@@ -161,6 +161,25 @@ design-craft        → візуальна продакшн
 
 ---
 
+## Версіювання
+
+Поточна версія: див. [`VERSION`](VERSION) (single source of truth).
+
+Формат: **`MAJOR.MINOR.PATCH`** (semver-light).
+- **PATCH** — кожна cloud-ітерація. ~12/добу на 2-годинному циклі.
+- **MINOR** — нова фіча, новий розділ доків.
+- **MAJOR** — брейкінг, pivot бренду. Не до релізу.
+
+Кожен bump = коміт + git tag + запис у [`CHANGELOG.md`](CHANGELOG.md).
+Стандарти комітів — у [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+**Дивитися історію змін:**
+- [CHANGELOG.md](CHANGELOG.md) — людиночитабельно
+- https://github.com/Rbit27/form/releases — теги і релізи
+- https://github.com/Rbit27/form/commits/main — коміт-стрім
+
+---
+
 ## Принципи (read this before contributing)
 
 1. **Жодних вигаданих цифр.** Цілі — окей. Результати — тільки коли є дані.
@@ -168,8 +187,11 @@ design-craft        → візуальна продакшн
 3. **Якщо фразу не можна сказати другу в гімі — її не каже Victor.**
 4. **Не пропускай два поспіль** — це принцип і для команди.
 
+Повні стандарти інженерної дисципліни — [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ---
 
 **Lead:** Claude (Opus 4.7) · координує команду
-**Owner:** користувач
-**Last update:** 14 травня 2026
+**Cloud iterator:** Claude (Sonnet 4.6) · кожні 2 години через [routine](https://claude.ai/code/routines/trig_01FYEjmyX5cwtRZtEWXWuLtf)
+**Owner:** Rbit27 (George)
+**Last update:** 14 травня 2026 · v0.2.1
