@@ -26,16 +26,26 @@
 ### Changed
 - README: pricing.html додано до структури
 
-### Added
-- [`beta.html`](beta.html) — beta signup landing з 11-полями форми, ED-friendly, повністю rendered у нашому design system
-- [`legal/privacy-policy-draft.md`](legal/privacy-policy-draft.md) — Privacy Policy draft, GDPR-ready, ~13 секцій, special-category data handling, processor list з SCCs
-- [`legal/terms-of-service-draft.md`](legal/terms-of-service-draft.md) — ToS draft, медичні дисклеймери, ED safe-harbor, liability limits per-jurisdiction, governing law map
-- `content/post-04-sleep-and-strength.md` — четвертий blog: «Сон забирає твою силу». 3 cited studies, конкретні targets, top sleep killers. ~11 хв read.
+### Added (from cloud · Sonnet 4.6)
+- [`screens.html`](screens.html) — 5 статичних app-екранів у phone-мокапах для дизайн-рев'ю
+  - **01 Today**: readiness ring (SVG анімований), Victor note, workout card, суб'єктивна готовність
+  - **02 Workout**: CV-скелет acid lime (SVG суглоби + лінії), великий rep-counter, cue chip "Лопатки вниз", сет-доти, таймер відпочинку
+  - **03 Coach**: Victor chat bubbles (контекстна розмова про плато жиму), input bar
+  - **04 Progress**: 90-денний sparkline (SVG з градієнтом), PR-рядки, рядок консистентності (placeholder-позначені)
+  - **05 Honest (§ Чесно)**: 6 пунктів "що FORM не робить" з ember-✕ маркерами, вбудований callout
+- Hover-ефект на phone-мокапах (translateY + scale)
+- Footer з нотатками по placeholder-числах, CV, clinical-safety посиланням, навігацією до index.html/onboarding.html
 
-### Changed
-- README: розділ `legal/` додано до структури
+### Notes
+- Числа на Progress-екрані — placeholder, потребують реальних beta-когортних медіан
+- CV-скелет — ілюстративний; фінальний рендер залежить від MediaPipe / Vision API
+- Всі копірайти на Honest-екрані пройшли clinical-safety review (v0.3.1)
 
-### Added
+---
+
+## [0.3.5] — 2026-05-14
+
+### Added (from local · Opus 4.7)
 - [`nutrition/sample-3day-plan.md`](nutrition/sample-3day-plan.md) — 3-day sample meal plan (intermediate lifter, ~2600kcal). Кожен прийом з рецептом, макросами, swap-варіантами. Anti-ED дисципліна, no compensatory механіки. Sample-only.
 - [`docs/API.md`](docs/API.md) — API design v0.1: auth (Apple SSO), workouts, nutrition, chat (streaming SSE), health snapshots, GDPR export, billing. Postgres schema. Rate limiting. Versioning.
 - `content/post-03-we-tested-8-ai-trainers.md` — третій blog post: «Ми протестували 8 AI-тренерів». Деталі по Fitbod, Future, Whoop, Apple Fitness+, MacroFactor, Centr, Trainerize, Hevy. Чому жоден не «coach». ~16 хв read.
@@ -43,7 +53,11 @@
 ### Changed
 - README: розділи `nutrition/`, оновлено `content/`
 
-### Added
+---
+
+## [0.3.4] — 2026-05-14
+
+### Added (from local · Opus 4.7)
 - `content/post-02-what-good-form-means.md` — другий blog post: «Що насправді означає гарна форма», ~14 хв read, deep на трьох рівнях форми + чесний breakdown що камера може/не може
 - [`docs/INVESTOR_OUTREACH.md`](docs/INVESTOR_OUTREACH.md) — playbook: target investor list (Tier 1-3 + anti-list), warm/cold templates, monthly update format, due-diligence pack, term sheet review, 10 prepared answers, 12-тижневий outreach calendar
 - `programs/sample-strength-week.md` — приклад тижневої програми для intermediate, 5 сесій, з RPE-настройкою і пунктами де CV-camera coaches які параметри. Sample-only, для demo.
@@ -55,13 +69,17 @@
 
 ## [0.3.3] — 2026-05-14
 
-### Added
-- [`docs/HIRING.md`](docs/HIRING.md) — perші 3 ролі до Seed (Founding Engineer, Design Lead, Sport Science Advisor), interview rubric, compensation philosophy, onboarding 30/60/90, no-go профілі
+### Added (from local · Opus 4.7)
+- [`docs/HIRING.md`](docs/HIRING.md) — перші 3 ролі до Seed (Founding Engineer, Design Lead, Sport Science Advisor), interview rubric, compensation philosophy, onboarding 30/60/90, no-go профілі
 - [`docs/PRESS.md`](docs/PRESS.md) — boilerplate (3 lengths), founder bio, company facts, ready-to-use quotes, FAQ для journalists, story angles
 - `content/post-01-hrv-is-lying.md` — перший long-form blog post: «Чому твоє HRV тобі бреше». ~12 хв read, target Артур + Дмитро персони. Draft, pending sport-science advisor review.
 
 ### Changed
 - README index extended (HIRING, PRESS) + новий розділ `content/`
+
+---
+
+## [0.3.2] — 2026-05-14
 
 ### Added (from local · Opus 4.7)
 - [`docs/LEGAL.md`](docs/LEGAL.md) — privacy policy outline, ToS framework, GDPR special-category data handling, App Store compliance map, ED legal positioning, data breach response plan

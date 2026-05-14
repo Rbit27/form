@@ -15,6 +15,7 @@ G:\Клод\form\
 ├─ onboarding.html         ← onboarding flow прототип, 8 екранів з ED-screening
 ├─ beta.html               ← beta signup landing з 11-полями форми
 ├─ pricing.html            ← цінова сторінка з toggle і порівнянням
+├─ screens.html            ← 5 статичних app-екранів у phone-мокапах (дизайн-референс)
 ├─ README.md               ← цей файл
 ├─ .claude\
 │  └─ agents\              ← команда субагентів
@@ -56,15 +57,11 @@ G:\Клод\form\
 content\
    ├─ post-01-hrv-is-lying.md            ← blog 1: «HRV тобі бреше» (draft)
    ├─ post-02-what-good-form-means.md    ← blog 2: «Що означає гарна форма» (draft)
-   ├─ post-03-we-tested-8-ai-trainers.md ← blog 3: «Ми протестували 8» (draft)
-   └─ post-04-sleep-and-strength.md      ← blog 4: «Сон забирає силу» (draft)
+   └─ post-03-we-tested-8-ai-trainers.md ← blog 3: «Ми протестували 8» (draft)
 programs\
    └─ sample-strength-week.md ← приклад тижня для intermediate
 nutrition\
    └─ sample-3day-plan.md     ← приклад 3-денного meal plan (anti-ED)
-legal\
-   ├─ privacy-policy-draft.md    ← Privacy Policy draft (GDPR-ready)
-   └─ terms-of-service-draft.md  ← ToS draft з jurisdiction map
 ```
 
 ---
@@ -177,7 +174,7 @@ design-craft        → візуальна продакшн
 - [x] App Store listing draft (5 screenshots, опис) · `marketing-lead` — [`docs/APP_STORE.md`](docs/APP_STORE.md) · v0.3.1
 - [x] Onboarding HTML-прототип з ED-screening · `ux-flow` + `clinical-safety` — [`onboarding.html`](onboarding.html) · v0.3.1
 - [ ] Прес-кіт сторінка · `content-strategist`
-- [ ] Mobile app static screens (Figma або HTML) · `design-craft`
+- [x] Mobile app static screens (HTML) · `design-craft` — [`screens.html`](screens.html) · v0.3.6
 
 ### Середньо (M2)
 - [ ] Стек-вибір і репозиторій · `platform-engineer`
@@ -225,4 +222,4 @@ design-craft        → візуальна продакшн
 **Lead:** Claude (Opus 4.7) · координує команду
 **Cloud iterator:** Claude (Sonnet 4.6) · кожні 2 години через [routine](https://claude.ai/code/routines/trig_01FYEjmyX5cwtRZtEWXWuLtf)
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.3.2
+**Last update:** 14 травня 2026 · v0.3.6
