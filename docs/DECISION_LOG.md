@@ -15,6 +15,27 @@
 
 ## 2026-05-14
 
+### DEC-027 · Assumptions Register як передумова до research sprint
+
+- **Decision:** Зафіксувати всі 30 product/market/tech assumptions явно ДО проведення інтерв'ю
+- **Owner:** research-lead + product-strategist
+- **Why:** RESEARCH.md описує як проводити інтерв'ю, але не що ми перевіряємо. Без explicit assumptions важко відстежити що змінилося після research і що треба pivotувати.
+- **Reverse cost:** Low (документ, не продуктове рішення)
+
+### DEC-026 · PostHog EU Cloud як analytics platform
+
+- **Decision:** PostHog (EU Cloud, Frankfurt) для всієї аналітики продукту
+- **Owner:** platform-engineer
+- **Why:** Cost (self-hostable fallback), privacy (GDPR EU-resident data), open-source (no vendor lock-in), iOS SDK зрілий. Mixpanel/Amplitude дорожчі і US-hosted за замовчуванням.
+- **Reverse cost:** Medium (65-event taxonomy і dashboards прив'язані до PostHog schema; міграція ≈ 2 спринти)
+
+### DEC-025 · FIRST_30_DAYS як primary execution sequencing framework
+
+- **Decision:** docs/FIRST_30_DAYS.md — єдина точка входу для першого місяця виконання
+- **Owner:** process-keeper + founder
+- **Why:** 40+ стратегічних документів без пріоритизації = paralysis. FIRST_30_DAYS синтезує RESEARCH + INVESTOR_OUTREACH + DEPLOYMENT + HIRING в послідовність тижнів.
+- **Reverse cost:** Low (framework, не зобов'язання; адаптується до реальних подій)
+
 ### DEC-024 · Twitter thread у Ukrainian або English?
 - **Decision:** English thread first, UA версія в наступний день
 - **Owner:** marketing-lead
