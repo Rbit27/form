@@ -16,6 +16,24 @@
 
 ---
 
+## [0.15.0] — 2026-05-14
+
+### Why MINOR
+- New HTML surface: `jobs.html` — dedicated careers page for FE + Design Lead hiring
+- Translates "JDs ready to post" into a shareable URL the founder can send to candidates and link from LinkedIn
+- Closes the gap between having JDs in markdown and having a designed hiring entry point
+
+### Added
+- [`jobs.html`](jobs.html) — 5-section careers page: Why FORM (4 values: mission, craft, equity, timing) / Open roles (FE iOS + Design Lead with requirements, hard-noes, compensation pills) / What We Value (6 principles from HIRING.md) / Interview Process (6 steps, honest timeline) / Compensation tables (salary + equity + benefits). Links to full JDs in `hiring/`. CTA: hiring@form.coach. Added to sitemap.xml with priority 0.8.
+
+### Changed
+- [`VERSION`](VERSION) — 0.14.0 → 0.15.0
+- [`sitemap.xml`](sitemap.xml) — jobs.html added (weekly, priority 0.8)
+- [`README.md`](README.md) — jobs.html in repo tree; HTML count 11→12; version refs → v0.15.0
+- [`STATUS.md`](STATUS.md) — jobs.html in pages table; version → v0.15.0; TL;DR → v0.15.0; "Apply JDs publicly" gap addressed
+
+---
+
 ## [0.14.0] — 2026-05-14
 
 ### Why MINOR

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Careers</title>
+<meta name="description" content="FORM is hiring a Founding Engineer (iOS) and Design Lead. Pre-product, Kyiv-first, full transparency. Founding equity, meaningful work, real craft bar." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { ink:'#0B0A07', deep:'#13110C', line:'#1F1D16', mute:'#6F6A60', dim:'#A39D8E', paper:'#F3EEE0', cream:'#E7DFC8', acid:'#DDFF2D', ember:'#FF5733' },
+    fontFamily: { serif:['Fraunces','serif'], sans:['Manrope','sans-serif'], mono:['JetBrains Mono','monospace'] }
+  }}};
+</script>
+<style>
+  html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; }
+  .display { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:0.86; }
+  .display em { font-style:italic; font-weight:300; }
+  .display b { font-weight:700; font-style:normal; }
+  .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+  .num { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  ::selection { background:#DDFF2D; color:#0B0A07; }
+  .grain::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.06;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:220px;
+  }
+  .btn-acid { background:#DDFF2D; color:#0B0A07; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:600; padding:16px 28px; border-radius:9999px; display:inline-block; transition:transform 0.15s, background 0.2s; }
+  .btn-acid:hover { background:#ECFF6B; transform:translateY(-1px); }
+  .btn-ghost { border:1px solid #1F1D16; color:#A39D8E; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:500; padding:14px 24px; border-radius:9999px; display:inline-block; transition:border-color 0.15s, color 0.15s; }
+  .btn-ghost:hover { border-color:#A39D8E; color:#F3EEE0; }
+  .stat-num { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:1; }
+  .role-card { border:1px solid #1F1D16; border-radius:12px; padding:40px; background:#13110C; transition:border-color 0.2s; }
+  .role-card:hover { border-color:#2D2B22; }
+  .value-item { border-top:1px solid #1F1D16; padding-top:24px; padding-bottom:8px; }
+  .step-num { font-family:'JetBrains Mono',monospace; font-size:11px; color:#6F6A60; letter-spacing:0.18em; }
+  .pill { display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:5px 12px; border-radius:9999px; border:1px solid #1F1D16; color:#A39D8E; }
+  .pill-acid { background:#DDFF2D; color:#0B0A07; border-color:#DDFF2D; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; padding:5px 12px; border-radius:9999px; display:inline-block; font-weight:600; }
+  .divider { border-top:1px solid #1F1D16; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<header class="border-b border-line">
+  <div class="max-w-[1480px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-[12px] font-mono tracking-widest uppercase text-mute">
+      <a href="/" class="hover:text-paper">Demo</a>
+      <a href="/pricing.html" class="hover:text-paper">Pricing</a>
+      <a href="/about.html" class="hover:text-paper">About</a>
+      <a href="/press.html" class="hover:text-paper">Press</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+    </nav>
+    <a href="mailto:hiring@form.coach" class="btn-ghost">hiring@form.coach</a>
+  </div>
+</header>
+
+<div class="fixed top-1/2 -translate-y-1/2 -left-40 w-[600px] h-[600px] bg-acid/8 blur-[140px] rounded-full pointer-events-none"></div>
+<div class="fixed -bottom-32 right-0 w-[500px] h-[500px] bg-ember/8 blur-[160px] rounded-full pointer-events-none"></div>
+
+<!-- Hero -->
+<section class="relative pt-32 pb-20 px-8">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ Careers · Kyiv + remote · 2026</div>
+    <h1 class="display text-paper text-[clamp(72px,12vw,200px)] mb-12">
+      Join<br><em>FORM.</em>
+    </h1>
+    <p class="text-dim text-xl leading-relaxed max-w-[700px] mb-10">
+      We're building an AI personal trainer that watches your form, adapts to your recovery, and coaches you with a voice that doesn't bullshit. Pre-product, two open roles, <span class="text-paper font-semibold">founding equity on the table.</span> Kyiv-first. Build-in-public.
+    </p>
+    <div class="flex flex-wrap gap-4">
+      <a href="mailto:hiring@form.coach" class="btn-acid">Email hiring@form.coach →</a>
+      <a href="#roles" class="btn-ghost">Open Roles ↓</a>
+      <a href="#process" class="btn-ghost">Interview Process ↓</a>
+      <a href="https://github.com/Rbit27/form" class="btn-ghost" target="_blank" rel="noopener">GitHub →</a>
+    </div>
+  </div>
+</section>
+
+<!-- Stats bar -->
+<section class="border-y border-line py-10 px-8">
+  <div class="max-w-[1480px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
+    <div>
+      <div class="stat-num text-paper text-5xl mb-2">1</div>
+      <div class="label">Human founder</div>
+    </div>
+    <div>
+      <div class="stat-num text-paper text-5xl mb-2">14</div>
+      <div class="label">AI agents on team</div>
+    </div>
+    <div>
+      <div class="stat-num text-acid text-5xl mb-2">2</div>
+      <div class="label">Open roles now</div>
+    </div>
+    <div>
+      <div class="stat-num text-paper text-5xl mb-2">Q3</div>
+      <div class="label">TestFlight beta target</div>
+    </div>
+  </div>
+</section>
+
+<!-- § 01 Why FORM -->
+<section class="py-24 px-8">
+  <div class="max-w-[1480px] mx-auto">
+    <div class="label mb-12">§ 01 · Why FORM</div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+      <div class="border border-line rounded-xl p-8 bg-deep">
+        <div class="w-8 h-8 rounded-full bg-acid/10 flex items-center justify-center mb-6">
+          <div class="w-2 h-2 bg-acid rounded-full"></div>
+        </div>
+        <h3 class="font-serif text-paper text-2xl mb-4 leading-tight">The mission doesn't<br><em>exploit users.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">We built the clinical-safety layer first — not as an afterthought or compliance checkbox. No shame, no before/after framing, no metrics that make users feel bad. Health technology that respects the person using it.</p>
+      </div>
+
+      <div class="border border-line rounded-xl p-8 bg-deep">
+        <div class="w-8 h-8 rounded-full bg-acid/10 flex items-center justify-center mb-6">
+          <div class="w-2 h-2 bg-acid rounded-full"></div>
+        </div>
+        <h3 class="font-serif text-paper text-2xl mb-4 leading-tight">The craft bar is<br><em>unusually high.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">Every HTML prototype, every doc, every line of copy is reviewed for AI-slop aesthetics. We have a brand-system agent that enforces token consistency. A brand-voice agent that catches anything Victor wouldn't actually say. If you care about craft, you'll care about working here.</p>
+      </div>
+
+      <div class="border border-line rounded-xl p-8 bg-deep">
+        <div class="w-8 h-8 rounded-full bg-acid/10 flex items-center justify-center mb-6">
+          <div class="w-2 h-2 bg-acid rounded-full"></div>
+        </div>
+        <h3 class="font-serif text-paper text-2xl mb-4 leading-tight">The equity is<br><em>real founding equity.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">Founding Engineer: 1.5–3.0%. Design Lead: 1.0–2.0%. 4-year vest, 1-year cliff, standard terms. You're not "early employee #47." You're the first two humans on this team. That means the equity reflects it.</p>
+      </div>
+
+      <div class="border border-line rounded-xl p-8 bg-deep">
+        <div class="w-8 h-8 rounded-full bg-acid/10 flex items-center justify-center mb-6">
+          <div class="w-2 h-2 bg-acid rounded-full"></div>
+        </div>
+        <h3 class="font-serif text-paper text-2xl mb-4 leading-tight">The timing means<br><em>you shape it.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">Pre-product means you choose the architecture. You make the decisions that compound for years. The roadmap exists, the strategy is documented, the platform is planned — but the execution is yours to define. If you want to inherit a system, this isn't the role. If you want to build one, it is.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- § 02 Open Roles -->
+<section id="roles" class="py-24 px-8 border-t border-line">
+  <div class="max-w-[1480px] mx-auto">
+    <div class="label mb-12">§ 02 · Open Roles</div>
+
+    <!-- Role 01: Founding Engineer -->
+    <div class="role-card mb-8">
+      <div class="flex flex-wrap items-start justify-between gap-6 mb-10">
+        <div>
+          <div class="label mb-3">Role 01 · Engineering</div>
+          <h2 class="font-serif text-paper text-4xl md:text-5xl font-light leading-tight">Founding Engineer<br><em>(iOS)</em></h2>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <span class="pill-acid">Open</span>
+          <span class="pill">Kyiv-first</span>
+          <span class="pill">$90–130k</span>
+          <span class="pill">1.5–3.0% equity</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+        <div>
+          <div class="label mb-4">What you'll build</div>
+          <ul class="space-y-2 text-dim text-sm leading-relaxed">
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>iOS app from scratch (SwiftUI, clean architecture)</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>Real-time CV pipeline for 8 base lifts (Apple Vision, AVFoundation, CoreML)</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>HealthKit + HRV integration for recovery-aware programming</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>Victor AI voice via ElevenLabs + streaming response pipeline</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>StoreKit 2 subscription flow (3-click cancel — our promise)</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>Backend via Cloudflare Workers + Supabase</span></li>
+          </ul>
+        </div>
+        <div>
+          <div class="label mb-4">You'll thrive here if</div>
+          <ul class="space-y-2 text-dim text-sm leading-relaxed">
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>5+ years iOS (Swift, SwiftUI) with consumer app shipped to App Store</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>Have touched AVFoundation, Vision framework, or CoreML in production</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>Can show public work — GitHub, App Store, side project — that reveals your style</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>Lift, run, or train seriously. You'll use this product daily.</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>Comfortable with ambiguity. Product spec exists; architecture decisions are yours.</span></li>
+          </ul>
+        </div>
+        <div>
+          <div class="label mb-4">Hard no if</div>
+          <ul class="space-y-2 text-dim text-sm leading-relaxed">
+            <li class="flex gap-2"><span class="text-ember mt-0.5">—</span><span>Only enterprise or B2B iOS experience (different muscle)</span></li>
+            <li class="flex gap-2"><span class="text-ember mt-0.5">—</span><span>Can't show work publicly. We need to see your decisions, not your titles.</span></li>
+            <li class="flex gap-2"><span class="text-ember mt-0.5">—</span><span>Interested in "AI startup" as category, not this specific problem</span></li>
+            <li class="flex gap-2"><span class="text-ember mt-0.5">—</span><span>Needs process and structure to be productive. We have docs, not managers.</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="divider pt-8 flex flex-wrap gap-4">
+        <a href="/hiring/jd-founding-engineer-ios.md" class="btn-acid" target="_blank">Full JD →</a>
+        <a href="mailto:hiring@form.coach?subject=Founding%20Engineer%20application" class="btn-ghost">Apply — hiring@form.coach</a>
+      </div>
+    </div>
+
+    <!-- Role 02: Design Lead -->
+    <div class="role-card">
+      <div class="flex flex-wrap items-start justify-between gap-6 mb-10">
+        <div>
+          <div class="label mb-3">Role 02 · Design</div>
+          <h2 class="font-serif text-paper text-4xl md:text-5xl font-light leading-tight">Design<br><em>Lead</em></h2>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <span class="pill-acid">Open</span>
+          <span class="pill">Kyiv-first</span>
+          <span class="pill">$80–115k</span>
+          <span class="pill">1.0–2.0% equity</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+        <div>
+          <div class="label mb-4">What you'll build</div>
+          <ul class="space-y-2 text-dim text-sm leading-relaxed">
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>Production design system in Figma — variables, tokens, auto-layout, no shortcuts</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>Xcode-ready component library matching SwiftUI constraints</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>Translate 11 HTML prototypes into production-grade iOS screens</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>Motion / interaction design for CV feedback animations</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>UX copy ownership (with brand-voice review, not replacement)</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">—</span><span>Keep the editorial-brutalist aesthetic from prototype to shipped product</span></li>
+          </ul>
+        </div>
+        <div>
+          <div class="label mb-4">You'll thrive here if</div>
+          <ul class="space-y-2 text-dim text-sm leading-relaxed">
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>5+ years product design with shipped iOS consumer apps</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>Figma expertise to variable/token depth — you'd set the system others use</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>Typography-sensitive: difference between Inter and Manrope is obvious to you</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>Writes UX copy that fits the brand voice without supervision</span></li>
+            <li class="flex gap-2"><span class="text-acid mt-0.5">+</span><span>Uses the fitness products they design. Test-user relationship with own work.</span></li>
+          </ul>
+        </div>
+        <div>
+          <div class="label mb-4">Hard no if</div>
+          <ul class="space-y-2 text-dim text-sm leading-relaxed">
+            <li class="flex gap-2"><span class="text-ember mt-0.5">—</span><span>Dribbble portfolio, no shipped iOS products. Craft ≠ shipped craft.</span></li>
+            <li class="flex gap-2"><span class="text-ember mt-0.5">—</span><span>Design-system maintainer only — we need someone who still designs features</span></li>
+            <li class="flex gap-2"><span class="text-ember mt-0.5">—</span><span>Not interested in the fitness / health domain personally</span></li>
+            <li class="flex gap-2"><span class="text-ember mt-0.5">—</span><span>Needs visual direction before starting — we need the person setting the direction</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="divider pt-8 flex flex-wrap gap-4">
+        <a href="/hiring/jd-design-lead.md" class="btn-acid" target="_blank">Full JD →</a>
+        <a href="mailto:hiring@form.coach?subject=Design%20Lead%20application" class="btn-ghost">Apply — hiring@form.coach</a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- § 03 What We Value -->
+<section class="py-24 px-8 border-t border-line">
+  <div class="max-w-[1480px] mx-auto">
+    <div class="label mb-12">§ 03 · What We Value</div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
+
+      <div class="value-item border-r-0 md:border-r border-line pr-0 md:pr-12 mb-8 md:mb-0 md:pb-0">
+        <div class="label text-acid mb-3">01</div>
+        <h3 class="font-serif text-paper text-2xl mb-3 leading-tight">Craft over<br><em>output velocity.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">Shipping fast and shipping well are different things. We don't measure PRs per week. We measure whether the thing we shipped is actually good. Speed will come when foundations are right.</p>
+      </div>
+
+      <div class="value-item border-r-0 lg:border-r border-line px-0 md:px-12 mb-8 lg:mb-0">
+        <div class="label text-acid mb-3">02</div>
+        <h3 class="font-serif text-paper text-2xl mb-3 leading-tight">Safety is the<br><em>product.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">clinical-safety has a hard veto on everything we ship. Not a review step — a block. This changes how we build. The guardrails are the brand, not the limitation.</p>
+      </div>
+
+      <div class="value-item border-line pl-0 lg:pl-12 mb-8 md:mb-0">
+        <div class="label text-acid mb-3">03</div>
+        <h3 class="font-serif text-paper text-2xl mb-3 leading-tight">Use what you<br><em>build.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">If you don't train, don't apply. Not because we require athletes — because building a product you'd personally use produces fundamentally better decisions than building for an imagined user.</p>
+      </div>
+
+      <div class="value-item border-r-0 md:border-r border-line pr-0 md:pr-12 mt-8">
+        <div class="label text-acid mb-3">04</div>
+        <h3 class="font-serif text-paper text-2xl mb-3 leading-tight">Direct, not<br><em>diplomatic.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">We expect disagreement. We expect it to be voiced clearly, not softened into ambiguity. Victor doesn't bullshit users. We don't bullshit each other.</p>
+      </div>
+
+      <div class="value-item border-r-0 lg:border-r border-line px-0 md:px-12 mt-8">
+        <div class="label text-acid mb-3">05</div>
+        <h3 class="font-serif text-paper text-2xl mb-3 leading-tight">Remote-first, not<br><em>remote-only.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">Async is default. Quarterly offsites — Kyiv, Lviv, or Berlin — are mandatory. Deep work needs space, but trust needs presence. We optimize for both.</p>
+      </div>
+
+      <div class="value-item pl-0 lg:pl-12 mt-8">
+        <div class="label text-acid mb-3">06</div>
+        <h3 class="font-serif text-paper text-2xl mb-3 leading-tight">No fabricated<br><em>numbers.</em></h3>
+        <p class="text-dim text-sm leading-relaxed">Goals are OK. Results only when data exists. This applies to our investor materials, our content, our product claims. If we don't have the data yet, we say so. We built-in-public for a reason.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- § 04 Interview Process -->
+<section id="process" class="py-24 px-8 border-t border-line">
+  <div class="max-w-[1480px] mx-auto">
+    <div class="label mb-12">§ 04 · Interview Process</div>
+    <div class="max-w-[800px]">
+      <p class="text-dim text-lg leading-relaxed mb-12">We aim for six steps over 2–3 weeks. No surprise rounds. No trick questions. We want to see your real work and judgment — not whether you can perform under artificial pressure.</p>
+
+      <div class="space-y-0">
+
+        <div class="border-t border-line py-8">
+          <div class="flex gap-6 items-start">
+            <div class="step-num mt-1 w-8 shrink-0">01</div>
+            <div>
+              <div class="text-paper font-semibold mb-2">Portfolio or work review (async)</div>
+              <p class="text-dim text-sm leading-relaxed">Send us work, not a CV. For engineers: a GitHub project, an App Store link, or a production codebase section you're proud of. For designers: a Figma file or shipped iOS screen with annotation of decisions you made. We review and respond within 3 business days.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-line py-8">
+          <div class="flex gap-6 items-start">
+            <div class="step-num mt-1 w-8 shrink-0">02</div>
+            <div>
+              <div class="text-paper font-semibold mb-2">30-min intro call (motivation + fit)</div>
+              <p class="text-dim text-sm leading-relaxed">What interests you about this problem specifically? What did you understand about FORM before this call? What would you want to build here that you couldn't build elsewhere? We're not checking enthusiasm — we're checking specificity.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-line py-8">
+          <div class="flex gap-6 items-start">
+            <div class="step-num mt-1 w-8 shrink-0">03</div>
+            <div>
+              <div class="text-paper font-semibold mb-2">Take-home (8 hours maximum)</div>
+              <p class="text-dim text-sm leading-relaxed">
+                <span class="text-paper">For engineers:</span> a minimal pose-detection prototype — use AVFoundation to capture video, detect a single body joint using Vision framework, log rep counts. Show your architecture decisions, not just output.<br/><br/>
+                <span class="text-paper">For designers:</span> redesign one section of our <a href="/index.html" class="text-acid hover:text-paper transition-colors">index.html</a> in Figma. Show the before, the decision rationale, the token structure you'd apply. Keep the editorial-brutalist aesthetic — or argue why it should change.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-line py-8">
+          <div class="flex gap-6 items-start">
+            <div class="step-num mt-1 w-8 shrink-0">04</div>
+            <div>
+              <div class="text-paper font-semibold mb-2">90-min deep technical / craft session</div>
+              <p class="text-dim text-sm leading-relaxed">Walk us through your take-home solution. Then we'll go deep on decisions: why this approach, what you'd do differently, how you'd scale it. For engineers, we may pair on a live extension of the prototype. For designers, we'll push on edge cases and dark patterns you might have missed.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-line py-8">
+          <div class="flex gap-6 items-start">
+            <div class="step-num mt-1 w-8 shrink-0">05</div>
+            <div>
+              <div class="text-paper font-semibold mb-2">60-min founder conversation</div>
+              <p class="text-dim text-sm leading-relaxed">George. No agenda beyond: how do you think? What would you change about what we've built? What would you build in the first 30 days? We want to understand your judgment, your taste, and whether you'd actually want to work here after seeing behind the curtain.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-line py-8">
+          <div class="flex gap-6 items-start">
+            <div class="step-num mt-1 w-8 shrink-0">06</div>
+            <div>
+              <div class="text-paper font-semibold mb-2">Reference checks + offer</div>
+              <p class="text-dim text-sm leading-relaxed">Three references: direct manager, peer, and if applicable a direct report. We'll ask about frustrations — not just strengths. If everything checks out, offer within 48 hours. Equity terms are transparent before the call, not a surprise at the end.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-line pt-8">
+          <p class="text-dim text-sm">Timeline: we aim to complete from first contact to offer in <span class="text-paper">2–3 weeks</span>. We'll tell you where you stand after every step. No ghosting.</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- § 05 Compensation -->
+<section class="py-24 px-8 border-t border-line">
+  <div class="max-w-[1480px] mx-auto">
+    <div class="label mb-12">§ 05 · Compensation</div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+
+      <div class="border border-line rounded-xl overflow-hidden">
+        <div class="bg-deep px-8 py-6 border-b border-line">
+          <div class="label mb-1">Founding Engineer (iOS)</div>
+          <div class="font-serif text-paper text-2xl">Role 01</div>
+        </div>
+        <div class="px-8 py-6 space-y-4">
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Base salary</span>
+            <span class="num text-paper">$90–130k USD</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Founding equity</span>
+            <span class="num text-acid font-semibold">1.5–3.0%</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Vesting schedule</span>
+            <span class="num text-paper text-sm">4yr / 1yr cliff</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Home-office budget</span>
+            <span class="num text-paper text-sm">$2,000</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Education / conferences</span>
+            <span class="num text-paper text-sm">$1,500/yr</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-dim text-sm">Health / gym allowance</span>
+            <span class="num text-paper text-sm">$1,000/yr</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="border border-line rounded-xl overflow-hidden">
+        <div class="bg-deep px-8 py-6 border-b border-line">
+          <div class="label mb-1">Design Lead</div>
+          <div class="font-serif text-paper text-2xl">Role 02</div>
+        </div>
+        <div class="px-8 py-6 space-y-4">
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Base salary</span>
+            <span class="num text-paper">$80–115k USD</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Founding equity</span>
+            <span class="num text-acid font-semibold">1.0–2.0%</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Vesting schedule</span>
+            <span class="num text-paper text-sm">4yr / 1yr cliff</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Home-office budget</span>
+            <span class="num text-paper text-sm">$2,000</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line pb-4">
+            <span class="text-dim text-sm">Education / conferences</span>
+            <span class="num text-paper text-sm">$1,500/yr</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-dim text-sm">Health / gym allowance</span>
+            <span class="num text-paper text-sm">$1,000/yr</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <p class="text-dim text-sm max-w-[700px] leading-relaxed">Compensation ranges reflect Kyiv top-of-market. Equity is standard 4-year / 1-year cliff. We may offer shorter cliff (6 months) for proven hires. All equity terms are disclosed before the offer call — no surprises. Cap table available on request under NDA after first call.</p>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="py-32 px-8 border-t border-line">
+  <div class="max-w-[1100px] mx-auto text-center">
+    <div class="label mb-8">Apply</div>
+    <h2 class="display text-paper text-[clamp(60px,10vw,160px)] mb-10">
+      Send<br><em>your work.</em>
+    </h2>
+    <p class="text-dim text-xl max-w-[600px] mx-auto mb-12 leading-relaxed">
+      No long cover letter required. Show us something you built and tell us why FORM specifically — not "AI startup" generally. We read everything.
+    </p>
+    <div class="flex flex-wrap gap-4 justify-center mb-8">
+      <a href="mailto:hiring@form.coach" class="btn-acid">Email hiring@form.coach →</a>
+      <a href="https://github.com/Rbit27/form" class="btn-ghost" target="_blank" rel="noopener">Read the public repo →</a>
+    </div>
+    <p class="text-mute text-sm font-mono">Response within 3 business days. Always.</p>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="border-t border-line py-12 px-8">
+  <div class="max-w-[1480px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <span class="font-serif text-paper">FORM<span class="text-acid">.</span></span>
+      <span class="text-mute text-sm font-mono ml-4">Pre-product · Kyiv · 2026 · v0.15.0</span>
+    </div>
+    <nav class="flex flex-wrap gap-6 text-[11px] font-mono tracking-widest uppercase text-mute">
+      <a href="/" class="hover:text-paper transition-colors">Home</a>
+      <a href="/about.html" class="hover:text-paper transition-colors">About</a>
+      <a href="/beta.html" class="hover:text-paper transition-colors">Beta</a>
+      <a href="/press.html" class="hover:text-paper transition-colors">Press</a>
+      <a href="/investors.html" class="hover:text-paper transition-colors">Investors</a>
+      <a href="https://github.com/Rbit27/form" class="hover:text-paper transition-colors" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+    <div class="text-mute text-sm font-mono">hiring@form.coach</div>
+  </div>
+</footer>
+
+</body>
+</html>

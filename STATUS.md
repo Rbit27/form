@@ -1,7 +1,7 @@
-# FORM · Project Status v0.14.0
+# FORM · Project Status v0.15.0
 
 **Date:** 14 травня 2026
-**Version:** 0.14.0
+**Version:** 0.15.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.14.0 with 30+ tagged releases, 11 functional HTML marketing/product pages (including a dedicated investor one-pager at `investors.html`), 43+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content, community), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with 27 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v0.15.0 with 31+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 43+ markdown documents covering every operational domain, 9 blog posts ready for distribution, a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, and a public GitHub repo with 27 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -30,6 +30,7 @@ FORM is at v0.14.0 with 30+ tagged releases, 11 functional HTML marketing/produc
 | [`press.html`](press.html) | Full HTML press kit | v0.6.0 ✓ |
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
+| [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
 
 ### Strategic documentation (markdown у `docs/`)
 
@@ -182,7 +183,8 @@ Now (May 14, 2026)
 ├── v0.12.0 — 4-week execution playbook (FIRST_30_DAYS.md)
 ├── v0.13.0 — 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) + DEC-025/026/027
 ├── v0.14.0 — investor one-pager HTML page (investors.html)
-├── Public GitHub repo з 30+ versions tagged
+├── v0.15.0 — careers page HTML (jobs.html) — FE + Design Lead open roles
+├── Public GitHub repo з 31+ versions tagged
 └── All strategic docs published
 
 Next 2 weeks
@@ -232,7 +234,7 @@ M10-M12 (Q2 2027)
 ## What's working well
 
 1. **Documentation discipline.** Every decision logged. Every doc versioned. Every tag pushed.
-2. **Brand consistency.** Editorial-brutalist aesthetic holds across 11 HTML pages.
+2. **Brand consistency.** Editorial-brutalist aesthetic holds across 12 HTML pages.
 3. **Safety-first design.** clinical-safety VETO has shaped many decisions positively.
 4. **Operational thinking.** Не just product — full operational playbook (support, ops, B2B, hiring, legal, finance).
 5. **Build-in-public.** Public repo з transparent decision-making.
@@ -251,7 +253,8 @@ M10-M12 (Q2 2027)
 
 ## What's next (immediate)
 
-- [ ] Apply Founding Engineer + Design Lead JDs publicly
+- [x] Careers page live → `jobs.html` (shareable URL for FE + DL hiring)
+- [ ] Apply Founding Engineer + Design Lead JDs on platforms (Djinni, DOU, LinkedIn, Wellfound)
 - [ ] Domain form.coach registered
 - [ ] Twitter / X account з first posts
 - [ ] Schedule 5 first user interviews
@@ -281,5 +284,5 @@ M10-M12 (Q2 2027)
 ---
 
 **Updated weekly.** Major changes → new version bump.
-**Last update:** 14 травня 2026 · v0.14.0
+**Last update:** 14 травня 2026 · v0.15.0
 **Next planned update:** після hire of Founding Engineer

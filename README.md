@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.14.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.15.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -14,7 +14,7 @@
 
 This is a **pre-product** project repository. There is no app code yet (mobile development begins з Founding Engineer hire). What you'll find:
 
-- **11 HTML product surfaces** — marketing site + product mockups + investor one-pager
+- **12 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page
 - **43+ markdown documents** — strategic, operational, content
 - **9 blog post drafts** — content engine ready для launch
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
@@ -30,7 +30,7 @@ If you're здесь з first time, start з [STATUS.md](STATUS.md) для curre
 
 ### For investors → [investors.html](investors.html), [docs/PITCH.md](docs/PITCH.md), [docs/FINANCIALS.md](docs/FINANCIALS.md), [docs/DATA_ROOM.md](docs/DATA_ROOM.md)
 ### For journalists → [press.html](press.html), [docs/PRESS.md](docs/PRESS.md), [content/press-pitch-templates.md](content/press-pitch-templates.md)
-### For potential hires → [hiring/](hiring/), [docs/HIRING.md](docs/HIRING.md)
+### For potential hires → [jobs.html](jobs.html), [hiring/](hiring/), [docs/HIRING.md](docs/HIRING.md)
 ### For builders / advisors → [docs/TECHNICAL.md](docs/TECHNICAL.md), [docs/API.md](docs/API.md)
 ### Просто цікавий? → [about.html](about.html) і [content/](content/) blogs
 
@@ -52,10 +52,11 @@ G:\\Клод\\form\\
 ├── press.html              ← HTML press kit (boilerplate, quotes, story angles)
 ├── workout-live.html       ← detailed workout mockup з CV
 ├── investors.html          ← investor one-pager (noindex — share directly)
+├── jobs.html               ← careers page — FE + Design Lead open roles
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
-├── VERSION                 ← single source of truth (0.14.0)
+├── VERSION                 ← single source of truth (0.15.0)
 ├── CHANGELOG.md            ← Keep-a-Changelog format
 ├── CONTRIBUTING.md         ← engineering standards
 ├── STATUS.md               ← project snapshot
@@ -243,12 +244,12 @@ Each iteration:
 
 ---
 
-## Метрики проєкту (як of v0.14.0)
+## Метрики проєкту (як of v0.15.0)
 
 | Metric | Value |
 |---|---|
-| Tagged releases | 30+ |
-| HTML pages | 11 |
+| Tagged releases | 31+ |
+| HTML pages | 12 |
 | Markdown documents | 43+ |
 | Blog posts (drafts) | 9 |
 | Social content assets | 4 (Twitter, LinkedIn, Reddit, press pitches) |
@@ -324,4 +325,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.14.0
+**Last update:** 14 травня 2026 · v0.15.0
