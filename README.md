@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.16.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.17.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -15,7 +15,7 @@
 This is a **pre-product** project repository. There is no app code yet (mobile development begins з Founding Engineer hire). What you'll find:
 
 - **12 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page
-- **43+ markdown documents** — strategic, operational, content
+- **44+ markdown documents** — strategic, operational, content
 - **9 blog post drafts** — content engine ready для launch
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **5 sample programs/nutrition plans** — sport-science discipline reference
@@ -56,7 +56,7 @@ G:\\Клод\\form\\
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
-├── VERSION                 ← single source of truth (0.16.0)
+├── VERSION                 ← single source of truth (0.17.0)
 ├── CHANGELOG.md            ← Keep-a-Changelog format
 ├── CONTRIBUTING.md         ← engineering standards
 ├── STATUS.md               ← project snapshot
@@ -103,6 +103,7 @@ G:\\Клод\\form\\
 │   ├── ANALYTICS_SETUP.md   — PostHog instrumentation guide: 65 events, W-ACSU, dashboards
 │   ├── FIRST_30_DAYS.md     — 4-week execution playbook (domain → interviews → investor → FE hire)
 │   ├── ASSUMPTIONS_REGISTER.md — 30 pre-research assumptions з confidence + pivot criteria
+│   ├── ADVISORY_BOARD.md    — 4 advisor profiles, outreach templates, compensation, timeline
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
 ├── content/                ← 9 blog posts + social
@@ -250,9 +251,9 @@ Each iteration:
 
 | Metric | Value |
 |---|---|
-| Tagged releases | 32+ |
+| Tagged releases | 33+ |
 | HTML pages | 12 |
-| Markdown documents | 43+ |
+| Markdown documents | 44+ |
 | Blog posts (drafts) | 9 |
 | Social content assets | 6 (Twitter, LinkedIn, Reddit, press pitches, 2 newsletter issues) |
 | Total lines committed | 22,000+ |
@@ -327,4 +328,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.16.0
+**Last update:** 14 травня 2026 · v0.17.0
