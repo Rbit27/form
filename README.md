@@ -1,0 +1,175 @@
+# FORM
+
+> Тренер. У кишені.
+> AI-тренер з real-time аналізом техніки, адаптивним плануванням і голосом, який поважає тебе.
+
+**Status:** v0.2 · Closed Beta planning · Київ 2026
+
+---
+
+## Структура
+
+```
+G:\Клод\form\
+├─ index.html              ← marketing-сайт прототип (відкрити в браузері)
+├─ README.md               ← цей файл
+├─ .claude\
+│  └─ agents\              ← команда субагентів
+│     ├─ README.md         ← склад команди + workflow
+│     ├─ product-strategist.md
+│     ├─ sports-scientist.md
+│     ├─ nutrition-coach.md
+│     ├─ clinical-safety.md       ← HARD VETO
+│     ├─ platform-engineer.md
+│     ├─ brand-voice.md
+│     ├─ design-craft.md
+│     ├─ ux-flow.md
+│     ├─ brand-system.md
+│     ├─ marketing-lead.md
+│     ├─ growth-lead.md
+│     ├─ content-strategist.md
+│     ├─ research-lead.md
+│     └─ process-keeper.md
+└─ docs\
+   ├─ BRAND.md             ← бренд-бук v0.1
+   ├─ FLOWS.md             ← user flows v0.1
+   └─ MARKETING.md         ← GTM strategy v0.1
+```
+
+---
+
+## Команда (14 субагентів)
+
+### Продукт і безпека (5)
+- `product-strategist` — scope, moat, чесність цифр
+- `sports-scientist` — програми, HRV, періодизація
+- `nutrition-coach` — харчування, ED-обережність
+- `clinical-safety` — **HARD VETO** на все шкідливе
+- `platform-engineer` — CV, носимі, реальність
+
+### Дизайн і ремесло (3)
+- `design-craft` — UI, типографіка, motion
+- `brand-system` — бренд-бук, токени, application
+- `ux-flow` — флоу, IA, edge cases
+
+### Голос (1)
+- `brand-voice` — копірайт, тон Victor, UA/EN
+
+### Зростання (3)
+- `marketing-lead` — позиціонування, GTM
+- `growth-lead` — funnel, retention, NSM
+- `content-strategist` — контент-маркетинг
+
+### Дослідження і координація (2)
+- `research-lead` — інтерв'ю, JTBD, валідація
+- `process-keeper` — decision log, dependencies
+
+---
+
+## Як працювати
+
+### Запустити цикл `/loop`
+
+Якщо хочеш, щоб я працював над FORM без перерви — викликай:
+
+```
+/loop 25m продовжуй роботу над FORM по нашому roadmap
+```
+
+Кожні 25 хв я прокидаюся з контекстом, дивлюся що зроблено, продовжую.
+
+Без `/loop` — пишеш «далі», я виконую наступну ітерацію.
+
+### Default pipeline на нову фічу
+
+```
+research-lead       → чи є попит? (інтерв'ю)
+product-strategist  → scope, moat
+sports-scientist / nutrition-coach / platform-engineer
+                    → зміст + техніка
+clinical-safety     → VETO або fix-list
+brand-voice         → копірайт (UA + EN)
+clinical-safety     → ще раз, копірайт
+design-craft        → UI mock
+ux-flow             → флоу + edge cases
+brand-system        → застосування токенів
+ship
+```
+
+### Default pipeline на маркетинг
+
+```
+marketing-lead      → позиціонування, аудиторія
+content-strategist  → план контенту
+brand-voice         → копірайт
+clinical-safety     → анти-shame review
+growth-lead         → funnel + метрики
+design-craft        → візуальна продакшн
+```
+
+---
+
+## Що зроблено · v0.2 (травень 2026)
+
+**Маркетинг-сайт прототип** ([index.html](index.html))
+- Editorial-естетика: Fraunces + Manrope + JBMono
+- 5 інтерактивних екранів продукту в phone-мокапі
+- Голос Victor через секцію Voice
+- Bento-система фіч
+- Секція «Чесно» — що FORM НЕ робить
+- Реалістична CTA з UA / Західна ЄС pricing
+
+**Бренд-бук** ([docs/BRAND.md](docs/BRAND.md))
+- Назва, лого, токени кольору, типографіка, мотіон
+- Voice rules + персони
+- Заборони чітким списком
+
+**User flows** ([docs/FLOWS.md](docs/FLOWS.md))
+- Onboarding (ED-screening non-skippable)
+- Daily ritual, Workout (live CV), Meals (anti-shame), Chat, Progress
+- Settings, Cancel-flow без friction
+- Push cadence ≤ 2/день, quiet hours 22:00–07:00
+
+**Marketing & GTM** ([docs/MARKETING.md](docs/MARKETING.md))
+- Позиціонування і JTBD
+- Аудиторія: primary / secondary / tertiary
+- Канали ранжовано: Reddit, YouTube, ASO, X. **Paid стоп до M4.**
+- 4-фазний GTM roadmap
+- Ціна: $9 UA / $19 Western, без free tier
+
+---
+
+## Що далі (відкритий roadmap)
+
+### Близько (наступні 2 тижні)
+- [ ] 30 user interviews · `research-lead`
+- [ ] App Store listing draft (5 screenshots, опис) · `marketing-lead` + `design-craft`
+- [ ] Onboarding HTML-прототип з ED-screening · `ux-flow`
+- [ ] Прес-кіт сторінка · `content-strategist`
+- [ ] Mobile app static screens (Figma або HTML) · `design-craft`
+
+### Середньо (M2)
+- [ ] Стек-вибір і репозиторій · `platform-engineer`
+- [ ] CV pose pipeline спайк (MediaPipe vs Vision на iOS) · `platform-engineer`
+- [ ] Newsletter setup + перші 2 пости · `content-strategist`
+- [ ] Beta sign-up форма + auto-respond email · `growth-lead`
+
+### Далеко (M3+)
+- [ ] TestFlight closed beta · 200 users
+- [ ] Cohort analysis · перші реальні цифри
+- [ ] Paid тест якщо unit econ працює
+
+---
+
+## Принципи (read this before contributing)
+
+1. **Жодних вигаданих цифр.** Цілі — окей. Результати — тільки коли є дані.
+2. **`clinical-safety` має право зупинити будь-що.** Не консультант — блок.
+3. **Якщо фразу не можна сказати другу в гімі — її не каже Victor.**
+4. **Не пропускай два поспіль** — це принцип і для команди.
+
+---
+
+**Lead:** Claude (Opus 4.7) · координує команду
+**Owner:** користувач
+**Last update:** 14 травня 2026
