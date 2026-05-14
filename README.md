@@ -47,12 +47,16 @@ G:\Клод\form\
    ├─ HIRING.md            ← 3 ролі до Seed, interview rubric, compensation
    ├─ PRESS.md             ← press kit, boilerplate, founder bio, FAQ
    ├─ INVESTOR_OUTREACH.md ← target funds, templates, due-dilig pack
+   ├─ API.md               ← API design + Postgres schema + rate limits
    └─ FOUNDER.md           ← founder narrative · INTERNAL · not for agents
 content\
-   ├─ post-01-hrv-is-lying.md       ← blog 1: «HRV тобі бреше» (draft)
-   └─ post-02-what-good-form-means.md ← blog 2: «Що означає гарна форма» (draft)
+   ├─ post-01-hrv-is-lying.md            ← blog 1: «HRV тобі бреше» (draft)
+   ├─ post-02-what-good-form-means.md    ← blog 2: «Що означає гарна форма» (draft)
+   └─ post-03-we-tested-8-ai-trainers.md ← blog 3: «Ми протестували 8» (draft)
 programs\
    └─ sample-strength-week.md ← приклад тижня для intermediate
+nutrition\
+   └─ sample-3day-plan.md     ← приклад 3-денного meal plan (anti-ED)
 ```
 
 ---

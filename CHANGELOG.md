@@ -16,7 +16,15 @@
 
 ---
 
-## [0.3.4] — 2026-05-14
+## [0.3.5] — 2026-05-14
+
+### Added
+- [`nutrition/sample-3day-plan.md`](nutrition/sample-3day-plan.md) — 3-day sample meal plan (intermediate lifter, ~2600kcal). Кожен прийом з рецептом, макросами, swap-варіантами. Anti-ED дисципліна, no compensatory механіки. Sample-only.
+- [`docs/API.md`](docs/API.md) — API design v0.1: auth (Apple SSO), workouts, nutrition, chat (streaming SSE), health snapshots, GDPR export, billing. Postgres schema. Rate limiting. Versioning.
+- `content/post-03-we-tested-8-ai-trainers.md` — третій blog post: «Ми протестували 8 AI-тренерів». Деталі по Fitbod, Future, Whoop, Apple Fitness+, MacroFactor, Centr, Trainerize, Hevy. Чому жоден не «coach». ~16 хв read.
+
+### Changed
+- README: розділи `nutrition/`, оновлено `content/`
 
 ### Added
 - `content/post-02-what-good-form-means.md` — другий blog post: «Що насправді означає гарна форма», ~14 хв read, deep на трьох рівнях форми + чесний breakdown що камера може/не може
