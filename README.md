@@ -1,242 +1,316 @@
 # FORM
 
-> Тренер. У кишені.
-> AI-тренер з real-time аналізом техніки, адаптивним плануванням і голосом, який поважає тебе.
+> **Тренер. У кишені.**
+> AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.2 · Closed Beta planning · Київ 2026
+**Status:** v0.5.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Public repo:** https://github.com/Rbit27/form
+**Releases:** https://github.com/Rbit27/form/releases
+**Founder:** George (Rbit27)
 
 ---
 
-## Структура
+## What this repo contains
+
+This is a **pre-product** project repository. There is no app code yet (mobile development begins з Founding Engineer hire). What you'll find:
+
+- **9 HTML product surfaces** — marketing site + product mockups
+- **30+ markdown documents** — strategic, operational, content
+- **9 blog post drafts** — content engine ready для launch
+- **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
+- **5 sample programs/nutrition plans** — sport-science discipline reference
+- **14 specialized AI agents** — operating model embodied у `.claude/agents/`
+- **Public decision log** — 24 documented decisions з reverse-cost
+
+If you're здесь з first time, start з [STATUS.md](STATUS.md) для current snapshot.
+
+---
+
+## Quick navigation
+
+### For investors → [docs/PITCH.md](docs/PITCH.md), [docs/FINANCIALS.md](docs/FINANCIALS.md), [docs/DATA_ROOM.md](docs/DATA_ROOM.md)
+### For journalists → [docs/PRESS.md](docs/PRESS.md), [content/press-pitch-templates.md](content/press-pitch-templates.md)
+### For potential hires → [hiring/](hiring/), [docs/HIRING.md](docs/HIRING.md)
+### For builders / advisors → [docs/TECHNICAL.md](docs/TECHNICAL.md), [docs/API.md](docs/API.md)
+### Просто цікавий? → [about.html](about.html) і [content/](content/) blogs
+
+---
+
+## Repo structure
 
 ```
 G:\Клод\form\
-├─ index.html              ← marketing-сайт прототип (відкрити в браузері)
-├─ onboarding.html         ← onboarding flow прототип, 8 екранів з ED-screening
-├─ beta.html               ← beta signup landing з 11-полями форми
-├─ pricing.html            ← цінова сторінка з toggle і порівнянням
-├─ screens.html            ← 5 статичних app-екранів у phone-мокапах (дизайн-референс)
-├─ about.html              ← manifesto page · хто ми + 4 red lines
-├─ settings.html           ← Settings screen mockup (cancel у 3 кліки)
-├─ README.md               ← цей файл
-├─ .claude\
-│  └─ agents\              ← команда субагентів
-│     ├─ README.md         ← склад команди + workflow
-│     ├─ product-strategist.md
-│     ├─ sports-scientist.md
-│     ├─ nutrition-coach.md
-│     ├─ clinical-safety.md       ← HARD VETO
-│     ├─ platform-engineer.md
-│     ├─ brand-voice.md
-│     ├─ design-craft.md
-│     ├─ ux-flow.md
-│     ├─ brand-system.md
-│     ├─ marketing-lead.md
-│     ├─ growth-lead.md
-│     ├─ content-strategist.md
-│     ├─ research-lead.md
-│     └─ process-keeper.md
-└─ docs\
-   ├─ BRAND.md             ← бренд-бук v0.1
-   ├─ FLOWS.md             ← user flows v0.1
-   ├─ MARKETING.md         ← GTM strategy v0.1
-   ├─ APP_STORE.md         ← App Store listing draft v0.1 (5 screenshot-описи, keywords, A/B)
-   ├─ PITCH.md             ← investor pitch + one-pager v0.1
-   ├─ PERSONAS.md          ← 4 детальні user personas v0.1
-   ├─ TECHNICAL.md         ← архітектура + стек + CV-pipeline v0.1
-   ├─ FINANCIALS.md        ← unit economics + 3-year model v0.1
-   ├─ COMPETITIVE.md       ← deep teardown 8 конкурентів v0.1
-   ├─ RESEARCH.md          ← 30-інтерв'ю план + script v0.1
-   ├─ LEGAL.md             ← privacy + ToS + GDPR + App Store compliance
-   ├─ METRICS.md           ← NSM, funnel, dashboard, A/B test discipline
-   ├─ HIRING.md            ← 3 ролі до Seed, interview rubric, compensation
-   ├─ PRESS.md             ← press kit, boilerplate, founder bio, FAQ
-   ├─ INVESTOR_OUTREACH.md ← target funds, templates, due-dilig pack
-   ├─ API.md               ← API design + Postgres schema + rate limits
-   ├─ EMAIL_SEQUENCE.md    ← 18+ email templates, A-D sequences
-   ├─ BETA_PLAYBOOK.md     ← як run TestFlight beta operationally
-   ├─ SECURITY.md          ← threat model, 5-layer defense, breach response
-   ├─ OKRS_2026.md         ← Q3+Q4 OKRs з kill-criteria, scoring
-   ├─ DATA_ROOM.md         ← 4-tier investor data room map
-   ├─ LAUNCH_CHECKLIST.md  ← P0 launch gate з roll-back plan
-   └─ FOUNDER.md           ← founder narrative · INTERNAL · not for agents
-content\
-   ├─ post-01-hrv-is-lying.md            ← blog 1: «HRV тобі бреше» (draft)
-   ├─ post-02-what-good-form-means.md    ← blog 2: «Що означає гарна форма» (draft)
-   ├─ post-03-we-tested-8-ai-trainers.md ← blog 3: «Ми протестували 8» (draft)
-   ├─ post-04-sleep-and-strength.md      ← blog 4: «Сон забирає силу» (draft)
-   ├─ post-05-building-fitness-from-ukraine.md ← blog 5: «UA founder» (draft)
-   ├─ post-06-30-user-interviews.md      ← blog 6: «30 інтерв'ю» (draft template)
-   └─ twitter-launch-thread.md           ← 14-tweet launch thread (draft)
-programs\
-   └─ sample-strength-week.md ← приклад тижня для intermediate
-nutrition\
-   └─ sample-3day-plan.md     ← приклад 3-денного meal plan (anti-ED)
-legal\
-   ├─ privacy-policy-draft.md    ← Privacy Policy draft (GDPR-ready)
-   └─ terms-of-service-draft.md  ← ToS draft з jurisdiction map
-hiring\
-   ├─ jd-founding-engineer-ios.md   ← JD: iOS FE, $90-130k + 1.5-3% equity
-   ├─ jd-design-lead.md             ← JD: Design Lead, $80-115k + 1-2% equity
-   └─ jd-sport-science-advisor.md   ← JD: Sport Science Advisor (part-time)
+│
+├── index.html              ← marketing-сайт (open у browser)
+├── about.html              ← manifesto + 4 red lines
+├── beta.html               ← closed beta application
+├── pricing.html            ← geo-priced з comparison table
+├── faq.html                ← 30+ questions у 7 categories
+├── settings.html           ← app settings mockup
+├── screens.html            ← 5 app screen mockups (cloud)
+├── onboarding.html         ← 8-screen onboarding (cloud)
+├── workout-live.html       ← detailed workout mockup з CV
+├── sitemap.xml             ← SEO sitemap
+├── robots.txt              ← AI scraper blocked
+│
+├── VERSION                 ← single source of truth (0.5.0)
+├── CHANGELOG.md            ← Keep-a-Changelog format
+├── CONTRIBUTING.md         ← engineering standards
+├── STATUS.md               ← project snapshot
+├── README.md               ← this file
+│
+├── .claude/
+│   └── agents/             ← 14 specialized AI agents
+│
+├── docs/                   ← 30+ strategic documents
+│   ├── BRAND.md             — design tokens, voice, applications
+│   ├── FLOWS.md             — user flows з ED-screening
+│   ├── MARKETING.md         — GTM, channels, positioning
+│   ├── APP_STORE.md         — App Store listing draft (cloud)
+│   ├── PITCH.md             — 12-slide pitch + one-pager
+│   ├── PERSONAS.md          — 4 detailed personas
+│   ├── TECHNICAL.md         — architecture, CV-pipeline, latency
+│   ├── FINANCIALS.md        — unit economics, 3-year P&L
+│   ├── COMPETITIVE.md       — 8-product teardown
+│   ├── RESEARCH.md          — 30-interview plan + script
+│   ├── LEGAL.md             — privacy, ToS, GDPR framework
+│   ├── METRICS.md           — NSM (W-ACSU), AARRR, dashboards
+│   ├── HIRING.md            — first 3 roles, interview rubric
+│   ├── PRESS.md             — press kit з founder bio
+│   ├── INVESTOR_OUTREACH.md — target funds, templates
+│   ├── API.md               — API design + Postgres schema
+│   ├── EMAIL_SEQUENCE.md    — 18+ email templates
+│   ├── BETA_PLAYBOOK.md     — TestFlight beta operations
+│   ├── SECURITY.md          — threat model, 5-layer defense
+│   ├── OKRS_2026.md         — Q3+Q4 OKRs з kill-criteria
+│   ├── DATA_ROOM.md         — 4-tier investor materials
+│   ├── LAUNCH_CHECKLIST.md  — P0/P1/P2 launch gate
+│   ├── I18N.md              — localization plan
+│   ├── DECISION_LOG.md      — 24 documented decisions
+│   ├── ENGINEERING_RUNBOOK.md — on-call, deploy, monitoring
+│   ├── INVESTOR_UPDATE_TEMPLATE.md — monthly template
+│   ├── SUPPORT.md           — customer support playbook
+│   ├── B2B_PLAYBOOK.md      — corporate wellness (post-PMF)
+│   ├── CONTENT_CALENDAR.md  — 90-day editorial plan
+│   ├── DEPLOYMENT.md        — Cloudflare Pages deploy guide
+│   └── FOUNDER.md           ← founder narrative · INTERNAL
+│
+├── content/                ← 9 blog posts + social
+│   ├── post-01-hrv-is-lying.md
+│   ├── post-02-what-good-form-means.md
+│   ├── post-03-we-tested-8-ai-trainers.md
+│   ├── post-04-sleep-and-strength.md
+│   ├── post-05-building-fitness-from-ukraine.md
+│   ├── post-06-30-user-interviews.md
+│   ├── post-07-progressive-overload-myths.md
+│   ├── post-08-why-no-free-tier.md
+│   ├── post-09-building-victor-voice.md
+│   ├── twitter-launch-thread.md
+│   ├── press-pitch-templates.md
+│   └── reddit-launch-posts.md
+│
+├── programs/               ← sport-science deliverables
+│   ├── sample-strength-week.md
+│   ├── sample-deload-week.md
+│   └── sample-cycle-aware-week.md
+│
+├── nutrition/              ← nutrition-coach deliverables
+│   ├── sample-3day-plan.md
+│   └── sample-cutting-plan.md
+│
+├── legal/                  ← drafts pending counsel review
+│   ├── privacy-policy-draft.md
+│   └── terms-of-service-draft.md
+│
+└── hiring/                 ← ready-to-publish JDs
+    ├── jd-founding-engineer-ios.md
+    ├── jd-design-lead.md
+    └── jd-sport-science-advisor.md
 ```
 
 ---
 
-## Команда (14 субагентів)
+## The team (1 + 14)
 
-### Продукт і безпека (5)
-- `product-strategist` — scope, moat, чесність цифр
-- `sports-scientist` — програми, HRV, періодизація
-- `nutrition-coach` — харчування, ED-обережність
-- `clinical-safety` — **HARD VETO** на все шкідливе
-- `platform-engineer` — CV, носимі, реальність
+One human founder. 14 specialized AI agents с distinct mandates.
 
-### Дизайн і ремесло (3)
-- `design-craft` — UI, типографіка, motion
-- `brand-system` — бренд-бук, токени, application
-- `ux-flow` — флоу, IA, edge cases
+### Product + Safety (5)
+- **`product-strategist`** — scope, moat, honest claims · VETO на bloat
+- **`sports-scientist`** — programming, HRV, periodization
+- **`nutrition-coach`** — meal planning, anti-ED defaults
+- **`clinical-safety`** — ED, mental health, injury triage · **HARD VETO**
+- **`platform-engineer`** — CV, wearables, mobile reality check
 
-### Голос (1)
-- `brand-voice` — копірайт, тон Victor, UA/EN
+### Design + Voice (4)
+- **`design-craft`** — typography, motion, screen-level craft
+- **`brand-system`** — tokens, identity system, applications
+- **`brand-voice`** — Victor persona, UA/EN copy
+- **`ux-flow`** — flows, IA, edge cases, onboarding
 
-### Зростання (3)
-- `marketing-lead` — позиціонування, GTM
-- `growth-lead` — funnel, retention, NSM
-- `content-strategist` — контент-маркетинг
+### Growth (3)
+- **`marketing-lead`** — positioning, channels, message hierarchy
+- **`growth-lead`** — funnels, retention, NSM, A/B test discipline
+- **`content-strategist`** — content marketing, editorial calendar
 
-### Дослідження і координація (2)
-- `research-lead` — інтерв'ю, JTBD, валідація
-- `process-keeper` — decision log, dependencies
+### Research + Process (2)
+- **`research-lead`** — interviews, JTBD, persona validation
+- **`process-keeper`** — decision log, dependency tracking
+
+Full agent definitions у [.claude/agents/](.claude/agents/).
+
+---
+
+## Operating model
+
+### Default pipeline для нову фічу
+
+```
+research-lead       → чи є попит?
+product-strategist  → scope, moat
+sports-scientist / nutrition-coach / platform-engineer
+                    → content + technical
+clinical-safety     → VETO або fix-list  ← critical gate
+brand-voice         → копірайт (UA + EN)
+clinical-safety     → ще раз на copy
+design-craft        → UI mock
+ux-flow             → flows + edge cases
+brand-system        → token application
+ship
+```
+
+### Default pipeline для маркетингу
+
+```
+marketing-lead      → positioning, audience
+content-strategist  → content plan
+brand-voice         → copy
+clinical-safety     → anti-shame review
+growth-lead         → funnel + metrics
+design-craft        → visual production
+```
 
 ---
 
 ## Як працювати
 
-### Запустити цикл `/loop`
+### Solo session
 
-Якщо хочеш, щоб я працював над FORM без перерви — викликай:
+Pишеш «продовжуй» → я роблю наступну ітерацію.
 
-```
-/loop 25m продовжуй роботу над FORM по нашому roadmap
-```
+### Cloud routine (active)
 
-Кожні 25 хв я прокидаюся з контекстом, дивлюся що зроблено, продовжую.
+Sonnet 4.6 cloud-agent iterates every 2 години автоматично:
+- https://claude.ai/code/routines/trig_01FYEjmyX5cwtRZtEWXWuLtf
 
-Без `/loop` — пишеш «далі», я виконую наступну ітерацію.
+Each iteration:
+1. Pulls latest main
+2. Reads VERSION + CHANGELOG + STATUS
+3. Picks 1-3 roadmap items
+4. Bumps version, updates CHANGELOG
+5. Tags + pushes
 
-### Default pipeline на нову фічу
+### Versioning
 
-```
-research-lead       → чи є попит? (інтерв'ю)
-product-strategist  → scope, moat
-sports-scientist / nutrition-coach / platform-engineer
-                    → зміст + техніка
-clinical-safety     → VETO або fix-list
-brand-voice         → копірайт (UA + EN)
-clinical-safety     → ще раз, копірайт
-design-craft        → UI mock
-ux-flow             → флоу + edge cases
-brand-system        → застосування токенів
-ship
-```
+`MAJOR.MINOR.PATCH` (semver-light):
+- **PATCH** — кожна ітерація
+- **MINOR** — нова фіча или розділ доків
+- **MAJOR** — брейкінг чи pivot
 
-### Default pipeline на маркетинг
+Кожен bump = commit + git tag + CHANGELOG entry.
 
-```
-marketing-lead      → позиціонування, аудиторія
-content-strategist  → план контенту
-brand-voice         → копірайт
-clinical-safety     → анти-shame review
-growth-lead         → funnel + метрики
-design-craft        → візуальна продакшн
-```
+Стандарти у [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## Що зроблено · v0.2 (травень 2026)
-
-**Маркетинг-сайт прототип** ([index.html](index.html))
-- Editorial-естетика: Fraunces + Manrope + JBMono
-- 5 інтерактивних екранів продукту в phone-мокапі
-- Голос Victor через секцію Voice
-- Bento-система фіч
-- Секція «Чесно» — що FORM НЕ робить
-- Реалістична CTA з UA / Західна ЄС pricing
-
-**Бренд-бук** ([docs/BRAND.md](docs/BRAND.md))
-- Назва, лого, токени кольору, типографіка, мотіон
-- Voice rules + персони
-- Заборони чітким списком
-
-**User flows** ([docs/FLOWS.md](docs/FLOWS.md))
-- Onboarding (ED-screening non-skippable)
-- Daily ritual, Workout (live CV), Meals (anti-shame), Chat, Progress
-- Settings, Cancel-flow без friction
-- Push cadence ≤ 2/день, quiet hours 22:00–07:00
-
-**Marketing & GTM** ([docs/MARKETING.md](docs/MARKETING.md))
-- Позиціонування і JTBD
-- Аудиторія: primary / secondary / tertiary
-- Канали ранжовано: Reddit, YouTube, ASO, X. **Paid стоп до M4.**
-- 4-фазний GTM roadmap
-- Ціна: $9 UA / $19 Western, без free tier
-
----
-
-## Що далі (відкритий roadmap)
-
-### Близько (наступні 2 тижні)
-- [ ] 30 user interviews · `research-lead`
-- [x] App Store listing draft (5 screenshots, опис) · `marketing-lead` — [`docs/APP_STORE.md`](docs/APP_STORE.md) · v0.3.1
-- [x] Onboarding HTML-прототип з ED-screening · `ux-flow` + `clinical-safety` — [`onboarding.html`](onboarding.html) · v0.3.1
-- [ ] Прес-кіт сторінка · `content-strategist`
-- [x] Mobile app static screens (HTML) · `design-craft` — [`screens.html`](screens.html) · v0.3.6
-
-### Середньо (M2)
-- [ ] Стек-вибір і репозиторій · `platform-engineer`
-- [ ] CV pose pipeline спайк (MediaPipe vs Vision на iOS) · `platform-engineer`
-- [ ] Newsletter setup + перші 2 пости · `content-strategist`
-- [ ] Beta sign-up форма + auto-respond email · `growth-lead`
-
-### Далеко (M3+)
-- [ ] TestFlight closed beta · 200 users
-- [ ] Cohort analysis · перші реальні цифри
-- [ ] Paid тест якщо unit econ працює
-
----
-
-## Версіювання
-
-Поточна версія: див. [`VERSION`](VERSION) (single source of truth).
-
-Формат: **`MAJOR.MINOR.PATCH`** (semver-light).
-- **PATCH** — кожна cloud-ітерація. ~12/добу на 2-годинному циклі.
-- **MINOR** — нова фіча, новий розділ доків.
-- **MAJOR** — брейкінг, pivot бренду. Не до релізу.
-
-Кожен bump = коміт + git tag + запис у [`CHANGELOG.md`](CHANGELOG.md).
-Стандарти комітів — у [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-**Дивитися історію змін:**
-- [CHANGELOG.md](CHANGELOG.md) — людиночитабельно
-- https://github.com/Rbit27/form/releases — теги і релізи
-- https://github.com/Rbit27/form/commits/main — коміт-стрім
-
----
-
-## Принципи (read this before contributing)
+## Принципи
 
 1. **Жодних вигаданих цифр.** Цілі — окей. Результати — тільки коли є дані.
-2. **`clinical-safety` має право зупинити будь-що.** Не консультант — блок.
+2. **`clinical-safety` має VETO на все шкідливе.** Не консультант — блок.
 3. **Якщо фразу не можна сказати другу в гімі — її не каже Victor.**
-4. **Не пропускай два поспіль** — це принцип і для команди.
+4. **Не пропускай два поспіль** — і для продукту, і для команди.
 
 Повні стандарти інженерної дисципліни — [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ---
 
-**Lead:** Claude (Opus 4.7) · координує команду
-**Cloud iterator:** Claude (Sonnet 4.6) · кожні 2 години через [routine](https://claude.ai/code/routines/trig_01FYEjmyX5cwtRZtEWXWuLtf)
+## Метрики проєкту (як of v0.5.0)
+
+| Metric | Value |
+|---|---|
+| Tagged releases | 20+ |
+| HTML pages | 9 |
+| Markdown documents | 35+ |
+| Blog posts (drafts) | 9 |
+| Total lines committed | 18,000+ |
+| AI agents defined | 14 |
+| Documented decisions | 24 |
+| Days від v0.1.0 до v0.5.0 | 2 |
+
+---
+
+## What's next
+
+### Близько (M0-M1)
+- [ ] Deploy marketing site на form.coach (Cloudflare Pages, ~85 min setup)
+- [ ] Hire Founding Engineer (iOS)
+- [ ] Hire Design Lead
+- [ ] Conduct 30 user interviews
+- [ ] Get sport-science advisor signed
+
+### Mid (M2-M4)
+- [ ] iOS app development (auth, today, workout, meals, chat)
+- [ ] CV pipeline на 3 base lifts
+- [ ] TestFlight closed beta з 200 users
+- [ ] Counsel-reviewed legal docs
+- [ ] First investor conversations
+
+### Public launch (Q4 2026)
+- [ ] App Store release (UA + Western EU)
+- [ ] 8 blog posts published
+- [ ] First 2,000 paid subscribers
+- [ ] Seed round close ($1.5-2.5M target)
+
+Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
+
+---
+
+## How to read this repo
+
+If you read **one file**: [STATUS.md](STATUS.md)
+If you read **two**: + [docs/PITCH.md](docs/PITCH.md)
+If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
+
+Якщо ти **журналіст**: [docs/PRESS.md](docs/PRESS.md)
+Якщо ти **інвестор**: [docs/PITCH.md](docs/PITCH.md) → [docs/DATA_ROOM.md](docs/DATA_ROOM.md)
+Якщо ти **потенційний hire**: [hiring/](hiring/) → [docs/FOUNDER.md](docs/FOUNDER.md) (хоча це internal, можна спитати)
+Якщо ти **advisor**: [docs/TECHNICAL.md](docs/TECHNICAL.md) і [docs/METRICS.md](docs/METRICS.md)
+
+---
+
+## Contact
+
+- **Email:** hello@form.coach (TBD on domain setup)
+- **Press:** press@form.coach
+- **Hiring:** hiring@form.coach
+- **Investors:** invest@form.coach
+- **Privacy:** privacy@form.coach
+- **GitHub Issues:** https://github.com/Rbit27/form/issues
+
+---
+
+## Build-in-public commitment
+
+Цей repo — public source-of-truth. Decision log є transparent. Доки розвиваються відкрито.
+
+Те що ми **не** робимо public:
+- User data (privacy)
+- Confidential metrics post-launch (без consent)
+- Negotiation details з investors
+- Внутрішні founder notes ([docs/FOUNDER.md](docs/FOUNDER.md) есть у repo, but marked internal)
+
+---
+
+**Lead:** Claude (Opus 4.7, 1M context) · координує
+**Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.3.6
+**Last update:** 14 травня 2026 · v0.5.0

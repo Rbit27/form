@@ -16,6 +16,19 @@
 
 ---
 
+## [0.5.0] — 2026-05-14
+
+### Why MINOR
+- Repo полностью документований і structured для public consumption
+- README перероблений як справжній project entry point
+- Marketing site deployment-ready (sitemap + robots + DEPLOYMENT runbook)
+- Це milestone — кінець «documentation sprint» phase, готовність до hiring + execution phase
+
+### Changed
+- [`README.md`](README.md) — full overhaul. Quick-navigation by audience type, full repo structure tree з doc descriptions, team-as-code section, operating model pipelines, project metrics (20+ releases, 35+ docs, 9 blog posts), «how to read this repo» depending on visitor type, build-in-public commitment
+
+---
+
 ## [0.4.9] — 2026-05-14
 
 ### Added
