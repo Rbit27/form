@@ -1,7 +1,7 @@
-# FORM · Project Status v0.15.0
+# FORM · Project Status v0.16.0
 
 **Date:** 14 травня 2026
-**Version:** 0.15.0
+**Version:** 0.16.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.15.0 with 31+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 43+ markdown documents covering every operational domain, 9 blog posts ready for distribution, a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, and a public GitHub repo with 27 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v0.16.0 with 32+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 43+ markdown documents covering every operational domain, 9 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, and a public GitHub repo with 27 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -91,6 +91,8 @@ FORM is at v0.15.0 with 31+ tagged releases, 12 functional HTML pages (marketing
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
 | reddit-launch-posts.md | Social | 3 готові |
+| newsletter-01.md | Newsletter | draft · clinical-safety PASS |
+| newsletter-02.md | Newsletter | draft · clinical-safety PASS |
 
 ### Programs + Nutrition
 
@@ -158,6 +160,7 @@ FORM is at v0.15.0 with 31+ tagged releases, 12 functional HTML pages (marketing
 - [ ] Twitter / X account active
 - [x] Newsletter setup guide → `docs/NEWSLETTER.md`
 - [x] LinkedIn posts (12) ready → `content/linkedin-posts.md`
+- [x] Newsletter issues (2) drafted → `content/newsletter-01.md` + `content/newsletter-02.md` · clinical-safety PASS
 - [ ] Newsletter platform actually configured on Beehiiv
 - [ ] Reddit account з reputation built
 

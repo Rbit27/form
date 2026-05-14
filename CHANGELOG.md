@@ -16,6 +16,27 @@
 
 ---
 
+## [0.16.0] — 2026-05-14
+
+### Why MINOR
+- Two new content assets: `content/newsletter-01.md` + `content/newsletter-02.md`
+- First full newsletter issues ready to publish on Beehiiv — closes the "перші 2 пости" gap from NEWSLETTER.md
+- Closes the last "Newsletter setup плюс перші 2 пости" item from the roadmap; prior work (NEWSLETTER.md) was platform setup only
+- Both passed clinical-safety review (PASS WITH NOTES: food logging feature needs ED screening gate; Victor correction loop needs ease-off exit path — product-level items logged, not newsletter blockers)
+
+### Added
+- [`content/newsletter-01.md`](content/newsletter-01.md) — Issue 01 "Why we're building FORM": personal founder letter (400–500 words), Victor off-duty tone, opens with in-person coach moment, draws category gap between tracker and trainer, lists what newsletters will and won't contain, beta CTA. clinical-safety: PASS.
+- [`content/newsletter-02.md`](content/newsletter-02.md) — Issue 02 "What FORM actually does (and what it doesn't)": structured breakdown of 3 core features (CV form on 8 lifts, HRV-adjusted programming, Victor voice) + 5 explicit won't-dos (no medical diagnoses, no calorie surveillance, no before/after, no guarantees, no data monetization) + honest CV accuracy uncertainty section. clinical-safety: PASS.
+
+### Changed
+- [`VERSION`](VERSION) — 0.15.0 → 0.16.0
+
+### Notes (product action items from clinical-safety)
+- Food logging feature requires SCOFF or equivalent ED screening gate before a user can enable it
+- Victor correction loop needs a documented ease-off exit path for users who re-attempt compulsively
+
+---
+
 ## [0.15.0] — 2026-05-14
 
 ### Why MINOR

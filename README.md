@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.15.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.16.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -56,7 +56,7 @@ G:\\Клод\\form\\
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
-├── VERSION                 ← single source of truth (0.15.0)
+├── VERSION                 ← single source of truth (0.16.0)
 ├── CHANGELOG.md            ← Keep-a-Changelog format
 ├── CONTRIBUTING.md         ← engineering standards
 ├── STATUS.md               ← project snapshot
@@ -118,7 +118,9 @@ G:\\Клод\\form\\
 │   ├── twitter-launch-thread.md
 │   ├── linkedin-posts.md
 │   ├── press-pitch-templates.md
-│   └── reddit-launch-posts.md
+│   ├── reddit-launch-posts.md
+│   ├── newsletter-01.md          ← Issue 01 "Why we're building FORM" (draft, clinical-safety ✓)
+│   └── newsletter-02.md          ← Issue 02 "What FORM does/doesn't do" (draft, clinical-safety ✓)
 │
 ├── programs/               ← sport-science deliverables
 │   ├── sample-strength-week.md
@@ -248,11 +250,11 @@ Each iteration:
 
 | Metric | Value |
 |---|---|
-| Tagged releases | 31+ |
+| Tagged releases | 32+ |
 | HTML pages | 12 |
 | Markdown documents | 43+ |
 | Blog posts (drafts) | 9 |
-| Social content assets | 4 (Twitter, LinkedIn, Reddit, press pitches) |
+| Social content assets | 6 (Twitter, LinkedIn, Reddit, press pitches, 2 newsletter issues) |
 | Total lines committed | 22,000+ |
 | AI agents defined | 14 |
 | Documented decisions | 27 |
@@ -325,4 +327,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.15.0
+**Last update:** 14 травня 2026 · v0.16.0
