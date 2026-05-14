@@ -16,6 +16,25 @@
 
 ---
 
+## [0.4.0] — 2026-05-14
+
+### Why MINOR
+- Закінчено повну launch-операційну документацію (LAUNCH_CHECKLIST + OKRs + DATA_ROOM)
+- 6 blog posts published — content strategy complete для launch
+- Twitter launch thread prepared — go-to-market ready
+- Marketing site complete: 7 HTML pages, всі продуктові поверхні showcased
+- Документація переходить з «strategic thinking» у «execution-ready»
+
+### Added
+- [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md) — pre-launch gate. P0 safety/quality/business/marketing checks. T-24h до T+72h sequence. Roll-back plan.
+- `content/post-06-30-user-interviews.md` — 6-й blog: «30 інтерв'ю до launch». Шаблон для post-research synthesis. Bias guards, what surprised us framework. ~13 хв read.
+- `content/twitter-launch-thread.md` — 14-tweet launch thread, ready-to-post format. Anti-patterns для launch day. Follow-up schedule T+24h/T+72h/T+7d.
+
+### Changed
+- README: чек roadmap items closed
+
+---
+
 ## [0.3.9] — 2026-05-14
 
 ### Added

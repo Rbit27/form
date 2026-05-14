@@ -58,11 +58,16 @@ G:\Клод\form\
    ├─ SECURITY.md          ← threat model, 5-layer defense, breach response
    ├─ OKRS_2026.md         ← Q3+Q4 OKRs з kill-criteria, scoring
    ├─ DATA_ROOM.md         ← 4-tier investor data room map
+   ├─ LAUNCH_CHECKLIST.md  ← P0 launch gate з roll-back plan
    └─ FOUNDER.md           ← founder narrative · INTERNAL · not for agents
 content\
    ├─ post-01-hrv-is-lying.md            ← blog 1: «HRV тобі бреше» (draft)
    ├─ post-02-what-good-form-means.md    ← blog 2: «Що означає гарна форма» (draft)
-   └─ post-03-we-tested-8-ai-trainers.md ← blog 3: «Ми протестували 8» (draft)
+   ├─ post-03-we-tested-8-ai-trainers.md ← blog 3: «Ми протестували 8» (draft)
+   ├─ post-04-sleep-and-strength.md      ← blog 4: «Сон забирає силу» (draft)
+   ├─ post-05-building-fitness-from-ukraine.md ← blog 5: «UA founder» (draft)
+   ├─ post-06-30-user-interviews.md      ← blog 6: «30 інтерв'ю» (draft template)
+   └─ twitter-launch-thread.md           ← 14-tweet launch thread (draft)
 programs\
    └─ sample-strength-week.md ← приклад тижня для intermediate
 nutrition\
