@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.5.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.6.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -14,8 +14,8 @@
 
 This is a **pre-product** project repository. There is no app code yet (mobile development begins з Founding Engineer hire). What you'll find:
 
-- **9 HTML product surfaces** — marketing site + product mockups
-- **30+ markdown documents** — strategic, operational, content
+- **10 HTML product surfaces** — marketing site + product mockups
+- **36+ markdown documents** — strategic, operational, content
 - **9 blog post drafts** — content engine ready для launch
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **5 sample programs/nutrition plans** — sport-science discipline reference
@@ -29,7 +29,7 @@ If you're здесь з first time, start з [STATUS.md](STATUS.md) для curre
 ## Quick navigation
 
 ### For investors → [docs/PITCH.md](docs/PITCH.md), [docs/FINANCIALS.md](docs/FINANCIALS.md), [docs/DATA_ROOM.md](docs/DATA_ROOM.md)
-### For journalists → [docs/PRESS.md](docs/PRESS.md), [content/press-pitch-templates.md](content/press-pitch-templates.md)
+### For journalists → [press.html](press.html), [docs/PRESS.md](docs/PRESS.md), [content/press-pitch-templates.md](content/press-pitch-templates.md)
 ### For potential hires → [hiring/](hiring/), [docs/HIRING.md](docs/HIRING.md)
 ### For builders / advisors → [docs/TECHNICAL.md](docs/TECHNICAL.md), [docs/API.md](docs/API.md)
 ### Просто цікавий? → [about.html](about.html) і [content/](content/) blogs
@@ -39,7 +39,7 @@ If you're здесь з first time, start з [STATUS.md](STATUS.md) для curre
 ## Repo structure
 
 ```
-G:\Клод\form\
+G:\\Клод\\form\\
 │
 ├── index.html              ← marketing-сайт (open у browser)
 ├── about.html              ← manifesto + 4 red lines
@@ -49,11 +49,12 @@ G:\Клод\form\
 ├── settings.html           ← app settings mockup
 ├── screens.html            ← 5 app screen mockups (cloud)
 ├── onboarding.html         ← 8-screen onboarding (cloud)
+├── press.html              ← HTML press kit (boilerplate, quotes, story angles)
 ├── workout-live.html       ← detailed workout mockup з CV
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
-├── VERSION                 ← single source of truth (0.5.0)
+├── VERSION                 ← single source of truth (0.6.0)
 ├── CHANGELOG.md            ← Keep-a-Changelog format
 ├── CONTRIBUTING.md         ← engineering standards
 ├── STATUS.md               ← project snapshot
@@ -62,7 +63,7 @@ G:\Клод\form\
 ├── .claude/
 │   └── agents/             ← 14 specialized AI agents
 │
-├── docs/                   ← 30+ strategic documents
+├── docs/                   ← 36+ strategic documents
 │   ├── BRAND.md             — design tokens, voice, applications
 │   ├── FLOWS.md             — user flows з ED-screening
 │   ├── MARKETING.md         — GTM, channels, positioning
@@ -92,6 +93,7 @@ G:\Клод\form\
 │   ├── SUPPORT.md           — customer support playbook
 │   ├── B2B_PLAYBOOK.md      — corporate wellness (post-PMF)
 │   ├── CONTENT_CALENDAR.md  — 90-day editorial plan
+│   ├── NEWSLETTER.md        — newsletter platform setup + first 2 post concepts
 │   ├── DEPLOYMENT.md        — Cloudflare Pages deploy guide
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
@@ -233,18 +235,18 @@ Each iteration:
 
 ---
 
-## Метрики проєкту (як of v0.5.0)
+## Метрики проєкту (як of v0.6.0)
 
 | Metric | Value |
 |---|---|
-| Tagged releases | 20+ |
-| HTML pages | 9 |
-| Markdown documents | 35+ |
+| Tagged releases | 22+ |
+| HTML pages | 10 |
+| Markdown documents | 36+ |
 | Blog posts (drafts) | 9 |
-| Total lines committed | 18,000+ |
+| Total lines committed | 19,000+ |
 | AI agents defined | 14 |
 | Documented decisions | 24 |
-| Days від v0.1.0 до v0.5.0 | 2 |
+| Days від v0.1.0 до v0.6.0 | 2 |
 
 ---
 
@@ -280,9 +282,9 @@ If you read **one file**: [STATUS.md](STATUS.md)
 If you read **two**: + [docs/PITCH.md](docs/PITCH.md)
 If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 
-Якщо ти **журналіст**: [docs/PRESS.md](docs/PRESS.md)
+Якщо ти **журналіст**: [press.html](press.html) → [docs/PRESS.md](docs/PRESS.md)
 Якщо ти **інвестор**: [docs/PITCH.md](docs/PITCH.md) → [docs/DATA_ROOM.md](docs/DATA_ROOM.md)
-Якщо ти **потенційний hire**: [hiring/](hiring/) → [docs/FOUNDER.md](docs/FOUNDER.md) (хоча це internal, можна спитати)
+Якщо ти **потенційний hire**: [hiring/](hiring/) → [docs/FOUNDER.md](docs/FOUNDER.md)
 Якщо ти **advisor**: [docs/TECHNICAL.md](docs/TECHNICAL.md) і [docs/METRICS.md](docs/METRICS.md)
 
 ---
@@ -313,4 +315,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.5.0
+**Last update:** 14 травня 2026 · v0.6.0

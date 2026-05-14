@@ -1,7 +1,7 @@
-# FORM · Project Status v0.4.6
+# FORM · Project Status v0.6.0
 
 **Date:** 14 травня 2026
-**Version:** 0.4.6
+**Version:** 0.6.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.4.6 with 18 tagged releases, 7 functional HTML marketing pages, 30+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content), 8 published blog posts ready for distribution, sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo з complete decision log. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins з Founding Engineer hire post-Seed.
+FORM is at v0.6.0 with 22+ tagged releases, 10 functional HTML marketing/product pages, 32+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with complete decision log. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed.
 
 ---
 
@@ -27,6 +27,8 @@ FORM is at v0.4.6 with 18 tagged releases, 7 functional HTML marketing pages, 30
 | [`settings.html`](settings.html) | App settings mockup (3-click cancel) | v0.3.9 ✓ |
 | [`screens.html`](screens.html) | 5 app-screen mockups (cloud) | v0.3.6 ✓ |
 | [`faq.html`](faq.html) | 30+ questions у 7 categories | v0.4.4 ✓ |
+| [`press.html`](press.html) | Full HTML press kit | v0.6.0 ✓ |
+| [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 
 ### Strategic documentation (markdown у `docs/`)
 
@@ -62,6 +64,7 @@ FORM is at v0.4.6 with 18 tagged releases, 7 functional HTML marketing pages, 30
 | SUPPORT.md | Customer support playbook | founder |
 | B2B_PLAYBOOK.md | Corporate wellness (post-PMF) | founder |
 | CONTENT_CALENDAR.md | 90-day editorial calendar | content-strategist |
+| NEWSLETTER.md | Newsletter platform setup + 2 post concepts | content-strategist |
 
 ### Content engine (markdown у `content/`)
 
@@ -142,7 +145,8 @@ FORM is at v0.4.6 with 18 tagged releases, 7 functional HTML marketing pages, 30
 - [ ] Marketing site deployed (only local prototype)
 - [ ] Blog posts published live
 - [ ] Twitter / X account active
-- [ ] Newsletter platform setup
+- [x] Newsletter setup guide → `docs/NEWSLETTER.md`
+- [ ] Newsletter platform actually configured on Beehiiv
 - [ ] Reddit account з reputation built
 
 ### Legal / compliance
@@ -158,8 +162,8 @@ FORM is at v0.4.6 with 18 tagged releases, 7 functional HTML marketing pages, 30
 
 ```
 Now (May 14, 2026)
-├── v0.4.6 documentation milestone
-├── Public GitHub repo з 18 versions tagged
+├── v0.6.0 — press kit HTML + newsletter guide
+├── Public GitHub repo з 22+ versions tagged
 └── All strategic docs published
 
 Next 2 weeks
@@ -209,7 +213,7 @@ M10-M12 (Q2 2027)
 ## What's working well
 
 1. **Documentation discipline.** Every decision logged. Every doc versioned. Every tag pushed.
-2. **Brand consistency.** Editorial-brutalist aesthetic holds across 8 HTML pages.
+2. **Brand consistency.** Editorial-brutalist aesthetic holds across 10 HTML pages.
 3. **Safety-first design.** clinical-safety VETO has shaped many decisions positively.
 4. **Operational thinking.** Не just product — full operational playbook (support, ops, B2B, hiring, legal, finance).
 5. **Build-in-public.** Public repo з transparent decision-making.
@@ -232,6 +236,7 @@ M10-M12 (Q2 2027)
 - [ ] Domain form.coach registered
 - [ ] Twitter / X account з first posts
 - [ ] Schedule 5 first user interviews
+- [ ] Configure Beehiiv newsletter (гайд у docs/NEWSLETTER.md)
 
 ---
 
@@ -242,6 +247,7 @@ M10-M12 (Q2 2027)
 - **CHANGELOG:** [CHANGELOG.md](CHANGELOG.md)
 - **All decisions:** [DECISION_LOG.md](docs/DECISION_LOG.md)
 - **Hiring:** [hiring/](hiring/)
+- **Press:** [press.html](press.html)
 
 ---
 
@@ -256,5 +262,5 @@ M10-M12 (Q2 2027)
 ---
 
 **Updated weekly.** Major changes → new version bump.
-**Last update:** 14 травня 2026 · v0.4.6
+**Last update:** 14 травня 2026 · v0.6.0
 **Next planned update:** після hire of Founding Engineer
