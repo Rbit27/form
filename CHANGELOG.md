@@ -16,6 +16,23 @@
 
 ---
 
+## [0.11.0] — 2026-05-14
+
+### Why MINOR
+- Новий документ: `docs/BETA_RECRUITING.md` — повний playbook рекрутингу 200 бета-юзерів
+- Закриває явний gap: `BETA_PLAYBOOK.md` покриває операції, але не пошук учасників
+- 10 розділів: target profile, канали (3 tier), scoring, invite-sequence, incentives, timeline, anti-patterns
+
+### Added
+- [`docs/BETA_RECRUITING.md`](docs/BETA_RECRUITING.md) — Beta user recruiting: мета 200 qualified users, Tier 1-3 канали (особиста мережа / спільноти / контент), scoring rubric (15 балів), форма заявки (+3 нових питання), invite email sequence, incentive structure, timeline Wave 0→2, метрики тижня, anti-patterns, messaging quick-ref (UA+EN)
+
+### Changed
+- [`VERSION`](VERSION) — 0.10.0 → 0.11.0
+- [`STATUS.md`](STATUS.md) — BETA_RECRUITING.md у docs-таблиці; doc count 39+→40+; версія → v0.11.0
+- [`README.md`](README.md) — BETA_RECRUITING.md у repo tree; doc count оновлено; version refs → v0.11.0
+
+---
+
 ## [0.10.0] — 2026-05-14
 
 ### Why MINOR

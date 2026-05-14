@@ -1,7 +1,7 @@
-# FORM · Project Status v0.10.0
+# FORM · Project Status v0.11.0
 
 **Date:** 14 травня 2026
-**Version:** 0.10.0
+**Version:** 0.11.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.10.0 with 26+ tagged releases, 10 functional HTML marketing/product pages, 39+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content, community), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook (Slack structure, moderation guidelines, feedback flows, Discord transition plan), sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with complete decision log. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v0.11.0 with 27+ tagged releases, 10 functional HTML marketing/product pages, 40+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content, community), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook (Slack structure, moderation guidelines, feedback flows, Discord transition plan), a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with complete decision log. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -68,6 +68,7 @@ FORM is at v0.10.0 with 26+ tagged releases, 10 functional HTML marketing/produc
 | COMMUNITY.md | Beta community setup (Slack + Discord, moderation) | process-keeper |
 | PRODUCT_SPEC.md | iOS product spec для Founding Engineer (sprints, acceptance criteria) | platform-engineer |
 | ANALYTICS_SETUP.md | PostHog instrumentation guide — 65 events, W-ACSU SQL, dashboards | platform-engineer |
+| BETA_RECRUITING.md | Beta user recruiting playbook — channels, scoring, timeline до 200 TestFlight users | growth-lead |
 
 ### Content engine (markdown у `content/`)
 
@@ -174,7 +175,8 @@ Now (May 14, 2026)
 ├── v0.8.0 — beta community setup guide (Slack + Discord + moderation)
 ├── v0.9.0 — iOS product spec for Founding Engineer (PRODUCT_SPEC.md)
 ├── v0.10.0 — analytics instrumentation guide for FE (ANALYTICS_SETUP.md)
-├── Public GitHub repo з 26+ versions tagged
+├── v0.11.0 — beta recruiting playbook (channels, scoring, timeline до 200 users)
+├── Public GitHub repo з 27+ versions tagged
 └── All strategic docs published
 
 Next 2 weeks
@@ -273,5 +275,5 @@ M10-M12 (Q2 2027)
 ---
 
 **Updated weekly.** Major changes → new version bump.
-**Last update:** 14 травня 2026 · v0.10.0
+**Last update:** 14 травня 2026 · v0.11.0
 **Next planned update:** після hire of Founding Engineer
