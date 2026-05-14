@@ -16,6 +16,26 @@
 
 ---
 
+## [0.19.0] — 2026-05-14
+
+### Why MINOR
+- New document: `docs/SEED_NARRATIVE.md` — verbal pre-seed pitch script
+- Complements PITCH.md (slide structure) and INVESTOR_OUTREACH.md (outreach templates)
+- Fills genuine gap: George needs a spoken narrative for angel calls, not just deck slides
+- Covers the specific challenge of raising pre-product pre-revenue: 6 narrative blocks, objection playbook, audience variants (angel/seed fund/accelerator/strategic)
+- Fix: STATUS.md and README.md had stale decision count (27 → 28, DEC-028 was added in v0.18.0)
+- Fix: STATUS.md timeline was missing v0.16.0–v0.19.0 milestones (stopped at v0.15.0)
+
+### Added
+- [`docs/SEED_NARRATIVE.md`](docs/SEED_NARRATIVE.md) — 6-block verbal pitch script for angel/pre-seed investor calls: Block 0 (opening line), Block 1 (personal story), Block 2 (product — 3 things), Block 3 (timing / tech window), Block 4 (market + model), Block 5 (honest state + what's next), Block 6 (ask). Objection playbook: 6 common objections with verbatim responses. Tonal rules table (do/don't). Audience variants table (angel-tech / angel-fitness / seed fund / strategic / accelerator). Companion references to PITCH.md, INVESTOR_OUTREACH.md, FINANCIALS.md.
+
+### Changed
+- [`VERSION`](VERSION) — 0.18.0 → 0.19.0
+- [`STATUS.md`](STATUS.md) — SEED_NARRATIVE.md added to docs table; TL;DR → v0.19.0; doc count 45+→46+; releases 34+→35+; version header + footer → v0.19.0; decision count 27→28; timeline extended to v0.19.0
+- [`README.md`](README.md) — SEED_NARRATIVE.md added to docs tree; doc count 45+→46+; version refs → v0.19.0; decision count 27→28
+
+---
+
 ## [0.18.0] — 2026-05-14
 
 ### Why MINOR

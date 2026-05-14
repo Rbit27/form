@@ -1,7 +1,7 @@
-# FORM · Project Status v0.18.0
+# FORM · Project Status v0.19.0
 
 **Date:** 14 травня 2026
-**Version:** 0.18.0
+**Version:** 0.19.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.18.0 with 34+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 45+ markdown documents covering every operational domain, 9 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, and a public GitHub repo with 28 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v0.19.0 with 35+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 46+ markdown documents covering every operational domain, 9 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, and a public GitHub repo with 28 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -75,6 +75,7 @@ FORM is at v0.18.0 with 34+ tagged releases, 12 functional HTML pages (marketing
 | ASSUMPTIONS_REGISTER.md | 30 pre-research assumptions з confidence levels, pivot criteria, review schedule | research-lead + product-strategist |
 | ADVISORY_BOARD.md | Advisory board recruitment strategy — 4 profiles, compensation, outreach templates, timeline | founder |
 | HIRING_GUIDE.md | Platform-by-platform JD posting guide — Djinni, DOU, LinkedIn, Wellfound; screening protocol; timeline | process-keeper |
+| SEED_NARRATIVE.md | Verbal pre-seed pitch script — 6 blocks, objection playbook, audience variants (angel/fund/accelerator) | product-strategist |
 
 ### Content engine (markdown у `content/`)
 
@@ -189,7 +190,11 @@ Now (May 14, 2026)
 ├── v0.13.0 — 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) + DEC-025/026/027
 ├── v0.14.0 — investor one-pager HTML page (investors.html)
 ├── v0.15.0 — careers page HTML (jobs.html) — FE + Design Lead open roles
-├── Public GitHub repo з 31+ versions tagged
+├── v0.16.0 — newsletter issues 01 + 02 (clinical-safety PASS)
+├── v0.17.0 — advisory board recruitment playbook (ADVISORY_BOARD.md)
+├── v0.18.0 — hiring guide platform-by-platform (HIRING_GUIDE.md) + DEC-028
+├── v0.19.0 — pre-seed verbal pitch narrative (SEED_NARRATIVE.md)
+├── Public GitHub repo з 35+ versions tagged
 └── All strategic docs published
 
 Next 2 weeks
@@ -232,7 +237,7 @@ M10-M12 (Q2 2027)
 - DEC-021: No Russian language UI у v1.0
 - DEC-023: Geo-pricing $9 UA / $19 Western
 
-27 total documented decisions з reverse-cost assessment.
+28 total documented decisions з reverse-cost assessment.
 
 ---
 
@@ -289,5 +294,5 @@ M10-M12 (Q2 2027)
 ---
 
 **Updated weekly.** Major changes → new version bump.
-**Last update:** 14 травня 2026 · v0.18.0
+**Last update:** 14 травня 2026 · v0.19.0
 **Next planned update:** після hire of Founding Engineer
