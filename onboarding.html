@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM. Onboarding · Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink:   '#0B0A07', deep:  '#13110C', line: '#1F1D16',
+          mute:  '#6F6A60', dim:   '#A39D8E', paper:'#F3EEE0',
+          cream: '#E7DFC8', acid:  '#DDFF2D', ember:'#FF5733', blood:'#B91C1C',
+        },
+        fontFamily: {
+          serif: ['Fraunces','serif'],
+          sans:  ['Manrope','sans-serif'],
+          mono:  ['JetBrains Mono','monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; margin:0; padding:0; }
+
+.grain::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.05;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:220px;
+}
+.display { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:0.9; }
+.display em { font-style:italic; }
+.display b  { font-weight:700; }
+.label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+.num   { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+
+.phone {
+  width:360px; height:740px;
+  border-radius:46px; background:#0B0A07;
+  border:1px solid #2A2820;
+  box-shadow:0 0 0 9px #0B0A07, 0 0 0 10px #2A2820,
+             0 80px 120px -40px rgba(0,0,0,0.8),
+             0 0 200px -30px rgba(221,255,45,0.08);
+  position:relative; overflow:hidden; flex-shrink:0;
+}
+.phone::before {
+  content:""; position:absolute; top:14px; left:50%; transform:translateX(-50%);
+  width:108px; height:30px; background:#050402; border-radius:20px; z-index:20;
+}
+.status-bar {
+  position:absolute; top:0; left:0; right:0; height:54px; z-index:25;
+  display:flex; justify-content:space-between; align-items:center;
+  padding:18px 28px 0; font-family:'JetBrains Mono',monospace; font-size:12px; color:#F3EEE0;
+}
+.phone-content { position:absolute; inset:0; overflow:hidden; }
+
+.screen {
+  position:absolute; inset:0; padding:54px 0 0;
+  display:flex; flex-direction:column;
+  opacity:0; pointer-events:none;
+  transition:opacity 0.3s ease, transform 0.3s ease;
+  transform:translateX(24px);
+}
+.screen.active { opacity:1; pointer-events:all; transform:translateX(0); }
+.screen.leaving { opacity:0; transform:translateX(-24px); pointer-events:none; }
+.screen-inner { flex:1; overflow-y:auto; scrollbar-width:none; padding:24px 28px; }
+.screen-inner::-webkit-scrollbar { display:none; }
+.screen-footer { padding:20px 28px 36px; flex-shrink:0; }
+
+.prog-dots { display:flex; gap:6px; align-items:center; }
+.dot { width:6px; height:6px; border-radius:3px; background:#1F1D16; transition:all 0.3s; }
+.dot.active { width:18px; background:#DDFF2D; }
+.dot.done   { background:#6F6A60; }
+
+.btn-next {
+  width:100%; padding:16px; border-radius:14px;
+  background:#DDFF2D; color:#0B0A07;
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  letter-spacing:0.18em; text-transform:uppercase; font-weight:600;
+  border:none; cursor:pointer;
+  transition:transform 0.15s, background 0.2s, opacity 0.2s;
+}
+.btn-next:hover { background:#ECFF6B; transform:translateY(-1px); }
+.btn-next:disabled { opacity:0.3; cursor:not-allowed; transform:none; }
+
+.btn-ghost {
+  width:100%; padding:12px;
+  background:transparent; color:#6F6A60;
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.18em; text-transform:uppercase;
+  border:none; cursor:pointer; transition:color 0.2s;
+}
+.btn-ghost:hover { color:#A39D8E; }
+
+.option-card {
+  border:1px solid #1F1D16; border-radius:14px;
+  padding:18px 20px; margin-bottom:10px; cursor:pointer;
+  transition:border-color 0.2s, background 0.2s;
+  display:flex; align-items:center; gap:14px;
+}
+.option-card:hover { border-color:#3A3830; }
+.option-card.selected { border-color:#DDFF2D; background:rgba(221,255,45,0.04); }
+.option-card .check {
+  width:22px; height:22px; border-radius:11px; border:1.5px solid #2A2820;
+  flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  transition:border-color 0.2s, background 0.2s;
+}
+.option-card.selected .check { border-color:#DDFF2D; background:#DDFF2D; }
+.option-card.selected .check::after { content:""; width:8px; height:8px; border-radius:4px; background:#0B0A07; }
+
+.ed-btn {
+  flex:1; padding:13px; border-radius:12px;
+  border:1.5px solid #1F1D16; background:transparent;
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  letter-spacing:0.14em; text-transform:uppercase; color:#6F6A60;
+  cursor:pointer; transition:all 0.2s;
+}
+.ed-btn:hover { border-color:#3A3830; color:#A39D8E; }
+.ed-btn.selected-yes { border-color:#DDFF2D; background:rgba(221,255,45,0.06); color:#DDFF2D; }
+.ed-btn.selected-no  { border-color:#2A2820; background:rgba(31,29,22,0.6); color:#A39D8E; }
+
+.tone-card {
+  border:1px solid #1F1D16; border-radius:14px;
+  padding:16px 18px; margin-bottom:8px; cursor:pointer;
+  transition:border-color 0.2s, background 0.2s;
+}
+.tone-card:hover { border-color:#3A3830; }
+.tone-card.selected { border-color:#DDFF2D; background:rgba(221,255,45,0.04); }
+.tone-card .tone-name { font-family:'Manrope',sans-serif; font-weight:600; font-size:14px; color:#F3EEE0; margin-bottom:3px; }
+.tone-card .tone-eg   { font-family:'JetBrains Mono',monospace; font-size:10px; color:#6F6A60; letter-spacing:0.04em; }
+
+.workout-card { border:1px solid #1F1D16; border-radius:16px; padding:20px; background:#13110C; }
+
+.tab-bar {
+  position:absolute; bottom:0; left:0; right:0; height:68px;
+  border-top:1px solid #1F1D16; background:#0B0A07;
+  display:flex; align-items:center; justify-content:space-around;
+  padding:0 8px 8px;
+}
+.tab { display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; padding:8px; }
+.tab-icon { width:22px; height:22px; }
+.tab-lbl { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:#6F6A60; }
+.tab.act .tab-lbl { color:#F3EEE0; }
+
+@keyframes fadeSlideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.anim-in { animation:fadeSlideIn 0.5s ease-out forwards; }
+
+.proto-badge {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  background:rgba(31,29,22,0.9); border:1px solid #2A2820;
+  color:#6F6A60; font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.14em; text-transform:uppercase;
+  padding:8px 16px; border-radius:999px; backdrop-filter:blur(10px);
+  white-space:nowrap; z-index:900;
+}
+
+.cs-note {
+  position:fixed; top:24px; right:24px; max-width:260px;
+  background:rgba(185,28,28,0.12); border:1px solid rgba(185,28,28,0.3);
+  color:#A39D8E; font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.06em; padding:12px 14px; border-radius:12px; line-height:1.6;
+  z-index:900;
+}
+.cs-note strong { font-size:9px; letter-spacing:0.18em; text-transform:uppercase; display:block; margin-bottom:6px; color:#FF5733; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<div style="position:fixed;top:40%;left:30%;width:500px;height:500px;background:rgba(221,255,45,0.06);border-radius:50%;filter:blur(140px);pointer-events:none;z-index:0;"></div>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;gap:48px;position:relative;z-index:1;">
+
+  <div style="text-align:center;">
+    <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <div style="width:6px;height:6px;border-radius:3px;background:#DDFF2D;"></div>
+      <span class="label">Onboarding Prototype · v0.3.1</span>
+    </div>
+    <h1 class="display" style="font-size:32px;color:#F3EEE0;">FORM<span style="color:#DDFF2D;">.</span></h1>
+    <p style="font-size:13px;color:#6F6A60;margin-top:8px;font-family:'Manrope',sans-serif;">
+      First-run flow · 8 екранів · ED-screening включено
+    </p>
+  </div>
+
+  <div class="phone">
+    <div class="status-bar">
+      <span class="num">9:41</span>
+      <span class="num" style="font-size:11px;color:#6F6A60;">●●●</span>
+    </div>
+    <div class="phone-content">
+
+      <!-- SCREEN 0: Splash -->
+      <div class="screen active" id="s0">
+        <div class="screen-inner" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px 28px;">
+          <div style="text-align:center;" class="anim-in">
+            <div class="display" style="font-size:72px;color:#F3EEE0;line-height:1;">FORM<span style="color:#DDFF2D;">.</span></div>
+            <p style="margin-top:16px;font-size:13px;color:#6F6A60;letter-spacing:0.04em;">Тренер. У кишені.</p>
+          </div>
+        </div>
+        <div class="screen-footer"><button class="btn-next" onclick="goTo(1)">Почати →</button></div>
+      </div>
+
+      <!-- SCREEN 1: 1/6 Привіт -->
+      <div class="screen" id="s1">
+        <div class="screen-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;">
+            <div class="prog-dots" id="dots1"></div>
+            <span class="label" style="color:#3A3830;">1 / 6</span>
+          </div>
+          <h2 class="display" style="font-size:36px;color:#F3EEE0;margin-bottom:12px;">Привіт.</h2>
+          <p style="font-size:15px;color:#A39D8E;line-height:1.55;margin-bottom:32px;">Побудуємо план під тебе.<br>Два хвилини — і перше тренування готове.</p>
+          <div style="margin-bottom:20px;">
+            <div class="label" style="margin-bottom:8px;">Як тебе звати?</div>
+            <input id="nameInput" type="text" placeholder="Ім'я (або пропусти)"
+              style="width:100%;padding:14px 16px;background:#13110C;border:1px solid #1F1D16;border-radius:12px;color:#F3EEE0;font-family:'Manrope',sans-serif;font-size:15px;outline:none;box-sizing:border-box;transition:border-color 0.2s;"
+              onfocus="this.style.borderColor='#DDFF2D'" onblur="this.style.borderColor='#1F1D16'" />
+          </div>
+        </div>
+        <div class="screen-footer"><button class="btn-next" onclick="goTo(2)">Далі →</button></div>
+      </div>
+
+      <!-- SCREEN 2: 2/6 Ціль -->
+      <div class="screen" id="s2">
+        <div class="screen-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;">
+            <div class="prog-dots" id="dots2"></div>
+            <span class="label" style="color:#3A3830;">2 / 6</span>
+          </div>
+          <h2 class="display" style="font-size:32px;color:#F3EEE0;margin-bottom:8px;">Яка головна ціль?</h2>
+          <p style="font-size:14px;color:#6F6A60;margin-bottom:24px;">Можна змінити пізніше.</p>
+          <div id="goalOptions">
+            <div class="option-card" onclick="selectGoal(this,'strength')">
+              <div class="check"></div><div><div style="font-size:15px;font-weight:600;color:#F3EEE0;">Сила</div><div style="font-size:12px;color:#6F6A60;margin-top:2px;">PR у присіді, тязі, жимі</div></div>
+            </div>
+            <div class="option-card" onclick="selectGoal(this,'physique')">
+              <div class="check"></div><div><div style="font-size:15px;font-weight:600;color:#F3EEE0;">Форма тіла</div><div style="font-size:12px;color:#6F6A60;margin-top:2px;">Гіпертрофія, склад тіла</div></div>
+            </div>
+            <div class="option-card" onclick="selectGoal(this,'endurance')">
+              <div class="check"></div><div><div style="font-size:15px;font-weight:600;color:#F3EEE0;">Витривалість</div><div style="font-size:12px;color:#6F6A60;margin-top:2px;">Серцево-судинна база, біг</div></div>
+            </div>
+            <div class="option-card" onclick="selectGoal(this,'health')">
+              <div class="check"></div><div><div style="font-size:15px;font-weight:600;color:#F3EEE0;">Здоров'я</div><div style="font-size:12px;color:#6F6A60;margin-top:2px;">Рух, стабільність, відчуття сили</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-footer"><button class="btn-next" id="btnGoal" onclick="goTo(3)" disabled>Далі →</button></div>
+      </div>
+
+      <!-- SCREEN 3: 3/6 Досвід -->
+      <div class="screen" id="s3">
+        <div class="screen-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;">
+            <div class="prog-dots" id="dots3"></div>
+            <span class="label" style="color:#3A3830;">3 / 6</span>
+          </div>
+          <h2 class="display" style="font-size:32px;color:#F3EEE0;margin-bottom:8px;">Досвід у залі?</h2>
+          <p style="font-size:14px;color:#6F6A60;margin-bottom:24px;">Це впливає на прогресію навантажень.</p>
+          <div id="expOptions">
+            <div class="option-card" onclick="selectExp(this,'beginner')">
+              <div class="check"></div><div><div style="font-size:15px;font-weight:600;color:#F3EEE0;">Початківець</div><div style="font-size:12px;color:#6F6A60;margin-top:2px;">&lt; 1 рок постійних тренувань</div></div>
+            </div>
+            <div class="option-card" onclick="selectExp(this,'intermediate')">
+              <div class="check"></div><div><div style="font-size:15px;font-weight:600;color:#F3EEE0;">1–3 роки</div><div style="font-size:12px;color:#6F6A60;margin-top:2px;">Знає базові рухи, є PR-цифри</div></div>
+            </div>
+            <div class="option-card" onclick="selectExp(this,'advanced')">
+              <div class="check"></div><div><div style="font-size:15px;font-weight:600;color:#F3EEE0;">3+ роки</div><div style="font-size:12px;color:#6F6A60;margin-top:2px;">Самостійний, знає програмування</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-footer"><button class="btn-next" id="btnExp" onclick="goTo(4)" disabled>Далі →</button></div>
+      </div>
+
+      <!-- SCREEN 4: 4/6 Частота -->
+      <div class="screen" id="s4">
+        <div class="screen-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;">
+            <div class="prog-dots" id="dots4"></div>
+            <span class="label" style="color:#3A3830;">4 / 6</span>
+          </div>
+          <h2 class="display" style="font-size:32px;color:#F3EEE0;margin-bottom:8px;">Скільки разів<br>на тиждень?</h2>
+          <p style="font-size:14px;color:#6F6A60;margin-bottom:28px;">Реальна цифра, не оптимістична.</p>
+          <div id="freqOptions" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="option-card" onclick="selectFreq(this,'2')" style="flex-direction:column;align-items:flex-start;gap:4px;">
+              <div class="check" style="margin-bottom:8px;"></div>
+              <div style="font-size:24px;font-weight:700;color:#F3EEE0;font-family:'JetBrains Mono',monospace;">2×</div>
+              <div style="font-size:11px;color:#6F6A60;">на тиждень</div>
+            </div>
+            <div class="option-card" onclick="selectFreq(this,'3')" style="flex-direction:column;align-items:flex-start;gap:4px;">
+              <div class="check" style="margin-bottom:8px;"></div>
+              <div style="font-size:24px;font-weight:700;color:#F3EEE0;font-family:'JetBrains Mono',monospace;">3×</div>
+              <div style="font-size:11px;color:#6F6A60;">на тиждень</div>
+            </div>
+            <div class="option-card" onclick="selectFreq(this,'4')" style="flex-direction:column;align-items:flex-start;gap:4px;">
+              <div class="check" style="margin-bottom:8px;"></div>
+              <div style="font-size:24px;font-weight:700;color:#F3EEE0;font-family:'JetBrains Mono',monospace;">4×</div>
+              <div style="font-size:11px;color:#6F6A60;">на тиждень</div>
+            </div>
+            <div class="option-card" onclick="selectFreq(this,'5+')" style="flex-direction:column;align-items:flex-start;gap:4px;">
+              <div class="check" style="margin-bottom:8px;"></div>
+              <div style="font-size:24px;font-weight:700;color:#F3EEE0;font-family:'JetBrains Mono',monospace;">5+</div>
+              <div style="font-size:11px;color:#6F6A60;">на тиждень</div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-footer"><button class="btn-next" id="btnFreq" onclick="goTo(5)" disabled>Далі →</button></div>
+      </div>
+
+      <!-- SCREEN 5: 5/6 ED-screening (clinical-safety APPROVED) -->
+      <!-- threshold: any 1 yes = soft mode | non-skippable | no crisis resources here -->
+      <div class="screen" id="s5">
+        <div class="screen-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;">
+            <div class="prog-dots" id="dots5"></div>
+            <span class="label" style="color:#3A3830;">5 / 6</span>
+          </div>
+          <h2 class="display" style="font-size:28px;color:#F3EEE0;margin-bottom:8px;">Кілька питань.</h2>
+          <p style="font-size:14px;color:#A39D8E;margin-bottom:28px;line-height:1.5;">Перед тим як будувати план. Правильних відповідей нема.</p>
+          <div style="margin-bottom:20px;">
+            <p style="font-size:15px;color:#F3EEE0;line-height:1.5;margin-bottom:12px;">Думки про їжу або харчування займають у вас багато розумової енергії?</p>
+            <div style="display:flex;gap:8px;"><button class="ed-btn" id="q1y" onclick="setED(1,'yes')">Так</button><button class="ed-btn" id="q1n" onclick="setED(1,'no')">Ні</button></div>
+          </div>
+          <div style="margin-bottom:20px;">
+            <p style="font-size:15px;color:#F3EEE0;line-height:1.5;margin-bottom:12px;">Чи відчували ви, що стосунки з їжею виходять з-під контролю?</p>
+            <div style="display:flex;gap:8px;"><button class="ed-btn" id="q2y" onclick="setED(2,'yes')">Так</button><button class="ed-btn" id="q2n" onclick="setED(2,'no')">Ні</button></div>
+          </div>
+          <div style="margin-bottom:20px;">
+            <p style="font-size:15px;color:#F3EEE0;line-height:1.5;margin-bottom:12px;">Вам некомфортно, коли інші коментують що або скільки ви їсте?</p>
+            <div style="display:flex;gap:8px;"><button class="ed-btn" id="q3y" onclick="setED(3,'yes')">Так</button><button class="ed-btn" id="q3n" onclick="setED(3,'no')">Ні</button></div>
+          </div>
+        </div>
+        <div class="screen-footer">
+          <button class="btn-next" id="btnED" onclick="proceedFromED()" disabled>Далі →</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 5b: Soft Mode (clinical-safety VETO: plan first, resources in Settings only) -->
+      <div class="screen" id="s5b">
+        <div class="screen-inner" style="display:flex;flex-direction:column;justify-content:center;height:100%;">
+          <div style="margin-bottom:32px;">
+            <div class="label" style="margin-bottom:12px;color:#DDFF2D;">Готово</div>
+            <h2 class="display" style="font-size:36px;color:#F3EEE0;margin-bottom:0;">Ваш план готовий.</h2>
+          </div>
+          <div style="border-top:1px solid #1F1D16;padding-top:24px;">
+            <p style="font-size:15px;color:#A39D8E;line-height:1.6;margin-bottom:16px;">На основі ваших відповідей налаштовуємо план без цільових калорій і відстеження ваги. Повна програма тренувань — кожне заняття, кожна прогресія. Харчування: фокус на якості й режимі, не на числах.</p>
+            <p style="font-size:12px;color:#6F6A60;line-height:1.5;">Ці налаштування можна переглянути в Налаштуваннях.</p>
+          </div>
+        </div>
+        <div class="screen-footer"><button class="btn-next" onclick="goTo(6)">Зрозумів →</button></div>
+      </div>
+
+      <!-- SCREEN 6: 6/6 Victor tone -->
+      <div class="screen" id="s6">
+        <div class="screen-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;">
+            <div class="prog-dots" id="dots6"></div>
+            <span class="label" style="color:#3A3830;">6 / 6</span>
+          </div>
+          <h2 class="display" style="font-size:28px;color:#F3EEE0;margin-bottom:8px;">Як говорить Victor?</h2>
+          <p style="font-size:14px;color:#6F6A60;margin-bottom:24px;">Змінити можна в будь-який момент.</p>
+          <div id="toneOptions">
+            <div class="tone-card" onclick="selectTone(this,'smart')">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div><div class="tone-name">Прямо і чітко</div><div class="tone-eg">« HRV 68. Сьогодні — спина. Починай.»</div></div>
+                <div class="check" style="width:20px;height:20px;flex-shrink:0;"></div>
+              </div>
+            </div>
+            <div class="tone-card" onclick="selectTone(this,'mindful')">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div><div class="tone-name">М'який і уважний</div><div class="tone-eg">«Як спалося? HRV непогано. Є план.»</div></div>
+                <div class="check" style="width:20px;height:20px;flex-shrink:0;"></div>
+              </div>
+            </div>
+            <div class="tone-card" onclick="selectTone(this,'cold')">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div><div class="tone-name">Холодний професор</div><div class="tone-eg">«Суб'єктивне відновлення: 7/10. Програма — A.»</div></div>
+                <div class="check" style="width:20px;height:20px;flex-shrink:0;"></div>
+              </div>
+            </div>
+            <div class="tone-card" onclick="selectTone(this,'coach')">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div><div class="tone-name">Тренер збірної</div><div class="tone-eg">«Є відповідь. Довіряй плану.»</div></div>
+                <div class="check" style="width:20px;height:20px;flex-shrink:0;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-footer"><button class="btn-next" id="btnTone" onclick="goTo(7)" disabled>Готово →</button></div>
+      </div>
+
+      <!-- SCREEN 7: Plan ready + HealthKit -->
+      <div class="screen" id="s7">
+        <div class="screen-inner" style="display:flex;flex-direction:column;justify-content:center;height:100%;">
+          <div class="label" style="margin-bottom:12px;color:#DDFF2D;">FORM.</div>
+          <h2 class="display" style="font-size:40px;color:#F3EEE0;margin-bottom:16px;">Перший план<br><em>готовий.</em></h2>
+          <p style="font-size:14px;color:#A39D8E;line-height:1.6;margin-bottom:36px;">Тижневий план під твій досвід і частоту. Підключи Apple Health щоб Victor бачив твій сон і HRV — план стане точнішим.</p>
+          <div style="border:1px solid #1F1D16;border-radius:14px;padding:18px;background:#13110C;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+              <div style="width:32px;height:32px;border-radius:8px;background:rgba(221,255,45,0.08);display:flex;align-items:center;justify-content:center;">
+                <svg width="16" height="16" fill="none" stroke="#DDFF2D" stroke-width="1.5" stroke-linecap="round"><path d="M8 2a2 2 0 0 1 2 2 4 4 0 0 1-4 4 2 2 0 0 1-2-2 4 4 0 0 1 4-4z"/><path d="M8 10v4M6 14h4"/></svg>
+              </div>
+              <div style="font-size:14px;font-weight:600;color:#F3EEE0;">Apple Health</div>
+            </div>
+            <p style="font-size:12px;color:#6F6A60;line-height:1.5;">HRV, сон і кроки. Більше нічого. Дані залишаються на пристрої.</p>
+          </div>
+        </div>
+        <div class="screen-footer">
+          <button class="btn-next" onclick="goTo(8)" style="margin-bottom:10px;">Підключити Apple Health →</button>
+          <button class="btn-ghost" onclick="goTo(8)">Пропустити</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 8: Today first view -->
+      <div class="screen" id="s8" style="padding-bottom:68px;">
+        <div class="screen-inner" style="padding-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">
+            <div>
+              <div class="label" style="margin-bottom:4px;">Понеділок, 14 травня</div>
+              <div style="font-size:18px;font-weight:600;color:#F3EEE0;">Добрий день, <span id="userName">спортсмен</span>.</div>
+            </div>
+            <div style="width:34px;height:34px;border-radius:17px;background:#13110C;border:1px solid #1F1D16;display:flex;align-items:center;justify-content:center;">
+              <svg width="16" height="16" fill="none" stroke="#A39D8E" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="6" r="3"/><path d="M2 16c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+            </div>
+          </div>
+          <div style="border:1px solid #1F1D16;border-radius:16px;padding:18px;background:#13110C;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <span class="label">Готовність</span>
+              <span class="label" style="color:#DDFF2D;">День 1 / 14</span>
+            </div>
+            <p style="font-size:13px;color:#6F6A60;line-height:1.5;">Збираємо baseline 14 днів. Поки що — суб'єктивна оцінка.</p>
+            <div style="margin-top:14px;">
+              <div class="label" style="margin-bottom:8px;">Як почуваєшся зараз?</div>
+              <div style="display:flex;gap:8px;">
+                <button style="flex:1;padding:10px;border-radius:10px;border:1px solid #1F1D16;background:transparent;color:#6F6A60;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;cursor:pointer;" onclick="this.style.borderColor='#DDFF2D';this.style.color='#DDFF2D'">Добре</button>
+                <button style="flex:1;padding:10px;border-radius:10px;border:1px solid #1F1D16;background:transparent;color:#6F6A60;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;cursor:pointer;" onclick="this.style.borderColor='#DDFF2D';this.style.color='#DDFF2D'">Норм</button>
+                <button style="flex:1;padding:10px;border-radius:10px;border:1px solid #1F1D16;background:transparent;color:#6F6A60;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;cursor:pointer;" onclick="this.style.borderColor='#DDFF2D';this.style.color='#DDFF2D'">Важко</button>
+              </div>
+            </div>
+          </div>
+          <div class="workout-card" style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+              <div><div class="label" style="margin-bottom:4px;">Перше тренування</div><div style="font-size:18px;font-weight:600;color:#F3EEE0;">Нижня частина тіла А</div></div>
+              <div style="text-align:right;"><div class="num" style="font-size:22px;color:#DDFF2D;">55</div><div style="font-size:10px;color:#6F6A60;">хв</div></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+              <span style="font-size:11px;color:#A39D8E;background:#1F1D16;padding:4px 10px;border-radius:6px;">Присід</span>
+              <span style="font-size:11px;color:#A39D8E;background:#1F1D16;padding:4px 10px;border-radius:6px;">Румунська тяга</span>
+              <span style="font-size:11px;color:#A39D8E;background:#1F1D16;padding:4px 10px;border-radius:6px;">Жим ногами</span>
+              <span style="font-size:11px;color:#6F6A60;background:#1F1D16;padding:4px 10px;border-radius:6px;">+2</span>
+            </div>
+            <button class="btn-next" style="padding:14px;">Почати тренування →</button>
+          </div>
+          <div style="border-top:1px solid #1F1D16;padding-top:16px;">
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <div style="width:28px;height:28px;border-radius:14px;background:#1F1D16;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;color:#A39D8E;">V</div>
+              <div>
+                <div class="label" style="margin-bottom:6px;">Victor</div>
+                <p style="font-size:14px;color:#A39D8E;line-height:1.55;margin:0;" id="victorNote">Перший день. Вага робоча — 70% від максимуму. Не тягни ривком на присіді.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <div class="tab act">
+            <svg class="tab-icon" fill="none" stroke="#F3EEE0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span class="tab-lbl" style="color:#F3EEE0;">Сьогодні</span>
+          </div>
+          <div class="tab">
+            <svg class="tab-icon" fill="none" stroke="#6F6A60" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span class="tab-lbl">Workout</span>
+          </div>
+          <div class="tab">
+            <svg class="tab-icon" fill="none" stroke="#6F6A60" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><path d="M12 8v4l3 3"/></svg>
+            <span class="tab-lbl">Харчування</span>
+          </div>
+          <div class="tab">
+            <svg class="tab-icon" fill="none" stroke="#6F6A60" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span class="tab-lbl">Коуч</span>
+          </div>
+          <div class="tab">
+            <svg class="tab-icon" fill="none" stroke="#6F6A60" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span class="tab-lbl">Прогрес</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:center;">
+    <div style="display:flex;align-items:center;gap:8px;"><div style="width:8px;height:8px;border-radius:4px;background:#DDFF2D;"></div><span style="font-size:11px;color:#6F6A60;font-family:'JetBrains Mono',monospace;letter-spacing:0.1em;">Acid lime = дія</span></div>
+    <div style="display:flex;align-items:center;gap:8px;"><div style="width:8px;height:8px;border-radius:4px;background:#FF5733;"></div><span style="font-size:11px;color:#6F6A60;font-family:'JetBrains Mono',monospace;letter-spacing:0.1em;">Ember = попередження</span></div>
+    <div style="display:flex;align-items:center;gap:8px;"><div style="width:8px;height:8px;border-radius:4px;background:#1F1D16;border:1px solid #2A2820;"></div><span style="font-size:11px;color:#6F6A60;font-family:'JetBrains Mono',monospace;letter-spacing:0.1em;">Line = межі</span></div>
+  </div>
+</div>
+
+<div class="proto-badge">HTML Prototype · FORM v0.3.1 · Onboarding</div>
+
+<div class="cs-note">
+  <strong>clinical-safety</strong>
+  ED-screening: 5/6 non-skippable.<br>
+  Threshold: 1 yes → soft mode.<br>
+  Resources: Settings → Підтримка only.<br>
+  No calorie targets in soft mode.<br>
+  Soft mode permanent unless user navigates Settings.
+</div>
+
+<script>
+const state = { currentScreen:0, goal:null, experience:null, frequency:null, edAnswers:{1:null,2:null,3:null}, softMode:false, tone:null };
+let prevScreen = null;
+
+function goTo(n) {
+  const cur = document.getElementById('s' + state.currentScreen);
+  const next = document.getElementById('s' + n);
+  if (!next) return;
+  cur.classList.add('leaving');
+  setTimeout(() => { cur.classList.remove('active','leaving'); }, 300);
+  next.classList.add('active');
+  prevScreen = state.currentScreen;
+  state.currentScreen = n;
+  updateDots(n);
+  if (n === 8) {
+    const name = document.getElementById('nameInput').value.trim();
+    if (name) document.getElementById('userName').textContent = name;
+  }
+}
+
+function proceedFromED() {
+  const flagged = Object.values(state.edAnswers).some(v => v === 'yes');
+  state.softMode = flagged;
+  if (flagged) { goTo('5b'); } else { showAllClear(); }
+}
+
+function showAllClear() {
+  const btn = document.getElementById('btnED');
+  btn.textContent = 'Зрозумів.';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = 'Далі →'; btn.disabled = false; goTo(6); }, 900);
+}
+
+function setED(q, val) {
+  state.edAnswers[q] = val;
+  document.getElementById('q'+q+'y').className = 'ed-btn' + (val==='yes' ? ' selected-yes' : '');
+  document.getElementById('q'+q+'n').className = 'ed-btn' + (val==='no'  ? ' selected-no'  : '');
+  const allAnswered = Object.values(state.edAnswers).every(v => v !== null);
+  document.getElementById('btnED').disabled = !allAnswered;
+}
+
+function selectGoal(el, val) {
+  document.querySelectorAll('#goalOptions .option-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected'); state.goal = val;
+  document.getElementById('btnGoal').disabled = false;
+}
+function selectExp(el, val) {
+  document.querySelectorAll('#expOptions .option-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected'); state.experience = val;
+  document.getElementById('btnExp').disabled = false;
+}
+function selectFreq(el, val) {
+  document.querySelectorAll('#freqOptions .option-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected'); state.frequency = val;
+  document.getElementById('btnFreq').disabled = false;
+}
+
+function selectTone(el, val) {
+  document.querySelectorAll('#toneOptions .tone-card').forEach(c => {
+    c.classList.remove('selected');
+    c.querySelector('.check').style.borderColor = '#2A2820';
+    c.querySelector('.check').style.background = 'transparent';
+  });
+  el.classList.add('selected');
+  const chk = el.querySelector('.check');
+  chk.style.borderColor = '#DDFF2D'; chk.style.background = '#DDFF2D';
+  state.tone = val;
+  document.getElementById('btnTone').disabled = false;
+  const notes = {
+    smart:   'Перший день. Вага робоча — 70% від максимуму. Не тягни ривком на присіді.',
+    mindful: 'Як почуваєшся? Починай із легшої ваги. Слухай тіло сьогодні.',
+    cold:    'День 1. Базовий об\'єм: 3×8 @ 70% 1RM. Темп 2-0-2. Фіксуй RPE.',
+    coach:   'Перша сесія — технічна. Довіряй процесу. Результат — через 12 тижнів.',
+  };
+  document.getElementById('victorNote').textContent = notes[val] || notes.smart;
+}
+
+function updateDots(screenNum) {
+  ['dots1','dots2','dots3','dots4','dots5','dots6'].forEach((id, idx) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '';
+    for (let i = 1; i <= 6; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      if (i < screenNum) dot.classList.add('done');
+      else if (i === screenNum) dot.classList.add('active');
+      el.appendChild(dot);
+    }
+  });
+}
+
+updateDots(1);
+</script>
+</body>
+</html>
