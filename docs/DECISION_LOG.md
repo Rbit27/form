@@ -15,6 +15,13 @@
 
 ## 2026-05-14
 
+### DEC-028 · Hiring platform priority: Djinni-first для FE, LinkedIn-first для Design Lead
+
+- **Decision:** Founding Engineer (iOS) постимо спочатку на Djinni + DOU + Wellfound; Design Lead — спочатку LinkedIn + Wellfound + Djinni. Бюджет: $0 на старті, boost (до $150) тільки якщо немає відгуків за тиждень.
+- **Owner:** founder (George)
+- **Why:** iOS розробники в Україні концентровані на Djinni/DOU; дизайнери — на LinkedIn. Wellfound потрібен обом як equity-signal платформа. Починати безкоштовно — зберігаємо runway. Paid boost тільки як fallback.
+- **Reverse cost:** Low (платформи незалежні; можна додати/прибрати будь-яку без наслідків)
+
 ### DEC-027 · Assumptions Register як передумова до research sprint
 
 - **Decision:** Зафіксувати всі 30 product/market/tech assumptions явно ДО проведення інтерв'ю

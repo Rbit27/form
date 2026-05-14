@@ -16,6 +16,26 @@
 
 ---
 
+## [0.18.0] — 2026-05-14
+
+### Why MINOR
+- New document: `docs/HIRING_GUIDE.md` — platform-by-platform JD posting guide
+- Closes the "Apply Founding Engineer + Design Lead JDs on platforms" gap from STATUS.md "What's next (immediate)"
+- Prior art: JD markdown files in `hiring/` + designed careers page (`jobs.html`) — but no concrete posting instructions for George
+- New: DEC-028 (platform priority for hiring) in DECISION_LOG.md
+- Fix: STATUS.md had wrong version reference (v0.15.0) — corrected to v0.18.0
+
+### Added
+- [`docs/HIRING_GUIDE.md`](docs/HIRING_GUIDE.md) — 8-section platform-by-platform hiring guide: role/platform priority table (FE: Djinni > DOU > Wellfound > LinkedIn; Design Lead: LinkedIn > Wellfound > Djinni > Behance); per-platform step-by-step setup (Djinni account, DOU jobs + forum, Wellfound company profile, LinkedIn personal post vs. paid job post); CV screening red/green flags by role; 48-hour response protocol; rejection email template; interview logistics (45-min structure); 5-week timeline; $0-150 budget breakdown; pre-posting checklist; tracking sheet columns
+
+### Changed
+- [`VERSION`](VERSION) — 0.17.0 → 0.18.0
+- [`STATUS.md`](STATUS.md) — HIRING_GUIDE.md у docs table; TL;DR → v0.18.0; doc count 44+→45+; releases 33+→34+; version header + footer → v0.18.0
+- [`README.md`](README.md) — HIRING_GUIDE.md у docs tree; doc count 44+→45+; version refs → v0.18.0
+- [`docs/DECISION_LOG.md`](docs/DECISION_LOG.md) — DEC-028 added (platform priority: Djinni-first для FE, LinkedIn-first для Design Lead; $0 start, boost as fallback)
+
+---
+
 ## [0.17.0] — 2026-05-14
 
 ### Why MINOR
