@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Ціна</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { ink:'#0B0A07', deep:'#13110C', line:'#1F1D16', mute:'#6F6A60', dim:'#A39D8E', paper:'#F3EEE0', cream:'#E7DFC8', acid:'#DDFF2D', ember:'#FF5733' },
+    fontFamily: { serif:['Fraunces','serif'], sans:['Manrope','sans-serif'], mono:['JetBrains Mono','monospace'] }
+  }}};
+</script>
+<style>
+  html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; }
+  .display { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:0.86; }
+  .display em { font-style:italic; font-weight:300; }
+  .display b { font-weight:700; font-style:normal; }
+  .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+  .num { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  ::selection { background:#DDFF2D; color:#0B0A07; }
+  .grain::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.06;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:220px;
+  }
+  .btn-acid { background:#DDFF2D; color:#0B0A07; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:600; transition:transform 0.15s, background 0.2s; padding:16px 28px; border-radius:9999px; display:inline-block; }
+  .btn-acid:hover { background:#ECFF6B; transform:translateY(-1px); }
+  .btn-out { border:1px solid #1F1D16; color:#F3EEE0; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:500; padding:16px 28px; border-radius:9999px; display:inline-block; transition:border-color 0.2s; }
+  .btn-out:hover { border-color:#DDFF2D; }
+  .toggle { display:inline-flex; background:#13110C; border:1px solid #1F1D16; border-radius:9999px; padding:4px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; }
+  .toggle button { padding:10px 24px; border-radius:9999px; color:#6F6A60; transition:background 0.2s, color 0.2s; cursor:pointer; }
+  .toggle button.active { background:#DDFF2D; color:#0B0A07; font-weight:600; }
+  .row-divider { border-top:1px solid #1F1D16; }
+  td, th { padding:14px 12px; vertical-align:middle; }
+  .check { color:#DDFF2D; font-size:18px; }
+  .x { color:#6F6A60; font-size:18px; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<header class="border-b border-line">
+  <div class="max-w-[1480px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-[12px] font-mono tracking-widest uppercase text-mute">
+      <a href="/" class="hover:text-paper">Демо</a>
+      <a href="/#voice" class="hover:text-paper">Голос</a>
+      <a href="/pricing.html" class="text-paper">Ціна</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+    </nav>
+    <a href="/beta.html" class="btn-acid">Beta →</a>
+  </div>
+</header>
+
+<!-- ambient glow -->
+<div class="fixed top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-acid/8 blur-[160px] rounded-full pointer-events-none"></div>
+
+<section class="relative pt-32 pb-16 px-8 text-center">
+  <div class="label mb-6">§ Ціна</div>
+  <h1 class="display text-paper text-[clamp(56px,9vw,140px)] mb-8">
+    Один план.<br><em>Без</em> <b>прихованого.</b>
+  </h1>
+  <p class="text-dim text-lg max-w-[560px] mx-auto leading-relaxed">
+    Підписка $19/міс (Western) або $9/міс (UA / EE). 14 днів безкоштовно. Cancel у 3 кліки. Це все.
+  </p>
+
+  <div class="mt-12 inline-block">
+    <div class="toggle" id="period-toggle">
+      <button class="active" data-period="monthly">Місячно</button>
+      <button data-period="annual">Річно · −34%</button>
+    </div>
+  </div>
+
+  <div class="mt-3 text-mute font-mono text-xs">Geo автоматично · ціна за регіоном</div>
+</section>
+
+<!-- Plans -->
+<section class="relative pb-20 px-8">
+  <div class="max-w-[1180px] mx-auto grid md:grid-cols-3 gap-6">
+
+    <!-- Trial -->
+    <div class="border border-line rounded-3xl p-8 bg-deep/30">
+      <div class="label mb-4">Триал</div>
+      <div class="num text-paper text-4xl font-light mb-1">Free</div>
+      <div class="text-mute font-mono text-xs">14 днів</div>
+
+      <div class="my-7 h-px bg-line"></div>
+
+      <ul class="space-y-3 text-sm">
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Все, що і у paid</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Без картки</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Cancel будь-коли</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Дані export після cancel</span></li>
+      </ul>
+
+      <a href="/beta.html" class="btn-out mt-8 w-full text-center block">Подати на Beta →</a>
+    </div>
+
+    <!-- Monthly -->
+    <div class="border border-acid/40 rounded-3xl p-8 bg-deep/60 relative">
+      <div class="absolute -top-3 left-8 bg-acid text-ink text-[10px] font-mono uppercase tracking-widest px-3 py-1 rounded-full font-bold">popular</div>
+
+      <div class="label mb-4">Місячна</div>
+      <div class="flex items-baseline gap-2 mb-1">
+        <span class="num text-paper text-5xl font-light" data-price-western-monthly>$19</span>
+        <span class="text-mute font-mono text-sm">/міс</span>
+      </div>
+      <div class="text-mute font-mono text-xs" data-region-note>$9/міс — UA · EE</div>
+
+      <div class="my-7 h-px bg-line"></div>
+
+      <ul class="space-y-3 text-sm">
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Програма + харчування + чат</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>CV-аналіз (beta, 8 базових рухів)</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Apple Health + Whoop + Oura integration</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Голос Victor — 4 персони</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Без лімітів</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Cancel у 3 кліки</span></li>
+      </ul>
+
+      <a href="/beta.html" class="btn-acid mt-8 w-full text-center block">Спробувати →</a>
+    </div>
+
+    <!-- Annual -->
+    <div class="border border-line rounded-3xl p-8 bg-deep/30">
+      <div class="label mb-4">Річна</div>
+      <div class="flex items-baseline gap-2 mb-1">
+        <span class="num text-paper text-5xl font-light" data-price-western-annual>$149</span>
+        <span class="text-mute font-mono text-sm">/рік</span>
+      </div>
+      <div class="text-acid font-mono text-xs" data-savings-note>≈ $12.40/міс · -34%</div>
+
+      <div class="my-7 h-px bg-line"></div>
+
+      <ul class="space-y-3 text-sm">
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Все що Місячна</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Економія $79/рік</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Locked-in pricing (рік)</span></li>
+        <li class="flex items-start gap-3"><span class="check">→</span><span>Безкоштовна early access новинок</span></li>
+      </ul>
+
+      <a href="/beta.html" class="btn-out mt-8 w-full text-center block">Спробувати →</a>
+    </div>
+
+  </div>
+
+  <p class="text-center text-mute font-mono text-xs mt-8">Усі ціни через Apple App Store · Google Play (Android phase 2)</p>
+</section>
+
+<!-- Vs competitors -->
+<section class="relative py-20 px-8 border-y border-line bg-deep/20">
+  <div class="max-w-[1180px] mx-auto">
+    <div class="label mb-4 text-center">§ Порівняння</div>
+    <h2 class="display text-paper text-[clamp(40px,6vw,80px)] text-center mb-12">
+      Що ще <em>за ці гроші.</em>
+    </h2>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="row-divider">
+            <th class="text-left text-mute font-mono text-[10px] uppercase tracking-widest"></th>
+            <th class="text-center">
+              <div class="font-serif text-paper text-lg">FORM</div>
+              <div class="num text-acid text-sm mt-1">$19/міс</div>
+            </th>
+            <th class="text-center">
+              <div class="font-serif text-paper text-lg">Whoop</div>
+              <div class="num text-mute text-sm mt-1">$30/міс</div>
+            </th>
+            <th class="text-center">
+              <div class="font-serif text-paper text-lg">Future</div>
+              <div class="num text-mute text-sm mt-1">$149/міс</div>
+            </th>
+            <th class="text-center">
+              <div class="font-serif text-paper text-lg">Fitbod</div>
+              <div class="num text-mute text-sm mt-1">$13/міс</div>
+            </th>
+            <th class="text-center">
+              <div class="font-serif text-paper text-lg">MacroFactor</div>
+              <div class="num text-mute text-sm mt-1">$12/міс</div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="row-divider">
+            <td class="text-paper font-medium">Адаптивна програма</td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+          </tr>
+          <tr class="row-divider">
+            <td class="text-paper font-medium">CV-аналіз техніки</td>
+            <td class="text-center"><span class="check">✓</span><br><span class="text-mute text-[10px] font-mono">8 рухів · beta</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+          </tr>
+          <tr class="row-divider">
+            <td class="text-paper font-medium">HRV-aware</td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="check">✓</span><br><span class="text-mute text-[10px] font-mono">read-only</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+          </tr>
+          <tr class="row-divider">
+            <td class="text-paper font-medium">Харчування</td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="check">✓</span></td>
+          </tr>
+          <tr class="row-divider">
+            <td class="text-paper font-medium">Голос / coaching tone</td>
+            <td class="text-center"><span class="check">✓</span><br><span class="text-mute text-[10px] font-mono">4 персони</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="check">✓</span><br><span class="text-mute text-[10px] font-mono">людина</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+          </tr>
+          <tr class="row-divider">
+            <td class="text-paper font-medium">Реакція в моменті</td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+          </tr>
+          <tr class="row-divider">
+            <td class="text-paper font-medium">Free tier</td>
+            <td class="text-center"><span class="x">—</span><br><span class="text-mute text-[10px] font-mono">trial 14д</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+          </tr>
+          <tr class="row-divider">
+            <td class="text-paper font-medium">Anti-surveillance</td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="check">✓</span></td>
+          </tr>
+          <tr class="row-divider">
+            <td class="text-paper font-medium">ED-screening on онбордингу</td>
+            <td class="text-center"><span class="check">✓</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+            <td class="text-center"><span class="x">—</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="text-center text-mute font-mono text-xs mt-8 max-w-[700px] mx-auto">
+      Таблиця оновлюється щоквартально. Конкуренти швидко змінюються — якщо щось застаріло, напиши на hello@form.coach.
+    </p>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="relative py-20 px-8">
+  <div class="max-w-[800px] mx-auto">
+    <div class="label mb-4">§ Часті питання</div>
+    <h2 class="display text-paper text-[clamp(40px,5vw,72px)] mb-12">
+      Чесно <em>про гроші.</em>
+    </h2>
+
+    <div class="space-y-6">
+      <div class="border border-line rounded-2xl p-6">
+        <div class="text-paper font-medium mb-2">Чому не free tier?</div>
+        <p class="text-dim text-base leading-relaxed">MyFitnessPal модель руйнує економіку (free-rider LTV). Замість — 14-day trial без картки. Хочеш — пробуєш. Не хочеш — закриваєш, без drama.</p>
+      </div>
+
+      <div class="border border-line rounded-2xl p-6">
+        <div class="text-paper font-medium mb-2">Geo-pricing справжній?</div>
+        <p class="text-dim text-base leading-relaxed">Так. UA / EE / PL: $9/міс. Western EU / UK / US: $19/міс. App Store визначає твій регіон. VPN-обхід працює технічно, але ми не радимо — порушує App Store ToS.</p>
+      </div>
+
+      <div class="border border-line rounded-2xl p-6">
+        <div class="text-paper font-medium mb-2">Можу скасувати?</div>
+        <p class="text-dim text-base leading-relaxed">Так. Через Settings → Subscription → Cancel — 3 кліки. Або через Apple App Store account. Жодних «давай ми тебе переконаємо», жодних 10-крокових cancel-flow.</p>
+      </div>
+
+      <div class="border border-line rounded-2xl p-6">
+        <div class="text-paper font-medium mb-2">Що буде з моїми даними?</div>
+        <p class="text-dim text-base leading-relaxed">30 днів grace після cancel — можна повернути. Після — full erasure (GDPR right to be forgotten). Export — JSON, одним кліком. Деталі — у Privacy Policy.</p>
+      </div>
+
+      <div class="border border-line rounded-2xl p-6">
+        <div class="text-paper font-medium mb-2">Family / multi-user план?</div>
+        <p class="text-dim text-base leading-relaxed">Поки немає. Особистий тренер — це особиста персоналізація. Family plan додамо коли матимемо чіткий use case.</p>
+      </div>
+
+      <div class="border border-line rounded-2xl p-6">
+        <div class="text-paper font-medium mb-2">Lifetime deal?</div>
+        <p class="text-dim text-base leading-relaxed">Ні. LTD убиває LTV і шкодить продукту. Subscription з cancel-у-3-кліки — це наш бар довіри. Без хитрощів.</p>
+      </div>
+
+      <div class="border border-line rounded-2xl p-6">
+        <div class="text-paper font-medium mb-2">Чому $19, а не $9 для всіх?</div>
+        <p class="text-dim text-base leading-relaxed">Чесно: західний ринок witholding для українського продукту = неможливо. Геопрайсинг дозволяє Україні мати доступ за зрозумілою ціною, не позбавляючись маржі на Західному ринку.</p>
+      </div>
+
+      <div class="border border-line rounded-2xl p-6">
+        <div class="text-paper font-medium mb-2">B2B / корпоративний пакет?</div>
+        <p class="text-dim text-base leading-relaxed">Зараз — ні. Після M9 (Series A) розглянемо для wellness-програм у компаніях. Якщо є інтерес — write to hello@form.coach.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="border-t border-line py-12 px-8">
+  <div class="max-w-[1480px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <div class="font-serif text-lg text-paper">FORM<span class="text-acid">.</span></div>
+      <div class="label ml-4">Київ · 2026</div>
+    </div>
+    <div class="flex items-center gap-8 font-mono text-xs uppercase tracking-widest text-mute">
+      <a href="/" class="hover:text-paper">Головна</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+      <a href="#" class="hover:text-paper">Приватність</a>
+      <a href="#" class="hover:text-paper">Умови</a>
+    </div>
+    <div class="font-mono text-[10px] text-mute">pricing v0.1</div>
+  </div>
+</footer>
+
+<script>
+  const toggle = document.getElementById('period-toggle');
+  const buttons = toggle.querySelectorAll('button');
+  buttons.forEach(b => b.addEventListener('click', () => {
+    buttons.forEach(x => x.classList.toggle('active', x === b));
+    // toggle pricing display между monthly and annual
+    const isAnnual = b.dataset.period === 'annual';
+    const monthlyEl = document.querySelector('[data-price-western-monthly]');
+    const annualEl = document.querySelector('[data-price-western-annual]');
+    if (isAnnual) {
+      monthlyEl.textContent = '$12.40';
+      annualEl.textContent = '$149';
+    } else {
+      monthlyEl.textContent = '$19';
+      annualEl.textContent = '$149';
+    }
+  }));
+</script>
+</body>
+</html>

@@ -14,6 +14,7 @@ G:\Клод\form\
 ├─ index.html              ← marketing-сайт прототип (відкрити в браузері)
 ├─ onboarding.html         ← onboarding flow прототип, 8 екранів з ED-screening
 ├─ beta.html               ← beta signup landing з 11-полями форми
+├─ pricing.html            ← цінова сторінка з toggle і порівнянням
 ├─ README.md               ← цей файл
 ├─ .claude\
 │  └─ agents\              ← команда субагентів
@@ -49,6 +50,8 @@ G:\Клод\form\
    ├─ PRESS.md             ← press kit, boilerplate, founder bio, FAQ
    ├─ INVESTOR_OUTREACH.md ← target funds, templates, due-dilig pack
    ├─ API.md               ← API design + Postgres schema + rate limits
+   ├─ EMAIL_SEQUENCE.md    ← 18+ email templates, A-D sequences
+   ├─ BETA_PLAYBOOK.md     ← як run TestFlight beta operationally
    └─ FOUNDER.md           ← founder narrative · INTERNAL · not for agents
 content\
    ├─ post-01-hrv-is-lying.md            ← blog 1: «HRV тобі бреше» (draft)

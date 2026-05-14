@@ -16,7 +16,15 @@
 
 ---
 
-## [0.3.6] — 2026-05-14
+## [0.3.7] — 2026-05-14
+
+### Added
+- [`pricing.html`](pricing.html) — pricing page з toggle Monthly/Annual, geo-pricing display, comparison table 5 конкурентів, 8-question FAQ
+- [`docs/EMAIL_SEQUENCE.md`](docs/EMAIL_SEQUENCE.md) — 18+ готових email templates: beta waitlist (A1-A5), active beta (B1-B5), newsletter (C1-C4), transactional (D1-D5), anti-patterns, frequency caps, success metrics
+- [`docs/BETA_PLAYBOOK.md`](docs/BETA_PLAYBOOK.md) — як run TestFlight beta: 3 waves, daily/weekly/monthly ops, Slack structure, bug triage tiers, crisis protocols, post-beta retro
+
+### Changed
+- README: pricing.html додано до структури
 
 ### Added
 - [`beta.html`](beta.html) — beta signup landing з 11-полями форми, ED-friendly, повністю rendered у нашому design system
