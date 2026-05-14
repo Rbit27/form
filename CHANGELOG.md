@@ -16,7 +16,15 @@
 
 ---
 
-## [0.3.2] — 2026-05-14
+## [0.3.3] — 2026-05-14
+
+### Added
+- [`docs/HIRING.md`](docs/HIRING.md) — perші 3 ролі до Seed (Founding Engineer, Design Lead, Sport Science Advisor), interview rubric, compensation philosophy, onboarding 30/60/90, no-go профілі
+- [`docs/PRESS.md`](docs/PRESS.md) — boilerplate (3 lengths), founder bio, company facts, ready-to-use quotes, FAQ для journalists, story angles
+- `content/post-01-hrv-is-lying.md` — перший long-form blog post: «Чому твоє HRV тобі бреше». ~12 хв read, target Артур + Дмитро персони. Draft, pending sport-science advisor review.
+
+### Changed
+- README index extended (HIRING, PRESS) + новий розділ `content/`
 
 ### Added (from local · Opus 4.7)
 - [`docs/LEGAL.md`](docs/LEGAL.md) — privacy policy outline, ToS framework, GDPR special-category data handling, App Store compliance map, ED legal positioning, data breach response plan

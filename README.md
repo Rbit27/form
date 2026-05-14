@@ -44,7 +44,11 @@ G:\Клод\form\
    ├─ RESEARCH.md          ← 30-інтерв'ю план + script v0.1
    ├─ LEGAL.md             ← privacy + ToS + GDPR + App Store compliance
    ├─ METRICS.md           ← NSM, funnel, dashboard, A/B test discipline
+   ├─ HIRING.md            ← 3 ролі до Seed, interview rubric, compensation
+   ├─ PRESS.md             ← press kit, boilerplate, founder bio, FAQ
    └─ FOUNDER.md           ← founder narrative · INTERNAL · not for agents
+content\
+   └─ post-01-hrv-is-lying.md  ← перший long-form пост (draft)
 ```
 
 ---
