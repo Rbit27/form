@@ -16,12 +16,29 @@
 
 ---
 
+## [0.10.0] — 2026-05-14
+
+### Why MINOR
+- Новий документ: `docs/ANALYTICS_SETUP.md` — повний instrumentation guide для Founding Engineer
+- Companion до `PRODUCT_SPEC.md`: що будувати → як вимірювати
+- 65 typed events, W-ACSU computation, PostHog iOS SDK setup, privacy implementation, A/B test guide
+
+### Added
+- [`docs/ANALYTICS_SETUP.md`](docs/ANALYTICS_SETUP.md) — PostHog setup (iOS SDK + Cloudflare EU), 65-event taxonomy з typed enums (no PII), W-ACSU SQL + PostHog formula, AARRR funnel setup, user super-properties, Core dashboard blueprint (11 panels), A/B test flag setup, privacy opt-out implementation, QA checklist per sprint, 3-environment separation (dev/beta/prod)
+
+### Changed
+- [`VERSION`](VERSION) — 0.9.0 → 0.10.0
+- [`STATUS.md`](STATUS.md) — ANALYTICS_SETUP.md у docs-таблиці; doc count 38+→39+; версія → v0.10.0
+- [`README.md`](README.md) — ANALYTICS_SETUP.md у repo tree; doc count оновлено; version refs → v0.10.0
+
+---
+
 ## [0.9.0] — 2026-05-14
 
 ### Why MINOR
 - Новий документ: `docs/PRODUCT_SPEC.md` — повна технічна специфікація iOS-продукту для Founding Engineer
 - Перший документ що синтезує FLOWS + TECHNICAL + API в єдиний "що будуємо" артефакт
-- Включає 12-тижневий sprint plan, acceptance criteria, clinical-safety checklist, CV pipeline spec
+- Інключає 12-тижневий sprint plan, acceptance criteria, clinical-safety checklist, CV pipeline spec
 
 ### Added
 - [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) — iOS product specification: MVP scope (P0/P1/P2), 7 screen specs з acceptance criteria, Victor AI implementation guide, CV pipeline для 8 ліфтів з accuracy targets, HealthKit integration, StoreKit 2 config, 12-тижневий sprint plan (Sprint 0–6 → TestFlight), NFR (performance/battery/privacy/a11y), pre-merge checklist, clinical-safety checklist per sprint

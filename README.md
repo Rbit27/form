@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.9.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.10.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -15,7 +15,7 @@
 This is a **pre-product** project repository. There is no app code yet (mobile development begins з Founding Engineer hire). What you'll find:
 
 - **10 HTML product surfaces** — marketing site + product mockups
-- **38+ markdown documents** — strategic, operational, content
+- **39+ markdown documents** — strategic, operational, content
 - **9 blog post drafts** — content engine ready для launch
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **5 sample programs/nutrition plans** — sport-science discipline reference
@@ -54,7 +54,7 @@ G:\\Клод\\form\\
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
-├── VERSION                 ← single source of truth (0.9.0)
+├── VERSION                 ← single source of truth (0.10.0)
 ├── CHANGELOG.md            ← Keep-a-Changelog format
 ├── CONTRIBUTING.md         ← engineering standards
 ├── STATUS.md               ← project snapshot
@@ -63,7 +63,7 @@ G:\\Клод\\form\\
 ├── .claude/
 │   └── agents/             ← 14 specialized AI agents
 │
-├── docs/                   ← 38+ strategic documents
+├── docs/                   ← 39+ strategic documents
 │   ├── BRAND.md             — design tokens, voice, applications
 │   ├── FLOWS.md             — user flows з ED-screening
 │   ├── MARKETING.md         — GTM, channels, positioning
@@ -97,6 +97,7 @@ G:\\Клод\\form\\
 │   ├── DEPLOYMENT.md        — Cloudflare Pages deploy guide
 │   ├── COMMUNITY.md         — beta community setup (Slack + Discord)
 │   ├── PRODUCT_SPEC.md      — iOS product spec для Founding Engineer (sprints, acceptance criteria)
+│   ├── ANALYTICS_SETUP.md   — PostHog instrumentation guide: 65 events, W-ACSU, dashboards
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
 ├── content/                ← 9 blog posts + social
@@ -238,19 +239,19 @@ Each iteration:
 
 ---
 
-## Метрики проєкту (як of v0.9.0)
+## Метрики проєкту (як of v0.10.0)
 
 | Metric | Value |
 |---|---|
-| Tagged releases | 25+ |
+| Tagged releases | 26+ |
 | HTML pages | 10 |
-| Markdown documents | 38+ |
+| Markdown documents | 39+ |
 | Blog posts (drafts) | 9 |
 | Social content assets | 4 (Twitter, LinkedIn, Reddit, press pitches) |
-| Total lines committed | 20,000+ |
+| Total lines committed | 21,000+ |
 | AI agents defined | 14 |
 | Documented decisions | 24 |
-| Days від v0.1.0 до v0.9.0 | 2 |
+| Days від v0.1.0 до v0.10.0 | 2 |
 
 ---
 
@@ -319,4 +320,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.9.0
+**Last update:** 14 травня 2026 · v0.10.0
