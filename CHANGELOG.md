@@ -16,6 +16,22 @@
 
 ---
 
+## [0.3.2] — 2026-05-14
+
+### Added (from local · Opus 4.7)
+- [`docs/LEGAL.md`](docs/LEGAL.md) — privacy policy outline, ToS framework, GDPR special-category data handling, App Store compliance map, ED legal positioning, data breach response plan
+- [`docs/METRICS.md`](docs/METRICS.md) — NSM (W-ACSU) detailed, AARRR funnel targets, anti-metrics, dashboard layout, cohort analysis framework, A/B test discipline
+- [`docs/FOUNDER.md`](docs/FOUNDER.md) — founder narrative, red lines, anti-motivators, failure thresholds, personal sustainability rules. **Internal — not for agent modification.**
+
+### Added (from cloud · Sonnet 4.6 · commit 9b44ab5, prior to 0.3.2 bump)
+- `onboarding.html` — 8-screen onboarding prototype з ED-screening (SCOFF-light), tone selection, HealthKit permission flow
+- [`docs/APP_STORE.md`](docs/APP_STORE.md) — App Store listing draft: 5 screenshot descriptions, keywords UA/EN, A/B copy variants
+
+### Changed
+- README index extended to include all 9 strategic docs + onboarding prototype
+
+---
+
 ## [0.3.1] — 2026-05-14
 
 ### Added

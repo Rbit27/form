@@ -38,7 +38,13 @@ G:\Клод\form\
    ├─ APP_STORE.md         ← App Store listing draft v0.1 (5 screenshot-описи, keywords, A/B)
    ├─ PITCH.md             ← investor pitch + one-pager v0.1
    ├─ PERSONAS.md          ← 4 детальні user personas v0.1
-   └─ TECHNICAL.md         ← архітектура + стек + CV-pipeline v0.1
+   ├─ TECHNICAL.md         ← архітектура + стек + CV-pipeline v0.1
+   ├─ FINANCIALS.md        ← unit economics + 3-year model v0.1
+   ├─ COMPETITIVE.md       ← deep teardown 8 конкурентів v0.1
+   ├─ RESEARCH.md          ← 30-інтерв'ю план + script v0.1
+   ├─ LEGAL.md             ← privacy + ToS + GDPR + App Store compliance
+   ├─ METRICS.md           ← NSM, funnel, dashboard, A/B test discipline
+   └─ FOUNDER.md           ← founder narrative · INTERNAL · not for agents
 ```
 
 ---
@@ -199,4 +205,4 @@ design-craft        → візуальна продакшн
 **Lead:** Claude (Opus 4.7) · координує команду
 **Cloud iterator:** Claude (Sonnet 4.6) · кожні 2 години через [routine](https://claude.ai/code/routines/trig_01FYEjmyX5cwtRZtEWXWuLtf)
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.3.1
+**Last update:** 14 травня 2026 · v0.3.2
