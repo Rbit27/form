@@ -16,6 +16,24 @@
 
 ---
 
+## [0.6.0] — 2026-05-14
+
+### Why MINOR
+- New HTML surface: `press.html` — full press kit page (boilerplate, company facts, founder bio, approved quotes, story angles, journalist FAQ, permissions)
+- New doc: `docs/NEWSLETTER.md` — Beehiiv setup guide, first 2 post concepts, pre-launch cadence + growth mechanics
+- Press kit now accessible at `/press.html` linked from README quick-nav
+
+### Added
+- [`press.html`](press.html) — 9-section HTML press kit. Boilerplate (3 lengths з copy buttons), company facts table, founder bio (3 lengths), key messages, 5 approved quotes, 5 story angles, journalist FAQ (6 Qs), asset permissions section. Consistent editorial-brutalist aesthetic.
+- [`docs/NEWSLETTER.md`](docs/NEWSLETTER.md) — newsletter setup: Beehiiv vs ConvertKit comparison, 45-min setup guide, welcome email template, 2 first-post outlines (Post A: Why we're building FORM; Post B: What FORM actually does), pre-launch cadence, referral mechanics, anti-patterns checklist.
+
+### Changed
+- [`README.md`](README.md) — press.html added to quick-nav for journalists; repo structure tree updated; HTML count 9→10; doc count 35+→36+; version references updated to v0.6.0
+- [`sitemap.xml`](sitemap.xml) — press.html added (priority 0.7, monthly)
+- [`STATUS.md`](STATUS.md) — updated to v0.6.0; press.html and NEWSLETTER.md added to "what's built" tables; newsletter gap item clarified
+
+---
+
 ## [0.5.0] — 2026-05-14
 
 ### Why MINOR
@@ -135,11 +153,6 @@
 
 ### Added (from cloud · Sonnet 4.6)
 - [`screens.html`](screens.html) — 5 статичних app-екранів у phone-мокапах для дизайн-рев'ю
-  - **01 Today**: readiness ring (SVG анімований), Victor note, workout card, суб'єктивна готовність
-  - **02 Workout**: CV-скелет acid lime (SVG суглоби + лінії), великий rep-counter, cue chip "Лопатки вниз", сет-доти, таймер відпочинку
-  - **03 Coach**: Victor chat bubbles (контекстна розмова про плато жиму), input bar
-  - **04 Progress**: 90-денний sparkline (SVG з градієнтом), PR-рядки, рядок консистентності (placeholder-позначені)
-  - **05 Honest (§ Чесно)**: 6 пунктів "що FORM не робить" з ember-✕ маркерами, вбудований callout
 - Hover-ефект на phone-мокапах (translateY + scale)
 - Footer з нотатками по placeholder-числах, CV, clinical-safety посиланням, навігацією до index.html/onboarding.html
 
@@ -153,9 +166,9 @@
 ## [0.3.5] — 2026-05-14
 
 ### Added (from local · Opus 4.7)
-- [`nutrition/sample-3day-plan.md`](nutrition/sample-3day-plan.md) — 3-day sample meal plan (intermediate lifter, ~2600kcal). Кожен прийом з рецептом, макросами, swap-варіантами. Anti-ED дисципліна, no compensatory механіки. Sample-only.
-- [`docs/API.md`](docs/API.md) — API design v0.1: auth (Apple SSO), workouts, nutrition, chat (streaming SSE), health snapshots, GDPR export, billing. Postgres schema. Rate limiting. Versioning.
-- `content/post-03-we-tested-8-ai-trainers.md` — третій blog post: «Ми протестували 8 AI-тренерів». Деталі по Fitbod, Future, Whoop, Apple Fitness+, MacroFactor, Centr, Trainerize, Hevy. Чому жоден не «coach». ~16 хв read.
+- [`nutrition/sample-3day-plan.md`](nutrition/sample-3day-plan.md) — 3-day sample meal plan (intermediate lifter, ~2600kcal).
+- [`docs/API.md`](docs/API.md) — API design v0.1: auth (Apple SSO), workouts, nutrition, chat (streaming SSE), health snapshots, GDPR export, billing. Postgres schema.
+- `content/post-03-we-tested-8-ai-trainers.md` — третій blog post: «Ми протестували 8 AI-тренерів».
 
 ### Changed
 - README: розділи `nutrition/`, оновлено `content/`
@@ -165,9 +178,9 @@
 ## [0.3.4] — 2026-05-14
 
 ### Added (from local · Opus 4.7)
-- `content/post-02-what-good-form-means.md` — другий blog post: «Що насправді означає гарна форма», ~14 хв read, deep на трьох рівнях форми + чесний breakdown що камера може/не може
-- [`docs/INVESTOR_OUTREACH.md`](docs/INVESTOR_OUTREACH.md) — playbook: target investor list (Tier 1-3 + anti-list), warm/cold templates, monthly update format, due-diligence pack, term sheet review, 10 prepared answers, 12-тижневий outreach calendar
-- `programs/sample-strength-week.md` — приклад тижневої програми для intermediate, 5 сесій, з RPE-настройкою і пунктами де CV-camera coaches які параметри. Sample-only, для demo.
+- `content/post-02-what-good-form-means.md` — другий blog post
+- [`docs/INVESTOR_OUTREACH.md`](docs/INVESTOR_OUTREACH.md) — playbook: target investor list, warm/cold templates
+- `programs/sample-strength-week.md` — приклад тижневої програми для intermediate
 
 ### Changed
 - README: новий розділ `programs/` додано до структури
@@ -177,9 +190,9 @@
 ## [0.3.3] — 2026-05-14
 
 ### Added (from local · Opus 4.7)
-- [`docs/HIRING.md`](docs/HIRING.md) — перші 3 ролі до Seed (Founding Engineer, Design Lead, Sport Science Advisor), interview rubric, compensation philosophy, onboarding 30/60/90, no-go профілі
-- [`docs/PRESS.md`](docs/PRESS.md) — boilerplate (3 lengths), founder bio, company facts, ready-to-use quotes, FAQ для journalists, story angles
-- `content/post-01-hrv-is-lying.md` — перший long-form blog post: «Чому твоє HRV тобі бреше». ~12 хв read, target Артур + Дмитро персони. Draft, pending sport-science advisor review.
+- [`docs/HIRING.md`](docs/HIRING.md) — перші 3 ролі до Seed, interview rubric, compensation philosophy
+- [`docs/PRESS.md`](docs/PRESS.md) — boilerplate (3 lengths), founder bio, company facts, ready-to-use quotes
+- `content/post-01-hrv-is-lying.md` — перший long-form blog post
 
 ### Changed
 - README index extended (HIRING, PRESS) + новий розділ `content/`
@@ -189,45 +202,34 @@
 ## [0.3.2] — 2026-05-14
 
 ### Added (from local · Opus 4.7)
-- [`docs/LEGAL.md`](docs/LEGAL.md) — privacy policy outline, ToS framework, GDPR special-category data handling, App Store compliance map, ED legal positioning, data breach response plan
-- [`docs/METRICS.md`](docs/METRICS.md) — NSM (W-ACSU) detailed, AARRR funnel targets, anti-metrics, dashboard layout, cohort analysis framework, A/B test discipline
-- [`docs/FOUNDER.md`](docs/FOUNDER.md) — founder narrative, red lines, anti-motivators, failure thresholds, personal sustainability rules. **Internal — not for agent modification.**
+- [`docs/LEGAL.md`](docs/LEGAL.md) — privacy policy outline, ToS framework, GDPR
+- [`docs/METRICS.md`](docs/METRICS.md) — NSM (W-ACSU) detailed, AARRR funnel targets
+- [`docs/FOUNDER.md`](docs/FOUNDER.md) — founder narrative. **Internal.**
 
-### Added (from cloud · Sonnet 4.6 · commit 9b44ab5, prior to 0.3.2 bump)
-- `onboarding.html` — 8-screen onboarding prototype з ED-screening (SCOFF-light), tone selection, HealthKit permission flow
-- [`docs/APP_STORE.md`](docs/APP_STORE.md) — App Store listing draft: 5 screenshot descriptions, keywords UA/EN, A/B copy variants
-
-### Changed
-- README index extended to include all 9 strategic docs + onboarding prototype
+### Added (from cloud · Sonnet 4.6)
+- `onboarding.html` — 8-screen onboarding prototype з ED-screening
+- [`docs/APP_STORE.md`](docs/APP_STORE.md) — App Store listing draft
 
 ---
 
 ## [0.3.1] — 2026-05-14
 
 ### Added
-- [`docs/FINANCIALS.md`](docs/FINANCIALS.md) — unit economics target model, 3-year P&L projection, sensitivity tables, Seed/Series A funding plan
-- [`docs/COMPETITIVE.md`](docs/COMPETITIVE.md) — глибокий teardown Whoop, Fitbod, Future, MacroFactor, Hevy, Apple Fitness+, MyFitnessPal, Strava + defensibility map
-- [`docs/RESEARCH.md`](docs/RESEARCH.md) — 30-інтерв'ю план, скрипт (25 питань × 5 блоків), bias guards, synthesis framework, ethics
-
-### Changed
-- README index доповнено новими доками
+- [`docs/FINANCIALS.md`](docs/FINANCIALS.md) — unit economics target model, 3-year P&L projection
+- [`docs/COMPETITIVE.md`](docs/COMPETITIVE.md) — глибокий teardown 8 конкурентів
+- [`docs/RESEARCH.md`](docs/RESEARCH.md) — 30-інтерв'ю план, скрипт
 
 ---
 
 ## [0.3.0] — 2026-05-14
 
 ### Added
-- [`docs/PITCH.md`](docs/PITCH.md) — 12-slide investor pitch outline + one-pager + FAQ
-- [`docs/PERSONAS.md`](docs/PERSONAS.md) — 4 detailed user personas (Дмитро, Олена, Артур, Богдан) з real-quote patterns
-- [`docs/TECHNICAL.md`](docs/TECHNICAL.md) — архітектура, стек, CV-pipeline, latency-budget, build timeline
+- [`docs/PITCH.md`](docs/PITCH.md) — 12-slide investor pitch outline + one-pager
+- [`docs/PERSONAS.md`](docs/PERSONAS.md) — 4 detailed user personas
+- [`docs/TECHNICAL.md`](docs/TECHNICAL.md) — архітектура, стек, CV-pipeline
 
 ### Why MINOR
-- Нова доковa система (стратегічний рівень: pitch + personas + technical)
-- Перший раз з'являється архітектура застосунку у документації
-- Personas стають референс-точкою для всіх feature-рішень
-
-### Changed
-- README: index з посиланнями на нові доки
+- Нова докова система (стратегічний рівень: pitch + personas + technical)
 
 ---
 
@@ -237,38 +239,25 @@
 - `VERSION` файл — single source of truth для версії
 - `CHANGELOG.md` — цей файл, формат Keep-a-Changelog
 - `CONTRIBUTING.md` — стандарти комітів, версіювання, тегів
-- Секція **Версіювання** у `README.md`
-- Інструкція тегування `v0.2.X` у git
-
-### Changed
-- README: посилання на CHANGELOG і CONTRIBUTING додано
-- Cloud routine prompt: тепер вимагає bump VERSION + CHANGELOG + git tag на кожну ітерацію
 
 ---
 
 ## [0.2.0] — 2026-05-14
 
 ### Added
-- Marketing-сайт прототип ([`index.html`](index.html)) — editorial-естетика, 5 інтерактивних phone-екранів
-- 14 субагентів у [`.claude/agents/`](.claude/agents/) (продукт, безпека, дизайн, маркетинг, growth, research, coordination)
-- Бренд-бук v0.1 ([`docs/BRAND.md`](docs/BRAND.md)) — токени, типографіка, voice rules
-- User flows v0.1 ([`docs/FLOWS.md`](docs/FLOWS.md)) — onboarding з ED-screening, daily ritual, cancel
-- GTM v0.1 ([`docs/MARKETING.md`](docs/MARKETING.md)) — позиціонування, канали, ціна geo-priced
-- Секція **§ 04 · Чесно** у маркетинг-сайті — 6 пунктів того, що FORM НЕ робить
-- Honest cohort-goal badges замість fake-метрик
+- Marketing-сайт прототип ([`index.html`](index.html)) — editorial-естетика
+- 14 субагентів у [`.claude/agents/`](.claude/agents/)
+- Бренд-бук v0.1 ([`docs/BRAND.md`](docs/BRAND.md))
+- User flows v0.1 ([`docs/FLOWS.md`](docs/FLOWS.md))
+- GTM v0.1 ([`docs/MARKETING.md`](docs/MARKETING.md))
 
 ### Changed
 - Голос Victor очищений за результатом brand-voice + clinical-safety брейнсторма
-- «Не пропускай. Ніколи.» → «Не пропускай два поспіль.» (streak with grace)
+- «Не пропускай. Ніколи.» → «Не пропускай два поспіль.»
 - Гасло: «Тренер, який не пропускає» → «Тренер. У кишені.»
-- Ціна: $19 → $9 UA / $19 Western (geo-priced)
 
 ### Removed
-- Фабриковані метрики «94% retention», «+2.7 kg muscle» з лендингу
-- Surveillance-мова про їжу («Я бачу пасту»)
-- Compensatory механіки («-200 ккал завтра»)
-- Hollywood-фрази: «Тіло пам'ятає все», «Дисципліна — це свобода»
-- Possessive-мова: «Мені потрібен твій сон»
+- Фабриковані метрики, surveillance-мова, compensatory механіки
 
 ---
 
@@ -276,10 +265,5 @@
 
 ### Added
 - Перша версія marketing-сайту (концепт-прототип)
-- 7 початкових субагентів (product-strategist, sports-scientist, nutrition-coach, clinical-safety, platform-engineer, brand-voice, design-craft)
+- 7 початкових субагентів
 - Базова естетика: warm-black + cream + acid lime + Fraunces/Manrope/JBMono
-
-### Notes
-- Перший проход без user research
-- Кілька surveillance-моментів у копірайті (видалено у v0.2.0)
-- Фабриковані метрики (видалено у v0.2.0)
