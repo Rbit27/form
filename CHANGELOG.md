@@ -16,7 +16,14 @@
 
 ---
 
-## [0.4.5] — 2026-05-14
+## [0.4.6] — 2026-05-14
+
+### Added
+- `content/post-08-why-no-free-tier.md` — 8-й blog post: «Чому FORM ніколи не матиме free tier». MyFitnessPal vs Whoop case studies, чому це для users добре. ~9 хв read.
+- [`docs/B2B_PLAYBOOK.md`](docs/B2B_PLAYBOOK.md) — corporate wellness playbook: target customers, pricing tiers, sales process, what we'll/won't promise companies vs employees, anti-patterns. **NOT activate** до B2C PMF proven.
+
+### Changed
+- [`index.html`](index.html) — nav оновлений: посилання на pricing.html, about.html, faq.html. CTA → beta.html. Інтегрує marketing site.
 
 ### Added
 - [`docs/ENGINEERING_RUNBOOK.md`](docs/ENGINEERING_RUNBOOK.md) — on-call rotation, deployment processes (iOS / backend), monitoring dashboards, incident SEV-0 runbook, code review requirements, secrets management
