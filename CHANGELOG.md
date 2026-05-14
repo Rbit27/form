@@ -16,7 +16,12 @@
 
 ---
 
-## [0.4.4] — 2026-05-14
+## [0.4.5] — 2026-05-14
+
+### Added
+- [`docs/ENGINEERING_RUNBOOK.md`](docs/ENGINEERING_RUNBOOK.md) — on-call rotation, deployment processes (iOS / backend), monitoring dashboards, incident SEV-0 runbook, code review requirements, secrets management
+- `programs/sample-cycle-aware-week.md` — cycle-aware training template (5 фаз), nutrition adjustments per phase, edge cases (birth control, menopause, irregular cycles). Position: helper, not optimizer (evidence base modest).
+- [`docs/INVESTOR_UPDATE_TEMPLATE.md`](docs/INVESTOR_UPDATE_TEMPLATE.md) — monthly investor update template з cadence rules, anti-patterns, bad-month protocol, distribution list guidance
 
 ### Added
 - [`faq.html`](faq.html) — FAQ page з 30+ accordion-style questions у 7 категоріях (Product, Pricing, Camera+Tech, Recovery+Data, Safety, Privacy, Team+Company)
