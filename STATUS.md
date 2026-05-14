@@ -1,7 +1,7 @@
-# FORM · Project Status v0.12.0
+# FORM · Project Status v0.14.0
 
 **Date:** 14 травня 2026
-**Version:** 0.12.0
+**Version:** 0.14.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.12.0 with 28+ tagged releases, 10 functional HTML marketing/product pages, 41+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content, community), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook (Slack structure, moderation guidelines, feedback flows, Discord transition plan), a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with complete decision log. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v0.14.0 with 30+ tagged releases, 11 functional HTML marketing/product pages (including a dedicated investor one-pager at `investors.html`), 43+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content, community), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with 27 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -29,6 +29,7 @@ FORM is at v0.12.0 with 28+ tagged releases, 10 functional HTML marketing/produc
 | [`faq.html`](faq.html) | 30+ questions у 7 categories | v0.4.4 ✓ |
 | [`press.html`](press.html) | Full HTML press kit | v0.6.0 ✓ |
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
+| [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 
 ### Strategic documentation (markdown у `docs/`)
 
@@ -58,7 +59,7 @@ FORM is at v0.12.0 with 28+ tagged releases, 10 functional HTML marketing/produc
 | LAUNCH_CHECKLIST.md | P0/P1/P2 launch gate | founder |
 | I18N.md | Localization plan UA+EN, DE/PL/ES | marketing-lead |
 | APP_STORE.md | App Store listing draft (cloud) | marketing-lead |
-| DECISION_LOG.md | 24 documented decisions | process-keeper |
+| DECISION_LOG.md | 27 documented decisions | process-keeper |
 | ENGINEERING_RUNBOOK.md | On-call, deploy, monitoring | platform-engineer |
 | INVESTOR_UPDATE_TEMPLATE.md | Monthly update format | founder |
 | SUPPORT.md | Customer support playbook | founder |
@@ -70,6 +71,7 @@ FORM is at v0.12.0 with 28+ tagged releases, 10 functional HTML marketing/produc
 | ANALYTICS_SETUP.md | PostHog instrumentation guide — 65 events, W-ACSU SQL, dashboards | platform-engineer |
 | BETA_RECRUITING.md | Beta user recruiting playbook — channels, scoring, timeline до 200 TestFlight users | growth-lead |
 | FIRST_30_DAYS.md | 4-week execution playbook — domain → interviews → investor outreach → FE hire | process-keeper |
+| ASSUMPTIONS_REGISTER.md | 30 pre-research assumptions з confidence levels, pivot criteria, review schedule | research-lead + product-strategist |
 
 ### Content engine (markdown у `content/`)
 
@@ -178,7 +180,9 @@ Now (May 14, 2026)
 ├── v0.10.0 — analytics instrumentation guide for FE (ANALYTICS_SETUP.md)
 ├── v0.11.0 — beta recruiting playbook (channels, scoring, timeline до 200 users)
 ├── v0.12.0 — 4-week execution playbook (FIRST_30_DAYS.md)
-├── Public GitHub repo з 27+ versions tagged
+├── v0.13.0 — 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) + DEC-025/026/027
+├── v0.14.0 — investor one-pager HTML page (investors.html)
+├── Public GitHub repo з 30+ versions tagged
 └── All strategic docs published
 
 Next 2 weeks
@@ -221,14 +225,14 @@ M10-M12 (Q2 2027)
 - DEC-021: No Russian language UI у v1.0
 - DEC-023: Geo-pricing $9 UA / $19 Western
 
-24 total documented decisions з reverse-cost assessment.
+27 total documented decisions з reverse-cost assessment.
 
 ---
 
 ## What's working well
 
 1. **Documentation discipline.** Every decision logged. Every doc versioned. Every tag pushed.
-2. **Brand consistency.** Editorial-brutalist aesthetic holds across 10 HTML pages.
+2. **Brand consistency.** Editorial-brutalist aesthetic holds across 11 HTML pages.
 3. **Safety-first design.** clinical-safety VETO has shaped many decisions positively.
 4. **Operational thinking.** Не just product — full operational playbook (support, ops, B2B, hiring, legal, finance).
 5. **Build-in-public.** Public repo з transparent decision-making.
@@ -277,5 +281,5 @@ M10-M12 (Q2 2027)
 ---
 
 **Updated weekly.** Major changes → new version bump.
-**Last update:** 14 травня 2026 · v0.12.0
+**Last update:** 14 травня 2026 · v0.14.0
 **Next planned update:** після hire of Founding Engineer

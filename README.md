@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.12.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.14.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -14,13 +14,13 @@
 
 This is a **pre-product** project repository. There is no app code yet (mobile development begins з Founding Engineer hire). What you'll find:
 
-- **10 HTML product surfaces** — marketing site + product mockups
-- **41+ markdown documents** — strategic, operational, content
+- **11 HTML product surfaces** — marketing site + product mockups + investor one-pager
+- **43+ markdown documents** — strategic, operational, content
 - **9 blog post drafts** — content engine ready для launch
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **5 sample programs/nutrition plans** — sport-science discipline reference
 - **14 specialized AI agents** — operating model embodied у `.claude/agents/`
-- **Public decision log** — 24 documented decisions з reverse-cost
+- **Public decision log** — 27 documented decisions з reverse-cost
 
 If you're здесь з first time, start з [STATUS.md](STATUS.md) для current snapshot.
 
@@ -28,7 +28,7 @@ If you're здесь з first time, start з [STATUS.md](STATUS.md) для curre
 
 ## Quick navigation
 
-### For investors → [docs/PITCH.md](docs/PITCH.md), [docs/FINANCIALS.md](docs/FINANCIALS.md), [docs/DATA_ROOM.md](docs/DATA_ROOM.md)
+### For investors → [investors.html](investors.html), [docs/PITCH.md](docs/PITCH.md), [docs/FINANCIALS.md](docs/FINANCIALS.md), [docs/DATA_ROOM.md](docs/DATA_ROOM.md)
 ### For journalists → [press.html](press.html), [docs/PRESS.md](docs/PRESS.md), [content/press-pitch-templates.md](content/press-pitch-templates.md)
 ### For potential hires → [hiring/](hiring/), [docs/HIRING.md](docs/HIRING.md)
 ### For builders / advisors → [docs/TECHNICAL.md](docs/TECHNICAL.md), [docs/API.md](docs/API.md)
@@ -51,10 +51,11 @@ G:\\Клод\\form\\
 ├── onboarding.html         ← 8-screen onboarding (cloud)
 ├── press.html              ← HTML press kit (boilerplate, quotes, story angles)
 ├── workout-live.html       ← detailed workout mockup з CV
+├── investors.html          ← investor one-pager (noindex — share directly)
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
-├── VERSION                 ← single source of truth (0.12.0)
+├── VERSION                 ← single source of truth (0.14.0)
 ├── CHANGELOG.md            ← Keep-a-Changelog format
 ├── CONTRIBUTING.md         ← engineering standards
 ├── STATUS.md               ← project snapshot
@@ -87,7 +88,7 @@ G:\\Клод\\form\\
 │   ├── DATA_ROOM.md         — 4-tier investor materials
 │   ├── LAUNCH_CHECKLIST.md  — P0/P1/P2 launch gate
 │   ├── I18N.md              — localization plan
-│   ├── DECISION_LOG.md      — 24 documented decisions
+│   ├── DECISION_LOG.md      — 27 documented decisions
 │   ├── ENGINEERING_RUNBOOK.md — on-call, deploy, monitoring
 │   ├── INVESTOR_UPDATE_TEMPLATE.md — monthly template
 │   ├── SUPPORT.md           — customer support playbook
@@ -100,6 +101,7 @@ G:\\Клод\\form\\
 │   ├── PRODUCT_SPEC.md      — iOS product spec для Founding Engineer (sprints, acceptance criteria)
 │   ├── ANALYTICS_SETUP.md   — PostHog instrumentation guide: 65 events, W-ACSU, dashboards
 │   ├── FIRST_30_DAYS.md     — 4-week execution playbook (domain → interviews → investor → FE hire)
+│   ├── ASSUMPTIONS_REGISTER.md — 30 pre-research assumptions з confidence + pivot criteria
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
 ├── content/                ← 9 blog posts + social
@@ -241,18 +243,18 @@ Each iteration:
 
 ---
 
-## Метрики проєкту (як of v0.12.0)
+## Метрики проєкту (як of v0.14.0)
 
 | Metric | Value |
 |---|---|
-| Tagged releases | 28+ |
-| HTML pages | 10 |
-| Markdown documents | 41+ |
+| Tagged releases | 30+ |
+| HTML pages | 11 |
+| Markdown documents | 43+ |
 | Blog posts (drafts) | 9 |
 | Social content assets | 4 (Twitter, LinkedIn, Reddit, press pitches) |
-| Total lines committed | 21,000+ |
+| Total lines committed | 22,000+ |
 | AI agents defined | 14 |
-| Documented decisions | 24 |
+| Documented decisions | 27 |
 | Days від v0.1.0 до v0.10.0 | 2 |
 
 ---
@@ -290,7 +292,7 @@ If you read **two**: + [docs/PITCH.md](docs/PITCH.md)
 If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 
 Якщо ти **журналіст**: [press.html](press.html) → [docs/PRESS.md](docs/PRESS.md)
-Якщо ти **інвестор**: [docs/PITCH.md](docs/PITCH.md) → [docs/DATA_ROOM.md](docs/DATA_ROOM.md)
+Якщо ти **інвестор**: [investors.html](investors.html) → [docs/PITCH.md](docs/PITCH.md) → [docs/DATA_ROOM.md](docs/DATA_ROOM.md)
 Якщо ти **потенційний hire**: [hiring/](hiring/) → [docs/FOUNDER.md](docs/FOUNDER.md)
 Якщо ти **advisor**: [docs/TECHNICAL.md](docs/TECHNICAL.md) і [docs/METRICS.md](docs/METRICS.md)
 
@@ -322,4 +324,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.12.0
+**Last update:** 14 травня 2026 · v0.14.0

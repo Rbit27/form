@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Investors</title>
+<meta name="description" content="FORM is raising $1.5–2.5M Seed. AI personal trainer with real-time camera coaching, HRV-aware programming, and a voice that respects the user." />
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { ink:'#0B0A07', deep:'#13110C', line:'#1F1D16', mute:'#6F6A60', dim:'#A39D8E', paper:'#F3EEE0', cream:'#E7DFC8', acid:'#DDFF2D', ember:'#FF5733' },
+    fontFamily: { serif:['Fraunces','serif'], sans:['Manrope','sans-serif'], mono:['JetBrains Mono','monospace'] }
+  }}};
+</script>
+<style>
+  html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; }
+  .display { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:0.86; }
+  .display em { font-style:italic; font-weight:300; }
+  .display b { font-weight:700; font-style:normal; }
+  .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+  .num { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  ::selection { background:#DDFF2D; color:#0B0A07; }
+  .grain::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.06;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:220px;
+  }
+  .btn-acid { background:#DDFF2D; color:#0B0A07; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:600; padding:16px 28px; border-radius:9999px; display:inline-block; transition:transform 0.15s, background 0.2s; }
+  .btn-acid:hover { background:#ECFF6B; transform:translateY(-1px); }
+  .btn-ghost { border:1px solid #1F1D16; color:#A39D8E; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:500; padding:14px 24px; border-radius:9999px; display:inline-block; transition:border-color 0.15s, color 0.15s; }
+  .btn-ghost:hover { border-color:#A39D8E; color:#F3EEE0; }
+  .stat-num { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:1; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<header class="border-b border-line">
+  <div class="max-w-[1480px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-[12px] font-mono tracking-widest uppercase text-mute">
+      <a href="/" class="hover:text-paper">Demo</a>
+      <a href="/pricing.html" class="hover:text-paper">Pricing</a>
+      <a href="/about.html" class="hover:text-paper">About</a>
+      <a href="/press.html" class="hover:text-paper">Press</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+    </nav>
+    <a href="mailto:invest@form.coach" class="btn-ghost">invest@form.coach</a>
+  </div>
+</header>
+
+<div class="fixed top-1/2 -translate-y-1/2 -left-40 w-[600px] h-[600px] bg-acid/8 blur-[140px] rounded-full pointer-events-none"></div>
+<div class="fixed -bottom-32 right-0 w-[500px] h-[500px] bg-ember/8 blur-[160px] rounded-full pointer-events-none"></div>
+
+<!-- Hero -->
+<section class="relative pt-32 pb-20 px-8">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ Investor Overview · Seed · May 2026</div>
+    <h1 class="display text-paper text-[clamp(72px,12vw,200px)] mb-12">
+      The<br><em>raise.</em>
+    </h1>
+    <p class="text-dim text-xl leading-relaxed max-w-[700px] mb-10">
+      FORM is raising <span class="text-paper font-semibold">$1.5–2.5M Seed</span> to ship an iOS app that watches your lifting form through the phone camera, adapts your program to HRV, and coaches you with a voice that doesn't bullshit. Pre-product. Full transparency. Build-in-public.
+    </p>
+    <div class="flex flex-wrap gap-4">
+      <a href="mailto:invest@form.coach" class="btn-acid">Email invest@form.coach →</a>
+      <a href="#ask" class="btn-ghost">The ask ↓</a>
+      <a href="#traction" class="btn-ghost">Traction ↓</a>
+      <a href="https://github.com/Rbit27/form" class="btn-ghost" target="_blank" rel="noopener">GitHub →</a>
+    </div>
+  </div>
+</section>
+
+<!-- Stats bar -->
+<section class="relative py-16 px-8 border-t border-b border-line bg-deep/40">
+  <div class="max-w-[1100px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-10">
+    <div>
+      <div class="stat-num text-acid text-[clamp(48px,6vw,80px)]">$1.5M</div>
+      <div class="label mt-2">Seed floor</div>
+    </div>
+    <div>
+      <div class="stat-num text-paper text-[clamp(48px,6vw,80px)]">18</div>
+      <div class="label mt-2">months runway</div>
+    </div>
+    <div>
+      <div class="stat-num text-paper text-[clamp(48px,6vw,80px)]">Q3</div>
+      <div class="label mt-2">TestFlight beta</div>
+    </div>
+    <div>
+      <div class="stat-num text-paper text-[clamp(48px,6vw,80px)]">Q4</div>
+      <div class="label mt-2">App Store launch</div>
+    </div>
+  </div>
+</section>
+
+<!-- Problem + Solution -->
+<section class="relative py-20 px-8 border-b border-line">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ 01 · The gap</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-16">
+      Every AI trainer<br>gives you a <em>plan.</em><br>None of them<br><b>watch.</b>
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="label mb-4" style="color:#FF5733">Human trainer</div>
+        <div class="text-paper text-2xl font-semibold mb-3">$200–400/week</div>
+        <p class="text-dim text-sm leading-relaxed">Real-time form coaching, adaptive programming. Expensive, scheduled, person-dependent.</p>
+      </div>
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="label mb-4" style="color:#FF5733">Fitbod / Hevy</div>
+        <div class="text-paper text-2xl font-semibold mb-3">$0–13/month</div>
+        <p class="text-dim text-sm leading-relaxed">Program generation and workout logging. Doesn't watch you move. Doesn't respond to your sleep. No coaching voice.</p>
+      </div>
+      <div class="bg-acid/10 border border-acid/30 rounded-xl p-8">
+        <div class="label mb-4" style="color:#DDFF2D">FORM</div>
+        <div class="text-paper text-2xl font-semibold mb-3">$9–19/month</div>
+        <p class="text-dim text-sm leading-relaxed">Camera watches your squat. Program adjusts to your HRV. Victor coaches without the bullshit. All three, one product.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Product -->
+<section class="relative py-20 px-8 border-b border-line bg-deep/30">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ 02 · Product</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-16">
+      Four layers.<br><em>One voice.</em>
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="border border-line rounded-xl p-8 space-y-3">
+        <div class="w-10 h-10 rounded-lg bg-acid/15 flex items-center justify-center">
+          <span class="text-acid font-mono text-xs font-bold">CV</span>
+        </div>
+        <div class="text-paper text-lg font-semibold">Camera coaching</div>
+        <p class="text-dim text-sm leading-relaxed">Real-time pose analysis on 8 base lifts (squat, deadlift, bench, press, row, hinge, pull, lunge). On-device inference — video never leaves the phone. Flags gross form deviations in the rep.</p>
+        <div class="label" style="color:#DDFF2D">Technical bet · iPhone 13+ · 30fps on-device</div>
+      </div>
+      <div class="border border-line rounded-xl p-8 space-y-3">
+        <div class="w-10 h-10 rounded-lg bg-acid/15 flex items-center justify-center">
+          <span class="text-acid font-mono text-xs font-bold">HRV</span>
+        </div>
+        <div class="text-paper text-lg font-semibold">Recovery-aware programming</div>
+        <p class="text-dim text-sm leading-relaxed">Reads Apple Health, Whoop, Oura, Garmin. Daily program adapts to HRV + sleep score. Not a static monthly plan — a response to how you slept last night.</p>
+        <div class="label" style="color:#DDFF2D">HealthKit + third-party wearables</div>
+      </div>
+      <div class="border border-line rounded-xl p-8 space-y-3">
+        <div class="w-10 h-10 rounded-lg bg-acid/15 flex items-center justify-center">
+          <span class="text-acid font-mono text-xs font-bold">V</span>
+        </div>
+        <div class="text-paper text-lg font-semibold">Victor — the coaching voice</div>
+        <p class="text-dim text-sm leading-relaxed">Single named persona. Smart-direct by default. No motivational posters. No surveillance language. Four calibration tones. Clinical-safety floor: no shame, no before/after, no ED triggers.</p>
+        <div class="label" style="color:#DDFF2D">LLM + ElevenLabs TTS · 4 tones</div>
+      </div>
+      <div class="border border-line rounded-xl p-8 space-y-3">
+        <div class="w-10 h-10 rounded-lg bg-acid/15 flex items-center justify-center">
+          <span class="text-acid font-mono text-xs font-bold">Rx</span>
+        </div>
+        <div class="text-paper text-lg font-semibold">Nutrition with respect</div>
+        <p class="text-dim text-sm leading-relaxed">Non-skippable ED-screening at onboarding (clinical-safety HARD VETO from day one). Meal plans without calorie obsession. No food surveillance. Designed around the NEDA standard.</p>
+        <div class="label" style="color:#DDFF2D">SCOFF-light screening · non-skippable</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Market -->
+<section class="relative py-20 px-8 border-b border-line">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ 03 · Market</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-16">
+      The wedge is<br><em>real.</em>
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-10 mb-16">
+      <div>
+        <div class="stat-num text-paper text-[clamp(40px,5vw,72px)]">12M</div>
+        <div class="label mt-2 mb-3">SAM — self-coached lifters with wearables, 25–45, Western + UA/EE</div>
+        <p class="text-dim text-xs leading-relaxed">The addressable population who already pays for fitness software and already has the hardware we require.</p>
+      </div>
+      <div>
+        <div class="stat-num text-paper text-[clamp(40px,5vw,72px)]">3M</div>
+        <div class="label mt-2 mb-3">Already pay $20+/month for fitness apps today</div>
+        <p class="text-dim text-xs leading-relaxed">These users exist. They are paying. None of their current tools watch them move.</p>
+      </div>
+      <div>
+        <div class="stat-num text-acid text-[clamp(40px,5vw,72px)]">$25M</div>
+        <div class="label mt-2 mb-3">ARR target — year 3 (50–100k paid subscribers)</div>
+        <p class="text-dim text-xs leading-relaxed">Conservative scenario at $19 Western ARPU and 60% annual uptake. These are targets, not results.</p>
+      </div>
+    </div>
+    <div class="bg-deep/50 border border-line rounded-xl p-8">
+      <div class="label mb-4">Why now — three things converged in 2026</div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
+        <div>
+          <div class="text-paper font-semibold mb-2">Apple Vision matured</div>
+          <p class="text-dim leading-relaxed">iPhone 12+ delivers accurate 33-keypoint pose estimation at 30fps on-device. Real-time coaching without cloud latency was not achievable at consumer cost before 2025.</p>
+        </div>
+        <div>
+          <div class="text-paper font-semibold mb-2">Wearables penetration</div>
+          <p class="text-dim leading-relaxed">80M+ active users in Western markets have HRV data available via API. Apple Watch, Garmin, Whoop, Oura — the dataset we need exists in users' pockets.</p>
+        </div>
+        <div>
+          <div class="text-paper font-semibold mb-2">LLM coaching voice</div>
+          <p class="text-dim leading-relaxed">Claude-class models in 2026 hold persona consistency and clinical-safety constraints reliably. Victor's voice — 20-year coach, no bullshit — was not possible to maintain at scale in 2022.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Traction (honest) -->
+<section id="traction" class="relative py-20 px-8 border-b border-line bg-deep/30">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ 04 · Traction (honest)</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-6">
+      Pre-product.<br><em>No users.</em><br><b>Full transparency.</b>
+    </h2>
+    <p class="text-dim text-lg leading-relaxed max-w-[640px] mb-16">We don't have users or revenue yet. This round is a bet on team + concept + market timing. Here's what we do have — and what we've committed to deliver before close.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div>
+        <div class="label mb-6" style="color:#DDFF2D">What exists today (v0.14 · May 2026)</div>
+        <ul class="space-y-3">
+          <li class="flex items-start gap-3"><span class="text-acid font-mono mt-0.5">✓</span><span class="text-paper text-sm">11 HTML product surfaces — marketing site, onboarding, workout mockup, pricing, settings, beta form, investor page</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid font-mono mt-0.5">✓</span><span class="text-paper text-sm">43+ strategic documents — product spec, brand book, GTM, pitch, financials, OKRs, legal drafts</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid font-mono mt-0.5">✓</span><span class="text-paper text-sm">14 specialized AI agents — operating model, clinical-safety HARD VETO enforced from v0.1</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid font-mono mt-0.5">✓</span><span class="text-paper text-sm">iOS product spec + sprint plan (12 weeks to TestFlight)</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid font-mono mt-0.5">✓</span><span class="text-paper text-sm">30+ tagged releases. Public GitHub. 27 documented decisions.</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid font-mono mt-0.5">✓</span><span class="text-paper text-sm">3 hiring JDs ready to post (Founding Engineer, Design Lead, Sport Science Advisor)</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="label mb-6" style="color:#FF5733">Committed pre-close milestones</div>
+        <ul class="space-y-3">
+          <li class="flex items-start gap-3"><span class="text-ember font-mono mt-0.5">→</span><span class="text-dim text-sm">30 user interviews — personas validated, pricing tested, JTBD confirmed</span></li>
+          <li class="flex items-start gap-3"><span class="text-ember font-mono mt-0.5">→</span><span class="text-dim text-sm">TestFlight closed beta with 200 lifters (Q3 2026)</span></li>
+          <li class="flex items-start gap-3"><span class="text-ember font-mono mt-0.5">→</span><span class="text-dim text-sm">CV pipeline validated on 3 base lifts — squat, deadlift, bench</span></li>
+          <li class="flex items-start gap-3"><span class="text-ember font-mono mt-0.5">→</span><span class="text-dim text-sm">First cohort metrics — D7, D30 retention, NPS</span></li>
+          <li class="flex items-start gap-3"><span class="text-ember font-mono mt-0.5">→</span><span class="text-dim text-sm">Founding Engineer and Design Lead hired</span></li>
+        </ul>
+        <p class="text-mute font-mono text-xs mt-8">If we miss these — you'll know. We update investors monthly on the 14th. No spin.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Business model + unit economics -->
+<section class="relative py-20 px-8 border-b border-line">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ 05 · Business model</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-16">
+      Subscription.<br><em>No free tier.</em>
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="label mb-4">Western EU / UK / US</div>
+        <div class="text-paper text-3xl font-semibold mb-1">$19 <span class="text-mute text-base font-normal">/month</span></div>
+        <div class="text-dim text-sm mb-4">or $149/year (−34%)</div>
+        <p class="text-mute text-xs leading-relaxed">14-day free trial. Cancel in 3 clicks. No retention dark patterns.</p>
+      </div>
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="label mb-4">Ukraine / Eastern Europe</div>
+        <div class="text-paper text-3xl font-semibold mb-1">$9 <span class="text-mute text-base font-normal">/month</span></div>
+        <div class="text-dim text-sm mb-4">or $69/year (−34%)</div>
+        <p class="text-mute text-xs leading-relaxed">Geo-pricing preserves accessibility without destroying margin. Validated against local purchasing power.</p>
+      </div>
+      <div class="bg-acid/10 border border-acid/30 rounded-xl p-8">
+        <div class="label mb-4">Unit economics (target)</div>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-dim">CAC (organic)</span><span class="text-paper num">$20–35</span></div>
+          <div class="flex justify-between"><span class="text-dim">LTV (12-mo avg)</span><span class="text-paper num">$130–180</span></div>
+          <div class="flex justify-between"><span class="text-dim">LTV / CAC</span><span class="text-acid font-semibold num">4–7×</span></div>
+          <div class="flex justify-between"><span class="text-dim">Gross margin</span><span class="text-paper num">78–84%</span></div>
+        </div>
+        <p class="text-mute font-mono text-xs mt-4">These are targets. Not results. No revenue exists yet.</p>
+      </div>
+    </div>
+    <div class="border border-line rounded-xl p-8">
+      <div class="label mb-4">Why no free tier</div>
+      <p class="text-dim text-base leading-relaxed max-w-[720px]">MyFitnessPal's model illustrates the problem: free tier users generate low LTV, drive support costs up, and dilute the product signal. A 14-day free trial removes commitment friction while preserving user intent — only people serious about training enter their payment details. This is a deliberate brand decision, not an oversight.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Team -->
+<section class="relative py-20 px-8 border-b border-line bg-deep/30">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ 06 · Team</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-6">
+      1 + 14.<br><em>Not a</em><br><b>joke.</b>
+    </h2>
+    <p class="text-dim text-lg leading-relaxed max-w-[640px] mb-16">One human founder. 14 specialized AI agents with distinct mandates. This is the operating model. It's not a parlor trick — it's how we built 43+ documents, 11 HTML surfaces, and a full operational playbook before writing a line of app code.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+      <div class="border border-line rounded-xl p-8">
+        <div class="label mb-4">Founder · George (Rbit27)</div>
+        <p class="text-paper text-base leading-relaxed mb-4">10 years software engineering in product companies. Personal training practice — self-coached, two PT cycles, tested every major fitness app. Built FORM because the gap between sports science and available consumer products was structural.</p>
+        <a href="https://github.com/Rbit27/form" class="text-acid font-mono text-xs hover:underline" target="_blank" rel="noopener">github.com/Rbit27/form →</a>
+      </div>
+      <div class="border border-line rounded-xl p-8">
+        <div class="label mb-4">Hiring now</div>
+        <div class="space-y-4">
+          <div>
+            <div class="text-paper text-sm font-semibold">Founding Engineer (iOS)</div>
+            <p class="text-dim text-xs mt-1">Swift + SwiftUI. AVFoundation / Vision. Shipped iOS app. $90–130k + 1.5–3% equity.</p>
+          </div>
+          <div>
+            <div class="text-paper text-sm font-semibold">Design Lead</div>
+            <p class="text-dim text-xs mt-1">Motion, UI craft, brand system ownership. Editorial-brutalist aesthetic. Remote.</p>
+          </div>
+          <div>
+            <div class="text-paper text-sm font-semibold">Sport Science Advisor</div>
+            <p class="text-dim text-xs mt-1">Evidence-based programming, HRV, periodization. Advisory equity.</p>
+          </div>
+        </div>
+        <a href="/hiring/" class="text-acid font-mono text-xs mt-4 inline-block hover:underline">See JDs →</a>
+      </div>
+    </div>
+    <div class="bg-deep/50 border border-line rounded-xl p-8">
+      <div class="label mb-4">Why the AI-agent model works at pre-seed</div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+        <p class="text-dim leading-relaxed"><span class="text-paper">Clinical-safety agent</span> has enforced a HARD VETO on any content touching ED, body image, or injury since v0.1. This protects the product in ways most fitness startups don't think about until it costs them.</p>
+        <p class="text-dim leading-relaxed"><span class="text-paper">Brand-voice + design-craft agents</span> hold consistent aesthetic and tone across 11 HTML pages and 43+ docs — work that would take a senior designer and copywriter months in a traditional team.</p>
+        <p class="text-dim leading-relaxed"><span class="text-paper">Sports-scientist + nutrition-coach agents</span> replace early-stage expert consultants and ensure every training recommendation is grounded in evidence before a human coach joins the team.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Risks (honest) -->
+<section class="relative py-20 px-8 border-b border-line">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ 07 · Risks</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-16">
+      The honest<br><em>case.</em>
+    </h2>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse text-sm">
+        <thead>
+          <tr class="border-b border-line">
+            <th class="text-left py-4 pr-8 font-mono text-mute text-xs tracking-widest uppercase">Risk</th>
+            <th class="text-left py-4 pr-8 font-mono text-mute text-xs tracking-widest uppercase">Severity</th>
+            <th class="text-left py-4 font-mono text-mute text-xs tracking-widest uppercase">What happens if we're wrong</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-line/50">
+            <td class="py-4 pr-8 text-paper">CV quality falls short of coaching</td>
+            <td class="py-4 pr-8"><span class="text-ember font-mono text-xs">HIGH</span></td>
+            <td class="py-4 text-dim">Ship as "beta assistant" + rep counter. Voice + program + HRV is still a $15–20M ARR business. CV is upside, not survival.</td>
+          </tr>
+          <tr class="border-b border-line/50">
+            <td class="py-4 pr-8 text-paper">Whoop / Apple blocks API</td>
+            <td class="py-4 pr-8"><span class="text-dim font-mono text-xs">MED</span></td>
+            <td class="py-4 text-dim">Apple HealthKit is native — not dependent on Whoop. We don't rely on one wearable partner for core functionality.</td>
+          </tr>
+          <tr class="border-b border-line/50">
+            <td class="py-4 pr-8 text-paper">UA team building Western product</td>
+            <td class="py-4 pr-8"><span class="text-dim font-mono text-xs">LOW–MED</span></td>
+            <td class="py-4 text-dim">Distributed-by-default architecture. Product decision-making is market-agnostic. English-first brand.</td>
+          </tr>
+          <tr class="border-b border-line/50">
+            <td class="py-4 pr-8 text-paper">Paid CAC exceeds LTV at scale</td>
+            <td class="py-4 pr-8"><span class="text-dim font-mono text-xs">MED</span></td>
+            <td class="py-4 text-dim">Paid CAC stops entirely until M4. Reddit / YouTube / build-in-public is the growth channel to M3. Organic-first is a discipline, not an assumption.</td>
+          </tr>
+          <tr>
+            <td class="py-4 pr-8 text-paper">Incumbent acquires us before launch</td>
+            <td class="py-4 pr-8"><span class="text-acid font-mono text-xs">GOOD</span></td>
+            <td class="py-4 text-dim">This is an option, not a risk.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- The ask -->
+<section id="ask" class="relative py-20 px-8 border-b border-line bg-deep/30">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ 08 · The ask</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-16">
+      $1.5–2.5M.<br><em>18 months.</em><br><b>One shot.</b>
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
+      <div>
+        <div class="label mb-6">Where the capital goes</div>
+        <div class="space-y-4">
+          <div class="flex justify-between items-center border-b border-line/50 pb-3">
+            <span class="text-paper text-sm">Engineering team (2 mobile + 1 backend × 18 mo)</span>
+            <span class="text-acid num font-mono font-semibold">$700k</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line/50 pb-3">
+            <span class="text-paper text-sm">CV R&amp;D pipeline</span>
+            <span class="text-paper num font-mono">$400k</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line/50 pb-3">
+            <span class="text-paper text-sm">Design + production</span>
+            <span class="text-paper num font-mono">$300k</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line/50 pb-3">
+            <span class="text-paper text-sm">Infrastructure (Apple Dev + cloud + LLM)</span>
+            <span class="text-paper num font-mono">$200k</span>
+          </div>
+          <div class="flex justify-between items-center border-b border-line/50 pb-3">
+            <span class="text-paper text-sm">First-touch marketing</span>
+            <span class="text-paper num font-mono">$250k</span>
+          </div>
+          <div class="flex justify-between items-center pb-3">
+            <span class="text-paper text-sm">Operations + legal + buffer</span>
+            <span class="text-paper num font-mono">$400k+</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="label mb-6">What we're committing to deliver</div>
+        <ul class="space-y-4">
+          <li class="flex items-start gap-3">
+            <span class="text-acid font-mono mt-0.5">01</span>
+            <div>
+              <div class="text-paper text-sm font-semibold">5k active beta users on TestFlight</div>
+              <p class="text-dim text-xs mt-1">D30 retention ≥ 22%. Real cohort data before Series A conversation.</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="text-acid font-mono mt-0.5">02</span>
+            <div>
+              <div class="text-paper text-sm font-semibold">CV pipeline on 3 base lifts</div>
+              <p class="text-dim text-xs mt-1">Squat, deadlift, bench. NPS ≥ 40 on form-coaching feature specifically.</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="text-acid font-mono mt-0.5">03</span>
+            <div>
+              <div class="text-paper text-sm font-semibold">App Store launch (UA + Western EU)</div>
+              <p class="text-dim text-xs mt-1">Q4 2026. First 500 paid subscribers without paid acquisition.</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="text-acid font-mono mt-0.5">04</span>
+            <div>
+              <div class="text-paper text-sm font-semibold">Series A-ready metrics</div>
+              <p class="text-dim text-xs mt-1">$1M ARR path visible by Q1 2027. Android started. First B2B pilot considered.</p>
+            </div>
+          </li>
+        </ul>
+        <div class="label mt-8 mb-3">What we need beyond capital</div>
+        <ul class="space-y-2 text-sm text-dim">
+          <li class="flex items-start gap-2"><span class="text-mute">→</span>Distribution into Reddit / YouTube fitness creator network</li>
+          <li class="flex items-start gap-2"><span class="text-mute">→</span>Mobile + ML hire network (iOS + Vision framework)</li>
+          <li class="flex items-start gap-2"><span class="text-mute">→</span>Apple App Store featuring relationships</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Contact + links -->
+<section class="relative py-20 px-8 border-b border-line">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ 09 · Next steps</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">
+      Email us.<br><em>Or read</em><br><b>everything.</b>
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <div>
+        <p class="text-dim text-lg leading-relaxed mb-8">If this looks like a fit — email <span class="text-paper">invest@form.coach</span>. Include how you heard about us and what in the pitch you want to dig into. No pitch competition, no deck email, no «would love your feedback.» We'll schedule a 30-minute call and share the full data room.</p>
+        <a href="mailto:invest@form.coach" class="btn-acid">Email invest@form.coach →</a>
+      </div>
+      <div>
+        <div class="label mb-6">Full materials</div>
+        <div class="space-y-3">
+          <a href="https://github.com/Rbit27/form/blob/main/docs/PITCH.md" class="flex items-center justify-between p-4 border border-line rounded-lg hover:border-acid/50 transition-colors group" target="_blank" rel="noopener">
+            <div>
+              <div class="text-paper text-sm font-semibold">Pitch deck</div>
+              <p class="text-mute text-xs mt-0.5">12 slides · docs/PITCH.md</p>
+            </div>
+            <span class="text-mute group-hover:text-acid font-mono text-xs transition-colors">→</span>
+          </a>
+          <a href="https://github.com/Rbit27/form/blob/main/docs/FINANCIALS.md" class="flex items-center justify-between p-4 border border-line rounded-lg hover:border-acid/50 transition-colors group" target="_blank" rel="noopener">
+            <div>
+              <div class="text-paper text-sm font-semibold">Financial model</div>
+              <p class="text-mute text-xs mt-0.5">Unit econ, 3-year P&amp;L · docs/FINANCIALS.md</p>
+            </div>
+            <span class="text-mute group-hover:text-acid font-mono text-xs transition-colors">→</span>
+          </a>
+          <a href="https://github.com/Rbit27/form/blob/main/docs/DATA_ROOM.md" class="flex items-center justify-between p-4 border border-line rounded-lg hover:border-acid/50 transition-colors group" target="_blank" rel="noopener">
+            <div>
+              <div class="text-paper text-sm font-semibold">Data room</div>
+              <p class="text-mute text-xs mt-0.5">4-tier investor materials · docs/DATA_ROOM.md</p>
+            </div>
+            <span class="text-mute group-hover:text-acid font-mono text-xs transition-colors">→</span>
+          </a>
+          <a href="https://github.com/Rbit27/form/blob/main/docs/TECHNICAL.md" class="flex items-center justify-between p-4 border border-line rounded-lg hover:border-acid/50 transition-colors group" target="_blank" rel="noopener">
+            <div>
+              <div class="text-paper text-sm font-semibold">Technical architecture</div>
+              <p class="text-mute text-xs mt-0.5">CV pipeline, stack, latency · docs/TECHNICAL.md</p>
+            </div>
+            <span class="text-mute group-hover:text-acid font-mono text-xs transition-colors">→</span>
+          </a>
+          <a href="https://github.com/Rbit27/form" class="flex items-center justify-between p-4 border border-line rounded-lg hover:border-acid/50 transition-colors group" target="_blank" rel="noopener">
+            <div>
+              <div class="text-paper text-sm font-semibold">Public GitHub repository</div>
+              <p class="text-mute text-xs mt-0.5">30+ tagged releases · 27 documented decisions</p>
+            </div>
+            <span class="text-mute group-hover:text-acid font-mono text-xs transition-colors">→</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="relative py-16 px-8">
+  <div class="max-w-[1100px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <div class="font-serif text-lg tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </div>
+    <div class="label text-mute">Pre-product · Kyiv · 2026 · v0.14.0</div>
+    <div class="flex items-center gap-6 text-[11px] font-mono tracking-widest uppercase text-mute">
+      <a href="mailto:invest@form.coach" class="hover:text-paper">invest@form.coach</a>
+      <a href="/press.html" class="hover:text-paper">Press</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+      <a href="https://github.com/Rbit27/form" class="hover:text-paper" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
