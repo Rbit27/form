@@ -16,7 +16,15 @@
 
 ---
 
-## [0.4.1] — 2026-05-14
+## [0.4.2] — 2026-05-14
+
+### Added
+- [`docs/I18N.md`](docs/I18N.md) — internationalization plan: UA+EN ship v1.0, DE/PL/ES phase 1 (Q2 2027), cost breakdown ($8.5k per language), cultural calibration notes, decision framework, RTL/CJK explicitly off-roadmap
+- `content/press-pitch-templates.md` — 5 ready-to-customize pitch templates: TechCrunch/Verge, Hacker News (Show HN), Lex/Huberman podcasts, YouTube creators (Jeff Nippard tier), Lenny/Stratechery newsletters. Anti-patterns + tracking method.
+- `content/reddit-launch-posts.md` — 3 готові пости: r/fitness (honest review of 8 AI apps), r/weightroom (technical pose-estimation breakdown), r/xxfitness (women-focused frustrations + questions). Engagement plans, mod-relations, anti-patterns.
+
+### Changed
+- README: updated structure (поки не критично, наступний commit)
 
 ### Added
 - `hiring/jd-founding-engineer-ios.md` — Standalone JD: $90-130k base + 1.5-3% equity. Process, tech stack, what success looks like 1/3/6/12 months, honest-truth section.
