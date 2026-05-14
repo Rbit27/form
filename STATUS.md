@@ -1,7 +1,7 @@
-# FORM · Project Status v0.7.0
+# FORM · Project Status v0.8.0
 
 **Date:** 14 травня 2026
-**Version:** 0.7.0
+**Version:** 0.8.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.7.0 with 23+ tagged releases, 10 functional HTML marketing/product pages, 32+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, 12 LinkedIn posts ready to publish, sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with complete decision log. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed.
+FORM is at v0.8.0 with 24+ tagged releases, 10 functional HTML marketing/product pages, 37+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content, community), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook (Slack structure, moderation guidelines, feedback flows, Discord transition plan), sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with complete decision log. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed.
 
 ---
 
@@ -65,6 +65,7 @@ FORM is at v0.7.0 with 23+ tagged releases, 10 functional HTML marketing/product
 | B2B_PLAYBOOK.md | Corporate wellness (post-PMF) | founder |
 | CONTENT_CALENDAR.md | 90-day editorial calendar | content-strategist |
 | NEWSLETTER.md | Newsletter platform setup + 2 post concepts | content-strategist |
+| COMMUNITY.md | Beta community setup (Slack + Discord, moderation) | process-keeper |
 
 ### Content engine (markdown у `content/`)
 
@@ -134,6 +135,7 @@ FORM is at v0.7.0 with 23+ tagged releases, 10 functional HTML marketing/product
 - [ ] Bank account
 - [ ] Accounting setup
 - [ ] Investor relationships warm
+- [x] Beta community setup guide → `docs/COMMUNITY.md` (Slack structure, Discord plan, moderation)
 
 ### Validation
 - [ ] 30 user interviews conducted
@@ -167,7 +169,8 @@ FORM is at v0.7.0 with 23+ tagged releases, 10 functional HTML marketing/product
 Now (May 14, 2026)
 ├── v0.6.0 — press kit HTML + newsletter guide
 ├── v0.7.0 — LinkedIn posts (12 ready) + social content complete
-├── Public GitHub repo з 23+ versions tagged
+├── v0.8.0 — beta community setup guide (Slack + Discord + moderation)
+├── Public GitHub repo з 24+ versions tagged
 └── All strategic docs published
 
 Next 2 weeks
@@ -266,5 +269,5 @@ M10-M12 (Q2 2027)
 ---
 
 **Updated weekly.** Major changes → new version bump.
-**Last update:** 14 травня 2026 · v0.7.0
+**Last update:** 14 травня 2026 · v0.8.0
 **Next planned update:** після hire of Founding Engineer

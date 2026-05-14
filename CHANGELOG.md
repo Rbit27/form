@@ -16,6 +16,23 @@
 
 ---
 
+## [0.8.0] — 2026-05-14
+
+### Why MINOR
+- Новий операційний документ: `docs/COMMUNITY.md` — beta community setup
+- Закриває явний gap у STATUS.md ("Beta community (Discord/Telegram)" — not built)
+- Підтримує BETA_PLAYBOOK.md (Slack-invite згадувався без деталей реалізації)
+- Модераційні правила (секція 8) відповідають clinical-safety defaults
+
+### Added
+- [`docs/COMMUNITY.md`](docs/COMMUNITY.md) — Slack (closed beta ≤200) + Discord (post-launch); 11 каналів; ролі; welcome flow; тижневий ритм; feedback збір; moderation guidelines з ED/mental-health defaults; метрики здоров'я спільноти; pre-launch checklist; план переходу Slack→Discord з OG Beta privileges
+
+### Changed
+- [`STATUS.md`](STATUS.md) — beta community gap позначений addressed; COMMUNITY.md у docs-таблиці; timeline оновлено; версія → v0.8.0
+- [`README.md`](README.md) — COMMUNITY.md у repo tree; doc count 36+→37+; releases 23+→24+; version refs → v0.8.0
+
+---
+
 ## [0.7.0] — 2026-05-14
 
 ### Why MINOR
