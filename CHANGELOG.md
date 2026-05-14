@@ -16,6 +16,18 @@
 
 ---
 
+## [0.3.1] — 2026-05-14
+
+### Added
+- [`docs/FINANCIALS.md`](docs/FINANCIALS.md) — unit economics target model, 3-year P&L projection, sensitivity tables, Seed/Series A funding plan
+- [`docs/COMPETITIVE.md`](docs/COMPETITIVE.md) — глибокий teardown Whoop, Fitbod, Future, MacroFactor, Hevy, Apple Fitness+, MyFitnessPal, Strava + defensibility map
+- [`docs/RESEARCH.md`](docs/RESEARCH.md) — 30-інтерв'ю план, скрипт (25 питань × 5 блоків), bias guards, synthesis framework, ethics
+
+### Changed
+- README index доповнено новими доками
+
+---
+
 ## [0.3.0] — 2026-05-14
 
 ### Added

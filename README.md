@@ -36,7 +36,10 @@ G:\Клод\form\
    ├─ MARKETING.md         ← GTM strategy v0.1
    ├─ PITCH.md             ← investor pitch + one-pager v0.1
    ├─ PERSONAS.md          ← 4 детальні user personas v0.1
-   └─ TECHNICAL.md         ← архітектура + стек + CV-pipeline v0.1
+   ├─ TECHNICAL.md         ← архітектура + стек + CV-pipeline v0.1
+   ├─ FINANCIALS.md        ← unit economics + 3-year model v0.1
+   ├─ COMPETITIVE.md       ← deep teardown 8 конкурентів v0.1
+   └─ RESEARCH.md          ← 30-інтерв'ю план + script v0.1
 ```
 
 ---
