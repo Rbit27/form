@@ -33,7 +33,10 @@ G:\Клод\form\
 └─ docs\
    ├─ BRAND.md             ← бренд-бук v0.1
    ├─ FLOWS.md             ← user flows v0.1
-   └─ MARKETING.md         ← GTM strategy v0.1
+   ├─ MARKETING.md         ← GTM strategy v0.1
+   ├─ PITCH.md             ← investor pitch + one-pager v0.1
+   ├─ PERSONAS.md          ← 4 детальні user personas v0.1
+   └─ TECHNICAL.md         ← архітектура + стек + CV-pipeline v0.1
 ```
 
 ---

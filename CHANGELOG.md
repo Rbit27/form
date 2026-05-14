@@ -16,6 +16,23 @@
 
 ---
 
+## [0.3.0] — 2026-05-14
+
+### Added
+- [`docs/PITCH.md`](docs/PITCH.md) — 12-slide investor pitch outline + one-pager + FAQ
+- [`docs/PERSONAS.md`](docs/PERSONAS.md) — 4 detailed user personas (Дмитро, Олена, Артур, Богдан) з real-quote patterns
+- [`docs/TECHNICAL.md`](docs/TECHNICAL.md) — архітектура, стек, CV-pipeline, latency-budget, build timeline
+
+### Why MINOR
+- Нова доковa система (стратегічний рівень: pitch + personas + technical)
+- Перший раз з'являється архітектура застосунку у документації
+- Personas стають референс-точкою для всіх feature-рішень
+
+### Changed
+- README: index з посиланнями на нові доки
+
+---
+
 ## [0.2.1] — 2026-05-14
 
 ### Added
