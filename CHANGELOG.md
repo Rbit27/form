@@ -16,7 +16,15 @@
 
 ---
 
-## [0.3.8] — 2026-05-14
+## [0.3.9] — 2026-05-14
+
+### Added
+- [`settings.html`](settings.html) — Settings screen mockup у phone-frame: профіль, нотифікації з toggles, інтеграції (Apple Health, Whoop, Oura), privacy controls (soft mode opt-out, analytics opt-out), підписка з cancel у 3 кліки, danger zone з GDPR delete
+- [`docs/OKRS_2026.md`](docs/OKRS_2026.md) — Q3 + Q4 2026 OKRs з kill-criteria, scoring formula, weekly/monthly review cadence, personal founder OKRs
+- [`docs/DATA_ROOM.md`](docs/DATA_ROOM.md) — 4-tier investor data room map (Public / Light NDA / Strong NDA / Closing-stage), process flow, sharing tools, status checklist готового vs to-prepare
+
+### Changed
+- README: settings.html, OKRs, DATA_ROOM додано до структури
 
 ### Added
 - [`about.html`](about.html) — manifesto page: who we are, 14-agent team structure, 4 red lines, what we don't do (10-list), Ukraine context

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Settings · mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { ink:'#0B0A07', deep:'#13110C', line:'#1F1D16', mute:'#6F6A60', dim:'#A39D8E', paper:'#F3EEE0', cream:'#E7DFC8', acid:'#DDFF2D', ember:'#FF5733', blood:'#B91C1C' },
+    fontFamily: { serif:['Fraunces','serif'], sans:['Manrope','sans-serif'], mono:['JetBrains Mono','monospace'] }
+  }}};
+</script>
+<style>
+  html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; }
+  .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+  .num { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  ::selection { background:#DDFF2D; color:#0B0A07; }
+  .grain::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.06;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:220px;
+  }
+
+  /* phone frame */
+  .phone {
+    width: 400px; max-width: 100%; height: 820px;
+    border-radius: 46px; background: #0B0A07;
+    border: 1px solid #2A2820;
+    box-shadow:
+      0 0 0 9px #0B0A07, 0 0 0 10px #2A2820,
+      0 80px 120px -40px rgba(0,0,0,0.8),
+      0 0 200px -30px rgba(221,255,45,0.08);
+    position: relative; overflow: hidden;
+  }
+  .phone::before {
+    content: ""; position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    width: 108px; height: 30px; background:#050402; border-radius:20px; z-index:20;
+  }
+  .status {
+    position: absolute; top: 0; left: 0; right: 0; height: 54px;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 28px 0 28px;
+    font-family: 'JetBrains Mono', monospace; font-size:12px; color:#F3EEE0; z-index:25;
+  }
+  .screen { position:absolute; inset:0; padding-top:54px; overflow-y:auto; scrollbar-width:none; }
+  .screen::-webkit-scrollbar { display:none; }
+
+  /* toggle switch */
+  .toggle-switch {
+    width: 44px; height: 26px; background: #1F1D16; border-radius: 9999px;
+    position: relative; cursor: pointer; transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px; background: #F3EEE0; border-radius: 50%;
+    transition: left 0.2s;
+  }
+  .toggle-switch.on { background: #DDFF2D; }
+  .toggle-switch.on::after { left: 21px; background: #0B0A07; }
+
+  .nav-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; cursor: pointer;
+  }
+  .nav-row:hover .arrow { color: #DDFF2D; }
+  .arrow { color: #6F6A60; transition: color 0.2s; }
+
+  .divider { border-top: 1px solid #1F1D16; }
+
+  .btn-danger {
+    background: transparent; color: #FF5733; border: 1px solid rgba(255,87,51,0.3);
+    font-family: 'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em;
+    text-transform: uppercase; font-weight: 500; padding: 14px 20px;
+    border-radius: 9999px; cursor: pointer; transition: all 0.2s;
+    width: 100%; text-align: center; display: block;
+  }
+  .btn-danger:hover { background: rgba(255,87,51,0.08); border-color: #FF5733; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<section class="min-h-screen flex flex-col items-center justify-start pt-12 pb-20 px-8">
+
+  <div class="text-center mb-8">
+    <div class="label mb-3">§ Settings screen · mockup</div>
+    <h1 class="font-serif text-paper text-4xl font-light">Profile · Privacy · <em>Subscription</em></h1>
+    <p class="text-mute text-sm mt-2 font-mono">Cancel у 3 кліки. Export 1-click. No dark patterns.</p>
+  </div>
+
+  <div class="phone">
+    <div class="status">
+      <span>9:24</span>
+      <span class="flex items-center gap-1.5">
+        <span class="w-3 h-1.5 border border-paper rounded-sm relative">
+          <span class="absolute inset-0.5 bg-acid rounded-[1px]" style="width:72%"></span>
+        </span>
+      </span>
+    </div>
+
+    <div class="screen">
+      <div class="px-6 pb-10">
+
+        <!-- title -->
+        <div class="flex items-center justify-between mt-2 mb-6">
+          <h2 class="font-serif text-paper text-3xl font-light">Settings</h2>
+          <button class="text-mute text-sm font-mono">×</button>
+        </div>
+
+        <!-- profile section -->
+        <div class="flex items-center gap-3 mb-7 pb-6 border-b border-line">
+          <div class="w-12 h-12 rounded-full bg-acid flex items-center justify-center font-mono text-ink text-lg font-bold">Д</div>
+          <div class="flex-1">
+            <div class="text-paper font-medium">Дмитро К.</div>
+            <div class="text-dim text-xs font-mono">28 · 3-й рік · day 47</div>
+          </div>
+          <div class="arrow text-xl">→</div>
+        </div>
+
+        <!-- Account -->
+        <div class="label mb-3">Account</div>
+        <div class="space-y-1 mb-6">
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Профіль</span>
+            <span class="arrow">→</span>
+          </div>
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Цілі</span>
+            <span class="text-dim text-xs font-mono">сила, recomp <span class="arrow ml-1">→</span></span>
+          </div>
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Тон Victor</span>
+            <span class="text-dim text-xs font-mono">smart-direct <span class="arrow ml-1">→</span></span>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="label mb-3">Нотифікації</div>
+        <div class="space-y-1 mb-2">
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Max на день</span>
+            <span class="text-dim text-xs font-mono">2 <span class="arrow ml-1">→</span></span>
+          </div>
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Тихий час</span>
+            <span class="text-dim text-xs font-mono">22:00 → 07:00 <span class="arrow ml-1">→</span></span>
+          </div>
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Ранкова перевірка</div>
+              <div class="text-mute text-xs mt-0.5">HRV + сон + готовність</div>
+            </div>
+            <div class="toggle-switch on" data-toggle></div>
+          </div>
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Pre-workout reminder</div>
+              <div class="text-mute text-xs mt-0.5">30 хв до сесії</div>
+            </div>
+            <div class="toggle-switch on" data-toggle></div>
+          </div>
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Weekly review</div>
+              <div class="text-mute text-xs mt-0.5">Пн, 09:00, ~60 слів</div>
+            </div>
+            <div class="toggle-switch on" data-toggle></div>
+          </div>
+        </div>
+
+        <div class="divider my-5"></div>
+
+        <!-- Integrations -->
+        <div class="label mb-3">Інтеграції</div>
+        <div class="space-y-1 mb-2">
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Apple Health</div>
+              <div class="text-mute text-xs mt-0.5">HRV, сон, серце</div>
+            </div>
+            <div class="text-acid text-xs font-mono">CONNECTED</div>
+          </div>
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Whoop</div>
+              <div class="text-mute text-xs mt-0.5">RMSSD, strain, recovery</div>
+            </div>
+            <div class="text-mute text-xs font-mono">CONNECT →</div>
+          </div>
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Oura</div>
+              <div class="text-mute text-xs mt-0.5">Sleep stages, readiness</div>
+            </div>
+            <div class="text-mute text-xs font-mono">CONNECT →</div>
+          </div>
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Calendar (iCloud)</div>
+              <div class="text-mute text-xs mt-0.5">Авто-розклад тренувань</div>
+            </div>
+            <div class="toggle-switch on" data-toggle></div>
+          </div>
+        </div>
+
+        <div class="divider my-5"></div>
+
+        <!-- Privacy -->
+        <div class="label mb-3">Приватність</div>
+        <div class="space-y-1 mb-2">
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Product analytics</div>
+              <div class="text-mute text-xs mt-0.5">Pseudonymous, opt-out OK</div>
+            </div>
+            <div class="toggle-switch on" data-toggle></div>
+          </div>
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Soft mode (no calorie tracking)</div>
+              <div class="text-mute text-xs mt-0.5">Якщо комфортніше без цифр</div>
+            </div>
+            <div class="toggle-switch" data-toggle></div>
+          </div>
+          <div class="flex items-center justify-between py-3.5">
+            <div>
+              <div class="text-paper text-[15px]">Body composition metrics</div>
+              <div class="text-mute text-xs mt-0.5">Можна вимкнути назавжди</div>
+            </div>
+            <div class="toggle-switch on" data-toggle></div>
+          </div>
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Експорт даних</span>
+            <span class="text-dim text-xs font-mono">JSON · 1 клік <span class="arrow ml-1">→</span></span>
+          </div>
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Privacy Policy</span>
+            <span class="arrow">→</span>
+          </div>
+        </div>
+
+        <div class="divider my-5"></div>
+
+        <!-- Subscription -->
+        <div class="label mb-3">Підписка</div>
+        <div class="rounded-2xl border border-line p-4 mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <div class="text-paper font-medium">Active · monthly</div>
+              <div class="text-mute text-xs mt-0.5 font-mono">$9 / міс · UA</div>
+            </div>
+            <div class="text-acid text-[10px] font-mono uppercase tracking-widest">ACTIVE</div>
+          </div>
+          <div class="text-dim text-xs font-mono">Поновлюється 14 червня 2026</div>
+        </div>
+        <div class="space-y-1 mb-2">
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Перейти на річну (-34%)</span>
+            <span class="arrow">→</span>
+          </div>
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Manage у Apple App Store</span>
+            <span class="arrow">→</span>
+          </div>
+          <div class="nav-row">
+            <span class="text-ember text-[15px]">Скасувати підписку</span>
+            <span class="text-ember text-xs">3 кліки →</span>
+          </div>
+        </div>
+
+        <div class="divider my-5"></div>
+
+        <!-- Support -->
+        <div class="label mb-3">Допомога</div>
+        <div class="space-y-1 mb-6">
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Чат з founder</span>
+            <span class="arrow">→</span>
+          </div>
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">FAQ</span>
+            <span class="arrow">→</span>
+          </div>
+          <div class="nav-row">
+            <span class="text-paper text-[15px]">Bug-report</span>
+            <span class="arrow">→</span>
+          </div>
+        </div>
+
+        <div class="divider my-5"></div>
+
+        <!-- Danger zone -->
+        <div class="label mb-4" style="color:#FF5733">Danger zone</div>
+        <button class="btn-danger mb-3">Delete account</button>
+        <p class="text-mute text-xs leading-relaxed">
+          Видалення — 3 step підтвердження. 30 днів grace для повернення. Після — full GDPR erasure.
+        </p>
+
+        <!-- footer -->
+        <div class="mt-10 pt-6 border-t border-line text-center">
+          <div class="font-serif text-paper text-sm">FORM<span class="text-acid">.</span></div>
+          <div class="text-mute font-mono text-[10px] mt-1">v0.3.8 · build 0514</div>
+          <div class="text-mute font-mono text-[10px] mt-1">Sign out</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- notes below -->
+  <div class="mt-12 max-w-[640px] text-center">
+    <div class="label mb-3">§ Дизайн-нотатки</div>
+    <p class="text-dim text-sm leading-relaxed">
+      Cancel-flow видимий і прямий (3 кліки, без obstr). Toggles великі, читабельні. Privacy controls на видноті, не у submenu. Soft mode (no calorie tracking) — на одному рівні з analytics opt-out, не сховано.
+    </p>
+  </div>
+
+</section>
+
+<script>
+  document.querySelectorAll('[data-toggle]').forEach(el => {
+    el.addEventListener('click', () => el.classList.toggle('on'));
+  });
+</script>
+</body>
+</html>

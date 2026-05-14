@@ -17,6 +17,7 @@ G:\Клод\form\
 ├─ pricing.html            ← цінова сторінка з toggle і порівнянням
 ├─ screens.html            ← 5 статичних app-екранів у phone-мокапах (дизайн-референс)
 ├─ about.html              ← manifesto page · хто ми + 4 red lines
+├─ settings.html           ← Settings screen mockup (cancel у 3 кліки)
 ├─ README.md               ← цей файл
 ├─ .claude\
 │  └─ agents\              ← команда субагентів
@@ -55,6 +56,8 @@ G:\Клод\form\
    ├─ EMAIL_SEQUENCE.md    ← 18+ email templates, A-D sequences
    ├─ BETA_PLAYBOOK.md     ← як run TestFlight beta operationally
    ├─ SECURITY.md          ← threat model, 5-layer defense, breach response
+   ├─ OKRS_2026.md         ← Q3+Q4 OKRs з kill-criteria, scoring
+   ├─ DATA_ROOM.md         ← 4-tier investor data room map
    └─ FOUNDER.md           ← founder narrative · INTERNAL · not for agents
 content\
    ├─ post-01-hrv-is-lying.md            ← blog 1: «HRV тобі бреше» (draft)
