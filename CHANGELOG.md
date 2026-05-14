@@ -16,7 +16,16 @@
 
 ---
 
-## [0.3.5] — 2026-05-14
+## [0.3.6] — 2026-05-14
+
+### Added
+- [`beta.html`](beta.html) — beta signup landing з 11-полями форми, ED-friendly, повністю rendered у нашому design system
+- [`legal/privacy-policy-draft.md`](legal/privacy-policy-draft.md) — Privacy Policy draft, GDPR-ready, ~13 секцій, special-category data handling, processor list з SCCs
+- [`legal/terms-of-service-draft.md`](legal/terms-of-service-draft.md) — ToS draft, медичні дисклеймери, ED safe-harbor, liability limits per-jurisdiction, governing law map
+- `content/post-04-sleep-and-strength.md` — четвертий blog: «Сон забирає твою силу». 3 cited studies, конкретні targets, top sleep killers. ~11 хв read.
+
+### Changed
+- README: розділ `legal/` додано до структури
 
 ### Added
 - [`nutrition/sample-3day-plan.md`](nutrition/sample-3day-plan.md) — 3-day sample meal plan (intermediate lifter, ~2600kcal). Кожен прийом з рецептом, макросами, swap-варіантами. Anti-ED дисципліна, no compensatory механіки. Sample-only.

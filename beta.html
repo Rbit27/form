@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Closed Beta · Q3 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      colors: { ink:'#0B0A07', deep:'#13110C', line:'#1F1D16', mute:'#6F6A60', dim:'#A39D8E', paper:'#F3EEE0', cream:'#E7DFC8', acid:'#DDFF2D', ember:'#FF5733' },
+      fontFamily: { serif:['Fraunces','serif'], sans:['Manrope','sans-serif'], mono:['JetBrains Mono','monospace'] }
+    }}
+  };
+</script>
+<style>
+  html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; }
+  .display { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:0.86; }
+  .display em { font-style:italic; font-weight:300; }
+  .display b { font-weight:700; font-style:normal; }
+  .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+  .num { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  ::selection { background:#DDFF2D; color:#0B0A07; }
+  .grain::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.06;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:220px;
+  }
+  input, textarea, select {
+    background:#13110C !important; border:1px solid #1F1D16 !important; color:#F3EEE0 !important;
+    font-family:'Manrope',sans-serif; padding:14px 16px; border-radius:12px; width:100%;
+    font-size:15px; transition:border 0.2s;
+  }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:#DDFF2D !important; }
+  input::placeholder { color:#6F6A60; }
+  .btn-acid {
+    background:#DDFF2D; color:#0B0A07; font-family:'JetBrains Mono',monospace;
+    font-size:12px; letter-spacing:0.2em; text-transform:uppercase; font-weight:600;
+    transition:transform 0.15s, background 0.2s; padding:18px 28px; border-radius:9999px; cursor:pointer;
+    border:none; width:100%;
+  }
+  .btn-acid:hover { background:#ECFF6B; transform:translateY(-1px); }
+  .checkbox { width:22px; height:22px; accent-color:#DDFF2D; cursor:pointer; }
+  .rule { display:flex; align-items:center; gap:1rem; }
+  .rule::before, .rule::after { content:""; flex:1; height:1px; background:#1F1D16; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<!-- top -->
+<header class="border-b border-line">
+  <div class="max-w-[1100px] mx-auto px-8 py-6 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <div class="label">Closed Beta · Q3 2026</div>
+  </div>
+</header>
+
+<!-- ambient glow -->
+<div class="fixed top-1/4 -left-40 w-[600px] h-[600px] bg-acid/8 blur-[140px] rounded-full pointer-events-none"></div>
+<div class="fixed bottom-0 right-0 w-[500px] h-[500px] bg-ember/8 blur-[160px] rounded-full pointer-events-none"></div>
+
+<section class="relative pt-20 pb-12 px-8">
+  <div class="max-w-[680px] mx-auto">
+
+    <div class="label mb-6">§ Closed Beta · TestFlight</div>
+
+    <h1 class="display text-paper text-[clamp(48px,8vw,84px)] mb-8">
+      Перші <em>200</em> ліфтерів.<br>
+      <b>Серпень 2026.</b>
+    </h1>
+
+    <p class="text-dim text-lg leading-relaxed max-w-[560px] mb-4">
+      Ми вибираємо <span class="text-paper">200 серйозних лiфтерів</span> для closed-beta тестування FORM на TestFlight. Не випадково — за критеріями.
+    </p>
+
+    <p class="text-dim text-base leading-relaxed max-w-[560px]">
+      Якщо приймемо — отримаєш повний продукт без оплати на 90 днів, прямий канал з командою, твої feedback впливає на v1.0.
+    </p>
+
+    <div class="grid grid-cols-3 gap-4 mt-12 mb-12 pt-8 border-t border-line">
+      <div>
+        <div class="num text-paper text-2xl font-light">200</div>
+        <div class="label mt-2">Місць</div>
+      </div>
+      <div>
+        <div class="num text-paper text-2xl font-light">90</div>
+        <div class="label mt-2">Днів free</div>
+      </div>
+      <div>
+        <div class="num text-paper text-2xl font-light">iOS</div>
+        <div class="label mt-2">Тільки</div>
+      </div>
+    </div>
+
+    <!-- form -->
+    <form id="beta-form" class="space-y-5">
+
+      <div class="rule mb-4"><span class="label">Хто ти</span></div>
+
+      <div>
+        <label class="label block mb-2">Email · до якого додам TestFlight invite</label>
+        <input type="email" name="email" required placeholder="ти@email.com" />
+      </div>
+
+      <div>
+        <label class="label block mb-2">Ім'я (як до тебе звертатись)</label>
+        <input type="text" name="name" required placeholder="Дмитро" />
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="label block mb-2">Вік</label>
+          <input type="number" name="age" min="18" max="99" required placeholder="28" />
+        </div>
+        <div>
+          <label class="label block mb-2">Стать (для plan)</label>
+          <select name="sex" required>
+            <option value="">— обери —</option>
+            <option value="male">Чоловіча</option>
+            <option value="female">Жіноча</option>
+            <option value="prefer_not">Не вказувати</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="rule mt-8 mb-4"><span class="label">Тренування</span></div>
+
+      <div>
+        <label class="label block mb-2">Скільки років силового досвіду?</label>
+        <select name="experience" required>
+          <option value="">— обери —</option>
+          <option value="lt1">Менше року</option>
+          <option value="1-3">1–3 роки</option>
+          <option value="3-7">3–7 років</option>
+          <option value="7plus">7+ років</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="label block mb-2">Скільки тренувань на тиждень типово?</label>
+        <select name="frequency" required>
+          <option value="">— обери —</option>
+          <option value="1-2">1–2</option>
+          <option value="3-4">3–4</option>
+          <option value="5plus">5+</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="label block mb-2">Які апки/інструменти зараз?</label>
+        <input type="text" name="current_tools" placeholder="Hevy, Apple Watch, Notion..." />
+      </div>
+
+      <div>
+        <label class="label block mb-2">Що б ти найбільше хотів вирішити з FORM?</label>
+        <textarea name="motivation" rows="3" placeholder="Конкретний pain point — а не «хочу буте сильнішим»"></textarea>
+      </div>
+
+      <div class="rule mt-8 mb-4"><span class="label">Дрібниці</span></div>
+
+      <div>
+        <label class="label block mb-2">Як ти знайшов FORM?</label>
+        <select name="source">
+          <option value="">— обери —</option>
+          <option value="twitter">X / Twitter</option>
+          <option value="reddit">Reddit</option>
+          <option value="youtube">YouTube</option>
+          <option value="friend">Друг порадив</option>
+          <option value="blog">Наш блог</option>
+          <option value="other">Інше</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="label block mb-2">Маєш wearable з HRV-tracking?</label>
+        <select name="wearable">
+          <option value="">— обери —</option>
+          <option value="apple_watch">Apple Watch</option>
+          <option value="whoop">Whoop</option>
+          <option value="oura">Oura</option>
+          <option value="garmin">Garmin</option>
+          <option value="none">Поки немає</option>
+          <option value="multiple">Кілька</option>
+        </select>
+      </div>
+
+      <div class="pt-6 border-t border-line space-y-3">
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" name="agree_data" class="checkbox mt-1" required />
+          <span class="text-dim text-sm leading-relaxed">Розумію що FORM збере мої health-дані (HRV, сон, тренування) для надання сервісу і покращення моделі. Я можу видалити акаунт у будь-який момент.</span>
+        </label>
+
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" name="agree_communication" class="checkbox mt-1" />
+          <span class="text-dim text-sm leading-relaxed">Окей з тим, що команда зв'яжеться зі мною раз на 2 тижні впродовж beta для feedback (можна skipпнути будь-яке).</span>
+        </label>
+
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" name="agree_call" class="checkbox mt-1" />
+          <span class="text-dim text-sm leading-relaxed">Готовий прийняти один 30-хв call з founder після 4 тижнів використання (опціонально, але цінується).</span>
+        </label>
+      </div>
+
+      <button type="submit" class="btn-acid mt-8">Подати заявку →</button>
+
+      <p class="text-mute text-xs text-center mt-4 font-mono">
+        Не всіх примемо — це closed beta з обмеженим розміром.<br>
+        Очікуй відповідь протягом 7 днів.
+      </p>
+    </form>
+
+  </div>
+</section>
+
+<!-- what to expect -->
+<section class="relative py-20 px-8 border-t border-line">
+  <div class="max-w-[680px] mx-auto">
+
+    <div class="label mb-6">§ Що очікувати</div>
+
+    <h2 class="display text-paper text-[clamp(36px,5vw,56px)] mb-12">
+      Не <em>"тестер".</em><br><b>Партнер.</b>
+    </h2>
+
+    <div class="space-y-8">
+      <div class="grid grid-cols-[60px_1fr] gap-6">
+        <div class="num text-acid text-2xl">01</div>
+        <div>
+          <div class="text-paper font-medium mb-2">Прямий канал з командою</div>
+          <p class="text-dim text-base leading-relaxed">Один Slack-канал на 200 людей. Founder + Founding Engineer + Design Lead присутні. Не support tickets.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-[60px_1fr] gap-6">
+        <div class="num text-acid text-2xl">02</div>
+        <div>
+          <div class="text-paper font-medium mb-2">90 днів безкоштовно. Потім — 50% off на рік.</div>
+          <p class="text-dim text-base leading-relaxed">Beta-учасники отримують повний продукт. Після — locked-in price на 12 міс post-launch.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-[60px_1fr] gap-6">
+        <div class="num text-acid text-2xl">03</div>
+        <div>
+          <div class="text-paper font-medium mb-2">Твій feedback впливає на v1.0</div>
+          <p class="text-dim text-base leading-relaxed">Чесно — не маркетинг. Кожен тиждень робимо ship-cycle на основі того, що чули від beta-people.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-[60px_1fr] gap-6">
+        <div class="num text-acid text-2xl">04</div>
+        <div>
+          <div class="text-paper font-medium mb-2">Bug-and-fix transparency</div>
+          <p class="text-dim text-base leading-relaxed">Publicly показуємо те, що не працює. CV проколює на якійсь вправі — повідомляємо одразу.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-[60px_1fr] gap-6">
+        <div class="num text-acid text-2xl">05</div>
+        <div>
+          <div class="text-paper font-medium mb-2">Можеш вийти будь-коли</div>
+          <p class="text-dim text-base leading-relaxed">Beta — не контракт. Якщо стане погано — закриваєш TestFlight, забуваєш про нас. Все.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- requirements -->
+<section class="relative py-20 px-8 border-t border-line bg-deep/40">
+  <div class="max-w-[680px] mx-auto">
+    <div class="label mb-6">§ Кого шукаємо</div>
+
+    <h2 class="display text-paper text-[clamp(36px,5vw,56px)] mb-10">
+      Серйозних<br><em>самостійних.</em>
+    </h2>
+
+    <div class="space-y-3 text-base">
+      <p class="text-paper"><span class="text-acid">✓</span> Тренуєшся силово 1+ рік регулярно</p>
+      <p class="text-paper"><span class="text-acid">✓</span> Маєш iPhone (iOS 17+)</p>
+      <p class="text-paper"><span class="text-acid">✓</span> Тренуєшся 3+ рази на тиждень</p>
+      <p class="text-paper"><span class="text-acid">✓</span> Готовий дати чесний feedback (не лестощі)</p>
+      <p class="text-paper"><span class="text-acid">✓</span> Bonus: маєш Apple Watch або інший wearable з HRV</p>
+    </div>
+
+    <div class="mt-10 pt-8 border-t border-line">
+      <p class="text-dim text-sm leading-relaxed">
+        <span class="text-paper">Не приймемо</span> якщо ти тренуєшся менше року, не маєш iPhone, або готуєшся до bodybuilding-сцени (відмінний product-fit).
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- timeline -->
+<section class="relative py-20 px-8 border-t border-line">
+  <div class="max-w-[680px] mx-auto">
+    <div class="label mb-6">§ Таймлайн</div>
+
+    <h2 class="display text-paper text-[clamp(36px,5vw,56px)] mb-12">
+      Що далі<br>після <em>заявки.</em>
+    </h2>
+
+    <div class="space-y-6">
+      <div>
+        <div class="label">Тиждень 1</div>
+        <div class="text-paper font-medium mt-1">Перевіряємо заявки</div>
+        <p class="text-dim text-sm mt-1">~7 днів. Дивимося профіль, мотивацію, fit.</p>
+      </div>
+
+      <div>
+        <div class="label">Тиждень 2</div>
+        <div class="text-paper font-medium mt-1">Відповідь: yes / waitlist / no</div>
+        <p class="text-dim text-sm mt-1">Email з підтвердженням або причиною відмови. Без drama.</p>
+      </div>
+
+      <div>
+        <div class="label">Серпень 2026</div>
+        <div class="text-paper font-medium mt-1">TestFlight invite</div>
+        <p class="text-dim text-sm mt-1">Перші 50 — early access. Решта — rolling rollout.</p>
+      </div>
+
+      <div>
+        <div class="label">Listopad 2026</div>
+        <div class="text-paper font-medium mt-1">Public launch на App Store</div>
+        <p class="text-dim text-sm mt-1">Beta переходить у paid. Locked price 50% off на 12 міс.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- footer -->
+<footer class="border-t border-line py-12 px-8">
+  <div class="max-w-[1100px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <div class="font-serif text-lg text-paper">FORM<span class="text-acid">.</span></div>
+      <div class="label ml-4">Київ · 2026</div>
+    </div>
+    <div class="flex items-center gap-8 font-mono text-xs uppercase tracking-widest text-mute">
+      <a href="/" class="hover:text-paper">Головна</a>
+      <a href="#" class="hover:text-paper">Приватність</a>
+      <a href="#" class="hover:text-paper">Умови</a>
+      <a href="#" class="hover:text-paper">@form.coach</a>
+    </div>
+    <div class="font-mono text-[10px] text-mute">beta v0.1 · build 0514</div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('beta-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    // Stub — у production шле в API endpoint
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    console.log('Beta application:', data);
+    alert('Дякуємо! Заявку отримали. Відповідь протягом 7 днів на ' + data.email + '.');
+    this.reset();
+  });
+</script>
+</body>
+</html>
