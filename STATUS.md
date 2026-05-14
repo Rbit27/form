@@ -1,7 +1,7 @@
-# FORM · Project Status v0.6.0
+# FORM · Project Status v0.7.0
 
 **Date:** 14 травня 2026
-**Version:** 0.6.0
+**Version:** 0.7.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.6.0 with 22+ tagged releases, 10 functional HTML marketing/product pages, 32+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with complete decision log. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed.
+FORM is at v0.7.0 with 23+ tagged releases, 10 functional HTML marketing/product pages, 32+ markdown documents covering every operational domain (product, design, marketing, growth, hiring, legal, finance, ops, content), 9 blog posts ready for distribution, a full press kit (HTML + markdown), a newsletter setup guide, 12 LinkedIn posts ready to publish, sample programs and nutrition plans, full legal drafts, hiring JDs ready to post, and a public GitHub repo with complete decision log. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed.
 
 ---
 
@@ -78,7 +78,9 @@ FORM is at v0.6.0 with 22+ tagged releases, 10 functional HTML marketing/product
 | post-06-30-user-interviews.md | Blog | draft template |
 | post-07-progressive-overload-myths.md | Blog | draft |
 | post-08-why-no-free-tier.md | Blog | draft |
+| post-09-building-victor-voice.md | Blog | draft |
 | twitter-launch-thread.md | Social | draft |
+| linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
 | reddit-launch-posts.md | Social | 3 готові |
 
@@ -146,6 +148,7 @@ FORM is at v0.6.0 with 22+ tagged releases, 10 functional HTML marketing/product
 - [ ] Blog posts published live
 - [ ] Twitter / X account active
 - [x] Newsletter setup guide → `docs/NEWSLETTER.md`
+- [x] LinkedIn posts (12) ready → `content/linkedin-posts.md`
 - [ ] Newsletter platform actually configured on Beehiiv
 - [ ] Reddit account з reputation built
 
@@ -163,7 +166,8 @@ FORM is at v0.6.0 with 22+ tagged releases, 10 functional HTML marketing/product
 ```
 Now (May 14, 2026)
 ├── v0.6.0 — press kit HTML + newsletter guide
-├── Public GitHub repo з 22+ versions tagged
+├── v0.7.0 — LinkedIn posts (12 ready) + social content complete
+├── Public GitHub repo з 23+ versions tagged
 └── All strategic docs published
 
 Next 2 weeks
@@ -262,5 +266,5 @@ M10-M12 (Q2 2027)
 ---
 
 **Updated weekly.** Major changes → new version bump.
-**Last update:** 14 травня 2026 · v0.6.0
+**Last update:** 14 травня 2026 · v0.7.0
 **Next planned update:** після hire of Founding Engineer

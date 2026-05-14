@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.6.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.7.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -54,7 +54,7 @@ G:\\Клод\\form\\
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
-├── VERSION                 ← single source of truth (0.6.0)
+├── VERSION                 ← single source of truth (0.7.0)
 ├── CHANGELOG.md            ← Keep-a-Changelog format
 ├── CONTRIBUTING.md         ← engineering standards
 ├── STATUS.md               ← project snapshot
@@ -108,6 +108,7 @@ G:\\Клод\\form\\
 │   ├── post-08-why-no-free-tier.md
 │   ├── post-09-building-victor-voice.md
 │   ├── twitter-launch-thread.md
+│   ├── linkedin-posts.md
 │   ├── press-pitch-templates.md
 │   └── reddit-launch-posts.md
 │
@@ -235,18 +236,19 @@ Each iteration:
 
 ---
 
-## Метрики проєкту (як of v0.6.0)
+## Метрики проєкту (як of v0.7.0)
 
 | Metric | Value |
 |---|---|
-| Tagged releases | 22+ |
+| Tagged releases | 23+ |
 | HTML pages | 10 |
 | Markdown documents | 36+ |
 | Blog posts (drafts) | 9 |
-| Total lines committed | 19,000+ |
+| Social content assets | 4 (Twitter, LinkedIn, Reddit, press pitches) |
+| Total lines committed | 19,500+ |
 | AI agents defined | 14 |
 | Documented decisions | 24 |
-| Days від v0.1.0 до v0.6.0 | 2 |
+| Days від v0.1.0 до v0.7.0 | 2 |
 
 ---
 
@@ -315,4 +317,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.6.0
+**Last update:** 14 травня 2026 · v0.7.0

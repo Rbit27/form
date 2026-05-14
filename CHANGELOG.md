@@ -16,6 +16,21 @@
 
 ---
 
+## [0.7.0] — 2026-05-14
+
+### Why MINOR
+- New content asset: `content/linkedin-posts.md` — 12 LinkedIn posts across 4 categories
+- Closes social media gap (Twitter + Reddit existed; LinkedIn was missing)
+- LinkedIn is the primary channel for hiring, investor outreach, and user interviews
+
+### Added
+- [`content/linkedin-posts.md`](content/linkedin-posts.md) — 12 ready-to-post LinkedIn posts: 3 founder-story, 4 product/insight, 3 hiring, 2 build-in-public templates. EN/UA mix. 12-week posting calendar + hashtag bank.
+
+### Changed
+- [`STATUS.md`](STATUS.md) — post-09 added to content table (was missing); linkedin-posts.md added to content table; version refs bumped to v0.7.0; TL;DR updated (23+ releases)
+
+---
+
 ## [0.6.0] — 2026-05-14
 
 ### Why MINOR
