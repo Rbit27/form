@@ -12,6 +12,7 @@
 ```
 G:\Клод\form\
 ├─ index.html              ← marketing-сайт прототип (відкрити в браузері)
+├─ onboarding.html         ← onboarding flow прототип, 8 екранів з ED-screening
 ├─ README.md               ← цей файл
 ├─ .claude\
 │  └─ agents\              ← команда субагентів
@@ -34,12 +35,10 @@ G:\Клод\form\
    ├─ BRAND.md             ← бренд-бук v0.1
    ├─ FLOWS.md             ← user flows v0.1
    ├─ MARKETING.md         ← GTM strategy v0.1
+   ├─ APP_STORE.md         ← App Store listing draft v0.1 (5 screenshot-описи, keywords, A/B)
    ├─ PITCH.md             ← investor pitch + one-pager v0.1
    ├─ PERSONAS.md          ← 4 детальні user personas v0.1
-   ├─ TECHNICAL.md         ← архітектура + стек + CV-pipeline v0.1
-   ├─ FINANCIALS.md        ← unit economics + 3-year model v0.1
-   ├─ COMPETITIVE.md       ← deep teardown 8 конкурентів v0.1
-   └─ RESEARCH.md          ← 30-інтерв'ю план + script v0.1
+   └─ TECHNICAL.md         ← архітектура + стек + CV-pipeline v0.1
 ```
 
 ---
@@ -149,8 +148,8 @@ design-craft        → візуальна продакшн
 
 ### Близько (наступні 2 тижні)
 - [ ] 30 user interviews · `research-lead`
-- [ ] App Store listing draft (5 screenshots, опис) · `marketing-lead` + `design-craft`
-- [ ] Onboarding HTML-прототип з ED-screening · `ux-flow`
+- [x] App Store listing draft (5 screenshots, опис) · `marketing-lead` — [`docs/APP_STORE.md`](docs/APP_STORE.md) · v0.3.1
+- [x] Onboarding HTML-прототип з ED-screening · `ux-flow` + `clinical-safety` — [`onboarding.html`](onboarding.html) · v0.3.1
 - [ ] Прес-кіт сторінка · `content-strategist`
 - [ ] Mobile app static screens (Figma або HTML) · `design-craft`
 
@@ -200,4 +199,4 @@ design-craft        → візуальна продакшн
 **Lead:** Claude (Opus 4.7) · координує команду
 **Cloud iterator:** Claude (Sonnet 4.6) · кожні 2 години через [routine](https://claude.ai/code/routines/trig_01FYEjmyX5cwtRZtEWXWuLtf)
 **Owner:** Rbit27 (George)
-**Last update:** 14 травня 2026 · v0.2.1
+**Last update:** 14 травня 2026 · v0.3.1
