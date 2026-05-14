@@ -16,7 +16,15 @@
 
 ---
 
-## [0.4.0] — 2026-05-14
+## [0.4.1] — 2026-05-14
+
+### Added
+- `hiring/jd-founding-engineer-ios.md` — Standalone JD: $90-130k base + 1.5-3% equity. Process, tech stack, what success looks like 1/3/6/12 months, honest-truth section.
+- `hiring/jd-design-lead.md` — Standalone JD: $80-115k + 1-2% equity. Aesthetic principles (yes/no list), take-home options, anti-profile.
+- `hiring/jd-sport-science-advisor.md` — Part-time advisor: $200-350/hr або $2,500-4k/mo + 0.1-0.25% equity. Monthly time breakdown, conflict-of-interest rules.
+
+### Changed
+- README: новий `hiring/` розділ додано
 
 ### Why MINOR
 - Закінчено повну launch-операційну документацію (LAUNCH_CHECKLIST + OKRs + DATA_ROOM)

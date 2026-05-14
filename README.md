@@ -72,6 +72,13 @@ programs\
    └─ sample-strength-week.md ← приклад тижня для intermediate
 nutrition\
    └─ sample-3day-plan.md     ← приклад 3-денного meal plan (anti-ED)
+legal\
+   ├─ privacy-policy-draft.md    ← Privacy Policy draft (GDPR-ready)
+   └─ terms-of-service-draft.md  ← ToS draft з jurisdiction map
+hiring\
+   ├─ jd-founding-engineer-ios.md   ← JD: iOS FE, $90-130k + 1.5-3% equity
+   ├─ jd-design-lead.md             ← JD: Design Lead, $80-115k + 1-2% equity
+   └─ jd-sport-science-advisor.md   ← JD: Sport Science Advisor (part-time)
 ```
 
 ---
