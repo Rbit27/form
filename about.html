@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Хто ми</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { ink:'#0B0A07', deep:'#13110C', line:'#1F1D16', mute:'#6F6A60', dim:'#A39D8E', paper:'#F3EEE0', cream:'#E7DFC8', acid:'#DDFF2D', ember:'#FF5733' },
+    fontFamily: { serif:['Fraunces','serif'], sans:['Manrope','sans-serif'], mono:['JetBrains Mono','monospace'] }
+  }}};
+</script>
+<style>
+  html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; }
+  .display { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:0.86; }
+  .display em { font-style:italic; font-weight:300; }
+  .display b { font-weight:700; font-style:normal; }
+  .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+  .num { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  ::selection { background:#DDFF2D; color:#0B0A07; }
+  .grain::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.06;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:220px;
+  }
+  .btn-acid { background:#DDFF2D; color:#0B0A07; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:600; padding:16px 28px; border-radius:9999px; display:inline-block; transition:transform 0.15s, background 0.2s; }
+  .btn-acid:hover { background:#ECFF6B; transform:translateY(-1px); }
+  .rule { display:flex; align-items:center; gap:1rem; }
+  .rule::before, .rule::after { content:""; flex:1; height:1px; background:#1F1D16; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<header class="border-b border-line">
+  <div class="max-w-[1480px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-[12px] font-mono tracking-widest uppercase text-mute">
+      <a href="/" class="hover:text-paper">Демо</a>
+      <a href="/pricing.html" class="hover:text-paper">Ціна</a>
+      <a href="/about.html" class="text-paper">Про нас</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+    </nav>
+    <a href="/beta.html" class="btn-acid">Beta →</a>
+  </div>
+</header>
+
+<div class="fixed top-1/2 -translate-y-1/2 -left-40 w-[600px] h-[600px] bg-acid/8 blur-[140px] rounded-full pointer-events-none"></div>
+<div class="fixed -bottom-32 right-0 w-[500px] h-[500px] bg-ember/8 blur-[160px] rounded-full pointer-events-none"></div>
+
+<section class="relative pt-32 pb-20 px-8">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ Маніфест</div>
+    <h1 class="display text-paper text-[clamp(72px,12vw,200px)] mb-12">
+      Чесно.<br><em>Серйозно.</em><br><b>Без BS.</b>
+    </h1>
+
+    <p class="text-dim text-xl leading-relaxed max-w-[760px]">
+      Більшість фітнес-апок робили programмери, які не тренуються. Більшість тренерів-продавців не вчилися sport science. Більшість «AI fitness» — це обгортки над ChatGPT з cheerleader-tone.
+    </p>
+
+    <p class="text-paper text-2xl font-serif italic mt-6 max-w-[760px]">
+      Ми робимо інакше.
+    </p>
+  </div>
+</section>
+
+<section class="relative py-20 px-8 border-t border-line">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 01 · Хто говорить</div>
+
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">
+      George.<br><em>Один</em> <b>founder.</b>
+    </h2>
+
+    <div class="space-y-6 text-dim text-lg leading-relaxed max-w-[680px]">
+      <p>10 років в product engineering. Перший рядок коду — в 14. Перша робота — в 19. Працював на consumer-апсі для компаній, що ти знаєш.</p>
+
+      <p>Тренуюся серйозно з 22. Перший рік — з особистим тренером. Потім сам. За ці 6 років пройшов через все: Hevy, Strong, Fitbod, MacroFactor, MyFitnessPal, Whoop, Oura, Future.</p>
+
+      <p>Жоден з них не давав мені те, що давав живий тренер: <span class="text-paper">хтось знаючий, хто дивиться на мою техніку і коригує програму на основі того, що бачить сьогодні.</span></p>
+
+      <p>Це — конкретна продуктова задача. Ніхто її не вирішує. Тому я почав FORM.</p>
+    </div>
+  </div>
+</section>
+
+<section class="relative py-20 px-8 border-t border-line bg-deep/30">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 02 · Команда</div>
+
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">
+      <em>1</em> людина + <em>14</em><br><b>AI-агентів.</b>
+    </h2>
+
+    <p class="text-dim text-lg leading-relaxed max-w-[680px] mb-10">
+      Це звучить як жарт. Це не жарт. Це структура, яка робить можливим побудувати world-class consumer SaaS з України з мінімальним burn'ом.
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 mt-10">
+      <div>
+        <div class="label mb-3">Продукт + безпека</div>
+        <ul class="space-y-2 font-mono text-sm text-paper">
+          <li>→ product-strategist</li>
+          <li>→ sports-scientist</li>
+          <li>→ nutrition-coach</li>
+          <li>→ <span class="text-acid">clinical-safety</span> · VETO</li>
+          <li>→ platform-engineer</li>
+        </ul>
+      </div>
+      <div>
+        <div class="label mb-3">Дизайн</div>
+        <ul class="space-y-2 font-mono text-sm text-paper">
+          <li>→ design-craft</li>
+          <li>→ brand-system</li>
+          <li>→ ux-flow</li>
+          <li>→ brand-voice (Victor)</li>
+        </ul>
+      </div>
+      <div>
+        <div class="label mb-3">Зростання</div>
+        <ul class="space-y-2 font-mono text-sm text-paper">
+          <li>→ marketing-lead</li>
+          <li>→ growth-lead</li>
+          <li>→ content-strategist</li>
+        </ul>
+      </div>
+      <div>
+        <div class="label mb-3">Дослідження</div>
+        <ul class="space-y-2 font-mono text-sm text-paper">
+          <li>→ research-lead</li>
+          <li>→ process-keeper</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="text-dim text-base leading-relaxed max-w-[680px] mt-12 pt-8 border-t border-line">
+      Кожен агент має один мандат і одне veto-право. <span class="text-paper">clinical-safety</span> зупиняє все, що шкодить. <span class="text-paper">brand-voice</span> тримає голос. <span class="text-paper">product-strategist</span> ріже bloat.
+    </p>
+
+    <p class="text-dim text-base leading-relaxed max-w-[680px] mt-4">
+      Це не магія. Це організаційний дизайн. AI — двигун. Структура — продукт.
+    </p>
+  </div>
+</section>
+
+<section class="relative py-20 px-8 border-t border-line">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 03 · Принципи</div>
+
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">
+      Чотири<br><em>червоні лінії.</em>
+    </h2>
+
+    <div class="space-y-12">
+      <div>
+        <div class="num text-acid text-3xl font-light mb-3">01</div>
+        <p class="font-serif text-paper text-2xl leading-snug mb-3">«Жодних вигаданих цифр.»</p>
+        <p class="text-dim text-base leading-relaxed">Ти не побачиш на нашому сайті «94% retention» або «+10 кг м'язів за місяць». Якщо немає реальної когорти за 90 днів — немає цифри. Цілі — окей. Результати — тільки коли є дані.</p>
+      </div>
+
+      <div>
+        <div class="num text-acid text-3xl font-light mb-3">02</div>
+        <p class="font-serif text-paper text-2xl leading-snug mb-3">«clinical-safety має VETO на все.»</p>
+        <p class="text-dim text-base leading-relaxed">ED-screening на онбордингу. Жодних compensatory механік. Жодного «я бачив, що ти з'їв». Жодних before/after фото тіл. Якщо щось може шкодити — ми не shipпуємо це. Точка.</p>
+      </div>
+
+      <div>
+        <div class="num text-acid text-3xl font-light mb-3">03</div>
+        <p class="font-serif text-paper text-2xl leading-snug mb-3">«Victor не каже того, що соромно сказати другу.»</p>
+        <p class="text-dim text-base leading-relaxed">Тренер не пише тобі «Тіло пам'ятає все». Не каже «Дисципліна — це свобода». Тренер каже «HRV 48 — нижче твого baseline». Дані, не пафос.</p>
+      </div>
+
+      <div>
+        <div class="num text-acid text-3xl font-light mb-3">04</div>
+        <p class="font-serif text-paper text-2xl leading-snug mb-3">«Не пропускай два поспіль.»</p>
+        <p class="text-dim text-base leading-relaxed">Streak ламається після ДВОХ пропусків, не одного. Реальні люди пропускають. Тренер, який звинувачує тебе за один день — поганий тренер. Це і про продукт, і про команду.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="relative py-20 px-8 border-t border-line bg-deep/30">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 04 · Чого свідомо НЕ робимо</div>
+
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">
+      Більше<br><em>«ні»</em> ніж <em>«так».</em>
+    </h2>
+
+    <div class="space-y-4 text-base">
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не показуємо before/after тіл</span></p>
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не присвоюємо калорійну межу &lt; 1,200</span></p>
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не пишемо нотифікацій після 22:00</span></p>
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не коментуємо їжу в реальному часі</span></p>
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не даємо медичних діагнозів</span></p>
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не приймаємо акаунти &lt; 18</span></p>
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не gamify-уємо food</span></p>
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не streak-shame</span></p>
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не Lifetime Deals (вбиває LTV і шкодить продукту)</span></p>
+      <p class="flex items-start gap-3"><span class="text-ember text-lg">✕</span><span class="text-paper">Не продаємо твої дані</span></p>
+    </div>
+  </div>
+</section>
+
+<section class="relative py-20 px-8 border-t border-line">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 05 · Україна</div>
+
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">
+      Будуємо<br><em>з</em> <b>Києва.</b>
+    </h2>
+
+    <div class="space-y-6 text-dim text-lg leading-relaxed max-w-[680px]">
+      <p>Так. Війна. Так — це contextual reality.</p>
+
+      <p>І так — українська tech-індустрія працює дисципліновано, з нижчою cost базою і вищою якістю інженерної роботи, ніж більшість Western competitors.</p>
+
+      <p>Це не виправдання. Це <span class="text-paper">forcing function</span>. Нам недоступне lazy VC money. Тому ми робимо продукт, який чесно вартий грошей.</p>
+
+      <p>Перший ринок — Україна. Західна ЄС — phase 2. US/UK — phase 3.</p>
+
+      <p>Цей бренд не приховує свого походження. Якщо це проблема для тебе — ми не для тебе.</p>
+    </div>
+  </div>
+</section>
+
+<section class="relative py-32 px-8 border-t border-line">
+  <div class="max-w-[760px] mx-auto text-center">
+    <h2 class="display text-paper text-[clamp(56px,9vw,140px)] mb-8">
+      <em>Готовий?</em>
+    </h2>
+
+    <p class="text-dim text-lg max-w-[480px] mx-auto leading-relaxed mb-12">
+      Подай заявку на closed beta. 200 ліфтерів, серпень 2026. 90 днів безкоштовно.
+    </p>
+
+    <a href="/beta.html" class="btn-acid">Подати на Beta →</a>
+
+    <p class="text-mute font-mono text-xs mt-6">Без картки. Cancel у 3 кліки.</p>
+  </div>
+</section>
+
+<footer class="border-t border-line py-12 px-8">
+  <div class="max-w-[1480px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <div class="font-serif text-lg text-paper">FORM<span class="text-acid">.</span></div>
+      <div class="label ml-4">Київ · 2026</div>
+    </div>
+    <div class="flex items-center gap-8 font-mono text-xs uppercase tracking-widest text-mute">
+      <a href="/" class="hover:text-paper">Головна</a>
+      <a href="/pricing.html" class="hover:text-paper">Ціна</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+      <a href="#" class="hover:text-paper">@form.coach</a>
+    </div>
+    <div class="font-mono text-[10px] text-mute">about v0.1</div>
+  </div>
+</footer>
+
+</body>
+</html>

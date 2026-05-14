@@ -16,7 +16,15 @@
 
 ---
 
-## [0.3.7] — 2026-05-14
+## [0.3.8] — 2026-05-14
+
+### Added
+- [`about.html`](about.html) — manifesto page: who we are, 14-agent team structure, 4 red lines, what we don't do (10-list), Ukraine context
+- [`docs/SECURITY.md`](docs/SECURITY.md) — threat model, 5-layer defense (device/network/app/storage/processors), secrets management, CV-specific privacy, LLM prompt-injection mitigation, GDPR breach response, incident severity tiers
+- `content/post-05-building-fitness-from-ukraine.md` — 5-й blog post: building fitness startup з України 2026. Особиста founder-перспектива, чому UA — advantage не despite, як говорити з investors, що hire community. ~10 хв read.
+
+### Changed
+- README: about.html, SECURITY.md додано до структури
 
 ### Added
 - [`pricing.html`](pricing.html) — pricing page з toggle Monthly/Annual, geo-pricing display, comparison table 5 конкурентів, 8-question FAQ
