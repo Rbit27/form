@@ -16,6 +16,23 @@
 
 ---
 
+## [0.12.0] — 2026-05-14
+
+### Why MINOR
+- Новий документ: `docs/FIRST_30_DAYS.md` — 4-тижневий execution playbook
+- Перший документ що перетворює 40+ стратегічних доків в операційний план дій
+- Синтезує RESEARCH.md + INVESTOR_OUTREACH.md + DEPLOYMENT.md + CONTENT_CALENDAR.md + HIRING.md в єдину послідовність
+
+### Added
+- [`docs/FIRST_30_DAYS.md`](docs/FIRST_30_DAYS.md) — Week 0 (інфраструктура: domain, email, tools), W1 (Twitter, Show HN, перший newsletter), W2 (research sprint — recruiting DM templates, interview notes template), W3 (investor CRM setup, warm intro scripts, FE JD distribution channels + tech assessment), W4 (синтез, synthesis checklist, 8-gate checkpoint), troubleshooting таблиця
+
+### Changed
+- [`VERSION`](VERSION) — 0.11.0 → 0.12.0
+- [`README.md`](README.md) — FIRST_30_DAYS.md у repo tree; doc count 40+→41+; version refs → v0.12.0
+- [`STATUS.md`](STATUS.md) — FIRST_30_DAYS.md у docs-таблиці; версія → v0.12.0
+
+---
+
 ## [0.11.0] — 2026-05-14
 
 ### Why MINOR
