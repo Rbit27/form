@@ -16,7 +16,12 @@
 
 ---
 
-## [0.4.2] — 2026-05-14
+## [0.4.3] — 2026-05-14
+
+### Added
+- `programs/sample-deload-week.md` — deload week template (3 sessions, 50% volume, RPE 5, focus на technique polish). Signals what's working vs needs extended deload. Stop-criteria during deload.
+- `nutrition/sample-cutting-plan.md` — 12-week cutting plan з 3 phases. Safety floor $1,800kcal min. Strength preservation gate. Soft-mode альтернативa для ED-history users. Stop-criteria.
+- [`docs/SUPPORT.md`](docs/SUPPORT.md) — customer support playbook: 10 common ticket templates, edge cases (crisis, pricing complaints, App Store reviews), SLA tiers (P0-P3), what we never do, metrics tracking.
 
 ### Added
 - [`docs/I18N.md`](docs/I18N.md) — internationalization plan: UA+EN ship v1.0, DE/PL/ES phase 1 (Q2 2027), cost breakdown ($8.5k per language), cultural calibration notes, decision framework, RTL/CJK explicitly off-roadmap
