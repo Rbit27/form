@@ -16,6 +16,15 @@
 
 ---
 
+## [0.4.9] — 2026-05-14
+
+### Added
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — step-by-step deployment runbook через Cloudflare Pages. ~85 хв total. Cost projection: ~$30/рік (домен + free tiers). Pre-deploy checklist, sitemap, robots.txt format, email routing, monitoring.
+- [`sitemap.xml`](sitemap.xml) — sitemap.xml для form.coach з усіма 9 HTML pages
+- [`robots.txt`](robots.txt) — robots.txt що allows search engines, blocks AI training scrapers (GPTBot, ClaudeBot, anthropic-ai, CCBot, Google-Extended, PerplexityBot, cohere-ai)
+
+---
+
 ## [0.4.8] — 2026-05-14
 
 ### Added
