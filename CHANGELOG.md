@@ -16,6 +16,14 @@
 
 ---
 
+## [0.4.8] — 2026-05-14
+
+### Added
+- [`workout-live.html`](workout-live.html) — high-fidelity workout mockup. CV skeleton, form metrics (кут спини + шлях штанги), animated voice equalizer, choice-architecture CTA (не наказ). Three explanation cards below (CV pipeline, Voice, User agency).
+- `content/post-09-building-victor-voice.md` — 9-й blog: «Як ми побудували Victor — голос AI-тренера». 200+ ref snippets process. Voice decomposition (cadence/diction/tone/authority/verbosity/register). Hard rules що Victor НЕ каже. Real examples (good vs bad). ~11 хв read.
+
+---
+
 ## [0.4.7] — 2026-05-14
 
 ### Added
