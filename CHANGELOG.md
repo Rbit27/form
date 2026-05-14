@@ -16,6 +16,18 @@
 
 ---
 
+## [0.3.4] — 2026-05-14
+
+### Added
+- `content/post-02-what-good-form-means.md` — другий blog post: «Що насправді означає гарна форма», ~14 хв read, deep на трьох рівнях форми + чесний breakdown що камера може/не може
+- [`docs/INVESTOR_OUTREACH.md`](docs/INVESTOR_OUTREACH.md) — playbook: target investor list (Tier 1-3 + anti-list), warm/cold templates, monthly update format, due-diligence pack, term sheet review, 10 prepared answers, 12-тижневий outreach calendar
+- `programs/sample-strength-week.md` — приклад тижневої програми для intermediate, 5 сесій, з RPE-настройкою і пунктами де CV-camera coaches які параметри. Sample-only, для demo.
+
+### Changed
+- README: новий розділ `programs/` додано до структури
+
+---
+
 ## [0.3.3] — 2026-05-14
 
 ### Added

@@ -46,9 +46,13 @@ G:\Клод\form\
    ├─ METRICS.md           ← NSM, funnel, dashboard, A/B test discipline
    ├─ HIRING.md            ← 3 ролі до Seed, interview rubric, compensation
    ├─ PRESS.md             ← press kit, boilerplate, founder bio, FAQ
+   ├─ INVESTOR_OUTREACH.md ← target funds, templates, due-dilig pack
    └─ FOUNDER.md           ← founder narrative · INTERNAL · not for agents
 content\
-   └─ post-01-hrv-is-lying.md  ← перший long-form пост (draft)
+   ├─ post-01-hrv-is-lying.md       ← blog 1: «HRV тобі бреше» (draft)
+   └─ post-02-what-good-form-means.md ← blog 2: «Що означає гарна форма» (draft)
+programs\
+   └─ sample-strength-week.md ← приклад тижня для intermediate
 ```
 
 ---
