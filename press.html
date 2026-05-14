@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Press Kit</title>
+<meta name="description" content="Press kit for FORM — AI personal trainer. Boilerplate, founder bio, company facts, quotes, and story angles." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { ink:'#0B0A07', deep:'#13110C', line:'#1F1D16', mute:'#6F6A60', dim:'#A39D8E', paper:'#F3EEE0', cream:'#E7DFC8', acid:'#DDFF2D', ember:'#FF5733' },
+    fontFamily: { serif:['Fraunces','serif'], sans:['Manrope','sans-serif'], mono:['JetBrains Mono','monospace'] }
+  }}};
+</script>
+<style>
+  html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; }
+  .display { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:0.86; }
+  .display em { font-style:italic; font-weight:300; }
+  .display b { font-weight:700; font-style:normal; }
+  .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+  .num { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  ::selection { background:#DDFF2D; color:#0B0A07; }
+  .grain::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.06;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:220px;
+  }
+  .btn-acid { background:#DDFF2D; color:#0B0A07; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:600; padding:16px 28px; border-radius:9999px; display:inline-block; transition:transform 0.15s, background 0.2s; }
+  .btn-acid:hover { background:#ECFF6B; transform:translateY(-1px); }
+  .btn-ghost { border:1px solid #1F1D16; color:#A39D8E; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:500; padding:14px 24px; border-radius:9999px; display:inline-block; transition:border-color 0.15s, color 0.15s; }
+  .btn-ghost:hover { border-color:#A39D8E; color:#F3EEE0; }
+  .quote-block { border-left: 2px solid #DDFF2D; padding-left: 1.5rem; }
+  .copy-btn { cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:#6F6A60; border:1px solid #1F1D16; padding:4px 10px; border-radius:4px; transition:color 0.15s, border-color 0.15s; }
+  .copy-btn:hover { color:#DDFF2D; border-color:#DDFF2D; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<header class="border-b border-line">
+  <div class="max-w-[1480px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-[12px] font-mono tracking-widest uppercase text-mute">
+      <a href="/" class="hover:text-paper">Demo</a>
+      <a href="/pricing.html" class="hover:text-paper">Pricing</a>
+      <a href="/about.html" class="hover:text-paper">About</a>
+      <a href="/press.html" class="text-paper">Press</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+    </nav>
+    <a href="mailto:press@form.coach" class="btn-ghost">press@form.coach</a>
+  </div>
+</header>
+
+<div class="fixed top-1/2 -translate-y-1/2 -left-40 w-[600px] h-[600px] bg-acid/8 blur-[140px] rounded-full pointer-events-none"></div>
+<div class="fixed -bottom-32 right-0 w-[500px] h-[500px] bg-ember/8 blur-[160px] rounded-full pointer-events-none"></div>
+
+<section class="relative pt-32 pb-20 px-8">
+  <div class="max-w-[1100px] mx-auto">
+    <div class="label mb-6">§ Press Kit · v0.1 · May 2026</div>
+    <h1 class="display text-paper text-[clamp(72px,12vw,200px)] mb-12">
+      Get the<br><em>story</em><br><b>right.</b>
+    </h1>
+    <p class="text-dim text-xl leading-relaxed max-w-[680px]">
+      Everything you need to write about FORM. Boilerplate, facts, founder bio, quotes approved for use. No embargo. No PR handler. If you have a question the press kit doesn't answer — email <span class="text-paper">press@form.coach</span>.
+    </p>
+    <div class="flex flex-wrap gap-4 mt-10">
+      <a href="#boilerplate" class="btn-ghost">Boilerplate ↓</a>
+      <a href="#facts" class="btn-ghost">Company facts ↓</a>
+      <a href="#quotes" class="btn-ghost">Quotes ↓</a>
+      <a href="#angles" class="btn-ghost">Story angles ↓</a>
+      <a href="mailto:press@form.coach" class="btn-acid">Email press →</a>
+    </div>
+  </div>
+</section>
+
+<section id="boilerplate" class="relative py-20 px-8 border-t border-line">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 01 · Boilerplate</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">Copy.<br><em>Paste.</em><br><b>Done.</b></h2>
+    <p class="text-dim text-base mb-10 max-w-[640px]">Three versions — use whichever fits your word count. All approved for use without attribution to FORM press team.</p>
+    <div class="space-y-10">
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="flex items-center justify-between mb-4">
+          <div class="label">One sentence</div>
+          <button class="copy-btn" onclick="copyText(this, 'copy-1')">Copy</button>
+        </div>
+        <p id="copy-1" class="text-paper text-lg leading-relaxed font-serif italic">
+          &ldquo;FORM is an AI personal trainer that watches your form through your phone&rsquo;s camera and adapts your training program to your sleep and HRV.&rdquo;
+        </p>
+      </div>
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="flex items-center justify-between mb-4">
+          <div class="label">Two sentences</div>
+          <button class="copy-btn" onclick="copyText(this, 'copy-2')">Copy</button>
+        </div>
+        <p id="copy-2" class="text-paper text-lg leading-relaxed font-serif italic">
+          &ldquo;FORM is the first AI personal trainer that combines real-time computer-vision technique analysis with recovery-aware programming. Built for self-coached lifters who refuse to pay $200/week for a human coach but won&rsquo;t accept generic programs, FORM ships voice-led coaching that respects time and never resorts to surveillance.&rdquo;
+        </p>
+      </div>
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="flex items-center justify-between mb-4">
+          <div class="label">Full paragraph</div>
+          <button class="copy-btn" onclick="copyText(this, 'copy-3')">Copy</button>
+        </div>
+        <p id="copy-3" class="text-paper text-lg leading-relaxed font-serif italic">
+          &ldquo;FORM is an AI personal trainer for serious self-coached lifters. The product combines on-device computer vision — analyzing form on 8 base exercises via the phone camera — recovery-aware programming (HRV and sleep integration with Apple Health, Whoop, and Oura), and a voice persona called Victor that delivers coaching cues in the style of a 20-year veteran trainer: without motivational posters, surveillance language, or fake metrics. Founded in Kyiv in 2026, FORM launches closed beta on TestFlight Q3 2026.&rdquo;
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="facts" class="relative py-20 px-8 border-t border-line bg-deep/30">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 02 · Company facts</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12"><em>Verified.</em><br><b>Current.</b></h2>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <tbody class="text-base">
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm w-48">Company</td><td class="py-4 text-paper">FORM</td></tr>
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm">Domain</td><td class="py-4 text-paper">form.coach</td></tr>
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm">Founded</td><td class="py-4 text-paper">May 2026, Kyiv, Ukraine</td></tr>
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm">Founder</td><td class="py-4 text-paper">George (Rbit27 on GitHub)</td></tr>
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm">Stage</td><td class="py-4 text-paper">Pre-seed · closed beta planning</td></tr>
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm">Seed target</td><td class="py-4 text-paper">$1.5–2.5M · target close Q3 2026</td></tr>
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm">Team</td><td class="py-4 text-paper">1 founder + 14 specialized AI agents</td></tr>
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm">Platform</td><td class="py-4 text-paper">iOS first (App Store Q4 2026) · Android phase 2 Q1 2027</td></tr>
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm">Pricing</td><td class="py-4 text-paper">$9/mo (UA) · $19/mo (Western) · $69/yr (UA) · $149/yr (Western)</td></tr>
+          <tr class="border-b border-line"><td class="py-4 pr-8 font-mono text-mute text-sm">Beta</td><td class="py-4 text-paper">~200 lifters on TestFlight · August 2026 · 90 days free</td></tr>
+          <tr><td class="py-4 pr-8 font-mono text-mute text-sm">GitHub</td><td class="py-4"><a href="https://github.com/Rbit27/form" class="text-acid hover:underline">github.com/Rbit27/form</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-mute font-mono text-xs mt-8">These are current figures. No traction numbers exist yet — we are pre-product. We will publish first cohort data after 90-day beta closes.</p>
+  </div>
+</section>
+
+<section class="relative py-20 px-8 border-t border-line">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 03 · Founder bio</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">George.<br><em>Builder.</em><br><b>Lifter.</b></h2>
+    <div class="space-y-10">
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="flex items-center justify-between mb-4"><div class="label">Short bio · 50 words</div><button class="copy-btn" onclick="copyText(this, 'bio-1')">Copy</button></div>
+        <p id="bio-1" class="text-paper text-lg leading-relaxed">George (Rbit27) is the founder of FORM. With ten years in software engineering and a personal training practice, he started FORM to close the gap between sports-science research and the products available to self-coached lifters.</p>
+      </div>
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="flex items-center justify-between mb-4"><div class="label">Medium bio · 100 words</div><button class="copy-btn" onclick="copyText(this, 'bio-2')">Copy</button></div>
+        <p id="bio-2" class="text-paper text-lg leading-relaxed">George (Rbit27) is the founder of FORM, an AI personal trainer launched from Kyiv in 2026. Prior to FORM, he spent a decade as a software engineer in product companies. His personal training practice — six years of self-coached lifting, two cycles of working with human trainers, and stints with most fitness apps in the market — convinced him that the gap between modern sports science and consumer products was structural and product-shaped. FORM is his attempt to close it.</p>
+      </div>
+      <div class="bg-deep/50 border border-line rounded-xl p-8">
+        <div class="mb-4"><div class="label">Extended bio · for interview context</div></div>
+        <div class="text-dim text-base leading-relaxed space-y-4">
+          <p>George started programming at 14, took his first software-engineering role at 19, and has shipped consumer products for the past decade. He started lifting seriously at 22 — first with a personal trainer, then self-coached, eventually realising that no commercial fitness product gave him what an expert coach gave: someone who watched his technique and adjusted his program based on what they saw that day.</p>
+          <p>His professional background: 10 years of software engineering with consumer-facing product companies. He has personally tried Whoop, Oura, Fitbod, MacroFactor, MyFitnessPal, and Hevy — and has used a human personal trainer for two distinct cycles.</p>
+          <p>His insight: the gap between modern sports science (HRV-driven programming, RPE autoregulation, evidence-based periodization) and the products available to serious self-coached lifters is structural. None of the major incumbents are built coaching-first.</p>
+          <p>FORM is his attempt to ship a coaching-first product that is honest about what AI can and cannot do, respects the user&rsquo;s time and body, and refuses to use the manipulative patterns common in the fitness industry.</p>
+          <p class="text-paper">He trains four days a week, reads non-fiction, and lives in Kyiv.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="relative py-20 px-8 border-t border-line bg-deep/30">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 04 · Key messages</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">What FORM<br><em>is.</em> What it<br><b>is not.</b></h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+      <div>
+        <div class="label mb-6" style="color:#DDFF2D">What FORM is</div>
+        <ul class="space-y-4">
+          <li class="flex items-start gap-3"><span class="text-acid mt-1 font-mono">→</span><span class="text-paper">The first AI trainer that watches your form via phone camera on 8 base exercises in real-time</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid mt-1 font-mono">→</span><span class="text-paper">A training program that adjusts daily to your HRV and sleep — not a static monthly plan</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid mt-1 font-mono">→</span><span class="text-paper">Victor — a voice coaching persona built from 200+ reference samples of honest coaching language</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid mt-1 font-mono">→</span><span class="text-paper">Honest about its limits: CV detects gross deviations, not microscopic biomechanics</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="label mb-6" style="color:#FF5733">What FORM is not</div>
+        <ul class="space-y-4">
+          <li class="flex items-start gap-3"><span class="text-ember mt-1 font-mono">✕</span><span class="text-dim">A medical device or substitute for a physiotherapist</span></li>
+          <li class="flex items-start gap-3"><span class="text-ember mt-1 font-mono">✕</span><span class="text-dim">A food-tracking panopticon (no real-time food commenting)</span></li>
+          <li class="flex items-start gap-3"><span class="text-ember mt-1 font-mono">✕</span><span class="text-dim">A social network or activity-sharing platform</span></li>
+          <li class="flex items-start gap-3"><span class="text-ember mt-1 font-mono">✕</span><span class="text-dim">Whoop (data only) or Fitbod (program only) — FORM is camera + voice + recovery + program in one</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-12 pt-8 border-t border-line">
+      <div class="label mb-4">Safety commitments (for factual accuracy)</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+        <p class="flex items-center gap-2"><span class="text-ember font-mono">✕</span><span class="text-dim">No before/after body images</span></p>
+        <p class="flex items-center gap-2"><span class="text-ember font-mono">✕</span><span class="text-dim">No calorie floor below 1,200 assigned</span></p>
+        <p class="flex items-center gap-2"><span class="text-ember font-mono">✕</span><span class="text-dim">No notifications after 22:00</span></p>
+        <p class="flex items-center gap-2"><span class="text-ember font-mono">✕</span><span class="text-dim">No streak-shaming on single miss</span></p>
+        <p class="flex items-center gap-2"><span class="text-ember font-mono">✕</span><span class="text-dim">ED screening non-skippable on onboarding</span></p>
+        <p class="flex items-center gap-2"><span class="text-ember font-mono">✕</span><span class="text-dim">No accounts under 18</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="quotes" class="relative py-20 px-8 border-t border-line">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 05 · Approved quotes</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">Use<br><em>as-is.</em><br><b>Verified.</b></h2>
+    <p class="text-dim text-base mb-10 max-w-[640px]">All quotes attributed to George, founder of FORM. Use without requesting written approval — all approved for editorial use.</p>
+    <div class="space-y-8">
+      <div>
+        <div class="label mb-3">On vision</div>
+        <div class="quote-block">
+          <p class="text-paper text-xl leading-relaxed font-serif italic">&ldquo;Most fitness apps treat users like data points. We treat them like adults who deserve a coach — not a cheerleader, not a panopticon, not a salesman.&rdquo;</p>
+          <p class="text-mute font-mono text-xs mt-3">— George, founder of FORM</p>
+        </div>
+      </div>
+      <div>
+        <div class="label mb-3">On the safety floor</div>
+        <div class="quote-block">
+          <p class="text-paper text-xl leading-relaxed font-serif italic">&ldquo;If you can&rsquo;t say a sentence to a friend in a gym without shame, our AI coach doesn&rsquo;t say it either. That&rsquo;s the rule from day one.&rdquo;</p>
+          <p class="text-mute font-mono text-xs mt-3">— George, founder of FORM</p>
+        </div>
+      </div>
+      <div>
+        <div class="label mb-3">On computer vision (important for technical accuracy)</div>
+        <div class="quote-block">
+          <p class="text-paper text-xl leading-relaxed font-serif italic">&ldquo;We&rsquo;re not promising perfect form analysis. We&rsquo;re promising rep counting, tempo, and gross-deviation detection on eight base lifts. That&rsquo;s what we can ship honestly today. Everything beyond that is research.&rdquo;</p>
+          <p class="text-mute font-mono text-xs mt-3">— George, founder of FORM</p>
+        </div>
+      </div>
+      <div>
+        <div class="label mb-3">On building from Ukraine</div>
+        <div class="quote-block">
+          <p class="text-paper text-xl leading-relaxed font-serif italic">&ldquo;Building world-class consumer SaaS from Ukraine in 2026 is not a handicap — it&rsquo;s a forcing function. We don&rsquo;t have access to lazy VC money, so we have to make a product that&rsquo;s actually good. That&rsquo;s a feature.&rdquo;</p>
+          <p class="text-mute font-mono text-xs mt-3">— George, founder of FORM</p>
+        </div>
+      </div>
+      <div>
+        <div class="label mb-3">On AI as engine, not product</div>
+        <div class="quote-block">
+          <p class="text-paper text-xl leading-relaxed font-serif italic">&ldquo;The mistake everyone makes is treating AI like a feature. It&rsquo;s not. The persona, the safety floor, the honesty about limitations — those are the product. The LLM is the engine. Anyone has the engine.&rdquo;</p>
+          <p class="text-mute font-mono text-xs mt-3">— George, founder of FORM</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="angles" class="relative py-20 px-8 border-t border-line bg-deep/30">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 06 · Story angles</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">Five<br><em>angles.</em><br><b>Your call.</b></h2>
+    <p class="text-dim text-base mb-10 max-w-[640px]">Looking for an entry point? These are the angles we think are genuinely interesting. We will cooperate on all of them, including critical ones.</p>
+    <div class="space-y-6">
+      <div class="bg-ink border border-line rounded-xl p-8 hover:border-acid/30 transition-colors">
+        <div class="flex items-start gap-6">
+          <div class="num text-acid text-4xl font-light flex-shrink-0">01</div>
+          <div><p class="text-paper text-xl font-serif mb-3">&ldquo;AI trainer from Ukraine&rdquo;</p><p class="text-dim text-base leading-relaxed">Founder story + wartime context + a product that targets a Western market from Kyiv. The honest version of a startup origin story: no easy VC money, no San Francisco comfort zone, a forcing function that makes you ship something actually good.</p></div>
+        </div>
+      </div>
+      <div class="bg-ink border border-line rounded-xl p-8 hover:border-acid/30 transition-colors">
+        <div class="flex items-start gap-6">
+          <div class="num text-acid text-4xl font-light flex-shrink-0">02</div>
+          <div><p class="text-paper text-xl font-serif mb-3">&ldquo;1 founder + 14 AI agents = company&rdquo;</p><p class="text-dim text-base leading-relaxed">A new operating model for early-stage consumer SaaS. Not AGI hype — a structured team where each agent has one mandate and one veto right. A clinical-safety agent blocks anything that could harm users. What happens when you design an organization this way?</p></div>
+        </div>
+      </div>
+      <div class="bg-ink border border-line rounded-xl p-8 hover:border-acid/30 transition-colors">
+        <div class="flex items-start gap-6">
+          <div class="num text-acid text-4xl font-light flex-shrink-0">03</div>
+          <div><p class="text-paper text-xl font-serif mb-3">&ldquo;Why all AI fitness apps are still bad&rdquo;</p><p class="text-dim text-base leading-relaxed">Critical angle: we&rsquo;ve done an honest teardown of 8 competitors. None solve the core coaching problem. The fitness industry has an honesty problem, and AI is making it worse, not better. FORM&rsquo;s answer: enforced discipline at the product level.</p></div>
+        </div>
+      </div>
+      <div class="bg-ink border border-line rounded-xl p-8 hover:border-acid/30 transition-colors">
+        <div class="flex items-start gap-6">
+          <div class="num text-acid text-4xl font-light flex-shrink-0">04</div>
+          <div><p class="text-paper text-xl font-serif mb-3">&ldquo;Can a phone camera replace a trainer?&rdquo;</p><p class="text-dim text-base leading-relaxed">Technology story with honest limitation disclosure. What Apple Vision actually does at 30fps. What &ldquo;form analysis&rdquo; can and cannot mean on a consumer device. The difference between gross-deviation detection and professional biomechanical analysis.</p></div>
+        </div>
+      </div>
+      <div class="bg-ink border border-line rounded-xl p-8 hover:border-acid/30 transition-colors">
+        <div class="flex items-start gap-6">
+          <div class="num text-acid text-4xl font-light flex-shrink-0">05</div>
+          <div><p class="text-paper text-xl font-serif mb-3">&ldquo;Fitness without surveillance&rdquo;</p><p class="text-dim text-base leading-relaxed">Consumer privacy angle. The data model that doesn&rsquo;t sell your workouts to insurance companies. The AI coach that doesn&rsquo;t comment on your food in real-time. The streak that doesn&rsquo;t shame you for one missed day.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="relative py-20 px-8 border-t border-line">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 07 · Journalist FAQ</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">Straight<br><em>answers.</em></h2>
+    <div class="space-y-8">
+      <div class="border-b border-line pb-8"><p class="text-paper text-lg font-serif mb-3">Q: How many users do you have?</p><p class="text-dim text-base leading-relaxed">Zero paying users. We are pre-product. No app exists yet — mobile development begins with the Founding Engineer hire. Closed beta is planned for ~200 lifters on TestFlight, August 2026. We do not claim traction we do not have.</p></div>
+      <div class="border-b border-line pb-8"><p class="text-paper text-lg font-serif mb-3">Q: Why 14 AI agents instead of one model?</p><p class="text-dim text-base leading-relaxed">Each agent has one mandate and one veto right. clinical-safety stops anything that could harm users. brand-voice maintains consistency. product-strategist kills feature creep. This isn&rsquo;t marketing — it&rsquo;s organizational design that fixes the typical AI-startup problem of &ldquo;one prompt does everything.&rdquo;</p></div>
+      <div class="border-b border-line pb-8"><p class="text-paper text-lg font-serif mb-3">Q: Who are your competitors?</p><p class="text-dim text-base leading-relaxed">Whoop (data, no program), Fitbod (program, no coaching), Future ($149/mo with human coaches), MacroFactor (nutrition only). None close the same gap: camera + voice + recovery + nutrition + program in one product.</p></div>
+      <div class="border-b border-line pb-8"><p class="text-paper text-lg font-serif mb-3">Q: Is this safe to use?</p><p class="text-dim text-base leading-relaxed">Safety is the first question, not the last. A clinical-safety agent has HARD VETO on anything touching food, body image, mental health, or harsh tone. ED screening on onboarding is non-skippable. Pain triage always routes to a doctor. Safety standards follow NEDA and APA guidelines.</p></div>
+      <div class="border-b border-line pb-8"><p class="text-paper text-lg font-serif mb-3">Q: Are you raising money?</p><p class="text-dim text-base leading-relaxed">Seed round, target $1.5–2.5M, planned close Q3 2026. Investor relations: invest@form.coach.</p></div>
+      <div class="pb-8"><p class="text-paper text-lg font-serif mb-3">Q: Why Ukraine?</p><p class="text-dim text-base leading-relaxed">That&rsquo;s where the founder is, and that&rsquo;s where the team will be built. Ukrainian tech works with discipline and lower cost structure. The war is a context, not an excuse. The first market is Ukraine; Western EU is phase 2.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="relative py-20 px-8 border-t border-line bg-deep/30">
+  <div class="max-w-[900px] mx-auto">
+    <div class="label mb-6">§ 08 · Assets + permissions</div>
+    <h2 class="display text-paper text-[clamp(48px,7vw,96px)] mb-12">What you<br><em>can</em> and<br><b>can't</b> use.</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <div>
+        <div class="label mb-4" style="color:#DDFF2D">OK to use without approval</div>
+        <ul class="space-y-3 text-base">
+          <li class="flex items-start gap-3"><span class="text-acid font-mono">→</span><span class="text-dim">Any boilerplate text from §01</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid font-mono">→</span><span class="text-dim">Any approved quotes from §05</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid font-mono">→</span><span class="text-dim">All company facts from §02</span></li>
+          <li class="flex items-start gap-3"><span class="text-acid font-mono">→</span><span class="text-dim">Screenshots from this press kit for editorial coverage</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="label mb-4" style="color:#FF5733">Requires approval</div>
+        <ul class="space-y-3 text-base">
+          <li class="flex items-start gap-3"><span class="text-ember font-mono">✕</span><span class="text-dim">Founder portrait in commercial contexts</span></li>
+          <li class="flex items-start gap-3"><span class="text-ember font-mono">✕</span><span class="text-dim">Traction or user numbers we haven&rsquo;t published</span></li>
+          <li class="flex items-start gap-3"><span class="text-ember font-mono">✕</span><span class="text-dim">Feature roadmap details beyond what&rsquo;s public</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-10 p-6 bg-ink border border-line rounded-xl">
+      <div class="label mb-3">Assets available on request</div>
+      <ul class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-dim">
+        <li class="flex items-center gap-2"><span class="text-mute font-mono">□</span> FORM logo (SVG + PNG, dark + light + mono)</li>
+        <li class="flex items-center gap-2"><span class="text-mute font-mono">□</span> Founder portrait (high-res, for editorial)</li>
+        <li class="flex items-center gap-2"><span class="text-mute font-mono">□</span> 5 app screenshots on iPhone Pro Max frame</li>
+        <li class="flex items-center gap-2"><span class="text-mute font-mono">□</span> Marketing site screenshots (hero, voice, honest)</li>
+        <li class="flex items-center gap-2"><span class="text-mute font-mono">□</span> 15-sec CV-analysis demo video (Q3 2026)</li>
+      </ul>
+      <p class="text-mute font-mono text-xs mt-4">Visual assets are being prepared. Email press@form.coach with your deadline.</p>
+    </div>
+  </div>
+</section>
+
+<section class="relative py-32 px-8 border-t border-line">
+  <div class="max-w-[760px] mx-auto text-center">
+    <div class="label mb-6">§ 09 · Contact</div>
+    <h2 class="display text-paper text-[clamp(56px,9vw,140px)] mb-8"><em>One</em> email.</h2>
+    <p class="text-dim text-lg max-w-[520px] mx-auto leading-relaxed mb-4">For press inquiries, interview requests, or anything this press kit doesn&rsquo;t cover:</p>
+    <a href="mailto:press@form.coach" class="btn-acid mb-8 inline-block">press@form.coach →</a>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 text-center">
+      <div><div class="label mb-2">Investors</div><p class="font-mono text-xs text-dim">invest@form.coach</p></div>
+      <div><div class="label mb-2">Hiring</div><p class="font-mono text-xs text-dim">hiring@form.coach</p></div>
+      <div><div class="label mb-2">General</div><p class="font-mono text-xs text-dim">hello@form.coach</p></div>
+      <div><div class="label mb-2">GitHub</div><a href="https://github.com/Rbit27/form" class="font-mono text-xs text-acid hover:underline">Rbit27/form</a></div>
+    </div>
+    <p class="text-mute font-mono text-xs mt-12">If you&rsquo;re writing a critical story — please give us a heads-up. We respond, we don&rsquo;t block.</p>
+  </div>
+</section>
+
+<footer class="border-t border-line py-12 px-8">
+  <div class="max-w-[1480px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <div class="font-serif text-lg text-paper">FORM<span class="text-acid">.</span></div>
+      <div class="label ml-4">Kyiv · 2026</div>
+    </div>
+    <div class="flex items-center gap-8 font-mono text-xs uppercase tracking-widest text-mute">
+      <a href="/" class="hover:text-paper">Home</a>
+      <a href="/pricing.html" class="hover:text-paper">Pricing</a>
+      <a href="/about.html" class="hover:text-paper">About</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+      <a href="/press.html" class="text-paper">Press</a>
+    </div>
+    <div class="font-mono text-[10px] text-mute">press kit v0.1</div>
+  </div>
+</footer>
+
+<script>
+function copyText(btn, id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = el.innerText.replace(/^[“”]|[“”]$/g, '').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const original = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.style.color = '#DDFF2D';
+    btn.style.borderColor = '#DDFF2D';
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 1800);
+  });
+}
+</script>
+
+</body>
+</html>
