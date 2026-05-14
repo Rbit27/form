@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Питання і відповіді</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { ink:'#0B0A07', deep:'#13110C', line:'#1F1D16', mute:'#6F6A60', dim:'#A39D8E', paper:'#F3EEE0', cream:'#E7DFC8', acid:'#DDFF2D', ember:'#FF5733' },
+    fontFamily: { serif:['Fraunces','serif'], sans:['Manrope','sans-serif'], mono:['JetBrains Mono','monospace'] }
+  }}};
+</script>
+<style>
+  html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; }
+  .display { font-family:'Fraunces',serif; font-weight:300; letter-spacing:-0.04em; line-height:0.86; }
+  .display em { font-style:italic; font-weight:300; }
+  .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+  ::selection { background:#DDFF2D; color:#0B0A07; }
+  .grain::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.06;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:220px;
+  }
+  details { background:#13110C; border:1px solid #1F1D16; border-radius:16px; padding:20px 24px; margin-bottom:12px; transition:border-color 0.2s; }
+  details:hover { border-color:#2A2820; }
+  details[open] { border-color:rgba(221,255,45,0.3); background:#191711; }
+  summary { font-family:'Fraunces',serif; font-weight:400; font-size:18px; color:#F3EEE0; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; }
+  summary::-webkit-details-marker { display:none; }
+  summary::after { content:"+"; color:#DDFF2D; font-family:'JetBrains Mono',monospace; font-size:20px; transition:transform 0.2s; }
+  details[open] summary::after { content:"−"; }
+  details p { color:#A39D8E; font-size:15px; line-height:1.65; margin-top:12px; }
+  details p strong { color:#F3EEE0; font-weight:500; }
+  details ul { color:#A39D8E; font-size:15px; line-height:1.65; margin-top:8px; padding-left:1.25em; }
+  details li { margin-bottom:4px; }
+  .btn-acid { background:#DDFF2D; color:#0B0A07; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; font-weight:600; padding:14px 24px; border-radius:9999px; display:inline-block; transition:transform 0.15s, background 0.2s; }
+  .btn-acid:hover { background:#ECFF6B; transform:translateY(-1px); }
+  .category { display:flex; align-items:center; gap:12px; margin-top:40px; margin-bottom:16px; }
+  .category::before { content:""; width:6px; height:6px; background:#DDFF2D; border-radius:50%; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<header class="border-b border-line">
+  <div class="max-w-[1480px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-[12px] font-mono tracking-widest uppercase text-mute">
+      <a href="/" class="hover:text-paper">Демо</a>
+      <a href="/pricing.html" class="hover:text-paper">Ціна</a>
+      <a href="/about.html" class="hover:text-paper">Про нас</a>
+      <a href="/faq.html" class="text-paper">FAQ</a>
+    </nav>
+    <a href="/beta.html" class="btn-acid">Beta →</a>
+  </div>
+</header>
+
+<div class="fixed top-1/3 -left-40 w-[600px] h-[600px] bg-acid/8 blur-[140px] rounded-full pointer-events-none"></div>
+
+<section class="relative pt-24 pb-16 px-8">
+  <div class="max-w-[920px] mx-auto">
+    <div class="label mb-6">§ FAQ</div>
+    <h1 class="display text-paper text-[clamp(56px,9vw,128px)] mb-8">
+      Питання.<br><em>Чесні</em> відповіді.
+    </h1>
+    <p class="text-dim text-lg max-w-[640px] leading-relaxed">
+      Якщо твоє питання тут немає — пиши на <a href="mailto:hello@form.coach" class="text-paper hover:text-acid">hello@form.coach</a>. Я особисто відповідаю.
+    </p>
+  </div>
+</section>
+
+<section class="relative pb-24 px-8">
+  <div class="max-w-[920px] mx-auto">
+
+    <!-- Product -->
+    <div class="category"><span class="label" style="font-size:11px">Продукт</span></div>
+
+    <details>
+      <summary>Що таке FORM, конкретно?</summary>
+      <p>FORM — це AI-тренер у твоєму iPhone. Він робить три речі:</p>
+      <ul>
+        <li><strong>Будує програму</strong> — адаптовану під твій сон і HRV щодня</li>
+        <li><strong>Дивиться на твою техніку</strong> — через камеру телефону на 8 базових рухах</li>
+        <li><strong>Говорить</strong> — як справжній coach з 20-річним стажем, без мотиваційної попси</li>
+      </ul>
+    </details>
+
+    <details>
+      <summary>Чим FORM відрізняється від Fitbod / Whoop / Future?</summary>
+      <p><strong>Fitbod</strong> генерує програму, але не дивиться на тебе. <strong>Whoop</strong> читає дані, але не каже що з ними робити. <strong>Future</strong> — живий тренер за $149/міс. FORM поєднує все: програму + камера-аналіз + воїс + інтеграція з носимими — за $9 (UA) / $19 (Western).</p>
+    </details>
+
+    <details>
+      <summary>Чи дійсно camera-аналіз працює?</summary>
+      <p>На 8 базових рухах (присід, тяга, жим, OHP, тяга в нахилі, RDL, віджимання, підтягування) — <strong>так</strong>. Конкретно: rep counting 95%+, tempo 90%+, grube form deviation 75-82%. Це не perfect, але краще за нічого. На інших рухах рахуємо повтори, але не coachу техніку. Чесно про це сказано в продукті.</p>
+    </details>
+
+    <details>
+      <summary>iPhone тільки? А Android?</summary>
+      <p>iOS first — публічний релиз Q4 2026. Android phase 2 — Q1 2027. Причина: CV pipeline складніший на Android (більше device-variation), правильно зробити означає окрему dedicated роботу.</p>
+    </details>
+
+    <!-- Pricing -->
+    <div class="category"><span class="label" style="font-size:11px">Ціна та підписка</span></div>
+
+    <details>
+      <summary>Скільки коштує?</summary>
+      <p><strong>$9/міс</strong> в Україні і Прибалтиці. <strong>$19/міс</strong> в Західній ЄС / UK / US. Річна підписка — на 34% дешевше. 14 днів безкоштовно, без картки.</p>
+    </details>
+
+    <details>
+      <summary>Чому немає free tier?</summary>
+      <p>Free tier у фітнес-апках вбиває LTV (MyFitnessPal — наш урок як НЕ робити). Краще — 14-день trial без картки. Хочеш — пробуєш. Не хочеш — закриваєш, без drama.</p>
+    </details>
+
+    <details>
+      <summary>Geo-pricing справжній?</summary>
+      <p>Так. App Store визначає твій регіон автоматично. VPN-обхід працює технічно, але це порушення Apple ToS і ми не радимо.</p>
+    </details>
+
+    <details>
+      <summary>Як скасувати?</summary>
+      <p>Три тапи: iOS Settings → Apple ID → Subscriptions → знайди FORM → Cancel. Без 10-step retention-flow. Або через app: Settings → Subscription → Cancel.</p>
+    </details>
+
+    <details>
+      <summary>Lifetime deal буде?</summary>
+      <p>Ні. LTD вбиває LTV і шкодить продукту. Subscription з cancel-у-3-кліки — це наш бар довіри.</p>
+    </details>
+
+    <details>
+      <summary>Family / multi-user план?</summary>
+      <p>Поки немає. Особистий тренер — це особиста персоналізація. Можливо додамо після Series A якщо буде попит.</p>
+    </details>
+
+    <!-- Camera + tech -->
+    <div class="category"><span class="label" style="font-size:11px">Камера + техніка</span></div>
+
+    <details>
+      <summary>Які саме рухи аналізує камера?</summary>
+      <p>8 базових:</p>
+      <ul>
+        <li>Back squat</li>
+        <li>Conventional deadlift</li>
+        <li>Romanian deadlift / hip hinge</li>
+        <li>Bench press</li>
+        <li>Overhead press</li>
+        <li>Bent-over row</li>
+        <li>Pull-up</li>
+        <li>Push-up</li>
+      </ul>
+      <p>Інші вправи — рахуємо повтори і темп, але не coachу техніку детально. Це чесно прописано в продукті.</p>
+    </details>
+
+    <details>
+      <summary>Як налаштувати камеру у залі?</summary>
+      <p>Sagittal view (збоку), відстань ~2м, телефон на штативі або стійці. Освітлення помірне. Один користувач у кадрі. Onboarding покаже визуально як setup.</p>
+    </details>
+
+    <details>
+      <summary>Чи відео мого тренування зберігається?</summary>
+      <p><strong>Ні.</strong> Жоден кадр не залишає твій телефон. Всі CV-вычислення відбуваються on-device через Apple Vision. Ми бачимо тільки агрегати — кути спини, темп, повтори.</p>
+    </details>
+
+    <details>
+      <summary>А якщо камера не працює?</summary>
+      <p>Manual mode — лічиш повтори тапом. Все інше (програма, харчування, чат) працює без камери.</p>
+    </details>
+
+    <!-- Recovery & data -->
+    <div class="category"><span class="label" style="font-size:11px">Recovery + дані</span></div>
+
+    <details>
+      <summary>Які носимі підтримуються?</summary>
+      <p>Apple Watch (через HealthKit) — full support. Whoop, Oura — через офіційні API (Q4 2026). Garmin — phase 2. Якщо немає wearable — ти можеш вручну логувати сон і самопочуття.</p>
+    </details>
+
+    <details>
+      <summary>Що таке HRV і чому це важливо?</summary>
+      <p>Heart Rate Variability — варіативність між ударами серця. Це індикатор стану нервової системи: високий HRV = відновлений, низький = втомлений. FORM використовує його (плюс сон і RHR) щоб коригувати інтенсивність твого тренування того дня. Деталі — в нашому блозі.</p>
+    </details>
+
+    <details>
+      <summary>Скільки часу потрібно щоб FORM "знав" мене?</summary>
+      <p>14 днів — це мінімум для baseline HRV / сну. Повна персоналізація — 30 днів. Перші 2 тижні: показуємо числа без вердиктів, тренування генеруємо по стандартних патернах.</p>
+    </details>
+
+    <!-- Safety -->
+    <div class="category"><span class="label" style="font-size:11px">Безпека</span></div>
+
+    <details>
+      <summary>Чи це безпечно для людей з ED-історією?</summary>
+      <p>На онбордингу — short ED-screening (SCOFF-based). Якщо є сигнали — soft-mode активується автоматично: без калорійного трекінгу, без body-comp метрик, фокус на тренуваннях. Це non-skippable. Налаштовується пізніше в Settings → Privacy → Soft Mode.</p>
+    </details>
+
+    <details>
+      <summary>Болить коліно. FORM мене вилікує?</summary>
+      <p><strong>Ні.</strong> FORM не діагностує. Для болю > 5/10 або > 5 днів — пряма рекомендація до лікаря. Для м'якого дискомфорту — план Б на верх тіла поки відновлюєшся. Жодних AI-діагнозів.</p>
+    </details>
+
+    <details>
+      <summary>Що з мінімальною калорійністю?</summary>
+      <p>Жорстко: <strong>1,200 ккал — abolute floor</strong>. Не нижче. Якщо твоя ціль вимагає дефіциту нижче — FORM відмовляється і пропонує консультацію.</p>
+    </details>
+
+    <details>
+      <summary>Вагітність?</summary>
+      <p>На онбордингу запитаємо. Якщо вагітна — окремий гайд з обмеженнями + порадою консультації з лікарем. Більшість агресивних протоколів вимикаються.</p>
+    </details>
+
+    <!-- Privacy -->
+    <div class="category"><span class="label" style="font-size:11px">Приватність</span></div>
+
+    <details>
+      <summary>Що збираєте?</summary>
+      <p>Email (Apple Sign In), workouts, food entries, HRV/sleep (через HealthKit), chat з Victor. <strong>НЕ</strong> збираємо: відео з камери, raw audio, локацію, контакти.</p>
+    </details>
+
+    <details>
+      <summary>Продаєте дані?</summary>
+      <p><strong>Ніколи.</strong> Ні data-brokers, ні рекламних мереж, ні researcher's. Деталі — в <a href="#" class="text-acid">Privacy Policy</a>.</p>
+    </details>
+
+    <details>
+      <summary>Як експортувати мої дані?</summary>
+      <p>Settings → Privacy → Export Data. JSON-файл з усім — профіль, тренування, харчування, чат — на твій email за 30 секунд.</p>
+    </details>
+
+    <details>
+      <summary>Як видалити акаунт?</summary>
+      <p>Settings → Profile → Delete Account. 3 тапи. 30 днів grace-period для повернення. Після — повне видалення (GDPR right to erasure).</p>
+    </details>
+
+    <!-- Team & company -->
+    <div class="category"><span class="label" style="font-size:11px">Команда та компанія</span></div>
+
+    <details>
+      <summary>Хто стоїть за FORM?</summary>
+      <p>George (founder) + 14 спеціалізованих AI-агентів які допомагають у дизайні, маркетингу, безпеці. До Seed close — Founding Engineer + Design Lead. Деталі — в <a href="/about.html" class="text-acid">about</a>.</p>
+    </details>
+
+    <details>
+      <summary>З України?</summary>
+      <p>Так. Київ. У 2026. Війна — реальність, не excuse. Деталі — в нашому блозі.</p>
+    </details>
+
+    <details>
+      <summary>Хто інвестує?</summary>
+      <p>Pre-seed self-funded. Seed раунд planning Q3 2026, target $1.5-2.5M. Деталі — <a href="https://github.com/Rbit27/form/blob/main/docs/PITCH.md" class="text-acid">pitch</a>.</p>
+    </details>
+
+    <details>
+      <summary>Ви наймаєте?</summary>
+      <p>Так. <a href="https://github.com/Rbit27/form/tree/main/hiring" class="text-acid">3 ролі відкриті</a>: Founding Engineer (iOS), Design Lead, Sport Science Advisor. Питання — hiring@form.coach.</p>
+    </details>
+
+    <!-- Misc -->
+    <div class="category"><span class="label" style="font-size:11px">Інше</span></div>
+
+    <details>
+      <summary>Хочу запропонувати фічу — куди писати?</summary>
+      <p>hello@form.coach. Я читаю кожен email. Кожен запит логується. Раз на місяць review для роадмапу.</p>
+    </details>
+
+    <details>
+      <summary>Я журналіст / podcaster. Можемо поговорити?</summary>
+      <p>Так — press@form.coach. <a href="https://github.com/Rbit27/form/blob/main/docs/PRESS.md" class="text-acid">Прес-кіт тут</a> — boilerplate, founder bio, screenshots, story angles.</p>
+    </details>
+
+    <details>
+      <summary>Інвестор?</summary>
+      <p>invest@form.coach. Або через intro — кращий шлях. <a href="https://github.com/Rbit27/form/blob/main/docs/INVESTOR_OUTREACH.md" class="text-acid">Наш data room map тут</a>.</p>
+    </details>
+
+    <details>
+      <summary>Гайми (gluten / dairy / vegan) — підтримуєте?</summary>
+      <p>Так. Onboarding запитає про обмеження. Meal plan генерується з урахуванням. Плюс swap-варіанти для всіх страв.</p>
+    </details>
+
+  </div>
+</section>
+
+<!-- footer CTA -->
+<section class="relative py-20 px-8 border-t border-line text-center">
+  <div class="max-w-[640px] mx-auto">
+    <h2 class="display text-paper text-[clamp(40px,6vw,72px)] mb-8">
+      Питання<br>не <em>знайшов?</em>
+    </h2>
+    <p class="text-dim text-base max-w-[440px] mx-auto leading-relaxed mb-8">
+      Напиши hello@form.coach — я відповідаю особисто. Або apply на closed beta.
+    </p>
+    <a href="/beta.html" class="btn-acid">Подати на Beta →</a>
+  </div>
+</section>
+
+<footer class="border-t border-line py-12 px-8">
+  <div class="max-w-[1480px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <div class="font-serif text-lg text-paper">FORM<span class="text-acid">.</span></div>
+      <div class="label ml-4">Київ · 2026</div>
+    </div>
+    <div class="flex items-center gap-8 font-mono text-xs uppercase tracking-widest text-mute">
+      <a href="/" class="hover:text-paper">Головна</a>
+      <a href="/pricing.html" class="hover:text-paper">Ціна</a>
+      <a href="/about.html" class="hover:text-paper">Про нас</a>
+      <a href="/beta.html" class="hover:text-paper">Beta</a>
+    </div>
+    <div class="font-mono text-[10px] text-mute">faq v0.1</div>
+  </div>
+</footer>
+
+</body>
+</html>

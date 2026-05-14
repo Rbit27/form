@@ -16,7 +16,12 @@
 
 ---
 
-## [0.4.3] — 2026-05-14
+## [0.4.4] — 2026-05-14
+
+### Added
+- [`faq.html`](faq.html) — FAQ page з 30+ accordion-style questions у 7 категоріях (Product, Pricing, Camera+Tech, Recovery+Data, Safety, Privacy, Team+Company)
+- `content/post-07-progressive-overload-myths.md` — 7-й blog: «Progressive overload — що половина лiфтерів робить неправильно». 8 vectors прогресу, RPE-autoregulation, block periodization, 3 типові помилки intermediate-лiфтерів. ~12 хв read.
+- [`docs/DECISION_LOG.md`](docs/DECISION_LOG.md) — live decision log з 24 documented decisions (DEC-001 → DEC-024). Append-only format, owner-mandatory, honest reverse-cost assessment.
 
 ### Added
 - `programs/sample-deload-week.md` — deload week template (3 sessions, 50% volume, RPE 5, focus на technique polish). Signals what's working vs needs extended deload. Stop-criteria during deload.
