@@ -16,7 +16,11 @@
 
 ---
 
-## [0.4.6] — 2026-05-14
+## [0.4.7] — 2026-05-14
+
+### Added
+- [`docs/CONTENT_CALENDAR.md`](docs/CONTENT_CALENDAR.md) — 90-day editorial calendar з distribution-per-piece strategy, repurposing framework (1 post → 7 derivatives), SEO targets, anti-patterns, measurement framework
+- [`STATUS.md`](STATUS.md) — comprehensive project status snapshot. What's built (all surfaces, docs, content), what's NOT built (honest gap list), 12-month timeline forward, decision highlights, what's working / worrying.
 
 ### Added
 - `content/post-08-why-no-free-tier.md` — 8-й blog post: «Чому FORM ніколи не матиме free tier». MyFitnessPal vs Whoop case studies, чому це для users добре. ~9 хв read.
