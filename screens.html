@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>App Screens · FORM v0.3.6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink:   '#0B0A07', deep:  '#13110C', line:  '#1F1D16',
+          mute:  '#6F6A60', dim:   '#A39D8E', paper: '#F3EEE0',
+          cream: '#E7DFC8', acid:  '#DDFF2D', ember: '#FF5733',
+        },
+        fontFamily: {
+          serif: ['Fraunces', 'serif'],
+          sans:  ['Manrope', 'sans-serif'],
+          mono:  ['JetBrains Mono', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  html, body { background: #0B0A07; color: #F3EEE0; font-family: 'Manrope', sans-serif; min-height: 100vh; }
+
+  .grain::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 220px;
+  }
+
+  .display { font-family: 'Fraunces', serif; font-weight: 300; letter-spacing: -0.04em; }
+  .display em { font-style: italic; font-weight: 300; }
+  .lbl { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; font-size: 9px; color: #6F6A60; }
+  .num { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  .phone {
+    width: 280px; height: 584px;
+    border-radius: 38px; background: #0B0A07;
+    border: 1px solid #2A2820;
+    box-shadow:
+      0 0 0 7px #0B0A07,
+      0 0 0 8px #2A2820,
+      0 60px 100px -30px rgba(0,0,0,0.95),
+      0 0 160px -30px rgba(221,255,45,0.06);
+    position: relative; overflow: hidden;
+    transition: transform 0.35s cubic-bezier(.2,.8,.2,1), box-shadow 0.35s ease;
+    flex-shrink: 0;
+    cursor: default;
+  }
+  .phone:hover {
+    transform: translateY(-10px) scale(1.025);
+    box-shadow:
+      0 0 0 7px #0B0A07,
+      0 0 0 8px #2A2820,
+      0 80px 120px -30px rgba(0,0,0,0.95),
+      0 0 240px -20px rgba(221,255,45,0.13);
+  }
+  .phone::before {
+    content: ""; position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 82px; height: 24px; background: #050402; border-radius: 16px; z-index: 30;
+  }
+
+  .p-status {
+    position: absolute; top: 0; left: 0; right: 0; height: 42px;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 22px 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #F3EEE0;
+    z-index: 25; pointer-events: none;
+  }
+  .p-body {
+    position: absolute; top: 42px; bottom: 58px; left: 0; right: 0;
+    overflow: hidden;
+  }
+  .p-body-scroll {
+    height: 100%; overflow-y: auto; scrollbar-width: none;
+  }
+  .p-body-scroll::-webkit-scrollbar { display: none; }
+
+  .tab-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 58px;
+    background: rgba(11,10,7,0.97); border-top: 1px solid #1F1D16;
+    display: flex; align-items: flex-start; padding-top: 10px;
+    backdrop-filter: blur(20px); z-index: 30;
+  }
+  .tab-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 7px;
+    letter-spacing: 0.10em; text-transform: uppercase; color: #6F6A60;
+  }
+  .tab-item.act { color: #E7DFC8; }
+  .tab-dot { width: 18px; height: 2px; border-radius: 1px; }
+  .tab-item.act .tab-dot { background: #DDFF2D; }
+
+  .victor-chip {
+    background: #DDFF2D; color: #0B0A07;
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; font-weight: 800; font-family: 'Manrope', sans-serif;
+    flex-shrink: 0;
+  }
+  .bubble-v {
+    background: #1F1D16; border-radius: 14px 14px 14px 3px;
+    padding: 9px 12px; max-width: 83%;
+    font-size: 11px; line-height: 1.55; color: #F3EEE0;
+    font-family: 'Manrope', sans-serif;
+  }
+  .bubble-u {
+    background: #DDFF2D; border-radius: 14px 14px 3px 14px;
+    padding: 9px 12px; max-width: 72%; align-self: flex-end;
+    font-size: 11px; line-height: 1.55; color: #0B0A07; font-weight: 600;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .pr-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #13110C; border-radius: 8px; padding: 8px 11px;
+  }
+
+  .honest-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 11px 0; border-bottom: 1px solid #1F1D16;
+  }
+
+  .batt {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .screen-label {
+    text-align: center; margin-top: 18px;
+  }
+
+  @keyframes joint-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .joint-pulse { animation: joint-pulse 1.8s ease-in-out infinite; }
+
+  @keyframes ring-in { from { stroke-dashoffset: 314; } to { stroke-dashoffset: 88; } }
+  .ring-animate { animation: ring-in 1.4s cubic-bezier(.2,.7,.2,1) forwards; }
+</style>
+</head>
+<body class="grain">
+
+<!-- ─── Header ─── -->
+<div style="padding: 56px 48px 36px; max-width: 1600px; margin: 0 auto;">
+  <div class="lbl" style="margin-bottom: 14px; letter-spacing: 0.22em;">FORM · App Screens · v0.3.6 · Дизайн-референс</div>
+  <h1 class="display" style="font-size: clamp(44px,5.5vw,76px); line-height: 0.9; color: #F3EEE0;">
+    П'ять екранів.<br><em>Один тренер.</em>
+  </h1>
+  <p style="margin-top: 18px; color: #6F6A60; font-size: 13px; max-width: 500px; line-height: 1.7;">
+    Статичні UI-екрани для дизайн-рев'ю і передачі в Figma.
+    Placeholder-значення позначено сірим. Реальні числа — після beta-когорти.
+  </p>
+</div>
+
+<!-- ─── Screens row ─── -->
+<div style="padding: 0 48px 56px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: #2A2820 transparent;">
+<div style="display: flex; gap: 28px; min-width: max-content; padding-bottom: 8px; align-items: flex-start;">
+
+
+<!-- SCREEN 01: TODAY -->
+<div>
+<div class="phone">
+  <div class="p-status">
+    <span>09:23</span>
+    <div class="batt">
+      <svg width="15" height="9" fill="none" viewBox="0 0 15 9"><rect x="0.5" y="0.5" width="12.5" height="8" rx="1.5" stroke="#F3EEE0"/><rect x="1.5" y="1.5" width="9.5" height="6" rx="0.8" fill="#F3EEE0"/><path d="M14 3v3a1.5 1.5 0 000-3z" fill="#F3EEE0" opacity="0.5"/></svg>
+    </div>
+  </div>
+  <div class="p-body">
+  <div class="p-body-scroll" style="padding: 8px 20px 16px;">
+    <div class="lbl" style="font-size: 8px; letter-spacing: 0.14em; margin-bottom: 5px;">Четвер, 14 травня</div>
+    <div class="display" style="font-size: 21px; line-height: 1.05; color: #F3EEE0;">Доброго ранку,<br><em>Дмитре.</em></div>
+    <div style="display: flex; align-items: center; gap: 14px; margin-top: 18px;">
+      <div style="position: relative; width: 112px; height: 112px; flex-shrink: 0;">
+        <svg width="112" height="112" viewBox="0 0 112 112">
+          <circle cx="56" cy="56" r="46" fill="none" stroke="#1F1D16" stroke-width="8"/>
+          <circle cx="56" cy="56" r="46" fill="none" stroke="#DDFF2D" stroke-width="8"
+            stroke-dasharray="289" stroke-dashoffset="80"
+            stroke-linecap="round" transform="rotate(-90 56 56)" class="ring-animate"/>
+        </svg>
+        <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <div class="num" style="font-size: 26px; color: #F3EEE0; line-height: 1;">72</div>
+          <div class="lbl" style="font-size: 7px; margin-top: 2px;">готовність</div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div style="font-size: 10.5px; color: #A39D8E;">Сон <span style="color: #F3EEE0; font-weight: 600;">7.2 год</span></div>
+        <div style="font-size: 10.5px; color: #A39D8E;">HRV <span style="color: #F3EEE0; font-weight: 600;">58 мс</span></div>
+        <div style="font-size: 10.5px; color: #A39D8E;">ЧСС<sub style="font-size: 8px;">спок</sub> <span style="color: #F3EEE0; font-weight: 600;">52 уд/хв</span></div>
+        <div class="lbl" style="font-size: 7px; margin-top: 3px; color: #2A2820; border: 1px solid #1F1D16; border-radius: 4px; padding: 2px 5px; display: inline-block;">← Apple Watch</div>
+      </div>
+    </div>
+    <div style="background: #13110C; border-radius: 12px; padding: 11px 13px; margin-top: 14px; border-left: 2px solid #DDFF2D;">
+      <div class="lbl" style="font-size: 7.5px; color: #DDFF2D; margin-bottom: 5px; letter-spacing: 0.2em;">Victor</div>
+      <div style="font-size: 11px; line-height: 1.6; color: #E7DFC8;">Спиш добре → тягни важко сьогодні. Плечі будуть вдячні.</div>
+    </div>
+    <div style="background: #13110C; border-radius: 12px; padding: 13px; margin-top: 11px; border: 1px solid #1F1D16;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+        <div>
+          <div style="font-size: 13px; font-weight: 700; color: #F3EEE0;">Верхній день А</div>
+          <div style="font-size: 10.5px; color: #6F6A60; margin-top: 3px;">Жим · Тяга · Плечі · 45 хв</div>
+        </div>
+        <div style="background: #DDFF2D; border-radius: 8px; padding: 7px 11px; flex-shrink: 0;">
+          <div class="lbl" style="font-size: 8px; color: #0B0A07; font-weight: 700; letter-spacing: 0.2em;">START</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap;">
+        <span class="num" style="background: #1F1D16; border-radius: 4px; padding: 3px 7px; font-size: 9px; color: #A39D8E;">Жим 5×5</span>
+        <span class="num" style="background: #1F1D16; border-radius: 4px; padding: 3px 7px; font-size: 9px; color: #A39D8E;">Тяга 4×8</span>
+        <span class="num" style="background: #1F1D16; border-radius: 4px; padding: 3px 7px; font-size: 9px; color: #6F6A60;">+3</span>
+      </div>
+    </div>
+    <div style="margin-top: 13px;">
+      <div class="lbl" style="font-size: 7.5px; margin-bottom: 8px; letter-spacing: 0.14em;">Як почуваєшся? · день 1/14</div>
+      <div style="display: flex; gap: 7px;">
+        <div style="flex: 1; background: #1F1D16; border-radius: 8px; padding: 8px 6px; text-align: center; font-size: 10px;">😴</div>
+        <div style="flex: 1; background: #1F1D16; border-radius: 8px; padding: 8px 6px; text-align: center; font-size: 10px;">😐</div>
+        <div style="flex: 1; background: rgba(221,255,45,0.12); border: 1px solid rgba(221,255,45,0.4); border-radius: 8px; padding: 8px 6px; text-align: center; font-size: 10px;">💪</div>
+        <div style="flex: 1; background: #1F1D16; border-radius: 8px; padding: 8px 6px; text-align: center; font-size: 10px;">🔥</div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item act"><div class="tab-dot"></div>Сьогодні</div>
+    <div class="tab-item"><div class="tab-dot"></div>Тренування</div>
+    <div class="tab-item"><div class="tab-dot"></div>Тренер</div>
+    <div class="tab-item"><div class="tab-dot"></div>Прогрес</div>
+    <div class="tab-item"><div class="tab-dot"></div>Більше</div>
+  </div>
+</div>
+<div class="screen-label">
+  <div class="lbl" style="color: #DDFF2D; font-size: 8px; letter-spacing: 0.25em;">01</div>
+  <div style="font-size: 13px; font-weight: 700; margin-top: 5px; color: #F3EEE0;">Today</div>
+  <div style="font-size: 10.5px; color: #6F6A60; margin-top: 3px;">Readiness · Victor note · Workout</div>
+</div>
+</div>
+
+
+<!-- SCREEN 02: WORKOUT -->
+<div>
+<div class="phone">
+  <div class="p-status">
+    <span>09:47</span>
+    <span style="color: #DDFF2D; font-size: 9px; letter-spacing: 0.08em;">● REC</span>
+  </div>
+  <div class="p-body">
+  <div class="p-body-scroll" style="padding: 8px 20px 16px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+      <div>
+        <div class="lbl" style="font-size: 8px; letter-spacing: 0.12em;">Жим лежачи</div>
+        <div style="font-size: 14px; font-weight: 700; margin-top: 4px; color: #F3EEE0;">Сет 3 <span style="color: #6F6A60; font-weight: 400;">/&thinsp;5</span></div>
+      </div>
+      <div style="text-align: right;">
+        <div class="num" style="font-size: 22px; color: #DDFF2D; line-height: 1;">80</div>
+        <div class="lbl" style="font-size: 7px; margin-top: 2px;">кг</div>
+      </div>
+    </div>
+    <div style="text-align: center; margin: 2px 0 0;">
+      <div class="display" style="font-size: 92px; line-height: 1; color: #F3EEE0;">8</div>
+      <div class="lbl" style="font-size: 8px; letter-spacing: 0.18em; margin-top: -4px;">повторень</div>
+    </div>
+    <div style="position: relative; width: 148px; height: 158px; margin: 8px auto 0;">
+      <svg width="148" height="158" viewBox="0 0 148 158">
+        <ellipse cx="74" cy="26" rx="15" ry="19" fill="#1A1814"/>
+        <rect x="64" y="42" width="10" height="10" rx="3" fill="#1A1814"/>
+        <rect x="46" y="52" width="52" height="44" rx="8" fill="#1A1814"/>
+        <rect x="18" y="52" width="14" height="38" rx="6" fill="#1A1814"/>
+        <rect x="116" y="52" width="14" height="38" rx="6" fill="#1A1814"/>
+        <rect x="14" y="86" width="12" height="32" rx="5" fill="#1A1814"/>
+        <rect x="122" y="86" width="12" height="32" rx="5" fill="#1A1814"/>
+        <rect x="50" y="96" width="18" height="38" rx="6" fill="#1A1814"/>
+        <rect x="80" y="96" width="18" height="38" rx="6" fill="#1A1814"/>
+        <rect x="51" y="130" width="16" height="26" rx="5" fill="#1A1814"/>
+        <rect x="81" y="130" width="16" height="26" rx="5" fill="#1A1814"/>
+        <line x1="74" y1="28" x2="74" y2="44" stroke="#DDFF2D" stroke-width="1.5" opacity="0.45"/>
+        <line x1="48" y1="56" x2="100" y2="56" stroke="#DDFF2D" stroke-width="1.5" opacity="0.45"/>
+        <line x1="48" y1="56" x2="22" y2="82" stroke="#DDFF2D" stroke-width="1.5" opacity="0.45"/>
+        <line x1="100" y1="56" x2="126" y2="82" stroke="#DDFF2D" stroke-width="1.5" opacity="0.45"/>
+        <line x1="22" y1="82" x2="20" y2="112" stroke="#DDFF2D" stroke-width="1.5" opacity="0.45"/>
+        <line x1="126" y1="82" x2="128" y2="112" stroke="#DDFF2D" stroke-width="1.5" opacity="0.45"/>
+        <line x1="56" y1="100" x2="59" y2="130" stroke="#DDFF2D" stroke-width="1.5" opacity="0.45"/>
+        <line x1="92" y1="100" x2="89" y2="130" stroke="#DDFF2D" stroke-width="1.5" opacity="0.45"/>
+        <circle cx="74" cy="20" r="4" fill="#DDFF2D" opacity="0.9"/>
+        <circle cx="48" cy="56" r="6" fill="#DDFF2D"/>
+        <circle cx="48" cy="56" r="9" fill="none" stroke="#DDFF2D" stroke-width="1.5" opacity="0.5" class="joint-pulse"/>
+        <circle cx="100" cy="56" r="6" fill="#DDFF2D"/>
+        <circle cx="100" cy="56" r="9" fill="none" stroke="#DDFF2D" stroke-width="1.5" opacity="0.5" class="joint-pulse"/>
+        <circle cx="22" cy="82" r="4.5" fill="#DDFF2D" opacity="0.85"/>
+        <circle cx="126" cy="82" r="4.5" fill="#DDFF2D" opacity="0.85"/>
+        <circle cx="20" cy="112" r="3.5" fill="#DDFF2D" opacity="0.75"/>
+        <circle cx="128" cy="112" r="3.5" fill="#DDFF2D" opacity="0.75"/>
+        <circle cx="56" cy="100" r="4.5" fill="#DDFF2D" opacity="0.8"/>
+        <circle cx="92" cy="100" r="4.5" fill="#DDFF2D" opacity="0.8"/>
+        <circle cx="59" cy="130" r="4" fill="#DDFF2D" opacity="0.7"/>
+        <circle cx="89" cy="130" r="4" fill="#DDFF2D" opacity="0.7"/>
+      </svg>
+      <div style="position: absolute; top: 0; right: 0; background: rgba(221,255,45,0.1); border: 1px solid rgba(221,255,45,0.35); border-radius: 6px; padding: 3px 7px;">
+        <span class="lbl" style="font-size: 7px; color: #DDFF2D; letter-spacing: 0.12em;">CV · Live</span>
+      </div>
+    </div>
+    <div style="text-align: center; margin-top: 8px;">
+      <div style="display: inline-block; background: rgba(221,255,45,0.1); border: 1px solid rgba(221,255,45,0.4); border-radius: 20px; padding: 6px 16px;">
+        <span style="font-size: 11px; color: #DDFF2D; font-weight: 600;">↓ Лопатки вниз</span>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+      <div style="display: flex; gap: 5px; align-items: center;">
+        <div style="width: 22px; height: 5px; border-radius: 3px; background: #DDFF2D;"></div>
+        <div style="width: 22px; height: 5px; border-radius: 3px; background: #DDFF2D;"></div>
+        <div style="width: 22px; height: 5px; border-radius: 3px; background: #DDFF2D;"></div>
+        <div style="width: 22px; height: 5px; border-radius: 3px; background: #1F1D16;"></div>
+        <div style="width: 22px; height: 5px; border-radius: 3px; background: #1F1D16;"></div>
+      </div>
+      <div style="text-align: right;">
+        <div class="num" style="font-size: 20px; color: #F3EEE0; line-height: 1;">1:45</div>
+        <div class="lbl" style="font-size: 7px; margin-top: 2px; letter-spacing: 0.1em;">відпочинок</div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item"><div class="tab-dot"></div>Сьогодні</div>
+    <div class="tab-item act"><div class="tab-dot"></div>Тренування</div>
+    <div class="tab-item"><div class="tab-dot"></div>Тренер</div>
+    <div class="tab-item"><div class="tab-dot"></div>Прогрес</div>
+    <div class="tab-item"><div class="tab-dot"></div>Більше</div>
+  </div>
+</div>
+<div class="screen-label">
+  <div class="lbl" style="color: #DDFF2D; font-size: 8px; letter-spacing: 0.25em;">02</div>
+  <div style="font-size: 13px; font-weight: 700; margin-top: 5px; color: #F3EEE0;">Workout</div>
+  <div style="font-size: 10.5px; color: #6F6A60; margin-top: 3px;">CV skeleton · Rep counter · Cue</div>
+</div>
+</div>
+
+
+<!-- SCREEN 03: COACH -->
+<div>
+<div class="phone">
+  <div class="p-status">
+    <span>11:04</span>
+    <div class="batt"><svg width="15" height="9" fill="none" viewBox="0 0 15 9"><rect x="0.5" y="0.5" width="12.5" height="8" rx="1.5" stroke="#F3EEE0" opacity="0.6"/><rect x="1.5" y="1.5" width="7" height="6" rx="0.8" fill="#F3EEE0"/><path d="M14 3v3a1.5 1.5 0 000-3z" fill="#F3EEE0" opacity="0.4"/></svg></div>
+  </div>
+  <div class="p-body" style="display: flex; flex-direction: column;">
+    <div style="padding: 8px 20px 10px; border-bottom: 1px solid #1F1D16; flex-shrink: 0;">
+      <div class="lbl" style="font-size: 7.5px; letter-spacing: 0.14em; margin-bottom: 4px;">Тренер</div>
+      <div style="font-size: 15px; font-weight: 700; color: #F3EEE0;">Victor</div>
+    </div>
+    <div style="flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 9px; scrollbar-width: none;">
+      <div style="display: flex; justify-content: flex-end;"><div class="bubble-u">Жим не зростає вже місяць. Що робити?</div></div>
+      <div style="display: flex; gap: 7px; align-items: flex-end;">
+        <div class="victor-chip">V</div>
+        <div class="bubble-v">Місяць — це вже плато. Три шляхи:<br>① Об'єм (+1 сет)<br>② Темп (3-0-1 ритм)<br>③ Деловантаження на тиждень.<br><br>З чого починав?</div>
+      </div>
+      <div style="display: flex; justify-content: flex-end;"><div class="bubble-u">Може об'єм спробую.</div></div>
+      <div style="display: flex; gap: 7px; align-items: flex-end;">
+        <div class="victor-chip">V</div>
+        <div class="bubble-v">Добре. Додай один сет на першому жимі. Тримай 3 тижні — потім поговоримо по цифрах.</div>
+      </div>
+      <div style="display: flex; gap: 7px; align-items: flex-end;">
+        <div class="victor-chip">V</div>
+        <div class="bubble-v" style="font-size: 10.5px; color: #A39D8E;">Поточний жим: <span style="color: #DDFF2D; font-weight: 600;">80 кг × 5</span></div>
+      </div>
+    </div>
+    <div style="padding: 8px 14px 10px; border-top: 1px solid #1F1D16; display: flex; gap: 8px; align-items: center; background: #0D0B08; flex-shrink: 0;">
+      <div style="flex: 1; background: #1A1814; border-radius: 18px; padding: 8px 13px; font-size: 11px; color: #6F6A60; font-family: 'Manrope', sans-serif;">Запитай Victor...</div>
+      <div style="width: 30px; height: 30px; background: #DDFF2D; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1L1 6l4 1.6L6.6 11 11 1z" fill="#0B0A07"/></svg>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item"><div class="tab-dot"></div>Сьогодні</div>
+    <div class="tab-item"><div class="tab-dot"></div>Тренування</div>
+    <div class="tab-item act"><div class="tab-dot"></div>Тренер</div>
+    <div class="tab-item"><div class="tab-dot"></div>Прогрес</div>
+    <div class="tab-item"><div class="tab-dot"></div>Більше</div>
+  </div>
+</div>
+<div class="screen-label">
+  <div class="lbl" style="color: #DDFF2D; font-size: 8px; letter-spacing: 0.25em;">03</div>
+  <div style="font-size: 13px; font-weight: 700; margin-top: 5px; color: #F3EEE0;">Coach</div>
+  <div style="font-size: 10.5px; color: #6F6A60; margin-top: 3px;">Victor chat · Context-aware advice</div>
+</div>
+</div>
+
+
+<!-- SCREEN 04: PROGRESS -->
+<div>
+<div class="phone">
+  <div class="p-status">
+    <span>14:22</span>
+    <div class="batt"><svg width="15" height="9" fill="none" viewBox="0 0 15 9"><rect x="0.5" y="0.5" width="12.5" height="8" rx="1.5" stroke="#F3EEE0" opacity="0.6"/><rect x="1.5" y="1.5" width="10" height="6" rx="0.8" fill="#F3EEE0"/><path d="M14 3v3a1.5 1.5 0 000-3z" fill="#F3EEE0" opacity="0.4"/></svg></div>
+  </div>
+  <div class="p-body">
+  <div class="p-body-scroll" style="padding: 8px 20px 16px;">
+    <div style="margin-bottom: 14px;">
+      <div class="lbl" style="font-size: 8px; letter-spacing: 0.14em; margin-bottom: 5px;">Прогрес</div>
+      <div class="display" style="font-size: 20px; color: #F3EEE0; line-height: 1;">90 <em>днів</em></div>
+    </div>
+    <div style="background: #13110C; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div class="lbl" style="font-size: 7.5px; letter-spacing: 0.12em;">Жим лежачи · кг</div>
+        <div style="font-size: 10px; color: #6F6A60; font-style: italic; font-family: 'Manrope', sans-serif;">placeholder</div>
+      </div>
+      <svg width="224" height="68" viewBox="0 0 224 68" style="overflow: visible; display: block;">
+        <defs>
+          <linearGradient id="sg" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#DDFF2D" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#DDFF2D" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="58" x2="224" y2="58" stroke="#1F1D16" stroke-width="1"/>
+        <line x1="0" y1="38" x2="224" y2="38" stroke="#1F1D16" stroke-width="0.5" opacity="0.5"/>
+        <line x1="0" y1="18" x2="224" y2="18" stroke="#1F1D16" stroke-width="0.5" opacity="0.5"/>
+        <path d="M0,56 C18,54 32,50 50,46 C68,42 80,44 98,37 C116,30 128,33 148,24 C168,15 180,19 196,12 C206,8 214,6 224,5 L224,58 L0,58 Z" fill="url(#sg)"/>
+        <path d="M0,56 C18,54 32,50 50,46 C68,42 80,44 98,37 C116,30 128,33 148,24 C168,15 180,19 196,12 C206,8 214,6 224,5" fill="none" stroke="#DDFF2D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="224" cy="5" r="4" fill="#DDFF2D"/>
+        <text x="0" y="66" font-family="JetBrains Mono" font-size="7" fill="#6F6A60">−90д</text>
+        <text x="192" y="66" font-family="JetBrains Mono" font-size="7" fill="#6F6A60">Сьогодні</text>
+        <text x="188" y="3" font-family="JetBrains Mono" font-size="8" fill="#DDFF2D" font-weight="600">82.5</text>
+      </svg>
+      <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+        <span style="font-size: 10px; color: #6F6A60;">Старт: 65 кг</span>
+        <span style="font-size: 10px; color: #DDFF2D; font-weight: 700;">+17.5 кг ↑</span>
+      </div>
+    </div>
+    <div style="margin-bottom: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div class="lbl" style="font-size: 7.5px; letter-spacing: 0.12em;">Особисті рекорди</div>
+        <div style="font-size: 9px; color: #6F6A60; font-style: italic; font-family: 'Manrope', sans-serif;">validate before live</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div class="pr-row"><span style="font-size: 11px; color: #F3EEE0;">Жим лежачи</span><span class="num" style="font-size: 11px; color: #DDFF2D; font-weight: 700;">+17.5 кг</span></div>
+        <div class="pr-row"><span style="font-size: 11px; color: #F3EEE0;">Присідання</span><span class="num" style="font-size: 11px; color: #DDFF2D; font-weight: 700;">+22 кг</span></div>
+        <div class="pr-row"><span style="font-size: 11px; color: #F3EEE0;">Станова тяга</span><span class="num" style="font-size: 11px; color: #DDFF2D; font-weight: 700;">+30 кг</span></div>
+      </div>
+    </div>
+    <div style="background: #13110C; border-radius: 10px; padding: 10px 13px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #1F1D16;">
+      <div>
+        <div class="lbl" style="font-size: 7.5px; letter-spacing: 0.12em;">Консистентність</div>
+        <div style="font-size: 13px; font-weight: 700; color: #F3EEE0; margin-top: 4px;">11 <span style="color: #6F6A60; font-weight: 400; font-size: 10.5px;">/&thinsp;14 трен.</span></div>
+      </div>
+      <div style="text-align: right;">
+        <div class="lbl" style="font-size: 7.5px; letter-spacing: 0.12em;">Серія</div>
+        <div class="num" style="font-size: 22px; color: #DDFF2D; line-height: 1; margin-top: 4px;">11</div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item"><div class="tab-dot"></div>Сьогодні</div>
+    <div class="tab-item"><div class="tab-dot"></div>Тренування</div>
+    <div class="tab-item"><div class="tab-dot"></div>Тренер</div>
+    <div class="tab-item act"><div class="tab-dot"></div>Прогрес</div>
+    <div class="tab-item"><div class="tab-dot"></div>Більше</div>
+  </div>
+</div>
+<div class="screen-label">
+  <div class="lbl" style="color: #DDFF2D; font-size: 8px; letter-spacing: 0.25em;">04</div>
+  <div style="font-size: 13px; font-weight: 700; margin-top: 5px; color: #F3EEE0;">Progress</div>
+  <div style="font-size: 10.5px; color: #6F6A60; margin-top: 3px;">Sparkline · PR badges · Consistency</div>
+</div>
+</div>
+
+
+<!-- SCREEN 05: HONEST -->
+<div>
+<div class="phone">
+  <div class="p-status">
+    <span>16:30</span>
+    <div class="batt"><svg width="15" height="9" fill="none" viewBox="0 0 15 9"><rect x="0.5" y="0.5" width="12.5" height="8" rx="1.5" stroke="#F3EEE0" opacity="0.6"/><rect x="1.5" y="1.5" width="5" height="6" rx="0.8" fill="#F3EEE0"/><path d="M14 3v3a1.5 1.5 0 000-3z" fill="#F3EEE0" opacity="0.4"/></svg></div>
+  </div>
+  <div class="p-body">
+  <div class="p-body-scroll" style="padding: 8px 20px 16px;">
+    <div style="margin-bottom: 16px;">
+      <div class="lbl" style="font-size: 8px; letter-spacing: 0.14em; margin-bottom: 6px;">§ Чесно</div>
+      <div class="display" style="font-size: 24px; color: #F3EEE0; line-height: 0.95;">Що FORM<br><em>не робить.</em></div>
+      <p style="font-size: 11px; color: #6F6A60; margin-top: 10px; line-height: 1.6; font-family: 'Manrope', sans-serif;">Ми хочемо бути корисними. Не всесильними.</p>
+    </div>
+    <div style="border-top: 1px solid #1F1D16;">
+      <div class="honest-row"><span style="color: #FF5733; font-size: 13px; font-weight: 800; flex-shrink: 0; margin-top: 1px; font-family: 'Manrope', sans-serif;">✕</span><span style="font-size: 11px; line-height: 1.55; color: #E7DFC8; font-family: 'Manrope', sans-serif;">Не рахує калорії, якщо ти не просив</span></div>
+      <div class="honest-row"><span style="color: #FF5733; font-size: 13px; font-weight: 800; flex-shrink: 0; margin-top: 1px; font-family: 'Manrope', sans-serif;">✕</span><span style="font-size: 11px; line-height: 1.55; color: #E7DFC8; font-family: 'Manrope', sans-serif;">Не стежить за їжею між тренуваннями</span></div>
+      <div class="honest-row"><span style="color: #FF5733; font-size: 13px; font-weight: 800; flex-shrink: 0; margin-top: 1px; font-family: 'Manrope', sans-serif;">✕</span><span style="font-size: 11px; line-height: 1.55; color: #E7DFC8; font-family: 'Manrope', sans-serif;">Не карає за пропущені тренування</span></div>
+      <div class="honest-row"><span style="color: #FF5733; font-size: 13px; font-weight: 800; flex-shrink: 0; margin-top: 1px; font-family: 'Manrope', sans-serif;">✕</span><span style="font-size: 11px; line-height: 1.55; color: #E7DFC8; font-family: 'Manrope', sans-serif;">Не обіцяє тіло мрії за 30 днів</span></div>
+      <div class="honest-row"><span style="color: #FF5733; font-size: 13px; font-weight: 800; flex-shrink: 0; margin-top: 1px; font-family: 'Manrope', sans-serif;">✕</span><span style="font-size: 11px; line-height: 1.55; color: #E7DFC8; font-family: 'Manrope', sans-serif;">Не замінює лікаря чи тренера IRL</span></div>
+      <div class="honest-row" style="border-bottom: none;"><span style="color: #FF5733; font-size: 13px; font-weight: 800; flex-shrink: 0; margin-top: 1px; font-family: 'Manrope', sans-serif;">✕</span><span style="font-size: 11px; line-height: 1.55; color: #E7DFC8; font-family: 'Manrope', sans-serif;">Не пише після 22:00 (quiet hours)</span></div>
+    </div>
+    <div style="margin-top: 14px; background: rgba(221,255,45,0.05); border: 1px solid rgba(221,255,45,0.15); border-radius: 10px; padding: 10px 12px;">
+      <div style="font-size: 10px; color: #A39D8E; line-height: 1.65; font-family: 'Manrope', sans-serif;">Це вбудований екран застосунку, не маркетинг. Ми вважаємо важливим сказати це прямо.</div>
+    </div>
+  </div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item"><div class="tab-dot"></div>Сьогодні</div>
+    <div class="tab-item"><div class="tab-dot"></div>Тренування</div>
+    <div class="tab-item"><div class="tab-dot"></div>Тренер</div>
+    <div class="tab-item"><div class="tab-dot"></div>ПроГрес</div>
+    <div class="tab-item act"><div class="tab-dot"></div>Більше</div>
+  </div>
+</div>
+<div class="screen-label">
+  <div class="lbl" style="color: #DDFF2D; font-size: 8px; letter-spacing: 0.25em;">05</div>
+  <div style="font-size: 13px; font-weight: 700; margin-top: 5px; color: #F3EEE0;">Honest</div>
+  <div style="font-size: 10.5px; color: #6F6A60; margin-top: 3px;">§ Чесно · What FORM doesn't do</div>
+</div>
+</div>
+
+
+</div>
+</div>
+
+
+<!-- Footer -->
+<div style="padding: 0 48px 64px; max-width: 1600px; margin: 0 auto;">
+  <div style="border-top: 1px solid #1F1D16; padding-top: 28px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 24px;">
+    <div>
+      <div class="lbl" style="margin-bottom: 10px; letter-spacing: 0.2em;">Дизайн-нотатки</div>
+      <div style="font-size: 12px; color: #6F6A60; line-height: 1.85; max-width: 520px; font-family: 'Manrope', sans-serif;">
+        Числа на екрані Прогрес — <em>placeholder</em>, замінити реальними медіанами після beta-когорти.<br>
+        CV-скелет — ілюстративний; фінальний рендер залежить від MediaPipe / Vision API на iOS.<br>
+        Копірайти пройшли clinical-safety review (<a href="CHANGELOG.md" style="color: #A39D8E; text-decoration: underline;">v0.3.1</a>).<br>
+        Hover на телефон = preview-zoom. Для Figma — порт з цього HTML.
+      </div>
+    </div>
+    <div>
+      <div class="lbl" style="margin-bottom: 10px; letter-spacing: 0.2em;">Метадані</div>
+      <div class="num" style="font-size: 13px; color: #F3EEE0; margin-bottom: 5px;">FORM v0.3.6 · 14 травня 2026</div>
+      <div style="font-size: 11px; color: #6F6A60; font-family: 'Manrope', sans-serif;">HTML Prototype · Mobile app static screens</div>
+      <div style="margin-top: 10px; display: flex; gap: 12px;">
+        <a href="index.html" style="font-size: 11px; color: #6F6A60; font-family: 'JetBrains Mono', monospace; text-decoration: none; border-bottom: 1px solid #1F1D16; padding-bottom: 1px;">→ Marketing site</a>
+        <a href="onboarding.html" style="font-size: 11px; color: #6F6A60; font-family: 'JetBrains Mono', monospace; text-decoration: none; border-bottom: 1px solid #1F1D16; padding-bottom: 1px;">→ Onboarding</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
