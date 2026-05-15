@@ -1,7 +1,7 @@
-# FORM · Project Status v0.26.0
+# FORM · Project Status v0.27.0
 
 **Date:** 15 травня 2026
-**Version:** 0.26.0
+**Version:** 0.27.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -82,6 +82,7 @@ FORM is at v0.25.0 with 41+ tagged releases, 12 functional HTML pages (marketing
 | TWITTER_PLAYBOOK.md | Pre-launch X/Twitter strategy — account setup, 5 pillars, build-in-public formula, beta recruiting via X, voice rules, metrics, quick-start checklist | content-strategist + brand-voice |
 | INVESTOR_PIPELINE.md | Investor CRM and relationship management — 7-stage pipeline (S0–S6), Google Sheets schema, cadence rules, interest signals, post-meeting ritual, close mechanics, raise timeline | founder |
 | LINKEDIN_PLAYBOOK.md | LinkedIn strategy — profile setup, 4 content pillars, 3-tier connection strategy, hiring InMail templates, investor visibility playbook, build-in-public translation guide, cadence, metrics, 10-item quick-start checklist | content-strategist + brand-voice |
+| RETENTION_PLAYBOOK.md | Retention strategy — D0/D7/D30/D90 windows, notification types + cadence, weekly streak mechanics, Victor personalization arc, re-engagement protocol (3-attempt cap), Pause>Cancel design, clinical-safety copy constraints | growth-lead + clinical-safety |
 
 ### Content engine (markdown у `content/`)
 
@@ -304,6 +305,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v0.26.0 · 15 травня 2026**
-**Last update:** 15 травня 2026 · v0.26.0
+**v0.27.0 · 15 травня 2026**
+**Last update:** 15 травня 2026 · v0.27.0
 **Next planned update:** після hire of Founding Engineer
