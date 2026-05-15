@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Admin Dashboard · Enterprise Tier Mockup</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { ink:'#0B0A07', deep:'#13110C', line:'#1F1D16', mute:'#6F6A60', dim:'#A39D8E', paper:'#F3EEE0', cream:'#E7DFC8', acid:'#DDFF2D', ember:'#FF5733' },
+    fontFamily: { serif:['Fraunces','serif'], sans:['Manrope','sans-serif'], mono:['JetBrains Mono','monospace'] }
+  }}};
+</script>
+<style>
+  html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; min-height:100vh; }
+  .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
+  .num { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  ::selection { background:#DDFF2D; color:#0B0A07; }
+  .grain::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.04;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:220px;
+  }
+  .sidebar-item { display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:8px; color:#A39D8E; font-size:14px; cursor:pointer; transition:all 0.15s; }
+  .sidebar-item:hover { background:#13110C; color:#F3EEE0; }
+  .sidebar-item.active { background:rgba(221,255,45,0.1); color:#DDFF2D; }
+  .stat-card { background:#13110C; border:1px solid #1F1D16; border-radius:16px; padding:24px; transition:border 0.2s; }
+  .stat-card:hover { border-color:#2A2820; }
+  .data { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+  .pulse-dot { position:relative; }
+  .pulse-dot::before { content:""; position:absolute; inset:-4px; border-radius:50%; background:#DDFF2D; opacity:0.3; animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform:scale(1); opacity:0.3; } 50% { transform:scale(1.6); opacity:0; } }
+  .chart-bar { display:flex; flex-direction:column-reverse; gap:2px; }
+  .chart-bar > div { background:#DDFF2D; border-radius:2px; min-height:4px; transition:opacity 0.2s; }
+  .chart-bar > div:hover { opacity:0.8; }
+  table { border-collapse:collapse; width:100%; }
+  th { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.15em; text-transform:uppercase; color:#6F6A60; text-align:left; padding:12px 16px; border-bottom:1px solid #1F1D16; }
+  td { padding:14px 16px; border-bottom:1px solid #1F1D16; font-size:14px; }
+  tr:hover td { background:rgba(221,255,45,0.03); }
+  .badge { display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:3px 8px; border-radius:9999px; }
+  .badge-active { background:rgba(221,255,45,0.15); color:#DDFF2D; border:1px solid rgba(221,255,45,0.4); }
+  .badge-onboarding { background:rgba(125,211,252,0.15); color:#7DD3FC; border:1px solid rgba(125,211,252,0.4); }
+  .badge-lapsed { background:rgba(255,87,51,0.15); color:#FF5733; border:1px solid rgba(255,87,51,0.4); }
+</style>
+</head>
+<body class="grain antialiased">
+
+<div class="flex min-h-screen">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-ink border-r border-line p-6 flex flex-col">
+    <div class="flex items-center gap-3 mb-8">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+      <span class="label ml-1">Admin</span>
+    </div>
+
+    <!-- Tenant switcher -->
+    <div class="bg-deep border border-line rounded-lg p-3 mb-6">
+      <div class="label mb-2">Tenant</div>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-paper text-sm font-medium">Acme Corp</div>
+          <div class="text-mute text-xs">412 seats</div>
+        </div>
+        <button class="text-mute text-xs font-mono">switch ↓</button>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex flex-col gap-1">
+      <div class="sidebar-item active">
+        <span class="font-mono">◐</span>
+        <span>Overview</span>
+      </div>
+      <div class="sidebar-item">
+        <span class="font-mono">⊞</span>
+        <span>Users</span>
+      </div>
+      <div class="sidebar-item">
+        <span class="font-mono">◇</span>
+        <span>Engagement</span>
+      </div>
+      <div class="sidebar-item">
+        <span class="font-mono">◢</span>
+        <span>Reports</span>
+      </div>
+
+      <div class="label mt-6 mb-2 px-3">Налаштування</div>
+      <div class="sidebar-item">
+        <span class="font-mono">⚙</span>
+        <span>Branding</span>
+      </div>
+      <div class="sidebar-item">
+        <span class="font-mono">⚿</span>
+        <span>SSO · SCIM</span>
+      </div>
+      <div class="sidebar-item">
+        <span class="font-mono">≡</span>
+        <span>Roles · RBAC</span>
+      </div>
+      <div class="sidebar-item">
+        <span class="font-mono">$</span>
+        <span>Billing</span>
+      </div>
+      <div class="sidebar-item">
+        <span class="font-mono">⚐</span>
+        <span>Audit log</span>
+      </div>
+    </nav>
+
+    <!-- User -->
+    <div class="mt-auto pt-6 border-t border-line">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-acid flex items-center justify-center">
+          <span class="text-ink text-xs font-bold font-mono">M</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-paper text-sm truncate">Maria Schultz</div>
+          <div class="text-mute text-xs">tenant_owner</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="flex-1 p-10 overflow-y-auto">
+
+    <!-- Header -->
+    <div class="flex items-end justify-between mb-10">
+      <div>
+        <div class="label mb-2">Overview · last 30 days</div>
+        <h1 class="font-serif text-paper text-5xl font-light leading-tight">
+          Acme Corp<br>
+          <em class="text-mute text-3xl">412 seats · 287 active</em>
+        </h1>
+      </div>
+      <div class="flex items-center gap-3 text-mute text-xs font-mono">
+        <div class="pulse-dot w-2 h-2 bg-acid rounded-full"></div>
+        <span>LIVE · оновлено зараз</span>
+      </div>
+    </div>
+
+    <!-- Key stats grid -->
+    <div class="grid grid-cols-4 gap-4 mb-10">
+      <div class="stat-card">
+        <div class="label">Активовано</div>
+        <div class="data text-paper text-4xl font-light mt-2">287<span class="text-mute text-lg"> / 412</span></div>
+        <div class="text-acid text-xs font-mono mt-2">↑ 24 за тиждень</div>
+        <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
+          <div class="h-1 bg-acid" style="width:69.6%"></div>
+        </div>
+        <div class="text-mute text-xs font-mono mt-1">70% активаційний рейт</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">Тижнева активність</div>
+        <div class="data text-paper text-4xl font-light mt-2">68<span class="text-mute text-lg">%</span></div>
+        <div class="text-acid text-xs font-mono mt-2">Bench 52% · ↑ above industry</div>
+        <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
+          <div class="h-1 bg-acid" style="width:68%"></div>
+        </div>
+        <div class="text-mute text-xs font-mono mt-1">195 з 287 активованих</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">W-ACSU · NSM</div>
+        <div class="data text-paper text-4xl font-light mt-2">3.4</div>
+        <div class="text-acid text-xs font-mono mt-2">↑ 0.2 за тиждень</div>
+        <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
+          <div class="h-1 bg-acid" style="width:85%"></div>
+        </div>
+        <div class="text-mute text-xs font-mono mt-1">Coached sessions / active / week</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">NPS</div>
+        <div class="data text-paper text-4xl font-light mt-2">52</div>
+        <div class="text-acid text-xs font-mono mt-2">⬤ 67 promoters · 11 detractors · 22 passives</div>
+        <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
+          <div class="h-1 bg-acid" style="width:76%"></div>
+        </div>
+        <div class="text-mute text-xs font-mono mt-1">N=100 за 30 днів</div>
+      </div>
+    </div>
+
+    <!-- Engagement chart + Top users -->
+    <div class="grid grid-cols-3 gap-4 mb-10">
+      <!-- Chart -->
+      <div class="stat-card col-span-2">
+        <div class="flex justify-between items-start mb-6">
+          <div>
+            <div class="label">Активність по днях</div>
+            <div class="text-paper text-sm mt-1">Активні користувачі · останні 30 днів</div>
+          </div>
+          <div class="text-mute text-xs font-mono">avg 195/day</div>
+        </div>
+        <div class="flex items-end gap-1 h-32">
+          <!-- 30 bar values -->
+          <div class="chart-bar flex-1"><div style="height:60px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:72px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:65px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:80px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:88px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:45px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:38px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:75px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:82px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:78px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:85px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:92px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:48px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:42px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:88px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:95px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:90px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:86px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:100px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:50px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:45px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:96px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:102px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:98px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:108px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:112px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:56px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:50px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:115px"></div></div>
+          <div class="chart-bar flex-1"><div style="height:120px"></div></div>
+        </div>
+        <div class="flex justify-between mt-3 text-mute text-xs font-mono">
+          <span>16 квіт</span><span>30 квіт</span><span>15 трав</span>
+        </div>
+      </div>
+
+      <!-- Privacy notice -->
+      <div class="stat-card flex flex-col justify-between" style="border-color:rgba(221,255,45,0.3)">
+        <div>
+          <div class="label" style="color:#DDFF2D">Privacy floor</div>
+          <h3 class="font-serif text-paper text-xl mt-3 leading-snug font-light">
+            HR ніколи не бачить<br>
+            <em>індивідуальні дані.</em>
+          </h3>
+          <p class="text-dim text-sm mt-4 leading-relaxed">
+            Всі цифри агреговані. Зайти на профіль користувача неможливо. Body comp, ED-screening, mental-health — взагалі недоступні цій dashboard.
+          </p>
+        </div>
+        <a href="#" class="text-acid text-xs font-mono mt-6">Privacy policy →</a>
+      </div>
+    </div>
+
+    <!-- Top departments + Risk users -->
+    <div class="grid grid-cols-2 gap-4 mb-10">
+
+      <div class="stat-card">
+        <div class="label mb-4">Топ відділів · adoption %</div>
+        <div class="space-y-3">
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Engineering · 124 seats</span><span class="data text-acid">82%</span></div>
+            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-acid" style="width:82%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Product · 38 seats</span><span class="data text-acid">76%</span></div>
+            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-acid" style="width:76%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Design · 18 seats</span><span class="data text-paper">61%</span></div>
+            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-paper" style="width:61%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Marketing · 42 seats</span><span class="data text-paper">52%</span></div>
+            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-paper" style="width:52%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Operations · 96 seats</span><span class="data text-mute">38%</span></div>
+            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-mute" style="width:38%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Sales · 94 seats</span><span class="data text-ember">28%</span></div>
+            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-ember" style="width:28%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label mb-4">Топ метрик коучингу</div>
+        <div class="space-y-4">
+          <div>
+            <div class="label">Camera-coached сесій</div>
+            <div class="data text-paper text-2xl mt-1 font-light">847<span class="text-mute text-base"> цього місяця</span></div>
+            <div class="text-acid text-xs font-mono mt-1">↑ 23% MoM</div>
+          </div>
+          <div>
+            <div class="label">Chat-питань до Victor</div>
+            <div class="data text-paper text-2xl mt-1 font-light">2,341</div>
+            <div class="text-acid text-xs font-mono mt-1">↑ 18% MoM</div>
+          </div>
+          <div>
+            <div class="label">AI Insights запитано</div>
+            <div class="data text-paper text-2xl mt-1 font-light">1,108</div>
+            <div class="text-acid text-xs font-mono mt-1">↑ 41% MoM · new feature</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users table -->
+    <div class="stat-card">
+      <div class="flex items-end justify-between mb-6">
+        <div>
+          <div class="label">Користувачі</div>
+          <div class="text-paper text-sm mt-1">412 у Acme · аноні́мізовані для HR</div>
+        </div>
+        <div class="flex gap-2">
+          <button class="text-xs font-mono px-3 py-2 bg-acid text-ink rounded-full font-bold">+ Invite</button>
+          <button class="text-xs font-mono px-3 py-2 border border-line rounded-full text-paper">CSV import</button>
+          <button class="text-xs font-mono px-3 py-2 border border-line rounded-full text-paper">SCIM sync</button>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Користувач (anon)</th>
+            <th>Відділ</th>
+            <th>Активований</th>
+            <th>Останньо · 7 днів</th>
+            <th>Статус</th>
+            <th>Дій</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="text-paper">user-3812</td>
+            <td class="text-dim">Engineering</td>
+            <td class="text-dim data">14 трав</td>
+            <td class="text-paper data">5 сесій</td>
+            <td><span class="badge badge-active">active</span></td>
+            <td class="text-mute text-xs">deactivate</td>
+          </tr>
+          <tr>
+            <td class="text-paper">user-2944</td>
+            <td class="text-dim">Product</td>
+            <td class="text-dim data">12 трав</td>
+            <td class="text-paper data">4 сесії</td>
+            <td><span class="badge badge-active">active</span></td>
+            <td class="text-mute text-xs">deactivate</td>
+          </tr>
+          <tr>
+            <td class="text-paper">user-7702</td>
+            <td class="text-dim">Engineering</td>
+            <td class="text-dim data">11 трав</td>
+            <td class="text-paper data">3 сесії</td>
+            <td><span class="badge badge-active">active</span></td>
+            <td class="text-mute text-xs">deactivate</td>
+          </tr>
+          <tr>
+            <td class="text-paper">user-1108</td>
+            <td class="text-dim">Marketing</td>
+            <td class="text-dim data">8 трав</td>
+            <td class="text-mute data">1 сесія</td>
+            <td><span class="badge badge-onboarding">onboarding</span></td>
+            <td class="text-mute text-xs">resend invite</td>
+          </tr>
+          <tr>
+            <td class="text-paper">user-5563</td>
+            <td class="text-dim">Operations</td>
+            <td class="text-dim data">2 трав</td>
+            <td class="text-mute data">0 сесій</td>
+            <td><span class="badge badge-lapsed">lapsed</span></td>
+            <td class="text-mute text-xs">re-engage</td>
+          </tr>
+          <tr>
+            <td class="text-paper">user-2231</td>
+            <td class="text-dim">Sales</td>
+            <td class="text-mute">—</td>
+            <td class="text-mute data">—</td>
+            <td><span class="badge badge-onboarding">invited</span></td>
+            <td class="text-mute text-xs">resend invite</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="flex justify-between items-center mt-6 text-mute text-xs font-mono">
+        <div>Показано 6 з 412 · ID-only · реальні імена прив'язані до user-уроду тільки індивідуально</div>
+        <div class="flex gap-3">
+          <button>← prev</button>
+          <span>1 / 69</span>
+          <button>next →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer note -->
+    <div class="mt-10 pt-6 border-t border-line flex justify-between items-center text-mute text-xs font-mono">
+      <div>Mockup · v0.32.0 · enterprise-architect + customer-success</div>
+      <div>SOC 2 Type II audit prep · WIP</div>
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>
