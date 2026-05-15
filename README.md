@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.20.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.21.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -107,6 +107,7 @@ G:\\Клод\\form\\
 │   ├── HIRING_GUIDE.md      — platform-by-platform JD posting (Djinni/DOU/LinkedIn/Wellfound)
 │   ├── SEED_NARRATIVE.md    — verbal pre-seed pitch script (6 blocks, objection playbook)
 │   ├── DD_FAQ.md            — investor due diligence FAQ (7 blocks, 25 common DD questions)
+│   ├── RESEARCH_SCREENER.md — user research recruiting toolkit (screener, DM templates, tracker, payment flow)
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
 ├── content/                ← 9 blog posts + social
@@ -256,7 +257,7 @@ Each iteration:
 |---|---|
 | Tagged releases | 33+ |
 | HTML pages | 12 |
-| Markdown documents | 47+ |
+| Markdown documents | 48+ |
 | Blog posts (drafts) | 9 |
 | Social content assets | 6 (Twitter, LinkedIn, Reddit, press pitches, 2 newsletter issues) |
 | Total lines committed | 22,000+ |
@@ -332,4 +333,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 15 травня 2026 · v0.20.0
+**Last update:** 15 травня 2026 · v0.21.0
