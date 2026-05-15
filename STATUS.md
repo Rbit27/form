@@ -1,7 +1,7 @@
-# FORM · Project Status v0.19.0
+# FORM · Project Status v0.20.0
 
-**Date:** 14 травня 2026
-**Version:** 0.19.0
+**Date:** 15 травня 2026
+**Version:** 0.20.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.19.0 with 35+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 46+ markdown documents covering every operational domain, 9 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, and a public GitHub repo with 28 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v0.20.0 with 36+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 47+ markdown documents covering every operational domain, 9 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), an investor DD FAQ (DD_FAQ.md — 7-block due diligence prep), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, and a public GitHub repo with 28 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -60,7 +60,7 @@ FORM is at v0.19.0 with 35+ tagged releases, 12 functional HTML pages (marketing
 | LAUNCH_CHECKLIST.md | P0/P1/P2 launch gate | founder |
 | I18N.md | Localization plan UA+EN, DE/PL/ES | marketing-lead |
 | APP_STORE.md | App Store listing draft (cloud) | marketing-lead |
-| DECISION_LOG.md | 27 documented decisions | process-keeper |
+| DECISION_LOG.md | 28 documented decisions | process-keeper |
 | ENGINEERING_RUNBOOK.md | On-call, deploy, monitoring | platform-engineer |
 | INVESTOR_UPDATE_TEMPLATE.md | Monthly update format | founder |
 | SUPPORT.md | Customer support playbook | founder |
@@ -76,6 +76,7 @@ FORM is at v0.19.0 with 35+ tagged releases, 12 functional HTML pages (marketing
 | ADVISORY_BOARD.md | Advisory board recruitment strategy — 4 profiles, compensation, outreach templates, timeline | founder |
 | HIRING_GUIDE.md | Platform-by-platform JD posting guide — Djinni, DOU, LinkedIn, Wellfound; screening protocol; timeline | process-keeper |
 | SEED_NARRATIVE.md | Verbal pre-seed pitch script — 6 blocks, objection playbook, audience variants (angel/fund/accelerator) | product-strategist |
+| DD_FAQ.md | Investor due diligence FAQ — 7 blocks, honest answers to 25 common DD questions, data room index | product-strategist |
 
 ### Content engine (markdown у `content/`)
 
@@ -179,7 +180,7 @@ FORM is at v0.19.0 with 35+ tagged releases, 12 functional HTML pages (marketing
 ## Timeline forward
 
 ```
-Now (May 14, 2026)
+Now (May 15, 2026)
 ├── v0.6.0 — press kit HTML + newsletter guide
 ├── v0.7.0 — LinkedIn posts (12 ready) + social content complete
 ├── v0.8.0 — beta community setup guide (Slack + Discord + moderation)
@@ -194,7 +195,8 @@ Now (May 14, 2026)
 ├── v0.17.0 — advisory board recruitment playbook (ADVISORY_BOARD.md)
 ├── v0.18.0 — hiring guide platform-by-platform (HIRING_GUIDE.md) + DEC-028
 ├── v0.19.0 — pre-seed verbal pitch narrative (SEED_NARRATIVE.md)
-├── Public GitHub repo з 35+ versions tagged
+├── v0.20.0 — investor DD FAQ (DD_FAQ.md) — 7-block due diligence prep
+├── Public GitHub repo з 36+ versions tagged
 └── All strategic docs published
 
 Next 2 weeks
@@ -294,5 +296,7 @@ M10-M12 (Q2 2027)
 ---
 
 **Updated weekly.** Major changes → new version bump.
+
+**v0.20.0 · 15 травня 2026**
 **Last update:** 14 травня 2026 · v0.19.0
 **Next planned update:** після hire of Founding Engineer

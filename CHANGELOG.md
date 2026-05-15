@@ -16,6 +16,26 @@
 
 ---
 
+## [0.20.0] — 2026-05-15
+
+### Why MINOR
+- New document: `docs/DD_FAQ.md` — investor due diligence FAQ prep
+- Completes the investor preparation toolkit: PITCH.md (deck) + SEED_NARRATIVE.md (call script) + INVESTOR_OUTREACH.md (outreach) + FINANCIALS.md (model) + DATA_ROOM.md (materials) were all present, but no DD Q&A prep
+- Covers 7 blocks: Team, Market, Product/Tech, Financials, Execution risks, Round terms, Data Room
+- All answers follow Principle #1: no fabricated numbers; honest about unknowns; confident on known facts
+- Fix: STATUS.md table had stale decision count (27 → 28) — DEC-028 was logged in v0.18.0 but table row wasn't updated
+- Fix: STATUS.md and README.md dates updated to 15 травня 2026
+
+### Added
+- [`docs/DD_FAQ.md`](docs/DD_FAQ.md) — 7-block investor DD FAQ: Team (co-founder risk, Ukraine risk), Market (TAM, competition, Apple/Google risk), Product/Tech (CV accuracy, privacy, LLM costs, iOS-only rationale), Financials (subscription model, pricing, break-even, fund use), Execution risks (3 biggest risks, kill criteria, Ukraine), Round (amount, terms, what beyond money), Data Room index. Companion to SEED_NARRATIVE.md, PITCH.md, FINANCIALS.md, DATA_ROOM.md.
+
+### Changed
+- [`VERSION`](VERSION) — 0.19.0 → 0.20.0
+- [`STATUS.md`](STATUS.md) — DD_FAQ.md added to docs table; DECISION_LOG.md row fixed 27→28 decisions; date → 15 травня 2026; TL;DR → v0.20.0; doc count 46+→47+; releases 35+→36+; version header + footer → v0.20.0; timeline extended to v0.20.0
+- [`README.md`](README.md) — DD_FAQ.md added to docs tree; doc count 46+→47+; version refs → v0.20.0; date → 15 травня 2026
+
+---
+
 ## [0.19.0] — 2026-05-14
 
 ### Why MINOR
