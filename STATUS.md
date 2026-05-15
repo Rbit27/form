@@ -1,7 +1,7 @@
-# FORM · Project Status v0.30.0
+# FORM · Project Status v0.31.0
 
 **Date:** 15 травня 2026
-**Version:** 0.30.0
+**Version:** 0.31.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -100,6 +100,7 @@ FORM is at v0.29.0 with 46+ tagged releases, 12 functional HTML pages (marketing
 | post-07-progressive-overload-myths.md | Blog | draft |
 | post-08-why-no-free-tier.md | Blog | draft |
 | post-09-building-victor-voice.md | Blog | draft |
+| post-10-why-programs-assume-youre-always-ready.md | Blog | draft · sports-scientist + clinical-safety pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
@@ -308,6 +309,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v0.30.0 · 15 травня 2026**
-**Last update:** 15 травня 2026 · v0.30.0
+**v0.31.0 · 15 травня 2026**
+**Last update:** 15 травня 2026 · v0.31.0
 **Next planned update:** після hire of Founding Engineer

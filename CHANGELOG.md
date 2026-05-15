@@ -16,6 +16,26 @@
 
 ---
 
+## [0.31.0] — 2026-05-15
+
+### Why MINOR
+- New blog post: `content/post-10-why-programs-assume-youre-always-ready.md`
+- Fills a genuine content gap: posts 01/04/07 cover HRV, sleep mechanics, and progressive overload individually; no post addresses the core conceptual problem — why standardized programs can't account for variable recovery capacity — and how adaptive training solves it
+- This is the differentiating argument behind FORM: Victor adapts because it reads the day's context, not only the week's schedule
+- `blog.html` updated: 10th card added, hero counters updated
+- Pending sports-scientist + clinical-safety review before publish (topic: training load management — no body image, no dietary claims)
+
+### Added
+- [`content/post-10-why-programs-assume-youre-always-ready.md`](content/post-10-why-programs-assume-youre-always-ready.md) — 13-min read, training-science; covers: the hidden assumption in every pre-written program, training load concept (acute:chronic workload ratio), autoregulation and RPE, what "adaptive" actually means vs. marketing buzzword (3 levels), practical self-coaching tips, FORM's approach via Victor, clinical-safety frontmatter note
+
+### Changed
+- [`blog.html`](blog.html) — post-10 card added (Спортивна наука, "Незабаром"); hero: 9→10 статей, 108→121 хв читання; card placed between post-04 and post-09
+- [`STATUS.md`](STATUS.md) — post-10 added to content engine table; version → v0.31.0
+- [`README.md`](README.md) — post-10 added to content tree; blog posts metric 9→10; version → v0.31.0
+- [`VERSION`](VERSION) — 0.30.0 → 0.31.0
+
+---
+
 ## [0.30.0] — 2026-05-15
 
 ### Why MINOR
