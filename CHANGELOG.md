@@ -16,6 +16,32 @@
 
 ---
 
+## [0.33.0] — 2026-05-16
+
+### Why MINOR
+- New: enterprise admin dashboard mockup (`admin-dashboard.html`) — full tenant control panel for HR/People leads with privacy floor
+- New: `docs/AUDIT_LOG_SCHEMA.md` — append-only HMAC-chained audit log architecture (SOC 2 / GDPR foundation)
+- New: DEC-030 in DECISION_LOG codifies the audit log architecture
+- iPhone app shipped multiple EAS updates: v0.20.0 → v0.21.0 (PR detection, streak grace per DEC-013, active meal slot highlight, rest timer ±30s controls)
+
+### Added
+- [`admin-dashboard.html`](admin-dashboard.html) — enterprise admin panel mockup: tenant switcher, 4 stat cards (Активовано 287/412, Тижнева 68%, W-ACSU 3.4, NPS 52), 30-day activity bar chart, department adoption breakdown, anonymous users table, privacy floor card emphasizing HR cannot see individual data
+- [`docs/AUDIT_LOG_SCHEMA.md`](docs/AUDIT_LOG_SCHEMA.md) — full schema (HMAC chain, partition strategy), action taxonomy (auth/tenant/data/privacy/integration/system/support), retention policies (7y / 3y / 30d), access controls + break-glass procedure, export options (webhook, S3 sync, REST, SIEM)
+- [`docs/DECISION_LOG.md`](docs/DECISION_LOG.md) — DEC-030 audit log architecture
+
+### iPhone app (EAS Update preview branch)
+- v0.20.0 — PR detection in Workout (heavier set → 🏆 alert + success haptic)
+- v0.20.1 — PR within-session fix (Math.max(historical, currentSession), only alert if historical > 0); active meal slot highlight ("· зараз") based on current hour
+- v0.20.2 — Streak grace per DEC-013: tolerates 1 missed day, breaks on 2 consecutive misses (Progress.tsx)
+- v0.20.3 — Today.tsx streak fix to match Progress.tsx (consistency across screens)
+- v0.21.0 — Rest timer ±30s adjustment buttons
+
+### QA walks (qa-walker)
+- P2 found and fixed: within-session double-PR re-trigger
+- P1 found and fixed: streak contradicted DEC-013 (broke after 1 miss, not 2)
+
+---
+
 ## [0.31.0] — 2026-05-15
 
 ### Why MINOR
