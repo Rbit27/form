@@ -1,7 +1,7 @@
-# FORM · Project Status v0.21.0
+# FORM · Project Status v0.22.0
 
 **Date:** 15 травня 2026
-**Version:** 0.21.0
+**Version:** 0.22.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.21.0 with 37+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 48+ markdown documents covering every operational domain, 9 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), an investor DD FAQ (DD_FAQ.md — 7-block due diligence prep), a user research screener toolkit (RESEARCH_SCREENER.md — screener survey with pass/reject criteria, Reddit/X/Telegram recruiting messages, interview tracker columns, gift card payment flow, anti-bias checklist — ready to use immediately without waiting for site launch), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, and a public GitHub repo with 28 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v0.22.0 with 38+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 49+ markdown documents covering every operational domain, 9 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), an investor DD FAQ (DD_FAQ.md — 7-block due diligence prep), a user research screener toolkit (RESEARCH_SCREENER.md — screener survey with pass/reject criteria, Reddit/X/Telegram recruiting messages, interview tracker columns, gift card payment flow, anti-bias checklist — ready to use immediately without waiting for site launch), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, and a public GitHub repo with 28 documented decisions. Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -78,6 +78,7 @@ FORM is at v0.21.0 with 37+ tagged releases, 12 functional HTML pages (marketing
 | SEED_NARRATIVE.md | Verbal pre-seed pitch script — 6 blocks, objection playbook, audience variants (angel/fund/accelerator) | product-strategist |
 | DD_FAQ.md | Investor due diligence FAQ — 7 blocks, honest answers to 25 common DD questions, data room index | product-strategist |
 | RESEARCH_SCREENER.md | User research recruiting toolkit — screener survey, recruiting messages, tracker template, payment flow | research-lead |
+| BETA_FEEDBACK_PROTOCOL.md | Beta feedback intake, taxonomy (P0–P3), synthesis rhythm, decision filter, Victor voice tracker | process-keeper + research-lead |
 
 ### Content engine (markdown у `content/`)
 
@@ -299,6 +300,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v0.21.0 · 15 травня 2026**
-**Last update:** 14 травня 2026 · v0.19.0
+**v0.22.0 · 15 травня 2026**
+**Last update:** 15 травня 2026 · v0.22.0
 **Next planned update:** після hire of Founding Engineer

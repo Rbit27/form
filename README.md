@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.21.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.22.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -20,7 +20,7 @@ This is a **pre-product** project repository. There is no app code yet (mobile d
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **5 sample programs/nutrition plans** — sport-science discipline reference
 - **14 specialized AI agents** — operating model embodied у `.claude/agents/`
-- **Public decision log** — 27 documented decisions з reverse-cost
+- **Public decision log** — 28 documented decisions з reverse-cost
 
 If you're здесь з first time, start з [STATUS.md](STATUS.md) для current snapshot.
 
@@ -56,7 +56,7 @@ G:\\Клод\\form\\
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
-├── VERSION                 ← single source of truth (0.20.0)
+├── VERSION                 ← single source of truth (0.22.0)
 ├── CHANGELOG.md            ← Keep-a-Changelog format
 ├── CONTRIBUTING.md         ← engineering standards
 ├── STATUS.md               ← project snapshot
@@ -108,6 +108,7 @@ G:\\Клод\\form\\
 │   ├── SEED_NARRATIVE.md    — verbal pre-seed pitch script (6 blocks, objection playbook)
 │   ├── DD_FAQ.md            — investor due diligence FAQ (7 blocks, 25 common DD questions)
 │   ├── RESEARCH_SCREENER.md — user research recruiting toolkit (screener, DM templates, tracker, payment flow)
+│   ├── BETA_FEEDBACK_PROTOCOL.md — beta feedback intake, taxonomy (P0–P3), synthesis rhythm, decision filter
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
 ├── content/                ← 9 blog posts + social
@@ -257,7 +258,7 @@ Each iteration:
 |---|---|
 | Tagged releases | 33+ |
 | HTML pages | 12 |
-| Markdown documents | 48+ |
+| Markdown documents | 49+ |
 | Blog posts (drafts) | 9 |
 | Social content assets | 6 (Twitter, LinkedIn, Reddit, press pitches, 2 newsletter issues) |
 | Total lines committed | 22,000+ |
@@ -333,4 +334,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 15 травня 2026 · v0.21.0
+**Last update:** 15 травня 2026 · v0.22.0
