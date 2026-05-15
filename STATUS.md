@@ -1,7 +1,7 @@
-# FORM · Project Status v0.24.0
+# FORM · Project Status v0.25.0
 
 **Date:** 15 травня 2026
-**Version:** 0.24.0
+**Version:** 0.25.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.24.0 with 40+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 50+ markdown documents covering every operational domain, 9 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), an investor DD FAQ (DD_FAQ.md — 7-block due diligence prep), a user research screener toolkit (RESEARCH_SCREENER.md — screener survey with pass/reject criteria, Reddit/X/Telegram recruiting messages, interview tracker columns, gift card payment flow, anti-bias checklist — ready to use immediately without waiting for site launch), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, a public GitHub repo with 28 documented decisions, and a pre-launch Twitter/X playbook (TWITTER_PLAYBOOK.md — account setup, 5 content pillars with example tweets, build-in-public formula, beta recruiting via X, voice rules for X vs LinkedIn vs newsletter, quick-start checklist George can act on today without domain or FE hire), and an investor CRM and relationship management framework (INVESTOR_PIPELINE.md — 7-stage pipeline model, Google Sheets schema, cadence rules, interest signal taxonomy, close mechanics, realistic raise timeline). Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v0.25.0 with 41+ tagged releases, 12 functional HTML pages (marketing, product mockups, investor one-pager, and careers page at `jobs.html`), 52+ markdown documents covering every operational domain, 9 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), an investor DD FAQ (DD_FAQ.md — 7-block due diligence prep), a user research screener toolkit (RESEARCH_SCREENER.md — screener survey with pass/reject criteria, Reddit/X/Telegram recruiting messages, interview tracker columns, gift card payment flow, anti-bias checklist — ready to use immediately without waiting for site launch), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish with a full deployment strategy, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, a public GitHub repo with 28 documented decisions, a pre-launch Twitter/X playbook (TWITTER_PLAYBOOK.md — account setup, 5 content pillars with example tweets, build-in-public formula, beta recruiting via X, voice rules for X vs LinkedIn vs newsletter, quick-start checklist George can act on today without domain or FE hire), an investor CRM and relationship management framework (INVESTOR_PIPELINE.md — 7-stage pipeline model, Google Sheets schema, cadence rules, interest signal taxonomy, close mechanics, realistic raise timeline), and a LinkedIn strategy playbook (LINKEDIN_PLAYBOOK.md — profile setup with headline variants and About draft, 4 content pillars, 3-tier connection strategy, hiring InMail templates for FE + Design Lead, investor visibility playbook, build-in-public translation guide from X, 2-3x/week cadence, voice rules, SSI metrics, 10-item quick-start checklist). Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -81,6 +81,7 @@ FORM is at v0.24.0 with 40+ tagged releases, 12 functional HTML pages (marketing
 | BETA_FEEDBACK_PROTOCOL.md | Beta feedback intake, taxonomy (P0–P3), synthesis rhythm, decision filter, Victor voice tracker | process-keeper + research-lead |
 | TWITTER_PLAYBOOK.md | Pre-launch X/Twitter strategy — account setup, 5 pillars, build-in-public formula, beta recruiting via X, voice rules, metrics, quick-start checklist | content-strategist + brand-voice |
 | INVESTOR_PIPELINE.md | Investor CRM and relationship management — 7-stage pipeline (S0–S6), Google Sheets schema, cadence rules, interest signals, post-meeting ritual, close mechanics, raise timeline | founder |
+| LINKEDIN_PLAYBOOK.md | LinkedIn strategy — profile setup, 4 content pillars, 3-tier connection strategy, hiring InMail templates, investor visibility playbook, build-in-public translation guide, cadence, metrics, 10-item quick-start checklist | content-strategist + brand-voice |
 
 ### Content engine (markdown у `content/`)
 
@@ -302,6 +303,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v0.24.0 · 15 травня 2026**
-**Last update:** 15 травня 2026 · v0.24.0
+**v0.25.0 · 15 травня 2026**
+**Last update:** 15 травня 2026 · v0.25.0
 **Next planned update:** після hire of Founding Engineer
