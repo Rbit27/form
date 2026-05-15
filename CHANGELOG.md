@@ -16,6 +16,24 @@
 
 ---
 
+## [0.26.0] — 2026-05-15
+
+### Why MINOR
+- New content: `content/newsletter-03.md` — Issue 03 "Building Victor: What it takes to design an AI coaching voice"
+- Extends newsletter content engine to 3 issues; natural third chapter after "Why we're building FORM" and "What FORM does/doesn't do"
+- Victor voice demonstrated via side-by-side example (competitor vs Victor on skipped workout) — clinical-safety PASS
+- brand-voice + clinical-safety reviewed: no food/body-image/injury/mental health content
+
+### Added
+- [`content/newsletter-03.md`](content/newsletter-03.md) — Issue 03 "Building Victor" (~720 words): problem statement (app praising on rest days), two bad coaching defaults (drill sergeant vs cheerleader), "не пропускай два поспіль" philosophy explained, side-by-side skipped-workout example (competitor vs Victor), clinical-safety as design constraint framed honestly, beta CTA · clinical-safety PASS
+
+### Changed
+- [`VERSION`](VERSION) — 0.25.0 → 0.26.0
+- [`STATUS.md`](STATUS.md) — newsletter-03.md added to content table; version → v0.26.0
+- [`README.md`](README.md) — newsletter-03.md added to content tree; version → v0.26.0
+
+---
+
 ## [0.25.0] — 2026-05-15
 
 ### Why MINOR

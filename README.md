@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.25.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.26.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -129,7 +129,8 @@ G:\\Клод\\form\\
 │   ├── press-pitch-templates.md
 │   ├── reddit-launch-posts.md
 │   ├── newsletter-01.md          ← Issue 01 "Why we're building FORM" (draft, clinical-safety ✓)
-│   └── newsletter-02.md          ← Issue 02 "What FORM does/doesn't do" (draft, clinical-safety ✓)
+│   ├── newsletter-02.md          ← Issue 02 "What FORM does/doesn't do" (draft, clinical-safety ✓)
+│   └── newsletter-03.md          ← Issue 03 "Building Victor" (draft, clinical-safety ✓)
 │
 ├── programs/               ← sport-science deliverables
 │   ├── sample-strength-week.md
@@ -263,7 +264,7 @@ Each iteration:
 | HTML pages | 12 |
 | Markdown documents | 52+ |
 | Blog posts (drafts) | 9 |
-| Social content assets | 6 (Twitter, LinkedIn, Reddit, press pitches, 2 newsletter issues) |
+| Social content assets | 7 (Twitter, LinkedIn, Reddit, press pitches, 3 newsletter issues) |
 | Total lines committed | 22,000+ |
 | AI agents defined | 14 |
 | Documented decisions | 28 |
@@ -337,4 +338,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 15 травня 2026 · v0.25.0
+**Last update:** 15 травня 2026 · v0.26.0

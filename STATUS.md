@@ -1,7 +1,7 @@
-# FORM · Project Status v0.25.0
+# FORM · Project Status v0.26.0
 
 **Date:** 15 травня 2026
-**Version:** 0.25.0
+**Version:** 0.26.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -102,6 +102,7 @@ FORM is at v0.25.0 with 41+ tagged releases, 12 functional HTML pages (marketing
 | reddit-launch-posts.md | Social | 3 готові |
 | newsletter-01.md | Newsletter | draft · clinical-safety PASS |
 | newsletter-02.md | Newsletter | draft · clinical-safety PASS |
+| newsletter-03.md | Newsletter | draft · clinical-safety PASS |
 
 ### Programs + Nutrition
 
@@ -169,7 +170,7 @@ FORM is at v0.25.0 with 41+ tagged releases, 12 functional HTML pages (marketing
 - [ ] Twitter / X account active
 - [x] Newsletter setup guide → `docs/NEWSLETTER.md`
 - [x] LinkedIn posts (12) ready → `content/linkedin-posts.md`
-- [x] Newsletter issues (2) drafted → `content/newsletter-01.md` + `content/newsletter-02.md` · clinical-safety PASS
+- [x] Newsletter issues (3) drafted → `content/newsletter-01.md` + `newsletter-02.md` + `newsletter-03.md` · clinical-safety PASS
 - [ ] Newsletter platform actually configured on Beehiiv
 - [ ] Reddit account з reputation built
 
@@ -303,6 +304,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v0.25.0 · 15 травня 2026**
-**Last update:** 15 травня 2026 · v0.25.0
+**v0.26.0 · 15 травня 2026**
+**Last update:** 15 травня 2026 · v0.26.0
 **Next planned update:** після hire of Founding Engineer
