@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.29.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.30.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -14,7 +14,7 @@
 
 This is a **pre-product** project repository. There is no app code yet (mobile development begins з Founding Engineer hire). What you'll find:
 
-- **12 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page
+- **13 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index
 - **47+ markdown documents** — strategic, operational, content
 - **9 blog post drafts** — content engine ready для launch
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
@@ -53,10 +53,11 @@ G:\\Клод\\form\\
 ├── workout-live.html       ← detailed workout mockup з CV
 ├── investors.html          ← investor one-pager (noindex — share directly)
 ├── jobs.html               ← careers page — FE + Design Lead open roles
+├── blog.html               ← articles index (9 posts, filtered by category)
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
-├── VERSION                 ← single source of truth (0.22.0)
+├── VERSION                 ← single source of truth (current)
 ├── CHANGELOG.md            ← Keep-a-Changelog format
 ├── CONTRIBUTING.md         ← engineering standards
 ├── STATUS.md               ← project snapshot
@@ -259,12 +260,12 @@ Each iteration:
 
 ---
 
-## Метрики проєкту (як of v0.29.0)
+## Метрики проєкту (як of v0.30.0)
 
 | Metric | Value |
 |---|---|
 | Tagged releases | 45+ |
-| HTML pages | 12 |
+| HTML pages | 13 |
 | Markdown documents | 56+ |
 | Blog posts (drafts) | 9 |
 | Social content assets | 7 (Twitter, LinkedIn, Reddit, press pitches, 3 newsletter issues) |
@@ -341,4 +342,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 15 травня 2026 · v0.29.0
+**Last update:** 15 травня 2026 · v0.30.0

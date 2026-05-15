@@ -1,7 +1,7 @@
-# FORM · Project Status v0.29.0
+# FORM · Project Status v0.30.0
 
 **Date:** 15 травня 2026
-**Version:** 0.29.0
+**Version:** 0.30.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -31,6 +31,7 @@ FORM is at v0.29.0 with 46+ tagged releases, 12 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 9 posts, category filter, newsletter CTA | v0.30.0 ✓ |
 
 ### Strategic documentation (markdown у `docs/`)
 
@@ -249,7 +250,7 @@ M10-M12 (Q2 2027)
 - DEC-021: No Russian language UI у v1.0
 - DEC-023: Geo-pricing $9 UA / $19 Western
 
-28 total documented decisions з reverse-cost assessment.
+29 total documented decisions з reverse-cost assessment.
 
 ---
 
@@ -307,6 +308,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v0.29.0 · 15 травня 2026**
-**Last update:** 15 травня 2026 · v0.29.0
+**v0.30.0 · 15 травня 2026**
+**Last update:** 15 травня 2026 · v0.30.0
 **Next planned update:** після hire of Founding Engineer

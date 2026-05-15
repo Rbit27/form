@@ -16,6 +16,29 @@
 
 ---
 
+## [0.30.0] — 2026-05-15
+
+### Why MINOR
+- New HTML surface: `blog.html` — articles index for 9 existing blog posts
+- Genuine gap: 9 blog posts existed as markdown drafts with no discoverable HTML entry point; journalists, investors, and beta candidates directed to the marketing site couldn't find the content engine
+- Adds category filter (all / training science / industry analysis / founder notes / product), newsletter CTA with email capture, and honest status badges ("Незабаром" vs "Після Q3 interviews" for post-06 which requires real interview data)
+- clinical-safety considerations: page shows titles + short neutral excerpts only; no body-image claims; post-04 framed around sleep/recovery mechanics without prescriptive language; no "never skip" phrasing — uses brand principle language
+
+### Added
+- [`blog.html`](blog.html) — articles index: 9 cards with category badges (Спортивна наука / Аналіз ринку / Нотатки засновника / Продукт / Дослідження), JS category filter, newsletter CTA with email capture, post-06 marked "Після Q3 interviews" (honest — requires real user interview data to complete), consistent editorial-brutalist design with grain overlay + acid lime + Fraunces/Manrope/JBMono
+
+### Fixed
+- [`STATUS.md`](STATUS.md) — "28 total documented decisions" → "29" (DEC-029 was added in v0.29.0 but counter not updated)
+- [`README.md`](README.md) — VERSION comment in repo tree was hardcoded "0.22.0" → "(current)"; HTML page count 12 → 13; surface description updated
+
+### Changed
+- [`sitemap.xml`](sitemap.xml) — `blog.html` added (priority 0.8, changefreq weekly)
+- [`VERSION`](VERSION) — 0.29.0 → 0.30.0
+- [`STATUS.md`](STATUS.md) — blog.html added to HTML pages table; version → v0.30.0
+- [`README.md`](README.md) — blog.html added to repo tree; metrics updated
+
+---
+
 ## [0.29.0] — 2026-05-15
 
 ### Why MINOR
