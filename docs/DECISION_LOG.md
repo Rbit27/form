@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-05-15
+
+### DEC-029 · Growth loops: sharing назовні, no in-app social, clinical-safety gate на весь share-контент
+
+- **Decision:** Всі viral/growth mechanics у FORM — це sharing на зовнішні платформи (Instagram, Twitter, Telegram). Жодного in-app social (leaderboards, друзі, порівняння). Весь share-контент проходить clinical-safety checklist перед ship: blocked — вага тіла, калорії, before/after, порівняння між юзерами. Allowed — form score, lift name, streak count, Victor cue.
+- **Owner:** growth-lead + clinical-safety
+- **Why:** DEC-002 (no social features) і клінічна безпека вимагають жорсткого розмежування між «шеримо досягнення» і «порівнюємо тіла». Зовнішній sharing дає organic acquisition без токсичного social comparison всередині продукту.
+- **Reverse cost:** Low-Medium (додати in-app social — рефакторинг, але можливо у v2.0 з повним clinical review)
+
+---
+
 ## 2026-05-14
 
 ### DEC-028 · Hiring platform priority: Djinni-first для FE, LinkedIn-first для Design Lead

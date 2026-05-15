@@ -16,6 +16,25 @@
 
 ---
 
+## [0.29.0] — 2026-05-15
+
+### Why MINOR
+- New document: `docs/GROWTH_LOOPS.md` — viral/organic growth mechanics
+- Fills a genuine gap: BETA_RECRUITING.md covers how to get 200 beta users; RETENTION_PLAYBOOK.md covers D0-D90 retention; but no document defines the specific viral mechanics (share cards, referral system, streak milestones) the Founding Engineer needs to build
+- 5 loops designed with DEC-002 (no in-app social) and DEC-016 (no free tier) constraints baked in
+- DEC-029 logged: growth loops policy — external sharing only, clinical-safety gate on all share content
+
+### Added
+- [`docs/GROWTH_LOOPS.md`](docs/GROWTH_LOOPS.md) — 5 growth loops: Loop 1 Form Check Share (CV result → share card → organic acquisition), Loop 2 Streak Share (milestone → share), Loop 3 Victor WOM (coaching quality drives word of mouth), Loop 4 Referral Program (formal, post-launch M4-M5), Loop 5 Beta FOMO (waitlist referral mechanics); clinical-safety allowed/blocked content tables; FE implementation priority P0-P4; PostHog events for tracking; K-factor targets; 5 open questions for future decisions
+- `docs/DECISION_LOG.md` — DEC-029: growth loops sharing policy (external only, clinical-safety gate, allowed vs. blocked share content)
+
+### Changed
+- [`VERSION`](VERSION) — 0.28.0 → 0.29.0
+- [`STATUS.md`](STATUS.md) — GROWTH_LOOPS.md added to docs table; doc count 55+→56+; decisions 28→29; version → v0.29.0
+- [`README.md`](README.md) — GROWTH_LOOPS.md added to docs tree; doc count 55+→56+; decisions 28→29; version → v0.29.0
+
+---
+
 ## [0.28.0] — 2026-05-15
 
 ### Why MINOR
