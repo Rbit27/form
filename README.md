@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.27.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.28.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -113,6 +113,7 @@ G:\\Клод\\form\\
 │   ├── INVESTOR_PIPELINE.md — investor CRM + relationship mgmt (7-stage pipeline, CRM schema, close mechanics)
 │   ├── LINKEDIN_PLAYBOOK.md — LinkedIn strategy: profile, pillars, hiring, investor visibility, quick-start
 │   ├── RETENTION_PLAYBOOK.md — D0/D7/D30/D90 windows, streaks, re-engagement, Pause>Cancel
+│   ├── VICTOR_PROMPT_GUIDE.md — LLM implementation guide: 5-layer arch, context schema, 22 scenarios, ED-flag mode
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
 ├── content/                ← 9 blog posts + social
@@ -257,13 +258,13 @@ Each iteration:
 
 ---
 
-## Метрики проєкту (як of v0.15.0)
+## Метрики проєкту (як of v0.28.0)
 
 | Metric | Value |
 |---|---|
-| Tagged releases | 33+ |
+| Tagged releases | 45+ |
 | HTML pages | 12 |
-| Markdown documents | 54+ |
+| Markdown documents | 55+ |
 | Blog posts (drafts) | 9 |
 | Social content assets | 7 (Twitter, LinkedIn, Reddit, press pitches, 3 newsletter issues) |
 | Total lines committed | 22,000+ |
@@ -339,4 +340,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 15 травня 2026 · v0.27.0
+**Last update:** 15 травня 2026 · v0.28.0
