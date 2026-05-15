@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-05-16
+
+### DEC-030 · Audit log: append-only HMAC-chained, 7-year retention для admin events, support actions auto-notify tenant
+
+- **Decision:** Кожна privileged action логуєтьcz у `audit_log` table з HMAC chain (tamper-evident). Retention 7 років для tenant/financial events, 3 роки для auth, 30 днів для high-volume reads. `support.*` actions (FORM employee touches tenant data) тригерять email-notification до tenant admin within 24h. Break-glass debug access requires 2-person approval + time-bounded role.
+- **Owner:** compliance-officer + security-engineer
+- **Why:** SOC 2 Type II requires immutable audit trail. GDPR Art. 30 requires processing records. Trust differentiation: most B2B SaaS логує "що ми робили з вашими даними" в чорну скриню; ми робимо це візибл і authenticated.
+- **Reverse cost:** High (schema і retention policies формують backbone compliance posture; зміна після audit = повторний audit)
+
+---
+
 ## 2026-05-15
 
 ### DEC-029 · Growth loops: sharing назовні, no in-app social, clinical-safety gate на весь share-контент
