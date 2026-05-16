@@ -9,6 +9,14 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.42.0] — 2026-05-16
+
+### Added
+- `blog.html` — картка post-13 (RIR/RPE autoregulation) у grid (category: science).
+- `STATUS.md` — рядок post-13 у content engine table.
+
+---
+
 ## [0.41.0] — 2026-05-16
 
 ### Added
