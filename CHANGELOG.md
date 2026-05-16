@@ -9,6 +9,21 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.48.0] — 2026-05-16
+
+### Added
+- `content/post-19-warmup-protocols.md` — «Warm-up протоколи — чому більшість не відповідає реальним потребам атлета». Спортивна наука: термічна розминка, статичний vs. динамічний стретчинг (meta-analysis Simic 2013, Behm & Chaouachi 2011), PAP vs. рампові підходи, індивідуальна варіабельність. clinical-safety: PASS WITH MINOR EDITS — 4 правки застосовані (stop-cue, pain-signal, Gołaś citation removed, PAP translation fixed).
+- `docs/MOBILE_ROADMAP.md` — канонічний документ мобільного продукту: v1.0/v1.1/v2.0 scope, технічні constraints (CV battery budget, latency SLOs, on-device/cloud boundary), deferred items table, 11 open questions для Founding Engineer, integration touchpoints з цим репо. Правило для cloud agents: mobile code не в цьому репо.
+- `blog.html` — картка post-19 у гриді блогу.
+
+### Fixed (clinical-safety edits on post-19)
+- «Виживання» passage: додано stop-and-assess cue замість чистого warm-up diagnosis
+- Ramp sets section: додано одне речення про гострий/нетиповий біль як сигнал зупинитись
+- Видалено непідтверджений Gołaś et al. citation з body text
+- Виправлено «пострецепторна потенціація» → «постактиваційна потенціація»
+
+---
+
 ## [0.47.2] — 2026-05-16
 
 ### Changed
