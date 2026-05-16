@@ -9,6 +9,16 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.45.0] — 2026-05-16
+
+### Added
+- `pricing-enterprise.html` — interactive enterprise pricing calculator. Inputs: seat count (50–10,000, synced slider + number input), contract length (1yr / 2yr –15% / 3yr –25%), annual upfront payment toggle (+10%). Live output panel: tier auto-detect (Starter $12 / Growth $9 / Enterprise $6–8), per-seat effective rate with discounts, annual contract total, multi-year total, savings callout. Feature add-ons panel updates per tier (SSO/SCIM, Admin, Audit, CSM, SIEM, SOC 2 report, White-label, custom DPA). Feature comparison table (16 rows × 3 tiers). FAQ (billing, seats, SOC 2 timeline, DPA). CTA mailto pre-fills subject with tier + seat count. Brand tokens exact match to enterprise.html. Owner: design-craft + enterprise-architect.
+- `content/post-15-training-frequency.md` — blog post «Скільки разів на тиждень качати м'яз: що каже наука і що з цим робити» (13 хв читання). Охоплює: MPS window (0–72h фазовий розклад, досвідчені vs початківці), Schoenfeld et al. 2016 (ES ~0.36 на користь 2x/тиж при рівному об'ємі), Ralston et al. 2017 (сила + обмеження при 20+ сетах), Krieger 2010 (якість підходів vs концентрація), McLester 2000 (1x vs 3x). Volume-distributor фреймворк з таблицею 1x/2x/3x. Практичні рекомендації: 3 дні = full body, 4 дні = upper/lower, 5 днів = конфігурації. «Що FORM робить»: Victor адаптує частоту по RPE-тренду, HRV-тренду, DOMS-маркеру. clinical-safety PASS (без харчування/тіла/ментального). Owner: sports-scientist + content-engine.
+- `blog.html` — картка post-15 (training frequency) у grid (category: science).
+- `STATUS.md` — рядки post-15, enterprise.html, pricing-enterprise.html у таблицях; оновлено agent count до 24.
+
+---
+
 ## [0.44.0] — 2026-05-16
 
 ### Added

@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Enterprise Pricing Calculator</title>
+<meta name="description" content="Calculate your FORM Enterprise contract. Seats, contract length, discounts. Transparent pricing from $6–$12/seat/month. No surprises." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: {
+      ink:   '#0B0A07',
+      deep:  '#13110C',
+      line:  '#1F1D16',
+      mute:  '#6F6A60',
+      dim:   '#A39D8E',
+      paper: '#F3EEE0',
+      cream: '#E7DFC8',
+      acid:  '#DDFF2D',
+      ember: '#FF5733',
+    },
+    fontFamily: {
+      serif: ['Fraunces', 'serif'],
+      sans:  ['Manrope', 'sans-serif'],
+      mono:  ['JetBrains Mono', 'monospace'],
+    },
+  }}};
+</script>
+<style>
+  html, body { background: #0B0A07; color: #F3EEE0; font-family: 'Manrope', sans-serif; }
+  body { font-feature-settings: "ss01", "cv11"; }
+  ::selection { background: #DDFF2D; color: #0B0A07; }
+
+  .grain::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000; opacity: 0.06;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 220px;
+  }
+
+  .display { font-family: 'Fraunces', serif; font-weight: 300; letter-spacing: -0.04em; line-height: 0.88; }
+  .display em { font-style: italic; font-weight: 300; }
+  .display b { font-weight: 700; font-style: normal; }
+
+  .label { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px; color: #6F6A60; }
+  .num   { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  .btn-acid {
+    background: #DDFF2D; color: #0B0A07;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 600;
+    transition: transform 0.15s, background 0.2s; padding: 16px 32px; border-radius: 9999px; display: inline-block;
+  }
+  .btn-acid:hover { background: #ECFF6B; transform: translateY(-1px); }
+
+  .btn-out {
+    border: 1px solid #2A2820; color: #F3EEE0;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 500;
+    padding: 16px 32px; border-radius: 9999px; display: inline-block; transition: border-color 0.2s;
+  }
+  .btn-out:hover { border-color: #DDFF2D; }
+
+  .divider { border: none; border-top: 1px solid #1F1D16; margin: 0; }
+
+  /* ── Calculator-specific ── */
+
+  /* Seats input */
+  .seats-input {
+    background: #13110C;
+    border: 1px solid #1F1D16;
+    border-radius: 12px;
+    color: #F3EEE0;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 48px;
+    font-weight: 300;
+    width: 100%;
+    padding: 20px 24px;
+    outline: none;
+    transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+  .seats-input::-webkit-outer-spin-button,
+  .seats-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .seats-input:focus { border-color: rgba(221,255,45,0.4); }
+
+  /* Range slider */
+  .seats-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 2px;
+    background: #1F1D16;
+    border-radius: 9999px;
+    outline: none;
+    cursor: pointer;
+    margin-top: 20px;
+  }
+  .seats-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #DDFF2D;
+    cursor: pointer;
+    border: 2px solid #0B0A07;
+    box-shadow: 0 0 0 1px #DDFF2D;
+    transition: transform 0.1s;
+  }
+  .seats-range::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  .seats-range::-moz-range-thumb {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #DDFF2D; cursor: pointer;
+    border: 2px solid #0B0A07; box-shadow: 0 0 0 1px #DDFF2D;
+  }
+
+  /* Contract toggle */
+  .toggle-group {
+    display: flex;
+    background: #13110C;
+    border: 1px solid #1F1D16;
+    border-radius: 9999px;
+    padding: 4px;
+    gap: 2px;
+  }
+  .toggle-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 9999px;
+    cursor: pointer;
+    color: #6F6A60;
+    border: none;
+    background: transparent;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .toggle-btn.active {
+    background: #DDFF2D;
+    color: #0B0A07;
+    font-weight: 600;
+  }
+  .toggle-btn:not(.active):hover { color: #F3EEE0; }
+
+  /* Upfront checkbox */
+  .upfront-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .upfront-check {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 1px solid #1F1D16;
+    border-radius: 5px;
+    background: #13110C;
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .upfront-check:checked {
+    background: #DDFF2D;
+    border-color: #DDFF2D;
+  }
+  .upfront-check:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px; top: 2px;
+    width: 6px; height: 10px;
+    border: 2px solid #0B0A07;
+    border-top: none; border-left: none;
+    transform: rotate(40deg);
+  }
+
+  /* Tier badge */
+  .tier-badge-starter {
+    background: rgba(11,10,7,0.7);
+    border: 1px solid #1F1D16;
+    color: #F3EEE0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 9999px;
+    display: inline-block;
+  }
+  .tier-badge-growth {
+    background: rgba(221,255,45,0.1);
+    border: 1px solid rgba(221,255,45,0.35);
+    color: #DDFF2D;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 9999px;
+    display: inline-block;
+  }
+  .tier-badge-enterprise {
+    background: rgba(255,87,51,0.1);
+    border: 1px solid rgba(255,87,51,0.35);
+    color: #FF5733;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 9999px;
+    display: inline-block;
+  }
+
+  /* Output panel */
+  .output-panel {
+    background: #13110C;
+    border: 1px solid #1F1D16;
+    border-radius: 24px;
+    padding: 40px;
+    position: sticky;
+    top: 96px;
+    transition: border-color 0.3s;
+  }
+  .output-panel.tier-growth { border-color: rgba(221,255,45,0.25); box-shadow: 0 0 60px -20px rgba(221,255,45,0.08); }
+  .output-panel.tier-enterprise { border-color: rgba(255,87,51,0.2); box-shadow: 0 0 60px -20px rgba(255,87,51,0.06); }
+
+  /* Output price display */
+  .price-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 56px;
+    font-weight: 300;
+    color: #F3EEE0;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    transition: opacity 0.2s;
+  }
+
+  /* Feature matrix table */
+  .feature-table { width: 100%; border-collapse: collapse; }
+  .feature-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #6F6A60;
+    padding: 12px 16px;
+    text-align: center;
+    border-bottom: 1px solid #1F1D16;
+    font-weight: 400;
+  }
+  .feature-table th:first-child { text-align: left; }
+  .feature-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #1F1D16;
+    vertical-align: middle;
+  }
+  .feature-table tr:last-child td { border-bottom: none; }
+  .feature-table td:first-child {
+    font-size: 13px;
+    color: #A39D8E;
+    font-family: 'Manrope', sans-serif;
+  }
+  .feature-table td:not(:first-child) {
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  .feature-table .check { color: #DDFF2D; }
+  .feature-table .dash  { color: #2A2820; }
+  .feature-table .note  { color: #6F6A60; font-size: 11px; letter-spacing: 0.05em; }
+  .feature-table .col-highlight { background: rgba(221,255,45,0.03); }
+  .feature-table thead .col-highlight { background: rgba(221,255,45,0.05); }
+
+  /* FAQ */
+  .faq-item { border-top: 1px solid #1F1D16; }
+  .faq-btn {
+    width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+    padding: 24px 0;
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    color: #F3EEE0; font-family: 'Manrope', sans-serif; font-size: 15px; font-weight: 500;
+    transition: color 0.15s;
+  }
+  .faq-btn:hover { color: #DDFF2D; }
+  .faq-icon { font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #6F6A60; flex-shrink: 0; transition: transform 0.2s, color 0.15s; }
+  .faq-body { display: none; padding-bottom: 24px; color: #A39D8E; font-size: 14px; line-height: 1.75; max-width: 680px; }
+  .faq-item.open .faq-body { display: block; }
+  .faq-item.open .faq-icon { transform: rotate(45deg); color: #DDFF2D; }
+  .faq-item.open .faq-btn { color: #F3EEE0; }
+
+  /* Discount row */
+  .discount-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #1F1D16;
+  }
+  .discount-row:last-child { border-bottom: none; }
+
+  /* Glow on output update */
+  @keyframes outputPulse {
+    0%   { opacity: 0.5; }
+    100% { opacity: 1; }
+  }
+  .updating { animation: outputPulse 0.18s ease-out; }
+
+  /* Addons grid */
+  .addon-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #1F1D16;
+    font-size: 13px;
+  }
+  .addon-item:last-child { border-bottom: none; }
+  .addon-included { color: #DDFF2D; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .addon-not      { color: #2A2820; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .addon-plan     { color: #6F6A60; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<!-- ─── Header ──────────────────────────────────────────────── -->
+<header class="border-b border-line sticky top-0 z-50" style="background:rgba(11,10,7,0.92);backdrop-filter:blur(12px);">
+  <div class="max-w-[1440px] mx-auto px-6 md:px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 font-mono text-[11px] tracking-widest uppercase text-mute">
+      <a href="/#demo" class="hover:text-paper transition-colors">Product</a>
+      <a href="/enterprise.html" class="hover:text-paper transition-colors">Enterprise</a>
+      <a href="/pricing-enterprise.html" class="text-paper">Pricing</a>
+      <a href="/admin-dashboard.html" class="hover:text-paper transition-colors">Admin demo</a>
+    </nav>
+    <div class="flex items-center gap-4">
+      <a href="mailto:enterprise@form.coach" class="btn-out hidden md:inline-block">Talk to sales</a>
+      <a href="/admin-dashboard.html" class="btn-acid">View admin →</a>
+    </div>
+  </div>
+</header>
+
+<!-- ─── Hero ─────────────────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-6 md:px-8 pt-24 pb-16">
+  <div class="max-w-3xl">
+    <div class="label mb-8 text-acid">Enterprise pricing · Transparent by default</div>
+    <h1 class="display text-[72px] md:text-[104px] text-paper mb-8">
+      Calculate your<br/><em>contract.</em>
+    </h1>
+    <p class="text-dim text-xl leading-relaxed max-w-xl" style="font-weight:300;">
+      Seats, contract length, features. <span class="text-paper">No surprises.</span> Every number here is the number on your invoice.
+    </p>
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 1.5rem;" />
+
+<!-- ─── Calculator ────────────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-6 md:px-8 py-20">
+  <div class="grid lg:grid-cols-[1fr_420px] gap-10 xl:gap-16 items-start">
+
+    <!-- ── Left: inputs ──────────────────────────────────────── -->
+    <div class="space-y-10">
+
+      <!-- Seats -->
+      <div>
+        <div class="label mb-4">Number of seats</div>
+        <div class="relative">
+          <input
+            type="number"
+            id="seatInput"
+            class="seats-input"
+            min="50"
+            max="10000"
+            value="250"
+            aria-label="Number of seats"
+          />
+          <!-- Tier badge overlaid inside input -->
+          <div class="absolute right-5 top-1/2 -translate-y-1/2" id="tierBadgeInline">
+            <span class="tier-badge-growth">Growth</span>
+          </div>
+        </div>
+        <input
+          type="range"
+          id="seatRange"
+          class="seats-range"
+          min="50"
+          max="10000"
+          value="250"
+          step="10"
+          aria-label="Seat count slider"
+        />
+        <div class="flex justify-between mt-2">
+          <span class="label" style="font-size:9px;">50 seats</span>
+          <span class="label" style="font-size:9px;color:#A39D8E;" id="sliderVal">250 seats</span>
+          <span class="label" style="font-size:9px;">10,000 seats</span>
+        </div>
+      </div>
+
+      <!-- Contract length -->
+      <div>
+        <div class="label mb-4">Contract length</div>
+        <div class="toggle-group" role="group" aria-label="Contract length">
+          <button class="toggle-btn active" data-years="1" id="toggle1">1 year</button>
+          <button class="toggle-btn" data-years="2" id="toggle2">2 year · <span style="color:#DDFF2D;opacity:0.7;">–15%</span></button>
+          <button class="toggle-btn" data-years="3" id="toggle3">3 year · <span style="color:#DDFF2D;opacity:0.7;">–25%</span></button>
+        </div>
+      </div>
+
+      <!-- Upfront payment -->
+      <div>
+        <div class="label mb-4">Payment schedule</div>
+        <label class="upfront-label">
+          <input type="checkbox" id="upfrontCheck" class="upfront-check" aria-label="Annual upfront payment discount" />
+          <div>
+            <div class="text-paper text-sm font-medium">Annual upfront payment</div>
+            <div class="text-mute text-xs mt-0.5">Additional 10% off — stackable with contract discount</div>
+          </div>
+          <span class="ml-auto label text-acid" style="font-size:9px;border:1px solid rgba(221,255,45,0.3);border-radius:9999px;padding:3px 10px;">–10%</span>
+        </label>
+      </div>
+
+      <!-- Discount summary -->
+      <div class="bg-deep border border-line rounded-2xl p-6">
+        <div class="label mb-4">Discount breakdown</div>
+        <div>
+          <div class="discount-row">
+            <span class="text-dim text-sm">Base rate (tier)</span>
+            <span class="num text-paper text-sm" id="baseRateDisplay">$9.00 / seat / mo</span>
+          </div>
+          <div class="discount-row" id="contractDiscountRow">
+            <span class="text-dim text-sm">Contract discount (1yr)</span>
+            <span class="num text-mute text-sm" id="contractDiscountDisplay">—</span>
+          </div>
+          <div class="discount-row" id="upfrontDiscountRow">
+            <span class="text-dim text-sm">Upfront discount</span>
+            <span class="num text-mute text-sm" id="upfrontDiscountDisplay">—</span>
+          </div>
+          <div class="discount-row">
+            <span class="text-paper text-sm font-medium">Effective rate</span>
+            <span class="num text-acid text-sm font-medium" id="effectiveRateDisplay">$9.00 / seat / mo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature add-ons -->
+      <div>
+        <div class="label mb-4">Included features at your tier</div>
+        <div class="bg-deep border border-line rounded-2xl p-6">
+          <div class="addon-item">
+            <span class="text-dim">SSO / SCIM (SAML 2.0, OIDC)</span>
+            <span class="addon-included" id="feat-sso">✓ included</span>
+          </div>
+          <div class="addon-item">
+            <span class="text-dim">Admin dashboard</span>
+            <span class="addon-included" id="feat-admin">✓ included</span>
+          </div>
+          <div class="addon-item">
+            <span class="text-dim">Audit log (REST export)</span>
+            <span class="addon-included" id="feat-audit">✓ included</span>
+          </div>
+          <div class="addon-item">
+            <span class="text-dim">Dedicated CSM + Slack Connect</span>
+            <span id="feat-csm" class="addon-included">✓ included</span>
+          </div>
+          <div class="addon-item">
+            <span class="text-dim">SIEM integrations (Datadog, Splunk)</span>
+            <span id="feat-siem" class="addon-included">✓ included</span>
+          </div>
+          <div class="addon-item">
+            <span class="text-dim">SOC 2 Type II report share</span>
+            <span id="feat-soc2" class="addon-not">— Enterprise only</span>
+          </div>
+          <div class="addon-item">
+            <span class="text-dim">White-label (custom domain + logo)</span>
+            <span id="feat-whitelabel" class="addon-not">— Enterprise only</span>
+          </div>
+          <div class="addon-item">
+            <span class="text-dim">Custom SLA (P0 &lt; 1h)</span>
+            <span id="feat-sla" class="addon-not">— Enterprise only</span>
+          </div>
+          <div class="addon-item">
+            <span class="text-dim">DPA + custom data processing terms</span>
+            <span id="feat-dpa" class="addon-not">— Enterprise only</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /left -->
+
+    <!-- ── Right: output panel ────────────────────────────── -->
+    <div class="output-panel tier-growth" id="outputPanel">
+
+      <!-- Tier indicator -->
+      <div class="flex items-center justify-between mb-8">
+        <div class="label">Your estimate</div>
+        <div id="outputTierBadge"><span class="tier-badge-growth">Growth</span></div>
+      </div>
+
+      <!-- Per-seat price -->
+      <div class="mb-2">
+        <div class="label mb-3" style="font-size:9px;">effective rate</div>
+        <div class="price-display" id="outputPerSeat">$9.00</div>
+        <div class="text-mute text-xs mt-1 font-mono">per seat / month</div>
+      </div>
+
+      <hr class="divider my-8" />
+
+      <!-- Annual total -->
+      <div class="mb-6">
+        <div class="label mb-2" style="font-size:9px;">annual contract total</div>
+        <div class="num text-paper text-3xl font-light" id="outputAnnual" style="letter-spacing:-0.02em;">$27,000</div>
+        <div class="text-mute text-xs mt-1 font-mono" id="outputAnnualSub">250 seats × $9.00 × 12 mo</div>
+      </div>
+
+      <!-- Multi-year total (hidden when 1yr) -->
+      <div id="multiyearBlock" class="hidden mb-6">
+        <div class="label mb-2" style="font-size:9px;" id="multiyearLabel">2-year total</div>
+        <div class="num text-paper text-2xl font-light" id="outputMulti" style="letter-spacing:-0.02em; color:#A39D8E;">$45,900</div>
+        <div class="text-mute text-xs mt-1 font-mono" id="outputMultiSub">includes 15% multi-year discount</div>
+      </div>
+
+      <!-- Enterprise custom pricing note -->
+      <div id="enterpriseNote" class="hidden mb-6 bg-ember bg-opacity-5 border border-ember border-opacity-20 rounded-xl p-4">
+        <div class="label mb-2" style="color:#FF5733;font-size:9px;">Custom pricing applies</div>
+        <p class="text-dim text-xs leading-relaxed">For 1,001+ seats, rate is negotiated based on contract length, features, and multi-year commitment. Estimate shown uses $7/seat — actual rate ranges $6–$8.</p>
+      </div>
+
+      <!-- Savings callout -->
+      <div id="savingsBlock" class="hidden mb-6 rounded-xl px-4 py-3" style="background:rgba(221,255,45,0.06);border:1px solid rgba(221,255,45,0.2);">
+        <div class="label mb-1" style="font-size:9px;color:#DDFF2D;">You save</div>
+        <div class="num text-acid text-xl font-light" id="savingsAmt">—</div>
+        <div class="text-mute text-xs mt-0.5 font-mono" id="savingsSub">vs. 1-year monthly billing</div>
+      </div>
+
+      <hr class="divider mb-8" />
+
+      <!-- CTA -->
+      <div id="outputCTA">
+        <a
+          id="ctaLink"
+          href="mailto:enterprise@form.coach?subject=FORM%20Growth%20%E2%80%94%20250%20seats"
+          class="btn-acid block text-center mb-4"
+          style="font-size:10px;"
+        >Request pilot → enterprise@form.coach</a>
+        <p class="text-mute text-center font-mono" style="font-size:10px;letter-spacing:0.1em;">
+          90-day free pilot · No commitment · DPA before data flows
+        </p>
+      </div>
+
+      <!-- Seat count echo -->
+      <div class="mt-8 pt-6 border-t border-line flex justify-between">
+        <span class="label" style="font-size:9px;">Seats</span>
+        <span class="num text-dim text-xs" id="outputSeats">250</span>
+      </div>
+      <div class="flex justify-between mt-2">
+        <span class="label" style="font-size:9px;">Contract</span>
+        <span class="num text-dim text-xs" id="outputContract">1 year</span>
+      </div>
+      <div class="flex justify-between mt-2">
+        <span class="label" style="font-size:9px;">Payment</span>
+        <span class="num text-dim text-xs" id="outputPayment">Monthly</span>
+      </div>
+
+    </div><!-- /output panel -->
+
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 1.5rem;" />
+
+<!-- ─── Feature comparison table ─────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-6 md:px-8 py-20">
+
+  <div class="label mb-4">Compare tiers</div>
+  <h2 class="display text-[52px] md:text-[64px] text-paper mb-12">
+    Every seat.<br/><em>Every feature.</em>
+  </h2>
+
+  <div class="bg-deep border border-line rounded-2xl overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th style="width:38%;">Feature</th>
+            <th>Starter<br/><span style="font-size:9px;color:#A39D8E;letter-spacing:0.05em;">$12 · 50–200</span></th>
+            <th class="col-highlight">Growth<br/><span style="font-size:9px;color:#DDFF2D;opacity:0.7;letter-spacing:0.05em;">$9 · 201–1,000</span></th>
+            <th>Enterprise<br/><span style="font-size:9px;color:#FF5733;opacity:0.7;letter-spacing:0.05em;">$6–8 · 1,001+</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Core -->
+          <tr>
+            <td colspan="4" style="padding:10px 16px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:#2A2820;border-bottom:1px solid #1F1D16;">Core product</td>
+          </tr>
+          <tr>
+            <td>Full AI coaching (CV, adaptive programming)</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Mobile + web apps</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Admin dashboard (RBAC: owner, admin, manager)</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Aggregated wellness analytics</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+
+          <!-- Identity -->
+          <tr>
+            <td colspan="4" style="padding:10px 16px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:#2A2820;border-bottom:1px solid #1F1D16;">Identity &amp; provisioning</td>
+          </tr>
+          <tr>
+            <td>SSO — SAML 2.0 + OIDC</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>SCIM v2 automated provisioning</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>MFA enforcement + session policy</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+
+          <!-- Compliance -->
+          <tr>
+            <td colspan="4" style="padding:10px 16px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:#2A2820;border-bottom:1px solid #1F1D16;">Compliance &amp; audit</td>
+          </tr>
+          <tr>
+            <td>Audit log (HMAC-chained, append-only)</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>GDPR DPA (signed before pilot)</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>SIEM integrations (Datadog, Splunk, Sumo Logic)</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>S3 audit log sync</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>SOC 2 Type II report share</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="dash">—</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Custom data processing terms</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="dash">—</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Annual penetration test summary</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="dash">—</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+
+          <!-- Support -->
+          <tr>
+            <td colspan="4" style="padding:10px 16px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:#2A2820;border-bottom:1px solid #1F1D16;">Support</td>
+          </tr>
+          <tr>
+            <td>Email support</td>
+            <td><span class="note">24h SLA</span></td>
+            <td class="col-highlight"><span class="note">24h SLA</span></td>
+            <td><span class="note">24h SLA</span></td>
+          </tr>
+          <tr>
+            <td>Dedicated CSM</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Slack Connect</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Quarterly business reviews</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>P0 response SLA</td>
+            <td><span class="note">&lt; 4h</span></td>
+            <td class="col-highlight"><span class="note">&lt; 4h</span></td>
+            <td><span class="note">&lt; 1h guaranteed</span></td>
+          </tr>
+          <tr>
+            <td>Dedicated phone line</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="dash">—</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+
+          <!-- Customisation -->
+          <tr>
+            <td colspan="4" style="padding:10px 16px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:#2A2820;border-bottom:1px solid #1F1D16;">Customisation</td>
+          </tr>
+          <tr>
+            <td>White-label (custom domain + logo)</td>
+            <td><span class="dash">—</span></td>
+            <td class="col-highlight"><span class="dash">—</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Multi-year contract discount</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Annual upfront discount (+10%)</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>PO number support</td>
+            <td><span class="check">✓</span></td>
+            <td class="col-highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="text-mute text-xs mt-6 font-mono text-center">All tiers include full product access. No per-feature upsells. 90-day free pilot available for all sizes.</p>
+
+</section>
+
+<hr class="divider" style="margin:0 1.5rem;" />
+
+<!-- ─── FAQ ───────────────────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-6 md:px-8 py-20">
+  <div class="grid lg:grid-cols-[280px_1fr] gap-16 items-start">
+
+    <div>
+      <div class="label mb-4">Common questions</div>
+      <h2 class="display text-[44px] text-paper">Billing &amp;<br/><em>contract</em><br/>detail.</h2>
+    </div>
+
+    <div>
+      <div class="faq-item" id="faq1">
+        <button class="faq-btn" onclick="toggleFaq('faq1')">
+          <span>How does the billing cycle work?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body">
+          All enterprise contracts are annual. You can pay monthly (invoiced at the start of each month) or upfront annually (one invoice, 10% lower rate). Multi-year contracts (2yr, 3yr) are billed annually within the term — the discount applies to each year's invoice. We do not offer month-to-month enterprise billing. Invoicing via Stripe or ACH wire; PO number support included.
+        </div>
+      </div>
+
+      <div class="faq-item" id="faq2">
+        <button class="faq-btn" onclick="toggleFaq('faq2')">
+          <span>How does seat count work mid-contract?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body">
+          You purchase a seat block upfront at the start of each annual term. Seats can be added mid-year at your contracted rate — charged prorated to the next renewal. Seats cannot be reduced mid-term. At renewal, you true-up to actual peak usage (with a 10% buffer). If your seat count crosses a tier boundary at renewal, the new rate applies to your full seat count from that date.
+        </div>
+      </div>
+
+      <div class="faq-item" id="faq3">
+        <button class="faq-btn" onclick="toggleFaq('faq3')">
+          <span>When will SOC 2 Type II be available, and how does sharing work?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body">
+          Our SOC 2 Type II audit is in progress under Drata continuous monitoring. Target completion is 12 months post-commercial launch. Enterprise-tier customers will receive a copy of the report under NDA upon completion. Starter and Growth customers can request a summary letter. In the interim, we can share our pen-test findings summary and Drata compliance dashboard access under NDA for any active pilot.
+        </div>
+      </div>
+
+      <div class="faq-item" id="faq4">
+        <button class="faq-btn" onclick="toggleFaq('faq4')">
+          <span>When is the DPA signed, and what does it cover?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body">
+          The Data Processing Agreement is signed before any employee data flows into FORM — always, without exception. It covers GDPR Article 9 health data obligations, a DPIA for health-category processing, Standard Contractual Clauses for US–EU transfers, EU data residency election (Frankfurt or Dublin), and a sub-processor list with 30-day advance notice of changes. Enterprise customers can negotiate custom data processing terms. CCPA service provider addendum available on request.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 1.5rem;" />
+
+<!-- ─── Bottom CTA ─────────────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-6 md:px-8 py-24 text-center">
+  <div class="max-w-xl mx-auto">
+    <div class="label mb-8">Start with a pilot</div>
+    <h2 class="display text-[64px] md:text-[80px] text-paper mb-8">
+      90 days.<br/><em>Free.</em>
+    </h2>
+    <p class="text-dim text-lg mb-12 leading-relaxed" style="font-weight:300;">
+      We define success criteria together upfront. You pay only if the metrics hit.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href="mailto:enterprise@form.coach?subject=Pricing%20calculator%20%E2%80%94%20pilot%20request" class="btn-acid">Request pilot → enterprise@form.coach</a>
+      <a href="/enterprise.html" class="btn-out">Back to enterprise overview</a>
+    </div>
+    <p class="text-mute text-xs mt-8 font-mono">Avg. contract: $50k–$500k ARR · Sales cycle: 5–7 months · Start now.</p>
+  </div>
+</section>
+
+<!-- ─── Footer ─────────────────────────────────────────────────── -->
+<footer class="border-t border-line">
+  <div class="max-w-[1440px] mx-auto px-6 md:px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <span class="font-serif text-lg tracking-tight text-paper">FORM<span class="text-acid">.</span></span>
+      <span class="label ml-2">Enterprise</span>
+    </div>
+    <nav class="flex flex-wrap justify-center gap-8 font-mono text-[11px] tracking-widest uppercase text-mute">
+      <a href="/enterprise.html" class="hover:text-paper transition-colors">Enterprise</a>
+      <a href="/pricing-enterprise.html" class="text-paper">Pricing</a>
+      <a href="/admin-dashboard.html" class="hover:text-paper transition-colors">Admin demo</a>
+      <a href="mailto:enterprise@form.coach" class="hover:text-paper transition-colors">Contact sales</a>
+    </nav>
+    <div class="text-mute text-xs font-mono">© 2026 FORM · Privacy floor enforced</div>
+  </div>
+</footer>
+
+<!-- ─── Calculator JS ──────────────────────────────────────────── -->
+<script>
+(function () {
+  'use strict';
+
+  // ── State ──────────────────────────────────────────────────────
+  var state = {
+    seats: 250,
+    years: 1,
+    upfront: false,
+  };
+
+  // ── Tier rules ─────────────────────────────────────────────────
+  var TIERS = {
+    starter:    { name: 'Starter',    min: 50,   max: 200,  baseRate: 12 },
+    growth:     { name: 'Growth',     min: 201,  max: 1000, baseRate: 9  },
+    enterprise: { name: 'Enterprise', min: 1001, max: 10000,baseRate: 7  }, // midpoint of $6–$8
+  };
+
+  var CONTRACT_DISCOUNTS = { 1: 0, 2: 0.15, 3: 0.25 };
+  var UPFRONT_DISCOUNT = 0.10;
+
+  // ── DOM refs ───────────────────────────────────────────────────
+  var seatInput       = document.getElementById('seatInput');
+  var seatRange       = document.getElementById('seatRange');
+  var sliderVal       = document.getElementById('sliderVal');
+  var toggleBtns      = document.querySelectorAll('.toggle-btn');
+  var upfrontCheck    = document.getElementById('upfrontCheck');
+
+  var tierBadgeInline       = document.getElementById('tierBadgeInline');
+  var outputPanel           = document.getElementById('outputPanel');
+  var outputTierBadge       = document.getElementById('outputTierBadge');
+  var outputPerSeat         = document.getElementById('outputPerSeat');
+  var outputAnnual          = document.getElementById('outputAnnual');
+  var outputAnnualSub       = document.getElementById('outputAnnualSub');
+  var outputSeats           = document.getElementById('outputSeats');
+  var outputContract        = document.getElementById('outputContract');
+  var outputPayment         = document.getElementById('outputPayment');
+  var multiyearBlock        = document.getElementById('multiyearBlock');
+  var multiyearLabel        = document.getElementById('multiyearLabel');
+  var outputMulti           = document.getElementById('outputMulti');
+  var outputMultiSub        = document.getElementById('outputMultiSub');
+  var savingsBlock          = document.getElementById('savingsBlock');
+  var savingsAmt            = document.getElementById('savingsAmt');
+  var savingsSub            = document.getElementById('savingsSub');
+  var enterpriseNote        = document.getElementById('enterpriseNote');
+  var ctaLink               = document.getElementById('ctaLink');
+
+  var baseRateDisplay       = document.getElementById('baseRateDisplay');
+  var contractDiscountRow   = document.getElementById('contractDiscountRow');
+  var contractDiscountDisplay = document.getElementById('contractDiscountDisplay');
+  var upfrontDiscountRow    = document.getElementById('upfrontDiscountRow');
+  var upfrontDiscountDisplay= document.getElementById('upfrontDiscountDisplay');
+  var effectiveRateDisplay  = document.getElementById('effectiveRateDisplay');
+
+  // Feature refs
+  var featCSM       = document.getElementById('feat-csm');
+  var featSIEM      = document.getElementById('feat-siem');
+  var featSOC2      = document.getElementById('feat-soc2');
+  var featWhitelabel= document.getElementById('feat-whitelabel');
+  var featSLA       = document.getElementById('feat-sla');
+  var featDPA       = document.getElementById('feat-dpa');
+
+  // ── Helpers ────────────────────────────────────────────────────
+  function getTier(seats) {
+    if (seats <= 200)  return 'starter';
+    if (seats <= 1000) return 'growth';
+    return 'enterprise';
+  }
+
+  function fmt(n) {
+    return n.toLocaleString('en-US');
+  }
+
+  function fmtDollar(n) {
+    return '$' + fmt(n);
+  }
+
+  function fmtRate(r) {
+    // Always show two decimal places for rate
+    return '$' + r.toFixed(2);
+  }
+
+  function badgeHTML(tier) {
+    var classes = {
+      starter:    'tier-badge-starter',
+      growth:     'tier-badge-growth',
+      enterprise: 'tier-badge-enterprise',
+    };
+    var names = { starter: 'Starter', growth: 'Growth', enterprise: 'Enterprise' };
+    return '<span class="' + classes[tier] + '">' + names[tier] + '</span>';
+  }
+
+  function panelClass(tier) {
+    return 'output-panel ' + (tier === 'growth' ? 'tier-growth' : tier === 'enterprise' ? 'tier-enterprise' : '');
+  }
+
+  // ── Core compute ───────────────────────────────────────────────
+  function compute() {
+    var seats  = state.seats;
+    var years  = state.years;
+    var upfront = state.upfront;
+
+    var tierKey   = getTier(seats);
+    var tier      = TIERS[tierKey];
+    var baseRate  = tier.baseRate;
+
+    var contractDisc = CONTRACT_DISCOUNTS[years];
+    var upfrontDisc  = upfront ? UPFRONT_DISCOUNT : 0;
+
+    // Discounts are applied multiplicatively: (1 - contract) * (1 - upfront)
+    var effectiveRate = baseRate * (1 - contractDisc) * (1 - upfrontDisc);
+
+    var annualTotal    = effectiveRate * seats * 12;
+    var multiyearTotal = annualTotal * years;
+
+    // Savings vs. undiscounted 1-year rate
+    var undiscountedAnnual = baseRate * seats * 12;
+    var savings = undiscountedAnnual * years - multiyearTotal;
+
+    return {
+      tierKey:          tierKey,
+      tierName:         tier.name,
+      baseRate:         baseRate,
+      contractDisc:     contractDisc,
+      upfrontDisc:      upfrontDisc,
+      effectiveRate:    effectiveRate,
+      annualTotal:      annualTotal,
+      multiyearTotal:   multiyearTotal,
+      savings:          savings,
+      seats:            seats,
+      years:            years,
+      upfront:          upfront,
+    };
+  }
+
+  // ── Render ─────────────────────────────────────────────────────
+  function render() {
+    var c = compute();
+
+    // Tier badges
+    var bHTML = badgeHTML(c.tierKey);
+    tierBadgeInline.innerHTML = bHTML;
+    outputTierBadge.innerHTML = bHTML;
+
+    // Panel border class
+    outputPanel.className = panelClass(c.tierKey);
+
+    // Per-seat price
+    if (c.tierKey === 'enterprise') {
+      outputPerSeat.textContent = '$6–$8';
+      outputPerSeat.style.fontSize = '40px';
+    } else {
+      outputPerSeat.textContent = fmtRate(c.effectiveRate);
+      outputPerSeat.style.fontSize = '';
+    }
+
+    // Annual total
+    if (c.tierKey === 'enterprise') {
+      // Show estimate range: $6–$8 midpoint already used, but flag it
+      var loAnnual = 6 * c.seats * 12;
+      var hiAnnual = 8 * c.seats * 12;
+      var effAnnual = c.annualTotal; // uses $7 midpoint
+      outputAnnual.textContent = fmtDollar(Math.round(effAnnual));
+      outputAnnualSub.textContent = fmt(c.seats) + ' seats × $7.00 est. × 12 mo (range: ' + fmtDollar(Math.round(loAnnual)) + '–' + fmtDollar(Math.round(hiAnnual)) + ')';
+      enterpriseNote.classList.remove('hidden');
+    } else {
+      outputAnnual.textContent = fmtDollar(Math.round(c.annualTotal));
+      outputAnnualSub.textContent = fmt(c.seats) + ' seats × ' + fmtRate(c.effectiveRate) + ' × 12 mo';
+      enterpriseNote.classList.add('hidden');
+    }
+
+    // Multi-year block
+    if (c.years > 1) {
+      multiyearBlock.classList.remove('hidden');
+      multiyearLabel.textContent = c.years + '-year total';
+      outputMulti.textContent = fmtDollar(Math.round(c.multiyearTotal));
+      var discPct = Math.round((1 - (1 - c.contractDisc) * (1 - c.upfrontDisc)) * 100);
+      outputMultiSub.textContent = 'includes ' + discPct + '% combined discount';
+    } else {
+      multiyearBlock.classList.add('hidden');
+    }
+
+    // Savings block
+    var totalDisc = c.contractDisc + c.upfrontDisc - (c.contractDisc * c.upfrontDisc);
+    if (totalDisc > 0 && c.tierKey !== 'enterprise') {
+      savingsBlock.classList.remove('hidden');
+      savingsAmt.textContent = fmtDollar(Math.round(c.savings));
+      if (c.years > 1) {
+        savingsSub.textContent = 'vs. ' + c.years + ' years at base rate';
+      } else {
+        savingsSub.textContent = 'vs. base rate (annual contract)';
+      }
+    } else {
+      savingsBlock.classList.add('hidden');
+    }
+
+    // Discount breakdown panel
+    baseRateDisplay.textContent = fmtRate(c.baseRate) + ' / seat / mo';
+
+    if (c.contractDisc > 0) {
+      contractDiscountDisplay.textContent = '–' + Math.round(c.contractDisc * 100) + '%';
+      contractDiscountDisplay.style.color = '#DDFF2D';
+      // Update label
+      contractDiscountRow.querySelector('.text-dim').textContent = 'Contract discount (' + c.years + 'yr)';
+    } else {
+      contractDiscountDisplay.textContent = '—';
+      contractDiscountDisplay.style.color = '#6F6A60';
+      contractDiscountRow.querySelector('.text-dim').textContent = 'Contract discount (1yr)';
+    }
+
+    if (c.upfrontDisc > 0) {
+      upfrontDiscountDisplay.textContent = '–10%';
+      upfrontDiscountDisplay.style.color = '#DDFF2D';
+    } else {
+      upfrontDiscountDisplay.textContent = '—';
+      upfrontDiscountDisplay.style.color = '#6F6A60';
+    }
+
+    if (c.tierKey === 'enterprise') {
+      effectiveRateDisplay.textContent = '$6.00–$8.00 / seat / mo';
+    } else {
+      effectiveRateDisplay.textContent = fmtRate(c.effectiveRate) + ' / seat / mo';
+    }
+
+    // Summary footer
+    outputSeats.textContent    = fmt(c.seats);
+    outputContract.textContent = c.years + ' year' + (c.years > 1 ? 's' : '');
+    outputPayment.textContent  = c.upfront ? 'Annual upfront' : 'Monthly';
+
+    // CTA mailto
+    var subject = 'FORM ' + c.tierName + ' — ' + fmt(c.seats) + ' seats';
+    ctaLink.href = 'mailto:enterprise@form.coach?subject=' + encodeURIComponent(subject);
+
+    // Feature flags
+    var isGrowthPlus     = (c.tierKey === 'growth' || c.tierKey === 'enterprise');
+    var isEnterprise     = (c.tierKey === 'enterprise');
+
+    function setFeat(el, included, label) {
+      if (included) {
+        el.textContent = '✓ included';
+        el.className = 'addon-included';
+      } else {
+        el.textContent = '— ' + label;
+        el.className = 'addon-not';
+      }
+    }
+
+    setFeat(featCSM,        isGrowthPlus, 'Growth+ only');
+    setFeat(featSIEM,       isGrowthPlus, 'Growth+ only');
+    setFeat(featSOC2,       isEnterprise, 'Enterprise only');
+    setFeat(featWhitelabel, isEnterprise, 'Enterprise only');
+    setFeat(featSLA,        isEnterprise, 'Enterprise only');
+    setFeat(featDPA,        isEnterprise, 'Enterprise only — custom terms');
+
+    // Pulse animation on output
+    outputPanel.classList.remove('updating');
+    void outputPanel.offsetWidth; // reflow
+    outputPanel.classList.add('updating');
+  }
+
+  // ── Sync slider ↔ input ────────────────────────────────────────
+  function clampSeats(v) {
+    var n = parseInt(v, 10);
+    if (isNaN(n)) return 50;
+    return Math.max(50, Math.min(10000, n));
+  }
+
+  seatInput.addEventListener('input', function () {
+    var v = clampSeats(seatInput.value);
+    state.seats = v;
+    seatRange.value = v;
+    sliderVal.textContent = fmt(v) + ' seats';
+    render();
+  });
+
+  seatRange.addEventListener('input', function () {
+    var v = parseInt(seatRange.value, 10);
+    state.seats = v;
+    seatInput.value = v;
+    sliderVal.textContent = fmt(v) + ' seats';
+    render();
+  });
+
+  // Enforce min on blur
+  seatInput.addEventListener('blur', function () {
+    var v = clampSeats(seatInput.value);
+    state.seats = v;
+    seatInput.value = v;
+    seatRange.value = v;
+    sliderVal.textContent = fmt(v) + ' seats';
+    render();
+  });
+
+  // ── Toggle buttons ─────────────────────────────────────────────
+  toggleBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      toggleBtns.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.years = parseInt(btn.dataset.years, 10);
+      render();
+    });
+  });
+
+  // ── Upfront checkbox ───────────────────────────────────────────
+  upfrontCheck.addEventListener('change', function () {
+    state.upfront = upfrontCheck.checked;
+    render();
+  });
+
+  // ── FAQ accordion ──────────────────────────────────────────────
+  window.toggleFaq = function (id) {
+    var item = document.getElementById(id);
+    var isOpen = item.classList.contains('open');
+    // Close all
+    document.querySelectorAll('.faq-item.open').forEach(function (el) {
+      el.classList.remove('open');
+    });
+    // Open clicked if it was closed
+    if (!isOpen) {
+      item.classList.add('open');
+    }
+  };
+
+  // ── Initial render ─────────────────────────────────────────────
+  render();
+
+})();
+</script>
+
+</body>
+</html>
