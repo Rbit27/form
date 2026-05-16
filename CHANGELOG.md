@@ -29,6 +29,13 @@
 
 ---
 
+## [0.39.0] — 2026-05-16
+
+### Added
+- `docs/DATA_MODEL.md` — multi-tenant Postgres data model (RLS-based). Covers: RLS vs schema-per-tenant decision with trade-off matrix, connection architecture (PgBouncer + SET LOCAL GUC pattern), core schema (tenants, users, user_health_profiles, workouts, meal_logs, tenant_wellness_summary MV, feature flags), RLS policies with fail-closed design, tenant isolation guarantees per layer, data classification (5 tiers with per-tenant AES-256-GCM + KMS for Sensitive class), privacy floor belt-and-suspenders enforcement (RLS + application), migration checklist + dangerous patterns, backup/restore isolation, GDPR DSAR + Right to Erasure flows. SOC 2 evidence: CC6.1, CC6.7, P series. Owner: enterprise-architect + compliance-officer + security-engineer.
+
+---
+
 ## [Unreleased]
 
 ---
