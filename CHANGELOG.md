@@ -8,6 +8,11 @@
 |---|---|
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
+
+## [0.36.0] — 2026-05-16
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — повний технічний runbook для SAML 2.0 / OIDC + SCIM 2.0 provisioning (1154 рядки). Покриває: вибір протоколу, Okta/Azure AD/Google Workspace setup, multi-tenant isolation, role mapping, security controls (PKCE, SLO, cert rotation), customer onboarding checklist, операційний runbook, 13 audit event types, 13 GAP-items для engineering. Owner: enterprise-architect + security-engineer. SOC 2 evidence: CC6.1–CC6.3.
 | **MAJOR** (`X.y.z`) | Брейкінг-чейндж, pivot бренду/скоупу. Не до релізу. |
 
 ---
