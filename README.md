@@ -300,6 +300,13 @@ Each iteration:
 - [ ] First 2,000 paid subscribers
 - [ ] Seed round close ($1.5-2.5M target)
 
+### Content engine roadmap (post-16+)
+- [x] post-16: AI-тренер vs PT — чесний trade-off
+- [ ] post-17: Overtraining vs. laziness — як відрізнити перетренованість від лінощів (behavioral + physiological markers)
+- [ ] post-18: Mobility work — що справді важливо vs. що є театром
+- [ ] post-19: Warm-up протоколи — чому більшість не відповідає реальним потребам атлета
+- [ ] post-20: Чому FORM обрав CV поверх wearable-only підходу
+
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
 ---
