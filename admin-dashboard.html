@@ -18,7 +18,6 @@
 <style>
   html,body { background:#0B0A07; color:#F3EEE0; font-family:'Manrope',sans-serif; min-height:100vh; }
   .label { font-family:'JetBrains Mono',monospace; letter-spacing:0.18em; text-transform:uppercase; font-size:10px; color:#6F6A60; }
-  .num { font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
   ::selection { background:#DDFF2D; color:#0B0A07; }
   .grain::before {
     content:""; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.04;
@@ -42,9 +41,32 @@
   td { padding:14px 16px; border-bottom:1px solid #1F1D16; font-size:14px; }
   tr:hover td { background:rgba(221,255,45,0.03); }
   .badge { display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:3px 8px; border-radius:9999px; }
-  .badge-active { background:rgba(221,255,45,0.15); color:#DDFF2D; border:1px solid rgba(221,255,45,0.4); }
+  .badge-active  { background:rgba(221,255,45,0.15); color:#DDFF2D; border:1px solid rgba(221,255,45,0.4); }
   .badge-onboarding { background:rgba(125,211,252,0.15); color:#7DD3FC; border:1px solid rgba(125,211,252,0.4); }
-  .badge-lapsed { background:rgba(255,87,51,0.15); color:#FF5733; border:1px solid rgba(255,87,51,0.4); }
+  .badge-lapsed  { background:rgba(255,87,51,0.15); color:#FF5733; border:1px solid rgba(255,87,51,0.4); }
+  .badge-ok      { background:rgba(221,255,45,0.15); color:#DDFF2D; border:1px solid rgba(221,255,45,0.4); }
+  .badge-warn    { background:rgba(251,191,36,0.15); color:#FBB F24; border:1px solid rgba(251,191,36,0.4); }
+  .badge-err     { background:rgba(255,87,51,0.15); color:#FF5733; border:1px solid rgba(255,87,51,0.4); }
+  .screen { display:none; }
+  .screen.active { display:block; }
+  .input-field { background:#13110C; border:1px solid #1F1D16; border-radius:8px; padding:10px 14px; color:#F3EEE0; font-size:13px; width:100%; font-family:'JetBrains Mono',monospace; transition:border 0.15s; }
+  .input-field:focus { outline:none; border-color:rgba(221,255,45,0.4); }
+  .input-field::placeholder { color:#6F6A60; }
+  .btn-primary { background:#DDFF2D; color:#0B0A07; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; padding:10px 20px; border-radius:9999px; border:none; cursor:pointer; transition:opacity 0.15s; }
+  .btn-primary:hover { opacity:0.88; }
+  .btn-ghost { background:transparent; color:#A39D8E; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; padding:10px 20px; border-radius:9999px; border:1px solid #1F1D16; cursor:pointer; transition:all 0.15s; }
+  .btn-ghost:hover { border-color:#2A2820; color:#F3EEE0; }
+  .copy-btn { background:rgba(221,255,45,0.08); color:#DDFF2D; font-family:'JetBrains Mono',monospace; font-size:10px; padding:4px 10px; border-radius:6px; border:1px solid rgba(221,255,45,0.2); cursor:pointer; }
+  .copy-btn:hover { background:rgba(221,255,45,0.15); }
+  .toggle { position:relative; width:40px; height:22px; cursor:pointer; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .toggle-slider { position:absolute; inset:0; background:#1F1D16; border-radius:999px; transition:0.2s; border:1px solid #2A2820; }
+  .toggle-slider:before { content:""; position:absolute; height:16px; width:16px; left:3px; bottom:2px; background:#6F6A60; border-radius:50%; transition:0.2s; }
+  .toggle input:checked + .toggle-slider { background:rgba(221,255,45,0.2); border-color:rgba(221,255,45,0.4); }
+  .toggle input:checked + .toggle-slider:before { transform:translateX(17px); background:#DDFF2D; }
+  .hmac-tag { font-family:'JetBrains Mono',monospace; font-size:10px; color:#6F6A60; background:#0B0A07; padding:2px 6px; border-radius:4px; border:1px solid #1F1D16; }
+  .chain-ok { color:#DDFF2D; }
+  .section-divider { height:1px; background:#1F1D16; margin:32px 0; }
 </style>
 </head>
 <body class="grain antialiased">
@@ -52,7 +74,7 @@
 <div class="flex min-h-screen">
 
   <!-- Sidebar -->
-  <aside class="w-64 bg-ink border-r border-line p-6 flex flex-col">
+  <aside class="w-64 bg-ink border-r border-line p-6 flex flex-col flex-shrink-0">
     <div class="flex items-center gap-3 mb-8">
       <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
       <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
@@ -65,49 +87,49 @@
       <div class="flex items-center justify-between">
         <div>
           <div class="text-paper text-sm font-medium">Acme Corp</div>
-          <div class="text-mute text-xs">412 seats</div>
+          <div class="text-mute text-xs data">412 seats</div>
         </div>
-        <button class="text-mute text-xs font-mono">switch ↓</button>
+        <button class="text-mute text-xs font-mono hover:text-paper transition-colors">switch ↓</button>
       </div>
     </div>
 
     <!-- Nav -->
     <nav class="flex flex-col gap-1">
-      <div class="sidebar-item active">
+      <div class="sidebar-item active" data-screen="overview">
         <span class="font-mono">◐</span>
         <span>Overview</span>
       </div>
-      <div class="sidebar-item">
+      <div class="sidebar-item" data-screen="users">
         <span class="font-mono">⊞</span>
         <span>Users</span>
       </div>
-      <div class="sidebar-item">
+      <div class="sidebar-item" data-screen="engagement">
         <span class="font-mono">◇</span>
         <span>Engagement</span>
       </div>
-      <div class="sidebar-item">
+      <div class="sidebar-item" data-screen="reports">
         <span class="font-mono">◢</span>
         <span>Reports</span>
       </div>
 
       <div class="label mt-6 mb-2 px-3">Налаштування</div>
-      <div class="sidebar-item">
+      <div class="sidebar-item" data-screen="branding">
         <span class="font-mono">⚙</span>
         <span>Branding</span>
       </div>
-      <div class="sidebar-item">
+      <div class="sidebar-item" data-screen="sso">
         <span class="font-mono">⚿</span>
         <span>SSO · SCIM</span>
       </div>
-      <div class="sidebar-item">
+      <div class="sidebar-item" data-screen="rbac">
         <span class="font-mono">≡</span>
         <span>Roles · RBAC</span>
       </div>
-      <div class="sidebar-item">
+      <div class="sidebar-item" data-screen="billing">
         <span class="font-mono">$</span>
         <span>Billing</span>
       </div>
-      <div class="sidebar-item">
+      <div class="sidebar-item" data-screen="auditlog">
         <span class="font-mono">⚐</span>
         <span>Audit log</span>
       </div>
@@ -130,279 +152,1096 @@
   <!-- Main content -->
   <main class="flex-1 p-10 overflow-y-auto">
 
-    <!-- Header -->
-    <div class="flex items-end justify-between mb-10">
-      <div>
-        <div class="label mb-2">Overview · last 30 days</div>
-        <h1 class="font-serif text-paper text-5xl font-light leading-tight">
-          Acme Corp<br>
-          <em class="text-mute text-3xl">412 seats · 287 active</em>
-        </h1>
-      </div>
-      <div class="flex items-center gap-3 text-mute text-xs font-mono">
-        <div class="pulse-dot w-2 h-2 bg-acid rounded-full"></div>
-        <span>LIVE · оновлено зараз</span>
-      </div>
-    </div>
-
-    <!-- Key stats grid -->
-    <div class="grid grid-cols-4 gap-4 mb-10">
-      <div class="stat-card">
-        <div class="label">Активовано</div>
-        <div class="data text-paper text-4xl font-light mt-2">287<span class="text-mute text-lg"> / 412</span></div>
-        <div class="text-acid text-xs font-mono mt-2">↑ 24 за тиждень</div>
-        <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
-          <div class="h-1 bg-acid" style="width:69.6%"></div>
-        </div>
-        <div class="text-mute text-xs font-mono mt-1">70% активаційний рейт</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="label">Тижнева активність</div>
-        <div class="data text-paper text-4xl font-light mt-2">68<span class="text-mute text-lg">%</span></div>
-        <div class="text-acid text-xs font-mono mt-2">Bench 52% · ↑ above industry</div>
-        <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
-          <div class="h-1 bg-acid" style="width:68%"></div>
-        </div>
-        <div class="text-mute text-xs font-mono mt-1">195 з 287 активованих</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="label">W-ACSU · NSM</div>
-        <div class="data text-paper text-4xl font-light mt-2">3.4</div>
-        <div class="text-acid text-xs font-mono mt-2">↑ 0.2 за тиждень</div>
-        <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
-          <div class="h-1 bg-acid" style="width:85%"></div>
-        </div>
-        <div class="text-mute text-xs font-mono mt-1">Coached sessions / active / week</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="label">NPS</div>
-        <div class="data text-paper text-4xl font-light mt-2">52</div>
-        <div class="text-acid text-xs font-mono mt-2">⬤ 67 promoters · 11 detractors · 22 passives</div>
-        <div class="h-1 bg-line rounded-full mt-3 overflow-hidden">
-          <div class="h-1 bg-acid" style="width:76%"></div>
-        </div>
-        <div class="text-mute text-xs font-mono mt-1">N=100 за 30 днів</div>
-      </div>
-    </div>
-
-    <!-- Engagement chart + Top users -->
-    <div class="grid grid-cols-3 gap-4 mb-10">
-      <!-- Chart -->
-      <div class="stat-card col-span-2">
-        <div class="flex justify-between items-start mb-6">
-          <div>
-            <div class="label">Активність по днях</div>
-            <div class="text-paper text-sm mt-1">Активні користувачі · останні 30 днів</div>
-          </div>
-          <div class="text-mute text-xs font-mono">avg 195/day</div>
-        </div>
-        <div class="flex items-end gap-1 h-32">
-          <!-- 30 bar values -->
-          <div class="chart-bar flex-1"><div style="height:60px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:72px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:65px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:80px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:88px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:45px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:38px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:75px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:82px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:78px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:85px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:92px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:48px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:42px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:88px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:95px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:90px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:86px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:100px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:50px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:45px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:96px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:102px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:98px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:108px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:112px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:56px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:50px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:115px"></div></div>
-          <div class="chart-bar flex-1"><div style="height:120px"></div></div>
-        </div>
-        <div class="flex justify-between mt-3 text-mute text-xs font-mono">
-          <span>16 квіт</span><span>30 квіт</span><span>15 трав</span>
-        </div>
-      </div>
-
-      <!-- Privacy notice -->
-      <div class="stat-card flex flex-col justify-between" style="border-color:rgba(221,255,45,0.3)">
+    <!-- ═══════════════════════════════════ OVERVIEW ═══════════════════════════════════ -->
+    <div id="screen-overview" class="screen active">
+      <div class="flex items-end justify-between mb-10">
         <div>
-          <div class="label" style="color:#DDFF2D">Privacy floor</div>
-          <h3 class="font-serif text-paper text-xl mt-3 leading-snug font-light">
-            HR ніколи не бачить<br>
-            <em>індивідуальні дані.</em>
-          </h3>
-          <p class="text-dim text-sm mt-4 leading-relaxed">
-            Всі цифри агреговані. Зайти на профіль користувача неможливо. Body comp, ED-screening, mental-health — взагалі недоступні цій dashboard.
-          </p>
+          <div class="label mb-2">Overview · last 30 days</div>
+          <h1 class="font-serif text-paper text-5xl font-light leading-tight">
+            Acme Corp<br>
+            <em class="text-mute text-3xl">412 seats · 287 active</em>
+          </h1>
         </div>
-        <a href="#" class="text-acid text-xs font-mono mt-6">Privacy policy →</a>
+        <div class="flex items-center gap-3 text-mute text-xs font-mono">
+          <div class="pulse-dot w-2 h-2 bg-acid rounded-full"></div>
+          <span>LIVE · оновлено зараз</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-4 gap-4 mb-10">
+        <div class="stat-card">
+          <div class="label">Активовано</div>
+          <div class="data text-paper text-4xl font-light mt-2">287<span class="text-mute text-lg"> / 412</span></div>
+          <div class="text-acid text-xs font-mono mt-2">↑ 24 за тиждень</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden"><div class="h-1 bg-acid" style="width:69.6%"></div></div>
+          <div class="text-mute text-xs font-mono mt-1">70% активаційний рейт</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Тижнева активність</div>
+          <div class="data text-paper text-4xl font-light mt-2">68<span class="text-mute text-lg">%</span></div>
+          <div class="text-acid text-xs font-mono mt-2">Bench 52% · ↑ above industry</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden"><div class="h-1 bg-acid" style="width:68%"></div></div>
+          <div class="text-mute text-xs font-mono mt-1">195 з 287 активованих</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">W-ACSU · NSM</div>
+          <div class="data text-paper text-4xl font-light mt-2">3.4</div>
+          <div class="text-acid text-xs font-mono mt-2">↑ 0.2 за тиждень</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden"><div class="h-1 bg-acid" style="width:85%"></div></div>
+          <div class="text-mute text-xs font-mono mt-1">Coached sessions / active / week</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">NPS</div>
+          <div class="data text-paper text-4xl font-light mt-2">52</div>
+          <div class="text-acid text-xs font-mono mt-2">67 promoters · 11 detractors</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden"><div class="h-1 bg-acid" style="width:76%"></div></div>
+          <div class="text-mute text-xs font-mono mt-1">N=100 за 30 днів</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4 mb-10">
+        <div class="stat-card col-span-2">
+          <div class="flex justify-between items-start mb-6">
+            <div>
+              <div class="label">Активність по днях</div>
+              <div class="text-paper text-sm mt-1">Активні користувачі · останні 30 днів</div>
+            </div>
+            <div class="text-mute text-xs font-mono">avg 195/day</div>
+          </div>
+          <div class="flex items-end gap-1 h-32">
+            <div class="chart-bar flex-1"><div style="height:60px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:72px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:65px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:80px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:88px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:45px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:38px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:75px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:82px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:78px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:85px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:92px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:48px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:42px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:88px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:95px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:90px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:86px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:100px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:50px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:45px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:96px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:102px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:98px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:108px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:112px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:56px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:50px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:115px"></div></div>
+            <div class="chart-bar flex-1"><div style="height:120px"></div></div>
+          </div>
+          <div class="flex justify-between mt-3 text-mute text-xs font-mono">
+            <span>16 квіт</span><span>30 квіт</span><span>15 трав</span>
+          </div>
+        </div>
+
+        <div class="stat-card flex flex-col justify-between" style="border-color:rgba(221,255,45,0.3)">
+          <div>
+            <div class="label" style="color:#DDFF2D">Privacy floor</div>
+            <h3 class="font-serif text-paper text-xl mt-3 leading-snug font-light">
+              HR ніколи не бачить<br>
+              <em>індивідуальні дані.</em>
+            </h3>
+            <p class="text-dim text-sm mt-4 leading-relaxed">
+              Всі цифри агреговані. Зайти на профіль користувача неможливо. Body comp, ED-screening, mental-health — взагалі недоступні цій dashboard.
+            </p>
+            <p class="text-mute text-xs font-mono mt-3">k-anonymity floor: N≥5 per cohort</p>
+          </div>
+          <a href="#" class="text-acid text-xs font-mono mt-6 hover:underline">Privacy policy →</a>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mb-10">
+        <div class="stat-card">
+          <div class="label mb-4">Топ відділів · adoption %</div>
+          <div class="space-y-3">
+            <div>
+              <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Engineering · 124 seats</span><span class="data text-acid">82%</span></div>
+              <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-acid" style="width:82%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Product · 38 seats</span><span class="data text-acid">76%</span></div>
+              <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-acid" style="width:76%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Design · 18 seats</span><span class="data text-paper">61%</span></div>
+              <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-paper" style="width:61%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Marketing · 42 seats</span><span class="data text-paper">52%</span></div>
+              <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-paper" style="width:52%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Operations · 96 seats</span><span class="data text-mute">38%</span></div>
+              <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-mute" style="width:38%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Sales · 94 seats</span><span class="data text-ember">28%</span></div>
+              <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-ember" style="width:28%"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="label mb-4">Топ метрик коучингу</div>
+          <div class="space-y-4">
+            <div>
+              <div class="label">Camera-coached сесій</div>
+              <div class="data text-paper text-2xl mt-1 font-light">847<span class="text-mute text-base"> цього місяця</span></div>
+              <div class="text-acid text-xs font-mono mt-1">↑ 23% MoM</div>
+            </div>
+            <div>
+              <div class="label">Chat-питань до Victor</div>
+              <div class="data text-paper text-2xl mt-1 font-light">2,341</div>
+              <div class="text-acid text-xs font-mono mt-1">↑ 18% MoM</div>
+            </div>
+            <div>
+              <div class="label">AI Insights запитано</div>
+              <div class="data text-paper text-2xl mt-1 font-light">1,108</div>
+              <div class="text-acid text-xs font-mono mt-1">↑ 41% MoM · new feature</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-10 pt-6 border-t border-line flex justify-between items-center text-mute text-xs font-mono">
+        <div>v0.47.2 · enterprise-architect + customer-success</div>
+        <div>SOC 2 Type II audit prep · WIP</div>
       </div>
     </div>
 
-    <!-- Top departments + Risk users -->
-    <div class="grid grid-cols-2 gap-4 mb-10">
-
-      <div class="stat-card">
-        <div class="label mb-4">Топ відділів · adoption %</div>
-        <div class="space-y-3">
-          <div>
-            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Engineering · 124 seats</span><span class="data text-acid">82%</span></div>
-            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-acid" style="width:82%"></div></div>
-          </div>
-          <div>
-            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Product · 38 seats</span><span class="data text-acid">76%</span></div>
-            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-acid" style="width:76%"></div></div>
-          </div>
-          <div>
-            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Design · 18 seats</span><span class="data text-paper">61%</span></div>
-            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-paper" style="width:61%"></div></div>
-          </div>
-          <div>
-            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Marketing · 42 seats</span><span class="data text-paper">52%</span></div>
-            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-paper" style="width:52%"></div></div>
-          </div>
-          <div>
-            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Operations · 96 seats</span><span class="data text-mute">38%</span></div>
-            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-mute" style="width:38%"></div></div>
-          </div>
-          <div>
-            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">Sales · 94 seats</span><span class="data text-ember">28%</span></div>
-            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-ember" style="width:28%"></div></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="label mb-4">Топ метрик коучингу</div>
-        <div class="space-y-4">
-          <div>
-            <div class="label">Camera-coached сесій</div>
-            <div class="data text-paper text-2xl mt-1 font-light">847<span class="text-mute text-base"> цього місяця</span></div>
-            <div class="text-acid text-xs font-mono mt-1">↑ 23% MoM</div>
-          </div>
-          <div>
-            <div class="label">Chat-питань до Victor</div>
-            <div class="data text-paper text-2xl mt-1 font-light">2,341</div>
-            <div class="text-acid text-xs font-mono mt-1">↑ 18% MoM</div>
-          </div>
-          <div>
-            <div class="label">AI Insights запитано</div>
-            <div class="data text-paper text-2xl mt-1 font-light">1,108</div>
-            <div class="text-acid text-xs font-mono mt-1">↑ 41% MoM · new feature</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Users table -->
-    <div class="stat-card">
-      <div class="flex items-end justify-between mb-6">
+    <!-- ═══════════════════════════════════ USERS ═══════════════════════════════════ -->
+    <div id="screen-users" class="screen">
+      <div class="flex items-end justify-between mb-10">
         <div>
-          <div class="label">Користувачі</div>
-          <div class="text-paper text-sm mt-1">412 у Acme · аноні́мізовані для HR</div>
+          <div class="label mb-2">Users · Acme Corp</div>
+          <h1 class="font-serif text-paper text-5xl font-light leading-tight">412 seats<br>
+            <em class="text-mute text-3xl">287 active · 68 invited · 57 lapsed</em>
+          </h1>
         </div>
         <div class="flex gap-2">
-          <button class="text-xs font-mono px-3 py-2 bg-acid text-ink rounded-full font-bold">+ Invite</button>
-          <button class="text-xs font-mono px-3 py-2 border border-line rounded-full text-paper">CSV import</button>
-          <button class="text-xs font-mono px-3 py-2 border border-line rounded-full text-paper">SCIM sync</button>
+          <button class="btn-primary">+ Invite</button>
+          <button class="btn-ghost">CSV import</button>
+          <button class="btn-ghost">SCIM sync</button>
         </div>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Користувач (anon)</th>
-            <th>Відділ</th>
-            <th>Активований</th>
-            <th>Останньо · 7 днів</th>
-            <th>Статус</th>
-            <th>Дій</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="text-paper">user-3812</td>
-            <td class="text-dim">Engineering</td>
-            <td class="text-dim data">14 трав</td>
-            <td class="text-paper data">5 сесій</td>
-            <td><span class="badge badge-active">active</span></td>
-            <td class="text-mute text-xs">deactivate</td>
-          </tr>
-          <tr>
-            <td class="text-paper">user-2944</td>
-            <td class="text-dim">Product</td>
-            <td class="text-dim data">12 трав</td>
-            <td class="text-paper data">4 сесії</td>
-            <td><span class="badge badge-active">active</span></td>
-            <td class="text-mute text-xs">deactivate</td>
-          </tr>
-          <tr>
-            <td class="text-paper">user-7702</td>
-            <td class="text-dim">Engineering</td>
-            <td class="text-dim data">11 трав</td>
-            <td class="text-paper data">3 сесії</td>
-            <td><span class="badge badge-active">active</span></td>
-            <td class="text-mute text-xs">deactivate</td>
-          </tr>
-          <tr>
-            <td class="text-paper">user-1108</td>
-            <td class="text-dim">Marketing</td>
-            <td class="text-dim data">8 трав</td>
-            <td class="text-mute data">1 сесія</td>
-            <td><span class="badge badge-onboarding">onboarding</span></td>
-            <td class="text-mute text-xs">resend invite</td>
-          </tr>
-          <tr>
-            <td class="text-paper">user-5563</td>
-            <td class="text-dim">Operations</td>
-            <td class="text-dim data">2 трав</td>
-            <td class="text-mute data">0 сесій</td>
-            <td><span class="badge badge-lapsed">lapsed</span></td>
-            <td class="text-mute text-xs">re-engage</td>
-          </tr>
-          <tr>
-            <td class="text-paper">user-2231</td>
-            <td class="text-dim">Sales</td>
-            <td class="text-mute">—</td>
-            <td class="text-mute data">—</td>
-            <td><span class="badge badge-onboarding">invited</span></td>
-            <td class="text-mute text-xs">resend invite</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="stat-card mb-6">
+        <div class="flex items-center gap-4 mb-2">
+          <input type="text" class="input-field" placeholder="Search by user ID, department…" style="max-width:360px" />
+          <select class="input-field" style="max-width:180px; width:auto">
+            <option>All statuses</option>
+            <option>Active</option>
+            <option>Onboarding</option>
+            <option>Lapsed</option>
+            <option>Invited</option>
+          </select>
+          <select class="input-field" style="max-width:200px; width:auto">
+            <option>All departments</option>
+            <option>Engineering</option>
+            <option>Product</option>
+            <option>Design</option>
+            <option>Marketing</option>
+            <option>Operations</option>
+            <option>Sales</option>
+          </select>
+          <div class="text-mute text-xs font-mono ml-auto">Показано 6 з 412</div>
+        </div>
+      </div>
 
-      <div class="flex justify-between items-center mt-6 text-mute text-xs font-mono">
-        <div>Показано 6 з 412 · ID-only · реальні імена прив'язані до user-уроду тільки індивідуально</div>
-        <div class="flex gap-3">
-          <button>← prev</button>
-          <span>1 / 69</span>
-          <button>next →</button>
+      <div class="stat-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Користувач (anon)</th>
+              <th>Відділ</th>
+              <th>Активований</th>
+              <th>Тижнів активний</th>
+              <th>Сесій (30 д)</th>
+              <th>Статус</th>
+              <th>Дій</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="text-paper data">user-3812</td>
+              <td class="text-dim">Engineering</td>
+              <td class="text-dim data">14 трав</td>
+              <td class="text-paper data">3 / 4</td>
+              <td class="text-paper data">22</td>
+              <td><span class="badge badge-active">active</span></td>
+              <td class="text-mute text-xs"><button class="hover:text-ember transition-colors">deactivate</button></td>
+            </tr>
+            <tr>
+              <td class="text-paper data">user-2944</td>
+              <td class="text-dim">Product</td>
+              <td class="text-dim data">12 трав</td>
+              <td class="text-paper data">3 / 4</td>
+              <td class="text-paper data">18</td>
+              <td><span class="badge badge-active">active</span></td>
+              <td class="text-mute text-xs"><button class="hover:text-ember transition-colors">deactivate</button></td>
+            </tr>
+            <tr>
+              <td class="text-paper data">user-7702</td>
+              <td class="text-dim">Engineering</td>
+              <td class="text-dim data">11 трав</td>
+              <td class="text-paper data">2 / 4</td>
+              <td class="text-paper data">14</td>
+              <td><span class="badge badge-active">active</span></td>
+              <td class="text-mute text-xs"><button class="hover:text-ember transition-colors">deactivate</button></td>
+            </tr>
+            <tr>
+              <td class="text-paper data">user-1108</td>
+              <td class="text-dim">Marketing</td>
+              <td class="text-dim data">8 трав</td>
+              <td class="text-mute data">1 / 4</td>
+              <td class="text-mute data">3</td>
+              <td><span class="badge badge-onboarding">onboarding</span></td>
+              <td class="text-mute text-xs"><button class="hover:text-acid transition-colors">resend invite</button></td>
+            </tr>
+            <tr>
+              <td class="text-paper data">user-5563</td>
+              <td class="text-dim">Operations</td>
+              <td class="text-dim data">2 трав</td>
+              <td class="text-mute data">0 / 4</td>
+              <td class="text-mute data">0</td>
+              <td><span class="badge badge-lapsed">lapsed</span></td>
+              <td class="text-mute text-xs"><button class="hover:text-acid transition-colors">re-engage</button></td>
+            </tr>
+            <tr>
+              <td class="text-paper data">user-2231</td>
+              <td class="text-dim">Sales</td>
+              <td class="text-mute">—</td>
+              <td class="text-mute">—</td>
+              <td class="text-mute">—</td>
+              <td><span class="badge badge-onboarding">invited</span></td>
+              <td class="text-mute text-xs"><button class="hover:text-acid transition-colors">resend invite</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="flex justify-between items-center mt-6 text-mute text-xs font-mono">
+          <div>ID-only · реальні імена доступні тільки самому користувачу · HR не бачить</div>
+          <div class="flex gap-3">
+            <button class="hover:text-paper transition-colors">← prev</button>
+            <span>1 / 69</span>
+            <button class="hover:text-paper transition-colors">next →</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Footer note -->
-    <div class="mt-10 pt-6 border-t border-line flex justify-between items-center text-mute text-xs font-mono">
-      <div>Mockup · v0.32.0 · enterprise-architect + customer-success</div>
-      <div>SOC 2 Type II audit prep · WIP</div>
+    <!-- ═══════════════════════════════════ ENGAGEMENT ═══════════════════════════════════ -->
+    <div id="screen-engagement" class="screen">
+      <div class="mb-10">
+        <div class="label mb-2">Engagement · last 8 weeks</div>
+        <h1 class="font-serif text-paper text-5xl font-light">Acme Corp<br>
+          <em class="text-mute text-3xl">weekly trend · aggregated</em>
+        </h1>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="stat-card">
+          <div class="label">D30 Retention</div>
+          <div class="data text-paper text-4xl font-light mt-2">71<span class="text-mute text-lg">%</span></div>
+          <div class="text-acid text-xs font-mono mt-2">↑ vs consumer avg 34%</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Avg sessions / active user</div>
+          <div class="data text-paper text-4xl font-light mt-2">3.4<span class="text-mute text-lg">/wk</span></div>
+          <div class="text-acid text-xs font-mono mt-2">Target: ≥ 3.0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Voice coaching enabled</div>
+          <div class="data text-paper text-4xl font-light mt-2">44<span class="text-mute text-lg">%</span></div>
+          <div class="text-acid text-xs font-mono mt-2">of active users</div>
+        </div>
+      </div>
+
+      <div class="stat-card mb-6">
+        <div class="flex justify-between items-start mb-6">
+          <div>
+            <div class="label">W-ACSU тренд · 8 тижнів</div>
+            <div class="text-paper text-sm mt-1">Weekly Active Coached Sessions per User</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 bg-acid rounded-full"></div>
+            <span class="text-mute text-xs font-mono">Acme Corp</span>
+            <div class="w-2 h-2 rounded-full ml-4" style="background:#2A2820"></div>
+            <span class="text-mute text-xs font-mono">Consumer avg</span>
+          </div>
+        </div>
+        <div class="flex items-end gap-6 h-28">
+          <div class="flex flex-col items-center gap-1 flex-1">
+            <div class="flex items-end gap-1 h-24 w-full">
+              <div class="flex-1 bg-acid rounded-sm" style="height:55px;opacity:0.7"></div>
+              <div class="flex-1 rounded-sm" style="height:32px;background:#2A2820"></div>
+            </div>
+            <div class="label" style="font-size:9px">Wk 1</div>
+          </div>
+          <div class="flex flex-col items-center gap-1 flex-1">
+            <div class="flex items-end gap-1 h-24 w-full">
+              <div class="flex-1 bg-acid rounded-sm" style="height:62px;opacity:0.75"></div>
+              <div class="flex-1 rounded-sm" style="height:33px;background:#2A2820"></div>
+            </div>
+            <div class="label" style="font-size:9px">Wk 2</div>
+          </div>
+          <div class="flex flex-col items-center gap-1 flex-1">
+            <div class="flex items-end gap-1 h-24 w-full">
+              <div class="flex-1 bg-acid rounded-sm" style="height:68px;opacity:0.8"></div>
+              <div class="flex-1 rounded-sm" style="height:34px;background:#2A2820"></div>
+            </div>
+            <div class="label" style="font-size:9px">Wk 3</div>
+          </div>
+          <div class="flex flex-col items-center gap-1 flex-1">
+            <div class="flex items-end gap-1 h-24 w-full">
+              <div class="flex-1 bg-acid rounded-sm" style="height:72px;opacity:0.82"></div>
+              <div class="flex-1 rounded-sm" style="height:34px;background:#2A2820"></div>
+            </div>
+            <div class="label" style="font-size:9px">Wk 4</div>
+          </div>
+          <div class="flex flex-col items-center gap-1 flex-1">
+            <div class="flex items-end gap-1 h-24 w-full">
+              <div class="flex-1 bg-acid rounded-sm" style="height:78px;opacity:0.87"></div>
+              <div class="flex-1 rounded-sm" style="height:35px;background:#2A2820"></div>
+            </div>
+            <div class="label" style="font-size:9px">Wk 5</div>
+          </div>
+          <div class="flex flex-col items-center gap-1 flex-1">
+            <div class="flex items-end gap-1 h-24 w-full">
+              <div class="flex-1 bg-acid rounded-sm" style="height:82px;opacity:0.9"></div>
+              <div class="flex-1 rounded-sm" style="height:35px;background:#2A2820"></div>
+            </div>
+            <div class="label" style="font-size:9px">Wk 6</div>
+          </div>
+          <div class="flex flex-col items-center gap-1 flex-1">
+            <div class="flex items-end gap-1 h-24 w-full">
+              <div class="flex-1 bg-acid rounded-sm" style="height:88px;opacity:0.94"></div>
+              <div class="flex-1 rounded-sm" style="height:35px;background:#2A2820"></div>
+            </div>
+            <div class="label" style="font-size:9px">Wk 7</div>
+          </div>
+          <div class="flex flex-col items-center gap-1 flex-1">
+            <div class="flex items-end gap-1 h-24 w-full">
+              <div class="flex-1 bg-acid rounded-sm" style="height:96px"></div>
+              <div class="flex-1 rounded-sm" style="height:36px;background:#2A2820"></div>
+            </div>
+            <div class="label" style="font-size:9px">Wk 8</div>
+          </div>
+        </div>
+        <div class="flex justify-between mt-2 text-mute text-xs font-mono">
+          <span>Acme: 2.2 → 3.4</span>
+          <span>Consumer avg: 2.8 → 2.9 (stable)</span>
+        </div>
+      </div>
+
+      <div class="stat-card" style="border-color:rgba(221,255,45,0.2)">
+        <div class="label mb-4" style="color:#DDFF2D">Privacy note</div>
+        <p class="text-dim text-sm leading-relaxed">
+          Цей екран показує тільки агреговані тижневі метрики по всій компанії. Немає розбивки по індивідуальних користувачах, відділах з N&lt;5, або будь-яких health/body-composition даних. Engagement = кількість сесій. Ніяких workout-контентних даних.
+        </p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ REPORTS ═══════════════════════════════════ -->
+    <div id="screen-reports" class="screen">
+      <div class="mb-10">
+        <div class="label mb-2">Reports · Acme Corp</div>
+        <h1 class="font-serif text-paper text-5xl font-light">Compliance &amp;<br>
+          <em class="text-mute text-3xl">SLA reports</em>
+        </h1>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div class="stat-card">
+          <div class="label mb-1">SOC 2 Type II</div>
+          <div class="text-paper font-medium mt-2">Audit Evidence Package</div>
+          <div class="text-dim text-sm mt-2 leading-relaxed">Control evidence for CC6–CC9. Includes access log summary, HMAC chain verification receipt, SCIM provisioning log, and encryption key rotation certificates.</div>
+          <div class="flex items-center justify-between mt-4">
+            <span class="text-mute text-xs font-mono">Last generated: 2026-05-01</span>
+            <button class="btn-primary" style="padding:8px 16px; font-size:10px">Download PDF</button>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="label mb-1">SLA Uptime Report</div>
+          <div class="text-paper font-medium mt-2">Monthly SLA · April 2026</div>
+          <div class="text-dim text-sm mt-2 leading-relaxed">API availability 99.97% · SSO success rate 99.94% · P95 latency 843ms. Full incident log with RCA for 2 P2 events.</div>
+          <div class="flex items-center justify-between mt-4">
+            <span class="text-mute text-xs font-mono">Period: 2026-04-01 / 04-30</span>
+            <button class="btn-primary" style="padding:8px 16px; font-size:10px">Download PDF</button>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="label mb-1">Seat Utilization</div>
+          <div class="text-paper font-medium mt-2">Monthly Utilization · April 2026</div>
+          <div class="text-dim text-sm mt-2 leading-relaxed">412 seats provisioned · 287 activated (69.7%) · 195 weekly active (47.3%). Department breakdown with activation rate.</div>
+          <div class="flex items-center justify-between mt-4">
+            <span class="text-mute text-xs font-mono">Delivered: 2026-05-03</span>
+            <button class="btn-ghost" style="padding:8px 16px; font-size:10px">Download CSV</button>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="label mb-1">GDPR Data Processing</div>
+          <div class="text-paper font-medium mt-2">DPA Compliance Summary · Q1 2026</div>
+          <div class="text-dim text-sm mt-2 leading-relaxed">Sub-processor list (8 processors, all DPA-signed), data residency certification (EU-Central-1), DSAR processing log: 0 requests, deletion requests: 0.</div>
+          <div class="flex items-center justify-between mt-4">
+            <span class="text-mute text-xs font-mono">Q1 2026 · ISO 27701 aligned</span>
+            <button class="btn-ghost" style="padding:8px 16px; font-size:10px">Download PDF</button>
+          </div>
+        </div>
+
+        <div class="stat-card col-span-2">
+          <div class="label mb-4">Scheduled delivery</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Report</th>
+                <th>Frequency</th>
+                <th>Recipient</th>
+                <th>Format</th>
+                <th>Next delivery</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-paper">SLA Uptime Report</td>
+                <td class="text-dim">Monthly</td>
+                <td class="text-dim data">maria.schultz@acme.com</td>
+                <td class="text-mute data">PDF</td>
+                <td class="text-dim data">2026-06-03</td>
+                <td class="text-mute text-xs"><button class="hover:text-paper transition-colors">edit</button></td>
+              </tr>
+              <tr>
+                <td class="text-paper">Seat Utilization</td>
+                <td class="text-dim">Monthly</td>
+                <td class="text-dim data">hr@acme.com</td>
+                <td class="text-mute data">CSV</td>
+                <td class="text-dim data">2026-06-03</td>
+                <td class="text-mute text-xs"><button class="hover:text-paper transition-colors">edit</button></td>
+              </tr>
+              <tr>
+                <td class="text-paper">SOC 2 Evidence Package</td>
+                <td class="text-dim">Quarterly</td>
+                <td class="text-dim data">security@acme.com</td>
+                <td class="text-mute data">PDF</td>
+                <td class="text-dim data">2026-08-01</td>
+                <td class="text-mute text-xs"><button class="hover:text-paper transition-colors">edit</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ BRANDING ═══════════════════════════════════ -->
+    <div id="screen-branding" class="screen">
+      <div class="mb-10">
+        <div class="label mb-2">Branding · White-label</div>
+        <h1 class="font-serif text-paper text-5xl font-light">Branding<br>
+          <em class="text-mute text-3xl">Enterprise plan only</em>
+        </h1>
+      </div>
+      <div class="stat-card" style="border-color:rgba(221,255,45,0.3)">
+        <div class="label" style="color:#DDFF2D">Enterprise feature</div>
+        <p class="text-dim text-sm mt-4 leading-relaxed max-w-lg">White-label branding (custom logo, app name, email sender domain) is available on the Enterprise plan. Contact your Customer Success Manager to enable.</p>
+        <a href="mailto:enterprise@form.coach" class="btn-primary inline-block mt-6" style="text-decoration:none">Contact CSM →</a>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ SSO · SCIM ═══════════════════════════════════ -->
+    <div id="screen-sso" class="screen">
+      <div class="flex items-end justify-between mb-10">
+        <div>
+          <div class="label mb-2">SSO · SCIM · Identity</div>
+          <h1 class="font-serif text-paper text-5xl font-light leading-tight">
+            Single Sign-On<br>
+            <em class="text-mute text-3xl">SAML 2.0 · OIDC · SCIM v2</em>
+          </h1>
+        </div>
+        <div class="flex items-center gap-2 text-acid text-xs font-mono">
+          <div class="w-2 h-2 bg-acid rounded-full pulse-dot"></div>
+          Connected · Okta
+        </div>
+      </div>
+
+      <!-- SAML 2.0 config -->
+      <div class="stat-card mb-6">
+        <div class="flex items-start justify-between mb-6">
+          <div>
+            <div class="label">SAML 2.0 Configuration</div>
+            <div class="text-paper font-medium mt-1">IdP: Okta · SP-initiated + IdP-initiated</div>
+          </div>
+          <span class="badge badge-active">active</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6">
+          <div>
+            <div class="label mb-2">FORM ACS URL <span class="text-mute">(provide to IdP)</span></div>
+            <div class="flex items-center gap-2">
+              <div class="input-field flex-1 text-dim" style="cursor:default">https://form.coach/auth/saml/acs/t_acme</div>
+              <button class="copy-btn">copy</button>
+            </div>
+          </div>
+          <div>
+            <div class="label mb-2">Entity ID / Audience URI</div>
+            <div class="flex items-center gap-2">
+              <div class="input-field flex-1 text-dim" style="cursor:default">https://form.coach/saml/metadata/t_acme</div>
+              <button class="copy-btn">copy</button>
+            </div>
+          </div>
+          <div>
+            <div class="label mb-2">IdP SSO URL <span class="text-mute">(from IdP)</span></div>
+            <div class="input-field text-paper">https://acme.okta.com/app/form/sso/saml</div>
+          </div>
+          <div>
+            <div class="label mb-2">IdP Certificate</div>
+            <div class="flex items-center gap-2">
+              <div class="input-field flex-1 text-acid data" style="cursor:default; overflow:hidden; white-space:nowrap; text-overflow:ellipsis">MIIDpDCCAo... (expires 2027-03-15)</div>
+              <button class="copy-btn">update</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="grid grid-cols-3 gap-6">
+          <div>
+            <div class="label mb-3">JIT provisioning</div>
+            <div class="flex items-center gap-3">
+              <label class="toggle">
+                <input type="checkbox" checked />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="text-paper text-sm">Enabled</span>
+            </div>
+            <div class="text-mute text-xs mt-2">New IdP users auto-provisioned on first login</div>
+          </div>
+          <div>
+            <div class="label mb-3">Default role for JIT users</div>
+            <select class="input-field">
+              <option selected>tenant_member</option>
+              <option>tenant_manager</option>
+              <option>tenant_admin</option>
+            </select>
+          </div>
+          <div>
+            <div class="label mb-3">Force SSO</div>
+            <div class="flex items-center gap-3">
+              <label class="toggle">
+                <input type="checkbox" />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="text-paper text-sm">Disabled</span>
+            </div>
+            <div class="text-mute text-xs mt-2">Block all non-SSO logins</div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 mt-6">
+          <button class="btn-ghost">Test connection</button>
+          <button class="btn-primary">Save SAML config</button>
+        </div>
+      </div>
+
+      <!-- SCIM v2 provisioning -->
+      <div class="stat-card mb-6">
+        <div class="flex items-start justify-between mb-6">
+          <div>
+            <div class="label">SCIM v2 Provisioning</div>
+            <div class="text-paper font-medium mt-1">Automated user lifecycle · Okta SCIM</div>
+          </div>
+          <span class="badge badge-active">syncing</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 mb-6">
+          <div>
+            <div class="label mb-2">SCIM Base URL <span class="text-mute">(provide to IdP)</span></div>
+            <div class="flex items-center gap-2">
+              <div class="input-field flex-1 text-dim" style="cursor:default">https://form.coach/scim/v2/t_acme</div>
+              <button class="copy-btn">copy</button>
+            </div>
+          </div>
+          <div>
+            <div class="label mb-2">Bearer Token</div>
+            <div class="flex items-center gap-2">
+              <div class="input-field flex-1 text-dim" style="cursor:default">••••••••••••••••••••scm_live_a8k2</div>
+              <button class="copy-btn">rotate</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-4 mb-6">
+          <div class="bg-deep border border-line rounded-xl p-4">
+            <div class="label">Last sync</div>
+            <div class="data text-paper text-lg mt-1">2 min ago</div>
+          </div>
+          <div class="bg-deep border border-line rounded-xl p-4">
+            <div class="label">Users synced</div>
+            <div class="data text-paper text-lg mt-1">412</div>
+          </div>
+          <div class="bg-deep border border-line rounded-xl p-4">
+            <div class="label">Deprovisioned</div>
+            <div class="data text-paper text-lg mt-1">8 <span class="text-mute text-sm">this month</span></div>
+          </div>
+          <div class="bg-deep border border-line rounded-xl p-4">
+            <div class="label">Sync errors</div>
+            <div class="data text-acid text-lg mt-1">0</div>
+          </div>
+        </div>
+
+        <div class="bg-deep border border-line rounded-xl p-4">
+          <div class="label mb-3">SCIM attribute mapping</div>
+          <table>
+            <thead>
+              <tr>
+                <th>IdP attribute</th>
+                <th>FORM field</th>
+                <th>Required</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-dim data">userName</td>
+                <td class="text-paper data">users.email</td>
+                <td><span class="badge badge-active">yes</span></td>
+              </tr>
+              <tr>
+                <td class="text-dim data">displayName</td>
+                <td class="text-paper data">users.display_name</td>
+                <td><span class="badge badge-onboarding">optional</span></td>
+              </tr>
+              <tr>
+                <td class="text-dim data">externalId</td>
+                <td class="text-paper data">users.external_id</td>
+                <td><span class="badge badge-active">yes</span></td>
+              </tr>
+              <tr>
+                <td class="text-dim data">active</td>
+                <td class="text-paper data">users.deactivated_at (null = active)</td>
+                <td><span class="badge badge-active">yes</span></td>
+              </tr>
+              <tr>
+                <td class="text-dim data">urn:form:role</td>
+                <td class="text-paper data">users.role</td>
+                <td><span class="badge badge-onboarding">optional</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- MFA policy -->
+      <div class="stat-card">
+        <div class="label mb-4">MFA Policy</div>
+        <div class="grid grid-cols-2 gap-6">
+          <div>
+            <div class="label mb-3">Require MFA for all users</div>
+            <div class="flex items-center gap-3">
+              <label class="toggle">
+                <input type="checkbox" checked />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="text-paper text-sm">Enabled</span>
+            </div>
+            <div class="text-mute text-xs mt-2">Users without MFA cannot access FORM after 2026-06-01</div>
+          </div>
+          <div>
+            <div class="label mb-3">MFA enforced at</div>
+            <select class="input-field">
+              <option>IdP level (recommended)</option>
+              <option>FORM application level</option>
+              <option>Both</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ ROLES · RBAC ═══════════════════════════════════ -->
+    <div id="screen-rbac" class="screen">
+      <div class="mb-10">
+        <div class="label mb-2">Roles · RBAC</div>
+        <h1 class="font-serif text-paper text-5xl font-light">Access control<br>
+          <em class="text-mute text-3xl">4-tier role model</em>
+        </h1>
+      </div>
+
+      <div class="stat-card mb-6">
+        <div class="label mb-6">Permission matrix</div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Capability</th>
+                <th>tenant_owner</th>
+                <th>tenant_admin</th>
+                <th>tenant_manager</th>
+                <th>tenant_member</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-paper">View aggregate engagement metrics</td>
+                <td class="text-acid">✓</td>
+                <td class="text-acid">✓</td>
+                <td class="text-acid">✓</td>
+                <td class="text-mute">—</td>
+              </tr>
+              <tr>
+                <td class="text-paper">View individual user workout data</td>
+                <td class="text-ember">✗ never</td>
+                <td class="text-ember">✗ never</td>
+                <td class="text-ember">✗ never</td>
+                <td class="text-ember">✗ never</td>
+              </tr>
+              <tr>
+                <td class="text-paper">View individual health profile</td>
+                <td class="text-ember">✗ never</td>
+                <td class="text-ember">✗ never</td>
+                <td class="text-ember">✗ never</td>
+                <td class="text-acid">✓ own only</td>
+              </tr>
+              <tr>
+                <td class="text-paper">Invite / deactivate users</td>
+                <td class="text-acid">✓</td>
+                <td class="text-acid">✓</td>
+                <td class="text-mute">—</td>
+                <td class="text-mute">—</td>
+              </tr>
+              <tr>
+                <td class="text-paper">Configure SSO / SCIM</td>
+                <td class="text-acid">✓</td>
+                <td class="text-mute">—</td>
+                <td class="text-mute">—</td>
+                <td class="text-mute">—</td>
+              </tr>
+              <tr>
+                <td class="text-paper">View audit log</td>
+                <td class="text-acid">✓ tenant scope</td>
+                <td class="text-acid">✓ tenant scope</td>
+                <td class="text-mute">—</td>
+                <td class="text-mute">—</td>
+              </tr>
+              <tr>
+                <td class="text-paper">Export SCIM / user data</td>
+                <td class="text-acid">✓</td>
+                <td class="text-mute">—</td>
+                <td class="text-mute">—</td>
+                <td class="text-mute">—</td>
+              </tr>
+              <tr>
+                <td class="text-paper">Download compliance reports</td>
+                <td class="text-acid">✓</td>
+                <td class="text-acid">✓</td>
+                <td class="text-mute">—</td>
+                <td class="text-mute">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 text-mute text-xs font-mono">
+          ✗ never = enforced at both RLS (Postgres) and application layer. Cannot be overridden by any role, including tenant_owner.
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label mb-4">Acme Corp · Current role distribution</div>
+        <div class="space-y-3">
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">tenant_member</span><span class="data text-paper">408</span></div>
+            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-paper" style="width:99%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">tenant_admin</span><span class="data text-acid">3</span></div>
+            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-acid" style="width:1.5%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-paper">tenant_owner</span><span class="data text-acid">1</span></div>
+            <div class="h-1.5 bg-line rounded-full overflow-hidden"><div class="h-1.5 bg-acid" style="width:0.5%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ BILLING ═══════════════════════════════════ -->
+    <div id="screen-billing" class="screen">
+      <div class="mb-10">
+        <div class="label mb-2">Billing · Enterprise</div>
+        <h1 class="font-serif text-paper text-5xl font-light">Growth plan<br>
+          <em class="text-mute text-3xl">412 seats · annual contract</em>
+        </h1>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="stat-card col-span-2">
+          <div class="label mb-4">Contract summary</div>
+          <div class="space-y-3">
+            <div class="flex justify-between py-3 border-b border-line">
+              <span class="text-dim">Plan</span>
+              <span class="text-paper">Growth · $9 / seat / month</span>
+            </div>
+            <div class="flex justify-between py-3 border-b border-line">
+              <span class="text-dim">Seats</span>
+              <span class="data text-paper">412</span>
+            </div>
+            <div class="flex justify-between py-3 border-b border-line">
+              <span class="text-dim">Contract length</span>
+              <span class="text-paper">Annual · 2026-03-01 → 2027-02-28</span>
+            </div>
+            <div class="flex justify-between py-3 border-b border-line">
+              <span class="text-dim">Annual contract value</span>
+              <span class="data text-paper">$44,496</span>
+            </div>
+            <div class="flex justify-between py-3 border-b border-line">
+              <span class="text-dim">Billing</span>
+              <span class="text-paper">Annual upfront · paid 2026-03-01</span>
+            </div>
+            <div class="flex justify-between py-3">
+              <span class="text-dim">Customer Success Manager</span>
+              <span class="text-paper">Dedicated · contact your CSM</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card flex flex-col justify-between">
+          <div>
+            <div class="label">Contract renewal</div>
+            <div class="data text-paper text-2xl font-light mt-2">287 days</div>
+            <div class="text-mute text-xs font-mono mt-1">2027-02-28</div>
+            <div class="section-divider" style="margin:16px 0"></div>
+            <div class="label">Seats headroom</div>
+            <div class="data text-paper text-2xl font-light mt-2">0<span class="text-mute text-base"> / 412</span></div>
+            <div class="text-mute text-xs font-mono mt-1">All seats provisioned</div>
+          </div>
+          <button class="btn-ghost mt-6" style="width:100%">Request seat expansion</button>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label mb-4">Invoice history</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="text-dim data">2026-03-01</td>
+              <td class="text-paper">Growth plan · 412 seats · annual</td>
+              <td class="text-paper data">$44,496.00</td>
+              <td><span class="badge badge-active">paid</span></td>
+              <td class="text-mute text-xs"><button class="hover:text-paper transition-colors">Download PDF</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ AUDIT LOG ═══════════════════════════════════ -->
+    <div id="screen-auditlog" class="screen">
+      <div class="flex items-end justify-between mb-10">
+        <div>
+          <div class="label mb-2">Audit log · Acme Corp</div>
+          <h1 class="font-serif text-paper text-5xl font-light leading-tight">
+            Tamper-evident<br>
+            <em class="text-mute text-3xl">HMAC-chained · append-only</em>
+          </h1>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 text-acid text-xs font-mono">
+            <div class="w-2 h-2 bg-acid rounded-full"></div>
+            Chain intact · verified 4 min ago
+          </div>
+          <button class="btn-ghost">Export NDJSON</button>
+          <button class="btn-ghost">SIEM webhook</button>
+        </div>
+      </div>
+
+      <!-- Chain status bar -->
+      <div class="stat-card mb-6" style="border-color:rgba(221,255,45,0.3)">
+        <div class="grid grid-cols-4 gap-6">
+          <div>
+            <div class="label">Chain status</div>
+            <div class="text-acid font-mono text-sm mt-1 font-bold">✓ INTACT</div>
+            <div class="text-mute text-xs mt-1">All 14,832 events verified</div>
+          </div>
+          <div>
+            <div class="label">Last HMAC verification</div>
+            <div class="data text-paper text-sm mt-1">2026-05-16 · 10:19 UTC</div>
+            <div class="text-mute text-xs mt-1">Weekly cron · next: 2026-05-23</div>
+          </div>
+          <div>
+            <div class="label">Events (this tenant)</div>
+            <div class="data text-paper text-sm mt-1">14,832 total</div>
+            <div class="text-mute text-xs mt-1">287 in last 24h</div>
+          </div>
+          <div>
+            <div class="label">Retention</div>
+            <div class="data text-paper text-sm mt-1">90 days queryable</div>
+            <div class="text-mute text-xs mt-1">7 years cold archive (R2)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="stat-card mb-4">
+        <div class="flex items-center gap-4">
+          <select class="input-field" style="max-width:200px; width:auto">
+            <option>All actions</option>
+            <option>auth.*</option>
+            <option>tenant.*</option>
+            <option>data.*</option>
+            <option>support.*</option>
+            <option>integration.*</option>
+          </select>
+          <select class="input-field" style="max-width:180px; width:auto">
+            <option>Last 24 hours</option>
+            <option>Last 7 days</option>
+            <option>Last 30 days</option>
+            <option>Custom range</option>
+          </select>
+          <input type="text" class="input-field" placeholder="Filter by actor ID or resource ID…" style="max-width:300px" />
+          <div class="text-mute text-xs font-mono ml-auto">287 events</div>
+        </div>
+      </div>
+
+      <!-- Event feed -->
+      <div class="stat-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp (UTC)</th>
+              <th>Action</th>
+              <th>Actor</th>
+              <th>Resource</th>
+              <th>Outcome</th>
+              <th>HMAC prefix</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-05-16 10:23:41</td>
+              <td><span class="badge badge-onboarding" style="font-size:9px">auth.login</span></td>
+              <td class="text-dim data" style="font-size:12px">user-3812</td>
+              <td class="text-dim data" style="font-size:12px">session:sess_8kx2</td>
+              <td><span class="badge badge-active" style="font-size:9px">success</span></td>
+              <td class="hmac-tag">a3f8b2c1…</td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-05-16 10:21:18</td>
+              <td><span class="badge badge-onboarding" style="font-size:9px">auth.sso_login</span></td>
+              <td class="text-dim data" style="font-size:12px">user-2944</td>
+              <td class="text-dim data" style="font-size:12px">session:sess_7jw1</td>
+              <td><span class="badge badge-active" style="font-size:9px">success</span></td>
+              <td class="hmac-tag">d91e4a07…</td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-05-16 09:58:03</td>
+              <td><span class="badge badge-active" style="font-size:9px">tenant.scim_provisioned</span></td>
+              <td class="text-dim data" style="font-size:12px">scim_service</td>
+              <td class="text-dim data" style="font-size:12px">user:user-0831 (new)</td>
+              <td><span class="badge badge-active" style="font-size:9px">success</span></td>
+              <td class="hmac-tag">c4b5d3e9…</td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-05-16 09:44:12</td>
+              <td><span class="badge badge-active" style="font-size:9px">tenant.scim_deprovisioned</span></td>
+              <td class="text-dim data" style="font-size:12px">scim_service</td>
+              <td class="text-dim data" style="font-size:12px">user:user-4432 (offboarded)</td>
+              <td><span class="badge badge-active" style="font-size:9px">success</span></td>
+              <td class="hmac-tag">f2a1c8b4…</td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-05-16 08:30:00</td>
+              <td><span class="badge badge-onboarding" style="font-size:9px">data.export_initiated</span></td>
+              <td class="text-dim data" style="font-size:12px">user-3812</td>
+              <td class="text-dim data" style="font-size:12px">dsar:dsar_0019</td>
+              <td><span class="badge badge-active" style="font-size:9px">success</span></td>
+              <td class="hmac-tag">e7d2f5a3…</td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-05-15 17:14:52</td>
+              <td><span class="badge" style="background:rgba(255,87,51,0.12);color:#FF5733;border:1px solid rgba(255,87,51,0.3);font-size:9px">auth.login_failed</span></td>
+              <td class="text-dim data" style="font-size:12px">unknown</td>
+              <td class="text-dim data" style="font-size:12px">email:m.schultz@acme.com</td>
+              <td><span class="badge badge-lapsed" style="font-size:9px">failed</span></td>
+              <td class="hmac-tag">b3c9d1e2…</td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-05-15 14:02:37</td>
+              <td><span class="badge badge-active" style="font-size:9px">tenant.role_changed</span></td>
+              <td class="text-dim data" style="font-size:12px">user-3812 (admin)</td>
+              <td class="text-dim data" style="font-size:12px">user:user-7702 → tenant_member</td>
+              <td><span class="badge badge-active" style="font-size:9px">success</span></td>
+              <td class="hmac-tag">a9e8f4c2…</td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-05-15 11:00:01</td>
+              <td><span class="badge" style="background:rgba(251,146,60,0.12);color:#FB923C;border:1px solid rgba(251,146,60,0.3);font-size:9px">support.break_glass</span></td>
+              <td class="text-dim data" style="font-size:12px">form_support_agent</td>
+              <td class="text-dim data" style="font-size:12px">tenant:t_acme · scope: read-only</td>
+              <td><span class="badge badge-active" style="font-size:9px">authorized</span></td>
+              <td class="hmac-tag">7f1a3b9d…</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="flex justify-between items-center mt-6 text-mute text-xs font-mono">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 bg-line rounded-full"></div>
+            Append-only · no row can be modified or deleted · HMAC chain enforces integrity
+          </div>
+          <div class="flex gap-3">
+            <button class="hover:text-paper transition-colors">← prev</button>
+            <span>1 / 36</span>
+            <button class="hover:text-paper transition-colors">next →</button>
+          </div>
+        </div>
+      </div>
     </div>
 
   </main>
 </div>
 
+<script>
+  const nav = document.querySelectorAll('.sidebar-item[data-screen]');
+  const screens = document.querySelectorAll('.screen');
+
+  nav.forEach(item => {
+    item.addEventListener('click', () => {
+      const target = item.dataset.screen;
+      nav.forEach(n => n.classList.remove('active'));
+      screens.forEach(s => s.classList.remove('active'));
+      item.classList.add('active');
+      const s = document.getElementById('screen-' + target);
+      if (s) s.classList.add('active');
+    });
+  });
+
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const prev = btn.textContent;
+      btn.textContent = 'copied!';
+      setTimeout(() => btn.textContent = prev, 1500);
+    });
+  });
+</script>
 </body>
 </html>

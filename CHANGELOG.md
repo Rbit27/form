@@ -9,6 +9,22 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.47.2] — 2026-05-16
+
+### Changed
+- `admin-dashboard.html` → v0.47.2: expanded from single static Overview screen to fully interactive multi-screen mockup. Added JavaScript tab-switching nav. New screens:
+  - **Users** — anonymised user table with search/filter by status and department.
+  - **Engagement** — 8-week W-ACSU trend chart (Acme Corp vs consumer average), D30 retention and session-frequency stats, privacy-floor notice.
+  - **Reports** — downloadable SOC 2 evidence package, SLA uptime report, seat-utilization CSV, GDPR data-processing summary; scheduled delivery table.
+  - **Branding** — Enterprise-plan gate with CSM CTA.
+  - **SSO · SCIM** — complete SAML 2.0 SP config panel (ACS URL, Entity ID, IdP metadata), SCIM v2 provisioning status (endpoint, token rotation, last-sync stats, attribute mapping table), JIT provisioning toggle, Force SSO toggle, MFA policy config. Functional copy-to-clipboard on all read-only fields.
+  - **Roles · RBAC** — permission matrix (8 capabilities × 4 roles) with hard-never rows for individual health data; role distribution chart for Acme Corp.
+  - **Billing** — contract summary (Growth plan, 412 seats, annual ACV), days-to-renewal countdown, invoice history.
+  - **Audit log** — HMAC chain status banner (intact, 14,832 events), event feed with action badges (`auth.*`, `tenant.*`, `data.*`, `support.break_glass`), HMAC prefix column, filter by action type and time range, NDJSON/SIEM export buttons. Append-only notice. Implements DEC-030 (HMAC audit chain) at UI level.
+- `VERSION` — 0.47.1 → 0.47.2
+
+---
+
 ## [0.47.1] — 2026-05-16
 
 ### Added
