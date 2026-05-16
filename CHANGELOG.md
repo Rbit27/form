@@ -9,6 +9,13 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.41.0] — 2026-05-16
+
+### Added
+- `docs/OBSERVABILITY.md` — metrics/logs/traces taxonomy (629 рядків). SLIs/SLOs per service, metrics taxonomy (infrastructure/product/business), structured log schemas з GDPR Art. 9 compliance (AI inference logs: tokens+latency, no content), distributed trace schema з tenant_id propagation, 20+ alerting rules P0–P3, 7 dashboard definitions, tooling decisions (Better Stack vs Datadog), error budget policy. SOC 2 evidence: CC7.2. Owner: devops-lead.
+
+---
+
 ## [0.40.0] — 2026-05-16
 
 ### Added
