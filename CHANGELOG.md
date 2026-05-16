@@ -9,6 +9,15 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.43.0] — 2026-05-16
+
+### Added
+- `content/post-14-sleep-deprived-training.md` — blog post «Тренування на 4 годинах сну: що дійсно відбувається і що робити» (13 хв читання). Охоплює: тестостерон -10-15% при 5h сну (Leproult & Van Cauter 2011), кортизол і катаболічне середовище, MPS impairment (Dattilo 2011), CNS reaction time деградація, GH і SWS архітектура; фреймворк MED: -40-50% об'єму, RPE-стеля 8, 2-3 сесії/тиж, 45-хв ліміт, 3h поріг пропуску; 3-місячний горизонт повернення до прогресу. Без контенту про харчування при ГВ, постпологові зміни тіла або ментальне здоров'я батьків. clinical-safety PENDING. Owner: content-engine + sports-scientist.
+- `blog.html` — картка post-14 у grid (category: science).
+- `STATUS.md` — рядок post-14 у content engine table.
+
+---
+
 ## [0.42.0] — 2026-05-16
 
 ### Added
