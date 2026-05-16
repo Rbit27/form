@@ -9,6 +9,13 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.38.0] — 2026-05-16
+
+### Added
+- `content/post-12-technique-over-intensity.md` — blog post «Техніка або інтенсивність: чому форма — це не безпека, а продуктивність» (13 хв читання). Охоплює: нейром'язову ефективність, механічний стимул vs зовнішнє навантаження, аналіз технічних помилок у squat/bench/deadlift, практичний фреймворк для self-coached атлетів. clinical-safety PASS. Owner: content-engine.
+- `blog.html` — картка post-12 у grid (category: science).
+- `STATUS.md` — рядок post-12 у content engine table.
+
 ## [0.37.0] — 2026-05-16
 
 ### Added

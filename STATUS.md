@@ -102,6 +102,7 @@ FORM is at v0.29.0 with 46+ tagged releases, 12 functional HTML pages (marketing
 | post-09-building-victor-voice.md | Blog | draft |
 | post-10-why-programs-assume-youre-always-ready.md | Blog | draft · sports-scientist + clinical-safety pending |
 | post-11-deload-weeks.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-12-technique-over-intensity.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
