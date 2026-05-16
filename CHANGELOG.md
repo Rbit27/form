@@ -9,6 +9,16 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.48.1] — 2026-05-16
+
+### Added
+- `content/post-20-doms-muscle-soreness.md` — «Крепатура — це не індикатор тренування». 13-хв читання. Розбір механізмів DOMS (EIMD, запальний каскад, нейросенсорна гіперчутливість), міф «без болю немає росту», repeated bout effect, практичні висновки для self-coached атлетів. clinical-safety PASS.
+- `blog.html` → Post 20 card додано до card-grid
+- `STATUS.md` → рядок post-20 у content engine table
+- `VERSION` → 0.48.0 → 0.48.1
+
+---
+
 ## [0.48.0] — 2026-05-16
 
 ### Added
