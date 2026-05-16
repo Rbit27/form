@@ -9,6 +9,14 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.40.0] — 2026-05-16
+
+### Added
+- `docs/COST_MODEL.md` — unit economics і cost model (416 рядків). COGS breakdown по тирах (Free/Pro/Enterprise), Anthropic API cost derivation, ElevenLabs voice cost, App Store tax impact (15% vs 30%), break-even analysis, gross margin targets, scaling economics, sensitivity analysis (2× API price, 80% vs 20% voice adoption). Owner: data-engineer + founder.
+- `content/post-13-rir-rpe-autoregulation.md` — blog post «RIR і RPE: як навчитись вимірювати зусилля, а не тільки вагу» (12 хв читання). Охоплює: Zourdos RPE scale, proximity-to-failure та гіпертрофія (Schoenfeld 2017, Refalo 2022), miscalibration patterns у novices (Zourdos 2016), авторегуляція vs фіксовані % схеми (Helms 2016), роль Victor у калібрації RPE через velocity/timing data. clinical-safety PASS. Owner: content-engine.
+
+---
+
 ## [0.38.0] — 2026-05-16
 
 ### Added
