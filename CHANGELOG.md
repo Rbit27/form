@@ -9,6 +9,16 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.46.1] — 2026-05-16
+
+### Changed
+- `docs/SOC2_READINESS.md` → v0.2: додано три нові розділи, які були відсутні і є обов'язковими для реального SOC 2 Type II звіту та enterprise-procurement:
+  - **Sub-Processor Register** — 8 sub-processors з DPA-статусом, регіоном, механізмом GDPR-transfer (SCC Module 2); відповідає CC9 та GDPR Art. 28; 30-денний notice period перед додаванням нового.
+  - **Complementary User Entity Controls (CUECs)** — 12 контролів (CUEC-01..12) що enterprise-customers мають впровадити на своєму боці: IAM (IdP security, MFA at IdP, SCIM deprovisioning SLA), data responsibility (employee consent disclosure, k-anonymity policy), incident cooperation (security contact, forensic cooperation).
+  - **Common Security Questionnaire Responses** — pre-approved відповіді на CAIQ/SIG Lite питання: data residency, encryption (at-rest AES-256 + per-tenant KMS CMK, in-transit TLS 1.3 + cert pinning), penetration testing, incident notification SLAs, offboarding/deletion, BCP (RTO 4h / RPO 1h), AI training prohibition, sub-processor change notification.
+
+---
+
 ## [0.46.0] — 2026-05-16
 
 ### Added
