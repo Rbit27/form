@@ -1,7 +1,7 @@
-# FORM · Project Status v0.47.0
+# FORM · Project Status v0.47.1
 
 **Date:** 16 травня 2026
-**Version:** 0.46.1
+**Version:** 0.47.1
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -109,6 +109,8 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-14-sleep-deprived-training.md | Blog | draft · clinical-safety PENDING · sports-scientist DONE |
 | post-15-training-frequency.md | Blog | draft · clinical-safety PASS · sports-scientist DONE |
 | post-16-ai-coach-vs-pt.md | Blog | draft · clinical-safety PASS · sports-scientist N/A |
+| post-17-overtraining-vs-laziness.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-18-rest-intervals.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
@@ -317,6 +319,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v0.47.0 · 16 травня 2026**
-**Last update:** 16 травня 2026 · v0.47.0
+**v0.47.1 · 16 травня 2026**
+**Last update:** 16 травня 2026 · v0.47.1
 **Next planned update:** після hire of Founding Engineer
