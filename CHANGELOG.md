@@ -9,6 +9,11 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.37.0] — 2026-05-16
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — production-grade IR runbook (1486 рядків). P0–P3 severity matrix, GDPR 72h clock anchoring, 6 runbooks (data breach, outage, account takeover, SSO compromise, HMAC chain break, DDoS), communication templates, PIR template, drill schedule. SOC 2 evidence: CC7.2–CC7.5, CC9.2. Owner: security-engineer + devops-lead.
+
 ## [0.36.0] — 2026-05-16
 
 ### Added
