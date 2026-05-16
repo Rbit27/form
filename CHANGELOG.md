@@ -9,6 +9,19 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.47.0] — 2026-05-16
+
+### Added
+- `content/post-17-overtraining-vs-laziness.md` — blog post «Перетренованість vs лінощі: як не переплутати одне з одним» (11 хв читання). Охоплює: спектр FO/NFO/OTS (Meeusen et al. 2013), вимірювані маркери (HRV-тренд, ранковий ЧСС, RPE-тренд 2+ тижні, якість сну, mood як lagging indicator), ЦНС-захисний механізм (Noakes 2012, з відповідним застереженням що модель дискутується), 4-рівнева операційна вилка (один поганий день → 5-7 днів → 2+ тижні → 4+ тижнів), три питання перед тим, як назвати себе лінивим. clinical-safety PASS (два FIX застосовані: redirect до лікаря при mood-dominant NFO в level-3 блоці; carve-outs для травми/хвороби/ментального здоров'я в «не пропускай два поспіль»). Owner: sports-scientist + content-engine.
+- `blog.html` — картка post-17 (category: science) у grid між post-16 і post-09.
+- `docs/DECISION_LOG.md` — DEC-031: документує розширення команди агентів з 14 → 24 (10 нових ролей: enterprise-architect, compliance-officer, devops-lead, data-engineer, security-engineer, ml-engineer, qa-lead, qa-walker, customer-success, product-manager).
+
+### Changed
+- `README.md` — виправлено 7 застарілих метрик: HTML pages 13→16, markdown docs 47+→58+, blog posts 9→17, AI agents 14→24 (3 місця), decisions 28→30, total lines 22k→30k+. Секція «The team» переписана для всіх 24 агентів у 6 групах (Product+Safety, Design+Voice, Growth+Content, Engineering+Infra, Research+Process, Quality+Compliance).
+- `STATUS.md` — синхронізовано версію заголовку (v0.31.0 → v0.46.1→v0.47.0 після цього bump-у), дата, TL;DR paragraph, кількість постів, агентів, footer.
+
+---
+
 ## [0.46.1] — 2026-05-16
 
 ### Changed

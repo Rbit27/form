@@ -14,13 +14,13 @@
 
 This is a **pre-product** project repository. There is no app code yet (mobile development begins з Founding Engineer hire). What you'll find:
 
-- **13 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index
-- **47+ markdown documents** — strategic, operational, content
-- **9 blog post drafts** — content engine ready для launch
+- **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
+- **58+ markdown documents** — strategic, operational, content
+- **17 blog post drafts** — content engine ready для launch
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **5 sample programs/nutrition plans** — sport-science discipline reference
-- **14 specialized AI agents** — operating model embodied у `.claude/agents/`
-- **Public decision log** — 28 documented decisions з reverse-cost
+- **24 specialized AI agents** — operating model embodied у `.claude/agents/`
+- **Public decision log** — 30 documented decisions з reverse-cost
 
 If you're здесь з first time, start з [STATUS.md](STATUS.md) для current snapshot.
 
@@ -64,9 +64,9 @@ G:\\Клод\\form\\
 ├── README.md               ← this file
 │
 ├── .claude/
-│   └── agents/             ← 14 specialized AI agents
+│   └── agents/             ← 24 specialized AI agents
 │
-├── docs/                   ← 40+ strategic documents
+├── docs/                   ← 58+ strategic documents
 │   ├── BRAND.md             — design tokens, voice, applications
 │   ├── FLOWS.md             — user flows з ED-screening
 │   ├── MARKETING.md         — GTM, channels, positioning
@@ -158,12 +158,13 @@ G:\\Клод\\form\\
 
 ---
 
-## The team (1 + 14)
+## The team (1 + 24)
 
-One human founder. 14 specialized AI agents с distinct mandates.
+One human founder. 24 specialized AI agents з distinct mandates.
 
-### Product + Safety (5)
+### Product + Safety (6)
 - **`product-strategist`** — scope, moat, honest claims · VETO на bloat
+- **`product-manager`** — roadmap, prioritization, acceptance criteria
 - **`sports-scientist`** — programming, HRV, periodization
 - **`nutrition-coach`** — meal planning, anti-ED defaults
 - **`clinical-safety`** — ED, mental health, injury triage · **HARD VETO**
@@ -175,14 +176,27 @@ One human founder. 14 specialized AI agents с distinct mandates.
 - **`brand-voice`** — Victor persona, UA/EN copy
 - **`ux-flow`** — flows, IA, edge cases, onboarding
 
-### Growth (3)
+### Growth + Content (3)
 - **`marketing-lead`** — positioning, channels, message hierarchy
 - **`growth-lead`** — funnels, retention, NSM, A/B test discipline
 - **`content-strategist`** — content marketing, editorial calendar
 
-### Research + Process (2)
+### Engineering + Infra (5)
+- **`ml-engineer`** — CV pose pipeline, on-device models, MLOps
+- **`devops-lead`** — CI/CD, Terraform, Kubernetes, observability
+- **`security-engineer`** — threat model, secrets, OAuth, incident response
+- **`enterprise-architect`** — SSO, RBAC, multi-tenant isolation
+- **`data-engineer`** — analytics warehouse, ETL, cohort infrastructure
+
+### Research + Process (3)
 - **`research-lead`** — interviews, JTBD, persona validation
 - **`process-keeper`** — decision log, dependency tracking
+- **`customer-success`** — enterprise onboarding, retention, QBRs
+
+### Quality + Compliance (3)
+- **`qa-lead`** — test strategy, automation, release qualification
+- **`qa-walker`** — manual user-flow walk after every ship (P0–P3)
+- **`compliance-officer`** — SOC 2, GDPR Art. 9, HIPAA-adjacent · VETO на features з compliance risk
 
 Full agent definitions у [.claude/agents/](.claude/agents/).
 
@@ -266,13 +280,13 @@ Each iteration:
 | Metric | Value |
 |---|---|
 | Tagged releases | 45+ |
-| HTML pages | 13 |
-| Markdown documents | 56+ |
-| Blog posts (drafts) | 10 |
+| HTML pages | 16 |
+| Markdown documents | 58+ |
+| Blog posts (drafts) | 17 |
 | Social content assets | 7 (Twitter, LinkedIn, Reddit, press pitches, 3 newsletter issues) |
-| Total lines committed | 22,000+ |
-| AI agents defined | 14 |
-| Documented decisions | 29 |
+| Total lines committed | 30,000+ |
+| AI agents defined | 24 |
+| Documented decisions | 30 |
 
 | Days від v0.1.0 до v0.10.0 | 2 |
 
@@ -302,7 +316,7 @@ Each iteration:
 
 ### Content engine roadmap (post-16+)
 - [x] post-16: AI-тренер vs PT — чесний trade-off
-- [ ] post-17: Overtraining vs. laziness — як відрізнити перетренованість від лінощів (behavioral + physiological markers)
+- [x] post-17: Overtraining vs. laziness — як відрізнити перетренованість від лінощів (behavioral + physiological markers)
 - [ ] post-18: Mobility work — що справді важливо vs. що є театром
 - [ ] post-19: Warm-up протоколи — чому більшість не відповідає реальним потребам атлета
 - [ ] post-20: Чому FORM обрав CV поверх wearable-only підходу

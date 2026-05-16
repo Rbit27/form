@@ -15,6 +15,15 @@
 
 ## 2026-05-16
 
+### DEC-031 · Agent team expanded from 14 → 24 agents
+
+- **Decision:** Розширити команду AI-агентів з 14 (v0.1) до 24, додавши 10 нових ролей: `enterprise-architect`, `compliance-officer`, `devops-lead`, `data-engineer`, `security-engineer`, `ml-engineer`, `qa-lead`, `qa-walker`, `customer-success`, `product-manager`.
+- **Owner:** process-keeper + founder
+- **Why:** Початкові 14 агентів покривали product/design/content/growth. Enterprise-tier і technical maturity вимагають ролей з compliance authority (SOC 2, GDPR), security threat modeling, infrastructure-as-code, і систематичного QA після кожного ship-у. `qa-walker` runs mentally after every meaningful change — це підлога якості, не опція.
+- **Reverse cost:** Low (агенти — текстові файли; можна remove/merge у будь-який момент)
+
+---
+
 ### DEC-030 · Audit log: append-only HMAC-chained, 7-year retention для admin events, support actions auto-notify tenant
 
 - **Decision:** Кожна privileged action логуєтьcz у `audit_log` table з HMAC chain (tamper-evident). Retention 7 років для tenant/financial events, 3 роки для auth, 30 днів для high-volume reads. `support.*` actions (FORM employee touches tenant data) тригерять email-notification до tenant admin within 24h. Break-glass debug access requires 2-person approval + time-bounded role.
