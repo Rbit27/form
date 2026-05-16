@@ -9,6 +9,14 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.48.2] — 2026-05-16
+
+### Changed
+- `pricing-enterprise.html` → v0.48.2: added **"What do you need?"** requirement-toggles block to the enterprise pricing calculator. Three interactive checkboxes (SSO / SCIM, Dedicated CSM, SOC 2 Type II) enforce minimum tier seat counts — CSM bumps minimum to 201 seats (Growth+), SOC 2 bumps to 1,001 seats (Enterprise). Auto-adjusts seat slider with a visible enforcement notice. Wired into calculator `render()` loop so discounts, tier badge, and feature matrix all respond live. CSS: new `.req-check`, `.req-label`, `.req-tier-pill`, `.req-notice` classes.
+- `VERSION` → 0.48.1 → 0.48.2
+
+---
+
 ## [0.48.1] — 2026-05-16
 
 ### Added

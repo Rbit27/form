@@ -327,6 +327,66 @@
   .addon-included { color: #DDFF2D; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
   .addon-not      { color: #2A2820; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
   .addon-plan     { color: #6F6A60; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; }
+
+  /* Requirement checkboxes */
+  .req-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+    padding: 12px 0;
+    border-bottom: 1px solid #1F1D16;
+  }
+  .req-label:last-child { border-bottom: none; }
+  .req-check {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px; height: 20px;
+    border: 1px solid #1F1D16;
+    border-radius: 5px;
+    background: #13110C;
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .req-check:checked { background: #DDFF2D; border-color: #DDFF2D; }
+  .req-check:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px; top: 2px;
+    width: 6px; height: 10px;
+    border: 2px solid #0B0A07;
+    border-top: none; border-left: none;
+    transform: rotate(40deg);
+  }
+  .req-tier-pill {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+  .req-tier-starter    { border: 1px solid #1F1D16; color: #6F6A60; }
+  .req-tier-growth     { border: 1px solid rgba(221,255,45,0.25); color: rgba(221,255,45,0.7); }
+  .req-tier-enterprise { border: 1px solid rgba(255,87,51,0.25); color: rgba(255,87,51,0.7); }
+  .req-notice {
+    display: none;
+    background: rgba(221,255,45,0.04);
+    border: 1px solid rgba(221,255,45,0.15);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-top: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: rgba(221,255,45,0.65);
+  }
+  .req-notice.visible { display: block; }
 </style>
 </head>
 <body class="grain antialiased">
@@ -452,6 +512,38 @@
             <span class="num text-acid text-sm font-medium" id="effectiveRateDisplay">$9.00 / seat / mo</span>
           </div>
         </div>
+      </div>
+
+      <!-- Requirement toggles -->
+      <div>
+        <div class="label mb-4">What do you need?</div>
+        <div class="bg-deep border border-line rounded-2xl p-6">
+          <label class="req-label">
+            <input type="checkbox" id="reqSSO" class="req-check" aria-label="SSO / SCIM required" />
+            <div>
+              <div class="text-paper text-sm font-medium">SSO / SCIM (SAML 2.0, OIDC)</div>
+              <div class="text-mute text-xs mt-0.5">IdP integration + automated provisioning</div>
+            </div>
+            <span class="req-tier-pill req-tier-starter">Starter+</span>
+          </label>
+          <label class="req-label">
+            <input type="checkbox" id="reqCSM" class="req-check" aria-label="Dedicated CSM required" />
+            <div>
+              <div class="text-paper text-sm font-medium">Dedicated CSM + Slack Connect</div>
+              <div class="text-mute text-xs mt-0.5">Named CSM, QBR quarterly, &lt; 4h response SLA</div>
+            </div>
+            <span class="req-tier-pill req-tier-growth">Growth+</span>
+          </label>
+          <label class="req-label">
+            <input type="checkbox" id="reqSOC2" class="req-check" aria-label="SOC 2 Type II report required" />
+            <div>
+              <div class="text-paper text-sm font-medium">SOC 2 Type II report</div>
+              <div class="text-mute text-xs mt-0.5">Audit report share under NDA · est. 12 mo post-launch</div>
+            </div>
+            <span class="req-tier-pill req-tier-enterprise">Enterprise</span>
+          </label>
+        </div>
+        <div class="req-notice" id="reqNotice"></div>
       </div>
 
       <!-- Feature add-ons -->
@@ -881,7 +973,13 @@
     seats: 250,
     years: 1,
     upfront: false,
+    reqSSO:  false,
+    reqCSM:  false,
+    reqSOC2: false,
   };
+
+  // Minimum seat counts enforced by each requirement
+  var REQ_MINS = { sso: 50, csm: 201, soc2: 1001 };
 
   // ── Tier rules ─────────────────────────────────────────────────
   var TIERS = {
@@ -934,6 +1032,12 @@
   var featSLA       = document.getElementById('feat-sla');
   var featDPA       = document.getElementById('feat-dpa');
 
+  // Requirement toggle refs
+  var reqSSO    = document.getElementById('reqSSO');
+  var reqCSM    = document.getElementById('reqCSM');
+  var reqSOC2   = document.getElementById('reqSOC2');
+  var reqNotice = document.getElementById('reqNotice');
+
   // ── Helpers ────────────────────────────────────────────────────
   function getTier(seats) {
     if (seats <= 200)  return 'starter';
@@ -966,6 +1070,33 @@
 
   function panelClass(tier) {
     return 'output-panel ' + (tier === 'growth' ? 'tier-growth' : tier === 'enterprise' ? 'tier-enterprise' : '');
+  }
+
+  function getMinSeats() {
+    var min = 50;
+    if (state.reqSSO)  min = Math.max(min, REQ_MINS.sso);
+    if (state.reqCSM)  min = Math.max(min, REQ_MINS.csm);
+    if (state.reqSOC2) min = Math.max(min, REQ_MINS.soc2);
+    return min;
+  }
+
+  function applyRequirements() {
+    var minSeats = getMinSeats();
+    if (minSeats > state.seats) {
+      state.seats = minSeats;
+      seatInput.value = minSeats;
+      seatRange.value = minSeats;
+      sliderVal.textContent = fmt(minSeats) + ' seats';
+    }
+    var constraints = [];
+    if (state.reqCSM)  constraints.push('CSM requires Growth+ · min 201 seats');
+    if (state.reqSOC2) constraints.push('SOC 2 requires Enterprise · min 1,001 seats');
+    if (constraints.length > 0) {
+      reqNotice.textContent = '↑ ' + constraints.join(' · ');
+      reqNotice.classList.add('visible');
+    } else {
+      reqNotice.classList.remove('visible');
+    }
   }
 
   // ── Core compute ───────────────────────────────────────────────
@@ -1009,6 +1140,7 @@
 
   // ── Render ─────────────────────────────────────────────────────
   function render() {
+    applyRequirements();
     var c = compute();
 
     // Tier badges
@@ -1178,6 +1310,20 @@
   // ── Upfront checkbox ───────────────────────────────────────────
   upfrontCheck.addEventListener('change', function () {
     state.upfront = upfrontCheck.checked;
+    render();
+  });
+
+  // ── Requirement checkboxes ─────────────────────────────────────
+  reqSSO.addEventListener('change', function () {
+    state.reqSSO = reqSSO.checked;
+    render();
+  });
+  reqCSM.addEventListener('change', function () {
+    state.reqCSM = reqCSM.checked;
+    render();
+  });
+  reqSOC2.addEventListener('change', function () {
+    state.reqSOC2 = reqSOC2.checked;
     render();
   });
 
