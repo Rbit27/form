@@ -16,6 +16,18 @@
 
 ---
 
+## [0.34.0] — 2026-05-16
+
+### Why MINOR
+- New blog post: `content/post-11-deload-weeks.md` — 13-min read on deload week science, supercompensation, and periodization
+- Blog card added to `blog.html`
+
+### Added
+- [`content/post-11-deload-weeks.md`](content/post-11-deload-weeks.md) — deload weeks: накопичена втома, суперкомпенсація, ознаки потреби, плановий vs реактивний деload, що конкретно робити. clinical-safety PASS. sports-scientist review pending.
+- `blog.html` — картка post-11 в grid (Спортивна наука, 13 хв)
+
+---
+
 ## [0.33.0] — 2026-05-16
 
 ### Why MINOR
