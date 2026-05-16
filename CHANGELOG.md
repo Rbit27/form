@@ -9,6 +9,13 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.44.0] — 2026-05-16
+
+### Added
+- `enterprise.html` — enterprise landing page (Fraunces display hero, editorial layout, "For 50+ employees" positioning). Sections: three pillars (privacy/identity/compliance), features grid with compliance badges and SLA table, privacy floor with non-negotiable HR data rules, pricing tiers (Starter $12 / Growth $9 / Enterprise $6–8 per seat), 90-day implementation timeline, pilot CTA. References ENTERPRISE.md, AUDIT_LOG_SCHEMA.md, DEC-030. Owner: enterprise-architect + compliance-officer + security-engineer.
+
+---
+
 ## [0.43.0] — 2026-05-16
 
 ### Added

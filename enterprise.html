@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Enterprise · AI Fitness Coaching for Teams</title>
+<meta name="description" content="FORM Enterprise — privacy-first AI fitness coaching for teams of 50+. SSO, SCIM, admin dashboard, SOC 2, GDPR. Annual contracts from $6/seat." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: {
+      ink:   '#0B0A07',
+      deep:  '#13110C',
+      line:  '#1F1D16',
+      mute:  '#6F6A60',
+      dim:   '#A39D8E',
+      paper: '#F3EEE0',
+      cream: '#E7DFC8',
+      acid:  '#DDFF2D',
+      ember: '#FF5733',
+    },
+    fontFamily: {
+      serif: ['Fraunces', 'serif'],
+      sans:  ['Manrope', 'sans-serif'],
+      mono:  ['JetBrains Mono', 'monospace'],
+    },
+  }}};
+</script>
+<style>
+  html, body { background: #0B0A07; color: #F3EEE0; font-family: 'Manrope', sans-serif; }
+  body { font-feature-settings: "ss01", "cv11"; }
+  ::selection { background: #DDFF2D; color: #0B0A07; }
+
+  .grain::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000; opacity: 0.06;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 220px;
+  }
+
+  .display { font-family: 'Fraunces', serif; font-weight: 300; letter-spacing: -0.04em; line-height: 0.88; }
+  .display em { font-style: italic; font-weight: 300; }
+  .display b { font-weight: 700; font-style: normal; }
+
+  .label { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px; color: #6F6A60; }
+  .num   { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  .btn-acid {
+    background: #DDFF2D; color: #0B0A07;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 600;
+    transition: transform 0.15s, background 0.2s; padding: 16px 32px; border-radius: 9999px; display: inline-block;
+  }
+  .btn-acid:hover { background: #ECFF6B; transform: translateY(-1px); }
+
+  .btn-out {
+    border: 1px solid #2A2820; color: #F3EEE0;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 500;
+    padding: 16px 32px; border-radius: 9999px; display: inline-block; transition: border-color 0.2s;
+  }
+  .btn-out:hover { border-color: #DDFF2D; }
+
+  .feature-card {
+    background: #13110C; border: 1px solid #1F1D16; border-radius: 20px; padding: 32px;
+    transition: border-color 0.2s;
+  }
+  .feature-card:hover { border-color: #2A2820; }
+
+  .tier-card {
+    background: #13110C; border: 1px solid #1F1D16; border-radius: 24px; padding: 40px;
+    transition: border-color 0.2s;
+  }
+  .tier-card.highlighted {
+    border-color: rgba(221,255,45,0.4);
+    box-shadow: 0 0 60px -20px rgba(221,255,45,0.12);
+  }
+
+  .check-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    color: #A39D8E; font-size: 14px; line-height: 1.5;
+  }
+  .check-item .icon { color: #DDFF2D; margin-top: 2px; flex-shrink: 0; font-size: 13px; }
+  .check-item .icon-lock { color: #6F6A60; margin-top: 2px; flex-shrink: 0; font-size: 13px; }
+
+  .timeline-step {
+    display: flex; gap: 24px; position: relative;
+  }
+  .timeline-step::before {
+    content: ""; position: absolute; left: 19px; top: 40px; bottom: -24px;
+    width: 1px; background: #1F1D16;
+  }
+  .timeline-step:last-child::before { display: none; }
+
+  .step-dot {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #13110C; border: 1px solid #1F1D16;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6F6A60;
+    letter-spacing: 0.1em;
+  }
+
+  .privacy-rule {
+    display: flex; gap: 16px; align-items: flex-start; padding: 20px 0;
+    border-bottom: 1px solid #1F1D16;
+  }
+  .privacy-rule:last-child { border-bottom: none; }
+  .privacy-rule .no { color: #FF5733; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; padding: 4px 10px; background: rgba(255,87,51,0.1); border: 1px solid rgba(255,87,51,0.3); border-radius: 9999px; flex-shrink: 0; margin-top: 2px; }
+
+  .badge-soc { background: rgba(221,255,45,0.08); border: 1px solid rgba(221,255,45,0.25); border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 14px; }
+  .badge-soc .icon { width: 36px; height: 36px; background: rgba(221,255,45,0.12); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #DDFF2D; font-size: 16px; }
+
+  .stat-pill { display: inline-flex; align-items: baseline; gap: 6px; background: #13110C; border: 1px solid #1F1D16; border-radius: 9999px; padding: 8px 20px; }
+
+  .divider { border: none; border-top: 1px solid #1F1D16; margin: 0; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<!-- ─── Header ────────────────────────────────────────────── -->
+<header class="border-b border-line sticky top-0 z-50" style="background:rgba(11,10,7,0.92);backdrop-filter:blur(12px);">
+  <div class="max-w-[1440px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 font-mono text-[11px] tracking-widest uppercase text-mute">
+      <a href="/#demo" class="hover:text-paper transition-colors">Product</a>
+      <a href="/enterprise.html" class="text-paper">Enterprise</a>
+      <a href="/pricing-enterprise.html" class="hover:text-paper transition-colors">Pricing</a>
+      <a href="/admin-dashboard.html" class="hover:text-paper transition-colors">Admin demo</a>
+    </nav>
+    <div class="flex items-center gap-4">
+      <a href="mailto:enterprise@form.coach" class="btn-out hidden md:inline-block">Talk to sales</a>
+      <a href="/admin-dashboard.html" class="btn-acid">View admin →</a>
+    </div>
+  </div>
+</header>
+
+<!-- ─── Hero ──────────────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 pt-28 pb-24">
+  <div class="max-w-5xl">
+    <div class="label mb-8 text-acid">Enterprise · For 50+ employees</div>
+    <h1 class="display text-[96px] md:text-[124px] text-paper mb-10">
+      Fitness coaching<br/>that <em>respects</em><br/>your people.
+    </h1>
+    <p class="text-dim text-xl leading-relaxed max-w-2xl mb-12" style="font-weight:300;">
+      FORM gives every employee a personal AI coach —
+      <span class="text-paper">CV pose feedback, recovery tracking, adaptive programming.</span>
+      HR sees aggregated wellness signals. Individual data stays private. Always.
+    </p>
+    <div class="flex flex-wrap gap-4 mb-16">
+      <a href="mailto:enterprise@form.coach" class="btn-acid">Request a pilot →</a>
+      <a href="/admin-dashboard.html" class="btn-out">Explore admin demo</a>
+    </div>
+    <!-- Key stats -->
+    <div class="flex flex-wrap gap-3">
+      <div class="stat-pill">
+        <span class="num text-acid text-2xl font-light">99.9%</span>
+        <span class="label">Uptime SLA</span>
+      </div>
+      <div class="stat-pill">
+        <span class="num text-paper text-2xl font-light">$6</span>
+        <span class="label">/ seat / mo · Enterprise</span>
+      </div>
+      <div class="stat-pill">
+        <span class="num text-paper text-2xl font-light">90-day</span>
+        <span class="label">Free pilot</span>
+      </div>
+      <div class="stat-pill">
+        <span class="num text-paper text-2xl font-light">SOC 2</span>
+        <span class="label">Type II · In progress</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider max-w-[1440px] mx-auto px-8" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Three pillars ──────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24">
+  <div class="label mb-12">Why FORM for enterprise</div>
+  <div class="grid md:grid-cols-3 gap-6">
+
+    <div class="feature-card">
+      <div class="w-10 h-10 bg-acid bg-opacity-10 rounded-xl flex items-center justify-center text-acid text-lg mb-6">⬡</div>
+      <h3 class="font-serif text-2xl text-paper mb-3" style="font-weight:300;letter-spacing:-0.02em;">Privacy <em>by design</em></h3>
+      <p class="text-mute text-sm leading-relaxed">HR never sees individual data — only opt-in aggregates. Our privacy floor is a non-negotiable hard constraint, not a policy checkbox. Clinical-safety has veto power.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="w-10 h-10 bg-acid bg-opacity-10 rounded-xl flex items-center justify-center text-acid text-lg mb-6">◈</div>
+      <h3 class="font-serif text-2xl text-paper mb-3" style="font-weight:300;letter-spacing:-0.02em;">Enterprise <em>identity</em></h3>
+      <p class="text-mute text-sm leading-relaxed">SAML 2.0 and OIDC SSO for Okta, Azure AD, Google Workspace, and OneLogin. SCIM v2 for automated provisioning. MFA enforcement and session policies at tenant level.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="w-10 h-10 bg-acid bg-opacity-10 rounded-xl flex items-center justify-center text-acid text-lg mb-6">◎</div>
+      <h3 class="font-serif text-2xl text-paper mb-3" style="font-weight:300;letter-spacing:-0.02em;">Compliance <em>ready</em></h3>
+      <p class="text-mute text-sm leading-relaxed">SOC 2 Type II audit underway. GDPR DPAs signed before any pilot data flows. EU data residency. Annual penetration tests. Tamper-evident audit log, 7-year retention.</p>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
+<!-- ─── Features grid ──────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24">
+  <div class="grid md:grid-cols-2 gap-16 items-start">
+
+    <div>
+      <div class="label mb-6">Platform capabilities</div>
+      <h2 class="display text-[52px] text-paper mb-10">Built for<br/><em>IT, HR, and people</em><br/>leads.</h2>
+      <div class="space-y-5">
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">SSO / SCIM provisioning</div>
+            <div class="text-mute text-sm">SAML 2.0, OIDC, SCIM v2. IdP-initiated and SP-initiated flows. Role sync from directory groups.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Admin dashboard</div>
+            <div class="text-mute text-sm">Aggregated wellness metrics. User provisioning (manual, CSV, SCIM). Audit log viewer. Three RBAC roles: owner, admin, manager.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Multi-tenant isolation</div>
+            <div class="text-mute text-sm">Row-level security in Postgres. Tenant-scoped feature flags. Cross-tenant CI tests block bad migrations.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Audit log &amp; SIEM</div>
+            <div class="text-mute text-sm">HMAC-chained, append-only. Stream via webhook, S3 sync, or pull REST API. Native exporters: Datadog, Splunk, Sumo Logic.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">White-label (≥ $50k ARR)</div>
+            <div class="text-mute text-sm">Custom domain (CNAME → form.coach), tenant logo, color palette override with accessibility floor enforced.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Dedicated CSM</div>
+            <div class="text-mute text-sm">Named customer success lead, quarterly business reviews, Slack Connect (Growth+). 90-day adoption support.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Self-serve billing portal</div>
+            <div class="text-mute text-sm">Stripe Customer Portal. Seat adjustments, invoice history, PO number support. Annual or multi-year contracts.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compliance badges -->
+    <div>
+      <div class="label mb-6">Compliance &amp; security posture</div>
+      <div class="space-y-3">
+        <div class="badge-soc">
+          <div class="icon">⊕</div>
+          <div>
+            <div class="text-paper text-sm font-medium">SOC 2 Type II</div>
+            <div class="text-mute text-xs mt-0.5">Audit in progress · Target: 12 months post-launch · Drata continuous monitoring</div>
+          </div>
+        </div>
+        <div class="badge-soc">
+          <div class="icon" style="color:#7DD3FC;background:rgba(125,211,252,0.12);">⊕</div>
+          <div>
+            <div class="text-paper text-sm font-medium">GDPR Art. 9 compliant</div>
+            <div class="text-mute text-xs mt-0.5">DPIA for health data · DPA signed before pilot · SCC for US–EU transfers</div>
+          </div>
+        </div>
+        <div class="badge-soc">
+          <div class="icon" style="color:#C4B5FD;background:rgba(196,181,253,0.12);">⊕</div>
+          <div>
+            <div class="text-paper text-sm font-medium">EU data residency</div>
+            <div class="text-mute text-xs mt-0.5">German customers → Cloudflare EU-Central (Frankfurt) · UK/IE → EU-West (Dublin)</div>
+          </div>
+        </div>
+        <div class="badge-soc">
+          <div class="icon" style="color:#F9A8D4;background:rgba(249,168,212,0.12);">⊕</div>
+          <div>
+            <div class="text-paper text-sm font-medium">Annual penetration tests</div>
+            <div class="text-mute text-xs mt-0.5">Summary shared with enterprise customers · Findings tracked to remediation</div>
+          </div>
+        </div>
+        <div class="badge-soc" style="background:rgba(221,255,45,0.04);">
+          <div class="icon">⊕</div>
+          <div>
+            <div class="text-paper text-sm font-medium">Tamper-evident audit log</div>
+            <div class="text-mute text-xs mt-0.5">HMAC-SHA256 chain (DEC-030) · 7-year retention · Support actions notify tenant within 24h</div>
+          </div>
+        </div>
+        <div class="badge-soc" style="background:rgba(221,255,45,0.04);">
+          <div class="icon">⊕</div>
+          <div>
+            <div class="text-paper text-sm font-medium">Break-glass access control</div>
+            <div class="text-mute text-xs mt-0.5">2-person approval + time-bound role (4h max) · Every action logged · Customer notified if data touched</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLAs -->
+      <div class="mt-8 bg-deep border border-line rounded-2xl p-6">
+        <div class="label mb-4">SLA commitments</div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center">
+            <span class="text-dim text-sm">Uptime</span>
+            <span class="num text-acid text-sm">99.9% (credits apply)</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-dim text-sm">P0 response</span>
+            <span class="num text-paper text-sm">&lt; 1 hour</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-dim text-sm">P1 response</span>
+            <span class="num text-paper text-sm">&lt; 4 hours</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-dim text-sm">P2 response</span>
+            <span class="num text-paper text-sm">&lt; 24 hours</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-dim text-sm">Audit log P95 delivery</span>
+            <span class="num text-paper text-sm">&lt; 5 seconds</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
+<!-- ─── Privacy floor ──────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24">
+  <div class="grid md:grid-cols-2 gap-16 items-start">
+
+    <div>
+      <div class="label mb-6 text-ember">Privacy floor</div>
+      <h2 class="display text-[52px] text-paper mb-6">
+        HR <em>never</em> sees<br/>individual data.
+      </h2>
+      <p class="text-dim text-base leading-relaxed mb-8" style="font-weight:300;">
+        These rules are enforced at the data layer — not a settings toggle, not a contractual promise. No customer demand can override them. Clinical-safety has veto power.
+      </p>
+      <div class="feature-card" style="border-color:rgba(255,87,51,0.2);background:rgba(255,87,51,0.04);">
+        <div class="label mb-4 text-ember">Non-negotiable floors</div>
+        <div>
+          <div class="privacy-rule">
+            <span class="no">Never</span>
+            <span class="text-dim text-sm leading-relaxed">HR sees individual user activity, workout, or health records</span>
+          </div>
+          <div class="privacy-rule">
+            <span class="no">Never</span>
+            <span class="text-dim text-sm leading-relaxed">Manager-level reports on direct reports' health data</span>
+          </div>
+          <div class="privacy-rule">
+            <span class="no">Never</span>
+            <span class="text-dim text-sm leading-relaxed">ED-screening data aggregated to employer dashboards</span>
+          </div>
+          <div class="privacy-rule">
+            <span class="no">Never</span>
+            <span class="text-dim text-sm leading-relaxed">Body composition data surfaced to employer</span>
+          </div>
+          <div class="privacy-rule">
+            <span class="no">Never</span>
+            <span class="text-dim text-sm leading-relaxed">Mental health signals aggregated for employer reporting</span>
+          </div>
+          <div class="privacy-rule" style="border-bottom:none;">
+            <span class="no">Never</span>
+            <span class="text-dim text-sm leading-relaxed">Employee unable to revoke company-association at any time</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="label mb-6">What HR &amp; People leads <em>do</em> see</div>
+      <p class="text-dim text-sm mb-6 leading-relaxed">Opt-in aggregate signals that prove program value without exposing individuals.</p>
+      <div class="space-y-4">
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Activation rate</div>
+            <div class="text-mute text-sm">% of invited employees who completed onboarding. No names, no cohort drill-down below anonymity threshold (n=15).</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Weekly engagement</div>
+            <div class="text-mute text-sm">% of activated employees with ≥1 session in the last 7 days. Trend chart by week.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Opt-in NPS</div>
+            <div class="text-mute text-sm">Aggregated satisfaction score from employees who chose to participate in the survey.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Seat utilisation</div>
+            <div class="text-mute text-sm">Contracted vs active seats for billing reconciliation. No per-user breakdown.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-8 bg-deep border border-line rounded-2xl p-6">
+        <div class="label mb-3">We decline certain deals</div>
+        <p class="text-mute text-sm leading-relaxed">We decline contracts from insurance companies seeking risk-scoring data, government contracts requiring backdoor access, wellness programs tied to insurance pricing or that punish non-participants, and sports leagues wanting performance data for athlete evaluation. A deal that requires compromising employee privacy is not a deal we take.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
+<!-- ─── Pricing tiers ──────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24">
+  <div class="label mb-4">Pricing</div>
+  <h2 class="display text-[56px] text-paper mb-4">Seats, not surprises.</h2>
+  <p class="text-dim text-lg mb-14" style="font-weight:300;">Annual contracts. No per-feature upsells. Full product at every tier.</p>
+
+  <div class="grid md:grid-cols-3 gap-6 mb-10">
+
+    <!-- Starter -->
+    <div class="tier-card">
+      <div class="label mb-4">Starter</div>
+      <div class="flex items-baseline gap-2 mb-1">
+        <span class="num text-paper text-5xl font-light">$12</span>
+        <span class="text-mute text-sm">/ seat / mo · annual</span>
+      </div>
+      <div class="text-mute text-xs mb-6">50 – 200 employees</div>
+      <a href="mailto:enterprise@form.coach?subject=FORM Starter" class="btn-out block text-center mb-8">Get started</a>
+      <div class="space-y-3">
+        <div class="check-item"><span class="icon">▸</span><span>Full AI coaching product</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>SSO / SCIM</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>Admin dashboard</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>Audit log (REST export)</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>Email support · 24h SLA</span></div>
+        <div class="check-item"><span class="icon-lock">—</span><span class="text-mute">Dedicated CSM</span></div>
+        <div class="check-item"><span class="icon-lock">—</span><span class="text-mute">White-label</span></div>
+        <div class="check-item"><span class="icon-lock">—</span><span class="text-mute">Custom SLA</span></div>
+      </div>
+    </div>
+
+    <!-- Growth -->
+    <div class="tier-card highlighted">
+      <div class="flex items-center justify-between mb-4">
+        <div class="label">Growth</div>
+        <span class="label text-acid border border-acid border-opacity-40 rounded-full px-3 py-1" style="font-size:9px;">Most popular</span>
+      </div>
+      <div class="flex items-baseline gap-2 mb-1">
+        <span class="num text-paper text-5xl font-light">$9</span>
+        <span class="text-mute text-sm">/ seat / mo · annual</span>
+      </div>
+      <div class="text-mute text-xs mb-6">200 – 1,000 employees</div>
+      <a href="mailto:enterprise@form.coach?subject=FORM Growth" class="btn-acid block text-center mb-8">Talk to sales</a>
+      <div class="space-y-3">
+        <div class="check-item"><span class="icon">▸</span><span>Everything in Starter</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>Dedicated CSM</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>Quarterly business reviews</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>Slack Connect support · 4h SLA</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>SIEM integrations (Datadog, Splunk)</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>S3 audit log sync</span></div>
+        <div class="check-item"><span class="icon-lock">—</span><span class="text-mute">White-label</span></div>
+        <div class="check-item"><span class="icon-lock">—</span><span class="text-mute">Custom SLA</span></div>
+      </div>
+    </div>
+
+    <!-- Enterprise -->
+    <div class="tier-card">
+      <div class="label mb-4">Enterprise</div>
+      <div class="flex items-baseline gap-2 mb-1">
+        <span class="num text-paper text-5xl font-light">$6–8</span>
+        <span class="text-mute text-sm">/ seat / mo · negotiated</span>
+      </div>
+      <div class="text-mute text-xs mb-6">1,000+ employees · multi-year</div>
+      <a href="mailto:enterprise@form.coach?subject=FORM Enterprise" class="btn-out block text-center mb-8">Contact us</a>
+      <div class="space-y-3">
+        <div class="check-item"><span class="icon">▸</span><span>Everything in Growth</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>White-label (custom domain + logo)</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>Custom SLA (P0 &lt; 1h guaranteed)</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>Multi-year contract discounts</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>Dedicated phone line</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>SOC 2 report share</span></div>
+        <div class="check-item"><span class="icon">▸</span><span>DPA + custom data processing terms</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="text-mute text-sm text-center">15% off 2-year · 25% off 3-year · 10% off annual upfront payment. <a href="/pricing-enterprise.html" class="text-dim underline hover:text-paper transition-colors">Open pricing calculator →</a></p>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
+<!-- ─── Implementation timeline ────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24">
+  <div class="grid md:grid-cols-2 gap-16">
+    <div>
+      <div class="label mb-6">From signature to full rollout</div>
+      <h2 class="display text-[52px] text-paper mb-6">Day 0 to<br/><em>fully deployed</em><br/>in 60 days.</h2>
+      <p class="text-dim text-base leading-relaxed" style="font-weight:300;">
+        A single dedicated customer success lead owns your implementation from kickoff call to first 90-day wellness report. No professional services surcharges.
+      </p>
+    </div>
+    <div class="space-y-6">
+      <div class="timeline-step">
+        <div class="step-dot">D0</div>
+        <div class="pt-2">
+          <div class="text-paper text-sm font-medium mb-1">Contract signed</div>
+          <div class="text-mute text-xs leading-relaxed">MSA, DPA, and order form. DPA signed before any employee data flows into FORM.</div>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <div class="step-dot">D7</div>
+        <div class="pt-2">
+          <div class="text-paper text-sm font-medium mb-1">Kickoff &amp; SSO setup</div>
+          <div class="text-mute text-xs leading-relaxed">Kickoff calls with IT, HR, and People leads. SSO/SCIM configured in test environment.</div>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <div class="step-dot">D21</div>
+        <div class="pt-2">
+          <div class="text-paper text-sm font-medium mb-1">Branding &amp; internal comms</div>
+          <div class="text-mute text-xs leading-relaxed">Custom domain live (Growth+). Pilot user list finalised. Internal launch comms drafted with your People team.</div>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <div class="step-dot">D28</div>
+        <div class="pt-2">
+          <div class="text-paper text-sm font-medium mb-1">Pilot launch</div>
+          <div class="text-mute text-xs leading-relaxed">Soft launch to 50–100 pilot users. Weekly check-ins with your CSM. Adoption monitored daily.</div>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <div class="step-dot">D60</div>
+        <div class="pt-2">
+          <div class="text-paper text-sm font-medium mb-1">Full rollout</div>
+          <div class="text-mute text-xs leading-relaxed">All seats activated. First-month adoption report delivered. QBR cadence begins.</div>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <div class="step-dot">D90</div>
+        <div class="pt-2">
+          <div class="text-paper text-sm font-medium mb-1">30/60/90 review</div>
+          <div class="text-mute text-xs leading-relaxed">Aggregate wellness metrics, engagement benchmarks, expansion discussion.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
+<!-- ─── CTA ────────────────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24 text-center">
+  <div class="max-w-2xl mx-auto">
+    <div class="label mb-8">Start with a pilot</div>
+    <h2 class="display text-[72px] md:text-[88px] text-paper mb-8">
+      90 days.<br/><em>Free.</em><br/>No risk.
+    </h2>
+    <p class="text-dim text-lg mb-12 leading-relaxed" style="font-weight:300;">
+      We run a 90-day free pilot with 50–100 employees, define success criteria together upfront, and you pay only if the metrics hit. Sales cycle averages 5–7 months — so let's start now.
+    </p>
+    <div class="flex flex-wrap gap-4 justify-center">
+      <a href="mailto:enterprise@form.coach" class="btn-acid">Request pilot → enterprise@form.coach</a>
+      <a href="/admin-dashboard.html" class="btn-out">Explore admin demo</a>
+    </div>
+    <p class="text-mute text-xs mt-8 font-mono">Average contract size: $50k – $500k ARR · Typical sales cycle: 5–7 months</p>
+  </div>
+</section>
+
+<!-- ─── Footer ─────────────────────────────────────────────── -->
+<footer class="border-t border-line">
+  <div class="max-w-[1440px] mx-auto px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <span class="font-serif text-lg tracking-tight text-paper">FORM<span class="text-acid">.</span></span>
+      <span class="label ml-2">Enterprise</span>
+    </div>
+    <nav class="flex gap-8 font-mono text-[11px] tracking-widest uppercase text-mute">
+      <a href="/pricing-enterprise.html" class="hover:text-paper transition-colors">Pricing</a>
+      <a href="/admin-dashboard.html" class="hover:text-paper transition-colors">Admin demo</a>
+      <a href="mailto:enterprise@form.coach" class="hover:text-paper transition-colors">Contact sales</a>
+    </nav>
+    <div class="text-mute text-xs font-mono">© 2026 FORM · Privacy floor enforced</div>
+  </div>
+</footer>
+
+</body>
+</html>
