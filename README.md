@@ -3,7 +3,7 @@
 > **Тренер. У кишені.**
 > AI personal trainer that watches your form, adapts to your sleep and HRV, and speaks like a 20-year coach — without the bullshit.
 
-**Status:** v0.31.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
+**Status:** v0.49.0 · pre-launch · Closed Beta planning Q3 2026 · Київ
 **Public repo:** https://github.com/Rbit27/form
 **Releases:** https://github.com/Rbit27/form/releases
 **Founder:** George (Rbit27)
@@ -16,7 +16,7 @@ This is a **pre-product** project repository. There is no app code yet (mobile d
 
 - **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
 - **58+ markdown documents** — strategic, operational, content
-- **17 blog post drafts** — content engine ready для launch
+- **21 blog post drafts** — content engine ready для launch
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **5 sample programs/nutrition plans** — sport-science discipline reference
 - **24 specialized AI agents** — operating model embodied у `.claude/agents/`
@@ -53,7 +53,7 @@ G:\\Клод\\form\\
 ├── workout-live.html       ← detailed workout mockup з CV
 ├── investors.html          ← investor one-pager (noindex — share directly)
 ├── jobs.html               ← careers page — FE + Design Lead open roles
-├── blog.html               ← articles index (9 posts, filtered by category)
+├── blog.html               ← articles index (21 posts, filtered by category)
 ├── sitemap.xml             ← SEO sitemap
 ├── robots.txt              ← AI scraper blocked
 │
@@ -118,17 +118,28 @@ G:\\Клод\\form\\
 │   ├── GROWTH_LOOPS.md      — 5 viral/organic loops, clinical-safety share constraints, FE priority, K-factor
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
-├── content/                ← 10 blog posts + social
+├── content/                ← 21 blog posts + social
 │   ├── post-01-hrv-is-lying.md
 │   ├── post-02-what-good-form-means.md
 │   ├── post-03-we-tested-8-ai-trainers.md
 │   ├── post-04-sleep-and-strength.md
 │   ├── post-05-building-fitness-from-ukraine.md
-│   ├── post-06-30-user-interviews.md
+│   ├── post-06-30-user-interviews.md        ← placeholder; publishes after user interviews
 │   ├── post-07-progressive-overload-myths.md
 │   ├── post-08-why-no-free-tier.md
 │   ├── post-09-building-victor-voice.md
 │   ├── post-10-why-programs-assume-youre-always-ready.md
+│   ├── post-11-deload-weeks.md
+│   ├── post-12-technique-over-intensity.md
+│   ├── post-13-rir-rpe-autoregulation.md
+│   ├── post-14-sleep-deprived-training.md
+│   ├── post-15-training-frequency.md
+│   ├── post-16-ai-coach-vs-pt.md
+│   ├── post-17-overtraining-vs-laziness.md
+│   ├── post-18-rest-intervals.md
+│   ├── post-19-warmup-protocols.md
+│   ├── post-20-doms-muscle-soreness.md
+│   ├── post-21-cv-vs-wearables.md           ← CV vs wearable-only arch (clinical-safety ✓)
 │   ├── twitter-launch-thread.md
 │   ├── linkedin-posts.md
 │   ├── press-pitch-templates.md
@@ -275,18 +286,18 @@ Each iteration:
 
 ---
 
-## Метрики проєкту (як of v0.31.0)
+## Метрики проєкту (як of v0.49.0)
 
 | Metric | Value |
 |---|---|
-| Tagged releases | 45+ |
+| Tagged releases | 60+ |
 | HTML pages | 16 |
-| Markdown documents | 58+ |
-| Blog posts (drafts) | 17 |
+| Markdown documents | 65+ |
+| Blog posts (drafts) | 21 |
 | Social content assets | 7 (Twitter, LinkedIn, Reddit, press pitches, 3 newsletter issues) |
-| Total lines committed | 30,000+ |
+| Total lines committed | 38,000+ |
 | AI agents defined | 24 |
-| Documented decisions | 30 |
+| Documented decisions | 31 |
 
 | Days від v0.1.0 до v0.10.0 | 2 |
 
@@ -316,10 +327,13 @@ Each iteration:
 
 ### Content engine roadmap (post-16+)
 - [x] post-16: AI-тренер vs PT — чесний trade-off
-- [x] post-17: Overtraining vs. laziness — як відрізнити перетренованість від лінощів (behavioral + physiological markers)
-- [ ] post-18: Mobility work — що справді важливо vs. що є театром
-- [ ] post-19: Warm-up протоколи — чому більшість не відповідає реальним потребам атлета
-- [ ] post-20: Чому FORM обрав CV поверх wearable-only підходу
+- [x] post-17: Overtraining vs. laziness — як відрізнити перетренованість від лінощів
+- [x] post-18: Відпочинок між підходами — PCr кінетика і Schoenfeld 2016
+- [x] post-19: Warm-up протоколи — статичний vs динамічний стретчинг, PAP
+- [x] post-20: Крепатура (DOMS) — EIMD, repeated bout effect, «без болю немає росту» міф
+- [x] post-21: CV vs wearable-only — pose estimation, on-device inference, bar path tracking
+- [ ] post-22: Mobility work — що справді важливо vs. що є театром
+- [ ] post-23: Velocity Based Training — практика без дорогих датчиків
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -364,4 +378,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 15 травня 2026 · v0.31.0
+**Last update:** 16 травня 2026 · v0.49.0

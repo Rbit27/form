@@ -9,6 +9,18 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.49.0] — 2026-05-16
+
+### Added
+- `content/post-21-cv-vs-wearables.md` — «Чому FORM обрав комп'ютерний зір замість wearable-only підходу». 14-хв читання. Охоплює: що wearables вимірюють добре (HRV, ЧСС, сон) і де їхня принципова межа (якість руху); як pracює pose estimation (MediaPipe BlazePose, MoveNet); on-device inference на Neural Engine (<10ms/frame); що аналізує CV — кути суглобів, bar path, симетрія, velocity; чесні обмеження (освітлення, occlusion, кут камери); CV + wearables як ортогональні виміри (готовність vs якість руху). clinical-safety: PASS — технічна тема без харчових, дієтичних або тілесних тригерів. sports-scientist + platform-engineer pending.
+- `blog.html` → картка post-21 (category: product) додана до card-grid після post-20.
+
+### Changed
+- `README.md` → синхронізовано з поточним станом: версія v0.31.0 → v0.49.0, «17 blog post drafts» → «21», «10 blog posts» у content/ → «21», blog.html «9 posts» → «21 posts», content/ directory listing розширено (post-11…post-21), метрики оновлено (releases 45+ → 60+, docs 58+ → 65+, total lines 30k+ → 38k+, decisions 30 → 31), content roadmap: post-18/19/20 відмічені [x], post-21 доданий [x], post-22/23 плановані.
+- `VERSION` → 0.48.2 → 0.49.0
+
+---
+
 ## [0.48.2] — 2026-05-16
 
 ### Changed
