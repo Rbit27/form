@@ -9,6 +9,19 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.58.0] — 2026-05-17
+
+### Added
+- `content/post-29-mind-muscle-connection.md` — «Зв'язок розум-м'яз — наука, бро-наука, або щось посередині?» (~2 600 слів, 13 хв). Охоплює: internal vs. external focus of attention (IFA/EFA); OPTIMAL theory Wulf — обмеження екстраполяції з моторного навчання на силові тренування; EMG-дані Schoenfeld & Contreras (2018, *Eur J Sport Sci*) — +12–15% активація bicep при IFA в ізоляційних вправах; Calatayud et al. (2016, 2017) — ефект зникає при >75–80% 1RM; чому навантаження змінює рівняння (рекрутування рухових одиниць); матриця застосування IFA/EFA за типом вправи і навантаженням; методологічні обмеження: EMG ≠ гіпертрофія, проблема зовнішньої валідності, неоднорідність визначень IFA у дослідженнях; practical frame «intent vs. execution»; CV-контекст: що pose estimation може відстежити опосередковано. Цитати: Wulf & Lewthwaite (2016 *Psychonomic B&R*), Schoenfeld & Contreras (2016 *SCJ*; 2018 *Eur J Sport Sci*), Calatayud et al. (2016 *Eur J Appl Physiol*; 2017 *J Hum Kinet*), Wulf (2013 *IRSEP*). Clinical-safety: PASS.
+
+### Changed
+- `blog.html` — картка Post 29 (mind-muscle connection) додана до card-grid перед Post 28. Загальна кількість карток: 28 → 29.
+- `STATUS.md` — content engine: рядок post-29 додано (draft · clinical-safety PASS · sports-scientist pending).
+- `README.md` — content engine roadmap: post-28 позначено [x], post-29 позначено [x], додано нові теми post-30–35 (eccentric training, unilateral, cluster sets, energy systems, supersets, tempo).
+- `VERSION` → 0.57.0 → 0.58.0
+
+---
+
 ## [0.57.0] — 2026-05-17
 
 ### Added
