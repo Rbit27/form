@@ -9,6 +9,14 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.54.0] — 2026-05-17
+
+### Added
+- `content/post-25-breathing-mechanics.md` — sports-science post «Як дихати під штангою: Valsalva, bracing і внутрішньочеревний тиск без містики». ~1750 слів, 13 хв читання. Охоплює: IAP як механізм стабілізації хребта (McGill 2002/2010, Harman 1988); Valsalva maneuver — механіка, пікові значення тиску, реальні протипоказання; bracing vs. hollowing — чому bracing перевищує hollowing для компаундних підйомів (McGill, Grenier & Norman 2003); практична модель застосування за контекстом (важкі компаунди / субмаксимальні ваги / ізоляція / overhead); топ помилок. clinical_safety_status: PASS.
+- `blog.html` → картка post-25 («Як дихати під штангою») додана до card-grid. Загальна кількість карток: 24 → 25.
+- `STATUS.md` → рядки post-24 і post-25 додані до content engine table.
+- `README.md` → roadmap оновлено: post-24 і post-25 позначені як done; post-28 (Mobility work) додано як наступний.
+
 ## [0.53.0] — 2026-05-17
 
 ### Added
