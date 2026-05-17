@@ -12,14 +12,13 @@
 ## [0.52.0] — 2026-05-17
 
 ### Added
+- `content/post-23-velocity-based-training.md` — sports-science post «Швидкість штанги — кращий датчик, ніж твій відсоток від максимуму». ~2500 слів, 13 хв читання. Охоплює: проблема %1RM і денні коливання ±7-11%; load-velocity relationship і таблиця MPV → % 1RM для присідань; Velocity Loss Threshold (VLT) і Minimum Velocity Threshold (MVT); Pareja-Blanco et al. 2017 — 20% vs 40% VLT і різний адаптаційний відгук (сила vs метаболічний стрес); побудова індивідуального L-V профілю; практична реалізація без Gymaware (iPhone slow-mo, myLift, Open Barbell, суб'єктивна RPV); три схеми впровадження за рівнем. Всі 5 джерел вбудовані в текст. clinical_safety_status: PASS.
 - `blog.html` → картки post-22 (periodization, 15 хв) і post-23 (VBT, 13 хв) додані до card-grid після post-21.
 
 ### Changed
-- `README.md` → roadmap: post-22/23 позначені `[x]`; нові теми post-24..27 (mobility, breathing mechanics, tendon adaptation, training age) додані до roadmap; blog posts counter оновлено
+- `README.md` → roadmap: post-22/23 позначені `[x]`; нові теми post-24..27 (mobility, breathing mechanics, tendon adaptation, training age) додані до roadmap
 - `STATUS.md` → записи post-21, post-22, post-23 додані до content engine таблиці
 - `VERSION` → 0.51.0 → 0.52.0
-
-> **Note:** `content/post-23-velocity-based-training.md` буде додано наступним commit після завершення sports-scientist review.
 
 ---
 
