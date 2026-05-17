@@ -337,7 +337,7 @@ Each iteration:
 - [x] post-24: Training to failure — proximity-to-failure, три типи відмови, RIR 0 vs RIR 1–2
 - [x] post-25: Breathing mechanics під навантаженням — Valsalva, bracing, IAP
 - [x] post-26: Адаптація сухожиль і зв'язок — чому вона повільніша і чому це має значення
-- [ ] post-27: Training age vs. chronological age — адаптаційна ємність і сенс "починати пізно"
+- [x] post-27: Training age vs. chronological age — адаптаційна ємність і сенс "починати пізно"
 - [ ] post-28: Mobility work — що справді важливо vs. що є театром
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).

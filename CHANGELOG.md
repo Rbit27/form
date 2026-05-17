@@ -9,6 +9,17 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.56.0] — 2026-05-17
+
+### Added
+- `content/post-27-training-age-vs-chronological-age.md` — «Тренувальний вік проти хронологічного: чому "пізно починати" — не та проблема» (~2 200 слів, 13 хв). Охоплює: тренувальний вік як окрема змінна, нейром'язові vs морфологічні адаптації (Unhjem 2015), порівняльна матриця трьох профілів, дані про початківців 40–70 (Reeves 2004, Fragala et al. 2019 NSCA position statement, Peterson et al. 2011), inflammaging і відновлення, практичні імплікації для програмування на трьох рівнях тренувального віку, Victor-специфічні рекомендації для Дмитра/Миколи/новачка 40+. Цитати: Unhjem et al. (2015, *J Electromyogr Kinesiol*), Peterson et al. (2011, *Ageing Res Rev*), Bhasin et al. (2001, *AJP Endocrinol Metab*), Reeves et al. (2004, *Exp Physiol*), Fragala et al. (2019, *JSCR*), Narici & Maffulli (2010, *Br Med Bull*). Clinical-safety: PASS.
+- `blog.html` — картки Post 26 (сухожилля) і Post 27 (тренувальний вік) додані до card-grid після Post 25. Загальна кількість карток: 25 → 27.
+- `STATUS.md` — content engine table: рядки post-26 і post-27 додані.
+
+### Changed
+- `README.md` — post-27 відмічено `[x]` у content engine roadmap.
+- `VERSION` → 0.55.0 → 0.56.0
+
 ## [0.55.0] — 2026-05-17
 
 ### Added
