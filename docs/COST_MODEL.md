@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v0.1
+# FORM · Cost Model & Unit Economics v0.3
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -22,6 +22,7 @@
 10. [Sensitivity Analysis](#10-sensitivity-analysis)
     - 10.5 Enterprise Revenue Mix Sensitivity
 11. [Open Questions / Gaps](#11-open-questions--gaps)
+12. [Free Tier Subsidy Model & Freemium Funnel Economics](#12-free-tier-subsidy-model--freemium-funnel-economics)
 
 ---
 
@@ -504,8 +505,115 @@ Each percentage point of revenue shifting from consumer to enterprise improves b
 
 ---
 
-**v0.2 · May 2026**
+---
+
+## 12. Free Tier Subsidy Model & Freemium Funnel Economics
+
+Section §3.4 flags the core risk: "a free user who never converts to Pro is $0.13/month of pure cost." This section models what that subsidy costs at scale, what conversion rate makes it economically neutral, and how to benchmark freemium as an acquisition channel against paid marketing.
+
+### 12.1 Free tier total subsidy at scale
+
+Infrastructure cost per free user per month: **$0.13** (from §3.3).
+
+| Free MAU | Monthly subsidy | Annual subsidy | Notes |
+|---|---|---|---|
+| 500 | $65 | $780 | Closed beta phase — negligible |
+| 2,000 | $260 | $3,120 | Early-access launch |
+| 10,000 | $1,300 | $15,600 | Growth phase; meaningful but not alarming |
+| 50,000 | $6,500 | $78,000 | Scale; now a budget line requiring active monitoring |
+| 100,000 | $13,000 | $156,000 | Pre-Series A max free pool without explicit subsidy budget |
+
+**Observation:** At any pre-Series A scale (≤100k free MAU), the raw infrastructure subsidy stays well below $200k/year and is covered by a modest number of Pro conversions. The free tier is not an infrastructure cost problem — it is a conversion discipline problem.
+
+### 12.2 Minimum conversion rate for free tier self-financing
+
+For the free tier to be cost-neutral from infrastructure COGS alone, converted users must generate enough gross profit to offset the ongoing subsidy of unconverted users.
+
+**Variables:**
+- `N` = free user pool size
+- `C` = monthly conversion rate (free → Pro, cumulative by month M)
+- Converted user generates `$12.25` gross profit/month (Pro at SBP, from §4)
+- Remaining free user costs `$0.13`/month
+
+**Break-even condition:**
+
+```
+N × C × $12.25  =  N × (1 − C) × $0.13
+
+C / (1 − C)     =  0.13 / 12.25  =  0.01061
+
+C               =  0.01061 / 1.01061  ≈  1.05%
+```
+
+**A lifetime conversion rate of ≥ 1.05% is sufficient to cover the pure infrastructure cost of the free tier** — regardless of free pool size. Typical well-designed freemium products convert 2–5% of free users to paid over the first 90 days. FORM's break-even threshold is intentionally conservative and should be achievable from the first beta cohort.
+
+### 12.3 Conversion rate targets by phase
+
+| Phase | Free MAU target | Required conversions/month to cover subsidy | Implied conversion rate floor |
+|---|---|---|---|
+| Beta (closed) | 500 | 1 Pro user | 0.2% |
+| Early launch | 2,000 | 3 Pro users | 0.15% |
+| Growth | 10,000 | 11 Pro users | 0.11% |
+| Scale | 50,000 | 53 Pro users | 0.11% |
+
+The required absolute conversion count is low at every phase. The strategic target is 2–5% cumulative conversion by D90 — well above the subsidy break-even floor — because the business goal is revenue, not merely cost neutrality.
+
+### 12.4 Freemium CAC vs. paid acquisition
+
+Freemium is an acquisition channel. The "cost" of acquiring a Pro subscriber via the free tier is the infrastructure subsidy paid during the pre-conversion period plus any organic/paid traffic cost to reach the free user.
+
+**Infrastructure-only freemium CAC:**
+
+```
+Freemium CAC (infra) = months_to_convert × $0.13/month
+
+If median conversion happens at month 2:  2 × $0.13 = $0.26
+If median conversion happens at month 6:  6 × $0.13 = $0.78
+```
+
+Even at a 6-month pre-conversion window, the infrastructure portion of freemium CAC is under $1 per converted user — negligibly small.
+
+**All-in freemium CAC** includes the cost of driving organic installs (App Store optimization, content marketing, referral mechanics) amortized over conversions:
+
+| Traffic source | Cost/install [ESTIMATE] | Cost/Pro conversion (at 3% rate) | Notes |
+|---|---|---|---|
+| Pure organic (ASO, referral) | ~$0 | ~$0.78 (6mo subsidy only) | Best case; viral coefficient dependent |
+| Content marketing (amortized) | $1–3 | $33–100 | Blog, social, educational content; high variance |
+| Influencer / partnership (fitness) | $3–8 | $100–267 | Higher intent but expensive at scale |
+| Paid UA (Meta/TikTok/Google) | $5–15 | $167–500 | Most expensive; often poorest LTV mix |
+
+**Benchmark:** Consumer fitness apps typically report blended CAC of $30–80 via paid channels. If FORM can sustain meaningful organic install volume, freemium CAC stays well below this range — making the free tier a structurally superior acquisition channel compared to paid UA, provided conversion discipline is maintained.
+
+### 12.5 Free tier cost controls
+
+The $0.13/month figure is derived from the §2.1 usage assumptions for free users (6.5 sessions/month, 10% voice adoption). Both are controllable by design:
+
+| Control | Current design | Cost impact if removed |
+|---|---|---|
+| Voice quota cap (free tier) | ElevenLabs character cap per month | Without cap: voice adoption rises; ElevenLabs cost ≈ $0.016 → potentially $0.08+/user |
+| Session frequency (natural, not capped) | No hard session cap; organic 1.5×/week usage assumed | If free users use at Pro rate (3.5×/week): COGS ≈ $0.30/user — still manageable |
+| Context window per session | Same as Pro (no reduction) | Context truncation on free would reduce Anthropic cost ~15%; deferred feature |
+| Workout history depth | 30-day rolling window on free (hypothetical) | Reduces Supabase storage; minor COGS impact (~$0.005/user/month) |
+
+**Design principle:** Free tier cost controls should be scoped features, not degraded experiences. The right levers are voice quota (highest cost impact) and session depth (contextual). Do not degrade coaching quality on free tier — that reduces conversion, which is the primary economic risk.
+
+### 12.6 Free pool size governance
+
+The free pool requires an explicit budget line once it reaches $1,300+/month (10k+ free MAU). Governance trigger:
+
+| Monthly subsidy threshold | Action required |
+|---|---|
+| < $500/month (≤ 3,800 free MAU) | No action; implicit in infra budget |
+| $500–2,000/month | Monitor conversion rate weekly in PostHog |
+| $2,000–5,000/month | Explicit free-tier budget line in FINANCIALS.md; conversion rate OKR target |
+| > $5,000/month (≥ 38,500 free MAU) | Board visibility; conversion funnel review; consider free-tier session throttle if D90 conversion < 1.5% |
+
+**Note on free tier as a strategic asset:** Aggressive throttling of the free tier to reduce subsidy cost is a false economy. The free pool is the top of the funnel — cutting it to save $0.13/user/month sacrifices the acquisition engine. The right response to poor conversion is better activation (onboarding, first-value moment), not pool reduction.
+
+---
+
+**v0.3 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
 
-*v0.2 additions: §8.5 Enterprise CAC Model, §8.6 LTV/CAC Analysis by Deal Size, §8.7 Expansion and Churn Economics (NRR model, expansion triggers, churn signals), §8.8 Year 1 vs Year 2+ deal economics, §10.5 Enterprise Revenue Mix Sensitivity.*
+*v0.3 additions: §12 Free Tier Subsidy Model & Freemium Funnel Economics — total subsidy at scale, minimum conversion rate for cost neutrality (1.05% threshold), freemium CAC vs. paid UA comparison, free tier cost controls, free pool governance triggers.*

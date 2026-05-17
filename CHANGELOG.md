@@ -9,6 +9,14 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.58.1] — 2026-05-17
+
+### Changed
+- `docs/COST_MODEL.md` v0.2 → v0.3 — §12 Free Tier Subsidy Model & Freemium Funnel Economics added. Covers: total infrastructure subsidy at scale (500–100k free MAU); minimum conversion rate for cost neutrality (break-even algebraically derived at **1.05% lifetime conversion**); per-phase conversion rate targets; freemium CAC vs. paid UA comparison (infra-only CAC ≤ $0.78 at 6-month conversion window vs. typical paid UA $30–80); free tier cost control levers (voice quota, session depth, context truncation); free pool governance triggers ($500/$2k/$5k monthly subsidy thresholds). Closes the gap flagged in §3.4. Audience: founder, investors, growth-lead.
+- `VERSION` → 0.58.0 → 0.58.1
+
+---
+
 ## [0.58.0] — 2026-05-17
 
 ### Added
