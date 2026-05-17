@@ -18,6 +18,35 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 
 ---
 
+## 0. RED Methodology
+
+The RED method — **Rate**, **Errors**, **Duration** — provides a per-service diagnostic framework. For every external-facing service FORM operates, these three signals answer: *how much traffic?*, *how much is failing?*, *how slow is it?*
+
+| Service | Rate (R) | Errors (E) | Duration (D) |
+|---|---|---|---|
+| **Cloudflare Workers API** | `cf_worker_requests_total` req/s by route | `cf_worker_errors_total` / `cf_worker_requests_total{status_class="5xx"}` | `cf_worker_request_duration_ms` P95/P99 |
+| **Supabase Postgres** | Queries/s (from `pg_stat_statements.calls`) | Failed queries from `pg_stat_statements.rows = 0 AND query LIKE 'SELECT%'`; RLS policy denials | `supabase_db_query_duration_ms` P95 |
+| **Supabase Auth** | `supabase_auth_signins_total` events/min | `supabase_auth_failures_total` by `failure_reason` | P95 of `auth_token_verify` span duration |
+| **Anthropic Claude API** | `anthropic_api_requests_total` req/min | `anthropic_api_requests_total{outcome=~"error\|timeout\|rate_limited"}` | `anthropic_api_latency_ms` P95 (time-to-first-token + stream complete) |
+| **ElevenLabs TTS** | `elevenlabs_requests_total` req/min | `elevenlabs_requests_total{outcome="error"}` | `elevenlabs_latency_ms` P95 |
+| **R2 TTS Cache** | `r2_cache_hits_total + r2_cache_misses_total` req/min | Cache misses are not errors, but miss rate > 60% triggers review | Not latency-sensitive; omit |
+| **Mobile App (iOS)** | Sessions/day (PostHog) | `sentry_crash_rate{platform="ios"}` | App launch P95, screen load P95 (Sentry Performance) |
+| **Mobile App (Android)** | Sessions/day (PostHog) | `sentry_crash_rate{platform="android"}` | App launch P95, screen load P95 (Sentry Performance) |
+| **EAS OTA Updates** | `eas_update_checks_total` checks/hour | `eas_update_checks_total{outcome="error"}` / total | Not actively measured; success rate (SLO §2.1) is the primary signal |
+| **Enterprise SSO (Auth0 / WorkOS)** | SAML/OIDC assertions/min per tenant | `supabase_auth_signins_total{provider="sso", outcome="failure"}` by tenant | P95 of SSO round-trip (SP-redirect → assertion received), target < 3,000 ms |
+
+### RED triage cascade
+
+When an alert fires, work through RED in order:
+
+1. **Rate** — has traffic volume changed? A spike means more absolute errors even at the same error rate. A drop could indicate clients are failing before they reach the service.
+2. **Errors** — filter by label (`route`, `tenant_id`, `outcome`, `failure_reason`) to narrow scope. A single tenant's errors are very different from a platform-wide error spike.
+3. **Duration** — is the latency shift at P50 (systemic) or only P99 (long-tail outlier, possibly a single bad request)? P95 is the primary SLO target.
+
+RED signals cascade across dependency tiers: an upstream provider latency increase (Anthropic, ElevenLabs) first appears as a **Duration** spike, then escalates to **Errors** as retries exhaust, then to a **Rate** drop as clients fall back or give up. Following this cascade backwards identifies the origin service. See §7.1 for the operational dashboard layout that surfaces this cascade.
+
+---
+
 ## 1. Three Pillars Overview
 
 | Pillar | What it answers | Primary tooling (proposed) | Secondary tooling | Retention |
@@ -621,6 +650,277 @@ The following items are known gaps as of v0.1. Each has an owner and a target re
 | **Trace correlation between Sentry and Cloudflare** | Sentry transactions and Cloudflare trace IDs are not yet correlated. An error in Sentry cannot be mapped to a Cloudflare trace without manual log search. Requires shared `trace_id` propagation. | platform-engineer | M3 |
 | **HMAC chain verification cron** | The weekly chain integrity cron described in `AUDIT_LOG_SCHEMA.md` is not yet deployed. Chain breaks would not be detected automatically. | devops-lead | M3 |
 | **Audit log export pipeline** | Enterprise webhook delivery and S3 sync described in §4.6 are not yet implemented. Blocking for enterprise launch. | platform-engineer | M4 |
+
+---
+
+## 11. SLI Calculation Expressions
+
+These expressions derive each SLI value from raw metrics. Use them as templates when configuring Better Stack SLO monitors or building SQL queries against Cloudflare Analytics Engine.
+
+Syntax is PromQL-compatible (Better Stack / Prometheus). Where Cloudflare Analytics Engine SQL is required, a CFA equivalent is noted.
+
+### 11.1 API Gateway availability
+```promql
+# 30-day rolling availability (excludes 429 rate-limit responses)
+1 - (
+  sum(rate(cf_worker_requests_total{status_class="5xx"}[30d]))
+  /
+  sum(rate(cf_worker_requests_total{status_class!="4xx_rate_limit"}[30d]))
+)
+# Target: ≥ 0.999
+```
+
+### 11.2 API Gateway P95 latency
+```promql
+# 7-day rolling P95 across all routes
+histogram_quantile(0.95,
+  sum by (le) (rate(cf_worker_request_duration_ms_bucket[7d]))
+)
+# Target: < 1500 ms
+```
+
+### 11.3 Database availability
+```promql
+# Computed from health-check probe (binary — up or down)
+avg_over_time(supabase_db_health_check_up[30d])
+# Target: ≥ 0.9995
+```
+
+### 11.4 Database query P95 latency
+```promql
+histogram_quantile(0.95,
+  sum by (le) (rate(supabase_db_query_duration_ms_bucket[7d]))
+)
+# Target: < 200 ms
+```
+
+### 11.5 AI inference P95 latency
+```promql
+histogram_quantile(0.95,
+  sum by (le) (rate(anthropic_api_latency_ms_bucket[7d]))
+)
+# Target: < 8000 ms
+```
+
+### 11.6 AI inference availability
+```promql
+1 - (
+  sum(rate(anthropic_api_requests_total{outcome=~"error|timeout"}[7d]))
+  /
+  sum(rate(anthropic_api_requests_total[7d]))
+)
+# Target: ≥ 0.995
+```
+
+### 11.7 TTS cache hit rate
+```promql
+sum(rate(r2_cache_hits_total{asset_type="tts_audio"}[7d]))
+/
+(
+  sum(rate(r2_cache_hits_total{asset_type="tts_audio"}[7d]))
+  + sum(rate(r2_cache_misses_total{asset_type="tts_audio"}[7d]))
+)
+# Target: > 0.60
+```
+
+### 11.8 Mobile crash-free session rate
+```promql
+# Sentry exports this as a gauge; query directly
+1 - sentry_crash_rate{platform="ios"}
+1 - sentry_crash_rate{platform="android"}
+# Target: ≥ 0.995
+```
+
+### 11.9 Enterprise SSO availability (per tenant)
+```promql
+# Computed per tenant_id label
+1 - (
+  sum by (tenant_id) (rate(supabase_auth_signins_total{provider="sso", outcome="failure"}[30d]))
+  /
+  sum by (tenant_id) (rate(supabase_auth_signins_total{provider="sso"}[30d]))
+)
+# Target: ≥ 0.999 per tenant
+```
+
+### 11.10 Error budget consumption
+
+Error budget consumed (%) for a given SLO over its window:
+
+```
+error_budget_consumed =
+  (actual_error_rate - (1 - SLO_target)) / (1 - SLO_target) × 100
+
+# Example: API Gateway with SLO 99.9%
+# Actual availability = 99.85% → error rate = 0.15%
+# Allowed error rate = 0.1%
+# Budget consumed = (0.15 - 0.10) / 0.10 × 100 = 50%
+```
+
+Alert fires at 50% consumed. Feature freeze at 0% (SLO breach). See §2.2 for policy.
+
+---
+
+## 12. Developer Instrumentation Guide
+
+A reference for engineers adding observability when shipping a new Worker route, Supabase RPC, or mobile screen. Follow this before opening a PR on any path that is customer-facing or tenant-scoped.
+
+### 12.1 Adding a span to a Cloudflare Worker
+
+FORM uses Sentry Performance (not an OTel collector — see §9.3 for rationale). The Sentry Cloudflare SDK wraps the OTel API surface.
+
+```typescript
+import * as Sentry from '@sentry/cloudflare';
+
+export async function handleNewFeatureRoute(
+  request: Request,
+  env: Env,
+  tenantId: string,
+): Promise<Response> {
+  return Sentry.startSpan(
+    {
+      name: 'new_feature_name',       // snake_case; add to §5.2 Span Definitions
+      op: 'http.server',
+      attributes: {
+        'http.method': request.method,
+        'http.route': '/api/v1/new-feature',
+        'tenant_id': tenantId,        // REQUIRED on every tenant-scoped span
+        'user_id_hash': sha256(userId), // hash before attaching — never raw user_id
+        'feature': 'new_feature_name',
+      },
+    },
+    async (span) => {
+      const result = await performWork(env, tenantId);
+
+      // Set result attributes on the span after work completes
+      span.setAttribute('result_count', result.items.length);
+      span.setAttribute('cache_hit', result.fromCache);
+
+      return Response.json(result);
+    },
+  );
+}
+```
+
+**Invariants:**
+- `tenant_id` must be the verified value from JWT claims, not a request parameter.
+- Never log health data, prompt content, or LLM response content as span attributes.
+- Span names use `snake_case` and match the §5.2 Span Definitions table — update the table when adding a new persistent span.
+
+### 12.2 Emitting a custom metric to Cloudflare Analytics Engine
+
+Analytics Engine is the primary metrics store for Workers (see §9.1). Each data point supports up to 20 blob fields (strings) and 20 double fields (numbers).
+
+```typescript
+// env.ANALYTICS is the Analytics Engine binding declared in wrangler.toml
+function emitMetric(
+  env: Env,
+  route: string,
+  tenantId: string | null,
+  outcome: 'success' | 'error' | 'rate_limited' | 'timeout',
+  durationMs: number,
+  aiTokens?: { input: number; output: number; cacheRead: number },
+): void {
+  env.ANALYTICS.writeDataPoint({
+    blobs: [
+      route,           // blob1: route label (primary filter dimension)
+      tenantId ?? '',  // blob2: tenant_id (empty string for consumer tier)
+      outcome,         // blob3: outcome label
+    ],
+    doubles: [
+      durationMs,                     // double1: duration_ms
+      aiTokens?.input ?? 0,           // double2: ai.input_tokens
+      aiTokens?.output ?? 0,          // double3: ai.output_tokens
+      aiTokens?.cacheRead ?? 0,       // double4: ai.cache_read_tokens
+    ],
+    indexes: [route],  // High-cardinality filter; one index per data point
+  });
+}
+```
+
+Query with Cloudflare Analytics Engine SQL API:
+```sql
+SELECT
+  blob1 AS route,
+  count() AS requests,
+  quantileWeighted(0.95)(double1, 1) AS p95_duration_ms,
+  sumIf(double1, blob3 = 'error') / count() AS error_rate
+FROM ANALYTICS
+WHERE timestamp > now() - interval '1' hour
+GROUP BY route
+ORDER BY requests DESC
+```
+
+### 12.3 OTel OTLP via fetch (Series A path)
+
+When a ClickHouse backend is available, Workers can export OTLP traces directly without a collector sidecar — export happens via a `fetch()` call at the end of the request lifecycle.
+
+```typescript
+// Set in wrangler.toml / environment secrets
+const OTLP_ENDPOINT = env.OTEL_EXPORTER_OTLP_ENDPOINT; // https://otel.example.com
+const OTLP_TOKEN   = env.OTEL_AUTH_TOKEN;
+
+async function exportSpanOtlp(spanData: SerializedSpan): Promise<void> {
+  // Fire-and-forget — use ctx.waitUntil() to avoid blocking the response
+  await fetch(`${OTLP_ENDPOINT}/v1/traces`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-protobuf',
+      'Authorization': `Bearer ${OTLP_TOKEN}`,
+    },
+    body: encodeOtlpTraceRequest([spanData]),
+  });
+}
+
+// In the Worker fetch handler:
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const span = buildSpan(request, env);
+    const response = await handleRequest(request, env, span);
+    ctx.waitUntil(exportSpanOtlp(span.serialize())); // non-blocking export
+    return response;
+  },
+};
+```
+
+This pattern is the planned migration path. Activate at Series A when ClickHouse is provisioned. Until then, Sentry Performance is the active tracing backend.
+
+### 12.4 Mobile screen instrumentation (React Native / Expo)
+
+```typescript
+import * as Sentry from '@sentry/react-native';
+
+// Wrap screens in Sentry.wrap() for automatic transaction creation
+export default Sentry.wrap(function WorkoutScreen({ route }: Props) {
+  // Manual child span for a significant operation within the screen
+  const transaction = Sentry.getCurrentHub().getScope()?.getTransaction();
+  const span = transaction?.startChild({
+    op: 'db.query',
+    description: 'load_workout_history',
+  });
+
+  const history = await loadHistory();
+  span?.finish();
+
+  // ...render
+});
+```
+
+Mobile spans propagate `traceparent` on outbound API requests automatically when the Sentry SDK is initialized with `tracePropagationTargets: ['api.form.coach']`.
+
+### 12.5 Instrumentation checklist before shipping
+
+| Checkpoint | Required | Notes |
+|---|---|---|
+| Root span added with `http.route` attribute | Yes | All new Worker routes |
+| `tenant_id` attached on every tenant-scoped span | Yes | `tenant_id_missing` counter fires if absent (P1 alert) |
+| `user_id_hash` used — never raw `user_id` in span or log | Yes | SHA-256 before attaching |
+| No health data in span attributes or log fields | Yes | GDPR Art. 9 — see §4.5 AI inference log schema |
+| No prompt / LLM response content in any log or span | Yes | AI inference log captures token counts only |
+| Analytics Engine `writeDataPoint()` added for high-traffic paths | Yes | Rate, outcome, duration minimum |
+| Existing alert rules reviewed — new critical path needs alert? | Yes | Add to §6.2 and commit |
+| New span added to §5.2 Span Definitions table | Yes (if permanent) | PR updating this doc required |
+| Mobile spans propagate `traceparent` on API calls | Yes | Verify in Sentry transaction waterfall |
+| Sentry `beforeSend` hook excludes health-adjacent fields from crash reports | Yes | Blocks GDPR compliance until done |
 
 ---
 

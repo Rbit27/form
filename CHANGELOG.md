@@ -9,6 +9,14 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.56.1] — 2026-05-17
+
+### Changed
+- `docs/OBSERVABILITY.md` — +300 lines, three new sections:
+  - **§0 RED Methodology** — explicit Rate/Error/Duration service map for all 10 production services (Workers API, Supabase Postgres, Auth, Anthropic, ElevenLabs, R2 cache, iOS/Android mobile, EAS, enterprise SSO); triage cascade description for cross-tier failure attribution.
+  - **§11 SLI Calculation Expressions** — PromQL formulas for all 9 SLIs in §2.1 (availability, P95 latency, crash-free rate, enterprise SSO per-tenant), plus error-budget consumption formula with worked example.
+  - **§12 Developer Instrumentation Guide** — Sentry Performance span API for Workers (TypeScript), Analytics Engine `writeDataPoint()` with CFA SQL query example, OTel OTLP-via-fetch pattern for the Series A ClickHouse path, React Native screen instrumentation, and a 10-point instrumentation checklist (tenant_id, user_id_hash, GDPR Art. 9 health data exclusions, alert review).
+
 ## [0.56.0] — 2026-05-17
 
 ### Added
