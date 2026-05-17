@@ -9,6 +9,21 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.54.1] — 2026-05-17
+
+### Added
+- `docs/SOC2_READINESS.md` Section 14 — Formal Risk Register (CC3). 18 risks across 6 categories: Security (SR-01…SR-05), Availability (AR-01…AR-04), Processing Integrity (IR-01…IR-02), Confidentiality (CR-01…CR-02), Privacy (PR-01…PR-02), Vendor/Operational (VR-01…VR-02, OR-01). Each risk carries: description, inherent Likelihood × Impact score, existing controls, residual score, named owner, and mitigation status. Risk appetite statement: FORM tolerates MEDIUM residual risk; zero tolerance on health data confidentiality and HMAC audit chain integrity. Heatmap summary included. Closes CC3 gaps for SOC 2.
+
+### Changed
+- `docs/SOC2_READINESS.md` CC3 controls — `Formal risk assessment documented` updated 🟡 Partial → ✅ Done (Section 14); `Risk register maintained, reviewed annually` updated 🔴 Gap → 🟡 Partial (Section 14 exists; first annual review scheduled August 2026).
+- `docs/SOC2_READINESS.md` P3 control — `Purpose limitation documented` updated 🟡 Gap → ✅ Done (docs/GDPR_DPIA.md v0.1, May 2026 — DPIA was shipped at v0.50.0 but SOC2 doc was not updated).
+- `docs/SOC2_READINESS.md` Gap Analysis Summary — critical gaps: 10 → 9; partial: 22 → 21; controls in place: 23 → 25; readiness score: 42% → 45%.
+- `docs/SOC2_READINESS.md` Open Items — DPIA and risk register marked `[x]` done.
+- `docs/SOC2_READINESS.md` version footer — v0.3 → v0.4.
+- `VERSION` → 0.54.0 → 0.54.1
+
+---
+
 ## [0.54.0] — 2026-05-17
 
 ### Added

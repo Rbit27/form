@@ -59,8 +59,8 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Control | Status | Evidence |
 |---|---|---|
-| Formal risk assessment documented | 🟡 Partial | `docs/SECURITY.md` §1 threat model covers key threats; needs formalization as Risk Register |
-| Risk register maintained, reviewed annually | 🔴 Gap | Create risk register doc; assign compliance-officer |
+| Formal risk assessment documented | ✅ Done | Section 14 — Formal Risk Register (18 risks, 6 categories, L×S scoring) |
+| Risk register maintained, reviewed annually | 🟡 Partial | Section 14 exists; first annual formal review not yet performed (scheduled August 2026) |
 | Vendor / third-party risk assessment | 🟡 Partial | Processor list in `docs/SECURITY.md` §5; needs formal scoring |
 
 ### CC4 — Monitoring of Controls
@@ -202,7 +202,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 |---|---|---|
 | Data minimization — only collect what's needed | ✅ Done | No SSN, no gov ID, no payment info; pseudonymized IDs |
 | Camera frames never leave device | ✅ Done | `docs/SECURITY.md` §4 — on-device inference, no frame upload |
-| Purpose limitation documented | 🟡 Gap | DPIA (Data Protection Impact Assessment) needed for health data processing |
+| Purpose limitation documented | ✅ Done | `docs/GDPR_DPIA.md` v0.1 (May 2026) — full DPIA for health data processing; 12 processing activities (PA-01…PA-12), necessity & proportionality analysis, 12 risks scored |
 
 ### P4 — Use, Retention, Disposal
 
@@ -249,11 +249,11 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Severity | Count | Examples |
 |---|---|---|
-| 🔴 **Critical gap** (blocks SOC 2) | 10 | Privacy policy, status page, security training, offboarding procedure |
-| 🟡 **Partial / needs formalization** | 22 | Risk register, vendor registry, patching SLA, DPIA |
-| ✅ **In place** | 23 | HMAC audit log, encryption, access controls, CV on-device, breach notification, data classification policy |
+| 🔴 **Critical gap** (blocks SOC 2) | 9 | Privacy policy, status page, security training, offboarding procedure |
+| 🟡 **Partial / needs formalization** | 21 | Vendor registry, patching SLA, annual risk review, DSAR SLA |
+| ✅ **In place** | 25 | HMAC audit log, encryption, access controls, CV on-device, breach notification, data classification policy, DPIA, formal risk register |
 
-**Readiness score: ~42% controls fully in place.** Target: 90% before observation period begins.
+**Readiness score: ~45% controls fully in place.** Target: 90% before observation period begins.
 
 ---
 
@@ -696,20 +696,124 @@ These map to SOC 2 Privacy criteria P2, P3, and P6, and simultaneously satisfy G
 
 ---
 
+## 14. Formal Risk Register (CC3)
+
+> Owner: `compliance-officer` + `security-engineer`. Review: quarterly. First review: August 2026.
+> SOC 2 evidence: CC3.1 (risk identification), CC3.2 (risk analysis), CC3.3 (risk mitigation).
+
+### 14.1 Scoring Methodology
+
+| Dimension | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| **Likelihood** | Rare (<once/5yr) | Unlikely (<once/yr) | Possible (1×/yr) | Likely (several/yr) | Almost Certain (monthly+) |
+| **Impact** | Negligible | Minor (service hiccup) | Moderate (user-visible, recoverable) | Major (SLA breach, data exposure) | Catastrophic (breach, regulatory, existential) |
+
+**Score = Likelihood × Impact**
+
+| Score | Rating | Response |
+|---|---|---|
+| 1–5 | LOW | Accept; monitor quarterly |
+| 6–11 | MEDIUM | Monitor; document mitigations |
+| 12–19 | HIGH | Mitigate; assign owner; track to closure |
+| 20–25 | CRITICAL | Immediate remediation; halt feature work if active |
+
+**Risk appetite:** MEDIUM — inherent scores ≥ 12 require documented mitigation plan and named owner. FORM has zero tolerance for risks affecting health data confidentiality or HMAC audit log integrity.
+
+### 14.2 Risk Register
+
+#### Security Risks (CC6, CC7)
+
+| ID | Risk | Inherent L | Inherent I | Inherent Score | Controls | Residual Score | Owner | Status |
+|---|---|---|---|---|---|---|---|---|
+| SR-01 | **JWT / session token compromise** — attacker obtains a valid token via MITM or device compromise, gains access to user data | 3 | 5 | **15 HIGH** | TLS 1.3 mandatory; JWT 1h expiry; 30-day session rotation; RLS fail-closed (token cannot escalate beyond its `tenant_id`); certificate pinning (mobile) | **6 MEDIUM** | security-engineer | Mitigated |
+| SR-02 | **Credential stuffing / auth brute force** — automated bot replays leaked credentials against FORM login | 3 | 4 | **12 HIGH** | Cloudflare WAF rate limits (50 req/min/IP cap); `supabase_auth_failures_total` alert (>50/min → P1 page); future: CAPTCHA after 5 failures | **4 LOW** | security-engineer | Mitigated |
+| SR-03 | **Insider threat** — future employee with production access exfiltrates user health data or tampers with audit logs | 2 | 5 | **10 MEDIUM** | RBAC (least privilege); break-glass dual-authorization; HMAC-chained audit log (DEC-030); `data.read_individual` audit event + `#security-alerts`; access reviewed quarterly | **4 LOW** | compliance-officer | Mitigated |
+| SR-04 | **Supply chain attack** — malicious npm package or Cloudflare Worker dependency introduces backdoor | 2 | 5 | **10 MEDIUM** | Dependabot + `npm audit` in CI; `package-lock.json` pinned; planned: CI fails on critical CVEs (Phase 2 roadmap) | **5 MEDIUM** | devops-lead | Partially mitigated |
+| SR-05 | **API key / secret exposure** — credentials committed to codebase or leaked via CI logs | 2 | 4 | **8 MEDIUM** | All secrets in GitHub Secrets + 1Password; `git-secrets` pre-commit hook; GitHub secret scanning enabled; no `.env` committed policy | **3 LOW** | security-engineer | Mitigated |
+
+#### Availability Risks (A1)
+
+| ID | Risk | Inherent L | Inherent I | Inherent Score | Controls | Residual Score | Owner | Status |
+|---|---|---|---|---|---|---|---|---|
+| AR-01 | **Anthropic API extended outage** (>4h) — Victor cannot respond; core product feature unavailable | 2 | 4 | **8 MEDIUM** | Graceful degradation: pre-built Victor coaching-cue templates served for common scenarios; user-visible status message; `anthropic_api_requests_total{outcome="error"}` alert (P0 if >80% in 5min) | **4 LOW** | devops-lead | Mitigated |
+| AR-02 | **Supabase Postgres outage** — database unreachable; all authenticated operations fail | 2 | 5 | **10 MEDIUM** | Supabase High Availability (primary + replica, automatic failover); PITR enabled (RPO 1h, RTO 4h per SECURITY.md §10); PITR restore runbook (DATA_MODEL.md §10); uptime check pages on-call in <60s | **4 LOW** | devops-lead | Mitigated |
+| AR-03 | **Cloudflare Workers platform outage** — edge API completely unreachable | 1 | 5 | **5 LOW** | Cloudflare 99.99% global network SLA; Workers run across 300+ PoPs; no single-region dependency; Cloudflare status page auto-opens P1 incident | **2 LOW** | devops-lead | Accept |
+| AR-04 | **ElevenLabs voice service outage** — voice coaching unavailable | 3 | 2 | **6 MEDIUM** | Silent fallback: text coaching continues uninterrupted; R2 TTS audio cache serves common cues (target >60% hit rate); user messaging: "Voice unavailable — coaching continues in text" | **2 LOW** | platform-engineer | Mitigated |
+
+#### Processing Integrity Risks (PI1)
+
+| ID | Risk | Inherent L | Inherent I | Inherent Score | Controls | Residual Score | Owner | Status |
+|---|---|---|---|---|---|---|---|---|
+| IR-01 | **Victor AI produces harmful coaching output** — injury-inducing advice, disordered-eating framing, or medically inappropriate guidance delivered to user | 2 | 4 | **8 MEDIUM** | `clinical-safety` VETO protocol (mandatory review before any body-image / injury / mental-health content ships); output filters; confidence thresholds (uncertain output → template fallback); ED-screening isolation (DEC-018); no-go list enforced | **2 LOW** | clinical-safety | Mitigated |
+| IR-02 | **Cross-tenant data corruption via migration** — schema migration fan-out corrupts or intermixes tenant data | 2 | 5 | **10 MEDIUM** | RLS fail-closed on all reads; canary migration on test tenant before production; automated rollback on CI failure; migration tested against PITR restore (DATA_MODEL.md §10) | **4 LOW** | enterprise-architect | Mitigated |
+
+#### Confidentiality Risks (C1)
+
+| ID | Risk | Inherent L | Inherent I | Inherent Score | Controls | Residual Score | Owner | Status |
+|---|---|---|---|---|---|---|---|---|
+| CR-01 | **Cross-tenant RLS bypass** — one enterprise tenant reads another tenant's workout or health data | 2 | 5 | **10 MEDIUM** | Fail-closed RLS (missing `tenant_id` → query returns 0 rows, never all rows); `tenant_id` sourced from verified JWT claims (not client-supplied); `tenant_id_missing` counter alert fires P1 if counter >0 (OBSERVABILITY.md §6.2); quarterly RLS policy audit | **3 LOW** | security-engineer | Mitigated |
+| CR-02 | **GDPR Art. 9 health data in operational logs** — workout data, body metrics, or AI prompt content logged to Cloudflare Logpush or Sentry | 2 | 5 | **10 MEDIUM** | AI inference log schema stores only token counts and latency — no prompt or response content (OBSERVABILITY.md §4.5); Sentry `beforeSend` hook strips `workout_data`, `body_metrics`, `coaching_context` before transmission (gap: not yet implemented — see OBSERVABILITY.md Open Questions); 30-day retention for AI inference logs | **4 LOW** | platform-engineer | Partially mitigated |
+
+#### Privacy Risks (P1–P8)
+
+| ID | Risk | Inherent L | Inherent I | Inherent Score | Controls | Residual Score | Owner | Status |
+|---|---|---|---|---|---|---|---|---|
+| PR-01 | **Consent management failure** — GDPR-required consent not recorded before processing special-category health data | 3 | 4 | **12 HIGH** | Consent-at-collection flow (in-app); `privacy.consent_granted` logged to audit trail; ED-screening consent separate from general T&C (DEC-018); withdrawal mechanism in Settings → `privacy.consent_withdrawn` | **6 MEDIUM** | compliance-officer | Partially mitigated (gap: formal consent management platform not yet deployed) |
+| PR-02 | **DSAR response missed** — FORM fails to deliver data export within GDPR 30-day deadline | 3 | 3 | **9 MEDIUM** | `data.export_initiated` logged to audit log; JSON export available in Settings (SECURITY.md §9); formal DSAR SLA procedure (Phase 3 roadmap — not yet documented); Linear ticket with 30-day deadline on each DSAR | **6 MEDIUM** | compliance-officer | Partially mitigated |
+
+#### Vendor / Operational Risks (CC9, CC1)
+
+| ID | Risk | Inherent L | Inherent I | Inherent Score | Controls | Residual Score | Owner | Status |
+|---|---|---|---|---|---|---|---|---|
+| VR-01 | **Anthropic pricing increase or service termination** — LLM infrastructure costs double or primary vendor exits market | 2 | 4 | **8 MEDIUM** | Model tiering flexibility (Haiku for classification, Sonnet for coaching); prompt caching reduces token consumption ~35–40%; cost sensitivity analysis (COST_MODEL.md §10.1 — 2× API cost moves GM only 1.4 pp); architecture does not hard-code Anthropic SDK in mobile client | **5 MEDIUM** | founder | Accept and monitor |
+| VR-02 | **Sentry DPA not confirmed** — processing EU crash data without valid DPA creates GDPR Art. 28 gap | 3 | 3 | **9 MEDIUM** | Sentry DPA review in progress; EU Sentry server (sentry.io EU region) available as alternative; `beforeSend` health data filter (partially implemented) limits sensitive data in crash reports | **6 MEDIUM** | compliance-officer | In progress |
+| OR-01 | **Key person dependency** — founder incapacitation; no other person can operate production systems | 2 | 5 | **10 MEDIUM** | All infrastructure documented in `docs/` repo; all code in GitHub; break-glass credentials in 1Password shared vault (emergency-access contact defined); `docs/ENGINEERING_RUNBOOK.md` covers all operational procedures | **7 MEDIUM** | founder | Accept; revisit at first engineering hire |
+
+### 14.3 Risk Heatmap Summary
+
+```
+Impact →      1-Negligible  2-Minor  3-Moderate  4-Major  5-Catastrophic
+Likelihood ↓
+5-Almost Cert                                              
+4-Likely                                                   
+3-Possible                          PR-02,VR-02  SR-02,PR-01  
+2-Unlikely            AR-03         VR-01        AR-01,SR-05  SR-01,SR-03,SR-04
+                                                 IR-01        AR-02,IR-02
+                                                              CR-01,CR-02
+1-Rare                AR-03
+```
+
+**Inherent risks requiring active mitigation (score ≥ 12):** SR-01 (15), SR-02 (12), PR-01 (12). All three have residual scores ≤ 6 with current controls.
+
+**Highest residual risks (score ≥ 6):** PR-01 (6), PR-02 (6), VR-01 (5), VR-02 (6), SR-04 (5), OR-01 (7). These are tracked as open items in the remediation roadmap.
+
+### 14.4 Review and Update Schedule
+
+| Trigger | Action |
+|---|---|
+| Quarterly | Re-score all risks; update status column; add new risks identified since last review |
+| After any P0 or P1 incident | Create new risk entry or update existing risk's inherent score |
+| Before audit observation period begins | Full risk register review with audit firm; confirm all HIGH inherent risks have documented mitigations |
+| On any new vendor added to sub-processor register | Add vendor risk entry; assign to compliance-officer |
+| On any new product feature involving health data | Add risk entry before feature ships; clinical-safety review required |
+
+---
+
 ## Open Items for compliance-officer
 
 - [ ] Engage audit firm (shortlist: Prescient Assurance, Johanson Group, Sensiba San Filippo)
 - [ ] Draft privacy policy (legal review required)
-- [ ] Complete DPIA for health data processing
-- [ ] Formalize risk register (seed from `docs/SECURITY.md` §1 threat model)
+- [x] Complete DPIA for health data processing — `docs/GDPR_DPIA.md` v0.1 (May 2026)
+- [x] Formalize risk register — Section 14 (May 2026)
 - [x] Define data classification policy tiers — Section 13 (May 2026)
 - [ ] Schedule first DR drill date
 - [ ] Confirm Sentry DPA status
 
 ---
 
-**v0.3 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
+**v0.4 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
 **Review cadence: quarterly. Next review: серпень 2026.**
 
 *v0.2 additions: Sub-Processor Register (CC9, GDPR Art. 28), Complementary User Entity Controls (CUECs), Common Security Questionnaire Responses (CAIQ/SIG Lite pre-answers).*
 *v0.3 additions: Section 13 — Data Classification Policy (four-tier: Public / Internal / Confidential / Restricted). Closes SOC 2 gap C1.1. Critical gaps: 11 → 10. Controls in place: 22 → 23.*
+*v0.4 additions: Section 14 — Formal Risk Register (18 risks across 6 categories: Security, Availability, Processing Integrity, Confidentiality, Privacy, Vendor/Operational). L×S scoring with residual scores and named owners. Closes CC3 gap (formal risk assessment documented). Updated P3 DPIA status to ✅ Done (docs/GDPR_DPIA.md v0.1). Critical gaps: 10 → 9. Partial: 22 → 21. Controls in place: 23 → 25. Readiness: 42% → 45%.*
