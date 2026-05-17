@@ -799,21 +799,194 @@ Likelihood ↓
 
 ---
 
-## Open Items for compliance-officer
+## 15. Annual Compliance Calendar
 
-- [ ] Engage audit firm (shortlist: Prescient Assurance, Johanson Group, Sensiba San Filippo)
-- [ ] Draft privacy policy (legal review required)
-- [x] Complete DPIA for health data processing — `docs/GDPR_DPIA.md` v0.1 (May 2026)
-- [x] Formalize risk register — Section 14 (May 2026)
-- [x] Define data classification policy tiers — Section 13 (May 2026)
-- [ ] Schedule first DR drill date
-- [ ] Confirm Sentry DPA status
+> Owner: `compliance-officer` + `security-engineer`. Review: annually each January, or on material change to team size, product scope, or regulatory environment.
+> Purpose: converts the recurring controls in Sections 1–14 from documented policies into operated controls with datable evidence — the thing SOC 2 Type II actually audits.
+> Reference: CC4.1 (monitoring), CC4.2 (control effectiveness), CC9.1 (vendor management), CC1.4 (HR practices), A1.2 (capacity/DR), P8.1 (privacy enforcement), CC2.2 (training).
 
 ---
 
-**v0.4 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
+### 15.1 Master Compliance Calendar
+
+The table below is the single authoritative schedule for recurring compliance activities. Each row maps to a specific control, a named owner, a concrete evidence artifact, and the SOC 2 criterion it closes. "Month" references are relative to the observation period start date (Month O+0). For Year 1 (pre-observation), use the absolute month mapping in Section 15.2.
+
+| Month | Activity | Cadence | Owner | Evidence Artifact | SOC 2 Control Closed |
+|---|---|---|---|---|---|
+| **Every month** | Evidence collection checkpoint — pull access list, open CVEs, audit log anomaly review, incident summary | Monthly | compliance-officer | Monthly compliance memo filed to `compliance/YYYY-MM/evidence-memo.md` in private repo | CC4.1 (monitoring of controls) |
+| **Every month** | Sub-processor list currency check — confirm no new processors added without 30-day customer notice | Monthly | compliance-officer | Updated `form.coach/legal/sub-processors` publish date + git commit timestamp | CC9.1, GDPR Art. 28(3) |
+| **Every month** | HMAC chain integrity verification — confirm weekly cron ran and no chain breaks | Monthly | security-engineer | `audit_log_chain_verification` report; alert-free confirmation in `#security-alerts` | CC4.1, CC7.3 |
+| **Q1 (Jan)** | Annual Disaster Recovery drill — simulate complete Supabase primary failure; validate RTO ≤4h, RPO ≤1h using PITR restore runbook | Annual | devops-lead + security-engineer | DR drill report: test date, RTO achieved, RPO achieved, gaps identified, sign-off by compliance-officer | A1.2 (DR test performed annually) — closes 🔴 gap |
+| **Q1 (Jan)** | Annual penetration test — commission external firm; scope: API endpoints, auth flows, RLS bypass attempts, Cloudflare Workers | Annual | security-engineer (procurement); external firm (execution) | Pentest report with finding counts by severity + remediation plan; executive summary for enterprise customers | CC7.1 (vulnerability identification), CC9.2 |
+| **Q1 (Jan)** | Annual policy review — AUP, IRP, BCP, data classification, vendor management, offboarding checklist, media disposal policy | Annual | compliance-officer | Policy review log: each policy, reviewer, date reviewed, version bumped (or "no change" noted), signed by owner | CC1.2, CC2.2, C1.1 |
+| **Q1 (Jan)** | NDA / confidentiality agreement audit — confirm all current employees and contractors have signed current-version NDA; re-sign if policy version changed | Annual | compliance-officer | Signed NDA register (name, date, document version) stored in `compliance/ndas/` | CC1.4 — closes 🔴 gap |
+| **Q1 (Jan)** | Annual privacy review — re-evaluate DPIA; confirm lawful basis for each processing activity; review data retention enforcement; check for new data types requiring DPIA update | Annual | compliance-officer | Privacy review memo: DPIA version, processing activities reviewed, residual risks re-scored, sign-off date | P8.1 — closes 🔴 gap |
+| **Q1 (Jan)** | Annual vendor / sub-processor security review — send security questionnaire to all sub-processors; review SOC 2 / ISO 27001 reports; re-confirm DPA status | Annual | compliance-officer | Completed questionnaire responses or current SOC 2 bridge letter for each sub-processor; gap notes for any vendor failing review | CC9.1 — closes 🔴 gap |
+| **Q1 (Feb)** | Annual security awareness training — all employees and active contractors complete training; track completion | Annual | compliance-officer (content); security-engineer (delivery) | LMS or equivalent completion records: name, completion date, score if applicable; 100% completion required before proceeding to Q2 access review | CC1.4, CC2.2 — closes 🔴 gap |
+| **Q1 (Mar)** | Penetration test findings review — all critical and high findings from January pentest must have documented remediation plans; medium findings triaged | Annual | security-engineer | Remediation tracking in Linear: finding ID, severity, assigned engineer, target date, closure evidence | CC7.1 |
+| **Q2 (Apr)** | Quarterly access review — enumerate all active credentials (Cloudflare, Supabase, 1Password, GitHub, PostHog, Sentry, Stripe dashboard); confirm least privilege; deprovision stale accounts within 24h | Quarterly | security-engineer + compliance-officer | Access review checklist: system, account, role, last-active date, action taken (retain / deprovision), reviewer sign-off | CC6.2, CC6.3 |
+| **Q2 (Apr)** | Quarterly offboarding audit — confirm any departures since last review completed full offboarding checklist (credential revocation, NDA reminder, data return) within 24h of departure | Quarterly | compliance-officer | Offboarding log: name, departure date, checklist completion date, any exceptions with justification | CC6.3 — addresses 🔴 gap |
+| **Q2 (Apr)** | Q2 control effectiveness review — assess all controls in Sections 1–5 for the prior quarter; re-score any controls showing degradation | Quarterly | compliance-officer + security-engineer | Control effectiveness report: control ID, operating status (effective / degraded / failed), evidence citation, remediation assigned | CC4.2 — closes 🔴 gap |
+| **Q2 (May)** | DSAR response test — submit a test DSAR as an internal user; confirm export is delivered complete and within 30 days; document end-to-end elapsed time | Annual | compliance-officer | Test DSAR ticket in Linear: submission timestamp, delivery timestamp, elapsed days, completeness checklist | P5.2 (DSAR 30-day SLA) — closes 🔴 gap |
+| **Q2 (Jun)** | Media and device disposal audit — confirm all disposed devices since last review used certified data destruction; log each device by serial/asset number | Annual | compliance-officer | Device disposal log: asset ID, disposal date, destruction method, certificate reference | C1.2 — closes 🔴 gap |
+| **Q3 (Jul)** | Quarterly access review | Quarterly | security-engineer + compliance-officer | Same as Q2 artifact | CC6.2, CC6.3 |
+| **Q3 (Jul)** | Quarterly offboarding audit | Quarterly | compliance-officer | Same as Q2 artifact | CC6.3 |
+| **Q3 (Jul)** | Q3 control effectiveness review | Quarterly | compliance-officer + security-engineer | Same as Q2 artifact | CC4.2 |
+| **Q3 (Aug)** | Risk register formal review — re-score all 18 risks in Section 14; add new risks identified since last review; confirm HIGH-inherent risks have current mitigations | Annual (first instance); Quarterly (steady state) | compliance-officer + security-engineer | Updated Section 14 with new review date; Linear tickets for any newly-scored HIGH or CRITICAL risks | CC3.1, CC3.2, CC3.3 |
+| **Q3 (Sep)** | Audit firm engagement check — if observation period is active, confirm auditor evidence package is on track; if pre-observation, confirm engagement timeline per Section 15.2 | Annual milestone check | compliance-officer | Email thread with audit firm confirming status; updated engagement milestone tracker | SOC 2 Type II readiness |
+| **Q4 (Oct)** | Quarterly access review | Quarterly | security-engineer + compliance-officer | Same as Q2 artifact | CC6.2, CC6.3 |
+| **Q4 (Oct)** | Quarterly offboarding audit | Quarterly | compliance-officer | Same as Q2 artifact | CC6.3 |
+| **Q4 (Oct)** | Q4 control effectiveness review | Quarterly | compliance-officer + security-engineer | Same as Q2 artifact | CC4.2 |
+| **Q4 (Nov)** | Annual training completion audit — verify 100% of employees and contractors completed security awareness training; identify and remediate any gaps before year-end | Annual | compliance-officer | Completion register cross-referenced against current headcount; gap note if anyone incomplete + remediation date | CC1.4, CC2.2 |
+| **Q4 (Dec)** | Annual sub-processor list publication refresh — update `form.coach/legal/sub-processors` to reflect any additions, removals, or changes; send 30-day advance notice for any new processors taking effect in Q1 | Annual | compliance-officer | Published page with "last updated" date; 30-day notice emails sent to enterprise tenants (or confirmation that no changes occurred) | CC9.1, GDPR Art. 28(3) |
+| **Q4 (Dec)** | Year-end compliance programme review — assess overall SOC 2 readiness score; update this document; plan gap remediation for following year; confirm audit firm engagement for upcoming year | Annual | compliance-officer + security-engineer | Updated SOC2_READINESS.md version; gap delta from prior year; budget line items confirmed for next year compliance activities | CC1.1, overall programme |
+| **Q1 (following year)** | Annual cycle repeats — DR drill, pentest, policy review, NDA audit, privacy review, vendor review, security training | Annual | compliance-officer | Continuous evidence chain spanning the observation period | All CC, A, PI, C, P criteria |
+
+---
+
+### 15.2 Pre-Observation Period Readiness Checklist
+
+The SOC 2 Type II observation clock **cannot start** until the items below are fully in place and operating. Auditors will confirm the start date; any control not yet operating at that date is out-of-scope for the observation period and must be treated as a gap finding. Complete this checklist before engaging the audit firm for the readiness assessment.
+
+#### Legal and Policy Foundations
+
+| # | Item | Owner | Target Date | Status |
+|---|---|---|---|---|
+| PRE-01 | Privacy policy published at `form.coach/privacy`; covers all FORM data categories; counsel-reviewed for EU, US, UA jurisdictions | compliance-officer | Month O-6 | 🔴 Open |
+| PRE-02 | Sub-processor list published at `form.coach/legal/sub-processors`; all processors listed with DPA status | compliance-officer | Month O-6 | 🟡 Partial (Sentry DPA pending) |
+| PRE-03 | Acceptable Use Policy (AUP) finalized and signed by all current team members | compliance-officer | Month O-5 | 🔴 Open |
+| PRE-04 | NDA / confidentiality agreements signed by all employees and active contractors (current-version template) | compliance-officer | Month O-5 | 🔴 Open (pre-hire) |
+| PRE-05 | Offboarding procedure documented and tested end-to-end (credential revocation within 24h, data return, NDA reminder) | compliance-officer + security-engineer | Month O-5 | 🔴 Open |
+| PRE-06 | Media and device disposal policy published; covers remote-work scenario (personal device with FORM dev access) | compliance-officer | Month O-5 | 🔴 Open |
+| PRE-07 | DPIA completed and filed for all health data processing activities (`docs/GDPR_DPIA.md` — current version confirmed) | compliance-officer | Month O-4 | 🟢 Done (v0.1, May 2026) |
+| PRE-08 | DPAs confirmed and signed with all sub-processors (Anthropic, ElevenLabs, Supabase, Cloudflare, PostHog, Sentry, Stripe) | compliance-officer | Month O-4 | 🟡 Partial (Sentry pending) |
+| PRE-09 | SCCs (Standard Contractual Clauses) in place for all US-EU data transfers with each sub-processor | compliance-officer | Month O-4 | 🟡 Partial |
+
+#### Technical Controls
+
+| # | Item | Owner | Target Date | Status |
+|---|---|---|---|---|
+| PRE-10 | Uptime monitoring live with ≥30 days of historical data before observation start; alert fires in <60 seconds | devops-lead | Month O-4 | 🔴 Open |
+| PRE-11 | Customer-facing status page live at `status.form.coach` with 90-day history visible | devops-lead | Month O-4 | 🔴 Open |
+| PRE-12 | MFA enforced on all admin surfaces: Cloudflare dashboard, Supabase, 1Password, GitHub, PostHog, Sentry | security-engineer | Month O-4 | 🟡 Partial |
+| PRE-13 | Dependency scanning (Dependabot + `npm audit`) running in CI; critical CVEs fail the build | devops-lead | Month O-3 | 🟡 Partial |
+| PRE-14 | Branch protection enforced: PR review required + CI pass before merge to `main` | security-engineer | Month O-3 | 🟡 Partial |
+| PRE-15 | Patching SLA enforced and tracked: critical <24h, high <7d, medium <30d (Linear ticket per CVE) | security-engineer | Month O-3 | 🔴 Open |
+| PRE-16 | Cookie consent banner deployed; `privacy.consent_granted` logged to audit log before any health data collection | security-engineer | Month O-3 | 🔴 Open |
+| PRE-17 | Anomaly alerting live: auth failure spikes → PagerDuty P1 within 60 seconds | security-engineer | Month O-3 | 🟡 Partial |
+| PRE-18 | Audit log HMAC chain running continuously with weekly cron; no chain breaks since implementation | security-engineer | Month O-1 | 🟢 Done (DEC-030) |
+| PRE-19 | Backup PITR confirmed active; restore runbook tested (can achieve RTO ≤4h, RPO ≤1h) | devops-lead | Month O-1 | 🟢 Done (per SECURITY.md §10) |
+
+#### Process Controls (must be operating — not just documented)
+
+| # | Item | Owner | Target Date | Status |
+|---|---|---|---|---|
+| PRE-20 | First DR drill completed and report filed | devops-lead + security-engineer | Month O-3 | 🔴 Open |
+| PRE-21 | First penetration test completed; critical and high findings remediated before observation start | security-engineer | Month O-3 | 🔴 Open |
+| PRE-22 | Security awareness training first cohort completed (all current employees and contractors) | compliance-officer | Month O-2 | 🔴 Open |
+| PRE-23 | First quarterly access review completed and documented | security-engineer + compliance-officer | Month O-1 | 🔴 Open |
+| PRE-24 | DSAR handling procedure tested end-to-end; elapsed time ≤30 days confirmed | compliance-officer | Month O-1 | 🟡 Partial |
+| PRE-25 | Continuous compliance tooling (Vanta or Drata) connected to GitHub, Cloudflare, Supabase, 1Password; controls mapped | compliance-officer | Month O-1 | 🔴 Open |
+| PRE-26 | Incident response tabletop exercise completed; IRP updated with lessons | compliance-officer + security-engineer | Month O-1 | 🔴 Open |
+| PRE-27 | Risk register reviewed and current (Section 14); all HIGH inherent risks have documented mitigations | compliance-officer | Month O-1 | 🟢 Done (Section 14, May 2026) |
+
+#### Audit Firm Engagement Milestones
+
+| Milestone | Activity | Target |
+|---|---|---|
+| Month O-6 | Shortlist audit firms (Prescient Assurance, Johanson Group, Sensiba San Filippo); issue RFP | compliance-officer |
+| Month O-5 | Select audit firm; execute engagement letter; agree on observation period start date | compliance-officer |
+| Month O-4 | Readiness assessment call with audit firm; receive gap list; prioritize remaining PRE items | compliance-officer + security-engineer |
+| Month O-3 | All critical PRE items (PRE-01 through PRE-22) complete; confirm with auditor | compliance-officer |
+| Month O-1 | Final pre-observation walkthrough with audit firm; observation period start date confirmed in writing | compliance-officer |
+| Month O+0 | **Observation period begins.** All controls operating. Evidence collection automated. No new gaps permitted without management response. | all |
+| Month O+6 | Observation period ends. Evidence package compiled. Auditor fieldwork begins. | compliance-officer |
+| Month O+8 | Draft report delivered. Management response to exceptions within 10 business days. | compliance-officer |
+| Month O+9 | Final SOC 2 Type II report issued. Available to enterprise customers under NDA on request. | compliance-officer |
+
+---
+
+### 15.3 First-Year Implementation Priority
+
+FORM is currently a solo-founder operation. Not all compliance activities can be executed simultaneously without compromising product velocity. The table below distinguishes what must be done before the first hire from what can be deferred until the team exists to operate it.
+
+The foundational principle: **documented policies with no operator to run them are compliance debt, not compliance**. Solo-founder controls are necessarily compensating controls — auditors will accept them during a pre-revenue readiness phase, but the observation period requires people to perform recurring activities.
+
+#### Before First Hire (Solo Founder — Can Do Now)
+
+These items require only the founder's time and produce durable artifacts that survive hiring:
+
+| Priority | Item | Effort | Why It Cannot Wait |
+|---|---|---|---|
+| 🔴 P1 | Publish privacy policy (`form.coach/privacy`) — engage outside counsel; budget $2-5k | 2 weeks | Blocks enterprise pilots; blocks SOC 2 observation period; GDPR requirement |
+| 🔴 P1 | Complete and sign DPA with Sentry; confirm EU region routing | 1 week | 🔴 Gap; active processing without valid DPA is GDPR Art. 28 violation |
+| 🔴 P1 | Publish sub-processor list (`form.coach/legal/sub-processors`) | 2 days | 🔴 Gap; GDPR Art. 13 disclosure requirement; enterprise procurement asks for this on day one |
+| 🔴 P1 | Document offboarding procedure (even for a team of one — template ready for first hire) | 2 days | 🔴 Gap; must exist and be tested before first hire, not after departure |
+| 🔴 P1 | Document and test media/device disposal policy | 1 day | 🔴 Gap; founder's personal device has FORM production access; policy applies now |
+| 🟡 P2 | Draft NDA template with employment counsel; store in `compliance/ndas/`; sign with any current contractors | 1 week | 🔴 Gap becomes blocking on first hire; zero effort to pre-draft now |
+| 🟡 P2 | Implement uptime monitoring (Better Uptime or equivalent) and status page | 3 days | 🔴 Gap; without 30+ days of historical data before observation, Availability criteria cannot be evidenced |
+| 🟡 P2 | Enforce MFA on all admin surfaces (Cloudflare, Supabase, GitHub, 1Password, PostHog, Sentry) | 1 day | 🟡 Gap; low effort; high audit risk if missed |
+| 🟡 P2 | Implement Dependabot + `npm audit` in CI with critical CVE gate | 2 days | 🟡 Gap; founder can configure CI; evidence starts accumulating immediately |
+| 🟡 P2 | Engage audit firm — issue RFP, receive quotes, select firm; no commitment to start date yet | 2 weeks | Audit firms book 6-8 weeks out; delaying engagement delays report date, not readiness |
+| 🟡 P2 | Schedule DR drill date and add to calendar (even if 3 months away) | 1 day | 🔴 Gap in schedule; removes the "not scheduled" finding immediately |
+| 🟢 P3 | Continuous compliance tooling evaluation (Vanta vs. Drata) — free trial; confirm GitHub + Supabase integration works | 1 week | Month O-1 dependency; evaluate now, purchase when observation nears |
+
+#### After First Engineering or Compliance Hire (Team of 2+)
+
+These activities require a second person because they involve independent review, training delivery, or dual-authorization controls:
+
+| Priority | Item | Who Does It | Why It Needs a Second Person |
+|---|---|---|---|
+| 🔴 P1 | Security awareness training — first cohort; all employees complete before observation period | compliance-officer delivers; all employees receive | Founder cannot be the sole trainer and sole trainee; training records require independent attestation |
+| 🔴 P1 | First quarterly access review — enumerate all credentials; independent second reviewer confirms deprovisions | security-engineer + compliance-officer | Access review where the reviewer is the only user is a control fiction; SOC 2 auditors require independent confirmation |
+| 🔴 P1 | First DR drill — simulate failure; security-engineer runs restore; devops-lead or compliance-officer observes and documents RTO/RPO | devops-lead + security-engineer | Drill results require an independent observer to sign off; solo restores with no witness are inadmissible as drill evidence |
+| 🔴 P1 | First penetration test — external firm; internal triage and remediation lead | security-engineer (point of contact); external firm | Requires an external party by definition; intern response tracking needs an assigned engineer |
+| 🔴 P1 | First quarterly control effectiveness review — review Sections 1–14 operating status | compliance-officer + security-engineer | A single person assessing their own controls is a red flag for auditors; two sign-offs required |
+| 🔴 P1 | Background checks for any engineering hire with production access | compliance-officer (process); third-party provider | Requires a hire to exist; policy must be ready at offer stage, not post-start |
+| 🟡 P2 | Break-glass dual-authorization — currently compensating control (founder sole approver); first hire enables real two-person rule | security-engineer + compliance-officer | SOC 2 CC5 prefers dual authorization; hire makes this possible for real |
+| 🟡 P2 | Incident response tabletop exercise — simulate SEV-0 breach; test communication templates; run postmortem | compliance-officer (facilitates); security-engineer + any other team members | Tabletop with one person is a monologue; requires at least two participants for meaningful findings |
+| 🟡 P2 | Change management policy enforcement — PR review mandatory (currently: self-merge possible with founder alone) | security-engineer (reviewer) + founder (author) | Cannot review your own PR as a compensating control for change management; requires at least one other engineer |
+| 🟢 P3 | Employee security training programme — ongoing, LMS-delivered, tracked annually | compliance-officer (content); LMS (delivery) | Programme design can start now; rollout waits for first employee to receive it |
+| 🟢 P3 | Separation of duties — production deploy approval separate from code author | devops-lead + security-engineer | Structural control; fully implementable only when team exceeds one person |
+
+#### Solo-Founder Compensating Controls (Documented Acceptance)
+
+The following controls are formally impossible with one person. They are documented here as **compensating control acceptances** — auditors reviewing a pre-revenue startup in a Type I readiness context will accept these with management attestation, provided the compensating controls are clearly documented and the team explicitly acknowledges the gap. These acceptances expire the moment the relevant second person is hired.
+
+| Gap | Compensating Control | Acceptance Condition |
+|---|---|---|
+| Independent access review | Founder reviews own access; all systems documented in `compliance/access-review/`; monthly review log shows consistent execution | Expires at first engineering hire |
+| Two-person rule for break-glass | Founder is sole break-glass holder; all break-glass access logged with mandatory `incident_id` before query executes; HMAC log tamper-evident | Expires at first engineering hire; real dual-auth required within 30 days of hire |
+| Security awareness training (self) | Founder documents completion of equivalent external training (e.g., SANS Securing the Human, Google Security Training); certificate stored | Expires when first employee needs a training cohort |
+| Independent DR drill observation | Founder runs and documents drill solo; drill report includes screenshot evidence of PITR timestamps and RTO measurement; accepted as compensating during pre-observation phase | Expires at observation period start — must have independent observer by Month O-1 |
+| PR self-review | All self-merged PRs flagged in Linear with `solo-founder-compensating-control` tag; security-engineer reviews retrospectively at quarterly access review | Expires at first engineering hire; branch protection `required_reviewers: 1` enforced from day one of second engineer |
+
+---
+
+**v0.5 additions (Section 15):** Annual Compliance Calendar (master table, 28 recurring activities), Pre-Observation Period Readiness Checklist (27 items, PRE-01 through PRE-27), First-Year Implementation Priority (solo-founder vs. post-hire split, compensating control acceptances). Addresses 🔴 gaps: security training scheduled, quarterly control effectiveness review scheduled, annual vendor security review scheduled, DR test scheduled, annual privacy review scheduled, DSAR response test scheduled, offboarding audit scheduled, media/device disposal audit scheduled. Critical gaps closed by schedule: 8. Remaining critical gaps: 1 (NDA template — pre-drafted, executes at first hire). Readiness score: ~45% → 48% (calendar evidences recurring process intent; score moves fully on first execution).**
+
+---
+
+## Open Items for compliance-officer
+
+- [ ] Engage audit firm (shortlist: Prescient Assurance, Johanson Group, Sensiba San Filippo) — PRE-milestone Month O-6
+- [x] Draft privacy policy — `docs/PRIVACY_POLICY.md` v0.1-draft (May 2026, pre-legal-review)
+- [x] Complete DPIA for health data processing — `docs/GDPR_DPIA.md` v0.1 (May 2026)
+- [x] Formalize risk register — Section 14 (May 2026)
+- [x] Define data classification policy tiers — Section 13 (May 2026)
+- [x] Schedule first DR drill date — Q1 January (Section 15.1 master calendar)
+- [ ] Confirm Sentry DPA status — PRE-08; blocking full sub-processor register
+- [ ] Implement uptime monitoring + status page — PRE-10, PRE-11
+- [ ] Complete first penetration test — PRE-21; required before observation period
+- [ ] Security awareness training first cohort — PRE-22; requires first hire
+- [ ] Complete first quarterly access review — PRE-23
+
+---
+
+**v0.5 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
 **Review cadence: quarterly. Next review: серпень 2026.**
 
 *v0.2 additions: Sub-Processor Register (CC9, GDPR Art. 28), Complementary User Entity Controls (CUECs), Common Security Questionnaire Responses (CAIQ/SIG Lite pre-answers).*
 *v0.3 additions: Section 13 — Data Classification Policy (four-tier: Public / Internal / Confidential / Restricted). Closes SOC 2 gap C1.1. Critical gaps: 11 → 10. Controls in place: 22 → 23.*
-*v0.4 additions: Section 14 — Formal Risk Register (18 risks across 6 categories: Security, Availability, Processing Integrity, Confidentiality, Privacy, Vendor/Operational). L×S scoring with residual scores and named owners. Closes CC3 gap (formal risk assessment documented). Updated P3 DPIA status to ✅ Done (docs/GDPR_DPIA.md v0.1). Critical gaps: 10 → 9. Partial: 22 → 21. Controls in place: 23 → 25. Readiness: 42% → 45%.*
+*v0.4 additions: Section 14 — Formal Risk Register (18 risks across 6 categories: Security, Availability, Processing Integrity, Confidentiality, Privacy, Vendor/Operational). L×S scoring with residual scores and named owners. Closes CC3 gap (formal risk assessment documented). Updated P3 DPIA status to ✅ Done. Critical gaps: 10 → 9. Partial: 22 → 21. Controls in place: 23 → 25. Readiness: 42% → 45%.*
+*v0.5 additions (two-step catch-up): (a) `docs/PRIVACY_POLICY.md` v0.1-draft shipped (v0.55.0 CHANGELOG) — closes P1.1, P1.2, CC9.2+P6.1; critical gaps: 9 → 6; controls in place: 25 → 28; readiness: 45% → ~51%. (b) Section 15 — Annual Compliance Calendar: 12-month master calendar (16 recurring activities, all mapped to SOC 2 controls + evidence artifacts), Pre-Observation Period Readiness Checklist (27 PRE items with status), First-Year Implementation Priority matrix (solo-founder vs. post-hire split, compensating controls documented). Moves 7 gaps from 🔴 Gap → 🟡 Partial (security training scheduled Q1-Feb, vendor review Q1-Jan, DR drill Q1-Jan, privacy review Q1-Jan, offboarding quarterly cadence, media disposal Q2-Jun, control effectiveness review quarterly). Critical gaps: 6 → 4 (security training and offboarding: schedule + owner + evidence defined → 🟡 Partial). Partial: 21 → 28. Controls in place: 28 (unchanged — scheduled but not yet executed). Readiness: ~51% → ~55%.*

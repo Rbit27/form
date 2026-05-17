@@ -119,6 +119,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-25-breathing-mechanics.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-26-tendon-ligament-adaptation.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-27-training-age-vs-chronological-age.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-28-progressive-overload-mechanics.md | Blog | draft · clinical-safety PASS · sports-scientist DONE |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

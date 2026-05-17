@@ -9,6 +9,20 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.57.0] — 2026-05-17
+
+### Added
+- `content/post-28-progressive-overload-mechanics.md` — «Прогресивне перевантаження — механізм адаптації, а не мотиваційна мантра» (~2 700 слів, 14 хв). Охоплює: mechanical tension як головний драйвер гіпертрофії, mTORC1-шлях, repeated bout effect, SRA-крива (Stimulus → Recovery → Adaptation) з поясненням різних часових рамок для м'язів vs. сполучної тканини. Шість форм прогресії в ієрархії (load → volume → density → frequency → ROM → технічна якість). Чому лінійна прогресія ламається у intermediate-атлетів: нейронний vs. структурний резерв, накопичення втоми приховує fitness. Практичне дерево рішень: RPE-gate → volume threshold → load bump (double progression). Шість найпоширеніших помилок: PR кожного тижня, деградація техніки, плутанина втома/адаптація, часта зміна вправ, агресивне нарощування об'єму, ігнорування не-тренувальних змінних. Контекст AI-тренера: детекція стагнації, deload на основі реального RPE vs. запланованого. Цитати: Schoenfeld (2010 *JSCR*; 2016 *Sports Med*; 2017 *J Sports Sci*), Helms et al. (2016 *SCJ*), Krieger (2010 *JSCR*), Ralston et al. (2017 *Sports Med*), Plisk & Stone (2003 *SCJ*), Zourdos et al. (2016 *JSCR*), Dankel et al. (2017 *Eur J Appl Physiol*). Clinical-safety: PASS.
+- `docs/SOC2_READINESS.md` Section 15 — Annual Compliance Calendar. Три підрозділи: (15.1) Master Compliance Calendar — 16 recurring activities mapped to SOC 2 controls, named owners, and evidence artifacts across monthly/quarterly/annual cadences; (15.2) Pre-Observation Period Readiness Checklist — 27 PRE items across Legal/Policy Foundations (PRE-01–09), Technical Controls (PRE-10–19), Process Controls (PRE-20–27), plus Audit Firm Engagement milestone timeline (Month O-6 to O+9); (15.3) First-Year Implementation Priority matrix — Before First Hire (12 items P1–P3 with effort estimates) vs. After First Hire (10 items), plus documented Compensating Controls acceptance for 5 solo-founder-specific gaps. Moves 7 items from 🔴 Gap → 🟡 Partial (security training Q1-Feb, vendor review Q1-Jan, DR drill Q1-Jan, privacy review Q1-Jan, offboarding quarterly, media disposal Q2-Jun, control effectiveness review quarterly). Critical gaps: 6 → 4. Partial: 21 → 28. Readiness: ~51% → ~55%. Open Items updated: draft privacy policy ✅, DR drill scheduled ✅.
+
+### Changed
+- `blog.html` — картка Post 28 (прогресивне перевантаження — механізм адаптації) додана до card-grid після Post 27. Загальна кількість карток: 27 → 28.
+- `STATUS.md` — content engine: рядок post-28 додано (draft · clinical-safety PASS · sports-scientist DONE).
+- `docs/SOC2_READINESS.md` — version footer v0.4 → v0.5; Open Items оновлено: 5 нових відкритих пунктів (Sentry DPA, uptime monitoring, pentest, security training first cohort, first access review); DR drill date тепер `[x]` (Section 15.1 Q1-Jan calendar entry).
+- `VERSION` → 0.56.1 → 0.57.0
+
+---
+
 ## [0.56.1] — 2026-05-17
 
 ### Changed
