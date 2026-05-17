@@ -9,6 +9,20 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.52.0] — 2026-05-17
+
+### Added
+- `blog.html` → картки post-22 (periodization, 15 хв) і post-23 (VBT, 13 хв) додані до card-grid після post-21.
+
+### Changed
+- `README.md` → roadmap: post-22/23 позначені `[x]`; нові теми post-24..27 (mobility, breathing mechanics, tendon adaptation, training age) додані до roadmap; blog posts counter оновлено
+- `STATUS.md` → записи post-21, post-22, post-23 додані до content engine таблиці
+- `VERSION` → 0.51.0 → 0.52.0
+
+> **Note:** `content/post-23-velocity-based-training.md` буде додано наступним commit після завершення sports-scientist review.
+
+---
+
 ## [0.51.0] — 2026-05-17
 
 ### Added

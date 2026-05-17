@@ -112,6 +112,9 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-17-overtraining-vs-laziness.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-18-rest-intervals.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-20-doms-muscle-soreness.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-21-cv-vs-wearables.md | Blog | draft · clinical-safety PASS · sports-scientist pending · platform-engineer pending |
+| post-22-periodization.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-23-velocity-based-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

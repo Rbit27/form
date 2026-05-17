@@ -332,8 +332,12 @@ Each iteration:
 - [x] post-19: Warm-up протоколи — статичний vs динамічний стретчинг, PAP
 - [x] post-20: Крепатура (DOMS) — EIMD, repeated bout effect, «без болю немає росту» міф
 - [x] post-21: CV vs wearable-only — pose estimation, on-device inference, bar path tracking
-- [ ] post-22: Mobility work — що справді важливо vs. що є театром
-- [ ] post-23: Velocity Based Training — практика без дорогих датчиків
+- [x] post-22: Periodization — лінійна, DUP, блочна: матриця вибору за рівнем
+- [x] post-23: Velocity Based Training — load-velocity relationship, VLT, без Gymaware
+- [ ] post-24: Mobility work — що справді важливо vs. що є театром
+- [ ] post-25: Breathing mechanics під навантаженням — Valsalva, bracing, IAP
+- [ ] post-26: Адаптація сухожиль і зв'язок — чому вона повільніша і чому це має значення
+- [ ] post-27: Training age vs. chronological age — адаптаційна ємність і сенс "починати пізно"
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
