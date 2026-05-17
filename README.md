@@ -342,7 +342,7 @@ Each iteration:
 - [x] post-29: Mind-muscle connection — internal vs. external focus, EMG studies, коли IFA має сенс і коли заважає
 - [x] post-30: Eccentric training — чому фаза опускання важливіша за підйом (mechanical tension, muscle damage, time under tension)
 - [x] post-31: Unilateral training — коли і чому (strength asymmetry, core stability, transfer to sport)
-- [ ] post-32: Cluster sets — накопичення об'єму без кумулятивної втоми (inter-repetition rest, power maintenance)
+- [x] post-32: Cluster sets — накопичення об'єму без кумулятивної втоми (inter-repetition rest, power maintenance)
 - [ ] post-33: Energy systems для силовика — ATP-PCr, glycolytic, oxidative: що реально важливо для ваш тренування
 - [ ] post-34: Supersets і antagonist pairs — time efficiency без компромісу з продуктивністю
 - [ ] post-35: Tempo-prescribed тренування — наука і практика контрольованої швидкості повторення

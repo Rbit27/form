@@ -123,6 +123,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-29-mind-muscle-connection.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-30-eccentric-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-31-unilateral-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-32-cluster-sets.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
