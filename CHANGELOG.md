@@ -9,6 +9,24 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.53.0] — 2026-05-17
+
+### Added
+- `content/post-24-training-to-failure.md` — sports-science post «До відмови чи ні: коли остання повторення має значення, а коли руйнує наступну». ~1800 слів, 12 хв читання. Охоплює: три типи відмови (concentric muscular / technical / volitional); огляд Schoenfeld & Grgic 2019 — proximity-to-failure як основний предиктор гіпертрофії; Refalo et al. 2022 мета-аналіз — failure vs 1–2 RIR при зіставному об'ємі дає однакову гіпертрофію; Morton et al. 2019 — широкий RIR-діапазон і зіставний ріст; Sampson & Groeller 2016 — нейром'язова стомленість після failure sets; контексти де відмова виправдана (ізоляція, 1RM-тест, кінець акумуляційного блоку); практична таблиця RIR за контекстом. clinical_safety_status: PASS.
+- `blog.html` → картка post-24 («До відмови чи ні») додана до card-grid. Загальна кількість карток: 23 → 24.
+- `docs/COST_MODEL.md` §8.5 Enterprise CAC Model — трирівнева модель (20/100/500 seats) з розбивкою по: AE/SDR outreach, technical POC, legal review, amortized content. Cash CAC range: $1,000–$14,000 залежно від розміру deal-у.
+- `docs/COST_MODEL.md` §8.6 LTV/CAC Analysis — LTV = ACV × 3yr × 89% GM. Всі три розміри deal-у повертають LTV/CAC вище 10×: Small 11.9×, Mid 22.9×, Large 52.2×. Payback period: 3 → 0.6 місяців.
+- `docs/COST_MODEL.md` §8.7 Expansion and Churn Economics — NRR модель для когорти 10 mid-deal ($360k ARR): 3 сценарії (80% / 105% / 117% NRR); expansion triggers (SSO-based frictionless rollout, pilot→company-wide); churn signals (champion departure, <30% utilization by M3, Q4 budget reset). Benchmark: Series A target >110% NRR.
+- `docs/COST_MODEL.md` §8.8 Year 1 vs Year 2+ Deal Economics — таблиця waterfall: імплементаційна вартість amortized → +4.1 pp margin у Year 2. Multi-year contract strategy: 5–8% discount виправданий.
+- `docs/COST_MODEL.md` §10.5 Enterprise Revenue Mix Sensitivity — 4-сценарна таблиця (5% → 80% enterprise mix): blended GM від ~82% до ~88%. Висновок: mix — вторинний lever, стратегічний кейс для enterprise — NRR і predictability.
+
+### Changed
+- `docs/COST_MODEL.md` Table of Contents — додані посилання на §8.5–8.8 та §10.5.
+- `docs/COST_MODEL.md` version footer — v0.1 → v0.2.
+- `VERSION` → 0.52.1 → 0.53.0
+
+---
+
 ## [0.52.1] — 2026-05-17
 
 ### Added

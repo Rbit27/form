@@ -14,8 +14,13 @@
 6. [Gross Margin Targets](#6-gross-margin-targets)
 7. [Scaling Economics](#7-scaling-economics)
 8. [Enterprise Economics](#8-enterprise-economics)
+   - 8.5 Enterprise CAC Model
+   - 8.6 LTV/CAC Analysis
+   - 8.7 Expansion and Churn Economics
+   - 8.8 Year 1 vs. Year 2+ Deal Economics
 9. [App Store Tax Impact](#9-app-store-tax-impact)
 10. [Sensitivity Analysis](#10-sensitivity-analysis)
+    - 10.5 Enterprise Revenue Mix Sensitivity
 11. [Open Questions / Gaps](#11-open-questions--gaps)
 
 ---
@@ -303,6 +308,79 @@ Deals below 20 seats are currently declined — the implementation overhead is n
 
 Enterprise wins on margin even with dedicated CS, because the direct billing relationship eliminates the App Store tax entirely.
 
+### 8.5 Enterprise CAC Model
+
+Enterprise CAC is the all-in cost to acquire one signed deal: marketing attribution, sales time, and pre-sales technical work. Unlike consumer CAC (driven by paid acquisition), enterprise CAC is driven by human time.
+
+| Cost item | Small deal (20 seats) | Mid deal (100 seats) | Large deal (500 seats) |
+|---|---|---|---|
+| SDR/AE outreach and qualification | $400–600 (founder-led) | $1,500–2,500 (AE at $120k OTE, 20 deals/year) | $3,500–6,000 (AE + SDR) |
+| Technical evaluation / POC | $300–500 (0.5–1 eng day) | $800–1,500 (1.5–3 eng days) | $2,000–4,000 (3–6 eng days) |
+| Legal and compliance review | $200–400 | $500–800 | $1,500–3,000 |
+| Content and outreach (amortized) | $100–200 | $300–500 | $500–1,000 |
+| **Total enterprise CAC [ESTIMATE]** | **$1,000–1,700** | **$3,100–5,300** | **$7,500–14,000** |
+
+Notes:
+- **Founder-led sales (pre-PMF):** No explicit AE cash cost. Founder time has opportunity cost but is not a cash outflow. Small-deal cash CAC at this stage: $500–800.
+- **Post-PMF AE-led:** The $1,500–2,500 AE cost on mid deals assumes 20 closed deals/year per AE at $120k total compensation. Adjust as actual close rates emerge.
+- All figures [ESTIMATE] until first 3 enterprise deals are time-tracked. See OQ-08.
+
+### 8.6 Enterprise LTV/CAC Analysis
+
+LTV = ACV × average contract life × gross margin. Enterprise average contract life: **3 years** [ESTIMATE — typical for corporate wellness; replace post-M12].
+
+| Deal size | ACV | LTV (3yr × 89% GM) | CAC (midpoint) | LTV/CAC | Payback period |
+|---|---|---|---|---|---|
+| Small (20 seats) | $6,000 | $16,020 | $1,350 | **11.9×** | ~3 months |
+| Mid (100 seats) | $36,000 | $96,120 | $4,200 | **22.9×** | ~1.7 months |
+| Large (500 seats) | $210,000 | $560,700 | $10,750 | **52.2×** | ~0.6 months |
+
+All three deal sizes deliver LTV/CAC ratios well above the conventional 3:1 benchmark for B2B SaaS. Even the minimum 20-seat deal returns ~12× CAC over the contract life. Economics improve dramatically at scale, justifying investment in enterprise GTM once consumer PMF is validated.
+
+**Caveat:** These ratios assume 89% net margin from §8.4. If CS cost scales above modeled levels (e.g., dedicated CSM per account below 50 seats), small-deal margin degrades. The 40-seat minimum threshold in §8.3 exists precisely to protect this.
+
+### 8.7 Expansion and Churn Economics
+
+Enterprise value is not initial ACV alone — it is expansion potential and net revenue retention (NRR).
+
+**NRR model — cohort of 10 mid deals ($360k starting ARR):**
+
+| Scenario | Year 2 ARR | NRR | Notes |
+|---|---|---|---|
+| Pessimistic: 20% logo churn, 0% expansion | $288,000 | 80% | High early-churn; no land-and-expand |
+| Baseline: 10% logo churn, 15% seat expansion | $378,000 | 105% | Modest organic growth offsets some churn |
+| Optimistic: 5% logo churn, 30% seat expansion | $421,200 | 117% | Strong adoption → org-wide rollout |
+
+**Expansion triggers:**
+- Initial purchase = one department or team. Natural expansion = company-wide rollout.
+- 20-seat pilot with proven adoption → 100-seat renewal is a 5× ACV expansion.
+- New office locations, shift cohorts, or acquired subsidiaries as additional seat blocks.
+- Enterprise SSO/SCIM integration (see `docs/SSO_SCIM_IMPLEMENTATION.md`) makes org-wide expansion frictionless once IdP is established — no individual onboarding per new employee.
+
+**Churn signals to monitor:**
+- Champion departure (HR lead or wellness coordinator who bought) — highest logo-churn risk
+- Seat utilization below 30% by M3 — leading indicator; trigger a CS engagement
+- Budget cycle reset (wellness budgets often reviewed in Q4)
+- M&A activity at client company
+
+**Investor benchmark context:** Series A enterprise SaaS targets NRR >110%. Series B targets >120%. Baseline scenario (105%) is below Series A target — validating that expansion motion is a first-class product and CS priority from day one.
+
+### 8.8 Year 1 vs. Year 2+ Deal Economics
+
+Implementation cost is front-loaded; from Year 2, the same deal generates higher net margin because setup is fully amortized.
+
+| Metric | Year 1 (mid deal, 100 seats) | Year 2+ (same deal, no expansion) |
+|---|---|---|
+| ACV | $36,000 | $36,000 |
+| Infrastructure COGS (@$0.34/seat/month × 12) | $408 | $408 |
+| Implementation cost (one-time) | $1,500 | $0 |
+| CSM cost ($250/month × 12) | $3,000 | $3,000 |
+| **Total cost** | **$4,908** | **$3,408** |
+| **Net margin** | **$31,092 (86.4%)** | **$32,592 (90.5%)** |
+| Y2 margin improvement vs Y1 | — | **+4.1 pp** |
+
+**Multi-year contract strategy:** A 5–8% discount on 2-year or 3-year prepayment improves cash flow and locks in renewal. The Year 2+ efficiency gain (+4.1 pp margin) more than offsets the discount on most deal sizes. Standard practice on deals >50 seats; offer proactively in enterprise negotiations.
+
 ---
 
 ## 9. App Store Tax Impact
@@ -392,6 +470,21 @@ Supabase Pro ($25/month) is sufficient through approximately 10,000–15,000 MAU
 
 Supabase cost is not a meaningful gross margin risk at any pre-Series A scale.
 
+### 10.5 Enterprise Revenue Mix Sensitivity
+
+**Scenario:** Enterprise tier grows faster than consumer, shifting FORM's revenue mix.
+
+| Enterprise % of MRR | Blended gross margin | Notes |
+|---|---|---|
+| 5% enterprise, 95% consumer Pro | ~82% | Near-pure consumer economics |
+| 20% enterprise, 80% consumer Pro | ~83.5% | Modest mix improvement |
+| 50% enterprise, 50% consumer Pro | ~86% | Direct billing on half of revenue eliminates store fee |
+| 80% enterprise, 20% consumer Pro | ~88% | Significant uplift; CS cost assumed at 3% of enterprise ACV |
+
+Each percentage point of revenue shifting from consumer to enterprise improves blended gross margin by ~0.1–0.15 pp. Mix improvement is a secondary margin lever — meaningful at scale (>$5M ARR) but not the primary driver. The primary driver remains consumer Pro pricing and App Store fee management.
+
+**The strategic case for enterprise is not margin** — it is contract predictability, expansion potential, and NRR. A 100-seat enterprise deal paying annually upfront is qualitatively different from 100 individual Pro subscribers at monthly billing with 3–5% monthly churn.
+
 ---
 
 ## 11. Open Questions / Gaps
@@ -411,6 +504,8 @@ Supabase cost is not a meaningful gross margin risk at any pre-Series A scale.
 
 ---
 
-**v0.1 · May 2026**
+**v0.2 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
+
+*v0.2 additions: §8.5 Enterprise CAC Model, §8.6 LTV/CAC Analysis by Deal Size, §8.7 Expansion and Churn Economics (NRR model, expansion triggers, churn signals), §8.8 Year 1 vs Year 2+ deal economics, §10.5 Enterprise Revenue Mix Sensitivity.*
