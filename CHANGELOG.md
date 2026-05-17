@@ -9,6 +9,16 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.50.0] — 2026-05-17
+
+### Added
+- `docs/GDPR_DPIA.md` v0.1 — повний Data Protection Impact Assessment під GDPR Art. 35 для FORM's health data processing. Охоплює: обов'язковість DPIA (5 з 9 EDPB-критеріїв виконані — special category, large-scale, systematic profiling, innovative tech, vulnerable subjects); inventory 12 processing activities (PA-01…PA-12) з legal basis для кожної; data flow diagrams для consumer та enterprise tier; data residency (us-east-1 / eu-central-1 / eu-west-1) і SCC transfer mechanism; necessity & proportionality analysis — доведено, чому CV frames ніколи не залишають device, чому meal logs excluded з enterprise aggregates, чому k-anon floor = 5; risk register 12 ризиків (R-01…R-12) з Likelihood × Severity scoring, inherent та residual scores; технічні та організаційні заходи (RLS fail-closed, per-tenant KMS, HMAC audit chain DEC-030, ED-screening isolation DEC-018, clinical-safety VETO); residual risk statement — overall MEDIUM-HIGH, accepted; supervisory authority consultation assessment (voluntary DPC engagement recommended); blocking open items перед EU enterprise launch (privacy policy, consent granularity, Sentry DPA, DSAR runbook). Закриває 🔴 critical gap з docs/SOC2_READINESS.md і відкриває шлях до EU enterprise sales.
+
+### Changed
+- `VERSION` → 0.49.0 → 0.50.0
+
+---
+
 ## [0.49.0] — 2026-05-16
 
 ### Added
