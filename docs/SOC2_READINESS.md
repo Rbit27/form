@@ -161,7 +161,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Control | Status | Evidence |
 |---|---|---|
-| Confidential data classification policy | 🔴 Gap | Define: Public / Internal / Confidential / Restricted |
+| Confidential data classification policy | ✅ Done | Four-tier policy (Public / Internal / Confidential / Restricted) in Section 13; data inventory; handling requirements; audit log `data_class` field |
 | Health data classified as Restricted | ✅ Done (implicitly) | GDPR Art. 9 treatment in SECURITY.md; needs explicit policy doc |
 | Encryption at rest (AES-256) | ✅ Done | Supabase default; column-level encryption for sensitive fields |
 | Encryption in transit (TLS 1.3) | ✅ Done | `docs/SECURITY.md` §2 — TLS 1.3 mandatory, HSTS |
@@ -249,11 +249,11 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Severity | Count | Examples |
 |---|---|---|
-| 🔴 **Critical gap** (blocks SOC 2) | 11 | Privacy policy, status page, security training, offboarding procedure |
+| 🔴 **Critical gap** (blocks SOC 2) | 10 | Privacy policy, status page, security training, offboarding procedure |
 | 🟡 **Partial / needs formalization** | 22 | Risk register, vendor registry, patching SLA, DPIA |
-| ✅ **In place** | 22 | HMAC audit log, encryption, access controls, CV on-device, breach notification |
+| ✅ **In place** | 23 | HMAC audit log, encryption, access controls, CV on-device, breach notification, data classification policy |
 
-**Readiness score: ~40% controls fully in place.** Target: 90% before observation period begins.
+**Readiness score: ~42% controls fully in place.** Target: 90% before observation period begins.
 
 ---
 
@@ -504,6 +504,184 @@ See the Sub-Processor Register in this document and `form.coach/legal/sub-proces
 
 ---
 
+## Data Classification Policy
+
+> Owner: compliance-officer + security-engineer. Effective: May 2026. Review: annual or on material data model change. Closes SOC 2 gap C1.1.
+
+FORM classifies all data into four tiers. Every engineer, vendor, and team member handling FORM data must apply the controls corresponding to the data's tier. The tier follows the data — if a document, log entry, or API response contains data from multiple tiers, the **highest tier applies to the whole**.
+
+---
+
+### Tier Definitions
+
+#### Tier 0 — Public
+
+Data explicitly approved for unrestricted external distribution.
+
+**Examples at FORM:** form.coach marketing pages, blog posts, press releases, app store screenshots, public pricing pages, open-source code, public API documentation, status page uptime history, security disclosure policy (`security@form.coach`).
+
+| Requirement | Rule |
+|---|---|
+| Encryption in transit | TLS (standard) |
+| Encryption at rest | Not required |
+| Access control | None — intentionally public |
+| Logging | Not required |
+| Breach notification | Not applicable |
+| HR visibility | Allowed |
+| LLM prompt inclusion | Allowed |
+| Code label | `class:public` |
+
+---
+
+#### Tier 1 — Internal
+
+Data shared within the FORM team that is not approved for external disclosure.
+
+**Examples at FORM:** Architecture docs (TECHNICAL.md, ENGINEERING_RUNBOOK.md), OKRs, roadmap, non-public financial projections, hiring docs, internal Slack channels, Linear tickets, vendor contracts (non-health-data-related), team meeting notes, non-public investor materials.
+
+| Requirement | Rule |
+|---|---|
+| Encryption in transit | TLS 1.3 |
+| Encryption at rest | Not required (GitHub private repo, Notion workspace controls suffice) |
+| Access control | Team members only; no external sharing without compliance-officer approval |
+| Logging | Not required for reads; data.export logged for bulk extractions |
+| Breach notification | Notify compliance-officer within 24h; external notification only if personal data is confirmed exposed |
+| HR visibility | Allowed |
+| LLM prompt inclusion | Allowed (no PII in prompts per `docs/SECURITY.md §5`) |
+| Code label | `class:internal` |
+
+---
+
+#### Tier 2 — Confidential
+
+Business-sensitive data whose exposure would materially harm FORM or its enterprise customers.
+
+**Examples at FORM:** User email, display name, and account metadata; enterprise tenant configuration (company name, contract value, seat count, IdP settings); employee PII; Stripe billing records; API keys and secrets (non-health); DPAs with vendors; audit log entries (without health payload); Linear issue content referencing customer details.
+
+| Requirement | Rule |
+|---|---|
+| Encryption in transit | TLS 1.3 mandatory |
+| Encryption at rest | AES-256 (Supabase default; Cloudflare KV encryption for edge-cached values) |
+| Access control | Role-based; least-privilege; documented in `docs/AUDIT_LOG_SCHEMA.md` role matrix |
+| Logging | All privileged reads and all writes logged to `audit_log` with `data_class: confidential` |
+| Breach notification | Affected enterprise tenants within 1h (P0 protocol); GDPR Art. 33 supervisory authority within 72h |
+| HR visibility | No individual customer or employee data without explicit role assignment |
+| LLM prompt inclusion | Pseudonymised only — user IDs replaced with session tokens; no direct email or name in prompt |
+| Code label | `class:confidential` |
+| Secret rotation | API keys: 90-day rotation maximum; break-glass keys: immediate rotation after use |
+
+---
+
+#### Tier 3 — Restricted (Special Category)
+
+GDPR Art. 9 special category data and any data whose exposure directly harms users' physical or psychological wellbeing. This tier carries the highest protection requirements and is **never negotiable** regardless of customer or investor requests.
+
+**Examples at FORM:** Workout biometrics (heart rate, HRV, wearable sensor data); CV pose keypoints and inferred movement patterns; ED-screening responses; explicit nutrition disorder indicators; mental health self-reports (surfaced in Victor coaching sessions); body composition data; clinical_flags entries; coach_sessions content containing health context.
+
+| Requirement | Rule |
+|---|---|
+| Encryption in transit | TLS 1.3 mandatory; mTLS for service-to-service paths carrying Restricted data |
+| Encryption at rest | AES-256 + per-tenant AWS KMS Customer Managed Key (CMK); annual automatic rotation |
+| Access control | Break-glass only for operational access; requires `incident_id` justification logged before access; RLS policy `rls_restricted_no_hr` blocks HR-tier roles at the database layer |
+| Logging | Every access (read, write, export, delete) logged to `audit_log` with `data_class: restricted`; system actor reads are `actor_type: system` to suppress per-access alert while still logging |
+| Alert | Any `data_class: restricted` access by a non-system actor triggers automated alert to `#security-alerts` within 30 seconds |
+| Breach notification | P0 protocol (tenant notification within 1h) + GDPR Art. 33 supervisory authority 72h + Art. 34 individual notification if high-risk exposure confirmed |
+| HR visibility | **Never.** `tenant_manager` role has zero query access to Restricted rows. No exception, no contract clause can override. |
+| LLM prompt inclusion | **Never.** Restricted data is not included in any prompt sent to Anthropic or any other external model. Prompts contain only pseudonymised exercise context (sets/reps/RPE/phase). See `docs/SECURITY.md §5`. |
+| Cross-border transfer | SCC Module 2 (controller→processor) required; DPIA required before new processing purpose |
+| Code label | `class:restricted` |
+| Retention | User-controlled right to erasure; hard delete ≤30 days from request; backup purge ≤60 days; audit log anonymised (user_id replaced, action and timestamp retained per DEC-030) |
+
+---
+
+### FORM Data Inventory by Classification Tier
+
+| Data Type | Tier | Primary Location | At-Rest Encryption | Notes |
+|---|---|---|---|---|
+| form.coach marketing pages | Public | Cloudflare Pages | TLS only | No PII |
+| Blog posts, press releases | Public | GitHub (public) | TLS only | No PII |
+| Architecture docs, roadmap | Internal | GitHub (private) | TLS only | Team access |
+| OKRs, financials (non-public) | Internal | Notion / private repo | TLS only | NDA covers |
+| User email, display name | Confidential | Supabase `auth.users` | AES-256 | Identity data |
+| Enterprise company name, ACV | Confidential | Supabase `tenants` | AES-256 | B2B metadata |
+| Admin email, IdP / SCIM config | Confidential | Supabase `tenant_sso_config` | AES-256 | Enterprise SSO |
+| Stripe billing data | Confidential | Stripe (processor) + Supabase `billing_events` | AES-256 | SCC covers Stripe |
+| API keys (Anthropic, ElevenLabs) | Confidential | 1Password + Cloudflare Secrets | Vault encryption | 90-day rotation |
+| Audit log entries (no health) | Confidential | Supabase `audit_log` | AES-256 + HMAC | 7-year retention |
+| Workout biometrics (HR, HRV) | **Restricted** | Supabase `wearable_sync` | CMK + AES-256 | GDPR Art. 9 |
+| CV pose keypoints | **Restricted** | On-device only | Device encryption | Never uploaded |
+| ED-screening responses | **Restricted** | Supabase `user_flags` | CMK + AES-256 | clinical-safety VETO |
+| Mental health self-reports | **Restricted** | Supabase `coach_sessions` | CMK + AES-256 | Aggregated-only in admin |
+| Victor coaching session content | **Restricted** | Supabase `coach_sessions` | CMK + AES-256 | No PII in Anthropic prompts |
+| Body composition data | **Restricted** | Supabase `body_metrics` | CMK + AES-256 | k-anon in admin dashboard |
+| `clinical_flags` entries | **Restricted** | Supabase `clinical_flags` | CMK + AES-256 | clinical-safety VETO |
+
+*CV pose keypoints never leave the device (on-device CoreML inference). They are listed for completeness; the "never uploaded" note is a privacy-by-design guarantee, not a policy control.*
+
+---
+
+### Handling Requirements Comparison
+
+| Requirement | Public | Internal | Confidential | Restricted |
+|---|---|---|---|---|
+| TLS in transit | ✅ | ✅ 1.3 | ✅ 1.3 | ✅ 1.3 + mTLS |
+| Encryption at rest | ❌ | ❌ | ✅ AES-256 | ✅ AES-256 + CMK |
+| Access logging | ❌ | Bulk only | ✅ All privileged | ✅ All access |
+| Security alert on access | ❌ | ❌ | ❌ | ✅ Non-system actor |
+| HR visibility | ✅ | ✅ | No individual | 🚫 Never |
+| LLM prompt allowed | ✅ | ✅ | Pseudonymised | 🚫 Never |
+| Cross-border SCC required | ❌ | ❌ | ✅ | ✅ + DPIA |
+| Breach notification SLA | None | 24h internal | 1h tenants + 72h SA | P0 + Art. 33 + Art. 34 |
+| Retention control | Indefinite | While relevant | Contract / law | User-controlled + erasure |
+| Key rotation | n/a | n/a | 90 days (secrets) | Annual (CMK) |
+
+---
+
+### Audit Log `data_class` Field
+
+All audit log entries for data-access actions **must** include a `data_class` field. This enables auditors to verify that access patterns match the policy defined above.
+
+```jsonc
+{
+  "event_id": "evt_01J…",
+  "timestamp": "2026-05-17T10:00:00.000Z",
+  "action": "data.read",
+  "resource": "wearable_sync",
+  "data_class": "restricted",         // ← required on all data-access events
+  "actor_id": "usr_abc123",
+  "actor_type": "user",               // "user" | "system" | "break-glass"
+  "tenant_id": "acme-corp",
+  "incident_id": null,                // required if actor_type = "break-glass"
+  "trace_id": "4bf92f3577b34da6a"
+}
+```
+
+**Alerting rule:** Any event where `data_class = restricted` AND `actor_type = user` triggers an automated Slack alert to `#security-alerts` within 30 seconds. System cron jobs use `actor_type: system` and are logged without alert; break-glass access requires a non-null `incident_id` before the query is permitted.
+
+This field also enables the compliance officer to run a quarterly access review query:
+
+```sql
+SELECT actor_id, data_class, COUNT(*) AS access_count, MAX(timestamp) AS last_access
+FROM audit_log
+WHERE timestamp >= NOW() - INTERVAL '90 days'
+  AND data_class IN ('confidential', 'restricted')
+GROUP BY actor_id, data_class
+ORDER BY data_class DESC, access_count DESC;
+```
+
+---
+
+### SOC 2 Criteria Closed by This Policy
+
+| Criterion | Description | Status |
+|---|---|---|
+| **C1.1** | FORM identifies and maintains confidential information per commitments and requirements | ✅ Closed — this policy |
+| **CC6.1** | Implements access controls limiting logical access to confidential information | ✅ Supported — RLS policy `rls_restricted_no_hr` + role matrix |
+| **P3.1** | Collects personal information only for identified purposes | ✅ Supported — data inventory + purpose limitation per tier |
+| **P6.1** | Creates and retains records of authorized disclosures of personal information | ✅ Supported — audit log `data_class` field |
+
+---
+
 ## Privacy Floor Enforcement (Non-Negotiable)
 
 The following controls are enforced regardless of customer requests. They are non-bypassable per `docs/ENTERPRISE.md` and `clinical-safety` VETO authority:
@@ -524,13 +702,14 @@ These map to SOC 2 Privacy criteria P2, P3, and P6, and simultaneously satisfy G
 - [ ] Draft privacy policy (legal review required)
 - [ ] Complete DPIA for health data processing
 - [ ] Formalize risk register (seed from `docs/SECURITY.md` §1 threat model)
-- [ ] Define data classification policy tiers
+- [x] Define data classification policy tiers — Section 13 (May 2026)
 - [ ] Schedule first DR drill date
 - [ ] Confirm Sentry DPA status
 
 ---
 
-**v0.2 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
+**v0.3 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
 **Review cadence: quarterly. Next review: серпень 2026.**
 
 *v0.2 additions: Sub-Processor Register (CC9, GDPR Art. 28), Complementary User Entity Controls (CUECs), Common Security Questionnaire Responses (CAIQ/SIG Lite pre-answers).*
+*v0.3 additions: Section 13 — Data Classification Policy (four-tier: Public / Internal / Confidential / Restricted). Closes SOC 2 gap C1.1. Critical gaps: 11 → 10. Controls in place: 22 → 23.*

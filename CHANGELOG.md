@@ -9,6 +9,20 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.52.1] — 2026-05-17
+
+### Added
+- `docs/SOC2_READINESS.md` Section 13 — Data Classification Policy. Four-tier taxonomy: **Public** (marketing, open docs) / **Internal** (team docs, roadmap) / **Confidential** (user PII, tenant metadata, API keys, audit logs) / **Restricted** (GDPR Art. 9 health data: biometrics, CV keypoints, ED-screening responses, mental health self-reports, body composition). Each tier defines encryption requirements, access controls, logging rules, breach notification SLA, HR visibility rules, LLM prompt inclusion rules, and code label (`data_class` field). Full FORM data inventory mapped to tiers. Audit log `data_class` field defined with alerting rule (any `class:restricted` non-system access → `#security-alerts` within 30s). Quarterly compliance SQL query included. Closes SOC 2 criteria C1.1.
+
+### Changed
+- `docs/SOC2_READINESS.md` C1.1 control row — `Confidential data classification policy` updated from 🔴 Gap → ✅ Done.
+- `docs/SOC2_READINESS.md` Gap Analysis Summary — critical gaps: 11 → 10; controls in place: 22 → 23. Readiness score: 40% → 42%.
+- `docs/SOC2_READINESS.md` Open Items — `Define data classification policy tiers` marked `[x]`.
+- `docs/SOC2_READINESS.md` version footer — v0.2 → v0.3.
+- `VERSION` → 0.52.0 → 0.52.1
+
+---
+
 ## [0.52.0] — 2026-05-17
 
 ### Added
