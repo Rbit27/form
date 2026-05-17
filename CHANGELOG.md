@@ -9,6 +9,18 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.51.0] — 2026-05-17
+
+### Added
+- `content/post-22-periodization.md` — sports-science post «Лінійна, хвиляста, блочна: як обрати модель periodization під свій рівень». ~2200 слів. Охоплює лінійну periodization (для початківців та піків), DUP з практичним прикладом тижня (сила/гіпертрофія/потужність), блочну periodization (акумуляція → інтенсифікація → реалізація), матрицю рішень за стажем/частотою/складністю, ACSM position, Issurins block model і DUP мета-аналітичну базу. clinical_safety_status: PASS. Голос Віктора в фіналі.
+- `docs/DATA_MODEL.md` Section 10 — PITR Tenant-Isolated Restore Runbook (SOC 2 criteria A1.2/A1.3). 7-кроковий runbook: PITR-вікно, ізольований RDS-кластер, pg_dump з tenant_id фільтром, re-import через INSERT … ON CONFLICT, teardown, пост-дрил запис. Закриває SOC 2 gap 9.4.
+
+### Changed
+- `docs/DATA_MODEL.md` — v0.1 → v0.2; gap 9.4 позначений RESOLVED; ToC оновлено.
+- `VERSION` → 0.50.0 → 0.51.0
+
+---
+
 ## [0.50.0] — 2026-05-17
 
 ### Added

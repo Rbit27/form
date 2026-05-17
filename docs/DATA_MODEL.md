@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v0.1
+# FORM · Multi-Tenant Data Model v0.2
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -17,6 +17,7 @@
 7. [Migration & Cross-Tenant Safety](#7-migration--cross-tenant-safety)
 8. [Backup and Restore Isolation](#8-backup-and-restore-isolation)
 9. [Open Questions / Gaps](#9-open-questions--gaps)
+10. [PITR Tenant-Isolated Restore Runbook](#10-pitr-tenant-isolated-restore-runbook)
 
 ---
 
@@ -514,9 +515,246 @@ Hard delete of `users` row deferred 30 days (in case of mistaken request).
 | 9.1 | When to shard: at what tenant count or data volume do we move the largest tenants to dedicated clusters? | enterprise-architect | Medium — revisit at 200 enterprise tenants |
 | 9.2 | `raw_cv_data` column size: JSONB for pose keypoints can grow large. Column to separate blob store (S3)? | platform-engineer | High — evaluate at 10k workouts/day |
 | 9.3 | k-anonymity floor at 5: is this sufficient for EU data regulators under GDPR recital 26? | compliance-officer | High — legal review before EU enterprise sales |
-| 9.4 | PITR restore drill: do we have a documented runbook for restoring a single tenant's data from PITR without affecting other tenants? | devops-lead | High — required for SOC 2 evidence |
+| 9.4 | PITR restore drill: do we have a documented runbook for restoring a single tenant's data from PITR without affecting other tenants? | devops-lead | **RESOLVED** — see Section 10 |
 | 9.5 | Soft-delete vs hard-delete on `workouts`: soft-delete allows undo but complicates RLS policies (deleted rows still present). | enterprise-architect | Low — decided when undo feature is scoped |
 
 ---
 
+## 10. PITR Tenant-Isolated Restore Runbook
+
+### 10.1 Purpose
+
+This runbook is SOC 2 evidence for Availability criteria A1.2 (environmental protections, software, and infrastructure) and A1.3 (recovery and resumption of services). It documents the exact procedure for restoring a single tenant's data from RDS Point-in-Time Recovery (PITR) without touching any other tenant's data and without taking the production database offline.
+
+### 10.2 When to Use
+
+| Scenario | Notes |
+|---|---|
+| Single tenant's data corrupted or lost due to application bug | Most common production use case |
+| Production incident requiring rollback of specific rows | Supplement to application-level undo |
+| Annual DR drill | Required by SOC 2 Availability criteria; must be run at least once per calendar year |
+
+Do **not** use this runbook for full-cluster restores or for bulk tenant offboarding. Those have separate procedures.
+
+### 10.3 Prerequisites
+
+| Requirement | Detail |
+|---|---|
+| RDS access | `form_admin` DB role credentials via AWS Secrets Manager (break-glass secret `form/prod/db/form_admin`) |
+| AWS Console / CLI | IAM role `FormDevOpsRestoreRole` with permissions: `rds:RestoreDBClusterToPointInTime`, `rds:CreateDBInstance`, `rds:DeleteDBCluster` |
+| Target tenant UUID | Obtain from admin dashboard or: `SELECT id, slug FROM tenants WHERE slug = '<tenant-slug>';` |
+| Approximate corruption time | Incident ticket timestamp, or earliest user-reported event time |
+| `pg_dump` and `psql` | Available on the bastion host; use the version matching the production Postgres major version |
+
+### 10.4 Step-by-Step Restore Procedure
+
+All steps are performed by the devops-lead or an on-call engineer with break-glass access. A second engineer must be present to verify each step (four-eyes principle). All activity is recorded in the incident ticket.
+
+#### Step 1 — Identify the PITR target window
+
+Determine the restore point: the latest timestamp *before* the corruption event. Use the incident timeline. For a drill, use a point 24 hours before the drill start.
+
+```
+RESTORE_POINT="2026-05-16T14:00:00Z"   # ISO 8601 UTC, before corruption
+TENANT_ID="<target-tenant-uuid>"
+DRILL_DATE="20260517"
+RESTORE_CLUSTER="form-restore-drill-${DRILL_DATE}"
+```
+
+Confirm the target point is within the PITR window (35-day retention):
+
+```bash
+aws rds describe-db-cluster-automated-backups \
+  --db-cluster-identifier form-prod \
+  --query 'DBClusterAutomatedBackups[0].{Earliest:RestoreWindow.EarliestTime,Latest:RestoreWindow.LatestTime}'
+```
+
+The `RESTORE_POINT` must fall between `Earliest` and `Latest`.
+
+#### Step 2 — Restore to a temporary isolated RDS cluster
+
+Spin up a new cluster from the PITR snapshot. This cluster is completely separate from production and has no application traffic.
+
+```bash
+aws rds restore-db-cluster-to-point-in-time \
+  --source-db-cluster-identifier form-prod \
+  --db-cluster-identifier "${RESTORE_CLUSTER}" \
+  --restore-to-time "${RESTORE_POINT}" \
+  --vpc-security-group-ids sg-restore-isolated \
+  --db-subnet-group-name form-private-subnets \
+  --no-publicly-accessible \
+  --tags Key=Purpose,Value=pitr-restore Key=CreatedBy,Value=devops-lead Key=IncidentTicket,Value=<ticket-id>
+
+# Wait for cluster to become available (typically 10–20 minutes)
+aws rds wait db-cluster-available --db-cluster-identifier "${RESTORE_CLUSTER}"
+
+# Attach a writer instance
+aws rds create-db-instance \
+  --db-instance-identifier "${RESTORE_CLUSTER}-writer" \
+  --db-cluster-identifier "${RESTORE_CLUSTER}" \
+  --db-instance-class db.t3.large \
+  --engine aurora-postgresql
+
+aws rds wait db-instance-available --db-instance-identifier "${RESTORE_CLUSTER}-writer"
+```
+
+Record the restored cluster endpoint:
+
+```bash
+RESTORE_HOST=$(aws rds describe-db-clusters \
+  --db-cluster-identifier "${RESTORE_CLUSTER}" \
+  --query 'DBClusters[0].Endpoint' --output text)
+```
+
+#### Step 3 — Extract the target tenant's rows from the restored cluster
+
+Connect to the restored cluster (via bastion host) using the `form_admin` role. Extract only the target tenant's rows from all relevant tables. The `WHERE tenant_id = $TENANT_ID` clause is explicit — no RLS bypass is needed or used for this read; `form_admin` reads with an explicit predicate.
+
+```bash
+TABLES="users user_health_profiles workouts workout_sets meal_logs audit_log"
+DUMP_DIR="/tmp/pitr-restore-${TENANT_ID}-${DRILL_DATE}"
+mkdir -p "${DUMP_DIR}"
+
+for TABLE in $TABLES; do
+  psql "host=${RESTORE_HOST} dbname=form user=form_admin sslmode=require" \
+    -c "\COPY (SELECT * FROM ${TABLE} WHERE tenant_id = '${TENANT_ID}') TO '${DUMP_DIR}/${TABLE}.csv' WITH (FORMAT CSV, HEADER)"
+  echo "Extracted ${TABLE}: $(wc -l < "${DUMP_DIR}/${TABLE}.csv") rows (including header)"
+done
+```
+
+`workout_sets` joins through `workouts`; extract via subquery:
+
+```bash
+psql "host=${RESTORE_HOST} dbname=form user=form_admin sslmode=require" \
+  -c "\COPY (SELECT ws.* FROM workout_sets ws JOIN workouts w ON w.id = ws.workout_id WHERE w.tenant_id = '${TENANT_ID}') TO '${DUMP_DIR}/workout_sets.csv' WITH (FORMAT CSV, HEADER)"
+```
+
+#### Step 4 — Verify row counts and data integrity
+
+Before touching production, confirm the extracted data is coherent.
+
+```bash
+# Print row counts for each extracted file
+for TABLE in $TABLES; do
+  COUNT=$(tail -n +2 "${DUMP_DIR}/${TABLE}.csv" | wc -l)
+  echo "${TABLE}: ${COUNT} rows"
+done
+
+# Spot-check: confirm tenant_id uniformity in users.csv
+TENANT_COL=$(head -1 "${DUMP_DIR}/users.csv" | tr ',' '\n' | grep -n tenant_id | cut -d: -f1)
+UNIQUE_TENANTS=$(tail -n +2 "${DUMP_DIR}/users.csv" | cut -d',' -f${TENANT_COL} | sort -u | wc -l)
+echo "Unique tenant_ids in users.csv: ${UNIQUE_TENANTS} (must be 1)"
+```
+
+If `UNIQUE_TENANTS` is not 1, stop immediately and open a critical incident — the extraction predicate did not filter correctly.
+
+#### Step 5 — Re-import rows into production
+
+Import the extracted rows into the production database. Use `INSERT ... ON CONFLICT DO UPDATE` to handle rows that may already exist (e.g., partial corruption rather than full loss). The `form_admin` role is used with an explicit `WHERE tenant_id = $TENANT_ID` guard on the conflict target.
+
+**Important:** `audit_log` rows from the restored period are **not** re-imported into production. The production audit log is append-only and HMAC-chained; re-inserting historical audit rows would break the chain. Instead, the extracted `audit_log.csv` is attached to the incident ticket as evidence and reviewed separately by the compliance officer.
+
+```sql
+-- Run on production DB as form_admin via psql on bastion
+-- Import users
+\COPY users FROM '/tmp/pitr-restore-.../users.csv' WITH (FORMAT CSV, HEADER)
+-- ON CONFLICT: if user row already exists, update non-key fields
+-- Run as a prepared transaction if volume > 10k rows to allow rollback
+
+-- Equivalent upsert pattern (preferred for large sets):
+INSERT INTO users
+  SELECT * FROM staging_users_restore WHERE tenant_id = :'TENANT_ID'
+ON CONFLICT (id) DO UPDATE SET
+  email          = EXCLUDED.email,
+  display_name   = EXCLUDED.display_name,
+  role           = EXCLUDED.role,
+  deactivated_at = EXCLUDED.deactivated_at,
+  updated_at     = now();
+
+-- Repeat for user_health_profiles, workouts, workout_sets, meal_logs
+-- audit_log: DO NOT re-import — attach audit_log.csv to incident ticket only
+```
+
+After each table import, verify counts match the extracted CSVs.
+
+#### Step 6 — Verify production state
+
+```sql
+-- On production DB as form_admin
+SELECT COUNT(*) FROM users              WHERE tenant_id = :'TENANT_ID';
+SELECT COUNT(*) FROM user_health_profiles WHERE tenant_id = :'TENANT_ID';
+SELECT COUNT(*) FROM workouts           WHERE tenant_id = :'TENANT_ID';
+SELECT COUNT(*) FROM workout_sets ws
+  JOIN workouts w ON w.id = ws.workout_id WHERE w.tenant_id = :'TENANT_ID';
+SELECT COUNT(*) FROM meal_logs          WHERE tenant_id = :'TENANT_ID';
+```
+
+Compare against the extracted row counts from Step 4. Confirm with the tenant admin that their data appears correct in the application before closing the incident.
+
+#### Step 7 — Destroy the temporary cluster
+
+The temporary cluster contains a full copy of the production database. It must be deleted immediately after the restore is complete and verified.
+
+```bash
+aws rds delete-db-instance \
+  --db-instance-identifier "${RESTORE_CLUSTER}-writer" \
+  --skip-final-snapshot
+
+aws rds wait db-instance-deleted --db-instance-identifier "${RESTORE_CLUSTER}-writer"
+
+aws rds delete-db-cluster \
+  --db-cluster-identifier "${RESTORE_CLUSTER}" \
+  --skip-final-snapshot
+
+aws rds wait db-cluster-deleted --db-cluster-identifier "${RESTORE_CLUSTER}"
+
+echo "Temporary cluster ${RESTORE_CLUSTER} destroyed."
+```
+
+Confirm deletion in AWS Console and record the timestamp in the incident ticket.
+
+### 10.5 Multi-Tenant Isolation Throughout
+
+The procedure above maintains full multi-tenant isolation at every step:
+
+- The temporary cluster is network-isolated (`sg-restore-isolated` security group has no inbound from application servers).
+- All extraction queries use an explicit `WHERE tenant_id = $TENANT_ID` predicate. No RLS bypass is used or needed for the extraction step.
+- The re-import into production also uses explicit `WHERE tenant_id = :'TENANT_ID'` guards on conflict targets, not a blanket upsert.
+- Only the affected tenant's rows are written to production. Zero rows from any other tenant are touched.
+
+### 10.6 DR Drill Schedule
+
+| Item | Detail |
+|---|---|
+| Frequency | Annually, minimum. Target: Q1 of each calendar year. |
+| Scheduling | Ops calendar event created by devops-lead by January 15 each year. |
+| Evidence | Screenshot of AWS Console showing cluster creation + deletion timestamps, plus row-count verification output, uploaded to the SOC 2 evidence folder under `A1.2 / DR Drill / <year>`. |
+| Approver | devops-lead signs off; compliance-officer co-signs for SOC 2 evidence package. |
+
+### 10.7 Post-Drill Record
+
+After each drill, update this section with:
+
+```
+Last drill: [date] · Result: [PASS / FAIL] · Notes: [summary of any issues and resolutions]
+```
+
+*Last drill: not yet conducted · Result: N/A · Notes: runbook established May 2026; first drill scheduled Q1 2027.*
+
+### 10.8 Estimated Time
+
+| Phase | Estimated duration |
+|---|---|
+| Cluster spin-up and PITR restore (Step 1–2) | 20–30 minutes |
+| Extraction and integrity check (Step 3–4) | 15–30 minutes (varies by tenant data volume) |
+| Re-import and production verification (Step 5–6) | 30–60 minutes |
+| Cluster teardown (Step 7) | 5–10 minutes |
+| **Total (typical tenant)** | **2–4 hours** |
+
+Large tenants (>100k workout rows) may require up to 6 hours. Escalate to devops-lead if the restore exceeds 4 hours without completion.
+
+---
+
 **v0.1 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer**
+
+*v0.2 additions: Section 10 PITR Tenant-Isolated Restore Runbook (closes SOC 2 gap 9.4).*
