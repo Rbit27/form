@@ -9,6 +9,18 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.55.0] — 2026-05-17
+
+### Added
+- `content/post-26-tendon-ligament-adaptation.md` — «Адаптація сухожиль і зв'язок: чому сполучна тканина не встигає за м'язами» (~2 000 слів). Охоплює: аваскулярність і колагенові цикли, синдром «сильний м'яз — слабке сухожилля», overuse tendinopathy механізм, HSR vs ексцентрика, 90% isometric threshold (Arampatzis), практичні імплікації для програмування і Victor. Цитати: Kjaer (2004, *Physiol Rev*), Magnusson et al. (2010, *Nat Rev Rheum*), Arampatzis et al. (2007, *J Exp Biol*; 2010, *J Biomech*), Beyer et al. (2015, *AJSM*), Rio et al. (2015, *BJSM*), Alfredson et al. (1998, *AJSM*). Clinical-safety: CONDITIONAL PASS → PASS після 2 mandatory edits.
+- `docs/PRIVACY_POLICY.md` — повна GDPR-сумісна Privacy Policy (807 рядків, v0.1.0-draft, pre-legal-review). 9 категорій даних; legal basis Art. 6 + Art. 9(2)(a); 9 sub-processors із DPA-статусом і SCCs Module 2; 8 GDPR rights; DSAR SLA 30 днів; Appendix A SOC2 mapping (17 annotations); Appendix B Apple App Store disclosure. Закриває 3 critical SOC2 gaps: P1.1, P1.2, CC9.2+P6.1. Critical gaps: 9 → 6. SOC2 readiness: 45% → ~51%.
+
+### Changed
+- `README.md` — post-26 відмічено `[x]`.
+- `VERSION` → 0.54.1 → 0.55.0
+
+---
+
 ## [0.54.1] — 2026-05-17
 
 ### Added
