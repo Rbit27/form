@@ -340,8 +340,8 @@ Each iteration:
 - [x] post-27: Training age vs. chronological age — адаптаційна ємність і сенс "починати пізно"
 - [x] post-28: Progressive overload mechanics — SRA-крива, форми прогресії, чому лінійна ламається у intermediate
 - [x] post-29: Mind-muscle connection — internal vs. external focus, EMG studies, коли IFA має сенс і коли заважає
-- [ ] post-30: Eccentric training — чому фаза опускання важливіша за підйом (mechanical tension, muscle damage, time under tension)
-- [ ] post-31: Unilateral training — коли і чому (strength asymmetry, core stability, transfer to sport)
+- [x] post-30: Eccentric training — чому фаза опускання важливіша за підйом (mechanical tension, muscle damage, time under tension)
+- [x] post-31: Unilateral training — коли і чому (strength asymmetry, core stability, transfer to sport)
 - [ ] post-32: Cluster sets — накопичення об'єму без кумулятивної втоми (inter-repetition rest, power maintenance)
 - [ ] post-33: Energy systems для силовика — ATP-PCr, glycolytic, oxidative: що реально важливо для ваш тренування
 - [ ] post-34: Supersets і antagonist pairs — time efficiency без компромісу з продуктивністю

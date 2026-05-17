@@ -9,6 +9,29 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.60.0] — 2026-05-17
+
+### Added
+- `content/post-31-unilateral-training.md` — «Унілатеральний тренінг: коли і чому (асиметрія сили, стабільність кору, трансфер у спорт)» (~2 400 слів, 14 хв). Охоплює: bilateral deficit (BLD) — феномен і нейронний механізм (іпсілатеральне інгібування, crossed extensor reflex suppression) з даними Secher et al. (1988, *J Appl Physiol*) і Koh et al. (2009, *Eur J Appl Physiol*); поширеність асиметрії сили ніг у спортсменів — Meylan et al. (2010, *JSCR*), поріг 10–15% як маркер продуктивності та ризику травм (не естетики); чому bilateral тренування не виправляє асиметрію автоматично — компенсаційні патерни і обґрунтування примусового унілатерального навантаження; McCurdy et al. (2005, *JSCR*) — результати 8-тижневого порівняльного дослідження single-leg squat vs bilateral squat; cross-education effect (контралатеральний перенос сили) — Munn et al. (2004, *J Appl Physiol*) meta-analysis ~8% трансфер; спортивний трансфер — Speirs et al. (2016, *JSCR*) і Jones et al. (2009) спринт і зміна напрямку; стабільність кору: Behm et al. (2010, *Sports Med*) — реальна різниця активації стабілізаторів vs prime movers у унілатеральних умовах; Bulgarian split squat — два окремих бар'єри для початківців (баланс/пропріоцепція і мобільність hip flexor), рекомендація: перші 2–3 тижні = моторне навчання, не силове тренування; порівняльна таблиця bilateral vs. unilateral (7 критеріїв); розподіл об'єму між bilateral і unilateral: базовий (60–70%/30–40%), при асиметрії або спортивному акценті (50/50 або 40/60), практичний приклад 4-денного тижня; Victor-контекст: CV pose estimation для виявлення pelvic drop, knee valgus і асиметрії глибини в унілатеральних вправах. Цитати: Secher et al. (1988), Koh et al. (2009), Meylan et al. (2010), McCurdy et al. (2005), Munn et al. (2004), Speirs et al. (2016), Jones et al. (2009), Behm et al. (2010). Clinical-safety: PASS.
+
+### Changed
+- `blog.html` — картки Post 30 і Post 31 (eccentric training і unilateral) додані до card-grid перед Post 29. Загальна кількість карток: 29 → 31.
+- `STATUS.md` — content engine: рядки post-30 і post-31 додані.
+- `README.md` — content engine roadmap: post-30 і post-31 позначені `[x]`.
+- `VERSION` → 0.59.0 → 0.60.0
+
+---
+
+## [0.59.0] — 2026-05-17
+
+### Added
+- `content/post-30-eccentric-training.md` — «Ексцентричне тренування — чому фаза опускання важливіша за підйом» (~2 500 слів, 15 хв). Охоплює: крива сила-швидкість і чому ми можемо опускати більше, ніж підіймаємо (~20–50% ексцентрична перевага — Enoka, 1996, *J Appl Physiol*); titin як молекулярна пружина і чому активація mTORC1 вища в подовженому стані — Schoenfeld (2010, *JSCR*), Lindstedt et al. (2001, *Exerc Sport Sci Rev*); EIMD: Z-disk streaming, sarcolemmal disruption, repeated bout effect — Proske & Morgan (2001, *J Physiol*), обговорення як фізіологія ремоделювання (не прославлення болю), посилання на post-20 для деталей DOMS; нейром'язова специфіка: переважне рекрутування тип-II волокон при ексцентричному навантаженні, відмінності alpha-motoneuron inhibition — Enoka (1996); мета-аналіз Roig et al. (2009, *Br J Sports Med*): eccentric d=0.88 vs. concentric d=0.49 для сили; d=0.54 vs. d=0.27 для гіпертрофії; саркомерогенез і довжина фасцикул: Franchi et al. (2014, *J Appl Physiol*) — +11% довжина фасцикул у ексцентричній групі, зменшений кут пернатості; AEL-протоколи: 4 практичні рівні (supramaximal, weight releasers, tempo control, unilateral eccentric/bilateral concentric) — Hody et al. (2019, *Front Physiol*); Nordic hamstring curl: 51% зниження ризику травм (van Dyk et al. 2019), механізм через збільшення довжини фасцикул; темп-нотація 3-1-0: що знищується при скиданні ваги; 4 типові помилки (bounce, непослідовний темп, прискорення у термінальній фазі, різкий об'ємний стрибок); практична матриця програмування за контекстом; Victor-контекст: детекція швидкості грифа, аналіз кутів суглобів, відстеження послідовності глибини. Цитати: Enoka (1996), Schoenfeld (2010), Lindstedt et al. (2001), Proske & Morgan (2001), Roig et al. (2009), Franchi et al. (2014), Hody et al. (2019). Clinical-safety: PASS.
+
+### Changed
+- `VERSION` → 0.58.1 → 0.59.0
+
+---
+
 ## [0.58.1] — 2026-05-17
 
 ### Changed
