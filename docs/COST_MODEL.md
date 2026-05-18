@@ -614,10 +614,299 @@ The free pool requires an explicit budget line once it reaches $1,300+/month (10
 
 ---
 
-**v0.4 · May 2026**
+## 13. Infrastructure Cost Breakdown by Service
+
+This section replaces the high-level COGS summary in §3.3 with a service-by-service breakdown that shows absolute monthly spend, per-user cost at each scale tier, the upgrade inflection points, and the optimization levers available at each stage. Purpose: give investors and the future CFO a precise view of where spend accumulates and what can be actively managed.
+
+**Assumptions for this section:**
+
+- MAU mix modeled at 60% Free / 40% Pro (consumer). Enterprise is modeled separately in §8.
+- Per-user behavioral rates from §2.1 apply throughout.
+- Per-user COGS from §3.3 apply: Free $0.13/user/month; Pro $0.50/user/month.
+- All figures [ESTIMATE] until reconciled against invoices.
+
+### 13.1 Service-by-service cost table
+
+| Service | Type | Current plan | 1k MAU total | 10k MAU total | 50k MAU total | 100k MAU total |
+|---|---|---|---|---|---|---|
+| **Anthropic Claude** | Variable | Pay-as-you-go (list price) | ~$134/mo | ~$1,344/mo | ~$6,720/mo | ~$13,440/mo |
+| **ElevenLabs TTS** | Variable | Creator/Business API | ~$97/mo | ~$968/mo | ~$4,840/mo | ~$9,680/mo |
+| **Supabase** | Fixed (step) | Pro ($25/mo) | $25/mo | $25/mo | $599/mo [Team] | $599/mo [Team] |
+| **Cloudflare Workers** | Variable + fixed | Paid ($5/mo base) | ~$14/mo | ~$140/mo | ~$700/mo | ~$1,400/mo |
+| **Sentry** | Fixed | Team (~$26/mo) | $26/mo | $26/mo | $26/mo | $26/mo [upgrade pressure] |
+| **PostHog** | Variable (above 1M events) | Free tier | $0 | ~$310/mo | ~$2,790/mo | ~$5,890/mo |
+| **Redis** | Fixed (step) | Managed cloud (est.) | ~$15/mo | ~$25/mo | ~$50/mo | ~$150/mo |
+| **Expo / EAS** | Fixed | Production plan | ~$99/mo | ~$99/mo | ~$99/mo | ~$99/mo |
+| **Total infrastructure** | — | — | **~$436/mo** | **~$3,197/mo** | **~$17,124/mo** | **~$33,884/mo** |
+| **Per total MAU** | — | — | **$0.44/user** | **$0.32/user** | **$0.34/user** | **$0.34/user** |
+
+All figures are [ESTIMATE]. The per-MAU blended cost stabilizes around $0.32–0.34 at 10k+ MAU because fixed overhead amortizes rapidly while variable cost per user holds steady until volume discounts apply.
+
+### 13.2 Fixed vs. variable classification
+
+**Fixed overhead (scale-insensitive at current stage):**
+
+- Supabase plan fee — pays for compute and baseline capacity; does not move with user activity within the plan tier
+- Cloudflare Workers base fee ($5/month) — pays for the Paid tier activation; request volume cost is variable but negligibly small at pre-50k scale
+- Sentry Team plan — covers event volume well beyond any pre-Series A scenario
+- Redis managed instance — provisioned capacity; actual memory usage scales gently
+- Expo/EAS — CI/CD pipeline and build quota; not user-count driven
+
+**Variable (scale with active users and session frequency):**
+
+- Anthropic API — strictly proportional to sessions × tokens per session × active users
+- ElevenLabs TTS — proportional to sessions × character volume × voice adoption rate
+- Cloudflare Workers requests — proportional to sessions × API requests per session
+- PostHog — proportional to total events per month once past the 1M free tier ceiling
+
+**Key insight:** Fixed overhead at 1k MAU is ~$165/month (Supabase + Sentry + Redis + EAS). Variable API costs are ~$245/month. By 10k MAU, fixed overhead is still ~$175/month while variable is ~$2,700/month. The business is fundamentally variable-cost at scale, which is correct — cost scales with delivered value, not with provisioned capacity.
+
+### 13.3 Plan upgrade inflection points (cost cliffs)
+
+These are the scale milestones at which a service requires a plan change — either because capacity limits are reached or because a better pricing tier becomes economically justified.
+
+| Service | Current ceiling | Upgrade trigger | New plan | Cost step-up |
+|---|---|---|---|---|
+| **Supabase** | ~10k–15k MAU (8GB DB, 250GB bandwidth) | DB approaching 8GB or monthly bandwidth >250GB | Team (~$599/mo) | $574/mo step-up (from $25) |
+| **Supabase** | ~50k–100k MAU (Team plan limits) | Read replica contention or storage overage | Enterprise ($500–2,000/mo negotiated) [ESTIMATE] | $0–$1,400/mo additional |
+| **PostHog** | 5k MAU / 1M events/month | Total events cross 1M/month | Pay-as-you-go at $0.00031/event | ~$310/mo at 10k MAU; ~$2,790/mo at 50k MAU |
+| **Sentry** | Team plan: ~50k errors/day | Consistent daily error volume approaching cap, or need for performance monitoring | Business/Enterprise | $80–$150/mo [ESTIMATE] |
+| **Anthropic** | No plan ceiling; list pricing | Monthly API spend reaches $10k–50k+ | Volume commitment discount tier | Rate negotiation, not a hard cliff |
+| **ElevenLabs** | Creator: 100k chars/month | Exceeds plan character quota | Business tier / Enterprise API | Variable; Business ~$99/mo [ESTIMATE] |
+| **Redis** | Scaled instance capacity | P99 latency increases or memory OOM errors | Larger managed instance | ~$50–200/mo additional [ESTIMATE] |
+| **Cloudflare** | Workers: 50M requests/day (Paid) | Exceeds Workers Paid daily limit | Workers Unbound or Enterprise | Not expected pre-Series A |
+
+**The only true hard cliff is Supabase** — the jump from $25/month Pro to $599/month Team is a 24× step-up in the plan line item. However, on a per-user basis at 15k+ MAU, the Team plan costs ~$0.04/user/month — less than the Anthropic API cost rounding error. This cliff is visually dramatic but economically negligible.
+
+**ElevenLabs plan quotas** are a more immediate operational concern. At 40% Pro voice adoption with 15.1 sessions/month and 1,200 chars/session, each Pro user generates ~7,248 characters of TTS monthly. The Creator plan ($22/month) covers 100,000 characters — exhausted by approximately 14 Pro voice users. This means ElevenLabs must operate on the per-character API billing model from launch, not on plan-based character quotas. Current assumption ($0.30/1,000 chars via Creator/Business tier API billing) is correct operationally but requires confirming enterprise API pricing with ElevenLabs directly. See OQ-05.
+
+### 13.4 Cost cliff analysis — step-function increases
+
+The following events represent non-linear jumps in the monthly infrastructure bill:
+
+**Cliff 1: Supabase Pro → Team at ~12k–15k MAU**
+Step-up: +$574/month. Revenue context: at 15k MAU with 40% Pro mix (6,000 Pro users at $19/month Western), MRR is approximately $114,000. The Supabase step-up represents 0.5% of MRR. Not a strategic concern — but it does appear as a line-item spike in any monthly cost review. Pre-announce internally when DB usage crosses 6GB.
+
+**Cliff 2: PostHog free → paid at ~5k MAU**
+Step-up: ~$310/month at 10k MAU; $2,790/month at 50k MAU. The 10k cliff is small. The 50k cliff is real (~2.4% of MRR at that scale assuming $116k MRR from Pro users alone). PostHog costs scale predictably — no sudden jump beyond the free tier exit. Acceptable; budget as a known line item at the 10k milestone.
+
+**Cliff 3: Anthropic volume commitment threshold at ~30k–50k Pro MAU** [ESTIMATE]
+This is not a cost increase — it is a cost decrease opportunity. When monthly Anthropic API spend approaches $10k–50k/month, volume commitment pricing becomes negotiable. Missing this window (continuing on list pricing past that threshold) is the inverse cliff: a failure to capture available savings. At 30k Pro MAU with current usage, estimated Anthropic spend is ~$6,000/month. Engagement target: initiate Anthropic sales conversation at $3k/month spend.
+
+**Cliff 4: ElevenLabs at scale — enterprise API negotiation**
+At 50k total MAU with 40% Pro mix (20k Pro users), estimated ElevenLabs API cost at list pricing is ~$4,840/month (from §13.1 table). This is the point at which audio caching becomes economically decisive. A 60% cache hit rate on common coaching cues reduces this to ~$1,936/month — a $2,900/month saving. Audio caching should be implemented before reaching 10k Pro MAU, not after.
+
+**Summary: when to act**
+
+| Milestone | Trigger action |
+|---|---|
+| 5k total MAU | Monitor PostHog event volume; budget $300/month for analytics starting M+1 |
+| 12k total MAU | Provision Supabase Team plan; schedule DB migration before 7.5GB |
+| 3k Pro MAU or $3k/mo Anthropic spend | Initiate Anthropic sales contact for committed spend pricing |
+| 8k Pro MAU (voice-enabled) | Implement audio caching for common cues; audit ElevenLabs character volume |
+| 30k total MAU | Begin Sentry Business evaluation; Supabase Enterprise scoping |
+
+### 13.5 Optimization levers by service
+
+**Anthropic Claude — highest priority**
+
+1. **Prompt caching.** Claude supports caching of static context segments via the `cache_control` API parameter. Victor's base persona, safety rules, and exercise reference library (~800–1,200 tokens) is static per-user-session. Caching this segment reduces input token cost on cached content by up to 90% (cache hits are billed at $0.30/1M tokens vs. $3.00/1M). [ESTIMATE: saves $0.03–0.06/Pro user/month at current usage; at 10k Pro users = $300–600/month]
+
+2. **Model tiering.** Route low-complexity tasks (intent classification, set logging confirmation, push notification copy) to Claude Haiku (significantly cheaper than Sonnet). Reserve Sonnet for genuine coaching turns and program adaptation. Target: 40–50% of API calls routable to Haiku. [ESTIMATE: 20–30% API cost reduction on the Haiku-routed portion]
+
+3. **Context window management.** The current assumption is 2,000 input tokens/session (§2.1). Implementing a sliding history window (most recent 5 sessions rather than full history) caps token growth as users accumulate history. Without this, long-tenure user costs grow logarithmically.
+
+4. **Committed spend / volume pricing.** Target $10k/month API spend as the conversation threshold with Anthropic sales. Typical discount 10–25% at this level. [ESTIMATE]
+
+**ElevenLabs — second priority**
+
+1. **Audio caching.** Victor's coaching vocabulary is finite and highly repetitive. Pre-generate and CDN-cache the top 200–300 cue phrases ("Good depth on that squat", "Elbows up and in", "Brace your core before the lift"). [ESTIMATE: 60–70% cache hit rate on character volume, reducing effective TTS cost by ~50%]
+
+2. **Character quota management.** Enforce per-user monthly character budgets in the application layer. Free tier: hard cap. Pro tier: soft cap with graceful degradation to text-only coaching beyond threshold.
+
+3. **Enterprise API pricing.** Negotiate directly with ElevenLabs at the point where monthly character volume exceeds 10M characters (~1,400 Pro users at current usage rates). Direct enterprise rates typically undercut Business tier list pricing at this volume.
+
+**Supabase — low priority, well-managed**
+
+1. **Read replicas for analytics.** Route all dashboard and analytics queries to a read replica (available on Team plan and above). Prevents analytical workloads from impacting production DB compute, which would trigger auto-scaling charges.
+
+2. **Storage tiering.** Workout history data older than 12 months can be moved to Supabase Storage (object storage, significantly cheaper than DB rows) or cold-archived. Reduces DB size growth rate by ~40% for mature users. [ESTIMATE]
+
+3. **Connection pooling (PgBouncer).** Already included in Supabase architecture. Ensure Cloudflare Workers connections route through PgBouncer to prevent connection exhaustion at scale.
+
+**PostHog — deferred**
+
+Costs are predictable and linear above 1M events. No optimization lever is economically significant at pre-50k MAU. At 100k MAU, consider: sampling non-critical events (e.g., `feature_viewed` for low-priority screens at 50% sample rate) to reduce event volume and cost. Preserve full fidelity on revenue-critical events (subscription state changes, session completions, conversion funnel events).
+
+**Cloudflare Workers — minimal action required**
+
+Request costs are negligible at any pre-Series A scale. Optimization only relevant if compute-intensive Workers (e.g., video frame processing) are introduced — currently not in scope (CV is on-device per §2.3).
+
+**Redis — passive**
+
+Sized appropriately for session store and rate limiting. No optimization levers at current scale. Scale instance up reactively on P99 latency signal.
+
+---
+
+## 14. Cohort LTV Model & CAC Payback Period
+
+This section models the expected revenue and gross profit generated by a subscriber cohort over 24 months, derives the payback period at different CAC assumptions, and establishes the LTV:CAC framework FORM will use in investor reporting. All churn figures are [ESTIMATE] — pre-launch benchmarks from comparable fitness and consumer SaaS products. These will be replaced with cohort actuals from beta as data accumulates. The first replacement checkpoint is M3 post-beta launch.
+
+### 14.1 Model assumptions and inputs
+
+| Parameter | Pro monthly | Pro annual | Enterprise (seat) | Source |
+|---|---|---|---|---|
+| Monthly subscription churn | 5.0% [ESTIMATE] | 1.5%/month [ESTIMATE] | 15%/year logo churn [ESTIMATE] | Fitness app benchmark; Noom/Calm public reports |
+| Net ARPU (after App Store SBP 15%) | $16.15/month | $10.20/month equiv. | $12/seat/month (direct) | §9.2; annual plan at $144/year × 0.85 ÷ 12 |
+| Infrastructure COGS | $0.50/month | $0.50/month | $0.34/seat/month | §3.3 |
+| Gross margin target | 85% | 85% | 89% | §6.1 |
+| CAC range modeled | $30–$120 | $30–$120 | $1,350–$10,750 | §8.5; consumer benchmark |
+
+**Note on annual plan ARPU:** The $10.20/month net figure reflects an annual price of $144/year with 15% App Store SBP fee applied at the point of billing. Annual plan subscribers churn at approximately one-third the rate of monthly subscribers (1.5% vs. 5% monthly churn [ESTIMATE]) because the renewal decision is annual, not monthly. This lower churn more than compensates for the reduced per-month ARPU in LTV terms.
+
+### 14.2 Pro monthly subscriber — cohort survival and cumulative revenue
+
+Starting cohort: 100 subscribers acquired in month 0 at $16.15 net ARPU/month. Monthly churn: 5% [ESTIMATE].
+
+**Survival formula:** `Remaining subscribers at month M = 100 × (1 − 0.05)^(M−1)`
+
+| Month | Cohort survival rate | Monthly net revenue (per original subscriber) | Cumulative gross revenue | Cumulative GM-adjusted LTV (85%) |
+|---|---|---|---|---|
+| 1 | 100.0% | $16.15 | $16.15 | $13.73 |
+| 3 | 90.2% | $14.58 | $46.07 | $39.16 |
+| 6 | 77.4% | $12.50 | $85.57 | $72.73 |
+| 12 | 56.9% | $9.19 | $148.46 | $126.19 |
+| 18 | 41.8% | $6.75 | $194.70 | $165.49 |
+| 24 | 30.7% | $4.96 | $228.69 | $194.38 |
+
+**Reading the table:** By month 24, approximately 31 of the original 100 subscribers remain. The cohort has generated $228.69 in cumulative gross revenue per original subscriber, of which $194.38 is gross-margin-adjusted LTV (at 85% GM). The curve is front-loaded: the first 6 months capture 37% of 24-month LTV while retaining 77% of the cohort.
+
+### 14.3 Pro annual subscriber — cohort survival and cumulative revenue
+
+Annual plan: $144/year ($120/year with 20% discount, or $144 list). Net ARPU after SBP: $10.20/month equivalent. Monthly churn: 1.5% [ESTIMATE].
+
+| Month | Cohort survival rate | Monthly net revenue equiv. | Cumulative gross revenue | Cumulative GM-adjusted LTV (85%) |
+|---|---|---|---|---|
+| 1 | 100.0% | $10.20 | $10.20 | $8.67 |
+| 3 | 97.0% | $9.90 | $30.14 | $25.62 |
+| 6 | 92.7% | $9.46 | $58.95 | $50.11 |
+| 12 | 84.7% | $8.64 | $112.79 | $95.87 |
+| 18 | 77.3% | $7.89 | $161.96 | $137.67 |
+| 24 | 70.6% | $7.20 | $206.87 | $175.84 |
+
+**Comparison with monthly plan:** Annual plan 24-month GM-adjusted LTV ($175.84) is lower than monthly ($194.38) in absolute terms, purely because monthly ARPU is higher ($16.15 vs. $10.20). However, the annual plan retains 70.6% of the cohort at month 24 versus 30.7% for monthly — annual subscribers are structurally more durable. For predictable cash flow and lower CAC payback pressure, annual plan mix is strategically preferable even with lower per-unit LTV.
+
+**Annual plan deferred revenue note:** Subscription revenue is recognized ratably over the subscription period. A subscriber paying $144 upfront creates $144 of cash inflow in month 0 and $12/month of recognized revenue over 12 months. The cash timing benefit is real and material for a capital-light pre-Series A company. However, under GAAP/IFRS, annual plan payments appear as deferred revenue on the balance sheet and are recognized at $12/month — investors and auditors will see both the cash and the recognition schedule. Disclose clearly in financial reports.
+
+### 14.4 CAC payback period analysis — Pro monthly plan
+
+CAC payback period = the number of months until cumulative gross-margin-adjusted revenue from a subscriber cohort equals the initial acquisition cost. Using 85% GM and 5% monthly churn [ESTIMATE].
+
+Monthly GM contribution per surviving subscriber at month M:
+`GM_M = $16.15 × (1 − 0.05)^(M−1) × 0.85`
+
+Cumulative GM contribution builds month by month until it crosses the CAC threshold:
+
+| CAC | Payback month | M12 GM-adj LTV | M24 GM-adj LTV | LTV:CAC at M12 | LTV:CAC at M24 |
+|---|---|---|---|---|---|
+| $30 | Month 3 | $126.19 | $194.38 | **4.2×** | **6.5×** |
+| $50 | Month 4 | $126.19 | $194.38 | **2.5×** | **3.9×** |
+| $80 | Month 7 | $126.19 | $194.38 | **1.6×** | **2.4×** |
+| $120 | Month 12 | $126.19 | $194.38 | **1.1×** | **1.6×** |
+
+**Interpretation:** CAC below $50 delivers payback inside Q1 of the customer relationship — structurally excellent. CAC at $80 pays back in 7 months — acceptable for a consumer subscription with a 24-month expected life. CAC above $120 pushes payback to month 12 and yields LTV:CAC of 1.6× at M24 — this is below the conventional 3× minimum benchmark and would require either churn improvement or ARPU expansion (upgrades, annual conversion) to be defensible.
+
+### 14.5 LTV:CAC ratio targets and rationale
+
+**Consumer Pro targets:**
+
+| Scenario | LTV:CAC target | Rationale |
+|---|---|---|
+| Organic / content-driven | ≥ 5× at M24 | CAC $30–40 expected; should deliver 4.9–6.5× |
+| Paid social (Meta/TikTok) | ≥ 3× at M24 | CAC $50–80 expected; minimum defensible threshold |
+| Maximum paid UA ceiling | ≥ 2× at M24 | CAC ~$100; only acceptable with path to annual conversion |
+
+The conventional SaaS benchmark is 3:1 LTV:CAC with payback under 12 months. Consumer subscription benchmarks are slightly different — Calm, Headspace, and comparable wellness apps report blended LTV:CAC of 2–4× depending on channel mix. FORM targets the upper end of this range (3–5×) by prioritizing organic and content-led growth over paid UA.
+
+**Why 3× is a floor, not a target:** At 3× LTV:CAC, after accounting for overhead allocation, the actual return on acquisition spend is thin. At 5×+, acquisition investment compounds meaningfully and provides headroom for higher CAC in channels that deliver better retention cohorts (e.g., users who discover FORM via sports science content convert at lower rates but churn at half the rate of paid UA users — higher CAC, much higher LTV).
+
+**Do not optimize CAC in isolation.** A $30 CAC from influencer campaigns may deliver worse 12-month LTV than an $80 CAC from organic content (higher intent, higher activation, lower churn). Track LTV:CAC by acquisition channel, not blended. This is a PostHog + Supabase cohort join query, not a back-of-envelope calculation.
+
+### 14.6 Enterprise LTV model
+
+Enterprise LTV is driven by initial ACV, expansion (seat growth and new feature adoption), and logo retention. The NRR model assumes 120% NRR [ESTIMATE] — meaning each surviving customer cohort grows 20% per year in ARR terms. This requires ~41% seat/price expansion on retained logos to offset 15% annual logo churn.
+
+**Minimum contract baseline:** 40 seats × $12/seat/month × 12 = **$5,760 ACV** (from §8.3).
+
+**Enterprise cohort LTV at 120% NRR, 15% annual logo churn [ESTIMATE], 89% gross margin:**
+
+| Year | ACV (per average deal) | GM-adjusted annual revenue | Cumulative GM-adj LTV |
+|---|---|---|---|
+| Year 1 | $5,760 | $5,126 | $5,126 |
+| Year 2 | $6,912 [120% NRR applied] | $6,152 | $11,278 |
+| Year 3 | $8,294 | $7,382 | $18,660 |
+
+**3-year GM-adjusted LTV on minimum deal: ~$18,660.** Against a CAC of ~$1,350 (small deal, §8.5): **LTV:CAC = 13.8×**.
+
+At larger deal sizes (with proportionally higher but sub-linear CAC from §8.5):
+
+| Deal size | Starting ACV | 3yr GM-adj LTV | CAC midpoint | LTV:CAC |
+|---|---|---|---|---|
+| Minimum (40 seats) | $5,760 | $18,660 | $1,350 | **13.8×** |
+| Mid (100 seats) | $36,000 | $116,626 | $4,200 | **27.8×** |
+| Large (500 seats) | $210,000 | $680,316 | $10,750 | **63.3×** |
+
+Enterprise LTV:CAC ratios are structurally superior to consumer at every deal size. The minimum 40-seat deal returns ~14× over 3 years. The economic argument for investing in enterprise GTM is not margin (which is already excellent at both tiers) but predictability: annual contracts, invoiced directly, with expanding seat counts, generate ARR that is fundamentally more stable than consumer monthly churn.
+
+**Expansion revenue mechanics at 120% NRR:** An enterprise account that starts at 40 seats and expands to the company-wide headcount of 200 seats over 24 months goes from $5,760 ACV to $28,800 ACV — a 5× ACV expansion on a single logo. This is the land-and-expand motion. The CAC is fixed at ~$1,350 (acquisition cost does not repeat on expansion); the incremental 160 seats are zero-CAC revenue. This is why NRR >100% is such a powerful metric for enterprise SaaS valuation multiples.
+
+### 14.7 Cohort survival curve — qualitative requirements
+
+What does FORM's retention curve need to look like to hit the targets above?
+
+**The shape that matters:** A healthy retention curve for a fitness app is not a smooth exponential decay. It is a steep initial drop (first 30 days: users who installed out of curiosity but never activated) followed by a flattening into a durable core cohort. The users who complete 3+ coached sessions in the first 14 days (the activation milestone from METRICS.md) are the ones who define the flat tail. The initial drop is expected and acceptable; the floor of the curve is what determines LTV.
+
+**Target curve shape:**
+- D1 retention: >60% [ESTIMATE] — users open the app the day after install
+- D7 retention: >40% [ESTIMATE] — first week engagement signal
+- D30 retention: >25% [ESTIMATE] — the "will this person stick?" threshold
+- M3 retention (monthly active): >20% [ESTIMATE] — 5% monthly churn means 86% survive month-to-month, so M3 = ~86^2 = ~74% for already-retained users; but accounting for trial-to-paid churn cliff, effective M3 paying retention should be ~65–70%
+- M12 retention (monthly active): >10% [ESTIMATE] — aligns with 56.9% cohort survival at month 12 in the LTV table above
+
+**The churn cliff to avoid:** Consumer subscriptions show a consistent pattern of elevated churn at the first billing renewal (day 7–14 for free trials, day 30 for first paid month). FORM's onboarding and early activation design must specifically address this cliff — users who have not experienced a "coaching moment that felt personalized" by day 10 are extremely likely to cancel at first renewal. The activation funnel target (3 coached sessions in 14 days) is designed to get users past this cliff.
+
+**What 5% monthly churn means in practice:** A cohort of 1,000 subscribers acquired in January will have approximately 540 remaining at December (month 12) — a 46% loss over the year. This is the benchmark being modeled. If actual beta churn comes in below 5%, every LTV figure above improves materially. If churn comes in at 8–10% (worse than benchmark), the CAC payback math at $80+ CAC breaks down and acquisition spend must be curtailed until churn is diagnosed and addressed.
+
+**Leading indicators to watch (from PostHog):**
+
+- W-ACSU (Weekly Active Coached Sessions per User) — the NSM from METRICS.md. Users with W-ACSU ≥ 2.5 in their first month churn at roughly half the rate of users with W-ACSU < 1.0. [ESTIMATE — to be validated in beta]
+- Chat message sent frequency — users who use the AI coaching chat ≥ 3 times per week show substantially lower churn in comparable AI wellness products
+- Session streak length — unbroken session streaks are a strong leading indicator; a 7-day streak in week 2 is the strongest early predictor of 90-day retention in fitness apps
+
+### 14.8 Data pipeline for cohort LTV tracking
+
+LTV is not a formula you run once — it is a live cohort measurement that requires a functioning data pipeline. FORM's approach:
+
+**Source tables:** `fact_events` (session completions, billing events), `dim_users` (acquisition channel, install date, tier), subscription state from Supabase (server-side, trusted).
+
+**Cohort definition:** Cohort = week of first subscription payment (not install). A user who installs in week 1 and subscribes in week 3 enters the cohort in week 3. This is the correct definition for LTV purposes — LTV clock starts at first revenue, not first install.
+
+**Retention metric computed daily** via ETL (§pipeline in ANALYTICS_SETUP.md): for each cohort-month, count users who made at least one session in that calendar month divided by original cohort size. Output: retention matrix stored in ClickHouse `fact_cohort_retention` table.
+
+**CAC by channel** sourced from paid attribution (UTM parameters → PostHog → Supabase), organic attribution (ASO, referral codes), and estimated content marketing cost amortized over organic installs per month.
+
+**LTV:CAC report** computed as a saved Metabase question: join `fact_cohort_retention` × `dim_users.acquisition_channel` × marketing spend table. Updated weekly. Owner: data-engineer.
+
+**Backfill note:** Until 90 days of post-launch data exist, LTV figures in investor reports will be labeled "projected based on [ESTIMATE] benchmark churn." The first cohort with real 90-day data is the point at which [ESTIMATE] tags are removed from §14.2 and §14.3. Target: M6 post-launch.
+
+---
+
+**v0.5 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
 
 *v0.3 additions: §12 Free Tier Subsidy Model & Freemium Funnel Economics — total subsidy at scale, minimum conversion rate for cost neutrality, freemium CAC vs. paid UA comparison, free tier cost controls, free pool governance triggers.*
 
 *v0.4 updates: §4, §5, §6, §8.4, §9, §10, §12 recalculated to reflect Pro ARPU of $19/month (Western markets, per pricing.html). Geo-pricing note added (§4). Free tier break-even threshold: 1.05% → 0.82%. Full-burn break-even: 6,530 → 5,112 Pro subscribers. Section 10 sensitivity margins updated throughout.*
+
+*v0.5 additions: §13 Infrastructure Cost Breakdown by Service — service-by-service table at 1k/10k/50k/100k MAU, fixed vs. variable classification, upgrade inflection points, cost cliff analysis, per-service optimization levers. §14 Cohort LTV Model & CAC Payback Period — 24-month cohort survival tables for Pro monthly and annual plans, CAC payback at $30/$50/$80/$120, LTV:CAC targets by channel, enterprise LTV at 120% NRR, cohort survival curve requirements, data pipeline specification.*

@@ -9,6 +9,43 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.68.0] — 2026-05-18
+
+### Added
+- `docs/DATA_MODEL.md` v0.3 → v0.4 — **§12 Soft Delete, Data Retention & GDPR Art. 17 Erasure** (enterprise-architect + compliance-officer)
+  - Soft-delete strategy table (14 tables; `audit_log` immutable per DEC-030; `tenant_scim_tokens` uses `revoked_at` not `deleted_at`)
+  - Retention windows by data classification (Art. 9 special category, consumer vs. enterprise DPA)
+  - Full Art. 17 erasure flow: re-auth gate → soft-delete → async erasure job → users anonymization (not hard-delete; FK integrity reasoning) → confirmation email
+  - `pg_cron` schedule: media-upload 90-day purge, 30-day hard-delete of user data, 2-year consumer audit log purge
+  - Art. 20 data portability export spec: JSON zip, signed Supabase Storage URL, 72h SLA target, 3-request/30-day rate limit
+  - Data minimisation register per Art. 5(1)(c): 10 data points with collection justification or exclusion reason
+- `docs/SOC2_READINESS.md` v0.7 → v0.8 — **§18 Business Continuity & Disaster Recovery** (devops-lead + compliance-officer)
+  - RTO/RPO commitments: Enterprise 4h/1h, Pro 8h/4h, Auth/SSO 1h/15min
+  - 4 failure scenarios with step-by-step response: Supabase unavailability, Cloudflare outage, data corruption (PITR path), nuke scenario (cold start from B2)
+  - Annual DR drill procedure (staging-env Scenario C), drill report template, evidence filing spec for CC7.5
+  - Communication tree: 5 incident phases × 3 channels (internal, enterprise, consumer)
+  - SOC 2 gap closure: CC7.5 🔴 → 🟡 Partial; DR runbook 🟡 → 🟢 Done; readiness ~58% → ~60%
+  - Cold storage backup gap newly documented (B2 nightly export not yet implemented)
+- `docs/SSO_SCIM_IMPLEMENTATION.md` v0.2 → v0.3 — **§11 Just-in-Time (JIT) Provisioning Design** (enterprise-architect + security-engineer)
+  - JIT vs. SCIM decision matrix (4 scenarios); JIT is the default for SSO-enabled, SCIM-disabled tenants
+  - Full provisioning flow: domain gate → seat-limit check (transactional FOR UPDATE) → INSERT users → audit log → admin notification
+  - SAML and OIDC claim extraction tables with per-field fallback behavior; per-tenant `claim_mapping JSONB` config
+  - Domain verification gate: `allowed_domains TEXT[]`, exact-match only (no subdomain passthrough), implementation note
+  - Seat limit race-condition fix: `SELECT ... FOR UPDATE` inside transaction prevents concurrent JIT overshooting `max_seats`
+  - JIT-to-SCIM reconciliation: 409 Conflict → PATCH adopt path; role not overwritten unless SCIM payload includes `roles`
+  - 6 JIT audit events per DEC-030; admin controls (jit_provisioning_enabled, default_role, notify_on_jit_provision)
+  - Security note: domain verification is mandatory; JIT without it is a tenant isolation bypass
+- `docs/COST_MODEL.md` v0.4 → v0.5 — **§§13-14: Infrastructure Cost Breakdown & Cohort LTV Model** (data-engineer)
+  - §13: per-service cost table at 1k/10k/50k/100k MAU (Anthropic, ElevenLabs, Supabase, Cloudflare, Sentry, PostHog, Redis); fixed vs. variable classification; upgrade inflection points; ElevenLabs Creator-plan quota concern flagged (exhausted at ~14 Pro voice users); Anthropic prompt caching lever (up to 90% reduction on cached context); blended per-user cost stabilizes at $0.32–0.34 at scale
+  - §14: 24-month cohort survival tables (monthly vs. annual Pro plans; 5% vs. 1.5% monthly churn); M24 GM-adjusted LTV $194 (monthly) and $176 (annual); CAC payback periods ($30→M3, $50→M4, $80→M7, $120→M12); LTV:CAC targets by channel; enterprise LTV model (40-seat min, 120% NRR, 3-year GM-adj $18,660); cohort survival requirements; deferred revenue recognition note
+- `content/post-40-hypertrophy-mechanisms.md` — **sports-science: механізми гіпертрофії** (sports-scientist, clinical-safety: PASS)
+  - Schoenfeld 2010 three-mechanism framework updated with 2020s evidence
+  - Mechanical tension as primary driver; metabolic stress and muscle damage re-examined
+  - Stretch-mediated hypertrophy (Pedrosa et al. 2022 cited); practical training implications
+  - Victor callout: editorial-brutalist, Ukrainian main body, bilingual key terms
+
+---
+
 ## [0.67.1] — 2026-05-18
 
 ### Added

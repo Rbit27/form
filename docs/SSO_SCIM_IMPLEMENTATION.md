@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v0.2
+# FORM · SSO/SCIM Implementation v0.3
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -18,6 +18,7 @@
 8. [Operational Runbook](#8-operational-runbook)
 9. [Open Questions / Gaps](#9-open-questions--gaps)
 10. [Magic Link Fallback Security Design](#10-magic-link-fallback-security-design)
+11. [Just-in-Time (JIT) Provisioning Design](#11-just-in-time-jit-provisioning-design)
 
 ---
 
@@ -1362,6 +1363,257 @@ The fallback OTP processing activity must be listed in FORM's Article 30 Record 
 
 ---
 
-**v0.2 · May 2026 · enterprise-architect + security-engineer**
+## 11. Just-in-Time (JIT) Provisioning Design
+
+> Owner: `enterprise-architect` + `security-engineer`. Required reading before implementing SSO callback handler.
+> Dependency: §1 (Architecture), §4 (Multi-Tenant Isolation), §5 (Role Mapping), §6 (Security Controls).
+
+JIT provisioning creates a FORM user account on the user's first successful SSO login, without requiring prior SCIM provisioning. It is the default provisioning mode for enterprise tenants who have SSO enabled but have not set up SCIM.
+
+---
+
+### 11.1 When JIT Applies
+
+| Scenario | Provisioning method |
+|---|---|
+| SCIM enabled + user pre-provisioned | SCIM wins. JIT is skipped. User record already exists. |
+| SCIM enabled + user NOT pre-provisioned | JIT creates the account. SCIM will "adopt" it on next sync (SCIM PATCH identifies by `userName`). |
+| SCIM disabled + SSO enabled | JIT is the only provisioning path. All users arrive via first login. |
+| SCIM disabled + SSO disabled | Invite-only provisioning. JIT does not apply. |
+
+**Default posture for new enterprise tenants:** SCIM disabled, SSO enabled → JIT is the provisioning path until the admin configures SCIM.
+
+---
+
+### 11.2 JIT Provisioning Flow
+
+```
+User authenticates at their IdP (Okta / Azure AD / Google Workspace)
+  ↓
+IdP issues SAML assertion or OIDC ID token to FORM callback
+  ↓
+Cloudflare Worker: validate token signature (JWKS from tenant IdP config)
+  ↓
+Extract claims: { sub, email, given_name, family_name, groups, ... }
+  ↓
+Lookup: SELECT id FROM users WHERE tenant_id = :tid AND email = :email
+
+  ── User exists ──────────────────────────────────────────────────────┐
+  |  Update last_login_at; refresh role from IdP groups claim          |
+  |  (if groups-to-roles mapping is configured in tenant_sso_configs)  |
+  └────────────────────────────────────────────────────────────────────┘
+  
+  ── User does NOT exist ──────────────────────────────────────────────┐
+  |  JIT check: is jit_provisioning_enabled for this tenant? (default: TRUE)
+  |    → FALSE: reject with 403; log audit event 'sso.jit.rejected'   |
+  |    → TRUE: proceed                                                 |
+  |                                                                    |
+  |  Seat check: SELECT COUNT(*) FROM users WHERE tenant_id = :tid     |
+  |              AND deactivated_at IS NULL                            |
+  |    → count >= tenant.max_seats: reject with 403; log              |
+  |      audit event 'sso.jit.seat_limit_reached'; alert tenant admin  |
+  |    → count < max_seats: proceed                                    |
+  |                                                                    |
+  |  Domain check: is email domain in tenant.verified_domains?        |
+  |    → NO: reject with 403; log 'sso.jit.domain_mismatch'           |
+  |    → YES: proceed                                                  |
+  |                                                                    |
+  |  INSERT INTO users: {                                              |
+  |    id: gen_random_uuid(),                                          |
+  |    tenant_id: :tid,                                                |
+  |    email: :email,                                                  |
+  |    display_name: given_name + ' ' + family_name,                  |
+  |    role: mapped_role (from groups claim) or tenant.default_role,   |
+  |    provisioned_via: 'sso_jit',                                     |
+  |    external_id: :sub (IdP subject),                                |
+  |    email_verified: TRUE (IdP has verified),                        |
+  |    created_at: NOW()                                               |
+  |  }                                                                 |
+  |  Write audit_log: 'sso.jit.provisioned'                           |
+  |  Send tenant admin notification (if notify_on_jit_provision = TRUE)|
+  └────────────────────────────────────────────────────────────────────┘
+
+  ↓
+Issue FORM session JWT
+  ↓
+Redirect to app (deep link or web dashboard)
+```
+
+---
+
+### 11.3 Claims Extraction and Mapping
+
+#### SAML assertion claims
+
+| SAML attribute | FORM field | Required? | Fallback if absent |
+|---|---|---|---|
+| `NameID` (or `uid`) | `external_id` | Required | Reject login |
+| `email` (or `mail`) | `email` | Required | Reject login |
+| `givenName` (or `firstName`) | `display_name` (first part) | Optional | Use email prefix |
+| `sn` (or `lastName`) | `display_name` (last part) | Optional | Empty string |
+| `groups` (or `memberOf`) | Role mapping (see §5) | Optional | Assign `default_role` from tenant config |
+
+#### OIDC ID token claims
+
+| OIDC claim | FORM field | Required? | Fallback if absent |
+|---|---|---|---|
+| `sub` | `external_id` | Required | Reject login |
+| `email` | `email` | Required | Reject login |
+| `email_verified` | Validation gate | Required (must be `true`) | Reject login; unverified emails not accepted |
+| `given_name` | `display_name` (first part) | Optional | Use email prefix |
+| `family_name` | `display_name` (last part) | Optional | Empty string |
+| `groups` (custom claim) | Role mapping (see §5) | Optional | Assign `default_role` |
+
+**Claim extraction configuration:** Per-tenant claim mapping is stored in `tenant_sso_configs.claim_mapping JSONB`. This allows tenants whose IdP uses non-standard attribute names (e.g., Okta custom attributes like `customEmailField`) to configure the correct source attribute name without a code change.
+
+Example `claim_mapping`:
+```json
+{
+  "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+  "given_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+  "groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+}
+```
+
+---
+
+### 11.4 Domain Verification Gate
+
+JIT provisioning is restricted to email addresses whose domain matches the tenant's verified domains. This prevents an attacker with a valid session at a different tenant's IdP from provisioning themselves into another tenant.
+
+**Verified domain list** is stored in `tenant_sso_configs.allowed_domains TEXT[]`. Each domain is verified by the FORM admin team before SSO is activated for the tenant (DNS TXT record verification, same mechanism as Google Workspace domain verification).
+
+```sql
+-- Tenant SSO config schema addition (supplement to §2.10):
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS allowed_domains       TEXT[] NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS jit_provisioning_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS default_role          TEXT NOT NULL DEFAULT 'tenant_member'
+    CHECK (default_role IN ('tenant_member', 'tenant_manager')),
+  ADD COLUMN IF NOT EXISTS notify_on_jit_provision BOOLEAN NOT NULL DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS claim_mapping         JSONB NOT NULL DEFAULT '{}';
+```
+
+Domain check implementation (Cloudflare Worker, TypeScript):
+
+```typescript
+function isEmailDomainAllowed(email: string, allowedDomains: string[]): boolean {
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return false;
+  // Exact match only — no subdomain matching; prevents bypass via sub.attacker.corp.example.com
+  return allowedDomains.map(d => d.toLowerCase()).includes(domain);
+}
+```
+
+Subdomain matching is intentionally excluded. If a tenant needs `us.corp.example.com` and `eu.corp.example.com`, both must be listed explicitly in `allowed_domains`.
+
+---
+
+### 11.5 Seat Limit Enforcement
+
+JIT provisioning is blocked if the tenant has reached `max_seats`. The check is performed **inside a transaction** with a row lock to prevent race conditions when multiple users attempt JIT provisioning simultaneously.
+
+```sql
+BEGIN;
+
+-- Row-lock the tenant row to prevent concurrent JIT provisioning from overshooting max_seats
+SELECT max_seats FROM tenants WHERE id = :tenant_id FOR UPDATE;
+
+-- Count active seats
+SELECT COUNT(*) INTO active_seat_count
+  FROM users
+  WHERE tenant_id = :tenant_id
+    AND deactivated_at IS NULL
+    AND deleted_at IS NULL;
+
+-- Conditional insert
+IF active_seat_count < max_seats THEN
+  INSERT INTO users (...) VALUES (...);
+  -- audit log write
+ELSE
+  -- Return error; write audit log 'sso.jit.seat_limit_reached'
+END IF;
+
+COMMIT;
+```
+
+When the seat limit is reached, the response to the user is a generic "Account provisioning error — contact your IT administrator" message. The detailed reason (seat limit) is visible only to tenant admins in the admin dashboard, not to end users (prevents seat-count enumeration).
+
+---
+
+### 11.6 JIT vs. SCIM Reconciliation
+
+When SCIM is activated on a tenant that already has JIT-provisioned users, the SCIM sync must reconcile without creating duplicate accounts or overwriting roles that were manually assigned post-JIT.
+
+**Reconciliation logic (SCIM POST /Users on a JIT-provisioned user):**
+
+1. SCIM provider sends a `POST /Users` for a user who already exists in FORM (matched by `userName` = email).
+2. FORM SCIM handler: check if a user with `email = :email AND tenant_id = :tid` already exists.
+3. If exists: return `409 Conflict` with `detail: "User already exists"` per RFC 7644 §3.3. The IdP SCIM client will then switch to a `PATCH` or `PUT` to update the existing record.
+4. FORM updates: `external_id` (overwrites JIT's IdP `sub` with SCIM `externalId`), `provisioned_via: 'scim'` (promotes the account to SCIM-managed).
+5. Role is NOT overwritten unless the SCIM payload explicitly includes the `roles` attribute. Manual role overrides survive SCIM reconciliation.
+
+This ensures JIT-provisioned users are seamlessly adopted by SCIM without data loss or duplicate records.
+
+---
+
+### 11.7 JIT Audit Events
+
+All JIT events are written to the HMAC-chained `audit_log` table per DEC-030.
+
+| Event | Trigger | Key metadata |
+|---|---|---|
+| `sso.jit.provisioned` | New user created via JIT | `tenant_id`, `user_id` (new), `email`, `external_id`, `role_assigned`, `domain` |
+| `sso.jit.login` | Existing JIT-provisioned user logs in via SSO | `tenant_id`, `user_id`, `session_id`, `idp_name` |
+| `sso.jit.seat_limit_reached` | JIT blocked due to seat limit | `tenant_id`, `email`, `current_seat_count`, `max_seats` |
+| `sso.jit.domain_mismatch` | JIT blocked; email domain not in `allowed_domains` | `tenant_id`, `email`, `email_domain`, `allowed_domains` |
+| `sso.jit.rejected` | JIT blocked because `jit_provisioning_enabled = FALSE` | `tenant_id`, `email` |
+| `sso.jit.scim_adopted` | JIT-provisioned user's record taken over by SCIM | `tenant_id`, `user_id`, `previous_provisioned_via: 'sso_jit'`, `new_external_id` |
+
+---
+
+### 11.8 Admin Controls
+
+Tenant admins control JIT behavior via Settings → Security → Provisioning.
+
+| Setting | Default | Description |
+|---|---|---|
+| `jit_provisioning_enabled` | `TRUE` | When `FALSE`, SSO logins by unknown users are rejected with a 403. SCIM must be used to pre-provision all users. |
+| `default_role` | `tenant_member` | Role assigned to JIT-provisioned users when the IdP groups claim is absent or unmapped. Options: `tenant_member`, `tenant_manager`. Cannot be set to `tenant_admin` or `tenant_owner` via JIT. |
+| `notify_on_jit_provision` | `TRUE` | When `TRUE`, tenant admin receives an email notification for each new JIT-provisioned user. Recommended for tenants without SCIM (provides visibility into who is accessing). |
+| `allowed_domains` | Set at onboarding | Editable by FORM admin team only (not self-serve); domain verification required before adding. |
+
+**Security note:** Setting `jit_provisioning_enabled = FALSE` is the right control for tenants who want strict control over who can access FORM — e.g., regulated industries where every user must be explicitly pre-approved in the IdP before accessing SaaS tools. For these tenants, the required flow is: HR/IT creates user in IdP → SCIM syncs to FORM → user can log in. A user who attempts SSO login without a SCIM-provisioned record receives a 403.
+
+---
+
+### 11.9 Implementation Sequencing
+
+JIT provisioning implementation depends on:
+
+| Dependency | Status | Notes |
+|---|---|---|
+| SAML assertion validation (§1, §2) | Not implemented | Core SSO flow must be implemented first |
+| OIDC token validation (§1, §2) | Not implemented | Core OIDC flow must be implemented first |
+| `tenant_sso_configs` schema additions (§11.4) | Not implemented | Migration required to add `jit_provisioning_enabled`, `allowed_domains`, `default_role`, `claim_mapping`, `notify_on_jit_provision` columns |
+| Seat count transactional check (§11.5) | Not implemented | Requires careful transaction design to avoid race condition |
+| Transactional email for admin notifications | Not implemented | Same dependency as §10.10 OTP email; Resend/Postmark/SES |
+| Admin dashboard — Provisioning settings panel | Not implemented | Blocked by G-007 |
+
+**Recommended implementation order:**
+1. Core SSO callback handler (SAML assertion parse + OIDC token validate)
+2. Schema migration for `tenant_sso_configs` additions
+3. JIT provisioning logic in callback handler (the upsert + seat check + domain check)
+4. Audit log integration
+5. Admin notification email
+6. Admin dashboard settings panel (after G-007)
+
+Do not ship JIT without domain verification. An SSO implementation without domain verification is a tenant isolation bypass.
+
+---
+
+**v0.3 · May 2026 · enterprise-architect + security-engineer**
 **Review trigger: any IdP integration change, any SCIM schema change, or quarterly — whichever comes first.**
 *v0.2 additions: Section 10 — Magic Link Fallback Security Design. Threat model (8 attack vectors), OTP spec, rate limits, trigger conditions, verification flow, abuse detection, audit events, admin controls, implementation sequencing, GDPR/DPA note. Closes G-010 design phase. Critical implementation dependencies identified.*
+
+*v0.3 additions: Section 11 — Just-in-Time (JIT) Provisioning Design. JIT vs. SCIM decision tree, provisioning flow with seat-limit and domain-verification gates, SAML and OIDC claim extraction mapping, per-tenant `claim_mapping` JSONB config, seat limit enforcement with FOR UPDATE transaction lock to prevent race condition, JIT-to-SCIM reconciliation (409 Conflict → PATCH adopt path), 6 JIT audit events, admin controls (jit_provisioning_enabled, default_role, notify_on_jit_provision), implementation sequencing. Security note: domain verification is not optional.*

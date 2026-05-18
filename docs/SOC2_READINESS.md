@@ -1483,6 +1483,235 @@ This section directly addresses the two 🔴 Gaps identified in the SOC 2 readin
 
 ---
 
+## 18. Business Continuity & Disaster Recovery (BCP/DRP)
+
+> Owner: `devops-lead` + `compliance-officer`. Review: after each DR drill, after any infrastructure change that affects RTO/RPO, or annually.
+> SOC 2 controls: CC7.4 (Response to detected incidents), CC7.5 (Recovery from incidents), A1.1 (Availability commitments), A1.2 (Capacity and performance management).
+
+---
+
+### 18.1 Purpose
+
+This section documents FORM's Business Continuity Plan (BCP) and Disaster Recovery Plan (DRP). It exists to:
+
+1. Satisfy SOC 2 CC7.5 and A1.1 requirements for documented recovery procedures
+2. Define RTO/RPO commitments that can be disclosed to enterprise customers
+3. Ensure the founding engineer (sole operator pre-Series A) has a written playbook, not tribal knowledge
+4. Establish the evidence artifact for the January DR drill (§15.1 compliance calendar)
+
+**Scope:** Production infrastructure only. This covers Supabase (database), Cloudflare Workers (API edge), Supabase Storage (media), ElevenLabs (voice), and Anthropic (LLM). It does not cover the iOS app itself (App Store distribution is Apple-operated).
+
+---
+
+### 18.2 Recovery Time Objective (RTO) and Recovery Point Objective (RPO)
+
+These targets govern what FORM promises enterprise customers and what the engineering team designs toward.
+
+| Service tier | RTO | RPO | Notes |
+|---|---|---|---|
+| **Enterprise** | 4 hours | 1 hour | Contractual SLA. Failure to meet: pro-rata credit per enterprise contract. |
+| **Pro (consumer)** | 8 hours | 4 hours | Best-effort commitment. Disclosed in Terms of Service. |
+| **Free tier** | 24 hours | 24 hours | No contractual commitment. |
+| **Auth / SSO** | 1 hour | 15 minutes | SSO outage blocks enterprise users from logging in. Priority restore. |
+| **Audit log** | N/A (read-only in recovery) | 0 minutes | HMAC-chained; append-only. Recovery means read access, not write. |
+
+**RPO implementation basis:**
+
+- Supabase enables Point-in-Time Recovery (PITR) with WAL streaming. Default PITR retention: 7 days. RPO for the database is therefore a function of WAL stream latency to the warm standby, which Supabase guarantees at < 5 minutes in Multi-AZ configuration.
+- Supabase Storage (object store) replicates across AZs within the selected data region. RPO for media is effectively 0 within-region.
+- The 1-hour RPO for enterprise and 4-hour for Pro represent the maximum acceptable data loss window, not the expected loss window (which is < 5 minutes under normal PITR).
+
+---
+
+### 18.3 Failure Scenarios and Response Procedures
+
+#### Scenario A — Supabase database unavailability
+
+**Definition:** Supabase Postgres primary is unreachable or returning errors on all queries for > 5 minutes.
+
+**Detection:** Better Uptime health check on `/api/health` returns non-2xx for 3 consecutive intervals (1 minute intervals). PagerDuty P1 alert fires. Sentry error rate spike (database connection errors).
+
+**Response:**
+
+| Step | Action | Owner | Time budget |
+|---|---|---|---|
+| 1 | Acknowledge PagerDuty alert; check Supabase Status Page (status.supabase.com) | On-call engineer | < 5 min |
+| 2 | If Supabase platform incident: post status update to form.coach/status; switch API to maintenance mode (return 503 with `Retry-After: 1800`) | On-call engineer | < 10 min |
+| 3 | If FORM-side issue (misconfiguration, migration gone wrong): invoke INCIDENT_RESPONSE.md §5.2 (Database Incident runbook) | On-call engineer | < 15 min |
+| 4 | If Supabase platform incident persists > 2 hours: contact Supabase enterprise support (requires paid plan); escalate to founder | On-call engineer | 2 hours |
+| 5 | If total outage > 4 hours and RPO breach imminent: initiate PITR restore to latest clean checkpoint (INCIDENT_RESPONSE.md §5 + DATA_MODEL.md §10) | Founder + on-call | 4 hours |
+| 6 | Notify enterprise tenants via DPA-specified contact channel; issue incident communication per §6 INCIDENT_RESPONSE.md template | On-call engineer | Within 1 hour of confirmed P1 |
+
+**RTO target for this scenario: 4 hours.** If Supabase recovers within 4 hours (platform incident), no PITR restore is needed. If outage exceeds 4 hours, PITR restore is initiated regardless.
+
+---
+
+#### Scenario B — Cloudflare Workers API unavailability
+
+**Definition:** All API endpoints unreachable globally for > 5 minutes, confirmed as Cloudflare-side.
+
+**Detection:** Better Uptime health check fails globally. Cloudflare Status Page (cloudflarestatus.com) confirms incident.
+
+**Response:**
+
+1. Post status update to form.coach/status. Enterprise tenant notification per DPA.
+2. No operational fallback exists for Cloudflare Workers outages — FORM's edge runtime has no secondary provider at this stage. Document as a known risk in the risk register (R-004).
+3. After recovery: verify all Worker deployments are serving the correct version (`wrangler tail` in production). Replay any queued background jobs if applicable.
+
+**RTO target for this scenario: dependent on Cloudflare recovery.** Cloudflare's historical uptime is > 99.99%; this scenario is low probability. The compensating control is Cloudflare's own redundancy (global anycast network).
+
+**DRP gap:** No secondary CDN/edge failover documented. This is a known gap. Mitigation: Cloudflare's SLA and historical reliability. Formal secondary-provider DR is Post-Series-A scope.
+
+---
+
+#### Scenario C — Data corruption (accidental or malicious)
+
+**Definition:** Production data found to be corrupted, partially deleted, or tampered with. Includes: accidental mass-delete via admin API, failed migration with data loss, insider threat.
+
+**Detection:** Monitoring anomaly on row counts in key tables (pg_stat_user_tables row count drops > 5% in < 1 hour triggers PagerDuty P1). Audit log review triggered by any P1 incident.
+
+**Response:**
+
+1. Immediately freeze the affected table(s): revoke `INSERT`, `UPDATE`, `DELETE` permissions from `form_api` role for the affected table using `ALTER TABLE <table> DISABLE TRIGGER ALL; REVOKE ...` — stops further corruption while preserving reads.
+2. Snapshot the current state before any restore attempt: `pg_dump --table=<affected_table>`.
+3. Identify the corruption timestamp from audit log and/or Cloudflare Worker logs.
+4. Invoke PITR restore to a timestamp 5 minutes before the corruption event. Follow DATA_MODEL.md §10 (PITR Tenant-Isolated Restore Runbook) exactly.
+5. Compare restored data against pre-corruption snapshot; apply delta to production.
+6. Write post-incident report (INCIDENT_RESPONSE.md §8 template).
+7. If malicious actor suspected: invoke INCIDENT_RESPONSE.md §5.5 (Security Breach), notify compliance-officer, evaluate breach notification obligation (72-hour GDPR clock starts from confirmed breach).
+
+**RPO target for this scenario: 1 hour (enterprise), 4 hours (Pro).** With PITR at < 5-minute granularity, the limiting factor is detection time, not restore granularity.
+
+---
+
+#### Scenario D — Complete environment loss ("nuke scenario")
+
+**Definition:** Loss of all production Supabase project data, Cloudflare Workers configuration, and access credentials simultaneously. Possible causes: compromised Supabase account, supplier-side data loss, operator error at provider level.
+
+**Response (cold start from backup):**
+
+| Step | Action |
+|---|---|
+| 1 | Retrieve Supabase backup export from cold storage (Backblaze B2 bucket, credentials in 1Password team vault under "DR / Cold Storage") |
+| 2 | Create new Supabase project in target region; restore from export using Supabase CLI `supabase db restore` |
+| 3 | Re-run all migrations from `supabase/migrations/` in order |
+| 4 | Restore Cloudflare Workers configuration from `wrangler.toml` in git; deploy via `wrangler deploy` |
+| 5 | Update all environment secrets in Cloudflare Workers dashboard (Anthropic, ElevenLabs, Supabase keys from 1Password) |
+| 6 | Re-point DNS (Cloudflare DNS panel; `api.form.coach` CNAME to new Worker route) |
+| 7 | Smoke test: run F1–F8 flows from qa-walker.md before lifting maintenance mode |
+| 8 | Notify all enterprise tenants; issue public incident communication |
+
+**RTO target for this scenario: 8 hours.** This is a worst-case scenario. The actual rebuild time for a solo engineer following this runbook is estimated at 4–6 hours, with 2-hour buffer for unexpected issues.
+
+**Prerequisite (gap):** Automated nightly backup export to Backblaze B2 is not yet implemented. Current state: Supabase PITR is the only backup mechanism. Cold storage backup is on the Q3 implementation roadmap. Until implemented, this scenario's RTO is Supabase's own DR capability, which is contractually undefined on the Pro plan.
+
+---
+
+### 18.4 DR Drill Procedure
+
+Per §15.1 (Annual Compliance Calendar), a DR drill is scheduled for Q1 January annually. The drill validates that the runbooks above are executable by the on-call engineer without tribal knowledge.
+
+#### Drill scope
+
+The January drill exercises **Scenario C (data corruption)** in a staging environment, because:
+- It tests the PITR restore process (highest-risk manual procedure)
+- It validates the audit log analysis workflow
+- It does not require taking production offline
+- It generates SOC 2 evidence (drill report = CC7.5 evidence artifact)
+
+#### Drill procedure
+
+```
+Pre-drill (D-7):
+  [ ] Notify all engineers that a drill will occur this week
+  [ ] Confirm staging environment is a recent copy of production schema
+  [ ] Confirm PITR is enabled on the staging Supabase project
+  [ ] Assign DR Lead (engineer who will run the drill; must NOT be the author of this runbook)
+
+Drill execution (2-4 hours):
+  [ ] DR Lead simulates data corruption: delete 10% of rows from workouts table in staging
+  [ ] DR Lead follows Scenario C runbook above, step-by-step
+  [ ] Observer (compliance-officer or devops-lead) timestamps each step
+  [ ] Record: time-to-detect, time-to-contain, time-to-restore, data loss (rows not recovered)
+  [ ] Compare actual RTO/RPO against targets in §18.2
+
+Post-drill (D+1):
+  [ ] Write drill report (see template below)
+  [ ] File drill report in evidence folder: evidence/dr-drills/YYYY-MM-drill-report.md
+  [ ] Update this section if runbook gaps discovered
+  [ ] Update SOC 2 evidence registry
+```
+
+#### Drill report template
+
+```markdown
+# DR Drill Report — [YYYY-MM]
+
+**Date:** YYYY-MM-DD
+**Scenario exercised:** C (Data Corruption Simulation)
+**DR Lead:** [name]
+**Observer:** [name]
+
+## Results
+
+| Metric | Target | Actual | Pass/Fail |
+|---|---|---|---|
+| Time to detect | < 10 min | X min | |
+| Time to contain | < 15 min from detect | X min | |
+| Time to restore | < 2 hours (staging) | X min | |
+| Data loss | 0 rows (PITR to pre-corruption) | X rows | |
+| Runbook gaps found | 0 | X | |
+
+## Runbook gaps discovered
+
+[List any steps that failed, were unclear, or took longer than expected.]
+
+## Remediation actions
+
+[Tickets created to address gaps.]
+
+## SOC 2 evidence classification
+
+CC7.5 — Incident recovery drill. Retain for 7 years per §15.1 evidence retention schedule.
+```
+
+---
+
+### 18.5 Communication Tree During DR Events
+
+| Phase | Internal | Enterprise tenants | Consumer users |
+|---|---|---|---|
+| Detection (P1 confirmed) | PagerDuty alert; engineer acknowledges | — | — |
+| 0–30 min | Engineer assesses scope; founder notified if > 30 min until recovery | — | Status page updated |
+| 30 min–2 hours | Founder directs response; investor notification if material impact likely | DPA-specified contact notified via email; ticket opened in customer success | Status page + banner on form.coach |
+| 2+ hours | Board/investor notification if data loss | Formal incident communication (INCIDENT_RESPONSE.md §6 template); hourly updates | Public status page; push notification if app is functional |
+| Recovery | All-clear to engineer team; post-incident report committed within 48h | Recovery confirmation to tenant admin; SLA credit calculation if applicable | Status page resolved; push notification "Service restored" |
+
+---
+
+### 18.6 SOC 2 Control Mapping
+
+| SOC 2 Control | Description | BCP/DRP Evidence |
+|---|---|---|
+| CC7.4 | Response to detected incidents | §18.3 failure scenarios with step-by-step response; INCIDENT_RESPONSE.md §4 lifecycle |
+| CC7.5 | Recovery from incidents | §18.3 restore procedures; §18.4 drill procedure + annual drill report |
+| A1.1 | Availability commitments and system monitoring | §18.2 RTO/RPO commitments; Better Uptime monitoring (§3 INCIDENT_RESPONSE.md) |
+| A1.2 | Capacity and performance | Supabase PITR + BRIN index maintenance (DATA_MODEL.md §11.6); OBSERVABILITY.md §2 SLOs |
+| CC9.1 | Risk mitigation via vendor management | §18.3 Scenario B — Cloudflare gap documented as R-004 in Risk Register |
+
+#### Gap closure status
+
+| Gap | Previous status | Status after §18 | Remaining work |
+|---|---|---|---|
+| DR runbook documented | 🟡 Partial (drill scheduled but no runbook) | 🟢 Done | Execute first drill Q1-Jan; file drill report |
+| RTO/RPO commitments defined | 🔴 Gap | 🟢 Done | Include in enterprise contract template |
+| Cold storage backup (Scenario D) | 🔴 Gap | 🟡 Partial (gap documented; runbook written) | Implement nightly B2 export |
+| CC7.5 evidence artifact | 🔴 Gap | 🟡 Partial (runbook written; drill report pending) | Execute drill; file report |
+
+**Readiness impact:** DR runbook gap: 🟡 Partial → 🟢 Done (runbook). CC7.5: 🔴 Gap → 🟡 Partial. Cold storage backup gap remains 🔴 (implementation pending). Net: 1 new Partial → Done; 1 Gap → Partial. Critical gaps: 1 → 1 (cold storage backup is newly documented as a gap but was previously undocumented, so no net change). Readiness: ~58% → ~60%.
+
+---
+
 ## Open Items for compliance-officer
 
 - [ ] Engage audit firm (shortlist: Prescient Assurance, Johanson Group, Sensiba San Filippo) — PRE-milestone Month O-6
@@ -1500,7 +1729,7 @@ This section directly addresses the two 🔴 Gaps identified in the SOC 2 readin
 
 ---
 
-**v0.7 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
+**v0.8 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
 **Review cadence: quarterly. Next review: серпень 2026.**
 
 *v0.2 additions: Sub-Processor Register (CC9, GDPR Art. 28), Complementary User Entity Controls (CUECs), Common Security Questionnaire Responses (CAIQ/SIG Lite pre-answers).*
@@ -1510,3 +1739,5 @@ This section directly addresses the two 🔴 Gaps identified in the SOC 2 readin
 *v0.6 additions: Section 16 — Penetration Test Program. Scope (API, auth flows, SSO/SCIM, RLS-via-API, mobile apps, Cloudflare edge), methodology (OWASP WSTG + ASVS L2 + MASVS L1/L2 + PTES + CWE Top 25), finding severity SLAs (Critical 24h → High 7d → Medium 30d), health-data and tenant-isolation severity uplift rules, remediation tracking workflow (Linear tickets → PR → re-test → compliance evidence filing), SOC 2 evidence package definition (engagement letter + full report + HMAC chain verification), customer disclosure policy (executive summary under NDA for >$50k ACV). CC7 control table updated to add "External penetration test" row (🟡 Partial). PRE-21 moved from 🔴 Open → 🟡 Partial. Open Items updated. CC7.1 and CC7.2 moved from 🔴 Gap → 🟡 Partial. Critical gaps: 4 → 3. Partial: 28 → 30. Readiness: ~55% → ~56%.*
 
 *v0.7 additions: Section 17 — Vendor Security Review Process. Closes two documented 🔴 Gaps: "Vendor security review process" and "Annual vendor security review." Three-tier risk classification (Critical/High/Standard) with review frequency per tier. Vendor Risk Registry covering 11 vendors (8 sub-processors + Better Uptime, PagerDuty, Linear) with DPA status, certification level, risk score, and owner. 5-step Initial Vendor Assessment checklist with DPA gate and approval veto. 5-step January Annual Review process with SOC 2 CC9.2 evidence package definition. 6-factor risk scoring matrix (composite 🟢/🟡/🟠/🔴 scale, escalation rules for DPA-missing and cert-lapse). 7-step new sub-processor addition workflow with emergency exception clause. Termination and offboarding process with 7-year evidence retention. SOC 2 control mapping: CC9.1, CC9.2, CC9.3, P8.1. Gap closure: "Vendor security review process" 🔴 → 🟡 Partial (first annual review Q1-2027); "Annual vendor security review" 🔴 → 🟡 Partial; "Vendor risk registry" 🟡 Partial → 🟡 Partial (formalized with scoring). Critical gaps: 3 → 1. Readiness: ~56% → ~58%.*
+
+*v0.8 additions: Section 18 — Business Continuity & Disaster Recovery (BCP/DRP). Closes CC7.5 and A1.1 runbook gap. RTO/RPO commitments defined per tier (Enterprise 4h RTO / 1h RPO; Pro 8h / 4h). Four failure scenarios with step-by-step response procedures (Supabase unavailability, Cloudflare outage, data corruption, nuke scenario). Annual DR drill procedure with evidence template for SOC 2 CC7.5. Communication tree (internal, enterprise, consumer) per incident phase. Cold storage backup gap newly documented as 🔴 (B2 export not yet implemented). CC7.5: 🔴 → 🟡 Partial. DR runbook: 🟡 Partial → 🟢 Done. Readiness: ~58% → ~60%.*

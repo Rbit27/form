@@ -19,6 +19,7 @@
 9. [Open Questions / Gaps](#9-open-questions--gaps)
 10. [PITR Tenant-Isolated Restore Runbook](#10-pitr-tenant-isolated-restore-runbook)
 11. [Index Strategy for RLS Performance](#11-index-strategy-for-rls-performance)
+12. [Soft Delete, Data Retention & GDPR Art. 17 Erasure](#12-soft-delete-data-retention--gdpr-art-17-erasure)
 
 ---
 
@@ -1059,8 +1060,221 @@ CREATE INDEX idx_workouts_recent_tenant        ON workouts(tenant_id, started_at
 
 ---
 
-**v0.3 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer**
+**v0.4 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer**
 
 *v0.2 additions: Section 10 PITR Tenant-Isolated Restore Runbook (closes SOC 2 gap 9.4).*
 
 *v0.3 additions: §2.8 workout_sets table (closes inconsistency with PITR runbook §10.3); §2.9 coaching_sessions and coaching_turns (Victor interaction storage with privacy floor enforcement); §2.10 tenant_sso_configs, tenant_scim_tokens, scim_provisioning_log (SSO/SCIM auxiliary tables, cross-reference docs/SSO_SCIM_IMPLEMENTATION.md); §3.6 RLS policies for workout_sets, coaching sessions/turns; §3.7 RLS policies for SSO/SCIM tables; §5 data classification updated for new tables; §11 Index Strategy for RLS Performance (isolation indexes, relationship traversal, SCIM/SSO, BRIN for time-series, maintenance policy).*
+
+*v0.4 additions: §12 Soft Delete, Data Retention & GDPR Art. 17 Erasure — soft-delete strategy per table, retention windows by data classification, Art. 17 erasure flow with anonymization design rationale, automated pg_cron retention jobs, Art. 20 data portability export spec, data minimisation register.*
+
+---
+
+## 12. Soft Delete, Data Retention & GDPR Art. 17 Erasure
+
+> Owner: `compliance-officer` + `enterprise-architect`. Mandatory review before any enterprise contract signing and on any change to data retention commitments.
+> References: docs/GDPR_DPIA.md, docs/PRIVACY_POLICY.md, docs/AUDIT_LOG_SCHEMA.md.
+
+---
+
+### 12.1 Soft Delete Strategy
+
+FORM uses **soft delete** (`deleted_at TIMESTAMPTZ`) for all user-generated data. Hard deletes are reserved for the GDPR Art. 17 erasure path only. This design satisfies three requirements simultaneously:
+
+1. **Recovery window** — accidental deletions recoverable within 30 days without PITR restore
+2. **Audit integrity** — references in `audit_log` remain non-null; FK violations are impossible on soft-deleted rows
+3. **Compliance traceability** — deletion timestamp is auditable; initiator and timestamp are in the audit log
+
+#### Soft-delete columns per table
+
+| Table | `deleted_at` | `deleted_by` | Notes |
+|---|---|---|---|
+| `users` | ✅ | `user_id` (self) or tenant admin | Primary soft-delete surface |
+| `workouts` | ✅ | `user_id` | User can delete individual sessions |
+| `workout_sets` | Cascade from `workouts` | — | No independent delete |
+| `coaching_sessions` | ✅ | `user_id` | Victor conversation history |
+| `coaching_turns` | Cascade from `coaching_sessions` | — | |
+| `meal_logs` | ✅ | `user_id` | User-initiated from history UI |
+| `body_metrics` | ✅ | `user_id` | Weight/measurement history |
+| `media_uploads` | ✅ | `user_id` | CV pose snapshot thumbnails |
+| `tenants` | ✅ | FORM engineer only | Off-boarded enterprise tenants |
+| `tenant_sso_configs` | Cascade from `tenants` | — | |
+| `tenant_scim_tokens` | Uses `revoked_at` instead | — | Revoked ≠ deleted; separate semantics |
+| `audit_log` | ❌ **Never** | — | HMAC-chained; immutable per DEC-030 |
+
+#### RLS interaction with soft-deleted rows
+
+Every user-data RLS policy must exclude soft-deleted rows. Enforced pattern:
+
+```sql
+CREATE POLICY "user_data_select" ON <table>
+  FOR SELECT USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND user_id = auth.uid()
+    AND deleted_at IS NULL  -- mandatory; absence of this clause is a P0 bug
+  );
+```
+
+This clause is checked at migration review. Any RLS policy missing it blocks the migration.
+
+---
+
+### 12.2 Retention Windows by Data Classification
+
+| Data category | Classification | Consumer retention | Enterprise retention | Hard-delete trigger |
+|---|---|---|---|---|
+| Workout sessions + sets | Personal fitness data | Account lifetime + 30-day recovery | Per DPA; min 12 months | Erasure request or account deletion + 30 days |
+| Coaching turns (Victor) | Personal + Art. 9 (health context) | Account lifetime + 30 days | Per DPA; max 24 months unless DPA extends | Erasure request |
+| Meal logs | Art. 9 special category | Account lifetime + 30 days | Per DPA | Erasure request |
+| Body metrics | Art. 9 special category | Account lifetime + 30 days | Per DPA | Erasure request |
+| Media uploads (CV pose) | Personal | 90-day rolling (thumbnails); raw frames discarded on-device | Per DPA | Automatic at 90 days or erasure request |
+| Auth events (audit log) | Personal operational | 2 years | 7 years (SOC 2 evidence) | Automatic at window end; not subject to Art. 17 (Art. 6(1)(c) legal obligation basis) |
+| SSO/SCIM events (audit log) | Personal operational | 2 years | 7 years (SOC 2 evidence) | Automatic at window end |
+| Anonymized aggregate metrics | Non-personal | Indefinite | Indefinite | N/A |
+
+**Art. 9 note:** Meal logs, body metrics, and coaching turns containing health disclosures are special category. They require explicit consent (captured at onboarding) and are stored encrypted at rest with Supabase Vault. Never included in anonymized aggregate exports without explicit secondary consent.
+
+---
+
+### 12.3 GDPR Art. 17 Right to Erasure — Implementation
+
+Erasure must execute within 30 days of a verified request.
+
+#### Erasure flow
+
+```
+User submits request (Settings → Privacy → Delete my data)
+  ↓
+Re-auth required (password or active SSO session)
+  ↓
+Audit log: { event: 'erasure.requested', user_id, tenant_id, requested_at, ip }
+  ↓
+Soft-delete users row: deleted_at = NOW(), erasure_requested_at = NOW()
+  ↓
+Queue async erasure job (Supabase Edge Function + pg_cron)
+  ↓
+Erasure job (within 24h of request; completes within 30 days):
+  → Hard-delete: workout_sets, workouts, coaching_turns, coaching_sessions,
+                 meal_logs, body_metrics, media_uploads (Storage purge)
+  → Anonymize users row (see §12.3 below — not hard-delete; FK integrity)
+  → Retain: audit_log rows (Art. 6(1)(c) legal obligation)
+  → Audit log: { event: 'erasure.completed', user_id, completed_at, record_counts }
+  ↓
+Confirmation email sent to user's address before it is nulled
+```
+
+#### Why `users` is anonymized, not hard-deleted
+
+Hard-deleting the `users` row would orphan every `audit_log.user_id` FK reference, or require nulling the FK across thousands of audit rows — breaking the HMAC chain (DEC-030). The UUID itself contains no personal data. GDPR Art. 17(3)(b) permits retention where necessary for legal obligation (audit records).
+
+Post-anonymization `users` row:
+
+```sql
+UPDATE users SET
+  email                = NULL,
+  display_name         = NULL,
+  avatar_url           = NULL,
+  phone                = NULL,
+  date_of_birth        = NULL,
+  biological_sex       = NULL,
+  height_cm            = NULL,
+  locale               = NULL,
+  timezone             = NULL,
+  deleted_at           = NOW(),
+  erasure_completed_at = NOW()
+WHERE id = :user_id;
+-- id (UUID) and tenant_id retained for audit FK integrity only
+-- No personal data remains in the row after this update
+```
+
+#### Enterprise tenant erasure
+
+Enterprise admins may initiate erasure on behalf of departing employees via the admin dashboard or SCIM DELETE endpoint (SSO_SCIM_IMPLEMENTATION.md §3). The SCIM DELETE path triggers the same erasure queue. Enterprise DPAs must specify the erasure SLA; FORM default: 30 days with confirmation to tenant admin.
+
+---
+
+### 12.4 Automated Retention Enforcement
+
+Art. 5(1)(e) GDPR (storage limitation) requires automatic hard-deletion when retention windows expire, not just on-request erasure.
+
+#### pg_cron schedule
+
+```sql
+-- Nightly at 02:00 UTC (low-traffic window)
+
+-- 1. Purge consumer media uploads past 90-day rolling window
+SELECT cron.schedule('purge-media-uploads', '0 2 * * *', $$
+  UPDATE media_uploads
+  SET deleted_at = NOW()
+  WHERE deleted_at IS NULL
+    AND created_at < NOW() - INTERVAL '90 days'
+    AND tenant_id IS NULL;  -- consumer only; enterprise governed by DPA schedule
+$$);
+
+-- 2. Hard-delete user data past 30-day soft-delete recovery window
+SELECT cron.schedule('hard-delete-user-data', '30 2 * * *', $$
+  DELETE FROM workout_sets
+    WHERE workout_id IN (SELECT id FROM workouts WHERE deleted_at < NOW() - INTERVAL '30 days');
+  DELETE FROM workouts WHERE deleted_at < NOW() - INTERVAL '30 days';
+  DELETE FROM coaching_turns
+    WHERE session_id IN (SELECT id FROM coaching_sessions WHERE deleted_at < NOW() - INTERVAL '30 days');
+  DELETE FROM coaching_sessions WHERE deleted_at < NOW() - INTERVAL '30 days';
+  DELETE FROM meal_logs     WHERE deleted_at < NOW() - INTERVAL '30 days';
+  DELETE FROM body_metrics  WHERE deleted_at < NOW() - INTERVAL '30 days';
+$$);
+
+-- 3. Purge consumer audit_log past 2-year retention
+SELECT cron.schedule('purge-audit-log-consumer', '0 3 * * *', $$
+  DELETE FROM audit_log
+  WHERE tenant_id IS NULL
+    AND created_at < NOW() - INTERVAL '2 years';
+$$);
+-- Enterprise audit log purge is NOT automated. Requires compliance-officer sign-off
+-- per contractual retention commitments. Manual process: INCIDENT_RESPONSE.md §7.
+```
+
+**Monitoring requirement:** Every pg_cron job writes row counts to `cron_job_results`. A job returning 0 affected rows for 7+ consecutive days triggers PagerDuty P3 (possible misconfiguration). See OBSERVABILITY.md §12 for the instrumentation spec.
+
+---
+
+### 12.5 Data Portability — Art. 20
+
+Art. 20 GDPR grants users the right to receive their personal data in machine-readable format within 30 days.
+
+**Export scope:** All personal data held at the time of request. Excludes anonymized aggregate data (non-personal).
+
+**Format:** JSON archive (`.zip`):
+
+```
+form-export-{user_id}-{date}.zip
+├── profile.json           # users row (all non-null PII fields at time of export)
+├── workouts.json          # all sessions + sets (non-deleted)
+├── coaching_sessions.json # full Victor conversation history (non-deleted)
+├── meal_logs.json         # all meal log entries
+├── body_metrics.json      # all body measurements
+└── README.txt             # field definitions, data classification, retention notice
+```
+
+**Delivery:** Signed Supabase Storage URL (24h TTL) sent to verified email. URL generated by Cloudflare Worker — never a direct client-accessible bucket URL (prevents IDOR).
+
+**Rate limit:** Max 3 export requests per 30-day window per user. Re-auth required per request.
+
+**SLA:** Target < 72 hours automated; hard deadline 30 days per Art. 20.
+
+---
+
+### 12.6 Data Minimisation Register (Art. 5(1)(c))
+
+| Data point | Collected? | Justification if yes / reason if no |
+|---|---|---|
+| Date of birth | Yes | Age-appropriate load programming; hormonal periodization context |
+| Biological sex | Optional | Relevant to programming; user-controlled; non-binary option provided |
+| Height + weight | Optional | Load calculation and BMR estimation; user-controlled |
+| GPS / location | No | Not required for coaching function |
+| Device contacts | No | No in-app social (DEC-002); no contact import |
+| Camera (CV pose) | On-demand, session-scoped | Raw frames never leave device; only pose keypoints transmitted |
+| HealthKit / Health Connect | On-demand, explicit consent | HRV and resting HR only; sleep data optional; workout write-back only |
+| Payment data | No | Stripe handles; FORM never touches raw card data |
+| Advertising IDs (IDFA) | No | ATT framework not requested; no retargeting SDK |
+
+Any addition to this register requires `compliance-officer` review and a DECISION_LOG entry before implementation.
