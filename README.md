@@ -360,6 +360,7 @@ Each iteration:
 - [x] post-33: Energy systems для силовика — ATP-PCr, glycolytic, oxidative: що реально важливо для вашого тренування
 - [x] post-34: Supersets і antagonist pairs — time efficiency без компромісу з продуктивністю
 - [x] post-35: Tempo-prescribed тренування — наука і практика контрольованої швидкості повторення
+- [x] post-36: Детренованість — що реально втрачається і з якою швидкістю (нейром'язові vs структурні адаптації, міонуклеарна пам'ять, maintenance MED, матриця повернення)
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
