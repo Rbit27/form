@@ -1612,8 +1612,610 @@ Do not ship JIT without domain verification. An SSO implementation without domai
 
 ---
 
-**v0.3 · May 2026 · enterprise-architect + security-engineer**
-**Review trigger: any IdP integration change, any SCIM schema change, or quarterly — whichever comes first.**
+## 12. Session Token Lifecycle & Refresh Management
+
+### 12.1 Overview
+
+FORM enterprise sessions use two token types with distinct lifetimes and storage strategies. This split is deliberate: a short-lived access token limits the blast radius of token theft; a long-lived refresh token enables seamless re-authentication without forcing users through SSO on every request.
+
+| Token type | Lifetime | Storage | Transport |
+|---|---|---|---|
+| JWT access token | 15 minutes | JavaScript memory only — never localStorage, never sessionStorage | `Authorization: Bearer` header on every API request |
+| Refresh token | Configurable per tenant (default: 7 days) | `enterprise_sessions` table (hashed); opaque UUID in httpOnly cookie | httpOnly Secure SameSite=Lax cookie — never accessible to JavaScript |
+
+Both token types exist at the enterprise tier only. Consumer mobile sessions use Supabase Auth's built-in session model (outside this document's scope). The enterprise session layer is implemented in Cloudflare Workers middleware sitting in front of Supabase.
+
+**Supabase Auth relationship:** Supabase Auth manages its own JWT issuance for direct Supabase client calls. The enterprise session layer described here is an additional, parallel control plane sitting at the Cloudflare Worker edge. The Workers middleware validates and issues FORM enterprise JWTs independently of Supabase's internal session mechanism. SCIM deprovisioning, tenant-scoped timeout policies, token family tracking, and re-authentication enforcement are not achievable using Supabase Auth primitives alone — they require this custom layer.
+
+---
+
+### 12.2 Access Token Design
+
+#### 12.2.1 Payload Structure
+
+```json
+{
+  "sub": "usr_01J5S4hxwP2mBy6yzmCdVJnt",
+  "tenant_id": "ten_01HXYZ1234ABCDEFGHIJKLMN",
+  "role": "tenant_admin",
+  "session_id": "ses_01J5ABCDE12345678FGHIJKL",
+  "iat": 1747526400,
+  "exp": 1747527300,
+  "iss": "https://form.coach",
+  "aud": "form-enterprise-api",
+  "jti": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+Field constraints:
+
+| Field | Type | Notes |
+|---|---|---|
+| `sub` | FORM-internal user ID | Never the IdP's `sub`. Stable after JIT provisioning and SCIM adoption. |
+| `tenant_id` | FORM-internal tenant ID | Present on every token. Every downstream query must validate this matches the request context. |
+| `role` | Enum | One of: `tenant_owner`, `tenant_admin`, `tenant_manager`, `member`, `support_readonly`. Must match current DB value at token issuance. Role changes do not propagate to in-flight tokens — tokens must be refreshed. |
+| `session_id` | Reference to `enterprise_sessions` row | Used to check revocation on the token's session without decoding the refresh token. |
+| `exp` | `iat + 900` (15 minutes) | Not configurable per tenant. Short enough to limit exposure; long enough to complete any API interaction. |
+| `jti` | UUID v4 | For blocklist lookup when individual token revocation is needed (elevated operations). Stored in Redis with TTL = remaining `exp` time. |
+
+No PII in the access token payload. Email, name, and device information are not included. If a service needs the user's email, it fetches it from the database using `sub` + `tenant_id` — it does not read it from the token.
+
+#### 12.2.2 Signing
+
+- Algorithm: **RS256** (RSA-2048 with SHA-256). Symmetric HS256 is prohibited — it requires sharing the secret with every verifying service.
+- Key rotation: monthly. Two keys are active simultaneously during a rolling 48-hour overlap window to allow existing tokens to expire without a hard cutover.
+- Key storage: Cloudflare Workers Secrets (encrypted at rest). Private key is never logged, never returned in API responses, never written to Supabase.
+- Public key published at: `https://form.coach/.well-known/jwks.json`. Internal services validate signatures against this endpoint with a 5-minute local cache. Cache-bust on rotation via a `kid` (key ID) field in the JWT header.
+
+#### 12.2.3 Storage and Transport
+
+The access token lives exclusively in the JavaScript heap of the browser process that requested it. It is never written to `localStorage`, `sessionStorage`, `IndexedDB`, or any other persistent browser store. On page reload, the access token is gone — the browser sends the httpOnly refresh token cookie, and the Workers middleware issues a new access token before the page finishes loading.
+
+This makes XSS harder to exploit: a script injected into the page cannot exfiltrate the access token via `document.cookie` (httpOnly cookie is not accessible) and cannot read `localStorage` (nothing is there). The in-memory token is accessible only to the page's own JavaScript execution context, which is already inside the trust boundary of a page that XSS has compromised — this residual risk is accepted and mitigated by the 15-minute TTL.
+
+---
+
+### 12.3 Refresh Token Design
+
+#### 12.3.1 Token Format
+
+The refresh token is an opaque UUID v4 string (e.g., `f47ac10b-58cc-4372-a567-0e02b2c3d479`). It carries no claims. All state associated with the refresh token is stored server-side in the `enterprise_sessions` table, keyed by the SHA-256 hash of the token value.
+
+Why opaque rather than a signed JWT: a signed refresh token would allow offline validation, which means a compromised private key enables offline token forgery. An opaque token requires a database lookup on every use, which is a controlled hot-path but eliminates the offline forgery risk. For enterprise session management — where a single SCIM deactivation must immediately invalidate all sessions — the database-backed model is required.
+
+#### 12.3.2 Cookie Attributes
+
+```
+Set-Cookie: form_rt=f47ac10b-58cc-4372-a567-0e02b2c3d479;
+  HttpOnly;
+  Secure;
+  SameSite=Lax;
+  Path=/auth/token;
+  Domain=form.coach;
+  Max-Age=604800
+```
+
+| Attribute | Value | Rationale |
+|---|---|---|
+| `HttpOnly` | Always set | Prevents JavaScript from reading the refresh token. XSS cannot exfiltrate it. |
+| `Secure` | Always set | Cookie transmitted only over HTTPS. Enforced by Cloudflare; HTTP requests are redirected before the Worker sees them. |
+| `SameSite=Lax` | Lax, not Strict | Strict would prevent the cookie from being sent after a top-level navigation redirect from the IdP (e.g., the final leg of an OIDC flow). Lax allows top-level GET navigations while still blocking cross-site POST CSRF. |
+| `Path=/auth/token` | Scoped path | Cookie is sent only to the refresh endpoint, not to every API call. Reduces the surface for cookie interception on other routes. |
+| `Domain` | `form.coach` | Not `.form.coach` (no leading dot in modern spec). White-label tenants (`tenant.example.com`) use a separate cookie on their custom domain — see §12.3.3. |
+| `Max-Age` | `tenant_sso_configs.session_timeout_hours * 3600` | Cookie lifespan matches session expiry. On browser close with session timeout, the cookie persists — the database `expires_at` is the authoritative expiry, not the cookie TTL. |
+
+#### 12.3.3 White-Label Custom Domain Refresh Tokens
+
+For tenants using a custom domain (e.g., `fit.acmecorp.com` CNAME → `form.coach`), the refresh token cookie is issued under the tenant's domain. The Cloudflare Worker handling the custom domain is the same Worker, but it sets `Domain=fit.acmecorp.com`. This means:
+
+- The cookie is not sent to `form.coach` — it stays on the tenant's domain.
+- FORM's Worker must receive and validate it on requests arriving via the custom domain.
+- This is achieved via Cloudflare Workers routing: the Worker is attached to both `form.coach/*` and `*.form.coach/*`, and custom domain traffic is proxied through Cloudflare with a matching route.
+
+#### 12.3.4 Single-Use with Rotation
+
+Every use of a refresh token — whether to obtain a new access token or to obtain a new refresh token — immediately invalidates the used token and issues a new one. The `enterprise_sessions` table is updated atomically: the `refresh_token_hash` column is overwritten with the hash of the new token, and `generation` is incremented.
+
+This property means a refresh token is a one-time credential. If an attacker steals the cookie value at rest (e.g., from a backup of the browser's cookie store) and uses it after the legitimate client has already rotated it, the stolen token is dead. If the attacker uses it first, the legitimate client's next request will trigger the token family attack detection (§12.4).
+
+---
+
+### 12.4 Token Family Attack Protection
+
+#### 12.4.1 The Attack
+
+A stolen refresh token is used by an attacker before the legitimate user's next refresh. From this point:
+
+1. Attacker holds a valid refresh token (generation N+1) from the stolen token.
+2. Legitimate user still holds the old token (generation N, now invalidated by the attacker's rotation).
+3. Legitimate user's next API call triggers a refresh — their generation-N token is submitted.
+4. The server sees a generation-N token submitted against a session that is now at generation N+1.
+
+This "replay of a previously rotated token" is the detection signal. It means either a clock skew edge case (benign, rare) or active token theft and prior use (malicious, must be treated as compromise).
+
+#### 12.4.2 Detection and Response Flow
+
+```
+Client A (legitimate)                   Client B (attacker)               Worker / DB
+       |                                        |                              |
+       |  [Token stolen at generation N]        |                              |
+       |                                        |                              |
+       |                                        | POST /auth/token             |
+       |                                        | Cookie: form_rt=<gen-N>      |
+       |                                        |----------------------------->|
+       |                                        |                              | Lookup hash(gen-N) → found
+       |                                        |                              | generation = N, family_id = F
+       |                                        |                              | Issue gen-N+1, write to DB
+       |                                        |<-----------------------------|
+       |                                        | 200 + new cookie (gen-N+1)   |
+       |                                        |                              |
+       |  POST /auth/token                      |                              |
+       |  Cookie: form_rt=<gen-N> (still held)  |                              |
+       |---------------------------------------------------------------------->|
+       |                                        |                              | Lookup hash(gen-N) → NOT FOUND
+       |                                        |                              | (row now has hash(gen-N+1))
+       |                                        |                              |
+       |                                        |                              | DETECTION: stale token submitted
+       |                                        |                              | → Revoke ALL sessions WHERE family_id = F
+       |                                        |                              | → Set revoked_reason = 'token_reuse_detected'
+       |                                        |                              | → Write audit event: session.token_reuse_detected
+       |                                        |                              |
+       |<----------------------------------------------------------------------|
+       | 401 Unauthorized                       |                              |
+       | WWW-Authenticate: Bearer               |                              |
+       | X-FORM-Error: session_revoked          |                              |
+       |                                        |                              |
+       |                                        | POST /auth/token (any future)|
+       |                                        |----------------------------->|
+       |                                        |                              | Lookup hash(gen-N+1) → NOT FOUND
+       |                                        |                              | (row revoked_at IS NOT NULL)
+       |                                        |<-----------------------------|
+       |                                        | 401 Unauthorized             |
+```
+
+#### 12.4.3 Family Definition
+
+A token family is a lineage of refresh tokens issued within a single authentication event (SSO login, magic link login). Every session row carries a `family_id UUID`. When a new session is created (on SSO callback), a new `family_id` is generated. Every rotation within that session preserves the same `family_id`. When a token family is revoked, the UPDATE sets `revoked_at` and `revoked_reason = 'token_reuse_detected'` on every row sharing that `family_id`.
+
+A single user can have multiple active families simultaneously (e.g., logged in on a laptop and a mobile device — two separate SSO logins = two separate families). Revoking one family does not affect the other.
+
+#### 12.4.4 Clock Skew Tolerance
+
+There is a 30-second grace window for token submissions within a single rotation cycle. If two requests from the same client arrive within 30 seconds of each other and both carry the generation-N token (due to a race between parallel requests), the second submission is treated as a duplicate rather than a reuse attack. This is tracked by `last_used_at` on the session row: if `now() - last_used_at < 30 seconds` and the submitted token matches the previous generation (N-1), issue the current generation's token again without revoking the family.
+
+This grace window is implemented as a short-circuit before the family revocation path. Any submission of a token older than the previous generation (N-2 or older) bypasses the grace window and immediately triggers family revocation.
+
+---
+
+### 12.5 Sessions Table Schema
+
+```sql
+CREATE TABLE enterprise_sessions (
+    session_id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id             UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    tenant_id           UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    refresh_token_hash  CHAR(64)    NOT NULL,          -- SHA-256 hex of current refresh token
+    family_id           UUID        NOT NULL,           -- Lineage group for token reuse detection
+    generation          INTEGER     NOT NULL DEFAULT 0, -- Increments on every rotation
+    device_fingerprint  TEXT,                           -- Hashed: UA + screen dims + timezone; for display only
+    ip_last             INET,                           -- IP of last token use; for display in session list
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_used_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at          TIMESTAMPTZ NOT NULL,           -- Authoritative expiry (tenant policy)
+    revoked_at          TIMESTAMPTZ,                    -- NULL = active; NOT NULL = revoked
+    revoked_reason      TEXT        CHECK (revoked_reason IN (
+                            'user_logout',
+                            'admin_revoked',
+                            'scim_deprovisioned',
+                            'token_reuse_detected',
+                            'session_timeout',
+                            'idle_timeout',
+                            'force_reauth',
+                            'key_rotation_invalidation'
+                        )),
+
+    CONSTRAINT tenant_isolation CHECK (tenant_id IS NOT NULL),
+    CONSTRAINT expiry_after_creation CHECK (expires_at > created_at),
+    CONSTRAINT revocation_consistency CHECK (
+        (revoked_at IS NULL AND revoked_reason IS NULL) OR
+        (revoked_at IS NOT NULL AND revoked_reason IS NOT NULL)
+    )
+);
+
+-- Lookup path: refresh token submission (hot path)
+CREATE UNIQUE INDEX idx_sessions_token_hash
+    ON enterprise_sessions (refresh_token_hash)
+    WHERE revoked_at IS NULL;
+
+-- Family revocation (reuse detection)
+CREATE INDEX idx_sessions_family_id
+    ON enterprise_sessions (family_id)
+    WHERE revoked_at IS NULL;
+
+-- SCIM deprovisioning: revoke all active sessions for a user
+CREATE INDEX idx_sessions_user_tenant
+    ON enterprise_sessions (user_id, tenant_id)
+    WHERE revoked_at IS NULL;
+
+-- Expiry sweep (background job)
+CREATE INDEX idx_sessions_expires_at
+    ON enterprise_sessions (expires_at)
+    WHERE revoked_at IS NULL;
+```
+
+Row-Level Security policy (tenant isolation):
+
+```sql
+ALTER TABLE enterprise_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY sessions_tenant_isolation ON enterprise_sessions
+    USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+```
+
+The `refresh_token_hash` column stores `encode(sha256(token_bytes), 'hex')`. The raw token value is never written to the database. SHA-256 is not reversible; a database dump does not expose usable refresh tokens.
+
+`device_fingerprint` stores a hash (SHA-256, truncated to 16 hex chars for display) of the user agent string combined with timezone and screen dimensions — collected client-side via the admin dashboard's session management page. It is display-only metadata, not a security control. It allows users to recognize which session corresponds to which device. It is not used in token validation.
+
+---
+
+### 12.6 Enterprise Session Timeout Configuration
+
+#### 12.6.1 Policy Fields
+
+Session timeout policy is stored per tenant in `tenant_sso_configs.session_policy JSONB`:
+
+```json
+{
+  "session_timeout_hours": 168,
+  "idle_timeout_minutes": null,
+  "max_concurrent_sessions": null,
+  "reauth_on_sensitive_ops": true,
+  "reauth_method": "sso"
+}
+```
+
+| Field | Type | Default | Range | Notes |
+|---|---|---|---|---|
+| `session_timeout_hours` | Integer | `168` (7 days) | `8` – `720` | Absolute session lifetime from creation. When `expires_at` is reached, the session is dead regardless of activity. Enterprise standard is 7 days. Regulated industries (finance, healthcare) commonly require 8 hours. Legal/compliance team at the customer must specify this during onboarding. |
+| `idle_timeout_minutes` | Integer or null | `null` (disabled) | `30` – `480` | If set, the session is revoked if `last_used_at` has not been updated within this window. Evaluated on every token refresh attempt. A session that has been idle longer than this threshold receives a 401 with `revoked_reason = 'idle_timeout'` on next access attempt. |
+| `max_concurrent_sessions` | Integer or null | `null` (unlimited) | `1` – `10` | If set, creating a new session (SSO login) beyond this count revokes the oldest active session for the user within the tenant. Useful for tenants with strict device-control policies. |
+| `reauth_on_sensitive_ops` | Boolean | `true` | — | When true, sensitive operations (listed in §12.8) require re-authentication through the IdP regardless of session age. |
+| `reauth_method` | Enum | `"sso"` | `"sso"`, `"mfa_totp"` | Whether re-authentication goes back to the IdP or can be satisfied by an in-app MFA step. `"sso"` is required for tenants with SAML ForceAuthn or OIDC `prompt=login` in their security policy. |
+
+#### 12.6.2 Schema Addition
+
+```sql
+ALTER TABLE tenant_sso_configs
+    ADD COLUMN IF NOT EXISTS session_policy JSONB NOT NULL DEFAULT '{
+        "session_timeout_hours": 168,
+        "idle_timeout_minutes": null,
+        "max_concurrent_sessions": null,
+        "reauth_on_sensitive_ops": true,
+        "reauth_method": "sso"
+    }';
+
+-- Validated constraint: session_timeout_hours must be between 8 and 720
+ALTER TABLE tenant_sso_configs
+    ADD CONSTRAINT session_policy_timeout_range CHECK (
+        (session_policy->>'session_timeout_hours')::INTEGER BETWEEN 8 AND 720
+    );
+```
+
+#### 12.6.3 Idle Timeout Enforcement
+
+Idle timeout is not enforced via a background job — it is enforced lazily at the point of the next refresh token use. When the Worker processes a `POST /auth/token` request:
+
+1. Look up the session row by `refresh_token_hash`.
+2. Compute `now() - last_used_at`.
+3. If the result exceeds `session_policy.idle_timeout_minutes`, immediately set `revoked_at = now()`, `revoked_reason = 'idle_timeout'`, and return `401`.
+4. If the session is valid, update `last_used_at = now()` atomically with the token rotation.
+
+This lazy approach means the idle timeout has a precision floor equal to the access token TTL (15 minutes). A session that has been idle for exactly `idle_timeout_minutes` will not be revoked until the next refresh attempt — which can happen up to 15 minutes after the idle window closes. This is acceptable: the worst-case overage is the access token TTL, which is short.
+
+For tenants requiring hard idle enforcement (no grace window), a background sweeper job runs every 5 minutes and revokes sessions where `last_used_at < now() - (idle_timeout_minutes * interval '1 minute')` and `revoked_at IS NULL`. This is opt-in (`strict_idle_enforcement: true` in `session_policy`) and is only offered to tenants contractually requiring it, as it adds database write pressure.
+
+#### 12.6.4 Propagating Policy Changes
+
+When a tenant admin changes `session_policy` (e.g., reduces `session_timeout_hours` from 168 to 8), the change takes effect:
+
+- **New sessions:** immediately. The new `session_timeout_hours` sets `expires_at` on all sessions created after the policy change.
+- **Existing sessions:** the next refresh token use re-evaluates policy. If the session's `expires_at` now exceeds `now() + new_session_timeout_hours`, it is capped. This is implemented by checking policy on each refresh: if `expires_at > now() + interval '1 hour' * session_timeout_hours`, truncate it.
+
+An audit event `tenant.session_policy_updated` is written with the previous and new policy values (redacted to field names and values, no PII).
+
+---
+
+### 12.7 SCIM Deprovisioning → Immediate Session Revocation
+
+When SCIM sends a deactivation signal for a user, all active sessions for that user within the tenant must be revoked synchronously before the SCIM operation returns a 200.
+
+#### 12.7.1 Trigger Paths
+
+| SCIM operation | Meaning | Action |
+|---|---|---|
+| `PATCH /Users/{id}` with `{ "active": false }` | User deactivated in IdP | Revoke all active sessions for `user_id` + `tenant_id` |
+| `DELETE /Users/{id}` | User deleted from IdP | Revoke all active sessions, then soft-delete the FORM user record |
+| `PATCH /Users/{id}` with `{ "active": true }` | User reactivated | No session action. The user must re-authenticate via SSO to obtain a new session. |
+
+#### 12.7.2 Revocation Query
+
+```sql
+UPDATE enterprise_sessions
+SET
+    revoked_at     = now(),
+    revoked_reason = 'scim_deprovisioned'
+WHERE
+    user_id    = $user_id
+    AND tenant_id  = $tenant_id
+    AND revoked_at IS NULL
+RETURNING session_id;
+```
+
+This runs inside the same database transaction as the SCIM user record update. If the transaction rolls back (e.g., due to a constraint violation), the sessions are not revoked. Atomicity is required: a deprovisioned user whose FORM record failed to update but whose sessions were revoked would be in an inconsistent state.
+
+The returned `session_id` list is used to:
+
+1. Purge any cached access token JTI entries from Redis (best-effort, non-blocking).
+2. Write one `session.revoked_by_scim` audit event per revoked session (see §12.9).
+
+#### 12.7.3 Latency Requirement
+
+The session revocation SQL must complete within the SCIM response window. The SCIM endpoint has a 10-second response timeout enforced by the Cloudflare Worker. If the bulk revocation query takes longer than 8 seconds (leaving 2 seconds for network overhead), the Worker returns a `503 Service Unavailable` to the SCIM client, and the IdP SCIM client will retry. The retry is idempotent — revoking already-revoked sessions is a no-op.
+
+For tenants with a large number of concurrent sessions per user (e.g., a highly active user with 50+ device sessions), the index `idx_sessions_user_tenant` ensures this query completes in milliseconds.
+
+#### 12.7.4 Access Token Residual Window
+
+After SCIM revocation, an already-issued access token (JWT) with up to 15 minutes of remaining TTL is still cryptographically valid. The Worker validates the access token's signature and expiry independently of the `enterprise_sessions` table — the access token carries a `session_id` claim but the hot path does not re-check the session row on every request (that would defeat the purpose of a short-lived JWT).
+
+Accepted residual window: up to 15 minutes post-deprovisioning. This is the documented and accepted trade-off for the JWT model.
+
+For tenants contractually requiring zero-latency deprovisioning (i.e., the deprovisioned user cannot make any API call after the SCIM signal arrives), a JTI blocklist check is added to the Worker's access token validation path. The JTI of every active access token issued under a revoked session is written to Redis with TTL = remaining JWT `exp` seconds. This adds one Redis lookup to every request for all enterprise tenants — a performance cost that must be weighed against the contractual requirement. This is an opt-in feature (`jti_revocation_check: true` in `session_policy`) at additional infrastructure cost.
+
+---
+
+### 12.8 SSO Re-authentication for Sensitive Operations
+
+#### 12.8.1 Sensitive Operation List
+
+The following operations require a fresh IdP authentication regardless of session age:
+
+| Operation | Rationale |
+|---|---|
+| Export tenant user data (bulk PII export) | GDPR Art. 32 — data exports carry high breach risk |
+| Change billing information or subscription tier | Financial fraud vector |
+| Promote a user to `tenant_admin` or `tenant_owner` | Privilege escalation must be explicitly authorized |
+| Add or modify SSO configuration (IdP credentials, ACS URL) | A compromised session could redirect all future SSO logins |
+| Generate or rotate SCIM bearer tokens | A SCIM token is a provisioning credential — equivalent impact to admin access |
+| Disable SSO entirely for the tenant | Enables magic link fallback — high-impact configuration change |
+| Add a new verified domain | Domain additions affect JIT provisioning scope |
+| Download audit log export | Audit logs contain behavioral data with privacy implications |
+
+#### 12.8.2 OIDC Re-authentication
+
+For tenants using OIDC, the Worker redirects the browser to the OIDC authorization endpoint with `prompt=login` added to the authorization request:
+
+```
+GET {idp_authorization_endpoint}
+  ?client_id={form_client_id}
+  &redirect_uri=https://form.coach/auth/callback/{tenant_id}
+  &scope=openid profile email groups
+  &response_type=code
+  &state={csrf_token}:{reauth_return_path}
+  &nonce={nonce}
+  &prompt=login
+  &max_age=0
+```
+
+`prompt=login` instructs the IdP to force credential entry even if the user has an active IdP session (SSO web session). `max_age=0` is redundant reinforcement — it tells the IdP the authentication must have happened within 0 seconds, which forces re-authentication.
+
+After the IdP callback, the Worker validates the `auth_time` claim in the ID token. If `auth_time < now() - 60 seconds`, the re-authentication is rejected as stale (guards against IdP implementations that ignore `prompt=login`). The sensitive operation proceeds only if this check passes. The existing session is preserved — re-authentication does not create a new session; it issues a short-lived re-auth assertion (a signed, single-use JWT with `scope: reauth`, `exp: now() + 300s`) that authorizes one specific sensitive operation.
+
+#### 12.8.3 SAML Re-authentication
+
+For tenants using SAML 2.0, the Worker issues an `<AuthnRequest>` with `ForceAuthn="true"`:
+
+```xml
+<samlp:AuthnRequest
+  xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+  ID="_form_{uuid}"
+  Version="2.0"
+  IssueInstant="{now}"
+  AssertionConsumerServiceURL="https://form.coach/auth/saml/callback/{tenant_id}"
+  ForceAuthn="true"
+  IsPassive="false">
+  <saml:Issuer>https://form.coach/saml/{tenant_id}</saml:Issuer>
+</samlp:AuthnRequest>
+```
+
+`ForceAuthn="true"` is the SAML equivalent of OIDC `prompt=login`. The IdP must prompt for credentials. After the assertion arrives, the Worker checks that the assertion's `AuthnInstant` is within 60 seconds of the current time.
+
+#### 12.8.4 Re-auth Assertion Format
+
+Regardless of protocol, the outcome of a successful re-authentication for a sensitive operation is a short-lived re-auth assertion attached to the current session:
+
+```json
+{
+  "type": "reauth_assertion",
+  "session_id": "ses_01J5ABCDE12345678FGHIJKL",
+  "user_id": "usr_01J5S4hxwP2mBy6yzmCdVJnt",
+  "tenant_id": "ten_01HXYZ1234ABCDEFGHIJKLMN",
+  "authorized_operation": "export_user_data",
+  "auth_time": 1747527300,
+  "exp": 1747527600,
+  "jti": "unique-per-assertion"
+}
+```
+
+The assertion is signed with the same RS256 key as access tokens. The Worker validates it on the sensitive operation's API endpoint before processing the request. The assertion is single-use — consuming it immediately marks its JTI as used in Redis.
+
+---
+
+### 12.9 Token Revocation Audit Events
+
+All events are written to the HMAC-chained `audit_log` table per DEC-030. No PII in metadata columns. Timestamps and identifiers only.
+
+| Event name | Trigger | Key metadata |
+|---|---|---|
+| `session.created` | New session issued after SSO login | `session_id`, `tenant_id`, `user_id`, `family_id`, `generation: 0`, `ip`, `device_fingerprint_hint` (first 8 chars of hash) |
+| `session.token_rotated` | Refresh token successfully rotated | `session_id`, `tenant_id`, `user_id`, `generation` (new value), `ip` |
+| `session.token_reuse_detected` | Stale refresh token submitted; family revoked | `session_id`, `tenant_id`, `user_id`, `family_id`, `submitted_generation`, `current_generation`, `ip`, `sessions_revoked_count` |
+| `session.revoked_user_logout` | User explicitly logs out | `session_id`, `tenant_id`, `user_id` |
+| `session.revoked_admin` | Tenant admin revokes a specific session via admin dashboard | `session_id`, `tenant_id`, `user_id`, `revoked_by_user_id` |
+| `session.revoked_by_scim` | SCIM deactivation or deletion revokes session | `session_id`, `tenant_id`, `user_id`, `scim_operation` (`patch_deactivate` or `delete`), `scim_request_id` |
+| `session.expired` | Session swept by expiry job (or lazy expiry at refresh) | `session_id`, `tenant_id`, `user_id`, `expired_reason` (`session_timeout` or `idle_timeout`) |
+| `session.family_revoked` | All sessions in a family revoked (reuse detection) | `family_id`, `tenant_id`, `user_id`, `sessions_count`, `trigger_session_id` |
+| `session.reauth_initiated` | Sensitive operation triggered IdP re-authentication | `session_id`, `tenant_id`, `user_id`, `operation`, `protocol` (`oidc` or `saml`) |
+| `session.reauth_completed` | Re-auth assertion issued | `session_id`, `tenant_id`, `user_id`, `operation`, `auth_time` |
+| `session.reauth_stale_rejected` | IdP returned assertion with `auth_time` outside 60s window | `session_id`, `tenant_id`, `user_id`, `operation`, `auth_time`, `threshold_seconds: 60` |
+| `session.jti_blocklisted` | Access token JTI added to revocation blocklist | `jti`, `session_id`, `tenant_id`, `user_id`, `expires_at` |
+| `tenant.session_policy_updated` | Tenant admin changed `session_policy` | `tenant_id`, `changed_by_user_id`, `previous_policy` (field names + values, no PII), `new_policy` |
+
+The `session.token_reuse_detected` event is a security-critical signal. FORM's monitoring infrastructure must alert on any occurrence of this event within 5 minutes. It indicates either a compromised refresh token or a client bug causing replay — both require investigation.
+
+---
+
+### 12.10 Implementation Notes
+
+#### 12.10.1 Supabase Auth Boundary
+
+Supabase Auth has its own session and JWT management. The enterprise session layer described in this document is not a replacement for Supabase Auth — it is an additional control plane for enterprise-specific requirements that Supabase Auth does not support:
+
+| Requirement | Supabase Auth | Enterprise session layer (this doc) |
+|---|---|---|
+| Tenant-scoped session timeout | Not supported | Implemented in Cloudflare Worker |
+| Token family tracking / reuse detection | Not supported | `enterprise_sessions` table |
+| SCIM deprovisioning → instant revocation | Not supported | Synchronous revocation in SCIM handler |
+| Per-operation re-authentication | Not supported | Re-auth assertion flow (§12.8) |
+| Idle timeout | Not supported | Lazy enforcement in Worker |
+| Session list in admin dashboard | Not supported | Query on `enterprise_sessions` |
+| `session_id` in audit log | Supabase has its own session ID | FORM's `session_id` from `enterprise_sessions` |
+
+The architecture is:
+
+```
+Browser
+  |
+  | httpOnly cookie (form_rt = refresh token)
+  v
+Cloudflare Worker (enterprise-sessions middleware)
+  |
+  ├─ Validates form_rt against enterprise_sessions table (Supabase DB direct connection)
+  ├─ Issues FORM JWT access token (RS256, custom claims)
+  ├─ Applies tenant session_policy
+  ├─ Runs token family detection
+  |
+  ├─ On valid session: passes request to Supabase with FORM JWT + Supabase service key
+  |    (Worker impersonates the user for Supabase RLS by setting `app.current_tenant_id`
+  |     and `app.current_user_id` in the connection context)
+  |
+  └─ Supabase Auth sessions: still issued for direct Supabase client calls (Realtime, Storage)
+       These are short-lived Supabase JWTs issued by Supabase Auth on the Worker's behalf.
+       They are scoped to a single request context and are not the enterprise refresh token.
+```
+
+Supabase Auth's own `auth.sessions` table remains in use for Supabase-internal session tracking. The `enterprise_sessions` table is additive — it does not replace Supabase Auth but wraps it.
+
+#### 12.10.2 Cloudflare Worker Middleware Structure
+
+The session middleware is a Cloudflare Worker that intercepts all requests to `form.coach/api/*` and `form.coach/auth/token`. Structure:
+
+```typescript
+// workers/enterprise-sessions/index.ts
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const path = new URL(request.url).pathname;
+
+    // Token refresh endpoint — processes the refresh token cookie
+    if (path === '/auth/token' && request.method === 'POST') {
+      return handleTokenRefresh(request, env);
+    }
+
+    // API routes — validate the Bearer JWT access token
+    if (path.startsWith('/api/')) {
+      return handleApiRequest(request, env);
+    }
+
+    // SSO callbacks — no session required; handled by auth-callback Worker
+    if (path.startsWith('/auth/callback/') || path.startsWith('/auth/saml/callback/')) {
+      return env.AUTH_CALLBACK_WORKER.fetch(request);
+    }
+
+    return new Response('Not Found', { status: 404 });
+  }
+};
+```
+
+Key functions:
+
+- `handleTokenRefresh`: reads `form_rt` cookie → SHA-256 hash → lookup in `enterprise_sessions` → check expiry, idle timeout, revocation → rotate token → issue new JWT access token → set new `form_rt` cookie.
+- `handleApiRequest`: extract `Authorization: Bearer` → verify RS256 signature → validate `exp`, `iss`, `aud`, `tenant_id` → optionally check JTI blocklist (if `jti_revocation_check: true`) → forward to Supabase.
+- `revokeFamily`: called on token reuse detection; bulk UPDATE on `enterprise_sessions` WHERE `family_id = ?`.
+- `revokeByScim`: called by SCIM handler; bulk UPDATE WHERE `user_id = ? AND tenant_id = ?`.
+
+#### 12.10.3 Migration from Supabase Default Sessions
+
+The migration path for any tenant who authenticated before the enterprise session layer was deployed:
+
+1. The enterprise session layer is deployed behind a feature flag: `ENTERPRISE_SESSION_LAYER_ENABLED` (Cloudflare Worker environment variable).
+2. When the flag is off: requests pass through to Supabase Auth as before.
+3. When the flag is on for a tenant: the Worker intercepts requests. If no `form_rt` cookie is present (the user has a Supabase Auth session but not a FORM enterprise session), the Worker responds with `401` and a `X-FORM-Auth: sso_relogin_required` header.
+4. The frontend detects this header and redirects the user through the SSO flow, which issues a new enterprise session via the SSO callback handler.
+5. After the SSO callback, `form_rt` is set, and subsequent requests pass through the enterprise session layer normally.
+
+This means the migration requires each user to complete one fresh SSO login after the enterprise session layer is enabled for their tenant. There is no automatic session migration — Supabase Auth sessions are not promoted to enterprise sessions. Users are notified via an in-app banner 48 hours before the cutover: "Your organization's security settings are being updated. You'll be asked to sign in again on [date]."
+
+The cutover is done tenant by tenant. No big-bang migration.
+
+#### 12.10.4 RS256 Key Rotation Procedure
+
+Key rotation happens monthly on the first Monday of each month. Procedure:
+
+1. Generate a new RSA-2048 key pair in the secure build environment (not on any developer's machine).
+2. Upload the new private key to Cloudflare Workers Secrets as `JWT_PRIVATE_KEY_NEW`.
+3. Publish the new public key to `/.well-known/jwks.json` alongside the existing key (dual-key response). Both keys are active.
+4. Deploy Worker update that uses `JWT_PRIVATE_KEY_NEW` for signing new tokens. Validation accepts both the old and new key (matching by `kid` in JWT header).
+5. Wait 15 minutes (one full access token TTL). All tokens signed with the old key have expired.
+6. Remove the old public key from `/.well-known/jwks.json`. Deploy.
+7. Delete `JWT_PRIVATE_KEY_OLD` from Cloudflare Workers Secrets. Rename `JWT_PRIVATE_KEY_NEW` to `JWT_PRIVATE_KEY`.
+
+Write `key.rotation.completed` audit event with `{kid_old, kid_new, rotation_timestamp}`.
+
+If a key is compromised before the monthly rotation: trigger emergency rotation immediately using the same procedure, compressing step 5 from "wait 15 minutes" to "immediately revoke all active enterprise sessions" (setting `revoked_at` + `revoked_reason = 'key_rotation_invalidation'` on all non-revoked rows). This forces all users to re-authenticate, accepting the user impact in exchange for eliminating any in-flight tokens signed with the compromised key.
+
+#### 12.10.5 Implementation Dependencies
+
+| Dependency | Status | Notes |
+|---|---|---|
+| `enterprise_sessions` table migration | Not implemented | Schema in §12.5; run after SSO callback handler exists |
+| `tenant_sso_configs.session_policy` column | Not implemented | Schema in §12.6.2; can be added independently |
+| Cloudflare Worker session middleware | Not implemented | Blocked by: `enterprise_sessions` table, RS256 key pair in Workers Secrets |
+| RS256 key pair generation | Not implemented | Required before Worker deployment |
+| Redis (Cloudflare KV or Upstash) for JTI blocklist | Not implemented | Required only if `jti_revocation_check: true` is offered; can defer until first regulated-industry customer |
+| SCIM deprovisioning integration | Not implemented | Blocked by G-001 (SCIM endpoint) |
+| Admin dashboard — session list UI | Not implemented | Blocked by G-007 (admin dashboard) |
+| Re-authentication flow (§12.8) | Not implemented | Blocked by core SSO flow (§1, §2) |
+| Background expiry sweeper job | Not implemented | Cloudflare Workers Cron Trigger; low-priority (lazy enforcement covers most cases) |
+
+**Recommended implementation order:**
+1. `enterprise_sessions` table migration + RLS policy
+2. `session_policy` column on `tenant_sso_configs`
+3. RS256 key pair generation; publish JWKS endpoint
+4. Cloudflare Worker session middleware (token refresh + JWT validation)
+5. SSO callback handler updates to write to `enterprise_sessions` on login
+6. SCIM deprovisioning revocation (after G-001)
+7. Audit log integration for all §12.9 events
+8. Re-authentication flow for sensitive operations (after core SSO)
+9. Admin dashboard session management UI (after G-007)
+10. JTI blocklist (Redis) — when first regulated-industry customer requires zero-latency deprovisioning
+
+---
+
+**v0.4 · May 2026 · enterprise-architect + security-engineer**
+**Review trigger: any IdP integration change, any SCIM schema change, any session policy change, or quarterly — whichever comes first.**
 *v0.2 additions: Section 10 — Magic Link Fallback Security Design. Threat model (8 attack vectors), OTP spec, rate limits, trigger conditions, verification flow, abuse detection, audit events, admin controls, implementation sequencing, GDPR/DPA note. Closes G-010 design phase. Critical implementation dependencies identified.*
 
 *v0.3 additions: Section 11 — Just-in-Time (JIT) Provisioning Design. JIT vs. SCIM decision tree, provisioning flow with seat-limit and domain-verification gates, SAML and OIDC claim extraction mapping, per-tenant `claim_mapping` JSONB config, seat limit enforcement with FOR UPDATE transaction lock to prevent race condition, JIT-to-SCIM reconciliation (409 Conflict → PATCH adopt path), 6 JIT audit events, admin controls (jit_provisioning_enabled, default_role, notify_on_jit_provision), implementation sequencing. Security note: domain verification is not optional.*
+
+*v0.4 additions: Section 12 — Session Token Lifecycle & Refresh Management. Dual-token model (RS256 JWT access token 15min memory-only; opaque UUID refresh token httpOnly cookie database-backed). `enterprise_sessions` table schema with `family_id` + `generation` for token reuse detection. Token family attack protection with full flow diagram and 30-second clock-skew grace window. Enterprise session timeout configuration via `tenant_sso_configs.session_policy` JSONB (`session_timeout_hours`, `idle_timeout_minutes`, `max_concurrent_sessions`). SCIM deprovisioning synchronous session revocation with accepted 15-minute access token residual window and opt-in JTI blocklist for zero-latency requirement. SSO re-authentication for sensitive operations (OIDC `prompt=login`, SAML `ForceAuthn=true`, re-auth assertion pattern). 13 audit events including `session.token_reuse_detected` as security-critical alert signal. Cloudflare Worker middleware architecture, Supabase Auth boundary definition, RS256 monthly key rotation procedure with emergency path, migration from Supabase default sessions (per-tenant flag + re-login trigger). 9 implementation dependencies with recommended sequencing.*

@@ -9,6 +9,11 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.72.0] — 2026-05-18
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md` v0.3 → v0.4 — **§12 Session Token Lifecycle & Refresh Management** (enterprise-architect + security-engineer). Dual-token model: RS256 JWT access token (15 min, memory-only, no localStorage) + opaque UUID refresh token (httpOnly Secure SameSite=Lax cookie, SHA-256 hashed in DB). `enterprise_sessions` table schema with `family_id` + `generation` columns enabling token family attack detection. Token reuse detection: stale-token lookup → bulk `family_id` revoke with `revoked_reason='token_reuse_detected'`, 30-second clock-skew grace for parallel requests. Enterprise session timeout config via `tenant_sso_configs.session_policy` JSONB (`session_timeout_hours` 8–720h, `idle_timeout_minutes`, `max_concurrent_sessions`, `reauth_on_sensitive_ops`). SCIM deprovisioning → synchronous session revocation in same transaction; 15-min access token residual documented; opt-in JTI Redis blocklist for zero-latency deprovisioning requirement. SSO re-auth for sensitive ops (OIDC `prompt=login`, SAML `ForceAuthn=true`, signed re-auth assertion JWT, 5-min TTL). 13 audit events (security-critical: `session.token_reuse_detected`). Cloudflare Worker middleware boundary vs Supabase Auth scope. RS256 monthly key rotation + emergency path. Per-tenant migration flag with 48h advance notice pattern. 9 implementation dependencies sequenced.
+
 ## [0.71.0] — 2026-05-18
 
 ### Added
