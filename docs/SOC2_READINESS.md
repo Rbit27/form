@@ -250,11 +250,11 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Severity | Count | Examples |
 |---|---|---|
-| 🔴 **Critical gap** (blocks SOC 2) | 9 | Privacy policy, status page, security training, offboarding procedure |
-| 🟡 **Partial / needs formalization** | 21 | Vendor registry, patching SLA, annual risk review, DSAR SLA |
-| ✅ **In place** | 25 | HMAC audit log, encryption, access controls, CV on-device, breach notification, data classification policy, DPIA, formal risk register |
+| 🔴 **Critical gap** (blocks SOC 2) | 3 | Status page (status.form.coach), sub-processor list published, annual privacy review |
+| 🟡 **Partial / needs formalization** | 30 | Security training (Q1-Feb scheduled), offboarding procedure (cadence set), vendor registry, DR drill (Q1-Jan scheduled), CC7.1–CC7.2 (pentest program defined, execution pending), patching SLA, DSAR SLA |
+| ✅ **In place** | 28 | HMAC audit log, encryption, access controls, CV on-device, breach notification, data classification policy (§13), DPIA (docs/GDPR_DPIA.md), formal risk register (§14), compliance calendar (§15), penetration test program (§16), privacy policy (docs/PRIVACY_POLICY.md) |
 
-**Readiness score: ~55% controls fully in place** (updated v0.5–v0.6; see version history). Target: 90% before observation period begins.
+**Readiness score: ~56% controls fully in place** (v0.6; see version history at bottom). Target: 90% before observation period begins.
 
 ---
 
