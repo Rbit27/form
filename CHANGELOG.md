@@ -9,6 +9,31 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.66.0] — 2026-05-18
+
+### Added
+- `docs/SOC2_READINESS.md` v0.6 → v0.7 — **§17 Vendor Security Review Process** (compliance-officer + security-engineer)
+  - Closes two documented 🔴 Gaps: "Vendor security review process" and "Annual vendor security review"
+  - Three-tier vendor classification (Critical / High / Standard) with proportionate review cadence
+  - Vendor Risk Registry: 11 vendors (8 sub-processors + operational tools) with DPA status, cert level, risk score, owner
+  - 5-step Initial Vendor Assessment with DPA gate (non-waivable) and compliance-officer approval veto
+  - January Annual Review process with SOC 2 CC9.2 evidence package definition
+  - 6-factor risk scoring matrix (data sensitivity, cert level, DPA, incident history, data residency, subprocessor chain depth)
+  - New sub-processor addition workflow (7 steps + emergency exception clause)
+  - Termination & offboarding: 24h credential revocation, written deletion confirmation, 7-year retention
+  - SOC 2 control mapping: CC9.1, CC9.2, CC9.3, P8.1
+  - Critical gaps: 3 → 1. Readiness: ~56% → ~58%
+- `content/post-38-isometric-training.md` — sports science deep-dive on isometric training (sports-scientist, clinical_safety_status: PASS)
+  - RFD (Rate of Force Development) and motor unit synchronization
+  - ±15° angle-specificity principle and sticking point exploitation
+  - Yielding vs. overcoming isometric mechanics and use cases
+  - Supramaximal isometric loading via power rack (>1RM force production)
+  - Tendon collagen synthesis physiology under isometric load
+  - Three concrete protocols: weak point overcoming isometric, yielding paused reps, intra-set PAP potentiation
+  - Honest limitations section (inferior to dynamic training for hypertrophy)
+
+---
+
 ## [0.65.1] — 2026-05-18
 
 ### Changed

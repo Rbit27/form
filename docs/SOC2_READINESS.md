@@ -1133,6 +1133,356 @@ The HMAC chain verification is a FORM-specific control artifact: it ensures that
 
 ---
 
+## 17. Vendor Security Review Process
+
+> Owner: `compliance-officer` + `security-engineer`. Review: annually each January and on any new vendor addition.
+> SOC 2 evidence: CC9.1 (vendor management programme), CC9.2 (security review of service providers), CC9.3 (vendor contract requirements), P8.1 (privacy enforcement with third parties).
+> This section closes two documented 🔴 Gaps: "Vendor security review process" and "Annual vendor security review."
+
+---
+
+### 17.1 Purpose and Scope
+
+#### Purpose
+
+SOC 2 Trust Service Criterion CC9.2 requires FORM to assess and monitor the risks associated with third-party vendors who have access to, process, or could affect the security and availability of FORM systems and data. This section defines the formal programme that satisfies CC9.2 and supplements the sub-processor register in §13.
+
+A documented vendor security review process is also required evidence for:
+
+- GDPR Art. 28 (processor due diligence obligation on the controller)
+- GDPR Art. 32 (appropriate technical and organisational measures, assessed across the supply chain)
+- CCPA / CPRA § 1798.100 (service provider contracts and purpose limitation)
+- Ukraine Law on Personal Data Protection Art. 21 (processor requirements)
+
+#### In Scope
+
+| Category | Examples |
+|---|---|
+| Sub-processors with access to personal data | Supabase, Anthropic, ElevenLabs, PostHog, Sentry, Stripe, Cloudflare |
+| Infrastructure and availability dependencies | Better Uptime, PagerDuty |
+| Compliance and operational tooling with privileged access to FORM systems | Vanta / Drata, Linear (if connected to production telemetry) |
+| Any future vendor that will process Restricted or Confidential data (§13 tiers) | Assessed before onboarding |
+
+#### Out of Scope
+
+- Open-source libraries (covered by dependency scanning — §15.1, PRE-13, Dependabot)
+- Vendors with no access to FORM systems or data and no contractual relationship (e.g., SaaS the team uses for internal productivity with no FORM data integration)
+- AWS (covered transitively via Supabase DPA — see §13 notes)
+
+---
+
+### 17.2 Vendor Risk Classification
+
+Vendors are assigned to one of three tiers at onboarding. Tier assignment determines review frequency and minimum evidence requirements. Tier is re-evaluated annually and on any material change to the vendor relationship.
+
+| Tier | Definition | Examples | Review Frequency |
+|---|---|---|---|
+| **Critical** | Processes Restricted data (GDPR Art. 9 health data, §13 tier) OR is a single point of failure for platform availability | Supabase (all user and health data), Anthropic (LLM inference for Victor — coaching session content), ElevenLabs (voice coaching) | Annual full review + quarterly status check |
+| **High** | Processes Confidential data OR provides security-relevant tooling (monitoring, error tracking, compliance automation) | PostHog (product analytics), Sentry (error monitoring), Cloudflare (CDN + WAF + Workers), Stripe (billing), Vanta / Drata (compliance tooling with system access) | Annual full review |
+| **Standard** | Operational tooling with no direct access to user data; availability impact limited to internal workflows | Better Uptime (uptime checks — no user data), PagerDuty (alerting routing — no user data), Linear (issue tracker — no production data by default) | Annual self-attestation; full review every two years or on scope change |
+
+**Tier promotion rule:** Any Standard vendor that is granted access to Confidential or Restricted data is automatically promoted to High or Critical respectively. The compliance-officer must be notified before any such access grant.
+
+---
+
+### 17.3 Initial Vendor Assessment (Pre-Approval)
+
+No new vendor that will access Confidential or Restricted data may be onboarded without completing this checklist. The compliance-officer holds approval authority. Steps must be completed in sequence; approval at each gate is required before proceeding.
+
+**Step 1 — Security questionnaire**
+
+Send the FORM vendor security questionnaire (template at `compliance/vendor-review/questionnaire-template.md`) to the vendor's security or legal contact. Minimum required responses:
+
+- Encryption at rest and in transit (specify standards)
+- Access control model (RBAC, MFA enforcement, privileged access management)
+- Incident notification SLA (target: ≤24h for breach affecting FORM data)
+- Penetration test cadence and willingness to share executive summary on request
+- Data deletion / return procedure on contract termination
+- Subprocessors the vendor uses (for GDPR Art. 28(4) chain-of-responsibility)
+- Data residency options (EU residency required for EU-resident user data)
+
+For Critical vendors: questionnaire must be completed. No waiver.
+For High vendors: questionnaire or current SOC 2 Type II / ISO 27001 report accepted in lieu.
+For Standard vendors: self-attestation by vendor's authorised signatory accepted.
+
+**Step 2 — Certification review**
+
+Review the vendor's current security certification. Acceptable evidence (in descending preference):
+
+1. SOC 2 Type II report (issued within the last 12 months) — review the opinion, any exceptions noted, and whether the service scope covers the services FORM will use
+2. ISO 27001 certificate (current, in-scope certification body listed) — confirm the certificate covers the specific service
+3. SOC 2 Type I report (point-in-time) — acceptable for Standard tier only; flag as a gap for Critical and High
+4. Vendor-completed questionnaire with specific technical controls described — Critical and High only if no SOC 2 / ISO cert exists; requires compliance-officer sign-off
+
+Document: certification type, issuing body, report date, expiry or next audit, any noted exceptions relevant to FORM's use case.
+
+**Step 3 — DPA review**
+
+Draft or obtain the Data Processing Agreement before any data flows begin.
+
+- For Critical and High vendors: DPA must be executed before a production connection is established. Standard EU/UK DPA template acceptable; FORM counsel review required if the vendor's template is non-standard.
+- SCCs (Standard Contractual Clauses, EU Commission 2021/914) must be incorporated for any US-based vendor receiving EU personal data.
+- DPA must include: purpose limitation, security obligations, subprocessor change notification (30 days), audit rights, data deletion on termination, breach notification ≤24h.
+- File the signed DPA to `compliance/dpa/VENDOR-NAME-DPA-YYYY.pdf` in the private compliance repo.
+
+**Step 4 — 30-day customer notice (for new sub-processors)**
+
+If the vendor will be added to the sub-processor register (§13), GDPR Art. 28(2) and FORM's enterprise contracts require 30 days advance written notice to enterprise customers before the sub-processor begins processing their data. This step runs in parallel with Steps 1–3 to avoid delaying onboarding unnecessarily.
+
+- Draft the sub-processor addition notice: vendor name, HQ location, purpose, data categories, region, effective date.
+- Send to all enterprise tenants via the mechanism specified in their DPA (email to security contact + in-app notification).
+- Log the notice date, recipient list, and any objections received to `compliance/subprocessor-notices/YYYY-MM-VENDOR.md`.
+- If an enterprise customer objects: escalate to compliance-officer and legal counsel before proceeding. Do not add the sub-processor for that tenant until the objection is resolved.
+
+**Step 5 — Approval gate**
+
+The compliance-officer reviews the completed questionnaire, certification evidence, and DPA before approving onboarding. Approval is documented in the Vendor Risk Registry (§17.4) as a dated entry with the reviewer's name.
+
+Approval conditions:
+
+| Condition | Required action before approval |
+|---|---|
+| Missing DPA | DPA must be executed. No waiver. |
+| No SOC 2 / ISO cert (Critical or High vendor) | Compensating control documented in registry; reviewed quarterly; plan to obtain cert or migrate to alternative vendor within 12 months |
+| Unresolved critical or high findings in pentest or SOC 2 exceptions | Vendor must provide written remediation plan with dates before approval |
+| Data residency mismatch (EU user data, no EU region) | Either vendor enables EU region or EU user data is excluded from that vendor contractually |
+
+---
+
+### 17.4 Vendor Risk Registry
+
+The registry below is the authoritative record of all vendors in scope. It is updated within 5 business days of any change (new vendor, DPA executed, cert renewed, review completed). The registry is filed in `compliance/vendor-registry/VENDOR-REGISTRY.md` (private compliance repo); this section is the canonical copy in the SOC 2 readiness document.
+
+**Last updated:** May 2026. Next full review: January 2027 (§15.1 annual vendor review).
+
+| Vendor | Tier | Data Categories | DPA Status | Latest Cert | Cert Expiry / Next Audit | Next Review | Risk Score | Owner |
+|---|---|---|---|---|---|---|---|---|
+| **Supabase** | Critical | Restricted (health metrics, coaching sessions, clinical flags), Confidential (user identity, tenant config, audit logs), all user data | ✅ Signed (SCC Module 2 included) | SOC 2 Type II | Check Supabase Trust Portal | Jan 2027 | 🟢 Low | security-engineer |
+| **Anthropic** | Critical | Confidential (pseudonymised exercise context — no PII in prompts by design; see §13 + SECURITY.md §5) | ✅ Signed (SCC Module 2 included) | SOC 2 Type II | Check Anthropic Trust Portal | Jan 2027 | 🟢 Low | security-engineer |
+| **ElevenLabs** | Critical | Confidential (coaching text cues — no user PII by design) | ✅ Signed (SCC Module 2 included) | SOC 2 Type II | Check ElevenLabs Trust Portal | Jan 2027 | 🟢 Low | security-engineer |
+| **Cloudflare** | High | Confidential (IP addresses, request metadata — no health data in Workers) | ✅ Enterprise DPA (SCC Module 2 included) | SOC 2 Type II + ISO 27001 | Check Cloudflare Trust Hub | Jan 2027 | 🟢 Low | security-engineer |
+| **PostHog** | High | Confidential (anonymous event data, `analytics_opt_out` flag — no PII by configuration) | ✅ Signed (SCC Module 2 included) | SOC 2 Type II | Check PostHog Trust Portal | Jan 2027 | 🟢 Low | compliance-officer |
+| **Stripe** | High | Confidential (billing contact name, company, invoice data — no health data) | ✅ Signed (SCC Module 2 included) | PCI DSS Level 1 + SOC 2 Type II | Check Stripe Trust Portal | Jan 2027 | 🟢 Low | compliance-officer |
+| **Sentry (Functional Software)** | High | Confidential (error stack traces, anonymised user IDs — health data scrubbed at SDK layer as compensating control) | 🟡 In progress (SCC Module 2 pending DPA signature) | SOC 2 Type II | Check Sentry Trust Portal | On DPA execution; Jan 2027 at latest | 🟡 Medium | compliance-officer |
+| **Better Uptime** | Standard | None (uptime check results only — no user data transmitted) | Not required (no personal data) | Vendor self-attestation | Annual | Jan 2027 | 🟢 Low | devops-lead |
+| **PagerDuty** | Standard | None (alert routing — no FORM user data in payloads by configuration) | Not required (no personal data) | SOC 2 Type II | Check PagerDuty Trust Portal | Jan 2027 | 🟢 Low | devops-lead |
+| **Linear** | Standard | Internal (issue titles, descriptions — no production user data by default) | Not required (no personal data; enforce no-production-data policy) | SOC 2 Type II | Check Linear Trust Portal | Jan 2027 | 🟢 Low | security-engineer |
+| **Vanta / Drata** | High | Confidential (read access to GitHub, Cloudflare, Supabase, 1Password for evidence collection) | Required before activation — obtain DPA before connecting to production systems | SOC 2 Type II | Check vendor Trust Portal | Before activation | 🟡 Medium (pre-activation — no connection yet) | compliance-officer |
+
+**Registry notes:**
+
+- Sentry: compensating control in place (PII scrubbed from Sentry payloads at the SDK `beforeSend` hook). Risk score remains 🟡 Medium until DPA is executed (tracking: VR-02 in §14, PRE-08). Compliance-officer must confirm DPA execution within 60 days of this document version.
+- Vanta / Drata: DPA and security review must be completed before connecting compliance tooling to production. The compliance-officer is the blocking approver for this activation.
+- AWS: covered transitively through the Supabase DPA (Supabase operates on AWS infrastructure); not listed separately per §13 convention.
+
+---
+
+### 17.5 Annual Review Process
+
+The annual vendor review runs every January per the §15.1 compliance calendar. The five steps below must be completed in sequence. All evidence artifacts are filed to `compliance/vendor-review/YYYY/` in the private compliance repo by 31 January each year to ensure evidence is available for the SOC 2 observation period.
+
+**Step 1 — Registry currency check (complete by January 5)**
+
+Verify the Vendor Risk Registry (§17.4) reflects all current vendors. Confirm:
+- No new sub-processors were added in the prior year without completing §17.3
+- Any vendors removed or contracted-terminated since the last review are archived (see §17.8)
+- Tier assignments are still accurate given current data flows
+
+Evidence artifact: `compliance/vendor-review/YYYY/01-registry-currency-check.md` — table of vendors reviewed, current tier, tier change if any, reviewer sign-off.
+
+**Step 2 — Certification and SOC 2 report refresh (complete by January 15)**
+
+For each Critical and High vendor, obtain the current SOC 2 Type II report or ISO 27001 certificate:
+- Request bridge letters from vendors whose annual report period has not yet closed
+- Review each report for: opinion type (unqualified vs. qualified), exceptions noted, whether exceptions affect controls relevant to FORM's use case
+- Note any exceptions in the registry Risk Score column and escalate to security-engineer if any Critical vendor has a material exception
+
+Evidence artifact: `compliance/vendor-review/YYYY/02-cert-refresh/VENDOR-NAME-cert-YYYY.pdf` (one file per vendor) + `02-cert-review-summary.md` (findings table).
+
+**Step 3 — DPA status confirmation (complete by January 20)**
+
+For each vendor in the registry, confirm the DPA is current and covers the current scope of data processing:
+- If the vendor has updated their DPA terms since last signature: review changes; re-execute if material changes affect FORM's obligations
+- Confirm SCCs have not been superseded by new EU Commission guidance
+- Confirm Sentry DPA status; if still unsigned, escalate to founder with a hard deadline
+
+Evidence artifact: `compliance/vendor-review/YYYY/03-dpa-status-check.md` — vendor, DPA version, last signed date, any re-execution required, sign-off.
+
+**Step 4 — Questionnaire or self-attestation (complete by January 25)**
+
+Send the annual security questionnaire to all Critical vendors. For High vendors, accept the current SOC 2 report in lieu if obtained in Step 2. For Standard vendors, request a one-paragraph written self-attestation confirming no material security posture changes.
+
+Minimum content to confirm annually:
+- No unresolved critical or high security findings from the vendor's most recent internal assessment or pentest
+- Incident notification SLA unchanged (≤24h)
+- Subprocessor list unchanged or 30-day notice issued for any changes
+- Data deletion capability confirmed
+
+Evidence artifact: `compliance/vendor-review/YYYY/04-questionnaire-responses/VENDOR-NAME-response-YYYY.{pdf,md}`.
+
+**Step 5 — Annual review sign-off and registry update (complete by January 31)**
+
+The compliance-officer reviews all evidence from Steps 1–4 and produces a consolidated annual review memo:
+- Risk score reassignment for any vendor where evidence warrants a change
+- Any newly identified gaps added to §14 risk register and PRE checklist
+- Updated §17.4 registry with "Next Review" dates advanced by 12 months
+- Escalation items (vendors with unresolved DPA gaps, material SOC 2 exceptions, or tier upgrades required) flagged to security-engineer and founder
+
+Evidence artifact: `compliance/vendor-review/YYYY/05-annual-review-memo.md` — compliance-officer sign-off with date, summary of material changes, open items with owners and deadlines.
+
+**SOC 2 CC9.2 evidence package:** The five artifacts above collectively constitute the annual vendor management evidence package for CC9.2. Auditors will request these files during fieldwork. The evidence chain must be unbroken: if Step 5 sign-off references Steps 1–4, and Steps 1–4 artifacts are dated within the same January window, the evidence satisfies the CC9.2 requirement for periodic review of service provider security.
+
+---
+
+### 17.6 Risk Scoring Criteria
+
+Each vendor in the registry is assigned a composite risk score. The score is calculated at initial onboarding (§17.3 Step 5) and re-evaluated at each annual review (§17.5 Step 5). The score informs tier assignment and escalation rules.
+
+#### Scoring Factors
+
+| Factor | 1 — Low | 2 — Medium | 3 — High |
+|---|---|---|---|
+| **Data sensitivity** | No personal data; Internal or Public tier only | Confidential data (identity, billing) | Restricted data (health, clinical, §13 special category) |
+| **Certification level** | Current SOC 2 Type II (unqualified) or ISO 27001 | SOC 2 Type II with exceptions relevant to FORM, or SOC 2 Type I only | No current SOC 2 or ISO cert; questionnaire only |
+| **DPA status** | Fully executed; SCCs in place | DPA in progress or under review; compensating controls documented | No DPA; processing personal data without agreement |
+| **Incident history** | No incidents involving FORM data in prior 12 months; vendor-side incidents disclosed promptly | Minor incident (no FORM data exposure); disclosed within SLA | Incident involving FORM data or material vendor breach; notification delayed |
+| **Data residency** | EU hosting available and selected for EU users; FORM contractually bound to region | EU hosting available but not yet selected; vendor asserts EU data stays in-region | No EU residency option; EU data transits or stored in third countries without adequate safeguards |
+| **Subprocessor chain depth** | Vendor has ≤2 documented subprocessors; FORM has visibility into the chain | Vendor has 3–5 subprocessors; partial visibility | Vendor has >5 subprocessors or undisclosed chain; FORM cannot assess downstream risk |
+
+#### Composite Score
+
+Sum the six factor scores (range 6–18) and apply the following scale:
+
+| Total Score | Risk Rating | Registry Colour | Escalation Rule |
+|---|---|---|---|
+| 6–8 | Low | 🟢 | No escalation; annual review per §17.5 |
+| 9–11 | Medium | 🟡 | Compliance-officer reviews quarterly; remediation plan required for any factor scored 3 within 90 days |
+| 12–14 | Elevated | 🟠 | Compliance-officer + security-engineer joint review quarterly; security-engineer must approve continued use; remediation plan within 30 days |
+| 15–18 | High | 🔴 | Escalate to founder immediately; continued use requires explicit written acceptance of risk; migrate to alternative vendor within 6 months unless compensating controls reduce score to ≤11 |
+
+#### Escalation Rules
+
+- Any vendor with a DPA factor score of 3 (no DPA, processing personal data) is automatically 🔴 regardless of composite score. No waiver.
+- Any Critical-tier vendor whose certification lapses (no current SOC 2 or ISO cert) is automatically promoted to 🟠 until renewed.
+- Any vendor involved in a data breach affecting FORM users is immediately reviewed for continued use. The founder, compliance-officer, and security-engineer must jointly approve continued engagement within 72 hours.
+
+---
+
+### 17.7 New Sub-Processor Addition Process
+
+Adding a new sub-processor after FORM is in the SOC 2 observation period requires completing all seven steps. For additions before the observation period, Steps 1–3 are minimum requirements; remaining steps must be completed before the observation period starts.
+
+**Step 1 — Identify and classify**
+
+The requesting team member (engineer, product, founder) submits a new vendor request to the compliance-officer via a Linear ticket tagged `compliance-vendor-request`. The request must include: vendor name, intended purpose, data categories that will flow to the vendor, estimated start date.
+
+The compliance-officer assigns a preliminary tier within 3 business days.
+
+**Step 2 — Complete §17.3 pre-approval checklist**
+
+Run the full pre-approval checklist (§17.3 Steps 1–5). For Critical-tier vendors, all five steps must be completed before any production data flows. For High-tier vendors, DPA execution is the hard gate; certification review may run in parallel with the 30-day notice period.
+
+**Step 3 — 30-day customer notice**
+
+As required by GDPR Art. 28(2) and FORM's enterprise DPA template: notify all enterprise tenants 30 days before the new sub-processor begins processing their data. The notice must be sent even if the vendor integration is still in testing, provided it will eventually process production data.
+
+Draft and send the notice per §17.3 Step 4. Log all notifications and any objections.
+
+**Step 4 — Update sub-processor register**
+
+Add the vendor to §13 (this document) and to `form.coach/legal/sub-processors` (public-facing list). The public list must be updated no later than the effective date of sub-processor addition. Include: vendor name, HQ, purpose, data categories, region, DPA status, transfer mechanism.
+
+**Step 5 — Update Vendor Risk Registry**
+
+Add the vendor to §17.4 with all required fields populated. Assign the composite risk score per §17.6. Set "Next Review" to the next January.
+
+**Step 6 — Add to §14 risk register if applicable**
+
+If the vendor introduces a new vendor risk (e.g., a critical single-point-of-failure dependency, a vendor with no SOC 2 cert), add a risk entry to §14 under the Vendor / Operational Risks category. Assign a residual score and named owner.
+
+**Step 7 — Archive and file**
+
+File all completed onboarding evidence (questionnaire responses, DPA PDF, certification, 30-day notice log) to `compliance/vendor-review/onboarding/VENDOR-NAME-YYYY-MM/` in the private compliance repo.
+
+#### Emergency Sub-Processor Addition Exception
+
+If a production incident requires integrating a new vendor immediately (e.g., switching from a failed vendor to an alternative), the following modified process applies:
+
+- Steps 1 and 5 are completed within 24 hours of the decision to add the vendor
+- DPA (Step 2, Step 3) must be executed within 7 days
+- The 30-day customer notice clock begins immediately; the vendor may process data in the interim only if compensating controls are documented (e.g., no personal data transmitted until DPA is in place)
+- The founder must provide written approval of the emergency exception before any personal data flows to the new vendor
+- All standard steps must be completed within 30 days of the emergency addition; any steps not completed within 30 days escalate to 🔴 in the risk registry
+
+---
+
+### 17.8 Termination and Offboarding
+
+When a vendor relationship ends (contract termination, migration to alternative, vendor insolvency), the following steps must be completed and documented before the vendor is removed from active registry records.
+
+**Step 1 — Cease data flows**
+
+Revoke all API keys, OAuth tokens, and credentials granting the vendor access to FORM systems. Confirm revocation in each system's access log. Document: credential type, system, revocation timestamp, confirming engineer.
+
+Target: all credentials revoked within 24 hours of termination decision.
+
+**Step 2 — Data deletion confirmation**
+
+For vendors that hold copies of FORM user data (Critical and High tier), issue a formal written data deletion request referencing the DPA deletion clause. The request must specify:
+- The scope of data subject to deletion (all FORM user data, or a specific subset)
+- The deadline for deletion (per DPA; typically 30–90 days)
+- The required confirmation format (written attestation from an authorised signatory)
+
+File the deletion request and the vendor's written confirmation to `compliance/vendor-offboarding/VENDOR-NAME-YYYY-MM/deletion-confirmation.pdf`.
+
+For Standard-tier vendors with no personal data: deletion confirmation is not required. Document that no personal data was held.
+
+**Step 3 — Sub-processor register update**
+
+Remove the vendor from §13 and from `form.coach/legal/sub-processors`. If the removal means enterprise tenants' data was previously processed by this vendor, issue a sub-processor change notice (no 30-day advance requirement for removals, but prompt notification is required per good-faith practice). Log the update.
+
+**Step 4 — Registry archive**
+
+Move the vendor entry in §17.4 from the active registry to the archive section in `compliance/vendor-registry/VENDOR-ARCHIVE.md`. Retain all onboarding, review, and offboarding evidence for a minimum of 7 years (matching the audit log retention period per §4 and GDPR Art. 17(3)(e) record-keeping exception).
+
+**Step 5 — Compliance calendar update**
+
+Remove the vendor from the next January annual review cycle. If the termination occurs within 30 days of the annual review, confirm that the offboarding is noted in the annual review memo (§17.5 Step 5 evidence artifact).
+
+---
+
+### 17.9 SOC 2 Control Mapping
+
+| SOC 2 Control | Description | This Section | Evidence Artifacts | Current Status |
+|---|---|---|---|---|
+| **CC9.1** | FORM identifies, selects, and develops risk mitigation activities for risks arising from potential business disruptions; considers the use of vendors in risk mitigation | §17.2 (tier classification), §17.5 (annual review), §17.6 (risk scoring) | Annual review memo; vendor risk registry; §14 risk register entries for vendor risks | 🟡 Partial — programme defined; first annual review Q1 2027 |
+| **CC9.2** | FORM assesses and monitors risks associated with third-party vendors; includes performance monitoring and review of relevant reports | §17.3 (pre-approval), §17.4 (registry), §17.5 (annual review), §17.7 (new additions) | Vendor registry; SOC 2 / ISO cert files; questionnaire responses; annual review memo with sign-off | 🟡 Partial — programme defined; first full evidence cycle Q1 2027 |
+| **CC9.3** | FORM evaluates compliance with vendor obligations; includes contract terms and access rights appropriate to vendor risk | §17.3 Steps 2–3 (DPA and cert review), §17.8 (termination — deletion confirmation and credential revocation) | Executed DPAs; SCCs; deletion confirmation letters; credential revocation logs | 🟡 Partial — DPAs in place for 6 of 8 sub-processors; Sentry DPA in progress; Vanta/Drata DPA pre-activation |
+| **P8.1** | FORM discloses personal information to third parties only in accordance with its privacy commitments; monitors third-party compliance with privacy commitments | §13 (sub-processor register + disclosure), §17.3 Step 4 (30-day notice), §17.7 Steps 3–4 (new processor notice + register update), §17.8 Steps 2–3 (deletion + register update) | Sub-processor register with DPA status; 30-day notice logs; deletion confirmations | 🟡 Partial — register published (§13); notice process defined; first full cycle P8.1 evidence Q1 2027 |
+
+---
+
+### 17.10 Gap Closure Status
+
+This section directly addresses the two 🔴 Gaps identified in the SOC 2 readiness tracker and formalises one 🟡 Partial item:
+
+| Gap | Pre-§17 Status | Post-§17 Status | Remaining Action to Reach 🟢 |
+|---|---|---|---|
+| Vendor security review process | 🔴 Gap — DPAs signed but formal vendor registry needed | 🟡 Partial — programme documented: tier classification, pre-approval checklist, risk scoring criteria, escalation rules, 7-step addition workflow, offboarding procedure | First annual review executed and evidence filed (Q1 2027); Vanta/Drata DPA executed before activation; Sentry DPA executed (PRE-08 closure) |
+| Annual vendor security review | 🔴 Gap — Process needed | 🟡 Partial — 5-step January process defined with named evidence artifacts mapped to CC9.2; scheduled in §15.1 compliance calendar | First annual review completed January 2027; all five evidence artifacts filed to `compliance/vendor-review/2027/` |
+| Vendor risk registry | 🟡 Partial — sub-processors listed in §13 without formal risk scoring | 🟡 Partial — formalised: all 11 vendors (8 sub-processors + Better Uptime + PagerDuty + Linear) entered with tier, data categories, DPA status, cert, risk score, and owner; composite scoring criteria defined in §17.6 | Score promoted to 🟢 when: (a) Sentry DPA executed → risk score drops to 🟢 Low; (b) Vanta/Drata activated with DPA → risk score confirmed; (c) first annual review confirms all certs current |
+
+**Impact on SOC 2 readiness metrics:**
+
+- Vendor security review process: 🔴 Gap → 🟡 Partial
+- Annual vendor security review: 🔴 Gap → 🟡 Partial
+- CC9.2 control status: 🔴 Gap → 🟡 Partial (was already 🟡 Partial per §16.11; this section provides the programme substance that was previously missing)
+- Critical gaps: 3 → 1 (two 🔴 Gaps converted to 🟡 Partial by this section)
+- Partial controls: 30 → 32
+- Readiness estimate: ~56% → ~58%
+
+---
+
 ## Open Items for compliance-officer
 
 - [ ] Engage audit firm (shortlist: Prescient Assurance, Johanson Group, Sensiba San Filippo) — PRE-milestone Month O-6
@@ -1150,7 +1500,7 @@ The HMAC chain verification is a FORM-specific control artifact: it ensures that
 
 ---
 
-**v0.5 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
+**v0.7 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
 **Review cadence: quarterly. Next review: серпень 2026.**
 
 *v0.2 additions: Sub-Processor Register (CC9, GDPR Art. 28), Complementary User Entity Controls (CUECs), Common Security Questionnaire Responses (CAIQ/SIG Lite pre-answers).*
@@ -1158,3 +1508,5 @@ The HMAC chain verification is a FORM-specific control artifact: it ensures that
 *v0.4 additions: Section 14 — Formal Risk Register (18 risks across 6 categories: Security, Availability, Processing Integrity, Confidentiality, Privacy, Vendor/Operational). L×S scoring with residual scores and named owners. Closes CC3 gap (formal risk assessment documented). Updated P3 DPIA status to ✅ Done. Critical gaps: 10 → 9. Partial: 22 → 21. Controls in place: 23 → 25. Readiness: 42% → 45%.*
 *v0.5 additions (two-step catch-up): (a) `docs/PRIVACY_POLICY.md` v0.1-draft shipped (v0.55.0 CHANGELOG) — closes P1.1, P1.2, CC9.2+P6.1; critical gaps: 9 → 6; controls in place: 25 → 28; readiness: 45% → ~51%. (b) Section 15 — Annual Compliance Calendar: 12-month master calendar (16 recurring activities, all mapped to SOC 2 controls + evidence artifacts), Pre-Observation Period Readiness Checklist (27 PRE items with status), First-Year Implementation Priority matrix (solo-founder vs. post-hire split, compensating controls documented). Moves 7 gaps from 🔴 Gap → 🟡 Partial (security training scheduled Q1-Feb, vendor review Q1-Jan, DR drill Q1-Jan, privacy review Q1-Jan, offboarding quarterly cadence, media disposal Q2-Jun, control effectiveness review quarterly). Critical gaps: 6 → 4 (security training and offboarding: schedule + owner + evidence defined → 🟡 Partial). Partial: 21 → 28. Controls in place: 28 (unchanged — scheduled but not yet executed). Readiness: ~51% → ~55%.*
 *v0.6 additions: Section 16 — Penetration Test Program. Scope (API, auth flows, SSO/SCIM, RLS-via-API, mobile apps, Cloudflare edge), methodology (OWASP WSTG + ASVS L2 + MASVS L1/L2 + PTES + CWE Top 25), finding severity SLAs (Critical 24h → High 7d → Medium 30d), health-data and tenant-isolation severity uplift rules, remediation tracking workflow (Linear tickets → PR → re-test → compliance evidence filing), SOC 2 evidence package definition (engagement letter + full report + HMAC chain verification), customer disclosure policy (executive summary under NDA for >$50k ACV). CC7 control table updated to add "External penetration test" row (🟡 Partial). PRE-21 moved from 🔴 Open → 🟡 Partial. Open Items updated. CC7.1 and CC7.2 moved from 🔴 Gap → 🟡 Partial. Critical gaps: 4 → 3. Partial: 28 → 30. Readiness: ~55% → ~56%.*
+
+*v0.7 additions: Section 17 — Vendor Security Review Process. Closes two documented 🔴 Gaps: "Vendor security review process" and "Annual vendor security review." Three-tier risk classification (Critical/High/Standard) with review frequency per tier. Vendor Risk Registry covering 11 vendors (8 sub-processors + Better Uptime, PagerDuty, Linear) with DPA status, certification level, risk score, and owner. 5-step Initial Vendor Assessment checklist with DPA gate and approval veto. 5-step January Annual Review process with SOC 2 CC9.2 evidence package definition. 6-factor risk scoring matrix (composite 🟢/🟡/🟠/🔴 scale, escalation rules for DPA-missing and cert-lapse). 7-step new sub-processor addition workflow with emergency exception clause. Termination and offboarding process with 7-year evidence retention. SOC 2 control mapping: CC9.1, CC9.2, CC9.3, P8.1. Gap closure: "Vendor security review process" 🔴 → 🟡 Partial (first annual review Q1-2027); "Annual vendor security review" 🔴 → 🟡 Partial; "Vendor risk registry" 🟡 Partial → 🟡 Partial (formalized with scoring). Critical gaps: 3 → 1. Readiness: ~56% → ~58%.*
