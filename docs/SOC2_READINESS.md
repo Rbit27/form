@@ -99,6 +99,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Vulnerability scanning (dependencies) | 🟡 Gap | Dependabot / `npm audit` planned; implement in CI |
 | Patching SLA defined | 🟡 Gap | Define: critical patches <24h, high <7d, medium <30d |
 | System health monitoring | 🟡 Gap | Uptime monitoring with customer-facing status page needed |
+| External penetration test | 🟡 Partial | Program defined — Section 16; first test pending PRE-21 |
 
 ### CC8 — Change Management
 
@@ -253,7 +254,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | 🟡 **Partial / needs formalization** | 21 | Vendor registry, patching SLA, annual risk review, DSAR SLA |
 | ✅ **In place** | 25 | HMAC audit log, encryption, access controls, CV on-device, breach notification, data classification policy, DPIA, formal risk register |
 
-**Readiness score: ~45% controls fully in place.** Target: 90% before observation period begins.
+**Readiness score: ~55% controls fully in place** (updated v0.5–v0.6; see version history). Target: 90% before observation period begins.
 
 ---
 
@@ -882,7 +883,7 @@ The SOC 2 Type II observation clock **cannot start** until the items below are f
 | # | Item | Owner | Target Date | Status |
 |---|---|---|---|---|
 | PRE-20 | First DR drill completed and report filed | devops-lead + security-engineer | Month O-3 | 🔴 Open |
-| PRE-21 | First penetration test completed; critical and high findings remediated before observation start | security-engineer | Month O-3 | 🔴 Open |
+| PRE-21 | First penetration test completed; critical and high findings remediated before observation start | security-engineer | Month O-3 | 🟡 Partial (program defined — Section 16; firm selection + execution pending) |
 | PRE-22 | Security awareness training first cohort completed (all current employees and contractors) | compliance-officer | Month O-2 | 🔴 Open |
 | PRE-23 | First quarterly access review completed and documented | security-engineer + compliance-officer | Month O-1 | 🔴 Open |
 | PRE-24 | DSAR handling procedure tested end-to-end; elapsed time ≤30 days confirmed | compliance-officer | Month O-1 | 🟡 Partial |
@@ -967,6 +968,171 @@ The following controls are formally impossible with one person. They are documen
 
 ---
 
+## 16. Penetration Test Program
+
+> Owner: `security-engineer` + `compliance-officer`. SOC 2 criteria closed: CC7.1 (threat identification), CC7.2 (vulnerability management), CC9.2 (vendor risk).
+> Reference: DEC-030 (HMAC-chained audit log), `docs/AUDIT_LOG_SCHEMA.md`, `docs/ENTERPRISE.md`, `docs/INCIDENT_RESPONSE.md`.
+
+### 16.1 Purpose
+
+The penetration test program formally identifies security vulnerabilities in FORM's production systems before an attacker does. It produces auditor-grade evidence for CC7 (System Operations) and demonstrates due care to enterprise customers. Results feed directly into the risk register (Section 14) and the incident response program (`docs/INCIDENT_RESPONSE.md`).
+
+This section defines the program structure. The first execution maps to PRE-21 in the readiness checklist (Section 15.2). Once executed, the report and remediation evidence are stored as durable SOC 2 artifacts.
+
+### 16.2 Scope
+
+#### In scope
+
+| Surface | Methodology | Notes |
+|---|---|---|
+| **API layer** (Cloudflare Workers) | Black-box + grey-box | Authenticated endpoints tested with valid JWT; unauthenticated endpoints black-box |
+| **Authentication flows** | Grey-box | OIDC/SAML SP-initiated and IdP-initiated, magic link OTP, MFA bypass attempts, session fixation |
+| **Admin dashboard** (`admin-dashboard.html`) | Grey-box | Role escalation, insecure direct object reference (IDOR), XSS |
+| **Enterprise SSO/SCIM endpoints** | Grey-box | Certificate replay, SCIM provisioning injection, group mapping bypass |
+| **RLS / data isolation** | Grey-box via API | Cross-tenant data access via crafted API requests; direct DB access not included (see below) |
+| **Mobile apps** (iOS + Android) | Binary + traffic analysis | Certificate pinning bypass, local storage secrets, OWASP MASVS L1 checklist |
+| **Cloudflare edge configuration** | Black-box | WAF bypass attempts, rate-limit evasion, header injection |
+
+#### Explicitly out of scope
+
+| Surface | Reason |
+|---|---|
+| Supabase internal infrastructure | Third-party; covered by Supabase's own SOC 2 report |
+| Anthropic API | Third-party; covered by Anthropic's own security posture |
+| ElevenLabs, PostHog, Sentry, Stripe | Third-party sub-processors |
+| Direct database access (Postgres) | Only `form_api` role exposed via API; direct Postgres port not reachable from internet |
+| Denial-of-service (DoS/DDoS) | Not permitted; destructive; covered by Cloudflare WAF operational controls |
+| Social engineering of FORM team | Out of scope at current company size; revisit at >10 employees |
+| Physical access | Remote-first; no physical infrastructure owned by FORM |
+
+#### Scope change process
+
+Any expansion of scope (e.g., adding a new product surface such as a browser extension or ClickHouse instance) requires a signed scope addendum before the test window opens. Changes discovered mid-test that reveal an adjacent attack surface are reported immediately to `security-engineer` with a decision on whether to extend scope or note as an out-of-scope observation.
+
+### 16.3 Methodology
+
+FORM uses industry-standard frameworks as the baseline for test coverage:
+
+| Framework | Application |
+|---|---|
+| **OWASP WSTG** (Web Security Testing Guide) v4.2 | API and web surface coverage checklist |
+| **OWASP ASVS** (Application Security Verification Standard) Level 2 | Authentication, session management, data protection |
+| **OWASP MASVS** L1 + L2 (Mobile Application Security Verification Standard) | iOS and Android apps |
+| **PTES** (Penetration Testing Execution Standard) | Engagement structure, reporting, evidence preservation |
+| **CWE Top 25** | Prioritised weakness categories; all Top 25 checked |
+
+FORM does not prescribe a specific CVSS scoring tool; the testing firm uses CVSS v3.1 as the baseline severity anchor, supplemented by context (FORM health data makes confidentiality impact higher than default for many vectors).
+
+### 16.4 Test Types
+
+| Test type | Frequency | Trigger |
+|---|---|---|
+| **Annual external penetration test** | Once per year (Q1) | Calendar — maps to Compliance Calendar §15.1 |
+| **Re-test of prior findings** | Within 30 days of remediation closure | After any Critical or High finding is remediated; confirms fix holds |
+| **Architecture-change test** | Within 60 days of major change | SSO/SCIM launch, new database region, new AI provider, significant API restructure |
+| **Pre-observation readiness test** | One-time | Before SOC 2 observation period starts (PRE-21) |
+| **Post-P0-incident targeted test** | Within 90 days of P0 | After any P0 security incident; scope limited to affected surface |
+
+### 16.5 Testing Firm Selection Criteria
+
+Firms are evaluated against the following minimum bar before engagement:
+
+| Criterion | Requirement |
+|---|---|
+| Certification | CREST-accredited firm, or team lead holds OSCP + minimum one of: OSCE, OSWE, GWAPT, BSCP |
+| Independence | No current or former employment relationship with FORM; no financial relationship with any FORM sub-processor |
+| Healthcare data experience | Demonstrated experience testing applications that handle health or biometric data (HIPAA-adjacent preferred) |
+| NDA | Mutual NDA executed before any test credentials, architecture diagrams, or API specs are shared |
+| Insurance | Professional indemnity ≥ $2M USD; cyber liability ≥ $1M USD |
+| Report format | Structured report required: executive summary, finding table (ID, title, CVSS, description, evidence, reproduction steps, remediation), methodology appendix |
+
+**Current shortlist (for first engagement):** Bishop Fox, NCC Group, Cobalt.io (continuous pentest platform — evaluate for Year 2), Cure53.
+
+`security-engineer` owns vendor selection and issues the statement of work. `compliance-officer` countersigns.
+
+### 16.6 Finding Severity and Remediation SLAs
+
+FORM uses CVSS v3.1 base score as the primary severity signal, adjusted upward one tier when the finding directly exposes health data (GDPR Art. 9 special category) or breaks tenant isolation.
+
+| Severity | CVSS v3.1 Range | Remediation SLA | Escalation |
+|---|---|---|---|
+| **Critical** | 9.0–10.0 | 24 hours from report delivery | Incident Commander paged immediately — treated as P1 per `docs/INCIDENT_RESPONSE.md`; `compliance-officer` notified |
+| **High** | 7.0–8.9 | 7 calendar days | `security-engineer` + `devops-lead` assigned; status update daily |
+| **Medium** | 4.0–6.9 | 30 calendar days | Linear ticket; `security-engineer` triage within 48h |
+| **Low** | 0.1–3.9 | 90 calendar days or next quarterly review (whichever comes first) | Batch-triaged at next quarterly access review |
+| **Informational** | N/A | Next quarterly review | Documented; no remediation SLA; inform relevant owner |
+
+**Health-data severity uplift:** Any finding that could expose `health_profiles`, `meal_logs`, `workouts`, or any field tagged `data_class = 'restricted'` (per `docs/AUDIT_LOG_SCHEMA.md` taxonomy) is escalated one tier. A Medium finding with health-data exposure is treated as High; a High with health-data exposure is treated as Critical.
+
+**Tenant isolation uplift:** Any finding that could allow one tenant's `form_api` session to read another tenant's rows (RLS bypass) is automatically Critical regardless of CVSS base score. This maps to Risk SR-02 in the risk register (Section 14) and would trigger a P0 incident declaration per `docs/INCIDENT_RESPONSE.md` §1.2 if discovered post-launch.
+
+### 16.7 Remediation Tracking
+
+All findings are entered into Linear immediately upon report receipt. No finding is closed without evidence.
+
+| Step | Action | Owner |
+|---|---|---|
+| **1. Intake** | `security-engineer` reads full report within 24h of delivery; creates one Linear ticket per finding with label `pentest-finding` and `severity-{critical|high|medium|low}` | security-engineer |
+| **2. Triage** | Within 48h: assign ticket to responsible engineer; set due date per SLA table above; link to affected code path or infra component | security-engineer |
+| **3. Remediation** | Assigned engineer implements fix; creates PR with description referencing finding ID (e.g., `PT-2026-01-007`) | Assigned engineer |
+| **4. Review** | PR reviewed by `security-engineer`; cannot self-review if the assignee is the same person — use `compliance-officer` as second reviewer during solo-founder phase | security-engineer |
+| **5. Re-test** | For Critical and High findings: provide reproduction steps to testing firm; receive confirmation that the fix holds before closing ticket | security-engineer + testing firm |
+| **6. Evidence filing** | Close Linear ticket with link to: merged PR, re-test confirmation (email or report addendum), deployment evidence (EAS build ID or Cloudflare deploy hash) | security-engineer |
+| **7. SOC 2 package** | `compliance-officer` compiles closed-ticket evidence into `compliance/pentest/YYYY/remediation-evidence.md` before end of remediation window | compliance-officer |
+
+Linear query to see all open pentest findings: `label:pentest-finding AND NOT state:done`. This query is reviewed at every quarterly access review.
+
+### 16.8 Report Format and Customer Disclosure
+
+| Audience | What They Receive | Conditions |
+|---|---|---|
+| `security-engineer` + `compliance-officer` + founder | Full penetration test report (all findings, evidence, methodology) | Immediately upon delivery from testing firm |
+| Enterprise customer (security review, >$50k ACV) | Executive summary: finding counts by severity, SLA compliance, methodology summary, attestation of Critical/High remediation | Signed mutual NDA; `compliance-officer` approval; redacted to remove reproduction steps that could be exploited by the customer |
+| Enterprise customer (<$50k ACV, standard) | Attestation letter: "FORM completed an annual penetration test in [month]. All Critical and High findings were remediated within SLA. A report is available to qualified customers under NDA." | `compliance-officer` approval |
+| Public / unauthenticated | No disclosure. | N/A |
+
+FORM does not participate in coordinated vulnerability disclosure programs at this stage. Responsible disclosure requests from external parties are routed to `security@form.coach` and triaged by `security-engineer` within 24 hours.
+
+**No AI training use of pentest reports.** Reports contain architectural details and exploitation techniques that must not be used as LLM training data. All reports stored in the private `form-compliance` repo with branch protection; not in the public `rbit27/form` repo.
+
+### 16.9 SOC 2 Evidence Package (per annual test)
+
+The following artifacts constitute the complete SOC 2 evidence package for CC7.1 and CC7.2. They are filed to `compliance/pentest/YYYY/` in the private compliance repo immediately after remediation is complete.
+
+| Artifact | Description | Required for Audit |
+|---|---|---|
+| `engagement-letter.pdf` | Signed SOW + NDA with testing firm | Yes |
+| `report-full.pdf` | Complete findings report from firm | Yes |
+| `report-exec-summary.pdf` | Redacted executive summary (customer-shareable version) | Yes |
+| `remediation-evidence.md` | Linear ticket IDs, PR links, re-test confirmations for all Critical + High findings | Yes |
+| `attestation-sign-off.md` | `security-engineer` written confirmation that all Critical + High findings are remediated; signed by date | Yes |
+| `open-accepted-risks.md` | Any Medium or Low findings accepted as residual risk (with justification, risk-owner sign-off, and reference to risk register entry in Section 14) | If applicable |
+| `hmac-chain-verification.txt` | Output of HMAC chain integrity cron run on the date pentest window closes — confirms no audit log tampering during the test (per DEC-030 and `docs/AUDIT_LOG_SCHEMA.md` §6) | Yes |
+
+The HMAC chain verification is a FORM-specific control artifact: it ensures that if a tester discovered a log-tampering vector during the engagement, the chain break would have been detected automatically. No chain break during the pentest window = the audit log is intact evidence. See `docs/AUDIT_LOG_SCHEMA.md` for chain verification procedure.
+
+### 16.10 Connection to Enterprise Commitments
+
+`docs/ENTERPRISE.md` §7 lists FORM's hard commitments to enterprise customers. Penetration testing supports these commitments:
+
+| Enterprise commitment | Pentest role |
+|---|---|
+| "Annual external penetration test; executive summary on request" | This section defines what "annual external penetration test" means operationally |
+| "99.9% uptime SLA with P0 < 1h response" | Pentest validates that no single exploitable vulnerability can take down the platform |
+| "Tenant isolation: your data is never accessible to other tenants" | Pentest scope includes RLS bypass attempts via API; Critical uplift for any isolation finding |
+| "No HR individual data visibility" | Pentest validates that the privacy floor enforcement (Section 6, `docs/DATA_MODEL.md` §6) cannot be bypassed via an unauthenticated or privilege-escalated path |
+
+### 16.11 Gap Closure Status
+
+| SOC 2 Control | Pre-§16 Status | Post-§16 Status | Remaining action |
+|---|---|---|---|
+| CC7.1 — threat and vulnerability identification | 🔴 Gap | 🟡 Partial | First test execution + report |
+| CC7.2 — vulnerability management (remediation tracking) | 🔴 Gap | 🟡 Partial | First test execution + Linear tickets |
+| CC9.2 — vendor management (security review of service providers) | 🟡 Partial | 🟡 Partial | Testing firm DPA + insurance confirmation |
+| PRE-21 — first penetration test completed | 🔴 Open | 🟡 Partial | Firm selection → execution → remediation |
+
+---
+
 ## Open Items for compliance-officer
 
 - [ ] Engage audit firm (shortlist: Prescient Assurance, Johanson Group, Sensiba San Filippo) — PRE-milestone Month O-6
@@ -977,7 +1143,8 @@ The following controls are formally impossible with one person. They are documen
 - [x] Schedule first DR drill date — Q1 January (Section 15.1 master calendar)
 - [ ] Confirm Sentry DPA status — PRE-08; blocking full sub-processor register
 - [ ] Implement uptime monitoring + status page — PRE-10, PRE-11
-- [ ] Complete first penetration test — PRE-21; required before observation period
+- [x] Define penetration test program — PRE-21 partial; Section 16 documents scope, methodology, SLAs (May 2026)
+- [ ] Execute first penetration test — PRE-21 complete; firm selection + engagement pending
 - [ ] Security awareness training first cohort — PRE-22; requires first hire
 - [ ] Complete first quarterly access review — PRE-23
 
@@ -990,3 +1157,4 @@ The following controls are formally impossible with one person. They are documen
 *v0.3 additions: Section 13 — Data Classification Policy (four-tier: Public / Internal / Confidential / Restricted). Closes SOC 2 gap C1.1. Critical gaps: 11 → 10. Controls in place: 22 → 23.*
 *v0.4 additions: Section 14 — Formal Risk Register (18 risks across 6 categories: Security, Availability, Processing Integrity, Confidentiality, Privacy, Vendor/Operational). L×S scoring with residual scores and named owners. Closes CC3 gap (formal risk assessment documented). Updated P3 DPIA status to ✅ Done. Critical gaps: 10 → 9. Partial: 22 → 21. Controls in place: 23 → 25. Readiness: 42% → 45%.*
 *v0.5 additions (two-step catch-up): (a) `docs/PRIVACY_POLICY.md` v0.1-draft shipped (v0.55.0 CHANGELOG) — closes P1.1, P1.2, CC9.2+P6.1; critical gaps: 9 → 6; controls in place: 25 → 28; readiness: 45% → ~51%. (b) Section 15 — Annual Compliance Calendar: 12-month master calendar (16 recurring activities, all mapped to SOC 2 controls + evidence artifacts), Pre-Observation Period Readiness Checklist (27 PRE items with status), First-Year Implementation Priority matrix (solo-founder vs. post-hire split, compensating controls documented). Moves 7 gaps from 🔴 Gap → 🟡 Partial (security training scheduled Q1-Feb, vendor review Q1-Jan, DR drill Q1-Jan, privacy review Q1-Jan, offboarding quarterly cadence, media disposal Q2-Jun, control effectiveness review quarterly). Critical gaps: 6 → 4 (security training and offboarding: schedule + owner + evidence defined → 🟡 Partial). Partial: 21 → 28. Controls in place: 28 (unchanged — scheduled but not yet executed). Readiness: ~51% → ~55%.*
+*v0.6 additions: Section 16 — Penetration Test Program. Scope (API, auth flows, SSO/SCIM, RLS-via-API, mobile apps, Cloudflare edge), methodology (OWASP WSTG + ASVS L2 + MASVS L1/L2 + PTES + CWE Top 25), finding severity SLAs (Critical 24h → High 7d → Medium 30d), health-data and tenant-isolation severity uplift rules, remediation tracking workflow (Linear tickets → PR → re-test → compliance evidence filing), SOC 2 evidence package definition (engagement letter + full report + HMAC chain verification), customer disclosure policy (executive summary under NDA for >$50k ACV). CC7 control table updated to add "External penetration test" row (🟡 Partial). PRE-21 moved from 🔴 Open → 🟡 Partial. Open Items updated. CC7.1 and CC7.2 moved from 🔴 Gap → 🟡 Partial. Critical gaps: 4 → 3. Partial: 28 → 30. Readiness: ~55% → ~56%.*

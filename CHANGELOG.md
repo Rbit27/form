@@ -9,6 +9,13 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.64.1] — 2026-05-18
+
+### Changed
+- `docs/SOC2_READINESS.md` — Section 16: Penetration Test Program. Scope definition (API, auth flows, SSO/SCIM endpoints, RLS-via-API, iOS/Android apps, Cloudflare edge); methodology (OWASP WSTG + ASVS L2 + MASVS L1/L2 + PTES + CWE Top 25); finding severity SLAs (Critical 24h, High 7d, Medium 30d, Low 90d) with health-data and tenant-isolation severity-uplift rules; remediation tracking via Linear (intake → triage → fix → re-test → evidence filing); SOC 2 evidence package (engagement letter + full report + HMAC chain verification per DEC-030 + remediation sign-off); customer disclosure policy (executive summary under NDA for >$50k ACV). CC7 control table updated with "External penetration test" row (🟡 Partial). PRE-21 moved 🔴 Open → 🟡 Partial. Readiness score updated to ~55% (catching up from earlier v0.5 changes). Gap delta: CC7.1, CC7.2 🔴 → 🟡; critical gaps 4 → 3. (compliance-officer · security-engineer · enterprise-architect)
+
+---
+
 ## [0.64.0] — 2026-05-18
 
 ### Added
