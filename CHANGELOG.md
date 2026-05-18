@@ -9,6 +9,19 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.65.1] — 2026-05-18
+
+### Changed
+- `docs/DATA_MODEL.md` v0.2 → v0.3 — four new sections:
+  - **§2.8 workout_sets** — table definition (closes inconsistency: table was referenced in PITR runbook §10.3 but never defined in core schema); CV flags JSONB + per-tenant KMS encryption note; composite unique index on `(workout_id, set_number)`.
+  - **§2.9 coaching_sessions + coaching_turns** — Victor interaction storage with privacy floor: `coaching_turns.content` classified Confidential; coaching turns excluded from `tenant_wellness_summary` MV; token/voice-char instrumentation columns for COST_MODEL reconciliation (OQ-01/OQ-02).
+  - **§2.10 tenant_sso_configs + tenant_scim_tokens + scim_provisioning_log** — SSO/SCIM auxiliary tables; `oidc_client_secret_enc` AES-256-GCM via KMS; `token_hash` write-only Restricted classification; `scim_provisioning_log` for IdP sync debugging; cross-reference to `docs/SSO_SCIM_IMPLEMENTATION.md`.
+  - **§3.6–3.7** — RLS policies for all six new tables; `form_system` role on SSO config read path; partial index for non-revoked SCIM tokens.
+  - **§5** — data classification table updated for new tables (`coaching_turns.content` Confidential, `oidc_client_secret_enc` Sensitive, `token_hash` Restricted).
+  - **§11 Index Strategy for RLS Performance** — isolation indexes `(tenant_id)` and `(tenant_id, user_id)` on all tables; relationship-traversal indexes for RLS subqueries (`workout_id`, `session_id`); SSO/SCIM hot-path indexes; BRIN for time-series aggregate scans; partial index on recent workouts (90-day MV window); index maintenance policy (CONCURRENTLY, quarterly `pg_stat_user_indexes` review). (enterprise-architect · compliance-officer · security-engineer)
+
+---
+
 ## [0.65.0] — 2026-05-18
 
 ### Added

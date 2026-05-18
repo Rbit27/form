@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v0.2
+# FORM · Multi-Tenant Data Model v0.3
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -18,6 +18,7 @@
 8. [Backup and Restore Isolation](#8-backup-and-restore-isolation)
 9. [Open Questions / Gaps](#9-open-questions--gaps)
 10. [PITR Tenant-Isolated Restore Runbook](#10-pitr-tenant-isolated-restore-runbook)
+11. [Index Strategy for RLS Performance](#11-index-strategy-for-rls-performance)
 
 ---
 
@@ -224,6 +225,147 @@ CREATE TABLE tenant_feature_flags (
 -- Not RLS-protected at row level — tenant row joined by application; only form_admin writes
 ```
 
+### 2.8 Workout Sets
+
+Referenced by the PITR runbook (§10.3) but previously undefined. Each `workouts` row has one or more sets; this table holds per-set detail including CV form flags.
+
+```sql
+CREATE TABLE workout_sets (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workout_id       UUID NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
+  tenant_id        UUID NOT NULL,                  -- denormalized for RLS; no FK to avoid join on every policy check
+  set_number       INTEGER NOT NULL,               -- 1-based ordering within the workout
+  exercise_name    TEXT NOT NULL,
+  target_reps      INTEGER,
+  actual_reps      INTEGER,
+  weight_kg        NUMERIC(6,2),
+  duration_seconds INTEGER,                        -- for time-based sets (planks, carries)
+  rpe              NUMERIC(3,1) CHECK (rpe BETWEEN 1 AND 10),
+  form_score       NUMERIC(4,1),                   -- 0–100; null if CV not used for this set
+  cv_flags         JSONB,                          -- [{joint, issue, severity}]; see PRODUCT_SPEC.md §8
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE workout_sets ENABLE ROW LEVEL SECURITY;
+
+-- Composite unique prevents duplicate set numbers per workout
+CREATE UNIQUE INDEX uq_workout_sets_workout_set ON workout_sets(workout_id, set_number);
+```
+
+`cv_flags` inherits the Sensitive classification of `raw_cv_data` — it is encrypted at rest via the same per-tenant KMS key. See §5.
+
+### 2.9 Coaching Sessions
+
+Victor's interactions are stored for continuity, billing instrumentation (token usage), and — critically — to enforce the privacy floor: coaching turn content is never surfaced to HR aggregates.
+
+```sql
+CREATE TABLE coaching_sessions (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id        UUID NOT NULL,
+  workout_id       UUID REFERENCES workouts(id),   -- null for standalone coaching (outside a live workout)
+  started_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at         TIMESTAMPTZ,
+  turn_count       INTEGER NOT NULL DEFAULT 0,
+  tokens_input     INTEGER,                         -- cumulative across all turns; updated on session close
+  tokens_output    INTEGER,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE coaching_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE coaching_turns (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id       UUID NOT NULL REFERENCES coaching_sessions(id) ON DELETE CASCADE,
+  tenant_id        UUID NOT NULL,                  -- denormalized for RLS
+  turn_index       INTEGER NOT NULL,               -- 0-based; monotonically increasing per session
+  role             TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+  content          TEXT NOT NULL,                  -- encrypted at rest; Confidential classification
+  tokens           INTEGER,                         -- token count for this turn (from Anthropic response)
+  voice_chars      INTEGER,                         -- ElevenLabs characters synthesized; null if voice not used
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (session_id, turn_index)
+);
+
+ALTER TABLE coaching_turns ENABLE ROW LEVEL SECURITY;
+```
+
+**Privacy note:** `coaching_turns.content` is classified Confidential (§5). The `tenant_wellness_summary` materialized view (§2.6) does not query `coaching_sessions` or `coaching_turns` — no aggregate of Victor dialogue is ever exposed to HR. Only token-count totals flow into `docs/COST_MODEL.md` instrumentation via a separate internal analytics path that strips all content fields before aggregation.
+
+### 2.10 SSO / SCIM Auxiliary Tables
+
+These tables persist IdP configuration and SCIM bearer tokens per tenant. They are written by `form_admin` (via the SCIM setup API endpoint, accessible only to `tenant_owner`) and read by the auth middleware on the SSO callback path.
+
+```sql
+-- One row per tenant; written during SSO setup flow documented in docs/SSO_SCIM_IMPLEMENTATION.md
+CREATE TABLE tenant_sso_configs (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
+  protocol         TEXT NOT NULL CHECK (protocol IN ('saml2', 'oidc')),
+
+  -- SAML 2.0 fields (null for OIDC tenants)
+  idp_entity_id    TEXT,
+  idp_sso_url      TEXT,
+  idp_slo_url      TEXT,
+  idp_certificate  TEXT,           -- PEM; stored but not RLS-readable from API path — served only by auth service
+
+  -- OIDC fields (null for SAML tenants)
+  oidc_issuer      TEXT,
+  oidc_client_id   TEXT,
+  oidc_client_secret_enc TEXT,     -- AES-256-GCM encrypted via per-tenant KMS key; never returned in API responses
+
+  -- SP / RP registration (our side)
+  sp_acs_url       TEXT NOT NULL,  -- SAML Assertion Consumer Service URL for this tenant
+  sp_entity_id     TEXT NOT NULL,  -- SAML SP Entity ID; or OIDC redirect_uri base
+  sp_metadata_url  TEXT,           -- computed; served at /sso/{tenant_slug}/metadata
+
+  -- Behaviour flags
+  jit_provisioning BOOLEAN NOT NULL DEFAULT TRUE,  -- create user on first SSO login if not in users table
+  force_authn      BOOLEAN NOT NULL DEFAULT FALSE, -- re-authenticate at IdP even with active session
+  attribute_map    JSONB,          -- {"email": "mail", "displayName": "cn"} — IdP attr → FORM field
+  role_map         JSONB,          -- {"cn=form-admins,dc=corp": "tenant_admin", ...} — group → FORM role
+
+  enabled          BOOLEAN NOT NULL DEFAULT FALSE, -- must be explicitly enabled after config validation
+  validated_at     TIMESTAMPTZ,    -- timestamp of last successful test login; null = not yet validated
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- SCIM bearer tokens — token value is NEVER stored; only its SHA-256 hash
+CREATE TABLE tenant_scim_tokens (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  token_hash       TEXT NOT NULL UNIQUE, -- SHA-256(bearer_token); checked on every SCIM request
+  label            TEXT,                 -- e.g. "Okta SCIM connector" — human-readable
+  created_by       UUID REFERENCES users(id),
+  expires_at       TIMESTAMPTZ,          -- null = non-expiring (standard enterprise default)
+  last_used_at     TIMESTAMPTZ,          -- updated on each authenticated SCIM request
+  revoked_at       TIMESTAMPTZ,          -- soft-revoke; check revoked_at IS NULL on auth
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT max_tokens_per_tenant CHECK (TRUE) -- enforced at application layer: max 5 active tokens per tenant
+);
+
+-- Audit trail for SCIM provisioning operations (high-volume; separate from main audit_log)
+CREATE TABLE scim_provisioning_log (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID NOT NULL,
+  scim_token_id    UUID REFERENCES tenant_scim_tokens(id),
+  operation        TEXT NOT NULL CHECK (operation IN ('create_user', 'update_user', 'deactivate_user', 'reactivate_user', 'list_users')),
+  external_id      TEXT,                -- IdP externalId from SCIM request
+  target_user_id   UUID,                -- form users.id; null if user not yet created
+  status           TEXT NOT NULL CHECK (status IN ('success', 'error', 'skipped')),
+  error_detail     TEXT,
+  idp_request_id   TEXT,               -- IdP's request identifier, for correlation with IdP logs
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE tenant_sso_configs   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_scim_tokens   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scim_provisioning_log ENABLE ROW LEVEL SECURITY;
+```
+
+**Security note:** `oidc_client_secret_enc` is encrypted before write using `pgcrypto.encrypt` with the tenant's KMS-derived key. The raw secret is never logged, never returned in API responses (the `GET /admin/sso` endpoint returns the field as `"***"` after initial save), and never appears in `pg_dump` output without the decryption key. See §5 Sensitive classification.
+
 ---
 
 ## 3. Row-Level Security Policies
@@ -341,6 +483,95 @@ Every CI run executes a cross-tenant isolation test:
 
 The test is in `__tests__/db/rls_isolation.test.ts` and runs against a local Postgres container with the same RLS policies as production.
 
+### 3.6 Workout Sets, Coaching Sessions, Coaching Turns
+
+All three tables follow the same owner-only pattern as `workouts`: individual rows are never visible to tenant admins — only the owning user can read their own records.
+
+```sql
+-- workout_sets: follow through workouts ownership (user sees only their sets)
+CREATE POLICY workout_sets_tenant_isolation ON workout_sets
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+  );
+
+CREATE POLICY workout_sets_owner_only ON workout_sets
+  AS RESTRICTIVE FOR SELECT
+  TO form_api
+  USING (
+    workout_id IN (
+      SELECT id FROM workouts
+      WHERE user_id = current_setting('app.current_user_id', TRUE)::UUID
+    )
+  );
+
+-- coaching_sessions
+CREATE POLICY coaching_sessions_tenant ON coaching_sessions
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
+
+CREATE POLICY coaching_sessions_owner ON coaching_sessions
+  AS RESTRICTIVE FOR SELECT
+  TO form_api
+  USING (user_id = current_setting('app.current_user_id', TRUE)::UUID);
+
+-- coaching_turns (denormalized tenant_id allows direct policy without a join)
+CREATE POLICY coaching_turns_tenant ON coaching_turns
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
+
+CREATE POLICY coaching_turns_owner ON coaching_turns
+  AS RESTRICTIVE FOR SELECT
+  TO form_api
+  USING (
+    session_id IN (
+      SELECT id FROM coaching_sessions
+      WHERE user_id = current_setting('app.current_user_id', TRUE)::UUID
+    )
+  );
+```
+
+**Note:** The nested subquery in `coaching_turns_owner` is intentional. Alternatives (e.g., also denormalizing `user_id`) would require keeping it in sync on every insert. The query planner uses the `idx_coaching_turns_session_id` index (§11) to make this efficient.
+
+### 3.7 SSO Config and SCIM Token Policies
+
+SSO configs are read only by `tenant_owner` (to validate their setup) and by the auth service running as `form_api` with a special system role claim. SCIM tokens are not readable at all via the API — only their `label`, `last_used_at`, and `revoked_at` are surfaced.
+
+```sql
+-- SSO config: tenant_owner can read; tenant_admin cannot (contains IdP secrets)
+CREATE POLICY sso_config_tenant ON tenant_sso_configs
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND current_setting('app.current_role', TRUE) IN ('tenant_owner', 'form_system')
+  );
+
+-- SCIM tokens: readable only by tenant_owner for metadata (not the hash)
+CREATE POLICY scim_tokens_tenant ON tenant_scim_tokens
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND current_setting('app.current_role', TRUE) = 'tenant_owner'
+    AND revoked_at IS NULL
+  );
+
+-- SCIM provisioning log: readable by tenant_admin+ (useful for debugging IdP sync issues)
+CREATE POLICY scim_log_tenant ON scim_provisioning_log
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND current_setting('app.current_role', TRUE) IN ('tenant_owner', 'tenant_admin')
+  );
+```
+
+The `token_hash` column in `tenant_scim_tokens` is never returned by any API endpoint. The auth middleware reads it directly via a Postgres function (`form_scim_auth`) that runs as `form_api` with `SECURITY INVOKER` (not definer) — the function receives the bearer token, hashes it, and returns the `tenant_id` if a matching non-revoked row exists.
+
 ---
 
 ## 4. Tenant Isolation Guarantees
@@ -391,9 +622,9 @@ export async function tenantContext(req: Request, res: Response, next: NextFunct
 |---|---|---|---|
 | **Public** | Tenant slug, display name | Standard RDS encryption | All roles |
 | **Internal** | User email, display name, role | Standard RDS encryption | `form_api` (RLS) |
-| **Confidential** | Health goals, restrictions, HRV baseline | Standard RDS encryption | Owner user only (RLS) |
-| **Sensitive** | CV raw pose data, meal log items | Per-tenant AES-256-GCM + KMS | Owner user only; `form_admin` via break-glass |
-| **Restricted** | Audit log HMAC keys | KMS only; never in DB | `form_audit` role + KMS policy |
+| **Confidential** | Health goals, restrictions, HRV baseline; `coaching_turns.content`; `workout_sets.cv_flags` | Standard RDS encryption | Owner user only (RLS) |
+| **Sensitive** | CV raw pose data, meal log items; `tenant_sso_configs.oidc_client_secret_enc`; `tenant_sso_configs.idp_certificate` | Per-tenant AES-256-GCM + KMS | Owner user / `form_system` only; `form_admin` via break-glass |
+| **Restricted** | Audit log HMAC keys; `tenant_scim_tokens.token_hash` (write-only; never returned) | KMS only; never in DB (token) or KMS-derived (HMAC key) | `form_audit` role + KMS policy; SCIM auth function only |
 
 ### 5.1 Encryption Details
 
@@ -755,6 +986,81 @@ Large tenants (>100k workout rows) may require up to 6 hours. Escalate to devops
 
 ---
 
-**v0.1 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer**
+## 11. Index Strategy for RLS Performance
+
+### 11.1 Why indexes matter more with RLS
+
+Every RLS policy appends a `USING` clause to the query. Without supporting indexes, `current_setting('app.current_tenant_id')` comparisons cause a full-table scan on every request. The indexes below ensure that the most common API paths (user's own rows, per-tenant admin aggregates) hit index-only or bitmap-index scans.
+
+### 11.2 Tenant isolation indexes
+
+```sql
+-- Primary isolation index for every RLS-protected table
+-- Covers: users, user_health_profiles, workouts, meal_logs, coaching_sessions
+-- Pattern: (tenant_id) for admin list queries; (tenant_id, user_id) for user-scoped reads
+
+CREATE INDEX idx_users_tenant_id               ON users(tenant_id);
+CREATE INDEX idx_users_tenant_active           ON users(tenant_id) WHERE deactivated_at IS NULL;
+CREATE INDEX idx_user_health_profiles_tenant   ON user_health_profiles(tenant_id);
+CREATE INDEX idx_workouts_tenant_user          ON workouts(tenant_id, user_id);
+CREATE INDEX idx_workouts_tenant_started       ON workouts(tenant_id, started_at DESC);
+CREATE INDEX idx_meal_logs_tenant_user         ON meal_logs(tenant_id, user_id);
+CREATE INDEX idx_coaching_sessions_tenant_user ON coaching_sessions(tenant_id, user_id);
+CREATE INDEX idx_scim_log_tenant_created       ON scim_provisioning_log(tenant_id, created_at DESC);
+```
+
+### 11.3 Relationship-traversal indexes
+
+```sql
+-- workout_sets: RLS subquery goes workout_sets → workouts.user_id
+-- The subquery resolves via workout_id FK; this index makes it O(log n)
+CREATE INDEX idx_workout_sets_workout_id       ON workout_sets(workout_id);
+
+-- coaching_turns: RLS subquery goes coaching_turns → coaching_sessions.user_id
+CREATE INDEX idx_coaching_turns_session_id     ON coaching_turns(session_id);
+```
+
+### 11.4 SSO / SCIM lookup indexes
+
+```sql
+-- SSO config lookup on the auth callback path (hot path; must be index-only)
+CREATE UNIQUE INDEX idx_sso_configs_tenant_id  ON tenant_sso_configs(tenant_id);
+
+-- SCIM token auth: hash lookup on every SCIM request
+CREATE UNIQUE INDEX idx_scim_tokens_hash       ON tenant_scim_tokens(token_hash)
+  WHERE revoked_at IS NULL;  -- partial index; expired tokens excluded from hot path
+
+-- Tenant slug lookup for SSO metadata URL routing (/sso/{slug}/metadata)
+CREATE UNIQUE INDEX idx_tenants_slug           ON tenants(slug);
+```
+
+### 11.5 Time-series and aggregate indexes
+
+```sql
+-- BRIN index for the materialized view refresh job (wide date range scans on workouts)
+-- BRIN is ~200× smaller than B-tree on monotonically increasing timestamps
+CREATE INDEX idx_workouts_started_brin         ON workouts USING BRIN (started_at)
+  WITH (pages_per_range = 128);
+
+-- Partial index: recent workouts (last 90 days) — covers the MV WHERE clause
+CREATE INDEX idx_workouts_recent_tenant        ON workouts(tenant_id, started_at)
+  WHERE started_at >= NOW() - INTERVAL '90 days';
+-- Note: this index is rebuilt nightly by the MV refresh job; adjust if retention window changes
+```
+
+### 11.6 Index maintenance policy
+
+| Rule | Detail |
+|---|---|
+| Every new table must have `(tenant_id)` or `(tenant_id, user_id)` index before first migration to production | Enforced in migration checklist §7.2 |
+| `CONCURRENTLY` required for all index creation on non-empty tables | Prevents lock escalation during deployments |
+| `pg_stat_user_indexes` reviewed quarterly for unused indexes | Unused = `idx_scan = 0` after 90 days in production |
+| BRIN indexes re-analyzed after bulk data migrations | `ANALYZE workouts;` in migration script |
+
+---
+
+**v0.3 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer**
 
 *v0.2 additions: Section 10 PITR Tenant-Isolated Restore Runbook (closes SOC 2 gap 9.4).*
+
+*v0.3 additions: §2.8 workout_sets table (closes inconsistency with PITR runbook §10.3); §2.9 coaching_sessions and coaching_turns (Victor interaction storage with privacy floor enforcement); §2.10 tenant_sso_configs, tenant_scim_tokens, scim_provisioning_log (SSO/SCIM auxiliary tables, cross-reference docs/SSO_SCIM_IMPLEMENTATION.md); §3.6 RLS policies for workout_sets, coaching sessions/turns; §3.7 RLS policies for SSO/SCIM tables; §5 data classification updated for new tables; §11 Index Strategy for RLS Performance (isolation indexes, relationship traversal, SCIM/SSO, BRIN for time-series, maintenance policy).*
