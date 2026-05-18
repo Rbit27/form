@@ -132,6 +132,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-38-isometric-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-39-motor-unit-henneman.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-40-hypertrophy-mechanisms.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-41-grip-strength.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
