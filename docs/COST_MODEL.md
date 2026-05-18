@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v0.3
+# FORM · Cost Model & Unit Economics v0.4
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -135,15 +135,17 @@ Voice cost = voice_adoption_rate × sessions_per_month × avg_chars_per_session 
 
 | Metric | Free | Pro | Enterprise seat |
 |---|---|---|---|
-| ARPU (monthly) | $0 | $15.00 | $30.00 [ESTIMATE, midpoint of $25–35 range] |
-| App store fee (15% SBP / 30% standard) | — | $2.25 (15%) → $4.50 (30%) | $0 (direct invoice) |
-| Net revenue after store fee | $0 | $10.50–$12.75 | $30.00 |
+| ARPU (monthly) | $0 | $19.00 (Western) | $30.00 [ESTIMATE, midpoint of $25–35 range] |
+| App store fee (15% SBP / 30% standard) | — | $2.85 (15%) → $5.70 (30%) | $0 (direct invoice) |
+| Net revenue after store fee | $0 | $13.30–$16.15 | $30.00 |
 | Infrastructure COGS/user/month | $0.13 | $0.50 | $0.34 |
-| Gross profit/user/month | -$0.13 | $10.00–$12.25 | $29.66 |
-| Gross margin % | n/a (no revenue) | 66.7%–81.7% | 98.9% |
-| Contribution margin (after COGS + store fee) | -$0.13 | $10.00–$12.25 | $29.66 |
+| Gross profit/user/month | -$0.13 | $12.80–$15.65 | $29.66 |
+| Gross margin % | n/a (no revenue) | 67.4%–82.4% | 98.9% |
+| Contribution margin (after COGS + store fee) | -$0.13 | $12.80–$15.65 | $29.66 |
 
 **Gross margin range on Pro** reflects App Store fee uncertainty: 15% Small Business Program applies while annual revenue is below $1M; transitions to 30% above that threshold. See Section 9.
+
+**Geo-pricing note:** ARPU above is the primary Western market price ($19/month). UA/EE/PL geo-pricing ($9/month) applies where App Store detects those regions; at $9 ARPU with SBP 15%, infrastructure gross margin = ($9 × 0.85 − $0.50) / $9 = 79.4%. Enterprise deals in all geographies are billed direct at $6–12/seat/month, independent of consumer geo-pricing.
 
 **Enterprise gross margin** is extremely high on COGS alone because the per-seat API cost is low relative to ACV. The real cost of enterprise is implementation and customer success labor, which is modeled in Section 8 and excluded from this infrastructure COGS table by design.
 
@@ -169,27 +171,27 @@ These costs exist regardless of user count (at launch scale):
 Break-even Pro subscribers =
     Fixed overhead / (Net revenue per Pro user - Variable COGS per Pro user)
 
-= $56 / ($12.75 - $0.50)    [using 15% SBP app store rate]
-= $56 / $12.25
-= ~5 Pro subscribers to cover fixed overhead
+= $56 / ($16.15 - $0.50)    [using Western $19 ARPU, 15% SBP app store rate]
+= $56 / $15.65
+= ~4 Pro subscribers to cover fixed overhead
 ```
 
 At 30% app store fee:
 
 ```
-= $56 / ($10.50 - $0.50)
-= $56 / $10.00
-= ~6 Pro subscribers
+= $56 / ($13.30 - $0.50)
+= $56 / $12.80
+= ~5 Pro subscribers
 ```
 
 **Interpretation:** Fixed infrastructure overhead is negligible. The real break-even question for FORM is not "how many users to cover servers" but "how many Pro subscribers to cover total burn" — which includes team salaries and is modeled in `docs/FINANCIALS.md`. Infrastructure break-even is effectively solved by a handful of subscribers.
 
 ### 5.3 Burn-rate break-even (for reference)
 
-From FINANCIALS.md, target burn at launch is ~$80k/month. At $12.25 net contribution per Pro user:
+From FINANCIALS.md, target burn at launch is ~$80k/month. At $15.65 net contribution per Pro user (Western $19 ARPU, SBP 15%):
 
 ```
-Pro subscribers needed to break even on full burn = $80,000 / $12.25 ≈ 6,530 Pro subscribers
+Pro subscribers needed to break even on full burn = $80,000 / $15.65 ≈ 5,112 Pro subscribers
 ```
 
 This is the number that matters operationally.
@@ -207,19 +209,19 @@ This is the number that matters operationally.
 | Whoop | ~45% [ESTIMATE] | Hardware + software mix; hardware drags margin |
 | Pure SaaS median | 70–80% | Software only, no AI inference cost |
 | AI-native SaaS (early stage) | 50–70% [ESTIMATE] | API costs before volume discounts |
-| **FORM target (Pro, post-SBP)** | **65–75%** | After app store fees, before support labor |
+| **FORM target (Pro, post-SBP)** | **75–85%** | After app store fees, before support labor; Western $19 ARPU |
 | **FORM target (Enterprise)** | **>85%** | After implementation cost, on mature accounts |
 
 ### 6.2 FORM gross margin path
 
 | Phase | Pro GM % | Driver |
 |---|---|---|
-| Beta (0–500 users) | ~67% | SBP 15% fee, no volume discounts on APIs |
-| Launch (500–5k users) | ~67–70% | SBP holds; prompt caching reduces Anthropic cost |
-| Growth (5k–50k users) | ~70–75% | Volume pricing discussions with Anthropic; PostHog moves to paid tier |
-| Scale (50k+ users) | ~72–78% | Committed spend discounts; potential model fine-tuning reduces token usage |
+| Beta (0–500 users) | ~79% | Western $19 ARPU, SBP 15% fee, ~$0.70/user support allocation, no volume discounts |
+| Launch (500–5k users) | ~79–82% | SBP holds; prompt caching begins to reduce Anthropic cost |
+| Growth (5k–50k users) | ~82–85% | Volume pricing discussions with Anthropic; PostHog moves to paid tier |
+| Scale (50k+ users) | ~84–87% | Committed spend discounts; model fine-tuning reduces token usage; support cost amortized |
 
-**Note on the 78% figure in FINANCIALS.md:** That figure is gross margin before App Store fees, which is a legitimate SaaS accounting presentation (treating store fees as a distribution cost rather than COGS). After store fees, the realized margin is 60–67%. Both figures will be disclosed transparently in investor materials, labeled appropriately.
+**Note on the 78% figure in FINANCIALS.md:** That figure is gross margin before App Store fees, which is a legitimate SaaS accounting presentation (treating store fees as a distribution cost rather than COGS). At Western $19 ARPU, after 15% SBP store fees, the realized margin is 63–69% (infrastructure COGS + support labor blended). Both figures will be disclosed transparently in investor materials, labeled appropriately.
 
 ---
 
@@ -300,12 +302,12 @@ Deals below 20 seats are currently declined — the implementation overhead is n
 
 | | Pro consumer | Enterprise (mid deal) |
 |---|---|---|
-| ARPU | $15/month | $30/seat/month |
+| ARPU | $19/month (Western) | $30/seat/month |
 | Store fee | 15–30% | 0% |
 | Infra COGS | $0.50 | $0.34 |
 | Support/CS allocation | ~$0.70 [ESTIMATE] | ~$3.00 [ESTIMATE] (dedicated CSM) |
-| **Net contribution margin** | ~$10.00–12.25 | ~$26.66 |
-| **Net margin %** | ~67–82% | ~89% |
+| **Net contribution margin** | ~$12.10–14.95 | ~$26.66 |
+| **Net margin %** | ~64–79% | ~89% |
 
 Enterprise wins on margin even with dedicated CS, because the direct billing relationship eliminates the App Store tax entirely.
 
@@ -399,15 +401,15 @@ Implementation cost is front-loaded; from Year 2, the same deal generates higher
 
 | Billing path | ARPU | Store/processing fee | Net revenue | Infra COGS | Gross profit | GM% |
 |---|---|---|---|---|---|---|
-| Apple IAP (SBP, 15%) | $15.00 | $2.25 | $12.75 | $0.50 | $12.25 | 81.7% |
-| Apple IAP (standard, 30%) | $15.00 | $4.50 | $10.50 | $0.50 | $10.00 | 66.7% |
-| Web billing (Stripe) | $15.00 | $0.74 | $14.26 | $0.50 | $13.76 | 91.7% |
+| Apple IAP (SBP, 15%) | $19.00 | $2.85 | $16.15 | $0.50 | $15.65 | 82.4% |
+| Apple IAP (standard, 30%) | $19.00 | $5.70 | $13.30 | $0.50 | $12.80 | 67.4% |
+| Web billing (Stripe) | $19.00 | $0.85 | $18.15 | $0.50 | $17.65 | 92.9% |
 
 ### 9.3 Strategy
 
 **Near-term (pre-$1M ARR):** Enroll in Small Business Program immediately on launch. 15% fee is the baseline. This is straightforward and material — the difference between 15% and 30% is $2.25/user/month, or roughly $27/year. On 5,000 Pro users that is $135k/year in additional margin.
 
-**Web billing alternative:** iOS App Store guidelines prohibit directing users to external purchase flows from within the app (anti-steering rules), but the Epic v. Apple ruling (US) and EU Digital Markets Act create openings. Monitor legal landscape. If web billing becomes viable in primary markets, a direct Stripe billing path at $15/month could recover ~$1.50–4.50/user/month vs. IAP.
+**Web billing alternative:** iOS App Store guidelines prohibit directing users to external purchase flows from within the app (anti-steering rules), but the Epic v. Apple ruling (US) and EU Digital Markets Act create openings. Monitor legal landscape. If web billing becomes viable in primary markets, a direct Stripe billing path at $19/month could recover ~$2.00–4.85/user/month vs. IAP.
 
 **Annual plan uplift:** Annual plans paid upfront ($120–144/year depending on discount offered) improve cash flow and reduce churn. App store fees still apply, but the timing benefit is material for a capital-light pre-Series A company.
 
@@ -425,8 +427,8 @@ Implementation cost is front-loaded; from Year 2, the same deal generates higher
 |---|---|---|---|
 | API cost/Pro user/month | $0.20 | $0.41 | +$0.21 |
 | Total COGS/Pro user | $0.50 | $0.71 | +$0.21 |
-| Gross profit/Pro user (SBP) | $12.25 | $12.04 | -$0.21 |
-| Gross margin % (SBP) | 81.7% | 80.3% | -1.4 pp |
+| Gross profit/Pro user (SBP) | $15.65 | $15.44 | -$0.21 |
+| Gross margin % (SBP) | 82.4% | 81.3% | -1.1 pp |
 
 **Assessment:** Surprisingly low impact at current usage. Even a 2× price increase only moves gross margin ~1.4 percentage points because API cost is a small fraction of ARPU at Pro pricing. The model is robust to Anthropic price increases at this ARPU level.
 
@@ -436,9 +438,9 @@ Implementation cost is front-loaded; from Year 2, the same deal generates higher
 
 | Scenario | Voice adoption | Voice cost/user/month | Total COGS | Gross margin % (SBP) |
 |---|---|---|---|---|
-| Low adoption | 20% | $0.11 | $0.39 | 82.4% |
-| Baseline | 40% | $0.22 | $0.50 | 81.7% |
-| High adoption | 80% | $0.43 | $0.71 | 80.3% |
+| Low adoption | 20% | $0.11 | $0.39 | 83.0% |
+| Baseline | 40% | $0.22 | $0.50 | 82.4% |
+| High adoption | 80% | $0.43 | $0.71 | 81.3% |
 
 **Assessment:** Voice adoption at 80% adds ~$0.21/user/month vs. 20% baseline — similar in magnitude to a 2× Anthropic price increase. The margin impact is manageable.
 
@@ -453,10 +455,10 @@ Implementation cost is front-loaded; from Year 2, the same deal generates higher
 | API cost/Pro user | $0.41 |
 | Voice cost/Pro user | $0.43 |
 | Total COGS | $0.92 |
-| Gross profit/Pro user (SBP) | $11.83 |
-| Gross margin % | 78.9% |
+| Gross profit/Pro user (SBP) | $15.23 |
+| Gross margin % | 80.2% |
 
-Even under this combined worst case, gross margin stays above 78% at the SBP rate. The model is structurally healthy at current ARPU levels. The model breaks if ARPU drops significantly (e.g., heavy discounting or geo mix shift toward lower-price markets), not from API costs.
+Even under this combined worst case, gross margin stays above 80% at the SBP rate. The model is structurally healthy at current ARPU levels. The model breaks if ARPU drops significantly (e.g., heavy discounting or geo mix shift toward lower-price markets), not from API costs.
 
 ### 10.4 Supabase scaling inflection
 
@@ -477,7 +479,7 @@ Supabase cost is not a meaningful gross margin risk at any pre-Series A scale.
 
 | Enterprise % of MRR | Blended gross margin | Notes |
 |---|---|---|
-| 5% enterprise, 95% consumer Pro | ~82% | Near-pure consumer economics |
+| 5% enterprise, 95% consumer Pro | ~82% | Near-pure consumer economics; Western $19 ARPU baseline |
 | 20% enterprise, 80% consumer Pro | ~83.5% | Modest mix improvement |
 | 50% enterprise, 50% consumer Pro | ~86% | Direct billing on half of revenue eliminates store fee |
 | 80% enterprise, 20% consumer Pro | ~88% | Significant uplift; CS cost assumed at 3% of enterprise ACV |
@@ -532,20 +534,20 @@ For the free tier to be cost-neutral from infrastructure COGS alone, converted u
 **Variables:**
 - `N` = free user pool size
 - `C` = monthly conversion rate (free → Pro, cumulative by month M)
-- Converted user generates `$12.25` gross profit/month (Pro at SBP, from §4)
+- Converted user generates `$15.65` gross profit/month (Pro at SBP, Western $19 ARPU, from §4)
 - Remaining free user costs `$0.13`/month
 
 **Break-even condition:**
 
 ```
-N × C × $12.25  =  N × (1 − C) × $0.13
+N × C × $15.65  =  N × (1 − C) × $0.13
 
-C / (1 − C)     =  0.13 / 12.25  =  0.01061
+C / (1 − C)     =  0.13 / 15.65  =  0.00831
 
-C               =  0.01061 / 1.01061  ≈  1.05%
+C               =  0.00831 / 1.00831  ≈  0.82%
 ```
 
-**A lifetime conversion rate of ≥ 1.05% is sufficient to cover the pure infrastructure cost of the free tier** — regardless of free pool size. Typical well-designed freemium products convert 2–5% of free users to paid over the first 90 days. FORM's break-even threshold is intentionally conservative and should be achievable from the first beta cohort.
+**A lifetime conversion rate of ≥ 0.82% is sufficient to cover the pure infrastructure cost of the free tier** — regardless of free pool size. Typical well-designed freemium products convert 2–5% of free users to paid over the first 90 days. FORM's break-even threshold is intentionally conservative and should be achievable from the first beta cohort.
 
 ### 12.3 Conversion rate targets by phase
 
@@ -612,8 +614,10 @@ The free pool requires an explicit budget line once it reaches $1,300+/month (10
 
 ---
 
-**v0.3 · May 2026**
+**v0.4 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
 
-*v0.3 additions: §12 Free Tier Subsidy Model & Freemium Funnel Economics — total subsidy at scale, minimum conversion rate for cost neutrality (1.05% threshold), freemium CAC vs. paid UA comparison, free tier cost controls, free pool governance triggers.*
+*v0.3 additions: §12 Free Tier Subsidy Model & Freemium Funnel Economics — total subsidy at scale, minimum conversion rate for cost neutrality, freemium CAC vs. paid UA comparison, free tier cost controls, free pool governance triggers.*
+
+*v0.4 updates: §4, §5, §6, §8.4, §9, §10, §12 recalculated to reflect Pro ARPU of $19/month (Western markets, per pricing.html). Geo-pricing note added (§4). Free tier break-even threshold: 1.05% → 0.82%. Full-burn break-even: 6,530 → 5,112 Pro subscribers. Section 10 sensitivity margins updated throughout.*

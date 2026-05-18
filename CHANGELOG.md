@@ -9,6 +9,14 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.61.1] — 2026-05-18
+
+### Changed
+- `docs/COST_MODEL.md` — v0.3 → v0.4. Recalculated all ARPU-dependent sections to reflect Pro consumer price of **$19/month** (Western markets), per `pricing.html`. Changes span §4 (unit economics table), §5 (break-even: 6,530 → 5,112 Pro subscribers), §6 (gross margin path: ~67–78% → ~79–87%; FORM benchmark: 65–75% → 75–85%), §8.4 (enterprise vs. consumer ARPU comparison), §9.2 (App Store tax table), §10.1–10.3 (sensitivity margins: SBP baseline 81.7% → 82.4%), §12.2 (freemium break-even: 1.05% → 0.82%). Geo-pricing note added in §4 ($9/month UA/EE/PL; enterprise direct-billed regardless of geo).
+- `VERSION` → 0.61.0 → 0.61.1
+
+---
+
 ## [0.61.0] — 2026-05-17
 
 ### Added
