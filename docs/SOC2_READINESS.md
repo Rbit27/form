@@ -1729,7 +1729,339 @@ CC7.5 — Incident recovery drill. Retain for 7 years per §15.1 evidence retent
 
 ---
 
-**v0.8 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
+## 19. Cold Storage Backup — Architecture, Implementation & SOC 2 Evidence
+
+> SOC 2 evidence: A1.2 (environmental protections for availability), A1.3 (recovery procedures tested), CC7.5 (recovery from incidents), C1.2 (disposal/destruction — inverse).
+> **Closes critical gap:** "Cold storage backup (Scenario D nuke case)" 🔴 documented in §18.6.
+> Owner: devops-lead + compliance-officer. Implementation milestone: M4 (enterprise launch gate).
+
+---
+
+### 19.1 Why This Gap Exists and Why It Matters
+
+Supabase PITR (Point-in-Time Recovery) retains up to 7 days of write-ahead log on the Pro plan and up to 30 days on the Team plan. This covers operational recovery (bad migration rollback, accidental row deletion) but fails two enterprise-tier requirements:
+
+1. **GDPR Art. 5(1)(e) storage limitation compliance** — audit logs are evidence artifacts that must be retained for 7 years per §15.1. Supabase PITR cannot satisfy a 7-year retention window; an independent cold storage layer can.
+
+2. **Scenario D ("nuke case") recovery** — if the Supabase account is terminated, compromised, or otherwise inaccessible, recovery requires a backup that is not co-located on Supabase infrastructure. PITR is a Supabase-internal capability; it cannot serve as the last resort.
+
+Until §19 is implemented, FORM cannot honestly represent A1.2 (long-term data protection) as fully in place to enterprise customers, and the SOC 2 auditor will flag a gap on first-year Type I review.
+
+---
+
+### 19.2 Three-Tier Backup Architecture
+
+| Tier | Technology | Retention | RTO / RPO | Cost model |
+|---|---|---|---|---|
+| **Tier 1 — Operational** | Supabase PITR (WAL replay) | 7 d (Pro) / 30 d (Team) | 4h RTO / 1h RPO (§18.2) | Included in Supabase plan |
+| **Tier 2 — Medium-term** | Nightly logical dump → Cloudflare R2 | 90 days rolling | 8h RTO / 24h RPO | ~$0.015/GB/month R2 storage |
+| **Tier 3 — Cold storage** | Monthly snapshot → Backblaze B2 (WORM) | 7 years | 48h RTO / 30 d RPO | ~$0.006/GB/month B2 storage |
+
+Tier 1 is Supabase-managed — no implementation required beyond keeping the plan current. Tiers 2 and 3 are what this section specifies.
+
+**Design principle:** Each tier is independent. Tier 2 cannot help if the R2 account is compromised; Tier 3 cannot help for same-day recovery. Use the lowest-numbered tier that satisfies the recovery scenario.
+
+---
+
+### 19.3 Tier 2: Nightly Logical Dump → Cloudflare R2
+
+**Trigger:** Cloudflare Workers Cron Trigger, daily at `03:00 UTC` (minimum-traffic window).
+**Worker name:** `form-backup-exporter`
+
+#### 19.3.1 Backup process
+
+The Worker invokes a Supabase Edge Function (`backup-runner`) that shells out to `pg_dump` via `Deno.Command`, streams the compressed dump back to the Worker over HTTPS, and the Worker writes it to R2. No plaintext dump file touches any intermediate disk.
+
+```
+1. Workers Cron fires → fetch POST https://<supabase-project>.functions.supabase.co/backup-runner
+
+2. Edge Function executes:
+     pg_dump -Fc --no-acl --no-owner "$DATABASE_URL" \
+       | gzip -9 \
+       | tee >(sha256sum > /tmp/hash.txt) \
+       | POST to Worker stream endpoint
+
+3. Worker streams body to R2 under:
+     backups/daily/YYYY/MM/DD/form_YYYYMMDD_HHmmss.dump.gz
+
+4. SHA-256 hash written to:
+     backups/daily/YYYY/MM/DD/form_YYYYMMDD_HHmmss.dump.gz.sha256
+
+5. JSON manifest written to:
+     backups/daily/YYYY/MM/DD/manifest.json
+   {
+     "backup_type":    "logical_pg_dump",
+     "format":         "custom-gzip",
+     "timestamp_utc":  "YYYY-MM-DDTHH:MM:SSZ",
+     "dump_file":      "form_YYYYMMDD_HHmmss.dump.gz",
+     "dump_sha256":    "<64-char hex>",
+     "pg_version":     "15.x",
+     "row_counts":     { "users": N, "workouts": N, "audit_log": N },
+     "size_bytes":     N,
+     "worker_version": "<git_sha>"
+   }
+
+6. Worker writes audit event (DEC-030):
+     action:   "system.backup_completed"
+     actor:    "backup-worker"
+     metadata: { tier: 2, r2_path: "...", sha256: "...", duration_ms: N, size_bytes: N }
+
+   On any failure:
+     action:   "system.backup_failed"
+     metadata: { tier: 2, error: "<message>", stage: "dump|upload|manifest" }
+   → PagerDuty alert fires (severity: P2)
+   → Two consecutive failures → severity escalates to P1
+```
+
+#### 19.3.2 R2 bucket configuration
+
+```hcl
+# Terraform — Cloudflare R2 lifecycle
+resource "cloudflare_r2_bucket_lifecycle_configuration" "backup_daily" {
+  account_id  = var.cloudflare_account_id
+  bucket_name = "form-backups"
+
+  rules = [{
+    id     = "expire-daily"
+    status = "enabled"
+    filter = { prefix = "backups/daily/" }
+    expiration = { days = 90 }
+  }]
+}
+```
+
+**Access:** R2 bucket is accessible only by the `form-backup-exporter` Worker service token (read/write) and a named `devops-lead` API token (read-only for restore operations). No application code holds R2 credentials.
+
+**Encryption at rest:** R2 encrypts all objects with AES-256 by default. No additional client-side encryption is applied at Tier 2 — the access restriction is the primary control. R2 bucket is not publicly accessible.
+
+---
+
+### 19.4 Tier 3: Monthly Snapshot → Backblaze B2 (WORM)
+
+**Trigger:** Cloudflare Workers Cron Trigger, `04:00 UTC` on the 1st of each month.
+**Worker name:** `form-cold-backup-archiver`
+
+#### 19.4.1 Archive process
+
+```
+1. Worker lists R2 prefix backups/daily/ → selects the most recent
+   daily manifest.json whose timestamp_utc falls within the previous
+   calendar month (deterministic selection — no random sampling)
+
+2. Worker streams the .dump.gz from R2 via R2 binding
+
+3. Worker applies AES-256-GCM client-side encryption:
+     key = Cloudflare Workers Secret B2_ENCRYPTION_KEY_YYYYMM
+           (month-scoped key; new key created on 1st of each month)
+     iv  = crypto.getRandomValues(new Uint8Array(12))  [96-bit]
+     AAD = "form-cold-backup|YYYY-MM|<source_sha256>"
+
+4. Encrypted blob uploaded to B2 under:
+     form-cold-backups/YYYY/MM/form_YYYYMM_snapshot.dump.gz.enc
+
+5. Manifest written to:
+     form-cold-backups/YYYY/MM/manifest.json
+   {
+     "source_r2_path":       "backups/daily/YYYY/MM/DD/...",
+     "source_sha256":        "<hex>",
+     "encrypted_b2_path":    "form-cold-backups/YYYY/MM/...",
+     "encryption_algorithm": "AES-256-GCM",
+     "key_id":               "B2_ENCRYPTION_KEY_YYYYMM",
+     "iv_hex":               "<24-char hex>",
+     "timestamp_utc":        "YYYY-MM-DDTHH:MM:SSZ"
+   }
+
+6. Audit event (DEC-030):
+     action: "system.cold_backup_completed"
+     metadata: { tier: 3, b2_path: "...", source_sha256: "...",
+                 key_id: "...", duration_ms: N }
+```
+
+#### 19.4.2 B2 bucket configuration
+
+| Setting | Value | Rationale |
+|---|---|---|
+| Bucket name | `form-cold-backups` | Single bucket; path-based partitioning by year/month |
+| Object Lock | WORM, 7-year lock | GDPR Art. 5(1)(e) and SOC 2 A1.2; prevents deletion by compromised credentials |
+| Versioning | Enabled | Protects against overwrite (shouldn't happen; key is month-unique path) |
+| Lifecycle rule | None on locked objects | WORM expiration is governed by Object Lock, not lifecycle |
+| Access | B2 application key scoped to this bucket only | devops-lead and compliance-officer hold keys in 1Password vault |
+
+#### 19.4.3 Encryption key management
+
+| Item | Detail |
+|---|---|
+| Key scope | One key per monthly backup (`B2_ENCRYPTION_KEY_YYYYMM`) |
+| Key generation | `crypto.getRandomValues(new Uint8Array(32))` — 256-bit, generated at Worker startup on the 1st |
+| Key storage (primary) | Cloudflare Workers Secrets, scoped to `form-cold-backup-archiver` |
+| Key archive (DR) | 1Password vault, tag `BACKUP-KEY-YYYYMM`, retention: 7 years + 1 year buffer |
+| Key escrow | compliance-officer holds a copy in a separate Bitwarden vault (air-gapped from production credentials) |
+| Key rotation | Monthly (new key per backup; old keys never reused) |
+| Key destruction | After 7 years and 1 month, the key for `YYYYMM` is scheduled for destruction — coordinate with compliance-officer to confirm all restores complete before destruction |
+
+**Why per-month keys:** If a monthly key is compromised, the attacker can decrypt that one month's backup but not others. Each backup is independently protected.
+
+#### 19.4.4 Cost estimate
+
+At 50 GB uncompressed database size (~15 GB compressed):
+
+| Line item | Year 1 cost | Year 7 cost (cumulative storage) |
+|---|---|---|
+| B2 storage (12 snapshots × ~15 GB = 180 GB) | ~$1.08/month | ~$7.56/month (84 × 15 GB) |
+| B2 egress (restore — rare; ~$0.01/GB) | Near zero | Near zero |
+| Workers Cron executions (monthly) | Negligible | Negligible |
+
+Cold storage is not a material cost line pre-Series A.
+
+---
+
+### 19.5 Backup Integrity Verification
+
+Unverified backups are not backups. Two verification cadences apply:
+
+#### 19.5.1 Monthly spot-check (devops-lead, first Monday of each month)
+
+```bash
+# 1. Identify the previous month's most recent Tier 2 daily backup
+R2_MANIFEST="backups/daily/YYYY/MM/DD/manifest.json"
+
+# 2. Download dump to local machine (NOT production)
+wrangler r2 object get form-backups "$R2_PATH" --file form_test.dump.gz
+
+# 3. Verify SHA-256 integrity
+sha256sum form_test.dump.gz | awk '{print $1}' | diff - <(cat form_test.dump.gz.sha256)
+# Expected: no diff (exit 0)
+
+# 4. Restore to a local Postgres 15 instance
+pg_restore -d "postgres://localhost/form_restore_test" form_test.dump.gz
+
+# 5. Spot-check row counts vs. manifest
+psql "postgres://localhost/form_restore_test" \
+  -c "SELECT 'users' AS t, COUNT(*) FROM users UNION ALL
+      SELECT 'workouts', COUNT(*) FROM workouts UNION ALL
+      SELECT 'audit_log', COUNT(*) FROM audit_log;"
+# Compare output to manifest.json row_counts — acceptable variance ±2% (intra-day inserts)
+
+# 6. Document in Linear ticket tagged backup-verification-YYYY-MM
+# 7. If restore fails → P1 incident; notify security-engineer + devops-lead immediately
+```
+
+#### 19.5.2 Annual full restore test (January; aligned with §15.1 compliance calendar)
+
+```
+1. Decrypt the most recent Tier 3 B2 snapshot:
+     a. Retrieve B2_ENCRYPTION_KEY_YYYYMM from 1Password vault (compliance-officer present)
+     b. Download encrypted blob from B2
+     c. Decrypt: AES-256-GCM with stored IV and AAD from manifest
+     d. Verify decrypted SHA-256 matches manifest source_sha256
+
+2. Restore to a staging Supabase project (isolated from production):
+     pg_restore -d "$STAGING_DATABASE_URL" form_YYYYMM_snapshot.dump.gz
+
+3. Verify RLS policies are intact on the restored instance:
+     -- Run CI test suite cross_tenant_rls_spec against staging
+     -- Expected: 0 failures
+
+4. Apply PITR WAL from staging Supabase (Tier 1) to advance to current day
+   → confirms Tier 1 → Tier 2 → Tier 3 chain is recoverable end-to-end
+
+5. Document results in Linear ticket tagged backup-annual-restore-YYYY:
+     - Decryption: PASS/FAIL
+     - SHA-256 verification: PASS/FAIL
+     - Restore duration: N minutes
+     - Row count variance: N%
+     - RLS test: PASS/FAIL
+
+6. File as SOC 2 A1.3 evidence artifact:
+     "Annual backup restore test — YYYY" (git-committed PDF or ticket export)
+     Retain for 7 years per §15.1 evidence retention schedule
+
+7. If any step FAILS → P0 incident; notify founder + security-engineer immediately
+```
+
+---
+
+### 19.6 Tenant Data Isolation in Backup Files
+
+The pg_dump includes all tenants' rows (separated by `tenant_id` under RLS). This has implications that must be documented for SOC 2 auditors.
+
+**Principle:** Tier 2 and Tier 3 restore operations are full-instance restores. They are not tenant-specific. Tenant-specific restores use Supabase PITR + `DATA_MODEL.md §10` runbook or the GDPR Art. 20 portability export (`DATA_MODEL.md §12.5`).
+
+**Access control:**
+
+| Resource | Who has access | How access is granted |
+|---|---|---|
+| `form-backups` R2 bucket | `form-backup-exporter` Worker (write) + devops-lead API token (read) | Workers Secrets + Cloudflare API token scoped to bucket |
+| `form-cold-backups` B2 bucket | devops-lead, compliance-officer | B2 application keys in 1Password vault; physical access log required |
+| Backup encryption keys | devops-lead (Workers Secrets), compliance-officer (1Password vault escrow) | Named individuals only; no shared service accounts |
+
+**No application code holds backup bucket credentials.** Backup buckets are infrastructure-only. Any access outside the named individuals above requires written approval from the compliance-officer and is logged as an audit event (`system.backup_accessed`).
+
+**Cross-tenant sensitivity:** A person with access to a Tier 2 dump file has read access to all tenants' data at the point-in-time of that backup. This is why the three-tier access model is not negotiable — especially the devops-lead + compliance-officer dual-custody requirement for Tier 3 decryption.
+
+---
+
+### 19.7 Privacy Constraints on Backup Access
+
+These constraints apply regardless of whether a backup access is for recovery or verification:
+
+| Constraint | Rule |
+|---|---|
+| Individual user health data | Never restored to a non-production environment without prior anonymisation of health-adjacent fields (`body_weight`, `health_conditions`, `cv_confidence_score`) |
+| Tenant data cross-contamination | Backup files must never be used to answer "what data does Tenant A have?" — that is a GDPR Art. 15 subject access request, not a recovery operation |
+| HMAC chain audit logs | If a restore overwrites `audit_log`, the HMAC chain from that point forward is broken. Restores must append a `system.restore_executed` event that re-anchors the chain — see `docs/AUDIT_LOG_SCHEMA.md §HMAC chaining` and DEC-030 |
+| HR-never-sees-individual-data floor | Restores to a staging environment must apply the same RLS policies as production before any human accesses the data |
+
+---
+
+### 19.8 SOC 2 Control Closure
+
+| SOC 2 Control | Description | Evidence Provided by §19 |
+|---|---|---|
+| **A1.2** | Environmental protections include physical safeguards, software, and infrastructure to protect against events that could impair availability commitments | Three-tier backup architecture (§19.2); R2 90-day rolling retention (§19.3.2); B2 7-year WORM Object Lock (§19.4.2) |
+| **A1.3** | Recovery and resumption of services — procedures are tested | Monthly spot-check (§19.5.1); Annual full restore test (§19.5.2); results documented and filed as evidence |
+| **C1.2** | Confidential information is protected during disposal | B2 WORM Object Lock prevents premature deletion; key escrow for 7-year access guarantee; key destruction schedule after retention period (§19.4.3) |
+| **CC7.5** | Recovery from identified security incidents | Tier 3 cold backup provides the recovery path for Scenario D (§18.3 — the "nuke case") that was not satisfied by Tier 1 PITR alone |
+
+#### Gap closure table
+
+| Gap | Status before §19 | Status after §19 | Remaining work |
+|---|---|---|---|
+| Cold storage backup | 🔴 Gap (architecture undefined; implementation absent) | 🟡 Partial (architecture specified; implementation checklist defined) | Deploy Workers, provision R2 lifecycle, provision B2 WORM bucket, execute first backup |
+| A1.2 — long-term data protection | 🟡 Partial (PITR only; no independent copy) | 🟡 Partial (three-tier architecture specified) | First nightly backup executed and verified |
+| A1.3 — recovery procedures tested | 🟡 Partial (restore runbook for Tier 1 only; §10 DATA_MODEL.md) | 🟡 Partial (Tier 2 + 3 spot-check and annual restore procedures documented) | Execute first monthly spot-check (M5); file first annual restore report (M14-Jan) |
+| CC7.5 — Scenario D coverage | 🟡 Partial (runbook written; no independent backup to restore from) | 🟡 Partial (Tier 3 B2 backup provides the independent copy Scenario D requires) | Implement and execute first backup |
+
+**Readiness impact:** The sole remaining 🔴 critical gap (cold storage backup) moves to 🟡 Partial upon implementation. Critical gaps: 1 → 0. Readiness: ~60% → ~63% (three A-series and one CC7.5 gap close partially; full credit requires first backup executed and first annual restore filed).
+
+---
+
+### 19.9 Implementation Checklist (devops-lead)
+
+Execute in the order listed. Each P0 item is a gate for enterprise launch (M4).
+
+| # | Task | Priority | Milestone | Notes |
+|---|---|---|---|---|
+| 19-01 | Provision `form-backups` R2 bucket | P0 | M4 | Apply 90-day lifecycle rule for `backups/daily/` prefix |
+| 19-02 | Provision Supabase Edge Function `backup-runner` with pg_dump + gzip + stream | P0 | M4 | Requires Supabase Team plan for adequate Edge Function execution time (>10 s) |
+| 19-03 | Deploy `form-backup-exporter` Worker with daily Cron Trigger at `03:00 UTC` | P0 | M4 | Edge Function must exist first |
+| 19-04 | Add Workers Secrets: `SUPABASE_BACKUP_RUNNER_KEY`, `DATABASE_URL` (read-only replica connection string) | P0 | M4 | Scoped to `form-backup-exporter` only |
+| 19-05 | Provision `form-cold-backups` B2 bucket with 7-year WORM Object Lock | P0 | M4 | Requires B2 account setup; Object Lock must be enabled at bucket creation (cannot be added retroactively) |
+| 19-06 | Generate `B2_ENCRYPTION_KEY_YYYYMM` for current month; store in Workers Secrets and 1Password | P0 | M4 | Escrow copy to compliance-officer 1Password vault immediately |
+| 19-07 | Deploy `form-cold-backup-archiver` Worker with monthly Cron Trigger at `04:00 UTC` on 1st | P0 | M4 | R2 daily backups must be running for ≥1 day first |
+| 19-08 | Add `system.backup_completed`, `system.backup_failed`, `system.cold_backup_completed`, `system.backup_accessed` to `audit_log` action taxonomy in `docs/AUDIT_LOG_SCHEMA.md` | P1 | M4 | Coordinate with security-engineer (DEC-030 action namespace) |
+| 19-09 | Add PagerDuty alert: backup failure on 2 consecutive nights → P1; single failure → P2 | P1 | M4 | PagerDuty provisioning (PRE-10) must be complete first |
+| 19-10 | Add Terraform configuration for R2 lifecycle rule and B2 bucket (IaC) | P1 | M4 | Manual provisioning acceptable for M4; Terraform required before SOC 2 Type I |
+| 19-11 | Execute and verify first nightly Tier 2 backup (spot-check via §19.5.1 procedure) | P0 | M5 | Worker must be deployed and running |
+| 19-12 | Execute first Tier 3 monthly archive; verify decryption and restore | P0 | M5 | At least one nightly backup must exist in R2 |
+| 19-13 | File §19.5.1 result as A1.2 SOC 2 evidence artifact | P0 | M5 | Git-commit the Linear ticket export or screenshot |
+| 19-14 | Add monthly spot-check to January compliance calendar (§15.1) | P1 | M5 | Recurring event; owner: devops-lead |
+| 19-15 | Schedule and execute first annual full restore test (§19.5.2) | P0 | M14 (Jan Year 2) | File as A1.3 evidence; coordinate with compliance-officer for key retrieval |
+| 19-16 | Confirm B2 Object Lock status via B2 API before enterprise first-deal close | P0 | M4 | Auditor will ask; have the API confirmation screenshot on file |
+
+---
+
+**v0.9 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
 **Review cadence: quarterly. Next review: серпень 2026.**
 
 *v0.2 additions: Sub-Processor Register (CC9, GDPR Art. 28), Complementary User Entity Controls (CUECs), Common Security Questionnaire Responses (CAIQ/SIG Lite pre-answers).*

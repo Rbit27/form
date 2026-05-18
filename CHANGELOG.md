@@ -9,6 +9,11 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.70.1] — 2026-05-18
+
+### Added
+- `docs/SOC2_READINESS.md` v0.8 → v0.9 — **§19 Cold Storage Backup — Architecture, Implementation & SOC 2 Evidence** (compliance-officer + security-engineer + devops-lead). Closes the sole remaining 🔴 critical gap ("cold storage backup") documented in §18.6. Three-tier backup architecture (Supabase PITR / Cloudflare R2 90-day rolling / Backblaze B2 7-year WORM): nightly logical dump Worker spec with pg_dump + gzip + SHA-256 manifest, R2 Terraform lifecycle rule; monthly cold-archive Worker spec with AES-256-GCM client-side encryption, per-month key rotation, B2 Object Lock WORM. Integrity verification: monthly spot-check procedure + annual full restore test mapped to SOC 2 A1.3 evidence artifact. Tenant data isolation constraints: dual-custody access model for B2, HMAC chain re-anchoring on restore (DEC-030). Privacy constraints: health-adjacent field anonymisation required on any non-production restore. SOC 2 control closure table (A1.2, A1.3, C1.2, CC7.5). Gap closure: cold storage backup 🔴 → 🟡 Partial. Critical gaps: 1 → 0 (upon implementation). Readiness: ~60% → ~63%. 16-item implementation checklist for devops-lead (M4 enterprise launch gate).
+
 ## [0.70.0] — 2026-05-18
 
 ### Added
