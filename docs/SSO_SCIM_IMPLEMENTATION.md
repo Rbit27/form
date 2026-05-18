@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v0.1
+# FORM · SSO/SCIM Implementation v0.2
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -17,6 +17,7 @@
 7. [Customer Onboarding Checklist](#7-customer-onboarding-checklist)
 8. [Operational Runbook](#8-operational-runbook)
 9. [Open Questions / Gaps](#9-open-questions--gaps)
+10. [Magic Link Fallback Security Design](#10-magic-link-fallback-security-design)
 
 ---
 
@@ -1143,12 +1144,224 @@ The following items are not yet built or require a decision before implementatio
 | G-007 | **Admin dashboard SSO configuration UI.** Currently all SSO config changes require direct SQL. The admin dashboard UI for SSO setup, certificate management, and group mapping does not exist. | High — required before first enterprise pilot | enterprise-architect (product spec) + platform-engineer (build) | Estimate: 3–4 weeks |
 | G-008 | **SCIM group sync for Azure AD GUIDs.** The design handles GUID-based group IDs, but the admin dashboard UI for mapping GUIDs to roles (where the customer IT admin enters human-readable group names and FORM resolves GUIDs via Microsoft Graph) is not designed. | Medium | enterprise-architect | Needs product design decision: do we show GUIDs and require customer to map, or do we call Graph API to resolve names? |
 | G-009 | **Session blocklist persistence.** The design uses a Supabase table for session blocklisting. Under high-revocation scenarios (large tenant SCIM deactivation of 1000+ users simultaneously), this table lookup on every request becomes a hot-path bottleneck. | Medium — performance, not correctness | devops-lead + platform-engineer | Options: Redis cache layer, Bloom filter, JWT short-TTL with revocation threshold. Needs decision before >100-seat enterprise customers. |
-| G-010 | **Magic link fallback security design.** The current fallback design in 8.3 and 8.4 uses verified email as the trust anchor. The exact verification flow (OTP via email, rate limiting, abuse detection) is not specified. | High — security-critical; a weak fallback creates an SSO bypass vector | security-engineer | Needs formal threat model before implementation. Founder + security-engineer decision required. |
+| G-010 | **Magic link fallback security design.** The current fallback design in 8.3 and 8.4 uses verified email as the trust anchor. The exact verification flow (OTP via email, rate limiting, abuse detection) is not specified. | ~~High — security-critical~~  **Resolved — see §10** | security-engineer | Design specified in §10. Implementation pending. |
 | G-011 | **Tenant SSO configuration test environment.** Customers currently have no sandbox/staging environment to test SSO config before production. This leads to live testing, which breaks existing users if misconfigured. | Medium | enterprise-architect | Proposal: dedicated `{tenant_slug}.staging.form.coach` environment with separate `tenant_id` for pre-production testing |
 | G-012 | **OIDC private key JWT client authentication.** Some enterprise IdPs require `private_key_jwt` client auth instead of `client_secret_post`. Not supported yet. | Low — affects <5% of prospective customers (primarily financial sector) | platform-engineer | Estimate: 1 week once RFC 7523 is understood |
 | G-013 | **Legal: DPA clause for SCIM data processing.** SCIM provisioning involves FORM processing employee directory data (names, emails, departments) on behalf of the customer. The standard DPA template needs a clause explicitly covering SCIM as a processing activity. | High — GDPR Art. 28 compliance | compliance-officer + outside counsel | Block: do not enable SCIM for any customer until DPA is updated |
 
 ---
 
-**v0.1 · May 2026 · enterprise-architect + security-engineer**
+## 10. Magic Link Fallback Security Design
+
+### 10.1 Purpose and Scope
+
+This section specifies the security design for the email OTP fallback authentication mechanism referenced in §8.3 and §8.4. The fallback allows a limited set of users to authenticate without an active IdP connection, using a time-limited one-time passcode delivered to a verified email address.
+
+This path is high-risk because it bypasses the primary SSO control entirely. A weak fallback implementation creates an SSO bypass vector that renders the entire SSO security posture moot. The design constraints in this section are non-negotiable: no implementation that relaxes these controls may ship without a formal security review.
+
+Scope:
+- Applies to enterprise tenants with SSO configured (`tenant_sso_configs.is_active = true`)
+- Governs both admin-initiated fallback (§8.3) and IdP-outage fallback (§8.4)
+- Does not apply to consumer mobile users (Apple Sign In, out of scope)
+- Does not cover SCIM provisioning — fallback OTPs are authentication-only; no directory write operations are permitted during a fallback session
+
+### 10.2 Threat Model
+
+| Attack Vector | Severity | Mitigation |
+|---|---|---|
+| Email account takeover — attacker controls the target's email inbox and receives the OTP | Critical | Fallback requires prior SSO session history (user must have ≥1 prior SSO login). New accounts with no SSO history cannot use fallback. Tenant admin notification on every fallback use. |
+| OTP brute force — attacker submits guesses against a valid OTP session | High | Max 3 attempts per OTP; lockout for 30 minutes after 3 failures. OTP is single-use and expires after 10 minutes regardless of attempts remaining. |
+| OTP phishing — attacker sends a fake FORM login page and relays the OTP in real time | High | OTP is bound to the session cookie established at the start of the fallback flow. An OTP submitted from a different session (different cookie) is rejected even if the OTP value is correct. |
+| OTP enumeration — attacker submits OTP requests for many email addresses to determine which are valid FORM users | Medium | The OTP request endpoint returns an identical response (`202 Accepted`) regardless of whether the email is a known user in the tenant. No timing differential. Rate limiting applies per IP before user lookup. |
+| Fallback abuse during non-outage — attacker DoSes the IdP (e.g., floods the IdP OIDC discovery endpoint) to trigger fallback conditions and then uses fallback to authenticate | High | Fallback is gated on 3 consecutive health check failures at 20-second intervals (60 seconds minimum confirmation window). A synthetic IdP outage lasting under 60 seconds does not trigger fallback. Health check monitors the IdP JWKS or metadata endpoint, not the authorization endpoint, which is harder to selectively block. Admin-explicit activation requires a verified out-of-band request. |
+| Replay attack — attacker captures an OTP (e.g., via email compromise after the fact) and attempts to reuse it | High | OTPs are single-use. On successful consumption, the Redis key is deleted immediately. An OTP that has already been consumed returns a distinct error (`otp_already_consumed`) distinguishable from expiry for audit purposes, but both are rejected. |
+| Session fixation — attacker pre-establishes a session and tricks the victim into completing the OTP flow on the attacker's session | High | Session cookie is validated at OTP submission; the cookie must match the one issued when the OTP request was initiated. On successful OTP validation, the existing session is invalidated and a new session UUID is issued (see §6.3 session fixation prevention). |
+| Fresh account abuse — attacker creates a new account in the tenant (via SCIM or JIT) and immediately attempts fallback to bypass IdP authentication | Medium | Fallback requires ≥1 prior SSO session recorded in `tenant_sso_sessions`. An account with no SSO history is ineligible regardless of tenant fallback settings. |
+
+### 10.3 OTP Specification
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| Format | 6 numeric digits | Sufficient entropy for the attempt limit; easier to transcribe than alphanumeric; no ambiguous characters |
+| TTL | 10 minutes | Short enough to limit the exposure window; long enough for transactional email delivery in degraded conditions |
+| Max attempts | 3 | Standard industry floor; beyond 3 attempts the probability of legitimate entry error is low relative to brute-force risk |
+| Lockout duration | 30 minutes | Applies per user per email address; lockout is stored in Redis with TTL; not a hard account lock |
+| Single-use | Yes | OTP Redis key is deleted on first successful validation, before the session is issued |
+| Session binding | Yes | OTP is stored with the `session_id` from the initiating request. Validation rejects the OTP if the session cookie does not match `session_id` stored alongside the OTP in Redis |
+| Generation | Cryptographically random via `crypto.getRandomValues()` (Web Crypto API, Cloudflare Workers) | No Math.random(), no sequential counters |
+
+### 10.4 Rate Limits
+
+| Limit Type | Threshold | Enforcement Layer | Behavior on Breach |
+|---|---|---|---|
+| Per-email OTP requests | 3 requests per hour per email address | Cloudflare Worker + Redis counter | `429 Too Many Requests`; no OTP generated; response body does not reveal whether email is valid |
+| Per-IP OTP requests | 10 requests per hour per IP | Cloudflare WAF rate rule | `429`; IP temporarily blocked at WAF layer before request reaches origin |
+| Per-tenant OTP requests | 50 requests per hour per tenant | Cloudflare Worker + Redis counter | `429`; PagerDuty P2 alert triggered simultaneously |
+| Concurrent active OTPs per user | 1 | Redis: issuing a new OTP invalidates any existing OTP for the same user | Only one active OTP per user at a time; eliminates parallel brute-force across multiple sessions |
+| Global spike alert | 500 OTP requests per minute across all tenants | Cloudflare Analytics + alert rule | PagerDuty P1; does not auto-block (too high a risk of false-positive during legitimate multi-tenant outage) |
+
+### 10.5 Trigger Conditions
+
+All of the following conditions must be true simultaneously for an OTP to be issued:
+
+1. `tenant.sso_fallback_enabled = TRUE` (tenant admin can set this to FALSE to permanently disable fallback)
+2. IdP unavailability confirmed — one of:
+   - 3 consecutive health check failures against the tenant's IdP JWKS or metadata endpoint, at 20-second polling intervals (minimum 60 seconds of confirmed unavailability); OR
+   - Explicit activation by a FORM enterprise-architect following a verified request from the `tenant_owner` or `tenant_admin`, recorded as `fallback.admin.enabled` in the audit log
+3. The requesting user has at least one prior `sso.login` event recorded in `audit_log` for this `(tenant_id, user_id)` pair
+4. The email domain of the requesting user matches a domain in `tenant_sso_configs.verified_domains`
+
+**Important:** When the IdP is reachable (health check passing), no OTP is issued for that tenant even if the fallback API endpoint is called. The endpoint checks IdP health synchronously on every request before evaluating any other condition. This check is not bypassable by the calling client.
+
+### 10.6 Verification Flow
+
+```
+User                        FORM API (Cloudflare Worker)         Redis           Email Delivery
+ |                                   |                              |                  |
+ |  GET /auth/fallback/initiate      |                              |                  |
+ |  {tenant_id, session_cookie}      |                              |                  |
+ |---------------------------------->|                              |                  |
+ |                                   |  Check IdP health (3x        |                  |
+ |                                   |  timeout at 20s intervals)   |                  |
+ |                                   |  [fails 3 consecutive]       |                  |
+ |                                   |                              |                  |
+ |  200 OK: fallback form rendered   |                              |                  |
+ |<----------------------------------|                              |                  |
+ |                                   |                              |                  |
+ |  POST /auth/fallback/request-otp  |                              |                  |
+ |  {email, tenant_id, session_id}   |                              |                  |
+ |---------------------------------->|                              |                  |
+ |                                   |  Rate limit check            |                  |
+ |                                   |  (per-email, per-IP,         |                  |
+ |                                   |   per-tenant)                |                  |
+ |                                   |                              |                  |
+ |                                   |  Verify: prior SSO session   |                  |
+ |                                   |  exists for (tenant, email)  |                  |
+ |                                   |                              |                  |
+ |                                   |  Generate OTP (6 digits,     |                  |
+ |                                   |  crypto.getRandomValues)     |                  |
+ |                                   |                              |                  |
+ |                                   |  SET otp:{tenant}:{user_id}  |                  |
+ |                                   |  {otp_hash, session_id,      |                  |
+ |                                   |   attempt_count: 0}          |                  |
+ |                                   |  TTL = 600s                  |                  |
+ |                                   |----------------------------->|                  |
+ |                                   |                              |                  |
+ |                                   |  Queue transactional email   |                  |
+ |                                   |  (OTP, tenant name, TTL,     |                  |
+ |                                   |   IP of requestor)           |                  |
+ |                                   |------------------------------------------------>|
+ |                                   |                              |                  |
+ |  202 Accepted                     |                              |                  |
+ |<----------------------------------|                              |                  |
+ |                                   |                              |                  |
+ |  [User reads email, enters OTP]   |                              |                  |
+ |                                   |                              |                  |
+ |  POST /auth/fallback/verify       |                              |                  |
+ |  {otp, session_cookie}            |                              |                  |
+ |---------------------------------->|                              |                  |
+ |                                   |  GET otp:{tenant}:{user_id}  |                  |
+ |                                   |<-----------------------------|                  |
+ |                                   |                              |                  |
+ |                                   |  Validate:                   |                  |
+ |                                   |  - session_id matches cookie |                  |
+ |                                   |  - HMAC(otp) matches stored  |                  |
+ |                                   |  - attempt_count < 3         |                  |
+ |                                   |  - key not expired           |                  |
+ |                                   |                              |                  |
+ |                                   |  DEL otp:{tenant}:{user_id}  |                  |
+ |                                   |  (single-use: delete first,  |                  |
+ |                                   |   then issue session)        |                  |
+ |                                   |----------------------------->|                  |
+ |                                   |                              |                  |
+ |                                   |  Invalidate old session_id   |                  |
+ |                                   |  Issue new FORM session JWT  |                  |
+ |                                   |  auth_method: fallback       |                  |
+ |                                   |                              |                  |
+ |                                   |  Write audit log:            |                  |
+ |                                   |  fallback.otp.consumed       |                  |
+ |                                   |  fallback.session.issued     |                  |
+ |                                   |                              |                  |
+ |  Set-Cookie: new session JWT      |                              |                  |
+ |  Redirect to admin dashboard      |                              |                  |
+ |<----------------------------------|                              |                  |
+```
+
+On OTP validation failure: increment `attempt_count` in Redis. If `attempt_count >= 3`, delete the key and set a lockout key `otp_lockout:{tenant}:{user_id}` with TTL = 1800 seconds. Write `fallback.otp.failed` to audit log. Return `401` with a generic error message (do not distinguish between wrong OTP, expired OTP, or session mismatch in the response body — differentiate only in the audit log).
+
+### 10.7 Abuse Detection and Alerting
+
+| Event | Threshold | Alert |
+|---|---|---|
+| OTP validation failures | 3 failures within 30 minutes for a single user | PagerDuty P2 + email to tenant admin |
+| OTP request spike for a tenant | More than 20 OTP requests per minute for a single tenant | PagerDuty P2 |
+| Cross-tenant OTP attempt | Any request where the email domain does not match the target tenant's verified domains | PagerDuty P1 (critical); request rejected; event logged as `fallback.abuse.flagged` |
+| Geo anomaly on first fallback use | OTP request IP country (via `CF-IPCountry` header) differs from the country of the user's last SSO login | Email to user + email to tenant admin; does not block the request |
+| Successful fallback after IdP restored | Any `fallback.session.issued` event where the IdP health check is passing at the time of session issuance | Email to tenant admin; this indicates the fallback was used after the trigger condition cleared |
+
+All abuse detection events are written to the audit log as `fallback.abuse.flagged` with `metadata` fields identifying the specific condition triggered.
+
+### 10.8 Audit Events
+
+All fallback events are logged to the HMAC-chained `audit_log` table per DEC-030. All entries include `metadata.auth_method: "fallback"`.
+
+| Event | Trigger | Key `metadata` Fields |
+|---|---|---|
+| `fallback.otp.requested` | User submits email on the fallback form; OTP generated and sent | `tenant_id`, `user_id`, `ip`, `country` (CF-IPCountry), `idp_health_status` |
+| `fallback.otp.consumed` | OTP successfully validated | `tenant_id`, `user_id`, `session_id_old`, `session_id_new`, `attempt_number` |
+| `fallback.otp.failed` | OTP validation fails (wrong value, expired, session mismatch) | `tenant_id`, `user_id`, `failure_reason` (`wrong_otp`, `expired`, `session_mismatch`, `lockout`), `attempt_number` |
+| `fallback.otp.expired` | TTL on Redis OTP key elapses without consumption (detected at cleanup or next request attempt) | `tenant_id`, `user_id` |
+| `fallback.session.issued` | New FORM session JWT issued following successful OTP | `tenant_id`, `user_id`, `session_id`, `idp_health_status_at_issue` |
+| `fallback.abuse.flagged` | Abuse detection condition triggered (see §10.7) | `tenant_id`, `user_id`, `abuse_type`, `ip`, `country` |
+| `fallback.admin.disabled` | Tenant admin or FORM engineer sets `sso_fallback_enabled = FALSE` | `tenant_id`, `actor_id`, `previous_value: true` |
+| `fallback.admin.enabled` | FORM engineer re-enables fallback following a verified request | `tenant_id`, `actor_id`, `requested_by`, `reason` |
+
+### 10.9 Admin Controls
+
+Tenant admins control fallback behavior via the admin dashboard (Settings → Security → SSO Fallback). All changes are audit-logged.
+
+| Setting | Default | Description |
+|---|---|---|
+| `sso_fallback_enabled` | `TRUE` | Master switch. When `FALSE`, no OTP is ever issued for this tenant regardless of IdP health. Turning this off disables all fallback; communicate the implications to the tenant admin before they toggle it. |
+| `sso_fallback_notify_admin_on_use` | `TRUE` | When `TRUE`, tenant admins receive an email notification every time a fallback session is issued for any user in their tenant. Recommended to leave enabled. |
+| `sso_fallback_allowed_hours` | `24` (hours) | Maximum duration that the fallback mechanism remains active after it is triggered. After this window, fallback is suspended even if the IdP remains down, until a FORM engineer re-activates it following re-verification. Configurable range: 1–72 hours. |
+| Emergency one-click disable | N/A | A button in the admin dashboard immediately sets `sso_fallback_enabled = FALSE` and writes `fallback.admin.disabled` to the audit log. No confirmation dialog — designed for rapid response. |
+
+### 10.10 Implementation Dependencies
+
+| Dependency | Status | Notes |
+|---|---|---|
+| IdP health check polling | Not implemented | Required to be implemented first. Must poll the tenant IdP JWKS or OIDC discovery endpoint at 20-second intervals. Health state must be stored per-tenant in Redis with a short TTL. Without this, the trigger condition in §10.5 cannot be evaluated. |
+| Upstash Redis for OTP TTL storage | Not implemented | OTP keys, attempt counters, lockout keys, and per-tenant/per-IP rate limit counters all require a Redis store with per-key TTL. Supabase is not suitable for this use case due to row-level TTL requirements and latency requirements at the hot path. |
+| Geo IP via Cloudflare `CF-IPCountry` header | Available | `CF-IPCountry` is available on all Cloudflare Worker requests in production. No additional integration required. Only valid in production; not present in local development — mock with `XX` in non-production environments. |
+| Transactional email delivery | Not implemented | Evaluate: Resend, Postmark, or AWS SES. Requirements: delivery latency under 30 seconds at p99, DKIM/SPF configured on `form.coach` sending domain, per-tenant "from name" templating, delivery receipt webhook for audit purposes. Decision must be made before OTP implementation. |
+| Admin dashboard — SSO Fallback settings panel | Not implemented | Blocked by G-007 (admin dashboard). The settings in §10.9 require a UI. Implement the underlying API endpoints first; dashboard UI follows G-007. |
+
+**Implementation sequencing recommendation:**
+
+1. IdP health check polling (prerequisite for automated trigger)
+2. OTP generation + Redis storage + transactional email delivery (core OTP flow)
+3. Rate limiting (per-email, per-IP, per-tenant counters in Redis)
+4. Audit log integration (all events in §10.8)
+5. Geo anomaly detection (CF-IPCountry comparison against last SSO login country)
+6. Admin dashboard settings panel (after G-007 unblocks)
+
+Do not ship steps 2–6 without step 1 complete. An OTP flow without IdP health gating is an unconditional SSO bypass.
+
+### 10.11 DPA / GDPR Implications
+
+Fallback OTP processing involves the following personal data categories: email address, IP address, country (derived from IP), authentication event timestamps. The lawful basis for this processing is Art. 6(1)(b) GDPR (performance of a contract — the authentication service the customer has contracted FORM to provide).
+
+OTP values are stored as HMAC hashes in Redis, not plaintext. Redis keys expire at the OTP TTL (10 minutes for OTPs, 30 minutes for lockout keys) and are not persisted to any durable store beyond the TTL. No OTP value is ever written to the audit log — only outcomes and metadata are logged.
+
+The audit log entries generated by fallback events (see §10.8) are retained per the schedule defined in `docs/PRIVACY_POLICY.md`. These entries constitute authentication records and are subject to the same retention and access controls as `sso.login` events.
+
+G-013 (DPA template update for SCIM) must be resolved before any SCIM-provisioned user can use the fallback mechanism in a production tenant. The DPA clause covering SCIM data processing (employee directory data) should be extended to include the following sentence: "The processor may also process the data subject's email address and network identifiers for the purpose of delivering one-time authentication codes during identity provider unavailability events, as part of the authentication services described in this agreement."
+
+The fallback OTP processing activity must be listed in FORM's Article 30 Record of Processing Activities (RoPA) under the same entry as the primary SSO authentication activity, with a note that email and IP are processed transiently during IdP unavailability events.
+
+---
+
+**v0.2 · May 2026 · enterprise-architect + security-engineer**
 **Review trigger: any IdP integration change, any SCIM schema change, or quarterly — whichever comes first.**
+*v0.2 additions: Section 10 — Magic Link Fallback Security Design. Threat model (8 attack vectors), OTP spec, rate limits, trigger conditions, verification flow, abuse detection, audit events, admin controls, implementation sequencing, GDPR/DPA note. Closes G-010 design phase. Critical implementation dependencies identified.*
