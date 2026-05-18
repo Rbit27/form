@@ -9,6 +9,15 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.63.0] — 2026-05-18
+
+### Added
+- `content/post-33-energy-systems-for-strength.md` — Energy systems для силовика: ATP-PCr, гліколіз, окислювальна система. Практика відновлення між підходами, HRV, aerobic capacity у силовому контексті. (sports-scientist · clinical-safety ✓)
+- `content/post-34-supersets-antagonist-pairs.md` — Supersets і antagonist pairs: таксономія, механізм (reciprocal inhibition + antagonist potentiation via PAP), дані щодо збереження сили, практичне програмування. (sports-scientist · clinical-safety ✓)
+- `content/post-35-tempo-training.md` — Tempo prescription: TUT myth vs механічна напруга, ексцентрична механіка (titin, stretched-position), intentional velocity концентрика, isometric holds, CV-feedback. (sports-scientist · clinical-safety ✓)
+
+---
+
 ## [0.61.1] — 2026-05-18
 
 ### Changed

@@ -118,7 +118,7 @@ G:\\Клод\\form\\
 │   ├── GROWTH_LOOPS.md      — 5 viral/organic loops, clinical-safety share constraints, FE priority, K-factor
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
-├── content/                ← 21 blog posts + social
+├── content/                ← 35 blog posts + social
 │   ├── post-01-hrv-is-lying.md
 │   ├── post-02-what-good-form-means.md
 │   ├── post-03-we-tested-8-ai-trainers.md
@@ -140,6 +140,20 @@ G:\\Клод\\form\\
 │   ├── post-19-warmup-protocols.md
 │   ├── post-20-doms-muscle-soreness.md
 │   ├── post-21-cv-vs-wearables.md           ← CV vs wearable-only arch (clinical-safety ✓)
+│   ├── post-22-periodization.md
+│   ├── post-23-velocity-based-training.md
+│   ├── post-24-training-to-failure.md
+│   ├── post-25-breathing-mechanics.md
+│   ├── post-26-tendon-ligament-adaptation.md ← (clinical-safety ✓)
+│   ├── post-27-training-age-vs-chronological-age.md
+│   ├── post-28-progressive-overload-mechanics.md
+│   ├── post-29-mind-muscle-connection.md
+│   ├── post-30-eccentric-training.md
+│   ├── post-31-unilateral-training.md
+│   ├── post-32-cluster-sets.md
+│   ├── post-33-energy-systems-for-strength.md ← (clinical-safety ✓)
+│   ├── post-34-supersets-antagonist-pairs.md  ← (clinical-safety ✓)
+│   └── post-35-tempo-training.md              ← (clinical-safety ✓)
 │   ├── twitter-launch-thread.md
 │   ├── linkedin-posts.md
 │   ├── press-pitch-templates.md
@@ -343,9 +357,9 @@ Each iteration:
 - [x] post-30: Eccentric training — чому фаза опускання важливіша за підйом (mechanical tension, muscle damage, time under tension)
 - [x] post-31: Unilateral training — коли і чому (strength asymmetry, core stability, transfer to sport)
 - [x] post-32: Cluster sets — накопичення об'єму без кумулятивної втоми (inter-repetition rest, power maintenance)
-- [ ] post-33: Energy systems для силовика — ATP-PCr, glycolytic, oxidative: що реально важливо для ваш тренування
-- [ ] post-34: Supersets і antagonist pairs — time efficiency без компромісу з продуктивністю
-- [ ] post-35: Tempo-prescribed тренування — наука і практика контрольованої швидкості повторення
+- [x] post-33: Energy systems для силовика — ATP-PCr, glycolytic, oxidative: що реально важливо для вашого тренування
+- [x] post-34: Supersets і antagonist pairs — time efficiency без компромісу з продуктивністю
+- [x] post-35: Tempo-prescribed тренування — наука і практика контрольованої швидкості повторення
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
