@@ -9,6 +9,17 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.67.1] — 2026-05-18
+
+### Added
+- `docs/OBSERVABILITY.md` v0.1 → v0.2 — **§§13-15: per-tenant observability, trace correlation, audit log export pipeline** (devops-lead + platform-engineer + security-engineer)
+  - **§13 Per-Tenant Observability Implementation**: tenant context injection pattern in Cloudflare Workers, Analytics Engine data point schema with `tenant_id` as `indexes[0]`, per-tenant SLO breach detection Worker (Standard 99.9% / Premium 99.95% tiers), admin dashboard SLA API schema (`GET /api/admin/tenants/:id/sla`) with privacy floor (no per-user data in SLA reports), weekly isolation audit query (cross-tenant leak detection → P0 incident). Closes M4 gap "Per-tenant SLA reporting".
+  - **§14 Cross-Backend Trace Correlation (Sentry ↔ Cloudflare)**: shared W3C `traceparent` as single `trace_id` namespace, Worker implementation (`extractTraceId`, `buildTraceparent`, upstream propagation), `X-Trace-Id` echo header, React Native `apiFetch` wrapper attaching `cf.trace_id` tag to Sentry transactions, Analytics Engine correlation query, Sentry→Cloudflare navigation runbook (6-step), verification checklist. Closes M3 gap "Trace correlation between Sentry and Cloudflare".
+  - **§15 Audit Log Export Pipeline**: two-mode delivery architecture (real-time webhook + hourly batch); CloudEvents 1.0 webhook payload with HMAC-SHA256 signature (`X-Form-Signature`), 5-attempt exponential retry policy, delivery failure audit event; hourly NDJSON batch to R2 with optional S3/GCS customer sync; HMAC chain customer verification algorithm (language-agnostic, uses shared onboarding key per DEC-030); privacy constraints (no raw `user_id`, no health content, no prompt/response); delivery SLAs (webhook P95 < 30 s, batch < 5 min post-hour); 10-item implementation checklist for platform-engineer. Closes M4 gap "Audit log export pipeline".
+  - `§10` gap table updated: 3 gaps now reference their design sections (§13, §14, §15)
+
+---
+
 ## [0.67.0] — 2026-05-18
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v0.1
+# FORM · Observability & Monitoring Taxonomy v0.2
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -643,13 +643,13 @@ The following items are known gaps as of v0.1. Each has an owner and a target re
 | **Sentry Workers SDK not installed** | Backend error tracking is absent. Worker exceptions are not being captured. Mobile SDK is installed but not backend. | platform-engineer | M2 |
 | **Better Stack not provisioned** | No centralized alerting or log indexing. All monitoring is currently manual dashboard checks. | devops-lead | M2 |
 | **PagerDuty not provisioned** | On-call routing is manual. Acceptable solo-founder stage; required before first on-call rotation. | devops-lead | M3 or first engineering hire |
-| **Per-tenant SLA reporting** | The Enterprise SLA dashboard (§8.4) depends on `tenant_id` label propagation in metrics, which is not yet implemented. | platform-engineer | M4 (enterprise launch) |
+| **Per-tenant SLA reporting** | The Enterprise SLA dashboard (§8.4) depends on `tenant_id` label propagation in metrics, which is not yet implemented. Design complete — see **§13**. | platform-engineer | M4 (enterprise launch) |
 | **Sentry `beforeSend` health data filter** | The hook to strip health-adjacent fields from crash reports before Sentry transmission is not yet implemented. Blocking for GDPR compliance. | mobile-engineer | M2 |
 | **Cost monitor Worker** | Daily cost aggregation from all billing APIs is not yet implemented. Cost anomaly alerting is not active. | devops-lead | M3 |
 | **ClickHouse for analytics** | Planned from M9. Until then, PostHog and Supabase materialized views carry the analytics load. Observability strategy for ClickHouse (traces, product events at scale) is not yet designed. | platform-engineer | M9 |
-| **Trace correlation between Sentry and Cloudflare** | Sentry transactions and Cloudflare trace IDs are not yet correlated. An error in Sentry cannot be mapped to a Cloudflare trace without manual log search. Requires shared `trace_id` propagation. | platform-engineer | M3 |
+| **Trace correlation between Sentry and Cloudflare** | Sentry transactions and Cloudflare trace IDs are not yet correlated. An error in Sentry cannot be mapped to a Cloudflare trace without manual log search. Requires shared `trace_id` propagation. Design complete — see **§14**. | platform-engineer | M3 |
 | **HMAC chain verification cron** | The weekly chain integrity cron described in `AUDIT_LOG_SCHEMA.md` is not yet deployed. Chain breaks would not be detected automatically. | devops-lead | M3 |
-| **Audit log export pipeline** | Enterprise webhook delivery and S3 sync described in §4.6 are not yet implemented. Blocking for enterprise launch. | platform-engineer | M4 |
+| **Audit log export pipeline** | Enterprise webhook delivery and S3 sync described in §4.6 are not yet implemented. Blocking for enterprise launch. Design complete — see **§15**. | platform-engineer | M4 |
 
 ---
 
@@ -924,6 +924,630 @@ Mobile spans propagate `traceparent` on outbound API requests automatically when
 
 ---
 
-**v0.1 · May 2026 · Owner: devops-lead**
+**v0.2 · May 2026 · Owner: devops-lead**
 **Review: quarterly or on architecture change. Next scheduled review: August 2026.**
 **SOC 2 evidence: CC7.2 (system monitoring). See also INCIDENT_RESPONSE.md for CC7.3–CC7.5.**
+
+---
+
+## 13. Per-Tenant Observability Implementation
+
+This section specifies how `tenant_id` propagates through every observability pillar — metrics, logs, and traces — to enable per-tenant SLA reporting, breach scoping, and isolation verification. It closes the gap listed in §10 ("Per-tenant SLA reporting", M4).
+
+### 13.1 Tenant context injection (Workers)
+
+Every inbound request to a Cloudflare Worker that carries a valid session JWT must extract `tenant_id` at the edge and attach it to all downstream signals for the lifetime of that request.
+
+```typescript
+// src/middleware/tenant-context.ts
+
+export interface TenantContext {
+  tenantId: string;
+  tenantSlug: string;
+  traceId: string; // W3C trace-id extracted from traceparent (see §14)
+}
+
+export async function injectTenantContext(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext
+): Promise<TenantContext | null> {
+  const jwt = request.headers.get('Authorization')?.replace('Bearer ', '');
+  if (!jwt) return null;
+
+  // Validate JWT — throws on invalid signature or expiry
+  const claims = await verifyJwt(jwt, env.JWT_SECRET);
+
+  // Enterprise sessions carry tenant_id claim; consumer sessions do not
+  const tenantId: string | null = claims['tenant_id'] ?? null;
+  if (!tenantId) return null;
+
+  const traceId = extractTraceId(request.headers.get('traceparent'));
+
+  return { tenantId, tenantSlug: claims['tenant_slug'], traceId };
+}
+```
+
+**Rule:** if a request is tenant-scoped and `tenantId` is absent from emitted signals, the `tenant_id_missing` counter (§6.2) fires as a P1 alert. This counter is the enforcement mechanism — missing context cannot be silently swallowed.
+
+### 13.2 Per-tenant Analytics Engine data points
+
+Each Analytics Engine `writeDataPoint()` call on a tenant-scoped path must include `tenant_id` as a blobs dimension. This enables SQL aggregation per tenant without scanning all rows.
+
+```typescript
+// Pattern: always emit tenant_id as blobs[0] on enterprise paths
+env.ANALYTICS.writeDataPoint({
+  blobs: [
+    tenantCtx.tenantId,          // blobs[0]: tenant_id (filter/group-by key)
+    route,                        // blobs[1]: http.route
+    outcome,                      // blobs[2]: "success" | "error" | "timeout"
+  ],
+  doubles: [
+    durationMs,                   // doubles[0]: request duration ms
+    statusCode,                   // doubles[1]: HTTP status
+  ],
+  indexes: [tenantCtx.tenantId],  // partition key for per-tenant queries
+});
+```
+
+**Per-tenant availability SLI SQL** (Cloudflare Analytics Engine):
+
+```sql
+SELECT
+  blob1                                                     AS tenant_id,
+  COUNT(*)                                                  AS total_requests,
+  COUNTIF(blob2 = 'success')                                AS successful_requests,
+  COUNTIF(blob2 = 'success') * 100.0 / COUNT(*)            AS availability_pct,
+  QUANTILEWEIGHTED(0.95)(double1, 1)                        AS p95_duration_ms
+FROM ANALYTICS_ENGINE_DATASET
+WHERE
+  timestamp >= NOW() - INTERVAL '30' DAY
+  AND blob1 = $tenant_id
+GROUP BY tenant_id
+```
+
+### 13.3 Per-tenant SLO targets and breach detection
+
+Each enterprise tenant is assigned an SLO tier at contract signing. The tier determines alerting thresholds:
+
+| SLO Tier | Availability Target | P95 Latency Target | SSO Availability | Who gets this |
+|---|---|---|---|---|
+| **Standard** | 99.9% | < 1,500 ms | 99.9% | Default for all enterprise contracts |
+| **Premium** | 99.95% | < 1,000 ms | 99.95% | Contracts with dedicated CSM + SLA addendum |
+
+Tier is stored in the `tenants` table (`slo_tier ENUM('standard', 'premium') NOT NULL DEFAULT 'standard'`). The per-tenant SLA dashboard (§7.4) reads this column to render the correct breach threshold line on graphs.
+
+**Breach detection query** (runs every 15 minutes via Cloudflare Cron Trigger):
+
+```typescript
+// workers/sla-monitor.ts
+async function checkTenantSla(tenantId: string, tier: SloTier, env: Env) {
+  const window = '15 minutes';
+  const threshold = tier === 'premium' ? 99.95 : 99.9;
+
+  const result = await queryAnalyticsEngine(env, `
+    SELECT
+      COUNTIF(blob2 = 'success') * 100.0 / COUNT(*) AS availability_pct,
+      QUANTILEWEIGHTED(0.95)(double1, 1)             AS p95_ms
+    FROM ANALYTICS_ENGINE_DATASET
+    WHERE blob1 = '${tenantId}'
+      AND timestamp >= NOW() - INTERVAL '15' MINUTE
+  `);
+
+  if (result.availability_pct < threshold) {
+    await emitSlaBreach(tenantId, 'availability', result.availability_pct, threshold, env);
+  }
+  if (result.p95_ms > (tier === 'premium' ? 1000 : 1500)) {
+    await emitSlaBreach(tenantId, 'latency_p95', result.p95_ms, tier === 'premium' ? 1000 : 1500, env);
+  }
+}
+
+async function emitSlaBreach(
+  tenantId: string, sliName: string, actual: number, target: number, env: Env
+) {
+  // 1. Write breach event to audit log (HMAC-chained, see AUDIT_LOG_SCHEMA.md)
+  await auditLog({ action: 'sla.breach', tenantId, metadata: { sliName, actual, target } }, env);
+
+  // 2. Alert Better Stack
+  await fetch(env.BETTER_STACK_WEBHOOK, {
+    method: 'POST',
+    body: JSON.stringify({
+      severity: 'high',
+      title: `SLA breach: ${sliName} for tenant ${tenantId}`,
+      message: `${sliName} is ${actual.toFixed(3)}% (target: ${target}%)`,
+      tags: { tenant_id: tenantId, sli: sliName },
+    }),
+  });
+
+  // 3. Notify tenant admin via webhook if configured (see §15 export pipeline)
+  await deliverTenantWebhook(tenantId, 'sla.breach', { sliName, actual, target }, env);
+}
+```
+
+### 13.4 Admin dashboard SLA API
+
+The admin dashboard (`admin-dashboard.html`) consumes a dedicated SLA reporting endpoint. This is separate from the real-time alert path.
+
+**GET `/api/admin/tenants/:tenantId/sla`**
+
+```typescript
+// Response schema
+interface TenantSlaReport {
+  tenantId: string;
+  tenantSlug: string;
+  sloTier: 'standard' | 'premium';
+  reportWindow: { from: string; to: string }; // ISO 8601
+  metrics: {
+    apiAvailability: { sli: number; slo: number; budgetRemaining: number };
+    apiP95Latency:   { sli: number; slo: number; budgetRemaining: number };
+    ssoAvailability: { sli: number; slo: number; budgetRemaining: number };
+  };
+  breaches: Array<{
+    occurredAt: string;
+    sliName: string;
+    durationMinutes: number;
+    resolutionStatus: 'resolved' | 'ongoing';
+    incidentId: string | null; // links to INCIDENT_RESPONSE post-mortem
+  }>;
+  errorBudgetConsumed: number; // 0.0–1.0; >= 0.5 triggers advisory
+  generatedAt: string;
+}
+```
+
+**Privacy floor:** this API is scoped to the enterprise admin role (`role = 'tenant_admin'`). It returns aggregate availability figures only. No per-user activity data, no workout content, no health metrics. The HR-never-sees-individual-user-data constraint (DEC-030) extends to SLA reports — the tenant admin SLA view is infrastructure availability, not user behaviour.
+
+### 13.5 Per-tenant isolation verification
+
+Beyond SLA reporting, `tenant_id` propagation enables isolation audit queries — proving that data belonging to tenant A never appeared in signals for tenant B.
+
+**Weekly isolation audit query** (run by the HMAC chain verification cron, §10):
+
+```sql
+-- Should return zero rows. Any result is a P0 cross-tenant leak.
+SELECT DISTINCT blob1 AS tenant_id, blob1_expected
+FROM (
+  SELECT
+    blob1,
+    -- RLS should ensure blob1 matches the session's tenant claim
+    -- If they differ, it indicates a missing RLS predicate on a query path
+    session_tenant_claim AS blob1_expected
+  FROM ANALYTICS_ENGINE_DATASET
+  WHERE blob1 != session_tenant_claim
+    AND timestamp >= NOW() - INTERVAL '7' DAY
+) AS mismatches;
+```
+
+If this query returns any row, a P0 incident is raised immediately following the classification in `docs/INCIDENT_RESPONSE.md §3`.
+
+---
+
+## 14. Cross-Backend Trace Correlation (Sentry ↔ Cloudflare)
+
+This section specifies the shared `trace_id` propagation pattern that allows a Sentry error or transaction to be linked to a Cloudflare Worker trace without manual log searching. It closes the gap listed in §10 ("Trace correlation between Sentry and Cloudflare", M3).
+
+### 14.1 Problem statement
+
+As of v0.1, Sentry and Cloudflare use separate trace ID namespaces:
+- Cloudflare generates a `CF-Ray` header per request and optionally a W3C `traceparent`.
+- Sentry generates its own `sentry-trace` header and transaction IDs.
+
+An engineer investigating a Sentry error cannot navigate directly to the Cloudflare trace for the same request — they must correlate manually via timestamp and approximate path matching, which is unreliable under concurrent load.
+
+### 14.2 Solution: shared W3C `traceparent` + Sentry custom context
+
+The fix is a single source of truth for `trace_id`: the W3C `traceparent` header, generated by the mobile client (or the Worker itself on direct API calls), propagated unchanged through all hops, and attached to the Sentry scope as a custom tag.
+
+```
+┌──────────────────────┐
+│   React Native app   │
+│  Sentry SDK active   │──── outbound HTTP ────▶ Cloudflare Worker
+│                      │  Headers:               │  CF-Ray: abc123
+│  Transaction: T1     │  traceparent: 00-TRACE_ID-PARENT_SPAN-01
+│  (auto-instrumented) │  sentry-trace: T1/S1/1  │
+└──────────────────────┘                         │
+                                                 ▼
+                                         Supabase / Anthropic
+                                         (traceparent forwarded)
+```
+
+The `TRACE_ID` (128-bit / 32 hex chars, middle segment of `traceparent`) becomes the shared key that appears in:
+1. Cloudflare Analytics Engine data points (as `blob3: trace_id` or a dedicated `indexes` entry)
+2. Sentry transactions (as `trace.trace_id` tag)
+3. Supabase structured logs (as `trace_id` field in API error log schema, §4.3)
+
+### 14.3 Worker-side implementation
+
+```typescript
+// src/middleware/trace-context.ts
+
+export function extractTraceId(traceparent: string | null): string {
+  if (!traceparent) return crypto.randomUUID().replace(/-/g, '');
+  // traceparent = "00-{traceId:32hex}-{parentSpanId:16hex}-{flags:2hex}"
+  const parts = traceparent.split('-');
+  return parts.length >= 2 ? parts[1] : crypto.randomUUID().replace(/-/g, '');
+}
+
+export function buildTraceparent(traceId: string, spanId: string): string {
+  return `00-${traceId}-${spanId}-01`;
+}
+
+// In the fetch handler: propagate traceparent to all upstream calls
+export async function callUpstream(
+  url: string,
+  options: RequestInit,
+  traceId: string
+): Promise<Response> {
+  const spanId = generateSpanId(); // 16 random hex chars
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      'traceparent': buildTraceparent(traceId, spanId),
+      // Sentry propagation header — required for Sentry's distributed tracing
+      'sentry-trace': `${traceId}-${spanId}-1`,
+    },
+  });
+}
+```
+
+**Analytics Engine attachment** — `trace_id` is written as `indexes[0]` to support direct lookup by trace ID:
+
+```typescript
+env.ANALYTICS.writeDataPoint({
+  blobs:   [tenantId, route, outcome],
+  doubles: [durationMs, statusCode],
+  indexes: [traceId],  // enables: SELECT * WHERE indexes[0] = '<trace_id>'
+});
+```
+
+**Response header** — the Worker echoes `X-Trace-Id` back to the client so that React Native can attach it to the Sentry transaction:
+
+```typescript
+response.headers.set('X-Trace-Id', traceId);
+response.headers.set('traceparent', buildTraceparent(traceId, rootSpanId));
+```
+
+### 14.4 React Native / Expo implementation
+
+```typescript
+// src/api/client.ts — base Axios/fetch wrapper
+
+import * as Sentry from '@sentry/react-native';
+
+export async function apiFetch(path: string, options: RequestInit = {}) {
+  const transaction = Sentry.getCurrentHub().getScope()?.getTransaction();
+  const sentryTrace = transaction
+    ? `${transaction.traceId}-${transaction.spanId}-1`
+    : undefined;
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...(sentryTrace ? { 'sentry-trace': sentryTrace } : {}),
+    },
+  });
+
+  // Attach Cloudflare trace ID to the active Sentry transaction for correlation
+  const cfTraceId = response.headers.get('X-Trace-Id');
+  if (cfTraceId && transaction) {
+    transaction.setTag('cf.trace_id', cfTraceId);
+    transaction.setData('cloudflare_trace_id', cfTraceId);
+  }
+
+  return response;
+}
+```
+
+With this in place, every Sentry transaction includes `cf.trace_id` as a searchable tag. An engineer can go from a Sentry error → copy `cf.trace_id` → query Cloudflare Analytics Engine directly.
+
+### 14.5 Cloudflare Analytics Engine correlation query
+
+Given a Sentry `cf.trace_id` value (e.g. `4bf92f3577b34da6a3ce929d0e0e4736`):
+
+```sql
+SELECT
+  blob1  AS tenant_id,
+  blob2  AS route,
+  blob3  AS outcome,
+  double1 AS duration_ms,
+  double2 AS status_code,
+  timestamp
+FROM ANALYTICS_ENGINE_DATASET
+WHERE indexes[0] = '4bf92f3577b34da6a3ce929d0e0e4736'
+ORDER BY timestamp ASC
+```
+
+This returns every span emitted during the lifecycle of that trace, enabling full root-cause analysis without log searching.
+
+### 14.6 Sentry-to-Cloudflare navigation runbook
+
+1. Open Sentry error or transaction.
+2. Locate tag `cf.trace_id` in the "Tags" panel.
+3. Copy the value (32 hex chars).
+4. Open Cloudflare Analytics Engine → **Explore** → paste the query from §14.5.
+5. Cross-reference the `route` and `duration_ms` columns against the Sentry span waterfall.
+6. If span durations match, root cause is in the identified route. If they do not appear, the request failed before reaching the Worker (DNS / Cloudflare edge error — check CF-Ray in the Sentry request headers instead).
+
+### 14.7 Verification checklist
+
+| Check | How to verify |
+|---|---|
+| `X-Trace-Id` present in API responses | `curl -I https://api.form.coach/health` — header must appear |
+| `cf.trace_id` tag on Sentry transactions | Sentry → Issues → any recent transaction → Tags tab |
+| Analytics Engine row retrievable by trace ID | Run §14.5 query with a known trace ID from a test request |
+| `traceparent` forwarded to Anthropic calls | Check Sentry transaction waterfall for a child span with `traceparent` tag |
+| `sentry-trace` forwarded to Anthropic calls | Optional; allows future Anthropic trace linkage if they support W3C propagation |
+
+---
+
+## 15. Audit Log Export Pipeline (Enterprise)
+
+This section specifies the architecture and implementation for enterprise audit log delivery — real-time webhook streaming to customer SIEMs and async R2/S3 export for compliance archiving. It closes the gap listed in §10 ("Audit log export pipeline", M4). Cross-reference: `docs/AUDIT_LOG_SCHEMA.md §Export & delivery`.
+
+### 15.1 Delivery architecture overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     FORM API Worker                         │
+│  auditLog() middleware → Supabase audit_log table           │
+│  (HMAC-chained, see AUDIT_LOG_SCHEMA.md §HMAC chaining)     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ INSERT trigger (pg_notify)
+                           ▼
+              ┌────────────────────────┐
+              │  Export Dispatcher     │  ← Supabase Edge Function
+              │  (edge-fn: audit-export│
+              │   -dispatcher)         │
+              └────────┬───────────────┘
+            ┌──────────┴────────────┐
+            ▼                       ▼
+  ┌──────────────────┐   ┌──────────────────────────────┐
+  │  Webhook delivery │   │  Batch export (R2 → S3/GCS)  │
+  │  (real-time SIEM) │   │  (hourly; signed URLs)       │
+  └──────────────────┘   └──────────────────────────────┘
+```
+
+Two delivery modes are independent and may be configured separately per tenant:
+1. **Webhook** — near-real-time delivery (< 30 s P95) for SIEM ingestion (Splunk, Elastic, Datadog).
+2. **Batch export** — hourly NDJSON files written to R2, then optionally synced to customer S3/GCS bucket via signed URL or pre-configured credentials.
+
+### 15.2 Tenant export configuration schema
+
+```sql
+-- In the tenants table (see DATA_MODEL.md §2.1)
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS audit_export_config JSONB;
+
+-- audit_export_config shape:
+-- {
+--   "webhook": {
+--     "enabled": true,
+--     "url": "https://customer-siem.example.com/ingest/form",
+--     "secret": "<HMAC secret for webhook signature>",
+--     "retry_policy": { "max_attempts": 5, "backoff_seconds": [10, 30, 60, 120, 300] },
+--     "event_filter": ["auth.*", "data_access.*", "admin.*"]  -- null = all events
+--   },
+--   "batch_export": {
+--     "enabled": true,
+--     "destination": "s3",   -- "s3" | "gcs" | "r2"
+--     "bucket": "customer-audit-archive",
+--     "prefix": "form/audit/",
+--     "credentials_secret_name": "AUDIT_EXPORT_AWS_CREDS_<TENANT_ID>",
+--     "include_hmac_chain": true  -- whether to include chain_hash in export
+--   }
+-- }
+```
+
+`secret` for webhook signing is stored as a Cloudflare Workers Secret (never in Supabase plaintext). `credentials_secret_name` is the name of the Workers Secret that holds the S3/GCS credentials for that tenant.
+
+### 15.3 Webhook delivery implementation
+
+```typescript
+// workers/audit-export-dispatcher/webhook.ts
+
+interface AuditWebhookPayload {
+  specversion: '1.0';            // CloudEvents spec
+  type: 'com.form.coach.audit';
+  source: 'https://api.form.coach';
+  id: string;                    // audit_log.id
+  time: string;                  // ISO 8601
+  datacontenttype: 'application/json';
+  data: {
+    tenantId: string;
+    action: string;
+    actorId: string;              // user_id_hash (SHA-256, never raw)
+    targetType: string | null;
+    targetId: string | null;
+    ipAddress: string | null;
+    chainHash: string;            // HMAC chain hash (DEC-030 — chain integrity)
+    metadata: Record<string, unknown>;
+  };
+}
+
+export async function deliverTenantWebhook(
+  tenantId: string,
+  auditRow: AuditLogRow,
+  webhookConfig: WebhookConfig,
+  env: Env
+): Promise<void> {
+  const payload: AuditWebhookPayload = {
+    specversion: '1.0',
+    type: 'com.form.coach.audit',
+    source: 'https://api.form.coach',
+    id: auditRow.id,
+    time: auditRow.created_at,
+    datacontenttype: 'application/json',
+    data: {
+      tenantId: auditRow.tenant_id,
+      action: auditRow.action,
+      actorId: sha256Hex(auditRow.actor_id),  // hash before emit
+      targetType: auditRow.target_type,
+      targetId: auditRow.target_id,
+      ipAddress: auditRow.ip_address,
+      chainHash: auditRow.chain_hash,
+      metadata: auditRow.metadata ?? {},
+    },
+  };
+
+  const body = JSON.stringify(payload);
+  const signature = await hmacSign(body, webhookConfig.secret);
+
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < webhookConfig.retry_policy.max_attempts; attempt++) {
+    try {
+      const res = await fetch(webhookConfig.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Form-Signature': `sha256=${signature}`,
+          'X-Form-Delivery-Id': auditRow.id,
+          'X-Form-Event': auditRow.action,
+        },
+        body,
+      });
+      if (res.ok) return;
+      lastError = new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      lastError = e as Error;
+    }
+    if (attempt < webhookConfig.retry_policy.max_attempts - 1) {
+      await scheduler.wait(webhookConfig.retry_policy.backoff_seconds[attempt] * 1000);
+    }
+  }
+
+  // All retries exhausted — write delivery failure to audit log and alert
+  await auditLog({
+    action: 'system.webhook_delivery_failed',
+    tenantId,
+    metadata: { auditRowId: auditRow.id, attempts: webhookConfig.retry_policy.max_attempts, lastError: lastError?.message },
+  }, env);
+}
+```
+
+**Webhook signature verification** (customer side):
+
+```typescript
+// Reference implementation for customer SIEM ingest
+const expectedSig = `sha256=${await hmacSign(rawBody, webhookSecret)}`;
+const receivedSig = req.headers['x-form-signature'];
+if (!timingSafeEqual(expectedSig, receivedSig)) {
+  return res.status(401).json({ error: 'invalid_signature' });
+}
+```
+
+### 15.4 Batch export implementation (R2 → S3/GCS)
+
+```typescript
+// Cloudflare Cron Trigger: runs hourly
+// workers/audit-export-dispatcher/batch.ts
+
+export async function runBatchExport(tenantId: string, config: BatchExportConfig, env: Env) {
+  const windowEnd = new Date();
+  const windowStart = new Date(windowEnd.getTime() - 60 * 60 * 1000); // last hour
+
+  // 1. Query Supabase for audit rows in window, ordered by created_at ASC
+  const rows = await supabase
+    .from('audit_log')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .gte('created_at', windowStart.toISOString())
+    .lt('created_at', windowEnd.toISOString())
+    .order('created_at', { ascending: true });
+
+  if (!rows.data?.length) return; // nothing to export
+
+  // 2. Serialize as NDJSON, one row per line
+  const ndjson = rows.data.map(row => JSON.stringify({
+    ...row,
+    actor_id: sha256Hex(row.actor_id), // hash before export
+  })).join('\n');
+
+  // 3. Write to R2 (primary archive, always)
+  const r2Key = `audit/${tenantId}/${formatHour(windowStart)}.ndjson`;
+  await env.R2_AUDIT_ARCHIVE.put(r2Key, ndjson, {
+    httpMetadata: { contentType: 'application/x-ndjson' },
+    customMetadata: {
+      tenant_id: tenantId,
+      row_count: String(rows.data.length),
+      window_start: windowStart.toISOString(),
+      window_end: windowEnd.toISOString(),
+    },
+  });
+
+  // 4. Sync to customer S3/GCS if configured
+  if (config.destination === 's3') {
+    const creds = await getSecret(config.credentials_secret_name, env);
+    await uploadToS3(ndjson, config.bucket, `${config.prefix}${formatHour(windowStart)}.ndjson`, creds);
+  } else if (config.destination === 'gcs') {
+    const creds = await getSecret(config.credentials_secret_name, env);
+    await uploadToGcs(ndjson, config.bucket, `${config.prefix}${formatHour(windowStart)}.ndjson`, creds);
+  }
+
+  // 5. Write export manifest to audit log (chained — export events are auditable)
+  await auditLog({
+    action: 'system.audit_export_completed',
+    tenantId,
+    metadata: { rowCount: rows.data.length, r2Key, destination: config.destination },
+  }, env);
+}
+```
+
+### 15.5 HMAC chain export and customer verification
+
+When `include_hmac_chain: true` (default for enterprise), each export file row includes `chain_hash`. This allows the customer to independently verify audit log integrity without trusting FORM.
+
+**Chain verification algorithm** (customer side, language-agnostic):
+
+```
+prev_hash ← "genesis"   # or the chain_hash of the last row of the previous export window
+for each row in export (ordered by created_at ASC):
+    expected_hash ← HMAC-SHA256(
+        key  = FORM_AUDIT_HMAC_KEY,            # shared during onboarding
+        data = prev_hash + "|" + row.id + "|" + row.action + "|" + row.created_at
+    )
+    if row.chain_hash != expected_hash:
+        RAISE IntegrityError(f"Chain broken at row {row.id}")
+    prev_hash ← row.chain_hash
+```
+
+The `FORM_AUDIT_HMAC_KEY` is a tenant-specific secret exchanged over a secure channel during enterprise onboarding (not stored in the export file itself). For auditors, this key is provided under NDA as part of the SOC 2 Type II evidence package. Reference: `docs/AUDIT_LOG_SCHEMA.md §HMAC chaining` and DEC-030.
+
+### 15.6 Delivery SLAs
+
+| Delivery Mode | P95 Latency | Availability SLO | Breach Action |
+|---|---|---|---|
+| Webhook (real-time) | < 30 s from audit event write | 99.9% of events delivered within 5 min | Write `system.webhook_delivery_failed` to audit log; page on-call |
+| Batch export (R2) | < 5 min after hour boundary | 100% (every hour must produce a file, even if empty) | P1 incident (missing export = compliance gap) |
+| Batch export (S3/GCS) | < 15 min after R2 write | 99.5% | Alert tenant admin; retry next cron cycle; max 3 cycles before P1 |
+
+### 15.7 Privacy constraints on export
+
+The following fields are **never** included in export files, regardless of customer request:
+
+| Field | Reason |
+|---|---|
+| `prompt_content` / `response_content` | GDPR Art. 9 — AI coaching content is health-adjacent |
+| Raw `user_id` | Replaced by `sha256(user_id)` before export (GDPR pseudonymisation) |
+| Workout content details | Not stored in audit_log; audit_log records access events, not data content |
+| Individual user health metrics | HR-never-sees-individual-user-data constraint (DEC-030) |
+
+The export schema mirrors the privacy guarantees in `docs/AUDIT_LOG_SCHEMA.md §Privacy guarantees`. Any customer request to export raw user health data must be refused and escalated to compliance-officer.
+
+### 15.8 Implementation checklist (platform-engineer)
+
+| Task | Priority | Notes |
+|---|---|---|
+| Create `audit-export-dispatcher` Supabase Edge Function | P0 (M4) | Triggered by `pg_notify` on `audit_log` INSERT |
+| Add `audit_export_config` JSONB column to `tenants` table | P0 (M4) | Migration: non-nullable default `'{}'::jsonb` |
+| Store webhook secrets in Cloudflare Workers Secrets (per-tenant) | P0 (M4) | Naming convention: `AUDIT_WEBHOOK_SECRET_<TENANT_ID_UPPER>` |
+| Provision `R2_AUDIT_ARCHIVE` bucket | P0 (M4) | Object lifecycle: 7-year retention (GDPR §5(1)(e) storage limitation) |
+| Implement `hmacSign` for outbound webhook signatures | P0 (M4) | Use Web Crypto API `HMAC-SHA256`; no external library |
+| Implement S3 upload path | P1 (M4) | Only needed for customers requesting S3 sync |
+| Implement GCS upload path | P2 (M5) | Deferred until first GCS-native customer |
+| Add `system.audit_export_completed` and `system.webhook_delivery_failed` to action taxonomy | P0 (M4) | Update `AUDIT_LOG_SCHEMA.md §Action taxonomy` |
+| Add §15.6 SLA metrics to Better Stack monitors | P0 (M4) | Alert on missing batch export within 10 min of hour boundary |
+| Add per-tenant webhook delivery alert to §6.2 alert rules | P0 (M4) | Severity: high; owner: platform-engineer |
+
+---
+
+*v0.2 additions: §13 Per-Tenant Observability Implementation (tenant context injection, per-tenant Analytics Engine data points, SLO breach detection, admin dashboard SLA API, isolation verification query); §14 Cross-Backend Trace Correlation — Sentry ↔ Cloudflare shared W3C `traceparent` propagation, Worker implementation, React Native client, correlation query, navigation runbook; §15 Audit Log Export Pipeline — webhook delivery (CloudEvents format, HMAC signing, retry policy), hourly R2/S3/GCS batch export, HMAC chain customer verification, privacy constraints, implementation checklist. Closes three M4/M3 gaps from §10.*
