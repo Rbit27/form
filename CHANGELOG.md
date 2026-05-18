@@ -9,6 +9,14 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.69.0] — 2026-05-18
+
+### Added
+- `content/post-40-hypertrophy-mechanisms.md` — Механічна напруга, метаболічний стрес і пошкодження м'язів: модель Шенфельда 2010 у 2026; stretch-mediated hypertrophy, тітін-сигналінг, перегляд ролі метаболічного стресу і EIMD. clinical-safety PASS.
+- `blog.html` — картка post-40 додана до article index; placeholder-картка post-41 (grip strength) готова
+- `STATUS.md` — content engine таблиця оновлена (post-40)
+- `README.md` — roadmap оновлено: post-40 позначено [x]; розширено pipeline post-42–45
+
 ## [0.68.0] — 2026-05-18
 
 ### Added
