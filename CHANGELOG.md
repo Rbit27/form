@@ -9,6 +9,13 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+---
+
+## [0.84.2] — 2026-05-19
+
+### Added
+- `content/post-54-training-volume-landmarks.md` — MEV/MAV/MRV: training volume landmarks explainer; Schoenfeld 2017 dose-response, Israetel/RP landmark estimates, Victor voice, clinical-safety clean
+
 ## [0.84.1] — 2026-05-19
 
 ### Changed
