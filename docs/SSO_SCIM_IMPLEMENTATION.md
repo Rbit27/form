@@ -3005,3 +3005,629 @@ For US enterprise customers (Supabase US East, `us-east-1`):
 ---
 
 *v0.6 additions: Section 14 — SCIM Data Processing: GDPR Article 28 Compliance Framework. Closes G-013 design phase (previously 🔴 "block: do not enable SCIM for any customer until DPA is updated" → 🟡 design complete, outside counsel review pending). Personal data inventory for all SCIM attribute classes with retention periods and legal basis chain. DPA Annex B template clause language (subject-matter, duration, nature/purpose, data types, data subject categories, controller obligations, sub-processor disclosure, Art. 15–20 assistance matrix) — ready for outside counsel review. Privacy floor enforcement: `users.scim_attributes` excluded from tenant-manager RLS; role mapping opacity; k-anonymity floor applies to SCIM-dimension aggregates. Data minimisation: unknown attribute silent-drop, enterprise extension allowlist, Art. 9 special category attribute scanner with `BLOCKED_ATTRIBUTE_PATTERNS` blocklist and `scim.rejected_sensitive_attribute` audit event. Art. 17 dual-path erasure: employer-initiated deprovisioning (Path A) vs. user-initiated GDPR erasure (Path B) with tenant notification and HMAC chain continuity via anonymised `actor_id` hash stored in separate `gdpr_erasure_log` table. 10 new audit events added to taxonomy (DEC-030 HMAC chain). Sub-processor disclosure: confirmed no new processors; PostHog `distinctId` isolation constraint documented. EU residency: Supabase `eu-central-1` for EU tenants; SCC Module 2 documented for US-region tenants with EU employees. Implementation checklist: 12 items (P0/P1/P2). G-013: 🔴 → 🟡 Partial.*
+
+---
+
+## 15. SCIM 2.0 Groups Provisioning
+
+> Owner: enterprise-architect. Review: on any IdP group schema change or quarterly.
+> Dependencies: §3 (SCIM 2.0 Provisioning), §5 (Role Mapping), §11 (JIT Provisioning), §12 (Session Lifecycle), §14 (GDPR Art. 28 Framework).
+
+---
+
+### 15.1 Overview
+
+SCIM Groups provisioning allows an enterprise customer's identity provider to push group memberships to FORM, which then drives role assignment without manual per-user configuration. Three provisioning paths are available; the right choice depends on org size, IdP capability, and role-mapping complexity.
+
+| Dimension | SCIM Groups | Direct role assignment | JIT role claims |
+|---|---|---|---|
+| **How roles are assigned** | IdP group membership → FORM role mapping table | Admin manually sets each user's role in FORM admin dashboard | Role claim in OIDC/SAML token evaluated at login |
+| **Auto-deprovisioning** | Yes — group removal triggers role revocation and session termination | No — manual only | No — revocation only on next login |
+| **Best for** | Orgs with >20 seats, structured IdP groups, HR-driven joiners/movers/leavers | Small pilots (<20 seats), orgs with no IdP group discipline | Google Workspace (see §15.6.3), orgs with mature claim-enrichment pipeline |
+| **IdP support** | Okta, Entra ID (full); Google Workspace (not supported — see §15.6.3 and G-014) | Any | Any (requires token claim config) |
+| **Bulk role change** | Yes — rename/reassign IdP group → all members updated | No | Yes — update claim value in IdP |
+| **Audit granularity** | Per-member add/remove events | Per-user manual event | Per-login event only |
+| **Recommended threshold** | **>20 seats** | ≤20 seats | Any size where SCIM Groups unavailable |
+
+**Recommendation:** Enable SCIM Groups for any new enterprise customer with more than 20 licensed seats and a functioning Okta or Entra ID group structure. For Google Workspace customers, fall back to JIT role claims per §11 and document the gap per §15.11 (G-014).
+
+---
+
+### 15.2 SCIM Group Resource Schema
+
+#### 15.2.1 RFC 7643 §8 Compliant JSON Example
+
+The following is the canonical SCIM Group resource representation FORM accepts and returns. FORM is the SP (SCIM server); the IdP is the client.
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "externalId": "00g1emaKYZTWRISHRRZT",
+  "displayName": "FORM Coaches — EMEA",
+  "members": [
+    {
+      "value": "2819c223-7f76-453a-919d-413861904646",
+      "display": "Jane Smith",
+      "$ref": "https://api.form.coach/scim/v2/Users/2819c223-7f76-453a-919d-413861904646",
+      "type": "User"
+    },
+    {
+      "value": "c75ad752-64ae-4823-840d-ffa80929976c",
+      "display": "Marcus Reid",
+      "$ref": "https://api.form.coach/scim/v2/Users/c75ad752-64ae-4823-840d-ffa80929976c",
+      "type": "User"
+    }
+  ],
+  "meta": {
+    "resourceType": "Group",
+    "created": "2026-03-15T09:00:00Z",
+    "lastModified": "2026-05-10T14:32:00Z",
+    "location": "https://api.form.coach/scim/v2/Groups/550e8400-e29b-41d4-a716-446655440000",
+    "version": "W/\"a330bc54f0671c9\""
+  }
+}
+```
+
+Notes:
+- `id` is FORM's internal UUID, stable across all operations.
+- `externalId` is the IdP-assigned group identifier (Okta group ID or Azure Object ID). FORM stores this and uses it for idempotent reconciliation.
+- `members.$ref` is the canonical SCIM URL for the referenced User resource. For groups with >500 members, FORM returns `$ref` values only (omitting `display`) to reduce payload size (see §15.5).
+- Nested Group `type: "Group"` members are not accepted; FORM returns `HTTP 400 scimType: "invalidValue"` with a descriptive detail message. Entra ID nested groups are flattened before storage — see §15.6.2a.
+
+#### 15.2.2 PostgreSQL Table Schema
+
+```sql
+-- SCIM Groups: one row per group pushed by IdP
+CREATE TABLE scim_groups (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  external_id      TEXT NOT NULL,           -- IdP-assigned group ID (Okta group ID, Azure Object ID)
+  display_name     TEXT NOT NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (tenant_id, external_id)
+);
+
+-- RLS: strict tenant isolation — no cross-tenant group reads
+ALTER TABLE scim_groups ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY scim_groups_tenant_isolation ON scim_groups
+  USING (tenant_id = current_setting('app.tenant_id')::UUID);
+
+-- SCIM Group Members: junction table between groups and provisioned users
+CREATE TABLE scim_group_members (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  group_id         UUID NOT NULL REFERENCES scim_groups(id) ON DELETE CASCADE,
+  user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  added_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  added_by_op      TEXT NOT NULL DEFAULT 'scim_patch', -- 'scim_patch' | 'scim_put' | 'scim_post'
+
+  UNIQUE (tenant_id, group_id, user_id)
+);
+
+-- RLS: same tenant_id constraint enforced at row level
+ALTER TABLE scim_group_members ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY scim_group_members_tenant_isolation ON scim_group_members
+  USING (tenant_id = current_setting('app.tenant_id')::UUID);
+
+-- Index: fast member lookup for role-resolution on login
+CREATE INDEX idx_scim_group_members_user
+  ON scim_group_members (tenant_id, user_id);
+
+-- Index: fast group membership list for SCIM GET /Groups/{id}
+CREATE INDEX idx_scim_group_members_group
+  ON scim_group_members (tenant_id, group_id);
+
+-- Trigger: keep scim_groups.updated_at current on any member change
+CREATE OR REPLACE FUNCTION update_scim_group_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE scim_groups
+    SET updated_at = now()
+    WHERE id = COALESCE(NEW.group_id, OLD.group_id)
+      AND tenant_id = current_setting('app.tenant_id')::UUID;
+  RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER trg_scim_group_members_updated
+  AFTER INSERT OR DELETE ON scim_group_members
+  FOR EACH ROW EXECUTE FUNCTION update_scim_group_updated_at();
+```
+
+**Migration note.** The `scim_group_role_mappings` table introduced in §4.2 remains the authoritative mapping table. `scim_groups` and `scim_group_members` are the new SCIM resource tables that back the `/Groups` endpoint. The `scim_group_role_mappings.idp_group_id` foreign-key-by-value relationship links to `scim_groups.external_id` within the same `tenant_id`.
+
+---
+
+### 15.3 Supported SCIM Group Operations
+
+FORM implements the following SCIM 2.0 Group endpoint operations at `https://api.form.coach/scim/v2/Groups`. All requests must include the tenant-scoped SCIM bearer token (§3.2).
+
+| Operation | HTTP method + path | Description | Notes |
+|---|---|---|---|
+| List groups | `GET /Groups` | Returns paginated list of all groups for tenant | Supports `filter=displayName eq "..."`, `count`, `startIndex` |
+| Get single group | `GET /Groups/{id}` | Returns full group resource including members array | `{id}` is FORM UUID, not `externalId` |
+| Create group | `POST /Groups` | Creates a new group; `externalId` required | Idempotent on `(tenant_id, externalId)` — returns existing group if already present |
+| Replace group | `PUT /Groups/{id}` | Full replace of group resource including member list | Existing members not in PUT body are removed; triggers per-member audit events |
+| Update group (members) | `PATCH /Groups/{id}` | Add or remove individual members; update `displayName` | Preferred over PUT for membership changes; supports `op: add`, `op: remove`, `op: replace` |
+| Delete group | `DELETE /Groups/{id}` | Removes group and all memberships; triggers role revocation | Member session revocation is atomic with group deletion (see §15.7) |
+
+**Deferred to M5:** Bulk group operations (`POST /Bulk` with Group resources). See §15.10 checklist item.
+
+**Pagination requirement:** Any group with more than 1000 members must be retrieved or written using cursor-based pagination (see §15.5). A `POST /Groups` or `PUT /Groups/{id}` with a `members` array exceeding 1000 entries returns `HTTP 400` with `detail: "members array exceeds 1000; use PATCH with paginated add operations"`.
+
+---
+
+### 15.4 Group-to-Role Mapping
+
+#### 15.4.1 Tenant SSO Config Extension
+
+The `tenant_sso_configs` table (§4.2) is extended with a `group_role_mappings` JSONB column. The JSON structure for that column:
+
+```json
+{
+  "group_role_mappings": [
+    {
+      "idp_group_id": "00g1emaKYZTWRISHRRZT",
+      "idp_group_display_name": "FORM Admins — Global",
+      "form_role": "tenant_admin"
+    },
+    {
+      "idp_group_id": "00g2xzKLMNOPQRSTUVWX",
+      "idp_group_display_name": "FORM Coaches — EMEA",
+      "form_role": "coach"
+    },
+    {
+      "idp_group_id": "00g3abcDEFGHIJKLMNOP",
+      "idp_group_display_name": "FORM Members — All Staff",
+      "form_role": "member"
+    }
+  ],
+  "default_role_for_unmatched_groups": "member",
+  "multiple_group_resolution": "highest_privilege"
+}
+```
+
+Fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `group_role_mappings` | array | Each entry maps one IdP group to one FORM role. `idp_group_id` is the stable IdP identifier (not the display name). |
+| `default_role_for_unmatched_groups` | string | FORM role assigned to a user whose groups are all unmapped. Must be one of the valid FORM roles. Cannot be `tenant_owner`. |
+| `multiple_group_resolution` | enum | `"highest_privilege"` (default) or `"lowest_privilege"`. Governs how FORM resolves a user who belongs to multiple mapped groups with different roles. |
+
+#### 15.4.2 `highest_privilege` Algorithm
+
+When a user belongs to multiple groups and `multiple_group_resolution = "highest_privilege"`, FORM evaluates all mapped groups the user is a member of and assigns the highest role in the following priority order:
+
+```
+tenant_admin  >  coach  >  member  >  viewer
+```
+
+`tenant_owner` cannot be assigned via group mapping — it must be set explicitly by a FORM `enterprise-architect`. This is a hard constraint: the mapping config schema rejects `"form_role": "tenant_owner"` with an error at save time.
+
+Example: a user is in groups mapped to `coach` and `member`. The resolved role is `coach`.
+
+When `multiple_group_resolution = "lowest_privilege"`, the same priority order is used in reverse (safest role wins). This is appropriate for orgs using broad catch-all groups.
+
+Role resolution runs on every authentication event (JIT login) and on every SCIM PATCH that modifies group membership, not just on first provisioning.
+
+#### 15.4.3 Unmapped Group Handling
+
+If a user's group membership set contains no entries in `group_role_mappings`:
+
+1. The user is assigned `default_role_for_unmatched_groups` (configured per tenant; defaults to `member`).
+2. A `scim.group_unmapped` audit event is written with fields: `tenant_id`, `user_id`, `idp_group_ids` (list of group IDs that triggered the condition), `assigned_default_role`.
+3. The user is allowed to authenticate and access FORM at the default role level. They are not blocked.
+
+If `default_role_for_unmatched_groups` is deliberately set to `null` by the tenant admin (opt-in strict mode), unmapped users are blocked from accessing FORM and receive a tenant-branded error page: "Your account is not assigned to an authorised group. Contact your IT administrator." The `scim.group_unmapped` event is still written.
+
+---
+
+### 15.5 Member Synchronization & Pagination
+
+#### 15.5.1 PATCH Operation: Add Members
+
+The following PATCH body adds two members to an existing group. This is the standard operation Okta and Entra ID issue when a user is added to a pushed group.
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "add",
+      "path": "members",
+      "value": [
+        {
+          "value": "2819c223-7f76-453a-919d-413861904646",
+          "display": "Jane Smith",
+          "$ref": "https://api.form.coach/scim/v2/Users/2819c223-7f76-453a-919d-413861904646"
+        },
+        {
+          "value": "c75ad752-64ae-4823-840d-ffa80929976c",
+          "display": "Marcus Reid",
+          "$ref": "https://api.form.coach/scim/v2/Users/c75ad752-64ae-4823-840d-ffa80929976c"
+        }
+      ]
+    }
+  ]
+}
+```
+
+FORM response on success: `HTTP 200` with the updated Group resource. If any `value` (user SCIM ID) does not exist within the tenant, FORM returns `HTTP 400 scimType: "noTarget"` for that specific member and does not apply the partial add — the entire operation is rejected atomically.
+
+#### 15.5.2 PATCH Operation: Remove Members
+
+The following PATCH body removes one member from a group. This is the standard operation issued when a user is removed from an IdP group.
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "remove",
+      "path": "members[value eq \"2819c223-7f76-453a-919d-413861904646\"]"
+    }
+  ]
+}
+```
+
+FORM response on success: `HTTP 200` with the updated Group resource. The member removal, role revocation, and session termination for the affected user are executed atomically in a single database transaction (see §15.7 and §12.7).
+
+#### 15.5.3 Large Group Pagination (>100 Members)
+
+For `GET /Groups/{id}` requests on groups with more than 100 members, FORM uses cursor-based pagination via standard SCIM list pagination parameters.
+
+Paginated list request:
+```
+GET /scim/v2/Groups/{id}/Members?count=100&startIndex=1
+```
+
+FORM response envelope:
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  "totalResults": 847,
+  "itemsPerPage": 100,
+  "startIndex": 1,
+  "Resources": [
+    { "value": "...", "display": "...", "$ref": "..." }
+  ]
+}
+```
+
+To retrieve the next page: `startIndex=101`, then `startIndex=201`, and so on until `startIndex > totalResults`.
+
+For `PATCH add` operations adding more than 100 members in a single batch, FORM accepts the full array up to the 1000-member hard cap (§15.3). Above 1000, the client must issue multiple PATCH operations.
+
+#### 15.5.4 `members.$ref` Optimisation for Large Groups
+
+For groups with more than 500 members, the `GET /Groups/{id}` response omits the `display` field from member entries and returns only `value` and `$ref`. This reduces the payload size by approximately 40% for typical display name lengths and keeps responses within Cloudflare Worker response body limits.
+
+Clients that require `display` for a specific member should call `GET /Users/{id}` directly.
+
+#### 15.5.5 Rate Limit Interaction
+
+Group membership synchronisation from a large IdP push (e.g., initial Okta group sync, Entra ID provisioning cycle) may generate a high volume of `PATCH /Groups/{id}` requests in a short window. The per-tenant rate limits from §3.6 apply:
+
+| Endpoint | Rate Limit | Burst |
+|---|---|---|
+| `POST /scim/v2/Groups` | 50 req/min | 100 |
+| `PATCH /scim/v2/Groups/{id}` | 100 req/min | 200 |
+| `DELETE /scim/v2/Groups/{id}` | 50 req/min | 100 |
+| `GET /scim/v2/Groups` (list) | 30 req/min | 60 |
+| `GET /scim/v2/Groups/{id}` | 300 req/min | 600 |
+
+When the limit is exceeded, FORM returns `HTTP 429` with a `Retry-After` header specifying the number of seconds until the window resets. Okta, Entra ID, and OneLogin all implement native exponential backoff when they receive `429` responses. No additional configuration is required on the customer side.
+
+**Initial sync guidance:** Customers performing an initial group push of >50 groups should contact their FORM customer success manager to request a temporary burst increase for the sync window. This is a manual process executed by the enterprise-architect; it is not self-serve.
+
+---
+
+### 15.6 IdP-Specific Group Behavior
+
+#### 15.6.1 Okta
+
+| Attribute | Detail |
+|---|---|
+| `externalId` source | Okta Group ID (e.g. `00g1emaKYZTWRISHRRZT`) — stable, use as the canonical group identifier |
+| Group push mechanism | Okta admin must configure "Push Groups" in the FORM app integration under the Provisioning → Push Groups tab |
+| Membership change operations | Okta issues `PATCH /Groups/{id}` with `op: add` or `op: remove` on individual member changes — never a full PUT replace |
+| Group deletion | Okta issues `DELETE /Groups/{id}` when "Push Groups" is removed or the group is unlocked from push |
+| Profile attributes | Okta may include group profile attributes in the Group resource body. FORM silently ignores all attributes not in the SCIM core Group schema (RFC 7643 §8). No `HTTP 400` is returned for unknown attributes — they are dropped and a `scim.group_updated` event notes `extra_attributes_dropped: true` |
+| Setup requirement | Customer IT admin must explicitly navigate to Provisioning → Push Groups in Okta and add each group to be pushed. Groups are not automatically pushed by default — this is a common onboarding gap |
+
+**Okta customer setup steps:**
+1. In Okta Admin Console, navigate to Applications → FORM app → Provisioning → Push Groups.
+2. Click "Push Groups" → "Find groups by name" → select each group to sync.
+3. Confirm "Create Group" is selected (not "Link Group") for new groups.
+4. Save. Okta will issue a `POST /Groups` for each selected group followed by `PATCH /Groups/{id}` for initial member population.
+
+#### 15.6.2 Microsoft Entra ID (Azure AD)
+
+| Attribute | Detail |
+|---|---|
+| `externalId` source | Azure AD Object ID (GUID, e.g. `7b2c4e1a-3f8d-4b9e-a123-456789abcdef`) — stable, tenant-scoped |
+| Group push mechanism | Entra ID Provisioning app uses automatic attribute mapping; groups are pushed via the SCIM `/Groups` endpoint when group assignment is configured in the Enterprise Application |
+| Membership change operations | Entra ID may issue either `PATCH /Groups/{id}` (incremental) or `PUT /Groups/{id}` (full replace) depending on the provisioning cycle and group size |
+| Dynamic groups | Entra ID dynamic membership groups are treated as static by FORM — FORM receives the resolved member list and does not interpret the dynamic membership rule. Changes to dynamic membership propagate to FORM on the next Entra provisioning cycle (typically 20–40 minutes) |
+
+##### 15.6.2a Nested Group Flattening
+
+Entra ID supports nested group membership (a group containing other groups). FORM does not accept nested Group members in the SCIM `members` array — entries with `type: "Group"` are rejected (see §15.2.1).
+
+**How FORM handles this:** When an Entra ID provisioning push includes a group with nested group members, FORM's SCIM endpoint:
+
+1. Accepts all `type: "User"` members normally.
+2. For each `type: "Group"` member entry, logs a `scim.group_nested_flattened` audit event with `tenant_id`, `parent_group_id`, `nested_group_ref`, and `action: "skipped"`.
+3. Returns `HTTP 200` with the created/updated Group resource — the nested group entries are omitted from the stored membership, not reflected back in the response.
+4. Does **not** resolve the nested group's membership transitively. Transitive member resolution is not performed server-side.
+
+**Customer recommendation — two options:**
+
+Option A (preferred): Restructure IdP groups to use flat security groups. Move all individual user accounts into a single-level group with no nesting. This is the simplest path and aligns with Microsoft's own provisioning best-practice guidance for third-party SCIM endpoints.
+
+Option B: Enable the Entra ID P1/P2 "Member flattening" setting if available in the customer's tenant configuration. With this setting, Entra ID resolves nested group members before pushing to third-party SCIM endpoints, sending only direct `User` member entries. This requires an Entra P1 or P2 licence.
+
+If neither option is implemented, FORM will only provision direct members of the pushed group. Members who are members via nesting will not be provisioned and will not receive roles. The `scim.group_nested_flattened` audit events in the admin dashboard give visibility into how many members were skipped.
+
+#### 15.6.3 Google Workspace
+
+Google Workspace does not support native SCIM Group provisioning to third-party SCIM endpoints. The Google Workspace Directory API can push user provisioning (SCIM Users), but does not expose a third-party SCIM Groups interface.
+
+**Consequence:** Customers using Google Workspace as their sole IdP cannot use SCIM Groups for role assignment in FORM.
+
+**Recommended path:** Use JIT provisioning with role claims per §11. The customer configures a custom attribute or group claim in their Google Workspace SAML/OIDC app configuration, and FORM maps the claim value to a FORM role at login time. Role changes take effect on the user's next login.
+
+This is a by-design limitation of Google Workspace's SCIM implementation, not a FORM defect. The gap is formally documented as G-014 (§15.11).
+
+---
+
+### 15.7 Audit Events for Group Operations
+
+All group operations write to the tenant's HMAC-chained `audit_log` per DEC-030. There is no separate group audit chain — group events are interleaved with all other tenant audit events, maintaining chain continuity.
+
+The following 9 events are added to the audit event taxonomy:
+
+| Event | Trigger | Key fields in `changes` |
+|---|---|---|
+| `scim.group_created` | `POST /Groups` succeeds | `group_id`, `external_id`, `display_name`, `initial_member_count`, `source_idp` |
+| `scim.group_updated` | `PUT /Groups/{id}` or `PATCH /Groups/{id}` (displayName only) | `group_id`, `old_display_name`, `new_display_name`, `extra_attributes_dropped` |
+| `scim.group_member_added` | `PATCH /Groups/{id} op:add` or `PUT` net-add | `group_id`, `user_id`, `user_email_hash`, `role_mapping_triggered`, `resolved_role` |
+| `scim.group_member_removed` | `PATCH /Groups/{id} op:remove` or `PUT` net-remove | `group_id`, `user_id`, `user_email_hash`, `sessions_revoked_count` |
+| `scim.group_deleted` | `DELETE /Groups/{id}` | `group_id`, `external_id`, `display_name`, `affected_user_count`, `sessions_revoked_count` |
+| `scim.group_role_mapping_applied` | Role resolved from group membership during login or PATCH | `user_id`, `group_ids_evaluated`, `resolved_role`, `resolution_strategy` |
+| `scim.group_unmapped` | User's groups have no mapping entries | `user_id`, `idp_group_ids`, `assigned_default_role`, `strict_mode_blocked` |
+| `scim.group_nested_flattened` | Entra ID pushes a group with `type: "Group"` members | `parent_group_id`, `nested_group_ref`, `action: "skipped"`, `members_skipped_count` |
+| `scim.group_pagination_started` | `GET /Groups/{id}/Members` paginated request begins | `group_id`, `total_members`, `page_size`, `start_index`, `requested_by` |
+
+**Atomicity requirement (member removal + session revocation).** The `scim.group_member_removed` event and the corresponding session revocation (§12.7) must be written in the same PostgreSQL transaction. If the session revocation step fails, the entire transaction is rolled back and the group membership is not removed. This prevents a state where a user has lost group membership (and thus their role entitlement) but retains an active session with the old role. The SCIM endpoint returns `HTTP 500` in this case and the IdP will retry per its backoff schedule.
+
+This constraint mirrors the session revocation atomicity requirement established in §12.7 for SCIM user deprovisioning and must be implemented with the same transaction pattern.
+
+---
+
+### 15.8 Customer Onboarding Checklist — Groups
+
+This checklist supplements §7 (Customer Onboarding Checklist). It covers the additional steps required to enable and validate SCIM Groups provisioning for a new enterprise customer.
+
+#### FORM side
+
+| Step | Owner | Notes |
+|---|---|---|
+| Enable `feature_flag: scim_groups` for tenant | enterprise-architect | Set in admin dashboard feature flags UI (§15.10 item 11). Not enabled by default — requires explicit activation |
+| Configure `group_role_mappings` in tenant SSO config | enterprise-architect (with customer) | Populate `idp_group_id`, `idp_group_display_name`, `form_role` for each group. Review with customer IT admin before activation |
+| Set `default_role_for_unmatched_groups` | enterprise-architect | Confirm with customer — default is `member`. Consider `null` (strict block) for high-security deployments |
+| Confirm `multiple_group_resolution` strategy | enterprise-architect | `highest_privilege` is default. Discuss with customer if they have overlapping group structures |
+| Verify rate limits are sufficient for initial sync | enterprise-architect | Assess group count and member count. Request temporary burst increase if >50 groups or >5000 total member assignments |
+| Confirm Art. 9 group name scanner is active | security-engineer | Verify `scim.group_name_sensitive_detected` events are enabled for the tenant (§15.9.5) |
+
+#### Customer side — Okta
+
+| Step | Customer role | Notes |
+|---|---|---|
+| Navigate to FORM app → Provisioning → Push Groups | IT admin | Required — groups are not pushed automatically |
+| Add each group to be pushed | IT admin | Use "Find groups by name". Confirm "Create Group" mode is selected |
+| Verify initial sync completes without errors | IT admin | Check Okta provisioning logs for `400` or `429` errors. Share FORM audit log export if troubleshooting |
+| Confirm no sensitive group names are in scope | IT admin + compliance | Review §15.9.1 — group names matching Art. 9 patterns trigger a compliance review |
+
+#### Customer side — Microsoft Entra ID
+
+| Step | Customer role | Notes |
+|---|---|---|
+| Assign groups to the FORM Enterprise Application | IT admin | Azure Portal → Enterprise Applications → FORM → Users and Groups → Add assignment → select groups |
+| Verify no nested groups are in scope | IT admin | Flatten nested groups or enable Entra P1/P2 member flattening before first sync (§15.6.2a) |
+| Check provisioning logs for nested group skips | IT admin | `scim.group_nested_flattened` events in FORM audit log indicate members missed due to nesting |
+| Confirm dynamic group membership is current | IT admin | Dynamic groups reflect membership at sync time. Confirm Entra evaluation cycle is recent before first FORM sync |
+
+#### Customer side — Google Workspace
+
+| Step | Customer role | Notes |
+|---|---|---|
+| Acknowledge SCIM Groups not supported | IT admin + FORM CSM | G-014 disclosure (§15.11) — customer must acknowledge in writing |
+| Configure JIT role claims per §11 | IT admin | Set up custom attribute or group claim in Google Workspace SAML/OIDC app |
+| Verify role claim values match FORM role names | IT admin + enterprise-architect | Test with a pilot user before full rollout |
+
+---
+
+### 15.9 GDPR Implications of Group Membership Data
+
+#### 15.9.1 Group `displayName` as Sensitive Data (Art. 9)
+
+Group `displayName` values can reveal Art. 9 special category data about the individuals in that group. Examples encountered in enterprise deployments:
+
+- `"PTSD Support Programme Members"` — reveals mental health condition
+- `"Oncology Patient Fitness Track"` — reveals health data
+- `"Ramadan Wellness Programme"` — reveals religious belief
+- `"Disability Access Accommodations"` — reveals disability status
+- `"Union Representatives"` — reveals trade union membership
+
+FORM does not control what names enterprise customers assign to their IdP groups. The `displayName` is a required field in the SCIM Group schema and must be accepted to function. However, storing and processing a group name that reveals Art. 9 data about its members creates a processing obligation FORM must handle under its DPA with the customer.
+
+#### 15.9.2 Group Membership as Organisational Hierarchy Data
+
+Beyond Art. 9 cases, group membership data reveals an employee's position in the organisational hierarchy, team, department, and access tier. This is personal data under Art. 4(1) GDPR.
+
+- Group membership data (which user is in which group) is excluded from all FORM analytics pipelines. It is not sent to PostHog, not used for aggregate reporting, and not included in any feature-usage event.
+- The privacy floor from §14 applies: `scim_group_members` data is excluded from `tenant_manager` RLS policies. `tenant_manager` role can see aggregate adoption metrics but cannot query which users are in which groups.
+- Group `displayName` values are stored in `scim_groups.display_name` but are not surfaced in any UI visible to roles below `tenant_admin`.
+
+#### 15.9.3 Art. 17 Erasure Procedure for Group Membership
+
+When a GDPR Art. 17 erasure request is received for a SCIM-provisioned user (§14.6 Path B), group membership is handled as follows:
+
+1. All rows in `scim_group_members` where `user_id = {erased_user_id}` are hard-deleted immediately (no soft-delete period — group membership is access control data, not user-generated content).
+2. The `scim_groups` records themselves are not deleted — they exist independently of individual users and belong to the tenant, not the individual.
+3. Audit log entries referencing the user's group memberships (`scim.group_member_added`, `scim.group_member_removed`) are retained with the anonymised `actor_id` hash per §14.6 and DEC-030 HMAC chain continuity requirements.
+4. The erasure completion event (`data.individual_deletion`) includes `group_memberships_deleted: true` and `group_count` in its `changes` field.
+
+#### 15.9.4 Art. 30 Records of Processing
+
+SCIM Group membership data must be added to FORM's Art. 30 records of processing activities. The processing activity is:
+
+- **Purpose:** Access control and role assignment within FORM enterprise tier
+- **Legal basis (controller):** Legitimate interests of the employer (Art. 6(1)(f)) — maintaining role-based access to a workplace tool
+- **Data types:** Group membership relationships (user–group pairs); group display names
+- **Retention:** Active while SCIM provisioning active; hard-deleted on user erasure (Art. 17); group records retained until tenant deletes the group via SCIM or tenant offboarding
+- **Recipients:** FORM backend only. Not shared with sub-processors beyond Supabase PostgreSQL and Cloudflare R2 (audit archive)
+
+#### 15.9.5 Art. 9 Group Name Scanner
+
+FORM implements a pre-storage scanner on incoming SCIM Group `displayName` values. The scanner uses the following TypeScript regex constants, which mirror the `BLOCKED_ATTRIBUTE_PATTERNS` from §14.5 but are applied to group names rather than SCIM attribute names:
+
+```typescript
+// src/scim/art9-group-name-scanner.ts
+
+/**
+ * Patterns that may indicate Art. 9 special category data encoded in
+ * a SCIM Group displayName. Mirrors BLOCKED_ATTRIBUTE_PATTERNS (§14.5)
+ * but applied to group names rather than attribute names.
+ *
+ * Positive match triggers scim.group_name_sensitive_detected audit event
+ * and routes the group for compliance-officer review. The group is NOT
+ * rejected — it is stored with a flag and the compliance officer decides
+ * whether to retain, rename (via admin dashboard), or request the customer
+ * rename the group in their IdP.
+ */
+export const ART9_GROUP_NAME_PATTERNS: RegExp[] = [
+  // Health / medical / disability
+  /health/i,
+  /medical/i,
+  /disability/i,
+  /disabilit/i,
+  /condition/i,
+  /diagnosis/i,
+  /patient/i,
+  /oncolog/i,
+  /mental.?health/i,
+  /ptsd/i,
+  /recovery/i,
+  /rehab/i,
+  /wheelchair/i,
+  /chronic/i,
+
+  // Religion / belief
+  /religion/i,
+  /faith/i,
+  /christian/i,
+  /muslim/i,
+  /islam/i,
+  /jewish/i,
+  /hindu/i,
+  /buddhis/i,
+  /ramadan/i,
+  /prayer/i,
+
+  // Trade union / political
+  /union/i,
+  /politic/i,
+  /party.member/i,
+  /activist/i,
+  /labour.rep/i,
+  /shop.steward/i,
+
+  // Ethnic / racial origin
+  /ethnic/i,
+  /race/i,
+  /national.*origin/i,
+  /indigenous/i,
+  /minority/i,
+
+  // Sexual orientation / gender identity
+  /sex.*orient/i,
+  /gender.*ident/i,
+  /lgbtq/i,
+  /lgbt/i,
+  /trans(?:gender)?/i,
+  /nonbinary/i,
+  /queer/i,
+];
+
+/**
+ * Scans a SCIM Group displayName for Art. 9 indicators.
+ * Returns the first matched pattern or null if no match.
+ */
+export function scanGroupDisplayName(displayName: string): RegExp | null {
+  for (const pattern of ART9_GROUP_NAME_PATTERNS) {
+    if (pattern.test(displayName)) {
+      return pattern;
+    }
+  }
+  return null;
+}
+```
+
+**Behaviour on positive match:**
+
+1. FORM **does not reject** the group. Rejection would break the customer's provisioning flow and could leave users without roles. Instead, the group is stored with a `sensitive_name_flagged: true` column in `scim_groups`.
+2. A `scim.group_name_sensitive_detected` audit event is written with: `tenant_id`, `group_id`, `display_name` (stored in audit log only — see note below), `matched_pattern_index` (not the pattern text itself, to avoid redundant storage), `action_required: "compliance_review"`.
+3. The tenant's compliance officer (or `tenant_owner` if no compliance officer role is assigned) receives an in-dashboard notification: "A newly provisioned group name may contain sensitive data requiring review under Art. 9 GDPR. Please review in the Group Settings page."
+4. The compliance officer can either: (a) mark as reviewed and acceptable, (b) request the customer rename the group in their IdP, or (c) manually override the `display_name` in FORM's admin dashboard (the IdP `externalId` and `displayName` are unchanged — this is a FORM-side display override only).
+
+**Note on audit log storage of sensitive group names.** The `displayName` value is stored in the `scim.group_name_sensitive_detected` event to enable the compliance review workflow. This is an intentional exception to the general principle of not storing values in audit logs. The audit log entry is classified as `sensitivity: HIGH` and is accessible only to `compliance_officer` and `security_engineer` roles, not to `tenant_admin` or `tenant_manager`.
+
+---
+
+### 15.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Notes |
+|---|---|---|---|---|---|
+| 1 | Create `scim_groups` and `scim_group_members` tables with RLS policies | platform-engineer | **P0** | M4 | Migration must include lint-check for RLS per §4.3 policy |
+| 2 | Implement `GET /Groups` and `GET /Groups/{id}` endpoints | platform-engineer | **P0** | M4 | Include pagination per §15.5.3 |
+| 3 | Implement `POST /Groups` endpoint with `(tenant_id, external_id)` idempotency | platform-engineer | **P0** | M4 | |
+| 4 | Implement `PUT /Groups/{id}` full-replace endpoint | platform-engineer | **P0** | M4 | Net-add/remove member diff must trigger per-member audit events |
+| 5 | Implement `PATCH /Groups/{id}` with `op: add`, `op: remove`, `op: replace` | platform-engineer | **P0** | M4 | |
+| 6 | Implement `DELETE /Groups/{id}` endpoint | platform-engineer | **P0** | M4 | |
+| 7 | Integrate group-to-role resolution in JIT login flow (§15.4.2 algorithm) | platform-engineer | **P0** | M4 | Must run on every login, not just first provisioning |
+| 8 | Atomic member removal + session revocation in single DB transaction (§15.7, §12.7) | platform-engineer | **P0** | M4 | Transaction rollback on session revocation failure — no partial state |
+| 9 | Art. 9 group name scanner (§15.9.5) — required before first enterprise customer | security-engineer | **P0** | M4 | No enterprise pilot without this active |
+| 10 | All 9 `scim.group_*` audit events wired to DEC-030 HMAC chain | platform-engineer | **P0** | M4 | Includes `scim.group_name_sensitive_detected` |
+| 11 | Feature flag `scim_groups` in admin dashboard UI — enable/disable per tenant | platform-engineer | **P1** | M4 | Default off; enterprise-architect enables per customer |
+| 12 | SCIM conformance test pass via Okta SCIM 2.0 test tool for Groups endpoints | platform-engineer + enterprise-architect | **P1** | M4 | Use Okta's published SCIM 2.0 compliance test suite |
+| 13 | Entra ID nested group integration test — verify `scim.group_nested_flattened` fires correctly | platform-engineer | **P1** | M4 | Test with a real Entra ID dev tenant |
+| 14 | Google Workspace JIT documentation update — reference §15.6.3 and G-014 in §7 onboarding checklist | enterprise-architect | **P1** | M4 | Customer-facing disclosure required before any Google Workspace pilot |
+| 15 | Bulk group operations (`POST /Bulk` with Group resources) | platform-engineer | **P2** | M5 | Not blocking M4 enterprise pilots |
+
+---
+
+### 15.11 G-014 New Gap: SCIM Groups — Google Workspace
+
+| Field | Value |
+|---|---|
+| **Gap ID** | G-014 |
+| **Summary** | Google Workspace does not support SCIM Group provisioning to third-party SCIM endpoints. Google's SCIM implementation covers user lifecycle (create, update, deactivate) but does not expose a `/Groups` push interface for third-party apps. |
+| **Impact** | Enterprise customers using Google Workspace as their sole IdP cannot use SCIM Groups for automated role assignment in FORM. Role assignment must be handled via JIT provisioning with role claims (§11) or manual assignment in the admin dashboard. Joiners/movers/leavers automation is limited compared to Okta and Entra ID deployments. |
+| **Status** | 🔴 By-design limitation of Google Workspace SCIM. Not a FORM defect. No remediation available within FORM's control. |
+| **Mitigation** | Use JIT role claims per §11. Customer configures a custom attribute or group membership claim in their Google Workspace SAML/OIDC app. FORM evaluates the claim at login and assigns the corresponding FORM role. Role changes require the affected user to re-authenticate to take effect. |
+| **Customer disclosure requirement** | Must be disclosed in writing during onboarding for any Google Workspace customer. The disclosure must state: "FORM's SCIM Groups provisioning is not available for Google Workspace. Automated role management uses JIT provisioning with role claims. User deprovisioning requires manual action in the FORM admin dashboard or SCIM User deactivation; group-based automatic deprovisioning is not available." Customer acknowledgement (email or signed onboarding document) must be retained in the customer success record. |
+| **SOC 2 impact** | None — CC6.2 (user access management) is satisfied via JIT provisioning. The JIT path is a documented and audited access control mechanism. SOC 2 auditor must be briefed that SCIM Groups is unavailable for Google Workspace customers and that JIT provisioning is the compensating control. No CC6.2 exception is required. |
+| **Resolution path** | Monitor Google Workspace SCIM roadmap. Google has not publicly committed to third-party SCIM Groups support as of the current document date. Re-evaluate at M6 (est. Q4 2026). If Google introduces SCIM Groups support, implement using the same endpoint and schema as the Okta/Entra ID paths — no FORM schema changes expected. |
+
+---
+
+*v0.7 additions: Section 15 — SCIM 2.0 Groups Provisioning. New database tables: `scim_groups` (RFC 7643 §8 compliant, RLS-enforced via `current_setting('app.tenant_id')::UUID`) and `scim_group_members` (atomic with session revocation per §12.7). Six SCIM Group endpoints specified with pagination (cursor, `count=100&startIndex=1`), rate-limit interaction with §3.6, and `(tenant_id, external_id)` idempotency. Group-to-role mapping: `group_role_mappings` JSONB config extension to `tenant_sso_configs`, `highest_privilege` resolution algorithm (tenant_admin > coach > member > viewer), `tenant_owner` blocked from group assignment, unmapped group fallback with `scim.group_unmapped` audit event and opt-in strict-block mode. IdP-specific: Okta (Push Groups manual config required — common onboarding gap); Entra ID (nested group flattening §15.6.2a — skips `type:"Group"` members, logs `scim.group_nested_flattened`, flat security group or P1/P2 member flattening recommended; dynamic groups treated as static); Google Workspace (SCIM Groups not supported — JIT via §11 compensating control; G-014 new gap). Nine new audit events added to DEC-030 HMAC chain taxonomy. GDPR: group `displayName` as potential Art. 9 carrier; Art. 9 group name scanner with TypeScript `ART9_GROUP_NAME_PATTERNS` regex constants mirroring §14.5 `BLOCKED_ATTRIBUTE_PATTERNS`; non-blocking flag-and-review workflow (not reject); `scim.group_name_sensitive_detected` event; group membership excluded from analytics and tenant-manager RLS; Art. 17 hard-delete of `scim_group_members` on erasure. Customer onboarding checklist extended for all three IdPs. Implementation checklist: 15 tasks (10× P0, 4× P1, 1× P2), M4/M5. G-014: 🔴 Google Workspace by-design limitation; JIT compensating control documented; SOC 2 CC6.2 satisfied; re-evaluate M6 Q4 2026.*

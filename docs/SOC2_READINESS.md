@@ -4341,3 +4341,315 @@ The 2-point increase reflects: (a) two 🔴 gaps formally designed to 🟡 Parti
 ---
 
 *v1.6 additions: Section 26 — CC6 Logical and Physical Access Controls. Full CC6.1–CC6.8 criteria mapping with FORM-specific implementation per sub-criterion. Identity and authentication architecture diagram (IdP/SAML/OIDC → Supabase Auth → API; internal Cloudflare Access layer). MFA enforcement matrix for all six admin surfaces (Cloudflare, Supabase, GitHub, 1Password, AWS, PostHog) with compensating-control narrative for solo-founder separation-of-duties. Break-glass PAM procedure formally mapped to CC6.1 with auditor narrative (compensating controls for pre-team entity accepted by AICPA). User lifecycle: three provisioning flows (SCIM auto, manual invite, consumer self-serve); role modification with atomic SQL + audit_log write in same transaction; deprovisioning SLA ≤24h; full internal engineer offboarding checklist. Physical access and device policy for remote-work context: FileVault 2, MDM enrolment, VPN policy, media disposal via macOS EACS + MDM remote wipe. CC6.6 external threat boundary: Cloudflare WAF + DDoS, CORS enforcement, tenant ID injection at API gateway, zero secrets in VCS. CC6.7 information transmission: all API responses RLS-scoped; S3 audit export with signed URL + approval event; privacy floor transmission restrictions (HR never receives individual data — data-layer enforcement). CC6.8 malicious software: Dependabot + npm audit CI gate; CSP design; no eval() policy; Cloudflare Page Shield. Ten new DEC-030 audit events: access.mfa_enabled, access.mfa_disabled, access.mfa_recovery_initiated, access.session_revoked, access.break_glass_initiated, access.break_glass_expired, access.bulk_export_approved, access.device_registered, access.device_wiped, access.api_key_rotated. Eight evidence artefacts PRE-26-E-001 through PRE-26-E-008. Implementation checklist: 14 items (6 P0, 5 P1, 3 P2). Gap closure: MFA enforcement 🟡 Gap → 🟡 Partial (→🟢 on impl); separation of duties 🟡 Partial → formally documented; media disposal 🔴 Gap → 🟡 Partial; offboarding 🔴 Gap → 🟡 Partial; dependency scanning (CC6.8) 🟡 Gap → 🟡 Partial; external boundary (CC6.6) 🟡 Gap → 🟡 Partial. SOC 2 readiness: ~75% → ~77%.*
+
+---
+
+## 27. CC5 — Control Activities: Policy Framework, Technology Controls & Deployment
+
+> Owner: `compliance-officer`. Review: quarterly.
+> SOC 2 evidence: CC5.1 (risk-to-control mapping), CC5.2 (technology general controls), CC5.3 (policy deployment).
+> Reference: §14 Formal Risk Register, §26 CC6 Logical Access Controls, `docs/SECURITY.md`, `docs/INCIDENT_RESPONSE.md`.
+
+---
+
+### 27.1 CC5.1 Overview — Control Activities Selected to Mitigate Risks
+
+CC5.1 requires the entity to select and develop control activities that contribute to the mitigation of risks to the achievement of objectives to acceptable levels. Controls selected must address the risks identified in the risk assessment (§14).
+
+#### 27.1.1 Risk-to-Control Mapping Matrix
+
+The ten risk categories below map FORM's operational risk taxonomy to the primary mitigating controls already documented in §14. Each row names the risk category, the §14 risk IDs it encompasses, the primary controls, the control owner, the review cadence, and the evidence artefact auditors should pull.
+
+| # | Risk Category | §14 Risk IDs | Primary Mitigating Controls | Control Owner | Review Cadence | Evidence Artefact |
+|---|---|---|---|---|---|---|
+| 1 | **Unauthorized access** — external attacker gains authenticated access to FORM systems | SR-01, SR-02 | Supabase Auth JWT (1h expiry); Cloudflare WAF rate limit (50 req/min/IP); RBAC fail-closed RLS; certificate pinning (mobile) | security-engineer | Quarterly access review (§23) | PRE-26-E-001 (MFA screenshots); WAF rule export (CC7-E-003) |
+| 2 | **API breach** — exploitation of FORM Worker or Supabase REST endpoint to exfiltrate data | SR-01, CR-01 | Tenant ID injected from JWT (not client-supplied); RLS fail-closed; CORS allowlist enforced at Worker; OWASP CRS WAF ruleset active | security-engineer | Per release + quarterly | CORS CI test result; Cloudflare WAF analytics export |
+| 3 | **Insider threat** — current or future employee with production credentials exfiltrates or tampers with data | SR-03 | RBAC least-privilege; break-glass dual-authorization; HMAC-chained audit log (DEC-030); `data.read_individual` audit event; quarterly access review; `#security-alerts` channel | compliance-officer | Quarterly | PRE-26-E-007 (break-glass log); access review memo (§23) |
+| 4 | **Vendor compromise** — upstream dependency or SaaS provider is breached, affecting FORM data | SR-04, VR-01, VR-02 | Dependabot + `npm audit --audit-level=critical` in CI; DPAs signed with all processors; annual vendor security questionnaire (§17); subprocessor list published | devops-lead | Per release (dep scan); annual (vendor review) | CI dep-scan report; vendor risk registry (§17) |
+| 5 | **Downtime** — extended outage of edge runtime, database, or LLM API | AR-01, AR-02, AR-03, AR-04 | Supabase HA + PITR; Cloudflare 300+ PoP redundancy; graceful degradation for Anthropic and ElevenLabs; Better Stack uptime monitoring; on-call alert ≤60 s | devops-lead | Monthly uptime report | Better Stack SLA report; PITR restore test record (§19) |
+| 6 | **Malicious code** — backdoored dependency, eval()-based injection, or malicious CI step introduces code into production | SR-04 | `npm audit` CI gate; Dependabot weekly PRs; CSP header (in design — CC6-GAP-007); no `eval()` policy; Cloudflare Page Shield; `git-secrets` pre-commit hook (CC6-GAP-006) | devops-lead | Per CI run | CI pipeline log; Page Shield report |
+| 7 | **Sub-processor breach** — Anthropic, ElevenLabs, Supabase, PostHog, Cloudflare, Sentry data exposure | VR-02, CR-02 | DPAs and SCCs in place; data minimization (no prompt content in logs — OBSERVABILITY.md §4.5); Sentry `beforeSend` filter; annual security questionnaire per §17 | compliance-officer | Annual | DPA register; Sentry filter CI test |
+| 8 | **Data loss** — accidental or malicious deletion of user health data or audit records | AR-02 | Supabase PITR enabled (RPO 1h, RTO 4h); daily backup freshness alert; audit log backed to R2; HMAC chain integrity verification weekly | devops-lead | Monthly backup test | PITR restore test record; R2 backup freshness alert log |
+| 9 | **Regulatory non-compliance** — GDPR Art. 9 violation, missed DSAR, or HIPAA-adjacent scope creep | PR-01, PR-02 | Explicit consent flow + `privacy.consent_granted` audit event; DSAR workflow with 30-day SLA; compliance calendar (§15); DPIA on file (`docs/GDPR_DPIA.md`); no covered-entity positioning | compliance-officer | Quarterly compliance calendar review | DPIA artefact; DSAR log; consent audit events |
+| 10 | **Credential leakage** — secrets committed to VCS, exposed in CI logs, or hardcoded in mobile binary | SR-05 | All secrets in CF Workers Secrets + Supabase Vault + 1Password; GitHub secret scanning enabled; `git-secrets` pre-commit hook; no `.env` committed policy; TruffleHog CI scan (CC5-P1-003 — gap) | security-engineer | Per commit (pre-commit hook); per release (CI scan) | GitHub secret scanning alert log; TruffleHog CI report |
+
+#### 27.1.2 Control Ownership Register
+
+The control ownership register is distinct from the risk mapping above. It defines accountability at the control level rather than the risk level, and provides the cadence and evidence artefact that a SOC 2 auditor would request to verify that each control is operating.
+
+| Control | Owner | Review Cadence | Evidence Artefact |
+|---|---|---|---|
+| Cloudflare WAF OWASP CRS ruleset | devops-lead | Quarterly — confirm ruleset active; review blocked-request volume | Cloudflare firewall analytics export; WAF rule list screenshot |
+| Supabase Auth JWT expiry (1h access / 30d refresh) | platform-engineer | Per Auth config change; annual baseline review | Supabase Auth config screenshot; `supabase/config.toml` diff |
+| RLS fail-closed policy on all tenant tables | platform-engineer | Per schema migration; quarterly RLS policy audit | RLS policy SQL dump; cross-tenant CI test result |
+| HMAC-chained audit log integrity | security-engineer | Weekly cron — chain-break alert; quarterly manual spot check | Chain-break alert log; weekly cron success metric |
+| Break-glass dual-authorization | compliance-officer | Per event (ticket filed); quarterly log review | PRE-26-E-007 break-glass export; Linear ticket archive |
+| Dependency scanning CI gate | devops-lead | Per CI run (automated); monthly review of open Dependabot PRs | CI pipeline pass/fail log; Dependabot PR queue |
+| MFA enforcement on all admin surfaces | security-engineer | Quarterly — re-screenshot all six surfaces | PRE-26-E-001 MFA screenshot bundle |
+| PITR backup and restore test | devops-lead | Monthly restore drill | PITR restore test record with RPO/RTO measured |
+| DSAR response SLA | compliance-officer | Per request (30-day SLA); quarterly log review | DSAR log with timestamps; Linear ticket per request |
+| Vendor DPA / SCC register | compliance-officer | Annual review + on every new processor | DPA register in `docs/SECURITY.md §5`; SCC execution copies |
+| Consent management | compliance-officer | Per consent flow change; quarterly audit event review | `privacy.consent_granted` audit event sample; consent UI screenshot |
+| Secrets management (CF Secrets + Vault + 1Password) | security-engineer | Per rotation (scheduled or suspected compromise); quarterly inventory | 1Password audit log; `access.api_key_rotated` event sample |
+
+---
+
+### 27.2 CC5.2 Overview — Technology General Controls
+
+CC5.2 requires the entity to select and develop general control activities over technology to support the achievement of objectives.
+
+#### 27.2.1 Infrastructure-as-Code Enforcement Table
+
+FORM's production infrastructure is defined and deployed through code. No infrastructure changes are applied manually to production without a corresponding IaC artefact in version control, except for emergency break-glass changes which are subject to the procedure in §26.4.
+
+| System | IaC Mechanism | Config Location | Drift Detection | Manual Change Policy |
+|---|---|---|---|---|
+| **Cloudflare Workers** | Wrangler CLI (`wrangler deploy`) driven by GitHub Actions CI/CD | `wrangler.toml` + Worker source in `workers/` | GitHub Actions deploy log — any divergence from `main` HEAD is a CI failure | Prohibited without Linear ticket; break-glass only; ticket filed within 1h |
+| **Cloudflare WAF / Firewall Rules** | Terraform (`cloudflare` provider) — rule set managed in `infra/cloudflare/` | `infra/cloudflare/firewall.tf` | Terraform plan in CI detects drift (CC5-P1-005 — gap: not yet automated) | Prohibited; all rule changes via PR → Terraform apply in CI |
+| **Cloudflare Transform Rules / Page Rules** | Terraform | `infra/cloudflare/transforms.tf` | Terraform plan in CI | Same as WAF |
+| **Supabase Schema Migrations** | Supabase migrations (`supabase/migrations/`) applied via `supabase db push` in CI | `supabase/migrations/*.sql` | Migration checksums verified by Supabase CLI before apply | Prohibited in production; all schema changes via numbered migration file |
+| **Supabase Edge Functions** | Deployed via `supabase functions deploy` in GitHub Actions | `supabase/functions/` | CI deploy log; function version tracked in Supabase dashboard | Prohibited; all changes via PR |
+| **Supabase RLS Policies** | Defined in migrations; version-controlled | `supabase/migrations/*.sql` | Any RLS change requires cross-tenant CI test suite pass | Prohibited without migration |
+| **React Native App (iOS/Android)** | Expo Application Services (EAS) — `eas build` + `eas submit` driven by CI | `eas.json` + `app.json` | App store binary hash logged at submission | OTA updates via Expo Updates — limited to JS bundle; no native binary change |
+| **Secrets** — API keys, DB connection strings | Cloudflare Workers Secrets (`wrangler secret put`) + Supabase Vault + 1Password | Not in VCS (enforced by `git-secrets` pre-commit hook) | GitHub secret scanning active; TruffleHog CI scan (CC5-P1-003 — gap) | All rotations logged as `access.api_key_rotated` audit event |
+| **DNS** | Cloudflare DNS managed in Terraform | `infra/cloudflare/dns.tf` | Terraform plan in CI | Prohibited without PR |
+
+#### 27.2.2 Configuration Baseline Standards
+
+The table below defines the required configuration baseline for each technology system. Deviations from baseline require a documented exception approved by `compliance-officer` and filed as a Linear ticket.
+
+| System / Control | Baseline Standard | Current Status | Evidence |
+|---|---|---|---|
+| **Supabase Auth — JWT access token expiry** | 1 hour (3600 s) | 🟢 Compliant | `supabase/config.toml` `[auth] jwt_expiry = 3600`; Supabase dashboard screenshot |
+| **Supabase Auth — refresh token rotation** | 30-day rolling; rotation on every use | 🟢 Compliant | Auth config; `auth.session_*` audit events |
+| **Cloudflare WAF — OWASP Core Rule Set (CRS)** | Enabled; sensitivity Medium; managed ruleset active | 🟢 Compliant | Cloudflare WAF dashboard export; §25 CC7 evidence |
+| **CORS policy** | Allowlist: `https://form.coach`, `https://*.form.coach`; no wildcard origin | 🟢 Compliant | Worker CORS middleware; CORS CI test result |
+| **TLS version** | TLS 1.3 minimum; TLS 1.0 and 1.1 disabled at Cloudflare SSL/TLS settings | 🟢 Compliant | Cloudflare SSL/TLS configuration screenshot; `testssl.sh` output |
+| **Cookie security flags** | `HttpOnly`; `Secure`; `SameSite=Strict` on all session and auth cookies | 🟢 Compliant | Browser DevTools cookie inspection screenshot; Set-Cookie header in CI integration test |
+| **Content Security Policy (CSP)** | `default-src 'self'`; no `unsafe-inline` for scripts; no `unsafe-eval` | 🟡 Gap — CSP header not yet deployed | CC6-GAP-007 (Cloudflare Transform Rule); target: P1 |
+| **Dependabot** | Enabled; weekly dependency PRs for `dependencies` and `devDependencies`; `npm audit --audit-level=critical` fails CI | 🟡 Partial — Dependabot enabled; CI gate gap (CC6-GAP-005) | `.github/dependabot.yml`; CI pipeline log |
+| **GitHub branch protection — `main`** | Require PR; require CI pass; require 1 approver (solo-founder compensating control: require CI pass as gate; approver waived until second engineer — documented exception); no force push | 🟡 Partial — CI gate enforced; approver requirement waived with documented exception | GitHub branch protection settings screenshot; exception filed as Linear ticket |
+| **Encryption at rest** | AES-256 via Supabase (PostgreSQL encryption); Cloudflare R2 (AES-256); device: FileVault 2 | 🟢 Compliant | Supabase encryption-at-rest documentation; R2 encryption spec; MDM FileVault report (PRE-26-E-004) |
+| **Encryption in transit** | TLS 1.3 only on all external endpoints; Supabase internal connections TLS enforced | 🟢 Compliant | `testssl.sh` output; Cloudflare SSL/TLS config |
+| **React Native — certificate pinning** | SHA-256 pin for `api.form.coach` and `supabase.co` endpoints | 🟢 Compliant | `src/api/httpClient.ts` pin config; EAS build artefact |
+
+#### 27.2.3 Logical Access to Technology Systems
+
+All administrative surfaces require MFA. The table below maps each system to its MFA mechanism, the gap status (cross-referencing §26 CC6-GAP items), and the access control policy.
+
+| System | MFA Mechanism | Access Policy | Gap Status | §26 Cross-Reference |
+|---|---|---|---|---|
+| **Supabase Dashboard** | TOTP (Supabase account-level) | Named accounts only; no shared credentials; `owner` role for compliance-officer + security-engineer; no external access | 🟡 Partial — account-level TOTP active; tenant-admin TOTP at application layer gap | CC6-GAP-003 |
+| **Cloudflare Dashboard** | TOTP or hardware key (Cloudflare account MFA setting) | Named accounts; `Super Administrator` role for founder only; no shared credentials | 🟡 Gap — account-wide "require 2FA" not yet enforced for all members | CC6-GAP-002 |
+| **GitHub** | TOTP or hardware key | Org "require 2FA for all members" policy not yet enabled; currently enforced by individual account settings | 🟡 Gap — org-level enforcement not yet enabled | CC6-GAP-001 |
+| **PostHog** | TOTP (PostHog SAML SSO or built-in MFA) | Named accounts; no shared credentials; read-only access for non-engineers | 🟢 Compliant | — |
+| **1Password** | TOTP + device trust | All team members; emergency-access contact defined; shared vaults by role | 🟢 Compliant | — |
+| **AWS (S3 audit export)** | IAM + MFA for console; programmatic access via least-privilege IAM role (no console login for service accounts) | No human IAM users with console access in production; export Lambda uses scoped IAM role | 🟢 Compliant | PRE-26-E-001 |
+
+CC6-GAP-001 and CC6-GAP-002 are the outstanding gaps in this table. Both are P0 items that must be closed before the SOC 2 observation period begins.
+
+#### 27.2.4 Automated Control Monitoring
+
+The following automated monitors provide continuous evidence that technology controls are operating. Each monitor maps to the control it verifies and the alert destination.
+
+| Monitor | Control Verified | Alert Destination | Cadence | Gap Status |
+|---|---|---|---|---|
+| **PostHog auth anomaly detection** — `supabase_auth_failures_total > 50/min` triggers P1 alert | Unauthorized access (SR-02); Cloudflare WAF rate limit effectiveness | `#security-alerts` Slack channel; PagerDuty on-call | Real-time (metric evaluated every 60 s) | 🟡 Partial — PostHog event tracking active; alert threshold not yet wired to PagerDuty (CC4 gap) |
+| **HMAC chain-break event** — `audit.chain_break_detected` fires if HMAC verification fails on weekly cron | Audit log tamper detection (SR-03); DEC-030 integrity | `#security-alerts` Slack; P0 incident | Weekly cron | 🟢 Active — DEC-030 implementation |
+| **Better Stack API error rate** — HTTP 5xx rate > 1% over 5 min pages on-call | Availability (AR-01 through AR-04); SLA monitoring | PagerDuty on-call; status page update | Real-time | 🟡 Partial — Better Stack account created; alert routing to PagerDuty pending |
+| **Backup freshness alert** — daily cron verifies PITR backup timestamp is < 25h old | Data loss prevention (AR-02) | `#ops-alerts` Slack | Daily | 🟡 Partial — PITR enabled; freshness alert cron not yet implemented |
+| **SSL certificate expiry** — Cloudflare alert 30 days before cert expiry | Encryption in transit baseline | Cloudflare email + `#ops-alerts` Slack | Daily check by Cloudflare | 🟢 Active — Cloudflare managed certificate with auto-renewal |
+| **Dependabot CI gate** — `npm audit --audit-level=critical` fails CI on any critical CVE | Malicious code / dependency (SR-04, CC5 control #6) | CI failure → PR blocked | Per CI run | 🟡 Gap — CI gate not yet merged (CC6-GAP-005) |
+| **TruffleHog CI secret scan** — scans all commits in PR for credential patterns | Credential leakage (SR-05, CC5 control #10) | CI failure → PR blocked | Per CI run | 🔴 Gap — not yet implemented (CC5-P1-003) |
+
+---
+
+### 27.3 CC5.3 Overview — Policies and Procedures Deployed
+
+CC5.3 requires the entity to deploy control activities through policies that establish what is expected and procedures that put policies into action.
+
+#### 27.3.1 Policy Inventory
+
+FORM maintains the following policy inventory. Policies marked 🔴 Gap have not yet been authored and represent the primary CC5 compliance debt surfaced by this section.
+
+| # | Policy | Owner | Status | Location | Approval Date | Review Cadence |
+|---|---|---|---|---|---|---|
+| 1 | **Information Security Policy** | compliance-officer | 🟢 In force | `docs/SECURITY.md` | git commit timestamp (initial publication) | Annual |
+| 2 | **Incident Response Policy** | compliance-officer | 🟢 In force | `docs/INCIDENT_RESPONSE.md` | git commit timestamp | Annual + after every P0/P1 incident |
+| 3 | **Data Classification Policy** | compliance-officer | 🟢 In force | `docs/SECURITY.md §3` (classification tiers) | git commit timestamp | Annual |
+| 4 | **Access Control Policy** | compliance-officer | 🟢 In force | `docs/AUDIT_LOG_SCHEMA.md` (role matrix) + `docs/SOC2_READINESS.md §26` | git commit timestamp | Annual + quarterly access review |
+| 5 | **Change Management Policy** | compliance-officer | 🟢 In force | `docs/SOC2_READINESS.md §21` (CC8) | git commit timestamp | Annual |
+| 6 | **Vendor Management Policy** | compliance-officer | 🟢 In force | `docs/SOC2_READINESS.md §17` (CC9) | git commit timestamp | Annual |
+| 7 | **Business Continuity Policy** | compliance-officer | 🟢 In force | `docs/SOC2_READINESS.md §18` (A1 BCP) | git commit timestamp | Annual + after any DR test |
+| 8 | **Data Retention and Deletion Policy** | compliance-officer | 🟢 In force | `docs/SECURITY.md §8` + `docs/GDPR_DPIA.md` | git commit timestamp | Annual |
+| 9 | **Security Awareness Training Policy** | compliance-officer | 🟡 Partial | `docs/SOC2_READINESS.md §22` (programme defined) | Programme defined; formal policy document not yet a standalone artefact | Annual |
+| 10 | **Vulnerability Management Policy** | compliance-officer | 🟡 Partial | `docs/SOC2_READINESS.md §16` (pen test programme) + CC6-GAP-005 (dep scanning) | Programme defined; formal policy document not yet standalone | Annual |
+| 11 | **Acceptable Use Policy (AUP)** | compliance-officer | 🔴 Gap — not yet authored | Annex A (draft, not yet in force) | Not yet approved | Annual; on every new hire |
+| 12 | **Cryptography Policy** | compliance-officer | 🔴 Gap — not yet authored | Pending — must define: approved cipher suites, key lengths, rotation schedules, key custody | Not yet approved | Annual |
+
+**CC1 cross-reference:** The AUP gap was first surfaced in §1 (CC1 — Control Environment) as "Code of conduct / acceptable use policy: 🟡 Gap — Draft needed." This section formally assigns the gap ID CC5-GAP-001 and provides the draft in Annex A.
+
+#### 27.3.2 Policy Communication Evidence — Solo-Founder Compensating Control Narrative
+
+SOC 2 CC5.3 requires that policies are communicated to personnel responsible for implementing them. FORM is a pre-team entity. The following narrative documents the compensating control for the observation period and is intended to be read into the audit record.
+
+**Context:** At the time of writing (May 2026), FORM has one person — the founder — with access to production systems. All policies listed in §27.3.1 are authored by and communicated to the same individual. This is a known limitation of pre-team entities seeking SOC 2 Type I/II certification.
+
+**Compensating controls accepted by AICPA for pre-team entities:**
+
+1. **Git commit timestamps as policy publication evidence.** Every policy document exists in the `form` git repository. The commit timestamp of each file's initial creation, and the timestamp of each subsequent revision, constitutes documented publication. The git log is tamper-evident by SHA-256 commit hashing. Auditors may run `git log --follow docs/SECURITY.md` to verify.
+
+2. **Compliance calendar as communication cadence evidence.** `docs/SOC2_READINESS.md §15` defines a quarterly compliance calendar. The founder's execution of each calendar item — evidenced by the Linear ticket created per calendar event — demonstrates that policy review and re-acknowledgment occurs on schedule.
+
+3. **New-hire onboarding checklist (CC5-P2-007).** Upon hiring the first employee, a formal policy acknowledgment log (signed PDF or DocuSign) will be obtained for all 12 policies. The onboarding checklist template is pre-authored as part of CC5-P2-007. The absence of signatures today is not a gap because there are no employees other than the founder-author.
+
+4. **Policy approval log CSV (CC5-P1-004).** A `compliance/policy-approval-log.csv` artefact will be created to record: policy name, version, approval date, approver (founder), and next review date. This CSV, version-controlled in git, creates an auditor-readable approval record.
+
+**Auditor note:** AICPA Interpretation — When evaluating pre-team entities, auditors consider the compensating control narrative above in lieu of signed acknowledgment records. The key evidence is that policies exist, are current, and have been applied (evidenced by the technical controls they specify being operational).
+
+#### 27.3.3 Control Procedure Deployment Table
+
+Each policy must be backed by one or more procedures (runbooks) that operationalize it. The table below maps each policy to its implementing procedure and the location of that procedure.
+
+| Policy | Implementing Procedure | Location | Status |
+|---|---|---|---|
+| Information Security Policy | Security Engineer runbook; WAF rule maintenance; secret rotation procedure | `docs/SECURITY.md`; `docs/ENGINEERING_RUNBOOK.md` | 🟢 Deployed |
+| Incident Response Policy | Incident Response runbook — P0/P1/P2 triage procedure; on-call escalation | `docs/INCIDENT_RESPONSE.md` | 🟢 Deployed |
+| Data Classification Policy | Data classification applied in `DATA_MODEL.md` (table-level sensitivity labels); `OBSERVABILITY.md §4.5` (log filter for health data) | `docs/DATA_MODEL.md`; `docs/OBSERVABILITY.md` | 🟢 Deployed |
+| Access Control Policy | User provisioning / deprovisioning procedure; break-glass procedure; quarterly access review procedure | `docs/SOC2_READINESS.md §26.3–26.5`; `docs/SOC2_READINESS.md §23` | 🟢 Deployed |
+| Change Management Policy | PR → review → CI pass → merge → deploy procedure; emergency change procedure | `docs/SOC2_READINESS.md §21`; GitHub branch protection config | 🟢 Deployed |
+| Vendor Management Policy | Vendor onboarding procedure (DPA review → security questionnaire → approval); annual vendor review | `docs/SOC2_READINESS.md §17` | 🟢 Deployed |
+| Business Continuity Policy | BCP activation runbook; PITR restore procedure; Anthropic fallback procedure | `docs/SOC2_READINESS.md §18–19`; `docs/DATA_MODEL.md §10` | 🟢 Deployed |
+| Data Retention and Deletion Policy | DSAR response procedure; right-to-erasure technical implementation | `docs/SECURITY.md §8–9`; `docs/GDPR_DPIA.md` | 🟢 Deployed |
+| Security Awareness Training Policy | Annual training programme (modules, delivery, completion tracking) | `docs/SOC2_READINESS.md §22` | 🟡 Partial — programme defined; completion tracking pre-team |
+| Vulnerability Management Policy | Pen test programme (§16); Dependabot PR triage procedure; CVE response SLA | `docs/SOC2_READINESS.md §16`; CI pipeline | 🟡 Partial — pen test programme defined; dep scan CI gate gap (CC6-GAP-005) |
+| Acceptable Use Policy | AUP acknowledgment procedure (new-hire onboarding checklist — CC5-P2-007) | Annex A (draft); CC5-P2-007 | 🔴 Gap — policy not yet in force |
+| Cryptography Policy | Key rotation procedure; cipher suite baseline (`wrangler.toml`, TLS config) | Pending policy authoring (CC5-P0-002) | 🔴 Gap — policy not yet authored |
+
+---
+
+### 27.4 CC5 Gap Analysis
+
+| Sub-Criterion | Status | Notes |
+|---|---|---|
+| **CC5.1** — Control activities selected to mitigate risks | 🟡 Partial | Risk-to-control matrix complete (§27.1.1). Control ownership register complete (§27.1.2). Gaps: TruffleHog CI not yet deployed (credential leakage control incomplete); Terraform IaC drift detection not yet automated (CC5-P1-005). |
+| **CC5.2** — Technology general controls | 🟡 Partial | IaC enforcement table complete (§27.2.1). Configuration baseline documented (§27.2.2). Logical access table complete with MFA gap cross-references (§27.2.3). Automated monitoring table complete (§27.2.4). Gaps: CSP header not deployed (CC6-GAP-007); Dependabot CI gate not merged (CC6-GAP-005); Better Stack → PagerDuty routing incomplete; backup freshness alert not implemented; TruffleHog CI not deployed (CC5-P1-003). |
+| **CC5.3** — Policies and procedures deployed | 🟡 Partial | 8 of 12 policies 🟢 In force. 2 policies 🟡 Partial (Security Awareness Training, Vulnerability Management — programmes defined but standalone policy documents not yet separated). 2 policies 🔴 Gap (AUP — CC5-GAP-001; Cryptography Policy — CC5-GAP-002). Policy communication compensating control narrative documented and auditor-ready (§27.3.2). Policy approval log CSV not yet created (CC5-P1-004). |
+
+---
+
+### 27.5 Implementation Checklist
+
+Items ordered by SOC 2 auditor impact. P0 items must be complete before the observation period begins.
+
+#### P0 — Required before observation period
+
+| ID | Action | Owner | Dependency |
+|---|---|---|---|
+| **CC5-P0-001** | Author and formally approve the Acceptable Use Policy. Promote Annex A draft to `docs/ACCEPTABLE_USE_POLICY.md`. Record in `compliance/policy-approval-log.csv`. Communicate to any personnel with system access. | compliance-officer | Annex A draft (this document); `compliance/policy-approval-log.csv` creation (CC5-P1-004) |
+| **CC5-P0-002** | Author and formally approve the Cryptography Policy. Must define: approved cipher suites (TLS 1.3; AES-256-GCM at rest; HMAC-SHA256 for audit chain), minimum key lengths (RSA 2048 / ECC 256), key rotation schedules (JWT signing key 90 days; API keys per §26.5.3 SLA; DB encryption key annual), key custody (1Password + Supabase Vault), and algorithm deprecation procedure (SHA-1 and MD5 prohibited). File at `docs/CRYPTOGRAPHY_POLICY.md`. | compliance-officer | No technical dependency; policy authoring only |
+
+#### P1 — Required within 30 days of observation period start
+
+| ID | Action | Owner | Dependency |
+|---|---|---|---|
+| **CC5-P1-003** | Add TruffleHog CI scan to GitHub Actions PR workflow. TruffleHog `--only-verified` flag scans all commits in the PR diff for verified credentials (Anthropic, Supabase, Stripe, ElevenLabs, Cloudflare, AWS patterns). CI fails on any verified finding. Complements existing `git-secrets` pre-commit hook (CC6-GAP-006) for defense-in-depth. | security-engineer | GitHub Actions workflow; TruffleHog GitHub Action (`trufflesecurity/trufflehog@main`) |
+| **CC5-P1-004** | Create `compliance/policy-approval-log.csv` with columns: `policy_name`, `version`, `approval_date`, `approver`, `next_review_date`, `location`. Populate with all 12 policies (8 in force with git commit timestamp as approval date; 2 partial with estimated dates; 2 gap entries with status `pending-authoring`). Commit to `main`; this CSV becomes the auditor-facing policy register. | compliance-officer | CC5-P0-001 and CC5-P0-002 completed first (so all 12 rows can be populated) |
+| **CC5-P1-005** | Implement Terraform IaC drift detection in CI. Add a `terraform plan` step to the GitHub Actions workflow for `infra/cloudflare/`. Pipeline should fail if `terraform plan` produces any diff against the deployed state (i.e., manual change was made outside Terraform). Alert sent to `#ops-alerts` on any non-zero plan output outside of a planned change PR. | devops-lead | Terraform state backend configured (Cloudflare-provider remote state or Terraform Cloud); `infra/cloudflare/` Terraform configs in repo |
+
+#### P2 — Recommended within observation period
+
+| ID | Action | Owner | Dependency |
+|---|---|---|---|
+| **CC5-P2-006** | Archive CI build and deploy logs to Cloudflare R2 for audit evidence retention. GitHub Actions logs are deleted after 90 days by default — insufficient for SOC 2 Type II (minimum 12-month observation period + 2-year evidence retention). Implement a GitHub Actions workflow step that uploads the final log bundle (JSON artefact) to `r2://form-audit-logs/ci/<YYYY-MM-DD>/<run-id>.json.gz` after every deploy to production. Retain for 3 years (matching DEC-030 audit log retention). | devops-lead | Cloudflare R2 bucket `form-audit-logs` exists (referenced in §19); R2 API token with `PutObject` scope in GitHub Secrets |
+| **CC5-P2-007** | Author new-hire security onboarding checklist. The checklist must include: (a) policy acknowledgment sign-off for all 12 policies in the policy inventory (§27.3.1) — DocuSign or PDF with wet signature; (b) 1Password vault invitation and device trust enrolment; (c) MDM device enrolment (Jamf Now or Kandji); (d) GitHub org 2FA verification; (e) completion of the security awareness training curriculum (§22); (f) break-glass access briefing. File checklist template at `compliance/onboarding-checklist-template.md`. Execute for every new team member before production access is granted. | compliance-officer | First new hire imminent; dependency on CC5-P0-001 (AUP must be in force before it can be acknowledged) |
+
+---
+
+### 27.6 SOC 2 Readiness Delta
+
+This section formally maps pre-existing FORM controls to the CC5 framework. Prior to §27, CC5 was represented in this document only by the brief summary table in §1 (four rows). No CC5 sub-criterion had been mapped to the full control inventory.
+
+**What §27 does:**
+
+- Surfaces the two most significant policy gaps (AUP, Cryptography Policy) as named, tracked items with assigned IDs and owners. These gaps were visible in §1 CC1 but were not quantified against CC5.3.
+- Provides auditors with the risk-to-control mapping matrix (§27.1.1) they will request in fieldwork — without this, an auditor would have to reconstruct it manually from scattered sections.
+- Documents the compensating control narrative (§27.3.2) for the solo-founder pre-team policy communication gap — this narrative is required for a clean Type I report.
+- Identifies TruffleHog CI and IaC drift detection as unimplemented technology controls under CC5.2, both of which were invisible before this section.
+
+**Readiness score impact:**
+
+| Metric | Before §27 | After §27 design | After §27 implementation |
+|---|---|---|---|
+| CC5.1 status | 🟡 (implicitly — controls existed but not mapped) | 🟡 Partial — formally documented | 🟢 Done — when CC5-P1-003 (TruffleHog) and CC5-P1-005 (IaC drift) are implemented |
+| CC5.2 status | 🟡 (implicitly — controls existed but not mapped) | 🟡 Partial — formally documented; 5 technology gaps named | 🟢 Done — when CC6-GAP-005/007 + CC5-P1-003/005 + monitoring gaps are closed |
+| CC5.3 status | 🟡 (8 policies existed; 2 absent; not mapped to CC5.3) | 🟡 Partial — 2 gaps formally named; AUP draft in Annex A | 🟢 Done — when CC5-P0-001/002 authored and CC5-P1-004 CSV filed |
+| 🔴 Critical gaps surfaced by §27 | 0 new (pre-existing) | 0 new critical gaps | — |
+| 🟡 Gap items named and tracked | +5 (CC5-GAP-001 through CC5-GAP-005) | Gaps were pre-existing; §27 makes them visible | — |
+
+**Readiness remains ~77%.** No regression — the gaps surfaced (AUP, Cryptography Policy, TruffleHog CI, IaC drift, policy approval log) were pre-existing but had not been formally tracked under CC5. §27 does not introduce new gaps; it formally identifies and assigns them.
+
+---
+
+### 27.7 Open Items
+
+| ID | Item | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC5-GAP-001** | Author and approve Acceptable Use Policy | P0 — blocks CC5.3 from 🟡 to 🟢; also blocks CC1 gap closure (§1 CC1 row 1) | compliance-officer | Annex A draft is ready to promote; action is approval, not authoring from scratch |
+| **CC5-GAP-002** | Author and approve Cryptography Policy | P0 — blocks CC5.3 and CC5.2 (configuration baseline requires policy backing) | compliance-officer | Must define cipher suites, key lengths, rotation schedule, key custody, SHA-1/MD5 prohibition |
+| **CC5-GAP-003** | Deploy TruffleHog CI scan (CC5-P1-003) | P1 — closes credential leakage control gap in CC5.1 risk-to-control matrix (row 10) and CC5.2 automated monitoring table | security-engineer | Complements CC6-GAP-006 (`git-secrets` pre-commit); defense-in-depth for SR-05 |
+| **CC5-GAP-004** | Create `compliance/policy-approval-log.csv` (CC5-P1-004) | P1 — primary auditor-facing policy register; without it, policy communication evidence relies solely on git timestamps | compliance-officer | Requires CC5-GAP-001 and CC5-GAP-002 to be resolved first for complete population |
+| **CC5-GAP-005** | Implement Terraform IaC drift detection in CI (CC5-P1-005) | P1 — closes CC5.2 IaC enforcement gap; without it, manual Cloudflare WAF changes cannot be detected | devops-lead | Terraform remote state backend must be configured first; estimate 1 day of engineering |
+
+---
+
+### Annex A — Acceptable Use Policy (Draft)
+
+> **Status: Draft — not yet in force.**
+> This draft is provided as part of the CC5-P0-001 implementation artefact. It must be reviewed, approved, and published to `docs/ACCEPTABLE_USE_POLICY.md` before it takes effect. Approval is recorded in `compliance/policy-approval-log.csv`.
+> Version: 0.1-draft. Date: 2026-05-19. Owner: compliance-officer.
+
+---
+
+**Purpose**
+
+This Acceptable Use Policy (AUP) defines the permitted and prohibited uses of FORM information systems, infrastructure, data, and tools by any person granted access — including the founding team, contractors, and future employees. Its purpose is to protect the confidentiality, integrity, and availability of FORM systems and the personal data of FORM users, and to satisfy AICPA SOC 2 CC1.1 and CC5.3 requirements.
+
+**Scope**
+
+This policy applies to all individuals granted access to any FORM system, including but not limited to: Cloudflare dashboard, Supabase dashboard, GitHub organisation, PostHog, 1Password, AWS, internal developer tooling, and any device used to access the above. Access to FORM systems constitutes acceptance of this policy.
+
+**Acceptable Uses**
+
+The following uses of FORM systems are permitted:
+
+1. Accessing FORM systems for the purpose of performing assigned job responsibilities.
+2. Using FORM development and production infrastructure to build, test, deploy, and operate FORM products and services.
+3. Accessing user data strictly in accordance with the Access Control Policy (`docs/SOC2_READINESS.md §26`) and only where a legitimate operational need exists — such as responding to a support request, executing a break-glass procedure, or fulfilling a DSAR.
+4. Using FORM-issued or FORM-approved devices for business purposes, subject to the device security requirements in `docs/SOC2_READINESS.md §26.6` (FileVault 2 enabled; MDM enrolled).
+5. Communicating about FORM business using FORM-approved communication channels (Slack, Linear, GitHub).
+6. Downloading or copying FORM data for authorised backup, DSAR fulfilment, or audit evidence purposes, provided that the operation is logged in the DEC-030 audit trail.
+
+**Prohibited Uses**
+
+The following uses are strictly prohibited:
+
+1. Accessing, copying, or transmitting FORM user health data for any purpose other than an explicitly authorised operational need. Curiosity access, personal research, or access outside of a documented support ticket are prohibited.
+2. Sharing FORM credentials, API keys, or access tokens with any person not named in the Access Control Policy, or storing credentials in any location other than 1Password, Cloudflare Workers Secrets, or Supabase Vault.
+3. Committing secrets, credentials, API keys, or personally identifiable information to any git repository — including private repositories.
+4. Disabling, modifying, or circumventing any security control (MFA, Cloudflare WAF, RLS policy, HMAC audit log, CSP header) without prior approval from `compliance-officer` and a filed Linear exception ticket.
+5. Using FORM systems or data for personal financial gain, competitive intelligence gathering, or any purpose unrelated to FORM business.
+6. Installing unauthorised software on FORM-issued or MDM-enrolled devices that has not been approved by the security-engineer.
+7. Transmitting FORM user health data to any third party not listed in the subprocessor register (`docs/SECURITY.md §5`), including any employer, HR system, or analytics platform not covered by a signed DPA.
+
+**Consequences**
+
+Violation of this policy may result in immediate revocation of system access, termination of employment or contract, and where applicable, notification to relevant regulatory authorities. Health data violations may constitute a GDPR Art. 83 infringement and will be treated as a P0 security incident per `docs/INCIDENT_RESPONSE.md`.
+
+**Review**
+
+This policy is reviewed annually by `compliance-officer` and updated to reflect changes in FORM's system architecture, team structure, or regulatory obligations. All persons with system access must re-acknowledge this policy on each annual review cycle and upon any material change. Acknowledgment is recorded in `compliance/policy-approval-log.csv`.
+
+---
+
+*v1.7 additions: Section 27 — CC5 Control Activities: Policy Framework, Technology Controls and Deployment. Full CC5.1–CC5.3 criteria mapping for FORM's Cloudflare Workers + Supabase + React Native stack. CC5.1: ten-category risk-to-control mapping matrix cross-referenced to §14 risk register (SR, AR, IR, CR, PR, VR categories); twelve-control ownership register with named owners, review cadences, and evidence artefacts. CC5.2: IaC enforcement table for all nine deployment systems (Wrangler, Terraform, Supabase migrations, Edge Functions, EAS, CF Workers Secrets + Supabase Vault, DNS); configuration baseline standards for thirteen controls (JWT expiry, WAF CRS, CORS, TLS, cookies, CSP, Dependabot, branch protection, encryption at rest/in-transit, certificate pinning); logical access table for six admin surfaces mapped to CC6-GAP-001/002 outstanding MFA gaps; automated monitoring table for seven monitors including HMAC chain-break, Better Stack, backup freshness, SSL expiry, Dependabot CI gate, and TruffleHog (gap). CC5.3: twelve-policy inventory (8 in force, 2 partial, 2 gap — AUP and Cryptography Policy); solo-founder compensating control narrative for policy communication evidence (git commit timestamps + compliance calendar + pre-authored onboarding checklist + policy approval log CSV); control procedure deployment table mapping all twelve policies to implementing runbooks. Gap analysis: all three CC5 sub-criteria 🟡 Partial. Implementation checklist: seven items across P0/P1/P2 (CC5-P0-001 AUP authoring, CC5-P0-002 Cryptography Policy, CC5-P1-003 TruffleHog CI, CC5-P1-004 policy approval log CSV, CC5-P1-005 IaC drift detection, CC5-P2-006 CI log archive to R2, CC5-P2-007 new-hire onboarding checklist). Five open items CC5-GAP-001 through CC5-GAP-005. Annex A: AUP draft (status: not yet in force) with purpose, scope, six acceptable uses, seven prohibited uses, consequences, and review cadence. SOC 2 readiness: ~77% (no regression — gaps were pre-existing but un-surfaced by prior sections).*

@@ -11,6 +11,14 @@
 
 ---
 
+## [0.85.0] — 2026-05-19
+
+### Added
+- `docs/SOC2_READINESS.md §27` — CC5 Control Activities: risk-to-control mapping (10 categories), IaC baseline table, configuration standards, policy inventory (12 policies, AUP + Cryptography Policy as 🔴 gaps), solo-founder compensating control narrative, AUP draft in Annex A; 5 open items CC5-GAP-001–005; readiness ~77% (no regression)
+- `docs/SSO_SCIM_IMPLEMENTATION.md §15` — SCIM 2.0 Groups Provisioning: RFC 7643 §8 schema, `scim_groups`/`scim_group_members` tables with RLS, 6 SCIM endpoints, group-to-role `highest_privilege` algorithm, Okta/Entra/Google Workspace IdP specifics, nested group flattening (§15.6.2a), Art. 9 group name scanner, 9 audit events (DEC-030 HMAC chain), G-014 gap (Google Workspace by-design limitation); 15-item implementation checklist
+
+---
+
 ## [0.84.2] — 2026-05-19
 
 ### Added
