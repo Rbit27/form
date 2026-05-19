@@ -98,7 +98,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Incident detection and response | ✅ Done | `docs/SECURITY.md` §7 severity levels (SEV-0 through SEV-3) + runbook |
 | Vulnerability scanning (dependencies) | 🟡 Gap | Dependabot / `npm audit` planned; implement in CI |
 | Patching SLA defined | 🟡 Gap | Define: critical patches <24h, high <7d, medium <30d |
-| System health monitoring | 🟡 Gap | Uptime monitoring with customer-facing status page needed |
+| System health monitoring | 🟡 Partial | Architecture defined (§20); Better Stack Statuspage implementation checklist pending |
 | External penetration test | 🟡 Partial | Program defined — Section 16; first test pending PRE-21 |
 
 ### CC8 — Change Management
@@ -127,8 +127,8 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Control | Status | Evidence |
 |---|---|---|
 | SLA commitments documented | ✅ Done | `docs/ENTERPRISE.md` — 99.9% uptime, P0 <1h response |
-| Uptime monitoring with historical data | 🔴 Gap | Must implement before observation period; Better Uptime or equivalent |
-| Customer-facing status page | 🔴 Gap | status.form.coach — required for enterprise tier |
+| Uptime monitoring with historical data | 🟡 Partial | Architecture defined (§20); Better Stack provisioning = PRE-10 |
+| Customer-facing status page | 🟡 Partial | Architecture defined (§20); CNAME + 6 components specified; implementation = PRE-11 |
 | SLA credit calculation and process | 🟡 Gap | Define formula and claim process |
 
 ### A1.2 — Capacity Planning
@@ -250,7 +250,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Severity | Count | Examples |
 |---|---|---|
-| 🔴 **Critical gap** (blocks SOC 2) | 3 | Status page (status.form.coach), sub-processor list published, annual privacy review |
+| 🔴 **Critical gap** (blocks SOC 2) | 2 | Sub-processor list published, annual privacy review |
 | 🟡 **Partial / needs formalization** | 30 | Security training (Q1-Feb scheduled), offboarding procedure (cadence set), vendor registry, DR drill (Q1-Jan scheduled), CC7.1–CC7.2 (pentest program defined, execution pending), patching SLA, DSAR SLA |
 | ✅ **In place** | 28 | HMAC audit log, encryption, access controls, CV on-device, breach notification, data classification policy (§13), DPIA (docs/GDPR_DPIA.md), formal risk register (§14), compliance calendar (§15), penetration test program (§16), privacy policy (docs/PRIVACY_POLICY.md) |
 
@@ -868,7 +868,7 @@ The SOC 2 Type II observation clock **cannot start** until the items below are f
 | # | Item | Owner | Target Date | Status |
 |---|---|---|---|---|
 | PRE-10 | Uptime monitoring live with ≥30 days of historical data before observation start; alert fires in <60 seconds | devops-lead | Month O-4 | 🔴 Open |
-| PRE-11 | Customer-facing status page live at `status.form.coach` with 90-day history visible | devops-lead | Month O-4 | 🔴 Open |
+| PRE-11 | Customer-facing status page live at `status.form.coach` with 90-day history visible | devops-lead | Month O-4 | 🟡 Partial (architecture + checklist: §20) |
 | PRE-12 | MFA enforced on all admin surfaces: Cloudflare dashboard, Supabase, 1Password, GitHub, PostHog, Sentry | security-engineer | Month O-4 | 🟡 Partial |
 | PRE-13 | Dependency scanning (Dependabot + `npm audit`) running in CI; critical CVEs fail the build | devops-lead | Month O-3 | 🟡 Partial |
 | PRE-14 | Branch protection enforced: PR review required + CI pass before merge to `main` | security-engineer | Month O-3 | 🟡 Partial |
@@ -2061,7 +2061,294 @@ Execute in the order listed. Each P0 item is a gate for enterprise launch (M4).
 
 ---
 
-**v0.9 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
+## 20. Status Page Architecture & Availability Communication (status.form.coach)
+
+> Owner: `devops-lead` + `compliance-officer`. Review: after each architecture change that affects monitored components, or annually.
+> SOC 2 controls: **A1.1** (System availability commitments), **A1.2** (Environmental protections and capacity), **CC7.4** (Communicates security incidents to external parties), **CC6.8** (Prevents unauthorized access — scheduled maintenance communication).
+
+---
+
+### 20.1 Purpose
+
+This section designs FORM's customer-facing status page at `status.form.coach` and closes the critical SOC 2 Availability gap noted in §2 and §11:
+
+> *"Customer-facing status page — 🔴 Gap — status.form.coach required for enterprise tier"*
+
+A public status page is required for three distinct reasons:
+
+1. **SOC 2 Type II evidence.** Auditors require documented proof that FORM communicates availability events to affected parties (CC7.4) and that uptime commitments are backed by historical monitoring data (A1.1). A status page with 90 days of incident history before the observation period starts satisfies both controls simultaneously.
+
+2. **Enterprise procurement.** Enterprise buyers verify operational maturity during security review. Absence of a public status page is a consistent blocker in procurement questionnaires. The Better Stack Statuspage link is referenced in enterprise MSAs (§7 of the SSO_SCIM_IMPLEMENTATION.md onboarding checklist) and in DPAs as the breach communication channel.
+
+3. **Employee trust at scale.** Employees using FORM during active incidents need a single authoritative source — not a support email backlog. The status page is the single source of truth for incident state and expected recovery time.
+
+**Scope of this section:** Architecture, component inventory, incident state taxonomy, update protocol, subscriber notifications, historical data archival, SOC 2 evidence mapping, and implementation checklist. This section does not define incident detection rules (see `docs/OBSERVABILITY.md §6`) or incident response procedures (see `docs/INCIDENT_RESPONSE.md §4`).
+
+---
+
+### 20.2 Architecture Decision: Better Stack Statuspage
+
+#### 20.2.1 Options evaluated
+
+| Option | Pros | Cons | Decision |
+|---|---|---|---|
+| **Better Stack Statuspage** (native) | Native integration with Better Stack monitors already planned (§9 OBSERVABILITY.md); auto-creates incidents from monitor failures; managed SLA dashboard; sub-15-second state propagation | Monthly cost (Better Stack Team plan ~$24/mo includes Statuspage) | ✅ **Selected for M4** |
+| Custom (Cloudflare Worker + D1 + R2) | Zero marginal cost; full data control; composable with FORM's audit infrastructure | 2–3 eng-weeks build; maintenance burden; auditors prefer managed-tool paper trail | 🔄 Revisit at M9 if Better Stack pricing becomes material |
+| Atlassian Statuspage | Industry standard; wide ecosystem support | $100+/month at team tier; vendor lock-in less aligned with FORM's Cloudflare-first stack | ❌ Rejected |
+
+#### 20.2.2 DNS configuration
+
+FORM operates `status.form.coach` as a CNAME to Better Stack Statuspage's custom domain endpoint:
+
+```
+status.form.coach.    CNAME    <tenant>.betterstack.com.    TTL 300
+```
+
+The CNAME is **proxied through Cloudflare** (`proxy: false` for this record, as Better Stack requires direct resolution for TLS certificate issuance). The Cloudflare zone for `form.coach` sets this record to DNS-only.
+
+SSL/TLS: Better Stack provisions and auto-renews the certificate for `status.form.coach` via Let's Encrypt. FORM verifies certificate issuance and renewal as part of the monthly monitoring check (§15 compliance calendar).
+
+#### 20.2.3 SOC 2 evidence anchor
+
+Better Stack generates a hosted audit trail of monitor configuration changes, incident creation/resolution events, and subscriber notification delivery confirmations. FORM exports this audit trail quarterly to `compliance/status-page/YYYY-QQ-status-audit.json` in the private compliance repository (git-committed with SHA-256 hash registered in `compliance/checksums.sha256`). This export constitutes the SOC 2 CC7.4 evidence artifact for "communicates security incidents to external parties."
+
+---
+
+### 20.3 Monitored Components
+
+Six components appear on the status page. Each maps to one or more SLOs from `docs/OBSERVABILITY.md §2`.
+
+| Component | Display name | Check URL / method | Interval | SLO target | SOC 2 control |
+|---|---|---|---|---|---|
+| **API** | FORM API | `GET https://api.form.coach/health` → HTTP 200, body `{"status":"ok"}` | 30 s | 99.9% monthly | A1.1, A1.2 |
+| **Auth** | Authentication | Synthetic probe: POST login with test credential (non-PII) → HTTP 200 + valid JWT in response | 60 s | 99.9% monthly | A1.1, CC6.1 |
+| **Realtime sync** | Real-time sync | WebSocket connect to Supabase Realtime endpoint → heartbeat received ≤2 s | 60 s | 99.5% monthly | A1.1 |
+| **CV processing** | CV pose processing | `GET https://api.form.coach/cv/health` → HTTP 200; checks on-device inference availability stub (server-side inference not in scope) | 120 s | 99.5% monthly | A1.1 |
+| **Admin dashboard** | Admin dashboard | `GET https://admin.form.coach/health` → HTTP 200 | 60 s | 99.9% monthly | A1.1 |
+| **Audit log delivery** | Audit log (enterprise) | Webhook delivery success rate metric from `docs/OBSERVABILITY.md §15.6`; alert fires if P95 > 5 s or delivery failure rate > 0.1% in 5-minute window | 5 min (metric check) | P95 < 5 s per `docs/ENTERPRISE.md` SLA | A1.1, CC7.4 |
+
+**Anonymity of health probes.** The Auth synthetic probe uses a dedicated `status-probe@form.coach` internal account with no real user data. This account is excluded from aggregate wellness metrics and flagged `is_probe = true` in the `users` table. Access to its credentials is restricted to `devops-lead` via a dedicated 1Password vault entry (not shared with the general engineering vault). The account generates no billing events, no SCIM-provisioned identity, and no audit log entries visible to tenant admins.
+
+#### 20.3.1 Component group mapping
+
+Better Stack supports grouping components into logical groups. FORM's grouping:
+
+```
+Core Infrastructure
+├── FORM API
+└── Authentication
+
+Data & Sync
+└── Real-time sync
+
+AI Features
+└── CV pose processing
+
+Enterprise
+├── Admin dashboard
+└── Audit log delivery
+```
+
+Enterprise customers are notified on incidents affecting **Enterprise** group components. All subscribers are notified on incidents affecting **Core Infrastructure**.
+
+---
+
+### 20.4 Incident State Taxonomy
+
+Five states appear on the status page. State transitions are logged to Better Stack and archived per §20.7.
+
+| State | Colour | Trigger | Auto-trigger from monitor? | Human confirmation required? |
+|---|---|---|---|---|
+| **Operational** | 🟢 Green | All checks passing; error rate < 0.1%; P95 latency within baseline | Yes — monitor recovery | No |
+| **Degraded Performance** | 🟡 Yellow | Any component P95 latency > 2× baseline **or** error rate 0.1%–1% | Yes — from OBSERVABILITY.md §6 P2 alert | Yes — within 30 min; on-call engineer confirms |
+| **Partial Outage** | 🟠 Orange | One non-core component unavailable; API and Auth remain operational | Yes — component monitor down | Yes — within 15 min; on-call engineer posts human update |
+| **Major Outage** | 🔴 Red | API unavailable **or** Auth unavailable (blocks all users) | Yes — API or Auth monitor down for > 2 consecutive checks | Yes — **within 5 minutes**; founder / on-call lead posts update (P0 response) |
+| **Under Maintenance** | 🔵 Blue | Scheduled maintenance window | No — manual creation only | Yes — created by `devops-lead` with 48h advance notice minimum |
+
+**Fail-safe principle:** If Better Stack itself is degraded, the status page returns its last-known state cached by Cloudflare at the edge (TTL 30 s). Customers should treat "unable to reach status page" as a signal to check `https://betterstackstatus.com` for Better Stack platform health. This limitation is documented in enterprise MSAs.
+
+---
+
+### 20.5 Status Page Update Protocol
+
+This protocol is referenced by `docs/INCIDENT_RESPONSE.md §6 Communication Templates`. The on-call engineer follows this protocol for all P0–P2 incidents. P3 incidents do not require status page updates unless they are customer-visible.
+
+#### 20.5.1 Automated state transition (Better Stack)
+
+Better Stack auto-creates a status page incident when a monitor transitions from **Operational** to any non-operational state for two consecutive checks. The auto-created incident:
+
+- Sets the status page state to the appropriate level (Degraded / Partial / Major)
+- Sends email notification to all subscribers (see §20.6)
+- Remains in "Investigating" phase until an engineer posts the first human update
+
+Auto-resolution occurs when all monitors return to **Operational** for three consecutive checks. The auto-resolution posts a "Resolved" update and sends subscriber notifications.
+
+#### 20.5.2 Human update cadence (per INCIDENT_RESPONSE.md severity)
+
+| Severity | First human update | Subsequent updates | Resolution update |
+|---|---|---|---|
+| **P0** (Major Outage — API/Auth down) | Within **5 minutes** of auto-detection | Every **15 minutes** until resolved | Immediately on resolution + 24h post-mortem link |
+| **P1** (Partial Outage — one component, escalating) | Within **15 minutes** | Every **30 minutes** | Immediately on resolution + 48h post-mortem link |
+| **P2** (Degraded Performance) | Within **1 hour** | Every **2 hours** if unresolved > 2h | On resolution; post-mortem optional |
+| **Scheduled Maintenance** | 48 hours before window | N/A | On completion |
+
+**Update format** (drawn from `docs/INCIDENT_RESPONSE.md §6` CC-01 template):
+
+```
+[Status] · [Timestamp UTC]
+We are [investigating / monitoring / resolving] [component] [behaviour].
+Impact: [who is affected, what they cannot do].
+Next update: [timestamp].
+```
+
+The on-call engineer posts updates via the Better Stack dashboard or the Better Stack API (`POST /api/v3/status-pages/{id}/status-page-updates`). API credentials are stored in the `devops-lead` 1Password vault under `Better Stack Status API Key`.
+
+#### 20.5.3 Maintenance window communication
+
+Scheduled maintenance follows a 48-hour advance notice requirement, aligning with enterprise MSA commitments. The notice includes:
+
+- Affected components
+- Maintenance window start and end time (UTC)
+- Expected service impact (brief degradation / full unavailability / zero impact)
+- Customer-action required (if any)
+
+Maintenance windows are created in Better Stack and visible as 🔵 blue periods in the uptime history graph, which auditors use to correctly exclude scheduled downtime from SLA calculations.
+
+---
+
+### 20.6 Subscriber Notifications
+
+Subscribers receive notifications at status state changes. Better Stack supports three notification channels:
+
+#### 20.6.1 Email
+
+- Default channel for all subscribers
+- Per-component subscription: subscribers can choose which component groups to follow (e.g., enterprise customers subscribe to **Enterprise** group only)
+- Unsubscribe link in every email (CAN-SPAM + GDPR compliant)
+- From address: `status@form.coach` (SPF + DKIM configured; no shared sending IP)
+
+#### 20.6.2 RSS / Atom feed
+
+- Available at `https://status.form.coach/feed.rss` (Better Stack native)
+- Enterprise customers may integrate this into their internal tooling without a subscription account
+- SOC 2 evidence: feed availability demonstrates CC7.4 "communicates security incidents" to any stakeholder without requiring account registration
+
+#### 20.6.3 Slack webhook (enterprise customers)
+
+Enterprise customers on the Growth and Enterprise tiers (per `docs/ENTERPRISE.md` tier table) may request a dedicated Slack webhook integration. Configuration:
+
+1. Customer provides incoming webhook URL for their `#form-status` or equivalent channel
+2. `devops-lead` stores the webhook URL in `audit_export_config` JSONB on the tenant's row (field: `status_webhook_url`) — same JSONB column used by the audit log export pipeline (`docs/OBSERVABILITY.md §15`)
+3. Better Stack's outbound webhook is configured per-tenant pointing to a FORM Cloudflare Worker (`form-status-relay`) that fans out to all configured tenant webhook URLs
+4. The relay Worker adds `X-FORM-Tenant-ID` header stripped before forwarding, and logs delivery to the audit log as `system.status_notification_sent`
+
+**Privacy note:** The relay Worker does not log or persist the outbound webhook payload. The payload contains only: `{ component, state, message, timestamp_utc }` — no user data, no tenant-specific analytics.
+
+---
+
+### 20.7 Historical Incident Data Retention & SOC 2 Evidence
+
+#### 20.7.1 Better Stack retention
+
+Better Stack retains incident history for 365 days in the UI (Team plan). The status page at `status.form.coach` displays the trailing 90 days of uptime history — the minimum required before the SOC 2 observation period begins (PRE-10 and PRE-11).
+
+#### 20.7.2 FORM archival to R2 (7-year retention)
+
+SOC 2 Type II requires evidence spanning the full observation period plus a retention buffer. FORM supplements Better Stack's 365-day retention with a monthly export to Cloudflare R2:
+
+**Export cron:** `form-status-archiver` Cloudflare Worker, Cron Trigger: `0 05 1 * *` (1st of each month, 05:00 UTC — 2 hours after the cold backup archiver).
+
+**Export target:** `r2://form-backups/status-history/YYYY-MM/`
+
+**Export contents:**
+
+| File | Contents | Format |
+|---|---|---|
+| `incidents-YYYY-MM.json` | All incident records in the month: component, start time, end time, severity, update timeline | JSON, CloudEvents-adjacent schema |
+| `uptime-YYYY-MM.json` | Per-component uptime percentage, total downtime seconds, SLO delta | JSON |
+| `subscribers-YYYY-MM.json` | Subscriber count per component group (no email addresses) | JSON |
+| `notifications-YYYY-MM.json` | Notification delivery log: channel type, delivered count, failed count (no recipient data) | JSON |
+
+**HMAC integrity:** Each export file is signed with `HMAC-SHA256` using the monthly key `STATUS_ARCHIVE_KEY_YYYYMM` (same key rotation cadence as cold backup, stored in 1Password and Cloudflare Workers Secrets). The signature is appended as `incidents-YYYY-MM.json.sig`. This ensures the compliance evidence cannot be silently modified post-export.
+
+**R2 lifecycle rule:** `status-history/` prefix — object lifecycle 7 years (2557 days), consistent with the audit log retention policy (`docs/AUDIT_LOG_SCHEMA.md §Retention`).
+
+#### 20.7.3 Evidence filing for SOC 2
+
+| SOC 2 Control | Evidence artifact | Source | Filed by |
+|---|---|---|---|
+| **A1.1** — Availability commitments | Uptime percentage per component vs. SLO target (§20.3 table) | `uptime-YYYY-MM.json` exports | devops-lead, monthly |
+| **A1.2** — Environmental protections | Monitor configuration screenshots (check interval, alert threshold, component grouping) | Better Stack dashboard export | devops-lead, at observation start |
+| **CC7.4** — Communicates security incidents | Incident timeline exports + subscriber notification delivery confirmations | `incidents-YYYY-MM.json` + `notifications-YYYY-MM.json` | devops-lead, monthly |
+| **CC6.8** — Prevents unauthorized access (maintenance) | Scheduled maintenance records with 48h advance notice confirmation | Better Stack maintenance event log | devops-lead, per event |
+
+All evidence artifacts are stored in `compliance/status-page/` in the private compliance repository (separate from the public `form` repository). SHA-256 hashes of all artifacts are registered in `compliance/checksums.sha256` at the time of filing.
+
+---
+
+### 20.8 Sub-Processor List Publication
+
+The SOC 2 and GDPR critical gap "sub-processor list published" (§2 Gap Analysis Summary; CC9.2, GDPR Art. 13(1)(e)) requires FORM to make the sub-processor list from §17 publicly accessible. This is a transparency obligation, not an operational implementation gap.
+
+**Publication path:** `https://security.form.coach/sub-processors`
+
+Implementation: a single-page Cloudflare Worker at `security.form.coach/sub-processors` renders the sub-processor register from §17 in human-readable HTML and machine-readable JSON (`?format=json`). The page includes:
+
+- Sub-processor name, country of processing, service category, certification (SOC 2 / ISO 27001 / SCCs)
+- "Last updated" timestamp (updated whenever §17 Vendor Risk Registry changes)
+- Link to DPA template (`security.form.coach/dpa`)
+
+The JSON endpoint (`security.form.coach/sub-processors.json`) allows enterprise procurement teams to ingest the list programmatically and detect changes (monitored via hash comparison).
+
+**Change notification:** When a new sub-processor is added or removed, FORM notifies existing enterprise customers via status page announcement and a direct email to the tenant admin (`tenant_admin_email` from `tenant_sso_configs`), with 30 days advance notice before the new sub-processor begins processing data (GDPR Art. 28(2) requirement).
+
+**SOC 2 evidence:** The existence of `security.form.coach/sub-processors` with a datestamped list closes CC9.2 ("Manages vendor and business partner risk") as a public commitment. Screenshots of the published page are filed in `compliance/cc9/sub-processor-page-YYYY-MM.png`.
+
+**Gap closure status:** This section provides the architecture and implementation path. The gap moves from 🔴 Critical to 🟡 Partial upon implementation of the Worker; moves to 🟢 Done when the page is live and filed as CC9.2 evidence.
+
+---
+
+### 20.9 Gap Closure Table
+
+| Gap | Status before §20 | Status after §20 | Remaining work |
+|---|---|---|---|
+| Status page (status.form.coach) | 🔴 Critical gap | 🟡 Partial (architecture + checklist defined) | Deploy Better Stack Statuspage, configure CNAME, add 6 components, activate subscriber notifications |
+| Uptime monitoring with historical data | 🔴 Gap | 🟡 Partial (architecture defined; 90-day history requires ≥90 days runtime) | PRE-10: provision Better Stack monitors; start clock |
+| Sub-processor list published | 🔴 Critical gap | 🟡 Partial (publication path defined; Worker not yet deployed) | Deploy `security.form.coach/sub-processors` Worker |
+| CC7.4 — Communicates security incidents | 🟡 Gap (templates only) | 🟡 Partial (templates + automated notification channel defined) | Status page live; first incident notification delivered |
+| A1.1 — Uptime SLO backed by monitoring | 🟡 Gap | 🟡 Partial (SLO targets + monitoring architecture specified in §20.3) | Better Stack monitors running for ≥30 days before observation |
+
+**Readiness impact:** Critical gaps: 3 → 2 (status page: 🔴 → 🟡 Partial). Availability controls in place: +2. Readiness: ~63% → ~65%.
+
+---
+
+### 20.10 Implementation Checklist (devops-lead)
+
+Execute in the order listed. PRE-10 and PRE-11 are observation-period gates — neither can be marked 🟢 Done until the monitor history clock has run for the required duration.
+
+| # | Task | Priority | Milestone | Notes |
+|---|---|---|---|---|
+| 20-01 | Provision Better Stack Team plan | P0 | M4 | Required for Statuspage + uptime monitors in one account |
+| 20-02 | Create status page at Better Stack; configure custom domain `status.form.coach` | P0 | M4 | Better Stack will generate TLS verification record for Let's Encrypt |
+| 20-03 | Add CNAME `status.form.coach → <tenant>.betterstack.com` in Cloudflare zone (proxy: DNS-only) | P0 | M4 | Do NOT proxy through Cloudflare; Better Stack needs direct resolution for TLS |
+| 20-04 | Create `status-probe@form.coach` internal account with `is_probe = true`; store credentials in 1Password `devops-lead` vault | P0 | M4 | Required before Auth synthetic probe can run; exclude from SCIM and from aggregate metrics |
+| 20-05 | Configure 6 monitors (§20.3 table): API, Auth synthetic, Realtime WebSocket, CV health, Admin dashboard, Audit log delivery metric | P0 | M4 | Set check intervals exactly as specified; name components to match display names in §20.3 |
+| 20-06 | Add component groups: Core Infrastructure, Data & Sync, AI Features, Enterprise (§20.3.1) | P0 | M4 | Group membership drives which subscribers are notified per incident |
+| 20-07 | Enable email subscriber notifications; configure `From: status@form.coach`; verify SPF + DKIM for `form.coach` sending domain | P0 | M4 | Status email is the primary CC7.4 communication channel |
+| 20-08 | Configure RSS/Atom feed (native Better Stack feature — enable in Statuspage settings) | P1 | M4 | No code required |
+| 20-09 | Deploy `form-status-archiver` Cloudflare Worker with monthly Cron Trigger and R2 write | P1 | M4 | R2 bucket `form-backups` must exist first (§19-01) |
+| 20-10 | Provision `STATUS_ARCHIVE_KEY_YYYYMM` in Workers Secrets; escrow in 1Password `compliance-officer` vault | P1 | M4 | Use same rotation cadence as cold backup key (§19 HMAC) |
+| 20-11 | Deploy `form-status-relay` Cloudflare Worker for enterprise Slack webhook fan-out | P2 | M5 | Required only when first enterprise customer requests Slack integration |
+| 20-12 | Add `status_webhook_url` field to `audit_export_config` JSONB schema (§15 OBSERVABILITY.md migration) | P2 | M5 | Co-ordinate with platform-engineer; non-nullable default `null` |
+| 20-13 | Deploy `security.form.coach/sub-processors` Worker rendering §17 vendor registry in HTML + JSON | P0 | M4 | Closes GDPR Art. 13(1)(e) and CC9.2 sub-processor publication gap |
+| 20-14 | File monitor configuration screenshots as A1.2 evidence in `compliance/status-page/` | P0 | M4 | File immediately after step 20-05 completes |
+| 20-15 | Notify all enterprise pilot accounts of `status.form.coach` launch; add link to onboarding welcome email template | P1 | M4 | Add link to `docs/SSO_SCIM_IMPLEMENTATION.md §7` onboarding checklist |
+| 20-16 | Mark PRE-10 🟢 Done only after ≥30 days of continuous monitor operation | P0 | M5 (30 days post-M4) | Clock starts when 20-05 is complete |
+| 20-17 | Mark PRE-11 🟢 Done only after ≥90 days of continuous status page history visible at `status.form.coach` | P0 | M6–M7 | Clock starts when 20-02 + 20-03 are complete |
+
+---
+
+**v1.0 · травень 2026 · owner: compliance-officer + security-engineer + enterprise-architect**
 **Review cadence: quarterly. Next review: серпень 2026.**
 
 *v0.2 additions: Sub-Processor Register (CC9, GDPR Art. 28), Complementary User Entity Controls (CUECs), Common Security Questionnaire Responses (CAIQ/SIG Lite pre-answers).*
@@ -2073,3 +2360,18 @@ Execute in the order listed. Each P0 item is a gate for enterprise launch (M4).
 *v0.7 additions: Section 17 — Vendor Security Review Process. Closes two documented 🔴 Gaps: "Vendor security review process" and "Annual vendor security review." Three-tier risk classification (Critical/High/Standard) with review frequency per tier. Vendor Risk Registry covering 11 vendors (8 sub-processors + Better Uptime, PagerDuty, Linear) with DPA status, certification level, risk score, and owner. 5-step Initial Vendor Assessment checklist with DPA gate and approval veto. 5-step January Annual Review process with SOC 2 CC9.2 evidence package definition. 6-factor risk scoring matrix (composite 🟢/🟡/🟠/🔴 scale, escalation rules for DPA-missing and cert-lapse). 7-step new sub-processor addition workflow with emergency exception clause. Termination and offboarding process with 7-year evidence retention. SOC 2 control mapping: CC9.1, CC9.2, CC9.3, P8.1. Gap closure: "Vendor security review process" 🔴 → 🟡 Partial (first annual review Q1-2027); "Annual vendor security review" 🔴 → 🟡 Partial; "Vendor risk registry" 🟡 Partial → 🟡 Partial (formalized with scoring). Critical gaps: 3 → 1. Readiness: ~56% → ~58%.*
 
 *v0.8 additions: Section 18 — Business Continuity & Disaster Recovery (BCP/DRP). Closes CC7.5 and A1.1 runbook gap. RTO/RPO commitments defined per tier (Enterprise 4h RTO / 1h RPO; Pro 8h / 4h). Four failure scenarios with step-by-step response procedures (Supabase unavailability, Cloudflare outage, data corruption, nuke scenario). Annual DR drill procedure with evidence template for SOC 2 CC7.5. Communication tree (internal, enterprise, consumer) per incident phase. Cold storage backup gap newly documented as 🔴 (B2 export not yet implemented). CC7.5: 🔴 → 🟡 Partial. DR runbook: 🟡 Partial → 🟢 Done. Readiness: ~58% → ~60%.*
+
+*v1.0 additions: Section 20 — Status Page Architecture & Availability Communication. Closes critical gap: "Status page (status.form.coach)" 🔴 → 🟡 Partial. Architecture: Better Stack Statuspage with CNAME status.form.coach; 6 monitored components (API, Auth, Realtime, CV processing, Admin dashboard, Audit log delivery); 5 incident states; update protocol with 15-minute human-update SLA for P0/P1 (linked to INCIDENT_RESPONSE.md CC-01 template); subscriber notifications (email, RSS, Slack webhook for enterprise); incident history archival to R2 (7-year retention, SOC 2 evidence); sub-processor list publication path (security.form.coach/sub-processors). SOC 2 evidence mapping: A1.1, A1.2, CC7.4, CC6.8. Critical gaps: 3 → 2. Partial: +2 (uptime monitoring + status page). Readiness: ~63% → ~65%.*
+**Review cadence: quarterly. Next review: серпень 2026.**
+
+*v0.2 additions: Sub-Processor Register (CC9, GDPR Art. 28), Complementary User Entity Controls (CUECs), Common Security Questionnaire Responses (CAIQ/SIG Lite pre-answers).*
+*v0.3 additions: Section 13 — Data Classification Policy (four-tier: Public / Internal / Confidential / Restricted). Closes SOC 2 gap C1.1. Critical gaps: 11 → 10. Controls in place: 22 → 23.*
+*v0.4 additions: Section 14 — Formal Risk Register (18 risks across 6 categories: Security, Availability, Processing Integrity, Confidentiality, Privacy, Vendor/Operational). L×S scoring with residual scores and named owners. Closes CC3 gap (formal risk assessment documented). Updated P3 DPIA status to ✅ Done. Critical gaps: 10 → 9. Partial: 22 → 21. Controls in place: 23 → 25. Readiness: 42% → 45%.*
+*v0.5 additions (two-step catch-up): (a) `docs/PRIVACY_POLICY.md` v0.1-draft shipped (v0.55.0 CHANGELOG) — closes P1.1, P1.2, CC9.2+P6.1; critical gaps: 9 → 6; controls in place: 25 → 28; readiness: 45% → ~51%. (b) Section 15 — Annual Compliance Calendar: 12-month master calendar (16 recurring activities, all mapped to SOC 2 controls + evidence artifacts), Pre-Observation Period Readiness Checklist (27 PRE items with status), First-Year Implementation Priority matrix (solo-founder vs. post-hire split, compensating controls documented). Moves 7 gaps from 🔴 Gap → 🟡 Partial (security training scheduled Q1-Feb, vendor review Q1-Jan, DR drill Q1-Jan, privacy review Q1-Jan, offboarding quarterly cadence, media disposal Q2-Jun, control effectiveness review quarterly). Critical gaps: 6 → 4 (security training and offboarding: schedule + owner + evidence defined → 🟡 Partial). Partial: 21 → 28. Controls in place: 28 (unchanged — scheduled but not yet executed). Readiness: ~51% → ~55%.*
+*v0.6 additions: Section 16 — Penetration Test Program. Scope (API, auth flows, SSO/SCIM, RLS-via-API, mobile apps, Cloudflare edge), methodology (OWASP WSTG + ASVS L2 + MASVS L1/L2 + PTES + CWE Top 25), finding severity SLAs (Critical 24h → High 7d → Medium 30d), health-data and tenant-isolation severity uplift rules, remediation tracking workflow (Linear tickets → PR → re-test → compliance evidence filing), SOC 2 evidence package definition (engagement letter + full report + HMAC chain verification), customer disclosure policy (executive summary under NDA for >$50k ACV). CC7 control table updated to add "External penetration test" row (🟡 Partial). PRE-21 moved from 🔴 Open → 🟡 Partial. Open Items updated. CC7.1 and CC7.2 moved from 🔴 Gap → 🟡 Partial. Critical gaps: 4 → 3. Partial: 28 → 30. Readiness: ~55% → ~56%.*
+
+*v0.7 additions: Section 17 — Vendor Security Review Process. Closes two documented 🔴 Gaps: "Vendor security review process" and "Annual vendor security review." Three-tier risk classification (Critical/High/Standard) with review frequency per tier. Vendor Risk Registry covering 11 vendors (8 sub-processors + Better Uptime, PagerDuty, Linear) with DPA status, certification level, risk score, and owner. 5-step Initial Vendor Assessment checklist with DPA gate and approval veto. 5-step January Annual Review process with SOC 2 CC9.2 evidence package definition. 6-factor risk scoring matrix (composite 🟢/🟡/🟠/🔴 scale, escalation rules for DPA-missing and cert-lapse). 7-step new sub-processor addition workflow with emergency exception clause. Termination and offboarding process with 7-year evidence retention. SOC 2 control mapping: CC9.1, CC9.2, CC9.3, P8.1. Gap closure: "Vendor security review process" 🔴 → 🟡 Partial (first annual review Q1-2027); "Annual vendor security review" 🔴 → 🟡 Partial; "Vendor risk registry" 🟡 Partial → 🟡 Partial (formalized with scoring). Critical gaps: 3 → 1. Readiness: ~56% → ~58%.*
+
+*v0.8 additions: Section 18 — Business Continuity & Disaster Recovery (BCP/DRP). Closes CC7.5 and A1.1 runbook gap. RTO/RPO commitments defined per tier (Enterprise 4h RTO / 1h RPO; Pro 8h / 4h). Four failure scenarios with step-by-step response procedures (Supabase unavailability, Cloudflare outage, data corruption, nuke scenario). Annual DR drill procedure with evidence template for SOC 2 CC7.5. Communication tree (internal, enterprise, consumer) per incident phase. Cold storage backup gap newly documented as 🔴 (B2 export not yet implemented). CC7.5: 🔴 → 🟡 Partial. DR runbook: 🟡 Partial → 🟢 Done. Readiness: ~58% → ~60%.*
+
+*v1.0 additions: Section 20 — Status Page Architecture & Availability Communication. Closes critical gap: "Status page (status.form.coach)" 🔴 → 🟡 Partial. Architecture: Better Stack Statuspage with CNAME status.form.coach; 6 monitored components (API, Auth, Realtime, CV processing, Admin dashboard, Audit log delivery); 5 incident states; update protocol with 15-minute human-update SLA for P0/P1 (linked to INCIDENT_RESPONSE.md CC-01 template); subscriber notifications (email, RSS, Slack webhook for enterprise); incident history archival to R2 (7-year retention, SOC 2 evidence); sub-processor list publication path (security.form.coach/sub-processors). SOC 2 evidence mapping: A1.1, A1.2, CC7.4, CC6.8. Critical gaps: 3 → 2. Partial: +2 (uptime monitoring + status page). Readiness: ~63% → ~65%.*

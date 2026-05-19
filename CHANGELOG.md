@@ -9,6 +9,11 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.74.0] — 2026-05-19
+
+### Added
+- `docs/SOC2_READINESS.md` v0.9 → v1.0 — **§20 Status Page Architecture & Availability Communication** (compliance-officer + security-engineer + enterprise-architect). Architecture decision: Better Stack Statuspage with CNAME `status.form.coach`; rejected Atlassian Statuspage (cost/lock-in) and custom Worker (eng burden). 6 monitored components with check intervals and SLO targets: API (30 s, 99.9%), Auth synthetic probe (60 s, 99.9%), Realtime WebSocket (60 s, 99.5%), CV health (120 s, 99.5%), Admin dashboard (60 s, 99.9%), Audit log delivery metric (5 min, P95 < 5 s). 5 incident states (Operational / Degraded / Partial Outage / Major Outage / Under Maintenance) with auto-trigger rules and human confirmation SLAs (P0: human update ≤5 min; P1: ≤15 min; P2: ≤1 h). Status update protocol linked to `INCIDENT_RESPONSE.md §6` CC-01 template. Subscriber notifications: email (per-component subscription, `status@form.coach`), RSS/Atom feed, enterprise Slack webhook via `form-status-relay` Worker fan-out with delivery audit log. R2 archival cron (monthly, 7-year retention, HMAC-SHA256 signed) for SOC 2 evidence. Sub-processor list publication: `security.form.coach/sub-processors` Worker (HTML + JSON, change notifications 30 days advance). SOC 2 evidence mapping: A1.1, A1.2, CC7.4, CC6.8. 17-item implementation checklist (PRE-10 and PRE-11 gated on 30/90-day runtime). Gap closures: "Status page" 🔴 → 🟡 Partial; "Uptime monitoring" 🔴 → 🟡 Partial; "Sub-processor list published" 🔴 → 🟡 Partial. Critical gaps: 3 → 2. Readiness: ~63% → ~65%.
+
 ## [0.73.0] — 2026-05-18
 
 ### Added
