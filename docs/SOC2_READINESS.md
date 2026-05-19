@@ -2375,3 +2375,225 @@ Execute in the order listed. PRE-10 and PRE-11 are observation-period gates — 
 *v0.8 additions: Section 18 — Business Continuity & Disaster Recovery (BCP/DRP). Closes CC7.5 and A1.1 runbook gap. RTO/RPO commitments defined per tier (Enterprise 4h RTO / 1h RPO; Pro 8h / 4h). Four failure scenarios with step-by-step response procedures (Supabase unavailability, Cloudflare outage, data corruption, nuke scenario). Annual DR drill procedure with evidence template for SOC 2 CC7.5. Communication tree (internal, enterprise, consumer) per incident phase. Cold storage backup gap newly documented as 🔴 (B2 export not yet implemented). CC7.5: 🔴 → 🟡 Partial. DR runbook: 🟡 Partial → 🟢 Done. Readiness: ~58% → ~60%.*
 
 *v1.0 additions: Section 20 — Status Page Architecture & Availability Communication. Closes critical gap: "Status page (status.form.coach)" 🔴 → 🟡 Partial. Architecture: Better Stack Statuspage with CNAME status.form.coach; 6 monitored components (API, Auth, Realtime, CV processing, Admin dashboard, Audit log delivery); 5 incident states; update protocol with 15-minute human-update SLA for P0/P1 (linked to INCIDENT_RESPONSE.md CC-01 template); subscriber notifications (email, RSS, Slack webhook for enterprise); incident history archival to R2 (7-year retention, SOC 2 evidence); sub-processor list publication path (security.form.coach/sub-processors). SOC 2 evidence mapping: A1.1, A1.2, CC7.4, CC6.8. Critical gaps: 3 → 2. Partial: +2 (uptime monitoring + status page). Readiness: ~63% → ~65%.*
+
+
+---
+
+## 21. CC8 — Change Management Controls: Formal Policy & Evidence Framework
+
+> Owner: `compliance-officer` + `security-engineer`. Effective: May 2026. Review: annually or on any material change to deployment architecture or team composition.
+> SOC 2 controls: **CC8.1** (authorises, tests, and documents changes before implementation; classifies changes by type; maintains rollback capability).
+> Reference: DEC-010 (version-controlled repo), DEC-030 (HMAC-chained audit log), `docs/ENGINEERING_RUNBOOK.md`, `docs/DATA_MODEL.md §10–11`.
+
+---
+
+### 21.1 Purpose and SOC 2 Mapping
+
+CC8.1 requires that changes to infrastructure and software are authorised, tested, and documented before they enter production. For FORM, this is not an abstract policy requirement — unauthorized or untested changes to the components that process health data create direct risks under the Processing Integrity (PI) and Confidentiality (C) trust service criteria:
+
+- An unauthorized schema migration could alter RLS policies governing health data access, triggering a C1 (confidentiality) failure
+- An untested change to the workout data processing pipeline could produce incorrect coaching outputs, triggering a PI1 (processing accuracy) failure
+- A change deployed without rollback capability could extend an outage beyond the enterprise RTO commitment of 4 hours (A1.1)
+
+**Scope of this section.** All production changes to:
+
+| Surface | Technology | Notes |
+|---|---|---|
+| API layer | Cloudflare Workers | Worker scripts and routes |
+| Database schema | Supabase (PostgreSQL migrations) | All DDL changes via `/supabase/migrations/` |
+| Frontend | Cloudflare Pages | Web app builds |
+| ML pipeline | Model files in Cloudflare R2; version pointer in KV | Inference path changes |
+| Auth configuration | Supabase Auth settings, SAML/OIDC config | SSO policy changes |
+
+Out of scope: changes to internal tooling (Linear, 1Password, Notion) that carry no production data; open-source dependency updates that are gated separately by Dependabot + CI.
+
+---
+
+### 21.2 Change Classification
+
+All production changes fall into one of three tiers. Tier determines authorization requirements, deployment SLA, and evidence obligations.
+
+| Type | Definition | Authorization Required | Max Deployment SLA | Examples |
+|---|---|---|---|---|
+| **Emergency (P0)** | Critical security patch, active breach response, production outage — time to deploy is measured in hours not days | Single-approver fast path; mandatory post-hoc review within 24 hours; incident ticket must be opened simultaneously | 2 hours from decision to deploy | SEV-0 CVE patch, RLS bypass hotfix, production-down config restore |
+| **Standard** | Feature work, refactor, new schema migration, dependency update, auth configuration change | PR with written rationale in PR body; solo phase: founder self-review with documented justification (see §21.7); post-hire: at minimum 1 independent reviewer | 24–72 hours from PR open to deploy | New API endpoint, schema migration, model version update, Cloudflare Worker update |
+| **Minor** | Copy/content changes, documentation, configuration changes with no security impact and no data model effect | PR merge + auto-deploy; no separate approval step required | Immediate on merge | Marketing copy, docs update, non-sensitive env var tuning |
+
+**Ambiguous changes default upward.** If it is not clear whether a change is Minor or Standard — particularly if it touches any file that handles Restricted or Confidential data (per §13 classification) — treat it as Standard and document the rationale.
+
+---
+
+### 21.3 Branch Protection Configuration (GitHub)
+
+The settings below must be configured on the `main` branch of `github.com/Rbit27/form`. The screenshot of this configuration is SOC 2 evidence artifact CC8-E-001 and must be re-captured any time settings change.
+
+| Setting | Value | Rationale |
+|---|---|---|
+| Require pull request before merging | Enabled | Direct push to main disabled; every change has a PR record |
+| Required number of approvals | 1 | Solo phase: founder; post-hire: any approved engineer |
+| Dismiss stale reviews when new commits are pushed | Yes | Prevents approving a safe commit then pushing a different one |
+| Require status checks to pass before merging | Yes (when CI is configured — see CC8-GAP-001) | Required CI checks: `ci/build`, `ci/test`, `ci/lint` |
+| Require branches to be up to date before merging | Yes | Prevents merge-race conditions |
+| Require linear history | Yes | Clean git history aids forensic review during incidents |
+| Include administrators | No | Solo-founder compensating control — see §21.8 for override logging requirement |
+
+**Current state vs. target state:**
+
+| Setting | Current state | Target state | Gap reference |
+|---|---|---|---|
+| Require pull request | Must be configured | Configured + screenshot filed as CC8-E-001 | PRE-14 |
+| Required CI checks | No CI pipeline exists | `ci/build`, `ci/test`, `ci/lint` required on merge | CC8-GAP-001 |
+| Include administrators | Off (compensating control) | On (post-hire, when P0 emergency path uses §21.2 fast track) | CC8-GAP-002 |
+
+**Evidence artifact CC8-E-001:** Screenshot of branch protection settings page for `main` at `github.com/Rbit27/form/settings/branches`. Filed to `/evidence/cc8/branch-protection-YYYY-MM-DD.png` in the private compliance repository. Refresh cadence: quarterly review; re-file immediately on any settings change.
+
+---
+
+### 21.4 CI/CD Pipeline as Change Control
+
+Automated CI is a primary CC8.1 control — it provides an objective, repeatable test gate that cannot be bypassed by a single human approving their own work.
+
+**Current state vs. target state:**
+
+| Dimension | Current state | Target state |
+|---|---|---|
+| Build gate | Manual — `wrangler deploy` run locally or from Cloudflare dashboard | GitHub Actions workflow: `push` to PR branch triggers build |
+| Test gate | No automated test execution on PR | GitHub Actions: `ci/test` runs full test suite; failing test blocks merge |
+| Lint gate | No automated lint enforcement on PR | GitHub Actions: `ci/lint` runs ESLint + type checking; failures block merge |
+| Deploy on merge | Manual — engineer runs `wrangler deploy` post-merge | GitHub Actions: merge to `main` triggers deploy job; deploy log archived |
+| Deployment log | No structured archive | GitHub Actions run log + deploy hash stored; archived to R2 per deploy (CC8-E-002) |
+
+**Gap: CC8-GAP-001.** No CI pipeline is currently configured. This is a documented gap. Until CI is live, the compensating control is the manual pre-deploy checklist in `docs/ENGINEERING_RUNBOOK.md`. Every deploy executed under the manual path must confirm checklist completion before pushing.
+
+**Evidence artifact CC8-E-002** (target state, once CI is live): GitHub Actions run log for each production deploy. Each log entry captures: commit SHA, branch, triggering PR number, test results, lint results, deploy timestamp, Cloudflare deploy hash. Archived to `r2://form-backups/ci-logs/YYYY/MM/` per deploy by the `form-ci-archiver` step in the Actions workflow. Refresh cadence: automated per deploy.
+
+---
+
+### 21.5 Database Schema Change Controls
+
+Schema changes carry the highest risk of any change type — a bad migration can corrupt RLS policies, destroy data, or break tenant isolation in ways that are difficult to reverse quickly.
+
+**Rules (all mandatory, no exceptions):**
+
+1. All schema changes via versioned migration files in `/supabase/migrations/`. Direct `ALTER` or `CREATE` statements run from the Supabase dashboard console are prohibited in production.
+2. Every migration file is PR-reviewed under the same authorization requirements as a Standard change (§21.2) regardless of apparent simplicity.
+3. Every `up` migration must have a corresponding `down` migration (rollback script) in the same PR. A PR that adds an up migration without a down migration fails review.
+
+**Migration review checklist (reviewer responsibility):**
+
+| Check | Requirement |
+|---|---|
+| RLS policies | Any new table or altered table must have RLS enabled and the appropriate policy applied before the migration is merged. Confirm `ALTER TABLE <name> ENABLE ROW LEVEL SECURITY` is present. |
+| Tenant isolation | Every new table that stores user or tenant data must have a `tenant_id` foreign key referencing `tenants(id)`. Confirm presence in the migration DDL. |
+| Index strategy | Any new table with expected query volume must have indexes documented in a comment in the migration or in `docs/DATA_MODEL.md §11`. Unindexed foreign keys on large tables = production latency incident. |
+| Backward compatibility | If the migration is not backward-compatible (e.g., dropping a column that application code still reads), confirm a coordinated deploy plan: new code that handles both old and new schema is deployed first, migration runs, old code path removed in a subsequent PR. |
+| Down migration tested | Reviewer confirms down migration has been tested in a staging environment, not just written. |
+
+**Rollback procedure for schema changes:**
+
+- **Within 30 minutes of deploy:** run the down migration script from the PR. Confirm row counts are consistent. Log the rollback as `system.config_changed` in the audit log with `metadata.reason = "migration_rollback"`.
+- **Beyond 30 minutes / data already written:** use Supabase PITR. Restore to a timestamp immediately before the migration ran. Follow `docs/DATA_MODEL.md §10` PITR runbook. RTO target: 15 minutes for rollback decision; PITR restore within 4 hours.
+
+**Evidence artifact CC8-E-003:** Migration file git history — `git log supabase/migrations/` — provides a complete, tamper-evident record of every schema change with author, timestamp, and PR link. Automated; no manual filing required.
+
+**Evidence artifact CC8-E-004:** PITR restore test record. Quarterly test of Supabase PITR targeting the schema migration recovery path. Filed to `/evidence/cc8/pitr-test-YYYY-MM.md`. Owner: `devops-lead`.
+
+---
+
+### 21.6 Rollback and Revert Procedures
+
+All production surfaces must have a documented, tested rollback path with a target RTO of 15 minutes for emergency rollback decisions.
+
+| Surface | Rollback method | RTO | Notes |
+|---|---|---|---|
+| **Cloudflare Workers (API)** | Cloudflare dashboard → Workers → select deployment → "Rollback to this version"; or CLI: `wrangler rollback` | < 5 minutes | Previous deployment is retained for 24 hours by Cloudflare. After 24 hours, earlier versions require a re-deploy from git. |
+| **Cloudflare Pages (frontend)** | Cloudflare Pages dashboard → Deployments → select any previous deployment → "Rollback to this deployment" | < 5 minutes | All historical deployments are permanently retained; any version is reachable. |
+| **Supabase schema (DDL)** | Run down migration script from the PR; or invoke PITR for the data as a fallback (§21.5) | < 15 minutes (down migration); < 4 hours (PITR) | Down migration required for every up migration — non-negotiable per §21.5 rule 3. |
+| **ML model** | Update `model_version` pointer in Cloudflare KV store to the prior version's key; model files versioned in R2 | < 5 minutes | Model files in R2 are never overwritten — new version is a new key. Rollback = KV update only. |
+
+**Quarterly rollback test.** Each rollback path above must be tested in a staging environment quarterly. Results documented and filed alongside the DR drill evidence. Confirmed RTO must be at or below the targets above; any exceedance is a gap finding requiring remediation within 30 days.
+
+---
+
+### 21.7 Separation of Duties — Solo-Founder Analysis
+
+This section documents the structural gap honestly. SOC 2 auditors reviewing a pre-revenue solo-founder company will not fail a Type I readiness assessment solely on this basis, but the gap must be disclosed in the Management Assertion Letter with compensating controls documented.
+
+**The structural gap:** One person (the founder) can author code, approve the PR, and execute the production deploy. No technical control presently prevents this. This is a structural limitation of a team of one and cannot be fully compensated by process alone.
+
+**Compensating controls in place:**
+
+1. All changes to production go through a PR, even from the sole author. This creates a mandatory review checkpoint and an immutable git history entry. There is no mechanism to deploy code that was never in a PR.
+2. Written rationale is mandatory in the PR body for all Standard and Emergency changes. The rationale must describe: what is changing, why it is changing, what the rollback plan is, and whether any security-relevant surface (auth, RLS, health data processing) is affected.
+3. Automated test gate (target: once CC8-GAP-001 is resolved) reduces the human error surface. A failing test blocks deploy regardless of who authored the change.
+4. The audit log is append-only and HMAC-chained (DEC-030). No deployment event can be edited or deleted after the fact. An auditor can independently verify the complete deployment history.
+
+**Auditor disclosure guidance.** The Management Assertion Letter for the SOC 2 Type I or Type II report must include a paragraph disclosing the separation of duties limitation and listing these four compensating controls. Auditors at firms experienced with early-stage SaaS companies (Prescient Assurance, Johanson Group) routinely accept this pattern as a finding-with-compensating-controls rather than a qualified opinion, provided the compensating controls are demonstrably operational throughout the observation period.
+
+**Post-hire target.** The moment a second engineer joins the team: GitHub branch protection is updated to require review from a code owner distinct from the PR author; the `CODEOWNERS` file is created mapping production-path directories to the first engineering hire as a required reviewer; this gap moves from 🟡 Partial to 🟢 Done.
+
+---
+
+### 21.8 Include-Administrators Override (Emergency Exception)
+
+GitHub's "Include administrators" branch protection setting is deliberately set to **off** during the solo-founder phase. The reason: if the branch protection requires a reviewer other than the author, and the founder is the only engineer, a P0 production outage cannot be remediated without the override. Turning "Include administrators" on would lock the founder out of the fast path at the worst possible moment.
+
+This is a documented exception, not an oversight. The following compensating controls govern every use of the admin override:
+
+1. Within 30 minutes of using the admin override to merge a PR without review: create a GitHub Issue tagged with the label `admin-override`. The issue must reference: the PR number, the incident ticket that justified the override (if Emergency change per §21.2), and the planned post-hoc review date.
+2. Post-hoc review within 24 hours: the founder reviews the merged change as if they were an independent reviewer. Any concerns identified are tracked as follow-up issues. The `admin-override` issue is updated with the review outcome.
+3. Every `admin-override` issue is reviewed at the next quarterly access review (§15.1) to confirm the post-hoc review occurred within the 24-hour SLA.
+
+**Evidence artifact CC8-E-005:** All GitHub Issues tagged `admin-override` at `github.com/Rbit27/form/issues?label=admin-override`. Refresh cadence: per occurrence. Owner: founder.
+
+**Post-hire target.** After the first engineering hire: set "Include administrators" to **on**. Emergency changes (§21.2) follow the 1-reviewer fast path using the hire as the second person. The admin-override exception is retired.
+
+---
+
+### 21.9 Evidence Package for SOC 2 Auditors
+
+| Evidence ID | Description | Location | Refresh Cadence | Owner |
+|---|---|---|---|---|
+| **CC8-E-001** | Branch protection screenshot — `main` branch settings at `github.com/Rbit27/form` | `/evidence/cc8/branch-protection-YYYY-MM-DD.png` in private compliance repo | Quarterly, or immediately on any settings change | founder |
+| **CC8-E-002** | CI/CD run log per production deploy — test results, lint results, deploy hash, commit SHA | GitHub Actions run history + archived to `r2://form-backups/ci-logs/YYYY/MM/` per deploy | Per deploy (automated once CI is live; CC8-GAP-001) | automated |
+| **CC8-E-003** | Migration file git history — complete DDL change history with author, timestamp, PR link | `git log supabase/migrations/` at `github.com/Rbit27/form` | Per deploy (automated — git history) | automated |
+| **CC8-E-004** | PITR restore test record — quarterly confirmation that schema rollback via PITR achieves RTO target | `/evidence/cc8/pitr-test-YYYY-MM.md` in private compliance repo | Quarterly | devops-lead |
+| **CC8-E-005** | Admin override issue log — all GitHub Issues tagged `admin-override` | `github.com/Rbit27/form/issues?label=admin-override` | Per occurrence | founder |
+| **CC8-E-006** | PR merge history — complete record of every change merged to `main`, including author, reviewer (if applicable), and linked CI status | `github.com/Rbit27/form/pulls?state=closed` + GitHub audit log export | Per change (automated) | automated |
+
+**Evidence collection note for auditors.** CC8-E-002 is currently unavailable because the CI pipeline (CC8-GAP-001) is not yet configured. The compensating control for the observation period prior to CI activation is the manual pre-deploy checklist in `docs/ENGINEERING_RUNBOOK.md`. Checklist completions are recorded as comments on the corresponding PR before merge. Auditors will find this evidence in the PR comment history (CC8-E-006).
+
+---
+
+### 21.10 Control Status Update
+
+This section closes two documented gaps and upgrades one from red to partial. The CC8 control table in §1 is updated as follows:
+
+| Control | Previous status | Status after §21 | Notes |
+|---|---|---|---|
+| All changes via version-controlled repo | ✅ Done | ✅ Done | No change — GitHub public repo, DEC-010 |
+| Production deploy requires CI pass | 🟡 Gap | 🟡 Gap | Gap formally documented as CC8-GAP-001; CI pipeline is a separate engineering task. Compensating manual checklist referenced. |
+| PR review policy documented | (not previously a separate control) | 🟢 Done | This section documents the policy, authorization matrix, and solo-founder compensating controls. Evidence: CC8-E-006. |
+| Rollback procedure documented | 🟡 Gap | 🟢 Done | §21.6 documents rollback for all four production surfaces (Workers, Pages, schema, ML model). RTO targets defined. |
+| Separation of duties | 🔴 Gap | 🟡 Partial | Structural gap acknowledged and disclosed. Four compensating controls documented. Auditor disclosure guidance included. Expires at first engineering hire. |
+| Emergency change process | 🟡 Gap | 🟢 Done | §21.2 defines Emergency change type with 2-hour SLA, single-approver fast path, mandatory post-hoc review, and simultaneous incident ticket requirement. |
+
+**Impact on readiness metrics:**
+
+- Critical gaps: 2 → 1 (separation of duties: 🔴 → 🟡 Partial with compensating controls)
+- Controls newly 🟢 Done: PR review policy, rollback procedure, emergency change process (+3)
+- Readiness: ~65% → ~67%
+
+---
+
+### 21.11 Open Items
+
+| ID | Item | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC8-GAP-001** | Configure GitHub Actions CI pipeline: test + lint + build on every PR; required status checks enforced on `main` branch protection | P1 — must be complete before observation period begins | devops-lead + platform-engineer | Blocks CC8-E-002 evidence generation and closes PRE-13 + PRE-14 partially. Until complete, manual pre-deploy checklist in `docs/ENGINEERING_RUNBOOK.md` is the compensating control. |
+| **CC8-GAP-002** | Enable "Include administrators" on `main` branch protection after first engineering hire | P2 — post-hire | security-engineer | Retires the admin-override exception (§21.8). Must be done within 30 days of first engineering hire starting. Update branch protection screenshot (CC8-E-001) immediately after. |
+| **CC8-GAP-003** | Automated deployment log archival to R2 (CC8-E-002) | P2 — can be implemented as part of CC8-GAP-001 CI pipeline | devops-lead | Add R2 archive step to GitHub Actions deploy job. Requires R2 bucket `form-backups` (§19-01) to be provisioned first. |
+
+---
+
+*v1.1 additions: Section 21 — CC8 Change Management Controls: Formal Policy & Evidence Framework. Three-tier change classification (Emergency/Standard/Minor) with authorization matrix. Branch protection configuration spec (CC8-E-001). CI/CD pipeline gap formally documented (CC8-GAP-001) with compensating manual pre-deploy checklist. Database schema change controls with mandatory down-migration requirement. Rollback procedures: Cloudflare Workers/Pages instant rollback, Supabase PITR + down-migration, ML model version pointer. Separation of duties: honest solo-founder gap analysis with 4 compensating controls documented; auditor disclosure guidance. Admin-override emergency exception with mandatory GitHub Issue log (CC8-E-005). Evidence package table (6 artifacts: CC8-E-001 through CC8-E-006). Control status: "PR review policy" 🆕 🟢 Done; "Rollback procedure" 🆕 🟢 Done; "Separation of duties" 🔴 → 🟡 Partial. Critical gaps: 2 → 1. Readiness: ~65% → ~67%.*

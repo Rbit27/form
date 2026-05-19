@@ -9,6 +9,11 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.77.0] — 2026-05-19
+
+### Added
+- `docs/SOC2_READINESS.md` v1.0 → v1.1 — **§21 CC8 Change Management Controls: Formal Policy & Evidence Framework** (compliance-officer + security-engineer + devops-lead). Three-tier change classification: Emergency (P0, 2h deploy SLA, single-approver + mandatory post-hoc review + simultaneous incident ticket), Standard (PR + written rationale, 24–72h SLA), Minor (PR + auto-deploy). Branch protection spec for `main`: 7 exact settings with current/target/gap table (CC8-E-001). CI/CD gap (CC8-GAP-001) formally documented — compensating control: manual pre-deploy checklist in ENGINEERING_RUNBOOK.md. Database schema change controls: 3 hard rules (migrations only, always Standard authorization, mandatory down-migration), 5-item migration review checklist (RLS, tenant_id FK, index strategy, backward compat, down-migration test), rollback paths (down-migration <15 min, PITR <4h). Rollback procedures: Cloudflare Workers (`wrangler rollback`, <5 min), Pages (permanent history, <5 min), Supabase schema (<15 min / <4h), ML model KV pointer (<5 min). Separation of duties: structural gap documented without softening — 4 compensating controls (PR-always, written rationale, test gate pending, HMAC audit log), Management Assertion Letter disclosure guidance, post-hire CODEOWNERS path. Admin-override emergency exception: `admin-override` GitHub Issue within 30 min + 24h post-hoc review (CC8-E-005). Evidence package: 6 artifacts (CC8-E-001 through CC8-E-006). Control status: PR review policy 🆕 🟢; Rollback procedure 🟡 → 🟢; Emergency change process 🟡 → 🟢; Separation of duties 🔴 → 🟡. Critical gaps: 2 → 1. Readiness: ~65% → ~67%.
+
 ## [0.76.0] — 2026-05-19
 
 ### Added
