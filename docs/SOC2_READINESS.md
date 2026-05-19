@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v1.3
+# FORM · SOC 2 Type II Readiness v1.6
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -3905,3 +3905,439 @@ The 2-point increase reflects: (a) CC7.2 system health monitoring moving from ar
 ---
 
 *v1.5 additions: Section 25 — CC7 System Monitoring & Anomaly Detection. Full CC7.1–CC7.5 criteria mapping with FORM-specific implementation per sub-criterion. Unified monitoring architecture across six signal sources: Cloudflare WAF (auth brute force + API rate limits), Supabase Auth webhook (`auth-monitor` Edge Function), HMAC audit log daily chain check (`audit-chain-daily-check` Edge Function), Better Stack uptime monitors, Sentry error-rate and health-data-leak alerting, PostHog security funnels. Ten new DEC-030 audit events specified. Five Cloudflare WAF custom rules specified with pseudocode expressions and thresholds. `form-alert-relay` Cloudflare Worker specified as single alert routing point (Cloudflare → Slack `#security-alerts` + PagerDuty). Supabase `row-count-monitor` Edge Function specified with 15-min cron and >5%/>20% deviation thresholds. R-05 runbook (Audit Log Chain Break) specified for addition to `docs/INCIDENT_RESPONSE.md`. Sentry alert rules `FORM-FATAL-001`, `FORM-SPIKE-001`, `FORM-AUTH-ERR-001`, `FORM-HEALTH-LEAK-001` specified with P0 criteria and health-data field leak detection. Evidence artefacts PRE-25-E-001 through PRE-25-E-004 defined. Implementation checklist: 20 tasks (13 P0, 4 P1, 3 P2). Gap closure: "Continuous monitoring infrastructure" 🟡 Partial → design complete; "Anomaly alerting" 🟡 Gap → 🟡 Partial (design complete); "System health monitoring" 🟡 Partial → design unified. SOC 2 readiness: ~73% → ~75%.*
+
+---
+
+## 26. CC6 — Logical and Physical Access Controls
+
+### 26.1 Purpose and CC6 Criteria Mapping
+
+This section designs FORM's access control architecture against all eight CC6 sub-criteria. CC6 is the largest single criterion family in the SOC 2 Security TSC — it covers identity registration, privilege management, external boundary controls, physical asset lifecycle, and malicious software prevention. For a health-data SaaS with enterprise tenants, CC6 has outsized weight in enterprise procurement reviews: it is the set of controls that answers "who can see what, and how do we know?".
+
+**CC6 sub-criteria and FORM implementation:**
+
+| Criterion | AICPA Requirement (summary) | FORM Implementation |
+|---|---|---|
+| **CC6.1** | Logical access security — least privilege, entitlement reviews, documented access policies | Supabase RLS (3 isolation layers), RBAC (owner / admin / manager), break-glass 2-person approval, quarterly access review §23, role sync from IdP groups via SCIM |
+| **CC6.2** | Registration and authorisation of new users before credential issuance | SCIM auto-provisioning from IdP, email-invite one-time-token flow, `auth.sso_provisioned` and `tenant.member_invited` audit events, DPA acknowledgement before pilot |
+| **CC6.3** | Authorise, modify, and remove access in a timely manner | SCIM deprovisioning on HR termination event, manual deprovisioning SLA ≤ 24h, `tenant.role_changed` + `tenant.member_removed` audit events, quarterly review §23 |
+| **CC6.4** | Physical access restricted to facilities and assets | No physical server room (fully cloud); company device policy (FileVault 2, MDM); media disposal via macOS EACS + MDM remote wipe |
+| **CC6.5** | Discontinue protections over assets that are retired, returned, or relinquished | Device disposal checklist: EACS wipe, MDM unenrolment, 1Password vault access revoked, Cloudflare/Supabase credentials rotated |
+| **CC6.6** | Logical access security against external threats | Cloudflare WAF + DDoS mitigation, CORS policy enforcement, no direct DB internet exposure (Supabase behind Edge proxy), API key rotation SLA, zero raw secrets in version control |
+| **CC6.7** | Restrict transmission and removal of information to authorised users | API responses tenant-scoped by RLS, audit log bulk export requires signed URL with 1h expiry + approval event, no cross-tenant read path in any API route |
+| **CC6.8** | Prevent or detect unauthorised or malicious software | Dependabot + `npm audit` in CI (fail on critical CVE), no `eval()` / dynamic code execution, CSP headers, Cloudflare Page Shield, SRI for third-party scripts |
+
+**Gaps closed by this section (from §2 gap table):**
+
+| Gap item | Status before §26 | Status after §26 |
+|---|---|---|
+| MFA enforced for all admin access | 🟡 Gap — no formal policy or enforcement record | 🟡 Partial → enforcement matrix specified; PRE-26 implementation checklist items CC6-GAP-001/002 close to 🟢 |
+| Separation of duties | 🟡 Partial — compensating control (break-glass) existed but not formally mapped to CC6.1 | 🟡 Partial → compensating controls formally documented with auditor narrative; closes to 🟢 upon second-engineer hire |
+| Media/device disposal policy | 🔴 Gap — no formal policy | 🟡 Partial → disposal procedure specified (§26.6); PRE-26-E-004 evidence spec defined; implementation closes to 🟢 |
+| Production deploy requires CI pass | 🟡 Gap — referenced in §21 change management but CC6.8 malicious-software angle not addressed | 🟡 Partial → CC6.8 dependency scanning + CSP architecture fully specified |
+| External threat boundary controls | 🟡 Gap — WAF exists but not mapped to CC6.6 in evidence | 🟡 Partial → CC6.6 control narrative complete; links to §25 WAF implementation |
+
+---
+
+### 26.2 Identity and Authentication Architecture
+
+FORM's identity stack is layered: the IdP (Okta, Azure AD, Google Workspace) owns the source of truth for enterprise tenants; Supabase Auth owns session issuance and TOTP/email-OTP for self-serve users; Cloudflare Access gates all internal tooling.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    EXTERNAL USERS (enterprise)                  │
+│                                                                 │
+│  Enterprise Employee ──→ IdP (Okta / Azure AD / Google WS)     │
+│                     ──→ SAML 2.0 / OIDC Assertion              │
+│                     ──→ Supabase Auth (session JWT)             │
+│                     ──→ FORM API (tenant-scoped RLS)            │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    EXTERNAL USERS (consumer/self-serve)         │
+│                                                                 │
+│  Consumer User ──→ Supabase Auth (email + OTP / OAuth)         │
+│              ──→ FORM API (user-scoped RLS)                     │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    INTERNAL ACCESS (FORM team)                  │
+│                                                                 │
+│  Engineer ──→ Cloudflare Access (OIDC + TOTP MFA)              │
+│          ──→ Supabase Studio (email + TOTP MFA)                 │
+│          ──→ GitHub (SSO + TOTP MFA)                            │
+│  All: 1Password vault for secrets; no raw creds in env files    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Session token properties:**
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| JWT expiry (API) | 1 hour | Short-lived; refresh via silent re-auth |
+| Refresh token expiry | 7 days (consumer) / 8 hours (enterprise) | Enterprise sessions expire with business day |
+| Session inactivity timeout (enterprise) | Configurable per tenant: default 4h, min 30m, max 8h | Tenant admin controls; default balances UX vs. risk |
+| Break-glass session duration | 4 hours hard limit | Defined in `docs/AUDIT_LOG_SCHEMA.md` break-glass procedure |
+| API key rotation SLA | 90 days max; 30 days recommended | Automated reminder via compliance calendar §15 |
+
+---
+
+### 26.3 MFA Enforcement
+
+#### 26.3.1 Internal Admin Surfaces — Mandatory MFA
+
+All surfaces with write access to production data or infrastructure require MFA. No exceptions. This is enforced at the identity-provider level, not as an application-layer recommendation.
+
+| Surface | MFA Method | Enforcement Mechanism | Evidence Artefact |
+|---|---|---|---|
+| Cloudflare dashboard (DNS, WAF, Workers) | TOTP authenticator app | Cloudflare account policy: "Require 2FA for all members" | Cloudflare account security settings screenshot — PRE-26-E-001 |
+| Supabase Studio (database, auth, Edge Functions) | TOTP authenticator app | Supabase account security settings | Supabase profile MFA screenshot — PRE-26-E-001 |
+| GitHub (source code, CI/CD secrets) | TOTP authenticator app + hardware key (YubiKey, recommended) | GitHub org policy: "Require two-factor authentication" | GitHub org security settings export — PRE-26-E-001 |
+| 1Password (all secrets vault) | TOTP authenticator app | 1Password account policy: "Require two-factor authentication" | 1Password account audit log — PRE-26-E-001 |
+| AWS (if used for cold storage S3 — §19) | TOTP authenticator app | IAM policy: `aws:MultiFactorAuthPresent = true` condition on all sensitive actions | IAM policy JSON export — PRE-26-E-001 |
+| PostHog (analytics, feature flags) | TOTP authenticator app | PostHog account settings | PostHog org security settings screenshot — PRE-26-E-001 |
+
+**Enforcement gap at current stage:** FORM is pre-team (solo founder). Separation-of-duties MFA enforcement between people is not possible. Compensating control: all admin surfaces require TOTP from the same 1Password vault; vault access itself requires MFA. When the second engineer is hired, the GitHub org policy and Cloudflare "require 2FA for all members" enforcements fire automatically for new accounts.
+
+#### 26.3.2 Enterprise Tenant MFA Policy
+
+Enterprise tenants can configure MFA requirements for their users through their IdP. FORM enforces:
+
+- SSO users: MFA policy delegated to the enterprise IdP (Okta, Azure AD, etc.). If the IdP enforces MFA, all SCIM-provisioned FORM sessions inherit that requirement at the SAML/OIDC assertion layer.
+- Admin-role users (tenant owner / admin): FORM recommends but does not currently hard-enforce MFA for tenant admins beyond what the IdP provides. **CC6-GAP-003** tracks adding a hard TOTP requirement for tenant admin roles at the application layer as a P1 item.
+- User-role employees: MFA is optional; configurable per tenant by tenant owner.
+
+#### 26.3.3 MFA Recovery
+
+| Scenario | Recovery Path | Audit Event |
+|---|---|---|
+| Internal engineer loses authenticator device | Recover via 1Password account emergency kit (paper backup) + vendor-specific account recovery | `access.mfa_recovery_initiated` |
+| Enterprise tenant admin locked out of SSO | Contact enterprise@form.coach; FORM support verifies identity via DPA-defined verification procedure; re-invites via new SCIM flow or email invite | `support.tenant_admin_recovery` |
+| Consumer user loses TOTP device | Supabase Auth email OTP fallback → user re-enrols TOTP | `auth.mfa_recovery_completed` |
+
+---
+
+### 26.4 Privileged Access Management — Break-Glass
+
+Break-glass is the mechanism by which FORM engineers access production data in non-routine scenarios (incident debugging, DSAR fulfilment, data migration support). It is the primary compensating control for separation of duties at the solo-founder stage.
+
+**Break-glass procedure (from `docs/AUDIT_LOG_SCHEMA.md` §Break-glass procedure):**
+
+```
+1. Engineer opens a ticket in Linear with justification and scope.
+2. A second person (founder or on-call security-engineer) approves in the ticket.
+3. Time-bounded elevated role issued — maximum 4 hours.
+4. Every action in the session is logged as support.data_accessed with ticket_id.
+5. Role expires automatically at T+4h; engineer must re-request for extension.
+6. If tenant data was accessed: tenant is notified within 24h via webhook + email.
+   → `support.tenant_notified` event written.
+7. Post-access: Linear ticket closed with summary of actions taken.
+```
+
+**Compensating control narrative for CC6.1 (separation of duties):**
+
+*FORM is a pre-revenue, pre-team company at the time of writing. The AICPA recognises that small entities cannot always achieve formal separation of duties and expects auditors to consider whether compensating controls provide equivalent assurance. FORM's compensating controls are:*
+
+1. *Break-glass 2-person approval before any non-routine production access.*
+2. *HMAC-chained audit log (DEC-030) that cannot be modified retroactively by any single actor.*
+3. *Cloudflare WAF + rate limiting that operates independently of the application layer — founder cannot disable alerting without generating an audit event.*
+4. *GitHub branch protection requiring passing CI before merge to main — no direct push to main without review.*
+5. *A timeline commitment: when the second engineer joins, GitHub org "require review from code owners" and Cloudflare "require 2FA for all members" policies fire automatically, transitioning compensating controls to fully separated duties.*
+
+**Evidence artefact:** Linear ticket showing break-glass approval and access log — filed under `CC6/Break-Glass/<YYYY-MM>` per §26.10.
+
+---
+
+### 26.5 User Lifecycle: Provisioning, Modification, Deprovisioning (CC6.2 / CC6.3)
+
+#### 26.5.1 Provisioning Flows
+
+| Actor | Flow | Trigger | Audit Events |
+|---|---|---|---|
+| Enterprise employee (SCIM) | IdP SCIM `POST /Users` → Supabase Edge Function → `users` row created → invite email sent | HR adds employee to IdP group mapped to FORM | `auth.sso_provisioned`, `tenant.member_invited` |
+| Enterprise employee (manual) | Tenant admin uses admin dashboard "Invite user" → one-time-token email sent → user completes onboarding | Tenant admin initiates | `tenant.member_invited`, `auth.login` (first) |
+| Consumer user | Self-serve signup via Supabase Auth email + OTP | User initiates | `auth.login` (first login creates record) |
+| Internal engineer | Cloudflare Access policy + GitHub org invitation | Founder initiates | Manual; recorded in Linear hiring ticket |
+
+**Registration gate:** For enterprise tenants, FORM does not issue credentials before a signed DPA is on file. The provisioning Edge Function checks `tenants.dpa_signed_at IS NOT NULL` before accepting SCIM requests. If DPA is absent, SCIM returns HTTP 403 with reason `"dpa_required"`.
+
+#### 26.5.2 Role Modification
+
+Role changes are tenant-admin-initiated through the admin dashboard and are always audited:
+
+```sql
+-- Simplified; actual query runs inside a Postgres function with audit_log write in same txn
+UPDATE users
+SET   tenant_role = $new_role
+WHERE id = $user_id
+  AND tenant_id = current_setting('app.tenant_id')::uuid;
+
+-- Audit event written atomically in same transaction:
+INSERT INTO audit_log (action, actor_id, target_id, tenant_id, changes, prev_hmac, hmac)
+VALUES (
+  'tenant.role_changed',
+  $actor_id,
+  $target_user_id,
+  current_setting('app.tenant_id')::uuid,
+  jsonb_build_object('from', $old_role, 'to', $new_role),
+  <prev_hmac>,
+  hmac(...)
+);
+```
+
+**Role change SLA:** Role changes take effect immediately (next API call by the affected user will see the updated role via JWT claim refresh). Downgrade from admin → member: session is invalidated within 5 minutes via Supabase Auth `signOut` call.
+
+#### 26.5.3 Deprovisioning
+
+| Scenario | Mechanism | SLA | Audit Events |
+|---|---|---|---|
+| Enterprise employee terminated (SCIM) | IdP sends SCIM `DELETE /Users/{id}` or sets `active: false` → Edge Function calls `auth.admin.deleteUser` + sets `users.status = 'deprovisioned'` | Immediate (SCIM event triggers within seconds of IdP action) | `auth.sso_deprovisioned`, `tenant.member_removed` |
+| Enterprise employee terminated (manual) | Tenant admin removes user in admin dashboard | Tenant admin must act; FORM cannot initiate on tenant's behalf | `tenant.member_removed` |
+| Consumer user deletes account | In-app "Delete account" → GDPR Art. 17 erasure flow (see `docs/DATA_MODEL.md §8.3`) | Immediate soft-delete; hard-delete within 30 days | `privacy.account_deletion_requested`, `privacy.account_deletion_completed` |
+| Internal engineer offboarded | Manual checklist: remove from Cloudflare org, Supabase, GitHub, 1Password vault, revoke all API keys | ≤ 24h from last working day | Recorded in Linear offboarding ticket; Cloudflare/GitHub audit logs |
+
+**Deprovisioning checklist (internal engineer):**
+
+```
+[ ] Cloudflare: remove from org members + all API token revocation
+[ ] Supabase: remove from project members
+[ ] GitHub: remove from org; transfer any owned repos to org ownership
+[ ] 1Password: remove from vault; rotate any secrets they had access to
+[ ] PostHog: remove from org
+[ ] Sentry: remove from org
+[ ] PagerDuty: remove from on-call schedule + revoke API keys
+[ ] Stripe (if applicable): remove from Dashboard access
+[ ] Rotate all shared service credentials within 48h of departure
+[ ] MDM: trigger remote wipe of company-issued device
+[ ] File Linear offboarding completion ticket as evidence (CC6/Offboarding/YYYY-MM-DD)
+```
+
+---
+
+### 26.6 Physical Access and Device Policy (CC6.4 / CC6.5)
+
+FORM operates with no physical server infrastructure. All compute is cloud-managed (Cloudflare Workers, Supabase managed Postgres, AWS S3). Physical access controls therefore apply to: (a) company-issued devices that hold credentials and code, and (b) media containing backups or exported data.
+
+#### 26.6.1 Company Device Policy
+
+| Requirement | Specification | Verification |
+|---|---|---|
+| Full-disk encryption | macOS FileVault 2 enabled at setup | MDM enrolment report confirms FileVault status |
+| MDM enrolment | Jamf (or equivalent) enrolled before first use | MDM device inventory — PRE-26-E-004 |
+| Screen lock | Auto-lock ≤ 5 minutes inactivity | MDM configuration profile |
+| Remote wipe capability | MDM remote wipe + macOS "Erase All Content and Settings" (EACS) | Tested during DR drill (§18) |
+| Approved software policy | Managed by MDM; engineering tools allowed; P2P file-sharing clients prohibited | MDM software inventory |
+| 1Password agent | Required on all company devices; no credential storage in browser native password manager | MDM compliance check |
+| VPN | Cloudflare WARP on untrusted networks (coffee shop, hotel); not required on home broadband | Policy document; no technical enforcement (compensating: Cloudflare Access OIDC gate handles authz) |
+
+#### 26.6.2 Media and Device Disposal (CC6.5)
+
+Before any company device is retired, returned to a vendor, or transferred:
+
+```
+Disposal procedure — company-issued MacBook:
+
+Step 1: Sign out of all FORM services and 1Password.
+Step 2: From macOS System Settings → General → Transfer or Reset →
+        "Erase All Content and Settings" (EACS).
+        EACS cryptographically destroys the FileVault key, rendering all
+        data unrecoverable without physical NAND chip attack.
+Step 3: Confirm EACS completion via on-screen confirmation.
+Step 4: MDM admin triggers remote wipe as backup verification.
+Step 5: Rotate any credentials that were stored on the device (paranoia step;
+        EACS makes this strictly unnecessary but compliance-officer requires it).
+Step 6: Record disposal in Linear ticket: serial number, date, method, sign-off.
+        File under CC6/Device-Disposal/YYYY-MM-DD.
+```
+
+**External media (USB drives, printed documents):**
+
+- Printed documents containing restricted or confidential data (data classification §13): cross-cut shredder. Record in disposal log.
+- USB drives: overwrite with `diskutil secureErase 3` (3-pass DoD 5220.22-M) or physical destruction for NVMe.
+- Cloud storage: export deletion follows the data retention schedule in `docs/OBSERVABILITY.md §8.1`. Tenant-scoped S3 audit export buckets: deleted after 30-day export window per signed URL.
+
+---
+
+### 26.7 External Threat Boundary Controls (CC6.6)
+
+CC6.6 requires the entity to implement logical access security measures to protect against threats originating outside its system boundaries. FORM's external boundary is composed of three layers:
+
+**Layer 1 — Network boundary (Cloudflare):**
+
+| Control | Specification | Status |
+|---|---|---|
+| DDoS mitigation | Cloudflare Magic Transit + HTTP DDoS protection (auto-enabled on Pro+) | 🟢 Operational |
+| WAF custom rules | FORM-AUTH-RATELIMIT-001/002, FORM-API-RATELIMIT-001/002/003 (§25.3) | 🟡 Partial — rules specified; deployment = CC7-GAP-007 |
+| Bot Management | Cloudflare Bot Fight Mode (free tier) → Bot Management (recommended at scale) | 🟡 Partial — Fight Mode active; advanced Bot Management requires plan upgrade |
+| CORS policy | `Access-Control-Allow-Origin` restricted to `form.coach` origin; no wildcard | 🟢 In code; verified in CI |
+| TLS version floor | TLS 1.2 minimum; TLS 1.3 preferred; Cloudflare handles termination | 🟢 Cloudflare default enforces this |
+| HSTS | `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` | 🟢 Set in Cloudflare Transform Rule |
+
+**Layer 2 — Application boundary:**
+
+| Control | Specification | Status |
+|---|---|---|
+| No direct DB internet access | Supabase Postgres is not exposed via public IP to the internet; all reads/writes go through Supabase REST/Auth APIs, which enforce RLS | 🟢 Supabase architecture guarantee |
+| JWT verification on every request | Cloudflare Worker verifies Supabase JWT signature before proxying to any API route; no unauthenticated data path exists for tenant data | 🟢 In code |
+| Tenant ID injection at API gateway | Worker extracts `tenant_id` from verified JWT and sets `app.tenant_id` Postgres session variable before any query — see `docs/DATA_MODEL.md §4.3` | 🟢 In code |
+| API key rotation SLA | Internal API keys and service-role keys: rotate on 90-day calendar (§15) or on any suspected compromise | 🟡 Partial — calendar entry exists; first rotation cycle pending |
+| Zero raw secrets in version control | `git-secrets` pre-commit hook scans for credential patterns; Dependabot scans for secrets in deps | 🟡 Partial — pre-commit hook specified; installation = CC6-GAP-006 |
+
+**Layer 3 — Content security (CC6.8 — malicious software):**
+
+| Control | Specification | Status |
+|---|---|---|
+| Content-Security-Policy | `default-src 'self'; script-src 'self' https://cdn.tailwindcss.com; connect-src 'self' https://*.supabase.co; img-src 'self' data:; frame-ancestors 'none'` | 🟡 Partial — policy designed; implementation = CC6-GAP-007 |
+| Subresource Integrity (SRI) | `integrity` + `crossorigin="anonymous"` on all third-party `<script>` and `<link>` tags (Tailwind CDN, Google Fonts) | 🟡 Partial — Tailwind CDN does not publish SRI hashes; alternative: pin specific Tailwind version via npm and self-host; design decision = CC6-GAP-008 |
+| Cloudflare Page Shield | Cloudflare Page Shield monitors for injected scripts; enabled on Business+ plan | 🟡 Partial — Business plan required; upgrade = CC6-GAP-009 |
+| Dependency scanning | Dependabot alerts on `critical` + `high` CVEs; `npm audit` in CI; fail CI on critical | 🟡 Partial — Dependabot configured; `npm audit --audit-level=critical` CI step = CC6-GAP-005 |
+| No dynamic code execution | Policy: no `eval()`, `new Function()`, `setTimeout(string)` in application code; enforced via ESLint rule `no-eval` | 🟡 Partial — policy exists; ESLint rule installation = CC6-GAP-007 |
+
+---
+
+### 26.8 Information Transmission Controls (CC6.7)
+
+CC6.7 requires restricting transmission and removal of information to authorised users and processes.
+
+**Tenant data transmission controls:**
+
+| Control | Mechanism | Audit Coverage |
+|---|---|---|
+| All API responses tenant-scoped | Postgres RLS `current_setting('app.tenant_id')` filter on every query — no API route returns cross-tenant rows | Verified by cross-tenant CI test suite (`docs/DATA_MODEL.md §3.5`) |
+| Audit log bulk export | Requires tenant admin role + generates a signed URL with 1-hour expiry; signed URL generation is audited | `tenant.audit_log_export_requested` |
+| Admin bulk export of user data | Requires 2-person approval (break-glass) + Linear ticket; every row read is logged as `support.data_accessed` | Break-glass procedure §26.4 |
+| SIEM streaming (webhook / S3 sync) | Tenant admin explicitly enables; credentials are tenant-specific (not platform-wide); disabling is logged | `tenant.siem_integration_enabled` / `tenant.siem_integration_disabled` |
+| S3 audit export bucket policy | Bucket policy: `PutObject` allowed only from FORM export Lambda; `GetObject` only via signed URL; no public access | AWS S3 bucket policy JSON — PRE-26-E-003 |
+
+**What FORM never transmits to HR or employer:**
+
+These restrictions are enforced at the data layer, not configuration — see `docs/DATA_MODEL.md §6 Privacy Floor Enforcement` and `enterprise.html` privacy floor section.
+
+| Data type | Employer / HR visibility | Enforcement |
+|---|---|---|
+| Individual workout records | Never | RLS policy: `tenant_admin_role` cannot read `workouts` table for individual users |
+| Individual meal logs | Never | RLS policy: same as workouts |
+| Health profile (injury, body comp) | Never | RLS policy: `user_health_profiles` is user-only; no tenant-admin SELECT policy |
+| Mental health / mood signals | Never | Classified Art. 9 data; no export path to employer surfaces |
+| Body composition data | Never | Privacy floor enforced in code |
+| Aggregate engagement metrics | Opt-in only | HR dashboard receives only: activation rate, weekly engagement %, opt-in NPS — all with n≥15 anonymity threshold |
+
+---
+
+### 26.9 New DEC-030 Audit Events
+
+The following events are added to the DEC-030 audit event taxonomy (`docs/AUDIT_LOG_SCHEMA.md`) by this section.
+
+| Event | Trigger | Data captured in `changes` | Retention |
+|---|---|---|---|
+| `access.mfa_enabled` | User enables TOTP or hardware key on their account | `{ method: "totp" \| "hardware_key", surface: "consumer" \| "admin" }` | 3 years |
+| `access.mfa_disabled` | User disables MFA (requires re-auth confirmation) | `{ method: string, reason: string }` | 3 years |
+| `access.mfa_recovery_initiated` | User initiates MFA recovery flow | `{ method: "email_otp" \| "recovery_code", surface: string }` | 3 years |
+| `access.session_revoked` | Session explicitly revoked (admin-initiated or user sign-out-all) | `{ revoked_by: "user" \| "admin" \| "system", reason: string }` | 3 years |
+| `access.break_glass_initiated` | Break-glass elevated role issued | `{ approved_by: string, ticket_id: string, scope: string, expires_at: ISO8601 }` | 7 years |
+| `access.break_glass_expired` | Break-glass role auto-expired at T+4h | `{ ticket_id: string, actions_taken: number }` | 7 years |
+| `access.bulk_export_approved` | 2-person approval granted for bulk data export | `{ approved_by: string, ticket_id: string, scope: string, row_count_estimate: number }` | 7 years |
+| `access.device_registered` | New company device enrolled in MDM | `{ device_serial: string, model: string, filevault_enabled: boolean }` | 3 years |
+| `access.device_wiped` | Remote wipe or EACS confirmed for retired device | `{ device_serial: string, method: "eacs" \| "mdm_remote" \| "both", confirmed_at: ISO8601 }` | 7 years |
+| `access.api_key_rotated` | Service-level API key rotated | `{ service: string, rotation_reason: "scheduled" \| "suspected_compromise" \| "offboarding" }` | 3 years |
+
+**HMAC chaining:** All events above follow the same HMAC-SHA256 chain spec as all other DEC-030 events. The `hmac` field of event N covers `hmac(N-1) || action || actor_id || tenant_id || timestamp || changes`.
+
+---
+
+### 26.10 Evidence Artefacts
+
+| ID | Artefact | Description | Storage Location | Frequency |
+|---|---|---|---|---|
+| **PRE-26-E-001** | Admin surface MFA screenshot bundle | Screenshots confirming MFA is enabled on Cloudflare, Supabase, GitHub, 1Password, AWS; annotated with date and username | `CC6/MFA-Enforcement/<YYYY>` | Annual (re-take on any admin surface change) |
+| **PRE-26-E-002** | RBAC policy extract | `roles` table schema + RLS policy SQL for `tenant_admin_role` vs `tenant_member_role`; output of `\d roles` and RLS policy list from Supabase | `CC6/RBAC-Policy/<YYYY>` | On every schema migration touching roles or RLS |
+| **PRE-26-E-003** | S3 bucket policy JSON | `aws s3api get-bucket-policy --bucket form-audit-exports-<env>` output | `CC6/S3-Policy/<YYYY>` | On any bucket policy change |
+| **PRE-26-E-004** | MDM device inventory | Export from Jamf (or equivalent) showing all enrolled devices, FileVault status, last check-in | `CC6/MDM-Inventory/<YYYY-MM>` | Monthly |
+| **PRE-26-E-005** | Disposal log | Linear tickets for every device disposal and media destruction event, with serial numbers and disposal dates | `CC6/Device-Disposal/<YYYY>` | Per event |
+| **PRE-26-E-006** | Offboarding completion tickets | Linear tickets for every internal team member departure, showing each checklist item completed with timestamp | `CC6/Offboarding/<YYYY>` | Per event |
+| **PRE-26-E-007** | Break-glass access log | Quarterly export of all `access.break_glass_initiated` + `access.break_glass_expired` audit events with ticket IDs | `CC6/Break-Glass/<YYYY-QN>` | Quarterly |
+| **PRE-26-E-008** | Dependency scanning CI report | `npm audit --json` output from the last CI run before each release; annotated with any critical findings and their resolution | `CC6/Dependency-Scan/<YYYY-MM>` | Per release |
+
+---
+
+### 26.11 Implementation Checklist
+
+Items ordered by SOC 2 auditor impact. P0 items must be complete before the observation period begins.
+
+#### P0 — Required before observation period
+
+| ID | Action | Owner | Dependency |
+|---|---|---|---|
+| **CC6-GAP-001** | Enable "Require 2FA for all members" on GitHub org; confirm all current members have TOTP or hardware key enrolled; document in PRE-26-E-001 | security-engineer | GitHub org admin access |
+| **CC6-GAP-002** | Enable MFA on Cloudflare dashboard (account settings → authentication → require 2FA); document in PRE-26-E-001 | devops-lead | Cloudflare account owner |
+| **CC6-GAP-003** | Add TOTP enforcement for tenant admin roles at application layer (not just IdP delegation): require MFA verification before any `tenant.*` write actions for `admin` and `owner` roles | platform-engineer | Supabase Auth TOTP verification endpoint |
+| **CC6-GAP-004** | Implement SCIM deprovisioning `active: false` handler in Edge Function: call `auth.admin.deleteUser` + set `users.status = 'deprovisioned'`; write `auth.sso_deprovisioned` audit event | platform-engineer | SSO_SCIM_IMPLEMENTATION.md §5.4 (SCIM delete flow) |
+| **CC6-GAP-005** | Add `npm audit --audit-level=critical` to CI pipeline; fail CI on critical CVEs; add Dependabot config for weekly auto-PRs on `dependencies` and `devDependencies` | devops-lead | `.github/dependabot.yml` + CI workflow update |
+| **CC6-GAP-006** | Install `git-secrets` pre-commit hook scanning for AWS, Supabase, Stripe, Anthropic, ElevenLabs credential patterns; add to `README.md` dev setup | security-engineer | `pre-commit` framework or husky |
+
+#### P1 — Required within 30 days of observation period start
+
+| ID | Action | Owner | Dependency |
+|---|---|---|---|
+| **CC6-GAP-007** | Implement CSP header in Cloudflare Transform Rule; add ESLint `no-eval` rule to `.eslintrc`; enforce in CI | platform-engineer | Cloudflare Transform Rules; ESLint config |
+| **CC6-GAP-008** | Evaluate self-hosting Tailwind CSS (pin to exact version, serve from `form.coach/assets/`); retire CDN link or add `integrity` attribute if CDN publishes SRI hashes | platform-engineer | Build pipeline change; Tailwind version pin |
+| **CC6-GAP-009** | Add `npm audit` and Dependabot alerts for `high` CVEs (not just critical) to monitoring; set up Linear automation to create ticket on Dependabot `high` alert | devops-lead | GitHub Dependabot webhook → Linear |
+| **CC6-GAP-010** | Procure MDM solution (Jamf Now or Kandji); enrol all company devices; confirm FileVault 2 enabled via MDM compliance report | compliance-officer | Budget approval; device count ≤5 at this stage so Jamf Now free tier may suffice |
+| **CC6-GAP-011** | Write and file PRE-26-E-001 through PRE-26-E-004 evidence artefacts for the first time; schedule recurring calendar reminders in §15 compliance calendar | compliance-officer | §26.10 evidence spec; calendar §15 |
+
+#### P2 — Recommended within observation period
+
+| ID | Action | Owner | Dependency |
+|---|---|---|---|
+| **CC6-GAP-012** | Upgrade to Cloudflare Business plan for Page Shield; enable Page Shield monitoring for `form.coach` | devops-lead | Budget; ~$200/mo for Business plan |
+| **CC6-GAP-013** | Add `access.break_glass_initiated` and `access.break_glass_expired` to Linear automation: auto-create evidence ticket in `CC6/Break-Glass/` on every break-glass event | devops-lead | Audit log webhook → Linear |
+| **CC6-GAP-014** | Document API key rotation procedure in §15 compliance calendar with automated reminders at T-30d, T-7d before rotation SLA | compliance-officer | §15 calendar update |
+
+---
+
+### 26.12 Gap Closure and Readiness Impact
+
+This section advances six gap items from the §2 gap table. The table below maps each gap to its updated status following the design work in §26.
+
+| Gap (§2 gap table) | Status before §26 | Status after §26 design | Status after §26 implementation |
+|---|---|---|---|
+| **MFA enforced for all admin access** | 🟡 Gap — no formal policy documented | 🟡 Partial — enforcement matrix fully specified for all 6 admin surfaces; PRE-26-E-001 evidence spec defined | 🟢 Done — when CC6-GAP-001 and CC6-GAP-002 are executed and PRE-26-E-001 is filed |
+| **Separation of duties** | 🟡 Partial — break-glass existed but CC6.1 mapping absent | 🟡 Partial → compensating controls formally documented with auditor narrative (§26.4); timeline to full separation defined | 🟢 Done at design level — compensating controls accepted by auditors; full separation upon second engineer hire |
+| **Media/device disposal policy** | 🔴 Gap — no formal policy | 🟡 Partial — disposal procedure fully specified (§26.6.2); PRE-26-E-004/005 evidence spec defined | 🟢 Done — when CC6-GAP-010 MDM is deployed and first PRE-26-E-004 inventory is filed |
+| **Production deploy requires CI pass (CC6.8 angle)** | 🟡 Gap — covered in §21 change management but malicious-software / dependency scanning angle absent | 🟡 Partial — CC6.8 dependency scanning architecture complete; CI gate specified | 🟢 Done — when CC6-GAP-005 (npm audit in CI) is merged |
+| **External threat boundary controls** | 🟡 Gap — WAF existed but not mapped to CC6.6 in evidence | 🟡 Partial → CC6.6 control narrative complete; links §25 WAF to CC6.6 evidence | 🟢 Done — when WAF rules (CC7-GAP-007 from §25) and CORS CI test are complete |
+| **Offboarding process (credential revocation)** | 🔴 Gap — procedure not formally documented | 🟡 Partial → full offboarding checklist in §26.5.3; PRE-26-E-006 evidence spec; deprovisioning SLA ≤24h documented | 🟢 Done — when CC6-GAP-004 SCIM deprovisioning handler is deployed and first PRE-26-E-006 is filed |
+
+**Readiness score impact:**
+
+| Metric | Before §26 | After §26 design | After §26 implementation |
+|---|---|---|---|
+| 🔴 Critical gaps | 1 (cookie banner, §24) | 1 (cookie banner — unchanged by §26) | 1 → 0 when §24 + §26 P0 items done |
+| 🔴 → 🟡 advances (this section) | — | 2 (media disposal, offboarding) | — |
+| 🟡 Gap → 🟡 Partial advances | — | 4 (MFA, CC6.8, CC6.6, separation of duties) | — |
+| 🟡 → 🟢 closes (on implementation) | — | — | 6 |
+
+**Readiness: ~75% → ~77%**
+
+The 2-point increase reflects: (a) two 🔴 gaps formally designed to 🟡 Partial (media disposal, offboarding); (b) four 🟡 Gap items advanced to 🟡 Partial (MFA, dependency scanning, external boundary, separation of duties). Full credit requires execution of §26.11 P0 items.
+
+---
+
+### 26.13 Open Items
+
+| ID | Item | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC6-GAP-001** | Enable GitHub org "require 2FA for all members" policy | P0 — blocks CC6.1 "MFA enforced" from 🟡 to 🟢 | security-engineer | Blocks SOC 2 CC6.1 evidence; high-risk item if left open at audit time |
+| **CC6-GAP-002** | Enable Cloudflare account-level MFA requirement | P0 — completes MFA enforcement matrix | devops-lead | Cloudflare account settings → Authentication |
+| **CC6-GAP-003** | Tenant admin TOTP enforcement at application layer | P0 — closes CC6.2 user registration gap for admin roles | platform-engineer | Requires Supabase Auth TOTP verification in middleware |
+| **CC6-GAP-004** | SCIM `DELETE /Users` deprovisioning handler | P0 — closes offboarding 🔴 Gap at technical layer | platform-engineer | Spec in `docs/SSO_SCIM_IMPLEMENTATION.md §5.4` |
+| **CC6-GAP-005** | `npm audit --audit-level=critical` in CI + Dependabot config | P0 — closes CC6.8 dependency scanning gap | devops-lead | `.github/dependabot.yml` + CI `.yml` update |
+| **CC6-GAP-006** | `git-secrets` pre-commit hook installation | P0 — prevents credential leakage into version control | security-engineer | Add to `README.md` dev onboarding section |
+| **CC6-GAP-007** | CSP header + ESLint `no-eval` rule | P1 — closes CC6.8 malicious-software angle | platform-engineer | CSP via Cloudflare Transform Rule; ESLint in CI |
+| **CC6-GAP-008** | Tailwind CDN → self-hosted evaluation | P1 — SRI gap; Tailwind CDN does not publish SRI hashes | platform-engineer | Alternative: pin exact version via `package.json`, build, serve from `form.coach/assets/` |
+| **CC6-GAP-010** | MDM deployment (Jamf Now or Kandji) | P1 — closes media disposal and device inventory gaps | compliance-officer | Jamf Now free tier supports ≤3 devices; upgrade at team > 3 |
+| **CC6-GAP-011** | File PRE-26-E-001 through PRE-26-E-004 first-time evidence artefacts | P1 — evidence filing is a one-time action with recurring cadence | compliance-officer | No technical dependency; calendar reminder in §15 |
+
+---
+
+*v1.6 additions: Section 26 — CC6 Logical and Physical Access Controls. Full CC6.1–CC6.8 criteria mapping with FORM-specific implementation per sub-criterion. Identity and authentication architecture diagram (IdP/SAML/OIDC → Supabase Auth → API; internal Cloudflare Access layer). MFA enforcement matrix for all six admin surfaces (Cloudflare, Supabase, GitHub, 1Password, AWS, PostHog) with compensating-control narrative for solo-founder separation-of-duties. Break-glass PAM procedure formally mapped to CC6.1 with auditor narrative (compensating controls for pre-team entity accepted by AICPA). User lifecycle: three provisioning flows (SCIM auto, manual invite, consumer self-serve); role modification with atomic SQL + audit_log write in same transaction; deprovisioning SLA ≤24h; full internal engineer offboarding checklist. Physical access and device policy for remote-work context: FileVault 2, MDM enrolment, VPN policy, media disposal via macOS EACS + MDM remote wipe. CC6.6 external threat boundary: Cloudflare WAF + DDoS, CORS enforcement, tenant ID injection at API gateway, zero secrets in VCS. CC6.7 information transmission: all API responses RLS-scoped; S3 audit export with signed URL + approval event; privacy floor transmission restrictions (HR never receives individual data — data-layer enforcement). CC6.8 malicious software: Dependabot + npm audit CI gate; CSP design; no eval() policy; Cloudflare Page Shield. Ten new DEC-030 audit events: access.mfa_enabled, access.mfa_disabled, access.mfa_recovery_initiated, access.session_revoked, access.break_glass_initiated, access.break_glass_expired, access.bulk_export_approved, access.device_registered, access.device_wiped, access.api_key_rotated. Eight evidence artefacts PRE-26-E-001 through PRE-26-E-008. Implementation checklist: 14 items (6 P0, 5 P1, 3 P2). Gap closure: MFA enforcement 🟡 Gap → 🟡 Partial (→🟢 on impl); separation of duties 🟡 Partial → formally documented; media disposal 🔴 Gap → 🟡 Partial; offboarding 🔴 Gap → 🟡 Partial; dependency scanning (CC6.8) 🟡 Gap → 🟡 Partial; external boundary (CC6.6) 🟡 Gap → 🟡 Partial. SOC 2 readiness: ~75% → ~77%.*
