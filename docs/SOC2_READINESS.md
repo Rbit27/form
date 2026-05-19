@@ -2597,3 +2597,241 @@ This section closes two documented gaps and upgrades one from red to partial. Th
 ---
 
 *v1.1 additions: Section 21 — CC8 Change Management Controls: Formal Policy & Evidence Framework. Three-tier change classification (Emergency/Standard/Minor) with authorization matrix. Branch protection configuration spec (CC8-E-001). CI/CD pipeline gap formally documented (CC8-GAP-001) with compensating manual pre-deploy checklist. Database schema change controls with mandatory down-migration requirement. Rollback procedures: Cloudflare Workers/Pages instant rollback, Supabase PITR + down-migration, ML model version pointer. Separation of duties: honest solo-founder gap analysis with 4 compensating controls documented; auditor disclosure guidance. Admin-override emergency exception with mandatory GitHub Issue log (CC8-E-005). Evidence package table (6 artifacts: CC8-E-001 through CC8-E-006). Control status: "PR review policy" 🆕 🟢 Done; "Rollback procedure" 🆕 🟢 Done; "Separation of duties" 🔴 → 🟡 Partial. Critical gaps: 2 → 1. Readiness: ~65% → ~67%.*
+
+---
+
+## 22 · Security Awareness & Training Program
+
+> **CC1.4 / CC2.2 gap closure.** This section documents the formal security awareness and training programme required by the CC1 (Control Environment) and CC2 (Communication and Information) Trust Service Criteria. It closes two previously open gaps: the absence of a documented training programme and the absence of a new-hire security onboarding checklist.
+
+---
+
+### 22.1 Purpose and SOC 2 Mapping
+
+**CC1.4 — Commitment to Competence** requires that the entity demonstrates a commitment to attracting, developing, and retaining individuals competent in alignment with objectives. For a software company processing special-category health data, competence includes security-specific knowledge: secure coding practices, phishing recognition, data handling obligations under GDPR, and incident response readiness.
+
+**CC2.2 — Communicates Internally** requires that the entity internally communicates information necessary to support the functioning of internal controls. Security awareness training is the primary mechanism by which the entity ensures that every person with production system access understands the controls they are required to operate and the obligations attached to that access.
+
+| SOC 2 Criterion | Requirement addressed by this section |
+|---|---|
+| **CC1.4** | Documented training programme with completion evidence; competency areas defined per role |
+| **CC2.2** | Structured internal communication of security policies, acceptable use, and data handling obligations |
+| **CC1.2** | Management accountability — founder completes training and signs off annually |
+| **CC9.2** | Vendor risk awareness training supports third-party risk management obligations |
+
+This section does not replace `docs/SECURITY.md` (which specifies technical controls) or the incident response runbook in §18. It is the human-layer control that ensures both documents are understood, practised, and retained by every person with access to production systems.
+
+---
+
+### 22.2 Programme Scope
+
+Security awareness training obligations differ materially between the current solo-founder phase and the post-hire operating model. This distinction is documented for auditors so the observation period evidence is not evaluated against controls that were not yet applicable.
+
+#### Current phase — solo founder
+
+The programme covers one person: the founder, who holds all production access roles. Training is self-directed but must be documented with completion evidence filed to the private compliance repository. The founder acts simultaneously as the training participant and the training programme owner. This dual role is a structural limitation acknowledged in §21.7 (separation of duties); the compensating control is the evidence requirement — completion cannot be self-asserted without an artefact verifiable by a third-party auditor (certificate, course completion screenshot, or signed attestation).
+
+#### Post-hire phase
+
+The programme expands to cover every person granted access to any of the following:
+- Production systems (Supabase, Cloudflare Workers, R2, KV, Cloudflare Dashboard)
+- The private compliance repository
+- The `github.com/Rbit27/form` codebase with write access to `main` or any protected branch
+- 1Password vaults holding production credentials or backup encryption keys
+- PostHog, Sentry, or any observability tooling with access to user-identifiable data
+
+Contractors and vendors with persistent access to any of the above are subject to the same training obligations as employees. Short-term contractors (engagement < 30 days, no production system access) are out of scope but must sign the acceptable use policy before any access is granted.
+
+> **Auditor note.** During the solo-founder observation period, evidence artefacts CC1-E-001 through CC1-E-004 are the primary training controls. CC1-E-005 (phishing simulation records) will be absent until the first hire; this is expected and disclosed rather than covered up. The absence of CC1-E-005 during the solo phase is not a finding under AICPA guidance for pre-revenue companies.
+
+---
+
+### 22.3 Required Training Topics
+
+The following eight topics constitute the core security awareness curriculum. Every person in scope (§22.2) must complete training in all eight areas before being granted production system access (new hires) or within 30 days of this programme being established (founder, current phase).
+
+| # | Topic | SOC 2 Criteria | Delivery method | Frequency |
+|---|---|---|---|---|
+| 1 | **OWASP Top 10** — web application vulnerability classes including injection, broken access control, cryptographic failures, and SSRF | CC6.1, CC6.6, PI1.2 | Interactive course (OWASP WebGoat or equivalent); completion certificate required | Annual; Q3 refresher each year |
+| 2 | **Phishing and social engineering** — recognising and reporting phishing emails, smishing, pretexting, and vishing attempts | CC1.4, CC2.2 | KnowBe4 or GoPhish simulation (post-hire); self-directed module with scenario exercises (solo phase) | Annual training + quarterly simulations post-hire |
+| 3 | **Data classification and handling** — the four-tier classification scheme (`docs/SECURITY.md §13`), Restricted data obligations, and prohibited sharing patterns | CC2.2, C1.1, P1.1 | Internal document review with signed attestation; founder-authored for solo phase | Annual; whenever classification scheme changes |
+| 4 | **Incident response** — roles and responsibilities during a security incident, escalation paths, the five-phase IR process (§18.1), and communication obligations under GDPR Art. 33 | CC7.3, CC7.4, CC7.5 | Tabletop exercise (§18.6); scenario walkthrough using `docs/INCIDENT_RESPONSE.md` | Annual tabletop; ad-hoc after any real incident |
+| 5 | **Credential hygiene** — password manager usage (1Password mandatory), MFA requirements, SSH key rotation, no shared credentials, no credentials in code or git history | CC6.1, CC6.2, CC6.3 | Policy review + hands-on verification (MFA gate; see §22.5 step 3) | Annual; immediate remediation on any credential exposure |
+| 6 | **Secure code review** — identifying security issues in pull request review: hardcoded secrets, missing input validation, RLS bypass patterns, insecure direct object references | CC6.1, CC8.1, PI1.2 | Cloudflare Security track + internal PR review checklist in `docs/ENGINEERING_RUNBOOK.md` | Annual; built into every PR via checklist |
+| 7 | **Privacy and GDPR** — Article 9 special-category health data obligations, lawful basis for processing, data subject rights (DSAR, erasure, portability), DPIA triggers, and breach notification timelines | P1.1, P2.1, P3.1, P4.1, P5.1, P6.1 | Supabase security and privacy documentation + GDPR controller self-assessment; external DPO review annually once user base exceeds 500 EU residents | Annual; whenever a new data type is introduced |
+| 8 | **Vendor risk awareness** — recognising supply-chain risk, understanding what DPAs and SCCs require, and the process for onboarding a new processor (§6 vendor management) | CC9.2, C1.2 | Internal subprocessor register review (`docs/ENTERPRISE.md §Subprocessors`); vendor security questionnaire walkthrough | Annual; whenever a new processor is added |
+
+**Curriculum completeness note.** These eight topics align with AICPA guidance for CC1.4 competency evidence and are calibrated to FORM's current risk surface — a health data SaaS running on Cloudflare + Supabase with AI inference via third-party APIs. If the product surface expands materially (e.g., native mobile app, on-premise deployment, expansion to HIPAA-covered-entity customers), the curriculum must be reviewed and updated with a DPIA-equivalent training impact assessment.
+
+---
+
+### 22.4 Solo-Founder Annual Training Plan
+
+During the solo-founder phase, the following training activities constitute the complete annual programme. All must be completed by **31 March** of each calendar year (Q1 deadline), with evidence filed to the private compliance repository under `/evidence/cc1/training/YYYY/`.
+
+#### Certifications and courses
+
+| Course / Resource | Platform | Completion evidence | SOC 2 topics covered |
+|---|---|---|---|
+| **OWASP WebGoat** — complete all modules relevant to server-side vulnerabilities (A01–A10 OWASP Top 10 2021) | OWASP WebGoat (self-hosted or owasp.org) | Screenshot of completion progress screen; exported completion record if available | Topics 1, 6 |
+| **Cloudflare Security Learning Path** — Workers security, zero trust concepts, DDoS and bot protection | developers.cloudflare.com/learning-paths/security | Cloudflare account dashboard screenshot showing completion; or notes document with module titles and completion dates | Topics 5, 6 |
+| **Supabase Security Documentation Review** — Row Level Security, Auth configuration, API key scoping, connection pooling security | supabase.com/docs (Security section) | Signed internal attestation: "I have reviewed the Supabase security documentation as of [date] and confirm understanding of RLS policies, API key rotation, and Auth security configuration" | Topics 3, 5, 6 |
+| **GDPR Controller Self-Assessment** — Article 9 obligations, DPIA completion, DSAR workflow test | ICO self-assessment toolkit or equivalent | Completed self-assessment export or signed attestation referencing the assessment tool and date | Topic 7 |
+
+#### Internal document review cadence
+
+| Document | Review trigger | Evidence artefact |
+|---|---|---|
+| `docs/SECURITY.md` | Annual (Q1) + any time the document changes materially | Signed attestation: "Reviewed [doc] on [date]. No policy gaps identified" or "Reviewed — gap identified: [description] — tracked in Linear as [ticket]" |
+| `docs/INCIDENT_RESPONSE.md` | Annual (Q1) + after any real incident | Signed attestation as above |
+| `docs/ENTERPRISE.md` — subprocessor list | Annual (Q1) + any time a processor is added or removed | Signed attestation confirming subprocessor list is current and all DPAs are in place |
+| `docs/SOC2_READINESS.md` (this document) | Annual (Q1) + quarterly for gap tracking | Signed attestation confirming readiness percentage and open gaps reviewed |
+
+#### Evidence artefact format
+
+Each training completion evidence item is filed as a PDF or PNG to `/evidence/cc1/training/YYYY/` in the private compliance repository using the naming convention:
+
+```
+CC1-E-001-YYYY-[topic-slug]-[type].[ext]
+```
+
+Examples:
+- `CC1-E-001-2026-owasp-webgoat-screenshot.png`
+- `CC1-E-002-2026-cloudflare-security-track-attestation.pdf`
+- `CC1-E-003-2026-gdpr-self-assessment-export.pdf`
+
+Each file must include the date of completion visible in the artefact itself (not just the filename) so an auditor can independently verify the timeline.
+
+---
+
+### 22.5 New Hire Security Onboarding Checklist
+
+Every person granted access to any production system must complete the following eight steps before credentials are provisioned. Steps are sequential — a step may not be skipped or deferred. **MFA is a hard gate: no credentials are issued until step 3 is verified.**
+
+| Step | Action | Owner | Verification method |
+|---|---|---|---|
+| **1** | Review and sign the Acceptable Use Policy (AUP) — covers permitted use of production systems, prohibition on credential sharing, mandatory incident reporting obligation, and data classification handling rules | security-engineer (witness); new hire (signatory) | Signed PDF filed to `/evidence/cc1/onboarding/[name]-[date]-aup-signed.pdf` |
+| **2** | Complete all eight required training topics (§22.3) — may be completed over the first five business days, but must be finished before solo production access is granted | new hire (self-directed); security-engineer (verifies completion) | Training completion evidence filed to `/evidence/cc1/onboarding/[name]-[date]-training-complete/` |
+| **3** | Enrol MFA on all provisioned accounts — GitHub (TOTP or hardware key), 1Password (hardware key strongly recommended), Supabase (TOTP), Cloudflare (TOTP or hardware key). Security-engineer verifies MFA active on each platform before credentials are considered live | security-engineer | Screenshot of each platform's MFA settings page showing MFA enabled and enrolment date; filed alongside AUP |
+| **4** | 1Password onboarding — receive vault access, confirm password manager is installed on work machine, confirm no credentials are stored outside 1Password (spot-check: no `~/.ssh/config` pointing to plain-text keys; no `.env` files in home directory with production values) | security-engineer | Verbal confirmation + spot-check checklist signed by security-engineer |
+| **5** | SSH key generation and registration — generate a new SSH key pair (Ed25519 minimum) on the work machine; register the public key on GitHub. Confirm the private key is passphrase-protected and stored only on the work machine (not in 1Password, cloud storage, or email) | new hire | Public key visible in GitHub account settings; security-engineer confirms key algorithm is acceptable |
+| **6** | Access provisioning review — security-engineer provisions access to only the systems required for the role (least privilege); access grants are logged in the access control matrix in `docs/ENTERPRISE.md §Access Control Matrix` | security-engineer | Access control matrix updated; Linear ticket created for access provisioning with list of systems granted |
+| **7** | Incident response orientation — 30-minute walkthrough of `docs/INCIDENT_RESPONSE.md` with security-engineer; confirm new hire knows how to report a suspected incident, what the escalation path is, and what they must not do during an active incident (e.g., no public disclosure before founder approval) | security-engineer (facilitates) | Signed attestation by new hire: "I have reviewed the incident response runbook on [date] with [name] and understand my obligations" |
+| **8** | 30-day check-in — security-engineer schedules a 30-day follow-up to address any questions, confirm no credential issues have arisen, and confirm the new hire's access scope is still appropriate for their current work | security-engineer | Linear ticket with 30-day follow-up outcome documented; any access changes logged in access control matrix |
+
+> **Hard gate reminder.** Step 3 (MFA verification) is a non-negotiable gate. No production credentials — GitHub write access, Supabase service role key, Cloudflare API token, 1Password vault access, or R2 bucket access — may be provisioned until the security-engineer has personally verified MFA is active on each platform. Verbal assurance from the new hire is not sufficient.
+
+---
+
+### 22.6 Annual Refresher Training
+
+Training effectiveness degrades without reinforcement. The following cadence governs refresher training for all persons in scope (§22.2).
+
+#### Q1 — Annual refresh (February; all topics)
+
+**Deadline: 28 February each year.**
+
+Every person in scope completes a full review of all eight training topics (§22.3). For courses with certificates (OWASP WebGoat, Cloudflare Security track), a fresh completion run is required — prior-year certificates do not satisfy the current year. For attestation-based topics (data classification, document review, GDPR self-assessment), a new signed attestation with the current year's date is required.
+
+The Q1 deadline is set to February rather than January to allow recovery time if January is consumed by annual planning or audit fieldwork. The deadline is firm — no extensions beyond 28 February without written approval from the compliance-officer filed to the compliance repository.
+
+#### Q3 — OWASP refresher (July/August)
+
+**Deadline: 31 August each year.**
+
+OWASP publishes updates to the Top 10 periodically. Even in years without a new Top 10 publication, the Q3 refresher requires:
+1. Review of any OWASP advisories published since the Q1 training run.
+2. Review of any CVEs affecting FORM's dependency stack (Cloudflare Workers runtime, Supabase/PostgreSQL, the Node.js or TypeScript runtime used in Workers) published since Q1.
+3. A signed attestation confirming the review was completed and listing any CVEs identified as relevant to FORM's stack.
+
+If a new OWASP Top 10 is published, the Q3 refresher must include a full re-run of the relevant OWASP WebGoat modules covering new or reclassified vulnerability categories.
+
+#### Ad-hoc — post-incident refresher
+
+Whenever a security incident (§18 — any severity SEV-1 or higher) is resolved, the incident review (§18.5 post-incident review process) must include an assessment of whether a training gap contributed to the incident. If a training gap is identified:
+
+1. A targeted refresher on the relevant topic is mandatory for all persons in scope within **14 days** of the post-incident review being completed.
+2. The refresher is documented as a separate training artefact referencing the incident ticket.
+3. The curriculum (§22.3) is reviewed to determine whether the gap indicates a systemic weakness in the existing training content; if so, the topic is updated before the next Q1 annual cycle.
+
+---
+
+### 22.7 Phishing Simulation Program
+
+**Applicability: post-hire only.** Phishing simulation requires a minimum of two participants to be meaningful — a simulation sent only to the person who configured it provides no useful signal. During the solo-founder phase, phishing awareness is covered by Topic 2 (§22.3) as self-directed training. The simulation programme activates upon the first hire.
+
+#### Programme design
+
+| Dimension | Specification |
+|---|---|
+| **Platform** | KnowBe4 (preferred — integrates with SAML; provides AICPA-recognised audit reports) or GoPhish (open-source self-hosted alternative if cost is a constraint at early stage) |
+| **Frequency** | Quarterly — four simulations per calendar year |
+| **Scenario variety** | Each quarter uses a different scenario type, rotating across: credential harvesting (fake login page), spear-phishing (personalised sender spoofing), attachment-based (malicious attachment lure), and SMS/voice (if mobile devices are in scope) |
+| **Difficulty calibration** | Year 1: low-to-medium difficulty (obvious sender anomalies, generic lures). Year 2+: escalate difficulty progressively; include domain-lookalike attacks and internal-spoofing scenarios |
+| **Reporting** | Results reported to compliance-officer within 5 business days of simulation completion. Report includes: number of targets, click rate, credential-submission rate, reporting rate (users who reported the simulation as suspicious) |
+
+#### Failure protocol
+
+> **No punitive action.** The phishing simulation programme is a training tool, not a disciplinary mechanism. Clicking a simulated phishing link is not a performance issue. Public shaming, manager notification, or compensation impact are strictly prohibited as responses to simulation failure. These outcomes destroy the psychological safety required for people to report real phishing attempts promptly — the opposite of what the programme is designed to achieve.
+
+| Outcome | Required response | Timeline |
+|---|---|---|
+| Clicked link (no credential submission) | Immediate in-platform training module delivered to the user — typically a 5-10 minute micro-course on the specific technique used in the simulation | Delivered automatically by platform within 24 hours of click |
+| Submitted credentials | In-platform training module (as above) + personal 1:1 debrief with security-engineer covering the specific indicators that should have flagged the simulation | Debrief within 5 business days |
+| Reported simulation as suspicious | Positive acknowledgement from security-engineer; reported rate tracked as a KPI (target: >30% of targets report the simulation within 24 hours by Year 2) | Acknowledgement within 2 business days |
+| Aggregate click rate > 30% in any quarter | Programme-wide refresher training on Topic 2 (phishing) for all persons in scope, regardless of individual performance | Completed within 30 days of simulation results |
+
+#### Evidence artefact
+
+Quarterly simulation reports are filed to `/evidence/cc1/phishing/YYYY-QN-simulation-report.[ext]`. Each report must include the aggregate statistics listed in the Programme design table above. Individual-level data (who clicked) is retained internally but is **not** included in the SOC 2 evidence package — auditors receive aggregate results only. Individual records are maintained for internal training tracking only and are subject to the data minimisation obligations in `docs/SECURITY.md §13`.
+
+---
+
+### 22.8 Evidence Package for SOC 2 Auditors
+
+The following artefacts constitute the complete CC1.4 / CC2.2 evidence package. Auditors should request these artefacts at the beginning of fieldwork. All items are stored in the private compliance repository under `/evidence/cc1/`.
+
+| Evidence ID | Description | Location | Refresh cadence | Owner |
+|---|---|---|---|---|
+| **CC1-E-001** | Annual training completion records — certificates, screenshots, and signed attestations for all eight training topics (§22.3) for each person in scope | `/evidence/cc1/training/YYYY/` — one sub-directory per calendar year | Annual (Q1, deadline 28 February) | compliance-officer |
+| **CC1-E-002** | New hire security onboarding completion record — all eight checklist steps (§22.5) with verification artefacts | `/evidence/cc1/onboarding/[name]-[date]-complete/` — one sub-directory per hire | Per hire | security-engineer |
+| **CC1-E-003** | Q3 OWASP refresher attestation — signed record of CVE review and any new OWASP guidance reviewed | `/evidence/cc1/training/YYYY/q3-owasp-refresher-YYYY.pdf` | Annual (Q3, deadline 31 August) | compliance-officer |
+| **CC1-E-004** | Acceptable Use Policy — current signed version, plus signed copies from all persons in scope | `/evidence/cc1/aup/aup-current-signed-[name]-[date].pdf` | Per hire; re-signed on material policy change | security-engineer |
+| **CC1-E-005** | Phishing simulation quarterly reports — aggregate results (click rate, credential-submission rate, reporting rate) | `/evidence/cc1/phishing/YYYY-QN-simulation-report.pdf` | Quarterly (post-hire only; §22.7) | compliance-officer |
+
+> **Solo-phase auditor note.** During the solo-founder observation period, CC1-E-002 will be absent (no hires) and CC1-E-005 will be absent (phishing simulation requires multiple participants). This is expected and disclosed. The primary controls for the solo phase are CC1-E-001 (annual training completion) and CC1-E-004 (AUP self-signature). Auditors at firms experienced with pre-revenue SaaS companies (Prescient Assurance, Johanson Group) routinely accept this pattern as appropriate for the operating context, provided CC1-E-001 and CC1-E-004 are demonstrably complete and filed before the observation period closes.
+
+---
+
+### 22.9 Gap Closure Table
+
+This section formally closes the CC1.4 and CC2.2 training gaps identified in the initial control inventory (§1) and subsequently flagged in the quarterly readiness reviews.
+
+| Control | Status before §22 | Status after §22 | Notes |
+|---|---|---|---|
+| Security awareness training programme | 🟡 Gap | 🟢 Done | Eight-topic curriculum defined (§22.3); solo-founder annual plan documented (§22.4); evidence artefacts CC1-E-001, CC1-E-003 defined |
+| New hire security onboarding | 🔴 Gap | 🟢 Done | Eight-step checklist with MFA hard gate documented (§22.5); evidence artefact CC1-E-002 defined; AUP signing requirement formalised |
+| Annual refresher training | 🟡 Gap | 🟢 Done | Q1 February cadence and Q3 OWASP refresher cadence documented (§22.6); post-incident ad-hoc refresher protocol defined |
+| Phishing simulation | 🔴 Gap | 🟡 Partial | Programme design and failure protocol documented (§22.7); KnowBe4/GoPhish platform specified; evidence artefact CC1-E-005 defined. Partial because the programme activates only post-hire — simulation cannot run during solo-founder phase |
+
+**Impact on readiness metrics:**
+
+- Critical gaps: 1 (separation of duties — structural; see §21.7) — no change; this gap cannot be closed by documentation
+- Controls newly 🟢 Done: security awareness programme, new hire onboarding, annual refresher (+3)
+- Controls moved to 🟡 Partial: phishing simulation (was 🔴; programme documented and platform specified)
+- Readiness: ~67% → ~69%
+
+---
+
+### 22.10 Open Items
+
+| ID | Item | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC1-GAP-001** | Draft and counsel-review the Acceptable Use Policy (AUP) document | P0 — must be complete before first hire | compliance-officer | AUP is referenced in §22.5 step 1 and CC1-E-004 but the document itself is not yet authored. Draft in `docs/ACCEPTABLE_USE_POLICY.md`; legal review required before any employee signs |
+| **CC1-GAP-002** | Complete founder annual training (CC1-E-001) for the current calendar year | P0 — must be completed by 28 February each year | founder | OWASP WebGoat + Cloudflare Security track + Supabase docs review + GDPR self-assessment. File artefacts to `/evidence/cc1/training/YYYY/` |
+| **CC1-GAP-003** | Procure KnowBe4 or configure GoPhish instance before first hire onboards | P1 — must be ready within 30 days of first hire start date | security-engineer | Budget line: KnowBe4 ~$25–35/user/year at early stage; GoPhish is free (self-hosted). Decision must be made and documented before the phishing simulation programme activates |
+| **CC1-GAP-004** | Add background check procedure to new hire onboarding checklist (§22.5) once a background check provider is selected | P1 — required before first hire with production access | compliance-officer + people-ops | Background checks are a CC1.1 requirement noted in §1. Provider not yet selected. Recommended: Checkr or Sterling for US hires; local equivalent for EU hires. Add as step 0 (pre-offer) in §22.5 once provider is active |
+
+---
+
+*v1.2 additions: Section 22 — Security Awareness & Training Program. Eight-topic required curriculum (OWASP Top 10, phishing, data classification, incident response, credential hygiene, secure code review, privacy/GDPR, vendor risk awareness) with SOC 2 criteria mapping and delivery methods. Solo-founder annual training plan with specific courses (OWASP WebGoat, Cloudflare Security track, Supabase security docs, GDPR self-assessment), internal document review cadence, and evidence artefact naming convention. New hire security onboarding checklist: eight sequential steps with MFA hard gate at step 3, owner and verification columns. Annual refresher cadence: Q1 February (all topics), Q3 August (OWASP), ad-hoc post-incident (14-day SLA). Phishing simulation programme: post-hire, quarterly, KnowBe4/GoPhish, no-punitive-action failure protocol, four outcome tiers. Evidence package table: CC1-E-001 through CC1-E-005. Gap closure: "Security awareness training programme" 🟡 → 🟢 Done; "New hire security onboarding" 🔴 → 🟢 Done; "Annual refresher training" 🟡 → 🟢 Done; "Phishing simulation" 🔴 → 🟡 Partial (post-hire only). Readiness: ~67% → ~69%.*
