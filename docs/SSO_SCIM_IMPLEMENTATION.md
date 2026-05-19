@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v0.3
+# FORM · SSO/SCIM Implementation v0.6
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -19,6 +19,9 @@
 9. [Open Questions / Gaps](#9-open-questions--gaps)
 10. [Magic Link Fallback Security Design](#10-magic-link-fallback-security-design)
 11. [Just-in-Time (JIT) Provisioning Design](#11-just-in-time-jit-provisioning-design)
+12. [Session Token Lifecycle & Refresh Management](#12-session-token-lifecycle--refresh-management)
+13. [Federated Logout — SAML SLO & OIDC Back-Channel Logout](#13-federated-logout--saml-slo--oidc-back-channel-logout)
+14. [SCIM Data Processing: GDPR Article 28 Compliance Framework](#14-scim-data-processing-gdpr-article-28-compliance-framework)
 
 ---
 
@@ -2762,3 +2765,243 @@ This is spec-compliant behaviour and is the correct interpretation. If per-devic
 ---
 
 *v0.5 additions: Section 13 — Federated Logout: SAML SLO & OIDC Back-Channel Logout. Closes G-002 design phase (SAML SLO: SP-initiated + IdP-initiated flows, SLO state machine, 6-state lifecycle, graceful degradation on IdP timeout). Closes G-003 design phase (OIDC Back-Channel logout_token validation, RFC-compliant revocation, enterprise_sessions integration). Front-channel logout explicitly rejected (SameSite/browser restrictions). 8 new audit events. idp_session_id column requirement on enterprise_sessions documented. G-002: 🔴 → 🟡 Partial (design done, implementation pending). G-003: 🔴 → 🟡 Partial. SOC 2 CC6.1 partial closure. Implementation sequencing: core SSO → §13 → G-007 admin UI.*
+
+---
+
+## 14. SCIM Data Processing: GDPR Article 28 Compliance Framework
+
+**Owner:** compliance-officer (primary), enterprise-architect (technical review), security-engineer (audit controls review)
+**Closes:** G-013 design phase
+**Blocking condition lifted when:** compliance-officer forwards §14.3 clause language to outside counsel, counsel approves, and the revised standard DPA template is signed.
+
+### 14.1 Why SCIM Requires a Dedicated DPA Annex
+
+FORM's standard Data Processing Agreement (DPA) covers user-generated data: workouts, meals, coaching sessions, and health profile data. SCIM provisioning introduces a qualitatively different processing activity: FORM now processes **employer-held employee directory data** on behalf of the enterprise customer.
+
+This distinction matters under GDPR Art. 28 for three reasons:
+
+1. **Source of data.** SCIM data originates in the customer's HR/IT systems (Okta, Azure AD, Google Workspace), not from the individual user. The user typically has no direct relationship with FORM at provisioning time — they may not yet have logged in or accepted any FORM privacy notice.
+
+2. **Legal basis at the controller.** The enterprise customer's lawful basis for processing employee directory data through SCIM is Art. 6(1)(b) (performance of an employment contract) or Art. 6(1)(c) (compliance with a legal obligation), not Art. 6(1)(a) (consent). FORM's DPA must reflect this, because the lawful basis chain affects how FORM may process, retain, and delete the data.
+
+3. **Data subjects have separate rights channels.** An employee's right of access (Art. 15), rectification (Art. 16), and erasure (Art. 17) against SCIM-sourced data runs primarily through the **employer** (controller), not through FORM. The DPA must clarify how FORM assists the controller in responding to data subject requests affecting SCIM-provisioned records.
+
+Without an explicit SCIM annex in the DPA, FORM is processing employee directory data without a documented legal basis chain from processor to controller — a finding that would appear in any GDPR audit or enterprise procurement review.
+
+### 14.2 SCIM Personal Data Inventory
+
+The following table defines exactly what personal data FORM processes through SCIM, the retention period for each attribute class, and the legal basis the enterprise customer relies on. This table is incorporated by reference into the DPA Annex (§14.3).
+
+| Attribute class | Specific fields | Retention in active state | Retention after deprovisioning | Legal basis at controller |
+|---|---|---|---|---|
+| **Identity** | `email` (= `userName`), `displayName`, `givenName`, `familyName` | While `active = true` | 30 days in users table (soft-delete), then audit log hash only · 7 years per DEC-030 | Art. 6(1)(b) employment contract |
+| **Account state** | `active` (boolean), `externalId` (IdP-assigned UID) | While `active = true` | Audit log only | Art. 6(1)(b) |
+| **Organisational** | `department`, `title`, `costCenter` | While `active = true` | Deleted at deprovisioning; not retained in audit log | Art. 6(1)(b) |
+| **Reporting structure** | `manager` (resolved to FORM `user_id`) | While `active = true` | Deleted at deprovisioning | Art. 6(1)(b) |
+| **Groups** | Group `displayName`, group `id` (IdP GUID or slug) | While group membership active | Deleted when user removed from group or deprovisioned | Art. 6(1)(b) |
+| **SCIM sync log** | Full operation payload (create/update/delete events) | 90 days rolling | Not retained post-deprovisioning | Art. 6(1)(f) legitimate interest (operational debugging) |
+| **Audit trail** | Actor (`system`), action (`auth.sso_provisioned`, `tenant.scim_provisioned`), `resource_id` (user UUID), timestamp | Indefinite (HMAC chain) | 7 years from creation · partition-drop pruned per `AUDIT_LOG_SCHEMA.md` retention schedule | Art. 6(1)(c) legal obligation (SOC 2, Art. 30 records) |
+
+**Special category data (GDPR Art. 9) — strict prohibition.** SCIM attribute mapping (§3.3) must reject, at the API layer, any attribute that could constitute special category data: health status, disability, religion, ethnicity, union membership, political opinion. If an enterprise IdP schema extension includes such fields, FORM's SCIM endpoint returns `HTTP 400 Bad Request` with `scimType: "invalidValue"` and logs a `scim.rejected_sensitive_attribute` audit event. No exception to this rule exists. See §14.5 for the enforcement mechanism.
+
+### 14.3 DPA Annex B — SCIM Provisioning Processing Activity (Template Clause)
+
+The following clause language is ready for outside counsel review. compliance-officer forwards this section to counsel for incorporation into FORM's standard DPA template. Until that template is updated and signed, **SCIM provisioning must not be enabled for any enterprise customer** (G-013 block).
+
+---
+
+**ANNEX B TO THE DATA PROCESSING AGREEMENT**
+**Processing Activity: SCIM 2.0 User and Group Provisioning**
+
+**1. Subject-matter of processing.**
+Automated synchronisation of enterprise directory data (users and groups) to provision, update, and deprovision user accounts within the FORM platform, using the SCIM 2.0 protocol (RFC 7643, RFC 7644).
+
+**2. Duration of processing.**
+For the term of the Enterprise Agreement, plus thirty (30) days following expiry or termination to allow deprovisioning completion. Audit log records are retained for seven (7) years from creation, consistent with Processor's SOC 2 Type II obligations and GDPR Article 30 records of processing activities. All other personal data is deleted within thirty (30) days of the end of the processing period.
+
+**3. Nature and purpose of processing.**
+Automated execution of SCIM operations (create, read, update, replace, delete) triggered by changes in the Controller's Identity Provider directory, for the purpose of:
+(a) Granting FORM platform access to eligible employees without manual onboarding;
+(b) Updating employee records (name, role, organisational attributes) to maintain accurate access control;
+(c) Revoking FORM platform access promptly when an employee is offboarded or transferred, in support of the Controller's information security obligations.
+
+**4. Types of personal data processed.**
+Email address; display name (first and last name); username (IdP-assigned); employee identifier (externalId, if provided); department; job title; cost centre; manager reference (resolved to an internal FORM user identifier); group memberships (group name and IdP-assigned group identifier). Processor will not request, accept, or store any attribute constituting special category data within the meaning of GDPR Article 9, including but not limited to health status, disability, ethnicity, religion, union membership, political opinion, or biometric data. Any such attribute received from the Controller's IdP will be rejected at the API layer and logged as a security event.
+
+**5. Categories of data subjects.**
+Employees (and, where applicable, contractors or agency workers) of the Controller who are designated by the Controller for access to the FORM platform.
+
+**6. Controller's obligations specific to SCIM provisioning.**
+(a) The Controller is responsible for ensuring that employees designated for SCIM provisioning have been informed, in accordance with GDPR Articles 13–14, that their directory data will be processed by FORM for the purpose described in clause 3 above. FORM's standard user privacy notice (available at form.coach/privacy) covers data processed after first login; GDPR Art. 14 notice for pre-login SCIM provisioning is the Controller's responsibility.
+(b) The Controller shall ensure that the SCIM bearer token (§14.6) is treated as a credential of equivalent sensitivity to an administrative password and is rotated at least annually or immediately upon suspected compromise.
+(c) The Controller shall configure its IdP to send only the attribute classes listed in clause 4. Custom IdP extension schemas that include special category data must be disabled before SCIM provisioning is activated.
+
+**7. Processor's sub-processors for SCIM data.**
+No sub-processors beyond those listed in the main body of this DPA are introduced by SCIM provisioning. SCIM data transits through Cloudflare Workers (zero-retention API layer) and is stored in Supabase (primary database), both of which are listed sub-processors. The Processor will provide thirty (30) days' advance notice of any new sub-processor involved in SCIM data processing.
+
+**8. Assistance with data subject rights.**
+The Processor will assist the Controller in responding to data subject rights requests affecting SCIM-provisioned data, as follows:
+- **Access (Art. 15):** Processor provides a tenant-admin API endpoint to export all stored attributes for a given `user_id`. The Controller is responsible for fulfilling the subject access request from that export.
+- **Rectification (Art. 16):** SCIM PATCH or PUT from the Controller's IdP is the authoritative correction mechanism. Direct corrections via FORM admin dashboard are also supported.
+- **Erasure (Art. 17):** See §14.6 of `docs/SSO_SCIM_IMPLEMENTATION.md` for the full erasure procedure. Identity attributes are anonymised; audit log hash-chain integrity is preserved per DEC-030.
+- **Restriction (Art. 18):** Processor will suspend all SCIM sync operations for a specific user upon written request from the Controller's data protection contact, pending resolution of the processing dispute.
+- **Portability (Art. 20):** Not applicable to SCIM-sourced data, as such data originates with the Controller and is already available in the Controller's IdP system of record.
+
+**[END OF ANNEX B TEMPLATE]**
+
+---
+
+**Outside counsel action required:** Review clauses 4, 6(a), and 8 for jurisdiction-specific language requirements (UK GDPR, Swiss DSG, CCPA B2B exemption). Confirm whether Art. 14 transparency notice obligation in clause 6(a) requires a specific notice template or whether a reference to FORM's privacy policy is sufficient under the applicable supervisory authority's guidance.
+
+### 14.4 Privacy Floor Enforcement for SCIM Attributes
+
+FORM's privacy floor (see `docs/ENTERPRISE.md §Privacy Floor`, `docs/DATA_MODEL.md §6`) prohibits HR-tier tenant admins from accessing individual user data. SCIM-sourced organisational attributes (`department`, `title`, `manager`) are potentially the most sensitive data in the system for this purpose: a manager could use them to identify which individual users have (or have not) engaged with the platform.
+
+**Storage.** SCIM organisational attributes are stored in a dedicated `users.scim_attributes` JSONB column, separate from the core `users` record. This column is:
+- Excluded from all tenant-admin query results by default
+- Not returned by any HR-tier API endpoint
+- Used only by the role-mapping engine (§5.2) at authentication time
+- Readable only by `tenant_owner` role and the Processor's support team (with audit log)
+
+**Role mapping opacity.** When SCIM group membership triggers a role assignment (e.g., group `formAdmins` → `tenant_admin` role), the admin dashboard shows the resulting role, not the source group attribute. A tenant admin can see "User X is a tenant_admin" but cannot see "User X is a tenant_admin *because they are in the Azure AD group formAdmins*" unless they are themselves the `tenant_owner` who configured that mapping.
+
+**Aggregate-only wellness reporting.** The admin dashboard wellness dashboard (described in `docs/ENTERPRISE.md §Admin Dashboard`) uses a k-anonymity floor of 5: any aggregate metric cell covering fewer than 5 users is suppressed and displayed as "< 5 users." SCIM organisational attributes (department, title) may be used as dimensions in aggregate reports only if the resulting cell count clears the k-anonymity floor. Dimensions that would identify individuals are never exposed.
+
+**HR admin access prohibition — hard rule.** The `tenant_manager` role may never receive a query response that includes `users.scim_attributes` content, regardless of API path. This constraint is enforced at three layers: (1) RLS policy on the `users` table (`docs/DATA_MODEL.md §3.3`), (2) application-layer field filter in the tenant API middleware, (3) audit alert if `data.read_individual` event is logged for a `tenant_manager` actor (see `AUDIT_LOG_SCHEMA.md`).
+
+### 14.5 Data Minimisation and Attribute Rejection
+
+The SCIM endpoint must reject at the API layer any attribute not in the approved mapping table (§3.3). Rejection is enforced as follows:
+
+**Unknown core attributes.** SCIM core schema attributes not in the mapping table (e.g., `phoneNumbers`, `addresses`, `x509Certificates`, `ims`, `entitlements`) are silently dropped from the request — the operation succeeds, but the unknown attribute is not stored. This matches RFC 7644 §3.3 guidance on partial attribute support.
+
+**Enterprise extension attributes beyond the approved list.** The approved SCIM enterprise extension attributes are: `department`, `costCenter`, `organization`, `division`, `manager`. Any other enterprise extension attribute (e.g., a custom `urn:okta:*` schema extension) is silently dropped.
+
+**Special category data detection.** A pre-storage attribute scanner inspects incoming SCIM payloads for attribute names that suggest special category data, using a blocklist:
+
+```
+BLOCKED_ATTRIBUTE_PATTERNS = [
+  /health/i, /disability/i, /medical/i, /condition/i,
+  /religion/i, /ethnic/i, /race/i, /national.*origin/i,
+  /politic/i, /union/i, /biometric/i, /genetic/i,
+  /sex.*orient/i, /gender.*ident/i,
+  /salary/i, /compensation/i, /pay.*grade/i  # financial — not Art. 9 but excluded
+]
+```
+
+If a match is found anywhere in the SCIM payload (attribute name or value key), the entire SCIM operation is rejected with `HTTP 400`, `scimType: "invalidValue"`, and a `scim.rejected_sensitive_attribute` audit event is written. The event includes `tenant_id`, `matched_pattern`, and the offending attribute name (not value), so the tenant admin can diagnose and fix their IdP configuration without exposing the sensitive value in logs.
+
+**Minimum required attributes.** If a SCIM `POST /Users` request lacks any of `userName`, `name.givenName + name.familyName` (or `displayName` as fallback), and `active`, the request is rejected with `HTTP 400`, `scimType: "invalidValue"`. These three fields are non-negotiable minimums.
+
+### 14.6 Right to Erasure for SCIM-Provisioned Users (Art. 17 Procedure)
+
+SCIM-provisioned users have a dual-path erasure scenario: their identity is managed by the employer's IdP, but they have independent GDPR rights against FORM.
+
+**Path A — Employer-initiated deprovisioning (SCIM DELETE or PATCH active=false).**
+
+This is the standard offboarding path. It is not a GDPR erasure; it is an access revocation. FORM's response:
+1. Sets `users.active = false`, adds `users.deleted_at` timestamp.
+2. Revokes all active sessions for the user (§12 session revocation).
+3. Retains all user data (workouts, meals, coaching sessions, health profile) for 30 days in the soft-delete state.
+4. After 30 days: hard-deletes `user_health_profile`, workout sets, meal logs, coaching turns per `DATA_MODEL.md §8.3`.
+5. Anonymises `users` record: `email` replaced with SHA-256 hash (stored only in audit log, not in users table), `display_name` replaced with `Deleted User {short_hash}`, `scim_attributes` column nulled.
+6. Audit log entries for the user remain intact with the anonymised `actor_id` hash for 7 years (DEC-030 HMAC chain continuity).
+
+**Path B — User-initiated GDPR erasure request (Art. 17).**
+
+A SCIM-provisioned user who has logged in and created data may request erasure directly from FORM (e.g., via the in-app settings or a written request to privacy@form.coach). This creates a tension with the employer's active provisioning of the account.
+
+FORM's procedure:
+1. Verify that the request comes from the verified account owner (SSO-authenticated request or email-verified OTP).
+2. Assess whether Art. 17(3) exceptions apply: no legal obligation, no public task, no archiving/research ground applies for FORM's use case. The erasure proceeds.
+3. Execute the health data erasure (same as Path A steps 3–5 above).
+4. **Notify the tenant admin** via a `system.gdpr_erasure_request` audit event and, if the tenant has a webhook configured (§15), a webhook notification: "A user with an active SCIM-provisioned account has requested GDPR erasure. FORM has completed erasure of user-generated health data. The user's directory account remains active in your IdP. You should review whether continued SCIM provisioning of this user's record is appropriate given the erasure request." FORM does not delete the IdP-provisioned record unilaterally — the Controller retains ownership of their directory.
+5. If the user is still `active` in the IdP and FORM continues to receive SCIM updates for that user_id after erasure, FORM accepts the SCIM updates to the identity fields (email, name) but does not re-populate health data. The account remains a shell for access control purposes only.
+6. A `data.individual_deletion` audit event is written per `AUDIT_LOG_SCHEMA.md`, with `actor_type = 'user'` and `changes = { "triggered_by": "gdpr_art17_request" }`.
+
+**Audit log preservation.** The HMAC chain (DEC-030) must remain intact through an erasure event. The user's past audit entries (login events, data access events, provisioning events) are not deleted; the `actor_id` in those entries is replaced with the anonymised hash. The hash is stored in a `gdpr_erasure_log` table (separate from `audit_log`) that maps the original `user_id` to the anonymised hash, accessible only to compliance-officer and security-engineer for chain verification purposes. This table is itself audited.
+
+### 14.7 SCIM Audit Events (HMAC Chain per DEC-030)
+
+All SCIM operations write to the `audit_log` table using the HMAC chain defined in `docs/AUDIT_LOG_SCHEMA.md`. The following events are added to the action taxonomy:
+
+| Event | Trigger | Notable fields in `changes` |
+|---|---|---|
+| `scim.user.provisioned` | SCIM POST /Users succeeds | `user_id`, `email_hash`, `scim_attributes_received` (attribute names only, not values), `source_idp` |
+| `scim.user.updated` | SCIM PUT or PATCH /Users/:id succeeds | `user_id`, `changed_attributes` (names only), `active_before`, `active_after` |
+| `scim.user.deprovisioned` | SCIM DELETE /Users/:id or PATCH active=false | `user_id`, `email_hash`, `final_session_count_revoked` |
+| `scim.group.created` | SCIM POST /Groups succeeds | `group_id`, `group_display_name`, `initial_member_count` |
+| `scim.group.updated` | SCIM PATCH /Groups/:id | `group_id`, `members_added_count`, `members_removed_count`, `role_mapping_triggered` |
+| `scim.group.deleted` | SCIM DELETE /Groups/:id | `group_id`, `affected_user_count`, `role_assignments_revoked_count` |
+| `scim.rejected_sensitive_attribute` | Attribute scanner detects blocked pattern | `tenant_id`, `matched_pattern`, `offending_attribute_name` (not value) |
+| `scim.token.rotated` | Customer rotates SCIM bearer token via admin dashboard | `tenant_id`, `initiated_by`, `old_token_last_4` |
+| `scim.token.revoked` | Emergency SCIM token revocation | `tenant_id`, `initiated_by`, `reason` |
+| `system.gdpr_erasure_request` | Art. 17 erasure request received for a SCIM-provisioned user | `user_id`, `request_method`, `tenant_notified`, `health_data_deleted_at` |
+
+**Retention.** SCIM provisioning events (`scim.user.*`, `scim.group.*`) are retained for 7 years per `AUDIT_LOG_SCHEMA.md §Retention schedule` (tenant administrative events class). `scim.rejected_sensitive_attribute` events are retained for 7 years (security events class). `system.gdpr_erasure_request` retained for 7 years (data export/deletion class).
+
+**HMAC chain continuity for SCIM events.** SCIM events are written to the same HMAC chain as all other audit events within the tenant. There is no separate SCIM audit chain. This ensures that a sequence such as `scim.user.provisioned` → `auth.login` → `data.read_aggregate` → `scim.user.deprovisioned` forms a single verifiable chain, which customers can verify using the chain verification procedure in `AUDIT_LOG_SCHEMA.md §HMAC chaining`.
+
+### 14.8 Sub-Processor Disclosure
+
+SCIM provisioning introduces no sub-processors beyond those already listed in FORM's main DPA. The complete data flow for a SCIM operation is:
+
+```
+Customer IdP (controller infrastructure)
+  → HTTPS POST to api.form.coach/scim/v2/
+  → Cloudflare Workers (transit only — zero persistent storage, <1ms retention)
+  → Supabase PostgreSQL (primary data store — existing DPA sub-processor)
+  → Cloudflare R2 (audit log archive — existing DPA sub-processor, if audit export configured)
+```
+
+No third-party enrichment, analytics, or AI inference is performed on SCIM-provisioned directory data. SCIM attributes are never sent to Anthropic, ElevenLabs, PostHog, or Sentry.
+
+**PostHog clarification.** FORM's PostHog integration tracks product usage events (feature interactions, session metrics). SCIM `email` and `displayName` values are **not** sent as PostHog identify traits for SCIM-provisioned users. PostHog receives only the FORM internal `user_id` (a UUID) and anonymised usage events. This constraint is enforced in the PostHog initialisation code: `distinctId` is always the FORM `user_id` UUID, never an email address.
+
+### 14.9 EU Data Residency for SCIM Attributes
+
+SCIM-provisioned user records — including all attributes in the personal data inventory (§14.2) — are stored in the same Supabase region as all other data for that tenant. There is no SCIM-specific data store.
+
+For EU enterprise customers (Supabase EU region, Frankfurt `eu-central-1`):
+- All SCIM attributes are stored exclusively in `eu-central-1`.
+- The Cloudflare Workers API layer processes SCIM requests at the edge closest to the inbound request, but holds no persistent state. Cloudflare's edge nodes for European requests are governed by Cloudflare's EU DPA and Standard Contractual Clauses.
+- Audit log entries for SCIM operations are partitioned within the same Supabase EU region.
+- No SCIM data for EU-region tenants transits through or is stored in US-region infrastructure.
+
+For US enterprise customers (Supabase US East, `us-east-1`):
+- Data residency is US by default.
+- EU-resident employees who are SCIM-provisioned under a US-region tenant: this is a controller-level decision. FORM's DPA discloses that US-region tenants store data in `us-east-1`. The enterprise customer (controller) is responsible for ensuring they have an appropriate legal basis for transferring EU employee data to a US-based processor — Standard Contractual Clauses (Module 2, controller-to-processor) are included in FORM's DPA as the transfer mechanism.
+
+### 14.10 SCIM DPA Compliance Implementation Checklist
+
+| Task | Owner | Priority | Blocking condition |
+|---|---|---|---|
+| Forward §14.3 Annex B clause language to outside counsel for review | compliance-officer | **P0 — blocks enterprise SCIM enable** | G-013 hard block |
+| Incorporate approved clause language into FORM standard DPA template | compliance-officer + outside counsel | P0 | Requires counsel approval |
+| Update FORM DPA template version number and effective date | compliance-officer | P0 | After counsel approval |
+| Confirm Art. 14 transparency notice approach with counsel (is privacy policy sufficient, or is a separate employee notice required?) | compliance-officer | P0 | Jurisdiction-dependent; resolve before first EU enterprise SCIM customer |
+| Implement `scim.rejected_sensitive_attribute` audit event in SCIM endpoint code | platform-engineer | P0 | Part of G-001 SCIM implementation |
+| Implement `BLOCKED_ATTRIBUTE_PATTERNS` scanner (§14.5) in SCIM endpoint | platform-engineer | P0 | Part of G-001 SCIM implementation |
+| Confirm `users.scim_attributes` column is excluded from all tenant-manager RLS policies | security-engineer | P1 | Verify at schema migration time when G-001 is built |
+| Add `system.gdpr_erasure_request` event to audit log action taxonomy in `AUDIT_LOG_SCHEMA.md` | compliance-officer | P1 | Before first GDPR erasure request is processed |
+| Add Art. 17 procedure for SCIM users (§14.6 Path B) to support runbook | customer-success | P1 | Before first enterprise customer goes live |
+| Verify PostHog SCIM data isolation (no email in distinctId for SCIM users) | platform-engineer | P1 | Part of G-001 implementation review |
+| Document SCIM in FORM's GDPR Art. 30 records of processing activities | compliance-officer | P1 | Art. 30 requires documentation of all processing activities |
+| Confirm SCC Module 2 coverage for US-region tenants with EU employees | compliance-officer + outside counsel | P2 — affects EU-employee data under US tenants | Not blocking for US-only enterprise customers |
+
+### 14.11 G-013 Status Update
+
+| Field | Value |
+|---|---|
+| **Gap ID** | G-013 |
+| **Previous status** | 🔴 Not designed — block on SCIM enablement |
+| **Updated status** | 🟡 Design complete, outside counsel review and DPA template update pending |
+| **Design deliverables** | §14.3 Annex B clause language; §14.2 personal data inventory; §14.5 attribute rejection spec; §14.6 Art. 17 procedure; §14.7 audit event taxonomy; §14.8 sub-processor disclosure; §14.9 residency commitments |
+| **Blocking condition** | G-013 hard block lifts when: (1) outside counsel approves revised DPA template, and (2) at least one signed DPA with revised Annex B exists for the first SCIM customer |
+| **Next action** | compliance-officer forwards §14.3 to outside counsel. ETA: 1–2 weeks for review. |
+| **SOC 2 impact** | SCIM provisioning, once implemented (G-001), contributes to CC6.1 (logical access) and CC6.2 (user access management). G-013 closure is required for the auditor to accept SCIM as a SOC 2 in-scope control rather than a compliance exception. |
+| **GDPR Art. 30 impact** | SCIM must be added to FORM's records of processing activities (Art. 30(2) processor records) — see §14.10 implementation checklist. |
+
+---
+
+*v0.6 additions: Section 14 — SCIM Data Processing: GDPR Article 28 Compliance Framework. Closes G-013 design phase (previously 🔴 "block: do not enable SCIM for any customer until DPA is updated" → 🟡 design complete, outside counsel review pending). Personal data inventory for all SCIM attribute classes with retention periods and legal basis chain. DPA Annex B template clause language (subject-matter, duration, nature/purpose, data types, data subject categories, controller obligations, sub-processor disclosure, Art. 15–20 assistance matrix) — ready for outside counsel review. Privacy floor enforcement: `users.scim_attributes` excluded from tenant-manager RLS; role mapping opacity; k-anonymity floor applies to SCIM-dimension aggregates. Data minimisation: unknown attribute silent-drop, enterprise extension allowlist, Art. 9 special category attribute scanner with `BLOCKED_ATTRIBUTE_PATTERNS` blocklist and `scim.rejected_sensitive_attribute` audit event. Art. 17 dual-path erasure: employer-initiated deprovisioning (Path A) vs. user-initiated GDPR erasure (Path B) with tenant notification and HMAC chain continuity via anonymised `actor_id` hash stored in separate `gdpr_erasure_log` table. 10 new audit events added to taxonomy (DEC-030 HMAC chain). Sub-processor disclosure: confirmed no new processors; PostHog `distinctId` isolation constraint documented. EU residency: Supabase `eu-central-1` for EU tenants; SCC Module 2 documented for US-region tenants with EU employees. Implementation checklist: 12 items (P0/P1/P2). G-013: 🔴 → 🟡 Partial.*
