@@ -3369,3 +3369,539 @@ Mobile implementation documented in `docs/MOBILE_ROADMAP.md` — responsibility 
 ---
 
 *v1.4 additions: Section 24 — Cookie Consent & Consent Management Platform. Closes PRE-16 design phase (🔴 Open → 🟡 Partial; critical gaps: 1 → 0 at design level). Full cookie & tracker inventory (7 items: 5 necessary, 2 analytics). CMP selection: Cookiebot (Usercentrics) Essential — CNIL-certified, Cloudflare Zaraz native integration, audit log API for SOC 2 evidence. Technical implementation: Zaraz consent gate (PostHog deferred until statistics consent), banner configuration (default-deny, equal prominence per ePrivacy). Mobile consent: ATT for iOS, in-app ConsentScreen for GDPR EU users (deferred to G-001 mobile phase, documented in MOBILE_ROADMAP.md). HMAC audit chain: 6 new events (consent_granted, consent_declined, consent_withdrawn, consent_updated, att_consent_granted, att_consent_denied). Enterprise B2B: individual consent required despite SCIM provisioning; tenant-level analytics opt-out default. Evidence package: PRE-16-E-001 through PRE-16-E-005. Implementation checklist: 11 items. Control updates: Cookie banner/CMP 🔴 → 🟡 Partial; P2.1 🔴 → 🟡 Partial. Readiness: ~71% → ~73%.*
+
+---
+
+## 25 · CC7 System Monitoring & Anomaly Detection
+
+> Owner: `security-engineer` + `compliance-officer`. Effective: May 2026. Review: after any infrastructure change affecting detection coverage, after any P0/P1 incident, or annually.
+> SOC 2 controls: **CC7.1** (detection of configuration changes and anomalies), **CC7.2** (monitoring of system components), **CC7.3** (evaluation of security events), **CC7.4** (response to detected security events), **CC7.5** (disclosure and communication).
+> Reference: DEC-030 (HMAC-chained audit log), `docs/AUDIT_LOG_SCHEMA.md`, `docs/INCIDENT_RESPONSE.md`, `docs/OBSERVABILITY.md`.
+
+---
+
+### 25.1 Purpose and SOC 2 Criteria Mapping
+
+This section designs the monitoring and anomaly-detection architecture that closes three open gaps in the CC4/CC7 control series. It specifies threshold logic, alert routing, integration points, and evidence artefacts across all five CC7 sub-criteria so that a SOC 2 auditor observing the platform during the Type II window finds a continuous, automated signal chain from event occurrence to documented response.
+
+**CC7 sub-criteria and how this section addresses each:**
+
+| Criterion | AICPA Requirement | FORM Implementation |
+|---|---|---|
+| **CC7.1** | Detects changes to configurations, unexpected locations, and anomalies that may indicate the presence of a threat | Cloudflare WAF rule alerts for auth failure spikes; Supabase Auth webhook events; HMAC chain integrity cron (DEC-030) |
+| **CC7.2** | Monitors system components for anomalies and malfunctions | Better Stack uptime monitors (§20.3); Sentry error-rate alerts; PostHog security-relevant event funnels; audit log daily verification |
+| **CC7.3** | Evaluates security events to determine whether they represent a security threat | Alert triage process in `docs/INCIDENT_RESPONSE.md §1`; thresholds defined in §25.3–25.5; on-call engineer decision gate within 15 minutes of P0/P1 alert |
+| **CC7.4** | Responds to identified security events through a defined process | `docs/INCIDENT_RESPONSE.md` runbooks R-01 through R-05; this section adds R-05 (audit log chain break) and links §25.3 thresholds to runbook entry points |
+| **CC7.5** | Discloses security events to external parties as needed | Better Stack status page (§20); enterprise tenant notification SLA ≤1h for P0; GDPR Art. 33 72h supervisory authority notification |
+
+**Gaps closed by this section (from §2 gap table):**
+
+| Gap item | Status before §25 | Status after §25 |
+|---|---|---|
+| Continuous monitoring infrastructure | 🟡 Partial (PostHog only; no uptime monitoring) | 🟡 Partial → design complete; PRE-10 implementation closes to 🟢 |
+| Anomaly alerting (auth failures, spike detection) | 🟡 Gap (rate limiting exists; no alerting) | 🟡 Partial → thresholds + routing fully specified; implementation closes to 🟢 |
+| System health monitoring | 🟡 Partial (architecture §20; Better Stack pending) | 🟡 Partial → monitoring architecture unified across all signal sources |
+
+---
+
+### 25.2 Monitoring Architecture Overview
+
+FORM's monitoring stack is composed of four signal sources feeding into a single alert routing layer. No in-house SIEM is deployed at this stage (pre-launch, solo-founder phase); the architecture deliberately uses best-of-breed managed services to minimise operational overhead while producing auditor-grade evidence artefacts.
+
+**Text-based data flow diagram:**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    SIGNAL SOURCES                       │
+│                                                         │
+│  Cloudflare WAF  ──→  Firewall Events (Logpush)        │
+│  Supabase Auth   ──→  Auth Webhook (Edge Function)     │
+│  HMAC Audit Log  ──→  Daily Cron (chain integrity)     │
+│  Better Stack    ──→  Uptime Monitor (30s interval)    │
+│  Sentry          ──→  Error Rate / P0 Alert            │
+│  PostHog         ──→  Security-relevant event funnels  │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────┐
+│                   ALERT ROUTING                         │
+│                                                         │
+│  Severity P0/P1  ──→  PagerDuty on-call page           │
+│                   ──→  Slack #security-alerts          │
+│  Severity P2     ──→  Slack #security-alerts           │
+│  Audit log chain ──→  Slack #security-alerts (30s SLA) │
+│  break                                                  │
+│  Restricted data ──→  Slack #security-alerts (30s SLA) │
+│  access                                                 │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────┐
+│               RESPONSE + EVIDENCE                       │
+│                                                         │
+│  On-call engineer triages alert within 15 min (P0/P1)  │
+│  Incident declared → INCIDENT_RESPONSE.md runbook      │
+│  Audit log event written (DEC-030)                     │
+│  Status page updated (status.form.coach)               │
+│  Evidence filed to compliance/monitoring/YYYY-MM/      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Signal source responsibilities:**
+
+| Source | What it monitors | Alert channel | Evidence artefact |
+|---|---|---|---|
+| Cloudflare WAF + Logpush | Auth failure rates, API spike detection, WAF rule matches, rate-limit overflows | PagerDuty + Slack #security-alerts | Cloudflare Logpush JSON to R2; WAF event log |
+| Supabase Auth webhook | Individual auth failure events, suspicious sign-in patterns, account enumeration | Slack #security-alerts (via Edge Function) | Audit log events (`auth.login_failed`, `auth.suspicious_activity`) |
+| HMAC Audit Log cron (DEC-030) | Chain integrity — missing link, hash mismatch, sequence gap | Slack #security-alerts (within 30s of detection) | `audit_log_chain_verification` report (weekly + on-demand) |
+| Better Stack | Uptime for 6 components (§20.3); SLO breach detection | PagerDuty P0/P1 | Monthly uptime export; incident timeline |
+| Sentry | Application error rates; P0 error spike detection; unhandled exception surge | PagerDuty (P0 threshold) + Slack #security-alerts | Sentry alert history; issue resolution evidence |
+| PostHog | Security-relevant user funnels; consent violation signals; anomalous admin access patterns | Slack #security-alerts (manual review cadence) | PostHog dashboard screenshot, quarterly export |
+
+**Slack channel taxonomy:**
+
+| Channel | Audience | What routes here |
+|---|---|---|
+| `#security-alerts` | `security-engineer`, `compliance-officer`, founder | All monitoring alerts; HMAC chain breaks; restricted-data access events; any WAF/rate-limit anomaly |
+| `#incidents` | All team | P0/P1 incidents declared after triage; status page updates; resolution confirmations |
+| `#pagerduty` | On-call engineer (rotating once team > 1) | PagerDuty delivery target for P0/P1 pages during off-hours |
+
+---
+
+### 25.3 Auth Failure & Brute Force Detection
+
+Auth failure detection is the highest-priority alerting gap — it directly maps to Risk SR-02 (credential stuffing / auth brute force) in the Risk Register (§14.2) and to the compensating control listed for that risk ("needs alerting to security channel").
+
+#### 25.3.1 Thresholds
+
+| Signal | Threshold | Window | Severity | Rationale |
+|---|---|---|---|---|
+| Failed logins per IP | **5 failures** | 60 seconds | P1 | Below this, false-positive rate from typos is high; above this, credential stuffing pattern is established |
+| Failed logins per IP | **20 failures** | 5 minutes | P0 | Volume consistent with automated attack tool; block + page immediately |
+| Failed logins per email (account enumeration) | **10 failures** | 5 minutes | P1 | Enumerating valid accounts without IP rotation |
+| Global auth failure rate | **>10% of total auth attempts** | 5 minutes | P0 | Platform-wide attack; may indicate Supabase auth service degradation or large-scale stuffing |
+| Successful login from new country (Restricted-data user) | Heuristic — compare against last 30-day login geolocation | P2 | Notify only; not a hard block; context-dependent |
+
+#### 25.3.2 Cloudflare WAF Rule — Auth Brute Force
+
+Cloudflare WAF Custom Rules are applied at the edge, before requests reach the Supabase Auth service. This layer adds a rate-limiting defence that does not depend on FORM's application code.
+
+**Rule: `FORM-AUTH-RATELIMIT-001` — IP-level auth failure rate limit**
+
+```
+# Cloudflare Custom Rule (Firewall Rules expression syntax)
+# Target: POST /auth/v1/token?grant_type=password (Supabase Auth password endpoint)
+# Also covers: POST /auth/v1/otp (magic link request endpoint)
+
+Rule name:     FORM-AUTH-RATELIMIT-001
+Expression:    (http.request.uri.path contains "/auth/v1/token" or
+                http.request.uri.path contains "/auth/v1/otp") and
+               http.request.method eq "POST"
+Action:        Rate Limit
+  Threshold:   5 requests
+  Period:      60 seconds
+  Match on:    IP address
+  Action:      Block (return HTTP 429)
+  Duration:    10 minutes
+
+Mitigation:    Subsequent block events logged to Cloudflare Logpush
+               Logpush filters on action="block" + ruleId="FORM-AUTH-RATELIMIT-001"
+               → alert fires in Slack #security-alerts within 60 seconds via Cloudflare
+                 Notification (Alert type: Security Events → WAF)
+```
+
+**Rule: `FORM-AUTH-RATELIMIT-002` — Account enumeration signal**
+
+```
+Rule name:     FORM-AUTH-RATELIMIT-002
+Expression:    http.request.uri.path contains "/auth/v1/token" and
+               http.request.method eq "POST"
+Action:        Rate Limit
+  Threshold:   10 requests
+  Period:      300 seconds
+  Match on:    (IP address, request body field "email") — Cloudflare WAF body inspection
+  Action:      Block (HTTP 429)
+  Duration:    30 minutes
+
+Note:          Cloudflare WAF body inspection requires Business/Enterprise plan.
+               Compensating control if plan does not support body inspection:
+               Supabase Edge Function `auth-monitor` (§25.3.3) performs email-level
+               counting independently.
+```
+
+#### 25.3.3 Supabase Auth Webhook — Application-Layer Event
+
+Supabase Auth emits webhook events for every auth action. FORM deploys a Supabase Edge Function (`auth-monitor`) as the webhook receiver. This function:
+
+1. Receives the Auth event payload
+2. Increments a per-IP and per-email failure counter stored in Supabase KV (Redis-compatible; Upstash or Supabase KV)
+3. Evaluates the counter against thresholds in §25.3.1
+4. On threshold breach: writes an audit log event (DEC-030) and posts to Slack `#security-alerts` via the Slack Incoming Webhook secret stored in Cloudflare Workers Secrets (`SLACK_SECURITY_WEBHOOK_URL`)
+
+**Audit log events emitted by `auth-monitor` (to be added to `docs/AUDIT_LOG_SCHEMA.md` taxonomy):**
+
+| Event action | Actor type | Key metadata fields | Chain |
+|---|---|---|---|
+| `auth.login_failed` | `system` | `{ ip_hash, email_hash, failure_count, threshold_triggered: false }` | ✅ |
+| `auth.brute_force_detected` | `system` | `{ ip_hash, email_hash, failure_count, threshold: "5/60s", severity: "P1" }` | ✅ |
+| `auth.account_enumeration_detected` | `system` | `{ ip_hash, email_hash, failure_count, threshold: "10/300s", severity: "P1" }` | ✅ |
+| `auth.login_from_new_country` | `system` | `{ ip_hash, user_id_hash, country_code, prior_country_code }` | ✅ |
+
+**Alert message format (Slack `#security-alerts`):**
+
+```
+[SECURITY ALERT] Auth brute force detected
+Severity:     P1
+Threshold:    5 failed logins in 60s
+IP (hashed):  sha256:a3f2...
+Email (hash): sha256:b7c1...
+Time:         2026-05-19T10:00:00Z
+WAF action:   Block (10 min)
+Audit event:  evt_01J... (HMAC chain)
+Runbook:      docs/INCIDENT_RESPONSE.md R-01 (Account Takeover)
+```
+
+**Privacy note:** IP addresses and email addresses are SHA-256 hashed before inclusion in the Slack alert payload and the audit log. The raw values are available only in Cloudflare Logpush (R2, access controlled per §19.6) and in the Supabase Auth service logs (operator access only, break-glass required). This satisfies GDPR data minimisation for the monitoring layer.
+
+#### 25.3.4 Escalation Path
+
+Alert fires in `#security-alerts` → `security-engineer` acknowledges within 15 minutes (P0/P1 SLA) → evaluates whether the event represents an active attack or a false positive → if active attack, declares incident per `docs/INCIDENT_RESPONSE.md §1.2` (P0/P1 declaration) and invokes runbook R-01 (Account Takeover). The audit log event `auth.brute_force_detected` is the evidence of detection; the Linear incident ticket is the evidence of response.
+
+---
+
+### 25.4 Rate Limiting & Spike Detection
+
+Beyond auth endpoints, FORM must detect API-layer anomalies that could indicate automated scraping, denial-of-service probing, or exploitation attempts against other endpoints.
+
+#### 25.4.1 Cloudflare Rate Limiting Rules — API Endpoints
+
+**Rule: `FORM-API-RATELIMIT-001` — Global API rate limit per IP**
+
+```
+Rule name:     FORM-API-RATELIMIT-001
+Expression:    http.request.uri.path starts_with "/api/"
+Action:        Rate Limit
+  Threshold:   200 requests
+  Period:      60 seconds
+  Match on:    IP address
+  Action:      Block (HTTP 429), Duration: 5 minutes
+  Notes:       Legitimate consumer mobile app generates < 30 req/min under normal use.
+               200 req/min/IP signals automation or misconfigured client.
+```
+
+**Rule: `FORM-API-RATELIMIT-002` — Authenticated API rate limit per JWT user**
+
+```
+Rule name:     FORM-API-RATELIMIT-002
+Expression:    http.request.uri.path starts_with "/api/" and
+               http.request.headers["Authorization"] exists
+Action:        Rate Limit
+  Threshold:   500 requests
+  Period:      60 seconds
+  Match on:    JWT sub claim (Cloudflare WAF can extract via CF-JWT-Sub header
+               set by the Cloudflare Access JWT validation middleware)
+  Action:      Block (HTTP 429), Duration: 5 minutes
+  Notes:       Per-user limit is higher than per-IP to accommodate shared NAT.
+```
+
+**Rule: `FORM-API-RATELIMIT-003` — Workout data submission spike**
+
+```
+Rule name:     FORM-API-RATELIMIT-003
+Expression:    http.request.uri.path contains "/api/workouts" and
+               http.request.method eq "POST"
+Action:        Rate Limit
+  Threshold:   20 requests
+  Period:      60 seconds
+  Match on:    IP address
+  Action:      Challenge (JS challenge), Duration: 3 minutes
+  Notes:       Legitimate users do not POST 20 workout submissions per minute.
+               A spike here likely indicates a replay attack or data injection attempt.
+               JS challenge preferred over hard block to avoid false-positives on
+               legitimate but aggressive sync clients.
+```
+
+#### 25.4.2 Anomaly Thresholds and Alert Triggers
+
+| Signal | Normal baseline | Alert threshold | Severity | Alert target |
+|---|---|---|---|---|
+| API 429 rate (global) | < 0.1% of requests | **> 1% of requests** in any 5-min window | P1 | PagerDuty + Slack #security-alerts |
+| API 5xx error rate | < 0.5% | **> 2%** in any 5-min window | P1 | PagerDuty + Better Stack |
+| Workout POST spike per IP | < 5/min | **> 20/min** (triggers FORM-API-RATELIMIT-003) | P2 | Slack #security-alerts |
+| New tenant API key created | N/A | **Any** creation outside normal working hours (21:00–05:00 UTC) | P2 (heuristic) | Slack #security-alerts |
+| `tenant_id_missing` counter | 0 | **> 0** (any value; per OBSERVABILITY.md §6.2) | P1 | PagerDuty + Slack |
+| Anthropic API error rate | < 5% | **> 80%** in 5-min window | P0 (service availability) | PagerDuty |
+
+**Alert routing implementation:** Cloudflare Notifications (natively available in all Cloudflare plans) are configured to deliver Security Events alerts via webhook to the `form-alert-relay` Cloudflare Worker. The Worker:
+
+1. Receives the Cloudflare event payload
+2. Classifies severity from event metadata
+3. Posts a formatted alert to Slack `#security-alerts` via `SLACK_SECURITY_WEBHOOK_URL`
+4. For P0/P1 events: additionally calls PagerDuty Events API v2 (`POST /v2/enqueue`) with `routing_key = PAGERDUTY_INTEGRATION_KEY` (stored in Cloudflare Workers Secrets)
+5. Writes a `system.security_alert_fired` audit log event (DEC-030)
+
+This Worker is the single alert routing point. It prevents alert duplication and provides an auditable record of every alert that fired, distinct from the underlying telemetry.
+
+#### 25.4.3 Spike Detection — Supabase Row Count Anomaly
+
+A sharp decline in row counts in key tables is a signal of data corruption or deletion attack (Risk SR-03 in §14.2; also triggers Scenario C in §18.3). The detection rule runs as a Supabase Edge Function scheduled cron (`row-count-monitor`) at `*/15 * * * *` (every 15 minutes).
+
+```sql
+-- row-count-monitor: compares current row counts against 1-hour rolling average
+WITH current_counts AS (
+  SELECT
+    relname AS table_name,
+    n_live_tup AS current_rows
+  FROM pg_stat_user_tables
+  WHERE relname IN ('users', 'workouts', 'audit_log', 'coach_sessions',
+                    'tenants', 'wearable_sync', 'body_metrics')
+),
+baseline AS (
+  -- stored in a monitoring_baselines table, updated hourly
+  SELECT table_name, avg_rows_1h
+  FROM monitoring_baselines
+)
+SELECT
+  c.table_name,
+  c.current_rows,
+  b.avg_rows_1h,
+  ROUND((c.current_rows - b.avg_rows_1h) / NULLIF(b.avg_rows_1h, 0) * 100, 1) AS pct_change
+FROM current_counts c
+JOIN baseline b ON c.table_name = b.table_name
+WHERE ABS((c.current_rows - b.avg_rows_1h) / NULLIF(b.avg_rows_1h, 0)) > 0.05;
+-- Alert fires if any table deviates > 5% from its 1-hour baseline
+-- P1 if deviation > 5%; P0 if deviation > 20%
+```
+
+On threshold breach, the Edge Function writes `system.row_count_anomaly_detected` to the audit log (DEC-030) and posts to Slack `#security-alerts`. If deviation exceeds 20%, PagerDuty is also paged (P0).
+
+---
+
+### 25.5 Audit Log Chain Integrity Monitoring
+
+The HMAC-chained audit log (DEC-030) is a foundational control for SOC 2 CC7.3 (evaluation of security events) and CC4.1 (monitoring of controls). A break in the chain means either a system fault or a deliberate tampering event. Both require immediate detection and response.
+
+#### 25.5.1 Daily Verification Job
+
+In addition to the weekly cron already specified in DEC-030, a **daily** lightweight chain check runs as a Supabase Edge Function (`audit-chain-daily-check`), scheduled at `06:00 UTC` each day. This differs from the weekly full-chain scan in that it verifies only the preceding 24 hours of entries — a targeted check that catches breaks within 24 hours rather than within 7 days.
+
+**Check logic:**
+
+```sql
+-- Daily audit chain check: verify HMAC continuity for the last 24 hours
+WITH ordered_entries AS (
+  SELECT
+    event_id,
+    sequence_number,
+    timestamp,
+    hmac_value,
+    prev_hmac_value,
+    LAG(hmac_value) OVER (ORDER BY sequence_number) AS computed_prev_hmac
+  FROM audit_log
+  WHERE timestamp >= NOW() - INTERVAL '24 hours'
+  ORDER BY sequence_number
+)
+SELECT
+  COUNT(*) FILTER (WHERE prev_hmac_value != computed_prev_hmac) AS broken_links,
+  COUNT(*) FILTER (WHERE sequence_number != LAG(sequence_number) OVER (ORDER BY sequence_number) + 1) AS sequence_gaps,
+  MIN(sequence_number) AS first_seq,
+  MAX(sequence_number) AS last_seq,
+  COUNT(*) AS total_entries_checked
+FROM ordered_entries;
+-- Expected: broken_links = 0, sequence_gaps = 0
+```
+
+**Outcomes:**
+
+| Result | Action | Audit event | Alert |
+|---|---|---|---|
+| `broken_links = 0` AND `sequence_gaps = 0` | No action; file daily confirmation | `system.audit_chain_verified` | None |
+| `broken_links > 0` OR `sequence_gaps > 0` | Declare P0 incident; invoke R-05 runbook | `system.audit_chain_break_detected` | PagerDuty P0 + Slack #security-alerts within **30 seconds** |
+| Edge Function itself fails (execution error) | Monitoring failure treated as a chain break — fail-safe principle | `system.audit_chain_check_failed` | PagerDuty P1 + Slack #security-alerts |
+
+#### 25.5.2 Runbook R-05 — Audit Chain Break Response
+
+When `system.audit_chain_break_detected` fires, the on-call engineer follows R-05. This runbook does not yet exist in `docs/INCIDENT_RESPONSE.md`; it is specified here and must be added before the observation period begins.
+
+**R-05 — Audit Log Chain Integrity Incident:**
+
+| Step | Action | Owner | Time budget |
+|---|---|---|---|
+| 1 | Acknowledge PagerDuty alert; join Slack `#incidents` | On-call engineer | < 5 min |
+| 2 | Run the weekly full-chain scan (DEC-030) manually to confirm the break is real and identify the first broken link's `sequence_number` | On-call engineer | < 15 min |
+| 3 | Determine the cause: (a) application bug in audit log writer, (b) direct database modification bypassing the application, (c) backup restore that did not re-anchor the chain (§19.7) | On-call engineer | < 30 min |
+| 4 | If cause = (b): treat as insider threat / security incident. Escalate to P0. Notify `compliance-officer`. Preserve all database access logs before any remediation. Do not modify the audit_log table until forensic review is complete. | On-call engineer + compliance-officer | Immediately |
+| 5 | If cause = (a) or (c): identify the gap; re-anchor chain with a `system.audit_chain_reanchored` event that records `{ broken_at_sequence: N, cause: "...", incident_id: "..." }`; this re-anchor event is itself HMAC-chained to the prior valid entry | On-call engineer | < 4 hours |
+| 6 | Write post-incident report; update `docs/INCIDENT_RESPONSE.md` with R-05 artefact | compliance-officer | Within 48h |
+| 7 | Assess whether the chain break constitutes a GDPR Art. 33 breach (was data modified or deleted as a result?). If yes: start 72-hour supervisory authority notification clock | compliance-officer | Immediately on determination |
+
+**Evidence artefact:** `system.audit_chain_break_detected` event in the HMAC chain is itself evidence of the detection. The corresponding `system.audit_chain_reanchored` event (or the P0 incident report if cause = insider threat) is evidence of the response. Both are filed as PRE-25-E-003 (see §25.7).
+
+#### 25.5.3 SOC 2 Evidence from Chain Verification
+
+Each daily run of `audit-chain-daily-check` writes a `system.audit_chain_verified` event with metadata:
+
+```jsonc
+{
+  "event_id": "evt_01J…",
+  "timestamp": "2026-05-19T06:00:00.000Z",
+  "action": "system.audit_chain_verified",
+  "actor_id": "audit-chain-daily-check",
+  "actor_type": "system",
+  "metadata": {
+    "entries_checked": 2847,
+    "broken_links": 0,
+    "sequence_gaps": 0,
+    "first_sequence": 98201,
+    "last_sequence": 101047,
+    "check_duration_ms": 312
+  }
+}
+```
+
+Auditors querying the audit log for `action = 'system.audit_chain_verified'` will find a daily record spanning the entire observation period — unambiguous CC7.3 evidence that FORM evaluated security events continuously, not just at point-in-time.
+
+---
+
+### 25.6 Application Error Monitoring (Sentry)
+
+Sentry provides the application-layer error signal that Better Stack uptime monitoring cannot — it detects code-level failures that do not cause HTTP 5xx responses (e.g., silent data processing errors, caught exceptions that degrade user experience without returning error codes).
+
+#### 25.6.1 Error Rate Thresholds
+
+| Signal | Normal baseline | Alert threshold | Severity | Target |
+|---|---|---|---|---|
+| Unhandled exception rate (React Native) | < 0.5/hour per active user | **> 5/hour per active user** over 15-min window | P1 | PagerDuty + Slack #security-alerts |
+| Sentry issue "first seen" for crash-level exception | N/A | Any new issue with `level: fatal` | P0 | PagerDuty (immediate) |
+| Error volume spike vs. 7-day baseline | Rolling | **> 300% of 7-day hourly average** | P1 | Slack #security-alerts |
+| Auth-related errors (Supabase auth errors in Sentry) | < 1% of auth events | **> 5%** in 15-min window | P1 | PagerDuty + Slack |
+| `beforeSend` filter drops health data fields | 0 (expected) | **Any event where `body_metrics` or `workout_data` keys present in payload** | P0 (data leak risk) | Slack #security-alerts + compliance-officer DM |
+
+**P0 alert criteria (Sentry → PagerDuty):**
+
+A Sentry alert escalates to P0 and pages the on-call engineer when any of the following are true:
+- Issue `level` is `fatal`
+- Error rate exceeds 300% of the 7-day hourly baseline AND error count > 50 in the window
+- Any Sentry event payload contains a field key matching `body_metrics`, `workout_data`, `health_conditions`, `clinical_flags`, or `coach_sessions` (indicates `beforeSend` scrubber failure — health data in error reports)
+
+The third criterion maps to Risk CR-02 (GDPR Art. 9 health data in operational logs) in §14.2. A `beforeSend` scrubber failure is treated as a potential GDPR Art. 33 breach trigger.
+
+#### 25.6.2 Sentry Alert Configuration
+
+Sentry Alert Rules are configured in the FORM Sentry project with the following routing:
+
+| Alert rule name | Condition | Action |
+|---|---|---|
+| `FORM-FATAL-001` | Issue `level: fatal` — first occurrence | Notify PagerDuty integration + Slack `#security-alerts` |
+| `FORM-SPIKE-001` | Event volume > 300% of 7-day baseline, AND count > 50 in 15-min window | Notify Slack `#security-alerts` |
+| `FORM-AUTH-ERR-001` | Events matching transaction `*/auth/*` with `level: error` > 5% rate | Notify PagerDuty + Slack `#security-alerts` |
+| `FORM-HEALTH-LEAK-001` | Event payload contains any key in `{ body_metrics, workout_data, health_conditions, clinical_flags }` | Notify Slack `#security-alerts` + DM `compliance-officer` + DM `security-engineer` |
+
+#### 25.6.3 Integration with Incident Response
+
+Sentry alerts are the primary trigger for runbook R-02 (Application Error Surge) in `docs/INCIDENT_RESPONSE.md`. When `FORM-SPIKE-001` or `FORM-FATAL-001` fires:
+
+1. On-call engineer acknowledges the Sentry alert and opens the Sentry issue
+2. If the issue is security-relevant (auth errors, data-access errors, health-data field exposure): declare a security incident per `docs/INCIDENT_RESPONSE.md §1.2` and escalate to P0/P1
+3. If the issue is a product quality error (non-security): track in Linear with label `bug-urgent`; do not escalate to the security incident flow
+4. All P0/P1 Sentry-originating incidents are filed as evidence against CC7.2 (monitoring of system components)
+
+**Sentry DPA status note:** As of May 2026, the Sentry DPA is in progress (VR-02 in §14.2; PRE-08 in §15.2). Until the DPA is executed, the `beforeSend` health-data scrubber (CR-02 compensating control) must remain active. If `FORM-HEALTH-LEAK-001` fires while the DPA is pending, this triggers both an application incident (fix the scrubber) and a compliance incident (assess GDPR Art. 33 notification obligation for the data that left the boundary without a valid DPA).
+
+---
+
+### 25.7 Evidence Artefacts for SOC 2 Auditors
+
+The following artefacts constitute the complete CC7 monitoring evidence package. All items are filed to `compliance/monitoring/YYYY-MM/` in the private compliance repository.
+
+| Artefact ID | Description | Source | Cadence | SOC 2 Criteria |
+|---|---|---|---|---|
+| **PRE-25-E-001** | Cloudflare WAF rule configuration export — names, expressions, thresholds, and actions for `FORM-AUTH-RATELIMIT-001/002` and `FORM-API-RATELIMIT-001/002/003` | Cloudflare dashboard → Firewall Rules export (JSON) | At implementation; after any rule change | CC7.1, CC7.2 |
+| **PRE-25-E-002** | Better Stack monitor configuration and 90-day uptime report — all 6 components (§20.3), check intervals, SLO targets, historical data | Better Stack dashboard export; monthly R2 archive (§20.7.2) | Monthly; full export at audit fieldwork | CC7.2, A1.1 |
+| **PRE-25-E-003** | Audit log chain verification history — daily `system.audit_chain_verified` events spanning the observation period; any `system.audit_chain_break_detected` events with corresponding resolution documentation | Audit log query: `SELECT * FROM audit_log WHERE action IN ('system.audit_chain_verified', 'system.audit_chain_break_detected') ORDER BY sequence_number` | Continuous (automated); query export at audit fieldwork | CC7.1, CC7.3 |
+| **PRE-25-E-004** | Sentry alert configuration screenshot and 30-day alert-fire history — all four alert rules (`FORM-FATAL-001`, `FORM-SPIKE-001`, `FORM-AUTH-ERR-001`, `FORM-HEALTH-LEAK-001`) with trigger history and disposition notes | Sentry dashboard → Alerts → Alert History export | Monthly; full export at audit fieldwork | CC7.2, CC7.3 |
+
+**Supplementary evidence** (not artefact-tagged but available on auditor request):
+
+- Slack `#security-alerts` channel export for the observation period — demonstrates continuous human review of alert output
+- PagerDuty incident log — shows response times against the ≤15-minute P0/P1 triage SLA
+- `system.security_alert_fired` events in the HMAC audit chain — machine-readable record of every alert dispatched by the `form-alert-relay` Worker
+
+**Filing convention:** Each monthly evidence file set is committed to `compliance/monitoring/YYYY-MM/` with a SHA-256 hash of each file registered in `compliance/checksums.sha256`. The `compliance-officer` signs off the monthly evidence filing by the 5th of the following month.
+
+---
+
+### 25.8 Implementation Checklist
+
+Execute in the order listed. P0 items are gates for the SOC 2 observation period (must be running before the observation clock starts). P1 items must be complete by Month O+1. P2 items are steady-state improvements.
+
+| Task | Owner | Priority | Notes |
+|---|---|---|---|
+| Configure Cloudflare WAF custom rule `FORM-AUTH-RATELIMIT-001` (5 failures/60s per IP → block + alert) | security-engineer | **P0** | Requires Cloudflare Pro plan minimum for Custom Rules; confirm plan tier first |
+| Configure Cloudflare WAF custom rule `FORM-AUTH-RATELIMIT-002` (10 failures/300s per email → block) | security-engineer | **P0** | Body inspection for email field requires Business/Enterprise plan; fall back to Edge Function counting if plan does not support body inspection |
+| Configure Cloudflare WAF custom rules `FORM-API-RATELIMIT-001/002/003` (global API rate limits) | security-engineer | **P0** | Standard rate limiting available on all Cloudflare paid plans |
+| Configure Cloudflare Notifications → Security Events webhook → `form-alert-relay` Worker | security-engineer | **P0** | Worker must exist before notification is configured |
+| Deploy `form-alert-relay` Worker: receives Cloudflare event → Slack #security-alerts + PagerDuty (P0/P1) | devops-lead | **P0** | Requires `SLACK_SECURITY_WEBHOOK_URL` and `PAGERDUTY_INTEGRATION_KEY` in Workers Secrets |
+| Deploy Supabase Edge Function `auth-monitor` as Auth webhook receiver; implement per-IP and per-email failure counters with KV store | security-engineer | **P0** | Requires Supabase project webhook configuration; KV counters use Upstash Redis or Supabase KV with 5-min TTL |
+| Add `auth.login_failed`, `auth.brute_force_detected`, `auth.account_enumeration_detected`, `auth.login_from_new_country` to DEC-030 action taxonomy in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | **P0** | Coordinate with security-engineer; events must be in taxonomy before Edge Function ships |
+| Deploy Supabase Edge Function `row-count-monitor` with 15-min cron; create `monitoring_baselines` table; configure alerting on >5% deviation | devops-lead | **P0** | `monitoring_baselines` table requires a seed run during a known-good state before anomaly detection is meaningful |
+| Deploy Supabase Edge Function `audit-chain-daily-check` with 06:00 UTC daily cron | security-engineer | **P0** | Supplements (does not replace) existing weekly DEC-030 chain scan |
+| Add `system.audit_chain_verified`, `system.audit_chain_break_detected`, `system.audit_chain_check_failed`, `system.audit_chain_reanchored` to DEC-030 action taxonomy | compliance-officer | **P0** | Required before daily check Edge Function ships |
+| Add runbook R-05 (Audit Log Chain Break) to `docs/INCIDENT_RESPONSE.md` | compliance-officer | **P0** | Use §25.5.2 specification as the draft; security-engineer reviews |
+| Configure Sentry alert rules `FORM-FATAL-001`, `FORM-SPIKE-001`, `FORM-AUTH-ERR-001`, `FORM-HEALTH-LEAK-001` with PagerDuty + Slack routing | security-engineer | **P0** | Requires PagerDuty Sentry integration token; Slack Sentry app installed in workspace |
+| Verify Sentry `beforeSend` scrubber is removing `body_metrics`, `workout_data`, `health_conditions`, `clinical_flags`, `coach_sessions` from all payloads; add automated test | platform-engineer | **P0** | Existing compensating control for CR-02 (§14.2); must have test coverage before observation period |
+| Provision Better Stack uptime monitors for all 6 components (§20.3) — if not already done per §20.10 | devops-lead | **P0** | This is also PRE-10; cross-reference §20.10 implementation checklist |
+| File PRE-25-E-001 (WAF rule export) immediately after WAF rules are configured | compliance-officer | **P0** | Re-file any time a rule is modified |
+| Add `system.security_alert_fired` to DEC-030 action taxonomy; implement in `form-alert-relay` Worker | security-engineer | **P1** | Provides machine-readable alert history in HMAC chain |
+| Configure PostHog security funnels: (a) admin dashboard access patterns, (b) consent withdrawal rate anomaly, (c) DSAR submission volume | compliance-officer | **P1** | PostHog funnels are dashboard-only monitoring; no automated alerting required at P1 stage |
+| Add monthly evidence filing reminder to §15.1 Compliance Calendar: file PRE-25-E-001 through PRE-25-E-004 by 5th of each month | compliance-officer | **P1** | Recurring; add alongside monthly compliance memo entry |
+| Add `audit-chain-daily-check` to `docs/AUDIT_LOG_SCHEMA.md §Cron Schedule` table | security-engineer | **P1** | Documentation update; no code change |
+| Evaluate Cloudflare Business/Enterprise plan upgrade for WAF body inspection (enables `FORM-AUTH-RATELIMIT-002` email-level counting at edge) | devops-lead + compliance-officer | **P2** | Cost vs. benefit analysis; compensating control (Edge Function counting) is acceptable until enterprise launch |
+| Annual review of all thresholds in §25.3.1 and §25.4.2 against observed traffic patterns from the prior year | compliance-officer + security-engineer | **P2** | Add to Q1 annual policy review (§15.1) |
+
+---
+
+### 25.9 Gap Closure and Readiness Impact
+
+This section closes or advances the three monitoring-related gaps identified in the §2 gap table. The table below maps each gap to its updated status following the design work in §25.
+
+| Gap (§2 gap table) | Status before §25 | Status after §25 design | Status after §25 implementation |
+|---|---|---|---|
+| **Continuous monitoring infrastructure** — "PostHog for product; needs uptime monitoring" | 🟡 Partial | 🟡 Partial — full architecture specified: Better Stack (§20 + §25.2), Supabase row-count monitor (§25.4.3), daily audit chain check (§25.5.1), Sentry (§25.6), `form-alert-relay` (§25.4.2) | 🟢 Done — when all P0 items in §25.8 are deployed and PRE-10 (Better Stack 30-day history) is satisfied |
+| **Anomaly alerting (auth failures, spike detection)** — "Rate limiting exists via Cloudflare WAF; needs alerting to security channel" | 🟡 Gap | 🟡 Partial — WAF rules `FORM-AUTH-RATELIMIT-001/002` and `FORM-API-RATELIMIT-001/002/003` specified; `auth-monitor` Edge Function specified; `form-alert-relay` Worker specified; thresholds documented (§25.3.1, §25.4.2) | 🟢 Done — when WAF rules, `auth-monitor`, and `form-alert-relay` are deployed and firing test alerts confirmed |
+| **System health monitoring** — "Architecture defined §20; Better Stack implementation pending" | 🟡 Partial | 🟡 Partial — monitoring architecture unified: signal sources catalogued (§25.2), thresholds specified (§25.3–25.6), alert routing specified (§25.2, §25.4.2), evidence artefacts defined (§25.7) | 🟢 Done — when all §25.8 P0 tasks are complete and PRE-25-E-001 through PRE-25-E-004 are filed |
+
+**Readiness score impact:**
+
+The three gaps above are currently classified as 🟡 Partial or 🟡 Gap in the §2 gap table. This section advances all three from unspecified-partial to fully-designed-partial, and provides a clear implementation path to 🟢 Done for each. No gap moves to 🟢 Done from documentation alone — implementation is required.
+
+Under the readiness methodology used in prior sections (design = advances partial; execution = closes to done), the impact of §25 at design completion is:
+
+- Monitoring/alerting gaps: 3 partial/gap items → 3 partial (design complete)
+- New evidence artefacts defined: 4 (PRE-25-E-001 through PRE-25-E-004)
+- New DEC-030 audit events specified: 10 (`auth.login_failed`, `auth.brute_force_detected`, `auth.account_enumeration_detected`, `auth.login_from_new_country`, `system.row_count_anomaly_detected`, `system.audit_chain_verified`, `system.audit_chain_break_detected`, `system.audit_chain_check_failed`, `system.audit_chain_reanchored`, `system.security_alert_fired`)
+- New runbook specified: R-05 (Audit Log Chain Break)
+- SOC 2 CC7 sub-criteria with formal design coverage: CC7.1, CC7.2, CC7.3, CC7.4, CC7.5 (all five)
+
+**Readiness: ~73% → ~75%**
+
+The 2-point increase reflects: (a) CC7.2 system health monitoring moving from architecture-only to fully-specified monitoring design across all signal sources; (b) CC7.1 and CC7.3 moving from rate-limiting-only to alert-routing-and-threshold-specification. Full credit (approaching 🟢) requires execution of §25.8 P0 items.
+
+---
+
+### 25.10 Open Items
+
+| ID | Item | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC7-GAP-001** | Deploy `form-alert-relay` Cloudflare Worker and configure Cloudflare Security Events webhook | P0 — blocks all Cloudflare-sourced alerting | devops-lead | Must exist before WAF alert rules have any effect on `#security-alerts`; no Worker = silent alerts |
+| **CC7-GAP-002** | Deploy `auth-monitor` Supabase Edge Function with KV-backed failure counters | P0 — closes "anomaly alerting" gap for auth events | security-engineer | Requires Supabase project webhook configuration and Upstash/Supabase KV provisioning |
+| **CC7-GAP-003** | Deploy `audit-chain-daily-check` Edge Function with 06:00 UTC cron; add new DEC-030 events to `docs/AUDIT_LOG_SCHEMA.md` | P0 — closes detection SLA from 7 days to 24 hours | security-engineer | DEC-030 taxonomy update must be merged before Edge Function ships |
+| **CC7-GAP-004** | Author and merge R-05 (Audit Log Chain Break) runbook into `docs/INCIDENT_RESPONSE.md` | P0 — SOC 2 CC7.4 requires a defined response process | compliance-officer | §25.5.2 is the specification; compliance-officer drafts; security-engineer reviews |
+| **CC7-GAP-005** | Configure all four Sentry alert rules with PagerDuty + Slack routing; verify `beforeSend` scrubber test coverage | P0 — health data leak alert is blocking DPA compensating control evidence | security-engineer + platform-engineer | Sentry DPA (VR-02) must be resolved concurrently; do not extend Sentry access scope before DPA is executed |
+| **CC7-GAP-006** | Deploy `row-count-monitor` Edge Function; seed `monitoring_baselines` table from known-good state | P0 — data corruption detection (Scenario C, §18.3) has no automated signal without this | devops-lead | Seed must happen during a stable period; do not seed immediately after a migration |
+| **CC7-GAP-007** | Configure Cloudflare WAF rate-limit rules `FORM-AUTH-RATELIMIT-001/002` and `FORM-API-RATELIMIT-001/002/003` | P0 — rate limiting exists but alert forwarding to `#security-alerts` does not | security-engineer | Confirm Cloudflare plan supports Custom Rules; note body inspection plan limitation for `FORM-AUTH-RATELIMIT-002` |
+| **CC7-GAP-008** | File PRE-25-E-001 (WAF rule export) immediately after WAF rules are live; add monthly filing cadence to §15.1 | P1 | compliance-officer | Evidence filing is a recurring process item, not a one-time task |
+
+---
+
+*v1.5 additions: Section 25 — CC7 System Monitoring & Anomaly Detection. Full CC7.1–CC7.5 criteria mapping with FORM-specific implementation per sub-criterion. Unified monitoring architecture across six signal sources: Cloudflare WAF (auth brute force + API rate limits), Supabase Auth webhook (`auth-monitor` Edge Function), HMAC audit log daily chain check (`audit-chain-daily-check` Edge Function), Better Stack uptime monitors, Sentry error-rate and health-data-leak alerting, PostHog security funnels. Ten new DEC-030 audit events specified. Five Cloudflare WAF custom rules specified with pseudocode expressions and thresholds. `form-alert-relay` Cloudflare Worker specified as single alert routing point (Cloudflare → Slack `#security-alerts` + PagerDuty). Supabase `row-count-monitor` Edge Function specified with 15-min cron and >5%/>20% deviation thresholds. R-05 runbook (Audit Log Chain Break) specified for addition to `docs/INCIDENT_RESPONSE.md`. Sentry alert rules `FORM-FATAL-001`, `FORM-SPIKE-001`, `FORM-AUTH-ERR-001`, `FORM-HEALTH-LEAK-001` specified with P0 criteria and health-data field leak detection. Evidence artefacts PRE-25-E-001 through PRE-25-E-004 defined. Implementation checklist: 20 tasks (13 P0, 4 P1, 3 P2). Gap closure: "Continuous monitoring infrastructure" 🟡 Partial → design complete; "Anomaly alerting" 🟡 Gap → 🟡 Partial (design complete); "System health monitoring" 🟡 Partial → design unified. SOC 2 readiness: ~73% → ~75%.*
