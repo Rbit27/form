@@ -915,6 +915,150 @@ If the Supabase connection string or Cloudflare Worker origin is exposed in clie
 
 ---
 
+### R-07: Sub-processor Breach Notification Received
+
+**Trigger:** A FORM sub-processor — Anthropic, Supabase, ElevenLabs, Cloudflare, PostHog, Sentry, or any other processor with a GDPR Data Processing Agreement — notifies FORM of a security incident that may have involved access to FORM user data. Notification may arrive via: processor status page incident report, email to security@form.coach or legal contact, account manager outreach, or regulatory authority advisory.
+
+**Critical legal distinction from R-01 to R-06:** This incident originates at a sub-processor, not at FORM's own systems. However, FORM remains the **controller** under GDPR Art. 4(7) for all user data processed on its behalf. FORM's Art. 33 notification obligation to the supervisory authority is triggered by FORM's **awareness** of a probable breach involving FORM users' data — regardless of where the breach occurred. **The 72-hour clock starts when FORM receives credible notification from the processor, not when the processor itself discovered the incident.**
+
+**Severity — determined by the data categories the processor holds, not by the processor's own incident classification:**
+
+| Processor | Data categories held for FORM | FORM severity floor |
+|---|---|---|
+| **Supabase** | Full database: health profiles, workouts, meal logs, coaching turns, auth tokens | P0 — Art. 9 health data confirmed |
+| **Anthropic** | Coaching conversation turns (system prompt + user turns contain health context) | P0 — Art. 9 probable |
+| **ElevenLabs** | Text coaching cue strings (health-adjacent language possible) | P1 — Art. 9 possible |
+| **Cloudflare** | Request logs, IP addresses, auth tokens in-flight, Workers KV (API keys) | P1 minimum; P0 if session token or API key exposure confirmed |
+| **PostHog** | Pseudonymous analytics events (no raw PII in standard instrumentation) | P2 minimum; audit instrumentation before downgrading |
+| **Sentry** | Error reports — may contain health-adjacent data in stack traces if scrubbing misconfigured | P1 minimum; audit scrubbing config before classification |
+| **Stripe** | Payment processing only; FORM holds no raw card data | P1 minimum for billing exposure; no health data |
+
+A Supabase or Anthropic breach notification is **always P0** until scope assessment proves otherwise.
+
+#### Immediate Actions (T+0 to T+30 min)
+
+```
+1. Open incident channel: #inc-YYYYMMDD-processor-[vendor-slug]
+   Example: #inc-20260520-processor-supabase
+
+2. Page: IC + security-engineer + compliance-officer simultaneously.
+   Do not wait for scope assessment — page all three at T+0.
+
+3. Note exact receipt time in channel. This is the GDPR Art. 33 clock start.
+   Format: "[HH:MM UTC] GDPR Art. 33 clock started — processor notification
+            received from [vendor]. T+0h of 72h."
+
+4. Preserve the notification artifact immediately:
+   - Screenshot the processor's status page at time of notification
+   - Forward or save any email notification to the incident evidence store (§7)
+   - SHA-256 hash the notification artifact and record in channel
+
+5. Do NOT publicly comment on the processor's incident.
+   FORM's external communications are independent of the processor's own.
+   IC authorizes all external statements.
+
+6. Identify data categories the processor holds for FORM.
+   Reference the processor registry in §11.2.
+```
+
+#### Scope Assessment
+
+IC leads scope assessment. Answer all of the following before external notification, but do not let assessment delay a partial Art. 33 filing if the 72-hour window is closing.
+
+**Data exposure questions:**
+```
+- Which FORM data categories does this processor hold? (§11.2)
+- What is the processor's stated scope? What systems? What time window?
+- Does the processor's incident intersect with FORM user data specifically?
+  (Shared infrastructure breach vs. FORM-tenant-specific exposure?)
+- Are Art. 9 health data fields in scope?
+  Anthropic: were coaching turns with health context transmitted in the window?
+  Supabase: were user_health_profiles, coaching_turns, workouts, meal_logs in scope?
+- How many FORM data subjects are potentially affected?
+- Which enterprise tenants (if any) are affected?
+  Enterprise DPAs may impose stricter notification timelines.
+```
+
+**FORM-side immediate mitigations:**
+```
+- Rotate the affected processor's API key immediately (R-03 rotation sequence)
+  even if the breach is not confirmed — precautionary rotation is correct.
+- If Supabase auth infrastructure is involved:
+  consider forcing re-authentication for all active sessions (R-03).
+- If Cloudflare is involved:
+  run HMAC chain integrity check immediately (R-05).
+  Cloudflare handles all API traffic; a breach there could mask a concurrent intrusion.
+```
+
+#### GDPR 72-Hour Clock — Sub-processor Context
+
+```
+Processor notifies FORM → T+0 — Art. 33 clock starts NOW
+
+T+0–T+12   Scope assessment + immediate mitigations
+T+12–T+24  Draft Art. 33 notification (partial if scope not fully known)
+T+48       FILE partial Art. 33 notification — leave 24h buffer
+           Use template §6.3, adding:
+           "This notification is made on the basis of information received
+            from FORM's sub-processor [name] on [date/time UTC].
+            FORM's investigation is ongoing.
+            A supplementary notification will follow as scope is confirmed."
+T+48–T+72  Continue scope assessment; supplement notification if new information
+T+72       Hard deadline — no extension available
+
+Do NOT wait for the processor to complete their own investigation before filing.
+```
+
+**Common error:** Assuming FORM's clock starts from when the processor completes their investigation. It does not. FORM's clock starts from the moment FORM receives credible notification. If the processor says "we think your data may have been affected," that is sufficient to start the clock.
+
+#### Enterprise Tenant Notification
+
+For any enterprise tenant whose data may be in scope:
+
+- Customer Lead (or customer-success) contacts affected tenant admins **by phone** within 4 hours of IC authorization — not via status page alone.
+- Check each tenant's DPA for notification timelines that may be stricter than Art. 33's 72-hour default.
+- Communicate: processor name, incident nature, which of their employees' data categories may be affected, what FORM has done to contain, what FORM's Art. 33 status is.
+- Do not speculate about the processor's own root cause or timeline — FORM communicates what it knows about its users' data, not the processor's internal investigation.
+
+#### Evidence Package (R-07 additions to standard §7 requirements)
+
+```
+[ ] Original notification artifact + SHA-256 hash + collection timestamp
+[ ] Processor's public incident report (if published) + hash
+[ ] Scope assessment document (completed assessment questions above)
+[ ] Art. 33 notification filing receipt + any supplementary filings
+[ ] Enterprise tenant notification records: timestamps + recipient confirmations
+[ ] Credential rotation log if API keys rotated (from R-03 sequence)
+[ ] Processor DPA review notes (was Art. 28(3)(f) clause satisfied?)
+```
+
+#### Post-Incident: Vendor Management Review
+
+After every processor breach incident, regardless of severity:
+
+```
+1. Review processor's DPA notification performance:
+   - Was Art. 28(3)(f) notification obligation met?
+   - Was "without undue delay" satisfied? (< 48h from processor's discovery)
+   - Was sufficient scope detail provided to assess FORM's Art. 33 obligation?
+
+2. If notification was inadequate:
+   - Document the gap in the PIR
+   - compliance-officer initiates formal written inquiry to the processor
+   - Review continued suitability of the processor for Art. 9 data processing
+   - For critical processors (Supabase, Anthropic, Cloudflare):
+     document the risk acceptance and mitigation plan in DECISION_LOG.md
+
+3. Update the processor registry (§11.2) if scope, data categories,
+   or notification contacts have changed.
+
+4. Every processor breach — regardless of severity — is a mandatory
+   inclusion in the annual vendor review (SOC 2 CC9.2 control evidence).
+   See §11.5.
+```
+
+---
+
 ## 6. Communication Templates
 
 ### 6.1 Internal Incident Channel Opening Message
@@ -1457,6 +1601,117 @@ This document is formal evidence for the following SOC 2 Trust Service Criteria:
 
 ---
 
+## 11. Sub-processor Incident Management
+
+### 11.1 Framework Purpose
+
+FORM is the **data controller** under GDPR Art. 4(7) for all personal data it collects and processes, including data processed by sub-processors on FORM's behalf. Sub-processor incidents are operationally distinct from self-originated incidents (R-01 to R-06): FORM does not control the pace of the processor's investigation, cannot contain the breach at source, and must derive its own Art. 33/34 assessment from second-hand information.
+
+This section provides the standing framework that governs R-07 execution: the sub-processor registry, Art. 28 contractual requirements, and the vendor management integration required for SOC 2 CC9.2 evidence.
+
+**Privacy floor applies to processors too.** A processor breach does not grant license to expand data analysis. FORM's scope assessment is limited to: *which of our users may have been affected, and what data categories?* FORM does not attempt to correlate or reconstruct individual user data from a processor's breach report. HR-restricted data (individual health profiles, coaching turns) remain HR-restricted throughout incident response.
+
+### 11.2 Sub-processor Registry
+
+**Last reviewed: May 2026 · Next review: November 2026 · Owner: compliance-officer + security-engineer**
+
+| Processor | Purpose | Data categories held for FORM | Art. 9 data? | DPA in place? | Security notification contact | FORM severity floor |
+|---|---|---|---|---|---|---|
+| **Supabase** | Primary database + auth | All user data: health profiles, workouts, meal logs, coaching turns, auth tokens, PII | ✅ Yes | ✅ via Supabase DPA | security@supabase.io; Supabase dashboard ticket | **P0** |
+| **Anthropic** | Victor AI coaching API | Coaching conversation content (system prompt + user turns contain health-adjacent context) | ✅ Probable | ✅ via Anthropic enterprise API DPA; notification clause under review — see gap below | security@anthropic.com; account team | **P0** |
+| **ElevenLabs** | Voice synthesis for coaching cues | Text coaching cue strings (health-adjacent language possible) | 🟡 Possible | 🟡 DPA required before production use — P1 action item | security@elevenlabs.io | **P1** |
+| **Cloudflare** | API gateway, CDN, Workers runtime, KV | Request logs (IP, UA, URL), auth tokens in-flight, API keys in Workers KV | 🟡 Auth tokens only; no health data at rest | ✅ via Cloudflare DPA | Cloudflare dashboard security ticket | **P1** (token exposure → **P0**) |
+| **PostHog** | Product analytics | Pseudonymous events (user_id hashed; no raw PII in standard instrumentation per OBSERVABILITY.md §5) | 🔴 No — if instrumented correctly | ✅ via PostHog DPA (EU-hosted) | privacy@posthog.com | **P2** |
+| **Sentry** | Error reporting | Error reports with stack traces — may contain health-adjacent data if scrubbing misconfigured | 🟡 Possible — depends on scrubber config | ✅ via Sentry DPA | security@sentry.io | **P1** (audit scrubbing config before downgrading) |
+| **Stripe** | Payment processing | Payment method metadata; FORM never touches raw card data | 🔴 No health data | ✅ via Stripe DPA; PCI-DSS certified | security@stripe.com | **P1** for billing exposure |
+| **Apple** (App Store / APNs) | App distribution + push notifications | App Store receipts, APNs device tokens | 🔴 No | Platform terms | App Store Connect security workflow | **P2** |
+| **Google** (Play Store / FCM) | App distribution + push notifications | Play receipts, FCM device tokens | 🔴 No | Platform terms | Play Console security workflow | **P2** |
+
+**Known gaps as of May 2026:**
+- **Anthropic DPA notification clause:** Art. 28(3)(f) language is present but the sub-24h notification SLA is not explicitly enumerated. compliance-officer to obtain explicit SLA commitment at next contract renewal. Risk: interim Art. 33 assessment relies on Anthropic's voluntary cooperation speed. Mitigant: Anthropic holds Art. 9-adjacent data; treat any Anthropic breach as P0 regardless of their initial classification.
+- **ElevenLabs DPA:** Not finalized before production. P1 action item — must be signed before the first ElevenLabs API call in production. Until signed, ElevenLabs must be treated as an unauthorized processor, and legal must be notified.
+- **Sentry scrubbing:** Unverified in production. A Sentry error report during a health data API call could capture health-adjacent data in `request.body` or response objects. Verification task open in Linear.
+
+**Annual registry review checklist:**
+```
+[ ] Confirm DPA is signed and current for every processor that touches GDPR Art. 9-adjacent data
+[ ] Verify security notification contacts are active (test by sending a test inquiry)
+[ ] Review whether any processor's data scope has expanded (new API endpoints, new data categories)
+[ ] Confirm EU data residency for processors holding health data
+    (Supabase: EU region; PostHog: EU Cloud; Anthropic: US — verify DPA adequacy decision)
+[ ] Review ElevenLabs and Anthropic DPA notification SLA gaps
+[ ] Update Sentry scrubbing status
+[ ] Log registry review in audit_log:
+    { action: 'system.access_review_completed', resource_type: 'vendor_registry',
+      metadata: { review_date, reviewer, gaps_identified: N } }
+```
+
+### 11.3 Art. 28 Contractual Requirements for FORM Sub-processors
+
+Under GDPR Art. 28(3)(f), processors must *"assist the controller in ensuring compliance with the obligations pursuant to Articles 32 to 36."* In practice, this requires each FORM sub-processor DPA to commit to:
+
+**1. Breach notification** — notify FORM "without undue delay" upon discovering a breach involving FORM data. Regulators interpret "without undue delay" as ≤ 24 hours for confirmed high-severity incidents; ≤ 48 hours maximum. Any DPA that does not specify a notification SLA is a gap risk.
+
+**2. Cooperation** — provide FORM with sufficient information to assess whether Art. 33/34 obligations are triggered: nature of breach, data categories involved, approximate number of data subjects, recommended measures.
+
+**3. Security measures** — implement appropriate technical and organizational measures per Art. 32, proportional to the risk of the data they hold.
+
+**4. Sub-processor restrictions** — not engage a sub-sub-processor without FORM's prior or general written approval, with notification mechanism for additions.
+
+**DPA signing checklist:**
+```
+[ ] Art. 28(3)(f) language is explicit — not implied by general compliance clauses
+[ ] Notification timeline is enumerated (< 48h from processor's discovery — not "without undue delay" only)
+[ ] Security notification contact is specified in the DPA or its annex
+[ ] Data processing scope annex accurately lists all data categories the processor will access
+[ ] Sub-processor list disclosed; mechanism for FORM approval of additions
+[ ] Governing law and DPA dispute resolution clause
+[ ] Data deletion / return obligations on contract termination
+[ ] For Art. 9 processors: explicit acknowledgment of special category data in annex
+```
+
+### 11.4 Processor Notification SLA Tracker
+
+Track sub-processor notifications against contractual and Art. 28(3)(f) obligations. SLA misses feed into the annual vendor review and SOC 2 CC9.2 evidence.
+
+| Processor | DPA notification SLA | Last incident | Notified within SLA? | Notes |
+|---|---|---|---|---|
+| Supabase | ≤ 48h from discovery | — | N/A | No incidents to date |
+| Anthropic | Not explicitly enumerated (gap — see §11.2) | — | N/A | Risk accepted with interim mitigant; renewal target |
+| ElevenLabs | N/A (DPA not finalized) | — | N/A | **P1 action item — DPA required before production** |
+| Cloudflare | ≤ 72h from discovery | — | N/A | No incidents to date |
+| PostHog | ≤ 72h from discovery | — | N/A | No incidents to date |
+| Sentry | ≤ 72h from discovery | — | N/A | Scrubbing verification open |
+| Stripe | ≤ 72h from discovery | — | N/A | PCI-DSS independent audit provides additional assurance |
+
+**SLA miss consequence:** Any processor failing to notify within the DPA-committed SLA triggers:
+1. compliance-officer formal written notice to the processor within 5 business days of discovering the miss
+2. Mandatory inclusion in the next SOC 2 vendor risk review
+3. Assessment of whether to continue using the processor for Art. 9 data processing
+
+### 11.5 SOC 2 CC9.2 Integration
+
+SOC 2 Trust Service Criterion CC9.2 requires: *"the entity assesses and manages risks associated with vendors and business partners."*
+
+**Evidence this framework provides:**
+
+| Evidence Type | Source | Storage Location | Frequency |
+|---|---|---|---|
+| Processor registry with risk classification | §11.2 (this doc) | SOC 2 evidence folder: `CC9.2/Vendor-Registry/<year>` | Annual review |
+| DPA signing confirmation | Processor contract repository | `CC9.2/DPAs/<vendor>` | On signing + renewal |
+| Notification SLA tracker | §11.4 (this doc) | Updated in-place; SOC 2 snapshot at audit | Ongoing |
+| Annual registry review record | §11.2 checklist completion + audit_log entry | `CC9.2/Vendor-Registry/<year>/review-complete.md` | Annual |
+| R-07 PIR documents | §8 PIR template | `CC9.2/Processor-Incidents/<YYYYMMDD>-<vendor>` | Per incident |
+
+**Auditor package for CC9.2:**
+- This document (version-controlled in git)
+- Annual registry review completion record with audit_log entry
+- DPA copies for all processors handling Art. 9-adjacent data
+- R-07 PIR documents for any processor incidents in the observation period
+- Notification SLA tracker with any miss disposition documentation
+
+---
+
 ## Appendix A — Quick Reference Card
 
 For use at 3am. IC: read §1 to classify, open the incident channel, then jump to the relevant runbook in §5.
@@ -1466,21 +1721,27 @@ P0?  → Open #inc-YYYYMMDD-slug immediately. Page security-engineer + IC. Start
 P1?  → Open #inc-YYYYMMDD-slug. Page IC. Monitor for upgrade.
 P2?  → Track in Linear. Handle in business hours unless escalating.
 
-Data breach?       → R-01
-Outage?            → R-02
-Creds compromised? → R-03
-SSO down?          → R-04
-Chain break?       → R-05 (always P0)
-DDoS?              → R-06
+Data breach?              → R-01
+Outage?                   → R-02
+Creds compromised?        → R-03
+SSO down?                 → R-04
+Chain break?              → R-05 (always P0)
+DDoS?                     → R-06
+Processor notified us?    → R-07 (72h clock starts NOW — page compliance-officer)
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
+  Sub-processor breach: clock starts when FORM receives notification, not when
+  processor discovered the incident. File partial notification at T+48h maximum.
 Evidence first, containment second — unless live exfiltration.
 Never modify production logs. Read-only copies only.
 Log every action in incident channel with timestamp and your name.
+Sub-processor registry: §11.2 — check which data categories the vendor holds.
 ```
 
 ---
 
-**v0.1 · May 2026 · Owner: security-engineer + devops-lead**
+**v0.2 · May 2026 · Owner: security-engineer + devops-lead**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: May 2027 or after first P0/P1 — whichever comes first.**
+
+*v0.2 additions: R-07 Sub-processor Breach Notification Received (new runbook — vendor-originated incident protocol, GDPR Art. 33 clock management when breach is at processor level, enterprise tenant notification, evidence package, post-incident vendor management review). §11 Sub-processor Incident Management (processor registry for Supabase/Anthropic/ElevenLabs/Cloudflare/PostHog/Sentry/Stripe with Art. 9 classification and severity floors; known DPA gaps including Anthropic notification SLA and ElevenLabs unsigned DPA; Art. 28(3)(f) contractual requirements and DPA signing checklist; notification SLA tracker; SOC 2 CC9.2 evidence integration). Appendix A updated to include R-07 quick reference and sub-processor context for GDPR clock.*
