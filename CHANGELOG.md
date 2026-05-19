@@ -11,6 +11,14 @@
 
 ---
 
+## [0.85.1] — 2026-05-19
+
+### Added
+- `content/post-55-training-splits.md` — **Тренувальні сплити: доказова матриця вибору** (sports-scientist pending, clinical-safety not-required). Full body vs Upper/Lower vs PPL vs body-part спліти: чотири архітектури з доказовою базою. Schoenfeld et al. (2016): вища частота переважає при рівному об'ємі. Ralston et al. (2017): Cohen's d 0.25 при рівному об'ємі. McLester et al. (2000): 3 vs 1 сесія при рівному об'ємі. Colquhoun et al. (2018): full body vs upper/lower — adherence вища. Krieger (2010): 2–3 якісних сети > 5 suboptimal. Матриця вибору: тренувальний стаж × стабільність розкладу × мета. Три конкретних сценарії: новачок 3 дні → full body; intermediate 4 стабільних дні → верх/низ; intermediate нестабільний → full body з акцентами. FORM Victor: спліт — похідна від реального розкладу, не навпаки. ~2,600 words.
+- `blog.html` — картки post-54 (MEV/MAV/MRV volume landmarks) і post-55 (Training splits) додані до grid.
+- `STATUS.md` — рядки post-54 і post-55 додані до content engine таблиці.
+- `README.md` — roadmap оновлено: post-54 [x] і post-55 [x] відмічені як виконані; post-56–59 додані як наступні теми (жінки і тренінг, overreaching, після 40, AI-coach vs PT).
+
 ## [0.85.0] — 2026-05-19
 
 ### Added
