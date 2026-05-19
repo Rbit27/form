@@ -3140,3 +3140,232 @@ This compensating control expires at the moment a second person is granted any p
 *v1.2 additions: Section 22 — Security Awareness & Training Program. Eight-topic required curriculum (OWASP Top 10, phishing, data classification, incident response, credential hygiene, secure code review, privacy/GDPR, vendor risk awareness) with SOC 2 criteria mapping and delivery methods. Solo-founder annual training plan with specific courses (OWASP WebGoat, Cloudflare Security track, Supabase security docs, GDPR self-assessment), internal document review cadence, and evidence artefact naming convention. New hire security onboarding checklist: eight sequential steps with MFA hard gate at step 3, owner and verification columns. Annual refresher cadence: Q1 February (all topics), Q3 August (OWASP), ad-hoc post-incident (14-day SLA). Phishing simulation programme: post-hire, quarterly, KnowBe4/GoPhish, no-punitive-action failure protocol, four outcome tiers. Evidence package table: CC1-E-001 through CC1-E-005. Gap closure: "Security awareness training programme" 🟡 → 🟢 Done; "New hire security onboarding" 🔴 → 🟢 Done; "Annual refresher training" 🟡 → 🟢 Done; "Phishing simulation" 🔴 → 🟡 Partial (post-hire only). Readiness: ~67% → ~69%.*
 
 *v1.3 additions: Section 23 — Quarterly Access Review Procedure. Closes PRE-23 design phase (🔴 Open → 🟡 Partial). Eleven-system scope: GitHub, Cloudflare, Supabase, 1Password, PostHog, Sentry, Stripe, ElevenLabs, Anthropic, Apple Developer, Google Play, plus service accounts and enterprise tenant admin roles. Six-step review procedure: enumerate → compare against authorized roster → deprovision within 24h SLA → enterprise tenant inactive-account sweep → CC4.2 control effectiveness assessment → sign-off and HMAC audit log filing. Authorized role roster table (solo-founder phase). Evidence artifact template (access-review-YYYY-QN.md) filed to private compliance repo, SHA-256 hashed into HMAC audit chain (`system.access_review_completed` DEC-030 event). Solo-founder compensating control: documentary evidence + git commit timestamp + HMAC publication replaces independence requirement. Privacy floor enforcement: reviewer scope limited to role/permission metadata — individual health data queries prohibited during review. CC4.2 control effectiveness table integrated into Step 5. Three new gap items (CC6-GAP-001 through CC6-GAP-003). Control updates: CC4.2 "Quarterly control effectiveness review" 🔴 → 🟡 Partial; CC6.3 "Quarterly access review" new row 🟡 Partial. Gap Analysis Summary updated: critical gaps 2 → 1 (cookie consent remains); in-place controls 28 → 31; partial 30 → 33; readiness ~69% → ~71%.*
+
+---
+
+## 24 · Cookie Consent & Consent Management Platform (P2.1 / ePrivacy / GDPR Art. 7)
+
+### 24.1 Purpose and Compliance Mapping
+
+Cookie consent is the **only remaining 🔴 critical gap** (PRE-16) in FORM's SOC 2 Type II readiness assessment. This section documents the CMP selection rationale, technical implementation architecture, and evidence artefact specification required to close PRE-16 and progress P2.1 from 🔴 Gap to 🟡 Partial.
+
+**Compliance obligations:**
+
+| Obligation | Source | Requirement | FORM Status (before §24) |
+|---|---|---|---|
+| Cookie consent before analytics | ePrivacy Directive 2002/58/EC Art. 5(3) | Informed, prior, freely given, specific consent before non-essential cookies are set | 🔴 Not implemented |
+| Consent as lawful basis | GDPR Art. 6(1)(a) | For analytics processing, consent is the only viable lawful basis | 🔴 Not documented |
+| Consent record | GDPR Art. 7(1) | "The controller shall be able to demonstrate that the data subject has consented" | 🔴 Not logging |
+| Withdrawal as easy as giving | GDPR Art. 7(3) | Withdrawal mechanism must be as easy as the original consent action | 🟡 Partial — Settings toggle exists |
+| Privacy by default | GDPR Art. 25(2) | Non-essential cookies must be off by default; no pre-ticked boxes | 🔴 Not designed |
+| P2.1 — Consent before non-essential processing | SOC 2 Privacy TSC P2.1 | Entity obtains consent before using personal information for secondary purposes | 🔴 Gap |
+
+**SOC 2 Trust Services Criteria affected:**
+
+| Criterion | Description | Impact |
+|---|---|---|
+| **P2.1** | Entity communicates choices available regarding collection, use, retention, disclosure of personal information | Direct — consent banner is primary mechanism |
+| **P3.1** | Personal information collected consistent with privacy commitments | Indirect — unconsented analytics contradicts commitments |
+| **P5.1** | Entity discloses personal information to third parties with informed consent | Direct — PostHog is a third-party data processor |
+| **P8.1** | Entity provides individuals process to submit inquiries or concerns | Indirect — consent withdrawal is an individual right; CMP must link to it |
+
+---
+
+### 24.2 Cookie & Tracker Inventory
+
+| Name | Set by | Category | Purpose | Duration | Personal Data? | Required? |
+|---|---|---|---|---|---|---|
+| `sb-*-auth-token` | Supabase JS | **Necessary** | Session authentication | Session / 1h rolling | Yes (session token) | ✅ Required |
+| `sb-*-auth-token-code-verifier` | Supabase JS | **Necessary** | PKCE code verifier for OAuth | Session | Yes | ✅ Required |
+| `__stripe_mid` | Stripe | **Necessary** | Fraud prevention for payments | 1 year | No (device fingerprint) | ✅ Required (payments only) |
+| `__stripe_sid` | Stripe | **Necessary** | Stripe session for checkout | 30 min | No | ✅ Required (conditional) |
+| `ph_*_posthog` | PostHog | **Analytics** | Anonymous session analytics, feature flags | 1 year | No (anonymised device ID) | ❌ Optional — consent required |
+| `ph_opt_in_out_*` | PostHog | **Analytics** | PostHog opt-in/out state | Persistent | No | ❌ Optional |
+| `_cfuvid` | Cloudflare | **Necessary** | Rate limiting; security infrastructure | Session | No (IP hash) | ✅ Required |
+
+PostHog is the only analytics tracker on FORM's marketing site and web app. It must be deferred until consent is granted.
+
+**Mobile note:** The FORM iOS/Android app does not set HTTP cookies. ATT (App Tracking Transparency) governs mobile analytics consent — documented in §24.5.
+
+---
+
+### 24.3 CMP Selection and Rationale
+
+**Evaluation criteria:** CNIL/ICO certification · Audit trail API · Cloudflare Pages integration · PostHog integration · Cost at pre-launch scale · GDPR Art. 7(1) record-keeping.
+
+| CMP | Pros | Cons | Cost |
+|---|---|---|---|
+| **Cookiebot (Usercentrics)** | CNIL-certified; auto-scan; audit log API; Cloudflare Zaraz native | Paid | €14/month (Essential) |
+| **Axeptio** | CNIL-recommended; excellent UX; PostHog connector | Limited audit API | €9/month |
+| **Klaro (self-hosted)** | Open source; zero cost | Requires custom audit logging; maintenance overhead | Free + dev time |
+| **Cloudflare Zaraz** | Native to CDN; zero latency penalty; consent mode built-in | Limited DPA compliance maturity | Included in Pages |
+| **Osano** | Strong CCPA/CPRA | Primarily US-focused | $49/month |
+
+**Decision: Cookiebot (Usercentrics) Essential tier**
+
+Rationale: CNIL + ICO certified; auto-cookie scanner eliminates manual inventory drift; consent log API exports structured records compatible with DEC-030 HMAC chain; native Cloudflare Zaraz connector defers PostHog until consent callback fires; €14/month is below 1% of MVP hosting budget.
+
+```javascript
+// Cookiebot consent callback → trigger PostHog init
+window.addEventListener('CookiebotOnAccept', function () {
+  if (Cookiebot.consent.statistics) {
+    posthog.init(POSTHOG_KEY, {
+      api_host: 'https://eu.posthog.com',
+      opt_in_site_apps: true,
+    })
+  }
+})
+// PostHog NOT initialized until consent granted
+```
+
+---
+
+### 24.4 Technical Implementation — Cloudflare Pages + Zaraz
+
+**Architecture:**
+
+```
+Browser → Cloudflare Pages
+              └── Cloudflare Zaraz (consent layer)
+                      ├── Cookiebot (banner) → always loads
+                      ├── PostHog          → BLOCKED until consent.statistics = true
+                      └── Stripe.js        → loads under necessary category (auto)
+```
+
+**Zaraz configuration steps:**
+1. Enable Cookiebot in Zaraz → `Settings → Consent`
+2. Map purposes: `necessary` → always load · `statistics` → PostHog · `marketing` → reserved
+3. PostHog tool in Zaraz: `Consent Purpose = statistics`
+4. Stripe.js: `Consent Purpose = necessary`
+
+**Banner requirements (GDPR Art. 7 + ePrivacy):**
+
+| Requirement | Configuration |
+|---|---|
+| All categories off by default | No pre-ticked boxes; `data-cbid` default-deny |
+| Reject All equally prominent (≤1 click) | Template: "GDPR" layout; Reject All on first screen |
+| Granular purpose selection visible | Category mode: shown |
+| Privacy Policy link | `data-cb-privacy` footer attribute |
+| Consent logged with timestamp + version | Cookiebot audit log API (built-in) |
+
+**Privacy Policy update required:** Add `## Cookies` section to `legal/privacy-policy-draft.md` listing §24.2 inventory, consent categories, and link to cookie preference centre (`Cookiebot.renew()`).
+
+---
+
+### 24.5 Mobile Consent Architecture — React Native
+
+**iOS — App Tracking Transparency (ATT):**
+
+| Step | Implementation |
+|---|---|
+| `NSUserTrackingUsageDescription` in `Info.plist` | Required; plain-language tracking explanation |
+| `ATTrackingManager.requestTrackingAuthorization()` | Called at first app open, before any analytics ID generated |
+| PostHog iOS SDK: opt-in / opt-out based on ATT result | `PHGPostHog.shared()?.optIn()` / `.optOut()` |
+| ATT result logged to HMAC audit chain | `privacy.att_consent_granted` or `privacy.att_consent_denied` |
+
+**In-app ConsentScreen for EU users (both platforms):**
+
+```
+ConsentScreen (shown before any PostHog event captured)
+  ├── Title: "Data we collect"
+  ├── Toggle: "Analytics" — OFF by default
+  ├── CTA: "Continue" (works regardless of toggle state)
+  └── Link: "Privacy Policy"
+
+On continue:
+  analytics on  → posthog.optIn()  + log privacy.consent_granted  { scope: 'analytics', platform: 'mobile' }
+  analytics off → posthog.optOut() + log privacy.consent_declined  { scope: 'analytics', platform: 'mobile' }
+```
+
+Mobile implementation documented in `docs/MOBILE_ROADMAP.md` — responsibility of mobile team.
+
+---
+
+### 24.6 Consent Record in HMAC Audit Chain (DEC-030)
+
+**New audit events (to be added to `docs/AUDIT_LOG_SCHEMA.md`):**
+
+| Event | Actor | Key Payload Fields | Chain |
+|---|---|---|---|
+| `privacy.consent_granted` | `sha256(user_id)` | `{ scope: ['analytics'], platform, cmp_version, ip_hash }` | ✅ |
+| `privacy.consent_declined` | `sha256(user_id)` | `{ scope: ['analytics'], platform, cmp_version }` | ✅ |
+| `privacy.consent_withdrawn` | `sha256(user_id)` | `{ scope: ['analytics'], withdrawn_at }` | ✅ |
+| `privacy.consent_updated` | `sha256(user_id)` | `{ old_scope, new_scope, cmp_version }` | ✅ |
+| `privacy.att_consent_granted` | `sha256(user_id)` | `{ platform: 'ios', att_status: 'authorized' }` | ✅ |
+| `privacy.att_consent_denied` | `sha256(user_id)` | `{ platform: 'ios', att_status: 'denied'\|'restricted' }` | ✅ |
+
+**GDPR Art. 7(1) satisfied via HMAC chain:** each entry proves who consented (pseudonymised), what they consented to (scope), when (timestamp, tamper-evident), which CMP version was shown, and from which platform — without storing a full plain-text consent receipt per user (which would itself violate data minimisation).
+
+**Evidence artefact:** `PRE-16-E-001` — 30-day consent log sample exported from Cookiebot API + HMAC audit chain, filed to private compliance repository.
+
+---
+
+### 24.7 Enterprise Tenant Consent (B2B)
+
+- **Employer disclosure**: employer must notify employees before SCIM provisioning (CUEC-07, §7).
+- **Individual consent at first login**: SCIM-provisioned users see `ConsentScreen` on first launch — consent is individual, never employer-delegated.
+- **Tenant-level analytics default**: enterprise admin may set `analytics_consent_default: false` in tenant config — pre-opts-out all SCIM users, individual override remains possible.
+- **No lawful basis exception**: GDPR Art. 7 applies to individual employees regardless of employer relationship. Health-adjacent data processing requires individual consent.
+
+---
+
+### 24.8 Evidence Package for SOC 2 Auditors
+
+| Artefact ID | Artefact | Source | Cadence | SOC 2 Criteria |
+|---|---|---|---|---|
+| **PRE-16-E-001** | 30-day consent log export | Cookiebot API + HMAC audit chain | Annual + on-request | P2.1, P3.1, P5.1 |
+| **PRE-16-E-002** | Cookiebot config screenshot (default-deny, equal prominence, granular categories) | Cookiebot dashboard | At implementation; after any banner change | P2.1 |
+| **PRE-16-E-003** | Cookie inventory (§24.2) signed by compliance-officer | `docs/SOC2_READINESS.md §24.2` | Annual + when new tracker deployed | P3.1 |
+| **PRE-16-E-004** | Privacy Policy `## Cookies` section | `legal/privacy-policy-draft.md` | Annual review | P2.1, P8.1 |
+| **PRE-16-E-005** | PostHog EU endpoint + no-PII `distinctId` config screenshot | PostHog project settings | At implementation | P5.1 |
+
+---
+
+### 24.9 PRE-16 Closure Checklist
+
+| # | Task | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Create Cookiebot account; configure FORM property with §24.2 cookie inventory | security-engineer | **P0 — blocks SOC 2 observation period** | Open |
+| 2 | Configure Cloudflare Zaraz: Cookiebot → consent gate → PostHog | platform-engineer | P0 | Open |
+| 3 | Verify PostHog NOT initialized before consent callback on all web pages | platform-engineer | P0 | Open |
+| 4 | Banner UX: Reject All on first screen; no pre-ticked boxes | design-craft | P0 | Open |
+| 5 | Add 6 `privacy.*` events to `docs/AUDIT_LOG_SCHEMA.md` action taxonomy | compliance-officer | P0 | Open |
+| 6 | Add `## Cookies` section to `legal/privacy-policy-draft.md` | compliance-officer | P0 | Open |
+| 7 | Add `ConsentScreen` to mobile onboarding flow | platform-engineer (mobile) | P1 — mobile phase | Open — see `MOBILE_ROADMAP.md` |
+| 8 | Implement ATT prompt (iOS) before any PostHog event | platform-engineer (mobile) | P1 | Open — mobile |
+| 9 | Export PRE-16-E-001 (30-day consent log) after 30 days of banner live | security-engineer | P1 — 30 days post-launch | Pending |
+| 10 | File PRE-16-E-002, PRE-16-E-003 in private compliance repository | compliance-officer | P1 | Open |
+| 11 | Add enterprise tenant analytics opt-out default to admin dashboard (§24.7) | enterprise-architect | P2 | Open — before first enterprise tenant |
+
+**PRE-16 status:** 🔴 Open → 🟡 Partial *(design complete; implementation pending)*
+
+---
+
+### 24.10 Gap Closure and Readiness Impact
+
+| Control | Before §24 | After §24 |
+|---|---|---|
+| Cookie banner / consent management | 🔴 Gap — no CMP deployed | 🟡 Partial — Cookiebot selected; Zaraz integration specified; implementation pending |
+| P2.1 — Consent before non-essential processing | 🔴 Gap | 🟡 Partial — consent architecture and HMAC chain events fully specified |
+| Privacy Policy cookie disclosure | 🔴 No section | 🟡 Partial — §24.4 authored; awaiting `legal/privacy-policy-draft.md` update |
+
+- Controls moved to 🟡 Partial: Cookie banner/CMP, P2.1, Privacy Policy cookies section (+3)
+- PRE-16: 🔴 Open → 🟡 Partial
+- **Critical gaps: 1 → 0** *(last critical gap formally closed at design level; implementation is an execution item, not an unaddressed design gap)*
+- Readiness: ~71% → ~73%
+
+---
+
+### 24.11 Open Items
+
+| ID | Item | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **PRE-16-IMPL-001** | Deploy Cookiebot + Zaraz to production | P0 | platform-engineer | Blocking SOC 2 observation period |
+| **PRE-16-IMPL-002** | 30-day consent log sample (PRE-16-E-001) | P1 | security-engineer | Available 30 days post-launch |
+| **CMP-001** | Annual cookie inventory review | P1 | compliance-officer | Q1 annually; add to §15 compliance calendar |
+| **CMP-002** | Add `privacy.consent_*` events to §15 Annual Compliance Calendar | P1 | compliance-officer | Quarterly withdrawal-rate anomaly check |
+| **CMP-003** | Enterprise tenant analytics opt-out default in admin dashboard | P2 | enterprise-architect | Before first enterprise tenant goes live |
+
+---
+
+*v1.4 additions: Section 24 — Cookie Consent & Consent Management Platform. Closes PRE-16 design phase (🔴 Open → 🟡 Partial; critical gaps: 1 → 0 at design level). Full cookie & tracker inventory (7 items: 5 necessary, 2 analytics). CMP selection: Cookiebot (Usercentrics) Essential — CNIL-certified, Cloudflare Zaraz native integration, audit log API for SOC 2 evidence. Technical implementation: Zaraz consent gate (PostHog deferred until statistics consent), banner configuration (default-deny, equal prominence per ePrivacy). Mobile consent: ATT for iOS, in-app ConsentScreen for GDPR EU users (deferred to G-001 mobile phase, documented in MOBILE_ROADMAP.md). HMAC audit chain: 6 new events (consent_granted, consent_declined, consent_withdrawn, consent_updated, att_consent_granted, att_consent_denied). Enterprise B2B: individual consent required despite SCIM provisioning; tenant-level analytics opt-out default. Evidence package: PRE-16-E-001 through PRE-16-E-005. Implementation checklist: 11 items. Control updates: Cookie banner/CMP 🔴 → 🟡 Partial; P2.1 🔴 → 🟡 Partial. Readiness: ~71% → ~73%.*
