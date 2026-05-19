@@ -2219,3 +2219,546 @@ If a key is compromised before the monthly rotation: trigger emergency rotation 
 *v0.3 additions: Section 11 — Just-in-Time (JIT) Provisioning Design. JIT vs. SCIM decision tree, provisioning flow with seat-limit and domain-verification gates, SAML and OIDC claim extraction mapping, per-tenant `claim_mapping` JSONB config, seat limit enforcement with FOR UPDATE transaction lock to prevent race condition, JIT-to-SCIM reconciliation (409 Conflict → PATCH adopt path), 6 JIT audit events, admin controls (jit_provisioning_enabled, default_role, notify_on_jit_provision), implementation sequencing. Security note: domain verification is not optional.*
 
 *v0.4 additions: Section 12 — Session Token Lifecycle & Refresh Management. Dual-token model (RS256 JWT access token 15min memory-only; opaque UUID refresh token httpOnly cookie database-backed). `enterprise_sessions` table schema with `family_id` + `generation` for token reuse detection. Token family attack protection with full flow diagram and 30-second clock-skew grace window. Enterprise session timeout configuration via `tenant_sso_configs.session_policy` JSONB (`session_timeout_hours`, `idle_timeout_minutes`, `max_concurrent_sessions`). SCIM deprovisioning synchronous session revocation with accepted 15-minute access token residual window and opt-in JTI blocklist for zero-latency requirement. SSO re-authentication for sensitive operations (OIDC `prompt=login`, SAML `ForceAuthn=true`, re-auth assertion pattern). 13 audit events including `session.token_reuse_detected` as security-critical alert signal. Cloudflare Worker middleware architecture, Supabase Auth boundary definition, RS256 monthly key rotation procedure with emergency path, migration from Supabase default sessions (per-tenant flag + re-login trigger). 9 implementation dependencies with recommended sequencing.*
+
+---
+
+## 13. Federated Logout — SAML SLO & OIDC Back-Channel Logout
+
+**Status: Design complete. Implementation pending. Closes G-002 and G-003 design phase.**
+
+---
+
+### 13.1 Why Federated Logout Is Hard
+
+Clicking "Sign out" in FORM clears the FORM session — it invalidates the refresh token in `enterprise_sessions`, expires the access token JWT, and removes the `form_rt` cookie. This is local logout. It is necessary but not sufficient for enterprise security posture.
+
+In an SSO environment there are three distinct session layers:
+
+| Layer | Owner | Cleared by local logout? |
+|---|---|---|
+| FORM application session | FORM (`enterprise_sessions` table) | Yes |
+| IdP SSO session (browser cookie at `login.okta.com`, etc.) | The Identity Provider | No |
+| Other SP sessions (other apps the user is also logged into via the same IdP SSO session) | Each SP independently | No |
+
+When an employee is terminated, the correct sequence is: HR deactivates the account in the IdP directory → SCIM signals FORM → FORM revokes sessions (§12.7). But if an employee with an active browser session chooses to log out of FORM themselves — without an upstream deactivation — the IdP session remains alive. Any other application that trusts that IdP session can still authenticate the user silently. FORM's local session is gone, but the employee could re-authenticate to FORM within seconds using the still-active IdP SSO session.
+
+Federated logout addresses this by propagating the logout signal from FORM outward to the IdP, and from the IdP outward to all other SPs registered in the same SSO federation.
+
+Two complementary protocols handle this:
+
+- **SAML 2.0 Single Logout (SLO)** — synchronous, browser-mediated (HTTP-Redirect or HTTP-POST binding) or asynchronous (SOAP binding, not implemented here). FORM sends a signed `LogoutRequest` to the IdP's SLO endpoint; the IdP propagates and returns a `LogoutResponse`.
+- **OIDC Back-Channel Logout** (RFC 8414 / OpenID Connect Back-Channel Logout 1.0) — the IdP POSTs a signed `logout_token` directly to FORM's registered back-channel logout URI, without browser involvement. FORM validates and revokes.
+
+These are complementary, not alternative. A tenant using SAML 2.0 uses SLO. A tenant using OIDC uses back-channel logout. Some IdPs support both protocols; in that case FORM applies the protocol matching the tenant's configured SSO protocol.
+
+Neither protocol guarantees atomicity across all SPs. The design in this section never blocks the local logout on the federated outcome. The FORM session is always revoked first, unconditionally. Federation is a best-effort propagation layer on top of a guaranteed local revocation.
+
+---
+
+### 13.2 SAML 2.0 Single Logout (SLO)
+
+#### 13.2.1 SP-Initiated SLO
+
+SP-initiated SLO begins when the user explicitly logs out from within FORM. The flow is:
+
+```
+User clicks "Sign out" in FORM
+          |
+          v
+FORM immediately revokes local session (enterprise_sessions UPDATE, §12.7.2 pattern)
+          |
+          v
+FORM constructs signed LogoutRequest
+          |
+          v
+FORM redirects browser to IdP SLO endpoint (HTTP-Redirect binding)
+          |
+          v
+IdP validates LogoutRequest signature
+          |
+          v
+IdP propagates LogoutRequest to all other SPs that share the SSO session
+          |
+          v
+IdP terminates its own SSO session
+          |
+          v
+IdP redirects browser back to FORM's SLO endpoint with signed LogoutResponse
+          |
+          v
+FORM validates LogoutResponse signature
+          |
+          v
+FORM redirects user to post-logout landing page (/login?logged_out=1)
+```
+
+The local session revocation (step 2) happens before the federated round-trip. The user cannot re-authenticate to FORM during the SLO round-trip because their `form_rt` cookie is already invalid.
+
+##### LogoutRequest XML Structure
+
+```xml
+<samlp:LogoutRequest
+  xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+  xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+  ID="_form_logout_{uuid_v4}"
+  Version="2.0"
+  IssueInstant="{ISO-8601-UTC}"
+  Destination="{idp_slo_url}"
+  NotOnOrAfter="{IssueInstant + 2 minutes}">
+  <saml:Issuer>https://form.coach/saml/{tenant_id}</saml:Issuer>
+  <saml:NameID
+    Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+    SPNameQualifier="https://form.coach/saml/{tenant_id}"
+    NameQualifier="{idp_entity_id}">
+    {name_id_value}
+  </saml:NameID>
+  <samlp:SessionIndex>{session_index_from_authn_assertion}</samlp:SessionIndex>
+</samlp:LogoutRequest>
+```
+
+Key fields:
+
+- `ID`: must be unique per request; stored in a short-lived cache (Redis TTL 5 minutes) to match against the `InResponseTo` field on the `LogoutResponse`. Prevents response replay.
+- `Destination`: the IdP's SLO endpoint URL, read from `tenant_sso_configs.slo_url` (new column, see §13.8).
+- `NameID`: the persistent identifier stored in `enterprise_sessions.idp_name_id` at session creation time. Must use the same `Format` that the IdP issued in the `AuthnResponse`.
+- `SessionIndex`: the IdP-side session identifier from the original `AuthnResponse` assertion, stored in `enterprise_sessions.idp_session_id` (new column, see §13.8). Required so the IdP can target the correct SSO session when the user may have multiple active sessions.
+- `NotOnOrAfter`: 2-minute validity window. The IdP must process the request before this timestamp.
+
+##### HTTP-Redirect Binding
+
+The SAML HTTP-Redirect binding encodes the `LogoutRequest` as follows:
+
+1. Deflate-compress the XML (RFC 1951 raw deflate, no zlib wrapper).
+2. Base64-encode the compressed bytes (standard alphabet, no line breaks).
+3. URL-encode the result.
+4. Construct the query string: `SAMLRequest={encoded}&SigAlg=http%3A%2F%2Fwww.w3.org%2F2001%2F04%2Fxmldsig-more%23rsa-sha256&RelayState={opaque_state}`.
+5. Sign the entire query string (not just `SAMLRequest`) using the FORM SP private key (same RS256 key pair as `AuthnRequest`, see §12.10.4). The signature covers the literal query string bytes.
+6. Append `&Signature={base64url_signature}`.
+
+The `RelayState` carries an opaque token (max 80 bytes per SAML spec) that FORM uses to recover the post-logout redirect path when the IdP returns.
+
+**HTTP-POST binding:** HTTP-POST binding avoids the URL-length limitation and allows the full XML to be transmitted in a form body. It is preferred when the IdP supports it, as query string signatures in HTTP-Redirect are vulnerable to query parameter reordering by intermediate proxies. FORM prefers HTTP-POST for `LogoutRequest` where both sides support it. The binding to use is negotiated at SSO configuration time and stored in `tenant_sso_configs` alongside the existing `binding` field.
+
+Both `LogoutRequest` (outbound) and `LogoutResponse` (inbound) must be signed. The signature algorithm is RS256 (`http://www.w3.org/2001/04/xmldsig-more#rsa-sha256`). FORM rejects any unsigned or HMAC-signed SLO messages.
+
+#### 13.2.2 IdP-Initiated SLO
+
+IdP-initiated SLO occurs without user action in FORM. The IdP sends an unsolicited `LogoutRequest` — typically triggered by a user logging out of another SP in the same federation, or by an admin terminating an IdP session from the IdP admin console.
+
+FORM's SLO endpoint: `POST /auth/saml/slo` (HTTP-POST binding preferred) or `GET /auth/saml/slo` (HTTP-Redirect binding).
+
+Processing steps:
+
+1. Parse and validate the `LogoutRequest` XML:
+   - Verify XML signature against the IdP's signing certificate (from `tenant_sso_configs.idp_cert`).
+   - Check `IssueInstant` is within ±5 minutes of `now()` (clock skew tolerance, consistent with §12.5 assertion window).
+   - Confirm `Destination` matches `https://api.form.coach/auth/saml/slo`.
+   - Confirm `Issuer` matches `tenant_sso_configs.idp_entity_id`.
+2. Extract `NameID` value and `SessionIndex` from the request.
+3. Look up matching sessions in `enterprise_sessions`:
+   ```sql
+   UPDATE enterprise_sessions
+   SET
+       revoked_at        = now(),
+       revocation_reason = 'federated_logout'
+   WHERE
+       tenant_id         = $tenant_id
+       AND idp_name_id   = $name_id
+       AND idp_session_id = $session_index
+       AND revoked_at    IS NULL
+   RETURNING session_id;
+   ```
+   If `SessionIndex` is absent from the request (some IdPs omit it), fall back to revoking all active sessions for the `NameID` within the tenant.
+4. Write audit events (§13.7).
+5. Construct and return a signed `LogoutResponse`:
+
+```xml
+<samlp:LogoutResponse
+  xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+  xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+  ID="_form_logoutresp_{uuid_v4}"
+  Version="2.0"
+  IssueInstant="{ISO-8601-UTC}"
+  Destination="{idp_slo_response_url}"
+  InResponseTo="{LogoutRequest_ID}">
+  <saml:Issuer>https://form.coach/saml/{tenant_id}</saml:Issuer>
+  <samlp:Status>
+    <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+  </samlp:Status>
+</samlp:LogoutResponse>
+```
+
+If validation fails (invalid signature, expired request, unknown `Issuer`), return a `LogoutResponse` with `StatusCode` `urn:oasis:names:tc:SAML:2.0:status:Responder` and write a `slo.failed` audit event. Do not return HTTP 4xx for SAML-level errors — the SAML protocol requires a `LogoutResponse` even for failures; HTTP errors are reserved for transport-level problems (malformed POST body, etc.).
+
+#### 13.2.3 SLO State Machine
+
+The SLO flow for SP-initiated logout passes through six states:
+
+| State | Description | Transitions |
+|---|---|---|
+| `Idle` | No logout in progress | → `LogoutInitiated` (user clicks sign out) |
+| `LogoutInitiated` | Local session revoked; `LogoutRequest` being constructed | → `WaitingIdPResponse` (request sent); → `Complete` (IdP SLO not configured — local-only path) |
+| `WaitingIdPResponse` | `LogoutRequest` dispatched to IdP; awaiting redirect-back | → `PropagatingToOtherSPs` (IdP confirms propagating); → `SessionsRevoked` (IdP returns `LogoutResponse`); → `Failed` (10s timeout) |
+| `PropagatingToOtherSPs` | IdP is propagating logout to other SPs in the federation | → `SessionsRevoked` (propagation complete, IdP sends final `LogoutResponse`) |
+| `SessionsRevoked` | `LogoutResponse` received and validated; all FORM sessions revoked | → `Complete` |
+| `Complete` | User redirected to post-logout page; SLO flow closed | Terminal |
+| `Failed` | IdP timeout, invalid signature, or unsupported SLO | → triggers fallback (§13.2.4); user still redirected |
+
+State is tracked in a short-lived Redis key `slo:{tenant_id}:{slo_request_id}` with TTL of 15 seconds. State is not persisted to the database — it is ephemeral coordination state for a single browser round-trip. If Redis is unavailable, the SLO flow degrades to the local-only fallback (§13.2.4).
+
+#### 13.2.4 Failure Modes and Graceful Degradation
+
+Three failure modes are defined. In every case, the FORM local session has already been revoked before any IdP communication begins. Failure never leaves the user with a live FORM session.
+
+| Failure | Condition | Response |
+|---|---|---|
+| IdP SLO not configured | `tenant_sso_configs.slo_url IS NULL` | Skip federated SLO entirely. Write `slo.fallback_local_only` audit event. Redirect user normally. |
+| IdP SLO timeout | No `LogoutResponse` received within 10 seconds of sending `LogoutRequest` | Abort SLO round-trip. Write `slo.failed` + `slo.fallback_local_only` audit events. Redirect user normally. Log warning to operational monitoring. |
+| Partial SP propagation failure | IdP returns `LogoutResponse` with `StatusCode` indicating partial success (non-`Success` status) | Accept the response, write `slo.completed` with `partial: true` flag in metadata. FORM has revoked its own session; other SPs' failure is outside FORM's control. |
+
+The 10-second timeout on IdP SLO response is implemented as a Worker `AbortController` signal wrapping the redirect-back wait. If the IdP round-trip has not completed within the window, the Worker redirects the user to the post-logout page and writes the failure events asynchronously. User experience is not blocked by a non-responsive IdP.
+
+FORM never retries a failed SLO round-trip. Retry introduces the risk of the IdP processing the same `LogoutRequest` twice. Session revocation on the FORM side is already complete; the SLO retry would only affect the IdP-side session, which is outside FORM's security boundary.
+
+---
+
+### 13.3 OIDC Back-Channel Logout
+
+Back-channel logout (OpenID Connect Back-Channel Logout 1.0) allows the IdP to notify FORM of a session termination without browser involvement. This is the preferred mechanism for OIDC tenants because it is not subject to browser cookie restrictions and is not visible in browser history.
+
+#### 13.3.1 Registration
+
+FORM registers a back-channel logout URI with each OIDC IdP at tenant onboarding time:
+
+```
+https://api.form.coach/auth/oidc/backchannel-logout
+```
+
+This is a single shared endpoint. Tenant routing is determined by the `iss` (issuer) claim in the `logout_token` — each IdP has a unique issuer URL that maps to one or more `tenant_sso_configs` rows. If a single IdP serves multiple FORM tenants (multi-tenant IdP like Azure AD with multiple Entra tenants), the `aud` claim disambiguates: FORM's `client_id` is unique per FORM tenant.
+
+The back-channel logout URI is registered in the IdP's application/client configuration alongside `redirect_uri` and `post_logout_redirect_uri`. It is not a protected endpoint — it does not require a bearer token. Authentication is provided by the signed `logout_token` JWT itself.
+
+#### 13.3.2 logout_token Validation
+
+When the IdP POSTs to the back-channel logout endpoint, the request body is `application/x-www-form-urlencoded` with a single parameter: `logout_token`.
+
+The `logout_token` is a signed JWT. FORM performs the following validation checks in order:
+
+| Check | Requirement | Failure action |
+|---|---|---|
+| JWT structure | Must be a three-part base64url-encoded JWT | Return HTTP 400 |
+| Signature | Must be signed by the IdP's public key (fetched from IdP JWKS endpoint, cached with 5-minute TTL) | Return HTTP 400 |
+| `iss` | Must match a known `tenant_sso_configs.oidc_issuer` value | Return HTTP 400 |
+| `aud` | Must include FORM's `client_id` for the relevant tenant | Return HTTP 400 |
+| `iat` | Must be within ±5 minutes of `now()` | Return HTTP 400 |
+| `nonce` | MUST NOT be present (spec requirement — distinguishes logout_token from ID token) | Return HTTP 400 |
+| `events` claim | Must contain `{"http://schemas.openid.net/event/backchannel-logout": {}}` | Return HTTP 400 |
+| `sub` or `sid` | At least one of `sub` (subject) or `sid` (session ID) must be present | Return HTTP 400 |
+| Feature enabled | `tenant_sso_configs.backchannel_logout_enabled` must be true for the tenant | Return HTTP 501 |
+
+On successful validation, FORM writes a `backchannel_logout.validated` audit event and proceeds to revocation.
+
+#### 13.3.3 Revocation
+
+Session lookup uses whichever identifiers are present in the `logout_token`:
+
+```sql
+UPDATE enterprise_sessions
+SET
+    revoked_at        = now(),
+    revocation_reason = 'federated_logout'
+WHERE
+    tenant_id  = $tenant_id
+    AND revoked_at IS NULL
+    AND (
+        -- Prefer sid match (precise — targets one SSO session)
+        (idp_session_id = $sid AND $sid IS NOT NULL)
+        OR
+        -- Fall back to sub match (broader — revokes all sessions for this user)
+        (user_id = (
+            SELECT id FROM users
+            WHERE tenant_id = $tenant_id AND idp_subject = $sub
+        ) AND $sid IS NULL)
+    )
+RETURNING session_id;
+```
+
+The `idp_session_id` column stores the OIDC `sid` claim from the ID token at login time, if the IdP provided it. The `idp_subject` column on the `users` table stores the OIDC `sub` claim and is indexed.
+
+If `sid` is present in the `logout_token`, FORM targets the specific SSO session — a user who is logged into FORM from two devices with two separate OIDC sessions will have only the correct device session revoked. If only `sub` is present, all active FORM sessions for that user within the tenant are revoked.
+
+#### 13.3.4 Response and Timing
+
+FORM must return an HTTP response to the IdP within a bounded time window. The specification requires the response before the IdP connection times out (typically 5–30 seconds depending on IdP).
+
+FORM's SLA for this endpoint: **return HTTP 200 within 2 seconds**. The response indicates acknowledgement of the request, not completion of revocation.
+
+For tenants with a small number of active sessions per user (typical case), revocation is synchronous — the SQL runs before the 200 is returned. For tenants with a large number of sessions (e.g., shared service accounts with many concurrent sessions), revocation is dispatched to a background queue and the 200 is returned immediately. The queue processes the revocation within 5 seconds in normal operation.
+
+Response codes:
+
+| HTTP status | Meaning |
+|---|---|
+| `200 OK` | `logout_token` accepted; revocation initiated or complete |
+| `400 Bad Request` | `logout_token` malformed, invalid signature, failed a validation check |
+| `501 Not Implemented` | Back-channel logout not enabled for this tenant |
+
+FORM does not return `503` for transient database errors — if the revocation fails for a transient reason, FORM still returns `200` and the background queue retries the SQL up to 3 times with exponential backoff. The rationale: returning `503` to the IdP may cause the IdP to retry the `logout_token`, and retry logic on the IdP side varies wildly by vendor. It is safer to accept the token, guarantee at-least-once processing internally, and avoid confusing IdPs with unexpected error responses.
+
+If all retries fail, a `slo.failed` audit event is written with `reason: db_revocation_failed` and an operational alert is raised.
+
+---
+
+### 13.4 OIDC Front-Channel Logout (Not Implemented)
+
+OIDC also defines a front-channel logout mechanism (OpenID Connect Front-Channel Logout 1.0) where the IdP embeds an `<iframe>` or `<img>` pointing to each SP's logout URI in the browser, causing the SP to receive a request with the session cookie in context.
+
+FORM does not implement front-channel logout. The reasons:
+
+1. **SameSite cookie restrictions.** FORM's `form_rt` cookie is set with `SameSite=Strict`. A cross-origin iframe or image request from the IdP's domain will not carry the `form_rt` cookie. Front-channel logout therefore cannot reliably identify the FORM session to revoke.
+2. **Session state in URL.** Front-channel logout URI parameters may contain `sid` values that appear in browser history and server access logs, creating a minor but avoidable information disclosure.
+3. **Browser blocking.** Third-party cookie deprecation in Chrome and Safari means cross-origin requests from iframes increasingly fail to carry session state, making front-channel logout unreliable regardless of `SameSite` settings.
+4. **Back-channel is strictly better.** For OIDC tenants, back-channel logout (§13.3) achieves the same goal reliably without browser involvement. There is no scenario where front-channel provides a capability that back-channel does not.
+
+This decision closes G-003 for OIDC tenants: the implementation path is back-channel only. Any IdP requirement for front-channel logout is a blocker to onboarding that IdP configuration — it must be documented in the enterprise contract and the customer directed to configure back-channel logout on their IdP instead.
+
+Reference: G-002 (SAML SLO) and G-003 (OIDC back-channel) are the two approved federated logout mechanisms. Front-channel is explicitly rejected and will not be revisited without a formal security review demonstrating that SameSite and third-party cookie restrictions no longer apply.
+
+---
+
+### 13.5 Session Revocation Mechanics
+
+#### 13.5.1 Integration with §12 enterprise_sessions Table
+
+Both SLO and back-channel logout converge on the same revocation pattern used by SCIM deprovisioning (§12.7.2), with a distinct `revocation_reason` value to distinguish the trigger in the audit trail:
+
+```sql
+-- Federated logout revocation (SLO or back-channel)
+UPDATE enterprise_sessions
+SET
+    revoked_at        = now(),
+    revocation_reason = 'federated_logout'
+WHERE
+    tenant_id  = $tenant_id
+    AND (
+        idp_name_id    = $name_id      -- SAML path
+        OR idp_session_id = $session_id -- OIDC back-channel path (sid)
+        OR user_id     = $user_id      -- fallback: sub-only back-channel
+    )
+    AND revoked_at IS NULL
+RETURNING session_id, user_id;
+```
+
+The `revocation_reason` values used across the codebase are:
+
+| Value | Trigger |
+|---|---|
+| `'scim_deprovisioned'` | SCIM `PATCH active=false` or `DELETE` (§12.7) |
+| `'federated_logout'` | SAML SLO or OIDC back-channel logout (§13) |
+| `'idle_timeout'` | Lazy or sweeper idle timeout enforcement (§12.6.3) |
+| `'session_timeout'` | Session exceeded absolute TTL (§12.6) |
+| `'token_reuse_detected'` | Token family attack detected (§12.4) |
+| `'admin_revoked'` | Tenant admin explicitly revoked the session |
+| `'key_rotation_invalidation'` | Emergency RS256 key rotation (§12.10.4) |
+| `'user_logout'` | Normal user-initiated local logout (no SLO) |
+
+#### 13.5.2 JTI Blocklist Interaction
+
+When `jti_revocation_check: true` is set in `session_policy` (opt-in per §12.7.4), revocation of a session via federated logout must also blocklist any in-flight access tokens whose parent session was just revoked.
+
+The `RETURNING session_id, user_id` clause from the revocation query provides the session IDs. For each revoked session, the Worker must look up any access tokens issued for that session that have not yet expired. Because FORM does not store issued access tokens in the database (they are stateless JWTs), the blocklist approach is:
+
+1. The session record in `enterprise_sessions` contains `last_access_token_jti` and `last_access_token_exp` — two columns that are updated on every token refresh (see §12.5 for schema context). These are the only in-flight access token candidates.
+2. For each revoked session, INSERT `last_access_token_jti` into the JTI blocklist (Redis) with TTL = `last_access_token_exp - now()`. If `last_access_token_exp < now()`, the token has already expired and no blocklist entry is needed.
+
+This requires two additional columns on `enterprise_sessions`:
+
+```sql
+ALTER TABLE enterprise_sessions
+  ADD COLUMN last_access_token_jti  TEXT,
+  ADD COLUMN last_access_token_exp  TIMESTAMPTZ;
+```
+
+These columns are updated atomically with each token rotation. The existing index `idx_sessions_user_tenant` covers the revocation query; no additional index is needed for JTI blocklist insertion (it is a primary key lookup by `session_id`).
+
+#### 13.5.3 SCIM Deprovisioning vs. Federated Logout
+
+These are different triggers using the same revocation mechanism:
+
+| Attribute | SCIM deprovisioning (§12.7) | Federated logout (§13) |
+|---|---|---|
+| Trigger | HR/IdP directory event (account deletion/deactivation) | User or IdP initiated logout action |
+| Revocation scope | All sessions for `user_id` + `tenant_id` | Specific `idp_session_id` or `idp_name_id` (may be partial) |
+| `revocation_reason` | `'scim_deprovisioned'` | `'federated_logout'` |
+| User re-authentication allowed? | No — account is deactivated | Yes — user can log in again immediately |
+| Synchronous requirement | Yes — must complete before SCIM 200 response | Best-effort within 2s for back-channel; synchronous for SLO |
+| User record soft-deleted? | On `DELETE`: yes. On `PATCH active=false`: no | Never — logout does not delete the user record |
+
+The revocation SQL path is shared; only the `WHERE` clause target and `revocation_reason` value differ.
+
+---
+
+### 13.6 SAML NameID Format Handling
+
+#### 13.6.1 Persistent NameID (Required)
+
+FORM requires IdPs to use the persistent NameID format:
+
+```
+urn:oasis:names:tc:SAML:2.0:nameid-format:persistent
+```
+
+A persistent NameID is an opaque, durable identifier that the IdP assigns to the user for a specific SP. It does not change across sessions or after the user changes their email address. This is the correct format for user identity continuity in a long-lived SaaS product.
+
+FORM stores the persistent NameID in `enterprise_sessions.idp_name_id` at session creation and in `users.idp_name_id` at JIT provisioning time. Logout requests use this stored value — they do not rely on any mutable user attribute.
+
+The `AuthnRequest` should request this format explicitly:
+
+```xml
+<samlp:NameIDPolicy
+  Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+  AllowCreate="false"/>
+```
+
+`AllowCreate="false"` tells the IdP not to create a new user — FORM handles provisioning through JIT (§11) or SCIM (§6). The IdP should only assert identity for users that already exist in its directory.
+
+#### 13.6.2 Transient NameID Fallback
+
+Some legacy IdPs (and misconfigured modern ones) issue transient NameIDs:
+
+```
+urn:oasis:names:tc:SAML:2.0:nameid-format:transient
+```
+
+Transient NameIDs change on every authentication — they cannot be used as a stable user identifier, and they cannot be used for SLO (the SLO `LogoutRequest` must carry the NameID value the IdP issued, but that value has no meaning after the session ends).
+
+FORM's fallback chain when a transient NameID is detected:
+
+1. **Attempt email attribute lookup.** Check the assertion's attribute statement for an email address claim (common attribute names: `email`, `mail`, `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress`). If found, use the email to look up the FORM user: `SELECT id FROM users WHERE email = $email AND tenant_id = $tenant_id`.
+2. **Attempt persistent identifier attribute.** Some IdPs that issue transient NameIDs also provide a persistent identifier as a separate attribute (e.g., `employeeID`, `objectGUID`). Check `tenant_sso_configs.claim_mapping` for a configured persistent identifier attribute.
+3. **Fail authentication** if neither of the above resolves to a unique, unambiguous FORM user. Write an audit event `sso.authn_failed` with `reason: transient_nameid_unresolvable`. Do not create a new user record based on a transient NameID.
+
+When a transient NameID is used, SLO is functionally impaired:
+
+- SP-initiated SLO: the `LogoutRequest` must carry the transient NameID value from the active session. FORM stores it in `enterprise_sessions.idp_name_id` per-session, so the SLO request can be constructed for the current session. However, the IdP may not be able to look up the session by transient NameID if it has already rotated the value internally.
+- IdP-initiated SLO: if the IdP sends a `LogoutRequest` with a transient NameID, FORM can look up sessions only by exact match on the stored transient value. This is reliable within a single session but will not match sessions from prior logins.
+
+The recommendation is to require persistent NameID as a condition of enterprise SSO onboarding. Tenants whose IdPs cannot issue persistent NameIDs should be offered a fallback configuration path, documented as a limitation in the customer's enterprise agreement, with an acknowledgement that SLO reliability is reduced.
+
+#### 13.6.3 Email-Format NameID
+
+A third format is occasionally seen:
+
+```
+urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
+```
+
+This uses the user's email address as the NameID value. It is stable as long as the user's email address does not change, but it is mutable — an email address change at the IdP will break the NameID→user lookup. FORM accepts this format but logs a warning at JIT provisioning time and stores the email-format NameID in `idp_name_id`. SLO operates normally for email-format NameIDs as long as the email address has not changed.
+
+---
+
+### 13.7 Audit Events
+
+All events are written to the HMAC-chained `audit_log` table per DEC-030. No PII in metadata. Timestamps, identifiers, and boolean outcomes only.
+
+| Event name | Trigger | Key metadata |
+|---|---|---|
+| `slo.sp_initiated` | User triggered logout from FORM; local session revoked; SLO round-trip beginning | `session_id`, `tenant_id`, `user_id`, `slo_request_id`, `idp_slo_url` |
+| `slo.idp_initiated` | IdP pushed a `LogoutRequest` to FORM's SLO endpoint | `tenant_id`, `idp_name_id` (stored — not raw PII), `session_index`, `logout_request_id`, `sessions_revoked_count` |
+| `slo.completed` | SP-initiated SLO round-trip completed; valid `LogoutResponse` received from IdP | `session_id`, `tenant_id`, `slo_request_id`, `duration_ms`, `partial` (boolean) |
+| `slo.failed` | SLO flow error — IdP timeout, invalid `LogoutResponse` signature, unexpected `StatusCode`, or DB revocation failure | `session_id`, `tenant_id`, `slo_request_id`, `reason` (`idp_timeout`, `invalid_signature`, `status_code_{value}`, `db_revocation_failed`) |
+| `slo.fallback_local_only` | Federated SLO unavailable (not configured or timed out); local session cleared, no IdP propagation | `session_id`, `tenant_id`, `user_id`, `reason` (`slo_not_configured`, `idp_timeout`) |
+| `backchannel_logout.received` | `logout_token` received at `/auth/oidc/backchannel-logout`; not yet validated | `tenant_id` (derived from `iss`), `iss`, `request_id` |
+| `backchannel_logout.validated` | `logout_token` passed all validation checks (§13.3.2) | `tenant_id`, `iss`, `sub_hash` (SHA-256 of `sub`, not the raw value), `sid`, `request_id` |
+| `backchannel_logout.revoked` | Sessions successfully revoked following back-channel logout | `tenant_id`, `sessions_revoked_count`, `revocation_method` (`sid` or `sub`), `request_id`, `async` (boolean — whether revocation was deferred to queue) |
+
+The `sub_hash` in `backchannel_logout.validated` is the SHA-256 of the OIDC `sub` claim. This allows correlation across audit events (e.g., matching a `backchannel_logout.validated` to a prior `session.created` event that also stores a `sub_hash`) without storing the raw OIDC subject identifier, which may be considered PII in some jurisdictions.
+
+Where `slo.failed` co-occurs with `slo.fallback_local_only`, both events are written. The `fallback_local_only` event confirms that the user's FORM session was cleared regardless of the SLO failure.
+
+---
+
+### 13.8 Implementation Dependencies and Sequencing
+
+| Dependency | Status | Blocking concern | Notes |
+|---|---|---|---|
+| SAML library SLO support | Not verified | Must confirm before committing to SAML SLO implementation | `node-saml` supports SLO as of v4.x — verify `LogoutRequest` construction and `LogoutResponse` parsing. `samlify` is an alternative but has had historical CVEs in XML parsing. Do not implement custom XML signing. |
+| `tenant_sso_configs.slo_url` column | Not implemented | Required for SP-initiated SLO | `ALTER TABLE tenant_sso_configs ADD COLUMN slo_url TEXT;` — nullable; NULL means SLO not configured for tenant |
+| `tenant_sso_configs.slo_binding` column | Not implemented | Required | `ALTER TABLE tenant_sso_configs ADD COLUMN slo_binding TEXT CHECK (slo_binding IN ('HTTP-POST', 'HTTP-Redirect'));` |
+| `tenant_sso_configs.backchannel_logout_enabled` column | Not implemented | Required for back-channel routing | `ALTER TABLE tenant_sso_configs ADD COLUMN backchannel_logout_enabled BOOLEAN NOT NULL DEFAULT false;` |
+| `enterprise_sessions.idp_name_id` column | Not implemented | Required for SAML SLO lookup | `ALTER TABLE enterprise_sessions ADD COLUMN idp_name_id TEXT;` — populated at session creation from SAML assertion `NameID` |
+| `enterprise_sessions.idp_session_id` column | Not implemented | Required for SAML `SessionIndex` and OIDC `sid` | `ALTER TABLE enterprise_sessions ADD COLUMN idp_session_id TEXT;` — populated from SAML `SessionIndex` or OIDC `sid` claim at session creation |
+| `enterprise_sessions.last_access_token_jti` and `last_access_token_exp` | Not implemented | Required for JTI blocklist path (opt-in) | Only needed if `jti_revocation_check: true`; can defer until first regulated-industry customer |
+| SLO state ephemeral store (Redis / Cloudflare KV) | Not implemented | Required for SP-initiated SLO request/response correlation | Redis key `slo:{tenant_id}:{slo_request_id}`, TTL 15 seconds. Cloudflare KV acceptable if Redis is not available (higher latency but sufficient for 15s TTL) |
+| `logout_token` validation library | Not implemented | Required for back-channel logout | Any RFC 7519-compliant JWT library with RS256 + ES256 support. `jose` (npm) is already used for access token validation per §12 — reuse it. |
+| Async queue for high-volume back-channel requests | Not implemented | Required for tenants with large concurrent session counts | Cloudflare Queue or Upstash Queue. Not required for initial launch if max sessions per user is bounded (e.g., `max_concurrent_sessions` ≤ 10 from `session_policy`). |
+
+**Recommended implementation order:**
+
+1. Schema migrations: `slo_url`, `slo_binding`, `backchannel_logout_enabled` on `tenant_sso_configs`; `idp_name_id`, `idp_session_id` on `enterprise_sessions`.
+2. Update SSO callback handlers (SAML and OIDC) to populate `idp_name_id` and `idp_session_id` on session creation.
+3. Verify `node-saml` SLO support. Write integration test against Okta developer sandbox.
+4. Implement IdP-initiated SLO endpoint (`POST /auth/saml/slo`) — simpler than SP-initiated; no redirect loop.
+5. Implement SP-initiated SLO — adds the redirect round-trip and state correlation.
+6. Implement back-channel logout endpoint (`POST /auth/oidc/backchannel-logout`) — self-contained; no browser state.
+7. Audit event integration for all §13.7 events.
+8. Admin dashboard: SLO configuration UI (show `slo_url` field, toggle `backchannel_logout_enabled`). Depends on G-007.
+9. JTI blocklist integration for federated logout path (after or alongside §12 JTI blocklist work).
+10. Async queue for back-channel revocation — when first customer has `max_concurrent_sessions > 10`.
+
+---
+
+### 13.9 Gap Closure
+
+| Gap | Previous status | Updated status | Notes |
+|---|---|---|---|
+| G-002 — SAML SLO | 🔴 Not designed | 🟡 Design complete, implementation pending | SP-initiated and IdP-initiated flows fully specified. SLO state machine defined. Failure modes and graceful degradation specified. Blocked on: `node-saml` SLO verification, schema migrations, SSO callback handler updates. |
+| G-003 — OIDC back-channel logout | 🔴 Not designed | 🟡 Design complete, implementation pending | Back-channel logout endpoint, `logout_token` validation, `enterprise_sessions` revocation path fully specified. Front-channel explicitly rejected. Blocked on: schema migrations, SSO callback handler updates. |
+
+**SOC 2 CC6.1 impact:** CC6.1 requires that access to systems is restricted based on logical access controls, and that those controls include procedures for timely revocation. The current state (local-only logout without IdP session propagation) is a partial control. Implementing §13 closes the gap between FORM session revocation and IdP session revocation, satisfying the "timely revocation across all access paths" requirement of CC6.1. This section, once implemented, enables the auditor finding for CC6.1 to move from "compensating control documented" to "control implemented and evidenced."
+
+Full closure of G-002 and G-003 (i.e., moving from 🟡 to 🟢) requires:
+- Implementation complete and deployed to production.
+- Integration tests passing against at least one IdP per protocol (Okta for SAML SLO, Azure AD for OIDC back-channel).
+- Audit events firing and queryable in the admin dashboard audit log viewer.
+
+---
+
+### 13.10 Open Questions
+
+**Q1: What happens if a customer's IdP does not support SLO or back-channel logout?**
+
+Not all IdPs support these protocols, particularly older on-premises deployments (ADFS pre-2016, some legacy Shibboleth configurations). When an enterprise customer's IdP does not support SLO:
+
+- FORM falls back to the local-only logout path (§13.2.4 fallback).
+- The limitation is documented in the enterprise contract: "Federated logout propagation requires IdP SLO support (SAML) or back-channel logout support (OIDC). Where the customer's IdP does not support these protocols, FORM will revoke its own session on user logout; the customer's IdP SSO session will remain active until it expires per the IdP's own session timeout policy."
+- FORM's session timeout policy (§12.6) acts as the backstop: if the IdP session expires before the user re-authenticates to FORM, access is naturally terminated. For tenants without SLO, it is recommended to set a shorter `session_timeout_hours` in `session_policy` (e.g., 8 hours instead of 168) to reduce the window of exposure.
+- This is a contractual and security posture decision, not a FORM implementation decision. The customer acknowledges the limitation at onboarding.
+
+**Q2: ADFS SLO certificate requirements.**
+
+Microsoft ADFS requires the SP's SLO `LogoutRequest` to be signed with the same certificate that is registered in the ADFS relying party trust configuration. ADFS does not support JWKS-based certificate discovery — the SP certificate must be uploaded to the ADFS console as a static X.509 certificate (PEM or DER format).
+
+This has implications for FORM's key rotation procedure (§12.10.4):
+
+- The RS256 key pair used for SAML signing must be accompanied by a self-signed X.509 certificate wrapper (the key pair is the same; the certificate wraps the public key in X.509 format).
+- When FORM rotates its signing key pair, ADFS customers must manually update the SP certificate in their ADFS relying party trust configuration before the old certificate expires.
+- FORM must notify ADFS customers at least 30 days before the signing certificate's `notAfter` date. This requires a separate certificate expiry monitoring job that is aware of which tenants are using ADFS (identifiable by the IdP metadata format or a `tenant_sso_configs.idp_type = 'adfs'` flag).
+
+**Decision required (security-engineer + enterprise-architect):** Should FORM maintain a separate, longer-lived (2-year) signing certificate for ADFS tenants, distinct from the monthly-rotated RS256 key pair used for JWTs? The tradeoff is operational simplicity for ADFS customers (fewer certificate update events) vs. a longer exposure window if the ADFS signing certificate is compromised. Recommendation: use a 1-year certificate for ADFS tenants, with a 60-day advance notice to the customer for each rotation. This aligns with the G-004 certificate rotation automation work and should be addressed in the same implementation sprint.
+
+**Q3: Behaviour when a logout_token `sid` does not match any known enterprise_sessions.idp_session_id.**
+
+This can occur legitimately if: (a) the user authenticated via a path that did not populate `idp_session_id` (e.g., before the §13.8 schema migrations were deployed), or (b) the `sid` in the logout_token refers to an IdP session that was authenticated before FORM's back-channel logout feature was enabled for the tenant.
+
+In this case, FORM has no session to revoke. FORM should return HTTP 200 (not 400) — the IdP's instruction is valid; FORM simply has no matching session. A `backchannel_logout.received` event is written, but no `backchannel_logout.revoked` event follows. An operational metric should track the count of no-match back-channel requests per tenant to detect misconfiguration.
+
+**Q4: Multi-device logout scope for OIDC back-channel when only `sub` is present.**
+
+If the IdP sends a logout_token with only `sub` (no `sid`), FORM revokes all active sessions for that user within the tenant. This is intentional per the spec: the absence of `sid` means the IdP is revoking all sessions for the subject, not just one specific SSO session. However, this means a user logging out on one device will also lose their session on all other devices, which may surprise users.
+
+This is spec-compliant behaviour and is the correct interpretation. If per-device logout is required, the IdP must include `sid` in its logout tokens. FORM should document this in the IdP configuration guide: "To enable per-device logout (rather than full account logout), configure your IdP to include the `sid` claim in logout tokens."
+
+---
+
+*v0.5 additions: Section 13 — Federated Logout: SAML SLO & OIDC Back-Channel Logout. Closes G-002 design phase (SAML SLO: SP-initiated + IdP-initiated flows, SLO state machine, 6-state lifecycle, graceful degradation on IdP timeout). Closes G-003 design phase (OIDC Back-Channel logout_token validation, RFC-compliant revocation, enterprise_sessions integration). Front-channel logout explicitly rejected (SameSite/browser restrictions). 8 new audit events. idp_session_id column requirement on enterprise_sessions documented. G-002: 🔴 → 🟡 Partial (design done, implementation pending). G-003: 🔴 → 🟡 Partial. SOC 2 CC6.1 partial closure. Implementation sequencing: core SSO → §13 → G-007 admin UI.*

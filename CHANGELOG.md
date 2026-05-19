@@ -9,6 +9,11 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.75.0] — 2026-05-19
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md` v0.4 → v0.5 — **§13 Federated Logout: SAML SLO & OIDC Back-Channel Logout** (enterprise-architect + security-engineer). Closes G-002 design phase (SAML 2.0 Single Logout): SP-initiated SLO flow (LogoutRequest → IdP propagation → LogoutResponse, HTTP-Redirect binding with deflate+base64+URL-encode, RS256 signature), IdP-initiated SLO (unsolicited LogoutRequest to `/auth/saml/slo`, NameID+SessionIndex lookup), 6-state SLO lifecycle (Idle → LogoutInitiated → WaitingIdPResponse → PropagatingToOtherSPs → SessionsRevoked → Complete/Failed), 4 failure modes with graceful degradation (local session cleared regardless of IdP response — never block local logout on partner SP timeout). Closes G-003 design phase (OIDC Back-Channel Logout): `back_channel_logout_uri` registration at `https://api.form.coach/auth/oidc/backchannel-logout`, logout_token JWT validation (iss, aud, iat within 5 min, nonce MUST NOT be present, events claim required), session revocation via `enterprise_sessions.idp_session_id`, 200 OK synchronous response with 2s revocation SLA. Front-channel logout explicitly rejected (4 reasons: SameSite=Strict blocks cross-origin, session state URL leak, third-party cookie deprecation, back-channel strictly superior). Session revocation mechanics: `revocation_reason='federated_logout'` unified with SCIM/timeout paths (§12), JTI blocklist interaction documented. SAML NameID format handling: persistent (required), transient fallback, email-format fallback chain. New `idp_session_id` column requirement on `enterprise_sessions` — prerequisite for both SLO and back-channel. 8 new audit events (`slo.sp_initiated`, `slo.idp_initiated`, `slo.completed`, `slo.failed`, `slo.fallback_local_only`, `backchannel_logout.received`, `backchannel_logout.validated`, `backchannel_logout.revoked`). 8-item implementation sequencing with dependencies. G-002: 🔴 → 🟡 Partial (design complete, implementation pending). G-003: 🔴 → 🟡 Partial. SOC 2 CC6.1 partial closure.
+
 ## [0.74.0] — 2026-05-19
 
 ### Added
