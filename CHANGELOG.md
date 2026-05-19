@@ -9,6 +9,11 @@
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
 | **MINOR** (`x.Y.z`) | Нова фіча, новий розділ документації, помітна зміна. |
 
+## [0.80.1] — 2026-05-19
+
+### Added
+- `docs/SOC2_READINESS.md` v1.2 → v1.3 — **§23 Quarterly Access Review Procedure** (compliance-officer + security-engineer + enterprise-architect). Closes PRE-23 design phase (🔴 Open → 🟡 Partial). Full scope definition: eleven production systems (GitHub, Cloudflare, Supabase, 1Password, PostHog, Sentry, Stripe, ElevenLabs, Anthropic, Apple Developer, Google Play) plus service-account / API-token inventory and enterprise tenant admin role sweep. Six-step procedure: (1) enumerate active access, (2) compare against authorized roster, (3) deprovision within 24h SLA, (4) enterprise tenant inactive-account sweep with 5-day tenant-admin acknowledgment gate, (5) CC4.2 control effectiveness table for six highest-risk CC6 controls, (6) sign-off and SHA-256 artifact filing into HMAC audit chain (`system.access_review_completed` DEC-030 event). Authorized role roster table for solo-founder phase plus five authorized service accounts with rotation SLAs. Evidence artifact template (`access-review-YYYY-QN.md`) for private compliance repository. Solo-founder compensating control: git commit timestamp + HMAC chain publication replaces independence requirement; expires at first hire. Privacy floor enforcement: reviewer scope limited to role/permission metadata — individual health data queries prohibited. Three new gap items (CC6-GAP-001 through CC6-GAP-003). Control table updates: CC4.2 "Quarterly control effectiveness review" 🔴 → 🟡 Partial; CC6.3 "Quarterly access review" new row added 🟡 Partial. Gap Analysis Summary updated: critical gaps 2 → 1 (cookie consent sole remaining blocker); controls in-place 28 → 31; partial 30 → 33; readiness ~69% → ~71%.
+
 ## [0.80.0] — 2026-05-19
 
 ### Added

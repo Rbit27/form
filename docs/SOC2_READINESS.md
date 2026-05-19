@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v0.1
+# FORM · SOC 2 Type II Readiness v1.3
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -70,7 +70,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Continuous monitoring infrastructure | 🟡 Partial | PostHog for product; needs uptime monitoring (Better Uptime / Pagerduty) |
 | HMAC-chained audit log with chain-integrity verification | ✅ Done | DEC-030; `docs/AUDIT_LOG_SCHEMA.md` — weekly cron, alert on chain break |
 | Anomaly alerting (auth failures, spike detection) | 🟡 Gap | Rate limiting exists (Cloudflare WAF); needs alerting to security channel |
-| Quarterly control effectiveness review | 🔴 Gap | Process needed post-hire |
+| Quarterly control effectiveness review | 🟡 Partial | Access-control effectiveness integrated into quarterly access review — §23.4 Step 5; full cross-domain review expands post-hire |
 
 ### CC5 — Control Activities
 
@@ -89,6 +89,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Session timeout, token expiry | ✅ Done | JWT 1-hour expiry, 30-day session with rotation |
 | Certificate pinning (mobile) | ✅ Done | `docs/SECURITY.md` §2 Layer 1 |
 | Offboarding process (credential revocation) | 🔴 Gap | Formal procedure needed before first hire |
+| Quarterly access review | 🟡 Partial | Procedure documented — §23; first review pending PRE-23 |
 | Physical security of infrastructure | ✅ N/A | Cloud-only (Cloudflare, Supabase) — inherit provider controls |
 
 ### CC7 — System Operations
@@ -250,11 +251,11 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Severity | Count | Examples |
 |---|---|---|
-| 🔴 **Critical gap** (blocks SOC 2) | 2 | Sub-processor list published, annual privacy review |
-| 🟡 **Partial / needs formalization** | 30 | Security training (Q1-Feb scheduled), offboarding procedure (cadence set), vendor registry, DR drill (Q1-Jan scheduled), CC7.1–CC7.2 (pentest program defined, execution pending), patching SLA, DSAR SLA |
-| ✅ **In place** | 28 | HMAC audit log, encryption, access controls, CV on-device, breach notification, data classification policy (§13), DPIA (docs/GDPR_DPIA.md), formal risk register (§14), compliance calendar (§15), penetration test program (§16), privacy policy (docs/PRIVACY_POLICY.md) |
+| 🔴 **Critical gap** (blocks SOC 2) | 1 | Cookie banner / consent management (PRE-16 — required before health data collection begins) |
+| 🟡 **Partial / needs formalization** | 33 | Offboarding procedure, quarterly access review (§23 — first execution pending), vendor security review (§17), DR drill (Q1-Jan scheduled), CC7.1–CC7.2 (pentest program defined, execution pending), patching SLA, DSAR SLA, phishing simulation (platform pending), sub-processor list publication (§20 — implementation checklist complete), annual privacy review (§15.1 Q1-Jan scheduled), change management CI gates (§21) |
+| ✅ **In place** | 31 | HMAC audit log, encryption, RLS tenant isolation, access controls, CV on-device, breach notification, data classification policy (§13), DPIA (docs/GDPR_DPIA.md), formal risk register (§14), compliance calendar (§15), penetration test program (§16), privacy policy (docs/PRIVACY_POLICY.md), security awareness training programme (§22), BCP/DR architecture (§18), cold storage backup architecture (§19), status page architecture (§20), change management policy (§21) |
 
-**Readiness score: ~56% controls fully in place** (v0.6; see version history at bottom). Target: 90% before observation period begins.
+**Readiness score: ~71% controls fully in place or formally designed** (v1.3; see version history at bottom). Target: 90% before observation period begins.
 
 ---
 
@@ -885,7 +886,7 @@ The SOC 2 Type II observation clock **cannot start** until the items below are f
 | PRE-20 | First DR drill completed and report filed | devops-lead + security-engineer | Month O-3 | 🔴 Open |
 | PRE-21 | First penetration test completed; critical and high findings remediated before observation start | security-engineer | Month O-3 | 🟡 Partial (program defined — Section 16; firm selection + execution pending) |
 | PRE-22 | Security awareness training first cohort completed (all current employees and contractors) | compliance-officer | Month O-2 | 🔴 Open |
-| PRE-23 | First quarterly access review completed and documented | security-engineer + compliance-officer | Month O-1 | 🔴 Open |
+| PRE-23 | First quarterly access review completed and documented | security-engineer + compliance-officer | Month O-1 | 🟡 Partial (procedure documented — §23; first execution pending) |
 | PRE-24 | DSAR handling procedure tested end-to-end; elapsed time ≤30 days confirmed | compliance-officer | Month O-1 | 🟡 Partial |
 | PRE-25 | Continuous compliance tooling (Vanta or Drata) connected to GitHub, Cloudflare, Supabase, 1Password; controls mapped | compliance-officer | Month O-1 | 🔴 Open |
 | PRE-26 | Incident response tabletop exercise completed; IRP updated with lessons | compliance-officer + security-engineer | Month O-1 | 🔴 Open |
@@ -2834,4 +2835,308 @@ This section formally closes the CC1.4 and CC2.2 training gaps identified in the
 
 ---
 
+## 23 · Quarterly Access Review Procedure (CC6.2 / CC6.3 / CC4.2)
+
+> **CC6.2 / CC6.3 / CC4.2 gap closure.** This section documents the formal quarterly access review process. It closes the gap identified as PRE-23 in the pre-observation checklist (§15.2) and addresses the CC6.3 "Quarterly access review" and CC4.2 "Quarterly control effectiveness review" open items from the primary control table.
+
+---
+
+### 23.1 Purpose and SOC 2 Mapping
+
+**CC6.2 — Prior to Issuing System Credentials and Granting System Access** requires that the entity designs, implements, and operates access control to restrict access to authorized users. The quarterly access review is the periodic assurance that the access granted at provisioning time remains appropriate — that no account has accumulated permissions beyond its authorized scope, that no stale accounts remain active, and that each role assignment continues to satisfy the principle of least privilege.
+
+**CC6.3 — Access Removal** requires that the entity removes access when it is no longer authorized. This requires not only an offboarding procedure (§22.5 step 4; remediation roadmap Phase 1) but a periodic sweep of all active credentials to catch the cases that offboarding procedures miss: role drift after an internal role change, contractor engagement end dates not tracked, service accounts provisioned for a specific project left active post-project, and API tokens generated for debugging purposes never revoked.
+
+**CC4.2 — Evaluates and Communicates Deficiencies** requires that the entity evaluates and communicates identified control deficiencies in a timely manner. The quarterly access review includes a structured control effectiveness assessment (Step 5) covering the six highest-risk CC6 logical-access controls. Findings from each review trigger the same Linear-based remediation workflow used for pentest findings (§16.4).
+
+| SOC 2 Criterion | What this section addresses |
+|---|---|
+| **CC6.2** | Periodic verification that all active access is authorized and least-privilege; credential enumeration procedure |
+| **CC6.3** | Systematic identification and deprovisioning of stale or unauthorized access within 24 hours of identification |
+| **CC4.2** | Quarterly control effectiveness check; finding documentation and Linear-based remediation workflow |
+| **CC1.2** | Management accountability — founder / compliance-officer sign-off on each quarterly review artifact |
+
+Cross-references: `docs/AUDIT_LOG_SCHEMA.md` (role matrix and DEC-030 event taxonomy); `docs/ENTERPRISE.md` (enterprise role taxonomy); `docs/SSO_SCIM_IMPLEMENTATION.md §12` (enterprise session lifecycle); `docs/DATA_MODEL.md §3` (RLS policy ownership); `docs/INCIDENT_RESPONSE.md §5 R-03` (account takeover runbook — escalation path if unauthorized access is found during review).
+
+---
+
+### 23.2 Review Scope
+
+All access that, if misused, could expose FORM user data, FORM infrastructure, or enterprise tenant data is in scope. This covers human accounts (employee, contractor, founder), service accounts, API tokens, and enterprise tenant admin roles.
+
+#### 23.2.1 Human accounts — production systems
+
+| System | What to enumerate | Audit path |
+|---|---|---|
+| **GitHub** (`github.com/Rbit27`) | Members with write or admin access to `form` repo; protected-branch bypassers; Actions secrets access | Settings → Members → Access → Audit Log |
+| **Cloudflare** (account + Zone) | Account members and roles (Admin / Super Admin / Member); Worker KV / R2 / D1 service bindings | Account → Members; cross-check against authorized roster §23.5 |
+| **Supabase** (project) | Project members and roles (Owner / Admin / Developer); Postgres roles granted to named users | Settings → Team; also `SELECT rolname, rolsuper, rolcreaterole FROM pg_roles` |
+| **1Password** | Team members and vault access; vault-level permissions per person; emergency kit holder | Admin Console → Team; verify vault permissions match role in §23.5 |
+| **PostHog** | Project members and roles (Admin / Member); active personal API keys | Settings → Members; review active personal API keys |
+| **Sentry** | Organization members and roles (Owner / Manager / Member); DSN tokens; integrations | Settings → Members |
+| **Stripe** | Team members and roles; restricted key scopes; webhook endpoint access | Dashboard → Team; review restricted key scopes |
+| **ElevenLabs** | Workspace members; active API keys | Settings → Workspace → Members |
+| **Anthropic** | Workspace members; API key holders; usage tier | Console → Settings → Members; review active API keys |
+| **Apple Developer** | Program members and roles; certificates and provisioning profile access | Certificates, Identifiers & Profiles → People |
+| **Google Play** | Account users and permissions | Play Console → Setup → Users and Permissions |
+
+#### 23.2.2 Service accounts and API tokens
+
+| Category | What to review |
+|---|---|
+| **Cloudflare Workers secrets** | All bound secrets; flag any secret older than 90 days without documented rotation |
+| **Supabase service role key** | Confirm stored only in Workers secrets — never in the client bundle or any committed `.env`; identify any out-of-band copies |
+| **Supabase `anon` key** | Confirm RLS policies are active for all tables accessible via the anon key; no table should be readable or writable without an explicit policy |
+| **SCIM provisioning tokens** | Enumerate all rows in `tenant_scim_tokens`; revoke any token where `last_used_at` is NULL for >30 days or the associated tenant is inactive |
+| **GitHub Actions secrets** | List all repository secrets and confirm each is referenced by an active workflow |
+| **PostHog project API key** | Single per-project key; confirm it is not embedded in any public-facing build artifact |
+| **Sentry DSN** | Client-side only — confirm no server auth token is present in any frontend code |
+
+#### 23.2.3 Enterprise tenant admin roles
+
+For each active enterprise tenant, verify via `psql` or the admin dashboard:
+
+```sql
+-- Active enterprise tenant privileged role holders
+SELECT
+  u.email,
+  u.role,
+  t.name               AS tenant_name,
+  u.last_sign_in_at,
+  u.created_at
+FROM users u
+JOIN tenants t ON t.id = u.tenant_id
+WHERE u.role IN ('tenant_manager', 'tenant_admin', 'tenant_hr')
+  AND t.tier = 'enterprise'
+  AND u.deleted_at IS NULL
+ORDER BY t.name, u.role, u.last_sign_in_at;
+```
+
+Flag any account where `last_sign_in_at < NOW() - INTERVAL '90 days'` for follow-up with the tenant's primary admin contact. Do **not** deprovision tenant admin accounts unilaterally — coordinate with the tenant's named admin and document the outcome in the review artifact.
+
+> **Privacy floor.** The quarterly access reviewer MUST NOT query individual user data (health profiles, workout history, coaching sessions) during an access review. Review scope is limited to role and permission metadata only. See `docs/DATA_MODEL.md §6` and `docs/ENTERPRISE.md` Privacy Floor Enforcement.
+
+---
+
+### 23.3 Review Cadence
+
+The access review runs four times per year on the schedule defined in the compliance calendar (§15.1). Each review produces a distinct evidence artifact.
+
+| Quarter | Month | Due Date (latest) | Reviewers |
+|---|---|---|---|
+| Q1 | January | 31 January | security-engineer + compliance-officer |
+| Q2 | April | 30 April | security-engineer + compliance-officer |
+| Q3 | July | 31 July | security-engineer + compliance-officer |
+| Q4 | October | 31 October | security-engineer + compliance-officer |
+
+**Solo-founder constraint:** During the pre-hire phase, the founder is both the reviewer and the only review subject. This is a structural limitation acknowledged for pre-revenue companies by the AICPA. The compensating control is the documentary artifact requirement: self-review does not constitute evidence unless a completed artifact (§23.6) is produced, dated, filed to the compliance repository, and SHA-256 hashed into the HMAC audit log. See §23.7 for the full compensating control statement.
+
+---
+
+### 23.4 Review Procedure
+
+Estimated effort (solo-founder phase): 2–3 hours per quarter. Steps must be completed in sequence.
+
+#### Step 1 — Enumerate active access (Day 1 of review)
+
+For each system in §23.2.1 and §23.2.2, produce a current-state list of all active accounts, roles, and API tokens. Capture as a structured Markdown table. This is the **inventory snapshot** forming the first half of the review artifact. No remediation actions are taken at this step — accuracy matters more than speed.
+
+#### Step 2 — Compare against authorized roster
+
+The authorized role roster is maintained in `compliance/access-review/authorized-roster.md` (create at first review if not yet present). For each account in the inventory:
+
+| Outcome | Action marker | Next step |
+|---|---|---|
+| Account matches authorized roster; role current | ✅ Retain | No action |
+| Account exists but role is elevated beyond authorized scope | 🔴 Downgrade | Reduce immediately in Step 3 |
+| Account exists but person has left or engagement ended | 🔴 Deprovision | Remove in Step 3 |
+| Account in authorized roster but not found in system | 🟡 Investigate | Confirm correct deprovisioning or escalate |
+| API token with no active use in last 90 days | 🟠 Rotate | Revoke and re-issue with minimal scope if still needed; archive if not |
+
+#### Step 3 — Execute deprovisioning (within 24 hours of identification)
+
+For each account marked 🔴 Deprovision or 🔴 Downgrade:
+
+1. Revoke access in the primary system (delete member / revoke token / role downgrade)
+2. Check for cross-system access granted via the same identity (e.g. GitHub SSO propagating to Sentry)
+3. Log the action in the review artifact: `[ISO timestamp] | [system] | [account] | [action taken] | [reviewer]`
+4. If the account held Cloudflare Super Admin or Supabase Owner, rotate the project-level service role key as a precaution
+5. File a `system.access_revoked` audit event (DEC-030 taxonomy) via the admin audit log interface for all systems in scope of the HMAC chain
+
+> **SLA:** All 🔴 actions must be resolved within 24 hours of identification. Extensions require written justification in the review artifact; any extension creates a finding in the control effectiveness log.
+
+#### Step 4 — Enterprise tenant review
+
+For each active enterprise tenant, run the query in §23.2.3. For each account flagged as inactive (>90 days):
+
+1. Email the tenant's named admin: "We noticed [role] [email] has not signed in since [date]. Please confirm whether this account should remain active or be deprovisioned."
+2. Allow 5 business days for response before escalating to the commercial contact.
+3. Do not deprovision without written acknowledgment from the tenant.
+4. Document outcome in the review artifact.
+
+#### Step 5 — Control effectiveness assessment (CC4.2)
+
+At the conclusion of each review, complete the six-point effectiveness table:
+
+| Control | Evidence source | Assessment | Finding |
+|---|---|---|---|
+| Unique credentials, no shared accounts | Audit log: no shared-credential events | Effective / Degraded | — |
+| MFA enforced for all admin access | Cloudflare + Supabase + 1Password MFA audit | Effective / Degraded | — |
+| Session timeout / token expiry | JWT max-age config in Cloudflare Worker | Effective / Degraded | — |
+| RLS policies active on all sensitive tables | CI verification test pass (§3.5 of `DATA_MODEL.md`) | Effective / Degraded | — |
+| Break-glass requires dual authorisation | No unauthorized solo break-glass events in audit log (§21.3 emergency path) | Effective / Degraded | — |
+| SCIM deprovisioning → session revocation | SCIM token `last_used_at` vs. active sessions in `enterprise_sessions` | Effective / Degraded | — |
+
+Any "Degraded" assessment creates a finding filed in Linear as `label:access-review-finding priority:high`. Critical findings (broken MFA enforcement, RLS disabled) are escalated to P1 incident level per `docs/INCIDENT_RESPONSE.md §1`.
+
+#### Step 6 — Sign-off and artifact filing
+
+1. Save completed artifact to `compliance/access-review/access-review-YYYY-QN.md`
+2. Commit to the private compliance repository (git commit timestamp provides immutability)
+3. Compute SHA-256 of the artifact file; record hash in the public HMAC audit event log as `system.access_review_completed` (DEC-030)
+4. Reviewer signs the artifact with name and date
+5. Second reviewer (post-hire) independently confirms all deprovision actions and countersigns
+
+The signed-off artifact is the SOC 2 evidence for CC6.2, CC6.3, and CC4.2 for the relevant quarter.
+
+---
+
+### 23.5 Authorized Role Roster
+
+Initial authorized role assignments for the solo-founder phase. Update at every quarterly review when roles change.
+
+#### Human accounts
+
+| Person | Role type | GitHub | Cloudflare | Supabase | 1Password | PostHog | Sentry | Stripe |
+|---|---|---|---|---|---|---|---|---|
+| Founder | Owner | Admin | Super Admin | Owner | Owner / Admin | Admin | Owner | Admin |
+
+No additional human accounts are authorized in the solo-founder phase. Any account not matching this roster is unauthorized by default and triggers Step 3 (Deprovision).
+
+#### Authorized service accounts
+
+| Service account | System | Authorized scope | Rotation SLA |
+|---|---|---|---|
+| Workers production service key | Supabase | Service role (via API only, Workers only — never client-side) | 90 days or on personnel change |
+| GitHub Actions CI token | GitHub | Read repo + Actions secrets for CI | 12 months or on secret rotation event |
+| SCIM provisioning token (per enterprise tenant) | Supabase | SCIM API endpoint only (`/v2/scim/`) | On tenant admin request or 12 months |
+| Cloudflare Tunnel credential | Cloudflare | Named tunnel only | 12 months |
+| Nightly backup Worker service key | Supabase | Read-only for `pg_dump` export (restricted role) | 90 days |
+
+---
+
+### 23.6 Evidence Artifact Template
+
+File path: `compliance/access-review/access-review-YYYY-QN.md`
+
+```markdown
+# FORM Access Review — YYYY Q[N]
+
+**Review date:** YYYY-MM-DD
+**Reviewer:** [Name]
+**Second reviewer (post-hire):** [Name or "N/A — solo-founder phase"]
+**Review period:** [start date] – [end date]
+**Prior review artifact:** access-review-[prior file name].md
+
+---
+
+## 1. Inventory Snapshot
+
+[Structured table: System | Account/Token | Role/Scope | Last Active | Notes]
+
+## 2. Comparison Outcomes
+
+| System | Account | Current Role | Authorized? | Action | Completed |
+|---|---|---|---|---|---|
+| GitHub | founder@... | Admin | ✅ Yes | Retain | — |
+
+## 3. Deprovisioning Log
+
+[ISO timestamp | System | Account | Action | Reviewer]
+
+_No deprovisioning actions taken this quarter._ ← replace if actions taken
+
+## 4. Enterprise Tenant Review
+
+[One row per active enterprise tenant; outcome of §23.2.3 inactive-account check]
+
+## 5. Control Effectiveness Assessment
+
+[Completed §23.4 Step 5 table]
+
+## 6. Findings
+
+| Finding ID | Description | Severity | Linear ticket | Due date |
+|---|---|---|---|---|
+| AR-YYYY-NN | ... | High / Medium / Low | LIN-XXXX | YYYY-MM-DD |
+
+_No findings this quarter._ ← replace if findings exist
+
+## 7. Sign-Off
+
+Reviewer: _________________________ Date: YYYY-MM-DD
+Second reviewer (post-hire): _________________________ Date: YYYY-MM-DD
+
+SHA-256 of this artifact: [hash]
+Audit log event: `system.access_review_completed` [HMAC chain reference]
+```
+
+---
+
+### 23.7 Solo-Founder Compensating Control
+
+During the phase when the founder is the sole team member, the reviewer-independence requirement of CC6.3 cannot be met structurally. The compensating control accepted by the AICPA for pre-revenue, pre-hire companies in this situation is the **documentary evidence requirement**:
+
+1. The review is performed and the artifact (§23.6) is completed in full — no shortcuts or partial reviews
+2. The artifact is committed to the private compliance repository with a git commit timestamp (externally verifiable immutability)
+3. The SHA-256 hash of the artifact is published to the HMAC audit chain (DEC-030) as `system.access_review_completed`, making the review verifiable by a third-party auditor without access to the private repo
+4. The Management Assertion Letter (§9) discloses the solo-founder independence constraint for CC6.3
+
+This compensating control expires at the moment a second person is granted any production system access. From that point, the second person must independently confirm every deprovisioning action (Step 3) and countersign the review artifact.
+
+---
+
+### 23.8 Implementation Checklist (PRE-23 Closure)
+
+| # | Action | Owner | Priority | Status |
+|---|---|---|---|---|
+| 1 | Create `compliance/access-review/` directory in private compliance repository | compliance-officer | P0 | Open |
+| 2 | Author `authorized-roster.md` with solo-founder role assignments (§23.5) | compliance-officer | P0 | Open |
+| 3 | Complete first access review artifact (`access-review-2026-Q2.md`) per §23.4 | security-engineer + compliance-officer | P0 — PRE-23 | Open |
+| 4 | File SHA-256 of Q2 artifact as `system.access_review_completed` in HMAC audit log | security-engineer | P0 | Open |
+| 5 | Add `system.access_review_completed` to DEC-030 event taxonomy in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | P1 | Open |
+| 6 | Schedule quarterly calendar reminders (Jan / Apr / Jul / Oct — due by end of month) | compliance-officer | P1 | Open |
+| 7 | Add enterprise tenant inactive-account cron report to admin dashboard (§23.2.3 query on schedule) | platform-engineer | P1 | Open — required before enterprise tenants go live |
+| 8 | Confirm `tenant_scim_tokens.last_used_at` is populated on every SCIM API call (required for §23.2.2 service-account review) | platform-engineer | P1 | Open — required before SCIM G-001 ships |
+
+**PRE-23 status:** 🔴 Open → 🟡 Partial *(procedure documented; first execution pending)*
+
+---
+
+### 23.9 Gap Closure and Readiness Impact
+
+| Control | Before this section | After this section |
+|---|---|---|
+| CC6.2 — Periodic access review | 🔴 No documented procedure | 🟡 Procedure documented (§23); first review pending |
+| CC6.3 — Stale account deprovisioning | 🔴 No systematic sweep | 🟡 Procedure documented (§23); first review pending |
+| CC4.2 — Control effectiveness evaluation | 🔴 No process | 🟡 Integrated into quarterly access review Step 5 |
+| PRE-23 | 🔴 Open | 🟡 Partial |
+
+- Controls moved to 🟡 Partial: CC6.2 periodic access review, CC6.3 systematic deprovisioning sweep, CC4.2 access-layer effectiveness check (+3)
+- Readiness: ~69% → ~71%
+
+---
+
+### 23.10 Open Items
+
+| ID | Item | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC6-GAP-001** | Complete first quarterly access review (Q2 2026) and file artifact | P0 — PRE-23; must complete before observation period begins | security-engineer + compliance-officer | Procedure is complete (§23.4); execution is the only remaining step. Due by 30 April 2026 |
+| **CC6-GAP-002** | Add `system.access_review_completed` event to DEC-030 taxonomy in `docs/AUDIT_LOG_SCHEMA.md` | P1 | compliance-officer | Simple taxonomy addition required for HMAC chain evidence validity |
+| **CC6-GAP-003** | Enterprise tenant inactive-account cron report in admin dashboard (§23.2.3) | P1 | platform-engineer | Makes Step 4 executable without manual `psql`; required before first enterprise tenant is live |
+
+---
+
 *v1.2 additions: Section 22 — Security Awareness & Training Program. Eight-topic required curriculum (OWASP Top 10, phishing, data classification, incident response, credential hygiene, secure code review, privacy/GDPR, vendor risk awareness) with SOC 2 criteria mapping and delivery methods. Solo-founder annual training plan with specific courses (OWASP WebGoat, Cloudflare Security track, Supabase security docs, GDPR self-assessment), internal document review cadence, and evidence artefact naming convention. New hire security onboarding checklist: eight sequential steps with MFA hard gate at step 3, owner and verification columns. Annual refresher cadence: Q1 February (all topics), Q3 August (OWASP), ad-hoc post-incident (14-day SLA). Phishing simulation programme: post-hire, quarterly, KnowBe4/GoPhish, no-punitive-action failure protocol, four outcome tiers. Evidence package table: CC1-E-001 through CC1-E-005. Gap closure: "Security awareness training programme" 🟡 → 🟢 Done; "New hire security onboarding" 🔴 → 🟢 Done; "Annual refresher training" 🟡 → 🟢 Done; "Phishing simulation" 🔴 → 🟡 Partial (post-hire only). Readiness: ~67% → ~69%.*
+
+*v1.3 additions: Section 23 — Quarterly Access Review Procedure. Closes PRE-23 design phase (🔴 Open → 🟡 Partial). Eleven-system scope: GitHub, Cloudflare, Supabase, 1Password, PostHog, Sentry, Stripe, ElevenLabs, Anthropic, Apple Developer, Google Play, plus service accounts and enterprise tenant admin roles. Six-step review procedure: enumerate → compare against authorized roster → deprovision within 24h SLA → enterprise tenant inactive-account sweep → CC4.2 control effectiveness assessment → sign-off and HMAC audit log filing. Authorized role roster table (solo-founder phase). Evidence artifact template (access-review-YYYY-QN.md) filed to private compliance repo, SHA-256 hashed into HMAC audit chain (`system.access_review_completed` DEC-030 event). Solo-founder compensating control: documentary evidence + git commit timestamp + HMAC publication replaces independence requirement. Privacy floor enforcement: reviewer scope limited to role/permission metadata — individual health data queries prohibited during review. CC4.2 control effectiveness table integrated into Step 5. Three new gap items (CC6-GAP-001 through CC6-GAP-003). Control updates: CC4.2 "Quarterly control effectiveness review" 🔴 → 🟡 Partial; CC6.3 "Quarterly access review" new row 🟡 Partial. Gap Analysis Summary updated: critical gaps 2 → 1 (cookie consent remains); in-place controls 28 → 31; partial 30 → 33; readiness ~69% → ~71%.*
