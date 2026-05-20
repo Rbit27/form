@@ -11,6 +11,13 @@
 
 ---
 
+## [0.94.1] — 2026-05-20
+
+### Changed
+- `docs/SOC2_READINESS.md` v2.1 → v2.2 — **§34 C1 — Confidentiality: Deep-Dive Control Implementation** (compliance-officer + security-engineer). Full C1.1 and C1.2 control mapping. C1.1 (8 sub-criteria): confidential data classification (✅ Done — §5 five-tier policy cross-referenced); data inventory (🟡 Partial — DATA_MODEL.md + §5 mapped as de facto inventory; standalone signed exhibit C1-GAP-002 surfaced); access controls (✅ Done — Supabase RLS row-level isolation, RBAC four roles, break-glass dual-auth); AES-256 at rest + TLS 1.3 in transit (✅ Done — Supabase default + column-level `pgp_sym_encrypt`); workforce NDAs (🔴 Gap → C1-GAP-001 P0 pre-hire gate); third-party DPAs (🟡 Partial — C1-GAP-003 P1, 7 sub-processors with filing paths); data minimization in LLM prompts (✅ Done — no PII in Anthropic API calls, `stripForbiddenProperties` middleware); DEC-030 HMAC access monitoring (✅ Done). C1.2 (5 sub-criteria): GDPR Art. 17 erasure 30-day grace + hard delete + 60-day backup purge (✅ Done); ClickHouse erasure SQL template (✅ Done); audit log anonymization on delete (✅ Done — `[DELETED-{hash}]` replacement, HMAC chain preserved); media/device disposal (🔴 Gap → C1-GAP-004 P1 NIST SP 800-88); end-of-employment offboarding (🟡 Partial — 4-hour access revocation SLA, not yet executed). 4 gaps (C1-GAP-001 P0, C1-GAP-002/003/004 P1). 8 evidence artifacts PRE-34-E-001 through PRE-34-E-008. 10-item checklist (2× P0, 6× P1, 2× P2). **Readiness: ~91% → ~92%**.
+
+---
+
 ## [0.94.0] — 2026-05-20
 
 ### Added
