@@ -11,6 +11,16 @@
 
 ---
 
+## [0.89.0] — 2026-05-20
+
+### Added
+- `content/post-59-zone2-cardio.md` — **Zone 2 Hype vs. Zone 2 Evidence**. LT1 physiology: mitochondrial biogenesis via PGC-1α (Holloszy 1967, Hood et al. 2000). Seiler 80/20 polarized model (Seiler & Kjerland 2006, Seiler 2010): elite endurance athletes at 10–15 h/week — structural context that created the distribution, not a universal prescription. HIIT equivalence: Gibala et al. (2006), Burgomaster et al. (2008) — equivalent mitochondrial stimulus in less time. Concurrent training interference: Wilson et al. (2012) meta-analysis — interference is dose-, mode-, and frequency-dependent; cycling > running for minimizing attenuation. Legitimate Zone 2 applications: CVD risk reduction, work capacity for long sessions, active recovery (true LT1 only), GPP for advanced athletes. What it is not: fat-loss mechanism, program substitute. FORM tracking proxy: resting HR trend, HRV baseline, workout HR response. clinical-safety: not-required. ~1,100 words.
+- `blog.html` — картки post-58 (Mind-Muscle Connection) і post-59 (Zone 2) додані до grid.
+- `STATUS.md` — рядки post-58 і post-59 додані до content engine таблиці.
+- `README.md` — content engine roadmap: post-56–59 позначено [x] з актуальними темами; додані future topics post-60–65.
+
+---
+
 ## [0.88.0] — 2026-05-20
 
 ### Added

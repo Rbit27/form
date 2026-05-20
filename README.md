@@ -380,10 +380,16 @@ Each iteration:
 - [x] post-53: Програмування для занятого: MEV-режим, 3-денний тиждень і нестабільний розклад — Schoenfeld (2016), Ralston (2017), Bickel (2011) maintenance, режими прогресу/обслуговування, чому пропущена сесія не переноситься
 - [x] post-54: MEV, MAV, MRV — три орієнтири об'єму, що насправді керують гіпертрофією: дозо-відповідні landmarks Israetel/RP, Schoenfeld (2017) dose-response meta-analysis, мезоцикл від MEV до MRV, практичні оцінки за групами м'язів
 - [x] post-55: Тренувальні сплити: доказова матриця вибору — full body vs верх/низ vs PPL за тренувальним стажем, розкладом і цілями. Schoenfeld (2016), Ralston (2017), Colquhoun (2018). Матриця вибору для трьох типових сценаріїв
-- [ ] post-56: Жінки і силовий тренінг — гормональний цикл і програмування: фолікулярна vs лютеальна фаза, estrogen і м'язова адаптація, що показує дослідна база (без myths; clinical-safety review mandatory перед публікацією)
-- [ ] post-57: Overreaching vs overtraining: операційна діагностика — NFO, FO, OTS: три різних стани, різні протоколи. Meeusen et al. 2013, HRV-тренд, RPE-drift, маркери і що з ними реально робити
-- [ ] post-58: Тренінг після 40: що змінюється і що ні — вікова нейром'язова фізіологія, зниження MVC, але збережена гіпертрофійна відповідь при адаптованому протоколі. Без «вже пізно» фрейму
-- [ ] post-59: AI-coach проти PT — чесний trade-off: де алгоритм перевершує людину, де не може замінити, що означає «довіряти системі» і що FORM не намагається бути
+- [x] post-56: Моделі periodization — лінійна, хвильова і блокова: LP, DUP, блочна з матрицею вибору за стажем і ціллю; Rhea et al. (2002), Prestes et al. (2009), residual training effects
+- [x] post-57: Тренінг після 40: саркопенія, анаболічна резистентність і програмування — Wilkinson et al. (2015) mTORC1 МПС −30%, Fragala et al. (2019) NSCA, Peterson et al. (2011) приріст у 60–70
+- [x] post-58: Mind-Muscle Connection — constrained action hypothesis Wulf et al. (2001), Calatayud et al. (2016) EMG internal vs external focus, Snyder & Fry (2012); практичний split за типом руху
+- [x] post-59: Zone 2 cardio — LT1 physiology, Seiler 80/20 context (10–15 год/тиждень endurance), interference Wilson et al. (2012), HIIT equivalence Gibala/Burgomaster; хто реально потребує, як дозувати
+- [ ] post-60: Жінки і силовий тренінг — фолікулярна vs лютеальна фаза, estrogen і м'язова адаптація, що показує дослідна база (clinical-safety review mandatory)
+- [ ] post-61: Overreaching vs overtraining: операційна діагностика — NFO, FO, OTS, Meeusen et al. 2013, HRV-тренд, RPE-drift
+- [ ] post-62: Foam rolling і міофасціальний реліз — що працює, що ритуал: EMG, ROM і latency досліди
+- [ ] post-63: Кофеїн і силовий тренінг — ergogenic evidence, timing protocols, tolerance, withdrawal
+- [ ] post-64: Allostatic load і тренувальна готовність — чому стандартні програми не враховують стрес-навантаження і що FORM робить інакше
+- [ ] post-65: Тренінг у гарячому і холодному середовищі — heat acclimation, cold exposure, термоадаптація для силових атлетів
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
