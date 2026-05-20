@@ -11,6 +11,13 @@
 
 ---
 
+## [0.89.2] — 2026-05-20
+
+### Added
+- [`content/post-60-deload-protocols.md`](content/post-60-deload-protocols.md) — deload protocols: supercompensation theory, 4 deload types, reactive vs proactive triggers, practical examples; clinical-safety reviewed ✓
+
+---
+
 ## [0.89.1] — 2026-05-20
 
 ### Changed
