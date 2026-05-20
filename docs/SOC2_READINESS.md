@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v1.6
+# FORM · SOC 2 Type II Readiness v2.1
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -5107,3 +5107,343 @@ CC4 requires that FORM both performs ongoing monitoring of its internal controls
 ---
 
 *v2.0 additions: Section 31 — CC3 Risk Assessment. All four CC3 sub-criteria (CC3.1–CC3.4) formally mapped; PITCH.md + OKRS_2026.md + ASSUMPTIONS_REGISTER.md mapped as three-layer objective hierarchy (CC3.1); §14 Formal Risk Register claimed as operative CC3.2 control; DEC-030 HMAC log, clinical-safety VETO, and break-glass dual-authorization mapped as primary anti-fraud controls (CC3.3); §21 CC8 and §15 calendar claimed for CC3.4; risk appetite statement gap (CC3-GAP-001), dedicated fraud risk assessment gap (CC3-GAP-002), and organizational change-impact checklist gap (CC3-GAP-003) surfaced. Section 32 — CC4 Monitoring Activities. Both CC4 sub-criteria (CC4.1–CC4.2) formally mapped; five ongoing evaluation mechanisms and three separate evaluation mechanisms documented for CC4.1; four-layer deficiency communication mechanism mapped for CC4.2; control deficiency log gap (CC4-GAP-001), observation-period evidence collection gap (CC4-GAP-002), and board-less compensating control structure (CC4-GAP-003, P0) documented with Series A upgrade trigger. All nine CC criteria now formally mapped. SOC 2 readiness: ~86% → ~90%.*
+
+---
+
+## 33. A1 — Availability: Deep-Dive Control Implementation
+
+### 33.1 Purpose
+
+This section formally maps FORM's Availability controls to the AICPA TSC A-series criteria. It supplements the overview table in §2 with implementation specifics, evidence artifacts, gap analysis, and a SOC 2 audit-ready control narrative for each A1 sub-criterion.
+
+The Availability trust service criteria are in scope when FORM's enterprise contracts include an SLA commitment. All Growth and Enterprise tier contracts include the 99.9% API availability SLA (§33.4.1), making the A series criteria directly applicable.
+
+**Three A1 sub-criteria are in scope for FORM's initial Type II engagement:**
+- **A1.1 — Capacity Management:** Monitoring, evaluating, and meeting processing capacity demand
+- **A1.2 — Environmental Protections & Recovery Infrastructure:** Backup architecture, redundancy, and recovery systems
+- **A1.3 — Recovery Testing:** Annual DR drill procedure and evidence
+
+**Gap closures initiated by §33:**
+- "SLA credit calculation and process" 🟡 Gap (§2) → 🟡 Partial — design complete; see §33.4
+- "Load testing before launches" 🟡 Gap (§2) → 🟡 Partial — program defined; see §33.3
+- "DR test performed annually" 🔴 Gap (§2) → 🟡 Partial — procedure and evidence package defined; first drill pending
+
+---
+
+### 33.2 A1.1 — Capacity Management
+
+**Criterion:** The entity maintains, monitors, and evaluates current processing capacity and use of system components (infrastructure, data, and software) to manage capacity demand and to enable the implementation of additional capacity to help meet its objectives.
+
+#### 33.2.1 Control Table
+
+| Control | Implementation | Status | Evidence Artifact |
+|---|---|---|---|
+| Capacity monitoring — API layer | Cloudflare Analytics Engine: p50/p95/p99 request latency + request rate per Worker per region; SLO breach alert fires at >80% error budget consumed (OBSERVABILITY §2.2) | 🟡 Partial | OBSERVABILITY §3.1; §2.1 SLO table |
+| Capacity monitoring — database | Supabase metrics: connection count, query p95 latency, storage used % of provisioned; PgBouncer saturation tracked | 🟡 Partial | OBSERVABILITY §3.1; PRE-33-E-001 |
+| Capacity monitoring — AI inference | Anthropic API: requests/min, tokens/min headroom vs. tier limit; ElevenLabs: concurrent-request count vs. plan cap | 🟡 Partial | OBSERVABILITY §3.1; COST_MODEL §3.1 |
+| Auto-scaling — API layer | Cloudflare Workers: serverless, horizontal scale is automatic; no instance limit at FORM's anticipated scale | ✅ Done | TECHNICAL.md; Cloudflare docs |
+| Auto-scaling — database | Supabase PgBouncer connection pooling (`pool_size` tuned per connection pressure); read replicas available on Enterprise plan | 🟡 Partial | PRE-33-E-001 |
+| Auto-scaling — AI inference | Anthropic: per-key rate limits; overflow → HTTP 429 → exponential backoff + queue (client-side); ElevenLabs: concurrent-stream limit; overflow → text-only fallback | ✅ Done | TECHNICAL.md §7 |
+| Capacity planning cadence | Monthly: devops-lead reviews p99 latency trends + DB connection saturation. Quarterly: capacity forecast linked to COST_MODEL §7 scaling model | 🟡 Gap → Partial | PRE-33-E-002 (post-launch) |
+| Enterprise onboarding burst handling | Large seat provisioning notified to devops-lead 48h in advance via onboarding checklist; Cloudflare absorbs login burst without pre-provisioning | ✅ Done | SSO_SCIM_IMPLEMENTATION §7.1 |
+
+#### 33.2.2 Three-Tier Capacity Architecture
+
+FORM's infrastructure has three distinct tiers of capacity constraint, each with a different scaling model and risk profile.
+
+**Tier 1 — Edge (Cloudflare Workers + KV + R2)**
+
+Workers are effectively unlimited at FORM's anticipated DAU. Workers have a 50ms CPU-time limit per request (Paid plan; 30s on Workers Paid for long-running). The FORM API tier operates well within this bound: typical inference-excluding request runs < 5ms CPU time. Cloudflare KV scales to 10 billion reads/day globally. R2 audit log archive has no IOPS ceiling relevant to FORM's event rate.
+
+*Capacity risk at Tier 1:* None until FORM exceeds ~$500k ARR requiring Workers Enterprise review. No action needed pre-launch.
+
+**Tier 2 — Database (Supabase/PostgreSQL + PgBouncer)**
+
+Supabase Pro plan provides: 500 MB database (expandable; Pro auto-scales to 8 GB then manual upgrade); 60 direct connections via PgBouncer with 500 pooled-mode connections to Postgres; daily backups + PITR.
+
+*Capacity risk at Tier 2:* At ~5,000 concurrent active users (DAU ~20k), connection pool saturation becomes the binding constraint. Migration path: Supabase Enterprise adds dedicated compute + read replicas. Trigger threshold: p99 connection-wait > 10ms sustained for 48h → upgrade ticket (OBSERVABILITY §6.2 alert rule `DB-CONN-SAT`).
+
+**Tier 3 — AI Inference (Anthropic Claude + ElevenLabs TTS)**
+
+Current rate limits: Anthropic Claude Sonnet Tier 4 — 8,000 RPM, 2M TPM (upgradeable); ElevenLabs Business — 5 concurrent streams, 500k characters/month.
+
+At 99% prompt-cache hit rate (COST_MODEL §3.1): effective Anthropic demand ≈ coaching turns × 0.01 per minute. At 10k DAU, 2 sessions/user/day = 200k sessions/day = 139 sessions/minute → 1.4 RPM cached demand — well within 8,000 RPM.
+
+**ElevenLabs character budget risk (A1.1 gap):** At 10k DAU, 50-word average response (~350 chars), 20% voice-on users = 350 chars × 2,000 users × 60 sessions/month = 42M chars/month. This exceeds the current Business plan 500k chars/month by ~84×. The COST_MODEL §3.2 documents this and the upgrade path (Scale plan: 2M chars/month; Enterprise: unlimited). This is the primary Tier 3 capacity risk and must be resolved before launch at scale.
+
+*Monitoring control:* ElevenLabs character consumption tracked in OBSERVABILITY §17 cost monitoring; alert fires at 50% of monthly budget.
+
+#### 33.2.3 Capacity Upgrade Triggers
+
+| Metric | Threshold | Required action | Owner |
+|---|---|---|---|
+| DB connection-wait p99 | > 10ms sustained 48h | Supabase Pro → Enterprise; read replica activation | devops-lead |
+| Cloudflare Workers error rate | > 1% sustained 4h | Investigate root cause; escalate to Cloudflare Enterprise if platform limit | devops-lead |
+| Anthropic RPM | > 4,000 (50% of Tier 4 limit) sustained 7 days | Request Anthropic Tier 5 upgrade (7-day processing SLA) | founder + devops-lead |
+| ElevenLabs chars/month | > 250k (50% of plan) | Upgrade to Scale plan; notify founder | devops-lead |
+| Database storage | > 80% of provisioned | Supabase disk expansion (1-click in dashboard) | devops-lead |
+| API p95 latency | > 500ms sustained 15 min | Page devops-lead; investigate → P1 incident if not resolving | PagerDuty → devops-lead |
+
+---
+
+### 33.3 Load Testing Program (A1.1 Supplemental)
+
+**Gap being closed:** "Load testing before launches" 🟡 Gap → 🟡 Partial
+
+A pre-launch load test is required before any of the following gate events:
+- First enterprise customer onboarding (> 200 seats)
+- General availability launch (public app store release)
+- Any feature deploying a new background Worker or cron job handling user data
+- Supabase schema migrations on tables with > 1 million rows
+
+#### 33.3.1 Load Test Specification
+
+**Tool:** k6 (open-source; CI-integrated via GitHub Actions).
+
+| Scenario | VUs / duration | Target surface | Pass criteria |
+|---|---|---|---|
+| Baseline | 100 VUs, 5 min sustained | Full API | p95 < 300ms; error rate < 0.1% |
+| Enterprise SSO login burst | 500 VUs over 30s ramp, then 2 min hold | Auth endpoint + SCIM provision | Auth p95 < 500ms; zero 5xx |
+| Coaching session load | 1,000 VUs, 2 min | `/api/coach/turn` | p95 < 2,000ms; zero timeouts |
+| DB connection saturation | Sustain 450 concurrent DB connections, 5 min | Supabase PgBouncer | Zero connection-timeout errors; queue < 50ms |
+| SCIM provisioning burst | 500 SCIM user-create operations in 60s | SCIM `/Users` endpoint | p95 < 1,000ms; zero 4xx |
+
+**Failure protocol:** Any `FAIL` verdict halts the release. devops-lead must post a resolution issue (linked to the failed k6 artifact) before the next deploy proceeds. Evidence filed to `compliance/evidence/load-tests/<YYYY-MM-DD>/`.
+
+#### 33.3.2 Evidence Requirements
+
+- k6 HTML summary report filed to `compliance/evidence/load-tests/<YYYY-MM-DD>/k6-report.html`
+- Pass/fail verdict logged as comment on the deploy-approval GitHub Issue (CC8-E-004 pattern)
+- Evidence artifact: **PRE-33-E-002** (load test report, pre-GA + pre-first-enterprise)
+
+---
+
+### 33.4 SLA Framework (A1.1 + A1.2 Supplemental)
+
+**Gap being closed:** "SLA credit calculation and process" 🟡 Gap → 🟡 Partial
+
+Cross-reference: INCIDENT_RESPONSE §12 documents per-incident SLA breach handling and enterprise notification templates (E-01 through E-04). This section defines the formal SLA tiers, credit schedule, and measurement methodology for SOC 2 evidence purposes.
+
+#### 33.4.1 Availability SLA Tiers
+
+| Metric | Starter | Growth | Enterprise | Measurement window |
+|---|---|---|---|---|
+| API availability | 99.5% | 99.9% | 99.9% | Rolling calendar month |
+| SSO/SAML endpoint | 99.0% | 99.5% | 99.9% | Rolling calendar month |
+| API p95 latency | < 500ms | < 300ms | < 300ms | 95th percentile, rolling 24h |
+| Scheduled maintenance | Excluded | Excluded; 7-day advance notice | Excluded; 14-day advance notice | — |
+
+**Availability formula:**
+
+```
+Availability % = (Total minutes in period − Downtime minutes) / Total minutes in period × 100
+```
+
+**Downtime definition:** A continuous period where the API availability probe (probe S-001, OBSERVABILITY §16.2) returns non-2xx for ≥ 3 consecutive probe intervals (= 90 seconds at 30s check cadence). Single-probe failures are not counted as downtime (transient network flap). Scheduled maintenance windows communicated in advance per §33.4.1 are excluded.
+
+#### 33.4.2 SLA Credit Schedule
+
+| Monthly availability achieved | Credit applied to next invoice |
+|---|---|
+| 99.0% – 99.9% (below commitment) | 10% of that month's invoice |
+| 98.0% – 98.9% | 25% of that month's invoice |
+| < 98.0% | 50% of that month's invoice |
+| < 95.0% (major breach) | 100% of that month's invoice |
+
+Credits are applied automatically — no customer claim required. Customer Lead applies the credit within 5 business days of the monthly SLA report. Template E-04 (INCIDENT_RESPONSE §12.5) is the required notification to tenant admin. Maximum credit: 100% of that month's invoice. Credits do not accumulate across months and do not entitle cash refunds.
+
+#### 33.4.3 SLA Measurement and Reporting
+
+- **Measurement source:** Better Stack Statuspage availability reports (SOC2_READINESS §20)
+- **Report generation:** Automated monthly (1st of each month, covering prior calendar month)
+- **Storage:** `compliance/evidence/sla-reports/YYYY-MM.json`
+- **JSON schema:** `{tenant_id, month, availability_pct, downtime_minutes, credit_pct, credit_amount_usd, status: "ok"|"credited"}`
+- **Audit log event:** `billing.sla_credit_applied` (new DEC-030 event, HMAC-chained, 7-year retention)
+- **Evidence artifact:** PRE-33-E-004 — Monthly SLA credit log (CSV, all tenants, 7-year retention)
+
+#### 33.4.4 SLA Exclusions
+
+The following are not counted as downtime:
+- Scheduled maintenance windows (communicated within required notice period)
+- Third-party service outages (Anthropic, ElevenLabs, Supabase platform) not caused by FORM configuration errors
+- DDoS attacks exceeding Cloudflare's mitigation capacity that FORM could not have prevented with available controls
+- Force majeure events as defined in the Master Subscription Agreement
+
+*Privacy floor:* The SLA credit log records `{tenant_id, credit_amount}` only — no individual user data. HR-tier access is prohibited (consistent with DATA_MODEL §6 privacy floor).
+
+---
+
+### 33.5 A1.2 — Environmental Protections & Recovery Infrastructure
+
+**Criterion:** The entity authorizes, designs, develops or acquires, implements, operates, approves, maintains, and monitors environmental protections, software, data back-up processes, and recovery infrastructure to meet its objectives.
+
+Most A1.2 controls are already implemented and documented across §18 (BCP/DRP), §19 (Cold Storage Backup), and DATA_MODEL §10 (PITR Restore Runbook). This section cross-references those controls and adds the RTO/RPO scenario map required for auditor presentation.
+
+#### 33.5.1 Control Table
+
+| Control | Implementation | Status | Evidence Artifact |
+|---|---|---|---|
+| Geographic redundancy — API | Cloudflare Workers on 300+ global PoPs; single-region failure is transparent | ✅ Done | Cloudflare network docs; TECHNICAL.md |
+| Geographic redundancy — database | Supabase primary `eu-central-1` (EU Enterprise tenants); `us-east-1` (US tenants); PITR operates independently per region | 🟡 Partial | PRE-33-E-001 |
+| Data backup — warm tier (PITR) | Supabase PITR: continuous WAL streaming, 35-day retention (Enterprise plan); single-tenant restore procedure: DATA_MODEL §10 | ✅ Done | DATA_MODEL §10; PRE-33-E-003 |
+| Data backup — cold tier (R2) | Nightly pg_dump + gzip → Cloudflare R2, AES-256-GCM, 90-day rolling; SOC2_READINESS §19 full spec | ✅ Done | SOC2_READINESS §19; PRE-33-E-003 |
+| Data backup — cold tier (B2 WORM) | Monthly cold archive → Backblaze B2 Object Lock WORM, 7-year retention; SOC2_READINESS §19 full spec | ✅ Done | SOC2_READINESS §19; PRE-33-E-003 |
+| RTO / RPO commitments | RTO: 4 hours (full service restoration). RPO: 1 hour (PITR WAL granularity). Documented in SECURITY.md §10 | ✅ Done | SECURITY.md §10 |
+| Tenant data isolation in backup | PITR restore enforces `WHERE tenant_id = $TENANT_ID` throughout; cross-tenant contamination not possible in logical-dump path (DATA_MODEL §10.5) | ✅ Done | DATA_MODEL §10.5 |
+| Backup encryption | R2 dump: AES-256-GCM, per-dump key from AWS KMS CMK. B2 WORM: same key chain, WORM lock prevents deletion for 7 years | ✅ Done | SOC2_READINESS §19 |
+| Health-data anonymisation on non-prod restore | Any restore to non-production environment must execute the anonymisation script before data is accessible to engineers | 🟡 Partial | PRE-33-E-005 (script not yet implemented) |
+| HMAC re-anchoring on restore | Restored audit log chain is re-anchored with a `system.restore_completed` event per DEC-030; chain integrity preserved | ✅ Done | SOC2_READINESS §19; DEC-030 |
+
+#### 33.5.2 RTO/RPO Map by Failure Scenario
+
+| Failure scenario | Recovery path | RTO target | RPO target |
+|---|---|---|---|
+| Worker bug / bad deploy | `wrangler rollback` (CC8 rollback §21) | < 5 min | 0 (stateless) |
+| Web app deploy regression | Cloudflare Pages: reactivate previous deployment | < 5 min | 0 (stateless) |
+| Database application-layer corruption | PITR restore to isolated cluster (DATA_MODEL §10) | 2 – 4 hours | ≤ 1 hour |
+| Supabase region outage | Read replica promotion + Supabase support escalation | 1 – 4 hours | < 15 min (replica WAL lag) |
+| Cold restore required (> 35-day window) | R2 nightly dump restore | 4 – 8 hours | ≤ 24 hours (prior nightly dump) |
+| Catastrophic loss (all warm + hot) | Backblaze B2 WORM restore | 24 – 48 hours | ≤ 24 hours |
+| Anthropic API outage | User-facing error message; coaching turns disabled; no data loss | N/A (no FORM-controlled recovery) | 0 |
+| ElevenLabs TTS outage | Automatic silent fallback to text-only coaching (< 1 min) | < 1 min | 0 |
+
+*Enterprise SLA credits apply if RTO is breached on scenarios 1–4 for enterprise tenants (§33.4.2).*
+
+---
+
+### 33.6 A1.3 — Recovery Testing
+
+**Criterion:** The entity tests recovery plan procedures supporting system recovery to meet its objectives.
+
+**Gap being closed:** "DR test performed annually" 🔴 Gap → 🟡 Partial
+
+#### 33.6.1 Annual DR Drill Requirements
+
+A DR drill is required at minimum once per SOC 2 observation calendar year. The drill validates the PITR restore procedure (DATA_MODEL §10) against live infrastructure and produces a SOC 2 auditor-ready evidence package.
+
+**Drill scope (minimum requirements):**
+
+| Step | Action | Pass criterion |
+|---|---|---|
+| 1 | Initiate PITR restore of a designated test tenant to an isolated cluster (DATA_MODEL §10.4 Steps 1–2) | Cluster available in AWS console; no production traffic on restore cluster |
+| 2 | Extract test tenant's rows for all 6 tables (DATA_MODEL §10.4 Step 3) | CSV files generated; row count > 0 for workouts table |
+| 3 | Verify row counts match a pre-drill baseline snapshot (DATA_MODEL §10.4 Step 4) | ≤ 1% discrepancy on any table |
+| 4 | Verify RLS enforcement on the restored cluster: tenant B cannot read tenant A rows | Zero rows returned on cross-tenant query |
+| 5 | Destroy the temporary cluster and confirm no test data remains in production (DATA_MODEL §10.4 Step 7) | `aws rds describe-db-clusters` returns no cluster with restore ID |
+
+**Additional requirement:** Wall-clock time from drill start (Step 1 initiated) to cluster destroy confirmed (Step 5 complete) must be < 4 hours. This validates the 4-hour RTO commitment.
+
+**Two-person rule:** A second engineer must be present and verify each step. Their name is recorded in PRE-33-E-010.
+
+#### 33.6.2 DR Drill Evidence Package
+
+| Artifact | Content | Storage path |
+|---|---|---|
+| PRE-33-E-006 | Timestamped bash session log covering all 5 drill steps | `compliance/evidence/dr-drill/YYYY-MM-DD/drill-log.txt` |
+| PRE-33-E-007 | Row count verification table (expected vs. actual for all 6 tables) | `compliance/evidence/dr-drill/YYYY-MM-DD/row-counts.csv` |
+| PRE-33-E-008 | RLS enforcement test output (cross-tenant query returning zero rows) | `compliance/evidence/dr-drill/YYYY-MM-DD/rls-test.txt` |
+| PRE-33-E-009 | AWS CLI output confirming restore cluster deletion | `compliance/evidence/dr-drill/YYYY-MM-DD/cluster-destroy.txt` |
+| PRE-33-E-010 | Sign-off form: devops-lead name, second engineer name, drill start/end timestamps, wall-clock RTO, pass/fail verdict | `compliance/evidence/dr-drill/YYYY-MM-DD/sign-off.md` |
+| PRE-33-E-011 | `system.dr_drill_completed` HMAC-chained DEC-030 event (in production audit_log) | audit_log table; reference to compliance path above |
+
+**DEC-030 event payload** for `system.dr_drill_completed`:
+
+```json
+{
+  "event": "system.dr_drill_completed",
+  "drill_date": "YYYY-MM-DD",
+  "rto_actual_minutes": 187,
+  "rpo_actual_minutes": 42,
+  "verdict": "pass",
+  "second_engineer": "devops-lead-name",
+  "evidence_path": "compliance/evidence/dr-drill/YYYY-MM-DD/"
+}
+```
+
+**Failure protocol:** If any step fails (row count mismatch > 1%, RLS violation, RTO > 4h), verdict is `FAIL`. devops-lead opens a P1 Linear ticket, remediates within 14 days, and re-runs the failed step. A full re-drill from Step 1 is required if Step 4 (RLS enforcement) fails.
+
+#### 33.6.3 DR Drill Schedule
+
+| Drill | Target | Status |
+|---|---|---|
+| Year 1 — first mandatory drill | Within 30 days of first enterprise customer go-live | 🔴 Not yet conducted |
+| Year 2+ | Q1 of each calendar year (January – March window) | 🔴 Scheduled via §15 compliance calendar |
+
+*Schedule entry required in §15 compliance calendar under Q1 of the observation year. Missing the Q1 window without documented cause is a SOC 2 observation-period finding.*
+
+---
+
+### 33.7 A Series Gap Analysis
+
+| Sub-criterion | Control | Before §33 | After §33 | Notes |
+|---|---|---|---|---|
+| A1.1 | Capacity monitoring | 🟡 Partial | 🟡 Partial | Metrics defined; observation evidence pending launch |
+| A1.1 | Auto-scaling — API | ✅ Done | ✅ Done | — |
+| A1.1 | Auto-scaling — database | 🟡 Partial | 🟡 Partial | Config defined; implementation pending |
+| A1.1 | Capacity planning cadence | 🟡 Gap | 🟡 Partial | Monthly review process defined; first entry post-launch |
+| A1.1 | Load testing program | 🟡 Gap | 🟡 Partial | k6 spec + pass criteria defined; execution pending launch |
+| A1.1 | SLA credit calculation | 🟡 Gap | 🟡 Partial | Credit schedule, measurement source, claim process formally defined |
+| A1.1 | ElevenLabs character budget risk | (not mapped) | 🟡 Partial | Risk quantified (84× overrun at 10k DAU); upgrade path documented |
+| A1.2 | Geographic redundancy — API | ✅ Done | ✅ Done | — |
+| A1.2 | Database backup — warm (PITR) | ✅ Done | ✅ Done | — |
+| A1.2 | Database backup — cold (R2/B2) | ✅ Done | ✅ Done | — |
+| A1.2 | RTO/RPO commitments | ✅ Done | ✅ Done | 8-scenario RTO/RPO map added |
+| A1.2 | Health-data anonymisation on non-prod restore | 🟡 Partial | 🟡 Partial | Policy defined; anonymisation script not yet implemented |
+| A1.3 | DR test performed annually | 🔴 Gap | 🟡 Partial | Procedure + 6-artifact evidence package defined; first drill pending |
+
+**Net gap movement:** 3 Gaps closed to Partial (load testing, SLA credit, DR test). 1 new risk formally quantified (ElevenLabs budget). Zero gaps introduced.
+
+---
+
+### 33.8 Evidence Artifacts
+
+| Artifact ID | Description | Owner | Status |
+|---|---|---|---|
+| PRE-33-E-001 | Supabase project config: PgBouncer pool size, connection limits, read replica config | devops-lead | 🔴 To implement |
+| PRE-33-E-002 | k6 load test report (pre-GA run) | devops-lead + platform-engineer | 🔴 Pre-launch gate |
+| PRE-33-E-003 | Cross-reference to §19 backup artifacts (no duplication) | devops-lead | ✅ Done (§19 exists) |
+| PRE-33-E-004 | Monthly SLA credit log CSV schema + first post-launch month entry | customer-success | 🔴 Post-launch |
+| PRE-33-E-005 | Health-data anonymisation SQL script (`src/scripts/anonymise-restore.sql`) | data-engineer | 🔴 To implement |
+| PRE-33-E-006 | DR drill bash session log (first drill) | devops-lead | 🔴 Not yet conducted |
+| PRE-33-E-007 | Row count verification CSV (first drill) | devops-lead | 🔴 Not yet conducted |
+| PRE-33-E-008 | RLS enforcement test output (first drill) | devops-lead | 🔴 Not yet conducted |
+| PRE-33-E-009 | Cluster destroy confirmation — AWS CLI output (first drill) | devops-lead | 🔴 Not yet conducted |
+| PRE-33-E-010 | Drill sign-off form (first drill) | devops-lead + second engineer | 🔴 Not yet conducted |
+| PRE-33-E-011 | `system.dr_drill_completed` HMAC-chained audit event in production | platform-engineer | 🔴 New DEC-030 event; to implement |
+
+---
+
+### 33.9 Implementation Checklist
+
+| Task | Priority | Owner | Milestone |
+|---|---|---|---|
+| Configure Supabase PgBouncer pool (`pool_size`, `max_connections`) and file PRE-33-E-001 | P0 | devops-lead | M3 (pre-launch) |
+| Upgrade ElevenLabs to Scale plan before launch; monitor chars/month via OBSERVABILITY §17 cost alert | P0 | founder | M3 |
+| Add `billing.sla_credit_applied` and `system.dr_drill_completed` to DEC-030 HMAC audit taxonomy | P0 | platform-engineer | M3 |
+| Implement k6 load test suite (5 scenarios from §33.3.1); add to pre-deploy CI gate | P0 | devops-lead + platform-engineer | M3 (pre-launch) |
+| Build monthly SLA report Worker (Better Stack API → JSON → R2 `compliance/evidence/sla-reports/YYYY-MM.json`) | P1 | devops-lead | M4 |
+| Implement health-data anonymisation script (`src/scripts/anonymise-restore.sql`); validate on staging restore | P1 | data-engineer | M4 |
+| Add §15 compliance calendar entry: "Annual DR drill — Q1 of each observation year" | P1 | compliance-officer | M4 |
+| Run first DR drill within 30 days of first enterprise customer go-live; file PRE-33-E-006 through PRE-33-E-011 | P1 | devops-lead | M4 (enterprise launch gate) |
+| Establish monthly capacity review cadence; file first log in `compliance/evidence/capacity-reviews/` | P1 | devops-lead | M4 (30 days post-launch) |
+| Configure Supabase read replica (Enterprise plan) when DB connection-wait p99 > 10ms sustained 48h | P2 | devops-lead | M5 (trigger-based) |
+
+---
+
+### 33.10 SOC 2 Readiness Delta
+
+| Metric | Before §33 | After §33 |
+|---|---|---|
+| A1.1 — Capacity management | Partially mapped; three gaps open | Fully mapped at design level; all gaps → Partial |
+| A1.2 — Recovery infrastructure | Fully implemented (§18, §19, DATA_MODEL §10) | Confirmed; 8-scenario RTO/RPO map added |
+| A1.3 — Recovery testing | 🔴 Hard gap — no DR test procedure existed | 🟡 Partial — procedure + evidence package defined; execution pending |
+| 🔴 Gaps closed | — | 1 (DR test: 🔴 → 🟡) |
+| 🟡 Gaps upgraded to Partial | — | 2 (load testing, SLA credit) |
+| New risk formally quantified | — | 1 (ElevenLabs character budget) |
+| **Readiness** | **~90%** | **~91%** |
+
+**SOC 2 readiness: ~90% → ~91%**
+
+---
+
+*v2.1 additions: §33 A1 — Availability Criteria Deep-Dive. Three-tier capacity architecture documented (Cloudflare Workers / Supabase PgBouncer / AI inference) with per-tier risk assessment and upgrade triggers. ElevenLabs character budget risk formally quantified (~84× overrun at 10k DAU on Business plan; Scale/Enterprise upgrade required pre-launch). Load testing program specified: k6 suite, 5 scenarios (baseline 100 VUs / SSO burst 500 VUs / coaching load 1,000 VUs / DB saturation 450 connections / SCIM burst 500 ops), pass criteria, CI gate integration, evidence filing. SLA Framework: four-tier availability commitments (Starter 99.5% / Growth 99.9% / Enterprise 99.9%); downtime definition (3 consecutive S-001 probe failures = 90s detection window); credit schedule (10%/25%/50%/100% by availability band); automatic credit application; two new DEC-030 HMAC-chained events (`billing.sla_credit_applied`, `system.dr_drill_completed`). RTO/RPO scenario map: 8 failure scenarios from Worker rollback (<5 min) through B2 WORM restore (24–48h) and AI provider outage (N/A). DR drill procedure: 5-step scope with quantitative pass criteria; 6-artifact evidence package (PRE-33-E-006 through PRE-33-E-011); FAIL protocol with 14-day remediation SLA; annual Q1 schedule entry requirement for §15 compliance calendar. 11-artifact evidence catalog (PRE-33-E-001 through PRE-33-E-011). 10-item implementation checklist (4× P0, 4× P1, 2× P2). Gap closures: DR test 🔴 → 🟡 Partial; load testing 🟡 Gap → 🟡 Partial; SLA credit 🟡 Gap → 🟡 Partial. SOC 2 readiness: ~90% → ~91%.*
