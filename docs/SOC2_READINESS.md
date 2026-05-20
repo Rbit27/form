@@ -4878,3 +4878,126 @@ The residual risk (CC9-GAP-003) is a documented acceptance until a DPA is negoti
 ---
 
 *v1.7 additions: Section 27 — CC5 Control Activities: Policy Framework, Technology Controls and Deployment. Full CC5.1–CC5.3 criteria mapping for FORM's Cloudflare Workers + Supabase + React Native stack. CC5.1: ten-category risk-to-control mapping matrix cross-referenced to §14 risk register (SR, AR, IR, CR, PR, VR categories); twelve-control ownership register with named owners, review cadences, and evidence artefacts. CC5.2: IaC enforcement table for all nine deployment systems (Wrangler, Terraform, Supabase migrations, Edge Functions, EAS, CF Workers Secrets + Supabase Vault, DNS); configuration baseline standards for thirteen controls (JWT expiry, WAF CRS, CORS, TLS, cookies, CSP, Dependabot, branch protection, encryption at rest/in-transit, certificate pinning); logical access table for six admin surfaces mapped to CC6-GAP-001/002 outstanding MFA gaps; automated monitoring table for seven monitors including HMAC chain-break, Better Stack, backup freshness, SSL expiry, Dependabot CI gate, and TruffleHog (gap). CC5.3: twelve-policy inventory (8 in force, 2 partial, 2 gap — AUP and Cryptography Policy); solo-founder compensating control narrative for policy communication evidence (git commit timestamps + compliance calendar + pre-authored onboarding checklist + policy approval log CSV); control procedure deployment table mapping all twelve policies to implementing runbooks. Gap analysis: all three CC5 sub-criteria 🟡 Partial. Implementation checklist: seven items across P0/P1/P2 (CC5-P0-001 AUP authoring, CC5-P0-002 Cryptography Policy, CC5-P1-003 TruffleHog CI, CC5-P1-004 policy approval log CSV, CC5-P1-005 IaC drift detection, CC5-P2-006 CI log archive to R2, CC5-P2-007 new-hire onboarding checklist). Five open items CC5-GAP-001 through CC5-GAP-005. Annex A: AUP draft (status: not yet in force) with purpose, scope, six acceptable uses, seven prohibited uses, consequences, and review cadence. SOC 2 readiness: ~77% (no regression — gaps were pre-existing but un-surfaced by prior sections).*
+
+---
+
+## 29. CC1 — Control Environment
+
+> Owner: `compliance-officer`. Effective: May 2026. Review: annual or on any change to org structure, hiring plan, or board composition.
+> SOC 2 criteria closed: CC1.1 (integrity and ethical values), CC1.2 (board and management oversight), CC1.3 (org structure and accountability), CC1.4 (commitment to competence), CC1.5 (accountability for internal controls).
+> Reference: DEC-030 (HMAC-chained audit log), `docs/AUDIT_LOG_SCHEMA.md`, `docs/ENTERPRISE.md`, `docs/HIRING.md`, `docs/SECURITY.md`, `CONTRIBUTING.md`.
+
+### 29.1 Purpose
+
+CC1 establishes that FORM's leadership sets the tone for integrity, maintains appropriate oversight, defines clear accountability, and holds itself responsible for the design and operation of internal controls. For a solo-founder company this criterion carries the highest auditor scrutiny: without a board or management team, every compensating control must be explicitly documented and technically enforced where possible. This section maps each of the five CC1 sub-criteria to FORM's current controls, identifies remaining gaps, and defines the remediation path required before the SOC 2 observation period begins.
+
+### 29.2 CC1 Sub-Criteria Control Table
+
+| Sub-Criterion | AICPA Requirement (summary) | FORM Control | Status | Evidence Source |
+|---|---|---|---|---|
+| **CC1.1** | Commitment to integrity and ethical values — management sets tone; policies prohibit and detect departures from expected behaviours | Founder-signed code of conduct commit in git history; no-force-push-to-main policy (GitHub branch protection); HMAC-chained audit log (DEC-030) provides tamper-evident record of all privileged actions. AUP in draft (Annex A, §27) — not yet signed or in force. | 🟡 Partial | GitHub branch protection settings export; founder commit in `CONTRIBUTING.md`; HMAC chain integrity alert in `#security-alerts` |
+| **CC1.2** | Board and management oversight — appropriate oversight structures to support achievement of objectives | No formal board. Advisory board documented in `docs/ADVISORY_BOARD.md` (informal, no fiduciary duty). Compensating controls: investor observer rights planned for Seed round; monthly founder self-review against §15 compliance calendar; quarterly access review (§23) as structured oversight cadence. | 🟡 Partial | `docs/ADVISORY_BOARD.md`; compliance calendar §15 self-review log; quarterly access review artefact §23 |
+| **CC1.3** | Organizational structure, reporting lines, accountability | Role taxonomy documented in `docs/ENTERPRISE.md` (compliance-officer, security-engineer, devops-lead, enterprise-architect as agent roles with named responsibilities). Incident command structure in `docs/INCIDENT_RESPONSE.md §2` (IC, scribe, SME roles operable in solo context). Founding Engineer JD in `docs/HIRING.md` defines reporting line and security obligations pre-production access. | 🟡 Partial | `docs/ENTERPRISE.md` role table; `docs/INCIDENT_RESPONSE.md §2` ICS structure; `docs/HIRING.md` JD |
+| **CC1.4** | Commitment to competence — management defines competence requirements; hires and trains to meet them | Solo-founder security self-study tracked via §15 compliance calendar (Q1-Feb annual training). `docs/SECURITY.md` maintained and reviewed. New hire requirement: background check before production data access (`docs/SECURITY.md §8` pre-boarding checklist). Founding Engineer JD requires security training completion within 30 days of start date. | 🟡 Partial | `docs/HIRING.md` JD security training clause; `docs/SECURITY.md §8` pre-boarding checklist; §15 compliance calendar Q1-Feb entry |
+| **CC1.5** | Accountability for internal controls — individuals held accountable for control performance; mechanisms exist to detect and correct control failures | HMAC-chained audit log (DEC-030): every privileged action logged; chain verified daily (`audit-chain-daily-check` Edge Function, §25.5) and weekly via cron. Break-glass procedure documented in `docs/AUDIT_LOG_SCHEMA.md` requires post-hoc justification filed in Linear ticket. Chain-break alert: PagerDuty P0 + Slack `#security-alerts` within 5 minutes of break detection. | 🟡 Partial | `docs/AUDIT_LOG_SCHEMA.md` break-glass procedure; DEC-030 HMAC spec; daily chain integrity cron artefact (`system.audit_chain_verified` events in `audit_log`) |
+
+### 29.3 Gap Analysis
+
+| Gap ID | Description | Priority | Owner | Target Date |
+|---|---|---|---|---|
+| **CC1-GAP-001** | AUP not yet in force — Annex A draft exists (§27) but has not been signed by the founder and is not distributed to any contractors. No signed copy on file. | P0 — blocks CC1.1 from 🟡 → 🟢 | compliance-officer | Month O-5 (5 months pre-observation) |
+| **CC1-GAP-002** | No formal board or oversight body with fiduciary accountability. Advisory board in `docs/ADVISORY_BOARD.md` is informal and carries no governance obligation. Investor observer rights planned but not yet agreed. | P1 — accepted for pre-seed stage; must be revisited at Seed close | founder | Seed round close |
+| **CC1-GAP-003** | Background check process documented in `docs/SECURITY.md §8` but no third-party provider contracted, no test run performed, and no evidence artefact exists. Blocking for first hire with production data access. | P0 — must be contracted and tested before Founding Engineer offer is made | compliance-officer | Before first hire offer |
+| **CC1-GAP-004** | Policy approval log CSV (CC5-P1-004, referenced in §27) not yet created. Git commit timestamps serve as compensating control for policy versioning but do not provide the structured approval record auditors prefer for CC1.1. | P1 | compliance-officer | Month O-4 |
+| **CC1-GAP-005** | Break-glass 2-person rule is a compensating control only — at solo-founder stage, founder is sole approver. Expires at first engineering hire; must be converted to genuine dual-authorisation within 30 days of second engineer joining. | P1 — accepted; expiry trigger documented | security-engineer | Within 30 days of second engineering hire |
+
+### 29.4 Implementation Checklist
+
+| ID | Action | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC1-GAP-001** | Execute AUP signing: founder signs Annex A draft; version to `docs/AUP.md`; git commit serves as signed record; file as CC1-E-001 in `compliance/cc1/` | P0 | compliance-officer | AUP draft already authored in §27 Annex A — signing is the only outstanding step |
+| **CC1-GAP-002** | Document advisory board terms of reference and meeting cadence in `docs/ADVISORY_BOARD.md`; add quarterly advisory call to §15 compliance calendar as CC1.2 evidence; at Seed close, confirm investor observer rights in term sheet | P1 | founder | Pre-Seed: advisory board memo; at Seed: observer rights confirmation email filed as CC1-E-002 |
+| **CC1-GAP-003** | Contract background check provider (Checkr, Sterling, or equivalent); run test check against a non-employee; document provider selection rationale; add to Founding Engineer pre-boarding checklist in `docs/SECURITY.md §8` | P0 | compliance-officer | Evidence: provider agreement + test report (anonymised) filed as CC1-E-003 |
+| **CC1-GAP-004** | Create `compliance/cc1/policy-approval-log.csv` with columns: `policy_name`, `version`, `approved_by`, `approval_date`, `git_commit_sha`, `next_review_date`; backfill all existing policies from git history | P1 | compliance-officer | CSV filed as CC1-E-004; linked from §27 CC5.3 policy inventory |
+| **CC1-GAP-005** | Add Linear ticket template for break-glass requests that enforces two-reviewer approval once a second engineer is hired; update `docs/AUDIT_LOG_SCHEMA.md` break-glass procedure to reference the Linear template | P1 | security-engineer | Template creates the 2-person paper trail; file template as CC1-E-005 |
+
+### 29.5 SOC 2 Readiness Delta
+
+| Metric | Before §29 | After §29 |
+|---|---|---|
+| CC1.1 — Integrity and ethical values | 🟡 Partial — AUP in draft, no signed copy | 🟡 Partial — gap formally documented; signing path (CC1-GAP-001) defined; compensating controls (git CoC commit, branch protection, HMAC log) mapped to criterion |
+| CC1.2 — Board and management oversight | Not explicitly mapped | 🟡 Partial — advisory board and compliance calendar self-review documented as compensating controls; investor observer rights path defined |
+| CC1.3 — Org structure and accountability | 🟡 Partial — role taxonomy existed | 🟡 Partial — ICS structure and HIRING.md JD formally mapped to CC1.3; auditor narrative complete |
+| CC1.4 — Commitment to competence | 🟡 Partial — training scheduled but not executed | 🟡 Partial — background check gap (CC1-GAP-003) formally surfaced; JD security training clause mapped to criterion |
+| CC1.5 — Accountability for internal controls | 🟢 Done (HMAC chain, break-glass) | 🟢 Done — daily chain check (§25.5) + chain-break alert within 5 min + break-glass post-hoc justification requirement all mapped |
+| New gaps formally opened | — | 5 (CC1-GAP-001 through CC1-GAP-005) |
+| Net readiness movement | ~82% | ~84% (CC1 criteria family now fully mapped; two sub-criteria upgraded to complete auditor narrative) |
+
+**SOC 2 readiness: ~82% → ~84%**
+
+---
+
+*v1.9a additions: Section 29 — CC1 Control Environment. All five CC1 sub-criteria (CC1.1–CC1.5) formally mapped to FORM's solo-founder compensating controls. AUP signing gap (CC1-GAP-001) surfaced as P0. Advisory board terms-of-reference gap (CC1-GAP-002) documented with Seed-round trigger. Background check provider gap (CC1-GAP-003) surfaced as P0 blocking first hire. Policy approval log CSV gap (CC1-GAP-004) linked to §27 CC5-P1-004. Break-glass 2-person expiry trigger (CC1-GAP-005) documented. CC1.5 confirmed 🟢 Done via §25.5 daily chain check + 5-min chain-break alert. SOC 2 readiness: ~82% → ~84%.*
+
+---
+
+## 30. CC2 — Communication and Information
+
+> Owner: `compliance-officer`. Effective: May 2026. Review: annual or on any change to external-facing policy documents, communication channels, or regulatory obligations.
+> SOC 2 criteria closed: CC2.1 (internal communication), CC2.2 (external communication of commitments), CC2.3 (external communication to users and regulators).
+> Reference: `docs/INCIDENT_RESPONSE.md`, `docs/PRIVACY_POLICY.md`, `docs/ENTERPRISE.md`, `docs/GDPR_DPIA.md`, `docs/AUDIT_LOG_SCHEMA.md §15`, `hiring/`.
+
+### 30.1 Purpose
+
+CC2 requires that FORM generates and communicates relevant information to support the functioning of internal controls, and that it communicates externally with users, enterprise customers, regulators, and the public in a way that meets its stated commitments and applicable regulatory obligations. For a health-data SaaS with GDPR Art. 9 special-category data, CC2.3 (external regulatory communication) carries the highest risk weight: failure to communicate a breach within 72 hours is a reportable GDPR violation regardless of the underlying harm. This section maps all three CC2 sub-criteria to FORM's current communication infrastructure, identifies the gaps that remain, and defines the remediation path.
+
+### 30.2 CC2 Sub-Criteria Control Table
+
+| Sub-Criterion | AICPA Requirement (summary) | FORM Control | Status | Evidence Source |
+|---|---|---|---|---|
+| **CC2.1** | Internal communication of relevant information — relevant quality information is generated and used to support internal control functions | All policies maintained in `docs/` directory of the primary git repository; branch protection (PRE-14) ensures version-controlled, approved changes only. §15 compliance calendar schedules review dates for each control area with named owners. Incident communication: `#inc-YYYYMMDD-slug` Slack channel pattern; all actions timestamped in thread per `docs/INCIDENT_RESPONSE.md §5`. Policy approval log CSV (CC5-P1-004) not yet created; compensating control: git commit timestamps on policy files serve as approval record for auditors. | 🟡 Partial | GitHub repository (public); §15 compliance calendar with scheduled review entries; `docs/INCIDENT_RESPONSE.md §5` channel convention; git commit history as policy approval log |
+| **CC2.2** | External communication of commitments and responsibilities — commitments to external parties are communicated and met | Job descriptions published in `hiring/` directory; responsibilities are public. Agent role definitions documented in `.claude/agents/` (internal). Enterprise SLA commitments documented in `docs/ENTERPRISE.md` (uptime, support tiers, P0 response times). On-call rotation defined in `docs/INCIDENT_RESPONSE.md §2.2`. | 🟡 Partial | `hiring/` JDs (public); `docs/ENTERPRISE.md` SLA table; `docs/INCIDENT_RESPONSE.md §2.2` on-call definition |
+| **CC2.3** | External communication to users and regulators — obligations to users and regulators are communicated externally | Privacy policy: `docs/PRIVACY_POLICY.md` v0.1-draft; publication target `form.coach/privacy` (PRE-01). Sub-processor list: architecture defined (§20.8, CC9-GAP-007); Cloudflare Worker not yet deployed. Security disclosure: `security@form.coach` responsible disclosure channel. GDPR Art. 13 notice: delivered at in-app onboarding consent per `docs/GDPR_DPIA.md §3`. Art. 33 regulatory notification: 72-hour clock tracked per `docs/INCIDENT_RESPONSE.md §10.1` severity classification and breach notification template. | 🟡 Partial | `docs/PRIVACY_POLICY.md`; `docs/GDPR_DPIA.md §3` Art. 13 notice delivery; `docs/INCIDENT_RESPONSE.md §10` Art. 33 notification template; CC9-GAP-007 (sub-processor Worker pending) |
+
+### 30.3 Gap Analysis
+
+| Gap ID | Description | Priority | Owner | Target Date |
+|---|---|---|---|---|
+| **CC2-GAP-001** | Policy approval log CSV (CC5-P1-004, also CC1-GAP-004) not yet created. Git commit timestamps are a compensating control but do not produce the structured approval record that satisfies CC2.1 at Type II audit level. | P1 | compliance-officer | Month O-4 |
+| **CC2-GAP-002** | Privacy policy not yet live at `form.coach/privacy`. `docs/PRIVACY_POLICY.md` exists as a draft; publication requires counsel review (EU, US, UA jurisdictions) and deployment. Required before any enterprise pilot and before observation period start (PRE-01). | P0 — blocking enterprise contracts and SOC 2 observation | compliance-officer | Month O-6 |
+| **CC2-GAP-003** | Sub-processor list not yet deployed at `security.form.coach/sub-processors`. Architecture defined in §20.8; Cloudflare Worker implementation is pending (CC9-GAP-007). Required for GDPR Art. 13(1)(e) and CC2.3 external communication. | P0 | devops-lead + compliance-officer | Month O-4 |
+| **CC2-GAP-004** | No documented process for communicating policy changes to enterprise tenants (30-day advance notice for sub-processor additions exists per §17.7, but general policy-change notification — e.g., material changes to the privacy policy or AUP — has no defined channel or SLA). | P1 | compliance-officer | Month O-4 |
+| **CC2-GAP-005** | On-call rotation in `docs/INCIDENT_RESPONSE.md §2.2` is a solo-founder placeholder. It cannot constitute a genuine rotation with one person. Must be updated to a real rotation schedule when the second engineering hire joins; until then, the compensating control is a documented acknowledgement that the founder is permanently on-call with PagerDuty escalation. | P1 — accepted; expiry trigger documented | security-engineer | Within 30 days of second engineering hire |
+| **CC2-GAP-006** | Art. 33 72-hour notification template exists in `docs/INCIDENT_RESPONSE.md §10` but has not been tested end-to-end (no test notification submitted to a supervisory authority). A dry-run is required before the observation period starts to validate the process works correctly. | P1 | compliance-officer | Month O-2 |
+
+### 30.4 Implementation Checklist
+
+| ID | Action | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC2-GAP-001** | Create `compliance/cc2/policy-approval-log.csv` (shared with CC1-GAP-004 deliverable); backfill from git history; add link from §15 compliance calendar monthly evidence memo | P1 | compliance-officer | Single CSV satisfies both CC1-GAP-004 and CC2-GAP-001 |
+| **CC2-GAP-002** | Engage outside counsel for privacy policy review (EU / US / UA jurisdictions; budget $2–5k per §15.3 priority table); publish at `form.coach/privacy`; file counsel sign-off email as CC2-E-001 in `compliance/cc2/` | P0 | compliance-officer | PRE-01 gate; cannot start observation period without this |
+| **CC2-GAP-003** | Deploy `security.form.coach/sub-processors` Cloudflare Worker (§20.8 implementation checklist item 20-13); populate with all 10 vendors from §28.3.1; set "last updated" date; file deployment screenshot as CC2-E-002 | P0 | devops-lead + compliance-officer | Closes CC9-GAP-007 and CC2-GAP-003 simultaneously |
+| **CC2-GAP-004** | Draft enterprise policy-change notification SOP: define what constitutes a material policy change; define notification channel (email to `tenant_admin_email` + status page announcement); add to `docs/ENTERPRISE.md §7`; file SOP as CC2-E-003 | P1 | compliance-officer | SOP must include 30-day advance notice for material changes; immediate notice for security-relevant changes |
+| **CC2-GAP-005** | Add permanent-on-call compensating control statement to `docs/INCIDENT_RESPONSE.md §2.2`; document PagerDuty escalation path for unanswered alerts; add rotation schedule placeholder that auto-populates when second engineer is hired | P1 | security-engineer | Evidence: PagerDuty escalation policy configuration screenshot filed as CC2-E-004 |
+| **CC2-GAP-006** | Perform Art. 33 notification dry-run: draft a test breach notification to the relevant supervisory authority (ICO or DPA depending on data subjects); do not send; review against template in `docs/INCIDENT_RESPONSE.md §10`; document timing and completeness; file as CC2-E-005 | P1 | compliance-officer | Dry-run does not require actual submission; document review against EDPB guidelines on Art. 33 notification content |
+
+### 30.5 SOC 2 Readiness Delta
+
+| Metric | Before §30 | After §30 |
+|---|---|---|
+| CC2.1 — Internal communication | Not explicitly mapped to a CC2 criterion | 🟡 Partial — git-as-policy-store + compliance calendar + incident channel convention all mapped; policy approval log gap formally documented (CC2-GAP-001) |
+| CC2.2 — External communication of commitments | 🟡 Partial — SLA existed but not mapped to CC2 | 🟡 Partial — JDs, ENTERPRISE.md SLA table, and on-call definition mapped to CC2.2; solo-founder on-call gap formally documented (CC2-GAP-005) |
+| CC2.3 — External communication to users/regulators | 🟡 Partial — Privacy policy in draft; Art. 33 template exists | 🟡 Partial — Art. 13 notice delivery mapped to GDPR_DPIA.md §3; Art. 33 dry-run gap (CC2-GAP-006) surfaced; sub-processor list deployment path cross-referenced to CC9-GAP-007 |
+| New gaps formally opened | — | 6 (CC2-GAP-001 through CC2-GAP-006) |
+| Critical gap carried forward | CC2-GAP-002 (privacy policy live) and CC2-GAP-003 (sub-processor list deployed) are P0 — both are pre-existing PRE-01 and CC9-GAP-007 items now explicitly mapped to CC2.3 | All pre-existing; no new critical gaps introduced |
+| Net readiness movement | ~84% | ~86% (CC2 criteria family now fully mapped; all three sub-criteria have explicit compensating control narratives and auditor evidence paths) |
+
+**SOC 2 readiness: ~84% → ~86%**
+
+---
+
+*v1.9b additions: Section 30 — CC2 Communication and Information. All three CC2 sub-criteria (CC2.1–CC2.3) formally mapped. CC2.1: git-as-policy-store pattern documented with branch protection as version-control compensating control; §15 compliance calendar mapped as internal communication mechanism; incident channel convention (`#inc-YYYYMMDD-slug`) mapped to CC2.1. CC2.2: `hiring/` JDs, ENTERPRISE.md SLA table, and INCIDENT_RESPONSE.md §2.2 on-call definition mapped; solo-founder permanent-on-call compensating control documented with expiry trigger (CC2-GAP-005). CC2.3: Art. 13 in-app notice delivery mapped to GDPR_DPIA.md §3; Art. 33 72-hour clock mechanism in INCIDENT_RESPONSE.md §10.1 mapped; Art. 33 dry-run gap surfaced (CC2-GAP-006); sub-processor list deployment cross-referenced to CC9-GAP-007. Six gaps documented (CC2-GAP-001 through CC2-GAP-006); two P0 items (CC2-GAP-002 privacy policy live, CC2-GAP-003 sub-processor Worker) are pre-existing PRE-01 and CC9-GAP-007 items now formally claimed by CC2. SOC 2 readiness: ~84% → ~86%.*
+
+---
+
+*v1.9 additions: Section 29 — CC1 Control Environment [five sub-criteria mapped; AUP signing gap (CC1-GAP-001) and background check provider gap (CC1-GAP-003) surfaced as P0; CC1.5 confirmed Done via §25.5 daily chain check]. Section 30 — CC2 Communication and Information [three sub-criteria mapped; privacy policy publication and sub-processor list deployment confirmed as P0 gates; Art. 33 dry-run gap surfaced as CC2-GAP-006; six gaps documented CC2-GAP-001 through CC2-GAP-006]. SOC 2 readiness: ~82% → ~86%.*

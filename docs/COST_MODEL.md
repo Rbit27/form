@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v0.4
+# FORM · Cost Model & Unit Economics v0.5
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -23,6 +23,20 @@
     - 10.5 Enterprise Revenue Mix Sensitivity
 11. [Open Questions / Gaps](#11-open-questions--gaps)
 12. [Free Tier Subsidy Model & Freemium Funnel Economics](#12-free-tier-subsidy-model--freemium-funnel-economics)
+13. [Infrastructure Cost Breakdown by Service](#13-infrastructure-cost-breakdown-by-service)
+    - 13.1 Service-by-service cost table (1k/10k/50k/100k MAU)
+    - 13.2 Fixed vs. variable classification
+    - 13.3 Plan upgrade inflection points
+    - 13.4 Cost cliff analysis
+    - 13.5 Optimization levers by service
+14. [Cohort LTV Model & CAC Payback Period](#14-cohort-ltv-model--cac-payback-period)
+    - 14.1 Model assumptions and inputs
+    - 14.2–14.3 Cohort survival tables (Pro monthly / annual)
+    - 14.4 CAC payback period analysis
+    - 14.5 LTV:CAC ratio targets
+    - 14.6 Enterprise LTV model (120% NRR)
+    - 14.7 Cohort survival curve requirements
+    - 14.8 Data pipeline specification
 
 ---
 

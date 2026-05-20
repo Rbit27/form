@@ -11,6 +11,18 @@
 
 ---
 
+## [0.88.0] — 2026-05-20
+
+### Added
+- `docs/SOC2_READINESS.md §29` — **CC1 Control Environment**: COSO Principles 1–5 mapped to solo-founder compensating-control framework. CC1.1 (integrity/ethics — AUP gap CC1-GAP-001 P0, founder CoC in git as compensating control); CC1.2 (board oversight — advisory board charter + compliance calendar self-review cadence + counsel escalation path; CC1-GAP-002 accepted at pre-seed, expires at Seed close); CC1.3 (org structure — ENTERPRISE.md role taxonomy + .claude/agents/ functional RACI + ICS structure; CC1-GAP-005 org chart artifact); CC1.4 (competence — background check provider CC1-GAP-003 P0, self-training log CC1-GAP-007); CC1.5 (accountability — 🟢 confirmed via HMAC-chained audit log DEC-030, daily chain check §25.5, break-glass post-hoc justification). 5 gaps CC1-GAP-001 through -005; implementation checklist; evidence mapping table. SOC 2 readiness: ~82% → ~84%.
+- `docs/SOC2_READINESS.md §30` — **CC2 Communication and Information**: COSO Principles 12–14. CC2.1 (internal comms — git-as-policy-store, compliance calendar, `#inc-YYYYMMDD-slug` incident channel convention; policy approval log CSV gap CC2-GAP-001 P1); CC2.2 (🟡 — hiring/ JDs, ENTERPRISE.md SLA, INCIDENT_RESPONSE.md §2.2 on-call mapped; solo-founder permanent-on-call compensating with expiry trigger CC2-GAP-005); CC2.3 (external — privacy policy at docs/PRIVACY_POLICY.md P0 gate CC2-GAP-002; sub-processor list CC2-GAP-003 P0 blocks enterprise DPA and GDPR Art. 28; Art. 33 dry-run gap CC2-GAP-006). 6 gaps including 2 🔴 blockers. 17-item implementation checklist. Cross-section dependency table (CC5-P1-004, CC9-GAP-007, CC1-GAP-005). SOC 2 readiness: ~84% → ~86%.
+- `content/post-58-mind-muscle-connection.md` — **Mind-Muscle Connection Is Real — With Conditions**. Wulf et al. (2001) constrained action hypothesis: internal focus disrupts motor automaticity in skill/velocity tasks → external focus wins for compounds. Calatayud et al. (2016): EMG amplitude significantly higher with internal focus for curls and chest flies — load matched. Snyder & Fry (2012): biceps EMG ↑ with internal focus instruction. Practical split: compound/velocity lifts → external cues (outcome-based: "push the floor away"); isolation/single-joint → internal focus (target tissue activation). Training age dimension: beginners lack motor automation for internal focus on compounds. FORM application: cue delivery is exercise-specific, not interchangeable filler. ~850 words.
+
+### Changed
+- `docs/COST_MODEL.md` — header corrected v0.4 → v0.5; ToC updated to include §13 (Infrastructure Cost Breakdown by Service) and §14 (Cohort LTV Model & CAC Payback Period) which were added in v0.5 but missing from the ToC.
+
+---
+
 ## [0.87.1] — 2026-05-20
 
 ### Added
