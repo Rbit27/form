@@ -1551,3 +1551,233 @@ The export schema mirrors the privacy guarantees in `docs/AUDIT_LOG_SCHEMA.md §
 ---
 
 *v0.2 additions: §13 Per-Tenant Observability Implementation (tenant context injection, per-tenant Analytics Engine data points, SLO breach detection, admin dashboard SLA API, isolation verification query); §14 Cross-Backend Trace Correlation — Sentry ↔ Cloudflare shared W3C `traceparent` propagation, Worker implementation, React Native client, correlation query, navigation runbook; §15 Audit Log Export Pipeline — webhook delivery (CloudEvents format, HMAC signing, retry policy), hourly R2/S3/GCS batch export, HMAC chain customer verification, privacy constraints, implementation checklist. Closes three M4/M3 gaps from §10.*
+
+---
+
+## 16. Synthetic Monitoring & Uptime Verification
+
+### 16.1 Purpose
+
+Synthetic monitoring executes scripted probes against FORM's production endpoints on a fixed schedule, independently of real user traffic. It validates that critical user flows are alive and within latency SLOs before users encounter failures — and generates availability evidence for SOC 2 CC7.2, enterprise SLA reporting, and status page truth.
+
+Synthetic checks complement real-user monitoring (RUM) in three scenarios that RUM misses:
+1. **Zero-traffic windows** — early morning UTC, when organic traffic is low but SLOs still apply.
+2. **Enterprise pilot readiness** — pre-launch validation that SSO flows, SCIM endpoints, and admin APIs are reachable from outside FORM's development network.
+3. **Post-deployment smoke tests** — automated gate in the Wrangler + EAS deployment pipeline, blocking promotion if a critical probe fails within 2 minutes of deploy.
+
+### 16.2 Probe Taxonomy
+
+Probes are categorised by **criticality** (P0 = 24/7 paging, P1 = business-hours paging, P2 = Slack-only).
+
+| Probe ID | Name | Endpoint | Method | Assertion | Frequency | Criticality | Owner |
+|---|---|---|---|---|---|---|---|
+| S-001 | API Health | `GET /health` (Cloudflare Worker) | GET | HTTP 200, `{"status":"ok"}` in body, latency ≤ 200ms | 60s | P0 | devops-lead |
+| S-002 | Auth Token Exchange | `POST /auth/v1/token` (Supabase) | POST | HTTP 200, `access_token` present, latency ≤ 500ms | 2m | P0 | platform-engineer |
+| S-003 | Workout Logging API | `POST /api/v1/workouts/sets` (synthetic user) | POST | HTTP 201, `set_id` UUID in response, latency ≤ 800ms | 5m | P0 | platform-engineer |
+| S-004 | AI Coaching Turn | `POST /api/v1/coaching/message` (synthetic session) | POST | HTTP 200, non-empty `content` in response, latency ≤ 4000ms | 5m | P1 | ml-engineer |
+| S-005 | SSO SAML Metadata | `GET /sso/saml/metadata` | GET | HTTP 200, XML `EntityDescriptor` present, valid cert, latency ≤ 300ms | 5m | P0 (enterprise-only) | enterprise-architect |
+| S-006 | SCIM User List | `GET /scim/v2/Users` (synthetic tenant token) | GET | HTTP 200, `{"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"]}`, latency ≤ 600ms | 5m | P1 (enterprise-only) | enterprise-architect |
+| S-007 | Audit Log Write | Internal HMAC chain integrity check via `GET /internal/audit/health` | GET | HTTP 200, `chain_valid: true`, last entry age ≤ 10m | 10m | P0 | security-engineer |
+| S-008 | R2 Backup Freshness | Check most recent object timestamp in `form-backups` R2 bucket via Worker | GET | Most recent object ≤ 25h old | 1h | P1 | devops-lead |
+| S-009 | CDN Asset Reachability | `GET https://assets.form.coach/app.js` (or equivalent) | GET | HTTP 200, `Content-Type: application/javascript`, latency ≤ 500ms from 3 regions | 5m | P0 | devops-lead |
+| S-010 | Status Page API | `GET https://status.form.coach/api/v1/summary` | GET | HTTP 200, `page.status` present | 5m | P2 | devops-lead |
+| S-011 | Stripe Webhook Endpoint | `POST /webhooks/stripe` (Stripe test event replay) | POST | HTTP 200, event acknowledged | 30m | P1 | platform-engineer |
+| S-012 | PostHog Ingest Health | `POST https://eu.posthog.com/capture/` (synthetic event) | POST | HTTP 200, `{"status":1}` | 30m | P2 | data-engineer |
+
+### 16.3 Probe Implementation — Better Stack
+
+All probes except S-007 and S-008 are implemented as Better Stack (Uptime) HTTP monitors. S-007 and S-008 are implemented as Cloudflare Workers scheduled tasks that report pass/fail to Better Stack via the Heartbeat API.
+
+**Better Stack configuration per probe:**
+
+```yaml
+# better-stack-monitors.yaml
+# Declarative config — apply via Better Stack API on infrastructure deploy
+
+monitors:
+  - name: "S-001 API Health"
+    url: "https://api.form.coach/health"
+    type: http
+    frequency: 60
+    method: GET
+    expected_status: 200
+    expected_body: '"status":"ok"'
+    regions: [us_east, eu_central, ap_southeast]
+    on_call_escalation: P0-api
+
+  - name: "S-004 AI Coaching Turn"
+    url: "https://api.form.coach/api/v1/coaching/message"
+    type: http
+    frequency: 300
+    method: POST
+    headers:
+      Authorization: "Bearer {{ secret.SYNTHETIC_USER_JWT }}"
+      Content-Type: application/json
+    body: '{"session_id":"synthetic-probe","message":"test"}'
+    expected_status: 200
+    expected_body: '"content"'
+    timeout: 8000
+    on_call_escalation: P1-api
+```
+
+Secrets (`SYNTHETIC_USER_JWT`, `SYNTHETIC_TENANT_SCIM_TOKEN`) are stored in Cloudflare Workers Secrets and rotated quarterly by `security-engineer`. The synthetic probe user and tenant are flagged `is_synthetic: true` in the `users` table and are excluded from all analytics, cohort, and LTV calculations via a PostHog filter (`properties.$synthetic != true`) and a ClickHouse partition filter (`WHERE NOT is_synthetic`).
+
+### 16.4 Probe Implementation — Scheduled Workers (S-007, S-008)
+
+**S-007 — Audit Log Chain Integrity:**
+
+```typescript
+// workers/synthetic/audit-health.ts
+// Cron: every 10 minutes via wrangler.toml [triggers.crons]
+
+export default {
+  async scheduled(_event: ScheduledEvent, env: Env) {
+    const { data, error } = await env.SUPABASE.from('audit_log')
+      .select('id, hmac, previous_hmac, created_at')
+      .order('created_at', { ascending: false })
+      .limit(2);
+
+    if (error || !data || data.length < 2) {
+      await reportHeartbeat(env.BETTERSTACK_HEARTBEAT_S007, 'fail');
+      return;
+    }
+
+    const [latest, previous] = data;
+    const expectedPreviousHmac = await computeHmac(previous, env.AUDIT_HMAC_KEY);
+    const chainValid = latest.previous_hmac === expectedPreviousHmac;
+    const ageMs = Date.now() - new Date(latest.created_at).getTime();
+    const fresh = ageMs < 10 * 60 * 1000; // 10 min
+
+    await reportHeartbeat(
+      env.BETTERSTACK_HEARTBEAT_S007,
+      chainValid && fresh ? 'pass' : 'fail'
+    );
+  }
+};
+```
+
+**S-008 — Backup Freshness:**
+
+```typescript
+// workers/synthetic/backup-freshness.ts
+// Cron: every hour
+
+export default {
+  async scheduled(_event: ScheduledEvent, env: Env) {
+    const objects = await env.FORM_BACKUPS_R2.list({ limit: 1, prefix: 'daily/' });
+    const latest = objects.objects[0];
+    if (!latest) {
+      await reportHeartbeat(env.BETTERSTACK_HEARTBEAT_S008, 'fail');
+      return;
+    }
+    const ageHours = (Date.now() - latest.uploaded.getTime()) / 3_600_000;
+    await reportHeartbeat(
+      env.BETTERSTACK_HEARTBEAT_S008,
+      ageHours <= 25 ? 'pass' : 'fail'
+    );
+  }
+};
+```
+
+### 16.5 Multi-Region Probe Strategy
+
+P0 probes (S-001, S-002, S-003, S-005, S-007, S-009) are executed from three regions simultaneously: `us-east-1`, `eu-central-1`, `ap-southeast-1`. A probe is declared **failed** only when ≥ 2 of 3 regions report failure within the same check window, preventing false positives from regional routing anomalies.
+
+**Latency SLO per region (p99):**
+
+| Region | API Health (S-001) | Auth (S-002) | Workout Log (S-003) | AI Turn (S-004) |
+|---|---|---|---|---|
+| eu-central-1 | ≤ 120ms | ≤ 350ms | ≤ 600ms | ≤ 3,500ms |
+| us-east-1 | ≤ 150ms | ≤ 400ms | ≤ 700ms | ≤ 3,800ms |
+| ap-southeast-1 | ≤ 200ms | ≤ 500ms | ≤ 900ms | ≤ 4,500ms |
+
+Regional latency SLOs are displayed on the enterprise SLA dashboard (§7.4) and included in the per-tenant SLA report exported monthly to enterprise customers.
+
+### 16.6 Post-Deployment Smoke Gate
+
+Synthetic probes S-001 through S-005 are re-executed as a blocking CI step after every Cloudflare Worker deployment (`wrangler deploy`) and after every EAS production build promotion.
+
+**CI integration (GitHub Actions step):**
+
+```yaml
+- name: Synthetic smoke gate
+  run: |
+    npx @betterstack/cli run-checks \
+      --monitors S-001,S-002,S-003,S-004,S-005 \
+      --timeout 120 \
+      --fail-on-first \
+      --api-key ${{ secrets.BETTERSTACK_API_KEY }}
+  env:
+    BETTERSTACK_API_KEY: ${{ secrets.BETTERSTACK_API_KEY }}
+```
+
+If any probe fails within 120 seconds of deploy, the deployment is flagged in Linear as a `deployment-regression` incident and the on-call engineer is paged (P1 severity). The deployment is NOT automatically rolled back — manual rollback decision is made by the on-call engineer per `docs/INCIDENT_RESPONSE.md R-02`.
+
+### 16.7 Synthetic User Data Hygiene
+
+The synthetic probe user (`synthetic@probe.form.coach`) and synthetic tenant (`tenant_id: 00000000-0000-0000-0000-000000000001`) must be excluded from all data pipelines:
+
+| Pipeline | Exclusion mechanism |
+|---|---|
+| PostHog analytics | `properties.$synthetic != true` filter on all dashboards and exports |
+| ClickHouse `fact_events` | `WHERE NOT is_synthetic` on all Metabase questions |
+| Cohort retention (`fact_cohort_retention`) | Excluded at ETL dbt model layer via `dim_users.is_synthetic = false` join |
+| GDPR DSAR | Exempt — synthetic user is not a natural person; document in DPIA |
+| Audit log | Synthetic events are written but tagged `actor_type: synthetic_probe`; excluded from CC6.2 quarterly access reviews |
+| Enterprise SLA reports | Excluded — SLA is calculated on real tenant traffic only |
+
+The synthetic user JWT is short-lived (1-hour expiry) and rotated by a Cloudflare Worker cron daily. Historical synthetic JWTs are revoked on rotation; the audit log records each rotation event as `system.synthetic_token_rotated`.
+
+### 16.8 Alerting and On-Call Integration
+
+Synthetic probe failures flow into the same PagerDuty routing as infrastructure alerts (§6.2). The alert payload includes:
+
+```json
+{
+  "probe_id": "S-003",
+  "probe_name": "Workout Logging API",
+  "region": "eu-central-1",
+  "regions_failed": 2,
+  "regions_total": 3,
+  "latency_ms": null,
+  "http_status": 503,
+  "body_snippet": "Error: upstream connect error",
+  "consecutive_failures": 3,
+  "runbook_url": "https://github.com/Rbit27/form/blob/main/docs/INCIDENT_RESPONSE.md#r-02"
+}
+```
+
+**Alert deduplication:** Consecutive failures from the same probe within the same 5-minute window are deduplicated into a single PagerDuty incident. A probe returning to passing state fires a `resolve` event that closes the incident automatically.
+
+### 16.9 SOC 2 Evidence Contribution
+
+| SOC 2 Criterion | How Synthetic Monitoring Satisfies It |
+|---|---|
+| CC7.2 — System monitoring | Probes S-001 through S-012 provide continuous automated monitoring evidence |
+| CC7.3 — Anomaly evaluation | Probe failure alerts feed the incident response pipeline (§docs/INCIDENT_RESPONSE.md) |
+| A1.2 — Availability processing | Multi-region probes generate the availability data for SLO compliance calculation |
+| CC4.1 — Monitoring activities | Monthly probe availability report is an auditor-facing evidence artefact |
+
+Better Stack uptime reports are exported monthly as PDF and stored in `compliance/evidence/synthetic-uptime-YYYY-MM.pdf`. These are referenced in the SOC 2 auditor evidence package under CC7.2.
+
+### 16.10 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Create Better Stack monitor definitions for S-001 through S-012 | devops-lead | P0 | M3 |
+| Provision `synthetic@probe.form.coach` user + synthetic tenant in production DB | platform-engineer | P0 | M3 |
+| Implement S-007 `audit-health` scheduled Worker | platform-engineer | P0 | M3 |
+| Implement S-008 `backup-freshness` scheduled Worker | devops-lead | P0 | M3 |
+| Store `SYNTHETIC_USER_JWT` + `SYNTHETIC_TENANT_SCIM_TOKEN` in Workers Secrets | security-engineer | P0 | M3 |
+| Add smoke gate step to Wrangler deploy GitHub Action | devops-lead | P1 | M3 |
+| Add smoke gate step to EAS production promote workflow | devops-lead | P1 | M4 |
+| Add `is_synthetic` column to `users` and `tenants` tables (migration) | platform-engineer | P1 | M3 |
+| Configure PostHog dashboard filters to exclude `$synthetic` events | data-engineer | P1 | M3 |
+| Configure ClickHouse ETL dbt model `WHERE NOT is_synthetic` | data-engineer | P1 | M4 |
+| Daily JWT rotation cron Worker for synthetic user token | platform-engineer | P1 | M4 |
+| Monthly Better Stack PDF export to `compliance/evidence/` | devops-lead | P2 | M4 |
+| Regional latency SLO tracking in enterprise SLA dashboard | platform-engineer | P2 | M5 |
+
+---
+
+*v0.3 additions: §16 Synthetic Monitoring & Uptime Verification — twelve-probe taxonomy (S-001 through S-012) covering API health, auth, workout logging, AI coaching turn, SSO SAML metadata, SCIM, audit log chain integrity, backup freshness, CDN, status page, Stripe webhook, PostHog ingest; Better Stack declarative YAML configuration; Cloudflare scheduled Worker implementations for S-007 (HMAC chain integrity) and S-008 (backup freshness) with TypeScript pseudocode; multi-region probe strategy (us-east-1, eu-central-1, ap-southeast-1) with 2-of-3 failure threshold; regional latency SLO table per probe; post-deployment smoke gate (GitHub Actions step, 120s timeout, P1 alert on failure, no auto-rollback); synthetic user data hygiene across seven pipelines (PostHog, ClickHouse, cohort ETL, DSAR, audit log, enterprise SLA); PagerDuty alert payload schema with deduplication and auto-resolve; SOC 2 CC7.2/CC7.3/A1.2/CC4.1 evidence mapping; thirteen-item implementation checklist across M3/M4/M5.*

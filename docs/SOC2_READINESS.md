@@ -4652,4 +4652,229 @@ This policy is reviewed annually by `compliance-officer` and updated to reflect 
 
 ---
 
+---
+
+## 28. CC9 — Risk Mitigation & Vendor Risk Management
+
+> Owner: `compliance-officer` + `security-engineer`. Effective: May 2026. Review: annually each January per §15.1 compliance calendar, and on any new vendor addition, material product architecture change, or P0/P1 incident affecting vendor-provided infrastructure.
+> SOC 2 controls: **CC9.1** (risk mitigation strategies for business disruptions), **CC9.2** (vendor and third-party risk management).
+> Cross-references: §14 Formal Risk Register, §17 Vendor Security Review Process, §18 BCP/DRP, §15.1 Annual Compliance Calendar.
+
+---
+
+### 28.1 Purpose
+
+CC9 is the formal synthesis of risk mitigation strategy — it does not introduce new controls but maps every identified risk from §14 to an explicit treatment decision (transfer / reduce / accept / avoid), names the residual risk level after controls, and links the evidence chain auditors need to verify that the decision has been implemented rather than merely documented.
+
+The two sub-criteria divide the work cleanly: CC9.1 covers how FORM responds to its own operational and regulatory risks; CC9.2 covers how FORM governs the third-party vendors who extend its attack surface, availability exposure, and compliance obligations. Both are required for the SOC 2 Security TSC regardless of whether Availability, Confidentiality, or Privacy criteria are in scope — CC9 is a baseline Security criterion.
+
+For an AI fitness coaching product processing GDPR Article 9 special-category health data via a multi-vendor stack (Cloudflare edge + Supabase database + Anthropic LLM + ElevenLabs voice + Expo mobile build), the vendor risk surface is unusually broad relative to engineering team size. This section makes those exposures explicit, assigns treatment strategies, and provides the evidence package auditors will require during fieldwork.
+
+---
+
+### 28.2 CC9.1 — Risk Mitigation Strategies
+
+CC9.1 requires FORM to identify and develop risk mitigation activities for risks arising from potential business disruptions. For each risk category, FORM selects one of four standard treatment strategies:
+
+| Strategy | Definition |
+|---|---|
+| **Reduce** | Implement controls that lower the likelihood or impact of the risk to an acceptable residual level |
+| **Transfer** | Shift financial consequence to a third party (insurance, contractual SLA credits) |
+| **Accept** | Document the residual risk explicitly; no additional control investment justified at current scale |
+| **Avoid** | Eliminate the activity or configuration that creates the risk entirely |
+
+#### 28.2.1 Risk Mitigation Register
+
+**Availability Risks**
+
+| Risk | §14 ID | Strategy | Control Implemented | Residual Risk | Evidence Artefact |
+|---|---|---|---|---|---|
+| **Cloud provider outage** — Cloudflare Workers platform unavailable globally | AR-03 | **Accept + Transfer (partial)** | Cloudflare 99.99% global network SLA across 300+ PoPs; no single-region dependency; Cloudflare Status Page auto-opens P1 incident; BCP §18 Scenario B documented; Cloudflare Enterprise DPA provides contractual SLA credit mechanism | **LOW** (2) — inherent score 5; platform redundancy built into vendor architecture; single-vendor risk acknowledged (§28.3.6) | Cloudflare Enterprise DPA SLA clause; §18 Scenario B runbook; Better Stack uptime report confirming Cloudflare-linked downtime events |
+| **Database outage** — Supabase Postgres primary unavailable | AR-02 | **Reduce** | Supabase High Availability (primary + replica, automatic failover); PITR enabled (RPO 1h, RTO 4h); restore runbook `docs/DATA_MODEL.md §10`; Better Stack uptime alert fires in <60s | **LOW** (4) | PITR restore test record §19.5; DR drill report §18.4; Better Stack SLA report |
+| **AI vendor outage** — Anthropic API unavailable >4h | AR-01 | **Reduce + Accept** | Graceful degradation to pre-built Victor coaching-cue templates for common scenarios; user-visible "AI temporarily unavailable" status message; `anthropic_api_requests_total{outcome="error"}` alert fires P0 if >80% error rate in 5 min; architecture does not hard-code Anthropic SDK in mobile client (enabling future provider swap) | **LOW** (4) | Template fallback smoke test; monitoring alert configuration screenshot; BCP §18 cross-reference |
+| **Voice service outage** — ElevenLabs unavailable | AR-04 | **Reduce** | Silent text coaching fallback (all coaching functionality continues in text mode); R2 TTS audio cache serves common cues (target >60% hit rate); user messaging defined | **LOW** (2) | R2 cache hit-rate metric; fallback smoke test in CI |
+| **Business continuity — complete environment loss** | AR-02, AR-03 | **Reduce** | Three-tier backup architecture: Supabase PITR (Tier 1, 7d), nightly R2 logical dump (Tier 2, 90d), monthly Backblaze B2 WORM snapshot (Tier 3, 7y); cold-start runbook §18 Scenario D; encryption key escrow (1Password + compliance-officer Bitwarden) | **MEDIUM** (7) — residual elevated until Tier 2/3 backups operational | Tier 2/3 backup implementation checklist §19.9; first backup execution evidence; B2 Object Lock API confirmation |
+
+**Security Risks**
+
+| Risk | §14 ID | Strategy | Control Implemented | Residual Risk | Evidence Artefact |
+|---|---|---|---|---|---|
+| **Data breach** — attacker accesses user health data via compromised credentials or API exploit | SR-01, SR-02 | **Reduce** | TLS 1.3 mandatory; JWT 1h expiry with 30-day session rotation; RLS fail-closed (missing `tenant_id` → 0 rows, never all rows); tenant ID sourced from JWT claims only; Cloudflare WAF rate limits (50 req/min/IP); certificate pinning (mobile); MFA on all admin surfaces (CC6-GAP-001/002 outstanding) | **MEDIUM** (6) — MFA implementation items outstanding | Cloudflare WAF analytics; JWT config `supabase/config.toml`; cross-tenant RLS CI test result |
+| **Source code compromise** — malicious commit, supply-chain attack via npm dependency, or CI pipeline injection | SR-04, SR-05 | **Reduce** | `git-secrets` pre-commit hook; GitHub secret scanning enabled; Dependabot + `npm audit --audit-level=critical` in CI (CC6-GAP-005); TruffleHog CI scan (CC5-P1-003 gap); `package-lock.json` pinned; no `eval()` policy; CSP header (CC6-GAP-007 gap); branch protection requiring PR review + CI pass (§21) | **MEDIUM** (5) | CI pipeline pass/fail log; Dependabot PR queue; GitHub secret scanning alert log |
+| **Insider threat** — team member with production access exfiltrates health data or tampers with audit log | SR-03 | **Reduce + Accept (solo phase)** | RBAC least-privilege; break-glass dual-authorization (compensating control: single-person with mandatory `incident_id` in solo phase); HMAC-chained audit log (DEC-030); `data.read_individual` triggers immediate `#security-alerts` alert; quarterly access review §23 | **LOW** (4) | Break-glass log; quarterly access review artifact §23.6; HMAC chain verification report |
+
+**Privacy and Compliance Risks**
+
+| Risk | §14 ID | Strategy | Control Implemented | Residual Risk | Evidence Artefact |
+|---|---|---|---|---|---|
+| **Regulatory non-compliance** — GDPR Art. 9 violation, missed DSAR, or inadvertent HIPAA-adjacent scope | PR-01, PR-02, CR-02 | **Reduce** | Explicit consent flow with `privacy.consent_granted` HMAC-chained audit event; DPIA on file (`docs/GDPR_DPIA.md`); DSAR workflow with 30-day SLA; compliance calendar (§15); FORM positioned as consumer wellness (not covered entity) — no BAA issued | **MEDIUM** (6) — CMP not yet deployed | DPIA artefact; DSAR log with timestamps; `privacy.consent_granted` audit sample; privacy policy git timestamp |
+| **Health data in operational logs** — GDPR Art. 9 data inadvertently captured in Sentry or Cloudflare Logpush | CR-02 | **Reduce + Avoid** | AI inference log schema stores token counts + latency only — no prompt or response content (`docs/OBSERVABILITY.md §4.5`); Sentry `beforeSend` hook strips health-adjacent fields before transmission; Cloudflare Logpush configured to exclude request bodies | **LOW** (4) — Sentry `beforeSend` scrubber not yet verified in CI | `OBSERVABILITY.md §4.5` log schema; Sentry `beforeSend` test coverage |
+
+**Vendor Risks**
+
+| Risk | §14 ID | Strategy | Control Implemented | Residual Risk | Evidence Artefact |
+|---|---|---|---|---|---|
+| **Third-party dependency vulnerability** — malicious or vulnerable npm package introduces backdoor | SR-04 | **Reduce** | Dependabot weekly PRs; `npm audit --audit-level=critical` CI gate; `package-lock.json` pinned; critical CVE patching SLA <24h; TruffleHog CI scan (gap — CC5-P1-003) | **MEDIUM** (5) | CI pipeline dep-scan log; Dependabot alert closure evidence |
+| **AI vendor pricing or service termination** — Anthropic doubles pricing or exits market | VR-01 | **Accept + Reduce** | Model-tier flexibility (Haiku for classification, Sonnet for coaching); prompt caching reduces token consumption 35–40%; architecture does not hard-code Anthropic SDK in mobile client; cost sensitivity analysis shows 2× API cost moves GM only 1.4pp (`docs/COST_MODEL.md §10.1`) | **MEDIUM** (5) | Cost model document; architecture review confirming no SDK hard-coding in mobile client |
+| **Sub-processor without valid DPA** — vendor processing EU data without executed DPA | VR-02 | **Reduce** | `beforeSend` compensating controls limit health data exposure; DPA in progress for outstanding gaps; compliance-officer 60-day escalation deadline | **MEDIUM** (6) — residual until DPA executed | VR-02 §14 risk entry; DPA execution confirmations (pending for Sentry, Expo) |
+
+#### 28.2.2 Insurance Program
+
+FORM has not yet secured a formal insurance program. The following defines the target program to be in place before Series A close.
+
+| Coverage Line | Purpose | Target Limit | Timing | Owner |
+|---|---|---|---|---|
+| **Cyber liability insurance** | Breach response costs (forensics, notification, credit monitoring), third-party liability, regulatory investigation costs, business interruption income loss | $2M minimum; $5M target at enterprise launch | Pre-Series A; required before signing enterprise contracts >$250k ACV | compliance-officer |
+| **Directors & Officers (D&O) insurance** | Founders and future board members against personal liability in regulatory action, investor dispute, or customer lawsuit | $2M minimum | Pre-Series A (investor requirement) | founder |
+| **Professional liability (E&O)** | Claims that FORM's AI coaching product caused harm — relevant given health-adjacent use case | $1M minimum | Before enterprise launch | compliance-officer |
+
+**SOC 2 relevance:** Cyber insurance is not a SOC 2 control requirement, but enterprise security questionnaires (CAIQ v4 domain RS.4) routinely ask whether the entity holds cyber liability insurance. Enterprise customers may decline to sign contracts >$100k ACV without it.
+
+**Timeline:** Insurance broker engagement target: Month O-3 (90 days before observation period begins).
+
+**BCP/DRP cross-reference:** §18 (Business Continuity & Disaster Recovery) defines FORM's operational response. Insurance supplements §18 by covering financial consequences that operational controls cannot prevent — legal and regulatory response costs in the aftermath of a confirmed breach.
+
+---
+
+### 28.3 CC9.2 — Vendor and Third-Party Risk Management
+
+#### 28.3.1 Full Vendor Risk Assessment Table
+
+| Vendor | Criticality | Purpose in FORM Stack | SOC 2 Status | DPA / Legal Status | SLA / Uptime | Contingency / Fallback | Review Cadence |
+|---|---|---|---|---|---|---|---|
+| **Anthropic (Claude API)** | Critical | LLM inference — Victor AI coaching sessions; exercise context classification; coaching cue generation | SOC 2 Type II (check Anthropic Trust Portal) | DPA signed; SCC Module 2 (controller→processor) | 99.9% API availability (published SLA); P0 alert fires at >80% error rate in 5 min | Pre-built Victor coaching template fallback; text mode continues during outage; no hard-coding of Anthropic SDK in mobile client (AR-01 in §14) | Annual full review (January) + quarterly status check |
+| **ElevenLabs** | High | Text-to-speech voice synthesis for Victor coaching cues | SOC 2 Type II (check ElevenLabs Trust Portal) | DPA signed; SCC Module 2 | No published SLA for API tier; ElevenLabs Status Page monitored | Silent fallback to text coaching (AR-04 in §14); R2 TTS audio cache serves common cues at target >60% hit rate | Annual full review (January) + quarterly status check |
+| **Supabase** | Critical | Managed PostgreSQL (all user and tenant data); Supabase Auth (sessions, SAML/OIDC SSO); Edge Functions; Storage | SOC 2 Type II (check Supabase Trust Portal); GDPR DPA available | DPA signed; SCC Module 2; EU data residency (`eu-central-1`) for enterprise tenants | Supabase HA: primary + replica automatic failover; PITR guarantee on Team plan | PITR restore runbook `docs/DATA_MODEL.md §10`; Tier 2/3 backup architecture §19; BCP §18 Scenario A | Annual full review (January) + quarterly status check |
+| **Cloudflare** | Critical | Edge runtime (Workers for all API endpoints); WAF and DDoS; R2 object storage (backups, TTS cache); KV (feature flags); DNS; CDN; Pages | SOC 2 Type II + ISO 27001 (check Cloudflare Trust Hub) | Enterprise DPA signed; SCC Module 2 | 99.99% global network SLA for Workers; 300+ PoPs with anycast routing | No real-time alternative edge provider (concentration risk — §28.3.6); Cloudflare's own redundancy is primary mitigation | Annual full review (January) + quarterly status check |
+| **PostHog (EU cloud)** | High | Product analytics; feature flags; session recording (if enabled); funnel analysis | SOC 2 Type II (check PostHog Trust Portal) | DPA signed; SCC Module 2; EU hosting at `eu.posthog.com` | No published SLA; EU region on AWS `eu-central-1` | Outage: product analytics unavailable; no user-visible coaching impact; `analytics_opt_out` flag stored in Supabase (survives PostHog outage) | Annual full review (January) |
+| **Better Stack** | Medium | Uptime monitoring for all six production components (§20.3); incident alerting; status page at `status.form.coach` | No SOC 2 publicly disclosed | GDPR DPA signed; EU data region available | Better Stack SLA: near real-time (30-second check interval); status page: 99.9% | Monitor data loss: uptime history gap — GitHub Actions synthetic health probe logs to audit log independently | Annual full review (January) |
+| **Expo / EAS** | High | React Native managed workflow; OTA update delivery; EAS Build (iOS/Android production builds); EAS Submit | No public SOC 2 report — **gap** | No DPA executed — **CC9-GAP-003** | Expo Status Page (status.expo.dev); no contractual SLA on standard tier | OTA outage: new OTA updates cannot be delivered; existing mobile app continues to function; no user data stored by Expo | Annual full review (January); **DPA negotiation required** |
+| **Stripe** | Critical | Payment processing for enterprise billing; invoice generation; subscription lifecycle | PCI DSS Level 1 + SOC 2 Type II (check Stripe Trust Portal) | DPA signed; SCC Module 2 | Stripe SLA: 99.99% for payment processing API | Billing operations unavailable during outage; no coaching or health data impact; user coaching continues uninterrupted | Annual full review (January) |
+| **1Password** | High | Secrets management vault: API keys, backup encryption keys, emergency credentials, employee credentials | SOC 2 Type II (check 1Password Trust Center) | No formal DPA (no FORM user personal data processed); GDPR-compliant by design | 1Password Teams SLA: 99.9%; zero-knowledge architecture | Offline mode (locally cached app) or emergency kit printed copy; all runtime secrets also stored in Cloudflare Workers Secrets and Supabase Vault | Annual full review (January) |
+| **GitHub** | Critical | Source control (all application code, migrations, Terraform IaC, compliance docs); CI/CD; branch protection; secret scanning | SOC 2 Type II (check GitHub Trust Center) | Microsoft/GitHub GDPR Data Processing Addendum covers GitHub Enterprise; standard ToS applies for standard plan — **gap for DPA chain** (CC9-GAP-004) | GitHub SLA: 99.9%; public incident history at githubstatus.com | GitHub outage blocks new deployments; existing production unaffected; emergency change procedure §21.5 provides manual deploy path via `wrangler deploy` | Annual full review (January) |
+
+#### 28.3.2 Vendor Onboarding Checklist
+
+Every new vendor that will process Confidential or Restricted data must complete all seven steps before any production data flows.
+
+| Step | Requirement | Gate (blocking?) | Evidence Filed |
+|---|---|---|---|
+| 1 | Security questionnaire sent and completed (or current SOC 2 report accepted in lieu for High-tier vendors) | Blocking for Critical vendors | `compliance/vendor-review/onboarding/VENDOR-NAME-YYYY-MM/01-questionnaire.{pdf,md}` |
+| 2 | SOC 2 Type II report (or ISO 27001 cert) reviewed; exceptions noted; material exceptions escalated to compliance-officer | Blocking for Critical and High vendors | `compliance/vendor-review/onboarding/VENDOR-NAME-YYYY-MM/02-cert-review.md` |
+| 3 | DPA executed; SCC Module 2 incorporated for US→EU data transfers | Blocking (no exceptions — GDPR Art. 28 hard requirement) | `compliance/dpa/VENDOR-NAME-DPA-YYYY.pdf` |
+| 4 | Sub-processor register updated | Blocking (GDPR Art. 13(1)(e) transparency) | `form.coach/legal/sub-processors` publish timestamp; git commit hash |
+| 5 | 30-day advance notice sent to all enterprise tenants (GDPR Art. 28(2)) | Blocking for live enterprise tenants | `compliance/subprocessor-notices/YYYY-MM-VENDOR.md` with recipient list and any objections |
+| 6 | Vendor Risk Registry (§17.4) updated: tier, data categories, risk score, owner | Non-blocking; must complete within 5 business days of approval | Updated §17.4 entry with composite risk score |
+| 7 | compliance-officer approval documented with date and reviewer name | Blocking | Approval entry in Vendor Risk Registry "Next Review" field |
+
+#### 28.3.3 Annual Vendor Review Process
+
+FORM's annual vendor review runs every January per §15.1. Five-step process defined in §17.5.
+
+| Evidence Artifact | Description | Location | Due Date |
+|---|---|---|---|
+| Registry currency check | Confirms all active vendors are listed; tier assignments are current | `compliance/vendor-review/YYYY/01-registry-currency-check.md` | January 5 |
+| Certification and SOC 2 refresh | Current SOC 2 report or bridge letter for each Critical and High vendor; exceptions noted | `compliance/vendor-review/YYYY/02-cert-refresh/VENDOR-NAME-cert-YYYY.pdf` + summary | January 15 |
+| DPA status confirmation | Confirms DPAs are current; SCCs not superseded | `compliance/vendor-review/YYYY/03-dpa-status-check.md` | January 20 |
+| Questionnaire responses | Annual security questionnaire from Critical vendors; SOC 2 report accepted for High | `compliance/vendor-review/YYYY/04-questionnaire-responses/VENDOR-NAME-response-YYYY.{pdf,md}` | January 25 |
+| Annual review memo | Consolidated sign-off: risk score changes, open items, next-review dates advanced | `compliance/vendor-review/YYYY/05-annual-review-memo.md` — compliance-officer sign-off with date | January 31 |
+
+The five artifacts, filed to `compliance/vendor-review/YYYY/` and dated within the January window, collectively satisfy CC9.2 ("FORM assesses and monitors risks associated with third-party vendors") for the observation year.
+
+#### 28.3.4 Vendor Concentration Risk: Cloudflare
+
+Cloudflare is FORM's single most critical vendor by scope of dependency: it hosts the edge API (Workers), WAF, DDoS protection, DNS, CDN, R2 object storage (backups and TTS cache), and KV (edge configuration). A Cloudflare account-level compromise or prolonged platform outage would affect all of these simultaneously.
+
+| Dimension | Detail |
+|---|---|
+| Services at risk in a single Cloudflare outage | Workers (API), WAF, DNS, R2 (backups), KV (feature flags), CDN, Pages (web) — effectively the entire production API surface |
+| Historical Cloudflare availability | >99.99% globally; distributed anycast architecture with no single-region dependency |
+| Contractual protections | Enterprise DPA with SLA credit mechanism |
+| Account-level compromise risk | Cloudflare account secured with MFA (CC6-GAP-002); API tokens scoped to minimum permissions per service |
+| Current mitigation gap | No secondary CDN/edge provider; no automated failover to an alternative platform; Cloudflare R2 backups are at risk in a Cloudflare account-compromise scenario (B2 cold storage is independent) |
+
+**Accepted concentration risk statement:** FORM accepts the concentration risk associated with Cloudflare as a single-platform dependency at this stage of the company. The primary mitigations are Cloudflare's own platform redundancy and the independent Backblaze B2 cold storage tier (§19.4) for backup data. A secondary edge provider is a Post-Series-A architectural investment. This acceptance is documented explicitly here.
+
+#### 28.3.5 Right-to-Audit Clauses: Status by Vendor
+
+| Vendor | Right-to-Audit Clause | Approach | Status |
+|---|---|---|---|
+| Anthropic | Not included in standard DPA | SOC 2 Type II report proxy (Anthropic Trust Portal) | Annual report review in §17.5 |
+| ElevenLabs | Not included in standard DPA | SOC 2 Type II report proxy | Annual report review in §17.5 |
+| Supabase | Available under Supabase Enterprise DPA | Report proxy for standard tier; audit right available if upgraded | Covered by SOC 2 Type II report review |
+| Cloudflare | Not included in standard Enterprise DPA | SOC 2 Type II + ISO 27001 report proxy (Cloudflare Trust Hub) | Annual report review in §17.5 |
+| PostHog | Available via GDPR DPA on reasonable request | SOC 2 Type II report proxy for day-to-day | Annual report review in §17.5 |
+| Stripe | Not included in standard DPA | PCI DSS Level 1 AOC + SOC 2 Type II report proxy | Annual report review in §17.5 |
+| 1Password | Available for enterprise customers on request | SOC 2 Type II report proxy | Annual report review in §17.5 |
+| GitHub | Available under GitHub Enterprise MSA | SOC 2 Type II report proxy | Annual report review in §17.5 |
+| Expo / EAS | Not available (no enterprise agreement or DPA) | **Gap — no audit right; no SOC 2 report** | **CC9-GAP-003 remediation required** |
+| Better Stack | Available on request (GDPR DPA) | GDPR DPA provides audit right; SOC 2 report proxy | Annual report review in §17.5 |
+
+**Note:** Where no right-to-audit clause exists, the compensating control is the vendor's most recent SOC 2 Type II or ISO 27001 report, reviewed annually under §17.5. A formal right-to-audit requirement should be added to all new vendor DPA negotiations as a standard template clause.
+
+#### 28.3.6 Expo / EAS Gap — Special Treatment
+
+Expo / EAS is a High-criticality vendor without a SOC 2 report, without an executed DPA, and without a right-to-audit mechanism.
+
+**Risk treatment:** OTA updates are code-signed using Expo EAS code signing; the private signing key is held only in 1Password. A compromised Expo CDN cannot deliver unsigned OTA updates that FORM's app would accept. All runtime secrets are injected via Cloudflare Workers Secrets and Supabase Vault — no production secrets exist in the source code or EAS environment variables. No FORM user health data is stored or processed by Expo infrastructure at any point.
+
+The residual risk (CC9-GAP-003) is a documented acceptance until a DPA is negotiated or an alternative mobile build infrastructure is evaluated.
+
+---
+
+### 28.4 CC9 Gap Analysis
+
+| Sub-Criterion | Control | Status | Notes |
+|---|---|---|---|
+| **CC9.1** — Risk mitigation activities identified for business disruptions | Risk mitigation register with transfer/reduce/accept/avoid per risk category | 🟢 | §28.2.1 register covers all required risk categories |
+| **CC9.1** — Business continuity planning (BCP/DRP) | BCP runbooks for all major failure scenarios | 🟡 | §18 BCP/DRP defined; Scenario D cold storage implementation pending (§19 checklist) |
+| **CC9.1** — Insurance program (cyber liability + D&O) | Cyber liability and D&O policies in force | 🔴 | Target: pre-Series A; broker engagement not yet initiated (CC9-GAP-001) |
+| **CC9.1** — Residual risk documented and accepted for all risk categories | Formal acceptance statements for accepted/transferred risks | 🟢 | §28.2.1 documents residual risk per category with named owners |
+| **CC9.2** — Sub-processor list published | `form.coach/legal/sub-processors` live with all vendors | 🟡 | Architecture defined §20.8; Worker not yet deployed (CC9-GAP-007) |
+| **CC9.2** — DPAs executed with all sub-processors | All Critical and High vendors have signed DPAs with SCCs | 🟡 | Sentry DPA in progress (VR-02); Expo DPA not executed (CC9-GAP-003); GitHub GDPR DPA gap (CC9-GAP-004) |
+| **CC9.2** — Vendor risk assessment with criticality and risk scoring | Vendor Risk Registry (§17.4) with composite risk scores | 🟢 | Registry complete with 10 vendors; scoring criteria §17.6 |
+| **CC9.2** — Annual vendor review process | 5-step January review process with evidence artifacts | 🟡 | Process defined §17.5; first execution January 2027 |
+| **CC9.2** — Vendor concentration risk documented | Single-vendor risk analysis for Cloudflare | 🟢 | §28.3.4 documents concentration risk with acceptance statement |
+| **CC9.2** — Vendor onboarding checklist | 7-step pre-approval process including DPA gate | 🟢 | §17.3 + §28.3.2 |
+| **CC9.2** — New sub-processor notification (30-day advance notice) | Enterprise tenant notification process | 🟡 | Process defined §17.7; first execution pending (no enterprise tenants live yet) |
+| **CC9.2** — Expo / EAS — no SOC 2 + no DPA | Compensating controls for high-criticality vendor without standard compliance posture | 🔴 | CC9-GAP-003; code signing + no runtime data exposure as compensating controls; DPA negotiation required |
+| **CC9.2** — Right-to-audit clauses in vendor contracts | Audit right or SOC 2 report proxy for each vendor | 🟡 | All vendors except Expo have SOC 2 report proxy; right-to-audit clause absent from most standard DPAs |
+| **CC9.2** — Better Stack SOC 2 status | SOC 2 report or equivalent for monitoring vendor | 🟡 | No public SOC 2 from Better Stack; GDPR DPA signed; monitoring-only (no user data); risk score Low |
+
+---
+
+### 28.5 Implementation Checklist
+
+| ID | Action | Priority | Owner | Target | Notes |
+|---|---|---|---|---|---|
+| **CC9-GAP-001** | Engage insurance broker; obtain cyber liability insurance quote ($2M minimum) and D&O quote; present to founder for approval | P0 | compliance-officer | Month O-3 (90 days pre-observation) | Required for enterprise contracts >$100k ACV |
+| **CC9-GAP-002** | Execute Sentry DPA; confirm EU data region routing; close VR-02 in §14 risk register | P0 | compliance-officer | Immediate (60-day deadline) | `beforeSend` scrubber compensating control is in place; DPA execution removes the GDPR Art. 28 gap |
+| **CC9-GAP-003** | Negotiate DPA with Expo / EAS for build pipeline; alternatively evaluate self-hosted EAS or alternative mobile CI (Bitrise, Fastlane on GitHub Actions) as a DPA-free alternative | P1 | compliance-officer + platform-engineer | Month O-4 | If no DPA available within 60 days, document formal risk acceptance with security-engineer sign-off |
+| **CC9-GAP-004** | Confirm GitHub GDPR DPA status for EU data processing; execute Microsoft/GitHub GDPR Data Processing Addendum if required | P1 | compliance-officer | Month O-4 | Legal counsel review recommended |
+| **CC9-GAP-005** | Add standard right-to-audit clause to FORM's vendor DPA template; include in all new vendor negotiations going forward | P1 | compliance-officer | Before next new vendor onboarding | Clause text: "Controller reserves the right to conduct or commission an audit of Processor's compliance, with 30 days advance written notice, no more than once per calendar year, at Controller's expense unless a material non-compliance is found." |
+| **CC9-GAP-006** | Complete first annual vendor review (January 2027) following §17.5 five-step process; file all five evidence artifacts to `compliance/vendor-review/2027/` | P0 | compliance-officer | January 31, 2027 | Closes CC9.2 "Annual vendor security review" from 🟡 Partial to 🟢 Done |
+| **CC9-GAP-007** | Deploy `security.form.coach/sub-processors` Cloudflare Worker (§20.8); update with all vendors from §28.3.1; set "last updated" to current date | P0 | devops-lead + compliance-officer | Month O-4 | Closes sub-processor list published gap; required for GDPR Art. 13(1)(e) |
+| **CC9-GAP-008** | Add Expo / EAS to §17.4 Vendor Risk Registry with current risk score and gap annotation | P1 | compliance-officer | Immediate | Ensures Expo is tracked formally even while DPA gap is unresolved |
+
+---
+
+### 28.6 Overall SOC 2 Readiness Delta
+
+| Metric | Before §28 | After §28 |
+|---|---|---|
+| CC9.1 — Risk mitigation register | 🔴 No explicit transfer/reduce/accept/avoid mapping | 🟢 Complete register with all required risk categories, strategies, residual scores, evidence artefacts |
+| CC9.1 — Insurance program | 🔴 Not addressed | 🟡 Partial — target program defined; broker engagement not yet initiated (CC9-GAP-001) |
+| CC9.2 — Vendor risk table | 🟡 Partial — §17 registry existed; CC9.2-focused summary absent | 🟢 Full table in §28.3.1 covering all 10 vendors with all required fields |
+| CC9.2 — Expo DPA gap | Not surfaced | 🔴 Formally surfaced as CC9-GAP-003 |
+| CC9.2 — Concentration risk | Not documented | 🟢 Cloudflare concentration risk documented with acceptance statement |
+| CC9.2 — Onboarding checklist | 🟡 Partial (§17.3 detailed) | 🟢 §28.3.2 provides consolidated checklist cross-referencing §17.3 |
+
+**SOC 2 readiness: ~77% → ~82%**
+
+---
+
+*v1.8 additions: Section 28 — CC9 Risk Mitigation & Vendor Risk Management. CC9.1: explicit transfer/reduce/accept/avoid strategy for all required risk categories (cloud provider outage AR-03, database outage AR-02, AI vendor outage AR-01, voice service outage AR-04, BCP/complete environment loss, data breach SR-01/SR-02, source code compromise SR-04/SR-05, insider threat SR-03, regulatory non-compliance PR-01/PR-02/CR-02, health data in operational logs CR-02, third-party dependency vulnerability SR-04, AI vendor pricing/termination VR-01, sub-processor DPA gap VR-02); residual risk levels and evidence artefacts per category. Insurance program roadmap: cyber liability ($2M target), D&O ($2M), professional liability ($1M); pre-Series A timeline; broker engagement target Month O-3; BCP/DRP cross-reference to §18 formalised. CC9.2: full vendor risk assessment table covering 10 vendors (Anthropic, ElevenLabs, Supabase, Cloudflare, PostHog EU, Better Stack, Expo/EAS, Stripe, 1Password, GitHub) with criticality, SOC 2 status, DPA status, SLA, contingency/fallback, review cadence. 7-step vendor onboarding checklist. 5-artifact January annual review process. Cloudflare concentration risk formally documented with accepted risk statement. Right-to-audit clause status for all 10 vendors. Expo/EAS gap formally surfaced: no SOC 2, no DPA — compensating controls (EAS code signing, no runtime user data) documented; CC9-GAP-003 tracks DPA negotiation. 8 implementation checklist items CC9-GAP-001 through CC9-GAP-008 (P0/P1 priorities). CC9 Gap Analysis table: 14 sub-criteria mapped with 🟢/🟡/🔴 status. SOC 2 readiness: ~77% → ~82%.*
+
+---
+
 *v1.7 additions: Section 27 — CC5 Control Activities: Policy Framework, Technology Controls and Deployment. Full CC5.1–CC5.3 criteria mapping for FORM's Cloudflare Workers + Supabase + React Native stack. CC5.1: ten-category risk-to-control mapping matrix cross-referenced to §14 risk register (SR, AR, IR, CR, PR, VR categories); twelve-control ownership register with named owners, review cadences, and evidence artefacts. CC5.2: IaC enforcement table for all nine deployment systems (Wrangler, Terraform, Supabase migrations, Edge Functions, EAS, CF Workers Secrets + Supabase Vault, DNS); configuration baseline standards for thirteen controls (JWT expiry, WAF CRS, CORS, TLS, cookies, CSP, Dependabot, branch protection, encryption at rest/in-transit, certificate pinning); logical access table for six admin surfaces mapped to CC6-GAP-001/002 outstanding MFA gaps; automated monitoring table for seven monitors including HMAC chain-break, Better Stack, backup freshness, SSL expiry, Dependabot CI gate, and TruffleHog (gap). CC5.3: twelve-policy inventory (8 in force, 2 partial, 2 gap — AUP and Cryptography Policy); solo-founder compensating control narrative for policy communication evidence (git commit timestamps + compliance calendar + pre-authored onboarding checklist + policy approval log CSV); control procedure deployment table mapping all twelve policies to implementing runbooks. Gap analysis: all three CC5 sub-criteria 🟡 Partial. Implementation checklist: seven items across P0/P1/P2 (CC5-P0-001 AUP authoring, CC5-P0-002 Cryptography Policy, CC5-P1-003 TruffleHog CI, CC5-P1-004 policy approval log CSV, CC5-P1-005 IaC drift detection, CC5-P2-006 CI log archive to R2, CC5-P2-007 new-hire onboarding checklist). Five open items CC5-GAP-001 through CC5-GAP-005. Annex A: AUP draft (status: not yet in force) with purpose, scope, six acceptable uses, seven prohibited uses, consequences, and review cadence. SOC 2 readiness: ~77% (no regression — gaps were pre-existing but un-surfaced by prior sections).*

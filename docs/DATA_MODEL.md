@@ -1278,3 +1278,487 @@ form-export-{user_id}-{date}.zip
 | Advertising IDs (IDFA) | No | ATT framework not requested; no retargeting SDK |
 
 Any addition to this register requires `compliance-officer` review and a DECISION_LOG entry before implementation.
+
+---
+
+## 13. Analytics Event Tracking Schema
+
+> Owner: `data-engineer`. Review: on any new event, schema version bump, or ClickHouse migration.
+> References: §5 Data Classification, §6 Privacy Floor Enforcement, §12 Soft Delete & GDPR Art. 17, DEC-013 (streak grace after 2 misses).
+
+---
+
+### 13.1 Design Principles
+
+#### 13.1.1 Capture layer
+
+PostHog (EU Cloud, `eu.posthog.com`) is the primary event store. Every client-side event fired by the React Native app is also mirrored server-side by the Cloudflare Worker middleware before being forwarded to PostHog. For billing-critical and subscription-state events, the server-side emission is the authoritative record; client-side is discarded on conflict.
+
+The trust hierarchy is:
+
+| Source | Trusted for |
+|---|---|
+| Cloudflare Worker (server-side) | Subscription events, tier changes, SSO login outcomes, server_timestamp |
+| React Native PostHog SDK (client-side) | UI-interaction events (feature views, onboarding steps, settings changes) |
+| Client-side only — never trusted | Revenue state, tier value, tenant_id |
+
+#### 13.1.2 Privacy-first: no PII, no Art. 9 health data in analytics events
+
+All analytics events are pseudonymous. The `user_id` property is a UUID that maps to a real identity only inside Supabase (RLS-protected). The following are **never** included in any event property payload:
+
+- Email address, display name, phone number
+- Body measurements (weight, BMI, body fat %)
+- Meal content or nutritional detail (Art. 9 special-category data)
+- Injury notes, mental health flags, free-text from coaching turns
+- Precise geolocation
+- Raw CV pose data or form scores for individual lifts
+- IDFA / advertising identifiers
+
+Exercise names, rep counts, and set counts are permitted as training-behaviour signals because they do not constitute health data under GDPR Art. 9 in the absence of a clinical context. See §5 for full classification and §6 for the privacy floor enforcement rules that govern what may never appear in aggregate views.
+
+#### 13.1.3 Pseudonymous user_id
+
+Every event carries `user_id` as a UUID (the same UUID primary key used in `public.users`). The UUID is not derived from email or any other PII. Re-identification from the analytics warehouse alone is not possible without a join to the Supabase `users` table, which is access-controlled by RLS.
+
+#### 13.1.4 Server-side enrichment via Cloudflare Worker middleware
+
+Properties that cannot be trusted from the client — `user_tier`, `tenant_id`, `server_timestamp`, `worker_region` — are injected by the Cloudflare Worker on every event before the event is forwarded to PostHog. See §13.3 for the enrichment pseudocode.
+
+#### 13.1.5 Schema versioning
+
+Every event carries a `$schema_version` property (string, semver format, e.g. `"1.0.0"`). The version is incremented when:
+
+- A required property is added or removed from any event
+- A property type changes
+- A new event name is introduced
+
+The Zod event schema (source of truth: `src/analytics/events.schema.ts`) is validated in CI. Events that fail schema validation fail the build. Backfill SQL for schema migrations is committed to `src/analytics/backfills/`.
+
+---
+
+### 13.2 PostHog Event Taxonomy
+
+All events carry the following **universal properties** (omitted from per-event tables for brevity):
+
+| Property | Type | Source | Description |
+|---|---|---|---|
+| `user_id` | `string (UUID)` | Client | Pseudonymous user identifier |
+| `$schema_version` | `string (semver)` | Client | Event schema version |
+| `app_version` | `string (semver)` | Client | App build version |
+| `platform` | `"ios" \| "android"` | Client | Device platform |
+| `os_version` | `string` | Client | OS version string |
+| `locale` | `string (BCP 47)` | Client | Device locale, e.g. `"en-GB"` |
+| `client_timestamp` | `string (ISO 8601)` | Client | Client-side event time (for ordering) |
+| `server_timestamp` | `string (ISO 8601)` | Worker (enriched) | Trusted server time |
+| `user_tier` | `"free" \| "pro" \| "enterprise"` | Worker (enriched) | Subscription tier at event time |
+| `tenant_id` | `string (UUID) \| null` | Worker (enriched) | Enterprise tenant; null for consumer |
+| `worker_region` | `string` | Worker (enriched) | Cloudflare colo region, e.g. `"eu-west-1"` |
+
+#### 13.2.1 App lifecycle
+
+| Event name | Trigger | Required properties | Notes |
+|---|---|---|---|
+| `app_opened` | App enters foreground (cold start or resume) | `session_id: string (UUID)`, `is_cold_start: boolean`, `source: "direct" \| "notification" \| "deep_link"` | Session ID generated client-side; cold-start = process not in memory |
+| `app_backgrounded` | App moves to background | `session_id: string (UUID)`, `foreground_duration_ms: number` | Foreground duration computed from paired `app_opened` client_timestamp |
+
+**Explicitly excluded from these events:** device model string (fingerprinting risk), battery level, network type.
+
+#### 13.2.2 Onboarding
+
+| Event name | Trigger | Required properties | Notes |
+|---|---|---|---|
+| `onboarding_started` | User reaches first onboarding screen after account creation | `method: "apple_sso" \| "email"` | Fired once per user lifetime |
+| `onboarding_step_completed` | User advances past any onboarding screen | `step_index: number`, `step_name: string`, `time_on_step_ms: number` | `step_name` is a stable slug, e.g. `"goal_selection"`, `"experience_level"` |
+| `onboarding_completed` | User reaches Today screen for first time | `total_duration_ms: number`, `steps_completed: number`, `goal: string` | `goal` is a categorical label from a fixed enum (e.g. `"strength"`, `"fat_loss"`) — never free text |
+
+**Explicitly excluded:** health goal detail beyond top-level enum, injury or restriction notes, body measurements entered during onboarding.
+
+#### 13.2.3 Workouts
+
+| Event name | Trigger | Required properties | Notes |
+|---|---|---|---|
+| `workout_started` | User taps Start Workout | `workout_id: string (UUID)`, `program_id: string \| null`, `exercise_count: number`, `is_coached: boolean` | `is_coached` = Victor AI session active |
+| `workout_set_logged` | User logs a completed set | `workout_id: string (UUID)`, `set_number: number`, `exercise_name: string`, `reps: number \| null`, `is_time_based: boolean`, `rpe: number \| null`, `used_cv: boolean` | Rep count and exercise name are permitted (training behaviour, not Art. 9 health data). Weight is **not** included — see note below |
+| `workout_completed` | User taps Finish and confirms | `workout_id: string (UUID)`, `duration_seconds: number`, `sets_logged: number`, `ai_turns: number`, `voice_used: boolean` | |
+| `workout_abandoned` | User exits mid-workout without completing | `workout_id: string (UUID)`, `duration_seconds: number`, `sets_logged: number`, `last_exercise_name: string \| null` | |
+
+**Weight (kg/lbs) is explicitly excluded from `workout_set_logged`** — it is stored in Supabase `workout_sets.weight_kg` (Confidential classification, §5) and must never appear in analytics events. Form scores and CV flags are likewise excluded.
+
+#### 13.2.4 AI coaching
+
+| Event name | Trigger | Required properties | Notes |
+|---|---|---|---|
+| `ai_message_sent` | User sends a message to Victor | `session_id: string (UUID)`, `coaching_session_id: string (UUID)`, `message_index: number`, `input_type: "text" \| "voice"`, `context: "workout" \| "standalone"` | Message content is **never** included |
+| `ai_message_received` | Victor response delivered to client | `session_id: string (UUID)`, `coaching_session_id: string (UUID)`, `message_index: number`, `response_latency_ms: number`, `model_id: string`, `has_voice: boolean` | Model ID is the Anthropic model slug. Token counts excluded (cost data, not product analytics) |
+| `ai_voice_played` | User plays a Victor voice response | `coaching_session_id: string (UUID)`, `voice_duration_ms: number`, `completed: boolean` | `completed` false if user skipped before end |
+
+**Explicitly excluded from all AI events:** message content (free text, Confidential §5), token counts, ElevenLabs character counts.
+
+#### 13.2.5 Subscriptions
+
+Server-side only. These events are emitted by the Cloudflare Worker on Stripe webhook receipt — never from the client.
+
+| Event name | Trigger | Required properties | Notes |
+|---|---|---|---|
+| `subscription_started` | Stripe `customer.subscription.created` webhook | `plan: "pro" \| "enterprise"`, `billing_period: "monthly" \| "annual"`, `trial: boolean`, `trial_end_date: string (ISO 8601) \| null` | |
+| `subscription_cancelled` | Stripe `customer.subscription.deleted` webhook | `plan: "pro" \| "enterprise"`, `reason: string \| null`, `days_since_start: number`, `at_period_end: boolean` | `reason` is the Stripe cancellation reason enum — no free text |
+| `subscription_reactivated` | Stripe `customer.subscription.updated` (cancelled → active) | `plan: "pro" \| "enterprise"`, `days_since_cancellation: number` | |
+| `subscription_upgraded` | Stripe `customer.subscription.updated` (plan change) | `from_plan: string`, `to_plan: string`, `from_billing_period: string`, `to_billing_period: string` | |
+
+**Explicitly excluded:** Stripe customer ID, payment method details, invoice amounts.
+
+#### 13.2.6 Enterprise SSO
+
+Server-side only. Emitted by the Cloudflare Worker SSO callback handler.
+
+| Event name | Trigger | Required properties | Notes |
+|---|---|---|---|
+| `sso_login_initiated` | User is redirected to IdP (OIDC redirect) | `tenant_id: string (UUID)`, `idp_type: "okta" \| "azure_ad" \| "google_workspace" \| "generic_oidc"` | |
+| `sso_login_completed` | OIDC callback succeeds; JWT issued | `tenant_id: string (UUID)`, `idp_type: string`, `is_new_user: boolean`, `scim_provisioned: boolean` | |
+| `sso_login_failed` | OIDC callback returns error or token validation fails | `tenant_id: string (UUID)`, `idp_type: string`, `error_code: string` | `error_code` is a stable internal enum, not the raw IdP error string |
+
+**Explicitly excluded:** OIDC subject claim, IdP user attributes, email address.
+
+#### 13.2.7 Streaks
+
+| Event name | Trigger | Required properties | Notes |
+|---|---|---|---|
+| `streak_maintained` | User completes a workout that extends their active streak | `streak_length_days: number`, `current_streak_start: string (ISO 8601 date)` | |
+| `streak_broken` | Streak breaks (per DEC-013: after 2 consecutive missed days, not 1) | `streak_length_days: number`, `missed_days: number` | `missed_days` will be 2 under current DEC-013 policy |
+| `streak_grace_used` | Grace period applied on first miss (day 1 of potential 2-day miss window) | `streak_length_days: number`, `grace_day: number` | Streak is preserved; user notified. `grace_day` is always 1 under DEC-013 |
+
+#### 13.2.8 Settings and permissions
+
+| Event name | Trigger | Required properties | Notes |
+|---|---|---|---|
+| `settings_changed` | User saves a settings change | `setting_key: string`, `new_value_type: "boolean" \| "string_enum" \| "number"` | `new_value_type` encodes the type of change; the value itself is **not** included unless it is a non-sensitive boolean (e.g. `dark_mode_enabled: true`) |
+| `notification_permission_granted` | OS permission prompt accepted | `permission_type: "push" \| "local"` | |
+| `notification_permission_denied` | OS permission prompt denied or dismissed | `permission_type: "push" \| "local"` | |
+
+#### 13.2.9 Feature flag exposure
+
+| Event name | Trigger | Required properties | Notes |
+|---|---|---|---|
+| `feature_flag_exposure` | PostHog SDK evaluates a feature flag for the first time in a session | `flag_key: string`, `flag_variant: string \| boolean`, `evaluation_context: "onboarding" \| "workout" \| "coaching" \| "subscription" \| "other"` | Standard PostHog `$feature_flag_called` event; this schema wraps and enforces typed properties on top of it. Used for A/B test analysis. |
+
+---
+
+### 13.3 Server-Side Enrichment Middleware
+
+The Cloudflare Worker intercepts all `/v1/analytics/capture` requests from the app and enriches each event before forwarding to PostHog. Properties injected at this layer override any client-supplied values of the same name.
+
+```typescript
+// src/workers/middleware/analytics-enrichment.ts
+// Runs in Cloudflare Worker before PostHog capture
+
+interface JwtClaims {
+  sub: string;          // user_id (UUID)
+  tenant_id: string | null;
+  tier: "free" | "pro" | "enterprise";
+  iat: number;
+  exp: number;
+}
+
+interface RawEvent {
+  event: string;
+  properties: Record<string, unknown>;
+  timestamp?: string;   // client_timestamp — retained but not trusted for ordering
+}
+
+interface EnrichedEvent extends RawEvent {
+  properties: Record<string, unknown> & {
+    user_id: string;
+    user_tier: "free" | "pro" | "enterprise";
+    tenant_id: string | null;
+    server_timestamp: string;
+    worker_region: string;
+    $schema_version: string;
+  };
+}
+
+async function enrichEvent(
+  rawEvent: RawEvent,
+  jwtClaims: JwtClaims,
+  request: Request,
+): Promise<EnrichedEvent> {
+  // Validate schema before enrichment — fail fast
+  const validated = EventSchema.parse(rawEvent); // Zod; throws on violation
+
+  // Scrub any PII fields the client should never have sent
+  const safeProperties = stripForbiddenProperties(validated.properties);
+
+  // Server-authoritative properties — always overwrite client values
+  const serverEnriched = {
+    ...safeProperties,
+    user_id: jwtClaims.sub,                            // from verified JWT, never client body
+    user_tier: jwtClaims.tier,                         // from JWT claim; Stripe state reflected at auth time
+    tenant_id: jwtClaims.tenant_id ?? null,            // null for consumer users
+    server_timestamp: new Date().toISOString(),        // trusted server time
+    worker_region: request.cf?.region ?? "unknown",    // Cloudflare colo region
+    $schema_version: CURRENT_SCHEMA_VERSION,           // pinned in worker deploy
+  };
+
+  return { ...validated, properties: serverEnriched };
+}
+
+// Properties that must never reach PostHog regardless of client payload
+const FORBIDDEN_PROPERTY_KEYS = new Set([
+  "email", "display_name", "name", "phone",
+  "weight_kg", "weight_lbs", "bmi", "body_fat_pct", "height_cm",
+  "meal_content", "meal_name",
+  "injury_notes", "mental_health_flag",
+  "cv_flags", "form_score",
+  "lat", "lng", "latitude", "longitude",
+  "idfa", "advertising_id",
+  "stripe_customer_id",
+  "coaching_turn_content",
+]);
+
+function stripForbiddenProperties(
+  props: Record<string, unknown>,
+): Record<string, unknown> {
+  const stripped = { ...props };
+  for (const key of Object.keys(stripped)) {
+    if (FORBIDDEN_PROPERTY_KEYS.has(key)) {
+      delete stripped[key];
+      // Emit a separate internal alert — indicates a client-side bug or schema regression
+      void reportForbiddenPropertyViolation(key);
+    }
+  }
+  return stripped;
+}
+```
+
+The enriched event is forwarded to PostHog using the server-side PostHog client with `distinctId` set to `jwtClaims.sub`. The client-side PostHog SDK is configured with `person_profiles: "identified_only"` and `capture_pageview: false`.
+
+---
+
+### 13.4 ClickHouse Analytics Tables
+
+ClickHouse Cloud (EU region, matching Supabase `eu-central-1` data residency) is the analytics warehouse. Tables use the MergeTree engine family for efficient time-series aggregation.
+
+#### 13.4.1 `fact_events`
+
+Raw event log. Populated hourly from PostHog S3 export (see §13.5).
+
+```sql
+CREATE TABLE analytics.fact_events
+(
+    event_id       UUID,
+    user_id        UUID,
+    event_name     LowCardinality(String),
+    ts             DateTime64(3, 'UTC'),          -- server_timestamp from enrichment
+    client_ts      DateTime64(3, 'UTC'),          -- client_timestamp for ordering
+    properties     JSON,                           -- full enriched properties blob
+    tier           LowCardinality(String),        -- "free" | "pro" | "enterprise"
+    tenant_id      Nullable(UUID),
+    app_version    LowCardinality(String),
+    platform       LowCardinality(String),        -- "ios" | "android"
+    schema_version LowCardinality(String)
+)
+ENGINE = ReplacingMergeTree(ts)
+PARTITION BY toYYYYMM(ts)
+ORDER BY (event_name, user_id, ts, event_id)
+TTL toDateTime(ts) + INTERVAL 2 YEAR DELETE
+SETTINGS index_granularity = 8192;
+```
+
+`ReplacingMergeTree(ts)` ensures that if the same `event_id` is re-ingested (e.g. from a PostHog export retry), the row with the latest `ts` wins. Deduplication is eventual — queries against `fact_events` use `FINAL` or a `max(ts) GROUP BY event_id` subquery where exactness is required.
+
+#### 13.4.2 `dim_users`
+
+User dimension updated daily. Reflects state as of the latest ETL run, not point-in-time.
+
+```sql
+CREATE TABLE analytics.dim_users
+(
+    user_id              UUID,
+    first_seen_date      Date,
+    cohort_week          Date,                   -- toMonday(first_seen_date)
+    acquisition_channel  LowCardinality(String), -- "organic" | "paid_ua" | "referral" | "enterprise_scim"
+    tier                 LowCardinality(String),
+    tenant_id            Nullable(UUID),
+    country_code         LowCardinality(String), -- ISO 3166-1 alpha-2; derived from worker_region at first open
+    is_enterprise        UInt8,                  -- 1 if tenant_id IS NOT NULL
+    last_updated         DateTime64(3, 'UTC')
+)
+ENGINE = ReplacingMergeTree(last_updated)
+PARTITION BY toYYYYMM(first_seen_date)
+ORDER BY (user_id)
+SETTINGS index_granularity = 8192;
+```
+
+`country_code` is derived from the `worker_region` Cloudflare colo at `app_opened` (first seen), not from GPS. This is coarse-grained and does not constitute precise location data.
+
+#### 13.4.3 `fact_cohort_retention`
+
+Pre-aggregated retention table rebuilt daily. Powers D1/D7/D14/D30/D60/D90/D180/D365 cohort curves.
+
+```sql
+CREATE TABLE analytics.fact_cohort_retention
+(
+    cohort_week      Date,
+    period_day       UInt16,                     -- 1, 7, 14, 30, 60, 90, 180, 365
+    tier             LowCardinality(String),
+    tenant_id        Nullable(UUID),             -- null for cross-tenant consumer aggregate
+    retained_users   UInt32,
+    cohort_size      UInt32,
+    retention_rate   Float32,                    -- retained_users / cohort_size
+    computed_at      DateTime64(3, 'UTC')
+)
+ENGINE = AggregatingMergeTree()
+PARTITION BY toYYYYMM(cohort_week)
+ORDER BY (cohort_week, period_day, tier, tenant_id)
+SETTINGS index_granularity = 8192;
+```
+
+Cohorts with `cohort_size < 5` are suppressed before write (k-anonymity floor, matching §2.6 Supabase materialized view policy). The dbt model enforces this filter before insert.
+
+#### 13.4.4 `fact_session_metrics`
+
+One row per workout session. Populated from `fact_events` joins, rebuilt hourly.
+
+```sql
+CREATE TABLE analytics.fact_session_metrics
+(
+    session_id        UUID,
+    user_id           UUID,
+    date              Date,
+    sets_logged       UInt16,
+    ai_turns          UInt16,
+    voice_played      UInt8,                     -- 1 if ai_voice_played fired in session
+    duration_seconds  UInt32,
+    completed         UInt8,                     -- 1 if workout_completed; 0 if workout_abandoned
+    tier              LowCardinality(String),
+    tenant_id         Nullable(UUID),
+    app_version       LowCardinality(String),
+    platform          LowCardinality(String),
+    ingested_at       DateTime64(3, 'UTC')
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+PARTITION BY toYYYYMM(date)
+ORDER BY (user_id, date, session_id)
+SETTINGS index_granularity = 8192;
+```
+
+---
+
+### 13.5 ETL Pipeline
+
+#### 13.5.1 PostHog → ClickHouse sync
+
+| Pipeline | Method | Cadence | Target table |
+|---|---|---|---|
+| Raw events | PostHog S3 batch export (EU bucket) | Hourly | `fact_events` |
+| Session metrics | dbt model over `fact_events` | Hourly, 15 min after export | `fact_session_metrics` |
+| User dimension | dbt model from Supabase read replica + `fact_events` | Daily at 03:30 UTC | `dim_users` |
+| Cohort retention | dbt model over `fact_events` + `dim_users` | Daily at 04:00 UTC | `fact_cohort_retention` |
+
+The full daily ETL sequence (coordinated by Cloudflare Cron Trigger):
+
+```
+03:00 UTC  Supabase read replica → ClickHouse dim_users snapshot
+03:15 UTC  PostHog S3 export batch lands
+03:20 UTC  ClickHouse COPY INTO fact_events FROM S3
+03:30 UTC  dbt run --select session_metrics
+04:00 UTC  dbt run --select cohort_retention
+04:15 UTC  Refresh Metabase dashboard caches
+04:20 UTC  Send daily metrics digest to founder Slack (Cloudflare Worker)
+```
+
+Hourly incremental runs at H:15 cover `fact_events` and `fact_session_metrics` only. Cohort and dimension tables are daily (require full-scan aggregation).
+
+#### 13.5.2 Real-time path
+
+Subscription state changes are not batched. The Cloudflare Worker Stripe webhook handler:
+
+1. Updates Supabase `users.tier` and `subscriptions` table immediately.
+2. Emits a server-side PostHog event with `server_timestamp`.
+3. The hourly PostHog export picks up the event within 75 minutes maximum.
+
+For sub-minute latency on active-user counts, PostHog real-time dashboard queries are used directly. ClickHouse is not in the real-time path.
+
+#### 13.5.3 dbt model structure
+
+```
+models/
+  staging/
+    stg_posthog_events.sql         -- deduplicates fact_events using FINAL
+    stg_supabase_users.sql         -- pulls from Supabase read replica
+  marts/
+    dim_users.sql                  -- joins stg_posthog_events + stg_supabase_users
+    fact_session_metrics.sql       -- pivots workout_* events into session rows
+    fact_cohort_retention.sql      -- cohort join + retention window calculation
+```
+
+All dbt models include a `config(tags=["pii_safe"])` assertion that fails if any column name matches the forbidden property key list from §13.3.
+
+---
+
+### 13.6 Privacy Constraints
+
+This section is the authoritative list of what is **never** permitted in any analytics event, ClickHouse table, or dbt model output. Extends §5 (Data Classification) and §6 (Privacy Floor Enforcement) into the analytics layer.
+
+#### 13.6.1 Prohibited analytics data
+
+| Category | Specific fields prohibited | Regulatory basis |
+|---|---|---|
+| Direct identifiers | Email, display name, phone, Apple Sign In subject claim | GDPR Art. 5(1)(a), Art. 25 |
+| Body measurements | Weight (kg/lbs), height, BMI, body fat %, waist circumference | GDPR Art. 9 (health data when combined with identity) |
+| Meal content | Food item names, calorie counts, macro breakdowns, meal log text | GDPR Art. 9; clinical-safety ED screening risk |
+| Injury and health notes | Injury descriptions, pain ratings, restriction text from coaching | GDPR Art. 9 |
+| Mental health signals | Any flag derived from coaching turn sentiment, burnout scores | GDPR Art. 9 |
+| CV and form data | Raw pose keypoints, joint angles, form scores per set, `cv_flags` JSONB | GDPR Art. 9 (biometric data) |
+| Coaching content | Any free text from `coaching_turns.content` | GDPR Art. 9; Confidential classification (§5) |
+| Precise location | GPS lat/lng, postcode | GDPR Art. 9 when combined with health context |
+| Advertising identifiers | IDFA, GAID, fingerprint hashes | ATT framework; GDPR Art. 5(1)(c) data minimisation |
+| Payment detail | Stripe customer ID, card last-4, invoice amounts | PCI-DSS; GDPR Art. 5(1)(c) |
+
+**What is permitted** as analytics properties in workouts: exercise name (from a fixed catalogue), rep count, set count, RPE value (1–10 scale), session duration, completion boolean. These are training-behaviour signals and do not constitute Art. 9 health data in isolation.
+
+#### 13.6.2 Retention and deletion
+
+- **ClickHouse `fact_events`:** 2-year TTL enforced by `TTL toDateTime(ts) + INTERVAL 2 YEAR DELETE`.
+- **After 2 years:** aggregate-only. Cohort tables retained indefinitely (no user-level rows).
+- **On GDPR Art. 17 erasure:** user_id rows deleted from `fact_events`, `fact_session_metrics`, and `dim_users` within 30 days. Triggered by the same erasure queue as §12.3. `fact_cohort_retention` not deleted (aggregates; k-anonymity floor applied).
+- **Art. 17 ClickHouse erasure SQL** committed to `src/analytics/backfills/erasure_template.sql`.
+
+#### 13.6.3 Cross-reference to §5 classifications
+
+| §5 Classification | May appear in analytics events? | May appear in ClickHouse? |
+|---|---|---|
+| Public | Yes | Yes |
+| Internal | No (email, name are Internal) | No |
+| Confidential | No | No |
+| Sensitive | No | No |
+| Restricted | No | No |
+
+---
+
+### 13.7 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Create `src/analytics/events.schema.ts` with Zod schemas for all §13.2 events | `data-engineer` | P0 | M3 |
+| Add CI schema validation step (Zod parse on all event fixtures) | `data-engineer` | P0 | M3 |
+| Implement `stripForbiddenProperties` in Cloudflare Worker enrichment middleware | `data-engineer` + `devops-lead` | P0 | M3 |
+| Configure PostHog EU Cloud project; set `person_profiles: "identified_only"` | `data-engineer` | P0 | M3 |
+| Wire React Native PostHog SDK; emit `app_opened`, `onboarding_*`, `workout_*` events | `data-engineer` | P0 | M3 |
+| Server-side subscription events from Stripe webhook handler | `data-engineer` | P0 | M3 |
+| Server-side SSO login events from OIDC callback handler | `data-engineer` | P1 | M4 |
+| Provision ClickHouse Cloud cluster (EU region); apply §13.4 DDL | `devops-lead` | P1 | M4 |
+| Configure PostHog S3 batch export (EU bucket); validate no cross-region copy | `devops-lead` | P1 | M4 |
+| Build dbt models: `stg_posthog_events`, `dim_users`, `fact_session_metrics` | `data-engineer` | P1 | M4 |
+| Build dbt model: `fact_cohort_retention`; enforce k-anonymity floor (N < 5 suppressed) | `data-engineer` | P1 | M4 |
+| Schedule Cloudflare Cron Trigger for daily ETL sequence (§13.5.1) | `devops-lead` | P1 | M4 |
+| Create Metabase instance (self-hosted); connect to ClickHouse; build D1/D7/D30 retention dashboard | `data-engineer` | P1 | M4 |
+| Implement Art. 17 ClickHouse erasure job; commit template SQL to `src/analytics/backfills/` | `data-engineer` | P1 | M4 |
+| Add `streak_*` events after streak engine ships (DEC-013) | `data-engineer` | P1 | M4 |
+| Implement `feature_flag_exposure` schema wrapper on PostHog flag evaluation | `data-engineer` | P2 | M5 |
+| Add dbt `pii_safe` tag assertion to all marts | `data-engineer` | P2 | M5 |
+| Load-test PostHog enrichment middleware at 10× expected launch DAU | `devops-lead` | P2 | M5 |
+| Validate ClickHouse TTL purge with a synthetic 2-year-old dataset | `data-engineer` | P2 | M5 |
+
+---
+
+*v0.4 additions: §13 Analytics Event Tracking Schema — PostHog event taxonomy (nine event categories, 29 named events with typed properties, universal enriched properties); Cloudflare Worker enrichment middleware with Zod validation and forbidden-property scrubbing; ClickHouse warehouse: four tables (fact_events ReplacingMergeTree, dim_users ReplacingMergeTree, fact_cohort_retention AggregatingMergeTree, fact_session_metrics ReplacingMergeTree) with partition keys, ORDER BY, and TTL; hourly + daily ETL pipeline via PostHog S3 export → ClickHouse → dbt; dbt model structure; GDPR Art. 9 analytics prohibition table (10 categories); 2-year ClickHouse TTL; Art. 17 erasure job; §5 classification cross-reference; 19-item implementation checklist across M3/M4/M5.*

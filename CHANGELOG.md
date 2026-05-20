@@ -11,6 +11,16 @@
 
 ---
 
+## [0.86.0] — 2026-05-20
+
+### Added
+- `docs/OBSERVABILITY.md §16` — Synthetic Monitoring & Uptime Verification: twelve-probe taxonomy S-001–S-012 (API health, auth, workout logging, AI coaching turn, SSO SAML metadata, SCIM, HMAC audit chain, backup freshness, CDN, status page, Stripe webhook, PostHog ingest); Better Stack declarative YAML config; Cloudflare scheduled Worker implementations for S-007 (HMAC chain) and S-008 (backup freshness) with TypeScript; multi-region strategy (us-east-1, eu-central-1, ap-southeast-1), 2-of-3 failure threshold; regional latency SLO table; post-deployment smoke gate (GitHub Actions, 120s, P1 alert); synthetic user data hygiene across 7 pipelines; PagerDuty payload schema; SOC 2 CC7.2/CC7.3/A1.2/CC4.1 evidence mapping; 13-item implementation checklist (M3/M4/M5). Observability doc → v0.3.
+- `content/post-56-periodization-models.md` — **Periodization Models: Linear, Undulating, and Block** (sports-scientist, clinical-safety-reviewed: no food/injury/pain content). LP structure with 8-week example table; DUP with Rhea et al. (2002) and Prestes et al. (2009) research basis; block periodization (accumulation → transmutation → realization), residual training effects (strength ~30d, aerobic ~15–25d), conjugate variant; model-selection matrix (training age × schedule × goal); RPE/RIR autoregulation integration note. ~1,100 words.
+- `docs/SOC2_READINESS.md §28` — CC9 Risk Mitigation & Vendor Risk Management: CC9.1 risk mitigation register (10 risk categories, explicit transfer/reduce/accept/avoid strategy, residual risk levels, evidence artefacts); insurance program roadmap (cyber liability $2M, D&O $2M, E&O $1M, pre-Series A timeline); CC9.2 full vendor risk assessment table covering 10 vendors (Anthropic, ElevenLabs, Supabase, Cloudflare, PostHog EU, Better Stack, Expo/EAS, Stripe, 1Password, GitHub) with criticality, SOC 2 status, DPA status, SLA, contingency; Cloudflare concentration risk formally documented with acceptance statement; Expo/EAS gap (no SOC 2, no DPA) surfaced as CC9-GAP-003; 8-item implementation checklist CC9-GAP-001–008; CC9 gap analysis 14 sub-criteria; SOC 2 readiness ~77% → ~82%. SOC2 doc → v1.8.
+- `docs/DATA_MODEL.md §13` — Analytics Event Tracking Schema: PostHog event taxonomy (9 categories, 29 named events with typed properties, universal enriched properties); Cloudflare Worker enrichment middleware with Zod validation and forbidden-property scrubbing (`stripForbiddenProperties` — 16 prohibited fields); ClickHouse warehouse: 4 tables (fact_events ReplacingMergeTree 2yr TTL, dim_users, fact_cohort_retention AggregatingMergeTree with k-anon floor N<5, fact_session_metrics); hourly + daily ETL pipeline via PostHog S3 export → ClickHouse → dbt; GDPR Art. 9 analytics prohibition table (10 categories); Art. 17 erasure job; 19-item checklist (M3/M4/M5). DATA_MODEL doc → v0.4.
+
+---
+
 ## [0.85.1] — 2026-05-19
 
 ### Added
