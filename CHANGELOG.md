@@ -11,6 +11,22 @@
 
 ---
 
+## [0.91.1] — 2026-05-20
+
+### Changed
+- [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) → **v0.4**: added §17 Cost Monitoring & Anomaly Alerting; doc header version bumped from v0.2 to v0.4; §10 "Cost monitor Worker" gap entry updated to "Design complete — see §17."
+  - **§17.1 Architecture**: daily Cloudflare scheduled Worker (Cron Trigger `0 6 * * *`) fetching Anthropic Admin API (input/output token counts), ElevenLabs monthly character delta via KV namespace, Cloudflare GraphQL Analytics (Workers requests). Supabase Postgres as the cost store; separate PagerDuty service "FORM Cost" with low-urgency routing to avoid paging on-call for non-user-impacting cost spikes.
+  - **§17.2 Schema**: `cost_daily` table with generated `variance_pct` column (actual vs. COST_MODEL.md projection); `cost_anomalies` table for immutable anomaly log; `form_cost_monitor` Postgres role with write-only grants and no RLS bypass.
+  - **§17.3 Thresholds**: per-service P1 (1.5× 7d rolling avg) and P0 (3× 7d rolling avg) anomaly thresholds derived from COST_MODEL.md §13.1; externalised to `COST_THRESHOLDS` Workers Secret for hot-update without redeploy; Supabase absolute thresholds (6 GB / 7.5 GB DB size) aligned to the $25 Pro → $599 Team plan cliff.
+  - **§17.4 Worker implementation**: TypeScript pseudocode for `fetchAnthropicUsage` (Anthropic Admin API `/v1/usage`), `fetchElevenLabsUsage` (cumulative-delta via KV, 7-day TTL), `fetchCloudflareUsage` (GraphQL Analytics); `detectAnomalies` against externalized thresholds; `Promise.allSettled` for partial-failure tolerance; KV delta logic for ElevenLabs character accounting.
+  - **§17.5 Per-tenant COGS**: `cost_daily_per_tenant` materialized view from `coaching_sessions` (token + voice char telemetry per tenant); `pg_cron` refresh at 07:00 UTC; per-tenant anomaly thresholds (margin-negative single-day = P0; 5× spike = P1); privacy constraint: view restricted to `form_admin` only — not exposed to enterprise admin dashboard.
+  - **§17.6 Dashboards**: three Metabase specs — Infra Cost Overview (six panels: daily COGS by service, 7d trend, COGS/Pro MAU, Anthropic split, ElevenLabs %, MTD run rate); Enterprise Tenant Cost panel (restricted, four panels including COGS vs. contracted revenue scatter); Cost Anomaly History (open anomalies, last-30d resolved, P0 frequency trend).
+  - **§17.7 Alerting**: PagerDuty event payload schema with `dedup_key` on `service + metric + date`; Slack `#metrics` daily digest format (06:10 UTC) with and without anomaly section; urgency routing table distinguishing cost-only P0 (low urgency, business-hours response) from service-impacting cost anomaly (routes to FORM Production, high urgency).
+  - **§17.8 SOC 2 evidence**: CC7.2 (continuous monitoring), CC7.3 (anomaly evaluation with immutable `cost_anomalies` log), CC5.2 (per-tenant resource accounting as technology control), A1.2 (cost spike as leading capacity indicator before rate-limit availability event); monthly CSV export to `compliance/evidence/cost-daily-YYYY-MM.csv`.
+  - **§17.9 Checklist**: 16 tasks across M3/M4/M5 — P0: migrations, Worker code, cron trigger, four secrets, KV namespace, Postgres role; P1: PagerDuty service, Slack webhook, pg_cron refresh, three Metabase dashboards; P2: est_cost_usd seed, compliance CSV export, ElevenLabs history endpoint upgrade.
+
+---
+
 ## [0.91.0] — 2026-05-20
 
 ### Added

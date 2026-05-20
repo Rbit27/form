@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v0.2
+# FORM · Observability & Monitoring Taxonomy v0.4
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -645,7 +645,7 @@ The following items are known gaps as of v0.1. Each has an owner and a target re
 | **PagerDuty not provisioned** | On-call routing is manual. Acceptable solo-founder stage; required before first on-call rotation. | devops-lead | M3 or first engineering hire |
 | **Per-tenant SLA reporting** | The Enterprise SLA dashboard (§8.4) depends on `tenant_id` label propagation in metrics, which is not yet implemented. Design complete — see **§13**. | platform-engineer | M4 (enterprise launch) |
 | **Sentry `beforeSend` health data filter** | The hook to strip health-adjacent fields from crash reports before Sentry transmission is not yet implemented. Blocking for GDPR compliance. | mobile-engineer | M2 |
-| **Cost monitor Worker** | Daily cost aggregation from all billing APIs is not yet implemented. Cost anomaly alerting is not active. | devops-lead | M3 |
+| **Cost monitor Worker** | Daily cost aggregation from all billing APIs is not yet implemented. Cost anomaly alerting is not active. Design complete — see **§17**. | devops-lead | M3 |
 | **ClickHouse for analytics** | Planned from M9. Until then, PostHog and Supabase materialized views carry the analytics load. Observability strategy for ClickHouse (traces, product events at scale) is not yet designed. | platform-engineer | M9 |
 | **Trace correlation between Sentry and Cloudflare** | Sentry transactions and Cloudflare trace IDs are not yet correlated. An error in Sentry cannot be mapped to a Cloudflare trace without manual log search. Requires shared `trace_id` propagation. Design complete — see **§14**. | platform-engineer | M3 |
 | **HMAC chain verification cron** | The weekly chain integrity cron described in `AUDIT_LOG_SCHEMA.md` is not yet deployed. Chain breaks would not be detected automatically. | devops-lead | M3 |
@@ -1780,4 +1780,479 @@ Better Stack uptime reports are exported monthly as PDF and stored in `complianc
 
 ---
 
+## 17. Cost Monitoring & Anomaly Alerting
+
+> Owner: devops-lead + data-engineer. Review: monthly or on any cost-cliff event. SOC 2 evidence: CC7.2, CC5.2, A1.2.
+> Closes the gap documented in §10 ("Cost monitor Worker"). Cross-reference: `docs/COST_MODEL.md` (unit economics and per-service thresholds), `docs/ENTERPRISE.md` (seat pricing and COGS targets).
+
+---
+
+### 17.1 Architecture
+
+The cost monitor is a Cloudflare **scheduled Worker** that runs at 06:00 UTC daily. It pulls the previous day's usage from each vendor's billing API, normalises it into a `cost_daily` table in Supabase, compares against rolling baselines, and either publishes a digest to `#metrics` or triggers a PagerDuty alert if a threshold is breached.
+
+```
+06:00 UTC daily
+   │
+   ├── Anthropic Admin API  → input_tokens, output_tokens, cost_usd
+   ├── ElevenLabs /v1/user  → character_count, cost_usd (delta from KV)
+   ├── CF GraphQL Analytics → workers_requests, cost_usd
+   └── Supabase Mgmt API    → db_size_gb, bandwidth_gb (no marginal billing below plan)
+                │
+                ▼
+         cost_daily (Supabase)
+                │
+       ┌────────┴─────────────────────────┐
+       │  anomaly detection               │  no anomaly
+       │  (§17.3 thresholds)              │
+       ▼                                  ▼
+  PagerDuty + Slack alert         Slack daily digest
+```
+
+**Why a scheduled Worker, not a Lambda / Cloud Run job?** Cloudflare Workers are already FORM's compute plane; adding a cron trigger requires only a `wrangler.toml` entry and avoids introducing a second runtime. The Worker runs in the `eu-central-1` Cloudflare data centre to minimise latency to the Supabase EU instance.
+
+**Excluded from initial scope:** PostHog cost (free tier until 1M events/month; trivial to add at that milestone), Redis (fixed instance cost, no per-query billing), Expo/EAS (fixed plan). Add these when marginal spend becomes material (see COST_MODEL.md §13.2).
+
+---
+
+### 17.2 Data Schema
+
+```sql
+-- Append-only. One row per (date, service, metric) per day. Upsert on conflict for idempotent re-runs.
+CREATE TABLE cost_daily (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date            DATE NOT NULL,
+  service         TEXT NOT NULL   -- 'anthropic' | 'elevenlabs' | 'cloudflare' | 'supabase'
+                    CHECK (service IN ('anthropic', 'elevenlabs', 'cloudflare', 'supabase', 'posthog', 'sentry', 'redis')),
+  metric_name     TEXT NOT NULL,  -- 'input_tokens' | 'output_tokens' | 'characters' | 'requests' | 'db_size_gb'
+  metric_value    NUMERIC NOT NULL,
+  cost_usd        NUMERIC(10,4) NOT NULL,   -- actual billed cost in USD
+  est_cost_usd    NUMERIC(10,4),            -- projection from COST_MODEL.md (seeded at launch)
+  variance_pct    NUMERIC(5,2)              -- (actual − est) / est × 100; NULL until est_cost_usd populated
+    GENERATED ALWAYS AS (
+      CASE WHEN est_cost_usd IS NOT NULL AND est_cost_usd > 0
+           THEN ROUND(((cost_usd - est_cost_usd) / est_cost_usd) * 100, 2)
+           ELSE NULL END
+    ) STORED,
+  tenant_id       UUID REFERENCES tenants(id) ON DELETE SET NULL,  -- NULL = platform-level
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (date, service, metric_name, COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::UUID))
+);
+
+CREATE INDEX cost_daily_date_service ON cost_daily (date, service);
+CREATE INDEX cost_daily_tenant_date  ON cost_daily (tenant_id, date) WHERE tenant_id IS NOT NULL;
+CREATE INDEX cost_daily_date_desc    ON cost_daily (date DESC);  -- for rolling-average lookups
+
+-- Anomaly log: written when any threshold in §17.3 is breached.
+CREATE TABLE cost_anomalies (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  detected_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  date          DATE NOT NULL,
+  service       TEXT NOT NULL,
+  metric_name   TEXT NOT NULL,
+  observed      NUMERIC NOT NULL,
+  baseline_7d   NUMERIC NOT NULL,
+  ratio         NUMERIC(5,2) NOT NULL,
+  severity      TEXT NOT NULL CHECK (severity IN ('P0', 'P1')),
+  resolved_at   TIMESTAMPTZ,
+  resolution    TEXT
+);
+```
+
+**RLS on `cost_daily`:** The `form_api` role cannot read or write this table — it is written only by the scheduled Worker (service-role key, used only in the Worker's secret binding, never in request-path code) and read by `form_admin` and Metabase service account only. Enterprise tenant admins do **not** see this table; per-tenant COGS is surfaced as an aggregated metric through the admin dashboard API (§7.4).
+
+---
+
+### 17.3 Anomaly Thresholds by Service
+
+Thresholds are derived from COST_MODEL.md §13.3 "cost cliff" analysis and §2.1 behavioral assumptions. The 1.5× P1 threshold detects gradual drift; the 3× P0 threshold detects runaway usage.
+
+| Service | Metric | P1 threshold | P0 threshold | Model baseline (daily) | Notes |
+|---|---|---|---|---|---|
+| **Anthropic** | `input_tokens` | > 1.5× 7d avg | > 3× 7d avg | MAU × 0.43k tokens/day [ESTIMATE] | Prompt caching hit-rate drop triggers this first |
+| **Anthropic** | `output_tokens` | > 1.5× 7d avg | > 3× 7d avg | MAU × 0.108k tokens/day [ESTIMATE] | |
+| **Anthropic** | `cost_usd` (daily) | > $50 (pre-5k MAU) | > $200 | ~$0.09 × MAU / 30 | Absolute floor before volume scaling kicks in |
+| **ElevenLabs** | `characters` | > 1.5× 7d avg | > 3× 7d avg | Pro-MAU × adoption × 1,200 chars/session × sessions/day | Voice adoption spike is the primary driver |
+| **ElevenLabs** | `cost_usd` (daily) | > $30 (pre-5k MAU) | > $100 | ~$0.22 × Pro-MAU / 30 | |
+| **Cloudflare** | `workers_requests` | > 2× 7d avg | > 5× 7d avg | MAU × 15 req/session × sessions/day | Traffic spike or retry storm |
+| **Supabase** | `db_size_gb` | > 6 GB | > 7.5 GB | Grows ~15 MB/user/month (§COST_MODEL §2.1) | Step-function cost at 8 GB (Team plan) |
+| **Supabase** | `bandwidth_gb` (monthly) | > 200 GB | > 240 GB | 80 MB/Pro-user/month | Monitored monthly, not daily |
+
+**Threshold adjustment policy:** Thresholds are reviewed at each MAU milestone (1k, 5k, 10k, 50k). The devops-lead updates the Worker's `COST_THRESHOLDS` environment variable (stored in Cloudflare Secrets) at each milestone. Do not hard-code thresholds in the Worker source — they must be externalised for hot-update without redeploy.
+
+---
+
+### 17.4 Daily Cost Aggregation Worker
+
+```typescript
+// workers/cost-monitor/index.ts
+// Cron trigger: "0 6 * * *"  (06:00 UTC daily)
+// See: wrangler.toml [triggers] crons = ["0 6 * * *"]
+
+interface Env {
+  ANTHROPIC_ADMIN_KEY:   string;  // Anthropic workspace admin key (not the API key)
+  ELEVENLABS_API_KEY:    string;
+  CF_ANALYTICS_TOKEN:    string;  // Cloudflare Analytics Read token (account-level)
+  CF_ACCOUNT_ID:         string;
+  SUPABASE_SERVICE_KEY:  string;
+  SUPABASE_URL:          string;
+  PAGERDUTY_COST_KEY:    string;  // Separate routing key from infra alerts
+  SLACK_METRICS_WEBHOOK: string;
+  COST_THRESHOLDS:       string;  // JSON blob: { "anthropic.input_tokens.p1_ratio": 1.5, ... }
+  EL_CHAR_KV:            KVNamespace;  // Stores previous-day ElevenLabs cumulative char count
+}
+
+interface DailyCost {
+  service:      string;
+  metric_name:  string;
+  metric_value: number;
+  cost_usd:     number;
+}
+
+export default {
+  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+    const yesterday = new Date();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const date = yesterday.toISOString().split('T')[0]; // "YYYY-MM-DD"
+
+    const [anthropic, elevenLabs, cloudflare] = await Promise.allSettled([
+      fetchAnthropicUsage(date, env),
+      fetchElevenLabsUsage(date, env),
+      fetchCloudflareUsage(date, env),
+    ]);
+
+    const rows: DailyCost[] = [
+      ...settled(anthropic),
+      ...settled(elevenLabs),
+      ...settled(cloudflare),
+    ];
+
+    // Upsert to Supabase cost_daily
+    await upsertCostRows(date, rows, env);
+
+    // Load 7-day rolling averages from cost_daily
+    const baselines = await load7DayBaselines(date, env);
+
+    // Detect anomalies
+    const thresholds = JSON.parse(env.COST_THRESHOLDS);
+    const anomalies = detectAnomalies(rows, baselines, thresholds);
+
+    if (anomalies.length > 0) {
+      await insertAnomalies(date, anomalies, env);
+      await Promise.all([
+        alertPagerDuty(anomalies, env),
+        postSlack(date, rows, anomalies, env),
+      ]);
+    } else {
+      await postSlack(date, rows, [], env);
+    }
+  },
+};
+
+// ── Anthropic ─────────────────────────────────────────────────────────────────
+async function fetchAnthropicUsage(date: string, env: Env): Promise<DailyCost[]> {
+  const start = `${date}T00:00:00Z`;
+  const end   = `${date}T23:59:59Z`;
+  const res = await fetch(
+    `https://api.anthropic.com/v1/usage?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+    { headers: { 'x-api-key': env.ANTHROPIC_ADMIN_KEY, 'anthropic-version': '2023-06-01' } }
+  );
+  if (!res.ok) throw new Error(`Anthropic usage API ${res.status}: ${await res.text()}`);
+  const body: { usage: { input_tokens: number; output_tokens: number } } = await res.json();
+  const INPUT_RATE  = 3.00 / 1_000_000;
+  const OUTPUT_RATE = 15.00 / 1_000_000;
+  return [
+    { service: 'anthropic', metric_name: 'input_tokens',  metric_value: body.usage.input_tokens,  cost_usd: body.usage.input_tokens  * INPUT_RATE  },
+    { service: 'anthropic', metric_name: 'output_tokens', metric_value: body.usage.output_tokens, cost_usd: body.usage.output_tokens * OUTPUT_RATE },
+  ];
+}
+
+// ── ElevenLabs ────────────────────────────────────────────────────────────────
+// ElevenLabs does not expose a per-day endpoint; it returns the billing-cycle cumulative total.
+// We store yesterday's cumulative in KV and subtract to derive a daily delta.
+async function fetchElevenLabsUsage(date: string, env: Env): Promise<DailyCost[]> {
+  const res = await fetch('https://api.elevenlabs.io/v1/user', {
+    headers: { 'xi-api-key': env.ELEVENLABS_API_KEY },
+  });
+  if (!res.ok) throw new Error(`ElevenLabs API ${res.status}: ${await res.text()}`);
+  const body: { subscription: { character_count: number } } = await res.json();
+  const currentTotal = body.subscription.character_count;
+
+  const prevKey = `el_chars_${date}`;
+  const prevRaw = await env.EL_CHAR_KV.get(prevKey);
+  const prevTotal = prevRaw ? parseInt(prevRaw, 10) : currentTotal; // fallback: 0 delta on first run
+
+  // Store today's total for tomorrow's delta
+  const tomorrowKey = `el_chars_${advanceDate(date, 1)}`;
+  await env.EL_CHAR_KV.put(tomorrowKey, String(currentTotal), { expirationTtl: 60 * 60 * 24 * 7 }); // 7d TTL
+
+  const dailyChars = Math.max(0, currentTotal - prevTotal);
+  const CHAR_RATE = 0.30 / 1_000;
+  return [{ service: 'elevenlabs', metric_name: 'characters', metric_value: dailyChars, cost_usd: dailyChars * CHAR_RATE }];
+}
+
+// ── Cloudflare ────────────────────────────────────────────────────────────────
+async function fetchCloudflareUsage(date: string, env: Env): Promise<DailyCost[]> {
+  const query = `{
+    viewer { accounts(filter: { accountTag: "${env.CF_ACCOUNT_ID}" }) {
+      workersInvocationsAdaptive(
+        limit: 1
+        filter: { date_gt: "${date}", date_lt: "${advanceDate(date, 1)}" }
+        orderBy: [date_ASC]
+      ) { sum { requests } }
+    }}
+  }`;
+  const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${env.CF_ANALYTICS_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  });
+  if (!res.ok) throw new Error(`CF GraphQL ${res.status}`);
+  const body: { data: { viewer: { accounts: Array<{ workersInvocationsAdaptive: Array<{ sum: { requests: number } }> }> } } } = await res.json();
+  const requests = body.data.viewer.accounts[0]?.workersInvocationsAdaptive[0]?.sum?.requests ?? 0;
+  // Workers Paid: $0.50 / 1M requests above 100k/day free threshold
+  const billableRequests = Math.max(0, requests - 100_000);
+  const cost = (billableRequests / 1_000_000) * 0.50;
+  return [{ service: 'cloudflare', metric_name: 'workers_requests', metric_value: requests, cost_usd: cost }];
+}
+
+// ── Anomaly detection ─────────────────────────────────────────────────────────
+interface Anomaly {
+  service: string; metric_name: string;
+  observed: number; baseline_7d: number; ratio: number; severity: 'P0' | 'P1';
+}
+
+function detectAnomalies(
+  rows: DailyCost[],
+  baselines: Record<string, number>,
+  thresholds: Record<string, number>
+): Anomaly[] {
+  const out: Anomaly[] = [];
+  for (const row of rows) {
+    const key = `${row.service}.${row.metric_name}`;
+    const baseline = baselines[key];
+    if (!baseline || baseline === 0) continue;
+    const ratio = row.metric_value / baseline;
+    const p0 = thresholds[`${key}.p0_ratio`] ?? 3.0;
+    const p1 = thresholds[`${key}.p1_ratio`] ?? 1.5;
+    if (ratio >= p0) out.push({ service: row.service, metric_name: row.metric_name, observed: row.metric_value, baseline_7d: baseline, ratio, severity: 'P0' });
+    else if (ratio >= p1) out.push({ service: row.service, metric_name: row.metric_name, observed: row.metric_value, baseline_7d: baseline, ratio, severity: 'P1' });
+  }
+  return out;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function settled<T>(result: PromiseSettledResult<T[]>): T[] {
+  return result.status === 'fulfilled' ? result.value : [];
+}
+
+function advanceDate(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split('T')[0];
+}
+```
+
+**Security notes:**
+- `ANTHROPIC_ADMIN_KEY` is a workspace-level admin key (not the same as the inference API key). It has read-only access to usage data. Stored in Cloudflare Workers Secrets — never in `wrangler.toml` or git.
+- The Worker does not handle user data. It reads only billing API endpoints that return aggregated counts. No PII or health data flows through this Worker.
+- The Supabase connection uses the service-role key in a dedicated Worker secret binding, scoped to write-only access on `cost_daily` and `cost_anomalies` via a custom Postgres role:
+
+```sql
+-- Role for the cost monitor Worker (write-only, no SELECT except rolling avg query)
+CREATE ROLE form_cost_monitor NOINHERIT;
+GRANT INSERT, UPDATE ON cost_daily     TO form_cost_monitor;
+GRANT INSERT          ON cost_anomalies TO form_cost_monitor;
+GRANT SELECT ON cost_daily TO form_cost_monitor;  -- for the 7-day baseline query only
+-- No RLS bypass — cost_daily has no tenant_id RLS (it's ops-internal, not user-data)
+```
+
+---
+
+### 17.5 Per-Tenant Cost Attribution (Enterprise)
+
+Enterprise seats are billed at a fixed price ($6–12/seat/month, per COST_MODEL.md §8), but per-tenant COGS is tracked internally for margin accounting and early anomaly detection. A tenant whose daily COGS is 3× its 30-day average may have an integration bug, a test environment pointed at production, or unusually high activation in a short window — all worth investigating before the month-end billing reconciliation.
+
+```sql
+-- Materialized view: per-tenant daily COGS from coaching session telemetry.
+-- Token counts are logged server-side by the Cloudflare Worker on every Anthropic call.
+-- Voice chars are logged on every ElevenLabs call that completes successfully.
+CREATE MATERIALIZED VIEW cost_daily_per_tenant AS
+SELECT
+  s.tenant_id,
+  DATE_TRUNC('day', s.created_at AT TIME ZONE 'UTC')::DATE        AS date,
+  COUNT(*)                                                          AS sessions,
+  COALESCE(SUM(s.anthropic_input_tokens),  0)                      AS input_tokens,
+  COALESCE(SUM(s.anthropic_output_tokens), 0)                      AS output_tokens,
+  COALESCE(SUM(s.elevenlabs_chars),        0)                      AS voice_chars,
+  COALESCE(SUM(s.anthropic_input_tokens),  0) * 3.00  / 1e6       AS anthropic_input_usd,
+  COALESCE(SUM(s.anthropic_output_tokens), 0) * 15.00 / 1e6       AS anthropic_output_usd,
+  COALESCE(SUM(s.elevenlabs_chars),        0) * 0.30  / 1e3       AS elevenlabs_usd,
+  (  COALESCE(SUM(s.anthropic_input_tokens),  0) * 3.00  / 1e6
+   + COALESCE(SUM(s.anthropic_output_tokens), 0) * 15.00 / 1e6
+   + COALESCE(SUM(s.elevenlabs_chars),        0) * 0.30  / 1e3 )  AS total_cogs_usd
+FROM coaching_sessions s
+WHERE s.tenant_id IS NOT NULL
+GROUP BY s.tenant_id, DATE_TRUNC('day', s.created_at AT TIME ZONE 'UTC')::DATE;
+
+-- Refresh 60 minutes after cost_daily is populated (07:00 UTC daily)
+SELECT cron.schedule(
+  'refresh-cost-tenant',
+  '0 7 * * *',
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY cost_daily_per_tenant$$
+);
+```
+
+Per-tenant anomaly thresholds (checked by a Metabase alert rule, not the daily Worker):
+
+| Signal | Threshold | Response |
+|---|---|---|
+| Tenant COGS > 2× 30-day avg for 3 consecutive days | Investigate | devops-lead checks session logs; customer-success notified if no technical explanation found |
+| Single-day COGS > contracted monthly revenue (any tenant) | P0 | Margin-negative situation; devops-lead + customer-success + founder notified immediately |
+| Single-day COGS spike > 5× tenant 30-day avg | P1 | Integration bug suspected; review within 4 hours |
+| COGS per active seat > $1.50/day (≈ $45/seat/month, 4× the $0.34 model) | P1 | Unusual per-seat usage; request explanation from tenant admin |
+
+**Privacy constraint:** The `cost_daily_per_tenant` view is visible only to FORM operations staff (`form_admin` Postgres role and the Metabase service account). It is **not** exposed to the enterprise admin dashboard. The admin dashboard shows seat utilisation and engagement trends — not session token counts or inferred COGS. Surfacing per-session costs to tenant admins would reveal operational cost structure and coaching interaction depth, both of which are Restricted classification (§5 DATA_MODEL.md).
+
+---
+
+### 17.6 Cost Dashboards (Metabase — Internal)
+
+#### 17.6.1 Infra Cost Overview
+
+| Panel | Metric | Query source | Refresh |
+|---|---|---|---|
+| Daily total COGS by service | Stacked bar: `SUM(cost_usd) GROUP BY service, date` | `cost_daily` | Daily |
+| 7-day rolling COGS trend | Line: 7-period moving average | `cost_daily` window function | Daily |
+| COGS per Pro MAU | `total_cogs / active_pro_mau` | `cost_daily` JOIN `dim_users` | Daily |
+| Anthropic input vs. output split | Pie: `cost_usd GROUP BY metric_name WHERE service='anthropic'` | `cost_daily` | Daily |
+| ElevenLabs as % of total COGS | Gauge: `el_cost / total_cost` | `cost_daily` | Daily |
+| Month-to-date run rate vs. model | Progress bar: `SUM(cost_usd WHERE month=current) / est_monthly_budget` | `cost_daily JOIN financials` | Daily |
+| Variance from model (%) | `AVG(variance_pct) GROUP BY service` | `cost_daily` | Daily |
+
+#### 17.6.2 Enterprise Tenant Cost Panel (Restricted — devops-lead + founder only)
+
+| Panel | Metric | Notes |
+|---|---|---|
+| Top 10 tenants by COGS (current month) | Ranked bar chart | Sorted by `total_cogs_usd DESC` |
+| COGS vs. contracted revenue scatter | Scatter: x=contracted_mrr, y=tenant_cogs | Points above the y=x line are margin-negative |
+| COGS per active seat by tenant | Table: `total_cogs_usd / active_seats` | Outliers (> $1.50/seat/day) highlighted in orange |
+| Tenant COGS 30-day spark lines | Small multiples | One spark per enterprise tenant; sorted by MRR |
+
+#### 17.6.3 Cost Anomaly History
+
+A dedicated Metabase page sourced from `cost_anomalies`:
+
+| Panel | Metric |
+|---|---|
+| Open anomalies | `WHERE resolved_at IS NULL ORDER BY detected_at DESC` |
+| Anomalies resolved in last 30 days | With `resolution` text visible to the reviewer |
+| P0 anomaly frequency (trend chart) | Should read 0 at steady state |
+
+---
+
+### 17.7 Alerting Integration
+
+Cost anomaly alerts share the PagerDuty and Slack infrastructure with service degradation alerts but route to a **separate PagerDuty service** (`FORM Cost`) so they do not page the on-call engineer at 02:00 UTC for a non-user-affecting cost spike.
+
+**Urgency routing:**
+
+| Severity | PagerDuty service | PagerDuty urgency | On-call response expectation |
+|---|---|---|---|
+| P0 cost anomaly | `FORM Cost` | Low (email only, not phone) | Investigate next business day unless cost spike is user-impacting |
+| P1 cost anomaly | `FORM Cost` | Low | Acknowledge within 24 hours |
+| P0 *service* anomaly that also happens to be a cost anomaly (e.g., runaway retry loop) | `FORM Production` | High | Immediate — service impact overrides the cost framing |
+
+**PagerDuty event payload:**
+
+```json
+{
+  "routing_key": "<PAGERDUTY_COST_ROUTING_KEY>",
+  "event_action": "trigger",
+  "dedup_key": "cost-anomaly-2026-05-20-anthropic-input_tokens",
+  "payload": {
+    "summary": "[COST P0] anthropic/input_tokens 4.2× 7d avg — $247 vs $59 expected",
+    "severity": "critical",
+    "source": "cost-monitor-worker",
+    "timestamp": "2026-05-20T06:05:00Z",
+    "custom_details": {
+      "service":        "anthropic",
+      "metric":         "input_tokens",
+      "observed":       8400000,
+      "baseline_7d":    2000000,
+      "ratio":          4.2,
+      "cost_usd":       247.00,
+      "expected_usd":   59.00,
+      "runbook":        "docs/ENGINEERING_RUNBOOK.md#cost-spike-anthropic",
+      "dashboard_url":  "https://metabase.form.coach/question/cost-overview"
+    }
+  }
+}
+```
+
+**Slack daily digest format** (06:10 UTC to `#metrics`, sent whether or not anomalies are present):
+
+```
+📊 FORM Daily Cost — 2026-05-20
+───────────────────────────────────────
+Anthropic     $12.40   (↑ 8% vs 7d avg)
+ElevenLabs     $8.20   (↑ 3% vs 7d avg)
+Cloudflare     $0.12   (→ nominal)
+Supabase       $0.00   (plan cost; no marginal billing today)
+───────────────────────────────────────
+Total COGS    $20.72   today
+Per-Pro-MAU    $0.49   (model: $0.50)
+MTD total    $392.60   (on pace for $589/mo)
+───────────────────────────────────────
+No anomalies detected.
+```
+
+When anomalies are present, the anomaly section replaces the final line:
+
+```
+⚠️ ANOMALY P1: ElevenLabs characters 1.7× 7d avg (4.8M vs 2.8M)
+   → Investigate: rising voice adoption or ElevenLabs retry storm?
+   PD: https://form.pagerduty.com/incidents/QXXXXXXX
+```
+
+---
+
+### 17.8 SOC 2 Evidence Contribution
+
+| SOC 2 Criterion | How Cost Monitoring Satisfies It |
+|---|---|
+| **CC7.2 — System monitoring** | The daily cost aggregation Worker provides continuous automated monitoring evidence for the inference and voice-synthesis subsystems. An anomalous cost spike is a leading indicator of misconfiguration, unauthorized API access, or an upstream provider incident — all conditions CC7.2 requires FORM to detect. |
+| **CC7.3 — Anomaly evaluation** | The threshold table in §17.3 defines explicit anomaly criteria; `cost_anomalies` provides an immutable log of every detection event; PagerDuty tickets created for each anomaly satisfy the "evaluate and respond" requirement. |
+| **CC5.2 — Technology controls** | Per-tenant cost tracking (§17.5) enforces that each enterprise tenant's resource consumption is bounded and accounted for — a technology control analogous to per-tenant API rate limiting. |
+| **A1.2 — Availability capacity** | Approaching Anthropic rate limits first manifests as a cost spike before it becomes a user-facing availability event. Cost monitoring provides early-warning capacity signal aligned with the A1.2 capacity planning requirement. |
+
+**Auditor evidence artifacts:** The `cost_daily` table is exported to CSV monthly (`compliance/evidence/cost-daily-YYYY-MM.csv`) by a scheduled Metabase export and committed to the compliance store. These are filed alongside the synthetic monitoring uptime reports (§16.9) as part of the CC7.2 evidence package. The `cost_anomalies` table is exported to CSV quarterly.
+
+---
+
+### 17.9 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Write `migrations/YYYYMMDD_cost_daily.sql` (both tables) | platform-engineer | P0 | M3 |
+| Implement `workers/cost-monitor/index.ts` (§17.4) | devops-lead | P0 | M3 |
+| Add `[triggers] crons = ["0 6 * * *"]` to `wrangler.toml` for cost-monitor Worker | devops-lead | P0 | M3 |
+| Store `ANTHROPIC_ADMIN_KEY`, `ELEVENLABS_API_KEY`, `CF_ANALYTICS_TOKEN` in Workers Secrets | security-engineer | P0 | M3 |
+| Create `EL_CHAR_KV` KV namespace and bind it to cost-monitor Worker | devops-lead | P0 | M3 |
+| Create `COST_THRESHOLDS` secret (JSON blob, §17.3 initial values) | devops-lead | P0 | M3 |
+| Create Postgres role `form_cost_monitor` with scoped grants (§17.4 security note) | platform-engineer | P0 | M3 |
+| Create PagerDuty service "FORM Cost" with low-urgency routing key | devops-lead | P1 | M3 |
+| Configure Slack `#metrics` incoming webhook for daily digest | devops-lead | P1 | M3 |
+| Add Supabase `pg_cron` job `refresh-cost-tenant` at 07:00 UTC | platform-engineer | P1 | M3 |
+| Build Metabase "Infra Cost Overview" dashboard (§17.6.1, six panels) | data-engineer | P1 | M4 |
+| Build Metabase "Enterprise Tenant Cost" panel (§17.6.2, restricted access) | data-engineer | P1 | M4 |
+| Build Metabase "Cost Anomaly History" page (§17.6.3) | data-engineer | P1 | M4 |
+| Seed `cost_daily.est_cost_usd` from COST_MODEL.md §13.1 projections (per-MAU model) | data-engineer | P2 | M4 |
+| Automate monthly CSV export to `compliance/evidence/cost-daily-YYYY-MM.csv` | devops-lead | P2 | M4 |
+| Improve ElevenLabs daily delta accuracy: switch from KV delta to ElevenLabs history endpoint when available | platform-engineer | P2 | M5 |
+
+---
+
 *v0.3 additions: §16 Synthetic Monitoring & Uptime Verification — twelve-probe taxonomy (S-001 through S-012) covering API health, auth, workout logging, AI coaching turn, SSO SAML metadata, SCIM, audit log chain integrity, backup freshness, CDN, status page, Stripe webhook, PostHog ingest; Better Stack declarative YAML configuration; Cloudflare scheduled Worker implementations for S-007 (HMAC chain integrity) and S-008 (backup freshness) with TypeScript pseudocode; multi-region probe strategy (us-east-1, eu-central-1, ap-southeast-1) with 2-of-3 failure threshold; regional latency SLO table per probe; post-deployment smoke gate (GitHub Actions step, 120s timeout, P1 alert on failure, no auto-rollback); synthetic user data hygiene across seven pipelines (PostHog, ClickHouse, cohort ETL, DSAR, audit log, enterprise SLA); PagerDuty alert payload schema with deduplication and auto-resolve; SOC 2 CC7.2/CC7.3/A1.2/CC4.1 evidence mapping; thirteen-item implementation checklist across M3/M4/M5.*
+
+*v0.4 additions: §17 Cost Monitoring & Anomaly Alerting — daily cost aggregation Worker (Cloudflare Cron Trigger 06:00 UTC) fetching Anthropic Admin API, ElevenLabs character delta via KV, Cloudflare GraphQL Analytics; `cost_daily` and `cost_anomalies` Postgres schema with generated `variance_pct` column; per-service anomaly thresholds (P1 = 1.5× 7d avg, P0 = 3× 7d avg) externalised to Workers Secret for hot-update; `form_cost_monitor` Postgres role with scoped write-only grants; per-tenant COGS materialized view (`cost_daily_per_tenant`) from `coaching_sessions` token telemetry, refreshed at 07:00 UTC; Metabase dashboard specs (Infra Cost Overview, Enterprise Tenant Cost panel, Cost Anomaly History); separate PagerDuty "FORM Cost" service with low-urgency routing; Slack `#metrics` daily digest format (with and without anomalies); SOC 2 CC7.2/CC7.3/CC5.2/A1.2 evidence mapping; monthly CSV export to `compliance/evidence/`; sixteen-item implementation checklist across M3/M4/M5. Closes §10 gap: Cost monitor Worker.*
