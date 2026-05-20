@@ -11,6 +11,16 @@
 
 ---
 
+## [0.91.0] — 2026-05-20
+
+### Added
+- [`content/post-61-overreaching-vs-overtraining.md`](content/post-61-overreaching-vs-overtraining.md) — operational diagnostic framework for FO/NFO/OTS: Meeusen et al. 2013 ECSS/ACSM consensus, HRV trend, RPE drift, bar speed decline, decision tree by state, recovery protocols; clinical-safety reviewed ✓
+- [`blog.html`](blog.html) — cards for post-60 (deload protocols) and post-61 (overreaching vs overtraining)
+- [`README.md`](README.md) — roadmap extended to post-69; post-60 and post-61 marked done; topics post-62–69 queued
+- [`STATUS.md`](STATUS.md) — content engine table: entries added for post-60 and post-61
+
+---
+
 ## [0.90.0] — 2026-05-20
 
 ### Added

@@ -384,12 +384,16 @@ Each iteration:
 - [x] post-57: Тренінг після 40: саркопенія, анаболічна резистентність і програмування — Wilkinson et al. (2015) mTORC1 МПС −30%, Fragala et al. (2019) NSCA, Peterson et al. (2011) приріст у 60–70
 - [x] post-58: Mind-Muscle Connection — constrained action hypothesis Wulf et al. (2001), Calatayud et al. (2016) EMG internal vs external focus, Snyder & Fry (2012); практичний split за типом руху
 - [x] post-59: Zone 2 cardio — LT1 physiology, Seiler 80/20 context (10–15 год/тиждень endurance), interference Wilson et al. (2012), HIIT equivalence Gibala/Burgomaster; хто реально потребує, як дозувати
-- [ ] post-60: Жінки і силовий тренінг — фолікулярна vs лютеальна фаза, estrogen і м'язова адаптація, що показує дослідна база (clinical-safety review mandatory)
-- [ ] post-61: Overreaching vs overtraining: операційна діагностика — NFO, FO, OTS, Meeusen et al. 2013, HRV-тренд, RPE-drift
-- [ ] post-62: Foam rolling і міофасціальний реліз — що працює, що ритуал: EMG, ROM і latency досліди
-- [ ] post-63: Кофеїн і силовий тренінг — ergogenic evidence, timing protocols, tolerance, withdrawal
-- [ ] post-64: Allostatic load і тренувальна готовність — чому стандартні програми не враховують стрес-навантаження і що FORM робить інакше
-- [ ] post-65: Тренінг у гарячому і холодному середовищі — heat acclimation, cold exposure, термоадаптація для силових атлетів
+- [x] post-60: Deload protocols — supercompensation model, 4 types (volume/intensity/full/frequency), reactive vs proactive triggers, practical implementation examples (Meeusen 2013, Schoenfeld, Helms)
+- [x] post-61: Overreaching vs overtraining: операційна діагностика — NFO, FO, OTS, Meeusen et al. 2013, HRV-тренд, RPE-drift, decision tree, recovery by state
+- [ ] post-62: Жінки і силовий тренінг — фолікулярна vs лютеальна фаза, estrogen і м'язова адаптація, що показує дослідна база (clinical-safety review mandatory)
+- [ ] post-63: Foam rolling і міофасціальний реліз — що працює, що ритуал: EMG, ROM і latency досліди
+- [ ] post-64: Кофеїн і силовий тренінг — ergogenic evidence, timing protocols, tolerance, withdrawal
+- [ ] post-65: Allostatic load і тренувальна готовність — чому стандартні програми не враховують стрес-навантаження і що FORM робить інакше
+- [ ] post-66: Тренінг у гарячому і холодному середовищі — heat acclimation, cold exposure, термоадаптація для силових атлетів
+- [ ] post-67: Creatine — механізм PCr ресинтезу, силові vs гіпертрофія ефекти, протокол завантаження, коли не потрібне
+- [ ] post-68: Sleep and muscle recovery — SWS і МПС, sleep restriction protocols (Simpson 2017), практичні пріоритети для тих, хто не висипається
+- [ ] post-69: Protein timing revisited — anabolic window myth vs. daily distribution logic, Schoenfeld & Aragon (2013, 2018)
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
