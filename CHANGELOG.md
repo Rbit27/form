@@ -11,6 +11,13 @@
 
 ---
 
+## [0.94.0] — 2026-05-20
+
+### Added
+- **`content/post-64-plyometrics-strength-athletes.md`** — editorial-brutalist пост «Plyometrics for Strength Athletes: Rate of Force Development and the Power Transfer Question». SSC механіка (slow-SSC GCT >250ms vs fast-SSC <250ms), RFD як gap силового тренінгу (0–200ms вікно), дослідження: Rimmer & Sleivert (2000), Arabatzi & Kellis (2012), Saez de Villarreal et al. (2012 JSCR meta-analysis), tendon adaptation lag Magnusson/Bohm. Програмування в foot contacts (80–100 FC beginner → 200+ advanced), intensity categories (low/medium/high), session placement rules (до силової, не після hypertrophy volume), хвилеподібна прогресія замість лінійної. Типові помилки: занадто швидке збільшення об'єму (10% правило → tendon lag constraint), soft surfaces only, ignoring landing quality, лінійний overload. FORM/Victor секція: три умови перед додаванням плайометрики (training age + strength base + recovery capacity). Clinical-safety PASS.
+
+---
+
 ## [0.93.1] — 2026-05-20
 
 ### Changed
