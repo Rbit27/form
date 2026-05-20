@@ -11,6 +11,14 @@
 
 ---
 
+## [0.95.1] — 2026-05-20
+
+### Changed
+- **`docs/SOC2_READINESS.md`** v2.2 → v2.3 — **§35 P1–P8 — Privacy: Deep-Dive Control Implementation** (compliance-officer). Completes the SOC 2 deep-dive series: §33 A1 Availability (v2.1), §34 C1 Confidentiality (v2.2), §35 P-series Privacy (v2.3). Full mapping of all 16 AICPA P-series sub-criteria against GDPR article-level obligations. GDPR ↔ P-series mapping table (§35.2) establishes dual-compliance framework: DEC-030 HMAC-chained audit events serve simultaneously as SOC 2 evidence and GDPR Art. 5(2) accountability artifacts. 53 controls (PRV-01–PRV-53): Art. 13 notice delivery architecture with scroll-completion gate and `consent_version` stamping; five-category granular consent model with DEC-030 `privacy.consent_granted` / `privacy.consent_withdrawn` event schema; data minimization (CV on-device inference, LLM prompt PII stripping, PostHog Art. 9 field blocklist); §35.6.3 health data retention schedule (workout_sessions 3yr, coaching_turns 2yr, cv_sessions 1yr, wearable_readings 2yr, meal_log 2yr); §35.7.2 authoritative DSAR five-step process flow with 30-day GDPR Art. 15 SLA; §35.8.2 four-principle government request handling policy; 72h/1h breach notification SLAs. 8 gaps: P-GAP-001 (privacy policy not live — P0), P-GAP-002 (sub-processor list not published — P0), P-GAP-003 (cookie banner — P1), P-GAP-004 (retention periods TBD — P1), P-GAP-005 (DSAR untested — P1), P-GAP-006 (gov request policy — P1), P-GAP-007 (no complaint intake — P1), P-GAP-008 (annual review — P2). 10 evidence artifacts (PRE-35-E-001–010). **Readiness: ~92% → ~93%**.
+- **`VERSION`** — 0.95.0 → 0.95.1
+
+---
+
 ## [0.95.0] — 2026-05-20
 
 ### Added

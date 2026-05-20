@@ -5566,3 +5566,339 @@ This section maps each C1 sub-criterion to FORM's operative controls, documents 
 ---
 
 *v2.2 additions: §34 C1 — Confidentiality Deep-Dive. Full C1.1 and C1.2 control mapping across eight C1.1 sub-criteria (classification, data inventory, access controls, encryption at rest, encryption in transit, workforce NDAs, third-party DPAs, data minimization, monitoring) and five C1.2 sub-criteria (GDPR Art. 17 erasure, analytics erasure, audit log anonymization on delete, backup purge, media/device disposal, end-of-employment offboarding). Four gaps formally opened: C1-GAP-001 (NDA template — P0 pre-hire gate), C1-GAP-002 (standalone data asset inventory — P1), C1-GAP-003 (third-party DPA receipt filing — P1), C1-GAP-004 (media/device disposal policy — P1). Eight evidence artifacts cataloged (PRE-34-E-001 through PRE-34-E-008). Ten-item implementation checklist (2× P0, 6× P1, 2× P2). Controls confirmed Done: §5 classification, Supabase RLS + RBAC + break-glass, TLS 1.3 + HSTS, LLM prompt data minimization, GDPR Art. 17 erasure queue, ClickHouse Art. 17 SQL template, DEC-030 audit log anonymization on delete. SOC 2 readiness: ~91% → ~92%.*
+
+---
+
+## 35. P1–P8 — Privacy: Deep-Dive Control Implementation
+
+> Owner: `compliance-officer`. Review cadence: annual (§15 compliance calendar) + triggered on any new processing activity or sub-processor addition.
+> SOC 2 criteria addressed: P1.1, P2.1, P3.1, P3.2, P4.1, P4.2, P4.3, P5.1, P5.2, P6.1, P6.2, P6.3, P6.4, P6.5, P7.1, P8.1
+> Reference: §5 Privacy overview, `docs/GDPR_DPIA.md`, `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/INCIDENT_RESPONSE.md` §10, `docs/DATA_MODEL.md` §13.6
+
+### 35.1 Purpose
+
+Privacy is the highest-stakes Trust Service Criterion for FORM because the core product is built on GDPR Article 9 special-category health data — body composition, workout performance, meal logs, wearable biometrics, and computer-vision body-frame analysis. Unlike security and confidentiality, where a gap is primarily a technical debt item, a gap in Privacy controls can constitute an immediately reportable data protection violation under GDPR, CCPA/CPRA, and Ukrainian data protection law. For enterprise deployments, the stakes are compounded: FORM operates as a data processor on behalf of employer-controller customers, meaning every control deficiency becomes the controller's liability as well. The P-series criteria are therefore not a compliance checkbox — they are the legal foundation on which any enterprise contract rests.
+
+The AICPA P-series (P1 through P8) maps almost one-for-one onto the GDPR obligations FORM has already accepted by collecting Article 9 data. This alignment is deliberate: evidence gathered for SOC 2 Privacy criteria directly satisfies GDPR accountability obligations (Art. 5(2)), and the DEC-030 HMAC-chained audit log that supports SOC 2 testing is simultaneously the technical instrument for demonstrating GDPR compliance to supervisory authorities. This section documents the control implementation state, identifies gaps, and provides the evidence artifacts and implementation checklist required to close those gaps before the SOC 2 Type II observation window opens.
+
+---
+
+### 35.2 GDPR ↔ P-Series Mapping
+
+| P Criterion | AICPA Description | GDPR Article(s) |
+|---|---|---|
+| P1.1 | Privacy notice — inform data subjects of purpose, categories, retention, rights | Art. 13, 14 |
+| P2.1 | Choice and consent — obtain and record consent; honour withdrawal | Art. 6(1)(a), Art. 7, Art. 9(2)(a) |
+| P3.1 | Collection limitation — collect only what is necessary for stated purpose | Art. 5(1)(c) data minimization |
+| P3.2 | Explicit consent for special-category data | Art. 9(2)(a) |
+| P4.1 | Use limitation — use data only for stated purposes | Art. 5(1)(b) purpose limitation |
+| P4.2 | Retention limitation — retain only as long as necessary | Art. 5(1)(e) storage limitation |
+| P4.3 | Disposal — securely delete data at end of retention period | Art. 17 right to erasure; Art. 5(1)(e) |
+| P5.1 | Access — provide data subjects access to their personal data | Art. 15 right of access |
+| P5.2 | Correction — allow data subjects to correct inaccurate data | Art. 16 right to rectification |
+| P6.1 | Disclosure to third parties — disclose only to authorised processors | Art. 28 processor obligations |
+| P6.2 | Sub-processor DPAs in place before data flows | Art. 28(2)–(4) |
+| P6.3 | International transfers — adequate safeguards (SCC Module 2) | Art. 46(2)(c) |
+| P6.4 | Breach notification — supervisory authority 72h; enterprise tenant 1h | Art. 33, 34 |
+| P6.5 | Government requests — legal review before any data release; no backdoor | Art. 48 |
+| P7.1 | Data quality — maintain accurate, complete, and relevant personal data | Art. 5(1)(d) accuracy |
+| P8.1 | Monitoring and enforcement — ongoing privacy compliance; complaint process | Art. 5(2) accountability |
+
+---
+
+### 35.3 P1.1 — Privacy Notice
+
+#### 35.3.1 Control Table
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-01** | Privacy policy published at `form.coach/privacy` before any enterprise pilot data flows and before SOC 2 observation period starts | Counsel-reviewed policy covering all Art. 9 data categories, legal bases, retention periods, sub-processor list URL, data subject rights, and privacy contact | 🔴 Gap — P-GAP-001 | PRE-35-E-001 (to create) |
+| **PRV-02** | Art. 13 notice delivered at point of collection — onboarding screen presents privacy notice before any health data field is surfaced; user must scroll to bottom before consent button activates | Onboarding flow gated on scroll completion; notice text references form.coach/privacy; data categories described in plain language | 🟡 Partial — implemented in code; not yet in production | PRE-35-E-003 (onboarding screenshot) |
+| **PRV-03** | Cookie consent banner on form.coach marketing site; analytics cookies blocked until opt-in; `privacy.cookies_changed` DEC-030 event logged | Consent Management Platform (CMP) integration; default all tracking to OFF; event emitted synchronously | 🔴 Gap — P-GAP-003 | PRE-35-E-003 (to create) |
+| **PRV-04** | Privacy policy explicitly covers all Art. 9 data categories: health_profile, meal_log, wearable_data, cv_workout_analysis, ED-screening result (PA-01–PA-12 per GDPR_DPIA.md §3) | Per-category table in policy: purpose, legal basis, retention period, deletion mechanism | 🔴 Gap — P-GAP-001, P-GAP-004 (retention TBD) | PRE-35-E-001 |
+| **PRV-05** | Privacy policy version management — `consent_version` field in `privacy.consent_granted` DEC-030 event ties each consent record to the policy version in force at time of consent | Semantic version string (e.g., `2026-01-v1`) stamped on every `privacy.consent_granted` event; policy changelog in `compliance/p1/privacy-policy-changelog.md` | 🟡 Partial — field defined in DEC-030 schema; changelog doc not yet created | PRE-35-E-002 (DEC-030 event sample) |
+
+#### 35.3.2 Art. 13/14 Notice Delivery Architecture
+
+FORM collects all Article 9 health data directly from the user in-app, making Article 13 (data collected from data subject) the operative obligation. No Article 14 scenario exists in current scope: wearable data pulled via HealthKit/Health Connect OAuth is treated as Article 13 direct collection because the user initiates the permission grant inside the FORM app.
+
+The delivery mechanism for Art. 13 notice is:
+
+1. **Onboarding gate:** Before the health_profile screen appears, FORM renders a full-screen privacy notice screen. The user must scroll to the bottom (scroll-completion event emitted) before the "I understand" button activates.
+2. **Consent version stamping:** When the user taps "I understand", a `privacy.consent_granted` DEC-030 event is emitted with `consent_version` = the current policy version, `categories_consented` = [] (populated per §35.4.2 category flow), and the HMAC chain position.
+3. **Policy pre-dating requirement:** The privacy policy URL referenced in the onboarding notice must be live and resolvable before any enterprise pilot user completes onboarding. P-GAP-001 blocks this.
+
+---
+
+### 35.4 P2.1 — Choice and Consent
+
+#### 35.4.1 Control Table
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-06** | Granular opt-in per data category at onboarding: health_profile, meal_log, wearable, cv_coaching, analytics — each with a plain-language toggle; all Art. 9 categories default to OFF | Category toggles rendered after scroll-completion gate; user can complete onboarding with all Art. 9 categories off (free tier remains functional) | 🟡 Partial — flow designed; integration test not yet passing | PRE-35-E-002 |
+| **PRV-07** | `privacy.consent_granted` DEC-030 event emitted at consent with `consent_version`, `categories_consented[]`, `ip_country`, HMAC chain | Event emitted synchronously before any health data write; backend rejects health data writes if no valid consent record exists for that user+category pair | 🟡 Partial — schema defined; backend consent-gate enforcement not yet confirmed in integration tests | PRE-35-E-002 |
+| **PRV-08** | Consent withdrawal in Settings → Privacy → Manage Consents; `privacy.consent_withdrawn` DEC-030 event logged with `categories_withdrawn[]` | Withdrawal triggers: (1) immediate processing cessation for that category; (2) erasure offer surfaced for health_profile and meal_log; (3) `privacy.consent_withdrawn` event logged to HMAC chain | 🟡 Partial — withdrawal flow designed; not yet end-to-end tested | PRE-35-E-002 |
+| **PRV-09** | ED-screening special consent — SCOFF-light (3 questions) shown at onboarding per DEC-018; explicit consent collected before questions appear; result stored as UX flag only (not as clinical record) | DEC-018 consent gate precedes ED-screening; consent event `privacy.consent_granted` with `categories_consented: ["ed_screening"]` | ✅ Done | `docs/GDPR_DPIA.md` §3 PA-08; DEC-018 |
+| **PRV-10** | Consent re-request triggered on any material policy change — users who consented to `consent_version` < current version are shown the consent flow again on next app open | Policy change detection: if `users.consent_version` < `current_policy_version`, consent re-request is mandatory before any feature access | 🟡 Gap — mechanism not yet implemented | PRE-35-E-002 (sample showing `consent_version` field) |
+
+#### 35.4.2 Consent Architecture
+
+FORM implements a five-category granular consent model. Each category is independent — a user may consent to health_profile but not to meal_log. Category states are stored in `users.consent_flags` (JSONB) and mirrored to the DEC-030 `privacy.consent_granted` event's `categories_consented` array.
+
+**Category map:**
+
+| Category key | Data covered | Legal basis | Default |
+|---|---|---|---|
+| `health_profile` | Date of birth, biological sex, height, resting HR, HRV baseline, goals, restrictions/injuries | Art. 9(2)(a) explicit consent | OFF |
+| `meal_log` | Food items, macros, meal type, timestamps | Art. 9(2)(a) explicit consent (health-adjacent) | OFF |
+| `wearable` | HRV, resting HR, sleep stages, step count (HealthKit / Health Connect) | Art. 9(2)(a) explicit consent | OFF |
+| `cv_coaching` | Joint angles, rep count, form score — computed on-device; only metadata stored | Art. 9(2)(a) + Art. 6(1)(b) contract | OFF |
+| `analytics` | Anonymous event stream (event name, device type, session duration; no health content) | Art. 6(1)(f) legitimate interest | ON (opt-out available) |
+
+**Withdrawal flow:**
+1. User withdraws consent for a category in Settings.
+2. `privacy.consent_withdrawn` DEC-030 event logged with `categories_withdrawn: ["<category>"]`.
+3. Backend processing ceases within 60 seconds (Worker re-reads consent state on next request).
+4. For `health_profile` and `meal_log`: erasure offer is surfaced in UI within 24h ("Would you like us to delete your [meal logs / health profile]?").
+5. If erasure confirmed: `privacy.erasure_completed` flow initiated (§35.6.4).
+
+---
+
+### 35.5 P3 — Collection Limitation
+
+#### 35.5.1 P3.1 — Purpose Limitation and Data Minimization
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-11** | No SSN, government ID, or payment card data collected or stored | Stripe handles all payment processing; FORM stores only `stripe_customer_id` (opaque reference); no PCI-scope data stored | ✅ Done | `docs/SECURITY.md` §3; Stripe architecture |
+| **PRV-12** | No advertising identifiers collected — no IDFA (iOS), no GAID (Android), no fingerprinting SDK | No advertising SDK in package dependencies; Apple ATT framework not invoked; PostHog configured with `person_profiles: "identified_only"` | ✅ Done | PRE-35-E-005 (dependency audit) |
+| **PRV-13** | CV body-frame analysis frames never leave the device — on-device inference only; only derived metadata (pose keypoints as numerical array, rep count, form score) transmitted to FORM servers; raw frames discarded after inference | CV pipeline runs on-device ML model; network traffic contains no image/video payload | 🟡 Partial — architecture confirmed; network traffic capture not yet produced as auditor exhibit | PRE-35-E-004 (to create: network capture) |
+| **PRV-14** | LLM prompts (Anthropic Claude) contain no PII — coaching prompts constructed with anonymized user context: goal type, session metrics, aggregate trends; user_id replaced with session-scoped token | Prompt construction layer: `stripPersonalProperties()` removes email, name, user_id, and raw health values before Anthropic API call | 🟡 Partial — prompt construction documented in SECURITY.md §5; auditor exhibit (redacted request log) not yet produced | PRE-35-E-006 (to create) |
+| **PRV-15** | PostHog analytics event schema excludes all Article 9 fields — no workout weights, meal content, CV keypoints, or health metrics in analytics events; lint rule enforced in CI | `analytics/schema.ts` Art. 9 field blocklist; CI lint rule fails build on any analytics call passing a blocked field | 🟡 Partial — schema defined; lint rule not yet committed to CI | PRE-35-E-007 (to create: lint rule + sample event) |
+
+#### 35.5.2 P3.2 — Explicit Consent for Special-Category Data
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-16** | Art. 9(2)(a) explicit consent is the legal basis for: health_profile, meal_log, wearable_data, cv_workout_analysis | Legal basis mapped per processing activity in `docs/GDPR_DPIA.md` §3 (PA-01 through PA-07) | ✅ Done | `docs/GDPR_DPIA.md` §3 PA-01–PA-07 |
+| **PRV-17** | Art. 6(1)(b) contract performance used for AI coaching and voice synthesis — no personal data beyond session context; no Art. 9 data flows to sub-processors | Anthropic API call contains exercise context only (no PII, no health metrics); ElevenLabs API contains coaching text cues only (no user PII) | ✅ Done | `docs/GDPR_DPIA.md` §3 PA-05, PA-06; SECURITY.md §5 |
+| **PRV-18** | Art. 6(1)(f) legitimate interest for analytics (PostHog) and error monitoring (Sentry) — opt-out honoured; Art. 9 data excluded | PostHog `analytics_opt_out` flag enforced; Sentry PII scrubbed at SDK level; both sub-processors have DPAs | 🟡 Partial — Sentry PII scrubbing pending formal DPA (CC9-GAP pending; compensating control: SDK-level scrub) | `docs/GDPR_DPIA.md` §3 PA-11, PA-12 |
+
+---
+
+### 35.6 P4 — Use, Retention, and Disposal
+
+#### 35.6.1 P4.1 — Use Limitation
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-19** | Health data used exclusively for AI coaching delivery — not sold, not licensed, not shared with enterprise customer HR for individual-level reporting | Privacy floor enforcement: 7 non-negotiable rules from `docs/ENTERPRISE.md`; `data.read_individual` access attempt by HR-scoped token triggers DEC-030 alert | ✅ Done | `docs/ENTERPRISE.md` privacy floor; DEC-030 `data.read_individual` alert spec |
+| **PRV-20** | No-go customer policy enforced — insurance risk-scoring, government backdoors, wellness-as-punishment deals declined at sales stage | No-go list maintained in `docs/ENTERPRISE.md §When we say no`; compliance-officer veto power on any deal with risk-scoring or surveillance characteristics | ✅ Done | `docs/ENTERPRISE.md` no-go list |
+| **PRV-21** | Enterprise aggregate reports respect k-anonymity floor N < 5 — any cohort with fewer than 5 members is suppressed in all HR-visible dashboards | k-anonymity enforced at the analytics query layer before results returned to tenant admin dashboard | 🟡 Partial — policy defined; enforcement not yet unit-tested | `docs/DATA_MODEL.md` §13.6; k-anonymity floor spec |
+| **PRV-22** | Analytics events stripped of all Article 9 fields before transmission to PostHog | PostHog event schema blocklist (PRV-15); middleware strips forbidden fields before event dispatch | 🟡 Partial — schema defined; lint rule CI enforcement pending (see PRV-15) | PRE-35-E-007 |
+
+#### 35.6.2 P4.2 — Retention Limitation
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-23** | Retention schedule published in privacy policy with per-category periods | Retention tiers defined in `docs/AUDIT_LOG_SCHEMA.md`; per-category periods for workout/health tables are TBD — must be decided before privacy policy publication | 🔴 Gap — P-GAP-004 | §35.6.3 retention schedule (decision record required) |
+| **PRV-24** | ClickHouse analytics events: 2-year rolling TTL (`TTL event_date + INTERVAL 2 YEAR DELETE`) | ClickHouse DDL in `docs/DATA_MODEL.md` §13.4 includes TTL clause on all analytics event tables | ✅ Done | PRE-35-E-008 (ClickHouse DDL commit hash) |
+| **PRV-25** | DEC-030 HMAC audit log: 7-year retention (regulatory minimum for SOC 2 + GDPR Art. 30 records) | AUDIT_LOG_SCHEMA.md retention tiers: `data.export/deletion` 7 years, `privacy.consent_*` 7 years | ✅ Done | `docs/AUDIT_LOG_SCHEMA.md` retention tier table |
+| **PRV-26** | Supabase TTL policies for active-coaching tables: formal decision record required before privacy policy publication | workout_sessions, sets, coaching_turns, cv_sessions: retention TBD (see §35.6.3 proposed periods) | 🔴 Gap — P-GAP-004 | `compliance/p1/retention-decisions.md` (to create) |
+
+#### 35.6.3 Health Data Retention Schedule
+
+The following table represents proposed retention periods. All TBD entries require a formal decision recorded in `compliance/p1/retention-decisions.md` and legal review before being published in the privacy policy. This schedule is the input to P-GAP-004 remediation.
+
+| Data category | Table(s) | Proposed retention | Basis | Disposal method |
+|---|---|---|---|---|
+| Workout sessions & sets | `workout_sessions`, `sets` | 3 years from last session | GDPR Art. 5(1)(e) — balance utility vs minimization | Hard delete; cascade; GDPR Art. 17 erasure on request within 30 days |
+| AI coaching turns | `coaching_turns` | 2 years from creation | Coaching context window; shorter than workout history | Hard delete; DEC-030 `privacy.erasure_completed` |
+| CV session metadata | `cv_sessions` | 1 year from creation | Keypoint data is biometric-adjacent; shorter retention | Hard delete; DEC-030 event |
+| Health profile | `user_profile` health fields | Until account deletion or consent withdrawal | User-active data; retained while service active | Hard delete on erasure request; `privacy.erasure_completed` |
+| Meal log | `meal_log` | 2 years from creation | Nutritional tracking has short relevance window | Hard delete; DEC-030 event |
+| Wearable readings | `wearable_readings` | 2 years from creation | HRV/sleep trends useful up to 2 years; diminishing returns beyond | Hard delete; DEC-030 event |
+| Analytics events | ClickHouse `fact_events` | 2 years (TTL enforced) | ClickHouse DDL `TTL event_date + INTERVAL 2 YEAR DELETE` | Automatic row expiry; Art. 17 erasure via `erasure_template.sql` |
+| Audit log | `audit_log` (DEC-030) | 7 years (immutable; WORM bucket) | GDPR Art. 30 records; SOC 2 evidence | Anonymization on user delete (`[DELETED-{hash}]`); WORM prevents full deletion |
+
+#### 35.6.4 P4.3 — Disposal
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-27** | GDPR Art. 17 erasure queue — 30-day grace period, then hard delete across all primary health tables; cascade delete across `workouts`, `sets`, `coaching_turns`, `cv_sessions`, `user_profile`; `privacy.erasure_completed` DEC-030 event | Erasure queue Worker per `docs/INCIDENT_RESPONSE.md` §12.5; cascade defined in DATA_MODEL.md | ✅ Done | `docs/SECURITY.md` §6; `docs/DATA_MODEL.md` §12 |
+| **PRV-28** | Backup purge within 60 days of erasure completion | Supabase PITR 60-day retention window; on erasure, backup rotation window expiry constitutes effective purge; B2 WORM 7-year immutable — WORM backups addressed via anonymization-on-restore policy (PRE-33-E-005) | 🟡 Partial — procedure documented; auditor exhibit not yet produced | PRE-35-E-009 |
+| **PRV-29** | ClickHouse Art. 17 erasure — `user_id` rows deleted from `fact_events` and `fact_session_metrics` within 30 days of erasure trigger; `fact_cohort_retention` not deleted (aggregates; k-anonymity floor) | Art. 17 erasure SQL template: `src/analytics/backfills/erasure_template.sql` | ✅ Done | `docs/DATA_MODEL.md` §13.6.2 |
+| **PRV-30** | Audit log anonymization on delete — `user_id` in DEC-030 events replaced with `[DELETED-{hash}]`; timestamp, action, and `data_class` retained; HMAC chain integrity preserved | Per `docs/AUDIT_LOG_SCHEMA.md` anonymization spec | ✅ Done | `docs/AUDIT_LOG_SCHEMA.md` anonymization section |
+
+---
+
+### 35.7 P5 — Access
+
+#### 35.7.1 P5.1 — Data Subject Access Requests (DSAR)
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-31** | In-app DSAR trigger — Settings → Privacy → Download My Data; `data.export_initiated` DEC-030 event logged | Authenticated user only; anonymous DSAR requests routed to `privacy@form.coach` (P-GAP-007) and verified before processing | 🟡 Partial — trigger implemented; end-to-end not tested (P-GAP-005) | PRE-35-E-010 |
+| **PRV-32** | JSON export format includes all Art. 15 required data: categories processed, purposes, retention periods, sub-processor list, data subject rights summary, plus all stored personal data | Export schema: `compliance/p1/dsar-export-schema.json`; export job assembles from health_profile, meal_log, workout_sessions, sets, coaching_turns, wearable_readings, cv_sessions | 🟡 Partial — schema defined; export assembly not yet tested end-to-end (P-GAP-005) | PRE-35-E-010 |
+| **PRV-33** | 48h secure download link delivery — signed URL (48h expiry) emailed to user's registered address; `data.export_completed` DEC-030 event | Supabase Storage signed URL; transactional email; completion event logged to HMAC chain | 🟡 Partial — not tested end-to-end (P-GAP-005) | PRE-35-E-010 |
+| **PRV-34** | 30-day GDPR Art. 15 SLA — DSAR must be fulfilled within 30 days of request; SLA monitoring alert at 25-day threshold | SLA clock anchored to `data.export_initiated` timestamp; PagerDuty alert at day 25 if `data.export_completed` not yet logged for that request | 🔴 Gap — monitoring alert not yet configured (P-GAP-005) | PRE-35-E-010 |
+
+#### 35.7.2 DSAR Process Flow
+
+The following is the authoritative DSAR procedure. It constitutes the basis for the end-to-end test required to close P-GAP-005.
+
+**Step 1 — Request:** User navigates to Settings → Privacy → Download My Data and confirms. `data.export_initiated` DEC-030 event logged. DSAR 30-day SLA clock starts at this timestamp.
+
+**Step 2 — Verification:** Request is already authenticated (Supabase session token). No additional identity verification required for authenticated in-app DSARs. Email-based DSARs via `privacy@form.coach` require identity confirmation (confirm registered email address) before processing.
+
+**Step 3 — Export assembly:** Background Worker assembles JSON archive from all tables in scope: `user_profile` (health fields), `meal_log`, `workout_sessions`, `sets`, `coaching_turns`, `wearable_readings`, `cv_sessions`. PII included; Art. 9 fields included. Export includes: processing purposes, legal bases, retention periods, sub-processor list (from `compliance/p1/dsar-export-schema.json`), and data subject rights summary.
+
+**Step 4 — Delivery:** Supabase Storage signed URL generated with 48h expiry. URL emailed to user's registered address via transactional email provider. Target delivery: within 48 hours of Step 1. `data.export_completed` DEC-030 event logged with `elapsed_minutes` field.
+
+**Step 5 — SLA monitoring:** If `data.export_completed` event not logged within 25 days of `data.export_initiated` for the same `resource_id`, PagerDuty alert fires to `compliance-officer`. Remediation target: complete and deliver within 30-day GDPR window.
+
+#### 35.7.3 P5.2 — Correction and Rectification
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-35** | In-app profile edit covers all `user_profile` fields — name, date of birth, biological sex, height, goals, restrictions | Settings → Profile; all fields editable; `data.profile_updated` DEC-030 event logged with `fields_changed[]` array | 🟡 Partial — edit UI implemented; `data.profile_updated` DEC-030 event emission not yet confirmed in integration tests | `data.profile_updated` DEC-030 event spec |
+| **PRV-36** | Meal log and workout data correction — user can delete or edit individual meal log entries and workout sets | In-app CRUD operations; `data.record_updated` DEC-030 event on each edit | 🟡 Partial — CRUD implemented; DEC-030 event not yet wired | `data.record_updated` DEC-030 event spec |
+| **PRV-37** | AI coaching_turns content correction — coaching_turns are AI-generated responses; Art. 16 applicability to AI-generated content requires outside counsel determination | No mechanism implemented; gap noted; coaching_turns are append-only | 🔴 Gap — low priority; outside counsel determination required before implementing | Outside counsel memo (to obtain) |
+
+---
+
+### 35.8 P6 — Disclosure to Third Parties
+
+#### 35.8.1 P6 Sub-Criteria Control Table
+
+| P Sub-Criterion | Control ID | Control | Status | Evidence |
+|---|---|---|---|---|
+| **P6.1 — Sub-processor list** | **PRV-38** | Sub-processor list published at `form.coach/legal/sub-processors` with name, country, purpose, DPA status, SCC status; updated within 30 days of any change | 🔴 Gap — P-GAP-002 | PRE-35-E-001 (to create: sub-processor page) |
+| **P6.2 — DPAs** | **PRV-39** | DPAs signed with all eight sub-processors before production data flows: Anthropic, ElevenLabs, Supabase, Cloudflare, PostHog EU, Better Stack, Stripe, Expo/EAS | 🟡 Partial — C1-GAP-003 (DPA receipts not all filed) | PRE-35-E-002 (DPA receipt file) |
+| **P6.3 — International transfers** | **PRV-40** | SCC Module 2 (controller→processor) executed for all US-based sub-processors: Anthropic, ElevenLabs, Cloudflare; EU-based processors (Supabase EU, PostHog EU) require no SCC | 🟡 Partial — SCCs referenced; not all filed in `compliance/dpa/` | PRE-35-E-002 |
+| **P6.4 — Breach notification** | **PRV-41** | Supervisory authority notified within 72h of confirmed or suspected personal data breach; affected enterprise tenant notified within 1h of P0 declaration | INCIDENT_RESPONSE.md §10 Art. 33 notification template; P0 tenant notification template E-01 | ✅ Done | `docs/INCIDENT_RESPONSE.md` §10 |
+| **P6.4 — Sub-processor breach** | **PRV-42** | Sub-processor must notify FORM within 24h of any breach; FORM's 72h clock to supervisory authority starts at sub-processor notification receipt, not sub-processor discovery | DPA clause: sub-processor notification within 24h; INCIDENT_RESPONSE.md §11 sub-processor incident management | ✅ Done | `docs/INCIDENT_RESPONSE.md` §11 |
+| **P6.5 — Government requests** | **PRV-43** | All government / law enforcement requests for user data subject to legal review before any data release; narrowest-possible-response principle; user notification where legally permitted; annual transparency report | Policy not yet formalized as standalone auditor exhibit — P-GAP-006 | PRE-35-E-006 (to create: `compliance/p1/gov-request-policy.md`) |
+| **P6.1 — 30-day notice** | **PRV-44** | Enterprise controller-customers notified 30 days in advance of any new sub-processor addition; right to object per GDPR Art. 28(2) | Notification process: email to `tenant_admin_email` + status page announcement; sub-processor list updated simultaneously | 🟡 Partial — commitment in ENTERPRISE.md; notification mechanism not yet automated | `docs/ENTERPRISE.md` |
+
+#### 35.8.2 Government Request Handling Policy
+
+FORM's no-backdoor principle (ENTERPRISE.md §When we say no) must be operationalized as a formal four-principle policy to close P-GAP-006 and satisfy P6.5. The policy to be documented at `compliance/p1/gov-request-policy.md`:
+
+**Principle 1 — Legal review first:** No user data is released in response to any government or law enforcement request without review by qualified legal counsel. Informal requests are declined. Formal requests (court order, subpoena, search warrant) are reviewed to confirm validity, jurisdiction, and scope before any response.
+
+**Principle 2 — Narrowest response:** FORM provides only the minimum data required by the order. If the order specifies a user, FORM provides only that user's data. If the order specifies a time range, FORM provides only that window. FORM does not provide bulk data in response to targeted orders.
+
+**Principle 3 — User notification where legally permitted:** If FORM receives a request and is not legally prohibited from notifying the affected user, FORM notifies the user before responding (or as soon as legally permitted after responding). Gag orders preventing notification are noted in the annual transparency report as "orders received with notification prohibited."
+
+**Principle 4 — Annual transparency report:** FORM publishes an annual transparency report disclosing: number of government requests received (by category: court orders, subpoenas, national security letters), number fulfilled, number challenged, and number subject to gag orders. First report due within 12 months of launch.
+
+**Policy document path:** `compliance/p1/gov-request-policy.md` — to be created (P-GAP-006 closure). Outside counsel review required before publication.
+
+---
+
+### 35.9 P7.1 — Data Quality
+
+#### 35.9.1 Control Table
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-45** | Zod schema validation at all input boundaries — all user-submitted data validated for type, range, and format before persistence | Zod schemas in Cloudflare Worker request handlers; invalid inputs return 422 with field-level errors; no raw user input reaches Supabase without validation | ✅ Done | `docs/SECURITY.md` §3; Cloudflare Worker request handler code |
+| **PRV-46** | In-app profile edit allows users to correct factual inaccuracies in health_profile fields at any time | Settings → Profile; all health_profile fields editable; changes take effect immediately | 🟡 Partial — edit UI implemented; DEC-030 event emission confirmation pending (PRV-35) | In-app UI |
+| **PRV-47** | `data.profile_updated` DEC-030 event logs all corrections with `fields_changed[]` and `old_values_hash` for audit trail | Event spec defined in AUDIT_LOG_SCHEMA.md | 🟡 Partial — spec defined; wiring to edit flow not confirmed | `docs/AUDIT_LOG_SCHEMA.md` |
+| **PRV-48** | Accuracy of AI-generated coaching content — coaching_turns are training-context outputs, not factual claims stored about the user; Art. 16 applicability requires outside counsel determination | See PRV-37; gap noted; low priority | 🔴 Gap — outside counsel required | Outside counsel memo |
+
+---
+
+### 35.10 P8.1 — Monitoring and Enforcement
+
+#### 35.10.1 Control Table
+
+| Control ID | Control | Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PRV-49** | DEC-030 privacy event monitoring — `privacy.consent_granted`, `privacy.consent_withdrawn`, `privacy.cookies_changed`, `privacy.analytics_opt_out`, `privacy.erasure_completed` events in HMAC chain; anomalies trigger PagerDuty alert | Chain integrity check daily (§25.5); anomalous consent event volumes alert to `compliance-officer` | ✅ Done | `docs/AUDIT_LOG_SCHEMA.md` privacy event taxonomy; §25.5 daily chain check |
+| **PRV-50** | Privacy incidents classified and tracked in INCIDENT_RESPONSE.md severity framework — P0 auto-triggers Art. 33 GDPR notification clock; P1 triggers monitoring for potential escalation | INCIDENT_RESPONSE.md §1 severity matrix includes privacy-specific P0 triggers: confirmed health data exposure, HMAC chain break, cross-tenant access | ✅ Done | `docs/INCIDENT_RESPONSE.md` §1 |
+| **PRV-51** | Annual privacy review entry in §15 compliance calendar — scope: DPIA refresh, sub-processor list review, consent mechanism review, retention schedule review, DSAR SLA validation | §15 calendar entry not yet added — P-GAP-008 | §15 compliance calendar entry (to add) | 🔴 Gap — P-GAP-008 |
+| **PRV-52** | Formal privacy complaint intake — `privacy@form.coach` mailbox; documented 30-day response SLA per GDPR Art. 77; complaint log in `compliance/p1/complaint-log.csv` | No mailbox exists; no procedure documented — P-GAP-007 | `compliance/p1/complaint-intake-procedure.md`; mailbox confirmation | 🔴 Gap — P-GAP-007 |
+| **PRV-53** | Privacy contact published in privacy policy and Settings → Privacy — data subjects directed to `privacy@form.coach` for Art. 15–22 requests | Not yet published; blocked by P-GAP-007 and P-GAP-001 | Privacy policy "Contact" section; Settings deep-link | 🔴 Gap — P-GAP-007 |
+
+---
+
+### 35.11 P-Series Gap Analysis
+
+| Gap ID | Priority | Criterion | Description | Remediation | Owner | Target |
+|---|---|---|---|---|---|---|
+| **P-GAP-001** | **P0 — pre-launch blocker** | P1.1 | Privacy policy not live at `form.coach/privacy` — blocks SOC 2 observation period start, all enterprise contracts, and all enterprise pilot data flows; no Art. 13 notice deliverable without a stable policy URL | Commission counsel-reviewed policy covering all Art. 9 categories, retention periods from §35.6.3, sub-processor URL, data subject rights, `privacy@form.coach` contact; publish at canonical URL; URL must be stable before first enterprise pilot | `compliance-officer` + outside counsel | Pre-launch |
+| **P-GAP-002** | **P0 — pre-launch blocker** | P6.1 | Sub-processor list not published at `form.coach/legal/sub-processors` — GDPR Art. 28(2) gives enterprise controller-customers the right to object to sub-processors; list must be public and stable before any enterprise DPA is signed | Create sub-processor list page with: processor name, country, purpose, DPA status, SCC status; implement 30-day advance-notice mechanism for additions (email to tenant admins + status page); page must be live before enterprise DPAs are countersigned | `compliance-officer` | Pre-launch |
+| **P-GAP-003** | P1 | P1.1 | Cookie consent banner not deployed on `form.coach` marketing site — any analytics tag active without prior consent constitutes GDPR / ePrivacy violation | Deploy CMP on `form.coach`; configure `privacy.cookies_changed` DEC-030 event on user choice; default all tracking cookies to OFF; verify banner fires before any analytics tag loads | `engineering` | Pre-launch |
+| **P-GAP-004** | P1 | P1.1, P4.2 | Workout/health data retention periods not formally decided or stated in privacy policy — `cv_sessions`, `wearable_readings`, `workout_sessions`, `coaching_turns` all TBD (§35.6.3 proposed periods); auditors require explicit per-category schedule in user-facing policy | Complete retention decision record at `compliance/p1/retention-decisions.md` using §35.6.3 as starting point; obtain legal sign-off; add retention table to privacy policy; implement Supabase TTL migrations for all decided periods | `compliance-officer` + `engineering` | Pre-launch |
+| **P-GAP-005** | P1 | P5.1 | DSAR end-to-end not tested — no logged test run of request → export assembly → signed URL delivery → DEC-030 completion event; 30-day SLA monitoring alert not configured | Conduct full DSAR test run in staging per §35.7.2 five-step flow; produce PRE-35-E-010 test run record; configure PagerDuty 25-day SLA alert on `data.export_initiated` events without matching `data.export_completed` | `engineering` + `compliance-officer` | Pre-launch |
+| **P-GAP-006** | P1 | P6.5 | Government request handling policy not formalized as standalone auditor exhibit — ENTERPRISE.md no-backdoor principle exists but no procedure document with: legal-review-first rule, narrowest-response principle, user-notification commitment, annual transparency report | Draft `compliance/p1/gov-request-policy.md` per §35.8.2 four-principle framework; outside counsel review; file as PRE-35-E-006 | `compliance-officer` + outside counsel | Pre-launch |
+| **P-GAP-007** | P1 | P8.1 | No formal privacy complaint intake process; no `privacy@form.coach` mailbox published; no 30-day response SLA — data subjects have no published channel for Art. 15–22 requests outside the in-app DSAR flow | Create `privacy@form.coach` mailbox; draft `compliance/p1/complaint-intake-procedure.md` with 30-day SLA, escalation path to supervisory authority, complaint log CSV; add privacy contact to privacy policy (P-GAP-001) and Settings | `compliance-officer` | Pre-launch |
+| **P-GAP-008** | P2 | P8.1 | Annual privacy review not calendared; §15 compliance calendar has no privacy review entry; review scope checklist not drafted — first actual review is due at launch + 12 months, but calendar entry and scope checklist must exist before SOC 2 Type II observation window | Add annual privacy review entry to §15 compliance calendar; draft scope checklist: DPIA refresh, sub-processor review, consent mechanism review, retention schedule review, DSAR SLA test; first review date: launch + 12 months | `compliance-officer` | Pre-launch |
+
+---
+
+### 35.12 Evidence Artifacts
+
+| Artifact ID | Description | Source / Location | P Criteria |
+|---|---|---|---|
+| **PRE-35-E-001** | Published privacy policy at `form.coach/privacy` — screenshot of live page + content checklist confirming all Art. 13(1) disclosures (identity of controller, purposes, legal bases, retention periods, data subject rights, right to withdraw consent, right to lodge complaint) | Live URL screenshot + review checklist | P1.1 |
+| **PRE-35-E-002** | DEC-030 `privacy.consent_granted` event sample from staging — showing `user_id`, `consent_version`, `categories_consented[]`, `ip_country`, `timestamp`, HMAC chain position; DEC-030 `privacy.consent_withdrawn` event sample | `audit_log` (staging) | P1.1, P2.1 |
+| **PRE-35-E-003** | Onboarding consent screen screenshot — shows Art. 13 notice text, per-category consent toggles (all Art. 9 categories default OFF), scroll-completion gate before consent button activates | App staging build | P1.1, P2.1, P3.2 |
+| **PRE-35-E-004** | CV pipeline architecture diagram with on-device inference boundary labelled; annotated network traffic capture confirming absence of image/video payload in any outbound API call from the FORM app | Engineering diagram + network capture (Charles Proxy or equivalent) | P3.1 |
+| **PRE-35-E-005** | Dependency audit output confirming absence of advertising SDK in `package.json` and native dependencies; PostHog project settings export showing `person_profiles: "identified_only"` | `npm audit` + `package.json` + PostHog config export | P3.1 |
+| **PRE-35-E-006** | Government request handling policy document at `compliance/p1/gov-request-policy.md` — four-principle framework, outside counsel reviewed, founder-signed | `compliance/p1/gov-request-policy.md` | P6.5 |
+| **PRE-35-E-007** | PostHog analytics event schema (`analytics/schema.ts`) + CI lint rule configuration blocking Art. 9 fields + sample analytics event from staging showing no health data fields present | Code repository + staging event log | P3.1, P4.1 |
+| **PRE-35-E-008** | ClickHouse DDL commit hash showing `TTL event_date + INTERVAL 2 YEAR DELETE` on `fact_events` and `fact_session_metrics` tables; Art. 17 erasure template SQL at `src/analytics/backfills/erasure_template.sql` | Git commit SHA + SQL file | P4.2, P4.3 |
+| **PRE-35-E-009** | Supabase PITR backup configuration showing 60-day retention window; Cloudflare R2 Object Lock configuration for WORM audit log storage (7-year retention) | Supabase dashboard screenshot + R2 configuration export | P4.2, P4.3 |
+| **PRE-35-E-010** | DSAR end-to-end test run record: DEC-030 event sequence from `data.export_initiated` (Step 1) to `data.export_completed` (Step 4); export archive sample (PII redacted); email delivery confirmation; elapsed time vs 48h target | `audit_log` test sequence + redacted export sample | P5.1 |
+
+---
+
+### 35.13 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Notes |
+|---|---|---|---|---|---|
+| 1 | Commission and publish counsel-reviewed privacy policy at `form.coach/privacy` (closes P-GAP-001) | `compliance-officer` + outside counsel | **P0** | Pre-launch | Must cover all Art. 9 categories with retention periods from §35.6.3, sub-processor list URL, data subject rights, `privacy@form.coach` contact. Blocks enterprise contracts. |
+| 2 | Publish sub-processor list at `form.coach/legal/sub-processors` with 30-day advance-notice mechanism (closes P-GAP-002) | `compliance-officer` | **P0** | Pre-launch | List: processor name, country, purpose, DPA status, SCC status. Blocks enterprise DPA countersigning. |
+| 3 | Create `privacy@form.coach` mailbox; draft `compliance/p1/complaint-intake-procedure.md` with 30-day response SLA; add privacy contact to privacy policy and Settings (closes P-GAP-007) | `compliance-officer` | P1 | Pre-launch | Must be created before P-GAP-001 privacy policy is finalized (policy must reference the contact address). |
+| 4 | Complete retention decision record for all TBD categories in §35.6.3; implement Supabase TTL migrations; add retention table to privacy policy (closes P-GAP-004) | `compliance-officer` + `engineering` | P1 | Pre-launch | Use proposed periods in §35.6.3 as starting point; legal sign-off required before publication. |
+| 5 | Conduct DSAR end-to-end test in staging per §35.7.2 five-step flow; configure PagerDuty 25-day SLA alert (closes P-GAP-005) | `engineering` + `compliance-officer` | P1 | Pre-launch | Produce PRE-35-E-010 test record. Must cover: in-app trigger, DEC-030 event sequence, export completeness, 48h delivery, SLA monitoring. |
+| 6 | Deploy CMP cookie consent banner on `form.coach`; configure `privacy.cookies_changed` DEC-030 event; default all tracking to OFF (closes P-GAP-003) | `engineering` | P1 | Pre-launch | Verify banner fires before any analytics tag loads. Produce PRE-35-E-003 updated screenshot. |
+| 7 | Draft and publish `compliance/p1/gov-request-policy.md` per §35.8.2; outside counsel review (closes P-GAP-006) | `compliance-officer` + outside counsel | P1 | Pre-launch | Four principles: legal-review-first, narrowest response, user notification, annual transparency report. File as PRE-35-E-006. |
+| 8 | Collect and file DPA receipts for all eight sub-processors in `compliance/dpa/`; execute SCC Module 2 for US processors (partially closes C1-GAP-003; closes PRV-39, PRV-40) | `compliance-officer` + legal | P1 | Pre-launch | US processors needing SCC Module 2: Anthropic, ElevenLabs, Cloudflare. EU: Supabase EU, PostHog EU (no SCC required). |
+| 9 | Commit PostHog Art. 9 field blocklist lint rule to CI; wire `data.profile_updated` DEC-030 event to in-app profile edit flow (closes PRV-15, PRV-35) | `engineering` | P1 | Pre-launch | Lint rule is a CI gate — PR fails if any analytics event passes a blocked field. |
+| 10 | Add annual privacy review entry to §15 compliance calendar; draft review scope checklist (closes P-GAP-008) | `compliance-officer` | P2 | Pre-launch | First review: launch + 12 months. Calendar entry and scope checklist must exist before SOC 2 observation window opens. |
+
+---
+
+### 35.14 SOC 2 Readiness Delta
+
+| P Criterion | Before §35 | After §35 |
+|---|---|---|
+| P1.1 — Privacy notice | Not mapped as P1 SOC 2 evidence | 🟡 Partial — Art. 13 notice architecture defined (§35.3.2); two P0 blockers surfaced (P-GAP-001 privacy policy not live; P-GAP-003 cookie banner not deployed) with explicit remediation paths |
+| P2.1 — Choice and consent | ✅ Partial (consent logged to DEC-030; listed in §5 overview) | Confirmed and mapped to P2.1 explicitly; five-category granular consent model documented (§35.4.2); consent withdrawal → erasure offer flow documented; three partial gaps: consent re-request on policy update (PRV-10), backend consent-gate enforcement (PRV-07), withdrawal end-to-end test (PRV-08) |
+| P3.1 — Data minimization | ✅ Partial (SECURITY.md §5 existed) | Confirmed and mapped to P3.1 explicitly; CV on-device inference confirmed (PRV-13); LLM prompt PII stripping confirmed (PRV-14); analytics Art. 9 field blocklist defined (PRV-15); two evidence artifact gaps (PRE-35-E-004, PRE-35-E-007) surfaced for pre-launch production |
+| P3.2 — Explicit consent for Art. 9 | ✅ Done (GDPR_DPIA.md §3 existed) | Confirmed; PA-01–PA-07 legal basis mapped to P3.2; no new gaps |
+| P4.1 — Use limitation | ✅ Done (ENTERPRISE.md privacy floor existed) | Confirmed; privacy floor (7 rules), k-anonymity floor, `data.read_individual` alert, no-go customer policy all mapped to P4.1 explicitly |
+| P4.2 — Retention | Not mapped as P4 evidence | 🟡 Partial — ClickHouse 2-year TTL and DEC-030 7-year retention confirmed; §35.6.3 health data retention schedule proposed; P-GAP-004 surfaced (TBD categories, no Supabase TTL policies) with remediation path |
+| P4.3 — Disposal | ✅ Done (SECURITY.md §6 existed) | Confirmed; Art. 17 erasure queue, backup purge, ClickHouse erasure SQL, audit log anonymization all mapped to P4.3 explicitly |
+| P5.1 — DSAR | Not mapped as P5 evidence | 🟡 Partial — DSAR in-app trigger and DEC-030 event defined; §35.7.2 five-step process flow documented as authoritative procedure; P-GAP-005 surfaced (end-to-end not tested; SLA monitoring not configured) |
+| P5.2 — Correction | Not mapped as P5 evidence | 🟡 Partial — in-app profile edit implemented; DEC-030 `data.profile_updated` event spec defined; wiring not confirmed; coaching_turns Art. 16 gap noted (low priority; outside counsel required) |
+| P6.1 — Sub-processor list | Not mapped as P6 evidence | 🔴 Gap — P-GAP-002 (list not published); all eight sub-processors identified; DPA and SCC status mapped in PRE-35-E-002 |
+| P6.2/P6.3 — DPAs / SCCs | 🟡 Partial (sub-processor list existed; DPA receipts not filed) | 🟡 Partial — C1-GAP-003 cross-referenced; SCC Module 2 requirement for US processors explicitly surfaced; DPA filing target: `compliance/dpa/` |
+| P6.4 — Breach notification | ✅ Done (INCIDENT_RESPONSE.md §10 existed) | Confirmed; 72h supervisory authority and 1h tenant SLAs explicitly cross-referenced to P6.4; sub-processor 24h notification obligation documented (PRV-42) |
+| P6.5 — Government requests | Not mapped as P6 evidence | 🔴 Gap — P-GAP-006 (no standalone policy); §35.8.2 provides the four-principle policy content for formalization |
+| P7.1 — Data quality | Not mapped as P7 evidence | 🟡 Partial — Zod input validation confirmed (PRV-45); in-app profile edit confirmed (PRV-46); DEC-030 event wiring gap (PRV-47); coaching_turns accuracy gap (PRV-48, low priority) |
+| P8.1 — Monitoring / enforcement | Not mapped as P8 evidence | 🟡 Partial — DEC-030 privacy event monitoring confirmed (PRV-49); INCIDENT_RESPONSE.md severity classification confirmed (PRV-50); two gaps surfaced: P-GAP-007 (no complaint intake), P-GAP-008 (annual review not calendared) |
+| New gaps formally opened | — | 8 (P-GAP-001 through P-GAP-008) |
+| Gaps with remediation path specified | — | 8/8 |
+| Net readiness movement | ~92% | ~93% (all 16 P-series sub-criteria now mapped with explicit control narratives and auditor evidence paths; two P0 pre-launch blockers surfaced; six P1 pre-launch gaps with remediation paths; two P2 deferred with calendar anchors) |
+
+**SOC 2 readiness: ~92% → ~93%**
+
+---
+
+*v2.3 additions: §35 P1–P8 — Privacy Deep-Dive. Full P-series control mapping across all 16 AICPA Privacy sub-criteria (P1.1 through P8.1) with GDPR article-level cross-references. §35.2 GDPR ↔ P-series mapping table establishes the dual-compliance framework: DEC-030 HMAC-chained audit events serve simultaneously as SOC 2 evidence and GDPR Art. 5(2) accountability artifacts. 53 controls mapped (PRV-01 through PRV-53) covering: Art. 13 notice delivery architecture with scroll-completion gate and `consent_version` stamping; five-category granular consent model (health_profile / meal_log / wearable / cv_coaching / analytics) with DEC-030 `privacy.consent_granted` schema and `categories_consented[]` array; consent withdrawal → processing cessation → erasure offer flow with `privacy.consent_withdrawn` DEC-030 event; data minimization controls (CV on-device inference confirmed, LLM prompt PII stripping via `stripPersonalProperties()`, PostHog Art. 9 field blocklist with CI lint rule); §35.6.3 health data retention schedule with proposed retention periods for all TBD categories (workout_sessions 3yr, coaching_turns 2yr, cv_sessions 1yr, wearable_readings 2yr, meal_log 2yr); §35.7.2 DSAR five-step authoritative process flow with 30-day GDPR Art. 15 SLA anchored to `data.export_initiated` timestamp and 25-day PagerDuty alert; enterprise privacy floor (7 non-negotiable rules, k-anonymity N < 5, `data.read_individual` forbidden alert); sub-processor DPA and SCC Module 2 mapping for all 8 processors; §35.8.2 four-principle government request handling policy (legal-review-first, narrowest response, user notification, annual transparency report); breach notification 72h/1h SLAs cross-referenced to INCIDENT_RESPONSE.md §10. 8 gaps formally opened: P-GAP-001 (privacy policy not live — P0 enterprise gate), P-GAP-002 (sub-processor list not published — P0 enterprise gate), P-GAP-003 (cookie consent banner — P1), P-GAP-004 (retention periods TBD and not in policy — P1), P-GAP-005 (DSAR end-to-end untested — P1), P-GAP-006 (government request policy not standalone — P1), P-GAP-007 (no complaint intake process — P1), P-GAP-008 (annual review not calendared — P2). 10 evidence artifacts cataloged (PRE-35-E-001 through PRE-35-E-010). 10-item implementation checklist (2× P0, 6× P1, 2× P2). SOC 2 readiness: ~92% → ~93%.*
