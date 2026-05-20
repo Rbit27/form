@@ -11,6 +11,19 @@
 
 ---
 
+## [0.95.0] — 2026-05-20
+
+### Added
+- **`content/post-65-caffeine-strength-training.md`** — editorial-brutalist пост «Caffeine and Strength Training: What the Evidence Actually Shows». Adenosine receptor antagonism як центральний механізм (не «енергія» — блокування сигналу втоми). Доказова база: Warren et al. (2010) +3.5% MVC, Grgic et al. (2018) Hedges' g ≈ 0.20 для сили, (2019) g ≈ 0.35–0.48 для потужності і wingate. Dose-response: 3–6 мг/кг за 45–60 хв. Tolernce dynamics: receptor upregulation, часткове збереження performance benefit, 5–7-day washout. CYP1A2 polymorphism: Cornelis et al. (2006) — slow metabolizers можуть не отримати користь або деградувати. Сон: half-life 4–6 год (fast) до 9–10 год (slow) — interference зі SWS недооцінена. Contraindications: anxiety, arrhythmia, pregnancy, drug interactions. Victor/FORM секція: індивідуальне dose-response tracking, tolerance creep detection, sleep trade-off signal. Clinical-safety PASS.
+- **`blog.html`** — додано 5 відсутніх карток: post-33 (Energy Systems), post-34 (Supersets/Antagonist Pairs), post-35 (Tempo Training), post-64 (Plyometrics/RFD), post-65 (Caffeine). Grid тепер має 65 карток.
+
+### Changed
+- **`README.md`** — roadmap оновлено: post-64 і post-65 позначено [x]; додано нові теми post-66–74 (allostatic load, foam rolling, heat/cold, creatine, sleep/recovery, protein timing, lifestyle capacity, grip longevity, unilateral training).
+- **`STATUS.md`** — blog.html рядок оновлено (16 → 65 posts, v0.95.0); додано рядки для post-64 і post-65.
+- **`VERSION`** — 0.94.1 → 0.95.0
+
+---
+
 ## [0.94.1] — 2026-05-20
 
 ### Changed
