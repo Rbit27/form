@@ -387,7 +387,7 @@ Each iteration:
 - [x] post-60: Deload protocols — supercompensation model, 4 types (volume/intensity/full/frequency), reactive vs proactive triggers, practical implementation examples (Meeusen 2013, Schoenfeld, Helms)
 - [x] post-61: Overreaching vs overtraining: операційна діагностика — NFO, FO, OTS, Meeusen et al. 2013, HRV-тренд, RPE-drift, decision tree, recovery by state
 - [x] post-62: Velocity-Based Training — load-velocity profile (González-Badillo & Sánchez-Medina 2010), velocity loss thresholds (Pareja-Blanco 2017), 1RM estimation accuracy, FORM CV-as-proxy; clinical-safety: not-required
-- [ ] post-63: Жінки і силовий тренінг — фолікулярна vs лютеальна фаза, estrogen і м'язова адаптація (clinical-safety review mandatory)
+- [x] post-63: Жінки і силовий тренінг — фолікулярна vs лютеальна фаза, estrogen і м'язова адаптація; McNulty et al. (2020) ~1.8% effect size; hormonal contraception addressed; clinical-safety PASS WITH CONDITIONS
 - [ ] post-64: Foam rolling і міофасціальний реліз — що працює, що ритуал: EMG, ROM і latency досліди
 - [ ] post-65: Кофеїн і силовий тренінг — ergogenic evidence, timing protocols, tolerance, withdrawal
 - [ ] post-65: Allostatic load і тренувальна готовність — чому стандартні програми не враховують стрес-навантаження і що FORM робить інакше

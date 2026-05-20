@@ -11,6 +11,15 @@
 
 ---
 
+## [0.93.0] — 2026-05-20
+
+### Added
+- **`content/post-63-women-strength-menstrual-cycle.md`** — 13-хв editorial-brutalist пост про менструальний цикл і силовий тренінг; McNulty et al. (2020) мета-аналіз як основа; гормональна контрацепція addressed directly; effect sizes reported accurately (~1.8% follicular/luteal); clinical-safety PASS WITH CONDITIONS; autoregulation framing ("listen and adjust", не "track to optimize")
+- **`blog.html`** — картка post-63 додана до articles grid
+- **`STATUS.md`** — рядок content engine table для post-63
+
+---
+
 ## [0.92.0] — 2026-05-20
 
 ### Added
