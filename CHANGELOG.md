@@ -11,6 +11,17 @@
 
 ---
 
+## [0.89.1] — 2026-05-20
+
+### Changed
+- `docs/COST_MODEL.md` → **v0.6**: added §15 Enterprise Infrastructure COGS Deep-Dive and §16 Enterprise Tier Break-Even by Plan.
+  - **§15**: per-feature marginal cost quantification for every enterprise-specific capability — SSO/SAML token validation ($0.0000065/seat/month), SCIM provisioning ($0.0000002), admin dashboard queries ($0.0000002), 7-year audit log storage hot + cold tier ($0.0000001 each), SIEM webhook delivery ($0.0000075), white-label DNS/SSL/logo (~$0.001/tenant), multi-tenant RLS ($0). Consolidated summary: all enterprise features together add < $0.00001/seat/month — less than 0.003% of the $0.34 baseline COGS. Explains why enterprise infrastructure gross margin reaches 97%+.
+  - **§16**: plan-level break-even table across Starter (50–200 seats, $12/seat), Growth (200–1,000 seats, $9/seat), Enterprise (1,000+, $6–8/seat) incorporating infra COGS + implementation amortization + CS labor. Key finding: 50-seat Starter Y1 GM = 47.9%; 20-seat deal is margin-negative in Y1 (−26.1%). Y1 vs Y2+ improvement table (Starter 50-seat: +15.9 pp when implementation drops to zero). Multi-year contract economics: 25% 3-year discount gives up $13,800 GP but eliminates ~$32,400 of churn-exposure ARR on a 200-seat Growth deal.
+  - **OQ-11** added to §11: minimum seat threshold for acceptable Y1 Starter margin — track actual CS hours on first 5 Starter deals before committing to sub-50-seat pilots.
+  - ToC updated for §15 and §16. Header and version footer bumped to v0.6.
+
+---
+
 ## [0.89.0] — 2026-05-20
 
 ### Added

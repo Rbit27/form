@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v0.5
+# FORM · Cost Model & Unit Economics v0.6
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -37,6 +37,19 @@
     - 14.6 Enterprise LTV model (120% NRR)
     - 14.7 Cohort survival curve requirements
     - 14.8 Data pipeline specification
+15. [Enterprise Infrastructure COGS Deep-Dive](#15-enterprise-infrastructure-cogs-deep-dive)
+    - 15.1 SSO/SAML token validation overhead
+    - 15.2 SCIM provisioning API costs
+    - 15.3 Admin dashboard query load
+    - 15.4 Audit log storage and long-term retention
+    - 15.5 White-label cost model
+    - 15.6 Multi-tenant RLS overhead
+    - 15.7 Enterprise infrastructure COGS summary
+16. [Enterprise Tier Break-Even by Plan](#16-enterprise-tier-break-even-by-plan)
+    - 16.1 Plan-level break-even table
+    - 16.2 Minimum viable Starter deal analysis
+    - 16.3 Year 1 vs. Year 2+ margin improvement by plan
+    - 16.4 Multi-year contract economics
 
 ---
 
@@ -518,6 +531,7 @@ Each percentage point of revenue shifting from consumer to enterprise improves b
 | OQ-08 | What is the true implementation cost per enterprise deal (eng hours + CS hours)? | High for enterprise margin model | Time-track first 3 enterprise deals |
 | OQ-09 | How does Supabase bandwidth cost behave with wearable data sync (HealthKit/Health Connect)? | Medium — wearable data is high-frequency | Benchmark bandwidth during beta with wearables enabled |
 | OQ-10 | Is there a Cloudflare Workers cost cliff from CV-adjacent edge processing? | Low — CV is on-device | Confirm no server-side CV inference at launch |
+| OQ-11 | What is the minimum seat threshold at which a Starter plan deal generates acceptable Year 1 gross margin? | Medium — sets enterprise minimum deal floor | Track GM per closed deal for first 5 Starter contracts; §16.2 model suggests 50-seat floor may need to rise to 75+ if dedicated CSM cost exceeds $200/month allocation |
 
 ---
 
@@ -915,7 +929,297 @@ LTV is not a formula you run once — it is a live cohort measurement that requi
 
 ---
 
-**v0.5 · May 2026**
+## 15. Enterprise Infrastructure COGS Deep-Dive
+
+Unlike consumer tiers, enterprise deployments carry additional infrastructure features — SSO, SCIM, admin dashboard, audit log delivery, and optional white-label. This section quantifies the marginal infrastructure cost of each enterprise-specific capability and explains why none of them materially change the baseline $0.34/seat/month COGS from §3.3.
+
+**Core finding: enterprise features are operationally lightweight.** SSO/SCIM, audit logs, admin dashboards, and SIEM webhooks are all low-compute, low-bandwidth operations that together add less than $0.002/seat/month to infrastructure COGS. The enterprise tier's high gross margin (~97% on infrastructure, ~89% blended with CS) is not a modeling artifact — it reflects the reality that identity, auditing, and analytics workloads are inexpensive at the compute level.
+
+### 15.1 SSO/SAML token validation overhead
+
+Each enterprise login generates additional Cloudflare Workers calls compared to a standard JWT auth flow:
+
+| Step | Workers requests | Description |
+|---|---|---|
+| SAML assertion receipt | 1 | IdP POST to FORM ACS endpoint (`/auth/saml/acs`) |
+| Assertion validation + RLS context set | 1 | HMAC verification, tenant scoping |
+| Session JWT issuance | 1 | Signed token issued and cached in Redis |
+| **Total per SSO login** | **3** | vs. 2 requests for standard email/password |
+
+Marginal SSO overhead per seat per month:
+
+```
+Sessions/month (enterprise): 12.9
+Additional Workers requests vs. standard JWT: 1 per login
+Cost: 12.9 × $0.50 / 1,000,000 = $0.0000065/seat/month
+At 500 seats: $0.003/month total
+```
+
+**OIDC vs. SAML:** OIDC token validation (OAuth 2.0 code exchange) follows the same 3-step pattern. No cost differential between SAML and OIDC implementation at any realistic scale.
+
+**Assessment: negligible.** The entire Cloudflare Workers overhead for enterprise SSO across 500 seats for a full year is approximately $0.04. Not a material cost driver at any deal size.
+
+### 15.2 SCIM provisioning API costs
+
+SCIM v2 events (create, update, deactivate) occur when the IdP syncs directory changes to FORM. Per `docs/SSO_SCIM_IMPLEMENTATION.md §4`, FORM exposes `/scim/v2/Users` and `/scim/v2/Groups`. Assumed frequency: 5% monthly workforce turnover = approximately 0.2 SCIM events/seat/month on average.
+
+| SCIM event type | Workers requests | DB writes | Typical frequency |
+|---|---|---|---|
+| User create (new hire) | 2 | 1 (insert + RLS policy attach) | Hire rate |
+| User update (role/group change) | 2 | 1 (update) | Occasional |
+| User deprovision (termination) | 2 | 1 (soft-delete + seat release) | ~5% annually |
+| Group sync (SCIM Groups → FORM roles) | 2 | 1 (role mapping update) | On group change |
+| **Per seat average** | **~0.4 req/month** | **~0.2 writes/month** | At 5% monthly turnover |
+
+Monthly cost per seat:
+
+```
+Workers: 0.4 × $0.50/1M = $0.0000002/seat/month
+DB writes: within Supabase plan capacity — no marginal charge
+```
+
+**SCIM bearer token** is per-tenant, stored hashed, rotated on customer request or annually (DEC-030 mandated rotation cadence). Token validation adds zero marginal compute.
+
+**Assessment: negligible.** SCIM is an availability and latency engineering concern, not a cost concern.
+
+### 15.3 Admin dashboard query load
+
+Admin dashboard users (HR leads, People ops, IT admins) run analytics queries against the enterprise admin API. Assumed: 2 admin users per 100 seats, checking dashboard 5×/week. All queries routed to Supabase read replica (available on Team plan and above).
+
+| Dashboard view | Read-replica DB queries | Workers requests | Cadence |
+|---|---|---|---|
+| Engagement overview (weekly trend chart) | 4 | 1 | Daily |
+| Seat utilisation table | 2 | 1 | 2×/week |
+| Audit log viewer (last 50 events) | 3 | 1 | Weekly |
+| User provisioning list | 2 | 1 | As-needed |
+
+Monthly admin query load per 100 seats:
+
+```
+Admin users: 2
+Sessions/week per admin: 5
+Weeks/month: 4.3
+Avg DB queries per session: 4
+
+Total DB queries: 2 × 5 × 4.3 × 4 = 172 queries/month per 100 seats
+= 1.72 queries/seat/month
+
+Workers requests: 2 × 5 × 4.3 × 1 = 43 requests/100 seats/month
+= 43 × $0.50/1M = $0.0000215/month per 100 seats
+= $0.000000215/seat/month
+```
+
+**Supabase cost:** Read-replica queries are included in Team plan ($599/month base). No per-query billing. Marginal cost of admin dashboard load: $0 on the existing Supabase plan.
+
+**Assessment: negligible.** Admin dashboard is among the highest-value enterprise features and costs effectively nothing to serve. The investment is in the product surface (see `admin-dashboard.html`), not in its runtime cost.
+
+### 15.4 Audit log storage and long-term retention
+
+Audit log events are generated for every material action per `docs/AUDIT_LOG_SCHEMA.md` and the HMAC-chain specification in DEC-030. Events are append-only and immutable once written.
+
+| Audit event type | Bytes per record | Events/seat/month |
+|---|---|---|
+| Session completion | ~350 | 12.9 |
+| SCIM provisioning event | ~480 | 0.2 |
+| Admin dashboard access | ~280 | 1.72 |
+| Billing / seat change | ~420 | 0.08 (annual contract) |
+| Break-glass access | ~620 | < 0.01 (rare) |
+| **Weighted average** | **~370 bytes** | **~14.9 events/seat/month** |
+
+Monthly storage growth per seat:
+
+```
+14.9 events × 370 bytes = 5,513 bytes ≈ 5.4 KB/seat/month
+```
+
+**Hot tier (0–90 days in PostgreSQL `audit_log` table):**
+
+```
+90-day hot window: 5.4 KB × 3 months = 16.2 KB/seat
+At 500 seats: 7.9 MB total — negligible within Supabase Team plan (1 TB)
+```
+
+**Cold tier (90 days–7 years in Supabase Storage):**
+
+HMAC-chained `.ndjson` files, one per tenant per calendar day, synced to Supabase Storage (and optionally customer S3):
+
+```
+7-year retention: 5.4 KB × 84 months = 453.6 KB/seat total
+At Supabase Storage rate $0.021/GB:
+0.44 MB / 1,024 MB × $0.021 = $0.0000090/seat for full 7-year archive
+Per month amortized: $0.0000090 / 84 months = $0.00000011/seat/month
+```
+
+**SIEM webhook delivery (Growth+ tier only):**
+
+```
+Events streamed to SIEM: ~14.9/seat/month
+1 Workers outbound request per event
+Cost: 14.9 × $0.50/1M = $0.0000075/seat/month
+At 500 seats with SIEM enabled: $0.0037/month
+```
+
+**Assessment: negligible.** Seven-year tamper-evident audit log with SIEM streaming adds under $0.001/seat/month total. The value delivered (SOC 2 CC6.1 evidence, customer SIEM integration, regulatory retention compliance) is not a function of its infrastructure cost.
+
+### 15.5 White-label cost model (Growth+, ≥ $50k ARR)
+
+White-label delivers a custom domain (e.g., `fit.acme.com`) routing to FORM's product. Infrastructure components:
+
+| Component | Provider | Per-tenant monthly cost | Notes |
+|---|---|---|---|
+| Custom domain routing | Cloudflare Workers Routes | $0 | Custom domains included in Workers Paid plan; no per-domain charge |
+| SSL/TLS certificate | Cloudflare | $0 | Cloudflare-managed; auto-renewed; no per-certificate cost |
+| DNS CNAME validation | Cloudflare | $0 | Tenant adds one CNAME record; Cloudflare handles resolution |
+| Tenant logo + favicon storage | Supabase Storage | ~$0.001 | ~50 KB assets; $0.021/GB = $0.001/month |
+| Custom color palette | CSS variable override in `tenant_config` | $0 | Theme tokens in DB row; no compute overhead |
+| Accessibility floor enforcement | One-time engineering check | $0 recurring | WCAG AA contrast ratio verified at setup; not a recurring cost |
+
+**Monthly white-label infrastructure cost: ~$0.001/tenant/month.**
+
+The one-time setup cost is modeled in §8.2 ($800–1,500 per deal, including custom domain DNS, branding asset upload, and accessibility validation). The recurring infrastructure cost of white-label is negligible.
+
+**Why white-label is gated at ≥ $50k ARR, not priced as a feature add-on:** The gate exists to ensure the one-time engineering setup cost is amortized against sufficient contract value, and to prevent brand dilution from small or low-commitment accounts. It is a strategic threshold, not a cost-driven pricing mechanism. The cost of delivering white-label is near-zero.
+
+### 15.6 Multi-tenant RLS overhead
+
+Row-Level Security enforces tenant isolation at the PostgreSQL layer (see `docs/DATA_MODEL.md §3`). Every query against a RLS-protected table has the relevant policy evaluated server-side before rows are returned.
+
+**Performance overhead:** RLS adds 2–8% additional query latency on typical Supabase-hosted workloads — well within FORM's P99 < 200ms API response target. CPU overhead is negligible.
+
+**Billing impact:** RLS is a PostgreSQL native feature. Supabase does not charge per-policy or per-evaluation. The Supabase plan cost is unchanged by RLS enablement.
+
+**Scale behavior:** RLS overhead is constant regardless of tenant count. The policy `tenant_id = current_setting('app.tenant_id')::uuid` is evaluated in O(1) per row scan — it does not grow with the number of tenants on the platform.
+
+**Cross-tenant query prevention:** RLS policies reject cross-tenant access at the DB layer before rows are returned to the application. This eliminates the need for an application-layer tenant lookup on every query, which would be both slower and less secure.
+
+**Assessment: zero cost impact.** RLS is a security architecture decision. Its value is the isolation guarantee, not a cost tradeoff.
+
+### 15.7 Enterprise infrastructure COGS summary
+
+| Enterprise feature | Marginal cost/seat/month | Assessment |
+|---|---|---|
+| SSO/SAML token validation overhead | $0.0000065 | Negligible |
+| SCIM provisioning (at 5% monthly turnover) | $0.0000002 | Negligible |
+| Admin dashboard queries (2 admins/100 seats) | $0.0000002 | Negligible |
+| Audit log hot-tier DB storage | $0.0000001 | Negligible |
+| Audit log cold-tier (7yr Supabase Storage) | $0.0000001 | Negligible |
+| SIEM webhook delivery (Growth+ only) | $0.0000075 | Negligible |
+| White-label infrastructure (per tenant, amortized/seat) | $0.000002 | Negligible |
+| Multi-tenant RLS | $0 | No billing impact |
+| **Total enterprise feature overhead** | **< $0.00001/seat/month** | **Effectively zero** |
+| **Baseline enterprise COGS (§3.3)** | **$0.34/seat/month** | From coaching sessions + voice |
+| **True enterprise all-in COGS** | **~$0.34/seat/month** | No material change |
+
+**The enterprise premium features — SSO, SCIM, admin dashboard, audit log, white-label, RLS — add less than 0.003% to per-seat infrastructure COGS.** This is the structural explanation for why enterprise infrastructure gross margin reaches 97%+. The real cost of enterprise is not compute — it is engineering time (one-time, modeled in §8.2) and customer success labor (ongoing, modeled in §8.4). Enterprise infrastructure itself is delivered at near-zero marginal cost.
+
+---
+
+## 16. Enterprise Tier Break-Even by Plan
+
+This section extends §8 by computing the break-even deal economics for each enterprise plan tier (Starter, Growth, Enterprise), incorporating all cost components: infrastructure COGS, one-time implementation cost amortized over Year 1, and dedicated CS labor allocation. It identifies the minimum seat threshold below which Year 1 economics are marginal, and quantifies the economic incentive for multi-year contracts.
+
+**Rate card used:** Starter $12/seat/month (50–200 seats), Growth $9/seat/month (200–1,000 seats), Enterprise $6–8/seat/month (1,000+ seats), per `enterprise.html` and `docs/ENTERPRISE.md`. All figures [ESTIMATE] until first 5 signed deals per tier are time-tracked.
+
+**Assumptions:**
+- Infrastructure COGS: $0.34/seat/month (§3.3 + §15.7 — enterprise features add nothing material)
+- Implementation cost amortized over 12 months (Year 1 only; zero in Year 2+)
+- Implementation cost midpoints from §8.2 ($1,150 for small deals, $1,500 for mid, $2,000 for large)
+- CS allocation: $200/month for Starter accounts; $300/month for Growth; $400–500/month for Enterprise
+- All figures are annual
+
+### 16.1 Plan-level break-even table
+
+| Plan | Seats | Monthly ACV | Annual ACV | Infra COGS (yr) | Impl. cost | CS cost (yr) | Total cost (yr) | Gross profit (yr) | GM% Y1 |
+|---|---|---|---|---|---|---|---|---|---|
+| Starter · minimum | 50 | $600 | $7,200 | $204 | $1,150 | $2,400 | $3,754 | $3,446 | 47.9% |
+| Starter · maximum | 200 | $2,400 | $28,800 | $816 | $1,150 | $2,400 | $4,366 | $24,434 | 84.8% |
+| Growth · minimum | 200 | $1,800 | $21,600 | $816 | $1,500 | $3,600 | $5,916 | $15,684 | 72.6% |
+| Growth · maximum | 1,000 | $9,000 | $108,000 | $4,080 | $1,500 | $4,800 | $10,380 | $97,620 | 90.4% |
+| Enterprise · minimum | 1,000 | $6,000 | $72,000 | $4,080 | $1,500 | $4,800 | $10,380 | $61,620 | 85.6% |
+| Enterprise · mid | 2,500 | $18,750 | $225,000 | $10,200 | $2,000 | $6,000 | $18,200 | $206,800 | 91.9% |
+
+All figures [ESTIMATE]. Implementation cost is a one-time charge amortized against Year 1 ACV. CS cost is the dedicated CSM labor allocation (§8.2).
+
+### 16.2 Minimum viable Starter deal analysis
+
+The 50-seat Starter deal at $12/seat/month generates $7,200 ACV but only 47.9% gross margin in Year 1. The drag is the fixed implementation ($1,150) and CS labor ($2,400/year) amortized over a small seat base.
+
+**Year 2 dynamics:** When implementation cost drops to zero, the same 50-seat deal yields:
+
+```
+Y2 GM = ($7,200 − $204 infra − $0 impl − $2,400 CS) / $7,200
+       = $4,596 / $7,200 = 63.8%
+```
+
+63.8% Year 2 margin is below the enterprise blended target (89%, §8.4) but above the consumer Pro margin floor at the lower end of the App Store tax range (~67%). The deal is economically viable across the full contract term; Year 1 is the investment round.
+
+**The minimum floor problem:** §8.3 cites a 20-seat minimum as historically the floor, but this section reveals that 20 seats at $12/seat/month ($2,880 ACV) would generate negative gross profit in Year 1:
+
+```
+20-seat Y1 cost: $82 infra + $1,150 impl + $2,400 CS = $3,632
+20-seat Y1 ACV: $2,880
+Y1 gross profit: −$752 (−26.1%)
+```
+
+**20-seat deals destroy margin in Year 1 at Starter pricing.** The minimum economic floor, given current CS cost allocation, is approximately **40–50 seats at $12/seat/month** for Year 1 neutrality. This is OQ-11.
+
+**Recommendation:** The 40-seat minimum stated in §8.3 is at the edge of viability. If dedicated CSM cost per small account exceeds the $200/month model allocation (e.g., if onboarding requires more than 1 hr/week sustained for 6 months), the minimum should rise to 75 seats. Track actual CS hours on first 5 Starter deals before committing to sub-50-seat pilots.
+
+### 16.3 Year 1 vs. Year 2+ margin improvement by plan
+
+Implementation cost is a one-time event. From Year 2, the same deal generates materially higher net margin:
+
+| Plan | Seats | Y1 GM% | Y2 GM% | Improvement | Notes |
+|---|---|---|---|---|---|
+| Starter · 50 seats | 50 | 47.9% | 63.8% | +15.9 pp | Large Y1 drag from fixed impl/CS on small base |
+| Starter · 200 seats | 200 | 84.8% | 88.0% | +3.2 pp | Fixed costs amortized; near-steady-state |
+| Growth · 200 seats ($9/seat) | 200 | 72.6% | 79.6% | +7.0 pp | Y1 impl drag on lower ACV-per-seat |
+| Growth · 1,000 seats | 1,000 | 90.4% | 91.8% | +1.4 pp | Fixed costs negligible vs. ACV |
+| Enterprise · 1,000 seats ($6/seat) | 1,000 | 85.6% | 87.7% | +2.1 pp | CS cost dominant at lower per-seat rate |
+
+**The Year 1 investment period** is longest and most visible at small seat counts. For Starter 50-seat accounts, Year 1 margin (47.9%) is substantially below steady-state (63.8%). This means the first cohort of small enterprise accounts will show compressed margins in investor financials until Year 2 data is available. Pre-empt this in investor communication: label Year 1 enterprise margin as "including implementation amortization" and show the Year 2 steady-state figure alongside it.
+
+**Expansion within the contract term** changes these numbers materially. A 50-seat Starter that expands to 100 seats at M6 (mid-contract) sees effective Year 1 economics shift toward the 200-seat row — expansion revenue carries zero additional implementation cost.
+
+### 16.4 Multi-year contract economics
+
+Multi-year contracts (2-year at 15% discount, 3-year at 25% discount per `enterprise.html`) are offered on Growth and Enterprise tiers. Despite the lower per-year ACV, multi-year deals are economically superior for three compounding reasons:
+
+**1. Implementation cost is a smaller percentage of lifetime ACV:**
+
+```
+200-seat Growth, $9/seat, annual:
+  Y1 total cost: $816 + $1,500 + $3,600 = $5,916 on $21,600 ACV
+  Implementation as % of Y1 ACV: 6.9%
+
+Same deal, 3-year at 25% discount ($9 × 0.75 = $6.75/seat/month):
+  3-year ACV: $6.75 × 200 × 36 = $48,600
+  Implementation as % of 3-year ACV: 3.1%
+```
+
+The implementation cost halves as a percentage of lifetime revenue. The discount is given back to the customer; the economics improve for FORM through amortization.
+
+**2. Logo churn risk is eliminated for the signed term:**
+
+Enterprise logo churn is modeled at 15% annually (§8.7). In a single-year renewal model, a 10-deal cohort at $21,600 ACV loses ~1.5 logos per year. A 3-year signed contract locks all 10 logos for the full term regardless of churn signal — worth approximately $32,400 in protected ARR per renewal cycle on a 10-deal cohort.
+
+**3. Cash flow timing:**
+
+Annual prepay on a 3-year contract delivers 3× the upfront cash versus annual renewals. For a pre-Series A company, this materially reduces the funding needed to reach ARR milestones.
+
+**Multi-year net margin summary (200-seat Growth example):**
+
+| Contract structure | 3-year gross ACV | 3-year total cost | 3-year gross profit | Blended 3yr GM |
+|---|---|---|---|---|
+| 3× annual renewals (undiscounted) | $64,800 | $16,732 | $48,068 | 74.2% |
+| 3-year prepay at 25% discount | $48,600 | $14,332 | $34,268 | 70.5% |
+| Δ (discount cost to FORM) | −$16,200 ACV | −$2,400 cost | −$13,800 GP | −3.7 pp |
+
+**The customer receives a $16,200 discount over 3 years; FORM gives up $13,800 in gross profit but eliminates ~$32,400 of churn-exposure ARR.** On a cohort basis, multi-year contracts are the correct offer for accounts where Year 2 expansion is expected (i.e., the pilot showed >50% seat utilisation at M3). Offer 3-year proactively on Growth and Enterprise tiers to accounts meeting the expansion signal threshold.
+
+---
+
+**v0.6 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
 
@@ -924,3 +1228,5 @@ All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actua
 *v0.4 updates: §4, §5, §6, §8.4, §9, §10, §12 recalculated to reflect Pro ARPU of $19/month (Western markets, per pricing.html). Geo-pricing note added (§4). Free tier break-even threshold: 1.05% → 0.82%. Full-burn break-even: 6,530 → 5,112 Pro subscribers. Section 10 sensitivity margins updated throughout.*
 
 *v0.5 additions: §13 Infrastructure Cost Breakdown by Service — service-by-service table at 1k/10k/50k/100k MAU, fixed vs. variable classification, upgrade inflection points, cost cliff analysis, per-service optimization levers. §14 Cohort LTV Model & CAC Payback Period — 24-month cohort survival tables for Pro monthly and annual plans, CAC payback at $30/$50/$80/$120, LTV:CAC targets by channel, enterprise LTV at 120% NRR, cohort survival curve requirements, data pipeline specification.*
+
+*v0.6 additions: §15 Enterprise Infrastructure COGS Deep-Dive — per-feature marginal cost quantification for SSO/SAML overhead, SCIM provisioning, admin dashboard queries, 7-year audit log storage (hot + cold tier), SIEM webhook delivery, white-label DNS/SSL, and multi-tenant RLS; consolidated summary showing enterprise features add < $0.00001/seat/month (< 0.003% of baseline COGS). §16 Enterprise Tier Break-Even by Plan — plan-level break-even table (Starter/Growth/Enterprise × seat count), minimum viable seat floor analysis (50-seat Starter Y1 GM = 47.9% vs 20-seat = −26.1%), Y1 vs Y2+ margin improvement by plan, multi-year contract economics (25% 3-year discount gives up $13,800 GP vs eliminates ~$32,400 churn-exposure ARR). OQ-11 added: minimum seat threshold for acceptable Y1 Starter margin.*
