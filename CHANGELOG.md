@@ -11,6 +11,31 @@
 
 ---
 
+## [0.92.0] — 2026-05-20
+
+### Added
+- **`compliance/`** — новий каталог аудиторських артефактів SOC 2 Type II
+  - [`compliance/README.md`](compliance/README.md) — індекс каталогу, посилання на docs/SOC2_READINESS.md, таблиця `evidence/` path-patterns
+  - [`compliance/cc4/control-deficiency-log.csv`](compliance/cc4/control-deficiency-log.csv) — **CC4-E-001** (CC4-GAP-001, P1): структурований CSV-реєстр усіх відомих дефектів контролю (8 pre-launch записів: CC1-GAP-001, CC2-GAP-002, CC3-GAP-001/002/003, CC4-GAP-001/002/003); обов'язкові поля: `deficiency_id`, `criterion`, `description`, `severity`, `root_cause`, `linear_ticket_url`, `owner`, `target_date`, `closed_date`, `auditor_exhibit_ref`; CC4-GAP-001 позначений closed (remediated цим же CSV)
+  - [`compliance/cc4/evidence-collection-plan.md`](compliance/cc4/evidence-collection-plan.md) — **CC4-E-002** (CC4-GAP-002, P1): план збору доказів для 5 ongoing + 3 separate evaluation controls (CC4.1); для кожного control: тип доказів, частота, storage path, відповідальний owner, start date (launch); перша точка перевірки — T+30 post-launch
+  - [`compliance/cc4/deficiency-communication-procedure.md`](compliance/cc4/deficiency-communication-procedure.md) — **CC4-E-003** (CC4-GAP-003, **P0**): трирівнева компенсуюча процедура для CC4.2 (відсутня рада директорів); Tier 1: щомісячний memo founder-а (git-commit підпис, шаблон), Tier 2: щоквартальна нотифікація advisory board (кворум, шаблон agenda, 5-day written summary), Tier 3: quarterly investor observer update (шаблон секції); P0 exception: 24h notification для P0 дефектів; Series A trigger — процедура expire-ує і замінюється audit committee charter впродовж 90 днів після закриття
+  - `compliance/evidence/` — порожній каталог (заповнюється після launch)
+- [`content/post-62-velocity-based-training.md`](content/post-62-velocity-based-training.md) — **Velocity-Based Training: What the Research Actually Says**; clinical-safety: not-required
+  - §1 What VBT Is: MPV vs MV distinction, device accuracy spectrum (GymAware LPT > Push/BEAST accelerometers > smartphone apps), practical stakes of device choice
+  - §2 Load-Velocity Profile: González-Badillo & Sánchez-Medina (2010) — every %1RM maps to a narrow velocity window; squat benchmarks (~1.0 m/s at ~40%, ~0.3 m/s near max); 1RM estimation without maxing
+  - §3 Velocity Loss Thresholds: Pareja-Blanco et al. (2017, Eur J Sport Sci) — 20% vs 40% VL in squat (neuromuscular efficiency vs hypertrophy stimulus tradeoff); Sanchez-Medina & González-Badillo (2011) on fatigue-velocity relationship; programmable variable framing, not universal prescription
+  - §4 1RM Estimation Accuracy: Jidovtseff et al. (2011) bench r=0.97; 5% day-to-day velocity variation propagates error; readiness monitoring application
+  - §5 What VBT Doesn't Solve: program design, exercise selection, equipment accuracy degradation at high loads
+  - §6 FORM Without a Transducer: maximal intent cues — Behm & Sale (1993), Sakamoto & Sinclair (2006); CV pipeline tempo change as velocity loss proxy
+  - §7 Bottom Line: gear vs principle, anti-hype close
+
+### Changed
+- [`blog.html`](blog.html) — картка post-62 (Velocity-Based Training) додана до grid
+- [`README.md`](README.md) — post-62 позначено [x] (VBT); жіноче тренування зсунуто на post-63; foam rolling → post-64; кофеїн → post-65
+- [`STATUS.md`](STATUS.md) — рядок post-62 доданий до таблиці content engine (clinical-safety: not-required)
+
+---
+
 ## [0.91.1] — 2026-05-20
 
 ### Changed

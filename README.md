@@ -386,9 +386,10 @@ Each iteration:
 - [x] post-59: Zone 2 cardio — LT1 physiology, Seiler 80/20 context (10–15 год/тиждень endurance), interference Wilson et al. (2012), HIIT equivalence Gibala/Burgomaster; хто реально потребує, як дозувати
 - [x] post-60: Deload protocols — supercompensation model, 4 types (volume/intensity/full/frequency), reactive vs proactive triggers, practical implementation examples (Meeusen 2013, Schoenfeld, Helms)
 - [x] post-61: Overreaching vs overtraining: операційна діагностика — NFO, FO, OTS, Meeusen et al. 2013, HRV-тренд, RPE-drift, decision tree, recovery by state
-- [ ] post-62: Жінки і силовий тренінг — фолікулярна vs лютеальна фаза, estrogen і м'язова адаптація, що показує дослідна база (clinical-safety review mandatory)
-- [ ] post-63: Foam rolling і міофасціальний реліз — що працює, що ритуал: EMG, ROM і latency досліди
-- [ ] post-64: Кофеїн і силовий тренінг — ergogenic evidence, timing protocols, tolerance, withdrawal
+- [x] post-62: Velocity-Based Training — load-velocity profile (González-Badillo & Sánchez-Medina 2010), velocity loss thresholds (Pareja-Blanco 2017), 1RM estimation accuracy, FORM CV-as-proxy; clinical-safety: not-required
+- [ ] post-63: Жінки і силовий тренінг — фолікулярна vs лютеальна фаза, estrogen і м'язова адаптація (clinical-safety review mandatory)
+- [ ] post-64: Foam rolling і міофасціальний реліз — що працює, що ритуал: EMG, ROM і latency досліди
+- [ ] post-65: Кофеїн і силовий тренінг — ergogenic evidence, timing protocols, tolerance, withdrawal
 - [ ] post-65: Allostatic load і тренувальна готовність — чому стандартні програми не враховують стрес-навантаження і що FORM робить інакше
 - [ ] post-66: Тренінг у гарячому і холодному середовищі — heat acclimation, cold exposure, термоадаптація для силових атлетів
 - [ ] post-67: Creatine — механізм PCr ресинтезу, силові vs гіпертрофія ефекти, протокол завантаження, коли не потрібне
