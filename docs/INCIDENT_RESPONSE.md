@@ -1059,6 +1059,331 @@ After every processor breach incident, regardless of severity:
 
 ---
 
+### R-08: Supply Chain Attack / Compromised Dependency
+
+**Trigger:** Intelligence — from GitHub Advisory, Dependabot alert, npm security advisory, external CERT, or security researcher disclosure — indicates that a package present in FORM's production dependency tree has been actively backdoored, typosquatted, or supply-chain-injected (distinct from a mere CVE: the package has been modified to execute malicious code, exfiltrate data, or install a reverse shell).
+
+**Examples from industry:** `event-stream` (2018, crypto-miner injected via maintainer handover); `ua-parser-js` (2021, cryptominer + password stealer); `xz-utils` (2024, SSH backdoor). Enterprise security questionnaires routinely ask whether you have a supply chain incident runbook.
+
+**Severity — determined by what the package has access to:**
+
+| Package location | Access surface | FORM severity floor |
+|---|---|---|
+| Cloudflare Workers runtime dependency | Network egress, env vars (API keys), KV store | P0 — all production secrets potentially exposed |
+| Supabase edge functions / DB trigger | Database credentials, RLS bypass surface | P0 |
+| React Native / Expo app (production build) | User device, JWT in AsyncStorage, camera/health permissions | P0 if malicious code reaches a published build |
+| Development toolchain only (not shipped) | CI environment, developer machines | P1 — secrets may be in dev env; no production user data |
+| Transitive dependency (not directly imported) | Depends on call chain — assess before downgrading | P1 minimum until call chain confirmed clean |
+
+**Do not downgrade from P0 without confirming the package is not on the production request path.**
+
+#### Immediate Actions (T+0 to T+30 min)
+
+```
+1. Open incident channel: #inc-YYYYMMDD-supply-chain-[package-name]
+   Example: #inc-20260520-supply-chain-lodash
+
+2. Page: IC + security-engineer + devops-lead simultaneously.
+
+3. Freeze all deployments immediately.
+   - Cloudflare: pause Wrangler deploy workflows in GitHub Actions
+   - EAS: revoke the active production release channel update if the build
+     includes the affected package
+   - Do NOT merge any PRs until the full dependency audit is complete.
+
+4. Identify the blast radius:
+   - Run: npm ls <package-name> (or equivalent for the package manager)
+   - Confirm whether the package is in the production bundle or dev-only
+   - Check if the malicious version range overlaps with what is in
+     package-lock.json (or yarn.lock / bun.lockb)
+
+5. Preserve evidence immediately:
+   - Snapshot package-lock.json (or lockfile) at the current commit hash
+   - Run npm audit --json > /tmp/npm-audit-YYYYMMDD.json and SHA-256 hash it
+   - Check Cloudflare Workers outbound connection logs for anomalous destinations
+     (look for unexpected IPs, cryptocurrency mining pools, C2 callback patterns)
+   - Pull Supabase auth logs for any anomalous access in the past 24–72 hours
+     (a compromised package may have already exfiltrated data before detection)
+
+6. Assess: Has malicious code already executed in production?
+   - Check Sentry for any new error types consistent with the advisory description
+   - Check PostHog for anomalous event sequences (bulk data reads, export spikes)
+   - Check Cloudflare Analytics for unexpected outbound request destinations
+```
+
+#### Scope Assessment
+
+Answer in this order before external communication, but do not delay Art. 33 filing past T+48h if health data exposure is plausible:
+
+```
+[ ] What is the exact malicious version range?
+    - Advisory CVE / GitHub Security Advisory ID:
+    - Malicious version(s):
+    - FORM's installed version (from lockfile):
+    - Versions overlap? YES / NO
+
+[ ] Is this package on the production request path?
+    - Workers production bundle? YES / NO
+    - Shipped mobile app (current production build in App Store)? YES / NO
+    - Development/CI environment only? YES / NO
+
+[ ] What is the package's runtime access surface?
+    - Access to network egress? (potential exfiltration)
+    - Access to environment variables / secrets?
+    - Access to database credentials or Supabase service key?
+    - Access to user device storage (AsyncStorage, Keychain)?
+    - Access to camera, microphone, health data?
+
+[ ] Time window of exposure:
+    - First deploy of malicious version: [YYYY-MM-DD]
+    - Most recent deploy: [YYYY-MM-DD]
+    - Package version pinned? YES (check if pin covers malicious range) / NO
+
+[ ] Evidence of active exploitation:
+    - Cloudflare outbound logs: clean / anomalous [describe]
+    - Supabase auth anomalies: none / detected [describe]
+    - Sentry new error patterns: none / detected [describe]
+```
+
+#### Containment
+
+```
+1. Pin the affected package to the last confirmed-clean version in package-lock.json.
+   If no clean version exists (entire package is compromised), remove the dependency
+   and replace with an alternative or inline the minimal required functionality.
+
+2. Remove the compromised package from the dependency tree:
+   npm install <package>@<clean-version> --save-exact
+   Verify lockfile updated before committing.
+
+3. Rotate any secrets that were accessible to the package:
+   - Supabase service role key and anon key → rotate immediately via Supabase dashboard
+   - Anthropic API key → rotate in Anthropic console
+   - ElevenLabs API key → rotate
+   - All Cloudflare API tokens → rotate via CF dashboard
+   - Any secrets stored in Cloudflare Workers environment variables
+   After rotation, redeploy all Workers immediately with the new secrets.
+
+4. Revoke all active user sessions if the package had access to JWT signing
+   or session storage. Users will be required to re-authenticate.
+   - Supabase: rotate the JWT secret in project settings (forces all token re-issue)
+   - Notify enterprise tenant admins via §12 protocol before forcing re-auth.
+
+5. If malicious code shipped in a mobile build:
+   - EAS: revoke OTA update access for the affected build
+   - Coordinate with devops-lead on forced update push to App Store if feasible
+   - Do NOT submit an emergency App Store update without IC approval —
+     App Store review SLA may be faster than the active exploit window, but
+     confirm timeline with Apple Developer Support before waiting.
+```
+
+#### Eradication
+
+```
+1. Full dependency tree audit (all direct and transitive dependencies):
+   npm audit --audit-level=high
+   Review each CVSS ≥ 7.0 finding individually — do not auto-apply npm audit fix
+   without reviewing what it changes.
+
+2. Review all packages that underwent maintainer changes in the past 90 days
+   using Socket.dev or similar supply chain analysis tool.
+
+3. Confirm clean build:
+   - Build from clean checkout on a fresh CI runner (no cached node_modules)
+   - Verify bundle hash matches pre-incident baseline (if available)
+
+4. Implement preventive controls (post-incident, to §9 testing program):
+   - Add Dependabot security update auto-merge for patch-level CVSS < 5.0
+   - Add npm audit step to CI pipeline (fail build on CVSS ≥ 7.0)
+   - Add Socket.dev or Snyk to PR check pipeline for supply chain analysis
+   - Pin lockfile versions for all production dependencies; automate lockfile
+     integrity check in CI
+```
+
+#### Evidence Package (SOC 2 CC6.1, CC6.8, CC7.2, CC7.4)
+
+```
+[ ] Snapshot of package-lock.json at the malicious version (read-only copy)
+[ ] npm audit output (JSON, SHA-256 hashed)
+[ ] Cloudflare outbound connection log export for the exposure window
+[ ] Supabase auth anomaly query results
+[ ] Sentry error report export for the exposure window
+[ ] Key rotation confirmation records (new key fingerprints + rotation timestamps)
+[ ] Session revocation confirmation (Supabase JWT secret rotation timestamp)
+[ ] Clean dependency audit output post-eradication
+[ ] audit_log entries: all secret rotation events (HMAC-verified chain)
+```
+
+**Regulatory note:** If the package had runtime access to health data or PII and there is any evidence it executed network egress, this is a probable Art. 9 breach. Trigger Art. 33 assessment and start the 72-hour clock. Consult compliance-officer immediately.
+
+---
+
+### R-09: Ransomware / Destructive Payload
+
+**Trigger:** Evidence that a destructive payload has executed within FORM-controlled systems: database records deleted or overwritten at scale; Cloudflare Workers source replaced with malicious code; git repository force-pushed with destructive history rewrite; infrastructure systematically destroyed or made unavailable; or files/objects replaced with encrypted versions and a ransom note detected.
+
+**This is always P0. No exceptions.**
+
+**Critical protocol difference from other runbooks:** In all other P0 incidents, the priority order is Evidence → Containment. In ransomware, the priority is **Isolation → Evidence → Recovery**. A live ransomware process will continue to encrypt or destroy data while you investigate. Stop the spread first.
+
+**Do not pay.** FORM's recovery path is Supabase PITR and git history — not decryption. Ransom payment does not guarantee decryption, funds criminal infrastructure, and may trigger OFAC sanctions exposure. The decision to pay (if ever considered) requires founder + legal + compliance-officer unanimous approval and is categorically excluded from IC authority alone.
+
+#### Immediate Actions (T+0 to T+15 min)
+
+```
+1. Open incident channel: #inc-YYYYMMDD-ransomware immediately.
+   Page: IC + security-engineer + devops-lead. No delay.
+
+2. ISOLATE FIRST — before any investigation:
+   a. Supabase: revoke the service role key immediately from the dashboard.
+      This stops any automated process using it from continuing to write/delete.
+   b. Cloudflare: disable the production Workers via CF dashboard
+      (set workers to maintenance mode or toggle off)
+   c. Revoke all Cloudflare API tokens and GitHub personal access tokens
+      from any account that shows anomalous activity.
+   d. If the attack vector is a developer machine: have that developer
+      immediately disconnect from all VPNs and network connections and
+      power down the machine. Do not reboot — preserve volatile memory.
+
+3. Take the platform offline deliberately:
+   - Redirect all DNS to a maintenance page (Cloudflare Pages static maintenance page)
+   - This is intentional — an isolated platform stops the spread.
+   - Enterprise customer communication starts NOW via §12 protocol.
+   - Post on status page: "We are performing emergency maintenance. No ETA yet."
+     (Do not mention ransomware in the first public post — IC must approve any
+     disclosure language.)
+
+4. Preserve state before any recovery action:
+   - DO NOT delete the ransom note artifacts
+   - DO NOT attempt to decrypt or restore anything yet
+   - Screenshot all visible ransom note text, attacker contact info, and
+     demanded amounts. SHA-256 hash and store.
+   - Note exact UTC timestamp of first detected symptom.
+```
+
+#### Scope Assessment
+
+```
+[ ] What systems are confirmed affected?
+    - Supabase database (tables, rows affected): [describe]
+    - Cloudflare Workers (source code modified): YES / NO
+    - GitHub repository (history modified / force push): YES / NO
+    - Developer machines (local files encrypted): YES / NO / UNKNOWN
+    - R2 object storage (objects replaced / deleted): YES / NO
+
+[ ] What is the attack vector hypothesis?
+    - Compromised service role key (→ R-03 protocol also applies)
+    - Compromised Cloudflare API token
+    - Compromised GitHub account / Actions workflow
+    - Compromised developer machine → lateral movement
+    - Supply chain package (→ R-08 protocol also applies)
+    - Social engineering / phishing
+
+[ ] Timeline of destruction:
+    - Earliest audit_log entry showing bulk DELETE or UPDATE: [timestamp]
+    - Supabase PITR earliest clean restore point: [timestamp]
+      (Supabase PITR window: 7 days at Pro tier; verify from dashboard)
+    - Gap between last known-clean state and confirmed destruction: [duration]
+
+[ ] Is the attack vector still active?
+    - Are destructive operations still occurring? (check Supabase realtime metrics)
+    - Has the isolated service role key been used after revocation? (check CF logs)
+    - Are any GitHub Actions workflows still running? Cancel all immediately.
+```
+
+#### Recovery (executed only after full isolation is confirmed)
+
+```
+1. Verify Supabase PITR availability:
+   - Log into Supabase dashboard → Database → Backups
+   - Confirm the continuous backup stream shows a clean timestamp before the
+     attack's earliest confirmed impact.
+   - PITR target timestamp: [last clean timestamp from scope assessment]
+
+2. Restore via Supabase PITR to the target timestamp.
+   Follow the full procedure in docs/DATA_MODEL.md §10 (PITR Tenant-Isolated
+   Restore Runbook). Key steps:
+   a. Create a new Supabase project in the same region (do not restore into
+      the compromised project — it may retain attacker access artifacts)
+   b. Initiate PITR restore to the clean timestamp
+   c. Verify row counts and spot-check health profiles against expected totals
+   d. Verify HMAC audit log chain integrity on the restored database:
+      run the chain verification script (§docs/AUDIT_LOG_SCHEMA.md)
+      before trusting any audit log entries — the attacker may have
+      attempted to inject false audit entries to obscure the timeline.
+
+3. Restore Cloudflare Workers from the last known-good git commit:
+   - Identify last clean commit hash in git history
+   - If GitHub repo is compromised: restore from a local developer checkout
+     (this is why every engineer maintains a local clone)
+   - Deploy from clean commit using new CF API tokens (old tokens are revoked)
+
+4. Provision new secrets — full rotation:
+   - New Supabase project → new service role key, new anon key, new JWT secret
+   - New Cloudflare API tokens (principle of least privilege — scope narrowly)
+   - New Anthropic API key, ElevenLabs key, all third-party secrets
+   - Update Workers environment variables before re-enabling traffic
+   - Document all new key fingerprints in audit_log with actor_type: 'system'
+
+5. Enterprise tenant validation before re-enabling traffic:
+   - Verify each enterprise tenant's data is intact in the restored database
+   - Run the RLS verification test suite (§docs/DATA_MODEL.md §3.5)
+   - Confirm cross-tenant isolation is intact post-restore
+   - Brief enterprise tenant admins directly before public re-opening (§12)
+
+6. Re-enable production traffic:
+   - IC authorizes re-enable only when: all vectors isolated, clean restore
+     verified, new secrets in place, enterprise tenants validated, legal
+     and compliance-officer have no objection.
+   - Update status page with resolution message.
+   - Internal post-mortem timeline starts: T+24h PIR.
+```
+
+#### Attack Vector Eradication
+
+Do not re-enable production until the entry point is closed. Work through the hypothesized attack vector (scope assessment) with security-engineer:
+
+```
+Compromised service role key → key rotated (already done in recovery)
+                                 + audit how key was exposed (git history,
+                                   env file, CI logs, developer machine)
+
+Compromised CF API token    → token rotated + audit CF access log for
+                                 all API calls made with the token
+
+Compromised GitHub account  → revoke all OAuth apps + re-enable MFA
+                              + audit GitHub Actions workflow runs for
+                                unauthorized secret access
+
+Developer machine           → forensic image of machine before wiping
+                              (preserve for potential law enforcement)
+                              + rotate all secrets that machine could access
+                              + audit git commits from that machine in past 30 days
+
+Supply chain package        → follow R-08 eradication protocol
+```
+
+#### Evidence Package (SOC 2 CC7.4, CC9.1)
+
+```
+[ ] Ransom note artifacts (screenshots + SHA-256 hashes)
+[ ] Supabase database metrics showing destruction timeline
+[ ] audit_log entries for bulk DELETE / UPDATE operations (HMAC-verified)
+[ ] Cloudflare Workers API access log covering attack window
+[ ] GitHub Actions workflow run logs (if CI compromise suspected)
+[ ] All key rotation confirmation records (audit_log entries)
+[ ] PITR restore confirmation (new project ID, restore timestamp, row count verification)
+[ ] HMAC chain re-verification report post-restore
+[ ] RLS test suite pass result post-restore
+[ ] Forensic image hash (if developer machine compromised)
+```
+
+**Law enforcement note:** Ransomware is a criminal act. Preserve all forensic artifacts. Do not engage law enforcement without founder + legal approval. FBI IC3 and CISA accept voluntary reports (US); NCSC accepts voluntary reports (UK/EU equivalent for major incidents). Reporting does not trigger mandatory disclosure independently of GDPR Art. 33.
+
+**GDPR note:** If any user health data was accessed, exfiltrated, or destroyed during the attack, Art. 33 is triggered. Destruction of health data is a reportable breach even if no exfiltration occurred — "accidental or unlawful destruction" is explicitly in scope. Start the 72-hour clock at first awareness and consult compliance-officer immediately.
+
+---
+
 ## 6. Communication Templates
 
 ### 6.1 Internal Incident Channel Opening Message
@@ -1526,6 +1851,16 @@ Run one of these per quarter, rotating through scenarios. Document findings in a
 **Scenario D — HMAC chain break with concurrent unusual data access (Q4):**
 "The weekly chain integrity cron fires at 03:00 UTC. Simultaneously, PostHog shows an anomalous spike in data export events over the past 6 hours."
 
+**Scenario E — Supply chain: popular npm package backdoored (Year 2, Q1):**
+"GitHub Advisory publishes a critical advisory: `@upstash/redis` v1.34.2 (released 18 hours ago) contains an obfuscated payload that calls home to an external IP with the contents of `process.env`. Your Dependabot alert fires at 07:15 UTC. npm ls confirms FORM's Cloudflare Workers bundle includes this version. The Workers have been serving production traffic since the package was deployed yesterday morning."
+
+Key discussion points: Has the malicious code executed? What was accessible in the Workers environment? How quickly can you confirm scope? What needs to rotate? What do enterprise tenants need to know, and when?
+
+**Scenario F — Ransomware discovered in staging, lateral movement suspected (Year 2, Q2):**
+"A developer messages the team at 14:30 UTC: their local checkout of the monorepo shows files being replaced with encrypted versions and a ransom note. Staging database on Supabase shows 40,000 rows deleted in the past 2 hours. The developer's machine is on the company VPN. They have access to the production service role key, which is stored in their local `.env` file."
+
+Key discussion points: Is production compromised? What is the isolation sequence? What is the PITR target? What do enterprise tenants need to know before production goes offline deliberately? Who makes the call to take the platform down?
+
 ### 9.4 Year 1 Testing Schedule
 
 | Month | Activity |
@@ -1543,6 +1878,25 @@ Run one of these per quarter, rotating through scenarios. Document findings in a
 | Month 11 | Alert verification |
 | Month 12 | Tabletop exercise — Scenario D (chain break) + Fire drill #2 + Annual DR test |
 | Month 12 | External pen test (pre-SOC 2 observation period close) |
+
+### 9.5 Year 2 Testing Schedule
+
+Expand from 4 scenarios to 6; add supply chain and ransomware to the rotation. Cross-functional drills begin — enterprise customer-success participates in Scenarios E and F.
+
+| Month | Activity |
+|---|---|
+| Month 13 | Alert verification + review Year 1 PIR findings; update runbooks |
+| Month 14 | Alert verification |
+| Month 15 | Tabletop exercise — Scenario E (supply chain npm backdoor); include customer-success in drill |
+| Month 16 | Alert verification |
+| Month 17 | Alert verification |
+| Month 18 | Tabletop exercise — Scenario F (ransomware + lateral movement) + Fire drill #3 |
+| Month 19 | Alert verification |
+| Month 20 | Alert verification |
+| Month 21 | Tabletop — Scenario A variation (RLS bypass in enterprise white-label context) |
+| Month 22 | Alert verification |
+| Month 23 | Alert verification |
+| Month 24 | Annual DR test (PITR full restore to new project) + External pen test year 2 + Tabletop — choose based on Year 1 PIR gaps |
 
 ---
 
@@ -1712,6 +2066,218 @@ SOC 2 Trust Service Criterion CC9.2 requires: *"the entity assesses and manages 
 
 ---
 
+## 12. Enterprise Tenant SLA Breach & Incident Communication Protocol
+
+### 12.1 Purpose
+
+Enterprise contracts carry explicit SLA commitments (typically 99.9% monthly uptime on the API gateway). When an incident breaches or imminently threatens those commitments, enterprise tenants have contractual rights to: (a) direct notification from a named contact, (b) SLA credit calculation, and (c) a formal post-incident summary. This section defines the operational protocol so that the customer-success and communications functions have a playbook that does not require IC judgment calls in the middle of an active incident.
+
+This section supplements §6 (general communication templates) — it covers the enterprise-specific layer on top.
+
+### 12.2 SLA Breach Definition
+
+**Standard enterprise SLA tier (unless contract specifies otherwise):**
+
+| Metric | SLA target | Breach threshold |
+|---|---|---|
+| API gateway monthly availability | 99.9% | Any calendar month ending below 99.9% (allows ~44 min/month downtime) |
+| API gateway P95 latency | < 500 ms | Sustained P95 > 500 ms for > 30 consecutive minutes |
+| SSO/SAML login availability (per tenant) | 99.5% | Any calendar month ending below 99.5% |
+| Admin dashboard availability | 99.5% | Any calendar month ending below 99.5% |
+
+**Downtime definition for SLA purposes:** Availability is measured from the Better Stack uptime probe (endpoint `/health`). Scheduled maintenance with ≥ 72 hours advance notice is excluded. Incidents caused by third-party infrastructure (Supabase, Cloudflare platform) count unless FORM has a compensating control (failover, degraded mode) that it did not activate.
+
+**SLA credit schedule (standard):**
+
+| Monthly uptime achieved | Credit as % of that month's invoice |
+|---|---|
+| 99.0% – 99.9% | 10% |
+| 95.0% – 99.0% | 25% |
+| < 95.0% | 50% |
+
+Credits are applied to the next invoice. Credits do not compound. Maximum credit in any calendar month is 50% of that month's invoice. Credits are the sole and exclusive remedy for SLA breaches unless the contract specifies otherwise — consult legal before making any additional commitments during an incident.
+
+### 12.3 Who Contacts Enterprise Tenants — and When
+
+**The Customer Lead** (as defined in §2.1) is the primary point of contact for all enterprise tenants during P0 and P1 incidents. The Customer Lead does not improvise — they use the templates in §12.5 and send only after IC approval.
+
+| Incident phase | Who sends | Channel | Timing |
+|---|---|---|---|
+| Incident declared (P0/P1) | Customer Lead via dedicated CSM | Direct email to tenant admin contact + Slack if shared workspace | Within 30 min of P0 declaration; within 60 min of P1 declaration |
+| Status update | Customer Lead | Same channels | Every 60 min for P0; every 2 hours for P1 |
+| Resolution | Customer Lead | Email + status page | Within 2 hours of resolution declaration |
+| Formal PIR summary | Customer Lead + IC | Email (written, not verbal) | Within 5 business days of resolution |
+| SLA credit notification | Customer-success + legal | Email + next invoice annotation | Within 10 business days of month-end if breach confirmed |
+
+**Do not:** route enterprise tenant communications through the public status page alone. Enterprise customers require direct personal contact. The status page is supplemental, not a substitute.
+
+**Tenant admin contact registry:** Maintained in the CRM (customer-success owns). Before any incident is declared, the on-call Customer Lead must be able to retrieve the primary and secondary contact for each enterprise tenant within 5 minutes. If the registry is not populated for a tenant, that is a P1 action item for customer-success, independent of any incident.
+
+### 12.4 Privacy Floor During Enterprise Incident Communication
+
+Under the FORM privacy floor (see `docs/ENTERPRISE.md`): HR and company admins **never** see individual user health data, even during an incident. This holds during incident communication.
+
+**What tenant admins are told:**
+- Whether their tenant's data was in scope for a breach
+- How many user records were affected (aggregate count only, no names)
+- What data categories were involved (e.g., "workout session logs" — not specific user health details)
+- What remediation steps were taken
+- Whether they need to take any action (e.g., re-authenticate users, update SSO configuration)
+
+**What tenant admins are NOT told:**
+- Individual user names, health profiles, or coaching session contents
+- Details about other tenants affected by the same incident
+- Internal FORM system architecture details beyond what is necessary for the tenant to take action
+
+### 12.5 Enterprise Incident Notification Templates
+
+#### Template E-01: Initial P0/P1 Notification to Tenant Admin
+
+```
+Subject: [FORM — Service Incident] Impact to [Tenant Name] — [Incident ID] — [Date]
+
+[Tenant Admin Name],
+
+We are writing to inform you that FORM is currently experiencing a service
+incident that affects your organization's access to the platform.
+
+Incident Reference: [INC-YYYYMMDD-slug]
+Severity: [P0 / P1]
+Detected: [HH:MM UTC, Date]
+Status at time of this email: [Investigating / Containing / Recovering]
+
+CURRENT IMPACT TO YOUR ORGANIZATION:
+[One to three sentences describing confirmed impact to this tenant specifically.
+Example: "Users at [Tenant Name] are unable to log into the FORM platform via
+your SSO configuration. Workout logging and AI coaching features are unavailable
+for authenticated users."]
+
+WHAT WE ARE DOING:
+[1–2 sentences on active steps being taken.]
+
+WHAT YOU MAY NEED TO DO:
+[Specific action for the tenant admin — or "No action required from your side
+at this time."]
+
+NEXT UPDATE:
+We will contact you again by [HH:MM UTC] or sooner if the situation changes.
+
+Your dedicated contact for this incident: [Customer Lead name, direct contact]
+
+We understand the impact this has on your team and are treating this as our
+highest priority.
+
+[Customer Lead Name]
+Customer Success, FORM
+```
+
+#### Template E-02: Status Update (60-min cadence for P0)
+
+```
+Subject: [UPDATE #N] FORM Service Incident [INC-YYYYMMDD-slug] — [HH:MM UTC]
+
+[Tenant Admin Name],
+
+Update #[N] on the ongoing incident affecting [Tenant Name].
+
+Status: [Investigating / Containing / Eradicating / Recovering]
+Time elapsed: [X hours Y minutes since incident declared]
+
+WHAT WE KNOW NOW:
+[2–4 bullet points of confirmed new information since last update.
+Do not speculate. Do not include information about other tenants.]
+
+CURRENT IMPACT:
+[Confirmed impact to this tenant at this moment.]
+
+ESTIMATED RESTORATION:
+[Best estimate, explicitly labeled as an estimate, or "No ETA — we will
+update you as soon as we have one." Do not over-promise.]
+
+NEXT UPDATE: [HH:MM UTC]
+
+[Customer Lead Name]
+```
+
+#### Template E-03: Resolution Notification
+
+```
+Subject: [RESOLVED] FORM Service Incident [INC-YYYYMMDD-slug]
+
+[Tenant Admin Name],
+
+The service incident affecting [Tenant Name] has been resolved.
+
+Resolved at: [HH:MM UTC, Date]
+Total duration: [X hours Y minutes]
+
+SUMMARY OF IMPACT TO YOUR ORGANIZATION:
+- Features affected: [list]
+- Duration of user-visible impact: [X hours Y minutes]
+- Data impact: [e.g., "No data was lost or exposed for your organization"
+  OR "X workout sessions from [date range] may need to be re-logged —
+  a full account of affected records will be in the formal PIR."]
+
+ROOT CAUSE (preliminary):
+[One paragraph — what went wrong, in plain language. Not a technical dissertation.
+Do not assign blame to team members or third parties by name.]
+
+WHAT WE ARE DOING TO PREVENT RECURRENCE:
+[2–3 bullet points. Specific, actionable, and honest about timeline.]
+
+FORMAL POST-INCIDENT REVIEW:
+You will receive a written post-incident summary within 5 business days.
+If this incident triggered an SLA credit under your contract, you will
+receive confirmation with your next invoice.
+
+Thank you for your patience. If you have any questions, please contact
+[Customer Lead Name] directly.
+
+[Customer Lead Name]
+Customer Success, FORM
+```
+
+#### Template E-04: SLA Credit Notification (sent with next invoice)
+
+```
+Subject: SLA Credit Applied — [Month Year] Invoice — [Tenant Name]
+
+[Tenant Admin Name],
+
+This message confirms that an SLA credit has been applied to your [Month Year]
+invoice in connection with the service incident on [incident date].
+
+Incident Reference: [INC-YYYYMMDD-slug]
+Downtime duration (for SLA calculation): [X hours Y minutes]
+Calculated monthly uptime: [XX.X%]
+Credit applied: [X%] of the [Month] invoice = $[amount]
+Reflected on invoice: [invoice number / date]
+
+Your SLA credit has been applied automatically. No action is required.
+
+If you have questions about this calculation or believe the downtime duration
+is incorrect, please reply to this email or contact your CSM within 30 days.
+
+[Customer Lead Name / Finance contact]
+FORM
+```
+
+### 12.6 SOC 2 Evidence from §12
+
+Enterprise incident communication generates the following SOC 2 evidence:
+
+| SOC 2 Criterion | Evidence from §12 |
+|---|---|
+| CC9.2 — Vendor risk and customer commitments | Tenant admin contact registry; SLA credit log |
+| A1.1 — Availability commitments | SLA definition (§12.2); credit schedule |
+| A1.2 — Availability monitoring | Better Stack availability reports used for SLA calculation |
+| CC7.3 — Communication to affected parties | Templates E-01 through E-04; sent-message archive |
+| CC2.2 — Internal communications | Incident channel pinned updates + Customer Lead email thread |
+
+**Evidence storage:** All Template E-01 through E-04 communications are archived in `compliance/evidence/incident-comms/<INC-YYYYMMDD-slug>/` and referenced in the PIR document (§8). The email archive + PIR constitute the auditor package for any observation-period incident involving enterprise tenants.
+
+---
+
 ## Appendix A — Quick Reference Card
 
 For use at 3am. IC: read §1 to classify, open the incident channel, then jump to the relevant runbook in §5.
@@ -1721,27 +2287,34 @@ P0?  → Open #inc-YYYYMMDD-slug immediately. Page security-engineer + IC. Start
 P1?  → Open #inc-YYYYMMDD-slug. Page IC. Monitor for upgrade.
 P2?  → Track in Linear. Handle in business hours unless escalating.
 
-Data breach?              → R-01
-Outage?                   → R-02
-Creds compromised?        → R-03
-SSO down?                 → R-04
-Chain break?              → R-05 (always P0)
-DDoS?                     → R-06
-Processor notified us?    → R-07 (72h clock starts NOW — page compliance-officer)
+Data breach?                → R-01
+Outage?                     → R-02
+Creds compromised?          → R-03
+SSO down?                   → R-04
+Chain break?                → R-05 (always P0)
+DDoS?                       → R-06
+Processor notified us?      → R-07 (72h clock starts NOW — page compliance-officer)
+Compromised npm package?    → R-08 (freeze deploys, check Workers env surface)
+Ransomware / destruction?   → R-09 (ISOLATE FIRST — do not pay)
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
   processor discovered the incident. File partial notification at T+48h maximum.
-Evidence first, containment second — unless live exfiltration.
+R-09 exception: Isolation BEFORE evidence — stop spread first.
+Evidence first, containment second — unless live exfiltration (R-01) or live destruction (R-09).
 Never modify production logs. Read-only copies only.
 Log every action in incident channel with timestamp and your name.
 Sub-processor registry: §11.2 — check which data categories the vendor holds.
+Enterprise tenant comms: §12 — Customer Lead owns; IC approves all external statements.
+  Template E-01 within 30 min (P0) / 60 min (P1) of declaration.
 ```
 
 ---
 
-**v0.2 · May 2026 · Owner: security-engineer + devops-lead**
+**v0.3 · May 2026 · Owner: security-engineer + devops-lead**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: May 2027 or after first P0/P1 — whichever comes first.**
 
 *v0.2 additions: R-07 Sub-processor Breach Notification Received (new runbook — vendor-originated incident protocol, GDPR Art. 33 clock management when breach is at processor level, enterprise tenant notification, evidence package, post-incident vendor management review). §11 Sub-processor Incident Management (processor registry for Supabase/Anthropic/ElevenLabs/Cloudflare/PostHog/Sentry/Stripe with Art. 9 classification and severity floors; known DPA gaps including Anthropic notification SLA and ElevenLabs unsigned DPA; Art. 28(3)(f) contractual requirements and DPA signing checklist; notification SLA tracker; SOC 2 CC9.2 evidence integration). Appendix A updated to include R-07 quick reference and sub-processor context for GDPR clock.*
+
+*v0.3 additions: R-08 Supply Chain Attack / Compromised Dependency — trigger matrix by package location and runtime access surface; immediate isolation protocol (freeze deploys, EAS revocation); blast radius assessment checklist; dependency tree audit with clean-build verification; preventive CI controls (Dependabot, npm audit, Socket.dev); SOC 2 CC6.1/CC6.8/CC7.2/CC7.4 evidence package. R-09 Ransomware / Destructive Payload — always-P0 protocol with explicit isolation-first ordering (overrides the standard evidence-first rule); no-pay policy with decision authority constraints; Supabase PITR recovery to new project; full secrets rotation sequence; enterprise tenant validation before re-enabling traffic; law enforcement preservation guidance; GDPR note on destruction as a reportable breach. §9.3 Scenarios E and F — supply chain (backdoored npm package in Workers env) and ransomware (staging-to-production lateral movement) tabletop scenarios with discussion point frameworks; both include enterprise customer-success participation requirement. §9.5 Year 2 Testing Schedule — 6-scenario rotation covering all runbook types; cross-functional drills (customer-success joins E and F). §12 Enterprise Tenant SLA Breach & Incident Communication Protocol — SLA tier definition and breach thresholds for API availability, P95 latency, and SSO; credit schedule (10%/25%/50% by uptime band); contact responsibility matrix with timing SLAs; privacy floor enforcement for tenant communications; Templates E-01 (initial notification), E-02 (60-min status update), E-03 (resolution), E-04 (SLA credit); SOC 2 evidence mapping (CC9.2, A1.1, A1.2, CC7.3, CC2.2). Appendix A updated to include R-08, R-09, and §12 enterprise comms reference.*

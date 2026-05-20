@@ -11,6 +11,13 @@
 
 ---
 
+## [0.87.1] — 2026-05-20
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §§R-08, R-09, 9.3–9.5, 12` — v0.3 extension: **R-08 Supply Chain Attack / Compromised Dependency** (blast radius matrix by package location and runtime access surface; deploy-freeze protocol; secrets rotation; CI preventive controls: Dependabot + npm audit + Socket.dev; SOC 2 CC6.1/CC6.8/CC7.4 evidence package). **R-09 Ransomware / Destructive Payload** (always-P0; isolation-first protocol overriding standard evidence-first rule; no-pay policy with decision authority constraints; Supabase PITR recovery to new project; full secrets rotation sequence; enterprise tenant validation before re-enabling traffic; law enforcement preservation note; GDPR Art. 33 applicability for destruction). **§9.3 Scenarios E & F** — tabletop scenarios: supply chain (backdoored npm package in Workers env) and ransomware (staging-to-production lateral movement); both require customer-success participation. **§9.5 Year 2 Testing Schedule** — 6-scenario rotation across all runbook types. **§12 Enterprise Tenant SLA Breach & Incident Communication Protocol** — SLA breach thresholds (99.9% API, 99.5% SSO); credit schedule (10/25/50% by uptime band); contact ownership matrix with per-severity timing SLAs; privacy floor enforcement for tenant communications; Templates E-01 (initial notification), E-02 (60-min status update), E-03 (resolution), E-04 (SLA credit); SOC 2 evidence mapping (CC9.2, A1.1, A1.2, CC7.3, CC2.2). Appendix A updated to reference R-08, R-09, and §12 enterprise comms protocol. INCIDENT_RESPONSE doc → v0.3.
+
+---
+
 ## [0.87.0] — 2026-05-20
 
 ### Added
