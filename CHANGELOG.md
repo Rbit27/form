@@ -11,6 +11,17 @@
 
 ---
 
+## [0.90.0] — 2026-05-20
+
+### Added
+- [`docs/SOC2_READINESS.md`](docs/SOC2_READINESS.md) §31 — CC3 Risk Assessment: усі 4 sub-criteria mapped (CC3.1–CC3.4); §14 Risk Register cross-referenced як CC3.2 control; DEC-030 HMAC log + clinical-safety VETO as CC3.3 anti-fraud controls; 3 gaps documented (CC3-GAP-001 risk appetite statement, CC3-GAP-002 fraud risk table, CC3-GAP-003 org-change checklist)
+- [`docs/SOC2_READINESS.md`](docs/SOC2_READINESS.md) §32 — CC4 Monitoring Activities: CC4.1 mapped (5 ongoing + 3 separate evaluation mechanisms); CC4.2 mapped (4-layer deficiency communication); CC4-GAP-003 (P0) board-less compensating control documented with Series A upgrade trigger
+
+### Changed
+- SOC 2 readiness: **~86% → ~90%** — всі 9 Common Criteria (CC1–CC9) тепер формально mapped
+
+---
+
 ## [0.89.2] — 2026-05-20
 
 ### Added

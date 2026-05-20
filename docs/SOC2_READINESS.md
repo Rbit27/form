@@ -5001,3 +5001,109 @@ CC2 requires that FORM generates and communicates relevant information to suppor
 ---
 
 *v1.9 additions: Section 29 — CC1 Control Environment [five sub-criteria mapped; AUP signing gap (CC1-GAP-001) and background check provider gap (CC1-GAP-003) surfaced as P0; CC1.5 confirmed Done via §25.5 daily chain check]. Section 30 — CC2 Communication and Information [three sub-criteria mapped; privacy policy publication and sub-processor list deployment confirmed as P0 gates; Art. 33 dry-run gap surfaced as CC2-GAP-006; six gaps documented CC2-GAP-001 through CC2-GAP-006]. SOC 2 readiness: ~82% → ~86%.*
+
+---
+
+## 31. CC3 — Risk Assessment
+
+> Owner: `compliance-officer`. Effective: May 2026. Review: annual or on any change to risk appetite, fraud risk profile, organizational structure, or significant system change.
+> SOC 2 criteria closed: CC3.1 (objectives specified with sufficient clarity), CC3.2 (risks to objectives identified and analyzed), CC3.3 (fraud potential considered), CC3.4 (changes that could impact internal controls identified and assessed).
+> Reference: `docs/ASSUMPTIONS_REGISTER.md`, `docs/OKRS_2026.md`, `docs/PITCH.md`, §14 Formal Risk Register (CC3), §15 Annual Compliance Calendar, §21 CC8 Change Management, `docs/AUDIT_LOG_SCHEMA.md`, DEC-030.
+
+### 31.1 Purpose
+
+CC3 requires that FORM specifies its objectives clearly enough that risks to those objectives can be identified, that it systematically identifies and analyzes those risks (including fraud risk), and that it identifies changes that could affect the system of internal controls. For a pre-launch company, the risk assessment discipline is simultaneously the most important and most difficult criterion to evidence: objectives are still being refined, the fraud surface is theoretical, and the change environment is constant. This section maps each of the four CC3 sub-criteria to FORM's existing controls, references the operative risk register rather than duplicating it, and identifies the three gaps that must be closed before the SOC 2 observation period begins.
+
+### 31.2 CC3 Sub-Criteria Control Table
+
+| Sub-Criterion | AICPA Requirement (summary) | FORM Control | Status | Evidence Source |
+|---|---|---|---|---|
+| **CC3.1** | Entity specifies objectives with sufficient clarity to enable identification and assessment of risks to those objectives | System objectives documented across three complementary artefacts: `docs/PITCH.md` (product vision and market objectives), `docs/OKRS_2026.md` (annual measurable objectives with key results), `docs/ASSUMPTIONS_REGISTER.md` (explicit assumption risks cross-referenced to objectives). Together these provide the auditor-legible objective hierarchy from strategic intent to operational assumption. | 🟡 Partial | `docs/PITCH.md`; `docs/OKRS_2026.md`; `docs/ASSUMPTIONS_REGISTER.md`; `docs/` directory structure as documented policy corpus |
+| **CC3.2** | Entity identifies risks to achievement of objectives and analyzes those risks as a basis for determining how risks should be managed | §14 Formal Risk Register is the operative control: inherent and residual scoring methodology, 15+ risk entries across six categories (SR/AR/IR/CR/PR/VR), heatmap with tolerance thresholds, and a quarterly review cadence. See §14 — content not duplicated here. | 🟡 Partial | §14 Formal Risk Register (CC3); quarterly review log artefact to be filed in `compliance/cc3/` at each review cycle |
+| **CC3.3** | Entity considers the potential for fraud in the assessment of risks to the achievement of objectives | DEC-030 HMAC-chained audit log is the primary anti-fraud technical control: tamper-evident, append-only, chain verified daily (§25.5) with PagerDuty P0 alert on any break. Clinical-safety VETO protocol prevents harmful or deceptive AI output from being surfaced to users. Break-glass dual-authorization procedure requires post-hoc justification filed in Linear, ensuring no single person can silently alter records. §14 risk entries CR-01 (cross-tenant data bypass) and IR-01 (harmful AI output) implicitly cover the two highest-consequence fraud scenarios. | 🟡 Partial | DEC-030 spec; `docs/AUDIT_LOG_SCHEMA.md` break-glass procedure; §25.5 daily chain integrity check artefact; §14 risk entries CR-01 and IR-01; clinical-safety VETO protocol documentation |
+| **CC3.4** | Entity identifies and assesses changes that could significantly impact the system of internal controls | §21 CC8 Change Management provides PR-level controls: required reviewers, deployment approval gates, and a Change Control Board (CCB) risk assessment step for significant changes. §15 Annual Compliance Calendar encodes change-triggered risk review obligations at each quarterly checkpoint. CC4.1 and CC4.2 are confirmed closed in §15. | 🟡 Partial | §21 CC8 Change Management (PR gate log, CCB artefact); §15 Annual Compliance Calendar (CC4.1 and CC4.2 entries); change-triggered review entries in Linear |
+
+### 31.3 Gap Analysis
+
+| Gap ID | Description | Priority | Owner | Target Date |
+|---|---|---|---|---|
+| **CC3-GAP-001** | No standalone signed "risk appetite statement" document exists as an auditor exhibit. Risk appetite is stated in §14.1 prose ("MEDIUM — inherent scores ≥12 require mitigation") but auditors typically expect a discrete, dated, founder-signed artefact filed separately from the risk register body. | P1 — blocks CC3.2 from 🟡 → 🟢 | compliance-officer | Month O-4 (4 months pre-observation) |
+| **CC3-GAP-002** | Fraud risk assessment is implicit in §14 (CR-01 cross-tenant bypass, IR-01 harmful AI output) but neither entry is explicitly labeled as a fraud risk for CC3.3 purposes. Auditors expect a dedicated "fraud risk assessment" section or table with explicit fraud scenario enumeration, likelihood/impact scoring, and named detective/preventive controls. | P1 — blocks CC3.3 from 🟡 → 🟢 | compliance-officer | Month O-4 |
+| **CC3-GAP-003** | No formal change-impact assessment checklist is triggered by significant organizational changes (e.g., new engineering hire, new regulatory jurisdiction, new market entry, acquisition of a significant third-party tool) beyond the PR-level CC8 controls that govern code changes. Organizational and environmental changes are a distinct CC3.4 requirement not fully covered by §21. | P1 — blocks CC3.4 from 🟡 → 🟢 | compliance-officer | Month O-3 |
+
+### 31.4 Implementation Checklist
+
+| ID | Action | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC3-GAP-001** | Draft and founder-sign a one-page "Risk Appetite Statement" document at `compliance/cc3/risk-appetite-statement.md`. Must include: appetite level (MEDIUM), threshold definition (inherent ≥12 requires mitigation plan), exceptions process, and signature block with date. Git commit SHA serves as signing record. File as CC3-E-001. | P1 | compliance-officer | Content already exists in §14.1 — this action is extraction, formatting, and formal sign-off only |
+| **CC3-GAP-002** | Add a "Fraud Risk Assessment" subsection to §14 (or create `compliance/cc3/fraud-risk-assessment.md`) that explicitly re-labels CR-01 and IR-01 as fraud risks, adds a fraud scenario table (misappropriation of health data, manipulation of AI output, unauthorized access to tenant data, insider threat), and maps each to a detective control (HMAC log, clinical-safety VETO, break-glass audit) and a preventive control (RLS policy, RBAC, AUP). File as CC3-E-002. | P1 | compliance-officer | Cross-reference to §14 entries; do not duplicate the full risk register |
+| **CC3-GAP-003** | Create `compliance/cc3/org-change-impact-checklist.md` with a structured checklist triggered by: (a) new hire with production data access, (b) new SaaS tool processing personal data, (c) entry into new regulatory jurisdiction, (d) material change in product scope. Each trigger maps to: risk register review, DPA/DPIA assessment, CC8 CCB notification, and compliance calendar update. File as CC3-E-003. | P1 | compliance-officer | This checklist complements §21 CC8 (code changes) with the organizational-change dimension CC3.4 requires |
+
+### 31.5 SOC 2 Readiness Delta
+
+| Metric | Before §31 | After §31 |
+|---|---|---|
+| CC3.1 — Objectives specified with clarity | Not explicitly mapped | 🟡 Partial — PITCH.md, OKRS_2026.md, and ASSUMPTIONS_REGISTER.md mapped as three-layer objective hierarchy; auditor narrative complete |
+| CC3.2 — Risks to objectives identified and analyzed | 🟡 Partial — §14 risk register existed | 🟡 Partial — §14 formally claimed as operative CC3.2 control; risk appetite gap (CC3-GAP-001) surfaced with signed-statement remediation path |
+| CC3.3 — Fraud risk considered | Not explicitly mapped | 🟡 Partial — DEC-030 HMAC log, clinical-safety VETO, and break-glass dual-authorization mapped as fraud controls; dedicated fraud risk assessment gap (CC3-GAP-002) surfaced |
+| CC3.4 — Changes impacting internal controls identified | 🟡 Partial — §21 CC8 existed for code changes | 🟡 Partial — §21 CC8 and §15 calendar formally claimed; organizational change-impact checklist gap (CC3-GAP-003) surfaced |
+| New gaps formally opened | — | 3 (CC3-GAP-001 through CC3-GAP-003) |
+| Net readiness movement | ~86% | ~88% (CC3 criteria family now fully mapped; all four sub-criteria have explicit compensating control narratives and auditor evidence paths) |
+
+**SOC 2 readiness: ~86% → ~88%**
+
+---
+
+*v2.0a additions: Section 31 — CC3 Risk Assessment. All four CC3 sub-criteria (CC3.1–CC3.4) formally mapped. CC3.1: PITCH.md, OKRS_2026.md, and ASSUMPTIONS_REGISTER.md documented as three-layer objective hierarchy. CC3.2: §14 Formal Risk Register formally claimed as operative CC3.2 control; risk appetite statement gap (CC3-GAP-001) surfaced as P1. CC3.3: DEC-030 HMAC log, clinical-safety VETO, and break-glass dual-authorization mapped as primary anti-fraud controls; dedicated fraud risk assessment gap (CC3-GAP-002) surfaced. CC3.4: §21 CC8 and §15 calendar claimed; organizational change-impact checklist gap (CC3-GAP-003) surfaced. Three gaps documented (CC3-GAP-001 through CC3-GAP-003); all P1. SOC 2 readiness: ~86% → ~88%.*
+
+---
+
+## 32. CC4 — Monitoring Activities
+
+> Owner: `compliance-officer`. Effective: May 2026. Review: annual or on any change to monitoring tool stack, incident response structure, or board/advisory composition.
+> SOC 2 criteria closed: CC4.1 (ongoing and separate evaluations selected, developed, and performed), CC4.2 (internal control deficiencies evaluated and communicated in a timely manner).
+> Reference: §15 Annual Compliance Calendar, §16 Penetration Test Program, §23 Quarterly Access Review, §25.5 daily HMAC chain integrity check, `docs/INCIDENT_RESPONSE.md`, DEC-030.
+
+### 32.1 Purpose
+
+CC4 requires that FORM both performs ongoing monitoring of its internal controls (CC4.1) and communicates identified deficiencies to those responsible for corrective action in a timely manner (CC4.2). For a pre-launch solo-founder company, this is the criterion where the absence of a board creates the most auditor friction: CC4.2 explicitly requires communication "to those responsible for taking corrective action, including senior management and the board." This section maps FORM's monitoring controls, identifies the compensating control structure for board-less governance, documents the three gaps that must be closed before the observation period begins, and defines the remediation path.
+
+### 32.2 CC4 Sub-Criteria Control Table
+
+| Sub-Criterion | AICPA Requirement (summary) | FORM Control | Status | Evidence Source |
+|---|---|---|---|---|
+| **CC4.1 — Ongoing evaluations** | Entity selects, develops, and performs ongoing evaluations to ascertain whether components of internal control are present and functioning | Five concurrent ongoing evaluation mechanisms: (1) §15 compliance calendar monthly evidence checkpoints and quarterly reviews; (2) §25.5 daily HMAC chain integrity check (automated Edge Function, `system.audit_chain_verified` events); (3) §23 Quarterly Access Review (structured review of all production access grants); (4) Supabase dashboard weekly review (availability, query performance, error rates); (5) Cloudflare analytics monthly review (WAF rule effectiveness, anomaly detection, blocked request trending). §15 explicitly confirms CC4.1 as closed. | 🟡 Partial — designed; pre-launch observation period not yet started | §15 Annual Compliance Calendar (CC4.1 entry); §25.5 cron artefact (`audit_log` chain events); §23 access review artefact; Supabase and Cloudflare dashboard export screenshots filed monthly in `compliance/cc4/` |
+| **CC4.1 — Separate evaluations** | Entity selects, develops, and performs separate (periodic, independent) evaluations to ascertain whether components of internal control are present and functioning | Three separate evaluation mechanisms: (1) §16 Penetration Test Program (annual third-party pentest, most recent report filed in `compliance/pentests/`); (2) §23 Quarterly Access Review (quarterly structured evaluation distinct from day-to-day operations); (3) §15 annual compliance calendar year-over-year effectiveness review (assesses whether prior-year controls remained effective across the 12-month observation window). | 🟡 Partial — §16 pentest not yet executed (pre-launch); §23 Q1 2026 review artefact pending | §16 pentest engagement letter and final report; §23 quarterly access review artefact; §15 year-over-year effectiveness memo |
+| **CC4.2 — Deficiency communication** | Entity evaluates and communicates internal control deficiencies in a timely manner to those responsible for taking corrective action, including senior management and the board | Four-layer deficiency communication mechanism: (1) `docs/INCIDENT_RESPONSE.md §2` incident command structure defines IC → founder escalation path with P0/P1/P2 severity tiers; (2) LINEAR ticket created on any identified control failure (control-failure label, mandatory fields: criterion, description, severity, owner, target date); (3) §15 monthly evidence memo contains a dedicated "anomalies and deficiencies" section reviewed at each checkpoint; (4) PagerDuty P0 alerts for automated control failures (HMAC chain break, `tenant_id_missing` counter threshold, auth failure spike). §15 explicitly confirms CC4.2 as closed. | 🟡 Partial — communication structure designed; no deficiencies logged yet (pre-launch; no observation period events) | `docs/INCIDENT_RESPONSE.md §2` ICS structure; Linear control-failure ticket template; §15 monthly evidence memo template; PagerDuty alert configuration export |
+
+### 32.3 Gap Analysis
+
+| Gap ID | Description | Priority | Owner | Target Date |
+|---|---|---|---|---|
+| **CC4-GAP-001** | No formal "control deficiency log" artifact exists. LINEAR tickets serve as the operational mechanism for tracking control failures, but there is no structured register with mandatory fields (criterion ID, deficiency description, severity classification, root cause, remediation status, date closed, auditor exhibit reference). Auditors require a dedicated, durable artifact — not an ephemeral ticket queue. | P1 — blocks CC4.2 from 🟡 → 🟢 | compliance-officer | Month O-4 (4 months pre-observation) |
+| **CC4-GAP-002** | Monitoring evidence is not yet in steady state. The product is pre-launch; most CC4.1 ongoing evaluation controls are designed and configured but have not yet accumulated the execution evidence (monthly dashboard screenshots, chain integrity event logs, access review artefacts) that an auditor expects to see across the 6-month observation window. This gap resolves automatically at launch + 6 months; it is documented here so the observation-period evidence collection plan is explicit. | P1 — accepted; resolves at launch + 6 months | compliance-officer | Launch + 6 months |
+| **CC4-GAP-003** | No board or audit committee exists to receive deficiency communications, as required by CC4.2. The compensating control is a three-tier communication structure: (1) deficiencies communicated to founder in structured self-review documented in §15 monthly evidence memo; (2) advisory board notified of any P0/P1 deficiency at the next quarterly advisory call; (3) Seed-round investor observer receives a deficiency summary in the quarterly investor update. This compensating control is acceptable at pre-Seed stage but must be upgraded to a formal audit committee or equivalent at Series A. | P0 — compensating control documented; structural gap accepted with explicit upgrade trigger | founder | Advisory board notification: immediate (next quarterly call); formal audit committee: Series A close |
+
+### 32.4 Implementation Checklist
+
+| ID | Action | Priority | Owner | Notes |
+|---|---|---|---|---|
+| **CC4-GAP-001** | Create `compliance/cc4/control-deficiency-log.csv` with mandatory columns: `deficiency_id`, `criterion`, `description`, `severity` (P0/P1/P2), `root_cause`, `linear_ticket_url`, `owner`, `target_date`, `closed_date`, `auditor_exhibit_ref`. Seed with any known pre-launch deficiencies from this document (CC1-GAP-001, CC2-GAP-002, etc. that are still open). Establish process: any Linear ticket with the `control-failure` label auto-generates a CSV row within 24 hours. File initial CSV as CC4-E-001. | P1 | compliance-officer | CSV is the auditor exhibit; Linear is the operational workflow — they must stay in sync |
+| **CC4-GAP-002** | Create `compliance/cc4/evidence-collection-plan.md` documenting: (a) what evidence is collected for each CC4.1 control, (b) collection frequency, (c) storage path in `compliance/cc4/YYYY-MM/`, (d) responsible owner, (e) start date (launch). Add a §15 calendar entry for first evidence collection checkpoint at T+30 days post-launch. File as CC4-E-002. | P1 | compliance-officer | This converts the design intent into an executable collection schedule that auditors can trace |
+| **CC4-GAP-003** | Document the three-tier compensating control for board communication in `compliance/cc4/deficiency-communication-procedure.md`: (1) founder self-review procedure and monthly evidence memo template; (2) advisory board notification protocol (agenda item template, quorum definition, written summary within 5 business days of call); (3) investor observer deficiency summary template (quarterly, to be included in investor update). Add Series A trigger note: "This procedure expires and must be replaced by formal audit committee charter within 90 days of Series A close." File as CC4-E-003. | P0 | founder | This document is the compensating control narrative the auditor will evaluate against CC4.2 — it must be precise and executed |
+
+### 32.5 SOC 2 Readiness Delta
+
+| Metric | Before §32 | After §32 |
+|---|---|---|
+| CC4.1 — Ongoing evaluations | 🟡 Partial — §15 calendar and §25.5 chain check existed | 🟡 Partial — five ongoing evaluation mechanisms formally mapped (§15 calendar, §25.5 daily chain check, §23 access review, Supabase weekly, Cloudflare monthly); all designed but pre-launch observation evidence not yet accumulated |
+| CC4.1 — Separate evaluations | Not explicitly mapped | 🟡 Partial — §16 pentest, §23 quarterly access review, and §15 year-over-year review formally claimed as separate evaluations; pentest execution pending (CC4-GAP-002) |
+| CC4.2 — Deficiency communication | Not explicitly mapped | 🟡 Partial — four-layer communication mechanism (INCIDENT_RESPONSE §2, Linear control-failure ticket, §15 monthly memo, PagerDuty P0) formally mapped; control deficiency log gap (CC4-GAP-001) surfaced; board-less compensating control (CC4-GAP-003) documented with Series A upgrade trigger |
+| New gaps formally opened | — | 3 (CC4-GAP-001 through CC4-GAP-003) |
+| Net readiness movement | ~88% | ~90% (CC4 criteria family now fully mapped; all nine CC criteria — CC1 through CC9 — are now formally mapped; CC3 and CC4 complete the Common Criteria coverage) |
+
+**SOC 2 readiness: ~88% → ~90%**
+
+---
+
+*v2.0 additions: Section 31 — CC3 Risk Assessment. All four CC3 sub-criteria (CC3.1–CC3.4) formally mapped; PITCH.md + OKRS_2026.md + ASSUMPTIONS_REGISTER.md mapped as three-layer objective hierarchy (CC3.1); §14 Formal Risk Register claimed as operative CC3.2 control; DEC-030 HMAC log, clinical-safety VETO, and break-glass dual-authorization mapped as primary anti-fraud controls (CC3.3); §21 CC8 and §15 calendar claimed for CC3.4; risk appetite statement gap (CC3-GAP-001), dedicated fraud risk assessment gap (CC3-GAP-002), and organizational change-impact checklist gap (CC3-GAP-003) surfaced. Section 32 — CC4 Monitoring Activities. Both CC4 sub-criteria (CC4.1–CC4.2) formally mapped; five ongoing evaluation mechanisms and three separate evaluation mechanisms documented for CC4.1; four-layer deficiency communication mechanism mapped for CC4.2; control deficiency log gap (CC4-GAP-001), observation-period evidence collection gap (CC4-GAP-002), and board-less compensating control structure (CC4-GAP-003, P0) documented with Series A upgrade trigger. All nine CC criteria now formally mapped. SOC 2 readiness: ~86% → ~90%.*
