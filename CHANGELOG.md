@@ -11,6 +11,15 @@
 
 ---
 
+## [0.98.0] — 2026-05-21
+
+### Added
+- **`content/post-68-heat-cold-training.md`** — «Training in Hot and Cold Environments: Thermoadaptation, CWI, and the Adaptation Tradeoff» (sports-scientist, clinical-safety PASS). Covers: heat effects on contractile force and central fatigue (Racinais & Oksa 2010, Nybo et al. 2010); heat acclimation protocol (Nielsen 1993, 10–14 days, plasma volume expansion, HR reduction, relevance for strength athletes); CWI adaptation tradeoff — Roberts et al. (2015, *J Physiol*) CWI blunts satellite cell activation and mTOR signalling with attenuated hypertrophy/strength over 12-week block; Yamane et al. (2006) 4-week attenuation; Peake et al. (2017) systematic review; phase-based CWI decision rule (competition window vs. accumulation block); cold environment warm-up implications; sauna recovery evidence (Laukkanen). ~2,700 words. Clinical safety: no food content, no body image, heat illness addressed educationally with medical referral direction.
+- **`README.md`** — post-68 marked complete; blog post count updated to 68
+- **`VERSION`** — 0.97.1 → 0.98.0
+
+---
+
 ## [0.97.1] — 2026-05-21
 
 ### Added
