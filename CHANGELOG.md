@@ -11,6 +11,15 @@
 
 ---
 
+## [0.96.0] — 2026-05-21
+
+### Added
+- **`docs/DATA_MODEL.md`** v0.3 → v0.5 — **§14 Wearable Data Integration Schema** (platform-engineer + enterprise-architect). Five source integrations: HealthKit (iOS Background Delivery), Health Connect (Android WorkManager), Whoop, Oura Ring, Garmin. `wearable_readings` table DDL with 14 `reading_type` values, `(user_id, source, reading_type, recorded_at)` UNIQUE idempotency constraint, two composite indexes, and `deleted_at` soft-delete. Full RLS policies: user self-access, coach access behind consent gate, `form_admin` BYPASSRLS for erasure. `tenant_wearable_summary` aggregate view: k-anonymity floor (N ≥ 5), HRV trend direction only (no raw RMSSD), sleep duration buckets. Cross-source HRV normalization table (Garmin weekly HRV Status not comparable to daily RMSSD). Coaching context builder: `stripPersonalProperties()` extension, all wearable signals bucketed/directional — raw values never reach Anthropic API. GDPR Art. 9: explicit consent gate, 2-year retention, 30-day Art. 17 erasure window. Seven DEC-030 HMAC-chained audit events. `wearable_oauth_tokens` table with Supabase Vault encryption. Analytics restrictions table: wearable data excluded from all PostHog / ClickHouse / Metabase layers. 18-item implementation checklist (11× P0, 5× P1, 2× P2).
+- **`content/post-66-hrv-strength-athletes.md`** — "HRV for Strength Athletes: How to Actually Use It" (sports-scientist + brand-voice, clinical-safety PASS). Covers: RMSSD mechanism (adenosine / autonomic NS); why strength athletes specifically benefit (CNS fatigue, Flatt & Esco 2016, Nuuttila et al. 2022); 7–14 day trend vs. single-day reading; personal baseline vs. population norms; morning measurement protocol; HRV-guided volume auto-regulation (Kiviniemi et al. 2010 RCT); high/mildly-suppressed/markedly-suppressed response heuristics; measurement confounds (alcohol, illness, cross-device incompatibility); when to ignore HRV (peaking, new block baseline period, illness); the anxiety trap (weekly trend-checking vs. daily obsession); FORM wearable data transparency statement.
+- **`VERSION`** — 0.95.1 → 0.96.0
+
+---
+
 ## [0.95.1] — 2026-05-20
 
 ### Changed

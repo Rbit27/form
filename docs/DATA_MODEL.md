@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v0.3
+# FORM · Multi-Tenant Data Model v0.5
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -20,6 +20,8 @@
 10. [PITR Tenant-Isolated Restore Runbook](#10-pitr-tenant-isolated-restore-runbook)
 11. [Index Strategy for RLS Performance](#11-index-strategy-for-rls-performance)
 12. [Soft Delete, Data Retention & GDPR Art. 17 Erasure](#12-soft-delete-data-retention--gdpr-art-17-erasure)
+13. [Analytics Event Tracking Schema](#13-analytics-event-tracking-schema)
+14. [Wearable Data Integration Schema](#14-wearable-data-integration-schema)
 
 ---
 
@@ -1762,3 +1764,413 @@ This section is the authoritative list of what is **never** permitted in any ana
 ---
 
 *v0.4 additions: §13 Analytics Event Tracking Schema — PostHog event taxonomy (nine event categories, 29 named events with typed properties, universal enriched properties); Cloudflare Worker enrichment middleware with Zod validation and forbidden-property scrubbing; ClickHouse warehouse: four tables (fact_events ReplacingMergeTree, dim_users ReplacingMergeTree, fact_cohort_retention AggregatingMergeTree, fact_session_metrics ReplacingMergeTree) with partition keys, ORDER BY, and TTL; hourly + daily ETL pipeline via PostHog S3 export → ClickHouse → dbt; dbt model structure; GDPR Art. 9 analytics prohibition table (10 categories); 2-year ClickHouse TTL; Art. 17 erasure job; §5 classification cross-reference; 19-item implementation checklist across M3/M4/M5.*
+
+---
+
+## 14. Wearable Data Integration Schema
+
+> Owner: `platform-engineer` + `enterprise-architect`. Review: on any new wearable source addition or quarterly.
+> References: §5 (Data Classification), §6 (Privacy Floor), §8.3 (Art. 17 Erasure), docs/SOC2_READINESS.md §35.6.3, docs/SSO_SCIM_IMPLEMENTATION.md §14.
+
+Wearable data — HRV, resting heart rate, sleep, recovery scores — is GDPR Art. 9 special category health data. This section defines the storage schema, RLS policies, consent gates, GDPR constraints, cross-source normalization, and sync architecture for wearable integrations. **Wearable data is classified as Sensitive (§5) and may never appear in PostHog analytics events, ClickHouse warehouse tables, or any tenant-visible aggregate other than the privacy-preserving view defined in §14.4.**
+
+---
+
+### 14.1 Supported Sources and Data Types
+
+| Source | Platform | Auth mechanism | Data types exposed | HRV metric | Notes |
+|---|---|---|---|---|---|
+| **HealthKit** | iOS only | HealthKit Background Delivery (no OAuth) | HRV (RMSSD), Resting HR, Sleep analysis (stages), Active energy (kcal), Steps | RMSSD in ms — gold standard | Background delivery pushes new data to FORM backend without polling; requires HealthKit entitlement + usage strings |
+| **Health Connect** | Android only | Health Connect Permission API (no OAuth) | HRV (RMSSD), Resting HR, Sleep stages, Active energy, Steps | RMSSD in ms — comparable to HealthKit | WorkManager background sync; 15-min minimum interval per Android policy; requires `READ_HEALTH_DATA` permission |
+| **Whoop** | iOS + Android | OAuth 2.0 (PKCE) | Recovery score (0–100), Strain (0–21), HRV (ms), Resting HR, Sleep performance % | RMSSD in ms — computed from overnight 5-minute windows; Whoop's HRV algorithm differs from HealthKit; do not cross-compare | API polling every 2h via Cloudflare Worker cron; Whoop webhook not available on standard API tier |
+| **Oura Ring** | iOS + Android | OAuth 2.0 (PKCE) | Readiness score (0–100), HRV (RMSSD ms), Resting HR, Sleep stages, Temperature deviation (°C) | RMSSD in ms — comparable to HealthKit for trend analysis; absolute values may differ | API polling every 2h; Oura personal API token (v2); EU data residency available |
+| **Garmin** | iOS + Android | OAuth 1.0a (Garmin Connect API) | Body Battery (0–100), HRV Status (weekly aggregate — not daily RMSSD), Resting HR, Sleep duration, VO2max estimate | Weekly HRV Status only — not daily RMSSD; cannot be compared to Whoop/Oura/HealthKit daily readings | API polling every 2h; Garmin Health API requires partner agreement; HRV Status is a 7-day rolling aggregate, not a single-night reading |
+
+**Cross-device HRV comparison is unreliable.** Whoop and Oura RMSSD are nominally comparable for trend analysis within each source. Garmin HRV Status is a weekly aggregate and is not comparable to nightly RMSSD values. Victor's coaching context never aggregates HRV across sources or compares user readings to population norms.
+
+---
+
+### 14.2 `wearable_readings` Table Schema
+
+```sql
+-- Classification: SENSITIVE — GDPR Art. 9 (health data: HR, HRV, sleep, biometric recovery scores)
+-- RLS: enforced — users see only their own rows; tenant aggregates via §14.4 view only
+-- Retention: 2 years from recorded_at (§35.6.3 proposed schedule; Supabase TTL migration required)
+CREATE TABLE wearable_readings (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id           UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+
+  source              TEXT NOT NULL
+                        CHECK (source IN (
+                          'healthkit',
+                          'health_connect',
+                          'whoop',
+                          'oura',
+                          'garmin'
+                        )),
+
+  reading_type        TEXT NOT NULL
+                        CHECK (reading_type IN (
+                          'hrv_rmssd',             -- RMSSD in ms (HealthKit, Health Connect, Whoop, Oura)
+                          'hrv_weekly_status',     -- Garmin weekly HRV aggregate (ordinal: 'balanced'|'low'|'unbalanced'|'poor')
+                          'resting_hr',            -- beats per minute
+                          'sleep_duration_min',    -- total sleep in minutes
+                          'sleep_efficiency_pct',  -- sleep efficiency 0–100 (Whoop, Oura)
+                          'sleep_stage_deep_min',  -- deep sleep minutes (HealthKit, Oura)
+                          'sleep_stage_rem_min',   -- REM sleep minutes (HealthKit, Oura)
+                          'recovery_score',        -- 0–100 (Whoop Recovery, Oura Readiness)
+                          'strain',                -- 0–21 (Whoop only)
+                          'body_battery',          -- 0–100 (Garmin only)
+                          'temperature_deviation_c', -- skin temp deviation °C (Oura only)
+                          'steps',                 -- daily step count
+                          'active_energy_kcal',    -- active calories burned
+                          'vo2max_estimate'        -- ml/kg/min (Garmin only)
+                        )),
+
+  value_numeric       NUMERIC,                     -- normalized SI-unit value; NULL for ordinal types
+  value_text          TEXT,                        -- ordinal values (e.g. Garmin HRV Status: 'balanced')
+  value_unit          TEXT NOT NULL,               -- 'ms', 'bpm', 'min', 'pct', 'score', 'kcal', 'ml/kg/min', 'C', 'ordinal'
+
+  recorded_at         TIMESTAMPTZ NOT NULL,        -- when the device recorded the reading (not sync time)
+  synced_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  source_reading_id   TEXT,                        -- external ID from source API; used for idempotency
+  metadata            JSONB,                       -- source-specific extras (sleep stage breakdown, Whoop cycle ID, etc.)
+
+  deleted_at          TIMESTAMPTZ,                 -- soft delete during 30-day Art. 17 window; hard delete by nightly job
+
+  CONSTRAINT wearable_readings_idempotency
+    UNIQUE (user_id, source, reading_type, recorded_at)
+);
+
+-- Composite index: RLS filter + coaching context query (last 7 days per user)
+CREATE INDEX idx_wearable_user_type_time
+  ON wearable_readings (user_id, reading_type, recorded_at DESC)
+  WHERE deleted_at IS NULL;
+
+-- Tenant-level aggregate queries (§14.4 view uses this)
+CREATE INDEX idx_wearable_tenant_type_time
+  ON wearable_readings (tenant_id, reading_type, recorded_at DESC)
+  WHERE deleted_at IS NULL;
+```
+
+**`source_reading_id` + the UNIQUE constraint on `(user_id, source, reading_type, recorded_at)` ensure idempotent upserts.** A sync that re-delivers the same reading (common on Health Connect and during polling retries) produces no duplicate rows.
+
+---
+
+### 14.3 RLS Policies for `wearable_readings`
+
+```sql
+-- Enable RLS
+ALTER TABLE wearable_readings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wearable_readings FORCE ROW LEVEL SECURITY;
+
+-- Users: read and write own rows only
+CREATE POLICY wearable_user_select ON wearable_readings
+  FOR SELECT TO form_api
+  USING (
+    user_id = current_setting('app.current_user_id')::UUID
+    AND deleted_at IS NULL
+  );
+
+CREATE POLICY wearable_user_insert ON wearable_readings
+  FOR INSERT TO form_api
+  WITH CHECK (
+    user_id = current_setting('app.current_user_id')::UUID
+    AND tenant_id = current_setting('app.current_tenant_id')::UUID
+  );
+
+CREATE POLICY wearable_user_update ON wearable_readings
+  FOR UPDATE TO form_api
+  USING (user_id = current_setting('app.current_user_id')::UUID)
+  WITH CHECK (user_id = current_setting('app.current_user_id')::UUID);
+
+-- Soft-delete (sets deleted_at); hard delete is form_admin only
+CREATE POLICY wearable_user_soft_delete ON wearable_readings
+  FOR UPDATE TO form_api
+  USING (user_id = current_setting('app.current_user_id')::UUID);
+
+-- Coach role: read readings for consented users within the same tenant
+-- Consent check: user must have 'wearable' in consent.categories_consented (§35.4.2)
+CREATE POLICY wearable_coach_select ON wearable_readings
+  FOR SELECT TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND current_setting('app.current_role') IN ('coach', 'tenant_admin', 'tenant_owner')
+    AND deleted_at IS NULL
+    AND EXISTS (
+      SELECT 1 FROM user_consents uc
+      WHERE uc.user_id = wearable_readings.user_id
+        AND 'wearable' = ANY(uc.categories_consented)
+        AND uc.revoked_at IS NULL
+    )
+  );
+
+-- Tenant admins: no raw reading access; use §14.4 aggregate view only
+-- (No SELECT policy for tenant_admin on raw table — aggregate view uses form_readonly role)
+
+-- form_admin: BYPASSRLS for nightly hard-delete erasure job and DSAR export
+-- (No policy needed — BYPASSRLS is set on the role)
+```
+
+**Tenant admins cannot query raw `wearable_readings` rows.** Attempting a SELECT as `tenant_admin` returns zero rows (no matching policy). All tenant-level wearable visibility is through the privacy-preserving aggregate view in §14.4.
+
+---
+
+### 14.4 Tenant-Visible Aggregate View
+
+Tenant admins and HR dashboards may see aggregated, bucketed wearable indicators — not raw readings.
+
+```sql
+-- Classification: Internal (aggregated, bucketed; no raw Art. 9 values)
+-- Visible to: tenant_admin, tenant_owner via form_readonly role
+-- k-anonymity: groups with < 5 members are suppressed (NULL returned)
+CREATE VIEW tenant_wearable_summary AS
+WITH weekly_hrv AS (
+  SELECT
+    tenant_id,
+    user_id,
+    DATE_TRUNC('week', recorded_at) AS week_start,
+    AVG(value_numeric) AS avg_hrv_rmssd,
+    LAG(AVG(value_numeric)) OVER (
+      PARTITION BY tenant_id, user_id ORDER BY DATE_TRUNC('week', recorded_at)
+    ) AS prev_week_avg_hrv
+  FROM wearable_readings
+  WHERE reading_type = 'hrv_rmssd'
+    AND deleted_at IS NULL
+    AND recorded_at >= NOW() - INTERVAL '4 weeks'
+  GROUP BY tenant_id, user_id, DATE_TRUNC('week', recorded_at)
+),
+weekly_sleep AS (
+  SELECT
+    tenant_id,
+    user_id,
+    DATE_TRUNC('week', recorded_at) AS week_start,
+    AVG(value_numeric) AS avg_sleep_min
+  FROM wearable_readings
+  WHERE reading_type = 'sleep_duration_min'
+    AND deleted_at IS NULL
+    AND recorded_at >= NOW() - INTERVAL '4 weeks'
+  GROUP BY tenant_id, user_id, DATE_TRUNC('week', recorded_at)
+)
+SELECT
+  h.tenant_id,
+  h.week_start,
+  COUNT(DISTINCT h.user_id) AS user_count,
+
+  -- HRV trend direction only — no raw RMSSD values
+  SUM(CASE WHEN h.avg_hrv_rmssd > h.prev_week_avg_hrv * 1.05 THEN 1 ELSE 0 END) AS hrv_improving_count,
+  SUM(CASE WHEN h.avg_hrv_rmssd < h.prev_week_avg_hrv * 0.95 THEN 1 ELSE 0 END) AS hrv_declining_count,
+  SUM(CASE WHEN h.avg_hrv_rmssd BETWEEN h.prev_week_avg_hrv * 0.95
+                                     AND h.prev_week_avg_hrv * 1.05 THEN 1 ELSE 0 END) AS hrv_stable_count,
+
+  -- Sleep duration buckets only — no exact minutes
+  SUM(CASE WHEN s.avg_sleep_min < 360 THEN 1 ELSE 0 END) AS sleep_under_6h_count,
+  SUM(CASE WHEN s.avg_sleep_min BETWEEN 360 AND 419 THEN 1 ELSE 0 END) AS sleep_6_7h_count,
+  SUM(CASE WHEN s.avg_sleep_min BETWEEN 420 AND 479 THEN 1 ELSE 0 END) AS sleep_7_8h_count,
+  SUM(CASE WHEN s.avg_sleep_min >= 480 THEN 1 ELSE 0 END) AS sleep_over_8h_count
+
+FROM weekly_hrv h
+LEFT JOIN weekly_sleep s
+  ON h.tenant_id = s.tenant_id
+  AND h.user_id = s.user_id
+  AND h.week_start = s.week_start
+WHERE h.prev_week_avg_hrv IS NOT NULL  -- exclude first week (no baseline)
+GROUP BY h.tenant_id, h.week_start
+HAVING COUNT(DISTINCT h.user_id) >= 5;  -- k-anonymity floor: suppress groups with < 5 users
+```
+
+**The view exposes only trend direction (improving/declining/stable) and sleep duration buckets.** No individual user identifiers, no raw RMSSD values, no recovery scores. A tenant admin cannot infer any individual employee's health status from this view.
+
+**k-anonymity floor:** weeks with fewer than 5 participating users return no rows — the `HAVING COUNT(...) >= 5` clause implements this. Consistent with the analytics floor in §13.6 and SOC 2 §35 privacy floor (§6).
+
+---
+
+### 14.5 Cross-Source HRV Normalization
+
+| Source | Metric stored | Unit | Comparability | Victor coaching context |
+|---|---|---|---|---|
+| HealthKit | `hrv_rmssd` | ms | ✅ Comparable to Oura for same-source trends | "HRV (HealthKit) trending down for 3 days" |
+| Health Connect | `hrv_rmssd` | ms | ✅ Comparable to HealthKit | "HRV (Health Connect) stable this week" |
+| Oura Ring | `hrv_rmssd` | ms | ✅ Comparable to HealthKit for trend analysis; absolute value may differ by ±10–20ms | "HRV (Oura) below your 30-day baseline" |
+| Whoop | `hrv_rmssd` | ms | 🟡 Same metric name; Whoop uses overnight 5-min windows, algorithm differs; trend direction reliable, absolute values not cross-comparable | "HRV (Whoop) trending down — 5-day decline" |
+| Garmin | `hrv_weekly_status` | ordinal | 🔴 Weekly aggregate — not daily RMSSD; cannot be compared to other sources | "HRV status (Garmin): low this week" |
+
+**Implementation rule:** the coaching context builder tags each HRV reading with its source. Victor's prompt template uses `{{hrv_source}}` + `{{hrv_trend_label}}` — it never outputs raw RMSSD numbers to the user and never aggregates HRV across sources.
+
+---
+
+### 14.6 Coaching Context Integration
+
+The coaching context builder queries `wearable_readings` for the authenticated user over the prior 14 days. It applies `stripPersonalProperties()` (documented in §35 PRV-14) before assembling the LLM context object.
+
+**Forbidden in LLM context (never passed to Anthropic API):**
+- Raw RMSSD values (e.g. "47ms")
+- Exact resting HR values
+- Exact sleep duration in minutes
+- Temperature deviation values
+- VO2max estimates
+- Body battery or strain raw scores
+
+**Permitted in LLM context (bucketed or directional only):**
+
+| Wearable signal | Permitted representation |
+|---|---|
+| HRV trend | "improving" / "declining" / "stable" (7-day vs. prior 7-day baseline) |
+| Resting HR trend | "elevated vs. baseline" / "normal" (directional only) |
+| Sleep duration | "< 6h" / "6–7h" / "7–8h" / "> 8h" bucket (3-night average) |
+| Recovery / Readiness | "low" (0–33) / "medium" (34–66) / "high" (67–100) bucket |
+| Strain | "low" / "moderate" / "high" (Whoop only, bucketed) |
+| Body battery | "depleted" (0–25) / "low" (26–50) / "charged" (51–75) / "full" (76–100) |
+
+**Victor never tells the user their specific HRV number.** If a user asks "what's my HRV?", Victor directs them to their wearable app for raw data and explains that FORM uses trend direction, not the raw value, for coaching context.
+
+---
+
+### 14.7 GDPR and Privacy Constraints
+
+| Constraint | Detail | Regulatory basis |
+|---|---|---|
+| **Data classification** | Sensitive — GDPR Art. 9 special category | §5 classification table |
+| **Legal basis** | Explicit consent — `consent.categories_consented` must include `'wearable'` | GDPR Art. 9(2)(a) |
+| **Consent gate** | Wearable sync is blocked at the API layer if `'wearable'` not in user's `categories_consented`; attempting sync without consent logs `wearable.sync_blocked_no_consent` DEC-030 event | §35 PRV-10 |
+| **Retention** | 2 years from `recorded_at` (proposed in §35.6.3; Supabase row-level TTL migration required before launch) | GDPR Art. 5(1)(e) |
+| **Art. 17 erasure** | `deleted_at` set within 30 days of erasure request (soft delete); nightly `form_admin` job hard-DELETEs rows where `deleted_at < NOW() - INTERVAL '30 days'`; includes OAuth tokens in `wearable_oauth_tokens` | GDPR Art. 17 |
+| **Analytics prohibition** | Never in PostHog events, ClickHouse tables, dbt models, or Metabase dashboards (§14.10) | Art. 9; §5 Sensitive classification |
+| **LLM prohibition** | Raw values never in Anthropic API requests; bucketed/directional representations only (§14.6) | Art. 9; §35 PRV-14 |
+| **Sub-processor disclosure** | Whoop, Oura, Garmin listed in sub-processor register as data processors; DPAs required (P-GAP-002) | GDPR Art. 28 |
+
+**DEC-030 audit events for wearable data:**
+
+| Event | Trigger | Logged fields |
+|---|---|---|
+| `wearable.source_connected` | User connects a wearable source | `user_id`, `tenant_id`, `source`, `scopes[]` |
+| `wearable.source_disconnected` | User disconnects a source | `user_id`, `tenant_id`, `source`, `revoked_by` |
+| `wearable.sync_completed` | Background sync job completes | `user_id`, `tenant_id`, `source`, `reading_count` (no values) |
+| `wearable.sync_blocked_no_consent` | Sync attempted without `'wearable'` consent | `user_id`, `tenant_id`, `source` |
+| `wearable.data_accessed_by_coach` | Coach role queries readings (§14.3 policy) | `coach_user_id`, `athlete_user_id`, `tenant_id`, `reading_types[]` |
+| `wearable.erasure_soft_deleted` | Art. 17 request sets `deleted_at` | `user_id`, `tenant_id`, `reading_count` |
+| `wearable.erasure_hard_deleted` | Nightly job permanently deletes soft-deleted rows | `user_id`, `tenant_id`, `reading_count` |
+
+---
+
+### 14.8 OAuth and Token Storage
+
+```sql
+-- Classification: RESTRICTED (OAuth tokens = access credentials)
+-- Tokens encrypted at rest via Supabase Vault (AES-256-GCM, per-tenant key)
+CREATE TABLE wearable_oauth_tokens (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  source          TEXT NOT NULL
+                    CHECK (source IN ('whoop', 'oura', 'garmin')),
+                    -- HealthKit and Health Connect use platform grants, not OAuth tokens
+  access_token    TEXT NOT NULL,    -- encrypted via Supabase Vault; plaintext never logged
+  refresh_token   TEXT,             -- encrypted via Supabase Vault
+  expires_at      TIMESTAMPTZ NOT NULL,
+  scopes          TEXT[] NOT NULL,  -- granted OAuth scopes
+  revoked_at      TIMESTAMPTZ,      -- set on disconnect; token purged from Vault
+
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (user_id, source)          -- one active token set per user per source
+);
+
+ALTER TABLE wearable_oauth_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wearable_oauth_tokens FORCE ROW LEVEL SECURITY;
+
+-- Users: read own tokens (to check connection status); cannot read token values
+CREATE POLICY oauth_tokens_user_select ON wearable_oauth_tokens
+  FOR SELECT TO form_api
+  USING (
+    user_id = current_setting('app.current_user_id')::UUID
+    AND revoked_at IS NULL
+  );
+
+-- form_admin only for actual token reads (used by Cloudflare Worker sync job via service role)
+-- (Service role for sync workers uses form_admin — BYPASSRLS)
+```
+
+**Token refresh architecture:**
+- A Cloudflare Worker cron job runs every 30 minutes and refreshes tokens expiring within 60 minutes.
+- Token refresh is not in the request path — the mobile app never handles OAuth token exchange after initial connect.
+- On revocation (user disconnects): `revoked_at` set, Supabase Vault key material for that token rotated, `wearable.source_disconnected` DEC-030 event emitted.
+
+---
+
+### 14.9 Sync Architecture
+
+```
+iOS — HealthKit
+  ├── HealthKit Background Delivery registration (per data type)
+  ├── HKObserverQuery fires on new data → FORM app calls backend
+  └── Backend: upsert into wearable_readings via (user_id, source, reading_type, recorded_at) UNIQUE
+
+Android — Health Connect
+  ├── WorkManager periodic task (15-min minimum; actual interval: 30 min to preserve battery)
+  ├── Health Connect Read request for delta since last sync (stored as SharedPreferences token)
+  └── Backend: batch upsert
+
+Whoop / Oura / Garmin
+  ├── Cloudflare Worker Cron Trigger: every 2 hours (*/120 * * * *)
+  ├── For each source:
+  │     1. Load access token from Supabase (via service role)
+  │     2. If token expired → refresh and update wearable_oauth_tokens
+  │     3. Fetch readings since last_synced_at (stored per user per source in wearable_oauth_tokens.updated_at)
+  │     4. Validate reading schema (Zod) — reject unknown fields
+  │     5. Upsert into wearable_readings
+  │     6. Emit wearable.sync_completed DEC-030 event (reading_count only, no values)
+  └── Rate limits: Whoop 100 req/min; Oura 5,000 req/day; Garmin 1,500 req/day — Worker enforces per-source limits
+
+Idempotency:
+  All paths use INSERT ... ON CONFLICT (user_id, source, reading_type, recorded_at) DO NOTHING
+  Duplicate deliveries from HealthKit Background Delivery (common after app restart) are silently ignored
+```
+
+---
+
+### 14.10 Analytics Restrictions
+
+| Layer | `wearable_readings` rows allowed? | `tenant_wearable_summary` view allowed? | Reason |
+|---|---|---|---|
+| PostHog events | 🔴 No | 🔴 No | Art. 9 Sensitive — §13.6 prohibition |
+| ClickHouse `fact_events` | 🔴 No | 🔴 No | Art. 9 Sensitive |
+| ClickHouse `fact_session_metrics` | 🔴 No | 🔴 No | Art. 9 Sensitive |
+| Metabase dashboards (raw) | 🔴 No | 🟡 Yes — aggregate view only, tenant_admin role | k-anonymity ≥ 5; trend/bucket only |
+| LLM coaching context (Victor) | 🔴 Raw values No | 🔴 No | Bucketed/directional only — §14.6 |
+| DEC-030 audit log | 🟡 Sync counts only | N/A | No individual values ever logged |
+| DSAR export (user requests own data) | ✅ Yes — full export | N/A | GDPR Art. 15 right of access |
+
+The `stripForbiddenProperties()` function (§35 PRV-14) is extended to include all `wearable_readings` numeric field names in its blocklist. A CI lint rule enforces this — any analytics event fixture containing a wearable field name fails the build.
+
+---
+
+### 14.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Notes |
+|---|---|---|---|---|---|
+| 1 | Create `wearable_readings` table with UNIQUE constraint and RLS policies per §14.3 | `platform-engineer` | **P0** | M3 | Migration must pass RLS lint check (§3.5); include `deleted_at` column and both composite indexes |
+| 2 | Create `wearable_oauth_tokens` table with Supabase Vault encryption for `access_token` and `refresh_token` | `platform-engineer` | **P0** | M3 | Never log token values in any DEC-030 event or debug log |
+| 3 | Implement HealthKit integration: Background Delivery registration + `HKObserverQuery` handler + backend upsert endpoint | `platform-engineer` | **P0** | M3 | iOS only; test with all supported data types (HRV, HR, sleep, energy, steps) |
+| 4 | Implement Health Connect integration: WorkManager periodic task + delta sync + batch upsert | `platform-engineer` | **P0** | M3 | Android only; test Health Connect permission flow on Android 13+ and 14+ |
+| 5 | Add `'wearable'` consent gate enforcement in sync endpoint: check `user_consents.categories_consented` before accepting any wearable data | `platform-engineer` | **P0** | M3 | Log `wearable.sync_blocked_no_consent` DEC-030 event on rejection |
+| 6 | Wire all seven DEC-030 `wearable.*` audit events to HMAC chain (§14.7) | `platform-engineer` | **P0** | M3 | Audit events for: source_connected, source_disconnected, sync_completed, sync_blocked_no_consent, data_accessed_by_coach, erasure_soft_deleted, erasure_hard_deleted |
+| 7 | Implement Whoop API client: OAuth PKCE flow + token refresh + data fetch + rate-limit enforcement | `platform-engineer` | **P0** | M4 | Cloudflare Worker cron every 2h; never exceed 100 req/min rate limit |
+| 8 | Implement Oura API client (v2): OAuth PKCE flow + token refresh + daily aggregate fetch | `platform-engineer` | **P0** | M4 | EU data residency endpoint; 5,000 req/day limit |
+| 9 | Implement Garmin API client: OAuth 1.0a + Health API data fetch + HRV Status (weekly) parsing | `platform-engineer` | **P1** | M4 | Requires Garmin Health API partner agreement; lower priority than Whoop/Oura |
+| 10 | Build coaching context builder: 14-day wearable query + `stripPersonalProperties()` + bucket mapping (§14.6) | `platform-engineer` | **P0** | M3 | Unit tests: verify no raw RMSSD/HR values pass through to LLM context; test all source × reading_type combinations |
+| 11 | Create `tenant_wearable_summary` view (§14.4): k-anonymity floor, trend buckets, sleep buckets | `platform-engineer` | **P1** | M4 | Confirm view is accessible by `form_readonly` role for Metabase; not accessible by `form_api` |
+| 12 | Implement Art. 17 hard-delete nightly job: hard-DELETE `wearable_readings` where `deleted_at < NOW() - INTERVAL '30 days'`; include `wearable_oauth_tokens` on revocation | `platform-engineer` | **P0** | M3 | Runs under `form_admin` BYPASSRLS; emit `wearable.erasure_hard_deleted` DEC-030 event with reading_count |
+| 13 | Add wearable field blocklist to `stripForbiddenProperties()` and PostHog CI lint rule | `data-engineer` | **P0** | M3 | CI build must fail if any analytics event fixture contains a wearable reading field name |
+| 14 | Implement Supabase row-level TTL migration: delete `wearable_readings` where `recorded_at < NOW() - INTERVAL '2 years'` (nightly cron) | `platform-engineer` | **P1** | M4 | Pending formal retention decision per P-GAP-004; use proposed 2-year period from §35.6.3 as placeholder |
+| 15 | DSAR export: include `wearable_readings` full export (all non-deleted rows) in Art. 15 data package | `platform-engineer` | **P0** | M3 | Per §14.10 — users are entitled to their own raw readings; export as JSON per reading_type per source |
+| 16 | Integration test: wearable consent revocation → sync blocked → existing readings soft-deleted → DEC-030 chain | `qa-lead` | **P1** | M4 | Full state machine test across consent → sync → revocation → erasure |
+| 17 | Load test: Cloudflare Worker cron at 10,000 connected users (Whoop + Oura simultaneously) | `devops-lead` | **P2** | M5 | Verify rate limits honored; verify no cross-user token leak |
+| 18 | Sub-processor DPA collection: obtain DPAs from Whoop (US), Oura (EU), Garmin (US); execute SCC Module 2 for US processors | `compliance-officer` | **P1** | Pre-launch | Required before any enterprise pilot customer whose employees connect wearables; closes P-GAP-002 partial scope |
+
+---
+
+*v0.5 additions: §14 Wearable Data Integration Schema — five source integrations (HealthKit, Health Connect, Whoop, Oura Ring, Garmin) with platform-specific auth mechanisms, data types, and HRV metric comparability notes; `wearable_readings` table DDL with 14 reading_type values, `(user_id, source, reading_type, recorded_at)` UNIQUE idempotency constraint, two composite indexes, and `deleted_at` soft-delete; RLS policies for user self-access, coach access with consent gate, and form_admin erasure path; `tenant_wearable_summary` aggregate view with k-anonymity floor (N ≥ 5), HRV trend direction only (no raw RMSSD), and sleep duration buckets (no exact minutes); cross-source HRV normalization table (Garmin weekly HRV Status not comparable to daily RMSSD; Whoop algorithm differs from HealthKit); coaching context builder with `stripPersonalProperties()` extension and bucket mapping for all wearable signals (bucketed/directional only — raw values never in Anthropic API requests); GDPR Art. 9 constraint table (explicit consent gate, 2-year retention, 30-day Art. 17 erasure window, analytics prohibition); seven DEC-030 HMAC-chained audit events (`wearable.source_connected`, `source_disconnected`, `sync_completed`, `sync_blocked_no_consent`, `data_accessed_by_coach`, `erasure_soft_deleted`, `erasure_hard_deleted`); `wearable_oauth_tokens` table with Supabase Vault encryption for tokens (RESTRICTED classification); sync architecture: HealthKit Background Delivery (iOS), Health Connect WorkManager (Android, 30-min interval), Cloudflare Worker cron every 2h (Whoop/Oura/Garmin) with per-source rate limits; analytics restrictions table confirming wearable data excluded from all PostHog/ClickHouse/Metabase layers; 18-item implementation checklist (11× P0, 5× P1, 2× P2) across M3/M4/M5.*
