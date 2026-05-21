@@ -11,6 +11,17 @@
 
 ---
 
+## [0.97.0] — 2026-05-21
+
+### Added
+- **`content/post-67-foam-rolling.md`** — "Foam Rolling and Myofascial Release: What Works, What Is Ritual" (sports-scientist, clinical-safety PASS). Covers: why SMR cannot mechanically deform fascia (Behm & Wilke 2019 — forces required are 100× bodyweight); actual mechanisms (mechanoreceptor stimulation, gate control modulation, transient viscoelastic changes); ROM evidence (Cheatham et al. 2015 systematic review — acute ROM gain without performance decrease); DOMS evidence (Macdonald et al. 2013 RCT, Wiewelhove et al. 2019 meta-analysis — SMD −0.3–0.5); performance: no significant effect (Healey et al. 2014); pressure intensity vs. outcomes (tolerable pressure ≥ sharp pain for mechanoreceptor loading); 5-minute protocol for pre-training, 5–10 min post-training for DOMS management; what foam rolling cannot do (fix structural dysfunction, treat injury, replace mobility training); the ritual time-trap.
+- **`blog.html`** — Post 66 (HRV for Strength Athletes) and Post 67 (Foam Rolling) cards added → 67 posts total
+- **`README.md`** — roadmap: post-66 and post-67 checked [x]; post-75–80 new topics added
+- **`STATUS.md`** — content engine table: post-66 and post-67 rows added; blog.html row updated to 67 posts / v0.97.0
+- **`VERSION`** — 0.96.0 → 0.97.0
+
+---
+
 ## [0.96.0] — 2026-05-21
 
 ### Added

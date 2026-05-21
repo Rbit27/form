@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 65 posts, category filter, newsletter CTA | v0.95.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 67 posts, category filter, newsletter CTA | v0.97.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -157,6 +157,8 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-63-women-strength-menstrual-cycle.md | Blog | draft · clinical-safety PASS WITH CONDITIONS · sports-scientist pending |
 | post-64-plyometrics-strength-athletes.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-65-caffeine-strength-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-66-hrv-strength-athletes.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-67-foam-rolling.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

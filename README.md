@@ -390,8 +390,8 @@ Each iteration:
 - [x] post-63: Жінки і силовий тренінг — фолікулярна vs лютеальна фаза, estrogen і м'язова адаптація; McNulty et al. (2020) ~1.8% effect size; hormonal contraception addressed; clinical-safety PASS WITH CONDITIONS
 - [x] post-64: Плайометрика для силовиків — SSC механіка, RFD, ground contact time, foot contacts прогресія, tendon adaptation lag; clinical-safety PASS
 - [x] post-65: Кофеїн і силовий тренінг — adenosine antagonism mechanism, Grgic et al. 2018 (+3–6% strength), 3–6 mg/kg dose-response, CYP1A2 polymorphism, tolerance cycling, sleep interference; clinical-safety PASS
-- [ ] post-66: Allostatic load і тренувальна готовність — чому стандартні програми не враховують стрес-навантаження і що FORM робить інакше
-- [ ] post-67: Foam rolling і міофасціальний реліз — що працює, що ритуал: EMG, ROM і latency досліди
+- [x] post-66: HRV для силових атлетів — RMSSD, 7–14-денний тренд, Flatt & Esco (2016), Nuuttila (2022), протокол вимірювання і volume-adjustment thresholds; clinical-safety PASS
+- [x] post-67: Foam rolling і міофасціальний реліз — механорецептори vs фасціальний реліз міф, Cheatham (2015) ROM meta-analysis, Wiewelhove (2019) DOMS meta-analysis, 5-хвилинний протокол; clinical-safety PASS
 - [ ] post-68: Тренінг у гарячому і холодному середовищі — heat acclimation, cold exposure, термоадаптація для силових атлетів
 - [ ] post-69: Creatine — механізм PCr ресинтезу, силові vs гіпертрофія ефекти, протокол завантаження, коли не потрібне
 - [ ] post-70: Sleep and muscle recovery — SWS і МПС, sleep restriction protocols (Simpson 2017), практичні пріоритети для тих, хто не висипається
@@ -399,6 +399,12 @@ Each iteration:
 - [ ] post-72: Загальний стрес і тренувальна ємність — чому лайфстайл визначає скільки об'єму ти можеш переварити
 - [ ] post-73: Grip strength і longevity — Bohannon 2019 meta-analysis, grip як proxy загального здоров'я, як тренувати
 - [ ] post-74: Single-leg training для двобічних атлетів — bilateral deficit, Botton et al. 2016, коли і як додавати унілатеральну роботу
+- [ ] post-75: Allostatic load і тренувальна готовність — чому стандартні програми ігнорують позатренувальний стрес і що FORM робить інакше
+- [ ] post-76: Стретчинг і м'язова гнучкість — статичний vs динамічний, PNF, loaded progressive stretching; що насправді змінює ROM (нейральна vs структурна)
+- [ ] post-77: Тренінг натщесерце — fed vs fasted state, fat oxidation myth, Schoenfeld (2014), коли має значення, коли ні
+- [ ] post-78: Omega-3 і тренувальна адаптація — Smith et al. (2011) MPS, anti-inflammatory механізм, dose і EPA:DHA ratio; клінічна безпека харчова — clinical-safety required
+- [ ] post-79: Magnesium і спортивна продуктивність — роль у МПС, нервово-м'язовій функції, якості сну; дефіцит у атлетів, форми і bio-availability
+- [ ] post-80: Dehidration і силовий тренінг — >2% body mass loss і сила, когнітивна функція, рішення щодо навантаження; практичний моніторинг
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
