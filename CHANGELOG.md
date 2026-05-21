@@ -6,6 +6,17 @@
 
 ---
 
+## [1.4.0] — 2026-05-21
+
+### Added
+- `docs/DATA_MODEL.md §15` — Computer Vision (CV) Pose Estimation Data Schema (v0.5 → v0.6); closes long-standing schema gap for `cv_sessions` table referenced in SOC2_READINESS.md PRE-34-E-006, §35.6.3, C1.2, and INCIDENT_RESPONSE.md §R-10. On-device inference architecture rationale (GDPR Art. 9 avoidance for raw video, < 100 ms latency, competitive privacy posture). `cv_sessions` DDL: BlazePose 33-keypoint / MoveNet 17-keypoint schema, 7-slug `cv_flags` defect taxonomy, `keypoints_enc` AES-256-GCM column-level encryption in Cloudflare Workers Secret (closes PRE-34-E-006), status state machine (active/completed/partial/tracking_lost), model identity columns for R-10 blast-radius scoping, 6 supporting indexes. RLS: user self-access; form_coach zero-row at Postgres layer (application-layer view only); form_tenant_admin zero-row privacy floor; form_system full access; form_admin break-glass with mandatory incident_id + separate decryption endpoint. Three CI RLS assertions added to `rls_isolation.test.ts`. `tenant_cv_summary` materialized view: weekly aggregate with k-anonymity N ≥ 5 suppression, form_quality averages, status percentages, three defect-prevalence columns (no individual data). Keypoint storage decision resolves §9 gap 9.2: JSONB TOAST with R2 migration gate at 20 GB / 1,000 sessions/day; `workouts.raw_cv_data` deprecated. `stripCVData()` TypeScript: 4-bucket form_quality mapping, flag-presence-only extraction, keypoints categorically excluded from Anthropic API; CI grep gate. GDPR: Art. 9 biometric classification; `'cv'` consent gate; two-phase deletion (1-year keypoints nullification, 3-year row hard delete); Art. 17 immediate keypoints nullification without grace period. Analytics restrictions: keypoints_enc + form_score/cv_flags excluded from all PostHog/ClickHouse/Metabase/Sentry/Anthropic layers. Seven DEC-030 HMAC-chained audit events (cv.session_started, cv.session_completed, cv.session_blocked, cv.keypoints_nullified, cv.session_hard_deleted, cv.keypoints_admin_accessed HIGH, cv.model_version_changed). 17-item implementation checklist (9× P0, 5× P1, 2× P2, 1× Pre-launch) across M3/M4/M5. OQ-CV-01: R2 migration gate.
+
+### Gap Closures
+- §9 gap 9.2 (`raw_cv_data` storage): 🔴→✅ RESOLVED — `cv_sessions.keypoints_enc` JSONB TOAST with R2 gate condition
+- SOC2 PRE-34-E-006 (`cv_sessions.keypoints` column-level encryption): 🟡→🟢 DDL authored (implementation commit pending)
+
+---
+
 ## [1.3.2] — 2026-05-21
 
 ### Added

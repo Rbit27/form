@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v0.5
+# FORM · Multi-Tenant Data Model v0.6
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -22,6 +22,7 @@
 12. [Soft Delete, Data Retention & GDPR Art. 17 Erasure](#12-soft-delete-data-retention--gdpr-art-17-erasure)
 13. [Analytics Event Tracking Schema](#13-analytics-event-tracking-schema)
 14. [Wearable Data Integration Schema](#14-wearable-data-integration-schema)
+15. [Computer Vision (CV) Pose Estimation Data Schema](#15-computer-vision-cv-pose-estimation-data-schema)
 
 ---
 
@@ -747,7 +748,7 @@ Hard delete of `users` row deferred 30 days (in case of mistaken request).
 | # | Question | Owner | Priority |
 |---|---|---|---|
 | 9.1 | When to shard: at what tenant count or data volume do we move the largest tenants to dedicated clusters? | enterprise-architect | Medium — revisit at 200 enterprise tenants |
-| 9.2 | `raw_cv_data` column size: JSONB for pose keypoints can grow large. Column to separate blob store (S3)? | platform-engineer | High — evaluate at 10k workouts/day |
+| 9.2 | `raw_cv_data` column size: JSONB for pose keypoints can grow large. Column to separate blob store (S3)? | platform-engineer | **RESOLVED** — see §15.5: keypoints stored encrypted in `cv_sessions.keypoints_enc` (JSONB TOAST); R2 migration gate at 20 GB / 1,000 sessions/day; `workouts.raw_cv_data` deprecated |
 | 9.3 | k-anonymity floor at 5: is this sufficient for EU data regulators under GDPR recital 26? | compliance-officer | High — legal review before EU enterprise sales |
 | 9.4 | PITR restore drill: do we have a documented runbook for restoring a single tenant's data from PITR without affecting other tenants? | devops-lead | **RESOLVED** — see Section 10 |
 | 9.5 | Soft-delete vs hard-delete on `workouts`: soft-delete allows undo but complicates RLS policies (deleted rows still present). | enterprise-architect | Low — decided when undo feature is scoped |
@@ -2421,4 +2422,529 @@ Sentry error monitoring must not log wearable values in exception payloads. The 
 ---
 
 *v0.5 additions: §14 Wearable Data Integration Schema — five-source integration specification (HealthKit, Health Connect, Whoop, Oura Ring, Garmin) with HRV metric compatibility matrix; `wearable_readings` Postgres DDL with SENSITIVE Art. 9 classification, idempotency constraint, and four supporting indexes; four-tier RLS policy set (user owner-only, tenant-admin blocked, coach-with-consent, form_admin BYPASSRLS); `tenant_wearable_summary` materialized view with k-anonymity N < 5 floor, directional HRV trend labels, and sleep duration bands (no raw numeric exposure); cross-source HRV normalization strategy with source-priority ordering and Garmin categorical isolation; coaching context integration specifying forbidden raw values and permitted bucketed representations with Victor response language constraints aligned to PRV-14 and `stripPersonalProperties()`; GDPR Art. 9 constraint set covering consent gate SQL, 2-year retention pg_cron job, Art. 17 30-day erasure flow, and six DEC-030 audit events (wearable.source_connected/disconnected, sync_completed/blocked/revoked, coach_context_accessed); `wearable_oauth_tokens` DDL with per-tenant KMS column encryption, revocation semantics, and Cloudflare Worker 2-hour refresh cron; sync architecture per source (HealthKit background delivery, Health Connect WorkManager, third-party 2-hour cron with rate limits); analytics restriction matrix confirming exclusion from all seven layers; 20-item implementation checklist across M3/M4/M5 and pre-launch.*
+
+---
+
+## 15. Computer Vision (CV) Pose Estimation Data Schema
+
+> Owner: `ml-engineer` + `platform-engineer` + `compliance-officer`. Review: on any CV model upgrade, data structure change, or quarterly.
+> Scope: consumer and enterprise tiers. CV form analysis is a core product differentiator; this schema defines how pose data is stored, protected, and constrained.
+> References: DEC-030 (HMAC-chained audit log), docs/SOC2_READINESS.md §35.6.3 (retention) + PRE-34-E-006 (column-level encryption), docs/INCIDENT_RESPONSE.md §R-10 (AI coach safety incident — blast-radius scoping by `model_version`), docs/VICTOR_PROMPT_GUIDE.md, docs/AUDIT_LOG_SCHEMA.md.
+
+---
+
+### 15.1 Architecture: On-Device Inference Model
+
+FORM's CV pipeline runs entirely on-device. Raw video frames are **never transmitted to FORM's backend** or to any third-party processor. The ML model (BlazePose or MoveNet, selected by device capability) runs at 30 fps inside the mobile app; only structured outputs — aggregate form scores, rep counts, cv defect flags, and sampled keypoint snapshots — are uploaded at session completion.
+
+**Why on-device?** Three converging constraints:
+
+| Constraint | Implication |
+|---|---|
+| GDPR Art. 9 (biometric data) | Video analysis of a person's body produces biometric data. Processing raw video frames on FORM's backend would require Art. 9 explicit consent, a separate DPIA entry, and additional sub-processor classification for the inference infrastructure. On-device inference avoids this classification for the raw video stream itself. |
+| Network latency | Real-time rep-by-rep form feedback requires < 100 ms round-trip. Cloud inference cannot meet this constraint at consumer latency budgets. |
+| Competitive moat | The user's video never leaves their device — a materially stronger privacy posture than cloud-video competitors. Privacy is a first-class product attribute, not a compliance checkbox. |
+
+**What is transmitted to FORM's backend (at session completion):**
+1. `rep_count` — integer
+2. `form_score` — NUMERIC(4,1), 0–100
+3. `cv_flags` — JSONB key/value pairs naming specific form defects detected (e.g. `{"knee_cave": 2, "back_arch": 0}`)
+4. `keypoints_enc` — sampled pose keypoints at **rep-boundary frames only** (peak and bottom positions per rep, max 2 frames/rep). At 33 keypoints × (x, y, z, visibility) × 2 frames × 50 reps maximum ≈ 150 KB per session. Transmitted over TLS 1.3; stored encrypted (§15.2).
+5. Session metadata: model name, model version, frame counts, confidence statistics.
+
+**What is never transmitted:**
+- Raw video frames
+- Continuous pose time-series (only rep-boundary snapshots)
+- Face or background content from the camera feed
+
+---
+
+### 15.2 `cv_sessions` Table Schema
+
+This table is the authoritative server-side record for every CV analysis session. It is referenced in `docs/SOC2_READINESS.md` PRE-34-E-006 (column-level encryption evidence artifact) and §35.6.3 (1-year retention for biometric-adjacent data). The `keypoints_enc` column contains GDPR Art. 9 biometric data and requires per-tenant AES-256-GCM column-level encryption.
+
+**Classification: SENSITIVE — GDPR Art. 9 (biometric data derived from video analysis). Column `keypoints_enc`: per-tenant AES-256-GCM + KMS encryption (closes SOC2 PRE-34-E-006). Retention: `keypoints_enc` nullified after 1 year; row hard-deleted after 3 years (§15.7.2).**
+
+```sql
+-- CLASSIFICATION: SENSITIVE — GDPR Art. 9 special category (biometric data derived from video).
+-- Column keypoints_enc: per-tenant AES-256-GCM encryption; key stored in Cloudflare Workers Secret,
+-- NOT in Supabase environment. Decryption available only to form_system and form_admin roles.
+-- Retention: keypoints_enc nullified after 1 year from created_at; row hard-deleted after 3 years.
+-- See SOC2_READINESS.md §35.6.3 and §15.7.2 of this document.
+-- Raw video frames: NEVER stored — on-device inference only (§15.1).
+CREATE TABLE cv_sessions (
+  id                        UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id                   UUID          NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id                 UUID          NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  workout_set_id            UUID          REFERENCES workout_sets(id) ON DELETE SET NULL,
+
+  -- CV model identity — required for blast-radius scoping in INCIDENT_RESPONSE.md §R-10
+  model_name                TEXT          NOT NULL
+                              CHECK (model_name IN (
+                                'blazepose_lite',
+                                'blazepose_full',
+                                'movenet_lightning',
+                                'movenet_thunder'
+                              )),
+  model_version             TEXT          NOT NULL,   -- semver, e.g. '2.0.0'; from on-device model registry
+
+  -- Session timing
+  started_at                TIMESTAMPTZ   NOT NULL DEFAULT now(),
+  ended_at                  TIMESTAMPTZ,              -- null if session was interrupted mid-set
+
+  -- Analysis status
+  status                    TEXT          NOT NULL DEFAULT 'active'
+                              CHECK (status IN (
+                                'active',             -- upload in progress
+                                'completed',          -- all reps counted, form_score computed
+                                'partial',            -- < 50% of frames had sufficient confidence
+                                'tracking_lost'       -- model lost pose track mid-set; form_score null
+                              )),
+
+  -- Aggregate outputs (non-encrypted; safe to query without decryption key)
+  rep_count                 SMALLINT,                -- null if status = 'tracking_lost'
+  form_score                NUMERIC(4,1),            -- 0.0–100.0; null if status != 'completed'
+  cv_flags                  JSONB         NOT NULL DEFAULT '{}',
+  -- cv_flags structure: {"<defect_slug>": <occurrence_count>, ...}
+  -- Defined defect slugs (ml-engineer owns taxonomy; add new slugs via migration only):
+  --   "knee_cave"        — valgus collapse during squat / lunge
+  --   "back_arch"        — lumbar hyperextension (deadlift, RDL)
+  --   "elbow_flare"      — horizontal abduction during press movement
+  --   "forward_lean"     — excessive torso inclination
+  --   "hip_shift"        — lateral imbalance during squat
+  --   "depth_short"      — squat/lunge above parallel threshold
+  --   "lockout_missing"  — incomplete range of motion at top position
+
+  -- Confidence statistics (aggregate; non-sensitive)
+  avg_keypoint_confidence   NUMERIC(4,3),            -- 0.000–1.000 mean across all analysed frames
+  frames_analysed           INTEGER,
+  frames_below_threshold    INTEGER,                 -- frames where confidence < REP_COUNT_CONFIDENCE_MIN (0.65)
+
+  -- Encrypted biometric payload (GDPR Art. 9)
+  -- Contains: sampled pose keypoints at rep-boundary frames (peak + bottom, max 2 frames/rep).
+  -- Storage format: pgp_sym_encrypt(keypoints_jsonb::text, current_setting('app.cv_enc_key'))
+  -- where app.cv_enc_key is a per-tenant AES-256-GCM key from Cloudflare Workers Secret.
+  -- Decrypted format: {"frames": [{"t": <ms_offset>, "kp": [[x, y, z, v], ...]}, ...]}
+  --   BlazePose: 33 keypoints × 4 floats = 132 values per frame
+  --   MoveNet: 17 keypoints × 4 floats = 68 values per frame
+  -- Maximum payload: 100 snapshots × ~1.5 KB ≈ 150 KB (TOAST-managed; see §15.5).
+  -- null if status = 'tracking_lost' AND frames_analysed < 3.
+  keypoints_enc             TEXT,
+
+  -- Soft-delete for GDPR Art. 17 30-day grace period (§15.7.3)
+  deleted_at                TIMESTAMPTZ,
+
+  created_at                TIMESTAMPTZ   NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ   NOT NULL DEFAULT now(),
+
+  CONSTRAINT chk_cv_form_score_range
+    CHECK (form_score IS NULL OR form_score BETWEEN 0.0 AND 100.0),
+  CONSTRAINT chk_cv_confidence_range
+    CHECK (avg_keypoint_confidence IS NULL OR avg_keypoint_confidence BETWEEN 0.000 AND 1.000),
+  CONSTRAINT chk_cv_ended_after_started
+    CHECK (ended_at IS NULL OR ended_at >= started_at),
+  CONSTRAINT chk_cv_frames_non_negative
+    CHECK (frames_analysed IS NULL OR frames_analysed >= 0)
+);
+
+ALTER TABLE cv_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cv_sessions FORCE ROW LEVEL SECURITY;
+
+-- Tenant isolation and user lookup (primary query patterns)
+CREATE INDEX idx_cv_sessions_user_id
+  ON cv_sessions (user_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_cv_sessions_tenant_id
+  ON cv_sessions (tenant_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_cv_sessions_set_id
+  ON cv_sessions (workout_set_id)
+  WHERE deleted_at IS NULL AND workout_set_id IS NOT NULL;
+
+CREATE INDEX idx_cv_sessions_created_at
+  ON cv_sessions (created_at) WHERE deleted_at IS NULL;
+
+-- Retention cron: find soft-deleted rows eligible for hard delete
+CREATE INDEX idx_cv_sessions_retention_sweep
+  ON cv_sessions (created_at) WHERE deleted_at IS NOT NULL;
+
+-- Incident response: blast-radius scoping by model version (INCIDENT_RESPONSE.md §R-10)
+CREATE INDEX idx_cv_sessions_model_version
+  ON cv_sessions (model_name, model_version) WHERE deleted_at IS NULL;
+```
+
+---
+
+### 15.3 RLS Policies for `cv_sessions`
+
+The privacy floor for CV data is stricter than for wearable data. `keypoints_enc` contains biometric data; even with decryption, raw keypoints are never returned to any persona except `form_system` (coaching context builder and erasure worker). Coaches receive `form_score`, `cv_flags`, and `rep_count` only — never `keypoints_enc`. Tenant admin is fully blocked from the table; CV quality is exposed only via the `tenant_cv_summary` aggregate view (§15.4).
+
+#### 15.3.1 RLS Policy Set
+
+```sql
+-- ── User self-access ──────────────────────────────────────────────────────────
+-- Users may query their own cv_sessions. The Supabase client never receives
+-- the decryption key for keypoints_enc — decryption requires the Workers backend
+-- injecting app.cv_enc_key, which is only done for form_system role calls.
+CREATE POLICY cv_sessions_user_self
+  ON cv_sessions
+  FOR ALL
+  TO form_user
+  USING (
+    user_id   = auth.uid()
+    AND tenant_id = current_setting('app.tenant_id')::UUID
+    AND deleted_at IS NULL
+  )
+  WITH CHECK (
+    user_id   = auth.uid()
+    AND tenant_id = current_setting('app.tenant_id')::UUID
+  );
+
+-- ── Coach access ──────────────────────────────────────────────────────────────
+-- Coaches have NO Postgres-level policy on cv_sessions.
+-- The Workers backend queries under form_system and returns only
+-- {rep_count, form_score, cv_flags, status} — never keypoints_enc.
+-- This prevents any Postgres-level projection bypass.
+-- Consent gate enforced at application layer (same pattern as §14.3 wearable_readings).
+
+-- ── Tenant admin: BLOCKED (privacy floor) ────────────────────────────────────
+-- form_tenant_admin has no policy on cv_sessions.
+-- Any query under form_tenant_admin returns 0 rows (fail-closed).
+-- CV quality is exposed only via the tenant_cv_summary aggregate view (§15.4).
+-- This must be verified in CI — see §15.3.2.
+
+-- ── form_system (backend service) ────────────────────────────────────────────
+-- Full access for CV session upload, coaching context builder, and erasure worker.
+CREATE POLICY cv_sessions_system
+  ON cv_sessions
+  FOR ALL
+  TO form_system
+  USING (tenant_id = current_setting('app.tenant_id')::UUID);
+
+-- ── form_admin (break-glass) ─────────────────────────────────────────────────
+-- Full table access including keypoints_enc.
+-- MANDATORY: every break-glass query must emit a cv.keypoints_admin_accessed
+-- DEC-030 event with incident_id before the query is executed.
+-- Decryption of keypoints_enc additionally requires calling the internal
+-- /admin/cv/decrypt-session endpoint (authenticated admin JWT + incident_id).
+-- The cv_enc_key is NOT available in the Supabase env — only in Workers Secrets.
+CREATE POLICY cv_sessions_admin
+  ON cv_sessions
+  FOR ALL
+  TO form_admin
+  USING (true);
+```
+
+#### 15.3.2 CI RLS Isolation Assertions
+
+Add to `__tests__/db/rls_isolation.test.ts`:
+
+```typescript
+// cv_sessions: tenant admin receives zero rows (privacy floor)
+it('tenant admin cannot read cv_sessions', async () => {
+  const { data, error } = await supabaseTenantAdmin
+    .from('cv_sessions')
+    .select('id');
+  expect(error).toBeNull();
+  expect(data).toHaveLength(0);
+});
+
+// cv_sessions: cross-tenant isolation
+it('cross-tenant cv_sessions read returns zero rows', async () => {
+  const { data, error } = await supabaseUserTenantB
+    .from('cv_sessions')
+    .select('id')
+    .eq('tenant_id', TENANT_A_ID);
+  expect(error).toBeNull();
+  expect(data).toHaveLength(0);
+});
+
+// cv_sessions: form_coach role has no policy → zero rows
+it('form_coach role cannot access keypoints_enc', async () => {
+  const { data } = await supabaseCoach
+    .from('cv_sessions')
+    .select('keypoints_enc');
+  expect(data).toHaveLength(0);
+});
+```
+
+---
+
+### 15.4 Tenant-Visible Aggregates (`tenant_cv_summary`)
+
+Enterprise tenant admins (HR / People leads) may see aggregate CV form quality trends for the organisation — for example, average form score improvement week over week, or which form defects appear most frequently across the team. Individual CV data (form score per user, session timestamps, per-person cv_flags) is never exposed. k-anonymity floor: all numeric values are suppressed when fewer than 5 unique users contributed in a given period.
+
+```sql
+-- CV aggregate view for the enterprise admin dashboard.
+-- k-anonymity: all numeric values NULL when unique_users_with_cv < 5.
+-- Privacy floor: no individual form scores, no user_id, no session identifiers.
+-- Access: form_admin + tenant_owner only; tenant_manager blocked.
+CREATE MATERIALIZED VIEW tenant_cv_summary AS
+SELECT
+  tenant_id,
+  DATE_TRUNC('week', created_at)                               AS week_start,
+  COUNT(DISTINCT user_id)                                      AS unique_users_with_cv,
+  -- k-anonymity suppression: NULL when N < 5
+  CASE WHEN COUNT(DISTINCT user_id) >= 5
+       THEN ROUND(AVG(form_score), 1)          ELSE NULL END   AS avg_form_score,
+  CASE WHEN COUNT(DISTINCT user_id) >= 5
+       THEN ROUND(AVG(rep_count), 0)           ELSE NULL END   AS avg_reps_per_session,
+  -- Status breakdown as percentages (not counts, to prevent cell-level re-identification)
+  CASE WHEN COUNT(*) > 0 AND COUNT(DISTINCT user_id) >= 5
+       THEN ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'completed') / COUNT(*), 1)
+       ELSE NULL END                                           AS pct_completed,
+  CASE WHEN COUNT(*) > 0 AND COUNT(DISTINCT user_id) >= 5
+       THEN ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'tracking_lost') / COUNT(*), 1)
+       ELSE NULL END                                           AS pct_tracking_lost,
+  -- Form defect prevalence: % of sessions where the flag count > 0
+  -- Directional only: no per-user defect attribution possible from this view
+  CASE WHEN COUNT(DISTINCT user_id) >= 5
+       THEN ROUND(100.0 * COUNT(*) FILTER (
+              WHERE (cv_flags->>'knee_cave')::int > 0
+            ) / NULLIF(COUNT(*), 0), 1)
+       ELSE NULL END                                           AS pct_knee_cave_detected,
+  CASE WHEN COUNT(DISTINCT user_id) >= 5
+       THEN ROUND(100.0 * COUNT(*) FILTER (
+              WHERE (cv_flags->>'back_arch')::int > 0
+            ) / NULLIF(COUNT(*), 0), 1)
+       ELSE NULL END                                           AS pct_back_arch_detected,
+  CASE WHEN COUNT(DISTINCT user_id) >= 5
+       THEN ROUND(100.0 * COUNT(*) FILTER (
+              WHERE (cv_flags->>'depth_short')::int > 0
+            ) / NULLIF(COUNT(*), 0), 1)
+       ELSE NULL END                                           AS pct_depth_short_detected
+FROM cv_sessions
+WHERE deleted_at IS NULL
+  AND status IN ('completed', 'partial')
+  AND form_score IS NOT NULL
+GROUP BY tenant_id, DATE_TRUNC('week', created_at);
+
+COMMENT ON MATERIALIZED VIEW tenant_cv_summary IS
+  'Aggregate CV form quality metrics by tenant and week. '
+  'k-anonymity: all values NULL when unique_users_with_cv < 5. '
+  'Privacy floor: no individual form scores, cv_flags, or session IDs exposed.';
+
+-- Nightly refresh at 03:05 UTC (staggered after tenant_wearable_summary at 03:00 UTC)
+-- SELECT cron.schedule('refresh-tenant-cv-summary', '5 3 * * *',
+--   $$REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_cv_summary$$);
+
+ALTER MATERIALIZED VIEW tenant_cv_summary OWNER TO form_system;
+GRANT SELECT ON tenant_cv_summary TO form_admin;
+-- tenant_admin and tenant_manager access is mediated via the admin dashboard API endpoint,
+-- which applies a tenant_id filter before returning data — no direct Supabase client access.
+```
+
+---
+
+### 15.5 Keypoint Storage Decision (Resolves §9.2)
+
+> **Gap 9.2** (raised in §9): "`raw_cv_data` column size: JSONB for pose keypoints can grow large. Column to separate blob store (S3)?" Owner: platform-engineer. Priority: High — evaluate at 10k workouts/day.
+
+**Decision: store encrypted keypoints in Postgres JSONB (`keypoints_enc`). Migrate to R2 only when the gate condition is triggered.**
+
+| Factor | Analysis |
+|---|---|
+| **Payload size** | Sampled at rep-boundary frames only (max 2 frames/rep). At 33 keypoints × 4 floats × 2 frames × 50 reps = 13,200 floats ≈ 105 KB uncompressed. JSONB LZ4 compression reduces this to ~20–40 KB. Postgres TOAST manages out-of-line storage automatically above 8 KB — no column fragmentation. |
+| **Volume at 1k sessions/day** | 1,000 sessions × 40 KB avg = 40 MB/day. At 1-year retention with keypoints nullification: peak table size ≈ 40 MB/day × 365 days ≈ 14.6 GB — within Supabase Team plan (100 GB). |
+| **Volume at 10k sessions/day** | 10,000 sessions × 40 KB avg = 400 MB/day. Annual peak ≈ 146 GB. At this scale FORM requires Supabase Enterprise (per COST_MODEL.md §13.4 upgrade cliff). Keypoints migration to R2 defers the Supabase storage bill by ~$0.015/GB/month. At 146 GB this is ~$2.2/month — not a compelling driver on its own. The real driver at 10k/day is operational simplicity of keeping all health data in one encrypted store with unified RLS. |
+| **Security** | Keypoints in Postgres benefit from the same RLS enforcement, PITR backup isolation, audit trail, and DEC-030 chain as all other health data. Moving to R2 requires a separate HMAC-signed URL access control layer, complicating the erasure worker and DSAR export job. |
+| **Migration gate** | Migrate `keypoints_enc` to R2 when: (a) `cv_sessions` table exceeds **20 GB**, OR (b) CV session volume exceeds **1,000/day** for 30 consecutive days. At that point: R2 bucket with Object Lock, per-object AES-256-GCM, `keypoints_r2_key TEXT` column replaces `keypoints_enc`, URL generation mediated by form_system only. See OQ-CV-01 (§15.10). |
+
+**`workouts.raw_cv_data` column: DEPRECATED.** All new writes must use `cv_sessions.keypoints_enc`. The `workouts.raw_cv_data` column will be dropped in a migration once all clients have shipped the CV session endpoint. Coordinate with mobile app release schedule.
+
+**Gap 9.2 status: RESOLVED** — keypoints in JSONB TOAST with R2 migration gate condition documented.
+
+---
+
+### 15.6 Coaching Context Integration
+
+Victor receives CV context in a bucketed, non-biometric form. Raw keypoints never reach the Anthropic API. The coaching context builder (running under `form_system` role) queries `cv_sessions` and applies `stripCVData()` before composing the Victor prompt.
+
+#### 15.6.1 Permitted CV Representations in the Victor Prompt
+
+| Field | Raw value | Prompt representation | Rationale |
+|---|---|---|---|
+| `form_score` | 73.5 | `"form_quality": "good"` | Bucketed: poor < 40 / fair 40–59 / good 60–79 / excellent ≥ 80 |
+| `rep_count` | 8 | `"reps_detected": 8` | Exact integer is not biometric |
+| `cv_flags["knee_cave"]` | 2 | `"flags": ["knee_cave"]` | Presence only; occurrence count omitted |
+| `cv_flags["back_arch"]` | 0 | _(omitted from flags array)_ | Zero-count flags are not included |
+| `avg_keypoint_confidence` | 0.83 | _(not included)_ | Internal quality metric; not coaching-relevant |
+| `keypoints_enc` | encrypted blob | _(never included)_ | Biometric data; categorically excluded from Anthropic API calls |
+
+**Victor response language constraints** (cross-reference `docs/VICTOR_PROMPT_GUIDE.md` §CV):
+- Victor must not quote exact form scores numerically ("Your form score was 73.5%").
+- Victor should use qualitative framing: "Your squat form looked solid today" / "I noticed some knee tracking to watch."
+- If `status = 'tracking_lost'`: "The camera lost tracking mid-set — hard to give you form feedback on that one."
+- Victor must not reference specific keypoint positions, joint angles, or anatomical landmarks derived from the keypoint data.
+
+#### 15.6.2 `stripCVData()` TypeScript Implementation
+
+```typescript
+interface CVSessionRaw {
+  status: 'completed' | 'partial' | 'tracking_lost';
+  rep_count: number | null;
+  form_score: number | null;      // 0.0–100.0
+  cv_flags: Record<string, number>;
+}
+
+interface CVPromptContext {
+  status: string;
+  reps_detected: number | null;
+  form_quality: 'poor' | 'fair' | 'good' | 'excellent' | null;
+  flags: string[];
+}
+
+const FORM_QUALITY_BUCKETS = [
+  [80, 'excellent'],
+  [60, 'good'],
+  [40, 'fair'],
+  [0,  'poor'],
+] as const;
+
+export function stripCVData(session: CVSessionRaw): CVPromptContext {
+  return {
+    status: session.status,
+    reps_detected: session.rep_count,
+    form_quality:
+      session.form_score !== null
+        ? (FORM_QUALITY_BUCKETS.find(([floor]) => session.form_score! >= floor)?.[1] ?? 'poor')
+        : null,
+    // Only flag names with occurrence_count > 0; count itself is not included
+    flags: Object.entries(session.cv_flags)
+      .filter(([, count]) => count > 0)
+      .map(([flag]) => flag),
+  };
+}
+// CI gate: grep the Anthropic API request payload for 'keypoints_enc' in unit tests.
+// Any match is an automatic build failure — keypoints must never reach the inference API.
+```
+
+---
+
+### 15.7 GDPR and Privacy Constraints
+
+#### 15.7.1 GDPR Art. 9 Classification
+
+CV pose keypoints are derived from video analysis of a person's body. Under GDPR Recital 51 and Art. 9(1), biometric data processed for the purpose of uniquely identifying natural persons is special category data. Pose keypoints from a workout session are sufficiently individualised — joint position time-series reflect unique biomechanics — to fall within this classification.
+
+**Classification decisions:**
+- `keypoints_enc`: **GDPR Art. 9 special category — biometric data.** Requires explicit `'cv'` category consent before any `cv_sessions` row is written.
+- `form_score`, `rep_count`, `cv_flags`: **Personal data (Art. 4)** — not Art. 9 in isolation. These are aggregate quality metrics derived from analysis, not raw biometric measurements.
+- Raw video frames: processed on-device without storage; GDPR does not impose retention obligations on in-memory transient processing.
+
+**Consent gate:** Before any `cv_sessions` row is written, the mobile app must confirm `'cv' = ANY(categories_consented)` in `users.categories_consented`. The session upload endpoint (`POST /v1/cv/session`) blocks writes and emits a `cv.session_blocked` DEC-030 event if consent is absent.
+
+#### 15.7.2 Retention: Two-Phase Deletion
+
+Per `docs/SOC2_READINESS.md` §35.6.3: *"CV session metadata | `cv_sessions` | 1 year | Keypoint data is biometric-adjacent; shorter retention."*
+
+1-year retention for `keypoints_enc` is shorter than `workout_sessions` (3 years) and `wearable_readings` (2 years) because keypoints are the highest-sensitivity data FORM stores. The form score and rep count retain long-term coaching value; the biometric payload does not.
+
+**Two-phase strategy:**
+1. After 1 year from `created_at`: nullify `keypoints_enc` (biometric data removed; aggregate session metadata retained for coaching history).
+2. After 3 years from `created_at`: hard-delete the entire row (aligns with `workout_sessions` retention).
+
+```sql
+-- Phase 1: nullify keypoints_enc after 1 year (pg_cron — daily at 04:00 UTC)
+SELECT cron.schedule('cv-keypoints-1yr-nullify', '0 4 * * *', $$
+  UPDATE cv_sessions
+  SET    keypoints_enc = NULL,
+         updated_at    = now()
+  WHERE  keypoints_enc IS NOT NULL
+    AND  created_at    < now() - INTERVAL '1 year'
+    AND  deleted_at    IS NULL;
+$$);
+
+-- Phase 2: hard-delete rows older than 3 years (pg_cron — daily at 04:30 UTC)
+SELECT cron.schedule('cv-sessions-3yr-hard-delete', '30 4 * * *', $$
+  DELETE FROM cv_sessions
+  WHERE created_at < now() - INTERVAL '3 years';
+$$);
+```
+
+Each Phase 1 batch must emit a `cv.keypoints_nullified` DEC-030 event with the row count. Each Phase 2 batch must emit a `cv.session_hard_deleted` DEC-030 event.
+
+#### 15.7.3 GDPR Art. 17 Right to Erasure
+
+When a user requests erasure, `cv_sessions` follows the 30-day grace period model (§12.3) with one exception: `keypoints_enc` must be nullified **immediately on erasure request** (no grace period). Art. 9 biometric data does not benefit from the grace period that applies to less-sensitive personal data.
+
+Erasure worker steps for `cv_sessions`:
+1. Set `deleted_at = now()` on all rows for the `user_id`.
+2. Immediately: set `keypoints_enc = NULL` (synchronous in the same transaction).
+3. After 30-day grace: hard-delete remaining soft-deleted rows.
+4. Emit `privacy.erasure_completed` DEC-030 event with `cv_sessions` row count.
+
+#### 15.7.4 Consent Withdrawal
+
+If a user withdraws `'cv'` consent, the session upload endpoint immediately blocks new writes. Historical rows are retained under the original consent grant until an explicit erasure request is filed. Same model as §14.7.1 (wearable consent withdrawal).
+
+---
+
+### 15.8 Analytics Restrictions
+
+CV data follows the most restrictive analytics exclusion policy in the system. `keypoints_enc` is categorically excluded everywhere. `form_score` and `cv_flags` are excluded from analytics pipelines because they are personal data with realistic re-identification risk when combined with workout timestamps and tenant context.
+
+| Layer | `keypoints_enc` | `form_score` (raw) | `cv_flags` (raw) | `rep_count` |
+|---|---|---|---|---|
+| PostHog client events | ❌ Blocked | ❌ Excluded | ❌ Excluded | ✅ Allowed |
+| PostHog server-side enrichment | ❌ Blocked | ❌ Excluded | ❌ Excluded | ✅ Allowed |
+| ClickHouse analytics tables | ❌ Blocked | ❌ Excluded (use form_quality bucket) | ❌ Excluded | ✅ Allowed |
+| Metabase tenant dashboard | ❌ Blocked | ❌ Excluded from individual queries | ❌ Excluded | Via `tenant_cv_summary` aggregate only |
+| Sentry error payloads | ❌ Blocked | ❌ Excluded | ❌ Excluded | ❌ Excluded |
+| Anthropic API prompt | ❌ Blocked | ❌ Excluded (form_quality bucket via `stripCVData()`) | ❌ Excluded (flag names only) | ✅ Allowed |
+| DSAR export (Art. 20) | ✅ User's own data | ✅ Included | ✅ Included | ✅ Included |
+
+The `stripForbiddenProperties()` middleware (§13.3) must be extended with:
+```
+['keypoints_enc', 'form_score', 'cv_flags', 'avg_keypoint_confidence',
+ 'frames_analysed', 'frames_below_threshold', 'raw_cv_data']
+```
+
+The last entry (`raw_cv_data`) handles the deprecated `workouts.raw_cv_data` column during the transition period.
+
+---
+
+### 15.9 DEC-030 Audit Events for CV Data
+
+All CV-data access and lifecycle events must be HMAC-chained per DEC-030 (`docs/AUDIT_LOG_SCHEMA.md`).
+
+| Event slug | Trigger | Severity | Notes |
+|---|---|---|---|
+| `cv.session_started` | Mobile begins uploading a CV session | Standard | 7-year retention |
+| `cv.session_completed` | `cv_sessions` row transitions to `status = 'completed'` | Standard | 7-year retention |
+| `cv.session_blocked` | Upload blocked: `'cv' NOT IN categories_consented` | Standard | 7-year retention; consent enforcement evidence |
+| `cv.keypoints_nullified` | Phase 1 retention cron nullifies `keypoints_enc` (batch) | Standard | 7-year retention; Art. 5(1)(e) storage limitation evidence |
+| `cv.session_hard_deleted` | Phase 2 cron or erasure worker hard-deletes row | Standard | 7-year retention; Art. 17 erasure evidence |
+| `cv.keypoints_admin_accessed` | `form_admin` queries `cv_sessions` (break-glass) | **HIGH** | Mandatory `incident_id` field; 7-year retention; SOC 2 CC6.1 evidence |
+| `cv.model_version_changed` | New CV model deployed to mobile production | Standard | 7-year retention; enables §R-10 blast-radius scoping |
+
+---
+
+### 15.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Notes |
+|---|---|---|---|---|---|
+| 1 | Apply `cv_sessions` DDL migration (§15.2): table, constraints, 6 indexes, `ENABLE ROW LEVEL SECURITY` | `platform-engineer` | **P0** | M3 | Migration must include RLS lint-check per §7.2 |
+| 2 | Apply RLS policies (§15.3.1): `cv_sessions_user_self`, `cv_sessions_system`, `cv_sessions_admin` | `platform-engineer` | **P0** | M3 | Confirm form_coach and form_tenant_admin have zero-row behaviour with a manual psql check |
+| 3 | Add CV RLS assertions to `__tests__/db/rls_isolation.test.ts` (§15.3.2): tenant-admin zero-row, cross-tenant zero-row, form_coach zero-row | `platform-engineer` | **P0** | M3 | Block any enterprise-tier merge if these assertions fail |
+| 4 | Provision `cv_enc_key` in Cloudflare Workers Secret — one AES-256-GCM key per tenant; document key rotation procedure (quarterly rotation); rotation event = `cv.keypoints_admin_accessed` with `reason: 'key_rotation'` | `security-engineer` | **P0** | M3 | Key must NOT be stored in Supabase env vars; Workers Secret only |
+| 5 | Implement CV session upload endpoint (`POST /v1/cv/session`): consent gate check, keypoints encryption with per-tenant key, `cv_sessions` write under `form_system`, emit `cv.session_started` + `cv.session_completed` DEC-030 events | `platform-engineer` | **P0** | M3 | |
+| 6 | Implement `stripCVData()` (§15.6.2); add unit tests asserting `keypoints_enc` never appears in Anthropic API call payload | `platform-engineer` | **P0** | M3 | CI gate: fail build if `keypoints_enc` found in any Anthropic request snapshot |
+| 7 | Wire `cv.session_blocked` DEC-030 event to consent gate check in upload endpoint | `platform-engineer` | **P0** | M3 | |
+| 8 | Extend `stripForbiddenProperties()` blocklist (§15.8) with CV field names including deprecated `raw_cv_data` | `data-engineer` | **P0** | M3 | |
+| 9 | Extend Sentry `beforeSend` filter (`docs/OBSERVABILITY.md`) to scrub `keypoints_enc`, `form_score`, `cv_flags`, `raw_cv_data` from error payloads | `platform-engineer` | **P0** | M3 | |
+| 10 | Create `tenant_cv_summary` materialized view (§15.4); add to nightly pg_cron refresh at 03:05 UTC; build admin dashboard Metabase panel using view (no direct `cv_sessions` query permitted) | `platform-engineer` + `data-engineer` | **P1** | M4 | Verify k-anonymity N < 5 suppression in view DDL before deploying |
+| 11 | Implement Phase 1 retention pg_cron (`cv-keypoints-1yr-nullify`): nullify `keypoints_enc` after 1 year; emit `cv.keypoints_nullified` DEC-030 event per batch with nullified row count | `platform-engineer` | **P1** | M4 | Validate with synthetic data dated > 1 year ago in staging |
+| 12 | Implement Phase 2 retention pg_cron (`cv-sessions-3yr-hard-delete`): hard-delete rows after 3 years; emit `cv.session_hard_deleted` DEC-030 event | `platform-engineer` | **P1** | M4 | |
+| 13 | Extend Art. 17 erasure worker (§12.3): soft-delete cv_sessions; immediately nullify `keypoints_enc` (no grace period for Art. 9 data); hard-delete after 30-day grace; verify row count in `privacy.erasure_completed` event | `platform-engineer` | **P1** | M4 | Immediate nullification for biometric data is not negotiable — no grace period exception |
+| 14 | Add `cv_sessions` to DSAR export job (§12.5): include `form_score`, `cv_flags`, `rep_count`, `status`, `started_at`, `ended_at` per row; add note that `keypoints_enc` payload available on written request via privacy@form.coach | `platform-engineer` | **P1** | M4 | |
+| 15 | Wire `cv.model_version_changed` DEC-030 event to mobile model registry deployment step in ml-engineer CI pipeline | `ml-engineer` | **P1** | M4 | Enables blast-radius scoping for INCIDENT_RESPONSE.md §R-10 |
+| 16 | Deprecate `workouts.raw_cv_data`: add deprecation notice comment to column DDL; update all client write paths to `cv_sessions`; drop column once write traffic is zero (validate via query log before migration) | `platform-engineer` + `ml-engineer` | **P2** | M5 | Coordinate with mobile app release cycle |
+| 17 | Complete formal retention decision record for `cv_sessions` (1-year keypoints nullification + 3-year hard delete); obtain compliance-officer sign-off; add to privacy policy retention table (closes P-GAP-004 line item for cv_sessions) | `compliance-officer` | **P0** | Pre-launch | |
+
+**OQ-CV-01 (Keypoint Blob Migration Gate):** Monitor `cv_sessions` table size in Supabase monthly post-launch. If table size exceeds 20 GB OR CV session volume exceeds 1,000/day for 30 consecutive days, initiate R2 migration (§15.5). Migration design: R2 bucket with Object Lock enabled, per-object AES-256-GCM using the same key derivation as current column encryption, `keypoints_r2_key TEXT` column replaces `keypoints_enc`, URL generation exclusively via form_system Worker (no pre-signed URLs returned to client). Owner: platform-engineer + devops-lead. Monitor checkpoint: M6.
+
+---
+
+*v0.6 additions: §15 Computer Vision (CV) Pose Estimation Data Schema — closes the schema gap for `cv_sessions` table referenced in SOC2_READINESS.md PRE-34-E-006 (column-level encryption evidence), §35.6.3 (1-year biometric retention), C1.2 (erasure cascade), and INCIDENT_RESPONSE.md §R-10 (blast-radius scoping by `model_version`). On-device inference architecture: GDPR Art. 9 avoidance for raw video stream, < 100 ms latency requirement, competitive privacy posture. `cv_sessions` DDL: 33-keypoint BlazePose / 17-keypoint MoveNet schema, 7 defect flag slugs in cv_flags taxonomy, `keypoints_enc` AES-256-GCM column-level encryption in Cloudflare Workers Secret (closes PRE-34-E-006), status state machine (active/completed/partial/tracking_lost), model identity columns for R-10 blast-radius, 6 indexes (user, tenant, set_id, created_at, retention sweep, model_version). RLS: user self-access policy; form_coach blocked at RLS layer (application-layer view only); form_tenant_admin zero-row privacy floor; form_system full access; form_admin break-glass with mandatory incident_id + separate decryption endpoint. Three CI RLS assertions (`rls_isolation.test.ts`). `tenant_cv_summary` materialized view: weekly aggregate with k-anonymity N ≥ 5 suppression, form_quality averages, status percentages, three defect-prevalence columns (no individual data). §15.5 keypoint storage decision resolves §9 gap 9.2: keypoints in JSONB TOAST with R2 migration gate at 20 GB / 1,000 sessions/day; `workouts.raw_cv_data` column deprecated. `stripCVData()` TypeScript: 4-bucket form_quality mapping, flag-presence-only extraction, keypoints categorically excluded from Anthropic API; CI grep gate. GDPR: Art. 9 biometric classification for keypoints_enc; explicit `'cv'` consent gate; two-phase deletion (1-year keypoints nullification via pg_cron, 3-year row hard delete); Art. 17 immediate keypoints nullification (no grace period for Art. 9 data); consent withdrawal semantics. Analytics restrictions: keypoints_enc and form_score/cv_flags excluded from all PostHog/ClickHouse/Metabase/Sentry/Anthropic layers; stripForbiddenProperties() extended. Seven DEC-030 HMAC-chained audit events (cv.session_started, cv.session_completed, cv.session_blocked, cv.keypoints_nullified, cv.session_hard_deleted, cv.keypoints_admin_accessed HIGH severity with incident_id requirement, cv.model_version_changed). 17-item implementation checklist (9× P0, 5× P1, 2× P2, 1× Pre-launch) across M3/M4/M5. OQ-CV-01: R2 blob migration gate condition. Gap 9.2 status updated to RESOLVED in §9.*
 
