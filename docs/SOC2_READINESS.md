@@ -6658,3 +6658,390 @@ The `coaching.completeness_check` DEC-030 event carries `orphaned_count` as a pa
 ---
 
 *v2.5 additions: §37 PI1 — Processing Integrity Deep-Dive. Five processing surfaces formally mapped against PI1.1/PI1.2/PI1.3: (1) Victor AI coaching pipeline — `coaching_turns.status` state machine, clinical safety output filter, P95 latency SLO < 3 s text / 5 s voice, three-gate authorization (subscription + consent + JWT); (2) CV pose estimation — confidence threshold 0.65, `cv_partial` session status, NPU timeliness; (3) wearable data ingestion — HealthKit anchor-based idempotency, cross-source HRV normalization (Garmin categorical exclusion), 2-hour cron disclosure; (4) nutrition / macro calculation — deterministic arithmetic constants, implicit-zero gap (PI-GAP-003), CI test gap (PI-GAP-004); (5) analytics ETL — PostHog→ClickHouse row-count cross-check gap (PI-GAP-005), `stripForbiddenProperties()` as accuracy control, ETL SLO gap. DEC-030 HMAC chain established as cross-surface PI1 evidence layer with canonical three-event audit pattern and stuck-turn detection SQL. 6 control IDs (PIC-01–PIC-06). 5 output surfaces mapped to PI1.3 (coaching response, SCIM RFC 7643, HR aggregate k-anonymity, DSAR export, DEC-030 chain). 7 gaps opened: PI-GAP-001 (stuck-row escalation P1), PI-GAP-002 (accuracy observability P1), PI-GAP-003 (meal log NOT NULL P2), PI-GAP-004 (nutrition CI test P2), PI-GAP-005 (ETL cross-check P1), PI-GAP-006 (SCIM conformance P1, blocked G-001), PI-GAP-007 (DSAR count P2). 8 evidence artifacts (PRE-37-E-001–PRE-37-E-008). 9-item implementation checklist (3× M3, 5× M4, 1× post-launch). SOC 2 readiness: ~94% → ~95%.*
+
+---
+
+## 38. Pre-Audit Readiness Assessment & Management Assertion
+
+### 38.1 Purpose of This Section
+
+This section serves three distinct audiences and purposes.
+
+**For FORM management:** It is the single consolidation point confirming that all prior sections of this document have been authored, reviewed, and that the gap portfolio is understood, owned, and on a remediation schedule. It provides the formal management assertion text that will appear verbatim (or with minor legal wordsmithing) in the final SOC 2 Type II report.
+
+**For the audit engagement partner:** It is the pre-call briefing package. It contains the consolidated readiness scorecard, the open gap registry with owners and milestone dates, the evidence data room structure, and the list of personnel who can speak to each Trust Service Criterion. An auditor receiving this section before the kickoff call should be able to form a preliminary view of scope, risk areas, and observation period eligibility without reading all 37 prior sections.
+
+**For enterprise prospects and their security reviewers:** When shared under NDA as part of a vendor due diligence package, it demonstrates that FORM has a mature, programmatic approach to SOC 2 readiness — not a checkbox exercise. The existence of an open gap registry with named owners and milestones is a positive signal, not a negative one; it shows operational honesty.
+
+This section does not introduce new controls or new gap IDs. It consolidates, cross-references, and renders a binary readiness verdict using the criteria defined in §38.8.
+
+---
+
+### 38.2 Management Assertion (Draft)
+
+> **Note to counsel:** The following text is a draft management assertion for inclusion in the SOC 2 Type II report. It follows AICPA AT-C Section 205 / TSP 100 conventions. Review and sign-off by outside counsel is required before submission to the audit firm. The assertion must be dated and signed by the founder/CEO as the entity's senior management representative.
+
+---
+
+**Management's Assertion Regarding the Description of FORM's System and the Suitability of the Design and Operating Effectiveness of Controls**
+
+We are responsible for the accompanying description of FORM's system and for the assertion contained herein. The description covers the period **[observation period start date]** through **[observation period end date]** (the "description period").
+
+**Regarding the description.** The accompanying description fairly presents the FORM system that was designed and implemented throughout the description period based on the criteria for a description of a service organization's system set forth in the AICPA's *Description Criteria for a Description of a Service Organization's System in a SOC 2® Report* (the "description criteria"). The criteria we used in making this assertion are the description criteria.
+
+**Regarding the suitability of design and operating effectiveness of controls.** The controls stated in the accompanying description were suitably designed throughout the description period to provide reasonable assurance that FORM's service commitments and system requirements were achieved based on the following applicable trust services criteria established in the AICPA's *TSP section 100, 2017 Trust Services Criteria for Security, Availability, Processing Integrity, Confidentiality, and Privacy* (the "applicable trust services criteria"):
+
+- **Security** (CC Series, CC1–CC9): Controls are suitably designed and, to the best of management's knowledge, operated effectively throughout the description period to meet the Common Criteria related to logical and physical access, change management, risk management, vendor management, system monitoring, and incident response.
+
+- **Availability** (A1): Controls are suitably designed and operated effectively to meet the Availability criteria related to system capacity, performance monitoring, incident recovery, and SLA commitments.
+
+- **Processing Integrity** (PI1): Controls are suitably designed and operated effectively to meet the Processing Integrity criteria related to completeness, accuracy, timeliness, and authorization of inputs, processing, and outputs across all five FORM processing surfaces (Victor AI coaching, computer vision pose estimation, wearable data ingestion, nutrition calculation, and analytics ETL).
+
+- **Confidentiality** (C1): Controls are suitably designed and operated effectively to meet the Confidentiality criteria related to the identification, protection, and disposal of confidential information.
+
+- **Privacy** (P1–P8): Controls are suitably designed and operated effectively to meet the Privacy criteria related to notice, choice and consent, collection, use and retention, access, disclosure to third parties, security for privacy, and monitoring and enforcement.
+
+The controls operated effectively throughout the description period to provide reasonable, but not absolute, assurance that the service commitments and system requirements were achieved based on the applicable trust services criteria.
+
+FORM processes health and fitness data that constitutes "special category" personal data under GDPR Article 9 and "sensitive personal information" under CCPA/CPRA. Management asserts that the additional controls documented for this data category — including explicit consent gating, data minimisation at the LLM prompt layer, on-device CV inference, HR aggregate k-anonymisation, and HMAC-chained audit logging — operated effectively throughout the description period.
+
+*[Signature block: Founder / Chief Executive Officer — FORM]*
+*[Date:]*
+*[Jurisdiction: Ukraine / Дія City]*
+
+---
+
+### 38.3 Consolidated Pre-Audit Readiness Scorecard
+
+The following table summarises the readiness state across all five Trust Services Criteria as of the date this document was last updated. "Evidence Artifacts Filed" counts artifacts with a status of ✅ Done or equivalent in their source section; "Pending" counts artifacts that are defined but not yet collected.
+
+| TSC | Primary Sections | Readiness | Open Gaps | P0 Gaps | Evidence Artifacts Filed | Evidence Artifacts Pending | Auditor-Presentable? |
+|---|---|---|---|---|---|---|---|
+| **CC — Security** | §1–§3, §14, §16, §21–§22, §25–§29, §36 | ~95% | CC8-GAP-001/002/003; CC6-GAP-001 through CC6-GAP-014; CC7-GAP-001 through CC7-GAP-008; CC1-GAP-001 through CC1-GAP-004; CC9-GAP-001/003; PEN-GAP-001 through PEN-GAP-005 | CC8-GAP-001, CC6-GAP-001–006, CC7-GAP-001–007, PEN-GAP-001/005 | PRE-25-E-001–004, PRE-26-E-001–008, PRE-36-E-001–008 (on execution) | CC8-E-002 (pending CI); CC1-E-004 (AUP not yet drafted) | 🟡 Yes with caveats — gap registry complete; compensating controls documented |
+| **A — Availability** | §18, §20, §33 | ~91% | A1: DR drill not yet conducted; load test not yet run; anonymisation script pending | None blocking observation start | PRE-33-E-003 (§19 cross-ref) | PRE-33-E-001, PRE-33-E-002, PRE-33-E-005 through PRE-33-E-011 | 🟡 Yes with caveats — architecture complete; execution evidence pending pre-launch |
+| **PI — Processing Integrity** | §37 | ~95% | PI-GAP-001 through PI-GAP-007 | PI-GAP-001 (stuck-row), PI-GAP-002 (accuracy observability), PI-GAP-005 (ETL cross-check), PI-GAP-006 (SCIM conformance, blocked G-001) | None yet (implementation in progress) | PRE-37-E-001 through PRE-37-E-008 | 🟡 Yes with caveats — control IDs and surface mapping complete; implementation checklist items M3/M4 |
+| **C — Confidentiality** | §5, §34 | ~88% | C1-GAP-001 (NDA template), C1-GAP-002 (data asset inventory), C1-GAP-003 (DPA receipts), C1-GAP-004 (device disposal policy) | C1-GAP-001 (pre-hire gate), C1-GAP-003 (pre-enterprise DPA gate) | PRE-34-E-002 (§5 cross-ref), PRE-34-E-005 (Supabase encryption, to file), PRE-34-E-006 (column encryption DDL, partial) | PRE-34-E-001, PRE-34-E-003, PRE-34-E-004, PRE-34-E-007, PRE-34-E-008 | 🟡 Yes with caveats — encryption architecture complete; documentation artifacts not yet filed |
+| **P — Privacy** | §35, §24, GDPR_DPIA.md | ~82% | P-GAP-001 through P-GAP-008 | P-GAP-001 (privacy policy not live — enterprise blocker), P-GAP-002 (sub-processor list not published — enterprise blocker) | PRE-35-E-002 (DEC-030 consent event schema), PRE-35-E-008 (ClickHouse TTL DDL), PRE-35-E-009 (backup config) | PRE-35-E-001, PRE-35-E-003 through PRE-35-E-007, PRE-35-E-010 | 🔴 Not yet — P-GAP-001 and P-GAP-002 are hard blockers; all other Privacy artifacts depend on policy going live |
+
+**Overall program readiness: ~95%** (weighted by TSC; Privacy TSC drags overall; CC/PI/A architecture is complete and auditor-presentable with compensating controls; P0 gap closure unlocks observation period start).
+
+---
+
+### 38.4 Open Gap Registry (Master)
+
+This table is the authoritative consolidated gap register for the entire document. It lists all gaps that remain open at the time of last edit. Gaps marked as closed in their source section are not repeated here. Gap IDs are those defined in their originating sections; no new IDs are introduced in §38.
+
+| Gap ID | TSC | Source Section | Description | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|---|---|
+| **CC8-GAP-001** | CC | §21 | No CI pipeline configured. Compensating control: manual pre-deploy checklist. Blocks automated CI evidence (CC8-E-002). | devops-lead + platform-engineer | P1 | Pre-launch | 🔴 Open |
+| **CC8-GAP-002** | CC | §21 | "Include administrators" not enabled on `main` branch protection. Deferred until first engineering hire. | security-engineer | P2 | Post-hire (30 days) | 🔴 Open (deferred) |
+| **CC8-GAP-003** | CC | §21 | Automated CI log archival to R2 not yet implemented. Dependent on CC8-GAP-001. | devops-lead | P2 | Pre-launch | 🔴 Open |
+| **CC1-GAP-001** | CC | §29 | Acceptable Use Policy (AUP) document not yet drafted. Required before first hire signs. | compliance-officer | P0 | Pre-hire | 🔴 Open |
+| **CC1-GAP-002** | CC | §29 | Founder annual security training not yet completed for current calendar year. Due 28 February annually. | founder | P0 | Annual | 🔴 Open |
+| **CC1-GAP-003** | CC | §29 | KnowBe4 / GoPhish instance not yet procured. Required 30 days before first hire. | security-engineer | P1 | Pre-hire | 🔴 Open |
+| **CC1-GAP-004** | CC | §29 | Background check provider not selected; not yet added to onboarding checklist. Required before first hire with production access. | compliance-officer + people-ops | P1 | Pre-hire | 🔴 Open |
+| **CC6-GAP-001** *(access review)* | CC | §23 | First quarterly access review (Q2 2026) not yet executed. Procedure is complete; execution is outstanding. Due 30 April 2026. | security-engineer + compliance-officer | P0 | Q2 2026 | 🔴 Open |
+| **CC6-GAP-001** *(MFA — GitHub)* | CC | §26 | GitHub org "Require 2FA for all members" policy not yet enabled. | security-engineer | P0 | Pre-launch | 🔴 Open |
+| **CC6-GAP-002** *(MFA — Cloudflare)* | CC | §26 | Cloudflare account-level MFA requirement not yet enabled. | devops-lead | P0 | Pre-launch | 🔴 Open |
+| **CC6-GAP-003** | CC | §26 | Tenant admin TOTP enforcement not yet implemented at application layer. | platform-engineer | P0 | Pre-launch | 🔴 Open |
+| **CC6-GAP-004** | CC | §26 | SCIM `DELETE /Users` deprovisioning handler not yet implemented. Blocks offboarding SLA evidence. | platform-engineer | P0 | Pre-launch | 🔴 Open |
+| **CC6-GAP-005** | CC | §26 | `npm audit --audit-level=critical` not yet in CI. Dependabot not yet configured. | devops-lead | P0 | Pre-launch | 🔴 Open |
+| **CC6-GAP-006** | CC | §26 | `git-secrets` pre-commit hook not yet installed. | security-engineer | P0 | Pre-launch | 🔴 Open |
+| **CC6-GAP-007** | CC | §26, §27 | CSP header not deployed; ESLint `no-eval` rule not yet in CI. | platform-engineer | P1 | Pre-launch | 🔴 Open |
+| **CC6-GAP-008** | CC | §26 | Tailwind CDN SRI gap; self-hosting evaluation not yet completed. | platform-engineer | P1 | Pre-launch | 🔴 Open |
+| **CC6-GAP-010** | CC | §26 | MDM (Jamf Now or Kandji) not yet deployed; device inventory and FileVault compliance not yet evidenced. | compliance-officer | P1 | Pre-launch | 🔴 Open |
+| **CC6-GAP-011** | CC | §26 | First-time filing of PRE-26-E-001 through PRE-26-E-004 evidence artifacts not yet completed. | compliance-officer | P1 | Pre-launch | 🔴 Open |
+| **CC7-GAP-001** | CC | §25 | `form-alert-relay` Cloudflare Worker not yet deployed. Blocks all Cloudflare-sourced alerting to `#security-alerts`. | devops-lead | P0 | Pre-launch | 🔴 Open |
+| **CC7-GAP-002** | CC | §25 | `auth-monitor` Supabase Edge Function not yet deployed. Blocks auth anomaly alerting. | security-engineer | P0 | Pre-launch | 🔴 Open |
+| **CC7-GAP-003** | CC | §25 | `audit-chain-daily-check` Edge Function not yet deployed. Audit chain detection SLA remains 7-day window. | security-engineer | P0 | Pre-launch | 🔴 Open |
+| **CC7-GAP-004** | CC | §25 | R-05 (Audit Log Chain Break) runbook not yet merged into `docs/INCIDENT_RESPONSE.md`. | compliance-officer | P0 | Pre-launch | 🔴 Open |
+| **CC7-GAP-005** | CC | §25 | Sentry alert rules not yet configured with PagerDuty + Slack routing. Health data leak alert not operational. | security-engineer + platform-engineer | P0 | Pre-launch | 🔴 Open |
+| **CC7-GAP-006** | CC | §25 | `row-count-monitor` Edge Function not yet deployed. Data corruption detection has no automated signal. | devops-lead | P0 | Pre-launch | 🔴 Open |
+| **CC7-GAP-007** | CC | §25 | Cloudflare WAF rate-limit rules not yet configured with `#security-alerts` forwarding. | security-engineer | P0 | Pre-launch | 🔴 Open |
+| **CC9-GAP-001** | CC | §28 | Cyber liability and D&O insurance program not yet engaged. Broker outreach not yet initiated. | compliance-officer | P1 | Pre-Series A | 🔴 Open |
+| **CC9-GAP-003** | CC | §28 | Expo/EAS DPA not yet negotiated. Compensating controls (code signing, no runtime user data) documented. | compliance-officer | P1 | Pre-launch | 🔴 Open |
+| **PEN-GAP-001** | CC | §36 | No penetration test completed. Blocks enterprise contract closure and observation period start for Security TSC. | security-engineer + compliance-officer | P0 | Pre-launch | 🔴 Open |
+| **PEN-GAP-002** | CC | §36 | DAST (OWASP ZAP / Burp Suite) not yet integrated into CI; Snyk not yet in CI pipeline. | security-engineer + engineering | P1 | Pre-launch | 🔴 Open |
+| **PEN-GAP-003** | CC | §36 | TC-RLS tenant isolation test protocol (§36.6) not yet formally executed. | security-engineer + data-engineer | P1 | Pre-launch | 🔴 Open |
+| **PEN-GAP-004** | CC | §36 | Victor AI red team scenarios (§36.7) not yet formally executed. | security-engineer + clinical-safety | P1 | Pre-launch | 🔴 Open |
+| **PEN-GAP-005** | CC | §36 | Attestation letter (PRE-36-E-005) not on file. Blocks enterprise contracts in regulated industries. | compliance-officer | P0 | Pre-launch | 🔴 Open |
+| **C1-GAP-001** | C | §34 | NDA / employment confidentiality agreement template not yet drafted. Required before first hire. | compliance-officer | P0 | Pre-hire | 🔴 Open |
+| **C1-GAP-002** | C | §34 | Confidential Data Asset Inventory not yet created. | compliance-officer + data-engineer | P1 | Pre-launch | 🔴 Open |
+| **C1-GAP-003** | C | §34 | DPA receipts for all sub-processors not yet collected and filed in `compliance/dpa/`. Blocks enterprise contracts. | compliance-officer | P0 | Pre-launch | 🔴 Open |
+| **C1-GAP-004** | C | §34 | Media/device disposal policy document not yet drafted. | compliance-officer | P1 | Pre-launch | 🔴 Open |
+| **P-GAP-001** | P | §35 | Privacy policy not live at `form.coach/privacy`. Blocks SOC 2 observation period start, all enterprise contracts, and all enterprise pilot data flows. | compliance-officer + outside counsel | P0 | Pre-launch | 🔴 Open |
+| **P-GAP-002** | P | §35 | Sub-processor list not published. Blocks enterprise DPA countersigning. | compliance-officer | P0 | Pre-launch | 🔴 Open |
+| **P-GAP-003** | P | §35 | Cookie consent banner not deployed on `form.coach`. Analytics cookies firing without consent constitutes GDPR / ePrivacy violation. | engineering | P1 | Pre-launch | 🔴 Open |
+| **P-GAP-004** | P | §35 | Retention periods for `cv_sessions`, `wearable_readings`, `workout_sessions`, `coaching_turns` not formally decided or published. | compliance-officer + engineering | P1 | Pre-launch | 🔴 Open |
+| **P-GAP-005** | P | §35 | DSAR end-to-end flow not tested; 30-day SLA monitoring alert not configured. | engineering + compliance-officer | P1 | Pre-launch | 🔴 Open |
+| **P-GAP-006** | P | §35 | Government request handling policy not formalized as standalone auditor exhibit. | compliance-officer + outside counsel | P1 | Pre-launch | 🔴 Open |
+| **P-GAP-007** | P | §35 | No `privacy@form.coach` mailbox; no formal complaint intake procedure; no 30-day response SLA published. | compliance-officer | P1 | Pre-launch | 🔴 Open |
+| **P-GAP-008** | P | §35 | Annual privacy review not calendared in §15; review scope checklist not drafted. | compliance-officer | P2 | Pre-launch | 🔴 Open |
+| **PI-GAP-001** | PI | §37 | `coaching_turns` stuck-row detection not implemented. Turns stuck in `status = 'processing'` > 60 s not escalated to `failed`. | platform-engineer | P1 | M3 | 🔴 Open |
+| **PI-GAP-002** | PI | §37 | Coaching turn and CV accuracy metrics not tracked in production observability. | devops-lead + platform-engineer | P1 | M3 | 🔴 Open |
+| **PI-GAP-003** | PI | §37 | `meal_logs.fat_g`, `carbohydrate_g`, `protein_g` lack `NOT NULL` DB constraints; partial entries silently default to zero. | platform-engineer | P2 | M4 | 🔴 Open |
+| **PI-GAP-004** | PI | §37 | Nutrition macro constants have no CI unit tests. | platform-engineer | P2 | M4 | 🔴 Open |
+| **PI-GAP-005** | PI | §37 | Analytics ETL has no row-count cross-check. Event loss between PostHog and ClickHouse undetectable until aggregate discrepancy surfaces. | data-engineer | P1 | M4 | 🔴 Open |
+| **PI-GAP-006** | PI | §37 | SCIM response schema not validated in CI against RFC 7643. Blocked on G-001 (SCIM endpoints not yet implemented). | platform-engineer + enterprise-architect | P1 | M4 (blocked G-001) | 🔴 Open |
+| **PI-GAP-007** | PI | §37 | `privacy.dsar_completed` DEC-030 event does not carry export row-count payload. Completeness not cryptographically committed to HMAC chain. | platform-engineer | P2 | M4 | 🔴 Open |
+
+**Gap summary:** 50 open gaps total. P0: 14. P1: 28. P2: 8. All gaps have named owners and milestone dates. No gap is undocumented.
+
+---
+
+### 38.5 Auditor Briefing Package Outline
+
+The following outline defines what FORM prepares for the first auditor call and populates into the data room before fieldwork begins. It is structured as a checklist; each item carries a responsible owner and a target population date.
+
+#### 38.5.1 Document List for Data Room
+
+| Category | Document | Location | Owner | Status |
+|---|---|---|---|---|
+| **System Description** | SOC 2 Readiness document (this file) — §1–§38 | `docs/SOC2_READINESS.md` | compliance-officer | ✅ Complete |
+| **System Description** | Audit log schema and DEC-030 event taxonomy | `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | ✅ Complete |
+| **System Description** | Data model and schema | `docs/DATA_MODEL.md` | data-engineer | ✅ Complete |
+| **System Description** | Enterprise architecture and RBAC | `docs/ENTERPRISE.md` | compliance-officer | ✅ Complete |
+| **System Description** | SSO / SCIM implementation spec | `docs/SSO_SCIM_IMPLEMENTATION.md` | enterprise-architect | ✅ Complete |
+| **System Description** | GDPR DPIA | `docs/GDPR_DPIA.md` | compliance-officer | ✅ Complete |
+| **Policies** | Acceptable Use Policy | `docs/ACCEPTABLE_USE_POLICY.md` | compliance-officer | 🔴 To create (CC1-GAP-001) |
+| **Policies** | Privacy Policy (published) | `form.coach/privacy` | compliance-officer + counsel | 🔴 To create (P-GAP-001) |
+| **Policies** | Incident Response Plan | `docs/INCIDENT_RESPONSE.md` | security-engineer | ✅ Complete |
+| **Policies** | Security Policy | `docs/SECURITY.md` | security-engineer | ✅ Complete |
+| **Policies** | BCP / DRP | `docs/SOC2_READINESS.md §18` | compliance-officer | ✅ Complete |
+| **Policies** | Government Request Policy | `compliance/p1/gov-request-policy.md` | compliance-officer + counsel | 🔴 To create (P-GAP-006) |
+| **Evidence** | Penetration test findings + attestation letter | `compliance/pentests/<YYYY-MM-DD>/` | security-engineer | 🔴 Pre-launch (PEN-GAP-001) |
+| **Evidence** | Quarterly access review artifact (most recent) | `compliance/access-reviews/` | compliance-officer | 🔴 Q2 2026 (CC6-GAP-001) |
+| **Evidence** | DPA filing receipts for all sub-processors | `compliance/dpa/` | compliance-officer | 🔴 Pre-launch (C1-GAP-003) |
+| **Evidence** | DEC-030 HMAC audit log chain verification (90-day sample) | `audit_log` table export | devops-lead | 🟡 Available at observation start |
+| **Evidence** | DR drill record (first drill) | `compliance/evidence/dr-drill/<date>/` | devops-lead | 🔴 Post-launch M1 (PRE-33-E-006–011) |
+| **Evidence** | DSAR end-to-end test run record | `compliance/evidence/dsar-test/` | engineering + compliance-officer | 🔴 Pre-launch (P-GAP-005) |
+| **Evidence** | Employee security training records | `compliance/evidence/cc1/training/` | founder | 🔴 Annual (CC1-GAP-002) |
+| **Evidence** | Sub-processor list (published) | `form.coach/legal/sub-processors` | compliance-officer | 🔴 Pre-launch (P-GAP-002) |
+
+#### 38.5.2 Data Room Structure
+
+```
+compliance/
+├── access-reviews/
+│   └── access-review-YYYY-QN.md
+├── c1/
+│   ├── data-asset-inventory.md           (C1-GAP-002)
+│   ├── device-disposal-policy.md         (C1-GAP-004)
+│   ├── nda-template.md                   (C1-GAP-001)
+│   └── dpas/
+│       └── {processor-name}-dpa.pdf      (C1-GAP-003)
+├── dpa/
+│   └── scc-module2-{processor}-YYYY.pdf
+├── evidence/
+│   ├── ai-redteam/<date>/                (PRE-36-E-008)
+│   ├── cc1/training/YYYY/                (CC1-GAP-002)
+│   ├── dast/<date>/                      (PRE-36-E-006)
+│   ├── dr-drill/<date>/                  (PRE-33-E-006–011)
+│   ├── dsar-test/                        (PRE-35-E-010)
+│   ├── pi1/                              (PRE-37-E-001–008)
+│   ├── rls-redteam/<date>/               (PRE-36-E-007)
+│   └── c1/
+│       └── supabase-encryption.png       (PRE-34-E-005)
+├── p1/
+│   ├── complaint-intake-procedure.md     (P-GAP-007)
+│   ├── complaint-log.csv
+│   ├── dsar-export-schema.json
+│   ├── gov-request-policy.md             (P-GAP-006)
+│   ├── privacy-policy-changelog.md
+│   └── retention-decisions.md            (P-GAP-004)
+└── pentests/<YYYY-MM-DD>/
+    ├── attestation-letter.pdf            (PRE-36-E-005)
+    ├── executive-summary-redacted.pdf    (PRE-36-E-002)
+    ├── retest-confirmation.pdf           (PRE-36-E-004)
+    ├── scope-agreement.pdf               (PRE-36-E-001)
+    └── technical-report-confidential.pdf (PRE-36-E-003)
+```
+
+#### 38.5.3 Key Controls Narrative (Summary for Auditor Kickoff)
+
+The following narrative is intended to be delivered verbally or as a one-page briefing at the first auditor call. It maps to the five TSC.
+
+**Security (CC).** FORM's security architecture is built on three layers: (1) network edge via Cloudflare WAF with rate limiting, DDoS mitigation, and bot management; (2) API authentication via Supabase Auth issuing short-lived JWTs (1-hour expiry) with TOTP-based MFA on all administrative surfaces; (3) data-layer enforcement via PostgreSQL Row-Level Security that enforces tenant isolation as a database primitive, not application logic. All administrative actions, user provisioning events, and health data access events are written to a HMAC-chained append-only audit log (DEC-030) with daily chain integrity verification. Change management follows a PR-review-required workflow with required status checks (CI pipeline in M3 — CC8-GAP-001 open, compensating manual checklist in force). The annual penetration test program (§36) defines scope, methodology (PTES-based), and SLAs (Critical 24h remediation); the pre-launch engagement is a gate condition for observation period start.
+
+**Availability (A).** FORM is deployed on Cloudflare Workers (globally distributed, no single region) backed by Supabase PostgreSQL with PITR continuous backup (35-day retention). RTO target is 4 hours for database failures and 15 minutes for application-layer failures. The DR drill procedure (§33.5) defines a five-step restoration verification with two-person sign-off. SLAs are tiered by subscription plan (Starter 99.5%, Growth/Enterprise 99.9%) with automated credit application via `billing.sla_credit_applied` DEC-030 event.
+
+**Processing Integrity (PI).** All five processing surfaces (Victor AI coaching, CV pose estimation, wearable data ingestion, nutrition calculation, analytics ETL) are mapped to PI1.1/PI1.2/PI1.3 in §37. The DEC-030 HMAC chain provides a cross-surface audit trail with a canonical three-event pattern (`*.started` → `*.completed` / `*.failed` → `hmac_self_verified`). The clinical safety output filter middleware is an accuracy control that operates inline with every coaching turn. Seven gaps are open (PI-GAP-001 through PI-GAP-007) with M3/M4 remediation milestones.
+
+**Confidentiality (C).** Health data is encrypted at rest (AES-256 at Supabase storage layer; column-level `pgp_sym_encrypt` on highest-sensitivity fields). All data in transit uses TLS 1.3 enforced via Cloudflare. The HR analytics layer enforces a k-anonymity floor (minimum 5 employees) in the database schema itself — individual health metrics are structurally unreachable by tenant administrators. Four confidentiality gaps are open (C1-GAP-001 through C1-GAP-004), all pre-hire or pre-launch artifacts.
+
+**Privacy (P).** FORM processes GDPR Article 9 special category health data. Legal basis is explicit consent (Art. 9(2)(a)); consent is granular per data category (five categories), logged to the DEC-030 HMAC chain with `consent_version` field, and withdrawable in-app with immediate processing cessation. On-device CV inference (raw video frames never transmitted) and LLM prompt anonymisation (`stripPersonalProperties()`) are the two primary data minimisation controls. Two P0 blockers remain: P-GAP-001 (privacy policy not yet published) and P-GAP-002 (sub-processor list not yet published). These are pre-launch tasks with outside counsel engaged.
+
+#### 38.5.4 Personnel to Interview
+
+| Role | Scope | Expected Questions |
+|---|---|---|
+| **Founder / CEO** | Management tone, risk appetite, SOC 2 commitment, overall system architecture | "Who owns security?" / "How are risks escalated?" / "What changed in the past 12 months?" |
+| **compliance-officer** | GDPR compliance, DPIA, DSAR process, DPA status, privacy policy, vendor management, access review procedure | "Walk me through a DSAR request." / "How do you track sub-processor changes?" |
+| **security-engineer** | Incident response, penetration testing, MFA enforcement, audit log integrity, break-glass procedure, Cloudflare WAF | "Walk me through a P0 incident." / "How is the audit log chain verified?" |
+| **devops-lead** | Backup procedures, DR, uptime monitoring, CI/CD pipeline, change management | "How long does a production restore take?" / "How are deploys authorized?" |
+| **platform-engineer** | Multi-tenant RLS architecture, SCIM provisioning, PI1 processing controls, coaching turn state machine | "How is cross-tenant data isolation enforced?" / "What happens if a coaching turn gets stuck?" |
+| **data-engineer** | Analytics ETL, data retention TTLs, ClickHouse schema, DSAR export assembly | "How are analytics events stripped of health data?" / "What is the retention period for workout sessions?" |
+
+---
+
+### 38.6 Evidence Artifact Master Index
+
+This table consolidates all defined evidence artifacts across the document. "Status" reflects state at last document edit. Artifacts in source sections marked ✅ Done or equivalent are noted as Filed; all others are Pending with their blocking gap ID.
+
+| Artifact ID | Description | Source Section | Target Location | Refresh Cadence | Owner | Status |
+|---|---|---|---|---|---|---|
+| **PRE-16-E-001** | 30-day consent log export (Cookiebot API + HMAC chain) | §24 | `compliance/evidence/consent/` | Annual + on-request | security-engineer | 🔴 Pending — 30 days post-launch |
+| **PRE-16-E-002** | Cookiebot config screenshot (default-deny, equal prominence) | §24 | `compliance/evidence/consent/` | At implementation + any banner change | security-engineer | 🔴 Pending (P-GAP-003) |
+| **PRE-16-E-003** | Cookie inventory signed by compliance-officer | §24 | `docs/SOC2_READINESS.md §24.2` | Annual + new tracker deployed | compliance-officer | 🔴 Pending |
+| **PRE-16-E-004** | Privacy Policy `## Cookies` section | §24 | `legal/privacy-policy-draft.md` | Annual review | compliance-officer | 🔴 Pending (P-GAP-001) |
+| **PRE-16-E-005** | PostHog EU endpoint + no-PII `distinctId` config screenshot | §24 | `compliance/evidence/consent/` | At implementation | security-engineer | 🔴 Pending |
+| **PRE-25-E-001** | Cloudflare WAF rule configuration export | §25 | `compliance/evidence/cc7/` | At implementation + any rule change | devops-lead | 🔴 Pending (CC7-GAP-007) |
+| **PRE-25-E-002** | Better Stack monitor config and 90-day uptime report | §25 | `compliance/evidence/cc7/` | Monthly | devops-lead | 🔴 Pending |
+| **PRE-25-E-003** | Audit log chain verification history (90-day `system.audit_chain_verified` events) | §25 | `audit_log` query export | Continuous (automated) | devops-lead | 🟡 Partial — available once CC7-GAP-003 deployed |
+| **PRE-25-E-004** | Sentry alert configuration screenshot and 30-day alert-fire history | §25 | `compliance/evidence/cc7/` | Monthly | security-engineer | 🔴 Pending (CC7-GAP-005) |
+| **PRE-26-E-001** | Admin surface MFA screenshot bundle (Cloudflare, Supabase, GitHub, 1Password, AWS, PostHog) | §26 | `compliance/evidence/cc6/MFA-Enforcement/` | Annual + any admin surface change | security-engineer | 🔴 Pending (CC6-GAP-001, CC6-GAP-002) |
+| **PRE-26-E-002** | RBAC policy extract (`roles` table schema + RLS policy SQL) | §26 | `compliance/evidence/cc6/RBAC-Policy/` | Per schema migration touching roles or RLS | data-engineer | 🔴 Pending (CC6-GAP-011) |
+| **PRE-26-E-003** | S3 bucket policy JSON | §26 | `compliance/evidence/cc6/S3-Policy/` | Per bucket policy change | devops-lead | 🔴 Pending |
+| **PRE-26-E-004** | MDM device inventory (Jamf export) | §26 | `compliance/evidence/cc6/MDM-Inventory/` | Monthly | compliance-officer | 🔴 Pending (CC6-GAP-010) |
+| **PRE-26-E-005** | Disposal log (Linear tickets per device disposal) | §26 | `compliance/evidence/cc6/Device-Disposal/` | Per event | compliance-officer | 🔴 Pending (CC6-GAP-010) |
+| **PRE-26-E-006** | Offboarding completion tickets (per departure) | §26 | `compliance/evidence/cc6/Offboarding/` | Per event | compliance-officer | 🔴 Pending (CC6-GAP-004) |
+| **PRE-26-E-007** | Break-glass access log (quarterly export) | §26 | `compliance/evidence/cc6/Break-Glass/` | Quarterly | compliance-officer | 🟡 Partial — available once break-glass is used |
+| **PRE-26-E-008** | Dependency scanning CI report (`npm audit --json` per release) | §26 | `compliance/evidence/cc6/Dependency-Scan/` | Per release | devops-lead | 🔴 Pending (CC6-GAP-005) |
+| **PRE-33-E-001** | Supabase PgBouncer pool config export | §33 | `compliance/evidence/a1/` | At implementation + capacity changes | devops-lead | 🔴 Pending — pre-launch |
+| **PRE-33-E-002** | k6 load test report (pre-GA) | §33 | `compliance/evidence/a1/` | Pre-GA + pre-first-enterprise | devops-lead + platform-engineer | 🔴 Pending — pre-launch gate |
+| **PRE-33-E-003** | Cross-reference to §19 backup artifacts | §33 | `docs/SOC2_READINESS.md §19` | N/A (§19 exists) | devops-lead | ✅ Filed |
+| **PRE-33-E-004** | Monthly SLA credit log CSV (schema + first post-launch month) | §33 | `compliance/evidence/a1/sla-credits/` | Monthly | customer-success | 🔴 Pending — post-launch |
+| **PRE-33-E-005** | Health-data anonymisation SQL script | §33 | `src/scripts/anonymise-restore.sql` | Per script change | data-engineer | 🔴 Pending — pre-launch |
+| **PRE-33-E-006** | DR drill bash session log | §33 | `compliance/evidence/dr-drill/<date>/` | Annual (Q1) | devops-lead | 🔴 Pending — post-launch M1 |
+| **PRE-33-E-007** | DR drill row count verification CSV | §33 | `compliance/evidence/dr-drill/<date>/` | Annual (Q1) | devops-lead | 🔴 Pending — post-launch M1 |
+| **PRE-33-E-008** | DR drill RLS enforcement test output | §33 | `compliance/evidence/dr-drill/<date>/` | Annual (Q1) | devops-lead | 🔴 Pending — post-launch M1 |
+| **PRE-33-E-009** | DR drill cluster destroy confirmation (AWS CLI) | §33 | `compliance/evidence/dr-drill/<date>/` | Annual (Q1) | devops-lead | 🔴 Pending — post-launch M1 |
+| **PRE-33-E-010** | DR drill sign-off form (two-person) | §33 | `compliance/evidence/dr-drill/<date>/` | Annual (Q1) | devops-lead + second engineer | 🔴 Pending — post-launch M1 |
+| **PRE-33-E-011** | `system.dr_drill_completed` DEC-030 HMAC-chained event | §33 | `audit_log` table | Annual (Q1) | platform-engineer | 🔴 Pending — post-launch M1 |
+| **PRE-34-E-001** | Confidential Data Asset Inventory document | §34 | `compliance/c1/data-asset-inventory.md` | Annual | compliance-officer + data-engineer | 🔴 Pending (C1-GAP-002) |
+| **PRE-34-E-002** | §5 Data Classification Policy cross-reference | §34 | `docs/SOC2_READINESS.md §5` | N/A (§5 exists) | compliance-officer | ✅ Filed |
+| **PRE-34-E-003** | NDA / employment confidentiality agreement template | §34 | `compliance/c1/nda-template.md` | Per template change | compliance-officer | 🔴 Pending (C1-GAP-001) |
+| **PRE-34-E-004** | DPA filing receipts for all sub-processors | §34 | `compliance/dpa/` | Per new sub-processor | compliance-officer | 🔴 Pending (C1-GAP-003) |
+| **PRE-34-E-005** | Supabase encryption screenshot (AES-256 at rest) | §34 | `compliance/evidence/c1/supabase-encryption.png` | At implementation; annually | devops-lead | 🔴 Pending — to file |
+| **PRE-34-E-006** | Column-level encryption DDL commit reference (DATA_MODEL §6) | §34 | Git permalink | Per schema change | data-engineer | 🟡 Partial — spec exists; implementation commit pending |
+| **PRE-34-E-007** | TLS 1.3 enforcement configuration (Cloudflare SSL/TLS settings) | §34 | `compliance/evidence/c1/tls-config.png` | Annual | devops-lead | 🔴 Pending — to file |
+| **PRE-34-E-008** | Media/device disposal policy document | §34 | `compliance/c1/device-disposal-policy.md` | Per policy change | compliance-officer | 🔴 Pending (C1-GAP-004) |
+| **PRE-35-E-001** | Published privacy policy (live URL screenshot + Art. 13 content checklist) | §35 | Live URL + `compliance/evidence/p1/` | Annual + any material policy change | compliance-officer | 🔴 Pending (P-GAP-001) |
+| **PRE-35-E-002** | DEC-030 `privacy.consent_granted` and `privacy.consent_withdrawn` event samples from staging | §35 | `audit_log` (staging) | Per consent flow change | security-engineer | 🟡 Partial — DEC-030 schema defined; staging sample pending |
+| **PRE-35-E-003** | Onboarding consent screen screenshot (scroll-gate, per-category toggles, Art. 9 default OFF) | §35 | App staging build screenshot | Per UI change to consent flow | engineering | 🔴 Pending (P-GAP-003 partial) |
+| **PRE-35-E-004** | CV pipeline architecture diagram + network traffic capture (no image/video in API calls) | §35 | `compliance/evidence/p1/cv-network-capture.pcap` | Per CV architecture change | engineering | 🔴 Pending — to capture |
+| **PRE-35-E-005** | Dependency audit — absence of advertising SDK; PostHog `person_profiles: "identified_only"` config | §35 | `npm audit` output + PostHog config export | Per dependency change | devops-lead | 🔴 Pending — to file |
+| **PRE-35-E-006** | Government request handling policy (`compliance/p1/gov-request-policy.md`) | §35 | `compliance/p1/gov-request-policy.md` | Per policy change; outside counsel review | compliance-officer | 🔴 Pending (P-GAP-006) |
+| **PRE-35-E-007** | PostHog Art. 9 field blocklist lint rule + sample analytics event from staging | §35 | Code repository + staging event log | Per analytics schema change | engineering | 🔴 Pending — to commit |
+| **PRE-35-E-008** | ClickHouse DDL commit hash (2-year TTL) + Art. 17 erasure template SQL | §35 | Git commit SHA + `src/analytics/backfills/erasure_template.sql` | Per ClickHouse DDL change | data-engineer | ✅ Filed (ClickHouse TTL DDL confirmed in DATA_MODEL §13.4) |
+| **PRE-35-E-009** | Supabase PITR config screenshot (60-day retention) + R2 WORM config export | §35 | Supabase dashboard + R2 config | Annual | devops-lead | ✅ Filed (§19 backup architecture complete) |
+| **PRE-35-E-010** | DSAR end-to-end test run record (DEC-030 event sequence, redacted export sample, delivery confirmation) | §35 | `compliance/evidence/dsar-test/` | Annual + any DSAR flow change | engineering + compliance-officer | 🔴 Pending (P-GAP-005) |
+| **PRE-36-E-001** | Signed penetration test scope agreement and rules of engagement | §36 | `compliance/pentests/<date>/scope-agreement.pdf` | Per engagement | security-engineer + compliance-officer | 🔴 Pending (PEN-GAP-001) |
+| **PRE-36-E-002** | Pentest executive summary (redacted) | §36 | `compliance/pentests/<date>/executive-summary-redacted.pdf` | Per engagement | security-engineer | 🔴 Pending (PEN-GAP-001) |
+| **PRE-36-E-003** | Pentest full technical report (confidential) | §36 | `compliance/pentests/<date>/technical-report-confidential.pdf` | Per engagement | security-engineer | 🔴 Pending (PEN-GAP-001) |
+| **PRE-36-E-004** | Pentest retest confirmation report | §36 | `compliance/pentests/<date>/retest-confirmation.pdf` | Per engagement | security-engineer | 🔴 Pending (PEN-GAP-001) |
+| **PRE-36-E-005** | Attestation letter | §36 | `compliance/pentests/<date>/attestation-letter.pdf` | Per engagement (annual) | compliance-officer | 🔴 Pending (PEN-GAP-005) |
+| **PRE-36-E-006** | Automated DAST CI report (OWASP ZAP / Snyk) | §36 | `compliance/evidence/dast/<date>/` | Per CI push to `main` (nightly) | security-engineer | 🔴 Pending (PEN-GAP-002) |
+| **PRE-36-E-007** | Tenant isolation (RLS) red team test log (TC-RLS-001 through TC-RLS-005) | §36 | `compliance/evidence/rls-redteam/<date>/` | Annual + any RLS architecture change | security-engineer + data-engineer | 🔴 Pending (PEN-GAP-003) |
+| **PRE-36-E-008** | Victor AI red team log (AI-RT-001 through AI-RT-005) | §36 | `compliance/evidence/ai-redteam/<date>/` | Annual + any Victor output filter change | security-engineer + clinical-safety | 🔴 Pending (PEN-GAP-004) |
+| **PRE-37-E-001** | Integration test: atomic SCIM user provisioning rollback | §37 | `__tests__/scim/user-provisioning-atomic.test.ts` | Per PR touching SCIM provisioning | platform-engineer | 🔴 Pending (PI-GAP-006, G-001) |
+| **PRE-37-E-002** | Integration test: atomic SCIM Group `PATCH` member operation | §37 | `__tests__/scim/group-patch-atomic.test.ts` | Per PR touching SCIM Groups | platform-engineer | 🔴 Pending (PI-GAP-006, G-001) |
+| **PRE-37-E-003** | `coaching_turns` DDL showing `status` enum constraint and `completed_at` timestamp | §37 | `supabase/migrations/` git log permalink | Per schema migration | platform-engineer | 🔴 Pending — M3 |
+| **PRE-37-E-004** | Coaching turn P95 latency SLO evidence (quarterly dashboard screenshot) | §37 | `compliance/evidence/pi1/coaching-latency-slo-YYYY-MM.pdf` | Quarterly | devops-lead | 🔴 Pending — post-launch M1 |
+| **PRE-37-E-005** | Clinical safety output filter middleware snippet (invocation point and return type) | §37 | `compliance/evidence/pi1/output-filter-middleware-snippet-YYYY-MM.ts` | Per significant output filter change | security-engineer + clinical-safety | 🔴 Pending — M3 |
+| **PRE-37-E-006** | CV confidence threshold constant git permalink (`REP_COUNT_CONFIDENCE_MIN = 0.65`) | §37 | `compliance/evidence/pi1/cv-threshold-git-permalink-YYYY-MM.txt` | Per ML model update | ml-engineer | 🔴 Pending — M3 |
+| **PRE-37-E-007** | Nutrition macro constant unit test CI results | §37 | `compliance/evidence/pi1/nutrition-unit-test-YYYY-MM.txt` | Per release | platform-engineer | 🔴 Pending (PI-GAP-004) — M4 |
+| **PRE-37-E-008** | ETL row-count cross-check alert config and first 30-day alert log | §37 | `compliance/evidence/pi1/etl-crosscheck-config-YYYY-MM.yaml` | Per ETL config change | data-engineer | 🔴 Pending (PI-GAP-005) — M4 |
+
+**Artifact summary:** 62 defined artifacts across 10 source sections (§16, §25, §26, §33, §34, §35, §36, §37). Filed: 6. Partial: 4. Pending: 52. The pending count is expected at this stage; all pending artifacts have defined owners, storage paths, and refresh cadences. The audit data room will be substantially populated during the M3–M4 implementation sprint and the pre-launch evidence filing effort.
+
+---
+
+### 38.7 Audit Engagement Timeline
+
+The following timeline runs from audit firm selection to SOC 2 Type II report issuance. Dates are expressed relative to the enterprise launch milestone ("Launch"). All milestones are targets; the audit firm's own scheduling constraints will apply.
+
+| Phase | Target Date | Milestone | Owner | Dependencies |
+|---|---|---|---|---|
+| **0 — Gap Remediation Sprint** | Now → M3 | Close all P0 CC gaps: CC7-GAP-001 through CC7-GAP-007, CC6-GAP-001 through CC6-GAP-006, CC8-GAP-001; complete first quarterly access review (CC6-GAP-001 §23); deploy CI pipeline | devops-lead + security-engineer + platform-engineer | Parallel with product development M3 sprint |
+| **0 — Privacy P0 Sprint** | Now → M3 | Close P-GAP-001 (privacy policy live), P-GAP-002 (sub-processor list live), C1-GAP-003 (DPA receipts filed), P-GAP-007 (privacy mailbox active) | compliance-officer + outside counsel | Outside counsel engaged; budget approved |
+| **0 — PI1 M3 Sprint** | Now → M3 | Close PI-GAP-001 (stuck-row detection), PI-GAP-002 (accuracy metrics), PI-GAP-006 preliminary (SCIM endpoints) | platform-engineer + devops-lead | M3 sprint prioritisation |
+| **1 — Audit Firm Selection** | M3 | Issue RFP to 3 audit firms (e.g., Prescient, Johanson, Schellman, A-LIGN); evaluate on: health/SaaS experience, AICPA registration, Drata/Vanta partner status, timeline, price ($15–25k for Type I); sign engagement letter | compliance-officer | P0 gaps substantially closed; RFP can issue earlier if firm selection is decoupled from gap closure |
+| **2 — Pre-Launch Pentest** | M3 (concurrent with firm selection) | Complete pre-launch gray-box penetration engagement; remediate Critical/High findings; obtain attestation letter (PRE-36-E-005); close PEN-GAP-001 and PEN-GAP-005 | security-engineer + compliance-officer | Firm selection lead time 6–8 weeks; start vendor outreach at M2 |
+| **3 — Evidence Filing Sprint** | M3–M4 | File PRE-26-E-001 through PRE-26-E-008 (CC6 artifacts), PRE-25-E-001 through PRE-25-E-004 (CC7 artifacts), PRE-34-E-001 through PRE-34-E-008 (C1 artifacts), PRE-35-E-001 through PRE-35-E-010 (Privacy artifacts), PRE-36-E-001 through PRE-36-E-005 (Pentest artifacts); populate data room per §38.5.2 | compliance-officer | P0 gaps closed; pentest completed |
+| **4 — SOC 2 Type I Assessment** | M4 (post-launch +30 days) | Auditor conducts point-in-time assessment; reviews controls design; issues Type I report (~6 weeks from kickoff to report); identifies any controls requiring strengthening before Type II | audit firm + compliance-officer | All P0 gaps closed; evidence data room populated; management assertion signed |
+| **5 — Observation Period Begins** | M4 (upon Type I report issuance) | Controls operating under audit observation; all DEC-030 events, access reviews, incident response actions, and change management records are now live evidence; continuous compliance tooling (Vanta / Drata) monitoring active | devops-lead + compliance-officer | Type I issued; continuous monitoring deployed |
+| **6 — PI1 M4 Sprint + DR Drill** | M4–M5 | Close PI-GAP-003 through PI-GAP-007 (remaining PI1 gaps); conduct first DR drill (PRE-33-E-006 through PRE-33-E-011); run k6 load test (PRE-33-E-002) | platform-engineer + data-engineer + devops-lead | M4 sprint; staging environment stable |
+| **7 — Mid-Observation Review** | Post-launch M3 | Internal review of observation period evidence to date; confirm DEC-030 chain intact (PRE-25-E-003); review any incidents and confirm INCIDENT_RESPONSE.md runbooks were followed; confirm quarterly access review cycle is on track | compliance-officer + security-engineer | 90+ days of observation data |
+| **8 — Annual Pentest** | Post-launch M6 (within observation window) | Annual black-box penetration engagement; findings remediated within SLA before SOC 2 fieldwork begins; updated attestation letter filed | security-engineer + compliance-officer | Prior attestation letter on file (PRE-36-E-005) |
+| **9 — SOC 2 Type II Fieldwork** | Post-launch M6–M8 | Auditor conducts fieldwork: evidence collection from data room, personnel interviews (§38.5.4), sample testing of DEC-030 events, RLS queries, change management records, access review artifacts; FORM responds to auditor requests within 5 business days | All owners | Observation period ≥ 6 months complete; all fieldwork evidence requests staffed |
+| **10 — Report Issuance** | Post-launch M9–M12 | Auditor issues SOC 2 Type II report covering the observation period; FORM reviews report for accuracy before finalisation; report shared with enterprise customers under NDA on request | audit firm + compliance-officer | Fieldwork complete; all auditor questions resolved; management assertion signed and dated |
+
+**Critical path:** P-GAP-001 (privacy policy) → observation period eligibility. PEN-GAP-001 (pentest) → enterprise contract gate. CC8-GAP-001 (CI pipeline) → Type II controls evidence quality. These three items are the rate-limiters for the entire timeline.
+
+---
+
+### 38.8 Readiness Decision Gate
+
+The following criteria define the binary "audit-ready" threshold. FORM must satisfy **all P0 criteria** before the SOC 2 observation period starts and before any enterprise contract with a SOC 2 requirement is countersigned. P1 criteria must be satisfied before fieldwork begins (i.e., before post-launch M6).
+
+#### P0 Gate Criteria (observation period start and enterprise contract gate)
+
+All of the following must be TRUE before the first enterprise customer onboards and before the SOC 2 observation period clock starts.
+
+| # | Criterion | Verification | Currently |
+|---|---|---|---|
+| P0-1 | Privacy policy is live at `form.coach/privacy` and counsel-reviewed | PRE-35-E-001 on file | **FAIL** — P-GAP-001 open |
+| P0-2 | Sub-processor list is published at `form.coach/legal/sub-processors` | Sub-processor page accessible; DPA status current | **FAIL** — P-GAP-002 open |
+| P0-3 | DPA receipts filed for all active sub-processors; SCC Module 2 executed for US processors | PRE-34-E-004 on file | **FAIL** — C1-GAP-003 open |
+| P0-4 | Penetration test attestation letter on file (pre-launch gray-box engagement completed) | PRE-36-E-005 on file | **FAIL** — PEN-GAP-001/005 open |
+| P0-5 | All P0 CC7 monitoring gaps closed: `form-alert-relay` Worker, `auth-monitor` Edge Function, `audit-chain-daily-check` Edge Function, Sentry alert rules, `row-count-monitor` Edge Function, WAF rate-limit rules all deployed | PRE-25-E-001 through PRE-25-E-004 on file | **FAIL** — CC7-GAP-001 through CC7-GAP-007 open |
+| P0-6 | GitHub org MFA enforcement and Cloudflare account MFA enforcement enabled | PRE-26-E-001 on file | **FAIL** — CC6-GAP-001/002 open |
+| P0-7 | SCIM `DELETE /Users` deprovisioning handler deployed (offboarding SLA enforceable) | PRE-26-E-006 (first event on file) or integration test passing | **FAIL** — CC6-GAP-004 open |
+| P0-8 | `npm audit --audit-level=critical` CI gate active; Dependabot configured | CI pipeline log showing gate active | **FAIL** — CC8-GAP-001, CC6-GAP-005 open |
+| P0-9 | `git-secrets` pre-commit hook installed on all developer machines | PRE-26-E-001 annotation or README setup log | **FAIL** — CC6-GAP-006 open |
+| P0-10 | First quarterly access review completed and filed | Access review artifact in `compliance/access-reviews/` | **FAIL** — CC6-GAP-001 (§23) open; due Q2 2026 |
+| P0-11 | Acceptable Use Policy (AUP) drafted, counsel-reviewed, filed | `docs/ACCEPTABLE_USE_POLICY.md` + CC1-E-004 | **FAIL** — CC1-GAP-001 open |
+| P0-12 | Tenant admin TOTP enforcement implemented at application layer | Integration test confirming TOTP required for `tenant.*` write actions | **FAIL** — CC6-GAP-003 open |
+| P0-13 | All Critical and High findings from pre-launch pentest remediated; retest confirmation on file | PRE-36-E-004 on file | **FAIL** — depends on PEN-GAP-001 |
+| P0-14 | NDA / employment confidentiality template drafted and founder-approved | PRE-34-E-003 on file | **FAIL** — C1-GAP-001 open (required before first hire, not technically before first enterprise customer) |
+
+**Current P0 gate status: 0 / 14 criteria met. FORM is NOT yet audit-ready.** This is expected at the current development stage. The 14 criteria map to work items in M3/M4 milestones.
+
+#### P1 Gate Criteria (fieldwork start gate — must be met before post-launch M6)
+
+All of the following must be TRUE before auditor fieldwork begins.
+
+| # | Criterion | Verification |
+|---|---|---|
+| P1-1 | CI/CD pipeline active with required status checks on `main` | CC8-E-002 generating on every deploy |
+| P1-2 | PI-GAP-001 through PI-GAP-005 closed (PI1 M3/M4 implementation sprint complete) | PRE-37-E-001 through PRE-37-E-008 on file (applicable items) |
+| P1-3 | DR drill completed; PRE-33-E-006 through PRE-33-E-011 filed | Two-person sign-off on file |
+| P1-4 | k6 load test completed; PRE-33-E-002 filed | Load test report passing all five scenarios |
+| P1-5 | DSAR end-to-end tested; 30-day SLA alert configured | PRE-35-E-010 on file |
+| P1-6 | MDM deployed; PRE-26-E-004 (device inventory) on file | Jamf inventory export on file |
+| P1-7 | Annual privacy review calendared in §15; scope checklist drafted | §15 calendar entry + review checklist document exists |
+| P1-8 | Continuous compliance monitoring (Vanta / Drata) integrated and control mapping current | Vanta/Drata connected to GitHub, Cloudflare, Supabase, 1Password; controls mapped |
+| P1-9 | Cookie consent banner deployed; `privacy.cookies_changed` DEC-030 event logging | PRE-16-E-001/002 on file |
+| P1-10 | Retention decision record complete; Supabase TTL migrations applied | `compliance/p1/retention-decisions.md` + migration applied |
+
+---
+
+### 38.9 SOC 2 Readiness Delta
+
+| Criterion | Before §38 | After §38 |
+|---|---|---|
+| **Management Assertion** | Not drafted; no AICPA-formatted text on file | Draft management assertion text complete (§38.2); ready for counsel review and dating at observation period start; covers all five TSC with health data special-category narrative |
+| **Consolidated scorecard** | TSC readiness visible only by reading all 37 sections individually | Single-table scorecard (§38.3) covering all five TSC with readiness %, open gap count, P0 count, artifact counts filed vs. pending; auditor can form preliminary view in under 5 minutes |
+| **Open gap registry** | Gaps distributed across 37 sections with no single consolidated view | Master gap registry (§38.4) with 50 open gaps, all with owner, priority, milestone, and status; no undocumented gaps exist in the program |
+| **Auditor briefing package** | No structured pre-call document existed | §38.5 defines the complete data room structure, document list, key controls narrative for each TSC, and personnel interview guide; distributable to audit firm as kickoff pre-read |
+| **Evidence artifact index** | Artifacts visible only section by section; no cross-section view of filing status | §38.6 master index of 62 artifacts with filing status, owner, target location, and refresh cadence; 6 filed, 4 partial, 52 pending — pending state is expected at current development stage |
+| **Audit engagement timeline** | Timeline existed in TL;DR (M0–M12) but with no phase-by-phase milestone definition | §38.7 defines 11 phases from gap remediation sprint to report issuance; each phase has target date, milestone, owner, and dependencies; critical path explicitly identified (P-GAP-001, PEN-GAP-001, CC8-GAP-001) |
+| **Readiness decision gate** | No binary pass/fail audit-readiness criteria existed | §38.8 defines 14 P0 gate criteria (observation period + enterprise contract gate) and 10 P1 gate criteria (fieldwork gate) with current pass/fail status; 0/14 P0 criteria currently met — expected at M2; all have M3/M4 remediation paths |
+| **Net readiness movement** | ~95% | ~95% (§38 adds no new control implementations; it is a consolidation and presentation layer. The readiness percentage does not change because §38 records the state, it does not change it. However, the program now has a complete auditor-presentable package: management assertion draft, master gap registry, evidence index, data room spec, timeline, and binary decision gate. FORM can now hand this document to an audit firm and conduct a credible kickoff call.) |
+
+**SOC 2 readiness: ~95% → ~95%** (§38 is a capstone section, not a control implementation section; readiness advances when P0 gap closure tasks in §38.8 are completed)
+
+---
+
+*v2.6 additions: §38 Pre-Audit Readiness Assessment & Management Assertion. Capstone section consolidating all prior sections (§1–§37) into auditor-presentable form. §38.1 defines the three audiences (management, audit firm, enterprise prospects). §38.2 provides draft management assertion text in AICPA AT-C 205 / TSP 100 format covering all five TSC with GDPR Article 9 special-category health data narrative; ready for counsel review and dating. §38.3 consolidated TSC readiness scorecard: CC ~95% (gap registry complete, compensating controls documented), A ~91% (architecture complete, execution evidence pre-launch), PI ~95% (surface mapping complete, M3/M4 implementation), C ~88% (encryption complete, documentation artifacts pending), P ~82% (two P0 blockers: policy and sub-processor list). §38.4 master open gap registry: 50 open gaps across all TSC (14 P0, 28 P1, 8 P2), all with named owners, source sections, and milestone dates; no undocumented gaps. §38.5 auditor briefing package: 20-item document list with filing status, data room directory structure, per-TSC key controls narrative (5 paragraphs), and 6-role personnel interview guide with expected auditor questions. §38.6 evidence artifact master index: 62 artifacts across 10 source sections (PRE-16 through PRE-37); 6 filed, 4 partial, 52 pending; all pending artifacts have owners, storage paths, and refresh cadences. §38.7 audit engagement timeline: 11 phases from gap remediation sprint to report issuance with relative dates (M3 through post-launch M12), owners, and dependencies; critical path: P-GAP-001 → observation eligibility, PEN-GAP-001 → enterprise gate, CC8-GAP-001 → evidence quality. §38.8 readiness decision gate: 14 binary P0 criteria (observation period start and enterprise contract gate) + 10 P1 criteria (fieldwork gate); current status 0/14 P0 met — expected at M2 stage; all criteria mapped to gap IDs with M3/M4 remediation paths. §38.9 readiness delta: ~95% → ~95% (capstone section; readiness advances when P0 criteria are executed, not when §38 is authored).*

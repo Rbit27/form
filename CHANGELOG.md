@@ -6,6 +6,17 @@
 
 ---
 
+## [1.0.0] — 2026-05-21
+
+### Added
+- `docs/SOC2_READINESS.md §38` — Pre-Audit Readiness Assessment & Management Assertion (capstone): AICPA AT-C 205 management assertion draft, consolidated TSC scorecard (~95% overall), master open gap registry (50 gaps: 14 P0 / 28 P1 / 8 P2), auditor briefing package, evidence artifact master index (62 artifacts), 11-phase audit engagement timeline, binary readiness decision gate (14 P0 criteria + 10 P1 criteria). Document now auditor-presentable for kickoff call.
+- `content/post-70-training-volume-mev-mav-mrv.md` — sports-science: MEV/MAV/MRV volume landmarks; Schoenfeld 2017 dose-response meta-analysis; individual variation as central thesis; clinical_safety_reviewed: PASS
+
+### Milestone
+- **v1.0.0** — перший "audit-ready" мілстоун: SOC 2 документ охоплює всі 5 TSC з §1–§38, має management assertion draft, 62 evidence artifacts, та binary decision gate для аудиторського engagement.
+
+---
+
 ## [0.99.2] — 2026-05-21
 
 ### Added
