@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v0.6
+# FORM · Cost Model & Unit Economics v0.7
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -50,6 +50,17 @@
     - 16.2 Minimum viable Starter deal analysis
     - 16.3 Year 1 vs. Year 2+ margin improvement by plan
     - 16.4 Multi-year contract economics
+17. [Downside Scenario Analysis & Unit Economics Stress Tests](#17-downside-scenario-analysis--unit-economics-stress-tests)
+    - 17.1 Purpose & Scope of Stress Testing
+    - 17.2 Scenario Definitions
+    - 17.3 S1: AI API Cost Shock
+    - 17.4 S2: App Store Commission Shock
+    - 17.5 S3: Churn Spike
+    - 17.6 S4: Price Compression
+    - 17.7 S5: Enterprise Pipeline Miss (Year 1)
+    - 17.8 S6: Combined Moderate Stress (S1 + S3)
+    - 17.9 Open Questions Added
+    - 17.10 Stress Test Summary Matrix
 
 ---
 
@@ -1219,7 +1230,356 @@ Annual prepay on a 3-year contract delivers 3× the upfront cash versus annual r
 
 ---
 
-**v0.6 · May 2026**
+## 17. Downside Scenario Analysis & Unit Economics Stress Tests
+
+### 17.1 Purpose & Scope of Stress Testing
+
+This section stress-tests the v0.6 unit economics baseline against six adverse scenarios before the seed raise. The purpose is to identify which events are survivable (margin compresses but the business remains viable), which require active mitigation (product or pricing response needed), and which are structurally threatening (would force a strategic pivot or emergency fundraise).
+
+All scenarios use v0.6 baseline inputs. The key baseline inputs are restated here for reference:
+
+| Metric | Baseline (v0.6) |
+|---|---|
+| Pro ARPU (Western) | $19.00/month |
+| App Store commission | 15% (Small Business Program) |
+| Net Pro revenue after IAP | $16.15/month |
+| Pro infrastructure COGS | $0.50/user/month |
+| — of which Anthropic API | $0.20/user/month |
+| — of which ElevenLabs voice | $0.22/user/month |
+| — of which Supabase | $0.05/user/month |
+| — of which Cloudflare | $0.02/user/month |
+| — of which Sentry + PostHog | $0.007/user/month |
+| Pro contribution margin per sub | $15.65/month |
+| Pro monthly churn | 5.0% [ESTIMATE] |
+| Pro subscriber average life (1/churn) | 20 months |
+| Simple LTV (net revenue × avg life) | ~$323/subscriber |
+| Full-burn monthly overhead | $80,000/month |
+| Full-burn break-even | 5,112 Pro subscribers |
+
+All results in this section are [ESTIMATE]. Replace with actuals at beta instrumentation.
+
+---
+
+### 17.2 Scenario Definitions
+
+| ID | Scenario | Trigger |
+|---|---|---|
+| S1 | Anthropic API cost doubles | Rate increase, model change, or token usage spike above baseline assumption |
+| S2 | App Store commission reverts to 30% | FORM crosses $1M annual App Store revenue, or Apple policy change removes SBP eligibility |
+| S3 | Pro monthly churn doubles | Onboarding quality problem, seasonal drop, competitive entrant stealing active users |
+| S4 | Price compression — 20% forced cut | Competitive pressure or App Store editorial pressure to match lower-cost competitors |
+| S5 | Enterprise pipeline miss (Year 1) | Zero enterprise deals closed in Year 1; 100% consumer-only revenue |
+| S6 | Combined moderate stress: S1 + S3 | Simultaneous API cost shock and churn spike — the "manageable worst-case" |
+
+Scenarios are evaluated independently (S1–S5) and in combination (S6). They are not modeled as tail-risk black swans — each is a plausible operating event within the first 18 months post-launch. The goal is to know the break-even and LTV impact in advance, not to discover them under board pressure.
+
+---
+
+### 17.3 S1: AI API Cost Shock
+
+**Trigger:** Anthropic doubles API rates from current list price. Pro Anthropic cost moves from $0.20 → $0.40/user/month.
+
+**Updated COGS breakdown:**
+
+| Cost item | Baseline | S1 | Delta |
+|---|---|---|---|
+| Anthropic API | $0.20 | $0.40 | +$0.20 |
+| ElevenLabs voice | $0.22 | $0.22 | — |
+| Supabase | $0.05 | $0.05 | — |
+| Cloudflare | $0.02 | $0.02 | — |
+| Sentry + PostHog | $0.007 | $0.007 | — |
+| **Total COGS** | **$0.50** | **$0.70** | **+$0.20** |
+
+**Impact on unit economics:**
+
+```
+Net Pro revenue (15% SBP):           $16.15    (unchanged)
+Pro COGS under S1:                    $0.70
+Contribution margin under S1:        $15.45    (vs. $15.65 baseline)
+
+Full-burn break-even under S1:       $80,000 / $15.45 = ~5,178 Pro subscribers
+vs. baseline:                                                 5,112 Pro subscribers
+Delta:                                                           +66 subscribers (+1.3%)
+```
+
+Infrastructure gross margin: ($16.15 − $0.70) / $16.15 = **95.7%** [vs. 96.9% baseline; infra-only, excluding support labor]
+
+**Assessment: S1 is survivable.** The contribution margin compresses by $0.20/subscriber/month — material at volume but not structurally threatening. Break-even rises by 66 subscribers, a 1.3% increase. The primary exposure is if S1 coincides with a period of rapid user growth, where the total monthly API bill scales proportionally.
+
+**Mitigations (in priority order):**
+
+1. Volume pricing negotiation with Anthropic. At $0.40 Anthropic cost per user, 5,178 subscribers = ~$2,070/month in Anthropic spend. Volume pricing thresholds are typically $10k+/month — not reachable until ~25,000 Pro subscribers at doubled rates. Flag to founder for Anthropic BD conversation as the pipeline grows (see OQ-12).
+2. Token budget optimisation: Victor system prompt compression, prompt caching for static context (§7.2 estimates 35–40% input cost reduction on cached portion), and Haiku routing for non-coaching turns.
+3. Model tiering: Haiku for intent classification and set acknowledgment reduces effective Anthropic cost by 20–30% if 50% of calls route to the cheaper model (§7.2).
+
+---
+
+### 17.4 S2: App Store Commission Shock
+
+**Trigger:** FORM crosses $1M in annual App Store revenue, automatically exiting the Small Business Program. At $19/month ARPU, this threshold is reached at approximately:
+
+```
+$1,000,000 / ($19 × 12) ≈ 4,386 annual Pro subscribers
+```
+
+This is a success-triggered event, not an adverse external shock. However, the economics shift materially and the timing is predictable — it should be modeled before it happens.
+
+**Updated revenue per subscriber:**
+
+| Scenario | Gross ARPU | Store fee | Net ARPU | COGS | Contribution margin | Break-even |
+|---|---|---|---|---|---|---|
+| Baseline (15% SBP) | $19.00 | $2.85 | $16.15 | $0.50 | $15.65 | 5,112 |
+| S2 (30% standard) | $19.00 | $5.70 | $13.30 | $0.50 | $12.80 | 6,250 |
+
+```
+Full-burn break-even under S2:  $80,000 / $12.80 = 6,250 Pro subscribers
+vs. baseline:                                         5,112 Pro subscribers
+Delta:                                                +1,138 subscribers (+22.3%)
+```
+
+The net revenue hit is $2.85/subscriber/month — a 17.6% reduction in contribution margin per subscriber. At 5,000 subscribers, this is a $14,250/month reduction in gross profit.
+
+Infrastructure gross margin under S2: ($13.30 − $0.50) / $13.30 = **96.2%** (infra-only). The commission shock is not a COGS event — it is a net revenue event.
+
+**Assessment: Triggered by success — not a pre-milestone threat.** The S2 trigger requires crossing 4,386 Pro subscribers, which is 86% of the full-burn break-even. At the point this activates, FORM is already near break-even. The break-even target simply shifts from 5,112 to 6,250 — a larger number, but one that is reachable without structural changes.
+
+**Mitigations:**
+
+1. **Web billing path (highest impact).** Direct web billing (Epic v. Apple precedent, EU DMA external link entitlement) bypasses App Store commission entirely. Subscribers acquired or migrated via web pay 0% commission rather than 30%. Monitoring per existing §9 note. Even a 30% web-billing mix reduces the blended commission from 30% toward ~21%, materially closing the gap to SBP economics.
+2. **Annual plan mix.** Annual plan subscribers ($144/year billed once) still pay 15% commission on the single transaction regardless of total revenue tier in most App Store interpretations. Driving annual plan conversion before crossing the SBP threshold locks more subscribers into the lower effective commission rate.
+3. **Explicit threshold monitoring.** Track cumulative App Store revenue in real-time via server-side billing events. Flag to founder at $750k annual run-rate (90% of SBP threshold) to trigger web billing migration sprint.
+
+---
+
+### 17.5 S3: Churn Spike
+
+**Trigger:** Pro monthly churn doubles from 5% to 10%. Plausible causes: weak first-week habit formation, onboarding flow failure, competitive entrant, or seasonal drop-off (e.g., post-January resolution cohort churning in bulk).
+
+**Cohort survival comparison:**
+
+| Month | Baseline (5% churn) | S3 (10% churn) | Delta |
+|---|---|---|---|
+| M1 | 95.0% | 90.0% | −5.0 pp |
+| M3 | 85.7% | 72.9% | −12.9 pp |
+| M6 | 73.5% | 53.1% | −20.4 pp |
+| M12 | 54.0% | 28.2% | −25.8 pp |
+| M24 | 29.2% | 8.0% | −21.2 pp |
+
+Survival computed as (1 − monthly_churn)^months.
+
+**LTV impact:**
+
+```
+Average subscriber life = 1 / monthly_churn
+
+Baseline:  1 / 0.05 = 20 months
+S3:        1 / 0.10 = 10 months
+
+Simple LTV (net revenue × avg life):
+  Baseline: $16.15 × 20 = $323.00/subscriber
+  S3:       $16.15 × 10 = $161.50/subscriber
+  Delta:                  −$161.50/subscriber (−50%)
+```
+
+**CAC payback and LTV:CAC at $80 CAC:**
+
+```
+Monthly gross margin per subscriber (at 85% GM):
+  $16.15 × 0.85 = $13.73/month  (unchanged by churn — churn affects LTV, not payback period)
+
+Payback period = $80 / $13.73 = ~5.8 months  (consistent with §14.4 figures)
+
+LTV:CAC at M24 (85% GM-adjusted LTV):
+  Baseline: ~$274 / $80 = 3.4×
+  S3:       ~$137 / $80 = 1.7×   — below the 3× minimum benchmark (§14.5)
+```
+
+At 10% monthly churn, GM-adjusted M24 LTV falls to approximately $137 per subscriber. Against an $80 CAC, LTV:CAC is 1.7× — below the 3× floor cited in §14.5. Paid acquisition is economically unjustifiable at these retention levels. Organic and referral channels only until churn is diagnosed and corrected.
+
+**Assessment: S3 requires product intervention.** The break-even subscriber count does not change (churn rate does not appear in the contribution margin formula used for break-even). However, to maintain a steady-state subscriber base of 5,112 at 10% monthly churn, FORM must acquire **511 gross new subscribers per month** (vs. 256/month at 5% churn) — doubling the gross acquisition burden to maintain the same net subscriber count. At $80 CAC, that is $40,880/month in acquisition spend to hold steady, up from $20,480/month.
+
+**Primary signal to watch:** D7 → D30 retention funnel in PostHog. If D30 paying retention drops below 55% in beta, treat as S3 onset. See §14.7 for cohort survival curve requirements.
+
+**Mitigations:**
+
+1. Victor onboarding quality: first-session coaching outcome must establish a habit anchor. Instrument session completion rate at the D1, D3, D7 checkpoints.
+2. Deload reminder system: proactive re-engagement for users who miss two consecutive sessions. Server-side trigger on Supabase `last_session_at` field.
+3. First-week program lock: users who complete 3 coached sessions in 14 days churn at materially lower rates (§14.7 activation insight). Make this the primary activation funnel metric.
+
+---
+
+### 17.6 S4: Price Compression
+
+**Trigger:** Competitive pressure forces a 20% price cut. Pro tier moves from $19/month → $15.20/month.
+
+**Updated unit economics:**
+
+```
+Gross ARPU under S4:             $15.20/month
+App Store fee (15% SBP):          $2.28
+Net revenue under S4:            $12.92/month   (vs. $16.15 baseline)
+Pro COGS (unchanged):             $0.50
+Contribution margin under S4:    $12.42/month   (vs. $15.65 baseline)
+
+Full-burn break-even under S4:   $80,000 / $12.42 = ~6,441 Pro subscribers
+vs. baseline:                                          5,112 Pro subscribers
+Delta:                                               +1,329 subscribers (+26.0%)
+```
+
+Infrastructure gross margin: ($12.92 − $0.50) / $12.92 = **96.1%** (infra-only).
+
+**Annual plan pricing constraint:** The current annual plan implies a monthly equivalent of ~$15.20/month at $19 monthly pricing with standard annual discount structure. At a $15.20 monthly price, the equivalent annual plan would need repricing to approximately $130–$139/year to maintain a meaningful discount over monthly billing — annual plan repricing is not automatic and requires deliberate product and pricing action alongside any monthly price move.
+
+**LTV under S4:**
+
+```
+Simple LTV: $12.92 × 20 = $258.40/subscriber   (vs. $323 baseline; −20%)
+GM-adjusted LTV (85%): ~$220
+
+LTV:CAC at $80 CAC: $220 / $80 = 2.75×  — below 3× floor; organic channels only are safe at $80 CAC
+```
+
+**Assessment: Survivable but structurally weakening.** $15.20 is near the psychological floor for a premium AI fitness app. Generic fitness apps and AI-adjacent competitors (Future: $149/month; Whoop: $30/month hardware bundle) create a wide pricing corridor. FORM's defensibility at $19 rests on the CV moat and Victor coaching quality — if that moat is validated in beta, price should be held. If the market responds to premium pricing with low conversion, the correct response is product differentiation investment, not price cutting.
+
+**Mitigation: hold the price.** Compete on quality, not price. The data to make this call is trial-to-paid conversion rate in beta, segmented by acquisition channel.
+
+---
+
+### 17.7 S5: Enterprise Pipeline Miss (Year 1)
+
+**Trigger:** Zero enterprise deals close in Year 1. Consumer-only revenue for the full first operating year.
+
+**Baseline Year 1 enterprise revenue assumption:**
+
+From §8 and §16, a conservative Year 1 enterprise pipeline assumption is 3–5 deals closing in H2 Year 1 (post-consumer PMF). Representative deal sizes: Starter 50-seat at $12/seat/month or Growth 200-seat at $9/seat/month.
+
+| Pipeline scenario | Deals | Representative ACV | Year 1 ARR contribution |
+|---|---|---|---|
+| Conservative (3 Starter deals) | 3 × 50-seat Starter | $12 × 50 × 12 = $7,200/deal | ~$21,600 |
+| Moderate (2 Starter + 2 Growth) | Mixed | ~$7,200 + ~$21,600 avg | ~$57,600 |
+| Optimistic (5 deals mixed) | 3 Starter + 2 Growth | ~$21,600 + ~$43,200 | ~$64,800 |
+
+Under S5, all of this ARR is $0. Lost Year 1 ARR range: **$21,600 – $64,800** [ESTIMATE].
+
+**Impact on break-even timeline:**
+
+Consumer break-even is unchanged at 5,112 Pro subscribers — enterprise miss does not affect the consumer equation. The impact is on time-to-break-even and seed runway consumption:
+
+```
+Lost enterprise gross profit at ~89% GM (§8.4):
+  Conservative miss: $21,600 × 0.89 = ~$19,224/year
+  Optimistic miss:   $64,800 × 0.89 = ~$57,672/year
+
+At $80k/month full burn ($960k/year):
+  Conservative miss: runway impact = $19,224 / $80,000 = ~0.24 months
+  Optimistic miss:   runway impact = $57,672 / $80,000 = ~0.72 months
+```
+
+Against a $2M seed at $80k/month burn (~25-month runway), S5 at its worst extends runway consumption by less than 1 month. The seed runway impact is **not material** — enterprise is Year 2+ ARR by design.
+
+**Assessment: Not existential.** The Year 1 plan is consumer-led. Enterprise revenue in Year 1 is a bonus, not a dependency. The real risk of S5 is not financial — it is the signal risk: if zero enterprise pilots can be closed after consumer PMF, the enterprise ICP hypothesis (§8) needs revisiting. Track enterprise pipeline separately from consumer revenue metrics; do not allow enterprise delays to create false pessimism about consumer performance.
+
+**Mitigation:** Prioritise consumer traction and PMF validation first. Run enterprise pilots only when the product is stable enough to not require major changes mid-pilot (estimated M6 post-launch). Do not staff a dedicated enterprise sales role until consumer ARR reaches $300k+ annually — enterprise should be founder-led until that threshold.
+
+---
+
+### 17.8 S6: Combined Moderate Stress (S1 + S3)
+
+**Trigger:** Simultaneous API cost shock and churn spike. This is the "manageable worst-case" — two independent adverse events occurring in the same period. Not a black-swan scenario; both S1 and S3 are operationally plausible within 18 months of launch.
+
+**Updated unit economics under S6:**
+
+```
+Net Pro revenue (15% SBP, $19 ARPU):              $16.15    (unchanged)
+Pro COGS under S6 (Anthropic doubled from S1):      $0.70
+Contribution margin under S6:                      $15.45    (vs. $15.65 baseline)
+
+Full-burn break-even (contribution margin):        $80,000 / $15.45 = ~5,178 Pro subscribers
+```
+
+The contribution margin impact of S1 alone is modest (+66 subs to break-even). The churn shock (S3) does not change the static break-even count but doubles the gross acquisition burden needed to maintain any given subscriber base.
+
+**Combined impact on steady-state acquisition requirement:**
+
+```
+To maintain 5,178 subscribers at steady state:
+  Baseline churn (5%):   5,178 × 0.05 = ~259 gross new subs/month needed
+  S3 churn (10%):        5,178 × 0.10 = ~518 gross new subs/month needed
+
+At $80 CAC:
+  Baseline acquisition spend to hold steady: ~259 × $80 = ~$20,720/month
+  S6 acquisition spend to hold steady:       ~518 × $80 = ~$41,440/month
+  Delta:                                                   +$20,720/month (+100%)
+```
+
+**LTV:CAC under S6:**
+
+```
+Average subscriber life at 10% churn:  10 months
+Simple LTV:                            $16.15 × 10 = $161.50
+GM-adjusted LTV (85%):                 ~$137
+
+LTV:CAC at $80 CAC: $137 / $80 = 1.7×   — below 3× floor; same result as S3 alone
+```
+
+The combined scenario is operationally more stressful than either S1 or S3 alone because it couples higher COGS with compressed LTV. However, the infrastructure cost delta ($0.20/user/month) is small relative to the churn-driven LTV compression. The dominant risk in S6 is the churn component.
+
+**Assessment:** S6 is survivable at a seed-stage company with $2M in the bank and a lean team, but the growth plan does not hold. The correct response to S6 is not to increase acquisition spending — it is to freeze paid acquisition, extend runway by reducing discretionary burn, and diagnose the churn root cause before resuming scale.
+
+**Decision rule for S6:** If PostHog shows D30 cohort retention below 55% AND the Anthropic invoice increases by more than 50% month-over-month, trigger the "steady-state mode" protocol: pause all paid acquisition, extend runway by 30%, and run a 6-week Victor onboarding sprint targeting the D7 → D30 activation step.
+
+---
+
+### 17.9 Open Questions Added
+
+**OQ-12: Anthropic volume pricing threshold**
+
+At what monthly Anthropic spend does FORM qualify for volume pricing? Volume pricing negotiations with Anthropic typically begin at approximately $10,000–$50,000/month in spend.
+
+```
+At baseline Anthropic cost ($0.20/user/month):
+  5,000 Pro users:   $1,000/month   — well below volume threshold
+  25,000 Pro users:  $5,000/month   — approaching threshold
+  50,000 Pro users:  $10,000/month  — at likely threshold entry
+
+At S1 doubled rates ($0.40/user/month):
+  25,000 Pro users:  $10,000/month  — at threshold
+```
+
+Volume pricing is not reachable at seed-stage user counts under baseline rates. Under S1 (doubled rates), volume pricing becomes relevant at ~25,000 Pro subscribers. Action: flag to founder for proactive Anthropic BD conversation when monthly API spend crosses $5,000/month (estimated at ~25,000 Pro subscribers under baseline; ~12,500 under S1 rates). Reference OQ-03.
+
+**OQ-13: Actual token budget per session (Victor)**
+
+The Pro Anthropic cost of $0.20/user/month is derived from assumptions in §2.1: 2,000 input tokens + 500 output tokens per session, 15.1 sessions/month. Actual token usage depends on Victor system prompt length, context window carry-forward, and tool call overhead.
+
+Victor's system prompt is estimated at ~1,200 tokens (§2.1). If context history carry-forward is larger than modeled, or if tool calls (e.g., program adaptation writes) add tokens not in the base assumption, the actual cost could be 1.5–2× the modeled figure. Instrument actual token counts per session in beta (per OQ-01). Until replaced with actuals, the $0.20/user/month figure should be treated as a planning floor estimate, not a ceiling.
+
+---
+
+### 17.10 Stress Test Summary Matrix
+
+| Scenario | Description | Contribution margin/sub | Full-burn break-even (subs) | LTV impact | Assessment |
+|---|---|---|---|---|---|
+| **Baseline** | v0.6 inputs | $15.65/month | 5,112 | $323 simple LTV | — |
+| **S1** | Anthropic API doubles ($0.20→$0.40) | $15.45/month | 5,178 (+1.3%) | Unchanged | Survivable — modest COGS compression; mitigate with prompt caching |
+| **S2** | App Store 30% commission | $12.80/month | 6,250 (+22.3%) | −20% on net ARPU | Triggered by success; manageable with web billing path and annual plan mix |
+| **S3** | Churn doubles (5%→10%) | $15.65/month | 5,112 (unchanged) | −50% ($323→$162) | Requires product intervention; doubles gross acquisition spend to hold steady |
+| **S4** | 20% price cut ($19→$15.20) | $12.42/month | 6,441 (+26.0%) | −20% | Survivable; LTV:CAC falls below 3× floor at $80 CAC — hold price, not cut |
+| **S5** | Enterprise pipeline miss Year 1 | $15.65/month | 5,112 (unchanged) | None on consumer LTV | Not existential; enterprise is Year 2+ revenue by design |
+| **S6** | S1 + S3 combined | $15.45/month | 5,178 (+1.3%) | −50% (churn-driven) | Survivable; freeze paid acquisition, run churn diagnosis sprint |
+
+**Reading this table:** The scenarios that raise break-even the most are S4 (+26%) and S2 (+22%), both net-revenue events rather than COGS events. S3 is the highest-severity scenario despite not changing break-even count — it doubles the gross acquisition spend required to hold any given subscriber base and collapses LTV:CAC below the 3× investment threshold. S1 is the most benign event in this set.
+
+**Monitoring priority:**
+
+1. S3 (churn) — highest LTV impact; primary beta signal; watch D7 → D30 retention daily in PostHog
+2. S2 (App Store commission) — success-triggered; monitor cumulative App Store revenue monthly against $750k threshold
+3. S4 (price) — competitive intelligence; review quarterly vs. competitor pricing
+4. S1 (API cost) — Anthropic invoice; review monthly against $0.20/user/month baseline; flag at 1.5×
+
+---
+
+**v0.7 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
 
@@ -1230,3 +1590,5 @@ All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actua
 *v0.5 additions: §13 Infrastructure Cost Breakdown by Service — service-by-service table at 1k/10k/50k/100k MAU, fixed vs. variable classification, upgrade inflection points, cost cliff analysis, per-service optimization levers. §14 Cohort LTV Model & CAC Payback Period — 24-month cohort survival tables for Pro monthly and annual plans, CAC payback at $30/$50/$80/$120, LTV:CAC targets by channel, enterprise LTV at 120% NRR, cohort survival curve requirements, data pipeline specification.*
 
 *v0.6 additions: §15 Enterprise Infrastructure COGS Deep-Dive — per-feature marginal cost quantification for SSO/SAML overhead, SCIM provisioning, admin dashboard queries, 7-year audit log storage (hot + cold tier), SIEM webhook delivery, white-label DNS/SSL, and multi-tenant RLS; consolidated summary showing enterprise features add < $0.00001/seat/month (< 0.003% of baseline COGS). §16 Enterprise Tier Break-Even by Plan — plan-level break-even table (Starter/Growth/Enterprise × seat count), minimum viable seat floor analysis (50-seat Starter Y1 GM = 47.9% vs 20-seat = −26.1%), Y1 vs Y2+ margin improvement by plan, multi-year contract economics (25% 3-year discount gives up $13,800 GP vs eliminates ~$32,400 churn-exposure ARR). OQ-11 added: minimum seat threshold for acceptable Y1 Starter margin.*
+
+*v0.7 additions: §17 Downside Scenario Analysis & Unit Economics Stress Tests — six adverse scenarios stress-tested against v0.6 baseline (S1: Anthropic API doubles, break-even +1.3%; S2: App Store 30% commission, break-even +22.3%; S3: churn doubles 5%→10%, LTV −50%; S4: 20% price cut, break-even +26.0%; S5: enterprise Year 1 miss, not existential; S6: S1+S3 combined, freeze paid acquisition protocol). Survivability assessments, mitigation priority lists, and monitoring thresholds for each scenario. OQ-12 added: Anthropic volume pricing threshold (~25k Pro subs at baseline rates). OQ-13 added: actual Victor token budget per session — instrument in beta per OQ-01.*

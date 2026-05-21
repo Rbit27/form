@@ -6,6 +6,13 @@
 
 ---
 
+## [1.1.2] — 2026-05-21
+
+### Added
+- `docs/COST_MODEL.md §17` — Downside Scenario Analysis & Unit Economics Stress Tests (v0.7): six adverse scenarios stress-tested against v0.6 baseline; S1 Anthropic API doubles (break-even +1.3%, survivable), S2 App Store 30% commission (break-even +22.3%, success-triggered — web billing path mitigates), S3 churn doubles 5%→10% (LTV −50%, product intervention required — D7→D30 retention primary signal), S4 20% price cut (break-even +26.0%, hold price), S5 enterprise Year 1 miss (not existential), S6 S1+S3 combined (freeze paid acquisition protocol); survivability verdicts, mitigation priority lists, per-scenario monitoring thresholds; OQ-12 (Anthropic volume pricing threshold ~25k Pro subs), OQ-13 (Victor token budget — instrument in beta)
+
+---
+
 ## [1.1.1] — 2026-05-21
 
 ### Added
