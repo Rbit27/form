@@ -6,6 +6,13 @@
 
 ---
 
+## [1.3.2] — 2026-05-21
+
+### Added
+- `content/post-73-stretch-mediated-hypertrophy.md` — 13-min sports-science post: titin, sarcomerogenesis, stretch-mediated hypertrophy; Wolf et al. 2023, Kassiano et al. 2023, Maeo et al. 2024; clinical-safety PASS; blog.html card added
+
+---
+
 ## [1.3.1] — 2026-05-21
 
 ### Added
