@@ -6,6 +6,13 @@
 
 ---
 
+## [1.1.0] — 2026-05-21
+
+### Added
+- `compliance/p1/retention-decisions.md` — enterprise: formal health-data retention decision record (P1-RET-001); closes P-GAP-004 (decision phase); per-category decisions for `workout_sessions` (3yr), `coaching_turns` (2yr), `cv_sessions` (1yr — biometric-adjacent, confirmed), `meal_log` (2yr), `wearable_readings` (2yr), `user_profile` health fields (until deletion/consent withdrawal); GDPR Art. 5(1)(e) legal basis per category; Supabase `pg_cron` TTL migration SQL; `data.retention_sweep_completed` DEC-030 event schema; privacy policy retention table template; gap-closure checklist (decision recorded — legal sign-off and implementation pending); annual review procedure; creates `compliance/p1/` directory
+
+---
+
 ## [1.0.1] — 2026-05-21
 
 ### Added
