@@ -161,6 +161,8 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-67-foam-rolling.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-68-heat-cold-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-69-creatine.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-70-training-volume-mev-mav-mrv.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-71-allostatic-load.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

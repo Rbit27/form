@@ -6,6 +6,16 @@
 
 ---
 
+## [1.0.1] — 2026-05-21
+
+### Added
+- `content/post-71-allostatic-load.md` — sports-science: allostatic load framework (McEwen & Stellar 1993; McEwen 1998 NEJM), HPA axis physiology, shared-budget problem for training and life stress, HRV as allostatic proxy, 4-stage performance degradation sequence, load adjustment decision framework; clinical_safety_reviewed: PASS (physiological framing throughout, no mental health pathologising, no food content)
+- `blog.html` — added cards for post-70 (MEV/MAV/MRV) and post-71 (allostatic load)
+- `STATUS.md` — content engine table updated with post-70 and post-71 rows
+- `README.md` — roadmap updated: post-70 and post-71 marked [x]; protein timing (formerly post-71) renumbered post-72 with clinical-safety warning flag
+
+---
+
 ## [1.0.0] — 2026-05-21
 
 ### Added
