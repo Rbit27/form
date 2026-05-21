@@ -6,6 +6,13 @@
 
 ---
 
+## [1.1.1] — 2026-05-21
+
+### Added
+- `compliance/p1/sub-processor-register.md` — enterprise: GDPR Art. 28 / SOC 2 CC9.2 sub-processor register (P1-SUB-001); closes P-GAP-005 (standalone auditor exhibit); 8 sub-processors (SP-01 Anthropic, SP-02 Supabase, SP-03 Cloudflare, SP-04 ElevenLabs, SP-05 PostHog, SP-06 Sentry, SP-07 Apple, SP-08 Google); DPA & SCC status matrix; Art. 9 exposure per sub-processor (SP-01 coaching turns, SP-02 all health data — others excluded by design); Sentry compensating control documented with full TypeScript `beforeSend` PII scrubber + CI test requirement; tier classification (Tier 1: Art. 9 / Tier 2: personal / Tier 3: encrypted passthrough); sub-processor addition/removal workflows; customer DPA notice language (30-day advance, 10-day objection window); annual Q1 review procedure; gap status: PRE-02 🟡, PRE-08 🟡, PRE-09 🟡, CC9.2 🟢
+
+---
+
 ## [1.1.0] — 2026-05-21
 
 ### Added
