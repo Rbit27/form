@@ -6,6 +6,18 @@
 
 ---
 
+## [1.3.1] — 2026-05-21
+
+### Added
+- `docs/ACCEPTABLE_USE_POLICY.md` — v1.0 AUTHORED (status: pending external counsel review + founder signature before taking legal effect); promotes `docs/SOC2_READINESS.md` §27 Annex A v0.1-draft to standalone enterprise-grade policy; closes CC1-GAP-001 + CC5-GAP-001 (both P0 SOC 2 gaps); filed as CC1-E-004; 13 sections: Purpose, Scope (all FORM systems + MDM devices), Definitions (6 terms incl. DEC-030 Audit Chain + Break-Glass Access), Acceptable Uses (10 items incl. consent-gated health data access + break-glass with incident_id), Prohibited Uses (12 items incl. health data curiosity access, git secrets, security control bypass, SHA-1/MD5, audit log tampering, force-push to main), Health Data Special Category Rules (GDPR Art. 9 consent gate enforcement, analytics exclusion, Sentry scrubber, coaching context bucketed only, DEC-030 on every access), Device Security Requirements (FileVault 2 / BitLocker, MDM, ≤5min screen lock, no public Wi-Fi without WARP), Incident Reporting Obligations (same-day mandatory, #security-alerts path), Enforcement (access revocation, GDPR Art. 83 trigger on health data violations = P0 incident), Acknowledgment path (compliance/cc1/aup/ + policy-approval-log.csv), SOC 2 mapping (CC1.1, CC5.3, CC6.3 + CC1-E-004), Signatory block (founder + compliance-officer; TBD on counsel approval)
+
+### SOC 2 Gap Progress
+- CC1-GAP-001 🔴→🟡 (AUP v1.0 authored; pending counsel review + founder signature for P0-11 gate PASS)
+- CC5-GAP-001 🔴→🟡 (AUP authored — same document; counsel + signature pending)
+- SOC 2 P0 gate: 0/14 → 0/14 (criteria met when counsel review + signing complete; authoring prerequisite fulfilled)
+
+---
+
 ## [1.3.0] — 2026-05-21
 
 ### Added
