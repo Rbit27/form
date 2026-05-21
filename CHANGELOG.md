@@ -11,6 +11,14 @@
 
 ---
 
+## [0.98.1] — 2026-05-21
+
+### Added
+- **`docs/SOC2_READINESS.md`** §36 — **Penetration Testing & Red Team Protocol** (security-engineer + compliance-officer). 504 lines. Covers seven attack-surface zones (external perimeter, web app, mobile MASVS L2, API, tenant isolation/lateral movement, social engineering, supply chain). Eight-phase PTES methodology with OWASP OTG v4, OWASP MASVS v2, OWASP API Security Top 10, NIST SP 800-115. Four engagement types with formal trigger conditions (annual black-box, pre-launch gray-box, post-major-change triggered, continuous DAST). CVSS 3.1-anchored severity/SLA table: Critical 24h, High 7d, Medium 30d, Low 90d. Five TC-RLS test cases: horizontal tenant access, JWT manipulation (alg:none + RS256→HS256 confusion), SECURITY DEFINER leak, SCIM over-provisioning wrong-tenant admin, DEC-030 HMAC chain tamper. Five Victor AI red team scenarios: prompt injection, medical advice extraction, PII exfiltration, context window poisoning, system prompt extraction — all cross-referenced to INCIDENT_RESPONSE.md R-10. Automated DAST vs. manual red team non-substitutability documented. 5 gaps opened: PEN-GAP-001/005 (no pentest or attestation letter — P0 enterprise gates), PEN-GAP-002/003/004 (CI DAST, RLS test execution, Victor AI test — P1). SOC 2 readiness: ~93% → ~94%.
+- **`VERSION`** — 0.98.0 → 0.98.1
+
+---
+
 ## [0.98.0] — 2026-05-21
 
 ### Added
