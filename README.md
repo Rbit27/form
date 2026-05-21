@@ -396,12 +396,10 @@ Each iteration:
 - [x] post-69: Creatine — механізм PCr ресинтезу, силові vs гіпертрофія ефекти, протокол завантаження, коли не потрібне; Rawson & Volek (2003), Kreider et al. (2017) ISSN; clinical-safety PASS
 - [x] post-70: Training Volume: MEV, MAV, MRV — dose-response landmarks; Schoenfeld 2017 meta-analysis; individual variation as central thesis
 - [x] post-71: Allostatic load і тренувальна готовність — McEwen (1998) allostatic load framework, HPA axis, HRV як proxy, чому фіксований об'єм ігнорує total load; clinical-safety PASS
-- [ ] post-72: Protein timing revisited — anabolic window myth vs. daily distribution logic, Schoenfeld & Aragon (2013, 2018) ⚠️ clinical-safety required before publish
-- [ ] post-73: Загальний стрес і тренувальна ємність — чому лайфстайл визначає скільки об'єму ти можеш переварити
-- [ ] post-72: Загальний стрес і тренувальна ємність — чому лайфстайл визначає скільки об'єму ти можеш переварити
-- [ ] post-73: Grip strength і longevity — Bohannon 2019 meta-analysis, grip як proxy загального здоров'я, як тренувати
-- [ ] post-74: Single-leg training для двобічних атлетів — bilateral deficit, Botton et al. 2016, коли і як додавати унілатеральну роботу
-- [ ] post-75: Allostatic load і тренувальна готовність — чому стандартні програми ігнорують позатренувальний стрес і що FORM робить інакше
+- [x] post-72: Загальний стрес і тренувальна ємність — сон-депривація (IGF-1), когнітивний стрес (HPA), ситуативні стресори (прозапальні цитокіни), практичний стрес-аудит і корекція MRV; clinical-safety PASS
+- [ ] post-73: Protein timing revisited — anabolic window myth vs. daily distribution logic, Schoenfeld & Aragon (2013, 2018) ⚠️ clinical-safety required before publish (food content)
+- [ ] post-74: Grip strength і longevity — Bohannon 2019 meta-analysis, grip як proxy загального здоров'я, як тренувати
+- [ ] post-75: Single-leg training для двобічних атлетів — bilateral deficit, Botton et al. 2016, коли і як додавати унілатеральну роботу
 - [ ] post-76: Стретчинг і м'язова гнучкість — статичний vs динамічний, PNF, loaded progressive stretching; що насправді змінює ROM (нейральна vs структурна)
 - [ ] post-77: Тренінг натщесерце — fed vs fasted state, fat oxidation myth, Schoenfeld (2014), коли має значення, коли ні
 - [ ] post-78: Omega-3 і тренувальна адаптація — Smith et al. (2011) MPS, anti-inflammatory механізм, dose і EPA:DHA ratio; клінічна безпека харчова — clinical-safety required

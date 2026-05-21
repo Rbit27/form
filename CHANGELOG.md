@@ -10,6 +10,10 @@
 
 ### Added
 - `docs/COST_MODEL.md §17` — Downside Scenario Analysis & Unit Economics Stress Tests (v0.7): six adverse scenarios stress-tested against v0.6 baseline; S1 Anthropic API doubles (break-even +1.3%, survivable), S2 App Store 30% commission (break-even +22.3%, success-triggered — web billing path mitigates), S3 churn doubles 5%→10% (LTV −50%, product intervention required — D7→D30 retention primary signal), S4 20% price cut (break-even +26.0%, hold price), S5 enterprise Year 1 miss (not existential), S6 S1+S3 combined (freeze paid acquisition protocol); survivability verdicts, mitigation priority lists, per-scenario monitoring thresholds; OQ-12 (Anthropic volume pricing threshold ~25k Pro subs), OQ-13 (Victor token budget — instrument in beta)
+- `content/post-72-total-stress-training-capacity.md` — sports-science: як загальний стрес (сон-депривація, когнітивний стрес, ситуативні стресори, імунне навантаження) знижує реальну MRV; механізми IGF-1, кортизолемії, прозапальних цитокінів; практичний стрес-аудит і модель корекції об'єму; clinical-safety PASS (physiological framing, no food/body-image/mental-health content)
+- `blog.html` — картка post-72 (Загальний стрес і тренувальна ємність)
+- `STATUS.md` — content engine table: post-72 row added
+- `README.md` — roadmap: post-72 marked [x]; protein timing renumbered to post-73 with clinical-safety warning; removed duplicate entries (old post-72/73 and post-75 allostatic duplicate)
 
 ---
 
