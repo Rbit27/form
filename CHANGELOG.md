@@ -11,6 +11,17 @@
 
 ---
 
+## [0.99.0] — 2026-05-21
+
+### Added
+- **`content/post-69-creatine.md`** — «Creatine: The Mechanism, the Evidence, and the Cases Where It Does Not Matter» (sports-scientist, clinical-safety PASS). Covers: PCr resynthesis mechanism and creatine kinase reaction; intramuscular PCr capacity and depletion timeline; Rawson & Volek (2003) meta-analysis (+8% strength, +14% reps-to-failure); Lanhers et al. (2017) upper body strength meta-analysis; Kreider et al. (2017) ISSN position stand; hypertrophy pathway (volume-mediated vs. direct cellular); non-responder phenotype (baseline saturation, vegetarian response); loading (20 g/day × 5–7 days) vs. maintenance (3–5 g/day × 28 days) equivalence; timing evidence (Antonio & Ciccone 2013, Candow 2014) with honest interpretation of small sample sizes; monohydrate vs. HCl/buffered/ethyl ester — no superiority evidence for alternatives (Spillane et al. 2009); intramuscular vs. subcutaneous water retention distinction; renal safety (Bizzarini & De Angelis 2004) and creatinine measurement confound; four scenarios where creatine is unlikely to matter: submaximal technique phases, aerobic-dominant training, near-saturated dietary intake, first 4 weeks for beginners. ~2,800 words. Clinical safety PASS: no dietary restriction framing, water retention contextualised as intramuscular, weight discussed only in training-load and lean-mass context.
+- **`blog.html`** — added post-68 card (heat-cold-training, Незабаром, cat-science) and post-69 card (creatine, Незабаром, cat-science); blog now shows 69 posts
+- **`STATUS.md`** — added post-68 and post-69 rows to content engine table
+- **`README.md`** — post-69 marked complete with key references
+- **`VERSION`** — 0.98.1 → 0.99.0
+
+---
+
 ## [0.98.1] — 2026-05-21
 
 ### Added
