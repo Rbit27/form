@@ -6,6 +6,14 @@
 
 ---
 
+## [1.2.0] — 2026-05-21
+
+### Added
+- `compliance/p1/complaint-intake-procedure.md` — enterprise: GDPR privacy complaint intake procedure (P1-CIP-001); closes P-GAP-007 (P8.1) — no formal complaint intake process; intake channel `privacy@form.coach`; 30-day response SLA with 90-day extension path per GDPR Art. 12(3); 8 triage categories (CAT-01 DSAR fallback through CAT-08 Art. 22 automated decision-making); per-category response procedures including Art. 9 flag requirement and compliance-officer sign-off; 6 new DEC-030 HMAC-chained audit events (`privacy.complaint_received`, `privacy.complaint_resolved`, `privacy.complaint_escalated`, `privacy.processing_restricted`, `privacy.objection_received`, `privacy.automated_decision_review_requested`) — all 7-year retention; complaint log schema (user_id hashed SHA-256, no PII in CSV); supervisory authority escalation paths for UK (ICO), EU (DPC/lead DPA), Ukraine (Ombudsman); 11 open items (P0: mailbox creation, mailbox address in privacy policy; P1: `processing_restricted` column migration, 6 DEC-030 events in AUDIT_LOG_SCHEMA.md, Settings deep-link, 23-day PagerDuty alert, PRE-35-E-011 evidence registration); annual Q1 review schedule with transparency report commitment; gap closure: P-GAP-007 🔴→🟡 (procedure defined — mailbox + DEC-030 wiring + privacy policy pending); P-GAP-001 dependency documented
+- `compliance/p1/complaint-log.csv` — enterprise: empty complaint log (schema header only); no PII; `user_id_hashed` field uses SHA-256; feeds annual transparency report
+
+---
+
 ## [1.1.2] — 2026-05-21
 
 ### Added
