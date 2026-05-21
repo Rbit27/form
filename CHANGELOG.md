@@ -11,6 +11,14 @@
 
 ---
 
+## [0.99.1] — 2026-05-21
+
+### Added
+- **`docs/SOC2_READINESS.md` §37** — **PI1 — Processing Integrity Deep-Dive** (compliance-officer + platform-engineer + ml-engineer). Extends the high-level §3 table into a full deep-dive matching the structure of §26–§35 (CC, A1, C1, P1–P8). Five processing surfaces mapped against PI1.1/PI1.2/PI1.3: (1) Victor AI coaching pipeline — `coaching_turns.status` state machine, clinical safety output filter, P95 latency SLO, three-gate authorization; (2) CV pose estimation — `REP_COUNT_CONFIDENCE_MIN = 0.65` threshold, `cv_partial` session status; (3) wearable data ingestion — anchor-based idempotency, cross-source HRV normalization, Garmin categorical exclusion; (4) nutrition/macro calculation — deterministic arithmetic constants, implicit-zero gap (PI-GAP-003), CI test gap (PI-GAP-004); (5) analytics ETL — PostHog→ClickHouse row-count cross-check gap (PI-GAP-005). DEC-030 HMAC chain established as cross-surface PI1 evidence layer with canonical three-event audit pattern and stuck-turn detection SQL. 6 control IDs (PIC-01–PIC-06). 5 output surfaces mapped to PI1.3. 7 gaps opened: PI-GAP-001 (stuck-row escalation P1), PI-GAP-002 (accuracy observability P1), PI-GAP-003 (meal log NOT NULL P2), PI-GAP-004 (nutrition CI test P2), PI-GAP-005 (ETL cross-check P1), PI-GAP-006 (SCIM RFC 7643 conformance P1 blocked on G-001), PI-GAP-007 (DSAR completeness count P2). 8 evidence artifacts (PRE-37-E-001–PRE-37-E-008). 9-item implementation checklist across M3/M4/post-launch. SOC 2 readiness: ~94% → ~95%.
+- **`VERSION`** — 0.99.0 → 0.99.1
+
+---
+
 ## [0.99.0] — 2026-05-21
 
 ### Added

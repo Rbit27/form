@@ -6406,3 +6406,255 @@ The automated and manual layers are scheduled such that DAST findings are availa
 ---
 
 *v2.4 additions: §36 Penetration Testing & Red Team Protocol. Formal penetration testing program defined covering all seven attack-surface zones (external perimeter, web application, mobile binary MASVS L2, API security, tenant isolation / lateral movement, social engineering, supply chain). §36.3 establishes the eight-phase PTES-based methodology with OWASP OTG v4, OWASP MASVS, OWASP API Security Top 10, and NIST SP 800-115 as governing standards; each phase carries a defined deliverable and evidence artifact path. §36.4 defines four engagement types (annual black-box, pre-launch gray-box, post-major-change triggered, continuous automated DAST) with trigger conditions, scope, provider criteria, and output artifacts. §36.5 establishes CVSS 3.1-anchored severity classification with remediation SLAs: Critical 24h, High 7 days, Medium 30 days, Low 90 days; GitHub Security Advisory as tracking mechanism; attestation letter as SOC 2 gate condition. §36.6 defines five specific Tenant Isolation (RLS) red team test cases (TC-RLS-001 through TC-RLS-005): horizontal tenant access via REST, JWT manipulation including alg:none and RS256→HS256 confusion, SECURITY DEFINER function leak enumeration, SCIM over-provisioning wrong-tenant admin assignment, and DEC-030 HMAC chain tamper detection — each with setup, method, expected result, detection mechanism, and evidence artifact. §36.7 defines five Victor AI Coach red team scenarios (AI-RT-001 through AI-RT-005): prompt injection via workout notes, medical advice extraction, PII exfiltration via crafted prompts, context window poisoning, and system prompt extraction — each with pass/fail criteria and INCIDENT_RESPONSE.md R-10 linkage. §36.8 documents the explicit distinction between continuous automated DAST (regression coverage, known vulnerability classes, dependency CVEs) and annual manual red team (chained attack discovery, logic flaws, AI-specific scenarios, attestation evidence) as complementary non-substitutable layers. 5 gaps formally opened: PEN-GAP-001 (no pentest completed — P0 enterprise gate), PEN-GAP-002 (no DAST in CI — P1), PEN-GAP-003 (RLS test protocol not executed — P1), PEN-GAP-004 (Victor AI red team not executed — P1), PEN-GAP-005 (no attestation letter — P0 enterprise gate). 8 evidence artifacts defined (PRE-36-E-001 through PRE-36-E-008) with storage paths and CC criteria mapping. 12-item implementation checklist (4× P0, 6× P1, 2× P2). SOC 2 readiness: ~93% → ~94%.*
+
+---
+
+## 37. PI1 — Processing Integrity: Deep-Dive Control Implementation
+
+> **Owner:** `compliance-officer` + `platform-engineer` + `ml-engineer`. **Effective:** May 2026. **Review:** annual (§15 compliance calendar) + triggered on any change to the coaching pipeline, CV model version, wearable integration source, analytics ETL architecture, or SCIM provisioning flow.
+> **SOC 2 criteria addressed:** PI1.1 (inputs captured completely and accurately), PI1.2 (processing is complete, accurate, timely, and authorized), PI1.3 (outputs are complete and accurate)
+> **Reference:** §3 Processing Integrity overview (high-level table), `docs/DATA_MODEL.md` §3 (RLS policies), §14 (wearable data integration), `docs/OBSERVABILITY.md` §2.1 (SLOs), §4 (log taxonomy), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 HMAC chain), `docs/INCIDENT_RESPONSE.md` R-10 (AI safety incident), `docs/ENTERPRISE.md` (privacy floor)
+
+### 37.1 Purpose
+
+Processing Integrity is the Trust Service Criterion that addresses whether FORM processes data in the way it has declared it will — completely, accurately, on time, and only when authorized. Unlike the Security (CC) criteria, which guard against unauthorized access, or the Privacy (P) criteria, which govern the legal basis and purpose for processing, PI1 addresses the *fidelity of the pipeline itself*: does every rep counted get counted correctly? Does every coaching turn receive a response? Is every wearable reading stored exactly once?
+
+For FORM, PI1 is uniquely consequential because the product's primary value proposition is that health guidance derived from AI analysis is accurate and trustworthy. Processing errors are not mere data quality issues — they affect training decisions, recovery decisions, and wellness self-perception. A coaching turn that silently drops a user's input, a rep count that misses a repetition, or a wearable reading that double-counts an HRV session could, in aggregate, systematically skew a user's understanding of their own fitness. This elevates PI1 from a compliance checkbox to a genuine product safety obligation, and is why `clinical-safety` is a secondary review owner for PI-GAP-001 and PI-GAP-002.
+
+PI1 also applies to the enterprise administrative layer. If a SCIM provisioning call is processed incompletely — user created but role not assigned — the resulting access control state is inconsistent: a processing integrity failure with direct security consequences. If the analytics ETL drops events, aggregated wellness metrics in HR dashboards are understated: a processing integrity failure with direct enterprise customer trust consequences.
+
+Every other Trust Service Criterion with enterprise implications (CC1–CC9, A1, C1, P1–P8) has its own deep-dive section (§26–§35). This section gives PI1 the same treatment: control mapping across all five processing surfaces, gap registry, evidence artifact chain, and implementation checklist.
+
+---
+
+### 37.2 FORM Processing Surfaces in Scope
+
+Five processing surfaces carry PI1.1/PI1.2/PI1.3 obligations. Each surface has a distinct integrity risk profile.
+
+| Surface | Primary PI1 Risk | Dimensions | Failure Consequence |
+|---|---|---|---|
+| **Victor AI coaching pipeline** | Coaching turn silently dropped or response not filtered before delivery | PI1.1 (input auth), PI1.2 (completeness, accuracy, timeliness, auth) | User receives incorrect or no coaching guidance; P1 incident; R-10 activation |
+| **CV pose estimation** | Rep counted incorrectly; confidence threshold bypassed | PI1.2 (accuracy, auth) | Workout tracking inaccurate; user misled about performance |
+| **Wearable data ingestion** | Duplicate readings; missed sync window; cross-source normalization error | PI1.1 (completeness), PI1.2 (accuracy, timeliness) | HRV trend incorrect; Victor coaching context corrupted |
+| **SCIM / SSO provisioning** | User created but role not assigned; deprovisioning incomplete; group membership not atomically applied | PI1.1 (completeness, auth), PI1.3 (output consistency) | Access control failure; enterprise SLA breach; CC6 implication |
+| **Analytics ETL pipeline** | Events dropped PostHog → ClickHouse; cohort or aggregate calculations incorrect | PI1.2 (completeness, accuracy, timeliness) | HR dashboard metrics wrong; enterprise wellness reports inaccurate |
+
+The DEC-030 HMAC audit log chain functions as the *cross-surface evidence layer* for PI1 controls. Every processing surface that emits a DEC-030 event contributes to the PI1 audit trail. The chain itself is subject to PI1.3 (output integrity) — a broken chain eliminates FORM's ability to attest that processing occurred correctly and triggers a P0 incident (INCIDENT_RESPONSE.md R-05).
+
+---
+
+### 37.3 PI1.1 — Inputs Captured Completely and Accurately
+
+#### 37.3.1 Control Table
+
+| Control ID | Control | FORM Implementation | Status | Evidence |
+|---|---|---|---|---|
+| **PIC-01** | API input validation — all external inputs validated against Zod schema before processing | Cloudflare Worker middleware applies Zod schema at every endpoint; invalid inputs → HTTP 400 with structured error body; the invalid request is rejected before touching any processing pipeline | ✅ Done | `docs/SECURITY.md` §3 (Zod validation); schema definitions in `src/workers/schemas/` |
+| **PIC-02** | JWT authentication required before any data write — unauthenticated inputs rejected at edge | Supabase JWT verified in the Cloudflare Worker before any DB operation; `Authorization: Bearer` required; RS256 verification uses Supabase JWKS endpoint; enterprise tenants additionally require `tenant_id` claim matching an active row in `tenant_sso_configs` | ✅ Done | `docs/SECURITY.md` §2; SSO_SCIM_IMPLEMENTATION.md §6.1 |
+| **PIC-03** | Wearable sync idempotency — duplicate readings silently discarded | `wearable_readings(user_id, source, reading_type, recorded_at)` UNIQUE constraint; `ON CONFLICT DO NOTHING` in sync upsert; the HealthKit anchor is not advanced until the POST succeeds — the same reading is safely re-attempted on the next background delivery wakeup | ✅ Done | `docs/DATA_MODEL.md` §14.2 (DDL); §14.8.3 (idempotency note) |
+| **PIC-04** | SCIM user provisioning atomicity — every `POST /Users` that returns 201 has both a `users` row and a `scim_users` row created in a single DB transaction | Transaction wraps both inserts; rollback on either failure; `scim.user_provisioned` DEC-030 event emitted only on transaction commit — no event, no provisioned state | 🟡 Partial — transaction wrapper designed; integration test for rollback path not yet passing | PRE-37-E-001 (integration test, to create) |
+| **PIC-05** | Coaching turn input completeness — empty or overlong inputs rejected before LLM call | Zod schema: `z.string().min(1).max(4096)` on coaching request body; empty input → HTTP 400 before any Anthropic API call or token spend | ✅ Done | Zod schema in `src/workers/schemas/coaching.ts` |
+| **PIC-06** | SCIM Group membership atomicity — `PATCH /Groups/{id}` member add/remove operations applied in a single DB transaction, including session revocation | Single transaction: member row insert/delete + session revocation (SSO_SCIM_IMPLEMENTATION.md §15.7); rollback on revocation failure — no partial membership state possible | 🟡 Partial — atomic transaction designed (SSO_SCIM §15.7); not yet implemented | PRE-37-E-002 (integration test, to create) |
+
+#### 37.3.2 Input Authorization Architecture
+
+For FORM, "authority to initiate transactions" (the PI1.1 AICPA language) is enforced at two independent layers, so neither layer alone is a single point of failure.
+
+**Layer 1 — Edge (Cloudflare Worker):** JWT present, valid, unexpired, and issued by the FORM Supabase project. Requests without a valid JWT are rejected before application logic runs. Enterprise tenants additionally require the JWT to carry `tenant_id` matching an active tenant record.
+
+**Layer 2 — Database (Postgres RLS):** Even if a valid JWT reaches the database, RLS policies evaluate `current_setting('app.tenant_id')::UUID` against every row. Tenant A's JWT cannot read, write, or modify Tenant B rows regardless of application code — the database enforces this independently of the Worker. This design is documented in DATA_MODEL.md §3 and §4.
+
+A bug in the Worker that passes an incorrect `tenant_id` to the DB would fail at the RLS layer. A bug in the DB application-layer code that constructs a bad query would fail at the Worker JWT check. The two-layer model means PI1.1 input authorization cannot be defeated by a single-component failure.
+
+---
+
+### 37.4 PI1.2 — Processing Is Complete, Accurate, Timely, and Authorized
+
+This is the core PI criterion. Each of FORM's five processing surfaces is addressed in a dedicated sub-section.
+
+---
+
+#### 37.4.1 Victor AI Coaching Pipeline
+
+The coaching pipeline is the highest-PI-risk surface because it produces health-adjacent guidance that users may act on directly. A silently dropped turn or an output that bypasses the clinical safety filter is both a PI1 failure and a potential R-10 trigger.
+
+**Pipeline stages and PI controls:**
+
+```
+User input (validated by PIC-05)
+  → Subscription check + coaching consent check (PI1.2 authorization gate)
+  → coaching_turns row inserted, status = 'processing' (PI1.2 completeness open)
+  → Context builder: wearable trend buckets (DATA_MODEL §14.6.2), workout history
+  → Anthropic API: Claude Sonnet 4.6, temperature = 0.3 for health topics
+  → Output filter: clinical safety scan (PI1.2 accuracy gate; blocks harmful content)
+  → coaching_turns.response populated; status = 'completed' (PI1.2 completeness close)
+  → coaching.turn_completed DEC-030 event emitted (PI1.3 evidence)
+```
+
+| PI1.2 Dimension | Control | Status |
+|---|---|---|
+| **Completeness** | `coaching_turns.status` state machine: every row must reach `completed` or `failed` — no row stays in `processing` indefinitely; pg_cron job escalates stuck rows (> 60 s in `processing`) to `failed` and emits `coaching.completeness_check` DEC-030 event with orphaned-row count | 🔴 Gap — PI-GAP-001: stuck-row escalation job not yet implemented |
+| **Accuracy** | Clinical safety output filter runs before response delivery; `temperature = 0.3` reduces hallucination surface; context builder uses bucketed wearable values (directional labels, not raw numerics) per DATA_MODEL.md §14.6.2 — raw HRV values never reach the LLM | 🟡 Partial — filter implemented; accuracy signal (output-filter rejection rate) not tracked in production observability (PI-GAP-002) |
+| **Timeliness** | P95 coaching turn latency SLO: < 3 s text, < 5 s voice (OBSERVABILITY.md §2.1); Anthropic API timeout: 30 s; on timeout the turn status is set to `failed` — it does not block the user session | ✅ Done |
+| **Authorization** | Coaching turn processed only if: (1) active subscription, (2) `coaching` consent flag set in `users.consent_flags`, (3) valid JWT — all three checked synchronously before the Anthropic API call | ✅ Done |
+
+**Evidence artifacts:**
+- **PRE-37-E-003:** `coaching_turns` DDL showing `status` enum (`processing`, `completed`, `failed`), `completed_at` timestamp, and `response` NOT NULL deferrable constraint
+- **PRE-37-E-004:** OBSERVABILITY.md §2.1 SLO table (coaching turn P95 latency) — quarterly extract to `compliance/evidence/pi1/`
+- **PRE-37-E-005:** Clinical safety output filter middleware source (redacted — shows invocation point and return type only, not filter pattern detail)
+
+---
+
+#### 37.4.2 CV Pose Estimation Pipeline
+
+The CV pipeline counts repetitions and analyzes exercise form using on-device ML inference. Rep count accuracy is the primary PI1.2 risk: a systematically high or low count causes users to believe their workout differed from what occurred, affecting progressive overload decisions.
+
+| PI1.2 Dimension | Control | Status |
+|---|---|---|
+| **Completeness** | Every workout session with `cv_enabled = true` must produce a `cv_sessions` row; if CV inference fails mid-session, the partial result is committed and the session is marked `cv_partial` — the user sees their partial data rather than a silent failure | 🟡 Partial — `cv_partial` status defined; not yet enforced in all mobile error-path branches |
+| **Accuracy** | Rep count confidence threshold: keypoint confidence score < 0.65 means the rep is not counted; borderline reps (0.65–0.75) flagged with `low_confidence: true` in `workout_sets.metadata` for transparency | 🟡 Partial — threshold constant defined in `src/ml/pose/config.ts`; not yet surfaced in observability (PI-GAP-002 extension) |
+| **Timeliness** | On-device inference latency target: < 100 ms per frame at 30 fps; inference runs on NPU where available (iOS Neural Engine on A-series chips, Android NNAPI on qualifying devices) | ✅ Done |
+| **Authorization** | CV processing initiates only when `cv_coaching` consent is set in `users.consent_flags` — checked once at session start, not per-frame; no CV inference occurs on any frame if consent is absent | ✅ Done |
+
+**Evidence artifact PRE-37-E-006:** `src/ml/pose/config.ts` git permalink showing `REP_COUNT_CONFIDENCE_MIN = 0.65` constant. Filed to `compliance/evidence/pi1/` at each ML model update.
+
+---
+
+#### 37.4.3 Wearable Data Ingestion and Normalization
+
+Wearable data feeds Victor's coaching context. Processing integrity requires both that readings are stored exactly once (completeness, via idempotency) and that cross-source HRV normalization produces values on a consistent physiological scale (accuracy).
+
+| PI1.2 Dimension | Control | Status |
+|---|---|---|
+| **Completeness** | HealthKit anchor-based retry: if the FORM app's `POST /v1/wearable/sync` fails, the `HKAnchoredObjectQuery` anchor is not advanced — iOS re-delivers the same readings on the next background delivery wakeup; the UNIQUE constraint (PIC-03) makes re-delivery a safe no-op | ✅ Done |
+| **Accuracy** | Cross-source HRV normalization: Garmin HRV is categorical (not RMSSD-numeric) — stored in `metadata` only, excluded from cross-source trend logic; Whoop and Oura RMSSD values join the normalization chain with source-priority ordering documented in DATA_MODEL.md §14.5; no source is up-weighted without a documented physiological rationale | ✅ Done |
+| **Timeliness** | HealthKit: near-real-time (iOS-pushed); Health Connect: 15-minute OS minimum (documented in DATA_MODEL.md §14.9.2); Whoop / Oura / Garmin: 2-hour cron — acceptable lag documented and disclosed in Victor's response templates ("based on your last recorded reading") | ✅ Done |
+| **Authorization** | Sync endpoint checks `wearable` consent gate before any write; unauthenticated calls fail at PIC-02; OAuth token decryption uses per-tenant KMS key (DATA_MODEL.md §14.8) | ✅ Done |
+
+---
+
+#### 37.4.4 Nutrition and Macro Calculation
+
+Macro arithmetic is deterministic and does not involve AI or external APIs. The PI1.2 risk is low but non-zero: unit-conversion errors (grams vs. ounces) or calorie-factor errors (protein 4 kcal/g, fat 9 kcal/g, carbohydrate 4 kcal/g) would bias every macro total computed by every user.
+
+| PI1.2 Dimension | Control | Status |
+|---|---|---|
+| **Completeness** | Meal log entry must supply all three macronutrient fields; entries with any macro field null are rejected at API layer — user is prompted to complete the entry | 🔴 Gap — PI-GAP-003: `NOT NULL` DB constraint not yet applied; mobile UI allows partial saves with implied zeros |
+| **Accuracy** | Macro constants in `src/nutrition/constants.ts`: `PROTEIN_KCAL_PER_G = 4`, `CARBOHYDRATE_KCAL_PER_G = 4`, `FAT_KCAL_PER_G = 9`; no AI is involved in calorie arithmetic — pure deterministic multiplication | 🔴 Gap — PI-GAP-004: constants not covered by CI unit tests; a refactor could silently change them with no regression detection |
+| **Timeliness** | Macro sum computed synchronously in the same request as the meal log write; no async pipeline | ✅ Done |
+| **Authorization** | Meal log write requires valid JWT + `meal_log` consent flag + active subscription — checked before any DB write | ✅ Done |
+
+---
+
+#### 37.4.5 Analytics ETL Pipeline
+
+The ClickHouse pipeline feeds enterprise HR dashboards with aggregated wellness metrics. If the ETL drops events, tenant-level aggregates are understated — a processing integrity failure with direct enterprise customer impact and a violation of the §2.6 aggregate accuracy obligation.
+
+| PI1.2 Dimension | Control | Status |
+|---|---|---|
+| **Completeness** | PostHog → ClickHouse nightly batch ETL; row-count cross-check between `posthog_event_count(date = yesterday)` and `fact_events COUNT WHERE event_date = yesterday`; discrepancy > 0.1% → PagerDuty P1 alert | 🔴 Gap — PI-GAP-005: cross-check not yet implemented; event loss is currently undetectable |
+| **Accuracy** | `stripForbiddenProperties()` middleware prevents Art. 9 fields from reaching PostHog (DATA_MODEL.md §13.3, §13.6.1); ClickHouse cohort calculation uses `event_date` from `fact_events`, not PostHog session timestamps, avoiding timezone skew | ✅ Done |
+| **Timeliness** | Nightly ETL target completion: before 06:00 UTC (ahead of cost-monitor Worker at 06:00 UTC per OBSERVABILITY.md §17.4); ETL completion-time SLO not yet formally defined — PI-GAP-005 remediation includes SLO definition | 🟡 Partial |
+| **Authorization** | ETL Worker uses a Cloudflare service binding — no public internet access; ClickHouse credentials in Workers Secrets; PostHog API key in Workers Secrets | ✅ Done |
+
+---
+
+### 37.5 PI1.3 — Outputs Complete and Accurate
+
+PI1.3 addresses the fidelity of system outputs at the boundary where FORM's processing results leave the FORM system — including interfaces with counterparty systems (SCIM, DSAR export) and the DEC-030 audit chain that serves as evidence for all other surfaces.
+
+| Output Surface | PI1.3 Control | Status | Evidence |
+|---|---|---|---|
+| **Victor coaching response** | Response schema validated in the Worker before returning HTTP 200 to client; `coaching_turns.response` is NOT NULL deferrable — a null response cannot reach the client | ✅ Done | Zod response schema in `src/workers/schemas/coaching.ts`; `coaching_turns` DDL |
+| **SCIM /Users and /Groups responses** | SCIM response payloads conform to RFC 7643 schema; `scim-validator` conformance test suite runs in CI on every SCIM endpoint | 🔴 Gap — PI-GAP-006: SCIM endpoints not yet implemented (G-001); conformance test therefore not in CI |
+| **HR dashboard aggregate metrics** | `tenant_aggregate_stats` materialized view enforces k-anonymity floor N ≥ 5 — no cohort of fewer than five users appears in any aggregate row; individual values never appear in dashboard output | ✅ Done | DATA_MODEL.md §2.6 (MV DDL); ENTERPRISE.md (privacy floor) |
+| **DSAR export (Art. 20 portability)** | Export ZIP contains all five data categories; row counts included in `privacy.dsar_completed` DEC-030 event so completeness claim is cryptographically committed to the HMAC chain | 🔴 Gap — PI-GAP-007: `counts` payload not yet added to `privacy.dsar_completed` event |
+| **DEC-030 HMAC audit chain** | Every emitted event carries `hmac_self = HMAC-SHA256(secret_key, hmac_prev ‖ canonical_payload)`; weekly chain validation cron verifies the full chain; break → P0 PagerDuty (INCIDENT_RESPONSE.md R-05) | ✅ Done | AUDIT_LOG_SCHEMA.md §HMAC chaining; OBSERVABILITY.md §16.8 (S-007 synthetic probe) |
+
+#### 37.5.1 DEC-030 as the Cross-Surface PI1 Evidence Layer
+
+Every processing surface that emits a DEC-030 event contributes to a verifiable PI1 evidence trail. The canonical three-event pattern for a coaching turn is:
+
+```
+coaching.turn_started     → input captured (PI1.1 evidence)
+coaching.turn_completed   → processing completed (PI1.2 completeness evidence)
+  └── hmac_self verified  → output integrity (PI1.3 evidence)
+```
+
+A gap in the chain — a `coaching.turn_started` event with no corresponding `coaching.turn_completed` within 60 seconds — is both a DEC-030 chain anomaly and the PI-GAP-001 trigger condition. The stuck-row detection query that closes PI-GAP-001 is:
+
+```sql
+-- Orphaned coaching turns: stuck in 'processing' for > 60 seconds
+-- Runs as a Supabase pg_cron job every 60 seconds
+SELECT id, user_id, tenant_id, created_at
+FROM   coaching_turns
+WHERE  status = 'processing'
+  AND  created_at < NOW() - INTERVAL '60 seconds';
+-- On non-empty result: UPDATE status = 'failed', emit coaching.completeness_check DEC-030 event
+```
+
+The `coaching.completeness_check` DEC-030 event carries `orphaned_count` as a payload field. Auditors can use this event series to verify that FORM actively monitors and closes PI1.2 completeness gaps, satisfying the "monitoring of processing" element of PI1.2.
+
+---
+
+### 37.6 Gap Analysis
+
+| Gap ID | Description | PI1 Dimension | Severity | Status |
+|---|---|---|---|---|
+| **PI-GAP-001** | `coaching_turns` stuck-row detection not implemented. Turns stuck in `status = 'processing'` for > 60 s are not escalated to `failed`. Orphaned processing state accumulates silently with no alert. | PI1.2 Completeness | P1 | 🔴 Open |
+| **PI-GAP-002** | Coaching turn and CV accuracy metrics not tracked in production observability. No metric for output-filter rejection rate, stuck-turn rate, or CV low-confidence rep rate. | PI1.2 Accuracy | P1 | 🔴 Open |
+| **PI-GAP-003** | Meal log allows incomplete entries. `fat_g`, `carbohydrate_g`, `protein_g` lack `NOT NULL` DB constraints; mobile UI can submit partial entries; missing macros silently default to zero in sum. | PI1.2 Completeness | P2 | 🔴 Open |
+| **PI-GAP-004** | Nutrition macro constants have no CI unit tests. `PROTEIN_KCAL_PER_G`, `CARBOHYDRATE_KCAL_PER_G`, `FAT_KCAL_PER_G` in `src/nutrition/constants.ts` are correct but unguarded against accidental regression. | PI1.2 Accuracy | P2 | 🔴 Open |
+| **PI-GAP-005** | Analytics ETL has no row-count cross-check. Event loss between PostHog and ClickHouse `fact_events` is undetectable until aggregate discrepancy surfaces in dashboard reports. No ETL completion-time SLO defined. | PI1.2 Completeness + Timeliness | P1 | 🔴 Open |
+| **PI-GAP-006** | SCIM response schema not validated in CI against RFC 7643. Blocked on G-001 (SCIM endpoints not yet implemented). | PI1.3 Output accuracy | P1 | 🔴 Open (blocked on G-001) |
+| **PI-GAP-007** | DSAR export completeness row-count not in `privacy.dsar_completed` DEC-030 event. Completeness claim is not cryptographically committed to the HMAC chain. | PI1.3 Output completeness | P2 | 🔴 Open |
+
+---
+
+### 37.7 Evidence Package
+
+| Artifact ID | Description | Target Location | Refresh Cadence | Owner |
+|---|---|---|---|---|
+| **PRE-37-E-001** | Integration test: atomic SCIM user provisioning rollback — confirms that a DB error during `scim_users` insert rolls back the `users` row (PIC-04) | `__tests__/scim/user-provisioning-atomic.test.ts` | Per PR touching SCIM provisioning | platform-engineer |
+| **PRE-37-E-002** | Integration test: atomic SCIM Group `PATCH` member operation — confirms single-transaction apply + session revocation rollback on failure (PIC-06) | `__tests__/scim/group-patch-atomic.test.ts` | Per PR touching SCIM Groups | platform-engineer |
+| **PRE-37-E-003** | `coaching_turns` DDL showing `status` enum constraint, `completed_at` timestamp, and `response NOT NULL DEFERRABLE` column | `supabase/migrations/` git log permalink | Per schema migration touching `coaching_turns` | platform-engineer |
+| **PRE-37-E-004** | Coaching turn P95 latency SLO evidence — OBSERVABILITY.md §2.1 extract or Metabase dashboard screenshot | `compliance/evidence/pi1/coaching-latency-slo-YYYY-MM.pdf` | Quarterly (§15 calendar) | devops-lead |
+| **PRE-37-E-005** | Clinical safety output filter middleware — redacted source showing invocation point and return type (not pattern detail) | `compliance/evidence/pi1/output-filter-middleware-snippet-YYYY-MM.ts` | Per significant change to output filter | security-engineer + clinical-safety |
+| **PRE-37-E-006** | CV confidence threshold constant (`REP_COUNT_CONFIDENCE_MIN = 0.65`) — git permalink to current commit | `compliance/evidence/pi1/cv-threshold-git-permalink-YYYY-MM.txt` | Per ML model update | ml-engineer |
+| **PRE-37-E-007** | Nutrition macro constant unit test CI results — GitHub Actions run URL showing `PROTEIN_KCAL_PER_G`, `CARBOHYDRATE_KCAL_PER_G`, `FAT_KCAL_PER_G` pass (remediation of PI-GAP-004) | `compliance/evidence/pi1/nutrition-unit-test-YYYY-MM.txt` | Per release | platform-engineer |
+| **PRE-37-E-008** | ETL row-count cross-check alert config and first 30-day alert log (remediation of PI-GAP-005) | `compliance/evidence/pi1/etl-crosscheck-config-YYYY-MM.yaml` | Per ETL config change | data-engineer |
+
+---
+
+### 37.8 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Notes |
+|---|---|---|---|---|---|
+| 1 | Implement `coaching_turns` stuck-row detection: Supabase pg_cron job every 60 s; `UPDATE coaching_turns SET status = 'failed', completed_at = NOW() WHERE status = 'processing' AND created_at < NOW() - INTERVAL '60 seconds'`; emit `coaching.completeness_check` DEC-030 event with `orphaned_count`; file PRE-37-E-003 on first successful run (closes PI-GAP-001) | platform-engineer | **P1** | M3 | Add alongside existing M3 cron jobs in the pg_cron migration; coordinate with clinical-safety on failed-turn UX copy |
+| 2 | Add PI1.2 accuracy metrics to OBSERVABILITY.md §6 alert rules: (a) `coaching_output_filter_rejection_rate` emitted via `coaching.turn_completed` DEC-030 event with `output_filter_triggered: bool`; alert threshold > 5% in any 10-min window → P1; (b) `cv_low_confidence_rep_rate` from `workout_sets.metadata.low_confidence` flag rate; alert threshold > 20% in any session → P2 (closes PI-GAP-002) | devops-lead + platform-engineer | **P1** | M3 | DEC-030 event payload extension: add `output_filter_triggered` boolean to `coaching.turn_completed`; update AUDIT_LOG_SCHEMA.md |
+| 3 | Apply `NOT NULL` constraints to `meal_logs.fat_g`, `meal_logs.carbohydrate_g`, `meal_logs.protein_g`; update mobile UI to require all three fields before save; backend rejects partial entries with HTTP 400 (closes PI-GAP-003) | platform-engineer | **P2** | M4 | Coordinate with nutrition-coach on UX — avoid framing as "you must log everything" which can create pressure around food logging |
+| 4 | Add `src/nutrition/constants.ts` unit tests to CI: assert `PROTEIN_KCAL_PER_G === 4`, `CARBOHYDRATE_KCAL_PER_G === 4`, `FAT_KCAL_PER_G === 9`; add total calorie fixture test with known input; add to `ci/test` gate required for merge (closes PI-GAP-004) | platform-engineer | **P2** | M4 | Trivial test file; high-value regression guard |
+| 5 | Implement PostHog → ClickHouse ETL row-count cross-check: Cloudflare Worker cron at 06:30 UTC; compare `posthog_event_count(date = yesterday)` via PostHog REST API to `SELECT COUNT(*) FROM fact_events WHERE event_date = yesterday` via ClickHouse HTTP; discrepancy > 0.1% → PagerDuty P1; define ETL completion SLO (target: 05:30 UTC); add SLO to OBSERVABILITY.md §2.1; file PRE-37-E-008 after 30-day clean run (closes PI-GAP-005) | data-engineer | **P1** | M4 | Credentials for both PostHog API and ClickHouse must be in Workers Secrets; do not hard-code |
+| 6 | Add RFC 7643 SCIM conformance test to CI (blocked on G-001): once SCIM endpoints are implemented, run `scim-js` or Okta SCIM test tool against all `/Users` and `/Groups` endpoints in integration tests; add to `ci/test` gate; file PRE-37-E-001 and PRE-37-E-002 after first passing run (closes PI-GAP-006) | platform-engineer + enterprise-architect | **P1** | M4 (blocked on G-001) | Add PI-GAP-006 to the G-001 implementation ticket as a blocking requirement |
+| 7 | Add `counts` payload to `privacy.dsar_completed` DEC-030 event: `{ workouts: N, meals: N, coaching_turns: N, wearable_readings: N }`; update AUDIT_LOG_SCHEMA.md action taxonomy before implementing (closes PI-GAP-007) | platform-engineer | **P2** | M4 | Small DEC-030 event extension; the counts are already available from the export job query results — this is a logging addition only |
+| 8 | File PRE-37-E-004 (coaching latency SLO evidence) to `compliance/evidence/pi1/` 30 days after first production month; schedule quarterly refresh in §15 compliance calendar | devops-lead | **P1** | Post-launch M1 | First filing: Day 30 post-launch |
+| 9 | File PRE-37-E-006 (CV confidence threshold permalink) to `compliance/evidence/pi1/` at first production ML release; refresh on every model update with `git log --follow -n 1 -- src/ml/pose/config.ts` | ml-engineer | **P2** | M3 | Permalink generation is a one-command operation |
+
+---
+
+### 37.9 SOC 2 Readiness Delta
+
+| Criterion | Before §37 | After §37 |
+|---|---|---|
+| **PI1.1 — Input completeness and authorization** | 🟡 Partial — Zod validation and JWT auth documented in §3 high-level table; no PI control IDs; SCIM atomic provisioning gap not formally tracked | 6 control IDs (PIC-01 through PIC-06) established; input authorization two-layer architecture (edge JWT + DB RLS) explicitly mapped to PI1.1; SCIM atomicity gaps formally opened as PI-GAP-006 with G-001 dependency noted; PRE-37-E-001 and PRE-37-E-002 evidence artifacts defined |
+| **PI1.2 — Processing completeness, accuracy, timeliness, authorization** | 🟡 Partial — §3 notes "error handling — failed processing not silently dropped" as a single gap row; no systematic mapping across processing surfaces | All five surfaces (coaching, CV, wearable, nutrition, analytics ETL) mapped against all four PI1.2 dimensions; 5 gaps opened (PI-GAP-001 through PI-GAP-005) with owners, priorities, milestones; stuck-row pg_cron job (PI-GAP-001) and ETL cross-check (PI-GAP-005) are the P1 items blocking observability coverage |
+| **PI1.3 — Output completeness and accuracy** | 🟡 Partial — DEC-030 HMAC chain documented in AUDIT_LOG_SCHEMA.md; no PI1.3 framing or output-surface enumeration | Five output surfaces mapped to PI1.3; DEC-030 established as cross-surface evidence layer with canonical three-event PI1 audit pattern; SCIM RFC 7643 conformance (PI-GAP-006) and DSAR completeness count (PI-GAP-007) formally opened |
+| **New gaps formally opened** | — | 7 (PI-GAP-001 through PI-GAP-007) |
+| **Gaps with remediation path** | — | 7/7 |
+| **Net readiness movement** | ~94% | ~95% (PI1 advances from a two-row high-level table in §3 to a full deep-dive with the same structure as §26–§35; 6 control IDs, 5 processing surfaces, 7 documented gaps with owners and milestones, 8 evidence artifacts, 9-item implementation checklist; PI1 is now formally programmatic and auditor-presentable as a peer of the CC, A, C, and P deep-dive sections) |
+
+**SOC 2 readiness: ~94% → ~95%**
+
+---
+
+*v2.5 additions: §37 PI1 — Processing Integrity Deep-Dive. Five processing surfaces formally mapped against PI1.1/PI1.2/PI1.3: (1) Victor AI coaching pipeline — `coaching_turns.status` state machine, clinical safety output filter, P95 latency SLO < 3 s text / 5 s voice, three-gate authorization (subscription + consent + JWT); (2) CV pose estimation — confidence threshold 0.65, `cv_partial` session status, NPU timeliness; (3) wearable data ingestion — HealthKit anchor-based idempotency, cross-source HRV normalization (Garmin categorical exclusion), 2-hour cron disclosure; (4) nutrition / macro calculation — deterministic arithmetic constants, implicit-zero gap (PI-GAP-003), CI test gap (PI-GAP-004); (5) analytics ETL — PostHog→ClickHouse row-count cross-check gap (PI-GAP-005), `stripForbiddenProperties()` as accuracy control, ETL SLO gap. DEC-030 HMAC chain established as cross-surface PI1 evidence layer with canonical three-event audit pattern and stuck-turn detection SQL. 6 control IDs (PIC-01–PIC-06). 5 output surfaces mapped to PI1.3 (coaching response, SCIM RFC 7643, HR aggregate k-anonymity, DSAR export, DEC-030 chain). 7 gaps opened: PI-GAP-001 (stuck-row escalation P1), PI-GAP-002 (accuracy observability P1), PI-GAP-003 (meal log NOT NULL P2), PI-GAP-004 (nutrition CI test P2), PI-GAP-005 (ETL cross-check P1), PI-GAP-006 (SCIM conformance P1, blocked G-001), PI-GAP-007 (DSAR count P2). 8 evidence artifacts (PRE-37-E-001–PRE-37-E-008). 9-item implementation checklist (3× M3, 5× M4, 1× post-launch). SOC 2 readiness: ~94% → ~95%.*
