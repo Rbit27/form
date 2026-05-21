@@ -6,6 +6,20 @@
 
 ---
 
+## [1.3.0] — 2026-05-21
+
+### Added
+- `docs/CRYPTOGRAPHY_POLICY.md` — v1.0 IN FORCE; closes CC5-GAP-002 (P0 SOC 2 gap); approved algorithms (TLS 1.3, AES-256-GCM, HMAC-SHA256, Argon2id), prohibited algorithms (MD5, SHA-1, DES/3DES, RC4, ECB, static IVs), minimum key lengths (RSA 2048, ECC P-256, AES-256, HMAC 256-bit, JWT 512-bit), key rotation schedule (JWT 90d, API keys 180d, DB encryption annual, HMAC chain annual with chain-continuity procedure), key custody matrix (1Password, Cloudflare Workers Secrets, Supabase Vault, offline escrow for B2 WORM tier), certificate management (Cloudflare-managed auto-renew, mobile SHA-256 pinning with 90d advance rotation notice), key compromise runbook (detect → isolate → rotate → audit → notify → post-mortem), algorithm deprecation procedure; SOC 2 evidence mapping CC5.2/CC5.3/C1.1/C1.2; 14-item implementation checklist M3/M4
+- `compliance/policy-approval-log.csv` — CC5-P1-004; policy registry with 9 policies (POL-001 through POL-009) covering AUP, Cryptography Policy, Security Policy, Privacy Policy, DPIA, Incident Response, Sub-processor Register, Retention Decisions, Complaint Intake Procedure; columns: policy_id, policy_name, version, file_path, status, effective_date, approved_by, approval_method, next_review_date, gap_ids_closed, soc2_criteria, gdpr_basis, notes
+- `compliance/cc1/README.md` — CC1 evidence directory index; CC1-E-001 through CC1-E-005 artifact tracking; AUP acknowledgment procedure (signing path → git tag → PDF to cc1/aup/ → policy-approval-log.csv update → SOC 2 P0-11 gate closure); CC1 gap status tracker (CC1-GAP-001 🟡 AUTHORED pending counsel; CC1-GAP-002/003/004 🔴 Open)
+
+### SOC 2 Gap Progress
+- CC5-GAP-002 🔴→🟢 CLOSED (Cryptography Policy authored and in force)
+- CC1-GAP-001 🔴→🟡 PARTIAL (AUP document authored; pending counsel review + founder signature for full P0-11 gate closure)
+- CC5-P1-004 🔴→🟡 PARTIAL (policy-approval-log.csv created; complete population after AUP and Cryptography Policy formally approved)
+
+---
+
 ## [1.2.0] — 2026-05-21
 
 ### Added
