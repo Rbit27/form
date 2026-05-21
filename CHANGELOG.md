@@ -4,6 +4,15 @@
 Формат базується на [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 Версіювання: **semver-light** — `MAJOR.MINOR.PATCH`.
 
+---
+
+## [0.99.2] — 2026-05-21
+
+### Added
+- `content/post-70-training-volume-mev-mav-mrv.md` — sports-science: MEV/MAV/MRV volume landmarks framework; dose-response biology, Schoenfeld 2017 meta-analysis, individual variation as central thesis; clinical_safety_reviewed: PASS (MRV framed as ceiling, not target; no competitive volume framing)
+
+---
+
 | Bump | Коли |
 |---|---|
 | **PATCH** (`x.y.Z`) | Кожна cloud-ітерація. Один концепт = один bump. |
