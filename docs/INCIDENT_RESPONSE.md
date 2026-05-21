@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v0.1
+# FORM · Incident Response Runbook v0.4
 
 > Owner: security-engineer + devops-lead. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2.
 
@@ -1384,6 +1384,240 @@ Supply chain package        → follow R-08 eradication protocol
 
 ---
 
+### R-10: AI Coach Safety Incident (Victor Harmful Guidance)
+
+**Trigger:** Evidence that FORM's AI coach Victor has generated — or is generating at scale — coaching guidance that is clinically unsafe, triggers eating-disorder-adjacent behaviors, produces body-shaming content, or bypasses the safety guardrails defined in `docs/VICTOR_PROMPT_GUIDE.md` and the clinical-safety protocol. Triggers include:
+
+- Direct user report of harmful coaching cue (injury, ED-adjacent language, dangerous load progression)
+- clinical-safety review flags a `coaching_turns` record as violating a hard constraint
+- Sentry alert: spike in `coaching_response_flagged` events above the 1% daily baseline
+- PostHog alert: unusual `feedback_negative` event cluster (>5 in 15 min from distinct users)
+- Anthropic safety filter bypass detected: response contains content that should have been blocked
+- Enterprise tenant admin reports that Victor gave harmful guidance to an employee
+- FORM employee discovers a prompt injection vector in user input that altered Victor's behavior
+
+**This runbook does not cover: individual user complaints about response quality (handled by support), feature requests for Victor behavior changes, or disputes about workout programming philosophy. Those are support tickets, not incidents.**
+
+**Severity:**
+
+| Condition | Severity Floor |
+|---|---|
+| Single user, isolated session, no clinical harm reported | P2 — log and investigate in business hours |
+| Multiple users (≥3) affected by the same harmful pattern in a 24-hour window | P1 — immediate investigation; IC notified |
+| Confirmed ED-adjacent content (weight loss advice crossing clinical thresholds, body-weight comparisons, restriction advocacy) | P1 minimum; upgrade to P0 if >10 users affected |
+| Body composition data surfaced to employer or admin dashboard (privacy floor violation) | P0 — triggers §12 enterprise tenant protocol immediately |
+| AI-generated advice linked to a user injury report | P0 — legal, clinical-safety, and compliance-officer on call |
+| Prompt injection vector confirmed: user-supplied text altered Victor's core persona or safety rules | P0 — all affected sessions are a security incident (CC7.4); assess GDPR Art. 34 |
+| Harmful guidance generated for ≥50 users or persisted across >1 model version deployment | P0 — model-level or prompt-level defect; Anthropic notification required |
+
+**Classification nuance:** AI safety incidents sit at the intersection of product safety and security. An Anthropic API safety filter failure is a third-party processor incident (→ R-07 cross-reference for sub-processor protocol). A prompt injection vector is a security vulnerability (→ CC7.4, treat as security incident). Harmful guidance from a well-functioning model is a product safety incident. All three paths start here; the scope assessment determines which branch applies.
+
+#### Immediate Actions (T+0 to T+30 min)
+
+```
+1. Open incident channel: #inc-YYYYMMDD-ai-safety-[brief-slug]
+   Example: #inc-20260520-ai-safety-ed-content-p1
+
+2. Page: IC + clinical-safety + security-engineer.
+   - clinical-safety has veto power on all containment decisions.
+   - Do NOT disable the coaching feature without clinical-safety approval of
+     the scope — a false positive that disables coaching for all users creates
+     a different harm (users mid-session with no feedback).
+
+3. Retrieve the harmful content immediately:
+   a. Query coaching_turns table (read-only replica):
+      SELECT session_id, user_id, content_hash, created_at, coach_response
+      FROM coaching_turns
+      WHERE created_at > NOW() - INTERVAL '24 hours'
+        AND (tenant_id = '<affected_tenant>' OR user_id = '<affected_user>')
+      ORDER BY created_at DESC LIMIT 50;
+
+   b. Do NOT log the raw text of harmful coaching responses to the incident
+      channel — they may contain ED-adjacent language that could harm responders.
+      Use content_hash and session_id references only.
+
+   c. Retrieve the system prompt version in use at the time:
+      Check victor_prompt_version label in the coaching_turns record.
+      Compare against the current production prompt in
+      workers/victor/system-prompt.ts (or equivalent).
+
+4. Assess prompt injection:
+   - Retrieve the user input from the same coaching_turns record
+     (user_message field or equivalent).
+   - Check for: role override instructions, "ignore previous instructions",
+     jailbreak patterns, excessive special characters or Unicode confusables,
+     or content that redirects Victor's persona.
+   - If prompt injection is confirmed → classify as P0 security incident immediately.
+     Notify security-engineer; do not proceed with product-safety branch alone.
+
+5. Check blast radius:
+   - Is this a single session or a systematic prompt/model issue?
+   - Query for the same victor_prompt_version or model_version across all
+     coaching_turns in the past 72 hours:
+     SELECT COUNT(*), victor_prompt_version
+     FROM coaching_turns
+     WHERE created_at > NOW() - INTERVAL '72 hours'
+     GROUP BY victor_prompt_version;
+   - Check PostHog: feedback_negative events by timestamp — look for a cluster
+     that correlates with a specific deployment or model version.
+```
+
+#### Scope Assessment
+
+Answer before any external communication. P0 upgrade if any "yes" answer:
+
+```
+[ ] Was the harmful content ED-adjacent (caloric restriction, weight comparisons,
+    body-weight language that a clinical-safety reviewer would flag)?
+    YES / NO
+
+[ ] Was body composition data surfaced to an employer admin dashboard?
+    YES — this is a privacy floor violation; trigger §12 and DEC-030
+    data.read_individual event audit immediately.
+    NO
+
+[ ] Is the harmful pattern reproducible? Test in staging using the same
+    user_input → system_prompt combination (never test on production).
+    REPRODUCIBLE / NOT REPRODUCIBLE
+
+[ ] Is this a model-level issue (same input produces same output on
+    multiple model calls) or a prompt-level issue (system prompt change
+    introduced the regression)?
+    MODEL-LEVEL (→ Anthropic notification; R-07 branch)
+    PROMPT-LEVEL (→ system prompt rollback; this runbook)
+    PROMPT-INJECTION (→ P0 security incident; R-01/CC7.4 branch also active)
+
+[ ] Scope of affected users:
+    - Users who received the harmful content: ___
+    - Enterprise tenants affected: ___
+    - Time window of exposure: ___
+    - Is the system prompt still deployed? YES / NO
+
+[ ] Has any affected user reported a physical injury or clinical harm?
+    YES — notify clinical-safety immediately; begin Art. 34 assessment with
+    compliance-officer. Do not make any public statement without legal review.
+    NO — continue assessment.
+
+[ ] Was this a wellness-as-punishment scenario (enterprise tenant using
+    FORM to punish employees for non-participation, or employer pressure
+    linked to Victor guidance)?
+    YES — this is a no-go customer contract violation; escalate to founder.
+    NO
+```
+
+#### Containment
+
+```
+1. Disable the affected coaching pathway via feature flag:
+   - Use the tenant_feature_flags table (or equivalent Workers KV entry)
+     to disable the specific feature — not the entire coaching product.
+   - If the issue is the system prompt, not a specific feature:
+     a. Do NOT disable all coaching — this harms all users.
+     b. Patch the system prompt in victor_prompt_configs (or Workers secret)
+        with the previous clean version. Requires security-engineer approval
+        to write a production secret.
+     c. Deploy the patched prompt to production Workers via Wrangler deploy.
+        Standard change management (§9.4 change management) is waived for
+        P0/P1 safety incidents; IC approval suffices.
+
+2. Prevent new affected sessions:
+   - If the harmful pattern is deterministic and reproducible: deploy the fix
+     before re-enabling the pathway.
+   - If the harmful pattern is stochastic (occurs occasionally for certain
+     input patterns): add a content filter check at the edge Worker level —
+     scan Victor's response for the blocked pattern before delivering to client.
+     DEC-030 event: coaching.response_blocked (new event type if not already
+     defined; add to AUDIT_LOG_SCHEMA.md under session events).
+
+3. Do not delete or modify coaching_turns records.
+   The coaching_turns table is append-only. Evidence preservation (§7) applies.
+   Harmful responses are retained for post-incident review and pattern analysis.
+   The content_hash makes each response identifiable without exposing full text.
+
+4. Notify clinical-safety owner of the exact nature of the harmful content.
+   clinical-safety has veto power on the "safe to re-enable" decision.
+   No pathway is re-enabled until clinical-safety signs off in the incident channel.
+
+5. If the affected system prompt version was deployed via CI:
+   - Revert the relevant commit (git revert — do not git reset --hard)
+   - Open a hotfix PR with the prompt correction
+   - clinical-safety must approve the PR before merge
+   - This is the only change management exception: clinical-safety approval
+     takes precedence over the normal code review requirement.
+```
+
+#### Eradication
+
+```
+1. Root cause determination:
+   a. PROMPT REGRESSION: Which prompt change introduced the harmful pattern?
+      - git log workers/victor/system-prompt.ts (or equivalent path)
+      - Compare the deployed prompt version with the previous version
+      - Identify the specific clause or instruction that allowed harmful output
+      - clinical-safety reviews the delta before any new prompt version is drafted
+
+   b. MODEL BEHAVIOR DRIFT: Same prompt, same input, but model output changed.
+      - Record the exact Anthropic model version used (from API response header
+        or from the model_version field in coaching_turns)
+      - File an issue with Anthropic safety team via their developer safety
+        reporting channel: https://www.anthropic.com/safety
+      - Document the input/output pair (without user PII) for Anthropic report
+      - Do not assume a model regression is benign — it may affect all FORM users
+        until a model version pin or Anthropic fix is in place
+
+   c. PROMPT INJECTION: User-supplied input manipulated Victor's core behavior.
+      - Document the injection vector exactly
+      - Implement input sanitization at the edge Worker: reject or transform
+        inputs containing role-override patterns before they reach the Anthropic API
+      - Sanitization rules must be tested against the Victor Jailbreak Test Suite
+        (add to §9 testing program if not yet present)
+      - Review whether other user-controlled input fields (nutrition log,
+        workout description free text) have the same injection surface
+
+2. Clinical-safety review of the full remediated prompt before re-deployment.
+   This is not optional. Duration: typically 24-48h for clinical-safety turnaround.
+   For P0 incidents, request an emergency clinical-safety review (<4h SLA).
+
+3. Implement preventive controls (add to §9 testing program):
+   - Add the harmful input pattern to the Victor regression test suite
+   - Add a clinical-safety review step to the prompt change PR template
+   - Add PostHog alert: feedback_negative rate >1% on any 15-minute window
+   - Add Sentry alert: coaching_response_flagged event spike
+   - Add a content filter Worker middleware that screens Victor responses for
+     blocked patterns (ED-adjacent language list maintained by clinical-safety)
+   - Review VICTOR_PROMPT_GUIDE.md — if the safety rules were unclear,
+     rewrite the relevant section before the patched prompt deploys
+```
+
+#### Evidence Package (SOC 2 CC7.4, CC5.2, CC1.2)
+
+```
+[ ] coaching_turns records (SHA-256 hashed content_hash identifiers only —
+    do NOT include raw harmful text in evidence package; store separately
+    in a restricted-access compliance folder with clinical-safety access control)
+[ ] System prompt diff: affected version vs. previous clean version
+[ ] PostHog feedback_negative event export for the affected time window
+[ ] Sentry coaching_response_flagged events (if applicable)
+[ ] Blast radius query result: count of affected users and sessions
+[ ] DEC-030 audit log entries for the incident window (HMAC chain verified)
+[ ] clinical-safety sign-off message from incident channel (timestamp + approver)
+[ ] Anthropic API model version in use at time of incident
+[ ] Prompt injection input sample (PII stripped) if applicable
+[ ] Patched prompt version (after clinical-safety review)
+[ ] Re-enable confirmation: timestamp + clinical-safety approver name
+[ ] Post-incident clinical-safety review report (filed to compliance/cc7/ai-safety/)
+```
+
+**Clinical-safety note:** Any coaching_turns content that a clinical reviewer judges to meet the criteria for ED-adjacent advice, dangerous injury-risk guidance, or wellness-as-punishment must be retained in the restricted compliance folder and treated as clinical evidence. This material is not for general incident channel distribution. Access is limited to: clinical-safety, compliance-officer, security-engineer, and founder.
+
+**Regulatory note (GDPR Art. 34):** If harmful AI guidance caused physical injury to a user and that injury is attributable to FORM's coaching product, Art. 34 (notification to the individual) may be required. This determination requires outside counsel. The 72-hour Art. 33 window for supervisory authority notification applies if the incident also involves unauthorized access to or alteration of the user's health data. Consult compliance-officer within 4 hours of confirming any physical injury report.
+
+**Anthropic sub-processor note:** If the root cause is a model-level regression or safety filter failure at Anthropic, activate R-07 (Sub-processor Breach Notification Received) in parallel. The R-07 protocol governs sub-processor incident coordination; R-10 governs FORM's internal product-safety response. Both run simultaneously.
+
+**No-go customer note:** If the investigation reveals that an enterprise customer is using FORM in a wellness-as-punishment configuration (e.g., reporting non-engagement to HR for disciplinary action, using engagement metrics in performance reviews, insurance risk-scoring integrations), this is a contract violation and a no-go customer classification. Escalate immediately to founder. Do not disclose the harmful-guidance incident to other customers until the no-go customer situation is resolved — the two incidents may have different disclosure obligations.
+
+---
+
 ## 6. Communication Templates
 
 ### 6.1 Internal Incident Channel Opening Message
@@ -2296,6 +2530,10 @@ DDoS?                       → R-06
 Processor notified us?      → R-07 (72h clock starts NOW — page compliance-officer)
 Compromised npm package?    → R-08 (freeze deploys, check Workers env surface)
 Ransomware / destruction?   → R-09 (ISOLATE FIRST — do not pay)
+Victor harmful guidance?    → R-10 (clinical-safety on call; no raw harmful text in channel)
+  Prompt injection?         → R-10 + P0 security reclassify → R-01 branch also active
+  Model behavior drift?     → R-10 + R-07 (Anthropic sub-processor notification)
+  Wellness-as-punishment?   → R-10 + escalate to founder (no-go customer contract violation)
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
@@ -2311,10 +2549,12 @@ Enterprise tenant comms: §12 — Customer Lead owns; IC approves all external s
 
 ---
 
-**v0.3 · May 2026 · Owner: security-engineer + devops-lead**
+**v0.4 · May 2026 · Owner: security-engineer + devops-lead**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: May 2027 or after first P0/P1 — whichever comes first.**
 
 *v0.2 additions: R-07 Sub-processor Breach Notification Received (new runbook — vendor-originated incident protocol, GDPR Art. 33 clock management when breach is at processor level, enterprise tenant notification, evidence package, post-incident vendor management review). §11 Sub-processor Incident Management (processor registry for Supabase/Anthropic/ElevenLabs/Cloudflare/PostHog/Sentry/Stripe with Art. 9 classification and severity floors; known DPA gaps including Anthropic notification SLA and ElevenLabs unsigned DPA; Art. 28(3)(f) contractual requirements and DPA signing checklist; notification SLA tracker; SOC 2 CC9.2 evidence integration). Appendix A updated to include R-07 quick reference and sub-processor context for GDPR clock.*
 
 *v0.3 additions: R-08 Supply Chain Attack / Compromised Dependency — trigger matrix by package location and runtime access surface; immediate isolation protocol (freeze deploys, EAS revocation); blast radius assessment checklist; dependency tree audit with clean-build verification; preventive CI controls (Dependabot, npm audit, Socket.dev); SOC 2 CC6.1/CC6.8/CC7.2/CC7.4 evidence package. R-09 Ransomware / Destructive Payload — always-P0 protocol with explicit isolation-first ordering (overrides the standard evidence-first rule); no-pay policy with decision authority constraints; Supabase PITR recovery to new project; full secrets rotation sequence; enterprise tenant validation before re-enabling traffic; law enforcement preservation guidance; GDPR note on destruction as a reportable breach. §9.3 Scenarios E and F — supply chain (backdoored npm package in Workers env) and ransomware (staging-to-production lateral movement) tabletop scenarios with discussion point frameworks; both include enterprise customer-success participation requirement. §9.5 Year 2 Testing Schedule — 6-scenario rotation covering all runbook types; cross-functional drills (customer-success joins E and F). §12 Enterprise Tenant SLA Breach & Incident Communication Protocol — SLA tier definition and breach thresholds for API availability, P95 latency, and SSO; credit schedule (10%/25%/50% by uptime band); contact responsibility matrix with timing SLAs; privacy floor enforcement for tenant communications; Templates E-01 (initial notification), E-02 (60-min status update), E-03 (resolution), E-04 (SLA credit); SOC 2 evidence mapping (CC9.2, A1.1, A1.2, CC7.3, CC2.2). Appendix A updated to include R-08, R-09, and §12 enterprise comms reference.*
+
+*v0.4 additions: R-10 AI Coach Safety Incident (Victor Harmful Guidance) — first AI-specific incident runbook in the taxonomy. Eight-level severity matrix distinguishing isolated quality issues (P2), systematic harmful patterns (P1), ED-adjacent content or injury reports (P0), and prompt injection vectors (P0 security incident). Three incident sub-types with different response branches: prompt regression (system prompt rollback + clinical-safety review gate), model behavior drift (Anthropic safety team notification + R-07 cross-reference), prompt injection (P0 security incident + input sanitization). Immediate actions include coaching_turns read-only query protocol with content_hash-only channel references (ED-adjacent text not distributed to responders). Blast radius assessment queries by victor_prompt_version. Containment: feature-flag scoping (pathway not full product), edge Worker content filter middleware, clinical-safety veto on re-enable decisions. Eradication: prompt diff methodology, Anthropic safety reporting path, Victor Jailbreak Test Suite addition to §9 testing program, clinical-safety PR review gate for all prompt changes. Evidence package: SOC 2 CC7.4/CC5.2/CC1.2 artifacts. Clinical-safety note: restricted compliance folder for harmful content (clinical-safety + compliance-officer + security-engineer + founder access only). Regulatory notes: GDPR Art. 34 physical injury path, Art. 33 prompt-injection health-data branch, Anthropic sub-processor R-07 parallel activation. No-go customer escalation: wellness-as-punishment detection triggers founder escalation. Appendix A updated with R-10 quick reference.*

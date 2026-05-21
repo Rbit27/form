@@ -11,6 +11,14 @@
 
 ---
 
+## [0.97.1] — 2026-05-21
+
+### Added
+- **`docs/INCIDENT_RESPONSE.md`** v0.1 → v0.4 — **R-10 AI Coach Safety Incident (Victor Harmful Guidance)** (security-engineer + clinical-safety, enterprise-architect). First AI-specific runbook in FORM's incident taxonomy. Eight-level severity matrix: isolated quality issue (P2) → systematic harmful pattern (P1) → ED-adjacent content / injury report (P0) → prompt injection (P0 security reclassify). Three incident sub-types with distinct response branches: prompt regression (system prompt rollback, clinical-safety review gate, hotfix PR with clinical-safety as mandatory approver), model behavior drift (Anthropic safety team notification, R-07 parallel activation), prompt injection (P0 security incident, input sanitization, Victor Jailbreak Test Suite). Immediate actions: `coaching_turns` read-only query protocol — `content_hash` references only in incident channel; ED-adjacent raw text routed to restricted compliance folder (clinical-safety + compliance-officer + security-engineer + founder access only). Blast radius query by `victor_prompt_version`. Containment: feature-flag pathway scoping (not full-product disable), edge Worker content filter middleware, clinical-safety veto on re-enable decisions. Eradication: prompt diff methodology, `VICTOR_PROMPT_GUIDE.md` update gate, PostHog `feedback_negative` rate alert + Sentry `coaching_response_flagged` alert. Evidence package: SOC 2 CC7.4 / CC5.2 / CC1.2. Regulatory notes: GDPR Art. 34 physical injury path, Art. 33 prompt-injection health-data branch. No-go customer escalation: wellness-as-punishment detection → founder escalation. Appendix A updated with R-10 / prompt-injection / model-drift / wellness-as-punishment quick references. Header version corrected v0.1 → v0.4.
+- **`VERSION`** — 0.97.0 → 0.97.1
+
+---
+
 ## [0.97.0] — 2026-05-21
 
 ### Added
