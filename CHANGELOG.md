@@ -6,6 +6,13 @@
 
 ---
 
+## [1.8.2] — 2026-05-22
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` → v0.5 — R-11 CV / Pose Estimation Biometric Data Privacy Incident + §13 Board & Investor Communication Protocol. R-11: GDPR Art. 9 biometric-specific runbook for CV pipeline incidents (distinct from R-01); two-track architecture (Track A on-device, Track B `cv_sessions.keypoints_enc`); scope assessment SQL; Art. 9 heightened notification rules; clinical-safety gate; 12-item evidence package; post-incident five-way re-enable gate. §13: Board & Investor Communication Protocol; six-trigger threshold table; founder-exclusive authority; Templates B-01 through B-04 with explicit constraints; 7-year archive in `compliance/evidence/incident-comms/<slug>/board/`; SOC 2 CC2.2/CC9.1/CC7.3/A1.1 mapping. Appendix A updated.
+
+---
+
 ## [1.8.1] — 2026-05-22
 
 ### Added

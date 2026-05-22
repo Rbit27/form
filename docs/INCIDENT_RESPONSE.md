@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v0.4
+# FORM · Incident Response Runbook v0.5
 
 > Owner: security-engineer + devops-lead. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2.
 
@@ -1618,6 +1618,193 @@ Answer before any external communication. P0 upgrade if any "yes" answer:
 
 ---
 
+### R-11: CV / Pose Estimation Biometric Data Privacy Incident
+
+> **Always P0.** GDPR Art. 9 biometric data breach carries the highest individual risk classification. Declare P0 immediately on any credible exposure path — do not wait for confirmation of actual access.
+
+#### Why R-11 Is Different from R-01
+
+R-01 covers general PII/health-data breaches. R-11 applies specifically when the CV pipeline's output data — pose keypoints, form-score signals, or the `keypoints_enc` column in `cv_sessions` — is potentially exposed. Biometric data processed for the purpose of uniquely identifying a natural person is Art. 9(1) special category data. Supervisory authority notification under Art. 33 is presumed required; individual notification under Art. 34 is likely required (biometric breach = high risk to data subjects by default).
+
+**FORM's privacy-first CV architecture reduces but does not eliminate risk:**
+
+| Data layer | Where it lives | Breach surface |
+|---|---|---|
+| Raw video frames | On-device only — never transmitted | No server-side exposure path |
+| Real-time keypoints | On-device only — processed in-memory by ML Kit / BlazePose | No server-side exposure path |
+| `keypoints_enc` | `cv_sessions` column in Supabase; AES-256-GCM encrypted at rest | Exposed **only** if encryption key is compromised or RLS policy fails |
+| Per-session aggregates | `cv_sessions.avg_confidence`, `defect_flags`, etc. | Standard Art. 9 health data — covered by R-01 if exposed |
+| Fleet stats | `cv_session_fleet_stats` materialized view — k-anonymity enforced, no `user_id` | Low individual risk; de-identified by design |
+
+Most R-11 incidents will be **Track B** (server-side, limited to `cv_sessions`). Track A (on-device) applies when a mobile device is physically compromised.
+
+#### Severity Assignment
+
+| Condition | Severity |
+|---|---|
+| `keypoints_enc` column accessible due to RLS failure or key compromise | **P0** |
+| CV session aggregate data (`avg_confidence`, `defect_flags`) cross-tenant RLS failure | **P0** (R-01 also active) |
+| Physical device loss / theft where CV session data may be cached locally | **P0** (coordinate with affected user directly) |
+| `cv_session_fleet_stats` view exposed (k-anonymity, no `user_id`) | **P1** — lower individual risk; upgrade to P0 if k-anonymity n < 5 |
+| CV feature flag misconfiguration exposing CV to users who opted out | **P1** |
+
+#### Immediate Actions (T+0 to T+15 min)
+
+```
+[ ] Declare P0 in #inc-YYYYMMDD-cv-biometric. Page security-engineer + compliance-officer.
+[ ] Start GDPR Art. 33 72-hour clock. Record exact time of first awareness.
+[ ] Page clinical-safety. CV pose data is health-category data; clinical-safety
+    advises on user-harm risk assessment throughout the incident.
+[ ] Disable the cv_enabled feature flag globally (all tenants) via admin dashboard.
+    Workers pick up flag changes within ~30 seconds.
+    Do NOT selectively disable — if keypoints_enc is at risk, disable fleet-wide.
+[ ] Confirm which track applies:
+    - Track A (on-device): device lost/stolen, malware on device → coordinate
+      with affected user; instruct them to remotely wipe via iOS/Android MDM
+    - Track B (server-side): Supabase `cv_sessions` or `keypoints_enc` access
+      path identified → proceed to scope assessment immediately
+[ ] Do NOT run SELECT on keypoints_enc values — this would retrieve decrypted
+    biometric data into memory. Run COUNT(*) and metadata queries only.
+    If decrypted content is needed for scope assessment, use compliance-officer
+    + security-engineer approval with dedicated audit log entry.
+```
+
+#### Track B: Scope Assessment (Server-Side)
+
+```sql
+-- Step 1: How many users and sessions are in the exposure window?
+SELECT
+  tenant_id,
+  COUNT(DISTINCT user_id)         AS affected_users,
+  COUNT(*)                         AS affected_sessions,
+  MIN(started_at)                  AS earliest_session,
+  MAX(started_at)                  AS latest_session
+FROM cv_sessions
+WHERE started_at >= $breach_window_start
+  AND started_at <= $breach_window_end
+GROUP BY tenant_id
+ORDER BY affected_sessions DESC;
+
+-- Step 2: Are keypoints_enc values actually populated (or all NULL)?
+-- NULL = session recorded but keypoints were never stored server-side.
+SELECT
+  COUNT(*)                              AS total_sessions,
+  COUNT(*) FILTER (WHERE keypoints_enc IS NOT NULL)  AS sessions_with_keypoints,
+  COUNT(*) FILTER (WHERE keypoints_enc IS NULL)      AS sessions_without_keypoints
+FROM cv_sessions
+WHERE started_at >= $breach_window_start;
+
+-- Step 3: Verify RLS is enforced on cv_sessions.
+-- Run as the Supabase anon role — should return zero rows.
+SET ROLE anon;
+SELECT COUNT(*) FROM cv_sessions;
+-- Expected: 0. Any other result = RLS failure → P0 confirmed, escalate to R-01 also.
+
+-- Step 4: Check keypoints_enc encryption key access log.
+-- This is outside Postgres — check 1Password audit trail or KMS access logs
+-- for cv_keypoints_encryption_key. Any access not by platform-engineer during
+-- normal operations is a finding.
+```
+
+**If keypoints_enc IS NULL for all sessions in the window:** biometric data was never persisted server-side for this cohort. Individual risk is significantly reduced. The session aggregates (`avg_confidence`, `defect_flags`) are still Art. 9 health data but not biometric in the strict sense. Downgrade to P1 after confirming RLS integrity; Art. 33 notification may still be required — consult compliance-officer.
+
+**If keypoints_enc IS NOT NULL for any session in the window:** biometric data was persisted. Treat as confirmed biometric exposure even if the encryption key has not been confirmed compromised — the precautionary principle applies under GDPR.
+
+#### Containment
+
+```
+[ ] CV feature flag is disabled (confirmed in step 1 of immediate actions).
+[ ] Rotate cv_keypoints_encryption_key in 1Password / Cloudflare Workers Secrets.
+    New key is active for any future sessions. Historical keypoints_enc values
+    remain encrypted with the old key — assess whether re-encryption is required
+    (only if the old key is confirmed compromised, not merely suspected).
+[ ] If RLS failure confirmed (Step 3 above returned rows):
+    - Activate R-01 in parallel
+    - Block all Supabase direct-connection access except platform-engineer
+    - Run §5.R-01 RLS verification steps for cv_sessions table specifically
+[ ] Preserve a read-only DB snapshot with PITR marker for evidence (see §7).
+[ ] Block any export / analytics job that might touch cv_sessions during investigation.
+    - Pause pg_cron job for cv_session_fleet_stats materialized view refresh.
+    - Suspend any Metabase dashboard that queries cv_sessions directly.
+```
+
+#### GDPR Art. 9 Notification Assessment
+
+Biometric data exposure triggers a heightened notification analysis. Complete this within T+4 hours.
+
+| Question | Answer required before Art. 33 notification |
+|---|---|
+| Was `keypoints_enc` accessible (key compromised or RLS failure)? | Yes → Art. 33 notification required; likely Art. 34 also |
+| Were keypoints_enc values all NULL (never persisted)? | Art. 33 may be required for session aggregates; Art. 34 lower threshold |
+| How many data subjects are affected? | Required for notification form; report range if exact count unavailable |
+| Which EU supervisory authorities have jurisdiction? | Determined by user location; FORM's lead authority: determined by main establishment |
+| Is there a DPA in place with relevant enterprise tenants? | Enterprise tenant must be notified per their DPA SLA (§12) |
+
+**Art. 34 trigger for biometric data:** GDPR Recital 75 and 85 identify biometric data as inherently high-risk. Supervisory authorities in most EU jurisdictions treat biometric breaches as meeting the Art. 34 "high risk to rights and freedoms" threshold. Do not apply the R-01 assessment that sometimes concludes Art. 34 is not required — for biometric data, assume Art. 34 applies unless outside counsel advises otherwise.
+
+**Notification timeline:**
+- T+0: GDPR Art. 33 clock starts
+- T+4h: compliance-officer completes initial Art. 9 risk assessment
+- T+24h: draft Art. 33 notification to supervisory authority (partial if scope not confirmed)
+- T+48h: file Art. 33 notification (partial notification acceptable; update as scope confirmed)
+- T+72h: hard deadline for Art. 33 notification
+- T+72h + 0: Art. 34 individual notifications begin (if required), coordinated with enterprise tenant notifications (§12)
+
+#### Enterprise Tenant Notification (CV-Specific)
+
+If affected users belong to enterprise tenants:
+1. Follow §12 Template E-01/E-02/E-03 timeline (30 min P0 initial notification).
+2. Disclose specifically that **pose estimation data** was involved, not just generic "health data." Enterprise DPAs may have specific clauses about biometric data sub-processing.
+3. Provide the tenant's DPO (if they have one) with the preliminary scope assessment: session count, user count, whether `keypoints_enc` was populated.
+4. Enterprise tenant may have their own Art. 33 obligations as joint controllers — coordinate with their DPO before filing separate notifications to avoid conflicting statements to supervisory authorities.
+
+**Privacy floor enforcement:** Under no circumstances disclose the list of affected users to an HR administrator or corporate wellness manager. Affected users receive individual Art. 34 notifications directly from FORM. The enterprise tenant's administrative contact receives aggregate scope information only.
+
+#### Clinical-Safety Coordination
+
+CV pose estimation records movement patterns that may reveal health conditions (injury compensation patterns, mobility limitations, chronic pain adaptations). clinical-safety must:
+- Review the affected cohort's session metadata for any red-flag indicators (sessions flagged `below_confidence_threshold` on sensitive exercises may indicate users self-treating injuries)
+- Assess whether any affected users have a pending clinical referral in their coaching session history
+- Advise on Art. 34 notification language — the user-facing notification must not inadvertently stigmatize users or reveal health inferences drawn from their pose data
+
+clinical-safety sign-off on Art. 34 notification text is mandatory before sending.
+
+#### Evidence Package (SOC 2 CC7.2, CC7.4, C1.1, PI1.2, A1.1)
+
+```
+[ ] cv_sessions scope query output (session count, user count, tenant breakdown)
+    — do NOT include keypoints_enc column values in evidence package
+[ ] keypoints_enc null/populated ratio for the exposure window
+[ ] Encryption key access audit trail: 1Password activity log or KMS audit
+    for cv_keypoints_encryption_key covering 30 days before incident
+[ ] RLS verification output: pg_tables rowsecurity check for cv_sessions
+    (expected: rowsecurity = true; any other result = finding)
+[ ] cv_session_fleet_stats: materialized view DDL verification that
+    GROUP BY user_id is absent and k-anonymity n≥5 guard is present
+[ ] Feature flag disable confirmation: timestamp + operator name
+[ ] DEC-030 audit log entries for cv_sessions access events in incident window
+    (HMAC chain verified; run §5.R-05 chain verification if any gaps)
+[ ] Cloudflare Workers request logs: any anomalous traffic to CV-related endpoints
+[ ] OBSERVABILITY.md §18 dashboard screenshots: CV Model Health panel at time of incident
+[ ] clinical-safety sign-off on Art. 34 notification draft (timestamp + approver)
+[ ] Art. 33 supervisory authority notification draft + filing confirmation
+[ ] Enterprise tenant DPA reference and notification sent confirmation
+[ ] Post-incident key rotation confirmation: new cv_keypoints_encryption_key
+    deployed + old key decommissioned from Workers Secrets
+```
+
+#### Post-Incident: Mandatory Controls Review
+
+After resolution, before re-enabling CV feature flag:
+
+1. **Encryption key governance review:** Confirm cv_keypoints_encryption_key is rotated on a schedule (recommendation: 90-day rotation; align with CRYPTOGRAPHY_POLICY.md). Confirm key access is logged and alerted.
+2. **`keypoints_enc` storage necessity review:** Assess whether server-side keypoints storage remains necessary. If it can be eliminated or replaced with on-device-only storage, this eliminates the biometric exposure surface entirely. Requires enterprise-architect + ml-engineer sign-off.
+3. **k-anonymity enforcement in `cv_session_fleet_stats`:** Confirm the `HAVING COUNT(DISTINCT user_id) >= 5` guard is in the materialized view DDL (per OBSERVABILITY.md §18).
+4. **OBSERVABILITY.md §18 alerting:** Confirm AL-CV-01 through AL-CV-08 alerts are active and routed to PagerDuty (not just Slack) for P0-class signals.
+5. **Re-enable gate:** ml-engineer + security-engineer + clinical-safety must all sign off before CV feature flag is re-enabled for any tenant.
+
+---
+
 ## 6. Communication Templates
 
 ### 6.1 Internal Incident Channel Opening Message
@@ -2512,6 +2699,222 @@ Enterprise incident communication generates the following SOC 2 evidence:
 
 ---
 
+## 13. Board & Investor Communication Protocol
+
+### 13.1 Purpose and Trigger Threshold
+
+This section governs communication to FORM's board members and lead investors during security and availability incidents. Board-level communication is distinct from enterprise tenant communication (§12) and regulatory notification (§10). It is forward-looking and strategic; regulatory notifications are legal obligations with fixed formats.
+
+**Activate §13 when ANY of the following are true:**
+
+| Trigger | Rationale |
+|---|---|
+| P0 incident confirmed and not resolved within 2 hours | Material service disruption; board should not be surprised by press or investor questions |
+| Confirmed Art. 9 biometric or health data breach (R-01, R-11) | Material privacy event; investor rights under typical SAFE/equity agreements |
+| Enterprise tenant loss directly attributable to an incident | Revenue impact; relevant to board's fiduciary view |
+| Incident generates media coverage or social media attention | Reputational; board must have context before receiving external inquiries |
+| Regulatory action initiated (supervisory authority investigation) | Legal and compliance materiality |
+| Estimated financial impact > $10,000 (credits, legal fees, remediation) | Financial materiality threshold at seed stage |
+
+**Do NOT activate §13 for:**
+- P1 or P2 incidents resolved without customer impact
+- Routine maintenance windows or planned degradation
+- False positive alerts
+
+### 13.2 Authority and Ownership
+
+**The founder is the sole person authorized to send board/investor communications.** No one else — including the IC (Incident Commander), security-engineer, or customer-success — may contact board members or investors about an active incident without explicit founder approval.
+
+During an incident, the founder plays dual roles: executive decision-maker and board communicator. If the founder is the IC, they must hand off IC duties to the most senior available responder before drafting board communications. IC responsibilities and board communication responsibilities must not be handled simultaneously.
+
+### 13.3 Communication Timeline
+
+| Milestone | Action | Deadline |
+|---|---|---|
+| §13 trigger activated | Founder acknowledges board communication responsibility | T+30 min from trigger |
+| Initial board notification | Send Template B-01 | T+4h from P0 declaration |
+| First status update | Send Template B-02 | T+12h if incident unresolved |
+| Subsequent updates | Send Template B-02 (repeat) | Every 12h while P0 is active |
+| Resolution notification | Send Template B-03 | Within 4h of incident closure |
+| Post-incident board summary | Send Template B-04 | Within 5 business days of PIR completion |
+
+### 13.4 Communication Templates
+
+#### Template B-01: Initial Board Notification
+
+Subject: `[FORM Incident] [Incident ID] — Initial Notification`
+
+```
+Board / [Investor name],
+
+I'm writing to flag an active incident at FORM.
+
+Incident ID: [INC-YYYYMMDD-slug]
+Declared: [timestamp UTC]
+Severity: P0
+Status: Active — investigating
+
+What we know:
+[2–3 sentences. State facts only: what system is affected, what behavior was
+observed, when we became aware. No speculation, no root cause claims.]
+
+What we're doing:
+[1–2 sentences. State the current action: investigating, contained, rolling back.]
+
+What we don't know yet:
+[1 sentence. State the key open question: scope of exposure, cause, ETA to resolve.]
+
+User impact:
+[State the observable impact: "Service unavailable for all users" /
+"Degraded performance on enterprise features" / "No current user-facing impact —
+investigating potential data exposure." Do not minimize, do not catastrophize.]
+
+Regulatory:
+[State whether GDPR Art. 33 clock is running, if known. If uncertain: "Assessing."]
+
+Next update: [timestamp UTC or condition: "within 12 hours, or sooner if material change"]
+
+I'll continue to keep you informed. Reach me at [phone] for urgent questions.
+
+[Founder name]
+```
+
+**What NOT to write in B-01:**
+- Root cause (not confirmed yet — premature statements create legal exposure)
+- Customer names or tenant identifiers
+- Specific dollar amounts (revenue impact, credit exposure)
+- Attribution (external attacker, vendor failure, internal error)
+- Legal conclusions ("we do/don't believe this triggers GDPR notification")
+- Speculation about press coverage or competitive impact
+
+#### Template B-02: Status Update
+
+Subject: `[FORM Incident] [Incident ID] — Update [N]`
+
+```
+Board / [Investor name],
+
+Update [N] on incident [INC-YYYYMMDD-slug] — [elapsed time] since declaration.
+
+Status: [Active / Contained / Recovering]
+
+What's changed since last update:
+[Facts only. What was confirmed, what was ruled out, what action was taken.]
+
+Current status of affected systems:
+[One sentence per affected system.]
+
+Regulatory:
+[Update on Art. 33 status if applicable: "Art. 33 notification filed at [timestamp]" /
+"Assessing — will update within [timeframe]."]
+
+Revised ETA to resolution: [estimate or "unknown — will update in [timeframe]"]
+
+Next update: [timestamp or condition]
+
+[Founder name]
+```
+
+#### Template B-03: Resolution Notification
+
+Subject: `[FORM Incident] [Incident ID] — Resolved`
+
+```
+Board / [Investor name],
+
+Incident [INC-YYYYMMDD-slug] is resolved.
+
+Resolved at: [timestamp UTC]
+Total duration: [X hours Y minutes]
+
+Summary:
+[3–5 sentences. What happened (high level), what the impact was,
+what we did to resolve it, what we're doing to prevent recurrence.
+Facts only — no blame attribution, no speculative root cause.]
+
+Customer impact:
+[Was any customer-facing SLA breached? Enterprise tenants notified?
+Credits to be issued? State factually.]
+
+Regulatory:
+[Art. 33 notification filed: [Y/N, date] / Not required / Under assessment]
+
+Post-incident review:
+A full post-incident review will be completed within 72 hours.
+I will share the summary findings with the board after the review.
+
+[Founder name]
+```
+
+#### Template B-04: Post-Incident Board Summary
+
+Subject: `[FORM Incident] [Incident ID] — Post-Incident Summary`
+
+Attach the post-incident review document (§8.3) with commercial-sensitive details redacted (do not attach if it contains specific vulnerability details that could assist future attackers).
+
+```
+Board / [Investor name],
+
+Following up on incident [INC-YYYYMMDD-slug] with the post-incident summary.
+
+What happened (technical summary — 1 paragraph):
+[Plain-language summary suitable for a non-technical reader. Avoid jargon.]
+
+Impact summary:
+- Users affected: [count or range]
+- Downtime: [duration, if applicable]
+- Enterprise tenants affected: [count; no names in written comms]
+- SLA credits issued: [$ amount or "none"]
+- Regulatory: [Art. 33 filed / not required; Art. 34 notifications sent if applicable]
+
+Root cause: [Confirmed root cause in one sentence]
+
+What we're changing:
+[Bulleted list of 3–5 concrete actions from the PIR action items.
+Link to the action items in Linear if board has access.]
+
+What this means for [relevant OKR / investor concern]:
+[One sentence connecting the incident to a known board-level concern, if relevant.
+If not relevant, omit this section entirely.]
+
+[Founder name]
+```
+
+### 13.5 Communication Channel
+
+Board/investor notifications are sent by email to the individual's preferred contact. Do not use Slack, WhatsApp, or other messaging platforms for initial incident notifications — email provides a timestamped audit trail.
+
+After the initial email, a phone call is appropriate if:
+- The incident involves confirmed Art. 9 biometric or health data breach
+- The incident is generating or likely to generate press coverage
+- The incident involves confirmed loss of an enterprise customer
+
+### 13.6 Evidence and Archiving
+
+All board/investor communications related to an incident are archived in:
+
+```
+compliance/evidence/incident-comms/<INC-YYYYMMDD-slug>/board/
+  B-01-initial-notification-[timestamp].eml
+  B-02-update-1-[timestamp].eml
+  B-02-update-N-[timestamp].eml
+  B-03-resolution-[timestamp].eml
+  B-04-post-incident-summary-[timestamp].eml
+```
+
+These records are retained for 7 years (consistent with the HMAC audit log retention policy per DEC-030) and are included in the SOC 2 evidence package under CC2.2 (internal and external communication of information relevant to risk and control activities).
+
+### 13.7 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Evidence from §13 |
+|---|---|
+| CC2.2 — Communication of information | Board notification email archive; B-04 post-incident summary |
+| CC9.1 — Risk mitigation commitments | B-03 resolution notification; PIR action items communicated in B-04 |
+| CC7.3 — Response to identified anomalies | B-01 through B-03 timeline shows timely escalation to governance |
+| A1.1 — Availability commitments | B-03 duration and impact statement cross-referenced to SLA |
+
+---
+
 ## Appendix A — Quick Reference Card
 
 For use at 3am. IC: read §1 to classify, open the incident channel, then jump to the relevant runbook in §5.
@@ -2534,10 +2937,15 @@ Victor harmful guidance?    → R-10 (clinical-safety on call; no raw harmful te
   Prompt injection?         → R-10 + P0 security reclassify → R-01 branch also active
   Model behavior drift?     → R-10 + R-07 (Anthropic sub-processor notification)
   Wellness-as-punishment?   → R-10 + escalate to founder (no-go customer contract violation)
+CV / pose keypoints exposed? → R-11 (always P0; disable cv_enabled flag immediately)
+  keypoints_enc at risk?    → R-11 + rotate cv_keypoints_encryption_key NOW
+  Art. 9 biometric breach?  → R-11 + Art. 33 clock + likely Art. 34 + clinical-safety
+  RLS failure on cv_sessions → R-11 + R-01 both active simultaneously
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
   processor discovered the incident. File partial notification at T+48h maximum.
+  Biometric data (R-11): Art. 34 individual notification presumed required — do not skip.
 R-09 exception: Isolation BEFORE evidence — stop spread first.
 Evidence first, containment second — unless live exfiltration (R-01) or live destruction (R-09).
 Never modify production logs. Read-only copies only.
@@ -2545,11 +2953,13 @@ Log every action in incident channel with timestamp and your name.
 Sub-processor registry: §11.2 — check which data categories the vendor holds.
 Enterprise tenant comms: §12 — Customer Lead owns; IC approves all external statements.
   Template E-01 within 30 min (P0) / 60 min (P1) of declaration.
+Board / investor comms: §13 — founder only; Template B-01 within 4h of P0 declaration.
+  Triggers: P0 > 2h / Art. 9 breach confirmed / enterprise tenant loss / press coverage.
 ```
 
 ---
 
-**v0.4 · May 2026 · Owner: security-engineer + devops-lead**
+**v0.5 · May 2026 · Owner: security-engineer + devops-lead**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: May 2027 or after first P0/P1 — whichever comes first.**
 
@@ -2558,3 +2968,5 @@ Enterprise tenant comms: §12 — Customer Lead owns; IC approves all external s
 *v0.3 additions: R-08 Supply Chain Attack / Compromised Dependency — trigger matrix by package location and runtime access surface; immediate isolation protocol (freeze deploys, EAS revocation); blast radius assessment checklist; dependency tree audit with clean-build verification; preventive CI controls (Dependabot, npm audit, Socket.dev); SOC 2 CC6.1/CC6.8/CC7.2/CC7.4 evidence package. R-09 Ransomware / Destructive Payload — always-P0 protocol with explicit isolation-first ordering (overrides the standard evidence-first rule); no-pay policy with decision authority constraints; Supabase PITR recovery to new project; full secrets rotation sequence; enterprise tenant validation before re-enabling traffic; law enforcement preservation guidance; GDPR note on destruction as a reportable breach. §9.3 Scenarios E and F — supply chain (backdoored npm package in Workers env) and ransomware (staging-to-production lateral movement) tabletop scenarios with discussion point frameworks; both include enterprise customer-success participation requirement. §9.5 Year 2 Testing Schedule — 6-scenario rotation covering all runbook types; cross-functional drills (customer-success joins E and F). §12 Enterprise Tenant SLA Breach & Incident Communication Protocol — SLA tier definition and breach thresholds for API availability, P95 latency, and SSO; credit schedule (10%/25%/50% by uptime band); contact responsibility matrix with timing SLAs; privacy floor enforcement for tenant communications; Templates E-01 (initial notification), E-02 (60-min status update), E-03 (resolution), E-04 (SLA credit); SOC 2 evidence mapping (CC9.2, A1.1, A1.2, CC7.3, CC2.2). Appendix A updated to include R-08, R-09, and §12 enterprise comms reference.*
 
 *v0.4 additions: R-10 AI Coach Safety Incident (Victor Harmful Guidance) — first AI-specific incident runbook in the taxonomy. Eight-level severity matrix distinguishing isolated quality issues (P2), systematic harmful patterns (P1), ED-adjacent content or injury reports (P0), and prompt injection vectors (P0 security incident). Three incident sub-types with different response branches: prompt regression (system prompt rollback + clinical-safety review gate), model behavior drift (Anthropic safety team notification + R-07 cross-reference), prompt injection (P0 security incident + input sanitization). Immediate actions include coaching_turns read-only query protocol with content_hash-only channel references (ED-adjacent text not distributed to responders). Blast radius assessment queries by victor_prompt_version. Containment: feature-flag scoping (pathway not full product), edge Worker content filter middleware, clinical-safety veto on re-enable decisions. Eradication: prompt diff methodology, Anthropic safety reporting path, Victor Jailbreak Test Suite addition to §9 testing program, clinical-safety PR review gate for all prompt changes. Evidence package: SOC 2 CC7.4/CC5.2/CC1.2 artifacts. Clinical-safety note: restricted compliance folder for harmful content (clinical-safety + compliance-officer + security-engineer + founder access only). Regulatory notes: GDPR Art. 34 physical injury path, Art. 33 prompt-injection health-data branch, Anthropic sub-processor R-07 parallel activation. No-go customer escalation: wellness-as-punishment detection triggers founder escalation. Appendix A updated with R-10 quick reference.*
+
+*v0.5 additions: R-11 CV / Pose Estimation Biometric Data Privacy Incident — second AI-adjacent runbook; addresses GDPR Art. 9 biometric data specifically (distinct from R-01 general health-data breach). Architecture-aware two-track design: Track A (on-device device loss — raw frames never server-side) vs. Track B (server-side `cv_sessions.keypoints_enc` exposure). Severity table: always P0 for `keypoints_enc` RLS failure or key compromise; P1 for k-anonymity fleet stats. Scope assessment SQL: tenant/user/session count in exposure window; keypoints_enc null/populated ratio; RLS anon-role verification. Containment: cv_enabled feature flag global disable; cv_keypoints_encryption_key rotation in Workers Secrets; pg_cron pause for `cv_session_fleet_stats` refresh. GDPR Art. 9 notification assessment table with Art. 34 presumption for biometric data (overrides standard R-01 assessment that sometimes waives Art. 34); 72h notification timeline ladder (T+4h assessment, T+24h draft, T+48h file partial, T+72h hard deadline). Enterprise tenant CV-specific notification requirements including DPO coordination for joint-controller Art. 33 filings. Clinical-safety mandatory coordination: movement-pattern health inference review; Art. 34 notification text sign-off gate. Evidence package: 12-item checklist including encryption key access audit trail and OBSERVABILITY.md §18 dashboard screenshots. Post-incident mandatory controls: encryption key rotation schedule, `keypoints_enc` storage necessity review, k-anonymity enforcement verification, OBSERVABILITY.md §18 alerting confirmation, five-way re-enable gate (ml-engineer + security-engineer + clinical-safety). §13 Board & Investor Communication Protocol — six-trigger threshold table (P0 > 2h, Art. 9 breach, enterprise tenant loss, media coverage, regulatory action, financial impact > $10k). Founder-exclusive authority (no other role contacts board during incident). Five-template set: B-01 Initial Notification (T+4h), B-02 Status Update (every 12h), B-03 Resolution (T+4h post-closure), B-04 Post-Incident Summary (within 5 business days of PIR); each template includes explicit "what NOT to write" constraints (no root cause, no attribution, no legal conclusions in B-01/B-02). Email-first channel requirement; phone call for biometric breach / press / customer loss. Evidence archiving in `compliance/evidence/incident-comms/<slug>/board/` retained 7 years per DEC-030. SOC 2 mapping: CC2.2 (board communication), CC9.1 (risk mitigation commitment), CC7.3 (anomaly escalation), A1.1 (availability commitment). Appendix A updated with R-11 and §13 quick references.*
