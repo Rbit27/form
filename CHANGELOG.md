@@ -6,6 +6,16 @@
 
 ---
 
+## [1.8.3] — 2026-05-22
+
+### Added
+- `content/post-80-rpe-rir-autoregulation.md` — Авторегуляція: RPE та RIR замість відсотків від 1RM. 10-бальна шкала Tuchscherer, RIR як зворотній бік RPE, три фундаментальні проблеми відсоткового програмування (варіація 1RM ±5–8% Meeusen et al. 2013, контекстна невідповідність навантаження, застарілий 1RM), RPE у блоках accumulation/intensification/peaking/deload, Colquhoun et al. 2017 JSCR (порівнянний приріст 1RM, менше провальних сесій у RPE-групі), Helms et al. 2016 IJSPP (точність RIR-оцінки ±1 у досвідчених), обмеження (новачки, пік-блок, командне тренування), гібридний підхід, Victor integration. clinical-safety PASS.
+
+### Fixed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — заголовок виправлено з v0.6 → v0.7 (§15 SCIM Groups вже був у тілі doc). ToC доповнено пунктом 15 (SCIM 2.0 Groups Provisioning).
+
+---
+
 ## [1.8.2] — 2026-05-22
 
 ### Changed

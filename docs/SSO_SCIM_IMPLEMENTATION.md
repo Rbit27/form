@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v0.6
+# FORM · SSO/SCIM Implementation v0.7
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -22,6 +22,7 @@
 12. [Session Token Lifecycle & Refresh Management](#12-session-token-lifecycle--refresh-management)
 13. [Federated Logout — SAML SLO & OIDC Back-Channel Logout](#13-federated-logout--saml-slo--oidc-back-channel-logout)
 14. [SCIM Data Processing: GDPR Article 28 Compliance Framework](#14-scim-data-processing-gdpr-article-28-compliance-framework)
+15. [SCIM 2.0 Groups Provisioning](#15-scim-20-groups-provisioning)
 
 ---
 
