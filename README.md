@@ -401,10 +401,12 @@ Each iteration:
 - [ ] post-74: Grip strength і longevity — Bohannon 2019 meta-analysis, grip як proxy загального здоров'я, як тренувати
 - [ ] post-75: Single-leg training для двобічних атлетів — bilateral deficit, Botton et al. 2016, коли і як додавати унілатеральну роботу
 - [ ] post-76: Стретчинг і м'язова гнучкість — статичний vs динамічний, PNF, loaded progressive stretching; що насправді змінює ROM (нейральна vs структурна)
-- [ ] post-77: Тренінг натщесерце — fed vs fasted state, fat oxidation myth, Schoenfeld (2014), коли має значення, коли ні
-- [ ] post-78: Omega-3 і тренувальна адаптація — Smith et al. (2011) MPS, anti-inflammatory механізм, dose і EPA:DHA ratio; клінічна безпека харчова — clinical-safety required
-- [ ] post-79: Magnesium і спортивна продуктивність — роль у МПС, нервово-м'язовій функції, якості сну; дефіцит у атлетів, форми і bio-availability
-- [ ] post-80: Dehidration і силовий тренінг — >2% body mass loss і сила, когнітивна функція, рішення щодо навантаження; практичний моніторинг
+- [x] post-77: Blood Flow Restriction (BFR) — механізм (венозна оклюзія, AMPK, рекрутування Type II), протокол Abe/Loenneke, коли BFR > важкого навантаження; clinical-safety PASS
+- [x] post-78: Concurrent Training — interference effect (Hickson 1980), AMPK vs mTOR молекулярний конфлікт, режим/об'єм/порядок сесій, практична організація тижня; clinical-safety PASS
+- [ ] post-79: Тренінг натщесерце — fed vs fasted state, fat oxidation myth, Schoenfeld (2014) ⚠️ clinical-safety required (food/eating patterns)
+- [ ] post-80: Omega-3 і тренувальна адаптація — Smith et al. (2011) MPS, anti-inflammatory механізм, dose і EPA:DHA ratio ⚠️ clinical-safety required (supplement/food)
+- [ ] post-81: Magnesium і спортивна продуктивність — роль у МПС, нервово-м'язовій функції, якості сну; дефіцит у атлетів, форми і bio-availability
+- [ ] post-82: Dehidration і силовий тренінг — >2% body mass loss і сила, когнітивна функція, рішення щодо навантаження; практичний моніторинг
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 

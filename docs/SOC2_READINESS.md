@@ -858,7 +858,7 @@ The SOC 2 Type II observation clock **cannot start** until the items below are f
 | PRE-02 | Sub-processor list published at `form.coach/legal/sub-processors`; all processors listed with DPA status | compliance-officer | Month O-6 | 🟡 Partial (Sentry DPA pending) |
 | PRE-03 | Acceptable Use Policy (AUP) finalized and signed by all current team members | compliance-officer | Month O-5 | 🔴 Open |
 | PRE-04 | NDA / confidentiality agreements signed by all employees and active contractors (current-version template) | compliance-officer | Month O-5 | 🔴 Open (pre-hire) |
-| PRE-05 | Offboarding procedure documented and tested end-to-end (credential revocation within 24h, data return, NDA reminder) | compliance-officer + security-engineer | Month O-5 | 🔴 Open |
+| PRE-05 | Offboarding procedure documented and tested end-to-end (credential revocation within 24h, data return, NDA reminder) | compliance-officer + security-engineer | Month O-5 | 🟡 Authored (`compliance/cc6/offboarding-procedure.md` v0.1, 2026-05-22) |
 | PRE-06 | Media and device disposal policy published; covers remote-work scenario (personal device with FORM dev access) | compliance-officer | Month O-5 | 🔴 Open |
 | PRE-07 | DPIA completed and filed for all health data processing activities (`docs/GDPR_DPIA.md` — current version confirmed) | compliance-officer | Month O-4 | 🟢 Done (v0.1, May 2026) |
 | PRE-08 | DPAs confirmed and signed with all sub-processors (Anthropic, ElevenLabs, Supabase, Cloudflare, PostHog, Sentry, Stripe) | compliance-officer | Month O-4 | 🟡 Partial (Sentry pending) |
@@ -923,7 +923,7 @@ These items require only the founder's time and produce durable artifacts that s
 | 🔴 P1 | Publish privacy policy (`form.coach/privacy`) — engage outside counsel; budget $2-5k | 2 weeks | Blocks enterprise pilots; blocks SOC 2 observation period; GDPR requirement |
 | 🔴 P1 | Complete and sign DPA with Sentry; confirm EU region routing | 1 week | 🔴 Gap; active processing without valid DPA is GDPR Art. 28 violation |
 | 🔴 P1 | Publish sub-processor list (`form.coach/legal/sub-processors`) | 2 days | 🔴 Gap; GDPR Art. 13 disclosure requirement; enterprise procurement asks for this on day one |
-| 🔴 P1 | Document offboarding procedure (even for a team of one — template ready for first hire) | 2 days | 🔴 Gap; must exist and be tested before first hire, not after departure |
+| 🟡 P1 | Document offboarding procedure (even for a team of one — template ready for first hire) | 2 days | 🟡 Authored — `compliance/cc6/offboarding-procedure.md` v0.1, 2026-05-22; PRE-05 🔴→🟡; closes 🟢 upon first execution with evidence filing |
 | 🔴 P1 | Document and test media/device disposal policy | 1 day | 🔴 Gap; founder's personal device has FORM production access; policy applies now |
 | 🟡 P2 | Draft NDA template with employment counsel; store in `compliance/ndas/`; sign with any current contractors | 1 week | 🔴 Gap becomes blocking on first hire; zero effort to pre-draft now |
 | 🟡 P2 | Implement uptime monitoring (Better Uptime or equivalent) and status page | 3 days | 🔴 Gap; without 30+ days of historical data before observation, Availability criteria cannot be evidenced |

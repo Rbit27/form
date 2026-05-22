@@ -6,6 +6,19 @@
 
 ---
 
+## [1.8.0] — 2026-05-22
+
+### Added
+- `compliance/cc6/offboarding-procedure.md` (CC6-E-001, v0.1) — Personnel Offboarding Procedure. CC6.3 control: 24h credential revocation SLA across 13 systems (GitHub, Supabase, Cloudflare, 1Password, PostHog, Sentry, Google Workspace, Slack, Linear, ElevenLabs, Anthropic, AWS, Stripe). Device/data handling, NDA reminder templates, secrets rotation decision matrix (HMAC key always rotated per DEC-030), DEC-030 audit events, solo-founder compensating controls, founder succession/emergency access protocol (§8), exception log, SOC 2 evidence package spec. PRE-05 🔴 Open → 🟡 Authored; CC6-GAP-001 🔴 → 🟡 Authored. Closes to 🟢 upon first execution with evidence filing.
+- `content/post-77-blood-flow-restriction.md` — BFR Training: venous occlusion mechanism, AMPK-driven Type II recruitment, AOP pressure protocol, Abe/Loenneke classic sets (30–15–15–15, 30–60s rest), evidence review (Slysz 2016, Lixandrão 2018), scenarios where BFR > standard loading (rehab, joint-limited, age-related), contraindications (DVT, coagulopathy, uncontrolled hypertension). clinical-safety PASS.
+- `content/post-78-concurrent-training.md` — Concurrent Training / interference effect: Hickson 1980 origin, AMPK vs mTOR molecular antagonism (TSC2 / RAPTOR phosphorylation), Wilson et al. 2012 meta-analysis (hypertrophy −, strength −, VO₂max =), mode effect (running > cycling), timing rules (strength → aerobic; ≥ 6h gap), volume thresholds (≤ 3 × 30–40 min = minimal interference), sample weekly template, aerobic training benefits for lifters (PCr resynthesis, mitochondrial density). clinical-safety PASS.
+
+### Changed
+- `docs/SOC2_READINESS.md` → PRE-05 🔴 Open → 🟡 Authored; fast-track item 🔴 → 🟡 in priority registry.
+- `README.md` → post-77/78 marked [x]; former planned topics renumbered post-79–82.
+
+---
+
 ## [1.7.2] — 2026-05-22
 
 ### Changed
