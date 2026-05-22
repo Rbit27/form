@@ -6,6 +6,13 @@
 
 ---
 
+## [1.7.1] — 2026-05-22
+
+### Changed
+- `docs/DATA_MODEL.md` → v0.7 — §16 Enterprise Contract & Pilot Lifecycle Schema. `tenants.lifecycle_status` 5-state machine (pilot/active/expired/suspended/churned) with Worker access gate. `tenant_pilots` table: 90-day pilot tracking with fixed-schema JSONB `success_criteria`, CSM owner field, `internal_notes` PII prohibition + weekly content-scan. `tenant_contracts` table: `arr_cents` FORM-internal (excluded from `form_api` RLS and `tenant_contract_portal` view); partial unique index enforcing one active contract per tenant. `assertSeatAvailable()` TypeScript in Cloudflare Worker provisioning layer: `SELECT … FOR UPDATE SKIP LOCKED` TOCTOU protection; 402 on seat-limit breach. `tenant_seat_utilization` materialized view: aggregate seat counts, 7d/30d utilization, k-anonymity NULL suppression below n=15, nightly 02:00 UTC pg_cron refresh; `arr_cents` absent. Renewal notice Worker (09:05 UTC): Slack to `#csm-renewals` at `renewal_notice_days`, PagerDuty P2 at ≤ 14 days. 14 DEC-030 HMAC-chained audit events (including HIGH-severity `tenant.contract_terminated` and `tenant.access_suspended`; `attempted_email: null` invariant CI-enforced). `dpa_ref TEXT` column required before EU pilot activation (closes P-GAP-002 DPA tracking). SOC 2: CC6.1 (seat enforcement), CC6.2 (contract-as-authorisation), CC9.1 (renewal notice), CC9.2 (contract record), A1.1 (SLA tier from plan), PI1.4 (processing integrity), C1.2 (`arr_cents` confidential). 14-item implementation checklist (7× P0, 4× P1, 2× P2, 1× Pre-EU-pilot). OQ-ENT-01: minimum seat floor validation at M6.
+
+---
+
 ## [1.7.0] — 2026-05-22
 
 ### Added

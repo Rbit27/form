@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v0.6
+# FORM · Multi-Tenant Data Model v0.7
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -2948,3 +2948,440 @@ All CV-data access and lifecycle events must be HMAC-chained per DEC-030 (`docs/
 
 *v0.6 additions: §15 Computer Vision (CV) Pose Estimation Data Schema — closes the schema gap for `cv_sessions` table referenced in SOC2_READINESS.md PRE-34-E-006 (column-level encryption evidence), §35.6.3 (1-year biometric retention), C1.2 (erasure cascade), and INCIDENT_RESPONSE.md §R-10 (blast-radius scoping by `model_version`). On-device inference architecture: GDPR Art. 9 avoidance for raw video stream, < 100 ms latency requirement, competitive privacy posture. `cv_sessions` DDL: 33-keypoint BlazePose / 17-keypoint MoveNet schema, 7 defect flag slugs in cv_flags taxonomy, `keypoints_enc` AES-256-GCM column-level encryption in Cloudflare Workers Secret (closes PRE-34-E-006), status state machine (active/completed/partial/tracking_lost), model identity columns for R-10 blast-radius, 6 indexes (user, tenant, set_id, created_at, retention sweep, model_version). RLS: user self-access policy; form_coach blocked at RLS layer (application-layer view only); form_tenant_admin zero-row privacy floor; form_system full access; form_admin break-glass with mandatory incident_id + separate decryption endpoint. Three CI RLS assertions (`rls_isolation.test.ts`). `tenant_cv_summary` materialized view: weekly aggregate with k-anonymity N ≥ 5 suppression, form_quality averages, status percentages, three defect-prevalence columns (no individual data). §15.5 keypoint storage decision resolves §9 gap 9.2: keypoints in JSONB TOAST with R2 migration gate at 20 GB / 1,000 sessions/day; `workouts.raw_cv_data` column deprecated. `stripCVData()` TypeScript: 4-bucket form_quality mapping, flag-presence-only extraction, keypoints categorically excluded from Anthropic API; CI grep gate. GDPR: Art. 9 biometric classification for keypoints_enc; explicit `'cv'` consent gate; two-phase deletion (1-year keypoints nullification via pg_cron, 3-year row hard delete); Art. 17 immediate keypoints nullification (no grace period for Art. 9 data); consent withdrawal semantics. Analytics restrictions: keypoints_enc and form_score/cv_flags excluded from all PostHog/ClickHouse/Metabase/Sentry/Anthropic layers; stripForbiddenProperties() extended. Seven DEC-030 HMAC-chained audit events (cv.session_started, cv.session_completed, cv.session_blocked, cv.keypoints_nullified, cv.session_hard_deleted, cv.keypoints_admin_accessed HIGH severity with incident_id requirement, cv.model_version_changed). 17-item implementation checklist (9× P0, 5× P1, 2× P2, 1× Pre-launch) across M3/M4/M5. OQ-CV-01: R2 blob migration gate condition. Gap 9.2 status updated to RESOLVED in §9.*
 
+
+---
+
+## 16. Enterprise Contract & Pilot Lifecycle Schema
+
+> Owner: `enterprise-architect` + `compliance-officer`. Review: on any contract structure change, pricing-tier update, or quarterly.
+> References: docs/ENTERPRISE.md §Pricing, §Implementation timeline; docs/AUDIT_LOG_SCHEMA.md (DEC-030); docs/SOC2_READINESS.md CC6.1, CC6.2, CC9.1; docs/OBSERVABILITY.md §7.4 (Per-Tenant SLA dashboard).
+
+---
+
+### 16.1 Purpose
+
+The `tenants` table (§2.1) captures a tenant's current plan and seat ceiling, but contains no record of the commercial lifecycle that precedes and governs a production deployment. Enterprise customers follow a predictable sequence:
+
+```
+prospect → 90-day free pilot → conversion decision → annual/multi-year contract → renewal cycle
+```
+
+Without a data model for this lifecycle, four critical functions lack a source of truth:
+
+1. **Seat enforcement** — the hard gate that blocks over-provisioning beyond contracted seats (CC6.1).
+2. **Pilot-to-contract conversion tracking** — required for CSM handoff and the 90-day success-criteria review (ENTERPRISE.md §Implementation timeline, Day 90).
+3. **Renewal notice triggering** — 60-day advance notice prevents contractual lapses under CC9.1.
+4. **Admin dashboard seat utilisation** — HR/People leads see aggregate seat usage; no individual data (privacy floor, §6).
+
+Section §16 defines `tenant_pilots`, `tenant_contracts`, an extension to `tenants`, the `tenant_seat_utilization` materialized view, seat enforcement logic, DEC-030 audit events, and the RLS posture for contract data.
+
+---
+
+### 16.2 `tenants` Table Extension — `lifecycle_status`
+
+Add a `lifecycle_status` column to the existing `tenants` table to drive the state machine:
+
+```sql
+ALTER TABLE tenants
+  ADD COLUMN lifecycle_status TEXT NOT NULL DEFAULT 'pilot'
+    CHECK (lifecycle_status IN (
+      'pilot',       -- 90-day free evaluation; max_seats enforced at pilot_seats cap
+      'active',      -- production contract signed and in effect
+      'expired',     -- contract end_at passed, not yet renewed or churned
+      'suspended',   -- payment failure or compliance hold; SSO login blocked
+      'churned'      -- permanently closed; data deletion scheduled
+    ));
+```
+
+**State transitions** (all transitions emit a DEC-030 `tenant.lifecycle_changed` event — see §16.7):
+
+| From | To | Trigger |
+|---|---|---|
+| `pilot` | `active` | `tenant_pilots.status = 'converted'`; `tenant_contracts` row created with `status = 'active'` |
+| `pilot` | `churned` | `tenant_pilots.status = 'expired'` after 90 days with no conversion; CSM confirms no pipeline |
+| `active` | `expired` | `tenant_contracts.end_at < now()` and auto-renew not completed |
+| `active` | `suspended` | Stripe payment failure or compliance-officer hold |
+| `expired` | `active` | Renewal contract signed; new `tenant_contracts` row |
+| `expired` | `churned` | 30 days past expiry with no renewal; CSM confirms lost |
+| `suspended` | `active` | Payment resolved or hold lifted |
+| `suspended` | `churned` | Suspension extended > 60 days |
+| Any | `churned` | Explicit termination; data deletion process begins per §12.3 |
+
+**Access gate:** When `lifecycle_status IN ('suspended', 'churned', 'expired')`, the Cloudflare Worker middleware blocks all API requests from that tenant with HTTP 402 and redirects the admin to `enterprise@form.coach`. SSO SAML assertions are rejected at the SP-initiated flow entry point.
+
+---
+
+### 16.3 `tenant_pilots` Table
+
+```sql
+CREATE TABLE tenant_pilots (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  pilot_seats       INTEGER NOT NULL DEFAULT 100
+                      CHECK (pilot_seats BETWEEN 10 AND 500),
+  started_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ends_at           TIMESTAMPTZ NOT NULL,            -- default: started_at + 90 days; never auto-extended
+  success_criteria  JSONB NOT NULL,                  -- agreed criteria (see §16.3.1)
+  status            TEXT NOT NULL DEFAULT 'active'
+                      CHECK (status IN (
+                        'active',    -- pilot running
+                        'extended',  -- manually extended beyond ends_at (requires CSM + founder approval)
+                        'converted', -- customer signed production contract
+                        'expired',   -- ends_at passed without conversion
+                        'declined'   -- customer explicitly declined to convert
+                      )),
+  extended_at       TIMESTAMPTZ,                     -- set when status → 'extended'
+  extension_ends_at TIMESTAMPTZ,                     -- new end date if extended
+  converted_at      TIMESTAMPTZ,                     -- set when status → 'converted'
+  declined_at       TIMESTAMPTZ,
+  csm_owner         TEXT NOT NULL,                   -- internal handle (e.g. '@alice') — NOT a FK to users
+  internal_notes    TEXT,                            -- CSM-only field; MUST NOT contain employee names or health data
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id)                                 -- one pilot record per tenant; repeat pilots require a new tenant slug
+);
+
+ALTER TABLE tenant_pilots ENABLE ROW LEVEL SECURITY;
+
+-- Only form_admin and form_system can read or write pilot data
+-- form_api cannot expose pilot terms, CSM notes, or success criteria to tenant admins
+CREATE POLICY tenant_pilots_admin_only ON tenant_pilots
+  USING (current_user IN ('form_admin', 'form_system'));
+```
+
+#### 16.3.1 `success_criteria` JSONB Schema
+
+The `success_criteria` field stores the metrics agreed with the customer before the pilot starts. These are evaluated at Day 90 by the CSM. Format is fixed-schema JSONB validated by a Zod schema in `src/enterprise/pilot.schema.ts`.
+
+```jsonc
+{
+  "activation_rate_pct": 60,        // % of invited seats who complete onboarding (min n=10 to count)
+  "weekly_engagement_pct": 40,      // % of activated users with ≥1 session in trailing 7 days
+  "nps_floor": 30,                  // Net Promoter Score floor (opt-in survey; no minimum response rate required)
+  "min_active_seats": 30,           // absolute floor — if < 30 users engage, criteria are inconclusive
+  "evaluation_date": "2026-08-20"   // ISO 8601 — Day 90 review call date agreed with customer
+}
+```
+
+**Privacy rule:** `success_criteria` contains only aggregate thresholds, not individual user identifiers or names. The CSM accesses pilot metrics exclusively through the `tenant_cv_summary` and `tenant_wellness_summary` admin views (§2.6), which enforce the n ≥ 15 anonymity floor.
+
+---
+
+### 16.4 `tenant_contracts` Table
+
+```sql
+CREATE TABLE tenant_contracts (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id             UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  contract_ref          TEXT UNIQUE NOT NULL,          -- e.g., 'ENT-2026-042'; assigned by CSM
+  plan                  TEXT NOT NULL
+                          CHECK (plan IN ('starter', 'growth', 'enterprise')),
+  seats_contracted      INTEGER NOT NULL
+                          CHECK (seats_contracted >= 50),  -- minimum deal size per §16.1
+  arr_cents             BIGINT NOT NULL
+                          CHECK (arr_cents > 0),           -- Annual Recurring Revenue, USD cents
+  billing_period        TEXT NOT NULL DEFAULT 'annual'
+                          CHECK (billing_period IN ('annual', '2year', '3year')),
+  discount_pct          SMALLINT NOT NULL DEFAULT 0
+                          CHECK (discount_pct BETWEEN 0 AND 40),
+  po_number             TEXT,                              -- customer PO; required for invoicing if set
+  start_at              TIMESTAMPTZ NOT NULL,
+  end_at                TIMESTAMPTZ NOT NULL
+                          CHECK (end_at > start_at),
+  auto_renew            BOOLEAN NOT NULL DEFAULT TRUE,
+  renewal_notice_days   INTEGER NOT NULL DEFAULT 60,       -- notify CSM + tenant_owner this many days before end_at
+  signed_at             TIMESTAMPTZ,
+  countersigned_at      TIMESTAMPTZ,                       -- FORM countersignature
+  status                TEXT NOT NULL DEFAULT 'draft'
+                          CHECK (status IN (
+                            'draft',      -- MSA/order form in negotiation
+                            'active',     -- signed and in effect
+                            'renewed',    -- superseded by a new contract row; kept for audit history
+                            'expired',    -- end_at passed; not renewed
+                            'terminated'  -- terminated early by either party
+                          )),
+  termination_reason    TEXT,                              -- populated on status = 'terminated'
+  stripe_subscription_id TEXT,                            -- Stripe sub for annual billing
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Partial unique index: only one 'active' contract per tenant at any time
+CREATE UNIQUE INDEX tenant_contracts_one_active_per_tenant
+  ON tenant_contracts (tenant_id)
+  WHERE status = 'active';
+
+ALTER TABLE tenant_contracts ENABLE ROW LEVEL SECURITY;
+
+-- form_admin and form_system: full access
+CREATE POLICY tenant_contracts_admin ON tenant_contracts
+  USING (current_user IN ('form_admin', 'form_system'));
+
+-- form_api: tenant admins see limited contract metadata only (NOT arr_cents — that is FORM-internal)
+CREATE POLICY tenant_contracts_tenant_read ON tenant_contracts
+  FOR SELECT
+  TO form_api
+  USING (tenant_id = current_setting('app.tenant_id')::UUID AND status = 'active');
+```
+
+**ARR confidentiality:** `arr_cents` is visible only to `form_admin` and `form_system`. The `form_api` role's SELECT policy returns contract rows for the tenant's own tenant_id, but the admin dashboard query MUST use a view that excludes `arr_cents`:
+
+```sql
+CREATE VIEW tenant_contract_portal AS
+  SELECT
+    id,
+    tenant_id,
+    contract_ref,
+    plan,
+    seats_contracted,
+    billing_period,
+    po_number,
+    start_at,
+    end_at,
+    auto_renew,
+    status
+    -- arr_cents intentionally excluded
+  FROM tenant_contracts
+  WHERE status = 'active';
+
+GRANT SELECT ON tenant_contract_portal TO form_api;
+```
+
+Tenant admins see their contract reference, seat count, billing period, and end date. They do not see the per-seat rate or total ARR — that is FORM commercial-confidential data.
+
+---
+
+### 16.5 Seat Enforcement at Provisioning
+
+Seat enforcement is the primary CC6.1 technical control for enterprise tenants. Every user provisioning path — SCIM `POST /Users`, CSV import, manual invite — runs through a single enforcement check before the user row is created.
+
+```typescript
+// workers/provisioning/seat-gate.ts
+// Runs inside the Cloudflare Worker before any INSERT to `users`
+export async function assertSeatAvailable(
+  tenantId: string,
+  db: PostgresClient,
+): Promise<void> {
+  const row = await db.queryOne<{ active_seats: number; max_seats: number }>(
+    `SELECT
+       COUNT(id) FILTER (WHERE deactivated_at IS NULL AND deleted_at IS NULL) AS active_seats,
+       (SELECT max_seats FROM tenants WHERE id = $1) AS max_seats
+     FROM users
+     WHERE tenant_id = $1`,
+    [tenantId],
+  );
+
+  if (row.active_seats >= row.max_seats) {
+    await emitAuditEvent({
+      event:     'tenant.seat_limit_enforcement_triggered',
+      tenant_id: tenantId,
+      severity:  'STANDARD',
+      metadata:  { active_seats: row.active_seats, max_seats: row.max_seats },
+    });
+    throw new SeatLimitError(
+      `Tenant ${tenantId} has reached the contracted seat limit (${row.max_seats}). ` +
+      `Contact enterprise@form.coach to add seats.`,
+      { status: 402 },
+    );
+  }
+}
+```
+
+**`max_seats` source of truth:** During a pilot, `tenants.max_seats` is set to `tenant_pilots.pilot_seats`. On conversion, it is updated to `tenant_contracts.seats_contracted`. Seat expansion mid-contract (order form amendment) updates both `tenant_contracts.seats_contracted` and `tenants.max_seats` in the same transaction, with a `tenant.seats_contracted_changed` DEC-030 event.
+
+**SCIM burst protection:** Large enterprise IdP syncs (e.g., Entra ID full sync on initial configuration) can send hundreds of `POST /Users` requests in rapid succession. The seat gate uses a `SELECT … FOR UPDATE SKIP LOCKED` pattern to prevent a TOCTOU race condition from creating more users than the seat limit permits. See `SSO_SCIM_IMPLEMENTATION.md §6.3` for rate limiting.
+
+---
+
+### 16.6 `tenant_seat_utilization` Materialized View
+
+This view is the sole data source for seat metrics in the admin dashboard and CSM QBR reports. It produces aggregate counts only — no individual user data is exposed.
+
+```sql
+CREATE MATERIALIZED VIEW tenant_seat_utilization AS
+SELECT
+  t.id                                                                      AS tenant_id,
+  t.slug,
+  t.plan,
+  t.lifecycle_status,
+  t.max_seats,
+  COALESCE(tc.seats_contracted, tp.pilot_seats)                             AS seats_contracted_or_pilot,
+  tc.end_at                                                                 AS contract_ends_at,
+  tc.contract_ref,
+  COUNT(u.id) FILTER (WHERE u.deactivated_at IS NULL AND u.deleted_at IS NULL)
+                                                                            AS active_seats,
+  COUNT(u.id) FILTER (
+    WHERE u.deactivated_at IS NULL AND u.deleted_at IS NULL
+    AND   u.provisioned_via = 'scim'
+  )                                                                         AS scim_provisioned,
+  COUNT(u.id) FILTER (
+    WHERE u.deactivated_at IS NULL AND u.deleted_at IS NULL
+    AND   u.last_login_at > now() - INTERVAL '7 days'
+  )                                                                         AS seats_active_7d,
+  COUNT(u.id) FILTER (
+    WHERE u.deactivated_at IS NULL AND u.deleted_at IS NULL
+    AND   u.last_login_at > now() - INTERVAL '30 days'
+  )                                                                         AS seats_active_30d,
+  ROUND(
+    COUNT(u.id) FILTER (
+      WHERE u.deactivated_at IS NULL AND u.deleted_at IS NULL
+      AND   u.last_login_at > now() - INTERVAL '7 days'
+    )::NUMERIC
+    / NULLIF(COALESCE(tc.seats_contracted, tp.pilot_seats), 0) * 100,
+    1
+  )                                                                         AS utilization_pct_7d,
+  now()                                                                     AS refreshed_at
+FROM tenants t
+LEFT JOIN tenant_contracts tc
+  ON tc.tenant_id = t.id AND tc.status = 'active'
+LEFT JOIN tenant_pilots tp
+  ON tp.tenant_id = t.id AND tp.status = 'active'
+LEFT JOIN users u
+  ON u.tenant_id = t.id AND u.deleted_at IS NULL
+GROUP BY
+  t.id, t.slug, t.plan, t.lifecycle_status, t.max_seats,
+  tc.seats_contracted, tc.end_at, tc.contract_ref,
+  tp.pilot_seats;
+
+-- Nightly refresh at 02:00 UTC (after wearable sync cron at 01:xx and before cost monitor at 06:00)
+SELECT cron.schedule('tenant-seat-util-refresh', '0 2 * * *', $$
+  REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_seat_utilization;
+$$);
+
+GRANT SELECT ON tenant_seat_utilization TO form_api;
+GRANT SELECT ON tenant_seat_utilization TO form_admin;
+```
+
+**Admin dashboard display rules (privacy floor):**
+- The Metabase panel consuming this view is restricted to `tenant_owner` and `tenant_admin` roles via `form_api` RLS — they see their own row only.
+- `contract_ref` and `contract_ends_at` are displayed. `arr_cents` is absent from this view.
+- `seats_active_7d` and `utilization_pct_7d` are aggregate numbers — no per-user breakdown is possible from this view.
+- Minimum display threshold: if `active_seats < 15`, the `seats_active_7d` and `utilization_pct_7d` columns are returned as `NULL` and rendered as "Insufficient data (< 15 users)" in the dashboard. This prevents cohort re-identification in very small pilots.
+
+**Expansion opportunity signal:** A Metabase alert fires to the CSM Slack channel when `utilization_pct_7d > 85` for 14 consecutive days. This is an internal signal only — not visible to the tenant admin. It triggers a CSM outreach conversation about seat expansion, not an automated upsell message.
+
+---
+
+### 16.7 Renewal Notice Trigger
+
+Contracts lapsing without notice create CC9.1 (business disruption) risk. A pg_cron job scans for contracts approaching expiry and fires a notification to the CSM via the internal Slack webhook.
+
+```sql
+-- Runs daily at 09:00 UTC
+SELECT cron.schedule('contract-renewal-notice', '0 9 * * *', $$
+  SELECT
+    contract_ref,
+    tenant_id,
+    end_at,
+    (end_at - now())::TEXT AS days_remaining
+  FROM tenant_contracts
+  WHERE status = 'active'
+    AND auto_renew = FALSE
+    AND end_at BETWEEN now() AND now() + (renewal_notice_days || ' days')::INTERVAL;
+$$);
+```
+
+The query result is consumed by the `renewal-notice` Cloudflare Worker (triggered via Cron at 09:05 UTC), which:
+1. Posts a Slack message to `#csm-renewals` with contract ref, tenant name, days remaining, and ARR.
+2. Emits a `tenant.renewal_notice_sent` DEC-030 event.
+3. For contracts within 14 days of expiry, pages PagerDuty `enterprise-ops` service (P2 severity).
+
+Auto-renew contracts (`auto_renew = TRUE`) receive a Slack digest-only notice at `renewal_notice_days` but do not page PagerDuty unless Stripe billing fails.
+
+---
+
+### 16.8 DEC-030 Audit Events for Contract Lifecycle
+
+All contract and pilot lifecycle transitions are HMAC-chained per DEC-030 (`docs/AUDIT_LOG_SCHEMA.md`). These events are retained for 7 years (matching financial record obligations).
+
+| Event slug | Trigger | Severity | Retention |
+|---|---|---|---|
+| `tenant.pilot_started` | `tenant_pilots` row created | STANDARD | 7 years |
+| `tenant.pilot_extended` | `tenant_pilots.status → 'extended'` | STANDARD | 7 years |
+| `tenant.pilot_converted` | `tenant_pilots.status → 'converted'`; `tenant_contracts` created | STANDARD | 7 years |
+| `tenant.pilot_expired` | `tenant_pilots.status → 'expired'` (no conversion) | STANDARD | 7 years |
+| `tenant.pilot_declined` | `tenant_pilots.status → 'declined'` | STANDARD | 7 years |
+| `tenant.contract_activated` | `tenant_contracts.status → 'active'` (signed) | STANDARD | 7 years |
+| `tenant.contract_renewed` | New `tenant_contracts` row with `status = 'active'`; prior row → `'renewed'` | STANDARD | 7 years |
+| `tenant.contract_expired` | `tenant_contracts.status → 'expired'` | STANDARD | 7 years |
+| `tenant.contract_terminated` | `tenant_contracts.status → 'terminated'` | **HIGH** | 7 years |
+| `tenant.seats_contracted_changed` | `seats_contracted` amended mid-contract | STANDARD | 7 years |
+| `tenant.seat_limit_enforcement_triggered` | Provisioning blocked by seat gate (§16.5) | STANDARD | 7 years |
+| `tenant.renewal_notice_sent` | Renewal notice dispatched to CSM + tenant_owner | STANDARD | 7 years |
+| `tenant.lifecycle_changed` | `tenants.lifecycle_status` state transition | STANDARD | 7 years |
+| `tenant.access_suspended` | `lifecycle_status → 'suspended'`; API access blocked | **HIGH** | 7 years |
+
+**`tenant.contract_terminated` — HIGH severity rationale:** Early termination is a high-risk event for both data residency and revenue. The HIGH severity classification ensures the event appears in SIEM dashboards and triggers the 24-hour tenant notification requirement under `docs/ENTERPRISE.md §Hard commitments`.
+
+**Metadata schema for `tenant.seat_limit_enforcement_triggered`:**
+```jsonc
+{
+  "event":        "tenant.seat_limit_enforcement_triggered",
+  "tenant_id":    "<uuid>",
+  "triggered_by": "scim" | "csv_import" | "manual_invite",
+  "active_seats": 200,
+  "max_seats":    200,
+  "attempted_email": null     // NEVER log the email of the blocked user — only the enforcement count
+}
+```
+
+`attempted_email` is explicitly `null` to prevent the audit log from becoming a PII store for blocked provisioning attempts.
+
+---
+
+### 16.9 Data Retention and GDPR
+
+**`tenant_contracts`:** Financial records. Retained for 7 years post-contract-end under EU bookkeeping obligations and US GAAP requirements. Not deleted on tenant churn — the record is delinked from active SSO/API access when `tenants.lifecycle_status = 'churned'` but the row itself is retained with `status = 'terminated'` or `'expired'`. No personal data in this table (company name is in `tenants.display_name`, not contract table).
+
+**`tenant_pilots`:** Operational records. Retained for 2 years post-pilot-end. Soft-deleted after 2 years (set `deleted_at`); hard-deleted after 5 years. The `internal_notes` field may contain personal data if a CSM writes an employee name — CSMs are instructed in the onboarding guide that this field must not contain named individuals. A Cloudflare Worker content-scan runs weekly against `internal_notes` matching common name-like patterns and flags for CSM review.
+
+**`tenant_seat_utilization` (materialized view):** Aggregate only. Refreshed nightly; prior state is not retained. Not subject to Art. 17 erasure independently — it is derived from `tenants` and `users` tables which handle their own erasure.
+
+**`tenants.lifecycle_status`:** Retained as part of the `tenants` row. On hard-delete of a churned tenant (post-grace-period), the full row is deleted per §12.3 (Art. 17 erasure cascade). The DEC-030 audit events for `tenant.lifecycle_changed` are retained for 7 years and are not deleted on tenant erasure (audit log immutability, §8 of AUDIT_LOG_SCHEMA.md).
+
+**Art. 28 DPA obligation:** `tenant_contracts` rows for EU tenants must reference the executed DPA in a `dpa_ref` note. Add `dpa_ref TEXT` column and populate before any EU pilot or contract is activated. This cross-references `compliance/p1/sub-processor-register.md` and closes the SOC 2 P-GAP-002 line for customer DPA tracking.
+
+---
+
+### 16.10 SOC 2 Mapping
+
+| SOC 2 Criterion | How §16 Satisfies It |
+|---|---|
+| **CC6.1 — Logical access** | Seat enforcement gate (§16.5) ensures only contracted users can be provisioned; `assertSeatAvailable()` is the technical control. Every blocked attempt emits a DEC-030 audit event. |
+| **CC6.2 — User authorisation** | `tenant_contracts.status = 'active'` is the business authorisation that unlocks provisioning. Pilot → contract conversion (§16.3) documents the pre-access approval workflow. |
+| **CC9.1 — Business disruption risk** | Renewal notice trigger (§16.7) detects upcoming contract expiry 60 days in advance; PagerDuty escalation at 14 days prevents availability disruption from lapsed contracts. |
+| **CC9.2 — Vendor and customer commitments** | `tenant_contracts.arr_cents`, `seats_contracted`, `end_at`, and `po_number` are the authoritative record of commercial commitments; referenced in any CC9.2 customer commitment evidence package. |
+| **A1.1 — Availability commitments documented** | `tenant_contracts.plan` maps to the SLA tier in INCIDENT_RESPONSE.md §12.2; the contract row is the evidence that a specific SLA was committed to a specific tenant. |
+| **PI1.4 — Processing accuracy** | `tenant.seat_limit_enforcement_triggered` events provide evidence that FORM does not process (provision) more users than contracted — a processing integrity control. |
+| **C1.2 — Confidential information protected** | `arr_cents` excluded from `tenant_contract_portal` view and from `form_api` role access; pilot `success_criteria` and `internal_notes` blocked from tenant-facing endpoints. |
+
+**Evidence artifacts for SOC 2 auditor:**
+- `tenant_contracts` table export (form_admin access only, `arr_cents` redacted before sharing with enterprise prospects) → `compliance/evidence/contracts/`
+- `tenant_pilots` status distribution report → `compliance/evidence/pilots/`
+- `tenant.seat_limit_enforcement_triggered` event log → CC6.1 enforcement evidence
+- `tenant.contract_activated` + `tenant.renewal_notice_sent` event log → CC9.1 risk management evidence
+
+---
+
+### 16.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Notes |
+|---|---|---|---|---|---|
+| 1 | `ALTER TABLE tenants ADD COLUMN lifecycle_status` — migration with default `'pilot'` for existing rows; add CHECK constraint and index | `platform-engineer` | **P0** | M3 | |
+| 2 | `CREATE TABLE tenant_pilots` DDL migration including RLS policy (`form_admin` + `form_system` only) | `platform-engineer` | **P0** | M3 | |
+| 3 | `CREATE TABLE tenant_contracts` DDL migration: all columns, partial unique index, RLS policies, `tenant_contract_portal` view | `platform-engineer` | **P0** | M3 | `tenant_contract_portal` view must exclude `arr_cents` before any tenant admin can see it |
+| 4 | Implement `assertSeatAvailable()` in `workers/provisioning/seat-gate.ts`; integrate into SCIM `POST /Users`, CSV import, and manual invite paths | `platform-engineer` | **P0** | M3 | TOCTOU protection via `SELECT … FOR UPDATE SKIP LOCKED`; test with concurrent provisioning in staging |
+| 5 | Wire all 14 DEC-030 events (§16.8) to their respective state transitions; validate HMAC chain in staging | `platform-engineer` + `security-engineer` | **P0** | M3 | `tenant.seat_limit_enforcement_triggered` metadata must have `attempted_email: null` — CI assertion |
+| 6 | `CREATE MATERIALIZED VIEW tenant_seat_utilization`; add `pg_cron` refresh at 02:00 UTC; grant SELECT to `form_api` and `form_admin` | `platform-engineer` | **P1** | M4 | Verify anonymity suppression (NULL output when `active_seats < 15`) with a staging tenant |
+| 7 | Build admin dashboard Metabase panel consuming `tenant_seat_utilization` (seats contracted, active seats, 7d utilization %, contract end date); restrict to `tenant_owner` + `tenant_admin` roles | `data-engineer` | **P1** | M4 | Panel must not expose `arr_cents` or `internal_notes` |
+| 8 | Implement `renewal-notice` Cloudflare Worker (Cron 09:05 UTC): query contracts nearing expiry, post Slack to `#csm-renewals`, emit `tenant.renewal_notice_sent` DEC-030, page PagerDuty at ≤ 14 days | `devops-lead` | **P1** | M4 | |
+| 9 | Implement `lifecycle_status` access gate in Worker middleware: block API requests from `suspended` / `churned` / `expired` tenants with HTTP 402 | `platform-engineer` | **P0** | M3 | Ensure SSO SAML assertion validation also checks `lifecycle_status` — see `SSO_SCIM_IMPLEMENTATION.md §6.1` |
+| 10 | Add `dpa_ref TEXT` column to `tenant_contracts` (EU pilot requirement); populate before any EU pilot activation | `compliance-officer` + `platform-engineer` | **P0** | Pre-EU pilot | Closes P-GAP-002 DPA tracking line item |
+| 11 | Implement `tenant.seats_contracted_changed` event in order-form amendment flow (CSM tool): single DB transaction updating `tenant_contracts.seats_contracted` + `tenants.max_seats` | `platform-engineer` | **P1** | M4 | |
+| 12 | CSM onboarding guide update: document `internal_notes` PII prohibition; implement weekly content-scan Worker flagging name-like patterns in `tenant_pilots.internal_notes` | `enterprise-architect` + `compliance-officer` | **P1** | M4 | |
+| 13 | Expansion opportunity alert: Metabase alert firing to CSM Slack when `utilization_pct_7d > 85` for 14 consecutive days — internal signal only, no tenant-facing automation | `data-engineer` | **P2** | M5 | |
+| 14 | 2-year `tenant_pilots` retention cron: soft-delete pilot rows where `status IN ('expired', 'declined', 'converted')` AND `COALESCE(ends_at, extension_ends_at) < now() - INTERVAL '2 years'` | `platform-engineer` | **P2** | M5 | |
+
+**OQ-ENT-01 (Minimum seat floor validation):** COST_MODEL.md §16.2 models 50-seat Starter Y1 gross margin at 47.9%. If actual CSM cost-per-pilot exceeds $200/month, the minimum viable seat floor rises to 75+. Instrument `tenant_pilots.pilot_seats` distribution across first 10 pilots and reconcile against §16.2 model. Owner: compliance-officer + enterprise-architect. Checkpoint: M6.
+
+---
+
+*v0.7 additions: §16 Enterprise Contract & Pilot Lifecycle Schema — closes the schema gap for pilot and contract tracking referenced in ENTERPRISE.md §Pricing, §Implementation timeline, and enterprise.html. `tenants.lifecycle_status` TEXT column with 5-state machine (pilot → active → expired/suspended/churned) and Worker access gate. `tenant_pilots` table: pilot seat cap (10–500), 90-day `ends_at`, fixed-schema JSONB `success_criteria` (activation_rate_pct, weekly_engagement_pct, nps_floor, min_active_seats, evaluation_date), status machine (active/extended/converted/expired/declined), CSM owner handle, internal_notes PII prohibition with weekly content-scan. `tenant_contracts` table: contract_ref, plan, seats_contracted (min 50), arr_cents (FORM-internal only — excluded from form_api RLS and tenant_contract_portal view), billing_period (annual/2year/3year), po_number, start_at/end_at, auto_renew + renewal_notice_days, Stripe subscription ID, partial unique index on (tenant_id) WHERE status = 'active'. Seat enforcement: `assertSeatAvailable()` TypeScript in Workers provisioning layer; FOR UPDATE SKIP LOCKED TOCTOU protection; 402 response with CSM contact; seat_limit_enforcement_triggered DEC-030 event with attempted_email: null. `tenant_seat_utilization` materialized view: active seats, scim-provisioned count, 7d/30d utilization, utilization_pct_7d; k-anonymity NULL suppression below n=15; nightly 02:00 UTC pg_cron refresh; arr_cents absent. Renewal notice pg_cron (09:00 UTC) + Cloudflare Worker (09:05 UTC): Slack to #csm-renewals at renewal_notice_days, PagerDuty at ≤14 days. 14 DEC-030 HMAC-chained audit events including HIGH-severity tenant.contract_terminated and tenant.access_suspended; attempted_email: null invariant CI-enforced. Data retention: tenant_contracts 7 years (financial records), tenant_pilots 2-year soft-delete + 5-year hard-delete. Art. 28 DPA: dpa_ref TEXT column required before EU pilot activation (closes P-GAP-002 DPA tracking). SOC 2 mapping: CC6.1 (seat enforcement), CC6.2 (contract-as-authorisation), CC9.1 (renewal notice), CC9.2 (contract record), A1.1 (SLA tier from plan), PI1.4 (processing integrity), C1.2 (arr_cents confidential). 14-item implementation checklist (7× P0, 4× P1, 2× P2, 1× Pre-EU-pilot). OQ-ENT-01: minimum seat floor validation against COST_MODEL.md §16.2 model at M6.*
