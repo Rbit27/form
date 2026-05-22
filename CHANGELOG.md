@@ -6,6 +6,18 @@
 
 ---
 
+## [1.8.4] — 2026-05-22
+
+### Added
+- `content/post-81-neural-vs-structural-adaptation.md` — Нейральна vs структурна адаптація: чому перші місяці тренінгу — це не гіпертрофія. Moritani & deVries (1979) класичний EMG-експеримент (EMG без змін окружності перші 3–4 тижні), три нейральні механізми (рекрутування рухових одиниць — Henneman Size Principle, rate coding — Patten et al. 2001, міжм'язова координація), Sale (1988) MSSEx (максимальне рекрутування зростає до структурних змін), Folland & Williams (2007) SportsMed (нейральні фактори пояснюють 20–100% початкового приросту сили), Aagaard et al. (2001) JAP (архітектурні зміни — кут пеннації +30%), часова шкала нейральної/структурної фази (тижні 1–4/4–8/8–16/16+), м'язова пам'ять: нейральна і epigenetic — Seaborne et al. (2018) Sci Rep, практичні наслідки для новачків (техніка = нейральна інвестиція), повернення після паузи, першого місяця нової вправи, зв'язок з авторегуляцією. clinical-safety PASS.
+
+### Changed
+- `blog.html` → додані картки для post-80 (RPE/RIR авторегуляція) і post-81 (нейральна vs структурна адаптація)
+- `STATUS.md` → content engine table: додані рядки post-80 і post-81
+- `README.md` → roadmap: post-80 і post-81 позначені [x]; food/supplement теми (натщесерце, Omega-3) переміщені до post-87–88 з флагом clinical-safety required; roadmap розширений до post-88 (motor learning і техніка, bilateral deficit, stretch-mediated hypertrophy)
+
+---
+
 ## [1.8.3] — 2026-05-22
 
 ### Added

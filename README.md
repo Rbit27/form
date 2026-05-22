@@ -404,13 +404,15 @@ Each iteration:
 - [x] post-77: Blood Flow Restriction (BFR) — механізм (венозна оклюзія, AMPK, рекрутування Type II), протокол Abe/Loenneke, коли BFR > важкого навантаження; clinical-safety PASS
 - [x] post-78: Concurrent Training — interference effect (Hickson 1980), AMPK vs mTOR молекулярний конфлікт, режим/об'єм/порядок сесій, практична організація тижня; clinical-safety PASS
 - [x] post-79: Принцип SAID — специфічна адаптація до накладених навантажень: три виміри (нейром'язова, метаболічна, морфологічна), перенос тренування, exercise selection logic, техніка як нейром'язова інвестиція; clinical-safety PASS
-- [ ] post-80: Тренінг натщесерце — fed vs fasted state, fat oxidation myth, Schoenfeld (2014) ⚠️ clinical-safety required (food/eating patterns)
-- [ ] post-81: Omega-3 і тренувальна адаптація — Smith et al. (2011) MPS, anti-inflammatory механізм, dose і EPA:DHA ratio ⚠️ clinical-safety required (supplement/food)
-- [ ] post-82: Magnesium і спортивна продуктивність — роль у МПС, нервово-м'язовій функції, якості сну; дефіцит у атлетів, форми і bio-availability
-- [ ] post-83: Dehidration і силовий тренінг — >2% body mass loss і сила, когнітивна функція, рішення щодо навантаження; практичний моніторинг
-- [ ] post-84: Neural adaptation vs structural adaptation — механізм новачкового прогресу: чому перші 8–12 тижнів — нейральні зміни, а не гіпертрофія; Moritani & deVries (1979), наслідки для програмування
-- [ ] post-85: Training load monitoring — sRPE (Foster 2001), acute:chronic workload ratio, Banister impulse-response model; objective vs subjective readiness markers; практичний ACWR протокол
-- [ ] post-86: Calisthenics vs weighted training — сила відносно маси тіла, прогресія у бодівейт тренінгу (lever progressions), transfer до штанги і навпаки; relative strength framework
+- [x] post-80: Авторегуляція: RPE і RIR — 10-бальна шкала Tuchscherer, RIR як зворотній бік RPE, три проблеми відсоткового програмування (варіація 1RM ±5–8%, контекст, застарілий max), Zourdos et al. (2016) JSCR, Helms et al. (2016) IJSPP, Colquhoun et al. (2017); clinical-safety PASS — ⚠️ попередній roadmap-запис (натщесерце) отримав VETO від clinical-safety
+- [x] post-81: Нейральна vs структурна адаптація — Moritani & deVries (1979) класичний EMG-експеримент, три нейральні механізми (рекрутування, rate coding, координація), Sale (1988), Folland & Williams (2007) огляд, часова шкала нейральної/структурної фази, м'язова пам'ять (epigenetic Seaborne 2018), наслідки для програмування новачків і повернення після паузи; clinical-safety PASS — ⚠️ попередній roadmap-запис (Omega-3) отримав VETO від clinical-safety
+- [ ] post-82: Training load monitoring — sRPE (Foster 2001), acute:chronic workload ratio, Banister impulse-response model; objective vs subjective readiness markers; практичний ACWR протокол
+- [ ] post-83: Calisthenics vs weighted training — сила відносно маси тіла, прогресія у бодівейт тренінгу (lever progressions), transfer до штанги і навпаки; relative strength framework
+- [ ] post-84: Двобічний дефіцит (bilateral deficit) і унілатеральний тренінг — нейральний механізм, Botton et al. (2016), коли і як додавати single-leg/single-arm роботу у програму
+- [ ] post-85: Stretch-mediated hypertrophy — гіпертрофія у розтягнутому положенні, Pedrosa et al. (2022), full ROM vs partial ROM, практичні модифікації
+- [ ] post-86: Motor learning і техніка — стадії Fitts & Posner (cognitive/associative/autonomous), blocked vs random practice, variability of practice; наслідки для навчання нових рухів
+- [ ] post-87: Тренінг натщесерце — fed vs fasted state, fat oxidation myth, Schoenfeld (2014) ⚠️ clinical-safety required before publish (food/eating patterns)
+- [ ] post-88: Omega-3 і тренувальна адаптація — Smith et al. (2011) MPS, EPA:DHA ratio ⚠️ clinical-safety required (supplement/food)
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
