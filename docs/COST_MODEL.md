@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v0.7
+# FORM · Cost Model & Unit Economics v0.8
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -303,57 +303,66 @@ This is the number that matters operationally.
 
 ### 8.1 Revenue and COGS per enterprise deal
 
-Minimum deal size: 20 seats at $25–35/seat/month = $500–700/month per deal, billed annually = $6,000–8,400 ACV.
+All enterprise pricing per `docs/ENTERPRISE.md` and `enterprise.html`: Starter $12/seat/mo (50–200 seats), Growth $9/seat/mo (200–1,000 seats), Enterprise $6–8/seat/mo (1,000+ seats, negotiated; $7 used as midpoint below). ACV figures assume annual contracts, billed directly — no App Store.
 
-| Metric | Min deal (20 seats, $25/seat) | Mid deal (100 seats, $30/seat) | Large deal (500 seats, $35/seat) |
+| Metric | Starter (100 seats, $12/seat) | Growth (500 seats, $9/seat) | Enterprise (2,000 seats, $7/seat) |
 |---|---|---|---|
-| Monthly recurring revenue | $500 | $3,000 | $17,500 |
-| Annual contract value (ACV) | $6,000 | $36,000 | $210,000 |
-| Monthly infrastructure COGS (@ $0.34/seat) | $6.80 | $102 | $595 |
-| Infrastructure gross margin | 98.6% | 96.6% | 96.6% |
+| Monthly recurring revenue | $1,200 | $4,500 | $14,000 |
+| Annual contract value (ACV) | $14,400 | $54,000 | $168,000 |
+| Monthly infra COGS (@ $0.34/seat) | $34 | $170 | $680 |
+| Infrastructure gross margin | 97.2% | 96.2% | 95.1% |
 
 ### 8.2 Implementation and onboarding cost
 
 Enterprise deals carry one-time and recurring non-infrastructure costs that consumer tiers do not:
 
-| Cost item | One-time per deal | Ongoing per month | Notes |
+| Cost item | Starter deal | Growth deal | Enterprise deal |
 |---|---|---|---|
-| SSO/SCIM integration and testing | $800–1,500 [ESTIMATE] | $0 | Engineering time; amortizes across deal life |
-| Admin dashboard onboarding and training | $200–400 [ESTIMATE] | $0 | Customer success time |
-| Custom SLA / compliance review | $300–800 [ESTIMATE] | $0 | Legal + compliance-officer time; lower for repeat buyer type |
-| Dedicated CSM time (ongoing) | — | $150–400 [ESTIMATE] | Scales with seat count; ~2 hrs/month per account at mid-size |
-| **Total implementation (mid deal)** | **~$1,500** | **~$250** | Payback on $36k ACV deal: < 2 months |
+| SSO/SCIM integration and testing | $800–1,200 [ESTIMATE] | $1,000–1,500 [ESTIMATE] | $1,500–2,000 [ESTIMATE] |
+| Admin dashboard onboarding and training | $200–400 [ESTIMATE] | $200–400 [ESTIMATE] | $400–600 [ESTIMATE] |
+| Custom SLA / compliance review | $300–500 [ESTIMATE] | $500–800 [ESTIMATE] | $1,000–3,000 [ESTIMATE] |
+| Dedicated CSM (ongoing) | — (email support only, 24h SLA) | $250–300/mo [ESTIMATE] | $400–500/mo [ESTIMATE] |
+| **Total one-time implementation** | **~$1,150** | **~$1,500** | **~$2,000** |
+
+Payback on $14,400 Starter ACV: < 1 month. Payback on $54,000 Growth ACV: < 0.5 months. Starter is email-only support; Growth and Enterprise include a named CSM.
 
 ### 8.3 Minimum viable enterprise deal
 
 For enterprise to be worth the GTM motion at this stage:
 
 ```
-Minimum ACV to justify sales + implementation overhead: ~$12,000/year [ESTIMATE]
-= 100 seats at $10/seat/month (floor), or
-= 40 seats at $25/seat/month (our floor pricing)
+Minimum ACV to justify sales + implementation overhead: ~$7,200/year [ESTIMATE]
+= 50 seats at $12/seat/month (Starter floor, annual contract)
+  → $600/month MRR · $7,200 ACV
+
+Growth floor (200 seats at $9/seat/month):
+  → $1,800/month MRR · $21,600 ACV
 ```
 
-Deals below 20 seats are currently declined — the implementation overhead is not recoverable. This threshold is reviewed when enterprise sales tooling matures (post-Series A).
+Deals below 50 seats are not offered — Starter starts at 50 seats by design. Section 16.2 shows that 50-seat Starter Year 1 gross margin is 47.9%; this is the economic minimum FORM accepts in exchange for landing a new enterprise logo. Deals below ~40 seats generate negative gross profit in Year 1 at Starter pricing and are declined. This threshold is reviewed when enterprise sales tooling matures (post-Series A).
 
 ### 8.4 Enterprise vs. consumer margin comparison
 
-| | Pro consumer | Enterprise (mid deal) |
+Growth tier (500 seats, $9/seat) used as representative enterprise deal; margin varies significantly by plan size — see §16 for full plan-level analysis.
+
+| | Pro consumer | Enterprise (Growth, 500 seats, $9/seat) |
 |---|---|---|
-| ARPU | $19/month (Western) | $30/seat/month |
+| ARPU | $19/month (Western) | $9/seat/month |
 | Store fee | 15–30% | 0% |
 | Infra COGS | $0.50 | $0.34 |
-| Support/CS allocation | ~$0.70 [ESTIMATE] | ~$3.00 [ESTIMATE] (dedicated CSM) |
-| **Net contribution margin** | ~$12.10–14.95 | ~$26.66 |
-| **Net margin %** | ~64–79% | ~89% |
+| Support/CS allocation | ~$0.70 [ESTIMATE] | ~$0.50 [ESTIMATE] (CSM @ $250/mo ÷ 500 seats) |
+| **Net contribution margin** | ~$12.10–14.95 | ~$8.16 |
+| **Net margin %** | ~64–79% | ~90.7% |
 
-Enterprise wins on margin even with dedicated CS, because the direct billing relationship eliminates the App Store tax entirely.
+Despite a lower per-seat price ($9 vs. $19 consumer ARPU), Growth tier net margin exceeds consumer margin at scale because: (a) no App Store tax, (b) CSM labor amortizes favorably at 500+ seats, and (c) direct Stripe billing has no 15–30% platform fee.
+
+**Starter tier note:** At 50 seats (minimum), per-seat support allocation is ~$4/seat/month ($200/mo email support ÷ 50 seats), compressing net margin to ~63–68% in Year 1. Year 2+ (no implementation amortization) recovers to ~82%. See §16 for full break-even by plan.
 
 ### 8.5 Enterprise CAC Model
 
 Enterprise CAC is the all-in cost to acquire one signed deal: marketing attribution, sales time, and pre-sales technical work. Unlike consumer CAC (driven by paid acquisition), enterprise CAC is driven by human time.
 
-| Cost item | Small deal (20 seats) | Mid deal (100 seats) | Large deal (500 seats) |
+| Cost item | Starter deal | Growth deal | Enterprise deal |
 |---|---|---|---|
 | SDR/AE outreach and qualification | $400–600 (founder-led) | $1,500–2,500 (AE at $120k OTE, 20 deals/year) | $3,500–6,000 (AE + SDR) |
 | Technical evaluation / POC | $300–500 (0.5–1 eng day) | $800–1,500 (1.5–3 eng days) | $2,000–4,000 (3–6 eng days) |
@@ -362,39 +371,40 @@ Enterprise CAC is the all-in cost to acquire one signed deal: marketing attribut
 | **Total enterprise CAC [ESTIMATE]** | **$1,000–1,700** | **$3,100–5,300** | **$7,500–14,000** |
 
 Notes:
-- **Founder-led sales (pre-PMF):** No explicit AE cash cost. Founder time has opportunity cost but is not a cash outflow. Small-deal cash CAC at this stage: $500–800.
-- **Post-PMF AE-led:** The $1,500–2,500 AE cost on mid deals assumes 20 closed deals/year per AE at $120k total compensation. Adjust as actual close rates emerge.
+- **Founder-led sales (pre-PMF):** No explicit AE cash cost. Founder time has opportunity cost but is not a cash outflow. Starter cash CAC at this stage: $500–800.
+- **Post-PMF AE-led:** The $1,500–2,500 AE cost on Growth deals assumes 20 closed deals/year per AE at $120k total compensation. Adjust as actual close rates emerge.
 - All figures [ESTIMATE] until first 3 enterprise deals are time-tracked. See OQ-08.
 
 ### 8.6 Enterprise LTV/CAC Analysis
 
-LTV = ACV × average contract life × gross margin. Enterprise average contract life: **3 years** [ESTIMATE — typical for corporate wellness; replace post-M12].
+LTV = ACV × average contract life × gross margin. Enterprise average contract life: **3 years** [ESTIMATE — typical for corporate wellness; replace post-M12]. GM% per tier: Starter ~80% (steady-state Y2+), Growth ~91%, Enterprise ~92% — derived from §8.4 and §16.
 
-| Deal size | ACV | LTV (3yr × 89% GM) | CAC (midpoint) | LTV/CAC | Payback period |
-|---|---|---|---|---|---|
-| Small (20 seats) | $6,000 | $16,020 | $1,350 | **11.9×** | ~3 months |
-| Mid (100 seats) | $36,000 | $96,120 | $4,200 | **22.9×** | ~1.7 months |
-| Large (500 seats) | $210,000 | $560,700 | $10,750 | **52.2×** | ~0.6 months |
+| Deal tier | Representative deal | ACV | LTV (3yr × tier GM%) | CAC (midpoint) | LTV/CAC | Payback |
+|---|---|---|---|---|---|---|
+| Starter · minimum | 50 seats × $12/seat | $7,200 | $17,280 (80% GM) | $1,350 | **12.8×** | ~2.3 mo |
+| Starter · typical | 100 seats × $12/seat | $14,400 | $34,560 (80% GM) | $1,500 | **23.0×** | ~1.3 mo |
+| Growth · typical | 500 seats × $9/seat | $54,000 | $147,420 (91% GM) | $4,200 | **35.1×** | ~0.9 mo |
+| Enterprise · typical | 2,000 seats × $7/seat | $168,000 | $448,560 (89% GM) | $10,750 | **41.7×** | ~0.8 mo |
 
-All three deal sizes deliver LTV/CAC ratios well above the conventional 3:1 benchmark for B2B SaaS. Even the minimum 20-seat deal returns ~12× CAC over the contract life. Economics improve dramatically at scale, justifying investment in enterprise GTM once consumer PMF is validated.
+All deal tiers deliver LTV/CAC ratios well above the conventional 3× B2B SaaS benchmark. The minimum 50-seat Starter deal returns ~13× over 3 years. Economics improve at scale, justifying enterprise GTM investment once consumer PMF is validated.
 
-**Caveat:** These ratios assume 89% net margin from §8.4. If CS cost scales above modeled levels (e.g., dedicated CSM per account below 50 seats), small-deal margin degrades. The 40-seat minimum threshold in §8.3 exists precisely to protect this.
+**Caveat:** Starter GM% (80%) uses steady-state Year 2+ margins — Year 1 is lower (47.9% at 50 seats) due to implementation amortization. If CS cost scales above modeled levels on small accounts, margin degrades further. The 50-seat minimum in §8.3 exists to protect this floor.
 
 ### 8.7 Expansion and Churn Economics
 
 Enterprise value is not initial ACV alone — it is expansion potential and net revenue retention (NRR).
 
-**NRR model — cohort of 10 mid deals ($360k starting ARR):**
+**NRR model — cohort of 10 Growth deals at launch ($540k starting ARR · 500 seats × $9/seat × 12 × 10 deals):**
 
 | Scenario | Year 2 ARR | NRR | Notes |
 |---|---|---|---|
-| Pessimistic: 20% logo churn, 0% expansion | $288,000 | 80% | High early-churn; no land-and-expand |
-| Baseline: 10% logo churn, 15% seat expansion | $378,000 | 105% | Modest organic growth offsets some churn |
-| Optimistic: 5% logo churn, 30% seat expansion | $421,200 | 117% | Strong adoption → org-wide rollout |
+| Pessimistic: 20% logo churn, 0% expansion | $432,000 | 80% | High early-churn; no land-and-expand |
+| Baseline: 10% logo churn, 15% seat expansion | $567,000 | 105% | Modest organic growth offsets some churn |
+| Optimistic: 5% logo churn, 30% seat expansion | $630,900 | 117% | Strong adoption → org-wide rollout |
 
 **Expansion triggers:**
 - Initial purchase = one department or team. Natural expansion = company-wide rollout.
-- 20-seat pilot with proven adoption → 100-seat renewal is a 5× ACV expansion.
+- 50-seat Starter pilot with proven adoption → 200-seat renewal at $12/seat is a 4× ACV expansion.
 - New office locations, shift cohorts, or acquired subsidiaries as additional seat blocks.
 - Enterprise SSO/SCIM integration (see `docs/SSO_SCIM_IMPLEMENTATION.md`) makes org-wide expansion frictionless once IdP is established — no individual onboarding per new employee.
 
@@ -410,17 +420,17 @@ Enterprise value is not initial ACV alone — it is expansion potential and net 
 
 Implementation cost is front-loaded; from Year 2, the same deal generates higher net margin because setup is fully amortized.
 
-| Metric | Year 1 (mid deal, 100 seats) | Year 2+ (same deal, no expansion) |
+| Metric | Year 1 (Growth, 500 seats, $9/seat) | Year 2+ (same deal, no expansion) |
 |---|---|---|
-| ACV | $36,000 | $36,000 |
-| Infrastructure COGS (@$0.34/seat/month × 12) | $408 | $408 |
+| ACV | $54,000 | $54,000 |
+| Infrastructure COGS (@ $0.34/seat/month × 12) | $2,040 | $2,040 |
 | Implementation cost (one-time) | $1,500 | $0 |
 | CSM cost ($250/month × 12) | $3,000 | $3,000 |
-| **Total cost** | **$4,908** | **$3,408** |
-| **Net margin** | **$31,092 (86.4%)** | **$32,592 (90.5%)** |
-| Y2 margin improvement vs Y1 | — | **+4.1 pp** |
+| **Total cost** | **$6,540** | **$5,040** |
+| **Net margin** | **$47,460 (87.9%)** | **$48,960 (90.7%)** |
+| Y2 margin improvement vs Y1 | — | **+2.8 pp** |
 
-**Multi-year contract strategy:** A 5–8% discount on 2-year or 3-year prepayment improves cash flow and locks in renewal. The Year 2+ efficiency gain (+4.1 pp margin) more than offsets the discount on most deal sizes. Standard practice on deals >50 seats; offer proactively in enterprise negotiations.
+**Multi-year contract strategy:** A 15–25% discount on 2–3 year prepayment (per `enterprise.html`) improves cash flow and locks in renewal. The Year 2+ efficiency gain (+2.8 pp) partially offsets the discount while eliminating annual logo churn risk entirely. See §16.4 for detailed multi-year contract economics.
 
 ---
 
@@ -875,29 +885,29 @@ The conventional SaaS benchmark is 3:1 LTV:CAC with payback under 12 months. Con
 
 Enterprise LTV is driven by initial ACV, expansion (seat growth and new feature adoption), and logo retention. The NRR model assumes 120% NRR [ESTIMATE] — meaning each surviving customer cohort grows 20% per year in ARR terms. This requires ~41% seat/price expansion on retained logos to offset 15% annual logo churn.
 
-**Minimum contract baseline:** 40 seats × $12/seat/month × 12 = **$5,760 ACV** (from §8.3).
+**Starter minimum contract baseline:** 50 seats × $12/seat/month × 12 = **$7,200 ACV** (from §8.3; minimum deal size that passes Year 1 economics per §16.2).
 
-**Enterprise cohort LTV at 120% NRR, 15% annual logo churn [ESTIMATE], 89% gross margin:**
+**Enterprise cohort LTV at 120% NRR, 15% annual logo churn [ESTIMATE], Starter tier (80% steady-state GM):**
 
 | Year | ACV (per average deal) | GM-adjusted annual revenue | Cumulative GM-adj LTV |
 |---|---|---|---|
-| Year 1 | $5,760 | $5,126 | $5,126 |
-| Year 2 | $6,912 [120% NRR applied] | $6,152 | $11,278 |
-| Year 3 | $8,294 | $7,382 | $18,660 |
+| Year 1 | $7,200 | $5,760 | $5,760 |
+| Year 2 | $8,640 [120% NRR applied] | $6,912 | $12,672 |
+| Year 3 | $10,368 | $8,294 | $20,966 |
 
-**3-year GM-adjusted LTV on minimum deal: ~$18,660.** Against a CAC of ~$1,350 (small deal, §8.5): **LTV:CAC = 13.8×**.
+**3-year GM-adjusted LTV on minimum Starter deal: ~$20,966.** Against a CAC of ~$1,350 (Starter deal, §8.5): **LTV:CAC = 15.5×**.
 
 At larger deal sizes (with proportionally higher but sub-linear CAC from §8.5):
 
-| Deal size | Starting ACV | 3yr GM-adj LTV | CAC midpoint | LTV:CAC |
+| Deal tier | Starting ACV | 3yr GM-adj LTV | CAC midpoint | LTV:CAC |
 |---|---|---|---|---|
-| Minimum (40 seats) | $5,760 | $18,660 | $1,350 | **13.8×** |
-| Mid (100 seats) | $36,000 | $116,626 | $4,200 | **27.8×** |
-| Large (500 seats) | $210,000 | $680,316 | $10,750 | **63.3×** |
+| Starter (50 seats, $12/seat) | $7,200 | $20,966 (80% GM) | $1,350 | **15.5×** |
+| Growth (500 seats, $9/seat) | $54,000 | $178,870 (91% GM) | $4,200 | **42.6×** |
+| Enterprise (2,000 seats, $7/seat) | $168,000 | $544,253 (89% GM) | $10,750 | **50.6×** |
 
-Enterprise LTV:CAC ratios are structurally superior to consumer at every deal size. The minimum 40-seat deal returns ~14× over 3 years. The economic argument for investing in enterprise GTM is not margin (which is already excellent at both tiers) but predictability: annual contracts, invoiced directly, with expanding seat counts, generate ARR that is fundamentally more stable than consumer monthly churn.
+Enterprise LTV:CAC ratios are structurally superior to consumer at every deal size. The minimum 50-seat Starter deal returns ~16× over 3 years. The economic argument for investing in enterprise GTM is not margin (which is already excellent at both tiers) but predictability: annual contracts, invoiced directly, with expanding seat counts, generate ARR that is fundamentally more stable than consumer monthly churn.
 
-**Expansion revenue mechanics at 120% NRR:** An enterprise account that starts at 40 seats and expands to the company-wide headcount of 200 seats over 24 months goes from $5,760 ACV to $28,800 ACV — a 5× ACV expansion on a single logo. This is the land-and-expand motion. The CAC is fixed at ~$1,350 (acquisition cost does not repeat on expansion); the incremental 160 seats are zero-CAC revenue. This is why NRR >100% is such a powerful metric for enterprise SaaS valuation multiples.
+**Expansion revenue mechanics at 120% NRR:** A Starter account that starts at 50 seats and expands to 200 seats over 24 months goes from $7,200 ACV to $28,800 ACV — a 4× ACV expansion on a single logo. If it upgrades to Growth tier (200 seats, $9/seat), ACV is $21,600 — a 3× expansion at lower per-seat price but with the same direct-invoice economics. The CAC is fixed at ~$1,350 (acquisition cost does not repeat on expansion); the incremental seats are zero-CAC revenue. This is why NRR >100% is such a powerful metric for enterprise SaaS valuation multiples.
 
 ### 14.7 Cohort survival curve — qualitative requirements
 
@@ -1579,13 +1589,15 @@ Victor's system prompt is estimated at ~1,200 tokens (§2.1). If context history
 
 ---
 
-**v0.7 · May 2026**
+**v0.8 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
 
 *v0.3 additions: §12 Free Tier Subsidy Model & Freemium Funnel Economics — total subsidy at scale, minimum conversion rate for cost neutrality, freemium CAC vs. paid UA comparison, free tier cost controls, free pool governance triggers.*
 
 *v0.4 updates: §4, §5, §6, §8.4, §9, §10, §12 recalculated to reflect Pro ARPU of $19/month (Western markets, per pricing.html). Geo-pricing note added (§4). Free tier break-even threshold: 1.05% → 0.82%. Full-burn break-even: 6,530 → 5,112 Pro subscribers. Section 10 sensitivity margins updated throughout.*
+
+*v0.8 updates: §8 (Enterprise Economics) and §14.6 (Enterprise LTV model) recalculated to reflect the current three-tier pricing from docs/ENTERPRISE.md and enterprise.html — Starter $12/seat (50–200 seats), Growth $9/seat (200–1,000 seats), Enterprise $6–8/seat (1,000+). Previous §8 used pre-launch placeholder pricing ($25–35/seat, 20/100/500-seat deal sizes) that was never aligned to the official rate card. §16 was already correct and is unchanged.*
 
 *v0.5 additions: §13 Infrastructure Cost Breakdown by Service — service-by-service table at 1k/10k/50k/100k MAU, fixed vs. variable classification, upgrade inflection points, cost cliff analysis, per-service optimization levers. §14 Cohort LTV Model & CAC Payback Period — 24-month cohort survival tables for Pro monthly and annual plans, CAC payback at $30/$50/$80/$120, LTV:CAC targets by channel, enterprise LTV at 120% NRR, cohort survival curve requirements, data pipeline specification.*
 

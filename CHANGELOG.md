@@ -6,6 +6,13 @@
 
 ---
 
+## [1.8.5] — 2026-05-22
+
+### Changed
+- `docs/COST_MODEL.md` → v0.8: §8 (Enterprise Economics) and §14.6 (Enterprise LTV model) recalculated to match the current three-tier rate card from `docs/ENTERPRISE.md` and `enterprise.html`. Previous §8 used stale placeholder pricing ($25–35/seat, 20/100/500-seat deal sizes); now aligned to Starter $12/seat (50–200 seats), Growth $9/seat (200–1,000 seats), Enterprise $6–8/seat (1,000+). §8.1 ACV table, §8.3 minimum deal floor (50 seats), §8.4 margin comparison (Growth tier representative), §8.5 CAC table (Starter/Growth/Enterprise tiers), §8.6 LTV/CAC (four representative deals), §8.7 NRR model (Growth cohort baseline), §8.8 Y1/Y2+ table (500-seat Growth deal) all updated. §14.6 LTV model uses 50-seat Starter minimum and Growth/Enterprise deal sizes; 3-yr GM-adj LTV and LTV:CAC ratios recalculated. §16 was already correct and is unchanged.
+
+---
+
 ## [1.8.4] — 2026-05-22
 
 ### Added
