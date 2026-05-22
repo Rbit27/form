@@ -6,7 +6,7 @@ This directory contains evidence artifacts for SOC 2 CC1 (Control Environment) c
 
 | Artifact ID | Description | Status | Path |
 |---|---|---|---|
-| CC1-E-001 | Founder annual security training completion record | 🔴 Pending — due 28 Feb each year | evidence/cc1/training/ |
+| CC1-E-001 | Founder annual security training completion record | 🟡 AUTHORED — log template + workflow defined; evidence pending founder completion | `compliance/cc1/security-training-log.md` |
 | CC1-E-002 | New hire onboarding checklist (signed) | 🔴 Pending — required on first hire | evidence/cc1/onboarding/ |
 | CC1-E-003 | Code of conduct acknowledgment | 🟡 Partial — CONTRIBUTING.md in git history | git commit history |
 | CC1-E-004 | Acceptable Use Policy — current version + signed copies | 🟡 In Progress — AUP authored v1.0; signing pending counsel review | aup/ |
@@ -26,7 +26,7 @@ When the AUP (POL-001 in `compliance/policy-approval-log.csv`) is formally signe
 | Gap ID | Description | Priority | Status |
 |---|---|---|---|
 | CC1-GAP-001 | AUP authored and signed | P0 | 🟡 AUTHORED — pending counsel review + founder signature |
-| CC1-GAP-002 | Founder annual training completion | P0 | 🔴 Open |
+| CC1-GAP-002 | Founder annual training completion | P0 | 🟡 AUTHORED — `compliance/cc1/security-training-log.md` (CC1-E-001, 2026-05-22); closes 🟢 upon founder self-attestation executed |
 | CC1-GAP-003 | Phishing simulation programme (KnowBe4 / GoPhish) | P1 | 🔴 Open — requires first hire |
 | CC1-GAP-004 | Background check procedure in onboarding checklist | P1 | 🔴 Open — requires first hire |
 

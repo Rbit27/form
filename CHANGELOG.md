@@ -6,6 +6,17 @@
 
 ---
 
+## [1.6.0] — 2026-05-22
+
+### Added
+- `compliance/cc1/security-training-log.md` — CC1-E-001, v0.1 · Annual Security Awareness Training Completion Log (CC1-GAP-002 🔴→🟡 AUTHORED). Eight-topic curriculum: OWASP Top 10, phishing and social engineering, GDPR Art. 9 data classification, incident response basics, credential hygiene / secrets management, OWASP ASVS secure code review, privacy and GDPR obligations, vendor risk awareness. Evidence filing instructions with git commit SHA workflow. Founder self-attestation template. Solo-phase auditor disclosure (CC1-E-002 and CC1-E-005 intentionally absent). Gap closes 🟢 upon founder self-attestation executed and committed.
+
+### Changed
+- `compliance/cc1/README.md` — CC1-E-001 row 🔴 Pending → 🟡 AUTHORED; CC1-GAP-002 row 🔴 Open → 🟡 AUTHORED with artifact reference.
+- `docs/SOC2_READINESS.md` → v2.8 — CC1-GAP-002 updated in §22 gap table, §38.4 master gap registry, and §38.6 evidence artifact index. Version note appended. Open gap count: 49 (no change — gap advances from 🔴 to 🟡, P0 count holds until self-attestation executed).
+
+---
+
 ## [1.5.0] — 2026-05-22
 
 ### Added
