@@ -6,6 +6,22 @@
 
 ---
 
+## [1.5.0] — 2026-05-22
+
+### Added
+- `compliance/c1/data-asset-inventory.md` — PRE-34-E-001, v0.1 · Confidential Data Asset Inventory (C1-GAP-002 → 🟡 Authored, pending founder signature for 🟢). Covers 14 Supabase table entries (DC-01 through DC-07 + audit_log + tenants + tenant_users + programs + subscriptions + analytics queue) with classification, retention period (P1-RET-001), column-level encryption status, and backup tier coverage. Cloudflare Workers / R2 / KV. Backblaze B2 WORM Tier 3 (7-year immutable). 8 sub-processor data holdings cross-referenced to `compliance/p1/sub-processor-register.md`. GitHub, 1Password Teams, Cloudflare Workers Secrets. PostHog EU / ClickHouse / Metabase analytics layer. Four-tier classification (Public/Internal/Confidential/Sensitive/Restricted) + Art. 9 health-data overlay applied throughout. GDPR Art. 17 erasure sequence (§8.1). Interim device disposal rule (§8.3, pending C1-GAP-004). RLS access control matrix cross-referenced from DATA_MODEL.md §8. Founder signatory block with C1-INV-001 signing procedure in compliance/c1/README.md.
+- `compliance/c1/README.md` — C1 evidence directory index; PRE-34-E-001 through PRE-34-E-008 artifact tracking; gap status for C1-GAP-001 through C1-GAP-004; signatory procedure for PRE-34-E-001.
+
+### Changed
+- `docs/SOC2_READINESS.md` v2.6→v2.7 — CC7-GAP-004 🔴→🟢 CLOSED (R-05 runbook confirmed in INCIDENT_RESPONSE.md §R-05 v0.4; gap was stale); C1-GAP-002 🔴→🟡 AUTHORED (PRE-34-E-001 v0.1 filed); PRE-34-E-001 evidence status updated; §38.4 master gap registry updated; open gap count 50→49; P0 count 14→13.
+
+### SOC 2 Gap Progress
+- CC7-GAP-004 🔴→🟢 CLOSED (R-05 runbook existed in INCIDENT_RESPONSE.md v0.4; gap was authored before runbook was merged)
+- C1-GAP-002 🔴→🟡 AUTHORED (`compliance/c1/data-asset-inventory.md` v0.1; pending founder signature)
+- SOC 2 open gaps: 50→49 · P0: 14→13 · Readiness: ~95% (unchanged — no new control implementations; documentation artifacts advanced)
+
+---
+
 ## [1.4.1] — 2026-05-22
 
 ### Added
