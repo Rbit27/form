@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v0.4
+# FORM · Observability & Monitoring Taxonomy v0.5
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -8,7 +8,7 @@
 
 This document defines FORM's observability strategy: what we measure, how we measure it, what triggers a human response, and how long we keep each signal. It is the authoritative reference for instrumenting new services, configuring alerts, building dashboards, and demonstrating monitoring controls to auditors.
 
-Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare Pages (marketing + admin), Supabase Postgres (primary database), Supabase Auth (consumer identity), Auth0 / WorkOS (enterprise SSO), Anthropic Claude API (Victor AI coach), ElevenLabs (voice synthesis), the iOS and Android mobile applications (React Native / Expo), and all dependent SaaS processors (PostHog, Sentry, ElevenLabs, Better Stack).
+Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare Pages (marketing + admin), Supabase Postgres (primary database), Supabase Auth (consumer identity), Auth0 / WorkOS (enterprise SSO), Anthropic Claude API (Victor AI coach), ElevenLabs (voice synthesis), the iOS and Android mobile applications (React Native / Expo), the on-device CV pose estimation pipeline (Apple Vision / ML Kit), and all dependent SaaS processors (PostHog, Sentry, ElevenLabs, Better Stack).
 
 **Multi-tenant note:** FORM operates a B2C consumer tier and a multi-tenant enterprise tier. Every observability concern must propagate `tenant_id` for enterprise contexts so that per-tenant SLA reporting, breach scoping, and isolation verification are possible from signal data alone.
 
@@ -2253,6 +2253,354 @@ When anomalies are present, the anomaly section replaces the final line:
 
 ---
 
+---
+
+## 18. CV Pose Estimation Model Observability
+
+> **Privacy-first constraint:** The CV pipeline processes GDPR Art. 9 biometric data (derived from video analysis). All observability signals in this section are designed so that no individual's pose data, form score, or movement pattern can be reconstructed from log or metric data. Raw frames never leave the device; only aggregate and anonymised signals flow to the observability stack. See §18.8 for the full privacy constraint matrix.
+
+### 18.1 Purpose and Scope
+
+FORM's computer vision (CV) pose estimation pipeline is the product's primary technical differentiator. It runs entirely on-device — raw video frames are never transmitted to FORM's backend or to any third party (`docs/DATA_MODEL.md` §15.1). This design creates observability constraints: there is no server-side frame stream to monitor. Instead, observability is distributed across three layers:
+
+1. **On-device SDK telemetry** — non-sensitive metrics (latency, frame counts, cold-start time) collected during the session and uploaded at session completion. No pose keypoints or form scores included.
+2. **Server-side session records** — the `cv_sessions` table stores aggregate quality signals (`status`, `avg_keypoint_confidence`, `frames_below_threshold`) without the encrypted biometric payload (`keypoints_enc`) being accessible to the observability stack.
+3. **Aggregate fleet views** — cross-session aggregation by `model_name` × `model_version` × `tenant_id`, used for model health monitoring and rollout progress tracking.
+
+**In scope:** Session completion rates, on-device latency telemetry, model version distribution, confidence degradation detection, `tracking_lost` spike detection, model rollout anomaly alerting, form defect prevalence at fleet level.
+
+**Out of scope:** Per-user form score breakdowns, individual keypoint data, per-user movement quality, any signal that would allow re-identification of an individual user's health status. These constraints are enforced at the schema level.
+
+Cross-references: `docs/DATA_MODEL.md` §15 (CV schema, RLS, `tenant_cv_summary`), `docs/INCIDENT_RESPONSE.md` R-10 (AI Coach Safety Incident — blast-radius scoping by `model_version`), `docs/SOC2_READINESS.md` §37 (PI1 Processing Integrity).
+
+---
+
+### 18.2 RED Signals for the CV Pipeline
+
+Applying the RED methodology (§0) to the CV pipeline:
+
+| Signal | Rate (R) | Errors (E) | Duration (D) |
+|---|---|---|---|
+| **CV session upload (Workers)** | `cv_sessions` inserts per hour, by `platform` | `status = 'tracking_lost'` rate; `status = 'partial'` rate | P95 of `cv_session_upload_duration_ms` Worker span |
+| **On-device inference (iOS)** | CV sessions per day on iOS | Sessions with `avg_keypoint_confidence < 0.65` (frame noise floor) | `inference_latency_p95_ms` from `cv_sdk_telemetry` |
+| **On-device inference (Android)** | CV sessions per day on Android | Same confidence threshold; separate model path (ML Kit vs Apple Vision) | `inference_latency_p95_ms` (Android) |
+| **Model rollout** | % of fleet sessions per `model_name` × `model_version` | New version `pct_tracking_lost` > 2× baseline | Not latency-sensitive; omit |
+
+**Interpretation note:** A rise in `tracking_lost` at constant session rate is an **Error** spike in RED terms. A drop in total sessions at constant `tracking_lost` could indicate a **Rate** regression (camera feature abandoned during cold start) vs a **Duration** regression (cold start too slow). Distinguish using `cold_start_ms` P95 from `cv_sdk_telemetry` before paging.
+
+---
+
+### 18.3 On-Device SDK Telemetry Schema
+
+At the end of each CV session the mobile app transmits a non-sensitive telemetry payload to the Cloudflare Worker at `POST /v1/cv/session-telemetry`. Authenticated with the user's Bearer JWT. Writes to `cv_sdk_telemetry`.
+
+**Classification: INTERNAL — non-sensitive aggregate. No GDPR Art. 9 content.**
+
+```sql
+-- Telemetry emitted by the mobile SDK at session end.
+-- No pose keypoints, form scores, or movement descriptions.
+-- Retention: 90 days (aligned with §8 metrics tier).
+CREATE TABLE cv_sdk_telemetry (
+  id                       UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  cv_session_id            UUID         NOT NULL REFERENCES cv_sessions(id) ON DELETE CASCADE,
+  tenant_id                UUID         NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+
+  -- Device context (non-identifying; used for model fleet health analysis)
+  platform                 TEXT         NOT NULL CHECK (platform IN ('ios', 'android')),
+  os_version               TEXT         NOT NULL,  -- "17.4.1" (iOS) or "14" (Android API level string)
+  device_tier              TEXT         NOT NULL   -- "high" | "mid" | "low" (inferred from device benchmark)
+                             CHECK (device_tier IN ('high', 'mid', 'low')),
+
+  -- Model selection (mirrors cv_sessions columns)
+  model_name               TEXT         NOT NULL,
+  model_version            TEXT         NOT NULL,
+
+  -- On-device latency (milliseconds)
+  cold_start_ms            INTEGER,     -- camera init + model warm-up; SLO P95 < 800 ms (TECHNICAL.md §2)
+  inference_latency_p50_ms INTEGER,     -- median per-frame inference; target ≈ 20 ms (Apple Vision)
+  inference_latency_p95_ms INTEGER,     -- 95th percentile; alert threshold: > 50 ms iOS, > 80 ms Android (§18.7)
+  frame_count              INTEGER,     -- total frames captured by camera
+  frames_dropped           INTEGER,     -- dropped before inference (buffer overflow / CPU saturation)
+  frames_skipped           INTEGER,     -- intentionally skipped (every-N-th frame strategy)
+
+  -- Tracking stability
+  kalman_resets            SMALLINT,    -- number of Kalman filter resets during session (tracking disruptions)
+
+  -- Memory pressure (iOS only; null on Android)
+  memory_warning_count     SMALLINT,    -- UIApplicationDidReceiveMemoryWarningNotification count
+
+  created_at               TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_cv_sdk_telemetry_session
+  ON cv_sdk_telemetry (cv_session_id);
+CREATE INDEX idx_cv_sdk_telemetry_model
+  ON cv_sdk_telemetry (model_name, model_version, platform);
+CREATE INDEX idx_cv_sdk_telemetry_created_at
+  ON cv_sdk_telemetry (created_at);
+```
+
+**Privacy note:** `platform`, `os_version`, and `device_tier` are non-identifying at this granularity. FORM does not store IDFA or Android Advertising ID (`docs/DATA_MODEL.md` §13.1). `os_version` (major.minor) does not constitute personal data under GDPR.
+
+---
+
+### 18.4 Server-Side Aggregate Signals (`cv_sessions`)
+
+The `cv_sessions` table (`docs/DATA_MODEL.md` §15.2) stores non-encrypted aggregate outputs per session. These columns are safe for fleet-level observability without decrypting `keypoints_enc`:
+
+| Column | Observability use |
+|---|---|
+| `status` (`completed` / `partial` / `tracking_lost` / `active`) | Session completion rate; `tracking_lost` spike detection |
+| `avg_keypoint_confidence` (0.000–1.000) | Confidence distribution; P50/P25 degradation alerting |
+| `frames_analysed` | Session length; cross-reference with SDK `frame_count` |
+| `frames_below_threshold` | Poor-confidence frame ratio (threshold: 0.65 per `REP_COUNT_CONFIDENCE_MIN`) |
+| `model_name` | Model distribution across fleet |
+| `model_version` | Rollout progress; per-version quality comparison |
+| `cv_flags` (JSONB) | Defect prevalence at fleet level — never per-user in dashboards |
+| `created_at` | Session volume time-series |
+
+**Columns excluded from observability:** `user_id` (never grouped by user), `keypoints_enc` (encrypted biometric payload — observability stack has no decryption key), individual `form_score` per user.
+
+#### 18.4.1 Fleet-Level Observability View
+
+```sql
+-- Internal observability view — aggregates cv_sessions at model × platform × day level.
+-- No user_id, no per-user form_score, no keypoints.
+-- Access: form_system, form_admin. devops-lead queries via Metabase (§18.9).
+-- Refresh: nightly pg_cron at 04:00 UTC (staggered after tenant_cv_summary at 03:05 UTC).
+CREATE MATERIALIZED VIEW cv_session_fleet_stats AS
+SELECT
+  DATE_TRUNC('day', created_at)                                         AS day,
+  model_name,
+  model_version,
+  tenant_id,                                -- for per-tenant anomaly detection (AL-CV-08); never returned to tenant admin
+
+  COUNT(*)                                                              AS total_sessions,
+  COUNT(*) FILTER (WHERE status = 'completed')                          AS completed_sessions,
+  COUNT(*) FILTER (WHERE status = 'partial')                            AS partial_sessions,
+  COUNT(*) FILTER (WHERE status = 'tracking_lost')                      AS tracking_lost_sessions,
+
+  -- Completion rate (primary SLO signal; §18.5)
+  ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'completed')
+    / NULLIF(COUNT(*), 0), 1)                                           AS pct_completed,
+  ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'tracking_lost')
+    / NULLIF(COUNT(*), 0), 1)                                           AS pct_tracking_lost,
+
+  -- Confidence distribution (P50 and P25 as floor degradation proxies)
+  PERCENTILE_CONT(0.50) WITHIN GROUP
+    (ORDER BY avg_keypoint_confidence)                                  AS confidence_p50,
+  PERCENTILE_CONT(0.25) WITHIN GROUP
+    (ORDER BY avg_keypoint_confidence)                                  AS confidence_p25,
+
+  -- Frame quality
+  ROUND(AVG(
+    CASE WHEN frames_analysed > 0
+      THEN frames_below_threshold::NUMERIC / frames_analysed
+      ELSE NULL
+    END
+  ), 3)                                                                 AS avg_below_threshold_ratio,
+
+  -- Form defect fleet prevalence (directional; no per-user attribution)
+  ROUND(100.0 * COUNT(*) FILTER (
+    WHERE (cv_flags->>'knee_cave')::int > 0
+  ) / NULLIF(COUNT(*), 0), 1)                                           AS pct_knee_cave,
+  ROUND(100.0 * COUNT(*) FILTER (
+    WHERE (cv_flags->>'back_arch')::int > 0
+  ) / NULLIF(COUNT(*), 0), 1)                                           AS pct_back_arch,
+  ROUND(100.0 * COUNT(*) FILTER (
+    WHERE (cv_flags->>'depth_short')::int > 0
+  ) / NULLIF(COUNT(*), 0), 1)                                           AS pct_depth_short
+
+FROM cv_sessions
+WHERE deleted_at IS NULL
+GROUP BY
+  DATE_TRUNC('day', created_at),
+  model_name,
+  model_version,
+  tenant_id;
+
+-- SELECT cron.schedule('refresh-cv-fleet-stats', '0 4 * * *',
+--   $$REFRESH MATERIALIZED VIEW CONCURRENTLY cv_session_fleet_stats$$);
+```
+
+---
+
+### 18.5 SLOs for the CV Pipeline
+
+These SLOs supplement the platform SLO table in §2.1. Minimum session count for all SLO evaluations: **≥ 50 sessions** in the rolling window; below this threshold the alert is suppressed and flagged as insufficient data.
+
+| SLI Name | Measurement | SLO Target | Alerting Threshold | Window | Owner |
+|---|---|---|---|---|---|
+| **CV session completion rate** | `pct_completed` in `cv_session_fleet_stats` (global fleet) | ≥ 85% | < 80% in 1-hour rolling window | Rolling 7 days | ml-engineer |
+| **CV tracking_lost rate** | `pct_tracking_lost` in `cv_session_fleet_stats` (global fleet) | ≤ 8% | > 15% in 1-hour rolling window | Rolling 7 days | ml-engineer |
+| **On-device inference P95 (iOS)** | `inference_latency_p95_ms` from `cv_sdk_telemetry` (`platform = 'ios'`) | < 30 ms | > 50 ms P95 in 6-hour window | Rolling 7 days | platform-engineer |
+| **On-device inference P95 (Android)** | `inference_latency_p95_ms` from `cv_sdk_telemetry` (`platform = 'android'`) | < 50 ms | > 80 ms P95 in 6-hour window | Rolling 7 days | platform-engineer |
+| **Camera cold start P95 (iOS)** | `cold_start_ms` from `cv_sdk_telemetry` (`platform = 'ios'`) | < 800 ms | > 1,200 ms P95 in 6-hour window | Rolling 7 days | platform-engineer |
+| **Avg keypoint confidence P50** | `confidence_p50` in `cv_session_fleet_stats` (global fleet) | ≥ 0.80 | < 0.70 in 1-hour rolling window | Rolling 7 days | ml-engineer |
+| **High-confidence session rate** | % of sessions with `avg_keypoint_confidence ≥ 0.90` | ≥ 70% | < 55% in 6-hour rolling window | Rolling 7 days | ml-engineer |
+| **Frame below-threshold ratio** | `avg_below_threshold_ratio` in `cv_session_fleet_stats` | ≤ 0.12 | > 0.20 in 1-hour rolling window | Rolling 7 days | ml-engineer |
+
+**Rationale for 85% completion target:** `docs/TECHNICAL.md` §2 reports 92–97% keypoint confidence in good-light conditions. Enterprise environments (private offices, inconsistent overhead lighting) degrade this. 85% is the floor below which user experience is materially impacted. The 92%+ rate in controlled conditions is a stretch target tracked separately in the "CV Model Health" Metabase panel (§18.9).
+
+---
+
+### 18.6 Model Version Registry and Rollout Monitoring
+
+Model versions are identified in `cv_sessions` by `(model_name, model_version)`. Four model variants:
+
+| `model_name` | Keypoints | Target device tier | iOS framework | Android framework |
+|---|---|---|---|---|
+| `blazepose_lite` | 33 (x, y, z, visibility) | Mid / Low | Apple Vision `VNDetectHumanBodyPoseRequest` | ML Kit Pose Detection Lite |
+| `blazepose_full` | 33 | High | Apple Vision | ML Kit Pose Detection Full |
+| `movenet_lightning` | 17 (x, y, z, visibility) | Mid / Low | CoreML (TFLite conversion) | TFLite |
+| `movenet_thunder` | 17 | High | CoreML | TFLite |
+
+**Rollout monitoring:** When a new `model_version` is deployed via EAS OTA, the version distribution in `cv_session_fleet_stats` tracks rollout progress. A new version that reaches > 10% of fleet with `pct_tracking_lost` > 2× the baseline version's `pct_tracking_lost` triggers AL-CV-03 (P1; §18.7).
+
+```sql
+-- Model version rollout progress query — run by ml-engineer post-deploy
+SELECT
+  model_name,
+  model_version,
+  SUM(total_sessions)                                           AS sessions_last_7d,
+  ROUND(100.0 * SUM(total_sessions)
+    / SUM(SUM(total_sessions)) OVER (PARTITION BY model_name), 1) AS pct_of_fleet,
+  ROUND(AVG(pct_completed), 1)                                  AS avg_pct_completed,
+  ROUND(AVG(pct_tracking_lost), 1)                              AS avg_pct_tracking_lost,
+  ROUND(AVG(confidence_p50)::NUMERIC, 3)                        AS avg_confidence_p50
+FROM cv_session_fleet_stats
+WHERE day >= CURRENT_DATE - 7
+GROUP BY model_name, model_version
+ORDER BY model_name, sessions_last_7d DESC;
+```
+
+**Blast-radius scoping (INCIDENT_RESPONSE.md R-10):** The `idx_cv_sessions_model_version` index (`docs/DATA_MODEL.md` §15.2) allows R-10 responders to scope affected sessions by model version without a full table scan:
+
+```sql
+-- R-10 blast-radius: sessions affected by a specific model version
+SELECT
+  COUNT(*)          AS affected_sessions,
+  MIN(started_at)   AS first_affected,
+  MAX(started_at)   AS last_affected
+FROM cv_sessions
+WHERE model_name    = 'blazepose_full'
+  AND model_version = '2.1.0'
+  AND deleted_at IS NULL;
+```
+
+---
+
+### 18.7 Alerting Rules
+
+These rules supplement the global alerting table in §6.
+
+| Alert ID | Condition | Severity | Action | Investigation path |
+|---|---|---|---|---|
+| **AL-CV-01** | `pct_tracking_lost` > 15% in any 1-hour rolling window (≥ 50 sessions, global fleet) | P1 | PagerDuty → ml-engineer + platform-engineer on-call | Check lighting-correlated geography (new rollout region? season/DST?); Sentry for camera-related errors; recent EAS deploy version distribution |
+| **AL-CV-02** | `confidence_p50` < 0.70 in 1-hour rolling window (≥ 50 sessions) | P1 | PagerDuty → ml-engineer | Cross-reference with Sentry crash rate; check if platform-specific (iOS vs Android); recent model version distribution shift |
+| **AL-CV-03** | New `model_version` reaches > 10% of fleet AND `pct_tracking_lost` > 2× baseline version's rate | P1 | PagerDuty → ml-engineer; consider feature-flag rollback | Run blast-radius query (§18.6); if > 25% of fleet affected, escalate to P0 + initiate rollback |
+| **AL-CV-04** | `inference_latency_p95_ms` (iOS) > 50 ms sustained > 6 hours | P2 | Slack #platform-alerts → platform-engineer | Check Sentry ANR reports; check `device_tier` distribution; Kalman filter loop CPU regression |
+| **AL-CV-05** | `cold_start_ms` (iOS) P95 > 1,200 ms in 6-hour window | P2 | Slack #platform-alerts → platform-engineer | AVFoundation initialization regression; check recent EAS deploy for camera permission flow changes |
+| **AL-CV-06** | `frames_dropped` P50 > 5% of `frame_count` in `cv_sdk_telemetry` | P2 | Slack #platform-alerts → platform-engineer | Device CPU contention; correlate with `memory_warning_count`; check frame-rate configuration for mid/low device tier |
+| **AL-CV-07** | `kalman_resets` P95 > 3 per session in `cv_sdk_telemetry` | P2 | Slack #platform-alerts → ml-engineer | Frequent tracking disruption; correlate with `pct_tracking_lost` and `pct_partial`; potential Kalman filter hyperparameter regression |
+| **AL-CV-08** | `pct_tracking_lost` for a specific `tenant_id` > 25% (≥ 20 sessions in rolling 48 hours) | P2 | Slack #csm-alerts → customer-success + ml-engineer | Enterprise-specific environment issue (office lighting, camera mount, unusual exercise context); CSM initiates customer outreach within 4 hours |
+
+**Alert deduplication:** AL-CV-01 and AL-CV-02 use PagerDuty `dedup_key = "cv-fleet-health-{window_start_epoch}"` to suppress duplicate pages within the same 1-hour window.
+
+**Rollout suppression:** AL-CV-01 and AL-CV-02 are suppressed for the first 2 hours after a new `model_version` reaches > 5% of fleet — AL-CV-03 is the primary signal during the sensitive rollout window.
+
+---
+
+### 18.8 Privacy Constraints on CV Observability Data
+
+The following constraints apply to all observability tooling, dashboards, and queries touching CV data. They are invariant — they may not be relaxed by customer request, internal product request, or a compliance exception process.
+
+| Constraint | Rationale | Enforcement |
+|---|---|---|
+| Raw video frames are never transmitted to any observability system | GDPR Art. 9 special category; frames constitute biometric data | On-device inference only; no frame upload path exists at the API layer |
+| `keypoints_enc` is never decrypted by the observability stack | Decryption key lives in Workers Secrets, not the observability layer | `form_cost_monitor` and Metabase roles have no `cv_enc_key` injected |
+| Individual form scores are never displayed in observability dashboards | Per-user `form_score` is Personal Data; cross-user combination re-identifies | `cv_session_fleet_stats` never `GROUP BY user_id`; Metabase query review gate |
+| Per-user defect flags are never surfaced in monitoring | `cv_flags` per user is health-adjacent Personal Data | All defect queries use `COUNT(*) FILTER (WHERE flag > 0)` at fleet level only |
+| k-anonymity floor of n ≥ 5 applies to per-tenant monitoring queries | Sub-5 groups risk cell re-identification | `CASE WHEN COUNT(DISTINCT user_id) >= 5 THEN ... ELSE NULL END` pattern in all per-tenant views |
+| `user_id` is never a `GROUP BY` key in CV monitoring queries | User-level aggregation is a re-identification vector | CI lint gate: grep for `GROUP BY user_id` in SQL files touching `cv_sessions`; fail build if found without security-engineer review annotation |
+
+**GDPR Art. 9 legal basis:** FORM's CV feature requires explicit consent under Art. 9(2)(a) before the camera is activated. The consent gate is enforced at the Worker layer (checked before `cv_sessions` insert). Any new observability signal that could be correlated with a specific user's health status or body type must be reviewed by compliance-officer before deployment.
+
+---
+
+### 18.9 CV Observability Dashboards
+
+These dashboards supplement the inventory in §7.
+
+#### 18.9.1 "CV Model Health" Dashboard (Metabase)
+
+**Access:** internal only — ml-engineer, devops-lead, platform-engineer, founder.
+**Data source:** `cv_session_fleet_stats` (nightly refresh); `cv_sdk_telemetry` (rolling queries).
+
+| Panel | Source | Threshold |
+|---|---|---|
+| **Completion rate (7-day trend)** | `pct_completed` | SLO 85% as red threshold line |
+| **Tracking_lost rate (7-day trend)** | `pct_tracking_lost` | SLO 8% as threshold |
+| **Confidence P50 and P25 (7-day trend)** | `confidence_p50`, `confidence_p25` | P50 target ≥ 0.80 |
+| **Session volume by platform** | `total_sessions` by `platform` | Stacked bar iOS vs Android |
+| **Model version distribution** | `pct_of_fleet` per `model_version` | Horizontal stacked bar; rollout progress |
+| **Per-version quality comparison** | `avg_pct_completed`, `avg_confidence_p50` by version | Table with delta vs. previous version |
+| **SDK inference latency P95 by platform** | `inference_latency_p95_ms` | Threshold lines: 30 ms (iOS), 50 ms (Android) |
+| **Camera cold start P95** | `cold_start_ms` P95 | Threshold: 800 ms |
+| **Form defect fleet prevalence** | `pct_knee_cave`, `pct_back_arch`, `pct_depth_short` | Week-over-week delta; ml-engineer prioritises fine-tuning targets |
+
+#### 18.9.2 "CV Rollout Progress" Dashboard (Metabase)
+
+Created per deploy; archived after rollout reaches > 95% of fleet. Shared with founder during P0 model rollback decisions.
+
+**Access:** ml-engineer, devops-lead.
+
+| Panel | Source |
+|---|---|
+| **Fleet rollout progress** | `pct_of_fleet` by `model_version` over time |
+| **New version vs. baseline: completion rate** | Side-by-side `pct_completed` |
+| **New version vs. baseline: tracking_lost rate** | Side-by-side `pct_tracking_lost` |
+| **AL-CV-03 trip status** | PagerDuty API — open/resolved status for rollout alert |
+| **Blast-radius estimate** | COUNT from R-10 blast-radius query (§18.6); auto-refreshes every 30 min |
+
+---
+
+### 18.10 SOC 2 Evidence Contribution
+
+| SOC 2 Criterion | How CV Observability Satisfies It |
+|---|---|
+| **CC7.2 — System monitoring** | `cv_session_fleet_stats` and alerting rules AL-CV-01 through AL-CV-08 provide continuous automated monitoring of the CV pipeline as a system component. AL-CV-01 through AL-CV-03 are detection controls for anomalous conditions that could indicate on-device model failure or a supply-chain compromise of the model artefact. |
+| **CC7.3 — Anomaly evaluation** | The alert taxonomy (§18.7) defines explicit criteria for when a CV anomaly requires human evaluation (PagerDuty page). Each alert event is logged in PagerDuty with timestamp and assigned responder — satisfying the "evaluate and respond" requirement. |
+| **PI1.2 — Processing is complete, accurate, timely, and authorised** | The CV session completion SLO (≥ 85% `status = 'completed'`) is the primary processing integrity indicator. Sessions with `status = 'partial'` or `'tracking_lost'` are explicitly flagged as incomplete processing. The SLO dashboard panel is the auditor evidence artefact for PI1.2. |
+| **PI1.4 — Output completeness** | Sessions where `form_score IS NULL` (`tracking_lost` or `partial`) are logged and counted. `pct_tracking_lost` in `cv_session_fleet_stats` is the evidence that FORM monitors and responds to incomplete outputs. |
+| **C1.2 — Confidentiality of sensitive data** | The privacy constraint matrix (§18.8) ensures biometric data never appears in observability. The SQL patterns (`CASE WHEN ... ELSE NULL END` for k-anonymity; prohibition on `GROUP BY user_id`) are reviewable by auditors in the Metabase query library. |
+
+**Auditor evidence artefacts:** Monthly CSV exports of `cv_session_fleet_stats` are stored in `compliance/evidence/cv-fleet-stats-YYYY-MM.csv`. Any AL-CV-01 or AL-CV-02 PagerDuty incidents with their resolution timelines are stored in `compliance/evidence/cv-incidents/<INC-YYYYMMDD>/`.
+
+---
+
+### 18.11 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Write `migrations/YYYYMMDD_cv_sdk_telemetry.sql` (`cv_sdk_telemetry` table + 3 indexes) | platform-engineer | P0 | M4 |
+| Add `cv_sdk_telemetry` insert to Workers `POST /v1/cv/session-telemetry` endpoint (authenticated; JWT-validated `cv_session_id`) | platform-engineer | P0 | M4 |
+| Write `migrations/YYYYMMDD_cv_session_fleet_stats.sql` (materialized view DDL + 04:00 UTC `pg_cron` job) | platform-engineer | P0 | M4 |
+| Implement AL-CV-01 and AL-CV-02 in Better Stack (query `cv_session_fleet_stats`; 1-hour window, min 50 sessions; PagerDuty routing to ml-engineer + platform-engineer on-call) | devops-lead | P0 | M4 |
+| Implement AL-CV-03 rollout regression alert (query: new version > 10% of fleet AND `pct_tracking_lost` > 2× baseline) | devops-lead | P0 | M4 |
+| Implement AL-CV-04 through AL-CV-07 Slack alerts (#platform-alerts) | devops-lead | P1 | M4 |
+| Implement AL-CV-08 per-tenant alert (Slack #csm-alerts; `tenant_id`-scoped query on `cv_session_fleet_stats`) | devops-lead | P1 | M4 |
+| Configure AL-CV-01/AL-CV-02 PagerDuty dedup keys (`cv-fleet-health-{window_start_epoch}`) | devops-lead | P1 | M4 |
+| Configure AL-CV-01/AL-CV-02 rollout suppression rule (2-hour suppression window post-5% fleet threshold) | devops-lead | P1 | M4 |
+| Build Metabase "CV Model Health" dashboard (§18.9.1 — 9 panels; data from `cv_session_fleet_stats` + `cv_sdk_telemetry`) | data-engineer | P1 | M5 |
+| Build Metabase "CV Rollout Progress" dashboard template (§18.9.2 — parameterised by `model_version`; includes PagerDuty API blast-radius panel) | data-engineer | P2 | M5 |
+| Add R-10 blast-radius query (§18.6) as a saved Metabase question accessible to ml-engineer and devops-lead | data-engineer | P2 | M5 |
+| Add `GROUP BY user_id` prohibition CI lint (grep pattern in migration SQL files touching `cv_sessions`; fail build without security-engineer annotation) | platform-engineer | P2 | M5 |
+
+---
+
 *v0.3 additions: §16 Synthetic Monitoring & Uptime Verification — twelve-probe taxonomy (S-001 through S-012) covering API health, auth, workout logging, AI coaching turn, SSO SAML metadata, SCIM, audit log chain integrity, backup freshness, CDN, status page, Stripe webhook, PostHog ingest; Better Stack declarative YAML configuration; Cloudflare scheduled Worker implementations for S-007 (HMAC chain integrity) and S-008 (backup freshness) with TypeScript pseudocode; multi-region probe strategy (us-east-1, eu-central-1, ap-southeast-1) with 2-of-3 failure threshold; regional latency SLO table per probe; post-deployment smoke gate (GitHub Actions step, 120s timeout, P1 alert on failure, no auto-rollback); synthetic user data hygiene across seven pipelines (PostHog, ClickHouse, cohort ETL, DSAR, audit log, enterprise SLA); PagerDuty alert payload schema with deduplication and auto-resolve; SOC 2 CC7.2/CC7.3/A1.2/CC4.1 evidence mapping; thirteen-item implementation checklist across M3/M4/M5.*
 
 *v0.4 additions: §17 Cost Monitoring & Anomaly Alerting — daily cost aggregation Worker (Cloudflare Cron Trigger 06:00 UTC) fetching Anthropic Admin API, ElevenLabs character delta via KV, Cloudflare GraphQL Analytics; `cost_daily` and `cost_anomalies` Postgres schema with generated `variance_pct` column; per-service anomaly thresholds (P1 = 1.5× 7d avg, P0 = 3× 7d avg) externalised to Workers Secret for hot-update; `form_cost_monitor` Postgres role with scoped write-only grants; per-tenant COGS materialized view (`cost_daily_per_tenant`) from `coaching_sessions` token telemetry, refreshed at 07:00 UTC; Metabase dashboard specs (Infra Cost Overview, Enterprise Tenant Cost panel, Cost Anomaly History); separate PagerDuty "FORM Cost" service with low-urgency routing; Slack `#metrics` daily digest format (with and without anomalies); SOC 2 CC7.2/CC7.3/CC5.2/A1.2 evidence mapping; monthly CSV export to `compliance/evidence/`; sixteen-item implementation checklist across M3/M4/M5. Closes §10 gap: Cost monitor Worker.*
+
+*v0.5 additions: §18 CV Pose Estimation Model Observability — on-device CV pipeline (Apple Vision / ML Kit) added to Scope; privacy-first observability design for GDPR Art. 9 biometric data; RED signal taxonomy for the CV pipeline (session upload, iOS inference, Android inference, model rollout); `cv_sdk_telemetry` table DDL (cold_start_ms, inference_latency P50/P95, frame_count, frames_dropped, kalman_resets, memory_warning_count, device_tier — no keypoints or form scores); `cv_session_fleet_stats` materialized view (daily × model_name × model_version × tenant_id aggregation: pct_completed, pct_tracking_lost, confidence_p50/P25, avg_below_threshold_ratio, three defect prevalence columns); eight SLOs (completion rate ≥ 85%, tracking_lost ≤ 8%, iOS inference P95 < 30 ms, Android P95 < 50 ms, cold start P95 < 800 ms, confidence P50 ≥ 0.80, high-confidence session rate ≥ 70%, below-threshold ratio ≤ 0.12); eight alerting rules AL-CV-01 through AL-CV-08 (fleet spike → PagerDuty, confidence drop → PagerDuty, new model version quality regression → P1 with rollback trigger, per-tenant anomaly → Slack #csm-alerts); alert deduplication and rollout suppression patterns; blast-radius query aligned with INCIDENT_RESPONSE.md R-10 and DATA_MODEL.md §15.2 `idx_cv_sessions_model_version`; privacy constraint matrix (raw frames never transmitted, keypoints_enc inaccessible to observability stack, no GROUP BY user_id, k-anonymity n ≥ 5 per tenant); Metabase "CV Model Health" (9 panels) and "CV Rollout Progress" dashboard specs; SOC 2 CC7.2/CC7.3/PI1.2/PI1.4/C1.2 evidence mapping; monthly CSV export to `compliance/evidence/cv-fleet-stats-YYYY-MM.csv`; thirteen-item implementation checklist across M4/M5.*

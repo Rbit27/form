@@ -6,6 +6,13 @@
 
 ---
 
+## [1.7.2] — 2026-05-22
+
+### Changed
+- `docs/OBSERVABILITY.md` → v0.5 — §18 CV Pose Estimation Model Observability. Privacy-first observability design for GDPR Art. 9 biometric data (raw frames never leave device; `keypoints_enc` inaccessible to observability stack). RED signal taxonomy for three CV layers: on-device SDK telemetry, `cv_sessions` server-side aggregates, fleet views. `cv_sdk_telemetry` table DDL: cold_start_ms, inference_latency P50/P95, frame_count, frames_dropped, frames_skipped, kalman_resets, memory_warning_count, device_tier — no keypoints or form scores. `cv_session_fleet_stats` materialized view: daily × model_name × model_version × tenant_id; pct_completed, pct_tracking_lost, confidence_p50/P25, avg_below_threshold_ratio, three defect prevalence columns (knee_cave, back_arch, depth_short); pg_cron 04:00 UTC. Eight SLOs: completion ≥ 85%, tracking_lost ≤ 8%, iOS inference P95 < 30 ms, Android P95 < 50 ms, cold start P95 < 800 ms, confidence P50 ≥ 0.80, high-confidence rate ≥ 70%, below-threshold ratio ≤ 0.12; ≥ 50-session window guard. Eight alerting rules AL-CV-01 through AL-CV-08: fleet spike → PagerDuty P1, confidence drop → PagerDuty P1, new model version regression → P1 with rollback trigger, latency/cold-start/frame-drop/Kalman → Slack P2, per-tenant anomaly → Slack #csm-alerts P2. Alert dedup (`dedup_key`) + rollout suppression (2h post 5% fleet). Blast-radius query aligned with INCIDENT_RESPONSE.md R-10 and DATA_MODEL.md §15.2 `idx_cv_sessions_model_version`. Six-constraint privacy matrix (no GROUP BY user_id, k-anonymity n ≥ 5, keypoints_enc inaccessible, no per-user form scores, CI lint gate). Four-model variant table (blazepose_lite/full, movenet_lightning/thunder × Apple Vision / ML Kit). Metabase "CV Model Health" (9 panels) and "CV Rollout Progress" dashboard specs. SOC 2 CC7.2/CC7.3/PI1.2/PI1.4/C1.2 evidence mapping; monthly CSV to `compliance/evidence/cv-fleet-stats-YYYY-MM.csv`. Thirteen-item implementation checklist (4× P0, 5× P1, 4× P2) across M4/M5.
+
+---
+
 ## [1.7.1] — 2026-05-22
 
 ### Changed
