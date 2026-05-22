@@ -6,6 +6,18 @@
 
 ---
 
+## [1.8.1] — 2026-05-22
+
+### Added
+- `content/post-79-said-principle-specificity.md` — Принцип SAID: три виміри специфічності адаптації (нейром'язова — кутова специфічність, швидкість скорочення, Sale & MacDougall 1981, Blazevich & Jenkins 2002; метаболічна — ATP-PCr/glycolytic/oxidative специфічність; морфологічна — ROM і архітектура м'яза, Schoenfeld & Grgic 2020, McMahon 2014), перенос тренування (де є, де мінімальний, cross-education ~8–15%), чому початківці — виняток із правила (Häkkinen 2001), exercise selection logic, техніка як нейром'язова інвестиція. clinical-safety PASS.
+
+### Changed
+- `blog.html` → додані картки для post-77 (BFR), post-78 (Concurrent Training), post-79 (SAID principle)
+- `STATUS.md` → content engine table: додані рядки post-77, post-78, post-79
+- `README.md` → post-79 позначений [x] (нова тема замість food-topic з VETO); roadmap розширений до post-86 (neural adaptation, training load monitoring, calisthenics vs weights); food/supplement теми переміщені до post-80–83 з флагом clinical-safety required
+
+---
+
 ## [1.8.0] — 2026-05-22
 
 ### Added

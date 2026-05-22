@@ -403,10 +403,14 @@ Each iteration:
 - [ ] post-76: Стретчинг і м'язова гнучкість — статичний vs динамічний, PNF, loaded progressive stretching; що насправді змінює ROM (нейральна vs структурна)
 - [x] post-77: Blood Flow Restriction (BFR) — механізм (венозна оклюзія, AMPK, рекрутування Type II), протокол Abe/Loenneke, коли BFR > важкого навантаження; clinical-safety PASS
 - [x] post-78: Concurrent Training — interference effect (Hickson 1980), AMPK vs mTOR молекулярний конфлікт, режим/об'єм/порядок сесій, практична організація тижня; clinical-safety PASS
-- [ ] post-79: Тренінг натщесерце — fed vs fasted state, fat oxidation myth, Schoenfeld (2014) ⚠️ clinical-safety required (food/eating patterns)
-- [ ] post-80: Omega-3 і тренувальна адаптація — Smith et al. (2011) MPS, anti-inflammatory механізм, dose і EPA:DHA ratio ⚠️ clinical-safety required (supplement/food)
-- [ ] post-81: Magnesium і спортивна продуктивність — роль у МПС, нервово-м'язовій функції, якості сну; дефіцит у атлетів, форми і bio-availability
-- [ ] post-82: Dehidration і силовий тренінг — >2% body mass loss і сила, когнітивна функція, рішення щодо навантаження; практичний моніторинг
+- [x] post-79: Принцип SAID — специфічна адаптація до накладених навантажень: три виміри (нейром'язова, метаболічна, морфологічна), перенос тренування, exercise selection logic, техніка як нейром'язова інвестиція; clinical-safety PASS
+- [ ] post-80: Тренінг натщесерце — fed vs fasted state, fat oxidation myth, Schoenfeld (2014) ⚠️ clinical-safety required (food/eating patterns)
+- [ ] post-81: Omega-3 і тренувальна адаптація — Smith et al. (2011) MPS, anti-inflammatory механізм, dose і EPA:DHA ratio ⚠️ clinical-safety required (supplement/food)
+- [ ] post-82: Magnesium і спортивна продуктивність — роль у МПС, нервово-м'язовій функції, якості сну; дефіцит у атлетів, форми і bio-availability
+- [ ] post-83: Dehidration і силовий тренінг — >2% body mass loss і сила, когнітивна функція, рішення щодо навантаження; практичний моніторинг
+- [ ] post-84: Neural adaptation vs structural adaptation — механізм новачкового прогресу: чому перші 8–12 тижнів — нейральні зміни, а не гіпертрофія; Moritani & deVries (1979), наслідки для програмування
+- [ ] post-85: Training load monitoring — sRPE (Foster 2001), acute:chronic workload ratio, Banister impulse-response model; objective vs subjective readiness markers; практичний ACWR протокол
+- [ ] post-86: Calisthenics vs weighted training — сила відносно маси тіла, прогресія у бодівейт тренінгу (lever progressions), transfer до штанги і навпаки; relative strength framework
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 

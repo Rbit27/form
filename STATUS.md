@@ -168,6 +168,9 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-74-bilateral-deficit.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-75-cluster-sets.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-76-lactate-myth.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-77-blood-flow-restriction.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-78-concurrent-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-79-said-principle-specificity.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
