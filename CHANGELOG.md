@@ -6,6 +6,17 @@
 
 ---
 
+## [1.9.6] — 2026-05-23
+
+### Added
+- `docs/DATA_MODEL.md` §17 — Enterprise Admin Reporting Schema — Aggregate-Only Data Model & Privacy-Floor Enforcement (v0.7→v0.8). Closes the schema gap between the §2.6 prototype `tenant_wellness_summary` and the full production admin dashboard data model. Permitted/Prohibited Metric Registry (§17.2): 12 permitted aggregate metrics (participation, WAU/MAU, session duration, form score, D30 retention, CV/voice adoption, opt-in NPS, SCIM-group engagement) and 9 strictly prohibited categories (individual workout rows, coaching content, health goals, body composition, meal logs, mental health signals, HRV, user-identity linkage, opted-out users) — 5 categories carry clinical-safety veto. Four production materialized views: `tenant_wellness_summary_v2` (replaces §2.6 prototype — adds `user_aggregate_consent` join, 13-week rolling window, k-anonymity CASE guard on `avg_form_score`, `REFRESH CONCURRENTLY` unique index, RLS policy); `tenant_engagement_summary` (activation_rate_pct, WAU/MAU, D30 retention with cohort-size k-gate via CTEs — no `user_health_profiles` join); `tenant_feature_adoption` (CV adoption % and voice coaching adoption % — session count permitted, content structurally absent); `tenant_cohort_breakdown` (SCIM-group engagement using §15 tables — Art. 9 sensitive-name gate, `meets_anonymity_floor` drives API suppression). Three-layer k-anonymity enforcement: `assert_k_anonymity()` Postgres STABLE function with `p_k_floor DEFAULT 5`; `applyKAnonymityGuard` + `buildSuppressedResponse` TypeScript in `workers/admin-reporting/k-anonymity-guard.ts`; Metabase defence-in-depth filter; `tenants.reporting_k_floor INTEGER CHECK IN (5,10,15)` per-tenant override. pg_cron refresh schedule 02:15/02:30/02:45/03:00 UTC CONCURRENTLY; stale banner at > 26h; P2 alert on cron failure. 5 admin reporting endpoints under `/v1/admin/reporting/`; no `/users` endpoint; `Last-Refreshed` header; EU 403 gate for `dpa_ref IS NULL`. `user_aggregate_consent` table: SCIM-provisioned default `consent_version = NULL` until onboarding; Settings → Privacy opt-out effective at next refresh; `consent_version` drives re-solicitation on registry expansion. GDPR Art. 89 safeguards table. 5 DEC-030 HMAC-chained audit events including `admin.consent_override_attempted` (HIGH, 7yr — auto-P1 incident). Privacy floor test suite: 6 Jest tests (no-user_id assertion, k-anonymity null/pass, opted-out exclusion, no-individual-in-response, cohort-suppression); CI gate blocks deploy on failure. SOC 2 mapping: CC6.1, CC6.3, CC7.2, C1.1, C1.2, P3.2, P4.1, P6.4. 18-item implementation checklist (12× P0, 4× P1, 2× P2). OQ-ENT-02: k-floor sufficiency under GDPR Recital 26 for EU enterprise pilots. OQ-ENT-03: consent re-solicitation mechanism on metric registry expansion.
+
+### Changed
+- `docs/DATA_MODEL.md` — ToC updated to include §16 and §17; header bumped v0.7→v0.8.
+- `VERSION` → 1.9.6
+
+---
+
 ## [1.9.5] — 2026-05-23
 
 ### Added

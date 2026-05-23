@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v0.7
+# FORM · Multi-Tenant Data Model v0.8
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -23,6 +23,8 @@
 13. [Analytics Event Tracking Schema](#13-analytics-event-tracking-schema)
 14. [Wearable Data Integration Schema](#14-wearable-data-integration-schema)
 15. [Computer Vision (CV) Pose Estimation Data Schema](#15-computer-vision-cv-pose-estimation-data-schema)
+16. [Enterprise Contract & Pilot Lifecycle Schema](#16-enterprise-contract--pilot-lifecycle-schema)
+17. [Enterprise Admin Reporting Schema — Aggregate-Only Data Model & Privacy-Floor Enforcement](#17-enterprise-admin-reporting-schema--aggregate-only-data-model--privacy-floor-enforcement)
 
 ---
 
@@ -3384,4 +3386,717 @@ All contract and pilot lifecycle transitions are HMAC-chained per DEC-030 (`docs
 
 ---
 
+---
+
+## 17. Enterprise Admin Reporting Schema — Aggregate-Only Data Model & Privacy-Floor Enforcement
+
+### 17.1 Purpose and Design Principles
+
+The admin dashboard is FORM's primary interface for enterprise HR and People leads. It answers *"is our fitness programme working?"* without exposing any individual employee data. This section specifies every materialized view, table, and API endpoint that powers that dashboard.
+
+**The privacy floor from §6 is a schema constraint here, not a policy.** Three independent layers enforce it:
+
+1. **Database layer:** Materialized views are defined using only permitted columns. No join to `user_health_profiles`, `meal_logs`, or `coaching_turns` exists anywhere in §17 DDL.
+2. **Application layer:** Admin reporting API endpoints (§17.6) route exclusively to aggregate views. No route exists to raw user rows for `tenant_admin` or `tenant_owner` roles.
+3. **API response layer:** A Cloudflare Worker middleware validates every admin reporting response for `cohort_size ≥ k_floor` before delivery. Responses where the threshold is not met are replaced with `{"suppressed": true, "reason": "k_anonymity_floor"}`.
+
+**Removing any layer requires:** compliance-officer sign-off + DECISION_LOG.md entry + SOC 2 auditor notification at next evidence cycle.
+
+---
+
+### 17.2 Permitted and Prohibited Metric Registry
+
+The registry below is the single source of truth for what may appear in any admin-facing report, dashboard panel, CSV export, or API response.
+
+#### Section A — Permitted for HR/Admin visibility (aggregate only, N ≥ k_floor)
+
+| Metric | Source table/column | Aggregate function | Notes |
+|---|---|---|---|
+| Provisioned seat count | `users` (per tenant) | COUNT | Always available; not anonymity-gated |
+| Activated users | `users WHERE onboarding_completed_at IS NOT NULL` | COUNT, % of provisioned | % of provisioned seats |
+| Weekly Active Users (WAU) | `workouts.started_at` (7-day window) | COUNT DISTINCT user_id | Suppressed if N < k_floor |
+| Monthly Active Users (MAU) | `workouts.started_at` (30-day window) | COUNT DISTINCT user_id | Suppressed if N < k_floor |
+| Total sessions per week | `workouts` | COUNT | Aggregate count only |
+| Avg session duration (minutes) | `workouts.duration_seconds` | AVG, PERCENTILE 50/90 | No individual values |
+| Avg AI form score | `workouts.form_score` | AVG, PERCENTILE 50 | No per-user breakdown; null if CV cohort N < k_floor |
+| D30 retention rate | `workouts` first session vs. return session | % returning | Cohort-level only; suppressed if cohort N < k_floor |
+| CV form analysis adoption | `workout_sets.form_score IS NOT NULL` | % of sessions using CV | Aggregate flag only |
+| Voice coaching adoption | `coaching_sessions` (session count) | COUNT / WAU | Session count only — no content |
+| Opt-in NPS score | `tenant_nps_responses.score` | AVG, distribution by bucket | **Only with explicit opt-in consent per §17.7** |
+| SCIM group engagement | `scim_group_members` + `workouts` | WAU/MAU by group | Suppressed if group N < k_floor; §15 Art. 9 name gate applies |
+
+#### Section B — Prohibited — never in any admin-facing output
+
+| Data category | Source | Prohibition | Note |
+|---|---|---|---|
+| Individual workout rows | `workouts` per user | Absolute — no per-user workout list | |
+| Individual form scores | `workout_sets.form_score` per user | Absolute | |
+| Coaching turn content | `coaching_turns.content` | Absolute | Victor dialogue is Confidential (§5) |
+| Per-user coaching session count | `coaching_sessions` per user | Absolute — only aggregate session rate | |
+| Health goals and restrictions | `user_health_profiles` | Absolute | Art. 9 GDPR health data |
+| Body composition metrics | `user_health_profiles.goals` (BMI, body fat) | Absolute | **clinical-safety veto — no exceptions** |
+| Meal log data | `meal_logs` | Absolute | **clinical-safety veto — ED-risk category** |
+| Mental health signals | Any health-adjacent `coaching_turns.content` | Absolute | **clinical-safety veto** |
+| HRV / resting HR individual trends | Wearable data per user | Absolute | Individual-level health signal |
+| User identity linked to any metric | `users.email`, `users.display_name` | Absolute | All metrics must be anonymous |
+| Opted-out users in any aggregate | `user_aggregate_consent.opted_out = TRUE` | Absolute — excluded from all MVs at query time | |
+
+**Enforcement note:** Any product feature that requests admin visibility into a Prohibited category requires a documented compliance-officer override in DECISION_LOG.md and a clinical-safety review for the five categories marked with the clinical-safety veto. The no-go list is non-negotiable regardless of customer demand.
+
+---
+
+### 17.3 Aggregate Materialized View Specifications
+
+#### 17.3.1 `tenant_wellness_summary_v2`
+
+Production replacement for the prototype in §2.6. The §2.6 view remains as a reference definition; this is the authoritative production specification.
+
+```sql
+-- Replaces §2.6 prototype. Populated by scheduled job only — never via API request path.
+-- Reads: workouts, users, user_aggregate_consent
+-- Structurally excludes: user_health_profiles, meal_logs, coaching_turns (§17.2B)
+CREATE MATERIALIZED VIEW tenant_wellness_summary_v2 AS
+SELECT
+  w.tenant_id,
+  DATE_TRUNC('week', w.started_at)           AS report_week,
+
+  -- Participation
+  COUNT(DISTINCT w.user_id)                  AS active_users,
+  COUNT(*)                                   AS total_sessions,
+
+  -- Duration signals
+  AVG(w.duration_seconds)  / 60.0            AS avg_duration_min,
+  PERCENTILE_CONT(0.5) WITHIN GROUP
+    (ORDER BY w.duration_seconds) / 60.0     AS median_duration_min,
+  PERCENTILE_CONT(0.9) WITHIN GROUP
+    (ORDER BY w.duration_seconds) / 60.0     AS p90_duration_min,
+
+  -- Quality signal (CV form score) — suppressed when CV cohort < k_floor
+  CASE
+    WHEN COUNT(DISTINCT w.user_id)
+         FILTER (WHERE w.form_score IS NOT NULL) >= 5
+    THEN ROUND(
+           AVG(w.form_score) FILTER (WHERE w.form_score IS NOT NULL)::NUMERIC,
+           1
+         )
+    ELSE NULL
+  END                                        AS avg_form_score,
+
+  -- k-anonymity gate column — API middleware checks this before delivery
+  COUNT(DISTINCT w.user_id) >= 5             AS meets_anonymity_floor
+
+FROM workouts w
+JOIN users u ON u.id = w.user_id
+JOIN user_aggregate_consent uac ON uac.user_id = w.user_id
+WHERE u.deactivated_at IS NULL
+  AND uac.opted_out = FALSE
+  AND uac.consent_version IS NOT NULL        -- consent must have been explicitly given
+  AND w.started_at >= NOW() - INTERVAL '13 weeks'
+GROUP BY w.tenant_id, DATE_TRUNC('week', w.started_at)
+WITH NO DATA;
+
+-- Unique index enables REFRESH CONCURRENTLY (non-blocking)
+CREATE UNIQUE INDEX uq_tws2_tenant_week
+  ON tenant_wellness_summary_v2 (tenant_id, report_week);
+
+ALTER TABLE tenant_wellness_summary_v2 ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tws2_tenant_read ON tenant_wellness_summary_v2
+  FOR SELECT TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
+```
+
+**Privacy invariants verified by §17.10 test suite:**
+- No `user_id` column in output
+- `meets_anonymity_floor = FALSE` rows filtered by API middleware before delivery
+- Users with `uac.opted_out = TRUE` excluded at query time, not post-aggregate
+
+---
+
+#### 17.3.2 `tenant_engagement_summary`
+
+Tracks activation funnel and retention signals. Powers the "Are employees using FORM?" panel.
+
+```sql
+CREATE MATERIALIZED VIEW tenant_engagement_summary AS
+WITH provisioned AS (
+  SELECT tenant_id, COUNT(*) AS total_provisioned
+  FROM users
+  WHERE deactivated_at IS NULL
+  GROUP BY tenant_id
+),
+activated AS (
+  SELECT tenant_id, COUNT(*) AS total_activated
+  FROM users
+  WHERE deactivated_at IS NULL
+    AND onboarding_completed_at IS NOT NULL
+  GROUP BY tenant_id
+),
+wau AS (
+  SELECT w.tenant_id, COUNT(DISTINCT w.user_id) AS weekly_active
+  FROM workouts w
+  JOIN users u ON u.id = w.user_id
+  JOIN user_aggregate_consent uac ON uac.user_id = w.user_id
+  WHERE w.started_at >= NOW() - INTERVAL '7 days'
+    AND u.deactivated_at IS NULL
+    AND uac.opted_out = FALSE
+  GROUP BY w.tenant_id
+),
+mau AS (
+  SELECT w.tenant_id, COUNT(DISTINCT w.user_id) AS monthly_active
+  FROM workouts w
+  JOIN users u ON u.id = w.user_id
+  JOIN user_aggregate_consent uac ON uac.user_id = w.user_id
+  WHERE w.started_at >= NOW() - INTERVAL '30 days'
+    AND u.deactivated_at IS NULL
+    AND uac.opted_out = FALSE
+  GROUP BY w.tenant_id
+),
+d30_retention AS (
+  -- D30: users who had a session in days 1-7 AND had a session in the most recent 7 days
+  SELECT
+    first_sess.tenant_id,
+    COUNT(DISTINCT first_sess.user_id)
+      FILTER (WHERE return_sess.user_id IS NOT NULL)  AS retained_d30,
+    COUNT(DISTINCT first_sess.user_id)                AS cohort_size_d30
+  FROM (
+    SELECT tenant_id, user_id, MIN(started_at) AS first_session
+    FROM workouts
+    WHERE started_at >= NOW() - INTERVAL '35 days'
+      AND started_at <  NOW() - INTERVAL '28 days'
+    GROUP BY tenant_id, user_id
+  ) first_sess
+  LEFT JOIN (
+    SELECT DISTINCT tenant_id, user_id
+    FROM workouts
+    WHERE started_at >= NOW() - INTERVAL '7 days'
+  ) return_sess USING (tenant_id, user_id)
+  GROUP BY first_sess.tenant_id
+)
+SELECT
+  p.tenant_id,
+  NOW()                                              AS computed_at,
+  p.total_provisioned,
+  COALESCE(a.total_activated, 0)                     AS total_activated,
+  ROUND(
+    100.0 * COALESCE(a.total_activated, 0)
+    / NULLIF(p.total_provisioned, 0), 1
+  )                                                  AS activation_rate_pct,
+  COALESCE(wau.weekly_active, 0)                     AS weekly_active_users,
+  ROUND(
+    100.0 * COALESCE(wau.weekly_active, 0)
+    / NULLIF(a.total_activated, 0), 1
+  )                                                  AS wau_of_activated_pct,
+  COALESCE(mau.monthly_active, 0)                    AS monthly_active_users,
+  -- D30 retention — suppressed if cohort < k_floor
+  CASE
+    WHEN COALESCE(d30.cohort_size_d30, 0) >= 5
+    THEN ROUND(
+           100.0 * d30.retained_d30
+           / NULLIF(d30.cohort_size_d30, 0), 1
+         )
+    ELSE NULL
+  END                                                AS d30_retention_pct,
+  COALESCE(d30.cohort_size_d30, 0)                   AS d30_cohort_size
+FROM provisioned p
+LEFT JOIN activated   a   ON a.tenant_id   = p.tenant_id
+LEFT JOIN wau             ON wau.tenant_id = p.tenant_id
+LEFT JOIN mau             ON mau.tenant_id = p.tenant_id
+LEFT JOIN d30_retention d30 ON d30.tenant_id = p.tenant_id
+WITH NO DATA;
+
+CREATE UNIQUE INDEX uq_tes_tenant ON tenant_engagement_summary (tenant_id);
+
+ALTER TABLE tenant_engagement_summary ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tes_tenant_read ON tenant_engagement_summary
+  FOR SELECT TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
+```
+
+**No individual data path:** Query aggregates only counts and percentages. `d30_cohort_size` is included so the API middleware can enforce the k-floor — it is never returned to the admin dashboard.
+
+---
+
+#### 17.3.3 `tenant_feature_adoption`
+
+Which FORM features are active, and at what rate? Powers the "Feature usage" panel.
+
+```sql
+-- coaching_sessions COUNT is permitted (§17.2A); coaching_turns.content is not present
+CREATE MATERIALIZED VIEW tenant_feature_adoption AS
+WITH base AS (
+  SELECT
+    w.tenant_id,
+    COUNT(DISTINCT w.user_id)                                   AS total_active_users,
+    COUNT(DISTINCT w.user_id)
+      FILTER (WHERE w.form_score IS NOT NULL)                   AS cv_users,
+    COUNT(DISTINCT w.id)                                        AS total_sessions,
+    COUNT(DISTINCT w.id)
+      FILTER (WHERE w.form_score IS NOT NULL)                   AS cv_sessions,
+    COUNT(DISTINCT cs.user_id)                                  AS voice_coach_users,
+    COUNT(DISTINCT cs.id)                                       AS voice_coach_sessions
+  FROM workouts w
+  JOIN users u ON u.id = w.user_id
+  JOIN user_aggregate_consent uac ON uac.user_id = w.user_id
+  LEFT JOIN coaching_sessions cs
+    ON cs.user_id   = w.user_id
+   AND cs.tenant_id = w.tenant_id
+   AND cs.started_at >= NOW() - INTERVAL '30 days'
+  WHERE w.started_at >= NOW() - INTERVAL '30 days'
+    AND u.deactivated_at IS NULL
+    AND uac.opted_out = FALSE
+  GROUP BY w.tenant_id
+)
+SELECT
+  tenant_id,
+  NOW()                                                         AS computed_at,
+  total_active_users,
+  total_sessions,
+  CASE WHEN total_active_users >= 5
+       THEN ROUND(100.0 * cv_users / NULLIF(total_active_users, 0), 1)
+       ELSE NULL END                                            AS cv_adoption_pct,
+  CASE WHEN total_sessions >= 5
+       THEN ROUND(100.0 * cv_sessions / NULLIF(total_sessions, 0), 1)
+       ELSE NULL END                                            AS cv_sessions_pct,
+  CASE WHEN total_active_users >= 5
+       THEN ROUND(100.0 * voice_coach_users / NULLIF(total_active_users, 0), 1)
+       ELSE NULL END                                            AS voice_coach_adoption_pct,
+  voice_coach_sessions                                          AS voice_coach_sessions_total
+FROM base
+WITH NO DATA;
+
+CREATE UNIQUE INDEX uq_tfa_tenant ON tenant_feature_adoption (tenant_id);
+
+ALTER TABLE tenant_feature_adoption ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tfa_tenant_read ON tenant_feature_adoption
+  FOR SELECT TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
+```
+
+---
+
+#### 17.3.4 `tenant_cohort_breakdown`
+
+Department or group-level breakdown via SCIM group memberships (§15). Enables HR to compare engagement across departments without individual employee data.
+
+```sql
+-- Depends on: scim_groups (§15), scim_group_members (§15), workouts, user_aggregate_consent
+-- Groups with fewer than k_floor active users are suppressed entirely by API middleware
+CREATE MATERIALIZED VIEW tenant_cohort_breakdown AS
+SELECT
+  sg.tenant_id,
+  sg.id                                               AS group_id,
+  -- Art. 9 sensitivity gate from §15.9: replace flagged names before admin sees them
+  CASE
+    WHEN sg.sensitive_name_flagged = FALSE
+    THEN sg.display_name
+    ELSE '[Group name under review]'
+  END                                                 AS group_display_name,
+  COUNT(DISTINCT sgm.user_id)                         AS group_size,
+  COUNT(DISTINCT w.user_id)                           AS active_users_30d,
+  ROUND(
+    100.0 * COUNT(DISTINCT w.user_id)
+    / NULLIF(COUNT(DISTINCT sgm.user_id), 0), 1
+  )                                                   AS engagement_rate_pct,
+  COUNT(DISTINCT w.id)                                AS total_sessions_30d,
+  -- k-anonymity gate: API middleware filters rows where this is FALSE
+  COUNT(DISTINCT w.user_id) >= 5                      AS meets_anonymity_floor
+FROM scim_groups sg
+JOIN scim_group_members sgm ON sgm.group_id = sg.id
+JOIN user_aggregate_consent uac
+  ON uac.user_id = sgm.user_id AND uac.opted_out = FALSE
+LEFT JOIN workouts w
+  ON w.user_id   = sgm.user_id
+ AND w.tenant_id = sg.tenant_id
+ AND w.started_at >= NOW() - INTERVAL '30 days'
+JOIN users u ON u.id = sgm.user_id AND u.deactivated_at IS NULL
+GROUP BY sg.tenant_id, sg.id, sg.display_name, sg.sensitive_name_flagged
+WITH NO DATA;
+
+CREATE UNIQUE INDEX uq_tcb_tenant_group ON tenant_cohort_breakdown (tenant_id, group_id);
+
+ALTER TABLE tenant_cohort_breakdown ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tcb_tenant_read ON tenant_cohort_breakdown
+  FOR SELECT TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
+```
+
+**Art. 9 sensitivity gate:** The `sensitive_name_flagged` check from §15.9 prevents group names containing health, religion, ethnicity, or sexual-orientation signals from appearing in HR dashboards unreviewed.
+
+**Suppression vs. zero:** The API middleware removes rows where `meets_anonymity_floor = FALSE` entirely — it does not return "< 5 users". Absence prevents inference attacks on small cohorts.
+
+---
+
+### 17.4 k-Anonymity Enforcement
+
+k-anonymity is enforced at three independent layers. All three must be verified by the §17.10 CI test suite.
+
+#### 17.4.1 Postgres Guard Function
+
+```sql
+-- Returns p_value unchanged if p_cohort_size >= p_k_floor, otherwise NULL.
+-- p_k_floor uses the tenant-configured floor (§17.4.4); default 5.
+CREATE OR REPLACE FUNCTION assert_k_anonymity(
+  p_value       ANYELEMENT,
+  p_cohort_size INTEGER,
+  p_k_floor     INTEGER DEFAULT 5
+) RETURNS ANYELEMENT
+LANGUAGE plpgsql STABLE SECURITY INVOKER AS $$
+BEGIN
+  IF p_cohort_size < p_k_floor THEN
+    RETURN NULL;
+  END IF;
+  RETURN p_value;
+END;
+$$;
+```
+
+Usage in reporting queries:
+```sql
+SELECT
+  report_week,
+  assert_k_anonymity(active_users,   active_users, 5) AS active_users,
+  assert_k_anonymity(avg_form_score, active_users, 5) AS avg_form_score
+FROM tenant_wellness_summary_v2
+WHERE tenant_id = current_setting('app.current_tenant_id')::UUID;
+```
+
+#### 17.4.2 Cloudflare Worker API Middleware
+
+```typescript
+// workers/admin-reporting/k-anonymity-guard.ts
+const K_FLOOR_DEFAULT = 5;
+
+export function applyKAnonymityGuard<
+  T extends { cohort_size?: number; meets_anonymity_floor?: boolean }
+>(rows: T[], kFloor = K_FLOOR_DEFAULT): T[] {
+  return rows.filter(row => {
+    if (typeof row.meets_anonymity_floor === 'boolean') {
+      return row.meets_anonymity_floor;
+    }
+    return (row.cohort_size ?? 0) >= kFloor;
+  });
+}
+
+export function buildSuppressedResponse(suppressedCount: number) {
+  return {
+    data: [],
+    suppressed_cohorts: suppressedCount,
+    reason: 'k_anonymity_floor',
+  };
+}
+```
+
+Responses where all rows are suppressed return `{ data: [], suppressed_cohorts: N, reason: "k_anonymity_floor" }` so the admin knows data exists but cannot be shown — not that the feature is broken.
+
+#### 17.4.3 Metabase Dashboard Guard
+
+All Metabase admin reporting panels include `WHERE {{active_users}} >= 5`. This is defence-in-depth only; primary enforcement is at DB and API layers. The filter prevents accidental exposure if a panel is cloned and the query modified internally.
+
+#### 17.4.4 Per-Tenant k-Floor Override
+
+Enterprise customers in sensitive industries (healthcare, mental health services) may require a higher k-floor. The `tenants.reporting_k_floor` column raises the floor without a schema change:
+
+```sql
+ALTER TABLE tenants
+  ADD COLUMN reporting_k_floor INTEGER NOT NULL DEFAULT 5
+    CHECK (reporting_k_floor IN (5, 10, 15));
+```
+
+The `assert_k_anonymity()` function and Worker middleware both respect this setting. Only `enterprise-architect` can change it via the admin console; each change emits a `tenant.settings_updated` DEC-030 event.
+
+---
+
+### 17.5 Aggregate Refresh Schedule
+
+All views refresh via `pg_cron` using `CONCURRENTLY` to avoid table-level locks.
+
+```sql
+-- tenant_wellness_summary_v2: nightly 02:15 UTC
+SELECT cron.schedule(
+  'refresh-wellness-summary-v2', '15 2 * * *',
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_wellness_summary_v2$$
+);
+
+-- tenant_engagement_summary: nightly 02:30 UTC
+SELECT cron.schedule(
+  'refresh-engagement-summary', '30 2 * * *',
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_engagement_summary$$
+);
+
+-- tenant_feature_adoption: nightly 02:45 UTC
+SELECT cron.schedule(
+  'refresh-feature-adoption', '45 2 * * *',
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_feature_adoption$$
+);
+
+-- tenant_cohort_breakdown: nightly 03:00 UTC
+-- After the others — depends on SCIM group sync completing (~01:30 UTC)
+SELECT cron.schedule(
+  'refresh-cohort-breakdown', '0 3 * * *',
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_cohort_breakdown$$
+);
+```
+
+**Failure handling:** pg_cron logs failures to the observability pipeline (OBSERVABILITY.md §7 P2 alert to `#ops-alerts`). Stale data is served with a `Last-Refreshed` header; the admin dashboard shows "Last updated: X hours ago" when the most recent refresh was > 26 hours ago.
+
+---
+
+### 17.6 Admin Reporting API Endpoints
+
+All endpoints are under `/v1/admin/reporting/` and require a `tenant_admin` or `tenant_owner` role JWT.
+
+| Endpoint | Method | Source view | Returns |
+|---|---|---|---|
+| `/v1/admin/reporting/wellness` | GET | `tenant_wellness_summary_v2` | Weekly metrics, rolling 13 weeks |
+| `/v1/admin/reporting/engagement` | GET | `tenant_engagement_summary` | Activation rate, WAU/MAU, D30 retention |
+| `/v1/admin/reporting/features` | GET | `tenant_feature_adoption` | CV and voice adoption rates |
+| `/v1/admin/reporting/cohorts` | GET | `tenant_cohort_breakdown` | Per-SCIM-group engagement (k-anonymity suppressed) |
+| `/v1/admin/reporting/export` | POST | All four views | CSV with `Last-Refreshed` header |
+
+**No `/v1/admin/reporting/users` endpoint exists.** Any attempt to add one requires a compliance-officer approval and a DECISION_LOG.md entry. Its absence is itself a SOC 2 CC6.1 control.
+
+**Response schema — `/v1/admin/reporting/wellness`:**
+```typescript
+interface WellnessReportResponse {
+  tenant_id:        string;
+  generated_at:     string;   // ISO 8601
+  last_refreshed_at: string;  // from MV; triggers stale banner if > 26h
+  period:           { weeks: 13 };
+  data:             WellnessWeek[];
+  suppressed_weeks: number;   // weeks where N < k_floor
+}
+
+interface WellnessWeek {
+  report_week:        string;        // ISO 8601 date (Monday)
+  active_users:       number;
+  total_sessions:     number;
+  avg_duration_min:   number | null;
+  median_duration_min: number | null;
+  p90_duration_min:   number | null;
+  avg_form_score:     number | null; // null if CV cohort N < k_floor
+}
+```
+
+---
+
+### 17.7 Opt-In Consent Tracking
+
+A user's data is excluded from all aggregate views unless explicit consent is recorded in this table.
+
+```sql
+CREATE TABLE user_aggregate_consent (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id        UUID NOT NULL,
+  opted_out        BOOLEAN NOT NULL DEFAULT FALSE,
+  consent_version  TEXT,            -- version string of consent text; NULL = not yet shown
+  consented_at     TIMESTAMPTZ,     -- NULL if opted_out or consent not yet shown
+  opted_out_at     TIMESTAMPTZ,
+  consent_channel  TEXT,            -- 'onboarding_flow' | 'settings_privacy' | 'scim_auto'
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, tenant_id)
+);
+
+ALTER TABLE user_aggregate_consent ENABLE ROW LEVEL SECURITY;
+
+-- Users can read and update their own consent record
+CREATE POLICY uac_owner_rw ON user_aggregate_consent
+  FOR ALL TO form_api
+  USING (user_id = current_setting('app.current_user_id', TRUE)::UUID);
+
+-- Aggregate MVs read this table via form_admin role (BYPASSRLS)
+-- No tenant_admin route to read individual consent records
+```
+
+**SCIM-provisioned users:** `consent_version = NULL` and `opted_out = FALSE` at provisioning time. User is not included in aggregates until they complete onboarding and the consent screen sets `consent_version` and `consented_at`.
+
+**Opt-out flow:** Settings → Privacy → "Disconnect from employer reporting" sets `opted_out = TRUE`. Effective at the next nightly MV refresh (≤ 26 hours). The user remains a `tenant_member` with full platform access.
+
+**Consent version re-solicitation:** Adding a new metric category to §17.2A triggers a new `consent_version`. All existing users whose `consent_version` predates the change must confirm consent before their data is included under the new category.
+
+---
+
+### 17.8 GDPR Art. 89 Statistical Purpose Compliance
+
+Aggregate reporting falls within the **statistical purpose exception** under GDPR Art. 89(1) and Recital 162, which permits processing personal data for statistical analysis where appropriate safeguards ensure results cannot be attributed to individual data subjects.
+
+| Safeguard (Art. 89 requirement) | Implementation |
+|---|---|
+| Pseudonymisation | `user_id` absent from all aggregate view output (§17.3 DDL verified by §17.10 tests) |
+| Data minimisation | No `user_health_profiles` or `meal_logs` joins in any §17 view |
+| k-Anonymity | Cohort floor N ≥ 5 enforced at DB, API, and dashboard layers (§17.4) |
+| Prohibition on re-identification | No admin endpoint narrows results to an individual; structural absence enforced (§17.6) |
+| No onward transfer without controls | `admin.report_exported` audit events record every export; DPA prohibits recipients from sharing raw exports externally |
+| Consent basis | `user_aggregate_consent` ensures only opted-in users contribute to aggregates |
+
+**GDPR legal basis:** Legitimate interest (Art. 6(1)(f)) for the enterprise customer's programme evaluation, balanced against the data subject's privacy interest (protected by k-anonymity floor and opt-out right). For Art. 9 special category data: the aggregate output metrics are behavioural/fitness signals, not health diagnoses. The query paths in §17.3 never read `user_health_profiles`, `meal_logs`, or `coaching_turns` — Art. 9 data is structurally absent from the output.
+
+**DPA gate:** Enterprise customers with EU employees must sign a DPA before admin reporting data flows. Admin reporting endpoints return HTTP 403 for tenants with `tenant_contracts.dpa_ref IS NULL` in EU data-residency regions (cross-reference §16.9).
+
+---
+
+### 17.9 DEC-030 Audit Events for Admin Reporting
+
+All admin reporting access is HMAC-chained per DEC-030 (`docs/AUDIT_LOG_SCHEMA.md`).
+
+| Event slug | Trigger | Severity | Retention | Notes |
+|---|---|---|---|---|
+| `admin.report_viewed` | Admin dashboard page load (any reporting tab) | LOW | 30 days | `resource_type: 'aggregate_dashboard'`; includes `report_type` in metadata |
+| `admin.report_exported` | CSV export via `/v1/admin/reporting/export` | STANDARD | 3 years | `resource_type: 'aggregate_export'`; includes `row_count` and `suppressed_cohorts` |
+| `admin.cohort_drill_viewed` | Per-group cohort breakdown viewed | STANDARD | 1 year | `resource_type: 'cohort_breakdown'`; includes `group_id` (not `display_name`) |
+| `admin.report_suppressed` | API returns `suppressed_cohorts > 0` | LOW | 30 days | Signals k-anonymity floor is active; no individual data in log |
+| `admin.consent_override_attempted` | Any attempt to access individual user data via an admin role | **HIGH** | 7 years | Must never fire in production — its presence is a P1 security incident |
+
+**`admin.consent_override_attempted` rationale:** This event fires if a code change accidentally creates a route that exposes individual data to an admin role. One instance in production triggers an automatic P1 incident (INCIDENT_RESPONSE.md §1.2) and an immediate review of the responsible code path.
+
+**Metadata schema — `admin.report_exported`:**
+```jsonc
+{
+  "event":              "admin.report_exported",
+  "tenant_id":          "<uuid>",
+  "actor_id":           "<uuid>",
+  "actor_role":         "tenant_admin",
+  "report_type":        "wellness | engagement | feature_adoption | cohort_breakdown | full",
+  "row_count":          42,
+  "format":             "csv",
+  "period_weeks":       13,
+  "suppressed_cohorts": 0
+}
+```
+
+---
+
+### 17.10 Privacy Floor Test Suite
+
+The CI pipeline must pass all tests below before any admin dashboard deploy.
+
+```typescript
+// tests/privacy/admin-reporting-floor.test.ts
+
+describe('Admin reporting privacy floor', () => {
+
+  it('tenant_wellness_summary_v2 contains no user_id column', async () => {
+    const cols = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'tenant_wellness_summary_v2'`
+    );
+    expect(cols.rows.map(r => r.column_name)).not.toContain('user_id');
+  });
+
+  it('tenant_wellness_summary_v2 contains no email column', async () => {
+    const cols = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'tenant_wellness_summary_v2'`
+    );
+    expect(cols.rows.map(r => r.column_name)).not.toContain('email');
+  });
+
+  it('assert_k_anonymity returns null for cohort < k_floor', async () => {
+    const result = await db.query(`SELECT assert_k_anonymity(42.5, 4)`);
+    expect(result.rows[0].assert_k_anonymity).toBeNull();
+  });
+
+  it('assert_k_anonymity returns value for cohort >= k_floor', async () => {
+    const result = await db.query(`SELECT assert_k_anonymity(42.5, 5)`);
+    expect(result.rows[0].assert_k_anonymity).toBe(42.5);
+  });
+
+  it('opted-out user is excluded from wellness MV', async () => {
+    await testDb.setUserOptOut(TEST_USER_ID, true);
+    await testDb.refreshMV('tenant_wellness_summary_v2');
+    const rows = await db.query(
+      `SELECT active_users FROM tenant_wellness_summary_v2 WHERE tenant_id = $1`,
+      [TEST_TENANT_ID]
+    );
+    expect(rows.rows[0].active_users).toBe(INITIAL_ACTIVE_USERS - 1);
+  });
+
+  it('no admin reporting endpoint returns individual user rows', async () => {
+    const endpoints = [
+      '/v1/admin/reporting/wellness',
+      '/v1/admin/reporting/engagement',
+      '/v1/admin/reporting/features',
+      '/v1/admin/reporting/cohorts',
+    ];
+    for (const endpoint of endpoints) {
+      const response = await adminApiClient.get(endpoint);
+      const body = JSON.stringify(await response.json());
+      expect(body).not.toContain(TEST_USER_EMAIL);
+      expect(body).not.toContain(TEST_USER_ID);
+    }
+  });
+
+  it('tenant_cohort_breakdown suppresses groups with fewer than 5 active users', async () => {
+    await testDb.createScimGroup(TEST_TENANT_ID, 'small-group', 3);
+    await testDb.refreshMV('tenant_cohort_breakdown');
+    const response = await adminApiClient.get('/v1/admin/reporting/cohorts');
+    const body = await response.json();
+    const groupIds = body.data.map((g: { group_id: string }) => g.group_id);
+    expect(groupIds).not.toContain(SMALL_GROUP_ID);
+  });
+
+});
+```
+
+Test failures block deployment via `scripts/ci/privacy-floor-gate.sh`.
+
+---
+
+### 17.11 SOC 2 Mapping
+
+| SOC 2 Criterion | How §17 Satisfies It |
+|---|---|
+| **CC6.1 — Logical access restricted** | No admin reporting endpoint exposes individual data; `admin.consent_override_attempted` fires if a route is accidentally added; absence of `/v1/admin/reporting/users` is a documented, tested access control |
+| **CC6.3 — Access restrictions tested** | §17.10 privacy floor test suite runs on every deploy; failures block deployment |
+| **CC7.2 — Monitoring for anomalies** | `admin.consent_override_attempted` (HIGH) auto-triggers P1 incident; `admin.report_exported` events feed SIEM |
+| **C1.1 — Confidentiality commitments** | §17.2B Prohibited Registry is a documented confidentiality commitment; DPA (§17.8) enforces contractual confidentiality |
+| **C1.2 — Confidential information protected** | Health data, body composition, coaching content, meal logs excluded from all aggregate view DDL — exclusion is structural, not policy-dependent |
+| **P3.2 — Privacy notice accurate** | `user_aggregate_consent.consent_version` records which notice the user saw; re-consent triggered on registry expansion |
+| **P4.1 — Data collected only as consented** | `uac.opted_out = FALSE` required for any user row to appear in aggregate MVs |
+| **P6.4 — Disclosure controlled** | `admin.report_exported` events record every export with row count; no personal data in export (verified by §17.10 tests) |
+
+**SOC 2 evidence artifacts:**
+- `admin.report_exported` event log → `compliance/evidence/admin-reporting/`
+- §17.10 CI test results → `compliance/evidence/privacy-floor-tests/`
+- §17.2B Prohibited Registry → C1.2 confidentiality protection evidence
+- `user_aggregate_consent` DDL → CC6.1 / P4.1 access control evidence
+
+---
+
+### 17.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Notes |
+|---|---|---|---|---|---|
+| 1 | Create `user_aggregate_consent` table with RLS; backfill SCIM-provisioned users with `opted_out = FALSE, consent_version = NULL` | `platform-engineer` | **P0** | M3 | Must exist before any aggregate MV is created |
+| 2 | `ALTER TABLE tenants ADD COLUMN reporting_k_floor INTEGER NOT NULL DEFAULT 5 CHECK (reporting_k_floor IN (5, 10, 15))` | `platform-engineer` | **P0** | M3 | |
+| 3 | Create `assert_k_anonymity()` Postgres function (§17.4.1); add CI test for null/pass cases | `platform-engineer` | **P0** | M3 | |
+| 4 | Create `tenant_wellness_summary_v2` DDL + unique index + `pg_cron` 02:15 UTC | `platform-engineer` | **P0** | M3 | Deprecation notice on §2.6 view after M3 deploy |
+| 5 | Create `tenant_engagement_summary` DDL + unique index + `pg_cron` 02:30 UTC | `platform-engineer` | **P0** | M3 | |
+| 6 | Create `tenant_feature_adoption` DDL + unique index + `pg_cron` 02:45 UTC | `platform-engineer` | **P0** | M4 | CV feature flag must be wired before this MV is meaningful |
+| 7 | Create `tenant_cohort_breakdown` DDL + unique index + `pg_cron` 03:00 UTC | `platform-engineer` | **P0** | M4 | Depends on §15 SCIM Groups tables |
+| 8 | Implement `k-anonymity-guard.ts` Worker middleware; integrate into all `/v1/admin/reporting/*` handlers | `platform-engineer` | **P0** | M3 | `applyKAnonymityGuard` and `buildSuppressedResponse` per §17.4.2 |
+| 9 | Read `tenants.reporting_k_floor` in tenant context middleware; pass to Worker guard | `platform-engineer` | **P1** | M4 | |
+| 10 | Implement all 5 admin reporting endpoints (§17.6); add `Last-Refreshed` header; stale banner at > 26h | `platform-engineer` | **P0** | M4 | No individual-data routes — CI gate verifies this |
+| 11 | Wire `admin.report_exported`, `admin.report_viewed`, `admin.cohort_drill_viewed`, `admin.consent_override_attempted` DEC-030 events | `platform-engineer` | **P0** | M4 | `admin.consent_override_attempted` must trigger P1 auto-incident |
+| 12 | Onboarding flow: add consent screen; update `user_aggregate_consent` on accept/decline | `platform-engineer` + `ux-flow` | **P0** | M3 | `consent_channel: 'onboarding_flow'` |
+| 13 | Settings → Privacy: "Disconnect from employer reporting" toggle; wire `opted_out` update | `platform-engineer` | **P0** | M3 | Effective at next nightly refresh (< 26h); inform user |
+| 14 | Implement §17.10 privacy floor test suite; integrate into CI gate; block deploy on failure | `qa-lead` + `platform-engineer` | **P0** | M3 | Zero-exception policy: any test failure = blocked deploy |
+| 15 | Metabase admin panels: 4 panels (wellness trend, engagement funnel, feature adoption, cohort table) with `WHERE active_users >= 5` filter | `data-engineer` | **P1** | M4 | Internal CSM use; enterprise customers use admin dashboard UI |
+| 16 | EU region gate: `/v1/admin/reporting/*` returns HTTP 403 for tenants where `dpa_ref IS NULL` | `platform-engineer` + `compliance-officer` | **P0** | Pre-EU pilot | Closes P-GAP-002 DPA enforcement at API layer |
+| 17 | Add pg_cron failure alerting to OBSERVABILITY.md §7 alert matrix; stale MV (> 26h) → P2 `#ops-alerts` | `devops-lead` | **P1** | M4 | |
+| 18 | Deprecate §2.6 `tenant_wellness_summary` (add `-- DEPRECATED: see §17.3.1` comment); hard-remove after 2 sprints | `platform-engineer` | **P2** | M5 | |
+
+**OQ-ENT-02: k-anonymity floor sufficiency under GDPR Recital 26 (EU):** The k-floor of 5 matches common government statistics practice (census data). Some EU supervisory authorities have informally suggested k ≥ 10 for health-adjacent data in corporate wellness contexts. Before FORM's first enterprise pilot in Germany, France, or the Netherlands, compliance-officer must obtain a legal opinion on whether k = 5 satisfies Recital 26 "not reasonably likely to be identified" for FORM's specific dataset. If k ≥ 10 is required, `tenants.reporting_k_floor` (§17.4.4) allows this per tenant without a schema change. **Owner: compliance-officer. Checkpoint: before first EU enterprise pilot.**
+
+**OQ-ENT-03: Consent re-solicitation on metric registry expansion:** If FORM adds a new permitted metric category to §17.2A (e.g., sleep quality aggregates from wearable data in §14), all existing users whose `consent_version` predates the change must be re-consented before their data is included under the new category. The re-consent notification and UI flow does not yet exist. The `consent_version` field is the hook; the flow must be designed before any metric category expansion. **Owner: platform-engineer + compliance-officer. Checkpoint: M6.**
+
+---
+
 *v0.7 additions: §16 Enterprise Contract & Pilot Lifecycle Schema — closes the schema gap for pilot and contract tracking referenced in ENTERPRISE.md §Pricing, §Implementation timeline, and enterprise.html. `tenants.lifecycle_status` TEXT column with 5-state machine (pilot → active → expired/suspended/churned) and Worker access gate. `tenant_pilots` table: pilot seat cap (10–500), 90-day `ends_at`, fixed-schema JSONB `success_criteria` (activation_rate_pct, weekly_engagement_pct, nps_floor, min_active_seats, evaluation_date), status machine (active/extended/converted/expired/declined), CSM owner handle, internal_notes PII prohibition with weekly content-scan. `tenant_contracts` table: contract_ref, plan, seats_contracted (min 50), arr_cents (FORM-internal only — excluded from form_api RLS and tenant_contract_portal view), billing_period (annual/2year/3year), po_number, start_at/end_at, auto_renew + renewal_notice_days, Stripe subscription ID, partial unique index on (tenant_id) WHERE status = 'active'. Seat enforcement: `assertSeatAvailable()` TypeScript in Workers provisioning layer; FOR UPDATE SKIP LOCKED TOCTOU protection; 402 response with CSM contact; seat_limit_enforcement_triggered DEC-030 event with attempted_email: null. `tenant_seat_utilization` materialized view: active seats, scim-provisioned count, 7d/30d utilization, utilization_pct_7d; k-anonymity NULL suppression below n=15; nightly 02:00 UTC pg_cron refresh; arr_cents absent. Renewal notice pg_cron (09:00 UTC) + Cloudflare Worker (09:05 UTC): Slack to #csm-renewals at renewal_notice_days, PagerDuty at ≤14 days. 14 DEC-030 HMAC-chained audit events including HIGH-severity tenant.contract_terminated and tenant.access_suspended; attempted_email: null invariant CI-enforced. Data retention: tenant_contracts 7 years (financial records), tenant_pilots 2-year soft-delete + 5-year hard-delete. Art. 28 DPA: dpa_ref TEXT column required before EU pilot activation (closes P-GAP-002 DPA tracking). SOC 2 mapping: CC6.1 (seat enforcement), CC6.2 (contract-as-authorisation), CC9.1 (renewal notice), CC9.2 (contract record), A1.1 (SLA tier from plan), PI1.4 (processing integrity), C1.2 (arr_cents confidential). 14-item implementation checklist (7× P0, 4× P1, 2× P2, 1× Pre-EU-pilot). OQ-ENT-01: minimum seat floor validation against COST_MODEL.md §16.2 model at M6.*
+
+*v0.8 additions: §17 Enterprise Admin Reporting Schema — Aggregate-Only Data Model & Privacy-Floor Enforcement. Closes the schema gap between the §2.6 prototype `tenant_wellness_summary` and the full production admin dashboard data model. Permitted/Prohibited Metric Registry (§17.2): explicit HR-visibility table covering 12 permitted aggregate metrics (participation, WAU/MAU, form score, D30 retention, feature adoption, SCIM-group engagement, opt-in NPS) and 9 prohibited categories (individual workout rows, coaching content, health goals, body composition, meal logs, mental health data, HRV, user identity linkage, opted-out users) — 5 categories require clinical-safety veto to override. Four materialized views: `tenant_wellness_summary_v2` (production replacement for §2.6 prototype — adds `user_aggregate_consent` join, 13-week rolling window, k-anonymity CASE guard on `avg_form_score`, `REFRESH CONCURRENTLY` unique index, RLS policy); `tenant_engagement_summary` (activation_rate_pct, WAU/MAU, D30 retention with cohort-size k-gate, computed via CTEs — no `user_health_profiles` join anywhere); `tenant_feature_adoption` (CV adoption % and voice coaching adoption % — `coaching_sessions` count permitted, `coaching_turns.content` structurally absent); `tenant_cohort_breakdown` (SCIM-group engagement using §15 tables — Art. 9 sensitive-name gate replaces flagged names with `[Group name under review]`, `meets_anonymity_floor` column drives API suppression). k-Anonymity: `assert_k_anonymity()` Postgres STABLE function (p_value + p_cohort_size + p_k_floor DEFAULT 5); `applyKAnonymityGuard` + `redactSubThreshold` TypeScript in `workers/admin-reporting/k-anonymity-guard.ts`; Metabase `WHERE active_users >= 5` defence-in-depth; `tenants.reporting_k_floor INTEGER DEFAULT 5 CHECK IN (5, 10, 15)` per-tenant override for sensitive industries. Refresh schedule: pg_cron CONCURRENTLY at 02:15/02:30/02:45/03:00 UTC; stale banner at > 26h; P2 alert on cron failure. Admin reporting API: 5 endpoints under `/v1/admin/reporting/` (wellness, engagement, features, cohorts, export); no `/users` endpoint; `Last-Refreshed` header; 403 for EU tenants with `dpa_ref IS NULL`. `user_aggregate_consent` table: `opted_out BOOLEAN DEFAULT FALSE`, `consent_version TEXT`, SCIM-provisioned default NULL-consent until onboarding; Settings → Privacy opt-out effective at next refresh (< 26h); `consent_version` triggers re-solicitation on metric registry expansion. GDPR Art. 89 safeguards: pseudonymisation (no user_id in output), minimisation (no Art. 9 table joins), k-anonymity N ≥ 5, re-identification prohibition (no individual-narrowing endpoints), consent basis (`user_aggregate_consent`), DPA gate (§17.8). DEC-030 audit events: `admin.report_viewed` (LOW, 30d), `admin.report_exported` (STANDARD, 3yr, includes `suppressed_cohorts`), `admin.cohort_drill_viewed` (STANDARD, 1yr), `admin.report_suppressed` (LOW, 30d), `admin.consent_override_attempted` (HIGH, 7yr — fires P1 incident automatically). Privacy floor test suite (§17.10): 6 Jest tests including no-user_id-column assertion, k-anonymity null/pass, opted-out exclusion, no-individual-data-in-response, cohort-suppression; CI gate blocks deploy on failure. SOC 2 mapping: CC6.1 (no individual-data route), CC6.3 (tests block deploy), CC7.2 (consent_override_attempted → P1), C1.1 (prohibited registry), C1.2 (structural exclusion), P3.2 (consent version), P4.1 (opted_out gate), P6.4 (export audit events). 18-item implementation checklist (12× P0, 4× P1, 2× P2). OQ-ENT-02: k-anonymity floor sufficiency under GDPR Recital 26 for EU enterprise pilots (legal opinion required before Germany/France/Netherlands). OQ-ENT-03: consent re-solicitation mechanism on metric registry expansion.*
