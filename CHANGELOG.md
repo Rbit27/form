@@ -6,6 +6,19 @@
 
 ---
 
+## [1.9.9] — 2026-05-23
+
+### Added
+- `content/post-90-calisthenics-vs-weighted-training.md` — Калістеніка проти обтяжень: чесне порівняння без фан-клубів. Covers EMG comparison (Calatayud et al. 2015: push-up variations vs bench press ~70% 1RM equivalence), progressive overload mechanisms in bodyweight training (leverage, unilateral variants, tempo, ROM, stability base), structural limitations of calisthenics (maximal strength, lower-body hypertrophy), structural limitations of weighted training (kinesthetic control, accessibility), partial transfer via shared muscles and vectors (Ralston et al. 2018), hybrid programming strategy (barbell compounds + calisthenics auxiliary), Victor 3-question filter: progression / goal match / consistency. clinical_safety_reviewed: PASS.
+
+### Changed
+- `blog.html` — card added for post-90
+- `STATUS.md` — post-90 row added to content engine table
+- `README.md` — post-90 marked done; post-94/95/96 added to roadmap
+- `VERSION` → 1.9.9
+
+---
+
 ## [1.9.8] — 2026-05-23
 
 ### Added
