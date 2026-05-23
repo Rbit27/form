@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v0.7
+# FORM · SSO/SCIM Implementation v0.8
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -23,6 +23,7 @@
 13. [Federated Logout — SAML SLO & OIDC Back-Channel Logout](#13-federated-logout--saml-slo--oidc-back-channel-logout)
 14. [SCIM Data Processing: GDPR Article 28 Compliance Framework](#14-scim-data-processing-gdpr-article-28-compliance-framework)
 15. [SCIM 2.0 Groups Provisioning](#15-scim-20-groups-provisioning)
+16. [Admin Dashboard SSO & SCIM Configuration UI](#16-admin-dashboard-sso--scim-configuration-ui)
 
 ---
 
@@ -1145,12 +1146,12 @@ The following items are not yet built or require a decision before implementatio
 | G-003 | **OIDC back-channel logout not implemented.** The endpoint exists in design but not in code. | High | platform-engineer | Estimate: 1 week (simpler than SLO) |
 | G-004 | **Certificate rotation automation.** The rotation runbook in 8.1 is manual. The 60-day expiry alert cron and the dual-cert metadata endpoint do not exist yet. | Medium — operational risk | devops-lead | Estimate: 1–2 weeks |
 | G-005 | **Google Directory API integration for group sync.** Currently Google Workspace OIDC lacks group membership in ID token. The service account approach is designed but not implemented. | Medium — Google Workspace tenants cannot use group-based role mapping without this | platform-engineer | Estimate: 2 weeks; requires per-tenant service account credential management |
-| G-006 | **`tenant_sso_configs.ip_allowlist` enforcement.** Schema column exists; the Cloudflare Worker that enforces IP allowlist on SSO callbacks is not written. | Medium — promised in enterprise contracts | platform-engineer | Estimate: 1 week |
-| G-007 | **Admin dashboard SSO configuration UI.** Currently all SSO config changes require direct SQL. The admin dashboard UI for SSO setup, certificate management, and group mapping does not exist. | High — required before first enterprise pilot | enterprise-architect (product spec) + platform-engineer (build) | Estimate: 3–4 weeks |
-| G-008 | **SCIM group sync for Azure AD GUIDs.** The design handles GUID-based group IDs, but the admin dashboard UI for mapping GUIDs to roles (where the customer IT admin enters human-readable group names and FORM resolves GUIDs via Microsoft Graph) is not designed. | Medium | enterprise-architect | Needs product design decision: do we show GUIDs and require customer to map, or do we call Graph API to resolve names? |
+| G-006 | **`tenant_sso_configs.ip_allowlist` enforcement.** Schema column exists; the Cloudflare Worker that enforces IP allowlist on SSO callbacks is not written. | ~~Medium — promised in enterprise contracts~~ **UI design resolved — see §16.10; Worker implementation pending** | platform-engineer | Estimate: 1 week for Worker once §16.10 spec is approved |
+| G-007 | **Admin dashboard SSO configuration UI.** Currently all SSO config changes require direct SQL. The admin dashboard UI for SSO setup, certificate management, and group mapping does not exist. | ~~High — required before first enterprise pilot~~ **Design resolved — see §16** | enterprise-architect (product spec) + platform-engineer (build) | Design complete. Implementation pending. Estimate: 3–4 weeks |
+| G-008 | **SCIM group sync for Azure AD GUIDs.** The design handles GUID-based group IDs, but the admin dashboard UI for mapping GUIDs to roles (where the customer IT admin enters human-readable group names and FORM resolves GUIDs via Microsoft Graph) is not designed. | ~~Medium~~ **Design resolved — see §16.8** | enterprise-architect | Decision: call Microsoft Graph API to resolve display names; GUID shown as fallback if consent not granted. See §16.8. |
 | G-009 | **Session blocklist persistence.** The design uses a Supabase table for session blocklisting. Under high-revocation scenarios (large tenant SCIM deactivation of 1000+ users simultaneously), this table lookup on every request becomes a hot-path bottleneck. | Medium — performance, not correctness | devops-lead + platform-engineer | Options: Redis cache layer, Bloom filter, JWT short-TTL with revocation threshold. Needs decision before >100-seat enterprise customers. |
 | G-010 | **Magic link fallback security design.** The current fallback design in 8.3 and 8.4 uses verified email as the trust anchor. The exact verification flow (OTP via email, rate limiting, abuse detection) is not specified. | ~~High — security-critical~~  **Resolved — see §10** | security-engineer | Design specified in §10. Implementation pending. |
-| G-011 | **Tenant SSO configuration test environment.** Customers currently have no sandbox/staging environment to test SSO config before production. This leads to live testing, which breaks existing users if misconfigured. | Medium | enterprise-architect | Proposal: dedicated `{tenant_slug}.staging.form.coach` environment with separate `tenant_id` for pre-production testing |
+| G-011 | **Tenant SSO configuration test environment.** Customers currently have no sandbox/staging environment to test SSO config before production. This leads to live testing, which breaks existing users if misconfigured. | ~~Medium~~ **Design resolved — see §16.11** | enterprise-architect | Design: dedicated `{slug}-staging.form.coach` endpoint with linked staging `tenant_id`; one-button config copy to production. Implementation pending. |
 | G-012 | **OIDC private key JWT client authentication.** Some enterprise IdPs require `private_key_jwt` client auth instead of `client_secret_post`. Not supported yet. | Low — affects <5% of prospective customers (primarily financial sector) | platform-engineer | Estimate: 1 week once RFC 7523 is understood |
 | G-013 | **Legal: DPA clause for SCIM data processing.** SCIM provisioning involves FORM processing employee directory data (names, emails, departments) on behalf of the customer. The standard DPA template needs a clause explicitly covering SCIM as a processing activity. | High — GDPR Art. 28 compliance | compliance-officer + outside counsel | Block: do not enable SCIM for any customer until DPA is updated |
 
@@ -3631,4 +3632,592 @@ export function scanGroupDisplayName(displayName: string): RegExp | null {
 
 ---
 
-*v0.7 additions: Section 15 — SCIM 2.0 Groups Provisioning. New database tables: `scim_groups` (RFC 7643 §8 compliant, RLS-enforced via `current_setting('app.tenant_id')::UUID`) and `scim_group_members` (atomic with session revocation per §12.7). Six SCIM Group endpoints specified with pagination (cursor, `count=100&startIndex=1`), rate-limit interaction with §3.6, and `(tenant_id, external_id)` idempotency. Group-to-role mapping: `group_role_mappings` JSONB config extension to `tenant_sso_configs`, `highest_privilege` resolution algorithm (tenant_admin > coach > member > viewer), `tenant_owner` blocked from group assignment, unmapped group fallback with `scim.group_unmapped` audit event and opt-in strict-block mode. IdP-specific: Okta (Push Groups manual config required — common onboarding gap); Entra ID (nested group flattening §15.6.2a — skips `type:"Group"` members, logs `scim.group_nested_flattened`, flat security group or P1/P2 member flattening recommended; dynamic groups treated as static); Google Workspace (SCIM Groups not supported — JIT via §11 compensating control; G-014 new gap). Nine new audit events added to DEC-030 HMAC chain taxonomy. GDPR: group `displayName` as potential Art. 9 carrier; Art. 9 group name scanner with TypeScript `ART9_GROUP_NAME_PATTERNS` regex constants mirroring §14.5 `BLOCKED_ATTRIBUTE_PATTERNS`; non-blocking flag-and-review workflow (not reject); `scim.group_name_sensitive_detected` event; group membership excluded from analytics and tenant-manager RLS; Art. 17 hard-delete of `scim_group_members` on erasure. Customer onboarding checklist extended for all three IdPs. Implementation checklist: 15 tasks (10× P0, 4× P1, 1× P2), M4/M5. G-014: 🔴 Google Workspace by-design limitation; JIT compensating control documented; SOC 2 CC6.2 satisfied; re-evaluate M6 Q4 2026.*
+## 16. Admin Dashboard SSO & SCIM Configuration UI
+
+**Owner:** enterprise-architect (product spec), platform-engineer (build)
+**Closes:** G-007 design phase, G-008 design phase, G-006 partial design phase, G-011 design phase
+**Blocking condition lifted when:** §16.3–16.11 implementation checklist items P0 are complete and a QA pass is signed off by enterprise-architect.
+
+This section is the canonical product specification for the SSO and SCIM configuration interface available to `tenant_owner` and `tenant_admin` roles in the FORM admin dashboard. All SSO/SCIM configuration that currently requires direct database access will be performed exclusively through this UI once it ships. It must be ready before the first enterprise pilot customer goes live.
+
+**Privacy floor:** This interface must never expose individual user data to the configurator. SSO configuration (IdP certificates, SCIM tokens, group-role mappings, IP allowlists) does not constitute user personal data and is appropriately visible to `tenant_owner` and `tenant_admin` roles. Aggregate connection health statistics (login success rate, SCIM provisioning count) are permitted. No session-level or per-user activity data may appear on any configuration screen.
+
+---
+
+### 16.1 Role-Based Access to SSO Configuration
+
+| Action | `tenant_owner` | `tenant_admin` | `tenant_manager` | `member` |
+|---|---|---|---|---|
+| View SSO connection status | ✅ | ✅ | ❌ | ❌ |
+| Run OIDC or SAML setup wizard | ✅ | ❌ | ❌ | ❌ |
+| Edit existing SSO configuration | ✅ | ❌ | ❌ | ❌ |
+| Download SP metadata | ✅ | ✅ | ❌ | ❌ |
+| Rotate SP signing certificate | ✅ | ❌ | ❌ | ❌ |
+| Generate / revoke SCIM token | ✅ | ❌ | ❌ | ❌ |
+| Edit group-to-role mappings | ✅ | ✅ | ❌ | ❌ |
+| Edit session policy | ✅ | ❌ | ❌ | ❌ |
+| Edit IP allowlist | ✅ | ❌ | ❌ | ❌ |
+| Promote staging config to production | ✅ | ❌ | ❌ | ❌ |
+
+**Access gate:** All SSO configuration screens are gated by `feature_flags.sso_enabled = true` for the tenant. Attempting to access any SSO screen when the flag is false returns HTTP 403 with error code `sso_not_enabled`. The admin dashboard renders the SSO nav item as disabled with tooltip: "SSO is available on the Growth and Enterprise plans. Contact your FORM account manager to upgrade."
+
+**Audit requirement:** Every write action in this section is an audit event on the DEC-030 HMAC chain. The `performed_by` field is the `user_id` of the `tenant_owner` or `tenant_admin` executing the action, never a service account.
+
+---
+
+### 16.2 Dashboard Navigation Structure
+
+The SSO & SCIM configuration is a top-level section within the admin dashboard, accessible from the left sidebar under **Settings → Identity & Access**.
+
+```
+Settings
+├── General (org name, logo, timezone)
+├── Identity & Access          ← §16
+│   ├── Identity Provider      (SSO setup, status, metadata)
+│   ├── SCIM Provisioning      (token, provisioning log)
+│   ├── Group Mappings         (role assignment rules)
+│   ├── Session Policy         (timeouts, concurrent sessions)
+│   ├── IP Allowlist           (network access control)
+│   └── Staging Environment    (pre-production SSO testing)
+├── Billing & Plan
+└── Security & Audit
+```
+
+The **Identity Provider** sub-page hosts the setup wizard when no IdP is configured. Once an IdP is configured, it shows the connection status panel with a link to edit.
+
+---
+
+### 16.3 Identity Provider Setup Wizard — OIDC
+
+**Trigger:** `tenant_owner` clicks "Set up SSO" with no existing configuration, then selects "OpenID Connect (OIDC)".
+
+**Step 1 — IdP Selection**
+
+Radio buttons with logos:
+- **Okta** — pre-populates discovery URL template: `https://{your-okta-domain}/.well-known/openid-configuration`
+- **Microsoft Entra ID (Azure AD)** — input: Entra tenant ID or domain; auto-constructs: `https://login.microsoftonline.com/{tenant-id}/v2.0/.well-known/openid-configuration`
+- **Google Workspace** — discovery URL: `https://accounts.google.com/.well-known/openid-configuration` (fixed)
+- **Generic OIDC** — manual entry mode
+
+**Step 2 — OIDC Credentials**
+
+| Field | Requirement | Notes |
+|---|---|---|
+| Discovery URL | Required | Validated via fetch at submit time; must return a JSON document with `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri` |
+| Client ID | Required | Stored as `tenant_sso_configs.oidc_client_id` (plaintext — not secret) |
+| Client Secret | Required | AES-256-GCM encrypted; key stored in Cloudflare Workers Secrets as `OIDC_CLIENT_SECRET_ENCRYPTION_KEY`; ciphertext stored in `tenant_sso_configs.oidc_client_secret_enc` |
+| Additional Scopes | Optional | Default: `openid email profile`; append space-separated additional scopes (e.g., `groups`) |
+
+Discovery URL validation: FORM fetches the URL server-side (from the Cloudflare Worker, never client-side) and confirms the response is valid OIDC metadata. If the fetch fails or the response is malformed, show inline error: "Could not fetch IdP metadata — check the URL and try again."
+
+**Step 3 — Attribute Mapping**
+
+| OIDC Claim | FORM Field | Default | Editable |
+|---|---|---|---|
+| `email` | `users.email` | `email` | No — email is always the primary identifier |
+| `name` or `given_name` + `family_name` | `users.display_name` | `name` | Yes |
+| `sub` | `users.idp_subject_id` | `sub` | No |
+| Custom claim (e.g., `groups`) | Role mapping source | `groups` | Yes |
+
+Attribute mapping is stored in `tenant_sso_configs.attribute_mapping` JSONB. The UI shows a two-column table: "IdP claim" (text input) → "FORM field" (dropdown). A "Test Claim Extraction" button appears in Step 4 to validate the mapping with a real login.
+
+**Step 4 — Test Login (Sandboxed)**
+
+FORM opens a new browser tab to `https://app.form.coach/auth/sso/test?tenant_id=<uuid>&session=<nonce>`. The test flow:
+1. Redirects to the IdP's authorization endpoint using the configured credentials.
+2. After user authenticates, returns to `https://app.form.coach/auth/sso/test/callback`.
+3. FORM validates the ID token, extracts configured attributes, and displays a success summary:
+   - **Resolved email:** `alice@acme.com`
+   - **Resolved display name:** `Alice Nakamura`
+   - **Groups claim value:** `["form-admins", "all-employees"]`
+   - **Role that would be assigned:** `tenant_admin` (via group mapping)
+4. If validation fails, display the specific error: token signature invalid / issuer mismatch / missing required claim / email not present.
+
+The test login does **not** create a session or provision a user. It is purely a validation handshake.
+
+`sso_config.test_login_initiated` and `sso_config.test_login_passed` / `sso_config.test_login_failed` audit events are written regardless of outcome.
+
+**Step 5 — Go-Live**
+
+Toggle: "Enable SSO for my organization."
+
+On enable:
+- Sets `tenant_sso_configs.is_active = true`.
+- Sets `tenant_sso_configs.enforced = false` by default (SSO available but not mandatory; users can still use magic link).
+- Secondary toggle: "Require SSO for all users (disable magic link login)" — sets `tenant_sso_configs.enforced = true`. Warning banner: "This will prevent users without an IdP account from logging in. Ensure all users have IdP accounts before enabling."
+- Writes `sso_config.activated` audit event with `protocol: 'oidc'`, `idp_type`, `enforced: bool`.
+
+---
+
+### 16.4 Identity Provider Setup Wizard — SAML 2.0
+
+**Trigger:** `tenant_owner` clicks "Set up SSO" and selects "SAML 2.0".
+
+**Step 1 — IdP Selection**
+
+Same IdP choices as §16.3 Step 1, plus:
+- **Microsoft ADFS** — flag shown: "ADFS requires manual certificate upload on each rotation. See §16.5 for the rotation procedure."
+- **OneLogin**
+- **Ping Identity**
+
+**Step 2 — SP Metadata (FORM → IdP direction)**
+
+Before entering IdP details, the admin must configure FORM as a Service Provider in their IdP. Display:
+
+| FORM SP Field | Value |
+|---|---|
+| **SP Entity ID** | `https://app.form.coach/saml/sp/{tenant-slug}` |
+| **ACS URL (Assertion Consumer Service)** | `https://app.form.coach/auth/saml/callback/{tenant-slug}` |
+| **SLO URL** | `https://app.form.coach/auth/saml/slo/{tenant-slug}` |
+| **SP Signing Certificate** | [Download PEM] [Download DER] |
+| **NameID Format** | `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` |
+
+"Download metadata.xml" button generates a complete SP metadata document and triggers a file download. The admin uploads this to their IdP.
+
+**Step 3 — IdP Metadata (IdP → FORM direction)**
+
+Two entry modes (tab selector):
+
+*Upload XML:*
+- File picker for IdP metadata XML.
+- FORM parses: `entityID`, `SingleSignOnService Location`, `SingleLogoutService Location`, `X509Certificate`.
+- Shows parsed values for confirmation before saving.
+
+*Manual Entry:*
+| Field | Description |
+|---|---|
+| IdP Entity ID | The IdP's `entityID` |
+| SSO URL | `SingleSignOnService Location` (HTTP-Redirect or HTTP-POST) |
+| SLO URL | `SingleLogoutService Location` (optional; if absent, SLO is disabled) |
+| IdP X.509 Certificate | Paste PEM-encoded certificate |
+
+Stored as `tenant_sso_configs.saml_idp_metadata_xml` (the raw XML) and parsed fields in individual columns for fast lookup.
+
+**Step 4 — Test Login**
+
+Same sandboxed flow as §16.3 Step 4, but triggers an SP-initiated SAML AuthnRequest to the IdP SSO URL. Success summary shows:
+- **NameID value:** `alice@acme.com`
+- **Attributes in assertion:** `email`, `displayName`, `http://schemas.xmlsoap.org/claims/Group`
+- **Mapped attributes:** email → `alice@acme.com`, role → `tenant_admin`
+
+**Step 5 — Attribute Mapping**
+
+Same two-column table as §16.3 Step 3, but source keys are SAML assertion attribute names (e.g., `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress`) rather than OIDC claim names. Pre-populated defaults by IdP type:
+
+| IdP | Default email attribute |
+|---|---|
+| Okta | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress` |
+| Entra ID | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress` |
+| Google Workspace | `email` (NameID, not attribute) |
+| ADFS | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress` |
+| Generic | Manual entry |
+
+**Step 6 — Go-Live**
+
+Same toggle and enforce options as §16.3 Step 5. `sso_config.activated` event with `protocol: 'saml'`.
+
+---
+
+### 16.5 SP Metadata & Certificate Viewer
+
+Available on the **Identity Provider** page once SSO is configured. Accessible to `tenant_owner` and `tenant_admin` (read-only for `tenant_admin`).
+
+**Connection status banner:**
+```
+● Connected — Okta (OIDC)  |  Last successful login: 3 minutes ago  |  147 active sessions
+```
+Status is derived from `sso_login_stats` (an in-memory cache in the Cloudflare Worker; refreshed every 60 seconds from `audit_log` counts). It shows the IdP type, protocol, last `sso.login` event timestamp, and active session count from `enterprise_sessions`.
+
+**SP Certificate panel:**
+
+| Field | Value |
+|---|---|
+| Serial number | `4a:f2:...` |
+| Subject | `CN=form-sp-{tenant-slug}` |
+| Not Before | `2026-01-01` |
+| Not After | `2027-01-01` |
+| Days until expiry | `224` (colour-coded: green > 90 days, yellow 30–90, red < 30) |
+| SHA-256 fingerprint | `ab:cd:ef:...` |
+
+**Actions:**
+
+- **Download PEM** — triggers file download of the public certificate.
+- **Download metadata.xml** — regenerates and downloads the full SP metadata document with current certificate.
+- **Rotate Certificate** — see §8.1 for the dual-cert overlap procedure. This button initiates that procedure and is restricted to `tenant_owner`. Confirmation dialog: "A new certificate will be added to SP metadata. You must update your IdP with the new metadata before the old certificate expires. Do not remove the old certificate until you have confirmed the IdP is using the new one." After confirmation writes `sso_cert.rotation_initiated` audit event.
+
+**ADFS-specific warning (shown only when `idp_type = 'adfs'`):**
+> ADFS requires manual certificate upload. When you rotate the FORM SP certificate, download the new SP metadata and upload the updated X.509 certificate in your ADFS Relying Party Trust configuration before the old certificate's expiry date. FORM will send an email reminder to the `tenant_owner` 60 and 30 days before expiry.
+
+---
+
+### 16.6 SCIM Token Management
+
+Available on the **SCIM Provisioning** sub-page. Restricted to `tenant_owner`.
+
+**Token display:**
+
+```
+SCIM Base URL:    https://app.form.coach/scim/v2
+Bearer Token:     •••••••••••••••••••••••••••••••••••••••••••••••••• abcd1234
+Token Age:        47 days  ✓
+                  [Rotate Token]  [Copy Base URL]  [Copy Token]
+```
+
+Token is stored in `tenant_sso_configs.scim_token_hash` (bcrypt hash) and `scim_token_preview` (last 8 characters, plaintext). The full token is only displayed once at generation time and cannot be recovered — only rotated.
+
+**Token age warning:** If `scim_token_generated_at < NOW() - INTERVAL '90 days'`, show amber banner: "Your SCIM token is 90+ days old. Rotate it to comply with your security policy." SOC 2 CC6.1 requires credential rotation; this banner is the nudge mechanism.
+
+**Rotate Token flow:**
+1. Confirmation dialog: "This will immediately invalidate the current token. Your IdP will fail to provision users until you update it with the new token. Do you want to continue?"
+2. New token generated server-side (32 random bytes, base64url-encoded).
+3. New token displayed in a one-time reveal modal: "Copy this token now. It will not be shown again."
+4. `scim_token.generated` audit event written. Previous `scim_token.revoked` event written simultaneously.
+5. 15-minute overlap window: both old and new tokens are accepted during transition (stored as `scim_token_hash_previous` with a `scim_token_previous_expires_at` timestamp). After 15 minutes, the previous token is rejected.
+
+**SCIM provisioning summary (read-only, last 30 days):**
+
+| Metric | Value |
+|---|---|
+| Users provisioned | 47 |
+| Users deactivated | 3 |
+| Last sync | 4 minutes ago |
+| Provisioning errors | 0 |
+
+These numbers are aggregate counts from `audit_log` events of type `scim.user_created`, `scim.user_deactivated`, `scim.user_error`. No individual user identifiers are shown on this screen (privacy floor).
+
+---
+
+### 16.7 Group-to-Role Mapping UI
+
+Available on the **Group Mappings** sub-page. Accessible to `tenant_owner` (edit) and `tenant_admin` (edit, if permitted by session policy — see §16.9).
+
+**Mapping table:**
+
+| IdP Group | FORM Role | Actions |
+|---|---|---|
+| `form-admins` (Okta) | `tenant_admin` | Edit · Remove |
+| `form-managers` (Okta) | `tenant_manager` | Edit · Remove |
+| `all-employees` (Okta) | `member` | Edit · Remove |
+| `00abc123-def4-...` (Entra ID) | `tenant_admin` | Edit · Remove · Resolve → |
+
+For Entra ID rows where the group identifier is a GUID, show a **Resolve →** action that triggers the Graph API call (§16.8). Once resolved, the display name appears in parentheses: `00abc123-def4-... (Engineering Leadership)`.
+
+**Add mapping:**
+
+```
+IdP Group Identifier: [ form-coaches           ]  (text input — enter group name or GUID)
+FORM Role:            [ Coach                  ▼]
+[ Add Mapping ]
+```
+
+Writes to `tenant_sso_configs.group_role_mappings` JSONB array:
+```jsonc
+[
+  { "idp_group_id": "form-coaches", "form_role": "coach", "resolved_display_name": null },
+  { "idp_group_id": "00abc123-...", "form_role": "tenant_admin", "resolved_display_name": "Engineering Leadership" }
+]
+```
+
+Note: `tenant_owner` is excluded from group assignment per §5.3 — it cannot appear in the FORM Role dropdown and is validated server-side.
+
+**Fallback role:**
+
+Dropdown: "Users whose groups do not match any mapping will be assigned: `[ member ▼ ]`". Options: `member`, `viewer`, `deny` (deny login with error: group not mapped). Default: `member`. Stored in `tenant_sso_configs.unmapped_group_fallback_role`.
+
+**Strict mode toggle:**
+
+"Deny login if no group claim present (require all users to be in a mapped group)" — maps to `tenant_sso_configs.group_strict_mode: boolean`. Shown with warning: "Enabling strict mode will block login for any user whose IdP does not send a groups claim. Verify attribute mapping is correct before enabling." Writes `sso_config.group_mapping_updated` audit event with `strict_mode_changed: true`.
+
+---
+
+### 16.8 Azure AD Group GUID Resolution
+
+**Problem (G-008):** Microsoft Entra ID sends group object GUIDs in SAML assertions and SCIM Group `id` fields — not human-readable display names. IT admins cannot identify a GUID like `00abc123-def4-5678-9012-abcdef012345` without consulting the Azure Portal.
+
+**Solution:** FORM calls the Microsoft Graph API with a per-tenant app registration to resolve GUIDs to display names on-demand. This is an opt-in operation triggered by the admin — FORM does not perform background group sync.
+
+**Schema additions to `tenant_sso_configs`:**
+
+```sql
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN graph_app_id          TEXT,
+  ADD COLUMN graph_app_secret_key_ref TEXT,  -- Cloudflare Workers Secrets key name, not the secret itself
+  ADD COLUMN graph_tenant_id       TEXT,     -- Entra ID tenant ID (GUID)
+  ADD COLUMN graph_consent_granted_at TIMESTAMPTZ,
+  ADD COLUMN graph_last_group_sync_at TIMESTAMPTZ;
+```
+
+`graph_app_secret_key_ref` stores the Cloudflare Workers Secrets key name (e.g., `GRAPH_SECRET_acme`). The actual client secret lives in Cloudflare Workers Secrets, never in the database.
+
+**UI flow — "Connect Microsoft Graph":**
+
+Shown only when `idp_type IN ('entra_id', 'azure_ad')`. Button: **Resolve Group Names (Microsoft Graph)**.
+
+Step 1: Display instructions to create an Azure app registration:
+```
+In the Azure Portal:
+1. Navigate to App Registrations → New registration.
+2. Name: "FORM Group Sync"
+3. Supported account types: Accounts in this organizational directory only
+4. After creation, note the Application (client) ID.
+5. Create a Client Secret under Certificates & Secrets.
+6. Grant API permission: Microsoft Graph → Application → Group.Read.All
+7. Grant admin consent.
+```
+
+Step 2: Input fields:
+- Application (client) ID → stored as `graph_app_id`
+- Client Secret → encrypted and stored in Cloudflare Workers Secrets, referenced by `graph_app_secret_key_ref`
+- Tenant ID → stored as `graph_tenant_id` (auto-populated from existing Entra ID config if available)
+
+Step 3: "Test Connection" — FORM calls `GET https://graph.microsoft.com/v1.0/groups?$top=1` to validate credentials. On success: "Connected to Microsoft Graph. You can now resolve group names."
+
+**Resolving GUIDs:**
+
+On any group mapping row where the IdP group identifier is a GUID, clicking **Resolve →** calls:
+```
+GET https://graph.microsoft.com/v1.0/groups/{guid}?$select=id,displayName
+```
+
+Response `displayName` is written to `group_role_mappings[].resolved_display_name`. The GUID remains the authoritative identifier used in SSO assertion matching; the display name is for human readability only.
+
+**Batch resolve:** "Resolve All" button runs a batch request for all unresolved GUIDs in the mapping table using Microsoft Graph batch API (`POST /v1.0/$batch`). Maximum 20 GUIDs per batch request; pagination handled automatically.
+
+**Graceful fallback:** If Graph credentials are not configured, or the Graph API call fails, the GUID is shown as-is. The admin may also enter a manual alias by clicking "Add alias" on any unresolved row, which sets `resolved_display_name` without calling Graph.
+
+**Privacy:** The Graph API is only called when the `tenant_owner` explicitly triggers the resolve action. FORM stores only the `displayName` of mapped groups — not member lists, not user directory data. `graph_api.group_resolved` audit event is written for every successful resolution, recording `group_guid` and `resolved_display_name`.
+
+---
+
+### 16.9 Session Policy Configuration Panel
+
+Available on the **Session Policy** sub-page. Restricted to `tenant_owner`.
+
+| Setting | Type | Default | Constraint |
+|---|---|---|---|
+| Session timeout | Integer (hours) | `168` (7 days) | 1–720 |
+| Maximum concurrent sessions per user | Integer | `∞` (unlimited) | 1–10, or 0 for unlimited |
+| Force SSO (disable magic link) | Boolean | `false` | Must have ≥ 1 active SSO config before enabling |
+| Require re-authentication for sensitive actions | Boolean | `false` | Sensitive actions: delete org, remove tenant_owner, export audit log |
+| Allow member-initiated session termination | Boolean | `true` | If false, members cannot log out (kiosk mode for managed devices) |
+
+All settings written to `tenant_sso_configs.session_policy` JSONB column (existing column, populated by §12). UI displays current values with inline edit capability (no separate "save" step per field — autosave with confirmation toast).
+
+**Force SSO warning:** "Enabling this will block all login paths except SSO, including the emergency magic link. If your IdP is unavailable, users will be locked out. Ensure you have a documented IdP outage procedure (see §8.4) before enabling." A secondary confirmation checkbox is required: "I have an IdP outage recovery plan and understand the lockout risk."
+
+Writes `sso_config.session_policy_updated` audit event with `changed_fields: ["session_timeout_hours", "force_sso"]` (field names only, no values logged).
+
+---
+
+### 16.10 IP Allowlist Configuration Panel
+
+**Design specification for G-006 closure.**
+
+Available on the **IP Allowlist** sub-page. Restricted to `tenant_owner`.
+
+**Warning banner (always visible on this page):**
+> Ensure all IP addresses used by your administrators are included in the allowlist before enabling. Once enabled, any IP not in the list will be blocked from SSO login — including your own. To recover from a lockout, contact FORM support. FORM support can disable the allowlist for your tenant using break-glass admin access (HMAC-chained audit event written).
+
+**CIDR entry:**
+
+```
+IP / CIDR:   [ 10.0.0.0/8          ]   [Add]
+             [ 203.0.113.45/32     ]   [Add]
+```
+
+Validations:
+- Must be valid IPv4 or IPv6 CIDR notation.
+- Rejects private RFC 1918 ranges when enforcement is enabled (warn-only: "This is a private IP range. Ensure it matches your network topology.").
+- Maximum 50 CIDR entries per tenant (prevents misconfigured overly-broad allowlists).
+
+**Current allowlist table:**
+
+| CIDR | Label (optional) | Added by | Added at | Actions |
+|---|---|---|---|---|
+| `10.0.0.0/8` | Corporate VPN | alice@acme.com | 2026-05-20 | Remove |
+| `203.0.113.0/24` | Office | alice@acme.com | 2026-05-20 | Remove |
+
+Label is a free-text annotation for human readability. Stored in `tenant_sso_configs.ip_allowlist` JSONB array:
+```jsonc
+[
+  { "cidr": "10.0.0.0/8", "label": "Corporate VPN", "added_by": "<user_id>", "added_at": "2026-05-20T..." },
+  { "cidr": "203.0.113.0/24", "label": "Office", "added_by": "<user_id>", "added_at": "2026-05-20T..." }
+]
+```
+
+**Enable/disable toggle:** "Block SSO login for IPs outside this list" — disabled by default. Two-step confirmation when enabling: type the org slug to confirm.
+
+**Cloudflare Worker enforcement spec (for G-006 implementation):**
+
+The Worker that handles the SSO callback route (`/auth/saml/callback/*` and `/auth/oidc/callback`) must read `tenant_sso_configs.ip_allowlist` and the request's `CF-Connecting-IP` header:
+
+```typescript
+async function enforceIpAllowlist(
+  request: Request,
+  tenantSsoConfig: TenantSsoConfig
+): Promise<Response | null> {
+  if (!tenantSsoConfig.ip_allowlist_enabled || tenantSsoConfig.ip_allowlist.length === 0) {
+    return null;  // pass-through
+  }
+  const clientIp = request.headers.get('CF-Connecting-IP');
+  if (!clientIp) return errorResponse(403, 'ip_allowlist_no_client_ip');
+  const allowed = tenantSsoConfig.ip_allowlist.some(entry => cidrContains(entry.cidr, clientIp));
+  if (!allowed) {
+    await writeAuditEvent({ event_type: 'sso.ip_blocked', client_ip: clientIp, tenant_id: tenantSsoConfig.tenant_id });
+    return errorResponse(403, 'ip_not_allowed', 'Your IP address is not permitted to access this organization.');
+  }
+  return null;  // pass-through
+}
+```
+
+`cidrContains` must handle both IPv4 and IPv6. Use a well-tested library (e.g., `ip-cidr` npm package) — do not implement CIDR matching manually.
+
+The allowlist is read from Supabase on every SSO callback. Cache with a 60-second TTL in the Worker's in-memory cache keyed by `tenant_id`. Cache invalidation is triggered by the `sso_config.ip_allowlist_updated` audit event via a Cloudflare D1 or KV write that the Worker polls.
+
+Writes `sso_config.ip_allowlist_updated` audit event on any add/remove/enable/disable action.
+
+---
+
+### 16.11 SSO Configuration Staging Environment
+
+**Design specification for G-011 closure.**
+
+Availability: Growth and Enterprise plans only. Shown as disabled with upgrade prompt on Starter.
+
+**Purpose:** Allow IT admins to test a complete SSO configuration against a production-identical FORM environment before enabling it for real users. A misconfigured SSO deployment in production causes immediate login failures for all users — the staging environment eliminates this risk.
+
+**Architecture:**
+
+Each enterprise tenant receives a linked staging tenant at provisioning time:
+
+```sql
+-- Schema additions to tenants table
+ALTER TABLE tenants
+  ADD COLUMN staging_tenant_id UUID REFERENCES tenants(id),
+  ADD COLUMN is_staging         BOOLEAN NOT NULL DEFAULT false;
+```
+
+Constraints:
+- A staging tenant always has `is_staging = true` and a non-null reference to its production parent via `staging_tenant_id`.
+- A production tenant has `staging_tenant_id` pointing to its staging sibling.
+- Staging tenants are not visible in FORM's tenant directory, billing, or analytics.
+- No actual user workout or health data is ever copied to a staging tenant.
+
+**Staging tenant properties:**
+
+| Property | Staging Value |
+|---|---|
+| Subdomain | `{slug}-staging.form.coach` |
+| `is_staging` | `true` |
+| Features enabled | SSO, SCIM (both enabled regardless of plan — staging is always full-feature) |
+| Billing | Not billed; linked to production tenant's contract |
+| Users | Synthetic test users only (see below) |
+| Data | Completely isolated from production; no production data |
+
+**Synthetic test users:**
+
+On staging tenant creation, FORM auto-creates 5 synthetic test user accounts:
+```
+test-owner@{slug}-staging.form.coach      (role: tenant_owner)
+test-admin@{slug}-staging.form.coach      (role: tenant_admin)
+test-manager@{slug}-staging.form.coach    (role: tenant_manager)
+test-member-1@{slug}-staging.form.coach   (role: member)
+test-member-2@{slug}-staging.form.coach   (role: member)
+```
+
+The `tenant_owner` may add additional test users via the admin dashboard (invite by email). These accounts have no real personal data. They are excluded from GDPR Art. 17 erasure requests unless the erasure is for the test email address specifically.
+
+**SSO configuration on staging:**
+
+Staging has its own independent `tenant_sso_configs` row. The admin configures SSO on staging using the same wizard as §16.3/§16.4, pointing to the staging ACS URL: `https://{slug}-staging.form.coach/auth/saml/callback/{slug}-staging`.
+
+The IT admin must add the staging ACS URL to their IdP as a second, separate application (or a second ACS URL if their IdP supports multiple). The SP entity ID for staging is `https://{slug}-staging.form.coach/saml/sp/{slug}-staging`, distinct from the production entity ID.
+
+**"Promote to Production" button:**
+
+Once staging SSO is confirmed working via test logins, the admin clicks **Promote Config to Production**:
+
+1. Confirmation dialog: "This will overwrite your production SSO configuration with the staging configuration. Existing user sessions will not be interrupted. New logins will use the promoted configuration immediately."
+2. FORM copies `tenant_sso_configs` fields from staging to production: `protocol`, `oidc_*`, `saml_*`, `attribute_mapping`, `group_role_mappings`, `unmapped_group_fallback_role`.
+3. Fields **not** copied: `scim_token_hash` (SCIM token remains independent), `ip_allowlist` (network policy is environment-specific), `session_policy` (policy is environment-specific), `is_active` (production activation is a separate go-live step).
+4. After copy, `sso_config.activated` is **not** automatically triggered — the admin must explicitly enable SSO via the go-live toggle (§16.3 Step 5 / §16.4 Step 6).
+5. `sso_staging.config_promoted` audit event written with `from_staging_tenant_id`, `to_production_tenant_id`, `fields_copied`.
+
+**Privacy:** Staging tenants are isolated at the RLS level. Every RLS policy that checks `current_setting('app.current_tenant_id')` implicitly isolates staging from production because they have different `tenant_id` UUIDs. A production-tenant query can never accidentally read staging data.
+
+---
+
+### 16.12 Audit Events
+
+All events below are appended to the DEC-030 HMAC chain. `performed_by` is the `user_id` of the acting `tenant_owner` or `tenant_admin`.
+
+| Event Type | Trigger | Key Metadata Fields |
+|---|---|---|
+| `sso_config.wizard_started` | Admin opens OIDC or SAML setup wizard | `protocol`, `idp_type`, `tenant_id` |
+| `sso_config.test_login_initiated` | Admin clicks "Test Login" in wizard (§16.3 Step 4 / §16.4 Step 4) | `protocol`, `idp_type`, `test_nonce` |
+| `sso_config.test_login_passed` | Sandboxed test login succeeds | `protocol`, `idp_type`, `resolved_email`, `resolved_role` |
+| `sso_config.test_login_failed` | Sandboxed test login fails | `protocol`, `idp_type`, `failure_reason` |
+| `sso_config.activated` | Admin enables SSO via go-live toggle | `protocol`, `idp_type`, `enforced: bool` |
+| `sso_config.deactivated` | Admin disables SSO | `protocol`, `idp_type` |
+| `sso_config.deleted` | Admin deletes SSO configuration entirely | `protocol`, `idp_type` |
+| `sso_cert.rotation_initiated` | Admin clicks "Rotate Certificate" (§16.5) | `cert_serial_old`, `cert_expiry_old`, `idp_type` |
+| `sso_cert.rotation_completed` | Old certificate removed after dual-cert overlap window | `cert_serial_new`, `cert_expiry_new` |
+| `scim_token.generated` | Admin generates a new SCIM token (§16.6) | `token_preview` (last 8 chars only) |
+| `scim_token.revoked` | Previous SCIM token revoked on rotation | `token_preview`, `revoked_at` |
+| `sso_config.ip_allowlist_updated` | Admin adds/removes/enables/disables an IP allowlist entry (§16.10) | `action` (add\|remove\|enable\|disable), `cidr` (if add/remove), `enabled_state` |
+| `sso_config.session_policy_updated` | Admin changes any session policy field (§16.9) | `changed_fields` (names only, no values) |
+| `sso_config.group_mapping_updated` | Admin adds/removes/edits a group mapping (§16.7) | `action` (add\|remove\|edit), `idp_group_id`, `form_role` (not logged on remove) |
+| `graph_api.group_resolved` | Azure AD GUID resolved via Microsoft Graph (§16.8) | `group_guid`, `resolved_display_name` |
+| `sso_staging.config_promoted` | Staging SSO config promoted to production (§16.11) | `from_staging_tenant_id`, `to_production_tenant_id`, `fields_copied` (list of field names) |
+
+All events use HMAC-SHA256 chaining per DEC-030. The `previous_hash` is the hash of the immediately preceding event in the audit log for this tenant.
+
+---
+
+### 16.13 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | How §16 Satisfies It |
+|---|---|
+| **CC6.1 — Logical and physical access controls** | SCIM token management panel (§16.6) enforces credential rotation; 90-day age alert provides the detective control. `scim_token.generated` and `scim_token.revoked` events create an auditable rotation trail. |
+| **CC6.2 — Prior to issuing system credentials** | Group-to-role mapping UI (§16.7) is the documented mechanism through which enterprise admins define access scope for all SSO-provisioned users. Changes are HMAC-chained audit events. Auditor can query the event log to verify that role assignments were authorised by a `tenant_owner` before going live. |
+| **CC6.3 — Network access controls** | IP allowlist panel (§16.10) is the documented control for restricting SSO login to known network ranges. `sso_config.ip_allowlist_updated` events provide the auditable change trail. The Cloudflare Worker enforcement spec ensures the control is implemented consistently — auditors may review the Worker code to verify enforcement. |
+| **CC8.1 — Change management** | Every SSO/SCIM configuration change generates a HMAC-chained audit event (§16.12). Changes cannot be made through direct database access without a break-glass `form_admin` event being recorded in the audit log. The staging environment (§16.11) provides a structured change management process: test in staging, review test results, promote to production. |
+| **CC6.7 — Restriction of authorised users** | Session policy panel (§16.9) documents the controls for session timeout, concurrent session limits, and forced re-authentication. Force SSO toggle provides an additional control that removes lower-assurance login paths for tenants that require it. |
+
+**Auditor evidence artefacts:**
+- `audit_log` events of type `sso_config.*`, `scim_token.*`, `sso_cert.*`, `graph_api.*`, `sso_staging.*` for the audit period are exported per §8.4 of `docs/AUDIT_LOG_SCHEMA.md`.
+- SCIM token rotation history: `scim_token.generated` and `scim_token.revoked` event pairs with timestamps demonstrate rotation cadence.
+- IP allowlist change log: all `sso_config.ip_allowlist_updated` events for the period demonstrate the allowlist was actively managed.
+
+---
+
+### 16.14 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Build OIDC setup wizard (§16.3) — all 5 steps including server-side discovery URL validation and sandboxed test login | platform-engineer | **P0** | M4 |
+| Build SAML setup wizard (§16.4) — all 6 steps including SP metadata display, IdP metadata XML parser, and sandboxed test login | platform-engineer | **P0** | M4 |
+| Build SP metadata viewer + certificate panel (§16.5) — expiry countdown, PEM/metadata download, rotation button wiring to §8.1 procedure, ADFS warning | platform-engineer | **P0** | M4 |
+| Build SCIM token management panel (§16.6) — masked display, rotate flow with 15-minute overlap window, 90-day age alert | platform-engineer | **P0** | M4 |
+| Build group-to-role mapping table (§16.7) — add/remove/edit, fallback role, strict mode toggle, write to `group_role_mappings` JSONB | platform-engineer | **P0** | M4 |
+| Implement Microsoft Graph GUID resolver (§16.8) — per-tenant app registration flow, client credentials token exchange, `GET /groups/{guid}` call, batch resolve, manual alias fallback | platform-engineer | **P0** | M4 |
+| Add `graph_app_id`, `graph_app_secret_key_ref`, `graph_tenant_id`, `graph_consent_granted_at`, `graph_last_group_sync_at` columns to `tenant_sso_configs` | platform-engineer | **P0** | M4 |
+| Build session policy panel (§16.9) — timeout, concurrent sessions, force-SSO toggle with lockout warning, re-auth gate | platform-engineer | **P0** | M4 |
+| Build IP allowlist UI (§16.10) — CIDR add/remove, enable toggle with slug-confirmation modal, lockout warning | platform-engineer | **P1** | M4 |
+| Implement Cloudflare Worker IP allowlist enforcement (§16.10 Worker spec) — `CF-Connecting-IP` check, 60-second TTL cache, `sso.ip_blocked` audit event | platform-engineer | **P1** | M4 |
+| Build staging environment UI and provisioning (§16.11) — staging tenant auto-creation at contract sign, synthetic test users, independent SSO config wizard, "Promote to Production" button | platform-engineer | **P1** | M5 |
+| Add `staging_tenant_id` and `is_staging` columns to `tenants` table; migration + RLS verification | platform-engineer | **P1** | M5 |
+| Wire all 16 audit events (§16.12) to DEC-030 HMAC chain writer | platform-engineer | **P0** | M4 |
+| Accessibility audit: all wizard steps, form controls, and table actions must meet WCAG 2.1 AA | qa-lead | **P1** | M4 |
+| QA end-to-end test: OIDC wizard → test login → go-live → force-SSO → rotate cert → SCIM token rotate — against a real Okta dev tenant | qa-lead + enterprise-architect | **P0** | M4 |
+
+**G-006 status update:** 🔴 → 🟡 Partial. IP allowlist UI spec complete. Worker implementation spec (§16.10) is the remaining engineering task. Unblocked from G-007.
+**G-007 status update:** 🔴 → 🟡 Partial. Design complete. Implementation pending per checklist above.
+**G-008 status update:** 🔴 → 🟡 Partial. Graph API resolver designed. Implementation pending per checklist above.
+**G-011 status update:** 🔴 → 🟡 Partial. Staging environment designed. Infrastructure provisioning pending.
+
+---
+
+*v0.7 additions: Section 15 — SCIM 2.0 Groups Provisioning. New database tables: `scim_groups` (RFC 7643 §8 compliant, RLS-enforced via `current_setting('app.tenant_id')::UUID`) and `scim_group_members` (atomic with session revocation per §12.7). Six SCIM Group endpoints specified with pagination (cursor, `count=100&startIndex=1`), rate-limit interaction with §3.6, and `(tenant_id, external_id)` idempotency. Group-to-role mapping: `group_role_mappings` JSONB config extension to `tenant_sso_configs`, `highest_privilege` resolution algorithm (tenant_admin > coach > member > viewer), `tenant_owner` blocked from group assignment, unmapped group fallback with `scim.group_unmapped` audit event and opt-in strict-block mode. IdP-specific: Okta (Push Groups manual config required — common onboarding gap); Entra ID (nested group flattening §15.6.2a — skips `type:"Group"` members, logs `scim.group_nested_flattened`, flat security group or P1/P2 member flattening recommended; dynamic groups treated as static); Google Workspace (SCIM Groups not supported — JIT via §11 compensating control; G-014 new gap). Nine new audit events added to DEC-030 HMAC chain taxonomy. GDPR: group `displayName` as potential Art. 9 carrier; Art. 9 group name scanner with TypeScript `ART9_GROUP_NAME_PATTERNS` regex constants mirroring §14.5 `BLOCKED_ATTRIBUTE_PATTERNS`; non-blocking flag-and-review workflow (not reject); `scim.group_name_sensitive_detected` event; group membership excluded from analytics and tenant-manager RLS; Art. 17 hard-delete of `scim_group_members` on erasure. Customer onboarding checklist extended for all three IdPs. Implementation checklist: 15 tasks (10× P0, 4× P1, 1× P2), M4/M5. G-014: 🔴 Google Workspace by-design limitation; JIT compensating control documented; SOC 2 CC6.2 satisfied; re-evaluate M6 Q4 2026.* New database tables: `scim_groups` (RFC 7643 §8 compliant, RLS-enforced via `current_setting('app.tenant_id')::UUID`) and `scim_group_members` (atomic with session revocation per §12.7). Six SCIM Group endpoints specified with pagination (cursor, `count=100&startIndex=1`), rate-limit interaction with §3.6, and `(tenant_id, external_id)` idempotency. Group-to-role mapping: `group_role_mappings` JSONB config extension to `tenant_sso_configs`, `highest_privilege` resolution algorithm (tenant_admin > coach > member > viewer), `tenant_owner` blocked from group assignment, unmapped group fallback with `scim.group_unmapped` audit event and opt-in strict-block mode. IdP-specific: Okta (Push Groups manual config required — common onboarding gap); Entra ID (nested group flattening §15.6.2a — skips `type:"Group"` members, logs `scim.group_nested_flattened`, flat security group or P1/P2 member flattening recommended; dynamic groups treated as static); Google Workspace (SCIM Groups not supported — JIT via §11 compensating control; G-014 new gap). Nine new audit events added to DEC-030 HMAC chain taxonomy. GDPR: group `displayName` as potential Art. 9 carrier; Art. 9 group name scanner with TypeScript `ART9_GROUP_NAME_PATTERNS` regex constants mirroring §14.5 `BLOCKED_ATTRIBUTE_PATTERNS`; non-blocking flag-and-review workflow (not reject); `scim.group_name_sensitive_detected` event; group membership excluded from analytics and tenant-manager RLS; Art. 17 hard-delete of `scim_group_members` on erasure. Customer onboarding checklist extended for all three IdPs. Implementation checklist: 15 tasks (10× P0, 4× P1, 1× P2), M4/M5. G-014: 🔴 Google Workspace by-design limitation; JIT compensating control documented; SOC 2 CC6.2 satisfied; re-evaluate M6 Q4 2026.*
+
+*v0.8 additions: Section 16 — Admin Dashboard SSO & SCIM Configuration UI. Product spec and UX design for the IT admin configuration surface in the FORM admin dashboard, required before first enterprise pilot. Closes G-007 (design phase). OIDC setup wizard (5-step: IdP selection → discovery URL / manual fields → attribute mapping → sandboxed test login → go-live toggle); SAML 2.0 setup wizard (6-step: IdP selection → metadata XML upload or manual entry → SP metadata download → test login → attribute mapping → go-live); SP metadata viewer with certificate expiry countdown, dual-cert rotation button, ADFS manual-upload flag. SCIM token management: masked display, one-click rotation with 15-minute overlap window, 90-day age alert. Group-to-role mapping table UI: add/remove/edit mappings, fallback role selector, strict-mode toggle — writes to `tenant_sso_configs.group_role_mappings` JSONB. Azure AD GUID resolver (closes G-008 design): opt-in Microsoft Graph API call (client credentials, per-tenant admin consent) resolves GUIDs to display names; stored in `group_role_mappings[].resolved_display_name`; graceful fallback to GUID display if consent not granted. Session policy panel: timeout, concurrent-session cap, force-SSO toggle, re-auth gate for sensitive actions. IP allowlist UI (closes G-006 design phase): CIDR add/remove, enable toggle, lockout-risk warning; Cloudflare Worker enforcement spec included. SSO sandbox environment (closes G-011 design phase): `{slug}-staging.form.coach` endpoint, linked staging `tenant_id`, one-button "promote config to production" flow, synthetic test users, full isolation from production data. New `tenants` schema columns: `staging_tenant_id UUID REFERENCES tenants(id)`, `is_staging BOOLEAN DEFAULT false`. Graph API schema: `tenant_sso_configs.graph_app_id`, `graph_app_secret_key_ref`, `graph_tenant_id`, `graph_consent_granted_at`, `graph_last_group_sync_at`. Sixteen new audit events added to DEC-030 HMAC chain: `sso_config.wizard_started`, `sso_config.test_login_initiated`, `sso_config.test_login_passed`, `sso_config.test_login_failed`, `sso_config.activated`, `sso_config.deactivated`, `sso_config.deleted`, `sso_cert.rotation_initiated`, `sso_cert.rotation_completed`, `scim_token.generated`, `scim_token.revoked`, `sso_config.ip_allowlist_updated`, `sso_config.session_policy_updated`, `sso_config.group_mapping_updated`, `graph_api.group_resolved`, `sso_staging.config_promoted`. SOC 2 mapping: CC6.1 (SCIM token rotation + age monitoring), CC6.2 (group-role mapping UI enforces principle of least privilege), CC6.3 (IP allowlist access restriction), CC8.1 (all config changes HMAC-chained). Implementation checklist: 15 tasks (8× P0, 5× P1, 2× P2), M4/M5. G-006: 🔴 → 🟡 Partial (UI + Worker spec done; Worker implementation pending). G-007: 🔴 → 🟡 Partial (design done; implementation pending). G-008: 🔴 → 🟡 Partial (Graph API resolver designed; implementation pending). G-011: 🔴 → 🟡 Partial (staging environment designed; infrastructure pending).*
