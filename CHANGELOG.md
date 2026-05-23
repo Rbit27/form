@@ -6,6 +6,18 @@
 
 ---
 
+## [1.9.3] — 2026-05-23
+
+### Added
+- `content/post-85-rate-of-force-development.md` — Rate of Force Development: чому швидкість приросту сили важливіша за саму силу. RFD як dF/dt у вікні 0–200 мс (Aagaard et al. 2002); нейральна база — motor unit recruitment rate, firing rate (Van Cutsem et al. 1998); чому абсолютна сила не конвертується в потужність без velocity training; методи розвитку RFD: intent-based training (максимальна намір швидкості при субмаксимальних вагах), ballistic/plyometric, accommodating resistance (ланцюги/гуми), contrast training (PAP — Tillin & Bishop 2009); практичне програмування: 2–4 підходи × 3–6 повторів × 30–70% 1RM з максимальним intent, позиція у тижні перед важкою силовою роботою. clinical-safety PASS.
+- `content/post-86-periodization-models.md` — Моделі програмування: лінійна vs DUP vs блокова. GAS (Selye 1950) + SAID принцип як фізіологічна база periodization; LP (Zatsiorsky) — максимальна простота, ефективна для new-intermediate, вичерпується через 12–16 тижнів через монотонний стимул; DUP (Rhea et al. 2002, JSCR) — варіація у межах тижня (сила/гіпертрофія/потужність-фокус по днях), усуває monotony без зміни обсягу; Block (Issurin 2008) — концентрація адаптацій і заплановані піки, Wilson et al. 2012 про competing adaptations; Harries et al. 2015 мета-аналіз — DUP перевершує LP для intermediate у більшості метрик; Victor-фільтр: три питання (стаж, ціль, частота) визначають модель. clinical-safety PASS.
+
+### Changed
+- `VERSION` → 1.9.3
+- `CHANGELOG.md` → [1.9.3] entry added
+
+---
+
 ## [1.9.2] — 2026-05-23
 
 ### Added
