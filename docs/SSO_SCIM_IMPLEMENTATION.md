@@ -24,6 +24,7 @@
 14. [SCIM Data Processing: GDPR Article 28 Compliance Framework](#14-scim-data-processing-gdpr-article-28-compliance-framework)
 15. [SCIM 2.0 Groups Provisioning](#15-scim-20-groups-provisioning)
 16. [Admin Dashboard SSO & SCIM Configuration UI](#16-admin-dashboard-sso--scim-configuration-ui)
+17. [Enterprise Pilot Program: 90-Day Runbook](#17-enterprise-pilot-program-90-day-runbook)
 
 ---
 
@@ -4221,3 +4222,525 @@ All events use HMAC-SHA256 chaining per DEC-030. The `previous_hash` is the hash
 *v0.7 additions: Section 15 — SCIM 2.0 Groups Provisioning. New database tables: `scim_groups` (RFC 7643 §8 compliant, RLS-enforced via `current_setting('app.tenant_id')::UUID`) and `scim_group_members` (atomic with session revocation per §12.7). Six SCIM Group endpoints specified with pagination (cursor, `count=100&startIndex=1`), rate-limit interaction with §3.6, and `(tenant_id, external_id)` idempotency. Group-to-role mapping: `group_role_mappings` JSONB config extension to `tenant_sso_configs`, `highest_privilege` resolution algorithm (tenant_admin > coach > member > viewer), `tenant_owner` blocked from group assignment, unmapped group fallback with `scim.group_unmapped` audit event and opt-in strict-block mode. IdP-specific: Okta (Push Groups manual config required — common onboarding gap); Entra ID (nested group flattening §15.6.2a — skips `type:"Group"` members, logs `scim.group_nested_flattened`, flat security group or P1/P2 member flattening recommended; dynamic groups treated as static); Google Workspace (SCIM Groups not supported — JIT via §11 compensating control; G-014 new gap). Nine new audit events added to DEC-030 HMAC chain taxonomy. GDPR: group `displayName` as potential Art. 9 carrier; Art. 9 group name scanner with TypeScript `ART9_GROUP_NAME_PATTERNS` regex constants mirroring §14.5 `BLOCKED_ATTRIBUTE_PATTERNS`; non-blocking flag-and-review workflow (not reject); `scim.group_name_sensitive_detected` event; group membership excluded from analytics and tenant-manager RLS; Art. 17 hard-delete of `scim_group_members` on erasure. Customer onboarding checklist extended for all three IdPs. Implementation checklist: 15 tasks (10× P0, 4× P1, 1× P2), M4/M5. G-014: 🔴 Google Workspace by-design limitation; JIT compensating control documented; SOC 2 CC6.2 satisfied; re-evaluate M6 Q4 2026.* New database tables: `scim_groups` (RFC 7643 §8 compliant, RLS-enforced via `current_setting('app.tenant_id')::UUID`) and `scim_group_members` (atomic with session revocation per §12.7). Six SCIM Group endpoints specified with pagination (cursor, `count=100&startIndex=1`), rate-limit interaction with §3.6, and `(tenant_id, external_id)` idempotency. Group-to-role mapping: `group_role_mappings` JSONB config extension to `tenant_sso_configs`, `highest_privilege` resolution algorithm (tenant_admin > coach > member > viewer), `tenant_owner` blocked from group assignment, unmapped group fallback with `scim.group_unmapped` audit event and opt-in strict-block mode. IdP-specific: Okta (Push Groups manual config required — common onboarding gap); Entra ID (nested group flattening §15.6.2a — skips `type:"Group"` members, logs `scim.group_nested_flattened`, flat security group or P1/P2 member flattening recommended; dynamic groups treated as static); Google Workspace (SCIM Groups not supported — JIT via §11 compensating control; G-014 new gap). Nine new audit events added to DEC-030 HMAC chain taxonomy. GDPR: group `displayName` as potential Art. 9 carrier; Art. 9 group name scanner with TypeScript `ART9_GROUP_NAME_PATTERNS` regex constants mirroring §14.5 `BLOCKED_ATTRIBUTE_PATTERNS`; non-blocking flag-and-review workflow (not reject); `scim.group_name_sensitive_detected` event; group membership excluded from analytics and tenant-manager RLS; Art. 17 hard-delete of `scim_group_members` on erasure. Customer onboarding checklist extended for all three IdPs. Implementation checklist: 15 tasks (10× P0, 4× P1, 1× P2), M4/M5. G-014: 🔴 Google Workspace by-design limitation; JIT compensating control documented; SOC 2 CC6.2 satisfied; re-evaluate M6 Q4 2026.*
 
 *v0.8 additions: Section 16 — Admin Dashboard SSO & SCIM Configuration UI. Product spec and UX design for the IT admin configuration surface in the FORM admin dashboard, required before first enterprise pilot. Closes G-007 (design phase). OIDC setup wizard (5-step: IdP selection → discovery URL / manual fields → attribute mapping → sandboxed test login → go-live toggle); SAML 2.0 setup wizard (6-step: IdP selection → metadata XML upload or manual entry → SP metadata download → test login → attribute mapping → go-live); SP metadata viewer with certificate expiry countdown, dual-cert rotation button, ADFS manual-upload flag. SCIM token management: masked display, one-click rotation with 15-minute overlap window, 90-day age alert. Group-to-role mapping table UI: add/remove/edit mappings, fallback role selector, strict-mode toggle — writes to `tenant_sso_configs.group_role_mappings` JSONB. Azure AD GUID resolver (closes G-008 design): opt-in Microsoft Graph API call (client credentials, per-tenant admin consent) resolves GUIDs to display names; stored in `group_role_mappings[].resolved_display_name`; graceful fallback to GUID display if consent not granted. Session policy panel: timeout, concurrent-session cap, force-SSO toggle, re-auth gate for sensitive actions. IP allowlist UI (closes G-006 design phase): CIDR add/remove, enable toggle, lockout-risk warning; Cloudflare Worker enforcement spec included. SSO sandbox environment (closes G-011 design phase): `{slug}-staging.form.coach` endpoint, linked staging `tenant_id`, one-button "promote config to production" flow, synthetic test users, full isolation from production data. New `tenants` schema columns: `staging_tenant_id UUID REFERENCES tenants(id)`, `is_staging BOOLEAN DEFAULT false`. Graph API schema: `tenant_sso_configs.graph_app_id`, `graph_app_secret_key_ref`, `graph_tenant_id`, `graph_consent_granted_at`, `graph_last_group_sync_at`. Sixteen new audit events added to DEC-030 HMAC chain: `sso_config.wizard_started`, `sso_config.test_login_initiated`, `sso_config.test_login_passed`, `sso_config.test_login_failed`, `sso_config.activated`, `sso_config.deactivated`, `sso_config.deleted`, `sso_cert.rotation_initiated`, `sso_cert.rotation_completed`, `scim_token.generated`, `scim_token.revoked`, `sso_config.ip_allowlist_updated`, `sso_config.session_policy_updated`, `sso_config.group_mapping_updated`, `graph_api.group_resolved`, `sso_staging.config_promoted`. SOC 2 mapping: CC6.1 (SCIM token rotation + age monitoring), CC6.2 (group-role mapping UI enforces principle of least privilege), CC6.3 (IP allowlist access restriction), CC8.1 (all config changes HMAC-chained). Implementation checklist: 15 tasks (8× P0, 5× P1, 2× P2), M4/M5. G-006: 🔴 → 🟡 Partial (UI + Worker spec done; Worker implementation pending). G-007: 🔴 → 🟡 Partial (design done; implementation pending). G-008: 🔴 → 🟡 Partial (Graph API resolver designed; implementation pending). G-011: 🔴 → 🟡 Partial (staging environment designed; infrastructure pending).*
+
+---
+
+## 17. Enterprise Pilot Program: 90-Day Runbook
+
+This section specifies the end-to-end operational procedure for an enterprise pilot — from contract signature through 90-day evaluation to conversion or termination. It integrates the staging environment defined in §16.11, the SCIM provisioning flows of §3 and §15, and the audit event taxonomy of §§8.4 and 16.12.
+
+The 90-day pilot is the standard commercial onboarding path for all enterprise customers. It is defined in `docs/ENTERPRISE.md` and reflected in `pricing-enterprise.html`. This section provides the technical specification that backs the commercial process.
+
+---
+
+### 17.1 Pilot Program Overview
+
+**What a pilot is:**
+A 90-day evaluation period conducted entirely on an isolated staging tenant (`{slug}-staging.form.coach`). Real employee data may be used. The staging tenant is fully isolated from production data per §16.11. If the pilot converts, a single "Promote to Production" operation migrates SSO/SCIM config; existing users are re-linked to the new production `tenant_id` via the SCIM migration path (§17.7). If the pilot terminates, data export is offered and the staging tenant is hard-deleted per §17.8.
+
+**Pilot ownership:**
+
+| Role | Responsibility |
+|---|---|
+| `customer-success` | Primary contact, milestone reviews, conversion proposal, termination handling |
+| `enterprise-architect` | Staging tenant provisioning, SSO/SCIM technical setup, conversion protocol |
+| `security-engineer` | Audit trail verification, incident handling per INCIDENT_RESPONSE.md §R-04 (SSO down) |
+| `compliance-officer` | DPA status verification before pilot start, post-pilot data erasure sign-off |
+| Founder | Approves all pilot terminations (CC8.1 evidence) |
+
+**Pilot states (finite state machine):**
+
+```
+not_started → sso_setup → active → [converted | terminated]
+                                  ↑
+                              paused (if SLA breach pending resolution)
+```
+
+---
+
+### 17.2 Pre-Pilot Technical Qualification
+
+The following checklist must be fully complete before a staging tenant is provisioned. `customer-success` owns verification; `enterprise-architect` provides the final technical sign-off.
+
+**Customer-side prerequisites:**
+
+| # | Item | Owner | Verification |
+|---|---|---|---|
+| Q-01 | Compatible IdP confirmed (Okta, Azure AD / Entra ID, Google Workspace, or other SAML 2.0/OIDC) | Customer IT admin | IdP name + version on file |
+| Q-02 | SCIM 2.0 support confirmed — customer IdP can send `POST /Users`, `PATCH /Users`, `DELETE /Users` | Customer IT admin | SCIM version documented |
+| Q-03 | At minimum 10 pilot users with real work email addresses in the IdP identified (for SSO test) | Customer IT admin | User list (names + emails) on file via secure form |
+| Q-04 | Customer IT admin with IdP admin rights identified; available for Day 7–14 technical setup window | Customer + CS | Named contact + calendar hold confirmed |
+| Q-05 | Network: no firewall rule that would block outbound requests from `{slug}-staging.form.coach` to IdP metadata endpoints | Customer IT/security | If IP allowlist needed — provided to CS before provisioning |
+| Q-06 | DPA (`docs/GDPR_DPIA.md §5`) signed and filed | compliance-officer | DPA receipt in `compliance/dpas/{slug}-pilot.pdf` |
+| Q-07 | Enterprise pilot contract executed (SOW + Master Services Agreement or equivalent) | Founder | Contract signed copy on file |
+| Q-08 | Billing contact and billing instrument on file (post-pilot invoicing) | Customer finance | |
+| Q-09 | Data region preference confirmed: EU (default) or US | Customer + CS | Documented in `pilot_programs.data_region` |
+
+**FORM-side prerequisites (platform-engineer signs off):**
+
+| # | Item | Status |
+|---|---|---|
+| F-01 | §16.11 staging tenant infrastructure deployed to target data region | ✓ if deployed; block pilot if not |
+| F-02 | SCIM provisioning endpoint (`/scim/v2`) live and passing integration tests | ✓ required |
+| F-03 | DEC-030 HMAC audit chain writer deployed and running | ✓ required |
+| F-04 | INCIDENT_RESPONSE.md on-call rotation active (security-engineer reachable within 15 min for P0) | ✓ required before go-live (Day 14+) |
+| F-05 | `pilot_programs` and `pilot_milestone_events` tables migrated (§17.9) | ✓ required |
+
+---
+
+### 17.3 Pilot Tenant Provisioning
+
+Performed by `enterprise-architect` after all Q-01 through Q-09 prerequisites are verified.
+
+**Step 1: Provision production tenant record (placeholder)**
+
+```sql
+-- Production tenant: slug reserved but is_active = false until conversion
+INSERT INTO tenants (id, slug, display_name, plan, seat_count, data_region, is_active, is_staging)
+VALUES (
+  gen_random_uuid(),         -- production_tenant_id (reserved)
+  'acme-corp',               -- DNS-safe slug
+  'Acme Corp',
+  'enterprise',              -- plan: starter | growth | enterprise
+  500,                       -- contracted seat count
+  'eu',                      -- data_region: 'eu' | 'us'
+  false,                     -- not yet active — activated at conversion (§17.7)
+  false
+);
+```
+
+**Step 2: Provision staging tenant record**
+
+```sql
+-- Staging tenant: is_staging = true; linked to production tenant via staging_tenant_id
+INSERT INTO tenants (id, slug, display_name, plan, seat_count, data_region, is_active, is_staging)
+VALUES (
+  gen_random_uuid(),
+  'acme-corp-staging',        -- slug for {slug}-staging.form.coach
+  'Acme Corp (Pilot)',
+  'enterprise',
+  500,
+  'eu',
+  true,                       -- pilot is active from Day 0 on staging tenant
+  true
+);
+
+-- Link staging to production
+UPDATE tenants SET staging_tenant_id = <staging_tenant_id> WHERE id = <production_tenant_id>;
+```
+
+**Step 3: Create pilot_programs record**
+
+```sql
+INSERT INTO pilot_programs (
+  staging_tenant_id, production_tenant_id, status, plan,
+  seat_count_contracted, contract_value_usd,
+  customer_success_owner, data_region
+) VALUES (
+  <staging_tenant_id>, <production_tenant_id>, 'sso_setup', 'enterprise',
+  500, 36000.00,
+  'cs@form.coach', 'eu'
+);
+```
+
+**Step 4: Configure admin dashboard access**
+
+Create a `tenant_owner` user record for the primary customer IT admin on the staging tenant. This user will complete the OIDC/SAML wizard in §16.3/§16.4.
+
+Share with customer IT admin:
+- Admin dashboard URL: `https://{slug}-staging.form.coach/admin`
+- Temporary login token (magic-link, valid 24 hours)
+- SSO Configuration Guide PDF (generated from §7.2 / §7.3 for their specific IdP)
+
+Emit `pilot.tenant_provisioned` audit event (§17.10).
+
+---
+
+### 17.4 Pilot Timeline
+
+| Day | Milestone | Owner | Pass Criteria | Action if Blocked |
+|---|---|---|---|---|
+| **0** | Contract signed; staging tenant provisioned | enterprise-architect | `pilot_programs.status = 'sso_setup'`; `pilot.tenant_provisioned` event in audit log | Escalate to founder if provisioning fails > 4 hours |
+| **1–7** | FORM team completes staging environment setup: SCIM endpoint live, admin dashboard accessible, synthetic test users in place per §16.11 | platform-engineer + enterprise-architect | Test login with synthetic user passes | Extend window by 3 days max; notify customer |
+| **7–14** | Customer IT admin configures SSO in their IdP using OIDC/SAML wizard (§16.3 / §16.4); runs sandboxed test login | Customer IT admin + CS | `sso_config.test_login_passed` event in audit log for ≥ 1 real employee test account | CS joins IT admin via screen share; max 2 calendar blocks before escalation to enterprise-architect |
+| **14** | SSO go-live: `sso_config.activated` event; real users begin logging in | enterprise-architect | `sso_config.activated` in audit log; `pilot_programs.status = 'active'`; `pilot.started_at` set | Block go-live if test login not passed |
+| **14–21** | SCIM provisioning configured: IT admin generates SCIM token in §16.6, configures in IdP; first real SCIM sync completes | Customer IT admin | `scim.user_provisioned` events appearing in audit log at IdP-sync cadence | CS support call; check §3 SCIM endpoint availability |
+| **21** | SCIM first-sync validation: CS verifies user count matches IdP group; SCIM error rate < 1% | CS + enterprise-architect | `pilot_milestone_events` record with `event_type = 'scim_first_sync'`, `passed = true` | Investigate per §8.2 debugging runbook |
+| **30** | **Day 30 Milestone Review** — CS meets with customer sponsor; reviews success metrics §17.5 | CS | See §17.5 Day-30 thresholds | If any P0 metric fails → pilot `paused` state; escalation to founder |
+| **31–60** | Business-as-usual; FORM monitors per §17.6; customer trains employees; optional: coach accounts for HR/wellness team | CS monitors | Weekly health report sent; alert thresholds per §17.6 | Any P0 incident → INCIDENT_RESPONSE.md R-04 |
+| **60** | **Day 60 Milestone Review** — conversion readiness assessment | CS | See §17.5 Day-60 thresholds | If score < threshold → plan remediation sprint in remaining 30 days |
+| **85** | Conversion proposal sent by CS: pricing confirmation, MSA amendment, production tenant ID, billing start date | CS | Written proposal sent; response deadline Day 90 | If no response → follow-up at Day 88 |
+| **90** | **Day 90 Decision** — customer converts or terminates | Founder (approves) | `pilot.converted` or `pilot.terminated` audit event | No extensions beyond Day 90 without founder approval |
+
+---
+
+### 17.5 Pilot Success Metrics
+
+These metrics are computed from the staging tenant's audit log and operational data. They are reviewed at Day 30, Day 60, and Day 90.
+
+**Metric definitions:**
+
+| Metric | Definition | Day-30 Target | Day-60 Target | Day-90 (Conversion Gate) |
+|---|---|---|---|---|
+| **SSO Adoption Rate** | Distinct users with ≥1 `auth.sso_login` event in prior 7 days ÷ SCIM-provisioned active users | ≥ 50% | ≥ 70% | ≥ 80% |
+| **SCIM Sync Error Rate** | Failed SCIM operations (4xx from FORM, not IdP-side 5xx) ÷ total SCIM operations in prior 7 days | < 2% | < 1% | < 0.5% |
+| **P0 Incident Count** | Count of `P0` incidents in INCIDENT_RESPONSE.md taxonomy affecting this staging tenant during pilot | 0 (mandatory) | 0 (mandatory) | 0 (mandatory) |
+| **Admin Dashboard Satisfaction** | Structured 5-question survey sent to IT admin at Day 30; score on 1–10 scale | ≥ 7/10 | ≥ 8/10 | (informational) |
+| **Pilot NPS** | Net Promoter Score from 3-question survey to all active pilot users | (informational) | ≥ +20 | ≥ +30 |
+| **SLA Compliance** | No breach of §12.2 SLA tier for the contracted plan | 100% | 100% | 100% |
+
+**P0 metric failure protocol:**
+If P0 Incident Count ≥ 1 during the pilot, the pilot automatically enters `paused` state. The incident must be fully remediated per INCIDENT_RESPONSE.md, the post-incident review filed, and the customer sponsor briefed. Resuming active state requires explicit founder approval and customer sign-off. The 90-day clock does **not** pause during P0 incidents — this is by design to ensure the pilot reflects realistic operating conditions.
+
+**Conversion gate logic:**
+
+```
+CONVERT if:
+  SSO Adoption Rate (Day-90 window) ≥ 80%
+  AND SCIM Sync Error Rate (Day-90 window) < 0.5%
+  AND P0 Incident Count (full pilot) = 0
+  AND customer has returned signed contract amendment
+
+ESCALATE TO FOUNDER if any metric misses — founder decides whether to convert
+  with remediation commitments, extend (max 30 days, once), or terminate.
+```
+
+---
+
+### 17.6 Mid-Pilot Health Monitoring
+
+**Weekly health report (automated, sent every Monday 08:00 customer timezone):**
+
+Cloudflare Worker (`pilot-health-worker`) queries the staging tenant's audit log and constructs a brief health digest sent to the CS owner and the customer's primary IT admin contact:
+
+```
+Subject: FORM Pilot Health — Acme Corp — Week 3 of 13
+
+SSO Adoption Rate (7d):  62%  [target ≥50%]  ✓
+SCIM Sync Error Rate (7d): 0.3% [target <2%]  ✓
+Active Users (7d):       312  of 500 provisioned
+P0 Incidents (pilot):    0    ✓
+Days Remaining:          69
+```
+
+**Alert thresholds that page customer-success:**
+
+| Condition | Alert Level | Action |
+|---|---|---|
+| SCIM error rate > 5% for > 2 consecutive hours | P1 | CS notified; check §8.2 |
+| SSO adoption rate drops > 20% week-over-week | P2 | CS notified; schedule check-in call |
+| `sso_config.deactivated` event on staging tenant | P0 | CS + enterprise-architect paged immediately |
+| Certificate expiry < 30 days (§16.5 expiry monitor) | P1 | CS notified; schedule rotation |
+| Pilot deadline < 14 days and no conversion proposal sent | P2 | CS notified; trigger conversion proposal workflow |
+
+**OBSERVABILITY.md integration:**
+Pilot-specific metrics are included in the enterprise tenant OBSERVABILITY.md §18 dashboard. A dedicated "Pilot Programs" panel shows all active pilots with current adoption rates, milestone status, and days remaining.
+
+---
+
+### 17.7 Pilot-to-Production Conversion Protocol
+
+Triggered when the customer returns the signed contract amendment. Performed by `enterprise-architect`.
+
+**Legal prerequisites (compliance-officer verifies):**
+- Contract amendment signed and filed
+- DPA updated if seat count or data categories changed from pilot scope
+- Billing activation confirmed with finance
+
+**Technical steps:**
+
+**Step 1: Activate production tenant**
+```sql
+UPDATE tenants SET is_active = true, updated_at = now()
+WHERE id = <production_tenant_id>;
+```
+
+**Step 2: "Promote to Production" — SSO/SCIM config migration**
+
+Use the admin dashboard §16.11 "Promote to Production" button. This copies:
+- `tenant_sso_configs` row from staging → production tenant_id
+- `scim_group_role_mappings` JSONB from staging config
+- `group_role_mappings` JSONB from staging config
+- Certificate and key material (staging cert is valid until rotation)
+
+Generates `sso_staging.config_promoted` audit event (§16.12) on both staging and production tenants.
+
+**Step 3: SCIM user migration**
+
+Option A (preferred for Okta and Azure): **Re-provision** — IT admin updates the SCIM base URL in IdP from `https://{slug}-staging.form.coach/scim/v2` to `https://{slug}.form.coach/scim/v2`; SCIM generates `DELETE /Users` for staging users and `POST /Users` for production users. Clean state on production. Staging user data is preserved during §17.8 30-day export window.
+
+Option B (for Google Workspace JIT only): **User mapping migration** — run migration script that updates `user_sessions.tenant_id` from staging → production `tenant_id` for all users whose `email` domain matches the tenant's `oidc_hd_restriction`. Requires security-engineer sign-off on the migration SQL before execution.
+
+```sql
+-- Option B migration: reassign users from staging to production tenant
+-- REQUIRES: two-person review before execution (enterprise-architect + security-engineer)
+-- REQUIRES: pilot_programs.converted_at IS NULL before running (idempotency guard)
+UPDATE users
+SET tenant_id = <production_tenant_id>, updated_at = now()
+WHERE tenant_id = <staging_tenant_id>
+  AND email LIKE ANY(ARRAY['%@acme.com', '%@acme.co.uk']);
+
+-- Verify count before committing:
+-- SELECT count(*) FROM users WHERE tenant_id = <staging_tenant_id>;
+-- Expected: 0 after migration
+```
+
+**Step 4: SCIM token regeneration**
+
+IT admin generates a new SCIM token for the production tenant via §16.6 (the staging SCIM token is revoked). Generates `scim_token.generated` and `scim_token.revoked` audit events.
+
+**Step 5: Validate production SSO login**
+
+Run sandboxed test login on production tenant (§7.4 procedure). Confirm `sso_config.test_login_passed` event in production audit log before notifying customer that production is live.
+
+**Step 6: Update pilot_programs record**
+
+```sql
+UPDATE pilot_programs
+SET
+  status = 'converted',
+  converted_at = now(),
+  updated_at = now()
+WHERE staging_tenant_id = <staging_tenant_id>;
+
+INSERT INTO pilot_milestone_events (pilot_id, event_type, passed, metric_snapshot, recorded_by)
+VALUES (
+  <pilot_id>, 'conversion', true,
+  '{"sso_adoption_rate": 0.87, "scim_error_rate": 0.002, "p0_count": 0}'::jsonb,
+  'enterprise-architect@form.coach'
+);
+```
+
+Emit `pilot.converted` audit event (§17.10).
+
+**Step 7: Staging tenant cleanup schedule**
+
+Do NOT immediately delete the staging tenant. Set a 30-day export window per §17.8.
+
+---
+
+### 17.8 Pilot Termination and Data Handling
+
+Applies when a pilot reaches Day 90 without converting, or when the customer chooses to terminate early.
+
+**Authorization required:** Founder approval (email + `pilot.terminated` audit event) before any termination action.
+
+**Data export window (all terminations):**
+
+Within 24 hours of `pilot.terminated` event, `customer-success` sends the customer a DSAR-format export link:
+- `form-pilot-export-{slug}-{date}.zip` containing all user data in the staging tenant, formatted per §12.5 DSAR export specification
+- Export link valid for 30 days (hosted on R2, pre-signed URL)
+- Notification email to all provisioned users with `data_export_available` notification (§18 notification system)
+
+**Hard deletion (Day 30 after termination):**
+
+```sql
+-- Precondition: compliance-officer has confirmed 30-day export window has passed
+-- Precondition: no active DSAR requests pending for this tenant
+
+-- 1. Revoke all active sessions for staging tenant users
+UPDATE user_sessions
+SET revoked_at = now(), revoke_reason = 'pilot_termination'
+WHERE tenant_id = <staging_tenant_id> AND revoked_at IS NULL;
+
+-- 2. Run Art. 17 erasure worker for all users in staging tenant
+-- (handled by existing erasure worker per DATA_MODEL.md §12.3 — invoked per user)
+
+-- 3. Deactivate staging tenant
+UPDATE tenants SET is_active = false, updated_at = now()
+WHERE id = <staging_tenant_id>;
+
+-- 4. Deactivate production tenant placeholder (was never activated)
+UPDATE tenants SET is_active = false, updated_at = now()
+WHERE id = <production_tenant_id>;
+```
+
+Emit `pilot.data_deleted` audit event. File in `compliance/evidence/pilot-terminations/{slug}/`.
+
+**GDPR obligations on termination:**
+- Art. 17 erasure: user personal data hard-deleted within 30 days of termination (or sooner on individual request)
+- Art. 20 portability: export offered as described above
+- DPA termination notice sent to customer (`compliance-officer` prepares; founder signs)
+- Sub-processor Anthropic notified if Victor coaching turns were generated during pilot (Anthropic data processing notification per INCIDENT_RESPONSE.md §11)
+
+---
+
+### 17.9 Database Schema
+
+#### Table: `pilot_programs`
+
+```sql
+CREATE TABLE pilot_programs (
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  staging_tenant_id      UUID NOT NULL REFERENCES tenants(id),
+  production_tenant_id   UUID NOT NULL REFERENCES tenants(id),
+  status                 TEXT NOT NULL DEFAULT 'not_started'
+    CHECK (status IN ('not_started', 'sso_setup', 'active', 'paused', 'converted', 'terminated')),
+  plan                   TEXT NOT NULL CHECK (plan IN ('starter', 'growth', 'enterprise')),
+  seat_count_contracted  INT NOT NULL CHECK (seat_count_contracted >= 10),
+  contract_value_usd     NUMERIC(12,2) NOT NULL CHECK (contract_value_usd > 0),
+  data_region            TEXT NOT NULL DEFAULT 'eu' CHECK (data_region IN ('eu', 'us')),
+  pilot_started_at       TIMESTAMPTZ,
+  pilot_deadline_at      TIMESTAMPTZ GENERATED ALWAYS AS (pilot_started_at + INTERVAL '90 days') STORED,
+  converted_at           TIMESTAMPTZ,
+  terminated_at          TIMESTAMPTZ,
+  termination_reason     TEXT CHECK (termination_reason IN (
+    'customer_choice', 'sla_breach', 'non_payment', 'security_finding', 'no_response'
+  )),
+  day30_review_at        TIMESTAMPTZ,
+  day30_review_passed    BOOLEAN,
+  day60_review_at        TIMESTAMPTZ,
+  day60_review_passed    BOOLEAN,
+  customer_success_owner TEXT NOT NULL,
+  notes                  TEXT,
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT pilot_dates_valid CHECK (
+    (pilot_started_at IS NULL) OR
+    (converted_at IS NULL OR converted_at >= pilot_started_at) AND
+    (terminated_at IS NULL OR terminated_at >= pilot_started_at)
+  ),
+  CONSTRAINT pilot_terminal_exclusive CHECK (
+    NOT (converted_at IS NOT NULL AND terminated_at IS NOT NULL)
+  )
+);
+
+CREATE UNIQUE INDEX pilot_programs_staging_uniq ON pilot_programs (staging_tenant_id);
+CREATE INDEX pilot_programs_status_idx ON pilot_programs (status) WHERE status IN ('sso_setup', 'active', 'paused');
+CREATE INDEX pilot_programs_deadline_idx ON pilot_programs (pilot_deadline_at) WHERE status = 'active';
+```
+
+**RLS policies:**
+
+```sql
+ALTER TABLE pilot_programs ENABLE ROW LEVEL SECURITY;
+
+-- form_admin: full access (internal ops)
+CREATE POLICY pilot_programs_form_admin ON pilot_programs
+  FOR ALL TO form_admin USING (true) WITH CHECK (true);
+
+-- form_system: full access (worker reads)
+CREATE POLICY pilot_programs_form_system ON pilot_programs
+  FOR SELECT TO form_system USING (true);
+
+-- No tenant_member access — pilot operational data is internal-only
+```
+
+#### Table: `pilot_milestone_events`
+
+```sql
+CREATE TABLE pilot_milestone_events (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pilot_id         UUID NOT NULL REFERENCES pilot_programs(id) ON DELETE RESTRICT,
+  event_type       TEXT NOT NULL CHECK (event_type IN (
+    'tenant_provisioned',
+    'sso_go_live',
+    'scim_first_sync',
+    'day30_review',
+    'day60_review',
+    'day90_decision',
+    'conversion',
+    'termination',
+    'sla_breach',
+    'paused',
+    'resumed'
+  )),
+  occurred_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  passed           BOOLEAN,
+  metric_snapshot  JSONB,  -- JSON snapshot of §17.5 metrics at milestone time
+  notes            TEXT,
+  recorded_by      TEXT NOT NULL  -- form_admin email; not nullable for audit accountability
+);
+
+CREATE INDEX pilot_milestones_pilot_id_idx ON pilot_milestone_events (pilot_id, occurred_at DESC);
+
+ALTER TABLE pilot_milestone_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY pilot_milestones_form_admin ON pilot_milestone_events
+  FOR ALL TO form_admin USING (true) WITH CHECK (true);
+
+CREATE POLICY pilot_milestones_form_system ON pilot_milestone_events
+  FOR SELECT TO form_system USING (true);
+```
+
+**`metric_snapshot` schema (informational — validated at application layer by Zod):**
+
+```typescript
+interface PilotMetricSnapshot {
+  sso_adoption_rate:   number;   // 0.0–1.0
+  scim_error_rate:     number;   // 0.0–1.0
+  p0_incident_count:   number;   // integer
+  active_users_7d:     number;   // integer
+  provisioned_users:   number;   // integer
+  admin_sat_score:     number | null;   // 1–10 or null if not yet surveyed
+  pilot_nps:           number | null;   // -100 to +100 or null
+}
+```
+
+---
+
+### 17.10 Audit Events
+
+All events use HMAC-SHA256 chaining per DEC-030. Events are written on the `staging_tenant_id` tenant's audit chain unless noted otherwise.
+
+| Event type | Trigger | Key metadata fields | Written on tenant |
+|---|---|---|---|
+| `pilot.tenant_provisioned` | Staging + production tenant records created (§17.3) | `staging_tenant_id`, `production_tenant_id`, `plan`, `seat_count_contracted`, `contract_value_usd`, `data_region` | Both tenants |
+| `pilot.sso_setup_started` | IT admin first accesses admin dashboard on staging tenant | `pilot_id`, `idp_type` (okta\|entra\|google\|other), `protocol` (oidc\|saml) | Staging tenant |
+| `pilot.started` | `sso_config.activated` on staging tenant + `pilot_programs.status` set to `'active'` | `pilot_id`, `pilot_started_at`, `pilot_deadline_at` | Staging tenant |
+| `pilot.milestone_review` | Day 30 or Day 60 review completed | `pilot_id`, `milestone` (day30\|day60), `passed`, `metric_snapshot` (JSON) | Staging tenant |
+| `pilot.paused` | P0 incident triggered pause | `pilot_id`, `reason`, `incident_id` (from INCIDENT_RESPONSE.md) | Staging tenant |
+| `pilot.resumed` | Founder approves resumption after pause | `pilot_id`, `approved_by` (founder email), `notes` | Staging tenant |
+| `pilot.converted` | Contract amendment signed; production tenant activated | `pilot_id`, `production_tenant_id`, `converted_at`, `final_metrics` (JSON snapshot) | Both tenants |
+| `pilot.terminated` | Pilot not converted at Day 90 or early termination | `pilot_id`, `termination_reason`, `authorized_by` (founder email) | Both tenants |
+| `pilot.data_deleted` | 30-day export window elapsed; staging tenant hard-deleted per §17.8 | `pilot_id`, `staging_tenant_id`, `users_deleted_count`, `audit_events_retained` | Production tenant (staging deleted) |
+
+All nine events are added to the DEC-030 HMAC chain taxonomy (append-only; requires DECISION_LOG entry per DATA_MODEL.md §18.2 note on adding enum values).
+
+---
+
+### 17.11 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | How §17 Satisfies It |
+|---|---|
+| **CC3.2 — Risk assessment** | The Pre-Pilot Technical Qualification checklist (§17.2) is a documented risk assessment performed before any customer data enters the FORM platform. Q-06 (DPA) and Q-07 (contract) ensure legal risk is addressed. Q-04 (F-04 on-call) ensures incident response capacity is in place before real users are admitted. The qualification sign-off is `pilot.tenant_provisioned` — an HMAC-chained event that creates an auditable record of when qualification was completed. |
+| **CC6.2 — Access controls prior to issuing credentials** | No user credentials (SCIM-provisioned accounts or SSO sessions) are issued to real employees until after `sso_config.test_login_passed` event (Day 14 gate). The `pilot.started` event marks the first moment real-employee SSO sessions are permitted. Auditors can verify that access issuance followed the documented procedure by checking the event ordering in the audit chain. |
+| **CC7.2 — System monitoring** | The weekly health report (§17.6) and the `pilot-health-worker` monitoring constitute documented, automated system monitoring for the pilot tenant. Alert thresholds and escalation paths are specified. Panel integration with OBSERVABILITY.md §18 dashboard provides auditor-accessible monitoring evidence. |
+| **CC8.1 — Change management** | The conversion protocol (§17.7) is a documented change management procedure for the production activation event — arguably the highest-impact configuration change in the enterprise lifecycle. The "Promote to Production" button generates `sso_staging.config_promoted` (§16.12); the migration SQL requires two-person review; `pilot.converted` event records founder awareness. Termination requires founder approval (`pilot.terminated` metadata: `authorized_by`). Both change paths are auditable via the HMAC chain. |
+| **CC9.2 — Vendor/customer management** | The termination protocol (§17.8) documents FORM's obligations to customers at relationship end: data export within 24h, DSAR-format portability, Art. 17 erasure within 30 days, DPA termination notice. `pilot.data_deleted` event provides evidence that obligations were completed. This satisfies the "vendor/customer lifecycle management" component of CC9.2. |
+| **A1.1 — Availability commitments** | SLA Compliance is a named success metric (§17.5) with a 100% target. Any SLA breach triggers `pilot.paused` and INCIDENT_RESPONSE.md escalation. The audit trail of `pilot.paused` / `pilot.resumed` events, combined with the INCIDENT_RESPONSE.md post-incident review, constitutes the evidence record for availability commitment management during the pilot. |
+
+**Auditor evidence artefacts:**
+- `audit_log` events of type `pilot.*` for the pilot period, queryable by `staging_tenant_id` or `production_tenant_id`
+- `pilot_milestone_events` table export: rows for all milestones including `metric_snapshot` JSON
+- Pre-Pilot Qualification checklist (Q-01 through Q-09): filed in `compliance/evidence/pilots/{slug}/qualification.md`
+- DPA receipt: `compliance/dpas/{slug}-pilot.pdf`
+- Conversion SQL review artifact (Option B only): two-person sign-off logged in `compliance/evidence/pilots/{slug}/conversion-sql-review.md`
+
+---
+
+### 17.12 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Write `migrations/YYYYMMDD_pilot_programs.sql` — `pilot_programs` table DDL, constraints, indexes, RLS policies | platform-engineer | **P0** | M4 |
+| Write `migrations/YYYYMMDD_pilot_milestone_events.sql` — `pilot_milestone_events` table DDL, indexes, RLS policies | platform-engineer | **P0** | M4 |
+| Implement `pilot-health-worker` Cloudflare Worker: cron Monday 06:00 UTC; compute §17.5 metrics from audit log for all `active` pilot tenants; insert `metric_snapshot` JSONB into `pilot_milestone_events`; send weekly health digest via SES to `customer_success_owner` + IT admin contact | platform-engineer + devops-lead | **P0** | M4 |
+| Implement alert thresholds in `pilot-health-worker`: SCIM error rate > 5% for 2h → page CS (PagerDuty); SSO adoption drop > 20% WoW → Slack `#cs-alerts`; `sso_config.deactivated` on pilot tenant → P0 page | devops-lead | **P0** | M4 |
+| Build "Pilot Programs" panel in Metabase admin dashboard: active pilots list, adoption rates, milestone status, days remaining, P0 count | data-engineer | **P1** | M4 |
+| Wire all 9 pilot audit events (§17.10) to DEC-030 HMAC chain writer; validate chain integrity in staging | platform-engineer + security-engineer | **P0** | M4 |
+| Write `compliance/evidence/pilots/TEMPLATE-qualification.md` — pre-pilot qualification checklist template (Q-01 through Q-09) for CS to fill out per customer | compliance-officer | **P1** | M4 |
+| Add `pilot_programs.pilot_deadline_at` alert: 14 days before deadline + no conversion proposal → Slack `#cs-team` (Cloudflare Worker cron, daily 08:00 UTC) | devops-lead | **P1** | M4 |
+| Implement DSAR-format export for staging tenant termination (§17.8): extend existing DSAR export job to accept `tenant_id` scope; generate `form-pilot-export-{slug}-{date}.zip`; upload to R2; generate 30-day pre-signed URL | platform-engineer | **P1** | M4 |
+| Implement two-person SQL review protocol for Option B user migration (§17.7): GitHub PR template with required reviewers `enterprise-architect` + `security-engineer`; merge gate requires both approvals | enterprise-architect + security-engineer | **P1** | M5 |
+| Add `pilot_programs.status` lifecycle enforcement at API layer: state machine validation (not_started → sso_setup → active; no skipping states); unauthorized state transitions return `422 Unprocessable Entity` | platform-engineer | **P0** | M4 |
+| QA: end-to-end pilot lifecycle test against Okta dev tenant — provisioning → SSO go-live → Day 30 metric computation → conversion promotion → staging cleanup | qa-lead + enterprise-architect | **P0** | M5 |
+| Add `pilot_programs` and `pilot_milestone_events` tables to Art. 17 erasure scope: confirm `pilot.data_deleted` event fires after staging tenant deletion | platform-engineer + compliance-officer | **P1** | M4 |
+
+**Gap status updates:**
+**G-011 status update:** 🟡 Partial → 🟡 Partial. §17 adds the operational runbook layer on top of §16.11's infrastructure design. Infrastructure provisioning (platform-engineer M4) remains the blocking item for G-011 to close to 🟢.
+
+---
+
+*v0.9 additions: Section 17 — Enterprise Pilot Program: 90-Day Runbook. Operational protocol for the full enterprise pilot lifecycle from contract signature through 90-day evaluation to conversion or termination, complementing the Admin Dashboard UI spec (§16) and Staging Environment design (§16.11). Pre-Pilot Technical Qualification: 9-item customer checklist (Q-01 compatible IdP, Q-02 SCIM 2.0, Q-03 pilot users, Q-04 IT admin availability, Q-05 network access, Q-06 DPA, Q-07 contract, Q-08 billing, Q-09 data region) and 5-item FORM platform prerequisite check. Pilot tenant provisioning: SQL walkthrough for staging + production tenant records, `pilot_programs` insert, and IT admin dashboard access setup. 90-day milestone timeline: 12 milestones from Day 0 provisioning through Day 90 conversion/termination decision with pass criteria and escalation paths for each. Pilot success metrics: 6 named metrics (SSO adoption rate, SCIM sync error rate, P0 incident count, admin dashboard satisfaction, Pilot NPS, SLA compliance) with Day-30/Day-60/Day-90 thresholds and binary conversion gate logic. Mid-pilot health monitoring: weekly health digest Worker (Monday 06:00 UTC), 5 alert thresholds, OBSERVABILITY.md §18 integration. Pilot-to-production conversion: 7-step protocol including production tenant activation, "Promote to Production" button (§16.11), SCIM migration options (Option A re-provision vs Option B user-ID mapping with two-person SQL review gate), SCIM token regeneration, and staging cleanup schedule. Termination and data handling: 24h DSAR-format export link, 30-day export window, Art. 17 erasure sequence, DPA termination, sub-processor notification. Database: `pilot_programs` table (state machine with generated `pilot_deadline_at` column, terminal state exclusivity constraint, RLS: form_admin full / form_system read / no tenant_member access) and `pilot_milestone_events` table (typed event_type enum, `metric_snapshot` JSONB with TypeScript interface definition). Nine new DEC-030 HMAC-chained audit events: `pilot.tenant_provisioned`, `pilot.sso_setup_started`, `pilot.started`, `pilot.milestone_review`, `pilot.paused`, `pilot.resumed`, `pilot.converted`, `pilot.terminated`, `pilot.data_deleted`. SOC 2 mapping: CC3.2 (risk assessment at qualification), CC6.2 (access issuance gate at Day 14), CC7.2 (weekly health monitoring), CC8.1 (conversion + termination change management with founder approval), CC9.2 (customer lifecycle data obligations), A1.1 (SLA compliance as named metric). Implementation checklist: 13 tasks (7× P0, 5× P1, 1× P0 QA), M4/M5. G-011: remains 🟡 Partial — §17 adds the operational runbook layer; infrastructure provisioning is the remaining blocker.*

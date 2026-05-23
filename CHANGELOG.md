@@ -6,6 +6,17 @@
 
 ---
 
+## [1.9.12] — 2026-05-23
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md` §17 — Enterprise Pilot Program: 90-Day Runbook (v0.8→v0.9). Operational protocol for the full pilot lifecycle from contract signature through conversion or termination. Pre-Pilot Technical Qualification: 9-item customer checklist (compatible IdP, SCIM 2.0, pilot users, IT admin contact, network access, DPA, contract, billing, data region) + 5-item FORM platform prerequisite check. Pilot tenant provisioning: SQL walkthrough for staging + production tenant records, `pilot_programs` INSERT, IT admin dashboard access. 90-day milestone timeline: 12 milestones (Day 0 provisioning → Day 14 SSO go-live → Day 21 SCIM first-sync → Day 30/60 reviews → Day 90 decision) with pass criteria and escalation paths. Pilot success metrics: 6 named metrics (SSO adoption rate ≥80% at Day 90, SCIM sync error rate <0.5%, P0 incidents = 0, admin satisfaction, NPS, SLA compliance) with binary conversion gate logic. Mid-pilot health monitoring: weekly digest Worker (Monday 06:00 UTC), 5 alert thresholds, OBSERVABILITY.md §18 dashboard integration. Pilot-to-production conversion: 7-step protocol including production tenant activation, "Promote to Production" (§16.11), SCIM Option A re-provision vs Option B user-ID mapping migration with two-person SQL review gate. Termination data handling: 24h DSAR-format export, 30-day window, Art. 17 erasure, DPA termination, sub-processor notification. Database: `pilot_programs` table (state machine FSM, generated `pilot_deadline_at`, terminal state exclusivity constraint, RLS: form_admin/form_system only) + `pilot_milestone_events` (typed enum, `metric_snapshot` JSONB, TypeScript interface). 9 new DEC-030 HMAC-chained audit events: `pilot.tenant_provisioned`, `pilot.sso_setup_started`, `pilot.started`, `pilot.milestone_review`, `pilot.paused`, `pilot.resumed`, `pilot.converted`, `pilot.terminated`, `pilot.data_deleted`. SOC 2 mapping: CC3.2, CC6.2, CC7.2, CC8.1, CC9.2, A1.1. Implementation checklist: 13 tasks (7× P0, 5× P1, 1× P0 QA), M4/M5. G-011: 🟡 Partial (operational runbook layer added; infrastructure provisioning remains blocker).
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — ToC updated §17; v0.8→v0.9; 4223→4746 lines.
+- `VERSION` → 1.9.12
+
+---
+
 ## [1.9.11] — 2026-05-23
 
 ### Added
