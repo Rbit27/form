@@ -3510,6 +3510,386 @@ Identified gaps to address before next observation period: [list or "none"]
 
 ---
 
+### R-13: Law Enforcement / Government Data Request
+
+**Definition:** A request from any government body, law enforcement agency, national security authority, court, regulatory body, or supervisory authority — domestic or foreign — seeking disclosure of FORM user data, metadata, or system records.
+
+This runbook is architecturally distinct from all prior runbooks: there is no attacker to contain and no breach to remediate. The triggering event is a legal instrument demanding disclosure. FORM will comply only with lawful, compulsory process and only to the minimum extent required. This runbook operationalizes `PRIVACY_POLICY.md §6.4`, DEC-030, GDPR Art. 48, and ENTERPRISE.md no-go customer policy (government backdoors).
+
+**No voluntary disclosure.** FORM does not produce user data in response to informal requests, tips, phone calls, or non-compulsory letters — regardless of agency or claimed urgency. Only compulsory legal process (subpoena, court order, search warrant, administrative order, GDPR supervisory authority binding decision) triggers this runbook. Informal requests receive a written response directing the agency to obtain compulsory process.
+
+---
+
+#### R-13.1 Request Type Taxonomy
+
+| Type | Jurisdiction | Compulsory? | Examples |
+|---|---|---|---|
+| **Criminal subpoena** | Any | Yes — court-issued | Grand jury subpoena, criminal court order, police production order |
+| **Civil subpoena** | Any | Yes — court-issued | Litigation discovery, arbitration subpoena |
+| **Search warrant** | Any | Yes — search compelled | Criminal warrant served by law enforcement |
+| **National Security Letter (NSL)** | US | Yes — FBI-issued; gag order standard | Terrorism/espionage financial + communication records |
+| **FISA court order / Section 215** | US | Yes — secret court; gag order standard | Foreign intelligence surveillance order |
+| **Foreign intelligence order** | Non-US states | Yes — depends on jurisdiction | EU member-state intelligence agency orders |
+| **EU DPA supervisory authority demand** | EU | Yes — binding under GDPR Art. 58 | Regulatory investigation, cross-border enforcement |
+| **EU Art. 48 cross-border court order** | Non-EU → EU data | Conditionally — requires treaty basis | US DOJ order for EU-resident user data |
+| **Informal / voluntary request** | Any | No | Phone call, email tip, unserved "request", courtesy notice |
+| **Emergency informal request (life safety)** | Any | No — special handling | Claimed imminent harm; see R-13.3 constraint #5 |
+
+---
+
+#### R-13.2 Severity Matrix
+
+| Severity | Trigger | Rationale |
+|---|---|---|
+| **P0** | NSL or FISA order received | Gag order likely; specialized counsel required before any acknowledgment; maximum sensitivity |
+| **P0** | Foreign intelligence order from state security service | High risk of coerced disclosure; Art. 48 GDPR likely implicated |
+| **P0** | Any request covering Art. 9 health / biometric data for ≥ 10 users | Special-category data; Art. 34 data-subject notification likely required independently |
+| **P0** | Any request covering an enterprise tenant's user base | Enterprise DPA triggered; IT admin notification required; may constitute enterprise SLA event |
+| **P1** | Criminal court order or search warrant | Compulsory; legal review within 4 hours; likely compliance after narrow-scope review |
+| **P1** | GDPR supervisory authority investigation demand (GDPR Art. 58) | Regulatory consequence if ignored; 10-business-day response window typical |
+| **P2** | Civil subpoena (litigation) | Court-issued but lower urgency than criminal; 14-day response window typical |
+| **P2** | Voluntary request accompanied by expressed intent to obtain process | Log and prepare; no disclosure until process received |
+| **P3** | Informal voluntary request with no legal instrument | Decline in writing; no disclosure |
+
+---
+
+#### R-13.3 Unique Response Constraints
+
+**Constraint 1 — Founder-only authority.**
+No team member may initiate a disclosure, acknowledge a request to a third party, or waive any legal right without founder sign-off. This applies regardless of request type, jurisdiction, or claimed urgency. If the founder is unreachable for more than 4 hours on a P0 request, the designated backup is compliance-officer with mandatory founder briefing within 1 hour of regaining contact.
+
+**Constraint 2 — Legal counsel before any action.**
+FORM must engage outside legal counsel (EU-qualified for GDPR matters; US-qualified for NSL/FISA) before responding to any compulsory process. For P0 NSL/FISA: retain counsel before acknowledging receipt to the agency. For P1/P2: retain counsel within 24 hours of receipt. Counsel reviews (a) validity of the legal instrument, (b) scope minimization opportunities, (c) notification obligations, (d) grounds to challenge.
+
+**Constraint 3 — Narrow scope enforcement.**
+FORM will not produce data beyond what the legal instrument explicitly compels. If a request is overbroad (see R-13.6), counsel files a motion to quash or narrow before any partial disclosure. Standard scope questions: Does the order name specific users? A specific time range? Specific data categories? FORM produces a minimum-necessary export scoped to named users, named date range, and named data types only.
+
+**Constraint 4 — No Art. 9 voluntary production.**
+Workout performance data, coaching session content, form scores, HR data, biometric keypoints, health profiles — are never produced voluntarily. For compulsory process: these require explicit Art. 9 data category acknowledgment in the instrument (not just "all records pertaining to user X") and a higher legal standard in most jurisdictions. Counsel must confirm Art. 9 production is specifically required by the instrument.
+
+**Constraint 5 — Emergency informal requests.**
+If a law enforcement officer claims imminent risk of death or serious physical harm and requests voluntary disclosure without a court order ("emergency exception"), the response is: (a) take the contact details and claimed basis in writing, (b) call the founder within 10 minutes, (c) counsel assesses within 30 minutes whether voluntary disclosure is legally defensible and warranted, (d) if produced: absolute minimum (e.g., last known GPS only), logged in full with DEC-030 event `legal.emergency_voluntary_disclosure`. This exception is rare and requires documented founder decision.
+
+**Constraint 6 — GDPR Art. 48 for non-EU orders on EU data.**
+FORM stores EU user data in Supabase EU region (`eu-west-1`). A non-EU court order (e.g., US DOJ subpoena) requiring production of EU-resident user data must satisfy GDPR Art. 48: the order must be based on an international agreement (MLAT, adequacy decision) in force between the EU and the requesting country. Without a treaty basis, FORM can only comply if the order is narrowly construed as necessary to avoid a disproportionate sanction under national law — and only after DPA notification in the EU member state where the data subject resides. Counsel must assess Art. 48 compliance before any cross-border production. See R-13.10 for detailed GDPR Art. 48 analysis.
+
+**Constraint 7 — No-go customer no-backdoor reaffirmation.**
+ENTERPRISE.md and DEC-030 explicitly prohibit providing government backdoor access, insurance risk-scoring, or proactive cooperation beyond legal compulsion. This constraint survives any change in team or external pressure. Any request to install surveillance software, provide ongoing access credentials, or create a programmatic monitoring hook is refused unconditionally and reported to legal counsel immediately.
+
+**Constraint 8 — Restricted incident channel.**
+Open channel `#inc-YYYYMMDD-legal` — access: founder + compliance-officer + legal counsel only. Not security-engineer unless specific technical data extraction is required. Reason: legal privilege considerations; minimizing internal knowledge of NSL/FISA gag orders; limiting who can inadvertently disclose the existence of the order.
+
+---
+
+#### R-13.4 Immediate Actions (T+0 to T+4h)
+
+**T+0: Receive and log.**
+1. The person who receives the request (email, physical mail, phone call, in-person service) notifies the founder and compliance-officer immediately via Signal direct message — not Slack.
+2. Photograph or scan the instrument (including envelope, delivery metadata). Store in `compliance/evidence/legal-requests/<YYYY-MM-DD-slug>/received/`.
+3. Record exact timestamp of receipt, delivery method, serving agency name, agency contact information, stated deadline.
+4. Do NOT acknowledge receipt to the agency until legal counsel is retained (exception: a formal signed acceptance of service if required by the instrument).
+5. Do NOT discuss the request with anyone outside the restricted channel.
+6. Emit DEC-030 `legal.request_received` event immediately (see R-13.11).
+
+**T+0 to T+1h: Classify and retain counsel.**
+7. Founder classifies severity using R-13.2 matrix.
+8. For NSL/FISA (P0): engage NSL-experienced US counsel immediately. Do not log the existence of the order in any system that is accessible to staff without explicit legal advice — gag order may prohibit even internal acknowledgment.
+9. For all other requests: compliance-officer opens the restricted channel `#inc-YYYYMMDD-legal`. Retain outside counsel within 2 hours (P0/P1) or 24 hours (P2).
+10. Trigger enterprise tenant notification assessment (R-13.9) within 30 minutes of receipt if the request names enterprise tenant users.
+
+**T+1h to T+4h: Initial legal assessment.**
+11. Provide counsel with: the instrument, FORM's data architecture summary (DATA_MODEL.md §4.1 tenant isolation, §5 data classification), applicable enterprise DPAs, current GDPR Data Processing Agreement.
+12. Counsel provides initial assessment:
+    - Is the instrument legally valid (properly issued, within jurisdiction, served correctly)?
+    - Is it overbroad? Grounds to challenge or narrow?
+    - Is user notification required or prohibited?
+    - Does GDPR Art. 48 or Art. 9 special-category analysis apply?
+    - Response deadline and next steps.
+13. Founder makes initial compliance/challenge decision based on counsel's advice.
+
+---
+
+#### R-13.5 Legal Review Process
+
+| Step | Actor | Timing | Output |
+|---|---|---|---|
+| 1. Instrument validity check | Counsel | T+4h | Written memo: valid / defective / service error |
+| 2. Scope analysis | Counsel + compliance-officer | T+8h | Named users, date range, data categories required by instrument |
+| 3. Over-breadth assessment | Counsel | T+12h | Challenge recommendation or narrowing letter drafted |
+| 4. GDPR Art. 48 / Art. 9 analysis | Counsel (EU-qualified) | T+12h | Art. 48 treaty basis assessment; Art. 9 production checklist |
+| 5. Notification obligations | Counsel | T+12h | Can we notify users? Must we notify DPA? Timeline? |
+| 6. Enterprise DPA review | Compliance-officer | T+8h | Does any enterprise DPA require tenant notification before compliance? |
+| 7. Disclosure decision | Founder (+ counsel sign-off) | T+24h (P1/P2); T+4h (P0 warrant) | Comply / challenge / partial comply with reservation |
+| 8. Data extraction | Platform-engineer (read-only query; scoped to named users/range) | After founder + counsel sign-off | Minimal data extract per scope analysis |
+| 9. Legal hold activation | Compliance-officer | T+4h | `legal_hold_active = true` flag in `tenants` table; no deletion for affected records |
+| 10. Disclosure execution | Compliance-officer + counsel | Per court deadline | Data package produced; production letter signed by counsel |
+| 11. Post-disclosure | Compliance-officer | Within 5 business days | Evidence package finalized; transparency tally updated |
+
+---
+
+#### R-13.6 Challenging Overbroad Requests
+
+FORM challenges requests that are:
+- **Temporally unlimited** (no date range specified) — file for temporal narrowing
+- **User-class based** ("all users who did X") — challenge: US 4th Amendment particularity; EU GDPR proportionality; require individual identification
+- **Art. 9 health data without explicit authorization** — challenge on grounds that production requires a higher legal standard (explicit court finding) not present in a general subpoena
+- **Cross-border (Art. 48) without treaty basis** — file GDPR Art. 48 objection; notify relevant EU DPA before complying; seek stay pending DPA guidance
+- **Enterprise-wide** (covering all users of a named tenant) — challenge proportionality; produce only named individuals
+
+**Challenge process:**
+1. Counsel files motion to quash or motion to modify (civil court) or challenges via counsel letter (administrative orders).
+2. Do not delay compliance with a valid order while a challenge is pending unless a court has granted a stay — continue evidence preservation and legal hold activation.
+3. If challenge is denied: comply with narrowed scope if any scope narrowing was achieved; comply in full otherwise.
+4. Log challenge outcome in the incident record.
+
+---
+
+#### R-13.7 Scope Minimization: What to Produce
+
+**Permitted for production (with valid court order + counsel sign-off):**
+
+| Data Category | Condition for Production |
+|---|---|
+| User ID (UUID) | Named user, specific request |
+| Account creation timestamp | Named user, specific request |
+| Last login timestamp | Named user, specific request |
+| Email address | Named user, specific request; counsel confirms email in scope |
+| Subscription status and plan | Named user, specific request |
+| IP address logs (if retained) | Named user, named date range; GDPR Art. 6(1)(c) basis |
+| SSO login audit events | Named user, named date range |
+| Push notification delivery logs | Named user, named date range |
+
+**Requires higher legal standard (explicit court order + counsel Art. 9 confirmation):**
+
+| Data Category | Additional Requirements |
+|---|---|
+| Workout logs and form scores | Art. 9 explicit reference in instrument |
+| Coaching session content (`coaching_turns`) | Art. 9; plus production creates clinical harm risk — clinical-safety review required |
+| Health profile data | Art. 9; explicit finding of necessity |
+| Meal logs | Art. 9 |
+| Wearable biometrics (HRV, sleep, HR) | Art. 9 |
+
+**Never produced under any legal process:**
+
+| Data Category | Rationale |
+|---|---|
+| CV session `keypoints_enc` raw data | On-device only; FORM cannot decrypt per architecture (on-device key); production is architecturally impossible |
+| `cv_session_fleet_stats` (k-anonymity aggregates) | Aggregate only; cannot be de-aggregated to named individual |
+| Other users' data not named in the instrument | No legal basis; FORM does not volunteer additional users |
+| HR aggregate dashboards | FORM holds privacy floor: HR aggregates cannot be attributed to individuals; production of aggregate only possible if no individual inference is possible |
+
+---
+
+#### R-13.8 User Notification Protocol
+
+**Default:** FORM notifies the named user(s) before complying with legal process unless legally prohibited from doing so.
+
+**Notification timing:** As soon as disclosure decision is made and before data is produced (except where a court order expressly prohibits prior notice).
+
+**Prohibited notification (gag order or court order):**
+- NSL: Federal gag order standard; counsel advises on scope of prohibition.
+- FISA: Gag standard; counsel advises.
+- Some criminal court orders include explicit prior-notice prohibitions.
+- Where notification is prohibited, FORM updates its public **Transparency Report** (see R-13.12) with aggregate statistics without identifying the specific order.
+
+**User notification template (where permitted):**
+
+> Subject: Legal process notice — FORM account
+>
+> We are writing to inform you that FORM has received [a court order / a subpoena / a legal demand] requiring us to produce certain information about your account. We believe in transparency and have a policy of notifying affected users when legally permitted to do so.
+>
+> What was requested: [description of data categories scoped to the instrument — not more].
+> What we are producing: [description of minimal data set after scope minimization].
+> When: [date of planned disclosure].
+>
+> You have the right to seek legal advice and, if you believe the order is unlawful, to seek a court order preventing or limiting production. We cannot delay production past [court deadline] without a court-issued stay.
+>
+> Questions: legal@form.coach
+
+**GDPR Art. 34 co-trigger:** If the request covers Art. 9 health data and the legal production would constitute a "high risk" disclosure to the data subject, compliance-officer assesses whether an independent Art. 34 notification obligation is triggered under GDPR (separate from the user notification above). Counsel advises.
+
+---
+
+#### R-13.9 Enterprise Tenant Notification
+
+**When triggered:** Any legal request naming users who belong to an enterprise tenant, or any request naming the tenant organization directly.
+
+**Who notifies:** compliance-officer (never platform-engineer or CSM without founder approval).
+
+**Timing:** Within 30 minutes of P0 classification; within 4 hours of P1 classification; within 24 hours of P2 classification.
+
+**What to disclose:** Only what the enterprise DPA requires FORM to disclose. Standard DPA provisions require notification if:
+- User data within the tenant's contracted scope is subject to a legal demand.
+- Production may affect the tenant's own GDPR obligations (e.g., the tenant is the data controller for its users).
+
+**What NOT to disclose:** The specific text of NSL or FISA orders (gag order applies). The identity of the agency or investigators beyond what is publicly available in an unsealed court order. Any information that counsel advises must be kept confidential.
+
+**Template T-01: Initial Enterprise Tenant Legal Request Notification**
+
+> Subject: Legal process affecting your FORM account — confidential
+>
+> [Tenant admin name],
+>
+> FORM has received a legal demand from [a court / a regulatory authority / [agency name if unsealed]] that may require us to produce certain account records related to [user(s) within your organization / your organization's account].
+>
+> We are in the process of legal review and will only produce data that we are legally required to produce. We are committed to minimizing scope and will challenge any overbroad aspects of the request.
+>
+> At this stage: No data has been disclosed. We are retaining legal counsel.
+>
+> We are informing you because your DPA with FORM requires us to provide notice when legally permitted. Depending on your role as data controller, you may have independent obligations to assess and act on this notification.
+>
+> We will provide an update within [48 hours / prior to any disclosure].
+>
+> Please direct any questions to your FORM Customer Lead or legal@form.coach. Please treat this communication as confidential.
+
+**Note:** If counsel advises that enterprise notification is legally prohibited (e.g., gag order covers tenant identity), do NOT send this template. Log the prohibition decision in the incident record with counsel's written guidance.
+
+---
+
+#### R-13.10 GDPR Art. 48 Analysis (Non-EU Court Orders on EU Data)
+
+FORM's user data for EU-resident users is stored in Supabase `eu-west-1` (Frankfurt region). GDPR Art. 48 governs whether FORM can comply with a non-EU court order or governmental request requiring transfer of EU-resident data to a non-EU jurisdiction.
+
+**Art. 48 rule:** Judgment or court order of a third country is only enforceable and recognised if based on an international agreement (e.g., Mutual Legal Assistance Treaty — MLAT) in force between the third country and the EU or a Member State.
+
+**MLAT status (as of drafting):**
+
+| Requesting Country | MLAT with EU in force? | Notes |
+|---|---|---|
+| United States | Partial — EU-US MLAT (2003) | MLAT exists but non-self-executing; US orders must be channeled through EU Member State competent authority for binding production |
+| United Kingdom | UK-EU MLA Convention pending | Post-Brexit: UK requests should be routed through individual EU Member State agreements; uncertain status |
+| Other | Case-by-case | Counsel must assess per country |
+
+**Art. 48 compliance procedure:**
+1. Counsel confirms whether the requesting country has a valid MLAT or international agreement with the EU in force.
+2. If yes (e.g., US MLAT): production may proceed via the treaty channel after scope minimization and notification obligations are met.
+3. If no or unclear: FORM cannot comply with the non-EU court order for EU-resident user data unless one of the limited Art. 49 derogations applies (vital interests of the data subject is the only plausible one — narrow, requires counsel confirmation).
+4. Compliance-officer notifies the competent EU DPA in the data subject's Member State of the request and FORM's intended response, before production (unless gag order prohibits).
+5. Document Art. 48 analysis in the incident evidence package.
+
+**DPA notification contact (EU):**
+
+| Likely jurisdiction | DPA | Contact |
+|---|---|---|
+| Germany (Supabase server location) | BfDI (Bundesbeauftragter für Datenschutz) | deregister request via bfdi.bund.de |
+| User's residence | Member State DPA | Per GDPR Art. 56 one-stop-shop: lead DPA is Ireland (DPC) for cross-border cases |
+| Ukraine-resident users | UAPDP | uapdp.gov.ua |
+
+---
+
+#### R-13.11 Evidence Package
+
+The following artifacts are filed at `compliance/evidence/legal-requests/<YYYY-MM-DD-slug>/`:
+
+```
+legal-requests/
+└── YYYY-MM-DD-slug/
+    ├── received/
+    │   ├── instrument-scan.pdf          # Original legal instrument (scanned)
+    │   ├── delivery-metadata.txt        # Receipt timestamp, method, agent details
+    │   └── sha256-manifest.txt          # SHA-256 hash of each file
+    ├── counsel/
+    │   ├── retention-engagement.pdf     # Signed counsel retention letter
+    │   ├── validity-memo.pdf            # Instrument validity assessment
+    │   ├── scope-analysis.pdf           # Data categories analysis
+    │   ├── gdpr-art48-memo.pdf          # Art. 48 / Art. 9 assessment (EU cases)
+    │   └── challenge-filing.pdf         # Motion to quash / narrowing letter (if filed)
+    ├── disclosure/
+    │   ├── production-package.zip       # Data produced (encrypted; password via 1Password)
+    │   ├── production-letter.pdf        # Signed production cover letter (counsel)
+    │   ├── disclosure-log.txt           # Exact data categories, user IDs, date range produced
+    │   └── sha256-manifest.txt
+    ├── notifications/
+    │   ├── user-notification.txt        # Notification sent to user (or gag-order prohibition memo)
+    │   ├── enterprise-tenant-notification.txt  # T-01 sent (or prohibition memo)
+    │   └── dpa-notification.pdf         # EU DPA notification (Art. 48 cases)
+    └── incident-log.md                  # Chronological log of all actions, decisions, timestamps
+```
+
+**Retention:** 7 years (DEC-030 HMAC chain; consistent with Art. 9 data record-of-processing retention under GDPR Art. 30; US litigation hold best practice).
+
+**DEC-030 HMAC-chained audit events for R-13:**
+
+| Event | Severity | When emitted |
+|---|---|---|
+| `legal.request_received` | HIGH | T+0: instrument received and logged |
+| `legal.counsel_retained` | MEDIUM | When outside counsel engagement confirmed |
+| `legal.legal_hold_activated` | HIGH | When `legal_hold_active` flag set on affected records |
+| `legal.challenge_filed` | MEDIUM | If motion to quash or narrowing letter filed |
+| `legal.user_notified` | MEDIUM | When user notification sent |
+| `legal.tenant_notified` | MEDIUM | When enterprise tenant notification sent |
+| `legal.dpa_notified` | HIGH | When EU supervisory authority notified (Art. 48 cases) |
+| `legal.disclosure_executed` | CRITICAL | When data production is delivered to requesting party |
+| `legal.emergency_voluntary_disclosure` | CRITICAL | Emergency Art. 9 voluntary disclosure (R-13.3 constraint #5 exception) |
+| `legal.legal_hold_released` | MEDIUM | When litigation hold lifted post-resolution |
+
+---
+
+#### R-13.12 Transparency Reporting
+
+FORM publishes an annual **Government Transparency Report** covering:
+- Number of requests received (by type: criminal, civil, NSL, FISA, EU DPA) — or "0 to N" range to protect NSL gag order status
+- Number of requests where FORM disclosed data vs. challenged vs. declined
+- Number of users affected (aggregate; not individual identities)
+- Number of requests where user notification was prohibited
+- GDPR Art. 48 requests and outcome
+
+**Report owner:** compliance-officer + founder.
+**Publication cadence:** Annual; published in the `press/` section or as a standalone public document.
+**First report:** To be published 12 months after first enterprise launch or upon receipt of first legal request — whichever comes first.
+**Format:** Plain-text table. No attorney-client privileged content. No specific incident dates or agency names unless the underlying order is publicly available.
+**Gag order constraint:** NSL and FISA gag orders prohibit specific disclosure. FORM uses the "0 to 499" range disclosure method (permitted under Freedoms Act) when applicable.
+
+---
+
+#### R-13.13 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | How R-13 Satisfies It |
+|---|---|
+| **CC6.3** — The entity authorizes, modifies, or removes access to data and systems based on approved and documented access policies | R-13 defines the policy under which FORM authorizes government access to user data: compulsory legal process only, minimum necessary scope, founder authorization required. The `legal.disclosure_executed` DEC-030 event is the auditor-accessible record of each authorization. |
+| **CC6.1** — The entity implements logical access security software, infrastructure, and architectures over protected information assets to protect them from security events | FORM's refusal to comply with informal requests, the legal-hold mechanism, and the never-produce list (§R-13.7) demonstrate that information assets are protected from unauthorized government access as rigorously as from technical attackers. |
+| **C1.1** — The entity identifies and maintains confidential information to meet its objectives related to confidentiality | GDPR Art. 9 production constraints (§R-13.7 higher-standard table) and the never-produce list operationalize FORM's confidentiality commitments for health data specifically. |
+| **CC9.1** — The entity identifies, selects, and manages business relationships to achieve its objectives | R-13.9 enterprise tenant notification ensures that FORM's contractual obligation to notify enterprise customers of legal demands is documented and consistently executed. |
+| **P6 (Privacy) — Disclosure and Notification** | R-13.8 user notification protocol and R-13.12 transparency report together fulfill the Privacy TSC requirement that the entity discloses information as defined in commitments and agreements. |
+
+**Auditor evidence artefacts:**
+- `compliance/evidence/legal-requests/` — case files per request (7-year retention)
+- `compliance/evidence/transparency-report/YYYY.md` — annual published report
+- DEC-030 `legal.disclosure_executed` events in `audit_log_events` — auditable disclosure record
+- `legal.legal_hold_activated` DEC-030 events — demonstrating information preservation on receipt of legal demand
+
+---
+
+#### R-13.14 Tabletop Scenario H (for §9 drill catalog)
+
+**Scenario title:** US DOJ Criminal Subpoena Covering EU-Resident Enterprise Tenant Users
+
+**Setup:**
+A US DOJ criminal division issues a grand jury subpoena to FORM demanding "all records, communications, and data pertaining to [TenantName] and its users" for a named 90-day date range. The named tenant is a Growth-tier enterprise customer with 350 users, 80% of whom are EU residents (Germany and France). The subpoena was served by email to legal@form.coach at 22:47 UTC on a Friday. The stated compliance deadline is 14 days from service.
+
+**Participants:** founder, compliance-officer, security-engineer, enterprise-architect, and the tenant's Customer Lead (CS).
+
+**Discussion points:**
+
+1. Who is the first person to act, and what are the first three actions within the first hour?
+2. Is this P0, P1, or P2 per R-13.2? What drives the classification?
+3. What Art. 48 GDPR analysis applies? Which DPA must be notified, and when?
+4. The subpoena says "all records" — what is the scope minimization strategy? What do you challenge and on what grounds?
+5. The 80% EU-resident user population: does production differ for EU vs. non-EU users within the same subpoena response?
+6. Does the restricted incident channel include the Customer Lead for this tenant? Why or why not?
+7. When is the enterprise tenant IT admin notified, using which template, and who sends it?
+8. The tenant's IT admin calls demanding to know "why FORM is talking to the DOJ about our employees." How does the Customer Lead respond?
+9. Does coaching session content (`coaching_turns`) get produced? What legal standard justifies or prohibits it?
+10. It is now T+72h. Counsel has filed a narrowing motion but the court has not yet ruled. Can FORM begin preparing a partial production? Who decides?
+11. After disclosure, what DEC-030 events must be in the audit log, and who verifies the HMAC chain integrity?
+12. The tenant's legal team sends a cease-and-desist claiming production would breach GDPR. Counsel advises the US order is technically enforceable but Art. 48 is unresolved. Who decides the final outcome?
+13. One week after disclosure, the news media reports on the criminal investigation. A journalist contacts FORM for comment. Who responds and what is the policy?
+14. In the post-incident review: what one preventive control, if it had existed, would most have reduced FORM's legal exposure? How does that control feed into §14 PIR Action Item Registry?
+
+**Target duration:** 90 minutes. **Facilitator:** compliance-officer. **Required:** outside legal counsel observing (not advising during drill). **Output:** updated R-13 if gaps identified; potential §6 template additions; one §14 action item minimum.
+
+---
+
 ## Appendix A — Quick Reference Card
 
 For use at 3am. IC: read §1 to classify, open the incident channel, then jump to the relevant runbook in §5.
@@ -3541,6 +3921,14 @@ Insider / privileged access abuse? → R-12 (evidence BEFORE containment — do 
   Legal counsel BEFORE HR   → No employment action without legal go-ahead
   Multi-tenant access?      → P0; enterprise E-01 within 30 min of P0 declaration
   Art. 9 data read?         → P0 + Art. 33 clock + R-12.8 GDPR table
+Law enforcement / government request? → R-13 (NO voluntary disclosure — compulsory process only)
+  NSL or FISA?              → P0; gag order likely; do NOT log in shared systems before counsel
+  Non-EU order on EU data?  → Art. 48 analysis required BEFORE any production; notify EU DPA
+  Enterprise tenant in scope? → T-01 notification within 30 min (P0) / 4h (P1)
+  User notification?        → Default YES (unless gag order); send before production
+  Art. 9 health data?       → Higher legal standard required; counsel must confirm explicitly
+  Founder authority only    → No disclosure, no acknowledgment without founder sign-off
+  Legal hold:               → Activate legal_hold_active flag; no deletion for affected records
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
@@ -3563,7 +3951,7 @@ Continuous improvement: §14 — action item registry in Linear [IR] project.
 
 ---
 
-**v0.6 · May 2026 · Owner: security-engineer + devops-lead**
+**v0.7 · May 2026 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: May 2027 or after first P0/P1 — whichever comes first.**
 
@@ -3574,5 +3962,7 @@ Continuous improvement: §14 — action item registry in Linear [IR] project.
 *v0.4 additions: R-10 AI Coach Safety Incident (Victor Harmful Guidance) — first AI-specific incident runbook in the taxonomy. Eight-level severity matrix distinguishing isolated quality issues (P2), systematic harmful patterns (P1), ED-adjacent content or injury reports (P0), and prompt injection vectors (P0 security incident). Three incident sub-types with different response branches: prompt regression (system prompt rollback + clinical-safety review gate), model behavior drift (Anthropic safety team notification + R-07 cross-reference), prompt injection (P0 security incident + input sanitization). Immediate actions include coaching_turns read-only query protocol with content_hash-only channel references (ED-adjacent text not distributed to responders). Blast radius assessment queries by victor_prompt_version. Containment: feature-flag scoping (pathway not full product), edge Worker content filter middleware, clinical-safety veto on re-enable decisions. Eradication: prompt diff methodology, Anthropic safety reporting path, Victor Jailbreak Test Suite addition to §9 testing program, clinical-safety PR review gate for all prompt changes. Evidence package: SOC 2 CC7.4/CC5.2/CC1.2 artifacts. Clinical-safety note: restricted compliance folder for harmful content (clinical-safety + compliance-officer + security-engineer + founder access only). Regulatory notes: GDPR Art. 34 physical injury path, Art. 33 prompt-injection health-data branch, Anthropic sub-processor R-07 parallel activation. No-go customer escalation: wellness-as-punishment detection triggers founder escalation. Appendix A updated with R-10 quick reference.*
 
 *v0.5 additions: R-11 CV / Pose Estimation Biometric Data Privacy Incident — second AI-adjacent runbook; addresses GDPR Art. 9 biometric data specifically (distinct from R-01 general health-data breach). Architecture-aware two-track design: Track A (on-device device loss — raw frames never server-side) vs. Track B (server-side `cv_sessions.keypoints_enc` exposure). Severity table: always P0 for `keypoints_enc` RLS failure or key compromise; P1 for k-anonymity fleet stats. Scope assessment SQL: tenant/user/session count in exposure window; keypoints_enc null/populated ratio; RLS anon-role verification. Containment: cv_enabled feature flag global disable; cv_keypoints_encryption_key rotation in Workers Secrets; pg_cron pause for `cv_session_fleet_stats` refresh. GDPR Art. 9 notification assessment table with Art. 34 presumption for biometric data (overrides standard R-01 assessment that sometimes waives Art. 34); 72h notification timeline ladder (T+4h assessment, T+24h draft, T+48h file partial, T+72h hard deadline). Enterprise tenant CV-specific notification requirements including DPO coordination for joint-controller Art. 33 filings. Clinical-safety mandatory coordination: movement-pattern health inference review; Art. 34 notification text sign-off gate. Evidence package: 12-item checklist including encryption key access audit trail and OBSERVABILITY.md §18 dashboard screenshots. Post-incident mandatory controls: encryption key rotation schedule, `keypoints_enc` storage necessity review, k-anonymity enforcement verification, OBSERVABILITY.md §18 alerting confirmation, five-way re-enable gate (ml-engineer + security-engineer + clinical-safety). §13 Board & Investor Communication Protocol — six-trigger threshold table (P0 > 2h, Art. 9 breach, enterprise tenant loss, media coverage, regulatory action, financial impact > $10k). Founder-exclusive authority (no other role contacts board during incident). Five-template set: B-01 Initial Notification (T+4h), B-02 Status Update (every 12h), B-03 Resolution (T+4h post-closure), B-04 Post-Incident Summary (within 5 business days of PIR); each template includes explicit "what NOT to write" constraints (no root cause, no attribution, no legal conclusions in B-01/B-02). Email-first channel requirement; phone call for biometric breach / press / customer loss. Evidence archiving in `compliance/evidence/incident-comms/<slug>/board/` retained 7 years per DEC-030. SOC 2 mapping: CC2.2 (board communication), CC9.1 (risk mitigation commitment), CC7.3 (anomaly escalation), A1.1 (availability commitment). Appendix A updated with R-11 and §13 quick references.*
+
+*v0.7 additions: R-13 Law Enforcement / Government Data Request — thirteenth runbook; operationalizes `PRIVACY_POLICY.md §6.4` and ENTERPRISE.md no-backdoor policy into a full incident-level response procedure. Request type taxonomy: 9 types from criminal subpoena through FISA order to EU DPA supervisory authority demand and informal voluntary requests. Severity matrix: P0 for NSL/FISA, foreign intelligence orders, Art. 9 requests for ≥ 10 users, and enterprise-tenant-scope requests; P1 for criminal court order or EU DPA investigation; P2 for civil subpoena; P3 for informal requests. Eight unique response constraints: founder-only authority (no disclosure without founder sign-off); legal counsel required before any action (P0: before acknowledging receipt); narrow scope enforcement (only what the instrument compels); Art. 9 no-voluntary-production rule; emergency exception protocol for claimed life-safety informal requests (counsel within 30 minutes, minimum-necessary, CRITICAL DEC-030 event); GDPR Art. 48 analysis required for non-EU court orders on EU-resident data; no-backdoor reaffirmation (unconditional refusal of programmatic access or surveillance hooks); restricted channel `#inc-YYYYMMDD-legal` (founder + compliance-officer + counsel only — legal privilege protection). 11-step legal review process with timing SLAs per severity tier. Challenge protocol for overbroad requests: temporal scope, user-class requests, Art. 9 production, Art. 48 non-treaty orders. Scope minimization table: permitted-for-production list (user ID, timestamps, email, SSO events, subscription status, IP logs); higher-legal-standard list (all Art. 9 health/coaching/wearable data); never-produce list (CV keypoints_enc — architecturally impossible; fleet stats — aggregate only; uninstrumented user data). User notification protocol: default notify-before-produce unless gag order; template for permitted notifications; GDPR Art. 34 co-trigger assessment for Art. 9 production. Enterprise tenant notification: Template T-01 (within 30 min P0, 4h P1, 24h P2); prohibition memo if gag order applies. GDPR Art. 48 analysis section: MLAT status table (US DOJ — partial EU-US MLAT 2003 non-self-executing; UK — post-Brexit uncertainty; others case-by-case); Art. 48 compliance procedure (treaty basis check, DPA notification before production, limited Art. 49 derogation path); DPA contact table (BfDI/Germany, DPC/Ireland one-stop-shop, UAPDP/Ukraine). Evidence package: structured directory (`received/`, `counsel/`, `disclosure/`, `notifications/`) with SHA-256 manifest; 7-year retention per DEC-030. 10 DEC-030 HMAC-chained audit events: `legal.request_received` (HIGH), `legal.counsel_retained` (MEDIUM), `legal.legal_hold_activated` (HIGH), `legal.challenge_filed` (MEDIUM), `legal.user_notified` (MEDIUM), `legal.tenant_notified` (MEDIUM), `legal.dpa_notified` (HIGH), `legal.disclosure_executed` (CRITICAL), `legal.emergency_voluntary_disclosure` (CRITICAL), `legal.legal_hold_released` (MEDIUM). Transparency reporting: annual Government Transparency Report (request counts by type, disclosure vs. challenge vs. decline, users affected, gag-order prohibition count, Art. 48 outcomes); NSL "0 to 499" range disclosure method. SOC 2 mapping: CC6.3 (government access authorization documented and auditable), CC6.1 (no-backdoor and no-informal-disclosure rules protect information assets), C1.1 (Art. 9 never-produce list enforces health data confidentiality), CC9.1 (enterprise tenant notification obligation), P6 Privacy (user notification + transparency report). Tabletop Scenario H: US DOJ criminal grand jury subpoena covering EU-resident Growth-tier tenant (350 users, 80% EU) served at 22:47 UTC Friday with 14-day deadline; 14 discussion points covering Art. 48 analysis, EU DPA notification, scope minimization, tenant IT admin communication, coaching_turns production gate, partial production during pending challenge, DEC-030 chain verification, media inquiry response, and PIR action item derivation. Appendix A updated with R-13 quick reference.*
 
 *v0.6 additions: R-12 Insider Threat / Privileged Access Abuse — twelfth runbook; covers current and former team members or contractors with legitimate credentials misusing access for exfiltration, sabotage, or personal gain. Evidence-before-containment constraint reinforced (overrides standard flow; exception only for active live exfiltration); private restricted investigation channel (`#inc-YYYYMMDD-insider`: founder + security-engineer + compliance-officer only — not HR, not subject). Trigger matrix: 9 signal types from bulk Supabase Studio access to HMAC chain break co-incident with staff activity; severity table: P0 for Art. 9 data read or multi-tenant cross-access, P1 for bulk access without confirmed exfiltration or post-HR-process access, P2 for historical single anomalous event. Unique response constraints: graduated containment options C-1 (passive monitoring) through C-5 (Workers Secrets rotation) ordered by investigative stealth; legal counsel notification before HR briefing rule with jurisdiction notes (EU/GDPR proportionality, US at-will, Ukraine labour law); HMAC chain R2 archive as forensic truth (live `audit_log_events` table not used forensically). Scope assessment SQL: blast radius by table with Art. 9 classification, multi-tenant exposure query, enterprise tenant identification, `health_profiles` record count for impacted users. Legal and HR interface timeline with legal hold notice template. GDPR implications table: 8 data category rows mapping to Art. 33/34 requirements; 72h clock start note; data subject rights derogation for ongoing investigation (Art. 23(1)(f)); HR investigation records retention under Art. 9(2)(b). Evidence package: 11-item directory structure with SHA-256 manifest, R2 object versioning, 7-year retention per DEC-030. Post-incident preventive controls: 7 controls covering least-privilege audit, offboarding checklist, bulk-read alert rule, Workers Secrets access review, quarterly access review cadence, HMAC chain integrity alert on staff actor + audit log resource, AUP acknowledgment. SOC 2 mapping: CC6.2/CC6.3 (access lifecycle), CC7.2/CC7.3/CC7.4 (monitoring and response), CC9.1 (risk mitigation), CC1.2 (integrity and ethical values). Tabletop Scenario G added to §9 drill catalog: insider data exfiltration before resignation affecting 14 enterprise tenants; 14 discussion points covering forensic chain, legal timing, tenant notification, Art. 33 clock, graduated response. §14 Continuous Improvement Program — closes the PIR-to-action-item loop for SOC 2 CC4.1/CC4.2 evidence. PIR Action Item Registry: Linear project `[IR] Action Items` with 10-field schema (incident_id, severity, priority, title, owner, due_date, SOC2 criterion, status, close_date, verification_note); closure SLA table (Critical P0: 14 days → founder paged; Critical P1: 30 days; High: 30–60 days; Medium: 90 days; Low: 180 days); monthly Linear export to `compliance/evidence/ir-action-items/YYYY-MM.csv`. Escalation thresholds: 4 triggers (overdue Critical, recurring failure pattern, > 3 High items open, SOC 2 observation period breach). Quarterly control effectiveness review: 60-min agenda (action item registry / incident trend analysis / runbook gap check / SOC 2 evidence completeness / decisions); MTTD/MTTR/false-positive-rate metrics; output template stored at `compliance/evidence/quarterly-ir-review/YYYY-QN.md`. Runbook update protocol: 6 mandatory triggers with SLAs; 5-step update procedure with dual-approval gate (compliance-officer + security-engineer); tagged archive at each minor version bump. Annual control self-assessment: Q4 cadence; structured against CC4.1, CC4.2, CC7.2, CC7.4, CC7.5 criteria; self-rated readiness with gap list; stored `compliance/evidence/annual-csa/YYYY-ir-csa.md`; shared with audit firm at observation period open. SOC 2 evidence mapping for §14: CC4.1, CC4.2, CC7.5, CC2.1; complete evidence package list. Appendix A updated with R-12 and §14 quick references.*

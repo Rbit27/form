@@ -6,6 +6,14 @@
 
 ---
 
+## [1.9.17] — 2026-05-23
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` §R-13 (v0.6→v0.7). R-13 Law Enforcement / Government Data Request: 9-type request taxonomy (criminal subpoena through FISA order, EU DPA supervisory authority demand, informal voluntary); 5-tier severity matrix (P0 NSL/FISA/Art.9≥10-users/enterprise-scope; P1 criminal order/EU DPA; P2 civil subpoena; P3 informal); 8 unique response constraints including founder-only authority, counsel-before-acknowledgment rule, Art. 9 no-voluntary-production floor, emergency voluntary exception, GDPR Art. 48 gate for non-EU court orders, no-backdoor reaffirmation, restricted `#inc-YYYYMMDD-legal` channel; 11-step legal review process; challenge protocol for overbroad/Art.48-defective requests; scope minimization table with permitted/higher-standard/never-produce categories (CV keypoints architecturally impossible, coaching_turns requires Art. 9 explicit authorization); user notification template with gag-order exception path; enterprise tenant Template T-01; GDPR Art. 48 MLAT analysis table (US, UK, others) with DPA notification protocol; 10 DEC-030 HMAC-chained events (`legal.request_received` HIGH through `legal.disclosure_executed` CRITICAL); annual transparency reporting protocol with NSL "0 to 499" range method; SOC 2 CC6.3/CC6.1/C1.1/CC9.1/P6 mapping; Tabletop Scenario H (DOJ subpoena, EU-resident Growth-tier tenant, 14 discussion points). Appendix A updated with R-13 quick reference. Footer v0.6→v0.7.
+- `VERSION` → 1.9.17
+
+---
+
 ## [1.9.16] — 2026-05-23
 
 ### Added
