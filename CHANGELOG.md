@@ -6,6 +6,17 @@
 
 ---
 
+## [1.9.11] — 2026-05-23
+
+### Added
+- `content/post-91-time-under-tension.md` — «Час під навантаженням (TUT): де правда, де міф». Sports-science post covering the TUT debate: mechanical tension vs. metabolic stress vs. muscle damage as hypertrophy drivers; Burd et al. (2012) JPhysiol evidence that intensity + proximity to failure outweigh time-under-load; Roig et al. (2009) on eccentric training superiority; practical tempo table by goal (strength / hypertrophy / endurance / BFR); three common TUT mistakes. Clinical-safety reviewed: PASS.
+- `content/post-92-concurrent-training-interference.md` — «Конкурентне тренування: чому сила і витривалість конфліктують». Sports-science post on the interference effect: Hickson (1980) original finding; AMPK/mTOR molecular conflict; Wilson et al. (2012) meta-analysis (−31% strength, −23% power, −19% hypertrophy); three moderating variables (modality, order, inter-session interval); practical recommendations by priority (hypertrophy-first, endurance-first, GPP); HIIT vs. Zone 2 comparison for concurrent contexts. Clinical-safety reviewed: PASS.
+
+### Changed
+- `VERSION` → 1.9.11
+
+---
+
 ## [1.9.10] — 2026-05-23
 
 ### Added
