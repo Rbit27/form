@@ -6,6 +6,17 @@
 
 ---
 
+## [1.9.7] — 2026-05-23
+
+### Added
+- `content/post-87-supercompensation-recovery-windows.md` — Суперкомпенсація: теорія, реальні обмеження та практичні інтервали відновлення. Covers GAS theory, fitness-fatigue two-factor model (Banister 1975–1982), functional vs non-functional overreaching (Meeusen et al. 2013 ECSS consensus), recovery time windows by stimulus type, and practical loading-timing implications for intermediate athletes. clinical_safety_reviewed: PASS.
+- `content/post-88-velocity-based-training-vbt.md` — Velocity-Based Training: авторегуляція через швидкість штанги. Covers load-velocity relationship (González-Badillo & Sánchez-Medina 2010), MPV vs peak velocity, velocity zones by adaptation goal (Pareja-Blanco et al. 2017), velocity-loss thresholds for volume autoregulation (Sánchez-Medina & González-Badillo 2011), daily L-V profile for 1RM estimation, VBT as daily readiness indicator, equipment comparison (GymAware/PUSH/apps), and FORM CV angle. clinical_safety_reviewed: PASS.
+
+### Changed
+- `VERSION` → 1.9.7
+
+---
+
 ## [1.9.6] — 2026-05-23
 
 ### Added
