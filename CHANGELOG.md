@@ -6,6 +6,18 @@
 
 ---
 
+## [1.9.15] — 2026-05-23
+
+### Added
+- `content/post-94-tendon-vs-muscle-adaptation.md` — сухожилля vs м'язи: structural lag (2–4 тижні vs 8–12 тижнів), Bohm et al. (2015) tendon stiffness і RFD, ексцентрика і HSR для сухожильної адаптації, правило 10%, deload-логіка; clinical-safety PASS
+- `content/post-95-peak-strength-vs-strength-endurance.md` — максимальна сила vs силова витривалість: mTOR vs AMPK молекулярний конфлікт, Hickson (1980) і Wilson et al. (2012) interference effect, блокова логіка для аматорів; clinical-safety PASS
+- `content/post-96-warmup-vs-activation.md` — розминка vs активація: температурний і нейронний механізми розминки, Fradkin et al. (2010) review, PAP (myosin RLC фосфорилювання, 3–7 хв вікно, тільки для досвідчених), RAMP-протокол; clinical-safety PASS
+
+### Changed
+- `README.md` — post-94, 95, 96 відмічені як [x] з clinical-safety PASS
+
+---
+
 ## [1.9.14] — 2026-05-23
 
 ### Changed
