@@ -175,6 +175,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-81-neural-vs-structural-adaptation.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-82-deload-protocols.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-83-muscle-fiber-types.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-84-motor-learning.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
