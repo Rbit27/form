@@ -6,6 +6,18 @@
 
 ---
 
+## [1.9.13] — 2026-05-23
+
+### Added
+- `content/post-93-mobility-vs-flexibility.md` — «Мобільність vs гнучкість: чому пасивне розтягування не переносить у силу». Sports-science post on the distinction between passive flexibility and active mobility under load: Behm & Chaouachi (2011) meta-analysis showing static stretching reduces force −5.5% and power −2.8% with no transfer to performance; Magnusson et al. (1996) demonstrating that repeated passive stretching changes viscoelastic resistance neurally, not structurally; Weppler & Magnusson (2010) stretch-tolerance model; the mobility deficit concept (passive vs active ROM gap); four limiting factors (neural inhibition, joint capsule, fascia, muscle length); end-range isometrics and loaded end-range work as evidence-based transfer mechanisms; three high-priority joints (ankle dorsiflexion → squat, hip internal rotation → deep squat, thoracic + shoulder → overhead press); pre-training vs post-training vs embedded mobility work protocols. Clinical-safety reviewed: PASS.
+- `blog.html` — added card for post-93 (Мобільність vs гнучкість) in sports-science category.
+- `STATUS.md` — content engine table row for post-93.
+
+### Changed
+- `VERSION` → 1.9.13
+
+---
+
 ## [1.9.12] — 2026-05-23
 
 ### Added
