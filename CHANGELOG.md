@@ -6,6 +6,21 @@
 
 ---
 
+## [1.9.18] — 2026-05-23
+
+### Added
+- `content/post-98-accommodating-resistance.md` — variable resistance mechanics: force curve matching, band/chain loading (25–35% of total load), Baker & Newton (2005), Rhea et al. (2009), Westside context, sticking point overload protocol; clinical-safety PASS
+- `content/post-99-sticking-points.md` — sticking point mechanics in squat (parallel — hip extensors, McLaughlin 1978), bench (two-phase van den Tillaar & Ettema 2013), deadlift (below/above knee); weak chain vs technique vs load diagnosis; targeted accessory selection; clinical-safety PASS
+- `content/post-100-e1rm-vs-rep-ranges.md` — E1RM milestone: Epley/Brzycki/Lombardi formulas; accuracy degradation past 5 reps (Reynolds et al. 2006); velocity-based estimation MPV (Jidovtseff et al. 2011); practical case for rep-range programming; clinical-safety PASS
+
+### Changed
+- `blog.html` — added cards for post-97, post-98, post-99, post-100 (four new Science entries)
+- `docs/DECISION_LOG.md` — DEC-032 (no-backdoor law enforcement policy formalized), DEC-033 (post-100 milestone: quality over velocity)
+- `README.md` — post-98, post-99, post-100 marked `[x]` done
+- `VERSION` → 1.9.18
+
+---
+
 ## [1.9.17] — 2026-05-23
 
 ### Changed

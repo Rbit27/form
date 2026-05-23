@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 73 posts, category filter, newsletter CTA | v0.98.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 94 cards (97 content posts authored), category filter, newsletter CTA | v1.9.18 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -184,6 +184,9 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-90-calisthenics-vs-weighted-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-93-mobility-vs-flexibility.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-97-loaded-carries.md | Blog | draft · clinical-safety PASS |
+| post-98-accommodating-resistance.md | Blog | draft · clinical-safety PASS |
+| post-99-sticking-points.md | Blog | draft · clinical-safety PASS |
+| post-100-e1rm-vs-rep-ranges.md | Blog | draft · clinical-safety PASS · milestone post-100 |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
@@ -333,8 +336,13 @@ M10-M12 (Q2 2027)
 - DEC-018: ED-screening non-skippable (clinical-safety HARD VETO)
 - DEC-021: No Russian language UI у v1.0
 - DEC-023: Geo-pricing $9 UA / $19 Western
+- DEC-029: Growth loops — sharing зовні, no in-app social, clinical-safety gate on all share content
+- DEC-030: Audit log append-only HMAC-chained, 7-year retention, support actions auto-notify tenant
+- DEC-031: Agent team expanded 14 → 24 agents
+- DEC-032: Law enforcement no-backdoor policy formalized (INCIDENT_RESPONSE R-13)
+- DEC-033: Post-100 milestone: quality over velocity (clinical-safety-blocked posts remain deferred)
 
-29 total documented decisions з reverse-cost assessment.
+33 total documented decisions з reverse-cost assessment.
 
 ---
 
@@ -392,6 +400,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v0.47.1 · 16 травня 2026**
-**Last update:** 16 травня 2026 · v0.47.1
+**v1.9.18 · 23 травня 2026**
+**Last update:** 23 травня 2026 · v1.9.18
 **Next planned update:** після hire of Founding Engineer

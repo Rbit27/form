@@ -13,6 +13,24 @@
 
 ---
 
+## 2026-05-23
+
+### DEC-033 · Blog milestone post-100 reached through sports-science only (no clinical-safety-blocked content)
+
+- **Decision:** Posts 98–100 complete the first century of FORM content strictly from sports-science corpus. Posts 73, 74, 75, 76, 87, 88 remain blocked or deferred pending correct clinical-safety review; we do not ship those to hit a number.
+- **Owner:** content-strategist + clinical-safety
+- **Why:** Content quality floor > content velocity. Having 100 posts with no clinical-safety violations is a stronger signal than 100 posts that include shortcuts on food/body topics.
+- **Reverse cost:** Low (deferred posts can ship after proper CS review)
+
+### DEC-032 · Law enforcement no-backdoor policy formalized (INCIDENT_RESPONSE R-13)
+
+- **Decision:** FORM will never install programmatic surveillance hooks, passive intercept mechanisms, or backdoor access at any government entity's request. All law enforcement data access must follow formal compelled legal process; founder sign-off required before any disclosure; Art. 9 health data is never voluntarily produced.
+- **Owner:** security-engineer + compliance-officer + founder
+- **Why:** Enterprise trust requires unconditional commitment. Any backdoor weakens security posture for all tenants. Anchored in PRIVACY_POLICY.md §6.4 and ENTERPRISE.md no-backdoor clause. First Government Transparency Report commitment signals seriousness to enterprise DPOs.
+- **Reverse cost:** Cannot reverse (constitutive promise; reversing requires public announcement, customer notification, and re-audit)
+
+---
+
 ## 2026-05-16
 
 ### DEC-031 · Agent team expanded from 14 → 24 agents
