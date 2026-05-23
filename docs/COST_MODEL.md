@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v0.8
+# FORM · Cost Model & Unit Economics v0.9
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -61,6 +61,15 @@
     - 17.8 S6: Combined Moderate Stress (S1 + S3)
     - 17.9 Open Questions Added
     - 17.10 Stress Test Summary Matrix
+18. [Revenue Recognition, ARR/MRR Bridge & SaaS Metrics Taxonomy](#18-revenue-recognition-arrmrr-bridge--saas-metrics-taxonomy)
+    - 18.1 Revenue Recognition Framework (ASC 606 / IFRS 15 alignment)
+    - 18.2 Billings vs. Revenue vs. Cash — the three waterfalls
+    - 18.3 ARR and MRR bridge methodology
+    - 18.4 Free pilot timing and first-recognition date
+    - 18.5 Deferred revenue waterfall for multi-year contracts
+    - 18.6 Net Revenue Retention (NRR) model and target
+    - 18.7 Investor-grade SaaS metrics taxonomy
+    - 18.8 Open questions added (OQ-14, OQ-15)
 
 ---
 
@@ -1589,7 +1598,271 @@ Victor's system prompt is estimated at ~1,200 tokens (§2.1). If context history
 
 ---
 
-**v0.8 · May 2026**
+---
+
+## 18. Revenue Recognition, ARR/MRR Bridge & SaaS Metrics Taxonomy
+
+> Owner: founder + future CFO. Audience: board, investors, auditors. Review: monthly (MRR bridge) / quarterly (ARR bridge, deferred rev waterfall).
+
+This section models the gap between *economic value generated* (ARR/MRR) and *cash received* (billings) and *GAAP-recognized revenue* — the three numbers that diverge on day one of any annual or multi-year contract. Getting them wrong in investor reporting is fatal for Series A due diligence.
+
+---
+
+### 18.1 Revenue Recognition Framework (ASC 606 / IFRS 15 Alignment)
+
+FORM's SaaS subscription is a single performance obligation: access to the platform over the contract period. Revenue is recognized *ratably over the service period*, not at invoice date.
+
+**Core rule:**
+```
+Monthly Recognized Revenue = Total Contract Value ÷ Contract Duration (months)
+```
+
+| Contract type | Billing event | Revenue recognition |
+|---|---|---|
+| Annual (1-year) | Day 0, annual upfront | 1/12 per month for 12 months |
+| Annual (monthly payment) | Month-by-month | 1/12 per month (concurrent with billing) |
+| 2-year, upfront | Day 0 | 1/24 per month for 24 months |
+| 3-year, upfront | Day 0 | 1/36 per month for 36 months |
+| Free 90-day pilot | No billing | No revenue recognition during pilot |
+
+**Variable consideration (seat expansion mid-contract):** When a customer adds seats mid-term, the incremental TCVis allocated over the remaining contract months. The existing seats continue on their original schedule. Seat reductions (downgrades) follow the same logic — excess recognized revenue becomes a refund obligation if seats drop below contracted minimum; this is a credit note risk, not an unbundling of the performance obligation.
+
+**Practical expedient (ASC 606-10-50-14):** FORM may apply the right-to-invoice practical expedient — if billing equals the value delivered in the period (monthly billing = monthly service) — which allows matching of billing and revenue recognition for the monthly-payment variant. Annual upfront deals do **not** qualify and require deferred revenue treatment.
+
+---
+
+### 18.2 Billings vs. Revenue vs. Cash — The Three Waterfalls
+
+For an annual upfront contract signed on 1 Jan (Starter, 100 seats × $12 × 12 months = $14,400 TCV):
+
+```
+Day 0   Invoice issued:    $14,400  → Accounts Receivable
+Day 0   Cash collected:    $14,400  → Cash + Deferred Revenue $14,400
+
+Month 1   Revenue recognized: $1,200  → Deferred Revenue ↓ to $13,200
+Month 2   Revenue recognized: $1,200  → Deferred Revenue ↓ to $12,000
+...
+Month 12  Revenue recognized: $1,200  → Deferred Revenue = $0
+```
+
+**Three numbers at end of Month 3:**
+
+| Metric | Amount | Note |
+|---|---|---|
+| Billings (invoiced YTD) | $14,400 | Cash received on Day 0 |
+| Revenue (recognized YTD) | $3,600 | 3 × $1,200 |
+| Deferred Revenue (balance sheet) | $10,800 | Future obligation |
+| ARR (annualized run-rate) | $14,400 | Unchanged — no seats added/dropped |
+
+**Why this matters for investor reporting:** Billings outpace revenue at the start of a high-growth year, then converge. A company growing net-new ARR fast will show rising deferred revenue on the balance sheet — this is a *positive* signal (customer cash advance), not a liability risk. Presenting the wrong line to investors conflates bookings momentum with revenue momentum.
+
+---
+
+### 18.3 ARR and MRR Bridge Methodology
+
+**Definitions:**
+
+| Term | Formula | Unit |
+|---|---|---|
+| ARR | Sum of all active annual contract values | $/year |
+| MRR | ARR ÷ 12 | $/month |
+| New ARR | ARR from customers who did not exist in prior period | $/year |
+| Expansion ARR | Additional ARR from existing customers (seat adds, tier upgrades) | $/year |
+| Contraction ARR | Reduced ARR from existing customers (seat removals, downgrades) | $/year |
+| Churned ARR | ARR from customers who did not renew | $/year |
+| Net New ARR | New + Expansion − Contraction − Churned | $/year |
+
+**Monthly MRR bridge template** (investor-grade):
+
+```
+Opening MRR (Month N-1)          $X,XXX
+  + New MRR                        +$AAA   (first invoice of new contracts)
+  + Expansion MRR                  +$BBB   (upsell / seat adds in existing contracts)
+  − Contraction MRR                −$CCC   (seat drops, downgrades)
+  − Churned MRR                    −$DDD   (non-renewals / cancellations)
+  = Closing MRR (Month N)          $Y,YYY
+```
+
+**Key rule:** MRR bridge movements are recorded on the *service start date of the change*, not the billing date. A contract signed 15 Dec for service from 1 Jan is recorded as New MRR in January.
+
+**Enterprise tier application:**
+
+Starter 100-seat deal signed 1 Feb ($12/seat × 100 = $1,200/month MRR):
+- Feb bridge: +$1,200 New MRR
+- If customer adds 25 seats in May: +$300 Expansion MRR in May
+- If customer drops to 75 seats at renewal: −$300 Contraction MRR at renewal month
+- If customer does not renew at 12 months: −$1,200 Churned MRR
+
+**Consumer tier MRR bridge:** Monthly subscribers are the cleanest case — billing month = service month = MRR recognition month. Annual Pro subscribers contribute $19/month to MRR but bill once annually; the MRR represents the amortized view.
+
+---
+
+### 18.4 Free Pilot Timing and First Recognition Date
+
+FORM's 90-day free pilot (no charge, no obligation) creates a specific revenue recognition question: when does ARR and MRR recognition begin?
+
+**Rule:** Zero ARR/MRR during the pilot period. Revenue recognition begins on the first day of the paid service term.
+
+```
+Pilot phase (Day 0 → Day 90):   ARR contribution = $0
+                                  Deferred Revenue = $0
+                                  Billings = $0
+
+Conversion event (Day 90):       Contract signed, first invoice issued
+                                  ARR recognized from Day 91
+                                  Deferred Revenue created on Day 91 (if annual upfront)
+```
+
+**Pipeline vs. ARR:** During the pilot, the deal may be tracked in the sales pipeline as "in-pilot" with a probability-weighted ARR contribution (e.g., 60% × $14,400 = $8,640 weighted ARR). This is **pipeline ARR**, never included in reported/committed ARR. Only convert to committed ARR at contract signature.
+
+**90-day pilot cadence and ARR concentration risk:** If FORM runs 12 enterprise pilots simultaneously and 8 convert in the same calendar month, ARR will spike in that month followed by a quiet quarter — a pattern that creates ARR lumpiness. Mitigate by staggering pilot start dates across the quarter (Sales ops KPI: no more than 40% of active pilots expiring in the same calendar month).
+
+---
+
+### 18.5 Deferred Revenue Waterfall for Multi-Year Contracts
+
+Multi-year deals (2-year: 15% discount; 3-year: 25% discount per pricing in §16.4) are paid upfront or annually. Each creates a deferred revenue balance that must be modeled on the balance sheet.
+
+**Example: Growth deal, 500 seats × $9 × 12 months × 3 years (25% discount applied)**
+
+```
+Undiscounted 3-year TCV:   500 × $9 × 36 = $162,000
+25% discount:              −$40,500
+Discounted 3-year TCV:     $121,500
+
+If paid upfront on Day 0:
+  Day 0 Deferred Revenue:  $121,500
+  Monthly recognition:     $121,500 ÷ 36 = $3,375/month
+  ARR (annualized):        $3,375 × 12 = $40,500/year (discounted rate)
+
+If paid annually (3 × annual invoices):
+  Year 1 invoice:          $121,500 ÷ 3 = $40,500 (upfront, creates $40,500 Def Rev)
+  Year 2 invoice:          $40,500 (on anniversary, creates $40,500 Def Rev)
+  Year 3 invoice:          $40,500 (on anniversary, creates $40,500 Def Rev)
+```
+
+**Balance sheet deferred revenue schedule (annual payment variant):**
+
+| Month | Deferred Rev Balance | Monthly Rev Recognized |
+|---|---|---|
+| 0 (invoice) | $40,500 | $0 |
+| 1 | $37,125 | $3,375 |
+| 6 | $20,250 | $3,375 |
+| 12 (Year 1 close) | $0 | $3,375 |
+| 12 (Year 2 invoice) | $40,500 | $0 (invoice hits same day as last recognition) |
+| ... | ... | ... |
+| 36 | $0 | $3,375 |
+
+**Short-term vs. long-term deferred revenue:** For annual upfront contracts, the full deferred balance is current (recognized within 12 months). For 3-year upfront contracts, only the next 12 months of revenue is current; the remainder is long-term deferred — material for balance sheet presentation at Series A and beyond.
+
+---
+
+### 18.6 Net Revenue Retention (NRR) Model and Target
+
+NRR (also called Net Dollar Retention / NDR) is the single most-watched enterprise SaaS metric for Series A investors. It measures the revenue growth from the existing customer base, independent of new customer acquisition.
+
+**Formula:**
+
+```
+NRR = (Opening ARR + Expansion ARR − Contraction ARR − Churned ARR) ÷ Opening ARR × 100%
+```
+
+**FORM targets and benchmarks:**
+
+| Company stage | NRR target | Benchmark reference |
+|---|---|---|
+| Pre-scale (<$1M ARR) | ≥ 100% | Survival floor |
+| Growth ($1M–$10M ARR) | ≥ 110% | Good SaaS B2B |
+| Scale ($10M+ ARR) | ≥ 120% | Top-quartile; used in §14.6 LTV model |
+| Best-in-class | 130–140% | Snowflake, Datadog at peak |
+
+**FORM NRR model (Year 2 target at 120% NRR):**
+
+Starting 100-seat Starter customer ($14,400 ARR):
+
+```
+Opening ARR (Month 1):          $14,400
+  + Expansion (seats 100→125):  +$3,600   (25 seat add at renewal)
+  − Contraction (no downgrade):  $0
+  − Churned (no churn):          $0
+Closing ARR (Month 13):         $18,000
+
+NRR = $18,000 ÷ $14,400 = 125% ✓ (exceeds 120% target)
+```
+
+**NRR sensitivity to churn rate (100-seat Starter cohort, Year 2):**
+
+| Annual churn rate | Churned ARR | Expansion needed for 110% NRR | Expansion needed for 120% NRR |
+|---|---|---|---|
+| 5% | $720 | +$2,120 (15 seats) | +$3,320 (23 seats) |
+| 10% | $1,440 | +$2,840 (20 seats) | +$4,040 (28 seats) |
+| 20% | $2,880 | +$4,280 (30 seats) | +$5,480 (38 seats) |
+
+**NRR data pipeline requirement:** NRR is a trailing 12-month (T12M) metric. Computing it requires:
+1. A snapshot of all active contracts at T-12 months (opening cohort)
+2. Tracking of every expansion, contraction, and churn event in the intervening 12 months for that exact cohort
+3. Strict exclusion of any new logos that joined after T-12 (they belong in New ARR, not NRR)
+
+This requires a contract-events table in the data warehouse — logged at the moment of each change, not reconstructed from billing. Instrument from Day 1 of first enterprise contract (pre-condition for Series A data room).
+
+**Gross Revenue Retention (GRR):** NRR minus the expansion component. GRR measures retention only (churn + contraction as a floor):
+
+```
+GRR = (Opening ARR − Contraction ARR − Churned ARR) ÷ Opening ARR × 100%
+```
+
+GRR cannot exceed 100%. Target ≥ 90% (top-quartile B2B SaaS). A GRR of 85% with NRR of 120% means the expansion engine is working hard to mask a churn problem — flag this pattern early.
+
+---
+
+### 18.7 Investor-Grade SaaS Metrics Taxonomy
+
+Single-source definitions to prevent inconsistent numbers across pitch decks, data rooms, and board reports.
+
+| Metric | Definition | FORM notes |
+|---|---|---|
+| **ARR** | Annualized value of all active, contracted recurring revenue | Includes enterprise (committed) + Pro annual (committed). Excludes monthly Pro (volatile), free tier, pilot revenue. |
+| **MRR** | ARR ÷ 12 | Use ARR for enterprise reporting; MRR for consumer/PLG reporting |
+| **ACV** | Annual Contract Value = ARR ÷ number of customers | Starter ACV floor: $7,200 (50 seats × $12 × 12). Growth ACV mid: $21,600 (200 seats × $9 × 12). |
+| **TCV** | Total Contract Value = ACV × contract years | Includes multi-year deals; TCV > ARR for 2/3-year deals |
+| **Bookings** | TCV of contracts signed in the period | Booking a 3-year Growth deal = booking $121,500 TCV |
+| **Billings** | Cash invoiced in the period | For annual upfront: billings spike in Month 1; for monthly: billings ≈ revenue |
+| **Revenue** | GAAP-recognized: ratably over service period | Always lags billings for annual/multi-year upfront |
+| **NRR** | Net Revenue Retention (see §18.6) | 120% target at growth stage |
+| **GRR** | Gross Revenue Retention (see §18.6) | ≥ 90% target |
+| **CAC** | Customer Acquisition Cost = total sales & marketing spend ÷ new customers | Enterprise CAC: model in §8.5. Consumer CAC: model in §14.4 |
+| **LTV** | Lifetime Value = ARPU × gross margin % ÷ monthly churn rate | Enterprise LTV: model in §14.6 |
+| **LTV:CAC** | Ratio target ≥ 3× (floor), ≥ 5× (healthy) | |
+| **Payback period** | CAC ÷ (ARPU × gross margin %) | Enterprise target < 18 months |
+| **Magic number** | Net New ARR ÷ prior quarter S&M spend | Target > 0.75 (efficient) |
+| **Rule of 40** | ARR growth rate % + FCF margin % ≥ 40 | Not applicable pre-$1M ARR; compute at Series A |
+
+**Reporting cadence:**
+
+| Metric | Frequency | Owner | Audience |
+|---|---|---|---|
+| MRR bridge | Monthly | data-engineer | Founder, board |
+| ARR bridge | Quarterly | Founder | Board, investors |
+| NRR / GRR | Quarterly (T12M) | data-engineer | Board, investors |
+| Deferred revenue waterfall | Monthly | Founder (finance) | Auditors, board |
+| Bookings vs. revenue bridge | Monthly | Founder | Board |
+| Magic number | Quarterly | data-engineer | Board |
+
+---
+
+### 18.8 Open Questions Added
+
+**OQ-14: Revenue recognition policy for seat-count adjustments mid-contract**
+
+When a customer adds seats on Day 45 of a 12-month annual contract (67% remaining), what is the incremental recognized revenue per period? The draft treatment is *allocation of incremental TCV over remaining months* (modification type: addition of distinct goods — new seats are functionally similar to contracted seats but start on a different date). This requires confirmation from FORM's future auditors and should be included in the accounting policy memo prior to Series A close.
+
+**OQ-15: 90-day pilot convertibility and ASC 606 variable consideration**
+
+If the 90-day pilot is structured as a conditional discount (i.e., the full-year contract exists from Day 0 with a "waive first 3 months" provision), the TCV is recognized over 15 months rather than 12. If the pilot is a separate, stand-alone free trial with no commitment, revenue recognition begins strictly at Day 91. The legal structure of the pilot agreement must be aligned with this accounting distinction before the first enterprise contract is signed. Flag to compliance-officer and future CFO at Series A prep.
+
+---
+
+**v0.9 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
 
@@ -1604,3 +1877,5 @@ All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actua
 *v0.6 additions: §15 Enterprise Infrastructure COGS Deep-Dive — per-feature marginal cost quantification for SSO/SAML overhead, SCIM provisioning, admin dashboard queries, 7-year audit log storage (hot + cold tier), SIEM webhook delivery, white-label DNS/SSL, and multi-tenant RLS; consolidated summary showing enterprise features add < $0.00001/seat/month (< 0.003% of baseline COGS). §16 Enterprise Tier Break-Even by Plan — plan-level break-even table (Starter/Growth/Enterprise × seat count), minimum viable seat floor analysis (50-seat Starter Y1 GM = 47.9% vs 20-seat = −26.1%), Y1 vs Y2+ margin improvement by plan, multi-year contract economics (25% 3-year discount gives up $13,800 GP vs eliminates ~$32,400 churn-exposure ARR). OQ-11 added: minimum seat threshold for acceptable Y1 Starter margin.*
 
 *v0.7 additions: §17 Downside Scenario Analysis & Unit Economics Stress Tests — six adverse scenarios stress-tested against v0.6 baseline (S1: Anthropic API doubles, break-even +1.3%; S2: App Store 30% commission, break-even +22.3%; S3: churn doubles 5%→10%, LTV −50%; S4: 20% price cut, break-even +26.0%; S5: enterprise Year 1 miss, not existential; S6: S1+S3 combined, freeze paid acquisition protocol). Survivability assessments, mitigation priority lists, and monitoring thresholds for each scenario. OQ-12 added: Anthropic volume pricing threshold (~25k Pro subs at baseline rates). OQ-13 added: actual Victor token budget per session — instrument in beta per OQ-01.*
+
+*v0.9 additions: §18 Revenue Recognition, ARR/MRR Bridge & SaaS Metrics Taxonomy — ASC 606 / IFRS 15 ratable recognition rule for annual and multi-year contracts; billings vs. revenue vs. cash waterfall; monthly MRR bridge template (New/Expansion/Contraction/Churned); free 90-day pilot timing and first-recognition date; deferred revenue schedule for 2-year and 3-year deals (short-term vs. long-term split); NRR / GRR model with target table (≥110% growth, ≥120% scale) and churn-rate sensitivity; investor-grade SaaS metrics taxonomy (ARR, MRR, ACV, TCV, Bookings, Billings, Revenue, NRR, GRR, CAC, LTV, Magic Number, Rule of 40) with FORM-specific notes; reporting cadence table. OQ-14 added: revenue recognition policy for mid-contract seat additions. OQ-15 added: ASC 606 variable consideration treatment for conditional pilot discounts.*

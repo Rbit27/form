@@ -6,6 +6,17 @@
 
 ---
 
+## [1.9.2] — 2026-05-23
+
+### Added
+- `docs/COST_MODEL.md` §18 — Revenue Recognition, ARR/MRR Bridge & SaaS Metrics Taxonomy. ASC 606 / IFRS 15 ratable recognition rule for annual and multi-year contracts; billings vs. revenue vs. cash three-waterfall model; monthly MRR bridge template (New/Expansion/Contraction/Churned ARR); free 90-day pilot timing and first-recognition date (zero ARR during pilot, recognition on Day 91); deferred revenue schedule for 2-year and 3-year deals (short-term vs. long-term balance sheet split); NRR/GRR model with target table (≥110% growth-stage, ≥120% scale-stage) and churn-rate sensitivity matrix; investor-grade SaaS metrics taxonomy (ARR, MRR, ACV, TCV, Bookings, Billings, Revenue, NRR, GRR, CAC, LTV, Magic Number, Rule of 40) with FORM-specific notes and reporting cadence. OQ-14: revenue recognition for mid-contract seat additions. OQ-15: ASC 606 variable-consideration treatment for conditional pilot discounts (15-month vs. 12-month recognition period depending on legal structure of pilot agreement). Doc bumped v0.8 → v0.9.
+
+### Changed
+- `VERSION` → 1.9.2
+- `CHANGELOG.md` → [1.9.2] entry added
+
+---
+
 ## [1.9.1] — 2026-05-23
 
 ### Added
