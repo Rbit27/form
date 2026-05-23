@@ -6,6 +6,17 @@
 
 ---
 
+## [1.9.4] — 2026-05-23
+
+### Added
+- `docs/OBSERVABILITY.md` §19 — SLO Error Budget Management (v0.5→v0.6). Error budget concept (1 − SLO target = permissible unreliability); per-SLO budget tables: 8 platform SLOs (SLO-01–08), 8 CV pipeline SLOs (CV-SLO-01–08), 12 synthetic probes (S-001–S-012) з monthly budget minutes; Google SRE two-window burn rate alerting: fast burn 14.4×/1h → P0 PagerDuty, slow burn 6.0×/6h → P1, trend 1.0×/3d → Slack; три Postgres queries (slo_burn_rate_fast.sql, slo_burn_rate_slow.sql, slo_burn_rate_trend.sql) + PagerDuty YAML з dedup keys; п'ятирівнева deploy policy (Green/Yellow/Orange/Red/Critical) з UTC 18–22 peak-hour freeze і GitHub Actions gate з override audit trail; `slo_budget_tracking` DDL з GENERATED `budget_consumed_pct`, RLS roles, 90-day pg_cron retention; `slo_budget_weekly` materialized view з Monday 06:00 UTC refresh; Metabase "SLO Error Budget Dashboard" (6 панелей: budget gauges, burn rate trend, top-5 consumers, 30-day rolling, enterprise tenant breakdown, exhaustion audit trail); SOC 2 CC4.1/CC7.2/A1.1/A1.2/CC5.2 mapping; 13-item checklist M3/M4.
+
+### Changed
+- `VERSION` → 1.9.4
+- `CHANGELOG.md` → [1.9.4] entry added
+
+---
+
 ## [1.9.3] — 2026-05-23
 
 ### Added

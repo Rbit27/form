@@ -2604,3 +2604,460 @@ Created per deploy; archived after rollout reaches > 95% of fleet. Shared with f
 *v0.4 additions: §17 Cost Monitoring & Anomaly Alerting — daily cost aggregation Worker (Cloudflare Cron Trigger 06:00 UTC) fetching Anthropic Admin API, ElevenLabs character delta via KV, Cloudflare GraphQL Analytics; `cost_daily` and `cost_anomalies` Postgres schema with generated `variance_pct` column; per-service anomaly thresholds (P1 = 1.5× 7d avg, P0 = 3× 7d avg) externalised to Workers Secret for hot-update; `form_cost_monitor` Postgres role with scoped write-only grants; per-tenant COGS materialized view (`cost_daily_per_tenant`) from `coaching_sessions` token telemetry, refreshed at 07:00 UTC; Metabase dashboard specs (Infra Cost Overview, Enterprise Tenant Cost panel, Cost Anomaly History); separate PagerDuty "FORM Cost" service with low-urgency routing; Slack `#metrics` daily digest format (with and without anomalies); SOC 2 CC7.2/CC7.3/CC5.2/A1.2 evidence mapping; monthly CSV export to `compliance/evidence/`; sixteen-item implementation checklist across M3/M4/M5. Closes §10 gap: Cost monitor Worker.*
 
 *v0.5 additions: §18 CV Pose Estimation Model Observability — on-device CV pipeline (Apple Vision / ML Kit) added to Scope; privacy-first observability design for GDPR Art. 9 biometric data; RED signal taxonomy for the CV pipeline (session upload, iOS inference, Android inference, model rollout); `cv_sdk_telemetry` table DDL (cold_start_ms, inference_latency P50/P95, frame_count, frames_dropped, kalman_resets, memory_warning_count, device_tier — no keypoints or form scores); `cv_session_fleet_stats` materialized view (daily × model_name × model_version × tenant_id aggregation: pct_completed, pct_tracking_lost, confidence_p50/P25, avg_below_threshold_ratio, three defect prevalence columns); eight SLOs (completion rate ≥ 85%, tracking_lost ≤ 8%, iOS inference P95 < 30 ms, Android P95 < 50 ms, cold start P95 < 800 ms, confidence P50 ≥ 0.80, high-confidence session rate ≥ 70%, below-threshold ratio ≤ 0.12); eight alerting rules AL-CV-01 through AL-CV-08 (fleet spike → PagerDuty, confidence drop → PagerDuty, new model version quality regression → P1 with rollback trigger, per-tenant anomaly → Slack #csm-alerts); alert deduplication and rollout suppression patterns; blast-radius query aligned with INCIDENT_RESPONSE.md R-10 and DATA_MODEL.md §15.2 `idx_cv_sessions_model_version`; privacy constraint matrix (raw frames never transmitted, keypoints_enc inaccessible to observability stack, no GROUP BY user_id, k-anonymity n ≥ 5 per tenant); Metabase "CV Model Health" (9 panels) and "CV Rollout Progress" dashboard specs; SOC 2 CC7.2/CC7.3/PI1.2/PI1.4/C1.2 evidence mapping; monthly CSV export to `compliance/evidence/cv-fleet-stats-YYYY-MM.csv`; thirteen-item implementation checklist across M4/M5.*
+
+---
+
+## 19. SLO Error Budget Management
+
+### 19.1 Error Budget Concept
+
+An error budget is the complement of the SLO target: it quantifies how much unreliability is permissible within a calendar window before the system is in breach of its reliability commitments. Operationally, the error budget converts an abstract percentage target into a concrete, finite resource that engineering and product teams consume when they ship risk.
+
+**Formula:**
+
+```
+error_budget_minutes = window_minutes × (1 − slo_target)
+```
+
+For a 30-day window (43,200 minutes):
+
+| SLO Target | Error Budget (minutes/month) | Error Budget (%) |
+|---|---|---|
+| 99.9% | 43.2 min | 0.1% |
+| 99.5% | 216.0 min | 0.5% |
+| 99.0% | 432.0 min | 1.0% |
+| 95.0% | 2,160.0 min | 5.0% |
+| 85.0% | 6,480.0 min | 15.0% |
+
+The budget is a shared resource. Every failed request, slow response, crash, or incomplete session consumes it. Planned maintenance, canary rollouts, and failed deploys all draw from the same pool. When the budget is exhausted, the team is obligated to stop spending it (feature freezes, rollbacks) and invest in reliability work until the budget is replenished at the start of the next window.
+
+### 19.2 Error Budget per SLO
+
+The following tables derive the per-SLO monthly error budget from the targets defined in §2.1 (platform SLOs) and §18.5 (CV pipeline SLOs), and from the synthetic probe availability targets implicit in §16.2.
+
+**Measurement window:** rolling 30-day calendar window (43,200 minutes). All "budget consumed" columns are evaluated by the `slo_budget_tracking` table defined in §19.5.
+
+#### 19.2.1 Platform SLOs (from §2.1)
+
+| SLO ID | SLI | Target | Budget (min/month) | Budget (%) | Tier | Owner |
+|---|---|---|---|---|---|---|
+| SLO-01 | API availability (`/health` 200 rate) | 99.9% | 43.2 | 0.10% | P0 | devops-lead |
+| SLO-02 | API P95 latency ≤ 1,500 ms | 99.5% | 216.0 | 0.50% | P0 | platform-engineer |
+| SLO-03 | Auth token exchange success rate | 99.9% | 43.2 | 0.10% | P0 | platform-engineer |
+| SLO-04 | Workout set write success rate | 99.5% | 216.0 | 0.50% | P0 | platform-engineer |
+| SLO-05 | AI coaching turn P95 latency ≤ 4,000 ms | 99.0% | 432.0 | 1.00% | P1 | ml-engineer |
+| SLO-06 | Crash-free sessions (mobile) | 99.5% | 216.0 | 0.50% | P0 | platform-engineer |
+| SLO-07 | Background task success rate | 99.9% | 43.2 | 0.10% | P1 | devops-lead |
+| SLO-08 | Database reachability | 99.9% | 43.2 | 0.10% | P0 | devops-lead |
+
+#### 19.2.2 CV Pipeline SLOs (from §18.5)
+
+| SLO ID | SLI | Target | Budget (min/month) | Budget (%) | Tier | Owner |
+|---|---|---|---|---|---|---|
+| CV-SLO-01 | CV session completion rate ≥ 85% | 85.0% | 6,480.0 | 15.00% | P1 | ml-engineer |
+| CV-SLO-02 | CV tracking_lost rate ≤ 8% | 92.0%* | 3,456.0 | 8.00% | P1 | ml-engineer |
+| CV-SLO-03 | On-device inference P95 < 30 ms (iOS) | 99.0% | 432.0 | 1.00% | P1 | platform-engineer |
+| CV-SLO-04 | On-device inference P95 < 50 ms (Android) | 99.0% | 432.0 | 1.00% | P1 | platform-engineer |
+| CV-SLO-05 | Camera cold start P95 < 800 ms (iOS) | 99.0% | 432.0 | 1.00% | P1 | platform-engineer |
+| CV-SLO-06 | Avg keypoint confidence P50 ≥ 0.80 | 99.0% | 432.0 | 1.00% | P1 | ml-engineer |
+| CV-SLO-07 | High-confidence session rate ≥ 70% | 95.0% | 2,160.0 | 5.00% | P1 | ml-engineer |
+| CV-SLO-08 | Frame below-threshold ratio ≤ 0.12 | 95.0% | 2,160.0 | 5.00% | P1 | ml-engineer |
+
+*CV-SLO-02 is expressed as a success-rate equivalent: an 8% floor means 92% of sessions must not be tracking_lost.
+
+#### 19.2.3 Synthetic Probe Availability Budgets (from §16.2)
+
+Synthetic probes each have an implicit availability SLO derived from their criticality. P0 probes inherit the 99.9% platform availability target; P1 probes use 99.5%; P2 probes use 99.0%.
+
+| Probe ID | Name | Criticality | Implied SLO | Budget (min/month) |
+|---|---|---|---|---|
+| S-001 | API Health | P0 | 99.9% | 43.2 |
+| S-002 | Auth Token Exchange | P0 | 99.9% | 43.2 |
+| S-003 | Workout Logging API | P0 | 99.9% | 43.2 |
+| S-004 | AI Coaching Turn | P1 | 99.5% | 216.0 |
+| S-005 | SSO SAML Metadata | P0 | 99.9% | 43.2 |
+| S-006 | SCIM User List | P1 | 99.5% | 216.0 |
+| S-007 | Audit Log Write | P0 | 99.9% | 43.2 |
+| S-008 | R2 Backup Freshness | P1 | 99.5% | 216.0 |
+| S-009 | CDN Asset Reachability | P0 | 99.9% | 43.2 |
+| S-010 | Status Page API | P2 | 99.0% | 432.0 |
+| S-011 | Stripe Webhook Endpoint | P1 | 99.5% | 216.0 |
+| S-012 | PostHog Ingest Health | P2 | 99.0% | 432.0 |
+
+---
+
+### 19.3 Burn Rate Alerting
+
+Burn rate quantifies how fast the error budget is being consumed relative to the rate at which it replenishes. A burn rate of 1× means the budget is being consumed at exactly the rate it refills — the system will end the 30-day window with 0% budget remaining. A burn rate of 14.4× means the 30-day budget would be exhausted in approximately 50 hours.
+
+FORM uses the Google SRE Workbook two-window, two-severity burn rate model. Two independent windows must simultaneously exceed their respective burn rate thresholds before an alert fires; this suppresses false positives from transient spikes while ensuring slow-moving degradations are caught before the budget is materially impacted.
+
+**Burn rate thresholds:**
+
+| Severity | Short Window | Short Window Burn Rate | Long Window | Long Window Burn Rate | Budget Consumed at Alert | Response |
+|---|---|---|---|---|---|---|
+| **P0 (page immediately)** | 1 hour | ≥ 14.4× | 5 minutes | ≥ 14.4× | ~2% | PagerDuty — P0 escalation |
+| **P1 (page business-hours)** | 6 hours | ≥ 6.0× | 30 minutes | ≥ 6.0× | ~5% | PagerDuty — P1 escalation |
+| **Slow burn (Slack only)** | 3 days | ≥ 1.0× | 1 hour | ≥ 1.0× | On pace to exhaust | Slack `#platform-alerts` |
+
+**Why 14.4× for P0:** at 14.4× burn rate, a 30-day budget is exhausted in 50 hours (30 days ÷ 14.4 = 2.08 days). A 1-hour confirmation window ensures the signal is real before paging.
+
+**Why 6.0× for P1:** at 6.0×, the budget exhausts in ~5 days. A 6-hour window catches degradation that is sustained but not acute — integration failures, memory leaks, gradual model quality drift.
+
+#### 19.3.1 Postgres Alert Rules
+
+The burn rate is computed from the `slo_budget_tracking` table (§19.5). The following queries are scheduled as Better Stack metric checks at 1-minute resolution.
+
+**Fast burn detection (P0 — runs every 1 minute):**
+
+```sql
+-- slo_burn_rate_fast.sql
+-- Alert condition: burn_rate_1h >= 14.4 for any P0 SLO
+-- Evaluated by Better Stack against Supabase read replica
+
+SELECT
+    slo_id,
+    burn_rate_1h,
+    budget_consumed_pct,
+    window_end
+FROM slo_budget_tracking
+WHERE
+    window_end >= NOW() - INTERVAL '2 minutes'   -- most recent completed window
+    AND burn_rate_1h >= 14.4
+    AND slo_id IN (
+        'SLO-01', 'SLO-02', 'SLO-03', 'SLO-04',
+        'SLO-06', 'SLO-07', 'SLO-08',            -- P0 platform SLOs
+        'S-001',  'S-002',  'S-003',  'S-005',
+        'S-007',  'S-009'                          -- P0 synthetic probes
+    )
+ORDER BY burn_rate_1h DESC;
+-- Non-empty result → fire PagerDuty P0
+```
+
+**Slow burn detection (P1 — runs every 5 minutes):**
+
+```sql
+-- slo_burn_rate_slow.sql
+-- Alert condition: burn_rate_6h >= 6.0 for any SLO
+
+SELECT
+    slo_id,
+    burn_rate_6h,
+    budget_consumed_pct,
+    window_end
+FROM slo_budget_tracking
+WHERE
+    window_end >= NOW() - INTERVAL '10 minutes'
+    AND burn_rate_6h >= 6.0
+ORDER BY burn_rate_6h DESC;
+-- Non-empty result → fire PagerDuty P1
+```
+
+**Slow-burn trending (Slack — runs every 1 hour):**
+
+```sql
+-- slo_burn_rate_trend.sql
+-- Alert condition: 3-day rolling burn_rate >= 1.0 (on pace to exhaust budget)
+
+SELECT
+    slo_id,
+    AVG(burn_rate_6h) AS burn_rate_3d_avg,
+    MAX(budget_consumed_pct) AS budget_consumed_pct_current
+FROM slo_budget_tracking
+WHERE window_end >= NOW() - INTERVAL '3 days'
+GROUP BY slo_id
+HAVING AVG(burn_rate_6h) >= 1.0
+ORDER BY burn_rate_3d_avg DESC;
+-- Non-empty result → post to Slack #platform-alerts
+```
+
+#### 19.3.2 PagerDuty Routing Rules
+
+```yaml
+# pagerduty-routing.yaml — SLO burn rate services
+
+services:
+  - name: "FORM SLO P0 Burn Rate"
+    escalation_policy: "P0 — Platform On-Call"
+    alert_grouping: "intelligent"
+    dedup_key_template: "slo-burn-p0-{{ slo_id }}-{{ window_hour }}"
+    auto_resolve_timeout: 1800    # 30 min — re-evaluate after incident window
+    urgency: high
+
+  - name: "FORM SLO P1 Burn Rate"
+    escalation_policy: "P1 — Platform Business Hours"
+    alert_grouping: "intelligent"
+    dedup_key_template: "slo-burn-p1-{{ slo_id }}-{{ window_6h }}"
+    auto_resolve_timeout: 3600
+    urgency: low
+```
+
+**Deduplication:** Burn rate alerts for the same `slo_id` within the same 1-hour epoch (P0) or 6-hour epoch (P1) are merged into a single PagerDuty incident. This prevents alert storms when a systemic failure degrades multiple correlated SLOs simultaneously (e.g., a Supabase outage simultaneously burning SLO-03, SLO-04, SLO-07, SLO-08, and S-002).
+
+---
+
+### 19.4 Error Budget Policies
+
+These policies govern what engineering and product may do at each budget level. They are enforced by the devops-lead and take precedence over feature roadmap velocity when budget thresholds are crossed. Policy state is surfaced in the Metabase "SLO Error Budget Dashboard" (§19.7) and posted to Slack `#engineering` each Monday morning.
+
+| Budget Remaining | Policy State | Deploy Velocity | Additional Constraints |
+|---|---|---|---|
+| **> 50%** | Green — Normal | Unrestricted | Standard change management; canary deploys encouraged |
+| **25%–50%** | Yellow — Caution | Peak-hour freeze (UTC 18:00–22:00) | All deploys require devops-lead approval; post-deploy monitoring extended to 2 hours |
+| **10%–25%** | Orange — Restricted | All non-critical deploys frozen | Only P0 reliability fixes may deploy; incident review required before resuming normal velocity; devops-lead notifies founder |
+| **< 10%** | Red — Freeze | All deploys frozen | P0 incident declared per INCIDENT_RESPONSE.md §12; SLA credit triggers evaluated; freeze lifted only after SRE review session and explicit devops-lead sign-off |
+| **Exhausted (0%)** | Critical — P0 Incident | All deploys frozen | P0 incident declared per INCIDENT_RESPONSE.md §12; SLA credit obligations per INCIDENT_RESPONSE.md §12.4 apply; post-mortem required within 5 business days; next 30-day window starts with Orange policy until reliability improvements are verified |
+
+**Policy enforcement mechanism:** The `slo_budget_tracking` materialized view exposes a `policy_state` computed column (see §19.6). A GitHub Actions pre-deploy check queries this column for the relevant SLOs; if any P0 SLO is in Orange or Red state, the deployment workflow pauses and requires explicit override via a GitHub environment approval gate. The override is logged in the audit trail.
+
+**Peak-hour definition (UTC 18:00–22:00):** This window covers European evening (20:00–00:00 CET) and US East Coast prime-time (14:00–18:00 ET), which represent FORM's highest-traffic periods based on PostHog session volume data.
+
+---
+
+### 19.5 `slo_budget_tracking` Table Schema
+
+This table is the source of truth for error budget state. It is written by a scheduled Cloudflare Worker (cron: every 5 minutes) that computes good/total event counts from Supabase and Better Stack APIs, then upserts a row per SLO per window.
+
+```sql
+-- migrations/YYYYMMDD_slo_budget_tracking.sql
+
+CREATE TABLE IF NOT EXISTS slo_budget_tracking (
+    id                  BIGSERIAL PRIMARY KEY,
+    slo_id              TEXT        NOT NULL,           -- e.g. 'SLO-01', 'CV-SLO-01', 'S-003'
+    window_start        TIMESTAMPTZ NOT NULL,           -- start of the 30-day rolling window
+    window_end          TIMESTAMPTZ NOT NULL,           -- timestamp of this measurement (≈ NOW())
+    target_pct          NUMERIC(6,4) NOT NULL,          -- e.g. 99.9000 for 99.9%
+    good_events         BIGINT      NOT NULL,           -- count of good (successful) events in window
+    total_events        BIGINT      NOT NULL,           -- count of total events in window
+    budget_consumed_pct NUMERIC(8,4) GENERATED ALWAYS AS (
+        CASE
+            WHEN total_events = 0 THEN 0
+            ELSE GREATEST(
+                0,
+                ((1 - target_pct / 100.0) - (1.0 - good_events::NUMERIC / total_events))
+                / (1 - target_pct / 100.0) * (-100.0) + 100.0
+            )
+        END
+    ) STORED,           -- % of monthly budget consumed; 0 = none consumed, 100 = fully exhausted
+    burn_rate_1h        NUMERIC(10,4),                  -- computed by Worker: actual_error_rate_1h / (1 - target_pct/100)
+    burn_rate_6h        NUMERIC(10,4),                  -- computed by Worker: actual_error_rate_6h / (1 - target_pct/100)
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT slo_budget_tracking_positive_events CHECK (total_events >= 0 AND good_events >= 0),
+    CONSTRAINT slo_budget_tracking_good_lte_total  CHECK (good_events <= total_events),
+    CONSTRAINT slo_budget_tracking_target_range    CHECK (target_pct BETWEEN 0 AND 100),
+    CONSTRAINT slo_budget_tracking_window_order    CHECK (window_end > window_start)
+);
+
+-- Unique: one row per SLO per 5-minute window_end bucket
+CREATE UNIQUE INDEX IF NOT EXISTS uix_slo_budget_tracking_slo_window
+    ON slo_budget_tracking (slo_id, window_end);
+
+-- Query pattern: latest state per SLO
+CREATE INDEX IF NOT EXISTS idx_slo_budget_tracking_slo_created
+    ON slo_budget_tracking (slo_id, created_at DESC);
+
+-- Query pattern: burn rate alerts (scan recent rows across all SLOs)
+CREATE INDEX IF NOT EXISTS idx_slo_budget_tracking_window_end
+    ON slo_budget_tracking (window_end DESC);
+
+-- Row-level security: slo_budget_reader role may SELECT; slo_budget_writer role may INSERT/UPDATE
+ALTER TABLE slo_budget_tracking ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY slo_budget_select ON slo_budget_tracking
+    FOR SELECT TO slo_budget_reader USING (true);
+
+CREATE POLICY slo_budget_insert ON slo_budget_tracking
+    FOR INSERT TO slo_budget_writer WITH CHECK (true);
+
+COMMENT ON TABLE slo_budget_tracking IS
+    'Rolling 30-day error budget state per SLO. Written by the slo-budget-worker Cloudflare Worker every 5 minutes. Read by Better Stack alert queries, Metabase dashboards, and the GitHub Actions pre-deploy gate.';
+
+COMMENT ON COLUMN slo_budget_tracking.burn_rate_1h IS
+    'Burn rate over the last 1 hour: (actual_error_rate_1h / allowable_error_rate). '
+    '1.0 = consuming budget at exactly the replenishment rate. 14.4 = P0 threshold.';
+
+COMMENT ON COLUMN slo_budget_tracking.burn_rate_6h IS
+    'Burn rate over the last 6 hours: (actual_error_rate_6h / allowable_error_rate). '
+    '6.0 = P1 threshold.';
+```
+
+**Retention:** Rows older than 90 days are deleted by a `pg_cron` job running daily at 03:00 UTC:
+
+```sql
+SELECT cron.schedule(
+    'slo_budget_tracking_cleanup',
+    '0 3 * * *',
+    $$DELETE FROM slo_budget_tracking WHERE created_at < NOW() - INTERVAL '90 days'$$
+);
+```
+
+---
+
+### 19.6 `slo_budget_weekly` Materialized View
+
+This view rolls up the per-5-minute `slo_budget_tracking` rows into weekly summaries. It is the primary data source for the Metabase "SLO Error Budget Dashboard" (§19.7) and for the Monday Slack digest.
+
+```sql
+-- migrations/YYYYMMDD_slo_budget_weekly.sql
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS slo_budget_weekly AS
+SELECT
+    slo_id,
+    DATE_TRUNC('week', window_end AT TIME ZONE 'UTC') AS week_start,
+
+    -- SLO target (should be constant per SLO; take the max to surface misconfiguration)
+    MAX(target_pct)                                   AS target_pct,
+
+    -- Budget consumption: max consumed in the week = worst point reached
+    MAX(budget_consumed_pct)                          AS budget_consumed_pct_peak,
+
+    -- Budget consumption: latest value in the week = current state
+    (ARRAY_AGG(budget_consumed_pct ORDER BY window_end DESC))[1]
+                                                      AS budget_consumed_pct_eow,
+
+    -- Burn rates: weekly averages and peaks
+    AVG(burn_rate_1h)                                 AS burn_rate_1h_avg,
+    MAX(burn_rate_1h)                                 AS burn_rate_1h_peak,
+    AVG(burn_rate_6h)                                 AS burn_rate_6h_avg,
+    MAX(burn_rate_6h)                                 AS burn_rate_6h_peak,
+
+    -- Event volume
+    SUM(total_events)                                 AS total_events_week,
+    SUM(good_events)                                  AS good_events_week,
+
+    -- Derived: actual error rate for the week
+    CASE
+        WHEN SUM(total_events) = 0 THEN NULL
+        ELSE ROUND(
+            (1.0 - SUM(good_events)::NUMERIC / SUM(total_events)) * 100,
+            4
+        )
+    END                                               AS actual_error_rate_pct,
+
+    -- Policy state at end of week
+    CASE
+        WHEN (ARRAY_AGG(budget_consumed_pct ORDER BY window_end DESC))[1] >= 100 THEN 'Critical'
+        WHEN (ARRAY_AGG(budget_consumed_pct ORDER BY window_end DESC))[1] >= 90  THEN 'Red'
+        WHEN (ARRAY_AGG(budget_consumed_pct ORDER BY window_end DESC))[1] >= 75  THEN 'Orange'
+        WHEN (ARRAY_AGG(budget_consumed_pct ORDER BY window_end DESC))[1] >= 50  THEN 'Yellow'
+        ELSE 'Green'
+    END                                               AS policy_state_eow,
+
+    COUNT(*)                                          AS sample_count,
+    MIN(window_end)                                   AS week_first_sample,
+    MAX(window_end)                                   AS week_last_sample
+
+FROM slo_budget_tracking
+GROUP BY slo_id, DATE_TRUNC('week', window_end AT TIME ZONE 'UTC')
+WITH DATA;
+
+-- Refresh every Monday at 06:00 UTC (after weekly data is complete)
+SELECT cron.schedule(
+    'slo_budget_weekly_refresh',
+    '0 6 * * 1',
+    $$REFRESH MATERIALIZED VIEW CONCURRENTLY slo_budget_weekly$$
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uix_slo_budget_weekly_slo_week
+    ON slo_budget_weekly (slo_id, week_start);
+
+CREATE INDEX IF NOT EXISTS idx_slo_budget_weekly_week_start
+    ON slo_budget_weekly (week_start DESC);
+
+COMMENT ON MATERIALIZED VIEW slo_budget_weekly IS
+    'Weekly rollup of slo_budget_tracking. Refreshed every Monday 06:00 UTC. '
+    'Primary source for Metabase SLO Error Budget Dashboard and Monday Slack digest.';
+```
+
+---
+
+### 19.7 Metabase Dashboard: "SLO Error Budget Dashboard"
+
+**Access:** devops-lead, platform-engineer, ml-engineer, founder.
+**Refresh cadence:** live query for panels 1–3 (5-minute auto-refresh); panels 4–6 query `slo_budget_weekly` (daily refresh sufficient).
+**Data sources:** `slo_budget_tracking` (panels 1–3), `slo_budget_weekly` (panels 4–6).
+
+#### Panel 1 — Error Budget Gauges by SLO Tier
+
+**Type:** gauge array (one gauge per SLO, grouped by tier: P0 Platform / P1 Platform / CV Pipeline / Synthetic P0 / Synthetic P1).
+**Source:** `slo_budget_tracking` — latest row per `slo_id` (WHERE `window_end >= NOW() - INTERVAL '10 minutes'`).
+**Display:** radial gauge 0–100%; colour bands: green (< 50% consumed), yellow (50–75%), orange (75–90%), red (> 90%), critical/black (100%).
+**Purpose:** single-glance view of which SLOs are under pressure. Linked to the corresponding PagerDuty service for one-click incident creation.
+
+#### Panel 2 — Burn Rate Trend (Rolling 7 Days)
+
+**Type:** multi-line time-series chart.
+**Source:** `slo_budget_tracking` — `burn_rate_1h` and `burn_rate_6h` per `slo_id`, filtered to the last 7 days.
+**Display:** one line per SLO; reference lines at 1.0× (steady state), 6.0× (P1 threshold), 14.4× (P0 threshold). Log scale on Y-axis to show slow-burn and fast-burn on the same chart. Interactive: click a line to drill to the SLO detail view.
+**Purpose:** catch accelerating burn before it crosses alert thresholds; identify correlated burn events (e.g., multiple SLOs spiking simultaneously → systemic incident vs. isolated regression).
+
+#### Panel 3 — Top-5 Budget Consumers (Current 30-Day Window)
+
+**Type:** horizontal bar chart.
+**Source:** `slo_budget_tracking` — `MAX(budget_consumed_pct)` per `slo_id` over the current 30-day window, ordered descending, limited to 5.
+**Display:** bars with value labels; colour-coded by policy state. Table below bar chart with columns: `slo_id`, `target_pct`, `budget_consumed_pct`, `burn_rate_6h`, `policy_state`.
+**Purpose:** prioritise reliability investment; ensure the team always knows which SLO is closest to exhaustion.
+
+#### Panel 4 — 30-Day Rolling View (Weekly Trend)
+
+**Type:** stacked area chart.
+**Source:** `slo_budget_weekly` — `budget_consumed_pct_eow` per `slo_id` per `week_start`, rolling 13 weeks (approximately 3 months of history).
+**Display:** one area per SLO tier (P0 Platform, P1 Platform, CV Pipeline); stacked to show aggregate budget pressure; colour bands correspond to policy states. X-axis: week_start. Y-axis: budget_consumed_pct_eow (0–100%).
+**Purpose:** reveal seasonal patterns and trend lines; evidence artefact for quarterly SRE review and SOC 2 auditor.
+
+#### Panel 5 — Enterprise Tenant Budget Breakdown
+
+**Type:** table with conditional formatting.
+**Source:** `slo_budget_tracking` joined to `tenants` — budget state for SLOs that have per-tenant variants (CV-SLO-01, CV-SLO-02, S-005, S-006). Grouped by `tenant_id`.
+**Display:** columns: `tenant_name`, `slo_id`, `budget_consumed_pct`, `burn_rate_6h`, `policy_state_eow`. Rows sorted by `budget_consumed_pct DESC`. Conditional formatting: red background for `policy_state_eow IN ('Orange', 'Red', 'Critical')`.
+**Note:** k-anonymity floor of n ≥ 5 sessions applies; tenants below threshold are suppressed (consistent with §18.8 privacy constraints).
+**Purpose:** identify enterprise tenants driving disproportionate SLO budget consumption; input to CSM outreach and enterprise SLA credit evaluation.
+
+#### Panel 6 — Audit Trail: Budget-Exhaustion Events
+
+**Type:** table (append-only log).
+**Source:** `slo_budget_tracking` filtered to `budget_consumed_pct >= 100`, joined to PagerDuty incident API (via Metabase HTTP data source) for linked incident IDs.
+**Display:** columns: `window_end` (timestamp of exhaustion detection), `slo_id`, `burn_rate_1h` at exhaustion, `burn_rate_6h` at exhaustion, `pagerduty_incident_id` (linked), `resolved_at` (from PagerDuty), `postmortem_url` (manual field, populated by devops-lead after post-mortem). Sorted by `window_end DESC`.
+**Purpose:** auditor evidence artefact for CC4.1 (breach detection) and CC7.2 (response logging); input to the "next-window Orange policy" decision after budget exhaustion per §19.4.
+
+---
+
+### 19.8 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | How §19 Satisfies It |
+|---|---|
+| **CC4.1 — Monitoring of controls** | The `slo_budget_tracking` table provides continuous, automated measurement of whether each SLO control is operating within its defined tolerance. The burn rate alert rules (§19.3) are detective controls that fire before the tolerance is fully exhausted — satisfying the "timely detection" requirement of CC4.1. Panel 6 of the Metabase dashboard is the auditor-accessible evidence artefact showing when controls were breached and how quickly they were remediated. |
+| **CC7.2 — System monitoring** | Error budget burn rate is a quantitative, time-stamped system monitoring signal. Every row in `slo_budget_tracking` is an immutable timestamped record of system health state. The 90-day retention policy ensures auditors can query historical monitoring data for the full SOC 2 audit period. |
+| **A1.1 — Availability commitments** | The error budget per SLO (§19.2) directly encodes FORM's availability commitments as measurable, numeric targets. The `slo_budget_weekly` materialized view provides the weekly rollup that demonstrates whether commitments were met. Auditors may query `policy_state_eow` to verify that FORM's availability posture remained compliant across the audit window. |
+| **A1.2 — Availability monitoring and response** | The error budget policy (§19.4) defines a documented, graduated response to availability degradation — from unrestricted velocity (> 50% budget) to mandatory P0 incident declaration (budget exhausted). The GitHub Actions pre-deploy gate enforces the policy programmatically. Policy state changes are logged in the audit trail (Panel 6). |
+| **CC5.2 — Control activities to mitigate risk** | The deploy freeze policy (§19.4) is a risk mitigation control: when the error budget is under pressure, it restricts the primary mechanism by which new risk is introduced (software deployments). The PagerDuty deduplication rules (§19.3.2) are a control activity that prevents alert fatigue from masking real incidents. The `slo_budget_writer` and `slo_budget_reader` Postgres roles enforce separation of concerns between the data pipeline and the monitoring/reporting layer. |
+
+**Auditor evidence artefacts:**
+- Monthly CSV exports of `slo_budget_weekly` are stored in `compliance/evidence/slo-budget-YYYY-MM.csv`.
+- Budget-exhaustion events (Panel 6) are exported to `compliance/evidence/slo-exhaustion/<SLO_ID>-<YYYYMMDD>/` including the linked PagerDuty incident timeline and post-mortem document.
+- The GitHub Actions pre-deploy gate override log is stored in `compliance/evidence/deploy-overrides/YYYY-MM.csv` (columns: `timestamp`, `slo_id`, `policy_state_at_override`, `approver`, `rationale`).
+
+---
+
+### 19.9 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Write `migrations/YYYYMMDD_slo_budget_tracking.sql` (table DDL, indexes, RLS policies, `pg_cron` cleanup job) | platform-engineer | P0 | M3 |
+| Write `migrations/YYYYMMDD_slo_budget_weekly.sql` (materialized view DDL, Monday 06:00 UTC `pg_cron` refresh) | platform-engineer | P0 | M3 |
+| Create `slo_budget_writer` and `slo_budget_reader` Postgres roles with scoped grants | platform-engineer | P0 | M3 |
+| Implement `slo-budget-worker` Cloudflare Worker (cron: every 5 minutes; fetches good/total counts from Supabase + Better Stack heartbeat API; upserts `slo_budget_tracking`; computes `burn_rate_1h` and `burn_rate_6h`) | devops-lead | P0 | M3 |
+| Configure Better Stack metric alerts using `slo_burn_rate_fast.sql` (1-minute polling; P0 PagerDuty escalation on `burn_rate_1h >= 14.4` for P0 SLOs) | devops-lead | P0 | M3 |
+| Configure Better Stack metric alerts using `slo_burn_rate_slow.sql` (5-minute polling; P1 PagerDuty escalation on `burn_rate_6h >= 6.0` for all SLOs) | devops-lead | P0 | M3 |
+| Configure Better Stack hourly slow-burn trend alert using `slo_burn_rate_trend.sql` (Slack `#platform-alerts` on 3-day avg `burn_rate_6h >= 1.0`) | devops-lead | P1 | M3 |
+| Configure PagerDuty "FORM SLO P0 Burn Rate" and "FORM SLO P1 Burn Rate" services with dedup key templates and escalation policies (§19.3.2) | devops-lead | P0 | M3 |
+| Add GitHub Actions pre-deploy gate: query `slo_budget_tracking` for P0 SLO `policy_state`; pause workflow if Orange/Red; require environment approval gate; log overrides to `compliance/evidence/deploy-overrides/` | devops-lead | P1 | M4 |
+| Build Metabase "SLO Error Budget Dashboard" — 6 panels per §19.7 spec; set auto-refresh 5 minutes for panels 1–3 | data-engineer | P1 | M4 |
+| Configure Monday 07:00 UTC Slack `#engineering` digest: query `slo_budget_weekly` for prior week; post policy state per SLO tier; flag any SLO that entered Orange/Red during the week | devops-lead | P1 | M4 |
+| Add monthly CSV export of `slo_budget_weekly` to `compliance/evidence/slo-budget-YYYY-MM.csv` (GitHub Actions schedule: first day of month, 08:00 UTC) | devops-lead | P2 | M4 |
+| Add budget-exhaustion event export to `compliance/evidence/slo-exhaustion/` on every P0 budget incident (triggered by PagerDuty webhook → Worker → R2 export) | devops-lead | P2 | M4 |
+
+---
+
+*v0.6 additions: §19 SLO Error Budget Management — error budget concept formalised with per-SLO budget tables covering 8 platform SLOs, 8 CV pipeline SLOs, and 12 synthetic probes; Google SRE-style two-window burn rate alerting (fast burn 14.4× / 1 hour → P0, slow burn 6.0× / 6 hours → P1) with concrete Postgres queries and PagerDuty deduplication rules; graduated deploy-freeze policy (Green/Yellow/Orange/Red/Critical) enforced via GitHub Actions gate with override audit trail; `slo_budget_tracking` Postgres schema with generated `budget_consumed_pct` column, burn rate columns, RLS policies, and 90-day retention cleanup; `slo_budget_weekly` materialized view with Monday 06:00 UTC pg_cron refresh; Metabase "SLO Error Budget Dashboard" spec (6 panels: budget gauges, burn rate trend, top-5 consumers, 30-day rolling view, enterprise tenant breakdown, budget-exhaustion audit trail); SOC 2 CC4.1/CC7.2/A1.1/A1.2/CC5.2 evidence mapping with compliance artefact export paths; thirteen-item implementation checklist across M3/M4.*
