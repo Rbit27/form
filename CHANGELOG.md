@@ -6,6 +6,17 @@
 
 ---
 
+## [1.9.8] — 2026-05-23
+
+### Added
+- `docs/DATA_MODEL.md` §18 — Notification & Webhook Event Queue Schema (v0.8→v0.9). 23-value `webhook_event_type` enum covering training lifecycle, streak events (DEC-013 two-miss grace), auth/SSO/SCIM, enterprise lifecycle, wearable sync, system events. `notifications` table: in-app/push/email with soft-delete, RLS (user self-read + tenant admin history + form_system). `webhook_endpoints` table: HTTPS-enforced, AES-256-GCM encrypted signing secret, auto-deactivation at 10 consecutive failures, GIN index on events[]. `webhook_deliveries` table: idempotency via UNIQUE(endpoint_id, idempotency_key), response_body capped 1 KB, exponential backoff (1m→5m→30m→2h→8h→24h, max 6 attempts), HMAC-SHA256 signing with timing-safe verification. GDPR Art.17 erasure: notifications hard-deleted, webhook_deliveries payload-scrubbed in-place within 24h, `erasure.webhook_payload_scrubbed` DEC-030 event. 9 indexes aligned with §11 strategy. 12 DEC-030 audit events. 3 pg_cron maintenance jobs (03:15/03:20/03:25 UTC). Privacy: email excluded from payloads by default; `email_in_webhooks` feature flag requires DPA. 14-item migration checklist, 18-item implementation checklist (M3–M5).
+
+### Changed
+- `docs/DATA_MODEL.md` — ToC updated §18; header bumped v0.8→v0.9.
+- `VERSION` → 1.9.8
+
+---
+
 ## [1.9.7] — 2026-05-23
 
 ### Added

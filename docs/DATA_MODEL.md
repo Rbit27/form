@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v0.8
+# FORM · Multi-Tenant Data Model v0.9
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -25,6 +25,7 @@
 15. [Computer Vision (CV) Pose Estimation Data Schema](#15-computer-vision-cv-pose-estimation-data-schema)
 16. [Enterprise Contract & Pilot Lifecycle Schema](#16-enterprise-contract--pilot-lifecycle-schema)
 17. [Enterprise Admin Reporting Schema — Aggregate-Only Data Model & Privacy-Floor Enforcement](#17-enterprise-admin-reporting-schema--aggregate-only-data-model--privacy-floor-enforcement)
+18. [Notification & Webhook Event Queue Schema](#18-notification--webhook-event-queue-schema)
 
 ---
 
@@ -4100,3 +4101,833 @@ Test failures block deployment via `scripts/ci/privacy-floor-gate.sh`.
 *v0.7 additions: §16 Enterprise Contract & Pilot Lifecycle Schema — closes the schema gap for pilot and contract tracking referenced in ENTERPRISE.md §Pricing, §Implementation timeline, and enterprise.html. `tenants.lifecycle_status` TEXT column with 5-state machine (pilot → active → expired/suspended/churned) and Worker access gate. `tenant_pilots` table: pilot seat cap (10–500), 90-day `ends_at`, fixed-schema JSONB `success_criteria` (activation_rate_pct, weekly_engagement_pct, nps_floor, min_active_seats, evaluation_date), status machine (active/extended/converted/expired/declined), CSM owner handle, internal_notes PII prohibition with weekly content-scan. `tenant_contracts` table: contract_ref, plan, seats_contracted (min 50), arr_cents (FORM-internal only — excluded from form_api RLS and tenant_contract_portal view), billing_period (annual/2year/3year), po_number, start_at/end_at, auto_renew + renewal_notice_days, Stripe subscription ID, partial unique index on (tenant_id) WHERE status = 'active'. Seat enforcement: `assertSeatAvailable()` TypeScript in Workers provisioning layer; FOR UPDATE SKIP LOCKED TOCTOU protection; 402 response with CSM contact; seat_limit_enforcement_triggered DEC-030 event with attempted_email: null. `tenant_seat_utilization` materialized view: active seats, scim-provisioned count, 7d/30d utilization, utilization_pct_7d; k-anonymity NULL suppression below n=15; nightly 02:00 UTC pg_cron refresh; arr_cents absent. Renewal notice pg_cron (09:00 UTC) + Cloudflare Worker (09:05 UTC): Slack to #csm-renewals at renewal_notice_days, PagerDuty at ≤14 days. 14 DEC-030 HMAC-chained audit events including HIGH-severity tenant.contract_terminated and tenant.access_suspended; attempted_email: null invariant CI-enforced. Data retention: tenant_contracts 7 years (financial records), tenant_pilots 2-year soft-delete + 5-year hard-delete. Art. 28 DPA: dpa_ref TEXT column required before EU pilot activation (closes P-GAP-002 DPA tracking). SOC 2 mapping: CC6.1 (seat enforcement), CC6.2 (contract-as-authorisation), CC9.1 (renewal notice), CC9.2 (contract record), A1.1 (SLA tier from plan), PI1.4 (processing integrity), C1.2 (arr_cents confidential). 14-item implementation checklist (7× P0, 4× P1, 2× P2, 1× Pre-EU-pilot). OQ-ENT-01: minimum seat floor validation against COST_MODEL.md §16.2 model at M6.*
 
 *v0.8 additions: §17 Enterprise Admin Reporting Schema — Aggregate-Only Data Model & Privacy-Floor Enforcement. Closes the schema gap between the §2.6 prototype `tenant_wellness_summary` and the full production admin dashboard data model. Permitted/Prohibited Metric Registry (§17.2): explicit HR-visibility table covering 12 permitted aggregate metrics (participation, WAU/MAU, form score, D30 retention, feature adoption, SCIM-group engagement, opt-in NPS) and 9 prohibited categories (individual workout rows, coaching content, health goals, body composition, meal logs, mental health data, HRV, user identity linkage, opted-out users) — 5 categories require clinical-safety veto to override. Four materialized views: `tenant_wellness_summary_v2` (production replacement for §2.6 prototype — adds `user_aggregate_consent` join, 13-week rolling window, k-anonymity CASE guard on `avg_form_score`, `REFRESH CONCURRENTLY` unique index, RLS policy); `tenant_engagement_summary` (activation_rate_pct, WAU/MAU, D30 retention with cohort-size k-gate, computed via CTEs — no `user_health_profiles` join anywhere); `tenant_feature_adoption` (CV adoption % and voice coaching adoption % — `coaching_sessions` count permitted, `coaching_turns.content` structurally absent); `tenant_cohort_breakdown` (SCIM-group engagement using §15 tables — Art. 9 sensitive-name gate replaces flagged names with `[Group name under review]`, `meets_anonymity_floor` column drives API suppression). k-Anonymity: `assert_k_anonymity()` Postgres STABLE function (p_value + p_cohort_size + p_k_floor DEFAULT 5); `applyKAnonymityGuard` + `redactSubThreshold` TypeScript in `workers/admin-reporting/k-anonymity-guard.ts`; Metabase `WHERE active_users >= 5` defence-in-depth; `tenants.reporting_k_floor INTEGER DEFAULT 5 CHECK IN (5, 10, 15)` per-tenant override for sensitive industries. Refresh schedule: pg_cron CONCURRENTLY at 02:15/02:30/02:45/03:00 UTC; stale banner at > 26h; P2 alert on cron failure. Admin reporting API: 5 endpoints under `/v1/admin/reporting/` (wellness, engagement, features, cohorts, export); no `/users` endpoint; `Last-Refreshed` header; 403 for EU tenants with `dpa_ref IS NULL`. `user_aggregate_consent` table: `opted_out BOOLEAN DEFAULT FALSE`, `consent_version TEXT`, SCIM-provisioned default NULL-consent until onboarding; Settings → Privacy opt-out effective at next refresh (< 26h); `consent_version` triggers re-solicitation on metric registry expansion. GDPR Art. 89 safeguards: pseudonymisation (no user_id in output), minimisation (no Art. 9 table joins), k-anonymity N ≥ 5, re-identification prohibition (no individual-narrowing endpoints), consent basis (`user_aggregate_consent`), DPA gate (§17.8). DEC-030 audit events: `admin.report_viewed` (LOW, 30d), `admin.report_exported` (STANDARD, 3yr, includes `suppressed_cohorts`), `admin.cohort_drill_viewed` (STANDARD, 1yr), `admin.report_suppressed` (LOW, 30d), `admin.consent_override_attempted` (HIGH, 7yr — fires P1 incident automatically). Privacy floor test suite (§17.10): 6 Jest tests including no-user_id-column assertion, k-anonymity null/pass, opted-out exclusion, no-individual-data-in-response, cohort-suppression; CI gate blocks deploy on failure. SOC 2 mapping: CC6.1 (no individual-data route), CC6.3 (tests block deploy), CC7.2 (consent_override_attempted → P1), C1.1 (prohibited registry), C1.2 (structural exclusion), P3.2 (consent version), P4.1 (opted_out gate), P6.4 (export audit events). 18-item implementation checklist (12× P0, 4× P1, 2× P2). OQ-ENT-02: k-anonymity floor sufficiency under GDPR Recital 26 for EU enterprise pilots (legal opinion required before Germany/France/Netherlands). OQ-ENT-03: consent re-solicitation mechanism on metric registry expansion.*
+
+---
+
+## 18. Notification & Webhook Event Queue Schema
+
+> Owner: `enterprise-architect` + `platform-engineer`. Review: on any new event type, webhook contract change, or quarterly.
+> Scope: in-app push notifications and enterprise webhook delivery. Consumer push is in scope; enterprise webhook delivery is enterprise-tier only.
+> References: DEC-030 (HMAC-chained audit log), docs/AUDIT_LOG_SCHEMA.md, docs/ENTERPRISE.md §Webhooks, §12 (soft delete and GDPR Art. 17 erasure), §11 (index strategy).
+
+---
+
+### 18.1 Design Principles
+
+1. **Notifications and webhook deliveries are separate concerns.** `notifications` drives in-app and push alerts for individual users. `webhook_endpoints` + `webhook_deliveries` delivers signed event payloads to enterprise customers' HTTP endpoints. Neither table fans data from the other.
+2. **Webhook payloads are contractually scoped.** Enterprise customers receive only the event types they have subscribed to, with payload content bounded by the DPA. No PII beyond what is documented in §18.7 may appear in any webhook payload.
+3. **Delivery reliability via the queue.** `webhook_deliveries` is an outbound queue. The delivery worker dequeues, signs, POSTs, and updates `status` in place. Exponential backoff with a 6-attempt cap prevents cascade load on customer endpoints.
+4. **Tenant isolation.** `tenant_id` is on every row. Cross-tenant notification or webhook delivery is a P0 bug equivalent to a cross-tenant data read.
+5. **Webhook signing secrets are encrypted at rest.** The raw HMAC key is never readable from the API response path; decryption is available only to the delivery worker running under `form_system`.
+
+---
+
+### 18.2 Event Type Enum
+
+All notification and webhook events draw from a single PostgreSQL enum. Adding a new event type requires a migration that increments this enum — enforcing that any new event is explicitly reviewed before it can appear in production payloads.
+
+```sql
+CREATE TYPE webhook_event_type AS ENUM (
+  -- Training lifecycle
+  'workout.completed',
+  'workout.abandoned',
+  'workout.set_logged',
+
+  -- Streak events (per DEC-013: grace after 2 misses)
+  'streak.maintained',
+  'streak.broken',
+  'streak.grace_period_activated',
+  'streak.milestone_reached',     -- at 7, 30, 60, 90, 180 days
+
+  -- Coaching
+  'coaching.session_started',
+  'coaching.session_ended',
+
+  -- Auth and identity
+  'auth.sso_login',
+  'auth.scim_user_provisioned',
+  'auth.scim_user_deprovisioned',
+  'auth.mfa_challenge_failed',
+  'auth.session_expired',
+
+  -- Enterprise / tenant lifecycle
+  'tenant.user_onboarded',        -- onboarding_completed_at set
+  'tenant.user_deactivated',
+  'tenant.seat_limit_approached', -- active_seats >= 90% of max_seats
+  'tenant.seat_limit_reached',    -- assertSeatAvailable() triggered (§16.5)
+  'tenant.pilot_milestone',       -- success_criteria threshold crossed (§16.3)
+  'tenant.contract_renewal_due',  -- renewal_notice_days before end_at (§16.7)
+
+  -- Wearable sync
+  'wearable.source_connected',
+  'wearable.source_disconnected',
+
+  -- System
+  'notification.delivery_failed', -- internal; not deliverable via webhook
+  'webhook.test'                  -- synthetic ping for endpoint validation
+);
+```
+
+**Governance:** New enum values require a DECISION_LOG.md entry specifying the event producer, payload schema version, and which enterprise tiers receive access. `form_admin` adds values; application code cannot define arbitrary event strings.
+
+---
+
+### 18.3 `notifications` Table
+
+In-app, push, and email notifications for individual users. Tenant-level system notifications (e.g. seat limit warnings) have `user_id = NULL` and `channel = 'email'` — they are delivered to `tenant_owner` email addresses by the notification worker.
+
+```sql
+CREATE TABLE notifications (
+  id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID          NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+
+  -- NULL for tenant-level notifications (seat limit, contract renewal, pilot milestone)
+  -- Non-null for user-targeted notifications (streak, workout complete, coaching)
+  user_id         UUID          REFERENCES users(id) ON DELETE SET NULL,
+
+  type            webhook_event_type NOT NULL,
+
+  -- Structured notification content. Schema is event-type-specific; validated by
+  -- a Zod schema in src/notifications/payload.schema.ts before insert.
+  -- MUST NOT contain PII beyond display_name and the minimum necessary for the
+  -- notification copy (e.g. streak count, exercise name from fixed catalogue).
+  -- Health data, form scores, coaching turn content: categorically excluded.
+  payload         JSONB         NOT NULL DEFAULT '{}',
+
+  channel         TEXT          NOT NULL
+                    CHECK (channel IN ('push', 'email', 'in_app', 'webhook')),
+
+  status          TEXT          NOT NULL DEFAULT 'pending'
+                    CHECK (status IN (
+                      'pending',    -- queued, not yet dispatched
+                      'sent',       -- dispatcher confirmed delivery to FCM/APNS/SES/endpoint
+                      'failed',     -- all retry attempts exhausted
+                      'cancelled'   -- superseded (e.g. user deactivated before delivery)
+                    )),
+
+  retry_count     SMALLINT      NOT NULL DEFAULT 0,
+  expires_at      TIMESTAMPTZ,              -- notification is cancelled if pending past this time
+
+  created_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
+  sent_at         TIMESTAMPTZ,              -- set when status → 'sent'
+
+  -- Soft delete per §12.1 pattern
+  deleted_at      TIMESTAMPTZ,
+  deleted_by      UUID          REFERENCES users(id) ON DELETE SET NULL
+);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Users can read their own non-deleted notifications
+CREATE POLICY notifications_user_select ON notifications
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id  = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND user_id = current_setting('app.current_user_id', TRUE)::UUID
+    AND deleted_at IS NULL
+  );
+
+-- tenant_admin / tenant_owner can read all notifications for their tenant
+-- (used in the admin dashboard notification history view)
+CREATE POLICY notifications_admin_select ON notifications
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND current_setting('app.current_role', TRUE)
+        IN ('tenant_owner', 'tenant_admin')
+    AND deleted_at IS NULL
+  );
+
+-- Soft delete: users can delete their own notifications; admins can cancel tenant-level ones
+CREATE POLICY notifications_soft_delete ON notifications
+  AS PERMISSIVE FOR UPDATE
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND (
+      user_id = current_setting('app.current_user_id', TRUE)::UUID
+      OR (
+        user_id IS NULL
+        AND current_setting('app.current_role', TRUE)
+            IN ('tenant_owner', 'tenant_admin')
+      )
+    )
+  )
+  WITH CHECK (
+    deleted_at IS NOT NULL   -- only allow setting deleted_at via this policy
+  );
+
+-- Delivery worker (form_system) reads pending notifications and updates status
+CREATE POLICY notifications_system_rw ON notifications
+  AS PERMISSIVE FOR ALL
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+```
+
+**Payload constraints:** The Zod schema referenced above rejects any payload containing keys that match the `FORBIDDEN_PROPERTY_KEYS` list from the analytics enrichment middleware (§13.3). Additionally, `coaching_turns.content`, `form_score`, `keypoints_enc`, and all wearable numeric values are on an explicit notification-layer blocklist enforced in `src/notifications/payload.schema.ts`. A CI test asserts that the production Zod schema rejects payloads containing these keys.
+
+---
+
+### 18.4 `webhook_endpoints` Table
+
+One row per customer-configured HTTP endpoint. Enterprise customers configure endpoints via the admin dashboard or the `POST /v1/admin/webhooks/endpoints` API. A single tenant may have up to 10 active endpoints (enforced at the application layer; not a DB constraint).
+
+```sql
+-- CLASSIFICATION: SENSITIVE — signing_secret_enc is an HMAC-SHA256 key that authenticates
+-- webhook deliveries as genuine FORM payloads. Key compromise allows payload forgery.
+-- Encrypted at rest using per-tenant KMS key (§5.1). Never returned in any API response.
+CREATE TABLE webhook_endpoints (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+
+  -- Customer-supplied HTTPS URL. HTTP is rejected at the application layer.
+  url                 TEXT        NOT NULL
+                        CHECK (url LIKE 'https://%'),
+
+  -- HMAC-SHA256 signing key. AES-256-GCM encrypted using the tenant's KMS-derived key
+  -- before write. Decryption available only to form_system (delivery worker).
+  -- Never returned by GET /v1/admin/webhooks/endpoints — API returns "***" after initial creation.
+  -- The raw secret is shown exactly once: at endpoint creation time, in the API response body.
+  signing_secret_enc  TEXT        NOT NULL,
+
+  -- Array of subscribed event types. Must be a subset of webhook_event_type enum values.
+  -- Empty array = endpoint receives no events (effectively disabled without deactivation).
+  events              TEXT[]      NOT NULL DEFAULT '{}',
+
+  -- FALSE: delivery worker skips this endpoint. Endpoint stays in table for audit trail.
+  active              BOOLEAN     NOT NULL DEFAULT TRUE,
+
+  -- Delivery health tracking
+  failure_count       INTEGER     NOT NULL DEFAULT 0,
+  -- Automatically deactivated (active = FALSE) when failure_count >= 10 consecutive failures.
+  -- Re-activation requires explicit tenant_admin action (POST .../reactivate).
+  last_success_at     TIMESTAMPTZ,
+  last_attempted_at   TIMESTAMPTZ,
+
+  -- Metadata for admin dashboard
+  description         TEXT,                    -- human-readable label, e.g. "Production HRIS sink"
+  created_by          UUID        REFERENCES users(id) ON DELETE SET NULL,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT uq_webhook_endpoint_url_per_tenant UNIQUE (tenant_id, url)
+);
+
+ALTER TABLE webhook_endpoints ENABLE ROW LEVEL SECURITY;
+
+-- tenant_admin / tenant_owner: read endpoint metadata (not the signing secret)
+CREATE POLICY webhook_endpoints_admin_read ON webhook_endpoints
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND current_setting('app.current_role', TRUE)
+        IN ('tenant_owner', 'tenant_admin')
+  );
+
+-- tenant_admin / tenant_owner: create, update, delete endpoints
+CREATE POLICY webhook_endpoints_admin_write ON webhook_endpoints
+  AS PERMISSIVE FOR INSERT
+  TO form_api
+  WITH CHECK (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND current_setting('app.current_role', TRUE)
+        IN ('tenant_owner', 'tenant_admin')
+  );
+
+CREATE POLICY webhook_endpoints_admin_update ON webhook_endpoints
+  AS PERMISSIVE FOR UPDATE
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND current_setting('app.current_role', TRUE)
+        IN ('tenant_owner', 'tenant_admin')
+  );
+
+-- Delivery worker: full access including signing_secret_enc decryption
+CREATE POLICY webhook_endpoints_system ON webhook_endpoints
+  AS PERMISSIVE FOR ALL
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+```
+
+**API serialisation rule:** The `GET /v1/admin/webhooks/endpoints` response serialiser explicitly excludes `signing_secret_enc`. The field is replaced with `"signing_secret": "***"`. This is enforced at the TypeScript serialiser level, not by column-level RLS — the RLS policy grants the row, but the application layer controls column projection. A CI test asserts that no API endpoint response fixture contains the literal string `signing_secret_enc`.
+
+---
+
+### 18.5 `webhook_deliveries` Table
+
+One row per delivery attempt per endpoint. The delivery worker inserts a row when it picks up an event, then updates `status`, `response_code`, and `response_body` after the HTTP call resolves. The `next_retry_at` column drives the retry queue; a nil value means no further retry is scheduled.
+
+```sql
+CREATE TABLE webhook_deliveries (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  endpoint_id       UUID        NOT NULL REFERENCES webhook_endpoints(id) ON DELETE CASCADE,
+  tenant_id         UUID        NOT NULL,       -- denormalized for RLS; no FK join on every policy check
+
+  event_type        webhook_event_type NOT NULL,
+
+  -- Full signed payload as delivered to the customer endpoint.
+  -- Schema-versioned (see §18.7). Scrubbed per §18.8 on GDPR Art. 17 erasure.
+  payload           JSONB       NOT NULL,
+
+  status            TEXT        NOT NULL DEFAULT 'pending'
+                      CHECK (status IN (
+                        'pending',      -- not yet attempted
+                        'delivered',    -- HTTP 2xx received from endpoint
+                        'failed',       -- non-2xx or network error; retries remaining
+                        'exhausted',    -- all 6 attempts failed; no further retry
+                        'cancelled'     -- endpoint deactivated before delivery
+                      )),
+
+  attempt_count     SMALLINT    NOT NULL DEFAULT 0,
+
+  -- Exponential backoff schedule (set by delivery worker after each failed attempt):
+  --   attempt 1 → +1 min
+  --   attempt 2 → +5 min
+  --   attempt 3 → +30 min
+  --   attempt 4 → +2 hours
+  --   attempt 5 → +8 hours
+  --   attempt 6 → +24 hours (final)
+  -- NULL when status = 'delivered' | 'exhausted' | 'cancelled'
+  next_retry_at     TIMESTAMPTZ,
+
+  delivered_at      TIMESTAMPTZ,   -- set when status → 'delivered'
+
+  -- HTTP response from the customer's endpoint
+  response_code     SMALLINT,
+  -- Capped at 1 KB before storage. Avoids storing sensitive customer-side error bodies.
+  -- Truncated by the delivery worker: LEFT(response_body_raw, 1024)
+  response_body     TEXT,
+
+  -- Idempotency: delivery worker can re-enqueue safely
+  -- Events sharing the same idempotency_key for the same endpoint are deduplicated
+  idempotency_key   TEXT        NOT NULL,   -- format: '<event_type>:<source_entity_id>:<epoch_ms>'
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT uq_webhook_delivery_idempotency UNIQUE (endpoint_id, idempotency_key)
+);
+
+ALTER TABLE webhook_deliveries ENABLE ROW LEVEL SECURITY;
+
+-- tenant_admin / tenant_owner: read delivery history for their tenant's endpoints
+CREATE POLICY webhook_deliveries_admin_read ON webhook_deliveries
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND current_setting('app.current_role', TRUE)
+        IN ('tenant_owner', 'tenant_admin')
+  );
+
+-- Delivery worker: full access — inserts new deliveries, updates status after HTTP call
+CREATE POLICY webhook_deliveries_system ON webhook_deliveries
+  AS PERMISSIVE FOR ALL
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- tenant_member / tenant_manager: no access to delivery history
+-- Absence of a permissive policy = zero rows (fail-closed per §3.1)
+```
+
+---
+
+### 18.6 Delivery Retry Logic
+
+The delivery worker is a Cloudflare Worker cron running every 60 seconds. It processes deliveries in `status = 'pending'` order by `next_retry_at ASC NULLS FIRST` (new deliveries have `next_retry_at = NULL` and are dispatched immediately).
+
+#### 18.6.1 Backoff Schedule
+
+| Attempt | Delay before next retry | Cumulative time elapsed |
+|---|---|---|
+| 1 (initial) | — | 0 |
+| 2 | +1 minute | ~1 min |
+| 3 | +5 minutes | ~6 min |
+| 4 | +30 minutes | ~36 min |
+| 5 | +2 hours | ~2h 36 min |
+| 6 | +8 hours | ~10h 36 min |
+| After 6 failures | Status → `exhausted`; no retry | ~1d 10h 36 min total elapsed |
+
+After `exhausted`, the delivery worker increments `webhook_endpoints.failure_count`. When `failure_count >= 10`, it sets `active = FALSE` on the endpoint and emits a `webhook.endpoint_auto_deactivated` DEC-030 event. The tenant is notified via email (via a `notifications` row with `channel = 'email'`, `user_id = NULL`, directed to `tenant_owner`).
+
+#### 18.6.2 Delivery Worker Pseudocode
+
+```typescript
+// workers/webhook-delivery/worker.ts
+// Runs every 60 seconds via Cloudflare Cron Trigger
+
+const BACKOFF_MINUTES = [1, 5, 30, 120, 480, 1440]; // 6 attempts
+const MAX_ATTEMPTS    = BACKOFF_MINUTES.length;
+
+export async function processWebhookDeliveries(db: PostgresClient): Promise<void> {
+  // Claim a batch of up to 50 deliveries due for dispatch.
+  // FOR UPDATE SKIP LOCKED prevents concurrent workers from double-processing.
+  const batch = await db.query<WebhookDelivery>(`
+    SELECT wd.*, we.url, we.signing_secret_enc, we.tenant_id AS endpoint_tenant_id
+    FROM webhook_deliveries wd
+    JOIN webhook_endpoints  we ON we.id = wd.endpoint_id AND we.active = TRUE
+    WHERE wd.status IN ('pending', 'failed')
+      AND (wd.next_retry_at IS NULL OR wd.next_retry_at <= NOW())
+      AND wd.attempt_count < $1
+    ORDER BY wd.next_retry_at ASC NULLS FIRST
+    LIMIT 50
+    FOR UPDATE OF wd SKIP LOCKED
+  `, [MAX_ATTEMPTS]);
+
+  for (const delivery of batch.rows) {
+    const signingKey = await decryptWithTenantKmsKey(
+      delivery.signing_secret_enc,
+      delivery.endpoint_tenant_id,
+    );
+    const signature = computeHmacSha256(signingKey, JSON.stringify(delivery.payload));
+
+    let responseCode: number | null = null;
+    let responseBody: string | null = null;
+    let succeeded = false;
+
+    try {
+      const res = await fetch(delivery.url, {
+        method:  'POST',
+        headers: {
+          'Content-Type':            'application/json',
+          'X-FORM-Signature-256':    `sha256=${signature}`,
+          'X-FORM-Event':            delivery.event_type,
+          'X-FORM-Delivery':         delivery.id,
+          'X-FORM-Payload-Version':  delivery.payload['$schema_version'],
+        },
+        body:    JSON.stringify(delivery.payload),
+        signal:  AbortSignal.timeout(10_000),  // 10-second hard timeout
+      });
+      responseCode = res.status;
+      responseBody = (await res.text()).slice(0, 1024); // cap at 1 KB
+      succeeded    = res.ok;
+    } catch (err) {
+      responseCode = null;
+      responseBody = String(err).slice(0, 1024);
+    }
+
+    const newAttemptCount = delivery.attempt_count + 1;
+
+    if (succeeded) {
+      await db.query(`
+        UPDATE webhook_deliveries
+        SET status = 'delivered', attempt_count = $1,
+            response_code = $2, response_body = $3,
+            delivered_at = NOW(), next_retry_at = NULL, updated_at = NOW()
+        WHERE id = $4
+      `, [newAttemptCount, responseCode, responseBody, delivery.id]);
+
+      await db.query(`
+        UPDATE webhook_endpoints
+        SET failure_count = 0, last_success_at = NOW(), last_attempted_at = NOW()
+        WHERE id = $1
+      `, [delivery.endpoint_id]);
+
+    } else {
+      const exhausted = newAttemptCount >= MAX_ATTEMPTS;
+      const nextRetry = exhausted
+        ? null
+        : new Date(Date.now() + BACKOFF_MINUTES[newAttemptCount] * 60_000);
+
+      await db.query(`
+        UPDATE webhook_deliveries
+        SET status = $1, attempt_count = $2,
+            response_code = $3, response_body = $4,
+            next_retry_at = $5, updated_at = NOW()
+        WHERE id = $6
+      `, [
+        exhausted ? 'exhausted' : 'failed',
+        newAttemptCount, responseCode, responseBody, nextRetry, delivery.id,
+      ]);
+
+      await db.query(`
+        UPDATE webhook_endpoints
+        SET failure_count = failure_count + 1, last_attempted_at = NOW()
+        WHERE id = $1
+      `, [delivery.endpoint_id]);
+
+      if (exhausted) {
+        await maybeAutoDeactivateEndpoint(db, delivery.endpoint_id, delivery.endpoint_tenant_id);
+      }
+    }
+  }
+}
+```
+
+#### 18.6.3 Signing Header
+
+Every delivery carries an `X-FORM-Signature-256` header. The signature is computed over the raw JSON-serialised payload body (before HTTP transmission), not the `payload` JSONB column value:
+
+```
+X-FORM-Signature-256: sha256=<hex(HMAC-SHA256(signing_key, request_body_bytes))>
+```
+
+Customer verification (reference implementation):
+
+```typescript
+// Customer's webhook receiver — for documentation purposes only; not FORM code
+function verifyFormWebhook(
+  rawBody: Buffer,
+  signatureHeader: string,
+  signingSecret: string,
+): boolean {
+  const expected = 'sha256=' + createHmac('sha256', signingSecret)
+    .update(rawBody)
+    .digest('hex');
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
+}
+```
+
+Timing-safe comparison is mandatory. The signing secret displayed to the customer at endpoint creation is the raw pre-encryption value (shown once; not recoverable from the API afterwards).
+
+---
+
+### 18.7 Payload Schema Versioning
+
+All webhook payloads carry a `$schema_version` field at the top level. Payload schema is versioned independently of the API version. Breaking changes (field removal, type change, enum value removal) require a major version bump and a 12-month deprecation window matching the API contract policy (Technical Principles §3).
+
+```jsonc
+// Example: workout.completed payload (schema version 1.0.0)
+{
+  "$schema_version": "1.0.0",
+  "id":              "<delivery-uuid>",
+  "event_type":      "workout.completed",
+  "tenant_id":       "<tenant-uuid>",
+  "occurred_at":     "2026-05-23T14:32:00Z",
+  "data": {
+    "workout_id":        "<workout-uuid>",
+    "user_id":           "<user-uuid>",      // pseudonymous UUID only
+    "duration_seconds":  2340,
+    "sets_logged":       12,
+    "source":            "cv",
+    // form_score is EXCLUDED — personal health signal; not contractually guaranteed
+    // coaching_turns, rep_detail, weight: EXCLUDED — see §18.8
+  }
+}
+```
+
+```jsonc
+// Example: auth.scim_user_provisioned payload (schema version 1.0.0)
+{
+  "$schema_version": "1.0.0",
+  "id":              "<delivery-uuid>",
+  "event_type":      "auth.scim_user_provisioned",
+  "tenant_id":       "<tenant-uuid>",
+  "occurred_at":     "2026-05-23T09:15:00Z",
+  "data": {
+    "user_id":        "<user-uuid>",     // FORM internal UUID
+    "external_id":    "<idp-subject>",   // IdP externalId per SCIM protocol
+    "provisioned_via":"scim",
+    "role":           "tenant_member"
+    // email: EXCLUDED unless contractually agreed in DPA and tenant has email_in_webhooks feature flag
+  }
+}
+```
+
+**PII in payloads:** The `email` field is excluded by default from all webhook payloads. It is available only when two conditions are met: (a) the enterprise DPA explicitly authorises email disclosure in webhook events, and (b) the `email_in_webhooks` tenant feature flag is enabled by `form_admin`. Any payload schema that includes email requires a compliance-officer sign-off and a DECISION_LOG entry. The feature flag is implemented in `tenant_feature_flags` (§2.7).
+
+---
+
+### 18.8 GDPR Art. 17 Erasure Integration
+
+When a user submits a GDPR Art. 17 erasure request (§12.3), both `notifications` and `webhook_deliveries` require scrubbing. The pattern follows §12.3 (hard-delete for user data) with one divergence: `webhook_deliveries` rows are payload-scrubbed rather than deleted, because they constitute delivery receipt evidence for the enterprise customer.
+
+#### 18.8.1 `notifications` — hard delete
+
+`notifications` rows follow the same hard-delete path as `workouts` and `meal_logs`:
+
+```sql
+-- Executed by the erasure worker (form_admin role) within 30-day grace period
+DELETE FROM notifications
+WHERE user_id = :user_id;
+-- tenant-level notifications (user_id IS NULL) are NOT deleted — they are operational records
+-- and contain no personal data beyond the tenant UUID.
+```
+
+The DSAR export job (§12.5) assembles user-targeted `notifications` rows before deletion:
+
+```
+form-export-{user_id}.zip
+  └── notifications.json   -- all non-deleted notifications for user at export time
+```
+
+#### 18.8.2 `webhook_deliveries` — payload scrub
+
+`webhook_deliveries` rows are retained as delivery receipts but the `payload` column is scrubbed in-place:
+
+```sql
+-- Payload scrub: replace payload JSONB with a tombstone record.
+-- The delivery metadata (status, response_code, attempt_count, timestamps) is retained
+-- as evidence of the delivery event for the enterprise customer's audit trail.
+UPDATE webhook_deliveries
+SET payload = jsonb_build_object(
+  '$schema_version', payload->>'$schema_version',
+  'event_type',      payload->>'event_type',
+  'tenant_id',       payload->>'tenant_id',
+  'occurred_at',     payload->>'occurred_at',
+  'data',            jsonb_build_object(
+                       '_erased', TRUE,
+                       '_erased_at', NOW()::TEXT,
+                       '_reason', 'gdpr_art17'
+                     )
+)
+WHERE payload->'data'->>'user_id' = :user_id::TEXT;
+```
+
+The `_erased` tombstone preserves the delivery record for the enterprise customer's SOC 2 audit trail while eliminating all personal data from the payload body. The scrub is executed synchronously within the 24-hour erasure job window (not deferred to the 30-day hard-delete cycle), because webhook payloads may contain the user's pseudonymous UUID which constitutes personal data under GDPR Art. 4(1) if the customer can re-identify it via their own user directory.
+
+**Erasure audit event:**
+
+```jsonc
+{
+  "event":                    "erasure.webhook_payload_scrubbed",
+  "user_id":                  "<uuid>",
+  "tenant_id":                "<uuid>",
+  "notifications_deleted":    14,
+  "webhook_deliveries_scrubbed": 7,
+  "scrubbed_at":              "2026-05-23T02:00:00Z"
+}
+```
+
+---
+
+### 18.9 Index Strategy
+
+Index design follows the §11 patterns: composite `(tenant_id, ...)` leads for RLS-aligned scans; partial indexes on active/non-deleted subsets; `(endpoint_id, created_at)` for delivery history lookups.
+
+```sql
+-- notifications: primary isolation index
+CREATE INDEX idx_notifications_tenant_user
+  ON notifications (tenant_id, user_id)
+  WHERE deleted_at IS NULL;
+
+-- notifications: delivery worker queue scan (pending + pending-retry ordered by created_at)
+CREATE INDEX idx_notifications_status_created
+  ON notifications (tenant_id, status, created_at)
+  WHERE deleted_at IS NULL AND status = 'pending';
+
+-- notifications: expiry sweep (nightly pg_cron job cancels expired pending notifications)
+CREATE INDEX idx_notifications_expires_at
+  ON notifications (expires_at)
+  WHERE status = 'pending' AND expires_at IS NOT NULL;
+
+-- notifications: admin dashboard history view (tenant-wide, most recent first)
+CREATE INDEX idx_notifications_tenant_created
+  ON notifications (tenant_id, created_at DESC)
+  WHERE deleted_at IS NULL;
+
+-- webhook_endpoints: tenant lookup (admin dashboard endpoint list)
+CREATE INDEX idx_webhook_endpoints_tenant
+  ON webhook_endpoints (tenant_id)
+  WHERE active = TRUE;
+
+-- webhook_endpoints: active endpoint scan by event type (delivery worker fanout)
+-- Partial GIN index over the events array for efficient ANY() membership checks
+CREATE INDEX idx_webhook_endpoints_events
+  ON webhook_endpoints USING GIN (events)
+  WHERE active = TRUE;
+
+-- webhook_deliveries: delivery worker retry queue
+-- Covers: status filter + next_retry_at ordering + endpoint join
+CREATE INDEX idx_webhook_deliveries_retry_queue
+  ON webhook_deliveries (next_retry_at ASC NULLS FIRST, endpoint_id)
+  WHERE status IN ('pending', 'failed');
+
+-- webhook_deliveries: tenant-scoped delivery history (admin dashboard)
+CREATE INDEX idx_webhook_deliveries_tenant_created
+  ON webhook_deliveries (tenant_id, created_at DESC);
+
+-- webhook_deliveries: per-endpoint delivery history (admin dashboard drilldown)
+CREATE INDEX idx_webhook_deliveries_endpoint_created
+  ON webhook_deliveries (endpoint_id, created_at DESC);
+
+-- webhook_deliveries: GDPR erasure scrub (identify rows by user_id inside payload JSONB)
+-- Expression index on the payload data.user_id field avoids a full-table JSONB scan
+CREATE INDEX idx_webhook_deliveries_payload_user_id
+  ON webhook_deliveries ((payload->'data'->>'user_id'))
+  WHERE payload->'data'->>'user_id' IS NOT NULL;
+```
+
+**Index maintenance:**
+
+- All indexes on `webhook_deliveries` are created `CONCURRENTLY` in migrations — this table is write-heavy during burst delivery periods.
+- `idx_webhook_deliveries_retry_queue` is rebuilt weekly via `REINDEX CONCURRENTLY` (added to the maintenance cron window) because rows transition out of the `IN ('pending', 'failed')` partial predicate frequently and bloat accumulates.
+- `idx_notifications_status_created` is a short-lived hot index. Rows exit `status = 'pending'` within seconds of dispatch. `autovacuum_vacuum_scale_factor` for `notifications` is set to `0.01` to reclaim dead tuples aggressively.
+
+---
+
+### 18.10 Privacy Considerations
+
+#### 18.10.1 Webhook payload PII scope
+
+The payload PII matrix below is the authoritative statement of what may appear in webhook payloads by default and under contractual extension. Any deviation from this matrix requires a compliance-officer approval and a DECISION_LOG entry.
+
+| Data field | Default | With DPA + `email_in_webhooks` flag | Never |
+|---|---|---|---|
+| `user_id` (FORM UUID) | Included | Included | — |
+| `tenant_id` | Included | Included | — |
+| `external_id` (IdP subject) | Included for auth events | Included | — |
+| `email` | Excluded | Included (auth events only) | Included in training events |
+| `display_name` | Excluded | Excluded | — |
+| `role` | Included | Included | — |
+| `form_score` (per workout) | Excluded | Excluded | Never |
+| `coaching_turns.content` | Never | Never | Never |
+| HRV / resting HR values | Never | Never | Never |
+| Meal log content | Never | Never | Never |
+| Keypoints / CV data | Never | Never | Never |
+| Body measurements | Never | Never | Never |
+
+**Rationale for personal data appearing in payloads at all:** Enterprise customers require `user_id` to correlate FORM events with their own HRIS data for wellness programme reporting. The `user_id` is a FORM-internal UUID (not derived from email or any PII) — re-identification requires the customer to hold a FORM-to-HRIS mapping, which they necessarily own. The transmission of this UUID is covered under Art. 6(1)(b) (contract performance for the enterprise subscription) and Art. 28 (processor relationship).
+
+#### 18.10.2 Payload schema versioning and deprecation
+
+Any payload field that is removed or renamed triggers a major schema version bump (`1.x.x → 2.0.0`). The old schema version remains supported for 12 months (matching the API deprecation policy, Technical Principles §3). During that window:
+
+- Both schema versions are delivered to the endpoint if the customer has not indicated a version preference.
+- The customer may specify a preferred schema version via the `X-FORM-Accept-Payload-Version` request header on their endpoint — FORM uses this as a hint when creating `webhook_deliveries` rows.
+- After 12 months, the old schema version is retired. Endpoints still requesting the old version are switched automatically and notified via email.
+
+#### 18.10.3 Webhook payload in DSAR export
+
+When a user requests a GDPR Art. 20 data export (§12.5), `webhook_deliveries` rows where `payload->'data'->>'user_id' = user_id` are included in the export:
+
+```
+form-export-{user_id}.zip
+  └── webhook_deliveries.json   -- delivery metadata + scrubbed payload per Art. 20
+```
+
+The export includes `event_type`, `delivered_at`, `tenant_id`, and the payload `data` field as it existed at export time. Post-scrub tombstones are included as-is.
+
+---
+
+### 18.11 DEC-030 Audit Events
+
+All webhook endpoint management and delivery lifecycle events are HMAC-chained per DEC-030 (`docs/AUDIT_LOG_SCHEMA.md`).
+
+| Event slug | Trigger | Severity | Retention |
+|---|---|---|---|
+| `webhook.endpoint_created` | Tenant admin creates a new endpoint | STANDARD | 7 years |
+| `webhook.endpoint_updated` | URL, events, or active flag changed | STANDARD | 7 years |
+| `webhook.endpoint_deleted` | Endpoint hard-deleted by tenant admin | STANDARD | 7 years |
+| `webhook.endpoint_auto_deactivated` | `failure_count >= 10` triggers auto-deactivation | STANDARD | 7 years |
+| `webhook.endpoint_reactivated` | Tenant admin re-enables a deactivated endpoint | STANDARD | 7 years |
+| `webhook.signing_secret_rotated` | Tenant admin rotates the signing secret | **HIGH** | 7 years |
+| `webhook.test_delivery_sent` | `webhook.test` event dispatched for endpoint validation | STANDARD | 1 year |
+| `webhook.delivery_exhausted` | Delivery reaches `status = 'exhausted'` after 6 attempts | STANDARD | 3 years |
+| `erasure.webhook_payload_scrubbed` | Art. 17 erasure scrubs payload JSONB | STANDARD | 7 years |
+| `notification.sent` | Notification status transitions to `sent` | LOW | 30 days |
+| `notification.failed` | Notification status transitions to `failed` | STANDARD | 1 year |
+| `notification.expired` | Pending notification cancelled due to `expires_at` | LOW | 30 days |
+
+**`webhook.signing_secret_rotated` — HIGH severity:** Secret rotation invalidates all in-flight deliveries using the old key. Customers must update their receiver within the rotation grace period (default: 24 hours, during which the delivery worker accepts both old and new key). Unannounced rotation is a potential denial-of-service for the customer's webhook pipeline. The HIGH severity classification ensures the event appears in SIEM dashboards and triggers the CSM notification workflow.
+
+**Metadata schema — `webhook.delivery_exhausted`:**
+```jsonc
+{
+  "event":           "webhook.delivery_exhausted",
+  "tenant_id":       "<uuid>",
+  "endpoint_id":     "<uuid>",
+  "delivery_id":     "<uuid>",
+  "event_type":      "workout.completed",
+  "attempt_count":   6,
+  "last_response_code": 503,
+  // payload field: NEVER logged in audit — it may contain personal data
+  // audit log stores only the delivery metadata identifiers
+}
+```
+
+---
+
+### 18.12 Notification Expiry and Retention
+
+```sql
+-- Nightly at 03:15 UTC: cancel expired pending notifications
+-- (staggered after §17.5 MV refresh schedule, before 04:00 retention jobs)
+SELECT cron.schedule('cancel-expired-notifications', '15 3 * * *', $$
+  UPDATE notifications
+  SET    status     = 'cancelled',
+         updated_at = NOW()
+  WHERE  status     = 'pending'
+    AND  expires_at < NOW()
+    AND  deleted_at IS NULL;
+$$);
+
+-- Nightly at 03:20 UTC: hard-delete soft-deleted notifications past 30-day grace
+SELECT cron.schedule('hard-delete-notifications', '20 3 * * *', $$
+  DELETE FROM notifications
+  WHERE deleted_at < NOW() - INTERVAL '30 days';
+$$);
+
+-- Nightly at 03:25 UTC: purge delivered/cancelled webhook_deliveries older than 90 days
+-- (exhausted + failed rows retained 1 year for delivery health analytics)
+SELECT cron.schedule('purge-webhook-deliveries', '25 3 * * *', $$
+  DELETE FROM webhook_deliveries
+  WHERE  status IN ('delivered', 'cancelled')
+    AND  created_at < NOW() - INTERVAL '90 days';
+
+  DELETE FROM webhook_deliveries
+  WHERE  status IN ('exhausted', 'failed')
+    AND  created_at < NOW() - INTERVAL '1 year';
+$$);
+```
+
+**Monitoring:** Each cron job writes affected row counts to `cron_job_results`. Zero affected rows for 7 consecutive days triggers PagerDuty P3 (consistent with §12.4 monitoring requirement).
+
+---
+
+### 18.13 Migration Checklist
+
+Per §7.2, the following items must be verified before any migration touching §18 tables reaches production.
+
+```
+[ ] `webhook_event_type` enum created before table DDL
+[ ] `notifications` has tenant_id + user_id composite index (§18.9)
+[ ] `notifications` ENABLE ROW LEVEL SECURITY
+[ ] `webhook_endpoints` has tenant_id index; signing_secret_enc excluded from all API serialisers
+[ ] `webhook_endpoints` ENABLE ROW LEVEL SECURITY
+[ ] `webhook_deliveries` has tenant_id + retry-queue + endpoint + JSONB user_id expression indexes
+[ ] `webhook_deliveries` ENABLE ROW LEVEL SECURITY
+[ ] RLS isolation test extended: tenant_member sees zero webhook_deliveries rows
+[ ] RLS isolation test extended: cross-tenant webhook_endpoints read returns zero rows
+[ ] Erasure worker extended: notifications hard-delete + webhook_deliveries payload scrub
+[ ] DSAR export worker extended: notifications.json + webhook_deliveries.json in zip
+[ ] pg_cron jobs for expiry, hard-delete, and purge registered (§18.12)
+[ ] form_audit role granted SELECT on notifications, webhook_endpoints, webhook_deliveries
+[ ] Data classification documented in §5 (webhook_endpoints.signing_secret_enc = Sensitive)
+```
+
+---
+
+### 18.14 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Notes |
+|---|---|---|---|---|---|
+| 1 | `CREATE TYPE webhook_event_type AS ENUM (...)` migration; add enum values for all 23 initial event types (§18.2) | `platform-engineer` | **P0** | M3 | New values require a DECISION_LOG entry — document this in migration header comments |
+| 2 | `CREATE TABLE notifications` DDL migration including all RLS policies, `ENABLE ROW LEVEL SECURITY`, four indexes (§18.9) | `platform-engineer` | **P0** | M3 | Verify `deleted_at IS NULL` clause on all user-read policies — absence is a P0 bug per §12.1 |
+| 3 | `CREATE TABLE webhook_endpoints` DDL migration; encrypt initial `signing_secret_enc` using per-tenant KMS key before insert; confirm API serialiser excludes raw column | `platform-engineer` + `security-engineer` | **P0** | M3 | CI test: no API response fixture may contain the literal string `signing_secret_enc` |
+| 4 | `CREATE TABLE webhook_deliveries` DDL migration including idempotency unique constraint, all indexes; add expression index on `payload->'data'->>'user_id'` | `platform-engineer` | **P0** | M3 | Create all indexes `CONCURRENTLY`; confirm `REINDEX CONCURRENTLY` maintenance cron entry |
+| 5 | Add `notifications`, `webhook_endpoints`, `webhook_deliveries` RLS isolation assertions to `__tests__/db/rls_isolation.test.ts` | `platform-engineer` | **P0** | M3 | Assertions: tenant_member zero-row for `webhook_deliveries`; cross-tenant `webhook_endpoints` zero-row |
+| 6 | Implement notification dispatch worker (Cloudflare Worker): dequeues `pending` notifications by channel; calls FCM (push), SES (email), or in-app pub/sub; updates `status`; emits `notification.sent` / `notification.failed` DEC-030 events | `platform-engineer` | **P0** | M3 | |
+| 7 | Implement webhook delivery worker (§18.6.2): cron every 60 seconds; `FOR UPDATE SKIP LOCKED` batch; HMAC-SHA256 signing; 10-second HTTP timeout; exponential backoff write-back; auto-deactivate at `failure_count >= 10` | `platform-engineer` | **P0** | M3 | Worker must verify endpoint URL starts with `https://` before dispatch — reject HTTP silently |
+| 8 | Implement `POST /v1/admin/webhooks/endpoints` and `GET /v1/admin/webhooks/endpoints` API endpoints; enforce 10-endpoint-per-tenant application-layer limit; show raw secret only in creation response | `platform-engineer` | **P0** | M3 | `GET` serialiser must replace `signing_secret_enc` with `"***"` — CI assertion required |
+| 9 | Implement webhook endpoint admin UI in React admin dashboard: endpoint list, event subscription checkboxes (multi-select from `webhook_event_type` enum), delivery log drilldown, manual re-trigger for `exhausted` deliveries | `platform-engineer` | **P1** | M4 | |
+| 10 | Implement `webhook.test` synthetic delivery: `POST /v1/admin/webhooks/endpoints/{id}/test` creates a `webhook.test` delivery row and dispatches immediately; used for customer endpoint validation during setup | `platform-engineer` | **P1** | M4 | `webhook.test_delivery_sent` DEC-030 event required; test payload schema version = current |
+| 11 | Implement signing secret rotation: `POST /v1/admin/webhooks/endpoints/{id}/rotate-secret`; 24-hour dual-key grace window where delivery worker tries new key first, falls back to old key on 401/403 from endpoint; emits `webhook.signing_secret_rotated` HIGH DEC-030 event | `platform-engineer` + `security-engineer` | **P1** | M4 | Grace window requires storing `previous_signing_secret_enc` on the endpoint row during transition; clear after 24 hours |
+| 12 | Implement payload Zod schema validation in `src/notifications/payload.schema.ts`; wire into notification insert path; CI test asserting schema rejects forbidden keys (`coaching_turns`, `form_score`, `keypoints_enc`, all wearable numeric fields) | `platform-engineer` | **P0** | M3 | Same `FORBIDDEN_PROPERTY_KEYS` set as §13.3; reuse validation module |
+| 13 | Extend Art. 17 erasure worker (§12.3): hard-delete `notifications WHERE user_id = :user_id`; payload-scrub `webhook_deliveries` where `payload->'data'->>'user_id' = :user_id`; emit `erasure.webhook_payload_scrubbed` DEC-030 event with counts | `platform-engineer` | **P1** | M4 | Scrub must execute within 24-hour erasure job window — not deferred to 30-day hard-delete cycle |
+| 14 | Extend DSAR export job (§12.5): add `notifications.json` and `webhook_deliveries.json` to `form-export-{user_id}.zip` | `platform-engineer` | **P1** | M4 | |
+| 15 | Register pg_cron jobs (§18.12): expiry cancellation at 03:15 UTC, hard-delete at 03:20 UTC, delivery purge at 03:25 UTC; add to `cron_job_results` monitoring per §12.4 | `platform-engineer` | **P1** | M4 | |
+| 16 | Wire all 12 DEC-030 events (§18.11) to their respective triggers; validate HMAC chain in staging; confirm `webhook.delivery_exhausted` metadata never includes payload field | `platform-engineer` + `security-engineer` | **P0** | M3 | |
+| 17 | Implement `email_in_webhooks` tenant feature flag: add to `tenant_feature_flags` (§2.7); wire into webhook payload serialiser; require compliance-officer sign-off per DPA before enabling for any tenant | `enterprise-architect` + `compliance-officer` | **P2** | M5 | Default: flag absent = email excluded from all payloads |
+| 18 | Update §5 data classification table: `webhook_endpoints.signing_secret_enc` = Sensitive (per-tenant KMS encryption); `notifications.payload` = Internal (JSONB, no health data permitted) | `enterprise-architect` + `compliance-officer` | **P0** | M3 | |
+
+---
+
+*v0.9 additions: §18 Notification & Webhook Event Queue Schema. `webhook_event_type` PostgreSQL enum: 23 event types across training lifecycle (workout.completed, workout.abandoned, workout.set_logged), streak events (maintained, broken, grace_period_activated, milestone_reached), coaching, auth (sso_login, scim_provisioned/deprovisioned, mfa_challenge_failed, session_expired), enterprise lifecycle (tenant.user_onboarded/deactivated, seat_limit_approached/reached, pilot_milestone, contract_renewal_due), wearable (source_connected/disconnected), and system (delivery_failed, webhook.test) — new values require DECISION_LOG entry and form_admin privilege. `notifications` table: tenant_id + nullable user_id (null = tenant-level), `webhook_event_type` type, JSONB payload (Zod-validated; FORBIDDEN_PROPERTY_KEYS enforced), channel enum (push/email/in_app/webhook), status enum (pending/sent/failed/cancelled), retry_count, expires_at; RLS: user self-read via user_id match, tenant admin full-tenant history, form_system full-access, soft-delete (deleted_at) per §12.1 pattern. `webhook_endpoints` table: SENSITIVE classification for `signing_secret_enc` (AES-256-GCM per-tenant KMS); url CHECK (HTTPS only); events TEXT[] with GIN index for ANY() fanout; active boolean with auto-deactivation at failure_count >= 10; API serialiser replaces secret with "***"; RLS: tenant_admin/owner read+write, form_system full access. `webhook_deliveries` table: endpoint_id FK with CASCADE, denormalized tenant_id, status enum (pending/delivered/failed/exhausted/cancelled), 6-attempt exponential backoff schedule (1min/5min/30min/2h/8h/24h), response_body capped at 1KB, idempotency_key UNIQUE constraint per endpoint; RLS: tenant admin read-only history, form_system full access. Delivery worker: Cloudflare Worker cron (60s); FOR UPDATE SKIP LOCKED batch (50 rows); HMAC-SHA256 X-FORM-Signature-256 header; 10-second AbortSignal timeout; backoff write-back; auto-deactivate + tenant_owner email notification at exhaustion. Signing header: `sha256=<hex(HMAC-SHA256(key, raw_body_bytes))>`; timing-safe verification reference implementation. Payload schema versioning: $schema_version semver field; 12-month deprecation window on breaking changes; X-FORM-Accept-Payload-Version customer hint; two example payloads (workout.completed, auth.scim_user_provisioned). PII matrix: user_id UUID included by default; email excluded by default, available only with DPA + email_in_webhooks feature flag; coaching content, form_score, HRV, meal logs, CV data: never. GDPR Art. 17 integration: notifications hard-deleted by user_id; webhook_deliveries payload-scrubbed in-place within 24h (not deferred to 30-day cycle) with _erased tombstone preserving delivery receipt; `erasure.webhook_payload_scrubbed` DEC-030 event with counts; both tables included in Art. 20 DSAR export. Index strategy (9 indexes): (tenant_id, user_id) partial for notifications RLS; status+created partial for dispatch queue; expires_at partial for expiry sweep; tenant+created DESC for admin history; GIN on webhook_endpoints.events for fanout; retry-queue composite; endpoint+created DESC for drilldown; expression index on payload->'data'->>'user_id' for erasure sweep. pg_cron: expiry cancel 03:15, hard-delete 03:20, delivery purge (90d delivered, 1yr exhausted) 03:25 UTC. 12 DEC-030 HMAC-chained audit events including HIGH-severity webhook.signing_secret_rotated with 24-hour dual-key grace window; delivery_exhausted metadata explicitly excludes payload field. 18-item implementation checklist (9× P0, 6× P1, 1× P2, 2× P0 documentation) across M3/M4/M5.*
