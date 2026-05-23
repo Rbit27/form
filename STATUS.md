@@ -176,6 +176,11 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-82-deload-protocols.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-83-muscle-fiber-types.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-84-motor-learning.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-85-rate-of-force-development.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-86-periodization-models.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-87-fasted-training.md | Blog | BLOCKED · clinical-safety VETO · food/eating patterns — do not write without CS review |
+| post-88-omega3-training.md | Blog | BLOCKED · clinical-safety VETO · supplement/food content — do not write without CS review |
+| post-89-acwr-training-load.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

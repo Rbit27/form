@@ -6,6 +6,19 @@
 
 ---
 
+## [1.9.5] — 2026-05-23
+
+### Added
+- `content/post-89-acwr-training-load.md` — ACWR і моніторинг навантаження: інструмент, який складніший за формулу. Gabbett (2016) BJSM: acute:chronic workload ratio, U-подібна крива ризику і «безпечна» зона 0.8–1.3; session-RPE (Foster et al. 2001) як метод розрахунку internal load (RPE × хвилини = AU); математична критика rolling-average ACWR (Impellizzeri et al. 2019, Murray et al. 2017): mathematical coupling чисельника і знаменника, поведінка при низькому chronic load; EWMA (Murray et al. 2017) з λ-параметрами для 7-денного і 28-денного вікна як статистично точніша альтернатива; external vs internal load: чому session-RPE перевершує зовнішні метрики для моніторингу накопиченої втоми; Bowen et al. (2017): absolute load як модератор; Victor multi-layer readiness model — 4 рівні: absolute load trend, RPE-drift, суб'єктивна готовність, відносний spike; practical implementation та логіка повернення після паузи. clinical-safety PASS.
+- `blog.html` — новий post-89 card: «ACWR і моніторинг навантаження — інструмент, який складніший за формулу» (sports-science, 13 хв читання, Victor · FORM).
+
+### Changed
+- `STATUS.md` — додані рядки: post-85 (RFD, PASS), post-86 (periodization models, PASS), post-87 (BLOCKED · clinical-safety VETO · food), post-88 (BLOCKED · clinical-safety VETO · food/supplement), post-89 (ACWR, PASS).
+- `README.md` — roadmap оновлено: post-85 і post-86 позначено як [x] з реальними назвами написаних постів; post-87 і post-88 позначено як VETO BLOCKED; post-89 позначено як [x]; нові теми post-91–93 додані до roadmap (loaded carries, accommodating resistance, sticking points).
+- `VERSION` → 1.9.5
+
+---
+
 ## [1.9.4] — 2026-05-23
 
 ### Added
