@@ -2915,6 +2915,601 @@ These records are retained for 7 years (consistent with the HMAC audit log reten
 
 ---
 
+### R-12: Insider Threat / Privileged Access Abuse
+
+**Definition:** A security incident in which a current or former FORM team member — or a contractor with legitimate access credentials — intentionally misuses their access to exfiltrate data, sabotage systems, or abuse permissions for personal gain, competitive intelligence, or coercion.
+
+This runbook is architecturally distinct from external credential compromise (R-03): the actor started with legitimate access. Standard containment (immediate revocation) may alert the actor, accelerate data destruction, or contaminate the investigation. Evidence preservation MUST precede containment except when live exfiltration is actively in progress.
+
+---
+
+#### R-12.1 Trigger Matrix
+
+| Signal | Source | Initial Severity |
+|---|---|---|
+| Bulk data export via Supabase Studio during off-hours | Supabase audit log / `audit_log_events` HMAC chain | P1 pending scope |
+| `service_role` key used from IP outside known developer ranges | Cloudflare Workers access log | P1 pending scope |
+| Admin dashboard accessed by team member who is in HR disciplinary process | HR tip to security-engineer or founder | P1 |
+| Sudden access to tables/RLS policies outside normal role | `audit_log_events` (action: `pg.read`, unusual `resource_type`) | P1 |
+| Termination notice issued → credential revocation NOT yet completed | HR → security-engineer standard offboarding check | P2 (escalates if access confirmed post-termination) |
+| Whistleblower report alleging data misuse by team member | Direct report to founder or compliance-officer | P1 |
+| HMAC audit chain break co-incident with staff admin activity | §5 R-05 + this runbook cross-activate | **P0** |
+| Former contractor requests re-use of old API key | Customer-success or platform-engineer reports | P2 |
+| Access log shows download of `health_profiles`, `coaching_turns`, or `cv_sessions` at volume | Supabase log analysis | P0 if Art. 9 data confirmed |
+
+**Do not trigger this runbook for:**
+- External actor using stolen staff credentials → R-03 (possible concurrent activation)
+- Misconfigured automation or CI/CD pipeline accessing data unexpectedly → standard debugging
+- Developer accessing their own user data in production for debugging → standard access review
+
+---
+
+#### R-12.2 Severity Matrix
+
+| Severity | Criteria |
+|---|---|
+| **P0** | Confirmed exfiltration of Art. 9 data (health profiles, coaching turns, CV keypoints) at any volume; cross-tenant data accessed by staff credential; HMAC chain tampered by insider; live exfiltration in progress |
+| **P0** | Art. 9 data accessed by staff credential from outside normal working hours AND volume > 100 records, until ruled out |
+| **P1** | Bulk access (> 500 records, any category) without confirmed exfiltration; anomalous privilege use (e.g., RLS policy alteration); access after HR process begins |
+| **P1** | Former team member retains active credentials (any environment) |
+| **P2** | Single anomalous access event, no sensitive data, historical (> 7 days ago), no active session |
+
+**Upgrade triggers:** Any access to `health_profiles`, `coaching_turns`, `cv_sessions`, or `tenant_admins` — regardless of volume — is an automatic P1 floor. Discovery of data uploaded to external storage is an automatic P0.
+
+---
+
+#### R-12.3 Unique Response Constraints
+
+These constraints override the standard incident response defaults for this runbook only:
+
+**1. Evidence before containment (reinforced)**
+Unlike R-01 (active exfiltration exception) and R-09 (isolation-first for ransomware), insider threat investigations require forensic snapshots BEFORE the actor is aware of the investigation. Premature revocation may cause the actor to:
+- Accelerate data exfiltration before access expires
+- Delete or alter local copies of exfiltrated data
+- Alert co-conspirators (if any)
+- Trigger legal claims of wrongful termination if the investigative basis is not documented
+
+Do not revoke access until legal counsel has been consulted AND evidence has been preserved, unless live exfiltration is active or destruction of evidence is imminent.
+
+**2. Restricted incident channel**
+This runbook uses a **private investigation channel** (`#inc-YYYYMMDD-insider`), accessible only to:
+- Founder
+- security-engineer
+- compliance-officer
+- Legal counsel (if retained)
+
+Do NOT add the HR lead, other team members, or the subject to this channel at any stage of the investigation. Customer-success is notified only if enterprise tenant data is confirmed affected, and then only via the standard E-01 template (§12) — the cause is disclosed as "internal access control incident" without naming the individual.
+
+**3. Employment law jurisdiction**
+FORM is subject to employment law that varies by jurisdiction. Key differences that affect evidence collection and monitoring rights:
+- **EU/GDPR jurisdiction:** Staff monitoring rights under GDPR Art. 6(1)(f) (legitimate interest for security) exist, but the monitoring must be proportionate and pre-disclosed in the employment contract or acceptable use policy. Bulk retrospective log access for a specific individual is proportionate for a security investigation.
+- **US jurisdiction:** At-will employment; monitoring of company systems is generally permitted if disclosed.
+- **Ukraine jurisdiction:** Monitoring permitted for company systems under labor law Art. 31 equivalent; legal counsel required before using investigation findings in termination.
+
+Rule: **Legal counsel before HR briefing, HR briefing before any contact with the subject.**
+
+**4. HMAC audit log integrity**
+The HMAC chain (DEC-030) is the forensic backbone. If the insider has `form_admin` role in the database, they may have attempted to alter audit log records. Always retrieve the immutable R2-archived copies (§7 in this document, §8.3 of OBSERVABILITY.md) rather than querying live `audit_log_events` for forensic purposes. The live table is for operational reference only during an insider investigation.
+
+---
+
+#### R-12.4 Immediate Actions (T+0 to T+30 min)
+
+**Prerequisite:** Before taking ANY action, open `#inc-YYYYMMDD-insider` (private channel), add founder + security-engineer + compliance-officer ONLY. Post time-stamped opening message.
+
+```
+Step 1 — EVIDENCE SNAPSHOT (do NOT wait for scope assessment)
+
+1a. Export R2-archived HMAC audit log for the past 90 days:
+    aws s3 cp s3://form-audit-logs/audit_log_events/ \
+      /tmp/insider-investigation/audit-export-$(date +%Y%m%d-%H%M%S)/ \
+      --recursive --profile form-r2
+    # SHA-256 the export directory immediately:
+    find /tmp/insider-investigation/ -type f | sort | xargs sha256sum \
+      > /tmp/insider-investigation/MANIFEST.sha256
+
+1b. Export Supabase Studio access log for the subject's email from the dashboard.
+    (Supabase Dashboard → Settings → Audit Logs → filter by user email)
+    Save as PDF + raw JSON. SHA-256 both.
+
+1c. Export Cloudflare Workers access logs for the suspected timeframe.
+    Use Cloudflare dashboard → Workers → Logs.
+    Filter by any relevant Worker routes (service_role key calls leave no Worker log,
+    but REST API access via anon/service key does appear in gateway logs).
+    Save + SHA-256.
+
+1d. If the subject has access to Workers Secrets (Cloudflare dashboard):
+    Note when each secret was last rotated. Do not rotate yet.
+
+1e. Capture a point-in-time snapshot of the subject's Supabase role grants:
+    -- Run as form_admin (read-only query — do NOT use in live channel)
+    SELECT grantee, table_catalog, table_schema, table_name, privilege_type
+    FROM information_schema.role_table_grants
+    WHERE grantee = '<subject-db-role>';
+
+    SELECT rolname, rolsuper, rolcreaterole, rolcreatedb
+    FROM pg_roles WHERE rolname = '<subject-db-role>';
+
+Step 2 — SCOPE ASSESSMENT (parallel with Step 1)
+
+2a. Query audit log for subject's activity in the past 30 days:
+    -- Use R2-archived copy, not live table
+    SELECT event_type, resource_type, resource_id,
+           tenant_id, created_at, ip_address, metadata
+    FROM audit_log_events
+    WHERE actor_id = '<subject-user-id>'
+      AND created_at >= NOW() - INTERVAL '30 days'
+    ORDER BY created_at DESC;
+
+2b. Identify any access to sensitive tables:
+    SELECT resource_type, COUNT(*) as access_count,
+           MIN(created_at) as first_access, MAX(created_at) as last_access
+    FROM audit_log_events
+    WHERE actor_id = '<subject-user-id>'
+      AND resource_type IN (
+        'health_profiles', 'coaching_turns', 'cv_sessions',
+        'users', 'tenant_admins', 'sso_configurations',
+        'audit_log_events'  -- self-reference = red flag
+      )
+      AND created_at >= NOW() - INTERVAL '90 days'
+    GROUP BY resource_type
+    ORDER BY access_count DESC;
+
+2c. Flag any access to audit_log_events as an actor — this indicates potential
+    log tampering attempt. Cross-reference with HMAC chain integrity.
+
+2d. Identify whether multi-tenant access occurred:
+    SELECT DISTINCT tenant_id FROM audit_log_events
+    WHERE actor_id = '<subject-user-id>'
+      AND created_at >= NOW() - INTERVAL '90 days';
+    -- More than one tenant_id = P0 cross-tenant access
+
+Step 3 — CLASSIFY AND ESCALATE
+
+3a. If Art. 9 data accessed → P0. Start GDPR Art. 33 clock.
+3b. If multi-tenant access → P0. Enterprise tenant notification required (§12).
+3c. If live access is currently active → proceed to §R-12.6 Containment.
+3d. If no live access and investigation is early → hold containment pending legal counsel.
+
+Step 4 — LEGAL COUNSEL NOTIFICATION
+
+Within 30 min of classification:
+    "We have a [P0/P1] internal access incident. Team member [role only, not name
+    in written record until legally advised] may have accessed [data category].
+    Requesting guidance on: evidence collection rights, monitoring scope, and
+    process for HR involvement and potential termination."
+
+Do NOT take employment action without explicit legal guidance.
+```
+
+---
+
+#### R-12.5 Blast Radius Assessment
+
+```sql
+-- 1. Total records accessed by subject in exposure window
+SELECT resource_type,
+       COUNT(*) AS access_events,
+       COUNT(DISTINCT resource_id) AS unique_records,
+       COUNT(DISTINCT tenant_id) AS tenants_affected
+FROM audit_log_events
+WHERE actor_id = '<subject-user-id>'
+  AND event_type IN ('read', 'list', 'export', 'download')
+  AND created_at BETWEEN '<window_start>' AND '<window_end>'
+GROUP BY resource_type;
+
+-- 2. Check for any bulk export events (PostHog or audit)
+SELECT event_type, metadata, created_at
+FROM audit_log_events
+WHERE actor_id = '<subject-user-id>'
+  AND (event_type LIKE 'export%' OR metadata::text LIKE '%bulk%' OR metadata::text LIKE '%download%')
+  AND created_at >= NOW() - INTERVAL '90 days'
+ORDER BY created_at DESC;
+
+-- 3. Identify enterprise tenants potentially affected
+SELECT t.id, t.name, t.plan, COUNT(ale.id) AS access_events
+FROM tenants t
+JOIN audit_log_events ale ON ale.tenant_id = t.id
+WHERE ale.actor_id = '<subject-user-id>'
+  AND t.plan IN ('starter', 'growth', 'enterprise')
+  AND ale.created_at >= NOW() - INTERVAL '90 days'
+GROUP BY t.id, t.name, t.plan
+ORDER BY access_events DESC;
+
+-- 4. Cross-reference with health_profiles record count for impacted users
+-- Use only if Art. 9 data access is confirmed
+SELECT COUNT(DISTINCT hp.user_id) AS health_profiles_potentially_exposed,
+       COUNT(DISTINCT hp.tenant_id) AS tenants_with_health_data_exposure
+FROM health_profiles hp
+WHERE hp.user_id IN (
+  SELECT DISTINCT resource_id::uuid
+  FROM audit_log_events
+  WHERE actor_id = '<subject-user-id>'
+    AND resource_type = 'health_profiles'
+    AND created_at BETWEEN '<window_start>' AND '<window_end>'
+);
+```
+
+**Multi-tenant exposure → mandatory enterprise notification.** Use §12 Template E-01 with cause: "internal access control incident involving a privileged credential." Do not name the individual. Legal counsel approves communication before dispatch.
+
+---
+
+#### R-12.6 Containment Options
+
+Containment is graduated based on live access status and investigative stage. Apply the least-revealing option sufficient to stop harm.
+
+| Option | Action | Reveals Investigation? | When to Use |
+|---|---|---|---|
+| **C-1 Passive monitoring** | No containment; observe audit log in real time | No | First 30 min while evidence is being gathered |
+| **C-2 Session expiry** | Set session expiry to "now" in Supabase Auth → revokes session token on next API call | Partial (subject notices next API call fails) | Live access active; investigation evidence secured |
+| **C-3 Role restriction** | Remove sensitive grants without disabling account | Yes — but access still works for permitted tables | Exfiltration of specific table type; legal advises no full revocation yet |
+| **C-4 Full revocation** | Supabase Auth → disable user account + revoke all Supabase role grants + rotate Workers Secrets if applicable | Yes | Legal counsel authorises; termination decision made |
+| **C-5 Workers Secrets rotation** | Rotate `SUPABASE_SERVICE_ROLE_KEY` and all other relevant secrets | Operational impact — all Workers redeploy | Only if subject had direct access to Workers Secrets |
+
+**C-5 note:** Rotating `SUPABASE_SERVICE_ROLE_KEY` triggers a full Workers redeployment. Coordinate with devops-lead. Plan a 5-minute maintenance window if at all possible, but do not delay if live exfiltration via direct API key is confirmed.
+
+**After full revocation (C-4):**
+```
+□ Supabase Auth user disabled (Dashboard → Users → Disable)
+□ Database role grants revoked:
+    REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM <subject_role>;
+    REVOKE USAGE ON SCHEMA public FROM <subject_role>;
+□ Workers Secrets verified as NOT accessible to subject's accounts
+□ GitHub repository access removed (Settings → Collaborators)
+□ Cloudflare dashboard access removed
+□ Internal tooling (Linear, Slack, PostHog) deprovisioned
+□ EAS / Expo build credentials access revoked if applicable
+□ SSO IdP account suspended (if FORM is the SP in its own SSO)
+□ Confirm no shared credentials the subject may have had knowledge of remain active
+```
+
+---
+
+#### R-12.7 Legal and HR Interface
+
+```
+Timeline:
+T+0         → Open private channel. Security-engineer + founder.
+T+30 min    → Legal counsel notified. Do not proceed to HR without legal guidance.
+T+Legal go  → HR Lead briefed by founder (verbal first; written summary follows).
+             → Legal prepares termination documentation if warranted.
+             → HR prepares separation agreement if warranted.
+T+Containment → Subject notified of access revocation. This is the moment the
+               investigation is revealed to the subject.
+T+Post      → Formal written documentation to subject per employment law requirements.
+             → If regulatory reporting required: legal counsel coordinates Art. 33.
+```
+
+**Legal hold notice (issued to IT/devops-lead as soon as investigation opens):**
+> "Legal hold is in effect for all data related to [role descriptor, not name at this stage]. Do not delete, overwrite, or allow expiry of any logs, email records, access logs, or storage related to this matter. Retain all items regardless of normal retention schedules. This hold remains in effect until explicitly lifted in writing."
+
+**Privacy floor applies during investigation:** The investigation accesses only system access logs and metadata. The content of coaching turns, health profiles, or workout data belonging to the subject qua user is accessed only if the subject's own data is within the blast radius of an exfiltration event, and then only by security-engineer with compliance-officer oversight and legal authorisation.
+
+---
+
+#### R-12.8 GDPR Implications
+
+| Data Exfiltrated | GDPR Implication | Notification Required |
+|---|---|---|
+| None confirmed | No breach | No |
+| Email addresses or names only | Art. 33 if > low risk; assess | Probable Art. 33; Art. 34 unlikely |
+| Workout logs, meal logs | Art. 33 (health-adjacent) | Art. 33 required; Art. 34 assess |
+| `health_profiles` (Art. 9 explicit) | Art. 33 mandatory; Art. 34 likely | Both required |
+| `coaching_turns` (health context) | Art. 33 mandatory; Art. 34 assess | Art. 33 required; Art. 34 based on content review |
+| `cv_sessions.keypoints_enc` (biometric) | Art. 9; R-11 cross-activate | Art. 33 mandatory; Art. 34 presumed (align with R-11) |
+| Multi-tenant: multiple enterprise customers | Art. 33 per affected jurisdiction | Notify each relevant SA; enterprise tenants via §12 |
+
+**72-hour clock starts** when the founder or security-engineer first becomes aware of a probable breach — the trigger is awareness, not confirmation.
+
+**The subject's own GDPR rights:** The subject employee retains data subject rights under GDPR during and after the investigation. However, the right to access (Art. 15) may be limited where disclosure would prejudice an ongoing investigation (GDPR Art. 23(1)(f)). Legal counsel advises on the specific derogation available in the relevant jurisdiction.
+
+**HR data handling:** Employment records created during this investigation (investigation notes, evidence summary, legal correspondence) are processed under GDPR Art. 6(1)(c) (legal obligation) and Art. 9(2)(b) (employment law) if health data about the employee is involved. These records are stored in a restricted compliance folder (`compliance/hr-investigations/<case-id>/`) accessible only to founder + legal + compliance-officer. Retention: 7 years post-employment end or as required by applicable employment law, whichever is longer.
+
+---
+
+#### R-12.9 Evidence Package
+
+```
+compliance/evidence/insider-<YYYYMMDD>-<case-id>/
+  ├── 00-manifest.sha256              ← SHA-256 of all files at collection time
+  ├── 01-audit-log-export/            ← R2-archived HMAC-chained audit log (read-only)
+  │     audit_log_events-<window>.jsonl
+  ├── 02-supabase-studio-logs/        ← Dashboard audit log PDF + JSON
+  ├── 03-cloudflare-access-logs/      ← Workers + Gateway logs for timeframe
+  ├── 04-scope-assessment/            ← SQL query outputs (blast radius)
+  │     blast-radius-by-table.csv
+  │     multi-tenant-exposure.csv
+  ├── 05-role-snapshot/               ← pg_roles + information_schema at T+0
+  ├── 06-github-access-log/           ← GitHub audit log for subject (if applicable)
+  ├── 07-legal-hold-notice.txt        ← Timestamped legal hold
+  ├── 08-incident-channel-export/     ← Exported private channel log (founder only)
+  ├── 09-containment-actions.txt      ← Timestamped log of every access change
+  ├── 10-gdpr-assessment.md           ← Art. 33/34 necessity determination
+  └── 11-pir-draft.md                 ← Post-incident review (redacted for external use)
+```
+
+**Chain of custody:** Each file in the evidence package is SHA-256 hashed at collection time and recorded in `00-manifest.sha256`. The package is stored in R2 (`form-compliance-evidence/insider-<case-id>/`) with object versioning enabled. Only founder + compliance-officer have read access. No modifications are permitted after initial upload.
+
+**Retention:** 7 years from case closure date, consistent with DEC-030 audit log retention policy.
+
+---
+
+#### R-12.10 Post-Incident Preventive Controls
+
+The following controls must be verified or implemented after every insider threat incident (P0/P1), regardless of whether exfiltration was confirmed:
+
+| Control | Verification Action | Owner |
+|---|---|---|
+| Principle of least privilege audit | Review all `form_admin` and `form_system` role grants; remove any that are broader than operationally necessary | security-engineer |
+| Offboarding checklist compliance | Confirm the current offboarding procedure covers all access systems in §R-12.6 Containment (C-4 list) | compliance-officer |
+| Audit log alert on bulk read | Add an alert rule in OBSERVABILITY.md §6.2 for: actor reads > 500 records in `health_profiles`, `coaching_turns`, or `cv_sessions` within 60 minutes | devops-lead |
+| Workers Secrets access review | Confirm only active team members with operational need have Cloudflare dashboard access | security-engineer |
+| Employee access review cadence | Confirm quarterly access review is scheduled (SOC 2 CC6.3 evidence requirement) | compliance-officer |
+| HMAC chain integrity alert | Confirm the chain integrity cron (§5 R-05) fires on any actor-is-staff + resource-type-is-audit_log_events read event | devops-lead |
+| Acceptable use policy acknowledgment | Confirm all current team members have signed an AUP that explicitly covers system access monitoring rights | compliance-officer |
+
+---
+
+#### R-12.11 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Evidence from R-12 |
+|---|---|
+| **CC6.2** — Prior to issuing system credentials, the entity registers and authorizes new internal and external users | Offboarding checklist (§R-12.6 C-4) and access review cadence (§R-12.10) demonstrate that credential lifecycle is managed |
+| **CC6.3** — The entity authorizes, modifies, or removes access to data, software, functions, and other protected information assets based on approved and documented requests | Quarterly access review process; role grant snapshots in evidence package |
+| **CC7.2** — The entity monitors system components for anomalies that could indicate a malicious act | Bulk-read alerting rule (§R-12.10); HMAC chain monitoring cross-reference |
+| **CC7.3** — The entity evaluates security events | Severity matrix (§R-12.2); blast radius assessment (§R-12.5) |
+| **CC7.4** — The entity responds to identified security incidents by executing a defined incident response program | This runbook as executed evidence; private channel export; containment log |
+| **CC9.1** — The entity identifies, selects, and develops risk mitigation activities for risks arising from potential business disruptions | Insider threat as a documented risk in the FORM risk register (SOC2_READINESS.md §14); preventive controls (§R-12.10) |
+| **CC1.2** — COSO Principle 2: The board demonstrates a commitment to integrity and ethical values | Acceptable use policy acknowledgment requirement (§R-12.10); no-pay and no-bypass policies |
+
+**Auditor evidence artefacts:**
+- Executed copy of this runbook with timestamped actions
+- Evidence package manifest (`compliance/evidence/insider-<case-id>/00-manifest.sha256`)
+- Quarterly access review records (`compliance/evidence/access-reviews/YYYY-QN.csv`)
+- AUP acknowledgment log (`compliance/hr/aup-acknowledgments.csv`)
+
+---
+
+#### R-12.12 Tabletop Scenario G (for §9 drill catalog)
+
+**Scenario G — Insider data exfiltration before resignation (Year 2, Q3):**
+
+*"It is 22:30 UTC on a Thursday. The HMAC chain integrity cron fires normally. But a PostHog anomaly alert, configured for bulk `health_profiles` read events, fires at 22:47 UTC: an actor with `form_admin` privileges has queried 2,200 records from `health_profiles` across 14 enterprise tenants in the past 90 minutes. A database role snapshot shows this actor is a current team member who gave verbal notice of resignation two weeks ago. Their official last day is in 8 days. No formal offboarding has been initiated."*
+
+Key discussion points:
+- Can you determine within 30 minutes whether data left FORM's systems?
+- The R2 archive is the forensic source — is the HMAC chain still intact?
+- Who is in the investigation channel? Who is NOT? Why does it matter?
+- When does the legal counsel call happen? Before or after the Supabase access is revoked?
+- This affects 14 enterprise tenants — what is the timeline for E-01 notifications?
+- The 72-hour Art. 33 clock: when exactly did it start?
+- Is this a P0 or P1? At what point does it upgrade?
+- What does the employment contract say about monitoring rights in this jurisdiction?
+- The subject still has 8 working days of access. How do you balance ongoing access needs with containment?
+
+**Who participates:** founder, security-engineer, compliance-officer, customer-success.
+**Legal observer invited:** external counsel or someone simulating their role.
+**Document findings in a tabletop PIR. Add to Year 2 testing schedule.**
+
+---
+
+## 14. Continuous Improvement Program
+
+### 14.1 Purpose
+
+The Post-Incident Review (§8) generates action items. This section defines how those action items are tracked to completion, how control effectiveness is reviewed on a recurring cadence, and how PIR findings feed back into runbook updates. This is the SOC 2 CC4 evidence layer: the organization not only responds to incidents but continuously evaluates and improves its controls.
+
+**Without this section, the IR program has a structural gap:** incidents generate PIR documents with action items, but there is no formal mechanism to verify closure, identify recurring failure patterns, or demonstrate to auditors that the feedback loop closes. SOC 2 CC4.1 (performance evaluations of controls) and CC4.2 (evaluation of deficiencies) require documented evidence of this loop.
+
+---
+
+### 14.2 PIR Action Item Registry
+
+Every action item generated in a PIR (§8.3) is entered into the PIR Action Item Registry within 48 hours of PIR finalization. The registry is a Linear project labeled `[IR] Action Items` with the following field schema:
+
+| Field | Values | Required |
+|---|---|---|
+| `incident_id` | `INC-YYYYMMDD-slug` | Yes |
+| `severity_of_source_incident` | P0 / P1 / P2 | Yes |
+| `action_item_priority` | Critical / High / Medium / Low | Yes |
+| `title` | Short description of the action | Yes |
+| `owner_role` | security-engineer / devops-lead / compliance-officer / founder / platform-engineer | Yes |
+| `due_date` | ISO 8601 date | Yes for Critical/High |
+| `soc2_criterion` | CC7.5 / CC4.1 / CC6.3 / etc. | Yes if SOC 2 relevant |
+| `status` | Open / In Progress / Blocked / Closed | Yes |
+| `close_date` | ISO 8601 date | Required on Close |
+| `verification_note` | How the action was verified as complete | Required on Close |
+
+**Mandatory SLAs for action item closure:**
+
+| Priority | Source Severity | Closure SLA | Escalation if Missed |
+|---|---|---|---|
+| Critical | P0 | 14 calendar days | Founder + compliance-officer paged |
+| Critical | P1 | 30 calendar days | Founder notified |
+| High | P0 | 30 calendar days | Founder notified |
+| High | P1 | 60 calendar days | security-engineer reviews |
+| Medium | Any | 90 calendar days | Quarterly review flags |
+| Low | Any | 180 calendar days | Semi-annual review flags |
+
+**SOC 2 evidence:** The Linear export of all `[IR] Action Items` tickets (closed and open) is produced monthly and stored at `compliance/evidence/ir-action-items/YYYY-MM.csv`. This is the primary CC7.5 evidence artefact (entity identifies and develops activities to recover from security incidents).
+
+---
+
+### 14.3 Escalation Thresholds
+
+The following conditions trigger an automatic escalation to founder + compliance-officer, regardless of individual ticket status:
+
+| Threshold | Condition | Escalation Action |
+|---|---|---|
+| Overdue Critical action items | Any Critical action item past due date | Immediate: founder + compliance-officer notified by security-engineer; root cause documented in same ticket |
+| Recurring failure pattern | Same control fails in 2 P0/P1 incidents within 12 months | Quarterly review convened within 2 weeks; root cause treated as systemic, not one-off |
+| > 3 High items open simultaneously | More than 3 High-priority items open at any point | Weekly stand-up added: security-engineer + founder review open items until count falls below 3 |
+| SOC 2 observation period breach | Any Critical or High item remains open at the start of the SOC 2 observation period | Automatic SOC 2 readiness flag (SOC2_READINESS.md §38 gate) — auditor must be notified of open items at period start |
+
+---
+
+### 14.4 Quarterly Control Effectiveness Review
+
+Held on the first Monday of each calendar quarter. Owner: security-engineer + compliance-officer. Attendees: founder (required for Q4).
+
+**Agenda (60 minutes maximum):**
+
+1. **Action item registry review** (15 min) — All items opened since last quarter. Overdue items: root cause. Closed items: verification adequate? Patterns across items.
+
+2. **Incident trend analysis** (15 min) — Incidents in the past quarter by severity and type. Any type appearing more than once: systemic? Alert quality: false positive rate (target < 20% of P2 pages). Mean time to detect (MTTD) and mean time to respond (MTTR) by severity.
+
+3. **Runbook gap check** (15 min) — Did any incident activate a runbook that was inadequate or absent? Are all runbooks current with the most recent PIR findings? Cross-check: do all runbooks reference current infrastructure (e.g., Supabase plan, Workers configuration)?
+
+4. **SOC 2 evidence completeness** (10 min) — Are all evidence artefacts per the master index (SOC2_READINESS.md §38.6) current? Any gaps ahead of the next observation period?
+
+5. **Decisions and action items** (5 min) — Record new action items in the registry immediately. Set due dates. Confirm owners.
+
+**Output:** A quarterly review record stored at `compliance/evidence/quarterly-ir-review/YYYY-QN.md`. Template:
+
+```markdown
+# IR Quarterly Review — YYYY Q[N]
+
+**Date:** YYYY-MM-DD
+**Attendees:** [roles, not names]
+**Owner:** security-engineer
+
+## Action Item Registry Summary
+- Total open items: [N]
+- Overdue items: [N] — [list with root cause]
+- Closed this quarter: [N]
+- New items added: [N]
+
+## Incident Trend Analysis
+- Incidents this quarter: P0=[N], P1=[N], P2=[N]
+- Recurring patterns: [none / describe]
+- MTTD (P0): [Xh average]
+- MTTR (P0): [Xh average]
+- Alert false positive rate: [X%]
+
+## Runbook Gaps Identified
+[List or "none"]
+
+## SOC 2 Evidence Completeness
+[Green / Yellow / Red — explain if not Green]
+
+## Decisions Made
+[List]
+
+## New Action Items
+[Entered in Linear — link to filter]
+```
+
+---
+
+### 14.5 Runbook Update Protocol
+
+Runbooks become stale when infrastructure changes, when incidents reveal gaps, or when new threat types emerge. This protocol governs how and when runbooks are updated.
+
+**Mandatory update triggers:**
+
+| Trigger | Runbook(s) Affected | Update SLA | Owner |
+|---|---|---|---|
+| P0/P1 incident reveals runbook gap or error | Relevant runbook(s) | 7 days after PIR finalized | security-engineer |
+| Infrastructure change affects response steps (e.g., Supabase migration, new Worker) | All runbooks referencing that component | Before change is deployed to production | devops-lead |
+| New third-party processor added | R-07, §11 sub-processor registry | Before processor handles production data | compliance-officer |
+| Regulatory change affecting notification obligations | R-01, R-07, R-11, §10 | 30 days from regulatory effective date | compliance-officer |
+| Annual review with no incidents | All runbooks | Once per year (calendar Q4) | security-engineer |
+| Tabletop exercise reveals gap | Relevant runbook(s) | 14 days after tabletop | security-engineer |
+
+**Update procedure:**
+```
+1. Create a Linear ticket: [IR Runbook Update] <runbook-name> — <brief reason>
+   Link to PIR or tabletop record that triggered the update.
+
+2. Draft the change in a git branch: incident-response-patch/<YYYYMMDD>-<slug>
+
+3. Review gate: compliance-officer reviews all changes to:
+   - Regulatory notification timelines (§10)
+   - GDPR obligations language (any runbook)
+   - Sub-processor registry (§11.2)
+   - Privacy floor enforcement clauses
+   security-engineer reviews all technical steps.
+
+4. Merge to main after dual approval.
+   Commit message: incident-response: <change-summary> (runbook update per <PIR-ID or tabletop>)
+
+5. Version bump (patch): update footer version, CHANGELOG.
+   Update ToC entry if section numbers changed.
+
+6. Archive: store a tagged snapshot of this document in
+   compliance/evidence/runbook-versions/INCIDENT_RESPONSE-v<X.Y>.md
+   at each minor version bump.
+```
+
+---
+
+### 14.6 Annual Control Self-Assessment
+
+Once per year (calendar Q4), the security-engineer conducts a formal control self-assessment against the complete SOC 2 CC7 and CC4 criteria. This is distinct from the quarterly review: it is structured against audit criteria, not operational metrics.
+
+**Self-assessment template:**
+
+```markdown
+# Annual Control Self-Assessment — IR Program
+**Year:** YYYY
+**Owner:** security-engineer
+**Reviewer:** compliance-officer
+**Stored at:** compliance/evidence/annual-csa/YYYY-ir-csa.md
+
+## CC4.1 — Performance Evaluations of Controls
+
+| Control | Evidence | Self-Rated Status | Gap |
+|---|---|---|---|
+| Alert verification monthly | Linear tickets labeled alert-test-* | ✅ / 🟡 / 🔴 | |
+| Tabletop quarterly | Tabletop PIR records | | |
+| DR test annual | DR test report | | |
+| Pen test annual | Pen test report | | |
+| Runbook review after P0/P1 | Git commit history on INCIDENT_RESPONSE.md | | |
+| Action item closure SLAs met | Linear action item export | | |
+
+## CC4.2 — Evaluation of Deficiencies
+
+List all deficiencies identified this year:
+| Deficiency | Source | Severity | Remediated? | Evidence |
+|---|---|---|---|---|
+| [describe] | PIR-YYYYMMDD / Tabletop / Alert failure | Critical/High/Medium | Yes/No | [link] |
+
+## CC7.2 — Monitoring for Anomalies
+[Confirm all alert sources in §3.1 remain configured and verified. List any gaps.]
+
+## CC7.4 — Incident Response Program
+[Confirm all runbooks were reviewed in the past 12 months. List last review date per runbook.]
+
+## CC7.5 — Recovery Activities
+[Confirm PIR was completed for every P0/P1 in the past 12 months. List incidents and PIR dates.]
+
+## Summary Assessment
+Self-rated SOC 2 readiness for CC4+CC7 cluster: [Ready / Conditionally Ready / Gaps Require Remediation]
+Identified gaps to address before next observation period: [list or "none"]
+```
+
+**Output** stored at `compliance/evidence/annual-csa/YYYY-ir-csa.md`. Shared with the audit firm at observation period open.
+
+---
+
+### 14.7 SOC 2 Evidence Contribution
+
+| SOC 2 Criterion | Evidence Generated by §14 |
+|---|---|
+| **CC4.1** — The entity evaluates and communicates internal control deficiencies | Quarterly review records; annual CSA; action item registry — these demonstrate a functioning evaluation cycle |
+| **CC4.2** — The entity evaluates and communicates deficiencies and their remediation | Overdue escalation records; recurring pattern analysis in quarterly review; runbook update protocol with PIR linkage |
+| **CC7.5** — The entity identifies, develops, and implements activities to recover from identified security incidents | Action item registry with closure evidence; verification notes on each closed item; SLA compliance data |
+| **CC2.1** — The entity obtains or generates and uses relevant, quality information to support the functioning of internal control | Quarterly review trend analysis; MTTD/MTTR metrics; false positive rate tracking |
+
+**Auditor evidence package for §14:**
+- `compliance/evidence/ir-action-items/YYYY-MM.csv` (monthly Linear export) — 12 months
+- `compliance/evidence/quarterly-ir-review/YYYY-QN.md` — 4 records per year
+- `compliance/evidence/annual-csa/YYYY-ir-csa.md` — 1 per year
+- `compliance/evidence/runbook-versions/` — tagged snapshots at each version bump
+- Git commit history on `docs/INCIDENT_RESPONSE.md` showing review cadence
+
+---
+
 ## Appendix A — Quick Reference Card
 
 For use at 3am. IC: read §1 to classify, open the incident channel, then jump to the relevant runbook in §5.
@@ -2941,6 +3536,11 @@ CV / pose keypoints exposed? → R-11 (always P0; disable cv_enabled flag immedi
   keypoints_enc at risk?    → R-11 + rotate cv_keypoints_encryption_key NOW
   Art. 9 biometric breach?  → R-11 + Art. 33 clock + likely Art. 34 + clinical-safety
   RLS failure on cv_sessions → R-11 + R-01 both active simultaneously
+Insider / privileged access abuse? → R-12 (evidence BEFORE containment — do NOT revoke first)
+  HMAC chain intact?        → R2 archive is forensic truth; do not use live audit_log_events
+  Legal counsel BEFORE HR   → No employment action without legal go-ahead
+  Multi-tenant access?      → P0; enterprise E-01 within 30 min of P0 declaration
+  Art. 9 data read?         → P0 + Art. 33 clock + R-12.8 GDPR table
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
@@ -2955,11 +3555,15 @@ Enterprise tenant comms: §12 — Customer Lead owns; IC approves all external s
   Template E-01 within 30 min (P0) / 60 min (P1) of declaration.
 Board / investor comms: §13 — founder only; Template B-01 within 4h of P0 declaration.
   Triggers: P0 > 2h / Art. 9 breach confirmed / enterprise tenant loss / press coverage.
+Continuous improvement: §14 — action item registry in Linear [IR] project.
+  Quarterly review: first Monday of each quarter (security-engineer + compliance-officer).
+  Runbook update SLA: 7 days post-PIR for gaps; before deploy for infra changes.
+  Annual CSA: Q4; output stored compliance/evidence/annual-csa/YYYY-ir-csa.md.
 ```
 
 ---
 
-**v0.5 · May 2026 · Owner: security-engineer + devops-lead**
+**v0.6 · May 2026 · Owner: security-engineer + devops-lead**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: May 2027 or after first P0/P1 — whichever comes first.**
 
@@ -2970,3 +3574,5 @@ Board / investor comms: §13 — founder only; Template B-01 within 4h of P0 dec
 *v0.4 additions: R-10 AI Coach Safety Incident (Victor Harmful Guidance) — first AI-specific incident runbook in the taxonomy. Eight-level severity matrix distinguishing isolated quality issues (P2), systematic harmful patterns (P1), ED-adjacent content or injury reports (P0), and prompt injection vectors (P0 security incident). Three incident sub-types with different response branches: prompt regression (system prompt rollback + clinical-safety review gate), model behavior drift (Anthropic safety team notification + R-07 cross-reference), prompt injection (P0 security incident + input sanitization). Immediate actions include coaching_turns read-only query protocol with content_hash-only channel references (ED-adjacent text not distributed to responders). Blast radius assessment queries by victor_prompt_version. Containment: feature-flag scoping (pathway not full product), edge Worker content filter middleware, clinical-safety veto on re-enable decisions. Eradication: prompt diff methodology, Anthropic safety reporting path, Victor Jailbreak Test Suite addition to §9 testing program, clinical-safety PR review gate for all prompt changes. Evidence package: SOC 2 CC7.4/CC5.2/CC1.2 artifacts. Clinical-safety note: restricted compliance folder for harmful content (clinical-safety + compliance-officer + security-engineer + founder access only). Regulatory notes: GDPR Art. 34 physical injury path, Art. 33 prompt-injection health-data branch, Anthropic sub-processor R-07 parallel activation. No-go customer escalation: wellness-as-punishment detection triggers founder escalation. Appendix A updated with R-10 quick reference.*
 
 *v0.5 additions: R-11 CV / Pose Estimation Biometric Data Privacy Incident — second AI-adjacent runbook; addresses GDPR Art. 9 biometric data specifically (distinct from R-01 general health-data breach). Architecture-aware two-track design: Track A (on-device device loss — raw frames never server-side) vs. Track B (server-side `cv_sessions.keypoints_enc` exposure). Severity table: always P0 for `keypoints_enc` RLS failure or key compromise; P1 for k-anonymity fleet stats. Scope assessment SQL: tenant/user/session count in exposure window; keypoints_enc null/populated ratio; RLS anon-role verification. Containment: cv_enabled feature flag global disable; cv_keypoints_encryption_key rotation in Workers Secrets; pg_cron pause for `cv_session_fleet_stats` refresh. GDPR Art. 9 notification assessment table with Art. 34 presumption for biometric data (overrides standard R-01 assessment that sometimes waives Art. 34); 72h notification timeline ladder (T+4h assessment, T+24h draft, T+48h file partial, T+72h hard deadline). Enterprise tenant CV-specific notification requirements including DPO coordination for joint-controller Art. 33 filings. Clinical-safety mandatory coordination: movement-pattern health inference review; Art. 34 notification text sign-off gate. Evidence package: 12-item checklist including encryption key access audit trail and OBSERVABILITY.md §18 dashboard screenshots. Post-incident mandatory controls: encryption key rotation schedule, `keypoints_enc` storage necessity review, k-anonymity enforcement verification, OBSERVABILITY.md §18 alerting confirmation, five-way re-enable gate (ml-engineer + security-engineer + clinical-safety). §13 Board & Investor Communication Protocol — six-trigger threshold table (P0 > 2h, Art. 9 breach, enterprise tenant loss, media coverage, regulatory action, financial impact > $10k). Founder-exclusive authority (no other role contacts board during incident). Five-template set: B-01 Initial Notification (T+4h), B-02 Status Update (every 12h), B-03 Resolution (T+4h post-closure), B-04 Post-Incident Summary (within 5 business days of PIR); each template includes explicit "what NOT to write" constraints (no root cause, no attribution, no legal conclusions in B-01/B-02). Email-first channel requirement; phone call for biometric breach / press / customer loss. Evidence archiving in `compliance/evidence/incident-comms/<slug>/board/` retained 7 years per DEC-030. SOC 2 mapping: CC2.2 (board communication), CC9.1 (risk mitigation commitment), CC7.3 (anomaly escalation), A1.1 (availability commitment). Appendix A updated with R-11 and §13 quick references.*
+
+*v0.6 additions: R-12 Insider Threat / Privileged Access Abuse — twelfth runbook; covers current and former team members or contractors with legitimate credentials misusing access for exfiltration, sabotage, or personal gain. Evidence-before-containment constraint reinforced (overrides standard flow; exception only for active live exfiltration); private restricted investigation channel (`#inc-YYYYMMDD-insider`: founder + security-engineer + compliance-officer only — not HR, not subject). Trigger matrix: 9 signal types from bulk Supabase Studio access to HMAC chain break co-incident with staff activity; severity table: P0 for Art. 9 data read or multi-tenant cross-access, P1 for bulk access without confirmed exfiltration or post-HR-process access, P2 for historical single anomalous event. Unique response constraints: graduated containment options C-1 (passive monitoring) through C-5 (Workers Secrets rotation) ordered by investigative stealth; legal counsel notification before HR briefing rule with jurisdiction notes (EU/GDPR proportionality, US at-will, Ukraine labour law); HMAC chain R2 archive as forensic truth (live `audit_log_events` table not used forensically). Scope assessment SQL: blast radius by table with Art. 9 classification, multi-tenant exposure query, enterprise tenant identification, `health_profiles` record count for impacted users. Legal and HR interface timeline with legal hold notice template. GDPR implications table: 8 data category rows mapping to Art. 33/34 requirements; 72h clock start note; data subject rights derogation for ongoing investigation (Art. 23(1)(f)); HR investigation records retention under Art. 9(2)(b). Evidence package: 11-item directory structure with SHA-256 manifest, R2 object versioning, 7-year retention per DEC-030. Post-incident preventive controls: 7 controls covering least-privilege audit, offboarding checklist, bulk-read alert rule, Workers Secrets access review, quarterly access review cadence, HMAC chain integrity alert on staff actor + audit log resource, AUP acknowledgment. SOC 2 mapping: CC6.2/CC6.3 (access lifecycle), CC7.2/CC7.3/CC7.4 (monitoring and response), CC9.1 (risk mitigation), CC1.2 (integrity and ethical values). Tabletop Scenario G added to §9 drill catalog: insider data exfiltration before resignation affecting 14 enterprise tenants; 14 discussion points covering forensic chain, legal timing, tenant notification, Art. 33 clock, graduated response. §14 Continuous Improvement Program — closes the PIR-to-action-item loop for SOC 2 CC4.1/CC4.2 evidence. PIR Action Item Registry: Linear project `[IR] Action Items` with 10-field schema (incident_id, severity, priority, title, owner, due_date, SOC2 criterion, status, close_date, verification_note); closure SLA table (Critical P0: 14 days → founder paged; Critical P1: 30 days; High: 30–60 days; Medium: 90 days; Low: 180 days); monthly Linear export to `compliance/evidence/ir-action-items/YYYY-MM.csv`. Escalation thresholds: 4 triggers (overdue Critical, recurring failure pattern, > 3 High items open, SOC 2 observation period breach). Quarterly control effectiveness review: 60-min agenda (action item registry / incident trend analysis / runbook gap check / SOC 2 evidence completeness / decisions); MTTD/MTTR/false-positive-rate metrics; output template stored at `compliance/evidence/quarterly-ir-review/YYYY-QN.md`. Runbook update protocol: 6 mandatory triggers with SLAs; 5-step update procedure with dual-approval gate (compliance-officer + security-engineer); tagged archive at each minor version bump. Annual control self-assessment: Q4 cadence; structured against CC4.1, CC4.2, CC7.2, CC7.4, CC7.5 criteria; self-rated readiness with gap list; stored `compliance/evidence/annual-csa/YYYY-ir-csa.md`; shared with audit firm at observation period open. SOC 2 evidence mapping for §14: CC4.1, CC4.2, CC7.5, CC2.1; complete evidence package list. Appendix A updated with R-12 and §14 quick references.*

@@ -6,6 +6,14 @@
 
 ---
 
+## [1.9.14] — 2026-05-23
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` §R-12 + §14 (v0.5→v0.6). R-12 Insider Threat / Privileged Access Abuse: evidence-before-containment constraint; private restricted investigation channel (founder + security-engineer + compliance-officer only); 9-trigger severity matrix; graduated containment options C-1 through C-5 ordered by stealth; legal-before-HR rule with jurisdiction notes; blast-radius SQL (Art. 9 classification, multi-tenant exposure, enterprise tenant identification); GDPR Art. 33/34 table by data category; 11-item evidence package with SHA-256 manifest; 7 post-incident preventive controls; SOC 2 CC6.2/CC6.3/CC7.2/CC7.3/CC7.4/CC9.1/CC1.2 mapping; Tabletop Scenario G added to §9 drill catalog (insider exfiltration before resignation, 14 enterprise tenants, 14 discussion points). §14 Continuous Improvement Program: PIR Action Item Registry (10-field Linear schema, 5-tier SLA table, monthly CSV export); 4 escalation thresholds; quarterly control effectiveness review (60-min agenda, MTTD/MTTR/false-positive metrics, output template); runbook update protocol (6 mandatory triggers, dual-approval gate, tagged archive); annual control self-assessment (Q4, CC4.1/CC4.2/CC7.2/CC7.4/CC7.5, audit firm handoff); SOC 2 CC4.1/CC4.2/CC7.5/CC2.1 mapping. Appendix A updated with R-12 and §14 quick references. Footer v0.5→v0.6.
+- `VERSION` → 1.9.14
+
+---
+
 ## [1.9.13] — 2026-05-23
 
 ### Added
