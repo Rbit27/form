@@ -6,6 +6,17 @@
 
 ---
 
+## [1.9.16] — 2026-05-23
+
+### Added
+- `content/post-97-loaded-carries.md` — loaded carries: farmer's walk, suitcase carry, yoke; механізми (grip під динамічним навантаженням, anti-lateral flexion, ізометрична стабілізація під час локомоції), McGill et al. (2013), Androulakis-Korakakis et al. (2018), Bohannon (2019), протоколи і місце у тижні; clinical-safety PASS
+
+### Changed
+- `README.md` — post-97 відмічений як [x], roadmap post-100–104 додані
+- `VERSION` → 1.9.16
+
+---
+
 ## [1.9.15] — 2026-05-23
 
 ### Added

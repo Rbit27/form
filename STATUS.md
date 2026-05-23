@@ -183,6 +183,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-89-acwr-training-load.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-90-calisthenics-vs-weighted-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-93-mobility-vs-flexibility.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-97-loaded-carries.md | Blog | draft · clinical-safety PASS |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
