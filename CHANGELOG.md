@@ -6,6 +6,19 @@
 
 ---
 
+## [1.10.1] — 2026-05-24
+
+### Added
+- [`content/post-107-hypertrophy-mechanisms-mechanical-tension.md`](content/post-107-hypertrophy-mechanisms-mechanical-tension.md) — Три механізми гіпертрофії: ієрархія між mechanical tension (первинний, mTORC1 → Wackerhage et al. 2019), metabolic stress (допоміжний, Schoenfeld 2013), та muscle damage (побічний ефект, не обов'язковий тригер); repeated bout effect як ключовий контраргумент; Burd et al. (2012) і Mitchell et al. (2012) дані MPS; практичні висновки — повний ROM, RIR 0–2, без гонитви за DOMS; 9-хв читання; clinical-safety PASS
+- [`content/post-108-lengthened-partials-stretch-hypertrophy.md`](content/post-108-lengthened-partials-stretch-hypertrophy.md) — Гіпертрофія при розтягнутих положеннях: Maeo et al. (2021) підколінні lengthened vs shortened; Pedrosa et al. (2022) квадрицепс; Kassiano et al. (2023) мета-аналіз — lengthened position > shortened partials; titin механізм (Ca²⁺ sensitization, sarcomerogenesis); Schoenfeld & Grgic (2020) ROM review; exercise selection по групах (RDL для підколінних, incline curl для біцепса, overhead extension для трицепса, повні присідання для квадрицепса); 13-хв читання; clinical-safety PASS
+- `blog.html` — картки для post-107 і post-108
+- `README.md` — post-107 і post-108 позначені [x] у roadmap
+
+### Changed
+- `VERSION` → 1.10.1
+
+---
+
 ## [1.10.0] — 2026-05-24
 
 ### Added
