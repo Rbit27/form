@@ -6,6 +6,14 @@
 
 ---
 
+## [1.9.22] — 2026-05-24
+
+### Changed
+- `docs/OBSERVABILITY.md` v0.7 → v0.8 — added §21 ClickHouse Analytics Observability (M9): closes the documented gap from §10 ("ClickHouse for analytics — observability strategy not yet designed"). Covers migration trigger thresholds (PostHog cost P0, query latency P0, MAU/tenant/volume advisory signals); ClickHouse Cloud EU-Central architecture with GDPR DPA; RED metrics table + eight alerting rules (AL-CH-01 through AL-CH-09) for ClickHouse itself; OpenTelemetry Collector pipeline (Fly.io EU) with PII filter processor; `traces` / `events` / `sessions` MergeTree DDL; BLOCKED_PROPERTY_KEYS deny-list preventing health values at ingest; six analytics SLOs (CH-SLO-01 through CH-SLO-06) with error budget burn rates; per-tenant ClickHouse Row Policies with break-glass cross-tenant access logging to DEC-030 HMAC chain; three-phase PostHog migration runbook; PostHog data deletion for GDPR Art. 5(1)(e) compliance; privacy constraints matrix (six constraints); nightly PII scan (AL-CH-09, P0); SOC 2 CC7.2/CC6.1/CC6.2/C1.2/PI1.2/A1.1/CC9.2 evidence mapping; six auditor artefact files; sixteen-item M7-prep + M9 implementation checklist.
+- `VERSION` → 1.9.22
+
+---
+
 ## [1.9.21] — 2026-05-24
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v0.7
+# FORM · Observability & Monitoring Taxonomy v0.8
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -3431,3 +3431,511 @@ These six events are the same as those defined in `DATA_MODEL.md §14.7`. Their 
 ---
 
 *v0.7 additions: §20 Wearable Data Integration Observability — five-source wearable pipeline (HealthKit, Health Connect, Whoop, Oura Ring, Garmin) added to observability scope; privacy-first design established (no health values in any observability signal; count-only DEC-030 audit events; k-anonymity n ≥ 5 enforced); RED metrics table per provider with Workers Analytics Engine counter names; eight freshness and operational SLOs (WEAR-SLO-01 through WEAR-SLO-08) with differentiated targets per sync mechanism (HealthKit 95%, Health Connect 90%, Whoop/Oura 92%, Garmin 88%); OAuth token state machine with five states and transition-triggered alerting; sync architecture health signals per mechanism (HealthKit background delivery, Health Connect WorkManager, third-party API cron); `wearable_sync_health` Postgres table DDL (operational metadata only — timestamps, failure counts, status codes — no health values) with RLS blocking tenant_admin direct access; eight alerting rules AL-WEAR-01 through AL-WEAR-08 (P1 PagerDuty for fleet failures and upstream outages; P2 Slack for quota and per-tenant stale; privacy-safe AL-WEAR-08 payload spec); `wearable_fleet_health` materialized view with k-anonymity HAVING clause and tenant_admin RLS; admin dashboard "Wearable Integration Health" widget spec (five panels, no user_id exposure, error code bucketing); six DEC-030 HMAC-chained audit events aligned with DATA_MODEL.md §14.7; privacy constraints summary table (five constraints, enforcement location documented); SOC 2 CC7.2/PI1.2/C1.2/A1.1/CC9.2 evidence mapping; thirteen-item implementation checklist across M4/M5. Header corrected v0.5 → v0.7 (§19 addition had bumped doc to v0.6 without updating the header).*
+
+---
+
+## 21. ClickHouse Analytics Observability (M9)
+
+> Owner: data-engineer + platform-engineer. Review: on migration trigger or quarterly post-M9. SOC 2 evidence: CC7.2, A1.1. Cross-reference: `docs/COST_MODEL.md §13`, `docs/DATA_MODEL.md §17`, `docs/ENTERPRISE.md`.
+
+This section closes the gap documented in §10 ("ClickHouse for analytics", M9). It designs the observability strategy for ClickHouse once FORM migrates product analytics and distributed traces from PostHog + Supabase materialized views to a self-hosted ClickHouse cluster. The section covers: (1) migration trigger thresholds, (2) RED metrics for ClickHouse itself, (3) the OpenTelemetry Collector → ClickHouse trace pipeline, (4) product event table schemas, (5) SLOs for analytics query latency, (6) privacy constraints, and (7) the migration runbook from PostHog.
+
+---
+
+### 21.1 Migration Trigger Thresholds
+
+ClickHouse is not deployed by default. PostHog and Supabase materialized views are the analytics stack through M8. Migration to ClickHouse is triggered when **any two** of the following thresholds are breached simultaneously, or when **any one** P0 threshold fires:
+
+| Threshold | Type | Trigger value | Rationale |
+|---|---|---|---|
+| **PostHog monthly cost** | P0 trigger | > $2,000/month | PostHog scale plan; at ~300k MAU PostHog exceeds $2k/month and ClickHouse self-hosting becomes cost-superior |
+| **Analytics query P95 latency** | P0 trigger | > 10 seconds on core dashboards | Materalized view lag in Postgres degrades admin dashboard; ClickHouse columnar engine resolves this |
+| **MAU** | Advisory | ≥ 200,000 | Leading indicator — schedule M9 sprint before PostHog costs hit P0 |
+| **Supabase DB size** | Advisory | ≥ 50 GB | Analytics tables crowding transactional DB; time to separate OLAP from OLTP |
+| **Enterprise tenant count** | Advisory | ≥ 30 tenants | Per-tenant analytics isolation becomes critical; ClickHouse TTL + tenant partitioning is cleaner than Postgres RLS for analytics workloads |
+| **Trace volume** | Advisory | > 50M spans/month | Sentry and Cloudflare logs become expensive at this volume; ClickHouse self-hosted traces store is cost-superior |
+
+**Monitoring the trigger thresholds:** These thresholds are themselves monitored:
+
+```sql
+-- Better Stack SQL monitor: PostHog cost proxy (tracked via cost_daily table from §17)
+SELECT daily_cost_usd
+FROM cost_daily
+WHERE service = 'posthog'
+  AND recorded_date = CURRENT_DATE - 1;
+-- Alert: daily_cost_usd > 67 (= $2,000/month ÷ 30)
+```
+
+The MAU counter (`SELECT COUNT(DISTINCT user_id) FROM sessions WHERE created_at > NOW() - INTERVAL '30 days'`) is surfaced in the Metabase "Growth Metrics" dashboard and reviewed monthly. The M9 sprint is scheduled when MAU crosses 150,000 — 25% headroom before the P0 threshold.
+
+---
+
+### 21.2 ClickHouse Architecture Overview
+
+```
+Mobile App / Worker API
+        │
+        │  (1) Product events: HTTP POST → Cloudflare Worker event collector
+        │  (2) Traces: W3C traceparent → OpenTelemetry Collector
+        ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  Cloudflare Worker: analytics-ingest                             │
+│  • Validates tenant_id from JWT                                  │
+│  • Strips PII fields (user_id → user_id_hash; no health values)  │
+│  • Writes to: Cloudflare Queues → ClickHouse HTTP ingest endpoint │
+└──────────────────────────────────────────────────────────────────┘
+        │
+        │  Cloudflare Queue (durable, at-least-once delivery)
+        ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  ClickHouse Cloud (EU-Central region for GDPR residency)         │
+│  • Database: form_analytics                                       │
+│  • Tables: events, traces, sessions, cost_daily_ch               │
+│  • Engine: MergeTree family; partitioned by toYYYYMM(timestamp)  │
+│  • TTL: configurable per table (see §21.4)                        │
+└──────────────────────────────────────────────────────────────────┘
+        │
+        ├──► Metabase (reads via ClickHouse JDBC driver)
+        └──► Grafana (reads via ClickHouse data source plugin)
+```
+
+**Deployment choice: ClickHouse Cloud vs self-hosted.** FORM uses ClickHouse Cloud (EU-Central) rather than a self-hosted cluster for the following reasons: (a) no Kubernetes operational overhead at pre-Series B headcount, (b) built-in S3-backed storage tiering, (c) SOC 2 Type II certified by ClickHouse Inc., which simplifies FORM's sub-processor register, (d) GDPR-compliant DPA available. At ≥ $10k/month ClickHouse Cloud spend, re-evaluate self-hosted on GCP/Hetzner EU. This threshold is modeled in `docs/COST_MODEL.md §13.8`.
+
+---
+
+### 21.3 RED Metrics for ClickHouse Itself
+
+ClickHouse is itself a monitored service in FORM's observability stack. The standard RED framework applies:
+
+| Signal | Metric name | Target | Alert threshold |
+|---|---|---|---|
+| **Rate** | `ch_queries_per_second` (from `system.query_log`) | — | Spike > 3× 7-day average → P2 Slack |
+| **Errors** | `ch_failed_queries_ratio` = failed / total from `system.query_log` | < 0.5% | > 1% over 5 min → P1 PagerDuty |
+| **Duration — analytics** | `ch_query_duration_p95_ms` for `form_analytics.*` queries | < 5,000 ms | > 10,000 ms → P1 (SLO breach) |
+| **Duration — trace queries** | `ch_query_duration_p95_ms` for `traces.*` queries | < 2,000 ms | > 5,000 ms → P2 Slack |
+| **Ingest lag** | `ch_ingest_lag_seconds` = `now() - max(timestamp)` in `events` table | < 30 s | > 120 s → P1 (data freshness SLO) |
+| **Queue depth** | `cf_queue_depth{queue="analytics-ingest"}` from Cloudflare Analytics | < 10,000 messages | > 50,000 → P1 |
+| **Storage** | `ch_disk_usage_bytes` | < 80% of provisioned | > 85% → P2, > 95% → P0 (data loss risk) |
+| **Memory** | `ch_memory_usage_ratio` | < 70% | > 85% → P2 |
+
+These metrics are sourced from the ClickHouse Cloud monitoring API (scraped every 60 seconds by a Cloudflare Cron Worker) and stored in the existing `cost_daily` Postgres table for cost metrics, and forwarded to Better Stack for alerting.
+
+```typescript
+// Cloudflare Cron Worker: ch-monitor (runs every 60 seconds)
+const chMetrics = await fetch(`${CH_CLOUD_API}/metrics`, {
+  headers: { 'X-ClickHouse-User': env.CH_MONITOR_USER, 'X-ClickHouse-Key': env.CH_MONITOR_KEY }
+});
+// Scrapes system.query_log aggregate, system.disks, system.asynchronous_metrics
+// Posts to Better Stack heartbeat + posts anomalies to #platform-alerts
+```
+
+**ClickHouse alerting rules (Better Stack):**
+
+| Alert ID | Condition | Severity | Routing |
+|---|---|---|---|
+| AL-CH-01 | `ch_failed_queries_ratio > 0.01` for 5 min | P1 | PagerDuty: platform-oncall |
+| AL-CH-02 | `ch_query_duration_p95_ms > 10000` (analytics) for 5 min | P1 | PagerDuty + Slack #platform-alerts |
+| AL-CH-03 | `ch_ingest_lag_seconds > 120` | P1 | PagerDuty: platform-oncall |
+| AL-CH-04 | `cf_queue_depth > 50000` for 3 min | P1 | PagerDuty: platform-oncall |
+| AL-CH-05 | `ch_disk_usage_bytes > 0.95 * provisioned` | P0 | PagerDuty: founder + platform-oncall |
+| AL-CH-06 | `ch_disk_usage_bytes > 0.85 * provisioned` | P2 | Slack #platform-alerts |
+| AL-CH-07 | `ch_memory_usage_ratio > 0.85` for 10 min | P2 | Slack #platform-alerts |
+| AL-CH-08 | ClickHouse Cloud API health check fails for 2 consecutive probes | P0 | PagerDuty: founder + platform-oncall |
+
+---
+
+### 21.4 OpenTelemetry Collector → ClickHouse Trace Pipeline
+
+FORM's distributed traces (§5) are exported to ClickHouse alongside Sentry. ClickHouse becomes the long-term trace store (90-day retention) while Sentry remains the primary developer debugging tool (14-day retention). This separation keeps Sentry costs bounded while preserving traces for compliance and SLO evidence.
+
+**Collector topology:**
+
+```
+Cloudflare Worker (edge)
+    │  OTLP/HTTP → OpenTelemetry Collector (deployed on Fly.io EU region)
+    ▼
+┌─────────────────────────────────────────────────────┐
+│  OpenTelemetry Collector v0.100+                     │
+│  Receivers:  otlp (HTTP + gRPC)                      │
+│  Processors: batch (8192 spans, 5s timeout)          │
+│              memory_limiter (80% heap → drop oldest) │
+│              attributes/tenant_pii_filter            │
+│              resource (add deployment.environment)   │
+│  Exporters:  clickhouse (primary, 90d retention)     │
+│              sentry (secondary, 14d retention)       │
+│              otlphttp/better_stack (SLO breach spans)│
+└─────────────────────────────────────────────────────┘
+```
+
+**Collector config (abbreviated):**
+
+```yaml
+processors:
+  attributes/tenant_pii_filter:
+    actions:
+      # Never store user_id — only the hash
+      - key: user_id
+        action: delete
+      # Truncate prompt content if accidentally included
+      - key: ai.prompt_content
+        action: delete
+      - key: ai.response_content
+        action: delete
+      # Preserve these for multi-tenant isolation queries
+      - key: tenant_id
+        action: upsert
+        value: "${env:OTEL_RESOURCE_TENANT_ID}"
+
+exporters:
+  clickhouse:
+    endpoint: "${env:CH_CLOUD_ENDPOINT}"
+    username: "${env:CH_OTEL_USER}"
+    password: "${env:CH_OTEL_KEY}"
+    database: form_analytics
+    traces_table_name: traces
+    ttl: 2160h   # 90 days
+    compress: lz4
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+```
+
+**ClickHouse `traces` table (ClickHouse-native OTLP schema):**
+
+```sql
+CREATE TABLE form_analytics.traces (
+    Timestamp           DateTime64(9) CODEC(Delta, ZSTD(1)),
+    TraceId             String CODEC(ZSTD(1)),
+    SpanId              String CODEC(ZSTD(1)),
+    ParentSpanId        String CODEC(ZSTD(1)),
+    TraceState          String CODEC(ZSTD(1)),
+    SpanName            LowCardinality(String) CODEC(ZSTD(1)),
+    SpanKind            LowCardinality(String) CODEC(ZSTD(1)),
+    ServiceName         LowCardinality(String) CODEC(ZSTD(1)),
+    ResourceAttributes  Map(LowCardinality(String), String) CODEC(ZSTD(1)),
+    SpanAttributes      Map(LowCardinality(String), String) CODEC(ZSTD(1)),
+    Duration            Int64 CODEC(Delta, ZSTD(1)),  -- nanoseconds
+    StatusCode          LowCardinality(String) CODEC(ZSTD(1)),
+    StatusMessage       String CODEC(ZSTD(1)),
+    -- Promoted keys for fast filtering:
+    tenant_id           LowCardinality(String) MATERIALIZED SpanAttributes['tenant_id'],
+    route               LowCardinality(String) MATERIALIZED SpanAttributes['http.route'],
+    http_status         UInt16 MATERIALIZED toUInt16OrZero(SpanAttributes['http.status_code']),
+    ai_feature          LowCardinality(String) MATERIALIZED SpanAttributes['ai.feature'],
+    ai_input_tokens     UInt32 MATERIALIZED toUInt32OrZero(SpanAttributes['ai.input_tokens']),
+    ai_output_tokens    UInt32 MATERIALIZED toUInt32OrZero(SpanAttributes['ai.output_tokens'])
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(Timestamp)
+ORDER BY (tenant_id, Timestamp, TraceId)
+TTL Timestamp + INTERVAL 90 DAY DELETE
+SETTINGS index_granularity = 8192;
+```
+
+**Privacy invariant:** The `user_id` field is deleted at the Collector processor stage before any span reaches ClickHouse. Only `user_id_hash` (SHA-256, keyed HMAC) is stored. Spans containing raw user data that accidentally escape the Collector processor generate an `otel_pii_leak_detected` alert (see AL-CH-09 below).
+
+**Trace query examples (Grafana Explore):**
+
+```sql
+-- P95 latency by route for the last 24 hours
+SELECT
+    route,
+    quantile(0.95)(Duration / 1e6) AS p95_ms,
+    COUNT() AS span_count
+FROM form_analytics.traces
+WHERE Timestamp >= now() - INTERVAL 24 HOUR
+  AND SpanName = 'http_request'
+GROUP BY route
+ORDER BY p95_ms DESC;
+
+-- Error rate by tenant (for enterprise SLA report)
+SELECT
+    tenant_id,
+    COUNTIf(http_status >= 500) AS error_count,
+    COUNT() AS total_count,
+    error_count / total_count AS error_rate
+FROM form_analytics.traces
+WHERE Timestamp >= now() - INTERVAL 7 DAY
+  AND SpanName = 'http_request'
+  AND tenant_id != ''
+GROUP BY tenant_id
+HAVING total_count > 100
+ORDER BY error_rate DESC;
+```
+
+---
+
+### 21.5 Product Event Table Schema
+
+Product events migrate from PostHog's cloud-hosted store to ClickHouse after the M9 trigger. The schema is designed to be PostHog-export compatible (same event names, same property keys) so that historical data can be bulk-loaded.
+
+```sql
+CREATE TABLE form_analytics.events (
+    event_id            UUID DEFAULT generateUUIDv4(),
+    timestamp           DateTime64(3, 'UTC') CODEC(Delta, ZSTD(1)),
+    event               LowCardinality(String) CODEC(ZSTD(1)),
+    -- Identity: never raw user_id, always hash
+    user_id_hash        FixedString(64) CODEC(ZSTD(1)),  -- HMAC-SHA256 hex
+    session_id          String CODEC(ZSTD(1)),
+    -- Multi-tenant context
+    tenant_id           LowCardinality(String) CODEC(ZSTD(1)),
+    -- Platform
+    platform            LowCardinality(String) CODEC(ZSTD(1)),  -- 'ios'|'android'|'web'
+    app_version         LowCardinality(String) CODEC(ZSTD(1)),
+    -- Dimensions (non-PII only; health values never stored here)
+    properties          Map(String, String) CODEC(ZSTD(1)),
+    -- Promoted properties for fast aggregation
+    screen              LowCardinality(String) MATERIALIZED properties['screen'],
+    feature             LowCardinality(String) MATERIALIZED properties['feature'],
+    workout_type        LowCardinality(String) MATERIALIZED properties['workout_type'],
+    -- Trace linkage
+    trace_id            String CODEC(ZSTD(1)),
+    -- Ingest metadata
+    ingest_timestamp    DateTime64(3, 'UTC') DEFAULT now64(3) CODEC(Delta, ZSTD(1))
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY (tenant_id, user_id_hash, timestamp)
+TTL timestamp + INTERVAL 2 YEAR DELETE   -- 2-year product analytics retention
+SETTINGS index_granularity = 8192;
+```
+
+**Event ingest pipeline:**
+
+```
+Mobile App / Web
+    │  POST /api/analytics/track  (Cloudflare Worker: analytics-ingest)
+    │  Body: { event, properties, session_id }
+    │  Auth: JWT (extracts user_id → user_id_hash via HMAC, tenant_id)
+    ▼
+Worker validates + strips PII:
+    - Removes: email, name, raw user_id, any health metric values
+    - Enforces: properties keys must be in ALLOWED_PROPERTY_KEYS allowlist
+    - Adds: timestamp, user_id_hash, tenant_id, platform, app_version
+    │
+    │  Cloudflare Queues (analytics-ingest) — durable buffer
+    ▼
+Queue consumer Worker (batch mode, max 250 events, 5s timeout):
+    - Bulk inserts to ClickHouse via HTTP interface
+    - On failure: dead-letter queue → alert AL-CH-03
+```
+
+**Allowed property keys allowlist (enforced in analytics-ingest Worker):**
+
+Health-adjacent properties (HRV values, body weight, body fat, mood scores, injury flags, eating pattern signals) are **never** allowed in the events table. The Worker rejects any `properties` key that matches the `BLOCKED_PROPERTY_KEYS` deny-list. This is enforced at ingest, not at query time, to prevent inadvertent storage.
+
+```typescript
+const BLOCKED_PROPERTY_KEYS = new Set([
+  'hrv', 'hrv_rmssd', 'body_weight', 'body_fat_pct',
+  'mood_score', 'stress_level', 'sleep_duration',
+  'sleep_quality', 'injury_flag', 'pain_level',
+  'calorie_intake', 'calorie_deficit', 'bmi',
+  'readiness_score', 'recovery_score',
+]);
+
+function sanitizeProperties(raw: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (BLOCKED_PROPERTY_KEYS.has(k)) continue;  // silently drop
+    out[k] = String(v).slice(0, 512);  // cap value length
+  }
+  return out;
+}
+```
+
+---
+
+### 21.6 Session Table Schema
+
+Sessions are derived from events but stored as a separate aggregated table for efficient cohort analysis. They do not contain health data.
+
+```sql
+CREATE TABLE form_analytics.sessions (
+    session_id          String CODEC(ZSTD(1)),
+    user_id_hash        FixedString(64) CODEC(ZSTD(1)),
+    tenant_id           LowCardinality(String) CODEC(ZSTD(1)),
+    platform            LowCardinality(String) CODEC(ZSTD(1)),
+    app_version         LowCardinality(String) CODEC(ZSTD(1)),
+    started_at          DateTime64(3, 'UTC') CODEC(Delta, ZSTD(1)),
+    ended_at            DateTime64(3, 'UTC') CODEC(Delta, ZSTD(1)),
+    duration_seconds    UInt32,
+    event_count         UInt32,
+    first_screen        LowCardinality(String) CODEC(ZSTD(1)),
+    -- Derived engagement signals (non-health)
+    used_ai_coach       UInt8,  -- boolean
+    used_voice          UInt8,
+    used_cv             UInt8,
+    workout_started     UInt8,
+    workout_completed   UInt8
+)
+ENGINE = ReplacingMergeTree(ended_at)
+PARTITION BY toYYYYMM(started_at)
+ORDER BY (tenant_id, user_id_hash, session_id)
+TTL started_at + INTERVAL 2 YEAR DELETE;
+```
+
+Sessions are materialized by a Cloudflare Cron Worker that closes open sessions (no event for > 30 minutes) and upserts the `ReplacingMergeTree` table. The `ReplacingMergeTree` engine ensures idempotency: if the cron runs twice, the row with the latest `ended_at` wins.
+
+---
+
+### 21.7 SLOs for ClickHouse-Backed Analytics
+
+| SLO ID | Description | Target | Measurement window | Error budget (30d) |
+|---|---|---|---|---|
+| **CH-SLO-01** | Product event ingest lag < 30 s (P95) | 99.5% | 5-min rolling | 3.6 hours |
+| **CH-SLO-02** | Analytics query P95 latency < 5,000 ms | 99.0% | 1-hour rolling | 7.2 hours |
+| **CH-SLO-03** | Trace query P95 latency < 2,000 ms | 99.5% | 1-hour rolling | 3.6 hours |
+| **CH-SLO-04** | ClickHouse availability (AL-CH-08 not firing) | 99.9% | Monthly | 43.8 minutes |
+| **CH-SLO-05** | No PII leak events in 30-day rolling window | 100% | 30-day | Zero tolerance |
+| **CH-SLO-06** | Ingest queue depth < 10,000 messages (P95 of 5-min readings) | 99.0% | Daily | 14.4 minutes/day |
+
+**Error budget burn rate thresholds (CH-SLO-01, CH-SLO-02):**
+
+| Burn rate | Time to budget exhaustion | Action |
+|---|---|---|
+| 1× | 30 days (normal) | No action |
+| 5× | 6 days | P2 Slack alert → investigate |
+| 14.4× | 50 hours | P1 PagerDuty → ClickHouse sizing review |
+
+---
+
+### 21.8 Per-Tenant Analytics Isolation
+
+Enterprise tenants require that their analytics data cannot be queried across tenant boundaries by FORM employees.
+
+**Access control model for ClickHouse:**
+
+| Role | Tables accessible | Row filter |
+|---|---|---|
+| `ch_platform_engineer` | All tables (system + form_analytics) | None — full access for ops |
+| `ch_data_engineer` | `form_analytics.*` | None — aggregate queries allowed; user_id_hash never joined back to identity |
+| `ch_tenant_readonly_{tenant_id}` | `form_analytics.events`, `form_analytics.sessions` | `WHERE tenant_id = '{tenant_id}'` enforced via Row Policy |
+| `ch_audit_reader` | `form_analytics.traces` | `WHERE tenant_id = '{tenant_id}'` — for enterprise audit log exports |
+
+**ClickHouse Row Policy (per-tenant isolation):**
+
+```sql
+-- Created per enterprise tenant at onboarding
+CREATE ROW POLICY rp_tenant_{tenant_id}
+ON form_analytics.events
+FOR SELECT
+USING tenant_id = '{tenant_id}'
+TO ch_tenant_readonly_{tenant_id};
+
+CREATE ROW POLICY rp_tenant_{tenant_id}
+ON form_analytics.sessions
+FOR SELECT
+USING tenant_id = '{tenant_id}'
+TO ch_tenant_readonly_{tenant_id};
+```
+
+**Breaking glass (cross-tenant query for incident response):** Any query run by `ch_platform_engineer` or `ch_data_engineer` that returns rows from more than one `tenant_id` must be pre-authorized via the break-glass process (`docs/INCIDENT_RESPONSE.md §7`). ClickHouse query logs are exported to the DEC-030 HMAC chain as `analytics.cross_tenant_query` events. Enterprise tenants are notified within 24 hours if their data is accessed cross-tenant.
+
+---
+
+### 21.9 PostHog Migration Runbook
+
+The migration from PostHog (cloud-hosted) to ClickHouse is a one-time operation executed when M9 triggers fire. It preserves historical data and switches ingest atomically.
+
+**Phase 1 — Parallel ingest (2 weeks):**
+
+1. Deploy ClickHouse cluster and run `migrations/M9_clickhouse_schema.sql`.
+2. Configure analytics-ingest Worker to dual-write: PostHog (primary) and ClickHouse (secondary).
+3. Verify ClickHouse event counts match PostHog event counts within 0.1% for 7 consecutive days.
+4. Validate `user_id_hash` round-trip: confirm ClickHouse hash matches PostHog distinct_id hash for the same user.
+
+**Phase 2 — Historical data export (1 week):**
+
+1. Export PostHog events via PostHog Batch Export to S3 (EU-Central bucket).
+2. Transform PostHog JSON export to ClickHouse TSV format via Cloudflare Worker (streaming, no intermediate storage of identifiable data).
+3. Bulk load to ClickHouse via `INSERT INTO form_analytics.events SELECT ... FROM s3(...)`.
+4. Delete S3 export files after successful load verification.
+
+**Phase 3 — Cutover:**
+
+1. Disable PostHog dual-write; ClickHouse becomes the single ingest target.
+2. Update Metabase data sources: replace PostHog data source with ClickHouse JDBC.
+3. Rebuild enterprise analytics dashboards against ClickHouse queries.
+4. Notify PostHog account team; cancel subscription at next billing cycle.
+5. Retain PostHog read access for 30 days post-cutover for comparison queries.
+
+**Rollback trigger:** If ClickHouse ingest lag CH-SLO-01 breaches > 60 s for > 15 minutes post-cutover, revert to PostHog dual-write and page platform-engineer. Root cause must be documented before re-attempting cutover.
+
+**PostHog data deletion after migration:**
+
+All PostHog data must be deleted within 30 days of successful migration. PostHog's "Delete all events for a person" API is used to delete all events associated with each `distinct_id`. This action is logged as a `compliance.posthog_data_deletion` DEC-030 audit event. GDPR compliance note: this deletion satisfies FORM's obligation to minimize data retention at processors (Art. 5(1)(e) storage limitation).
+
+---
+
+### 21.10 Privacy Constraints Summary
+
+| Constraint | What it prohibits | Where enforced |
+|---|---|---|
+| No raw `user_id` in ClickHouse | User identity stored only as HMAC-keyed hash; raw user_id never reaches ClickHouse | analytics-ingest Worker; OTel Collector processor `attributes/tenant_pii_filter` |
+| No health metric values in events | HRV, body weight, sleep scores, readiness, pain, calorie intake — never in `properties` | `BLOCKED_PROPERTY_KEYS` deny-list enforced in analytics-ingest Worker at ingest |
+| Cross-tenant queries require break-glass | `ch_data_engineer` queries spanning multiple `tenant_id` values must be pre-authorized | ClickHouse query log exported to DEC-030 HMAC chain; automated detection via nightly audit query |
+| k-anonymity floor n ≥ 15 for enterprise reports | Per-tenant analytics cohorts below 15 users suppressed in Metabase dashboards | Metabase question parameter guard; same floor as `docs/DATA_MODEL.md §17.4` |
+| Event property value length cap | Values > 512 characters truncated at ingest to prevent encoding of large blobs | analytics-ingest Worker `sanitizeProperties()` |
+| No ClickHouse data in AI inference context | ClickHouse query results never used as Victor context (no health data flow back to LLM) | Architecture constraint; Victor reads only from Supabase Postgres via RLS |
+
+**AL-CH-09 — PII leak detection:**
+
+A nightly Cloudflare Cron Worker scans a sample of ClickHouse `events` rows (1,000 random rows from the previous 24 hours) for patterns matching the `BLOCKED_PROPERTY_KEYS` list in property values. If a match is found, AL-CH-09 fires as P0:
+
+```
+PagerDuty: FORM · ClickHouse PII Leak Detected
+Severity: P0
+Description: Property key or value matching PII pattern found in form_analytics.events.
+Immediate action: Halt analytics ingest Worker. Quarantine affected rows. Begin data breach assessment per INCIDENT_RESPONSE.md R-01.
+```
+
+---
+
+### 21.11 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | How §21 Satisfies It |
+|---|---|
+| **CC7.2 — System monitoring** | ClickHouse RED metrics (§21.3) and alerting rules AL-CH-01 through AL-CH-09 are detective controls monitoring the analytics pipeline for anomalies. The daily audit query detecting cross-tenant access is a continuous monitoring control. |
+| **CC6.1 — Logical access controls** | Per-tenant ClickHouse Row Policies (§21.8) enforce tenant isolation at the query engine layer. Role taxonomy (platform_engineer, data_engineer, tenant_readonly) with least-privilege assignments. |
+| **CC6.2 — Access provisioning** | ClickHouse roles provisioned at enterprise onboarding; deprovisioned via SCIM offboarding webhook. Role grants logged to DEC-030 as `analytics.ch_role_granted` / `analytics.ch_role_revoked`. |
+| **C1.2 — Confidentiality protection** | `BLOCKED_PROPERTY_KEYS` deny-list (§21.5) and OTel Collector PII filter (§21.4) prevent health data entering the analytics store. Privacy constraints matrix (§21.10) documents the technical implementation. |
+| **PI1.2 — Processing integrity inputs** | Ingest lag SLO CH-SLO-01 (< 30 s, 99.5%) quantifies FORM's commitment to analytics data freshness. The dual-write migration validation (§21.9 Phase 1) ensures historical data integrity during migration. |
+| **A1.1 — Availability commitments** | CH-SLO-04 (99.9% ClickHouse availability) is a documented availability commitment. ClickHouse Cloud's SLA (99.9% uptime) is contractually inherited; FORM's own SLO does not exceed the vendor SLA. |
+| **CC9.2 — Third-party risk management** | ClickHouse Inc. is added to FORM's sub-processor register (`docs/SOC2_READINESS.md §Sub-Processor Register`) at M9. ClickHouse Cloud's SOC 2 Type II report is obtained annually and stored in `compliance/vendor-reports/clickhouse/`. |
+
+**Auditor evidence artefacts:**
+
+- Nightly PII scan results stored to `compliance/evidence/clickhouse-pii-scan-YYYY-MM-DD.json` (GitHub Actions, 02:00 UTC). Every scan result, including zero-finding results, is retained.
+- Monthly ClickHouse query log export filtered to `ch_platform_engineer` and `ch_data_engineer` cross-tenant queries, stored to `compliance/evidence/clickhouse-cross-tenant-YYYY-MM.csv`.
+- CH-SLO-01 through CH-SLO-06 monthly compliance report stored to `compliance/evidence/clickhouse-slo-YYYY-MM.csv`.
+- ClickHouse user list snapshot (first day of month) stored to `compliance/evidence/clickhouse-users-YYYY-MM-DD.csv` for access review evidence.
+
+---
+
+### 21.12 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Monitor M9 trigger thresholds: add PostHog daily cost to `cost_daily` table (§21.1) and configure Better Stack alert at $67/day | devops-lead | P0 | M7 (pre-M9 headroom) |
+| Monitor MAU threshold: add `mau_rolling_30d` to Metabase Growth Metrics dashboard; schedule M9 sprint when MAU ≥ 150,000 | data-engineer | P0 | M7 |
+| Provision ClickHouse Cloud cluster (EU-Central); configure DPA with ClickHouse Inc.; add to sub-processor register | compliance-officer | P0 | M9 sprint start |
+| Write `migrations/M9_clickhouse_schema.sql`: `form_analytics` database, `traces`, `events`, `sessions` tables with TTL and partitioning per §21.4–21.6 | platform-engineer | P0 | M9 sprint start |
+| Deploy OpenTelemetry Collector on Fly.io (EU region); configure receivers, PII filter processor, ClickHouse + Sentry exporters per §21.4 | platform-engineer | P0 | M9 sprint |
+| Update analytics-ingest Worker to dual-write PostHog + ClickHouse; implement `BLOCKED_PROPERTY_KEYS` deny-list and `sanitizeProperties()` per §21.5 | platform-engineer | P0 | M9 sprint |
+| Configure ClickHouse Row Policies per enterprise tenant (provisioning script in `scripts/ch-tenant-provision.sh`) per §21.8 | platform-engineer | P0 | M9 sprint |
+| Configure Better Stack alerts AL-CH-01 through AL-CH-08 against ClickHouse Cloud monitoring API per §21.3 | devops-lead | P0 | M9 sprint |
+| Run Phase 1 parallel ingest for 7 days; validate event count parity within 0.1% per §21.9 Phase 1 | data-engineer | P0 | M9 sprint +7d |
+| Execute PostHog bulk export + ClickHouse load per §21.9 Phase 2; delete S3 export files after verification | data-engineer | P1 | M9 sprint +14d |
+| Cutover: disable PostHog dual-write; update Metabase data sources per §21.9 Phase 3 | platform-engineer | P0 | M9 sprint +21d |
+| Build AL-CH-09 PII leak scan (Cloudflare Cron, 02:00 UTC); store results to `compliance/evidence/clickhouse-pii-scan-YYYY-MM-DD.json` | devops-lead | P0 | M9 sprint +21d |
+| Write cross-tenant query audit cron: nightly export to `compliance/evidence/clickhouse-cross-tenant-YYYY-MM.csv` | devops-lead | P1 | M9 sprint +21d |
+| Delete PostHog event data via PostHog API (all distinct_ids); log as `compliance.posthog_data_deletion` DEC-030 event | compliance-officer | P0 | M9 sprint +30d |
+| Add CH-SLO-01 through CH-SLO-06 to quarterly SLO compliance report cadence (§19) | devops-lead | P1 | M9 sprint +30d |
+| Add ClickHouse Inc. to annual vendor security review cycle (`docs/SOC2_READINESS.md §17`) | compliance-officer | P1 | M9 sprint +30d |
+
+---
+
+*v0.8 additions: §21 ClickHouse Analytics Observability (M9) — closes the documented gap from §10 ("ClickHouse for analytics — observability strategy not yet designed"); migration trigger thresholds (PostHog cost > $2k/month P0, analytics query P95 > 10s P0, MAU ≥ 200k advisory, 30+ enterprise tenants advisory); ClickHouse Cloud architecture (EU-Central, SOC 2 certified, GDPR DPA); RED metrics table for ClickHouse itself (rate/errors/duration/ingest lag/queue/storage/memory); eight alerting rules AL-CH-01 through AL-CH-09 with severity and PagerDuty routing; OpenTelemetry Collector topology (Fly.io EU) with PII filter processor deleting user_id and ai prompt/response content before ClickHouse; `traces` MergeTree table DDL with promoted materialized columns for tenant_id, route, http_status, ai tokens; product `events` table DDL with BLOCKED_PROPERTY_KEYS deny-list enforcing no health values at ingest; `sessions` ReplacingMergeTree table; six analytics SLOs (CH-SLO-01 through CH-SLO-06) with error budget burn rate thresholds; per-tenant Row Policies in ClickHouse (least-privilege; cross-tenant queries require break-glass and are DEC-030 logged); three-phase PostHog migration runbook (parallel ingest → historical export → cutover) with rollback trigger; PostHog data deletion after migration (GDPR Art. 5(1)(e) storage limitation compliance); privacy constraints matrix (six constraints, enforcement locations documented); nightly PII scan (AL-CH-09, P0); SOC 2 CC7.2/CC6.1/CC6.2/C1.2/PI1.2/A1.1/CC9.2 evidence mapping; six auditor evidence artefact files; sixteen-item implementation checklist across M7 prep and M9 sprint.*
