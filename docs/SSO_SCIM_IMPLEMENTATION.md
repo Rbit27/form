@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v0.8
+# FORM · SSO/SCIM Implementation v1.0
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -25,6 +25,7 @@
 15. [SCIM 2.0 Groups Provisioning](#15-scim-20-groups-provisioning)
 16. [Admin Dashboard SSO & SCIM Configuration UI](#16-admin-dashboard-sso--scim-configuration-ui)
 17. [Enterprise Pilot Program: 90-Day Runbook](#17-enterprise-pilot-program-90-day-runbook)
+18. [Tenant IdP Migration Runbook](#18-tenant-idp-migration-runbook)
 
 ---
 
@@ -4743,4 +4744,409 @@ All nine events are added to the DEC-030 HMAC chain taxonomy (append-only; requi
 
 ---
 
-*v0.9 additions: Section 17 — Enterprise Pilot Program: 90-Day Runbook. Operational protocol for the full enterprise pilot lifecycle from contract signature through 90-day evaluation to conversion or termination, complementing the Admin Dashboard UI spec (§16) and Staging Environment design (§16.11). Pre-Pilot Technical Qualification: 9-item customer checklist (Q-01 compatible IdP, Q-02 SCIM 2.0, Q-03 pilot users, Q-04 IT admin availability, Q-05 network access, Q-06 DPA, Q-07 contract, Q-08 billing, Q-09 data region) and 5-item FORM platform prerequisite check. Pilot tenant provisioning: SQL walkthrough for staging + production tenant records, `pilot_programs` insert, and IT admin dashboard access setup. 90-day milestone timeline: 12 milestones from Day 0 provisioning through Day 90 conversion/termination decision with pass criteria and escalation paths for each. Pilot success metrics: 6 named metrics (SSO adoption rate, SCIM sync error rate, P0 incident count, admin dashboard satisfaction, Pilot NPS, SLA compliance) with Day-30/Day-60/Day-90 thresholds and binary conversion gate logic. Mid-pilot health monitoring: weekly health digest Worker (Monday 06:00 UTC), 5 alert thresholds, OBSERVABILITY.md §18 integration. Pilot-to-production conversion: 7-step protocol including production tenant activation, "Promote to Production" button (§16.11), SCIM migration options (Option A re-provision vs Option B user-ID mapping with two-person SQL review gate), SCIM token regeneration, and staging cleanup schedule. Termination and data handling: 24h DSAR-format export link, 30-day export window, Art. 17 erasure sequence, DPA termination, sub-processor notification. Database: `pilot_programs` table (state machine with generated `pilot_deadline_at` column, terminal state exclusivity constraint, RLS: form_admin full / form_system read / no tenant_member access) and `pilot_milestone_events` table (typed event_type enum, `metric_snapshot` JSONB with TypeScript interface definition). Nine new DEC-030 HMAC-chained audit events: `pilot.tenant_provisioned`, `pilot.sso_setup_started`, `pilot.started`, `pilot.milestone_review`, `pilot.paused`, `pilot.resumed`, `pilot.converted`, `pilot.terminated`, `pilot.data_deleted`. SOC 2 mapping: CC3.2 (risk assessment at qualification), CC6.2 (access issuance gate at Day 14), CC7.2 (weekly health monitoring), CC8.1 (conversion + termination change management with founder approval), CC9.2 (customer lifecycle data obligations), A1.1 (SLA compliance as named metric). Implementation checklist: 13 tasks (7× P0, 5× P1, 1× P0 QA), M4/M5. G-011: remains 🟡 Partial — §17 adds the operational runbook layer; infrastructure provisioning is the remaining blocker.*
+*v0.9 additions: Section 17 — Enterprise Pilot Program: 90-Day Runbook. Operational protocol for the full enterprise pilot lifecycle from contract signature through 90-day evaluation to conversion or termination, complementing the Admin Dashboard UI spec (§16) and Staging Environment design (§16.11). Pre-Pilot Technical Qualification: 9-item customer checklist (Q-01 compatible IdP, Q-02 SCIM 2.0, Q-03 pilot users, Q-04 IT admin availability, Q-05 network access, Q-06 DPA, Q-07 contract, Q-08 billing, Q-09 data region) and 5-item FORM platform prerequisite check. Pilot tenant provisioning: SQL walkthrough for staging + production tenant records, `pilot_programs` insert, and IT admin dashboard access setup. 90-day milestone timeline: 12 milestones from Day 0 provisioning through Day 90 conversion/termination decision with pass criteria and escalation paths for each. Pilot success metrics: 6 named metrics (SSO adoption rate, SCIM sync error rate, P0 incident count, admin dashboard satisfaction, Pilot NPS, SLA compliance) with Day-30/Day-60/Day-60/Day-90 thresholds and binary conversion gate logic. Mid-pilot health monitoring: weekly health digest Worker (Monday 06:00 UTC), 5 alert thresholds, OBSERVABILITY.md §18 integration. Pilot-to-production conversion: 7-step protocol including production tenant activation, "Promote to Production" button (§16.11), SCIM migration options (Option A re-provision vs Option B user-ID mapping with two-person SQL review gate), SCIM token regeneration, and staging cleanup schedule. Termination and data handling: 24h DSAR-format export link, 30-day export window, Art. 17 erasure sequence, DPA termination, sub-processor notification. Database: `pilot_programs` table (state machine with generated `pilot_deadline_at` column, terminal state exclusivity constraint, RLS: form_admin full / form_system read / no tenant_member access) and `pilot_milestone_events` table (typed event_type enum, `metric_snapshot` JSONB with TypeScript interface definition). Nine new DEC-030 HMAC-chained audit events: `pilot.tenant_provisioned`, `pilot.sso_setup_started`, `pilot.started`, `pilot.milestone_review`, `pilot.paused`, `pilot.resumed`, `pilot.converted`, `pilot.terminated`, `pilot.data_deleted`. SOC 2 mapping: CC3.2 (risk assessment at qualification), CC6.2 (access issuance gate at Day 14), CC7.2 (weekly health monitoring), CC8.1 (conversion + termination change management with founder approval), CC9.2 (customer lifecycle data obligations), A1.1 (SLA compliance as named metric). Implementation checklist: 13 tasks (7× P0, 5× P1, 1× P0 QA), M4/M5. G-011: remains 🟡 Partial — §17 adds the operational runbook layer; infrastructure provisioning is the remaining blocker.*
+
+---
+
+## 18. Tenant IdP Migration Runbook
+
+### 18.1 Purpose and Scope
+
+This section specifies the end-to-end operational procedure for migrating an active enterprise tenant from one identity provider to another — whether that means switching IdP vendors (Okta → Microsoft Entra ID), upgrading protocols (SAML → OIDC), migrating a SCIM endpoint to a new directory, or any combination of the above.
+
+IdP migrations are **high-risk configuration changes**. Every active employee's ability to log in to FORM depends on `tenant_sso_configs` being correct. A misconfigured migration leaves users locked out; a botched `external_id` remap can fragment user history or grant the wrong role to a re-provisioned user. This runbook enforces a staging-first, founder-authorised, HMAC-audited procedure with a defined rollback path at every step.
+
+**Scope:** Tenants in `'active'` or `'pilot'` status with `sso_enabled = true`. Protocol upgrades (SAML → OIDC) and SCIM-only migrations are handled as sub-types. Consumer tier is out of scope.
+
+**Prerequisites:** §16.11 staging environment must be provisioned for the tenant before this runbook can begin. If staging does not exist, provision it first using the §16.11 procedure.
+
+---
+
+### 18.2 Migration Trigger Scenarios
+
+| Scenario | Protocol change? | SCIM impact | Estimated effort | Owner |
+|---|---|---|---|---|
+| **M&A — new parent company IdP** (e.g., Okta → Entra ID) | Sometimes | High — new externalIds for all users | 3–5 days engineering + 1–2 weeks customer IT coordination | enterprise-architect + platform-engineer |
+| **IdP vendor replacement** (e.g., Okta → Ping Identity) | Rarely | High if SCIM endpoint changes | 2–4 days engineering | platform-engineer |
+| **Protocol upgrade** (SAML → OIDC on same IdP) | Yes | Low if IdP sub = prior NameID | 1–2 days engineering | platform-engineer |
+| **SCIM endpoint migration** (same IdP, new SCIM app) | No | Medium — new token, possible new externalIds | 1 day engineering | platform-engineer |
+| **Custom domain migration** (IT restructure, sub-domain change) | No | None | Hours — redirect rules only | devops-lead |
+| **On-premises ADFS → cloud IdP** | Usually (SAML → OIDC) | High — ADFS objectGUID differs from cloud UPN | 5–7 days | enterprise-architect + platform-engineer |
+
+**Customer IT coordination is always the critical path.** Engineering can complete its side in hours; customer IT configuring the new IdP application, testing SCIM with new credentials, and running user acceptance testing typically takes 1–4 weeks.
+
+---
+
+### 18.3 Pre-Migration Assessment Checklist
+
+Before opening a migration record, the CS owner and enterprise-architect must complete this assessment jointly with the customer IT admin.
+
+**FORM side (CS + enterprise-architect):**
+
+| # | Check | Pass criteria |
+|---|---|---|
+| F-01 | Staging environment exists for tenant | `tenant_sso_configs` row with `is_staging = true` present; staging URL accessible |
+| F-02 | Current SSO config is stable | No `sso.login_failed` spikes in last 7 days; `is_active = true`; no open P0/P1 incidents |
+| F-03 | SCIM state is clean | `scim_provisioning_log` shows no `error` rows in last 24h; `users.provisioned_via = 'scim'` count matches IdP active users ± 2% |
+| F-04 | User count documented | Record `active_user_count` at migration start; used as rollback success threshold (§18.9) |
+| F-05 | DPA covers new IdP's data region | If new IdP routes SCIM through a different region (e.g., Entra GCC High, US-only), verify existing DPA data-region clause covers it; re-amend if not |
+| F-06 | Founder authorisation obtained | Migration record in `sso_idp_migrations` with `authorized_by` = founder email required before any production change |
+
+**Customer IT side (CS to confirm with customer):**
+
+| # | Check | Pass criteria |
+|---|---|---|
+| C-01 | New IdP application configured in staging | SP metadata imported; test user assigned; test login successful in staging within 48h of migration start |
+| C-02 | SCIM provisioning app created | New SCIM bearer token generated; test provisioning event sent and received in staging |
+| C-03 | Group mappings documented | Customer IT provides `{new_group_id: form_role}` mapping for all groups; compared against current `scim_group_role_mappings` for role-equivalence |
+| C-04 | Email domain unchanged | Users' email addresses remain the same in new IdP (required for email-match strategy §18.6.2). If emails change, use manual ID mapping strategy. |
+| C-05 | Rollback window agreed | Customer IT agrees to maintain old IdP application in active state for 48 hours post-cutover; cannot be shortened |
+| C-06 | Maintenance window scheduled | Migration cutover window agreed: 60 minutes, outside peak usage hours, with IT admin on call |
+
+---
+
+### 18.4 Migration Database Tables
+
+Two new tables track the migration lifecycle and resolve identity continuity.
+
+```sql
+CREATE TABLE sso_idp_migrations (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id             UUID NOT NULL REFERENCES tenants(id),
+  status                TEXT NOT NULL DEFAULT 'planning'
+                          CHECK (status IN (
+                            'planning',        -- assessment in progress
+                            'staging',         -- new IdP tested in staging
+                            'cutover_pending', -- staging validated; awaiting maintenance window
+                            'committed',       -- production cutover complete
+                            'rolled_back'      -- cutover reverted; old config restored
+                          )),
+  from_idp_type         TEXT NOT NULL,
+  to_idp_type           TEXT NOT NULL,
+  from_protocol         TEXT NOT NULL CHECK (from_protocol IN ('saml', 'oidc')),
+  to_protocol           TEXT NOT NULL CHECK (to_protocol IN ('saml', 'oidc')),
+  protocol_change       BOOLEAN GENERATED ALWAYS AS (from_protocol <> to_protocol) STORED,
+  scim_migration        BOOLEAN NOT NULL DEFAULT FALSE,   -- true if SCIM endpoint also changes
+  active_user_count     INTEGER NOT NULL,                 -- snapshot at assessment (F-04)
+  staging_validated_at  TIMESTAMPTZ,
+  cutover_at            TIMESTAMPTZ,
+  rolled_back_at        TIMESTAMPTZ,
+  authorized_by         TEXT NOT NULL,  -- founder email; required; enforced in API layer
+  cs_owner              TEXT NOT NULL,
+  notes                 TEXT,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Only one migration can be in a non-terminal state per tenant at a time
+  CONSTRAINT one_active_migration_per_tenant EXCLUDE USING btree (
+    tenant_id WITH =
+  ) WHERE (status NOT IN ('committed', 'rolled_back'))
+);
+
+-- RLS: form_admin full access (BYPASSRLS); form_system read-only; no tenant-facing access
+ALTER TABLE sso_idp_migrations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY sso_idp_migrations_form_system ON sso_idp_migrations
+  FOR SELECT TO form_system USING (true);
+-- form_api: no policy = zero rows (fail-closed)
+
+CREATE INDEX idx_sso_migrations_tenant ON sso_idp_migrations (tenant_id, created_at DESC);
+CREATE INDEX idx_sso_migrations_status ON sso_idp_migrations (status)
+  WHERE status NOT IN ('committed', 'rolled_back');
+```
+
+```sql
+CREATE TABLE sso_external_id_mappings (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id),
+  migration_id    UUID NOT NULL REFERENCES sso_idp_migrations(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id),
+  old_external_id TEXT NOT NULL,     -- users.external_id before migration
+  new_external_id TEXT,              -- populated during staging validation; NULL = unmatched
+  match_method    TEXT NOT NULL
+                    CHECK (match_method IN (
+                      'email',    -- matched via users.email = SCIM userName
+                      'scim',     -- matched via SCIM externalId sent by new IdP
+                      'manual'    -- manually mapped by enterprise-architect + security-engineer (two-person)
+                    )),
+  matched_at      TIMESTAMPTZ,
+  confirmed_at    TIMESTAMPTZ,       -- set when test login with new external_id succeeds in staging
+  UNIQUE (tenant_id, migration_id, user_id)
+);
+
+-- RLS: form_admin only (BYPASSRLS). This table maps old-to-new identity — never exposed to API or tenants.
+ALTER TABLE sso_external_id_mappings ENABLE ROW LEVEL SECURITY;
+-- No form_api or form_system policy = zero rows for both roles (fail-closed)
+
+CREATE INDEX idx_ext_id_mappings_migration ON sso_external_id_mappings (migration_id, matched_at);
+CREATE INDEX idx_ext_id_mappings_user ON sso_external_id_mappings (user_id, tenant_id);
+```
+
+---
+
+### 18.5 Migration Runbook by Type
+
+#### 18.5.1 Type A — Same Protocol, Different IdP Vendor
+
+*Example: Okta SAML → Microsoft Entra ID SAML (no protocol change)*
+
+**Phase 1 — Staging validation (Days 1–14)**
+
+1. Enterprise-architect opens `sso_idp_migrations` row: `status = 'staging'`, `from_idp_type = 'okta'`, `to_idp_type = 'azure_ad'`, `authorized_by` = founder email. Emits `sso.migration_initiated` DEC-030 event (HIGH severity).
+2. In the tenant's **staging** `tenant_sso_configs`, update:
+   ```sql
+   UPDATE tenant_sso_configs
+   SET
+     idp_type              = 'azure_ad',
+     saml_idp_entity_id    = '<new_entra_entity_id>',
+     saml_idp_metadata_url = '<new_entra_federation_metadata_url>',
+     saml_idp_sso_url      = '<new_entra_sso_url>',
+     saml_idp_certificate  = '<new_entra_signing_cert_pem>',
+     -- saml_sp_certificate and saml_sp_private_key unchanged (FORM's SP cert stays the same)
+     -- group_role_mappings updated with new Azure Object IDs per C-03 mapping
+     group_role_mappings   = '<new_jsonb_group_mapping>',
+     updated_at            = now()
+   WHERE tenant_id = '<tenant_id>' AND is_staging = true;
+   ```
+3. Customer IT imports FORM's SP metadata at new Entra enterprise app. Test user completes SSO login against staging URL. Confirm `sso.login` DEC-030 event fires with `idp_type = 'azure_ad'`.
+4. If SCIM is also migrating (`scim_migration = true`): customer IT configures new SCIM provisioning app against staging SCIM endpoint with new token. Confirm `scim.user_synced` events in staging.
+5. Run `sso_external_id_mappings` population for all active users (§18.6).
+6. Confirm 100% match rate before proceeding to Phase 2. Any unmatched user requires manual resolution (§18.6.3).
+7. Enterprise-architect marks staging validated: `UPDATE sso_idp_migrations SET status = 'cutover_pending', staging_validated_at = now()`. Emits `sso.migration_staging_validated` DEC-030 event (MEDIUM severity).
+
+**Phase 2 — Production cutover (maintenance window, ~30 minutes)**
+
+1. Announce maintenance window in `#inc-<slug>-idp-migration` Slack channel. CS notifies customer IT admin and FORM on-call.
+2. Set `tenant_sso_configs.is_active = false` on production config: users immediately fall back to email magic link (§10). No users are hard-locked out.
+3. Copy staging `tenant_sso_configs` fields (idp_type, saml_idp_entity_id, saml_idp_metadata_url, saml_idp_certificate, group_role_mappings) to production row.
+4. Apply `external_id` remaps from `sso_external_id_mappings` to production `users` table:
+   ```sql
+   -- Two-person SQL review required: enterprise-architect + security-engineer must both approve this PR
+   UPDATE users u
+   SET
+     external_id       = m.new_external_id,
+     idp_name_id       = m.new_external_id,   -- SLO NameID anchor updated to match
+     updated_at        = now()
+   FROM sso_external_id_mappings m
+   WHERE
+     u.id          = m.user_id
+     AND u.tenant_id = m.tenant_id
+     AND m.migration_id = '<migration_id>'
+     AND m.new_external_id IS NOT NULL;
+   ```
+   This SQL requires a GitHub PR with `enterprise-architect` + `security-engineer` as required reviewers. Merge gate must require both approvals. (Same two-person rule as §17.7 Option B.)
+5. Re-enable: `UPDATE tenant_sso_configs SET is_active = true WHERE tenant_id = '<tenant_id>' AND is_staging = false`.
+6. Customer IT admin performs live test login on production with new IdP. Confirm `sso.login` event fires; confirm user's `tenant_member_roles` row is unchanged; confirm work sessions resume normally.
+7. Update migration record: `UPDATE sso_idp_migrations SET status = 'committed', cutover_at = now()`. Emits `sso.migration_production_committed` DEC-030 event (HIGH severity).
+
+#### 18.5.2 Type B — Protocol Upgrade (SAML → OIDC)
+
+Protocol upgrades on the same IdP (e.g., customer IT team enables OIDC on Okta and wants to switch from legacy SAML app) follow the same staging-first procedure with one critical difference: **the SP configuration changes entirely** (no SP certificate reuse — OIDC uses client credentials, not SAML assertions).
+
+Additional steps unique to Type B:
+
+1. New `oidc_client_id` and `oidc_client_secret_enc` must be generated on the IdP side and stored in staging `tenant_sso_configs`. The SAML columns (`saml_idp_*`, `saml_sp_*`) are nulled out on the staging row.
+2. `external_id` source changes: SAML uses NameID (typically `user.email` or `user.employeeId`); OIDC uses `sub` claim (typically an opaque identifier). **The `sub` will not match the old NameID.** `sso_external_id_mappings` must resolve every user via email-match strategy (§18.6.2) — manual override required for any user whose email differs.
+3. SAML SLO (§13) is no longer applicable after migration. OIDC back-channel logout (§13) must be configured and tested in staging before cutover.
+4. After committed cutover, verify `users.idp_name_id` is cleared (SAML-only field) to prevent stale SAML SLO attempts. OIDC sessions do not use `idp_name_id`.
+
+#### 18.5.3 Type C — SCIM-Only Migration
+
+When the SSO protocol and IdP vendor remain the same but the SCIM provisioning application changes (e.g., customer IT decommissions old Okta SCIM app and creates a new one):
+
+1. No `tenant_sso_configs` update required for SSO fields.
+2. Issue new `tenant_scim_tokens` entry in staging. Provide new endpoint URL and bearer token to customer IT.
+3. Customer IT runs a full SCIM sync against staging. Verify all `scim.user_synced` events land with same `user_id` values (email-match reconciliation happens automatically via the existing SCIM PUT handler).
+4. Old SCIM token: do NOT revoke until 24-hour overlap window after new SCIM app is confirmed stable in production. Use the existing 24-hour dual-token window from `tenant_scim_tokens` rotation.
+5. SCIM group IDs may change (new Okta group Push IDs vs. old ones). Update `scim_groups.external_id` values and `scim_group_role_mappings.idp_group_id` values in production after confirming group sync in staging.
+
+---
+
+### 18.6 SCIM User Identity Preservation
+
+#### 18.6.1 The external_id Problem
+
+Every FORM user has `users.external_id` — the subject claim from the IdP (`sub` for OIDC, `NameID` for SAML). When a tenant switches IdPs, the new IdP assigns a different subject identifier for the same employee. Without remapping, the first SSO login from the new IdP would create a **duplicate user record** rather than matching the existing one, fragmenting the user's workout history, coaching history, wearable integrations, and consent records.
+
+SCIM provisioning faces the same problem: `users.scim_external_id` (the SCIM `externalId` attribute) is set by the sending IdP. A new SCIM provisioning app typically sends different `externalId` values.
+
+#### 18.6.2 Strategy 1: Email-Match (Default)
+
+When the employee's work email address is identical in old and new IdP — the common case for same-org IdP replacements — FORM matches on `users.email`:
+
+```sql
+-- Populate sso_external_id_mappings for email-match strategy
+-- Run against staging; verify before any production change
+INSERT INTO sso_external_id_mappings (
+  tenant_id, migration_id, user_id,
+  old_external_id, new_external_id,
+  match_method, matched_at
+)
+SELECT
+  u.tenant_id,
+  '<migration_id>',
+  u.id,
+  u.external_id,           -- current (old IdP) external_id
+  scim.external_id_new,    -- new IdP's externalId from staging SCIM sync
+  'email',
+  now()
+FROM users u
+JOIN (
+  -- Staging SCIM provisioning log: new externalId keyed by email
+  SELECT DISTINCT ON (email)
+    email,
+    new_external_id AS external_id_new
+  FROM scim_provisioning_log
+  WHERE
+    tenant_id   = '<staging_tenant_id>'
+    AND action  = 'upsert'
+    AND created_at > '<migration_start_at>'
+  ORDER BY email, created_at DESC
+) scim ON scim.email = u.email
+WHERE
+  u.tenant_id = '<tenant_id>'
+  AND u.is_active = true;
+
+-- Verify: any unmatched users (no entry in mapping table)?
+SELECT u.id, u.email
+FROM users u
+LEFT JOIN sso_external_id_mappings m
+  ON m.user_id = u.id AND m.migration_id = '<migration_id>'
+WHERE
+  u.tenant_id = '<tenant_id>'
+  AND u.is_active = true
+  AND m.id IS NULL;
+-- Must return 0 rows before proceeding to cutover_pending
+```
+
+#### 18.6.3 Strategy 2: Manual ID Mapping
+
+For M&A scenarios where employee emails change (e.g., `alice@acquiredco.com` → `alice@acquirer.com`), email-match fails. The enterprise-architect must produce a CSV mapping and apply it with two-person SQL review:
+
+```
+old_email,new_email,old_external_id,new_external_id
+alice@acquiredco.com,alice@acquirer.com,okta|00ud8...,9a3f72...
+```
+
+The `match_method` for these rows is `'manual'`. Every manual mapping row must be approved by both `enterprise-architect` and `security-engineer` before it is applied to the `sso_external_id_mappings` table. The approval is recorded via the GitHub PR review trail (same gate as §17.7 Option B SQL review).
+
+**Hard limit:** If more than 20% of active users require manual mapping, escalate to founder before proceeding. Mass manual remapping at this scale indicates a data quality problem in the customer's IdP that must be resolved on their side first.
+
+---
+
+### 18.7 Rollback Procedure
+
+Rollback is available at any phase up to and including the first 48 hours post-cutover. After 48 hours, the old IdP application is decommissioned by customer IT (C-05) and rollback is no longer possible without customer IT re-activating it.
+
+**Trigger conditions for rollback:**
+- SSO failure rate > 5% for 10 consecutive minutes post-cutover (OBSERVABILITY.md §13 alert)
+- `sso.login_failed` DEC-030 events with `failure_reason = 'external_id_not_found'` for > 10 unique users
+- SCIM sync error rate > 10% in first hour post-cutover
+- Customer IT admin requests rollback during 48-hour window
+
+**Rollback steps:**
+
+1. Immediately re-disable production SSO: `UPDATE tenant_sso_configs SET is_active = false` — users fall back to magic link (§10). Emits `sso.migration_rolled_back` DEC-030 event (HIGH severity).
+2. Reverse `external_id` remaps on production `users` table using `sso_external_id_mappings.old_external_id`:
+   ```sql
+   -- Two-person review required (same gate as cutover)
+   UPDATE users u
+   SET
+     external_id  = m.old_external_id,
+     idp_name_id  = m.old_external_id,
+     updated_at   = now()
+   FROM sso_external_id_mappings m
+   WHERE
+     u.id          = m.user_id
+     AND u.tenant_id = m.tenant_id
+     AND m.migration_id = '<migration_id>';
+   ```
+3. Restore production `tenant_sso_configs` fields to pre-migration values (backed up in `sso_idp_migrations.notes` JSONB — enterprise-architect records snapshot at migration open).
+4. Re-enable: `UPDATE tenant_sso_configs SET is_active = true`.
+5. Customer IT admin confirms old IdP SSO login succeeds. Update `sso_idp_migrations.status = 'rolled_back'`, `rolled_back_at = now()`.
+6. Notify customer: provide written summary of what failed and expected timeline for re-attempt.
+7. Retain `sso_idp_migrations` and `sso_external_id_mappings` records — do not delete. Post-incident review required before scheduling a new migration attempt.
+
+---
+
+### 18.8 Post-Migration Validation Checklist
+
+Run within 2 hours of `status = 'committed'`:
+
+| # | Check | Method | Pass criteria |
+|---|---|---|---|
+| V-01 | SSO error rate | OBSERVABILITY.md §13 per-tenant dashboard | `sso.login_failed` rate < 0.5% in first hour |
+| V-02 | All pre-migration users can log in | `sso.login` count in 24h ≥ 80% of `active_user_count` snapshot | — |
+| V-03 | No duplicate users created | `SELECT COUNT(*) FROM users WHERE tenant_id = ... AND created_at > cutover_at` | Should be ≈ 0 (only genuinely new employees) |
+| V-04 | Role assignments preserved | Sample 10 random users: confirm `tenant_member_roles.role` matches pre-migration state | Manual spot-check |
+| V-05 | SCIM sync functional | Deprovision a test user in new IdP → confirm `users.is_active = false` in FORM within 10 minutes | Automated smoke test if available |
+| V-06 | Group role mappings active | New IdP group triggers correct FORM role for a test user | Manual with customer IT |
+| V-07 | HMAC chain intact | Run §R-05 chain verification query against `audit_log_events` for tenant since cutover | Zero chain breaks |
+| V-08 | No cross-tenant bleed | Standard `rls_isolation.test.ts` CI suite passes against production (read-only mode) | All assertions pass |
+
+---
+
+### 18.9 DEC-030 Audit Events
+
+Seven new events added to the DEC-030 HMAC-chained taxonomy. All require `migration_id` in metadata. Events are written to `audit_log_events` with `tenant_id` of the production tenant.
+
+| Event type | Trigger | Severity | Retention | Key metadata |
+|---|---|---|---|---|
+| `sso.migration_initiated` | `sso_idp_migrations` row created | HIGH | 7 years | `migration_id`, `from_idp_type`, `to_idp_type`, `from_protocol`, `to_protocol`, `authorized_by`, `active_user_count` |
+| `sso.migration_staging_validated` | `status` → `'cutover_pending'` | MEDIUM | 7 years | `migration_id`, `matched_user_count`, `unmatched_user_count`, `staging_validated_at` |
+| `sso.migration_production_committed` | `status` → `'committed'` after cutover SQL | HIGH | 7 years | `migration_id`, `cutover_at`, `users_remapped_count`, `scim_migration` |
+| `sso.migration_rolled_back` | `status` → `'rolled_back'` | HIGH | 7 years | `migration_id`, `rolled_back_at`, `rollback_reason`, `users_restored_count` |
+| `sso.external_id_remapped` | Each row written to `sso_external_id_mappings` with `confirmed_at` set | HIGH | 7 years | `migration_id`, `user_id` (UUID), `match_method`; **no** `old_external_id` or `new_external_id` in event — values are in the mapping table, not the audit log |
+| `sso.migration_old_config_decommissioned` | Form engineer marks old IdP app decommissioned (48h post-cutover) | MEDIUM | 7 years | `migration_id`, `decommissioned_at` |
+| `sso.scim_token_rotated_for_migration` | New SCIM token issued, old token revocation scheduled | HIGH | 7 years | `migration_id`, `new_token_id`, `old_token_revocation_at` |
+
+**Note on `sso.external_id_remapped` event design:** The `old_external_id` and `new_external_id` values are deliberately omitted from the DEC-030 event payload. These values are IdP subject identifiers that, combined, create a linkage between the old and new identity — which is sensitive data. The `sso_external_id_mappings` table (form_admin access only, BYPASSRLS) is the authoritative record. The DEC-030 event proves the action occurred and names the `user_id`; auditors query the mapping table directly for the actual values under break-glass procedure.
+
+---
+
+### 18.10 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | How §18 Satisfies It |
+|---|---|
+| **CC8.1 — Change management** | The migration runbook is a documented change management procedure for identity provider changes. The `sso_idp_migrations` state machine enforces a planning → staging → cutover_pending → committed flow with no skip transitions. Founder authorisation (`authorized_by` column) is required before any production change. Two-person SQL review (§18.5.1 step 4, §18.6.3) mirrors the pattern established in §17.7. The `sso.migration_production_committed` HMAC-chained event creates an immutable record of when the change was made and who authorised it. |
+| **CC6.1 — Logical access controls** | The staging-first validation requirement (§18.3 F-01) ensures that new IdP access controls are verified against FORM's RLS before production activation. The `external_id` remap procedure (§18.6) guarantees that user identity continuity is preserved — preventing duplicate accounts from receiving access that should belong to an existing user. The V-04 spot-check and V-08 RLS isolation test confirm access integrity post-migration. |
+| **CC6.2 — Access controls prior to issuing credentials** | `tenant_sso_configs.is_active = false` during cutover (§18.5.1 step 2) ensures no SSO credentials are accepted from the new IdP until the `external_id` remap is complete. The rollback trigger conditions (§18.7) fire before access control failures can propagate to more than 10 users. |
+| **CC7.2 — System monitoring** | OBSERVABILITY.md §13 per-tenant SSO monitoring provides the post-cutover failure rate signal (V-01). The `sso.login_failed` event with `failure_reason` label allows automatic detection of `external_id_not_found` rollback triggers. |
+| **CC9.2 — Vendor/customer management** | The migration procedure protects user data integrity across the identity provider change — a vendor/customer obligation. The 48-hour rollback window (C-05) and post-migration validation checklist (§18.8) document FORM's commitment to continuity. The `sso.migration_old_config_decommissioned` event records when the old vendor relationship was formally closed. |
+| **C1.1 — Confidentiality commitments** | The `sso.external_id_remapped` event design (§18.9) deliberately excludes `old_external_id` and `new_external_id` values from the audit log to prevent unnecessary identity-linkage exposure. The `sso_external_id_mappings` table is BYPASSRLS form_admin access only — the minimum necessary access for a security-critical operation. |
+
+**Auditor evidence artefacts:**
+- `sso_idp_migrations` table export for any migration during observation period: status, `authorized_by`, timestamps
+- `audit_log_events` of type `sso.migration_*` for the migration, HMAC chain verified
+- Two-person SQL review approval history (GitHub PR): `enterprise-architect` + `security-engineer` required reviewers
+- Pre-migration assessment checklist: `compliance/evidence/idp-migrations/{slug}-{date}/assessment.md`
+- Post-migration validation results: `compliance/evidence/idp-migrations/{slug}-{date}/validation.md`
+
+---
+
+### 18.11 Gap Status Updates
+
+| Gap | Before §18 | After §18 |
+|---|---|---|
+| **G-004** (Certificate rotation automation) | 🟡 Partial — §8.1 rotation procedure exists but is manual; no expiry cron or dual-cert metadata endpoint | 🟡 Partial — §18 provides the full migration runbook which subsumes certificate-replacement scenarios. G-004 closes to 🟢 when the 60-day expiry alert cron (OBSERVABILITY.md §6 alert rule) and admin dashboard certificate management UI (§16.3) are implemented. |
+
+---
+
+### 18.12 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Write `migrations/YYYYMMDD_sso_idp_migrations.sql` — `sso_idp_migrations` table DDL, exclusion constraint, indexes, RLS policies | platform-engineer | **P0** | M5 |
+| Write `migrations/YYYYMMDD_sso_external_id_mappings.sql` — `sso_external_id_mappings` table DDL, indexes, BYPASSRLS-only policy | platform-engineer + security-engineer | **P0** | M5 |
+| Implement `POST /internal/admin/sso/migrations` — create migration record with founder-auth check; emit `sso.migration_initiated` DEC-030 event | platform-engineer | **P0** | M5 |
+| Implement email-match population query (§18.6.2) as a managed script in `scripts/sso-migration-email-match.ts`; dry-run mode that reports unmatched count without writing | platform-engineer | **P0** | M5 |
+| Implement production `external_id` remap SQL as a reviewed migration script template in `scripts/sso-migration-apply-remap.sql`; wire GitHub PR template requiring enterprise-architect + security-engineer approval | enterprise-architect + security-engineer | **P0** | M5 |
+| Wire all 7 DEC-030 events (§18.9) to their respective triggers; validate HMAC chain in staging | platform-engineer + security-engineer | **P0** | M5 |
+| Implement rollback script `scripts/sso-migration-rollback.sql` reversing `external_id` from `sso_external_id_mappings.old_external_id`; same two-person PR review gate | enterprise-architect + security-engineer | **P0** | M5 |
+| Add post-migration validation checks V-01 through V-08 (§18.8) as a runnable script in `scripts/sso-migration-validate.ts` outputting pass/fail per check | platform-engineer | **P1** | M5 |
+| Add `sso_idp_migrations` read panel to admin dashboard (internal FORM view only — not customer-facing): active migrations, status, days since cutover | platform-engineer | **P1** | M5 |
+| Create `compliance/evidence/idp-migrations/TEMPLATE-assessment.md` — pre-migration assessment checklist template for CS to fill out | compliance-officer | **P1** | M5 |
+| Create `compliance/evidence/idp-migrations/TEMPLATE-validation.md` — post-migration validation template | compliance-officer | **P1** | M5 |
+| Add `sso_idp_migrations` to Art. 17 erasure scope: on tenant hard-delete, confirm mapping table rows are deleted (referential cascade handles `sso_external_id_mappings`) | platform-engineer | **P2** | M6 |
+
+---
+
+*v1.0 additions: Section 18 — Tenant IdP Migration Runbook. Closes the identity lifecycle gap: §1–§17 cover provisioning, session management, logout, GDPR compliance, groups, admin UI, and pilot programs; §18 covers the previously undocumented scenario of migrating between identity providers without fragmenting user history. Migration trigger table: 6 scenarios from M&A-driven vendor replacement to on-premises ADFS → cloud IdP, with estimated engineering effort and critical-path note (customer IT coordination). Pre-migration assessment: 6 FORM-side checks (F-01 through F-06, including staging environment prerequisite and founder authorisation requirement) and 6 customer IT checks (C-01 through C-06, including mandatory 48-hour rollback window). New database tables: `sso_idp_migrations` (state machine with exclusion constraint preventing concurrent active migrations per tenant; `authorized_by` column enforced at API layer; BYPASSRLS for form_admin; form_system read-only; form_api zero-rows fail-closed) and `sso_external_id_mappings` (old↔new external_id linkage; form_admin BYPASSRLS only — never exposed to API or tenants; retains match_method and confirmed_at for audit trail). Three migration type runbooks: Type A (same protocol, different vendor — SAML field swap with two-person external_id remap SQL, staging-first, 30-minute maintenance window), Type B (SAML → OIDC protocol upgrade — SP reconfiguration, NameID→sub resolution via email-match, SAML SLO cleanup), Type C (SCIM-only — dual-token 24-hour overlap, group external_id update). SCIM identity preservation: the external_id problem (new IdP assigns new subject IDs; naïve handling creates duplicate users); Strategy 1 email-match (default — staging SCIM sync keyed by email; SQL to populate mappings and verify 0 unmatched); Strategy 2 manual ID mapping (M&A email-change scenario; CSV import with two-person review; hard limit at 20% manual rate requiring escalation). Rollback: 4 trigger conditions (SSO failure rate, login_failed count, SCIM error rate, customer IT request); reverse-remap SQL; `status = 'rolled_back'`; post-incident review gate before re-attempt. Post-migration validation checklist: 8 checks (V-01 SSO error rate via OBSERVABILITY §13, V-02 login coverage, V-03 no duplicate users, V-04 role preservation spot-check, V-05 SCIM deprovision smoke test, V-06 group mapping activation, V-07 HMAC chain integrity, V-08 RLS isolation CI suite). Seven new DEC-030 HMAC-chained events: sso.migration_initiated (HIGH), sso.migration_staging_validated (MEDIUM), sso.migration_production_committed (HIGH), sso.migration_rolled_back (HIGH), sso.external_id_remapped (HIGH — no id values in event; design rationale documented), sso.migration_old_config_decommissioned (MEDIUM), sso.scim_token_rotated_for_migration (HIGH). SOC 2 mapping: CC8.1 (change management — state machine + founder auth + two-person SQL gate), CC6.1 (no duplicate access via remap procedure), CC6.2 (is_active gate during cutover), CC7.2 (OBSERVABILITY §13 rollback signal), CC9.2 (48h rollback window + decommission event), C1.1 (external_id values excluded from audit log). G-004 status update: 🟡 Partial → 🟡 Partial (§18 covers certificate-replacement scenarios; G-004 closes on expiry cron + admin UI implementation). Auditor evidence artefacts: sso_idp_migrations export, sso.migration_* chain, two-person SQL PR reviews, compliance/evidence/idp-migrations/ templates. Implementation checklist: 12 tasks (7× P0, 4× P1, 1× P2), M5/M6.*

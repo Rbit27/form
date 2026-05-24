@@ -6,6 +6,17 @@
 
 ---
 
+## [1.11.0] — 2026-05-24
+
+### Added
+- [`docs/SSO_SCIM_IMPLEMENTATION.md`](docs/SSO_SCIM_IMPLEMENTATION.md) §18 — Tenant IdP Migration Runbook (doc bumped v0.9 → v1.0): end-to-end procedure for migrating an active enterprise tenant between identity providers without fragmenting user history or roles. Migration trigger table (6 scenarios: M&A vendor replacement, IdP vendor switch, SAML → OIDC protocol upgrade, SCIM-only migration, custom domain change, on-premises ADFS → cloud). Pre-migration assessment: 6 FORM-side checks (F-01 staging prerequisite → F-06 founder authorisation) and 6 customer IT checks (C-01 new app in staging → C-06 maintenance window). Two new tables: `sso_idp_migrations` (state machine planning→staging→cutover_pending→committed/rolled_back, exclusion constraint preventing concurrent active migrations per tenant, BYPASSRLS form_admin) and `sso_external_id_mappings` (old↔new external_id linkage, form_admin only, never API-exposed). Three migration type runbooks: Type A same-protocol different-vendor (SAML field swap, two-person SQL remap gate), Type B SAML→OIDC protocol upgrade (full SP rebuild, NameID→sub resolution, SAML SLO cleanup), Type C SCIM-only (dual-token 24h overlap, group external_id update). SCIM identity preservation: email-match strategy (default; staging SCIM sync keyed by email, SQL with 0-unmatched gate before cutover) and manual ID mapping (M&A email-change scenario; CSV import with two-person review; 20% manual-rate escalation threshold). Rollback: 4 trigger conditions, reverse-remap SQL, post-incident review gate. Post-migration validation: 8 checks (V-01 SSO error rate, V-02 login coverage, V-03 no duplicates, V-04 role spot-check, V-05 SCIM deprovision smoke test, V-06 group mapping, V-07 HMAC chain integrity, V-08 RLS isolation CI). Seven new DEC-030 HMAC-chained events: `sso.migration_initiated` (HIGH), `sso.migration_staging_validated` (MEDIUM), `sso.migration_production_committed` (HIGH), `sso.migration_rolled_back` (HIGH), `sso.external_id_remapped` (HIGH — id values excluded from log payload by design), `sso.migration_old_config_decommissioned` (MEDIUM), `sso.scim_token_rotated_for_migration` (HIGH). SOC 2 mapping: CC8.1 (state machine + founder auth + two-person SQL gate), CC6.1 (remap prevents duplicate-account access), CC6.2 (is_active gate during cutover window), CC7.2 (OBSERVABILITY §13 rollback signal), CC9.2 (48h rollback window + decommission event), C1.1 (external_id values excluded from audit log). G-004 status 🟡 Partial → 🟡 Partial (§18 covers certificate-replacement scenarios; closes to 🟢 on expiry cron + admin UI). Implementation checklist: 12 tasks (7× P0, 4× P1, 1× P2), M5/M6.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` header — v0.8 → v1.0
+- `VERSION` → 1.11.0
+
+---
+
 ## [1.10.2] — 2026-05-24
 
 ### Added
