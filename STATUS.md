@@ -196,6 +196,10 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-107-hypertrophy-mechanisms-mechanical-tension.md | Blog | draft · clinical-safety PASS |
 | post-108-lengthened-partials-stretch-hypertrophy.md | Blog | draft · clinical-safety PASS |
 | post-109-force-velocity-curve.md | Blog | draft · clinical-safety PASS |
+| post-110-muscle-architecture.md | Blog | draft · clinical-safety PASS |
+| post-111-post-activation-potentiation.md | Blog | draft · clinical-safety PASS |
+| post-112-rpe-vs-percentage-autoregulation.md | Blog | draft · clinical-safety PASS |
+| post-113-eccentric-overload.md | Blog | draft · clinical-safety PASS |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

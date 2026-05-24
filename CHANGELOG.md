@@ -6,6 +6,19 @@
 
 ---
 
+## [1.12.2] — 2026-05-24
+
+### Added
+- [`content/post-113-eccentric-overload.md`](content/post-113-eccentric-overload.md) — Ексцентрична сила: Katz (1939) ієрархія F_eccentric > F_isometric > F_concentric і актоміозинова кінетика; ексцентричний max +20–50% vs концентричний (Dvir 2004; Grange & Houston 1991); Enoka (1996) — менший EMG при вищій ексцентричній силі; Roig et al. (2009) мета-аналіз: ексцентричний акцент → більша гіпертрофія (ES 0.79 vs 0.52) без втрати концентричної сили; Franchi et al. (2014) — дистальна гіпертрофія і довші фасцикули при ексцентричному акценті; Nordic Hamstring Exercise: Timmins et al. (2016) оптимальний кут і FL; Har-Nir et al. (2022) −51% травм підколінних (OR 0.49); supramaximal loading механіка; flywheel: Vicens-Bordas et al. (2018) ексцентрична сила +10.2% vs +3.8%; Duchateau & Enoka (2008) нейральна специфічність ексцентрики; Repeated Bout Effect і дозування; clinical-safety PASS
+- `blog.html` — картки для post-110, post-111, post-112, post-113
+- `README.md` — post-113 [x] у roadmap
+- `STATUS.md` — рядки post-110–post-113
+
+### Changed
+- `VERSION` → 1.12.2
+
+---
+
 ## [1.12.1] — 2026-05-24
 
 ### Added
