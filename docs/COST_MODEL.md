@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v0.9
+# FORM · Cost Model & Unit Economics v1.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -70,6 +70,15 @@
     - 18.6 Net Revenue Retention (NRR) model and target
     - 18.7 Investor-grade SaaS metrics taxonomy
     - 18.8 Open questions added (OQ-14, OQ-15)
+19. [Enterprise Go-to-Market Financial Model](#19-enterprise-go-to-market-financial-model)
+    - 19.1 Sales Velocity Equation
+    - 19.2 Pipeline Stage Conversion Model
+    - 19.3 Founder-Led Phase (Deals 0 → 3)
+    - 19.4 First AE Hire Economics
+    - 19.5 SDR Layer Economics
+    - 19.6 CSM Cost Absorption Bridge
+    - 19.7 Enterprise Revenue Forecast (Month 1–24)
+    - 19.8 Open Questions Added (OQ-16, OQ-17)
 
 ---
 
@@ -1862,7 +1871,296 @@ If the 90-day pilot is structured as a conditional discount (i.e., the full-year
 
 ---
 
-**v0.9 · May 2026**
+---
+
+## 19. Enterprise Go-to-Market Financial Model
+
+> Owner: founder. Audience: founder, future VP Sales, board. Review: monthly during enterprise ramp; quarterly thereafter.
+
+This section models enterprise revenue as a capacity-and-velocity system: sales headcount → qualified pipeline → closed ARR → recognized revenue. It answers the pre-Series A questions: *how many people does it take to close 12 enterprise deals in Year 2, what does it cost, and what does the ARR look like month by month?*
+
+---
+
+### 19.1 Sales Velocity Equation
+
+The sales velocity equation converts pipeline activity into a predictable closed-ARR rate:
+
+```
+Sales Velocity ($/month) = (Opportunities × Win Rate × ACV) ÷ Sales Cycle (months)
+```
+
+FORM enterprise planning inputs [ESTIMATE]:
+
+| Input | Year 1 (founder-led) | Year 2 (AE-led) | Source |
+|---|---|---|---|
+| Win rate | 25% | 25% | Mid-market B2B SaaS benchmark; calibrate from first 5 outcomes |
+| Blended ACV | $18,000 | $23,000 | Starter-heavy Y1; Starter + Growth mix Y2 (see §19.4) |
+| Sales cycle | 6 months | 6 months | Average of 5–7 month range (ENTERPRISE.md) |
+| Target closed deals | 2 | 12 | ENTERPRISE.md targets |
+| Opportunities needed | 8 | 48 | Target ÷ Win Rate |
+
+```
+Year 1 Sales Velocity: (8 × 0.25 × $18,000) ÷ 6 = $6,000/month closed ARR [ESTIMATE]
+Year 2 Sales Velocity: (48 × 0.25 × $23,000) ÷ 6 = $46,000/month closed ARR [ESTIMATE]
+```
+
+**The 4× pipeline coverage rule:** To hit Year 2 target of 12 closed deals, maintain ≥ 48 opportunities in active pipeline at any time. Pipeline health is the leading indicator; closed ARR is the lag. When pipeline coverage drops below 4× the close target for two consecutive months, treat it as a critical signal — not a planning note.
+
+---
+
+### 19.2 Pipeline Stage Conversion Model
+
+Based on the ENTERPRISE.md sales process stages, assuming a 5–7 month average cycle:
+
+| Stage | Typical timing | Stage-to-next conversion | Disqualification signal |
+|---|---|---|---|
+| Outbound / inbound lead qualified | Week 1–2 | 30% → Discovery | No named sponsor, < 50 seat budget |
+| Discovery call (champion identified) | Week 2–4 | 50% → Technical eval | Champion has no budget authority |
+| Technical evaluation + security review | Week 4–8 | 60% → Pilot agreement | SSO/SCIM incompatible IdP; no DPA authority |
+| 90-day pilot agreement signed | Week 8–12 | 70% → Contract | Pilot activation < 40% at Day 60 |
+| Legal / DPA / MSA execution | Week 12–24 | 85% → Close | Insurance risk-scoring or backdoor request (auto-decline) |
+| **Lead → signed contract** | **5–7 months** | **≈ 25% overall** | — |
+
+**Stage-exit gates (hard):**
+- Discovery → Technical: champion has confirmed internal sponsor with budget authority
+- Technical → Pilot: IT/security sign-off on SSO/SCIM; DPA in review; no-go check passed (ENTERPRISE.md §5)
+- Pilot → Contract: ≥ 60% pilot activation at Day 60; legal cleared to proceed; MSA review scheduled
+- Contract → Close: MSA + DPA fully executed; SOC 2 bridge letter or report shared
+
+**BANT disqualification triggers:**
+- Budget: < 50 contracted seats → deal floor not met (§16.2); decline or re-scope
+- Authority: no named sponsor with budget sign-off → stall risk; add as disqualification criterion
+- Need: no wellness program owner internally → no adoption driver; deprioritize
+- Timeline: > 9 months to decision → move to nurture; re-qualify at 90-day cadence
+
+---
+
+### 19.3 Founder-Led Phase (Deals 0 → 3)
+
+The first three enterprise deals are closed by the founder. No explicit AE cash cost — the cost is founder time (opportunity cost: not on product, not on fundraising). Budget it as a time allocation, not a line item.
+
+**Founder time per enterprise deal [ESTIMATE]:**
+
+| Activity | Hours |
+|---|---|
+| Outreach and qualification | 4 |
+| Discovery call(s) | 3 |
+| Technical evaluation support | 6 |
+| Pilot kickoff and 90-day oversight | 10 |
+| Legal and contract negotiation | 8 |
+| Onboarding (D0 → D60, handoff to CS) | 6 |
+| **Total per deal** | **37 hours** |
+
+At a 5-hour/week enterprise allocation (~15% of a 33-hour founder week), one deal in active stages 3–5 is manageable. Two concurrent deals at different pipeline stages is the practical maximum before quality degrades or founder misses product milestones.
+
+**Founder-led close timeline (Base Case):**
+- Month 2–3: first pilot signed (outreach begins Month 0–1)
+- Month 7–8: Deal 1 closes post-pilot conversion
+- Month 10–11: Deal 2 closes (pipeline built in parallel with Deal 1)
+- Month 13–14: Deal 3 closes; AE search has started at Month 10–11
+
+**AE hire trigger:** when the founder is simultaneously holding ≥ 3 deals in stages 3–5, or loses ≥ 2 qualified deals due to bandwidth. Search lead time: ~3 months (1 month recruiting + 2 months ramp to first close). Initiate AE search no later than when Deal 2 is in legal/contract stage.
+
+---
+
+### 19.4 First AE Hire Economics
+
+| Parameter | Value | Notes |
+|---|---|---|
+| Total compensation (OTE) | $120,000/yr | $60k base + $60k variable [ESTIMATE]; reference §8.5 |
+| Target quota | 20 deals/year | Calibrated to 4× OTE quota multiple target |
+| Deal mix (Year 2) | 60% Starter / 35% Growth / 5% Enterprise | Starter-heavy while brand is building |
+| Blended ACV | $23,000 [ESTIMATE] | 0.60 × $14,400 + 0.35 × $27,000 + 0.05 × $100,800 |
+| Annual ARR at quota | $460,000 | 20 deals × $23,000 |
+| Quota multiple | 3.8× OTE | Below 4× target; see adjustment options below |
+
+**Quota multiple adjustment levers:**
+```
+Current: 20 deals × $23,000 ACV = $460,000 ARR → 3.8× OTE
+
+To reach 4× ($480,000 ARR):
+  Option A: Shift 2 Starter → Growth deals in AE's target account list
+  Option B: Require minimum 300-seat Starter floor (raises blended ACV ~$1k)
+  Option C: Add one Enterprise-tier target per half-year to AE's named accounts
+
+Do not adjust by cutting AE OTE — compresses the available talent pool.
+```
+
+**AE gross profit contribution (Year 2, steady-state):**
+```
+ARR production at quota:          $460,000
+Gross margin @ 65%:               $299,000 GP generated
+AE total comp:                   −$120,000
+Net GP contribution:              $179,000/year [ESTIMATE]
+Monthly GP contribution (avg):     $9,917/month including 2-month ramp
+```
+
+**AE ramp model:**
+
+| Month post-hire | Productivity | Deals closed | Quarterly ARR closed |
+|---|---|---|---|
+| 1–2 | 0% | 0 | $0 (pipeline building only) |
+| 3–4 | 50% | 2 | $46,000 |
+| 5–6 | 75% | 3 | $69,000 |
+| 7–12 | 100% | 12 | $276,000 |
+| **Full Year 1 (AE)** | — | **17** | **$391,000** |
+
+Ramp cost to GP break-even: Month 1–2 AE salary = $20,000 outlay before first closed deal. Month 3 first close: $23,000 ACV × 65% GM = $14,950 annual GP ($1,246/month recognized). Full ramp-cost recovery at Month 5 post-hire (cumulative GP covers ramp salary spend).
+
+---
+
+### 19.5 SDR Layer Economics
+
+The SDR hire is justified when AE pipeline coverage drops below 4× for two consecutive months, meaning the AE is self-sourcing all pipeline, which degrades close rate. Premature SDR hire creates pipeline generation without close capacity.
+
+**SDR hire trigger:** pipeline coverage < 4× for 2 consecutive months AND AE is sourcing > 70% of own pipeline.
+
+| Parameter | Value | Notes |
+|---|---|---|
+| SDR OTE | $70,000/yr | $42k base + $28k variable [ESTIMATE] |
+| SQL quota | 40 SQLs/year | ~3–4 qualified meetings/month delivered to AE |
+| SQL → closed deal conversion | 25% | Consistent with pipeline model (§19.2) |
+| Deals attributable to SDR | 10/year | 40 SQLs × 25% |
+| ARR from SDR-sourced deals | $230,000 | 10 × $23k blended ACV |
+| GP from SDR-sourced deals | $149,500 | $230k × 65% |
+| SDR net GP contribution | $79,500/year | After $70k SDR cost |
+| SDR ROI | 2.1× | GP generated ÷ SDR cost |
+
+**SDR outreach model for FORM's ICP:**
+
+```
+ICP: Head of People, CHRO, or Benefits Manager at companies with 200–5,000 employees
+     in wellness-forward industries (tech, professional services, CPG)
+
+Outreach channels (ranked by FORM fit):
+  1. LinkedIn Sales Navigator — people-leader titles, company size filter
+  2. Intent signal tools (Bombora, G2) — "employee wellness" or "fitness benefits"
+  3. Conference presence — SHRM Annual, Wellbeing at Work, Health 2.0
+  4. Closed-customer referrals — warmest lead source, zero SDR cost
+
+Capacity model:
+  Active sequences: 50 accounts/week (personalized, not mass spray)
+  Response rate:    3–5% → 2 conversations/week
+  SQL rate:         50% of conversations → ~1 SQL/week = 45–50 SQLs/year
+```
+
+**SQL qualification criteria (passed to AE before handoff):**
+1. Company ≥ 50 confirmed employees in target geo
+2. Named internal sponsor with budget authority confirmed in conversation
+3. Wellness program budget confirmed or in active planning cycle
+4. Next step is a scheduled technical evaluation or demo with IT/HR attendees
+
+---
+
+### 19.6 CSM Cost Absorption Bridge
+
+CSM cost is the single largest post-platform-COGS cost for enterprise accounts below 600 seats. The absorption bridge below shows at what seat count CSM cost falls below 5% of account revenue — the threshold at which it no longer materially compresses gross margin.
+
+| Plan | Seats | Monthly revenue | CSM cost/month [ESTIMATE] | CSM % of revenue | Absorbed? |
+|---|---|---|---|---|---|
+| Starter | 50 | $600 | $0 (email only, shared CS pool) | 0% | Yes |
+| Starter | 150 | $1,800 | $0 | 0% | Yes |
+| Growth | 200 | $1,800 | $275 | 15.3% | No |
+| Growth | 300 | $2,700 | $275 | 10.2% | No |
+| Growth | 500 | $4,500 | $275 | 6.1% | Approaching |
+| Growth | 700 | $6,300 | $275 | 4.4% | **Yes** |
+| Enterprise | 1,000 | $7,000 (@ $7/seat) | $450 | 6.4% | Approaching |
+| Enterprise | 1,500 | $10,500 | $450 | 4.3% | **Yes** |
+| Enterprise | 5,000 | $33,333 | $500 | 1.5% | De minimis |
+
+**Implication:** The CSM cost problem is a Growth-tier, sub-700-seat problem. For Growth accounts below 300 seats, CSM consumes > 10% of revenue — the largest single margin lever at that deal size. Three mitigation paths:
+
+1. **Pooled CSM model:** one CSM handles 3–4 sub-300-seat Growth accounts concurrently; effective per-account CSM cost reduces to ~$92/month/account
+2. **Scaled CS for sub-300 seats:** async support + shared playbooks, not dedicated CSM; reserve named CSM for ≥ 400 seats
+3. **Raise Growth minimum to 300 seats (OQ-16):** eliminates the below-threshold band; weigh vs. pipeline lost in the 200–299-seat range
+
+**COGS vs. S&M classification:**
+
+| CSM activity | Classification |
+|---|---|
+| Onboarding, SSO/SCIM setup, admin training | COGS (delivery of contracted service) |
+| D0–D60 adoption enablement | COGS |
+| QBR facilitation, success metrics review | S&M (retention / renewal) |
+| Expansion selling, upsell discovery | S&M |
+
+At current scale (< 10 enterprise accounts), classify 100% of CSM cost as S&M (operationally simpler; consistent with pre-revenue GAAP guidance). Migrate to blended COGS/S&M treatment pre-Series A audit — flag to compliance-officer.
+
+---
+
+### 19.7 Enterprise Revenue Forecast (Month 1–24)
+
+Three scenarios using inputs from §19.1–19.6. All enterprise ARR is recognized ratably per §18.1. No revenue is recognized during the 90-day free pilot. Pilot success rate: 70% (30% of signed pilots do not convert to a paid contract).
+
+**Common assumptions:**
+- Month 0: product launch; enterprise outreach begins
+- First pilot signed: Month 2–4
+- First contract signed: Month 7–10 (90-day pilot + legal cycle)
+- AE hire: Month 12 (Base), Month 10 (Bull), Month 15 (Bear)
+- AE ramp: 2 months to first close post-hire
+- Year 1 blended ACV: $18,000; Year 2: $23,000
+
+**Base Case — 2 deals Year 1, 12 deals Year 2:**
+
+| Month | Event | Cumulative deals | Monthly ARR recognized | Enterprise ARR |
+|---|---|---|---|---|
+| 0–6 | Outreach, pilots running | 0 | $0 | $0 |
+| 7 | Deal 1: 100-seat Starter | 1 | $1,200 | $14,400 |
+| 10 | Deal 2: 75-seat Starter | 2 | $2,100 | $25,200 |
+| 12 | Year 1 close; AE hired | 2 | $2,100 | $25,200 |
+| 14 | Deal 3 (founder-led) | 3 | $3,050 | $36,600 |
+| 18 | Deals 4–7 (AE at full productivity) | 7 | $7,375 | $88,500 |
+| 21 | Deals 8–10 | 10 | $10,708 | $128,500 |
+| 24 | Deals 11–14 (first Growth deal) | 14 | $15,667 | $188,000 |
+
+**Bull Case — 3 deals Year 1, 18 deals Year 2:**
+
+| Month | Cumulative deals | Monthly ARR recognized | Enterprise ARR |
+|---|---|---|---|
+| 7 | 1 | $1,200 | $14,400 |
+| 10 | 2 | $2,100 | $25,200 |
+| 12 | 3 | $3,350 | $40,200 |
+| 18 | 10 | $10,708 | $128,500 |
+| 24 | 21 | $26,000 | $312,000 |
+
+**Bear Case — 1 deal Year 1, 6 deals Year 2:**
+
+| Month | Cumulative deals | Monthly ARR recognized | Enterprise ARR |
+|---|---|---|---|
+| 9 | 1 | $1,200 | $14,400 |
+| 12 | 1 | $1,200 | $14,400 |
+| 18 | 4 | $4,200 | $50,400 |
+| 24 | 7 | $7,175 | $86,100 |
+
+**Scenario interpretation:** The bull/bear spread at Month 24 is $86k – $312k ARR — a 3.6× range. This spread is driven primarily by pilot velocity in Months 2–4 and pilot-to-contract conversion rate — both founder-controllable before any sales hire. The two highest-leverage actions in Year 1 are: (a) signing the first pilot before Month 3, and (b) maintaining pilot activation ≥ 60% by Day 60.
+
+**Series A context for enterprise ARR:** Enterprise ARR at Month 24 in all scenarios is sub-$350k — pre-material relative to a $2M–5M raise. Enterprise matters at Series A for *ARR quality* (NRR ≥ 110%, LTV:CAC ≥ 5×, expansion proof) rather than raw enterprise ARR quantity. Primary enterprise signal for Series A: ≥ 3 active accounts with ≥ 90% seat activation and measurable positive NRR.
+
+---
+
+### 19.8 Open Questions Added
+
+**OQ-16: Growth-tier minimum seat floor for CSM economics**
+
+§19.6 shows dedicated CSM cost (≥$275/month) consumes > 10% of revenue for Growth accounts below 300 seats. The current Growth minimum is 200 seats (ACV: $21,600). Raising the floor to 300 seats (ACV: $32,400) improves Year 1 gross margin by ~4 points on these accounts, at the cost of losing the addressable 200–299-seat market segment. Before adjusting: estimate how many prospects fall in the 200–299-seat band from CRM and outreach data. If fewer than 2–3 anticipated per year, raising the floor is economically rational. Flag to product-manager and founder at first Growth deal close.
+
+**OQ-17: Win rate calibration — is 25% defensible?**
+
+The 25% win rate is an industry median for mid-market B2B SaaS, not a FORM-specific measurement. The sensitivity is material:
+
+```
+Win rate 15% → 80 opportunities needed for 12 Year 2 closed deals
+               (vs. 48 at 25%) — requires SDR hire at Month 10 vs. 14
+Win rate 25% → 48 opportunities (base model)
+Win rate 35% → 34 opportunities — AE self-sources; SDR deferred to Month 18+
+```
+
+Instrument win rate from the first five closed/lost outcomes. Create a closed-lost reason taxonomy before any AE is hired so the data is structured from Day 1. Until five data points exist, target pipeline coverage at 5× the close target (conservative buffer for the 15% scenario) rather than the 4× base model.
+
+---
+
+---
+
+**v1.0 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
 
@@ -1879,3 +2177,5 @@ All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actua
 *v0.7 additions: §17 Downside Scenario Analysis & Unit Economics Stress Tests — six adverse scenarios stress-tested against v0.6 baseline (S1: Anthropic API doubles, break-even +1.3%; S2: App Store 30% commission, break-even +22.3%; S3: churn doubles 5%→10%, LTV −50%; S4: 20% price cut, break-even +26.0%; S5: enterprise Year 1 miss, not existential; S6: S1+S3 combined, freeze paid acquisition protocol). Survivability assessments, mitigation priority lists, and monitoring thresholds for each scenario. OQ-12 added: Anthropic volume pricing threshold (~25k Pro subs at baseline rates). OQ-13 added: actual Victor token budget per session — instrument in beta per OQ-01.*
 
 *v0.9 additions: §18 Revenue Recognition, ARR/MRR Bridge & SaaS Metrics Taxonomy — ASC 606 / IFRS 15 ratable recognition rule for annual and multi-year contracts; billings vs. revenue vs. cash waterfall; monthly MRR bridge template (New/Expansion/Contraction/Churned); free 90-day pilot timing and first-recognition date; deferred revenue schedule for 2-year and 3-year deals (short-term vs. long-term split); NRR / GRR model with target table (≥110% growth, ≥120% scale) and churn-rate sensitivity; investor-grade SaaS metrics taxonomy (ARR, MRR, ACV, TCV, Bookings, Billings, Revenue, NRR, GRR, CAC, LTV, Magic Number, Rule of 40) with FORM-specific notes; reporting cadence table. OQ-14 added: revenue recognition policy for mid-contract seat additions. OQ-15 added: ASC 606 variable consideration treatment for conditional pilot discounts.*
+
+*v1.0 additions: §19 Enterprise Go-to-Market Financial Model — sales velocity equation (opportunities × win rate × ACV ÷ sales cycle) for Year 1 founder-led ($6k/month) and Year 2 AE-led ($46k/month) phases; pipeline stage conversion model with hard exit gates and BANT disqualification triggers; founder time-budget per deal (37 hours total) and AE hire trigger criteria; first AE hire economics ($120k OTE, 3.8× quota multiple, $179k net GP/year at quota, Month-5 ramp-cost recovery); SDR layer economics ($70k OTE, 2.1× ROI, SQL qualification criteria, 40 SQL/year quota); CSM cost absorption bridge (dedicated CSM < 5% of revenue at Growth 700+ seats and Enterprise 1,500+ seats; pooled CSM model for sub-300-seat accounts); three-scenario Month 1–24 enterprise ARR forecast (Base: $188k ARR Month 24; Bull: $312k; Bear: $86k) with month-by-month recognized ARR; Series A ARR quality framing (NRR ≥ 110%, LTV:CAC ≥ 5×, ≥ 3 active accounts). OQ-16 added: Growth-tier minimum seat floor for CSM absorption. OQ-17 added: win rate calibration sensitivity (15–35%) on SDR hire timing and pipeline coverage targets.*

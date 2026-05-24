@@ -6,6 +6,17 @@
 
 ---
 
+## [1.10.0] — 2026-05-24
+
+### Added
+- [`docs/COST_MODEL.md`](docs/COST_MODEL.md) §19 — Enterprise Go-to-Market Financial Model (doc bumped v0.9 → v1.0): sales velocity equation for founder-led and AE-led phases; pipeline stage conversion model with hard exit gates and BANT triggers; founder time-budget per deal (37 hrs); first AE hire economics ($120k OTE, 3.8× quota multiple, $179k net GP/yr, Month-5 ramp recovery); SDR layer economics ($70k OTE, 2.1× ROI); CSM cost absorption bridge (< 5% of revenue at Growth 700+ seats, Enterprise 1,500+ seats); three-scenario Month 1–24 enterprise ARR forecast (Base $188k, Bull $312k, Bear $86k); Series A quality-signal framing. OQ-16 (Growth minimum seat floor) and OQ-17 (win rate calibration) added.
+
+### Changed
+- `docs/COST_MODEL.md` header — v0.9 → v1.0
+- `VERSION` → 1.10.0
+
+---
+
 ## [1.9.24] — 2026-05-24
 
 ### Added
