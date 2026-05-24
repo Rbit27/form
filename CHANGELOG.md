@@ -6,6 +6,19 @@
 
 ---
 
+## [1.9.24] — 2026-05-24
+
+### Added
+- [`content/post-106-women-strength-anatomy.md`](content/post-106-women-strength-anatomy.md) — Жіночий підхід до силового: Q-angle myth (Collins et al. 2009), estrogen і tendon laxity (Lowe 2017), ACL-ризик з base-rate контекстом (Myklebust 2003, NCAA 2016), recovery differences (Hicks et al. 2001), cycle-phase periodization як contested area; 13-хв читання; clinical-safety PASS WITH CONDITIONS
+- `blog.html` — картка для post-106
+- `STATUS.md` — рядки post-104, post-105, post-106 у content engine table
+- `README.md` — post-106 позначено [x] у roadmap
+
+### Changed
+- `VERSION` → 1.9.24
+
+---
+
 ## [1.9.23] — 2026-05-24
 
 ### Added

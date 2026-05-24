@@ -190,6 +190,9 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-101-sleep-recovery-mechanisms.md | Blog | draft · clinical-safety PASS |
 | post-102-heat-cold-training-performance.md | Blog | draft · clinical-safety PASS |
 | post-103-readiness-diagnostics.md | Blog | draft · clinical-safety PASS |
+| post-104-dehydration-performance.md | Blog | draft · clinical-safety PASS WITH CONDITIONS |
+| post-105-grip-strength-longevity.md | Blog | draft · clinical-safety not required |
+| post-106-women-strength-anatomy.md | Blog | draft · clinical-safety PASS WITH CONDITIONS (2026-05-24) |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
