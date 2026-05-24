@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v0.8
+# FORM · Observability & Monitoring Taxonomy v0.9
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -3938,4 +3938,267 @@ Immediate action: Halt analytics ingest Worker. Quarantine affected rows. Begin 
 
 ---
 
+## 22. AI Coaching Quality Observability
+
+> Owner: ml-engineer + platform-engineer. Review: monthly during beta; quarterly post-launch. SOC 2 evidence: CC5.2 (control activities), CC7.2 (monitoring), CC7.4 (evaluation of deficiencies), CC1.2 (integrity and ethical values). Cross-reference: `docs/INCIDENT_RESPONSE.md` R-10 (AI Coach Safety Incident), `docs/VICTOR_PROMPT_GUIDE.md`, `docs/DATA_MODEL.md` §11 (`coaching_turns`).
+
+**Privacy-first constraint:** Victor's coaching conversations contain GDPR Art. 9-adjacent health data (training performance, self-reported readiness, injury context). This section defines observability through **behavioral proxy metrics only** — signals that indicate coaching quality without storing or transmitting prompt or response content. No coaching turn text, no Victor response text, and no user message text appears in any observability signal defined here.
+
+---
+
+### 22.1 Purpose: Operational vs Quality Observability
+
+Section §3 (Metrics Taxonomy) and §4.5 (AI Inference Log Schema) cover **operational observability** for the Anthropic API integration: latency, token counts, error rates, cache efficiency. Those signals answer "Is the system working?" They do not answer "Is Victor coaching well?"
+
+This section defines **quality observability** — signals that answer:
+- Is coaching engagement trending up or down?
+- Did a prompt change regress workout plan adherence?
+- Are there fleet-level signals suggesting Victor is giving unhelpful or harmful guidance?
+- Is a new prompt version performing better or worse than the baseline?
+
+Quality observability is harder than operational observability because the ground truth (coaching quality) is subjective, proxied through behavioral outcomes, and cannot be inferred from content (GDPR constraint). The signals defined here are leading indicators, not direct measurements. They must be interpreted together, never in isolation.
+
+**Scope:** Victor coaching interactions on consumer iOS/Android app (Growth and Pro tiers). Enterprise tenant coaching is in scope for fleet aggregates; tenant-level quality drilldown is available only to tenant admins with DPA-appropriate consent.
+
+**Out of scope:** Storing any portion of coaching conversation text for quality review. Anthropic's safety evaluations and model-level alignment monitoring are Anthropic's responsibility and are not duplicated here. Content moderation for individual messages is handled at the application layer (INCIDENT_RESPONSE.md R-10), not here.
+
+---
+
+### 22.2 Coaching Quality Proxy Metric Taxonomy
+
+All metrics are computed at the **coaching session** or **weekly user cohort** level. No metric is computed at the individual message level (prevents content reconstruction).
+
+| Metric | Name | Computation Source | Retention | What it proxies |
+|---|---|---|---|---|
+| **Plan adherence rate** | `victor_plan_adherence_rate` | `workout_logs` vs `training_plan_weeks` | 24 months | Did users follow the workout Victor prescribed? |
+| **Coaching session depth** | `victor_session_depth_turns` | `COUNT(*) GROUP BY session_id` in `coaching_turns` | 90 days | Multi-turn engagement — shallow = unhelpful or confusing response |
+| **Session abandonment rate** | `victor_session_abandoned_rate` | Sessions with 1 turn / total sessions | 90 days | User did not find first response useful |
+| **Post-coaching workout start rate** | `victor_post_coaching_workout_pct` | `workout_logs.started_at` within 4h of `coaching_sessions.ended_at` | 24 months | Victor drove action, not just conversation |
+| **Workout completion rate (post-coaching)** | `victor_post_coaching_completion_pct` | Workouts started post-coaching that reached `status=completed` | 24 months | Prescription quality (overloaded? underloaded? unclear?) |
+| **Retry rate within session** | `victor_session_retry_rate` | Turns with `user_feedback = retry` or consecutive short-gap turns | 30 days | User found response inadequate, asked again |
+| **Plan regeneration rate** | `victor_plan_regen_rate` | Regeneration requests per user per week | 30 days | User dissatisfied with plan prescription |
+| **Explicit negative feedback rate** | `victor_thumbs_down_rate` | `coaching_turns.feedback = negative` / total turns with feedback | 24 months | Direct dissatisfaction signal |
+| **No-engagement rate** | `victor_no_engage_7d_rate` | Users with 0 coaching sessions in trailing 7d (active subscribers) | 90 days | Victor not surfaced or not useful enough to seek |
+| **Streak grace trigger rate** | `victor_streak_grace_rate` | Streak grace activations per week (DEC-013 signal) | 24 months | Real-world adherence floor (grace = miss, but within policy) |
+
+**Derivation note:** All metrics are computed via `pg_cron` views refreshed at 04:00 UTC daily. Raw `coaching_turns` table is never exported — aggregation happens inside Supabase Postgres. `coaching_turns.content_hash` exists for deduplication but is never used in observability queries.
+
+---
+
+### 22.3 Prompt Version Tracking
+
+Victor's behavior is controlled by a system prompt stored in Cloudflare Workers Secrets (`VICTOR_SYSTEM_PROMPT_HASH`) and versioned by `victor_prompt_version` (semver, e.g. `2.1.4`). This version tag is:
+
+- Written to `coaching_turns.victor_prompt_version` at inference time.
+- Included in the AI inference log (§4.5) as `prompt_version` field.
+- Used to segment all quality metrics in §22.2 by version, enabling before/after comparison for prompt changes.
+
+**Prompt version schema extension** (additive to `coaching_turns`):
+
+```sql
+-- Already exists in DATA_MODEL.md §11; confirm these columns are present:
+ALTER TABLE coaching_turns
+  ADD COLUMN IF NOT EXISTS victor_prompt_version TEXT NOT NULL DEFAULT '0.0.0',
+  ADD COLUMN IF NOT EXISTS prompt_ab_bucket     TEXT;  -- NULL unless A/B test active
+
+CREATE INDEX IF NOT EXISTS idx_coaching_turns_prompt_version
+  ON coaching_turns (victor_prompt_version, created_at DESC);
+```
+
+**Baseline definition:** When a new prompt version ships, the prior 14 days of data under the previous version become the **quality baseline** for that dimension. Regression alerting (§22.6) compares the 7-day rolling window of the new version against this baseline.
+
+---
+
+### 22.4 Quality SLOs
+
+| SLO ID | Metric | Target | Alert Threshold | Window | Owner |
+|---|---|---|---|---|---|
+| **QA-COACH-SLO-01** | Plan adherence rate | ≥ 65% | < 55% sustained 3 days | Rolling 7 days | ml-engineer |
+| **QA-COACH-SLO-02** | Session abandonment rate (1-turn sessions) | ≤ 30% | > 45% sustained 3 days | Rolling 7 days | ml-engineer |
+| **QA-COACH-SLO-03** | Post-coaching workout start rate | ≥ 40% | < 25% sustained 3 days | Rolling 7 days | platform-engineer |
+| **QA-COACH-SLO-04** | Explicit negative feedback rate | ≤ 8% | > 15% sustained 2 days | Rolling 7 days | ml-engineer |
+| **QA-COACH-SLO-05** | Plan regeneration rate | ≤ 15% per active user/week | > 25% sustained 3 days | Rolling 7 days | ml-engineer |
+| **QA-COACH-SLO-06** | No-engagement rate (0 coaching sessions / 7d) | ≤ 40% of active subscribers | > 60% sustained 7 days | Rolling 14 days | growth-lead |
+
+**SLO philosophy:** These targets are calibrated for a pre-launch beta with < 200 users. They should be re-baselined at M6 (post-public launch) using first 30-day cohort data. Targets tighten as sample size increases and measurement confidence improves.
+
+**Caution on interpretation:** Quality SLO breaches are *hypotheses*, not conclusions. A drop in plan adherence rate may indicate bad coaching, a UI bug, a seasonal effect, or a cohort-mix shift. SLO breach triggers investigation, not automatic rollback.
+
+---
+
+### 22.5 Clinical Safety Monitoring Signals
+
+Clinical safety observability differs from quality observability: it watches for signals that Victor may have produced potentially harmful coaching. Per INCIDENT_RESPONSE.md R-10, content itself is not accessible to monitoring systems. Instead, the following **structural signals** serve as canaries:
+
+| Signal | Source | Trigger condition | Severity | Response |
+|---|---|---|---|---|
+| **Coaching session duration spike** | `coaching_turns` | P99 session duration > 3× 30d baseline for a given `victor_prompt_version` | P1 | ML-engineer + clinical-safety review of that prompt version |
+| **Retry rate spike after prompt deploy** | `coaching_turns` | `victor_session_retry_rate` > 2× baseline within 24h of prompt deploy | P1 | Prompt version rollback candidate; clinical-safety review |
+| **No-action post-session spike** | Behavioral | `victor_post_coaching_workout_pct` drops > 30% relative in 48h | P1 | May indicate confusing or alarming coaching; escalate to clinical-safety |
+| **Negative feedback rate spike** | `coaching_turns.feedback` | `victor_thumbs_down_rate` > 25% in any 4-hour window | P0 | Immediate escalation per R-10 §2.1; FEATURE FLAG consideration |
+| **Explicit harm report** | Support ticket + `incident_reports` | Any ticket tagged `victor_harmful_content` | P0 | R-10 full activation; clinical-safety VETO authority engaged |
+| **Jailbreak test suite failure** | CI / scheduled | `victor_jailbreak_tests` fails any assertion | P0 | Block prompt deploy; notify security-engineer + clinical-safety |
+
+**No-go escalation path:** If any P0 clinical safety signal fires, the response escalation leads to clinical-safety as defined in R-10. Clinical-safety has VETO power to disable the Victor feature flag without founder approval for P0 safety events (DEC-012 exception).
+
+---
+
+### 22.6 Alerting Rules
+
+| Alert ID | Condition | Severity | Channel | Dedup key |
+|---|---|---|---|---|
+| **AL-COACH-01** | `victor_plan_adherence_rate` < 55% for 3 consecutive daily aggregations | P1 | `#alerts-quality` (Slack) | `qa_coach_adherence_{prompt_version}` |
+| **AL-COACH-02** | `victor_session_abandoned_rate` > 45% for 3 consecutive daily aggregations | P1 | `#alerts-quality` | `qa_coach_abandon_{prompt_version}` |
+| **AL-COACH-03** | `victor_thumbs_down_rate` > 25% in any 4-hour window (rolling) | P0 | PagerDuty (ml-engineer on-call) + `#inc-YYYYMMDD-coach` | `qa_coach_thumbsdown_p0` |
+| **AL-COACH-04** | New `victor_prompt_version` deployed AND any QA-COACH-SLO breached within 48h | P1 | `#alerts-quality` + ml-engineer DM | `qa_coach_regression_{new_version}` |
+| **AL-COACH-05** | `victor_jailbreak_tests` CI job fails | P0 | PagerDuty + Slack `#security` | `qa_coach_jailbreak_{commit_sha}` |
+| **AL-COACH-06** | `victor_no_engage_7d_rate` > 60% for 7 consecutive daily aggregations | P2 | `#metrics` Slack digest | `qa_coach_noengage_{week}` |
+
+**Alert suppression:** AL-COACH-01, AL-COACH-02, AL-COACH-04 are suppressed during the first 72 hours after a prompt version deploy. Small sample sizes produce false positives before the new version accumulates sufficient session volume (target: ≥ 200 coaching sessions before quality SLOs are evaluated against the new version).
+
+---
+
+### 22.7 Prompt A/B Testing Observability Framework
+
+When testing two prompt variants:
+1. Each session is assigned `coaching_turns.prompt_ab_bucket ∈ {control, variant_a}` at session start (via Cloudflare Workers random split, tenant-locked for consistency within a session).
+2. All §22.2 quality metrics are segmented by `prompt_ab_bucket`.
+3. A/B tests run for minimum 14 days or 500 sessions per bucket (whichever is later), before a statistical conclusion is drawn.
+4. Statistical method: two-proportion z-test for rate metrics; Mann-Whitney U for ordinal depth metrics. α = 0.05, power = 0.80.
+5. Results stored in `victor_ab_results` table (schema below); archived to `compliance/evidence/victor-ab/{test_id}/` at test conclusion.
+
+```sql
+CREATE TABLE victor_ab_results (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  test_id         TEXT NOT NULL,            -- e.g. 'ab-2026-05-24-bracing-cue'
+  started_at      TIMESTAMPTZ NOT NULL,
+  concluded_at    TIMESTAMPTZ,
+  control_version TEXT NOT NULL,
+  variant_version TEXT NOT NULL,
+  winner          TEXT CHECK (winner IN ('control', 'variant', 'no_difference', 'inconclusive')),
+  primary_metric  TEXT NOT NULL,            -- e.g. 'victor_post_coaching_completion_pct'
+  control_value   NUMERIC(6,4),
+  variant_value   NUMERIC(6,4),
+  p_value         NUMERIC(6,4),
+  session_count   INTEGER,
+  notes           TEXT,
+  concluded_by    TEXT,                     -- founder or ml-engineer
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+**DEC-030 events for A/B tests:**
+
+| Event | Severity | When emitted |
+|---|---|---|
+| `victor.ab_test_started` | MEDIUM | Test bucket assignment begins |
+| `victor.ab_test_concluded` | MEDIUM | Winner declared or test terminated |
+| `victor.prompt_version_promoted` | HIGH | Variant promoted to production (winner = variant) |
+| `victor.prompt_version_rolled_back` | HIGH | Variant retired due to regression |
+
+---
+
+### 22.8 Metabase Dashboard: Victor Coaching Quality
+
+**Dashboard name:** `Victor Coaching Quality`
+**Refresh:** Daily at 05:00 UTC (after pg_cron aggregation at 04:00)
+**Access:** Founder + ml-engineer + clinical-safety. NOT tenant_admin (enterprise coaching quality is surfaced through separate tenant admin views with appropriate anonymisation).
+
+| Panel | Query | Chart type |
+|---|---|---|
+| Plan adherence rate (7d rolling) | `victor_quality_daily` WHERE metric = 'adherence', trailing 30 rows | Line, with QA-COACH-SLO-01 threshold line |
+| Session abandonment rate (7d rolling) | Same table, metric = 'abandonment' | Line, with QA-COACH-SLO-02 threshold |
+| Post-coaching workout start rate | metric = 'post_coaching_start' | Line |
+| Negative feedback rate | metric = 'thumbs_down' | Line, with P0 threshold at 25% in red |
+| Quality by prompt version | GROUP BY victor_prompt_version | Grouped bar: adherence, completion, abandonment per version |
+| Active A/B test status | `victor_ab_results` WHERE concluded_at IS NULL | Table: test_id, sessions/bucket, primary metric current value |
+| No-engagement trend | metric = 'no_engage_7d' | Area chart (inverse — high is bad) |
+| Streak grace rate | metric = 'streak_grace' | Line |
+
+---
+
+### 22.9 Supporting Database Schema
+
+```sql
+-- Daily aggregation table — computed by pg_cron, never raw coaching content
+CREATE TABLE victor_quality_daily (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date         DATE NOT NULL,
+  metric       TEXT NOT NULL,               -- one of: adherence, abandonment, post_coaching_start, completion, thumbs_down, plan_regen, no_engage_7d, streak_grace, session_depth_p50
+  value        NUMERIC(8,4) NOT NULL,
+  prompt_version TEXT NOT NULL,
+  sample_size  INTEGER NOT NULL,            -- session or user count for this metric × date × version
+  ab_bucket    TEXT,                        -- NULL unless A/B test active
+  tenant_id    UUID,                        -- NULL = all tenants (fleet aggregate)
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (date, metric, prompt_version, COALESCE(ab_bucket, ''), COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'))
+);
+
+-- RLS: founder + ml-engineer read; form_system write; tenant_admin sees only own tenant_id rows
+ALTER TABLE victor_quality_daily ENABLE ROW LEVEL SECURITY;
+CREATE POLICY vqd_form_admin ON victor_quality_daily FOR ALL TO form_admin USING (true);
+CREATE POLICY vqd_tenant_read ON victor_quality_daily FOR SELECT TO tenant_admin
+  USING (tenant_id = current_setting('app.tenant_id')::UUID);
+
+-- pg_cron job: daily aggregation at 04:00 UTC
+-- SELECT cron.schedule('victor-quality-daily', '0 4 * * *', $$
+--   INSERT INTO victor_quality_daily (date, metric, value, prompt_version, sample_size)
+--   SELECT
+--     CURRENT_DATE - 1,
+--     'adherence',
+--     ROUND(COUNT(*) FILTER (WHERE followed_plan) / NULLIF(COUNT(*), 0)::NUMERIC, 4),
+--     victor_prompt_version,
+--     COUNT(*)
+--   FROM coaching_plan_adherence_view   -- view joins training_plan_weeks × workout_logs
+--   WHERE plan_date = CURRENT_DATE - 1
+--   GROUP BY victor_prompt_version
+--   ON CONFLICT DO NOTHING;
+-- $$);
+
+-- Retention: 24 months (GDPR Art. 5(1)(e) storage limitation — aggregate only, no personal data)
+-- pg_cron hard-delete at 03:30 UTC: DELETE FROM victor_quality_daily WHERE date < now() - INTERVAL '24 months';
+```
+
+**Privacy note:** `victor_quality_daily` contains no user identifiers. `sample_size` must be ≥ 5 before the row is written — rows with `sample_size < 5` are suppressed (k-anonymity floor). This prevents micro-cohort reconstruction at the tenant + prompt_version level for small enterprise tenants.
+
+---
+
+### 22.10 SOC 2 Evidence Mapping
+
+| Control | Criterion | Evidence artefact | Owner |
+|---|---|---|---|
+| Victor quality monitoring exists | CC7.2 — System operation monitoring | §22 policy document (this section) | ml-engineer |
+| Prompt version regression detection | CC7.4 — Evaluation of processing activities | AL-COACH-04 alert rule + `victor_ab_results` table | ml-engineer |
+| Ethical coaching boundary enforcement | CC1.2 — Commitment to integrity and ethical values | AL-COACH-05 (jailbreak CI gate) + R-10 escalation path | clinical-safety |
+| Clinical safety escalation path documented | CC5.2 — Control activities for risk mitigation | §22.5 clinical safety signals + R-10 cross-reference | clinical-safety |
+| No coaching content in observability data | C1.1 — Confidential information protected | §22.1 privacy constraint statement + §22.9 RLS policy | platform-engineer |
+
+**Evidence artefacts:**
+- `compliance/evidence/victor-quality/YYYY-MM-quality-report.md` — monthly quality metric summary (exported from Metabase §22.8), retained 24 months.
+- `compliance/evidence/victor-ab/` — one directory per A/B test with `victor_ab_results` export and statistical analysis. Retained 36 months.
+- `compliance/evidence/victor-jailbreak/` — monthly CI jailbreak test run logs. Retained 24 months.
+
+---
+
+### 22.11 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Add `victor_prompt_version` and `prompt_ab_bucket` columns to `coaching_turns` if not present; add `idx_coaching_turns_prompt_version` index | platform-engineer | **P0** | M3 |
+| Create `victor_quality_daily` table with RLS policies per §22.9 | platform-engineer | **P0** | M3 |
+| Create `coaching_plan_adherence_view` (joins `training_plan_weeks` × `workout_logs`) as computation base for adherence metric | platform-engineer | **P0** | M3 |
+| Write pg_cron jobs for all 8 metrics in §22.2; validate k-anonymity suppression (sample_size < 5 → skip row) | platform-engineer | **P0** | M3 |
+| Configure Better Stack alert rules AL-COACH-01 through AL-COACH-06 with correct dedup keys and suppression window | devops-lead | **P0** | M3 |
+| Implement `victor_jailbreak_tests` CI job (prompt injection, ED-adjacent content detection, harm refusal validation); wire to AL-COACH-05 | ml-engineer + security-engineer | **P0** | M3 |
+| Create `victor_ab_results` table; wire A/B bucket assignment to Cloudflare Workers random split (tenant-locked within session) | platform-engineer | **P1** | M4 |
+| Build Metabase "Victor Coaching Quality" dashboard with 8 panels per §22.8; restrict access to founder + ml-engineer + clinical-safety | data-engineer | **P1** | M4 |
+| Define `victor_quality_daily` k-anonymity suppression test in `__tests__/db/rls_isolation.test.ts` | platform-engineer | **P0** | M3 |
+| Implement monthly quality report export to `compliance/evidence/victor-quality/` via Metabase API (pg_cron or scheduled Worker) | devops-lead | **P1** | M4 |
+| Register DEC-030 events: `victor.ab_test_started`, `victor.ab_test_concluded`, `victor.prompt_version_promoted`, `victor.prompt_version_rolled_back` | platform-engineer | **P0** | M3 |
+| Re-baseline QA-COACH-SLO-01 through SLO-06 after 30 days of beta data (M6) | ml-engineer | **P1** | M6 |
+
+---
+
 *v0.8 additions: §21 ClickHouse Analytics Observability (M9) — closes the documented gap from §10 ("ClickHouse for analytics — observability strategy not yet designed"); migration trigger thresholds (PostHog cost > $2k/month P0, analytics query P95 > 10s P0, MAU ≥ 200k advisory, 30+ enterprise tenants advisory); ClickHouse Cloud architecture (EU-Central, SOC 2 certified, GDPR DPA); RED metrics table for ClickHouse itself (rate/errors/duration/ingest lag/queue/storage/memory); eight alerting rules AL-CH-01 through AL-CH-09 with severity and PagerDuty routing; OpenTelemetry Collector topology (Fly.io EU) with PII filter processor deleting user_id and ai prompt/response content before ClickHouse; `traces` MergeTree table DDL with promoted materialized columns for tenant_id, route, http_status, ai tokens; product `events` table DDL with BLOCKED_PROPERTY_KEYS deny-list enforcing no health values at ingest; `sessions` ReplacingMergeTree table; six analytics SLOs (CH-SLO-01 through CH-SLO-06) with error budget burn rate thresholds; per-tenant Row Policies in ClickHouse (least-privilege; cross-tenant queries require break-glass and are DEC-030 logged); three-phase PostHog migration runbook (parallel ingest → historical export → cutover) with rollback trigger; PostHog data deletion after migration (GDPR Art. 5(1)(e) storage limitation compliance); privacy constraints matrix (six constraints, enforcement locations documented); nightly PII scan (AL-CH-09, P0); SOC 2 CC7.2/CC6.1/CC6.2/C1.2/PI1.2/A1.1/CC9.2 evidence mapping; six auditor evidence artefact files; sixteen-item implementation checklist across M7 prep and M9 sprint.*
+
+*v0.9 additions: §22 AI Coaching Quality Observability — closes the gap between operational observability (§3/§4.5 — tokens, latency) and quality observability (is Victor coaching well?); privacy-first design established (GDPR Art. 9 constraint — no coaching content in any observability signal; all metrics are behavioral proxies computed at session or weekly cohort level); ten-metric quality proxy taxonomy: plan adherence rate, session depth (turns), session abandonment rate, post-coaching workout start rate, workout completion rate (post-coaching), retry rate within session, plan regeneration rate, explicit negative feedback rate (thumbs-down), no-engagement rate (7d), streak grace trigger rate — all computed via pg_cron `victor_quality_daily` table with k-anonymity floor (sample_size ≥ 5); prompt version tracking: `victor_prompt_version` and `prompt_ab_bucket` columns on `coaching_turns`, 14-day baseline window for regression detection; six QA-COACH-SLOs covering adherence (≥ 65%), abandonment (≤ 30%), post-coaching start (≥ 40%), negative feedback (≤ 8%), plan regen (≤ 15%/user/week), no-engagement (≤ 40%); five clinical safety monitoring signals (session duration spike, retry spike, no-action spike, negative feedback P0 at 25%, explicit harm report) with clinical-safety VETO authority path via R-10; six alerting rules AL-COACH-01 through AL-COACH-06 with 72h suppression window after prompt deploys; A/B testing observability framework: `prompt_ab_bucket` tenant-locked random split, 14-day / 500-session minimum test duration, two-proportion z-test (α = 0.05), `victor_ab_results` table DDL with concluded_by field; four DEC-030 HMAC-chained audit events for prompt lifecycle (ab_test_started, ab_test_concluded, prompt_version_promoted, prompt_version_rolled_back); Metabase "Victor Coaching Quality" dashboard spec: 8 panels (adherence trend, abandonment trend, post-coaching start, negative feedback with P0 threshold, quality-by-version grouped bar, active A/B test status, no-engagement area chart, streak grace line); `victor_quality_daily` table DDL with UNIQUE constraint, RLS (founder + ml-engineer + clinical-safety full access; tenant_admin scoped to own tenant_id; form_system write), 24-month retention pg_cron cleanup; SOC 2 evidence mapping: CC7.2 (quality monitoring), CC7.4 (prompt regression detection via victor_ab_results), CC1.2 (jailbreak CI gate AL-COACH-05), CC5.2 (clinical safety escalation path), C1.1 (no coaching content in observability — RLS policy evidence); twelve-item implementation checklist across M3/M4/M6.*

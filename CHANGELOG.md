@@ -6,6 +6,17 @@
 
 ---
 
+## [1.12.0] — 2026-05-24
+
+### Added
+- [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) §22 — AI Coaching Quality Observability (doc bumped v0.8 → v0.9): closes the gap between operational observability (§3/§4.5 — tokens, latency) and quality observability (is Victor coaching well?). Privacy-first design: GDPR Art. 9 constraint enforced — no coaching content in any observability signal; all metrics are behavioral proxies computed at session or weekly cohort level via pg_cron. Ten-metric quality proxy taxonomy: plan adherence rate, session depth (turns), session abandonment rate, post-coaching workout start rate, workout completion rate (post-coaching), retry rate within session, plan regeneration rate, explicit negative feedback (thumbs-down), no-engagement rate (7d), streak grace trigger rate — all computed in `victor_quality_daily` table with k-anonymity floor (sample_size ≥ 5 before row is written). Prompt version tracking: `victor_prompt_version` + `prompt_ab_bucket` columns on `coaching_turns`; 14-day baseline window for regression detection. Six QA-COACH-SLOs: plan adherence ≥ 65%, session abandonment ≤ 30%, post-coaching workout start ≥ 40%, explicit negative feedback ≤ 8%, plan regen ≤ 15%/user/week, no-engagement ≤ 40%. Five clinical safety monitoring signals (session duration spike, retry spike, no-action spike, thumbs-down P0 at 25%, explicit harm report) with clinical-safety VETO authority path via INCIDENT_RESPONSE.md R-10. Six alerting rules AL-COACH-01 through AL-COACH-06 with 72h suppression window after prompt deploys (prevents small-sample false positives). A/B testing observability: `prompt_ab_bucket` tenant-locked random split, 14-day / 500-session minimum, two-proportion z-test α=0.05, `victor_ab_results` table DDL. Four DEC-030 HMAC-chained events for prompt lifecycle. Metabase "Victor Coaching Quality" dashboard spec (8 panels). `victor_quality_daily` DDL with UNIQUE constraint + RLS (founder + ml-engineer + clinical-safety; tenant_admin scoped; form_system write) + 24-month retention cleanup. SOC 2 mapping: CC7.2 (quality monitoring), CC7.4 (prompt regression via victor_ab_results), CC1.2 (jailbreak CI gate AL-COACH-05), CC5.2 (clinical safety escalation), C1.1 (no coaching content in observability). Twelve-item implementation checklist across M3/M4/M6.
+
+### Changed
+- `docs/OBSERVABILITY.md` header — v0.8 → v0.9
+- `VERSION` → 1.12.0
+
+---
+
 ## [1.11.0] — 2026-05-24
 
 ### Added
