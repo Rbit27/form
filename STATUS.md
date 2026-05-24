@@ -200,6 +200,9 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-111-post-activation-potentiation.md | Blog | draft · clinical-safety PASS |
 | post-112-rpe-vs-percentage-autoregulation.md | Blog | draft · clinical-safety PASS |
 | post-113-eccentric-overload.md | Blog | draft · clinical-safety PASS |
+| post-114-training-volume-hypertrophy.md | Blog | draft · clinical-safety PASS |
+| post-115-training-frequency-hypertrophy.md | Blog | draft · clinical-safety PASS |
+| post-116-hypertrophy-responder-variability.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

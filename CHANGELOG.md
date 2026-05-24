@@ -6,6 +6,18 @@
 
 ---
 
+## [1.12.5] — 2026-05-24
+
+### Added
+- [`content/post-116-hypertrophy-responder-variability.md`](content/post-116-hypertrophy-responder-variability.md) — «Варіативність гіпертрофічної відповіді: чому одна програма дає різні результати». Hubal et al. (2005) — 585 учасників, розкид CSA 0–+59% і сили 0–+250% при однаковому протоколі; Bamman et al. (2007) кластерний аналіз: extreme responders (~26%), moderate (~51%), non-responders (~23%); Petrella et al. (2008) — базальний рівень сателітних клітин передбачає гіпертрофічну відповідь; генетика: ACTN3 R577X і волокна Type II, міостатин як негативний регулятор (Schuelke 2004), полігенна природа потенціалу; Wakahara et al. (2013) — регіональна неоднорідна гіпертрофія; Churchward-Venne et al. (2015) — non-responders на низькому обсязі стають responders при вищому; успадковуваність 50–80% (HERITAGE Family Study); практичні наслідки: горизонт оцінки 12–16 тижнів, обсяг до MEV/MAV порогу, сила ≠ гіпертрофія. clinical_safety: PASS (виключно тренувальна фізіологія і генетика).
+- `blog.html` — картка Post 116 (data-cat="science").
+- `STATUS.md` — рядки post-114, post-115, post-116 у content engine table.
+
+### Changed
+- `VERSION` → 1.12.5
+
+---
+
 ## [1.12.4] — 2026-05-24
 
 ### Added

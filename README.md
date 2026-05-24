@@ -439,6 +439,9 @@ Each iteration:
 - [x] post-95: Пікова сила vs силова витривалість — дві різні нейром'язові цілі; чому training for both одночасно може давати interference effect; блокова логіка для аматорів з обмеженим часом; clinical-safety PASS
 - [x] post-96: Warming up vs activation — різниця між підвищенням температури тканин (ефективний warmup) і «активацією» (нейром'язовий праймінг); що реально робить PAP і для кого він релевантний; Fradkin et al. (2010) огляд; clinical-safety PASS
 
+- [x] post-114: Обсяг тренувань і гіпертрофія — Krieger (2010) мета-аналіз multiple vs single sets; Schoenfeld/Ogborn/Krieger (2017) доза-відповідь (10+ сетів/м'яз/тиждень); Radaelli et al. (2015) 6-місячне RCT (5 > 3 > 1 сет); MEV/MAV/MRV операційна модель (Israetel); ознаки перевищення MRV; зворотній зв'язок інтенсивності і обсягу; clinical-safety PASS
+- [x] post-115: Частота тренувань і гіпертрофія — Schoenfeld/Ogborn/Krieger (2016) 2x > 1x (ES 0.37 vs 0.14, обсяг неурівняний); Ralston et al. (2017) при рівному обсязі ефект частоти зникає; McLester et al. (2000) деградація якості пізніх сетів; Colquhoun et al. (2018) 6x = 3x; вікно MPS ~24–48h; частота як механізм розподілу обсягу; clinical-safety PASS
+- [x] post-116: Варіативність гіпертрофічної відповіді — Hubal et al. (2005) 585 учасників: CSA 0–+59%, сила 0–+250% при однаковому протоколі; Bamman et al. (2007) кластери: ~26% extreme responders, ~23% non-responders; Petrella et al. (2008) базальний рівень satellite cells як передбачник; ACTN3 R577X і Type II волокна; міостатин (Schuelke 2004); Churchward-Venne et al. (2015) non-responders на низькому обсязі → responders при вищому; clinical-safety PASS
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
 ---
