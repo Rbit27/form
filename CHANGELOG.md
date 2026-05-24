@@ -6,6 +6,17 @@
 
 ---
 
+## [1.9.20] — 2026-05-24
+
+### Added
+- `content/post-101-sleep-recovery-mechanisms.md` — sleep physiology for strength athletes: GH pulsatile secretion (70% during SWS via Veldhuis & Bowers 2010), GH → IGF-1 → PI3K/Akt/mTORC1 signaling cascade, Leproult & Van Cauter (2011) JAMA: 1-week 5h sleep → −10–15% daytime testosterone; cortisol elevation via HPA axis → ubiquitin-proteasome activation + mTORC1 suppression; evidence-graded sleep hygiene table (Level A/B/C: circadian entrainment, darkness, 16–19°C temperature, caffeine cutoff, alcohol SWS fragmentation, pre-sleep training cutoff); "one bad night" section preventing anxiety framing using Van Dongen et al. 2003 cumulative debt data; FORM wearable proxy signals (HRV rMSSD trend, RPE anomaly detection, sleep duration not sleep stages from consumer devices); clinical-safety PASS
+- `content/post-102-heat-cold-training-performance.md` — temperature as performance modifier: Q10 enzymatic kinetics (10°C drop → 2× slower reactions), cross-bridge cycling temperature dependence; heat mechanisms — CNS fatigue acceleration above 38°C core temp (Nielsen et al. 1993) + cardiovascular output competition; Jensen (2013) strength reduction in heat; cold mechanisms — Bergh & Ekblom (1979): 30°C vs 39°C → ~30% peak power reduction; increased muscle viscosity + injury risk (McGovern 2009); temperature × strength output table (optimal 15–25°C); warm-up duration table by ambient temperature (8–25+ min); heat adaptation (Périard et al. 2015: 10–14 days → plasma volume expansion); FORM RPE vs temperature load correction; no hyperthermia/hypothermia triggers; clinical-safety PASS
+- `blog.html` — cards for post-101 (sleep/recovery mechanisms) and post-102 (heat/cold performance modifiers) added before empty-state
+- `README.md` — post-102 marked [x] complete
+- `VERSION` → 1.9.20
+
+---
+
 ## [1.9.19] — 2026-05-24
 
 ### Changed
