@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v0.5
+# FORM · Observability & Monitoring Taxonomy v0.7
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -3061,3 +3061,373 @@ COMMENT ON MATERIALIZED VIEW slo_budget_weekly IS
 ---
 
 *v0.6 additions: §19 SLO Error Budget Management — error budget concept formalised with per-SLO budget tables covering 8 platform SLOs, 8 CV pipeline SLOs, and 12 synthetic probes; Google SRE-style two-window burn rate alerting (fast burn 14.4× / 1 hour → P0, slow burn 6.0× / 6 hours → P1) with concrete Postgres queries and PagerDuty deduplication rules; graduated deploy-freeze policy (Green/Yellow/Orange/Red/Critical) enforced via GitHub Actions gate with override audit trail; `slo_budget_tracking` Postgres schema with generated `budget_consumed_pct` column, burn rate columns, RLS policies, and 90-day retention cleanup; `slo_budget_weekly` materialized view with Monday 06:00 UTC pg_cron refresh; Metabase "SLO Error Budget Dashboard" spec (6 panels: budget gauges, burn rate trend, top-5 consumers, 30-day rolling view, enterprise tenant breakdown, budget-exhaustion audit trail); SOC 2 CC4.1/CC7.2/A1.1/A1.2/CC5.2 evidence mapping with compliance artefact export paths; thirteen-item implementation checklist across M3/M4.*
+
+---
+
+## 20. Wearable Data Integration Observability
+
+> Owner: platform-engineer + devops-lead. References: `docs/DATA_MODEL.md §14`, `docs/INCIDENT_RESPONSE.md R-10`, `docs/SOC2_READINESS.md §35.6.3`, `docs/GDPR_DPIA.md`, DEC-030.
+
+**Scope:** HealthKit (iOS), Health Connect (Android), Whoop, Oura Ring, Garmin — all five wearable sources defined in `DATA_MODEL.md §14.1`.
+
+**Why wearable observability is different:** A coaching API failure is immediately visible — the user gets an error screen. A wearable sync failure is a *silent failure*: Victor continues responding, but his readiness assessments silently degrade because HRV and sleep data are stale. The user has no indication anything is wrong. This makes freshness monitoring for wearable data a higher-priority concern than availability monitoring for most other services — a stale-but-responsive system is often worse than an honest error.
+
+**Privacy boundary:** All signals in this section operate at aggregate or per-device operational metadata granularity only. The `wearable_sync_health` table (§20.6) stores sync *outcomes* — timestamps, failure counts, error codes — not health *values*. No HRV readings, recovery scores, sleep durations, or any other `wearable_readings.value_numeric` content is present in any observability signal, dashboard, or alert payload. This is a hard constraint aligned with GDPR Art. 9 and the analytics restriction matrix in `DATA_MODEL.md §14.10`.
+
+---
+
+### 20.1 RED Metrics Per Provider
+
+One row per wearable source. Rate = successful syncs per time window. Errors = sync failures or stale connections. Duration = sync latency (background syncs are asynchronous; latency here means time from cron trigger to DB write completion).
+
+| Source | Rate (R) | Errors (E) | Duration (D) |
+|---|---|---|---|
+| **HealthKit (iOS)** | `wearable_sync_success_total{source="healthkit"}` events/hour | `wearable_sync_failures_total{source="healthkit"}` / total syncs | P95 of background-delivery-to-db-write latency (target < 10 s) |
+| **Health Connect (Android)** | `wearable_sync_success_total{source="health_connect"}` events/hour | `wearable_sync_failures_total{source="health_connect"}` / total syncs | P95 of WorkManager job completion time (target < 60 s; includes 15-min OS minimum delay) |
+| **Whoop** | `wearable_sync_success_total{source="whoop"}` per cron run | `wearable_sync_failures_total{source="whoop"}` + `wearable_sync_rate_limited_total{source="whoop"}` | Cron run wall-clock time P95 (target < 120 s per run across all active Whoop users) |
+| **Oura** | `wearable_sync_success_total{source="oura"}` per cron run | `wearable_sync_failures_total{source="oura"}` | Cron run wall-clock time P95 (target < 90 s) |
+| **Garmin** | `wearable_sync_success_total{source="garmin"}` per cron run | `wearable_sync_failures_total{source="garmin"}` + `wearable_sync_quota_exceeded_total{source="garmin"}` | Cron run wall-clock time P95 (target < 90 s) |
+| **Token refresh (Whoop/Oura/Garmin)** | `wearable_token_refresh_success_total` per 2h cron | `wearable_token_refresh_failures_total` by source | P95 token refresh round-trip latency (target < 5 s) |
+
+All counters are emitted from the sync Cloudflare Worker via Workers Analytics Engine and stored in the `wearable_sync_health` table (§20.6). Source label values match the `wearable_readings.source` CHECK constraint in `DATA_MODEL.md §14.2`.
+
+---
+
+### 20.2 Wearable Data Freshness SLOs
+
+Freshness is the primary health signal for wearable integrations. "Stale" means the coaching context builder is operating on data older than the staleness threshold, producing readiness assessments that may no longer reflect the user's actual recovery state.
+
+**Eligibility filter:** SLOs apply only to *active, wearable-connected users* — users who: (a) have at least one non-revoked `wearable_oauth_tokens` row (or active HealthKit/Health Connect permission) for the source, and (b) have logged at least one coaching session in the prior 7 days. Users who have disconnected a source or been inactive for >7 days are excluded from freshness SLO calculation.
+
+| SLO ID | SLI | SLO Target | Alerting Threshold | Window | Owner |
+|---|---|---|---|---|---|
+| **WEAR-SLO-01** | % of active HealthKit-connected users with a `wearable_readings` row for any `reading_type` with `recorded_at` within 25 hours | ≥ 95% | < 88% in 4-hour window | Rolling 7 days | platform-engineer |
+| **WEAR-SLO-02** | % of active Health Connect-connected users with a reading within 26 hours | ≥ 90% | < 80% in 4-hour window | Rolling 7 days | platform-engineer |
+| **WEAR-SLO-03** | % of active Whoop-connected users with a reading within 26 hours | ≥ 92% | < 82% in 4-hour window | Rolling 7 days | platform-engineer |
+| **WEAR-SLO-04** | % of active Oura-connected users with a reading within 26 hours | ≥ 92% | < 82% in 4-hour window | Rolling 7 days | platform-engineer |
+| **WEAR-SLO-05** | % of active Garmin-connected users with a reading within 26 hours | ≥ 88% | < 75% in 4-hour window | Rolling 7 days | platform-engineer |
+| **WEAR-SLO-06** | % of active third-party OAuth tokens (Whoop/Oura/Garmin) that are valid — `expires_at IS NULL OR expires_at > NOW() + INTERVAL '1 hour'` and `revoked_at IS NULL` | ≥ 99.5% | < 98% in 1-hour window | Rolling 7 days | platform-engineer |
+| **WEAR-SLO-07** | % of scheduled wearable sync cron runs that complete without terminal error within the expected window (Whoop/Oura/Garmin cron: every 2 hours ± 10 min) | ≥ 99% | < 97% in 24-hour window | Rolling 7 days | devops-lead |
+| **WEAR-SLO-08** | % of multi-source users (≥ 2 active wearable sources) where the HRV normalization layer produces a valid, non-null `hrv_trend_label` from `tenant_wearable_summary` (DATA_MODEL.md §14.4) | ≥ 98% | < 94% in 12-hour window | Rolling 7 days | platform-engineer |
+
+**Health Connect target is lower (90%) than HealthKit (95%)** because the Android OS enforces a 15-minute minimum WorkManager interval. A user who does not open the app may experience up to ~30-minute sync lag on top of data publication delay. This is an OS-imposed constraint, not a FORM failure. Victor's response templates explicitly account for this ("based on your most recent available data").
+
+**Garmin target is lowest (88%)** because Garmin's 500 requests/day per-user limit creates an inherent staleness risk at the 2-hour cron cadence if the user has multiple wearable data types to fetch. The Garmin integration is enterprise-only, and its 26-hour freshness window is aligned to the daily summary data granularity of the Garmin Health API.
+
+---
+
+### 20.3 OAuth Token Health Monitoring
+
+Only Whoop, Oura, and Garmin use OAuth tokens (see `DATA_MODEL.md §14.8`). HealthKit and Health Connect use on-device OS permissions — they have no server-side token to monitor.
+
+**Token state machine observable via `wearable_oauth_tokens`:**
+
+| State | Condition | Observable signal | Action |
+|---|---|---|---|
+| Healthy | `revoked_at IS NULL` AND (`expires_at IS NULL` OR `expires_at > NOW() + 24h`) | Normal sync | None |
+| Expiry-approaching | `revoked_at IS NULL` AND `expires_at BETWEEN NOW() AND NOW() + 24h` | `wearable_token_expiry_approaching_total` counter | AL-WEAR-05 P2 alert; refresh worker must run |
+| Expired | `revoked_at IS NULL` AND `expires_at < NOW()` | `wearable_token_expired_total` counter | AL-WEAR-04: user session sync will fail; requires re-authentication |
+| Refresh-failed | `last_refreshed_at` not updated in >3h despite valid token | `wearable_token_refresh_failures_total{source=X}` | AL-WEAR-04 P1 alert |
+| Revoked-by-user | `revoked_at IS NOT NULL` | Not an error state | Excluded from SLO calculation; source shown as disconnected in UI |
+
+**Refresh worker guarantees:** The Cloudflare Worker cron that refreshes tokens (2-hour cadence per `DATA_MODEL.md §14.9.3`) must complete before `expires_at`. Most sources issue tokens with 6–24h expiry windows. The refresh worker targets updating tokens when `expires_at < NOW() + 4h` — providing a 2-cron-run buffer. If the refresh fails twice consecutively (`consecutive_refresh_failures ≥ 2`), the token is flagged in `wearable_sync_health.sync_status = 'refresh_failed'` and AL-WEAR-04 fires.
+
+---
+
+### 20.4 Sync Architecture Health Signals
+
+Each sync mechanism requires distinct health checks:
+
+**HealthKit background delivery:**
+- Observable via: `wearable_sync_health.last_sync_attempted_at` — if iOS background delivery is functioning, this timestamp advances at least once per 25 hours for active users.
+- Failure mode: HealthKit Background Delivery registration can silently expire after OS updates. Detection: `last_sync_attempted_at > NOW() - INTERVAL '25 hours'` is FALSE for > 5% of active iOS users.
+- No server-side polling is available to diagnose iOS permission state — FORM relies on the absence of syncs as the primary failure signal. A freshness alert (AL-WEAR-01) is the only detection mechanism for this failure mode.
+
+**Health Connect WorkManager:**
+- Observable via: sync timestamps and `wearable_sync_failures_total{source="health_connect", error_code="permission_denied"}` counter.
+- Failure mode: Android 14+ may revoke Health Connect permissions without user action in response to app backgrounding policy changes. Detection: `error_code="permission_denied"` counter increasing.
+- Recovery: user must re-grant permissions in-app. Push notification template: "Your Android Health data connection needs attention — tap to restore."
+
+**Third-party API crons (Whoop / Oura / Garmin):**
+- Observable via: cron run completion timestamps in `wearable_sync_health`, cron-level error rates, and per-source `sync_status` field.
+- Failure modes:
+  - API upstream outage: all users of that source fail simultaneously; error rate spikes cross-source. Indicator: `wearable_sync_failures_total{source="whoop"}` rises sharply across many users in a single cron run.
+  - Rate limit exhaustion: Whoop (100 req/min), Garmin (500/day per user). Indicator: `wearable_sync_rate_limited_total` and/or `wearable_sync_quota_exceeded_total`.
+  - OAuth token expiry: individual user failure, not fleet-wide. Indicator: `error_code="auth_failure"` on a subset of users.
+- Cron-run heartbeat: each cron invocation emits `wearable_cron_heartbeat{source="whoop"|"oura"|"garmin", status="started"|"completed"|"failed"}` to the Workers Analytics Engine. The absence of a heartbeat for > 3 hours (missed 1.5 expected runs) triggers AL-WEAR-07.
+
+---
+
+### 20.5 HRV Normalization Quality Monitoring
+
+Victor's readiness module normalises HRV values from heterogeneous sources into a single per-user trend using the priority ordering in `DATA_MODEL.md §14.5` (HealthKit > Health Connect > Oura > Whoop > Garmin-categorical-only). The observability concern here is not the HRV *value* — it is whether the normalization pipeline produces a *valid trend output*.
+
+**What to monitor:**
+- `tenant_wearable_summary` materialized view (from `DATA_MODEL.md §14.4`) refreshes daily at 04:00 UTC. If the refresh job fails or produces NULL `hrv_trend_label` values for eligible users, WEAR-SLO-08 degrades.
+- The `pg_cron` job that refreshes `tenant_wearable_summary` emits a DEC-030 audit event `analytics.materialized_view_refreshed{view="tenant_wearable_summary"}` with a row count. If the row count drops by > 20% vs. the prior day with no corresponding user churn, it signals a normalization pipeline failure.
+
+**What NOT to monitor:** The numeric HRV distribution across users. Aggregate HRV statistics are GDPR Art. 9 data — they must not appear in any operational dashboard. The observable is *pipeline output validity* (was a trend label produced? yes/no), never the trend label values themselves or any derived statistics.
+
+---
+
+### 20.6 Database Schema: `wearable_sync_health`
+
+This table stores operational metadata about wearable sync state. It contains **no health data values** — only timestamps, failure counts, and status codes. Classification: **INTERNAL** (not SENSITIVE — no health data present).
+
+```sql
+-- Operational sync health tracking per user per source.
+-- CLASSIFICATION: INTERNAL — timestamps and error codes only; no health values.
+-- Retention: rolling 90 days (pg_cron cleanup; beyond that, aggregate to wearable_sync_weekly).
+-- Privacy note: no GROUP BY user_id in fleet queries — use tenant-level aggregates (§20.8).
+CREATE TABLE wearable_sync_health (
+  id                          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id                     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id                   UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+
+  source                      TEXT        NOT NULL
+                                CHECK (source IN (
+                                  'healthkit',
+                                  'health_connect',
+                                  'whoop',
+                                  'oura',
+                                  'garmin'
+                                )),
+
+  -- When the sync worker last attempted a sync for this user+source (any outcome).
+  last_sync_attempted_at      TIMESTAMPTZ,
+
+  -- When the last sync produced at least one new row in wearable_readings.
+  last_sync_succeeded_at      TIMESTAMPTZ,
+
+  -- The recorded_at timestamp of the most recent wearable_readings row for this user+source.
+  -- Derived from: MAX(recorded_at) WHERE user_id=? AND source=? AND deleted_at IS NULL.
+  -- Updated on each successful sync. Used for freshness SLO calculation (§20.2).
+  last_reading_recorded_at    TIMESTAMPTZ,
+
+  -- Count of consecutive sync failures (reset to 0 on any success).
+  consecutive_sync_failures   SMALLINT    NOT NULL DEFAULT 0,
+
+  -- Total sync failures in the rolling 7-day window.
+  failures_7d                 SMALLINT    NOT NULL DEFAULT 0,
+
+  -- Sync disposition for this source.
+  -- 'ok'              — last sync succeeded, freshness within SLO
+  -- 'stale'           — last sync succeeded but last_reading_recorded_at outside freshness window
+  -- 'sync_failed'     — last N consecutive syncs failed (N >= 2)
+  -- 'refresh_failed'  — OAuth token refresh failed (Whoop/Oura/Garmin only)
+  -- 'token_expired'   — OAuth token is past expires_at with no valid refresh
+  -- 'permission_lost' — OS permission check returned denied (HC/HealthKit)
+  -- 'quota_exceeded'  — API rate limit or daily quota exhausted (Garmin)
+  -- 'disabled'        — user explicitly disconnected source (revoked_at IS NOT NULL)
+  sync_status                 TEXT        NOT NULL DEFAULT 'ok'
+                                CHECK (sync_status IN (
+                                  'ok', 'stale', 'sync_failed', 'refresh_failed',
+                                  'token_expired', 'permission_lost', 'quota_exceeded',
+                                  'disabled'
+                                )),
+
+  -- Last error code from the sync worker (e.g. 'auth_failure', 'rate_limited',
+  -- 'upstream_5xx', 'network_timeout', 'permission_denied', 'no_new_data').
+  -- 'no_new_data' is NOT a failure — source produced no readings since last sync.
+  error_code_last             TEXT,
+
+  -- Timestamp of last OAuth token refresh (Whoop/Oura/Garmin only; NULL for HealthKit/HC).
+  last_token_refreshed_at     TIMESTAMPTZ,
+
+  -- Count of consecutive token refresh failures (reset on successful refresh).
+  consecutive_refresh_failures SMALLINT   NOT NULL DEFAULT 0,
+
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- One row per user per source. Upserted by sync worker on every run.
+  UNIQUE (user_id, source)
+);
+
+ALTER TABLE wearable_sync_health ENABLE ROW LEVEL SECURITY;
+
+-- Sync worker (form_system) reads and writes all rows.
+CREATE POLICY wearable_sync_health_system ON wearable_sync_health
+  AS PERMISSIVE FOR ALL
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- Users may read their own sync status (surfaced in Settings → Integrations).
+CREATE POLICY wearable_sync_health_user_read ON wearable_sync_health
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND user_id = current_setting('app.current_user_id', TRUE)::UUID
+  );
+
+-- Tenant admin role: NO SELECT policy on this table.
+-- Admin dashboard wearable health is exposed only via wearable_fleet_health VIEW (§20.8).
+-- Absence of permissive policy = zero rows (fail-closed per §3.1).
+
+CREATE INDEX idx_wearable_sync_health_tenant_source
+  ON wearable_sync_health (tenant_id, source, sync_status);
+
+CREATE INDEX idx_wearable_sync_health_stale
+  ON wearable_sync_health (tenant_id, source, last_reading_recorded_at)
+  WHERE sync_status IN ('stale', 'sync_failed', 'token_expired');
+```
+
+**Upsert pattern:** The sync Worker issues an `INSERT ... ON CONFLICT (user_id, source) DO UPDATE` after every sync attempt. The upsert sets `last_sync_attempted_at = NOW()`, conditionally updates `last_sync_succeeded_at` and `last_reading_recorded_at` on success, increments `consecutive_sync_failures` on failure, and resets it to 0 on success. The `sync_status` label is computed by the Worker from the current field values before writing, not derived by Postgres.
+
+---
+
+### 20.7 Alerting Rules
+
+Alert names follow the `AL-WEAR-XX` taxonomy. All rules run against the `wearable_sync_health` table and Workers Analytics Engine counters.
+
+| Rule ID | Signal | Threshold | Severity | Destination | Notes |
+|---|---|---|---|---|---|
+| **AL-WEAR-01** | % of active HealthKit-connected users with `sync_status IN ('sync_failed', 'stale')` in 4h window | > 12% | P1 | PagerDuty | Indicates iOS OS-level issue or HealthKit API change; fleet-wide |
+| **AL-WEAR-02** | % of active Health Connect-connected users with `sync_status IN ('sync_failed', 'permission_lost')` in 4h window | > 18% | P1 | PagerDuty | Higher threshold due to WorkManager OS constraints; permission_lost = Android policy change |
+| **AL-WEAR-03** | `wearable_sync_failures_total{source="whoop"|"oura"|"garmin"}` rate in a single cron run / total users for that source | > 20% | P1 | PagerDuty | Third-party upstream outage; check source status page before escalating |
+| **AL-WEAR-04** | `consecutive_refresh_failures >= 2` across > 5% of active Whoop/Oura/Garmin-connected users | — | P1 | PagerDuty | Token refresh systemic failure; check KMS key availability and source OAuth endpoints |
+| **AL-WEAR-05** | `wearable_token_expiry_approaching_total` — tokens expiring within 4 hours where `consecutive_refresh_failures >= 1` | > 0 | P2 | Slack `#platform-alerts` | Individual token expiry after one failed refresh; refresh worker should self-heal on next run |
+| **AL-WEAR-06** | `wearable_sync_quota_exceeded_total{source="garmin"}` exceeds 80% of the 500/day per-user limit in the first 18 hours of the UTC day | — | P2 | Slack `#platform-alerts` | Garmin quota risk; cron may fail for high-activity users in the final 6h window |
+| **AL-WEAR-07** | Wearable cron heartbeat absent: no `wearable_cron_heartbeat{source=X, status="completed"}` in > 3h (1.5× expected 2h interval) | — | P1 | PagerDuty | Cron missed two runs; check Worker cron trigger in Cloudflare dashboard; dedup key: `wearable-cron-missed-{source}` |
+| **AL-WEAR-08** | Per-enterprise-tenant wearable stale rate: > 30% of active wearable-connected users within a tenant have `sync_status = 'stale'` AND `last_reading_recorded_at < NOW() - INTERVAL '48 hours'` | — | P2 | Slack `#csm-alerts` | CSM-facing alert; tenant SLA may be at risk; dedup key: `wearable-stale-tenant-{tenant_id}` |
+
+**Alert deduplication keys** use the same `dedup_key` pattern as §6 and §18 — PagerDuty suppresses re-alerts on the same key until the incident is resolved. AL-WEAR-07 and AL-WEAR-08 are routed to their respective channels with a 15-minute dedup window.
+
+**AL-WEAR-08 privacy gate:** The alert payload for Slack `#csm-alerts` includes only: `tenant_name`, `source`, `stale_user_pct`, `stale_48h_user_count`. It must NOT include any individual `user_id` values or any wearable reading metadata. The Slack Worker that formats this alert must enforce this stripping in its serializer.
+
+---
+
+### 20.8 Enterprise Per-Tenant Wearable Fleet View
+
+Enterprise HR and People Ops admins may access aggregate wearable adoption and sync health statistics via the admin dashboard. The privacy floor defined in `DATA_MODEL.md §14.4` (tenant admin never sees individual user data) applies equally here.
+
+**`wearable_fleet_health` view** — refreshed daily at 05:30 UTC by `pg_cron` (30 minutes after `tenant_wearable_summary` at 05:00 UTC):
+
+```sql
+-- Exposes aggregate wearable sync health to tenant_admin role.
+-- Privacy: no individual user_id, no health values, k-anonymity enforced (n >= 5).
+CREATE MATERIALIZED VIEW wearable_fleet_health AS
+SELECT
+  tenant_id,
+  source,
+  COUNT(*)                                                    AS connected_users,
+  COUNT(*) FILTER (WHERE sync_status = 'ok')                 AS users_syncing_ok,
+  COUNT(*) FILTER (WHERE sync_status = 'stale')              AS users_stale,
+  COUNT(*) FILTER (WHERE sync_status IN ('sync_failed',
+    'token_expired', 'refresh_failed'))                       AS users_failing,
+  COUNT(*) FILTER (WHERE sync_status = 'permission_lost')    AS users_permission_lost,
+
+  -- Freshness percentiles: hours since last_reading_recorded_at
+  PERCENTILE_CONT(0.50) WITHIN GROUP (
+    ORDER BY EXTRACT(EPOCH FROM (NOW() - last_reading_recorded_at)) / 3600
+  ) FILTER (WHERE last_reading_recorded_at IS NOT NULL)       AS median_hours_since_reading,
+
+  PERCENTILE_CONT(0.90) WITHIN GROUP (
+    ORDER BY EXTRACT(EPOCH FROM (NOW() - last_reading_recorded_at)) / 3600
+  ) FILTER (WHERE last_reading_recorded_at IS NOT NULL)       AS p90_hours_since_reading,
+
+  NOW()                                                       AS refreshed_at
+FROM wearable_sync_health
+WHERE sync_status != 'disabled'
+GROUP BY tenant_id, source
+HAVING COUNT(*) >= 5;  -- k-anonymity: suppress rows with < 5 connected users
+```
+
+**k-anonymity enforcement:** The `HAVING COUNT(*) >= 5` clause suppresses source-level rows for tenants with fewer than 5 connected users for that source. This prevents tenant-admin users from identifying individual employees' wearable adoption status in small teams.
+
+**RLS on the materialized view:**
+
+```sql
+ALTER MATERIALIZED VIEW wearable_fleet_health OWNER TO form_system;
+
+CREATE POLICY wearable_fleet_health_tenant_admin ON wearable_fleet_health
+  AS PERMISSIVE FOR SELECT
+  TO tenant_admin, tenant_owner
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+  );
+```
+
+**Admin dashboard widget spec — "Wearable Integration Health":**
+
+| Panel element | Data source | Display |
+|---|---|---|
+| Source connection counts (per source) | `wearable_fleet_health.connected_users` | Horizontal bar chart; sorted by `connected_users DESC` |
+| Sync status breakdown (per source) | `users_syncing_ok` / `users_stale` / `users_failing` | Stacked bar (green/yellow/red) |
+| Median freshness (hours) | `median_hours_since_reading` | Gauge; green < 25h, yellow 25–48h, red > 48h |
+| P90 freshness trend (14 days) | Daily snapshots from `wearable_fleet_health_snapshots` | Line chart; threshold line at 48h |
+| Users needing attention | `users_permission_lost + users_failing` (if > 0) | Orange banner with count; clicking opens a modal with source name and error type only — no user identifiers |
+
+The "users needing attention" modal is the one interface where an admin sees an actionable signal. It shows: `source`, `sync_status`, `error_code_last` (bucketed: `permission_denied`, `auth_failure`, `quota_exceeded`, `upstream_error`), and a recommended action. It never shows `user_id` or any identifying field.
+
+---
+
+### 20.9 DEC-030 HMAC-Chained Audit Events
+
+Wearable sync lifecycle events are part of the DEC-030 HMAC chain per `docs/AUDIT_LOG_SCHEMA.md`. The following events are emitted by the sync Worker and validated by the weekly chain-integrity probe (§16: S-007 synthetic monitor).
+
+| Event | Emitted when | Severity in chain | Notes |
+|---|---|---|---|
+| `wearable.source_connected` | User connects a wearable source | LOW | Includes `source`, `tenant_id`; no token content |
+| `wearable.source_disconnected` | User disconnects a source | LOW | Includes `source`, `revoked_at`; triggers 24h erasure timer |
+| `wearable.sync_completed` | Successful sync run produces ≥ 1 new reading | LOW | Count only: `new_readings_count` integer; no reading values |
+| `wearable.sync_blocked` | Sync blocked by consent gate (`user_consents.categories_consented` does not include `wearable`) | MEDIUM | Requires investigation if unexpected |
+| `wearable.token_refresh_failed` | OAuth token refresh returns non-2xx after retry | MEDIUM | `source`, `error_code`, `consecutive_failures`; no token content |
+| `wearable.permission_revoked` | OS permission check returns denied (HealthKit/HC) | MEDIUM | Platform, app version; triggers push notification to user |
+
+These six events are the same as those defined in `DATA_MODEL.md §14.7`. Their presence in the HMAC chain means any tampering with sync records (e.g., attempting to backdate a sync to mask a freshness SLA breach) would be detectable by the chain integrity probe.
+
+---
+
+### 20.10 Privacy Constraints Summary
+
+| Constraint | What it prohibits | Where enforced |
+|---|---|---|
+| No raw health values in observability | HRV values, recovery scores, sleep durations, readiness scores — never in logs, metrics, or alert payloads | `wearable_sync_health` schema (§20.6); alert Worker serializer (AL-WEAR-08); Logpush exclusion list |
+| No GROUP BY user_id in fleet queries | Individual wearable sync patterns are not aggregated per-user in any dashboard | `wearable_fleet_health` VIEW DDL; Metabase question template guards |
+| k-anonymity floor n ≥ 5 | Per-source fleet stats suppressed for tenants with < 5 connected users | `HAVING COUNT(*) >= 5` in `wearable_fleet_health` VIEW |
+| Tenant admin blocked from raw `wearable_sync_health` rows | Admin cannot enumerate which specific users have sync failures | RLS on `wearable_sync_health` (no tenant_admin policy); admin access only via VIEW |
+| No health data in error codes | `error_code_last` field is drawn from a bounded vocabulary of operational error types; no reading values leak through error messages | `wearable_sync_health.error_code_last` CHECK constraint (implicit via Worker serializer) |
+| DEC-030 audit events contain count-only reading metadata | `wearable.sync_completed` payload carries `new_readings_count` integer only — not reading types, values, or timestamps | Audit log emitter in sync Worker |
+
+---
+
+### 20.11 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | How §20 Satisfies It |
+|---|---|
+| **CC7.2 — System monitoring** | `wearable_sync_health` provides continuous, timestamped monitoring of the wearable data pipeline. AL-WEAR-01 through AL-WEAR-08 are detective controls that fire on freshness, token, and upstream-health anomalies. The `wearable_fleet_health` materialized view gives auditors a queryable snapshot of per-tenant sync health at any point in the 90-day retention window. |
+| **PI1.2 — Processing integrity inputs** | Freshness SLOs WEAR-SLO-01 through WEAR-SLO-05 quantify FORM's commitment to using current data inputs in Victor's readiness module. Stale data that feeds incorrect coaching output is a Processing Integrity risk; these SLOs are the formal control. |
+| **C1.2 — Confidentiality protection of third-party data** | The privacy constraint matrix (§20.10) documents how FORM prevents wearable health data from flowing into operational dashboards, logs, or analytics pipelines. The audit log event design (count-only payloads) is the technical implementation of C1.2 for this pipeline. |
+| **A1.1 — Availability commitments** | WEAR-SLO-06 (OAuth token validity ≥ 99.5%) and WEAR-SLO-07 (cron run completion ≥ 99%) are availability commitments for the wearable sync pipeline. Enterprise tenants relying on wearable data for their workforce wellness programme need these commitments documented and measured. |
+| **CC9.2 — Third-party risk management** | Per-provider RED metrics (§20.1) and AL-WEAR-03 / AL-WEAR-07 are the detective controls for third-party API upstream failures (Whoop, Oura, Garmin). The `error_code_last` signal allows scoping an incident to a specific provider without requiring manual log search. |
+
+**Auditor evidence artefacts:**
+- Daily `wearable_fleet_health` snapshots stored to `compliance/evidence/wearable-fleet-YYYY-MM-DD.csv` (GitHub Actions schedule: 06:00 UTC).
+- Monthly freshness SLO compliance report: per-source `WEAR-SLO-01` through `WEAR-SLO-05` compliance pct stored in `compliance/evidence/wearable-slo-YYYY-MM.csv`.
+- DEC-030 `wearable.sync_blocked` events: any occurrence is high-signal for auditors (unexpected consent gate blocks) and exported to `compliance/evidence/wearable-sync-blocks/YYYY-MM.csv`.
+
+---
+
+### 20.12 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Write `migrations/YYYYMMDD_wearable_sync_health.sql`: table DDL, indexes, RLS policies, `pg_cron` 90-day retention cleanup | platform-engineer | P0 | M4 |
+| Update wearable sync Workers (HealthKit background delivery handler, Health Connect WorkManager endpoint, Whoop/Oura/Garmin cron Worker) to upsert `wearable_sync_health` after every sync attempt | platform-engineer | P0 | M4 |
+| Emit Workers Analytics Engine counters: `wearable_sync_success_total`, `wearable_sync_failures_total`, `wearable_sync_rate_limited_total`, `wearable_cron_heartbeat` per source | platform-engineer | P0 | M4 |
+| Write `migrations/YYYYMMDD_wearable_fleet_health.sql`: materialized view DDL, RLS, `pg_cron` 05:30 UTC refresh | platform-engineer | P0 | M4 |
+| Configure Better Stack WEAR-SLO-01 through WEAR-SLO-08 monitors against `wearable_sync_health` (SQL-based monitors polling every 30 min) | devops-lead | P0 | M4 |
+| Configure PagerDuty routing for AL-WEAR-01, AL-WEAR-02, AL-WEAR-03, AL-WEAR-04, AL-WEAR-07 (P1 → wearable-oncall rotation; dedup keys per §20.7) | devops-lead | P0 | M4 |
+| Configure Slack `#platform-alerts` routing for AL-WEAR-05, AL-WEAR-06 (P2 Slack alerts; 15-min dedup) | devops-lead | P1 | M4 |
+| Configure Slack `#csm-alerts` routing for AL-WEAR-08 (P2 per-tenant stale alert; privacy-safe payload enforced — no user_id) | devops-lead | P1 | M4 |
+| Add wearable cron heartbeat monitoring to Better Stack: alert if `wearable_cron_heartbeat{status="completed"}` absent for > 3h per source (AL-WEAR-07) | devops-lead | P0 | M4 |
+| Implement `wearable_fleet_health_snapshots` daily append table (materialized view snapshot → append row) for 14-day trend chart in admin dashboard | platform-engineer | P1 | M5 |
+| Build Metabase "Wearable Integration Health" admin dashboard widget per §20.8 spec; enforce k-anonymity display constraints in Metabase question parameters | data-engineer | P1 | M5 |
+| Add daily `wearable_fleet_health` CSV export to `compliance/evidence/wearable-fleet-YYYY-MM-DD.csv` via GitHub Actions (06:00 UTC) | devops-lead | P2 | M5 |
+| Add monthly WEAR-SLO freshness compliance report to `compliance/evidence/wearable-slo-YYYY-MM.csv` (first day of month, 08:00 UTC) | devops-lead | P2 | M5 |
+
+---
+
+*v0.7 additions: §20 Wearable Data Integration Observability — five-source wearable pipeline (HealthKit, Health Connect, Whoop, Oura Ring, Garmin) added to observability scope; privacy-first design established (no health values in any observability signal; count-only DEC-030 audit events; k-anonymity n ≥ 5 enforced); RED metrics table per provider with Workers Analytics Engine counter names; eight freshness and operational SLOs (WEAR-SLO-01 through WEAR-SLO-08) with differentiated targets per sync mechanism (HealthKit 95%, Health Connect 90%, Whoop/Oura 92%, Garmin 88%); OAuth token state machine with five states and transition-triggered alerting; sync architecture health signals per mechanism (HealthKit background delivery, Health Connect WorkManager, third-party API cron); `wearable_sync_health` Postgres table DDL (operational metadata only — timestamps, failure counts, status codes — no health values) with RLS blocking tenant_admin direct access; eight alerting rules AL-WEAR-01 through AL-WEAR-08 (P1 PagerDuty for fleet failures and upstream outages; P2 Slack for quota and per-tenant stale; privacy-safe AL-WEAR-08 payload spec); `wearable_fleet_health` materialized view with k-anonymity HAVING clause and tenant_admin RLS; admin dashboard "Wearable Integration Health" widget spec (five panels, no user_id exposure, error code bucketing); six DEC-030 HMAC-chained audit events aligned with DATA_MODEL.md §14.7; privacy constraints summary table (five constraints, enforcement location documented); SOC 2 CC7.2/PI1.2/C1.2/A1.1/CC9.2 evidence mapping; thirteen-item implementation checklist across M4/M5. Header corrected v0.5 → v0.7 (§19 addition had bumped doc to v0.6 without updating the header).*

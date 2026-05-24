@@ -6,6 +6,14 @@
 
 ---
 
+## [1.9.19] — 2026-05-24
+
+### Changed
+- `docs/OBSERVABILITY.md` §20 — Wearable Data Integration Observability (v0.6→v0.7). Five-source wearable pipeline (HealthKit, Health Connect, Whoop, Oura Ring, Garmin) added to observability scope. RED metrics table per provider with Workers Analytics Engine counter names (`wearable_sync_success_total`, `wearable_sync_failures_total`, `wearable_cron_heartbeat`, etc.). Eight freshness and operational SLOs (WEAR-SLO-01 through WEAR-SLO-08) with differentiated targets per sync mechanism: HealthKit ≥ 95% freshness-within-25h, Health Connect ≥ 90% (WorkManager 15-min OS floor), Whoop/Oura ≥ 92%, Garmin ≥ 88% (500 req/day quota constraint); OAuth token validity ≥ 99.5% (WEAR-SLO-06); cron run completion ≥ 99% (WEAR-SLO-07); HRV normalization valid-output rate ≥ 98% (WEAR-SLO-08). OAuth token health state machine (five states: healthy/expiry-approaching/expired/refresh-failed/revoked-by-user). `wearable_sync_health` Postgres table DDL — operational metadata only (timestamps, failure counts, `sync_status` enum, `error_code_last`; no health values); RLS blocking tenant_admin direct access; 90-day pg_cron retention. Eight alerting rules AL-WEAR-01 through AL-WEAR-08: fleet failure spikes → P1 PagerDuty (HealthKit >12%, Health Connect >18%, third-party API >20%, token refresh systemic >5%); quota risk and individual expiry → P2 Slack `#platform-alerts`; cron heartbeat absent → P1 PagerDuty (AL-WEAR-07); per-enterprise-tenant stale rate >30% → P2 Slack `#csm-alerts` with privacy-safe payload (no user_id). `wearable_fleet_health` materialized view with k-anonymity HAVING n ≥ 5 and tenant_admin RLS; daily 05:30 UTC pg_cron refresh. Admin dashboard "Wearable Integration Health" widget spec (five panels: source counts, sync status stacked bars, median freshness gauge, 14-day P90 trend, attention banner with error bucketing — no individual user exposure). Six DEC-030 HMAC-chained audit events (`wearable.source_connected/disconnected`, `sync_completed` count-only, `sync_blocked`, `token_refresh_failed`, `permission_revoked`) aligned with DATA_MODEL.md §14.7. Privacy constraints matrix (five constraints with enforcement locations: no raw values in observability, no GROUP BY user_id, k-anonymity n ≥ 5, tenant_admin blocked from raw rows, count-only DEC-030 payloads). SOC 2 CC7.2/PI1.2/C1.2/A1.1/CC9.2 evidence mapping with three compliance artefact export paths (`wearable-fleet-YYYY-MM-DD.csv`, `wearable-slo-YYYY-MM.csv`, `wearable-sync-blocks/YYYY-MM.csv`). Thirteen-item implementation checklist across M4/M5. Header corrected v0.5 → v0.7 (§19 had bumped to v0.6 without updating the document header).
+- `VERSION` → 1.9.19
+
+---
+
 ## [1.9.18] — 2026-05-23
 
 ### Added
