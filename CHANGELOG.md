@@ -6,6 +6,18 @@
 
 ---
 
+## [1.9.23] — 2026-05-24
+
+### Added
+- [`content/post-104-dehydration-performance.md`](content/post-104-dehydration-performance.md) — Дегідрація і продуктивність: Savoie et al. (2015), González-Alonso et al. (1997), ACSM urine-color protocol, hyponatremia warning; clinical-safety PASS WITH CONDITIONS
+- [`content/post-105-grip-strength-longevity.md`](content/post-105-grip-strength-longevity.md) — Grip strength як маркер здоров'я: Bohannon (2019) мета-аналіз, Leong et al. (2015) PURE, Celis-Morales (2018) UK Biobank, NHANES нормативи, 4 методи тренування
+- `blog.html` — картки для post-104 і post-105
+
+### Fixed
+- `README.md` — roadmap: виправлено розрив post-103 (Жіночий підхід → post-106); post-104 і post-105 позначені [x]
+
+---
+
 ## [1.9.22] — 2026-05-24
 
 ### Changed
