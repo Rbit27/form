@@ -6,6 +6,18 @@
 
 ---
 
+## [1.10.2] — 2026-05-24
+
+### Added
+- [`content/post-109-force-velocity-curve.md`](content/post-109-force-velocity-curve.md) — Крива сила-швидкість: Hill (1938) гіперболічне рівняння і чому максимальна потужність досягається при 30–45% 1RM а не при максимальній силі; explosive strength deficit (ESD, Zatsiorsky); F-V профілювання за Samozino et al. (2012, 2014) і Morin & Samozino (2016); діагностика силового vs швидкісного дефіциту; Cormie et al. (2011) оптимальне навантаження для потужності; Haff & Nimphius (2012); Skelton et al. (1994) RFD і вікові зміни; блокова логіка для аматора; 13-хв читання; clinical-safety PASS
+- `blog.html` — картка для post-109
+- `README.md` — post-109 позначений [x] у roadmap
+
+### Changed
+- `VERSION` → 1.10.2
+
+---
+
 ## [1.10.1] — 2026-05-24
 
 ### Added

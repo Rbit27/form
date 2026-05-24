@@ -193,6 +193,9 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-104-dehydration-performance.md | Blog | draft · clinical-safety PASS WITH CONDITIONS |
 | post-105-grip-strength-longevity.md | Blog | draft · clinical-safety not required |
 | post-106-women-strength-anatomy.md | Blog | draft · clinical-safety PASS WITH CONDITIONS (2026-05-24) |
+| post-107-hypertrophy-mechanisms-mechanical-tension.md | Blog | draft · clinical-safety PASS |
+| post-108-lengthened-partials-stretch-hypertrophy.md | Blog | draft · clinical-safety PASS |
+| post-109-force-velocity-curve.md | Blog | draft · clinical-safety PASS |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
