@@ -6,6 +6,16 @@
 
 ---
 
+## [1.9.21] — 2026-05-24
+
+### Added
+- `content/post-103-readiness-diagnostics.md` — four-dimensional readiness framework: neuromuscular (VBT/RPE deviation during warm-up sets), systemic-autonomic (HRV RMSSD vs 7-day rolling baseline, Plews et al. 2013: >20% drop = suboptimal recovery), local/structural (eccentric DOMS peak at 24–48h, Clarkson & Hubal 2002: strength reduction 10–40% for up to 7 days), cognitive-neural (Pageaux & Lepers 2018: cognitive fatigue → reduced voluntary neural drive ~85–90% of max). Decision matrix: full session / volume reduction (20–30%) / intensity reduction / active recovery. Meeusen et al. (2013): both NFO risk from training through suppressed readiness AND undertraining risk from over-cautious avoidance framed. Flatt et al. (2017): 7-day rolling mean eliminates single-day noise. Pre-session protocol: 2-min HRV + 5-min warm-up diagnostics. FORM wearable integration angle: automated baseline, rolling comparisons, per-session load adaptation. clinical-safety PASS.
+- `blog.html` — card for post-103 (readiness diagnostics) added
+- `STATUS.md` — entries for post-101, post-102, post-103 added to content engine table; blog.html count updated (97 cards, 103 posts authored)
+- `VERSION` → 1.9.21
+
+---
+
 ## [1.9.20] — 2026-05-24
 
 ### Added

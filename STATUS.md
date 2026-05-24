@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 94 cards (97 content posts authored), category filter, newsletter CTA | v1.9.18 ✓ |
+| [`blog.html`](blog.html) | Articles index — 97 cards (103 content posts authored), category filter, newsletter CTA | v1.9.21 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -187,6 +187,9 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-98-accommodating-resistance.md | Blog | draft · clinical-safety PASS |
 | post-99-sticking-points.md | Blog | draft · clinical-safety PASS |
 | post-100-e1rm-vs-rep-ranges.md | Blog | draft · clinical-safety PASS · milestone post-100 |
+| post-101-sleep-recovery-mechanisms.md | Blog | draft · clinical-safety PASS |
+| post-102-heat-cold-training-performance.md | Blog | draft · clinical-safety PASS |
+| post-103-readiness-diagnostics.md | Blog | draft · clinical-safety PASS |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
