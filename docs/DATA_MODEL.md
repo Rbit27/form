@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v0.9
+# FORM · Multi-Tenant Data Model v1.0
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -26,6 +26,7 @@
 16. [Enterprise Contract & Pilot Lifecycle Schema](#16-enterprise-contract--pilot-lifecycle-schema)
 17. [Enterprise Admin Reporting Schema — Aggregate-Only Data Model & Privacy-Floor Enforcement](#17-enterprise-admin-reporting-schema--aggregate-only-data-model--privacy-floor-enforcement)
 18. [Notification & Webhook Event Queue Schema](#18-notification--webhook-event-queue-schema)
+19. [Feature Flag & Entitlement Registry Schema](#19-feature-flag--entitlement-registry-schema)
 
 ---
 
@@ -4931,3 +4932,735 @@ Per §7.2, the following items must be verified before any migration touching §
 ---
 
 *v0.9 additions: §18 Notification & Webhook Event Queue Schema. `webhook_event_type` PostgreSQL enum: 23 event types across training lifecycle (workout.completed, workout.abandoned, workout.set_logged), streak events (maintained, broken, grace_period_activated, milestone_reached), coaching, auth (sso_login, scim_provisioned/deprovisioned, mfa_challenge_failed, session_expired), enterprise lifecycle (tenant.user_onboarded/deactivated, seat_limit_approached/reached, pilot_milestone, contract_renewal_due), wearable (source_connected/disconnected), and system (delivery_failed, webhook.test) — new values require DECISION_LOG entry and form_admin privilege. `notifications` table: tenant_id + nullable user_id (null = tenant-level), `webhook_event_type` type, JSONB payload (Zod-validated; FORBIDDEN_PROPERTY_KEYS enforced), channel enum (push/email/in_app/webhook), status enum (pending/sent/failed/cancelled), retry_count, expires_at; RLS: user self-read via user_id match, tenant admin full-tenant history, form_system full-access, soft-delete (deleted_at) per §12.1 pattern. `webhook_endpoints` table: SENSITIVE classification for `signing_secret_enc` (AES-256-GCM per-tenant KMS); url CHECK (HTTPS only); events TEXT[] with GIN index for ANY() fanout; active boolean with auto-deactivation at failure_count >= 10; API serialiser replaces secret with "***"; RLS: tenant_admin/owner read+write, form_system full access. `webhook_deliveries` table: endpoint_id FK with CASCADE, denormalized tenant_id, status enum (pending/delivered/failed/exhausted/cancelled), 6-attempt exponential backoff schedule (1min/5min/30min/2h/8h/24h), response_body capped at 1KB, idempotency_key UNIQUE constraint per endpoint; RLS: tenant admin read-only history, form_system full access. Delivery worker: Cloudflare Worker cron (60s); FOR UPDATE SKIP LOCKED batch (50 rows); HMAC-SHA256 X-FORM-Signature-256 header; 10-second AbortSignal timeout; backoff write-back; auto-deactivate + tenant_owner email notification at exhaustion. Signing header: `sha256=<hex(HMAC-SHA256(key, raw_body_bytes))>`; timing-safe verification reference implementation. Payload schema versioning: $schema_version semver field; 12-month deprecation window on breaking changes; X-FORM-Accept-Payload-Version customer hint; two example payloads (workout.completed, auth.scim_user_provisioned). PII matrix: user_id UUID included by default; email excluded by default, available only with DPA + email_in_webhooks feature flag; coaching content, form_score, HRV, meal logs, CV data: never. GDPR Art. 17 integration: notifications hard-deleted by user_id; webhook_deliveries payload-scrubbed in-place within 24h (not deferred to 30-day cycle) with _erased tombstone preserving delivery receipt; `erasure.webhook_payload_scrubbed` DEC-030 event with counts; both tables included in Art. 20 DSAR export. Index strategy (9 indexes): (tenant_id, user_id) partial for notifications RLS; status+created partial for dispatch queue; expires_at partial for expiry sweep; tenant+created DESC for admin history; GIN on webhook_endpoints.events for fanout; retry-queue composite; endpoint+created DESC for drilldown; expression index on payload->'data'->>'user_id' for erasure sweep. pg_cron: expiry cancel 03:15, hard-delete 03:20, delivery purge (90d delivered, 1yr exhausted) 03:25 UTC. 12 DEC-030 HMAC-chained audit events including HIGH-severity webhook.signing_secret_rotated with 24-hour dual-key grace window; delivery_exhausted metadata explicitly excludes payload field. 18-item implementation checklist (9× P0, 6× P1, 1× P2, 2× P0 documentation) across M3/M4/M5.*
+
+## 19. Feature Flag & Entitlement Registry Schema
+
+> Owner: `enterprise-architect` + `compliance-officer`. Review: on any new flag, tier change, or compliance gate addition.
+> References: DEC-030 (HMAC-chained audit log), docs/AUDIT_LOG_SCHEMA.md, docs/ENTERPRISE.md, docs/SSO_SCIM_IMPLEMENTATION.md.
+
+---
+
+### 19.1 Purpose & Design Principles
+
+The §2.7 stub `tenant_feature_flags` table used an arbitrary-string `flag_name` column with no enforcement of which strings were valid, which tiers they required, or whether compliance sign-off was needed before enablement. This created four production risks:
+
+1. **Arbitrary drift.** Any `form_admin` could silently invent new flags. By M4, referencing `cv_enabled` (§15), `email_in_webhooks` (§18), `ip_allowlist_enabled` (SSO_SCIM_IMPLEMENTATION.md), and `sso_staging_env_enabled` (SSO_SCIM_IMPLEMENTATION.md) from different call sites with slightly different spelling guarantees bugs.
+2. **No tier gate.** A Starter tenant could receive a flag that is contractually Growth-tier. Revenue leakage and contract non-compliance.
+3. **No compliance gate.** `webhook.email_in_payloads` requires a DPA authorisation before enablement. The stub had a free-text `reason` field with no enforcement.
+4. **No audit trail at the right level.** Flag mutations were not HMAC-chained to DEC-030, so they were outside the SOC 2 CC8.1 change-management evidence chain.
+
+This section replaces the §2.7 stub with a two-table design:
+
+- `feature_flag_registry` — canonical set of valid flags, owned by `form_admin` only. This is the allowlist. No flag outside this table may be inserted into `tenant_feature_flags` after M4.
+- `tenant_feature_flags` — per-tenant enablement rows with FK to the registry, compliance approval reference, and DEC-030 audit trail.
+
+**Design principles:**
+
+1. **Registry is the single source of truth.** The TypeScript enforcement layer derives its type-safe `FlagKey` literal union from the registry at build time. Arbitrary strings are a compile error after M4.
+2. **Tier enforcement at write time.** The Cloudflare Worker `assertFeatureEnabled()` function checks both the registry `minimum_tier` and the tenant's current plan before returning. Tier downgrade handling deferred to OQ-FLAG-01.
+3. **Compliance gate is a hard block.** Any flag where `requires_compliance_gate = TRUE` may not be enabled without a non-null `compliance_approval_ref` referencing a DECISION_LOG entry. Enforced in the Worker layer and at the DB level via a CHECK constraint.
+4. **DEC-030 on every mutation.** HMAC-chained audit event emitted synchronously (in-transaction) for every INSERT, UPDATE, and DELETE on `tenant_feature_flags`. Failure to emit = transaction abort (fail-closed).
+5. **No per-flag usage analytics surfaced to tenant admin.** The registry enables product A/B testing internally, but no flag evaluation counts or adoption percentages are surfaced to tenant-admin roles. They see only whether a flag is enabled for their tenant.
+
+---
+
+### 19.2 Feature Flag Registry
+
+```sql
+-- Canonical registry of all valid feature flags.
+-- Only form_admin (BYPASSRLS) may write. form_api roles have SELECT only.
+-- A flag not in this table CANNOT be inserted into tenant_feature_flags (FK constraint).
+
+CREATE TABLE feature_flag_registry (
+  flag_key                      TEXT PRIMARY KEY,
+                                -- Dotted namespace: '<domain>.<flag_name>'
+                                -- e.g. 'sso.saml_enabled', 'audit.siem_export_enabled'
+                                -- Validated by CHECK below
+
+  display_name                  TEXT NOT NULL,
+                                -- Human-readable label shown in internal admin UI
+
+  description                   TEXT NOT NULL,
+                                -- One-paragraph explanation of what this flag enables
+                                -- and any operational notes
+
+  minimum_tier                  TEXT NOT NULL
+                                  CHECK (minimum_tier IN ('starter', 'growth', 'enterprise')),
+                                -- Lowest tier at which a tenant is entitled to this flag.
+                                -- form_admin may not enable the flag for a tenant on a lower tier.
+
+  default_enabled_at_activation BOOLEAN NOT NULL DEFAULT FALSE,
+                                -- TRUE = flag is set enabled=TRUE automatically when a new
+                                -- tenant activates at a qualifying tier.
+                                -- FALSE = flag must be manually enabled after activation.
+
+  requires_compliance_gate      BOOLEAN NOT NULL DEFAULT FALSE,
+                                -- TRUE = a compliance-officer sign-off (DECISION_LOG entry)
+                                -- is required before this flag may be enabled for any tenant.
+                                -- Enforced via NOT NULL compliance_approval_ref in tenant_feature_flags.
+
+  deprecated_at                 TIMESTAMPTZ,
+                                -- NULL = active. Non-null = flag is sunset; no new tenants
+                                -- may have it enabled after this timestamp.
+                                -- Existing enabled rows are honoured until contract expiry.
+
+  created_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT flag_key_namespace CHECK (flag_key ~ '^[a-z_]+\.[a-z_]+$')
+                                -- Enforces dotted namespace format at DB level.
+                                -- Prevents arbitrary strings from bypassing the naming convention.
+);
+
+-- No RLS on this table. form_api roles are granted SELECT only (not INSERT/UPDATE/DELETE).
+-- form_admin (BYPASSRLS) is the only writer — enforced via GRANT, not RLS.
+GRANT SELECT ON feature_flag_registry TO form_api;
+GRANT SELECT ON feature_flag_registry TO form_readonly;
+GRANT SELECT ON feature_flag_registry TO form_system;
+-- INSERT / UPDATE / DELETE: form_admin only (no explicit GRANT to form_api)
+
+CREATE INDEX idx_ffr_minimum_tier    ON feature_flag_registry(minimum_tier);
+CREATE INDEX idx_ffr_deprecated      ON feature_flag_registry(deprecated_at)
+  WHERE deprecated_at IS NOT NULL;
+```
+
+---
+
+### 19.3 Registry Seed Data
+
+```sql
+-- Run by form_admin during M3 migration.
+-- All flag_key values here are canonical — no other strings are valid in tenant_feature_flags.
+
+INSERT INTO feature_flag_registry
+  (flag_key, display_name, description, minimum_tier, default_enabled_at_activation, requires_compliance_gate)
+VALUES
+
+  -- All enterprise tiers (Starter+)
+  (
+    'sso.saml_enabled',
+    'SAML 2.0 SSO',
+    'Enables SAML 2.0 single sign-on for the tenant. Auto-enabled at activation when the IdP protocol is SAML. See SSO_SCIM_IMPLEMENTATION.md §1.',
+    'starter', TRUE, FALSE
+  ),
+  (
+    'sso.oidc_enabled',
+    'OIDC SSO',
+    'Enables OIDC single sign-on for the tenant. Auto-enabled at activation when the IdP protocol is OIDC. See SSO_SCIM_IMPLEMENTATION.md §1.',
+    'starter', TRUE, FALSE
+  ),
+  (
+    'scim.provisioning_enabled',
+    'SCIM 2.0 User Provisioning',
+    'Enables SCIM 2.0 endpoint for automated user provisioning and deprovisioning from the tenant IdP. See SSO_SCIM_IMPLEMENTATION.md §3.',
+    'starter', FALSE, FALSE
+  ),
+  (
+    'admin.dashboard_enabled',
+    'Admin Reporting Dashboard',
+    'Enables the web-based admin reporting dashboard with aggregate-only wellness and engagement metrics. See DATA_MODEL.md §17.',
+    'starter', TRUE, FALSE
+  ),
+  (
+    'audit.rest_export_enabled',
+    'Audit Log REST Export',
+    'Enables the GET /v1/audit/logs API endpoint for historical audit log retrieval by tenant admins.',
+    'starter', TRUE, FALSE
+  ),
+  (
+    'webhook.outbound_enabled',
+    'Outbound Webhooks',
+    'Enables outbound webhook delivery for the tenant. See DATA_MODEL.md §18.',
+    'starter', FALSE, FALSE
+  ),
+  (
+    'cv.client_side_enabled',
+    'Client-Side CV Pose Estimation',
+    'Enables on-device computer vision pose estimation during workouts. See DATA_MODEL.md §15.',
+    'starter', TRUE, FALSE
+  ),
+
+  -- Growth+ tier
+  (
+    'audit.siem_export_enabled',
+    'SIEM Integration Export',
+    'Enables native SIEM exporters (Datadog, Splunk, Sumo Logic) for real-time audit event streaming. Requires audit.rest_export_enabled.',
+    'growth', FALSE, FALSE
+  ),
+  (
+    'audit.s3_sync_enabled',
+    'S3 Audit Log Continuous Sync',
+    'Enables continuous sync of the tenant audit log to a customer-owned S3 bucket. See AUDIT_LOG_SCHEMA.md §Export.',
+    'growth', FALSE, FALSE
+  ),
+  (
+    'admin.cohort_analytics_enabled',
+    'SCIM-Group Cohort Analytics',
+    'Enables SCIM-group cohort breakdown in admin reporting. Requires scim.provisioning_enabled and minimum 5-user cohort k-anonymity floor. See DATA_MODEL.md §17.',
+    'growth', FALSE, FALSE
+  ),
+
+  -- Enterprise tier only
+  (
+    'branding.white_label_enabled',
+    'White-Label Branding',
+    'Enables custom domain (CNAME to form.coach), tenant logo, and primary colour override. Powered by FORM footer is non-removable below $50k ARR. See ENTERPRISE.md.',
+    'enterprise', FALSE, FALSE
+  ),
+  (
+    'sso.staging_env_enabled',
+    'SSO Staging / Sandbox Environment',
+    'Enables a staging IdP configuration alongside the production config, allowing tenants to test SSO changes without affecting live users. See SSO_SCIM_IMPLEMENTATION.md.',
+    'enterprise', FALSE, FALSE
+  ),
+  (
+    'security.ip_allowlist_enabled',
+    'IP Allowlist Enforcement',
+    'Enables IP allowlist enforcement at the Cloudflare Worker layer. Requests from IPs not in the tenant allowlist receive 403. See SSO_SCIM_IMPLEMENTATION.md §6.',
+    'enterprise', FALSE, FALSE
+  ),
+
+  -- Compliance-gated (any tier, but requires compliance-officer sign-off)
+  (
+    'webhook.email_in_payloads',
+    'Email Address in Webhook Payloads',
+    'When enabled, the user email address is included in outbound webhook payloads. REQUIRES explicit DPA authorisation from the tenant data controller before enabling. Default: email excluded from all payloads. See DATA_MODEL.md §18.7.',
+    'starter', FALSE, TRUE
+  )
+;
+```
+
+---
+
+### 19.4 Tenant Feature Flags (Production Schema)
+
+This section replaces the §2.7 stub. The stub table (`tenant_feature_flags` with free-text `flag_name`) is migrated in §19.9.
+
+```sql
+-- Drop the stub constraint before running the §19.9 migration.
+-- After M4, arbitrary flag_name strings are a FK violation — not a runtime error.
+
+CREATE TABLE tenant_feature_flags (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  tenant_id               UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+
+  flag_key                TEXT NOT NULL REFERENCES feature_flag_registry(flag_key)
+                            ON UPDATE CASCADE
+                            ON DELETE RESTRICT,
+                          -- RESTRICT prevents deletion of a registry entry that has
+                          -- live tenant rows. Deprecate via deprecated_at; never hard-delete
+                          -- a registry row with active tenants.
+
+  enabled                 BOOLEAN NOT NULL DEFAULT FALSE,
+
+  set_by                  UUID REFERENCES users(id),
+                          -- form_admin user UUID. Never a tenant_admin or tenant_member.
+                          -- NULL only for system-automated activation at tenant creation.
+
+  enabled_at              TIMESTAMPTZ,
+                          -- Populated when enabled transitions to TRUE. NULL when disabled.
+
+  compliance_approval_ref TEXT,
+                          -- REQUIRED (NOT NULL enforced by CHECK below) when the referenced
+                          -- registry flag has requires_compliance_gate = TRUE.
+                          -- Value MUST be a DECISION_LOG entry identifier, e.g. 'DEC-047'.
+                          -- Checked at INSERT and UPDATE by the application layer before
+                          -- the DB write; the CHECK constraint is a defence-in-depth backstop.
+
+  reason                  TEXT,
+                          -- Internal justification for enabling/disabling. Not exposed to
+                          -- tenant admin. Stored for internal audit trail context only.
+
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (tenant_id, flag_key)
+);
+
+ALTER TABLE tenant_feature_flags ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies
+
+-- form_api can read any flag row scoped to the current tenant.
+-- tenant_admin and tenant_member: read-only, own tenant only.
+-- No role below form_admin may write (INSERT / UPDATE / DELETE).
+CREATE POLICY tff_tenant_read ON tenant_feature_flags
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+  );
+
+-- form_system: read-only across all tenants (used by Workers flag evaluation path).
+CREATE POLICY tff_system_read ON tenant_feature_flags
+  AS PERMISSIVE FOR SELECT
+  TO form_system
+  USING (TRUE);
+
+-- Write: only form_admin (BYPASSRLS) — no permissive write policy for form_api.
+-- If a form_api write is attempted it hits the implicit DENY from no matching write policy.
+-- Note: form_admin BYPASSRLS means it does not need a policy; the absence of an INSERT
+-- policy for form_api is the enforcement mechanism.
+
+-- Indexes
+CREATE INDEX idx_tff_tenant_id    ON tenant_feature_flags(tenant_id);
+CREATE INDEX idx_tff_flag_key     ON tenant_feature_flags(flag_key);
+CREATE INDEX idx_tff_tenant_flag  ON tenant_feature_flags(tenant_id, flag_key);
+                                  -- Covering index for the hot-path: assertFeatureEnabled()
+                                  -- queries (tenant_id, flag_key) -> enabled
+
+-- form_audit role: SELECT for compliance evidence collection
+GRANT SELECT ON tenant_feature_flags TO form_audit;
+```
+
+---
+
+### 19.5 Tier Entitlement Matrix
+
+Legend:
+- **auto** — automatically enabled when tenant activates at this tier
+- **avail** — available for the tier; must be manually enabled by `form_admin`
+- **—** — not available at this tier (FK check + Worker tier gate will reject)
+- **gate** — compliance officer sign-off required regardless of tier
+
+| Flag key | Starter | Growth | Enterprise |
+|---|---|---|---|
+| `sso.saml_enabled` | auto | auto | auto |
+| `sso.oidc_enabled` | auto | auto | auto |
+| `scim.provisioning_enabled` | avail | avail | avail |
+| `admin.dashboard_enabled` | auto | auto | auto |
+| `audit.rest_export_enabled` | auto | auto | auto |
+| `webhook.outbound_enabled` | avail | avail | avail |
+| `cv.client_side_enabled` | auto | auto | auto |
+| `audit.siem_export_enabled` | — | avail | avail |
+| `audit.s3_sync_enabled` | — | avail | avail |
+| `admin.cohort_analytics_enabled` | — | avail | avail |
+| `branding.white_label_enabled` | — | — | avail |
+| `sso.staging_env_enabled` | — | — | avail |
+| `security.ip_allowlist_enabled` | — | — | avail |
+| `webhook.email_in_payloads` | gate | gate | gate |
+
+---
+
+### 19.6 Cloudflare Worker Enforcement Layer
+
+```typescript
+// src/workers/feature-flags/assert-feature-enabled.ts
+// Called by every Worker handler that requires a feature gate.
+// Fail-closed: any DB error throws 403, never 200.
+
+import { KVNamespace } from '@cloudflare/workers-types';
+
+// FlagKey is derived from the registry at build time.
+// After M4 the seeded values below are the canonical list; a new flag requires
+// a registry INSERT (form_admin) + a TypeScript union update + CI schema validation.
+export type FlagKey =
+  | 'sso.saml_enabled'
+  | 'sso.oidc_enabled'
+  | 'scim.provisioning_enabled'
+  | 'admin.dashboard_enabled'
+  | 'audit.rest_export_enabled'
+  | 'webhook.outbound_enabled'
+  | 'cv.client_side_enabled'
+  | 'audit.siem_export_enabled'
+  | 'audit.s3_sync_enabled'
+  | 'admin.cohort_analytics_enabled'
+  | 'branding.white_label_enabled'
+  | 'sso.staging_env_enabled'
+  | 'security.ip_allowlist_enabled'
+  | 'webhook.email_in_payloads';
+
+// Tier ordering for minimum_tier enforcement.
+const TIER_ORDER: Record<string, number> = {
+  starter:    1,
+  growth:     2,
+  enterprise: 3,
+};
+
+interface FlagCacheEntry {
+  enabled: boolean;
+  minimumTier: string;
+  requiresComplianceGate: boolean;
+  tenantTier: string;
+  cachedAt: number; // epoch ms
+}
+
+const KV_TTL_SECONDS = 30; // 30-second cache; flag changes propagate within one TTL window
+
+/**
+ * Asserts that the given feature flag is enabled for the tenant.
+ * Throws a 403 Response if:
+ *   - The flag is not enabled for the tenant
+ *   - The tenant's tier is below the flag's minimum_tier
+ *   - Any DB/KV error occurs (fail-closed)
+ *
+ * Does NOT throw if the flag is enabled and the tier gate passes.
+ */
+export async function assertFeatureEnabled(
+  tenantId: string,
+  flagKey: FlagKey,
+  env: { KV: KVNamespace; DB: D1Database },
+): Promise<void> {
+  const cacheKey = `flag:${tenantId}:${flagKey}`;
+
+  try {
+    // 1. Check KV cache first (30-second TTL)
+    const cached = await env.KV.get<FlagCacheEntry>(cacheKey, 'json');
+    if (cached !== null) {
+      const ageMs = Date.now() - cached.cachedAt;
+      if (ageMs < KV_TTL_SECONDS * 1000) {
+        enforceFromCache(cached, tenantId, flagKey);
+        return;
+      }
+    }
+
+    // 2. Cache miss or stale: query DB
+    const row = await env.DB.prepare(`
+      SELECT
+        tff.enabled,
+        ffr.minimum_tier,
+        ffr.requires_compliance_gate,
+        t.plan AS tenant_tier,
+        tff.compliance_approval_ref
+      FROM tenant_feature_flags tff
+      JOIN feature_flag_registry ffr ON ffr.flag_key = tff.flag_key
+      JOIN tenants t ON t.id = tff.tenant_id
+      WHERE tff.tenant_id = ?1
+        AND tff.flag_key   = ?2
+        AND t.deleted_at IS NULL
+        AND t.suspended_at IS NULL
+        AND (ffr.deprecated_at IS NULL OR ffr.deprecated_at > CURRENT_TIMESTAMP)
+    `)
+      .bind(tenantId, flagKey)
+      .first<{
+        enabled: number; // SQLite returns 0/1 for boolean
+        minimum_tier: string;
+        requires_compliance_gate: number;
+        tenant_tier: string;
+        compliance_approval_ref: string | null;
+      }>();
+
+    if (row === null) {
+      // Flag row does not exist for this tenant — treat as disabled (fail-closed).
+      throw forbidden(tenantId, flagKey, 'flag_not_found');
+    }
+
+    const entry: FlagCacheEntry = {
+      enabled:                row.enabled === 1,
+      minimumTier:            row.minimum_tier,
+      requiresComplianceGate: row.requires_compliance_gate === 1,
+      tenantTier:             row.tenant_tier,
+      cachedAt:               Date.now(),
+    };
+
+    // 3. Tier gate: tenant's plan must be >= minimum_tier
+    const tenantTierRank  = TIER_ORDER[entry.tenantTier]  ?? 0;
+    const minimumTierRank = TIER_ORDER[entry.minimumTier] ?? 99;
+    if (tenantTierRank < minimumTierRank) {
+      throw forbidden(tenantId, flagKey, 'tier_insufficient');
+    }
+
+    // 4. Compliance gate: if required, must have an approval reference
+    if (entry.requiresComplianceGate && !row.compliance_approval_ref) {
+      throw forbidden(tenantId, flagKey, 'compliance_gate_missing');
+    }
+
+    // 5. Enabled check
+    if (!entry.enabled) {
+      throw forbidden(tenantId, flagKey, 'flag_disabled');
+    }
+
+    // 6. Write back to KV cache
+    await env.KV.put(cacheKey, JSON.stringify(entry), { expirationTtl: KV_TTL_SECONDS });
+
+  } catch (err) {
+    if (err instanceof Response) throw err; // re-throw our own 403s
+    // Any unexpected DB / KV error -> fail-closed 403 (never 200 on uncertainty)
+    console.error(`[assertFeatureEnabled] DB error for tenant=${tenantId} flag=${flagKey}`, err);
+    throw forbidden(tenantId, flagKey, 'internal_error');
+  }
+}
+
+function enforceFromCache(
+  cached: FlagCacheEntry,
+  tenantId: string,
+  flagKey: FlagKey,
+): void {
+  const tenantTierRank  = TIER_ORDER[cached.tenantTier]  ?? 0;
+  const minimumTierRank = TIER_ORDER[cached.minimumTier] ?? 99;
+  if (tenantTierRank < minimumTierRank) {
+    throw forbidden(tenantId, flagKey, 'tier_insufficient');
+  }
+  if (!cached.enabled) {
+    throw forbidden(tenantId, flagKey, 'flag_disabled');
+  }
+}
+
+function forbidden(tenantId: string, flagKey: string, reason: string): Response {
+  return new Response(
+    JSON.stringify({ error: 'feature_not_enabled', flag: flagKey, reason }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } },
+  );
+}
+```
+
+**KV cache invalidation:** When `form_admin` mutates a `tenant_feature_flags` row, the mutation API explicitly deletes the KV key `flag:<tenantId>:<flagKey>` before committing the DB write. This ensures the next Worker evaluation reads fresh data within the same request cycle. The 30-second TTL is a backstop only; it is not the primary invalidation mechanism.
+
+---
+
+### 19.7 DEC-030 Audit Events
+
+All four event types are HMAC-chained per AUDIT_LOG_SCHEMA.md and must be written synchronously within the database transaction that mutates `tenant_feature_flags`. Failure to write = transaction abort.
+
+| Event type | Severity | Retention | Required metadata fields |
+|---|---|---|---|
+| `feature_flag.enabled` | STANDARD | 7 years | `tenant_id`, `flag_key`, `set_by_user_id`, `previous_enabled: false`, `new_enabled: true`, `enabled_at`, `compliance_approval_ref` (null if not gated), `reason` |
+| `feature_flag.disabled` | STANDARD | 7 years | `tenant_id`, `flag_key`, `set_by_user_id`, `previous_enabled: true`, `new_enabled: false`, `disabled_at`, `reason` |
+| `feature_flag.registry_updated` | HIGH | 7 years | `flag_key`, `changed_fields: string[]`, `previous_values: object`, `new_values: object`, `set_by_user_id` (form_admin only) |
+| `feature_flag.compliance_gate_bypassed` | CRITICAL | 10 years | `tenant_id`, `flag_key`, `attempted_by_user_id`, `reason`, `blocked: true` — fires when a Worker or API call attempts to enable a gated flag without `compliance_approval_ref`; the attempt MUST be blocked, not silently allowed |
+
+**Notes:**
+
+- `feature_flag.compliance_gate_bypassed` is always emitted with `blocked: true`. There is no path by which this event fires and the flag is also enabled. If the event fires and investigation reveals the flag was enabled concurrently, that is a P0 security incident.
+- `feature_flag.registry_updated` fires when `form_admin` modifies any column of `feature_flag_registry`. The `previous_values` and `new_values` fields contain only the changed columns — not a full row dump — to avoid storing unnecessary context. The `flag_key` value is the `resource_id` in the `audit_log` row.
+- Metadata fields listed here map to the `metadata JSONB` column in `audit_log`. The `changes` column is left NULL for flag events (it is reserved for before/after on data rows, not control-plane mutations).
+
+---
+
+### 19.8 Compliance Gate Protocol
+
+A compliance-gated flag (e.g. `webhook.email_in_payloads`) follows this exact sequence before it may be enabled for any tenant:
+
+```
+1. Tenant (or CSM) submits a request identifying:
+     - The flag_key requested
+     - The specific DPA clause or legal basis authorising the flag
+     - The tenant data controller contact who approved
+
+2. Compliance officer reviews the request.
+   The review is documented in docs/DECISION_LOG.md as a new DEC-NNN entry.
+   The entry must include:
+     - Flag key
+     - Tenant ID
+     - DPA reference (contract clause, Article 28 processor agreement section)
+     - Date of approval
+     - Compliance officer name
+
+3. Compliance officer updates the DECISION_LOG.md file via the standard PR process.
+   The PR must be approved by a second named compliance contact or legal counsel.
+
+4. Once the DECISION_LOG PR is merged, the DEC-NNN identifier is the compliance_approval_ref.
+
+5. A form_admin engineer executes the flag enablement via the internal admin API:
+     POST /internal/v1/admin/tenants/{tenantId}/flags
+     {
+       "flag_key": "webhook.email_in_payloads",
+       "enabled": true,
+       "compliance_approval_ref": "DEC-047",
+       "reason": "DPA signed 2026-06-01, clause 4.2 authorises email in webhook payloads"
+     }
+
+6. The Worker enforces:
+   - flag_key must exist in feature_flag_registry
+   - tenant plan must meet minimum_tier
+   - requires_compliance_gate = TRUE means compliance_approval_ref must be non-null
+   - KV key invalidated before DB write
+
+7. On successful write, a feature_flag.enabled DEC-030 audit event fires with
+   compliance_approval_ref populated. The event is HMAC-chained.
+
+8. Any attempt to skip steps 3-4 (i.e., enable the flag with compliance_approval_ref = NULL
+   when requires_compliance_gate = TRUE) is blocked by the Worker and emits a
+   feature_flag.compliance_gate_bypassed CRITICAL DEC-030 event.
+   This event automatically opens a PagerDuty P1 incident.
+```
+
+**What compliance officers must NOT do:** provide verbal approval. The DECISION_LOG PR merge is the approval event. Verbal approvals have no legal standing and are not traceable to the audit log.
+
+---
+
+### 19.9 Migration: §2.7 Stub to §19 Registry
+
+This migration replaces the free-text `flag_name` column with the FK-constrained `flag_key` column. It must run as a single transaction under `form_admin`.
+
+```sql
+-- Migration: 0019_feature_flag_registry.sql
+-- Run as form_admin. No application traffic during this migration window.
+-- Prerequisite: registry seed data (§19.3) already applied.
+
+BEGIN;
+
+-- Step 1: Rename the stub flag names to canonical registry keys.
+-- Any flag_name not in this mapping is UNKNOWN and must be reviewed before proceeding.
+UPDATE tenant_feature_flags SET flag_name = 'cv.client_side_enabled'
+  WHERE flag_name IN ('cv_enabled', 'cv.enabled', 'client_cv_enabled');
+
+UPDATE tenant_feature_flags SET flag_name = 'webhook.email_in_payloads'
+  WHERE flag_name IN ('email_in_webhooks', 'webhook_email_in_payloads', 'email_in_webhook_payloads');
+
+UPDATE tenant_feature_flags SET flag_name = 'security.ip_allowlist_enabled'
+  WHERE flag_name IN ('ip_allowlist_enabled', 'ip_allowlist');
+
+UPDATE tenant_feature_flags SET flag_name = 'sso.staging_env_enabled'
+  WHERE flag_name IN ('sso_staging_env_enabled', 'sso_staging');
+
+UPDATE tenant_feature_flags SET flag_name = 'sso.saml_enabled'
+  WHERE flag_name IN ('saml_enabled', 'sso_saml_enabled');
+
+UPDATE tenant_feature_flags SET flag_name = 'sso.oidc_enabled'
+  WHERE flag_name IN ('oidc_enabled', 'sso_oidc_enabled');
+
+UPDATE tenant_feature_flags SET flag_name = 'scim.provisioning_enabled'
+  WHERE flag_name IN ('scim_enabled', 'scim_provisioning_enabled');
+
+UPDATE tenant_feature_flags SET flag_name = 'admin.dashboard_enabled'
+  WHERE flag_name IN ('dashboard_enabled', 'admin_dashboard_enabled');
+
+UPDATE tenant_feature_flags SET flag_name = 'audit.rest_export_enabled'
+  WHERE flag_name IN ('audit_export_enabled', 'audit_rest_export');
+
+UPDATE tenant_feature_flags SET flag_name = 'webhook.outbound_enabled'
+  WHERE flag_name IN ('webhook_enabled', 'outbound_webhook_enabled');
+
+UPDATE tenant_feature_flags SET flag_name = 'audit.siem_export_enabled'
+  WHERE flag_name IN ('siem_export_enabled', 'siem_enabled');
+
+UPDATE tenant_feature_flags SET flag_name = 'audit.s3_sync_enabled'
+  WHERE flag_name IN ('s3_sync_enabled', 'audit_s3_sync');
+
+UPDATE tenant_feature_flags SET flag_name = 'admin.cohort_analytics_enabled'
+  WHERE flag_name IN ('cohort_analytics_enabled', 'cohort_breakdown_enabled');
+
+UPDATE tenant_feature_flags SET flag_name = 'branding.white_label_enabled'
+  WHERE flag_name IN ('white_label_enabled', 'white_label');
+
+-- Step 2: Abort if any unrecognised flag_name values remain.
+DO $$
+DECLARE
+  unknown_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO unknown_count
+  FROM tenant_feature_flags
+  WHERE flag_name NOT IN (SELECT flag_key FROM feature_flag_registry);
+
+  IF unknown_count > 0 THEN
+    RAISE EXCEPTION
+      'Migration blocked: % unrecognised flag_name values exist. '
+      'Review tenant_feature_flags WHERE flag_name NOT IN (SELECT flag_key FROM feature_flag_registry).',
+      unknown_count;
+  END IF;
+END;
+$$;
+
+-- Step 3: Rename the column to flag_key and add the FK constraint.
+ALTER TABLE tenant_feature_flags
+  RENAME COLUMN flag_name TO flag_key;
+
+ALTER TABLE tenant_feature_flags
+  ADD CONSTRAINT tenant_feature_flags_flag_key_fkey
+    FOREIGN KEY (flag_key)
+    REFERENCES feature_flag_registry(flag_key)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT;
+
+-- Step 4: Add new columns introduced by §19.4.
+ALTER TABLE tenant_feature_flags
+  ADD COLUMN IF NOT EXISTS enabled_at               TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS compliance_approval_ref  TEXT;
+
+-- Backfill enabled_at from updated_at for currently-enabled rows.
+UPDATE tenant_feature_flags
+  SET enabled_at = updated_at
+  WHERE enabled = TRUE AND enabled_at IS NULL;
+
+-- Step 5: Surrogate id column retained as UUID PK to preserve existing FK references
+-- in audit_log.resource_id. The UNIQUE (tenant_id, flag_key) constraint already existed.
+-- No structural change required.
+
+-- Step 6: Emit a DEC-030 feature_flag.registry_updated audit event for the migration.
+INSERT INTO audit_log (
+  tenant_id, actor_id, actor_type, action, resource_type,
+  changes, outcome, metadata
+)
+VALUES (
+  NULL,         -- system-level event; no single tenant
+  NULL,         -- system actor
+  'system',
+  'feature_flag.registry_updated',
+  'tenant_feature_flags',
+  NULL,
+  'success',
+  jsonb_build_object(
+    'migration', '0019_feature_flag_registry.sql',
+    'changed_fields', ARRAY['flag_name renamed to flag_key', 'FK constraint added',
+                             'enabled_at added', 'compliance_approval_ref added'],
+    'note', 'Schema promotion from §2.7 stub to §19 registry-backed schema'
+  )
+);
+
+COMMIT;
+```
+
+**Post-migration validation (run on production after migration, before re-enabling app traffic):**
+
+```sql
+-- Confirm zero unrecognised flag_keys
+SELECT COUNT(*) FROM tenant_feature_flags
+WHERE flag_key NOT IN (SELECT flag_key FROM feature_flag_registry);
+-- Expected: 0
+
+-- Confirm compliance-gated flags with enabled=TRUE all have compliance_approval_ref
+SELECT tff.tenant_id, tff.flag_key, tff.compliance_approval_ref
+FROM tenant_feature_flags tff
+JOIN feature_flag_registry ffr ON ffr.flag_key = tff.flag_key
+WHERE ffr.requires_compliance_gate = TRUE
+  AND tff.enabled = TRUE
+  AND tff.compliance_approval_ref IS NULL;
+-- Expected: 0 rows. Any rows here require immediate investigation before app traffic resumes.
+```
+
+---
+
+### 19.10 Gap Analysis & Open Questions
+
+| # | Question | Owner | Priority |
+|---|---|---|---|
+| OQ-FLAG-01 | **Tier downgrade handling.** When a tenant downgrades from Growth to Starter, flags with `minimum_tier = 'growth'` (e.g. `audit.siem_export_enabled`, `admin.cohort_analytics_enabled`) are still `enabled = TRUE` in their rows. The Worker tier gate will block them at the enforcement layer, but the rows remain inconsistent. Decision needed: (a) auto-disable Growth+ flags on plan downgrade via a contract lifecycle hook (see §16 `tenant.lifecycle_status`), emitting `feature_flag.disabled` DEC-030 events for each; or (b) leave rows intact, rely solely on the Worker tier gate, and accept that re-upgrade re-activates them without a new `form_admin` enablement action. Option (a) is preferred: clean data, correct audit trail, no surprise reactivation. | `enterprise-architect` + `platform-engineer` | High — resolve before any Growth tenant downgrade path is enabled in billing self-serve (M5) |
+| OQ-FLAG-02 | **Flag deprecation sunset process.** When `deprecated_at` is set on a registry entry, the `assertFeatureEnabled()` function blocks new evaluations. But existing enabled tenant rows remain. Sunset process needs definition: (a) how far in advance is `deprecated_at` set (proposed: minimum 90 days notice to tenants using the flag); (b) who communicates the sunset to affected tenants; (c) whether the `tenant_feature_flags` rows are soft-deleted or left as tombstones. Proposed: 90-day notice, CSM communication via admin dashboard banner, automatic soft-delete of tenant rows at `deprecated_at + 90 days` via pg_cron. | `enterprise-architect` + `compliance-officer` | Medium — establish policy before the first flag is deprecated (M6) |
+
+---
+
+### 19.11 SOC 2 Mapping
+
+| SOC 2 Criterion | How §19 addresses it |
+|---|---|
+| **CC6.1** — Logical access restricted to authorised individuals | `feature_flag_registry` is read-only for all API roles; only `form_admin` (BYPASSRLS, never in request path) writes. `tenant_feature_flags` write is `form_admin` only; no `form_api` write policy exists. Entitlement gates enforce least-privilege: a Starter tenant cannot access Growth/Enterprise features. |
+| **CC6.2** — Authorisation controls ensure access only to authorised resources | `assertFeatureEnabled()` tier check is the authorisation gate. Tenant plan is fetched from `tenants.plan` (written by `form_admin`, not by the tenant) and compared against `feature_flag_registry.minimum_tier`. Plan value cannot be self-elevated by the tenant. |
+| **CC8.1** — Change management controls | All mutations to `tenant_feature_flags` and `feature_flag_registry` emit HMAC-chained DEC-030 audit events synchronously in-transaction. Mutation outside this chain is only possible via `form_admin` break-glass, which triggers `support.*` DEC-030 events per AUDIT_LOG_SCHEMA.md. |
+| **CC9.2** — Vendor and business partner risk management | `compliance_approval_ref` column persists the DECISION_LOG entry ID for every compliance-gated flag enablement. Audit log `feature_flag.enabled` event retains this reference for 7 years. SOC 2 auditor can trace any gated flag back to the DPA clause that authorised it. |
+
+---
+
+### 19.12 Implementation Checklist
+
+| # | Task description | Owner role | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create `feature_flag_registry` table DDL with `flag_key_namespace` CHECK constraint; GRANT SELECT to `form_api` / `form_readonly` / `form_system`; confirm no INSERT GRANT to `form_api`; create `idx_ffr_minimum_tier` and `idx_ffr_deprecated` indexes | `enterprise-architect` | **P0** | M3 |
+| 2 | Insert §19.3 seed data for all 14 canonical flags; verify zero rows violate `flag_key_namespace` CHECK after seed; confirm `webhook.email_in_payloads` has `requires_compliance_gate = TRUE` | `enterprise-architect` | **P0** | M3 |
+| 3 | Run §19.9 migration: rename stub column to `flag_key`, add FK constraint, backfill `enabled_at`, add `compliance_approval_ref` column, run post-migration validation queries; migration script must abort (RAISE EXCEPTION) if any unrecognised `flag_name` values remain | `enterprise-architect` + `platform-engineer` | **P0** | M3 |
+| 4 | Enable RLS on `tenant_feature_flags`; add `tff_tenant_read` (form_api) and `tff_system_read` (form_system) policies; add to `__tests__/db/rls_isolation.test.ts`: tenant_member reads zero rows for another tenant; `form_api` INSERT attempt returns permission denied | `enterprise-architect` | **P0** | M3 |
+| 5 | Implement `assertFeatureEnabled(tenantId, flagKey, env)` TypeScript in `src/workers/feature-flags/assert-feature-enabled.ts`; unit tests covering: `flag_not_found` → 403; `tier_insufficient` → 403; `flag_disabled` → 403; `compliance_gate_missing` → 403; DB error → 403 (fail-closed); cache hit under 30s skips DB query | `platform-engineer` | **P0** | M3 |
+| 6 | Wire `assertFeatureEnabled()` into all existing Workers that gate on `cv_enabled`, `email_in_webhooks`, `ip_allowlist_enabled`, `sso_staging_env_enabled`; replace ad-hoc string checks with typed `FlagKey` calls; CI grep gate: no raw `flag_name` string lookups in Worker code after M4 | `platform-engineer` | **P0** | M3 |
+| 7 | Implement KV cache invalidation: mutation API deletes `flag:<tenantId>:<flagKey>` from KV before DB commit; integration test verifies next Worker call reads fresh value within the same request cycle | `platform-engineer` | **P0** | M3 |
+| 8 | Wire all four DEC-030 audit events (§19.7): `feature_flag.enabled` and `feature_flag.disabled` on `tenant_feature_flags` mutation; `feature_flag.registry_updated` on `feature_flag_registry` mutation; `feature_flag.compliance_gate_bypassed` on blocked gated-flag write attempt; validate HMAC chain in staging before deploying to production | `platform-engineer` + `security-engineer` | **P0** | M3 |
+| 9 | Implement compliance gate protocol enforcement in the internal admin flag mutation API: if `requires_compliance_gate = TRUE` and `compliance_approval_ref IS NULL`, emit `feature_flag.compliance_gate_bypassed` CRITICAL DEC-030 event and return 403; automatically open PagerDuty P1 incident on this event | `platform-engineer` + `compliance-officer` | **P0** | M3 |
+| 10 | Add auto-enablement hook to tenant activation flow: on new tenant created, for each registry flag where `default_enabled_at_activation = TRUE` and tenant plan meets `minimum_tier`, insert an enabled `tenant_feature_flags` row with `set_by = NULL` (system); emit `feature_flag.enabled` DEC-030 event per flag with `reason = 'auto_activation'` | `platform-engineer` | **P1** | M4 |
+| 11 | Resolve OQ-FLAG-01: implement plan downgrade hook in contract lifecycle (§16) that auto-disables Growth+/Enterprise-only flags when plan decreases; emit `feature_flag.disabled` DEC-030 events with `reason = 'plan_downgrade'` for each disabled flag | `enterprise-architect` + `platform-engineer` | **P1** | M5 |
+| 12 | Resolve OQ-FLAG-02: define flag deprecation sunset policy (minimum 90-day notice); implement pg_cron soft-delete of tenant flag rows at `deprecated_at + 90 days`; wire admin dashboard banner for tenants using a flag with non-null `deprecated_at` | `enterprise-architect` + `compliance-officer` | **P2** | M6 |
+
+---
+
+*v1.0 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer*
+
+*v1.0 additions: §19 Feature Flag & Entitlement Registry Schema — closes the §2.7 stub gap across all cross-references (§15 `cv.client_side_enabled`, §18 `webhook.email_in_payloads`, SSO_SCIM_IMPLEMENTATION.md `security.ip_allowlist_enabled` and `sso.staging_env_enabled`). Two-table design: `feature_flag_registry` (canonical allowlist, form_admin-only write, FK-enforced dotted namespace, `flag_key_namespace` CHECK constraint) and `tenant_feature_flags` (production per-tenant rows with FK to registry, `compliance_approval_ref`, `enabled_at`, RLS read-only for form_api and form_system). Seed data for 14 canonical flags across Starter / Growth / Enterprise tiers with one compliance-gated flag (`webhook.email_in_payloads`). Tier entitlement matrix (auto / avail / — / gate). TypeScript `assertFeatureEnabled()` in `src/workers/feature-flags/assert-feature-enabled.ts`: Cloudflare KV 30-second cache, tier rank comparison against TIER_ORDER map, compliance gate check, fail-closed on any DB or KV error (throws 403). Four DEC-030 HMAC-chained audit events: `feature_flag.enabled` (STANDARD, 7yr), `feature_flag.disabled` (STANDARD, 7yr), `feature_flag.registry_updated` (HIGH, 7yr), `feature_flag.compliance_gate_bypassed` (CRITICAL, 10yr — auto PagerDuty P1, always `blocked: true`). Compliance gate protocol: DPA authorisation → DECISION_LOG PR merge → compliance_approval_ref populated → form_admin enables via internal API → DEC-030 event with approval reference. §19.9 migration script: 14 flag_name-to-flag_key renames, RAISE EXCEPTION abort on unrecognised flags, FK constraint addition, `enabled_at` backfill from `updated_at`, `compliance_approval_ref` column addition, post-migration validation queries (zero unrecognised flags; zero enabled gated flags without approval ref). OQ-FLAG-01: tier downgrade auto-disable decision (preferred: contract lifecycle hook emitting feature_flag.disabled events, M5). OQ-FLAG-02: flag deprecation 90-day sunset policy with pg_cron soft-delete and admin dashboard banner (M6). SOC 2 mapping: CC6.1 (form_admin-only write, tier entitlement gates), CC6.2 (tier check = authorisation gate, plan not self-elevatable), CC8.1 (all mutations HMAC-chained in-transaction), CC9.2 (compliance_approval_ref persisted 7yr, auditor-traceable to DPA clause). 12-item implementation checklist (8× P0 M3, 1× P1 M4, 1× P1 M5, 1× P2 M6).*

@@ -6,6 +6,16 @@
 
 ---
 
+## [1.12.3] — 2026-05-24
+
+### Added
+- [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) §19 — Feature Flag & Entitlement Registry Schema (doc bumped v0.9 → v1.0): closes the §2.7 stub gap that left `tenant_feature_flags` without registry enforcement, tier gating, compliance gates, or DEC-030 audit trail. Two-table design: `feature_flag_registry` (canonical allowlist, `form_admin`-only write, FK-enforced dotted namespace via `flag_key_namespace` CHECK constraint) + `tenant_feature_flags` (production per-tenant rows with FK to registry, `compliance_approval_ref`, `enabled_at`, RLS read-only for `form_api` and `form_system`). Seed data for 14 canonical flags across Starter / Growth / Enterprise tiers (`sso.saml_enabled`, `sso.oidc_enabled`, `scim.provisioning_enabled`, `admin.dashboard_enabled`, `audit.rest_export_enabled`, `webhook.outbound_enabled`, `cv.client_side_enabled`, `audit.siem_export_enabled`, `audit.s3_sync_enabled`, `admin.cohort_analytics_enabled`, `branding.white_label_enabled`, `sso.staging_env_enabled`, `security.ip_allowlist_enabled`, `webhook.email_in_payloads`). Tier entitlement matrix: auto / avail / — / 🔒 gate per flag × tier. TypeScript `assertFeatureEnabled()` in `src/workers/feature-flags/assert-feature-enabled.ts`: Cloudflare KV 30-second cache, `TIER_ORDER` rank map, fail-closed on any error (throws 403). Four DEC-030 HMAC-chained audit events: `feature_flag.enabled` (STANDARD, 7yr), `feature_flag.disabled` (STANDARD, 7yr), `feature_flag.registry_updated` (HIGH, 7yr), `feature_flag.compliance_gate_bypassed` (CRITICAL, 10yr — auto PagerDuty P1). Compliance gate protocol: DPA authorisation → DECISION_LOG PR → `compliance_approval_ref` populated → `form_admin` enables → DEC-030 event. §19.9 migration script from §2.7 stub: 14 flag_name → flag_key renames, `RAISE EXCEPTION` abort on unrecognised flags, FK constraint addition, `enabled_at` backfill. OQ-FLAG-01 tier-downgrade auto-disable hook (M5). OQ-FLAG-02 deprecation sunset (M6). SOC 2: CC6.1/CC6.2/CC8.1/CC9.2. 12-item implementation checklist (8× P0 M3).
+
+### Changed
+- `VERSION` → 1.12.3
+
+---
+
 ## [1.12.2] — 2026-05-24
 
 ### Added
