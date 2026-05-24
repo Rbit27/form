@@ -6,6 +6,18 @@
 
 ---
 
+## [1.12.4] — 2026-05-24
+
+### Added
+- [`content/post-114-training-volume-hypertrophy.md`](content/post-114-training-volume-hypertrophy.md) — «Обсяг тренувань і гіпертрофія: крива доза-відповідь». Krieger (2010) мета-аналіз (multiple vs single sets), Schoenfeld/Ogborn/Krieger (2017) доза-відповідь (10+ сетів/м'яз/тиждень), Radaelli et al. (2015) 6-місячне RCT (5 > 3 > 1 сет), MEV/MAV/MRV операційна модель (Israetel), ознаки перевищення MRV, зворотній зв'язок інтенсивності і обсягу. clinical_safety: PASS (виключно тренувальна наука).
+- [`content/post-115-training-frequency-hypertrophy.md`](content/post-115-training-frequency-hypertrophy.md) — «Частота тренувань і гіпертрофія: нюанси важливіші за правило». Schoenfeld/Ogborn/Krieger (2016) 2x > 1x (ES 0.37 vs 0.14, але обсяг неурівняний), Ralston et al. (2017) при рівному обсязі ефект частоти зникає, McLester et al. (2000) деградація якості пізніх сетів, Colquhoun et al. (2018) 6x = 3x, вікно MPS (~24–48h), частота як механізм розподілу обсягу, full-body vs upper/lower vs bro split аналіз. clinical_safety: PASS (виключно тренувальна наука).
+- `blog.html` — картки Post 114 і Post 115 додані до сітки блогу (data-cat="science").
+
+### Changed
+- `VERSION` → 1.12.4
+
+---
+
 ## [1.12.3] — 2026-05-24
 
 ### Added
