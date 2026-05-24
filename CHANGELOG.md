@@ -6,6 +6,19 @@
 
 ---
 
+## [1.12.1] — 2026-05-24
+
+### Added
+- [`content/post-110-muscle-architecture.md`](content/post-110-muscle-architecture.md) — Архітектура м'яза: кут пір'їстості, довжина пучка, PCSA; clinical-safety PASS
+- [`content/post-111-post-activation-potentiation.md`](content/post-111-post-activation-potentiation.md) — PAP механізм (RLC фосфорилювання), вікно 4–12 хв, complex/contrast training; clinical-safety PASS
+- [`content/post-112-rpe-vs-percentage-autoregulation.md`](content/post-112-rpe-vs-percentage-autoregulation.md) — RPE vs %1RM, авторегуляція навантаження, Zourdos/Helms валідація; clinical-safety PASS
+
+### Changed
+- `README.md` — content roadmap +posts 110–112
+- `VERSION` → 1.12.1
+
+---
+
 ## [1.12.0] — 2026-05-24
 
 ### Added
