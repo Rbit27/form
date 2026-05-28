@@ -6,6 +6,19 @@
 
 ---
 
+## [1.12.6] — 2026-05-28
+
+### Added
+- [`content/post-117-fitness-fatigue-model.md`](content/post-117-fitness-fatigue-model.md) — «Модель Баністера: чому після важкого блоку форма росте — але потім». Banister et al. (1975) dual-factor impulse-response model: fitness component τ₁ ≈ 42 дні і fatigue component τ₂ ≈ 13 днів; Morton et al. (1990) Mathematical Modeling of Cardiovascular Fitness — верифікація на плавцях, k₂ > k₁ (втома пригнічує більше, ніж адаптація піднімає короткостроково); Busso (2003) нелінійне розширення і індивідуальна варіативність τ₁/τ₂; Zatsiorsky & Kraemer — блокова структура як практичне втілення dual-factor; Bosquet et al. (2007) meta-analysis (27 досліджень, ~2000 атлетів): оптимальний tapering +2–3% performance, –41–60% обсягу, 8–14 днів, збережена інтенсивність; Plews et al. (2013) HRV як proxy для h(t) fatigue component; практична структура мезоциклу accumulation/intensification/deload/peak; обмеження моделі. clinical_safety: PASS (виключно тренувальна наука і фізіологія адаптації).
+- `blog.html` — картка Post 117 (data-cat="science").
+- `STATUS.md` — рядок post-117 у content engine table.
+- `README.md` — пост post-117 відмічено [x]; додано 5 нових тем до роадмапу (post-118–122): відпочинок між підходами, drop sets, міофібрилярна vs саркоплазматична гіпертрофія, sarcomerogenesis, кут пір'їстості.
+
+### Changed
+- `VERSION` → 1.12.6
+
+---
+
 ## [1.12.5] — 2026-05-24
 
 ### Added
