@@ -27,6 +27,7 @@
 17. [Enterprise Admin Reporting Schema — Aggregate-Only Data Model & Privacy-Floor Enforcement](#17-enterprise-admin-reporting-schema--aggregate-only-data-model--privacy-floor-enforcement)
 18. [Notification & Webhook Event Queue Schema](#18-notification--webhook-event-queue-schema)
 19. [Feature Flag & Entitlement Registry Schema](#19-feature-flag--entitlement-registry-schema)
+20. [White-Label Tenant Branding Schema](#20-white-label-tenant-branding-schema)
 
 ---
 
@@ -5660,6 +5661,448 @@ WHERE ffr.requires_compliance_gate = TRUE
 | 12 | Resolve OQ-FLAG-02: define flag deprecation sunset policy (minimum 90-day notice); implement pg_cron soft-delete of tenant flag rows at `deprecated_at + 90 days`; wire admin dashboard banner for tenants using a flag with non-null `deprecated_at` | `enterprise-architect` + `compliance-officer` | **P2** | M6 |
 
 ---
+
+---
+
+## 20. White-Label Tenant Branding Schema
+
+### 20.1 Purpose and Scope
+
+The `white_label BOOLEAN` column in the `tenants` table (§2) acts as a fast-path entitlement gate. This section defines the complementary `tenant_branding` table that stores the actual branding assets and configuration applied when that flag is `TRUE`.
+
+White-label features per ENTERPRISE.md:
+- **Custom domain**: CNAME of `coaching.acme.com` → `form.coach` (DNS resolved at Cloudflare edge)
+- **Tenant logo**: replaces the FORM wordmark in the admin dashboard, mobile app, and transactional emails
+- **Primary colour override**: applied to buttons, active states, and progress indicators; accessibility floor enforced at write time
+- **"Powered by FORM" footer**: non-removable below $50k ARR; `powered_by_removal = TRUE` requires a signed contract amendment and `form_admin` write
+
+This section does NOT cover:
+- SSO custom domain flow — see SSO_SCIM_IMPLEMENTATION.md §4.5
+- White-label COGS — see COST_MODEL §15.5
+- Asset CDN delivery logic — `logo_url` stores the R2 public URL; cache headers are set at the Cloudflare R2 bucket level
+
+### 20.2 Design Decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Separate table vs inline on `tenants` | Separate `tenant_branding` (1:1, lazy) | Most tenants never configure branding; keeps the hot `tenants` row small |
+| `custom_domain` location | `tenant_branding.custom_domain` (not `tenants`) | Custom domain is a branding concern; avoids adding nullable columns to the core tenant row |
+| SVG allowed? | **No** — PNG and WebP only | SVG allows arbitrary JS in `<script>` tags; XSS attack surface is unacceptable on a shared CDN origin |
+| Colour validation layer | Application layer (admin dashboard API), not a DB CHECK | WCAG contrast requires two colours; a single-column CHECK cannot enforce the relational constraint. API rejects on fail; DB stores whatever the API accepts |
+| `powered_by_removal` writability | `form_admin` BYPASSRLS only; 403 on `form_system` or `form_api` write | Contractual control — removal is a $50k ARR+ concession; self-serve would allow flag toggle without a signed amendment |
+
+### 20.3 `tenant_branding` DDL
+
+```sql
+-- Data classification: DC-03 (business configuration, non-personal)
+-- Exception: email_reply_to may contain a personal email address → DC-05 (contact data)
+-- Art. 17 erasure: tenant_branding is hard-deleted with the tenant (ON DELETE CASCADE in §12)
+
+CREATE TABLE tenant_branding (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID        NOT NULL UNIQUE
+                              REFERENCES tenants(id) ON DELETE CASCADE,
+
+  -- Logos (R2 public URLs; written by asset upload API, never by direct DB write)
+  logo_url                  TEXT,         -- light-mode wordmark/logo (PNG or WebP, ≤ 200 KB)
+  logo_dark_url             TEXT,         -- dark-mode variant; fallback: logo_url
+  favicon_url               TEXT,         -- .ico or 32×32 PNG; ≤ 50 KB
+  logo_alt_text             TEXT,         -- accessibility: alt attribute for <img>
+
+  -- Colour tokens (hex; validated for WCAG AA at write time by admin dashboard API)
+  primary_color             TEXT
+                              CHECK (primary_color ~ '^#[0-9A-Fa-f]{6}$'),
+  primary_color_contrast    TEXT          -- auto-calculated: '#ffffff' or '#000000'
+                              CHECK (primary_color_contrast IN ('#ffffff', '#000000')),
+
+  -- Custom domain (Cloudflare Worker resolves tenant on this host; see SSO_SCIM §4.5 for SSO flow)
+  custom_domain             TEXT UNIQUE,  -- FQDN e.g. 'coaching.acme.com'; null = not configured
+  custom_domain_verified_at TIMESTAMPTZ,  -- null = pending DNS verification
+  custom_domain_status      TEXT        NOT NULL DEFAULT 'not_configured'
+                              CHECK (custom_domain_status IN
+                                ('not_configured', 'pending_dns', 'active', 'error')),
+
+  -- "Powered by FORM" enforcement
+  -- FALSE = footer visible (default). TRUE = footer removed.
+  -- Writable ONLY by form_admin (BYPASSRLS); form_system WITH CHECK rejects TRUE.
+  -- Contract threshold: contract_arr ≥ $50,000 per ENTERPRISE.md.
+  powered_by_removal        BOOLEAN     NOT NULL DEFAULT FALSE,
+  powered_by_removal_ref    TEXT,         -- DECISION_LOG entry ID for the contract amendment
+
+  -- Email sender branding (transactional emails via Resend / Postmark)
+  email_sender_name         TEXT,         -- e.g. 'Acme Fitness' → "Acme Fitness via FORM <noreply@form.coach>"
+  email_reply_to            TEXT,         -- optional; e.g. 'hr@acme.com'
+
+  -- Audit
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by                UUID          REFERENCES users(id) ON DELETE SET NULL
+                              -- NULL when set by form_admin (system action, no user context)
+);
+
+CREATE INDEX idx_tb_tenant_id     ON tenant_branding(tenant_id);
+CREATE INDEX idx_tb_custom_domain ON tenant_branding(custom_domain)
+  WHERE custom_domain IS NOT NULL;
+
+CREATE TRIGGER tenant_branding_updated_at
+  BEFORE UPDATE ON tenant_branding
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+```
+
+**Constraints enforced at the application layer** (not via DB CHECK):
+1. `logo_url` and `logo_dark_url` must resolve to R2 paths under `tenant-assets/{tenant_id}/` — validated at upload time
+2. `primary_color` must achieve ≥ 4.5:1 contrast ratio with `#ffffff` — WCAG AA for white text on the tenant's primary background — validated in the admin dashboard API before any write
+3. `custom_domain` must be a valid FQDN — validated at write time via regex `/^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?(\.[a-z]{2,})+$/i`
+4. `powered_by_removal = TRUE` requires `powered_by_removal_ref IS NOT NULL` and `contracts.contract_arr ≥ 50000` — enforced in the admin mutation API
+
+### 20.4 R2 Asset Storage
+
+R2 bucket: `form-tenant-assets` (same bucket as CV session stills; separate path prefix).
+
+```
+form-tenant-assets/
+└── tenant-assets/
+    └── {tenant_id}/           -- UUID
+        ├── logo.png            -- canonical light-mode logo
+        ├── logo-dark.png       -- dark-mode variant (optional)
+        └── favicon.ico         -- 32×32 px
+```
+
+**Asset upload flow** (admin dashboard API):
+1. Admin dashboard UI sends `POST /internal/admin/tenant/:id/branding/logo` with `Content-Type: multipart/form-data`
+2. API validates: MIME type ∈ `{image/png, image/webp}`, size ≤ 200 KB, dimensions non-zero via Sharp
+3. API streams to R2 via `env.TENANT_ASSETS.put()` at the path above
+4. On success: writes `logo_url = 'https://assets.form.coach/tenant-assets/{tenant_id}/logo.png?v={ts}'` to `tenant_branding`, emits `branding.logo_updated` DEC-030 event, and invalidates KV cache key `branding:{tenant_id}`
+5. Old asset is overwritten in-place (R2 overwrite); DEC-030 audit chain provides change history
+
+**Cache headers on R2 public bucket**: `Cache-Control: public, max-age=3600, s-maxage=86400`. Cache-bust is achieved by the `?v={unix_timestamp}` suffix written into `logo_url` by the upload API.
+
+**Allowed MIME types**: `image/png`, `image/webp` only. SVG is explicitly rejected — see §20.2. Favicon additionally accepts `image/x-icon`; max 50 KB; 32×32 px minimum validated at upload time.
+
+**Art. 17 erasure**: tenant logo files are deleted from R2 synchronously when a tenant account is hard-deleted, via an explicit R2 delete call in the tenant deletion Worker (the SQL `ON DELETE CASCADE` handles the DB row; it does not reach R2). Deletion is recorded under `branding.logo_deleted` DEC-030.
+
+### 20.5 WCAG Accessibility Floor
+
+ENTERPRISE.md specifies a "colour override з accessibility floor." This section defines that floor and its enforcement implementation.
+
+**Minimum contrast requirement**: primary colour must achieve ≥ **4.5:1** contrast ratio with white (`#ffffff`) when used as a background behind white text — WCAG 2.1 AA, Success Criterion 1.4.3 (normal text). This protects the white "FORM" wordmark and action-button labels rendered on the tenant's primary colour.
+
+```typescript
+// src/workers/admin/branding/validate-color.ts
+
+// WCAG relative luminance (IEC 61966-2-1 / sRGB)
+function relativeLuminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const linearise = (c: number) =>
+    c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  return 0.2126 * linearise(r) + 0.7152 * linearise(g) + 0.0722 * linearise(b);
+}
+
+function contrastRatio(hex1: string, hex2: string): number {
+  const L1 = relativeLuminance(hex1);
+  const L2 = relativeLuminance(hex2);
+  const [L, D] = L1 > L2 ? [L1, L2] : [L2, L1];
+  return (L + 0.05) / (D + 0.05);
+}
+
+export function pickContrastColor(hex: string): '#ffffff' | '#000000' {
+  return contrastRatio(hex, '#ffffff') >= contrastRatio(hex, '#000000')
+    ? '#ffffff'
+    : '#000000';
+}
+
+export function validatePrimaryColor(hex: string): {
+  valid: boolean;
+  contrastWithWhite: number;
+  primaryColorContrast: '#ffffff' | '#000000';
+  warning: string | null;
+} {
+  const ratio = contrastRatio(hex, '#ffffff');
+  return {
+    valid: ratio >= 4.5,
+    contrastWithWhite: Math.round(ratio * 100) / 100,
+    primaryColorContrast: pickContrastColor(hex),
+    warning:
+      ratio >= 3.0 && ratio < 4.5
+        ? `Contrast ${ratio.toFixed(2)}:1 fails WCAG AA (≥ 4.5:1 required for white text)`
+        : null,
+  };
+}
+// < 3.0:1  → API returns 422; tenant must choose a different colour
+// 3.0–4.5:1 → API returns 422; admin must correct
+// ≥ 4.5:1  → accepted; primary_color_contrast auto-set to '#ffffff' or '#000000'
+```
+
+**Admin dashboard UX**: colour picker renders a live contrast badge. The save button is disabled below 4.5:1 — no override modal exists. Below 3.0:1 the API returns 422 unconditionally.
+
+### 20.6 "Powered by FORM" Enforcement
+
+```
+Rule: powered_by_removal = FALSE always, UNLESS:
+  1. tenants.plan = 'enterprise'
+  2. Matching contracts row has contract_arr >= 50000
+  3. Contract amendment signed (DECISION_LOG entry exists)
+  4. powered_by_removal_ref IS NOT NULL (references the DECISION_LOG entry ID)
+  5. Write performed by form_admin role (BYPASSRLS)
+```
+
+**API enforcement** (`src/workers/admin/branding/set-powered-by-removal.ts`):
+```typescript
+export async function setPoweredByRemoval(
+  tenantId: string,
+  value: boolean,
+  decisionLogRef: string | null,
+  env: Env
+): Promise<void> {
+  // Callable ONLY from the internal form_admin API (service-token auth).
+  // form_api and form_system routes must reject this endpoint at the router layer.
+
+  if (value && !decisionLogRef) {
+    await emitDec030('branding.powered_by_removal_attempted_without_ref', {
+      tenant_id: tenantId, blocked: true, severity: 'CRITICAL',
+    }, env);
+    throw new ApiError(403, 'powered_by_removal requires a DECISION_LOG reference');
+  }
+
+  const contract = await getActiveContract(tenantId, env.DB);
+  if (value && (!contract || contract.contract_arr < 50_000)) {
+    await emitDec030('branding.powered_by_removal_below_arr_threshold', {
+      tenant_id: tenantId,
+      contract_arr: contract?.contract_arr ?? 0,
+      blocked: true,
+      severity: 'HIGH',
+    }, env);
+    throw new ApiError(403, 'powered_by_removal requires contract_arr ≥ $50,000');
+  }
+
+  await env.DB.prepare(
+    `UPDATE tenant_branding
+       SET powered_by_removal = ?, powered_by_removal_ref = ?, updated_at = now()
+     WHERE tenant_id = ?`
+  ).bind(value, decisionLogRef, tenantId).run();
+
+  await emitDec030(
+    value
+      ? 'branding.powered_by_removal_enabled'
+      : 'branding.powered_by_removal_revoked',
+    { tenant_id: tenantId, decision_log_ref: decisionLogRef, severity: 'HIGH' },
+    env
+  );
+}
+```
+
+**Mobile / web rendering**: the mobile app fetches `powered_by_removal` from the branding API (KV-cached, 300s TTL). If `FALSE` (default), the "Powered by FORM" footer component renders unconditionally — it cannot be suppressed via client-side state. The render decision is the server-returned value, not a client toggle.
+
+### 20.7 Custom Domain DNS Management
+
+Custom domains use Cloudflare's proxied CNAME model. The tenant's IT admin creates the DNS record; FORM does not manage the tenant's DNS zone.
+
+**Tenant-side setup** (instructions sent by customer-success):
+```
+CNAME coaching.acme.com → form.coach   (Cloudflare proxied)
+```
+
+**FORM-side verification flow**:
+1. Admin triggers `POST /internal/admin/tenant/:id/branding/verify-domain`
+2. Worker calls Cloudflare DNS-over-HTTPS to confirm the CNAME resolves to `form.coach`
+3. Worker issues `OPTIONS https://coaching.acme.com/.well-known/form-verify` — expects `X-FORM-Tenant-Id` response header set by the edge Worker (confirms Cloudflare proxying is active)
+4. Pass → `custom_domain_status = 'active'`, `custom_domain_verified_at = now()`, emit `branding.custom_domain_verified`
+5. Fail → `custom_domain_status = 'error'`, emit `branding.custom_domain_verification_failed`
+
+**Cloudflare Worker resolution** (leverages existing SSO_SCIM_IMPLEMENTATION.md §4.5 infrastructure):
+```typescript
+// On each inbound request arriving at a custom domain:
+const host = request.headers.get('Host');
+const branding = await kv.get<TenantBranding>(`branding-domain:${host}`); // 60s TTL
+const tenantId = branding?.tenant_id
+  ?? await db.query(
+      'SELECT tenant_id FROM tenant_branding WHERE custom_domain = $1 AND custom_domain_status = $2',
+      [host, 'active']
+    ).then(r => r.rows[0]?.tenant_id);
+
+if (!tenantId) return new Response('Not found', { status: 404 });
+// Set trusted internal header — NOT trusted from the internet (strip on ingress)
+headers.set('X-FORM-Tenant-Id', tenantId);
+```
+
+**SSL**: Cloudflare Universal SSL covers the proxied custom domain automatically. No FORM-side certificate management required. Certificate expiry monitoring is in OBSERVABILITY.md §6.
+
+### 20.8 Row-Level Security
+
+```sql
+ALTER TABLE tenant_branding ENABLE ROW LEVEL SECURITY;
+
+-- Tenant members: read own branding (used by mobile app theming API)
+CREATE POLICY tb_tenant_read ON tenant_branding
+  FOR SELECT TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+-- form_system: full read (admin dashboard API, BI tooling)
+CREATE POLICY tb_system_read ON tenant_branding
+  FOR SELECT TO form_system
+  USING (TRUE);
+
+-- form_system: insert + update allowed; powered_by_removal = TRUE rejected by WITH CHECK
+-- All branding mutations are routed through form_system (admin dashboard API)
+-- EXCEPT powered_by_removal, which requires form_admin BYPASSRLS
+CREATE POLICY tb_system_write ON tenant_branding
+  FOR ALL TO form_system
+  USING (TRUE)
+  WITH CHECK (
+    powered_by_removal = FALSE  -- form_system can never set TRUE; that path requires form_admin
+  );
+
+-- form_api: zero write access (no policy = deny)
+-- All branding writes flow through admin dashboard API (form_system) or internal admin API (form_admin).
+-- Reason: every mutation requires a DEC-030 event; form_api has no audit-event emission path.
+
+-- form_admin: BYPASSRLS — only role permitted to write powered_by_removal = TRUE
+```
+
+**Cross-tenant RLS isolation tests** (add to `__tests__/db/rls_isolation.test.ts`):
+```typescript
+it('tenant_branding: form_api reads zero rows for another tenant', async () => {
+  await setTenantContext(dbA, tenantAId);
+  const rows = await dbA.query(
+    'SELECT * FROM tenant_branding WHERE tenant_id = $1', [tenantBId]
+  );
+  expect(rows.rows).toHaveLength(0);
+});
+
+it('tenant_branding: form_system WITH CHECK rejects powered_by_removal = TRUE', async () => {
+  await expect(
+    dbSystem.query(
+      'UPDATE tenant_branding SET powered_by_removal = TRUE WHERE tenant_id = $1',
+      [tenantAId]
+    )
+  ).rejects.toThrow(); // WITH CHECK violation
+});
+```
+
+### 20.9 DEC-030 HMAC-Chained Audit Events
+
+All `tenant_branding` mutations emit HMAC-chained events per AUDIT_LOG_SCHEMA.md DEC-030.
+
+| Event key | Severity | Retention | Trigger |
+|---|---|---|---|
+| `branding.logo_updated` | STANDARD | 7yr | Logo or favicon uploaded successfully |
+| `branding.logo_deleted` | STANDARD | 7yr | Asset file deleted from R2 (tenant delete cascade) |
+| `branding.color_updated` | STANDARD | 7yr | `primary_color` or `primary_color_contrast` written |
+| `branding.custom_domain_added` | HIGH | 7yr | Non-null `custom_domain` written for the first time |
+| `branding.custom_domain_verified` | STANDARD | 7yr | DNS verification passed; `custom_domain_status = 'active'` |
+| `branding.custom_domain_verification_failed` | HIGH | 7yr | DNS verification failed; `custom_domain_status = 'error'` |
+| `branding.custom_domain_removed` | HIGH | 7yr | `custom_domain` set to NULL |
+| `branding.email_sender_updated` | STANDARD | 7yr | `email_sender_name` or `email_reply_to` changed |
+| `branding.powered_by_removal_enabled` | HIGH | 7yr | `powered_by_removal` → TRUE; `decision_log_ref` in payload |
+| `branding.powered_by_removal_revoked` | HIGH | 7yr | `powered_by_removal` → FALSE |
+| `branding.powered_by_removal_attempted_without_ref` | CRITICAL | 10yr | Attempt without `decision_log_ref`; always `blocked: true`; auto PagerDuty P1 |
+| `branding.powered_by_removal_below_arr_threshold` | HIGH | 7yr | Attempt when `contract_arr < 50,000`; always `blocked: true` |
+
+**Payload schema** (consistent with AUDIT_LOG_SCHEMA.md §2):
+```json
+{
+  "event": "branding.logo_updated",
+  "tenant_id": "uuid",
+  "actor_user_id": "uuid | null",
+  "actor_role": "form_system | form_admin",
+  "timestamp": "ISO-8601",
+  "data": {
+    "field": "logo_url",
+    "asset_path": "tenant-assets/{tenant_id}/logo.png",
+    "file_size_bytes": 42500,
+    "mime_type": "image/png"
+  },
+  "hmac": "sha256:...",
+  "prev_hmac": "sha256:..."
+}
+```
+
+Events MUST NOT include the previous or new logo URL value — avoids storing asset URLs in the tamper-evident chain beyond what the audit record requires.
+
+### 20.10 Migration from `tenants.white_label`
+
+The existing `tenants.white_label` boolean remains as a fast-path gate in Worker entitlement checks (no JOIN required). `tenant_branding` rows are lazily instantiated on first branding write.
+
+```sql
+-- No schema change to the tenants table is required.
+-- tenant_branding rows are created by the first admin dashboard branding write.
+-- For tenants where tenants.white_label = TRUE but no tenant_branding row exists:
+-- the Cloudflare Worker applies FORM defaults (standard logo, FORM brand colour).
+-- This is correct: white_label = TRUE means entitled, not configured.
+
+-- Nightly consistency check (pg_cron at 04:00 UTC):
+-- Detects the impossible state where a non-white-label tenant has
+-- a custom domain or powered_by_removal set.
+SELECT t.id, t.slug
+FROM tenants t
+JOIN tenant_branding tb ON tb.tenant_id = t.id
+WHERE t.white_label = FALSE
+  AND (tb.custom_domain IS NOT NULL OR tb.powered_by_removal = TRUE);
+-- Any row returned = data integrity violation.
+-- On result: emit CRITICAL DEC-030 'branding.invariant_violation', alert PagerDuty P1.
+```
+
+### 20.11 Tenant Branding API Endpoint Map
+
+| Method | Path | Auth | Action |
+|---|---|---|---|
+| `GET` | `/api/v1/tenant/branding` | `form_api` (any member) | Read branding config for mobile app theming; KV-cached 300s |
+| `PUT` | `/internal/admin/tenant/:id/branding/color` | `form_system` + `tenant_admin` JWT | Update `primary_color`; validates WCAG AA before write |
+| `POST` | `/internal/admin/tenant/:id/branding/logo` | `form_system` + `tenant_admin` JWT | Upload logo PNG/WebP to R2; writes `logo_url` |
+| `POST` | `/internal/admin/tenant/:id/branding/logo-dark` | `form_system` + `tenant_admin` JWT | Upload dark-mode logo |
+| `POST` | `/internal/admin/tenant/:id/branding/favicon` | `form_system` + `tenant_admin` JWT | Upload favicon to R2 |
+| `PUT` | `/internal/admin/tenant/:id/branding/custom-domain` | `form_system` + `tenant_admin` JWT | Set or clear `custom_domain`; sets status `pending_dns` |
+| `POST` | `/internal/admin/tenant/:id/branding/verify-domain` | `form_system` + `tenant_admin` JWT | Re-run DNS + preflight verification check |
+| `PUT` | `/internal/admin/tenant/:id/branding/email-sender` | `form_system` + `tenant_admin` JWT | Update `email_sender_name` / `email_reply_to` |
+| `PUT` | `/internal/form-admin/tenant/:id/branding/powered-by-removal` | `form_admin` service token only | Toggle `powered_by_removal`; requires `decision_log_ref` + ARR gate |
+
+All write paths invalidate `branding:{tenant_id}` KV cache synchronously before returning 200.
+
+### 20.12 SOC 2 Evidence Mapping
+
+| Control | TSC Criterion | Evidence artefact |
+|---|---|---|
+| Branding changes are audit-logged with actor, timestamp, and HMAC chain | CC7.2 — System monitoring; CC8.1 — Change management | `audit_log_events` rows for all `branding.*` event keys; HMAC chain verified by weekly cron (OBSERVABILITY.md §6) |
+| `powered_by_removal` requires DECISION_LOG reference and ARR gate | CC8.1 — Change management; CC6.1 — Logical access | `tenant_branding.powered_by_removal_ref` persisted 7yr; `contracts.contract_arr` validation code path unit-tested |
+| Custom domain verified before activation | CC6.2 — Authorisation (DNS ownership proof before domain becomes active) | `branding.custom_domain_verified` DEC-030 event with `custom_domain_verified_at` timestamp; `custom_domain_status` state machine prevents activation without verification |
+| SVG rejected at API layer | CC6.8 — Input validation; CC7.2 — Malicious content detection | MIME-type allow-list unit test in `__tests__/admin/branding/asset-upload.test.ts` |
+
+**Auditor evidence artefacts**:
+- `compliance/evidence/branding/branding-schema.sql` — DDL export from production Supabase, refreshed quarterly
+- `compliance/evidence/branding/rls-policies.sql` — RLS policy export, matches §20.8 DDL
+- `compliance/evidence/branding/powered-by-removal-log.csv` — `audit_log_events` export filtered on `branding.powered_by_removal_enabled`; reviewed at each quarterly access review (§23)
+
+### 20.13 Open Questions
+
+| # | Question | Owner | Priority |
+|---|---|---|---|
+| OQ-BRAND-01 | Should `email_reply_to` require a FORM-operated domain (e.g. `@acme.form.coach`) to prevent SPF misalignment and phishing risk? Currently accepts arbitrary email addresses. | compliance-officer + security-engineer | Medium — resolve before first white-label transactional email send |
+| OQ-BRAND-02 | At what ARR / seat threshold should a second colour token (`secondary_color`) and heading font override be offered? Omitted here to limit accessibility validation scope. | enterprise-architect | Low — revisit at first Enterprise customer requesting it |
+| OQ-BRAND-03 | `custom_domain_status = 'error'` has no automated retry today. Should verification auto-retry on a 24h pg_cron, or require manual re-trigger by the tenant admin? | platform-engineer | Medium — manual trigger is acceptable for initial launch; auto-retry is a P2 improvement |
+
+### 20.14 Implementation Checklist
+
+| # | Task description | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create `migrations/YYYYMMDD_tenant_branding.sql` — `tenant_branding` DDL, CHECK constraints, indexes, `update_updated_at_column()` trigger, all RLS policies from §20.8 | `enterprise-architect` | **P0** | M5 |
+| 2 | Implement `validatePrimaryColor()` in `src/workers/admin/branding/validate-color.ts` per §20.5; unit tests: `#ffffff` (1:1 → fail), `#1a1f2e` FORM navy (passes), `#888888` (3.9:1 → warn) | `platform-engineer` | **P0** | M5 |
+| 3 | Implement asset upload API: MIME allow-list (PNG/WebP/ICO), size gate, Sharp dimension read, R2 put with `?v={ts}` cache-bust suffix, DB write, KV invalidation, `branding.logo_updated` DEC-030 event | `platform-engineer` | **P0** | M5 |
+| 4 | Implement `GET /api/v1/tenant/branding` with KV 300s cache; response: `{ logo_url, logo_dark_url, favicon_url, primary_color, primary_color_contrast, powered_by_removal, custom_domain, email_sender_name }`; test: cache hit/miss, cross-tenant RLS | `platform-engineer` | **P0** | M5 |
+| 5 | Implement `PUT /internal/form-admin/tenant/:id/branding/powered-by-removal` per §20.6 — form_admin service token validation, `decision_log_ref` requirement, ARR gate from `contracts` table (§16), DEC-030 events for enable/revoke/blocked paths | `platform-engineer` + `compliance-officer` | **P0** | M5 |
+| 6 | Implement custom domain flow: `PUT` sets `pending_dns`; `POST verify-domain` runs CNAME + preflight check; state machine transitions; `branding.custom_domain_added`, `branding.custom_domain_verified`, `branding.custom_domain_verification_failed` DEC-030 events | `platform-engineer` | **P0** | M5 |
+| 7 | Wire all 12 DEC-030 audit events (§20.9) to their triggers; confirm `branding.powered_by_removal_attempted_without_ref` carries `blocked: true` and CRITICAL severity; auto-open PagerDuty P1 on CRITICAL branding events | `platform-engineer` + `security-engineer` | **P0** | M5 |
+| 8 | Add cross-tenant RLS isolation tests to `__tests__/db/rls_isolation.test.ts` per §20.8 — form_api zero rows for another tenant; form_system WITH CHECK rejects `powered_by_removal = TRUE` | `enterprise-architect` | **P0** | M5 |
+| 9 | Add nightly pg_cron consistency check at 04:00 UTC (§20.10) — emit CRITICAL DEC-030 `branding.invariant_violation` + PagerDuty P1 if any non-white-label tenant has `custom_domain IS NOT NULL` or `powered_by_removal = TRUE` | `platform-engineer` + `devops-lead` | **P0** | M5 |
+| 10 | Add `branding.white_label_enabled` flag to `feature_flag_registry` seed data (§19.3) if missing; wire `assertFeatureEnabled('branding.white_label_enabled')` gate into all branding write paths | `platform-engineer` | **P1** | M5 |
+| 11 | Admin dashboard UI: branding settings page — live colour picker with WCAG contrast badge, logo upload with dimensions preview, custom domain config with verification status indicator; `powered_by_removal` toggle visible only in internal form_admin view | `enterprise-architect` | **P1** | M6 |
+| 12 | Add `tenant_branding` to Art. 17 erasure documentation in §12 (soft delete section); confirm `ON DELETE CASCADE` covers DB row; add explicit R2 asset deletion call to tenant deletion Worker (CASCADE does not reach R2) | `platform-engineer` + `compliance-officer` | **P1** | M5 |
+| 13 | File compliance artefacts: `compliance/evidence/branding/rls-policies.sql` and `compliance/evidence/branding/branding-schema.sql`; add both to SOC2_READINESS.md §38.6 evidence index | `compliance-officer` | **P2** | M6 |
+
+---
+
+*v1.1 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer*
 
 *v1.0 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer*
 

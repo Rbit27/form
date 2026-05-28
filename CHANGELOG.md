@@ -6,6 +6,14 @@
 
 ---
 
+## [1.12.23] — 2026-05-28
+
+### Changed
+- `docs/DATA_MODEL.md` — §20 White-Label Tenant Branding Schema added. Closes the gap where `SSO_SCIM_IMPLEMENTATION.md §4.5` referenced `tenants.custom_domain` but no column or dedicated table existed. New `tenant_branding` table: 1:1 with `tenants` (lazy instantiation), columns for `logo_url` / `logo_dark_url` / `favicon_url` / `logo_alt_text`, `primary_color` + auto-calculated `primary_color_contrast`, `custom_domain` with DNS-verification state machine (`not_configured` → `pending_dns` → `active` / `error`), `powered_by_removal` (form_admin BYPASSRLS only; form_system WITH CHECK rejects TRUE; ARR gate ≥ $50k + DECISION_LOG ref required), and `email_sender_name` / `email_reply_to`. R2 asset storage at `form-tenant-assets/tenant-assets/{tenant_id}/`; PNG/WebP only (SVG rejected — XSS risk). WCAG AA colour floor: `validatePrimaryColor()` TypeScript implementation using IEC 61966-2-1 relative luminance; ≥ 4.5:1 contrast ratio with `#ffffff` required; `<3.0:1` returns 422 unconditionally; `primary_color_contrast` auto-set to `#ffffff` or `#000000`. "Powered by FORM" enforcement: `powered_by_removal = FALSE` always unless `contract_arr ≥ $50,000` + signed contract amendment + DECISION_LOG ref; attempts without ref emit CRITICAL DEC-030 event + auto PagerDuty P1. Custom domain DNS management: Cloudflare CNAME proxying, CNAME + preflight verification, KV-cached Cloudflare Worker tenant resolution at 60s TTL. RLS: `form_api` tenant-scoped SELECT; `form_system` full read + insert/update with WITH CHECK rejecting `powered_by_removal = TRUE`; `form_api` zero write access. 12 DEC-030 HMAC-chained audit events (STANDARD/HIGH/CRITICAL). Nightly pg_cron consistency check at 04:00 UTC detects white_label/tenant_branding invariant violations → CRITICAL DEC-030 + PagerDuty P1. Endpoint map for 9 API paths (form_api read, form_system writes, form_admin powered-by-removal). SOC 2 mapping: CC7.2 (HMAC audit chain), CC8.1 (change management + ARR gate), CC6.1 (logo access), CC6.2 (DNS verification before activation), CC6.8 (SVG rejection). 3 open questions (OQ-BRAND-01 email_reply_to domain constraint; OQ-BRAND-02 secondary_color scope; OQ-BRAND-03 domain re-verification automation). 13-item implementation checklist (9× P0 M5, 3× P1 M5/M6, 1× P2 M6). ToC updated with §20 entry. owner: enterprise-architect + compliance-officer + security-engineer.
+- `VERSION` → 1.12.23
+
+---
+
 ## [1.12.22] — 2026-05-28
 
 ### Added
