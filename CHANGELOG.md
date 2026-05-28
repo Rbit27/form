@@ -6,6 +6,14 @@
 
 ---
 
+## [1.12.7] — 2026-05-28
+
+### Changed
+- [`docs/COST_MODEL.md`](docs/COST_MODEL.md) — §20 Customer ROI Model & Business Case Template added (patch extension). Buyer-facing financial justification tool for enterprise sales: status quo cost baseline (Willis Towers Watson / Mercer benchmarks, $43–90/seat/month at 20% utilisation); five quantifiable value levers (utilisation arbitrage 3.25×, absenteeism reduction 14% conservative vs RAND 28%, productivity uplift 0.5%, turnover avoidance, direct cost comparison); three-year ROI tables by tier (Starter 100-seat 255% ROI 3.4-month payback / Growth 300-seat 318% 2.9-month / Enterprise 1,000-seat 434% 2.3-month); three sensitivity analyses showing floor case (40% activation + 5% absenteeism reduction) still yields 161–175% ROI; non-financial value drivers (CSRD/ESG, talent acquisition, EEOC/HIPAA/ADA risk avoidance, culture signal); copy-paste business case template for internal champion; sales champion usage notes (lead with absenteeism, disclose conservative basis, no fabricated case studies). OQ-18 added: pilot activation instrumentation requirement. OQ-19 added: ICP salary band discovery question.
+- `VERSION` → 1.12.7
+
+---
+
 ## [1.12.6] — 2026-05-28
 
 ### Added
