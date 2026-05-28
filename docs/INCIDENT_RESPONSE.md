@@ -1,6 +1,6 @@
-# FORM · Incident Response Runbook v0.5
+# FORM · Incident Response Runbook v0.8
 
-> Owner: security-engineer + devops-lead. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2.
+> Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
 ---
 
@@ -3890,6 +3890,412 @@ A US DOJ criminal division issues a grand jury subpoena to FORM demanding "all r
 
 ---
 
+### R-14: DSAR / Data Subject Rights Incident
+
+**Trigger:** Any of the following:
+- 30-day deadline (Art. 15/20 access/portability) missed or at imminent risk of being missed
+- 72-hour Art. 17 erasure failure — Art. 9 health data confirmed still queryable after erasure job ran
+- DSAR export confirmed to contain another user's or tenant's data (cross-tenant contamination)
+- Bulk or coordinated DSAR campaign (≥ 10 requests in 24 hours from suspected coordinated source)
+- DPA notification received of a data subject complaint filed against FORM regarding a DSAR
+
+**Severity:**
+
+| Scenario | Default Severity | Notes |
+|---|---|---|
+| DSAR export contains cross-tenant data | **P0** | R-01 also active immediately — this is a data breach |
+| Art. 9 health data confirmed present after erasure deadline | **P0** | R-01 scope assessment; assess R-11 for `cv_sessions.keypoints_enc` |
+| 30-day DSAR deadline missed, DPA not yet contacted | **P1** | Compliance-officer decides on DPA self-report |
+| Export worker complete failure (zero exports delivered) | **P1** | Data-engineer + compliance-officer |
+| Single DSAR delayed, within cure window (days 28–30) | **P2** | IC informed; manual delivery if possible |
+| Bulk DSAR suspected abuse, no deadline risk yet | **P2** | Monitor; → P1 if deadlines materialise |
+| DPA complaint received from a data subject | **P1** | Compliance-officer classifies; legal counsel notified |
+
+#### Immediate Actions (T+0 to T+30 min)
+
+**For P0 (cross-tenant contamination or Art. 9 erasure failure):**
+```
+1. Open incident channel: #inc-YYYYMMDD-dsar
+2. Page: IC + compliance-officer + security-engineer simultaneously
+3. If cross-tenant contamination: activate R-01 in parallel — treat as a data breach
+4. If Art. 9 erasure failure: lock the affected user_id from new data ingestion while
+   scope is assessed; do NOT delete further until audit is complete (legal hold applies)
+5. Note exact detection timestamp — Art. 33 clock may start now if health data was exposed
+6. Capture current state BEFORE remediation:
+   - Export contamination: download the offending archive; compute SHA-256
+   - Erasure failure: run R-14.1 scope assessment queries; screenshot results
+```
+
+**For P1 (missed deadline or export worker failure):**
+```
+1. Open incident channel or Linear ticket (P1 may be business-hours handled)
+2. Notify compliance-officer within 1 hour
+3. Missed deadline: draft Template D-01 (DPA self-report — see R-14.7)
+4. Export worker failure: page data-engineer; capture job failure logs
+5. Check DSAR register for all in-flight requests — identify any others at deadline risk
+```
+
+#### R-14.1 Severity Assessment Queries
+
+```sql
+-- In-flight DSARs approaching or past deadline
+SELECT id, user_id, request_type, submitted_at,
+       submitted_at + interval '30 days' AS deadline,
+       now() > submitted_at + interval '30 days' AS overdue,
+       status
+FROM dsar_requests
+WHERE status NOT IN ('fulfilled', 'rejected_with_reason')
+ORDER BY submitted_at ASC;
+
+-- Check if export delivery was generated and sent
+SELECT id, user_id, export_url_generated_at, export_delivered_at,
+       export_download_confirmed_at
+FROM dsar_requests
+WHERE status = 'export_generated' AND export_delivered_at IS NULL;
+
+-- Erasure completeness check for a specific user (run after erasure job claims completion)
+SELECT 'user_profiles' AS tbl, count(*) FROM user_profiles WHERE user_id = '<uid>'
+UNION ALL
+SELECT 'health_profiles', count(*) FROM health_profiles WHERE user_id = '<uid>'
+UNION ALL
+SELECT 'workout_sessions', count(*) FROM workout_sessions WHERE user_id = '<uid>'
+UNION ALL
+SELECT 'coaching_turns', count(*) FROM coaching_turns WHERE user_id = '<uid>'
+UNION ALL
+SELECT 'wearable_readings', count(*) FROM wearable_readings WHERE user_id = '<uid>'
+UNION ALL
+SELECT 'cv_sessions', count(*) FROM cv_sessions WHERE user_id = '<uid>';
+-- All values should be 0 after hard-delete; 1 tombstone row acceptable after soft-delete
+```
+
+#### R-14.2 Cross-Tenant Data in Export (P0)
+
+If a DSAR export is confirmed to contain data belonging to a user or tenant other than the requester:
+
+```
+1. This is simultaneously a DSAR incident AND a data breach — activate R-01 in parallel
+2. Revoke the export download link immediately if not yet downloaded:
+   - Invalidate the pre-signed R2/S3 URL or expire the signed delivery token
+   - Log: dsar.export_link_revoked (DEC-030, CRITICAL)
+3. If already downloaded: you cannot un-download
+   - If health data (Art. 9) was in the contaminated archive: Art. 33 clock starts now
+   - Focus on scope assessment and notification, not just technical containment
+4. Do NOT re-run the export job until root cause is confirmed and a cross-tenant
+   isolation regression test passes
+5. Scope assessment:
+   - Whose data was in the export? (user_id / tenant_id of contaminated data)
+   - What data categories? (Art. 9 health data → P0 Art. 34 presumed; PII only → P0, lower Art. 34 risk)
+   - Did the requester download the archive?
+   - Is this a systematic query bug or an isolated event?
+6. If the contaminated data belongs to an enterprise tenant employee:
+   → Notify tenant admin via Template E-01 (§12) within 30 min of P0 confirmation
+   → Customer Lead owns tenant comms; IC approves all statements
+7. After fix and cross-tenant RLS/export isolation test passes:
+   → Deliver a corrected export to the original requester
+   → Log: dsar.export_redelivered with correction_reason field
+```
+
+#### R-14.3 Failed Erasure (Art. 17 Right to Erasure)
+
+FORM implements erasure as a multi-step job (see DATA_MODEL.md §12.1). An erasure incident occurs when the erasure worker completed without error but data remains queryable, a worker timed out leaving partial erasure, or a cascading failure leaves a tombstone row accessible.
+
+```
+1. Run R-14.1 scope assessment queries first — document results before any action
+2. Check the last erasure worker run in audit log:
+   SELECT * FROM audit_log_events
+   WHERE event_type = 'data.user_deleted'
+     AND metadata->>'user_id' = '<uid>'
+   ORDER BY created_at DESC LIMIT 5;
+
+3. Check the erasure worker job logs:
+   - Cloudflare Workers tail for the erasure Worker
+   - Supabase pg_cron logs for scheduled deletion sweeps
+
+4. Determine scope of partial erasure:
+   - Which tables still contain rows?
+   - Document in incident channel
+
+5. Containment: prevent the user from logging in while erasure is being completed:
+   DELETE FROM auth.sessions WHERE user_id = '<uid>';
+
+6. Manual erasure for remaining rows (IC + compliance-officer authorization required):
+   -- Execute per table; commit after each; emit DEC-030 event per table
+   DELETE FROM health_profiles WHERE user_id = '<uid>';
+   -- repeat for each remaining table
+   -- Log: dsar.erasure_manual_supplement (CRITICAL) with table_name, row_count, operator_id,
+   --      ic_authorization_ref
+
+7. Art. 9 data confirmed accessible after erasure deadline:
+   → Assess Art. 33: was the data accessed (by someone other than the subject) after deadline?
+   → Yes → R-01 also active; Art. 33 clock starts from date of that access
+   → No (data present but not accessed) → no Art. 33 obligation; document assessment
+
+8. cv_sessions.keypoints_enc specific:
+   If keypoints_enc rows remain populated after erasure → activate R-11 alongside R-14
+   Biometric Art. 9 protocol in R-11 takes precedence on notification timeline
+```
+
+#### R-14.4 Missed GDPR Deadline (Art. 15/20)
+
+Statutory deadline: **30 calendar days** from the date of the verified DSAR request. One-time extension to **90 days** is permitted for complex requests, but the data subject must be notified within the original 30-day window that the extension is being applied and why.
+
+```
+Days 28–30 with no delivery (P2 cure window):
+1. Notify compliance-officer immediately
+2. Check export worker status — has the job run? Output valid?
+3. If job ran but delivery failed: manually re-trigger; log to DEC-030
+4. If job not yet run: trigger manually; monitor to completion
+5. Document delay cause in Linear DSAR register
+6. No DPA self-report required if delivered before the hard deadline
+
+Day 30 passed with no delivery (P1 — missed):
+1. Open #inc-YYYYMMDD-dsar; notify compliance-officer within 1 hour
+2. Deliver the export as soon as technically possible
+3. Draft Template D-01 (DPA voluntary self-report)
+4. Notify data subject of the delay (Template D-02)
+5. Compliance-officer decides on DPA self-report:
+   → GDPR Art. 12(3) imposes no explicit self-report obligation for missed DSARs
+   → Self-reporting demonstrates cooperation (Art. 83(2)(f)) and reduces fine exposure
+   → Default: self-report for any Art. 9 DSAR with a missed deadline
+   → Compliance-officer has authority to self-report without founder sign-off
+     when no data breach is involved
+```
+
+#### R-14.5 Bulk DSAR / Coordinated Abuse (P2 → P1)
+
+GDPR Art. 12(5) permits FORM to refuse or charge a reasonable fee for requests that are "manifestly unfounded or excessive, in particular because of their repetitive character."
+
+```
+Trigger threshold: ≥ 10 DSAR submissions from distinct accounts in 24 hours
+sharing the same IP range, employer, or coordinated submission pattern
+
+1. Flag requests in DSAR register as suspected coordinated
+2. Do NOT automatically reject — each request requires individual assessment
+3. Notify compliance-officer; they decide on Art. 12(5) refusal strategy
+4. If refusing on Art. 12(5) grounds:
+   - Each refusal must state the reason in writing
+   - User retains the right to complain to the DPA (Art. 77)
+   - Use Template D-03 (Art. 12(5) refusal notice)
+5. Document volume, source analysis, and refusal rationale in Legal folder
+6. If coinciding with a social media campaign or activist group:
+   - Notify founder and customer-success (reputational risk)
+   - Do NOT characterise as abuse in any external communication
+7. If ≥ 5 requests approach day 28 simultaneously → escalate to P1:
+   data-engineer prioritises export worker capacity
+```
+
+#### R-14.6 Enterprise Employee DSAR
+
+Under FORM's enterprise licence, the employer is the data controller for employee fitness data. FORM is the data processor. This creates a joint-controller complexity when an enterprise employee submits a DSAR directly to FORM.
+
+```
+FORM's position:
+- Art. 15/20 DSARs run against the controller (the employer), not the processor
+- FORM should redirect the employee to their employer but cannot refuse to acknowledge
+
+Protocol:
+1. Acknowledge receipt in writing within 5 business days
+2. Notify the enterprise tenant IT admin or DPO via Template E-DSAR-01
+3. Compliance-officer assesses:
+   a. Is FORM also an independent controller for any data? (e.g., support chat, billing data)
+   b. If yes: FORM must fulfill the DSAR for the data it independently controls
+   c. If no: redirect employee to their employer with Template D-04
+
+4. Do NOT produce the employee's workout, coaching, or health data without
+   explicit written instruction from the employer (controller) or a valid legal order
+
+5. Privacy floor — if the employer instructs FORM to withhold data FROM the employee:
+   - FORM cannot be party to suppressing an individual's Art. 15 right of access
+   - If employer objects and FORM cannot fulfill without instruction:
+     escalate to compliance-officer + external counsel
+   - Do not comply with a blocking instruction that extinguishes the data subject's rights
+```
+
+#### R-14.7 Communication Templates
+
+**Template D-01 — DPA Voluntary Notification (Missed DSAR Deadline)**
+```
+To: [competent DPA — see §10 Regulatory Obligations for DPA contact table]
+Subject: Voluntary Notification — DSAR Response Delay
+
+We are writing voluntarily to inform [DPA name] of a delayed response to a data
+subject access request received by FORM (form.coach).
+
+The request was submitted on [date] by a data subject resident in [member state] under
+Article 15 GDPR. The 30-day statutory response period elapsed on [date] without delivery.
+
+Root cause: [brief factual description — e.g., "A configuration error in the export
+processing worker caused the job to fail silently without alerting operators."]
+
+Remediation: The data subject received their complete export on [delivery date]. We have
+implemented [brief preventive control, e.g., "day-25 and day-29 Slack alerts"]. The DSAR
+register has been audited; no other requests are currently overdue.
+
+Our data protection contact: privacy@form.coach.
+[compliance-officer name, title]
+```
+
+**Template D-02 — User Notification (Delayed DSAR Response)**
+```
+Subject: Your data request — brief delay
+
+Hi [Name],
+
+We received your data request on [date] and owe you an apology — we've missed
+the 30-day deadline we're required to meet.
+
+What happened: [plain-language explanation]
+
+Your complete data export is [attached / available at the secure link below].
+It includes [list categories: workout history, coaching conversations, account data, etc.].
+
+If you have questions, contact privacy@form.coach. You also have the right to
+lodge a complaint with your supervisory authority at any time:
+[link to relevant DPA — BfDI/Germany, DPC/Ireland, ICO/UK, etc.]
+
+[compliance-officer / privacy team name]
+```
+
+**Template D-03 — Art. 12(5) Refusal Notice**
+```
+Subject: Your data request — our response
+
+We received your data request on [date].
+
+After assessment, we have determined that this request is one of multiple requests
+submitted in a short period that, taken together, are excessive in character within
+the meaning of Article 12(5) GDPR.
+
+[If charging a fee:] We are exercising our right to charge a reasonable fee of
+[amount] to process this request. Please confirm payment to privacy@form.coach to proceed.
+
+[If refusing:] We are declining to process this request on the above grounds.
+You have the right to lodge a complaint with your supervisory authority and
+to seek a judicial remedy under Article 79 GDPR.
+
+[compliance-officer name, title]
+```
+
+**Template D-04 — Employee DSAR Redirect to Employer**
+```
+Subject: Your data request — next step
+
+Hi [Name],
+
+Thank you for your request. Under your employer's FORM Enterprise licence, [TenantName]
+is the data controller responsible for the employee fitness data collected during your use
+of FORM as a workplace benefit.
+
+For your request under Article 15 GDPR, please contact [TenantName]'s designated data
+protection contact at [employer DPO contact if known, otherwise HR].
+
+FORM holds some data as an independent controller (for example, billing and support
+interactions not related to your workplace licence). If you wish to request that data,
+please reply to this email and we will handle it directly within 30 days.
+
+[privacy@form.coach]
+```
+
+**Template E-DSAR-01 — Enterprise Tenant Notification (Employee DSAR Received)**
+```
+To: [Tenant IT admin / DPO]
+Subject: Data request received from an employee
+
+We have received a data subject access request from an individual who identifies as an
+employee covered under [TenantName]'s FORM Enterprise licence. The request was received
+on [date] and the 30-day response window runs until [date].
+
+As data controller for employee data under your licence, this request is primarily
+directed at you. We are notifying you as required under our Data Processing Agreement.
+
+If FORM holds data as an independent controller that also falls within scope,
+we will handle that portion directly. Please instruct us within 5 business days
+if you have any direction on the employer-controlled data.
+
+Contact: enterprise@form.coach
+[Customer Lead name, FORM Enterprise]
+```
+
+#### R-14.8 DEC-030 Audit Events
+
+| Event Type | Severity | Trigger | Required Metadata |
+|---|---|---|---|
+| `dsar.request_received` | MEDIUM | New DSAR submitted | `request_type`, `user_id`, `jurisdiction`, `dsar_id` |
+| `dsar.identity_verified` | LOW | ID verification completed | `dsar_id`, `verification_method` |
+| `dsar.export_initiated` | MEDIUM | Export job started | `dsar_id`, `export_job_id` |
+| `dsar.export_delivered` | MEDIUM | Secure link sent to requester | `dsar_id`, `delivery_method`, `link_expiry` |
+| `dsar.export_link_revoked` | CRITICAL | Link revoked — contamination discovered | `dsar_id`, `reason`, `was_downloaded` |
+| `dsar.export_redelivered` | HIGH | Corrected export delivered after revocation | `dsar_id`, `correction_reason` |
+| `dsar.erasure_initiated` | HIGH | Erasure job started | `dsar_id`, `user_id`, `tables_in_scope` |
+| `dsar.erasure_completed` | HIGH | All tables confirmed empty | `dsar_id`, `tables_erased`, `rows_deleted_total` |
+| `dsar.erasure_manual_supplement` | CRITICAL | Manual erasure by ops after job failure | `dsar_id`, `table_name`, `row_count`, `operator_id`, `ic_authorization_ref` |
+| `dsar.deadline_missed` | HIGH | Day 30 passed without delivery | `dsar_id`, `deadline`, `current_status` |
+| `dsar.extension_applied` | MEDIUM | 90-day extension applied (Art. 12(3)) | `dsar_id`, `reason`, `new_deadline` |
+| `dsar.rejected_art_12_5` | HIGH | Request refused as manifestly excessive | `dsar_id`, `reason`, `legal_basis` |
+| `dsar.dpa_notified` | HIGH | Voluntary DPA self-report sent | `dsar_id`, `dpa_name`, `notification_method` |
+| `dsar.enterprise_tenant_notified` | MEDIUM | Enterprise admin notified of employee DSAR | `dsar_id`, `tenant_id`, `notification_timestamp` |
+
+#### R-14.9 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Evidence Type | Source |
+|---|---|---|
+| **P4.0** (Data subject inquiries and complaints) | DSAR register with submission, status, and resolution timestamps | Linear DSAR register + `dsar_requests` table |
+| **P5.0** (Data subject requests) | Fulfilled export packages with delivery timestamps | DEC-030 `dsar.export_delivered` events |
+| **P5.1** (Consent and choice) | Erasure completion confirmations | DEC-030 `dsar.erasure_completed` + scope query results |
+| **P8.0** (Disposal) | Manual erasure supplementation log | DEC-030 `dsar.erasure_manual_supplement` events |
+| **CC2.2** (External communications) | DPA notifications, user delay notifications | Template D-01, D-02 sent copies in evidence folder |
+| **CC6.5** (Access controls — disposal) | Post-erasure verification query showing zero rows | SQL output saved to `compliance/evidence/dsar/` |
+
+Evidence package location: `compliance/evidence/dsar/YYYY-MM/<dsar_id>/`
+
+```
+request/          — original DSAR submission (redacted copy)
+verification/     — identity verification record
+export/           — manifest of delivered data (not the export archive itself)
+erasure/          — post-erasure verification query output + SHA-256 manifest
+comms/            — all emails sent to data subject and DPA
+dec030/           — DEC-030 event export for this dsar_id
+```
+
+Retention: 7 years per DEC-030 policy. Evidence folder is read-only after case closure.
+
+#### R-14.10 Post-Incident Preventive Controls
+
+| Control | Owner | Verification Method |
+|---|---|---|
+| Day-25 and day-29 DSAR deadline Slack alerts | data-engineer | Check pg_cron + Slack alert config |
+| Monthly end-to-end export worker test (synthetic DSAR) | qa-lead | CI canary job in Linear |
+| Post-erasure verification query (automated, runs 1h after erasure job) | platform-engineer | Check job exists; alerts on non-zero count |
+| Cross-tenant export isolation regression test | qa-lead | Test asserts export zip contains only requester's `user_id` |
+| Weekly DSAR register review | compliance-officer | Linear [Privacy] project weekly cadence |
+| `cv_sessions.keypoints_enc` NULL check after erasure | security-engineer | Separate automated check; alerts to #security |
+
+#### R-14.11 Tabletop Scenario I
+
+**Scenario title:** DSAR Export Cross-Tenant Contamination — Enterprise Scale
+
+**Setup:**
+A data engineer pushed an update to the DSAR export worker with a query bug: instead of filtering by `user_id = $REQUESTER`, the query filters by `tenant_id = $TENANT_ID` with no user-level isolation. A Growth-tier enterprise customer (420 users, UK and Ireland) had three employees submit DSARs in the same week. Each received an export containing data for all 420 users in the tenant. All three archives were downloaded; one employee has already opened the file and emails FORM: "I can see everyone's data including health information."
+
+**Participants:** IC, security-engineer, compliance-officer, data-engineer, enterprise-architect, Customer Lead (CS).
+
+**Discussion points:**
+
+1. Severity classification — which runbooks are simultaneously active?
+2. First action and who takes it — can the export links be revoked? For which of the three?
+3. All three archives have been downloaded. Scope of the data breach — is this Art. 33-reportable?
+4. Health data (`health_profiles`, `coaching_turns`) is in the contaminated exports — does this trigger Art. 34 individual notification for all 420 affected employees?
+5. The enterprise tenant has 420 employees whose data was in the wrong export — how do you notify them, and who owns that communication?
+6. The tenant admin demands to know "whose data went to whom" — can you share the three requester names with the admin?
+7. The ICO must be notified within 72 hours — who files, what does the initial filing contain, and is a partial filing acceptable at T+48h?
+8. The employee's email ("I can see everyone's data") is a witness statement — how does this affect evidence preservation protocol?
+9. Can FORM re-run the three original DSARs with the fixed worker? What is the corrected-export re-delivery protocol?
+10. One year later during the SOC 2 Type II audit — what evidence in `compliance/evidence/dsar/` covers this incident?
+
+**Target duration:** 75 minutes. **Facilitator:** compliance-officer. **Required:** data-engineer present for root-cause analysis portion. **Output:** updated cross-tenant export regression test; updated R-14 post-incident controls; one §14 PIR action item minimum.
+
+---
+
 ## Appendix A — Quick Reference Card
 
 For use at 3am. IC: read §1 to classify, open the incident channel, then jump to the relevant runbook in §5.
@@ -3929,6 +4335,12 @@ Law enforcement / government request? → R-13 (NO voluntary disclosure — comp
   Art. 9 health data?       → Higher legal standard required; counsel must confirm explicitly
   Founder authority only    → No disclosure, no acknowledgment without founder sign-off
   Legal hold:               → Activate legal_hold_active flag; no deletion for affected records
+DSAR / data subject rights?  → R-14 (compliance-officer leads; note Art. 33 clock risk)
+  Cross-tenant export?       → R-14 + R-01 simultaneously (P0 data breach — revoke link NOW)
+  Erasure failure (Art. 9)?  → R-14 + assess R-11 for cv_sessions.keypoints_enc
+  Missed 30-day deadline?    → R-14, P1; deliver ASAP; draft Template D-01 for DPA
+  Enterprise employee DSAR?  → R-14.6; notify tenant admin; do not produce without instruction
+  Bulk / coordinated abuse?  → R-14.5; Art. 12(5) assessment; notify compliance-officer
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
@@ -3951,7 +4363,7 @@ Continuous improvement: §14 — action item registry in Linear [IR] project.
 
 ---
 
-**v0.7 · May 2026 · Owner: security-engineer + compliance-officer**
+**v0.8 · May 2026 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: May 2027 or after first P0/P1 — whichever comes first.**
 
@@ -3966,3 +4378,5 @@ Continuous improvement: §14 — action item registry in Linear [IR] project.
 *v0.7 additions: R-13 Law Enforcement / Government Data Request — thirteenth runbook; operationalizes `PRIVACY_POLICY.md §6.4` and ENTERPRISE.md no-backdoor policy into a full incident-level response procedure. Request type taxonomy: 9 types from criminal subpoena through FISA order to EU DPA supervisory authority demand and informal voluntary requests. Severity matrix: P0 for NSL/FISA, foreign intelligence orders, Art. 9 requests for ≥ 10 users, and enterprise-tenant-scope requests; P1 for criminal court order or EU DPA investigation; P2 for civil subpoena; P3 for informal requests. Eight unique response constraints: founder-only authority (no disclosure without founder sign-off); legal counsel required before any action (P0: before acknowledging receipt); narrow scope enforcement (only what the instrument compels); Art. 9 no-voluntary-production rule; emergency exception protocol for claimed life-safety informal requests (counsel within 30 minutes, minimum-necessary, CRITICAL DEC-030 event); GDPR Art. 48 analysis required for non-EU court orders on EU-resident data; no-backdoor reaffirmation (unconditional refusal of programmatic access or surveillance hooks); restricted channel `#inc-YYYYMMDD-legal` (founder + compliance-officer + counsel only — legal privilege protection). 11-step legal review process with timing SLAs per severity tier. Challenge protocol for overbroad requests: temporal scope, user-class requests, Art. 9 production, Art. 48 non-treaty orders. Scope minimization table: permitted-for-production list (user ID, timestamps, email, SSO events, subscription status, IP logs); higher-legal-standard list (all Art. 9 health/coaching/wearable data); never-produce list (CV keypoints_enc — architecturally impossible; fleet stats — aggregate only; uninstrumented user data). User notification protocol: default notify-before-produce unless gag order; template for permitted notifications; GDPR Art. 34 co-trigger assessment for Art. 9 production. Enterprise tenant notification: Template T-01 (within 30 min P0, 4h P1, 24h P2); prohibition memo if gag order applies. GDPR Art. 48 analysis section: MLAT status table (US DOJ — partial EU-US MLAT 2003 non-self-executing; UK — post-Brexit uncertainty; others case-by-case); Art. 48 compliance procedure (treaty basis check, DPA notification before production, limited Art. 49 derogation path); DPA contact table (BfDI/Germany, DPC/Ireland one-stop-shop, UAPDP/Ukraine). Evidence package: structured directory (`received/`, `counsel/`, `disclosure/`, `notifications/`) with SHA-256 manifest; 7-year retention per DEC-030. 10 DEC-030 HMAC-chained audit events: `legal.request_received` (HIGH), `legal.counsel_retained` (MEDIUM), `legal.legal_hold_activated` (HIGH), `legal.challenge_filed` (MEDIUM), `legal.user_notified` (MEDIUM), `legal.tenant_notified` (MEDIUM), `legal.dpa_notified` (HIGH), `legal.disclosure_executed` (CRITICAL), `legal.emergency_voluntary_disclosure` (CRITICAL), `legal.legal_hold_released` (MEDIUM). Transparency reporting: annual Government Transparency Report (request counts by type, disclosure vs. challenge vs. decline, users affected, gag-order prohibition count, Art. 48 outcomes); NSL "0 to 499" range disclosure method. SOC 2 mapping: CC6.3 (government access authorization documented and auditable), CC6.1 (no-backdoor and no-informal-disclosure rules protect information assets), C1.1 (Art. 9 never-produce list enforces health data confidentiality), CC9.1 (enterprise tenant notification obligation), P6 Privacy (user notification + transparency report). Tabletop Scenario H: US DOJ criminal grand jury subpoena covering EU-resident Growth-tier tenant (350 users, 80% EU) served at 22:47 UTC Friday with 14-day deadline; 14 discussion points covering Art. 48 analysis, EU DPA notification, scope minimization, tenant IT admin communication, coaching_turns production gate, partial production during pending challenge, DEC-030 chain verification, media inquiry response, and PIR action item derivation. Appendix A updated with R-13 quick reference.*
 
 *v0.6 additions: R-12 Insider Threat / Privileged Access Abuse — twelfth runbook; covers current and former team members or contractors with legitimate credentials misusing access for exfiltration, sabotage, or personal gain. Evidence-before-containment constraint reinforced (overrides standard flow; exception only for active live exfiltration); private restricted investigation channel (`#inc-YYYYMMDD-insider`: founder + security-engineer + compliance-officer only — not HR, not subject). Trigger matrix: 9 signal types from bulk Supabase Studio access to HMAC chain break co-incident with staff activity; severity table: P0 for Art. 9 data read or multi-tenant cross-access, P1 for bulk access without confirmed exfiltration or post-HR-process access, P2 for historical single anomalous event. Unique response constraints: graduated containment options C-1 (passive monitoring) through C-5 (Workers Secrets rotation) ordered by investigative stealth; legal counsel notification before HR briefing rule with jurisdiction notes (EU/GDPR proportionality, US at-will, Ukraine labour law); HMAC chain R2 archive as forensic truth (live `audit_log_events` table not used forensically). Scope assessment SQL: blast radius by table with Art. 9 classification, multi-tenant exposure query, enterprise tenant identification, `health_profiles` record count for impacted users. Legal and HR interface timeline with legal hold notice template. GDPR implications table: 8 data category rows mapping to Art. 33/34 requirements; 72h clock start note; data subject rights derogation for ongoing investigation (Art. 23(1)(f)); HR investigation records retention under Art. 9(2)(b). Evidence package: 11-item directory structure with SHA-256 manifest, R2 object versioning, 7-year retention per DEC-030. Post-incident preventive controls: 7 controls covering least-privilege audit, offboarding checklist, bulk-read alert rule, Workers Secrets access review, quarterly access review cadence, HMAC chain integrity alert on staff actor + audit log resource, AUP acknowledgment. SOC 2 mapping: CC6.2/CC6.3 (access lifecycle), CC7.2/CC7.3/CC7.4 (monitoring and response), CC9.1 (risk mitigation), CC1.2 (integrity and ethical values). Tabletop Scenario G added to §9 drill catalog: insider data exfiltration before resignation affecting 14 enterprise tenants; 14 discussion points covering forensic chain, legal timing, tenant notification, Art. 33 clock, graduated response. §14 Continuous Improvement Program — closes the PIR-to-action-item loop for SOC 2 CC4.1/CC4.2 evidence. PIR Action Item Registry: Linear project `[IR] Action Items` with 10-field schema (incident_id, severity, priority, title, owner, due_date, SOC2 criterion, status, close_date, verification_note); closure SLA table (Critical P0: 14 days → founder paged; Critical P1: 30 days; High: 30–60 days; Medium: 90 days; Low: 180 days); monthly Linear export to `compliance/evidence/ir-action-items/YYYY-MM.csv`. Escalation thresholds: 4 triggers (overdue Critical, recurring failure pattern, > 3 High items open, SOC 2 observation period breach). Quarterly control effectiveness review: 60-min agenda (action item registry / incident trend analysis / runbook gap check / SOC 2 evidence completeness / decisions); MTTD/MTTR/false-positive-rate metrics; output template stored at `compliance/evidence/quarterly-ir-review/YYYY-QN.md`. Runbook update protocol: 6 mandatory triggers with SLAs; 5-step update procedure with dual-approval gate (compliance-officer + security-engineer); tagged archive at each minor version bump. Annual control self-assessment: Q4 cadence; structured against CC4.1, CC4.2, CC7.2, CC7.4, CC7.5 criteria; self-rated readiness with gap list; stored `compliance/evidence/annual-csa/YYYY-ir-csa.md`; shared with audit firm at observation period open. SOC 2 evidence mapping for §14: CC4.1, CC4.2, CC7.5, CC2.1; complete evidence package list. Appendix A updated with R-12 and §14 quick references.*
+
+*v0.8 additions: R-14 DSAR / Data Subject Rights Incident — fourteenth runbook; operationalises GDPR Arts. 15, 17, 18, 19, 20 rights enforcement into an incident-level response procedure, closing the gap flagged in SOC2_READINESS.md (🔴 DSAR SLA, 🟡 DSAR process) and referenced in GDPR_DPIA.md §10.1.5. Seven-scenario severity matrix: P0 for cross-tenant contamination in export (simultaneous R-01 activation) and for Art. 9 health data confirmed present after erasure deadline; P1 for missed 30-day deadline or export worker complete failure; P2 for single DSAR in cure window or bulk DSAR with no immediate deadline risk. R-14.1 scope assessment SQL: in-flight DSAR register query with overdue flag, export delivery check, erasure completeness query per-table (6 health data tables). R-14.2 cross-tenant contamination protocol: immediate export link revocation (DEC-030 CRITICAL), parallel R-01 activation, Art. 33 clock start on Art. 9 data, enterprise tenant notification within 30 min via Template E-01 (§12), corrected re-delivery with dsar.export_redelivered event. R-14.3 failed erasure protocol: last-good erasure job lookup via audit_log_events, pg_cron log diagnosis, targeted per-table manual erasure with IC + compliance-officer authorization gate, Art. 9 access assessment for Art. 33 trigger, cv_sessions.keypoints_enc → R-11 cross-reference. R-14.4 missed deadline: cure-window (day 28–30) and post-deadline protocols; Art. 12(3) 90-day extension handling; DPA self-report decision framework with compliance-officer authority (no founder sign-off required for non-breach DSAR delays). R-14.5 bulk DSAR/coordinated abuse: Art. 12(5) refusal strategy, deadline escalation threshold, social-media campaign awareness. R-14.6 enterprise employee DSAR: joint-controller complexity where employer is controller for workplace fitness data; privacy floor enforcement — FORM cannot comply with an employer instruction that extinguishes an employee's Art. 15 right. Five communication templates: D-01 DPA voluntary notification (missed deadline), D-02 user delay notification, D-03 Art. 12(5) refusal, D-04 employee redirect to employer, E-DSAR-01 enterprise tenant notification. 14 DEC-030 HMAC-chained audit events covering full DSAR lifecycle from `dsar.request_received` (MEDIUM) through `dsar.export_link_revoked` (CRITICAL) and `dsar.erasure_manual_supplement` (CRITICAL). SOC 2 evidence mapping: P4.0 (data subject inquiries), P5.0 (data subject requests), P5.1 (consent/choice), P8.0 (disposal), CC2.2 (external communications), CC6.5 (logical access — disposal). Evidence package structure: `compliance/evidence/dsar/YYYY-MM/<dsar_id>/` with 6 subdirectories (request, verification, export manifest, erasure, comms, dec030); 7-year retention per DEC-030; read-only after case closure. Six post-incident preventive controls (day-25/29 Slack deadline alerts, monthly export canary, automated post-erasure verification query, cross-tenant isolation regression test, weekly DSAR register review, keypoints_enc NULL check). Tabletop Scenario I: DSAR export cross-tenant contamination affecting 420-user Growth-tier enterprise tenant (UK/Ireland); bug filters by tenant_id instead of user_id; 3 employees received full-tenant exports; all downloaded; Art. 33/34 assessment; ICO notification; evidence chain; re-delivery protocol; 10 discussion points. Document header corrected from v0.5 → v0.8 (intermediate versions v0.6 and v0.7 were committed out of order; header had not been updated past v0.5). Owner line corrected: devops-lead → compliance-officer (matching footer since v0.5). Appendix A updated with R-14 quick reference. SOC 2 scope line in document header updated to include P4.0, P5.0, P8.0.*

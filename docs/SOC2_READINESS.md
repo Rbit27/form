@@ -218,9 +218,9 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Control | Status | Evidence |
 |---|---|---|
-| Data Subject Access Request (DSAR) process | 🟡 Gap | Define handling procedure; data.export_initiated in audit log |
+| Data Subject Access Request (DSAR) process | 🟡 Partial | Handling procedure documented: `docs/INCIDENT_RESPONSE.md R-14`; 5 communication templates (D-01–D-04, E-DSAR-01); end-to-end test still pending (P-GAP-005) |
 | Export format defined (JSON) | ✅ Done | `docs/SECURITY.md` §9 — JSON export in Settings |
-| Response time SLA for DSAR (GDPR: 30 days) | 🔴 Gap | Document and test |
+| Response time SLA for DSAR (GDPR: 30 days) | 🟡 Partial | 30-day SLA documented in R-14.4; day-25/29 alert controls specified; PagerDuty alert not yet configured (P-GAP-005) |
 
 ### P6 — Disclosure and Notification
 

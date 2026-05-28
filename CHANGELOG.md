@@ -6,6 +6,15 @@
 
 ---
 
+## [1.12.11] — 2026-05-28
+
+### Changed
+- [`docs/INCIDENT_RESPONSE.md`](docs/INCIDENT_RESPONSE.md) — v0.5 → v0.8: додано R-14 DSAR / Data Subject Rights Incident (чотирнадцятий runbook). Closes 🔴 Gap "Response time SLA for DSAR" і 🟡 Gap "DSAR process" із SOC2_READINESS.md; виконує §10.1.5 GDPR_DPIA.md ("DSAR handling runbook"). R-14 покриває 7 сценаріїв (P0–P2): cross-tenant export contamination (+ R-01 паралельно), Art. 9 erasure failure (+ R-11 для keypoints_enc), missed 30-day deadline, export worker failure, bulk/abuse DSAR, enterprise employee DSAR (joint-controller), DPA complaint received. Scope assessment SQL для in-flight DSAR register + erasure completeness. 14 DEC-030 HMAC-chained audit events (`dsar.request_received` → `dsar.export_link_revoked` CRITICAL → `dsar.erasure_manual_supplement` CRITICAL). 5 communication templates (D-01 DPA voluntary notification, D-02 user delay notice, D-03 Art. 12(5) refusal, D-04 employee employer redirect, E-DSAR-01 enterprise tenant). Privacy floor: FORM не може виконати employer instruction що гасить Art. 15 right of employee. SOC 2 mapping: P4.0, P5.0, P5.1, P8.0, CC2.2, CC6.5. Evidence package: `compliance/evidence/dsar/YYYY-MM/<dsar_id>/` 7-year retention. 6 preventive controls. Tabletop Scenario I: cross-tenant contamination 420-user Growth tenant (UK/Ireland), 10 discussion points. Виправлено header version v0.5 → v0.8 (проміжні v0.6, v0.7 були внесені не по порядку і не оновлювали header). Виправлено owner в header: `devops-lead` → `compliance-officer` (відповідно до footer з v0.5). Appendix A quick reference: додано R-14 quick-ref рядки.
+- [`docs/SOC2_READINESS.md`](docs/SOC2_READINESS.md) — DSAR process 🟡 Gap → 🟡 Partial (ref: R-14); Response time SLA 🔴 Gap → 🟡 Partial (ref: R-14.4; технічний тест P-GAP-005 ще pending).
+- `VERSION` → 1.12.11
+
+---
+
 ## [1.12.10] — 2026-05-28
 
 ### Added
