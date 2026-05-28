@@ -6,6 +6,19 @@
 
 ---
 
+## [1.12.21] — 2026-05-28
+
+### Added
+- `content/post-126-central-neuromuscular-fatigue.md` — Центральна нейром'язова втома: twitch interpolation і voluntary activation (Gandevia 1996); Central Governor Model (Noakes 2004); аферентна сигналізація Group III/IV; серотонін/дофамін-гіпотези; кумулятивна втома (Meeusen 2013 ECSS consensus); практика: RPE-тренд, deload, HRV. clinical-safety PASS.
+- `content/post-127-stretch-shortening-cycle-titin.md` — SSC і тітін: три фази (ексцентрична/аморизаційна/концентрична); сухожилля як пружний резервуар; тітін Ca²⁺-залежна взаємодія з актином (Nishikawa 2012); CMJ vs SJ ~8–18% SSC-внесок; паузний vs звичайний присід; complex training і PAP. clinical-safety PASS.
+- `content/post-128-motor-unit-synchronization-rate-coding.md` — Синхронізація мотонейронів: Henneman Size Principle (1965); рекрутування vs rate coding; МЕ-синхронізація і пікова сила (Semmler & Enoka 2000); нейронні адаптації (Carroll et al. 2011); bilateral deficit; важкий тренінг для IIb-рекрутування; ізометрії для rate coding. clinical-safety PASS.
+
+### Changed
+- `README.md` — content roadmap оновлено: додано записи post-125 через post-128 з анотаціями і clinical-safety статусом
+- `VERSION` → 1.12.21
+
+---
+
 ## [1.12.18] — 2026-05-28
 
 ### Changed
