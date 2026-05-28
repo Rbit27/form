@@ -2270,6 +2270,16 @@
 
 ---
 
+## [1.12.16] — 2026-05-28
+
+### Added
+- `content/post-124-rest-intervals-hypertrophy.md` — Відпочинок між підходами і гіпертрофія; Schoenfeld et al. (2016) JSCR 3 хв vs 1 хв; PCr кінетика (Harris 1976, Greenhaff 1994); спростування гормональної гіпотези (West 2010, Ahtiainen 2005); практичні орієнтири для компаундних і ізолюючих вправ; clinical-safety NOT REQUIRED
+
+### Fixed
+- `README.md` — виправлено записи post-118 і post-119 (відображали старі планові теми замість реально відправлених файлів: deload-strategies і rep-range-continuum); додано post-123 (cross-education) і post-124 до content roadmap
+
+---
+
 ## [0.3.0] — 2026-05-14
 
 ### Added
