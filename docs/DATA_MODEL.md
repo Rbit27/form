@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.0
+# FORM · Multi-Tenant Data Model v1.1
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -28,6 +28,7 @@
 18. [Notification & Webhook Event Queue Schema](#18-notification--webhook-event-queue-schema)
 19. [Feature Flag & Entitlement Registry Schema](#19-feature-flag--entitlement-registry-schema)
 20. [White-Label Tenant Branding Schema](#20-white-label-tenant-branding-schema)
+21. [AI Coaching Session & Memory Schema](#21-ai-coaching-session--memory-schema)
 
 ---
 

@@ -6,6 +6,14 @@
 
 ---
 
+## [1.12.24] — 2026-05-28
+
+### Changed
+- `docs/DATA_MODEL.md` — ToC entry for §21 AI Coaching Session & Memory Schema added; document header version v1.0 → v1.1.
+- `VERSION` → 1.12.24
+
+---
+
 ## [1.12.23] — 2026-05-28
 
 ### Changed
