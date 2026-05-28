@@ -6,6 +6,14 @@
 
 ---
 
+## [1.12.18] — 2026-05-28
+
+### Changed
+- `enterprise.html` — ROI / business case section added between Pricing tiers and Implementation timeline. Five value levers (utilisation arbitrage, absenteeism reduction at 50% of RAND meta-analysis, productivity uplift at 0.5% of Pronk published effect, turnover avoidance, direct cost comparison) with sourcing notes. 3-year ROI table by tier (Starter 100-seat: 255%, Growth 300-seat: 318%, Enterprise 1,000-seat: 434%) drawn from `docs/COST_MODEL.md §20`. Payback stat pills (2.3–3.4 months, $0 pilot risk, 65% activation SHRM benchmark). Anti-fabrication note linking to custom business case session. Floor-case disclosure (40% activation + 5% absenteeism reduction → 161-175% ROI). Owner: enterprise-architect + compliance-officer.
+- `VERSION` → 1.12.18
+
+---
+
 ## [1.12.17] — 2026-05-28
 
 ### Added
