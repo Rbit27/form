@@ -6,6 +6,14 @@
 
 ---
 
+## [1.12.15] — 2026-05-28
+
+### Changed
+- `docs/SOC2_READINESS.md` v2.9 — three P-series gap advances reflecting compliance artifacts authored 2026-05-21: P-GAP-004 🔴→🟡 (`compliance/p1/retention-decisions.md` P1-RET-001 authored; PRV-23/PRV-26 status updated); P-GAP-007 🔴→🟡 (`compliance/p1/complaint-intake-procedure.md` P1-CIP-001 authored; PRV-52 status updated); P-GAP-002 partial advance (`compliance/p1/sub-processor-register.md` P1-SUB-001 added to §38.5 document list and data room structure). §35.11 gap analysis remediation steps marked ✅ partial. §38.3 Privacy TSC readiness ~82% → ~84%. §38.4 master gap registry updated. §38.5.2 data room p1/ structure annotated with filing status for all five authored artifacts.
+- `VERSION` → 1.12.15
+
+---
+
 ## [1.12.14] — 2026-05-28
 
 ### Added
