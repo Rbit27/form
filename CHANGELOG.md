@@ -6,6 +6,17 @@
 
 ---
 
+## [1.13.0] — 2026-05-28
+
+### Added
+- `docs/DATA_MODEL.md §21` — AI Coaching Session & Memory Schema. П'ять таблиць: `coaching_sessions` (session_token, model_id, context_window_used_pct, session_cost_usd, per-model token counts), `coaching_turns` (column-level AES-256-GCM шифрування content, clinical_safety_flagged per turn, append-only via RLS), `coaching_memory` (dotted-namespace memory keys, confidence score, GDPR soft-delete), `coaching_feedback` (thumbs_up/down/flagged_unsafe/flagged_inaccurate), `coaching_session_context` (hash-only immutable context snapshot). Стратегія context window: 80% threshold → auto-complete + fresh session з memory re-injection. GDPR Art. 17 erasure: content_encrypted → NULL, memory soft-delete з per-key audit events. Cost attribution: session_cost_usd at turn-write time + `tenant_monthly_coaching_cost` materialized view (pg_cron CONCURRENTLY). 7 DEC-030 HMAC-chained audit events. SOC 2 mapping: CC6.1/CC6.7/CC7.2/CC9.2. 15-item implementation checklist (M3/M4). 3 open questions (OQ-COACH-01/02/03).
+
+### Changed
+- `docs/DATA_MODEL.md` — v1.1 additions footer оновлений зі §20 і §21 описами.
+- `VERSION` → 1.13.0
+
+---
+
 ## [1.12.25] — 2026-05-28
 
 ### Added

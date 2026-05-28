@@ -6103,7 +6103,948 @@ All write paths invalidate `branding:{tenant_id}` KV cache synchronously before 
 
 ---
 
+## 21. AI Coaching Session & Memory Schema
+
+> Owner: `enterprise-architect` + `platform-engineer` + `compliance-officer`. Review: on any LLM provider change, token pricing revision, or GDPR erasure audit.
+> References: DEC-030 (HMAC-chained audit log), docs/AUDIT_LOG_SCHEMA.md, docs/ENTERPRISE.md, docs/SOC2_READINESS.md, §12 (Art. 17 erasure), §19 (feature flag registry).
+
+---
+
+### 21.1 Purpose and Scope
+
+Victor is FORM's AI strength training coach persona, powered by the Anthropic Claude API. Every Victor interaction is a multi-turn LLM conversation: the mobile client exchanges messages with a Cloudflare Worker, which assembles a context window (system prompt + injected memory + recent workout history + wearable summary) and calls `claude-sonnet-4-6` (or a future model) via the Anthropic Messages API.
+
+This section defines the database schema, encryption posture, context-window management strategy, GDPR erasure integration, cost attribution model, and audit trail for all Victor interactions within the multi-tenant FORM platform.
+
+**What this section covers:**
+
+- Five tables: `coaching_sessions`, `coaching_turns`, `coaching_memory`, `coaching_feedback`, `coaching_session_context`
+- Column-level AES-256-GCM encryption for message content and extracted memory values
+- RLS policies for all five tables across `form_api`, `form_system`, and `form_admin` roles
+- DEC-030 HMAC-chained audit events for all safety-critical paths
+- Context window management: auto-completion at 80% utilisation and fresh-session handoff
+- GDPR Art. 17 erasure sequence integrated with §12
+- Per-tenant cost attribution with `session_cost_usd` and a materialized view for monthly roll-up
+- SOC 2 control mapping: CC6.1, CC6.7, CC7.2, CC9.2
+
+**What this section does NOT cover:**
+
+- The Cloudflare Worker prompt assembly logic — see `src/workers/coaching/context-builder.ts`
+- The Anthropic API request/retry logic — see `src/lib/anthropic/client.ts`
+- Clinical safety screening rules — see `docs/CLINICAL_SAFETY.md`
+- Billing UI for coaching cost attribution — see admin dashboard specs
+
+---
+
+### 21.2 Design Decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| One session per conversation thread, not per day | Session is bounded by the LLM conversation state (Messages API thread) | Context window is the unit of billing and truncation risk; sessions must track exactly what was sent to Anthropic |
+| Column-level encryption for `content_encrypted` | AES-256-GCM, key from Cloudflare Secrets Store | DB-level encryption (Supabase transparent encryption) is a necessary baseline but insufficient; column-level encryption ensures the DB superuser cannot read turn content — required for CC6.7 and the principle of least privilege |
+| Separate `coaching_memory` table vs embedding memory in session metadata | Separate table with dotted-namespace keys | Memory outlives any single session; structured keys allow precise GDPR erasure of specific facts (e.g. `user.injuries.known`) without deleting the entire profile |
+| `coaching_session_context` snapshot per session | Immutable snapshot of injected context (hashes only, not content) | Required for debugging context truncation bugs and for demonstrating reproducibility to auditors; content is NOT stored here to avoid double-storing encrypted content |
+| `clinical_safety_flagged` on turns, not sessions | Per-turn boolean + reason | Clinical safety violations are turn-level events; flagging the session would mask which specific response triggered the classifier |
+| session_token is client-facing, not the Anthropic API key | Short-lived opaque UUID token (JWT or random 32-byte hex) | The mobile client must never touch the Anthropic API key; session_token is exchanged for a Worker-managed Anthropic API call with tenant-scoped rate limiting |
+| Cost attribution at session level, not turn level | `session_cost_usd` on `coaching_sessions`; per-turn tokens on `coaching_turns` | Enterprise billing is by tenant-month; session-level cost enables the materialized view roll-up without a per-turn aggregation scan |
+
+---
+
+### 21.3 `coaching_sessions` DDL
+
+```sql
+-- Data classification: DC-02 (operational metadata, non-personal content)
+-- session_token and user_id are DC-05 (personal identifiers); content is in coaching_turns.
+-- Art. 17 erasure: metadata retained for billing audit; no PII in this table's payload columns.
+-- Retention: 7 years (billing record).
+
+CREATE TABLE coaching_sessions (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  tenant_id                 UUID        NOT NULL
+                              REFERENCES tenants(id) ON DELETE CASCADE,
+                            -- REQUIRED on every table. RLS index on (tenant_id, user_id).
+
+  user_id                   UUID        NOT NULL
+                              REFERENCES users(id) ON DELETE CASCADE,
+
+  session_token             TEXT        NOT NULL UNIQUE,
+                            -- Short-lived opaque token issued to the mobile client.
+                            -- NOT the Anthropic API key. Format: 32-byte hex, URL-safe.
+                            -- Expires: 4 hours of inactivity (enforced in Worker, not DB).
+                            -- Worker verifies token before every /api/v1/coach/turn call.
+
+  model_id                  TEXT        NOT NULL DEFAULT 'claude-sonnet-4-6',
+                            -- Anthropic model slug used for this session.
+                            -- Stored at session creation; survives model upgrades in flight.
+                            -- Allows cost recalculation with correct per-model pricing.
+
+  status                    TEXT        NOT NULL DEFAULT 'active'
+                              CHECK (status IN ('active', 'completed', 'abandoned', 'error')),
+                            -- active     = session is open; mobile client may send turns.
+                            -- completed  = natural end or context-window limit reached.
+                            -- abandoned  = client disconnected / token expired without completion.
+                            -- error      = Anthropic API error that prevented completion.
+
+  message_count             INTEGER     NOT NULL DEFAULT 0,
+                            -- Total number of turns in this session (user + assistant messages).
+                            -- Incremented atomically by the turn-write Worker.
+
+  input_tokens_total        INTEGER     NOT NULL DEFAULT 0,
+                            -- Cumulative input tokens across all turns in this session.
+                            -- Includes cache_read_tokens and cache_write_tokens.
+
+  output_tokens_total       INTEGER     NOT NULL DEFAULT 0,
+                            -- Cumulative output tokens (assistant responses) in this session.
+
+  cache_read_tokens         INTEGER     NOT NULL DEFAULT 0,
+                            -- Tokens served from Anthropic prompt cache (billed at discount).
+                            -- Separated to allow accurate cost calculation.
+
+  cache_write_tokens        INTEGER     NOT NULL DEFAULT 0,
+                            -- Tokens written to Anthropic prompt cache in this session.
+
+  session_cost_usd          NUMERIC(10,6) NOT NULL DEFAULT 0.000000,
+                            -- Computed cost of this session in USD.
+                            -- Formula (illustrative; actual rates from Anthropic API):
+                            --   input_tokens  * $0.000003    (per token, non-cached)
+                            --   output_tokens * $0.000015
+                            --   cache_read    * $0.0000003
+                            --   cache_write   * $0.00000375
+                            -- Updated after every turn by the turn-write Worker.
+                            -- Source of truth for tenant monthly cost roll-up.
+
+  context_window_used_pct   NUMERIC(5,2) NOT NULL DEFAULT 0.00,
+                            -- Percentage of model context window consumed.
+                            -- Computed: (input_tokens_total / model_context_window_size) * 100.
+                            -- When this exceeds 80%, the session is auto-completed and a new
+                            -- session is started with a fresh memory injection (§21.9).
+
+  started_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_active_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+                            -- Updated on every turn; used by abandonment detection cron.
+  completed_at              TIMESTAMPTZ,
+                            -- Set when status transitions to 'completed', 'abandoned', or 'error'.
+
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Triggers
+CREATE TRIGGER set_coaching_sessions_updated_at
+  BEFORE UPDATE ON coaching_sessions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Indexes
+CREATE INDEX idx_cs_tenant_user
+  ON coaching_sessions(tenant_id, user_id);
+  -- Primary RLS lookup path: every query filters by both.
+
+CREATE INDEX idx_cs_tenant_status
+  ON coaching_sessions(tenant_id, status)
+  WHERE status = 'active';
+  -- Narrow partial index for the Worker's active-session lookup.
+
+CREATE INDEX idx_cs_session_token
+  ON coaching_sessions(session_token);
+  -- Token verification on every /api/v1/coach/turn call; must be fast.
+
+CREATE INDEX idx_cs_tenant_started_at
+  ON coaching_sessions(tenant_id, started_at DESC);
+  -- Monthly cost roll-up materialized view scan.
+
+ALTER TABLE coaching_sessions ENABLE ROW LEVEL SECURITY;
+```
+
+---
+
+### 21.4 `coaching_turns` DDL
+
+```sql
+-- Data classification: DC-06 (sensitive personal health content, encrypted at column level)
+-- content_encrypted contains verbatim user messages and Victor responses.
+-- These are the most sensitive rows in the schema: eating disorder mentions, injury disclosures,
+-- mental health context. Column-level encryption is MANDATORY even though Supabase encrypts
+-- at rest — the DB superuser must not be able to read plaintext turn content.
+--
+-- Encryption: AES-256-GCM. Key stored in Cloudflare Secrets Store (not in DB).
+-- Key rotation: quarterly, using envelope encryption (data key encrypted by root key).
+-- Decryption: only via the coaching Worker endpoint; DB layer never sees plaintext.
+--
+-- Art. 17 erasure: content_encrypted overwritten with NULL on erasure request.
+--   content_hash is retained (hash of NULL becomes a sentinel value).
+--   Token counts and metadata retained for billing audit (§21.10).
+
+CREATE TABLE coaching_turns (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  tenant_id                 UUID        NOT NULL
+                              REFERENCES tenants(id) ON DELETE CASCADE,
+
+  session_id                UUID        NOT NULL
+                              REFERENCES coaching_sessions(id) ON DELETE CASCADE,
+
+  user_id                   UUID        NOT NULL
+                              REFERENCES users(id) ON DELETE CASCADE,
+                            -- Denormalized for RLS performance; avoids JOIN through sessions.
+
+  turn_index                INTEGER     NOT NULL,
+                            -- 0-based position within the session. Monotonically increasing.
+                            -- (session_id, turn_index) is unique and defines message order.
+
+  role                      TEXT        NOT NULL
+                              CHECK (role IN ('user', 'assistant')),
+                            -- 'user'      = message from the FORM mobile client (human turn).
+                            -- 'assistant' = response from Victor (Claude).
+
+  content_encrypted         TEXT,
+                            -- AES-256-GCM ciphertext of the turn content.
+                            -- Base64url-encoded. Format: <nonce>.<ciphertext>.<tag>
+                            -- NULL after GDPR Art. 17 erasure.
+                            -- SELECT returns NULL to form_api role (masked; see §21.7 RLS).
+                            -- Decryption requires the coaching Worker to present valid JWT
+                            -- and the plaintext is returned only to the owning user.
+
+  content_hash              TEXT,
+                            -- SHA-256 of the UTF-8 plaintext, hex-encoded.
+                            -- Used for deduplication detection (retry-safe turn submission).
+                            -- NOT a reversible value; safe to retain post-erasure.
+                            -- Set to 'erased' sentinel after Art. 17 erasure.
+
+  input_tokens              INTEGER,
+                            -- Anthropic input tokens for this turn (user message tokens +
+                            -- context window tokens sent with this request).
+
+  output_tokens             INTEGER,
+                            -- Anthropic output tokens for this turn (assistant response tokens).
+
+  cache_read_tokens         INTEGER     NOT NULL DEFAULT 0,
+                            -- Tokens served from prompt cache for this specific turn.
+
+  cache_write_tokens        INTEGER     NOT NULL DEFAULT 0,
+                            -- Tokens written to prompt cache for this specific turn.
+
+  latency_ms                INTEGER,
+                            -- End-to-end latency from Worker sending the Anthropic request
+                            -- to receiving the complete streamed response (time-to-last-token).
+
+  model_id                  TEXT        NOT NULL,
+                            -- Model used for this specific turn. May differ from session model_id
+                            -- if the model was upgraded mid-session (handled by Worker).
+
+  stop_reason               TEXT
+                              CHECK (stop_reason IN (
+                                'end_turn', 'max_tokens', 'stop_sequence', 'tool_use'
+                              )),
+                            -- Anthropic stop_reason from the API response.
+                            -- 'max_tokens' on an assistant turn = context truncation risk.
+                            --   The Worker logs a warning and triggers session auto-completion.
+
+  clinical_safety_flagged   BOOLEAN     NOT NULL DEFAULT FALSE,
+                            -- Set to TRUE by the post-generation clinical safety Worker
+                            -- (runs async after the response is streamed to the client).
+                            -- Triggers: ED screening keywords, self-harm indicators,
+                            -- mentions of medical contraindications without disclaimer.
+                            -- See docs/CLINICAL_SAFETY.md for classifier rules.
+
+  clinical_safety_reason    TEXT,
+                            -- Human-readable reason code from the safety classifier.
+                            -- e.g. 'ed_screening_keyword', 'self_harm_indicator'.
+                            -- NULL when clinical_safety_flagged = FALSE.
+                            -- NOT the flagged content itself — reason code only (no PII in audit).
+
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+                            -- Immutable. Turns are append-only; never updated.
+                            -- (No updated_at — mutations are prohibited by RLS.)
+);
+
+-- Constraints
+ALTER TABLE coaching_turns
+  ADD CONSTRAINT uq_turn_position UNIQUE (session_id, turn_index);
+
+-- Indexes
+CREATE INDEX idx_ct_session_id
+  ON coaching_turns(session_id, turn_index ASC);
+  -- Primary read path: fetch all turns for a session in order.
+
+CREATE INDEX idx_ct_tenant_user
+  ON coaching_turns(tenant_id, user_id);
+  -- RLS enforcement path and GDPR erasure scan.
+
+CREATE INDEX idx_ct_safety_flagged
+  ON coaching_turns(tenant_id, clinical_safety_flagged)
+  WHERE clinical_safety_flagged = TRUE;
+  -- Admin dashboard safety flag monitoring query.
+
+CREATE INDEX idx_ct_content_hash
+  ON coaching_turns(content_hash)
+  WHERE content_hash IS NOT NULL AND content_hash != 'erased';
+  -- Deduplication lookup on turn submission retry.
+
+ALTER TABLE coaching_turns ENABLE ROW LEVEL SECURITY;
+```
+
+---
+
+### 21.5 `coaching_memory` DDL
+
+```sql
+-- Data classification: DC-06 (sensitive personal health facts, encrypted at column level)
+-- memory_value_encrypted contains extracted facts: goals, injuries, training history summaries.
+-- These are the most structurally sensitive rows: a single memory key 'user.injuries.known'
+-- may contain a clinical diagnosis. Column-level encryption is MANDATORY.
+--
+-- Memory is extracted by the memory Worker after each session completes.
+-- Keys follow a dotted namespace (§21.6). Schema evolution handled via OQ-COACH-03.
+--
+-- Art. 17 erasure: is_deleted = TRUE, memory_value_encrypted = NULL.
+--   Row is retained (soft delete) for billing audit integrity.
+--   Erasure integrates with §12 erasure sequence.
+
+CREATE TABLE coaching_memory (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  tenant_id                 UUID        NOT NULL
+                              REFERENCES tenants(id) ON DELETE CASCADE,
+
+  user_id                   UUID        NOT NULL
+                              REFERENCES users(id) ON DELETE CASCADE,
+
+  memory_key                TEXT        NOT NULL,
+                            -- Dotted namespace. Examples:
+                            --   'user.goals.primary'           — primary training goal
+                            --   'user.goals.timeline'          — target date or event
+                            --   'user.injuries.known'          — active injury list
+                            --   'user.injuries.contraindications' — exercises to avoid
+                            --   'user.training_history.summary' — free-text training background
+                            --   'user.preferences.workout_time' — morning / evening
+                            --   'user.context.recent_life_stressor' — ephemeral, expires_at set
+                            -- Namespace validated by Worker before insert. DB CHECK below.
+                            CONSTRAINT memory_key_format
+                              CHECK (memory_key ~ '^[a-z_]+(\.[a-z_]+){1,4}$'),
+
+  memory_value_encrypted    TEXT,
+                            -- AES-256-GCM ciphertext of the extracted fact value.
+                            -- Base64url-encoded. Format: <nonce>.<ciphertext>.<tag>
+                            -- NULL after GDPR Art. 17 erasure.
+
+  confidence_score          NUMERIC(3,2)
+                              CHECK (confidence_score >= 0.00 AND confidence_score <= 1.00),
+                            -- Confidence assigned by the memory-extraction Worker (LLM-scored).
+                            -- 0.00–0.49: uncertain; may be contradicted by later turns.
+                            -- 0.50–0.79: likely; inject into context with hedge phrasing.
+                            -- 0.80–1.00: confirmed; inject as established fact.
+                            -- Victor's context builder uses this to rank which memories to inject
+                            -- when the context window budget is constrained.
+
+  source_session_id         UUID
+                              REFERENCES coaching_sessions(id) ON DELETE SET NULL,
+                            -- Session from which this memory was extracted. NULL if manually set.
+
+  source_turn_id            UUID
+                              REFERENCES coaching_turns(id) ON DELETE SET NULL,
+                            -- Specific turn where the fact was stated. NULL if session-level.
+
+  extracted_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+                            -- When the memory Worker extracted and wrote this row.
+
+  last_confirmed_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+                            -- Updated when a later session re-confirms the same fact.
+                            -- Used by Victor's context builder to age-weight memories.
+
+  expires_at                TIMESTAMPTZ,
+                            -- NULL = persistent memory.
+                            -- Non-null = ephemeral context (e.g. 'user.context.recent_life_stressor').
+                            -- The context builder skips expired memories. A nightly pg_cron
+                            -- marks expired rows as is_deleted = TRUE (does not hard-delete).
+
+  is_deleted                BOOLEAN     NOT NULL DEFAULT FALSE,
+                            -- Soft delete. TRUE = excluded from context injection.
+                            -- Set by: GDPR erasure Worker, expiry cron, user explicit clear.
+
+  deleted_at                TIMESTAMPTZ,
+                            -- NULL when is_deleted = FALSE. Set to now() on soft delete.
+
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Triggers
+CREATE TRIGGER set_coaching_memory_updated_at
+  BEFORE UPDATE ON coaching_memory
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Constraints
+ALTER TABLE coaching_memory
+  ADD CONSTRAINT uq_memory_user_key
+    UNIQUE (user_id, memory_key);
+  -- One active value per user per key. UPDATE (not INSERT) on re-extraction.
+  -- is_deleted rows are overwritten when a new extraction produces the same key.
+
+-- Indexes
+CREATE INDEX idx_cm_user_active
+  ON coaching_memory(user_id, memory_key)
+  WHERE is_deleted = FALSE;
+  -- Context builder lookup: all active memories for a user, ordered by confidence.
+
+CREATE INDEX idx_cm_tenant_user
+  ON coaching_memory(tenant_id, user_id);
+  -- RLS enforcement and GDPR erasure scan.
+
+CREATE INDEX idx_cm_expires_at
+  ON coaching_memory(expires_at)
+  WHERE expires_at IS NOT NULL AND is_deleted = FALSE;
+  -- Nightly expiry cron.
+
+ALTER TABLE coaching_memory ENABLE ROW LEVEL SECURITY;
+```
+
+---
+
+### 21.6 Memory Key Namespace
+
+The `memory_key` column uses a dotted namespace to organise extracted facts. The Worker maintains a compile-time allowlist (`src/workers/coaching/memory-keys.ts`) that maps each key to its data classification and expiry policy.
+
+| Key | Example value | Classification | Default expiry |
+|---|---|---|---|
+| `user.goals.primary` | `"build muscle"` | DC-05 | Persistent |
+| `user.goals.timeline` | `"before August marathon"` | DC-05 | Persistent |
+| `user.injuries.known` | `"left knee ACL repair 2023"` | DC-06 | Persistent |
+| `user.injuries.contraindications` | `"avoid deep squats"` | DC-06 | Persistent |
+| `user.training_history.summary` | `"3 years lifting, powerlifting background"` | DC-05 | Persistent |
+| `user.preferences.workout_time` | `"morning"` | DC-03 | Persistent |
+| `user.preferences.equipment` | `"home gym, no barbell"` | DC-03 | Persistent |
+| `user.context.recent_life_stressor` | `"moving house this week"` | DC-05 | 14 days |
+| `user.context.current_fatigue_level` | `"high — poor sleep last 3 nights"` | DC-05 | 3 days |
+| `user.biometrics.weight_kg` | `"82"` | DC-06 | Persistent |
+| `user.biometrics.height_cm` | `"178"` | DC-06 | Persistent |
+
+Keys outside this allowlist are rejected by the Worker with a `400 Unknown memory key` response before any DB write. This prevents arbitrary data accumulation. New keys require a PR to `memory-keys.ts` and a corresponding DATA_MODEL.md update.
+
+---
+
+### 21.7 `coaching_feedback` DDL
+
+```sql
+-- Data classification: DC-03 (operational feedback metadata)
+-- feedback_text_encrypted may contain personal content (DC-05 if present).
+-- Retained 2 years. Not subject to billing audit retention.
+-- Art. 17 erasure: feedback_text_encrypted set to NULL; row retained for product metrics.
+
+CREATE TABLE coaching_feedback (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  tenant_id                 UUID        NOT NULL
+                              REFERENCES tenants(id) ON DELETE CASCADE,
+
+  user_id                   UUID        NOT NULL
+                              REFERENCES users(id) ON DELETE CASCADE,
+
+  turn_id                   UUID        NOT NULL
+                              REFERENCES coaching_turns(id) ON DELETE CASCADE,
+                            -- The specific Victor response being rated.
+
+  session_id                UUID        NOT NULL
+                              REFERENCES coaching_sessions(id) ON DELETE CASCADE,
+                            -- Denormalized for tenant-scoped analytics queries.
+
+  feedback_type             TEXT        NOT NULL
+                              CHECK (feedback_type IN (
+                                'thumbs_up',
+                                'thumbs_down',
+                                'flagged_unsafe',
+                                'flagged_inaccurate'
+                              )),
+                            -- thumbs_up          = user found the response helpful.
+                            -- thumbs_down         = user found the response unhelpful.
+                            -- flagged_unsafe      = user believes response was harmful/dangerous.
+                            -- flagged_inaccurate  = user believes response contained factual errors.
+                            -- 'flagged_unsafe' triggers a PagerDuty alert; see §21.8 audit events.
+
+  feedback_text_encrypted   TEXT,
+                            -- Optional free-text explanation from the user, AES-256-GCM encrypted.
+                            -- NULL if the user provided no text. NULL after Art. 17 erasure.
+
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Indexes
+CREATE INDEX idx_cf_tenant_session
+  ON coaching_feedback(tenant_id, session_id);
+
+CREATE INDEX idx_cf_turn_id
+  ON coaching_feedback(turn_id);
+
+CREATE INDEX idx_cf_flagged
+  ON coaching_feedback(tenant_id, feedback_type)
+  WHERE feedback_type IN ('flagged_unsafe', 'flagged_inaccurate');
+  -- Safety flag monitoring query for the admin dashboard.
+
+ALTER TABLE coaching_feedback ENABLE ROW LEVEL SECURITY;
+```
+
+---
+
+### 21.8 `coaching_session_context` DDL
+
+```sql
+-- Data classification: DC-02 (operational metadata — hashes only, no personal content)
+-- Stores what was injected into the context window for each session.
+-- Purpose: reproducibility, debugging, and auditor demonstration of what Victor "knew".
+-- Content is NOT stored here — only hashes and token counts.
+-- The actual content for 'memory_injection' is in coaching_memory (encrypted).
+-- The actual system prompt content is in Worker source code (version-pinned by deploy SHA).
+
+CREATE TABLE coaching_session_context (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  session_id                UUID        NOT NULL
+                              REFERENCES coaching_sessions(id) ON DELETE CASCADE,
+                            -- No tenant_id denorm: accessed only via session JOIN.
+                            -- Sessions have tenant_id; this table piggybacks on that.
+
+  context_type              TEXT        NOT NULL
+                              CHECK (context_type IN (
+                                'system_prompt',
+                                'memory_injection',
+                                'workout_history',
+                                'wearable_summary'
+                              )),
+                            -- system_prompt     = the static Victor persona + instructions block.
+                            -- memory_injection   = structured facts from coaching_memory.
+                            -- workout_history    = recent workouts from the workouts table (§2.4).
+                            -- wearable_summary   = aggregated wearable data (§14).
+
+  content_hash              TEXT        NOT NULL,
+                            -- SHA-256 of the injected content (plaintext), hex-encoded.
+                            -- Allows the Worker to detect if the same context block was used
+                            -- across sessions (cache hit potential) and for auditability.
+
+  token_count               INTEGER     NOT NULL,
+                            -- Tokens consumed by this context block in the context window.
+                            -- Sum across all context_type rows for a session = context overhead.
+
+  injected_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+                            -- When this context block was assembled and injected.
+                            -- Immutable; row is written once at session start.
+);
+
+-- Indexes
+CREATE INDEX idx_csc_session_id
+  ON coaching_session_context(session_id, context_type);
+  -- Primary lookup: all context blocks for a session.
+```
+
+Note: `coaching_session_context` does NOT have RLS enabled because it contains no personal data (hashes only) and is accessed exclusively via `form_system` service role within the coaching Worker. `form_api` has no direct access to this table.
+
+---
+
+### 21.9 RLS Policies
+
+#### `coaching_sessions`
+
+```sql
+-- form_api: authenticated users may read and create their own sessions.
+-- Users cannot read other users' sessions even within the same tenant.
+CREATE POLICY cs_select_own ON coaching_sessions
+  FOR SELECT TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND user_id = auth.uid()
+  );
+
+CREATE POLICY cs_insert_own ON coaching_sessions
+  FOR INSERT TO form_api
+  WITH CHECK (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND user_id = auth.uid()
+  );
+
+-- form_api cannot UPDATE or DELETE coaching_sessions directly.
+-- Status transitions are performed by form_system (the coaching Worker).
+
+-- form_system: tenant-scoped read/write for Worker operations.
+-- No cross-tenant access: tenant_id must match the service-token claim.
+CREATE POLICY cs_system_all ON coaching_sessions
+  FOR ALL TO form_system
+  USING (tenant_id = current_setting('app.current_tenant_id')::UUID)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+-- form_admin: BYPASSRLS — no policy required (compliance toolchain only).
+```
+
+#### `coaching_turns`
+
+```sql
+-- form_api: authenticated users may read own turns, BUT content_encrypted is masked.
+-- The raw encrypted column is accessible only via the decryption Worker endpoint.
+-- This policy returns NULL for content_encrypted to prevent the DB from ever returning
+-- ciphertext to a client that could then attempt offline decryption attacks.
+CREATE POLICY ct_select_own ON coaching_turns
+  FOR SELECT TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND user_id = auth.uid()
+  );
+-- Note: The SELECT list in the API query explicitly excludes content_encrypted:
+--   SELECT id, session_id, turn_index, role, content_hash,
+--          input_tokens, output_tokens, latency_ms, model_id, stop_reason,
+--          clinical_safety_flagged, created_at
+--   FROM coaching_turns
+-- The column is projected as NULL at the application layer, NOT via a column-level
+-- security policy (Postgres does not support column-level RLS). This is enforced
+-- as a lint rule on all queries selecting from coaching_turns. See §21.13 checklist item 6.
+
+-- form_api cannot INSERT directly — turns are written exclusively by form_system.
+-- This prevents a rogue client from injecting fabricated turns into a session.
+
+-- form_system: tenant-scoped full access for the coaching Worker.
+CREATE POLICY ct_system_all ON coaching_turns
+  FOR ALL TO form_system
+  USING (tenant_id = current_setting('app.current_tenant_id')::UUID)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+-- Turns are append-only. form_system may INSERT but MUST NOT UPDATE content_encrypted
+-- after creation (except during GDPR erasure, which uses form_admin BYPASSRLS).
+-- Enforced at the Worker layer: no UPDATE statement on content_encrypted exists outside
+-- the erasure Worker. The erasure Worker validates the §12 erasure job ID before writing.
+```
+
+#### `coaching_memory`
+
+```sql
+-- form_api: authenticated users may read their own active memory keys (not values).
+-- memory_value_encrypted is masked identically to content_encrypted above:
+-- the application layer never returns the encrypted value via form_api SELECT.
+CREATE POLICY cm_select_own ON coaching_memory
+  FOR SELECT TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND user_id = auth.uid()
+    AND is_deleted = FALSE
+  );
+
+-- form_api cannot INSERT or UPDATE. Memory is managed exclusively by form_system.
+
+-- form_system: tenant-scoped access for memory extraction Worker.
+CREATE POLICY cm_system_all ON coaching_memory
+  FOR ALL TO form_system
+  USING (tenant_id = current_setting('app.current_tenant_id')::UUID)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id')::UUID);
+```
+
+#### `coaching_feedback`
+
+```sql
+-- form_api: users may insert their own feedback and read their own feedback rows.
+CREATE POLICY cf_select_own ON coaching_feedback
+  FOR SELECT TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND user_id = auth.uid()
+  );
+
+CREATE POLICY cf_insert_own ON coaching_feedback
+  FOR INSERT TO form_api
+  WITH CHECK (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND user_id = auth.uid()
+  );
+
+-- form_system: tenant-scoped read for feedback analytics and safety monitoring.
+CREATE POLICY cf_system_select ON coaching_feedback
+  FOR SELECT TO form_system
+  USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+```
+
+**Cross-tenant RLS isolation tests** (add to `__tests__/db/rls_isolation.test.ts`):
+
+```typescript
+it('coaching_sessions: form_api reads zero rows for another tenant', async () => {
+  await setTenantContext(dbA, tenantAId, userAId);
+  const rows = await dbA.query(
+    'SELECT * FROM coaching_sessions WHERE tenant_id = $1', [tenantBId]
+  );
+  expect(rows.rows).toHaveLength(0);
+});
+
+it('coaching_turns: form_api cannot insert directly', async () => {
+  await setTenantContext(dbA, tenantAId, userAId);
+  await expect(
+    dbA.query(
+      `INSERT INTO coaching_turns (tenant_id, session_id, user_id, turn_index, role, model_id)
+       VALUES ($1, $2, $3, 0, 'user', 'claude-sonnet-4-6')`,
+      [tenantAId, sessionId, userAId]
+    )
+  ).rejects.toThrow(); // No INSERT policy for form_api
+});
+
+it('coaching_memory: form_api reads zero rows for is_deleted = TRUE', async () => {
+  await setTenantContext(dbA, tenantAId, userAId);
+  const rows = await dbA.query(
+    'SELECT * FROM coaching_memory WHERE user_id = $1 AND is_deleted = TRUE', [userAId]
+  );
+  expect(rows.rows).toHaveLength(0); // RLS WHERE clause excludes deleted rows
+});
+
+it('coaching_turns: form_system cannot access another tenant', async () => {
+  await setSystemContext(dbSystem, tenantAId);
+  const rows = await dbSystem.query(
+    'SELECT * FROM coaching_turns WHERE tenant_id = $1', [tenantBId]
+  );
+  expect(rows.rows).toHaveLength(0);
+});
+```
+
+---
+
+### 21.10 Context Window Management
+
+Anthropic's Claude models have a finite context window (200k tokens for claude-sonnet-4-6 as of the model's release). Silent context truncation — where the API silently drops early messages to fit the window — is a correctness failure: Victor loses track of earlier conversation facts without any signal to the user or the system.
+
+**Strategy: track, warn, and hand off at 80%.**
+
+```
+Session start
+  │
+  ├─ Worker assembles context: system_prompt + memory_injection + workout_history + wearable_summary
+  │   └─ Writes coaching_session_context rows (§21.8)
+  │   └─ token_count sum = context_overhead
+  │
+  ├─ Each turn:
+  │   ├─ Worker estimates new input_tokens (context_overhead + all prior turns + new user message)
+  │   ├─ Updates coaching_sessions.context_window_used_pct
+  │   └─ If context_window_used_pct > 80%:
+  │       ├─ Complete current session (status = 'completed', completed_at = now())
+  │       ├─ Emit coaching.session_completed DEC-030 event with reason = 'context_window_limit'
+  │       ├─ Trigger memory extraction Worker (async) for the completed session
+  │       ├─ Start a new session (INSERT coaching_sessions, new session_token)
+  │       ├─ Re-inject fresh memory from coaching_memory (now includes extracted facts)
+  │       └─ Send continuation message to user: Victor acknowledges the session refresh
+  │
+  └─ Mobile client: receives new session_token in response; transparently continues conversation
+```
+
+The `coaching_session_context` table records exactly which context blocks were injected into each new session, creating a reproducible audit trail. The 80% threshold gives a 40k-token safety margin for the turn in progress (worst case: a very long user message + full Victor response).
+
+**Why 80% and not 95%?** At 95%, the current turn's input + output can push the effective usage past 100%, triggering Anthropic's own truncation silently. The 80% gate ensures the Worker controls the handoff, not the API.
+
+---
+
+### 21.11 GDPR Art. 17 Erasure Integration
+
+This section integrates with §12 (Soft Delete, Data Retention & GDPR Art. 17 Erasure). The coaching schema adds the following rows to the §12 erasure sequence table:
+
+| Table | Erasure action | What is retained | Retention reason |
+|---|---|---|---|
+| `coaching_sessions` | No row mutation; metadata retained | All columns (no PII in payload) | Billing audit, 7yr |
+| `coaching_turns` | `content_encrypted = NULL`, `content_hash = 'erased'` | All other columns (token counts, latency, model_id, stop_reason, clinical_safety_flagged) | Billing audit + safety audit, 7yr |
+| `coaching_memory` | `is_deleted = TRUE`, `memory_value_encrypted = NULL`, `deleted_at = now()` | All other columns (memory_key, confidence_score, extracted_at) | Data lineage, 2yr |
+| `coaching_feedback` | `feedback_text_encrypted = NULL` | All other columns (feedback_type, created_at) | Product quality metrics, 2yr |
+| `coaching_session_context` | Hard delete (`DELETE`) | None | Content is hashes only; no billing relevance; no PII |
+
+**Erasure sequence for a user deletion request:**
+
+```sql
+-- Step 1: Erase turn content (most sensitive — column-level encrypted PII)
+UPDATE coaching_turns
+SET content_encrypted = NULL,
+    content_hash       = 'erased'
+WHERE user_id = $1
+  AND tenant_id = $2;
+
+-- Step 2: Erase memory values
+UPDATE coaching_memory
+SET memory_value_encrypted = NULL,
+    is_deleted             = TRUE,
+    deleted_at             = now()
+WHERE user_id = $1
+  AND tenant_id = $2;
+
+-- Step 3: Erase feedback text
+UPDATE coaching_feedback
+SET feedback_text_encrypted = NULL
+WHERE user_id = $1
+  AND tenant_id = $2;
+
+-- Step 4: Hard delete session context (hash-only rows; no billing relevance)
+DELETE FROM coaching_session_context
+WHERE session_id IN (
+  SELECT id FROM coaching_sessions
+  WHERE user_id = $1 AND tenant_id = $2
+);
+
+-- Step 5: Emit DEC-030 coaching.memory_deleted event (HIGH, 7yr) for each memory key erased.
+-- This is emitted by the erasure Worker, not by a DB trigger.
+-- The event payload includes memory_key (the key name, not the value) and user_id hash (not plaintext).
+
+-- coaching_sessions rows are NOT deleted — retained for billing audit.
+-- The user_id FK will become a dangling reference when the users row is deleted.
+-- Resolved by: users.id ON DELETE SET NULL on coaching_sessions.user_id (see DDL note below).
+```
+
+**FK handling for user deletion:** The DDL above uses `ON DELETE CASCADE` for all coaching tables. For GDPR erasure (which must retain billing metadata in `coaching_sessions`), the erasure sequence must run Steps 1–5 BEFORE the `users` row is deleted. The §12 erasure Worker enforces this ordering. Do NOT rely on CASCADE for coaching_sessions; the explicit erasure sequence is the control.
+
+---
+
+### 21.12 Cost Attribution per Tenant
+
+#### Pricing formula (illustrative; actual rates from Anthropic API at billing time)
+
+| Token type | Rate (USD per token) |
+|---|---|
+| Input (non-cached) | $0.000003 |
+| Output | $0.000015 |
+| Cache read | $0.0000003 |
+| Cache write | $0.00000375 |
+
+The `session_cost_usd` column on `coaching_sessions` is computed by the coaching Worker after each turn using these rates and the token counts returned by the Anthropic API response headers. The Worker updates `coaching_sessions` atomically with the new token totals and recomputed `session_cost_usd`.
+
+#### Monthly cost roll-up materialized view
+
+```sql
+-- Refreshed nightly at 02:00 UTC by pg_cron.
+-- Used by: billing Worker (monthly invoice generation), admin dashboard cost analytics.
+-- Tenant admins see only their own tenant's row (RLS enforced on the base table).
+-- form_admin sees all tenants for cross-tenant billing analysis.
+
+CREATE MATERIALIZED VIEW tenant_monthly_coaching_cost AS
+SELECT
+  cs.tenant_id,
+  date_trunc('month', cs.started_at)         AS month,
+  COUNT(DISTINCT cs.id)                       AS session_count,
+  COUNT(DISTINCT cs.user_id)                  AS active_coaching_users,
+  SUM(cs.message_count)                       AS total_turns,
+  SUM(cs.input_tokens_total)                  AS total_input_tokens,
+  SUM(cs.output_tokens_total)                 AS total_output_tokens,
+  SUM(cs.cache_read_tokens)                   AS total_cache_read_tokens,
+  SUM(cs.cache_write_tokens)                  AS total_cache_write_tokens,
+  SUM(cs.session_cost_usd)                    AS total_cost_usd,
+  AVG(cs.session_cost_usd)                    AS avg_cost_per_session_usd,
+  ROUND(
+    SUM(cs.session_cost_usd) /
+    NULLIF(COUNT(DISTINCT cs.user_id), 0),
+    6
+  )                                           AS avg_cost_per_user_usd
+FROM coaching_sessions cs
+WHERE cs.status IN ('completed', 'abandoned', 'error')
+  -- Only closed sessions have final token counts. Active sessions are excluded.
+GROUP BY cs.tenant_id, date_trunc('month', cs.started_at);
+
+CREATE UNIQUE INDEX ON tenant_monthly_coaching_cost (tenant_id, month);
+
+-- Refresh schedule (pg_cron):
+SELECT cron.schedule(
+  'refresh-coaching-cost-mv',
+  '0 2 * * *',  -- 02:00 UTC daily
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_monthly_coaching_cost$$
+);
+```
+
+**Cost threshold alerting:** When a session's `session_cost_usd` exceeds the tenant's configured coaching cost threshold (stored in `tenant_config.coaching_cost_alert_threshold_usd`, default $0.50/session), the coaching Worker emits `coaching.session_cost_threshold_exceeded` (HIGH, 7yr) and enqueues a webhook event to the tenant's billing alert webhook (if configured).
+
+---
+
+### 21.13 DEC-030 HMAC-Chained Audit Events
+
+All coaching events follow the HMAC-chained append-only format defined in AUDIT_LOG_SCHEMA.md DEC-030.
+
+| Event key | Severity | Retention | Trigger |
+|---|---|---|---|
+| `coaching.session_started` | STANDARD | 2yr | New `coaching_sessions` row created; session_token issued to mobile client |
+| `coaching.session_completed` | STANDARD | 2yr | `status` → `completed`; includes final token counts, `session_cost_usd`, completion reason |
+| `coaching.turn_clinical_safety_flagged` | HIGH | 7yr | `clinical_safety_flagged = TRUE` written to a `coaching_turns` row; triggers PagerDuty alert |
+| `coaching.memory_extracted` | LOW | 1yr | Memory Worker writes or updates a `coaching_memory` row; sampled at 10% to reduce log volume |
+| `coaching.memory_deleted` | HIGH | 7yr | GDPR Art. 17 erasure: `memory_value_encrypted = NULL`, `is_deleted = TRUE` written; one event per key |
+| `coaching.feedback_submitted` | LOW | 1yr | `coaching_feedback` row created; `feedback_type` included in payload |
+| `coaching.session_cost_threshold_exceeded` | HIGH | 7yr | Session cost exceeds tenant alert threshold; payload includes `session_cost_usd`, `threshold_usd`, `tenant_id` |
+
+**Payload schema for `coaching.turn_clinical_safety_flagged`** (highest-criticality coaching event):
+
+```json
+{
+  "event": "coaching.turn_clinical_safety_flagged",
+  "tenant_id": "uuid",
+  "actor_user_id": "sha256-hash-of-uuid",
+  "actor_role": "form_system",
+  "timestamp": "ISO-8601",
+  "data": {
+    "session_id": "uuid",
+    "turn_id": "uuid",
+    "turn_index": 7,
+    "role": "assistant",
+    "clinical_safety_reason": "ed_screening_keyword",
+    "model_id": "claude-sonnet-4-6",
+    "latency_ms": 1842
+  },
+  "hmac": "sha256:...",
+  "prev_hmac": "sha256:..."
+}
+```
+
+**Critical constraints:**
+
+- The event MUST NOT include `content_encrypted` or any decrypted content. The audit log is retained 7yr and must contain zero PII.
+- `actor_user_id` is a SHA-256 hash of the UUID, not the UUID itself. This prevents the audit log from becoming a PII store when cross-referenced with other systems. The raw UUID is retained in `coaching_turns.user_id` under column-level encryption controls.
+- `coaching.memory_deleted` events are emitted once per memory key, not once per erasure request. An erasure for a user with 12 memory keys emits 12 events, each with `memory_key` (not the value) in the payload.
+- `coaching.session_cost_threshold_exceeded` must be emitted synchronously before the coaching Worker returns the turn response to the client. Failure to emit = transaction abort (fail-closed, consistent with §19 DEC-030 principle).
+
+---
+
+### 21.14 SOC 2 Evidence Mapping
+
+| Control | TSC Criterion | Evidence artefact |
+|---|---|---|
+| `coaching_turns.content_encrypted` uses AES-256-GCM column-level encryption; key in Cloudflare Secrets Store | CC6.7 — Encryption of data at rest and in transit | Key rotation procedure in `docs/KEY_ROTATION.md`; quarterly key rotation audit log; `coaching_turns` DDL in `compliance/evidence/coaching/coaching-schema.sql` |
+| RLS policies on all coaching tables enforce `tenant_id` isolation; no cross-tenant query is possible under `form_api` or `form_system` | CC6.1 — Logical and physical access controls | Cross-tenant RLS isolation test results in `compliance/evidence/coaching/rls-test-results.txt`; §21.9 DDL in evidence index |
+| `clinical_safety_flagged` turns trigger PagerDuty P1 and are retained 7yr in HMAC-chained audit log; reviewed monthly by compliance-officer | CC7.2 — System monitoring and anomaly detection | Monthly clinical safety flag report (`compliance/evidence/coaching/safety-flags-YYYY-MM.csv`); PagerDuty P1 ticket history |
+| Anthropic is a sub-processor for all Victor AI responses; data processing terms (DPA) in place; model is US-hosted | CC9.2 — Vendor and third-party risk management | Anthropic DPA signed copy in `compliance/legal/anthropic-dpa.pdf`; sub-processor list in `docs/SUBPROCESSORS.md`; annual Anthropic security review in `compliance/evidence/vendors/anthropic-YYYY.pdf` |
+
+**Auditor evidence artefacts**:
+
+- `compliance/evidence/coaching/coaching-schema.sql` — DDL export from production Supabase, refreshed quarterly
+- `compliance/evidence/coaching/rls-policies.sql` — RLS policy export, matches §21.9 DDL
+- `compliance/evidence/coaching/rls-test-results.txt` — CI output of cross-tenant isolation test suite
+- `compliance/evidence/coaching/safety-flags-YYYY-MM.csv` — monthly export of `coaching.turn_clinical_safety_flagged` events from audit log, reviewed and signed by compliance-officer
+- `compliance/evidence/coaching/cost-attribution-sample.csv` — sample `tenant_monthly_coaching_cost` view output demonstrating per-tenant cost isolation
+
+---
+
+### 21.15 Open Questions
+
+| # | Question | Owner | Priority |
+|---|---|---|---|
+| OQ-COACH-01 | Should `coaching_turns` content be retained for Anthropic model fine-tuning or FORM internal model evaluation? This requires explicit opt-in user consent under GDPR Art. 6(1)(a) (consent basis, separate from the Art. 6(1)(b) contract basis for coaching delivery), a Data Processing Impact Assessment (DPIA), and a separate `coaching_turns.fine_tune_consent` boolean column. Until consent infrastructure is in place, ALL coaching content is excluded from any fine-tuning pipeline. | `compliance-officer` + `legal` | **P0 — resolve before any model evaluation use case ships** |
+| OQ-COACH-02 | Token cost attribution model for enterprise: flat per-seat coaching fee (predictable for tenant budgeting) vs. actual consumption billing (fair but variable and complex to invoice). Current schema supports both: `tenant_monthly_coaching_cost` view provides actual consumption; a per-seat flat rate would cap at a configurable `tenant_config.coaching_seat_allowance_tokens` with overage billing. Decision needed before enterprise contracts are signed. | `enterprise-architect` + `finance` | **P1 — before first enterprise pilot invoicing** |
+| OQ-COACH-03 | Memory key namespace versioning: how do we handle schema evolution of `memory-keys.ts`? If `user.training_history.summary` is renamed to `user.training_history.background` in a future release, existing rows hold the old key. Options: (a) migration script to rename keys; (b) alias map in the context builder; (c) version suffix on keys (`user.training_history.summary.v2`). Each has trade-offs for erasure targeting and context builder complexity. | `platform-engineer` | **P1 — before memory schema stabilises at M4** |
+
+---
+
+### 21.16 Implementation Checklist
+
+| # | Task description | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create `migrations/YYYYMMDD_coaching_sessions.sql` — `coaching_sessions` DDL, all indexes, `update_updated_at_column()` trigger, RLS policies from §21.9 | `enterprise-architect` | **P0** | M3 |
+| 2 | Create `migrations/YYYYMMDD_coaching_turns.sql` — `coaching_turns` DDL, `uq_turn_position` constraint, all indexes, RLS policies from §21.9 | `enterprise-architect` | **P0** | M3 |
+| 3 | Create `migrations/YYYYMMDD_coaching_memory.sql` — `coaching_memory` DDL, `uq_memory_user_key` constraint, all indexes, `update_updated_at_column()` trigger, RLS policies from §21.9 | `enterprise-architect` | **P0** | M3 |
+| 4 | Create `migrations/YYYYMMDD_coaching_feedback_and_context.sql` — `coaching_feedback` and `coaching_session_context` DDL, all indexes, RLS policies from §21.9 | `enterprise-architect` | **P0** | M3 |
+| 5 | Implement AES-256-GCM column-level encryption in `src/lib/encryption/coaching-crypto.ts`: `encrypt(plaintext, key)` and `decrypt(ciphertext, key)` using the Web Crypto API (available in Cloudflare Workers); key loaded from Cloudflare Secrets Store at Worker startup; unit tests for encrypt/decrypt round-trip and null handling | `platform-engineer` | **P0** | M3 |
+| 6 | Implement lint rule (`src/lint/no-coaching-turns-content.ts`) that rejects any query selecting `content_encrypted` from `coaching_turns` without going through the decryption Worker endpoint; add to CI pipeline | `platform-engineer` | **P0** | M3 |
+| 7 | Implement the coaching turn Worker (`src/workers/coaching/turn-handler.ts`): session token validation, context assembly, Anthropic Messages API call, streaming response to client, atomic `coaching_turns` INSERT + `coaching_sessions` UPDATE (token counts, cost, context_window_used_pct), `coaching_session_context` snapshot on first turn | `platform-engineer` | **P0** | M3 |
+| 8 | Implement context window management (§21.10): detect `context_window_used_pct > 80%` after each turn; auto-complete session; emit `coaching.session_completed` DEC-030 event with `reason = 'context_window_limit'`; trigger memory extraction; start new session with fresh injection | `platform-engineer` | **P0** | M3 |
+| 9 | Implement memory extraction Worker (`src/workers/coaching/memory-extractor.ts`): invoked async after session completion; calls Claude to extract structured facts from the session turns; validates extracted keys against `memory-keys.ts` allowlist; UPSERT into `coaching_memory`; emits `coaching.memory_extracted` DEC-030 event (sampled 10%) | `platform-engineer` | **P0** | M4 |
+| 10 | Implement post-generation clinical safety classifier (`src/workers/coaching/safety-classifier.ts`): runs async after each Victor response is streamed; keyword + pattern matching per `docs/CLINICAL_SAFETY.md`; if flagged: UPDATE `coaching_turns.clinical_safety_flagged = TRUE`, emit `coaching.turn_clinical_safety_flagged` DEC-030 event (HIGH), open PagerDuty P1 | `platform-engineer` + `clinical-advisor` | **P0** | M3 |
+| 11 | Create `tenant_monthly_coaching_cost` materialized view (§21.12) and pg_cron job; wire to admin dashboard cost analytics endpoint; add `coaching.session_cost_threshold_exceeded` DEC-030 event emission to the turn Worker | `platform-engineer` | **P1** | M4 |
+| 12 | Implement GDPR Art. 17 erasure sequence for coaching tables (§21.11): integrate into §12 erasure Worker; ordering: turns → memory → feedback → session_context → (sessions retained); emit `coaching.memory_deleted` DEC-030 event per key; unit tests for each step | `platform-engineer` + `compliance-officer` | **P1** | M4 |
+| 13 | Add all cross-tenant RLS isolation tests from §21.9 to `__tests__/db/rls_isolation.test.ts`; add to CI gating | `enterprise-architect` | **P0** | M3 |
+| 14 | Wire all 7 DEC-030 coaching audit events (§21.13) to their triggers; confirm `coaching.turn_clinical_safety_flagged` emits synchronously and carries `blocked: false` (it does not block the response, but it does alert); confirm `coaching.session_cost_threshold_exceeded` is fail-closed | `platform-engineer` + `security-engineer` | **P0** | M3 |
+| 15 | Add `coaching.victor_enabled` flag to `feature_flag_registry` seed data (§19.3) with `minimum_tier = 'growth'`, `requires_compliance_gate = TRUE`; wire `assertFeatureEnabled('coaching.victor_enabled')` gate into the turn Worker; compliance gate requires DPA with Anthropic as sub-processor in DECISION_LOG | `platform-engineer` + `compliance-officer` | **P0** | M3 |
+
+---
+
 *v1.1 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer*
+
+*v1.1 additions: §20 White-Label Tenant Branding Schema — `tenant_branding` table (1:1 with tenants, lazy), `logo_url/logo_dark_url/favicon_url`, `primary_color` + WCAG AA contrast validation, `custom_domain` DNS-verification state machine, `powered_by_removal` with ARR gate ($50k+) and DECISION_LOG ref requirement; R2 asset storage (PNG/WebP only, SVG rejected); 9 API endpoints; 12 DEC-030 HMAC-chained audit events; nightly pg_cron invariant check; SOC 2 CC7.2/CC8.1/CC6.2/CC6.8 mapping; 13-item checklist. §21 AI Coaching Session & Memory Schema — five-table schema: `coaching_sessions` (session_token, model_id, context_window_used_pct, session_cost_usd, per-model token counts), `coaching_turns` (column-level AES-256-GCM encryption on content, clinical_safety_flagged per turn, append-only via RLS), `coaching_memory` (dotted-namespace memory keys with confidence score and GDPR soft-delete), `coaching_feedback` (thumbs_up/down/flagged_unsafe/flagged_inaccurate), `coaching_session_context` (hash-only immutable context snapshot). Column-level encryption: AES-256-GCM, key from Cloudflare Secrets Store. RLS: form_api own-rows read (content_encrypted masked at query layer), form_system tenant-scoped, form_admin unrestricted. Context window management: 80% threshold triggers auto-complete + fresh session with memory re-injection. GDPR Art. 17 erasure: turns content_encrypted → NULL, memory soft-delete with key-level events. Cost attribution: session_cost_usd computed at turn-write time; `tenant_monthly_coaching_cost` materialized view, CONCURRENTLY refreshed via pg_cron. 7 DEC-030 audit events (coaching.session_started/completed/turn_clinical_safety_flagged/memory_extracted/memory_deleted/feedback_submitted/session_cost_threshold_exceeded). SOC 2 mapping: CC6.1 (RLS), CC6.7 (column encryption), CC7.2 (clinical safety flagging), CC9.2 (Anthropic as GDPR sub-processor). 3 open questions (OQ-COACH-01: fine-tuning consent P0; OQ-COACH-02: flat vs consumption billing P1; OQ-COACH-03: memory key namespace versioning P1). 15-item implementation checklist (12× P0 M3, 2× P1 M4, 1× P0 M3 feature-flag gate).*
 
 *v1.0 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer*
 
