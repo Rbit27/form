@@ -6,6 +6,14 @@
 
 ---
 
+## [1.16.6] — 2026-05-29
+
+### Changed
+- `docs/SOC2_READINESS.md §39` — Security Trust Center Architecture (`security.form.coach`). Full portal design for the enterprise-facing trust page. Seven pages specified across public and NDA-gated tiers: `/` security overview, `/sub-processors` (closes CC9-GAP-007 design phase 🔴→🟡: Cloudflare Worker spec, `SECURITY_PORTAL_KV` schema, JSON API, SHA-256 `X-List-Hash` header for programmatic polling by procurement tools), `/dpa` DPA template download with SCC Module 2 note, `/disclosure` responsible disclosure policy (90-day window, PGP key, CVSS 3.1 severity table), `/questionnaire` CAIQ Lite PDF hub, `/soc2` NDA-gated SOC 2 report access (HTML request form → Resend notification → CSM DocuSign NDA → Vanta/Drata link, 7-day expiry), `/pentest` executive summary NDA-gate. `trust_center_requests` Supabase table DDL (form_admin-only RLS; form_api and form_system excluded; no tenant exposure). Eight DEC-030 HMAC-chained audit events covering full trust center lifecycle (`trust_center.sub_processor_list_updated`, `trust_center.soc2_report_requested/approved/declined/shared`, `trust_center.pentest_summary_shared`, `trust_center.nda_signed`, `trust_center.disclosure_report_submitted`). Gap status: CC9-GAP-007 🔴→🟡 (sub-processor Worker fully specified; deployment remaining), CC2-GAP-003 🔴→🟡 (publication architecture defined; deployment closes to 🟢). SOC 2 evidence mapping: CC9.2 (vendor list transparency), CC2.3 (change notification pledge), CC6.1 (NDA-gate on restricted docs), CC6.2 (access issuance log), CC7.1 (responsible disclosure), CC8.1 (HMAC-chained mutations), P6.1 (DPA public availability). 14-item implementation checklist (8× P0 M4, 5× P1 M4/M5, 1× P2 M5). SOC 2 readiness: ~95% → ~95% (design complete; advances when Worker deployed and screenshot filed as CC9 evidence artifact).
+- `VERSION` → 1.16.6
+
+---
+
 ## [1.16.5] — 2026-05-29
 
 ### Added

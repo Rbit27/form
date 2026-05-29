@@ -7052,4 +7052,299 @@ All of the following must be TRUE before auditor fieldwork begins.
 
 *v2.8 updates (2026-05-22): CC1-GAP-002 🔴→🟡 AUTHORED — `compliance/cc1/security-training-log.md` (CC1-E-001, v0.1) authored 2026-05-22. Defines 8-topic annual security awareness training curriculum (OWASP Top 10, phishing, GDPR Art. 9 data classification, incident response, credential hygiene, OWASP ASVS secure code review, privacy/GDPR obligations, vendor risk awareness) with specific platforms, evidence file naming conventions, evidence filing workflow, and founder self-attestation template. Solo-phase auditor disclosure documents CC1-E-002 and CC1-E-005 as intentionally absent (no employees). `compliance/cc1/README.md` updated: CC1-E-001 row 🔴→🟡 AUTHORED; CC1-GAP-002 row 🔴→🟡 AUTHORED. §22 gap table and §38.4 master gap registry updated. Open gap count: 49→49 (CC1-GAP-002 advances from 🔴 to 🟡; P0 count unchanged — gap closes to 🟢 upon self-attestation execution, not authorship). SOC 2 readiness: ~95% → ~95% (documentation gap advanced; control closes when training is completed and attested).*
 
+---
+
+## 39. Security Trust Center Architecture (`security.form.coach`)
+
+> **Owner:** `enterprise-architect` + `compliance-officer`. **Effective:** 2026-05-29. **Review:** quarterly or on any material change to the sub-processor list, DPA template, or NDA gate workflow.
+> **SOC 2 criteria addressed:** CC2.3 (external communication of control commitments), CC6.1 (access restriction to authorised parties), CC6.2 (access issuance documentation), CC7.1 (vulnerability identification via responsible disclosure), CC8.1 (change management audit trail), CC9.2 (vendor and third-party risk transparency), P6.1 (disclosure to external parties).
+> **Gap closure:** CC9-GAP-007 🔴 → 🟡 (design complete; Worker deployment remaining), CC2-GAP-003 🔴 → 🟡 (publication architecture defined; deployment closes to 🟢).
+> **Reference:** §20.8 (sub-processor publication path), §28.3.1 (vendor registry), §30 CC2 Communication (CC2-GAP-003), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/SSO_SCIM_IMPLEMENTATION.md §14` (DPA context).
+
+### 39.1 Purpose and Scope
+
+`security.form.coach` is a dedicated trust portal, separate from `form.coach` (consumer product) and `admin.form.coach` (enterprise admin dashboard). Its sole purpose is to give enterprise procurement teams, current enterprise customers, and external auditors a single authoritative URL for all security and compliance artefacts. The portal imposes no login requirement on public pages; a lightweight NDA-gate (email-based, DocuSign) restricts access to the SOC 2 report and penetration test summary.
+
+#### 39.1.1 Audiences and Needs
+
+| Audience | Entry Point | Primary Need | Auth Required |
+|---|---|---|---|
+| Enterprise procurement teams (pre-sale security review) | `/`, `/sub-processors`, `/dpa`, `/questionnaire` | Confirm GDPR Art. 28 compliance; download DPA template; submit CAIQ/SIG questionnaire | None (public) |
+| Current enterprise customers (ongoing compliance) | `/sub-processors`, `/soc2`, `/pentest` | Monitor sub-processor changes; request annual SOC 2 report; verify pentest remediation status | NDA-gate for `/soc2`, `/pentest` |
+| External auditors (evidence collection) | `/soc2`, `/pentest`, `/sub-processors` | Access SOC 2 Type II report; review sub-processor list as of audit period; confirm pentest attestation | NDA-gate for `/soc2`, `/pentest` |
+
+#### 39.1.2 SOC 2 Criteria Alignment
+
+| Criterion | How the trust portal satisfies it |
+|---|---|
+| **CC2.3** | Public pages communicate FORM's security commitments, sub-processor list, and disclosure policy to external parties; 30-day change-notification pledge is visible at `/sub-processors` |
+| **CC9.2** | `/sub-processors` publishes the full §28.3.1 vendor registry with DPA status, data categories, and region; `X-List-Hash` header enables programmatic monitoring of changes |
+| **P6.1** | DPA template at `/dpa` documents GDPR Art. 28 controller–processor relationship and lawful transfer mechanism for all enterprise customers |
+| **CC6.1** | SOC 2 report and pentest summary are restricted to parties who have executed an NDA; DocuSign signature required before any link is shared |
+| **CC6.2** | `trust_center_requests` table records every access issuance event; auditor can query the table for the observation period |
+| **CC7.1** | Responsible disclosure policy at `/disclosure` defines the vulnerability intake channel and coordinated-disclosure window |
+| **CC8.1** | All trust center state changes (sub-processor list update, report shared, NDA signed) are DEC-030 HMAC-chained events |
+
+---
+
+### 39.2 Site Architecture
+
+```
+security.form.coach  (CNAME → Cloudflare Pages deployment)
+│
+├── Cloudflare Pages project: apps/security-portal/
+│   ├── Static HTML pages: /, /dpa, /disclosure, /questionnaire
+│   └── Cloudflare Workers (dynamic): /sub-processors, /soc2, /pentest
+│
+├── KV namespace: SECURITY_PORTAL_KV
+│   └── key: sub-processors-v1  (JSON; authoritative vendor list)
+│
+└── Supabase table: trust_center_requests
+    └── form_admin RLS; no tenant exposure; no form_api access
+```
+
+**Deployment:**
+- Cloudflare Pages project name: `form-security-portal` (separate from `form-web`)
+- CNAME: `security.form.coach` → `form-security-portal.pages.dev`
+- Source path in monorepo: `apps/security-portal/`
+- Wrangler config: `apps/security-portal/wrangler.toml`
+
+**Privacy-first design constraints:**
+- No cookies set on any public page
+- No analytics scripts loaded on public pages (PostHog excluded from this domain)
+- All outbound links to `form.coach` open in a new tab (`target="_blank" rel="noopener"`)
+- GDPR Art. 25 data minimisation: contact form collects only name, company, email, relationship, and document type — no IP stored, no fingerprinting
+
+**Required response headers (applied via Cloudflare Pages `_headers` file):**
+
+| Header | Value |
+|---|---|
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Content-Security-Policy` | `default-src 'self'; form-action 'self'` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+
+---
+
+### 39.3 Page Inventory
+
+#### 39.3.1 Public Pages (No NDA Required)
+
+| Path | Title | Content | Gap Closed | SOC 2 Criterion |
+|---|---|---|---|---|
+| `/` | Security Overview | Brief intro paragraph; links to all sub-pages; `security@form.coach` contact; "last updated" date (auto-injected from deploy timestamp) | — | CC2.3 |
+| `/sub-processors` | Sub-Processor List | Rendered from `SECURITY_PORTAL_KV`; full §28.3.1 registry; `?format=json` JSON endpoint; `Last-Modified`, `ETag`, `X-List-Hash` response headers; "last updated" date + git commit hash; 30-day advance notice pledge; link to `/dpa` | CC9-GAP-007, CC2-GAP-003 | CC9.2, CC2.3 |
+| `/dpa` | Data Processing Agreement | GDPR Art. 28 compliant DPA template (version-dated PDF download); SCC Module 2 included; covers all §28.3.1 sub-processors; references `docs/SSO_SCIM_IMPLEMENTATION.md §14`; "current version" date visible without download | — | P6.1 |
+| `/disclosure` | Responsible Disclosure | `security@form.coach` intake; 90-day coordinated disclosure window; PGP public key published inline; bug bounty: hall-of-fame recognition (no cash); CVSS 3.1 severity scoring table; response SLA by severity (Critical 1 BD / High 3 BD / Medium 10 BD) | — | CC7.1 |
+| `/questionnaire` | Security Questionnaire Hub | Downloadable pre-filled CAIQ Lite PDF; instructions for SIG Lite or custom questionnaire requests via `security@form.coach`; estimated turnaround (5 business days for custom SIG) | — | CC2.3 |
+
+#### 39.3.2 NDA-Gated Pages (Email Access — Not Portal Login)
+
+| Path | Title | Gate Mechanism | Content | SOC 2 Criterion |
+|---|---|---|---|---|
+| `/soc2` | SOC 2 Type II Report | Request form → `security@form.coach` notification → CSM verifies → DocuSign NDA → Vanta/Drata link (7-day expiry) | Report request form; relationship selector; current audit status note; expected issuance date | CC6.1, CC6.2 |
+| `/pentest` | Penetration Test Summary | Same NDA gate as `/soc2` | Executive summary only (not full report); current status: pre-launch engagement in progress; findings-to-remediation tracking status | CC6.1, CC7.1 |
+
+---
+
+### 39.4 Sub-Processor List Worker Design
+
+The `/sub-processors` route is a Cloudflare Worker, not a static HTML page, so the list can be updated without a Pages redeploy by writing to KV.
+
+#### 39.4.1 KV Schema
+
+KV namespace: `SECURITY_PORTAL_KV`. Key: `sub-processors-v1`.
+
+```jsonc
+{
+  "last_updated_at": "2026-05-29T00:00:00Z",
+  "git_commit": "abc1234",
+  "notice_pledge_days": 30,
+  "processors": [
+    {
+      "name": "Anthropic",
+      "category": "AI inference",
+      "data_categories": ["coaching_turns", "user_messages"],
+      "dpa_status": "signed",
+      "certification": "SOC 2 Type II",
+      "data_region": "US",
+      "last_reviewed_at": "2026-01-01"
+    }
+    // ... one entry per §28.3.1 vendor
+  ]
+}
+```
+
+#### 39.4.2 Worker Behaviour
+
+| Request | Response |
+|---|---|
+| `GET /sub-processors` (no query string) | HTML page; server-side rendered from KV; no client JS required |
+| `GET /sub-processors?format=json` | Raw JSON; `Content-Type: application/json` |
+| Any request | `Last-Modified: <last_updated_at>`, `ETag: "<sha256_of_json>"`, `X-List-Hash: sha256:<hex>` |
+
+The `X-List-Hash` header contains a SHA-256 hex digest of the serialised JSON payload. Enterprise procurement tools that poll for sub-processor list changes can compare this header value between requests without parsing the full JSON body.
+
+**Update procedure:** `compliance-officer` runs `wrangler kv:key put --namespace-id=<id> sub-processors-v1 "$(cat updated-list.json)"`. This triggers a `trust_center.sub_processor_list_updated` DEC-030 event (see §39.7). The compliance calendar entry (§15) for "monthly sub-processor currency check" should verify the `last_updated_at` field is not stale.
+
+---
+
+### 39.5 SOC 2 Report Access Workflow
+
+The `/soc2` page renders an HTML form. Submission is handled by a Cloudflare Worker that validates input, notifies the internal team, and creates a database record. No report link is ever auto-sent; a human review step gates every share.
+
+```
+Requestor fills /soc2 form
+    │
+    ▼
+Worker: validate → INSERT trust_center_requests (status='pending')
+    │              + emit trust_center.soc2_report_requested (DEC-030)
+    │              + POST to Resend API → email to security@form.coach
+    ▼
+CSM reviews within 1 BD
+    │
+    ├── Enterprise customer → CSM sends DocuSign NDA
+    │       │
+    │       ▼
+    │   DocuSign webhook → trust_center.nda_signed (DEC-030)
+    │       │
+    │       ▼
+    │   CSM shares Vanta/Drata link (7-day expiry)
+    │       │
+    │       ▼
+    │   UPDATE trust_center_requests status='shared', link_expires_at=now()+7d
+    │   + emit trust_center.soc2_report_shared (DEC-030)
+    │
+    ├── Prospect → founder reviews; must be at pilot-qualification stage or beyond
+    │       → same NDA + link flow if approved
+    │       → emit trust_center.soc2_report_declined if not approved
+    │
+    └── Auditor → compliance-officer reviews; named audit firm required;
+                  standard NDA; engagement letter must name FORM as subject entity
+```
+
+| Step | Actor | SLA | DEC-030 Event |
+|---|---|---|---|
+| Form submission | Requestor | — | `trust_center.soc2_report_requested` |
+| CSM review and NDA dispatch | CSM or founder | 1 business day | — |
+| NDA signature | Requestor | — | `trust_center.nda_signed` |
+| Report link shared | CSM | Within 4 hours of NDA signature | `trust_center.soc2_report_shared` |
+| Request declined | Reviewer | 1 business day | `trust_center.soc2_report_declined` |
+
+---
+
+### 39.6 `trust_center_requests` Table DDL
+
+```sql
+CREATE TABLE trust_center_requests (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at         TIMESTAMPTZ NOT NULL    DEFAULT now(),
+  requestor_name     TEXT        NOT NULL,
+  requestor_email    TEXT        NOT NULL,
+  requestor_company  TEXT        NOT NULL,
+  relationship       TEXT        NOT NULL
+                     CHECK (relationship IN (
+                       'customer', 'prospect', 'auditor', 'analyst', 'other'
+                     )),
+  document_type      TEXT        NOT NULL
+                     CHECK (document_type IN (
+                       'soc2_report', 'pentest_summary', 'custom_questionnaire'
+                     )),
+  status             TEXT        NOT NULL    DEFAULT 'pending'
+                     CHECK (status IN (
+                       'pending', 'approved', 'declined', 'shared'
+                     )),
+  reviewed_by        TEXT,        -- form_admin email or display name
+  reviewed_at        TIMESTAMPTZ,
+  link_shared_at     TIMESTAMPTZ,
+  link_expires_at    TIMESTAMPTZ  -- set to link_shared_at + INTERVAL '7 days'
+);
+
+-- RLS: form_admin role has full SELECT/INSERT/UPDATE access.
+-- form_api and form_system roles have NO access.
+-- No tenant_id column: this table is platform-level, never tenant-scoped.
+-- No exposure via any tenant-facing API surface.
+
+ALTER TABLE trust_center_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "form_admin_full_access" ON trust_center_requests
+  FOR ALL
+  TO form_admin
+  USING (true)
+  WITH CHECK (true);
+```
+
+Migration path: `supabase/migrations/<timestamp>_trust_center_requests.sql`. The table must exist before the `/soc2` Worker is deployed. Evidence artefact: git permalink to migration commit filed as `compliance/evidence/cc6/trust-center-requests-ddl-YYYY-MM.txt`.
+
+---
+
+### 39.7 DEC-030 Audit Events
+
+All trust center events follow the DEC-030 envelope defined in `docs/AUDIT_LOG_SCHEMA.md`: `tenant_id = NULL` (platform-level events, not tenant-scoped), `trace_id`, `actor_id` (SHA-256 hash of requestor email for external parties; CSM user ID for internal actors), `event_type`, `severity`, `payload`, `hmac_self`, `hmac_chain`.
+
+| Event Type | Severity | Retention | Actor | Key Payload Fields | Trigger |
+|---|---|---|---|---|---|
+| `trust_center.sub_processor_list_updated` | STANDARD | 7 yr | compliance-officer (internal) | `{ git_commit, processor_count, changed_vendors[] }` | `wrangler kv:key put` update to `sub-processors-v1` |
+| `trust_center.soc2_report_requested` | MEDIUM | 7 yr | `sha256(requestor_email)` | `{ document_type, relationship, requestor_company }` | `/soc2` form submission |
+| `trust_center.soc2_report_approved` | MEDIUM | 7 yr | CSM user ID | `{ request_id, requestor_company }` | CSM sets `status = 'approved'` |
+| `trust_center.soc2_report_declined` | MEDIUM | 7 yr | Reviewer user ID | `{ request_id, decline_reason }` | CSM/founder sets `status = 'declined'` |
+| `trust_center.soc2_report_shared` | HIGH | 7 yr | CSM user ID | `{ request_id, link_expires_at, docusign_envelope_id }` | CSM marks `status = 'shared'` |
+| `trust_center.pentest_summary_shared` | HIGH | 7 yr | CSM user ID | `{ request_id, link_expires_at, docusign_envelope_id }` | Pentest summary NDA signed + link shared |
+| `trust_center.nda_signed` | HIGH | 7 yr | `sha256(requestor_email)` | `{ request_id, docusign_envelope_id, signed_at }` | DocuSign webhook confirms signature |
+| `trust_center.disclosure_report_submitted` | MEDIUM | 3 yr | `sha256(reporter_email)` | `{ cvss_score, vulnerability_class, reporter_company }` | Responsible disclosure submission received at `security@form.coach` |
+
+These 8 event types must be registered in `docs/AUDIT_LOG_SCHEMA.md` under the `trust_center.*` namespace before the Workers are deployed.
+
+---
+
+### 39.8 Gap Status Updates
+
+| Gap ID | Description | Before §39 | After §39 | Remaining Work |
+|---|---|---|---|---|
+| **CC9-GAP-007** | Deploy `security.form.coach/sub-processors` Cloudflare Worker | 🔴 Open | 🟡 Partial | Wrangler deploy + KV populate + screenshot to `compliance/cc9/` |
+| **CC2-GAP-003** | Sub-processor list not deployed at `security.form.coach/sub-processors` | 🔴 Open | 🟡 Partial | Same deployment task as CC9-GAP-007; both close to 🟢 on deploy |
+| **CC2-GAP-004** (new) | SOC 2 report access workflow not yet implemented; `trust_center_requests` table not yet created | 🔴 Open | 🟡 Partial | `/soc2` Worker, DB migration, DocuSign integration; Worker spec complete in §39.5–§39.6 |
+
+**Note on CC2-GAP-004:** This gap was first surfaced in §30 as "no documented process for communicating policy changes to enterprise tenants." §39 scopes it more precisely to the SOC 2 report access workflow. The original §30 CC2-GAP-004 (policy-change notification SOP) remains a separate remediation item and is not superseded by §39.
+
+---
+
+### 39.9 SOC 2 Evidence Mapping
+
+| Trust Center Control | SOC 2 Criterion | Evidence Artefact | Current Status |
+|---|---|---|---|
+| `/sub-processors` published with full §28.3.1 registry | CC9.2 — vendor risk transparency | Screenshot `compliance/cc9/sub-processor-page-YYYY-MM.png`; `GET /sub-processors.json` response | 🟡 Partial — design complete; deployment pending |
+| Sub-processor `last_updated_at` + 30-day notice pledge | CC2.3 — external communication of changes | `X-List-Hash` header value logged in monthly currency check (AL-SEC-01) | 🟡 Partial — implementation pending |
+| `/soc2` NDA-gate (DocuSign before link share) | CC6.1 — access restricted to authorised parties | `trust_center.nda_signed` DEC-030 events + `trust_center_requests` table rows | 🔴 Open — Worker not yet built |
+| `trust_center_requests` table records every share | CC6.2 — access issuance documentation | Table query export covering observation period | 🔴 Open — table not yet created |
+| `/disclosure` responsible disclosure policy | CC7.1 — vulnerability identification | Public URL screenshot; PGP key publication | 🔴 Open — page not yet deployed |
+| DEC-030 events on all trust center mutations | CC8.1 — change management audit trail | `audit_log` query: `event_type LIKE 'trust_center.%'` | 🔴 Open — event types not yet registered |
+| `/dpa` template publicly downloadable | P6.1 — disclosure to third parties | Public URL screenshot; PDF version-date metadata | 🔴 Open — page not yet deployed |
+
+---
+
+### 39.10 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Create `apps/security-portal/` directory structure; add `wrangler.toml` with `SECURITY_PORTAL_KV` binding and Pages project config | devops-lead | P0 | M4 |
+| Write `/sub-processors` Worker: KV read, server-side HTML render (no client JS), `?format=json` branch, `ETag` + `Last-Modified` + `X-List-Hash` response headers | platform-engineer | P0 | M4 |
+| Populate `SECURITY_PORTAL_KV` key `sub-processors-v1` with all vendors from §28.3.1; set `last_updated_at` and `git_commit` | compliance-officer | P0 | M4 |
+| Write static `/` overview page (HTML; FORM brand tokens; links to all sub-pages; `security@form.coach`; deploy-timestamp last-updated footer) | platform-engineer | P0 | M4 |
+| Write static `/dpa` page with PDF download link, version date, SCC Module 2 note, and reference to `docs/SSO_SCIM_IMPLEMENTATION.md §14` | compliance-officer | P0 | M4 |
+| Write static `/disclosure` page: `security@form.coach`, 90-day window, PGP key block, CVSS 3.1 severity table, response SLA table, hall-of-fame note | security-engineer | P0 | M4 |
+| Write static `/questionnaire` page: CAIQ Lite PDF download link; email-for-SIG instructions; 5 BD turnaround note | compliance-officer | P1 | M4 |
+| Write `/soc2` Worker: HTML form render + POST handler (form validation, Resend notification to `security@form.coach`, `trust_center_requests` INSERT, DEC-030 `soc2_report_requested` event) | platform-engineer | P0 | M4 |
+| Create `supabase/migrations/<ts>_trust_center_requests.sql`; apply `form_admin` RLS policy; confirm `form_api` and `form_system` have no access | platform-engineer + enterprise-architect | P0 | M4 |
+| Register all 8 `trust_center.*` DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md`; assign severity and retention tier per §39.7 | compliance-officer | P0 | M4 |
+| File screenshot of deployed `/sub-processors` page as `compliance/cc9/sub-processor-page-YYYY-MM.png`; update §38.4 gap registry (CC9-GAP-007 🔴 → 🟡 and CC2-GAP-003 🔴 → 🟡 on design; 🟢 on deploy) | compliance-officer | P0 | M4 |
+| Configure Cloudflare Pages `_headers` file with all six required security response headers from §39.2 | devops-lead | P1 | M4 |
+| Set up monthly automated smoke test (AL-SEC-01): `GET https://security.form.coach/sub-processors?format=json` → assert HTTP 200, JSON parses, `last_updated_at` < 90 days; alert to `#security-alerts` on failure | devops-lead | P1 | M5 |
+| Write `/pentest` Worker (same NDA-gate pattern as `/soc2`); update to reflect live pentest status once PEN-GAP-001 is closed | security-engineer | P2 | M5 |
+
+---
+
 *v2.9 updates (2026-05-28): Three P-series gap advances reflecting compliance artifacts authored 2026-05-21 not yet mirrored in this document. (1) P-GAP-004 🔴→🟡 AUTHORED — `compliance/p1/retention-decisions.md` (P1-RET-001, effective 2026-05-21) formally decides per-category retention periods for all seven Art. 9 health data tables using §35.6.3 proposed schedule as input: workout_sessions 3yr, sets 3yr (cascade), coaching_turns 2yr, cv_sessions 1yr, user_profile health fields until account deletion, meal_log 2yr, wearable_readings 2yr; ClickHouse 2yr TTL and DEC-030 7yr WORM retention confirmed out-of-scope (already decided). Remaining for full P-GAP-004 closure: (a) legal sign-off on retention periods, (b) publication of per-category retention schedule in privacy policy (blocked on P-GAP-001), (c) Supabase TTL migration execution. §35.6.2 PRV-23 and PRV-26 advanced 🔴→🟡; §35.11 P-GAP-004 remediation step marked ✅ partial. (2) P-GAP-007 🔴→🟡 AUTHORED — `compliance/p1/complaint-intake-procedure.md` (P1-CIP-001, effective 2026-05-21) defines: `privacy@form.coach` complaint intake with 30-day GDPR Art. 77 response SLA; five-step processing flow (acknowledge → triage → investigate → respond → close); Art. 9 flag for health-data requests requiring compliance-officer sign-off; `complaint-log.csv` template seeded; supervisory authority escalation path (UA DPA → EDPB); Art. 22 automated decision-making position. Remaining for full P-GAP-007 closure: (a) `privacy@form.coach` mailbox creation, (b) privacy contact published in privacy policy and Settings (blocked on P-GAP-001). §35.10 PRV-52 advanced 🔴→🟡. (3) P-GAP-002 🔴→🟡 PARTIAL — `compliance/p1/sub-processor-register.md` (P1-SUB-001, effective 2026-05-21) formalizes the internal sub-processor register covering all 8 processors with DPA and SCC Module 2 status; Sentry (SP-06) DPA in progress with compensating control documented. P-GAP-002 requires publication at `form.coach/legal/sub-processors` before closure — internal register is a necessary precursor, not closure. §38.5.1 document list updated: sub-processor-register.md added as 🟡 Authored; §38.5.2 data room structure updated to show p1/ filing status for all five authored artifacts. §38.3 Privacy TSC readiness: ~82% → ~84% (two full P1 gaps advanced to 🟡; one P0 precursor advanced). Open gap count: 49→49 (gaps remain in open count until mailbox creation, legal sign-off, and TTL migrations executed). SOC 2 overall readiness: ~95% → ~95% (Privacy TSC weight is partial; overall moves when P0 blockers P-GAP-001/002 are cleared).*
+*v3.0 additions: §39 Security Trust Center Architecture — full design for `security.form.coach` trust portal. Seven public and NDA-gated pages specified: `/` security overview, `/sub-processors` (closes CC9-GAP-007 design phase: Worker spec, KV schema, JSON API, SHA-256 `X-List-Hash` header for programmatic polling), `/dpa` template download, `/disclosure` responsible disclosure + PGP, `/questionnaire` CAIQ Lite hub, `/soc2` NDA-gated report access (DocuSign NDA → Vanta/Drata link, 7-day expiry), `/pentest` executive summary NDA-gate. `trust_center_requests` Supabase table DDL (form_admin-only RLS; no tenant exposure). Eight DEC-030 HMAC-chained events covering full trust center lifecycle. Closes CC9-GAP-007 design phase (🔴 → 🟡): sub-processor Worker fully specified; deployment (Wrangler + KV populate) is the remaining engineering task. Closes CC2-GAP-003 design phase (🔴 → 🟡): publication architecture defined; deployment closes the gap to 🟢. SOC 2 evidence mapping: CC9.2 (sub-processor list + annual review), CC2.3 (change notification pledge), CC6.1 (NDA-gate on restricted docs), CC6.2 (trust_center_requests table as access issuance log), CC7.1 (responsible disclosure policy), CC8.1 (all trust center mutations HMAC-chained), P6.1 (DPA template public availability). 14-item implementation checklist (8× P0 M4, 5× P1 M5, 1× P2 M5). Net readiness movement: CC9-GAP-007 🔴 → 🟡, CC2-GAP-003 🔴 → 🟡. SOC 2 overall: ~95% → ~95% (design complete; readiness advances when Worker is deployed and screenshot filed).*
