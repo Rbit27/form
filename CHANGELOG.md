@@ -6,6 +6,16 @@
 
 ---
 
+## [1.17.9] — 2026-05-29
+
+### Added
+- `content/post-145-mechanotransduction-tensegrity.md` — Механотрансдукція і tensegrity: tensegrity-модель клітини (Ingber 2003); integrin α7β1 → costamere (талін/вінкулін/паксилін) → F-actin → LINC complex (несприн/SUN1-2) → ламін A/C → хроматин; Piezo1/2 механочутливі канали (Coste et al. 2010 Science) — Ca²⁺ → кальциневрин → NFAT; FAK Tyr397-автофосфорилювання і Flück et al. (2008) in vivo у людини; Hornberger et al. (2006 PNAS) — PLD → phosphatidic acid → mTORC1 FRB-зв'язування незалежно від PI3K/Akt; практичні наслідки для повної амплітуди, темпу ексцентрики і навантаження у розтягнутому положенні; clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — додано картку post-145 у сітку контенту
+- `STATUS.md` — додано рядки post-143, post-144, post-145 у content engine table
+- `README.md` — post-145 позначений [x]; додано roadmap-записи post-146–149 (HSP, епігенетика/м'язова пам'ять, субстратна утилізація, нейром'язовий синапс)
+
 ## [1.17.8] — 2026-05-29
 
 ### Changed
