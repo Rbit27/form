@@ -6,6 +6,15 @@
 
 ---
 
+## [1.16.4] — 2026-05-29
+
+### Added
+- `content/post-137-mtorc1-signaling-cascade.md` — Сигнальний каскад mTORC1: PI3K→Akt→TSC2→Rheb→mTORC1 повний ланцюг, phosphatidic acid (Hornberger 2006 PNAS), S6K1 і 4E-BP1 як ефектори, SESN2–GATOR система амінокислотного сенсингу (Wolfson et al. 2016 Science), AMPK два механізми інгібування mTOR (Hardie et al. 2012), часовий профіль активації, 5 практичних наслідків для програмування (без дієтичних рекомендацій). clinical-safety PASS.
+- `README.md` — post-137 позначений [x]
+- `VERSION` → 1.16.4
+
+---
+
 ## [1.16.3] — 2026-05-29
 
 ### Added
