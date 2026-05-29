@@ -6,6 +6,19 @@
 
 ---
 
+## [1.17.4] — 2026-05-29
+
+### Added
+- `content/post-142-ribosomal-biogenesis-training-volume.md` — Рибосомна біогенез і тренувальний об'єм: рибосомна ємність як пляшкове горло синтезу білка (Figueiredo et al. 2015, 2017); c-Myc → Pol I → рДНК-транскрипція; mTORC1/S6K1 → TIF-1A; чому нетреновані відповідають на мінімальний об'єм; MEV/MAV/MRV через молекулярну лінзу; volume accumulation meso логіка; деловк і рибосомна кінетика. clinical-safety NOT REQUIRED.
+- `blog.html` — картка post-142 (ribosomal biogenesis / training volume)
+- `STATUS.md` — додано записи post-139–142 до content engine table
+- `README.md` — post-139–142 відмічені [x]; нові roadmap-записи post-143–145 (ROS/гормезис, аутофагія, механотрансдукція/tensegrity)
+
+### Changed
+- `VERSION` → 1.17.4
+
+---
+
 ## [1.17.3] — 2026-05-29
 
 ### Added
