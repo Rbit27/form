@@ -6,6 +6,16 @@
 
 ---
 
+## [1.17.9] — 2026-05-29
+
+### Added
+- `docs/SOC2_READINESS.md §41` — Vulnerability Management & Patching SLA — CC7.1/CC7.2 Auditor Exhibit: closes PRE-15 (🔴→🟢), P0 count 12→11. Four discovery sources (Dependabot, `npm audit --audit-level=critical` CI gate, annual pentest §16, 7 vendor advisory channels). CVSS v3.1 severity tiers with three FORM-specific uplift rules (U-01 Art.9 health data, U-02 RLS bypass — never risk-acceptable, U-03 HMAC chain integrity). Binding SLA: Critical 24h / High 7d / Medium 30d / Low 90d; SLA clock mechanics (start/stop/pause); full 7-stage triage workflow with Linear ticket schema. Platform & runtime patching table for 6 vendor-managed components. Risk Acceptance protocol (U-02 exempt; Critical requires joint founder+compliance-officer approval, max 7d). Enterprise disclosure templates E-VULN-01 (cross-tenant Critical, <2h) and E-VULN-02 (Critical no cross-tenant, <24h). Five DEC-030 HMAC-chained events (`vuln.cve_discovered`, `vuln.patch_deployed`, `vuln.sla_exception_granted`, `vuln.wont_fix_closed`, `vuln.enterprise_notified`). Evidence artefacts CC7-E-001–CC7-E-009. Gap closures: PRE-15 🔴→🟢, CC5.3 Vulnerability Management Policy 🟡→🟢, CC7.1/CC7.2 advancing. 12-item implementation checklist.
+
+### Changed
+- `VERSION` → 1.17.9
+
+---
+
 ## [1.17.8] — 2026-05-29
 
 ### Changed

@@ -7587,3 +7587,475 @@ Four events added to the DEC-030 HMAC-chained taxonomy. All carry the standard e
 | 7 | Create `compliance/tenant-offboarding/TEMPLATE-deletion-confirmation.md` for customer-success to issue on first enterprise tenant termination | compliance-officer + customer-success | **P1** | M4 (enterprise launch) |
 | 8 | Once MDM deployed (CC6-GAP-010): enrol all BYOD devices; enable remote-wipe capability; update §40.6 to reference MDM-specific wipe procedures | compliance-officer | **P1** | Post-CC6-GAP-010 |
 | 9 | File a standalone copy of this policy at `compliance/c1/media-disposal-policy.md` (C1-E-007, auditor exhibit copy); record in `compliance/policy-approval-log.csv` | compliance-officer | **P0** | Pre-launch |
+
+---
+
+## 41. Vulnerability Management & Patching SLA — CC7.1/CC7.2 Auditor Exhibit
+
+> Owner: `security-engineer` + `compliance-officer`. Effective: May 2026. Review: quarterly per §15.1 compliance calendar and after any P0/P1 security incident or CVE-triggered deployment.
+> SOC 2 controls: **CC7.1** (identification of, and response to, threats from vulnerabilities in infrastructure and software), **CC7.2** (monitoring of system components to detect anomalies and vulnerabilities).
+> Cross-references: §16 Penetration Test Program, §25 CC7 System Monitoring & Anomaly Detection, §27 CC5 Control Activities, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 chain), `docs/INCIDENT_RESPONSE.md` R-01/R-03/R-08, `docs/ENTERPRISE.md §What we promise customers` (annual pentest summary + quarterly compliance attestation).
+
+---
+
+### 41.1 Purpose and Scope
+
+**This section closes PRE-15 (🔴 Open → 🟢 Done)** by establishing FORM's formal Vulnerability Management & Patching SLA Policy as a standalone auditor exhibit for CC7.1 and CC7.2.
+
+Prior to this section, patching SLA thresholds were referenced in §16 (penetration test finding severity SLAs) and §27 CC5 (risk-to-control matrix row 4 and 6) but existed only as aspirational mentions without a binding policy document, a defined discovery-to-remediation lifecycle, or an evidence collection path. A SOC 2 Type II auditor testing CC7.1 requires a documented policy that names the SLA, defines the clock, and produces verifiable artefacts for the observation period. This section supplies all three.
+
+**Scope:** All software components in FORM's production environment that are under FORM's direct control or influence:
+
+| Layer | Components in scope | Patching authority |
+|---|---|---|
+| **Application dependencies** | npm packages in `workers/`, `supabase/functions/`, React Native app (`package.json`) | FORM — security-engineer + devops-lead |
+| **Application runtime** | Node.js version referenced in CI (`.nvmrc`, Wrangler target); Cloudflare Workers runtime | FORM controls Node.js target; Cloudflare runtime = vendor managed (§41.8) |
+| **Database engine** | Supabase Postgres major/minor version | Supabase managed — FORM monitors advisories and requests upgrades (§41.8) |
+| **Mobile client** | React Native version, Expo SDK version, third-party RN packages | FORM — coordinated via `expo upgrade` and Dependabot |
+| **CI/CD toolchain** | GitHub Actions runners, EAS build workers, Wrangler CLI | GitHub/EAS managed for runners; FORM-pinned for CLI versions |
+| **Out of scope** | Cloudflare global network infrastructure, Supabase PostgreSQL kernel, Apple/Google OS | Vendor responsibility; monitored via vendor security advisories (§41.2.4) |
+
+**Privacy constraint:** No CVE triage discussion, patch PR description, or Linear ticket shall include health data content, user identifiers, or coaching transcript excerpts. Vulnerability context must be expressed in structural/architectural terms only.
+
+---
+
+### 41.2 Vulnerability Discovery Sources
+
+FORM's vulnerability discovery stack uses four independent signal sources, each with a defined owner and notification path:
+
+#### 41.2.1 Dependabot Automated Dependency Scanning
+
+GitHub Dependabot is configured via `.github/dependabot.yml` for the following ecosystems:
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 20
+    labels: ["security", "dependencies"]
+    reviewers: ["security-engineer"]
+    assignees: ["devops-lead"]
+    groups:
+      patch-updates:
+        applies-to: version-updates
+        update-types: ["patch"]
+  - package-ecosystem: "npm"
+    directory: "/mobile"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["security", "mobile", "dependencies"]
+    reviewers: ["security-engineer"]
+```
+
+Dependabot generates security alerts for any dependency with a published CVE in the GitHub Advisory Database (GHSA). Alerts are automatically filed as Dependabot PRs for patch-level updates and as security alerts for major/minor updates requiring manual assessment.
+
+**Notification routing:** GitHub security alert → Dependabot PR in repository → `security-engineer` reviewer assignment → Linear ticket created manually by security-engineer for CVSS ≥ 7.0.
+
+#### 41.2.2 `npm audit` in CI Pipeline
+
+The GitHub Actions CI workflow runs `npm audit --audit-level=critical` as a required check on every pull request to `main`. Any critical-severity finding (CVSS ≥ 9.0) fails the build and blocks merge.
+
+```yaml
+# .github/workflows/ci.yml (required security check)
+- name: Dependency audit
+  run: npm audit --audit-level=critical
+  working-directory: ./
+```
+
+A separate `npm audit --audit-level=high` step runs as a warning (non-blocking) until CC6-GAP-005 is resolved. Evidence: CI workflow run log, retained in R2 per CC5-P2-006.
+
+#### 41.2.3 Annual External Penetration Test
+
+Per §16, FORM commissions an annual external penetration test (OWASP WSTG + ASVS L2 + MASVS L1). All findings with CVSS ≥ 7.0 (High or Critical) trigger the patching SLA from §41.4 starting at the engagement close date (report delivery). The engagement letter and report are filed as PRE-36-E-001 through PRE-36-E-006.
+
+#### 41.2.4 Vendor Security Advisories
+
+FORM monitors the following vendor advisory channels and treats each published advisory as a potential vulnerability discovery event:
+
+| Vendor | Advisory channel | Monitoring owner | Action threshold |
+|---|---|---|---|
+| **Cloudflare** | `blog.cloudflare.com/tag/security`, Cloudflare Trust Hub | devops-lead | Any advisory referencing Workers, D1, R2, or WAF |
+| **Supabase** | GitHub `supabase/supabase` releases, security@supabase.io | devops-lead | Any advisory referencing Postgres, Auth, Storage, or Edge Functions |
+| **Anthropic** | `docs.anthropic.com/changelog`, Anthropic Trust Center | security-engineer | Any advisory referencing API authentication, data retention, or model security |
+| **ElevenLabs** | ElevenLabs changelog, security@elevenlabs.io | security-engineer | Any advisory referencing API key security or TTS data handling |
+| **Node.js** | `nodejs.org/en/blog/vulnerability` | devops-lead | All published CVEs; applies to `.nvmrc`-pinned runtime version |
+| **Expo / EAS** | `expo.dev/changelog`, GitHub `expo/expo` security advisories | devops-lead | Any advisory referencing OTA update signing, EAS token security, or app credential handling |
+| **GitHub** | GitHub Security Blog, `github.com/security` | security-engineer | Advisories affecting Actions runners, GHCR, secret scanning |
+
+**Response:** Within 24 hours of a Critical advisory, `security-engineer` must assess applicability and open a Linear ticket if FORM's stack is affected. Within 72 hours for High advisories.
+
+#### 41.2.5 Bug Bounty / Responsible Disclosure (future)
+
+A formal bug bounty program is not currently active. The responsible disclosure path is `security@form.coach` with a 72-hour acknowledgment SLA. All received reports are treated as vulnerability discovery events and enter the §41.6 triage workflow. Evidence: Linear ticket with `[vuln-report]` label, filed as CC7-E-007. Target: launch formal HackerOne program at Series A or 10k MAU, whichever comes first.
+
+---
+
+### 41.3 CVE Severity Classification
+
+FORM uses CVSS v3.1 Base Score as the primary severity classifier, with three FORM-specific severity uplift rules that apply to the FORM product context.
+
+#### 41.3.1 Base Severity Tiers
+
+| CVSS v3.1 Base Score | FORM Tier | Linear Priority Label |
+|---|---|---|
+| 9.0 – 10.0 | **Critical** | P0 |
+| 7.0 – 8.9 | **High** | P1 |
+| 4.0 – 6.9 | **Medium** | P2 |
+| 0.1 – 3.9 | **Low** | P3 |
+| 0.0 / informational | **Informational** | Backlog |
+
+#### 41.3.2 FORM-Specific Severity Uplift Rules
+
+The following conditions elevate a CVE one tier above its CVSS Base Score:
+
+| Uplift Rule | Condition | Example |
+|---|---|---|
+| **U-01 — Health data exposure path** | The vulnerable component has a code path that processes, stores, or transmits GDPR Art. 9 special-category data (`health_profiles`, `coaching_turns`, `wearable_data`, `cv_sessions.keypoints_enc`) | A Medium (CVSS 5.5) npm package vulnerability in a Worker that handles coaching sessions → elevated to High |
+| **U-02 — RLS bypass potential** | The vulnerability could be used to construct a SQL injection or auth bypass that circumvents Supabase Row-Level Security policies, enabling cross-tenant data access | Any SQL injection CVSS < 7.0 in the API layer is auto-elevated to Critical (cross-tenant exposure is always P0) |
+| **U-03 — HMAC chain integrity** | The vulnerability could allow an attacker to forge or modify `audit_log_events` entries, breaking the DEC-030 HMAC chain (NIST 800-92 compliance) | A cryptographic library vulnerability affecting HMAC-SHA256 is elevated one tier regardless of base score |
+
+When uplift applies, the elevated tier governs the patching SLA (§41.4). The uplift rationale must be documented in the Linear ticket under the `severity_rationale` field.
+
+---
+
+### 41.4 Patching SLA Table
+
+The following SLAs are FORM's binding internal commitments and are disclosed to enterprise customers on request (under NDA for Critical/High details per §41.10).
+
+| Severity | CVSS Score | Patching SLA | Clock Start | Max Extension (§41.9) | Escalation if Missed |
+|---|---|---|---|---|---|
+| **Critical** | 9.0–10.0 | **24 hours** from discovery | First notification (Dependabot alert, advisory publication, or pentest report delivery — whichever is earliest) | +24h with compliance-officer approval; engineering lead must personally approve deploy | Page founder immediately; incident channel `#inc-YYYYMMDD-crit-cve`; treat as P0 incident per `docs/INCIDENT_RESPONSE.md` |
+| **High** | 7.0–8.9 | **7 calendar days** | First notification | +7d with security-engineer + compliance-officer approval; risk acceptance memo required | Page security-engineer at T+5d if patch not in staging; Linear ticket auto-escalated to P0 |
+| **Medium** | 4.0–6.9 | **30 calendar days** | Linear ticket creation date (security-engineer triage complete) | +30d with compliance-officer sign-off; documented risk assessment required | Weekly automated reminder to security-engineer; escalated to High at T+25d if no patch PR |
+| **Low** | 0.1–3.9 | **90 calendar days** | Linear ticket creation date | +90d acceptable with documented rationale | Quarterly bulk review; close as Won't Fix only with compliance-officer approval |
+| **Informational** | 0.0 | **Next scheduled sprint** | Backlog grooming | N/A | Monthly backlog review |
+
+**SLA applies to:** Having a patch merged to `main` and deployed to production (or a fully documented risk acceptance on file). A PR open but not merged does not satisfy the SLA.
+
+**Dependency on vendor releases:** If no patch is available from the upstream package maintainer, FORM must either (a) implement a compensating control (WAF rule, code-level sanitization, feature flag disable) within the SLA window, or (b) initiate §41.9 Risk Acceptance. "No upstream patch available" does not pause the SLA clock.
+
+---
+
+### 41.5 SLA Clock Mechanics
+
+#### 41.5.1 Clock Start
+
+The SLA clock starts at the **earliest** of:
+
+1. Timestamp of first GitHub Dependabot alert notification email received by `security-engineer`
+2. Timestamp of CVE publication in GHSA or NVD, if FORM's stack is observably affected
+3. Engagement close date on a penetration test report containing the finding
+4. Timestamp of `security@form.coach` receipt for a responsible disclosure report
+5. Timestamp when any FORM team member becomes aware of a vulnerability through any channel (Slack, conference, news)
+
+The clock start event must be recorded in the Linear ticket `vuln_discovered_at` field within 2 hours of awareness.
+
+#### 41.5.2 Clock Stop
+
+The SLA clock stops when **both** of the following are true:
+- The patch PR has been merged to `main` (GitHub merge timestamp)
+- The change has been deployed to production (Wrangler deploy log timestamp, or EAS Submit confirmation)
+
+If a compensating control is applied instead of a patch, clock stops when the control is confirmed active in production and documented in the Linear ticket.
+
+#### 41.5.3 Clock Pause (Exceptional Cases)
+
+The SLA clock may be paused only in the following circumstances, each requiring written approval in the Linear ticket:
+
+| Pause Condition | Approver | Maximum Pause Duration |
+|---|---|---|
+| Awaiting upstream maintainer patch (patch PR submitted to maintainer) | security-engineer | Up to 14 calendar days; after that, risk acceptance required |
+| Supabase/Cloudflare managed service advisory — patch is vendor-side, no FORM action required pending vendor deploy | devops-lead | Until vendor confirms patch deployed; FORM must verify within 24h of vendor announcement |
+| CI pipeline broken due to unrelated issue blocking the security PR from merging | devops-lead | 8 hours maximum; break-glass deploy allowed if CI failure is confirmed unrelated to the security fix |
+
+---
+
+### 41.6 CVE Triage & Remediation Workflow
+
+```
+[DISCOVERY]
+  Dependabot alert / npm audit / pentest finding / advisory
+       │
+       ▼
+[TRIAGE] security-engineer (within 4h for Critical/High; 24h for Medium)
+  1. Read CVE description and affected version range
+  2. Confirm FORM is on an affected version (`package.json` / `.nvmrc`)
+  3. Apply uplift rules §41.3.2 (U-01, U-02, U-03)
+  4. Assign final severity tier
+  5. Open Linear ticket [SEC] CVE-YYYY-NNNN — <package> (<severity>)
+     Fields: vuln_discovered_at, cvss_base, final_severity, sla_deadline,
+             affected_components[], uplift_applied (bool), uplift_rationale
+       │
+       ▼
+[ASSESSMENT] security-engineer + devops-lead
+  - Is a patched version available? → Yes: proceed to patch
+  - No patched version?             → Compensating control or §41.9 Risk Acceptance
+  - Health data exposure path?      → Notify compliance-officer (U-01 uplift)
+  - RLS bypass potential?           → Page security-engineer immediately (U-02 uplift → P0)
+       │
+       ▼
+[PATCH PR]
+  1. Create branch `fix/cve-YYYY-NNNN`
+  2. Update `package.json` / `package-lock.json` to patched version
+  3. Run full test suite locally: `npm test`, `npm run build`
+  4. Run `npm audit` to confirm CVE resolved
+  5. PR description: severity, CVSS score, SLA deadline, affected component, brief impact
+     NOTE: no health data content in PR description (privacy constraint §41.1)
+  6. CI runs: `npm audit --audit-level=critical` must pass
+  7. Required reviewers: security-engineer (always) + second reviewer for Critical/High
+       │
+       ▼
+[STAGING DEPLOY + VERIFY]
+  - Deploy to staging environment
+  - Confirm affected functionality still works (smoke test)
+  - For U-02 uplift: run `__tests__/db/rls_isolation.test.ts` against staging
+  - For U-03 uplift: run HMAC chain integrity verification against staging audit log
+       │
+       ▼
+[PRODUCTION DEPLOY]
+  - Merge PR to `main`
+  - CI/CD auto-deploys via Wrangler / EAS
+  - Record deploy timestamp in Linear ticket `patched_at` field
+  - For Critical: post confirmation in `#security-alerts` channel
+       │
+       ▼
+[EVIDENCE FILING]
+  compliance-officer files to `compliance/evidence/vuln-management/YYYY/`:
+    - Linear ticket export (JSON)
+    - Git commit hash of patch merge
+    - `npm audit` post-patch output (zero Critical/High findings)
+    - Production deploy log excerpt (Wrangler deploy timestamp)
+    - For U-01/U-02/U-03: uplift rationale memo
+  Evidence artefact ID: CC7-E-001 through CC7-E-009 (§41.12)
+```
+
+---
+
+### 41.7 Dependency Scanning Configuration
+
+#### 41.7.1 Dependabot Configuration Baseline
+
+The baseline `.github/dependabot.yml` must be in place before the SOC 2 observation period starts. Required settings:
+
+| Setting | Required Value | Rationale |
+|---|---|---|
+| `schedule.interval` | `weekly` or tighter | Weekly minimum ensures ≤7d discovery lag for new CVEs |
+| `open-pull-requests-limit` | ≥10 per ecosystem | Prevents Dependabot silently stopping PRs when limit is hit |
+| `reviewers` | `["security-engineer"]` | Ensures security-engineer sees every dependency PR |
+| `labels` | `["security", "dependencies"]` | Enables Linear automation to detect Dependabot PRs |
+| `groups.patch-updates` | enabled | Reduces merge friction for patch-only updates |
+
+#### 41.7.2 CI Audit Gate Baseline
+
+| Gate | Command | CI failure condition | Milestone |
+|---|---|---|---|
+| Critical gate (**required**) | `npm audit --audit-level=critical` | Any critical finding → build fails, PR blocked | Pre-launch (CC6-GAP-005) |
+| High gate (**required**) | `npm audit --audit-level=high` | Any high finding → build fails, PR blocked | Pre-SOC 2 observation period |
+| Snyk SCA (optional) | `snyk test --severity-threshold=high` | Any high/critical Snyk finding | Post-Series A (PEN-GAP-002 complement) |
+
+#### 41.7.3 TruffleHog Secret Scan
+
+Per CC5-P1-003 (§27 gap), `trufflesecurity/trufflehog` must be added to CI for credential pattern scanning. Once deployed, the TruffleHog scan produces CC5-E-003 evidence artefacts. This is a dependency-scanning complement, not a CVE scanner, but its absence is a CC5.1 gap that affects the overall vulnerability management posture.
+
+---
+
+### 41.8 Platform & Runtime Patching (Vendor-Managed Components)
+
+Some components are managed by vendors and cannot be directly patched by FORM. The following table defines the monitoring and response approach for each:
+
+| Component | Patch authority | FORM monitoring action | FORM response SLA | Evidence |
+|---|---|---|---|---|
+| **Cloudflare Workers runtime** | Cloudflare — automatic, no FORM action | Monitor Cloudflare Trust Hub and security blog; subscribe to `cf-announce` email list | No action required for automatic patches; verify functionality post-update within 24h of Cloudflare deployment announcement | Cloudflare Trust Hub status archive |
+| **Cloudflare WAF / OWASP CRS** | Cloudflare — managed ruleset auto-updated | Dependabot cannot track; monitor Cloudflare WAF changelog | Review changelog quarterly; confirm OWASP CRS version active in dashboard | Cloudflare WAF ruleset export (CC7-E-004) |
+| **Supabase Postgres** | Supabase — major/minor upgrades on maintenance windows | Monitor Supabase changelog; review Postgres CVE database (nvd.nist.gov/vuln/search for `postgres`) | For Critical Postgres CVEs: contact Supabase support to confirm patch status within 24h; document vendor response in Linear ticket | Supabase dashboard Postgres version screenshot; support ticket exchange |
+| **Expo / EAS OTA runtime** | Expo — Hermes engine and Expo Modules auto-versioned in SDK | Monitor `expo.dev/changelog` and GitHub `expo/expo` security advisories | Run `expo upgrade` within 30 days of a security-tagged SDK release; Critical findings in Expo core: 7-day SLA | `package.json` `expo` version diff; EAS build log |
+| **GitHub Actions runners** | GitHub — `ubuntu-latest` auto-patched | Monitor GitHub Changelog for runner security updates | Confirm CI workflows do not pin to a runner version with a known CVE | GitHub Security blog monitoring log |
+| **Apple iOS / Google Android OS** | Apple / Google — end-user device update | Not in FORM's patch scope | Out of scope; BYOD policy (§40.6) requires OS updates within 30 days of Critical OS patch | N/A |
+
+---
+
+### 41.9 Risk Acceptance & SLA Exception Protocol
+
+When FORM cannot remediate a vulnerability within the standard SLA, a Risk Acceptance must be documented and approved. Risk Acceptance does **not** excuse FORM from remediating the vulnerability — it formally acknowledges the extended timeline and requires compensating controls.
+
+#### 41.9.1 Risk Acceptance Criteria
+
+Risk Acceptance is permitted only when **all** of the following are true:
+
+1. No upstream patch exists (or the patch introduces a breaking change that requires material refactoring)
+2. At least one compensating control is deployed or formally described
+3. The vulnerability does not trigger U-02 (RLS bypass potential — these are never eligible for Risk Acceptance; they must be remediated or the feature must be disabled)
+4. The risk acceptance has a defined expiry date (no "indefinite" acceptances)
+
+#### 41.9.2 Risk Acceptance Approval Matrix
+
+| CVE Severity | Approver | Max Duration | Compensating Control Required | Evidence |
+|---|---|---|---|---|
+| **Critical** | Founder + compliance-officer (joint) | 7 days | Mandatory — WAF block, feature flag disable, or equivalent | Memo in `compliance/evidence/vuln-management/risk-acceptance/YYYY-NNNN.md` |
+| **High** | security-engineer + compliance-officer | 30 days | Mandatory | Same as Critical |
+| **Medium** | security-engineer | 60 days | Recommended; document why not applied if absent | Linear ticket suffices as evidence |
+| **Low** | security-engineer | 90 days | Optional | Linear ticket or close as Won't Fix |
+
+#### 41.9.3 Won't Fix Policy
+
+A vulnerability may be closed as Won't Fix only when:
+- CVSS Base Score ≤ 3.9 (Low or Informational)
+- The vulnerable component is not reachable from production traffic (confirmed dead code or disabled feature)
+- Approved by security-engineer with rationale documented in Linear
+
+Won't Fix decisions must be reviewed annually during the Q4 vulnerability management audit.
+
+---
+
+### 41.10 Enterprise Customer Disclosure Policy
+
+Per `docs/ENTERPRISE.md §What we promise customers`, FORM commits to sharing an **annual penetration test summary** and providing **quarterly compliance attestations**. This section extends that commitment to cover in-year CVE disclosures.
+
+#### 41.10.1 Disclosure Tiers
+
+| CVE Severity | Disclosure to Enterprise Customers | Timing | Format |
+|---|---|---|---|
+| **Critical** (U-02 uplift — cross-tenant risk) | Mandatory — all active enterprise tenants | Within 2 hours of confirming cross-tenant exposure scope | Template E-VULN-01 (below); shared by Customer Lead via encrypted email |
+| **Critical** (no cross-tenant risk) | Optional — notify tenant admin if their data type is in affected component | Within 24 hours of patch deploy | Template E-VULN-02 (below) |
+| **High** | Included in quarterly compliance attestation | Next scheduled quarterly attestation | Aggregate: "N High CVEs remediated in quarter; all within SLA" |
+| **Medium / Low** | Included in annual pentest summary | Annual | Aggregate count + SLA adherence rate |
+
+#### 41.10.2 Disclosure Templates
+
+**Template E-VULN-01 — Critical CVE with cross-tenant exposure potential**
+
+```
+Subject: FORM Security Notice — Critical CVE [CVE-YYYY-NNNN] — Action required
+
+Dear [Tenant Admin Name],
+
+We are writing to notify you of a Critical security vulnerability (CVE-YYYY-NNNN,
+CVSS [score]) identified in [component] on [date]. This vulnerability affected
+[affected data types in structural terms — no individual user data].
+
+Current status: [Patch deployed to production at HH:MM UTC / Compensating control active]
+
+Impact to your account: [Based on our investigation, your tenant data was not
+accessed / We have no evidence of exploitation during the exposure window
+[start]–[end] / We are continuing to investigate and will update you within [N] hours]
+
+Actions required from you: [None at this time / Please [specific action if any]]
+
+For questions, contact your Customer Success Manager or security@form.coach.
+
+FORM Security Team
+```
+
+**Template E-VULN-02 — Critical CVE, no cross-tenant risk**
+
+```
+Subject: FORM Security Notice — Critical CVE Remediated [CVE-YYYY-NNNN]
+
+Dear [Tenant Admin Name],
+
+This notice confirms that FORM has identified and remediated a Critical security
+vulnerability (CVE-YYYY-NNNN) affecting [component]. The patch was deployed on
+[date] within our 24-hour Critical patching SLA.
+
+No cross-tenant data exposure was possible through this vulnerability. Your
+organisation's data was not at risk.
+
+No action is required on your part. This notification is provided as part of
+FORM's quarterly compliance attestation programme.
+
+FORM Security Team
+```
+
+#### 41.10.3 Pentest Summary Disclosure
+
+Enterprise customers with ACV ≥ $50k/year may request the full pentest executive summary (under mutual NDA) per §16.7. The summary must be available within 30 days of the annual engagement close. For customers with ACV < $50k, an aggregate summary (finding counts by severity, SLA adherence rate, no finding details) is provided in the quarterly attestation.
+
+---
+
+### 41.11 DEC-030 Audit Events
+
+All vulnerability management lifecycle events are HMAC-chained per `docs/AUDIT_LOG_SCHEMA.md` (DEC-030). Required event types:
+
+| Event type | Trigger | Logged by | Severity | Retention | Key payload fields |
+|---|---|---|---|---|---|
+| `vuln.cve_discovered` | Linear ticket created for a CVSS ≥ 4.0 finding | security-engineer (manual via admin API) | MEDIUM | 7 years | `cve_id`, `cvss_base`, `final_severity`, `uplift_applied`, `uplift_rules[]`, `component`, `affected_version`, `sla_deadline` |
+| `vuln.patch_deployed` | Production deploy of the patching PR confirmed | devops-lead (automated via CI post-deploy hook) | MEDIUM | 7 years | `cve_id`, `patch_pr_url`, `merged_at`, `deployed_at`, `sla_met` (bool), `elapsed_hours` |
+| `vuln.sla_exception_granted` | Risk acceptance approved per §41.9.2 | compliance-officer (manual via admin API) | HIGH | 7 years | `cve_id`, `original_severity`, `approved_by[]`, `new_deadline`, `compensating_control`, `rationale_ref` |
+| `vuln.wont_fix_closed` | Linear ticket closed as Won't Fix per §41.9.3 | security-engineer | MEDIUM | 7 years | `cve_id`, `cvss_base`, `rationale`, `approved_by` |
+| `vuln.enterprise_notified` | Template E-VULN-01 or E-VULN-02 sent to enterprise tenant | customer-success (manual) | MEDIUM | 7 years | `cve_id`, `tenant_id`, `template_used`, `sent_by`, `notified_at` |
+
+All five event types must carry `trace_id` and `actor_id` in the standard DEC-030 envelope. The HMAC chain must remain unbroken — a chain break on any `vuln.*` event is a P0 incident per `docs/INCIDENT_RESPONSE.md §R-05`.
+
+**Note on privacy:** `cve_id` and `component` are infrastructure identifiers with no user data linkage. `affected_version` is a package version string. No payload field in any `vuln.*` event may contain user_id, session_id, health data, or coaching content.
+
+---
+
+### 41.12 SOC 2 Evidence Mapping
+
+#### 41.12.1 Control Criteria Addressed
+
+| SOC 2 Criterion | Requirement | How §41 Satisfies It |
+|---|---|---|
+| **CC7.1 — Threat identification** | Entity uses detection tools and procedures to identify potential vulnerabilities and threats from internal and external parties | §41.2 documents four discovery sources (Dependabot, `npm audit`, pentest, vendor advisories); §41.7 specifies CI gate configuration; §41.11 DEC-030 events create a continuous audit trail of every discovered vulnerability |
+| **CC7.2 — Vulnerability monitoring** | Entity monitors system components to detect and assess vulnerabilities | §41.6 workflow with Linear ticket per CVE ≥ CVSS 4.0; §41.4 SLA table with defined remediation windows; §41.5 clock mechanics ensuring no ambiguity about when SLA starts/stops |
+| **CC7.3 — Security event evaluation** | Entity evaluates security events to determine whether they represent a security threat | §41.3 severity classification with FORM-specific uplift rules (U-01 Art. 9 health data, U-02 RLS bypass, U-03 HMAC chain); triage workflow in §41.6 Step 3 |
+| **CC7.4 — Response to identified events** | Entity responds to identified security events through a defined process | §41.4 SLA table; §41.6 remediation workflow; §41.9 risk acceptance protocol for cases where immediate patch is impossible; cross-reference to `docs/INCIDENT_RESPONSE.md` R-08 (supply chain) |
+| **CC5.3 — Vulnerability Management Policy** | Entity deploys policies and procedures to support the achievement of objectives | §41 is the standalone Vulnerability Management Policy document referenced in §27 CC5.3 as "🟡 Partial — programmes defined but standalone policy documents not yet separated" |
+| **CC6.8 — Prevent malicious software** | Entity prevents or detects unauthorized or malicious software | §41.7 Dependabot + `npm audit --audit-level=critical` CI gate; TruffleHog scan (CC5-P1-003); Cloudflare Page Shield cross-reference |
+
+#### 41.12.2 Evidence Artefacts for Auditors
+
+| Artefact ID | Description | Location | Collection cadence | SOC 2 criteria |
+|---|---|---|---|---|
+| **CC7-E-001** | Linear vulnerability ticket export — all `[SEC]` tickets during observation period, JSON format, including `vuln_discovered_at`, `patched_at`, `sla_met` fields | `compliance/evidence/vuln-management/YYYY/linear-export-YYYY-QN.json` | Quarterly + at audit fieldwork | CC7.1, CC7.2 |
+| **CC7-E-002** | `npm audit` CI gate pass record — GitHub Actions workflow run logs confirming `npm audit --audit-level=critical` passed on every `main` merge | `compliance/evidence/vuln-management/YYYY/ci-audit-gate-YYYY-QN.txt` | Per audit period export (CI logs) | CC7.1, CC7.2 |
+| **CC7-E-003** | Dependabot alert closure log — list of all Dependabot security alerts opened and closed during observation period, with timestamps | GitHub Security tab → "Dependabot alerts" CSV export | Quarterly | CC7.1 |
+| **CC7-E-004** | Cloudflare WAF rule configuration export | Cloudflare dashboard → Firewall → Rules export | At any rule change + quarterly | CC7.1 (also PRE-25-E-001) |
+| **CC7-E-005** | `audit_log_events` query filtered on `event_type LIKE 'vuln.%'`, HMAC chain verified, covering observation period | `compliance/evidence/vuln-management/YYYY/dec030-vuln-chain-YYYY.json` | At audit fieldwork | CC7.1, CC7.2 |
+| **CC7-E-006** | Risk acceptance memos for any SLA exceptions granted during observation period | `compliance/evidence/vuln-management/risk-acceptance/YYYY/` | Per exception; exported at audit fieldwork | CC7.2 |
+| **CC7-E-007** | Responsible disclosure inbox log — all reports received at `security@form.coach`, pseudonymised if reporter requests anonymity | `compliance/evidence/vuln-management/YYYY/responsible-disclosure-log.csv` | Quarterly | CC7.1 |
+| **CC7-E-008** | Vendor advisory monitoring log — record of advisory channels reviewed per §41.2.4 | `compliance/evidence/vuln-management/YYYY/vendor-advisory-log.csv` | Monthly | CC7.1 |
+| **CC7-E-009** | SLA adherence summary table — per-severity tier: total CVEs, patched within SLA, exceptions granted, Won't Fix, open at period end | `compliance/evidence/vuln-management/YYYY/sla-adherence-YYYY.md` | Quarterly + annual | CC7.1, CC7.2 |
+
+---
+
+### 41.13 Gap Closure Summary
+
+| Gap | Before §41 | After §41 |
+|---|---|---|
+| **PRE-15** — Patching SLA enforced and tracked | 🔴 Open — "critical <24h, high <7d, medium <30d" referenced in §16 but no standalone policy or evidence path | 🟢 **Done** — §41.4 SLA table is the binding policy; §41.6 workflow with Linear ticket produces CC7-E-001; §41.12.2 evidence artefact set satisfies auditor evidence request |
+| **CC7.1 vulnerability management** | 🟡 Partial — pentest program defined (§16), execution pending; no dependency scanning policy | 🟡 **Partial → Advancing** — full discovery source documentation (§41.2), severity classification (§41.3), remediation workflow (§41.6), evidence set (§41.12.2). Advances to 🟢 when first annual pentest is executed and CC7-E-001 spans a full quarter. |
+| **CC7.2 remediation tracking** | 🟡 Partial — "first test execution + Linear tickets" required | 🟡 **Partial → Advancing** — Linear ticket schema (§41.6), SLA clock mechanics (§41.5), DEC-030 events (§41.11). Advances to 🟢 when first quarter of `vuln.*` events are in the audit log. |
+| **CC5.3 Vulnerability Management Policy** | 🟡 Partial — "programmes defined but standalone policy documents not yet separated" | 🟢 **Done** — §41 is the standalone policy document. Reference from `compliance/policy-approval-log.csv` entry "Vulnerability Management Policy v1.0" pointing to §41. |
+
+**P0 count: 12 → 11** (PRE-15 reclassified from 🔴 to 🟢).
+
+---
+
+### 41.14 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Add `.github/dependabot.yml` per §41.7.1 baseline; confirm `security-engineer` is assigned reviewer on all generated PRs; validate with first Dependabot weekly run | devops-lead | **P0** | Pre-launch |
+| 2 | Merge `npm audit --audit-level=critical` CI gate (closes CC6-GAP-005); verify it fails on a pinned known-vulnerable package in a test branch before enabling | devops-lead | **P0** | Pre-launch |
+| 3 | Add `npm audit --audit-level=high` as non-blocking warning step to CI; schedule promotion to blocking gate 30 days before SOC 2 observation period starts | devops-lead | **P1** | Pre-SOC 2 observation |
+| 4 | Create Linear `[SEC]` ticket template with fields: `cve_id`, `cvss_base`, `final_severity`, `uplift_applied`, `sla_deadline`, `vuln_discovered_at`, `patched_at`, `sla_met`; apply template to all new vulnerability tickets | security-engineer | **P0** | Pre-launch |
+| 5 | Subscribe `security-engineer` and `devops-lead` to all vendor advisory channels listed in §41.2.4; document subscription confirmation in `compliance/evidence/vuln-management/advisory-subscriptions.md` | security-engineer | **P0** | Pre-launch |
+| 6 | Register five `vuln.*` DEC-030 event types from §41.11 in `docs/AUDIT_LOG_SCHEMA.md` event registry (severity, retention tier, required payload fields) | security-engineer | **P1** | M3 |
+| 7 | Implement `vuln.cve_discovered` and `vuln.patch_deployed` DEC-030 event emission — former via internal admin API endpoint (`POST /internal/admin/security/vulnerabilities`), latter via CI post-deploy webhook | platform-engineer + security-engineer | **P1** | M4 |
+| 8 | Create `compliance/evidence/vuln-management/` directory structure with `YYYY/` subdirectory, `risk-acceptance/YYYY/` subdirectory, and `README.md` describing CC7-E-001 through CC7-E-009 artefact paths | compliance-officer | **P0** | Pre-launch |
+| 9 | File §41 as standalone policy in `compliance/cc7/vuln-management-policy.md`; record in `compliance/policy-approval-log.csv` with approval date and next review date | compliance-officer | **P0** | Pre-launch |
+| 10 | Add TruffleHog CI scan (CC5-P1-003) per §41.7.3; this closes CC5.1 credential-leakage control gap and strengthens the overall vulnerability management posture | security-engineer | **P1** | Pre-SOC 2 observation |
+| 11 | Implement `vuln.enterprise_notified` DEC-030 event emission in the admin notification workflow; wire Template E-VULN-01 and E-VULN-02 to the `#enterprise-security` channel as Slack templates for Customer Lead | platform-engineer + customer-success | **P1** | M4 (enterprise launch) |
+| 12 | Produce first CC7-E-009 SLA adherence summary after first full quarter of operation; share with compliance-officer for quarterly compliance attestation content | security-engineer | **P2** | Q3 2026 (first full quarter post-launch) |
+
+---
+
+*v1.3 additions: §41 Vulnerability Management & Patching SLA — CC7.1/CC7.2 Auditor Exhibit. Closes PRE-15 (🔴 Open → 🟢 Done) — the longest-standing P0 gap in the patching domain. Four discovery sources: Dependabot (`.github/dependabot.yml` baseline config with ecosystem and reviewer requirements), `npm audit --audit-level=critical` CI gate (CC6-GAP-005), annual external penetration test (§16), and vendor security advisory channels (7 vendor channels with monitoring owners and action thresholds); responsible disclosure path (`security@form.coach`) documented with bug bounty roadmap. CVSS v3.1 severity classification with three FORM-specific uplift rules: U-01 (Art. 9 health data exposure path elevates one tier), U-02 (RLS bypass potential auto-elevates to Critical — never eligible for Risk Acceptance), U-03 (HMAC chain integrity affects escalates one tier). Binding patching SLA table: Critical 24h / High 7d / Medium 30d / Low 90d; SLA applies to production deploy, not PR open; "no upstream patch" does not pause the clock. SLA clock mechanics: clock start = earliest of Dependabot notification, NVD publication, pentest report delivery, or responsible disclosure receipt; clock stop = both PR merged to main and deployed to production; clock pause permitted only in three defined exceptional cases (max 14d awaiting upstream, vendor-managed deploy, CI outage <8h). Full discovery-to-evidence CVE triage workflow (7 stages: discovery → triage → assessment → patch PR → staging verify → production deploy → evidence filing) with Linear ticket field schema. Platform and runtime patching table for 6 vendor-managed components (Cloudflare Workers/WAF, Supabase Postgres, Expo/EAS, GitHub Actions runners) with explicit response SLAs and evidence artefacts. Risk Acceptance protocol: never permitted for U-02 (RLS bypass); joint founder+compliance-officer approval required for Critical (max 7d extension); Won't Fix permitted only for CVSS ≤ 3.9 confirmed unreachable code. Enterprise customer disclosure policy: mandatory Template E-VULN-01 for Critical CVEs with cross-tenant exposure (within 2h); Template E-VULN-02 for Critical without cross-tenant risk (within 24h of patch deploy); High CVEs in quarterly compliance attestation; full pentest executive summary available for ACV ≥ $50k under NDA. Five DEC-030 HMAC-chained audit events: `vuln.cve_discovered` (MEDIUM, 7yr), `vuln.patch_deployed` (MEDIUM, 7yr), `vuln.sla_exception_granted` (HIGH, 7yr), `vuln.wont_fix_closed` (MEDIUM, 7yr), `vuln.enterprise_notified` (MEDIUM, 7yr); all privacy-safe (no user_id, no health data, no coaching content in any payload). SOC 2 evidence mapping: CC7.1 (4 discovery sources + DEC-030 trail), CC7.2 (Linear ticket schema + SLA clock + SLA adherence CC7-E-009), CC7.3 (uplift rules = security event evaluation), CC7.4 (remediation workflow + R-08 cross-ref), CC5.3 (§41 is the standalone Vulnerability Management Policy document). Nine evidence artefacts CC7-E-001 through CC7-E-009. Gap closures: PRE-15 🔴→🟢 (P0 count 12→11); CC5.3 Vulnerability Management Policy 🟡→🟢; CC7.1 and CC7.2 advancing toward 🟢 on first quarter of operational evidence. 12-item implementation checklist (6× P0, 5× P1, 1× P2).*
