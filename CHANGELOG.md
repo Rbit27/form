@@ -6,6 +6,17 @@
 
 ---
 
+## [1.17.3] — 2026-05-29
+
+### Added
+- `content/post-141-autoregulation-rpe-rir-vbt.md` — Авторегуляція: RPE 1–10 у силовому тренінгу (Zourdos et al. 2016); RIR як контролер навантаження (Helms et al. 2016); VBT — MPV/% 1RM кореляція (González-Badillo 2010), мінімальна швидкість відмови, індивідуальний load-velocity профіль; порівняльна таблиця трьох методів; комбінована стратегія; обмеження для новачків. clinical-safety NOT REQUIRED.
+- `blog.html` — картки post-139 (PAP), post-140 (eccentric / titin), post-141 (autoregulation RPE/RIR/VBT)
+
+### Changed
+- `VERSION` → 1.17.3
+
+---
+
 ## [1.17.2] — 2026-05-29
 
 ### Added
