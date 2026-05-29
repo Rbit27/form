@@ -6,6 +6,16 @@
 
 ---
 
+## [1.18.0] — 2026-05-29
+
+### Added
+- `docs/SOC2_READINESS.md §42` — Personnel Security, Background Check & Confidentiality Onboarding Policy — CC1.1/CC1.4 Auditor Exhibit: advances CC1-GAP-003 🔴→🟡 AUTHORED and PRE-04 🔴→🟡 AUTHORED; P0 count 11→10. Background check provider selection: Checkr primary (SOC 2 certified, EU DPA available, 1–5 day turnaround) vs Sterling approved fallback; check scope: identity + criminal record (country of residence + global watchlist) + employment history 5yr; GDPR Art. 6(1)(b) + Art. 10 legal basis with candidate notice and Art. 28 processor DPA. Adjudication criteria: individualized assessment; four automatic disqualifiers (fraud/identity theft/computer crimes/data-privacy violations <7yr, unauthorized computer access, financial crimes <7yr, minor victims). NDA template 10-clause structure (parties, Art. 9 health data enumeration in confidential information definition, obligations, exclusions, GDPR data protection clause with 1-hour internal breach report SLA, IP assignment explicitly covering ML artefacts, 12-month non-solicitation, indefinite health data survival clause); four template variants (employee, advisor, contractor rider, pentest MNDA); DocuSign signing workflow; NDA register schema (12 columns, pseudonymized). Pre-boarding checklist: 11 steps Day −14 through Day 30; background check blocks all access; security training and AUP signing on Day 0; production write access expansion only at Day-30 access review. Four DEC-030 events: `personnel.background_check_initiated` (STANDARD 7yr), `personnel.background_check_passed` (HIGH 7yr), `personnel.nda_signed` (STANDARD 7yr), `personnel.hire_check_passed` (HIGH 7yr); manual emission path for pre-automation phase; chain-break = P0 incident. Seven evidence artefacts CC1-E-003a through CC1-E-007b. SOC 2 criteria: CC1.1, CC1.4, CC6.1, CC6.3, P3.1. PRE-15 stale status corrected via §42.10 (closed by §41 v1.17.9). 12-item checklist (6× P0 before Founding Engineer offer, 4× P1 M3/M4).
+
+### Changed
+- `VERSION` → 1.18.0
+
+---
+
 ## [1.17.9] — 2026-05-29
 
 ### Added

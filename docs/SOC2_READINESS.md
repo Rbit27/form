@@ -8059,3 +8059,298 @@ All five event types must carry `trace_id` and `actor_id` in the standard DEC-03
 ---
 
 *v1.3 additions: §41 Vulnerability Management & Patching SLA — CC7.1/CC7.2 Auditor Exhibit. Closes PRE-15 (🔴 Open → 🟢 Done) — the longest-standing P0 gap in the patching domain. Four discovery sources: Dependabot (`.github/dependabot.yml` baseline config with ecosystem and reviewer requirements), `npm audit --audit-level=critical` CI gate (CC6-GAP-005), annual external penetration test (§16), and vendor security advisory channels (7 vendor channels with monitoring owners and action thresholds); responsible disclosure path (`security@form.coach`) documented with bug bounty roadmap. CVSS v3.1 severity classification with three FORM-specific uplift rules: U-01 (Art. 9 health data exposure path elevates one tier), U-02 (RLS bypass potential auto-elevates to Critical — never eligible for Risk Acceptance), U-03 (HMAC chain integrity affects escalates one tier). Binding patching SLA table: Critical 24h / High 7d / Medium 30d / Low 90d; SLA applies to production deploy, not PR open; "no upstream patch" does not pause the clock. SLA clock mechanics: clock start = earliest of Dependabot notification, NVD publication, pentest report delivery, or responsible disclosure receipt; clock stop = both PR merged to main and deployed to production; clock pause permitted only in three defined exceptional cases (max 14d awaiting upstream, vendor-managed deploy, CI outage <8h). Full discovery-to-evidence CVE triage workflow (7 stages: discovery → triage → assessment → patch PR → staging verify → production deploy → evidence filing) with Linear ticket field schema. Platform and runtime patching table for 6 vendor-managed components (Cloudflare Workers/WAF, Supabase Postgres, Expo/EAS, GitHub Actions runners) with explicit response SLAs and evidence artefacts. Risk Acceptance protocol: never permitted for U-02 (RLS bypass); joint founder+compliance-officer approval required for Critical (max 7d extension); Won't Fix permitted only for CVSS ≤ 3.9 confirmed unreachable code. Enterprise customer disclosure policy: mandatory Template E-VULN-01 for Critical CVEs with cross-tenant exposure (within 2h); Template E-VULN-02 for Critical without cross-tenant risk (within 24h of patch deploy); High CVEs in quarterly compliance attestation; full pentest executive summary available for ACV ≥ $50k under NDA. Five DEC-030 HMAC-chained audit events: `vuln.cve_discovered` (MEDIUM, 7yr), `vuln.patch_deployed` (MEDIUM, 7yr), `vuln.sla_exception_granted` (HIGH, 7yr), `vuln.wont_fix_closed` (MEDIUM, 7yr), `vuln.enterprise_notified` (MEDIUM, 7yr); all privacy-safe (no user_id, no health data, no coaching content in any payload). SOC 2 evidence mapping: CC7.1 (4 discovery sources + DEC-030 trail), CC7.2 (Linear ticket schema + SLA clock + SLA adherence CC7-E-009), CC7.3 (uplift rules = security event evaluation), CC7.4 (remediation workflow + R-08 cross-ref), CC5.3 (§41 is the standalone Vulnerability Management Policy document). Nine evidence artefacts CC7-E-001 through CC7-E-009. Gap closures: PRE-15 🔴→🟢 (P0 count 12→11); CC5.3 Vulnerability Management Policy 🟡→🟢; CC7.1 and CC7.2 advancing toward 🟢 on first quarter of operational evidence. 12-item implementation checklist (6× P0, 5× P1, 1× P2).*
+
+---
+
+## 42. Personnel Security, Background Check & Confidentiality Onboarding Policy — CC1.1/CC1.4 Auditor Exhibit
+
+> **Owner:** `compliance-officer` + `security-engineer`  
+> **Effective:** May 2026  
+> **Review:** Annually (§15 compliance calendar, Q1-Jan) and after any Founding Engineer or contractor hire.  
+> **SOC 2 criteria:** CC1.1 (integrity and ethical values), CC1.4 (commitment to competence), CC6.3 (logical access removal / personnel changes).
+
+This section is the standalone **Personnel Security Policy** for FORM. It closes two pre-hire P0 gaps: **CC1-GAP-003** (background check provider not contracted) and **PRE-04** (NDA template not yet authored), both of which must be resolved before a conditional offer is extended to the Founding Engineer. §40 governs offboarding and device disposal; §42 governs pre-hire due diligence and confidentiality binding.
+
+---
+
+### 42.1 Scope
+
+This policy applies to:
+
+| Role category | Coverage | First trigger |
+|---|---|---|
+| **Full-time employees** (Founding Engineer, Design Lead, future hires) | Full background check + NDA before Day 1 system access | Founding Engineer conditional offer |
+| **Part-time contractors** with production access (code, infra, data) | Identity verification + abbreviated background check + NDA before access granted | First contractor engagement |
+| **Advisory board members** | NDA before any non-public product or financial information shared | First advisory session |
+| **Penetration test firms** | Mutual NDA before credentials or architecture diagrams are shared (§16.3 cross-reference) | Scope kick-off meeting |
+| **Solo-founder (current phase)** | Self-attestation; background check not applicable; NDA obligations addressed by founder's direct ownership | Continuous |
+
+**Out of scope:** End users of the FORM app; enterprise tenant admin users (governed by Enterprise Agreement); sub-processors (governed by §13 and §28).
+
+---
+
+### 42.2 Background Check Policy
+
+#### 42.2.1 Trigger and Timing
+
+Background check is **mandatory** for any individual who will receive:
+- GitHub push access to `rbit27/form` or any production repository
+- Supabase production project access (any role above read-only)
+- 1Password production vault access
+- Cloudflare account access (any permission level)
+- Direct access to any Art. 9 health data (workout records, coaching turns, CV sessions, biometric readings)
+
+**Timing:** Background check initiated **before** a conditional offer is extended. Offer is explicitly conditional on satisfactory check completion. No production access granted until check result is received and reviewed by `compliance-officer`.
+
+#### 42.2.2 Provider Selection
+
+| Criterion | Checkr | Sterling | Decision |
+|---|---|---|---|
+| **GDPR / EU compliance** | Checkr EU entity; DPA available; EU data stored in EU | Sterling EU entity; GDPR-compliant; EMEA team | Both compliant |
+| **Ukraine national ID verification** | Supported via global identity verification module | Supported via global network | Both cover UA |
+| **Criminal record check** (UA, EU, global) | Available with addons; automated for common jurisdictions | Available; more manual for Eastern Europe | Slight edge to Sterling for UA depth |
+| **SOC 2 Type II certified** | Yes (Checkr is SOC 2 certified) | Yes (Sterling is SOC 2 certified) | Both qualified |
+| **Pricing for < 5 hires/year** | $30–$50/check depending on package | $35–$65/check; minimum volumes may apply | Checkr lower friction for solo-phase |
+| **Integration** | API + dashboard; Checkr Packages API | Dashboard primary; API available | Checkr easier for solo phase |
+| **Time to complete** | 1–5 business days (standard package) | 3–7 business days | Checkr faster |
+
+**Recommended provider:** **Checkr** — lower friction for a solo-founder hiring < 5 people per year, SOC 2 certified, GDPR DPA available, faster turnaround. Upgrade trigger: if the first hire is UA-domiciled and requires deep Ukraine criminal record verification, evaluate Sterling for that package specifically.
+
+**Fallback:** If Checkr pricing or scope proves inadequate at time of first offer, Sterling is the approved fallback. Document selection rationale in `compliance/evidence/cc1/background-check-provider-selection.md` (CC1-E-003a) before contracting.
+
+#### 42.2.3 Check Scope
+
+| Check type | Mandatory | Rationale |
+|---|---|---|
+| **Identity verification** (government ID) | Yes | Confirms candidate identity before any access |
+| **Criminal record check** (country of residence + global watchlist) | Yes | Required for access to Art. 9 health data per GDPR Art. 9 sensitivity; SOC 2 CC1.1 |
+| **Employment history verification** (last 5 years or most recent 3 employers) | Yes | CC1.4 competence; confirms claimed credentials |
+| **Education verification** (highest degree claimed) | Conditional — only if technical degree is cited as qualification criterion in JD | Avoids scope creep; apply only when material to role |
+| **Credit check** | No | FORM does not handle direct financial transactions; credit history not material to role risk |
+| **Drug screen** | No | Remote-first; not material to role or safety risk |
+
+#### 42.2.4 GDPR Legal Basis for Background Check Processing
+
+Processing of personal data for background check purposes uses **GDPR Art. 6(1)(b)** (performance of a contract / pre-contractual steps) and, where criminal record data is involved, **GDPR Art. 10** (processing of personal data relating to criminal convictions and offences) under national law of the candidate's country of residence. FORM will:
+
+1. Provide the candidate with a **background check notice** at the point of initiating the check, citing the legal basis, data categories, provider name (Checkr), retention period (check result retained 7 years, raw report retained 1 year or minimum required by provider DPA), and right to dispute.
+2. Instruct Checkr to act as a **data processor** under a DPA (Checkr DPA v2 covers EU; confirm DPA version at contract signing and file as CC1-E-003b).
+3. Not retain the full background check report beyond 12 months from check completion date; retain only the pass/fail attestation (`background_check_passed: true`, check date, check ID) for the 7-year HMAC audit log retention requirement.
+
+#### 42.2.5 Adverse Result Handling
+
+| Result | Definition | Action |
+|---|---|---|
+| **Clear** | No disqualifying findings | Conditional offer converts to unconditional; access provisioning begins per §42.5 |
+| **Consider** (Checkr term) | Finding exists; Checkr's adjudication matrix suggests review | `compliance-officer` reviews finding against FORM's adjudication criteria (§42.2.6) before employment decision; individual adjudication (no blanket bans) |
+| **Suspended / Dispute** | Candidate disputes a finding | Access provisioning paused; dispute resolution process followed per Checkr procedure; start date adjusted if needed |
+| **Failed** | Disqualifying finding confirmed after individual adjudication | Conditional offer withdrawn; legal counsel consulted before any communication to candidate; no production access granted |
+
+#### 42.2.6 Adjudication Criteria
+
+FORM applies **individualized assessment** per EEOC guidance and relevant EU/UA employment law:
+
+- The nature of the finding and how it relates to the specific role duties
+- Time elapsed since the incident
+- Evidence of rehabilitation or changed circumstances
+
+**Automatic disqualifiers** (no individualized assessment required): conviction for fraud, identity theft, computer crimes, or data privacy violations within the last 7 years; any finding involving unauthorized access to computer systems; any finding involving a minor victim.
+
+**Non-disqualifiers:** Minor traffic violations; incidents > 10 years ago with no pattern; offences unrelated to the role or data access scope.
+
+All adjudication decisions are documented in `compliance/evidence/cc1/adjudication-log.csv` (pseudonymized — check ID only, no candidate name) and retained 7 years.
+
+---
+
+### 42.3 Confidentiality Agreement (NDA) Policy
+
+#### 42.3.1 NDA Requirement
+
+Every individual in scope (§42.1) must sign a confidentiality agreement **before** any of the following:
+- Access to non-public product roadmap, pricing, or financial information
+- Access to any production system
+- Access to any Art. 9 health data belonging to FORM users or enterprise tenants
+- Participation in a user research session where session content is shared
+
+#### 42.3.2 NDA Template Structure
+
+The FORM NDA template must cover the following clauses. The master template is filed as `compliance/ndas/TEMPLATE-employee-nda.md` (CC1-E-005). Counsel review of the template is required before first hire (owner: compliance-officer + outside counsel).
+
+| Clause | Required content | Notes |
+|---|---|---|
+| **1. Parties** | FORM (full legal entity name once incorporated) and individual | Update with legal entity name at incorporation |
+| **2. Definition of Confidential Information** | All non-public technical, financial, user data, and health data; explicitly includes all Art. 9 data categories processed by FORM (workout records, coaching turns, CV sessions, wearable readings, meal logs, biometric data) | Health data requires explicit enumeration to ensure enforceability under UA/EU law |
+| **3. Obligations** | Recipient must: (a) hold in strict confidence, (b) not disclose to third parties without written consent, (c) use only for performance of role duties, (d) apply at minimum same protections as own confidential information (floor: reasonable care per GDPR Art. 32) | |
+| **4. Exclusions** | Standard: publicly available information; independently developed; received from a third party lawfully; required by law (with prior written notice to FORM where legally permissible) | |
+| **5. Data protection obligations** | Recipient must process personal data (including Art. 9 health data) only as directed by FORM and consistent with `docs/SECURITY.md` and the FORM Data Processing Guidelines; must report any suspected personal data breach to `security@form.coach` within 1 hour of discovery | 1-hour internal report feeds the 72-hour GDPR Art. 33 clock |
+| **6. Intellectual property** | All work product created in scope of role is work-for-hire assigned to FORM; includes model weights, training data annotations, CV pipeline improvements, and coaching prompt templates | Critical: must explicitly cover ML artefacts |
+| **7. Non-solicitation** | 12-month post-termination non-solicit of FORM employees and customers | Review with counsel for enforceability by jurisdiction |
+| **8. Term** | Effective from date of signing; survives termination for 5 years (health data obligations survive indefinitely) | Health data survival clause needed for GDPR Art. 9 data minimisation post-termination enforcement |
+| **9. Governing law** | Ukraine law (primary); EU GDPR takes precedence for data protection obligations; jurisdiction for disputes: Kyiv Commercial Court | Update at incorporation; re-evaluate if main entity is incorporated in a different jurisdiction |
+| **10. Signature** | Wet ink or DocuSign qualified electronic signature; date | Git commit of signed PDF hash is the DEC-030 audit event |
+
+#### 42.3.3 NDA Signing Workflow
+
+```
+Step 1 — Template preparation (compliance-officer, pre-offer):
+  - Generate NDA from TEMPLATE-employee-nda.md
+  - Fill: candidate name, role title, start date, effective date
+  - Send via DocuSign to candidate email on file
+
+Step 2 — Candidate signature:
+  - Candidate signs via DocuSign qualified e-signature
+  - DocuSign timestamps serve as binding execution evidence
+
+Step 3 — Counter-signature (founder):
+  - Founder counter-signs in DocuSign
+
+Step 4 — Filing:
+  - Completed PDF filed to compliance/ndas/{YYYY}/{employee-id}-nda-signed.pdf
+  - SHA-256 hash of PDF recorded as payload of DEC-030 event
+    personnel.nda_signed (see §42.6)
+  - Row added to compliance/ndas/nda-register.csv
+
+Step 5 — Annual audit:
+  - §15 compliance calendar Q1-Jan: NDA register audited;
+    confirm all active employees/contractors on current template version
+  - Re-sign required if template version changes materially
+    (data protection obligations clause, IP assignment clause)
+```
+
+#### 42.3.4 NDA Register
+
+File: `compliance/ndas/nda-register.csv`
+
+| Column | Description |
+|---|---|
+| `individual_id` | Internal ID (not name — pseudonymized in register) |
+| `role` | Job title |
+| `nda_version` | Template version (e.g., `v1.0`) |
+| `signed_date` | ISO 8601 date |
+| `docusign_envelope_id` | DocuSign envelope ID for retrieval |
+| `pdf_sha256` | SHA-256 hash of signed PDF |
+| `dec030_event_id` | ID of the `personnel.nda_signed` HMAC event |
+| `status` | `active` / `superseded` / `terminated` |
+| `superseded_date` | Date if re-signed on new template version |
+| `termination_date` | Date if individual departed FORM |
+
+---
+
+### 42.4 Advisory Board and Contractor NDA
+
+**Advisory board members:** FORM-standard NDA (§42.3.2) with clause 7 (non-solicitation) removed and clause 6 (IP assignment) scoped to advisory work product only. Template: `compliance/ndas/TEMPLATE-advisor-nda.md`.
+
+**Short-term contractors (< 30 days, no production access):** Confidentiality rider only (clauses 2, 3, 4, 5, 8 from §42.3.2). Template: `compliance/ndas/TEMPLATE-contractor-confidentiality-rider.md`.
+
+**Penetration test firms:** Mutual NDA (MNDA) — both parties bound. Template: `compliance/ndas/TEMPLATE-pentest-mnda.md`. Required before any test credentials, architecture diagrams, or API specs are shared (§16.3).
+
+---
+
+### 42.5 Pre-Boarding Security Checklist
+
+Executed by `compliance-officer` + `security-engineer`. Timeline: Day −14 through Day 0 (start date).
+
+| # | Day | Task | Owner | Blockers |
+|---|---|---|---|---|
+| 1 | **Day −14** | Background check initiated via Checkr; candidate notified with §42.2.4 background check notice | compliance-officer | Checkr account must be active (CC1-GAP-003 closure task #1) |
+| 2 | **Day −10** | NDA sent via DocuSign; counter-signed by founder | compliance-officer | Template must be counsel-reviewed (CC1-E-005) |
+| 3 | **Day −7** | Background check result reviewed; adjudication completed if needed (§42.2.5); go/no-go decision documented | compliance-officer | Checkr 1–5 day SLA |
+| 4 | **Day −5** | 1Password Teams seat provisioned; Starter vault access granted (no production secrets vault) | security-engineer | 1Password admin access |
+| 5 | **Day −3** | GitHub account added as `member` to `rbit27` org; no push access to `main` before first code review approved | security-engineer | GitHub org owner access |
+| 6 | **Day −2** | Role-specific access matrix reviewed against §26 (CC6 Logical Access Controls): exact permissions scoped, no over-provisioning | security-engineer | §26 access table |
+| 7 | **Day −1** | `personnel.hire_check_passed` DEC-030 event emitted (manually via admin API until §42.6 worker is live; document in HMAC log) | security-engineer | DEC-030 HMAC chain active |
+| 8 | **Day 0** | Production access granted in order: (a) Supabase read-only → (b) Cloudflare dev-only → (c) expand per role matrix; no write access to production until probationary review at Day 30 | security-engineer | Background check clear |
+| 9 | **Day 0** | Security awareness training assigned (§22 CC1.4 programme); 30-day completion deadline per Founding Engineer JD | compliance-officer | KnowBe4 or GoPhish instance active (CC1-GAP-003 task per §22) |
+| 10 | **Day 0** | AUP signed (§29 CC1-GAP-001 requirement); copy filed as CC1-E-002 | compliance-officer | AUP counsel-reviewed (`docs/ACCEPTABLE_USE_POLICY.md`) |
+| 11 | **Day 30** | First access review (§23): confirm all granted permissions still appropriate; expand to production write access if probationary review passes | security-engineer + compliance-officer | §23 access review procedure |
+
+---
+
+### 42.6 DEC-030 HMAC-Chained Audit Events
+
+All four events carry the standard DEC-030 envelope (`event_id`, `event_type`, `actor_id`, `timestamp_utc`, `hmac_chain_value`). No health data, no coaching content, no user_id in any payload.
+
+| Event type | Retention tier | Retention | Trigger | Required payload fields |
+|---|---|---|---|---|
+| `personnel.background_check_initiated` | STANDARD | 7 yr | Step 1 of §42.5 checklist | `check_provider` (`"checkr"`), `role`, `check_package`, `check_id` (provider reference) |
+| `personnel.background_check_passed` | HIGH | 7 yr | Step 3 of §42.5 (adjudication clear); written by `compliance-officer` via admin API | `check_id`, `adjudication_outcome` (`"clear"` / `"consider-approved"`), `compliance_officer_id` |
+| `personnel.nda_signed` | STANDARD | 7 yr | Step 2 of §42.5 (DocuSign completion webhook) | `nda_version`, `docusign_envelope_id`, `nda_register_row_sha256` (SHA-256 of the `nda-register.csv` row appended) |
+| `personnel.hire_check_passed` | HIGH | 7 yr | After both `background_check_passed` and `nda_signed` events are confirmed; written by `compliance-officer` | `employee_id`, `role`, `start_date`, `background_check_id`, `nda_envelope_id` |
+
+**Chain break rule:** A `personnel.hire_check_passed` event with a broken HMAC chain is a **P0 incident** per `docs/INCIDENT_RESPONSE.md §R-05`. Do not grant production access until chain integrity is restored.
+
+**Emission before automated pipeline:** Until the DocuSign completion webhook and Checkr webhook are wired to the DEC-030 emission endpoint, events are emitted **manually** via `POST /internal/admin/personnel/events` by `compliance-officer` immediately after each milestone. Manual emission is acceptable for the first hire cycle; automation is required before the third hire (§42.8 checklist item #5).
+
+---
+
+### 42.7 Evidence Artefacts for Auditors
+
+| Artefact ID | Description | Location | Collection cadence | SOC 2 criteria |
+|---|---|---|---|---|
+| **CC1-E-003a** | Background check provider selection rationale (Checkr vs. Sterling evaluation table per §42.2.2) | `compliance/evidence/cc1/background-check-provider-selection.md` | Once at selection; update if provider changes | CC1.4 |
+| **CC1-E-003b** | Checkr DPA (EU) — confirms Checkr is a GDPR Art. 28 data processor for background check data | `compliance/cc1/checkr-dpa.pdf` | At contract signing; re-file on DPA version change | CC1.4, P3.1 |
+| **CC1-E-003c** | Anonymized background check completion log — check IDs with `check_status` and `check_date` (no names, no finding details) | `compliance/evidence/cc1/background-check-log-{YYYY}.csv` | Updated per hire; exported at audit fieldwork | CC1.4 |
+| **CC1-E-005** | NDA template (all four templates per §42.3.2 and §42.4) — counsel-reviewed versions with approval date | `compliance/ndas/TEMPLATE-*.md` + approval record in `compliance/policy-approval-log.csv` | On counsel sign-off; re-file on any substantive template change | CC1.1 |
+| **CC1-E-006** | NDA register — all signed NDAs in force, pseudonymized | `compliance/ndas/nda-register.csv` | Updated per hire; exported at audit fieldwork | CC1.1 |
+| **CC1-E-007a** | Pre-boarding security checklist completion record — one per hire showing each §42.5 step completed with date and owner | `compliance/evidence/cc1/onboarding-checklist-{employee-id}-{YYYY-MM-DD}.md` | Per hire | CC1.4, CC6.3 |
+| **CC1-E-007b** | DEC-030 audit log filtered on `event_type LIKE 'personnel.%'`, HMAC chain verified | HMAC audit log query | At audit fieldwork | CC1.1, CC1.4, CC6.3 |
+
+---
+
+### 42.8 SOC 2 Criteria Mapping
+
+| SOC 2 Criterion | Requirement | How §42 Satisfies It |
+|---|---|---|
+| **CC1.1 — Integrity and ethical values** | Management establishes standards of conduct; deviations detected and remedied | NDA template (CC1-E-005) binds individuals to confidentiality and data protection obligations; AUP signing (CC1-GAP-001) sets conduct standards; NDA register (CC1-E-006) provides evidence of coverage |
+| **CC1.4 — Commitment to competence** | Management defines competence requirements; hires meet them | Background check policy (§42.2) verifies candidate identity and criminal history before production access; pre-boarding checklist (§42.5) ensures security training assigned Day 0; CC1-E-003a documents provider selection rationale |
+| **CC6.3 — Logical access removal** | Entity removes access when no longer needed; verifies access is appropriate | §42.5 pre-boarding checklist scopes access to minimum required; Day-30 access review (step #11) confirms appropriateness; offboarding cross-reference to §40.5 ensures revocation within 24h of departure |
+| **CC6.1 — Logical access provisioning** | Access provisioning based on authenticated identity and authorised roles | Background check confirms identity before any access; NDA signed before access; `personnel.hire_check_passed` DEC-030 event is the access-granting trigger |
+| **P3.1 — Personal data collection** | Entity obtains consent/discloses use of personal information | §42.2.4 background check notice covers GDPR disclosure obligation for candidate personal data processed during screening |
+
+---
+
+### 42.9 Gap Closure Summary
+
+| Gap | Before §42 | After §42 |
+|---|---|---|
+| **CC1-GAP-003** — Background check provider not contracted | 🔴 Open — "no third-party provider contracted, no test run performed, and no evidence artefact exists" | 🟡 **AUTHORED** — §42.2.2 provider selection rationale (Checkr as primary, Sterling as fallback) authored; §42.2.3–42.2.6 check scope, GDPR basis, and adjudication criteria authored; CC1-E-003a through CC1-E-003c evidence paths specified. Closes to 🟢 when: (a) Checkr account created, (b) Checkr DPA signed and filed as CC1-E-003b, (c) test check run on a non-employee volunteer, (d) first real check result filed in CC1-E-003c. |
+| **PRE-04** — NDA/confidentiality agreements signed | 🔴 Open (pre-hire) — NDA template not yet authored | 🟡 **AUTHORED** — §42.3.2 NDA template structure authored with all 10 required clauses; §42.3.3 signing workflow specified; §42.4 additional templates (advisor, contractor, pentest) specified; NDA register schema (CC1-E-006) defined. Closes to 🟢 when: (a) outside counsel reviews and approves template, (b) template filed in `compliance/ndas/`, (c) founder signs own NDA equivalent or self-attestation, (d) first hire NDA is executed. |
+
+> **Gap closure:** CC1-GAP-003 🔴 → 🟡 (authored; closes to 🟢 on provider contract + test check).
+> **Gap closure:** PRE-04 🔴 → 🟡 (authored; closes to 🟢 on counsel review + first signing).
+> **P0 count: 11 → 10** (CC1-GAP-003 reclassified from 🔴 Open to 🟡 AUTHORED).
+
+---
+
+### 42.10 PRE-15 Pre-Launch Checklist Status Correction
+
+The pre-launch checklist (§15.2) still shows PRE-15 as 🔴 Open. This is a stale status. §41 closed PRE-15 to 🟢 Done. For the record:
+
+| Checklist item | Previous status | Corrected status | Closed by |
+|---|---|---|---|
+| **PRE-15** — Patching SLA enforced and tracked | 🔴 Open | 🟢 **Done** | §41 (v1.17.9, 2026-05-29) — standalone policy is §41.4 SLA table + §41.6 workflow + CC7-E-001 through CC7-E-009 evidence set |
+
+The checklist row itself is in §15.2 and is not amended (append-only document principle); this sub-section serves as the correction record.
+
+---
+
+### 42.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create Checkr account; complete Checkr onboarding (company verification, criminal background + employment history package selected); execute EU DPA and file as CC1-E-003b | compliance-officer | **P0** | Before Founding Engineer offer |
+| 2 | Run a test background check on a willing non-employee volunteer (e.g., a friend or advisor); confirm result workflow end-to-end; file anonymized result in CC1-E-003c | compliance-officer + security-engineer | **P0** | Before Founding Engineer offer |
+| 3 | Commission outside counsel to review NDA template (§42.3.2); confirm enforceability in UA, EU, and relevant contractor jurisdiction; file approval record in `compliance/policy-approval-log.csv` | compliance-officer + outside counsel | **P0** | Before Founding Engineer offer |
+| 4 | Create `compliance/ndas/` directory with four template files and `nda-register.csv` seed (header row only) per §42.3.4 schema | compliance-officer | **P0** | Before Founding Engineer offer |
+| 5 | Create `compliance/evidence/cc1/background-check-provider-selection.md` (CC1-E-003a) from §42.2.2 table; record Checkr as selected provider with rationale | compliance-officer | **P0** | On Checkr contract signing |
+| 6 | Register four `personnel.*` DEC-030 event types from §42.6 in `docs/AUDIT_LOG_SCHEMA.md` event registry (retention tier, required payload fields) | security-engineer | **P0** | Before first hire |
+| 7 | Implement `POST /internal/admin/personnel/events` admin API endpoint; accept `personnel.background_check_initiated`, `personnel.background_check_passed`, `personnel.nda_signed`, `personnel.hire_check_passed` as valid event types; emit to DEC-030 HMAC chain | platform-engineer + security-engineer | **P1** | M3 |
+| 8 | Wire Checkr webhook to DEC-030 `personnel.background_check_passed` event emission (automated path); test with Checkr webhook simulator before first real hire | platform-engineer | **P1** | M4 |
+| 9 | Wire DocuSign completion webhook to DEC-030 `personnel.nda_signed` event emission; validate envelope ID and SHA-256 hash of completed PDF in payload | platform-engineer | **P1** | M4 |
+| 10 | File §42 as standalone personnel security policy at `compliance/cc1/personnel-security-policy.md` (CC1-E-007 companion); record in `compliance/policy-approval-log.csv` | compliance-officer | **P1** | M3 |
+| 11 | Add pre-boarding checklist template to `compliance/cc1/TEMPLATE-onboarding-checklist.md` per §42.5 step table; use for first Founding Engineer hire | compliance-officer + security-engineer | **P0** | Before Founding Engineer offer |
+| 12 | Execute founder self-attestation for NDA equivalent: commit `compliance/ndas/founder-self-attestation.md` (git commit timestamp = DEC-030 anchor for solo-founder phase) | founder | **P1** | M3 |
+
+---
+
+*v1.4 additions (2026-05-29): §42 Personnel Security, Background Check & Confidentiality Onboarding Policy — CC1.1/CC1.4 Auditor Exhibit. Background check provider selection: Checkr (primary, SOC 2 certified, EU DPA available, 1–5 day turnaround, lower friction for < 5 hires/year) vs Sterling (approved fallback, stronger UA criminal record depth); check scope: identity verification + criminal record (country of residence + global watchlist) + employment history (last 5 years) — education verification conditional; credit and drug screen explicitly excluded. GDPR legal basis: Art. 6(1)(b) pre-contractual steps; Art. 10 for criminal data with national law; candidate background check notice required; Checkr as Art. 28 processor; raw report retention 12 months, pass/fail attestation 7 years. Adjudication criteria: individualized assessment per EEOC/EU employment law; four automatic disqualifiers (fraud, identity theft, computer crimes, privacy violations < 7yr; unauthorized computer access; financial crimes < 7yr; minor victims); non-disqualifier examples. NDA template: 10-clause structure (parties, confidential information definition — explicitly enumerates Art. 9 health data categories, obligations, exclusions, data protection obligations including 1-hour internal breach report, IP assignment — explicitly covers ML artefacts and CV pipeline, non-solicitation 12 months, indefinite health data survival clause, DocuSign signing workflow); four template variants (employee, advisor, contractor rider, pentest MNDA); NDA register schema (12 columns, pseudonymized). Pre-boarding security checklist: 11 steps Day −14 through Day 30; no production access before background check clear; security training assigned Day 0; AUP signed Day 0; production write access expansion at Day-30 review only. Four DEC-030 HMAC-chained personnel events: `personnel.background_check_initiated` (STANDARD, 7yr), `personnel.background_check_passed` (HIGH, 7yr), `personnel.nda_signed` (STANDARD, 7yr), `personnel.hire_check_passed` (HIGH, 7yr); all privacy-safe; manual emission path specified for pre-automation phase. Seven auditor evidence artefacts CC1-E-003a through CC1-E-007b. SOC 2 criteria mapping: CC1.1 (NDA + AUP coverage), CC1.4 (background check policy + competence verification), CC6.3 (access scoping + Day-30 review + offboarding §40 cross-ref), CC6.1 (identity-verified access provisioning), P3.1 (candidate GDPR notice). PRE-15 stale status corrected: §15.2 checklist shows 🔴 Open for PRE-15; corrected to 🟢 Done by §42.10 (closed by §41 v1.17.9). Gap advances: CC1-GAP-003 🔴→🟡 AUTHORED (P0 count 11→10); PRE-04 🔴→🟡 AUTHORED. 12-item implementation checklist (6× P0, 4× P1, 2× P1/founder).*
