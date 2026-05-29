@@ -6,6 +6,17 @@
 
 ---
 
+## [1.15.0] — 2026-05-29
+
+### Added
+- `content/post-132-bilateral-deficit.md` — Bilateral deficit phenomenon: why bilateral leg press produces 5–15% less force than sum of unilateral reps. Neural architecture: commissural interneurons, corticospinal drive reduction (Zijdewind & Kernell 2001), reciprocal inhibition, Ia interneurons. Population differences (Häkkinen et al. 1996). Practical programming: unilateral trains neural drive unavailable in bilateral movements — combine, not replace. clinical-safety PASS.
+- `content/post-133-foam-rolling-myofascial-release.md` — Foam rolling: what the science actually shows. Fascial release mechanism is mechanically implausible at body-weight pressures (Chaudhry et al. 2008: >1000 N required). Actual mechanisms: gate control (Melzack & Wall 1965), autogenic inhibition via GTOs, mechanoreceptors. Real effects: +5–15° ROM lasting 10–20 min (Wiewelhove et al. 2019 meta-analysis), neutral acute performance impact at ≤120 s/muscle. Evidence-based protocol. clinical-safety PASS.
+- `content/post-134-training-age-adaptation-ceiling.md` — Training age & adaptation ceiling: novice/intermediate/advanced response differences. Neural adaptation phase (weeks 1–12, Häkkinen 1988). Structural hypertrophy phase (months 3–18, Schoenfeld 2010). Advanced ceiling: 1–3% annual strength gain (Zatsiorsky & Kraemer), block periodization (Issurin 2010), INOL. RPA self-classification heuristic. Programming matrix by training age. clinical-safety PASS.
+- `docs/COST_MODEL.md §21` — Pilot Economics, Conversion Governance & Discount Authority Matrix. Three pilot structures (Free 90d standard, Extended 180d with founder approval, Paid $1/seat/month). ASC 606 variable consideration treatment for each (closes OQ-15): free pilots zero revenue; paid pilot ratable + contingent credit liability. Conversion targets: 35%/55%/70% by type (OQ-20 calibration after 10 pilots). Discount authority matrix: Founder ≤40%, AE ≤20%, CSM ≤10% renewal, SDR 0%; floor prices ($6/seat Starter, $4.50/seat Growth). Contract minimums ($600/year, 12-month minimum term, 25-seat increment). Pilot KPIs: Day-14 activation rate as P0 leading indicator. Multi-year economics (2yr/3yr break-even analysis). Six-item implementation checklist. OQ-20, OQ-21, OQ-22 added.
+- `blog.html` — Cards for posts 132, 133, 134.
+
+---
+
 ## [1.14.1] — 2026-05-29
 
 ### Added

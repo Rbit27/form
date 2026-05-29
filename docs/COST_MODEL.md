@@ -88,6 +88,7 @@
     - 20.7 Business Case Template (copy-paste narrative for internal champion)
     - 20.8 Open Questions Added (OQ-18, OQ-19)
     - 19.8 Open Questions Added (OQ-16, OQ-17)
+21. [Pilot Economics, Conversion Governance & Discount Authority Matrix](#21-pilot-economics-conversion-governance--discount-authority-matrix)
 
 ---
 
@@ -2530,6 +2531,203 @@ The base model uses $75,000 average salary (US private-sector knowledge-worker m
 
 ---
 
+---
+
+## 21. Pilot Economics, Conversion Governance & Discount Authority Matrix
+
+> Closes OQ-15 (ASC 606 variable consideration for pilot discounts) and OQ-18 (pilot activation data calibration). Defines the commercial framework for converting free pilots to paid contracts.
+
+---
+
+### 21.1 Purpose
+
+This section establishes the complete commercial framework governing how FORM runs pilots, converts them to paid contracts, and manages discount authority. It closes two open questions from prior sections:
+
+- **OQ-15** (from §18.8): ASC 606 variable consideration treatment for conditional pilot discounts — resolved in §21.3.
+- **OQ-18** (from §20.8): First pilot activation data to calibrate the §20.4 ROI model — resolved by the KPI instrumentation plan in §21.7 and the OQ-20 calibration trigger.
+
+It also provides the discount authority matrix required for sales governance as the team scales from founder-led to AE-led selling (§19.3–19.4).
+
+---
+
+### 21.2 Pilot Structures
+
+Three pilot types are offered. Selection is determined by account size and procurement constraints.
+
+#### Free Pilot (Standard)
+
+- **Duration:** 90 days
+- **Seat limit:** ≤ 250 seats
+- **Payment required:** None. No credit card on file during pilot period.
+- **Features:** All features unlocked — same product experience as paid Growth tier.
+- **Revenue recognition:** Zero. No performance obligation exists during pilot. First-recognition date is the execution date of the paid annual contract (§18.4 methodology applies).
+- **Eligibility:** Default pilot type for all inbound and outbound prospects. No founder approval required.
+
+#### Extended Free Pilot
+
+- **Duration:** 180 days
+- **Seat limit:** No hard cap, but requires written founder approval.
+- **Approval criteria:** Strategic account size — minimum ≥ 500 seats at conversion. Extended timeline must be justified by procurement cycle length (e.g., large-enterprise budget calendar constraints, legal review backlog) or documented strategic relationship value.
+- **Revenue recognition:** Same as Free Pilot — zero revenue until paid contract executes.
+- **Risk note:** Extended pilots carry higher time-cost per deal. Founder approval gate exists to prevent overuse as a discount substitute.
+
+#### Paid Pilot
+
+- **Duration:** 90 days
+- **Pricing:** $1/seat/month — flat rate regardless of tier.
+- **Onboarding fee:** Waived.
+- **Credit on conversion:** Full paid-pilot amount ($1/seat/month × seats × 3 months) applied as a credit against Year 1 contract value if the account converts within 30 days of pilot end.
+- **Revenue recognition:** Recognized ratably over the 90-day pilot period (§21.3 below).
+- **Eligibility:** Designed for accounts ≥ 500 seats where procurement policy requires a vendor payment before multi-year commitment. Also suitable where the buyer's procurement team requires an established billing relationship prior to budget approval.
+
+---
+
+### 21.3 ASC 606 Variable Consideration Treatment (Closes OQ-15)
+
+Each pilot type creates a distinct revenue recognition scenario under ASC 606 / IFRS 15.
+
+#### Free Pilot (Standard and Extended)
+
+No contract exists during the pilot period. FORM has no performance obligation — the pilot is a pre-contract evaluation. Revenue: $0. Contract inception date for ASC 606 purposes is the execution date of the signed paid annual agreement. This aligns with the first-recognition policy documented in §18.4.
+
+#### Paid Pilot — Credit on Conversion
+
+The $1/seat/month Paid Pilot creates a variable consideration question: if the account converts, the pilot fees become a credit against Year 1 ACV. Under **ASC 606-10-32-11**, variable consideration must be constrained to the extent it is probable that a significant revenue reversal will not occur.
+
+Treatment:
+
+1. During the 90-day pilot: recognize $1/seat/month ratably. Record a corresponding **contingent credit liability** (deferred revenue offset) equal to the total pilot fees collected, classified as short-term deferred revenue on the balance sheet.
+2. At conversion (paid contract executed within 30 days of pilot end): release the deferred revenue offset against the Year 1 contract ACV. The net recognized amount equals full Year 1 ACV minus the credit applied.
+3. At pilot expiry without conversion: the contingent credit liability lapses. Release to revenue at the period of expiry — the pilot fees earned ratably become fully recognized revenue with no further obligation.
+4. Most likely amount estimate during pilot: treat expected revenue as **$0 net** (recognize pilot fees, offset by full credit liability) until the convert/not-convert decision point is reached. This is the conservative position consistent with ASC 606-10-32-11 constraint principles.
+
+#### Extended Pilot with Price Concession at Conversion
+
+If a price concession greater than **20% off list price** is offered at conversion following an extended pilot, the full contract is recognized at the discounted ACV. No step-up accounting applies unless the contract contains an explicit multi-element structure with separately stated price increases in future periods (which FORM does not currently offer). The concession is treated as a reduction to transaction price, not a separate performance obligation.
+
+#### Audit Trail Requirement
+
+Add the following event types to **AUDIT_LOG_SCHEMA.md** (DEC-030):
+
+| Event type | Trigger | Required fields |
+|---|---|---|
+| `pilot.started` | Pilot agreement signed or pilot environment provisioned | `tenant_id`, `pilot_type`, `start_date`, `seat_count`, `CSM_owner` |
+| `pilot.converted` | Paid contract executed within 30 days of pilot end | `tenant_id`, `contract_value_ACV`, `seats`, `discount_pct`, `approver` |
+| `pilot.expired` | 30-day post-pilot conversion window closes without contract | `tenant_id`, `pilot_type`, `reason_code` |
+
+---
+
+### 21.4 Pilot Conversion Rate Targets
+
+All figures below are [ESTIMATE] — pre-launch planning inputs. No live pilot data exists yet.
+
+| Pilot type | Conversion target | Benchmark basis | Conversion defined as |
+|---|---|---|---|
+| Free Pilot (90d) | 35% | Slack-comparable bottom-up SaaS free-to-paid: 30–40% | Signed annual contract ≥ 12 months executed within 30 days of pilot end |
+| Extended Free Pilot (180d) | 55% | Filtered for strategic accounts with ≥ 500-seat commitment signal; higher close probability by selection | Same |
+| Paid Pilot | 70% | Payment indicates procurement intent; low-friction signal of budget availability | Same |
+
+**OQ-20 (new):** Track actual pilot conversion rate from the first live pilot. Update the targets in this table after 10 pilot data points have been collected. Assigned to: customer-success (data-engineer to instrument `pilot.*` events; customer-success to report conversion rate in monthly metrics digest). Review checkpoint: first 10 pilots completed or 12 months post-launch, whichever comes first.
+
+---
+
+### 21.5 Discount Authority Matrix
+
+All discounts are measured against published list prices: Starter $12/seat/month, Growth $16/seat/month, Enterprise custom (reference $14/seat/month for discount floor purposes).
+
+#### Approval authority by role
+
+| Approver | Discount limit | Scope | Required justification |
+|---|---|---|---|
+| **Founder** | Up to 40% from list price | Any tier, any contract term | Strategic, competitive, or relationship rationale; written note logged in CRM deal record before discount is communicated to prospect |
+| **Future AE (Year 2+)** | Up to 20% from list price | Starter and Growth tiers only | Competitive displacement: must document competitor name, displacement reason, and confirm buyer has received competing proposal |
+| **SDR / BDR** | 0% — not authorized to discount | — | All discounts require AE or founder approval before communication to prospect. SDRs must escalate any pricing discussion immediately |
+| **CSM (expansion / renewal)** | Up to 10% on renewal | Same tier as current contract | Retention risk documented in CRM with churn risk score and intervention history |
+| **Discount > 40%** | Requires board approval | Any | Pre-Series A: founder + lead investor sign-off in writing. Post-Series A: board approval per standard authority matrix |
+
+#### Floor prices (hard minimums — no discount authority overrides these)
+
+| Tier | List price | Floor price | Floor as % of list |
+|---|---|---|---|
+| Starter | $12/seat/month | $6/seat/month | 50% |
+| Growth | $16/seat/month | $8/seat/month | 50% |
+| Enterprise | Custom pricing | $7/seat/month | Not applicable to custom structures; floor applies to reference price |
+
+Floor prices cannot be waived by any single approver. Pricing below floor requires a separate commercial exception process (founder + investor lead sign-off pre-Series A).
+
+---
+
+### 21.6 Contract Minimums and Commercial Floors
+
+| Parameter | Floor | Rationale |
+|---|---|---|
+| Minimum contract value | $600/year | Starter 100 seats × 12 months × $6 floor price. Sub-$600 deals are unprofitable after CSM, billing, and support overhead |
+| Minimum contract term | 12 months for annual pricing | Month-to-month is not offered in the Enterprise tier. Consumer Pro tier retains month-to-month optionality (separate from enterprise) |
+| Minimum seat increment at expansion | 25 seats | Operational overhead of provisioning, billing, and CSM notification makes sub-25-seat expansions uneconomic |
+| Minimum seat count at renewal to retain same unit price | Maintain ≥ original contracted seat count | Seat count reductions at renewal trigger a unit price renegotiation. No ratchet-down without price adjustment — protecting ACV floor |
+
+---
+
+### 21.7 Pilot KPIs for Conversion Prediction
+
+The following KPIs are instrumented via the beta analytics pipeline and the admin dashboard. They serve as leading indicators of pilot conversion likelihood.
+
+| KPI | Target | Priority | Measurement | Interpretation |
+|---|---|---|---|---|
+| Week-2 activation rate (seats with ≥ 1 session logged ÷ total pilot seats) | ≥ 50% | P0 — primary leading indicator | Computed daily from `session_completed` events joined to pilot seat roster | < 30% at Day 14 triggers CSM save protocol (see below) |
+| Week-4 30-day retention (WAU ÷ total pilot seats) | ≥ 30% | P1 | Computed weekly from `app_opened` event cohort | Below target suggests low stickiness; review onboarding funnel |
+| Admin dashboard logins in 90-day pilot | ≥ 3 logins by account admin | P1 — champion health signal | Tracked via `feature_viewed` events with `screen_name = admin_dashboard` | < 2 logins by Day 45 indicates low champion engagement; escalate to founder |
+| Victor interaction positive-reaction rate (thumbs-up ÷ total rated interactions) | ≥ 60% | P1 | Tracked via explicit feedback events in chat flow | Below 60% triggers product review; may indicate coaching quality mismatch for ICP |
+
+**CSM save protocol trigger:** If Week-2 activation rate is < 30% at Day 14, initiate the save protocol. Pilot is statistically less likely to convert. (See OQ-21 for full protocol definition.)
+
+**OQ-21 (new):** Define the CSM save protocol — intervention steps, trigger thresholds, escalation path, and success criteria. Owner: customer-success. Target: protocol documented and approved before first live pilot kickoff. Review by Q3 2026.
+
+---
+
+### 21.8 Multi-Year Contract Economics
+
+Integrates §16.4 (multi-year contract economics) and §19 (enterprise revenue forecast) data.
+
+#### 2-year contract (10% annual discount)
+
+A 10% annual discount on a Growth 300-seat deal ($32,400/year list) reduces ACV to $29,160/year. Over 2 years vs. two sequential 1-year renewals:
+
+- ARR sacrifice: $3,240/year × 2 = $6,480 over the contract period
+- Churn exposure eliminated: at 5% annual churn (§17.5), a 300-seat account has ~15% probability of churn over 2 years. Expected GP at risk: $32,400 × 2 × 60% GM × 15% = **$5,832**
+- Net economics at 2 years: ARR sacrifice ($6,480) vs. churn GP preserved (~$5,832) — roughly break-even at the 300-seat Growth level. Minimum account size where 2-year discount is clearly net-positive: **≥ 480 seats** (where churn-exposure GP saved exceeds ARR sacrifice).
+
+#### 3-year contract (20% annual discount)
+
+A 20% annual discount reduces ACV to $25,920/year on the same Growth 300-seat deal. ARR sacrifice: $6,480/year × 3 = $19,440 over contract. Justifiable for Enterprise 1,000+ seat accounts where (a) churn risk is existential to the deal, (b) multi-year lock-in provides ARR visibility critical for Series A narrative, and (c) the ARR sacrifice is offset by account size.
+
+**Implementation checklist item:** Add the multi-year discount schedule (10% for 2 years, 20% for 3 years) to the `pricing-enterprise.html` FAQ section. Owner: design-craft. Milestone: M3.
+
+---
+
+### 21.9 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Add `pilot.started`, `pilot.converted`, `pilot.expired` event types to AUDIT_LOG_SCHEMA.md | security-engineer | P0 | M3 |
+| Update `pricing-enterprise.html` FAQ with pilot terms, discount floor note, and multi-year discount schedule | design-craft | P1 | M3 |
+| Build `pilots` table in DATA_MODEL.md — track `pilot_id`, `tenant_id`, `pilot_type`, `start_date`, `end_date`, `converted_at`, `seats`, `CSM_owner` | platform-engineer | P1 | M4 |
+| Instrument Week-2 activation alert in admin dashboard (trigger when activation rate < 30% at Day 14) | platform-engineer | P1 | M4 |
+| Create CRM deal template with discount approval field and competitive displacement reason field | customer-success | P1 | M4 |
+| Add pilot economics sensitivity to §10 sensitivity analysis table | data-engineer | P2 | M5 |
+
+---
+
+### 21.10 Open Questions
+
+**OQ-20:** Track actual pilot conversion rate from the first live pilots. Update §21.4 conversion rate targets after 10 pilot data points have been collected. Assigned to: customer-success + data-engineer. Checkpoint: first 10 completed pilots or 12 months post-launch.
+
+**OQ-21:** Define CSM save protocol — full intervention steps, trigger thresholds (Day-14 activation < 30%), escalation path to founder, and success criteria. Owner: customer-success. Target: Q3 2026, before first pilot kickoff.
+
+**OQ-22:** Determine whether the Paid Pilot ($1/seat/month) is compliant with procurement thresholds in target EU enterprise buyers. Some EU public-sector and regulated-industry procurement frameworks require full tender processes above a minimum contract value threshold (e.g., € 1,000 in some jurisdictions). If Paid Pilot fees cross this threshold for large-seat pilots, the structure may trigger procurement requirements that the Free Pilot avoids. Owner: legal / founder. Checkpoint: before first Paid Pilot is offered to an EU-domiciled buyer.
+
+---
+
 **v1.0 · May 2026**
 
 All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actuals as beta instrumentation delivers real usage data. The first reconciliation checkpoint is 30 days post-beta launch, targeting OQ-01 and OQ-02 as the highest priority gaps.
@@ -2551,3 +2749,5 @@ All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actua
 *v1.1 additions: §20 Customer ROI Model & Business Case Template — buyer-facing financial model covering status quo cost baseline (Willis Towers Watson / Mercer benchmarks), five quantifiable value levers (utilisation arbitrage, absenteeism reduction at 50% of RAND meta-analysis, productivity uplift at 0.5% of Pronk published effect, turnover avoidance, direct cost comparison), three-year ROI tables by tier (Starter 100-seat: 255% / Growth 300-seat: 318% / Enterprise 1,000-seat: 434% with 2.3–3.4-month payback), sensitivity analysis on activation rate / salary band / absenteeism reduction rate (floor case 40% activation + 5% reduction still yields 161–175% ROI), non-financial drivers (ESG/CSRD, talent acquisition, EEOC/HIPAA/ADA risk avoidance, culture), copy-paste business case template for internal champion, and sales champion usage notes. OQ-18 added: first pilot activation data to calibrate model. OQ-19 added: ICP salary band discovery to update absenteeism value estimate.*
 
 *v1.0 additions: §19 Enterprise Go-to-Market Financial Model — sales velocity equation (opportunities × win rate × ACV ÷ sales cycle) for Year 1 founder-led ($6k/month) and Year 2 AE-led ($46k/month) phases; pipeline stage conversion model with hard exit gates and BANT disqualification triggers; founder time-budget per deal (37 hours total) and AE hire trigger criteria; first AE hire economics ($120k OTE, 3.8× quota multiple, $179k net GP/year at quota, Month-5 ramp-cost recovery); SDR layer economics ($70k OTE, 2.1× ROI, SQL qualification criteria, 40 SQL/year quota); CSM cost absorption bridge (dedicated CSM < 5% of revenue at Growth 700+ seats and Enterprise 1,500+ seats; pooled CSM model for sub-300-seat accounts); three-scenario Month 1–24 enterprise ARR forecast (Base: $188k ARR Month 24; Bull: $312k; Bear: $86k) with month-by-month recognized ARR; Series A ARR quality framing (NRR ≥ 110%, LTV:CAC ≥ 5×, ≥ 3 active accounts). OQ-16 added: Growth-tier minimum seat floor for CSM absorption. OQ-17 added: win rate calibration sensitivity (15–35%) on SDR hire timing and pipeline coverage targets.*
+
+*v1.2 additions: §21 Pilot Economics, Conversion Governance & Discount Authority Matrix — three pilot structures (Free 90d, Extended 180d, Paid $1/seat/month); ASC 606 variable consideration treatment for each (closes OQ-15); pilot conversion rate targets (35%/55%/70% by type); discount authority matrix (founder/AE/CSM authority levels with floor prices); contract minimums ($600/year floor, 25-seat increment); pilot KPIs for conversion prediction (Day-14 activation rate as P0 leading indicator); multi-year contract economics integrated from §16.4; six-item implementation checklist; OQ-20 (actual conversion rate calibration), OQ-21 (CSM save protocol), OQ-22 (EU procurement threshold compatibility for Paid Pilot).*
