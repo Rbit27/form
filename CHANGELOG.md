@@ -6,6 +6,16 @@
 
 ---
 
+## [1.17.2] — 2026-05-29
+
+### Added
+- `content/post-140-eccentric-training-mechanisms.md` — Ексцентричний тренінг: тітін як активний пружний елемент при Ca²⁺-залежному розтягуванні (Herzog et al. 2012, Nishikawa et al. 2020); ексцентрична сила ≥ 120–150% концентричного максимуму; stretch-mediated hypertrophy і саркомерогенез у серію (Oranchuk et al. 2019); Nordic hamstring curl −51% травм підколінних сухожилків (Petersen et al. 2011); акцентоване ексцентрическое (AEL) і протокол 4-секундного опускання; переважна гіпертрофія Type II волокон; фазування в мезоциклі. clinical-safety NOT REQUIRED.
+
+### Changed
+- `VERSION` → 1.17.2
+
+---
+
 ## [1.17.1] — 2026-05-29
 
 ### Added
