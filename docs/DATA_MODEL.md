@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.1
+# FORM · Multi-Tenant Data Model v1.2
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -29,6 +29,7 @@
 19. [Feature Flag & Entitlement Registry Schema](#19-feature-flag--entitlement-registry-schema)
 20. [White-Label Tenant Branding Schema](#20-white-label-tenant-branding-schema)
 21. [AI Coaching Session & Memory Schema](#21-ai-coaching-session--memory-schema)
+22. [Gamification, Streak & Achievement Schema](#22-gamification-streak--achievement-schema)
 
 ---
 
@@ -7091,6 +7092,500 @@ All coaching events follow the HMAC-chained append-only format defined in AUDIT_
 
 *v1.1 additions: §20 White-Label Tenant Branding Schema — `tenant_branding` table (1:1 with tenants, lazy), `logo_url/logo_dark_url/favicon_url`, `primary_color` + WCAG AA contrast validation, `custom_domain` DNS-verification state machine, `powered_by_removal` with ARR gate ($50k+) and DECISION_LOG ref requirement; R2 asset storage (PNG/WebP only, SVG rejected); 9 API endpoints; 12 DEC-030 HMAC-chained audit events; nightly pg_cron invariant check; SOC 2 CC7.2/CC8.1/CC6.2/CC6.8 mapping; 13-item checklist. §21 AI Coaching Session & Memory Schema — five-table schema: `coaching_sessions` (session_token, model_id, context_window_used_pct, session_cost_usd, per-model token counts), `coaching_turns` (column-level AES-256-GCM encryption on content, clinical_safety_flagged per turn, append-only via RLS), `coaching_memory` (dotted-namespace memory keys with confidence score and GDPR soft-delete), `coaching_feedback` (thumbs_up/down/flagged_unsafe/flagged_inaccurate), `coaching_session_context` (hash-only immutable context snapshot). Column-level encryption: AES-256-GCM, key from Cloudflare Secrets Store. RLS: form_api own-rows read (content_encrypted masked at query layer), form_system tenant-scoped, form_admin unrestricted. Context window management: 80% threshold triggers auto-complete + fresh session with memory re-injection. GDPR Art. 17 erasure: turns content_encrypted → NULL, memory soft-delete with key-level events. Cost attribution: session_cost_usd computed at turn-write time; `tenant_monthly_coaching_cost` materialized view, CONCURRENTLY refreshed via pg_cron. 7 DEC-030 audit events (coaching.session_started/completed/turn_clinical_safety_flagged/memory_extracted/memory_deleted/feedback_submitted/session_cost_threshold_exceeded). SOC 2 mapping: CC6.1 (RLS), CC6.7 (column encryption), CC7.2 (clinical safety flagging), CC9.2 (Anthropic as GDPR sub-processor). 3 open questions (OQ-COACH-01: fine-tuning consent P0; OQ-COACH-02: flat vs consumption billing P1; OQ-COACH-03: memory key namespace versioning P1). 15-item implementation checklist (12× P0 M3, 2× P1 M4, 1× P0 M3 feature-flag gate).*
 
-*v1.0 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer*
+---
 
-*v1.0 additions: §19 Feature Flag & Entitlement Registry Schema — closes the §2.7 stub gap across all cross-references (§15 `cv.client_side_enabled`, §18 `webhook.email_in_payloads`, SSO_SCIM_IMPLEMENTATION.md `security.ip_allowlist_enabled` and `sso.staging_env_enabled`). Two-table design: `feature_flag_registry` (canonical allowlist, form_admin-only write, FK-enforced dotted namespace, `flag_key_namespace` CHECK constraint) and `tenant_feature_flags` (production per-tenant rows with FK to registry, `compliance_approval_ref`, `enabled_at`, RLS read-only for form_api and form_system). Seed data for 14 canonical flags across Starter / Growth / Enterprise tiers with one compliance-gated flag (`webhook.email_in_payloads`). Tier entitlement matrix (auto / avail / — / gate). TypeScript `assertFeatureEnabled()` in `src/workers/feature-flags/assert-feature-enabled.ts`: Cloudflare KV 30-second cache, tier rank comparison against TIER_ORDER map, compliance gate check, fail-closed on any DB or KV error (throws 403). Four DEC-030 HMAC-chained audit events: `feature_flag.enabled` (STANDARD, 7yr), `feature_flag.disabled` (STANDARD, 7yr), `feature_flag.registry_updated` (HIGH, 7yr), `feature_flag.compliance_gate_bypassed` (CRITICAL, 10yr — auto PagerDuty P1, always `blocked: true`). Compliance gate protocol: DPA authorisation → DECISION_LOG PR merge → compliance_approval_ref populated → form_admin enables via internal API → DEC-030 event with approval reference. §19.9 migration script: 14 flag_name-to-flag_key renames, RAISE EXCEPTION abort on unrecognised flags, FK constraint addition, `enabled_at` backfill from `updated_at`, `compliance_approval_ref` column addition, post-migration validation queries (zero unrecognised flags; zero enabled gated flags without approval ref). OQ-FLAG-01: tier downgrade auto-disable decision (preferred: contract lifecycle hook emitting feature_flag.disabled events, M5). OQ-FLAG-02: flag deprecation 90-day sunset policy with pg_cron soft-delete and admin dashboard banner (M6). SOC 2 mapping: CC6.1 (form_admin-only write, tier entitlement gates), CC6.2 (tier check = authorisation gate, plan not self-elevatable), CC8.1 (all mutations HMAC-chained in-transaction), CC9.2 (compliance_approval_ref persisted 7yr, auditor-traceable to DPA clause). 12-item implementation checklist (8× P0 M3, 1× P1 M4, 1× P1 M5, 1× P2 M6).*
+## 22. Gamification, Streak & Achievement Schema
+
+### 22.1 Design Rationale
+
+Gamification in FORM is a **personal progress instrument**, not a competitive mechanism. Four hard constraints govern every design decision in this section:
+
+1. **DEC-013 (streak grace):** The streak is preserved after 1 consecutive missed day (grace). It resets only after 2 consecutive misses. A streak must never reset after a single missed day. This is a brand floor — documented in DECISION_LOG and `docs/FLOWS.md`.
+2. **DEC-002 (no in-app social):** No leaderboards, no cross-user comparisons, no public achievement walls. All gamification data is strictly personal and never exposed to other users or tenant admins in identified form.
+3. **DEC-029 (clinical-safety gate on sharing):** If any external sharing of achievements is introduced in future, it must pass clinical-safety review before shipping.
+4. **Privacy floor on tenant admin reporting:** Tenant admins never see individual streak lengths or personal records. Only anonymised, k-anonymity-gated fleet statistics (§17) are permitted.
+
+### 22.2 Streak Engine Design
+
+The streak engine computes streak state against `workout_sessions.completed_at` (§2.4 core schema). A "qualifying session" is any row in `workout_sessions` where `completed_at IS NOT NULL`. This is the **default** per OQ-GAM-01 (§22.14); a minimum-sets threshold can be added later without schema change.
+
+**State machine (per user, per calendar day in user local timezone):**
+
+```
+State: active_streak (S > 0)
+
+  today = qualifies:
+    current_streak += 1
+    last_activity_date = today
+    grace_used_this_cycle = FALSE
+    → emit gamification.streak_milestone if S ∈ {7, 14, 30, 60, 90, 180, 365}
+
+  today-1 missed, today = qualifies, grace NOT used:
+    GRACE APPLIED
+    current_streak preserved (unchanged)
+    grace_used_this_cycle = TRUE
+    total_grace_uses += 1
+    → emit gamification.streak_grace_applied
+    → then: current_streak += 1, last_activity_date = today
+
+  today-1 missed, today = qualifies, grace ALREADY USED:
+    two consecutive misses confirmed (day N-1 was the grace day, today is day N+1 still missing)
+    [This path is actually: grace_used = TRUE AND today qualifies AND gap = 2 days]
+    current_streak RESET to 1 (today starts new streak)
+    streak_start_date = today
+    grace_used_this_cycle = FALSE
+    → emit gamification.streak_reset (carries previous streak length)
+    → emit gamification.streak_started
+
+  2+ consecutive misses, today = qualifies:
+    RESET (grace_used or not, gap > 1 day after grace or gap > 2 days without)
+    current_streak = 1
+    streak_start_date = today
+    grace_used_this_cycle = FALSE
+    → emit gamification.streak_reset
+    → emit gamification.streak_started
+```
+
+**Timezone note:** Streak day boundaries are computed in the user's local timezone (`user_profile.timezone`; defaults to UTC if not set). A workout completed at 23:59 local time counts for that local day.
+
+**Grace invariant:** At most one grace event can occur per streak cycle. `grace_used_this_cycle` resets to `FALSE` only when the user logs a qualifying session (not on reset). This prevents "chain grace" abuse.
+
+### 22.3 `user_streaks` Table
+
+```sql
+CREATE TABLE user_streaks (
+  user_id               UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  current_streak        INTEGER      NOT NULL DEFAULT 0 CHECK (current_streak >= 0),
+  longest_streak        INTEGER      NOT NULL DEFAULT 0 CHECK (longest_streak >= 0),
+  streak_start_date     DATE         NULLABLE,                -- NULL when current_streak = 0
+  last_activity_date    DATE         NULLABLE,                -- last qualifying workout date (local tz)
+  grace_used_this_cycle BOOLEAN      NOT NULL DEFAULT FALSE,
+  total_grace_uses      INTEGER      NOT NULL DEFAULT 0 CHECK (total_grace_uses >= 0),
+  created_at            TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id)
+);
+
+CREATE INDEX idx_user_streaks_last_activity ON user_streaks (last_activity_date)
+  WHERE last_activity_date IS NOT NULL;
+
+CREATE TRIGGER update_user_streaks_updated_at
+  BEFORE UPDATE ON user_streaks
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Invariant: longest_streak >= current_streak always
+ALTER TABLE user_streaks
+  ADD CONSTRAINT chk_streak_longest CHECK (longest_streak >= current_streak);
+```
+
+**longest_streak** is maintained by the streak engine: on every `current_streak` increment, if `current_streak > longest_streak`, update `longest_streak = current_streak`.
+
+### 22.4 `streak_grace_events` Table
+
+Append-only record of every grace application. No DELETE or UPDATE permitted via RLS.
+
+```sql
+CREATE TABLE streak_grace_events (
+  id                      UUID         NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id                 UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  missed_date             DATE         NOT NULL,      -- the calendar day that was missed (user local tz)
+  streak_count_at_grace   INTEGER      NOT NULL CHECK (streak_count_at_grace > 0),
+  grace_applied_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  workout_session_id      UUID         NULLABLE REFERENCES workout_sessions(id) ON DELETE SET NULL
+  -- the qualifying session that triggered the grace (day after the missed day)
+);
+
+CREATE INDEX idx_grace_events_user ON streak_grace_events (user_id, grace_applied_at DESC);
+CREATE INDEX idx_grace_events_missed_date ON streak_grace_events (user_id, missed_date);
+```
+
+### 22.5 `personal_records` Table
+
+Tracks the user's best-ever performance per exercise × metric combination. Each row represents one PR event (historical series, not just current best).
+
+```sql
+CREATE TYPE pr_metric AS ENUM (
+  '1rm_kg',              -- estimated or tested 1-rep max in kilograms
+  'max_reps',            -- maximum reps at a given weight (weight in context JSONB)
+  'volume_session_kg',   -- total volume (sets × reps × weight) in a single session, kg
+  'best_set_kg',         -- heaviest single set weight lifted, kg
+  'time_seconds'         -- for timed exercises (plank, etc.)
+);
+
+CREATE TABLE personal_records (
+  id                  UUID         NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id             UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  exercise_slug       TEXT         NOT NULL,   -- e.g. 'squat', 'bench-press', 'pull-up'
+  metric              pr_metric    NOT NULL,
+  value               NUMERIC(10,3) NOT NULL CHECK (value > 0),
+  previous_best       NUMERIC(10,3) NULLABLE,  -- snapshot of value before this PR was set
+  improvement_pct     NUMERIC(6,2)  NULLABLE,  -- (value - previous_best) / previous_best * 100
+  workout_session_id  UUID         NULLABLE REFERENCES workout_sessions(id) ON DELETE SET NULL,
+  achieved_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  context             JSONB        NOT NULL DEFAULT '{}'::jsonb,
+  -- context carries supporting data: {reps_used: 3, rpe: 8, set_id: "...", e1rm_formula: "epley"}
+  created_at          TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX idx_pr_user_exercise_metric_value
+  ON personal_records (user_id, exercise_slug, metric, achieved_at DESC);
+CREATE INDEX idx_pr_user_exercise ON personal_records (user_id, exercise_slug);
+CREATE INDEX idx_pr_user_recent ON personal_records (user_id, achieved_at DESC);
+
+-- Partial index: only the current best per user × exercise × metric
+-- Used by the UI "current PRs" query; the engine maintains this via the achieved_at ordering
+CREATE INDEX idx_pr_current_best ON personal_records (user_id, exercise_slug, metric)
+  WHERE created_at = achieved_at; -- approximation; actual "current best" is MAX(value) per group
+```
+
+**Current best query pattern:**
+```sql
+-- Current best PR per exercise × metric for a user
+SELECT DISTINCT ON (exercise_slug, metric)
+  exercise_slug, metric, value, achieved_at, context
+FROM personal_records
+WHERE user_id = $1
+ORDER BY exercise_slug, metric, value DESC, achieved_at DESC;
+```
+
+### 22.6 `achievement_definitions` Table
+
+Canonical catalog of achievement types. Written by form_admin only. Never modified after an achievement key has been earned by any user (soft-archive via `is_active = FALSE` instead of deletion).
+
+```sql
+CREATE TYPE achievement_category AS ENUM (
+  'streak',        -- streak-length milestones (7d, 30d, 90d, 365d)
+  'pr',            -- personal record events (first PR, 10-PR club, etc.)
+  'volume',        -- cumulative volume milestones (total tonnes lifted)
+  'consistency',   -- training frequency (e.g. 3× / week for 4 weeks)
+  'milestone'      -- onboarding and lifecycle events (first session, plan week 1 complete, etc.)
+);
+
+CREATE TYPE achievement_tier AS ENUM ('bronze', 'silver', 'gold', 'platinum');
+
+CREATE TABLE achievement_definitions (
+  achievement_key   TEXT                  NOT NULL PRIMARY KEY,
+  -- dotted namespace: 'streak.7d', 'pr.first_squat_1rm', 'milestone.first_session'
+  display_name_uk   TEXT                  NOT NULL,
+  display_name_en   TEXT                  NOT NULL,
+  description_uk    TEXT                  NOT NULL,
+  description_en    TEXT                  NOT NULL,
+  category          achievement_category  NOT NULL,
+  tier              achievement_tier      NOT NULL,
+  is_active         BOOLEAN               NOT NULL DEFAULT TRUE,
+  created_at        TIMESTAMPTZ           NOT NULL DEFAULT now()
+);
+
+-- Key namespace constraint: prevent typos on insert
+ALTER TABLE achievement_definitions
+  ADD CONSTRAINT chk_achievement_key_namespace
+  CHECK (achievement_key ~ '^[a-z_]+\.[a-z0-9_]+$');
+```
+
+**Seed data (initial achievement catalog):**
+
+| achievement_key | UA | Tier |
+|---|---|---|
+| `milestone.first_session` | Перше тренування | Bronze |
+| `milestone.plan_week_1` | Перший тиждень плану | Bronze |
+| `milestone.plan_month_1` | Перший місяць | Silver |
+| `streak.7d` | 7 днів поспіль | Bronze |
+| `streak.14d` | 14 днів | Bronze |
+| `streak.30d` | 30 днів | Silver |
+| `streak.60d` | 60 днів | Silver |
+| `streak.90d` | 90 днів | Gold |
+| `streak.180d` | Пів року | Gold |
+| `streak.365d` | Рік | Platinum |
+| `pr.first_squat_1rm` | Перший 1RM присідання | Bronze |
+| `pr.first_bench_1rm` | Перший 1RM жим | Bronze |
+| `pr.first_deadlift_1rm` | Перший 1RM тяга | Bronze |
+| `pr.10_prs` | 10 особистих рекордів | Silver |
+| `pr.50_prs` | 50 особистих рекордів | Gold |
+| `volume.10_tonnes` | 10 000 кг загального об'єму | Bronze |
+| `volume.100_tonnes` | 100 000 кг | Silver |
+| `volume.1000_tonnes` | 1 000 000 кг | Gold |
+| `consistency.3x_week_4w` | 3× на тиждень, 4 тижні поспіль | Silver |
+
+### 22.7 `user_achievements` Table
+
+Append-only earned achievements per user. The achievement engine (Workers script) writes rows; form_api reads them for the user's own achievements.
+
+```sql
+CREATE TABLE user_achievements (
+  id              UUID         NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id         UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  achievement_key TEXT         NOT NULL REFERENCES achievement_definitions(achievement_key),
+  earned_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  context         JSONB        NOT NULL DEFAULT '{}'::jsonb,
+  -- context carries supporting data:
+  -- streak achievements: {streak_length: 30, streak_start_date: "2026-04-01"}
+  -- PR achievements:     {exercise_slug: "squat", value: 140, metric: "1rm_kg"}
+  -- volume achievements: {total_volume_kg: 10000}
+  created_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- A user can earn the same achievement multiple times (e.g. streak.30d after a reset and re-earn)
+-- but not on the same calendar day
+CREATE UNIQUE INDEX idx_achievements_user_key_day
+  ON user_achievements (user_id, achievement_key, date_trunc('day', earned_at));
+
+CREATE INDEX idx_achievements_user_recent
+  ON user_achievements (user_id, earned_at DESC);
+```
+
+### 22.8 Row-Level Security Policies
+
+```sql
+-- ============================================================
+-- user_streaks
+-- ============================================================
+ALTER TABLE user_streaks ENABLE ROW LEVEL SECURITY;
+
+-- API: users read and update their own streak
+CREATE POLICY "user_streaks_api_select" ON user_streaks
+  FOR SELECT TO form_api USING (user_id = auth.uid());
+
+CREATE POLICY "user_streaks_api_update" ON user_streaks
+  FOR UPDATE TO form_api USING (user_id = auth.uid());
+
+-- System: reads all rows for streak engine Worker; inserts on new user creation
+CREATE POLICY "user_streaks_system_all" ON user_streaks
+  FOR ALL TO form_system USING (TRUE) WITH CHECK (TRUE);
+
+-- Admin: unrestricted
+CREATE POLICY "user_streaks_admin_all" ON user_streaks
+  FOR ALL TO form_admin USING (TRUE) WITH CHECK (TRUE);
+
+
+-- ============================================================
+-- streak_grace_events (append-only for form_api)
+-- ============================================================
+ALTER TABLE streak_grace_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "grace_events_api_select" ON streak_grace_events
+  FOR SELECT TO form_api USING (user_id = auth.uid());
+
+-- form_api may NOT insert directly; inserts are done by form_system via streak Worker
+CREATE POLICY "grace_events_system_all" ON streak_grace_events
+  FOR ALL TO form_system USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY "grace_events_admin_select" ON streak_grace_events
+  FOR SELECT TO form_admin USING (TRUE);
+
+-- No UPDATE or DELETE policies for any role; grace events are immutable
+-- (form_admin can delete via BYPASSRLS if compelled by Art. 17 — handled in erasure Worker)
+
+
+-- ============================================================
+-- personal_records
+-- ============================================================
+ALTER TABLE personal_records ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "prs_api_select" ON personal_records
+  FOR SELECT TO form_api USING (user_id = auth.uid());
+
+CREATE POLICY "prs_api_insert" ON personal_records
+  FOR INSERT TO form_api WITH CHECK (user_id = auth.uid());
+
+-- No direct UPDATE from form_api: PR records are write-once (a new PR creates a new row)
+-- Form_system writes PR rows from the workout-completion Worker
+CREATE POLICY "prs_system_all" ON personal_records
+  FOR ALL TO form_system USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY "prs_admin_all" ON personal_records
+  FOR ALL TO form_admin USING (TRUE) WITH CHECK (TRUE);
+
+
+-- ============================================================
+-- achievement_definitions (read-only for non-admin)
+-- ============================================================
+ALTER TABLE achievement_definitions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "achdef_api_select" ON achievement_definitions
+  FOR SELECT TO form_api USING (is_active = TRUE);
+
+CREATE POLICY "achdef_system_select" ON achievement_definitions
+  FOR SELECT TO form_system USING (TRUE);
+
+CREATE POLICY "achdef_admin_all" ON achievement_definitions
+  FOR ALL TO form_admin USING (TRUE) WITH CHECK (TRUE);
+
+
+-- ============================================================
+-- user_achievements (append-only for form_system; read for form_api)
+-- ============================================================
+ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "achievements_api_select" ON user_achievements
+  FOR SELECT TO form_api USING (user_id = auth.uid());
+
+-- form_system writes achievement rows from the achievement engine
+CREATE POLICY "achievements_system_insert" ON user_achievements
+  FOR INSERT TO form_system WITH CHECK (TRUE);
+
+CREATE POLICY "achievements_system_select" ON user_achievements
+  FOR SELECT TO form_system USING (TRUE);
+
+CREATE POLICY "achievements_admin_all" ON user_achievements
+  FOR ALL TO form_admin USING (TRUE) WITH CHECK (TRUE);
+```
+
+### 22.9 RLS Isolation Properties
+
+| Property | Guarantee |
+|---|---|
+| Cross-user streak read | Impossible — `user_streaks` SELECT restricted to `auth.uid()` |
+| Cross-tenant PR leakage | Impossible — `personal_records` SELECT restricted to `auth.uid()`; tenant boundary enforced by `users.tenant_id` FK, which RLS on `users` table enforces transitively |
+| Achievement definitions exposure | `form_api` reads only `is_active = TRUE` rows; inactive definitions (deprecated achievements) not returned to clients |
+| form_system privilege | Streak engine and achievement engine run as `form_system`; they access all user rows scoped by their processing batch — never expose to user requests |
+| Grace event immutability | No UPDATE or DELETE policy exists for `form_api` or `form_system` on `streak_grace_events`; GDPR Art. 17 erasure uses form_admin BYPASSRLS |
+| No tenant admin access | `tenant_admin` role has no policy on any gamification table — consistent with DEC-002 (no identified gamification data in admin reporting) |
+
+### 22.10 DEC-013 Compliance Verification
+
+DEC-013 states: **"Не пропускай 2 поспіль — streak grace після 2 misses, не 1."**
+
+Translation to data-layer invariants:
+
+| Invariant | Enforcement Location |
+|---|---|
+| Grace applied only after exactly 1 consecutive missed day | Streak Worker checks `DATEDIFF(today, last_activity_date) = 2 AND NOT grace_used_this_cycle` before applying grace |
+| Grace used at most once per streak cycle | `grace_used_this_cycle = TRUE` flag set atomically in the same transaction as the grace application; reset only on next qualifying session |
+| Streak resets only after 2+ consecutive misses | Streak Worker resets only when `DATEDIFF(today, last_activity_date) > 2` OR `(DATEDIFF = 2 AND grace_used_this_cycle = TRUE)` |
+| grace_used_this_cycle reset on qualifying session | Streak Worker always writes `grace_used_this_cycle = FALSE` alongside `current_streak += 1` |
+| Immutable grace history | `streak_grace_events` rows never deleted or updated by non-admin roles |
+
+**Regression test (must pass in CI):**
+```sql
+-- Scenario: user trains Mon, misses Tue, trains Wed → grace applied; streak preserved
+-- Setup: last_activity_date = Mon, grace_used_this_cycle = FALSE, current_streak = 5
+-- Action: workout_sessions row inserted for Wed
+-- Expected: current_streak = 6, grace_used_this_cycle = TRUE, streak_grace_events has 1 new row for Tue
+
+-- Scenario: user trains Mon, misses Tue (grace), misses Wed → streak resets
+-- Setup: last_activity_date = Mon, grace_used_this_cycle = TRUE (grace from prior cycle reused)
+-- Wait, grace_used_this_cycle was just set TRUE after Mon→Tue grace... but user hasn't trained Wed.
+-- No workout for Wed → DATEDIFF(Thu, Mon) = 3 (or checking at Wed: DATEDIFF(Wed, Mon) = 2, grace = TRUE → RESET)
+-- Expected: current_streak = 0, gamification.streak_reset emitted carrying previous_streak = 6
+```
+
+The full test suite is in `__tests__/db/gamification_streak.test.ts` (§22.16 task 5).
+
+### 22.11 DEC-030 HMAC-Chained Audit Events
+
+| Event type | Severity | Retention | Trigger |
+|---|---|---|---|
+| `gamification.streak_started` | STANDARD | 3 years | `current_streak` transitions from 0 → 1 (new streak) |
+| `gamification.streak_grace_applied` | STANDARD | 3 years | Grace applied; streak preserved across 1 missed day |
+| `gamification.streak_reset` | STANDARD | 3 years | Streak resets to 0; payload includes `previous_streak` count |
+| `gamification.streak_milestone` | STANDARD | 3 years | `current_streak` reaches {7, 14, 30, 60, 90, 180, 365}; payload includes `milestone_days` |
+| `gamification.pr_set` | STANDARD | 3 years | New `personal_records` row inserted; payload includes `exercise_slug`, `metric`, `value`, `improvement_pct` |
+| `gamification.achievement_earned` | STANDARD | 3 years | New `user_achievements` row inserted; payload includes `achievement_key`, `tier`, `category` |
+
+**Payload schema (all events):**
+```json
+{
+  "event_type": "gamification.streak_grace_applied",
+  "user_id": "<uuid>",
+  "tenant_id": "<uuid>",
+  "timestamp": "2026-05-29T14:23:00Z",
+  "payload": {
+    "missed_date": "2026-05-28",
+    "streak_count_at_grace": 14,
+    "workout_session_id": "<uuid>"
+  }
+}
+```
+
+Events are emitted **within the same database transaction** as the streak state update, using the DEC-030 HMAC-chaining function from `docs/AUDIT_LOG_SCHEMA.md`. If the transaction rolls back, no event is emitted.
+
+### 22.12 GDPR Art. 17 Erasure
+
+On user hard-delete (§12 erasure Worker), the following sequence is executed for gamification data. No special retention applies — all gamification data is personal and deleted immediately.
+
+```sql
+-- Erasure sequence for gamification (called within §12 erasure Worker)
+-- Step order: achievements → grace_events → personal_records → user_streaks
+
+-- 1. user_achievements
+DELETE FROM user_achievements WHERE user_id = $1;
+-- emit coaching.memory_deleted analog: gamification.achievements_erased (CRITICAL, 7yr DEC-030 event)
+
+-- 2. streak_grace_events (immutable normally; erasure via form_admin BYPASSRLS)
+DELETE FROM streak_grace_events WHERE user_id = $1;
+
+-- 3. personal_records
+DELETE FROM personal_records WHERE user_id = $1;
+
+-- 4. user_streaks
+DELETE FROM user_streaks WHERE user_id = $1;
+
+-- CASCADE: all four tables have ON DELETE CASCADE on user_id → users(id),
+-- so a direct users DELETE would also cascade. The explicit sequence above is
+-- used to emit per-table DEC-030 events and confirm each step before proceeding.
+```
+
+**Note:** `achievement_definitions` is not user data; no erasure action required.
+
+### 22.13 Tenant Admin Reporting (Privacy Floor)
+
+Per DEC-002 and §17 (Enterprise Admin Reporting Schema), **tenant admins never see individual streak lengths, grace usage counts, or personal records in identified form**. If aggregate reporting is added (e.g., "% of team with active streaks"), it must:
+
+- Pass through the §17 aggregate view layer
+- Meet the k-anonymity floor (minimum cohort size ≥ 5 per §17.3)
+- Emit a `gamification.admin_aggregate_query` DEC-030 event
+
+Currently, no aggregate gamification views are defined. This is explicitly deferred per OQ-GAM-02 (§22.14).
+
+### 22.14 Open Questions
+
+| # | Question | Owner | Priority |
+|---|---|---|---|
+| OQ-GAM-01 | What qualifies as a "streak day"? Default: any `workout_sessions.completed_at IS NOT NULL`. Future option: minimum N sets completed, or minimum session duration. Requires product-manager + sports-scientist alignment before streak engine ships. | `product-manager` + `sports-scientist` | **P0 — before streak engine ships** |
+| OQ-GAM-02 | Should aggregate gamification metrics (% team with active streak, average PR improvement) be exposed in the tenant admin dashboard? Default: NO (privacy floor + DEC-002). If yes: requires §17 aggregate view layer + k-anonymity gate + DEC-030 audit event + clinical-safety review. | `enterprise-architect` + `clinical-safety` | **P2 — after beta cohort data available** |
+| OQ-GAM-03 | External achievement sharing (e.g., "share my 30-day streak to Instagram"): blocked by DEC-029 (clinical-safety gate on external sharing). If introduced: clinical-safety review required; achievement share must not display body-composition or injury-related context. | `clinical-safety` + `product-strategist` | **P2 — out of scope until post-launch** |
+| OQ-GAM-04 | Streak timezone edge case: user travels across the date-line during an active streak. Current design uses `user_profile.timezone` which is static. If user updates timezone mid-streak, the streak engine must re-evaluate the last_activity_date in the new timezone. Implementation detail deferred to streak Worker design. | `platform-engineer` | **P1 — before streak engine ships** |
+| OQ-GAM-05 | Should `personal_records` include e1RM estimates (Epley/Brzycki formulas applied to multi-rep sets) or only tested maxima? Default: include e1RM with `context.e1rm_formula` field and `context.reps_used` to allow consumers to evaluate reliability. Display note: UI should surface e1RM estimates with confidence indicator when `reps_used > 3`. | `platform-engineer` + `sports-scientist` | **P1 — before PR engine ships** |
+
+### 22.15 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | How §22 Satisfies It |
+|---|---|
+| **CC6.1 — Logical access** | RLS restricts all gamification tables to own-user rows for `form_api`. No cross-user or cross-tenant read paths exist. `achievement_definitions` is read-only for non-admin roles. |
+| **CC6.2 — Access controls prior to issuing** | `form_api` cannot write `user_achievements` directly; the achievement engine runs as `form_system`, preventing self-award exploits. `achievement_definitions` is form_admin-only write, preventing key injection. |
+| **CC7.2 — System monitoring** | `gamification.streak_reset` and `gamification.pr_set` events in the HMAC-chained audit log enable anomaly detection (e.g., impossible PR values, streak counter jumps without qualifying sessions). OBSERVABILITY.md §22 coaching quality panel can be extended for gamification anomaly alerting. |
+| **CC8.1 — Change management** | All gamification mutations are HMAC-chained in-transaction. `achievement_definitions` changes require form_admin and produce `gamification.*` events with `entity_type: 'achievement_definitions'`. The append-only constraint on `streak_grace_events` and `user_achievements` is enforced at the RLS layer — no accidental retroactive modification. |
+| **P4.0 / P5.0 — Privacy inquiries and requests** | GDPR Art. 17 erasure sequence (§22.12) ensures complete deletion of all gamification personal data. The four-step explicit sequence with DEC-030 events per table provides auditor evidence of erasure completeness. |
+
+**Auditor evidence artefacts:**
+- `user_streaks` table export with `updated_at` covering observation period, confirming streak state changes correspond to `workout_sessions.completed_at`
+- `streak_grace_events` table export for observation period: verify no user has more than 1 grace per streak cycle
+- `audit_log_events` filtered on `gamification.*` event types, HMAC chain verified
+- `__tests__/db/gamification_streak.test.ts` CI run output (DEC-013 regression tests)
+
+### 22.16 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create `migrations/YYYYMMDD_user_streaks.sql` — `user_streaks` DDL, indexes, `update_updated_at_column()` trigger, `chk_streak_longest` constraint, RLS policies from §22.8 | `platform-engineer` | **P0** | M3 |
+| 2 | Create `migrations/YYYYMMDD_streak_grace_events.sql` — `streak_grace_events` DDL, indexes, RLS policies | `platform-engineer` | **P0** | M3 |
+| 3 | Create `migrations/YYYYMMDD_personal_records.sql` — `personal_records` DDL, `pr_metric` type, indexes, RLS policies | `platform-engineer` | **P0** | M3 |
+| 4 | Create `migrations/YYYYMMDD_achievement_tables.sql` — `achievement_definitions` DDL (types, constraints, seed data from §22.6), `user_achievements` DDL, indexes, RLS policies | `platform-engineer` | **P0** | M3 |
+| 5 | Write `__tests__/db/gamification_streak.test.ts` — DEC-013 regression tests: (a) single miss → grace applied, streak preserved; (b) double miss → reset; (c) grace_used_this_cycle reset on next session; (d) timezone edge case (UTC midnight boundary); (e) longest_streak invariant. Add to CI gating. | `qa-lead` + `platform-engineer` | **P0** | M3 |
+| 6 | Implement streak engine Worker `src/workers/gamification/streak-engine.ts`: invoked on every `workout_sessions.completed_at` update; computes gap, applies grace or reset per §22.2 state machine; emits all DEC-030 events in-transaction | `platform-engineer` | **P0** | M3 |
+| 7 | Implement PR engine Worker `src/workers/gamification/pr-engine.ts`: on workout-completion, evaluate sets in the session against `personal_records` current best; INSERT new row if PR; emit `gamification.pr_set` DEC-030 event; resolve OQ-GAM-05 (e1RM formula choice) before shipping | `platform-engineer` + `sports-scientist` | **P0** | M4 |
+| 8 | Implement achievement engine Worker `src/workers/gamification/achievement-engine.ts`: triggered after streak-engine and PR-engine complete; checks `achievement_definitions` against current state; INSERTs into `user_achievements` for any newly qualifying achievements; emits `gamification.achievement_earned` DEC-030 events | `platform-engineer` | **P1** | M4 |
+| 9 | Add gamification erasure steps to §12 erasure Worker (`src/workers/gdpr/erasure.ts`): explicit four-step sequence from §22.12 with per-step DEC-030 events; add `gamification.achievements_erased` and `gamification.prs_erased` event types to `AUDIT_LOG_SCHEMA.md` | `platform-engineer` + `compliance-officer` | **P0** | M3 |
+| 10 | Register all 6 `gamification.*` DEC-030 event types (§22.11) in `docs/AUDIT_LOG_SCHEMA.md` event registry; add severity, retention tier, and `entity_type: 'gamification'` label | `compliance-officer` | **P0** | M3 |
+| 11 | Wire streak milestones ({7, 14, 30, 60, 90, 180, 365}) into streak Worker; emit `gamification.streak_milestone` event with `milestone_days` payload; dedup: only emit once per milestone per streak cycle (not on re-earn of same milestone in new cycle — OQ-GAM-01 clarification needed on whether re-earned milestones re-emit) | `platform-engineer` | **P1** | M4 |
+| 12 | Add RLS cross-tenant isolation tests for gamification tables to `__tests__/db/rls_isolation.test.ts`; verify no cross-user PR leakage, no achievement fabrication from form_api role | `enterprise-architect` | **P0** | M3 |
+
+---
+
+*v1.2 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer*
+
+*v1.2 additions: §22 Gamification, Streak & Achievement Schema — closes the data-layer gap for DEC-013 (streak grace after 2 consecutive misses, not 1) and formalises personal record and achievement storage. Five-table schema: `user_streaks` (current_streak, longest_streak, streak_start_date, last_activity_date, grace_used_this_cycle, total_grace_uses; `chk_streak_longest` invariant constraint), `streak_grace_events` (append-only grace history; no UPDATE/DELETE RLS for non-admin), `personal_records` (PR series per user × exercise × metric; `pr_metric` ENUM with 5 metrics; current best via `DISTINCT ON` query; e1RM estimates with formula attribution in context JSONB), `achievement_definitions` (form_admin-only write; dotted namespace key; soft-archive via `is_active`; 19-item seed catalog across 5 categories and 4 tiers), `user_achievements` (form_system INSERT only; append-only by convention; UNIQUE index preventing same achievement twice in one calendar day). DEC-013 compliance: streak grace state machine documented with 4 transition paths; grace_used_this_cycle flag enforces at-most-one grace per streak cycle; DEC-013 invariant table with enforcement locations; CI regression test specification (`__tests__/db/gamification_streak.test.ts`). RLS: `form_api` own-row read/update on streaks; no direct form_api insert on grace_events or user_achievements (streak Worker and achievement engine run as form_system); `tenant_admin` has zero access to all gamification tables (DEC-002 compliance). DEC-030 HMAC-chained events: 6 event types across streak and achievement lifecycle (gamification.streak_started, streak_grace_applied, streak_reset, streak_milestone, pr_set, achievement_earned); all STANDARD severity, 3-year retention; emitted in-transaction. GDPR Art. 17: explicit four-step erasure sequence (achievements → grace_events → prs → streaks) with per-table DEC-030 events; ON DELETE CASCADE as safety net. Tenant admin privacy floor: zero aggregate gamification views defined; any future admin reporting requires §17 aggregate layer + k-anonymity ≥ 5 + clinical-safety gate per OQ-GAM-02. SOC 2 mapping: CC6.1 (own-row RLS), CC6.2 (no self-award exploit), CC7.2 (audit log anomaly detection on impossible PRs), CC8.1 (HMAC-chained mutations, append-only grace/achievement tables), P4.0/P5.0 (Art. 17 erasure evidence). 5 open questions (OQ-GAM-01 through OQ-GAM-05); OQ-GAM-01 (streak qualifying session definition) and OQ-GAM-04 (timezone edge case) are P0 before streak engine ships. 12-item implementation checklist (8× P0 M3, 3× P1 M4, 1× P0 M3 erasure). Table of Contents updated to include §22.*
+
+*v1.1 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer*
+
+*v1.1 additions: §20 White-Label Tenant Branding Schema — closes the §2.7 stub gap across all cross-references (§15 `cv.client_side_enabled`, §18 `webhook.email_in_payloads`, SSO_SCIM_IMPLEMENTATION.md `security.ip_allowlist_enabled` and `sso.staging_env_enabled`). Two-table design: `feature_flag_registry` (canonical allowlist, form_admin-only write, FK-enforced dotted namespace, `flag_key_namespace` CHECK constraint) and `tenant_feature_flags` (production per-tenant rows with FK to registry, `compliance_approval_ref`, `enabled_at`, RLS read-only for form_api and form_system). Seed data for 14 canonical flags across Starter / Growth / Enterprise tiers with one compliance-gated flag (`webhook.email_in_payloads`). Tier entitlement matrix (auto / avail / — / gate). TypeScript `assertFeatureEnabled()` in `src/workers/feature-flags/assert-feature-enabled.ts`: Cloudflare KV 30-second cache, tier rank comparison against TIER_ORDER map, compliance gate check, fail-closed on any DB or KV error (throws 403). Four DEC-030 HMAC-chained audit events: `feature_flag.enabled` (STANDARD, 7yr), `feature_flag.disabled` (STANDARD, 7yr), `feature_flag.registry_updated` (HIGH, 7yr), `feature_flag.compliance_gate_bypassed` (CRITICAL, 10yr — auto PagerDuty P1, always `blocked: true`). Compliance gate protocol: DPA authorisation → DECISION_LOG PR merge → compliance_approval_ref populated → form_admin enables via internal API → DEC-030 event with approval reference. §19.9 migration script: 14 flag_name-to-flag_key renames, RAISE EXCEPTION abort on unrecognised flags, FK constraint addition, `enabled_at` backfill from `updated_at`, `compliance_approval_ref` column addition, post-migration validation queries (zero unrecognised flags; zero enabled gated flags without approval ref). OQ-FLAG-01: tier downgrade auto-disable decision (preferred: contract lifecycle hook emitting feature_flag.disabled events, M5). OQ-FLAG-02: flag deprecation 90-day sunset policy with pg_cron soft-delete and admin dashboard banner (M6). SOC 2 mapping: CC6.1 (form_admin-only write, tier entitlement gates), CC6.2 (tier check = authorisation gate, plan not self-elevatable), CC8.1 (all mutations HMAC-chained in-transaction), CC9.2 (compliance_approval_ref persisted 7yr, auditor-traceable to DPA clause). 12-item implementation checklist (8× P0 M3, 1× P1 M4, 1× P1 M5, 1× P2 M6).*

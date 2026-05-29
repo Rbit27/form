@@ -6,6 +6,16 @@
 
 ---
 
+## [1.17.0] — 2026-05-29
+
+### Added
+- `docs/DATA_MODEL.md §22` — Gamification, Streak & Achievement Schema. Closes the data-layer gap for DEC-013 (streak grace after 2 consecutive misses, not 1) and formalises personal record and achievement storage. Five-table schema: `user_streaks` (current_streak, longest_streak, streak_start_date, last_activity_date, grace_used_this_cycle, total_grace_uses; `chk_streak_longest` invariant constraint), `streak_grace_events` (append-only grace history; no UPDATE/DELETE RLS for non-admin), `personal_records` (PR series per user × exercise × metric; `pr_metric` ENUM with 5 metrics; current-best via `DISTINCT ON`; e1RM estimates with formula attribution in context JSONB), `achievement_definitions` (form_admin-only write; dotted-namespace key; soft-archive via `is_active`; 19-item seed catalog across 5 categories and 4 tiers), `user_achievements` (form_system INSERT only; UNIQUE index preventing same achievement twice in one calendar day). DEC-013 state machine: 4 transition paths fully specified; `grace_used_this_cycle` flag enforces at-most-one grace per cycle; DEC-013 invariant table with enforcement locations; CI regression test specification. RLS: `form_api` own-row read/update on streaks; no direct form_api insert on grace_events or user_achievements; `tenant_admin` zero access (DEC-002 compliance). DEC-030: 6 HMAC-chained event types (gamification.streak_started, streak_grace_applied, streak_reset, streak_milestone, pr_set, achievement_earned); STANDARD severity, 3-year retention; emitted in-transaction. GDPR Art. 17: explicit 4-step erasure sequence with per-table DEC-030 events; ON DELETE CASCADE safety net. Privacy floor: zero aggregate gamification views; any future admin reporting requires §17 aggregate layer + k-anonymity ≥ 5 + clinical-safety gate (DEC-029). SOC 2: CC6.1, CC6.2, CC7.2, CC8.1, P4.0/P5.0. 5 open questions (OQ-GAM-01 through OQ-GAM-05). 12-item implementation checklist (8× P0 M3, 3× P1 M4, 1× P0 M3 erasure). Data model version bump v1.1 → v1.2. ToC updated.
+
+### Changed
+- `VERSION` → 1.17.0
+
+---
+
 ## [1.16.6] — 2026-05-29
 
 ### Changed
