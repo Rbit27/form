@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 98 cards (104 content posts authored), category filter, newsletter CTA | v1.16.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 99 cards (138 content posts authored), category filter, newsletter CTA | v1.16.5 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -216,6 +216,13 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-129-bone-adaptation-strength-training.md | Blog | draft · clinical-safety PASS |
 | post-130-tendon-adaptation-loading.md | Blog | draft · clinical-safety PASS |
 | post-131-circadian-training-timing.md | Blog | draft · clinical-safety PASS |
+| post-132-bilateral-deficit.md | Blog | draft · clinical-safety PASS |
+| post-133-foam-rolling-myofascial-release.md | Blog | draft · clinical-safety PASS |
+| post-134-training-age-adaptation-ceiling.md | Blog | draft · clinical-safety PASS |
+| post-135-lateral-strength-asymmetry.md | Blog | draft · clinical-safety PASS |
+| post-136-spinal-reflex-chains-inhibition.md | Blog | draft · clinical-safety PASS |
+| post-137-mtorc1-signaling-cascade.md | Blog | draft · clinical-safety PASS |
+| post-138-satellite-cells-myonuclear-domain.md | Blog | draft · clinical-safety NOT REQUIRED |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

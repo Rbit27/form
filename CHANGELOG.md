@@ -6,6 +6,17 @@
 
 ---
 
+## [1.16.5] — 2026-05-29
+
+### Added
+- `content/post-138-satellite-cells-myonuclear-domain.md` — Satellite cells і міоядерний домен: PAX7+/MYOD1+ активаційний каскад (HGF, FGF-2, MGF), міоядерний домен ~1500–2000 μm³ (Cheek 1985, Kadi & Thornell 2000), responders vs non-responders (Bamman 2003, Petrella 2006/2008), Bruusgaard et al. (2010 PNAS) — міоядра персистують після атрофії, McCarthy et al. (2011 PNAS) — satellite cell-незалежна гіпертрофія до певної межі, Seaborne et al. (2018 Sci Rep) — епігенетичний відбиток тренінгу, 5 практичних наслідків для ексцентрики, close-to-failure, повернення після паузи. clinical-safety NOT REQUIRED.
+- `blog.html` — картка post-138 (Satellite cells і міоядерний домен)
+- `README.md` — post-138 позначений [x]; нові roadmap-записи post-139–142 додані
+- `STATUS.md` — рядки post-132–138 додані до content engine table; blog.html рахунок оновлено до 99 карток / 138 постів
+- `VERSION` → 1.16.5
+
+---
+
 ## [1.16.4] — 2026-05-29
 
 ### Added
