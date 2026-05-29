@@ -6,6 +6,19 @@
 
 ---
 
+## [1.14.0] — 2026-05-29
+
+### Added
+- `content/post-131-circadian-training-timing.md` — Циркадна біологія і тренувальний тайминг. CLOCK/BMAL1-петля і Clock-генова регуляція мітохондрій (PGC-1α, Peek et al. 2013 Cell); добова варіація сили ~3–8% (Atkinson & Reilly 1996); mTORC1 і циркадна трансляційна активність рибосом (Jouffe et al. 2013, Cell Metabolism); хронотип MSFsc (Roenneberg 2003–2006); соціальний джетлаг і здоров'я; Clock-зсув від тренування (Wolff & Esser 2012 PNAS); ранкові компроміси (спінальна декомпресія McGill 1990); вечірні тренування і сон (Myllymäki 2011); матриця вибору часу тренування за хронотипом і типом роботи. clinical-safety PASS.
+
+### Changed
+- `README.md` — content roadmap: post-130 і post-131 відмічені як виконані.
+- `blog.html` — додано картку post-131 «Циркадна біологія і тренувальний тайминг».
+- `STATUS.md` — content engine table: додано рядки post-130, post-131.
+- `VERSION` → 1.14.0
+
+---
+
 ## [1.13.0] — 2026-05-28
 
 ### Added

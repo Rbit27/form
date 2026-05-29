@@ -214,6 +214,8 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-127-stretch-shortening-cycle-titin.md | Blog | draft · clinical-safety PASS |
 | post-128-motor-unit-synchronization-rate-coding.md | Blog | draft · clinical-safety PASS |
 | post-129-bone-adaptation-strength-training.md | Blog | draft · clinical-safety PASS |
+| post-130-tendon-adaptation-loading.md | Blog | draft · clinical-safety PASS |
+| post-131-circadian-training-timing.md | Blog | draft · clinical-safety PASS |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
