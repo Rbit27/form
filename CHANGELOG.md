@@ -6,6 +6,17 @@
 
 ---
 
+## [1.17.5] — 2026-05-29
+
+### Added
+- `docs/SOC2_READINESS.md §40` — Media, Device & Secrets Disposal Policy (C1.2 Auditor Exhibit): device classification A–E (laptop/iPhone/USB/BYOD/cloud), NIST 800-88 Rev 1 sanitization (Cryptographic Erase for Apple Silicon, 3-pass for Intel T2-less), 10-step offboarding with 24h revocation SLA, BYOD permitted/prohibited policy, enterprise tenant data destruction 7-step (Day 0–30), Backblaze B2 Cryptographic Erase via key rotation, device disposal log spec (C1-E-008), four DEC-030 events. Gap advances: C1-GAP-004 🔴→🟡 AUTHORED, CC1-GAP-001 🔴→🟡 AUTHORED (docs/ACCEPTABLE_USE_POLICY.md v1.0 confirmed), P0 count 13→12.
+
+### Changed
+- `docs/SOC2_READINESS.md §38.4` — gap registry: CC1-GAP-001 🔴→🟡, C1-GAP-004 🔴→🟡; gap summary P0 count updated 13→12
+- `VERSION` → 1.17.5
+
+---
+
 ## [1.17.4] — 2026-05-29
 
 ### Added

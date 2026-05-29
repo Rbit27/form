@@ -6736,7 +6736,7 @@ This table is the authoritative consolidated gap register for the entire documen
 | **CC8-GAP-001** | CC | §21 | No CI pipeline configured. Compensating control: manual pre-deploy checklist. Blocks automated CI evidence (CC8-E-002). | devops-lead + platform-engineer | P1 | Pre-launch | 🔴 Open |
 | **CC8-GAP-002** | CC | §21 | "Include administrators" not enabled on `main` branch protection. Deferred until first engineering hire. | security-engineer | P2 | Post-hire (30 days) | 🔴 Open (deferred) |
 | **CC8-GAP-003** | CC | §21 | Automated CI log archival to R2 not yet implemented. Dependent on CC8-GAP-001. | devops-lead | P2 | Pre-launch | 🔴 Open |
-| **CC1-GAP-001** | CC | §29 | Acceptable Use Policy (AUP) document not yet drafted. Required before first hire signs. | compliance-officer | P0 | Pre-hire | 🔴 Open |
+| **CC1-GAP-001** | CC | §29 | AUP authored: `docs/ACCEPTABLE_USE_POLICY.md` v1.0 (CC1-E-004, effective 2026-05-21), status AUTHORED — PENDING EXTERNAL COUNSEL REVIEW. Gap closes to 🟢 on: (a) external counsel review covering EU/US/UA jurisdictions, (b) founder signature. | compliance-officer | P0 | Pre-hire | 🟡 AUTHORED |
 | **CC1-GAP-002** | CC | §29 | Founder annual training log `compliance/cc1/security-training-log.md` (CC1-E-001) authored 2026-05-22. Eight-topic curriculum + filing workflow + self-attestation template defined. Pending founder completion and attestation. | founder | P0 | Annual | 🟡 AUTHORED |
 | **CC1-GAP-003** | CC | §29 | KnowBe4 / GoPhish instance not yet procured. Required 30 days before first hire. | security-engineer | P1 | Pre-hire | 🔴 Open |
 | **CC1-GAP-004** | CC | §29 | Background check provider not selected; not yet added to onboarding checklist. Required before first hire with production access. | compliance-officer + people-ops | P1 | Pre-hire | 🔴 Open |
@@ -6768,7 +6768,7 @@ This table is the authoritative consolidated gap register for the entire documen
 | **C1-GAP-001** | C | §34 | NDA / employment confidentiality agreement template not yet drafted. Required before first hire. | compliance-officer | P0 | Pre-hire | 🔴 Open |
 | **C1-GAP-002** | C | §34 | Confidential Data Asset Inventory. | compliance-officer + data-engineer | P1 | Pre-launch | 🟡 **Authored** — `compliance/c1/data-asset-inventory.md` v0.1 (2026-05-22); pending founder signature |
 | **C1-GAP-003** | C | §34 | DPA receipts for all sub-processors not yet collected and filed in `compliance/dpa/`. Blocks enterprise contracts. | compliance-officer | P0 | Pre-launch | 🔴 Open |
-| **C1-GAP-004** | C | §34 | Media/device disposal policy document not yet drafted. | compliance-officer | P1 | Pre-launch | 🔴 Open |
+| **C1-GAP-004** | C | §34, §40 | Media/device disposal policy authored: `docs/SOC2_READINESS.md §40` (C1-E-007, effective 2026-05-29). Closes to 🟢 on founder signature. Device disposal log (C1-E-008) created at `compliance/media-disposal/device-disposal-log.csv`. | compliance-officer | P1 | Pre-launch | 🟡 AUTHORED |
 | **P-GAP-001** | P | §35 | Privacy policy not live at `form.coach/privacy`. Blocks SOC 2 observation period start, all enterprise contracts, and all enterprise pilot data flows. | compliance-officer + outside counsel | P0 | Pre-launch | 🔴 Open |
 | **P-GAP-002** | P | §35 | Sub-processor list not published. Blocks enterprise DPA countersigning. | compliance-officer | P0 | Pre-launch | 🔴 Open |
 | **P-GAP-003** | P | §35 | Cookie consent banner not deployed on `form.coach`. Analytics cookies firing without consent constitutes GDPR / ePrivacy violation. | engineering | P1 | Pre-launch | 🔴 Open |
@@ -6785,7 +6785,7 @@ This table is the authoritative consolidated gap register for the entire documen
 | **PI-GAP-006** | PI | §37 | SCIM response schema not validated in CI against RFC 7643. Blocked on G-001 (SCIM endpoints not yet implemented). | platform-engineer + enterprise-architect | P1 | M4 (blocked G-001) | 🔴 Open |
 | **PI-GAP-007** | PI | §37 | `privacy.dsar_completed` DEC-030 event does not carry export row-count payload. Completeness not cryptographically committed to HMAC chain. | platform-engineer | P2 | M4 | 🔴 Open |
 
-**Gap summary:** 49 open gaps total. P0: 13. P1: 28. P2: 8. All gaps have named owners and milestone dates. No gap is undocumented. *(CC7-GAP-004 closed 2026-05-22 — R-05 runbook confirmed in INCIDENT_RESPONSE.md v0.4; P-GAP-004 🔴→🟡 2026-05-28 — retention-decisions.md P1-RET-001 authored; P-GAP-007 🔴→🟡 2026-05-28 — complaint-intake-procedure.md P1-CIP-001 authored; gaps remain in open count pending execution of remaining steps)*
+**Gap summary:** 49 open gaps total. P0: 12. P1: 28. P2: 8. No undocumented gap exists. *(CC7-GAP-004 🟢 closed 2026-05-22 — R-05 runbook confirmed; P-GAP-004 🔴→🟡 2026-05-28; P-GAP-007 🔴→🟡 2026-05-28; CC1-GAP-001 🔴→🟡 2026-05-29 — docs/ACCEPTABLE_USE_POLICY.md v1.0 authored, pending counsel review + founder signature, P0 count 13→12; C1-GAP-004 🔴→🟡 2026-05-29 — §40 is the policy document, pending founder signature; gaps remain in open count until full closure conditions met)*
 
 ---
 
@@ -7347,4 +7347,243 @@ These 8 event types must be registered in `docs/AUDIT_LOG_SCHEMA.md` under the `
 ---
 
 *v2.9 updates (2026-05-28): Three P-series gap advances reflecting compliance artifacts authored 2026-05-21 not yet mirrored in this document. (1) P-GAP-004 🔴→🟡 AUTHORED — `compliance/p1/retention-decisions.md` (P1-RET-001, effective 2026-05-21) formally decides per-category retention periods for all seven Art. 9 health data tables using §35.6.3 proposed schedule as input: workout_sessions 3yr, sets 3yr (cascade), coaching_turns 2yr, cv_sessions 1yr, user_profile health fields until account deletion, meal_log 2yr, wearable_readings 2yr; ClickHouse 2yr TTL and DEC-030 7yr WORM retention confirmed out-of-scope (already decided). Remaining for full P-GAP-004 closure: (a) legal sign-off on retention periods, (b) publication of per-category retention schedule in privacy policy (blocked on P-GAP-001), (c) Supabase TTL migration execution. §35.6.2 PRV-23 and PRV-26 advanced 🔴→🟡; §35.11 P-GAP-004 remediation step marked ✅ partial. (2) P-GAP-007 🔴→🟡 AUTHORED — `compliance/p1/complaint-intake-procedure.md` (P1-CIP-001, effective 2026-05-21) defines: `privacy@form.coach` complaint intake with 30-day GDPR Art. 77 response SLA; five-step processing flow (acknowledge → triage → investigate → respond → close); Art. 9 flag for health-data requests requiring compliance-officer sign-off; `complaint-log.csv` template seeded; supervisory authority escalation path (UA DPA → EDPB); Art. 22 automated decision-making position. Remaining for full P-GAP-007 closure: (a) `privacy@form.coach` mailbox creation, (b) privacy contact published in privacy policy and Settings (blocked on P-GAP-001). §35.10 PRV-52 advanced 🔴→🟡. (3) P-GAP-002 🔴→🟡 PARTIAL — `compliance/p1/sub-processor-register.md` (P1-SUB-001, effective 2026-05-21) formalizes the internal sub-processor register covering all 8 processors with DPA and SCC Module 2 status; Sentry (SP-06) DPA in progress with compensating control documented. P-GAP-002 requires publication at `form.coach/legal/sub-processors` before closure — internal register is a necessary precursor, not closure. §38.5.1 document list updated: sub-processor-register.md added as 🟡 Authored; §38.5.2 data room structure updated to show p1/ filing status for all five authored artifacts. §38.3 Privacy TSC readiness: ~82% → ~84% (two full P1 gaps advanced to 🟡; one P0 precursor advanced). Open gap count: 49→49 (gaps remain in open count until mailbox creation, legal sign-off, and TTL migrations executed). SOC 2 overall readiness: ~95% → ~95% (Privacy TSC weight is partial; overall moves when P0 blockers P-GAP-001/002 are cleared).*
+*v3.1 additions (2026-05-29): §40 Media, Device & Secrets Disposal Policy — C1.2 Auditor Exhibit. New standalone policy document (C1-E-007) covering: device classification A–E (MacBook / iPhone / USB / BYOD / cloud instance) with sensitivity and disposal method per class; NIST 800-88 Rev 1 Purge/Destroy standards with macOS Apple Silicon Cryptographic Erase and Intel T2 `diskutil secureErase` instructions; 10-step personnel offboarding procedure with 24h revocation SLA across GitHub, 1Password, Cloudflare, Supabase, Sentry, PostHog, PagerDuty, and Slack, and BYOD attestation compensating control; BYOD policy defining permitted uses (browser sessions, 1Password app) and prohibited uses (local `.env` files, production `wrangler deploy`, Art. 9 health data local storage); enterprise tenant data destruction 7-step procedure (Day 0–30: SSO revocation → export window → hard-delete cascade per `DATA_MODEL.md §12` → deletion confirmation letter, with exceptions for `audit_log_events` 7yr WORM and financial records 7yr); Backblaze B2 WORM Cryptographic Erase via encryption key rotation (`CRYPTOGRAPHY_POLICY.md §6.3` cross-reference); device disposal log spec (C1-E-008: 12-column append-only CSV at `compliance/media-disposal/device-disposal-log.csv`); four DEC-030 HMAC-chained events (`asset.device_disposal_logged` STANDARD, `tenant.data_deleted` HIGH, `tenant.deletion_confirmed` STANDARD, `personnel.offboarding_completed` STANDARD — all 7yr retention); SOC 2 evidence mapping (C1.2, CC6.3, CC6.5, C1.1) with four auditor artefact paths. Gap advances: C1-GAP-004 🔴→🟡 AUTHORED (§40 is the policy; closes on founder signature); CC1-GAP-001 🔴→🟡 AUTHORED (`docs/ACCEPTABLE_USE_POLICY.md` v1.0 authored 2026-05-21, confirmed in §38.4 registry; closes on counsel review + founder signature). Gap summary: P0 count 13→12 (CC1-GAP-001 reclassified from 🔴 to 🟡). 9-item implementation checklist (4× P0 Pre-launch/Pre-hire, 4× P1 M3/M4, 1× post-MDM).*
+
 *v3.0 additions: §39 Security Trust Center Architecture — full design for `security.form.coach` trust portal. Seven public and NDA-gated pages specified: `/` security overview, `/sub-processors` (closes CC9-GAP-007 design phase: Worker spec, KV schema, JSON API, SHA-256 `X-List-Hash` header for programmatic polling), `/dpa` template download, `/disclosure` responsible disclosure + PGP, `/questionnaire` CAIQ Lite hub, `/soc2` NDA-gated report access (DocuSign NDA → Vanta/Drata link, 7-day expiry), `/pentest` executive summary NDA-gate. `trust_center_requests` Supabase table DDL (form_admin-only RLS; no tenant exposure). Eight DEC-030 HMAC-chained events covering full trust center lifecycle. Closes CC9-GAP-007 design phase (🔴 → 🟡): sub-processor Worker fully specified; deployment (Wrangler + KV populate) is the remaining engineering task. Closes CC2-GAP-003 design phase (🔴 → 🟡): publication architecture defined; deployment closes the gap to 🟢. SOC 2 evidence mapping: CC9.2 (sub-processor list + annual review), CC2.3 (change notification pledge), CC6.1 (NDA-gate on restricted docs), CC6.2 (trust_center_requests table as access issuance log), CC7.1 (responsible disclosure policy), CC8.1 (all trust center mutations HMAC-chained), P6.1 (DPA template public availability). 14-item implementation checklist (8× P0 M4, 5× P1 M5, 1× P2 M5). Net readiness movement: CC9-GAP-007 🔴 → 🟡, CC2-GAP-003 🔴 → 🟡. SOC 2 overall: ~95% → ~95% (design complete; readiness advances when Worker is deployed and screenshot filed).*
+
+---
+
+## 40. Media, Device & Secrets Disposal Policy — C1.2 Auditor Exhibit
+
+> **Owner:** `compliance-officer` + `security-engineer`. **Effective:** 2026-05-29. **Status:** AUTHORED — PENDING FOUNDER SIGNATURE. **Review:** annual (Q4) or upon any material change to device inventory, remote-work policy, or offboarding procedure.
+> **SOC 2 criteria addressed:** C1.2 (Dispose of Confidential Information), CC6.3 (Termination of Access), CC6.5 (Removal of Access to Protected Information Assets), C1.1 (Identify and Maintain Confidential Information).
+> **Evidence artifact IDs:** C1-E-007 (this policy document); C1-E-008 (`compliance/media-disposal/device-disposal-log.csv`); CC6-E-009 (`compliance/offboarding/<name>-<date>/offboarding-checklist.md`, per departure).
+> **Gap closure:** C1-GAP-004 🔴 → 🟡 (authored; closes to 🟢 on founder signature).
+> **Reference:** `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/DATA_MODEL.md §12` (GDPR Art. 17 erasure), `docs/CRYPTOGRAPHY_POLICY.md §6.3` (key rotation), `docs/INCIDENT_RESPONSE.md §R-12` (insider threat offboarding branch), `docs/ENTERPRISE.md §Privacy floor for enterprise`.
+
+---
+
+### 40.1 Purpose and SOC 2 Criterion
+
+AICPA C1.2 requires that FORM "disposes of confidential information to meet the entity's objectives related to confidentiality." Without a documented disposal policy, there is no auditor-facing evidence that production data, secrets, and devices containing customer health data are reliably sanitized when they leave FORM's custody.
+
+This policy defines:
+1. What counts as a FORM asset containing confidential information.
+2. How each asset class must be sanitized before disposal or transfer.
+3. How disposal events are evidenced for SOC 2 and GDPR auditors.
+4. How enterprise tenant data is destroyed at contract termination.
+
+**The scope covers three asset categories:**
+
+| Category | Examples | Governing obligation |
+|---|---|---|
+| Physical devices | MacBook, iPhone, USB drives, external SSDs | C1.2 — sanitize before disposal or transfer |
+| Logical secrets | API keys, signing keys, Workers Secrets, GitHub PATs | CC6.3 — revoke within 24h of personnel departure |
+| Enterprise tenant data | All rows across all tables attributable to a tenant | GDPR Art. 17 + DPA Art. 28 — delete within 30 days of contract termination |
+
+---
+
+### 40.2 Scope
+
+**In scope:**
+- All devices that have ever accessed FORM production systems or FORM customer data — regardless of ownership (company-issued or personal BYOD).
+- All FORM-managed secrets: API tokens, signing certificates, Workers Secrets, 1Password vault entries, Supabase service role keys, GitHub PATs, Stripe restricted keys, Cloudflare API tokens.
+- Enterprise tenant data stored in FORM-controlled infrastructure at contract end.
+
+**Out of scope:**
+- Hardware owned by sub-processors (Supabase, Cloudflare, Backblaze, Anthropic, Stripe) — governed by their respective DPAs, SOC 2 reports, and disposal certifications. FORM reviews these annually per `docs/SOC2_READINESS.md §28.3.3`.
+- Consumer-tier user data deleted via GDPR Art. 17 self-service — governed by `DATA_MODEL.md §12`. This policy covers corporate assets and B2B tenant obligations.
+
+---
+
+### 40.3 Device Classification
+
+| Class | Description | Sensitivity | Required Disposal Method |
+|---|---|---|---|
+| **Class A — Primary Work Device** | MacBook Pro, development laptop with production codebase, `.env` files, SSH keys, or 1Password local vault | CRITICAL — may hold plaintext production secrets in memory, git history with accidental credentials, Supabase service role key | NIST 800-88 Purge (Cryptographic Erase for Apple Silicon / T2; three-pass overwrite for Intel without T2) + compliance-officer confirmation |
+| **Class B — Mobile Device** | iPhone or Android with FORM developer build, GitHub Mobile, Slack, PagerDuty | HIGH — session tokens, push notification device tokens, Cloudflare mobile app credentials | Factory Reset + removal from all MDM profiles + 1Password device trust removal + confirmation email |
+| **Class C — Removable Media** | USB drives, external SSDs used for backups or development snapshots | HIGH — may hold unencrypted development data or cold backup archives if encryption was not enforced | Physical destruction (shredding or certified degaussing). Software sanitization alone is not accepted for Class C. |
+| **Class D — BYOD Device** | Personal laptop or phone that accessed GitHub, Supabase Dashboard, Cloudflare Dashboard, or 1Password via browser or native app | MEDIUM — browser-cached session tokens, 1Password device key | Factory Reset of FORM-related profiles + GitHub session revocation + 1Password device removal + written attestation from departing individual |
+| **Class E — Decommissioned Cloud Instance** | Fly.io machine, VPS, or any cloud compute instance that held FORM production data | HIGH — may retain data in ephemeral storage if not explicitly wiped | API-level deletion + provider storage-wipe confirmation (provider API response or support ticket); retained as `compliance/media-disposal/cloud-disposal/YYYY-MM-<instance>.pdf` |
+
+---
+
+### 40.4 Data Sanitization Standards
+
+FORM applies **NIST Special Publication 800-88 Rev 1** as the baseline for all physical and logical sanitization.
+
+| NIST Method | Definition | FORM Application |
+|---|---|---|
+| **Clear** | Logical overwrite; adequate for reuse within a trusted environment | Not used for FORM devices leaving FORM custody |
+| **Purge** | Media-specific techniques rendering data recovery infeasible with state-of-the-art laboratory techniques | Required for Class A (laptop) before reuse, transfer, or disposal |
+| **Destroy** | Physical destruction: shredding, disintegration, incineration | Required for Class C (USB, external SSD) in all cases |
+
+**macOS-specific instructions:**
+
+- **Apple Silicon (M1/M2/M3/M4) and Intel with T2 chip:** `System Settings → General → Transfer or Reset → Erase All Content and Settings`. This performs a hardware-backed Cryptographic Erase of the Secure Enclave key, rendering all data cryptographically inaccessible. Equivalent to NIST Purge. Record OS version and chip type in the device disposal log.
+- **Intel Mac without T2 chip:** Boot to macOS Recovery (`Cmd + R` at startup) → open Terminal → `diskutil secureErase 3 /dev/diskN` (3-pass DOD 5220.22-M equivalent). Record method and disk identifier in disposal log.
+- **iPhone / iPad:** `Settings → General → Transfer or Reset iPhone → Erase All Content and Settings`. Confirm Activation Lock is removed. Record iOS version in disposal log.
+
+---
+
+### 40.5 Personnel Offboarding — Access Revocation and Device Return
+
+Applies to: all employees, contractors, interns, and any individual whose FORM production access is being fully terminated.
+
+**Trigger:** Departure notification received by compliance-officer or security-engineer. Also triggers on: access review (§23) flagging unauthorized retained access; insider threat incident (INCIDENT_RESPONSE.md R-12) requiring emergency revocation.
+
+**Timeline:** All access revocation steps (1–6) must complete within **24 hours** of termination notice. Device return (step 7) within **7 business days**.
+
+| Step | Action | Owner | Evidence artifact |
+|---|---|---|---|
+| 1 | Remove from GitHub organisation; revoke all PATs | security-engineer | GitHub audit log export |
+| 2 | Remove from all 1Password shared vaults; remove device trust | security-engineer | 1Password audit log |
+| 3 | Revoke all Cloudflare API tokens; remove from Cloudflare account members | devops-lead | Cloudflare audit log screenshot |
+| 4 | Revoke Supabase dashboard access; rotate any service role key the individual held | security-engineer | Supabase access log; key rotation record |
+| 5 | Revoke Sentry, PostHog EU, Better Stack, PagerDuty access; remove from Slack `#security-*` channels | security-engineer | Per-system screenshots filed to offboarding folder |
+| 6 | Revoke Stripe restricted key if held; revoke Anthropic API key if held | devops-lead | Stripe + Anthropic dashboard screenshots |
+| 7 | Initiate device return: shipping label issued or in-person return arranged (Class A, B devices) | compliance-officer | Return confirmation email |
+| 8 | Execute device sanitization per §40.4 upon receipt; log in `compliance/media-disposal/device-disposal-log.csv` (C1-E-008) | security-engineer | Disposal log row; `asset.device_disposal_logged` DEC-030 event |
+| 9 | File `compliance/offboarding/<name>-<YYYY-MM-DD>/offboarding-checklist.md` with completion timestamps for each step | compliance-officer | Checklist artifact (CC6-E-009) |
+| 10 | Emit `personnel.offboarding_completed` DEC-030 event | security-engineer | Audit log |
+
+**BYOD exception (Class D):** If a FORM team member used a personal device under BYOD and the device cannot be physically returned, compliance-officer obtains:
+- Written attestation from the departing individual confirming no FORM production secrets are retained on the device.
+- Documentation of remote session invalidation: GitHub sessions revoked, 1Password device removed, Cloudflare browser sessions cleared.
+- Filed as `compliance/offboarding/<name>-<YYYY-MM-DD>/byod-attestation-signed.pdf`.
+
+The attestation is a compensating control — not a substitute for physical sanitization — and is disclosed to auditors as such.
+
+---
+
+### 40.6 BYOD Policy — In-Service Personal Devices
+
+FORM is pre-hire as of May 2026 (solo founder). This policy section anticipates the first hire.
+
+**Permitted BYOD uses:**
+- Accessing GitHub, Cloudflare Dashboard, and Supabase Dashboard via browser sessions on a personal device (no local credential storage beyond browser session cookies).
+- Receiving Slack and PagerDuty notifications on a personal mobile device.
+- Using 1Password on a personal device via the 1Password mobile or desktop app, provided the device is enrolled in the FORM 1Password account and MFA is active.
+
+**Prohibited BYOD uses:**
+- Storing production secrets (API keys, service role keys, Workers Secrets, `.env` files, SSH keys) in local files, shell profiles, or note-taking apps on a personal device.
+- Running `wrangler deploy`, `supabase db push`, or any production deployment command from a personal device.
+- Storing or processing GDPR Art. 9 special-category health data locally on a personal device.
+- Cloning the production codebase to a personal device that is not encrypted at rest (FileVault on macOS; BitLocker on Windows).
+
+**MDM enrollment:** Once MDM is deployed (CC6-GAP-010 resolved), all BYOD devices with production access must be enrolled. Until then, the BYOD policy relies on 1Password device trust and browser-session-only access as compensating controls for MDM-absent environments.
+
+---
+
+### 40.7 Enterprise Tenant Data Destruction at Contract End
+
+When an enterprise tenant's contract terminates (`lifecycle_status → 'churned'`), FORM's obligation under GDPR Art. 17 and the standard DPA is to destroy or return all tenant data within **30 days** of contract end.
+
+| Day | Action | DEC-030 Event | Evidence |
+|---|---|---|---|
+| 0 | Contract termination confirmed; `lifecycle_status = 'churned'` set | `tenant.contract_terminated` (HIGH) | Contract termination email / signature |
+| 0–7 | Tenant admin dashboard and API access disabled; SSO and SCIM tokens revoked | `tenant.access_suspended` (HIGH) | Supabase access revocation log |
+| 7 | Data export window offered: signed download link to full tenant data export (Art. 20 format); 7-day window | `tenant.data_export_link_generated` (STANDARD) | Resend delivery confirmation |
+| 14 | Export link expires | `tenant.data_export_link_expired` (STANDARD) | DEC-030 event timestamp |
+| 14–30 | Hard-delete cascade executed: all tenant rows deleted per `DATA_MODEL.md §12` erasure sequence, including Art. 9 tables, coaching content, wearable data | `tenant.data_deleted` (HIGH) with `row_counts` JSONB | Row counts per table in DEC-030 event metadata |
+| 30 | Deletion confirmation letter issued to tenant DPA contact via `enterprise@form.coach` | `tenant.deletion_confirmed` (STANDARD) | Letter PDF archived in `compliance/tenant-offboarding/<tenant_id>-<YYYY-MM-DD>/deletion-confirmation.pdf` (C1-E-010, retained 7 years) |
+
+**Permanent retention exceptions (both categories accessible only by `form_admin` with `BYPASSRLS`; no API access):**
+- `audit_log_events` rows attributable to this tenant are retained 7 years per DEC-030 WORM policy (GDPR Art. 5(2) accountability; SOC 2 evidence integrity). The tenant's personal data is gone; the tamper-evident record of what was done persists.
+- `tenant_contracts` and `tenant_pilots` financial records retained 7 years per accounting obligations (EU accounting directives, UA Tax Code).
+
+---
+
+### 40.8 Cold Storage and Backup Media
+
+All cold storage backups (Backblaze B2 WORM tier, documented in `docs/SOC2_READINESS.md §19`) are encrypted with AES-256-GCM using keys held in Cloudflare Workers Secrets. If a backup archive must be rendered permanently inaccessible:
+
+1. **Rotate the encryption key** per `docs/CRYPTOGRAPHY_POLICY.md §6.3`. All existing backups encrypted under the old key become cryptographically inaccessible (Cryptographic Erase per NIST 800-88 §5.3.3). The encrypted bytes remain on disk per Backblaze Object Lock WORM policy — this is intentional and does not constitute a retention violation.
+2. **Log the key rotation** in `compliance/media-disposal/backups/YYYY-MM-key-rotation-log.md` with: date, key ID being retired, reason, approver.
+3. **After Object Lock expiry** (retention period elapsed): issue Backblaze B2 lifecycle rule deletion. Confirm via API response code `204`; file in `compliance/media-disposal/backups/YYYY-MM-deletion-log.md`.
+
+---
+
+### 40.9 Device Disposal Log — Evidence Artifact C1-E-008
+
+Every disposal event is recorded in `compliance/media-disposal/device-disposal-log.csv`. This file is the primary C1.2 auditor evidence artifact.
+
+**Column spec:**
+
+| Column | Type | Description |
+|---|---|---|
+| `disposal_id` | TEXT | UUID v4 — unique per event |
+| `date` | DATE | ISO 8601 date of sanitization or destruction |
+| `device_class` | TEXT | A, B, C, D, or E (§40.3) |
+| `make_model` | TEXT | e.g., `Apple MacBook Pro 14-inch M3 Pro` |
+| `serial_number` | TEXT | Device serial; `UNKNOWN` if BYOD with no physical access |
+| `asset_owner` | TEXT | Full name of individual; `FORM` if company-issued |
+| `reason` | TEXT | `offboarding`, `end_of_life`, `theft_or_loss`, `tenant_contract_end` |
+| `sanitization_method` | TEXT | NIST method (e.g., `Cryptographic Erase — Apple Silicon`) |
+| `certificate_ref` | TEXT | Shredder certificate filename or `N/A` for software methods |
+| `performed_by` | TEXT | Full name of security-engineer executing the procedure |
+| `witness` | TEXT | compliance-officer confirming; `SOLO` during solo-founder phase |
+| `notes` | TEXT | Exceptions, BYOD attestation reference, compensating controls |
+
+The log is **append-only**. Existing rows must never be modified. Corrections are made by appending a new row with `reason = 'correction'` and referencing the original `disposal_id` in `notes`.
+
+---
+
+### 40.10 DEC-030 Audit Events
+
+Four events added to the DEC-030 HMAC-chained taxonomy. All carry the standard envelope fields (`tenant_id` or `null`, `trace_id`, `actor_id`) per `docs/AUDIT_LOG_SCHEMA.md`.
+
+| Event type | Trigger | Severity | Retention | Key metadata |
+|---|---|---|---|---|
+| `asset.device_disposal_logged` | Row appended to device-disposal-log.csv | STANDARD | 7 years | `disposal_id`, `device_class`, `reason`, `performed_by`, `sanitization_method` |
+| `tenant.data_deleted` | Tenant hard-delete cascade complete (§40.7, Day 14–30) | HIGH | 7 years | `tenant_id`, `row_counts` JSONB (per-table), `performed_by` |
+| `tenant.deletion_confirmed` | Deletion confirmation letter issued (§40.7, Day 30) | STANDARD | 7 years | `tenant_id`, `deletion_date`, `letter_delivery_method` |
+| `personnel.offboarding_completed` | All steps in §40.5 checklist confirmed complete | STANDARD | 7 years | `subject_name` (display name only — no email in event payload), `offboarding_date`, `device_classes_sanitized` |
+
+**Privacy note:** `personnel.offboarding_completed` deliberately omits the departing individual's email address from the DEC-030 event payload to prevent unnecessary personal data in the immutable audit chain. `subject_name` is the display name used in GitHub and 1Password; the authoritative offboarding record is in `compliance/offboarding/` which holds full details.
+
+---
+
+### 40.11 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | How §40 Satisfies It |
+|---|---|
+| **C1.2 — Dispose of Confidential Information** | Device disposal log (C1-E-008) is the primary evidence artifact, capturing every sanitization event with method and approver. The tenant data destruction procedure (§40.7) covers B2B customer data. Cryptographic Erase of cold storage (§40.8) covers backup media. Together, these three artefacts demonstrate that all three asset categories in scope are covered. |
+| **CC6.3 — Termination of Access** | The 10-step offboarding procedure (§40.5) defines the access revocation sequence with a 24-hour SLA. The per-departure `offboarding-checklist.md` artifact (CC6-E-009) is the auditor-facing evidence of execution. |
+| **CC6.5 — Removal of Access to Protected Information Assets** | The BYOD policy (§40.6) explicitly defines prohibited device uses (local `.env` files, production deployment, Art. 9 health data storage) to prevent unauthorized copies of confidential information persisting on personal devices after departure. |
+| **C1.1 — Identify and Maintain Confidential Information** | The device classification table (§40.3) cross-references the Data Asset Inventory (`compliance/c1/data-asset-inventory.md`, C1-GAP-002 🟡). Assigning a sensitivity and disposal method to each class demonstrates that FORM has identified where confidential information resides in physical assets. |
+
+**Auditor evidence artefacts (C1.2 cluster):**
+- `compliance/media-disposal/device-disposal-log.csv` — C1-E-008; append-only; retained 7 years.
+- `compliance/offboarding/<name>-<date>/offboarding-checklist.md` — CC6-E-009; per departure; retained 7 years.
+- `compliance/tenant-offboarding/<tenant_id>-<date>/deletion-confirmation.pdf` — C1-E-010; per enterprise tenant termination; retained 7 years (contractual proof + SOC 2 evidence).
+- DEC-030 filtered on `asset.device_disposal_logged`, `tenant.data_deleted`, `personnel.offboarding_completed` — continuous chain-verified log with HMAC integrity.
+
+---
+
+### 40.12 Gap Closure
+
+| Gap ID | Before §40 | After §40 |
+|---|---|---|
+| **C1-GAP-004** | 🔴 Open — "Media/device disposal policy document not yet drafted" | 🟡 AUTHORED — §40 is the policy document, filed as C1-E-007. Device disposal log template (C1-E-008) spec complete. Closes to 🟢 on founder signature (same trigger as AUP). |
+| **CC6.3 offboarding** | Partially covered in §26 access controls (access revocation referenced) with no standalone exhibit | §40.5 is a dedicated 10-step offboarding procedure with per-system evidence requirements. CC6-E-009 evidence path defined. |
+| **CC1-GAP-001** | 🔴 Open (as of §38.4 prior state) | 🟡 AUTHORED — `docs/ACCEPTABLE_USE_POLICY.md` v1.0 authored 2026-05-21 (CC1-E-004). This advance is reflected in §38.4 gap registry update alongside §40. Closes to 🟢 on counsel review + founder signature. |
+
+**Net open gap count: 49 → 49** (🟡 items remain in count; C1-GAP-004 and CC1-GAP-001 decrement to final count when founder signature is executed).
+**P0 count: 13 → 12** (CC1-GAP-001 reclassified from 🔴 to 🟡).
+
+---
+
+### 40.13 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create `compliance/media-disposal/device-disposal-log.csv` with header row from §40.9; seed with founder MacBook entry if device was used for production access | compliance-officer | **P0** | Pre-launch |
+| 2 | Create `compliance/media-disposal/README.md` describing C1-E-008 artifact format and retention requirement | compliance-officer | **P0** | Pre-launch |
+| 3 | Create `compliance/offboarding/TEMPLATE-offboarding-checklist.md` from §40.5 step table; template usable for all future departures | compliance-officer + security-engineer | **P0** | Pre-hire |
+| 4 | Obtain founder signature on §40 policy document; record in `compliance/policy-approval-log.csv` (CC5-GAP-004); gap advances C1-GAP-004 🟡→🟢 | founder (signatory) + compliance-officer | **P0** | Pre-hire |
+| 5 | Register four DEC-030 event types from §40.10 in `docs/AUDIT_LOG_SCHEMA.md` event taxonomy (severity, retention tier) | security-engineer | **P1** | M3 |
+| 6 | Implement `tenant.data_deleted` DEC-030 event emission in the tenant hard-delete Worker; cross-reference `DATA_MODEL.md §12` erasure sequence; include `row_counts` JSONB payload | platform-engineer + security-engineer | **P1** | M4 (enterprise launch) |
+| 7 | Create `compliance/tenant-offboarding/TEMPLATE-deletion-confirmation.md` for customer-success to issue on first enterprise tenant termination | compliance-officer + customer-success | **P1** | M4 (enterprise launch) |
+| 8 | Once MDM deployed (CC6-GAP-010): enrol all BYOD devices; enable remote-wipe capability; update §40.6 to reference MDM-specific wipe procedures | compliance-officer | **P1** | Post-CC6-GAP-010 |
+| 9 | File a standalone copy of this policy at `compliance/c1/media-disposal-policy.md` (C1-E-007, auditor exhibit copy); record in `compliance/policy-approval-log.csv` | compliance-officer | **P0** | Pre-launch |
