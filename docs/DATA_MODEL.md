@@ -3023,10 +3023,18 @@ ALTER TABLE tenants
 CREATE TABLE tenant_pilots (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  pilot_type        TEXT NOT NULL DEFAULT 'free'
+                      CHECK (pilot_type IN (
+                        'free',           -- 90-day free standard; ≤ 250 seats; no founder approval required (COST_MODEL §21.2)
+                        'extended_free',  -- 180-day free; any seat count; founder approval required; ≥ 500-seat conversion target
+                        'paid'            -- 90-day at $1/seat/month; target ≥ 500 seats; founder approval required; credit on conversion
+                      )),
   pilot_seats       INTEGER NOT NULL DEFAULT 100
-                      CHECK (pilot_seats BETWEEN 10 AND 500),
+                      CHECK (pilot_seats BETWEEN 10 AND 10000),
+  monthly_fee_cents INTEGER DEFAULT NULL,            -- NULL for free/extended_free; 100 (= $1.00/seat/month) for paid type
+  founder_approved_at TIMESTAMPTZ,                   -- NULL for 'free' pilots; must be set before provisioning 'extended_free' or 'paid'
   started_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  ends_at           TIMESTAMPTZ NOT NULL,            -- default: started_at + 90 days; never auto-extended
+  ends_at           TIMESTAMPTZ NOT NULL,            -- default: started_at + 90 days (free/paid) or + 180 days (extended_free)
   success_criteria  JSONB NOT NULL,                  -- agreed criteria (see §16.3.1)
   status            TEXT NOT NULL DEFAULT 'active'
                       CHECK (status IN (
@@ -3043,7 +3051,11 @@ CREATE TABLE tenant_pilots (
   csm_owner         TEXT NOT NULL,                   -- internal handle (e.g. '@alice') — NOT a FK to users
   internal_notes    TEXT,                            -- CSM-only field; MUST NOT contain employee names or health data
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (tenant_id)                                 -- one pilot record per tenant; repeat pilots require a new tenant slug
+  UNIQUE (tenant_id),                                -- one pilot record per tenant; repeat pilots require a new tenant slug
+  CONSTRAINT pilot_fee_consistency CHECK (
+    (pilot_type = 'paid' AND monthly_fee_cents IS NOT NULL AND monthly_fee_cents > 0)
+    OR (pilot_type IN ('free', 'extended_free') AND monthly_fee_cents IS NULL)
+  )
 );
 
 ALTER TABLE tenant_pilots ENABLE ROW LEVEL SECURITY;
@@ -3053,6 +3065,38 @@ ALTER TABLE tenant_pilots ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_pilots_admin_only ON tenant_pilots
   USING (current_user IN ('form_admin', 'form_system'));
 ```
+
+**Migration for existing rows** (run after initial `CREATE TABLE` on a live database with pre-existing pilot rows):
+
+```sql
+-- Add new columns to any previously deployed tenant_pilots table
+ALTER TABLE tenant_pilots
+  ADD COLUMN IF NOT EXISTS pilot_type TEXT NOT NULL DEFAULT 'free'
+    CHECK (pilot_type IN ('free', 'extended_free', 'paid')),
+  ADD COLUMN IF NOT EXISTS monthly_fee_cents INTEGER DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS founder_approved_at TIMESTAMPTZ;
+
+-- Increase pilot_seats ceiling from 500 → 10000 to accommodate paid/extended pilots
+ALTER TABLE tenant_pilots
+  DROP CONSTRAINT IF EXISTS tenant_pilots_pilot_seats_check;
+ALTER TABLE tenant_pilots
+  ADD CONSTRAINT tenant_pilots_pilot_seats_check CHECK (pilot_seats BETWEEN 10 AND 10000);
+
+-- Add cross-column fee consistency constraint
+ALTER TABLE tenant_pilots
+  ADD CONSTRAINT pilot_fee_consistency CHECK (
+    (pilot_type = 'paid' AND monthly_fee_cents IS NOT NULL AND monthly_fee_cents > 0)
+    OR (pilot_type IN ('free', 'extended_free') AND monthly_fee_cents IS NULL)
+  );
+```
+
+**Column notes:**
+
+| Column | Type | Nullable | Meaning |
+|---|---|---|---|
+| `pilot_type` | TEXT | NOT NULL | Commercial structure of the pilot: `'free'` (standard, ≤250 seats), `'extended_free'` (180-day, founder-approved, ≥500-seat conversion target), `'paid'` ($1/seat/month, founder-approved, credit on conversion). Drives ASC 606 treatment (COST_MODEL §21.3) and `pilot.started` audit event `pilot_type` field. |
+| `monthly_fee_cents` | INTEGER | NULL | For `paid` pilots: 100 (= $1.00/seat/month, billed to Stripe). NULL for free pilot types. The `pilot_fee_consistency` constraint enforces this at the DB layer. |
+| `founder_approved_at` | TIMESTAMPTZ | NULL | Timestamp when founder approved the `extended_free` or `paid` pilot. Application must set this before provisioning SSO and emitting `pilot.started`. NULL is valid for `'free'` pilot_type — no approval required. |
 
 #### 16.3.1 `success_criteria` JSONB Schema
 
@@ -3373,6 +3417,7 @@ All contract and pilot lifecycle transitions are HMAC-chained per DEC-030 (`docs
 |---|---|---|---|---|---|
 | 1 | `ALTER TABLE tenants ADD COLUMN lifecycle_status` — migration with default `'pilot'` for existing rows; add CHECK constraint and index | `platform-engineer` | **P0** | M3 | |
 | 2 | `CREATE TABLE tenant_pilots` DDL migration including RLS policy (`form_admin` + `form_system` only) | `platform-engineer` | **P0** | M3 | |
+| 2a | Add `pilot_type`, `monthly_fee_cents`, `founder_approved_at` columns to `tenant_pilots`; update `pilot_seats` CHECK ceiling to 10000; add `pilot_fee_consistency` table constraint (see §16.3 migration block) | `platform-engineer` | **P1** | M3 | Closes COST_MODEL §21.9 item: "Build `pilots` table tracking `pilot_type`" |
 | 3 | `CREATE TABLE tenant_contracts` DDL migration: all columns, partial unique index, RLS policies, `tenant_contract_portal` view | `platform-engineer` | **P0** | M3 | `tenant_contract_portal` view must exclude `arr_cents` before any tenant admin can see it |
 | 4 | Implement `assertSeatAvailable()` in `workers/provisioning/seat-gate.ts`; integrate into SCIM `POST /Users`, CSV import, and manual invite paths | `platform-engineer` | **P0** | M3 | TOCTOU protection via `SELECT … FOR UPDATE SKIP LOCKED`; test with concurrent provisioning in staging |
 | 5 | Wire all 14 DEC-030 events (§16.8) to their respective state transitions; validate HMAC chain in staging | `platform-engineer` + `security-engineer` | **P0** | M3 | `tenant.seat_limit_enforcement_triggered` metadata must have `attempted_email: null` — CI assertion |

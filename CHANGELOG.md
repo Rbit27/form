@@ -6,6 +6,15 @@
 
 ---
 
+## [1.16.1] — 2026-05-29
+
+### Changed
+- `docs/DATA_MODEL.md §16.3` — `tenant_pilots` table extended with three new columns required to track commercial pilot structure (COST_MODEL §21.9 P1 checklist item): `pilot_type` TEXT ('free' | 'extended_free' | 'paid') with CHECK constraint and inline comments mapping to COST_MODEL §21.2 definitions; `monthly_fee_cents` INTEGER (NULL for free types; 100 = $1.00/seat/month for paid type); `founder_approved_at` TIMESTAMPTZ (NULL for standard free pilots; application-enforced before provisioning extended_free or paid pilots). `pilot_seats` CHECK ceiling raised from 500 → 10000 to accommodate paid and extended pilots targeting ≥ 500 seats. `CONSTRAINT pilot_fee_consistency` ensures fee/type coherence at DB layer. Migration block added for live-database ALTER TABLE. Implementation checklist row 2a added. Column notes table documents ASC 606 and audit-event linkage.
+- `pricing-enterprise.html` FAQ — two new items added (closes COST_MODEL §21.9 P1 item "Update pricing-enterprise.html FAQ with pilot terms, discount floor note, and multi-year discount schedule"): FAQ #5 "What pilot options are available before we commit?" covers all three pilot structures (Free 90d / Extended Free 180d / Paid $1/seat/month) with eligibility, approval requirements, credit-on-conversion terms, and DPA timing; FAQ #6 "What is the multi-year discount schedule and are there price floors?" states 10%/20% annual discount for 2yr/3yr contracts, upfront stacking, multiplicative application, and hard floor prices (Starter $6/seat, Growth $8/seat, Enterprise $7/seat reference floor) with waiver requirements.
+- `VERSION` → 1.16.1
+
+---
+
 ## [1.16.0] — 2026-05-29
 
 ### Added
