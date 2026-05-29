@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v0.9
+# FORM · Observability & Monitoring Taxonomy v1.0
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -4199,6 +4199,361 @@ CREATE POLICY vqd_tenant_read ON victor_quality_daily FOR SELECT TO tenant_admin
 
 ---
 
+## 23. Enterprise SLA Reporting & Credit Calculation
+
+### 23.1 Purpose
+
+This section defines how FORM measures the 99.9% monthly uptime SLA committed in `docs/ENTERPRISE.md`, how that data is surfaced to tenant administrators, and the precise credit calculation and claim process when the SLA is missed. It closes the gap at `docs/SOC2_READINESS.md §2 A1.1` ("SLA credit calculation and process — Define formula and claim process") and provides SOC 2 Type II evidence for criterion A1.1 (Availability commitments documented and honoured).
+
+**Owner:** devops-lead (measurement), enterprise-architect (API and admin dashboard), compliance-officer (credit issuance authority).
+
+---
+
+### 23.2 SLA Definition and Covered Services
+
+**SLA target:** 99.9% monthly availability per tenant. This equals a maximum of **43.8 minutes of covered downtime per 30-day calendar month**.
+
+**Covered services** (all must be simultaneously unavailable for downtime to count):
+
+| Service | SLI used | SLA probe |
+|---|---|---|
+| API Gateway (Cloudflare Workers) | HTTP availability at `GET /health` | S-001 (§16.2) |
+| Authentication (Supabase Auth / WorkOS SSO) | HTTP 200 from token exchange | S-002 + S-005 |
+| Workout Logging API | HTTP 201 from `POST /api/v1/workouts/sets` | S-003 |
+| AI Coaching (Victor) | HTTP 200 from coaching turn probe | S-004 |
+| Admin Dashboard API | HTTP 200 from `GET /api/v1/admin/health` | new probe S-013 |
+
+**Partial-service degradation rule:** If one service is down but others remain reachable, the incident is classified as a **partial outage**. Partial outages count at 50% weight against the downtime budget — 10 minutes of coaching unavailability = 5 credited minutes toward the 43.8-minute threshold.
+
+**Single-tenant vs. platform-wide:** FORM measures uptime per tenant. A bug that affects only one tenant's SSO configuration is an incident for that tenant only; other tenants' SLA clocks are unaffected.
+
+---
+
+### 23.3 Uptime Measurement Methodology
+
+Availability is calculated from two independent signal sources, reconciled at month-end:
+
+**Source 1 — Better Stack synthetic probes (primary):**
+- Probes S-001 through S-013 run from three regions (us-east, eu-central, ap-southeast) on the schedules defined in §16.2.
+- A minute is classified as **down** when two or more probe regions report failure simultaneously. Single-region failure is classified as a **degraded** minute (50% weight).
+- Better Stack generates a monthly `uptime_report` object per monitor per tenant label.
+
+**Source 2 — Cloudflare Analytics Engine (secondary, corroborating):**
+
+```sql
+-- Cloudflare Analytics Engine SQL
+-- Hourly availability SLI per tenant (run at month-end reconciliation)
+SELECT
+  toStartOfHour(timestamp) AS hour_bucket,
+  blob1 AS tenant_id,
+  countIf(double1 < 500 AND double2 = 200) AS good_requests,
+  count() AS total_requests,
+  good_requests / total_requests AS availability_sli
+FROM cf_worker_requests
+WHERE
+  timestamp BETWEEN toDateTime('2026-05-01 00:00:00') AND toDateTime('2026-05-31 23:59:59')
+  AND blob1 = :tenant_id          -- tenant_id label injected at Worker edge
+  AND blob2 = 'api'               -- only count API surface, not status-page
+GROUP BY hour_bucket, tenant_id
+ORDER BY hour_bucket;
+```
+
+**Reconciliation rule:** If the two sources disagree by > 0.05% availability on a given day, the lower value (more conservative for the customer) is used. The reconciliation is logged as a DEC-030 audit event `sla.measurement_reconciled` with both source values.
+
+**Maintenance window exclusions:** Planned maintenance is excluded from the downtime calculation if:
+1. The tenant received email notification ≥ 72 hours in advance (7 days for Enterprise tier).
+2. The maintenance window does not exceed 4 hours per occurrence or 8 hours per calendar month.
+3. The window is registered in `maintenance_windows` table (§23.8) before it begins.
+
+---
+
+### 23.4 SLA Exclusions
+
+The following do not count toward covered downtime:
+
+| Category | Rationale |
+|---|---|
+| **Upstream provider outage** | Cloudflare, Supabase, Anthropic, ElevenLabs, Auth0/WorkOS outage beyond FORM's control. FORM provides best-effort workaround where possible. Documented via provider status page link in the DEC-030 `sla.incident_closed` event. |
+| **Scheduled maintenance** (per §23.3) | Advance-notified windows registered in `maintenance_windows`. |
+| **Customer-side network or IdP misconfiguration** | Failures traceable to tenant's own Okta/Azure AD misconfiguration, firewall rules blocking FORM IPs, or SCIM credential expiry not renewed by the tenant. Evidenced by SSO error code `idp_configuration_error` in the audit log. |
+| **Force majeure** | Acts of God, internet backbone failures, national infrastructure incidents beyond FORM's ability to route around. |
+| **Synthetic probe false positives** | If S-001 through S-013 report failure but zero real-user errors appear in Cloudflare analytics within the same 5-minute window, the minute is reclassified as a probe false positive and excluded. Reclassification requires security-engineer approval and is DEC-030 logged. |
+| **Beta / preview features** | Features explicitly labelled `[BETA]` in the admin dashboard carry no SLA coverage. |
+
+---
+
+### 23.5 Credit Calculation Formula
+
+Credits are calculated on the tenant's **Monthly Recurring Revenue (MRR)** for the affected calendar month.
+
+**Credit tiers:**
+
+| Monthly Availability (calendar month) | Downtime budget used | Service Credit |
+|---|---|---|
+| ≥ 99.9% | 0 – 43.8 min | 0% — SLA met |
+| 99.0% – < 99.9% | 43.8 min – 7.2 h | **5% of monthly invoice** |
+| 95.0% – < 99.0% | 7.2 h – 36 h | **15% of monthly invoice** |
+| 90.0% – < 95.0% | 36 h – 72 h | **25% of monthly invoice** |
+| < 90.0% | > 72 h | **50% of monthly invoice** |
+
+**Partial-service multiplier:** Credits earned during partial-outage windows (§23.2 50% weight rule) are issued at 50% of the tier rate. A 2-hour coaching-only outage that crosses into the 99.0–99.9% tier earns 2.5% credit (5% × 50%).
+
+**Credit cap:** Total credits in any calendar month cannot exceed 50% of the tenant's monthly invoice. Credits are applied to the following month's invoice; they are not redeemable as cash.
+
+**Calculation example (Growth tier, 300 seats at $9/seat = $2,700 MRR):**
+
+```
+Covered downtime in May: 95 minutes (full platform outage, all probes)
+  → Exceeds 43.8-minute SLA threshold
+  → Falls in 99.0–99.9% tier (actual: ~99.78% availability in a 30-day month = 43,200 minutes)
+  → Credit: 5% × $2,700 = $135.00 applied to June invoice
+```
+
+---
+
+### 23.6 Customer-Facing Uptime Report
+
+**Admin dashboard panel — "SLA Uptime Report"** (existing UI stub at `admin-dashboard.html:575`):
+
+The panel renders the current month's availability data in real-time, refreshed every 60 seconds from the `/api/v1/admin/sla/current` endpoint.
+
+```typescript
+// GET /api/v1/admin/sla/current
+// Auth: tenant_admin JWT required — RLS enforces tenant_id isolation
+// Returns: current-month SLA status for the calling tenant
+
+interface SlaCurrentResponse {
+  tenant_id: string;
+  report_month: string;              // "2026-05" ISO format
+  availability_pct: number;          // e.g. 99.97
+  covered_downtime_minutes: number;  // actual downtime against the SLA definition
+  sla_threshold_minutes: number;     // 43.8 for 99.9% in a 30-day month
+  sla_met: boolean;
+  credit_tier: 0 | 5 | 15 | 25 | 50;  // credit % if applicable; 0 = SLA met
+  projected_credit_usd: number | null;  // null if credit_tier === 0
+  incidents: SlaIncident[];
+  last_refreshed_at: string;         // ISO timestamp
+}
+
+interface SlaIncident {
+  incident_id: string;               // matches DEC-030 sla.incident_opened event
+  started_at: string;
+  ended_at: string | null;           // null if still open
+  duration_minutes: number;
+  outage_type: 'full' | 'partial';
+  affected_services: string[];
+  excluded: boolean;                 // true if falls under §23.4 exclusion
+  exclusion_reason: string | null;
+}
+```
+
+**Monthly PDF report:** On the 3rd business day of each month, a pg_cron job generates a PDF summary for the previous month. It is stored at `r2://form-compliance/{tenant_id}/sla/{YYYY-MM}-uptime-report.pdf` and delivered to `tenant_billing_email` via Resend. The PDF contains:
+- Availability percentage and downtime minutes (covered and excluded)
+- Incident log with start/end times, affected services, and RCA links
+- Credit calculation workings (if applicable)
+- SHA-256 hash of the Better Stack monthly report (as the corroborating source reference)
+
+---
+
+### 23.7 SLA Credit Claim Process
+
+**Step 1 — Eligibility check (automated):**
+At month-end (00:30 UTC on the 1st of each month), a scheduled Cloudflare Worker (`workers/sla/month-close.ts`) runs the measurement reconciliation (§23.3) and writes the final `sla_monthly_reports` row (§23.8). If `credit_tier > 0`, the Worker:
+1. Emits `sla.credit_calculated` DEC-030 event.
+2. Creates a Linear ticket assigned to `compliance-officer` with the credit amount and invoice month.
+3. Sends the tenant an automated email: "Your SLA report for [Month] is ready — you are eligible for a $X credit."
+
+**Step 2 — Tenant claim (optional):**
+Credits ≥ 5% are applied automatically without requiring a formal claim — the automated path in Step 1 covers this. Tenants may contest an SLA report (e.g., dispute an exclusion ruling) via:
+- Admin dashboard → SLA Reports → "Dispute this report" button (routes to `enterprise@form.coach` with pre-filled incident IDs).
+- Dispute deadline: within 30 days of the month-end report delivery.
+
+**Step 3 — Compliance-officer review:**
+On receiving the Linear ticket, `compliance-officer`:
+1. Verifies the automated measurement against the Better Stack uptime export and Cloudflare Analytics reconciliation query.
+2. Checks that all exclusions are documented and defensible.
+3. Approves or adjusts the credit amount within 5 business days.
+4. Emits `sla.credit_approved` DEC-030 event.
+5. Instructs billing to apply the credit to the next invoice.
+
+**Step 4 — Credit application:**
+The credit is applied as a line-item reduction on the following month's invoice. The invoice line reads:
+
+```
+SLA Service Credit — [Month YYYY] (99.x% availability, 5% credit)    −$XXX.00
+```
+
+**Step 5 — Dispute escalation:**
+If the tenant disputes the exclusion ruling and internal review does not resolve it within 10 business days, compliance-officer escalates to the founder for final determination. All communications are logged as DEC-030 `sla.dispute_*` events.
+
+---
+
+### 23.8 Postgres Schema
+
+```sql
+-- Stores the final monthly SLA record per tenant (written by month-close Worker)
+CREATE TABLE sla_monthly_reports (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  report_month              DATE NOT NULL,      -- always the 1st of the month (e.g. 2026-05-01)
+  calendar_minutes          INTEGER NOT NULL,   -- total minutes in the month
+  covered_downtime_minutes  NUMERIC(8,2) NOT NULL DEFAULT 0,
+  excluded_downtime_minutes NUMERIC(8,2) NOT NULL DEFAULT 0,
+  availability_pct          NUMERIC(7,5) GENERATED ALWAYS AS (
+    100.0 * (calendar_minutes - covered_downtime_minutes) / NULLIF(calendar_minutes, 0)
+  ) STORED,
+  sla_met                   BOOLEAN GENERATED ALWAYS AS (
+    covered_downtime_minutes <= (calendar_minutes * 0.001)
+  ) STORED,
+  credit_tier_pct           SMALLINT NOT NULL DEFAULT 0,  -- 0 / 5 / 15 / 25 / 50
+  credit_amount_usd         NUMERIC(10,2),
+  mrr_snapshot_usd          NUMERIC(10,2) NOT NULL,
+  betterstack_report_sha256 TEXT,        -- hash of raw Better Stack export for auditability
+  cf_analytics_reconciled   BOOLEAN NOT NULL DEFAULT FALSE,
+  reconciliation_delta_pct  NUMERIC(6,4),  -- |betterstack_availability - cf_availability|
+  credit_approved_by        UUID REFERENCES users(id),  -- compliance-officer user_id
+  credit_approved_at        TIMESTAMPTZ,
+  report_pdf_r2_key         TEXT,         -- path in R2 for tenant PDF copy
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, report_month)
+);
+
+-- Incident log contributing to monthly SLA calculation
+CREATE TABLE sla_incidents (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  started_at       TIMESTAMPTZ NOT NULL,
+  ended_at         TIMESTAMPTZ,
+  outage_type      TEXT NOT NULL CHECK (outage_type IN ('full', 'partial')),
+  affected_probes  TEXT[] NOT NULL,    -- e.g. ['S-001', 'S-002']
+  downtime_weight  NUMERIC(3,2) NOT NULL DEFAULT 1.0,  -- 0.5 for partial
+  excluded         BOOLEAN NOT NULL DEFAULT FALSE,
+  exclusion_reason TEXT,              -- must be non-null if excluded = TRUE
+  incident_ref     TEXT,              -- Linear or PagerDuty incident ID
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Scheduled maintenance windows (must be registered before window starts)
+CREATE TABLE maintenance_windows (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           UUID REFERENCES tenants(id) ON DELETE CASCADE,  -- NULL = platform-wide
+  scheduled_start     TIMESTAMPTZ NOT NULL,
+  scheduled_end       TIMESTAMPTZ NOT NULL,
+  notified_at         TIMESTAMPTZ NOT NULL,  -- when tenant notification was sent
+  notification_hours  INTEGER GENERATED ALWAYS AS (
+    EXTRACT(EPOCH FROM (scheduled_start - notified_at)) / 3600
+  ) STORED,
+  max_duration_hours  NUMERIC(4,1) NOT NULL,
+  approved_by         UUID NOT NULL REFERENCES users(id),
+  description         TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (scheduled_end > scheduled_start),
+  CHECK (scheduled_end - scheduled_start <= INTERVAL '4 hours')  -- per §23.4 cap
+);
+
+-- RLS: tenant_admin sees only their own tenant's reports and incidents
+ALTER TABLE sla_monthly_reports ENABLE ROW LEVEL SECURITY;
+CREATE POLICY sla_reports_tenant_isolation ON sla_monthly_reports
+  USING (
+    tenant_id = (current_setting('app.current_tenant_id', TRUE))::UUID
+    OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'founder')
+  );
+
+ALTER TABLE sla_incidents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY sla_incidents_tenant_isolation ON sla_incidents
+  USING (
+    tenant_id = (current_setting('app.current_tenant_id', TRUE))::UUID
+    OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'founder')
+  );
+
+-- Index for month-end aggregation Worker
+CREATE INDEX idx_sla_incidents_tenant_month
+  ON sla_incidents (tenant_id, started_at)
+  WHERE ended_at IS NOT NULL;
+
+-- Monthly aggregation query (used inside month-close Worker)
+-- Returns covered_downtime_minutes for a given tenant and calendar month
+SELECT
+  COALESCE(
+    SUM(
+      LEAST(ended_at, month_end) - GREATEST(started_at, month_start)
+    ) * downtime_weight / INTERVAL '1 minute', 0
+  ) AS covered_downtime_minutes
+FROM sla_incidents
+CROSS JOIN (VALUES (
+  '2026-05-01 00:00:00+00'::TIMESTAMPTZ,
+  '2026-06-01 00:00:00+00'::TIMESTAMPTZ
+)) AS t(month_start, month_end)
+WHERE
+  tenant_id = :tenant_id
+  AND excluded = FALSE
+  AND ended_at IS NOT NULL
+  AND tstzrange(started_at, ended_at) && tstzrange(month_start, month_end);
+```
+
+---
+
+### 23.9 DEC-030 Audit Trail
+
+All SLA lifecycle events are HMAC-chained per `docs/AUDIT_LOG_SCHEMA.md` (DEC-030). Required event types:
+
+| Event type | Trigger | Logged by | Key payload fields |
+|---|---|---|---|
+| `sla.incident_opened` | Downtime detected by month-close Worker or manual P0 declaration | devops-lead / Worker | `tenant_id`, `probe_ids`, `outage_type`, `started_at` |
+| `sla.incident_closed` | Probes recover; `ended_at` written | devops-lead / Worker | `tenant_id`, `incident_id`, `ended_at`, `duration_minutes`, `exclusion_applied` |
+| `sla.measurement_reconciled` | Month-end reconciliation completes | month-close Worker | `tenant_id`, `report_month`, `betterstack_pct`, `cf_analytics_pct`, `delta_pct`, `chosen_source` |
+| `sla.credit_calculated` | Automated credit tier determined | month-close Worker | `tenant_id`, `report_month`, `credit_tier_pct`, `credit_amount_usd` |
+| `sla.credit_approved` | compliance-officer approves | compliance-officer | `tenant_id`, `report_month`, `approved_by`, `final_credit_usd` |
+| `sla.credit_adjusted` | Credit amount changed from calculated (e.g., dispute resolution) | compliance-officer | `tenant_id`, `report_month`, `original_usd`, `adjusted_usd`, `reason` |
+| `sla.dispute_opened` | Tenant submits dispute via admin dashboard | platform (form_system role) | `tenant_id`, `report_month`, `dispute_reason` |
+| `sla.dispute_resolved` | Dispute closed (upheld or rejected) | compliance-officer | `tenant_id`, `report_month`, `outcome`, `final_credit_usd` |
+| `sla.maintenance_window_registered` | maintenance_windows row inserted | devops-lead | `tenant_id` or `null` (platform), `scheduled_start`, `scheduled_end`, `notification_hours` |
+| `sla.exclusion_reclassified` | False-positive probe reclassification per §23.4 | security-engineer | `tenant_id`, `incident_id`, `original_classification`, `approved_by` |
+
+All ten event types must carry `tenant_id` (or `null` for platform-wide events), `trace_id`, and `actor_id` in the standard DEC-030 envelope. HMAC chain must remain unbroken — a chain break on any `sla.*` event is a P0 incident per `docs/INCIDENT_RESPONSE.md §R-05`.
+
+---
+
+### 23.10 SOC 2 Evidence Mapping
+
+| Control | Criterion | Evidence artefact | Owner |
+|---|---|---|---|
+| SLA availability commitment documented | A1.1 — Availability commitments | `docs/ENTERPRISE.md §What we promise customers` + this section | compliance-officer |
+| SLA credit formula defined and published | A1.1 — Honoured commitments | §23.5 credit table (this document) | compliance-officer |
+| SLA measured against committed threshold | A1.1 — Monitoring against commitments | `sla_monthly_reports` table + Better Stack monthly export | devops-lead |
+| SLA credit issuance process documented | A1.1 — Remediation when commitments not met | §23.7 claim process (this document) + DEC-030 `sla.credit_*` events | compliance-officer |
+| System monitoring generates availability data | CC7.2 — Anomaly detection | Better Stack probes S-001–S-013, Cloudflare Analytics Engine query (§23.3) | devops-lead |
+| Maintenance windows disclosed in advance | A1.1 — Exclusions are pre-communicated | `maintenance_windows` table + `notification_hours ≥ 72` constraint | devops-lead |
+
+**Evidence artefacts for auditors:**
+- `compliance/evidence/sla/{YYYY-MM}-{tenant_id}-uptime-report.json` — machine-readable monthly report, generated by month-close Worker, retained 36 months.
+- `compliance/evidence/sla/{YYYY-MM}-betterstack-export.csv` — raw Better Stack uptime export, SHA-256 hashed and recorded in `sla_monthly_reports.betterstack_report_sha256`, retained 36 months.
+- `compliance/evidence/sla/{YYYY-MM}-credit-ledger.csv` — all credits issued that month, signed by compliance-officer, retained 7 years (financial record).
+- DEC-030 audit log filtered on `event_type LIKE 'sla.%'` — continuous chain-verified log, retained per `docs/AUDIT_LOG_SCHEMA.md` schedule.
+
+---
+
+### 23.11 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Create `sla_monthly_reports`, `sla_incidents`, `maintenance_windows` tables with RLS per §23.8 | platform-engineer | **P0** | M4 |
+| Add synthetic probe S-013 (Admin Dashboard API health) to `better-stack-monitors.yaml` | devops-lead | **P0** | M4 |
+| Implement `workers/sla/month-close.ts` — measurement reconciliation, `sla_monthly_reports` write, credit calculation, Linear ticket creation, DEC-030 emit | platform-engineer | **P0** | M4 |
+| Implement `GET /api/v1/admin/sla/current` endpoint with tenant_id RLS guard | platform-engineer | **P0** | M4 |
+| Wire admin dashboard SLA panel to live endpoint (replace static stub in `admin-dashboard.html:575`) | design-craft + platform-engineer | **P1** | M4 |
+| Implement `GET /api/v1/admin/sla/history` endpoint returning last 12 monthly reports | platform-engineer | **P1** | M4 |
+| Implement monthly PDF report generation (pg_cron + Resend delivery) | devops-lead | **P1** | M5 |
+| Register all 10 `sla.*` DEC-030 event types in `AUDIT_LOG_SCHEMA.md` event registry | security-engineer | **P0** | M4 |
+| Add `sla.credit_*` event assertions to `__tests__/db/rls_isolation.test.ts` | platform-engineer | **P1** | M4 |
+| Implement "Dispute this report" admin dashboard flow (form → `enterprise@form.coach` email with incident IDs pre-filled) | platform-engineer | **P2** | M5 |
+| Update `SOC2_READINESS.md §2 A1.1` credit-calculation row from 🟡 Gap to ✅ Done | compliance-officer | **P0** | M4 |
+| Add `sla_monthly_reports` Metabase dashboard: panel per tenant showing rolling-12-month availability % and credit history | data-engineer | **P2** | M5 |
+
+---
+
 *v0.8 additions: §21 ClickHouse Analytics Observability (M9) — closes the documented gap from §10 ("ClickHouse for analytics — observability strategy not yet designed"); migration trigger thresholds (PostHog cost > $2k/month P0, analytics query P95 > 10s P0, MAU ≥ 200k advisory, 30+ enterprise tenants advisory); ClickHouse Cloud architecture (EU-Central, SOC 2 certified, GDPR DPA); RED metrics table for ClickHouse itself (rate/errors/duration/ingest lag/queue/storage/memory); eight alerting rules AL-CH-01 through AL-CH-09 with severity and PagerDuty routing; OpenTelemetry Collector topology (Fly.io EU) with PII filter processor deleting user_id and ai prompt/response content before ClickHouse; `traces` MergeTree table DDL with promoted materialized columns for tenant_id, route, http_status, ai tokens; product `events` table DDL with BLOCKED_PROPERTY_KEYS deny-list enforcing no health values at ingest; `sessions` ReplacingMergeTree table; six analytics SLOs (CH-SLO-01 through CH-SLO-06) with error budget burn rate thresholds; per-tenant Row Policies in ClickHouse (least-privilege; cross-tenant queries require break-glass and are DEC-030 logged); three-phase PostHog migration runbook (parallel ingest → historical export → cutover) with rollback trigger; PostHog data deletion after migration (GDPR Art. 5(1)(e) storage limitation compliance); privacy constraints matrix (six constraints, enforcement locations documented); nightly PII scan (AL-CH-09, P0); SOC 2 CC7.2/CC6.1/CC6.2/C1.2/PI1.2/A1.1/CC9.2 evidence mapping; six auditor evidence artefact files; sixteen-item implementation checklist across M7 prep and M9 sprint.*
 
 *v0.9 additions: §22 AI Coaching Quality Observability — closes the gap between operational observability (§3/§4.5 — tokens, latency) and quality observability (is Victor coaching well?); privacy-first design established (GDPR Art. 9 constraint — no coaching content in any observability signal; all metrics are behavioral proxies computed at session or weekly cohort level); ten-metric quality proxy taxonomy: plan adherence rate, session depth (turns), session abandonment rate, post-coaching workout start rate, workout completion rate (post-coaching), retry rate within session, plan regeneration rate, explicit negative feedback rate (thumbs-down), no-engagement rate (7d), streak grace trigger rate — all computed via pg_cron `victor_quality_daily` table with k-anonymity floor (sample_size ≥ 5); prompt version tracking: `victor_prompt_version` and `prompt_ab_bucket` columns on `coaching_turns`, 14-day baseline window for regression detection; six QA-COACH-SLOs covering adherence (≥ 65%), abandonment (≤ 30%), post-coaching start (≥ 40%), negative feedback (≤ 8%), plan regen (≤ 15%/user/week), no-engagement (≤ 40%); five clinical safety monitoring signals (session duration spike, retry spike, no-action spike, negative feedback P0 at 25%, explicit harm report) with clinical-safety VETO authority path via R-10; six alerting rules AL-COACH-01 through AL-COACH-06 with 72h suppression window after prompt deploys; A/B testing observability framework: `prompt_ab_bucket` tenant-locked random split, 14-day / 500-session minimum test duration, two-proportion z-test (α = 0.05), `victor_ab_results` table DDL with concluded_by field; four DEC-030 HMAC-chained audit events for prompt lifecycle (ab_test_started, ab_test_concluded, prompt_version_promoted, prompt_version_rolled_back); Metabase "Victor Coaching Quality" dashboard spec: 8 panels (adherence trend, abandonment trend, post-coaching start, negative feedback with P0 threshold, quality-by-version grouped bar, active A/B test status, no-engagement area chart, streak grace line); `victor_quality_daily` table DDL with UNIQUE constraint, RLS (founder + ml-engineer + clinical-safety full access; tenant_admin scoped to own tenant_id; form_system write), 24-month retention pg_cron cleanup; SOC 2 evidence mapping: CC7.2 (quality monitoring), CC7.4 (prompt regression detection via victor_ab_results), CC1.2 (jailbreak CI gate AL-COACH-05), CC5.2 (clinical safety escalation path), C1.1 (no coaching content in observability — RLS policy evidence); twelve-item implementation checklist across M3/M4/M6.*
+
+*v1.0 additions: §23 Enterprise SLA Reporting & Credit Calculation — closes the documented gap at `docs/SOC2_READINESS.md §2 A1.1` ("SLA credit calculation and process"); 99.9% monthly uptime SLA definition (43.8-minute covered-downtime budget) with partial-service degradation at 50% weight and per-tenant measurement scope; uptime measurement methodology dual-source: Better Stack synthetic probes (S-001 through S-013 per §16) as primary, Cloudflare Analytics Engine SQL as corroborating secondary (conservative reconciliation rule); probe S-013 added (Admin Dashboard API health); ten exclusion categories (upstream provider, scheduled maintenance, customer-side IdP misconfiguration, force majeure, synthetic probe false positives, beta features); five-tier credit schedule (0% SLA met → 5% at 99.0–99.9% → 15% at 95–99% → 25% at 90–95% → 50% < 90%) applied against monthly MRR with 50% credit cap; automated credit application without tenant claim requirement for credits ≥ 5%; three-table Postgres schema (`sla_monthly_reports` with generated availability_pct and sla_met columns, `sla_incidents` with downtime_weight for partial-outage support, `maintenance_windows` with 4-hour per-window cap and 72-hour notification constraint) with RLS tenant isolation; `GET /api/v1/admin/sla/current` and `/history` API specs; monthly PDF delivery via Resend on 3rd business day of each month; ten DEC-030 HMAC-chained event types covering the full incident→credit→dispute lifecycle; SOC 2 A1.1 and CC7.2 evidence mapping with four compliance artefact paths (JSON monthly report, Better Stack CSV, credit ledger, DEC-030 audit log filtered on `sla.*`); twelve-item implementation checklist across M4/M5.*

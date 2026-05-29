@@ -6,6 +6,18 @@
 
 ---
 
+## [1.14.1] — 2026-05-29
+
+### Added
+- `docs/OBSERVABILITY.md §23` — Enterprise SLA Reporting & Credit Calculation. Closes `docs/SOC2_READINESS.md §2 A1.1` gap ("SLA credit calculation and process"). Covers: 99.9% monthly uptime SLA definition (43.8-minute covered-downtime budget); dual-source measurement methodology (Better Stack synthetic probes primary, Cloudflare Analytics Engine corroborating); five-tier credit schedule (5/15/25/50% of monthly MRR); automated credit application without tenant claim; three-table Postgres schema (`sla_monthly_reports`, `sla_incidents`, `maintenance_windows`) with RLS tenant isolation; `GET /api/v1/admin/sla/current` and `/history` API specs; monthly PDF delivery; ten DEC-030 HMAC-chained `sla.*` event types; SOC 2 A1.1 and CC7.2 evidence mapping with four compliance artefact paths; twelve-item implementation checklist (M4/M5). Doc bumped v0.9 → v1.0.
+
+### Changed
+- `docs/OBSERVABILITY.md` — version header v0.9 → v1.0.
+- `docs/SOC2_READINESS.md §2 A1.1` — "SLA credit calculation and process" status 🟡 Gap → ✅ Done; evidence updated to reference `OBSERVABILITY.md §23`.
+- `VERSION` → 1.14.1
+
+---
+
 ## [1.14.0] — 2026-05-29
 
 ### Added

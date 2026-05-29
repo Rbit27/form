@@ -130,7 +130,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | SLA commitments documented | ✅ Done | `docs/ENTERPRISE.md` — 99.9% uptime, P0 <1h response |
 | Uptime monitoring with historical data | 🟡 Partial | Architecture defined (§20); Better Stack provisioning = PRE-10 |
 | Customer-facing status page | 🟡 Partial | Architecture defined (§20); CNAME + 6 components specified; implementation = PRE-11 |
-| SLA credit calculation and process | 🟡 Gap | Define formula and claim process |
+| SLA credit calculation and process | ✅ Done | `docs/OBSERVABILITY.md §23` — five-tier credit formula (5/15/25/50% MRR), automated issuance, DEC-030 audit trail |
 
 ### A1.2 — Capacity Planning
 
