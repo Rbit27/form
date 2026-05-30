@@ -6,6 +6,18 @@
 
 ---
 
+## [1.26.0] — 2026-05-30
+
+### Added
+- `docs/DATA_MODEL.md §23` — Exercise Library & Program Schema. Closes the core product schema gap for exercise catalog storage, program templates, user program instances, and periodization structure. Eight-table design: `exercises` (global catalog + custom; 7 ENUMs; `is_cv_supported` flag; `contraindication_tags`; 60-exercise seed catalog), `exercise_instructions` (multilingual UA/EN coaching cues), `exercise_muscle_groups` (push:pull balance analysis), `program_templates` (FORM-curated library, form_admin-only write), `user_programs` (`uq_user_one_active_program` partial unique index; `generation_context` JSONB with strict privacy schema forbidding injury/body-composition/diagnostic fields), `program_blocks` (accumulation/intensification/realization/deload), `program_sessions` (`workout_session_id` FK to actual logged session), `program_session_exercises` (full load prescription: relative/absolute/rpe_governed/amrap; substitution pattern via `substitute_for` self-FK). `sanitizeGenerationContext()` Worker function with CI grep gate. GDPR Art. 17 five-step erasure. 12 DEC-030 HMAC-chained events. RLS: `tenant_admin` zero access (DEC-002). 4 open questions (OQ-PROG-01 through OQ-PROG-04). 14-item implementation checklist.
+- `content/post-153-lactate-signaling-molecule.md` — «Лактат — від «токсину» до центральної молекули адаптації». Sports-science series. Covers: Brooks' cell-to-cell lactate shuttle; MCT1/MCT4 transporter adaptation; lactate threshold as a trainable marker; lactate as a signaling molecule via GPR81 (HCAR1), histone lactylation (Zhang et al. 2019), and VEGF-mediated angiogenesis; practical implications for Zone 2 training, HIIT, and inter-set recovery. clinical-safety NOT REQUIRED.
+
+### Changed
+- `docs/DATA_MODEL.md` header — v1.2 → v1.3; Table of Contents updated to include §23.
+- `VERSION` → 1.26.0
+
+---
+
 ## [1.25.1] — 2026-05-30
 
 ### Added

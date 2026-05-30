@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.2
+# FORM · Multi-Tenant Data Model v1.3
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -30,6 +30,7 @@
 20. [White-Label Tenant Branding Schema](#20-white-label-tenant-branding-schema)
 21. [AI Coaching Session & Memory Schema](#21-ai-coaching-session--memory-schema)
 22. [Gamification, Streak & Achievement Schema](#22-gamification-streak--achievement-schema)
+23. [Exercise Library & Program Schema](#23-exercise-library--program-schema)
 
 ---
 
@@ -7579,6 +7580,732 @@ Currently, no aggregate gamification views are defined. This is explicitly defer
 | 10 | Register all 6 `gamification.*` DEC-030 event types (§22.11) in `docs/AUDIT_LOG_SCHEMA.md` event registry; add severity, retention tier, and `entity_type: 'gamification'` label | `compliance-officer` | **P0** | M3 |
 | 11 | Wire streak milestones ({7, 14, 30, 60, 90, 180, 365}) into streak Worker; emit `gamification.streak_milestone` event with `milestone_days` payload; dedup: only emit once per milestone per streak cycle (not on re-earn of same milestone in new cycle — OQ-GAM-01 clarification needed on whether re-earned milestones re-emit) | `platform-engineer` | **P1** | M4 |
 | 12 | Add RLS cross-tenant isolation tests for gamification tables to `__tests__/db/rls_isolation.test.ts`; verify no cross-user PR leakage, no achievement fabrication from form_api role | `enterprise-architect` | **P0** | M3 |
+
+---
+
+## 23. Exercise Library & Program Schema
+
+This section defines the exercise catalog, program templates, user program instances, and periodization structure. It closes the schema gap referenced in `docs/PRODUCT_SPEC.md` (exercise catalog) and `docs/TECHNICAL.md` (program generation architecture). Cross-references: §2 (`workout_sessions` / `workout_sets` core schema), §22 (`personal_records` — PRs inform load prescriptions), §21 (`coaching_sessions` — Victor-generated programs originate here), §15 (`cv_sessions` — `is_cv_supported` flag links exercises to the CV pipeline), `docs/VICTOR_PROMPT_GUIDE.md`.
+
+---
+
+### 23.1 Design Decisions
+
+**Exercise catalog is global, not tenant-scoped.** The canonical library (`exercises` with `is_custom = FALSE`) is shared across all tenants and users. Custom exercises (`is_custom = TRUE`) belong to a specific user and/or tenant and are invisible to others. This avoids duplication and enables consistent CV form detection across the pipeline — §15 `cv_sessions` reference the same canonical `exercise_id` regardless of tenant.
+
+**Program templates are FORM-curated, not user-submitted.** `program_templates` has `form_admin`-only write access. User-generated templates are out of scope at launch (see OQ-PROG-04). This maintains quality and clinical-safety control over the program library.
+
+**Victor-generated programs are first-class data.** When Victor (§21) generates a program, it creates a `user_programs` row with `source = 'victor_generated'` and a FK to the originating `coaching_session_id`. The structured prescription (blocks → sessions → exercises) is stored in relational tables, not free-form JSON, enabling adherence tracking, PR correlation, and future coaching context reconstruction.
+
+**One active program per user.** A partial unique index enforces at most one program per user with `status = 'active'`. Victor must mark the existing active program as `'abandoned'` (with `abandonment_reason = 'victor_replaced'`) before inserting a new one — and emit a DEC-030 event for the abandoned program within the same transaction.
+
+**Load prescription is relative-first.** `load_type = 'relative'` computes working weight as a percentage of the user's current `personal_records` (§22) for that exercise. Absolute prescriptions are allowed but discouraged for Victor-generated programs, since they become stale as strength increases.
+
+---
+
+### 23.2 ENUMs
+
+```sql
+CREATE TYPE movement_pattern AS ENUM (
+  'push_horizontal',   -- bench press, push-up
+  'push_vertical',     -- overhead press, dip
+  'pull_horizontal',   -- row, face pull
+  'pull_vertical',     -- pull-up, lat pulldown
+  'hip_hinge',         -- deadlift, RDL, good morning
+  'squat',             -- squat, leg press, hack squat
+  'lunge',             -- split squat, walking lunge
+  'carry',             -- farmer carry, suitcase carry
+  'rotation',          -- cable rotation, landmine twist
+  'static_hold',       -- plank, wall sit, dead hang
+  'plyometric',        -- box jump, clap push-up
+  'cardio'             -- assault bike, rowing, treadmill
+);
+
+CREATE TYPE muscle_group AS ENUM (
+  'chest', 'back_upper', 'back_lower',
+  'shoulders_front', 'shoulders_side', 'shoulders_rear',
+  'biceps', 'triceps', 'forearms',
+  'quadriceps', 'hamstrings', 'glutes', 'calves',
+  'core_anterior', 'core_posterior', 'core_lateral',
+  'hip_flexors', 'adductors', 'abductors',
+  'traps_upper', 'traps_mid_lower', 'spinal_erectors'
+);
+
+CREATE TYPE equipment_type AS ENUM (
+  'barbell', 'dumbbell', 'cable', 'machine', 'bodyweight',
+  'kettlebell', 'resistance_band', 'trap_bar', 'ez_bar',
+  'smith_machine', 'rings', 'pullup_bar', 'dip_station',
+  'ab_wheel', 'bench', 'other'
+);
+
+CREATE TYPE program_goal AS ENUM (
+  'strength',            -- 1RM / multi-rep maxes primary metric
+  'hypertrophy',         -- volume and muscle size primary
+  'powerbuilding',       -- strength + hypertrophy blend
+  'strength_endurance',  -- higher rep, shorter rest
+  'general_fitness',     -- beginner / maintenance
+  'recomposition'        -- concurrent strength + conditioning
+);
+
+CREATE TYPE program_source AS ENUM (
+  'victor_generated',  -- AI program for this specific user
+  'template',          -- cloned from program_templates library
+  'custom'             -- user-built (reserved; out of scope at launch)
+);
+
+CREATE TYPE program_status AS ENUM (
+  'draft',      -- generated but not yet confirmed by user
+  'active',     -- currently being executed
+  'paused',     -- user-paused
+  'completed',  -- successfully finished
+  'abandoned'   -- ended early (user or Victor triggered)
+);
+
+CREATE TYPE block_type AS ENUM (
+  'accumulation',    -- high volume, moderate intensity (~65-75% 1RM)
+  'intensification', -- moderate volume, high intensity (~80-90% 1RM)
+  'realization',     -- low volume, peak / test week
+  'deload'           -- reduced load and volume for recovery
+);
+
+CREATE TYPE session_split AS ENUM (
+  'upper_body', 'lower_body', 'full_body',
+  'push', 'pull', 'legs',
+  'upper_push', 'upper_pull',
+  'squat_focus', 'hinge_focus',
+  'posterior_chain', 'anterior_chain',
+  'conditioning', 'mobility_flexibility', 'rest'
+);
+```
+
+---
+
+### 23.3 `exercises` — Global Catalog
+
+Global rows (`is_custom = FALSE`) are FORM-curated and readable by all authenticated users. Custom rows (`is_custom = TRUE`) are visible only to the owning user/tenant.
+
+```sql
+CREATE TABLE exercises (
+  exercise_id       UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug              TEXT    NOT NULL UNIQUE,   -- e.g. 'barbell-back-squat'
+  name_ua           TEXT    NOT NULL,
+  name_en           TEXT    NOT NULL,
+  category          TEXT    NOT NULL CHECK (category IN (
+    'compound', 'isolation', 'cardio', 'mobility', 'warm_up'
+  )),
+  movement_pattern  movement_pattern NOT NULL,
+  is_bilateral      BOOLEAN NOT NULL DEFAULT TRUE,
+  is_bodyweight     BOOLEAN NOT NULL DEFAULT FALSE,
+  is_cv_supported   BOOLEAN NOT NULL DEFAULT FALSE,  -- CV pose estimation (§15)
+  difficulty        SMALLINT NOT NULL CHECK (difficulty BETWEEN 1 AND 5),
+  min_equipment     equipment_type[] NOT NULL DEFAULT '{}',
+  alt_equipment     equipment_type[] NOT NULL DEFAULT '{}',
+  -- contraindication_tags: Victor screens against user_health_profiles.injuries
+  -- e.g. 'lower_back_pain', 'shoulder_impingement', 'knee_flexion_pain'
+  contraindication_tags TEXT[] NOT NULL DEFAULT '{}',
+  is_custom         BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by_user   UUID    REFERENCES user_profiles(user_id) ON DELETE SET NULL,
+  created_by_tenant UUID    REFERENCES tenants(tenant_id)     ON DELETE SET NULL,
+  is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+  deprecated_at     TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_custom_has_owner CHECK (
+    (is_custom = FALSE AND created_by_user IS NULL AND created_by_tenant IS NULL)
+    OR
+    (is_custom = TRUE AND (created_by_user IS NOT NULL OR created_by_tenant IS NOT NULL))
+  ),
+  CONSTRAINT chk_deprecated_inactive CHECK (
+    deprecated_at IS NULL OR is_active = FALSE
+  )
+);
+
+CREATE INDEX idx_exercises_movement  ON exercises (movement_pattern) WHERE is_active = TRUE;
+CREATE INDEX idx_exercises_category  ON exercises (category)         WHERE is_active = TRUE;
+CREATE INDEX idx_exercises_cv        ON exercises (is_cv_supported)  WHERE is_active = TRUE;
+CREATE INDEX idx_exercises_custom_u  ON exercises (created_by_user)  WHERE is_custom = TRUE;
+CREATE INDEX idx_exercises_custom_t  ON exercises (created_by_tenant) WHERE is_custom = TRUE;
+```
+
+**Seed catalog — 60 exercises (P0 M2):** Barbell Back Squat, Front Squat, Romanian Deadlift, Conventional Deadlift, Sumo Deadlift, Flat Bench Press, Incline Bench Press, Decline Bench Press, Overhead Press, Pendlay Row, Barbell Row, Pull-up, Chin-up, Lat Pulldown, Seated Cable Row, Dumbbell Lateral Raise, Dumbbell Curl, EZ Bar Curl, Skull Crusher, Triceps Pushdown, Bulgarian Split Squat, Hip Thrust, Leg Press, Leg Curl, Leg Extension, Calf Raise (Standing/Seated), Face Pull, Plank, Dead Bug, Copenhagen Plank, Farmer Carry, Suitcase Carry, Trap Bar Deadlift, Close-Grip Bench Press, Dips, Ring Row, GHD Sit-Up, Back Extension, Good Morning, Hack Squat, Step-Up, Walking Lunge, Box Jump, Assault Bike Sprint, Rowing Machine, Treadmill Run, Incline Dumbbell Press, Dumbbell Row, Cable Fly, Preacher Curl, Hammer Curl, Overhead Triceps Extension (DB/Cable), Close-Grip Push-Up, Push-Up, Inverted Row, Jefferson Curl, Nordic Curl, Glute Bridge, Ab Wheel Rollout, Hanging Leg Raise, Pallof Press, Landmine Press.
+
+---
+
+### 23.4 `exercise_instructions` — Multilingual Coaching Cues
+
+```sql
+CREATE TABLE exercise_instructions (
+  instruction_id UUID     PRIMARY KEY DEFAULT gen_random_uuid(),
+  exercise_id    UUID     NOT NULL REFERENCES exercises(exercise_id) ON DELETE CASCADE,
+  locale         TEXT     NOT NULL CHECK (locale IN ('uk', 'en')),
+  step_number    SMALLINT NOT NULL CHECK (step_number >= 1),
+  instruction    TEXT     NOT NULL,
+  coaching_cue   TEXT,    -- short in-workout reminder ≤ 80 chars
+  UNIQUE (exercise_id, locale, step_number)
+);
+
+CREATE INDEX idx_ex_instr_exercise_locale ON exercise_instructions (exercise_id, locale);
+```
+
+---
+
+### 23.5 `exercise_muscle_groups` — Muscle Group Junction
+
+```sql
+CREATE TABLE exercise_muscle_groups (
+  exercise_id  UUID         NOT NULL REFERENCES exercises(exercise_id) ON DELETE CASCADE,
+  muscle_group muscle_group NOT NULL,
+  role         TEXT         NOT NULL CHECK (role IN ('primary', 'secondary', 'stabilizer')),
+  PRIMARY KEY (exercise_id, muscle_group, role)
+);
+
+CREATE INDEX idx_emg_muscle_primary ON exercise_muscle_groups (muscle_group) WHERE role = 'primary';
+```
+
+Victor uses this table for **muscle group balance analysis** when generating or reviewing a program. It checks that weekly volume across `primary` groups is balanced — flagging if push:pull ratio deviates more than 20% from 1:1, or if posterior-chain weekly volume is below 30% of total lower-body volume. Both checks are enforced in the program generation Worker before commit; they are not DB constraints.
+
+---
+
+### 23.6 `program_templates` — FORM-Curated Library
+
+```sql
+CREATE TABLE program_templates (
+  template_id        UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug               TEXT         NOT NULL UNIQUE,
+  name_ua            TEXT         NOT NULL,
+  name_en            TEXT         NOT NULL,
+  goal               program_goal NOT NULL,
+  duration_weeks     SMALLINT     NOT NULL CHECK (duration_weeks BETWEEN 4 AND 52),
+  days_per_week      SMALLINT     NOT NULL CHECK (days_per_week BETWEEN 2 AND 7),
+  experience_level   TEXT         NOT NULL CHECK (experience_level IN (
+    'beginner', 'intermediate', 'advanced'
+  )),
+  equipment_required equipment_type[] NOT NULL DEFAULT '{}',
+  description_ua     TEXT,
+  description_en     TEXT,
+  is_victor_authored BOOLEAN      NOT NULL DEFAULT FALSE,
+  is_active          BOOLEAN      NOT NULL DEFAULT TRUE,
+  -- min_plan_tier: gates template visibility by subscription level
+  min_plan_tier      TEXT         NOT NULL DEFAULT 'consumer' CHECK (min_plan_tier IN (
+    'consumer', 'starter', 'growth', 'enterprise'
+  )),
+  created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+```
+
+**Initial library (P1 M3):** 6 templates — 2× beginner (3-day full-body strength; 3-day beginner hypertrophy), 2× intermediate (4-day upper/lower powerbuilding; 4-day push/pull/legs/full), 2× advanced (5-day powerbuilding block; 6-day frequency specialist). All `is_victor_authored = FALSE` at initial import; Victor-authored templates require sports-scientist sign-off before `is_victor_authored = TRUE`.
+
+---
+
+### 23.7 `user_programs` — User Program Instances
+
+```sql
+CREATE TABLE user_programs (
+  program_id          UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID           NOT NULL REFERENCES user_profiles(user_id) ON DELETE CASCADE,
+  tenant_id           UUID           REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  template_id         UUID           REFERENCES program_templates(template_id) ON DELETE SET NULL,
+  coaching_session_id UUID           REFERENCES coaching_sessions(session_id) ON DELETE SET NULL,
+  source              program_source NOT NULL,
+  status              program_status NOT NULL DEFAULT 'draft',
+  goal                program_goal   NOT NULL,
+  name_ua             TEXT           NOT NULL,
+  name_en             TEXT           NOT NULL,
+  duration_weeks      SMALLINT       NOT NULL CHECK (duration_weeks BETWEEN 1 AND 52),
+  days_per_week       SMALLINT       NOT NULL CHECK (days_per_week BETWEEN 1 AND 7),
+  started_at          TIMESTAMPTZ,
+  target_end_at       TIMESTAMPTZ    GENERATED ALWAYS AS (
+    CASE WHEN started_at IS NOT NULL
+         THEN started_at + (duration_weeks * INTERVAL '1 week')
+         ELSE NULL END
+  ) STORED,
+  completed_at        TIMESTAMPTZ,
+  abandoned_at        TIMESTAMPTZ,
+  abandonment_reason  TEXT           CHECK (abandonment_reason IN (
+    'user_requested', 'victor_replaced', 'goal_changed',
+    'injury_reported', 'insufficient_progress', 'equipment_changed'
+  )),
+  -- generation_context: Victor's rationale (see §23.7.1 privacy constraints)
+  generation_context  JSONB,
+  -- adherence_pct: computed on completion/abandonment
+  -- ratio of (sessions completed) / (total non-rest sessions)
+  adherence_pct       NUMERIC(5,2)   CHECK (adherence_pct BETWEEN 0 AND 100),
+  created_at          TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_active_has_start CHECK (
+    status NOT IN ('active', 'paused', 'completed', 'abandoned')
+    OR started_at IS NOT NULL
+  ),
+  CONSTRAINT chk_completion_consistency CHECK (
+    (status = 'completed'  AND completed_at IS NOT NULL AND abandoned_at IS NULL)
+    OR (status = 'abandoned' AND abandoned_at IS NOT NULL AND completed_at IS NULL)
+    OR status NOT IN ('completed', 'abandoned')
+  )
+);
+
+-- At most one active program per user
+CREATE UNIQUE INDEX uq_user_one_active_program
+  ON user_programs (user_id)
+  WHERE status = 'active';
+
+CREATE INDEX idx_user_programs_user     ON user_programs (user_id, status);
+CREATE INDEX idx_user_programs_tenant   ON user_programs (tenant_id) WHERE tenant_id IS NOT NULL;
+CREATE INDEX idx_user_programs_coaching ON user_programs (coaching_session_id)
+  WHERE coaching_session_id IS NOT NULL;
+```
+
+#### 23.7.1 `generation_context` Privacy Schema
+
+The `generation_context` JSONB column stores Victor's reasoning for program construction. Strict allow/deny rules apply before INSERT (enforced by `sanitizeGenerationContext()` — see §23.12):
+
+| Field | Status | Notes |
+|---|---|---|
+| `training_age_bracket` | ✅ Permitted | `'<1yr'` / `'1-3yr'` / `'3-5yr'` / `'>5yr'` |
+| `strength_level` | ✅ Permitted | `'novice'` / `'intermediate'` / `'advanced'` |
+| `goal_stated` | ✅ Permitted | Value from `program_goal` ENUM |
+| `days_available` | ✅ Permitted | Integer |
+| `equipment_available` | ✅ Permitted | Array of `equipment_type` values |
+| `preferred_movements` | ✅ Permitted | Array of `movement_pattern` values |
+| `injury_mentions` | ❌ **BLOCKED** | Injury data lives in `user_health_profiles` only |
+| `body_weight_kg` | ❌ **BLOCKED** | Body-composition data never in program records |
+| `caloric_intake` | ❌ **BLOCKED** | Nutrition data never in program records |
+| Diagnostic language | ❌ **BLOCKED** | e.g. "herniated disc", "tendinopathy" — clinical-safety VETO |
+
+---
+
+### 23.8 `program_blocks` — Periodization Blocks
+
+```sql
+CREATE TABLE program_blocks (
+  block_id      UUID       PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_id    UUID       NOT NULL REFERENCES user_programs(program_id) ON DELETE CASCADE,
+  block_number  SMALLINT   NOT NULL,
+  name_ua       TEXT       NOT NULL,
+  name_en       TEXT       NOT NULL,
+  block_type    block_type NOT NULL,
+  week_start    SMALLINT   NOT NULL CHECK (week_start >= 1),
+  week_end      SMALLINT   NOT NULL,
+  notes_ua      TEXT,
+  notes_en      TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (program_id, block_number),
+  CONSTRAINT chk_block_week_range CHECK (week_end >= week_start)
+);
+
+CREATE INDEX idx_program_blocks_program ON program_blocks (program_id);
+```
+
+**Deload enforcement rule:** Victor must include at least one `block_type = 'deload'` block in any program of 8+ weeks. This is a Worker-layer constraint, not a DB constraint (to avoid blocking valid 4–7 week programs). The program generation Worker validates before commit; the DEC-030 `program.created` event includes a `deload_blocks_count` field for auditing.
+
+---
+
+### 23.9 `program_sessions` — Planned Sessions
+
+```sql
+CREATE TABLE program_sessions (
+  session_id                 UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_id                 UUID          NOT NULL REFERENCES user_programs(program_id) ON DELETE CASCADE,
+  block_id                   UUID          REFERENCES program_blocks(block_id) ON DELETE SET NULL,
+  week_number                SMALLINT      NOT NULL CHECK (week_number >= 1),
+  day_of_week                SMALLINT      NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),  -- 1 = Mon
+  session_number             SMALLINT      NOT NULL,  -- global sequence within program
+  session_split              session_split NOT NULL,
+  name_ua                    TEXT          NOT NULL,
+  name_en                    TEXT          NOT NULL,
+  estimated_duration_minutes SMALLINT,
+  is_rest_day                BOOLEAN       NOT NULL DEFAULT FALSE,
+  coaching_notes_ua          TEXT,
+  coaching_notes_en          TEXT,
+  -- FK to actual logged session; NULL until user completes this session
+  workout_session_id         UUID          REFERENCES workout_sessions(session_id) ON DELETE SET NULL,
+  completed_at               TIMESTAMPTZ,
+  skipped_at                 TIMESTAMPTZ,
+  created_at                 TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  UNIQUE (program_id, week_number, day_of_week),
+  CONSTRAINT chk_not_both_completed_skipped CHECK (
+    NOT (completed_at IS NOT NULL AND skipped_at IS NOT NULL)
+  )
+);
+
+CREATE INDEX idx_program_sessions_program ON program_sessions (program_id, week_number);
+CREATE INDEX idx_program_sessions_workout ON program_sessions (workout_session_id)
+  WHERE workout_session_id IS NOT NULL;
+```
+
+---
+
+### 23.10 `program_session_exercises` — Exercise Prescriptions
+
+```sql
+CREATE TABLE program_session_exercises (
+  prescription_id  UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id       UUID    NOT NULL REFERENCES program_sessions(session_id) ON DELETE CASCADE,
+  exercise_id      UUID    NOT NULL REFERENCES exercises(exercise_id) ON DELETE RESTRICT,
+  order_index      SMALLINT NOT NULL CHECK (order_index >= 1),
+  superset_group   SMALLINT,  -- NULL = standalone; same integer = superset partners
+  sets             SMALLINT NOT NULL CHECK (sets BETWEEN 1 AND 20),
+  rep_min          SMALLINT CHECK (rep_min >= 1),
+  rep_max          SMALLINT CHECK (rep_max >= 1),
+  reps_fixed       SMALLINT CHECK (reps_fixed >= 1),
+  rpe_target       NUMERIC(3,1) CHECK (rpe_target BETWEEN 5.0 AND 10.0),
+  rir_target       SMALLINT CHECK (rir_target BETWEEN 0 AND 5),
+  load_type        TEXT    NOT NULL DEFAULT 'rpe_governed' CHECK (load_type IN (
+    'relative',      -- % of 1RM from personal_records (§22)
+    'absolute',      -- explicit kg
+    'bodyweight',
+    'rpe_governed',  -- load not prescribed; RPE is the governing constraint
+    'amrap'
+  )),
+  load_pct_1rm     NUMERIC(5,2) CHECK (load_pct_1rm BETWEEN 20 AND 110),
+  load_kg          NUMERIC(6,2) CHECK (load_kg > 0),
+  rest_seconds     SMALLINT     CHECK (rest_seconds BETWEEN 10 AND 600),
+  tempo            TEXT         CHECK (tempo ~ '^\d-\d-\d-\d$'),  -- e.g. '3-1-2-0'
+  coaching_cue_ua  TEXT,
+  coaching_cue_en  TEXT,
+  -- substitution pattern: see §23.13
+  substitute_for   UUID    REFERENCES program_session_exercises(prescription_id) ON DELETE SET NULL,
+  substituted_at   TIMESTAMPTZ,
+  substitution_reason TEXT CHECK (substitution_reason IN (
+    'equipment_unavailable', 'exercise_too_hard', 'exercise_too_easy',
+    'user_preference', 'injury_reported', 'victor_recommended'
+  )),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_rep_prescription CHECK (
+    (rep_min IS NOT NULL AND rep_max IS NOT NULL AND rep_min <= rep_max)
+    OR reps_fixed IS NOT NULL
+    OR load_type = 'amrap'
+  ),
+  CONSTRAINT chk_load_consistency CHECK (
+    (load_type = 'relative'  AND load_pct_1rm IS NOT NULL AND load_kg IS NULL)
+    OR (load_type = 'absolute' AND load_kg IS NOT NULL      AND load_pct_1rm IS NULL)
+    OR load_type IN ('bodyweight', 'rpe_governed', 'amrap')
+  ),
+  CONSTRAINT chk_substitution_atomicity CHECK (
+    (substitute_for IS NULL) = (substituted_at IS NULL)
+  )
+);
+
+-- Substitution rows may share order_index with the replaced row;
+-- the partial index only enforces uniqueness among active (non-substitute) rows.
+CREATE UNIQUE INDEX uq_session_exercise_order
+  ON program_session_exercises (session_id, order_index)
+  WHERE substitute_for IS NULL;
+
+CREATE INDEX idx_pse_session  ON program_session_exercises (session_id);
+CREATE INDEX idx_pse_exercise ON program_session_exercises (exercise_id);
+```
+
+---
+
+### 23.11 Row-Level Security Policies
+
+#### 23.11.1 `exercises`
+
+```sql
+-- Global catalog: read by all authenticated users
+CREATE POLICY exercises_read_global ON exercises
+  FOR SELECT TO form_api
+  USING (is_custom = FALSE AND is_active = TRUE);
+
+-- Custom: own-user read
+CREATE POLICY exercises_read_custom_own ON exercises
+  FOR SELECT TO form_api
+  USING (is_custom = TRUE AND created_by_user = auth.uid());
+
+-- Custom: tenant-shared read (same tenant_id)
+CREATE POLICY exercises_read_custom_tenant ON exercises
+  FOR SELECT TO form_api
+  USING (
+    is_custom = TRUE
+    AND created_by_tenant = (
+      SELECT tenant_id FROM user_profiles WHERE user_id = auth.uid()
+    )
+  );
+
+-- Custom exercise creation: own-user only, tenant context required
+CREATE POLICY exercises_insert_custom ON exercises
+  FOR INSERT TO form_api
+  WITH CHECK (
+    is_custom = TRUE
+    AND created_by_user = auth.uid()
+    AND created_by_tenant IS NOT NULL
+  );
+
+-- exercise_instructions + exercise_muscle_groups inherit via exercise_id join.
+-- form_admin: unrestricted (global catalog management).
+```
+
+#### 23.11.2 `program_templates`
+
+```sql
+-- Read: all authenticated users whose plan tier satisfies min_plan_tier
+CREATE POLICY templates_read ON program_templates
+  FOR SELECT TO form_api
+  USING (
+    is_active = TRUE
+    AND min_plan_tier IN ('consumer', (
+      SELECT plan FROM tenants
+      WHERE tenant_id = (
+        SELECT tenant_id FROM user_profiles WHERE user_id = auth.uid()
+      )
+    ))
+  );
+
+-- Write: form_admin only
+CREATE POLICY templates_admin_all ON program_templates
+  FOR ALL TO form_admin USING (TRUE);
+```
+
+#### 23.11.3 `user_programs`, `program_blocks`, `program_sessions`, `program_session_exercises`
+
+```sql
+-- user_programs: own-row read
+CREATE POLICY user_programs_own_read ON user_programs
+  FOR SELECT TO form_api
+  USING (user_id = auth.uid());
+
+-- No direct form_api INSERT/UPDATE on user_programs.
+-- All program lifecycle mutations run as form_system (program generation Worker,
+-- program lifecycle Worker) to ensure constraint enforcement and DEC-030
+-- event emission are atomic within the same transaction.
+
+-- form_system: tenant-scoped access
+CREATE POLICY user_programs_system ON user_programs
+  FOR ALL TO form_system
+  USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
+
+-- tenant_admin: ZERO ACCESS (DEC-002 — individual training programs
+-- are not visible to enterprise HR administrators).
+-- Aggregate reporting uses §17 materialized views exclusively.
+
+-- form_admin: unrestricted
+CREATE POLICY user_programs_admin ON user_programs
+  FOR ALL TO form_admin USING (TRUE);
+
+-- Child tables (program_blocks, program_sessions, program_session_exercises):
+-- same pattern — form_api reads via user_id join through user_programs;
+-- form_system writes with tenant context; form_admin unrestricted.
+```
+
+---
+
+### 23.12 Victor Program Generation — Worker Pattern
+
+When Victor generates a program during a coaching session, the Worker must execute as a single atomic transaction:
+
+```typescript
+// src/workers/programs/generate-program.ts (structural sketch)
+
+const PERMITTED_CONTEXT_KEYS = new Set([
+  'training_age_bracket', 'strength_level', 'goal_stated',
+  'days_available', 'equipment_available', 'preferred_movements'
+]);
+
+function sanitizeGenerationContext(raw: unknown): Record<string, unknown> {
+  if (typeof raw !== 'object' || raw === null) return {};
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>)
+      .filter(([k]) => PERMITTED_CONTEXT_KEYS.has(k))
+  );
+}
+
+async function generateProgram(
+  userId: string, tenantId: string | null,
+  coachingSessionId: string,
+  prescription: ProgramPrescription,
+  tx: DatabaseTransaction
+): Promise<string> {
+
+  // 1. Abandon existing active program
+  const existing = await tx.query<{ program_id: string }>(
+    `SELECT program_id FROM user_programs
+     WHERE user_id = $1 AND status = 'active' FOR UPDATE`,
+    [userId]
+  );
+  if (existing.rows.length > 0) {
+    await tx.query(
+      `UPDATE user_programs SET status = 'abandoned', abandoned_at = NOW(),
+       abandonment_reason = 'victor_replaced' WHERE program_id = $1`,
+      [existing.rows[0].program_id]
+    );
+    await emitAuditEvent(tx, 'program.abandoned', {
+      entity_id: existing.rows[0].program_id, entity_type: 'program',
+      user_id: userId, tenant_id: tenantId,
+      metadata: { reason: 'victor_replaced' }
+    });
+  }
+
+  // 2. Insert user_programs with sanitized context
+  const { program_id } = await tx.query<{ program_id: string }>(
+    `INSERT INTO user_programs
+       (user_id, tenant_id, coaching_session_id, source, status, goal,
+        name_ua, name_en, duration_weeks, days_per_week, generation_context)
+     VALUES ($1,$2,$3,'victor_generated','draft',$4,$5,$6,$7,$8,$9)
+     RETURNING program_id`,
+    [userId, tenantId, coachingSessionId,
+     prescription.goal, prescription.name_ua, prescription.name_en,
+     prescription.duration_weeks, prescription.days_per_week,
+     sanitizeGenerationContext(prescription.context)]
+  ).then(r => r.rows[0]);
+
+  // 3. Batch-insert blocks → sessions → exercises
+  // ... (loop over prescription.blocks)
+
+  // 4. Emit program.created audit event
+  await emitAuditEvent(tx, 'program.created', {
+    entity_id: program_id, entity_type: 'program',
+    user_id: userId, tenant_id: tenantId,
+    metadata: {
+      source: 'victor_generated', goal: prescription.goal,
+      duration_weeks: prescription.duration_weeks,
+      deload_blocks_count: prescription.blocks.filter(b => b.type === 'deload').length
+    }
+  });
+
+  return program_id;
+}
+```
+
+CI gates for `sanitizeGenerationContext`: (1) unit tests asserting all 4 blocked field categories are stripped; (2) grep for `'injury_mentions'`, `'body_weight'`, `'caloric'`, `'diagnosis'` in any INSERT path touching `generation_context`.
+
+---
+
+### 23.13 Exercise Substitution Pattern
+
+When a user or Victor swaps an exercise within a program session:
+
+1. The original `program_session_exercises` row is **never deleted or updated**.
+2. A new row is inserted with `substitute_for` pointing to the original `prescription_id`, and `substitution_reason` set.
+3. The partial unique index `uq_session_exercise_order` allows both original and substitute to share `order_index` (it filters `WHERE substitute_for IS NULL`).
+4. The UI renders the substitute row and visually strikes through the original.
+5. `program.exercise_substituted` DEC-030 event is emitted with both `original_prescription_id` and `new_prescription_id` in metadata.
+
+This pattern preserves full prescription history for adherence analysis and for Victor's future context ("how did the substitutions in your last program perform?").
+
+---
+
+### 23.14 GDPR Art. 17 Erasure — Program Data
+
+Erasure steps for the program data domain, to be added to the §12 erasure Worker:
+
+```sql
+-- Step 1: Nullify generation_context (health-adjacent rationale)
+UPDATE user_programs
+SET generation_context = NULL
+WHERE user_id = $user_id;
+-- DEC-030: program.generation_context_erased
+
+-- Step 2: Nullify per-session coaching notes (may contain health references)
+UPDATE program_sessions
+SET coaching_notes_ua = NULL, coaching_notes_en = NULL
+WHERE program_id IN (
+  SELECT program_id FROM user_programs WHERE user_id = $user_id
+);
+
+-- Step 3: Nullify per-exercise coaching cues
+UPDATE program_session_exercises
+SET coaching_cue_ua = NULL, coaching_cue_en = NULL
+WHERE session_id IN (
+  SELECT ps.session_id FROM program_sessions ps
+  JOIN user_programs up ON ps.program_id = up.program_id
+  WHERE up.user_id = $user_id
+);
+
+-- Step 4: Hard delete user_programs (cascades to all child tables)
+DELETE FROM user_programs WHERE user_id = $user_id;
+-- DEC-030: program.programs_erased (count in metadata)
+
+-- Step 5: Hard delete custom exercises owned by the user
+DELETE FROM exercises WHERE created_by_user = $user_id AND is_custom = TRUE;
+-- DEC-030: exercise.custom_exercises_erased (count in metadata)
+```
+
+**Retention exception:** Aggregate adherence data already materialized into §17 views at k-anonymity ≥ 5 may be retained after individual erasure. Those views contain no `user_id` or `program_id` — they are irreversibly aggregated. Basis: Art. 17(3)(b) research/statistics exemption applied narrowly.
+
+---
+
+### 23.15 DEC-030 HMAC-Chained Audit Events
+
+All program lifecycle mutations must emit HMAC-chained audit events in the same transaction (DEC-030 pattern, `docs/AUDIT_LOG_SCHEMA.md`).
+
+| Event Type | Severity | Retention | Trigger |
+|---|---|---|---|
+| `program.created` | STANDARD | 3yr | New `user_programs` row inserted (any source) |
+| `program.started` | STANDARD | 3yr | `status` → `'active'` |
+| `program.paused` | STANDARD | 3yr | `status` → `'paused'` |
+| `program.resumed` | STANDARD | 3yr | `status` → `'active'` from `'paused'` |
+| `program.completed` | STANDARD | 3yr | `status` → `'completed'` |
+| `program.abandoned` | STANDARD | 3yr | `status` → `'abandoned'` |
+| `program.regenerated` | STANDARD | 3yr | Victor replaces an active program (emitted alongside `program.abandoned` for the replaced program) |
+| `program.exercise_substituted` | STANDARD | 3yr | New substitute row in `program_session_exercises` |
+| `program.generation_context_erased` | STANDARD | 7yr | Art. 17 nullification of `generation_context` |
+| `program.programs_erased` | STANDARD | 7yr | Art. 17 hard delete of all user programs |
+| `exercise.custom_created` | STANDARD | 3yr | User inserts a custom exercise |
+| `exercise.custom_exercises_erased` | STANDARD | 7yr | Art. 17 deletion of user's custom exercises |
+
+**Mandatory metadata fields for `program.created`:**
+```json
+{
+  "source": "victor_generated | template | custom",
+  "goal": "<program_goal>",
+  "duration_weeks": 12,
+  "days_per_week": 4,
+  "deload_blocks_count": 1
+}
+```
+
+---
+
+### 23.16 SOC 2 Mapping
+
+| Criterion | Control | Evidence Artefact |
+|---|---|---|
+| **CC6.1** | RLS on `user_programs`: `form_api` reads own rows; `tenant_admin` zero access (DEC-002) | `rls_isolation.test.ts` — cross-user and tenant_admin assertions |
+| **CC6.2** | `program_templates` are `form_admin`-only write; users cannot inject into the shared library | CI test: `form_api` INSERT to `program_templates` → 403 |
+| **CC7.2** | DEC-030 events on all program mutations enable anomaly detection (e.g. programs created without a coaching session FK) | Audit log filter `event_type LIKE 'program.%'` |
+| **CC8.1** | HMAC-chained events; `sanitizeGenerationContext()` CI-enforced before any `generation_context` INSERT | Unit test + CI grep for blocked field names |
+| **PI1.4** | What the user sees (their program plan) exactly matches what is stored — no hidden prescription layer | Direct read path: `user_programs` → `program_sessions` → `program_session_exercises` |
+| **P4.0** | `generation_context` nullified on Art. 17 request; custom exercises hard deleted | Art. 17 erasure integration test: `generation_context IS NULL` post-erasure |
+| **P5.0** | `generation_context` schema forbids body-composition, injury, and diagnostic data | `sanitizeGenerationContext()` unit test; CI grep for `body_weight`, `caloric`, `diagnosis`, `injury` in INSERT paths |
+
+---
+
+### 23.17 Open Questions
+
+| ID | Question | Owner | Priority |
+|---|---|---|---|
+| OQ-PROG-01 | **Victor output format.** Should Victor return a structured program JSON schema directly (deterministic, type-safe, testable) or should the program generation Worker parse free-text output? Structured JSON is strongly preferred. Decision needed before program generation Worker ships — an unstable free-text bridge is brittle and blocks adherence tracking. | `ml-engineer` + `platform-engineer` | **P0 — before M3 program Worker** |
+| OQ-PROG-02 | **Program versioning on mid-cycle modification.** If Victor adjusts a program mid-cycle (load reduction due to fatigue signal), do we snapshot the original structure? Option A: `program_revisions` append-only table. Option B: substitution pattern (§23.13) is sufficient at exercise level. Option A preferred for full reproducibility; adds schema complexity. Resolve at M4. | `platform-engineer` + `enterprise-architect` | **P1 — M4** |
+| OQ-PROG-03 | **Custom exercise visibility in enterprise tier.** When a user creates a custom exercise, is it visible to other users in the same tenant? Default: NO (own-user only). Tenant-shared custom exercises would require clinical-safety review of exercise naming for PII/health-language risk before opening. | `enterprise-architect` + `clinical-safety` | **P2 — before enterprise feature expansion** |
+| OQ-PROG-04 | **User-submitted program templates.** Should FORM allow power users to author templates for others? Blocked at launch (`form_api` INSERT to `program_templates` denied by RLS). If opened: requires sports-scientist review gate, clinical-safety approval, and a separate `community_program_templates` table to avoid mixing with FORM-curated library. | `product-strategist` + `clinical-safety` | **P3 — post-launch v2** |
+
+---
+
+### 23.18 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create `migrations/YYYYMMDD_exercise_enums.sql` — all 7 ENUMs from §23.2 (`movement_pattern`, `muscle_group`, `equipment_type`, `program_goal`, `program_source`, `program_status`, `block_type`, `session_split`) | `platform-engineer` | **P0** | M2 |
+| 2 | Create `migrations/YYYYMMDD_exercises.sql` — `exercises`, `exercise_instructions`, `exercise_muscle_groups` DDL with indexes and RLS policies from §23.11.1 | `platform-engineer` | **P0** | M2 |
+| 3 | Seed `exercises` with 60-exercise catalog from §23.3; add UA/EN `exercise_instructions` (≥4 steps each); populate `exercise_muscle_groups` (primary/secondary/stabilizer) for all 60 | `sports-scientist` + `platform-engineer` | **P0** | M2 |
+| 4 | Verify push:pull balance across seed catalog using §23.5 query; flag imbalances for sports-scientist review before merge | `sports-scientist` | **P0** | M2 |
+| 5 | Create `migrations/YYYYMMDD_program_templates.sql` — `program_templates` DDL with RLS; seed 6 initial templates | `platform-engineer` + `sports-scientist` | **P1** | M3 |
+| 6 | Create `migrations/YYYYMMDD_user_programs.sql` — `user_programs`, `program_blocks`, `program_sessions`, `program_session_exercises` DDL with all constraints, indexes, and RLS from §23.11.2/3 | `platform-engineer` | **P0** | M3 |
+| 7 | Write regression test: `uq_user_one_active_program` — inserting a second `status = 'active'` program for the same user raises a unique violation; add to CI gating | `qa-lead` + `platform-engineer` | **P0** | M3 |
+| 8 | Implement `sanitizeGenerationContext()` in `src/workers/programs/sanitize-context.ts`; write unit tests asserting all blocked field categories are stripped; add CI grep for `injury`, `body_weight`, `caloric`, `diagnosis` in all `generation_context` INSERT paths | `platform-engineer` | **P0** | M3 |
+| 9 | Implement `src/workers/programs/generate-program.ts` — atomic transaction per §23.12: abandon active → insert program tree → emit DEC-030; resolve OQ-PROG-01 (Victor output format) before shipping | `platform-engineer` + `ml-engineer` | **P0** | M3 |
+| 10 | Write `__tests__/db/rls_isolation.test.ts` additions: (a) user A cannot read user B's `user_programs`; (b) `tenant_admin` role returns zero rows from `user_programs`; (c) `form_api` INSERT to `program_templates` → 403 | `enterprise-architect` + `qa-lead` | **P0** | M3 |
+| 11 | Register all 12 `program.*` and `exercise.*` DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` with severity and retention tiers | `compliance-officer` | **P0** | M3 |
+| 12 | Add program erasure (5-step sequence from §23.14) to `src/workers/gdpr/erasure.ts`; emit `program.generation_context_erased`, `program.programs_erased`, `exercise.custom_exercises_erased` events | `platform-engineer` + `compliance-officer` | **P0** | M3 |
+| 13 | Implement substitution flow in program lifecycle Worker — insert substitute row per §23.13 pattern; verify `uq_session_exercise_order` partial index allows coexistence; add integration test | `platform-engineer` | **P1** | M4 |
+| 14 | Implement `program.completed` / `program.abandoned` transitions: compute and store `adherence_pct` (completed non-rest sessions / total non-rest sessions) on status change | `platform-engineer` | **P1** | M4 |
+
+---
+
+*v1.3 · травень 2026 · owner: enterprise-architect + platform-engineer + ml-engineer*
+
+*v1.3 additions: §23 Exercise Library & Program Schema — closes the core product schema gap for exercise catalog storage, program templates, user program instances, and periodization structure referenced in PRODUCT_SPEC.md and TECHNICAL.md. Eight-table design: `exercises` (global catalog + is_custom user/tenant-owned; 7 ENUMs including movement_pattern, muscle_group, equipment_type; is_cv_supported flag linking to §15; contraindication_tags for Victor injury screening; chk_custom_has_owner and chk_deprecated_inactive constraints; 60-exercise seed catalog); `exercise_instructions` (multilingual UA/EN coaching cues per step); `exercise_muscle_groups` (primary/secondary/stabilizer roles, push:pull balance analysis by program generation Worker); `program_templates` (FORM-curated library, form_admin-only write, min_plan_tier entitlement gate, 6-template initial library); `user_programs` (program_source and program_status ENUMs; uq_user_one_active_program partial unique index; generated target_end_at column; generation_context JSONB with strict allow/deny privacy schema prohibiting injury/body-composition/diagnostic fields; chk_active_has_start and chk_completion_consistency constraints); `program_blocks` (block_type ENUM with accumulation/intensification/realization/deload; deload enforcement rule for 8+ week programs at Worker layer); `program_sessions` (session_split ENUM; workout_session_id FK to actual logged session; chk_not_both_completed_skipped constraint); `program_session_exercises` (full load prescription schema: relative/absolute/bodyweight/rpe_governed/amrap load_type; rep_min/rep_max/reps_fixed/AMRAP constraint; tempo regex validation; substitution pattern via substitute_for self-FK with uq_session_exercise_order partial unique index). Victor program generation Worker pattern: single atomic transaction that abandons existing active program → inserts full program tree → emits DEC-030 events; sanitizeGenerationContext() strips all non-permitted fields before INSERT with CI grep gate. Exercise substitution pattern: original row preserved; substitute_for FK + partial unique index enable historical coexistence without losing original prescription. GDPR Art. 17: five-step erasure (generation_context nullification → coaching notes nullification → coaching cues nullification → user_programs hard delete with CASCADE → custom exercises hard delete); aggregate retention exception for k-anonymity ≥ 5 materialized data under Art. 17(3)(b). RLS: form_api own-row on user_programs (no direct INSERT — Workers only); program_templates form_admin write; tenant_admin zero access (DEC-002); form_system tenant-scoped. 12 DEC-030 HMAC-chained audit events across program and exercise lifecycle. SOC 2 mapping: CC6.1 (RLS), CC6.2 (template write gate), CC7.2 (audit events for anomaly detection), CC8.1 (HMAC chain + sanitization CI gate), PI1.4 (no hidden prescription layer), P4.0/P5.0 (erasure + forbidden-field enforcement). 4 open questions (OQ-PROG-01: Victor output format P0; OQ-PROG-02: program versioning P1; OQ-PROG-03: enterprise custom exercise sharing P2; OQ-PROG-04: user-submitted templates P3). 14-item implementation checklist (12× P0 M2-M3, 2× P1 M4).*
 
 ---
 
