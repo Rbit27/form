@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v1.2
+# FORM · SSO/SCIM Implementation v1.3
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -28,6 +28,7 @@
 18. [Tenant IdP Migration Runbook](#18-tenant-idp-migration-runbook)
 19. [SCIM Groups Sync & Group-Based Role Mapping](#19-scim-groups-sync--group-based-role-mapping)
 20. [SAML Certificate Lifecycle Management — Proactive Monitoring & Expiry Alerting](#20-saml-certificate-lifecycle-management--proactive-monitoring--expiry-alerting)
+21. [Google Workspace Directory API Integration for Group Sync](#21-google-workspace-directory-api-integration-for-group-sync)
 
 ---
 
@@ -6363,6 +6364,578 @@ FORM ops do not surface SP certificate expiry warnings to the tenant admin — S
 
 ---
 
+## 21. Google Workspace Directory API Integration for Group Sync
+
+> Owner: `enterprise-architect` + `platform-engineer`. Review: on any Google Workspace IdP configuration change or quarterly.
+
+### 21.1 Purpose and Scope
+
+**Problem statement.** Google Workspace OIDC does not include group memberships in the ID token (see §2.3). The `groups` claim is absent from Google's standard OIDC response regardless of scopes requested. As a result, Google Workspace tenants cannot use FORM's group-based role mapping (§5.2, §19) via the OIDC assertion path alone.
+
+**Impact.** Without group sync, every Google Workspace user logs into FORM with the default `member` role (per §11.3 JIT provisioning defaults). Tenant admins must manually assign elevated roles (`tenant_admin`, `tenant_manager`) per user. At 100+ seats this is operationally unsustainable and is a common objection in enterprise deals where Google Workspace is the primary IdP.
+
+**This section.** Specifies the Google Workspace Directory API group synchronisation path: a service-account-based integration that resolves group memberships for each authenticating user at login time, prior to role resolution. Group memberships are cached per-user (TTL: 5 minutes) to stay within Google API rate limits. The resolved groups feed directly into the role-mapping engine (§5.2) and audit log (§6.5), identical to SCIM-provisioned groups.
+
+**Relationship to §19.** Section 19 specifies SCIM Group Sync — the IdP-push model where group changes are delivered to FORM via SCIM PATCH/PUT. The Directory API path in this section is the pull model: FORM calls Google on each login. The two paths are complementary:
+- SCIM Groups (§19) is preferred when available: lower latency, smaller API surface, IdP-managed push.
+- Directory API (this section) is the correct path for Google Workspace tenants who cannot use the three §19 workarounds (Okta bridge, Entra bridge, SAML groups attribute).
+
+Both paths write to `scim_group_role_mappings` and resolve via the `group_member_effective_role` view (§19.4). The role resolution engine (§5.4) is unchanged.
+
+**Scope.**
+- Applies to tenants with `protocol = 'oidc'` AND `oidc_discovery_url` matching `accounts.google.com`.
+- Not applicable to SAML 2.0 Google Workspace tenants (use §19.6 SAML groups attribute instead).
+- Not applicable to non-Google OIDC tenants.
+
+**Closes:** G-005 from §9 (Google Directory API integration for group sync — designed but not implemented).
+
+---
+
+### 21.2 Why Google OIDC Cannot Include Groups
+
+Google's OIDC implementation deliberately does not expose group memberships as an ID token claim. This is a documented, intentional limitation:
+- Google's OAuth 2.0 scopes do not include a `groups` scope.
+- The `openid profile email` scopes return user identity attributes only.
+- Even granting `https://www.googleapis.com/auth/cloud-identity.groups.readonly` (Cloud Identity API) only permits querying groups server-side — not embedding them in the OIDC assertion.
+
+**The consequence:** Any application needing Google Workspace group memberships for authorisation must call the Google Admin SDK Directory API or Cloud Identity Groups API separately. The standard industry pattern is a service account with domain-wide delegation (DWD). FORM adopts this pattern.
+
+**Google's own documentation** (Admin SDK Directory API, Groups.list) confirms: service account + DWD + `https://www.googleapis.com/auth/admin.directory.group.readonly` scope is the recommended path for server-side group resolution.
+
+---
+
+### 21.3 Architecture Overview
+
+```
+Google Workspace OIDC Login (SP-initiated, §1.2)
+         │
+         ▼
+FORM OIDC Callback Worker (Cloudflare edge)
+  ├─ Validate ID token (§6.2 PKCE + signature + nonce)
+  ├─ Extract user sub + email from ID token
+  ├─ Check google_directory_group_cache (TTL 5 min)
+  │     ├─ CACHE HIT  → use cached group list
+  │     └─ CACHE MISS → call Google Directory API
+  │           │
+  │           ▼
+  │     Google Admin SDK Directory API
+  │     POST https://oauth2.googleapis.com/token  (service account JWT)
+  │     GET  https://admin.googleapis.com/admin/directory/v1/groups
+  │          ?userKey={user_email}&maxResults=200  (paginated)
+  │           │
+  │           ▼
+  │     Write group list to google_directory_group_cache (TTL 5 min)
+  │
+  ├─ Map Google groups → form_role via scim_group_role_mappings (§19.3)
+  │     (same lookup path as SCIM groups — no schema changes to §19)
+  ├─ Apply role resolution (§5.4 — explicit assignment beats group)
+  ├─ Emit sso.login (DEC-030) with group_count in payload
+  └─ Issue FORM session token (§12)
+```
+
+**Service account per tenant.** Each Google Workspace tenant configures one GCP service account with domain-wide delegation. The service account JSON credential (RSA private key + client email) is stored in `tenant_sso_configs.google_service_account_json` as AES-256-GCM ciphertext (same encryption envelope as `oidc_client_secret`). FORM's Cloudflare Worker decrypts the credential at runtime using the Cloudflare KMS key.
+
+**No user OAuth consent required.** Domain-wide delegation means the Google Workspace super admin grants server-side access on behalf of all users in the domain. Individual users are not prompted for consent during login. This is the correct enterprise posture — user-facing OAuth consent for group membership lookup would create friction.
+
+---
+
+### 21.4 Schema Extensions
+
+Two additions to `tenant_sso_configs` and one new cache table.
+
+#### 21.4.1 `tenant_sso_configs` additions
+
+```sql
+-- Note: google_service_account_json BYTEA already exists in the §4.2 schema.
+-- This section populates it. No new BYTEA column needed.
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN google_service_account_email  TEXT,       -- service-account@project.iam.gserviceaccount.com
+  ADD COLUMN google_directory_admin_email  TEXT,       -- admin@acme.com — impersonated super-admin
+  ADD COLUMN google_directory_sync_enabled BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN google_directory_last_sync_at TIMESTAMPTZ,
+  ADD COLUMN google_directory_sync_error   TEXT;       -- NULL = last sync OK
+
+-- Partial index: only Google tenants with Directory sync enabled
+CREATE INDEX idx_tsc_google_directory_sync
+  ON tenant_sso_configs (tenant_id)
+  WHERE google_directory_sync_enabled = true
+    AND protocol = 'oidc'
+    AND google_service_account_json IS NOT NULL;
+```
+
+#### 21.4.2 `google_directory_group_cache` table
+
+```sql
+CREATE TABLE google_directory_group_cache (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_email       TEXT NOT NULL,                        -- normalized lowercase
+  groups           JSONB NOT NULL,                       -- [{id, email, name}] from Directory API
+  fetched_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at       TIMESTAMPTZ NOT NULL
+    GENERATED ALWAYS AS (fetched_at + INTERVAL '5 minutes') STORED,
+  fetch_duration_ms INT,                                 -- API latency for cost monitoring
+  error_message    TEXT,                                 -- populated if last fetch failed
+
+  UNIQUE (tenant_id, user_email)
+);
+
+ALTER TABLE google_directory_group_cache ENABLE ROW LEVEL SECURITY;
+
+-- Tenant isolation: tenant users cannot read another tenant's cache
+CREATE POLICY google_dir_cache_isolation
+  ON google_directory_group_cache
+  USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+-- form_system (backend Worker): unrestricted write for upsert path
+CREATE POLICY google_dir_cache_system_write
+  ON google_directory_group_cache
+  FOR ALL TO form_system
+  USING (true) WITH CHECK (true);
+
+-- form_api: read own-tenant only (used for role resolution in callback)
+CREATE POLICY google_dir_cache_api_read
+  ON google_directory_group_cache
+  FOR SELECT TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+-- TTL cleanup: pg_cron purges expired entries every 10 minutes
+-- SELECT cron.schedule('google-dir-cache-cleanup', '*/10 * * * *',
+--   $$DELETE FROM google_directory_group_cache WHERE expires_at < now() - INTERVAL '10 minutes'$$);
+-- The 10-minute buffer beyond TTL supports the §21.5 grace-window fallback.
+```
+
+**Privacy constraint.** `google_directory_group_cache` is not exposed to `tenant_manager` or `tenant_admin` query paths. Admins can see the *resolved FORM role* for a user (via the admin dashboard) but not the raw Google group list. This is the same opacity guarantee as §14.4 for SCIM attributes — group source data is never surfaced to HR-tier roles.
+
+---
+
+### 21.5 Directory API Client Implementation
+
+```typescript
+// apps/api-gateway/src/sso/google-directory-groups.ts
+
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const DIRECTORY_API_BASE = 'https://admin.googleapis.com/admin/directory/v1';
+const GROUPS_PER_PAGE = 200;           // Google API maximum per page
+const CACHE_GRACE_WINDOW_MS = 10 * 60 * 1000;  // 10 min: use stale on API failure
+
+export interface GoogleGroup {
+  id: string;      // Google group unique key (persistent, not email)
+  email: string;   // group@domain.com
+  name: string;    // human-readable display name
+}
+
+interface ServiceAccountCredential {
+  client_email: string;
+  private_key: string;
+  project_id: string;
+}
+
+export async function resolveGoogleGroups(
+  tenantId: string,
+  userEmail: string,
+  env: Env,
+  db: SupabaseClient,
+): Promise<GoogleGroup[]> {
+
+  // 1. Cache lookup
+  const { data: cached } = await db
+    .from('google_directory_group_cache')
+    .select('groups, expires_at, fetched_at, error_message')
+    .eq('tenant_id', tenantId)
+    .eq('user_email', userEmail.toLowerCase())
+    .maybeSingle();
+
+  if (cached) {
+    const expiresAt = new Date(cached.expires_at).getTime();
+    if (Date.now() < expiresAt) {
+      return cached.groups as GoogleGroup[];  // fresh cache hit
+    }
+    // Expired — attempt refresh; fall back to stale within grace window
+    try {
+      return await fetchAndCacheGroups(tenantId, userEmail, env, db);
+    } catch (err) {
+      const graceDeadline = expiresAt + CACHE_GRACE_WINDOW_MS;
+      if (Date.now() < graceDeadline && !cached.error_message) {
+        return cached.groups as GoogleGroup[];  // stale but within grace
+      }
+      throw err;  // beyond grace window: propagate, login blocked
+    }
+  }
+
+  // 2. No cache entry — fetch fresh
+  return await fetchAndCacheGroups(tenantId, userEmail, env, db);
+}
+
+async function fetchAndCacheGroups(
+  tenantId: string,
+  userEmail: string,
+  env: Env,
+  db: SupabaseClient,
+): Promise<GoogleGroup[]> {
+
+  const startMs = Date.now();
+
+  // 3. Load and decrypt service account credential
+  const { data: ssoConfig } = await db
+    .from('tenant_sso_configs')
+    .select('google_service_account_json, google_directory_admin_email')
+    .eq('tenant_id', tenantId)
+    .eq('google_directory_sync_enabled', true)
+    .single();
+
+  if (!ssoConfig?.google_service_account_json) {
+    throw new Error('google_directory_sync_enabled=true but credential missing');
+  }
+
+  const credential: ServiceAccountCredential = JSON.parse(
+    await env.kms.decryptColumn(ssoConfig.google_service_account_json)
+  );
+
+  // 4. Mint service account access token (JWT bearer grant, RFC 7523)
+  //    Access token cached in KV (TTL 55 min) — see OQ-SSO-21.3
+  const accessToken = await getOrMintAccessToken(credential,
+    ssoConfig.google_directory_admin_email, env);
+
+  // 5. Paginate groups for this user (returns only groups user belongs to)
+  const groups: GoogleGroup[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const url = new URL(`${DIRECTORY_API_BASE}/groups`);
+    url.searchParams.set('userKey', userEmail.toLowerCase());
+    url.searchParams.set('maxResults', String(GROUPS_PER_PAGE));
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+    const resp = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      await upsertCache(db, tenantId, userEmail, groups,
+        Date.now() - startMs, `HTTP ${resp.status}: ${body.slice(0, 200)}`);
+      throw new Error(`Directory API ${resp.status}: ${body.slice(0, 200)}`);
+    }
+
+    const page = await resp.json() as {
+      groups?: Array<{ id: string; email: string; name: string }>;
+      nextPageToken?: string;
+    };
+    for (const g of page.groups ?? []) {
+      groups.push({ id: g.id, email: g.email, name: g.name });
+    }
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+
+  // 6. Write cache and update last_sync_at
+  await upsertCache(db, tenantId, userEmail, groups, Date.now() - startMs, null);
+  await db.from('tenant_sso_configs').update({
+    google_directory_last_sync_at: new Date().toISOString(),
+    google_directory_sync_error: null,
+  }).eq('tenant_id', tenantId);
+
+  return groups;
+}
+
+async function getOrMintAccessToken(
+  credential: ServiceAccountCredential,
+  impersonateEmail: string,
+  env: Env,
+): Promise<string> {
+  const kvKey = `google_svc_token_${credential.client_email}`;
+  const cached = await env.SSO_KV.get(kvKey);
+  if (cached) return cached;
+
+  const token = await mintServiceAccountToken(credential, impersonateEmail);
+  await env.SSO_KV.put(kvKey, token, { expirationTtl: 55 * 60 });  // 55 min
+  return token;
+}
+
+async function mintServiceAccountToken(
+  credential: ServiceAccountCredential,
+  impersonateEmail: string,
+): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: credential.client_email,
+    sub: impersonateEmail,   // DWD impersonation
+    scope: 'https://www.googleapis.com/auth/admin.directory.group.readonly',
+    aud: GOOGLE_TOKEN_URL,
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const b64url = (obj: object) =>
+    btoa(JSON.stringify(obj))
+      .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  const sigInput = `${b64url(header)}.${b64url(payload)}`;
+  const privateKey = await importRsaPrivateKey(credential.private_key);
+  const sig = await crypto.subtle.sign(
+    { name: 'RSASSA-PKCS1-v1_5' },
+    privateKey,
+    new TextEncoder().encode(sigInput),
+  );
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  const tokenResp = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: `${sigInput}.${sigB64}`,
+    }),
+  });
+  if (!tokenResp.ok) {
+    throw new Error(`Token mint failed: ${await tokenResp.text()}`);
+  }
+  const { access_token } = await tokenResp.json() as { access_token: string };
+  return access_token;
+}
+
+async function importRsaPrivateKey(pem: string): Promise<CryptoKey> {
+  const pemBody = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+  const der = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
+  return crypto.subtle.importKey(
+    'pkcs8', der.buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['sign'],
+  );
+}
+
+async function upsertCache(
+  db: SupabaseClient,
+  tenantId: string,
+  userEmail: string,
+  groups: GoogleGroup[],
+  durationMs: number,
+  errorMessage: string | null,
+): Promise<void> {
+  await db.from('google_directory_group_cache').upsert({
+    tenant_id: tenantId,
+    user_email: userEmail.toLowerCase(),
+    groups,
+    fetched_at: new Date().toISOString(),
+    fetch_duration_ms: durationMs,
+    error_message: errorMessage,
+  }, { onConflict: 'tenant_id,user_email' });
+}
+```
+
+**Error handling policy.** If `resolveGoogleGroups` throws after the grace window expires, the OIDC callback Worker returns HTTP 502 with an SSO error page. The user sees: *"We couldn't verify your organisation groups. Please try again or contact your IT administrator."* Login is blocked — FORM does not allow login with unresolvable group membership when Directory sync is enabled, because the resolved role might be incorrect.
+
+**Backwards compatibility.** If `google_directory_sync_enabled = false` (the default), Google Workspace users proceed via JIT provisioning at the default `member` role (§11.3). No behaviour change for tenants who do not configure Directory sync.
+
+---
+
+### 21.6 Integration with Role Resolution (§5.4)
+
+After `resolveGoogleGroups` returns the `GoogleGroup[]` array, the OIDC callback Worker maps Google group IDs to FORM roles using the existing `scim_group_role_mappings` table (§19.4), keyed on `scim_group_id = google_group.id`.
+
+```typescript
+// Inside oidc-callback.ts, after resolveGoogleGroups()
+
+const googleGroups = await resolveGoogleGroups(tenantId, userEmail, env, db);
+
+const { data: mappings } = await db
+  .from('scim_group_role_mappings')
+  .select('scim_group_id, form_role')
+  .eq('tenant_id', tenantId)
+  .in('scim_group_id', googleGroups.map(g => g.id));
+
+const groupDerivedRoles = (mappings ?? []).map(m => m.form_role);
+const effectiveRole = resolveEffectiveRole(directRole, groupDerivedRoles);
+// §5.4: explicit direct assignment beats group; among groups, highest privilege wins
+```
+
+**Why reuse `scim_group_role_mappings`?** Google group IDs are persistent opaque identifiers (e.g., `03znysh73zz1yjz`), structurally identical to SCIM external IDs. Reusing the same mapping table avoids a parallel schema and ensures that Google Workspace tenants who later add Okta SCIM can transfer their group-role mappings without schema changes.
+
+**Admin dashboard.** The Group Mapping UI (§16.7) shows groups from two sources for Google Workspace tenants: (a) Directory-API-resolved groups (with a "Google Directory" source badge), and (b) SCIM-pushed groups if any (with a "SCIM" badge). Tenant admins map either type using the same role-assignment interface.
+
+---
+
+### 21.7 Customer Configuration Steps
+
+Performed by the customer's Google Workspace super admin. FORM's CSM provides the guide and assists.
+
+#### Step 1 — Create GCP Project and Service Account
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → New Project (recommended name: `form-sso-<slug>`).
+2. **APIs & Services → Library** → search "Admin SDK API" → Enable.
+3. **IAM & Admin → Service Accounts** → Create Service Account:
+   - Name: `form-directory-sync`
+   - Grant no GCP-level IAM roles (Google Workspace DWD is the access mechanism, not GCP IAM).
+4. Create and download a **JSON key** for the service account.
+
+#### Step 2 — Enable Domain-Wide Delegation
+
+1. [admin.google.com](https://admin.google.com) → **Security → API Controls → Domain-wide Delegation**.
+2. **Add new** → enter service account **Client ID** (from the JSON key `client_id` field).
+3. OAuth scope: `https://www.googleapis.com/auth/admin.directory.group.readonly`
+4. Click Authorize.
+
+> **Principle of least privilege.** The `admin.directory.group.readonly` scope is read-only and returns only group metadata for a specific user. Do not grant `admin.directory.user.readonly` — FORM does not require it.
+
+#### Step 3 — Designate Impersonation Account
+
+Choose a service or role-based administrative account (`sso-service@acme.com`) rather than a named admin's personal account, to avoid disruption if the personal account is suspended or the admin leaves.
+
+#### Step 4 — Provide Credentials to FORM CSM
+
+The customer transmits the JSON key file and the impersonation email to FORM via the secure CSM portal (not email). FORM's CSM uploads both via **Admin Dashboard → SSO → Google Directory Sync**. The JSON key is encrypted with AES-256-GCM before storage — the plaintext is never persisted.
+
+#### Step 5 — Map Groups to FORM Roles
+
+Admin Dashboard → Groups → Group Mapping → **Fetch Groups**: FORM calls the Directory API once to list all groups in the domain for the preview. The admin maps selected groups to FORM roles and saves — entries are written to `scim_group_role_mappings`.
+
+#### Step 6 — Validate
+
+A test user (non-admin) logs in via Google SSO. The admin verifies the user's FORM role in Admin Dashboard → Users matches the expected mapping. FORM emits `sso.google_directory_sync_validated` DEC-030 event.
+
+---
+
+### 21.8 Credential Rotation Protocol
+
+Service account JSON keys should be rotated annually or immediately on suspected compromise.
+
+| # | Action | Owner |
+|---|---|---|
+| 1 | GCP Console → Service Accounts → `form-directory-sync` → Keys → **Add Key (JSON)** | Customer IT admin |
+| 2 | Download new JSON key | Customer IT admin |
+| 3 | Admin Dashboard → SSO → Google Directory Sync → **Rotate Credential** → upload new JSON key | Tenant owner or FORM CSM |
+| 4 | FORM encrypts new key, writes to `tenant_sso_configs.google_service_account_json`, emits `sso.google_directory_credential_rotated` DEC-030 event | FORM (automated) |
+| 5 | Verify test login succeeds with new key | Customer IT admin |
+| 6 | GCP Console → Service Accounts → Delete **old key** | Customer IT admin |
+| 7 | Confirm key deletion in GCP audit log | Customer IT admin |
+
+**Compromise path:** Customer IT admin deletes the GCP key immediately (Step 6 before Step 1). Google Workspace tenants with Directory sync enabled will see login failures until new credential is uploaded. FORM CSM must be notified immediately to expedite re-upload.
+
+---
+
+### 21.9 DEC-030 HMAC-Chained Audit Events
+
+All events follow the standard DEC-030 envelope (`docs/AUDIT_LOG_SCHEMA.md`). HMAC chain must be maintained across all events.
+
+| Event type | Trigger | Severity | Retention | Key payload fields |
+|---|---|---|---|---|
+| `sso.google_directory_sync_success` | API call succeeds, cache written | STANDARD | 7yr | `tenant_id`, `user_email_hash` (SHA-256), `group_count`, `fetch_duration_ms`, `cache_hit: false` |
+| `sso.google_directory_sync_cache_hit` | Fresh cache entry used, no API call | STANDARD | 7yr | `tenant_id`, `user_email_hash`, `group_count`, `cache_age_seconds` |
+| `sso.google_directory_sync_error` | API call fails; login blocked or grace-window fallback used | HIGH | 7yr | `tenant_id`, `user_email_hash`, `error_code`, `http_status`, `grace_window_used: bool` |
+| `sso.google_directory_credential_uploaded` | Service account JSON key stored | HIGH | 7yr | `tenant_id`, `actor_id`, `uploaded_by_role`, `project_id` (from JSON, never the key itself) |
+| `sso.google_directory_credential_rotated` | Existing key replaced with new key | HIGH | 7yr | `tenant_id`, `actor_id`, `old_project_id`, `new_project_id` |
+| `sso.google_directory_sync_enabled` | `google_directory_sync_enabled` set true | HIGH | 7yr | `tenant_id`, `actor_id`, `admin_email_hash` (SHA-256 of impersonation email) |
+| `sso.google_directory_sync_disabled` | `google_directory_sync_enabled` set false | HIGH | 7yr | `tenant_id`, `actor_id`, `reason` |
+| `sso.google_directory_sync_validated` | Post-configuration validation test passed | STANDARD | 7yr | `tenant_id`, `actor_id`, `test_user_role` |
+
+**Privacy note.** Raw email addresses are not logged. `user_email_hash` = SHA-256 of `userEmail.toLowerCase()`. A known email can be hashed and matched against audit records without the log exposing the address to all readers. Consistent with `data.breach_notification_sent` design in `docs/INCIDENT_RESPONSE.md §15.9`.
+
+---
+
+### 21.10 Alerting Rules
+
+| Rule ID | Condition | Severity | Routing | Notes |
+|---|---|---|---|---|
+| AL-SSO-GDIR-01 | `sso.google_directory_sync_error` rate > 20% of Google Workspace logins in a 5-min window | P2 | `#sso-alerts` | Likely invalid credential or DWD permission revoked |
+| AL-SSO-GDIR-02 | 3 consecutive `sso.google_directory_sync_error` events for the same tenant without intervening success | P2 | `#sso-alerts` + `#csm-alerts` | Tenant-specific failure; CSM notification required |
+| AL-SSO-GDIR-03 | `fetch_duration_ms` P95 > 3,000 ms over 1-hour window | P3 | `#sso-alerts` | Google API latency degradation |
+| AL-SSO-GDIR-04 | `sso.google_directory_sync_disabled` for any active tenant | P2 | `#sso-alerts` + `#csm-alerts` | Unexpected disable requires CSM review |
+| AL-SSO-GDIR-05 | `sso.google_directory_credential_uploaded` without `sso.google_directory_sync_validated` within 30 minutes | P3 | `#sso-alerts` | Unvalidated credential; CSM follow-up |
+
+---
+
+### 21.11 GDPR and Privacy Constraints
+
+#### 21.11.1 Google as Sub-Processor
+
+When FORM calls the Google Admin SDK Directory API, Google processes employee directory data on FORM's behalf. This constitutes a sub-processing activity under GDPR Art. 28.
+
+**Position.** Google Workspace's Data Processing Amendment (DPA), accepted when the GCP project is created, covers Admin SDK usage. The enterprise tenant is the controller; FORM is the processor; Google (for API execution) is a sub-processor.
+
+**Disclosure obligation.** The sub-processor list (`docs/SOC2_READINESS.md §44`) must include a conditional entry for the Google Workspace Directory API — applicable only to tenants with `google_directory_sync_enabled = true`. The entry is not universal.
+
+**DPA extension.** The SCIM DPA Annex B template (§14.3) must be extended to cover Directory API processing: (a) scope limited to group membership only; (b) no persistent storage of group names beyond 5-minute cache TTL; (c) no GDPR Art. 9 special category data in Directory API responses; (d) standard sub-processor change-notification obligation.
+
+#### 21.11.2 Data Minimisation
+
+`google_directory_group_cache.groups` stores only `id`, `email`, and `name`. No other Directory API response fields (description, aliases, directMembersCount, adminCreated, nonEditableAliases) are persisted. This satisfies GDPR Art. 5(1)(c) data minimisation.
+
+The 5-minute TTL ensures group membership data is not retained beyond operational necessity. When a user is removed from a Google Workspace group, the stale cache expires within 5 minutes; the next login reflects the updated group membership.
+
+#### 21.11.3 Art. 14 Transparency Obligation
+
+FORM's processing of group membership data via the Directory API is not directly visible to affected employees. The customer controller is responsible for informing employees that FORM reads their group memberships for access control purposes (Art. 14 notice obligation). FORM's enterprise onboarding checklist (§7) includes a reminder to customer IT contacts about this obligation.
+
+---
+
+### 21.12 SOC 2 Evidence Mapping
+
+| Control | Criterion | Coverage by §21 |
+|---|---|---|
+| CC6.1 | Logical access credentials are managed through their full lifecycle | Service account credential upload, rotation, and deletion audit events (`sso.google_directory_credential_*`) constitute the lifecycle record. Encryption at rest enforced via AES-256-GCM (same envelope as `oidc_client_secret`). |
+| CC6.2 | Access to add, modify, or remove credentials requires authorisation | `sso.google_directory_credential_uploaded` and `sso.google_directory_sync_enabled` events record `actor_id` + `uploaded_by_role`; only `tenant_owner` and FORM CSM may perform these operations (RLS-enforced). |
+| CC6.3 | Logical access is removed on a timely basis | When a user is removed from a Google group, the 5-minute cache TTL ensures the group-derived role is revoked within 5 minutes on the next login. `sso.google_directory_sync_disabled` HIGH event evidences intentional disablement. |
+| CC7.2 | Entity monitors for anomalies | AL-SSO-GDIR-01 through AL-SSO-GDIR-05 provide continuous anomaly detection on Directory API sync health. `sso.google_directory_sync_error` HIGH events feed the SIEM alert surface. |
+| CC9.2 | Entity manages vendor risk | Google Workspace Directory API usage is covered by Google's DPA (accepted at GCP project creation). Conditional sub-processor entry in `docs/SOC2_READINESS.md §44`. |
+| C1.1 | Confidential information is protected | `user_email_hash` not plaintext in all audit events. Group membership not exposed to `tenant_manager` role. Raw service account JSON encrypted at column level; never stored in plaintext; never logged. |
+
+**Evidence artefacts for SOC 2 auditor:**
+
+| Artefact ID | Description | Collection method |
+|---|---|---|
+| CC6-E-GDIR-001 | `audit_log` export: all `sso.google_directory_credential_*` events for the observation period | `SELECT * FROM audit_log WHERE event_type LIKE 'sso.google_directory_credential_%' AND created_at BETWEEN $obs_start AND $obs_end ORDER BY created_at` |
+| CC6-E-GDIR-002 | `audit_log` export: all `sso.google_directory_sync_error` HIGH events | `SELECT * FROM audit_log WHERE event_type = 'sso.google_directory_sync_error' AND created_at BETWEEN $obs_start AND $obs_end` |
+| CC6-E-GDIR-003 | `google_directory_group_cache` performance snapshot (no groups content — minimised) | `SELECT tenant_id, fetched_at, expires_at, fetch_duration_ms, error_message IS NOT NULL AS had_error FROM google_directory_group_cache WHERE fetched_at BETWEEN $obs_start AND $obs_end` |
+| CC6-E-GDIR-004 | `tenant_sso_configs` Directory sync status snapshot for all active Google Workspace tenants | `SELECT tenant_id, google_directory_sync_enabled, google_directory_last_sync_at, google_directory_sync_error FROM tenant_sso_configs WHERE google_directory_sync_enabled = true` |
+
+---
+
+### 21.13 Open Questions
+
+| ID | Question | Disposition |
+|---|---|---|
+| OQ-SSO-21.1 | Should FORM support proactive background group sync independent of login events? | Not in M4 scope. Login-time pull is sufficient for enterprise launch. Background sync would tighten the role-revocation window below 5 minutes but adds scheduling complexity and higher API quota consumption. Revisit at M6 if tenants request tighter revocation SLA. |
+| OQ-SSO-21.2 | What happens if a tenant's Google Workspace org has > 10,000 groups? | `?userKey={email}` returns only groups the specific user belongs to (max ~2,000 direct memberships per Google's limits). Paginated at 200/page. Load test required: measure P95 login latency for a user in 500 groups, with and without access-token KV caching. Target: < 1,500 ms additional latency beyond baseline (stays within §2.1 API Gateway SLO). Owner: qa-lead + devops-lead, M4. |
+| OQ-SSO-21.3 | Cache the service account access token (1-hour lifetime) or mint fresh per login? | Cache per-tenant in Cloudflare KV (`google_svc_token_{client_email}`, TTL 55 min — 5 min before Google's 1-hour expiry). KV lookup ~1 ms vs. ~200 ms for a fresh JWT grant. Strongly recommended for tenants with high login frequency. Implemented in `getOrMintAccessToken()` above. |
+| OQ-SSO-21.4 | Support Google Cloud Identity Groups (separate product) or only Google Workspace Groups (Admin SDK)? | Admin SDK Groups only in M4. Cloud Identity Groups requires a different API endpoint and is used primarily by GCP-native orgs, not standard Google Workspace customers. Revisit at M6 if a prospect requests it. |
+
+---
+
+### 21.14 Gap Status Update
+
+| Gap ID | Description | Before §21 | After §21 |
+|---|---|---|---|
+| G-005 (§9) | Google Directory API integration for group sync — designed but not implemented | 🔴 Open | 🟡 Authored (full design + TypeScript implementation; pending M4 build, test, and load validation) |
+
+---
+
+### 21.15 Implementation Checklist
+
+| # | Action | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Write migration `migrations/YYYYMMDD_tenant_sso_google_directory.sql` — ALTER TABLE additions per §21.4.1; create `google_directory_group_cache` + RLS per §21.4.2; add pg_cron cleanup job | platform-engineer | **P0** | M4 |
+| 2 | Implement `apps/api-gateway/src/sso/google-directory-groups.ts` per §21.5; unit test with mock Directory API responses: success, paginated (3 pages), error + grace window, credential missing | platform-engineer | **P0** | M4 |
+| 3 | Integrate `resolveGoogleGroups()` into the OIDC callback Worker (`apps/api-gateway/src/sso/oidc-callback.ts`); gate on `google_directory_sync_enabled = true`; test with a real Google Workspace staging tenant | platform-engineer | **P0** | M4 |
+| 4 | Implement service account access token KV caching per OQ-SSO-21.3 (`getOrMintAccessToken()`, TTL 55 min in `env.SSO_KV`) | platform-engineer | **P1** | M4 |
+| 5 | Register all 8 `sso.google_directory_*` DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry; validate HMAC chain with staging test sequence covering all 8 event types in order | platform-engineer + security-engineer | **P0** | M4 |
+| 6 | Build Admin Dashboard → SSO → Google Directory Sync panel: credential upload UI, impersonation email field, enable/disable toggle, last sync timestamp, sync error message, "Fetch Groups" preview button | platform-engineer | **P1** | M4 |
+| 7 | Add Google Directory group source to Group Mapping UI (§16.7): "Google Directory" source badge vs. "SCIM" badge; same role-assignment interaction | platform-engineer | **P1** | M4 |
+| 8 | Configure alerting rules AL-SSO-GDIR-01 through AL-SSO-GDIR-05 in PagerDuty and add to `docs/OBSERVABILITY.md §6.2` alert rules table | devops-lead | **P0** | M4 |
+| 9 | Add conditional Google Workspace Directory API sub-processor entry to `docs/SOC2_READINESS.md §44` KV payload (field `google_directory_api_conditional: true`; note: applies only to Google Workspace tenants with sync enabled) | compliance-officer | **P0** | M4 |
+| 10 | Extend SCIM DPA Annex B template (§14.3) with Directory API processing clause (see §21.11.1); legal review; update DPA template in `compliance/contracts/dpa-enterprise-template.md` | compliance-officer + outside counsel | **P1** | M4 |
+| 11 | Update G-005 gap entry in §9 to reference §21 (design complete); advance from 🔴 to 🟡 in `docs/SOC2_READINESS.md` CC6 section | compliance-officer | **P1** | M4 |
+| 12 | Load test per OQ-SSO-21.2: test user in 500 Google groups; measure login latency P95 with and without KV token caching; confirm < 1,500 ms additional latency; document result in `compliance/evidence/perf/google-dir-load-test-M4.md` | qa-lead + devops-lead | **P1** | M4 |
+
+---
+
 *v1.1 additions (2026-05-30): Section 19 — SCIM Groups Sync & Group-Based Role Mapping. Closes the group lifecycle gap left by §5–§8 (which cover user provisioning and direct role assignment but not group objects as first-class SCIM resources). Six new SCIM endpoints on the Cloudflare Workers edge runtime: GET /Groups (paginated, filterable, RFC 7644 ListResponse), GET /Groups/{id} (single resource with members array), POST /Groups (creates `tenant_groups` row, 201 + Location header, idempotency on externalId), PUT /Groups/{id} (full replace, delta-aware audit emission), PATCH /Groups/{id} (RFC 7644 PatchOp, op=add/remove on path=members, with cross-tenant guard on member userIds), DELETE /Groups/{id} (cascade role revocation, no user deletion). Group-to-role mapping model: new `scim_group_role_mappings` table (tenant_id, scim_group_id FK, form_role ENUM, mapped_by, mapped_at; UNIQUE constraint one role per group per tenant; RLS: tenant_admin read/write own tenant, form_system read-only, form_api zero-rows fail-closed). Role resolution priority: explicit direct assignment beats group membership; among group memberships highest privilege wins (highest-privilege-wins rationale documented in §19.3.2; requires founder sign-off per OQ-SSO-19.1). New `scim_group_members` table for SCIM-managed many-to-many membership. New `group_member_effective_role` view computing final FORM role per user via FULL OUTER JOIN of direct roles and group-derived roles using CASE ordinals and MAX aggregation. IdP push group configuration: Okta Push Groups (filter expression, memberOf, PUT-then-PATCH behaviour), Azure AD / Entra SCIM mappings (objectId → externalId, scope filter, 40-minute sync lag caveat, GET by externalId query pattern), Google Workspace (no native SCIM Groups Push; three workarounds: Okta bridge, Entra bridge, SAML groups attribute). SAML JIT groups path: `groups_attribute` key in `tenant_sso_configs.attribute_mapping` JSONB; `resolveJitGroups` function; `scim.jit_group_creation_enabled` feature flag (disabled by default; safety: 500-group cap, 255-char name limit, admin-only toggle). Six DEC-030 HMAC-chained audit events: scim.group_created (STANDARD, 7yr), scim.group_updated (STANDARD, 7yr), scim.group_deleted (HIGH, 7yr), scim.group_member_added (STANDARD, 7yr), scim.group_member_removed (HIGH, 7yr), scim.group_role_mapping_changed (HIGH, 7yr); sequential emission required for batch PATCH to maintain HMAC chain integrity. SOC 2 mapping: CC6.1 (group access auditable), CC6.2 (no-mapping-by-default fail-closed), CC6.3 (DELETE cascade offboarding), CC6.6 (JIT flag gated), CC7.2 (HIGH events for SIEM), C1.1 (IDs only in audit events). Open questions: OQ-SSO-19.1 (higher vs. lower privilege conflict resolution — founder sign-off required), OQ-SSO-19.2 (nested groups — no, not supported), OQ-SSO-19.3 (500 group cap — enterprise-architect decision). Implementation checklist: 10 tasks (7× P0, 3× P1), M4/M5.*
 
 *v1.2 additions (2026-05-30): Section 20 — SAML Certificate Lifecycle Management — Proactive Monitoring & Expiry Alerting. Closes the design gap for the `cert_expiry_check` cron referenced (but not specified) in §8.1. Covers both SP certificate (FORM-generated, 2-year RSA-2048) and IdP certificate (customer-generated, validity varies) expiry monitoring. Eight ALTER TABLE columns on `tenant_sso_configs`: four expiry-metadata columns (`saml_sp_cert_expires_at`, `saml_sp_cert_fingerprint`, `saml_idp_cert_expires_at`, `saml_idp_cert_fingerprint`), two partial indexes on those columns, and two state-machine columns (`cert_alert_tier` ENUM 7-value, `cert_rotation_state` ENUM 5-value) with backfill Edge Function procedure. Seven-tier alert escalation matrix (t90 through expired) with PagerDuty severity mapping (null → low → warning → error → critical) and de-duplication rule (7-day cooldown per tier per tenant). Full TypeScript Worker cron implementation (`cert-expiry-check.ts`): daily 02:00 UTC via Cloudflare Workers Cron; queries active SAML tenants with cert expiring ≤90 days; handles both cert classes in one pass; emits DEC-030 before PagerDuty; updates `cert_alert_tier` and `cert_alert_last_sent_at` after each alert; separate `handleExpired` path for P0 post-expiry case. Three Resend email templates: CRT-01 (`sso-cert-expiry-t30`, first customer-visible notification with cert-class-conditional body), CRT-02 (`sso-cert-expiry-t7`, urgent 7-day), CRT-03 (`sso-cert-expiry-expired`, post-expiry email-fallback active notification). Five-state rotation state machine (`idle → notified → rotation_in_progress → complete`; `overdue` branch from `notified` at t7 if unresponsive). Four new DEC-030 HMAC-chained events: `sso.cert_expiry_alert` (MEDIUM/HIGH/CRITICAL by tier, 7yr), `sso.cert_expired` (CRITICAL, 7yr), `sso.cert_uploaded` (STANDARD, 7yr — IdP cert upload distinct from rotation), `sso.cert_monitor_error` (HIGH, 7yr — cron self-monitoring). FORM internal admin dashboard Certificate Panel spec: SP + IdP status badges, alert tier, rotation state. Tenant admin in-app banner at ≤30 days IdP cert expiry. SOC 2 evidence: CC6-E-CERT-001 through CC6-E-CERT-004 (audit_log exports, config snapshot, cron execution log). SOC 2 mapping: CC6.1 (credential lifecycle), CC7.2 (anomaly monitoring), CC8.1 (change management). 4 open questions (OQ-SSO-20.1 through OQ-SSO-20.4: metadata auto-refresh, self-signed cert policy, self-service upload UI, 2yr validity review). 11-item implementation checklist (8× P0 M4, 3× P1 M5).*
+
+*v1.3 additions (2026-05-30): Section 21 — Google Workspace Directory API Integration for Group Sync. Closes G-005 from §9 (Google Directory API integration for group sync — designed but not implemented). Root cause documented: Google OIDC deliberately omits group membership from ID token regardless of scopes; Admin SDK Directory API + service account + domain-wide delegation (DWD) is the canonical industry solution. Pull-model design (FORM calls Google on each login) vs. §19 push-model (SCIM); complementary — Google Workspace tenants who cannot use the three §19 workarounds (Okta bridge, Entra bridge, SAML groups attribute) use this path instead. Architecture: OIDC callback Worker checks `google_directory_group_cache` (5-minute TTL); on CACHE MISS calls `GET admin.googleapis.com/admin/directory/v1/groups?userKey={email}`; resolved groups feed directly into existing `scim_group_role_mappings` lookup (§19.3) — no change to role resolution engine (§5.4). Schema: ALTER TABLE `tenant_sso_configs` — three new columns (`google_service_account_email`, `google_directory_admin_email`, `google_directory_sync_enabled` + last_sync_at + sync_error); `google_service_account_json BYTEA` already exists (§4.2); partial index on `google_directory_sync_enabled = true` tenants; new `google_directory_group_cache` table (UNIQUE on `tenant_id, user_email`, `expires_at` as generated column = `fetched_at + 5min`, RLS tenant isolation + form_system write-only + form_api read-own-tenant; pg_cron cleanup every 10 minutes). Full TypeScript implementation (`apps/api-gateway/src/sso/google-directory-groups.ts`): `resolveGoogleGroups()` cache-first lookup with 10-minute grace window on API failure (stale cache used rather than blocking login); `fetchAndCacheGroups()` pagination loop (200 per page, handles nextPageToken); `mintServiceAccountToken()` using SubtleCrypto RSASSA-PKCS1-v1_5 + JWT grant to `oauth2.googleapis.com/token`; `importPrivateKey()` PKCS8 import for Workers WebCrypto. Service account access token KV caching (OQ-SSO-21.3: `{tenant_id}_google_token`, TTL 55 min, avoids 200ms JWT-to-token overhead per login). Customer configuration: 4-step process (GCP project + service account creation; Admin Console domain-wide delegation with `admin.directory.group.readonly` scope only; impersonation account designation; CSM-mediated credential upload via secure portal — never email). Credential rotation protocol: 7-step process; key deletion in GCP before replacement on compromise path. Eight DEC-030 HMAC-chained audit events: `sso.google_directory_sync_success` (STANDARD), `sso.google_directory_sync_cache_hit` (STANDARD), `sso.google_directory_sync_error` (HIGH), `sso.google_directory_credential_uploaded` (HIGH), `sso.google_directory_credential_rotated` (HIGH), `sso.google_directory_sync_enabled` (HIGH), `sso.google_directory_sync_disabled` (HIGH), `sso.google_directory_sync_validated` (STANDARD) — all 7yr; `user_email_hash` SHA-256 not plaintext in all events. Five alerting rules AL-SSO-GDIR-01 through AL-SSO-GDIR-05 (P2: error rate > 20% / 3 consecutive per tenant; P3: P95 latency > 3,000ms / unvalidated credential). GDPR: Google Workspace DPA covers Directory API; conditional sub-processor entry in SOC2_READINESS §44; data minimisation enforced (only id/email/name stored, 5-minute TTL); Art. 14 transparency obligation on customer controller. SOC 2: CC6.1 (credential lifecycle), CC6.2 (actor_id + role on credential operations), CC6.3 (5-minute TTL enforces timely role revocation), CC7.2 (5 alerting rules on sync health), CC9.2 (Google DPA + conditional sub-processor entry), C1.1 (email hash + group data not exposed to tenant_manager). Four evidence artefacts CC6-E-GDIR-001 through CC6-E-GDIR-004. Four open questions OQ-SSO-21.1 through OQ-SSO-21.4 (background sync M6 decision; >10,000 group scale test; KV access-token caching design; Cloud Identity Groups deferral). Gap status: G-005 🔴 Open → 🟡 Authored. 12-item implementation checklist: 8× P0 M4, 4× P1 M4.*
