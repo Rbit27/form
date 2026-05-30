@@ -6,6 +6,17 @@
 
 ---
 
+## [1.27.1] — 2026-05-30
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §20` — SAML Certificate Lifecycle Management — Proactive Monitoring & Expiry Alerting. Closes the design gap for the `cert_expiry_check` cron referenced (but unspecified) in §8.1. Two certificate classes monitored: SP signing cert (FORM-generated, 2-year RSA-2048) and IdP signing cert (customer-generated, varies). Schema: ALTER TABLE `tenant_sso_configs` — four expiry-metadata columns (`saml_sp_cert_expires_at`, `saml_sp_cert_fingerprint`, `saml_idp_cert_expires_at`, `saml_idp_cert_fingerprint`), two partial expiry indexes, two state-machine columns (`cert_alert_tier` 7-value ENUM, `cert_rotation_state` 5-value ENUM); backfill Edge Function parses BYTEA PEM fields at migration time. Seven-tier alert escalation matrix (t90 INFO → t60 P3 → t30 P2 → t14 P1 → t7 P1 → t2 P0 → expired P0) with PagerDuty severity routing and 7-day de-duplication rule. Full TypeScript `cert-expiry-check.ts` Worker cron (daily 02:00 UTC): queries active SAML tenants, processes both cert classes per tenant, emits DEC-030 before PagerDuty dispatch, updates state columns; separate `handleExpired` branch for post-expiry P0 path. Three Resend email templates: CRT-01 (`sso-cert-expiry-t30`, first customer-visible notification, cert-class-conditional body for SP vs IdP), CRT-02 (`sso-cert-expiry-t7`, urgent 7-day), CRT-03 (`sso-cert-expiry-expired`, post-expiry email fallback active). Five-state rotation state machine (`idle → notified → rotation_in_progress → complete`; `overdue` branch when customer unresponsive at t7). Four new DEC-030 HMAC-chained events: `sso.cert_expiry_alert` (MEDIUM/HIGH/CRITICAL by tier, 7yr), `sso.cert_expired` (CRITICAL, 7yr), `sso.cert_uploaded` (STANDARD, 7yr), `sso.cert_monitor_error` (HIGH, 7yr). FORM internal admin dashboard Certificate Panel spec (M5). Tenant admin in-app banner at ≤30 days IdP cert expiry. SOC 2 evidence: CC6-E-CERT-001 through CC6-E-CERT-004. SOC 2 mapping: CC6.1 (credential lifecycle), CC7.2 (anomaly monitoring), CC8.1 (change management). 4 open questions (OQ-SSO-20.1 through OQ-SSO-20.4). 11-item implementation checklist (8× P0 M4, 3× P1 M5).
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` header — v1.1 → v1.2; Table of Contents updated to include §20.
+- `VERSION` → 1.27.1
+
+---
+
 ## [1.27.0] — 2026-05-30
 
 ### Added
