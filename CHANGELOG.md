@@ -6,6 +6,19 @@
 
 ---
 
+## [1.19.0] — 2026-05-30
+
+### Added
+- `content/post-146-myokines-muscle-endocrine-organ.md` — «Міокіни: м'яз як ендокринний орган» — 13 хв читання. IL-6 як перший міокін (Pedersen & Febbraio 2008 *Physiological Reviews*): транзиторний протизапальний сигнал vs хронічний патологічний IL-6 жирової тканини; кількісна різниця: 100× зростання без TNF-α/IL-1β, AMPK→ліполіз, протизапальна IL-10/IL-1Ra вісь. PGC-1α → FNDC5 → іризин (Boström et al. 2012 *Nature* 481): browning білого жиру, термогенез; hippocampal BDNF через PGC-1α/FNDC5 (Wrann et al. 2013 *Cell Metabolism* 18). Іризиновий консенсус 2024: підтверджений targeted mass spectrometry (Jedrychowski et al. 2015 *Cell Metabolism*), browning у людини суттєво слабший ніж у мишей; FNDC5/irisin → αV інтегрини → нейропротекція (Lourenco et al. 2019 *Nature Medicine*). FGF21 і мітохондріальний стрес-сигнал (ATF4). Meteorin-like/Metrnl (Rao et al. 2014 *Cell*): еозинофіли, IL-4, термогенез і нейрогенез. Остеокальцин–м'яз петля (Mera et al. 2016 *Cell Metabolism*): undercarboxylated OC → GPRC6A → FAO і витривалість. SPARC і колоректальна протипухлинна вісь (Aoi et al. 2013 *Gut*). 600+ міокінів у секретомі (Pathak et al. 2022). clinical-safety NOT REQUIRED.
+- `blog.html` — Post 146 картка (Спортивна наука, «Незабаром», 13 хв). Картка 146 у сітці.
+
+### Changed
+- `STATUS.md` — blog.html рядок: 146 cards (146 content posts authored), v1.19.0.
+- `README.md` — post-145 `[ ]` → `[x]`, post-146 `[x]` додано до content engine roadmap.
+- `VERSION` → 1.19.0
+
+---
+
 ## [1.18.0] — 2026-05-29
 
 ### Added
