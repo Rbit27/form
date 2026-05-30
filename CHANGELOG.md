@@ -6,6 +6,16 @@
 
 ---
 
+## [1.20.0] — 2026-05-30
+
+### Added
+- `docs/COST_MODEL.md §22` — Year 1 Cash Flow Forecast & Runway Model: month-by-month Base/Bull/Bear cash table (Months 1–18), runway sensitivity matrix (6× funding levels × 5× burn rates, safe-harbor rule at ≤6 months remaining), key cash flow trigger events table (8 triggers with direction/impact/contingency), Series A readiness criteria integrated with §19.7 GTM forecast (ARR ≥ €150k, NRR ≥ 110%, ≥3 logos, ≥9 months runway, LTV:CAC ≥ 5×), cash management controls (3-account structure, weekly 5-point Monday review, 90-day variable commitment cap), OQ-23 through OQ-27 (pre-seed amount, EUR/USD FX exposure, entity formation, App Store payout lag, SOC 2 audit retainer structure). P&L vs. cash flow distinction table. Post-hire burn cliff flagged at Founding Engineer hire (Month 13 Base, +$8,333/month).
+
+### Changed
+- `VERSION` → 1.20.0
+
+---
+
 ## [1.19.1] — 2026-05-30
 
 ### Added

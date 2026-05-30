@@ -2751,3 +2751,302 @@ All figures marked [ESTIMATE] are pre-launch planning inputs. Replace with actua
 *v1.0 additions: §19 Enterprise Go-to-Market Financial Model — sales velocity equation (opportunities × win rate × ACV ÷ sales cycle) for Year 1 founder-led ($6k/month) and Year 2 AE-led ($46k/month) phases; pipeline stage conversion model with hard exit gates and BANT disqualification triggers; founder time-budget per deal (37 hours total) and AE hire trigger criteria; first AE hire economics ($120k OTE, 3.8× quota multiple, $179k net GP/year at quota, Month-5 ramp-cost recovery); SDR layer economics ($70k OTE, 2.1× ROI, SQL qualification criteria, 40 SQL/year quota); CSM cost absorption bridge (dedicated CSM < 5% of revenue at Growth 700+ seats and Enterprise 1,500+ seats; pooled CSM model for sub-300-seat accounts); three-scenario Month 1–24 enterprise ARR forecast (Base: $188k ARR Month 24; Bull: $312k; Bear: $86k) with month-by-month recognized ARR; Series A ARR quality framing (NRR ≥ 110%, LTV:CAC ≥ 5×, ≥ 3 active accounts). OQ-16 added: Growth-tier minimum seat floor for CSM absorption. OQ-17 added: win rate calibration sensitivity (15–35%) on SDR hire timing and pipeline coverage targets.*
 
 *v1.2 additions: §21 Pilot Economics, Conversion Governance & Discount Authority Matrix — three pilot structures (Free 90d, Extended 180d, Paid $1/seat/month); ASC 606 variable consideration treatment for each (closes OQ-15); pilot conversion rate targets (35%/55%/70% by type); discount authority matrix (founder/AE/CSM authority levels with floor prices); contract minimums ($600/year floor, 25-seat increment); pilot KPIs for conversion prediction (Day-14 activation rate as P0 leading indicator); multi-year contract economics integrated from §16.4; six-item implementation checklist; OQ-20 (actual conversion rate calibration), OQ-21 (CSM save protocol), OQ-22 (EU procurement threshold compatibility for Paid Pilot).*
+
+---
+
+## 22. Year 1 Cash Flow Forecast & Runway Model
+
+> Owner: data-engineer + founder. Audience: founder, lead investor, future CFO. Review cadence: weekly cash position check; full model refresh monthly pre-Series A. All figures marked [ESTIMATE] are pre-launch planning inputs — not commitments.
+
+---
+
+### 22.1 Purpose
+
+A P&L shows whether the business is profitable. A cash flow forecast shows whether the business is alive. Pre-revenue, the two diverge materially: accrual accounting records expenses when incurred regardless of payment timing, while cash accounting records when money enters or leaves the bank account. For a pre-seed company on personal savings with no credit facility, the cash balance on a given day is the only number that determines operational continuity.
+
+This section models cash inflows and outflows month-by-month for Months 1–18, providing three things a P&L cannot:
+
+1. **Runway visibility** — how many months of operations remain at current burn, under each scenario
+2. **Trigger clarity** — which events materially accelerate or decelerate the cash trajectory, so they can be managed proactively
+3. **Fundraise timing** — when to initiate the Series A process based on runway position, not on panic
+
+Key distinctions from other financial views in this document:
+
+| View | Question answered | Timing basis | Primary audience |
+|---|---|---|---|
+| P&L (§3–§10) | Are we profitable per unit? | Accrual | Investors (post-revenue) |
+| ARR forecast (§19.7) | How much recurring revenue are we building? | Recognized revenue | Investors, board |
+| Billings vs. revenue (§18.2) | When does cash from contracts arrive? | Cash receipt | Finance, investor diligence |
+| **Cash flow forecast (this section)** | **Will we run out of money?** | **Actual bank cash** | **Founder, lead investor** |
+
+The cash flow model is a living document. It must be updated every time a material assumption changes — a delayed hire, an earlier-than-expected first contract, or a change in the Anthropic API rate. It is not a forecast to present; it is a tool to navigate.
+
+---
+
+### 22.2 Funding Assumptions
+
+#### 22.2.1 Pre-seed funding input
+
+| Parameter | Value | Notes |
+|---|---|---|
+| Pre-seed capital raised | [FOUNDER_INPUT] | Total cash available at Month 0, including any personal savings committed to the company |
+| Cash at Month 0 | [FOUNDER_INPUT] | Assume equal to pre-seed capital raised unless a portion is held in reserve by investor instrument terms |
+| Funding instrument | [FOUNDER_INPUT] | SAFE / convertible note / priced round — affects dilution model but not cash-flow mechanics |
+| Wire receipt date | [FOUNDER_INPUT] | The date the capital is in the operating bank account; cash flow starts from this date |
+
+Until [FOUNDER_INPUT] values are confirmed, the runway model in §22.4 is presented as a sensitivity matrix across a range of pre-seed amounts rather than a single-path forecast.
+
+#### 22.2.2 Burn rate categories
+
+Cash out is organized into five categories. Each maps to a cash-flow table row in §22.3.
+
+| Category | What it covers | Fixed or variable? | Primary driver |
+|---|---|---|---|
+| **Infra** | Anthropic API, ElevenLabs, Supabase, Cloudflare Workers, Sentry, PostHog, Redis, Expo/EAS | Hybrid — fixed base + variable per MAU | MAU × per-user cost (per §13.1 scaling tables) |
+| **AI API costs** | Anthropic Claude API specifically, isolated from above for sensitivity tracking | Strictly variable | Pro MAU × sessions × tokens (per §3.1) |
+| **Marketing / UA** | Paid acquisition (App Store ads, social), content production, SEO tooling | Discretionary variable | Founder decision per growth phase |
+| **Legal / compliance** | Entity formation, IP filings, privacy counsel (GDPR/HIPAA), SOC 2 readiness, contract review | Lumpy fixed | Milestone-driven: launch, first enterprise deal, audit |
+| **Hiring** | Founding Engineer cash compensation (salary only; equity excluded from cash model) | Fixed once hired | Hire date + negotiated salary [FOUNDER_INPUT] |
+
+**Note on founder compensation:** The model assumes $0 founder salary during Months 1–12 [ESTIMATE]. If the founder draws a salary, add it to the Hiring row from the month payment begins. This is [FOUNDER_INPUT].
+
+**Note on non-cash items excluded from this cash model:** equity-based compensation (stock options, SAFE conversions), depreciation, and deferred revenue adjustments. The cash flow model uses receipts and disbursements only.
+
+---
+
+### 22.3 Month-by-Month Cash Flow Table (Months 1–18)
+
+#### 22.3.1 Model construction notes
+
+**Revenue cash timing:** Consumer Pro subscriptions are charged monthly at billing date (MRR = cash-in in the same month, net of App Store payout lag of ~45 days [ESTIMATE]). Annual enterprise contracts: cash received upfront at contract signing; recognized as revenue ratably per §18.1, but cash-in occurs in the month the invoice is paid. For cash flow purposes, annual contract cash lands in the month of invoice settlement — typically Month 1 of the contract term, with 30-day net payment terms adding one month lag [ESTIMATE].
+
+**Infra costs per §13.1:** At the MAU levels modeled in Months 1–18, total infrastructure cost stays within the sub-1k MAU band ($436/month) through approximately Month 6, then scales toward the 1k–10k MAU band ($436–$3,197/month range) as the beta cohort grows. The AI API (Anthropic) line is separated and grows proportionally to Pro MAU per §3.1 ($0.20/Pro user/month).
+
+**Base scenario revenue ramp:** Consumer Pro MRR grows from $0 at Month 0 to an estimated $2,000–$4,000/month by Month 12 [ESTIMATE], driven by closed beta invite → App Store launch → organic growth. Enterprise revenue per §19.7 Base scenario: first contract cash receipt Month 8 ($14,400 upfront annual payment [ESTIMATE]), second contract cash receipt Month 11 ($10,800 [ESTIMATE]).
+
+**Three scenarios defined:**
+
+| Scenario | Consumer Pro ramp | Enterprise deals (Year 1) | Key assumption |
+|---|---|---|---|
+| **Base** | Moderate: 50 Pro subs Month 6 → 200 Month 12 [ESTIMATE] | 2 deals (per §19.7 Base) | Aligned to §19 Base; App Store launch Month 4 |
+| **Bull** | Faster: 100 Pro subs Month 6 → 400 Month 12 [ESTIMATE] | 3 deals (per §19.7 Bull) | Viral coefficient > 1 in beta; first enterprise deal Month 7 |
+| **Bear** | Slow: 20 Pro subs Month 6 → 80 Month 12 [ESTIMATE] | 1 deal (per §19.7 Bear) | App Store review delay; low beta-to-paid conversion |
+
+#### 22.3.2 Base Scenario Cash Flow (Months 1–18)
+
+All figures [ESTIMATE]. Positive = cash in. Negative = cash out. "Cumulative Cash" assumes [FOUNDER_INPUT] initial balance; shown here as delta from Month 0 for scenario comparability.
+
+| Month | Consumer MRR cash | Enterprise contract cash | Total Cash In | Infra (excl. AI API) | AI API cost | Marketing / UA | Legal / compliance | Hiring | Total Cash Out | Net Cash | Cumulative Delta |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | $0 | $0 | **$0** | $(440) | $(10) | $(500) | $(2,000) | $0 | **$(2,950)** | $(2,950) | $(2,950) |
+| 2 | $0 | $0 | **$0** | $(440) | $(20) | $(500) | $(500) | $0 | **$(1,460)** | $(1,460) | $(4,410) |
+| 3 | $0 | $0 | **$0** | $(440) | $(40) | $(1,000) | $(500) | $0 | **$(1,980)** | $(1,980) | $(6,390) |
+| 4 | $500 | $0 | **$500** | $(450) | $(80) | $(1,500) | $(1,500) | $0 | **$(3,530)** | $(3,030) | $(9,420) |
+| 5 | $950 | $0 | **$950** | $(460) | $(150) | $(1,500) | $(500) | $0 | **$(2,610)** | $(1,660) | $(11,080) |
+| 6 | $950 | $0 | **$950** | $(470) | $(220) | $(1,500) | $(500) | $0 | **$(2,690)** | $(1,740) | $(12,820) |
+| 7 | $1,425 | $0 | **$1,425** | $(490) | $(300) | $(1,500) | $(500) | $0 | **$(2,790)** | $(1,365) | $(14,185) |
+| 8 | $1,900 | $14,400 | **$16,300** | $(530) | $(380) | $(1,500) | $(3,000) | $0 | **$(5,410)** | $10,890 | $(3,295) |
+| 9 | $1,900 | $0 | **$1,900** | $(560) | $(380) | $(1,500) | $(500) | $0 | **$(2,940)** | $(1,040) | $(4,335) |
+| 10 | $2,375 | $0 | **$2,375** | $(600) | $(460) | $(2,000) | $(500) | $0 | **$(3,560)** | $(1,185) | $(5,520) |
+| 11 | $2,850 | $10,800 | **$13,650** | $(650) | $(550) | $(2,000) | $(2,000) | $0 | **$(5,200)** | $8,450 | $2,930 |
+| 12 | $3,325 | $0 | **$3,325** | $(700) | $(640) | $(2,000) | $(500) | $0 | **$(3,840)** | $(515) | $2,415 |
+| 13 | $3,800 | $0 | **$3,800** | $(760) | $(730) | $(2,000) | $(500) | $(8,333) | **$(12,323)** | $(8,523) | $(6,108) |
+| 14 | $3,800 | $12,960 | **$16,760** | $(820) | $(730) | $(2,000) | $(2,500) | $(8,333) | **$(14,383)** | $2,377 | $(3,731) |
+| 15 | $4,275 | $0 | **$4,275** | $(880) | $(820) | $(2,000) | $(500) | $(8,333) | **$(12,533)** | $(8,258) | $(11,989) |
+| 16 | $4,275 | $0 | **$4,275** | $(950) | $(820) | $(2,000) | $(500) | $(8,333) | **$(12,603)** | $(8,328) | $(20,317) |
+| 17 | $4,750 | $0 | **$4,750** | $(1,020) | $(910) | $(2,000) | $(500) | $(8,333) | **$(12,763)** | $(8,013) | $(28,330) |
+| 18 | $5,225 | $18,000 | **$23,225** | $(1,100) | $(1,000) | $(2,000) | $(500) | $(8,333) | **$(12,933)** | $10,292 | $(18,038) |
+
+**Key observations — Base scenario:**
+- Month 8 and Month 11 enterprise cash receipts provide material cushion against consumer-only burn rate. Without enterprise cash, cumulative delta at Month 11 would be approximately $(24,000) deeper [ESTIMATE].
+- Founding Engineer hire at Month 13 ($100,000 annual salary → $8,333/month) is the single largest permanent step-change in monthly burn. This timing should be treated as a cash-sensitive milestone, not a fixed calendar date (see §22.5).
+- By Month 18, cumulative cash consumed from initial balance is approximately $(18,000) [ESTIMATE], meaning the business has consumed pre-seed capital net of enterprise cash receipts. Actual ending balance = [FOUNDER_INPUT] − $18,038. This must remain well above zero; see §22.4 for the safe-harbor trigger.
+
+#### 22.3.3 Bull Scenario Cash Flow — Summary (Months 1–18)
+
+Full month-by-month detail omitted for brevity; key variance lines vs. Base [ESTIMATE]:
+
+| Parameter | Base | Bull | Delta |
+|---|---|---|---|
+| Month 12 consumer MRR | $3,325 | $6,650 | +$3,325/month |
+| Enterprise cash receipts (Year 1) | $25,200 | $40,200 | +$15,000 |
+| Month 12 AI API cost | $(640) | $(1,280) | $(640)/month |
+| Month 12 marketing UA | $(2,000) | $(3,000) | $(1,000)/month |
+| Cumulative cash delta at Month 18 | $(18,038) | $(4,500) [ESTIMATE] | +$13,538 |
+| Months of additional runway vs. Base | — | +2–3 months [ESTIMATE] | — |
+
+Bull scenario implication: Series A process can begin from a position of comfort rather than urgency. Founding Engineer hire can be accelerated to Month 10–11 without materially compressing runway, enabling faster product velocity.
+
+#### 22.3.4 Bear Scenario Cash Flow — Summary (Months 1–18)
+
+| Parameter | Base | Bear | Delta |
+|---|---|---|---|
+| Month 12 consumer MRR | $3,325 | $1,330 | $(1,995)/month |
+| Enterprise cash receipts (Year 1) | $25,200 | $14,400 | $(10,800) |
+| Founding Engineer hire | Month 13 | Deferred to Month 16+ | Saves $25,000 in cumulative cash |
+| Cumulative cash delta at Month 18 | $(18,038) | $(38,000) [ESTIMATE] | $(19,962) |
+| Months of additional burn vs. Base | — | +3–4 months of higher need [ESTIMATE] | — |
+
+Bear scenario implication: founding engineer hire must be deferred. Marketing/UA spend must be cut to $500/month by Month 9. Series A process starts earlier on weaker metrics — the worst-case fundraising position. The bear scenario does not imply business failure, but it does require a deliberate decision by Month 6 to cut discretionary spend if the early signals (beta activation rate, first pilot progress) are tracking below plan.
+
+**Bear scenario decision gate:** If consumer Pro subscribers at Month 6 are below 30 (i.e., below the Bear scenario's own 20-sub estimate by ≥33%), treat it as a signal to invoke the S6 combined stress protocol from §17.8 — freeze paid acquisition, defer any hiring, and initiate a pre-seed extension conversation.
+
+---
+
+### 22.4 Runway Sensitivity Matrix
+
+The table below shows months of runway as a function of initial cash balance and average monthly net burn. "Net burn" is Total Cash Out minus Total Cash In per month, averaged across the period.
+
+Average monthly net burn ranges are drawn from the Base scenario:
+- **Early burn (Months 1–6):** approximately $2,000–$3,500/month net [ESTIMATE] (no revenue, legal costs front-loaded)
+- **Mid burn (Months 7–12):** approximately $1,000–$2,000/month net [ESTIMATE] (consumer revenue partially offsets; enterprise cash receipts are lumpy)
+- **Post-hire burn (Months 13–18):** approximately $7,500–$9,000/month net [ESTIMATE] (Founding Engineer salary dominates)
+
+#### Runway table — months of cash remaining
+
+| Initial Cash | $4,000/mo avg burn | $6,000/mo avg burn | $8,000/mo avg burn | $10,000/mo avg burn | $12,000/mo avg burn |
+|---|---|---|---|---|---|
+| $100,000 | 25 months | 17 months | 13 months | 10 months | 8 months |
+| $150,000 | 38 months | 25 months | 19 months | 15 months | 13 months |
+| $200,000 | 50 months | 33 months | 25 months | 20 months | 17 months |
+| $250,000 | 63 months | 42 months | 31 months | 25 months | 21 months |
+| $300,000 | 75 months | 50 months | 38 months | 30 months | 25 months |
+| $400,000 | 100 months | 67 months | 50 months | 40 months | 33 months |
+
+All figures [ESTIMATE]. Burn rate is the average across the modeled period — not the peak monthly burn. Post-hire burn (Months 13+) at Base scenario is $8,000–$9,000/month net; early-phase burn is lower. Use weighted average burn for the period in question when reading this table.
+
+**Safe-harbor rule:** When projected cash remaining falls below **6 months of current burn rate**, the Series A fundraising process must be initiated immediately. Six months is the minimum required lead time: 2–3 months for process (deck, data room, initial meetings) + 1–2 months for term sheet negotiation + 1 month for close and wire. Starting a raise with fewer than 6 months of runway places the founder in a structurally weak negotiating position and increases the probability of a distressed raise on unfavorable terms.
+
+**Fundraising process start trigger:** (Current cash balance) ÷ (current monthly net burn) ≤ 6 months → initiate Series A process immediately. Do not wait for the next monthly review — treat this as a hard real-time threshold.
+
+**Emergency reserve floor:** Maintain a minimum $15,000 [ESTIMATE] in the operating account as a non-deployable reserve. This covers one month of post-hire burn in a scenario where the Series A wire is delayed after a signed term sheet. Do not let operating cash fall below this floor under any scenario.
+
+---
+
+### 22.5 Key Cash Flow Triggers
+
+These are the events that produce a step-change in the cash trajectory. Each has a directional impact (positive = more cash, negative = more burn) and a dependency that makes the timing uncertain.
+
+| Trigger | Direction | Estimated cash impact | Timing dependency | Action if delayed |
+|---|---|---|---|---|
+| **App Store launch (consumer)** | Positive | Begins consumer MRR ramp; Base: +$500/month from Month 4 [ESTIMATE] | App Store review approval (typically 1–3 days, but rejections add 2–4 weeks) | Submit 4 weeks before planned launch; have a web-payment fallback for beta users |
+| **First paid enterprise pilot conversion (Deal 1)** | Positive | $14,400 upfront cash receipt [ESTIMATE] per §19.7 Base; single-month spike | Pilot activation rate ≥ 60% at Day 60 per §21.7; legal turnaround time | If Day 60 activation is below threshold, invoke CSM save protocol (§21.7) immediately; do not wait for Day 90 |
+| **Second enterprise deal close** | Positive | $10,800 upfront cash receipt [ESTIMATE] per §19.7 Base (75-seat Starter × $12 × 12 months) | Dependent on second pilot signed by Month 5; conversion per §21.4 timeline | Accelerate second pilot outreach to Month 2–3; pipeline coverage is the lead metric |
+| **Founding Engineer hire** | Negative | +$8,333/month permanent burn increase (at $100,000 salary [ESTIMATE]) | Offer acceptance date; conditional on runway ≥ 12 months post-hire [ESTIMATE] | If runway < 12 months post-hire at time of offer, defer 60–90 days or restructure offer (lower base + higher equity) |
+| **AE hire (Month 12, Base)** | Negative | +$5,000–$10,000/month incremental burn [ESTIMATE] during 5-month ramp-to-quota (§19.4) | Triggered by Deal 2 closing + AE trigger criteria per §19.3; Base scenario Month 12 | Defer if fewer than 2 enterprise deals closed — founder-led sales remains viable up to 3 deals per §19.3 |
+| **Anthropic API cost shock (S1)** | Negative | +$0.20/Pro user/month incremental COGS per §17.3 | External event (rate change) | Activate model-tiering fallback (Haiku for classification, Sonnet only for active coaching turns) within 48 hours of rate notice |
+| **Supabase Pro → Team upgrade (§13.4 Cliff 1)** | Negative | +$574/month step-up in infra spend | Triggered at ~12k–15k MAU; not a Year 1 concern in Base scenario | Pre-provision Team plan in Month 5 budget if beta cohort growth is outpacing forecast |
+| **Series A wire received** | Positive | [FOUNDER_INPUT] raise amount — resets runway clock | Dependent on fundraise process start timing (§22.6) | See §22.4 safe-harbor trigger |
+
+---
+
+### 22.6 Fundraise Timing Model
+
+Series A fundraising should be initiated when the business has sufficient evidence to command a strong valuation and sufficient runway to negotiate without duress. These two requirements point in opposite directions: evidence takes time to accumulate, but runway constrains how long you can wait. The model below identifies the window where both conditions are met simultaneously.
+
+#### 22.6.1 Series A readiness criteria (integrating §19.7 GTM model)
+
+These criteria are thresholds, not checkboxes — they inform the fundraise story, not a binary gate.
+
+| Metric | Minimum threshold for credible Series A | Strong Series A | Source |
+|---|---|---|---|
+| Enterprise ARR | ≥ $50,000 [ESTIMATE] | ≥ $120,000 [ESTIMATE] | §19.7 Base scenario: $25,200 at Month 12; $88,500 at Month 18 |
+| Enterprise logo count | ≥ 2 active, paid accounts | ≥ 4 active accounts | §19.7 Base: 2 deals by Month 12; 7 deals by Month 18 |
+| NRR | ≥ 100% (no contraction) | ≥ 110% (expansion evident) | §18.6 target; first renewal data available Month 13+ |
+| Consumer Pro subscribers | ≥ 500 [ESTIMATE] | ≥ 1,500 [ESTIMATE] | §22.3.2 Base: 200 at Month 12; 300 at Month 18 [ESTIMATE] |
+| W-ACSU (NSM) | ≥ 3.0 sessions/week/active user | ≥ 3.5 sessions/week | Defined in METRICS.md; computed from `session_completed` events |
+| D30 retention | ≥ 40% [ESTIMATE] | ≥ 55% [ESTIMATE] | Cohort retention curves per data-engineer pipeline |
+| Pilot conversion rate | ≥ 30% (per §21.4 free pilot target) | ≥ 45% | First measurable after 10 completed pilots (OQ-20) |
+
+**Observation:** Under the Base scenario, the minimum threshold for a credible Series A is not met until approximately Month 16–18, when enterprise ARR crosses $50k and logo count reaches 4+. This means the fundraise process should be initiated at Month 12–13 (four to six months before the anticipated close) — even though the story is not yet at full strength. Starting at Month 12 allows close at Month 17–18 on minimum-threshold metrics, which is better than starting at Month 16 and closing on no runway.
+
+Under the Bull scenario, minimum thresholds are met by Month 12. Starting the fundraise at Month 10–11 enables a close at Month 14–15 from a position of relative strength.
+
+Under the Bear scenario, minimum thresholds may not be met within 18 months. If base enterprise ARR is below $25k at Month 15, evaluate a pre-seed extension rather than a formal Series A process. A bridge round of $50,000–$100,000 [ESTIMATE] from existing investors or strategic angels buys 6–9 months of additional time at Bear burn rates.
+
+#### 22.6.2 Fundraise process timeline
+
+| Phase | Duration | Milestone |
+|---|---|---|
+| Preparation: deck, data room, metrics dashboard | 3–4 weeks | Data room complete; Metabase dashboards investor-ready |
+| Warm introductions + first meetings | 3–5 weeks | ≥ 10 first meetings completed |
+| Partner meetings + diligence | 4–6 weeks | 2–3 firms in active diligence |
+| Term sheet negotiation | 2–3 weeks | Term sheet signed |
+| Legal close + wire | 3–4 weeks | Cash in bank |
+| **Total elapsed time** | **15–22 weeks (4–6 months)** | — |
+
+**Earliest recommended fundraise start date (Base scenario):** Month 12–13, targeting close at Month 17–18 with 3–4 months of runway remaining at close.
+
+**Safe-harbor override:** If the §22.4 safe-harbor trigger fires before Month 12 (cash balance ÷ burn ≤ 6 months), begin fundraise preparation immediately, regardless of milestone achievement. Revenue evidence is preferred but runway pressure is existential.
+
+---
+
+### 22.7 Cash Management Controls
+
+These are operational policies, not strategic decisions. They exist to prevent avoidable errors — missed payments, unmonitored commitments, or a cash position surprise during a board meeting.
+
+#### 22.7.1 Banking
+
+| Policy | Requirement |
+|---|---|
+| Operating account | Single business checking account for all inflows and outflows [FOUNDER_INPUT: institution] |
+| Reserve account | Separate account for the $15,000 [ESTIMATE] emergency reserve floor; no debit card attached |
+| Payroll | Separate payroll account once the Founding Engineer is hired; funded by transfer from operating account on salary date |
+| Payment processor float | App Store payouts (Apple/Google) have 45-day lag [ESTIMATE]; model this as a 1.5-month MRR lag in cash receipts |
+| Enterprise invoice collections | Net-30 payment terms; chase at Day 32 if unpaid; escalate to founder at Day 45; no new provisioning for accounts > 60 days overdue |
+
+#### 22.7.2 Weekly cash position review
+
+Every Monday (or the next business day), the founder reviews:
+
+1. Current operating account balance
+2. Outstanding invoices (enterprise accounts receivable)
+3. Upcoming commitments in the next 30 days (payroll, annual subscriptions, legal retainer)
+4. Current burn rate vs. prior week
+5. Runway = (current balance − $15,000 reserve) ÷ (trailing 4-week average monthly burn)
+
+This review takes 15 minutes with a maintained cash tracker. It is not optional — a founder who discovers a cash crisis in a board meeting rather than 6 weeks before it is a preventable failure of process.
+
+**Tooling:** Maintain a shared Google Sheet (or Notion database) with the above five fields updated weekly. data-engineer to automate Supabase/Stripe revenue figures into the tracker once instrumentation is live; until then, manual entry.
+
+#### 22.7.3 Commitment controls
+
+| Control | Policy |
+|---|---|
+| Variable-rate commitments | No open-ended variable spend commitment > 3 months duration without founder approval (e.g., agency retainers, contractor agreements, SaaS annual plans with usage-based upside) |
+| Annual SaaS renewals | All annual plan renewals > $500/year require explicit founder approval 30 days before renewal date. Maintain a renewal calendar in the cash tracker |
+| Contractor and freelancer engagements | Maximum 90-day engagements with explicit renewal decision at each term end. No auto-renewal clauses in contractor agreements |
+| Board approval threshold (post-seed) | Any single expenditure or commitment > [FOUNDER_INPUT] requires lead investor notification. Any expenditure > [FOUNDER_INPUT] requires board approval. Exact thresholds to be set in the SHA/investor rights agreement |
+| Credit cards | No corporate credit card balances carried month-to-month. All card spend cleared at statement close. No personal guarantee on corporate debt instruments without founder explicit sign-off |
+
+#### 22.7.4 Expense recognition lag
+
+Vendor invoices for the prior month (Anthropic, ElevenLabs, Supabase) typically arrive in the first week of the following month. The cash tracker must account for this lag: record the expense in the month it was incurred, not the month the invoice arrives. This prevents a false "good month" in month N followed by a surprise double-expense in month N+1.
+
+---
+
+### 22.8 Open Questions
+
+**OQ-23: Pre-seed capital amount and wire date**
+
+The entire cash flow model in §22.3 is conditioned on [FOUNDER_INPUT] initial balance. Until this figure is confirmed, the month-by-month table should be read as a structure and scenario tool, not a literal forecast. Owner: founder. Resolution: before Month 1 of company operations. Priority: P0 — blocks all runway calculations.
+
+**OQ-24: Founding Engineer hire cost and timing**
+
+§22.3 uses $100,000 annual salary as the Founding Engineer cash compensation [ESTIMATE], triggering at Month 13 in the Base scenario. The actual offer and acceptance date may shift this by several months in either direction, and the salary range depends on the candidate and market. A $20,000 difference in annual salary moves monthly burn by $1,667 and modifies runway by 1–2 months at the $150k initial cash level. Owner: founder. Resolution: when the engineering hire decision is made; update §22.3 immediately on offer acceptance.
+
+**OQ-25: App Store payout lag and payment processor terms**
+
+The Base scenario models a 45-day [ESTIMATE] lag between consumer subscription revenue and cash receipt (Apple/Google payout terms). If the payout lag is shorter (Apple Connect typically pays monthly with 30-day settlement), the MRR-to-cash conversion is faster than modeled, improving early cash position by up to $1,500–$2,000 in cumulative improvement by Month 12 [ESTIMATE]. Owner: data-engineer (instrument actual payout dates via Stripe/RevenueCat reconciliation). Resolution: first full month of live App Store revenue.
+
+**OQ-26: Legal and compliance cost profile**
+
+§22.3 allocates $(2,000) in Month 1 for entity formation and initial IP counsel, plus lumpy $(2,000–$3,000) amounts at enterprise deal milestones for contract review and DPA execution. Actual legal costs depend on counsel hourly rate, deal complexity, and whether a pre-negotiated MSA template reduces per-deal review time (§21.3 approach). Highly variable: a contested enterprise DPA with a Fortune 500 legal team could cost $5,000–$15,000 in counsel fees alone. Owner: founder + legal counsel. Resolution: get a fixed-fee engagement letter from legal counsel before Month 1, covering at minimum entity formation and standard enterprise contract templates.
+
+**OQ-27: Founder salary policy and personal runway**
+
+§22.2 assumes $0 founder salary through Month 12. This assumption must be validated against the founder's personal financial position and the pre-seed funding amount. If the founder requires a market-rate or sustenance salary from Day 1, total monthly burn in §22.3 increases by $5,000–$10,000/month [ESTIMATE], reducing runway by 20–35% at the $150k initial cash level. This is not a judgment — it is a planning input that must be explicit. Owner: founder. Resolution: before company formation or within 30 days of first capital receipt.
+
+---
+
+*v1.3 additions: §22 Year 1 Cash Flow Forecast & Runway Model — cash flow vs. P&L distinction and purpose (§22.1); funding assumptions structure with [FOUNDER_INPUT] placeholders (§22.2); month-by-month 18-month cash flow table across Base/Bull/Bear scenarios with per-category rows (infra, AI API, marketing, legal, hiring) aligned to §13.1 scaling tables and §19.7 enterprise revenue forecast (§22.3); runway sensitivity matrix (funding amount × monthly burn → months of runway) with 6-month safe-harbor fundraise trigger (§22.4); key cash flow triggers table covering App Store launch, first enterprise deal, Founding Engineer hire, AE hire, API cost shock, and infrastructure cliffs (§22.5); Series A fundraise timing model with readiness criteria table (ARR, NRR, logo count, W-ACSU, D30 retention) and 15–22-week process timeline (§22.6); cash management controls covering single-account policy, weekly 5-point cash review, variable-rate commitment gate (90-day max without founder approval), and expense recognition lag (§22.7); OQ-23 (pre-seed capital amount), OQ-24 (Founding Engineer hire cost), OQ-25 (App Store payout lag), OQ-26 (legal cost profile), OQ-27 (founder salary policy) (§22.8).*
