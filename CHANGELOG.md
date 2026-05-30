@@ -6,6 +6,16 @@
 
 ---
 
+## [1.25.1] — 2026-05-30
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §15` — GDPR Article 33/34 Data Breach Notification Operational Runbook. Closes the gap between §10 (legal framework overview) and the hands-on procedure required under the 72-hour clock. §15.2 awareness clock taxonomy (6 trigger events + partial-notification override rule). §15.3 incident-to-notification decision matrix (10 scenarios, Art. 33 / Art. 34 / exempt mapping, Art. 9 presumption rule). §15.4 multi-tenant breach scoping SQL (Query 1: affected user count with Art. 9 / biometric breakdown; Query 2: enterprise tenant list for B2B notifications; Query 3: HMAC chain integrity check in exposure window). §15.5 72-hour clock procedure (11 timestamped steps, T+0h through post-filing supplementaries). Template A33-01 (Art. 33 DPA notification, all required GDPR fields). Template A34-01 (Art. 34 data subject notification; subject-line Art. 9 omission rule; Resend delivery; Art. 34(3)(c) bounce exception). Template P2C-01 (Art. 28 processor-to-controller enterprise tenant notification, T+8h target). 10 DEC-030 HMAC-chained events: `breach.awareness_declared` (CRITICAL, 7yr), `breach.scope_assessment_completed`, `breach.art33_obligation_determined`, `breach.processor_notified_tenant`, `breach.art33_notification_filed` (CRITICAL — primary P7.1 auditor evidence), `breach.art33_supplementary_filed`, `breach.art34_notifications_sent`, `data.breach_notification_sent` (per-user, email_hash only), `breach.art34_waiver_documented`, `breach.notification_case_closed`. Evidence directory structure with SHA-256 manifest sealing. SOC 2 mapping: P7.1, P8.1, P6.1, CC2.2, CC7.3. 12-item implementation checklist (7× P0 M4, 4× P1, 1× P2 tabletop Scenario J).
+
+### Changed
+- `VERSION` → 1.25.1
+
+---
+
 ## [1.25.0] — 2026-05-30
 
 ### Added

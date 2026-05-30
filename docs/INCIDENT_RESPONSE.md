@@ -4363,9 +4363,487 @@ Continuous improvement: §14 — action item registry in Linear [IR] project.
 
 ---
 
-**v0.8 · May 2026 · Owner: security-engineer + compliance-officer**
+## 15. GDPR Article 33/34 Data Breach Notification Operational Runbook
+
+> Owner: compliance-officer. Deputy: security-engineer. Audience: compliance-officer, founder, external counsel. Review: annually or after any Art. 33 filing.
+> SOC 2 controls: P7.1 (breach notification commitments), P8.1 (disposal — notification as closure step), CC2.2 (external communication obligations), P6.1 (disclosure to third parties).
+
+**Relationship to other sections:** §10 defines the legal framework. R-01 through R-14 are the *technical* response runbooks. This section is the *notification infrastructure* runbook — it operates in parallel with any technical runbook whenever a confirmed or probable breach involves personal data. The 72-hour clock does not wait for containment.
+
+**Multi-tenant note:** FORM processes personal data in two capacities simultaneously:
+- **B2C consumer tier:** FORM is the data controller. Art. 33 notifications go to the lead supervisory authority.
+- **B2B enterprise tier:** FORM is a data processor. The enterprise tenant (employer) is the data controller. FORM's Art. 28 DPA obligations require FORM to notify the enterprise tenant *without undue delay* (§15.8) so the tenant can discharge their own Art. 33 obligation.
+
+---
+
+### 15.1 Purpose and Scope
+
+This section provides the step-by-step operational procedure for managing GDPR breach notification under Articles 33 and 34. It covers:
+
+1. Determining when the 72-hour clock starts (§15.2)
+2. Deciding which incidents require Art. 33, Art. 34, or both (§15.3)
+3. Scoping which data subjects and enterprise tenants are affected (§15.4)
+4. Executing the 72-hour procedure (§15.5)
+5. Filing notifications using pre-approved templates (§15.6, §15.7, §15.8)
+6. Maintaining an auditable DEC-030 chain throughout (§15.9)
+7. Preserving evidence for regulatory submissions (§15.10)
+8. Managing follow-up and supplementary notifications (§15.11)
+
+This runbook does **not** replace R-01 through R-14. Run the appropriate technical runbook concurrently. The breach commander for the technical runbook and the compliance-officer for this runbook operate in parallel; they must sync at T+1h, T+24h, and T+48h.
+
+---
+
+### 15.2 Awareness Clock — When Does the 72-Hour Window Open?
+
+The 72-hour notification window begins at the moment FORM (as controller) becomes **aware** of a probable breach — not when the breach is confirmed or fully scoped.
+
+**Awareness events that start the clock:**
+
+| Event | Clock Starts | Who Determines |
+|---|---|---|
+| Alert fires in PagerDuty for `data.bulk_deletion`, `data.read_individual`, or `data.export_initiated` by unexpected actor | Immediately on acknowledge | devops-lead pages compliance-officer |
+| Sub-processor notifies FORM of a breach (R-07 activation) | When FORM receives written notification from sub-processor | compliance-officer |
+| Internal detection via HMAC chain break alert (S-007) | When chain break alert is confirmed as tamper (not probe error) | security-engineer pages compliance-officer |
+| Security researcher discloses probable data exposure | When disclosure is received and triaged as credible | security-engineer + compliance-officer |
+| R-11 (CV biometric) or R-12 (insider) runbook confirms Art. 9 data access | When scope assessment SQL confirms populated `keypoints_enc` or Art. 9 table rows in blast radius | compliance-officer |
+| DSAR export (R-14) reveals cross-tenant contamination | When contamination confirmed in export manifest | compliance-officer |
+
+**Clock override rule:** If there is genuine uncertainty about whether a breach occurred, FORM has an obligation to investigate promptly and file a partial Art. 33 notification before T+72h if the investigation has not ruled out a reportable breach. Filing a partial notification (Art. 33(4)) and supplementing it later is compliant. Filing nothing and later discovering a reportable breach was "missed" is not.
+
+**Clock tracking:** Create a `#inc-YYYYMMDD-gdpr-clock` Slack message immediately on awareness. Pin the message. Update it at T+4h, T+24h, T+48h, and T+72h. Archive the thread to `compliance/evidence/breach-notifications/<slug>/clock-log.txt`.
+
+---
+
+### 15.3 Incident-Class to Notification Decision Matrix
+
+Not every security incident requires GDPR notification. Use this matrix to determine the obligation.
+
+| Incident Scenario | Data Categories Involved | Art. 33 Required? | Art. 34 Required? | Notes |
+|---|---|---|---|---|
+| Unauthorized read of `health_profiles` or `coaching_turns` (Art. 9 data) | Special category health data | **Yes — P0** | **Yes — P0** | Art. 9 data triggers Art. 34 presumption; override requires documented mitigation |
+| Unauthorized read of `cv_sessions.keypoints_enc` (biometric) | Art. 9 biometric | **Yes — P0** | **Yes — P0** | See R-11; Art. 34 individual notification required unless key not compromised |
+| Unauthorized read of `users.email` only | Contact data | Yes — P1 | Discretionary | High risk only if enables further harm (phishing, identity theft); assess with security-engineer |
+| Accidental export cross-tenant contamination | Any | Yes — P0 | Depends on data in export | If Art. 9 data in export: Art. 34 required. Email-only: discretionary |
+| Ransomware with confirmed data destruction (no exfiltration) | All FORM data | **Yes — P0** | Conditional | Destruction is a breach. Art. 34 if data cannot be restored and subjects are harmed |
+| Insider threat — Art. 9 data read confirmed (R-12) | Art. 9 + contact | **Yes — P0** | **Yes — P0** | Art. 9 read by unauthorized actor is high risk by default |
+| Sub-processor breach affecting FORM user data (R-07) | Depends on sub-processor surface | Yes — assess Art. 9 tier | Depends | FORM may need to file Art. 33 even if sub-processor also files; Art. 28 DPA determines |
+| Compromised Supabase auth token — no confirmed data access | Auth data only | Maybe — investigate | No | Unauthorized access potential; file if investigation cannot rule out data read within 72h |
+| Government data request (R-13) | Any | No | No | Art. 33 applies to *security* breaches, not lawful government access; Art. 34 may apply separately if FORM notifies user |
+| DSAR export failure — no data delivered, no third-party exposure | N/A | No | No | Not a security breach; R-14 DSAR process governs |
+
+**Assessment authority:** compliance-officer makes the Art. 33 / Art. 34 determination. For Art. 9 data, external counsel must be consulted within 24 hours. The founder must be briefed before any DPA notification is filed.
+
+---
+
+### 15.4 Multi-Tenant Breach Scoping SQL
+
+Run these queries to determine which users and enterprise tenants are affected before drafting notifications. Results are used to populate the Art. 33 notification fields ("approximate number of data subjects affected").
+
+Execute with the `form_admin` role (BYPASSRLS). Results must be treated as restricted — route to `#inc-YYYYMMDD-gdpr-clock` only; do not paste into general incident channel.
+
+**Query 1: Identify affected user count and data categories**
+
+```sql
+-- Scope: users active in the exposure window whose Art. 9 data was accessible
+-- Replace :exposure_start and :exposure_end with confirmed breach timestamps
+-- Replace :suspect_actor_id with the actor confirmed in blast radius assessment
+
+WITH affected_users AS (
+  SELECT DISTINCT
+    u.id               AS user_id,
+    u.tenant_id,
+    u.created_at,
+    CASE
+      WHEN hp.id IS NOT NULL THEN 'Art.9:health'
+      ELSE 'Art.6:contact'
+    END                AS data_category,
+    hp.id IS NOT NULL  AS has_art9_data,
+    cs.keypoints_enc IS NOT NULL AS has_biometric
+  FROM users u
+  LEFT JOIN health_profiles hp ON hp.user_id = u.id
+  LEFT JOIN (
+    SELECT DISTINCT user_id, keypoints_enc
+    FROM cv_sessions
+    WHERE keypoints_enc IS NOT NULL
+      AND created_at BETWEEN :exposure_start AND :exposure_end
+  ) cs ON cs.user_id = u.id
+  WHERE u.id IN (
+    SELECT resource_id::uuid
+    FROM audit_log_events
+    WHERE action IN ('data.read_individual', 'data.export_initiated')
+      AND created_at BETWEEN :exposure_start AND :exposure_end
+      AND actor_id = :suspect_actor_id
+  )
+)
+SELECT
+  COUNT(*)                                  AS total_affected_users,
+  COUNT(*) FILTER (WHERE has_art9_data)     AS users_with_art9_data,
+  COUNT(*) FILTER (WHERE has_biometric)     AS users_with_biometric,
+  COUNT(DISTINCT tenant_id)                 AS enterprise_tenants_affected,
+  MIN(created_at)                           AS earliest_user_created,
+  MAX(created_at)                           AS latest_user_created
+FROM affected_users;
+```
+
+**Query 2: Identify affected enterprise tenants for B2B notification**
+
+```sql
+-- Produces the list of enterprise tenants requiring Art. 28 processor-to-controller notification
+SELECT
+  t.id            AS tenant_id,
+  t.slug,
+  t.display_name,
+  t.billing_email,
+  t.it_admin_email,
+  COUNT(u.id)     AS affected_seat_count,
+  BOOL_OR(hp.id IS NOT NULL) AS has_art9_exposure
+FROM tenants t
+JOIN users u ON u.tenant_id = t.id
+LEFT JOIN health_profiles hp ON hp.user_id = u.id
+WHERE u.id IN (
+  SELECT resource_id::uuid
+  FROM audit_log_events
+  WHERE action IN ('data.read_individual', 'data.export_initiated')
+    AND created_at BETWEEN :exposure_start AND :exposure_end
+    AND actor_id = :suspect_actor_id
+)
+GROUP BY t.id, t.slug, t.display_name, t.billing_email, t.it_admin_email
+ORDER BY has_art9_exposure DESC, affected_seat_count DESC;
+```
+
+**Query 3: Verify HMAC chain integrity in exposure window**
+
+```sql
+-- Confirms the audit log was not tampered during or after the breach
+-- Any row where hmac_prev ≠ LAG(hmac_self) is a chain break — P0 per docs/AUDIT_LOG_SCHEMA.md
+SELECT
+  id,
+  created_at,
+  action,
+  actor_id,
+  hmac_self,
+  LAG(hmac_self) OVER (ORDER BY created_at) AS expected_hmac_prev,
+  hmac_prev
+FROM audit_log_events
+WHERE created_at BETWEEN :exposure_start - INTERVAL '1 hour'
+                     AND :exposure_end   + INTERVAL '1 hour'
+ORDER BY created_at;
+```
+
+Output of all three queries must be saved to `compliance/evidence/breach-notifications/<slug>/scope-assessment/` before the Art. 33 notification is filed.
+
+---
+
+### 15.5 72-Hour Clock Procedure
+
+| T+ | Action | Owner | Output |
+|---|---|---|---|
+| T+0h | Clock starts. Pin message in `#inc-YYYYMMDD-gdpr-clock`. Open Linear ticket `[GDPR] <slug> Art.33 clock`. Activate relevant technical runbook in parallel. | compliance-officer | Slack message ID, Linear ticket URL |
+| T+0h | Brief founder. Provide: breach type, estimated scope, 72h deadline timestamp. One paragraph, no root-cause speculation. | compliance-officer | Founder acknowledgment (Slack DM logged in thread) |
+| T+2h | Run §15.4 scope assessment SQL. Log query results in Linear ticket. | security-engineer + compliance-officer | Scope assessment files committed to `compliance/evidence/breach-notifications/<slug>/scope-assessment/` |
+| T+4h | Determine Art. 33 / Art. 34 obligations using §15.3 matrix. Log decision and rationale in Linear ticket. Retain external counsel if Art. 9 data confirmed. | compliance-officer | Decision logged; counsel engaged if required |
+| T+8h | For enterprise tenants in scope: send B2B processor-to-controller notification (§15.8 Template P2C-01). Emit `breach.processor_notified_tenant` DEC-030 event per enterprise tenant notified. | compliance-officer | Per-tenant email sent; DEC-030 event chain confirmed |
+| T+24h | Draft Art. 33 notification (§15.6 Template A33-01). Share with founder and counsel for review. Draft Art. 34 notification if required (§15.7 Template A34-01). | compliance-officer + counsel | Draft documents in `compliance/evidence/breach-notifications/<slug>/drafts/` |
+| T+48h | If Art. 33 required and scope is not yet fully established: prepare partial notification per Art. 33(4). Do not wait for complete scope if partial filing preserves the 72h window. Founder gives final sign-off. | compliance-officer + founder | Go / No-go decision; if No-go, documented rationale as to why breach is not reportable |
+| T+71h | File Art. 33 notification via the lead DPA's online portal. Screenshot the confirmation receipt. Save to `compliance/evidence/breach-notifications/<slug>/art33/`. Emit `breach.art33_notification_filed` DEC-030 event. | compliance-officer | Filing receipt, DEC-030 event ID |
+| T+72h | 72-hour deadline. If not filed: this is a compliance failure. Notify founder and counsel immediately. File anyway — late is better than never. Document the delay and cause in the Art. 33 form. | compliance-officer | — |
+| Post-filing | If Art. 34 required: send data subject notifications within 24 hours of Art. 33 filing. Use Template A34-01 (§15.7). Emit `breach.art34_notifications_sent` DEC-030 event. | compliance-officer | Bulk send confirmation; DEC-030 event |
+| Post-filing | File supplementary Art. 33(4) notifications as scope investigation completes. Emit `breach.art33_supplementary_filed` for each supplementary submission. | compliance-officer | Supplementary filing receipts |
+
+---
+
+### 15.6 Article 33 Supervisory Authority Notification Template
+
+**Template A33-01 — Initial or Partial Art. 33 Notification**
+
+File via the lead DPA's online portal. If the online portal is unavailable, send by encrypted email to the DPA's security incident contact. Retain the sent copy and delivery confirmation.
+
+```
+SUBJECT: GDPR Article 33 Data Breach Notification — FORM · [INC-YYYYMMDD-slug]
+
+CONTROLLER DETAILS
+  Name:           FORM (form.coach)
+  Address:        [FOUNDER_INPUT: registered address]
+  Contact email:  enterprise@form.coach
+  DPO / Contact:  [FOUNDER_INPUT: compliance-officer name and direct contact]
+
+BREACH DESCRIPTION
+  Date breach occurred (or estimated range): [INSERT]
+  Date controller became aware:              [INSERT — this is T+0h for the 72-hour clock]
+  Type of breach: [Confidentiality / Integrity / Availability — check all that apply]
+  Description:
+    [Plain-language description. Example: "Unauthorized access to the health_profiles
+    table by an insider actor between [DATE] and [DATE]. Affected data includes workout
+    performance metrics, body composition logs, and AI coaching session metadata for
+    approximately [N] users."]
+
+CATEGORIES AND APPROXIMATE NUMBER OF DATA SUBJECTS AFFECTED
+  Data subject categories:          [e.g., consumer users / enterprise employees]
+  Approximate number of subjects:   [Insert from §15.4 Query 1 — err high if uncertain]
+  Member states involved:           [List EU member states where affected subjects are located]
+
+CATEGORIES AND APPROXIMATE VOLUME OF RECORDS AFFECTED
+  Record categories:   [health_profiles rows / coaching_turns rows / cv_sessions rows / users rows]
+  Approximate count:   [Insert — err high if uncertain]
+  Art. 9 special category data involved: [Yes / No — if Yes, specify categories]
+
+LIKELY CONSEQUENCES
+  [Describe risks to data subjects. Example: "Affected data subjects may experience distress
+  from the exposure of health and fitness data. In the worst case, the data could be used to
+  infer medical conditions or create discriminatory profiles. Financial harm is not anticipated
+  as payment data is not stored by FORM (processed exclusively by Stripe)."]
+
+MEASURES TAKEN OR PROPOSED
+  Containment: [Brief summary of containment steps completed at time of filing]
+  Eradication: [Steps planned or in progress]
+  Recovery:    [Estimated restoration timeline]
+  Preventive:  [Improvements committed to in post-incident review]
+
+SUPPLEMENTARY INFORMATION
+  Is this a partial notification under Art. 33(4)? [Yes / No]
+  If yes, further information will be provided by: [Date — typically within 7 days]
+  FORM internal reference: [INC-YYYYMMDD-slug]
+  Has Art. 34 notification been issued to data subjects? [Yes / No / In progress]
+
+Signed: [compliance-officer name]
+Date:   [ISO 8601 timestamp UTC]
+```
+
+---
+
+### 15.7 Article 34 Data Subject Notification Template
+
+**Template A34-01 — Data Subject Notification (High Risk)**
+
+Send via email to affected users using `users.email`. For Art. 9 breaches, do not include the specific Art. 9 data category in the email subject line — this prevents re-exposing sensitive data in email headers, which may be logged by email providers.
+
+```
+SUBJECT: Important security notice about your FORM account
+
+Hi [first_name, or "FORM user" if first_name unavailable],
+
+We are writing to let you know about a security incident that may have affected your FORM account.
+
+WHAT HAPPENED
+[Plain language description. Example: "Between [DATE] and [DATE], an unauthorized person
+may have had access to your FORM account data. We detected and stopped the incident on [DATE]."]
+
+WHAT DATA WAS INVOLVED
+[Specific to this user's data tier. Example: "Your account may have included: your workout
+history, training plans, and fitness metrics you logged in the FORM app."]
+
+[If the user's account did NOT include Art. 9 data, state that clearly:]
+"Your account did not include detailed health or fitness data beyond basic profile information."
+
+WHAT WE HAVE DONE
+- We have contained the incident and stopped the unauthorized access.
+- We have notified [DPA name, e.g., the UK Information Commissioner's Office] as required by GDPR.
+- We are conducting a full investigation and will implement additional security controls.
+
+WHAT YOU CAN DO
+- Review your account for any unusual activity.
+- Change your FORM password at [link].
+- Request a full copy of your data (Subject Access Request): [DSAR portal link or enterprise@form.coach].
+- Questions? Contact us at enterprise@form.coach. We will respond within 3 business days.
+
+CONTACT FOR FOLLOW-UP
+  Incident queries:        enterprise@form.coach
+  Data rights (DSAR):      [DSAR link]
+  Supervisory authority:   [DPA name + URL, e.g., ICO: ico.org.uk/make-a-complaint]
+
+We take this seriously and apologise for any concern this causes.
+
+FORM Team
+```
+
+**Delivery:** Use Resend via the `breach_notification` email template slot. Do not use PostHog (product analytics sub-processor). Emit `data.breach_notification_sent` DEC-030 per user delivered (§15.9). For users with undeliverable email, log failed delivery in `art34/send-report.json` and apply Art. 34(3)(c) disproportionate-effort exception with a 30-day status page notice as the substitute public communication.
+
+---
+
+### 15.8 Enterprise Tenant B2B Processor-to-Controller Notification
+
+Under FORM's Art. 28 Data Processing Agreement with each enterprise tenant, FORM (processor) must notify the enterprise tenant (controller) **without undue delay**. FORM targets T+8h from awareness; the contractual maximum in FORM's standard DPA is 48 hours.
+
+**Template P2C-01 — Processor-to-Controller Notification**
+
+```
+TO:      [it_admin_email from tenants table] + [legal_contact if on file]
+CC:      enterprise@form.coach
+SUBJECT: Data Processing Incident Notification — [tenant.display_name] · FORM · [INC-YYYYMMDD-slug]
+
+Dear [tenant.display_name] IT / Legal Team,
+
+Pursuant to our Data Processing Agreement (Clause [X] — processor breach notification),
+we are writing to inform you of a security incident affecting data we process on your behalf.
+
+INCIDENT REFERENCE: [INC-YYYYMMDD-slug]
+NOTIFICATION TIMESTAMP (UTC): [ISO 8601]
+
+NATURE OF THE INCIDENT
+[Brief description — what is known at T+8h. Avoid speculation on root cause.]
+
+YOUR ORGANIZATION'S DATA
+  Approximate employees affected:            [from §15.4 Query 2 — affected_seat_count]
+  Data categories involved:                  [Art. 9 / contact / usage data]
+  Art. 9 special category data involved:     [Yes / No]
+
+CURRENT STATUS
+  Containment:           [status]
+  Investigation:         [ongoing / complete]
+  Estimated resolution:  [date or "investigation ongoing — update by T+48h"]
+
+YOUR GDPR OBLIGATIONS AS CONTROLLER
+As the data controller for your employees' data, you may have independent obligations
+under GDPR Art. 33/34 to notify your national supervisory authority and/or your employees.
+We recommend you consult your Data Protection Officer or legal counsel.
+
+  FORM's Art. 33 filing status: [Filed / Pending — target T+71h from FORM awareness]
+  DPA reference (if filed):     [reference number from DPA portal, or "pending"]
+
+NEXT STEPS FROM FORM
+We will provide a full scope update by [T+48h date].
+Your CSM [name] is available for calls: [contact].
+Urgent queries: enterprise@form.coach
+
+This notification is confidential and sent pursuant to our DPA obligations.
+
+[compliance-officer name], Compliance
+FORM (form.coach)
+```
+
+**Tracking:** For each enterprise tenant notified, create `compliance/evidence/breach-notifications/<slug>/tenant-notifications/<tenant-slug>.md` containing: sent timestamp, recipient emails, DEC-030 `breach.processor_notified_tenant` event ID, and CSM acknowledgment status.
+
+---
+
+### 15.9 DEC-030 Audit Events for Breach Notification Lifecycle
+
+All breach notification events must be HMAC-chained per `docs/AUDIT_LOG_SCHEMA.md`. The chain provides tamper-evident evidence that notifications were filed on time and in sequence — this is the primary SOC 2 P7.1 auditor evidence. A break in the `breach.*` event chain is itself a P0 incident (R-05).
+
+| Event Type | Severity | Retention | Trigger | Key Payload Fields |
+|---|---|---|---|---|
+| `breach.awareness_declared` | CRITICAL | 7 years | T+0h — compliance-officer declares clock start | `incident_id`, `awareness_timestamp`, `data_categories[]`, `art9_involved` (bool), `declared_by` |
+| `breach.scope_assessment_completed` | HIGH | 7 years | §15.4 SQL queries executed and results committed | `incident_id`, `user_count`, `tenant_count`, `art9_user_count`, `biometric_user_count`, `query_executed_by` |
+| `breach.art33_obligation_determined` | HIGH | 7 years | §15.3 matrix applied; decision reached | `incident_id`, `art33_required` (bool), `art34_required` (bool), `rationale`, `determined_by`, `counsel_consulted` (bool) |
+| `breach.processor_notified_tenant` | HIGH | 7 years | Template P2C-01 sent to enterprise tenant | `incident_id`, `tenant_id`, `notification_sent_at`, `recipient_emails[]`, `hours_since_awareness` |
+| `breach.art33_notification_filed` | CRITICAL | 7 years | Art. 33 notification submitted to DPA portal | `incident_id`, `dpa_name`, `dpa_reference`, `filed_at`, `hours_since_awareness`, `is_partial` (bool), `filed_by` |
+| `breach.art33_supplementary_filed` | HIGH | 7 years | Art. 33(4) supplementary notification submitted | `incident_id`, `dpa_reference`, `supplement_number`, `new_information_summary`, `filed_at` |
+| `breach.art34_notifications_sent` | HIGH | 7 years | Bulk send to affected data subjects complete | `incident_id`, `total_sent`, `art9_subjects_count`, `delivery_provider`, `send_completed_at`, `template_version` |
+| `data.breach_notification_sent` | STANDARD | 7 years | Per-user Art. 34 notification delivered | `incident_id`, `user_id`, `email_hash` (SHA-256 of email — never raw), `delivered_at` |
+| `breach.art34_waiver_documented` | HIGH | 7 years | Compliance-officer documents rationale for NOT sending Art. 34 | `incident_id`, `waiver_basis` (e.g., "encryption key not compromised"), `documented_by`, `counsel_reviewed` (bool) |
+| `breach.notification_case_closed` | HIGH | 7 years | All obligations met; Linear ticket closed | `incident_id`, `art33_filed` (bool), `art34_filed` (bool), `tenant_count_notified`, `dpa_case_reference`, `closed_by` |
+
+**Manual emission path:** All events may be emitted via the manual SQL path in `docs/AUDIT_LOG_SCHEMA.md` when the automated path is unavailable during an active incident. Document the manual emission in the Linear ticket with executor role, timestamp, and reason for manual path.
+
+---
+
+### 15.10 Evidence Preservation for Regulatory Submissions
+
+Create `compliance/evidence/breach-notifications/<INC-YYYYMMDD-slug>/` immediately at T+0h. Populate using the following structure:
+
+```
+compliance/evidence/breach-notifications/<INC-YYYYMMDD-slug>/
+  README.md                            — incident overview, clock log, final decision log
+  clock-log.txt                        — archived Slack #inc-YYYYMMDD-gdpr-clock thread
+  scope-assessment/
+    query1-user-count.csv              — §15.4 Query 1 output (no raw email — user_id only)
+    query2-tenant-list.csv             — §15.4 Query 2 output
+    query3-hmac-check.csv             — §15.4 Query 3 output (chain integrity)
+    query-executed-at.txt             — ISO 8601 timestamp + executor role
+  drafts/
+    art33-draft-v1.md                  — iterative drafts of Art. 33 notification
+    art34-draft-v1.md                  — iterative drafts of Art. 34 (if applicable)
+  art33/
+    filed-notification.pdf             — copy of submitted Art. 33 notification
+    dpa-confirmation.png               — screenshot of DPA portal confirmation receipt
+    filed-at.txt                       — ISO 8601 timestamp of filing
+    supplement-01.pdf                  — first supplementary Art. 33(4) filing (if applicable)
+    dpa-correspondence-YYYY-MM-DD.pdf  — all subsequent DPA communications
+  art34/
+    send-report.json                   — Resend bulk delivery report (user_id + email_hash + status)
+    waiver-rationale.md                — if Art. 34 waived: documented basis + counsel sign-off
+  tenant-notifications/
+    <tenant-slug>.md                   — per-tenant §15.8 notification record
+  board/
+    b01-initial.md                     — Board notification Template B-01 (see §13)
+  legal/
+    counsel-engagement.md              — date retained, scope, billing reference
+  dec030/
+    breach-event-chain.json           — breach.* events exported for auditor, HMAC chain included
+  SHA256MANIFEST.txt                   — generated at case close (see below)
+```
+
+**Tamper-evident sealing at case close:**
+
+```bash
+find compliance/evidence/breach-notifications/<slug>/ -type f | sort \
+  | xargs sha256sum > compliance/evidence/breach-notifications/<slug>/SHA256MANIFEST.txt
+git add compliance/evidence/breach-notifications/<slug>/SHA256MANIFEST.txt
+git commit -m "evidence: <slug> SHA-256 manifest sealed [compliance-officer]"
+```
+
+The git commit hash constitutes immutable sealing. Retain the full directory for 7 years.
+
+---
+
+### 15.11 Post-Notification Follow-Up and Supplementary Notifications
+
+**Supplementary Art. 33(4) filings** are required when material new information becomes available: a more accurate data subject count, confirmation of previously uncertain Art. 9 exposure, or discovery of additional affected enterprise tenants. File within 7 days of learning new material information; do not wait for the full investigation to close.
+
+**DPA follow-up:** EU DPAs typically acknowledge receipt and may request additional information within 2–4 weeks. All DPA correspondence routes exclusively through compliance-officer. Log each communication in the Linear ticket and in `art33/dpa-correspondence-YYYY-MM-DD.pdf`. DPA investigations for non-systemic breaches typically close in 6–18 months. Do not respond to DPA information requests without counsel review.
+
+**Data subject follow-up:** Failed Art. 34 deliveries (bounce) must be logged in `art34/send-report.json`. If no alternative delivery method exists (no in-app account), apply Art. 34(3)(c) disproportionate-effort exception and publish a 30-day public notice on the FORM status page as the substitute. Document the exception and notice in `art34/waiver-rationale.md`.
+
+**PIR integration:** The breach notification process itself must be reviewed in the §8 Post-Incident Review. Required PIR questions: (1) Did the clock start on the correct awareness event? (2) Was the T+8h enterprise tenant notification SLA met? (3) Was Art. 33 filed within 72h? (4) Were all affected enterprise tenants identified by Query 2 and notified? (5) Were Art. 34 decisions (filed or waiver) documented before filing? Add gaps to the §14 PIR Action Item Registry.
+
+---
+
+### 15.12 SOC 2 Privacy Criterion Mapping
+
+| Privacy Criterion | Description | Evidence Provided by §15 |
+|---|---|---|
+| **P7.1** | The entity provides notification of breaches and incidents to affected data subjects, business partners, and regulators as required by commitments, agreements, and applicable laws | §15.5 procedure ensures timely filing; `breach.art33_notification_filed` DEC-030 CRITICAL event with `hours_since_awareness` field is the primary timing evidence for auditors |
+| **P8.1** | The entity provides data subjects with an accounting of personal data held and corrects or deletes inaccurate data in a timely manner | §15.7 Art. 34 notifications include a DSAR reference; §15.11 PIR integration links breach closure to erasure verification |
+| **P6.1** | The entity discloses personal data to third parties with the knowledge and consent of data subjects or as required by law or regulation | §15.8 documents the Art. 28 processor-to-controller notification; `breach.processor_notified_tenant` DEC-030 chain evidences timely disclosure |
+| **CC2.2** | The entity communicates information to improve security knowledge and address security deficiencies | Board notifications (§13 Template B-01) and enterprise tenant notifications (§15.8 Template P2C-01) demonstrate external communication obligations are met |
+| **CC7.3** | The entity evaluates security events to determine whether they could or have resulted in a failure of a commitment or requirement | §15.3 notification decision matrix constitutes the documented evaluation; `breach.art33_obligation_determined` DEC-030 event is the auditable outcome |
+
+**Auditor evidence artefacts:**
+- `compliance/evidence/breach-notifications/` directory (all incidents, SHA-256 sealed, 7-year retention)
+- DEC-030 audit log filtered on `event_type LIKE 'breach.%'` with HMAC chain verification
+- DPA filing receipts and all subsequent correspondence (`art33/` subdirectory per incident)
+- Resend bulk delivery reports for Art. 34 (`art34/send-report.json` per incident)
+- Enterprise tenant notification records (`tenant-notifications/` per incident)
+
+---
+
+### 15.13 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Register all 10 `breach.*` and `data.breach_notification_sent` DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry | security-engineer | **P0** | M4 |
+| Implement `breach.*` HMAC chain writer calls in the standard DEC-030 emitter function; validate chain in staging with a simulated breach sequence | platform-engineer + security-engineer | **P0** | M4 |
+| Create `compliance/evidence/breach-notifications/` directory in repo with `TEMPLATE-README.md`, `TEMPLATE-SHA256MANIFEST.sh`, and `TEMPLATE-scope-queries.sql` | compliance-officer | **P0** | M4 |
+| Determine lead supervisory authority: confirm FORM's main EU establishment in `docs/GDPR_DPIA.md §2`; document lead DPA name, portal URL, and encrypted-email fallback contact | compliance-officer + counsel | **P0** | M4 |
+| Create `breach_notification` email template in Resend (Template A34-01, §15.7); confirm EU-region delivery node; send test to internal mailbox | platform-engineer | **P0** | M4 |
+| Implement breach notification sender: `apps/api/src/breach/notify-subjects.ts` — reads `user_id[]`, renders A34-01, sends via Resend, emits `data.breach_notification_sent` DEC-030 per user | platform-engineer | **P0** | M4 |
+| Add `scripts/breach-scope-assessment.sql` containing §15.4 Query 1, Query 2, and Query 3 with commented parameter documentation; confirm `form_admin` role BYPASSRLS access works for each | platform-engineer | **P0** | M4 |
+| Create Linear project template `[GDPR] Art.33 Clock` with tasks pre-populated from §15.5 table; test by creating a template instance and archiving immediately | compliance-officer | **P1** | M4 |
+| Write `compliance/policy-templates/P2C-01-processor-controller-notification.md` with Template P2C-01 (§15.8) and FORM standard DPA clause references pre-filled | compliance-officer | **P1** | M4 |
+| Update `docs/SOC2_READINESS.md §35 P7.1` row from 🟡 to 🟢 after checklist items 1–7 are complete and verified in staging | compliance-officer | **P1** | M4 |
+| Tabletop drill (Scenario J): simulate P0 breach involving `health_profiles` for a 150-seat enterprise tenant; run §15.5 checklist end-to-end in staging (mock DPA portal, test Resend send, mock tenant email); record elapsed time vs. 72h target; file result as `compliance/evidence/annual-csa/YYYY-gdpr-breach-drill.md` | compliance-officer + security-engineer | **P1** | M5 |
+| Add Scenario J to §9 Testing and Drills rotation (§9.5 Year 2 schedule or first available annual slot) | compliance-officer | **P2** | M5 |
+
+---
+
+*v0.9 additions (2026-05-30): §15 GDPR Article 33/34 Data Breach Notification Operational Runbook. Closes the gap between §10 (legal framework overview) and the step-by-step operational procedure required when a breach occurs — the two sections are complementary, not duplicative: §10 defines the law, §15 executes the procedure. Awareness clock taxonomy (§15.2): six trigger events mapped to the person responsible for determining clock start (devops-lead, compliance-officer, security-engineer), plus clock override rule for uncertain-but-probable breaches mandating partial Art. 33(4) filing within 72h. Incident-to-notification decision matrix (§15.3): ten breach scenarios mapped to Art. 33 required / Art. 34 required / optional with rationale and assessment authority assignments; Art. 9 data triggers Art. 34 presumption overridable only with documented mitigation. Multi-tenant breach scoping SQL (§15.4): three queries with form_admin BYPASSRLS — Query 1 (affected user count with Art. 9 / biometric / contact data breakdown), Query 2 (enterprise tenant list with affected_seat_count and has_art9_exposure flag for B2B notifications), Query 3 (HMAC chain integrity verification in exposure window; chain break = P0 per R-05); results routed exclusively to restricted incident channel. 72-hour clock procedure (§15.5): eleven timestamped steps from T+0h declaration through post-filing supplementary submissions with named owners and output artefacts. Template A33-01 (§15.6): complete Article 33 supervisory authority notification template with all required GDPR fields (controller details, breach description, data categories and approximate subject count, likely consequences, measures taken, partial-notification declaration, internal reference). Template A34-01 (§15.7): plain-language Article 34 data subject notification template with explicit instruction to omit Art. 9 category label from email subject line (prevents header-based re-exposure); delivery via Resend breach_notification slot; failed-delivery Art. 34(3)(c) exception path with 30-day status page substitute. Template P2C-01 (§15.8): Art. 28 processor-to-controller enterprise tenant notification with T+8h target, 48h contractual maximum, per-tenant tracking record. Ten DEC-030 HMAC-chained events (§15.9): breach.awareness_declared (CRITICAL, 7yr), breach.scope_assessment_completed (HIGH, 7yr), breach.art33_obligation_determined (HIGH, 7yr), breach.processor_notified_tenant (HIGH, 7yr), breach.art33_notification_filed (CRITICAL, 7yr — primary P7.1 auditor evidence with hours_since_awareness field), breach.art33_supplementary_filed (HIGH, 7yr), breach.art34_notifications_sent (HIGH, 7yr), data.breach_notification_sent (STANDARD, 7yr — per-user with email_hash not raw email), breach.art34_waiver_documented (HIGH, 7yr), breach.notification_case_closed (HIGH, 7yr); chain break on breach.* is P0 per R-05. Evidence directory structure (§15.10): eight subdirectories (scope-assessment, drafts, art33, art34, tenant-notifications, board, legal, dec030) with SHA-256 manifest generation command and git commit tamper-evident sealing. Post-notification follow-up (§15.11): supplementary Art. 33(4) cadence (within 7 days of material new information), DPA correspondence tracking protocol, bounce / Art. 34(3)(c) exception path, five PIR review questions specific to breach notification process quality. SOC 2 privacy criterion mapping (§15.12): P7.1 (timely notification — breach.art33_notification_filed CRITICAL event with hours_since_awareness is primary auditor evidence), P8.1 (disposal chain via PIR integration), P6.1 (processor-to-controller disclosure evidenced by breach.processor_notified_tenant), CC2.2 (board + tenant external communication), CC7.3 (§15.3 decision matrix as documented evaluation with auditable DEC-030 outcome). Implementation checklist (§15.13): twelve tasks across M4/M5 (7× P0 M4, 4× P1 M4, 1× P1 M5 tabletop drill Scenario J, 1× P2 M5 annual schedule integration). Advances SOC2_READINESS.md §35 P7.1 from 🟡 to target 🟢 on checklist completion.*
+
+---
+
+**v0.9 · 2026-05-30 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: May 2027 or after first P0/P1 — whichever comes first.**
+
+---
 
 *v0.2 additions: R-07 Sub-processor Breach Notification Received (new runbook — vendor-originated incident protocol, GDPR Art. 33 clock management when breach is at processor level, enterprise tenant notification, evidence package, post-incident vendor management review). §11 Sub-processor Incident Management (processor registry for Supabase/Anthropic/ElevenLabs/Cloudflare/PostHog/Sentry/Stripe with Art. 9 classification and severity floors; known DPA gaps including Anthropic notification SLA and ElevenLabs unsigned DPA; Art. 28(3)(f) contractual requirements and DPA signing checklist; notification SLA tracker; SOC 2 CC9.2 evidence integration). Appendix A updated to include R-07 quick reference and sub-processor context for GDPR clock.*
 
