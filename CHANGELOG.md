@@ -6,6 +6,19 @@
 
 ---
 
+## [1.24.0] — 2026-05-30
+
+### Added
+- `content/post-149-muscle-fiber-type-plasticity.md` — МHC ізоформи і пластичність волокон: Type I/IIa/IIx континуум, гібридні волокна, кальценурин/NFAT та PGC-1α як молекулярні драйвери переходу, межі конверсії у людей (47 KB, 11 секцій, clinical-safety: NOT REQUIRED).
+- `content/post-150-calcium-signaling-adaptation.md` — Кальцієва сигналізація та вибір між силою і витривалістю: E-C coupling, SERCA1a/2a ізоформи, «Ca²⁺ частотний код» CaMKII vs кальценурин/NFAT, Chin 1998 Science перехресна іннервація (46 KB, 11 секцій, clinical-safety: NOT REQUIRED).
+- `content/post-151-neuromuscular-junction-adaptation.md` — Нейром'язове сполучення і нейральна адаптація: агрин/MuSK/рапсин, Henneman size principle, пресинаптична і постсинаптична морфологія, BDNF/trkB, rate coding, RFD (45 KB, 11 секцій, clinical-safety: NOT REQUIRED).
+- `blog.html` — 3 нові картки (post-149/150/151) у card-grid.
+
+### Changed
+- `VERSION` → 1.24.0
+
+---
+
 ## [1.23.0] — 2026-05-30
 
 ### Added
