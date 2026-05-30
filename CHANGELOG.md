@@ -6,6 +6,23 @@
 
 ---
 
+## [1.31.0] — 2026-05-30
+
+### Added
+- `.github/workflows/ci.yml` — 5-job CI pipeline: `typecheck` (tsc --noEmit), `lint` (ESLint --max-warnings 0), `test` (npm test), `audit` (npm audit --audit-level=critical з auditable exception bypass RISK-XXXXXX), `secret-scan` (git-secrets full history + working tree). Матеріалізація §45.2 з `docs/SOC2_READINESS.md`. SOC 2 controls: CC8.1, CC6.8, CC7.1, CC6.6.
+- `.github/workflows/deploy-workers.yml` — Wrangler deploy gated on CI `conclusion == 'success'`; deployable Workers: `security-portal` + `api-gateway` (skip if no wrangler.toml); structured CC8-E-002 deploy log → Cloudflare R2 `form-audit-logs/deploy-logs/`; three DEC-030 HMAC-chained events: `ci.deploy_succeeded` (MEDIUM), `ci.deploy_failed` (HIGH), `ci.build_blocked` (MEDIUM). Матеріалізація §45.3.
+- `.github/dependabot.yml` — npm (weekly Monday 08:00 Kyiv, lockfile-only, grouped security PRs, `form-compliance` reviewer) + GitHub Actions (weekly, SHA-digest pinning). Матеріалізація §45.4.
+- `.github/git-secrets-patterns` — шість канонічних credential-патернів: Anthropic `sk-ant-`, Supabase JWT, Stripe `sk_live_`, ElevenLabs `xi-api-key`, Cloudflare Bearer, hex HMAC. Per §43.6.2.
+
+### Closes
+- CC8-GAP-001 🟡 AUTHORED → 🟡 FILED (`.github/workflows/ci.yml` на `main`; закривається до 🟢 при першому green CI run)
+- CC8-GAP-002 🟡 AUTHORED → pending (branch protection rules потребують ручного налаштування у GitHub Settings > Branches)
+
+### Changed
+- `VERSION` → 1.31.0
+
+---
+
 ## [1.30.0] — 2026-05-30
 
 ### Added

@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: TypeScript compile check
+  # Maps to: CC8.1 (only passing builds reach main), CC6.8 (type safety)
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: TypeScript compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: TypeScript compile (no emit)
+        run: npx tsc --noEmit
+
+  # ---------------------------------------------------------------------------
+  # Job 2: ESLint — must pass with zero warnings (--max-warnings 0)
+  # Maps to: CC6.8 (no-eval policy enforcement), CC8.1 (code quality gate)
+  # §43 Section 6 specifies no-eval + no-new-func + no-implied-eval rules
+  # ---------------------------------------------------------------------------
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: ESLint (zero warnings)
+        run: npx eslint . --max-warnings 0
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Unit + integration tests
+  # Maps to: CC8.1 (processing integrity gate), CC7.1 (regression detection)
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Run tests
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # Job 4: npm audit — critical CVEs block the build
+  # Maps to: CC6.8 (dependency vulnerability management)
+  # §43 Section 5.1 mandates --audit-level=critical
+  # Exception bypass: commit message must contain [skip-audit-critical: RISK-XXXXXX]
+  # co-approved by compliance-officer + founder (documented in risk register)
+  # ---------------------------------------------------------------------------
+  audit:
+    name: npm audit (critical)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Check for approved exception bypass
+        id: bypass_check
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -qE '\[skip-audit-critical: RISK-[A-Z0-9]+\]'; then
+            echo "bypass=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::npm audit bypass invoked — risk register entry required"
+          else
+            echo "bypass=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: npm audit --audit-level=critical
+        if: steps.bypass_check.outputs.bypass != 'true'
+        run: npm audit --audit-level=critical
+
+  # ---------------------------------------------------------------------------
+  # Job 5: git-secrets scan — blocks credential leakage
+  # Maps to: CC6.6 (prevent credential exposure), CC6.8 (secret hygiene)
+  # §43 Section 5.2 specifies six canonical patterns in .github/git-secrets-patterns
+  # Scans full commit history of the PR branch, not just the diff
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: git-secrets scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-secrets
+        run: |
+          git clone https://github.com/awslabs/git-secrets.git /tmp/git-secrets
+          cd /tmp/git-secrets && sudo make install
+
+      - name: Register canonical FORM patterns
+        run: |
+          git secrets --register-aws || true
+          while IFS= read -r pattern; do
+            [[ "$pattern" =~ ^#.*$ || -z "$pattern" ]] && continue
+            git secrets --add "$pattern"
+          done < .github/git-secrets-patterns
+
+      - name: Scan commit history
+        run: git secrets --scan-history
+
+      - name: Scan working tree
+        run: git secrets --scan

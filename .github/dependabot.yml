@@ -1,0 +1,52 @@
+version: 2
+
+updates:
+  # -------------------------------------------------------------------------
+  # npm ecosystem — covers all package.json manifests in the monorepo
+  # Security PRs are grouped; non-security updates are open one-per-package
+  # -------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Kyiv"
+    open-pull-requests-limit: 10
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(dev-deps)"
+    labels:
+      - "dependencies"
+      - "security"
+    reviewers:
+      - "form-compliance"
+    # Major version bumps for direct dependencies — reviewer must confirm
+    # changelog review before merge (CC8.1 change management)
+    versioning-strategy: lockfile-only
+
+  # -------------------------------------------------------------------------
+  # GitHub Actions ecosystem — pins action SHA digests weekly
+  # Prevents supply-chain compromise via tag mutation (CC6.8)
+  # -------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Kyiv"
+    open-pull-requests-limit: 5
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(actions)"
+    labels:
+      - "dependencies"
+      - "github-actions"

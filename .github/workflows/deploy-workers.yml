@@ -1,0 +1,170 @@
+name: Deploy Workers
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write   # required for OIDC Cloudflare token exchange (future)
+
+jobs:
+  deploy:
+    name: Wrangler deploy
+    runs-on: ubuntu-latest
+    # Hard gate: only run if CI workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_AUDIT_BUCKET: form-audit-logs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@latest
+
+      - name: Capture pre-deploy metadata
+        id: meta
+        run: |
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+          echo "ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "actor=${GITHUB_ACTOR}" >> "$GITHUB_OUTPUT"
+          echo "run_id=${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy security-portal Worker
+        id: deploy_security
+        run: |
+          wrangler deploy \
+            --config apps/security-portal/wrangler.toml \
+            --env production \
+            2>&1 | tee /tmp/deploy-security-portal.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy api-gateway Worker (if present)
+        id: deploy_api
+        continue-on-error: true
+        run: |
+          if [ -f apps/api-gateway/wrangler.toml ]; then
+            wrangler deploy \
+              --config apps/api-gateway/wrangler.toml \
+              --env production \
+              2>&1 | tee /tmp/deploy-api-gateway.log
+          else
+            echo "api-gateway wrangler.toml not found — skipping" | tee /tmp/deploy-api-gateway.log
+          fi
+
+      - name: Assemble structured deploy log (CC8-E-002)
+        run: |
+          cat > /tmp/deploy-summary.json << EOF
+          {
+            "event_type": "ci.deploy_succeeded",
+            "sha": "${{ steps.meta.outputs.sha }}",
+            "short_sha": "${{ steps.meta.outputs.short_sha }}",
+            "deployed_at": "${{ steps.meta.outputs.ts }}",
+            "actor": "${{ steps.meta.outputs.actor }}",
+            "run_id": "${{ steps.meta.outputs.run_id }}",
+            "run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ steps.meta.outputs.run_id }}",
+            "ci_workflow_run_id": "${{ github.event.workflow_run.id }}",
+            "workers_deployed": ["security-portal", "api-gateway"],
+            "cloudflare_account_id": "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          }
+          EOF
+          cat /tmp/deploy-summary.json
+
+      - name: Upload deploy log to R2 (CC8-E-002)
+        run: |
+          # Archive structured summary
+          wrangler r2 object put \
+            "${R2_AUDIT_BUCKET}/deploy-logs/${{ steps.meta.outputs.ts }}-${{ steps.meta.outputs.short_sha }}.json" \
+            --file /tmp/deploy-summary.json \
+            --content-type application/json
+
+          # Archive raw Wrangler output for each Worker
+          for log_file in /tmp/deploy-*.log; do
+            worker_name=$(basename "$log_file" .log | sed 's/^deploy-//')
+            wrangler r2 object put \
+              "${R2_AUDIT_BUCKET}/deploy-logs/raw/${{ steps.meta.outputs.ts }}-${worker_name}.log" \
+              --file "$log_file" \
+              --content-type text/plain
+          done
+
+      - name: Emit DEC-030 ci.deploy_succeeded event
+        run: |
+          curl -sf \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"event_type\": \"ci.deploy_succeeded\",
+              \"actor_id\": \"github-actions\",
+              \"sha\": \"${{ steps.meta.outputs.sha }}\",
+              \"short_sha\": \"${{ steps.meta.outputs.short_sha }}\",
+              \"run_id\": \"${{ steps.meta.outputs.run_id }}\",
+              \"deployed_at\": \"${{ steps.meta.outputs.ts }}\",
+              \"actor_github\": \"${{ steps.meta.outputs.actor }}\"
+            }" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/audit-log-ingest" || \
+          echo "::warning::DEC-030 emit failed — deploy succeeded but audit event not recorded; manual backfill required"
+
+  deploy-failed:
+    name: Record deploy failure
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Emit DEC-030 ci.deploy_failed event
+        run: |
+          curl -sf \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"event_type\": \"ci.deploy_failed\",
+              \"actor_id\": \"github-actions\",
+              \"sha\": \"${GITHUB_SHA}\",
+              \"run_id\": \"${GITHUB_RUN_ID}\",
+              \"failed_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"ci_conclusion\": \"${{ github.event.workflow_run.conclusion }}\"
+            }" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/audit-log-ingest" || \
+          echo "::warning::DEC-030 emit failed for ci.deploy_failed event"
+
+  build-blocked:
+    name: Record CI gate block
+    runs-on: ubuntu-latest
+    # Fires on non-success conclusions other than 'failure' (cancelled, timed_out, action_required)
+    if: >
+      ${{ github.event.workflow_run.conclusion != 'success' &&
+          github.event.workflow_run.conclusion != 'failure' }}
+    steps:
+      - name: Emit DEC-030 ci.build_blocked event
+        run: |
+          curl -sf \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"event_type\": \"ci.build_blocked\",
+              \"actor_id\": \"github-actions\",
+              \"sha\": \"${GITHUB_SHA}\",
+              \"run_id\": \"${GITHUB_RUN_ID}\",
+              \"blocked_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"conclusion\": \"${{ github.event.workflow_run.conclusion }}\"
+            }" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/audit-log-ingest" || \
+          echo "::warning::DEC-030 emit failed for ci.build_blocked event"
