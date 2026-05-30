@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 154 cards (154 content posts authored), category filter, newsletter CTA | v1.27.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 156 cards (156 content posts authored), category filter, newsletter CTA | v1.29.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -227,6 +227,20 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-140-eccentric-training-mechanisms.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-141-autoregulation-rpe-rir-vbt.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-142-ribosomal-biogenesis-training-volume.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-143-ros-hormesis-training.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-144-autophagy-muscle-remodeling.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-145-mechanotransduction-tensegrity.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-146-myokines-muscle-endocrine-organ.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-147-extracellular-vesicles-muscle-crosstalk.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-148-mitochondrial-biogenesis.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-149-muscle-fiber-type-plasticity.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-150-calcium-signaling-adaptation.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-151-neuromuscular-junction-adaptation.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-152-systemic-inflammation-anti-inflammatory-adaptation.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-153-lactate-signaling-molecule.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-154-telomeres-training-geroprotection.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-155-concurrent-training-interference-ampk-mtorc1.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-156-glymphatic-system-sleep-training.md | Blog | draft · clinical-safety NOT REQUIRED |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

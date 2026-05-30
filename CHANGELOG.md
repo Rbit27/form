@@ -6,6 +6,19 @@
 
 ---
 
+## [1.29.0] — 2026-05-30
+
+### Added
+- `content/post-156-glymphatic-system-sleep-training.md` — "Глімфатична система і сон: як тренінг і сон разом очищують мозок." Sports-science series post. Covers Iliff/Nedergaard (2012 Science Translational Medicine) and Xie et al. (2013 Science) discovery of the glymphatic system and AQP4-mediated perivaqueductal drainage; CSF-ISF exchange mechanism; glymphatic activity ~60% higher during sleep vs wakefulness (expanded interstitial space); Holth et al. (2019 Science) one night sleep deprivation → +25–30% β-amyloid in CSF; Lundgaard et al. (2017 Nature Communications) exercise ↑ AQP4 polarization and glymphatic flow; synaptic homeostasis hypothesis (Tononi/Cirelli) and motor consolidation during sleep (Walker 2017; Stickgold & Walker 2007 Nat Rev Neurosci); Lee et al. (2015 J Neurosci) lateral sleep position; Kredlow et al. (2015) meta-analysis exercise → sleep quality; training→BDNF→sleep→neuroplasticity triangle; honest note on mouse-model limitations for human glymphatic quantification. `clinical_safety_note: NOT REQUIRED`.
+- `blog.html` — cards for post-155 (Ефект інтерференції AMPK/mTORC1) and post-156 (Глімфатична система і сон) added; total 156 cards.
+- `STATUS.md` — content engine table backfilled for post-143 through post-156; blog.html row updated to 156 cards.
+- `README.md` — roadmap: post-155 marked [x] with actual AMPK/mTORC1 content (ECM planned as post-159); post-156 marked [x] with full description.
+
+### Changed
+- `VERSION` → 1.29.0
+
+---
+
 ## [1.28.0] — 2026-05-30
 
 ### Added
