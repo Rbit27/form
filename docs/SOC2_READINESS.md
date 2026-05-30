@@ -8353,4 +8353,655 @@ The checklist row itself is in §15.2 and is not amended (append-only document p
 
 ---
 
+## 43. Credential & Access Hardening Policy — CC6.1/CC6.2/CC6.3/CC6.6/CC6.8 Auditor Exhibit
+
+> **New section added 2026-05-30. This is a standalone auditor exhibit that documents FORM's mandatory credential and access hardening controls as binding implementation specifications. It is designed to be extracted and delivered directly to auditors without requiring cross-reference to §26, which provides the architectural narrative this section implements.**
+
+> **Gap closure:** CC6-GAP-001 (MFA — GitHub) 🔴 → 🟡 AUTHORED · CC6-GAP-002 (MFA — Cloudflare) 🔴 → 🟡 AUTHORED · CC6-GAP-003 (Tenant admin TOTP) 🔴 → 🟡 AUTHORED · CC6-GAP-004 (SCIM DELETE deprovisioning) 🔴 → 🟡 AUTHORED · CC6-GAP-005 (npm audit CI gate) 🔴 → 🟡 AUTHORED · CC6-GAP-006 (git-secrets pre-commit) 🔴 → 🟡 AUTHORED · CC6-GAP-007 (CSP/ESLint, P1) 🔴 → 🟡 AUTHORED.
+> **P0 count: 10 → 4** (six P0 gaps reclassified from 🔴 Open to 🟡 AUTHORED; CC6-GAP-007 is P1).
+
+---
+
+### 43.1 Purpose and Scope
+
+This exhibit documents FORM's binding credential and access hardening controls at four layers: internal tooling (GitHub, Cloudflare MFA enforcement), application (tenant admin TOTP), identity lifecycle (SCIM deprovisioning), and CI/CD pipeline (dependency audit, secret scanning, static analysis). Together these controls satisfy AICPA SOC 2 logical access criteria CC6.1, CC6.2, CC6.3, CC6.6, and CC6.8.
+
+**Relationship to §26:** Section 26 (CC6 — Logical and Physical Access Controls) documents the access architecture, session token properties, and compensating control narrative for the solo-founder phase. §43 specifies the concrete technical enforcement points — the exact settings to enable, the API contracts to implement, the CI pipeline additions, and the evidence artefacts each control produces. §43 is the implementation specification; §26 is the architecture narrative. Both sections together constitute the full CC6 evidence package.
+
+**Control scope:**
+
+| Layer | Control | SOC 2 Criterion |
+|---|---|---|
+| Internal tooling MFA | GitHub org + Cloudflare account-level 2FA enforcement | CC6.1, CC6.2 |
+| Application-layer TOTP | Tenant admin / tenant owner role-gated TOTP enforcement | CC6.1, CC6.2 |
+| SCIM deprovisioning | `DELETE /scim/v2/Users/{userId}` lifecycle handler | CC6.3 |
+| CI dependency audit | `npm audit --audit-level=critical` + Dependabot | CC6.8 |
+| Secret scanning | `git-secrets` pre-commit hook + CI scan step | CC6.6 |
+| CSP + static analysis | `Content-Security-Policy` header + ESLint `no-eval` (P1) | CC6.8 |
+
+**Out of scope for this exhibit:** Consumer user authentication flows (documented in `docs/SSO_SCIM_IMPLEMENTATION.md §6`); physical access controls (out of scope for a fully remote, cloud-native architecture); break-glass procedure (documented in §26.4 and `docs/AUDIT_LOG_SCHEMA.md`); penetration testing (§36); vulnerability management SLA (§41).
+
+---
+
+### 43.2 Internal Tooling MFA Enforcement
+
+#### 43.2.1 GitHub Organization MFA Requirement — CC6-GAP-001 (MFA — GitHub)
+
+**Gap closed:** GitHub org "Require two-factor authentication" policy not yet enabled. Any future team member added to the org could access source code and CI/CD secrets without MFA.
+
+**Required configuration:**
+
+```
+GitHub org settings → Security → Authentication security:
+  ☑  Require two-factor authentication for everyone in the organisation
+```
+
+**Effect when enabled:** Any member without 2FA is immediately removed from the organisation. GitHub sends a re-join link after MFA enrolment. The organisation owner (founder) must have 2FA active before enabling this policy for others — confirmed by 1Password TOTP per §26.3.1.
+
+**Permitted 2FA methods:**
+
+| Method | Status | Notes |
+|---|---|---|
+| TOTP authenticator app | Required minimum | Google Authenticator, Authy, 1Password integrated TOTP |
+| Hardware security key (YubiKey, passkey) | Recommended | Required for any engineer with production-deploy access |
+| SMS OTP | Not accepted as sole method | NIST SP 800-63B deprecates SMS for Level 2 assurance and above |
+
+**Compensating control for solo-founder phase:** The organisation has one member (founder). The GitHub org-level policy cannot enforce itself meaningfully against a single-member org; the founder already uses MFA. The compensating control is 1Password TOTP on the GitHub account, documented in §26.3.1. The org-level policy must be enabled before any second member is added — this is a **pre-hire** gate, not merely a pre-launch gate.
+
+**Evidence artefact — CC6-E-001a:**
+```
+File: compliance/evidence/cc6/github-mfa-org-policy-YYYY-MM.png
+Content: Screenshot of GitHub org Security settings showing "Require two-factor
+         authentication" checked and the organisation name visible in the browser
+Cadence: Captured at time of enabling; re-captured at each quarterly access review
+         (§23) and at each SOC 2 observation period open
+Retention: 7 years (CC6.1 access control evidence)
+```
+
+---
+
+#### 43.2.2 Cloudflare Account-Level MFA Requirement — CC6-GAP-002
+
+**Gap closed:** Cloudflare "Require 2FA for all members" account security setting not yet enabled. Without this, a future team member with Cloudflare access could operate without MFA on the surface that holds DNS, WAF rules, Workers Secrets (Anthropic key, Supabase service role key, DEC-030 HMAC signing key, ElevenLabs API key), and edge routing.
+
+**Blast radius context:** Unauthorised Cloudflare access is a critical exposure — an attacker with Cloudflare credentials can exfiltrate all production secrets from Workers Secrets, disable WAF rules, redirect traffic, and modify edge routing. MFA enforcement at this layer is non-negotiable even before the first team hire.
+
+**Required configuration:**
+
+```
+Cloudflare dashboard → Account → Security:
+  ☑  Require 2FA for all members
+```
+
+**Effect when enabled:** Any account member without 2FA is blocked from Cloudflare dashboard access until they enrol a TOTP device. The account owner (founder) must have 2FA active first.
+
+**Evidence artefact — CC6-E-001b:**
+```
+File: compliance/evidence/cc6/cloudflare-mfa-policy-YYYY-MM.png
+Content: Screenshot of Cloudflare Account Security settings showing
+         "Require 2FA for all members" enabled and the account name visible
+Cadence: At time of enabling; re-captured at each quarterly access review
+Retention: 7 years
+```
+
+---
+
+### 43.3 Application-Layer Tenant Admin TOTP Enforcement — CC6-GAP-003
+
+#### 43.3.1 Gap Description and Policy Decision
+
+**Gap closed:** Enterprise tenant admins (`tenant_owner`, `tenant_admin` roles) can currently perform role-restricted actions — SSO configuration, bulk provisioning, audit log export, admin dashboard access — without MFA at the FORM application layer. SSO enterprise tenants inherit IdP MFA if their IdP enforces it; self-serve and non-SSO tenants have no equivalent enforcement.
+
+**Policy decision (binding as of §43):** All `tenant_owner` and `tenant_admin` role holders must complete TOTP enrolment via Supabase Auth `mfa_factors` before invoking any role-gated admin API endpoint. This applies to both SSO and non-SSO admin accounts, with the IdP delegation exemption in §43.3.3.
+
+#### 43.3.2 TOTP Enforcement Flow
+
+**Enrolment sequence:**
+
+1. Tenant admin completes initial login (SSO or email/OTP).
+2. If `auth.users.mfa_factors` has zero verified factors, the Worker middleware returns `HTTP 403 MFA_ENROLLMENT_REQUIRED` on any admin-gated endpoint.
+3. Client redirects admin to `/settings/security/mfa`.
+4. Admin scans TOTP QR code (Supabase Auth `mfa/enroll` endpoint generates `otpauth://` URI).
+5. Admin verifies first TOTP code via Supabase Auth `mfa/challenge` + `mfa/verify`.
+6. On success: existing `auth.mfa_enabled` DEC-030 event emitted (from AUDIT_LOG_SCHEMA.md); Supabase `mfa_factors` row created with `factor_type = 'totp'`, `status = 'verified'`.
+
+**Grace period for new admins:**
+
+| Day since provisioning | Admin experience |
+|---|---|
+| Day 0–7 | Access allowed; persistent `⚠ Enroll MFA within N days` banner on admin dashboard; `access.tenant_admin_totp_waiver_used` DEC-030 event emitted per invocation |
+| Day 8+ | Admin-gated endpoints return `HTTP 403 MFA_ENROLLMENT_REQUIRED`; non-admin endpoints unaffected |
+
+**Rationale for 7-day grace period:** Enterprise IT onboarding sometimes involves staged equipment handover. Blocking admin access on day one creates escalation pressure on the FORM team. Seven days matches the grace period used by Atlassian and GitHub Enterprise; it is long enough for TOTP enrolment in any reasonable onboarding scenario.
+
+**Enforcement middleware (Cloudflare Worker — admin API gate):**
+
+```typescript
+async function requireAdminMfa(
+  request: Request,
+  env: Env,
+  claims: JwtClaims
+): Promise<Response | null> {
+  if (!['tenant_owner', 'tenant_admin'].includes(claims.role)) {
+    return null; // not an admin role — pass through
+  }
+
+  const enrolled = await isMfaEnrolled(claims.sub, env);
+  if (enrolled) return null; // TOTP enrolled — pass through
+
+  const gracePeriodExpired = await isGracePeriodExpired(claims.sub, env);
+  if (!gracePeriodExpired) {
+    await emitDec030(env, {
+      event_type: 'access.tenant_admin_totp_waiver_used',
+      actor_id: claims.sub,
+      tenant_id: claims.tenant_id,
+      metadata: {
+        endpoint_path: new URL(request.url).pathname,
+        days_since_provisioned: await daysSinceProvisioned(claims.sub, env),
+      }
+    });
+    return null; // within grace period — allow with audit trail
+  }
+
+  return new Response(JSON.stringify({
+    error: 'MFA_ENROLLMENT_REQUIRED',
+    message: 'Tenant admin access requires TOTP enrollment.',
+    enroll_url: `${env.APP_URL}/settings/security/mfa`
+  }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+```
+
+#### 43.3.3 SSO Enterprise Tenant Exemption
+
+Enterprise tenants using SAML 2.0 or OIDC SSO may claim an MFA exemption if their IdP enforces MFA before issuing an assertion to FORM. The exemption is recorded per-tenant in `tenant_sso_configs.mfa_delegated_to_idp = true`.
+
+**Exemption conditions (all three must be met):**
+
+1. Tenant has `sso_enabled = true` in `tenant_sso_configs`.
+2. The SAML assertion or OIDC ID token includes a qualifying authentication context: `TimeSyncToken`, `X509Certificate`, or OIDC `acr_values = mfa`. Note: `PasswordProtectedTransport` context class does **not** qualify.
+3. Tenant IT admin provides written attestation (`compliance/enterprise-tenants/{slug}/mfa-idp-attestation.md`) confirming IdP enforces MFA for all FORM-bound users.
+
+If any condition is unmet, FORM's application-layer TOTP requirement remains active.
+
+**Evidence artefact — CC6-E-002:**
+```
+File: compliance/evidence/cc6/tenant-admin-totp-enforcement-YYYY-MM.md
+Content: Deployment confirmation (commit SHA of Worker middleware);
+         count of tenant_owner/admin users with mfa_factors row (verified status);
+         count of access.tenant_admin_totp_waiver_used events in quarter;
+         list of tenants with mfa_delegated_to_idp = true + attestation reference
+Cadence: Generated at each quarterly access review (§23); archived with the review
+Retention: 7 years
+```
+
+---
+
+### 43.4 SCIM User Deprovisioning Handler — CC6-GAP-004
+
+#### 43.4.1 Gap Description
+
+**Gap closed:** FORM's SCIM v2 implementation handles `POST /scim/v2/Users` (create) and `PATCH /scim/v2/Users/{id}` (update) but is missing `DELETE /scim/v2/Users/{userId}` (deprovision). Without this handler, terminated employees remain in an active session state until manually removed by the tenant admin, violating CC6.3 (access removal from former employees) and breaking the offboarding SLA evidence trail.
+
+The SCIM Groups `DELETE /scim/v2/Groups/{id}` handler is in scope for the same gap and must be implemented simultaneously.
+
+#### 43.4.2 Handler Specification
+
+**Endpoint:** `DELETE /scim/v2/Users/{userId}`
+
+**Response codes:**
+
+| Status | Condition |
+|---|---|
+| `204 No Content` | Successful deprovision, or user was already deprovisioned (idempotent) |
+| `401 Unauthorized` | Invalid or expired SCIM bearer token |
+| `403 Forbidden` | SCIM token does not belong to the user's tenant |
+| `404 Not Found` | `{userId}` is not a valid user UUID in this tenant |
+| `409 Conflict` | User is the sole `tenant_owner`; cannot delete last owner without a replacement |
+
+**Actions on DELETE (single atomic transaction):**
+
+```sql
+BEGIN;
+
+-- 1. Soft-delete the user (preserve data for Art. 17 retention schedule)
+UPDATE users
+   SET deprovisioned_at = NOW(),
+       deprovisioned_by = 'scim',
+       is_active        = FALSE
+ WHERE id        = :userId
+   AND tenant_id = :tenantId;
+
+-- 2. Release one seat from the subscription count
+UPDATE tenant_subscriptions
+   SET active_seat_count = active_seat_count - 1
+ WHERE tenant_id         = :tenantId
+   AND active_seat_count > 0;
+
+-- 3. Revoke all active sessions
+--    Executed via Supabase admin API inside the Cloudflare Worker:
+--    supabase.auth.admin.signOut(userId, { scope: 'global' })
+--    This invalidates all refresh tokens and JWT sessions immediately.
+
+-- 4. Emit HMAC-chained audit event
+INSERT INTO audit_log_events (
+  event_type, actor_type, actor_id,
+  tenant_id, resource_id, metadata
+) VALUES (
+  'auth.scim_user_deprovisioned', 'system', :scimTokenActorId,
+  :tenantId, :userId,
+  jsonb_build_object(
+    'deprovisioned_by',  'scim',
+    'sessions_revoked',  :sessionsRevoked,
+    'seat_count_after',  :seatCountAfter
+  )
+);
+
+COMMIT;
+```
+
+**Soft-delete rationale:** GDPR Art. 17 erasure applies to personal data in health tables (`health_profiles`, `coaching_turns`, `cv_sessions`, `meal_log`) — governed by the retention schedule in `compliance/p1/retention-decisions.md`. The `users` row itself is retained for 7 years as a SOC 2 access-lifecycle evidence artefact. On a separate Art. 17 erasure request, PII fields in the `users` row are overwritten with pseudonymous values; the audit-relevant metadata (`id`, `tenant_id`, `deprovisioned_at`, `deprovisioned_by`) is retained for HMAC chain continuity.
+
+**Idempotency requirement:** If `DELETE /scim/v2/Users/{userId}` is called for a user where `deprovisioned_at IS NOT NULL`, the handler returns `204` without error. IdP systems (Okta, Azure AD) frequently retry DELETE requests on timeout; a non-idempotent handler breaks IdP retry logic and produces false-failure alerts at the tenant's IT team.
+
+**SCIM Groups handler (`DELETE /scim/v2/Groups/{groupId}`):** When a SCIM Group is deleted, FORM deprovisions all users whose sole FORM role came from that group membership. The same soft-delete + session revocation + seat release sequence applies per affected user. A single `audit_log_events` row with `resource_type = 'scim_group'` covers the group-level action; individual `auth.scim_user_deprovisioned` events are emitted per affected user.
+
+**Evidence artefact — CC6-E-003:**
+```
+File: compliance/evidence/cc6/scim-deprovision-handler-YYYY-MM.md
+Content: Deployment confirmation (commit SHA of DELETE handler);
+         integration test results from Okta dev tenant — user created via POST,
+         deprovisioned via DELETE, session confirmed revoked (Supabase
+         auth.users.confirmed_at check), seat_count confirmed decremented,
+         DEC-030 event confirmed in HMAC chain;
+         DEC-030 event type registration reference
+Cadence: Filed at deployment; updated after each quarterly access review
+Retention: 7 years (CC6.3 access removal evidence)
+```
+
+---
+
+### 43.5 CI Security Gate: Dependency Audit and Dependabot — CC6-GAP-005
+
+#### 43.5.1 Gap Description
+
+**Gap closed:** `npm audit --audit-level=critical` is not yet a blocking CI step. Dependabot is not yet configured. Critical CVEs in npm dependencies could be merged to `main` without automated detection.
+
+#### 43.5.2 npm Audit CI Gate
+
+**GitHub Actions workflow addition (`.github/workflows/ci.yml`):**
+
+```yaml
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Audit critical vulnerabilities
+        run: npm audit --audit-level=critical
+        # Exits 1 on any CVSS ≥ 9.0 critical CVE with available fix
+        # High / medium / low logged to stdout but do not block merge
+```
+
+This step is added as a required status check on the `main` branch protection rule. A PR cannot be merged while this check is failing.
+
+**Exception process:** If a critical CVE has no upstream fix and the dependency cannot be removed, a Risk Acceptance record is required per §41.7 before the CI gate can be bypassed. The bypass uses commit message annotation `[skip-audit-critical: RISK-XXXXXX]` (Linear Risk Acceptance ticket ID). A CI annotation step detects this token, emits a `ci.dependency_audit_blocked` DEC-030 event with the exception reference, and permits the build. Compliance-officer + founder co-approval in the Linear ticket is required before the bypass token is used. Bypasses are auditable, not silent.
+
+#### 43.5.3 Dependabot Configuration
+
+**File: `.github/dependabot.yml`**
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "rbit27"
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      non-breaking:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "rbit27"
+    labels:
+      - "dependencies"
+      - "github-actions"
+```
+
+**Dependabot security alerts:** Alerts in the GitHub Security tab (distinct from Dependabot PRs) must be triaged within 24h for critical severity per §41.4. Dependabot is the "GitHub advisory database" discovery source referenced in §41.3.1.
+
+**Evidence artefact — CC6-E-004:**
+```
+File: compliance/evidence/cc6/ci-dependency-audit-YYYY-QN.txt
+Content: GitHub Actions run log for the dependency-audit job from the most
+         recent CI run on main (exit 0, or exception record if any CVE exists);
+         Dependabot PR merge history for the quarter (GitHub PR list filtered
+         by `is:pr label:security merged:YYYY`)
+Cadence: Captured at each quarterly access review; one artefact per quarter
+Retention: 7 years (CC6.8 malicious-software prevention evidence per §41 SLA)
+```
+
+---
+
+### 43.6 Secret Scanning: Pre-commit Hook and CI Step — CC6-GAP-006
+
+#### 43.6.1 Gap Description
+
+**Gap closed:** `git-secrets` pre-commit hook not yet installed. A developer could accidentally commit a production credential to the repository. GitHub native push protection (requires GitHub Advanced Security) is not yet enabled.
+
+**Blast radius of a credential commit:** FORM's most sensitive secrets are the Supabase service role key (bypasses RLS — grants full DB read/write for all tenants), the Anthropic API key (unbounded AI spend), the DEC-030 HMAC signing key (chain integrity), and the ElevenLabs API key. Any of these committed to the repo create an exposure window until rotation. Rotation SLA is 2 hours from detection — equivalent to Critical CVE treatment in §41, given the Art. 9 health data exposure path via the Supabase service role key.
+
+#### 43.6.2 git-secrets Installation and Pattern Registration
+
+**Installation (one-time, per developer machine):**
+
+```bash
+# Install git-secrets
+brew install git-secrets          # macOS Homebrew
+# Alternative: git clone https://github.com/awslabs/git-secrets && sudo make install
+
+# Install hooks in the FORM repository
+cd /path/to/form
+git secrets --install             # installs pre-commit, commit-msg, prepare-commit-msg hooks
+
+# Register AWS credential patterns (built-in)
+git secrets --register-aws
+
+# Register FORM-specific patterns from the canonical pattern file
+cat .github/git-secrets-patterns | while read -r pattern; do
+  [[ "$pattern" =~ ^#.*$ || -z "$pattern" ]] && continue  # skip comments and blank lines
+  git secrets --add "$pattern"
+done
+```
+
+**Canonical pattern file (`.github/git-secrets-patterns`):**
+
+```
+# Anthropic API key (sk-ant-api03- prefix)
+sk-ant-[A-Za-z0-9\-_]{95}
+
+# Supabase service role JWT (eyJhbGci... base64 prefix, long bearer token)
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_\-]{100,}
+
+# Stripe live secret key
+sk_live_[A-Za-z0-9]{24,}
+
+# ElevenLabs API key header pattern
+xi-api-key[=: ]["']?[A-Za-z0-9\-_]{32,}
+
+# Cloudflare API token (Bearer token, 40+ chars)
+Bearer [A-Za-z0-9\-_]{40,}
+
+# Generic high-entropy hex — covers most HMAC signing keys
+[^a-zA-Z0-9][0-9a-f]{40}[^a-zA-Z0-9]
+```
+
+This file is committed to the repository so patterns stay current across the team. When a new secret type is introduced, the compliance-officer adds a pattern here via a normal PR and developers update via `git pull` and re-running the install command.
+
+#### 43.6.3 CI Secret Scanning Step
+
+The pre-commit hook protects against accidental developer commits. The CI step covers force-pushes, automated commits (Dependabot, CI bots), and any commits that bypassed the pre-commit hook.
+
+**GitHub Actions workflow addition (`.github/workflows/ci.yml`):**
+
+```yaml
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # full history required for --scan-history
+      - name: Install git-secrets
+        run: |
+          git clone --depth 1 https://github.com/awslabs/git-secrets.git /tmp/git-secrets
+          cd /tmp/git-secrets && sudo make install
+      - name: Register FORM patterns
+        run: |
+          git secrets --register-aws
+          cat .github/git-secrets-patterns | while read -r pattern; do
+            [[ "$pattern" =~ ^#.*$ || -z "$pattern" ]] && continue
+            git secrets --add "$pattern"
+          done
+      - name: Scan PR commits
+        run: git secrets --scan-history
+        # Scans all commits introduced by the PR branch
+        # Exits non-zero on pattern match — blocks PR merge
+```
+
+**GitHub Advanced Security push protection (belt-and-suspenders):**
+
+When GHAS is available (free for public repos; GitHub Advanced Security for private repos at scale), enable push protection:
+
+```
+Repository → Settings → Security → Code security and analysis:
+  ☑  Secret scanning (alerts)
+  ☑  Push protection (blocks pushes containing detected secrets)
+```
+
+GHAS covers 200+ secret types natively, including Anthropic, Stripe, Cloudflare, and ElevenLabs, without relying on custom regex patterns. The `git-secrets` hook is the primary control at the pre-Series A phase; GHAS push protection is the belt-and-suspenders secondary.
+
+**Evidence artefact — CC6-E-005:**
+```
+File: compliance/evidence/cc6/secret-scan-ci-YYYY-QN.txt
+Content: GitHub Actions run log for the secret-scan CI step on the latest main
+         branch run (clean scan, exit 0); screenshot of .github/git-secrets-patterns
+         showing the pattern list; if GHAS enabled: screenshot of repository
+         security settings showing push protection active
+Cadence: Captured at each quarterly access review
+Retention: 7 years (CC6.6 external-threat prevention evidence)
+```
+
+---
+
+### 43.7 Content Security Policy and Static Analysis Gate — CC6-GAP-007 (P1)
+
+#### 43.7.1 Content Security Policy Header
+
+**Gap closed (P1):** CSP header not yet deployed. Without CSP, the web app is exposed to XSS attacks that could inject scripts, exfiltrate session tokens, or modify coaching UI to display harmful guidance — a clinical-safety concern as well as a security one.
+
+**CSP policy (Cloudflare Transform Rule, all `*.form.coach` responses):**
+
+```
+Content-Security-Policy:
+  default-src 'none';
+  script-src 'self' https://static.cloudflareinsights.com;
+  connect-src 'self'
+              https://*.supabase.co
+              https://api.anthropic.com
+              https://api.elevenlabs.io
+              https://eu.posthog.com
+              https://sentry.io;
+  img-src 'self' data: blob: https://imagedelivery.net;
+  style-src 'self' 'unsafe-inline';
+  font-src 'self' data:;
+  frame-ancestors 'none';
+  base-uri 'self';
+  form-action 'self';
+  upgrade-insecure-requests;
+  report-uri /api/csp-report;
+```
+
+**`unsafe-inline` for styles:** A temporary concession for the current CSS-in-JS architecture. The roadmap is nonce-based or hash-based inline style allowlisting as the component library matures. The `report-uri /api/csp-report` endpoint surfaces violations for systematic resolution.
+
+**Cloudflare Transform Rule implementation:**
+
+```
+Dashboard → Rules → Transform Rules → Modify Response Headers
+Rule name: Add Content-Security-Policy header
+When incoming requests match:
+  (http.host eq "form.coach") or (http.host ends_with ".form.coach")
+  AND NOT (http.request.uri.path starts_with "/api/csp-report")
+Then:
+  Set header → Content-Security-Policy → <policy above>
+```
+
+#### 43.7.2 ESLint Static Analysis Gate
+
+**Gap closed (P1):** ESLint `no-eval` rule not yet in CI. `eval()` and equivalent constructs (`new Function()`, `setTimeout(string)`) create code-injection vectors. In a coaching app where user-provided text flows through the system, any `eval()` in the codebase is a material XSS and code-injection risk.
+
+**ESLint rule additions (`.eslintrc.js` or `eslint.config.js`):**
+
+```javascript
+rules: {
+  'no-eval':         'error',  // eval()
+  'no-new-func':     'error',  // new Function(string)
+  'no-implied-eval': 'error',  // setTimeout(string, ...) escape hatch
+}
+```
+
+**CI gate addition (`.github/workflows/ci.yml`):**
+
+```yaml
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx eslint . --max-warnings 0
+        # Any ESLint error (including no-eval) blocks PR merge
+```
+
+**Evidence artefact — CC6-E-006:**
+```
+File: compliance/evidence/cc6/csp-eslint-YYYY-QN.txt
+Content: `curl -I https://form.coach` output showing Content-Security-Policy
+         header present with correct policy; screenshot of Cloudflare
+         Transform Rule configuration; GitHub Actions ESLint CI run log
+         from latest main run (exit 0, no eval violations)
+Cadence: At deployment; re-verified at each quarterly access review
+Retention: 7 years
+```
+
+---
+
+### 43.8 DEC-030 HMAC-Chained Audit Events
+
+Six new event types for the DEC-030 taxonomy, to be registered in `docs/AUDIT_LOG_SCHEMA.md`. All are append-only, HMAC-chained — tamper-evident, region-resident, no retroactive modification possible.
+
+| Event type | Sensitivity | Retention | Trigger | Required payload fields |
+|---|---|---|---|---|
+| `auth.scim_user_deprovisioned` | HIGH | 7 years | SCIM `DELETE /Users/{userId}` handler (§43.4.2); also fires per user in group-deletion cascade | `tenant_id`, `deprovisioned_user_id`, `deprovisioned_by` (`'scim'` or `'admin'`), `scim_token_actor_id`, `sessions_revoked` (int), `seat_count_after` (int) |
+| `access.mfa_org_policy_enabled` | HIGH | 7 years | GitHub or Cloudflare org-level MFA enforcement policy activated by account owner | `platform` (`'github'` or `'cloudflare'`), `enabled_by`, `policy_name`, `timestamp_utc` |
+| `access.tenant_admin_totp_enrolled` | STANDARD | 7 years | Tenant owner or admin completes TOTP factor enrolment via `/settings/security/mfa` | `tenant_id`, `user_id`, `factor_type` (`'totp'`), `grace_period_used` (bool) |
+| `access.tenant_admin_totp_waiver_used` | HIGH | 7 years | Admin invokes an admin-gated endpoint during the 7-day grace period — enforcement bypassed with audit trail | `tenant_id`, `user_id`, `endpoint_path`, `days_since_provisioned`, `grace_period_expires_at` |
+| `ci.secret_scan_blocked` | HIGH | 7 years | CI `git secrets --scan-history` step or GHAS push protection detects a credential pattern in a PR commit | `repo`, `commit_sha`, `branch`, `pattern_matched` (pattern **name** only — never the matched string), `actor` (GitHub username), `blocked_at` |
+| `ci.dependency_audit_blocked` | MEDIUM | 7 years | `npm audit --audit-level=critical` CI step exits non-zero on a PR, or exception bypass token used | `repo`, `pr_number`, `cve_ids` (array), `cvss_scores` (array), `packages_affected` (array of `name@version`), `branch`, `actor`, `exception_risk_id` (if bypass used) |
+
+**Privacy notes:**
+- `ci.secret_scan_blocked`: `pattern_matched` records the **name** of the matched pattern (e.g., `"anthropic_api_key"`) — never the matched string value. The matched credential is never written to any log.
+- `auth.scim_user_deprovisioned`: No health data referenced. Records identity lifecycle facts only — no Art. 9 data categories.
+- All six events: `user_id` / `actor_id` fields are UUID references. No name, email, or health content in any payload.
+
+**AUDIT_LOG_SCHEMA.md update required:** Register these six event types in the action taxonomy and retention table. The `auth.scim_user_deprovisioned` event fills the known lifecycle gap in AUDIT_LOG_SCHEMA.md — the auth taxonomy currently has `auth.sso_provisioned` (create) but no corresponding deprovision event. §43 closes that gap by defining the symmetric deprovisioning counterpart.
+
+---
+
+### 43.9 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control in §43 | Evidence Artefact | Status before §43 | Status after §43 |
+|---|---|---|---|---|
+| **CC6.1** — Logical access restrictions to authorised individuals | GitHub org MFA enforcement (§43.2.1); Cloudflare MFA enforcement (§43.2.2); Tenant admin TOTP gate — only enrolled users can invoke admin-role endpoints (§43.3) | CC6-E-001a, CC6-E-001b, CC6-E-002 | 🔴 Open (CC6-GAP-001, 002, 003) | 🟡 AUTHORED — closes to 🟢 on deployment + screenshot filing |
+| **CC6.2** — Access issuance requires prior authorisation | TOTP enrolment required before admin-role actions are granted (§43.3.2 grace period design); SCIM DELETE closes the issuance–revocation lifecycle loop so every access grant is bounded (§43.4) | CC6-E-002, CC6-E-003 | 🔴 Open (CC6-GAP-003, 004) | 🟡 AUTHORED |
+| **CC6.3** — Access removal upon employee termination | SCIM DELETE handler (§43.4.2): session revoke + seat release + DEC-030 event in single atomic transaction; `auth.scim_user_deprovisioned` provides auditable trail for every terminated enterprise employee | CC6-E-003 | 🔴 Open (CC6-GAP-004) | 🟡 AUTHORED |
+| **CC6.6** — Logical access security against external threats | Secret scanning (§43.6): pre-commit hook + CI step blocks credential patterns before they reach the repository; 2-hour rotation SLA applies on any detection | CC6-E-005 | 🔴 Open (CC6-GAP-006) | 🟡 AUTHORED |
+| **CC6.8** — Prevent or detect unauthorised or malicious software | npm audit CI gate blocks merges introducing critical CVEs (§43.5); Dependabot provides weekly automated dependency PRs (§43.5.3); ESLint `no-eval` blocks code-injection patterns (§43.7.2); CSP header mitigates XSS payload execution in browser (§43.7.1) | CC6-E-004, CC6-E-006 | 🔴 Open (CC6-GAP-005, 007) | 🟡 AUTHORED |
+
+**Auditor evidence package structure for the SOC 2 Type II observation period:**
+
+```
+compliance/evidence/cc6/
+├── github-mfa-org-policy-YYYY-QN.png        (CC6-E-001a — screenshot at obs. open + close)
+├── cloudflare-mfa-policy-YYYY-QN.png        (CC6-E-001b — screenshot at obs. open + close)
+├── tenant-admin-totp-enforcement-YYYY-QN.md (CC6-E-002 — quarterly: enrolled count, waivers)
+├── scim-deprovision-handler-YYYY-QN.md      (CC6-E-003 — deployment + integration test log)
+├── ci-dependency-audit-YYYY-QN.txt          (CC6-E-004 — CI run log + Dependabot merge list)
+├── secret-scan-ci-YYYY-QN.txt               (CC6-E-005 — CI scan log + GHAS status)
+└── csp-eslint-YYYY-QN.txt                   (CC6-E-006 — curl output + ESLint run log)
+```
+
+**Continuous operation evidence for Type II auditors:** For CC6.8 (CI gates), every merged PR generates a CI run log in GitHub Actions. The audit evidence is the GitHub Actions run log archive for all PRs merged during the observation period, queryable via the GitHub Actions API filtered by date range and workflow name. The compliance-officer adds a quarterly `ci-summary-YYYY-QN.md` note showing the count of CI runs on `main` with zero suppressed security gate failures, confirming continuous operation throughout the quarter.
+
+---
+
+### 43.10 Gap Closure Summary
+
+> **CC6-GAP-001 (MFA — GitHub)** 🔴 Open → 🟡 **AUTHORED** — §43.2.1 specifies the exact GitHub org security setting, compensating control for the solo-founder phase, and CC6-E-001a evidence artefact. Closes to 🟢 when the org security setting is enabled and the screenshot is filed.
+>
+> **CC6-GAP-002 (MFA — Cloudflare)** 🔴 Open → 🟡 **AUTHORED** — §43.2.2 specifies the Cloudflare account security setting, blast-radius rationale, and CC6-E-001b evidence artefact. Closes to 🟢 when the setting is enabled and the screenshot is filed.
+>
+> **CC6-GAP-003 (Tenant admin TOTP)** 🔴 Open → 🟡 **AUTHORED** — §43.3 specifies the full Cloudflare Worker enforcement middleware, 7-day grace period design, SSO IdP delegation exemption conditions (three qualifying criteria), and CC6-E-002 evidence artefact. Closes to 🟢 when middleware is deployed and the first CC6-E-002 quarterly report is filed.
+>
+> **CC6-GAP-004 (SCIM DELETE deprovisioning)** 🔴 Open → 🟡 **AUTHORED** — §43.4 specifies the complete `DELETE /scim/v2/Users/{userId}` handler: atomic SQL transaction, idempotency requirement (204 on re-delete), 409 last-owner guard, GDPR Art. 17 soft-delete justification, SCIM Groups cascade, and CC6-E-003 evidence artefact. Closes to 🟢 when handler is deployed and integration-tested against Okta dev tenant.
+>
+> **CC6-GAP-005 (npm audit CI gate)** 🔴 Open → 🟡 **AUTHORED** — §43.5 specifies the GitHub Actions workflow step YAML, Dependabot `.github/dependabot.yml` configuration, failure behaviour, and auditable exception bypass process. Closes to 🟢 when the CI step merges and the first main-branch run passes.
+>
+> **CC6-GAP-006 (git-secrets pre-commit)** 🔴 Open → 🟡 **AUTHORED** — §43.6 specifies installation instructions, the canonical `.github/git-secrets-patterns` file with six FORM-specific patterns, CI scan step YAML, and GHAS push protection integration. Closes to 🟢 when the CI scan step runs on the first PR and CC6-E-005 is filed.
+>
+> **CC6-GAP-007 (CSP/ESLint, P1)** 🔴 Open → 🟡 **AUTHORED** — §43.7 specifies the full CSP policy string, Cloudflare Transform Rule configuration, ESLint `no-eval` / `no-new-func` / `no-implied-eval` rule set, and CI lint step. P1 priority; closes to 🟢 on deployment and CC6-E-006 filing.
+
+**P0 count: 10 → 4.** The four remaining P0 gaps (not addressed by §43):
+
+| Gap | Description | Remaining blocker |
+|---|---|---|
+| CC6-GAP-001 *(access review)* | First Q2 2026 quarterly access review execution outstanding | §23 procedure is complete; requires execution, not documentation |
+| P-GAP-001 | Privacy policy not yet published at `form.coach/privacy` | Blocked on outside counsel review |
+| PRE-25 | Continuous compliance tooling (Vanta/Drata) not yet connected to GitHub, Cloudflare, Supabase | Requires SOC 2 audit firm selection to determine tooling |
+| CC9-GAP-007 / CC2-GAP-003 | Sub-processor page not yet deployed at `security.form.coach/sub-processors` | §39 design complete; requires Wrangler deploy + KV populate + screenshot filed |
+
+---
+
+### 43.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Enable "Require two-factor authentication" in GitHub org Security settings; take screenshot; file as `compliance/evidence/cc6/github-mfa-org-policy-YYYY-MM.png` (CC6-E-001a) | security-engineer | **P0** | Pre-hire (before adding any second GitHub org member) |
+| 2 | Enable "Require 2FA for all members" in Cloudflare Account → Security; take screenshot; file as `compliance/evidence/cc6/cloudflare-mfa-policy-YYYY-MM.png` (CC6-E-001b) | devops-lead | **P0** | Pre-launch |
+| 3 | Add `dependency-audit` job to `.github/workflows/ci.yml` (spec §43.5.2): `npm audit --audit-level=critical`; mark as required status check on `main` branch protection rule | devops-lead | **P0** | Pre-launch |
+| 4 | Commit `.github/dependabot.yml` (spec §43.5.3): npm weekly Monday 09:00 UTC + GitHub Actions ecosystem; `rbit27` as reviewer; merge initial Dependabot PRs to clear baseline debt | devops-lead | **P0** | Pre-launch |
+| 5 | Create `.github/git-secrets-patterns` with six FORM-specific patterns per §43.6.2 (Anthropic key prefix, Supabase service role JWT, Stripe live key, ElevenLabs key, Cloudflare bearer token, 40-char hex); add installation command to `docs/ENGINEERING_RUNBOOK.md §Security` | security-engineer | **P0** | Pre-launch |
+| 6 | Add `secret-scan` CI job to `.github/workflows/ci.yml` (spec §43.6.3): install `git-secrets`, register patterns from `.github/git-secrets-patterns`, run `git secrets --scan-history`; mark as required status check | security-engineer | **P0** | Pre-launch |
+| 7 | Implement `DELETE /scim/v2/Users/{userId}` handler (spec §43.4.2): atomic SQL transaction (soft-delete + seat release + Supabase `auth.admin.signOut` + DEC-030 emit); idempotent 204 on re-delete; 409 last-owner guard; integration test against Okta dev tenant | platform-engineer | **P0** | M4 |
+| 8 | Implement `DELETE /scim/v2/Groups/{groupId}` handler with cascading per-user deprovision (§43.4.2); add to the same integration test suite | platform-engineer | **P0** | M4 |
+| 9 | Implement tenant admin TOTP enforcement middleware in Cloudflare Worker (spec §43.3.2): `requireAdminMfa()` guard on all admin-gated API routes; 7-day grace period; `mfa_delegated_to_idp` exemption path (§43.3.3); emit `access.tenant_admin_totp_enrolled` and `access.tenant_admin_totp_waiver_used` DEC-030 events | platform-engineer | **P1** | M3 |
+| 10 | Register six DEC-030 event types from §43.8 in `docs/AUDIT_LOG_SCHEMA.md` action taxonomy and retention table; add `auth.scim_user_deprovisioned` to the auth events section noting it closes the `auth.sso_provisioned` lifecycle gap | security-engineer | **P1** | M3 |
+| 11 | Deploy CSP header via Cloudflare Transform Rule (policy §43.7.1); wire `/api/csp-report` Cloudflare Worker for violation collection; verify with `curl -I https://form.coach`; file CC6-E-006 | platform-engineer | **P1** | M3 |
+| 12 | Add ESLint `no-eval`, `no-new-func`, `no-implied-eval` to `.eslintrc.js` / `eslint.config.js`; add ESLint `ci.yml` step with `--max-warnings 0` (§43.7.2) | platform-engineer | **P1** | M3 |
+| 13 | File §43 as standalone policy at `compliance/cc6/access-hardening-policy.md`; record in `compliance/policy-approval-log.csv` with date and `docs/SOC2_READINESS.md §43` cross-reference | compliance-officer | **P1** | M3 |
+| 14 | Enable GitHub Advanced Security secret scanning + push protection when org plan includes GHAS; file GHAS push-protection screenshot as addendum to CC6-E-005 | security-engineer | **P2** | M5 |
+
+---
+
+*v1.5 additions (2026-05-30): §43 Credential & Access Hardening Policy — CC6.1/CC6.2/CC6.3/CC6.6/CC6.8 Auditor Exhibit. Binding implementation specifications for six P0 CC6 gaps simultaneously advanced from 🔴 Open to 🟡 AUTHORED. Internal tooling MFA: GitHub org "Require 2FA for all members" setting specification with compensating control narrative for solo-founder phase (CC6-GAP-001); Cloudflare account-level MFA enforcement with blast-radius rationale for Workers Secrets surface (DEC-030 HMAC signing key, Supabase service role key, Anthropic key, ElevenLabs key) (CC6-GAP-002); permitted 2FA methods table — TOTP required, YubiKey recommended, SMS explicitly rejected per NIST SP 800-63B. Application-layer TOTP: tenant admin / owner TOTP enrolment gate via Supabase Auth mfa_factors; 7-day grace period with progressive warning banner and per-invocation `access.tenant_admin_totp_waiver_used` DEC-030 event; full Cloudflare Worker middleware pseudocode; SSO IdP delegation exemption requiring three qualifying conditions (sso_enabled + qualifying auth context class + written IT admin attestation — PasswordProtectedTransport explicitly rejected) (CC6-GAP-003). SCIM DELETE deprovisioning: `DELETE /scim/v2/Users/{userId}` full endpoint spec — atomic SQL transaction (soft-delete + seat release + Supabase admin.signOut + DEC-030 emit), idempotency requirement (204 on re-delete), 409 last-owner guard, GDPR Art. 17 soft-delete justification (PII overwritten on erasure; audit-relevant metadata retained), SCIM Groups cascade spec with per-user deprovision events (CC6-GAP-004). CI dependency audit: `npm audit --audit-level=critical` GitHub Actions job; Dependabot `.github/dependabot.yml` for npm + GitHub Actions; auditable exception bypass `[skip-audit-critical: RISK-XXXXXX]` with compliance-officer + founder co-approval gate (CC6-GAP-005). Secret scanning: `git-secrets` pre-commit hook installation with canonical `.github/git-secrets-patterns` file (six patterns: Anthropic sk-ant- prefix, Supabase JWT, Stripe live, ElevenLabs xi-api-key, Cloudflare Bearer token, generic 40-char hex HMAC key); CI `git secrets --scan-history` step; GHAS push protection as secondary control (CC6-GAP-006). CSP/ESLint (P1): full Content-Security-Policy string with report-uri; Cloudflare Transform Rule configuration; ESLint no-eval + no-new-func + no-implied-eval with --max-warnings 0 CI gate; unsafe-inline styles acknowledged as temporary with nonce-based roadmap (CC6-GAP-007). Six new DEC-030 HMAC-chained events: `auth.scim_user_deprovisioned` (HIGH, 7yr — closes AUDIT_LOG_SCHEMA.md auth lifecycle gap: sso_provisioned had no symmetric deprovision counterpart), `access.mfa_org_policy_enabled` (HIGH, 7yr), `access.tenant_admin_totp_enrolled` (STANDARD, 7yr), `access.tenant_admin_totp_waiver_used` (HIGH, 7yr), `ci.secret_scan_blocked` (HIGH, 7yr — pattern name only, matched value never logged), `ci.dependency_audit_blocked` (MEDIUM, 7yr — exception_risk_id field for bypass audit trail). SOC 2 evidence mapping: CC6.1 (MFA at two admin surfaces + TOTP enrolment gate), CC6.2 (TOTP prerequisite before admin role + bounded lifecycle via SCIM DELETE), CC6.3 (SCIM DELETE atomic offboarding closes SLA evidence gap), CC6.6 (secret scanning pre-commit + CI), CC6.8 (npm audit + Dependabot + no-eval + CSP). Evidence package: six artefacts CC6-E-001a through CC6-E-006 with file paths, content specs, quarterly capture cadence, 7-year retention. 14-item implementation checklist (8× P0 pre-launch/pre-hire/M4, 5× P1 M3, 1× P2 M5). Gap advances: CC6-GAP-001/002/003/004/005/006 🔴 → 🟡 AUTHORED; CC6-GAP-007 (P1) 🔴 → 🟡 AUTHORED. P0 count: 10 → 4. Four remaining P0 gaps: CC6-GAP-001 (access review execution outstanding), P-GAP-001 (privacy policy counsel-review blocked), PRE-25 (Vanta/Drata — audit firm selection), CC9-GAP-007/CC2-GAP-003 (sub-processor Wrangler deploy outstanding).*
+
+---
+
 *v1.4 additions (2026-05-29): §42 Personnel Security, Background Check & Confidentiality Onboarding Policy — CC1.1/CC1.4 Auditor Exhibit. Background check provider selection: Checkr (primary, SOC 2 certified, EU DPA available, 1–5 day turnaround, lower friction for < 5 hires/year) vs Sterling (approved fallback, stronger UA criminal record depth); check scope: identity verification + criminal record (country of residence + global watchlist) + employment history (last 5 years) — education verification conditional; credit and drug screen explicitly excluded. GDPR legal basis: Art. 6(1)(b) pre-contractual steps; Art. 10 for criminal data with national law; candidate background check notice required; Checkr as Art. 28 processor; raw report retention 12 months, pass/fail attestation 7 years. Adjudication criteria: individualized assessment per EEOC/EU employment law; four automatic disqualifiers (fraud, identity theft, computer crimes, privacy violations < 7yr; unauthorized computer access; financial crimes < 7yr; minor victims); non-disqualifier examples. NDA template: 10-clause structure (parties, confidential information definition — explicitly enumerates Art. 9 health data categories, obligations, exclusions, data protection obligations including 1-hour internal breach report, IP assignment — explicitly covers ML artefacts and CV pipeline, non-solicitation 12 months, indefinite health data survival clause, DocuSign signing workflow); four template variants (employee, advisor, contractor rider, pentest MNDA); NDA register schema (12 columns, pseudonymized). Pre-boarding security checklist: 11 steps Day −14 through Day 30; no production access before background check clear; security training assigned Day 0; AUP signed Day 0; production write access expansion at Day-30 review only. Four DEC-030 HMAC-chained personnel events: `personnel.background_check_initiated` (STANDARD, 7yr), `personnel.background_check_passed` (HIGH, 7yr), `personnel.nda_signed` (STANDARD, 7yr), `personnel.hire_check_passed` (HIGH, 7yr); all privacy-safe; manual emission path specified for pre-automation phase. Seven auditor evidence artefacts CC1-E-003a through CC1-E-007b. SOC 2 criteria mapping: CC1.1 (NDA + AUP coverage), CC1.4 (background check policy + competence verification), CC6.3 (access scoping + Day-30 review + offboarding §40 cross-ref), CC6.1 (identity-verified access provisioning), P3.1 (candidate GDPR notice). PRE-15 stale status corrected: §15.2 checklist shows 🔴 Open for PRE-15; corrected to 🟢 Done by §42.10 (closed by §41 v1.17.9). Gap advances: CC1-GAP-003 🔴→🟡 AUTHORED (P0 count 11→10); PRE-04 🔴→🟡 AUTHORED. 12-item implementation checklist (6× P0, 4× P1, 2× P1/founder).*

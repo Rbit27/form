@@ -6,6 +6,16 @@
 
 ---
 
+## [1.19.1] — 2026-05-30
+
+### Added
+- `docs/SOC2_READINESS.md §43` — Credential & Access Hardening Policy — CC6.1/CC6.2/CC6.3/CC6.6/CC6.8 Auditor Exhibit: binding implementation specifications for six P0 CC6 gaps simultaneously advanced from 🔴 Open to 🟡 AUTHORED; P0 count 10→4. GitHub org MFA enforcement (CC6-GAP-001): exact org security setting, compensating control for solo-founder phase, CC6-E-001a evidence path. Cloudflare account MFA enforcement (CC6-GAP-002): blast-radius rationale covering DEC-030 HMAC signing key + Supabase service role key in Workers Secrets, CC6-E-001b evidence path. Tenant admin TOTP enforcement (CC6-GAP-003): full Cloudflare Worker `requireAdminMfa()` middleware pseudocode, 7-day grace period with `access.tenant_admin_totp_waiver_used` DEC-030 event per invocation, SSO IdP delegation exemption requiring SAML TimeSyncToken/X509/OIDC acr=mfa context (PasswordProtectedTransport rejected). SCIM DELETE deprovisioning (CC6-GAP-004): atomic SQL transaction spec (soft-delete + seat release + `auth.admin.signOut` + DEC-030 emit), idempotency requirement, 409 last-owner guard, GDPR Art. 17 soft-delete justification, SCIM Groups cascade with per-user events. CI dependency audit (CC6-GAP-005): `npm audit --audit-level=critical` GitHub Actions job, `.github/dependabot.yml` for npm + GitHub Actions ecosystems, auditable exception bypass `[skip-audit-critical: RISK-XXXXXX]` with compliance-officer + founder co-approval gate. Secret scanning (CC6-GAP-006): `git-secrets` pre-commit hook, canonical `.github/git-secrets-patterns` file (Anthropic sk-ant-, Supabase JWT, Stripe live, ElevenLabs xi-api-key, Cloudflare Bearer, 40-char hex), CI `git secrets --scan-history` step, GHAS push protection as secondary. CSP/ESLint P1 (CC6-GAP-007): full Content-Security-Policy string with report-uri, Cloudflare Transform Rule, ESLint no-eval + no-new-func + no-implied-eval. Six new DEC-030 events: `auth.scim_user_deprovisioned` (HIGH, 7yr — closes AUDIT_LOG_SCHEMA.md lifecycle gap), `access.mfa_org_policy_enabled` (HIGH), `access.tenant_admin_totp_enrolled` (STANDARD), `access.tenant_admin_totp_waiver_used` (HIGH), `ci.secret_scan_blocked` (HIGH — pattern name only, value never logged), `ci.dependency_audit_blocked` (MEDIUM). SOC 2 mapping: CC6.1/CC6.2 (MFA + TOTP), CC6.3 (SCIM DELETE offboarding), CC6.6 (secret scan), CC6.8 (audit + Dependabot + no-eval + CSP). Evidence package: CC6-E-001a through CC6-E-006. 14-item implementation checklist (8× P0, 5× P1, 1× P2). Remaining P0 gaps: CC6-GAP-001 (access review execution), P-GAP-001 (privacy policy counsel-review), PRE-25 (Vanta/Drata), CC9-GAP-007/CC2-GAP-003 (sub-processor Wrangler deploy).
+
+### Changed
+- `VERSION` → 1.19.1
+
+---
+
 ## [1.19.0] — 2026-05-30
 
 ### Added
