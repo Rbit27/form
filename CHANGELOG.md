@@ -6,6 +6,17 @@
 
 ---
 
+## [1.23.0] — 2026-05-30
+
+### Added
+- `docs/SOC2_READINESS.md §45` — GitHub Actions CI/CD Pipeline Implementation (CC8.1/CC6.8/CC7.1 Auditor Exhibit). Complete `.github/workflows/ci.yml` (5 gated jobs: typecheck/lint/test/audit/secret-scan), `.github/workflows/deploy-workers.yml` (gated on CI pass, Wrangler deploy, R2 log archive as CC8-E-002), `.github/dependabot.yml` (npm + Actions, weekly grouped security). Branch protection specification (10 settings, solo-founder compensating control). 3 DEC-030 events (`ci.deploy_succeeded` MEDIUM, `ci.deploy_failed` HIGH, `ci.build_blocked` MEDIUM). Advances CC8-GAP-001 and CC8-GAP-002 🟡 Open → 🟡 AUTHORED. P0 count unchanged at 2.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §19` — SCIM Groups Sync & Group-Based Role Mapping. 6 SCIM Group endpoints (GET list/single, POST, PUT, PATCH RFC7644 PatchOp, DELETE cascade). New `scim_group_role_mappings` table + `group_member_effective_role` view (highest-privilege-wins resolution). IdP configuration guides: Okta Push Groups, Azure AD/Entra, Google Workspace (SAML JIT fallback). 6 DEC-030 events (`scim.group_*`). SOC 2: CC6.1/CC6.2/CC6.3/CC6.6. 10-item checklist (7× P0 M4, 3× P1 M5).
+
+### Changed
+- `VERSION` → 1.23.0
+
+---
+
 ## [1.22.1] — 2026-05-30
 
 ### Added

@@ -9681,4 +9681,655 @@ Execute in order. Steps 1–6 are P0 and must complete before the observation pe
 
 ---
 
-*v1.4 additions (2026-05-29): §42 Personnel Security, Background Check & Confidentiality Onboarding Policy — CC1.1/CC1.4 Auditor Exhibit. Background check provider selection: Checkr (primary, SOC 2 certified, EU DPA available, 1–5 day turnaround, lower friction for < 5 hires/year) vs Sterling (approved fallback, stronger UA criminal record depth); check scope: identity verification + criminal record (country of residence + global watchlist) + employment history (last 5 years) — education verification conditional; credit and drug screen explicitly excluded. GDPR legal basis: Art. 6(1)(b) pre-contractual steps; Art. 10 for criminal data with national law; candidate background check notice required; Checkr as Art. 28 processor; raw report retention 12 months, pass/fail attestation 7 years. Adjudication criteria: individualized assessment per EEOC/EU employment law; four automatic disqualifiers (fraud, identity theft, computer crimes, privacy violations < 7yr; unauthorized computer access; financial crimes < 7yr; minor victims); non-disqualifier examples. NDA template: 10-clause structure (parties, confidential information definition — explicitly enumerates Art. 9 health data categories, obligations, exclusions, data protection obligations including 1-hour internal breach report, IP assignment — explicitly covers ML artefacts and CV pipeline, non-solicitation 12 months, indefinite health data survival clause, DocuSign signing workflow); four template variants (employee, advisor, contractor rider, pentest MNDA); NDA register schema (12 columns, pseudonymized). Pre-boarding security checklist: 11 steps Day −14 through Day 30; no production access before background check clear; security training assigned Day 0; AUP signed Day 0; production write access expansion at Day-30 review only. Four DEC-030 HMAC-chained personnel events: `personnel.background_check_initiated` (STANDARD, 7yr), `personnel.background_check_passed` (HIGH, 7yr), `personnel.nda_signed` (STANDARD, 7yr), `personnel.hire_check_passed` (HIGH, 7yr); all privacy-safe; manual emission path specified for pre-automation phase. Seven auditor evidence artefacts CC1-E-003a through CC1-E-007b. SOC 2 criteria mapping: CC1.1 (NDA + AUP coverage), CC1.4 (background check policy + competence verification), CC6.3 (access scoping + Day-30 review + offboarding §40 cross-ref), CC6.1 (identity-verified access provisioning), P3.1 (candidate GDPR notice). PRE-15 stale status corrected: §15.2 checklist shows 🔴 Open for PRE-15; corrected to 🟢 Done by §42.10 (closed by §41 v1.17.9). Gap advances: CC1-GAP-003 🔴→🟡 AUTHORED (P0 count 11→10); PRE-04 🔴→🟡 AUTHORED. 12-item implementation checklist (6× P0, 4× P1, 2× P1/founder).*
+## 45. GitHub Actions CI/CD Pipeline Implementation — CC8.1/CC6.8/CC7.1 Auditor Exhibit
+
+> **New section added 2026-05-30. This is a standalone auditor exhibit delivering the complete, ready-to-merge GitHub Actions workflow configuration for the FORM monorepo. It closes CC8-GAP-001 (no CI pipeline) and CC8-GAP-002 (branch protection off) from a documentation standpoint; both gaps move to 🟢 Done when the workflow files are merged to `main` and the first CI run passes.**
+>
+> **Gap closure:** CC8-GAP-001 🟡 P1 → 🟡 **AUTHORED** (closes to 🟢 when `.github/workflows/ci.yml` is merged and first green run is recorded) · CC8-GAP-002 🟡 P1 → 🟡 **AUTHORED** (closes to 🟢 when branch protection rules are applied per §45.5).
+> **P1 count advances.** P0 count remains 2 (CC6-GAP-001 access review execution; P-GAP-001 privacy policy counsel-review blocked).
+
+---
+
+### 45.1 Purpose and Scope
+
+§21 (CC8 Change Management Controls: Formal Policy and Evidence Framework) established the policy layer — change classifications, approval gates, rollback triggers, and the evidence artefact set. §43 (Credential and Access Hardening Policy) specified `npm audit --audit-level=critical` and `git-secrets` CI steps as dependency and secret-scanning controls. This exhibit completes the implementation layer:
+
+1. `.github/workflows/ci.yml` — full build, test, TypeScript compile, ESLint, npm audit, and git-secrets CI pipeline
+2. `.github/workflows/deploy-workers.yml` — production deploy gated on CI pass; deploy log archived to Cloudflare R2 for CC8-E-002
+3. `.github/dependabot.yml` — automated dependency update configuration (npm and GitHub Actions, weekly, grouped security PRs)
+4. Branch protection configuration specification — exact GitHub Settings values required for `main`
+5. Evidence collection procedure for CC8-E-001, CC8-E-002, and CC8-E-003
+6. Three DEC-030 HMAC-chained audit events for CI lifecycle
+7. SOC 2 evidence mapping table across CC8.1, CC6.8, and CC7.1
+8. Implementation checklist (9 items, P1, M3/M4)
+
+**Relationship to existing sections:**
+
+| Section | Role |
+|---|---|
+| §21 | CC8 change management policy framework — §45 implements the technical enforcement layer §21 specifies |
+| §43 | npm audit and git-secrets specification — §45 embeds both as CI jobs with the exact flags §43 mandates |
+| §44 | Sub-processor Worker deploy — §45 `deploy-workers.yml` is the deployment pipeline for that and all future Workers |
+
+---
+
+### 45.2 CI Pipeline — `.github/workflows/ci.yml`
+
+File path: `.github/workflows/ci.yml`
+
+This workflow runs on every push and pull request targeting `main`. All jobs must pass before the deploy workflow is permitted to trigger.
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Job 1: TypeScript compile check
+  # Maps to: CC8.1 (only passing builds reach main), CC6.8 (type safety)
+  # -----------------------------------------------------------------------
+  typecheck:
+    name: TypeScript compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: TypeScript compile (no emit)
+        run: npx tsc --noEmit
+
+  # -----------------------------------------------------------------------
+  # Job 2: ESLint — must pass with zero warnings (--max-warnings 0)
+  # Maps to: CC6.8 (no-eval policy enforcement), CC8.1 (code quality gate)
+  # §43 Section 6 specifies no-eval + no-new-func + no-implied-eval rules
+  # -----------------------------------------------------------------------
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: ESLint (zero warnings)
+        run: npx eslint . --max-warnings 0
+
+  # -----------------------------------------------------------------------
+  # Job 3: Unit + integration tests
+  # Maps to: CC8.1 (processing integrity gate), CC7.1 (regression detection)
+  # -----------------------------------------------------------------------
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Run tests
+        run: npm test
+
+  # -----------------------------------------------------------------------
+  # Job 4: npm audit — critical CVEs block the build
+  # Maps to: CC6.8 (dependency vulnerability management)
+  # §43 Section 5.1 mandates --audit-level=critical
+  # Exception bypass: commit message must contain [skip-audit-critical: RISK-XXXXXX]
+  # co-approved by compliance-officer + founder (documented in risk register)
+  # -----------------------------------------------------------------------
+  audit:
+    name: npm audit (critical)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Check for approved exception bypass
+        id: bypass_check
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -qE '\[skip-audit-critical: RISK-[A-Z0-9]+\]'; then
+            echo "bypass=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::npm audit bypass invoked — risk register entry required"
+          else
+            echo "bypass=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: npm audit --audit-level=critical
+        if: steps.bypass_check.outputs.bypass != 'true'
+        run: npm audit --audit-level=critical
+
+  # -----------------------------------------------------------------------
+  # Job 5: git-secrets scan — blocks credential leakage
+  # Maps to: CC6.6 (prevent credential exposure), CC6.8 (secret hygiene)
+  # §43 Section 5.2 specifies six canonical patterns in .github/git-secrets-patterns
+  # Scans full commit history of the PR branch, not just the diff
+  # -----------------------------------------------------------------------
+  secret-scan:
+    name: git-secrets scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-secrets
+        run: |
+          git clone https://github.com/awslabs/git-secrets.git /tmp/git-secrets
+          cd /tmp/git-secrets && sudo make install
+
+      - name: Register canonical FORM patterns
+        run: |
+          git secrets --register-aws || true
+          while IFS= read -r pattern; do
+            [[ "$pattern" =~ ^#.*$ || -z "$pattern" ]] && continue
+            git secrets --add "$pattern"
+          done < .github/git-secrets-patterns
+
+      - name: Scan commit history
+        run: git secrets --scan-history
+
+      - name: Scan working tree
+        run: git secrets --scan
+```
+
+**Job dependency summary:**
+
+| Job | Trigger | Blocks deploy | SOC 2 control |
+|---|---|---|---|
+| `typecheck` | push / PR to main | yes | CC8.1 |
+| `lint` | push / PR to main | yes | CC6.8 |
+| `test` | push / PR to main | yes | CC8.1, CC7.1 |
+| `audit` | push / PR to main | yes (unless RISK bypass) | CC6.8 |
+| `secret-scan` | push / PR to main | yes | CC6.6, CC6.8 |
+
+---
+
+### 45.3 Deploy Pipeline — `.github/workflows/deploy-workers.yml`
+
+File path: `.github/workflows/deploy-workers.yml`
+
+This workflow deploys all Cloudflare Workers. It is triggered only on pushes to `main` and only when the `CI` workflow has completed successfully (`needs` + `workflow_run` pattern). The deploy log is archived to Cloudflare R2 bucket `form-audit-logs` as the CC8-E-002 evidence artefact.
+
+```yaml
+name: Deploy Workers
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write   # required for OIDC Cloudflare token exchange (future)
+
+jobs:
+  deploy:
+    name: Wrangler deploy
+    runs-on: ubuntu-latest
+    # Hard gate: only run if CI workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_AUDIT_BUCKET: form-audit-logs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@latest
+
+      - name: Capture pre-deploy metadata
+        id: meta
+        run: |
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+          echo "ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "actor=${GITHUB_ACTOR}" >> "$GITHUB_OUTPUT"
+          echo "run_id=${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy security-portal Worker
+        id: deploy_security
+        run: |
+          wrangler deploy \
+            --config apps/security-portal/wrangler.toml \
+            --env production \
+            2>&1 | tee /tmp/deploy-security-portal.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy api-gateway Worker (if present)
+        id: deploy_api
+        continue-on-error: true
+        run: |
+          if [ -f apps/api-gateway/wrangler.toml ]; then
+            wrangler deploy \
+              --config apps/api-gateway/wrangler.toml \
+              --env production \
+              2>&1 | tee /tmp/deploy-api-gateway.log
+          else
+            echo "api-gateway wrangler.toml not found — skipping" | tee /tmp/deploy-api-gateway.log
+          fi
+
+      - name: Assemble structured deploy log (CC8-E-002)
+        run: |
+          cat > /tmp/deploy-summary.json << EOF
+          {
+            "event_type": "ci.deploy_succeeded",
+            "sha": "${{ steps.meta.outputs.sha }}",
+            "short_sha": "${{ steps.meta.outputs.short_sha }}",
+            "deployed_at": "${{ steps.meta.outputs.ts }}",
+            "actor": "${{ steps.meta.outputs.actor }}",
+            "run_id": "${{ steps.meta.outputs.run_id }}",
+            "run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ steps.meta.outputs.run_id }}",
+            "ci_workflow_run_id": "${{ github.event.workflow_run.id }}",
+            "workers_deployed": ["security-portal", "api-gateway"],
+            "cloudflare_account_id": "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          }
+          EOF
+          cat /tmp/deploy-summary.json
+
+      - name: Upload deploy log to R2 (CC8-E-002)
+        run: |
+          # Archive structured summary
+          wrangler r2 object put \
+            "${R2_AUDIT_BUCKET}/deploy-logs/${{ steps.meta.outputs.ts }}-${{ steps.meta.outputs.short_sha }}.json" \
+            --file /tmp/deploy-summary.json \
+            --content-type application/json
+
+          # Archive raw Wrangler output for each Worker
+          for log_file in /tmp/deploy-*.log; do
+            worker_name=$(basename "$log_file" .log | sed 's/^deploy-//')
+            wrangler r2 object put \
+              "${R2_AUDIT_BUCKET}/deploy-logs/raw/${{ steps.meta.outputs.ts }}-${worker_name}.log" \
+              --file "$log_file" \
+              --content-type text/plain
+          done
+
+      - name: Emit DEC-030 ci.deploy_succeeded event
+        run: |
+          # DEC-030 event emission via Supabase Edge Function
+          # Full payload spec in §45.6; HMAC signing handled server-side
+          curl -sf \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"event_type\": \"ci.deploy_succeeded\",
+              \"actor_id\": \"github-actions\",
+              \"sha\": \"${{ steps.meta.outputs.sha }}\",
+              \"short_sha\": \"${{ steps.meta.outputs.short_sha }}\",
+              \"run_id\": \"${{ steps.meta.outputs.run_id }}\",
+              \"deployed_at\": \"${{ steps.meta.outputs.ts }}\",
+              \"actor_github\": \"${{ steps.meta.outputs.actor }}\"
+            }" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/audit-log-ingest" || \
+          echo "::warning::DEC-030 emit failed — deploy succeeded but audit event not recorded; manual backfill required"
+
+  deploy-failed:
+    name: Record deploy failure
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Emit DEC-030 ci.deploy_failed event
+        run: |
+          curl -sf \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"event_type\": \"ci.deploy_failed\",
+              \"actor_id\": \"github-actions\",
+              \"sha\": \"${GITHUB_SHA}\",
+              \"run_id\": \"${GITHUB_RUN_ID}\",
+              \"failed_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"ci_conclusion\": \"${{ github.event.workflow_run.conclusion }}\"
+            }" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/audit-log-ingest" || \
+          echo "::warning::DEC-030 emit failed for ci.deploy_failed event"
+
+  build-blocked:
+    name: Record CI gate block
+    runs-on: ubuntu-latest
+    # This job fires when CI completes with a non-success conclusion that is
+    # not 'failure' (e.g., cancelled, timed_out, action_required) — see §45.6
+    if: >
+      ${{ github.event.workflow_run.conclusion != 'success' &&
+          github.event.workflow_run.conclusion != 'failure' }}
+    steps:
+      - name: Emit DEC-030 ci.build_blocked event
+        run: |
+          curl -sf \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"event_type\": \"ci.build_blocked\",
+              \"actor_id\": \"github-actions\",
+              \"sha\": \"${GITHUB_SHA}\",
+              \"run_id\": \"${GITHUB_RUN_ID}\",
+              \"blocked_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"conclusion\": \"${{ github.event.workflow_run.conclusion }}\"
+            }" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/audit-log-ingest" || \
+          echo "::warning::DEC-030 emit failed for ci.build_blocked event"
+```
+
+**Required GitHub Actions secrets** (set in repo Settings > Secrets > Actions):
+
+| Secret name | Value source | Used in job |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard — API Token with Workers:Edit permission | deploy |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard — Account ID | deploy |
+| `SUPABASE_URL` | Supabase project URL | deploy, deploy-failed, build-blocked |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Settings > API > service_role key | deploy, deploy-failed, build-blocked |
+
+---
+
+### 45.4 Dependabot Configuration — `.github/dependabot.yml`
+
+File path: `.github/dependabot.yml`
+
+Dependabot keeps npm packages and GitHub Actions pinned versions current. Security updates are grouped into a single weekly PR to minimise merge noise while maintaining the audit trail required by CC6.8.
+
+```yaml
+version: 2
+
+updates:
+  # -----------------------------------------------------------------------
+  # npm ecosystem — covers all package.json manifests in the monorepo
+  # Security PRs are grouped; non-security updates are open one-per-package
+  # -----------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Kyiv"
+    open-pull-requests-limit: 10
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(dev-deps)"
+    labels:
+      - "dependencies"
+      - "security"
+    reviewers:
+      - "form-compliance"
+    # Allow major version bumps for direct dependencies — reviewer must
+    # confirm changelog review before merge (CC8.1 change management)
+    versioning-strategy: lockfile-only
+
+  # -----------------------------------------------------------------------
+  # GitHub Actions ecosystem — pins action SHA digests weekly
+  # Prevents supply-chain compromise via tag mutation (CC6.8)
+  # -----------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Kyiv"
+    open-pull-requests-limit: 5
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(actions)"
+    labels:
+      - "dependencies"
+      - "github-actions"
+```
+
+---
+
+### 45.5 Branch Protection Configuration Specification
+
+**Location:** GitHub repository Settings > Branches > Branch protection rules > Add rule
+
+**Protected branch pattern:** `main`
+
+The following settings must be enabled. This table constitutes the specification; the CC8-E-001 evidence artefact is a screenshot of the Settings page confirming each row is checked.
+
+| Setting | Required value | SOC 2 rationale |
+|---|---|---|
+| Require a pull request before merging | Enabled | CC8.1 — no direct push to main; all changes reviewed |
+| Required approvals | 1 (or more when team grows) | CC8.1 — four-eyes principle; solo-founder compensating control: self-review with written justification filed in PR description |
+| Dismiss stale pull request approvals when new commits are pushed | Enabled | CC8.1 — re-approval required after any change post-approval |
+| Require status checks to pass before merging | Enabled | CC8.1 — CI gate is mandatory, not advisory |
+| Required status checks | `typecheck`, `lint`, `test`, `audit`, `secret-scan` | CC8.1 — all five CI jobs must be green |
+| Require branches to be up to date before merging | Enabled | CC8.1 — prevents stale-branch merges that bypass CI |
+| Require conversation resolution before merging | Enabled | CC8.1 — review comments must be addressed |
+| Require signed commits | Enabled | CC6.8 — commit authorship non-repudiation; GPG or SSH signing required |
+| Do not allow bypassing the above settings | Enabled | CC8.1 — even repository admins cannot push direct; removes admin bypass |
+| Restrict who can push to matching branches | Enabled — restrict to `form-compliance` and repo admins with justification | CC8.1, CC6.2 — limits deployment authority |
+
+**Solo-founder compensating control (CC8.1):** During the pre-hire phase when the founding engineer is the sole contributor, a PR opened by the founder must include a `Compliance-Self-Review:` section in the PR description listing the change classification (per §21 Table 21-A), risk assessment, and rollback procedure. This written record substitutes for a second approver until the first engineering hire. The compensating control must be documented in the SOC 2 management assertion narrative.
+
+---
+
+### 45.6 DEC-030 HMAC-Chained Audit Events
+
+Three new events are appended to the FORM audit log schema. All events inherit the DEC-030 HMAC-chain structure: each event carries a `prev_hmac` field linking to the immediately preceding event in the chain, and the server recomputes the HMAC on ingest using the signing key stored in Cloudflare Workers Secrets.
+
+| Event type | Severity | Retention | Trigger condition | Key fields |
+|---|---|---|---|---|
+| `ci.deploy_succeeded` | MEDIUM | 7 years | `deploy-workers.yml` job completes with exit code 0 | `sha`, `short_sha`, `run_id`, `run_url`, `deployed_at`, `actor_github`, `workers_deployed[]` |
+| `ci.deploy_failed` | HIGH | 7 years | `deploy-workers.yml` fires because CI workflow concluded with `failure` | `sha`, `run_id`, `failed_at`, `ci_conclusion`, `failing_jobs[]` (optional, best-effort) |
+| `ci.build_blocked` | MEDIUM | 7 years | `deploy-workers.yml` fires because CI workflow concluded with non-failure non-success (cancelled, timed_out, action_required) | `sha`, `run_id`, `blocked_at`, `conclusion` |
+
+**Manual emission SQL (for backfill or incident recovery):**
+
+```sql
+-- ci.deploy_succeeded (backfill example)
+SELECT emit_audit_event(
+  p_event_type     => 'ci.deploy_succeeded',
+  p_actor_id       => 'github-actions',
+  p_severity       => 'MEDIUM',
+  p_payload        => jsonb_build_object(
+    'sha',               '<full_sha>',
+    'short_sha',         '<short_sha>',
+    'run_id',            '<run_id>',
+    'run_url',           '<run_url>',
+    'deployed_at',       '<iso8601_utc>',
+    'actor_github',      '<github_username>',
+    'workers_deployed',  jsonb_build_array('security-portal'),
+    'backfill',          true,
+    'backfill_reason',   '<reason>'
+  )
+);
+
+-- ci.deploy_failed
+SELECT emit_audit_event(
+  p_event_type     => 'ci.deploy_failed',
+  p_actor_id       => 'github-actions',
+  p_severity       => 'HIGH',
+  p_payload        => jsonb_build_object(
+    'sha',            '<full_sha>',
+    'run_id',         '<run_id>',
+    'failed_at',      '<iso8601_utc>',
+    'ci_conclusion',  'failure'
+  )
+);
+
+-- ci.build_blocked
+SELECT emit_audit_event(
+  p_event_type     => 'ci.build_blocked',
+  p_actor_id       => 'github-actions',
+  p_severity       => 'MEDIUM',
+  p_payload        => jsonb_build_object(
+    'sha',         '<full_sha>',
+    'run_id',      '<run_id>',
+    'blocked_at',  '<iso8601_utc>',
+    'conclusion',  'cancelled'
+  )
+);
+```
+
+**Rationale for HIGH severity on `ci.deploy_failed`:** A failed production deployment after a successful CI pass indicates either a Wrangler/Cloudflare infrastructure failure or a configuration drift between the workflow and the live environment. Both scenarios require immediate investigation; the HIGH severity ensures the event surfaces in anomaly dashboards and is included in any incident post-mortem reviewed under CC7.1.
+
+---
+
+### 45.7 Evidence Collection — CC8-E-001, CC8-E-002, CC8-E-003
+
+#### CC8-E-001 — Branch Protection Screenshot
+
+| Field | Value |
+|---|---|
+| Artefact ID | CC8-E-001 |
+| Description | Full-page screenshot of GitHub repository Settings > Branches > Protection rules for `main`, showing all checkboxes in §45.5 enabled |
+| File path | `compliance/evidence/cc8/CC8-E-001-branch-protection-screenshot-YYYY-MM.png` |
+| Capture cadence | Once on initial configuration; re-capture on any rule change and at each quarterly access review |
+| Retention | 7 years |
+| Responsible | Compliance officer |
+| Audit use | Direct visual evidence that no direct push to `main` is possible; proves CC8.1 change management enforcement is technical, not policy-only |
+
+**Capture procedure:**
+1. Navigate to `https://github.com/<org>/<repo>/settings/branches`
+2. Click the edit pencil on the `main` protection rule
+3. Take a full-page screenshot (browser extension or OS screenshot) showing all settings
+4. Rename to `CC8-E-001-branch-protection-screenshot-<YYYY-MM>.png`
+5. Commit to `compliance/evidence/cc8/` via PR (the commit itself is evidence of the date)
+
+#### CC8-E-002 — Automated Deploy Log
+
+| Field | Value |
+|---|---|
+| Artefact ID | CC8-E-002 |
+| Description | Structured JSON deploy log uploaded to R2 `form-audit-logs/deploy-logs/` by `deploy-workers.yml`; one object per successful deploy |
+| File path | `s3://form-audit-logs/deploy-logs/<ISO8601_TS>-<short_sha>.json` (R2) |
+| Capture cadence | Automatic — every production deploy |
+| Retention | 7 years (R2 lifecycle policy must be configured — see §45.8 checklist item 8) |
+| Responsible | Automated (GitHub Actions) |
+| Audit use | Proves every production change was deployed through the automated pipeline, not manual Wrangler CLI; auditor can correlate `sha` field against git log to verify full traceability |
+
+**Auditor query procedure (R2):**
+
+```bash
+# List all deploy logs in the observation window (example: Q1 2027)
+wrangler r2 object list form-audit-logs \
+  --prefix "deploy-logs/2027-01" \
+  --json | jq '.objects[] | {key, uploaded}'
+
+# Retrieve a specific log
+wrangler r2 object get form-audit-logs \
+  "deploy-logs/2027-01-15T14:22:00Z-a1b2c3d4.json" \
+  --file /tmp/deploy-log.json && cat /tmp/deploy-log.json
+```
+
+#### CC8-E-003 — Migration Git Log
+
+CC8-E-003 is already specified in §21.7 (Migration Git Log). It requires no additional capture procedure here. The evidence artefact is produced by:
+
+```bash
+git log --oneline --follow -- supabase/migrations/ \
+  > compliance/evidence/cc8/CC8-E-003-migration-log-$(date +%Y-%m).txt
+```
+
+The command is run at each quarterly review and the output committed to `compliance/evidence/cc8/`.
+
+---
+
+### 45.8 SOC 2 Evidence Mapping
+
+| Control | Criterion text (abbreviated) | Current state (pre-§45) | Target state (post-§45 merge) | Evidence artefact |
+|---|---|---|---|---|
+| CC8.1 | Changes to infrastructure, data, software, and procedures are authorized, designed, developed, tested, and approved | YELLOW — policy authored (§21) but no technical enforcement; direct push to main possible | GREEN — branch protection blocks direct push; all five CI jobs must pass; PR required with written justification | CC8-E-001, CC8-E-002, CC8-E-003 |
+| CC6.8 | The entity implements controls to prevent or detect and act upon the introduction of unauthorized or malicious software | YELLOW — npm audit and git-secrets specified in §43 but not implemented in CI | GREEN — `audit` and `secret-scan` jobs run on every push; build blocks on critical CVE or credential pattern match; `ci.secret_scan_blocked` and `ci.dependency_audit_blocked` DEC-030 events provide tamper-evident record | CC8-E-002 (deploy log confirms only audited code reaches production) |
+| CC7.1 | To meet its objectives, the entity uses detection and monitoring procedures to identify anomalies and unusual activity | YELLOW — monitoring described but no automated regression detection in pipeline | GREEN — `test` job detects behavioral regressions pre-deploy; `ci.deploy_failed` HIGH-severity event triggers alert surface; Dependabot PRs create weekly signal of dependency drift | CC8-E-002, DEC-030 `ci.deploy_failed` chain excerpt |
+
+---
+
+### 45.9 Gap Closure
+
+| Gap ID | Priority | Description | State before §45 | State after §45 | Closes to GREEN when |
+|---|---|---|---|---|---|
+| CC8-GAP-001 | P1 | No CI pipeline configured — production deploy requires CI pass | YELLOW Open | YELLOW AUTHORED | `.github/workflows/ci.yml` merged to `main` and first green CI run passes |
+| CC8-GAP-002 | P1 | Branch protection (include administrators) off — direct push to `main` possible | YELLOW Open | YELLOW AUTHORED | Branch protection rules applied per §45.5 with "Do not allow bypassing" enabled |
+
+**P0 count remains 2:** CC6-GAP-001 (quarterly access review execution outstanding — §23 procedure complete, requires operational execution) and P-GAP-001 (privacy policy blocked on outside counsel review). CC8-GAP-001 and CC8-GAP-002 are P1 gaps and their advancement does not affect the P0 count.
+
+---
+
+### 45.10 Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Done |
+|---|---|---|---|---|---|
+| 1 | Create `.github/workflows/ci.yml` with exact YAML from §45.2; commit to a branch and open PR | P1 | M3 | Engineering | [ ] |
+| 2 | Create `.github/workflows/deploy-workers.yml` with exact YAML from §45.3; include in same PR | P1 | M3 | Engineering | [ ] |
+| 3 | Create `.github/dependabot.yml` with exact YAML from §45.4; include in same PR | P1 | M3 | Engineering | [ ] |
+| 4 | Set four GitHub Actions secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | P1 | M3 | Engineering | [ ] |
+| 5 | Apply branch protection rules to `main` per §45.5 table — enable all ten settings including "Do not allow bypassing" | P1 | M3 | Compliance | [ ] |
+| 6 | Capture CC8-E-001 screenshot after branch protection applied; commit to `compliance/evidence/cc8/` | P1 | M3 | Compliance | [ ] |
+| 7 | Merge CI/CD PR; verify first green CI run; confirm CC8-GAP-001 and CC8-GAP-002 advance to GREEN | P1 | M3 | Engineering + Compliance | [ ] |
+| 8 | Configure R2 lifecycle policy on `form-audit-logs` bucket: 7-year retention, no automatic deletion | P1 | M4 | Engineering | [ ] |
+| 9 | Verify DEC-030 `ci.deploy_succeeded` event appears in audit log after first successful deploy; confirm HMAC chain is intact | P1 | M4 | Compliance | [ ] |
+
+---
+
+*v1.7 additions (2026-05-30): §45 GitHub Actions CI/CD Pipeline Implementation — CC8.1/CC6.8/CC7.1 Auditor Exhibit. Closes the gap between the CC8 change management policy authored in §21 and the technical enforcement layer required for SOC 2 Type II observation-period evidence. Complete `.github/workflows/ci.yml` delivered with five gated jobs: `typecheck` (TypeScript compile with `--noEmit`), `lint` (ESLint with `--max-warnings 0` enforcing the no-eval rules specified in §43), `test` (full unit and integration suite), `audit` (`npm audit --audit-level=critical` with auditable bypass path `[skip-audit-critical: RISK-XXXXXX]` matching §43 Section 5.1 exception procedure), and `secret-scan` (`git-secrets --scan-history` plus `--scan` on working tree, consuming the canonical `.github/git-secrets-patterns` file specified in §43 Section 5.2 with six credential patterns). Complete `.github/workflows/deploy-workers.yml` delivered: `workflow_run` trigger gated on `CI` workflow `conclusion == 'success'`; deploys `security-portal` Worker and optionally `api-gateway` Worker via `wrangler deploy --env production`; assembles structured JSON deploy summary with `sha`, `short_sha`, `deployed_at`, `actor`, `run_id`, `run_url`, and `workers_deployed[]`; uploads summary and raw Wrangler logs to Cloudflare R2 bucket `form-audit-logs/deploy-logs/` as the CC8-E-002 evidence artefact; emits DEC-030 `ci.deploy_succeeded` event via Supabase Edge Function with graceful degradation on emit failure. Companion `deploy-failed` and `build-blocked` jobs emit HIGH/MEDIUM DEC-030 events when CI concludes with failure or a non-success conclusion respectively. `.github/dependabot.yml` configuration: npm ecosystem (all monorepo `package.json` files, weekly Monday 08:00 Kyiv, grouped security PRs, `form-compliance` as reviewer, `lockfile-only` versioning strategy) and GitHub Actions ecosystem (weekly, grouped security updates, SHA-digest pinning to prevent supply-chain compromise via tag mutation). Branch protection specification table: ten settings for `main` with exact GitHub UI setting names — PR required, 1 approval, dismiss stale approvals, all five status checks required (`typecheck`/`lint`/`test`/`audit`/`secret-scan`), up-to-date branch required, conversation resolution required, signed commits required, admin bypass disabled, push restriction to `form-compliance` team; solo-founder compensating control defined (written `Compliance-Self-Review:` PR description section substitutes for second approver during pre-hire phase, must appear in SOC 2 management assertion narrative). Evidence collection: CC8-E-001 (branch protection screenshot — capture procedure, file path `compliance/evidence/cc8/`, quarterly cadence, 7-year retention), CC8-E-002 (automated R2 deploy log — automatic on every deploy, auditor query procedure with `wrangler r2 object list` and `wrangler r2 object get` commands), CC8-E-003 (migration git log — already specified in §21.7, no new procedure). Three DEC-030 HMAC-chained events: `ci.deploy_succeeded` (MEDIUM, 7yr — full deploy metadata including `workers_deployed[]`), `ci.deploy_failed` (HIGH, 7yr — HIGH severity rationale: post-CI-pass Wrangler failure indicates infrastructure or configuration drift requiring immediate investigation), `ci.build_blocked` (MEDIUM, 7yr — catches cancelled/timed-out/action-required conclusions distinct from outright failure). Manual emission SQL provided for all three events. SOC 2 evidence mapping: CC8.1 current YELLOW (policy only) → target GREEN (technical enforcement via branch protection + CI gate); CC6.8 current YELLOW (specified not implemented) → target GREEN (audit + secret-scan jobs run on every push); CC7.1 current YELLOW → target GREEN (test regression detection + deploy_failed HIGH event surface). Gap advances: CC8-GAP-001 🟡 Open → 🟡 AUTHORED; CC8-GAP-002 🟡 Open → 🟡 AUTHORED. Both close to 🟢 on first successful CI run and branch protection applied respectively. P0 count unchanged at 2 (CC6-GAP-001 access review execution; P-GAP-001 privacy policy counsel-review blocked). P1 gap count advances. 9-item implementation checklist: items 1-3 (create workflow and dependabot files, M3), item 4 (set four Actions secrets, M3), item 5 (apply branch protection, M3), item 6 (capture CC8-E-001, M3), item 7 (merge and verify green run, M3), item 8 (R2 lifecycle policy 7-year retention, M4), item 9 (verify DEC-030 HMAC chain on first deploy, M4).*

@@ -5150,3 +5150,710 @@ Seven new events added to the DEC-030 HMAC-chained taxonomy. All require `migrat
 ---
 
 *v1.0 additions: Section 18 — Tenant IdP Migration Runbook. Closes the identity lifecycle gap: §1–§17 cover provisioning, session management, logout, GDPR compliance, groups, admin UI, and pilot programs; §18 covers the previously undocumented scenario of migrating between identity providers without fragmenting user history. Migration trigger table: 6 scenarios from M&A-driven vendor replacement to on-premises ADFS → cloud IdP, with estimated engineering effort and critical-path note (customer IT coordination). Pre-migration assessment: 6 FORM-side checks (F-01 through F-06, including staging environment prerequisite and founder authorisation requirement) and 6 customer IT checks (C-01 through C-06, including mandatory 48-hour rollback window). New database tables: `sso_idp_migrations` (state machine with exclusion constraint preventing concurrent active migrations per tenant; `authorized_by` column enforced at API layer; BYPASSRLS for form_admin; form_system read-only; form_api zero-rows fail-closed) and `sso_external_id_mappings` (old↔new external_id linkage; form_admin BYPASSRLS only — never exposed to API or tenants; retains match_method and confirmed_at for audit trail). Three migration type runbooks: Type A (same protocol, different vendor — SAML field swap with two-person external_id remap SQL, staging-first, 30-minute maintenance window), Type B (SAML → OIDC protocol upgrade — SP reconfiguration, NameID→sub resolution via email-match, SAML SLO cleanup), Type C (SCIM-only — dual-token 24-hour overlap, group external_id update). SCIM identity preservation: the external_id problem (new IdP assigns new subject IDs; naïve handling creates duplicate users); Strategy 1 email-match (default — staging SCIM sync keyed by email; SQL to populate mappings and verify 0 unmatched); Strategy 2 manual ID mapping (M&A email-change scenario; CSV import with two-person review; hard limit at 20% manual rate requiring escalation). Rollback: 4 trigger conditions (SSO failure rate, login_failed count, SCIM error rate, customer IT request); reverse-remap SQL; `status = 'rolled_back'`; post-incident review gate before re-attempt. Post-migration validation checklist: 8 checks (V-01 SSO error rate via OBSERVABILITY §13, V-02 login coverage, V-03 no duplicate users, V-04 role preservation spot-check, V-05 SCIM deprovision smoke test, V-06 group mapping activation, V-07 HMAC chain integrity, V-08 RLS isolation CI suite). Seven new DEC-030 HMAC-chained events: sso.migration_initiated (HIGH), sso.migration_staging_validated (MEDIUM), sso.migration_production_committed (HIGH), sso.migration_rolled_back (HIGH), sso.external_id_remapped (HIGH — no id values in event; design rationale documented), sso.migration_old_config_decommissioned (MEDIUM), sso.scim_token_rotated_for_migration (HIGH). SOC 2 mapping: CC8.1 (change management — state machine + founder auth + two-person SQL gate), CC6.1 (no duplicate access via remap procedure), CC6.2 (is_active gate during cutover), CC7.2 (OBSERVABILITY §13 rollback signal), CC9.2 (48h rollback window + decommission event), C1.1 (external_id values excluded from audit log). G-004 status update: 🟡 Partial → 🟡 Partial (§18 covers certificate-replacement scenarios; G-004 closes on expiry cron + admin UI implementation). Auditor evidence artefacts: sso_idp_migrations export, sso.migration_* chain, two-person SQL PR reviews, compliance/evidence/idp-migrations/ templates. Implementation checklist: 12 tasks (7× P0, 4× P1, 1× P2), M5/M6.*
+
+---
+
+## 19. SCIM Groups Sync & Group-Based Role Mapping
+
+> Precursors: §6 (SCIM User API — user lifecycle endpoints), §8 (Role Mapping — direct user role assignment), §18 (IdP Migration — group external_id update on SCIM-only migration). This section closes the group lifecycle gap: §5–§8 handle user provisioning and direct role assignment; §19 handles group objects as first-class SCIM resources and the mapping from group membership to FORM roles.
+
+---
+
+### 19.1 Purpose and Scope
+
+Enterprise IT workflows provision access in two stages: (1) create/update the user record, (2) assign the user to one or more groups that carry role semantics. When FORM only supported individual user role assignment (§8), IT administrators were required to set each user's FORM role explicitly after provisioning — an error-prone manual step that scaled poorly beyond ~50 users and blocked fully-automated onboarding pipelines.
+
+SCIM Groups Sync solves this by treating groups as a first-class resource:
+
+- IdP groups (Okta groups, Azure AD security groups, Google groups via bridge) are pushed to FORM's `/scim/v2/Groups` endpoint.
+- A tenant admin maps each group to a FORM role via the admin dashboard "Group Role Mapping" panel.
+- When a user is added to a group in the IdP, the SCIM provisioner pushes a `PATCH /scim/v2/Groups/{id}` with `op=add` for that user. FORM resolves the user's effective role automatically.
+- When a user is removed from all groups or deprovisioned entirely, §6 SCIM user lifecycle handles suspension; SCIM group removal ensures role is withdrawn even if the user account persists.
+
+**What is not in scope for §19:**
+- Nested group hierarchies (not defined by SCIM 2.0; see OQ-SSO-19.2).
+- IdP-side group provisioning (FORM is always the Service Provider receiving pushes, never initiating group writes to the IdP).
+- Consumer (non-enterprise) tenants — all `/scim/v2/Groups` endpoints require a valid `tenant_scim_tokens` bearer token scoped to an enterprise tenant.
+
+---
+
+### 19.2 SCIM Groups Endpoint Specification
+
+All endpoints are hosted on the Cloudflare Workers edge runtime at the same base URL as the SCIM User API (§6): `https://api.form.coach/scim/v2/`. Authentication: `Authorization: Bearer <tenant_scim_token>` — same token used for user provisioning. The token resolves `tenant_id` server-side; no tenant identifier appears in the URL path. All responses use `Content-Type: application/scim+json`.
+
+#### 19.2.1 GET /scim/v2/Groups — List Groups
+
+Returns an RFC 7644 `ListResponse` of all groups for the authenticated tenant.
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `startIndex` | integer (1-based) | Pagination offset. Default: `1`. |
+| `count` | integer | Page size. Default: `100`. Max: `1000`. |
+| `filter` | string | RFC 7644 filter expression. Supported attribute: `displayName`. Operator: `eq`, `sw` (starts-with). Example: `filter=displayName eq "FORM-Admins"`. |
+
+**TypeScript pseudo-code (Cloudflare Worker):**
+
+```typescript
+app.get('/scim/v2/Groups', async (c) => {
+  const tenantId = c.var.scimToken.tenant_id; // resolved by auth middleware
+  const startIndex = Math.max(1, parseInt(c.req.query('startIndex') ?? '1'));
+  const count = Math.min(1000, parseInt(c.req.query('count') ?? '100'));
+  const filter = c.req.query('filter');
+
+  // form_admin BYPASSRLS connection — SCIM bearer resolves tenant_id; RLS-enforced
+  // query still scopes explicitly to tenant_id for defence-in-depth
+  const { groups, total } = await db.scimGroups.list({
+    tenantId,
+    offset: startIndex - 1,
+    limit: count,
+    displayNameFilter: parseScimFilter(filter), // returns { op, value } | null
+  });
+
+  return c.json({
+    schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+    totalResults: total,
+    startIndex,
+    itemsPerPage: groups.length,
+    Resources: groups.map(toScimGroupResource),
+  }, 200);
+});
+```
+
+**Response shape (abbreviated):**
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  "totalResults": 3,
+  "startIndex": 1,
+  "itemsPerPage": 3,
+  "Resources": [
+    {
+      "schemas": ["urn:ietf:params:scim:core:2.0:Group"],
+      "id": "grp_01HZ...",
+      "displayName": "FORM-Admins",
+      "members": [
+        { "value": "usr_01HZ...", "display": "alice@acme.com" }
+      ],
+      "meta": {
+        "resourceType": "Group",
+        "created": "2025-03-10T09:00:00Z",
+        "lastModified": "2025-05-01T14:22:00Z",
+        "location": "https://api.form.coach/scim/v2/Groups/grp_01HZ..."
+      }
+    }
+  ]
+}
+```
+
+#### 19.2.2 GET /scim/v2/Groups/{id} — Single Group
+
+Returns a single SCIM Group resource including the full `members` array. Returns `404` if the group does not exist within the authenticated tenant (no cross-tenant information leakage — a group belonging to another tenant returns the same `404` as a non-existent ID).
+
+```typescript
+app.get('/scim/v2/Groups/:id', async (c) => {
+  const tenantId = c.var.scimToken.tenant_id;
+  const group = await db.scimGroups.findOne({ tenantId, id: c.req.param('id') });
+  if (!group) return scimError(c, 404, 'Group not found');
+  return c.json(toScimGroupResource(group), 200);
+});
+```
+
+#### 19.2.3 POST /scim/v2/Groups — Create Group
+
+Creates a new group under the authenticated tenant. Inserts a row into `tenant_groups` and returns `201 Created` with a `Location` header pointing to the new resource. Idempotency: if a group with the same `externalId` already exists for the tenant, returns `409 Conflict` rather than creating a duplicate.
+
+```typescript
+app.post('/scim/v2/Groups', async (c) => {
+  const tenantId = c.var.scimToken.tenant_id;
+  const body = await c.req.json<ScimGroupCreateRequest>();
+
+  if (!body.displayName) return scimError(c, 400, 'displayName is required');
+
+  // Idempotency check on externalId if provided by IdP
+  if (body.externalId) {
+    const existing = await db.scimGroups.findByExternalId({ tenantId, externalId: body.externalId });
+    if (existing) return scimError(c, 409, 'Group with this externalId already exists');
+  }
+
+  const group = await db.scimGroups.create({
+    tenantId,
+    displayName: body.displayName,
+    externalId: body.externalId ?? null,
+    members: body.members ?? [],
+  });
+
+  await emitAuditEvent('scim.group_created', { tenantId, groupId: group.id, triggeredBy: 'scim' });
+
+  const location = `https://api.form.coach/scim/v2/Groups/${group.id}`;
+  c.header('Location', location);
+  return c.json(toScimGroupResource(group), 201);
+});
+```
+
+#### 19.2.4 PUT /scim/v2/Groups/{id} — Full Replace
+
+Replaces the entire group resource including its `members` array. Idempotent: calling PUT twice with identical payloads produces the same final state and emits a single `scim.group_updated` event only if a delta exists. Members not present in the PUT body are removed from the group.
+
+```typescript
+app.put('/scim/v2/Groups/:id', async (c) => {
+  const tenantId = c.var.scimToken.tenant_id;
+  const id = c.req.param('id');
+  const body = await c.req.json<ScimGroupReplaceRequest>();
+
+  const existing = await db.scimGroups.findOne({ tenantId, id });
+  if (!existing) return scimError(c, 404, 'Group not found');
+
+  const updated = await db.scimGroups.replace({ tenantId, id, displayName: body.displayName, members: body.members ?? [] });
+
+  if (hasChanges(existing, updated)) {
+    await emitAuditEvent('scim.group_updated', { tenantId, groupId: id, triggeredBy: 'scim' });
+  }
+
+  return c.json(toScimGroupResource(updated), 200);
+});
+```
+
+#### 19.2.5 PATCH /scim/v2/Groups/{id} — Incremental Member Add / Remove
+
+Implements RFC 7644 §3.5.2 PatchOp. Supports `op=add` and `op=remove` on `path=members`. This is the primary operation used by Okta and Azure AD push-group provisioning — they do not send full PUT payloads on member change, only PATCHes.
+
+**PatchOp payload examples:**
+
+Add a member:
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "add",
+      "path": "members",
+      "value": [{ "value": "usr_01HZ..." }]
+    }
+  ]
+}
+```
+
+Remove a member:
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "remove",
+      "path": "members",
+      "value": [{ "value": "usr_01HZ..." }]
+    }
+  ]
+}
+```
+
+**Worker pseudo-code:**
+
+```typescript
+app.patch('/scim/v2/Groups/:id', async (c) => {
+  const tenantId = c.var.scimToken.tenant_id;
+  const id = c.req.param('id');
+  const body = await c.req.json<ScimPatchRequest>();
+
+  const group = await db.scimGroups.findOne({ tenantId, id });
+  if (!group) return scimError(c, 404, 'Group not found');
+
+  for (const op of body.Operations) {
+    if (op.path !== 'members') return scimError(c, 400, `Unsupported path: ${op.path}`);
+
+    const userIds = (op.value as Array<{ value: string }>).map(v => v.value);
+
+    if (op.op === 'add') {
+      // Verify all userIds belong to this tenant before inserting (cross-tenant guard)
+      await assertUsersInTenant(tenantId, userIds);
+      await db.scimGroupMembers.addBatch({ tenantId, groupId: id, userIds });
+      for (const userId of userIds) {
+        await emitAuditEvent('scim.group_member_added', { tenantId, groupId: id, userId, triggeredBy: 'scim' });
+      }
+    } else if (op.op === 'remove') {
+      await db.scimGroupMembers.removeBatch({ tenantId, groupId: id, userIds });
+      for (const userId of userIds) {
+        await emitAuditEvent('scim.group_member_removed', { tenantId, groupId: id, userId, triggeredBy: 'scim' });
+      }
+    } else {
+      return scimError(c, 400, `Unsupported op: ${op.op}`);
+    }
+  }
+
+  const updated = await db.scimGroups.findOne({ tenantId, id });
+  return c.json(toScimGroupResource(updated!), 200);
+});
+```
+
+**Constraint:** `op=replace` on `path=members` is treated equivalently to a full member list replacement (same semantics as PUT). Any `op` value other than `add`, `remove`, or `replace` returns `400 Bad Request`.
+
+#### 19.2.6 DELETE /scim/v2/Groups/{id} — Delete Group
+
+Removes the group from `tenant_groups`. Cascades to `scim_group_members` (membership rows deleted) and `scim_group_role_mappings` (role mapping deleted). Does **not** delete or suspend member users — user lifecycle is governed by §6 SCIM user endpoints. Returns `204 No Content` on success.
+
+```typescript
+app.delete('/scim/v2/Groups/:id', async (c) => {
+  const tenantId = c.var.scimToken.tenant_id;
+  const id = c.req.param('id');
+
+  const group = await db.scimGroups.findOne({ tenantId, id });
+  if (!group) return scimError(c, 404, 'Group not found');
+
+  // Cascade handled by FK ON DELETE CASCADE in DDL (§19.4)
+  await db.scimGroups.delete({ tenantId, id });
+
+  await emitAuditEvent('scim.group_deleted', {
+    tenantId,
+    groupId: id,
+    displayName: group.displayName, // display name only — no user PII in audit log
+    triggeredBy: 'scim',
+  });
+
+  return new Response(null, { status: 204 });
+});
+```
+
+**Important:** Deletion of a group that carries a role mapping (via `scim_group_role_mappings`) is an access-reduction event. The role the group conferred is immediately withdrawn from all members who held that role exclusively through group membership. Users who also hold a direct role assignment (§8) retain that direct assignment unaffected.
+
+---
+
+### 19.3 Group → FORM Role Mapping
+
+#### 19.3.1 Mapping Model
+
+Group-to-role mapping is a separate, explicitly-configured resource — it is not automatic. A tenant admin must visit the admin dashboard "Group Role Mapping" panel and assign a FORM role to each group. This is a deliberate fail-closed design: a newly pushed group has no role until an admin maps it. This satisfies CC6.2 (no auto-escalation of access).
+
+**FORM roles available for group mapping:**
+
+| FORM Role | Description | Equivalent direct-assign role (§8) |
+|---|---|---|
+| `owner` | Full tenant control | `tenant_owner` |
+| `admin` | Manage users, configure, view analytics | `tenant_admin` |
+| `manager` | View team analytics (no PII) | `tenant_manager` |
+| `member` | Regular FORM user inside org | `member` |
+| `viewer` | Read-only access to shared content | `support_readonly` |
+
+#### 19.3.2 Role Resolution Priority
+
+When a user is a member of multiple groups with different role mappings, or holds both a direct role assignment and a group-derived role, the following priority order applies:
+
+1. **Explicit direct user role assignment** (set by a tenant admin or via SCIM `roles` attribute on the user resource — §6/§8) — always wins over any group-derived role.
+2. **Group membership — highest privilege wins.** If a user is in Group A mapped to `member` and Group B mapped to `admin`, the effective role is `admin`.
+
+Rationale for highest-privilege-wins on group conflict (see OQ-SSO-19.1): enterprise IT departments assign users to groups based on job function, not minimum access. A user assigned to both a broad "All Staff" group (member) and a specialist "FORM Coaches" group (admin) should receive the more permissive role reflecting their specialist function. Lowest-privilege-wins would require IT to exclude specialist users from general groups — a fragile configuration that breaks with group nesting patterns common in Active Directory. This choice is documented here and requires founder sign-off before the feature ships (OQ-SSO-19.1).
+
+**Role resolution is computed at session creation time,** not stored. `group_member_effective_role` view (§19.4.4) provides the real-time computed role for any user. The session token carries the resolved role; role changes propagate on next login or token refresh (whichever comes first — configured by tenant session policy §12).
+
+#### 19.3.3 Admin Dashboard — Group Role Mapping Panel
+
+Location in admin dashboard: **Settings > Identity > Group Role Mapping**.
+
+Panel behaviour:
+- Lists all groups currently synced for the tenant (read from `tenant_groups`).
+- Each row displays: group display name, member count, current mapped role (or "— unmapped —"), last synced timestamp.
+- Role selector: dropdown with options `owner`, `admin`, `manager`, `member`, `viewer`, "Remove mapping".
+- Save button is per-row (not a bulk save) to prevent accidental bulk changes.
+- Changing a mapping emits `scim.group_role_mapping_changed` DEC-030 event immediately (before HTTP response, same transaction).
+- Warning banner displayed when saving a mapping to `owner` or `admin`: "This grants elevated access to all N members of this group. Confirm?"
+- Groups with no role mapping are displayed in grey with a "Not mapped — no access granted via this group" tooltip.
+
+**Default for new tenants:** no group-to-role mappings exist. Tenant admin must configure explicitly. SCIM provisioning can push groups and members freely without mapping; those users receive no group-derived role until mapping is configured.
+
+---
+
+### 19.4 Database Schema
+
+#### 19.4.1 Existing tenant_groups Table
+
+The `tenant_groups` table stores SCIM group objects. It is the authoritative source for group identity within a tenant. Columns referenced by §19:
+
+```sql
+-- Reference — table created in earlier migration (§6/groups schema)
+-- Shown here for FK reference clarity; do not re-run this DDL
+CREATE TABLE tenant_groups (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  display_name  text NOT NULL,
+  external_id   text,           -- IdP-assigned group ID (Okta groupId, Azure Object ID, etc.)
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, external_id)
+);
+```
+
+#### 19.4.2 scim_group_role_mappings DDL
+
+```sql
+CREATE TABLE scim_group_role_mappings (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  scim_group_id uuid NOT NULL REFERENCES tenant_groups(id) ON DELETE CASCADE,
+  form_role     text NOT NULL CHECK (form_role IN ('owner', 'admin', 'manager', 'member', 'viewer')),
+  mapped_by     uuid NOT NULL REFERENCES users(id),   -- tenant admin who set the mapping
+  mapped_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, scim_group_id)                   -- one role per group per tenant
+);
+
+-- Indexes
+CREATE INDEX idx_scim_group_role_mappings_tenant
+  ON scim_group_role_mappings (tenant_id);
+
+CREATE INDEX idx_scim_group_role_mappings_group
+  ON scim_group_role_mappings (scim_group_id);
+
+-- RLS
+ALTER TABLE scim_group_role_mappings ENABLE ROW LEVEL SECURITY;
+
+-- tenant_admin: read + write own tenant
+CREATE POLICY scim_group_role_mappings_tenant_admin
+  ON scim_group_role_mappings
+  FOR ALL
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::uuid
+    AND EXISTS (
+      SELECT 1 FROM tenant_member_roles tmr
+      WHERE tmr.user_id = current_setting('app.current_user_id')::uuid
+        AND tmr.tenant_id = scim_group_role_mappings.tenant_id
+        AND tmr.role IN ('owner', 'admin')
+    )
+  )
+  WITH CHECK (
+    tenant_id = current_setting('app.current_tenant_id')::uuid
+    AND EXISTS (
+      SELECT 1 FROM tenant_member_roles tmr
+      WHERE tmr.user_id = current_setting('app.current_user_id')::uuid
+        AND tmr.tenant_id = scim_group_role_mappings.tenant_id
+        AND tmr.role IN ('owner', 'admin')
+    )
+  );
+
+-- form_system: read-only (for role resolution at session creation)
+CREATE POLICY scim_group_role_mappings_form_system_read
+  ON scim_group_role_mappings
+  FOR SELECT
+  TO form_system
+  USING (true);
+
+-- form_admin BYPASSRLS: implicit — no explicit policy needed
+-- form_api: zero rows if not tenant_admin (covered by tenant_admin policy above; default-deny)
+```
+
+#### 19.4.3 scim_group_members Table
+
+Stores the many-to-many relationship between groups and users as managed by SCIM. This is separate from any direct role assignment rows.
+
+```sql
+CREATE TABLE scim_group_members (
+  tenant_id  uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  group_id   uuid NOT NULL REFERENCES tenant_groups(id) ON DELETE CASCADE,
+  user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  added_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (group_id, user_id)
+);
+
+CREATE INDEX idx_scim_group_members_user
+  ON scim_group_members (tenant_id, user_id);
+
+ALTER TABLE scim_group_members ENABLE ROW LEVEL SECURITY;
+
+-- form_system: read (role resolution)
+CREATE POLICY scim_group_members_form_system_read
+  ON scim_group_members FOR SELECT TO form_system USING (true);
+
+-- form_api: tenant-scoped read (SCIM worker reads membership for PATCH responses)
+CREATE POLICY scim_group_members_form_api_tenant
+  ON scim_group_members FOR ALL TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+```
+
+#### 19.4.4 group_member_effective_role View
+
+Resolves the final FORM role for every user in a tenant, combining direct role assignment and group-derived roles using the priority rule from §19.3.2 (explicit direct > highest group role).
+
+```sql
+CREATE OR REPLACE VIEW group_member_effective_role AS
+WITH direct_roles AS (
+  -- Explicit per-user role assignments (§8)
+  SELECT
+    tmr.tenant_id,
+    tmr.user_id,
+    tmr.role                        AS direct_role,
+    -- Role ordinal for comparison; higher ordinal = higher privilege
+    CASE tmr.role
+      WHEN 'owner'   THEN 5
+      WHEN 'admin'   THEN 4
+      WHEN 'manager' THEN 3
+      WHEN 'member'  THEN 2
+      WHEN 'viewer'  THEN 1
+      ELSE 0
+    END                             AS direct_ordinal
+  FROM tenant_member_roles tmr
+),
+group_derived_roles AS (
+  -- Highest-privilege role from any group the user belongs to
+  SELECT
+    sgm.tenant_id,
+    sgm.user_id,
+    MAX(
+      CASE sgrm.form_role
+        WHEN 'owner'   THEN 5
+        WHEN 'admin'   THEN 4
+        WHEN 'manager' THEN 3
+        WHEN 'member'  THEN 2
+        WHEN 'viewer'  THEN 1
+        ELSE 0
+      END
+    )                               AS group_max_ordinal,
+    -- Retrieve the actual role label for the max ordinal
+    (array_agg(sgrm.form_role ORDER BY
+      CASE sgrm.form_role
+        WHEN 'owner'   THEN 5
+        WHEN 'admin'   THEN 4
+        WHEN 'manager' THEN 3
+        WHEN 'member'  THEN 2
+        WHEN 'viewer'  THEN 1
+        ELSE 0
+      END DESC
+    ))[1]                           AS group_derived_role
+  FROM scim_group_members sgm
+  JOIN scim_group_role_mappings sgrm
+    ON sgrm.scim_group_id = sgm.group_id
+   AND sgrm.tenant_id     = sgm.tenant_id
+  GROUP BY sgm.tenant_id, sgm.user_id
+),
+combined AS (
+  SELECT
+    COALESCE(dr.tenant_id, gdr.tenant_id) AS tenant_id,
+    COALESCE(dr.user_id,   gdr.user_id)   AS user_id,
+    dr.direct_role,
+    dr.direct_ordinal,
+    gdr.group_derived_role,
+    gdr.group_max_ordinal,
+    -- Priority: direct > group
+    CASE
+      WHEN dr.direct_role IS NOT NULL THEN dr.direct_role
+      WHEN gdr.group_derived_role IS NOT NULL THEN gdr.group_derived_role
+      ELSE NULL
+    END                                   AS effective_role,
+    CASE
+      WHEN dr.direct_role IS NOT NULL THEN 'direct'
+      WHEN gdr.group_derived_role IS NOT NULL THEN 'group'
+      ELSE NULL
+    END                                   AS role_source
+  FROM direct_roles dr
+  FULL OUTER JOIN group_derived_roles gdr
+    ON dr.tenant_id = gdr.tenant_id AND dr.user_id = gdr.user_id
+)
+SELECT
+  tenant_id,
+  user_id,
+  effective_role,
+  role_source,
+  direct_role,
+  group_derived_role
+FROM combined
+WHERE effective_role IS NOT NULL;
+
+-- RLS on the view inherits from underlying tables (form_system, form_api scoping)
+-- form_api callers see only their current_tenant_id rows via underlying table RLS
+```
+
+---
+
+### 19.5 Okta / Azure AD / Google Workspace Push Group Configuration
+
+#### 19.5.1 Okta — Push Groups
+
+Okta supports native SCIM Group Push. Configuration path in Okta Admin Console:
+
+1. Navigate to **Applications > [FORM SCIM App] > Provisioning > Push Groups**.
+2. Click **Push Groups** and select **Find groups by name** or **Find groups by rule**.
+3. Recommended rule expression to scope only FORM-relevant groups: `name sw "FORM-"` (groups whose display name starts with "FORM-"). This prevents sending all Okta groups to FORM and keeps the tenant's `tenant_groups` table clean.
+4. For each pushed group, select **Push group memberships immediately**.
+5. `memberOf` attribute mapping: in the SCIM attribute mappings (**Provisioning > To App > Attribute Mappings**), ensure `groups` is mapped if using SAML attribute-based group extraction (§19.6). For pure SCIM push, `memberOf` mapping is not needed — Okta pushes group membership directly via PATCH.
+6. Confirm SCIM Group Push is working: navigate to the Push Groups tab, click the group, and check **Push Status = Active**. FORM must respond `200 OK` or `201 Created` within Okta's 10-second timeout. The Cloudflare Worker target latency for group endpoints is < 200 ms p99.
+
+**Known Okta behaviour:** Okta sends `PUT` (full replace) when a group is first pushed, then `PATCH` for subsequent membership changes. The FORM Worker handles both (§19.2.4, §19.2.5).
+
+#### 19.5.2 Azure AD / Microsoft Entra ID — Group Sync
+
+Azure AD Provisioning (Entra ID) configuration path:
+
+1. **Enterprise Application > [FORM App] > Provisioning > Mappings**.
+2. Click **Synchronize Azure Active Directory Groups to [FORM SCIM App]**.
+3. Ensure mapping is **Enabled**.
+4. Attribute mapping review: verify `displayName → displayName`, `objectId → externalId`, `members → members`. The `objectId` is Azure's stable group identifier — mapping it to `externalId` ensures that if a group is renamed in Azure AD, FORM can reconcile by `externalId` rather than creating a duplicate.
+5. Scope filter: under **Provisioning > Settings > Scope**, select **Sync only assigned users and groups** (preferred) or configure an attribute filter. Recommended attribute filter: add a group attribute filter `appRoleAssignments` or, for simpler setups, assign only the relevant security groups to the enterprise application.
+6. If the tenant uses Azure AD dynamic groups (membership rule-based), confirm the dynamic group membership is resolved before provisioning runs. Azure AD provisioning runs every ~40 minutes by default; FORM group state may lag by up to 40 minutes after a membership rule change.
+
+**Azure AD SCIM behaviour:** Entra ID sends full membership lists via `PUT` on initial sync and incremental `PATCH` on delta sync. Entra does not support `filter=displayName` queries against FORM's `GET /Groups` endpoint — it uses `GET /Groups?filter=externalId eq "<objectId>"` to check existence before creating. Ensure `externalId` is populated in FORM's `POST /Groups` response and returned in `GET /Groups` responses.
+
+#### 19.5.3 Google Workspace — No Native SCIM Groups Push
+
+Google Workspace does not support outbound SCIM Group Push natively. Google's SCIM support covers user provisioning only (§6); group objects are not pushed to external service providers.
+
+**Workarounds (in order of recommendation):**
+
+| Option | Description | Complexity |
+|---|---|---|
+| Okta as SCIM bridge | Sync Google Workspace → Okta (Okta's Google Workspace integration); enable Okta Push Groups to FORM | Medium — requires Okta licence |
+| Microsoft Entra External ID as bridge | Provision Google identities into Entra; use Entra SCIM provisioning to push groups to FORM | High — cross-IdP complexity |
+| SAML `groups` attribute (JIT path) | Configure Google SAML app to include Google Groups in assertion; FORM extracts groups from SAML attribute (§19.6) | Low — no SCIM push; JIT only |
+| Manual group management in FORM | Tenant admin manages group membership directly in FORM admin dashboard; no IdP sync | Lowest — loses automation benefit |
+
+The SAML `groups` attribute path (§19.6) is the recommended Google Workspace workaround for tenants that cannot introduce a SCIM bridge.
+
+---
+
+### 19.6 SAML Groups Attribute Mapping (JIT Path)
+
+When a tenant uses SAML SSO (§1) and the IdP does not support SCIM Group Push (or the tenant has not configured push groups), FORM can extract group membership from the SAML assertion at login time. This is the JIT (Just-in-Time) group path — complementary to, not a replacement for, SCIM group sync.
+
+#### 19.6.1 Assertion Attribute Configuration
+
+The IdP must be configured to include group membership in the SAML assertion. Common attribute names:
+
+| IdP | Attribute name in assertion | Format |
+|---|---|---|
+| Okta | `groups` | Multi-value string list |
+| Azure AD / Entra | `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups` | Multi-value (Object IDs) |
+| Google (SAML app) | `groups` (custom attribute — must be configured explicitly) | Multi-value string list |
+| OneLogin | `memberOf` | Multi-value string list |
+| Ping Identity | `memberOf` | Multi-value string list |
+
+FORM reads the attribute name from `tenant_sso_configs.attribute_mapping` JSONB field. To enable group extraction, the tenant admin (or CS engineer via internal tooling) adds a `groups_attribute` key:
+
+```json
+{
+  "email": "email",
+  "first_name": "firstName",
+  "last_name": "lastName",
+  "groups_attribute": "groups"
+}
+```
+
+The value of `groups_attribute` is the exact XML attribute name in the assertion. If the key is absent, group extraction is skipped (fail-closed).
+
+#### 19.6.2 JIT Group Resolution
+
+On successful SAML login, after the user record is created or matched (§11 JIT Provisioning):
+
+```typescript
+async function resolveJitGroups(
+  tenantId: string,
+  userId: string,
+  samlAttributes: Record<string, string[]>,
+  tenantSsoConfig: TenantSsoConfig,
+): Promise<void> {
+  const groupsAttrKey = tenantSsoConfig.attribute_mapping?.groups_attribute;
+  if (!groupsAttrKey) return; // no group extraction configured
+
+  const groupNames: string[] = samlAttributes[groupsAttrKey] ?? [];
+  if (groupNames.length === 0) return;
+
+  const jitEnabled = await featureFlag('scim.jit_group_creation_enabled', tenantId);
+
+  for (const groupName of groupNames) {
+    let group = await db.tenantGroups.findByDisplayName({ tenantId, displayName: groupName });
+
+    if (!group) {
+      if (!jitEnabled) {
+        // Group does not exist and JIT creation is disabled — skip silently, log warning
+        logger.warn('jit_group_skip', { tenantId, groupName, reason: 'jit_group_creation_disabled' });
+        continue;
+      }
+      // JIT create the group
+      group = await db.tenantGroups.create({ tenantId, displayName: groupName, externalId: null });
+      await emitAuditEvent('scim.group_created', { tenantId, groupId: group.id, triggeredBy: 'saml_jit' });
+    }
+
+    // Upsert membership
+    const alreadyMember = await db.scimGroupMembers.exists({ tenantId, groupId: group.id, userId });
+    if (!alreadyMember) {
+      await db.scimGroupMembers.add({ tenantId, groupId: group.id, userId });
+      await emitAuditEvent('scim.group_member_added', {
+        tenantId, groupId: group.id, userId, triggeredBy: 'saml_jit',
+      });
+    }
+  }
+}
+```
+
+#### 19.6.3 JIT Group Creation Feature Flag
+
+`scim.jit_group_creation_enabled` is a **tenant-scoped feature flag**, disabled by default. Enabling it allows FORM to automatically create `tenant_groups` rows based on group names appearing in SAML assertions. This can result in unbounded group creation if the IdP sends large or variable group lists.
+
+**Safety constraints when enabling:**
+- Maximum groups per tenant (§OQ-SSO-19.3 default: 500). Attempts to create a 501st group via JIT return a logged warning and are silently skipped — the user still logs in successfully.
+- Group names are sanitised: max 255 characters, stripped of leading/trailing whitespace. Names that fail sanitisation are skipped with a warning log.
+- The flag may only be enabled by a `tenant_admin` or higher via the admin dashboard (Settings > Identity > Advanced).
+- Enabling emits `scim.group_role_mapping_changed` with a note that JIT group creation was activated — auditor visibility.
+
+**When to keep disabled (default):** Tenants using SCIM Group Push (§19.5) should keep JIT group creation disabled to avoid creating duplicate group entries from SAML assertions that may use different group name formats than SCIM `displayName` values.
+
+---
+
+### 19.7 DEC-030 HMAC-Chained Audit Events
+
+All group lifecycle and role mapping events follow the DEC-030 HMAC chain specification (docs/AUDIT_LOG_SCHEMA.md). PII constraint: audit events must contain group IDs and user IDs only — never email addresses, display names (except for `scim.group_created`/`scim.group_deleted` where `displayName` is the group's own name, not a user attribute), or role values in plaintext where not required for audit purpose.
+
+| Event name | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `scim.group_created` | STANDARD | 7 yr | POST /scim/v2/Groups or JIT creation | `tenant_id`, `group_id`, `display_name`, `triggered_by` (scim \| saml_jit \| admin) |
+| `scim.group_updated` | STANDARD | 7 yr | PUT /scim/v2/Groups/{id} (when delta exists) | `tenant_id`, `group_id`, `triggered_by` |
+| `scim.group_deleted` | HIGH | 7 yr | DELETE /scim/v2/Groups/{id} | `tenant_id`, `group_id`, `display_name`, `member_count_at_deletion`, `triggered_by` |
+| `scim.group_member_added` | STANDARD | 7 yr | PATCH op=add or JIT membership upsert | `tenant_id`, `group_id`, `user_id` (scim_user_id), `triggered_by` (scim \| saml_jit \| admin) |
+| `scim.group_member_removed` | HIGH | 7 yr | PATCH op=remove or group DELETE cascade | `tenant_id`, `group_id`, `user_id`, `triggered_by` |
+| `scim.group_role_mapping_changed` | HIGH | 7 yr | Admin dashboard save, or JIT flag toggle | `tenant_id`, `group_id`, `old_role` (null if new mapping), `new_role` (null if mapping removed), `mapped_by_user_id` |
+
+**Rationale for HIGH severity on removal/deletion events:** Access-reduction events (`scim.group_member_removed`, `scim.group_deleted`) require HIGH severity because they may be used as evidence in offboarding audits, access reviews, or incident investigations where the exact time of access revocation is material. HIGH severity events are surfaced prominently in the admin dashboard audit log viewer and in SOC 2 evidence exports.
+
+**HMAC chain integrity note:** Each event carries the HMAC of the previous event in the chain. Events emitted within the same database transaction (e.g., a PATCH removing 5 members) must be serialised — emit each `scim.group_member_removed` sequentially, not concurrently, to maintain chain integrity. The Worker must await each `emitAuditEvent` call before emitting the next.
+
+---
+
+### 19.8 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Requirement | How §19 Satisfies It | Evidence Artefact |
+|---|---|---|---|
+| CC6.1 | Logical access is restricted to authorised individuals | Group-based access control documented (§19.3), auditable via DEC-030 `scim.group_*` events, `group_member_effective_role` view provides point-in-time access state | `scim_group_role_mappings` table export; `scim.group_role_mapping_changed` audit chain |
+| CC6.2 | Access is removed on a timely basis; no auto-escalation | New groups have no role mapping by default (§19.3.3 fail-closed); tenant admin explicit action required before any group confers access | Admin dashboard audit log showing mapping creation date vs. group push date |
+| CC6.3 | Policies exist for provisioning and deprovisioning access | SCIM GROUP DELETE cascades role revocation immediately (§19.2.6); `scim.group_member_removed` HIGH event confirms offboarding path | `scim.group_deleted` and `scim.group_member_removed` events in audit chain for terminated user |
+| CC6.6 | Logical access controls use identified authorised users | JIT group creation disabled by default; groups only created via authenticated SCIM push or explicit tenant admin action (§19.6.3) | Feature flag audit log; `scim.group_created` triggered_by field |
+| CC7.2 | System monitoring detects and responds to unauthorised access | HIGH severity removal events surfaced in admin dashboard and available for SIEM export; role resolution view enables access snapshots for incident review | `group_member_effective_role` view snapshot; HIGH event SIEM integration |
+| C1.1 | PII protection in audit events | Audit events carry IDs only; no email addresses or display names beyond group's own `displayName` (§19.7 PII constraint) | Audit log schema review; DEC-030 compliance attestation |
+
+---
+
+### 19.9 Open Questions
+
+| ID | Question | Current Answer / Disposition |
+|---|---|---|
+| OQ-SSO-19.1 | **Role conflict resolution:** when a user is a member of two groups with conflicting role mappings, should higher or lower privilege win? | Preferred: higher privilege wins. Rationale: §19.3.2. Requires **founder sign-off** before feature ships. If security team prefers lowest-privilege-wins, the `group_member_effective_role` view's `MAX()` logic must be replaced with `MIN()`, and §19.3.2 rationale updated accordingly. |
+| OQ-SSO-19.2 | **Nested group support:** should FORM support groups-within-groups (hierarchical group membership)? | Current answer: **no.** SCIM 2.0 (RFC 7643) does not define nested group semantics. IdPs handle nesting inconsistently — Okta flattens membership before pushing; Azure AD may or may not flatten depending on group type. Supporting nesting would require recursive SQL, add query complexity, and create role-resolution ambiguity. If a customer requires nested groups, the recommended workaround is to configure the IdP to push flattened membership to FORM. |
+| OQ-SSO-19.3 | **Maximum groups per tenant:** what is the default cap? | Proposed default: **500 groups per tenant.** Configurable per enterprise agreement (field in `tenants.feature_limits` JSONB). Rationale: 500 covers the largest expected enterprise deployment (a 10,000-person org with granular team groups); above 500 suggests the customer may be pushing all IdP groups rather than FORM-specific groups, which indicates a misconfigured push filter. Requires **enterprise-architect decision** and confirmation that the `tenant_groups` table index performance is acceptable at 500 rows (trivially yes for B-tree). |
+
+---
+
+### 19.10 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Write `migrations/YYYYMMDD_scim_group_role_mappings.sql` — `scim_group_role_mappings` DDL, indexes, RLS policies (§19.4.2) | platform-engineer | **P0** | M4 |
+| Write `migrations/YYYYMMDD_scim_group_members.sql` — `scim_group_members` DDL, indexes, RLS policies (§19.4.3) | platform-engineer | **P0** | M4 |
+| Write `migrations/YYYYMMDD_group_member_effective_role_view.sql` — `group_member_effective_role` view (§19.4.4); include test query validating direct-beats-group and highest-group-wins cases | platform-engineer + enterprise-architect | **P0** | M4 |
+| Implement `GET`, `POST`, `PUT`, `PATCH`, `DELETE` on `/scim/v2/Groups` in Cloudflare Worker (§19.2); enforce tenant isolation guard in PATCH `op=add` (`assertUsersInTenant`) | platform-engineer | **P0** | M4 |
+| Wire all 6 DEC-030 audit events (§19.7) with correct severity levels; validate HMAC chain ordering for batch PATCH operations (sequential emission) | platform-engineer + security-engineer | **P0** | M4 |
+| Implement `resolveJitGroups` function (§19.6.2) in SAML JIT login path; gate on `scim.jit_group_creation_enabled` feature flag; enforce 500-group cap | platform-engineer | **P0** | M4 |
+| Get founder sign-off on OQ-SSO-19.1 (higher-privilege-wins) and record decision in `docs/DECISION_LOG.md` | enterprise-architect | **P0** | M4 |
+| Build admin dashboard "Group Role Mapping" panel (§19.3.3): group list, role selector, save-per-row, warning banner for owner/admin mapping | platform-engineer | **P1** | M5 |
+| Write Okta Push Groups configuration guide for CS team (§19.5.1); include Okta filter expression recommendation `name sw "FORM-"` and expected SCIM call sequence | enterprise-architect | **P1** | M5 |
+| Add `scim_group_role_mappings` and `scim_group_members` to Art. 17 erasure scope: confirm FK CASCADE handles tenant hard-delete; add erasure smoke test to CI suite | platform-engineer | **P1** | M5 |
+
+---
+
+*v1.1 additions (2026-05-30): Section 19 — SCIM Groups Sync & Group-Based Role Mapping. Closes the group lifecycle gap left by §5–§8 (which cover user provisioning and direct role assignment but not group objects as first-class SCIM resources). Six new SCIM endpoints on the Cloudflare Workers edge runtime: GET /Groups (paginated, filterable, RFC 7644 ListResponse), GET /Groups/{id} (single resource with members array), POST /Groups (creates `tenant_groups` row, 201 + Location header, idempotency on externalId), PUT /Groups/{id} (full replace, delta-aware audit emission), PATCH /Groups/{id} (RFC 7644 PatchOp, op=add/remove on path=members, with cross-tenant guard on member userIds), DELETE /Groups/{id} (cascade role revocation, no user deletion). Group-to-role mapping model: new `scim_group_role_mappings` table (tenant_id, scim_group_id FK, form_role ENUM, mapped_by, mapped_at; UNIQUE constraint one role per group per tenant; RLS: tenant_admin read/write own tenant, form_system read-only, form_api zero-rows fail-closed). Role resolution priority: explicit direct assignment beats group membership; among group memberships highest privilege wins (highest-privilege-wins rationale documented in §19.3.2; requires founder sign-off per OQ-SSO-19.1). New `scim_group_members` table for SCIM-managed many-to-many membership. New `group_member_effective_role` view computing final FORM role per user via FULL OUTER JOIN of direct roles and group-derived roles using CASE ordinals and MAX aggregation. IdP push group configuration: Okta Push Groups (filter expression, memberOf, PUT-then-PATCH behaviour), Azure AD / Entra SCIM mappings (objectId → externalId, scope filter, 40-minute sync lag caveat, GET by externalId query pattern), Google Workspace (no native SCIM Groups Push; three workarounds: Okta bridge, Entra bridge, SAML groups attribute). SAML JIT groups path: `groups_attribute` key in `tenant_sso_configs.attribute_mapping` JSONB; `resolveJitGroups` function; `scim.jit_group_creation_enabled` feature flag (disabled by default; safety: 500-group cap, 255-char name limit, admin-only toggle). Six DEC-030 HMAC-chained audit events: scim.group_created (STANDARD, 7yr), scim.group_updated (STANDARD, 7yr), scim.group_deleted (HIGH, 7yr), scim.group_member_added (STANDARD, 7yr), scim.group_member_removed (HIGH, 7yr), scim.group_role_mapping_changed (HIGH, 7yr); sequential emission required for batch PATCH to maintain HMAC chain integrity. SOC 2 mapping: CC6.1 (group access auditable), CC6.2 (no-mapping-by-default fail-closed), CC6.3 (DELETE cascade offboarding), CC6.6 (JIT flag gated), CC7.2 (HIGH events for SIEM), C1.1 (IDs only in audit events). Open questions: OQ-SSO-19.1 (higher vs. lower privilege conflict resolution — founder sign-off required), OQ-SSO-19.2 (nested groups — no, not supported), OQ-SSO-19.3 (500 group cap — enterprise-architect decision). Implementation checklist: 10 tasks (7× P0, 3× P1), M4/M5.*
