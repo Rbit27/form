@@ -6,6 +6,19 @@
 
 ---
 
+## [1.27.0] — 2026-05-30
+
+### Added
+- `content/post-154-telomeres-training-geroprotection.md` — «Теломери і тренінг — геропротекція на молекулярному рівні». Sports-science series. Covers: telomere biology and end-replication problem; hTERT/hTERC mechanism; Cherkas et al. (2008 Arch Intern Med) twin study — ≈200 bp difference between most and least active; Werner et al. (2009 Circulation) 8-week RCT — ↑ hTERT, ↓ p16INK4a in adults 50+; LaRocca et al. (2010 J Physiol) — aerobic capacity correlates with EPC telomere length; IGF-1/FOXO3 axis and pulsatile FOXO3 activation during recovery; satellite cells and muscle-specific telomere dynamics; upper-volume limit — ultraendurance without recovery reverses the effect; practical zone 150–300 min/week. 13 хв читання. clinical-safety NOT REQUIRED.
+- `blog.html` — картки Post 153 (лактат) і Post 154 (теломери) — 154 cards total. Backfills missing card for post-153 from v1.26.0.
+- `README.md` — post-153 [x] (лактат, actual content); post-154 [x] (теломери); post-155 (колаген/ECM) у roadmap; нові теми post-156 (глімфатична система), post-157 (нейрогенез), post-158 (мікробіом і тренінг) додані до roadmap.
+
+### Changed
+- `STATUS.md` — blog.html row: 152 → 154 cards · v1.27.0
+- `VERSION` → 1.27.0
+
+---
+
 ## [1.26.0] — 2026-05-30
 
 ### Added
