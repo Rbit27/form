@@ -9000,6 +9000,683 @@ compliance/evidence/cc6/
 
 ---
 
+## 44. Sub-Processor List Worker — Complete Implementation — CC9-GAP-007 / CC2-GAP-003 Auditor Exhibit
+
+> **New section added 2026-05-30. This is a standalone auditor exhibit delivering the complete, ready-to-deploy Cloudflare Worker implementation for `security.form.coach/sub-processors`. It is the final documentation step before gap closure; the gap moves to 🟢 Done on Wrangler deploy + CC9-E-001 screenshot filed.**
+>
+> **Gap closure:** CC9-GAP-007 🔴 → 🟡 **AUTHORED** (§39 provided architecture; §44 delivers the complete deployable implementation spec; closes to 🟢 on `wrangler deploy` + CC9-E-001 filed) · CC2-GAP-003 🔴 → 🟡 **AUTHORED** (CC2.3 external communication commitment now has full deploy spec; closes to 🟢 concurrently with CC9-GAP-007).
+> **P0 count: 4 → 2.** CC9-GAP-007 and CC2-GAP-003 reclassified from 🔴 Open to 🟡 AUTHORED. Two remaining P0 gaps: CC6-GAP-001 (quarterly access review execution outstanding), P-GAP-001 (privacy policy blocked on outside counsel review).
+
+---
+
+### 44.1 Purpose and Scope
+
+§39 (Security Trust Center Architecture) defined the architecture of `security.form.coach` and specified the KV schema and Worker behaviour for `/sub-processors` (§39.4). This exhibit closes the documentation-to-implementation gap:
+
+1. The complete, deployable TypeScript source (`apps/security-portal/src/sub-processors.ts`)
+2. The authoritative initial KV payload (`sub-processors-v1`) — all eight vendors from §28.3.1, pre-populated
+3. The `wrangler.toml` configuration fragment for the `form-security-portal` project
+4. The three-step KV population sequence
+5. Staleness management rules for routine list updates
+6. Two DEC-030 HMAC-chained events (deploy + update)
+7. An 8-item implementation checklist — the minimal action set to advance CC9-GAP-007 to 🟢
+
+**Relationship to existing sections:**
+
+| Section | Role |
+|---|---|
+| §20.8 | First named `security.form.coach/sub-processors` as the publication path; defined checklist item 20-13 |
+| §28.3.1 | Vendor registry — the source of truth for KV payload in §44.2 |
+| §39.4 | KV schema + Worker behaviour spec — §44 implements it in full TypeScript |
+| `compliance/p1/sub-processor-register.md` | Authoritative GDPR Art. 28 register; KV payload derives from §4 of that document and must stay in sync |
+
+**Privacy-first constraints (inherited from §39.2):** No cookies, no analytics scripts, no PostHog on `security.form.coach`. No IP addresses stored. `X-List-Hash` header enables programmatic change-detection by enterprise procurement tools without exposing internal state beyond the `git_commit` field already public on GitHub.
+
+---
+
+### 44.2 KV Payload — `sub-processors-v1`
+
+This is the authoritative initial payload. After every vendor change, compliance-officer runs the update procedure in §44.5 and increments `list_version` by 1.
+
+```json
+{
+  "list_version": 1,
+  "last_updated_at": "2026-05-30T00:00:00Z",
+  "git_commit": "[FILL: short hash of commit that writes sub-processor-kv-payload.json]",
+  "notice_pledge_days": 30,
+  "contact": "privacy@form.coach",
+  "dpa_template_url": "https://security.form.coach/dpa",
+  "processors": [
+    {
+      "id": "SP-01",
+      "name": "Anthropic",
+      "legal_entity": "Anthropic PBC",
+      "hq_country": "US",
+      "category": "AI inference",
+      "purpose": "LLM inference — Victor AI coaching sessions; exercise context classification; coaching cue generation",
+      "data_categories": ["coaching_turns"],
+      "art9_exposure": true,
+      "tier": 1,
+      "dpa_status": "signed",
+      "scc_status": "signed",
+      "scc_module": "Module 2 (controller→processor)",
+      "certification": "SOC 2 Type II",
+      "data_region": "US",
+      "last_reviewed_at": "2026-01-01"
+    },
+    {
+      "id": "SP-02",
+      "name": "Supabase",
+      "legal_entity": "Supabase Inc",
+      "hq_country": "US",
+      "category": "Database & authentication",
+      "purpose": "Managed PostgreSQL, Supabase Auth (SSO/OIDC/SAML), Edge Functions, file storage — primary datastore for all user and tenant data including all GDPR Art. 9 categories",
+      "data_categories": ["identity_data", "health_profile", "workout_data", "cv_pose_data", "wearable_data", "coaching_turns", "meal_log", "payment_metadata"],
+      "art9_exposure": true,
+      "tier": 1,
+      "dpa_status": "signed",
+      "scc_status": "signed",
+      "scc_module": "Module 2; EU data residency at eu-central-1 eliminates transfer requirement for EU enterprise tenants",
+      "certification": "SOC 2 Type II",
+      "data_region": "EU eu-central-1 (enterprise) / US us-east-1 (default)",
+      "last_reviewed_at": "2026-01-01"
+    },
+    {
+      "id": "SP-03",
+      "name": "Cloudflare",
+      "legal_entity": "Cloudflare Inc",
+      "hq_country": "US",
+      "category": "Edge compute, CDN, DNS, DDoS protection",
+      "purpose": "API gateway (Cloudflare Workers), WAF, DDoS protection, R2 object storage (backups and TTS cache), KV (feature flags), DNS — no Art. 9 health data transits Cloudflare layer",
+      "data_categories": ["ip_metadata", "request_metadata"],
+      "art9_exposure": false,
+      "tier": 2,
+      "dpa_status": "signed",
+      "scc_status": "signed",
+      "scc_module": "Module 2 + Cloudflare EU DPA addendum (UK IDTA equivalent also available)",
+      "certification": "SOC 2 Type II, ISO 27001",
+      "data_region": "Global edge (EU data stays in EU PoPs before reaching Supabase eu-central-1)",
+      "last_reviewed_at": "2026-01-01"
+    },
+    {
+      "id": "SP-04",
+      "name": "ElevenLabs",
+      "legal_entity": "ElevenLabs Inc",
+      "hq_country": "US",
+      "category": "Text-to-speech synthesis",
+      "purpose": "Voice synthesis for Victor coaching cues — receives coaching cue text strings only; no user PII or health data in TTS payloads by design",
+      "data_categories": ["coaching_cue_text"],
+      "art9_exposure": false,
+      "tier": 2,
+      "dpa_status": "signed",
+      "scc_status": "signed",
+      "scc_module": "Module 2",
+      "certification": "SOC 2 Type II",
+      "data_region": "US",
+      "last_reviewed_at": "2026-01-01"
+    },
+    {
+      "id": "SP-05",
+      "name": "PostHog",
+      "legal_entity": "PostHog Inc",
+      "hq_country": "US",
+      "category": "Product analytics",
+      "purpose": "Pseudonymised product analytics, feature flags, funnel analysis — no health event content by configuration; analytics_opt_out flag stops all transmission",
+      "data_categories": ["analytics_events"],
+      "art9_exposure": false,
+      "tier": 2,
+      "dpa_status": "signed",
+      "scc_status": "signed",
+      "scc_module": "Module 2 (not required for EU tenants — EU Cloud Frankfurt)",
+      "certification": "SOC 2 Type II",
+      "data_region": "EU Frankfurt — eu.posthog.com (EU data stays in EU; SCC applies for US tenants only)",
+      "last_reviewed_at": "2026-01-01"
+    },
+    {
+      "id": "SP-06",
+      "name": "Sentry",
+      "legal_entity": "Functional Software Inc",
+      "hq_country": "US",
+      "category": "Error monitoring & crash reporting",
+      "purpose": "Crash reporting — health-adjacent fields scrubbed before transmission via beforeSend hook per compliance/p1/sub-processor-register.md §6",
+      "data_categories": ["error_telemetry"],
+      "art9_exposure": false,
+      "tier": 2,
+      "dpa_status": "in_progress",
+      "dpa_target_date": "2026-07-20",
+      "scc_status": "pending",
+      "scc_module": "Module 2 (planned; EU region migration planned on DPA execution)",
+      "certification": "SOC 2 Type II",
+      "data_region": "US (EU region migration planned on DPA execution)",
+      "compensating_control": "beforeSend PII scrubber active — see compliance/p1/sub-processor-register.md §6",
+      "last_reviewed_at": "2026-01-01"
+    },
+    {
+      "id": "SP-07",
+      "name": "Apple (App Store)",
+      "legal_entity": "Apple Inc",
+      "hq_country": "US",
+      "category": "App distribution — independent controller",
+      "purpose": "iOS App Store in-app purchase processing — FORM receives receipt tokens only; Apple is an independent controller for payment PII",
+      "data_categories": ["payment_receipt_tokens"],
+      "art9_exposure": false,
+      "tier": 3,
+      "dpa_status": "n/a_independent_controller",
+      "scc_status": "n/a",
+      "scc_module": "N/A",
+      "certification": "PCI DSS",
+      "data_region": "Apple servers",
+      "note": "Independent controller — not a sub-processor within GDPR Art. 4(8); Apple Developer Program terms govern",
+      "last_reviewed_at": "2026-01-01"
+    },
+    {
+      "id": "SP-08",
+      "name": "Google (Play Store)",
+      "legal_entity": "Google LLC",
+      "hq_country": "US",
+      "category": "App distribution — independent controller",
+      "purpose": "Android Play Store in-app purchase processing — FORM receives receipt tokens only; Google is an independent controller for payment PII",
+      "data_categories": ["payment_receipt_tokens"],
+      "art9_exposure": false,
+      "tier": 3,
+      "dpa_status": "n/a_independent_controller",
+      "scc_status": "n/a",
+      "scc_module": "N/A",
+      "certification": "PCI DSS",
+      "data_region": "Google servers",
+      "note": "Independent controller — not a sub-processor within GDPR Art. 4(8); Google Play Developer Distribution Agreement governs",
+      "last_reviewed_at": "2026-01-01"
+    }
+  ]
+}
+```
+
+**Field definitions:**
+
+| Field | Type | Notes |
+|---|---|---|
+| `list_version` | integer | Increment by 1 on every KV write; auditors compare versions across observation period to detect changes |
+| `last_updated_at` | ISO 8601 UTC | Updated on every KV write; mirrors the `Last-Modified` HTTP response header |
+| `git_commit` | string | Short git commit hash of the `compliance/p1/sub-processor-kv-payload.json` commit that triggered this update; creates a tamper-evident link between the public page and the version-controlled register |
+| `notice_pledge_days` | integer | The advance notice window — must match §28.3.1 and `compliance/p1/sub-processor-register.md §8` DPA template language (30 days) |
+| `processors[].art9_exposure` | boolean | True if the processor receives any GDPR Art. 9 special-category data; auditor-visible on the public page as a red/green indicator |
+| `processors[].tier` | integer 1–3 | Tier 1 = Art. 9 data (highest); Tier 2 = personal data (non-Art. 9); Tier 3 = independent controller (lowest) |
+| `processors[].dpa_status` | enum | `"signed"` / `"in_progress"` / `"n/a_independent_controller"` — rendered as green / amber / grey badge on the page |
+| `processors[].compensating_control` | string? | Present only when `dpa_status = "in_progress"`; surfaces the active compensating control on the public page for enterprise procurement teams |
+
+---
+
+### 44.3 Worker Source — `apps/security-portal/src/sub-processors.ts`
+
+Complete, deployable TypeScript. Handles HTML (default) and JSON (`?format=json`). All rendering is server-side — no client JavaScript.
+
+```typescript
+export interface Env {
+  SECURITY_PORTAL_KV: KVNamespace;
+}
+
+interface Processor {
+  id: string;
+  name: string;
+  legal_entity: string;
+  hq_country: string;
+  category: string;
+  purpose: string;
+  data_categories: string[];
+  art9_exposure: boolean;
+  tier: 1 | 2 | 3;
+  dpa_status: "signed" | "in_progress" | "n/a_independent_controller";
+  dpa_target_date?: string;
+  scc_status: string;
+  scc_module: string;
+  certification: string;
+  data_region: string;
+  compensating_control?: string;
+  note?: string;
+  last_reviewed_at: string;
+}
+
+interface SubProcessorList {
+  list_version: number;
+  last_updated_at: string;
+  git_commit: string;
+  notice_pledge_days: number;
+  contact: string;
+  dpa_template_url: string;
+  processors: Processor[];
+}
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Content-Security-Policy":
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://fonts.gstatic.com; form-action 'self'",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+};
+
+function dpaStatusBadge(p: Processor): string {
+  switch (p.dpa_status) {
+    case "signed":
+      return '<span style="color:#22c55e;font-weight:600;">✓ Signed</span>';
+    case "in_progress":
+      return (
+        '<span style="color:#f59e0b;font-weight:600;">⏳ In progress</span>' +
+        (p.dpa_target_date
+          ? `<br/><span style="font-size:11px;color:#94a3b8;">Target: ${p.dpa_target_date}</span>`
+          : "")
+      );
+    case "n/a_independent_controller":
+      return '<span style="color:#6b7280;font-size:12px;">N/A — independent controller</span>';
+  }
+}
+
+function tierLabel(tier: 1 | 2 | 3): string {
+  switch (tier) {
+    case 1: return '<span style="color:#f87171;">Tier 1 · Art. 9 data</span>';
+    case 2: return "Tier 2 · personal data";
+    case 3: return '<span style="color:#6b7280;">Tier 3 · independent controller</span>';
+  }
+}
+
+function renderHtml(data: SubProcessorList, hashHex: string): string {
+  const lastUpdated = new Date(data.last_updated_at).toLocaleDateString("en-GB", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const rows = data.processors
+    .map(
+      (p) => `
+      <tr>
+        <td><strong>${p.name}</strong><br/><span style="color:#6b7280;font-size:12px;">${p.legal_entity} · ${p.hq_country}</span></td>
+        <td style="font-size:12px;">${p.category}</td>
+        <td style="font-size:12px;color:#94a3b8;">${p.purpose}</td>
+        <td style="text-align:center;">${p.art9_exposure ? '<span style="color:#f87171;font-weight:600;">Yes</span>' : "No"}</td>
+        <td style="font-size:12px;">${tierLabel(p.tier)}</td>
+        <td style="font-size:12px;">${dpaStatusBadge(p)}</td>
+        <td style="font-size:11px;color:#6b7280;">${p.certification}</td>
+        <td style="font-size:11px;color:#6b7280;">${p.data_region}</td>
+        <td style="font-size:11px;color:#f59e0b;">${p.compensating_control ?? (p.note ? `<span style="color:#6b7280;">${p.note}</span>` : "—")}</td>
+      </tr>`
+    )
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Sub-Processors · FORM Security</title>
+<meta name="robots" content="noindex,nofollow"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:#0B0A07;color:#F3EEE0;font-family:'Manrope',sans-serif;font-size:15px;line-height:1.6;}
+  .wrap{max-width:1400px;margin:0 auto;padding:48px 32px;}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:64px;border-bottom:1px solid #1F1D16;padding-bottom:24px;}
+  .logo{font-family:'Fraunces',serif;font-size:22px;font-weight:300;letter-spacing:-0.04em;color:#F3EEE0;}
+  .logo span{color:#DDFF2D;}
+  nav a{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6F6A60;text-decoration:none;margin-left:24px;}
+  nav a:hover{color:#F3EEE0;}
+  nav a.active{color:#DDFF2D;}
+  h1{font-family:'Fraunces',serif;font-size:56px;font-weight:300;letter-spacing:-0.04em;line-height:0.92;color:#F3EEE0;margin-bottom:24px;}
+  h1 em{font-style:italic;}
+  .label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#6F6A60;margin-bottom:12px;}
+  .meta{color:#A39D8E;font-size:14px;margin-bottom:40px;line-height:1.9;}
+  .meta a{color:#DDFF2D;text-decoration:none;}
+  .meta code{font-family:'JetBrains Mono',monospace;font-size:12px;background:#13110C;padding:2px 6px;border-radius:4px;}
+  .pledge{background:#13110C;border:1px solid #1F1D16;border-left:3px solid #DDFF2D;border-radius:12px;padding:20px 24px;margin-bottom:40px;}
+  .pledge p{font-size:14px;color:#A39D8E;line-height:1.7;}
+  .pledge p strong{color:#F3EEE0;}
+  .pledge a{color:#DDFF2D;text-decoration:none;}
+  .tbl-wrap{overflow-x:auto;border:1px solid #1F1D16;border-radius:16px;margin-bottom:48px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#6F6A60;text-align:left;padding:14px 16px;border-bottom:1px solid #1F1D16;background:#0D0C09;white-space:nowrap;}
+  td{padding:14px 16px;border-bottom:1px solid #1F1D16;color:#A39D8E;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(221,255,45,0.02);}
+  .footer{border-top:1px solid #1F1D16;padding-top:28px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;}
+  .footer-left{font-size:12px;color:#6F6A60;line-height:1.8;}
+  .footer-left a{color:#6F6A60;text-decoration:underline;}
+  .footer-right{font-family:'JetBrains Mono',monospace;font-size:10px;color:#6F6A60;letter-spacing:0.08em;text-align:right;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">FORM<span>.</span> <span style="font-size:14px;color:#6F6A60;font-family:'JetBrains Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;">Security</span></div>
+    <nav>
+      <a href="/">Overview</a>
+      <a href="/sub-processors" class="active">Sub-processors</a>
+      <a href="/dpa">DPA</a>
+      <a href="/disclosure">Disclosure</a>
+      <a href="/questionnaire">Questionnaire</a>
+    </nav>
+  </header>
+
+  <div class="label">Transparency · GDPR Art. 13(1)(e)</div>
+  <h1>Sub-<em>processor</em><br/>list.</h1>
+
+  <div class="meta">
+    <strong style="color:#F3EEE0;">Last updated:</strong> ${lastUpdated} &nbsp;·&nbsp;
+    <strong style="color:#F3EEE0;">List version:</strong> ${data.list_version} &nbsp;·&nbsp;
+    <strong style="color:#F3EEE0;">Commit:</strong> <code>${data.git_commit}</code><br/>
+    <strong style="color:#F3EEE0;">Questions:</strong> <a href="mailto:${data.contact}">${data.contact}</a> &nbsp;·&nbsp;
+    <strong style="color:#F3EEE0;">DPA template:</strong> <a href="${data.dpa_template_url}">${data.dpa_template_url}</a> &nbsp;·&nbsp;
+    <a href="?format=json" style="color:#6F6A60;">JSON endpoint →</a>
+  </div>
+
+  <div class="pledge">
+    <p><strong>${data.notice_pledge_days}-day advance notice pledge.</strong> FORM will give enterprise customers not less than ${data.notice_pledge_days} days' prior written notice before any new sub-processor begins processing Customer Personal Data. Notice is delivered to the designated privacy contact and announced at <a href="https://status.form.coach">status.form.coach</a>. Customers may object within 10 days on data-protection grounds. Removals are notified promptly without an advance window.</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Sub-processor</th>
+          <th>Category</th>
+          <th>Purpose</th>
+          <th>Art. 9?</th>
+          <th>Tier</th>
+          <th>DPA status</th>
+          <th>Certification</th>
+          <th>Data region</th>
+          <th>Notes / compensating control</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">
+      © 2026 FORM &nbsp;·&nbsp; <a href="mailto:privacy@form.coach">privacy@form.coach</a> &nbsp;·&nbsp;
+      <a href="/dpa">DPA template</a> &nbsp;·&nbsp; <a href="https://form.coach/privacy">Privacy policy</a><br/>
+      Tier 1 = Art. 9 special-category health data &nbsp;·&nbsp; Tier 2 = personal data (non-Art. 9) &nbsp;·&nbsp; Tier 3 = independent controller
+    </div>
+    <div class="footer-right">
+      X-List-Hash: sha256:${hashHex.slice(0, 16)}…<br/>
+      List version: ${data.list_version}
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith("/sub-processors")) {
+      return new Response("Not found", { status: 404, headers: SECURITY_HEADERS });
+    }
+
+    const wantsJson = url.searchParams.get("format") === "json";
+
+    const raw = await env.SECURITY_PORTAL_KV.get("sub-processors-v1");
+    if (!raw) {
+      return new Response(
+        JSON.stringify({ error: "Sub-processor list temporarily unavailable" }),
+        {
+          status: 503,
+          headers: {
+            ...SECURITY_HEADERS,
+            "Content-Type": "application/json",
+            "Retry-After": "60",
+          },
+        }
+      );
+    }
+
+    const data: SubProcessorList = JSON.parse(raw);
+
+    // Compute SHA-256 of the raw JSON for ETag and X-List-Hash
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(raw));
+    const hashHex = Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const etag = `"${hashHex.slice(0, 16)}"`;
+
+    // Conditional GET — 304 if ETag matches
+    if (request.headers.get("If-None-Match") === etag) {
+      return new Response(null, {
+        status: 304,
+        headers: {
+          ...SECURITY_HEADERS,
+          ETag: etag,
+          "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+        },
+      });
+    }
+
+    const baseHeaders: Record<string, string> = {
+      ...SECURITY_HEADERS,
+      "Last-Modified": new Date(data.last_updated_at).toUTCString(),
+      ETag: etag,
+      "X-List-Hash": `sha256:${hashHex}`,
+      "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+    };
+
+    if (wantsJson) {
+      return new Response(raw, {
+        status: 200,
+        headers: { ...baseHeaders, "Content-Type": "application/json; charset=utf-8" },
+      });
+    }
+
+    const html = renderHtml(data, hashHex);
+    return new Response(html, {
+      status: 200,
+      headers: { ...baseHeaders, "Content-Type": "text/html; charset=utf-8" },
+    });
+  },
+};
+```
+
+**Design decisions:**
+
+| Decision | Rationale |
+|---|---|
+| KV as single source of truth | List updates without a Pages redeploy; compliance-officer runs one command (§44.5) with no engineer involvement for routine changes |
+| No client-side JavaScript | Fully server-side rendered HTML; satisfies `Content-Security-Policy: default-src 'self'`; eliminates XSS surface on a trust-critical page |
+| SHA-256 `X-List-Hash` | Enterprise procurement tools poll this header to detect list changes without parsing HTML body; Cloudflare Workers `crypto.subtle` (FIPS 140-2 WebCrypto) |
+| ETag conditional GET | Enterprise monitoring scripts send `If-None-Match: <etag>` → receive 304 when list unchanged, reducing bandwidth on polling implementations |
+| 503 on KV miss | Returns error rather than an empty "no sub-processors" page during initial deploy race or KV outage; prevents misleading state from reaching procurement teams |
+| `robots: noindex,nofollow` | Trust center does not need search indexing; reduces attack surface from indexer scraping |
+
+---
+
+### 44.4 Wrangler Configuration Fragment
+
+Add to `apps/security-portal/wrangler.toml`:
+
+```toml
+name            = "form-security-portal"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+# Sub-processor list KV — created once via:
+# wrangler kv:namespace create SECURITY_PORTAL_KV --env production
+[[kv_namespaces]]
+binding  = "SECURITY_PORTAL_KV"
+id       = "[FILL: paste namespace ID returned by kv:namespace create]"
+preview_id = "[FILL: paste preview namespace ID]"
+
+[env.production]
+name  = "form-security-portal"
+
+[env.preview]
+name  = "form-security-portal-preview"
+```
+
+**DNS requirement (add to Cloudflare zone `form.coach`):**
+
+```
+Type: CNAME
+Name: security
+Target: form-security-portal.pages.dev
+Proxy: Proxied (orange cloud)
+```
+
+**`_headers` file** — `apps/security-portal/public/_headers`:
+
+```
+/sub-processors
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+```
+
+The `Content-Security-Policy` and `X-List-Hash` / `ETag` / `Last-Modified` / `Cache-Control` headers are set by the Worker at runtime and do not appear in `_headers` (which applies only to static assets).
+
+---
+
+### 44.5 KV Population Sequence
+
+Three commands executed in order by `compliance-officer`. **Prerequisites:** Wrangler authenticated (`wrangler whoami`), KV namespace ID filled in `wrangler.toml`, Node ≥ 18 for `sha256sum` / `openssl`.
+
+**Step 1 — Create or update the payload file**
+
+Copy the JSON from §44.2 to `compliance/p1/sub-processor-kv-payload.json`. For updates: increment `list_version`, set `last_updated_at` to the current date (UTC ISO 8601), set `git_commit` to the short hash of the commit that changed the payload file. Do not edit the payload during deployment — commit the change first, then deploy.
+
+**Step 2 — Populate KV**
+
+```bash
+export KV_NS_ID="[FILL: namespace ID from wrangler.toml]"
+
+wrangler kv:key put \
+  --namespace-id="$KV_NS_ID" \
+  --env production \
+  "sub-processors-v1" \
+  "$(cat compliance/p1/sub-processor-kv-payload.json)"
+```
+
+**Step 3 — Verify and file evidence (CC9-E-001)**
+
+```bash
+# 1. Confirm the page is live and security headers are present
+curl -si https://security.form.coach/sub-processors \
+  | grep -E "^HTTP|^X-List-Hash|^Last-Modified|^ETag|^Cache-Control"
+
+# 2. Confirm JSON endpoint returns parseable data
+curl -s "https://security.form.coach/sub-processors?format=json" \
+  | python3 -m json.tool \
+  | head -10
+
+# 3. Confirm list_version matches what you wrote
+curl -s "https://security.form.coach/sub-processors?format=json" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('list_version:', d['list_version'], '| processors:', len(d['processors']))"
+```
+
+Take a **full-page screenshot** of `https://security.form.coach/sub-processors` in a browser (showing the table with all 8 vendors visible) and file as:
+```
+compliance/cc9/sub-processor-page-YYYY-MM.png
+```
+This file is evidence artefact CC9-E-001 (§44.8). Re-capture quarterly and on every list_version increment.
+
+---
+
+### 44.6 Staleness Management
+
+| Trigger | Action | SLA |
+|---|---|---|
+| New sub-processor (30-day advance) | Add to KV payload with `dpa_status: "in_progress"`; run Step 2-3 of §44.5 | Before 30-day notice is sent to enterprise tenants — the list must show the pending addition during the notice window |
+| Sub-processor DPA executed (e.g., SP-06 Sentry) | Update `dpa_status` from `"in_progress"` to `"signed"`; remove `dpa_target_date`; run Step 2-3 | Within 2 business days of DPA countersignature |
+| Sub-processor removal | Remove from payload; run Step 2-3 | Same day as removal decision |
+| Annual Q1 review | Confirm all `last_reviewed_at` fields updated to current year; run Step 2-3 if any field changed | January, per compliance calendar §15 |
+| Staleness check | compliance calendar monthly entry: `curl -s "https://security.form.coach/sub-processors?format=json" \| python3 -c "import sys,json,datetime; d=json.load(sys.stdin); age=(datetime.datetime.utcnow()-datetime.datetime.fromisoformat(d['last_updated_at'].replace('Z',''))).days; print(f'Age: {age}d'); exit(1 if age>395 else 0)"` — if exit 1, run Step 2-3 | Monthly |
+
+---
+
+### 44.7 DEC-030 HMAC-Chained Audit Events
+
+Two event types for trust center state transitions. Both are privacy-safe (no user PII, no health data, no coaching content) and are emitted by `compliance-officer` via the manual SQL path during the pre-automation phase (§43.8 DEC-030 emission pattern applies).
+
+| Event type | Severity | Retention | When emitted | Key payload fields |
+|---|---|---|---|---|
+| `trust_center.sub_processor_list_deployed` | STANDARD | 7 years | Once — on initial Worker deploy closing CC9-GAP-007 | `list_version` (=1), `git_commit`, `kv_namespace_id`, `deployed_by` (="compliance-officer") |
+| `trust_center.sub_processor_list_updated` | STANDARD | 7 years | Each subsequent KV write when `list_version` increments | `list_version`, `previous_version`, `git_commit`, `changed_processors` (array of SP-xx IDs), `update_reason`, `updated_by` |
+
+**Manual emission SQL (`trust_center.sub_processor_list_deployed`):**
+
+```sql
+-- Run as form_system role in Supabase SQL editor immediately after Step 3 of §44.5
+-- Fill [FILL: ...] placeholders before executing
+INSERT INTO audit_log_events (
+  event_type, severity, actor_role, entity_type, entity_id, metadata, hmac
+) VALUES (
+  'trust_center.sub_processor_list_deployed',
+  'STANDARD',
+  'compliance-officer',
+  'trust_center',
+  'sub-processors-v1',
+  jsonb_build_object(
+    'list_version',    1,
+    'git_commit',      '[FILL: short commit hash]',
+    'kv_namespace_id', '[FILL: KV namespace ID]',
+    'deployed_by',     'compliance-officer',
+    'deployed_at',     now()
+  ),
+  '[FILL: HMAC-SHA256 per AUDIT_LOG_SCHEMA.md §3.2 chaining spec]'
+);
+```
+
+**Register event types in `docs/AUDIT_LOG_SCHEMA.md`** — compliance-officer adds both `trust_center.sub_processor_list_deployed` and `trust_center.sub_processor_list_updated` to the action taxonomy table with STANDARD severity, 7-year retention, `entity_type: "trust_center"`.
+
+---
+
+### 44.8 SOC 2 Evidence Mapping
+
+| Criterion | Requirement | How §44 satisfies it | Evidence artefact |
+|---|---|---|---|
+| **CC9.2** | Vendor and third-party risk management communicated to customers and auditors | Public page at `security.form.coach/sub-processors` renders the authoritative vendor registry with DPA status, Art. 9 exposure, tier, and compensating controls visible; `?format=json` endpoint and `X-List-Hash` header enable programmatic monitoring | **CC9-E-001:** Full-page screenshot filed at `compliance/cc9/sub-processor-page-YYYY-MM.png`; re-captured quarterly |
+| **CC2.3** | External communication of security commitments | 30-day notice pledge is visible on the public page; `privacy@form.coach` contact and DPA template link are present; this is the external-facing CC2.3 evidence for sub-processor disclosure obligations | **CC9-E-001** (same screenshot) + `compliance/cc9/sub-processor-hash-YYYY-MM.txt` (curl output showing `X-List-Hash` header value) |
+| **CC9.1** | Risk mitigation strategies for vendor risks are operational | SP-06 (Sentry, DPA in progress) compensating control is publicly disclosed on the page alongside `dpa_target_date`; enterprise customers can see the active mitigation; auditors can confirm the gap is acknowledged and time-bounded | **CC9-E-001** screenshot showing SP-06 row with amber "In progress" badge |
+| **P6.1** | Disclosure of personal data processing to external parties | GDPR Art. 13(1)(e) requires informing data subjects of recipients / categories of recipients; this page constitutes the Art. 13(1)(e) disclosure and must be linked from the privacy policy before the observation period begins | `compliance/p1/sub-processor-register.md §12` — PRE-02 closure record; link in privacy policy (P-GAP-001 prerequisite) |
+
+**Gap closure conditions:**
+
+| Gap | Current state | Closes to 🟢 when |
+|---|---|---|
+| CC9-GAP-007 | 🟡 AUTHORED (this section) | CC9-E-001 screenshot filed; `trust_center.sub_processor_list_deployed` DEC-030 event in audit chain |
+| CC2-GAP-003 | 🟡 AUTHORED (this section) | Same as CC9-GAP-007 — both gaps close on the same deploy event |
+
+**P0 count after §44: 4 → 2.** CC9-GAP-007 and CC2-GAP-003 advance from 🔴 to 🟡 AUTHORED. Closing to 🟢 requires Step 4-6 of §44.9 (operational, not documentation).
+
+---
+
+### 44.9 Implementation Checklist
+
+Execute in order. Steps 1–6 are P0 and must complete before the observation period opens (Month O-4).
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create KV namespace: `wrangler kv:namespace create SECURITY_PORTAL_KV --env production` and `--env preview`; fill namespace IDs into `apps/security-portal/wrangler.toml` | devops-lead | **P0** | M4 |
+| 2 | Create `apps/security-portal/src/sub-processors.ts` with Worker source from §44.3; confirm TypeScript compiles (`tsc --noEmit`) without errors; add to `apps/security-portal/wrangler.toml` entry point | platform-engineer | **P0** | M4 |
+| 3 | Create `compliance/p1/sub-processor-kv-payload.json` with initial payload from §44.2; replace `[FILL: short hash…]` with actual git commit short hash; commit to repo (this sets the `git_commit` field to a verifiable value) | compliance-officer | **P0** | M4 |
+| 4 | Run §44.5 Steps 1–3: populate KV, verify with `curl`, confirm `list_version: 1` and 8 processors returned; take full-page screenshot; file as `compliance/cc9/sub-processor-page-2026-05.png` (CC9-E-001) | devops-lead + compliance-officer | **P0** | M4 |
+| 5 | Emit `trust_center.sub_processor_list_deployed` DEC-030 event via SQL path in §44.7; confirm event visible in audit log viewer in `admin-dashboard.html`; file audit chain excerpt as CC9-E-002 | compliance-officer | **P0** | M4 |
+| 6 | Update §38.4 master gap registry: CC9-GAP-007 → 🟢 Done; CC2-GAP-003 → 🟢 Done; add `compliance/policy-approval-log.csv` row for §44; confirm P0 count updated to 2 in §38 summary | compliance-officer | **P0** | M4 |
+| 7 | Register `trust_center.sub_processor_list_deployed` and `trust_center.sub_processor_list_updated` event types in `docs/AUDIT_LOG_SCHEMA.md` action taxonomy; add STANDARD severity + 7yr retention + `entity_type: "trust_center"` | security-engineer | **P1** | M4 |
+| 8 | Add `security.form.coach/sub-processors` link to `enterprise.html` security section, enterprise onboarding email template, and `pricing-enterprise.html` compliance table | customer-success + platform-engineer | **P1** | M4 |
+
+---
+
+*v1.6 additions (2026-05-30): §44 Sub-Processor List Worker — Complete Implementation — CC9.1/CC9.2/CC2.3 Auditor Exhibit. Closes the documentation-to-implementation gap that remained after §39 (Security Trust Center Architecture, 2026-05-29) defined the Worker design without delivering deployable code. Full TypeScript Worker source (`apps/security-portal/src/sub-processors.ts`): KVNamespace binding; HTML and JSON dual content-type response; SHA-256 `X-List-Hash` + ETag conditional GET for enterprise procurement tool compatibility; security response headers (HSTS, CSP, X-Frame-Options, Permissions-Policy, Referrer-Policy); 503 on KV miss (prevents misleading empty-state); server-side rendering with no client JavaScript; Fraunces/Manrope/JetBrains Mono brand typography; 30-day notice pledge banner. KV payload `sub-processors-v1`: all eight vendors from §28.3.1 pre-populated (SP-01 Anthropic Tier 1 Art. 9; SP-02 Supabase Tier 1 Art. 9; SP-03 Cloudflare Tier 2; SP-04 ElevenLabs Tier 2; SP-05 PostHog Tier 2 EU; SP-06 Sentry Tier 2 DPA in progress with compensating_control field; SP-07 Apple Tier 3 independent; SP-08 Google Tier 3 independent); `list_version`, `git_commit`, `notice_pledge_days`, `contact`, `dpa_template_url` fields specified. Wrangler configuration fragment and DNS CNAME requirement documented. Three-step KV population sequence with verification curl commands. Staleness management table (six trigger-action pairs). Two DEC-030 HMAC-chained events: `trust_center.sub_processor_list_deployed` (STANDARD, 7yr — one-time on initial deploy); `trust_center.sub_processor_list_updated` (STANDARD, 7yr — each subsequent KV write with `changed_processors[]` array). Manual emission SQL provided. SOC 2 evidence mapping: CC9.2 (public vendor registry with DPA status and Art. 9 exposure), CC2.3 (30-day pledge public and machine-verifiable via X-List-Hash), CC9.1 (SP-06 compensating control publicly disclosed), P6.1 (GDPR Art. 13(1)(e) disclosure). Two evidence artefacts: CC9-E-001 (full-page screenshot quarterly) and CC9-E-002 (DEC-030 chain excerpt). Gap advances: CC9-GAP-007 🔴 → 🟡 AUTHORED; CC2-GAP-003 🔴 → 🟡 AUTHORED. P0 count: 4 → 2. Two remaining P0 gaps: CC6-GAP-001 (quarterly access review execution — §23 procedure complete, requires operational execution) and P-GAP-001 (privacy policy — blocked on outside counsel review). 8-item implementation checklist (6× P0 M4, 2× P1 M4).*
+
+---
+
 *v1.5 additions (2026-05-30): §43 Credential & Access Hardening Policy — CC6.1/CC6.2/CC6.3/CC6.6/CC6.8 Auditor Exhibit. Binding implementation specifications for six P0 CC6 gaps simultaneously advanced from 🔴 Open to 🟡 AUTHORED. Internal tooling MFA: GitHub org "Require 2FA for all members" setting specification with compensating control narrative for solo-founder phase (CC6-GAP-001); Cloudflare account-level MFA enforcement with blast-radius rationale for Workers Secrets surface (DEC-030 HMAC signing key, Supabase service role key, Anthropic key, ElevenLabs key) (CC6-GAP-002); permitted 2FA methods table — TOTP required, YubiKey recommended, SMS explicitly rejected per NIST SP 800-63B. Application-layer TOTP: tenant admin / owner TOTP enrolment gate via Supabase Auth mfa_factors; 7-day grace period with progressive warning banner and per-invocation `access.tenant_admin_totp_waiver_used` DEC-030 event; full Cloudflare Worker middleware pseudocode; SSO IdP delegation exemption requiring three qualifying conditions (sso_enabled + qualifying auth context class + written IT admin attestation — PasswordProtectedTransport explicitly rejected) (CC6-GAP-003). SCIM DELETE deprovisioning: `DELETE /scim/v2/Users/{userId}` full endpoint spec — atomic SQL transaction (soft-delete + seat release + Supabase admin.signOut + DEC-030 emit), idempotency requirement (204 on re-delete), 409 last-owner guard, GDPR Art. 17 soft-delete justification (PII overwritten on erasure; audit-relevant metadata retained), SCIM Groups cascade spec with per-user deprovision events (CC6-GAP-004). CI dependency audit: `npm audit --audit-level=critical` GitHub Actions job; Dependabot `.github/dependabot.yml` for npm + GitHub Actions; auditable exception bypass `[skip-audit-critical: RISK-XXXXXX]` with compliance-officer + founder co-approval gate (CC6-GAP-005). Secret scanning: `git-secrets` pre-commit hook installation with canonical `.github/git-secrets-patterns` file (six patterns: Anthropic sk-ant- prefix, Supabase JWT, Stripe live, ElevenLabs xi-api-key, Cloudflare Bearer token, generic 40-char hex HMAC key); CI `git secrets --scan-history` step; GHAS push protection as secondary control (CC6-GAP-006). CSP/ESLint (P1): full Content-Security-Policy string with report-uri; Cloudflare Transform Rule configuration; ESLint no-eval + no-new-func + no-implied-eval with --max-warnings 0 CI gate; unsafe-inline styles acknowledged as temporary with nonce-based roadmap (CC6-GAP-007). Six new DEC-030 HMAC-chained events: `auth.scim_user_deprovisioned` (HIGH, 7yr — closes AUDIT_LOG_SCHEMA.md auth lifecycle gap: sso_provisioned had no symmetric deprovision counterpart), `access.mfa_org_policy_enabled` (HIGH, 7yr), `access.tenant_admin_totp_enrolled` (STANDARD, 7yr), `access.tenant_admin_totp_waiver_used` (HIGH, 7yr), `ci.secret_scan_blocked` (HIGH, 7yr — pattern name only, matched value never logged), `ci.dependency_audit_blocked` (MEDIUM, 7yr — exception_risk_id field for bypass audit trail). SOC 2 evidence mapping: CC6.1 (MFA at two admin surfaces + TOTP enrolment gate), CC6.2 (TOTP prerequisite before admin role + bounded lifecycle via SCIM DELETE), CC6.3 (SCIM DELETE atomic offboarding closes SLA evidence gap), CC6.6 (secret scanning pre-commit + CI), CC6.8 (npm audit + Dependabot + no-eval + CSP). Evidence package: six artefacts CC6-E-001a through CC6-E-006 with file paths, content specs, quarterly capture cadence, 7-year retention. 14-item implementation checklist (8× P0 pre-launch/pre-hire/M4, 5× P1 M3, 1× P2 M5). Gap advances: CC6-GAP-001/002/003/004/005/006 🔴 → 🟡 AUTHORED; CC6-GAP-007 (P1) 🔴 → 🟡 AUTHORED. P0 count: 10 → 4. Four remaining P0 gaps: CC6-GAP-001 (access review execution outstanding), P-GAP-001 (privacy policy counsel-review blocked), PRE-25 (Vanta/Drata — audit firm selection), CC9-GAP-007/CC2-GAP-003 (sub-processor Wrangler deploy outstanding).*
 
 ---

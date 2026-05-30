@@ -6,6 +6,16 @@
 
 ---
 
+## [1.22.1] — 2026-05-30
+
+### Added
+- `docs/SOC2_READINESS.md §44` — Sub-Processor List Worker: complete Cloudflare Workers (TypeScript) implementation for GDPR Art. 13(1)(e) transparency endpoint (`security.form.coach/sub-processors`). Covers KV payload schema for all 8 sub-processors (SP-01 Anthropic → SP-08 Google), Worker source with SHA-256 ETag + `X-List-Hash` header, conditional GET (304), JSON + HTML dual-format response, `Cache-Control: public, max-age=3600, stale-while-revalidate=86400`, Wrangler config fragment, DNS CNAME, staleness management table (6 trigger–action pairs), DEC-030 HMAC-chained audit events (`trust_center.sub_processor_list_deployed` / `_updated`), SOC 2 evidence mapping (CC9.2, CC2.3, CC9.1, P6.1), and 8-item implementation checklist. Advances CC9-GAP-007 and CC2-GAP-003 from 🔴 Open → 🟡 AUTHORED; P0 gap count 4 → 2.
+
+### Changed
+- `VERSION` → 1.22.1
+
+---
+
 ## [1.22.0] — 2026-05-30
 
 ### Added
