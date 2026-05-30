@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 156 cards (156 content posts authored), category filter, newsletter CTA | v1.29.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 157 cards (157 content posts authored), category filter, newsletter CTA | v1.32.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -241,6 +241,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-154-telomeres-training-geroprotection.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-155-concurrent-training-interference-ampk-mtorc1.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-156-glymphatic-system-sleep-training.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-157-myokines-muscle-endocrine-organ.md | Blog | draft · clinical-safety NOT REQUIRED |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
