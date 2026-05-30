@@ -6,6 +6,19 @@
 
 ---
 
+## [1.25.0] — 2026-05-30
+
+### Added
+- `content/post-152-systemic-inflammation-anti-inflammatory-adaptation.md` — Запалення і тренінг: м'яз як протизапальний орган. Гостра vs хронічна запальна відповідь; м'язовий IL-6/IL-10/IL-1Ra петля (Pedersen & Febbraio 2008 Physiol Rev); M1→M2 макрофагний перехід (Arnold 2007 J Exp Med); антиоксидантний парадокс Ristow (2009 PNAS); вагусний тонус і нейрозапалення; дозова залежність. 13 хв читання. clinical-safety NOT REQUIRED.
+- `blog.html` — картка Post 152 (152 cards total).
+- `README.md` — post-149/150/151 [x] + post-152 [x] + roadmap post-153/154.
+
+### Changed
+- `STATUS.md` — blog.html row: 148 → 152 cards · v1.25.0
+- `VERSION` → 1.25.0
+
+---
+
 ## [1.24.0] — 2026-05-30
 
 ### Added
