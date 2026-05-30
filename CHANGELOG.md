@@ -6,6 +6,18 @@
 
 ---
 
+## [1.28.0] — 2026-05-30
+
+### Added
+- `docs/DATA_MODEL.md §24` — Subscription, Billing & Revenue Schema. Closes the monetization data-layer gap. Two-track billing architecture: consumer via Apple StoreKit 2 / Google Play RTDN webhooks, enterprise via Stripe invoicing with per-seat pricing; `user_subscriptions` is the single source of truth for access control, never App Store/Stripe directly. Four ENUMs (`plan_tier_enum`, `subscription_status_enum`, `billing_channel_enum`, `subscription_event_type_enum`). Tables: `user_subscriptions` (18 columns, 6 CHECK constraints, partial unique index `uq_user_one_active_subscription`), `subscription_events` (append-only lifecycle log, idempotency index on `external_event_id`, no UPDATE/DELETE RLS for any non-admin role), `enterprise_seat_allocations` (period-based contracted seats with `effective_to IS NULL` = current), `enterprise_seat_assignments` (per-user seat with `revoked_at`, `assigned_by` audit trail), `tenant_seat_utilization` view. Webhook integration: Apple JWS 2-hop cert chain verification (6h replay window); Google Play Pub/Sub + Developer API v3 verify; Stripe HMAC-SHA256 with seat expansion path (close old allocation, insert new). 13-transition trial/grace state machine. GDPR Art. 17 vs. 7-year fiscal retention resolved via pseudonymization (Ukrainian Tax Code Art. 44, EU VAT Directive 2006/112/EC Art. 245). 12 DEC-030 HMAC-chained events (5× STANDARD, 7× HIGH, all 7yr). RLS: `form_api` own-row SELECT only; billing Worker (`form_system`) is sole INSERT/UPDATE path; `tenant_admin` scoped to own tenant for seat management. SOC 2: CC6.2 (plan tier = authz gate), CC6.3 (seat revocation), CC8.1 (single write path), CC7.2 (payment_failed SIEM signal), A1.1, P5.0/P8.0 (GDPR billing erasure). 5 open questions (OQ-BILL-01 through OQ-BILL-05). 12-item implementation checklist.
+- `content/post-155-concurrent-training-interference-ampk-mtorc1.md` — "Ефект інтерференції в суміщеному тренінгу: молекулярний антагонізм AMPK/mTORC1." Sports-science series post. Covers Hickson (1980) original interference effect observation, AMPK/mTORC1 molecular antagonism (two inhibitory routes: AMPK → TSC2/Rheb suppression via Inoki et al. 2003; AMPK → direct Raptor phosphorylation via Gwinn et al. 2008), Atherton (2005) and Coffey (2006) acute signaling evidence with explicit surrogate-vs-adaptation limitations noted, Wilson (2012) and Schumann (2022) meta-analyses, session ordering effect (endurance-before-strength blunts mTOR peak more than reverse), Type II fiber preferential sensitivity, dose-dependency (minimal interference on separate days), practical framework. `clinical_safety_note: NOT REQUIRED`.
+
+### Changed
+- `docs/DATA_MODEL.md` header — v1.3 → v1.4; TOC updated to include §24.
+- `VERSION` → 1.28.0
+
+---
+
 ## [1.27.1] — 2026-05-30
 
 ### Added

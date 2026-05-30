@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.3
+# FORM · Multi-Tenant Data Model v1.4
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -31,6 +31,7 @@
 21. [AI Coaching Session & Memory Schema](#21-ai-coaching-session--memory-schema)
 22. [Gamification, Streak & Achievement Schema](#22-gamification-streak--achievement-schema)
 23. [Exercise Library & Program Schema](#23-exercise-library--program-schema)
+24. [Subscription, Billing & Revenue Schema](#24-subscription-billing--revenue-schema)
 
 ---
 
@@ -8316,3 +8317,757 @@ All program lifecycle mutations must emit HMAC-chained audit events in the same 
 *v1.1 · травень 2026 · owner: enterprise-architect + compliance-officer + security-engineer*
 
 *v1.1 additions: §20 White-Label Tenant Branding Schema — closes the §2.7 stub gap across all cross-references (§15 `cv.client_side_enabled`, §18 `webhook.email_in_payloads`, SSO_SCIM_IMPLEMENTATION.md `security.ip_allowlist_enabled` and `sso.staging_env_enabled`). Two-table design: `feature_flag_registry` (canonical allowlist, form_admin-only write, FK-enforced dotted namespace, `flag_key_namespace` CHECK constraint) and `tenant_feature_flags` (production per-tenant rows with FK to registry, `compliance_approval_ref`, `enabled_at`, RLS read-only for form_api and form_system). Seed data for 14 canonical flags across Starter / Growth / Enterprise tiers with one compliance-gated flag (`webhook.email_in_payloads`). Tier entitlement matrix (auto / avail / — / gate). TypeScript `assertFeatureEnabled()` in `src/workers/feature-flags/assert-feature-enabled.ts`: Cloudflare KV 30-second cache, tier rank comparison against TIER_ORDER map, compliance gate check, fail-closed on any DB or KV error (throws 403). Four DEC-030 HMAC-chained audit events: `feature_flag.enabled` (STANDARD, 7yr), `feature_flag.disabled` (STANDARD, 7yr), `feature_flag.registry_updated` (HIGH, 7yr), `feature_flag.compliance_gate_bypassed` (CRITICAL, 10yr — auto PagerDuty P1, always `blocked: true`). Compliance gate protocol: DPA authorisation → DECISION_LOG PR merge → compliance_approval_ref populated → form_admin enables via internal API → DEC-030 event with approval reference. §19.9 migration script: 14 flag_name-to-flag_key renames, RAISE EXCEPTION abort on unrecognised flags, FK constraint addition, `enabled_at` backfill from `updated_at`, `compliance_approval_ref` column addition, post-migration validation queries (zero unrecognised flags; zero enabled gated flags without approval ref). OQ-FLAG-01: tier downgrade auto-disable decision (preferred: contract lifecycle hook emitting feature_flag.disabled events, M5). OQ-FLAG-02: flag deprecation 90-day sunset policy with pg_cron soft-delete and admin dashboard banner (M6). SOC 2 mapping: CC6.1 (form_admin-only write, tier entitlement gates), CC6.2 (tier check = authorisation gate, plan not self-elevatable), CC8.1 (all mutations HMAC-chained in-transaction), CC9.2 (compliance_approval_ref persisted 7yr, auditor-traceable to DPA clause). 12-item implementation checklist (8× P0 M3, 1× P1 M4, 1× P1 M5, 1× P2 M6).*
+
+---
+
+## 24. Subscription, Billing & Revenue Schema
+
+This section defines the complete data model for subscription lifecycle management, billing channel integration, enterprise seat management, and revenue-related compliance. It closes the schema gap for plan entitlement enforcement referenced in §19 (`assertFeatureEnabled()` tier checks), §16 (enterprise contract lifecycle), §17 (admin adoption metrics), and `docs/TECHNICAL.md` (billing architecture). Cross-references: §19 (`plan_tier` entitlement gate), §16 (`enterprise_contracts` — contract precedes seat allocation), §12 (GDPR Art. 17 erasure), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/SSO_SCIM_IMPLEMENTATION.md` §19 (SCIM provisioning integration).
+
+---
+
+### 24.1 Overview & Design Principles
+
+**Two-track billing architecture.** FORM operates two structurally distinct billing channels that must never be conflated:
+
+- **Consumer track** — individual users subscribe via iOS App Store (StoreKit 2) or Google Play (Billing Library v6). Billing is managed entirely by the platform; FORM receives server-side notifications. No Stripe involvement. No tenant association.
+- **Enterprise track** — organizations are invoiced via Stripe. A `tenants` row (§2.1) must exist before any enterprise subscription is created. Seats are contracted, allocated via `enterprise_seat_allocations`, and assigned to individual users via `enterprise_seat_assignments`.
+
+**Single source of truth: `user_subscriptions`.** App Store, Google Play, and Stripe are authoritative for payment events, but they are not authoritative for FORM's access-control decisions. The `user_subscriptions` table is the canonical record of a user's current plan tier, status, and period. The billing Workers translate external events into mutations on this table. Any feature entitlement decision (§19 `assertFeatureEnabled()`) reads from `user_subscriptions`, never from an external API call.
+
+**Revenue recognition principle.** Revenue is recognized on service delivery — across the subscription period — not on receipt of payment. A payment received on 1 June for a June–July period contributes to MRR evenly over those two months. This aligns with the COST_MODEL reference in §22 and enables accurate accrual-basis reporting. The `current_period_start` / `current_period_end` columns encode the service delivery window; `subscription_events.occurred_at` encodes when the payment event was received. These are distinct and both must be preserved.
+
+**Monetary amounts in minor units.** All `_usd_cents` columns store integers in the minor currency unit (cents for USD, kopecks for UAH). No floating-point money columns. Currency is always stored alongside the amount per ISO 4217. Display formatting is a presentation-layer concern.
+
+**Billing Worker is the only mutation path.** No application `form_api` role may UPDATE `user_subscriptions` directly. All writes go through the billing Cloudflare Worker running as `form_system`. This is enforced via RLS (§24.11) and verified by the HMAC chain (§24.12). The reasoning: preventing any client-side or API-layer code from elevating a user's plan without a verified payment event.
+
+---
+
+### 24.2 Plan Tier Definitions
+
+| Tier | `monthly_price_usd_cents` | `annual_price_usd_cents` | Notable Feature Gates | Billing Channel |
+|---|---|---|---|---|
+| `free` | 0 | 0 | Core logging, 3 AI coaching messages/month, no CV, no programs | `none` |
+| `growth` | 1500 | 15000 | Unlimited AI coaching, CV form analysis, program generation, wearable sync | `app_store_ios` or `google_play` |
+| `elite` | 2500 | 25000 | All Growth features + priority Victor model, advanced analytics, export | `app_store_ios` or `google_play` |
+| `enterprise` | custom | custom | All Elite features + SSO/SCIM, white-label, admin dashboard, seat management, SLA | `stripe` |
+
+Notes:
+- Annual pricing for Growth ($150/yr) and Elite ($250/yr) represents a ~17% and ~17% discount respectively versus monthly.
+- Enterprise pricing is per-seat, custom-negotiated, stored in `enterprise_seat_allocations.price_per_seat_usd_cents`. The `user_subscriptions.price_usd_cents` for enterprise rows stores the total contract value per billing period, not per-seat.
+- `free` tier has `billing_channel = 'none'` — no payment method on file, no external subscription ID.
+- Promotional or grandfathered pricing is accommodated by `user_subscriptions.price_usd_cents` differing from the plan default above.
+
+---
+
+### 24.3 `user_subscriptions` Table DDL
+
+```sql
+CREATE TYPE plan_tier_enum AS ENUM (
+  'free',
+  'growth',
+  'elite',
+  'enterprise'
+);
+
+CREATE TYPE subscription_status_enum AS ENUM (
+  'trialing',    -- within free trial window; access at trial tier granted
+  'active',      -- paid and current
+  'grace',       -- payment failed; 7-day grace period before access revocation
+  'past_due',    -- grace expired; access revoked; awaiting payment (reserved for future dunning)
+  'cancelled',   -- user-initiated cancel; access continues until current_period_end
+  'expired'      -- period ended with no renewal; access revoked
+);
+
+CREATE TYPE billing_channel_enum AS ENUM (
+  'none',           -- free tier; no payment provider
+  'app_store_ios',  -- Apple App Store / StoreKit 2
+  'google_play',    -- Google Play Billing Library
+  'stripe'          -- Stripe invoicing (enterprise only)
+);
+
+CREATE TABLE user_subscriptions (
+  id                        UUID                      NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id                   UUID                      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id                 UUID                      REFERENCES tenants(id),
+  -- NULL for consumer subscriptions; set for enterprise (enforced by chk_enterprise_has_tenant)
+
+  plan_tier                 plan_tier_enum            NOT NULL DEFAULT 'free',
+  status                    subscription_status_enum  NOT NULL,
+  billing_channel           billing_channel_enum      NOT NULL,
+
+  current_period_start      TIMESTAMPTZ,
+  current_period_end        TIMESTAMPTZ,
+  trial_ends_at             TIMESTAMPTZ,
+  -- NULL unless status = 'trialing'; enforced by chk_trial_coherent
+  grace_ends_at             TIMESTAMPTZ,
+  -- NULL unless status = 'grace'; grace_ends_at = payment_failed_at + INTERVAL '7 days'
+
+  external_subscription_id  TEXT,
+  -- App Store: original_transaction_id (stable across renewals)
+  -- Google Play: purchaseToken (changes on renewal — use linkedPurchaseToken chain)
+  -- Stripe: subscription ID (sub_...)
+  external_customer_id      TEXT,
+  -- Stripe: customer ID (cus_...); NULL for App Store / Play (platform manages customer identity)
+
+  price_usd_cents           INTEGER,
+  -- Actual price for current period. May differ from plan default (grandfathering, promotions).
+  -- NULL for free tier.
+  currency                  CHAR(3)                   NOT NULL DEFAULT 'USD',
+
+  cancel_at_period_end      BOOLEAN                   NOT NULL DEFAULT FALSE,
+  -- TRUE = user has requested cancellation; access continues until current_period_end
+  cancelled_at              TIMESTAMPTZ,
+  -- Timestamp of cancellation request (not the access end date)
+
+  created_at                TIMESTAMPTZ               NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ               NOT NULL DEFAULT now(),
+
+  -- One active subscription per user (partial unique index)
+  CONSTRAINT chk_enterprise_has_tenant CHECK (
+    billing_channel <> 'stripe' OR tenant_id IS NOT NULL
+  ),
+  CONSTRAINT chk_trial_coherent CHECK (
+    status <> 'trialing' OR trial_ends_at IS NOT NULL
+  ),
+  CONSTRAINT chk_grace_coherent CHECK (
+    status <> 'grace' OR grace_ends_at IS NOT NULL
+  ),
+  CONSTRAINT chk_free_no_price CHECK (
+    billing_channel <> 'none' OR price_usd_cents IS NULL
+  )
+);
+
+-- At most one non-expired subscription per user.
+-- Expired rows are retained for financial audit trail.
+CREATE UNIQUE INDEX uq_user_one_active_subscription
+  ON user_subscriptions (user_id)
+  WHERE status <> 'expired';
+
+-- Fast lookup by external ID (webhook correlation).
+CREATE INDEX idx_user_subscriptions_external_id
+  ON user_subscriptions (external_subscription_id)
+  WHERE external_subscription_id IS NOT NULL;
+
+-- Renewal sweep: find subscriptions approaching period end.
+CREATE INDEX idx_user_subscriptions_renewal_sweep
+  ON user_subscriptions (current_period_end)
+  WHERE status IN ('active', 'grace');
+
+-- Tenant seat management lookup.
+CREATE INDEX idx_user_subscriptions_tenant
+  ON user_subscriptions (tenant_id)
+  WHERE tenant_id IS NOT NULL;
+
+CREATE TRIGGER update_user_subscriptions_updated_at
+  BEFORE UPDATE ON user_subscriptions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+```
+
+**Design note on `external_subscription_id` for Google Play.** Google Play's `purchaseToken` is not stable across renewals — each renewal issues a new token. However, the renewed purchase carries a `linkedPurchaseToken` pointing to the predecessor. The billing Worker must follow this chain when correlating an RTDN notification to an existing `user_subscriptions` row. The `external_subscription_id` column stores the *original* (first-ever) purchase token, and the Worker resolves renewal chains back to it. This mirrors the App Store's `original_transaction_id` stability guarantee.
+
+---
+
+### 24.4 `subscription_events` Table DDL
+
+Append-only lifecycle log. Every state transition in `user_subscriptions` produces a row here in the same database transaction. No UPDATE or DELETE is permitted by any non-admin role.
+
+```sql
+CREATE TYPE subscription_event_type_enum AS ENUM (
+  'created',          -- new subscription row inserted (billing_channel set, status = trialing or active)
+  'activated',        -- status → active (from trialing or grace)
+  'renewed',          -- active period extended; new current_period_start/end set
+  'upgraded',         -- plan_tier increased (e.g. growth → elite, or seat count increased)
+  'downgraded',       -- plan_tier decreased (cancel_at_period_end path or immediate)
+  'payment_failed',   -- external payment event failed; grace period may start
+  'grace_started',    -- status → grace; grace_ends_at computed
+  'cancelled',        -- cancel_at_period_end = TRUE set; access continues until period end
+  'expired',          -- status → expired; access revoked
+  'refunded',         -- partial or full refund issued; amount_usd_cents = refunded amount
+  'trial_started',    -- status = trialing; trial_ends_at set
+  'trial_converted',  -- trial → active; payment method confirmed
+  'trial_expired',    -- trial_ends_at passed without payment; status → expired
+  'reactivated'       -- expired → active (new subscription; previous row kept as expired)
+);
+
+CREATE TABLE subscription_events (
+  id                    UUID                             NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id               UUID                             NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  subscription_id       UUID                             NOT NULL REFERENCES user_subscriptions(id),
+
+  event_type            subscription_event_type_enum     NOT NULL,
+  previous_plan_tier    plan_tier_enum,
+  -- NULL for events where plan tier does not change (e.g. renewed, payment_failed)
+  new_plan_tier         plan_tier_enum,
+
+  amount_usd_cents      INTEGER,
+  -- Amount charged or refunded in this event. NULL for non-payment events.
+  -- For 'refunded': negative value is NOT used; store positive refunded amount.
+  currency              CHAR(3)                          NOT NULL DEFAULT 'USD',
+
+  external_event_id     TEXT,
+  -- App Store: signed transaction UUID from JWS payload
+  -- Google Play: RTDN notification UUID
+  -- Stripe: event ID (evt_...)
+  -- UNIQUE index below enforces idempotency
+  external_invoice_id   TEXT,
+  -- Stripe: invoice ID (in_...). NULL for App Store / Play.
+
+  failure_reason        TEXT,
+  -- Human-readable payment failure code. No card numbers, no CVV, no PAN fragments.
+  -- Populated only for event_type IN ('payment_failed').
+  -- Nullified on Art. 17 erasure (may contain free-text PII).
+
+  occurred_at           TIMESTAMPTZ                      NOT NULL DEFAULT now(),
+  -- When the event actually occurred (from external notification timestamp where available).
+  created_at            TIMESTAMPTZ                      NOT NULL DEFAULT now()
+  -- When this row was inserted (may lag occurred_at by webhook delivery latency).
+);
+
+-- Idempotency: prevent duplicate processing of the same external notification.
+CREATE UNIQUE INDEX uq_subscription_events_external_id
+  ON subscription_events (external_event_id)
+  WHERE external_event_id IS NOT NULL;
+
+CREATE INDEX idx_subscription_events_subscription
+  ON subscription_events (subscription_id, occurred_at DESC);
+
+CREATE INDEX idx_subscription_events_user_type
+  ON subscription_events (user_id, event_type);
+```
+
+**Append-only enforcement via RLS** (see §24.11). The `form_api` role has SELECT only; `form_system` has INSERT only. No UPDATE or DELETE is granted to any non-admin role. The HMAC chain (§24.12) provides independent tamper evidence — any attempt to mutate a historical row breaks the chain.
+
+---
+
+### 24.5 Enterprise Seat Management Schema
+
+Enterprise customers contract a fixed seat count. Seat allocation tracks the contracted quantity and price per billing period. Seat assignment tracks which specific users hold a seat at any given time.
+
+#### 24.5.1 `enterprise_seat_allocations`
+
+```sql
+CREATE TABLE enterprise_seat_allocations (
+  id                        UUID         NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id                 UUID         NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  -- RESTRICT: cannot delete a tenant with active allocations
+  subscription_id           UUID         NOT NULL REFERENCES user_subscriptions(id),
+
+  total_seats               INTEGER      NOT NULL CHECK (total_seats >= 1),
+  effective_from            DATE         NOT NULL,
+  effective_to              DATE,
+  -- NULL = this is the current active allocation for the tenant.
+  -- Closed (non-NULL) rows are historical — kept for financial audit.
+
+  price_per_seat_usd_cents  INTEGER      NOT NULL CHECK (price_per_seat_usd_cents >= 0),
+  -- Per-seat price for this allocation period. Zero is valid (free pilot allocation).
+
+  created_at                TIMESTAMPTZ  NOT NULL DEFAULT now(),
+
+  -- Prevent overlapping allocation periods for the same tenant.
+  CONSTRAINT uq_tenant_allocation_period UNIQUE (tenant_id, effective_from)
+);
+
+CREATE INDEX idx_seat_allocations_tenant
+  ON enterprise_seat_allocations (tenant_id)
+  WHERE effective_to IS NULL;
+-- Partial index targets the current (open) allocation only.
+```
+
+**Seat expansion / contraction.** When a contract is amended (seats added or removed), the billing Worker closes the current allocation row (`effective_to = today`) and inserts a new row with the updated `total_seats` and new `effective_from`. This preserves a complete historical record of contracted seat counts for financial reconciliation and SOC 2 evidence.
+
+#### 24.5.2 `enterprise_seat_assignments`
+
+```sql
+CREATE TABLE enterprise_seat_assignments (
+  id             UUID         NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id      UUID         NOT NULL REFERENCES tenants(id),
+  user_id        UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  allocation_id  UUID         NOT NULL REFERENCES enterprise_seat_allocations(id),
+
+  assigned_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  revoked_at     TIMESTAMPTZ,
+  -- NULL = seat is currently active. Non-NULL = seat was revoked.
+
+  assigned_by    UUID         REFERENCES users(id),
+  -- The tenant_admin who performed the assignment. NULL only for SCIM-automated provisioning.
+
+  -- One active seat per user per tenant (partial unique index).
+  CONSTRAINT chk_assignment_tenant_matches CHECK (
+    -- Application layer enforces that user belongs to the named tenant.
+    -- RLS on tenant_id ensures tenant_admin cannot assign seats to foreign-tenant users.
+    tenant_id IS NOT NULL
+  )
+);
+
+-- One active seat assignment per user per tenant.
+CREATE UNIQUE INDEX uq_tenant_user_active_seat
+  ON enterprise_seat_assignments (tenant_id, user_id)
+  WHERE revoked_at IS NULL;
+
+CREATE INDEX idx_seat_assignments_allocation
+  ON enterprise_seat_assignments (allocation_id)
+  WHERE revoked_at IS NULL;
+
+CREATE INDEX idx_seat_assignments_user
+  ON enterprise_seat_assignments (user_id)
+  WHERE revoked_at IS NULL;
+```
+
+#### 24.5.3 `tenant_seat_utilization` View
+
+Materialized view for admin dashboard performance. Refreshed by the billing Worker after any seat assignment or revocation event.
+
+```sql
+CREATE MATERIALIZED VIEW tenant_seat_utilization AS
+SELECT
+  esa.tenant_id,
+  esa.id                                                    AS allocation_id,
+  esa.total_seats,
+  COUNT(ass.id) FILTER (WHERE ass.revoked_at IS NULL)       AS used_seats,
+  esa.total_seats
+    - COUNT(ass.id) FILTER (WHERE ass.revoked_at IS NULL)   AS available_seats,
+  now()                                                     AS refreshed_at
+FROM enterprise_seat_allocations esa
+LEFT JOIN enterprise_seat_assignments ass
+  ON ass.allocation_id = esa.id
+WHERE esa.effective_to IS NULL   -- current allocation only
+GROUP BY esa.tenant_id, esa.id, esa.total_seats;
+
+CREATE UNIQUE INDEX uq_tenant_seat_utilization_tenant
+  ON tenant_seat_utilization (tenant_id);
+```
+
+`REFRESH MATERIALIZED VIEW CONCURRENTLY tenant_seat_utilization` is called by the billing Worker after any seat assignment mutation. The `CONCURRENTLY` option ensures dashboard reads are never blocked during refresh.
+
+---
+
+### 24.6 App Store Server Notifications (StoreKit 2)
+
+**Webhook endpoint:** `POST /api/v1/webhooks/apple` — Cloudflare Worker running as `form_system`.
+
+**Payload verification:**
+1. Apple delivers a signed JWS (JSON Web Signature) payload.
+2. Worker extracts the certificate chain from the JWS header and verifies it chains to Apple's root CA (pinned in Worker secrets, rotated on Apple CA update).
+3. JWS `iat` claim must be within a 6-hour window of `now()` to reject replayed notifications.
+4. Decoded payload type is `responseBodyV2`; inner `data.signedTransactionInfo` and `data.signedRenewalInfo` are separately decoded JWS objects.
+
+**Idempotency:** `subscription_events.external_event_id` stores the Apple-assigned `transactionId` from the signed transaction. The `uq_subscription_events_external_id` unique index causes a constraint violation on duplicate delivery — the Worker catches this and returns HTTP 200 (acknowledged) without double-processing.
+
+**Notification type to `subscription_event_type_enum` mapping:**
+
+| Apple Notification Type | `notificationSubtype` | FORM Event Type |
+|---|---|---|
+| `SUBSCRIBED` | `INITIAL_BUY` | `created`, `activated` |
+| `SUBSCRIBED` | `RESUBSCRIBE` | `reactivated` |
+| `DID_RENEW` | — | `renewed` |
+| `DID_FAIL_TO_RENEW` | `GRACE_PERIOD` | `payment_failed`, `grace_started` |
+| `DID_FAIL_TO_RENEW` | — (no grace) | `payment_failed` |
+| `GRACE_PERIOD_EXPIRED` | — | `expired` |
+| `EXPIRED` | `VOLUNTARY` | `expired` |
+| `EXPIRED` | `BILLING_RETRY` | `expired` |
+| `DID_CHANGE_RENEWAL_STATUS` | `AUTO_RENEW_DISABLED` | `cancelled` |
+| `REFUND` | — | `refunded` |
+| `OFFER_REDEEMED` | — | `activated` (with promotional price in `price_usd_cents`) |
+
+**`original_transaction_id` as stable key.** Every renewed transaction carries the same `originalTransactionId`. The billing Worker stores this as `user_subscriptions.external_subscription_id` on first creation and uses it as the lookup key for all subsequent notifications. The per-renewal `transactionId` is stored in `subscription_events.external_event_id`.
+
+---
+
+### 24.7 Google Play Real-Time Developer Notifications (RTDN)
+
+**Delivery path:** Google Cloud Pub/Sub push subscription → `POST /api/v1/webhooks/google-play` Cloudflare Worker.
+
+**Processing sequence:**
+1. Base64-decode the Pub/Sub `message.data` field to obtain a `DeveloperNotification` proto.
+2. If `subscriptionNotification` is present: extract `purchaseToken` and `notificationType`.
+3. Verify the purchase via Google Play Developer API v3 `purchases.subscriptionsv2.get(packageName, subscriptionId, purchaseToken)`. This is mandatory — Pub/Sub messages are not signed and must be verified against the authoritative Google API.
+4. Map `SubscriptionNotification.notificationType` to `subscription_event_type_enum`.
+5. For renewals: Google issues a new `purchaseToken`. The renewed purchase's `linkedPurchaseToken` field points to the predecessor. Follow the `linkedPurchaseToken` chain to resolve back to the original token stored in `user_subscriptions.external_subscription_id`.
+6. Idempotency: store the Pub/Sub `message.messageId` (or the `orderId` from the verified purchase) as `subscription_events.external_event_id`.
+
+**Notification type mapping:**
+
+| `notificationType` | FORM Event Type |
+|---|---|
+| `SUBSCRIPTION_PURCHASED` (1) | `created`, `activated` |
+| `SUBSCRIPTION_RENEWED` (2) | `renewed` |
+| `SUBSCRIPTION_CANCELED` (3) | `cancelled` |
+| `SUBSCRIPTION_PURCHASED` from `linkedPurchaseToken` path | `reactivated` |
+| `SUBSCRIPTION_ON_HOLD` (5) | `payment_failed`, `grace_started` |
+| `SUBSCRIPTION_IN_GRACE_PERIOD` (6) | `grace_started` |
+| `SUBSCRIPTION_RESTARTED` (7) | `reactivated` |
+| `SUBSCRIPTION_PRICE_CHANGE_CONFIRMED` (8) | `upgraded` or `downgraded` |
+| `SUBSCRIPTION_DEFERRED` (9) | no event (deferred renewal; update `current_period_end`) |
+| `SUBSCRIPTION_PAUSED` (10) | `cancelled` (treat pause as cancel-at-period-end) |
+| `SUBSCRIPTION_EXPIRED` (13) | `expired` |
+| `SUBSCRIPTION_REVOKED` (12) | `expired` (refund-driven revocation) |
+
+---
+
+### 24.8 Stripe Webhook Integration (Enterprise)
+
+**Webhook endpoint:** `POST /api/v1/webhooks/stripe` — Cloudflare Worker running as `form_system`.
+
+**Signature verification:** Stripe-Signature header contains a timestamp (`t=`) and HMAC-SHA256 signatures (`v1=`). Worker recomputes `HMAC-SHA256(webhook_secret, "{timestamp}.{raw_body}")` and compares to the `v1` signature. Timestamp must be within 300 seconds of `now()` to prevent replay. The raw body must be read before any JSON parsing to preserve signature validity.
+
+**Relevant event mapping:**
+
+| Stripe Event | FORM Event Type | Notes |
+|---|---|---|
+| `invoice.payment_succeeded` | `renewed` (or `activated` for first payment) | `invoice.lines.data[].quantity` × `price.unit_amount` = total; store in `amount_usd_cents` |
+| `invoice.payment_failed` | `payment_failed`, `grace_started` | `grace_ends_at = now() + INTERVAL '7 days'`; store `failure_reason` from `last_payment_error.code` |
+| `customer.subscription.updated` | `upgraded` or `downgraded` | Compare `previous_attributes.items` quantity to new `items` quantity |
+| `customer.subscription.deleted` | `cancelled` or `expired` | `cancel_at_period_end = TRUE` → `cancelled`; immediate deletion → `expired` |
+| `invoice.finalized` | no `subscription_events` row | Update `current_period_start` / `current_period_end` on `user_subscriptions` only |
+| `customer.subscription.trial_will_end` | no row (3-day warning) | Trigger push notification via §18 notification queue |
+
+**Seat expansion flow.** When a Stripe subscription quantity increases (e.g. 50 seats → 75 seats):
+1. `customer.subscription.updated` event received; `previous_attributes.items[0].quantity = 50`, `items[0].quantity = 75`.
+2. Billing Worker closes the current `enterprise_seat_allocations` row (`effective_to = today`).
+3. Inserts a new `enterprise_seat_allocations` row with `total_seats = 75`, `effective_from = today`, `price_per_seat_usd_cents` from the Stripe price object.
+4. Emits `billing.seats_expanded` DEC-030 event (payload: `previous_seats`, `new_seats`, `tenant_id`).
+5. Refreshes `tenant_seat_utilization` materialized view.
+
+Seat reduction follows the same pattern; emits `billing.seats_reduced` (HIGH severity — access revocation signal). If `used_seats > new total_seats`, the billing Worker must NOT automatically revoke assignments. It sets a `seat_over_allocation` flag on the tenant record and surfaces an alert in the admin dashboard — the tenant admin must manually choose which assignments to revoke.
+
+---
+
+### 24.9 Trial & Grace Period State Machine
+
+```
+[none / pre-subscription]
+        │
+        ▼ billing Worker: new subscription, trial granted
+  ┌──────────────┐
+  │  trialing    │ ─── trial_ends_at passed, no payment ──────────────────────────────────►  expired
+  └──────────────┘
+        │
+        │ payment processed (trial_converted event)
+        ▼
+  ┌──────────────┐
+  │   active     │ ◄────────────────────────────────────── payment retry succeeded (grace → active)
+  └──────────────┘
+        │                        │                          │
+        │ payment failed         │ user cancels             │ current_period_end passed
+        ▼                        ▼                          ▼
+  ┌──────────────┐         ┌──────────────┐          ┌──────────────┐
+  │    grace     │         │  cancelled   │          │   expired    │
+  │ (7 days)     │         │ (access OK   │          │ (access      │
+  └──────────────┘         │ until end)   │          │  revoked)    │
+        │                  └──────────────┘          └──────────────┘
+        │ grace_ends_at passed                              │
+        ▼                                                   │ user resubscribes
+  ┌──────────────┐                                         │ (new subscription row)
+  │   expired    │                                          ▼
+  └──────────────┘                                   ┌──────────────┐
+                                                      │   active     │
+                                                      │ (reactivated)│
+                                                      └──────────────┘
+```
+
+**Complete state transition table:**
+
+| Current State | Trigger | New State | `subscription_events` Row(s) | `user_subscriptions` Changes |
+|---|---|---|---|---|
+| _(none)_ | New subscription, trial enabled | `trialing` | `trial_started`, `created` | `status = 'trialing'`, `trial_ends_at = now() + interval` |
+| _(none)_ | New subscription, no trial | `active` | `created`, `activated` | `status = 'active'`, `current_period_start/end` set |
+| `trialing` | Payment method confirmed before `trial_ends_at` | `active` | `trial_converted`, `activated` | `status = 'active'`, `trial_ends_at = NULL` |
+| `trialing` | `trial_ends_at` passed, no payment | `expired` | `trial_expired`, `expired` | `status = 'expired'` |
+| `active` | Successful renewal payment | `active` | `renewed` | `current_period_start/end` advanced |
+| `active` | Plan tier change (upgrade) | `active` | `upgraded` | `plan_tier` updated, `price_usd_cents` updated |
+| `active` | Plan tier change (downgrade) | `active` | `downgraded` | `plan_tier` updated, `cancel_at_period_end = TRUE` or immediate |
+| `active` | User requests cancellation | `cancelled` | `cancelled` | `cancel_at_period_end = TRUE`, `cancelled_at = now()` |
+| `active` | Payment fails | `grace` | `payment_failed`, `grace_started` | `status = 'grace'`, `grace_ends_at = now() + 7 days` |
+| `grace` | Payment retry succeeds | `active` | `activated` | `status = 'active'`, `grace_ends_at = NULL` |
+| `grace` | `grace_ends_at` passed | `expired` | `expired` | `status = 'expired'` |
+| `cancelled` | `current_period_end` passed | `expired` | `expired` | `status = 'expired'` |
+| `expired` | User resubscribes | `active` | `created`, `activated` or `trial_started` | New `user_subscriptions` row inserted; old row retained as `expired` |
+
+**Access revocation on expiry.** When `status` transitions to `expired`, the billing Worker must:
+1. Update `user_subscriptions.status = 'expired'` and `updated_at = now()`.
+2. For enterprise rows: does NOT automatically revoke `enterprise_seat_assignments` — that requires tenant admin action to comply with §16 offboarding flow.
+3. Emit `billing.subscription_expired` DEC-030 event (HIGH severity).
+4. Enqueue a notification via §18 queue.
+
+The `form_api` RLS on `user_subscriptions` (§24.11) ensures that an expired user's subsequent API calls yield a subscription row with `status = 'expired'`, which `assertFeatureEnabled()` (§19) treats as equivalent to `free` tier.
+
+---
+
+### 24.10 GDPR Art. 17 vs. Financial Retention Tension
+
+**The conflict.** GDPR Art. 17 grants data subjects the right to erasure of personal data. `subscription_events` and `user_subscriptions` contain `user_id` (a personal data identifier), `amount_usd_cents`, currency, dates, and invoice IDs. However:
+
+- Ukrainian tax law (Tax Code of Ukraine, Art. 44) requires retention of primary financial documents for **1095 days** (3 years) from the reporting period, with extended 7-year retention for VAT records and documents subject to tax audit.
+- EU VAT records requirements (Council Directive 2006/112/EC, Art. 245) mandate retention for a period determined by each Member State, typically 7–10 years.
+- FORM's legal basis for retention is **Art. 17(3)(b)** — processing necessary for compliance with a legal obligation to which the controller is subject.
+
+**Resolution: pseudonymization, not deletion.**
+
+On a valid Art. 17 erasure request, the GDPR erasure Worker (`src/workers/gdpr/erasure.ts`) executes the following billing-specific steps after the standard erasure sequence:
+
+```sql
+-- Step B-1: Pseudonymize user_id in subscription_events
+-- Retain: amount_usd_cents, currency, occurred_at, external_invoice_id, event_type
+-- Erase: user_id identity linkage, failure_reason (may contain free-text PII)
+UPDATE subscription_events
+SET
+  user_id        = '[ERASED-' || encode(
+                     digest(user_id::text || $erasure_salt, 'sha256'), 'hex'
+                   ) || ']',
+  -- Note: user_id column is TEXT after pseudonymization; UUID constraint relaxed via separate
+  -- erased_user_id TEXT column approach — see OQ-BILL-05 (schema evolution note below)
+  failure_reason = NULL
+WHERE user_id = $user_id;
+-- DEC-030: billing.user_erased (HIGH, retention_basis = 'Art17(3)(b)')
+
+-- Step B-2: Soft-delete user_subscriptions (do not hard-delete — financial record)
+UPDATE user_subscriptions
+SET
+  status     = 'expired',
+  updated_at = now()
+WHERE user_id = $user_id
+  AND status <> 'expired';
+-- The user_id in user_subscriptions is also pseudonymized via the same mechanism.
+-- external_customer_id (Stripe cus_...) is retained — it is not personal data per se
+-- but links to Stripe's own records. Legal review required before nulling (OQ-BILL-03 variant).
+```
+
+**Schema note.** The `user_id` column on `subscription_events` is declared `UUID NOT NULL REFERENCES users(id)`. Pseudonymization breaks this FK. The implementation must either: (a) use a separate `erased_user_reference TEXT` column and NULL the FK column on erasure, or (b) use a sentinel UUID in the `users` table (`[erased-sentinel]`) that the FK resolves to. Option (b) is preferred for schema consistency. This is a schema evolution decision — see implementation checklist item 7.
+
+**DEC-030 event on erasure:**
+```json
+{
+  "event_type": "billing.user_erased",
+  "severity": "HIGH",
+  "payload": {
+    "pseudonym": "[ERASED-{sha256_hex}]",
+    "rows_affected_subscription_events": N,
+    "rows_affected_user_subscriptions": M,
+    "retention_basis": "Art17(3)(b)",
+    "legal_reference": "Tax Code of Ukraine Art.44 / EU VAT Directive 2006/112/EC Art.245"
+  }
+}
+```
+
+This event must be emitted in the same transaction as the pseudonymization UPDATE statements and appended to the HMAC chain. The `billing.user_erased` event is itself retained for 7 years as evidence of the erasure action.
+
+The erasure step must be added to `src/workers/gdpr/erasure.ts` as a named step (`billingPseudonymization`) executed after the standard identity erasure but before the final `gdpr.erasure_completed` DEC-030 event.
+
+---
+
+### 24.11 RLS Policies
+
+```sql
+-- ─── user_subscriptions ────────────────────────────────────────────────────
+
+-- form_api: users may read their own subscription row (for entitlement checks)
+CREATE POLICY user_subscriptions_select_own
+  ON user_subscriptions FOR SELECT
+  TO form_api
+  USING (user_id = current_setting('app.current_user_id')::uuid);
+
+-- form_system: billing Worker has full read access (needed for webhook correlation)
+CREATE POLICY user_subscriptions_select_system
+  ON user_subscriptions FOR SELECT
+  TO form_system
+  USING (TRUE);
+
+-- form_system: billing Worker is the ONLY INSERT path
+CREATE POLICY user_subscriptions_insert_system
+  ON user_subscriptions FOR INSERT
+  TO form_system
+  WITH CHECK (TRUE);
+
+-- form_system: billing Worker is the ONLY UPDATE path
+-- form_api has no UPDATE — prevents client-side plan elevation without payment verification
+CREATE POLICY user_subscriptions_update_system
+  ON user_subscriptions FOR UPDATE
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- No DELETE policy for any non-admin role. Hard deletes blocked.
+
+-- ─── subscription_events ───────────────────────────────────────────────────
+
+-- form_api: users may read their own subscription event history
+CREATE POLICY subscription_events_select_own
+  ON subscription_events FOR SELECT
+  TO form_api
+  USING (user_id = current_setting('app.current_user_id')::uuid);
+
+-- form_system: billing Worker read access (idempotency check before INSERT)
+CREATE POLICY subscription_events_select_system
+  ON subscription_events FOR SELECT
+  TO form_system
+  USING (TRUE);
+
+-- form_system: INSERT only — append-only enforced
+CREATE POLICY subscription_events_insert_system
+  ON subscription_events FOR INSERT
+  TO form_system
+  WITH CHECK (TRUE);
+
+-- No UPDATE or DELETE for any non-admin role.
+-- form_admin (BYPASSRLS) may UPDATE only for Art.17 pseudonymization — executed via
+-- the GDPR erasure Worker, not via direct API access.
+
+-- ─── enterprise_seat_allocations ───────────────────────────────────────────
+
+-- tenant_admin: read own tenant's allocations (no INSERT/UPDATE — billing Worker only)
+CREATE POLICY seat_allocations_select_tenant_admin
+  ON enterprise_seat_allocations FOR SELECT
+  TO tenant_admin
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+CREATE POLICY seat_allocations_select_system
+  ON enterprise_seat_allocations FOR SELECT
+  TO form_system
+  USING (TRUE);
+
+CREATE POLICY seat_allocations_insert_system
+  ON enterprise_seat_allocations FOR INSERT
+  TO form_system
+  WITH CHECK (TRUE);
+
+CREATE POLICY seat_allocations_update_system
+  ON enterprise_seat_allocations FOR UPDATE
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- ─── enterprise_seat_assignments ───────────────────────────────────────────
+
+-- tenant_admin: read, assign (INSERT), and revoke (UPDATE revoked_at) within own tenant
+CREATE POLICY seat_assignments_select_tenant_admin
+  ON enterprise_seat_assignments FOR SELECT
+  TO tenant_admin
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+CREATE POLICY seat_assignments_insert_tenant_admin
+  ON enterprise_seat_assignments FOR INSERT
+  TO tenant_admin
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+CREATE POLICY seat_assignments_update_tenant_admin
+  ON enterprise_seat_assignments FOR UPDATE
+  TO tenant_admin
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id')::uuid);
+  -- Only revoked_at update is meaningful; no other column changes permitted
+  -- (enforced at application layer via column-level check in billing Worker)
+
+-- form_api: users may see their own seat assignment (to know they have a seat)
+CREATE POLICY seat_assignments_select_own
+  ON enterprise_seat_assignments FOR SELECT
+  TO form_api
+  USING (user_id = current_setting('app.current_user_id')::uuid);
+
+-- form_system: full access for SCIM-driven provisioning
+CREATE POLICY seat_assignments_select_system
+  ON enterprise_seat_assignments FOR SELECT TO form_system USING (TRUE);
+
+CREATE POLICY seat_assignments_insert_system
+  ON enterprise_seat_assignments FOR INSERT TO form_system WITH CHECK (TRUE);
+
+CREATE POLICY seat_assignments_update_system
+  ON enterprise_seat_assignments FOR UPDATE TO form_system
+  USING (TRUE) WITH CHECK (TRUE);
+
+-- ─── tenant_seat_utilization (materialized view) ───────────────────────────
+-- Tenant admins and form_system read; no writes (it is a materialized view).
+-- RLS on the underlying tables provides the security boundary.
+-- The materialized view is owned by form_system; tenant_admin is granted SELECT
+-- with a WHERE tenant_id = current_tenant_id() filter enforced at view query time
+-- via a security-invoker wrapper function, not via RLS on the MV itself.
+```
+
+---
+
+### 24.12 DEC-030 HMAC-Chained Audit Events
+
+All billing audit events are emitted via `emitAuditEvent()` in the same database transaction as the `subscription_events` INSERT and the `user_subscriptions` UPDATE that triggered them. This maintains HMAC chain integrity — a billing mutation without a corresponding audit event is detectable as a chain break.
+
+| Event Type | Severity | Retention | Trigger | Mandatory Payload Fields |
+|---|---|---|---|---|
+| `billing.subscription_created` | STANDARD | 7yr | New `user_subscriptions` row inserted | `plan_tier`, `billing_channel`, `user_id`, `tenant_id` (if enterprise) |
+| `billing.subscription_activated` | STANDARD | 7yr | `status` → `active` (from trialing, grace, or reactivation) | `plan_tier`, `previous_status`, `activation_source` (`trial_converted` \| `payment` \| `reactivated`) |
+| `billing.subscription_renewed` | STANDARD | 7yr | Successful renewal payment; `current_period_end` advanced | `plan_tier`, `new_period_end`, `amount_usd_cents`, `external_invoice_id` |
+| `billing.subscription_upgraded` | STANDARD | 7yr | `plan_tier` increases or seat count increases | `previous_plan_tier`, `new_plan_tier`, `previous_seats` (enterprise), `new_seats` (enterprise) |
+| `billing.subscription_downgraded` | STANDARD | 7yr | `plan_tier` decreases or `cancel_at_period_end = TRUE` set | `previous_plan_tier`, `new_plan_tier`, `effective_date` |
+| `billing.subscription_cancelled` | STANDARD | 7yr | `cancel_at_period_end = TRUE` set by user action | `plan_tier`, `cancelled_at`, `access_ends_at` (`current_period_end`) |
+| `billing.payment_failed` | HIGH | 7yr | External payment failure notification received | `billing_channel`, `failure_code`, `grace_period_end` (if grace started), `attempt_count` |
+| `billing.grace_started` | HIGH | 7yr | `status` → `grace`; `grace_ends_at` computed | `grace_ends_at`, `plan_tier`, `billing_channel` |
+| `billing.subscription_expired` | HIGH | 7yr | `status` → `expired` (grace elapsed, trial elapsed, or period ended post-cancel) | `plan_tier`, `expiry_reason` (`grace_elapsed` \| `trial_elapsed` \| `period_ended`) |
+| `billing.seats_expanded` | STANDARD | 7yr | Enterprise seat count increased; new `enterprise_seat_allocations` row | `tenant_id`, `previous_seats`, `new_seats`, `price_per_seat_usd_cents` |
+| `billing.seats_reduced` | HIGH | 7yr | Enterprise seat count decreased; over-allocation alert if `used_seats > new_seats` | `tenant_id`, `previous_seats`, `new_seats`, `over_allocated` (bool) |
+| `billing.user_erased` | HIGH | 7yr | Art. 17 pseudonymization of billing records | `pseudonym`, `rows_affected_subscription_events`, `rows_affected_user_subscriptions`, `retention_basis` (`Art17(3)(b)`), `legal_reference` |
+
+**Severity rationale:**
+- `billing.payment_failed` is HIGH because repeated payment failures are an anomaly detection signal for potential fraud or account takeover (card testing against accounts).
+- `billing.grace_started` is HIGH because grace expiry triggers access revocation — a material change in user entitlement.
+- `billing.subscription_expired` is HIGH for the same reason.
+- `billing.seats_reduced` is HIGH because it may trigger access revocation for over-allocated seats, which is a security-relevant event.
+- `billing.user_erased` is HIGH as an irreversible operation on financial records requiring elevated audit visibility.
+
+All events carry the standard DEC-030 envelope fields: `tenant_id`, `user_id`, `event_type`, `severity`, `actor_id` (billing Worker service identity for automated events; `tenant_admin` user ID for seat assignment events), `trace_id`, `payload`, `hmac`, `prev_hmac`.
+
+---
+
+### 24.13 SOC 2 Evidence Mapping
+
+| Criterion | Control | Evidence Artefact |
+|---|---|---|
+| **CC6.2** | Plan tier = authorization gate; `user_subscriptions.plan_tier` checked by `assertFeatureEnabled()` (§19) — two-table authorization chain: `user_subscriptions` → `tenant_feature_flags` → `feature_flag_registry` | `__tests__/db/billing_entitlement.test.ts`: assert `form_api` cannot read Elite feature flags with `plan_tier = 'free'` |
+| **CC6.3** | Seat revocation (`revoked_at` update on `enterprise_seat_assignments`) removes access; `form_api` RLS on `user_subscriptions` returns `status = 'expired'` for revoked users; `assertFeatureEnabled()` treats `expired` as `free` | Integration test: revoke seat → verify API returns 403 on Elite feature |
+| **A1.1** | `subscription_status_enum` active/grace/expired monitoring provides operational signal for availability SLA commitment; `idx_user_subscriptions_renewal_sweep` enables scheduled renewal health checks | Pg-level monitoring query: `SELECT status, COUNT(*) FROM user_subscriptions GROUP BY status` — sampled in ops dashboard |
+| **CC7.2** | `billing.payment_failed` HIGH events surface in SIEM for revenue anomaly detection; repeated failures from same tenant signal potential account abuse | Splunk / Datadog filter: `event_type = 'billing.payment_failed' AND severity = 'HIGH'` → revenue anomaly alert |
+| **CC8.1** | Billing Worker is the sole INSERT/UPDATE path for `user_subscriptions` (RLS §24.11 blocks `form_api` writes); HMAC chain verifies no unauthorized mutations between audit events | CI test: `form_api` UPDATE to `user_subscriptions` → permission denied; HMAC chain verification test in `__tests__/audit/hmac_chain.test.ts` |
+| **P5.0** | GDPR Art. 17 erasure path for billing data documented (§24.10 pseudonymization); `failure_reason` nulled on erasure; `billing.user_erased` event with `retention_basis` retained as legal compliance evidence | Art. 17 erasure integration test: `subscription_events.failure_reason IS NULL` and `user_id` pseudonymized post-erasure |
+| **P8.0** | `billing.user_erased` DEC-030 events with `retention_basis = 'Art17(3)(b)'` provide auditor-traceable evidence of erasure requests and the legal basis for retention of pseudonymized records | Export: `SELECT * FROM audit_log WHERE event_type = 'billing.user_erased'` — provided to DPA on request |
+
+**Evidence exports for auditor:**
+- Monthly `subscription_events` export filtered on `event_type IN ('upgraded', 'downgraded', 'seats_expanded', 'seats_reduced')` → authorization-gated plan change log for CC6.2.
+- `enterprise_seat_assignments` join `users` filtered on `revoked_at IS NOT NULL` over the audit period → access revocation evidence for CC6.3.
+- `billing.user_erased` DEC-030 events with `retention_basis` → Art. 17(3)(b) compliance evidence for P8.0.
+
+---
+
+### 24.14 Open Questions
+
+| ID | Question | Owner | Priority |
+|---|---|---|---|
+| OQ-BILL-01 | **Trial length configurability.** Should trial duration be configurable per enterprise tenant (e.g. 30-day pilot negotiated in §16 enterprise contract) or fixed at 14 days for consumer? If per-tenant: `trial_duration_days` must be added to `enterprise_contracts` (§16) and the billing Worker must read it when computing `trial_ends_at`. If fixed: simpler; pilots handled by comped subscription rather than extended trial. **P0 — affects `trial_ends_at` computation in billing Worker; founder decision before enterprise pilot.** | `founder` + `enterprise-architect` | **P0 — pre-M4** |
+| OQ-BILL-02 | **Currency localization.** Should UAH pricing be stored as a separate `price_uah_kopecks` column or computed at display time from USD via a fixed exchange rate? Separate storage is more accurate (avoids forex volatility in displayed prices) but requires pricing sync on rate changes. Display-time conversion is simpler but can show jarring price changes. Recommendation: store a `display_prices JSONB` column on `plan_tier_definitions` (new table) with per-currency display amounts, independent of `price_usd_cents` which remains the internal accounting unit. | `product-strategist` + `enterprise-architect` | **P1 — before UA market launch** |
+| OQ-BILL-03 | **Refund policy encoding.** Full refund within 24 hours? Pro-rated? Store-platform refunds (Apple/Google) differ from Stripe refunds. The `billing.refunded` event `amount_usd_cents` field needs a policy decision: (a) always = full period price; (b) pro-rated = `price_usd_cents × (days_remaining / period_days)`; (c) platform-determined (use whatever Apple/Google/Stripe reports). Option (c) is strongly preferred: trust the platform's amount and record it verbatim. Needs legal sign-off for consumer contracts in Ukraine. | `legal` + `compliance-officer` | **P1 — before public launch** |
+| OQ-BILL-04 | **Invite-based seat provisioning.** Should `enterprise_seat_assignments` allow a `tenant_admin` to assign a seat to an email address not yet in the `users` table? This enables invite-then-provision flow (admin assigns seat → user receives invite → user creates account → account auto-linked to assignment). Requires a `pending_email TEXT` column on `enterprise_seat_assignments` and a linking step in the SCIM provisioning flow (§SSO_SCIM_IMPLEMENTATION.md §19). Without this, tenant admins must provision users via SCIM before assigning seats — a multi-step friction point. | `enterprise-architect` + `platform-engineer` | **P1 — before enterprise GA** |
+| OQ-BILL-05 | **Art. 17 pseudonymization: FK constraint approach.** The `user_id UUID NOT NULL REFERENCES users(id)` FK on `subscription_events` cannot hold a pseudonymized string. Two options: (a) sentinel UUID — insert a permanent `[erased-user]` row in `users` table; set `user_id` to this sentinel on erasure; (b) split column — add `erased_user_reference TEXT` column; null the FK on erasure; populate the text column with the pseudonym. Option (a) is schema-simpler but creates a real row in `users` that must itself be excluded from all queries. Option (b) is cleaner but requires schema migration and query changes everywhere `subscription_events.user_id IS NOT NULL` is assumed. | `enterprise-architect` + `platform-engineer` + `compliance-officer` | **P0 — before any erasure path ships** |
+
+---
+
+### 24.15 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create `migrations/YYYYMMDD_billing_enums.sql` — `plan_tier_enum`, `subscription_status_enum`, `billing_channel_enum`, `subscription_event_type_enum` | `platform-engineer` | **P0** | M4 |
+| 2 | Create `migrations/YYYYMMDD_user_subscriptions.sql` — full DDL from §24.3 including all CHECK constraints, partial unique index, and RLS policies from §24.11 | `platform-engineer` | **P0** | M4 |
+| 3 | Create `migrations/YYYYMMDD_subscription_events.sql` — full DDL from §24.4 including `uq_subscription_events_external_id` idempotency index and RLS | `platform-engineer` | **P0** | M4 |
+| 4 | Create `migrations/YYYYMMDD_enterprise_seats.sql` — `enterprise_seat_allocations`, `enterprise_seat_assignments` DDL, `tenant_seat_utilization` materialized view, all indexes and RLS policies from §24.11 | `platform-engineer` | **P0** | M4 |
+| 5 | Implement `src/workers/billing/apple-webhook.ts` — StoreKit 2 JWS verification, notification type mapping (§24.6), idempotency via `external_event_id`, atomic `user_subscriptions` + `subscription_events` + DEC-030 transaction | `platform-engineer` | **P0** | M4 |
+| 6 | Implement `src/workers/billing/google-play-webhook.ts` — Pub/Sub base64 decode, Google Play Developer API v3 verification, `linkedPurchaseToken` chain resolution, notification type mapping (§24.7) | `platform-engineer` | **P0** | M4 |
+| 7 | Implement `src/workers/billing/stripe-webhook.ts` — Stripe-Signature HMAC-SHA256 verification (raw body), event mapping (§24.8), seat expansion/contraction flow, `tenant_seat_utilization` refresh | `platform-engineer` | **P0** | M4 |
+| 8 | Resolve OQ-BILL-05 (Art. 17 FK approach — sentinel UUID vs. split column) and implement chosen approach before any erasure path ships; add schema migration if split column chosen | `platform-engineer` + `compliance-officer` | **P0** | M4 |
+| 9 | Add billing pseudonymization step (`billingPseudonymization`) to `src/workers/gdpr/erasure.ts` per §24.10 — UPDATE `subscription_events` pseudonymize + null `failure_reason`; soft-expire `user_subscriptions`; emit `billing.user_erased` DEC-030 event | `platform-engineer` + `compliance-officer` | **P0** | M4 |
+| 10 | Register all 12 `billing.*` DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` with severity, retention tier (all 7yr), and mandatory payload fields from §24.12 | `compliance-officer` | **P0** | M4 |
+| 11 | Write `__tests__/db/billing_rls.test.ts` — (a) `form_api` UPDATE to `user_subscriptions` → permission denied; (b) `form_api` reads own subscription row; (c) `tenant_admin` reads own tenant's `enterprise_seat_allocations`; (d) `tenant_admin` cannot read another tenant's allocations; (e) `subscription_events` INSERT as `form_api` → permission denied | `qa-lead` + `enterprise-architect` | **P0** | M4 |
+| 12 | Write `__tests__/db/billing_entitlement.test.ts` — assert `assertFeatureEnabled()` returns false for `plan_tier = 'free'` on Growth/Elite-gated flags; returns true on matching tier; `status = 'expired'` treated as `free`; regression against CC6.2 | `qa-lead` + `platform-engineer` | **P0** | M4 |
+
+---
+
+*v1.4 · травень 2026 · owner: enterprise-architect + compliance-officer + platform-engineer*
+
+*v1.4 additions: §24 Subscription, Billing & Revenue Schema — closes the billing data-layer gap for plan entitlement enforcement (cross-ref §19 `assertFeatureEnabled()`), enterprise contract lifecycle (§16), and GDPR Art. 17 financial retention tension. Two-track billing architecture: consumer via App Store (StoreKit 2) / Google Play (Billing Library v6) and enterprise via Stripe invoicing; `user_subscriptions` is the single source of truth for access control decisions — never App Store or Stripe directly. Four ENUMs: `plan_tier_enum` (free/growth/elite/enterprise), `subscription_status_enum` (trialing/active/grace/past_due/cancelled/expired), `billing_channel_enum` (none/app_store_ios/google_play/stripe), `subscription_event_type_enum` (14 values across full lifecycle). `user_subscriptions` table: `uq_user_one_active_subscription` partial unique index (status != 'expired'); `chk_enterprise_has_tenant` (stripe billing requires tenant_id); `chk_trial_coherent` (trialing requires trial_ends_at); `chk_grace_coherent`; `chk_free_no_price`; `idx_user_subscriptions_renewal_sweep` partial index on `current_period_end` for scheduled renewal sweep Worker; all monetary amounts in minor currency units with ISO 4217 currency column. `subscription_events` append-only lifecycle log: 14-value `subscription_event_type_enum`; `uq_subscription_events_external_id` idempotency index prevents duplicate webhook processing; no UPDATE/DELETE for any non-admin role (RLS + HMAC chain). Enterprise seat management: `enterprise_seat_allocations` (period-based contracted seat count with `effective_from`/`effective_to` history pattern; `uq_tenant_allocation_period` unique constraint; `RESTRICT` on tenant delete); `enterprise_seat_assignments` (per-user seat with `revoked_at`; `uq_tenant_user_active_seat` partial unique index; `assigned_by` FK for audit trail); `tenant_seat_utilization` materialized view refreshed `CONCURRENTLY` after every seat mutation. Webhook integration: Apple StoreKit 2 (JWS certificate chain verification against Apple root CA; 6-hour replay window; `original_transaction_id` as stable `external_subscription_id`); Google Play RTDN (Pub/Sub → Worker → Play Developer API v3 verification; `linkedPurchaseToken` chain resolution for renewal correlation); Stripe (HMAC-SHA256 `Stripe-Signature` verification on raw body; seat expansion/contraction via `customer.subscription.updated` quantity diff; over-allocation alert suppresses automatic revocation). 13-transition state machine: trialing/active/grace/cancelled/expired states with complete trigger → new_state → subscription_events rows → user_subscriptions changes table. GDPR Art. 17 vs. financial retention: Ukrainian Tax Code Art. 44 and EU VAT Directive 2006/112/EC Art. 245 mandate 7-year retention, overriding erasure per Art. 17(3)(b); resolution is pseudonymization of `user_id` to `[ERASED-{sha256(user_id,salt)}]` in `subscription_events`, NULL of `failure_reason`, and soft-expiry of `user_subscriptions` row; `billing.user_erased` HIGH DEC-030 event carries `retention_basis`; OQ-BILL-05 (FK constraint approach — sentinel UUID vs. split column) is P0 before erasure ships. RLS: `form_api` SELECT own rows; `form_system` full read/write (sole INSERT/UPDATE path for `user_subscriptions`); `tenant_admin` SELECT + seat assignment INSERT/UPDATE within own tenant; no form_api UPDATE on `user_subscriptions` (prevents client-side plan elevation). 12 DEC-030 HMAC-chained audit events (all 7yr retention): 5 STANDARD (subscription_created, activated, renewed, upgraded, seats_expanded) and 7 HIGH (subscription_downgraded, subscription_cancelled, payment_failed, grace_started, subscription_expired, seats_reduced, user_erased); all emitted in-transaction with subscription_events INSERT. SOC 2 mapping: CC6.2 (two-table authorization chain user_subscriptions → feature_flags); CC6.3 (seat revocation removes API access via RLS); A1.1 (subscription status operational monitoring); CC7.2 (billing.payment_failed HIGH events in SIEM for revenue anomaly detection); CC8.1 (billing Worker sole mutation path + HMAC chain); P5.0 (Art. 17 pseudonymization path); P8.0 (billing.user_erased with retention_basis as DPA evidence). 5 open questions (OQ-BILL-01: trial length configurability P0; OQ-BILL-02: UAH currency localization P1; OQ-BILL-03: refund policy encoding P1; OQ-BILL-04: invite-based seat provisioning P1; OQ-BILL-05: Art. 17 FK sentinel vs. split column P0). 12-item implementation checklist (10× P0 M4, 2× P0 M4 regression tests).*
+
+---
+
