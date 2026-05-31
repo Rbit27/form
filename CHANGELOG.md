@@ -6,6 +6,19 @@
 
 ---
 
+## [1.39.0] — 2026-05-31
+
+### Added
+- `content/post-164-altitude-hypoxia-training.md` — Адаптація до висоти: гіпоксія як тренувальний стимул (~13 хв). HIF-1α молекулярний механізм (PHD-деградація, VHL-убіквітинування, downstream генна регуляція). EPO-кінетика і еритропоез: Hbmass +3.3–4.5% за 28 днів (Gore et al. 2013 BJSM meta-analysis). Levine & Stray-Gundersen (1997 JAP): LHTL vs LHTH — чому LHTL дає +5% VO₂max проти +2% у LHTH. Altitude tents: поріг ≥12 год/добу, hypobaric vs normobaric при ≤3000 м незначна різниця. Мінімальний поріг ≥2000 м/≥21 день. Адаптації поза еритропоезом: VEGF/капіляризація, міоглобін, 2,3-DPG. AMS базова механіка. Три рівні практичного застосування. Статус: clinical_safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — додано картки Post 162 (сателітні клітини), Post 163 (HSP), Post 164 (висота/гіпоксія); лічильник 161 → 165 карток
+- `STATUS.md` — додано рядки post-158 через post-164 у таблиці content engine; blog.html → v1.39.0, 165 карток
+- `README.md` — roadmap: post-162/163 помічено [x] з актуальними темами; додано нові теми post-169 (PCr ресинтез), post-170 (ноцицепція), post-171 (сон і результати), post-172 (сила хвату)
+- `VERSION` → 1.39.0
+
+---
+
 ## [1.38.1] — 2026-05-31
 
 ### Changed

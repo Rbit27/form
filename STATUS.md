@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 161 cards (161 content posts authored), category filter, newsletter CTA | v1.37.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 165 cards (165 content posts authored), category filter, newsletter CTA | v1.39.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -242,6 +242,13 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-155-concurrent-training-interference-ampk-mtorc1.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-156-glymphatic-system-sleep-training.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-157-myokines-muscle-endocrine-organ.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-158-mitophagy-mitochondrial-quality-control.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-159-neurogenesis-aerobic-training.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-160-force-velocity-curve.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-161-microbiome-training.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-162-satellite-cells-muscle-hypertrophy.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-163-heat-shock-proteins-training.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-164-altitude-hypoxia-training.md | Blog | draft · clinical-safety NOT REQUIRED |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
