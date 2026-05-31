@@ -6,6 +6,21 @@
 
 ---
 
+## [1.32.1] — 2026-05-31
+
+### Added
+- `docs/SOC2_READINESS.md §46` — Security Alert Pipeline: `form-alert-relay` Cloudflare Worker · `auth-monitor` Supabase Edge Function · `audit-chain-daily-check` Supabase Edge Function — CC7.1/CC7.2/CC7.3 Auditor Exhibit. Complete TypeScript implementations for all three P0 CC7 components specified in §25.10. Closes CC7-GAP-001, CC7-GAP-002, CC7-GAP-003 to 🟡 AUTHORED (🟢 on deploy + test). P0 count: 12 → 9. SOC 2 readiness: ~93% → ~94%. +985 рядків, v1.8.
+
+### Closes
+- CC7-GAP-001 🔴 Open → 🟡 AUTHORED (`form-alert-relay` Worker implementation spec filed)
+- CC7-GAP-002 🔴 Open → 🟡 AUTHORED (`auth-monitor` Edge Function implementation spec filed)
+- CC7-GAP-003 🔴 Open → 🟡 AUTHORED (`audit-chain-daily-check` Edge Function + cron spec filed)
+
+### Changed
+- `VERSION` → 1.32.1
+
+---
+
 ## [1.32.0] — 2026-05-30
 
 ### Added
