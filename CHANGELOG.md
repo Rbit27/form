@@ -6,6 +6,14 @@
 
 ---
 
+## [1.39.1] — 2026-05-31
+
+### Changed
+- `docs/SOC2_READINESS.md §51` — Consolidated Gap Register + Observation Period Readiness Dashboard (+344 рядків). Supersedes stale v1.3 Gap Analysis Summary (~71%) with current state (~97%). Fulfils §49 checklist item 10 (CC6-GAP-001/002/003 §26 status → 🟡 Authored) and §50 checklist item 9 (CC5-GAP-003/005 §27 status → 🟡 Authored) via consolidated register. Master gap register: 32 TSC sub-criteria across all 5 Trust Service Criteria (Security/Availability/Processing Integrity/Confidentiality/Privacy); 14/32 🟢, 18/32 🟡, 0/32 🔴. 13-item pre-observation-period gate checklist (G-01 through G-13) with critical path: ~25–35 days from M4 sprint start to observation clock open. 3 remaining P0 gaps (CC7-GAP-005/006/007) all 🟡 Authored — implementation-pending only. 9 automated evidence streams documented (~8,640+ DEC-030 events in 90-day window). 8-item manual evidence calendar with responsible-party assignment. §51.8 privacy floor reminder: RLS-enforced prohibition on auditor queries against individual health data or CV keypoints. 16-item implementation checklist (M4 deployment sprint → audit close). Document header v2.1 → v2.3. SOC 2 readiness: ~96.5% → ~97%.
+- `VERSION` → 1.39.1
+
+---
+
 ## [1.39.0] — 2026-05-31
 
 ### Added

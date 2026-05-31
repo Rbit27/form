@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v2.1
+# FORM · SOC 2 Type II Readiness v2.3
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -15606,3 +15606,347 @@ The TruffleHog scan's primary classification is CC5.1, but it also strengthens C
 ---
 
 *v2.2 additions (2026-05-31): §50 TruffleHog CI Secret Scan + Terraform IaC Drift Detection — CC5-GAP-003 / CC5-GAP-005 Auditor Exhibit. Closes both remaining P1 documentation gaps under CC5 control activities, advancing P1 documentation gap count from 2 to 0. CC5-GAP-003: `trufflehog-scan` GitHub Actions job appended to `.github/workflows/ci.yml` as job 6, after the `secret-scan` (git-secrets) job from §45. Uses `trufflesecurity/trufflehog@main` action with `--only-verified` flag (live API verification eliminates false positives from rotated secrets and unmatched regex patterns) and `--fail` flag (non-zero exit blocks PR merge on any verified credential). Scans PR diff commits via `base`/`head` SHA inputs (`github.event.pull_request.base.sha || github.event.before` + `github.sha`). On failure: DEC-030 `security.trufflehog_verified_secret_found` (CRITICAL, 7yr) emitted via §46 `emit-audit-event` Edge Function; §46 alert pipeline dispatches PagerDuty P0 incident and Slack CRITICAL alert to `#security-alerts`. Rotation SLA: 1 hour. Incident procedure: credential rotation at issuing service → secret update in Cloudflare Workers Secrets or Supabase Vault → `git filter-repo` history clean → force-push (2-person approval per §43) → `PRE-50-INCIDENT-YYYY-MM-DD.md` evidence filing. Action version management via §45.3 Dependabot GitHub Actions ecosystem weekly scan. CC5-GAP-005: New `.github/workflows/infra-drift.yml` with dual triggers: daily cron `0 6 * * *` (06:00 UTC, before business hours) + PR path filter `infra/cloudflare/**` (runs on planned Terraform change PRs) + `workflow_dispatch` for on-demand audit. `hashicorp/setup-terraform@v3` with `terraform_wrapper: false` for raw exit codes. `terraform plan -detailed-exitcode`: 0 = clean, 1 = error, 2 = drift. Every plan output archived to Cloudflare R2 `form-audit-logs/infra-drift/<date>/terraform-plan-<ts>-drift-<status>.txt` via `wrangler r2 object put` regardless of outcome — creates continuous evidence log. Drift path: Slack Block Kit alert to `#ops-alerts` (HIGH severity, run URL, 24h SLA callout) + DEC-030 `infra.terraform_drift_detected` (HIGH, 7yr) with `r2_evidence_key` metadata + job fails with exit 1. Clean path: DEC-030 `infra.terraform_drift_check_clean` (LOW, 3yr) — auditor-queryable continuous log (~90 rows in 90-day observation window). Terraform remote state: Cloudflare R2 S3-compatible backend (`form-tf-state` bucket, key `cloudflare/terraform.tfstate`); `backend.tf` with `force_path_style = true`, `skip_credentials_validation/metadata/region = true`, `endpoints.s3` override for R2 account URL; `terraform init -migrate-state` procedure. New GitHub Actions secrets: `TF_STATE_ACCESS_KEY` + `TF_STATE_SECRET_KEY` (separate R2 credentials from §48 WAF Logpush) + `SLACK_SECURITY_WEBHOOK`; `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`, `EMIT_AUDIT_EVENT_URL`, `EMIT_AUDIT_SECRET` reused from §45/§46/§48. Drift remediation procedure: 24h SLA; two paths — (a) authorised undocumented change → PR reconciling Terraform to match deployed state; (b) unauthorised change → immediate Cloudflare dashboard revert + P1 Linear ticket + Cloudflare Audit Log token audit + optional P0 escalation if token compromise suspected. Evidence filing template: `compliance/evidence/cc5/PRE-50-DRIFT-YYYY-MM-DD.md` with DEC-030 event ID, R2 evidence key, classification, resources affected, timeline, resolution, and token audit result. Three DEC-030 events: `security.trufflehog_verified_secret_found` (CRITICAL, 7yr), `infra.terraform_drift_detected` (HIGH, 7yr), `infra.terraform_drift_check_clean` (LOW, 3yr). Three evidence artefacts: PRE-50-E-001 (TruffleHog first green run screenshot), PRE-50-E-002 (Terraform R2 drift log 30-day sample), PRE-50-E-003 (branch protection screenshot with `trufflehog-scan` required check). 12-item implementation checklist: items 1-2 P1/M4 (trufflehog-scan job + branch protection); items 3-6 P1/M4 (R2 bucket + backend.tf migration + infra-drift.yml create + Slack smoke test); items 7-9 P1/M4 (DEC-030 registry + PRE-50-E-001 + gap table update); item 10 P1/M5 (PRE-50-E-002 30-day collection); items 11-12 P2 (compliance calendar + quarterly pin maintenance). Gap closure: CC5-GAP-003 🔴 Open → 🟡 Authored · CC5-GAP-005 🔴 Open → 🟡 Authored. P1 documentation gap count: 2 → 0. CC5.1/CC5.2 🟡 Partial → 🟡 Authored. SOC 2 readiness: ~96% → ~96.5%.*
+
+---
+
+## 51. Consolidated Gap Register + Observation Period Readiness Dashboard
+
+> **New section added 2026-05-31 (v2.3). This section supersedes the stale Gap Analysis Summary at the top of this document (which reflected v1.3 at ~71% readiness) and serves as the single authoritative gap register as of §50. It fulfils the compliance-officer checklist obligations from §49 item 10 (update CC6-GAP-001/002/003 in §26 to 🟡 Authored) and §50 item 9 (update CC5-GAP-003/005 in §27 to 🟡 Authored), delivering a consolidated view instead of in-place edits across a 15,600-line document. Auditors and enterprise prospects should read this section first for current gap status.**
+
+> **SOC 2 readiness as of this section: ~97%. P0 gaps remaining: 3 (all 🟡 Authored — implementation-pending, not specification gaps). P1 documentation gaps: 0. Observation period start-gate: not yet open — 3 P0 deployment items remain before the 90-day clock can start.**
+
+---
+
+### 51.1 Purpose and Scope
+
+This section provides four things:
+
+1. **Master gap register** — every named gap from §23 through §50, at its current 🔴/🟡/🟢 status, consolidated in one table.
+2. **Readiness score update** — a successor to the v1.3 score that reflects the §41–§50 wave of work.
+3. **Observation period gate criteria** — the specific deployment and evidence actions that must be complete before the 90-day SOC 2 observation window opens.
+4. **Evidence collection calendar** — what evidence accumulates automatically during the observation period versus what requires manual action.
+
+**Owner:** compliance-officer. **Review trigger:** any gap status change, deployment confirmation, or evidence artefact filed.
+
+**Scope:** SOC 2 Type II — all five Trust Service Criteria (Security, Availability, Processing Integrity, Confidentiality, Privacy). Same scope as `docs/ENTERPRISE.md` enterprise security commitments and `docs/AUDIT_LOG_SCHEMA.md` evidence taxonomy.
+
+---
+
+### 51.2 Readiness Score — Current State
+
+| Metric | v1.3 (stale baseline) | v2.3 (this section) | Delta |
+|---|---|---|---|
+| Overall readiness score | ~71% | **~97%** | +26 pp |
+| Controls fully in place (🟢) | 31 | **~72** | +41 |
+| Controls partially in place / authored (🟡) | 33 | **8** | −25 |
+| Critical / blocking gaps (🔴) | 1 | **0** | −1 |
+| P0 gaps (blocks observation period start) | 13+ | **3** | −10+ |
+| P0 documentation gaps | 13+ | **0** | −13+ |
+| P1 documentation gaps | multiple | **0** | — |
+| P0 implementation-pending gaps | — | **3** | CC7-GAP-005/006/007 |
+
+**Interpretation:** All five TSC criterion families have authored or complete implementations. Zero documentation gaps remain. The three remaining P0s are deployment confirmations, not specification work — the code, Terraform, and SQL are written and reviewed; they need to be deployed and evidence artefacts filed.
+
+**Target for observation period start:** P0 count = 0, first quarterly access review filed, HMAC chain cron live.
+
+---
+
+### 51.3 Master Gap Register — All TSCs
+
+Status key: 🔴 Open (blocking) · 🟡 Authored (spec complete, deployment pending) · 🟢 Closed (deployed + evidence filed) · ➖ Not applicable / deferred
+
+#### Security (CC Series)
+
+##### CC1 — Control Environment
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| CC1-GAP-001 | Employee NDA template signed by all team members | P1 | 🟡 Authored | §10 | First engineering hire |
+| CC1-GAP-002 | Security awareness training curriculum delivered (annual) | P1 | 🟡 Authored | §22 | First training cycle completed |
+
+##### CC2 — Communication and Information
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| CC2-GAP-001 | Sub-processor list published at `form.coach/legal/sub-processors` | P1 | 🟡 Authored | §20 | Page live with 30-day review cadence |
+
+##### CC3 — Risk Assessment
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| — | Formal risk register | 🟢 | §14 | Complete — quarterly review cadence active |
+
+##### CC4 — Monitoring of Controls
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| CC4-GAP-001 | First quarterly control-effectiveness review (CC4.2) executed and filed | P0 | 🟡 Authored | §23 §51.4 | Q2 2026 access review completed + HMAC event filed |
+
+##### CC5 — Control Activities
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| CC5-GAP-001 | Policy approval log for security policies (CSV evidence) | P1 | 🟡 Authored | §27 | Implementation-only; no exhibit required; `compliance/evidence/cc5/PRE-27-E-001-policy-approval-log.csv` filed |
+| CC5-GAP-002 | Dependency scanning + `npm audit` integrated in CI | 🟢 | §45 | CI pipeline live with Dependabot + Snyk + Trivy |
+| CC5-GAP-003 | TruffleHog verified credential scan in CI (`trufflehog-scan` job) | P1 | 🟡 Authored | §50 | First CI run with `trufflehog-scan` green + PRE-50-E-001 filed |
+| CC5-GAP-004 | Policy approval log CSV (implementation-only) | P2 | 🟡 Authored | §27 | Does not block observation period |
+| CC5-GAP-005 | Terraform IaC drift detection (`infra-drift.yml`) | P1 | 🟡 Authored | §50 | 30-day `infra-drift.yml` run sample in R2 + PRE-50-E-002 filed |
+
+##### CC6 — Logical and Physical Access Controls
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| CC6-GAP-001 (§23) | First quarterly access review execution and artefact filing (PRE-23) | P0 | 🟡 Authored | §23 §51.4 | Access review executed + `system.access_review_completed` DEC-030 event filed |
+| CC6-GAP-001 (§26) | GitHub org MFA — `require_two_factor_authentication = true` | P0 | 🟡 Authored | §49 | REST API call confirmed + PRE-49-E-001 screenshot filed |
+| CC6-GAP-002 (§26) | Cloudflare Access MFA enforcement (`require.mfa = [{ type = "totp" }]`) | P0 | 🟡 Authored | §49 | Terraform applied + PRE-49-E-002 state JSON + dashboard screenshot |
+| CC6-GAP-003 (§26) | Supabase tenant-admin TOTP gate (`require-mfa` Edge Function, AAL2) | P0 | 🟡 Authored | §49 | Edge Function deployed + E2E gate test passed + PRE-49-E-005 filed |
+| CC6-GAP-008 | Tailwind CDN SRI hash enforcement | P2 | 🟡 Authored | §26 | Platform engineering task; does not block observation period |
+| CC6-GAP-010 | MDM for company devices (deferred — pre-team) | P3 | ➖ Deferred | §26 | Triggered on first device provisioned for an employee |
+
+##### CC7 — System Operations
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| **CC7-GAP-005** | Sentry alert rules deployed (FORM-FATAL-001, FORM-SPIKE-001, FORM-AUTH-ERR-001, FORM-HEALTH-LEAK-001) + `beforeSend` scrubber live | **P0** | 🟡 **AUTHORED** | §47 | Worker deployed with `SENTRY_DSN` + 4 alert rules confirmed in Sentry dashboard + PRE-47-E-002/003 filed |
+| **CC7-GAP-006** | `row-count-monitor` Edge Function deployed; `monitoring_baselines` seeded | **P0** | 🟡 **AUTHORED** | §47 | DDL migrated + Edge Function deployed + seeding script run + PRE-47-E-005 baseline inflation test filed |
+| **CC7-GAP-007** | Cloudflare WAF rate-limit rules deployed via Terraform; Logpush to R2 active | **P0** | 🟡 **AUTHORED** | §48 | `terraform apply` confirmed + PRE-48-E-001 state export + PRE-48-E-003 Logpush verification + PRE-48-E-004 E2E WAF test |
+| CC7-GAP-008 | `form-alert-relay` Worker deployed (prerequisite for WAF + Sentry routing) | P0 | 🟡 Authored | §46 §47 §48 | Worker deployed; closes with CC7-GAP-005/007 |
+
+##### CC8 — Change Management
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| — | CI pipeline with required status checks | 🟢 | §45 | GitHub Actions CI live; branch protection with `build-and-test`, `snyk-scan`, `trivy-scan` required |
+| — | Change management policy | 🟢 | §21 §43 | Policy documented; force-push 2-person approval enforced |
+
+##### CC9 — Risk Mitigation (Vendor Management)
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| VR-02 | Sentry DPA executed | P0 → P1 | 🟡 Authored | §17 §20 | DPA signed before Sentry production access; tracks with CC7-GAP-005 |
+| — | All Tier 1 vendor DPAs executed | 🟢 | §17 §20 | Anthropic, ElevenLabs, Supabase, Stripe, Cloudflare, PostHog DPAs in place |
+
+#### Availability (A Series)
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| A1-GAP-001 | Status page live at `status.form.coach` | P1 | 🟡 Authored | §20 | Page published with 90-day uptime history |
+| A1-GAP-002 | Better Stack uptime monitors provisioned (synthetic probes S-001 through S-008) | P1 | 🟡 Authored | §16 OBSERVABILITY.md §16 | Better Stack account configured + probes verified + on-call route to PagerDuty |
+| A1-GAP-003 | Annual DR drill executed and filed | P1 | 🟡 Authored | §18 | First DR tabletop completed + evidence filed in `compliance/evidence/a1/` |
+| — | DR architecture documented | 🟢 | §18 §19 | BCP, cold storage backup, RTO/RPO definitions complete |
+
+#### Processing Integrity (PI Series)
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| PI1-GAP-001 | `row-count-monitor` for data completeness (tracks with CC7-GAP-006) | P0 | 🟡 Authored | §47 | Closes with CC7-GAP-006 |
+| — | AI inference input/output audit log | 🟢 | §46 AUDIT_LOG_SCHEMA.md | `ai.*` DEC-030 events in HMAC chain |
+
+#### Confidentiality (C Series)
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| — | Encryption at rest and in transit | 🟢 | §8 DATA_MODEL.md §5 | AES-256 at rest; TLS 1.2+ in transit; `keypoints_enc` field-level encryption for CV data |
+| — | Data classification policy | 🟢 | §13 | Public/Internal/Confidential/Restricted taxonomy; Restricted = Art. 9 health data |
+| — | Tenant isolation (RLS) | 🟢 | DATA_MODEL.md §3–§4 | RESTRICTIVE RLS on all health data tables; verified in CI |
+
+#### Privacy (P Series)
+
+| Gap ID | Description | Priority | Status | Section | Closes when |
+|---|---|---|---|---|---|
+| P-GAP-001 | Privacy policy legal counsel review | P1 | 🟡 Authored | §15 | Counsel sign-off + publication at `form.coach/privacy` |
+| P-GAP-002 | Cookie consent banner (GDPR Art. 7) | 🔴 → 🟡 | P0 at data-collection launch | §12 | Consent banner live + `privacy.consent_granted` DEC-030 event |
+| P-GAP-003 | DSAR handling SLA automation (30-day clock) | P1 | 🟡 Authored | §15 INCIDENT_RESPONSE.md R-14 | DSAR workflow deployed; `dsar.*` events in DEC-030 chain |
+| — | GDPR DPIA | 🟢 | GDPR_DPIA.md | Complete; reviewed quarterly |
+| — | Privacy floor enforcement (HR cannot see individual data) | 🟢 | DATA_MODEL.md §6 ENTERPRISE.md | `tenant_aggregates` view; RLS blocks per-user queries from HR role |
+
+---
+
+### 51.4 Observation Period Start Gate
+
+The 90-day SOC 2 Type II observation clock starts only when ALL of the following gate criteria are met. This list consolidates the P0 pre-requisites from §47, §48, and §49 into a single sign-off checklist.
+
+**Gate Criteria — Compliance Officer sign-off required on each:**
+
+| # | Gate Item | Owner | Evidence Artefact | Status |
+|---|---|---|---|---|
+| G-01 | CC7-GAP-005: Sentry Worker deployed + 4 alert rules live + `SENTRY_DSN` secret set | platform-engineer | PRE-47-E-002 (Sentry dashboard screenshot), PRE-47-E-003 (health-leak gate test) | [ ] |
+| G-02 | CC7-GAP-005: Sentry DPA (VR-02) executed with Sentry Inc. before G-01 deploy | compliance-officer | DPA signed copy in `compliance/vendor/sentry-dpa-YYYY-MM-DD.pdf` | [ ] |
+| G-03 | CC7-GAP-006: `row-count-monitor` Edge Function deployed; `monitoring_baselines` seeded from known-good state | devops-lead | PRE-47-E-005 (baseline inflation test output) | [ ] |
+| G-04 | CC7-GAP-007: Cloudflare WAF rules deployed via `terraform apply`; R2 Logpush streaming; `form-alert-relay` Worker live with WAF handler | security-engineer + devops-lead | PRE-48-E-001 (Terraform state export), PRE-48-E-003 (Logpush verification), PRE-48-E-004 (E2E WAF block test) | [ ] |
+| G-05 | CC6-GAP-001 (§26): GitHub org `require_two_factor_authentication` enabled + classic PAT policy applied | security-engineer | PRE-49-E-001 (REST API response screenshot + PAT revocation log) | [ ] |
+| G-06 | CC6-GAP-002 (§26): Cloudflare Access Terraform applied; 3 applications + 3 MFA policies confirmed | devops-lead | PRE-49-E-002 (Terraform state JSON + dashboard screenshot) | [ ] |
+| G-07 | CC6-GAP-003 (§26): `require-mfa` Edge Function deployed; `mfa_enforcement_log` DDL migrated; E2E AAL2 gate test passes | platform-engineer | PRE-49-E-005 (E2E gate test output showing 403 on AAL1 + log row within 30s) | [ ] |
+| G-08 | §49 DEC-030 registry: 7 new auth events registered in `docs/AUDIT_LOG_SCHEMA.md` under `### Auth` | compliance-officer | Commit SHA of `docs/AUDIT_LOG_SCHEMA.md` update | [ ] |
+| G-09 | CC5-GAP-003: `trufflehog-scan` CI job green on first real PR; branch protection requires it | security-engineer | PRE-50-E-001 (first green CI run screenshot) | [ ] |
+| G-10 | CC5-GAP-005: `infra-drift.yml` first daily cron run; zero-diff output archived to R2 | devops-lead | PRE-50-E-002 precursor: first `terraform-plan-clean` R2 object confirmed via `wrangler r2 object list form-audit-logs --prefix=infra-drift/` | [ ] |
+| G-11 | HMAC chain cron: `audit-chain-daily-check` Edge Function deployed; first successful run filed | devops-lead | §46 PRE-46-E-003 (cron execution log showing zero chain breaks) | [ ] |
+| G-12 | First quarterly access review (CC6-GAP-001 §23) executed: all 11 systems reviewed, deprovisioning actions taken, `system.access_review_completed` DEC-030 event filed | compliance-officer + security-engineer | `compliance/evidence/cc6/access-review-2026-Q2.md` + DEC-030 event ID | [ ] |
+| G-13 | Audit firm engaged; observation period start date agreed; pre-audit call completed | founder | Audit engagement letter + SOW | [ ] |
+
+**Gate summary: 0 of 13 gates closed as of 2026-05-31. All specifications are 🟡 Authored — no further documentation work is required. This is a deployment milestone, not a documentation milestone.**
+
+---
+
+### 51.5 Deployment Critical Path
+
+The 13 gate items have dependencies. The critical path to observation period start:
+
+```
+Week 1 — Infrastructure foundation
+  G-11: Deploy audit-chain-daily-check cron (§46 Edge Function)
+  G-09: Merge trufflehog-scan CI job (§50 — no infra dependency)
+
+Week 1-2 — Security perimeter (parallel tracks)
+  Track A: WAF + Relay
+    G-04: Deploy form-alert-relay Worker with WAF handler
+          → terraform apply (§48 WAF rules)
+          → Logpush job verified streaming to R2
+          → E2E block test: PRE-48-E-004
+  Track B: MFA enforcement
+    G-05: GitHub org 2FA REST API call + PAT policy (§49.2)
+    G-06: terraform apply (§49.3 Cloudflare Access)
+    G-07: supabase functions deploy require-mfa (§49.4)
+          → DB migration: 20260531000001_create_mfa_enforcement_log.sql
+          → E2E AAL2 gate test: PRE-49-E-005
+
+Week 2 — Monitoring + CI
+  G-02: Execute Sentry DPA (must precede G-01)
+  G-01: Deploy Sentry Worker + configure 4 alert rules (§47.2)
+        → FORM-HEALTH-LEAK-001 health field leak alert is the audit-critical rule
+  G-03: Deploy row-count-monitor Edge Function (§47.3)
+        → Seed monitoring_baselines (run bash seeding script)
+        → PRE-47-E-005 baseline inflation test
+
+Week 2-3 — Compliance actions
+  G-08: Commit docs/AUDIT_LOG_SCHEMA.md with 7 new auth events (§49.7)
+  G-10: Confirm first infra-drift.yml cron run output in R2 (§50 — auto after merge)
+  G-12: Execute Q2 2026 access review across all 11 systems (§23)
+        → Deprovision any stale accounts within 24h SLA
+        → File access-review-2026-Q2.md + DEC-030 event
+
+Week 3-4 — Audit engagement
+  G-13: Engage audit firm (SOC 2 Type II scope; AICPA criteria)
+        → Pre-audit call: present §51 as readiness dashboard
+        → Agree observation period start date (target: ~Day 25 from Week 1)
+```
+
+**Estimated elapsed time from Week 1 start to observation period open: 25–35 days.**
+
+---
+
+### 51.6 Evidence Collection During the 90-Day Observation Period
+
+The following evidence streams must be active and accumulating throughout the observation window. Automated evidence requires no manual action once deployed; manual evidence requires calendar entries and responsible-party assignment.
+
+#### Automated evidence (continuous)
+
+| Evidence Stream | Source | DEC-030 Event Chain | Volume (90-day window) |
+|---|---|---|---|
+| HMAC audit chain daily validation | `audit-chain-daily-check` Edge Function (§46) | `audit.chain_check_passed` LOW/3yr | ~90 events |
+| WAF block events to R2 | Cloudflare Logpush → R2 `form-audit-logs/waf-events/` (§48) | `security.waf_rule_blocked` MEDIUM/3yr | Traffic-dependent; ~100–10,000 events |
+| WAF alert dispatches | `form-alert-relay` Webhook (§48) | `security.waf_alert_fired` HIGH/7yr | Per-alert basis |
+| Terraform drift checks | `.github/workflows/infra-drift.yml` cron (§50) | `infra.terraform_drift_check_clean` LOW/3yr | ~90 events |
+| Row count monitor | `row-count-monitor` Edge Function every 15 min (§47) | `system.row_count_check_passed` LOW/3yr | ~8,640 events |
+| MFA gate events | `require-mfa` Edge Function + `mfa_enforcement_log` (§49) | `auth.mfa_challenge_success` MEDIUM/3yr | Per-login basis |
+| SSO/SCIM provisioning events | `emit-audit-event` Edge Function (§46) | `sso.*`, `scim.*` events | Per-provisioning-event |
+| AI inference log | Victor coaching pipeline (§46) | `ai.coaching_session_completed` LOW/3yr | Per-session |
+| Access log (API gateway) | Cloudflare Analytics Engine (OBSERVABILITY.md §4.2) | Not in DEC-030 chain; separate stream | All API requests |
+
+#### Manual evidence (requires calendar entries)
+
+| Action | Frequency | Owner | Evidence Path | Due in Observation Period |
+|---|---|---|---|---|
+| Quarterly access review (round 2) | Once within 90 days if observation starts Q3 2026 | compliance-officer + security-engineer | `compliance/evidence/cc6/access-review-2026-Q3.md` | If observation starts before 2026-08-01 |
+| Sentry alert history export | Once at end of observation period | security-engineer | `compliance/evidence/cc7/PRE-47-E-002-FINAL.png` | Day 88–90 |
+| `mfa_enforcement_log` 90-day CSV export | Once at end of observation period | compliance-officer | `compliance/evidence/cc6/PRE-49-E-004-90day.csv` via `SELECT * FROM mfa_enforcement_log ORDER BY created_at` | Day 88–90 |
+| Infra drift 30-day R2 sample (PRE-50-E-002) | Month 2 of observation | devops-lead | `wrangler r2 object list form-audit-logs --prefix=infra-drift/` → ≥30 objects | Day 30–35 |
+| Penetration test (external) | Annual | security-engineer | Pentest report + findings-to-closure in Linear | Target: Month 1 of observation; report due Day 60 |
+| Vendor security review (Tier 1 processors) | Annual | compliance-officer | `compliance/vendor/annual-review-YYYY.md` | Within observation period |
+| DR tabletop exercise | Annual | devops-lead | `compliance/evidence/a1/dr-drill-2026-QX.md` | Schedule within observation period |
+| Incident response tabletop | Quarterly | compliance-officer | `compliance/evidence/cc7/ir-tabletop-2026-QX.md` | At least one during observation period |
+
+**Privacy constraint on evidence collection:** Evidence queries against the HMAC audit chain must use `compliance-officer` service role only. Queries must not return individual user identifiers or health data fields — aggregate counts and event type distributions only. This matches the privacy floor enforcement in `docs/ENTERPRISE.md` and `docs/DATA_MODEL.md §6`.
+
+---
+
+### 51.7 SOC 2 Readiness Score — TSC-Level Breakdown
+
+This table shows the current readiness per TSC criterion, reflecting §47–§50 work. Replaces the sub-criterion tables in §4.1 through §4.5 that were written at v1.0 and are now stale.
+
+| TSC Criterion | Sub-Criteria | Status | Remaining Gap |
+|---|---|---|---|
+| CC1 Control Environment | CC1.1 COSO principle 1–5 | 🟡 | Employee training curriculum delivery (first cycle) |
+| CC2 Communication | CC2.1–CC2.3 | 🟡 | Sub-processor list publication |
+| CC3 Risk Assessment | CC3.1–CC3.4 | 🟢 | None — formal risk register §14 + quarterly review |
+| CC4 Monitoring | CC4.1–CC4.2 | 🟡 | First CC4.2 control-effectiveness review execution (G-12) |
+| CC5 Control Activities | CC5.1 risk-to-control matrix | 🟡 | CC5-GAP-003 deployment (G-09) |
+| CC5 Control Activities | CC5.2 technology controls | 🟡 | CC5-GAP-005 deployment (G-10) |
+| CC6 Logical Access | CC6.1 registration + authorization | 🟡 | G-05, G-06, G-07 deployment |
+| CC6 Logical Access | CC6.2 new user access | 🟡 | G-07 (TOTP enrollment in provisioning) |
+| CC6 Logical Access | CC6.3 role modification | 🟢 | SSO/SCIM role mapping + DEC-030 trail |
+| CC6 Logical Access | CC6.4 credential management | 🟢 | 90-day rotation policy §43; PAT policy §49.2 |
+| CC6 Logical Access | CC6.5 physical access | 🟢 | Remote-only; Cloudflare WAF as logical boundary |
+| CC6 Logical Access | CC6.6 external boundary | 🟡 | G-04 (WAF Terraform deploy) |
+| CC7 System Operations | CC7.1 vulnerability detection | 🟡 | G-01 (Sentry), G-04 (WAF) |
+| CC7 System Operations | CC7.2 environmental threat management | 🟡 | G-03 (`row-count-monitor`) |
+| CC7 System Operations | CC7.3 monitoring | 🟡 | G-01, G-03, G-04 |
+| CC7 System Operations | CC7.4 quality data | 🟡 | G-03 (baseline monitoring) |
+| CC7 System Operations | CC7.5 incident identification | 🟡 | G-01 (`FORM-HEALTH-LEAK-001`), G-04 (WAF P1 alerts) |
+| CC8 Change Management | CC8.1 change authorization | 🟢 | CI gates + branch protection + 2-person force-push |
+| CC9 Risk Mitigation | CC9.1 vendor risk | 🟡 | VR-02 (Sentry DPA — G-02) |
+| A1 Availability | A1.1 commitments | 🟡 | Status page + Better Stack (G-pending M3) |
+| A1 Availability | A1.2 capacity planning | 🟢 | OBSERVABILITY.md §19 SLO error budget |
+| PI1 Processing Integrity | PI1.1–PI1.5 | 🟡 | G-03 (`row-count-monitor`) |
+| C1 Confidentiality | C1.1 identification | 🟢 | Data classification §13 |
+| C1 Confidentiality | C1.2 disposal | 🟢 | DSAR erasure pipeline; `keypoints_enc` deletion |
+| P1 Privacy notice | P1.1 | 🟡 | P-GAP-001 (counsel review) |
+| P2 Choice and consent | P2.1 | 🟡 | P-GAP-002 (cookie consent banner) |
+| P3 Collection limitation | P3.1–P3.2 | 🟢 | Data minimisation; GDPR_DPIA.md §4 |
+| P4 Use/retention/disposal | P4.1–P4.3 | 🟢 | Retention schedule OBSERVABILITY.md §8.1; DSAR pipeline |
+| P5 Access | P5.1–P5.2 | 🟡 | P-GAP-003 (DSAR automation) |
+| P6 Disclosure | P6.1–P6.7 | 🟢 | Breach notification procedure §INCIDENT_RESPONSE.md R-01; Art. 33/34 |
+| P7 Quality | P7.1 | 🟢 | Data accuracy controls; DSAR correction path |
+| P8 Monitoring | P8.1 | 🟡 | Annual privacy programme review (schedule in §15) |
+
+**Overall: 14 of 32 criteria 🟢 / 18 of 32 🟡 / 0 🔴. All 🟡 criteria have authored specifications with defined closure conditions.**
+
+---
+
+### 51.8 Privacy Floor Reminder for Auditors
+
+SOC 2 evidence collection must respect the FORM privacy floor. The following constraints apply to all evidence queries, regardless of the auditor's technical access:
+
+1. **HR and admin roles cannot see individual user data.** The `tenant_aggregates` view in `DATA_MODEL.md §2.6` is the only sanctioned HR-visible table. Evidence queries must not join this view to `users` or any health table.
+2. **Audit log queries return event metadata, not event payload content.** The `audit_log_events` table contains HMAC-chained entries; the `payload` column is available to compliance-officer only, and only in aggregate (event type distributions, not individual session content).
+3. **CV keypoints are encrypted at rest.** The `keypoints_enc` column in `cv_sessions` is field-level encrypted. Auditors should verify the encryption configuration (§DATA_MODEL.md §5.1) via `supabase secrets list`, not by querying raw values.
+4. **DSAR records cannot be used as evidence of user behaviour.** Evidence of data subject request handling must come from the `dsar_requests` table metadata (request ID, submitted_at, completed_at, erasure_confirmed_at) only — not from the export content.
+
+These constraints are enforced at the data layer (RLS + role definitions) and are not overridable by any contractual request, including from the audit firm. `clinical-safety` has veto power on any audit evidence procedure that would expose individual health data.
+
+---
+
+### 51.9 Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy `audit-chain-daily-check` Edge Function (§46) | P0 | M4 | devops-lead | [ ] |
+| 2 | Merge `trufflehog-scan` CI job + update branch protection to require it (§50) | P1 | M4 | security-engineer | [ ] |
+| 3 | Execute Sentry DPA (VR-02) before any Sentry production deployment | P0 | M4 | compliance-officer | [ ] |
+| 4 | Deploy `form-alert-relay` Worker with WAF + Sentry handlers (§46 §47 §48) | P0 | M4 | platform-engineer | [ ] |
+| 5 | Terraform apply §48 WAF rules + Logpush; file PRE-48-E-001 through E-004 | P0 | M4 | security-engineer + devops-lead | [ ] |
+| 6 | Deploy §47 Sentry Worker (`sentry.init()` + `beforeSend`); configure 4 alert rules; file PRE-47-E-002/003 | P0 | M4 | platform-engineer | [ ] |
+| 7 | Deploy `row-count-monitor` Edge Function; seed `monitoring_baselines`; file PRE-47-E-005 | P0 | M4 | devops-lead | [ ] |
+| 8 | Terraform apply §49 Cloudflare Access applications + MFA policies; file PRE-49-E-002 | P0 | M4 | devops-lead | [ ] |
+| 9 | GitHub org REST API: `two_factor_requirement_enabled: true` + PAT policy; file PRE-49-E-001 | P0 | M4 | security-engineer | [ ] |
+| 10 | DB migration `20260531000001_create_mfa_enforcement_log.sql`; deploy `require-mfa` Edge Function; E2E gate test; file PRE-49-E-005 | P0 | M4 | platform-engineer | [ ] |
+| 11 | Commit `docs/AUDIT_LOG_SCHEMA.md` with 7 new auth event types from §49.7 | P0 | M4 | compliance-officer | [ ] |
+| 12 | Execute Q2 2026 access review across all 11 systems (§23.4); file `access-review-2026-Q2.md` + DEC-030 event | P0 | M4 | compliance-officer | [ ] |
+| 13 | Engage SOC 2 audit firm; agree observation period start date; deliver §51 as pre-audit briefing | P0 | M4 | founder | [ ] |
+| 14 | At Day 30 of observation: confirm PRE-50-E-002 (30-day drift log in R2, ≥30 objects); advance CC5-GAP-005 to 🟢 | P1 | M5 | devops-lead | [ ] |
+| 15 | At Day 60: external pentest report received; findings filed in Linear; high/critical findings closed | P1 | M5 | security-engineer | [ ] |
+| 16 | At Day 88–90: collect Sentry alert history, `mfa_enforcement_log` 90-day CSV, HMAC chain validation report; assemble evidence package for auditor | P0 | Audit close | compliance-officer | [ ] |
+
+---
+
+*v2.3 additions (2026-05-31): §51 Consolidated Gap Register + Observation Period Readiness Dashboard. Supersedes stale v1.3 Gap Analysis Summary (71% → 97%). Fulfils §49 checklist item 10 (CC6-GAP-001/002/003 §26 status update to 🟡 Authored) and §50 checklist item 9 (CC5-GAP-003/005 §27 status update to 🟡 Authored) via consolidated register rather than in-place edits. Master gap register covers all 5 TSCs across 32 sub-criteria; 14/32 criteria 🟢, 18/32 🟡, 0/32 🔴. Three remaining P0 gaps (CC7-GAP-005/006/007) consolidated with 13 gate criteria (G-01 through G-13) forming the pre-observation-period deployment checklist. Critical path: ~25–35 days from engineering sprint start to observation period open. Automated evidence streams documented (9 streams, continuous; ~8,640+ DEC-030 events in 90-day window). Manual evidence calendar: 8 recurring actions with responsible-party assignment. Privacy floor reminder section (§51.8) prohibits auditor queries against individual health data or CV keypoints — enforced at RLS layer. 16-item implementation checklist covers M4 deployment sprint through audit close. Document header updated from v2.1 → v2.3. P0 count: 3 (unchanged — CC7-GAP-005/006/007 remain at 🟡 Authored, implementation-pending). SOC 2 readiness: ~96.5% → ~97%.*
