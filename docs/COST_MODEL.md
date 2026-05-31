@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v1.0
+# FORM · Cost Model & Unit Economics v1.4
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -89,6 +89,26 @@
     - 20.8 Open Questions Added (OQ-18, OQ-19)
     - 19.8 Open Questions Added (OQ-16, OQ-17)
 21. [Pilot Economics, Conversion Governance & Discount Authority Matrix](#21-pilot-economics-conversion-governance--discount-authority-matrix)
+22. [Year 1 Cash Flow Forecast & Runway Model](#22-year-1-cash-flow-forecast--runway-model)
+    - 22.1 Cash flow vs. P&L distinction
+    - 22.2 Funding assumptions
+    - 22.3 Month-by-month 18-month cash flow table
+    - 22.4 Runway sensitivity matrix
+    - 22.5 Key cash flow triggers
+    - 22.6 Series A fundraise timing
+    - 22.7 Cash management controls
+    - 22.8 Open questions (OQ-23 to OQ-27)
+23. [Enterprise NRR Engine & Expansion Revenue Model](#23-enterprise-nrr-engine--expansion-revenue-model)
+    - 23.1 Monthly ARR bridge template
+    - 23.2 Tier migration economics
+    - 23.3 Add-on revenue taxonomy
+    - 23.4 Three-year cohort NRR projection by tier
+    - 23.5 Blended NRR weighted by §19.7 mix
+    - 23.6 Annual price indexation clause
+    - 23.7 Expansion audit events (DEC-030)
+    - 23.8 NRR-to-valuation multiples
+    - 23.9 Implementation checklist
+    - 23.10 Open questions (OQ-28 to OQ-30)
 
 ---
 
@@ -3050,3 +3070,403 @@ The Base scenario models a 45-day [ESTIMATE] lag between consumer subscription r
 ---
 
 *v1.3 additions: §22 Year 1 Cash Flow Forecast & Runway Model — cash flow vs. P&L distinction and purpose (§22.1); funding assumptions structure with [FOUNDER_INPUT] placeholders (§22.2); month-by-month 18-month cash flow table across Base/Bull/Bear scenarios with per-category rows (infra, AI API, marketing, legal, hiring) aligned to §13.1 scaling tables and §19.7 enterprise revenue forecast (§22.3); runway sensitivity matrix (funding amount × monthly burn → months of runway) with 6-month safe-harbor fundraise trigger (§22.4); key cash flow triggers table covering App Store launch, first enterprise deal, Founding Engineer hire, AE hire, API cost shock, and infrastructure cliffs (§22.5); Series A fundraise timing model with readiness criteria table (ARR, NRR, logo count, W-ACSU, D30 retention) and 15–22-week process timeline (§22.6); cash management controls covering single-account policy, weekly 5-point cash review, variable-rate commitment gate (90-day max without founder approval), and expense recognition lag (§22.7); OQ-23 (pre-seed capital amount), OQ-24 (Founding Engineer hire cost), OQ-25 (App Store payout lag), OQ-26 (legal cost profile), OQ-27 (founder salary policy) (§22.8).*
+
+---
+
+## 23. Enterprise NRR Engine & Expansion Revenue Model
+
+> This section adds the financial machinery that sits above the static ARR forecasts in §19.7 and the NRR targets in §18.3 and §18.6. It does not restate those sections — it provides the formulaic bridge mechanics, tier-migration economics, add-on taxonomy, cohort NRR projections, price escalation policy, audit instrumentation, and the valuation translation layer that converts NRR into enterprise value multiples.
+
+---
+
+### 23.1 Monthly ARR Bridge Template
+
+The ARR bridge is the single most important recurring financial report for an enterprise SaaS business. It answers the question: why did ARR change this month? Every movement in ARR falls into exactly one of six buckets. The template below is the canonical structure to be reproduced in the admin dashboard and investor reporting.
+
+#### 23.1.1 Bridge formula
+
+```
+Closing ARR = Opening ARR
+            + New Logo ARR
+            + Seat Expansion ARR
+            + Tier Upgrade ARR
+            + Add-on ARR
+            − Seat Contraction ARR
+            − Logo Churn ARR
+```
+
+Gross expansion = New Logo ARR + Seat Expansion ARR + Tier Upgrade ARR + Add-on ARR
+Gross contraction = Seat Contraction ARR + Logo Churn ARR
+Net new ARR = Gross expansion − Gross contraction
+NRR (trailing 12 months) = (Opening cohort ARR + expansion − contraction − churn) ÷ Opening cohort ARR
+
+#### 23.1.2 Bridge row definitions
+
+| Row | Definition | Source event | Unit |
+|---|---|---|---|
+| **Opening ARR** | Sum of all active annual contract values at start of period | Snapshot from `tenant_contracts` table | $ |
+| **New Logo ARR** | ARR from tenants whose first paid invoice falls in the current period | `enterprise.contract_renewed` on first contract | $ |
+| **Seat Expansion ARR** | Incremental ARR from seat count increases at existing tenants, within the same tier | `enterprise.seat_expanded` events | $ |
+| **Tier Upgrade ARR** | Incremental ARR from a tenant moving to a higher price tier (Starter → Growth, Growth → Enterprise) | `enterprise.tier_upgraded` event | $ |
+| **Add-on ARR** | ARR from add-on SKUs (white-label, premium SLA, custom integration) purchased by existing tenants | `enterprise.addon_purchased` event | $ |
+| **Seat Contraction ARR** | ARR reduction from seat count decreases at existing tenants, within the same tier | `enterprise.seat_contracted` events | $ |
+| **Logo Churn ARR** | Full ARR lost from tenants who do not renew or are terminated | Absence of `enterprise.contract_renewed` at contract end date | $ |
+| **Closing ARR** | Computed output; must reconcile to sum of all active contract values at end of period | Reconcile against `tenant_contracts` daily batch | $ |
+
+#### 23.1.3 Reporting cadence and owners
+
+The bridge is computed monthly by data-engineer from the event stream and reconciled against Stripe invoice records and `tenant_contracts`. The founder reviews it in the first week of each month alongside the §22.7.2 cash position review. Discrepancies > $500 between the event-derived bridge and Stripe-derived ARR require same-day investigation — they typically indicate a provisioning event that was not matched to a contract amendment.
+
+#### 23.1.4 Sample bridge (Month 12, Base scenario) [ESTIMATE]
+
+Numbers derived from §19.7 Base forecast. Presented as a structural example, not a prediction.
+
+| Row | Amount |
+|---|---|
+| Opening ARR (Month 11 closing) | $25,200 [ESTIMATE] |
+| + New Logo ARR | $14,400 [ESTIMATE] |
+| + Seat Expansion ARR | $2,160 [ESTIMATE] |
+| + Tier Upgrade ARR | $0 [ESTIMATE] |
+| + Add-on ARR | $0 [ESTIMATE] |
+| − Seat Contraction ARR | $(0) [ESTIMATE] |
+| − Logo Churn ARR | $(0) [ESTIMATE] |
+| **Closing ARR (Month 12)** | **$41,760 [ESTIMATE]** |
+
+Seat expansion of $2,160 assumes the first deal (100 seats × $12 = $14,400 ACV) adds 15 seats in Month 12 at the Starter rate: 15 × $12 × 12 = $2,160. No tier upgrades or churn are modeled at Month 12 — these metrics become observable only after the first renewal cycle (Month 13+).
+
+---
+
+### 23.2 Tier Migration Economics
+
+Tier migration is the highest-leverage expansion motion in the FORM enterprise model. When a tenant upgrades from Starter to Growth, the ACV increase is larger than adding a second Starter tenant. This section calculates the exact economics of each migration path.
+
+#### 23.2.1 Starter → Growth migration
+
+The canonical migration event is a Starter tenant at 100 seats (the median Starter seat count [ESTIMATE]) growing to 200 seats, which crosses the 200-seat threshold that defines the Growth tier.
+
+| Parameter | Starter (pre-migration) | Growth (post-migration) | Delta |
+|---|---|---|---|
+| Seat count | 100 | 200 | +100 seats |
+| Price per seat per month | $12.00 | $9.00 | −$3.00 |
+| Monthly contract value | $1,200 | $1,800 | +$600 |
+| **Annual contract value (ACV)** | **$14,400** | **$21,600** | **+$7,200 (+50%)** |
+
+The per-seat price decreases by 25% but the seat volume more than doubles, yielding a net +50% ACV increase. The ACV gain of $7,200 represents a single-event contribution to the Tier Upgrade ARR row of the bridge.
+
+**Gross margin at migration:** Starter per-seat COGS is approximately $1.80/seat/month at 100 seats (§15.7). Growth per-seat COGS is approximately $1.50/seat/month at 200 seats due to RLS query amortization. Gross margin improves from 85% to 83.3% in absolute terms — the lower price per seat is more than offset by the COGS reduction from scale. See §15.6 for RLS overhead detail.
+
+#### 23.2.2 Growth → Enterprise migration
+
+The canonical migration event is a Growth tenant at 500 seats growing to 1,000 seats, crossing the Enterprise threshold. Enterprise pricing is negotiated; this model uses $7.00/seat as the midpoint of the $6–8 range specified in ENTERPRISE.md.
+
+| Parameter | Growth (pre-migration) | Enterprise (post-migration) | Delta |
+|---|---|---|---|
+| Seat count | 500 | 1,000 | +500 seats |
+| Price per seat per month | $9.00 | $7.00 | −$2.00 |
+| Monthly contract value | $4,500 | $7,000 | +$2,500 |
+| **Annual contract value (ACV)** | **$54,000** | **$84,000** | **+$30,000 (+56%)** |
+
+The +$30,000 ACV jump from a single Growth → Enterprise migration equals approximately two new Starter logo deals. In the §19.7 Base scenario, the first Growth → Enterprise migration is not expected until Year 2, making it a key Bull scenario differentiator.
+
+#### 23.2.3 Multi-year contract pricing at migration
+
+When a tenant upgrades tier, the multi-year discount from ENTERPRISE.md applies to the new tier rate:
+
+| Contract term | Starter/seat/mo | Growth/seat/mo | Enterprise/seat/mo (midpoint) |
+|---|---|---|---|
+| Annual (1yr) | $12.00 | $9.00 | $7.00 |
+| 2-year (15% off) | $10.20 | $7.65 | $5.95 |
+| 3-year (25% off) | $9.00 | $6.75 | $5.25 |
+
+**Important:** the 2-year Starter rate ($10.20) is equal to the 1-year Growth rate rounded ($9.00 + margin), which creates a decision boundary. A 100-seat tenant signing a 2-year Starter contract pays $10.20 × 100 × 12 = $12,240 ACV — lower than the $14,400 they would pay on a 1-year Starter contract. The Tier Upgrade ARR calculation must use the contracted per-seat rate, not the list price, to avoid overstating expansion. The contracting system must record the effective per-seat rate at the time of migration, not the list rate.
+
+#### 23.2.4 Migration trigger signals
+
+The CSM layer (§19.6) should monitor the following leading indicators that precede a migration event, typically 60–90 days in advance [ESTIMATE]:
+
+- Seat utilization ≥ 90% of contracted seats for two consecutive months
+- Admin dashboard exports showing org-wide activation rate ≥ 70%
+- Inbound support requests for features gated at higher tier (e.g., custom integrations)
+- QBR conversation noting headcount growth plans or new department rollouts
+
+These signals should feed a CSM alert in the admin dashboard, triggering an expansion conversation before the tenant self-identifies the need.
+
+---
+
+### 23.3 Add-on Revenue Taxonomy
+
+Add-on revenue sits in its own ARR bridge row because it is sold to existing tenants rather than new logos, it has different gross margins than seat-based ARR, and it is an early proxy for product-market depth. This section defines the canonical add-on SKUs, their pricing, and their margin profiles.
+
+#### 23.3.1 Add-on SKU table
+
+All prices are per tenant per month, billed annually. These are pre-launch estimates pending first enterprise deals.
+
+| Add-on SKU | Description | Price range (per tenant/month) | Minimum tier | Gross margin [ESTIMATE] |
+|---|---|---|---|---|
+| **White-label** | Custom domain, tenant logo, tenant primary color, "Powered by FORM" removal | $500–$2,000 [ESTIMATE] | Growth (≥ $50k ARR per ENTERPRISE.md) | ~90% |
+| **Premium SLA** | P0 response < 30 min (vs standard 1hr); dedicated on-call escalation path; monthly uptime report | $300–$800 [ESTIMATE] | Starter | ~85% |
+| **Custom Integration** | Webhook delivery to tenant HRIS (Workday, BambooHR, HiBob); custom field mapping; integration support | $400–$1,500 [ESTIMATE] | Growth | ~70% |
+| **Advanced Analytics** | Extended data retention (24mo vs 12mo default); custom aggregate report builder; CSV/JSON export on demand | $200–$600 [ESTIMATE] | Starter | ~88% |
+| **Additional Admin Seats** | Extra `tenant_admin` role seats above the default two included per plan | $50–$100/seat [ESTIMATE] | Starter | ~95% |
+
+**White-label margin note:** The high margin on white-label reflects minimal incremental COGS (SSL certificate provisioning, DNS CNAME setup, branding asset storage). The primary cost is the one-time implementation effort at onboarding (~2–4 engineer-hours), which is amortized over the contract life. See §15.5 for white-label infrastructure cost model.
+
+**Custom integration margin note:** The lower margin reflects ongoing webhook delivery infrastructure (retry queues, dead-letter handling, signature verification) and integration support engineer time. At scale, dedicated integration infrastructure costs approximately $50–$150/month per active integration endpoint [ESTIMATE].
+
+#### 23.3.2 Add-on attach rate targets [ESTIMATE]
+
+These targets are unvalidated and should be treated as planning assumptions until first-renewal data is available (OQ-29).
+
+| Add-on SKU | Target attach rate at Year 2 renewal | Expected ARR per attached tenant |
+|---|---|---|
+| White-label | 15% of Growth + Enterprise tenants [ESTIMATE] | $9,600/yr (midpoint $800/mo) [ESTIMATE] |
+| Premium SLA | 25% of all tenants [ESTIMATE] | $6,600/yr (midpoint $550/mo) [ESTIMATE] |
+| Custom Integration | 20% of Growth + Enterprise tenants [ESTIMATE] | $11,400/yr (midpoint $950/mo) [ESTIMATE] |
+| Advanced Analytics | 30% of all tenants [ESTIMATE] | $4,800/yr (midpoint $400/mo) [ESTIMATE] |
+| Additional Admin Seats | 40% of all tenants [ESTIMATE] | $900/yr (3 extra seats × $75/mo) [ESTIMATE] |
+
+#### 23.3.3 Add-on revenue in the §19.7 Base forecast
+
+The §19.7 Base forecast does not model add-on revenue explicitly. Add-on ARR is expected to be immaterial (< 5% of total ARR) in Year 1 and becomes a meaningful NRR driver in Year 2 as tenants renew and expand. Any add-on ARR realized in Year 1 should be treated as upside to the §19.7 Base forecast, not as a budget line.
+
+---
+
+### 23.4 Three-Year Cohort NRR Projection by Tier
+
+The §14.6 enterprise LTV model assumes a single 120% NRR figure across all enterprise tenants. This section disaggregates that assumption by tier, reflecting the empirical pattern in comparable B2B wellness SaaS businesses where larger tenants expand more predictably [ESTIMATE] but also have higher churn risk if the champion departs.
+
+#### 23.4.1 NRR assumptions by tier
+
+All figures are [ESTIMATE] — pre-launch projections pending first renewal cycle data.
+
+| Tier | Year 1 NRR | Year 2 NRR | Year 3 NRR | Primary NRR driver |
+|---|---|---|---|---|
+| **Starter** (50–200 seats) | 100% | 105% | 112% | Gradual seat fill-up to contracted maximum; low upgrade rate |
+| **Growth** (200–1,000 seats) | 105% | 112% | 120% | Department-by-department rollout; first tier upgrade cycle in Year 2 |
+| **Enterprise** (1,000+ seats) | 108% | 118% | 127% | Seat expansion across subsidiaries; add-on attach; multi-year renewal uplift |
+
+**Year 1 NRR note:** Year 1 NRR is measured at the first renewal (Month 12–13). It is inherently lower than Year 2+ because expansion motions (tier upgrades, add-on purchases, subsidiary rollouts) require the CSM relationship to mature. A Starter tenant that renews at 100% in Year 1 is performing to plan — contraction at Year 1 renewal is the warning signal.
+
+**Year 3 compounding note:** The Year 3 NRR figures compound on the Year 2 cohort ARR, not the original ACV. A Growth tenant that enters at $54,000 ACV and achieves 112% NRR in Year 2 has a Year 2 closing ARR of ~$60,500. Applying 120% NRR in Year 3 yields a Year 3 closing ARR of ~$72,600 — a 34% increase from the original ACV over three years before any tier upgrade.
+
+#### 23.4.2 Blended NRR projection
+
+The §19.7 Base scenario mix at Month 24 is approximately 4 Starter : 3 Growth : 1 Enterprise by logo count [ESTIMATE]. Applying a revenue-weighted blend (Starter deals average $14,400 ACV, Growth $54,000 ACV, Enterprise $84,000 ACV):
+
+**Year 2 blended NRR calculation:**
+
+| Tier | Logo count (Month 24, Base) | Avg ACV | Total ARR weight | Tier Year 2 NRR | Weighted NRR contribution |
+|---|---|---|---|---|---|
+| Starter | 4 | $14,400 | $57,600 | 105% | 2.87% |
+| Growth | 3 | $54,000 | $162,000 | 112% | 8.15% |
+| Enterprise | 1 | $84,000 | $84,000 | 118% | 2.81% |
+| **Total / Blended** | **8** | — | **$303,600** | — | **~113.8%** |
+
+Blended Year 2 NRR of ~114% [ESTIMATE] is consistent with the §18.3 growth-stage target of ≥ 110% NRR and the §14.6 assumption of 120% NRR (which is achievable in the Bull scenario where Enterprise logos are a larger share of the mix).
+
+**Year 3 blended NRR** (assuming mix shifts toward Growth/Enterprise as Starter tenants migrate): ~119% [ESTIMATE], approaching the §14.6 steady-state assumption.
+
+---
+
+### 23.5 Blended NRR Weighted by §19.7 Mix
+
+This section documents the ongoing methodology for computing blended NRR as the enterprise mix evolves, so the calculation in §23.4.2 can be reproduced in future periods without re-deriving the formula.
+
+#### 23.5.1 Blended NRR formula
+
+```
+Blended NRR = Σ (Tier_i ARR × Tier_i NRR) / Σ (Tier_i ARR)
+```
+
+Where Tier_i ARR is the opening ARR of the cohort being measured (not the new logo ARR added during the period), and Tier_i NRR is the trailing 12-month NRR for tenants in that tier.
+
+#### 23.5.2 Mix-shift effect
+
+As the enterprise book grows and Starter tenants either migrate to Growth or churn, the ARR-weighted mix shifts toward higher-NRR tiers. This mix-shift effect means blended NRR can improve even if each tier's individual NRR remains flat — it is a portfolio composition benefit, not an operational improvement. Investor reporting should separate tier-level NRR from blended NRR to prevent the mix-shift effect from masking deterioration within a specific tier.
+
+#### 23.5.3 Sensitivity to Enterprise logo share
+
+| Enterprise share of total ARR | Blended Year 2 NRR (all else equal) |
+|---|---|
+| 10% (Base scenario, Month 24) | ~114% [ESTIMATE] |
+| 20% | ~116% [ESTIMATE] |
+| 30% | ~117% [ESTIMATE] |
+| 50% | ~119% [ESTIMATE] |
+
+The sensitivity is moderate — Enterprise NRR is higher than Starter, but not dramatically so at Year 2. The primary NRR lever in Year 2 is Growth tier expansion, which drives volume at a meaningful ACV.
+
+---
+
+### 23.6 Annual Price Indexation Clause
+
+Multi-year enterprise contracts create a revenue predictability benefit (§16.4) but expose FORM to cost inflation risk over the contract term. The price indexation clause is the contractual mechanism that protects against this risk.
+
+#### 23.6.1 Standard clause terms
+
+The following terms are the default position in FORM's MSA template. Deviations require founder approval and must be logged in the contract management system.
+
+| Parameter | Standard term |
+|---|---|
+| Indexation metric | Consumer Price Index (CPI), US Urban All Items (CPI-U), published by the US Bureau of Labor Statistics |
+| Annual increase cap | CPI + 3 percentage points, per contract year |
+| Floor | 0% (no price decrease, even if CPI is negative) |
+| Ceiling | 10% absolute maximum increase per year [ESTIMATE] |
+| Application | Applied to the per-seat rate at each annual renewal within a multi-year term |
+| Notice period | Written notice ≥ 60 days before the anniversary date |
+| Opt-out | Tenant may opt out of renewal (not of the indexation clause itself) |
+
+**Example:** A Growth tenant signs a 3-year contract at $9.00/seat/month in Year 1. If CPI runs at 3.5% in Year 2, the Year 2 rate is $9.00 × (1 + min(3.5% + 3%, 10%)) = $9.00 × 1.065 = $9.585/seat/month. If CPI runs at 5% in Year 3, the Year 3 rate is $9.585 × 1.065 = $10.21/seat/month.
+
+#### 23.6.2 Three-year compounding scenarios
+
+Using the $9.00 Growth base rate and varying CPI assumptions:
+
+| CPI assumption | Year 1 rate | Year 2 rate | Year 3 rate | 3yr cumulative increase |
+|---|---|---|---|---|
+| CPI = 2% (low inflation) | $9.00 | $9.45 (+5%) | $9.92 (+5%) | +10.3% |
+| CPI = 3.5% (moderate) | $9.00 | $9.59 (+6.5%) | $10.21 (+6.5%) | +13.4% |
+| CPI = 7% (elevated) | $9.00 | $9.90 (+10% cap) | $10.89 (+10% cap) | +21.0% |
+| CPI = 0% (deflation) | $9.00 | $9.27 (+3% floor above CPI) | $9.55 (+3%) | +6.1% |
+
+The CPI+3% formula is designed so that even in a zero-inflation environment, FORM captures approximately 3% annual price growth to cover headcount cost inflation (§22.3 burn model). At the 10% annual cap, cumulative 3-year price growth of 21% still falls within the range that comparable SaaS companies apply without material customer pushback [ESTIMATE].
+
+#### 23.6.3 EUR contract FX considerations
+
+For EU-based tenants paying in EUR, the indexation clause should reference HICP (Harmonised Index of Consumer Prices) rather than US CPI-U. The FX impact on USD-denominated ARR is a separate risk addressed in OQ-30. The contract currency (USD vs EUR) must be specified in the MSA and should default to USD unless the tenant's treasury function explicitly requires EUR invoicing.
+
+---
+
+### 23.7 Expansion Audit Events (DEC-030)
+
+Per the DEC-030 decision (HMAC-chained audit log, 7-year retention), all expansion and contraction events that affect ARR must be recorded in the audit log. These events are the authoritative source for the ARR bridge computation (§23.1) and are immutable once written.
+
+The audit log schema is defined in AUDIT_LOG_SCHEMA.md. The events below follow the `event_type` naming convention established in that document.
+
+#### 23.7.1 Expansion event registry
+
+| Event type | Trigger | Severity | Retention | ARR bridge row |
+|---|---|---|---|---|
+| `enterprise.seat_expanded` | Seat count increased on an active tenant contract (admin action or SCIM-driven) | HIGH | 7 years | Seat Expansion ARR |
+| `enterprise.seat_contracted` | Seat count decreased on an active tenant contract (admin action or SCIM-driven) | HIGH | 7 years | Seat Contraction ARR |
+| `enterprise.tier_upgraded` | Tenant plan migrated to a higher tier (Starter → Growth, Growth → Enterprise) | CRITICAL | 7 years | Tier Upgrade ARR |
+| `enterprise.tier_downgraded` | Tenant plan migrated to a lower tier (any direction) | CRITICAL | 7 years | Seat Contraction ARR (net delta) |
+| `enterprise.addon_purchased` | Add-on SKU activated for a tenant | HIGH | 7 years | Add-on ARR |
+| `enterprise.contract_renewed` | Tenant contract renewed (with or without price change); also the first-contract activation event | STANDARD | 7 years | New Logo ARR (first occurrence); Logo Churn prevention signal (subsequent) |
+
+#### 23.7.2 Required audit log fields per event
+
+In addition to the standard AUDIT_LOG_SCHEMA.md fields (`event_id`, `tenant_id`, `actor_id`, `created_at`, `hmac_chain`), expansion events must include the following in the `metadata` JSONB column:
+
+| Field | Type | Description |
+|---|---|---|
+| `previous_seat_count` | integer | Seat count before the event |
+| `new_seat_count` | integer | Seat count after the event |
+| `previous_tier` | enum | `starter` / `growth` / `enterprise` |
+| `new_tier` | enum | `starter` / `growth` / `enterprise` |
+| `previous_mrr` | numeric(10,2) | Monthly contract value before the event |
+| `new_mrr` | numeric(10,2) | Monthly contract value after the event |
+| `contract_amendment_ref` | text | Internal contract amendment ID; no customer PII |
+| `effective_date` | date | Contract amendment effective date (may differ from event timestamp) |
+
+**Privacy constraint:** The `metadata` field must not contain any individual user health data, PII, or data that could identify a specific employee's behavior. The audit log records commercial terms and administrator actions only. This is consistent with the §22.7.4 expense recognition lag principle — financial events, not health events.
+
+#### 23.7.3 HMAC chaining for expansion events
+
+Expansion events participate in the same HMAC chain as all other audit log entries. The chain is computed per-tenant (not globally), so a high-volume enterprise tenant with frequent seat changes does not create chain contention with other tenants. The HMAC input for expansion events is:
+
+```
+HMAC_input = event_id || tenant_id || event_type || created_at || metadata_hash || previous_hmac
+```
+
+Where `metadata_hash` is SHA-256 of the serialized `metadata` JSONB (canonical JSON, sorted keys). See AUDIT_LOG_SCHEMA.md for the full chain specification.
+
+---
+
+### 23.8 NRR-to-Valuation Multiples
+
+Series A investors in SaaS businesses apply ARR revenue multiples that are conditioned on NRR. A business with 130% NRR commands a materially higher multiple than one at 90% NRR, because NRR is a forward-looking revenue predictor that embeds both the quality of the customer base and the growth trajectory. This section documents the translation table that converts FORM's NRR into an ARR valuation range.
+
+#### 23.8.1 Market multiple reference table
+
+Multiples reflect early-stage B2B SaaS comparable transactions and public SaaS comp data as of the document date [ESTIMATE]. These are directional — actual Series A valuation depends on growth rate, TAM narrative, team quality, and market timing.
+
+| NRR | ARR multiple (early-stage Series A) | Interpretation | FORM target scenario |
+|---|---|---|---|
+| 90% | 4–6× ARR [ESTIMATE] | Contraction-stage; investors expect turnaround story | Bear scenario §19.7 |
+| 100% | 6–8× ARR [ESTIMATE] | Flat retention; growth comes from new logos only | Below target |
+| 110% | 8–12× ARR [ESTIMATE] | Growth-stage minimum; expansion covers some churn | §18.3 growth-stage target |
+| 120% | 12–16× ARR [ESTIMATE] | Strong expansion; §14.6 steady-state assumption | Base + Bull scenario Year 2 |
+| 130% | 16–22× ARR [ESTIMATE] | Best-in-class; requires consistent Enterprise tier expansion | Bull scenario Year 3+ |
+
+#### 23.8.2 Valuation implications at §19.7 ARR levels
+
+Applying the multiple table to the §19.7 Month 24 ARR forecasts:
+
+| Scenario | Month 24 ARR | Projected NRR | ARR multiple range | Implied valuation |
+|---|---|---|---|---|
+| Bear | $86,000 [ESTIMATE] | ~100% [ESTIMATE] | 6–8× | $516k–$688k [ESTIMATE] |
+| Base | $188,000 [ESTIMATE] | ~114% [ESTIMATE] | 10–13× | $1.88M–$2.44M [ESTIMATE] |
+| Bull | $312,000 [ESTIMATE] | ~120% [ESTIMATE] | 12–16× | $3.74M–$4.99M [ESTIMATE] |
+
+**Important caveat:** Series A valuations at sub-$500k ARR are predominantly driven by the growth rate and team narrative rather than pure ARR multiples. The multiple table above becomes the dominant valuation framework at ARR > $500k. Before that threshold, the valuation is more accurately modeled as a story premium on top of a floor set by the multiple table.
+
+#### 23.8.3 NRR as a fundraise gating metric
+
+The §22.6.1 Series A readiness criteria table requires NRR ≥ 100% (minimum) and ≥ 110% (strong). The NRR-to-multiple table explains why: a business with NRR < 100% at Series A faces a 30–40% multiple compression versus the 110% NRR case, reducing the pre-money valuation by a similar magnitude. Given that the founder's equity stake is determined by the post-money dilution at Series A, maintaining NRR ≥ 110% is not just a SaaS health metric — it is directly accretive to founder economics.
+
+---
+
+### 23.9 Implementation Checklist
+
+This checklist tracks the work required to make the financial machinery in §23 operational. Items are prioritized P0 (blocks investor reporting) or P1 (improves expansion motion) and mapped to the Milestone schedule used in §19.3 and §21.
+
+#### 23.9.1 Dashboard and reporting infrastructure
+
+| Item | Priority | Milestone | Owner | Definition of done |
+|---|---|---|---|---|
+| ARR bridge computation job (monthly, event-driven from audit log) | P0 | M4 | data-engineer | Job runs on 1st of each month; outputs bridge rows to `arr_bridge_monthly` table; reconciles against Stripe ARR within $1 |
+| ARR bridge display in admin dashboard | P0 | M4 | enterprise-architect | Dashboard shows current-month bridge for `tenant_owner` and `tenant_admin` roles; read-only |
+| Tier NRR tracking by cohort (trailing 12-month rolling) | P0 | M5 | data-engineer | Cohort NRR computed per §23.5.1 formula; available per tier and blended; investor export CSV available |
+| Add-on ARR tracking (separate row from seat-based ARR) | P1 | M5 | data-engineer | Add-on ARR isolated in bridge; attach rate metric available per §23.3.2 |
+| Multi-year contract price escalation calculator | P1 | M5 | enterprise-architect | Contracting tool applies CPI+3% cap per §23.6.1; outputs year-by-year rate schedule for MSA attachment |
+
+#### 23.9.2 Event instrumentation
+
+| Item | Priority | Milestone | Owner | Definition of done |
+|---|---|---|---|---|
+| `enterprise.seat_expanded` event emission | P0 | M4 | enterprise-architect | Emitted on every seat count increase in `tenant_contracts`; HMAC-chained per §23.7.3; metadata fields per §23.7.2 |
+| `enterprise.seat_contracted` event emission | P0 | M4 | enterprise-architect | Emitted on every seat count decrease; same fields as expansion |
+| `enterprise.tier_upgraded` event emission | P0 | M4 | enterprise-architect | Emitted on tier migration; `previous_tier` and `new_tier` populated correctly; CRITICAL severity |
+| `enterprise.tier_downgraded` event emission | P0 | M4 | enterprise-architect | Emitted on downgrade; CRITICAL severity; triggers CSM alert |
+| `enterprise.addon_purchased` event emission | P0 | M5 | enterprise-architect | Emitted when add-on SKU is activated; SKU identifier in metadata |
+| `enterprise.contract_renewed` event emission | P0 | M4 | enterprise-architect | Emitted at contract renewal and at first contract activation; STANDARD severity |
+| Integration test: ARR bridge reconciliation | P0 | M4 | qa-lead | CI test confirms that a simulated seat expansion event produces a matching delta in the ARR bridge computation; must pass before M4 deploy |
+
+#### 23.9.3 Review cadence
+
+| Review | Frequency | Participants | Inputs | Outputs |
+|---|---|---|---|---|
+| ARR bridge review | Monthly (1st week) | Founder + data-engineer | Bridge output + Stripe reconciliation | Approved ARR figure for investor reporting |
+| Tier NRR review | Quarterly | Founder + customer-success | Cohort NRR table per §23.4.1 | CSM action items for at-risk tenants |
+| Add-on attach rate review | Quarterly | Founder + customer-success | §23.3.2 attach rate actuals vs targets | Pricing and packaging decisions |
+| Valuation multiples refresh | Semi-annually | Founder | §23.8.1 market comps vs updated NRR | Updated Series A narrative |
+
+---
+
+### 23.10 Open Questions
+
+**OQ-28: Actual seat expansion rate**
+
+§23.1 and §23.4 use [ESTIMATE] figures for seat expansion rates within a tier. The key unknown is: what fraction of Starter tenants add seats between contract signing and first renewal, and at what pace? Comparable B2B SaaS businesses report seat utilization of 60–80% at contract signing, with fill-up to 90%+ by Month 9 [ESTIMATE]. If FORM tenants fill seats faster (high engagement product), the Seat Expansion ARR in the bridge will exceed the §23.1.4 sample. Owner: data-engineer (instrument `enterprise.seat_expanded` events from Day 1 of first enterprise deal). Resolution: first 90 days of first enterprise tenant live. Priority: P0 — materially affects NRR measurement.
+
+**OQ-29: Add-on attach rate**
+
+§23.3.2 targets are pre-launch estimates with no comparable internal data. The white-label attach rate in particular is uncertain: ENTERPRISE.md gates white-label at $50k ARR, which limits the eligible population in Year 1 to zero or one tenants. The premium SLA attach rate is more testable early — if the first Starter tenant asks about SLA guarantees during onboarding, that is a signal that a paid SLA tier has immediate demand. Owner: customer-success (track all add-on inquiries from pilot Day 1; do not wait for formal pricing). Resolution: after first 3 renewal cycles (approximately Month 36 at current pipeline pace). Priority: P1 — affects LTV model in §14.6 but does not block Year 1 operations.
+
+**OQ-30: FX impact on EUR contracts**
+
+§23.6.3 flags the EUR contract currency question. The specific risk is: if FORM signs Growth or Enterprise tenants in the EU with EUR-denominated invoices, and the EUR/USD rate moves materially (±10% is not uncommon over a 3-year contract term), the USD-equivalent ARR in the §19.7 forecast shifts without any change in operating performance. At $188k Base ARR (Month 24), a 10% EUR depreciation on a 50% EUR-denominated book would reduce USD ARR by approximately $9,400 — a 5% hit to the Base scenario headline. Owner: founder + legal counsel (specify contract currency in MSA template before first EU enterprise deal). Resolution: before first EU enterprise pilot conversion. Priority: P1 — material at scale; immaterial in Year 1 at current pipeline.
+
+---
+
+*v1.4 additions: §23 Enterprise NRR Engine & Expansion Revenue Model — formulaic monthly ARR bridge with six named rows and sample Month 12 computation (§23.1); tier migration economics with precise ACV calculations for Starter → Growth (+$7,200, +50%) and Growth → Enterprise (+$30,000, +56%) canonical migrations, multi-year discount pricing grid, and CSM migration trigger signals (§23.2); add-on revenue taxonomy with five SKUs (white-label, premium SLA, custom integration, advanced analytics, additional admin seats), price ranges, gross margin profiles, and Year 2 attach rate targets (§23.3); three-year cohort NRR projection table by tier (Starter 100%/105%/112%, Growth 105%/112%/120%, Enterprise 108%/118%/127%) with blended NRR calculation at §19.7 Base mix yielding ~114% Year 2 blended NRR (§23.4); blended NRR formula, mix-shift effect documentation, and Enterprise share sensitivity table (§23.5); annual price indexation clause with CPI+3% cap, 0% floor, 10% ceiling, three-year compounding scenarios across four CPI regimes, and EUR contract HICP note (§23.6); six DEC-030 expansion audit events (enterprise.seat_expanded HIGH, enterprise.seat_contracted HIGH, enterprise.tier_upgraded CRITICAL, enterprise.tier_downgraded CRITICAL, enterprise.addon_purchased HIGH, enterprise.contract_renewed STANDARD) with required metadata fields and per-tenant HMAC chaining specification (§23.7); NRR-to-ARR multiple table (90% NRR → 4–6×; 130% NRR → 16–22×) with implied valuation ranges at §19.7 Bear/Base/Bull ARR levels and NRR as a founder equity protection metric (§23.8); implementation checklist with P0/P1 priorities and M4/M5 milestones covering ARR bridge job, event instrumentation for all six audit events, tier NRR tracking, and quarterly review cadence (§23.9); OQ-28 (actual seat expansion rate), OQ-29 (add-on attach rate at first renewal), OQ-30 (FX impact on EUR-denominated contracts) (§23.10).*

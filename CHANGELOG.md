@@ -6,6 +6,16 @@
 
 ---
 
+## [1.42.0] — 2026-05-31
+
+### Added
+- `docs/COST_MODEL.md §23` — Enterprise NRR Engine & Expansion Revenue Model (+420 рядків, doc bumped v1.0 → v1.4). Formulaic monthly ARR bridge з шістьма рядками (Opening ARR + New Logo + Seat Expansion + Tier Upgrade + Add-on − Seat Contraction − Logo Churn = Closing ARR) та sample Month 12 Base computation (§23.1). Tier migration economics: Starter→Growth +$7,200 ACV (+50%), Growth→Enterprise +$30,000 ACV (+56%); multi-year discount pricing grid (1yr/2yr/3yr) по всіх тірах; CSM migration trigger signals (seat utilisation ≥ 90%, activation ≥ 70%) (§23.2). Add-on revenue taxonomy: 5 SKUs (white-label $500–2,000/mo ~90% GM, premium SLA $300–800 ~85%, custom integration $400–1,500 ~70%, advanced analytics $200–600 ~88%, extra admin seats $50–100/seat ~95%); Year 2 attach rate targets (§23.3). Three-year cohort NRR table: Starter 100%/105%/112%, Growth 105%/112%/120%, Enterprise 108%/118%/127%; blended NRR при §19.7 Base mix (4:3:1 logo ratio) → ~114% Year 2 (§23.4). Blended NRR formula, mix-shift effect documentation, Enterprise-share sensitivity table (§23.5). Annual price indexation clause: CPI-U+3% cap, 0% floor, 10% ceiling, 60-day notice; compounding scenarios по 4 CPI regime; EUR contract HICP note (§23.6). Шість DEC-030 HMAC-chained expansion audit events: enterprise.seat_expanded (HIGH, 7yr), enterprise.seat_contracted (HIGH, 7yr), enterprise.tier_upgraded (CRITICAL, 7yr), enterprise.tier_downgraded (CRITICAL, 7yr), enterprise.addon_purchased (HIGH, 7yr), enterprise.contract_renewed (STANDARD, 7yr) з required metadata JSONB fields та per-tenant HMAC chain input spec (§23.7). NRR-to-ARR multiple table: 90%→4–6×, 100%→6–8×, 110%→8–12×, 120%→12–16×, 130%→16–22×; implied valuations при §19.7 Bear/Base/Bull ARR (§23.8). Implementation checklist: 12 items P0/P1 M4/M5 (ARR bridge job, event instrumentation, tier NRR tracking, quarterly review cadence) (§23.9). OQ-28 (actual seat expansion rate — P0, data-engineer, Day 90 first enterprise tenant), OQ-29 (add-on attach rate — P1, customer-success, Month 36), OQ-30 (FX EUR/USD impact — P1, founder + counsel, before first EU pilot conversion) (§23.10).
+
+### Changed
+- `VERSION` → 1.42.0
+
+---
+
 ## [1.41.0] — 2026-05-31
 
 ### Added
