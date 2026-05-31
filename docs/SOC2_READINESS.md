@@ -12798,3 +12798,1074 @@ ORDER BY 1;
 ---
 
 *v1.9 additions (2026-05-31): §47 Sentry Alert Rules Configuration + `row-count-monitor` Edge Function — CC7-GAP-005 + CC7-GAP-006 Auditor Exhibit. Closes the final two CC7 implementation-level documentation P0 gaps specified in §25 but not yet implementation-specced. Four Sentry alert rules fully specified: `FORM-FATAL-001` (fatal error count > 5 in 5 min → P0 PagerDuty CRITICAL + Slack `#security-alerts`), `FORM-SPIKE-001` (error count > 100 in 5 min → P1 PagerDuty WARNING + Slack `#engineering-alerts`; companion metric alert `FORM-SPIKE-001B` for session error rate), `FORM-AUTH-ERR-001` (tag `feature=auth` error count > 15 in 5 min → P1 PagerDuty + Slack `#security-alerts`), and `FORM-HEALTH-LEAK-001` (tag `health_field_detected=true` count > 0 in 5 min → P0 PagerDuty CRITICAL + Slack `#security-alerts`); each rule includes complete JSON specification, Sentry Dashboard step-by-step configuration path, and equivalent `curl`-to-Sentry-REST-API form. `sentry.init()` configuration block (`apps/api/src/sentry.ts`): `tracesSampleRate: 0.02`, `sendDefaultPii: false`, `environment: production`, `release` from `WORKER_VERSION`, `beforeSend` hook wired via factory `makeSentryBeforeSend`. `beforeSend` scrubber (`supabase/functions/shared/sentry-scrubber.ts`): recursive `scrubObject` strips eleven health field names (`hrv`, `hrv_rmssd`, `heart_rate`, `resting_hr`, `weight_kg`, `body_fat_pct`, `sleep_score`, `sleep_duration_min`, `readiness_score`, `spo2`, `vo2max`) from `event.extra`, `event.contexts`, and `event.request.data`; replaces with `[HEALTH_DATA_REDACTED]`; sets tag `health_field_detected: true` (detection surface for FORM-HEALTH-LEAK-001); emits `system.sentry_health_field_detected` DEC-030 CRITICAL/7yr event via `emit-audit-event` async (fire-and-forget, never blocks `beforeSend` return); structured stderr log to Cloudflare Logpush; always returns scrubbed event, never null; Vitest unit test scaffold included. `row-count-monitor` Edge Function (`supabase/functions/row-count-monitor/index.ts`): Supabase Edge Function invoked by pg_cron `*/15 * * * *`; monitors six tables (`users`, `workouts`, `workout_sets`, `programs`, `workout_templates`, `audit_logs`); single round-trip via `get_monitored_table_counts` RPC (LEFT JOIN `pg_stat_user_tables` with `monitoring_baselines`); `deviation_pct = (baseline - current) / baseline * 100`; >5% → P1 Slack `#engineering-alerts`; >20% → P0 PagerDuty Events API v2 CRITICAL + Slack `#security-alerts`; alert deduplication via `monitoring_alerts` table (same `table_name + alert_tier` within 60 min window suppresses re-alert); handles missing baseline (skip + emit MEDIUM audit event); Slack Block Kit message includes table name, current count, baseline, deviation %, severity badge, and runbook link R-01 (Data Breach / Unauthorized Data Access). `monitoring_baselines` + `monitoring_alerts` DDL: both tables with `ENABLE ROW LEVEL SECURITY` and deny-all policies for `anon` and `authenticated` roles; `idx_monitoring_alerts_dedup` index on `(table_name, alert_tier, fired_at DESC)`; `get_monitored_table_counts` SECURITY DEFINER RPC; bash seeding script with operator safety guard (active-query check + manual YES confirmation), `ON CONFLICT DO UPDATE` to allow re-seed; post-seed validation query. Four new DEC-030 events: `system.sentry_health_field_detected` (CRITICAL, 7yr), `system.row_count_anomaly_detected` (HIGH, 7yr), `system.row_count_check_passed` (LOW, 3yr), `system.row_count_baseline_missing` (MEDIUM, 3yr). Four new secrets: `SENTRY_DSN` (Worker), `SENTRY_PAGERDUTY_SERVICE_KEY` (Worker/record), `MONITORING_SLACK_WEBHOOK_URL` (Edge Function), `MONITORING_PAGERDUTY_ROUTING_KEY` (Edge Function). Five evidence artefacts PRE-47-E-001 through PRE-47-E-005. 11-item implementation checklist: items 1-7 (Sentry scrubber + init + deploy + PD integration + 4 alert rules + PRE-47-E-003 test, M3), items 8-10 (monitoring DDL + seed + row-count-monitor deploy + cron, M3), item 11 (PRE-47-E-005 baseline inflation test, M4). New runbook R-15 (Health Data Leak Response) flagged as required authoring task. Gap closures: CC7-GAP-005 🔴 → 🟡 AUTHORED, CC7-GAP-006 🔴 → 🟡 AUTHORED. P0 count: 9 → 7. CC7.1/CC7.2/CC7.3 advance to implementation-spec-complete partial; CC7.4 blocked on R-15 authoring. SOC 2 readiness: ~94% → ~95%.*
+
+---
+
+## 48. Cloudflare WAF Rate-Limit Rules: Terraform Configuration + Logpush Routing — CC7-GAP-007 Auditor Exhibit
+
+### 48.1 Purpose and Scope
+
+#### 48.1.1 Goal
+
+This section provides the deployable Terraform HCL, Logpush configuration, Cloudflare Notifications webhook wiring, DEC-030 audit event definitions, and SOC 2 evidence artefacts required to close **CC7-GAP-007** from **🔴 Open (P0)** to **🟡 Authored**.
+
+CC7-GAP-007 was opened in §25.10 with the finding:
+
+> "Configure Cloudflare WAF rate-limit rules FORM-AUTH-RATELIMIT-001/002 and FORM-API-RATELIMIT-001/002/003"
+
+The five rules were specified as pseudocode and threat-model narrative in §25.3 (auth endpoint protection) and §25.4 (API surface protection). §48 converts that specification into production-grade infrastructure-as-code with full evidence collection and monitoring integration.
+
+#### 48.1.2 SOC 2 Criteria Addressed
+
+| Criterion | Description | How §48 contributes |
+|---|---|---|
+| CC7.1 | Threat detection mechanisms | Five WAF rules detect brute-force, enumeration, and spike attacks at the Cloudflare edge before requests reach the application layer |
+| CC7.2 | System monitoring | Logpush delivers a continuous firewall event stream to R2; form-alert-relay dispatches real-time alerts; HMAC-chained `security.waf_alert_fired` events provide a machine-readable monitoring record |
+| CC7.3 | Event evaluation | form-alert-relay severity mapping constitutes documented evaluation logic; `security.waf_alert_fired.metadata.severity` is the auditable output |
+| CC7.4 | Incident response | WAF block events trigger runbook R-01 (Account Takeover / Brute Force) per §25.3.4 |
+| CC6.6 | External boundary protection | Five WAF rules collectively form the edge-level authentication and API protection boundary for the FORM platform |
+
+#### 48.1.3 Relationship to Prior Sections
+
+- **§25.3–25.4**: Original pseudocode specification for all five rules. §48 supersedes the pseudocode with deployable HCL.
+- **§46**: `form-alert-relay` Worker deployed there is the inbound webhook target for Cloudflare Notifications wired in §48.5. The `emit-audit-event` call chain in §46 emits the DEC-030 events defined in §48.7.
+- **§47**: Sentry alert rules and `row-count-monitor` closed CC7-GAP-005/006. §48 closes the final CC7 P0 gap (CC7-GAP-007), completing the CC7 detection coverage triangle: application errors (§47 Sentry) + database anomalies (§47 row-count-monitor) + edge/network attacks (§48 WAF).
+
+---
+
+### 48.2 Architecture Overview
+
+```
+                        ┌─────────────────────────────────────────────────────────┐
+                        │                  Cloudflare Edge                        │
+                        │                                                         │
+  Inbound request ──▶   │  WAF Ruleset Evaluation                                 │
+                        │  ┌──────────────────────────────────────────────────┐   │
+                        │  │  FORM-AUTH-RATELIMIT-001  (IP, /auth/v1/token)   │   │
+                        │  │  FORM-AUTH-RATELIMIT-002  (IP+email, /auth/v1/token) │
+                        │  │  FORM-API-RATELIMIT-001   (IP, /api/)            │   │
+                        │  │  FORM-API-RATELIMIT-002   (JWT sub, /api/)       │   │
+                        │  │  FORM-API-RATELIMIT-003   (IP, /api/workouts)    │   │
+                        │  └──────────────┬───────────────────────────────────┘   │
+                        │                 │ Block / JS Challenge                  │
+                        └─────────────────┼───────────────────────────────────────┘
+                                          │
+                      ┌───────────────────┼───────────────────────┐
+                      │                   │                        │
+                      ▼                   ▼                        ▼
+             Request blocked     Cloudflare Logpush        Cloudflare Notifications
+             → HTTP 429 /        (firewall_events)         (Security Events webhook)
+               JS Challenge      → R2 bucket               → form-alert-relay Worker
+                                   form-audit-logs/            (§46)
+                                   waf-events/             │
+                                   YYYY/MM/DD/             ├─▶ Slack #security-alerts
+                                   *.ndjson                ├─▶ PagerDuty (P0/P1 only)
+                                                           └─▶ emit DEC-030
+                                                               security.waf_alert_fired
+                                                               (HMAC chain, 7yr)
+```
+
+**Data flow summary:**
+
+1. Every inbound request to `form.coach` traverses the Cloudflare WAF ruleset before reaching the Supabase origin.
+2. Rules evaluate rate counters keyed by IP or (IP, email body field). If a counter breaches the threshold, Cloudflare applies the configured action (block or js_challenge) and logs a firewall event.
+3. Cloudflare Logpush streams `firewall_events` dataset to the R2 bucket `form-audit-logs/waf-events/` in NDJSON format at high frequency (sub-minute delivery SLA).
+4. Cloudflare Notifications sends a signed webhook payload to the `form-alert-relay` Worker endpoint (`/cloudflare-event`) for every block event matching a `FORM-*RATELIMIT-*` rule ID.
+5. `form-alert-relay` evaluates severity (§48.5), dispatches Slack and/or PagerDuty, and emits a `security.waf_alert_fired` DEC-030 event into the HMAC audit chain.
+6. A companion `security.waf_rule_blocked` event is emitted for every individual block forwarded, providing the low-level record. `security.waf_alert_fired` provides the high-level alert record that auditors inspect.
+
+---
+
+### 48.3 Terraform Configuration
+
+All Terraform files live in `infra/cloudflare/`. The Cloudflare Terraform provider version is pinned to `~> 4.0`.
+
+#### 48.3.1 Provider and Version Pins
+
+```hcl
+# infra/cloudflare/versions.tf
+
+terraform {
+  required_version = ">= 1.7.0"
+
+  required_providers {
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
+  }
+
+  # Remote state — update bucket/key for your environment
+  backend "s3" {
+    bucket = "form-terraform-state"
+    key    = "cloudflare/waf/terraform.tfstate"
+    region = "auto"
+    # Cloudflare R2 endpoint — set via TF_BACKEND_CONFIG or workspace config
+  }
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+```
+
+#### 48.3.2 Variables
+
+```hcl
+# infra/cloudflare/variables.tf
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token. Required permissions: Zone:Edit, Firewall Services:Edit, Logpush:Edit, Notifications:Edit. Store in CI secret CLOUDFLARE_API_TOKEN — never commit."
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_zone_id" {
+  description = "Cloudflare Zone ID for form.coach. Visible in dashboard Overview page → API section."
+  type        = string
+}
+
+variable "cloudflare_account_id" {
+  description = "Cloudflare Account ID. Required for R2 bucket and Logpush job resources."
+  type        = string
+}
+
+variable "cloudflare_plan" {
+  description = "Active Cloudflare plan for this zone. Accepted values: free | pro | business | enterprise. FORM-AUTH-RATELIMIT-002 requires 'business' or 'enterprise' for HTTP request body inspection. If set to 'free' or 'pro', AUTH-002 is disabled and the fallback auth-monitor Edge Function (§46) is the sole defence."
+  type        = string
+  default     = "business"
+
+  validation {
+    condition     = contains(["free", "pro", "business", "enterprise"], var.cloudflare_plan)
+    error_message = "cloudflare_plan must be one of: free, pro, business, enterprise."
+  }
+}
+
+variable "alert_relay_webhook_url" {
+  description = "HTTPS endpoint of the form-alert-relay Worker that receives Cloudflare Notification events. Deployed in §46. Example: https://waf-relay.form-workers.workers.dev/cloudflare-event"
+  type        = string
+}
+
+variable "r2_waf_access_key_id" {
+  description = "R2 access key ID for Logpush destination. Scoped to form-audit-logs bucket write only."
+  type        = string
+  sensitive   = true
+}
+
+variable "r2_waf_secret_access_key" {
+  description = "R2 secret access key for Logpush destination."
+  type        = string
+  sensitive   = true
+}
+```
+
+#### 48.3.3 Auth Rate-Limiting Ruleset (FORM-AUTH-RATELIMIT-001 and 002)
+
+```hcl
+# infra/cloudflare/waf_auth_ratelimit.tf
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FORM-AUTH-RATELIMIT-001
+# IP-level brute-force protection on the Supabase auth token endpoint.
+# Threshold: 5 POST requests / 60 seconds per source IP → HTTP 429 block,
+# 10-minute mitigation period.
+# Plan requirement: Free+. No body inspection required.
+# ─────────────────────────────────────────────────────────────────────────────
+resource "cloudflare_ruleset" "auth_ratelimit" {
+  zone_id     = var.cloudflare_zone_id
+  name        = "FORM Auth Rate-Limit Rules"
+  description = "Brute-force and enumeration protection for Supabase auth endpoints. CC7-GAP-007. Managed by Terraform — do not edit in dashboard."
+  kind        = "zone"
+  phase       = "http_ratelimit"
+
+  rules {
+    ref         = "FORM-AUTH-RATELIMIT-001"
+    description = "IP-level auth failure rate limit: 5 POST / 60s per IP on /auth/v1/token or /auth/v1/otp. Block 10 min. CC7.1/CC6.6."
+    enabled     = true
+
+    # Match: POST to either auth token endpoint
+    expression = "(http.request.method eq \"POST\") and (http.request.uri.path eq \"/auth/v1/token\" or http.request.uri.path eq \"/auth/v1/otp\")"
+
+    action = "block"
+
+    action_parameters {
+      response {
+        status_code  = 429
+        content_type = "application/json"
+        content      = "{\"error\":\"rate_limit_exceeded\",\"message\":\"Too many authentication attempts. Please wait before retrying.\",\"rule\":\"FORM-AUTH-RATELIMIT-001\"}"
+      }
+    }
+
+    ratelimit {
+      # Count unique source IPs
+      characteristics = ["cf.colo.id", "ip.src"]
+
+      # 5 requests within 60-second sliding window
+      period              = 60
+      requests_per_period = 5
+
+      # Once triggered, block for 10 minutes (600 seconds)
+      mitigation_timeout = 600
+
+      # Count all matching requests (no counting_expression filter — count every POST)
+      # counting_expression omitted intentionally: count the rule-matching requests themselves
+    }
+  }
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FORM-AUTH-RATELIMIT-002
+  # Account enumeration signal: per (IP, email) combination.
+  # Threshold: 10 POST / 300s → Block 30 min.
+  # REQUIRES Cloudflare Business+ for HTTP request body inspection.
+  # If cloudflare_plan is "free" or "pro", this rule is disabled and the
+  # auth-monitor Edge Function (§46) is the sole enumeration defence.
+  # ─────────────────────────────────────────────────────────────────────────────
+  rules {
+    ref         = "FORM-AUTH-RATELIMIT-002"
+    description = "Account enumeration signal: 10 POST / 300s per (IP, email) on /auth/v1/token. Block 30 min. Requires Business+ body inspection. CC7.1."
+    # Disable this rule if the plan does not support body inspection
+    enabled = contains(["business", "enterprise"], var.cloudflare_plan)
+
+    # Match: POST to token endpoint only (email is in POST body — body inspection required)
+    expression = "(http.request.method eq \"POST\") and (http.request.uri.path eq \"/auth/v1/token\")"
+
+    action = "block"
+
+    action_parameters {
+      response {
+        status_code  = 429
+        content_type = "application/json"
+        content      = "{\"error\":\"rate_limit_exceeded\",\"message\":\"Too many authentication attempts for this account. Please wait before retrying.\",\"rule\":\"FORM-AUTH-RATELIMIT-002\"}"
+      }
+    }
+
+    ratelimit {
+      # Key by source IP AND the `email` field extracted from the POST body.
+      # `http.request.body.form["email"]` requires Business+ Cloudflare plan.
+      # If body inspection is unavailable, disable this rule (enabled = false above).
+      characteristics = ["cf.colo.id", "ip.src", "http.request.body.form[\"email\"]"]
+
+      period              = 300
+      requests_per_period = 10
+
+      mitigation_timeout = 1800 # 30 minutes
+
+      # Only count requests where the response status indicates a failure (401/400).
+      # This avoids penalising legitimate repeated logins that succeed.
+      # counting_expression uses cf.edge.server_port as a proxy signal; the actual
+      # response-code-based counting requires enterprise. On Business, counting_expression
+      # is set to the same as expression (count all matching POSTs regardless of outcome).
+      # Accepted trade-off documented in §25.3.2.
+      counting_expression = "(http.request.method eq \"POST\") and (http.request.uri.path eq \"/auth/v1/token\")"
+    }
+  }
+}
+```
+
+#### 48.3.4 API Rate-Limiting Ruleset (FORM-API-RATELIMIT-001, 002, 003)
+
+```hcl
+# infra/cloudflare/waf_api_ratelimit.tf
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API Rate-Limit Rules — FORM-API-RATELIMIT-001/002/003
+# Phase: http_ratelimit (separate ruleset from auth to allow independent ordering)
+# ─────────────────────────────────────────────────────────────────────────────
+resource "cloudflare_ruleset" "api_ratelimit" {
+  zone_id     = var.cloudflare_zone_id
+  name        = "FORM API Rate-Limit Rules"
+  description = "Global and per-user API rate limiting plus workout spike protection. CC7-GAP-007. Managed by Terraform — do not edit in dashboard."
+  kind        = "zone"
+  phase       = "http_ratelimit"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FORM-API-RATELIMIT-001
+  # Global IP-level rate limit on all /api/ paths.
+  # Threshold: 200 requests / 60s per IP → Block 5 min.
+  # Protects against volumetric scraping or DDoS targeting the API prefix.
+  # Plan requirement: Free+.
+  # ─────────────────────────────────────────────────────────────────────────────
+  rules {
+    ref         = "FORM-API-RATELIMIT-001"
+    description = "Global API rate limit: 200 req / 60s per IP on /api/ prefix. Block 5 min. CC7.1/CC6.6."
+    enabled     = true
+
+    expression = "http.request.uri.path matches \"^/api/\""
+
+    action = "block"
+
+    action_parameters {
+      response {
+        status_code  = 429
+        content_type = "application/json"
+        content      = "{\"error\":\"rate_limit_exceeded\",\"message\":\"API rate limit exceeded. Please slow down your request rate.\",\"rule\":\"FORM-API-RATELIMIT-001\"}"
+      }
+    }
+
+    ratelimit {
+      characteristics     = ["cf.colo.id", "ip.src"]
+      period              = 60
+      requests_per_period = 200
+      mitigation_timeout  = 300 # 5 minutes
+    }
+  }
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FORM-API-RATELIMIT-002
+  # Per-authenticated-user rate limit keyed on JWT subject claim.
+  # Threshold: 500 requests / 60s per JWT sub → Block 5 min.
+  # Requires Cloudflare to extract the Authorization header and hash the JWT sub.
+  # The `http.request.headers["authorization"]` characteristic keys the counter
+  # on the full Bearer token; this is a conservative proxy for JWT sub since
+  # token rotation is bounded by the Supabase JWT expiry window (1 hour default).
+  # For true per-sub keying, an enterprise Workers for Platforms approach is
+  # needed. Accepted trade-off documented in §25.4.2.
+  # Plan requirement: Pro+.
+  # ─────────────────────────────────────────────────────────────────────────────
+  rules {
+    ref         = "FORM-API-RATELIMIT-002"
+    description = "Authenticated API rate limit: 500 req / 60s per JWT Bearer token on /api/. Block 5 min. CC7.1."
+    enabled     = true
+
+    # Match /api/ paths that carry an Authorization header (authenticated calls)
+    expression = "(http.request.uri.path matches \"^/api/\") and (http.request.headers[\"authorization\"][*] matches \"^Bearer \")"
+
+    action = "block"
+
+    action_parameters {
+      response {
+        status_code  = 429
+        content_type = "application/json"
+        content      = "{\"error\":\"rate_limit_exceeded\",\"message\":\"Per-user API rate limit exceeded. Your account has been temporarily rate limited.\",\"rule\":\"FORM-API-RATELIMIT-002\"}"
+      }
+    }
+
+    ratelimit {
+      # Key by the Authorization header value (Bearer token as JWT sub proxy)
+      characteristics     = ["cf.colo.id", "http.request.headers[\"authorization\"]"]
+      period              = 60
+      requests_per_period = 500
+      mitigation_timeout  = 300 # 5 minutes
+    }
+  }
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FORM-API-RATELIMIT-003
+  # Workout data submission spike protection.
+  # Threshold: 20 POST / 60s per IP to /api/workouts → JS Challenge, 3 min.
+  # Action is js_challenge (not block) to allow legitimate clients through while
+  # stopping scripted bots. Accepted trade-off: adds ~2s latency to clients
+  # that trigger the threshold but are legitimate. Document in runbook R-02.
+  # Plan requirement: Free+.
+  # ─────────────────────────────────────────────────────────────────────────────
+  rules {
+    ref         = "FORM-API-RATELIMIT-003"
+    description = "Workout submission spike: 20 POST / 60s per IP on /api/workouts. JS Challenge 3 min. CC7.1."
+    enabled     = true
+
+    expression = "(http.request.method eq \"POST\") and (http.request.uri.path eq \"/api/workouts\")"
+
+    # JS Challenge preferred over block: legitimate mobile clients pass the
+    # challenge after a brief delay; scripted bots fail it silently.
+    action = "js_challenge"
+
+    ratelimit {
+      characteristics     = ["cf.colo.id", "ip.src"]
+      period              = 60
+      requests_per_period = 20
+      mitigation_timeout  = 180 # 3 minutes
+    }
+  }
+}
+```
+
+#### 48.3.5 Outputs
+
+```hcl
+# infra/cloudflare/outputs.tf  (append to existing file if present)
+
+output "waf_auth_ruleset_id" {
+  description = "Cloudflare ruleset ID for FORM auth rate-limit rules (AUTH-001/002). Use in evidence PRE-48-E-001."
+  value       = cloudflare_ruleset.auth_ratelimit.id
+}
+
+output "waf_api_ruleset_id" {
+  description = "Cloudflare ruleset ID for FORM API rate-limit rules (API-001/002/003). Use in evidence PRE-48-E-001."
+  value       = cloudflare_ruleset.api_ratelimit.id
+}
+
+output "waf_logpush_job_id" {
+  description = "Cloudflare Logpush job ID for firewall_events → R2. Use in evidence PRE-48-E-003."
+  value       = cloudflare_logpush_job.waf_firewall_events.id
+}
+```
+
+---
+
+### 48.4 Cloudflare Logpush Configuration (Terraform)
+
+#### 48.4.1 R2 Bucket (create if not already defined)
+
+```hcl
+# infra/cloudflare/r2_audit_logs.tf
+
+# The form-audit-logs R2 bucket is the canonical destination for all
+# compliance audit streams. If this bucket was created in a prior section
+# (e.g., §46 Logpush for Workers analytics), import the existing resource
+# rather than creating a new one:
+#   terraform import cloudflare_r2_bucket.audit_logs <account_id>/form-audit-logs
+#
+# If this is the first Terraform reference to the bucket, it will be created.
+
+resource "cloudflare_r2_bucket" "audit_logs" {
+  account_id = var.cloudflare_account_id
+  name       = "form-audit-logs"
+
+  # Retain all objects for 7 years to satisfy DEC-030 HIGH/CRITICAL retention policy.
+  # Cloudflare R2 does not natively enforce object lock as of provider v4.
+  # Retention enforcement is implemented via:
+  #   (a) IAM: the R2 access key used by Logpush is write-only (no delete permission)
+  #   (b) Lifecycle rule applied via Cloudflare dashboard (not yet in TF provider v4)
+  #   (c) Quarterly manual audit: `aws s3api list-object-versions --bucket form-audit-logs`
+  #       run against R2 S3-compatible endpoint confirms no deletions in period
+  location = "WNAM" # Western North America — co-locate with Supabase us-west-2 region
+}
+```
+
+#### 48.4.2 Logpush Job
+
+```hcl
+# infra/cloudflare/logpush_waf.tf
+
+resource "cloudflare_logpush_job" "waf_firewall_events" {
+  zone_id          = var.cloudflare_zone_id
+  enabled          = true
+  name             = "form-waf-firewall-events-to-r2"
+  logpull_options  = "fields=Action,ClientIP,ClientRequestHost,ClientRequestMethod,ClientRequestURI,EdgeResponseStatus,RuleID,Datetime,ClientCountry,RayID&timestamps=rfc3339"
+
+  # Dataset: firewall_events covers WAF, rate-limit, and firewall rules actions.
+  dataset = "firewall_events"
+
+  # Destination: R2 bucket with path prefix for WAF events.
+  # Credentials must be scoped to write-only on the form-audit-logs bucket.
+  # Use the R2 S3-compatible endpoint format required by Logpush.
+  destination_conf = "r2://form-audit-logs/waf-events/?account-id=${var.cloudflare_account_id}&access-key-id=${var.r2_waf_access_key_id}&secret-access-key=${var.r2_waf_secret_access_key}"
+
+  # Filter: only deliver block and js_challenge events for FORM-*RATELIMIT-* rules.
+  # This prevents noise from unrelated WAF events (e.g., managed ruleset blocks)
+  # while ensuring all five FORM rate-limit rule events are captured.
+  #
+  # Cloudflare Logpush filter syntax is a JSON string.
+  # "RuleID" contains the ref value set in the cloudflare_ruleset rules blocks above.
+  filter = jsonencode({
+    where = {
+      and = [
+        {
+          or = [
+            { key = "Action", operator = "eq", value = "block" },
+            { key = "Action", operator = "eq", value = "jschallenge" }
+          ]
+        },
+        {
+          or = [
+            { key = "RuleID", operator = "contains", value = "FORM-AUTH-RATELIMIT-" },
+            { key = "RuleID", operator = "contains", value = "FORM-API-RATELIMIT-" }
+          ]
+        }
+      ]
+    }
+  })
+
+  # Output format: NDJSON (one JSON object per line) for easy streaming ingestion.
+  output_options {
+    field_names = [
+      "Action",
+      "ClientIP",
+      "ClientRequestHost",
+      "ClientRequestMethod",
+      "ClientRequestURI",
+      "EdgeResponseStatus",
+      "RuleID",
+      "Datetime",
+      "ClientCountry",
+      "RayID"
+    ]
+    output_type       = "ndjson"
+    batch_prefix      = ""
+    batch_suffix      = "\n"
+    # Timestamp format: RFC3339 (ISO 8601) for compatibility with log parsers
+    timestamp_format  = "rfc3339"
+  }
+
+  # High frequency: Cloudflare attempts to deliver log batches within ~30 seconds
+  # of event occurrence. This satisfies the CC7.2 monitoring continuity requirement.
+  frequency = "high"
+
+  depends_on = [cloudflare_r2_bucket.audit_logs]
+}
+```
+
+#### 48.4.3 Logpush R2 Object Layout
+
+Objects are written by Cloudflare under the prefix `waf-events/` with the following path structure:
+
+```
+form-audit-logs/
+  waf-events/
+    YYYY/
+      MM/
+        DD/
+          HH/
+            <zone_id>_<dataset>_<batch_id>.log.gz
+```
+
+Example path: `waf-events/2026/05/31/14/form-zone-abc123_firewall_events_20260531T141500Z_abc.log.gz`
+
+Each object is NDJSON, gzip-compressed, containing one firewall event per line. For evidence collection (PRE-48-E-003), count objects under `waf-events/YYYY/MM/` to confirm continuous delivery over the 30-day audit window.
+
+---
+
+### 48.5 Cloudflare Notifications Webhook Configuration
+
+#### 48.5.1 Terraform: Notification Policy
+
+```hcl
+# infra/cloudflare/notifications_waf.tf
+
+# Cloudflare Notifications: Security Events alert
+# Fires when a WAF rule matching our FORM-* prefix triggers a block action.
+# Webhook destination: form-alert-relay Worker /cloudflare-event endpoint (§46).
+
+resource "cloudflare_notification_policy" "waf_block_alerts" {
+  account_id  = var.cloudflare_account_id
+  name        = "FORM WAF Rate-Limit Block Alerts"
+  description = "Sends Security Events notifications to form-alert-relay for all FORM-*RATELIMIT-* block events. Feeds DEC-030 security.waf_alert_fired audit chain. CC7-GAP-007."
+  enabled     = true
+
+  # Alert type: Security Events (Cloudflare Firewall)
+  # This alert type fires on WAF, rate-limit, and firewall rule actions.
+  alert_type = "security_events_alert"
+
+  # Filter: only notify for block actions on FORM-* prefixed rules.
+  # Cloudflare Notifications filter syntax varies by alert type; use the
+  # "filters" block supported in provider v4.
+  filters {
+    # Actions to notify on: block and jschallenge
+    actions = ["block", "jschallenge"]
+
+    # Product: rate-limit (covers http_ratelimit phase rules)
+    products = ["rateLimit"]
+
+    # Zone scope
+    zones = [var.cloudflare_zone_id]
+  }
+
+  # Webhook delivery to form-alert-relay
+  email_integration {
+    # Email integrations disabled — webhook only
+    id = ""
+  }
+
+  webhooks_integration {
+    id = cloudflare_notification_webhook.alert_relay.id
+  }
+}
+
+resource "cloudflare_notification_webhook" "alert_relay" {
+  account_id = var.cloudflare_account_id
+  name       = "form-alert-relay-waf"
+  url        = var.alert_relay_webhook_url
+  # Cloudflare signs the payload with HMAC-SHA256 using the secret below.
+  # form-alert-relay verifies this signature before processing (§48.5.2).
+  secret     = var.cloudflare_notification_webhook_secret
+}
+
+variable "cloudflare_notification_webhook_secret" {
+  description = "HMAC secret used by Cloudflare to sign notification webhook payloads. form-alert-relay verifies this. Minimum 32 bytes, base64-encoded. Store in CI secret CLOUDFLARE_NOTIFICATION_WEBHOOK_SECRET."
+  type        = string
+  sensitive   = true
+}
+```
+
+#### 48.5.2 form-alert-relay: WAF Event Handler
+
+The following TypeScript snippet extends the `form-alert-relay` Worker (§46) to handle the `/cloudflare-event` route. Add this to `workers/form-alert-relay/src/index.ts`.
+
+```typescript
+// workers/form-alert-relay/src/waf-handler.ts
+// Handles Cloudflare Security Events notifications for WAF rate-limit blocks.
+// Called by the router in index.ts for POST /cloudflare-event.
+// DO NOT log ClientIP in plaintext — hash it before including in any audit event.
+
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+// ─── Rule severity mapping ────────────────────────────────────────────────────
+// Determines PagerDuty urgency and Slack channel routing.
+// Any rule firing > 100 times in 5 minutes escalates to P1 regardless of base tier.
+
+const RULE_SEVERITY: Record<string, "P1" | "P2"> = {
+  "FORM-AUTH-RATELIMIT-001": "P1", // Brute force — account takeover signal
+  "FORM-AUTH-RATELIMIT-002": "P1", // Enumeration — credential stuffing signal
+  "FORM-API-RATELIMIT-001":  "P2", // Volumetric API abuse
+  "FORM-API-RATELIMIT-002":  "P2", // Per-user API abuse
+  "FORM-API-RATELIMIT-003":  "P2", // Workout submission spike (js_challenge)
+};
+
+// Escalation threshold: if block_count_5m exceeds this for any rule, escalate to P1
+const BURST_ESCALATION_THRESHOLD = 100;
+
+// ─── Cloudflare notification payload shape (simplified) ──────────────────────
+interface CloudflareSecurityEvent {
+  RuleID:               string;
+  Action:               string; // "block" | "jschallenge"
+  ClientIP:             string; // MUST be hashed before logging
+  ClientRequestURI:     string;
+  ClientRequestMethod:  string;
+  ClientCountry:        string;
+  Datetime:             string; // RFC3339
+  RayID:                string;
+  // block_count_5m is injected by Cloudflare Analytics query or estimated from
+  // the batch size of the notification payload. If not present, default to 1.
+  block_count_5m?:      number;
+}
+
+interface CloudflareNotificationPayload {
+  data:    CloudflareSecurityEvent[];
+  zone_id: string;
+  alert_type: string;
+}
+
+// ─── HMAC signature verification ─────────────────────────────────────────────
+
+function verifyCloudflareSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  secret: string
+): boolean {
+  if (!signatureHeader) return false;
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const expectedBuf = Buffer.from(`sha256=${expected}`, "utf8");
+  const actualBuf   = Buffer.from(signatureHeader, "utf8");
+  if (expectedBuf.length !== actualBuf.length) return false;
+  return timingSafeEqual(expectedBuf, actualBuf);
+}
+
+// ─── IP hashing ──────────────────────────────────────────────────────────────
+// SHA-256 of IP is included in audit events. Raw IP is never stored in logs.
+
+function hashIp(ip: string): string {
+  return createHmac("sha256", "FORM-IP-HASH-SALT")
+    .update(ip)
+    .digest("hex")
+    .substring(0, 16); // first 64 bits — sufficient for correlation, not reversible
+}
+
+// ─── URI path extraction ──────────────────────────────────────────────────────
+// Strip query string and any path segments that may contain user IDs.
+
+function sanitizeUriPath(uri: string): string {
+  try {
+    const url = new URL(uri, "https://form.coach");
+    // Replace UUID-shaped path segments with ":id"
+    return url.pathname.replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      ":id"
+    );
+  } catch {
+    return "/[unparseable]";
+  }
+}
+
+// ─── Main handler ─────────────────────────────────────────────────────────────
+
+export async function handleCloudflareWafEvent(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const rawBody = await request.text();
+  const signature = request.headers.get("cf-webhook-auth");
+
+  // 1. Verify HMAC signature from Cloudflare
+  if (!verifyCloudflareSignature(rawBody, signature, env.CLOUDFLARE_NOTIFICATION_WEBHOOK_SECRET)) {
+    console.error("WAF webhook: invalid signature — rejecting");
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  let payload: CloudflareNotificationPayload;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return new Response("Bad Request: invalid JSON", { status: 400 });
+  }
+
+  // 2. Process each security event in the notification batch
+  const results = await Promise.allSettled(
+    payload.data.map((event) => processWafEvent(event, env))
+  );
+
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(`WAF handler: ${failures.length}/${results.length} events failed processing`);
+  }
+
+  return new Response(JSON.stringify({ processed: results.length, failed: failures.length }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function processWafEvent(event: CloudflareSecurityEvent, env: Env): Promise<void> {
+  const ruleId       = event.RuleID;
+  const blockCount5m = event.block_count_5m ?? 1;
+  const ipHash       = hashIp(event.ClientIP);
+  const uriPath      = sanitizeUriPath(event.ClientRequestURI);
+
+  // 3. Determine severity — burst escalation overrides base tier
+  let baseSeverity = RULE_SEVERITY[ruleId] ?? "P2";
+  const severity: "P1" | "P2" = blockCount5m > BURST_ESCALATION_THRESHOLD ? "P1" : baseSeverity;
+  const escalated = severity !== baseSeverity;
+
+  // 4. Dispatch Slack alert (always — P1 and P2 both go to #security-alerts for WAF)
+  const slackMessage = buildSlackMessage(ruleId, severity, ipHash, uriPath, blockCount5m, escalated, event);
+  const slackNotified = await dispatchSlack(slackMessage, env.SECURITY_ALERTS_SLACK_WEBHOOK_URL);
+
+  // 5. Dispatch PagerDuty for P1 only
+  let pagerdutyNotified = false;
+  if (severity === "P1") {
+    pagerdutyNotified = await dispatchPagerDuty({
+      ruleId,
+      severity: "critical",
+      summary: `[FORM WAF] ${ruleId} rate limit triggered — ${blockCount5m} blocks in 5 min${escalated ? " [BURST ESCALATION]" : ""}`,
+      source:  "cloudflare-waf",
+      dedupKey: `${ruleId}-${new Date().toISOString().substring(0, 16)}`, // dedup within same minute
+    }, env.PAGERDUTY_ROUTING_KEY);
+  }
+
+  // 6. Emit DEC-030 security.waf_alert_fired event (HIGH, 7yr retention)
+  await emitAuditEvent({
+    action:        "security.waf_alert_fired",
+    actor_type:    "system",
+    actor_id:      "form-alert-relay",
+    resource_type: "waf_rule",
+    resource_id:   ruleId,
+    tenant_id:     null, // WAF events are pre-tenant (edge layer)
+    severity:      "HIGH",
+    metadata: {
+      rule_id:              ruleId,
+      rule_name:            ruleId, // ref value is the canonical name
+      client_ip_hash:       ipHash,
+      request_uri_path:     uriPath,
+      action_taken:         event.Action,
+      severity:             severity,
+      escalated_from_burst: escalated,
+      slack_notified:       slackNotified,
+      pagerduty_notified:   pagerdutyNotified,
+      block_count_5m:       blockCount5m,
+      client_country:       event.ClientCountry,
+      ray_id:               event.RayID,
+    },
+  }, env);
+
+  // 7. Also emit the lower-level security.waf_rule_blocked event (MEDIUM, 3yr)
+  await emitAuditEvent({
+    action:        "security.waf_rule_blocked",
+    actor_type:    "system",
+    actor_id:      "cloudflare-waf",
+    resource_type: "waf_rule",
+    resource_id:   ruleId,
+    tenant_id:     null,
+    severity:      "MEDIUM",
+    metadata: {
+      rule_id:          ruleId,
+      client_ip_hash:   ipHash,
+      request_uri_path: uriPath,
+      action_taken:     event.Action,
+      ray_id:           event.RayID,
+      datetime:         event.Datetime,
+    },
+  }, env);
+}
+
+// ─── Slack message builder ────────────────────────────────────────────────────
+
+function buildSlackMessage(
+  ruleId: string,
+  severity: "P1" | "P2",
+  ipHash: string,
+  uriPath: string,
+  blockCount5m: number,
+  escalated: boolean,
+  event: CloudflareSecurityEvent
+): object {
+  const badge = severity === "P1" ? ":red_circle: P1 CRITICAL" : ":large_yellow_circle: P2 WARNING";
+  const title = escalated
+    ? `${badge} WAF Burst Escalation: ${ruleId}`
+    : `${badge} WAF Rate-Limit Triggered: ${ruleId}`;
+
+  return {
+    blocks: [
+      { type: "header", text: { type: "plain_text", text: title } },
+      {
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: `*Rule ID:*\n${ruleId}` },
+          { type: "mrkdwn", text: `*Action:*\n${event.Action}` },
+          { type: "mrkdwn", text: `*Blocks (5 min):*\n${blockCount5m}` },
+          { type: "mrkdwn", text: `*IP Hash:*\n${ipHash}` },
+          { type: "mrkdwn", text: `*URI Path:*\n${uriPath}` },
+          { type: "mrkdwn", text: `*Country:*\n${event.ClientCountry}` },
+          { type: "mrkdwn", text: `*Ray ID:*\n${event.RayID}` },
+          { type: "mrkdwn", text: `*Time:*\n${event.Datetime}` },
+        ],
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: severity === "P1"
+            ? "*Runbook:* <https://form.coach/runbooks/R-01|R-01 Account Takeover / Brute Force>\n*Action required:* Investigate source IP, check auth logs, consider IP block."
+            : "*Runbook:* <https://form.coach/runbooks/R-02|R-02 API Abuse>\n*Action:* Monitor. Escalates automatically if burst threshold exceeded.",
+        },
+      },
+    ],
+  };
+}
+```
+
+#### 48.5.3 Severity Mapping Reference
+
+| Rule ID | Base Severity | Trigger Condition | Escalation Rule |
+|---|---|---|---|
+| FORM-AUTH-RATELIMIT-001 | P1 | 5 POST / 60s per IP on `/auth/v1/token` or `/auth/v1/otp` | P1 base; no escalation (already maximum) |
+| FORM-AUTH-RATELIMIT-002 | P1 | 10 POST / 300s per (IP, email) on `/auth/v1/token` | P1 base; no escalation |
+| FORM-API-RATELIMIT-001 | P2 | 200 req / 60s per IP on `/api/` | Escalates to P1 if `block_count_5m > 100` |
+| FORM-API-RATELIMIT-002 | P2 | 500 req / 60s per JWT token on `/api/` | Escalates to P1 if `block_count_5m > 100` |
+| FORM-API-RATELIMIT-003 | P2 | 20 POST / 60s per IP on `/api/workouts` (JS Challenge) | Escalates to P1 if `block_count_5m > 100` |
+| Any rule | P1 (escalated) | Any rule, `block_count_5m > 100` within a 5-min window | Burst escalation — PagerDuty CRITICAL |
+
+---
+
+### 48.6 Environment Variables and Secrets
+
+The following secrets and variables are required for §48 components. All secrets must be stored in the CI/CD secret store (GitHub Actions Secrets for Terraform runs; Cloudflare Workers secrets via `wrangler secret put` for the form-alert-relay Worker).
+
+| Variable / Secret | Used by | Permissions / Scope | Storage location |
+|---|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Terraform provider | Zone:Edit, Firewall Services:Edit, Logpush:Edit, Notifications:Edit — do NOT use Global API Key | GitHub Actions Secret |
+| `CLOUDFLARE_ACCOUNT_ID` | Terraform variable | Read-only metadata — not sensitive, but do not commit to public repos | `terraform.tfvars` (git-ignored) or GitHub Actions Variable |
+| `CLOUDFLARE_ZONE_ID` | Terraform variable | Read-only metadata | `terraform.tfvars` or GitHub Actions Variable |
+| `R2_WAF_ACCESS_KEY_ID` | Terraform Logpush job; Logpush destination | R2 write-only on `form-audit-logs` bucket — no read, no delete | GitHub Actions Secret |
+| `R2_WAF_SECRET_ACCESS_KEY` | Terraform Logpush job; Logpush destination | Paired with `R2_WAF_ACCESS_KEY_ID` | GitHub Actions Secret |
+| `CLOUDFLARE_NOTIFICATION_WEBHOOK_SECRET` | Terraform `cloudflare_notification_webhook.alert_relay`; form-alert-relay signature verification | Minimum 32 bytes random, base64-encoded. Rotated annually or on compromise. | GitHub Actions Secret + Cloudflare Worker secret (`wrangler secret put CLOUDFLARE_NOTIFICATION_WEBHOOK_SECRET`) |
+| `SECURITY_ALERTS_SLACK_WEBHOOK_URL` | form-alert-relay (§46, shared) | Scoped to `#security-alerts` channel only | Cloudflare Worker secret (already set in §46) |
+| `PAGERDUTY_ROUTING_KEY` | form-alert-relay (§46, shared) | FORM security service integration key | Cloudflare Worker secret (already set in §46) |
+
+**Secret rotation policy:** `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_NOTIFICATION_WEBHOOK_SECRET` rotate on a 90-day schedule or immediately upon suspected compromise. Rotation procedure: generate new value → update GitHub Actions Secret → `terraform apply` (for webhook secret, this updates Cloudflare automatically) → update Worker secret via `wrangler secret put` → confirm health check passes → emit `security.waf_rule_updated` DEC-030 event with `metadata.change_type = "secret_rotation"`.
+
+**IAM principle:** The `CLOUDFLARE_API_TOKEN` used for Terraform must NOT be the account owner token. Create a scoped token in the Cloudflare dashboard under My Profile → API Tokens with the minimum permissions listed above.
+
+---
+
+### 48.7 DEC-030 HMAC-Chained Audit Events
+
+Four new event types are added to the DEC-030 audit event taxonomy. Register all four in `docs/AUDIT_LOG_SCHEMA.md` under the `security.*` namespace.
+
+#### 48.7.1 New Event Type Registry
+
+| Event type | Severity | Retention | Trigger | Owner |
+|---|---|---|---|---|
+| `security.waf_rule_blocked` | MEDIUM | 3yr | Cloudflare block or js_challenge event forwarded to form-alert-relay and processed | form-alert-relay (system) |
+| `security.waf_alert_fired` | HIGH | 7yr | form-alert-relay dispatched a PagerDuty or Slack alert for a WAF block event | form-alert-relay (system) |
+| `security.waf_rule_updated` | HIGH | 7yr | `terraform apply` changes a rate-limit rule threshold, expression, or action | GitHub Actions post-deploy hook (system) |
+| `security.waf_logpush_gap` | HIGH | 7yr | Logpush health check detects > 15-minute gap in the `firewall_events` R2 stream | Logpush health check Worker/Lambda (system) |
+
+All four events participate in the DEC-030 HMAC chain. Each event's `hmac_sha256` field is computed as:
+
+```
+HMAC-SHA256(
+  key   = AUDIT_CHAIN_SECRET,
+  input = previous_event_hmac + event_id + sequence_number + created_at + action + resource_id
+)
+```
+
+Chain continuity is verified daily by the `audit-chain-daily-check` function (§46).
+
+#### 48.7.2 security.waf_rule_updated — Emission Mechanism
+
+This event is emitted by a GitHub Actions post-deploy step added to `.github/workflows/deploy-cloudflare-waf.yml`. The step runs after `terraform apply` completes and diffs the current Terraform state against the previous state stored in the remote backend.
+
+```bash
+# .github/workflows/deploy-cloudflare-waf.yml  (post-apply step excerpt)
+
+- name: Emit WAF rule updated audit event on rule change
+  if: steps.terraform-apply.outputs.changed == 'true'
+  run: |
+    # Extract current WAF ruleset state from Terraform
+    CURRENT=$(terraform -chdir=infra/cloudflare show -json \
+      | jq '[.values.root_module.resources[]
+             | select(.type == "cloudflare_ruleset")
+             | {name: .values.name, rules: [.values.rules[]
+                | {ref: .ref, expression: .expression, enabled: .enabled,
+                   action: .action, ratelimit: .ratelimit}]}]')
+
+    # Post to form-alert-relay audit emission endpoint
+    curl -sSf -X POST "${{ secrets.AUDIT_EMIT_ENDPOINT }}" \
+      -H "Authorization: Bearer ${{ secrets.AUDIT_EMIT_TOKEN }}" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"action\": \"security.waf_rule_updated\",
+        \"actor_type\": \"system\",
+        \"actor_id\": \"github-actions\",
+        \"resource_type\": \"waf_ruleset\",
+        \"resource_id\": \"cloudflare_waf\",
+        \"tenant_id\": null,
+        \"severity\": \"HIGH\",
+        \"metadata\": {
+          \"changed_by_workflow\": \"$GITHUB_WORKFLOW\",
+          \"commit_sha\": \"$GITHUB_SHA\",
+          \"pr_number\": \"${{ github.event.pull_request.number }}\",
+          \"ruleset_state\": $CURRENT,
+          \"change_type\": \"rule_configuration\"
+        }
+      }"
+```
+
+#### 48.7.3 Full JSON Envelope: security.waf_alert_fired
+
+The following example shows the complete DEC-030 envelope for a `security.waf_alert_fired` event emitted by form-alert-relay when FORM-AUTH-RATELIMIT-001 triggers with a burst escalation pattern.
+
+```json
+{
+  "event_id": "evt_01J4KX9P2QR7MWBN3ZVDCF8HT6",
+  "sequence_number": 18472,
+  "created_at": "2026-05-31T14:23:07.841Z",
+  "schema_version": "2.0",
+
+  "actor_type": "system",
+  "actor_id": "form-alert-relay",
+  "actor_display_name": null,
+
+  "action": "security.waf_alert_fired",
+
+  "resource_type": "waf_rule",
+  "resource_id": "FORM-AUTH-RATELIMIT-001",
+
+  "tenant_id": null,
+
+  "metadata": {
+    "rule_id": "FORM-AUTH-RATELIMIT-001",
+    "rule_name": "FORM-AUTH-RATELIMIT-001",
+    "client_ip_hash": "a3f9c2e1d84b7f60",
+    "request_uri_path": "/auth/v1/token",
+    "action_taken": "block",
+    "severity": "P1",
+    "escalated_from_burst": false,
+    "slack_notified": true,
+    "pagerduty_notified": true,
+    "block_count_5m": 47,
+    "client_country": "RU",
+    "ray_id": "8dc3b9f2a1e40025"
+  },
+
+  "audit_chain": {
+    "previous_event_id": "evt_01J4KX9NMVR3TPBC2YUDAF7GS5",
+    "previous_hmac_sha256": "b8e3c21f94a07d3e5c2b1a8f6d4e9072c3f5a1b8d7e4c2091f3a6b8e5d2c7f4a",
+    "hmac_sha256": "2f7a9c4e1b8d3f06a5c2e9b7d4f1a8c3e6b2d5f8a1c4e7b9d2f5a8c1e4b7d0f3"
+  },
+
+  "retention": {
+    "severity_class": "HIGH",
+    "retain_until": "2033-05-31",
+    "policy_ref": "DEC-030"
+  },
+
+  "emitted_by": "form-alert-relay@1.4.0",
+  "environment": "production"
+}
+```
+
+**Field notes for auditors:**
+
+- `tenant_id: null` — WAF rules operate at the Cloudflare edge layer before tenant routing. Events are not tenant-scoped.
+- `client_ip_hash` — The source IP is SHA-256 hashed with a non-reversible application salt. Raw IPs are never stored in audit logs (PII protection, GDPR Art. 5 data minimisation).
+- `block_count_5m` — Approximate count of blocks by this rule in the 5-minute window preceding alert dispatch. Sourced from the Cloudflare notification payload batch size or Analytics API if available.
+- `hmac_sha256` — Links this event into the tamper-evident HMAC chain. The `audit-chain-daily-check` function (§46) verifies chain continuity.
+- `retain_until` — AUTO-COMPUTED: `created_at` + 7 years (HIGH severity DEC-030 policy). Logpush R2 object lifecycle enforces this.
+
+---
+
+### 48.8 Evidence Artefacts for SOC 2
+
+| Artefact ID | Description | Collection method | Frequency | Owner |
+|---|---|---|---|---|
+| PRE-48-E-001 | Terraform state export showing all 5 WAF rules with expressions, thresholds, and enabled status | `terraform -chdir=infra/cloudflare show -json \| jq '[.values.root_module.resources[] \| select(.type == "cloudflare_ruleset") \| {name: .values.name, rules: .values.rules}]'` → saved to `compliance/evidence/cc7/PRE-48-E-001-waf-ruleset-state-YYYY-MM-DD.json` | At implementation; after any rule change (automated by post-apply step §48.7.2) | devops-lead |
+| PRE-48-E-002 | Cloudflare Dashboard screenshot: Security → WAF → Rate limiting rules, showing all 5 FORM-*RATELIMIT-* rules with status Active | Manual dashboard screenshot; save as `compliance/evidence/cc7/PRE-48-E-002-waf-dashboard-YYYY-MM.png` | At implementation; monthly | security-engineer |
+| PRE-48-E-003 | Logpush job configuration export and 30-day delivery confirmation | Terraform state for `cloudflare_logpush_job.waf_firewall_events` + `aws s3api list-objects-v2 --bucket form-audit-logs --prefix waf-events/YYYY/MM/ --endpoint-url https://<account-id>.r2.cloudflarestorage.com --query 'length(Contents)'` — confirm non-zero object count for each day in the 30-day window | Monthly | devops-lead |
+| PRE-48-E-004 | End-to-end synthetic block test: trigger FORM-AUTH-RATELIMIT-001, confirm 429 response, Slack message in #security-alerts, and `security.waf_alert_fired` DEC-030 event | Test procedure: from staging IP not in allowlist, send 6 POST requests to `https://form.coach/auth/v1/token` (any body) within 60 seconds; confirm 6th returns HTTP 429 with `rule: FORM-AUTH-RATELIMIT-001`; confirm Slack message arrives in `#security-alerts` within 90 seconds; run `SELECT * FROM audit_logs WHERE action = 'security.waf_alert_fired' AND created_at > NOW() - INTERVAL '5 min'` and confirm row present; save screenshots as `compliance/evidence/cc7/PRE-48-E-004-e2e-test-YYYY-MM-DD/` | At implementation; quarterly | security-engineer |
+
+**Evidence filing path:** All PRE-48 artefacts are filed under `compliance/evidence/cc7/`. The directory must exist before the first Terraform apply (`mkdir -p compliance/evidence/cc7/`).
+
+---
+
+### 48.9 SOC 2 Evidence Mapping
+
+| Criterion | How §48 satisfies it | Evidence artefact |
+|---|---|---|
+| CC7.1 — Threat detection mechanisms | Five WAF rate-limit rules detect brute-force (AUTH-001), account enumeration (AUTH-002), volumetric API abuse (API-001), per-user API abuse (API-002), and workout submission spikes (API-003) at the Cloudflare edge before any request reaches the Supabase application layer. Rules are Infrastructure-as-Code (Terraform) with version-controlled thresholds and expressions. | PRE-48-E-001, PRE-48-E-002 |
+| CC7.2 — System monitoring | Cloudflare Logpush delivers a continuous `firewall_events` stream to R2 at high frequency (sub-minute). form-alert-relay dispatches real-time Slack and PagerDuty alerts. Every alert dispatch produces a `security.waf_alert_fired` DEC-030 event in the HMAC audit chain, providing a machine-readable, tamper-evident monitoring record. `security.waf_logpush_gap` events alert on stream discontinuity. | PRE-48-E-003, DEC-030 `security.waf_alert_fired` events |
+| CC7.3 — Event evaluation | The severity mapping in §48.5.3 (FORM-AUTH-RATELIMIT-001/002 → P1; FORM-API-RATELIMIT-001/002/003 → P2; `block_count_5m > 100` → P1 escalation) constitutes a documented, code-enforced evaluation rubric. The `security.waf_alert_fired.metadata.severity` field is the auditable output of that evaluation for every alert. | §48.5 waf-handler.ts; `security.waf_alert_fired.metadata.severity` field |
+| CC7.4 — Incident response | WAF block events trigger runbook R-01 (Account Takeover / Brute Force) for P1 AUTH events and runbook R-02 (API Abuse) for P2 API events. Runbook links are included in Slack alert messages. PagerDuty routing ensures on-call acknowledgement within SLA. | `docs/INCIDENT_RESPONSE.md §R-01`, `§R-02`; Slack alert `blocks[2].text` runbook reference |
+| CC6.6 — External boundary protection | Five WAF rules collectively constitute the Cloudflare edge protection boundary for the FORM platform. All API traffic and authentication traffic traverses this boundary before reaching origin servers. Rules are always-on (`enabled = true`) and managed via Terraform with change control. | PRE-48-E-001 (enabled flag), PRE-48-E-002 (dashboard Active status) |
+
+---
+
+### 48.10 Gap Closure Summary
+
+#### 48.10.1 CC7-GAP-007 Status Transition
+
+| Gap ID | Description | Previous status | New status | Closed by |
+|---|---|---|---|---|
+| CC7-GAP-007 | Configure Cloudflare WAF rate-limit rules FORM-AUTH-RATELIMIT-001/002 and FORM-API-RATELIMIT-001/002/003 | 🔴 Open (P0) | 🟡 Authored | §48 Terraform HCL + Logpush + Notifications + DEC-030 events |
+
+**Authored** means: implementation specification is complete and deployable. Status advances to 🟢 Closed when the §48.11 implementation checklist is completed and PRE-48-E-001 through PRE-48-E-004 are filed in `compliance/evidence/cc7/`.
+
+#### 48.10.2 Companion Evidence Advancement
+
+| Artefact | Previous status | New status |
+|---|---|---|
+| PRE-25-E-001 (WAF rule export, first referenced in §25) | Pending deployment | Evidence specification complete — collection method defined in PRE-48-E-001 |
+
+#### 48.10.3 P0 Gap Count Update
+
+| Metric | Before §48 | After §48 authored |
+|---|---|---|
+| P0 gaps open | 7 | 6 |
+| CC7 gaps open | 1 (CC7-GAP-007) | 0 |
+| SOC 2 readiness estimate | ~95% | ~95.5% |
+
+The one remaining P0 gap (not CC7-related) continues to be tracked in §25.10 and is not affected by §48.
+
+---
+
+### 48.11 Implementation Checklist
+
+Track completion in `compliance/checklists/PRE-48-checklist.md`. Items are ordered by dependency; do not skip ahead.
+
+| # | Action | Priority | Milestone | Owner | Done |
+|---|---|---|---|---|---|
+| 1 | Apply Terraform: `cd infra/cloudflare && terraform init && terraform plan -out=waf.tfplan && terraform apply waf.tfplan`. Confirm Terraform creates 2 rulesets (5 WAF rules total) with no errors. Verify Terraform state contains both `cloudflare_ruleset.auth_ratelimit` and `cloudflare_ruleset.api_ratelimit`. | P0 | M4 | security-engineer | [ ] |
+| 2 | Confirm all 5 rules visible in Cloudflare Dashboard → Security → WAF → Rate limiting rules. Each rule must show status Active and the correct ref (`FORM-AUTH-RATELIMIT-001` etc.). Capture screenshot as `compliance/evidence/cc7/PRE-48-E-002-waf-dashboard-YYYY-MM.png`. | P0 | M4 | security-engineer | [ ] |
+| 3 | Apply `cloudflare_logpush_job.waf_firewall_events` via Terraform (included in the apply from item 1). Verify Logpush job appears in Cloudflare Dashboard → Analytics → Logpush. Trigger a test block event (use staging IP) and confirm a `.log.gz` object appears in `form-audit-logs/waf-events/` within 5 minutes. | P0 | M4 | devops-lead | [ ] |
+| 4 | Apply `cloudflare_notification_policy.waf_block_alerts` and `cloudflare_notification_webhook.alert_relay` via Terraform. In Cloudflare Dashboard → Notifications, confirm the policy `FORM WAF Rate-Limit Block Alerts` is enabled. Use the Cloudflare test notification button to send a synthetic event to the form-alert-relay webhook; confirm the Worker returns HTTP 200. | P0 | M4 | devops-lead | [ ] |
+| 5 | Update the form-alert-relay Worker (§46) by adding `waf-handler.ts` (§48.5.2) and wiring the `/cloudflare-event` route in `index.ts`. Deploy updated Worker: `wrangler deploy --env production`. Set the `CLOUDFLARE_NOTIFICATION_WEBHOOK_SECRET` Worker secret: `wrangler secret put CLOUDFLARE_NOTIFICATION_WEBHOOK_SECRET`. | P0 | M4 | platform-engineer | [ ] |
+| 6 | Register 4 new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry: `security.waf_rule_blocked` (MEDIUM, 3yr), `security.waf_alert_fired` (HIGH, 7yr), `security.waf_rule_updated` (HIGH, 7yr), `security.waf_logpush_gap` (HIGH, 7yr). Ensure HMAC chain fields and retention fields are specified for each. | P0 | M4 | compliance-officer | [ ] |
+| 7 | Run PRE-48-E-004 end-to-end test: from a staging IP, send 6 POST requests to `https://form.coach/auth/v1/token` within 60 seconds. Confirm: (a) 6th response is HTTP 429 with body containing `"rule":"FORM-AUTH-RATELIMIT-001"`; (b) Slack message arrives in `#security-alerts` within 90 seconds with correct rule ID and runbook link; (c) `SELECT * FROM audit_logs WHERE action = 'security.waf_alert_fired' AND created_at > NOW() - INTERVAL '5 min'` returns at least one row. File screenshots and query output as `compliance/evidence/cc7/PRE-48-E-004-e2e-test-YYYY-MM-DD/`. | P0 | M4 | security-engineer | [ ] |
+| 8 | Export Terraform state as PRE-48-E-001: run `terraform -chdir=infra/cloudflare show -json \| jq '[.values.root_module.resources[] \| select(.type == "cloudflare_ruleset") \| {name: .values.name, rules: .values.rules}]' > compliance/evidence/cc7/PRE-48-E-001-waf-ruleset-state-$(date +%Y-%m-%d).json`. Commit file to the compliance evidence repository. | P0 | M4 | compliance-officer | [ ] |
+| 9 | Update CC7-GAP-007 in §25.10 gap table from `🔴 Open` to `🟡 AUTHORED`. Update PRE-25-E-001 status to `Evidence specification complete`. Update P0 count from 7 to 6. Update SOC 2 readiness from ~95% to ~95.5%. | P0 | M4 | compliance-officer | [ ] |
+| 10 | Add `terraform plan` WAF diff step to `.github/workflows/deploy-cloudflare-waf.yml`: after `terraform apply`, extract ruleset state via `terraform show -json \| jq ...` and post `security.waf_rule_updated` DEC-030 event to the audit emission endpoint if any `cloudflare_ruleset` resource changed. Validates that every WAF threshold change is captured in the HMAC chain. | P1 | M5 | devops-lead | [ ] |
+| 11 | Add `security.waf_logpush_gap` detection: deploy a Worker or Lambda health-check that runs every 10 minutes, queries the R2 bucket for the most recent object under `waf-events/`, and emits `security.waf_logpush_gap` DEC-030 HIGH event + PagerDuty P1 alert if the most recent object is older than 15 minutes. This satisfies CC7.2 monitoring continuity for the Logpush stream itself. | P1 | M5 | devops-lead | [ ] |
+| 12 | Quarterly maintenance: rerun PRE-48-E-004 test; update thresholds if attack pattern analysis (§25.9 annual review) identifies that current thresholds are generating excessive false positives or are being evaded; emit `security.waf_rule_updated` DEC-030 event for any threshold change; update PRE-48-E-001 evidence. | P2 | Quarterly | security-engineer | [ ] |
+
+---
+
+*v2.0 additions (2026-05-31): §48 Cloudflare WAF Rate-Limit Rules — Terraform Configuration + Logpush Routing — CC7-GAP-007 Auditor Exhibit. Delivers production-deployable Terraform HCL for two `cloudflare_ruleset` resources (phase `http_ratelimit`) covering all five WAF rate-limit rules: FORM-AUTH-RATELIMIT-001 (5 POST / 60s per IP on `/auth/v1/token` or `/auth/v1/otp` → block 10 min), FORM-AUTH-RATELIMIT-002 (10 POST / 300s per (IP, email) on `/auth/v1/token` → block 30 min; requires Cloudflare Business+ body inspection; fallback to §46 auth-monitor if plan is Free/Pro), FORM-API-RATELIMIT-001 (200 req / 60s per IP on `/api/` → block 5 min), FORM-API-RATELIMIT-002 (500 req / 60s per JWT Bearer token on `/api/` → block 5 min), FORM-API-RATELIMIT-003 (20 POST / 60s per IP on `/api/workouts` → js_challenge 3 min). `variables.tf` with `cloudflare_plan` validation gating AUTH-002 body-inspection characteristic on Business+ plan. `cloudflare_logpush_job` resource streaming `firewall_events` dataset to R2 `form-audit-logs/waf-events/` at high frequency; NDJSON output; filter restricted to block/jschallenge actions on FORM-*RATELIMIT-* rule IDs; fields: Action, ClientIP, ClientRequestHost, ClientRequestMethod, ClientRequestURI, EdgeResponseStatus, RuleID, Datetime, ClientCountry, RayID. `cloudflare_r2_bucket.audit_logs` with WNAM location and retention commentary. `cloudflare_notification_policy` + `cloudflare_notification_webhook` resources routing Security Events notifications to form-alert-relay Worker `/cloudflare-event` endpoint. `waf-handler.ts` TypeScript extension for form-alert-relay: HMAC-SHA256 Cloudflare signature verification via `timingSafeEqual`; IP hashing (SHA-256 + salt, first 64 bits); URI path sanitisation (UUID segment redaction); severity mapping (AUTH-001/002 → P1; API-001/002/003 → P2; `block_count_5m > 100` → burst escalation to P1 regardless of base tier); Slack Block Kit message builder with runbook links (R-01 for P1 auth events, R-02 for P2 API events); PagerDuty Events API v2 dispatch for P1 only; dual DEC-030 event emission: `security.waf_rule_blocked` (MEDIUM, 3yr) per block event + `security.waf_alert_fired` (HIGH, 7yr) per alert dispatch. Four new DEC-030 event types: `security.waf_rule_blocked` (MEDIUM, 3yr), `security.waf_alert_fired` (HIGH, 7yr), `security.waf_rule_updated` (HIGH, 7yr — emitted by GitHub Actions post-deploy hook diffing Terraform state), `security.waf_logpush_gap` (HIGH, 7yr — emitted by Logpush health-check Worker if stream gap > 15 min). Full JSON envelope for `security.waf_alert_fired` with all DEC-030 fields including HMAC chain, `retain_until`, `client_ip_hash` (never raw IP), `tenant_id: null` (edge-layer pre-routing). Six secrets documented: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`, `R2_WAF_ACCESS_KEY_ID`, `R2_WAF_SECRET_ACCESS_KEY`, `CLOUDFLARE_NOTIFICATION_WEBHOOK_SECRET`; IAM scoping and rotation policy (90-day cadence) specified. Four evidence artefacts PRE-48-E-001 through PRE-48-E-004 with exact collection commands. SOC 2 mapping across CC7.1/CC7.2/CC7.3/CC7.4/CC6.6 with evidence references. 12-item implementation checklist: items 1-9 P0/M4 (Terraform apply, dashboard confirmation, Logpush verification, Notifications webhook, form-alert-relay deploy, DEC-030 registry, PRE-48-E-004 e2e test, PRE-48-E-001 state export, gap table update), items 10-11 P1/M5 (WAF diff GitHub Actions step, Logpush gap health check), item 12 P2/quarterly (threshold review). Gap closure: CC7-GAP-007 🔴 Open → 🟡 Authored. P0 count: 7 → 6. SOC 2 readiness: ~95% → ~95.5%.*

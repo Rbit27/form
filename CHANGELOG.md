@@ -6,6 +6,16 @@
 
 ---
 
+## [1.34.2] — 2026-05-31
+
+### Added
+- `docs/SOC2_READINESS.md §48` — Cloudflare WAF Rate-Limit Rules: Terraform Configuration + Logpush Routing — CC7-GAP-007 Auditor Exhibit. Two `cloudflare_ruleset` resources (phase `http_ratelimit`) covering all 5 WAF rules: FORM-AUTH-RATELIMIT-001 (5 POST/60s per IP → block 10 min), FORM-AUTH-RATELIMIT-002 (10 POST/300s per IP+email → block 30 min; Cloudflare Business+ body inspection gated via `cloudflare_plan` variable), FORM-API-RATELIMIT-001/002/003 (global/per-JWT/workout spike limits). `cloudflare_logpush_job` → R2 `form-audit-logs/waf-events/` (NDJSON, high frequency, filtered to FORM-*RATELIMIT-* block/jschallenge events). `cloudflare_notification_policy` + `cloudflare_notification_webhook` → form-alert-relay. `waf-handler.ts` extension: HMAC signature verification, IP hashing, severity mapping (AUTH-001/002 → P1; API-001/002/003 → P2; burst escalation at block_count_5m > 100), Slack Block Kit builder, PagerDuty dispatch. 4 нові DEC-030 події: `security.waf_rule_blocked` (MEDIUM/3yr), `security.waf_alert_fired` (HIGH/7yr), `security.waf_rule_updated` (HIGH/7yr — GitHub Actions Terraform diff), `security.waf_logpush_gap` (HIGH/7yr). 4 evidence artefacts PRE-48-E-001–004. 12 checklist items. CC7-GAP-007 🔴→🟡 Authored. P0: 7→6. SOC2: ~95%→~95.5%.
+
+### Changed
+- `VERSION` → 1.34.2
+
+---
+
 ## [1.34.1] — 2026-05-31
 
 ### Added
