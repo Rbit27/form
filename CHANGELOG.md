@@ -6,6 +6,18 @@
 
 ---
 
+## [1.40.0] — 2026-05-31
+
+### Added
+- `docs/OBSERVABILITY.md §24` — Subscription & Revenue Event Observability (711 рядків). Закриває SOC 2 PI1.1–PI1.5 Processing Integrity gap. Consumer (RevenueCat) і enterprise (Stripe) state machine diagrams з таблицями valid/invalid transitions. 13-подійна Revenue Event Taxonomy. 5 SLOs (SUB-SLO-01..05): webhook lag P95 < 30s, error rate < 0.5%, state consistency 100%, enterprise seat accuracy 100% within 5 min, grace period enforcement < 72h overshoot. 8 alerting rules AL-SUB-01..08 (P0–P3). Worker `webhook-receiver.ts` spec з HMAC-SHA256 + RevenueCat Bearer signature verification. `subscription_events` DDL (13 cols, 4 indexes, 3 RLS policies, append-only, 7yr retention). pg_cron `seat-reconciliation` (5 хв) + `billing-consistency-check` (03:00 UTC daily) зі SQL. 11 DEC-030 HMAC-chained billing events (STANDARD/HIGH/CRITICAL, 7yr). Metabase "Subscription Health" dashboard spec (8 панелей). PI1.1–PI1.5 + CC7.2 + CC6.1 evidence mapping. 7 GDPR privacy constraints (no raw payload storage, SHA-256 hash only, DPAs). 14-task implementation checklist (M4/M5). Document header v1.0 → v1.1.
+- `content/post-165-blood-flow-restriction-training.md` — BFR-тренінг: механізми та протоколи (~14 хв, clinical-safety reviewed ✓). Механізм 1: метаболічний стрес (mTORC1 via AMPK/CaMKII/p70S6K, ROS hormesis via NF-κB, lactate-GPR81/HCAR1 signaling). Механізм 2: рекрутування волокон (Henneman's Size Principle → override при передчасній Type I втомі, EMG-дані Takarada). Механізм 3: гормональна відповідь (Group III/IV chemoceptors → GH pulse, MGF vs. systemic IGF-1). Механізм 4: клітинний набряк (Piezo1/TRPC, integrin-FAK, polyamine synthesis). LOP finger-palpation approximation. Протокол 1×30+3×15, 30s rest, 20–30% 1RM. Абсолютні та відносні протипоказання (DVT, PAD, вагітність, III–IV varicose veins). Meta-analysis Lixandrão 2018: BFR ≈ traditional RT для гіпертрофії. clinical_safety_reviewed: true.
+- `content/post-166-deload-strategies.md` — Розвантажувальний тиждень: фізіологія і стратегії (~12 хв, clinical-safety NOT REQUIRED). Периферична (глікоген, крос-брідж кінетика, Ca²⁺ regulation) vs центральна (кортикальний драйв, TMS-дані Taylor 2006, RPE drift) втома. Supercompensation timing windows: гіпертрофія 4–7 днів, сила 7–14 днів, нейральна до 21 дня. HRV/RHR/bar-speed/RPE маркери для triggering deload. 4 стратегії: volume deload (–40–60% vol, збережена інтенсивність), intensity deload (50–60% 1RM, збережений обсяг), frequency deload (менше сесій), active recovery. Reactive vs proactive deload. Bosquet et al. (2007): tapering → +2.4–3% performance. Спростування страху "втратити форму" — без significant muscle loss за 7–10 днів. Рішення-матриця: 4 trigger criteria.
+
+### Changed
+- `VERSION` → 1.40.0
+
+---
+
 ## [1.39.1] — 2026-05-31
 
 ### Changed

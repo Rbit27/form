@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v1.0
+# FORM · Observability & Monitoring Taxonomy v1.1
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -4557,3 +4557,713 @@ All ten event types must carry `tenant_id` (or `null` for platform-wide events),
 *v0.9 additions: §22 AI Coaching Quality Observability — closes the gap between operational observability (§3/§4.5 — tokens, latency) and quality observability (is Victor coaching well?); privacy-first design established (GDPR Art. 9 constraint — no coaching content in any observability signal; all metrics are behavioral proxies computed at session or weekly cohort level); ten-metric quality proxy taxonomy: plan adherence rate, session depth (turns), session abandonment rate, post-coaching workout start rate, workout completion rate (post-coaching), retry rate within session, plan regeneration rate, explicit negative feedback rate (thumbs-down), no-engagement rate (7d), streak grace trigger rate — all computed via pg_cron `victor_quality_daily` table with k-anonymity floor (sample_size ≥ 5); prompt version tracking: `victor_prompt_version` and `prompt_ab_bucket` columns on `coaching_turns`, 14-day baseline window for regression detection; six QA-COACH-SLOs covering adherence (≥ 65%), abandonment (≤ 30%), post-coaching start (≥ 40%), negative feedback (≤ 8%), plan regen (≤ 15%/user/week), no-engagement (≤ 40%); five clinical safety monitoring signals (session duration spike, retry spike, no-action spike, negative feedback P0 at 25%, explicit harm report) with clinical-safety VETO authority path via R-10; six alerting rules AL-COACH-01 through AL-COACH-06 with 72h suppression window after prompt deploys; A/B testing observability framework: `prompt_ab_bucket` tenant-locked random split, 14-day / 500-session minimum test duration, two-proportion z-test (α = 0.05), `victor_ab_results` table DDL with concluded_by field; four DEC-030 HMAC-chained audit events for prompt lifecycle (ab_test_started, ab_test_concluded, prompt_version_promoted, prompt_version_rolled_back); Metabase "Victor Coaching Quality" dashboard spec: 8 panels (adherence trend, abandonment trend, post-coaching start, negative feedback with P0 threshold, quality-by-version grouped bar, active A/B test status, no-engagement area chart, streak grace line); `victor_quality_daily` table DDL with UNIQUE constraint, RLS (founder + ml-engineer + clinical-safety full access; tenant_admin scoped to own tenant_id; form_system write), 24-month retention pg_cron cleanup; SOC 2 evidence mapping: CC7.2 (quality monitoring), CC7.4 (prompt regression detection via victor_ab_results), CC1.2 (jailbreak CI gate AL-COACH-05), CC5.2 (clinical safety escalation path), C1.1 (no coaching content in observability — RLS policy evidence); twelve-item implementation checklist across M3/M4/M6.*
 
 *v1.0 additions: §23 Enterprise SLA Reporting & Credit Calculation — closes the documented gap at `docs/SOC2_READINESS.md §2 A1.1` ("SLA credit calculation and process"); 99.9% monthly uptime SLA definition (43.8-minute covered-downtime budget) with partial-service degradation at 50% weight and per-tenant measurement scope; uptime measurement methodology dual-source: Better Stack synthetic probes (S-001 through S-013 per §16) as primary, Cloudflare Analytics Engine SQL as corroborating secondary (conservative reconciliation rule); probe S-013 added (Admin Dashboard API health); ten exclusion categories (upstream provider, scheduled maintenance, customer-side IdP misconfiguration, force majeure, synthetic probe false positives, beta features); five-tier credit schedule (0% SLA met → 5% at 99.0–99.9% → 15% at 95–99% → 25% at 90–95% → 50% < 90%) applied against monthly MRR with 50% credit cap; automated credit application without tenant claim requirement for credits ≥ 5%; three-table Postgres schema (`sla_monthly_reports` with generated availability_pct and sla_met columns, `sla_incidents` with downtime_weight for partial-outage support, `maintenance_windows` with 4-hour per-window cap and 72-hour notification constraint) with RLS tenant isolation; `GET /api/v1/admin/sla/current` and `/history` API specs; monthly PDF delivery via Resend on 3rd business day of each month; ten DEC-030 HMAC-chained event types covering the full incident→credit→dispute lifecycle; SOC 2 A1.1 and CC7.2 evidence mapping with four compliance artefact paths (JSON monthly report, Better Stack CSV, credit ledger, DEC-030 audit log filtered on `sla.*`); twelve-item implementation checklist across M4/M5.*
+
+---
+
+## 24. Subscription & Revenue Event Observability
+
+### 24.1 Purpose & SOC 2 Gap Closed
+
+SOC 2 Type II Processing Integrity criteria PI1.1 through PI1.5 require that system processing is **complete** (PI1.1), **accurate** (PI1.2), **timely** (PI1.3), **authorized** (PI1.4), and **valid** (PI1.5). Of all processing surfaces in FORM, subscription billing carries the highest PI risk: a mis-processed webhook can silently grant or revoke premium feature access for real users, affect revenue recognition, and — in the enterprise tier — miscount licensed seats against a contractual commitment.
+
+The current `docs/SOC2_READINESS.md` PI1.1–PI1.5 gap row is partially addressed by the `row-count-monitor` Edge Function, which confirms that rows are being written but does not verify state correctness, transition validity, cross-system consistency, or the completeness of billing lifecycle events. This section closes that gap by defining:
+
+- A formal subscription state machine with monitored transitions (PI1.4 — authorized, PI1.5 — valid).
+- An event taxonomy covering every billing lifecycle event from both RevenueCat (consumer) and Stripe (enterprise) (PI1.1 — complete).
+- SLIs and SLOs that measure delivery lag, error rate, state consistency, and seat accuracy (PI1.2 — accurate, PI1.3 — timely).
+- Alerting rules that fire on anomalies in any of the above.
+- A daily consistency check that verifies end-to-end state correctness across all users and tenants.
+- DEC-030 HMAC-chained audit events for every billing state change, ensuring a tamper-evident record for auditors.
+
+**Auditor reference:** Evidence artefacts produced by this section are listed in §24.9 (consistency check results table), §24.10 (DEC-030 event registry), and the implementation checklist at §24.14. The primary SOC 2 criterion map is in §24.12.
+
+---
+
+### 24.2 Subscription State Machine
+
+FORM operates two parallel billing channels that converge on the same `users.subscription_tier` column in Supabase Postgres. Both channels must be monitored independently.
+
+#### Consumer tier (RevenueCat → Supabase)
+
+```
+          ┌──────────────────────────────────────────────────────────────────┐
+          │                    CONSUMER SUBSCRIPTION                         │
+          │                                                                  │
+          │   [new user]                                                     │
+          │       │                                                          │
+          │       ▼                                                          │
+          │   trialing ──────────────────────────────────────────► canceled  │
+          │       │          trial_expired / manual_cancel                  │
+          │       │ trial_converted                                          │
+          │       ▼                                                          │
+          │    active ──── payment_failed ──► past_due ── recovered ──► active│
+          │       │                               │                          │
+          │       │ manual_cancel                 │ grace_period_expired     │
+          │       │                               ▼                          │
+          │       ├──────────────────────────► canceled                      │
+          │       │                                                          │
+          │       │ paused (voluntary)                                       │
+          │       ▼                                                          │
+          │    paused ──── resume ──────────────────────────────────► active  │
+          │       │                                                          │
+          │       │ pause_period_expired                                     │
+          │       ▼                                                          │
+          │   canceled                                                       │
+          └──────────────────────────────────────────────────────────────────┘
+```
+
+| From state | To state | Trigger | Valid |
+|---|---|---|---|
+| `trialing` | `active` | `initial_purchase` / `trial_converted` RevenueCat event | Yes |
+| `trialing` | `canceled` | `expiration` / `cancellation` RevenueCat event | Yes |
+| `active` | `past_due` | `billing_issue` RevenueCat event (payment failure) | Yes |
+| `active` | `canceled` | `cancellation` RevenueCat event | Yes |
+| `active` | `paused` | `product_change` / voluntary pause RevenueCat event | Yes |
+| `past_due` | `active` | `renewal` / `billing_issue_resolved` RevenueCat event | Yes |
+| `past_due` | `canceled` | grace period expiry (72h) | Yes |
+| `paused` | `active` | `renewal` after pause end RevenueCat event | Yes |
+| `paused` | `canceled` | pause period expires without renewal | Yes |
+| `canceled` | `active` | `renewal` (resubscribe) RevenueCat event | Yes |
+| **any** | `trialing` | **No trigger** — backward transition | **INVALID — AL-SUB-01** |
+| `canceled` | `past_due` | **No trigger** | **INVALID — AL-SUB-01** |
+
+#### Enterprise tier (Stripe Invoicing → Supabase)
+
+```
+          ┌──────────────────────────────────────────────────────────────────┐
+          │                    ENTERPRISE SUBSCRIPTION                       │
+          │                                                                  │
+          │   [contract signed]                                              │
+          │       │                                                          │
+          │       ▼                                                          │
+          │    active ──── invoice_payment_failed ──► past_due               │
+          │       │                                       │                  │
+          │       │                           invoice_paid│ (retry)          │
+          │       │                                       ▼                  │
+          │       │                                    active                │
+          │       │                                       │                  │
+          │       │ contract_end / manual_cancel          │ overdue > 30d    │
+          │       ▼                                       ▼                  │
+          │   canceled ◄──────────────────────────── canceled               │
+          └──────────────────────────────────────────────────────────────────┘
+```
+
+Enterprise subscriptions do not have a `trialing` state; they activate immediately upon contract execution. The `paused` state is not used for enterprise; voluntary suspension requires a contract amendment and manual admin action, which is logged as `source = 'manual_admin'` in `subscription_events`.
+
+**Invalid transition detection:** Any state transition not in the tables above must immediately fire AL-SUB-01 (P0) and emit a `billing.subscription_state_changed` DEC-030 CRITICAL event with `invalid_transition = true`. The transition must be written to `subscription_events` with `event_type = 'invalid_transition_detected'` so the audit chain is preserved, but `users.subscription_tier` must NOT be updated.
+
+---
+
+### 24.3 Revenue Event Taxonomy
+
+All events below are ingested via the Cloudflare Worker webhook receiver (`workers/billing/webhook-receiver.ts`, §24.6). Each event is persisted to `subscription_events` (§24.7) and emits the corresponding DEC-030 HMAC-chained audit event (§24.10).
+
+| Event type | Source | Description | Severity | DEC-030 classification |
+|---|---|---|---|---|
+| `subscription_created` | RevenueCat / Stripe | New subscription record created (first purchase or enterprise contract activation) | INFO | STANDARD |
+| `subscription_renewed` | RevenueCat / Stripe | Successful auto-renewal or manual invoice payment | INFO | STANDARD |
+| `subscription_canceled` | RevenueCat / Stripe / `manual_admin` | Subscription terminated; access revocation scheduled | WARN | HIGH |
+| `subscription_paused` | RevenueCat | Voluntary pause; grace period clock not started | WARN | STANDARD |
+| `subscription_reactivated` | RevenueCat / Stripe | Canceled subscription restarted by customer | INFO | STANDARD |
+| `subscription_grace_period_entered` | RevenueCat | Payment failed; user enters 72h grace period before access revocation | WARN | HIGH |
+| `payment_failed` | RevenueCat / Stripe | Payment attempt declined; retry scheduled | WARN | HIGH |
+| `payment_recovered` | RevenueCat / Stripe | Previously failed payment succeeded; state returns to `active` | INFO | STANDARD |
+| `refund_issued` | RevenueCat / Stripe | Refund processed; subscription status depends on refund type | WARN | HIGH |
+| `enterprise_seat_added` | Stripe | Seat quantity increased on enterprise subscription | INFO | STANDARD |
+| `enterprise_seat_removed` | Stripe | Seat quantity decreased on enterprise subscription | WARN | STANDARD |
+| `enterprise_invoice_paid` | Stripe | Enterprise invoice paid; covers period `valid_from`–`valid_to` | INFO | STANDARD |
+| `enterprise_invoice_overdue` | Stripe | Invoice unpaid past 30-day net terms | CRITICAL | CRITICAL |
+| `invalid_transition_detected` | system | State machine violation detected (see §24.2) | CRITICAL | CRITICAL |
+
+**Source definitions:**
+- `revenuecat` — webhook delivered by RevenueCat to `POST /api/v1/billing/webhook/revenuecat`.
+- `stripe` — webhook delivered by Stripe to `POST /api/v1/billing/webhook/stripe`.
+- `manual_admin` — action performed by a FORM admin via the admin dashboard; requires two-factor confirmation and writes actor `user_id` to `subscription_events.actor_id`.
+
+---
+
+### 24.4 SLIs and SLOs
+
+The following SLOs govern the subscription processing pipeline. All SLOs are measured continuously; breach of any P0 SLO triggers an immediate PagerDuty alert routed to the on-call engineer and the billing-owner.
+
+| ID | Name | SLI | Target | Error budget (30d) | Alert |
+|---|---|---|---|---|---|
+| **SUB-SLO-01** | Webhook delivery lag | P95 time from RevenueCat/Stripe event timestamp to `subscription_events.processed_at`, measured from `billing.webhook.lag_ms` histogram | 99% of webhooks processed within **30 seconds** | ≤ 1% of webhooks may exceed 30s (≈ 432 webhooks/30d at 1 webhook/min) | AL-SUB-05 fires at P95 > 60s over 5-min window |
+| **SUB-SLO-02** | Webhook processing error rate | `billing.webhook.processed{outcome="error"}` / `billing.webhook.received` over 24h rolling window | **< 0.5%** error rate | 0.5% error budget over 24h rolling; 2% triggers immediate alert | AL-SUB-03 fires at > 2% over 15-min window |
+| **SUB-SLO-03** | Subscription state consistency | % of users where `users.subscription_tier` matches the terminal state derived from `subscription_events` latest row for that `user_id` | **100%** at any point-in-time consistency check | Zero tolerance: any discrepancy is a P0 | AL-SUB-01 fires on any mismatch; §24.9 daily check |
+| **SUB-SLO-04** | Enterprise seat count accuracy | % of enterprise tenants where `tenant_seats.seat_count` equals Stripe subscription `quantity` within 5 minutes of any seat-change event | **100%** within 5 minutes | Zero tolerance: any delta > 0 persisting > 5 min is a P1 | AL-SUB-04 fires on delta > 0 for > 5 min |
+| **SUB-SLO-05** | Grace period enforcement | No user whose grace period has expired by more than 72 hours retains premium feature access | **Zero violations** | Zero tolerance: any violation is a P0 incident | AL-SUB-02 fires on detection |
+
+**Measurement infrastructure:**
+- SUB-SLO-01 and SUB-SLO-02: Cloudflare Analytics Engine, metrics emitted by `workers/billing/webhook-receiver.ts` via the `billing.*` metric namespace.
+- SUB-SLO-03: Daily pg_cron `billing-consistency-check` (§24.9) + real-time AL-SUB-01 from state machine validator.
+- SUB-SLO-04: pg_cron `seat-reconciliation` every 5 minutes (§24.8).
+- SUB-SLO-05: pg_cron `grace-period-enforcer` runs every 30 minutes; queries users in `past_due` state with `valid_to < now() - interval '72 hours'` and revokes access, emitting `billing.access_revoked` DEC-030 CRITICAL event per user.
+
+---
+
+### 24.5 Alerting Rules
+
+All alerts are routed through PagerDuty. P0 and P1 alerts page the on-call engineer immediately. P2 creates a Linear ticket. P3 writes to the observability Slack channel only.
+
+| Alert ID | Severity | Condition | Evaluation window | Routing | Runbook |
+|---|---|---|---|---|---|
+| **AL-SUB-01** | **P0** | Impossible state transition detected: `subscription_events` row with `(from_state, to_state)` pair not in the valid-transitions table (§24.2), OR `users.subscription_tier` does not match latest terminal `subscription_events` row for any `user_id` | Real-time (event-driven, fired in webhook receiver) | PagerDuty P0 → on-call → billing-owner within 5 min | `docs/runbooks/RB-SUB-01.md` |
+| **AL-SUB-02** | **P0** | Grace period overshoot: any `user_id` in state `past_due` / `canceled` whose `subscription_events.valid_to < now() - interval '72 hours'` AND `users.subscription_tier = 'premium'` | Every 30 min (pg_cron grace-period-enforcer) | PagerDuty P0 → on-call → billing-owner | `docs/runbooks/RB-SUB-02.md` |
+| **AL-SUB-03** | **P1** | Webhook error rate: `billing.webhook.processed{outcome="error"}` / `billing.webhook.received` > 2% over any 15-minute rolling window | 15-min rolling, evaluated every 60s | PagerDuty P1 → on-call | `docs/runbooks/RB-SUB-03.md` |
+| **AL-SUB-04** | **P1** | Enterprise seat drift: `tenant_seats.seat_count` ≠ Stripe `subscription.quantity` for any enterprise `tenant_id`, persisting for > 5 minutes | 5-min pg_cron `seat-reconciliation` (§24.8) | PagerDuty P1 → on-call → customer-success | `docs/runbooks/RB-SUB-04.md` |
+| **AL-SUB-05** | **P1** | RevenueCat/Stripe webhook delivery lag: `billing.webhook.lag_ms` P95 > 60,000 ms over any 5-minute window | 5-min rolling, evaluated every 60s in Cloudflare Analytics Engine | PagerDuty P1 → on-call | `docs/runbooks/RB-SUB-05.md` |
+| **AL-SUB-06** | **P2** | Elevated refund rate: refund events in the trailing 7 days exceed 5% of renewal events in the same window | Daily pg_cron `billing-consistency-check` (§24.9) | Linear ticket → billing-owner + fraud-review | `docs/runbooks/RB-SUB-06.md` |
+| **AL-SUB-07** | **P2** | Enterprise invoice overdue: `enterprise_invoice_overdue` event present for any `tenant_id` with `created_at < now() - interval '30 days'` | Daily pg_cron `billing-consistency-check` (§24.9) | Linear ticket → customer-success escalation | `docs/runbooks/RB-SUB-07.md` |
+| **AL-SUB-08** | **P3** | Subscription state orphan: `user_id` present in `subscription_events` with no matching row in `users` table | Daily pg_cron `billing-consistency-check` (§24.9) | Slack `#observability` | `docs/runbooks/RB-SUB-08.md` |
+
+**Alert suppression:** AL-SUB-03, AL-SUB-05 are suppressed for 10 minutes immediately following a RevenueCat or Stripe announced incident (detected via their respective status-page webhooks) to avoid noise during upstream outages. Suppression itself is DEC-030 logged as `billing.alert_suppressed` (STANDARD).
+
+---
+
+### 24.6 Webhook Receiver Monitoring
+
+**Worker:** `workers/billing/webhook-receiver.ts`  
+**Routes:** `POST /api/v1/billing/webhook/revenuecat`, `POST /api/v1/billing/webhook/stripe`
+
+#### Metrics emitted
+
+| Metric name | Type | Labels | Description |
+|---|---|---|---|
+| `billing.webhook.received` | Counter | `source` (`revenuecat` \| `stripe`) | Incremented on every inbound webhook request, before any validation |
+| `billing.webhook.processed` | Counter | `source`, `outcome` (`success` \| `idempotent` \| `error`), `event_type` | Incremented after processing completes; `idempotent` means duplicate suppressed by idempotency key |
+| `billing.webhook.lag_ms` | Histogram | `source` | Milliseconds between event source timestamp and `processed_at`; buckets: 1000, 5000, 10000, 30000, 60000, 120000 |
+| `billing.webhook.signature_invalid` | Counter | `source` | Incremented on HMAC/signature verification failure; feeds AL-SUB-01 |
+
+#### Idempotency
+
+Each webhook source provides a unique event identifier. The receiver stores this as `subscription_events.idempotency_key` (UNIQUE constraint). On duplicate delivery, the row insert is skipped and `billing.webhook.processed{outcome="idempotent"}` is incremented. The idempotency key is:
+
+- **RevenueCat:** `transaction_id` from the webhook body (present on all purchase, renewal, cancellation, and billing-issue events).
+- **Stripe:** `event.id` from the top-level event envelope (globally unique `evt_*` identifier).
+
+#### HMAC signature verification
+
+Before any event processing, the worker verifies the webhook signature:
+
+```typescript
+// workers/billing/webhook-receiver.ts (excerpt)
+
+import { Env } from '../types';
+
+async function verifyRevenueCatSignature(
+  request: Request,
+  env: Env
+): Promise<boolean> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader) return false;
+  // RevenueCat uses Bearer token matching REVENUECAT_WEBHOOK_AUTH_KEY
+  return authHeader === `Bearer ${env.REVENUECAT_WEBHOOK_AUTH_KEY}`;
+}
+
+async function verifyStripeSignature(
+  rawBody: string,
+  sigHeader: string,
+  env: Env
+): Promise<boolean> {
+  const secret = env.STRIPE_WEBHOOK_SIGNING_SECRET;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['verify']
+  );
+  // Parse Stripe signature header: t=<timestamp>,v1=<signature>
+  const parts = Object.fromEntries(
+    sigHeader.split(',').map(p => p.split('=') as [string, string])
+  );
+  const signedPayload = `${parts['t']}.${rawBody}`;
+  const expectedSig = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(signedPayload)
+  );
+  const expectedHex = Array.from(new Uint8Array(expectedSig))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return expectedHex === parts['v1'];
+}
+
+export async function handleBillingWebhook(
+  request: Request,
+  env: Env,
+  source: 'revenuecat' | 'stripe'
+): Promise<Response> {
+  // 1. Increment received counter
+  env.ANALYTICS.writeDataPoint({
+    blobs: [source],
+    indexes: ['billing.webhook.received'],
+  });
+
+  const rawBody = await request.text();
+  let signatureValid: boolean;
+
+  if (source === 'revenuecat') {
+    signatureValid = await verifyRevenueCatSignature(request, env);
+  } else {
+    const sigHeader = request.headers.get('Stripe-Signature') ?? '';
+    signatureValid = await verifyStripeSignature(rawBody, sigHeader, env);
+  }
+
+  if (!signatureValid) {
+    env.ANALYTICS.writeDataPoint({
+      blobs: [source],
+      indexes: ['billing.webhook.signature_invalid'],
+    });
+    // Emit DEC-030 CRITICAL event — AL-SUB-01 path
+    await emitDec030Event(env, {
+      event_type: 'billing.webhook_signature_invalid',
+      severity: 'CRITICAL',
+      source,
+      trace_id: request.headers.get('cf-ray') ?? crypto.randomUUID(),
+    });
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  // 2. Parse, deduplicate, persist, and emit DEC-030 events
+  // ... (remainder of processing pipeline)
+}
+```
+
+**On signature failure:** The worker increments `billing.webhook.signature_invalid`, emits a DEC-030 `billing.webhook_signature_invalid` CRITICAL event, and returns HTTP 401. The failure is counted against SUB-SLO-02 as an `error` outcome. If the signature-failure rate exceeds 10 events in any 5-minute window, AL-SUB-01 (P0) fires with routing to the security-engineer in addition to on-call, as repeated failures indicate a possible credential compromise or active spoofing attempt.
+
+---
+
+### 24.7 Subscription Events Table
+
+The `subscription_events` table implements event-sourcing for all billing state changes. It is the authoritative record for subscription history and is read by the daily consistency check (§24.9), the state machine validator (§24.2), and all DEC-030 audit queries. Raw webhook payloads are never stored; only the SHA-256 hash of the incoming payload is recorded for GDPR compliance (see §24.13).
+
+```sql
+-- migrations/024_subscription_events.sql
+
+CREATE TYPE subscription_source AS ENUM ('revenuecat', 'stripe', 'manual_admin');
+
+CREATE TABLE subscription_events (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id                 UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    tenant_id               UUID REFERENCES tenants(id) ON DELETE RESTRICT,  -- NULL for consumer-tier users
+    event_type              TEXT NOT NULL,                                    -- see §24.3 taxonomy
+    source                  subscription_source NOT NULL,
+    from_state              TEXT,                                             -- state before transition; NULL for subscription_created
+    to_state                TEXT NOT NULL,                                    -- state after transition
+    raw_payload_hash        TEXT NOT NULL,                                    -- SHA-256 of incoming webhook body; NOT the payload itself (GDPR)
+    subscription_tier       TEXT NOT NULL,                                    -- 'free' | 'premium' | 'enterprise'
+    valid_from              TIMESTAMPTZ NOT NULL,                             -- start of the entitlement period granted by this event
+    valid_to                TIMESTAMPTZ,                                      -- end of the entitlement period; NULL = indefinite (active)
+    idempotency_key         TEXT NOT NULL,                                    -- RevenueCat transaction_id or Stripe event.id
+    actor_id                UUID REFERENCES users(id),                       -- populated only for source = 'manual_admin'
+    processed_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    processing_duration_ms  INT NOT NULL,                                    -- wall-clock ms from webhook receipt to this row committed
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT subscription_events_idempotency_key_unique UNIQUE (idempotency_key),
+    CONSTRAINT subscription_events_valid_period_check CHECK (
+        valid_to IS NULL OR valid_to > valid_from
+    ),
+    CONSTRAINT subscription_events_processing_duration_positive CHECK (
+        processing_duration_ms >= 0
+    )
+);
+
+-- Indexes for state machine queries and consistency checks
+CREATE INDEX subscription_events_user_id_created_at_idx
+    ON subscription_events (user_id, created_at DESC);
+
+CREATE INDEX subscription_events_tenant_id_idx
+    ON subscription_events (tenant_id)
+    WHERE tenant_id IS NOT NULL;
+
+CREATE INDEX subscription_events_event_type_idx
+    ON subscription_events (event_type, created_at DESC);
+
+CREATE INDEX subscription_events_to_state_idx
+    ON subscription_events (to_state, valid_to)
+    WHERE valid_to IS NOT NULL;
+
+-- Retention: 7 years (financial records, SOC 2 PI evidence)
+-- pg_cron cleanup is NOT applied to this table; rows are retained for the full 7-year period.
+-- A separate pg_cron 'subscription_events_archive' job moves rows older than 7 years to
+-- the compliance cold-storage bucket (R2) and deletes from primary DB after SHA-256 verification.
+
+-- Row-Level Security
+ALTER TABLE subscription_events ENABLE ROW LEVEL SECURITY;
+
+-- form_system role: write-only (INSERT), no SELECT/UPDATE/DELETE via application path
+CREATE POLICY subscription_events_form_system_insert
+    ON subscription_events FOR INSERT
+    TO form_system
+    WITH CHECK (true);
+
+-- tenant_admin: read rows for their own tenant (enterprise) or own user_id (consumer)
+CREATE POLICY subscription_events_tenant_admin_select
+    ON subscription_events FOR SELECT
+    TO tenant_admin
+    USING (
+        tenant_id = current_setting('app.current_tenant_id', true)::UUID
+        OR user_id = current_setting('app.current_user_id', true)::UUID
+    );
+
+-- compliance_officer: full read across all tenants; write is prohibited
+CREATE POLICY subscription_events_compliance_officer_select
+    ON subscription_events FOR SELECT
+    TO compliance_officer
+    USING (true);
+
+-- No UPDATE or DELETE policies: this table is append-only.
+-- Corrections are made by inserting a compensating event with event_type = 'correction'
+-- and actor_id set to the admin performing the correction.
+
+COMMENT ON TABLE subscription_events IS
+    'Append-only event-sourced ledger for all subscription billing state changes. '
+    'SOC 2 PI1.1–PI1.5 evidence. Raw payloads not stored (GDPR); SHA-256 hash only.';
+```
+
+---
+
+### 24.8 Enterprise Seat Reconciliation
+
+The pg_cron job `seat-reconciliation` runs every 5 minutes and is the enforcement mechanism for SUB-SLO-04. It compares the live `tenant_seats` seat count in Supabase Postgres against the authoritative seat quantity on the Stripe subscription object, using a Cloudflare Worker proxy to avoid direct Stripe API access from Postgres.
+
+#### Reconciliation query
+
+```sql
+-- Executed inside the 'seat-reconciliation' pg_cron function
+-- Called via: SELECT cron.schedule('seat-reconciliation', '*/5 * * * *', $$...$$);
+
+WITH stripe_quantities AS (
+    -- Fetch current Stripe seat quantities via Worker proxy
+    -- The Worker at /internal/stripe/seat-quantities returns:
+    --   { tenant_id: UUID, stripe_quantity: INT }[]
+    -- authenticated by service-role JWT
+    SELECT
+        (value->>'tenant_id')::UUID  AS tenant_id,
+        (value->>'stripe_quantity')::INT AS stripe_quantity
+    FROM
+        http_get(
+            current_setting('app.internal_worker_base_url') || '/internal/stripe/seat-quantities',
+            ARRAY[
+                ARRAY['Authorization', 'Bearer ' || current_setting('app.service_role_key')]
+            ]
+        ) AS resp,
+        json_array_elements(resp.content::json) AS value
+),
+local_counts AS (
+    SELECT
+        tenant_id,
+        seat_count
+    FROM tenant_seats
+    WHERE subscription_tier = 'enterprise'
+),
+drift AS (
+    SELECT
+        lc.tenant_id,
+        lc.seat_count          AS local_count,
+        sq.stripe_quantity     AS stripe_count,
+        ABS(lc.seat_count - sq.stripe_quantity) AS delta,
+        now()                  AS checked_at
+    FROM local_counts lc
+    JOIN stripe_quantities sq USING (tenant_id)
+    WHERE lc.seat_count <> sq.stripe_quantity
+)
+INSERT INTO seat_reconciliation_log
+    (tenant_id, local_count, stripe_count, delta, checked_at, resolved)
+SELECT
+    tenant_id,
+    local_count,
+    stripe_count,
+    delta,
+    checked_at,
+    false
+FROM drift
+ON CONFLICT (tenant_id, checked_at) DO NOTHING;
+```
+
+#### Drift escalation logic
+
+After the INSERT above, the pg_cron function checks whether any `tenant_id` has an unresolved drift row with `checked_at < now() - interval '5 minutes'`:
+
+```sql
+SELECT COUNT(*) AS persistent_drift_count
+FROM seat_reconciliation_log
+WHERE resolved = false
+  AND checked_at < now() - interval '5 minutes';
+```
+
+If `persistent_drift_count > 0`, the function calls the internal Worker endpoint `POST /internal/dec030/emit` with event type `billing.seat_drift_detected` (CRITICAL severity). This feeds AL-SUB-04.
+
+#### seat_reconciliation_log schema
+
+```sql
+CREATE TABLE seat_reconciliation_log (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id    UUID NOT NULL REFERENCES tenants(id),
+    local_count  INT NOT NULL,
+    stripe_count INT NOT NULL,
+    delta        INT NOT NULL,
+    checked_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved     BOOLEAN NOT NULL DEFAULT false,
+    resolved_at  TIMESTAMPTZ,
+    resolved_by  UUID REFERENCES users(id),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT seat_reconciliation_log_unique_check UNIQUE (tenant_id, checked_at)
+);
+
+CREATE INDEX seat_reconciliation_log_unresolved_idx
+    ON seat_reconciliation_log (tenant_id, checked_at)
+    WHERE resolved = false;
+
+ALTER TABLE seat_reconciliation_log ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY seat_recon_compliance_officer_select
+    ON seat_reconciliation_log FOR SELECT TO compliance_officer USING (true);
+
+CREATE POLICY seat_recon_tenant_admin_select
+    ON seat_reconciliation_log FOR SELECT TO tenant_admin
+    USING (tenant_id = current_setting('app.current_tenant_id', true)::UUID);
+```
+
+---
+
+### 24.9 Revenue Consistency Check
+
+The pg_cron job `billing-consistency-check` runs daily at **03:00 UTC**. It performs three independent checks across the full user and tenant population and writes results to `billing_consistency_checks`. Any check failure emits a DEC-030 CRITICAL event and triggers a PagerDuty P0 alert via `billing.consistency_check_failed`.
+
+#### Check A — Active subscribers have a valid entitlement row
+
+```sql
+-- Check A: Every user with subscription_tier = 'premium' or 'enterprise'
+-- must have a subscription_events row where valid_to IS NULL OR valid_to > now()
+INSERT INTO billing_consistency_checks
+    (check_name, check_date, passed, failure_count, failure_sample)
+SELECT
+    'active_subscriber_entitlement_coverage',
+    now(),
+    COUNT(*) = 0,
+    COUNT(*),
+    jsonb_agg(jsonb_build_object('user_id', u.id, 'tier', u.subscription_tier) ORDER BY u.id LIMIT 50)
+FROM users u
+WHERE u.subscription_tier IN ('premium', 'enterprise')
+  AND NOT EXISTS (
+      SELECT 1 FROM subscription_events se
+      WHERE se.user_id = u.id
+        AND se.to_state = 'active'
+        AND (se.valid_to IS NULL OR se.valid_to > now())
+  );
+```
+
+#### Check B — No premium access without a valid subscription record
+
+```sql
+-- Check B: No user has subscription_tier = 'premium' without a matching
+-- subscription_events entry (catches manual DB edits that bypass the event pipeline)
+INSERT INTO billing_consistency_checks
+    (check_name, check_date, passed, failure_count, failure_sample)
+SELECT
+    'no_premium_without_subscription_event',
+    now(),
+    COUNT(*) = 0,
+    COUNT(*),
+    jsonb_agg(jsonb_build_object('user_id', u.id) ORDER BY u.id LIMIT 50)
+FROM users u
+WHERE u.subscription_tier = 'premium'
+  AND NOT EXISTS (
+      SELECT 1 FROM subscription_events se
+      WHERE se.user_id = u.id
+        AND se.subscription_tier = 'premium'
+  );
+```
+
+#### Check C — Enterprise seat counts match Stripe
+
+```sql
+-- Check C: tenant_seats.seat_count = Stripe quantity for all enterprise tenants
+-- (relies on the same Worker proxy used by seat-reconciliation in §24.8)
+INSERT INTO billing_consistency_checks
+    (check_name, check_date, passed, failure_count, failure_sample)
+WITH stripe_quantities AS (
+    SELECT
+        (value->>'tenant_id')::UUID  AS tenant_id,
+        (value->>'stripe_quantity')::INT AS stripe_quantity
+    FROM
+        http_get(
+            current_setting('app.internal_worker_base_url') || '/internal/stripe/seat-quantities',
+            ARRAY[ARRAY['Authorization', 'Bearer ' || current_setting('app.service_role_key')]]
+        ) AS resp,
+        json_array_elements(resp.content::json) AS value
+)
+SELECT
+    'enterprise_seat_count_stripe_parity',
+    now(),
+    COUNT(*) = 0,
+    COUNT(*),
+    jsonb_agg(jsonb_build_object(
+        'tenant_id', ts.tenant_id,
+        'local_count', ts.seat_count,
+        'stripe_count', sq.stripe_quantity
+    ) ORDER BY ts.tenant_id LIMIT 50)
+FROM tenant_seats ts
+JOIN stripe_quantities sq USING (tenant_id)
+WHERE ts.seat_count <> sq.stripe_quantity;
+```
+
+#### billing_consistency_checks schema
+
+```sql
+CREATE TABLE billing_consistency_checks (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    check_name      TEXT NOT NULL,
+    check_date      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    passed          BOOLEAN NOT NULL,
+    failure_count   INT NOT NULL DEFAULT 0,
+    failure_sample  JSONB,   -- up to 50 anonymised failing user_id / tenant_id references
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX billing_consistency_checks_check_date_idx
+    ON billing_consistency_checks (check_date DESC, check_name);
+
+ALTER TABLE billing_consistency_checks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY billing_consistency_checks_compliance_officer
+    ON billing_consistency_checks FOR SELECT TO compliance_officer USING (true);
+
+CREATE POLICY billing_consistency_checks_form_system_insert
+    ON billing_consistency_checks FOR INSERT TO form_system WITH CHECK (true);
+```
+
+**Failure escalation:** After all three checks are inserted, the pg_cron function executes:
+
+```sql
+SELECT COUNT(*) INTO v_failures
+FROM billing_consistency_checks
+WHERE check_date >= now() - interval '1 hour'
+  AND passed = false;
+```
+
+If `v_failures > 0`, the function POSTs to `POST /internal/dec030/emit` with `billing.consistency_check_failed` (CRITICAL) and to `POST /internal/pagerduty/trigger` with severity P0, incident title `billing-consistency-check-failed`, and a JSON body listing the failed check names and failure counts. The on-call engineer and billing-owner are paged.
+
+---
+
+### 24.10 DEC-030 HMAC-Chained Audit Events
+
+All billing audit events are written to the HMAC-chained append-only audit log defined in `docs/AUDIT_LOG_SCHEMA.md`. Each event carries the standard DEC-030 envelope (`trace_id`, `actor_id`, `tenant_id`, `timestamp`, `prev_hmac`) plus the billing-specific fields listed below. All events are retained for **7 years** (financial records).
+
+`actor_id` for machine-generated events (all `source ≠ 'manual_admin'` events) is set to the service account identifier `form_system`. For `manual_admin` events, `actor_id` is the authenticated FORM admin user ID.
+
+`user_id_hash` in the DEC-030 envelope is the SHA-256 hash of the plaintext `user_id` UUID — never the plaintext UUID itself. This applies to all `billing.*` events.
+
+| DEC-030 event type | Severity | Trigger | Key fields (beyond standard envelope) |
+|---|---|---|---|
+| `billing.subscription_state_changed` | STANDARD | Any valid state transition persisted to `subscription_events` | `user_id_hash`, `tenant_id`, `from_state`, `to_state`, `subscription_tier`, `source`, `idempotency_key` |
+| `billing.payment_failed` | HIGH | `payment_failed` event received and processed | `user_id_hash`, `tenant_id`, `source`, `retry_attempt`, `idempotency_key` |
+| `billing.grace_period_entered` | HIGH | `subscription_grace_period_entered` event processed; 72h clock started | `user_id_hash`, `tenant_id`, `grace_expiry_at`, `idempotency_key` |
+| `billing.access_revoked` | CRITICAL | User access revoked after grace period expiry or cancellation | `user_id_hash`, `tenant_id`, `revocation_reason` (`grace_period_expired` \| `canceled` \| `manual_admin`), `actor_id` |
+| `billing.refund_issued` | HIGH | `refund_issued` event received and processed | `user_id_hash`, `tenant_id`, `source`, `refund_amount_cents`, `currency`, `idempotency_key` |
+| `billing.enterprise_invoice_paid` | STANDARD | `enterprise_invoice_paid` event processed | `tenant_id`, `invoice_id_hash` (SHA-256 of Stripe invoice ID), `amount_cents`, `currency`, `period_start`, `period_end` |
+| `billing.enterprise_invoice_overdue` | CRITICAL | `enterprise_invoice_overdue` event processed; invoice unpaid > 30 days | `tenant_id`, `invoice_id_hash`, `amount_cents`, `overdue_days` |
+| `billing.seat_count_changed` | STANDARD | `enterprise_seat_added` or `enterprise_seat_removed` event processed | `tenant_id`, `previous_count`, `new_count`, `change_reason`, `idempotency_key` |
+| `billing.seat_drift_detected` | CRITICAL | pg_cron `seat-reconciliation` detects persistent delta > 0 for > 5 minutes (§24.8) | `tenant_id`, `local_count`, `stripe_count`, `delta`, `drift_duration_minutes` |
+| `billing.consistency_check_failed` | CRITICAL | Any check in the daily `billing-consistency-check` pg_cron job returns `passed = false` (§24.9) | `failed_checks` (array of check names), `total_failures` |
+| `billing.webhook_signature_invalid` | CRITICAL | HMAC/Bearer signature verification failure in webhook receiver (§24.6) | `source`, `cf_ray` (Cloudflare Ray ID), `ip_hash` (SHA-256 of requester IP) |
+
+**HMAC chain integrity:** A break in the HMAC chain on any `billing.*` event is a P0 incident per `docs/INCIDENT_RESPONSE.md §R-05`. The chain is verified nightly by the `dec030-chain-verify` pg_cron job. Any gap in the `billing.*` event sequence (missing event for a known `idempotency_key`) is also flagged as a P0.
+
+---
+
+### 24.11 Metabase Revenue Observability Dashboard
+
+**Dashboard name:** "Subscription Health"  
+**Access:** billing-owner, compliance-officer, founder, on-call engineer (read-only for on-call)  
+**Refresh interval:** 5 minutes  
+**Data source:** Supabase Postgres (primary) + Cloudflare Analytics Engine (webhook metrics)
+
+| Panel # | Panel title | Visualisation | Primary query / metric | Alert threshold shown |
+|---|---|---|---|---|
+| 1 | Webhook Processing Rate & Error Rate (last 24h) | Dual-axis line chart: left = requests/min, right = error % | `billing.webhook.received` and `billing.webhook.processed{outcome="error"}` from Cloudflare Analytics Engine, 5-min buckets | Red band at error rate > 2% (AL-SUB-03 threshold) |
+| 2 | Subscription State Distribution | Stacked bar chart, one bar per hour for last 7 days | `SELECT to_state, COUNT(*) FROM subscription_events WHERE created_at > now()-'7 days' GROUP BY to_state, date_trunc('hour', created_at)` | N/A (trend visibility) |
+| 3 | Daily Churn Rate (consumer) | Line chart, daily granularity, rolling 30d | `canceled` events / `active` user-days for consumer tier, from `subscription_events` | Reference line at 2% daily churn (advisory) |
+| 4 | Grace-Period Users (live count) | Single stat + trend sparkline | `SELECT COUNT(*) FROM users u JOIN subscription_events se ON se.user_id = u.id WHERE se.to_state = 'past_due' AND (se.valid_to IS NULL OR se.valid_to > now())` | Red threshold at any count > 0 where `valid_to < now() - interval '72 hours'` |
+| 5 | Enterprise Seat Drift Count | Single stat (target: 0) + last-7d bar chart | `SELECT COUNT(*) FROM seat_reconciliation_log WHERE resolved = false AND checked_at > now() - interval '24 hours'` | Red threshold at count > 0 (AL-SUB-04) |
+| 6 | Daily Revenue Events Count | Grouped bar chart by event_type, last 14d | `SELECT event_type, COUNT(*), date_trunc('day', created_at) FROM subscription_events GROUP BY 1,3 ORDER BY 3` | N/A (volume trend) |
+| 7 | Refund Rate (rolling 7d) | Gauge + line trend | `refund_issued` count / `subscription_renewed` count over trailing 7d from `subscription_events` | Yellow at > 3%, red at > 5% (AL-SUB-06 threshold) |
+| 8 | Billing Consistency Check Status | Status table: one row per check name, latest result | `SELECT check_name, check_date, passed, failure_count FROM billing_consistency_checks WHERE check_date >= now() - interval '25 hours' ORDER BY check_date DESC` | Red row background on `passed = false`; green on `passed = true` |
+
+**Dashboard annotations:** Any AL-SUB-01 or AL-SUB-02 P0 alert that fires is automatically annotated on all time-series panels via the Metabase annotation API, with the alert ID and timestamp. This allows post-incident correlation without requiring access to PagerDuty.
+
+---
+
+### 24.12 SOC 2 PI1 Mapping
+
+| PI criterion | Requirement | Evidence artefact in this section | Owner |
+|---|---|---|---|
+| **PI1.1** — Processing is complete | All subscription events are captured without omission | `subscription_events` append-only table; idempotency-key uniqueness constraint prevents gaps; `billing-consistency-check` Check A verifies every active subscriber has a valid event row | platform-engineer |
+| **PI1.2** — Processing is accurate | State transitions are validated against the state machine; seat counts match Stripe authoritative source | State machine validator in webhook receiver (§24.2); `seat-reconciliation` pg_cron + `seat_reconciliation_log` (§24.8); `billing-consistency-check` Check C (§24.9) | platform-engineer |
+| **PI1.3** — Processing is timely | Webhooks are processed within committed latency SLO; seat reconciliation runs every 5 minutes; daily consistency check at 03:00 UTC | SUB-SLO-01 (P95 < 30s), SUB-SLO-04 (5-min reconciliation); `billing.webhook.lag_ms` histogram; AL-SUB-05 fires on lag regression | devops-lead |
+| **PI1.4** — Processing is authorized | Webhook signatures are verified before any state change; `manual_admin` events require authenticated session and two-factor; RLS on `subscription_events` prevents unauthorised writes | HMAC/Bearer verification in §24.6; `subscription_events` RLS policies (§24.7); `billing.webhook_signature_invalid` DEC-030 CRITICAL event on auth failure | security-engineer |
+| **PI1.5** — Processing is valid | Invalid state transitions are rejected and never written to `users.subscription_tier`; grace period overshoot is detected and alerted; consistency checks flag any data integrity breach | State machine invalid-transition block (§24.2); AL-SUB-01 (impossible transition P0); AL-SUB-02 (grace period overshoot P0); `billing-consistency-check` Check B (§24.9) | platform-engineer |
+
+**Additional SOC 2 criterion coverage:**
+
+| Criterion | Coverage |
+|---|---|
+| **CC7.2** — Anomaly detection | AL-SUB-01 through AL-SUB-08 alerting rules; `billing.webhook_signature_invalid` CRITICAL event; DEC-030 chain-break detection |
+| **CC6.1** — Logical access controls | RLS on `subscription_events`, `seat_reconciliation_log`, `billing_consistency_checks`; `compliance_officer` read-only; `form_system` write-only; `tenant_admin` scoped to own tenant |
+
+**Evidence artefacts for auditors:**
+- `compliance/evidence/billing/{YYYY-MM}-consistency-check.json` — machine-readable daily consistency check results, retained 7 years.
+- `compliance/evidence/billing/{YYYY-MM}-subscription-events-count.json` — monthly row count and event-type distribution from `subscription_events`, retained 7 years.
+- DEC-030 audit log filtered on `event_type LIKE 'billing.%'` — continuous chain-verified log, retained 7 years.
+- `seat_reconciliation_log` export: monthly CSV of all drift events per tenant, retained 7 years.
+
+---
+
+### 24.13 Privacy Notes
+
+The following privacy controls are enforced by design. Each is a hard constraint; any change requires a privacy impact assessment reviewed by the compliance-officer and documented in `docs/PRIVACY_IMPACT.md`.
+
+1. **Raw webhook payloads are not stored.** `subscription_events.raw_payload_hash` contains only the SHA-256 hash of the incoming webhook body. This is sufficient for audit integrity verification without retaining payment card data, billing addresses, or other personal data present in raw Stripe/RevenueCat payloads. The raw body is discarded after hash computation and processing, before any await boundary.
+
+2. **No payment card data or billing addresses are stored anywhere in FORM's Supabase database.** All payment instrument data resides exclusively with Stripe and RevenueCat as sub-processors. FORM stores only subscription state, entitlement periods, and identifiers (Stripe customer ID, RevenueCat app user ID) that cannot be used to reconstruct payment details.
+
+3. **`subscription_events` contains no personal data beyond `user_id`.** The table holds subscription state, timestamps, and processing metadata. No name, email address, IP address, device fingerprint, or health-adjacent data is stored in this table. `user_id` is a UUID primary key with no semantic meaning to a third party without access to the `users` table, which is subject to separate RLS policies.
+
+4. **DEC-030 `billing.*` events carry `user_id_hash` (SHA-256 of the plaintext `user_id`), not the plaintext UUID.** This preserves auditability (the same user's events are linkable by hash) while preventing the audit log from becoming a direct lookup table for user identity.
+
+5. **RevenueCat and Stripe are designated sub-processors** under FORM's Data Processing Agreement framework. Both hold current signed DPAs with FORM. RevenueCat's DPA covers EU/UK GDPR and CCPA; Stripe's DPA covers EU/UK GDPR, CCPA, and PCI-DSS. Sub-processor status is recorded in `docs/SUBPROCESSORS.md`.
+
+6. **Tenant-level data minimisation:** The `tenant_id` column in `subscription_events` is NULL for consumer-tier users. Enterprise tenant administrators can only read events for their own `tenant_id` via RLS. A `tenant_admin` cannot enumerate consumer-tier subscription events.
+
+7. **Data subject access requests (DSARs):** A DSAR for subscription history is fulfilled by querying `subscription_events WHERE user_id = :user_id` and returning event type, date, and subscription tier only. `raw_payload_hash` is excluded from DSAR responses as it is a system integrity field, not personal data in meaningful form.
+
+---
+
+### 24.14 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Create `subscription_events` table with full DDL, indexes, and RLS policies per §24.7 | platform-engineer | **P0** | M4 |
+| Register `subscription_source` ENUM and all `subscription_events` constraints in migration `024_subscription_events.sql` | platform-engineer | **P0** | M4 |
+| Implement `workers/billing/webhook-receiver.ts` with HMAC/Bearer signature verification, idempotency deduplication, state machine validator, and all metric emissions per §24.6 | platform-engineer | **P0** | M4 |
+| Create `seat_reconciliation_log` table with DDL and RLS per §24.8 | platform-engineer | **P0** | M4 |
+| Implement pg_cron `seat-reconciliation` job (every 5 minutes) per §24.8; include Worker proxy endpoint `GET /internal/stripe/seat-quantities` | platform-engineer | **P0** | M4 |
+| Implement pg_cron `billing-consistency-check` job (daily 03:00 UTC) with all three checks and PagerDuty escalation per §24.9 | platform-engineer | **P0** | M4 |
+| Create `billing_consistency_checks` table with DDL and RLS per §24.9 | platform-engineer | **P0** | M4 |
+| Register all 11 `billing.*` DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry with severity and 7-year retention | security-engineer | **P0** | M4 |
+| Implement pg_cron `grace-period-enforcer` job (every 30 minutes) that queries past-due users beyond 72h and revokes access; emits `billing.access_revoked` CRITICAL | platform-engineer | **P0** | M4 |
+| Configure AL-SUB-01 through AL-SUB-08 alerting rules in PagerDuty and Cloudflare Analytics Engine; write runbooks `RB-SUB-01` through `RB-SUB-08` | devops-lead | **P1** | M4 |
+| Build "Subscription Health" Metabase dashboard with all 8 panels per §24.11; configure 5-minute refresh and AL-SUB-01/AL-SUB-02 annotations | data-engineer | **P1** | M5 |
+| Update `docs/SOC2_READINESS.md` PI1.1–PI1.5 gap rows from 🟡 Gap to ✅ Done, citing this section as evidence | compliance-officer | **P0** | M4 |
+| Add `billing.webhook_signature_invalid` rate assertion to `__tests__/db/rls_isolation.test.ts` and add webhook-receiver integration tests covering idempotency, signature rejection, and invalid-transition blocking | platform-engineer | **P1** | M5 |
+| Add RevenueCat and Stripe to `docs/SUBPROCESSORS.md` with DPA reference dates and data categories per §24.13 | compliance-officer | **P2** | M5 |
+
+---
+
+*v1.1 additions: §24 Subscription & Revenue Event Observability — closes the PI1.1–PI1.5 Processing Integrity gap documented in `docs/SOC2_READINESS.md`, which was previously only partially addressed by the `row-count-monitor` Edge Function; defines the full subscription state machine for both the consumer tier (RevenueCat → Supabase, states: trialing → active → past_due → canceled / paused) and the enterprise tier (Stripe Invoicing → Supabase, states: active → past_due → canceled), with a complete valid-transitions table and an invalid-transition blocking path that prevents `users.subscription_tier` updates on impossible transitions while preserving the audit record; thirteen-event revenue taxonomy covering both sources (`revenuecat`, `stripe`, `manual_admin`) with DEC-030 classification for each event type; five SUB-SLOs governing webhook delivery lag P95 < 30s (SUB-SLO-01), processing error rate < 0.5% over 24h (SUB-SLO-02), 100% subscription state consistency (SUB-SLO-03), 100% enterprise seat count accuracy within 5 minutes of seat changes (SUB-SLO-04), and zero grace-period overshoot beyond 72h (SUB-SLO-05); eight alerting rules AL-SUB-01 through AL-SUB-08 spanning P0 impossible state transitions and grace-period overshoot, P1 webhook error rate / seat drift / delivery lag, P2 elevated refund rate and overdue enterprise invoices, and P3 subscription state orphans; Cloudflare Worker `workers/billing/webhook-receiver.ts` specification with four metric types (`billing.webhook.received`, `billing.webhook.processed`, `billing.webhook.lag_ms`, `billing.webhook.signature_invalid`), HMAC-chained idempotency using RevenueCat `transaction_id` and Stripe `event.id`, full TypeScript signature-verification code for both RevenueCat Bearer-token and Stripe HMAC-SHA-256 webhook authentication; `subscription_events` append-only Postgres DDL with thirteen columns, two CHECK constraints, four indexes, and three RLS policies (form_system write-only, tenant_admin scoped read, compliance_officer full read); enterprise seat-reconciliation pg_cron job running every 5 minutes with full SQL using `http_get` Worker proxy to Stripe, `seat_reconciliation_log` DDL with unresolved-drift index, and DEC-030 CRITICAL emission path on drift persisting beyond 5 minutes; daily `billing-consistency-check` pg_cron at 03:00 UTC with three SQL checks (active-subscriber entitlement coverage, no-premium-without-subscription-event, enterprise-seat-count-stripe-parity), `billing_consistency_checks` DDL, and PagerDuty P0 escalation path; eleven DEC-030 HMAC-chained event types with severity levels and key fields, all retained 7 years; "Subscription Health" Metabase dashboard specification with eight panels (webhook rate/error rate, state distribution, daily churn, grace-period live count, enterprise seat drift, daily revenue events, rolling refund rate, consistency check status); PI1.1–PI1.5 evidence mapping table plus CC7.2 and CC6.1 supplementary coverage; seven privacy constraints (no raw payload storage — SHA-256 hash only; no payment card data in Supabase; no PII beyond user_id in subscription_events; user_id_hash in DEC-030 events; RevenueCat and Stripe DPAs documented; tenant-level data minimisation; DSAR fulfilment scope); fourteen-item implementation checklist across M4/M5 with owners and priorities.*
