@@ -5298,3 +5298,214 @@ The following privacy controls are enforced by design. Each is a hard constraint
 ---
 
 *v1.1 additions: §24 Subscription & Revenue Event Observability — closes the PI1.1–PI1.5 Processing Integrity gap documented in `docs/SOC2_READINESS.md`, which was previously only partially addressed by the `row-count-monitor` Edge Function; defines the full subscription state machine for both the consumer tier (RevenueCat → Supabase, states: trialing → active → past_due → canceled / paused) and the enterprise tier (Stripe Invoicing → Supabase, states: active → past_due → canceled), with a complete valid-transitions table and an invalid-transition blocking path that prevents `users.subscription_tier` updates on impossible transitions while preserving the audit record; thirteen-event revenue taxonomy covering both sources (`revenuecat`, `stripe`, `manual_admin`) with DEC-030 classification for each event type; five SUB-SLOs governing webhook delivery lag P95 < 30s (SUB-SLO-01), processing error rate < 0.5% over 24h (SUB-SLO-02), 100% subscription state consistency (SUB-SLO-03), 100% enterprise seat count accuracy within 5 minutes of seat changes (SUB-SLO-04), and zero grace-period overshoot beyond 72h (SUB-SLO-05); eight alerting rules AL-SUB-01 through AL-SUB-08 spanning P0 impossible state transitions and grace-period overshoot, P1 webhook error rate / seat drift / delivery lag, P2 elevated refund rate and overdue enterprise invoices, and P3 subscription state orphans; Cloudflare Worker `workers/billing/webhook-receiver.ts` specification with four metric types (`billing.webhook.received`, `billing.webhook.processed`, `billing.webhook.lag_ms`, `billing.webhook.signature_invalid`), HMAC-chained idempotency using RevenueCat `transaction_id` and Stripe `event.id`, full TypeScript signature-verification code for both RevenueCat Bearer-token and Stripe HMAC-SHA-256 webhook authentication; `subscription_events` append-only Postgres DDL with thirteen columns, two CHECK constraints, four indexes, and three RLS policies (form_system write-only, tenant_admin scoped read, compliance_officer full read); enterprise seat-reconciliation pg_cron job running every 5 minutes with full SQL using `http_get` Worker proxy to Stripe, `seat_reconciliation_log` DDL with unresolved-drift index, and DEC-030 CRITICAL emission path on drift persisting beyond 5 minutes; daily `billing-consistency-check` pg_cron at 03:00 UTC with three SQL checks (active-subscriber entitlement coverage, no-premium-without-subscription-event, enterprise-seat-count-stripe-parity), `billing_consistency_checks` DDL, and PagerDuty P0 escalation path; eleven DEC-030 HMAC-chained event types with severity levels and key fields, all retained 7 years; "Subscription Health" Metabase dashboard specification with eight panels (webhook rate/error rate, state distribution, daily churn, grace-period live count, enterprise seat drift, daily revenue events, rolling refund rate, consistency check status); PI1.1–PI1.5 evidence mapping table plus CC7.2 and CC6.1 supplementary coverage; seven privacy constraints (no raw payload storage — SHA-256 hash only; no payment card data in Supabase; no PII beyond user_id in subscription_events; user_id_hash in DEC-030 events; RevenueCat and Stripe DPAs documented; tenant-level data minimisation; DSAR fulfilment scope); fourteen-item implementation checklist across M4/M5 with owners and priorities.*
+
+---
+
+## 25. Product & Activation Funnel Observability
+
+> Owner: growth-lead + devops-lead. Review: monthly or on any funnel architecture change.
+> Cross-references: §1 Three Pillars Overview (PostHog pillar), §12 Developer Instrumentation Guide, §24 Subscription & Revenue Event Observability, `docs/FLOWS.md` (F1–F8 user flows).
+
+---
+
+### 25.1 Purpose and Scope
+
+Sections §1–§24 cover infrastructure observability: RED metrics, SLOs, crash rates, error budgets, trace correlation, and billing event integrity. Those signals answer *is the system up and operating correctly?*
+
+This section closes the complementary gap: *are users activating, and is the product delivering its core value loop?* Infrastructure metrics can show a 99.9%-available API with sub-200 ms P95 latency at the same moment that zero users are completing their first coaching session — a product failure that no infrastructure alert would detect.
+
+§25 defines FORM's product observability layer: the PostHog event taxonomy for F1–F8 user flows (see `docs/FLOWS.md`), the activation and engagement SLOs that sit alongside §2's infrastructure SLOs, the alerting rules that fire on product metric regressions, A/B test instrumentation standards, and the privacy constraints that govern what may and may not enter PostHog.
+
+PostHog (EU Cloud, Frankfurt) is the sole destination for all events in this section. It was selected in DEC-XXX (TBD) for open-source pedigree, EU data residency, combined feature flag and analytics surface, and competitive cost versus Amplitude at early-stage scale. See OQ-32 for the open Amplitude comparison question. PostHog is already referenced in the §1 Three Pillars table as the product metrics tool and in §12.5 as an instrumentation checkpoint.
+
+**Privacy-first constraint:** FORM's workout data, body composition trends, recovery scores, and coaching content are GDPR Art. 9 health-adjacent special category data. Nothing in §25 permits health data to enter PostHog. All event schemas below are designed with this constraint as a hard gate. The clinical-safety team holds a veto on any proposed event property that is body-adjacent, injury-adjacent, or could reconstruct an individual's health status from the PostHog event stream.
+
+---
+
+### 25.2 Activation Funnel Definition
+
+FORM defines **"activated"** as: a user who completes at least one full coaching session with CV pose feedback enabled within 7 days of registration [DEC-XXX TBD]. This is the D7 Activation metric (ACT-SLO-01). It is the primary product health signal pre-Series A.
+
+The activation journey maps to flows F1 through F4 in `docs/FLOWS.md`. Flows F5–F8 are engagement and monetisation steps that follow activation.
+
+| Flow ID | Flow Name | Entry Event | Completion Event | Activation Gate | Max Acceptable Drop-off |
+|---|---|---|---|---|---|
+| F1 | Onboarding | `app.opened` | `onboarding.completed` | YES | < 30% |
+| F2 | Daily Check-in | `checkin.started` | `checkin.submitted` | NO | < 15% |
+| F3 | Session Start | `session.intent_started` | `session.confirmed` | YES | < 20% |
+| F4 | Live Session (CV) | `session.confirmed` | `session.completed_with_cv` | YES | < 25% |
+| F5 | Post-Session | `session.completed_with_cv` | `postsession.dismissed` | NO | < 5% |
+| F6 | Progress Review | `progress.opened` | `progress.milestone_viewed` | NO | < 40% |
+| F7 | Program Change | `program.change_started` | `program.change_confirmed` | NO | < 30% |
+| F8 | Paywall / Upgrade | `paywall.shown` | `subscription.purchase_started` | NO | < 85% |
+
+**Activation gate** means the flow is a required step on the path to the D7 Activation definition. Drop-off floors are targets, not hard SLOs — they trigger investigation, not a page. Paging thresholds are defined in §25.5. All drop-off floors are [ESTIMATE] values pending real baseline data from the first 500 installs.
+
+---
+
+### 25.3 PostHog Event Taxonomy
+
+All events below are captured by the mobile clients (iOS and Android) via the PostHog React Native SDK and sent to `https://eu.posthog.com`. No events transit through FORM's Cloudflare Workers — they are sent client-side directly. This architectural choice is intentional: it decouples product analytics uptime from API uptime (see AL-ACT-06 in §25.5 which detects a zero-event window as a signal of a client-side or CDN failure).
+
+**`distinct_id` field:** Every event uses `user_id_hash` (SHA-256 of the plaintext Supabase `user_id`) as the PostHog `distinct_id`. The plaintext `user_id` is never transmitted to PostHog. See §25.7 constraint 4.
+
+**PII risk column:** LOW = no personal data; MEDIUM = pseudonymous or aggregatable; HIGH = must not reach PostHog.
+
+| Event Name | Trigger | Key Properties | PII Risk | Retained in PostHog | Notes |
+|---|---|---|---|---|---|
+| `app.opened` | App foregrounded or cold-launched | `platform` (ios\|android), `app_version`, `is_fresh_install` (boolean) | LOW | YES | Entry point for all funnel analysis |
+| `onboarding.step_viewed` | Each onboarding screen renders | `step_name`, `step_index` | LOW | YES | Used to identify drop-off step within F1 |
+| `onboarding.completed` | User taps through final onboarding screen | `duration_seconds`, `profile_complete` (boolean) | LOW | YES | F1 completion event |
+| `checkin.started` | Daily check-in flow entered | `source` (push_notification\|manual\|widget) | LOW | YES | F2 entry event |
+| `checkin.submitted` | Check-in form submitted | `checkin_completed` (boolean: true) | LOW | YES | F2 completion. Mood score (1–5) and readiness score (1–5) are NOT sent — see §25.7 constraint 1 and OQ-33 |
+| `session.intent_started` | User taps "Start Session" | `program_id` (opaque UUID — no health semantics) | LOW | YES | F3 entry. No exercise names, no load data |
+| `session.confirmed` | Session parameters confirmed, session begins | `exercise_count`, `estimated_duration_min` | LOW | YES | F3 completion / F4 entry |
+| `session.completed_with_cv` | Session ends with CV enabled and at least one rep counted | `duration_actual_min` (rounded to nearest 5 min), `cv_enabled` (boolean), `rep_count_total` | LOW | YES | F4 completion. Weight, load, RPE, and form scores are NOT sent — see §25.7 constraints 1 and 3 |
+| `session.abandoned` | User exits mid-session | `step_at_abandon` (warm_up\|working_sets\|cool_down), `cv_enabled` (boolean) | LOW | YES | Used to identify abandonment point within F3/F4 |
+| `postsession.dismissed` | Post-session summary screen dismissed | — | LOW | YES | F5 completion event |
+| `progress.opened` | Progress screen tapped | `weeks_active` | LOW | YES | F6 entry event |
+| `progress.milestone_viewed` | User scrolls to or taps a milestone card | — | LOW | YES | F6 completion event |
+| `program.change_started` | User initiates program change flow | — | LOW | YES | F7 entry event |
+| `program.change_confirmed` | Program change confirmed | — | LOW | YES | F7 completion event |
+| `paywall.shown` | Paywall screen rendered | `source` (session_gate\|feature_gate\|manual), `tier_offered` | LOW | YES | F8 entry event |
+| `paywall.dismissed` | Paywall screen dismissed without purchase | `time_shown_sec` | LOW | YES | Complement to F8 conversion |
+| `subscription.purchase_started` | User taps purchase CTA on paywall | `tier`, `billing_period` | LOW | YES | F8 completion event. Actual transaction outcome is in §24, not PostHog |
+| `victor.message_sent` | User submits a message to Victor | `message_length_bucket` (short\|medium\|long) | LOW | YES | Message content is NOT sent — see §25.7 constraint 2 |
+| `victor.response_received` | Victor response rendered in UI | `latency_ms`, `response_length_bucket` (short\|medium\|long) | LOW | YES | Response content is NOT sent |
+| `feature.cv_permissions_granted` | User grants camera permission for CV | `platform` (ios\|android) | LOW | YES | Key friction point in F4 |
+| `experiment.enrolled` | User assigned to an A/B experiment variant | `experiment_id`, `variant` (control\|treatment_A\|...), `user_id_hash` | LOW | YES | See §25.6. Plaintext `user_id` is NOT the value — `user_id_hash` is a property here too |
+| `experiment.converted` | User triggers the primary conversion event of an experiment | `experiment_id`, `variant`, `conversion_event_name` | LOW | YES | See §25.6 |
+
+**Properties that must never appear in any PostHog event:**
+
+| Prohibited Property | Category | Reason |
+|---|---|---|
+| Weight / load values (kg, lb, 1RM %) | Health data | GDPR Art. 9; clinical-safety veto |
+| Mood score (1–5), readiness score (1–5) | Health-adjacent | Excluded pending OQ-33 ruling |
+| Body measurements (height, weight, composition) | Health data | GDPR Art. 9 |
+| CV keypoints or pose coordinates | Biometric data | GDPR Art. 9 |
+| Victor message or response content | Personal data | Free-text health context |
+| GPS or location data | Personal data | Not collected by FORM |
+| `user_id` (plaintext Supabase UUID) | Personal data | Use `user_id_hash` only |
+
+---
+
+### 25.4 Activation & Engagement SLOs
+
+These SLOs sit alongside the infrastructure SLOs in §2. They are measured in PostHog using funnel and cohort queries, not in Prometheus or Cloudflare Analytics Engine. The measurement cadence is daily or weekly depending on the window — they are not real-time signals.
+
+All targets marked [ESTIMATE] are benchmarks derived from comparable fitness app cohort studies. They must be recalibrated after the first 500 real installs (see OQ-31).
+
+| SLO ID | Definition | Target | Measurement Window | Alerting Threshold | Owner |
+|---|---|---|---|---|---|
+| ACT-SLO-01 | D7 Activation Rate: % of installs that complete at least one session with CV in the 7 days following registration | ≥ 40% [ESTIMATE] | 7-day rolling cohort | < 35% → AL-ACT-01 | growth-lead |
+| ACT-SLO-02 | F1 Onboarding Completion Rate: `onboarding.completed` / `app.opened` for new installs | ≥ 70% [ESTIMATE] | 7-day rolling | < 60% → AL-ACT-02 | ux-flow |
+| ACT-SLO-03 | F3 → F4 Session Start Completion: `session.completed_with_cv` / `session.confirmed` | ≥ 80% [ESTIMATE] | 24h rolling | < 70% → AL-ACT-03 | platform-engineer |
+| ACT-SLO-04 | D30 Retention: % of D7-activated users with ≥ 1 session in days 8–30 | ≥ 35% [ESTIMATE] | 30-day cohort | < 25% → growth-lead review | growth-lead |
+| ACT-SLO-05 | F8 Paywall Conversion: `subscription.purchase_started` / `paywall.shown` | ≥ 15% [ESTIMATE] | 7-day rolling | < 10% → AL-ACT-04 | growth-lead |
+| ACT-SLO-06 | PostHog event delivery lag: P95 time from app event to PostHog ingestion | < 60 s (P95) | Rolling 30-min window | P95 > 120 s → AL-ACT-05 | devops-lead |
+
+**Error budget policy for product SLOs:** Product SLOs do not carry a formal error budget in the same sense as infrastructure SLOs (§2.2). Instead, breaching an alerting threshold triggers a structured investigation (see §25.5 runbook pointers) rather than a feature freeze. Feature freeze logic is reserved for infrastructure SLOs where system correctness is at risk. Product SLO responses are growth team actions: funnel analysis, user interviews, A/B tests.
+
+---
+
+### 25.5 Alerting Rules (AL-ACT-XX)
+
+Product alerts route through PostHog alert conditions and PagerDuty. P1 alerts page growth-lead during business hours (not 24/7 — product metrics do not constitute user-facing outages unless combined with AL-ACT-06). P2 alerts post to Slack `#product-alerts`. AL-ACT-06 is the exception: it is a P0 alert because zero events in a 6-hour window during peak hours indicates a client-side crash or CDN failure, not a product metric regression.
+
+| Alert ID | Condition | Severity | Response SLA | Runbook / Response |
+|---|---|---|---|---|
+| AL-ACT-01 | ACT-SLO-01 D7 Activation Rate drops below 35% over a 48h rolling window (minimum 50 users in window) | P1 | 4h (business hours) | growth-lead opens PostHog F1→F4 funnel, identifies step with highest drop-off delta vs prior 7-day baseline; escalates to platform-engineer if F4 (`session.completed_with_cv`) drop-off > 50% (CV pipeline regression — cross-reference §18 AL-CV alerts) |
+| AL-ACT-02 | F1 Onboarding completion rate drops below 60% in any 24h window with ≥ 20 new installs in that window | P1 | 2h (business hours) | ux-flow reviews `onboarding.step_viewed` funnel in PostHog to identify exit step; checks for app version regression in Sentry (§7.7 Mobile Release Health dashboard); if crash-correlated, escalates to P0 |
+| AL-ACT-03 | `session.abandoned` rate exceeds 30% of `session.confirmed` events in a 24h rolling window | P2 | 8h | platform-engineer checks CV pipeline inference latency (§18.5 SLOs) and session UI for regressions; cross-reference §18 AL-CV-01 through AL-CV-03 for on-device latency spikes; if CV cold-start P95 > 800 ms, likely root cause |
+| AL-ACT-04 | F8 Paywall conversion (`subscription.purchase_started` / `paywall.shown`) drops below 10% in a 72h rolling window with ≥ 50 paywall impressions | P2 | Next business day | growth-lead + product-manager review paywall variant performance in PostHog; check for A/B test contamination (§25.6); check RevenueCat purchase completion rate (§24) to confirm drop is at presentation not at payment processing |
+| AL-ACT-05 | PostHog event delivery lag P95 exceeds 120 s in any 30-minute window (measured via S-012 synthetic probe in §16.2) | P2 | 4h | devops-lead checks PostHog EU Cloud status page; checks PostHog JS SDK network path from app; verifies Cloudflare is not blocking `eu.posthog.com` egress; checks S-012 probe history in Better Stack |
+| AL-ACT-06 | Zero `app.opened` events received by PostHog in any 6-hour window during 08:00–22:00 UTC | P0 | 30 min | devops-lead: this alert indicates app is not launching or PostHog ingest is completely broken — NOT a product metric regression; cross-reference §6 AL-002 (Full platform unavailable) and S-001 (API Health probe); if API and mobile crash rate are normal but PostHog events are zero, the PostHog SDK initialization or the `eu.posthog.com` route is broken; immediately check Sentry for React Native init errors |
+
+---
+
+### 25.6 A/B Test Instrumentation
+
+FORM uses PostHog Feature Flags for all A/B experiments. The following rules are mandatory for any experiment that affects a user-facing flow.
+
+**Experiment definition requirements (before launch):**
+
+Every experiment must document, in the feature flag description in PostHog and in the relevant Linear ticket:
+1. **Hypothesis** — the causal mechanism being tested.
+2. **Primary metric** — must map directly to an ACT-SLO (e.g., "improve ACT-SLO-02 F1 completion rate").
+3. **Sample size calculation** — minimum detectable effect (MDE) ≥ 5%, significance threshold p < 0.05, power ≥ 80%.
+4. **Minimum duration** — at least 14 calendar days to control for day-of-week effects. Experiments shorter than 14 days are not considered statistically valid.
+5. **Rollback condition** — explicit metric regression threshold that triggers immediate flag kill (e.g., "if treatment arm session abandonment rate exceeds 50%, kill flag immediately regardless of significance").
+
+**Required events:**
+
+| Event Name | When | Properties | PII Constraint |
+|---|---|---|---|
+| `experiment.enrolled` | User is assigned to an experiment variant (first flag evaluation) | `experiment_id`, `variant` (control\|treatment_A\|...), `user_id_hash` | `user_id_hash` is SHA-256; plaintext `user_id` is NOT a property here |
+| `experiment.converted` | User triggers the experiment's primary conversion event | `experiment_id`, `variant`, `conversion_event_name` | Same constraint |
+
+**Privacy constraints on A/B tests:**
+- No health data may be used as an experiment segmentation variable. This is a clinical-safety hard veto. Segmenting by "users who have logged weight data" or "users with high readiness scores" is prohibited.
+- Opaque identifiers (e.g., `program_id`, `user_id_hash`) are permitted as segmentation dimensions.
+- Experiment results are reported as aggregate conversion rates only. Individual user variant assignments are not exported or shared outside PostHog.
+
+**Statistical rules:**
+- Significance threshold: p < 0.05.
+- Minimum detectable effect: ≥ 5% relative change.
+- Do not call a winner before both minimum sample size and minimum duration are met. Peeking before both conditions are satisfied inflates false positive rates.
+- Conflicting experiments (two experiments modifying the same UI component simultaneously) require explicit approval from growth-lead before launch.
+
+---
+
+### 25.7 Privacy Constraints
+
+The following constraints are enforced by design. They are hard requirements, not guidelines. Any proposed change requires a privacy impact assessment reviewed by compliance-officer and documented in `docs/PRIVACY_IMPACT.md`. The clinical-safety team holds a hard veto on any constraint relaxation for items 1, 2, and 3.
+
+1. **No raw health metrics in PostHog.** Weight, load, body composition, RPE, and body measurement values are never sent as event properties. The boolean `checkin_completed` is permitted as a check-in completion signal; the numerical `readiness_score` (1–5) and `mood_score` (1–5) are excluded pending the OQ-33 ruling by clinical-safety. Until that ruling, treat both as prohibited.
+
+2. **No free-text content of any kind.** Victor conversation turns (both user messages and AI responses), custom workout notes, and any other free-text user input must not appear as PostHog event properties. Length-bucket proxies (`message_length_bucket`: short|medium|long) are permitted in place of character counts or content.
+
+3. **No CV keypoints or pose data.** Individual frame keypoint coordinates, form scores (numerical), or per-rep quality assessments are never sent to PostHog. The boolean `cv_enabled` property on `session.completed_with_cv` is permitted.
+
+4. **User identification via `user_id_hash` only.** The PostHog `distinct_id` for every event is `sha256(plaintext_user_id)`. The plaintext Supabase `user_id` UUID is never transmitted to PostHog as `distinct_id`, as a property, or in any other field. The hash is computed in the mobile app before the PostHog SDK call, not by PostHog itself.
+
+5. **PostHog is a designated sub-processor under FORM's GDPR framework.** The Data Processing Agreement with PostHog (EU Cloud, Frankfurt) must be executed before any production event is sent. Sub-processor status is recorded in `docs/SUBPROCESSORS.md`. See §25.8 checklist item for the compliance-officer action.
+
+6. **DSAR fulfilment.** PostHog supports person deletion via its Admin API (`DELETE /api/person/:id/`) and the `$delete` capture event. The DSAR erasure procedure for PostHog is: identify the PostHog person record by `distinct_id` (which equals `sha256(user_id)`) and call the deletion endpoint. This procedure must be documented in `docs/INCIDENT_RESPONSE.md` as runbook R-14 (DSAR runbook). Note: SHA-256 is a one-way function; FORM cannot look up `distinct_id` from `user_id` without recomputing the hash at the time of the DSAR request.
+
+7. **PostHog Session Recording is disabled for all health-adjacent screens.** The PostHog Session Recording feature must be explicitly disabled on the following screens via `posthog.optOutSessionRecording()` or equivalent before the screen mounts: daily check-in screen, active session screen (live CV), post-session summary with rep data, and progress charts. These screens may render health-adjacent metrics in their UI state even if those metrics are not sent as PostHog events. Recording any of these screens would constitute Art. 9 data capture. Session Recording is permitted on marketing, onboarding, and paywall screens only.
+
+---
+
+### 25.8 Implementation Checklist
+
+| Task | Priority | Milestone | Owner |
+|---|---|---|---|
+| Implement all §25.3 events in iOS app (PostHog React Native SDK calls with correct properties) | P0 | M4 | platform-engineer |
+| Implement all §25.3 events in Android app | P0 | M4 | platform-engineer |
+| Execute PostHog Data Processing Agreement before any production event is sent | P0 | Before M4 deploy | compliance-officer |
+| Configure `user_id_hash` (SHA-256 of plaintext `user_id`) as PostHog `distinct_id` — verify plaintext UUID is never transmitted | P0 | M4 | security-engineer |
+| Disable PostHog Session Recording on check-in, live session, post-session summary, and progress chart screens | P0 | M4 | platform-engineer |
+| Add PostHog to `docs/SUBPROCESSORS.md` with DPA reference date, data categories, and EU hosting confirmation | P1 | M4 | compliance-officer |
+| Verify zero health metric leakage in QA: automated test that inspects the PostHog event queue in a test session and asserts no prohibited properties are present | P0 | Before M4 deploy | qa-lead |
+| Set up PostHog "Activation Funnel" visualisation matching the F1 → F2 → F3 → F4 gate sequence | P1 | M5 | growth-lead |
+| Configure AL-ACT-01 through AL-ACT-06 alert conditions in PostHog Alerts + PagerDuty routing rules | P1 | M5 | devops-lead |
+| Baseline ACT-SLO-01 through ACT-SLO-06 after first 500 real installs and update [ESTIMATE] targets with measured values | P1 | M5 | growth-lead |
+| Document PostHog DSAR erasure procedure in `docs/INCIDENT_RESPONSE.md` as runbook R-14 | P1 | M5 | compliance-officer |
+| Add `experiment.enrolled` and `experiment.converted` instrumentation to feature flag evaluation path | P1 | M5 | platform-engineer |
+| Configure S-012 PostHog Ingest Health synthetic probe latency alerting in Better Stack to feed AL-ACT-05 | P1 | M5 | devops-lead |
+| Add ACT-SLO-01 through ACT-SLO-06 to the §7.2 Product Engagement dashboard in PostHog | P2 | M5 | growth-lead |
+
+---
+
+### 25.9 Open Questions
+
+| OQ | Question | Owner | Resolution Target | Priority |
+|---|---|---|---|---|
+| OQ-31 | D7 Activation Rate baseline — 40% is an [ESTIMATE] derived from comparable fitness app benchmarks (Strava, Fitbod cohort data, published mobile fitness retention studies). FORM's CV-gated activation definition is more demanding than most comparators; the true baseline may be lower. | growth-lead | First 500 installs; recalibrate ACT-SLO-01 target and AL-ACT-01 threshold based on observed distribution | P1 |
+| OQ-32 | PostHog vs Amplitude — PostHog was selected for open-source option, EU data residency, and combined feature flag + analytics surface in a single contract. If enterprise customers require data portability guarantees for product analytics data (e.g., exporting their own users' funnel data to their own BI tool), Amplitude has a stronger export and data governance story. This is not a current blocker but may become one at enterprise GA. | data-engineer | Before enterprise GA; revisit if a prospective enterprise customer explicitly requires analytics data portability as a contract term | P2 |
+| OQ-33 | Readiness score and mood score in PostHog — the numerical `readiness_score` (1–5) and `mood_score` (1–5) captured in the daily check-in flow are excluded from PostHog pending clinical-safety review. If ruled as non-health data (i.e., subjective self-report that does not constitute a clinical measure), they could be included as bucketed properties (`readiness_bucket`: low\|medium\|high) to improve check-in drop-off analysis. Clinical-safety has not yet issued a ruling. Until ruled, treat as prohibited per §25.7 constraint 1. | clinical-safety | Before M4 deploy; this must be resolved before the check-in event schema is finalised | P0 |
+
+---
+
+*v1.2 additions: §25 Product & Activation Funnel Observability — closes the gap between infrastructure observability (§1–§24) and product health by defining FORM's PostHog-backed product observability layer; §25.1 scopes the section and cross-references PostHog from §1 Three Pillars and §12 Developer Instrumentation Guide; §25.2 defines the "activated" user criterion (one full CV session within 7 days of registration) and maps F1–F8 flows (`docs/FLOWS.md`) to entry events, completion events, activation gate status, and max acceptable drop-off targets; §25.3 specifies the full PostHog event taxonomy (21 events), including explicit prohibitions on mood/readiness scores pending OQ-33, weight/load data, CV keypoints, free-text content, and plaintext user_id — each event row documents PII risk and PostHog retention decision; §25.4 defines six product SLOs (ACT-SLO-01 through ACT-SLO-06) covering D7 activation rate ≥ 40% [ESTIMATE], F1 onboarding completion ≥ 70% [ESTIMATE], F3→F4 session start completion ≥ 80% [ESTIMATE], D30 retention ≥ 35% [ESTIMATE], F8 paywall conversion ≥ 15% [ESTIMATE], and PostHog event delivery lag P95 < 60 s, with measurement windows, alerting thresholds, and owners; §25.5 specifies six alerting rules (AL-ACT-01 through AL-ACT-06) with severities P0–P2, response SLAs, and structured runbook descriptions — AL-ACT-06 (zero `app.opened` events in 6h peak window) is P0 as it signals client crash or CDN failure rather than a product metric regression; §25.6 specifies A/B test instrumentation rules (experiment definition requirements, `experiment.enrolled` / `experiment.converted` event schemas, clinical-safety veto on health-data segmentation, p < 0.05 significance threshold, 14-day minimum duration, MDE ≥ 5%); §25.7 lists seven privacy constraints (no health metrics; no free-text; no CV pose data; SHA-256 distinct_id; PostHog DPA as sub-processor; DSAR via PostHog deletion API documented in R-14; Session Recording disabled on health-adjacent screens); §25.8 provides a fourteen-item implementation checklist across M4/M5; §25.9 documents three open questions (OQ-31 D7 activation baseline, OQ-32 PostHog vs Amplitude enterprise portability, OQ-33 clinical-safety ruling on readiness/mood scores in PostHog — P0 resolution required before M4 deploy).*

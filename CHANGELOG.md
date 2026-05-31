@@ -6,6 +6,34 @@
 
 ---
 
+## [1.44.0] — 2026-05-31
+
+### Added
+- `docs/OBSERVABILITY.md §25` — Product & Activation Funnel Observability (211 рядків, doc bumped v1.1 → v1.2). Визначення "activated" (≥1 CV-сесія за 7 днів після реєстрації). F1–F8 funnel map з entry/completion events і max drop-off targets (§25.2). PostHog event taxonomy: 21 event + "must-never-appear" таблиця (weight/load, mood score, CV keypoints, free-text — заборонені). Шість ACT-SLO: D7 activation ≥40%, F1 onboarding ≥70%, F3→F4 ≥80%, D30 retention ≥35%, F8 paywall ≥15%, PostHog lag P95 <60s [ESTIMATE] (§25.4). Шість alerting rules AL-ACT-01..06 (P0–P2) з runbook pointers (§25.5). A/B test instrumentation з clinical-safety veto на health-data segmentation (§25.6). Сім privacy constraints: no health metrics, no free-text, no CV pose data, SHA-256 distinct_id only, PostHog DPA, DSAR via R-14, Session Recording disabled на health-adjacent screens (§25.7). 14-item implementation checklist P0/P1 M4/M5 (§25.8). OQ-31 (D7 baseline — P1, growth-lead), OQ-32 (PostHog vs Amplitude — P2, data-engineer), OQ-33 (clinical-safety ruling on mood/readiness score — **P0**, clinical-safety, must resolve before M4) (§25.9).
+
+### Changed
+- `VERSION` → 1.44.0
+
+---
+
+## [1.43.0] — 2026-05-31
+
+### Added
+- `docs/COST_MODEL.md §24` — Series A Fundraising Economics & Dilution Modeling (231 рядків, doc bumped v1.4 → v1.5). Pre-seed cap table baseline [ESTIMATE]; Series A readiness criteria розширені від §22.6.1 (ARR $500k, NRR ≥110%, GM ≥70%, ≥3 пілоти, ≥12 міс runway post-close) (§24.3). Capital requirements Bear/Base/Bull ($2–4M raise) з use-of-funds table по 6 категоріях та CEE market rate assumptions (§24.4). Three-method pre-money valuation: ARR multiple 3–8× ($240k–$4.2M implied), 4-row comparable transactions, 5-factor score method (§24.5). Dilution table: Bear ($1.5M at $6M pre), Base ($2.5M at $10M pre), Bull ($4M at $16M pre) + ESOP refresh impact (~63% founder post-refresh) (§24.6). Cap table evolution seed→SeriesA→SeriesB (§24.7). Bridge financing: SAFE з MFN, $200–500k, trigger criteria table + Ukrainian SAFE law caveat (§24.8). П'ять DEC-030 fundraising audit events: fundraise.term_sheet_received (HIGH), fundraise.round_closed (CRITICAL), fundraise.bridge_instrument_signed (HIGH), fundraise.esop_pool_expanded (HIGH), fundraise.cap_table_updated (CRITICAL), 7yr retention (§24.10). OQ-31 (CEE vs US multiple compression — P1, founder), OQ-32 (ESOP phantom equity Ukrainian law — P1, founder+counsel), OQ-33 (SAFE not valid under UA law, HoldCo required — **P0**, founder+counsel) (§24.12).
+
+### Changed
+- `VERSION` → 1.43.0
+
+---
+
+## [1.42.1] — 2026-05-31
+
+### Added
+- `docs/COST_MODEL.md` — §24 ToC entry (Series A Fundraising Economics)
+- `docs/OBSERVABILITY.md` — §25 ToC entry (Product & Activation Funnel) + ToC table added to Purpose section
+
+---
+
 ## [1.42.0] — 2026-05-31
 
 ### Added
