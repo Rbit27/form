@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v1.1
+# FORM · Observability & Monitoring Taxonomy v1.2
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -15,6 +15,37 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 **SOC 2 mapping:** This document is formal evidence for CC7.2 (the entity monitors system components for anomalies that could indicate a malicious act, a natural disaster, or an operational error). The alerting rules in §7, dashboard inventory in §8, and tooling decisions in §10 constitute the operating control evidence. See `docs/INCIDENT_RESPONSE.md` for CC7.3–CC7.5 evidence (response, recovery, and post-incident review).
 
 **GDPR note:** FORM processes workout performance data, body composition trends, and health-adjacent metrics that fall within or close to GDPR Art. 9 special category data (health data). Observability data must not re-create raw health records. Log schemas in §5 reflect this constraint: AI inference logs capture latency and token counts, not prompt content or response content.
+
+### Table of Contents
+
+| Section | Title |
+|---|---|
+| §0 | RED Methodology |
+| §1 | Three Pillars Overview |
+| §2 | SLIs and SLOs |
+| §3 | Metrics Taxonomy |
+| §4 | Log Taxonomy |
+| §5 | Distributed Traces |
+| §6 | Alerting Rules |
+| §7 | Dashboards |
+| §8 | Data Retention and Privacy |
+| §9 | Tooling Decisions |
+| §10 | Open Questions and Gaps |
+| §11 | SLI Calculation Expressions |
+| §12 | Developer Instrumentation Guide |
+| §13 | Per-Tenant Observability Implementation |
+| §14 | Cross-Backend Trace Correlation (Sentry ↔ Cloudflare) |
+| §15 | Audit Log Export Pipeline (Enterprise) |
+| §16 | Synthetic Monitoring & Uptime Verification |
+| §17 | Cost Monitoring & Anomaly Alerting |
+| §18 | CV Pose Estimation Model Observability |
+| §19 | SLO Error Budget Management |
+| §20 | Wearable Data Integration Observability |
+| §21 | ClickHouse Analytics Observability (M9) |
+| §22 | AI Coaching Quality Observability |
+| §23 | Enterprise SLA Reporting & Credit Calculation |
+| §24 | Subscription & Revenue Event Observability |
+| §25 | Product & Activation Funnel Observability |
 
 ---
 

@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v1.4
+# FORM · Cost Model & Unit Economics v1.5
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -109,6 +109,19 @@
     - 23.8 NRR-to-valuation multiples
     - 23.9 Implementation checklist
     - 23.10 Open questions (OQ-28 to OQ-30)
+24. [Series A Fundraising Economics & Dilution Modeling](#24-series-a-fundraising-economics--dilution-modeling)
+    - 24.1 Purpose
+    - 24.2 Seed Round Recap & Current Cap Table Baseline
+    - 24.3 Series A Readiness Criteria (expanded from §22.6.1)
+    - 24.4 Capital Requirements Model
+    - 24.5 Pre-Money Valuation Methodology
+    - 24.6 Dilution Scenarios
+    - 24.7 Cap Table Evolution (Seed → Series A → Series B)
+    - 24.8 Bridge Financing Analysis
+    - 24.9 Series A Timing Triggers
+    - 24.10 DEC-030 Fundraising Audit Events
+    - 24.11 Implementation Checklist
+    - 24.12 Open Questions (OQ-31 to OQ-33)
 
 ---
 
