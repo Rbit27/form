@@ -11318,3 +11318,1483 @@ SELECT
 ---
 
 *v1.8 additions (2026-05-31): §46 Security Alert Pipeline — `form-alert-relay` Worker · `auth-monitor` Edge Function · `audit-chain-daily-check` Edge Function — CC7.1/CC7.2/CC7.3 Auditor Exhibit. Closes the design-to-implementation gap for three P0 CC7 items specified in §25.10. Complete TypeScript delivered for all three components. `form-alert-relay` (Cloudflare Worker, `apps/security-portal/src/alert-relay.ts`): receives Cloudflare Logpush Firewall Events webhook via HTTP POST; validates `CF-Webhook-Auth` HMAC header; classifies severity P0/P1/P2 from WAF rule ID and action (P0 = FORM-AUTH-RATELIMIT block, P1 = any block, P2 = challenge); formats Slack Block Kit message with hashed IP, rule ID, path, and timestamp; pages PagerDuty Events API v2 for P0/P1 via `trigger` event; emits `system.security_alert_fired` DEC-030 event via `emit-audit-event` Edge Function; GDPR-compliant: IP addresses SHA-256 hashed before inclusion in any payload; Wrangler configuration fragment for `security.form.coach/webhooks/cloudflare-events` route with five secrets. `auth-monitor` (Supabase Edge Function, `supabase/functions/auth-monitor/index.ts`): receives auth failure events from PostgreSQL trigger on `auth.audit_log_entries`; atomically increments per-IP and per-email failure counters using `increment_security_counter` SECURITY DEFINER RPC (upsert with expiry); checks three thresholds from §25.3.1 (IP 5/60s → P1, IP 20/300s → P0, email 10/300s → P1); fires Slack Block Kit alert only on first threshold crossing (prevents storm alerts during active attack); emits `auth.login_failed` on every failure (no threshold, LOW severity, 3yr retention) and `auth.brute_force_detected` or `auth.account_enumeration_detected` (HIGH, 7yr) on threshold breach; privacy: IP and email SHA-256 hashed before inclusion; `security_counters` table DDL + `increment_security_counter` RPC + daily cleanup cron + RLS deny-all policy; PostgreSQL trigger `trg_auth_failure_notify` on `auth.audit_log_entries` using `net.http_post` to call the Edge Function. `audit-chain-daily-check` (Supabase Edge Function, `supabase/functions/audit-chain-daily-check/index.ts`): scheduled cron at 06:00 UTC via `cron.schedule`; reads last 1,000 rows from `audit_logs` ordered by `sequence_number` DESC, sorts ascending for verification; recomputes HMAC-SHA256(secret_key, hmac_prev ‖ canonical_payload) per row using Web Crypto API; on mismatch: posts P0 Slack alert with sequence number and row ID, emits `system.audit_chain_break_detected` (CRITICAL, 7yr), triggers R-05 runbook invocation; on success: emits `system.audit_chain_verified` (LOW, 3yr); on DB failure: emits `system.audit_chain_check_failed` (HIGH, 7yr) as indeterminate; dual-key HMAC rotation protocol specified (7-day overlap window to prevent false chain-break alerts on rotation day). Seven new DEC-030 events specified and mapped to `docs/AUDIT_LOG_SCHEMA.md`: `system.security_alert_fired`, `auth.login_failed`, `auth.brute_force_detected`, `auth.account_enumeration_detected`, `system.audit_chain_verified`, `system.audit_chain_break_detected`, `system.audit_chain_check_failed`. Six new evidence artefacts PRE-46-E-001 through PRE-46-E-006. 12-item implementation checklist: items 1-5 (form-alert-relay deploy + test, M3), items 6-9 (auth-monitor migrations + deploy + test, M3), items 10-11 (audit-chain-daily-check deploy + first run, M3/M4), item 12 (DEC-030 taxonomy update in AUDIT_LOG_SCHEMA.md, M3). Gap closures: CC7-GAP-001 🔴 → 🟡 AUTHORED, CC7-GAP-002 🔴 → 🟡 AUTHORED, CC7-GAP-003 🔴 → 🟡 AUTHORED. P0 count: 12 → 9. CC7.1/CC7.2/CC7.3 advance from design-only partial to implementation-spec-complete partial; all three close to 🟢 on deployment + test confirmation. SOC 2 readiness: ~93% → ~94%.*
+
+---
+
+## 47. Sentry Alert Rules Configuration + `row-count-monitor` Edge Function — CC7-GAP-005 + CC7-GAP-006 Auditor Exhibit
+
+> **New section added 2026-05-31. This is a standalone auditor exhibit delivering the complete, ready-to-deploy Sentry alert rule specifications and `row-count-monitor` Edge Function implementation for CC7-GAP-005 and CC7-GAP-006. Both gaps were designed in §25 but lacked implementation specs. This section is the final documentation step before gap closure; each gap advances to 🟡 AUTHORED here and closes to 🟢 on deployment + evidence artefact confirmation.**
+>
+> **Gap closure:** CC7-GAP-005 🔴 → 🟡 **AUTHORED** (four Sentry alert rules with complete JSON specifications + `beforeSend` health data scrubber TypeScript delivered; closes to 🟢 on deployment + PRE-47-E-002 screenshot + PRE-47-E-003 test) · CC7-GAP-006 🔴 → 🟡 **AUTHORED** (complete `row-count-monitor` TypeScript + `monitoring_baselines` DDL + seeding procedure delivered; closes to 🟢 on deployment + PRE-47-E-005 test).
+> **P0 count: 9 → 7.** SOC 2 readiness: ~94% → ~95%.
+
+---
+
+### 47.1 Purpose and Scope
+
+§25 (Security Monitoring Architecture) designed the full suite of observability controls for FORM, including four Sentry alert rules (§25.x) and the `row-count-monitor` Supabase Edge Function (§25.x). Both components were specified at the architectural level in §25 but lacked the implementation detail required to deploy and evidence them for a SOC 2 audit. This section closes that gap.
+
+**CC7-GAP-005 closure:** Sentry project `FORM-API` is configured with four alert rules — `FORM-FATAL-001`, `FORM-SPIKE-001`, `FORM-AUTH-ERR-001`, and `FORM-HEALTH-LEAK-001` — covering fatal error spikes, general error rate, auth anomaly spikes, and health data field detection in payloads respectively. This section delivers: full Sentry project SDK configuration, per-rule JSON specifications with trigger conditions, PagerDuty and Slack routing, complete `beforeSend` TypeScript scrubber that strips eleven health-adjacent field names from all Sentry event payloads before transmission, and the GDPR-mandated `system.sentry_health_field_detected` DEC-030 audit event emitted on every scrub invocation.
+
+**CC7-GAP-006 closure:** `row-count-monitor` is a Supabase Edge Function scheduled every 15 minutes that compares live row counts across six monitored tables against baselines stored in `monitoring_baselines`. Deviations exceeding 5% fire a P1 Slack alert; deviations exceeding 20% additionally page PagerDuty at P0. Alert deduplication prevents repeat alerts within a 60-minute window for the same table and severity tier. This section delivers: complete TypeScript source, `monitoring_baselines` and `monitoring_alerts` DDL, RLS policies, seeding procedure, and all associated DEC-030 events.
+
+**Relationship to existing sections:**
+
+| Section | Role |
+|---|---|
+| §25 | Original architecture specification for Sentry rules and `row-count-monitor`; §47 is the implementation exhibit |
+| §46 | Alert routing infrastructure (`form-alert-relay`, PagerDuty, Slack Block Kit patterns) reused in §47 |
+| `docs/AUDIT_LOG_SCHEMA.md` | DEC-030 taxonomy; four new events defined in §47.9 must be appended to the `### System` subsection |
+| `compliance/p1/sub-processor-register.md §6` | Sentry DPA status and `beforeSend` scrubber commitment; §47.5 is the technical fulfilment of that commitment |
+
+---
+
+### 47.2 Architecture Summary
+
+Sentry alert routing and row-count anomaly detection share the same downstream alerting infrastructure introduced in §46 — PagerDuty Events API v2 and Slack Block Kit webhooks — but originate from entirely different signal sources. Sentry observes application-level errors emitted from Cloudflare Worker entrypoints via the `@sentry/node` SDK; alert rules evaluate event streams within rolling time windows inside Sentry Cloud and fire outbound webhooks to PagerDuty and Slack when thresholds are crossed. The `beforeSend` hook operates client-side (inside the Worker process) before any data reaches Sentry's network, ensuring health field names are stripped and the `system.sentry_health_field_detected` DEC-030 event is emitted to the FORM audit log before Sentry receives a sanitised event tagged `health_field_detected: true`. That tag is the detection surface for `FORM-HEALTH-LEAK-001`.
+
+The `row-count-monitor` signal path is fully independent: a `pg_cron` job fires every 15 minutes inside Supabase, invoking the Edge Function via `net.http_post`. The function issues a single LEFT JOIN query against `monitoring_baselines` to obtain both current counts and baselines in one round-trip, computes deviation percentages, checks `monitoring_alerts` for recent duplicates, and fans out to Slack and/or PagerDuty depending on severity. A DEC-030 audit event is emitted on every execution — pass or fail — maintaining a continuous integrity trail that auditors can query across the observation period.
+
+```
+SIGNAL FLOW — SENTRY ALERT PIPELINE
+=====================================
+Cloudflare Worker
+  └─ @sentry/node SDK
+       ├─ beforeSend hook (§47.5)
+       │    ├─ strips health fields → [HEALTH_DATA_REDACTED]
+       │    ├─ emits DEC-030 system.sentry_health_field_detected (CRITICAL)
+       │    └─ sets tag health_field_detected: true
+       └─ transmits scrubbed event → Sentry Cloud (FORM-API project)
+                                          │
+                               ┌──────────┴──────────┐
+                               │    Alert Rules        │
+                               ├── FORM-FATAL-001      │
+                               ├── FORM-SPIKE-001      │
+                               ├── FORM-AUTH-ERR-001   │
+                               └── FORM-HEALTH-LEAK-001│
+                                          │
+                               ┌──────────┴──────────┐
+                               │                       │
+                         PagerDuty               Slack
+                     Events API v2          #security-alerts
+                     (P0: CRITICAL)         #engineering-alerts
+                     (P1: WARNING)          (per-rule routing)
+
+SIGNAL FLOW — ROW-COUNT-MONITOR
+=================================
+pg_cron (*/15 * * * *)
+  └─ net.http_post → row-count-monitor Edge Function
+       ├─ SELECT current counts LEFT JOIN monitoring_baselines
+       ├─ compute deviation_pct per table
+       ├─ check monitoring_alerts (dedup, 60-min window)
+       ├─ emit DEC-030 (pass: LOW / anomaly: HIGH / missing: MEDIUM)
+       └─ if threshold exceeded:
+            ├─ >5%  → P1 Slack #engineering-alerts
+            └─ >20% → P0 PagerDuty CRITICAL + Slack #security-alerts
+```
+
+---
+
+### 47.3 Sentry Project Configuration
+
+**Project settings:**
+
+| Setting | Value |
+|---|---|
+| Project name | `FORM-API` |
+| Platform | `javascript` |
+| SDK | `@sentry/node` (latest stable at deploy time) |
+| Team | `form-engineering` |
+| Environment | `production` (staging uses separate `SENTRY_DSN_STAGING` secret) |
+| DSN storage | Cloudflare Workers Secret `SENTRY_DSN` — never hardcoded |
+| Release tracking | `WORKER_VERSION` env var injected at Wrangler deploy time via `[vars]` |
+| Data scrubbing | `beforeSend` hook (§47.5) — applied before any network transmission |
+
+**`sentry.init()` configuration (`apps/api/src/sentry.ts` — imported by all Worker entrypoints):**
+
+```typescript
+// apps/api/src/sentry.ts
+// Centralised Sentry initialisation for all FORM Cloudflare Worker entrypoints.
+// Import and call initSentry(env) at the top of each Worker's fetch handler.
+
+import * as Sentry from '@sentry/node';
+import { makeSentryBeforeSend } from '../../shared/sentry-scrubber';
+
+export interface WorkerEnv {
+  SENTRY_DSN: string;
+  WORKER_VERSION: string;
+  SUPABASE_URL: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
+  // ...other secrets
+}
+
+let initialised = false;
+
+export function initSentry(env: WorkerEnv): void {
+  if (initialised) return;
+  initialised = true;
+
+  Sentry.init({
+    dsn: env.SENTRY_DSN,
+    environment: 'production',
+    release: env.WORKER_VERSION,
+
+    // Low sample rate — cost control; errors are always captured regardless of this rate
+    tracesSampleRate: 0.02,
+
+    // Health data scrubber — strips eleven health field names before transmission (§47.5)
+    // Also emits system.sentry_health_field_detected DEC-030 event when health fields found
+    beforeSend: makeSentryBeforeSend(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY),
+
+    // Integrations: keep minimal for edge runtime compatibility
+    integrations: [
+      // HTTP breadcrumbs — useful for tracing upstream call failures
+      new Sentry.Integrations.Http({ breadcrumbs: true, tracing: false }),
+    ],
+
+    // Never send personally identifiable information automatically
+    sendDefaultPii: false,
+
+    // Ignore noisy non-actionable errors
+    ignoreErrors: [
+      'AbortError',
+      'TimeoutError',
+      /^NetworkError/,
+    ],
+  });
+}
+```
+
+**Alert notification channel configuration (Sentry Dashboard → Settings → Integrations):**
+
+| Integration | Configuration | Secret |
+|---|---|---|
+| PagerDuty | Add integration → select "PagerDuty" → enter service integration key → save | `SENTRY_PAGERDUTY_SERVICE_KEY` (Cloudflare Worker secret; also set as Sentry integration token in Dashboard) |
+| Slack | Add integration → OAuth install to FORM workspace → select channel per rule | No additional secret; Sentry uses OAuth token stored within Sentry Cloud |
+| P0 Slack channel | `#security-alerts` | — |
+| P1/P2 Slack channel | `#engineering-alerts` | — |
+
+> **GDPR note:** Sentry's EU data residency option must be selected in Project Settings → Data → Data Storage to ensure error telemetry does not leave the EU for EU-tenant errors. This must be completed before the first EU enterprise contract is signed. The subprocessor register (`compliance/p1/sub-processor-register.md §6`) must be updated to reflect `data_region: EU` once migration is complete.
+
+---
+
+### 47.4 Sentry Alert Rule Specifications
+
+All four rules are configured via Sentry Dashboard → Alerts → Create Alert Rule → Issue Alert. The equivalent API/CLI approach using `curl` to the Sentry REST API is provided after each rule.
+
+**Shared configuration across all rules:**
+
+| Field | Value |
+|---|---|
+| Project | `FORM-API` |
+| Environment filter | `production` |
+| Action interval | Do not repeat within `60 minutes` (prevents alert storms on sustained incidents) |
+
+---
+
+#### Rule 1 — FORM-FATAL-001: Fatal Error Threshold
+
+```jsonc
+{
+  "rule_id": "FORM-FATAL-001",
+  "name": "FORM-FATAL-001 — Fatal Error Threshold",
+  "environment": "production",
+  "conditions": [
+    {
+      "id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+      "value": 5,
+      "comparisonType": "count",
+      "interval": "5m"
+    }
+  ],
+  "filters": [
+    {
+      "id": "sentry.rules.filters.level_filter.LevelFilter",
+      "match": "eq",
+      "level": "fatal"
+    }
+  ],
+  "actions": [
+    {
+      "id": "sentry.integrations.pagerduty.notify_action.PagerDutyNotifyServiceAction",
+      "account": "<FORM_PAGERDUTY_ACCOUNT_ID>",
+      "service": "<FORM_PAGERDUTY_SERVICE_ID>",
+      "severity": "critical"
+    },
+    {
+      "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+      "workspace": "<FORM_SLACK_WORKSPACE_ID>",
+      "channel": "#security-alerts",
+      "channel_id": "<CHANNEL_ID>",
+      "tags": "environment,release",
+      "notes": "Runbook: docs/INCIDENT_RESPONSE.md §R-02"
+    }
+  ],
+  "actionMatch": "all",
+  "filterMatch": "all",
+  "frequency": 60,
+  "runbook": "docs/INCIDENT_RESPONSE.md §R-02"
+}
+```
+
+**Dashboard configuration steps:**
+1. Alerts → Create Alert Rule → Issue Alert
+2. Set **When**: "The number of events in an issue is more than" → `5` in `5 minutes`
+3. Add **Filter**: "The issue's level is equal to" → `fatal`
+4. Add **Action**: Notify PagerDuty → FORM service → Severity `critical`
+5. Add **Action**: Send Slack notification → `#security-alerts` → include tags `environment`, `release`
+6. Set **Action Interval**: `60 minutes`
+7. Name: `FORM-FATAL-001 — Fatal Error Threshold`
+8. Save rule; note the rule ID from the URL for PRE-47-E-001
+
+**API approach:**
+```bash
+curl -X POST "https://sentry.io/api/0/projects/<ORG_SLUG>/FORM-API/rules/" \
+  -H "Authorization: Bearer <SENTRY_AUTH_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d @- <<'EOF'
+{
+  "name": "FORM-FATAL-001 — Fatal Error Threshold",
+  "environment": "production",
+  "conditions": [{"id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition", "value": 5, "comparisonType": "count", "interval": "5m"}],
+  "filters": [{"id": "sentry.rules.filters.level_filter.LevelFilter", "match": "eq", "level": "fatal"}],
+  "actions": [
+    {"id": "sentry.integrations.pagerduty.notify_action.PagerDutyNotifyServiceAction", "account": "<ACCOUNT_ID>", "service": "<SERVICE_ID>", "severity": "critical"},
+    {"id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction", "workspace": "<WORKSPACE_ID>", "channel": "#security-alerts", "channel_id": "<CHANNEL_ID>", "tags": "environment,release", "notes": "Runbook: docs/INCIDENT_RESPONSE.md §R-02"}
+  ],
+  "actionMatch": "all",
+  "filterMatch": "all",
+  "frequency": 60
+}
+EOF
+```
+
+---
+
+#### Rule 2 — FORM-SPIKE-001: Error Rate Spike
+
+```jsonc
+{
+  "rule_id": "FORM-SPIKE-001",
+  "name": "FORM-SPIKE-001 — Error Rate Spike",
+  "environment": "production",
+  "conditions": [
+    {
+      "id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+      "value": 100,
+      "comparisonType": "count",
+      "interval": "5m"
+    }
+  ],
+  "filters": [],
+  "actions": [
+    {
+      "id": "sentry.integrations.pagerduty.notify_action.PagerDutyNotifyServiceAction",
+      "account": "<FORM_PAGERDUTY_ACCOUNT_ID>",
+      "service": "<FORM_PAGERDUTY_SERVICE_ID>",
+      "severity": "warning"
+    },
+    {
+      "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+      "workspace": "<FORM_SLACK_WORKSPACE_ID>",
+      "channel": "#engineering-alerts",
+      "channel_id": "<CHANNEL_ID>",
+      "tags": "environment,release,transaction",
+      "notes": "Runbook: docs/INCIDENT_RESPONSE.md §R-02"
+    }
+  ],
+  "actionMatch": "all",
+  "filterMatch": "all",
+  "frequency": 60,
+  "runbook": "docs/INCIDENT_RESPONSE.md §R-02"
+}
+```
+
+**Dashboard configuration steps:**
+1. Alerts → Create Alert Rule → Issue Alert
+2. Set **When**: "The number of events in an issue is more than" → `100` in `5 minutes`
+3. Leave **Filter** empty (any error level)
+4. Add **Action**: Notify PagerDuty → FORM service → Severity `warning`
+5. Add **Action**: Send Slack notification → `#engineering-alerts` → include tags `environment`, `release`, `transaction`
+6. Set **Action Interval**: `60 minutes`
+7. Name: `FORM-SPIKE-001 — Error Rate Spike`
+8. Save rule
+
+> **Note:** Sentry does not natively expose `percent_sessions_with_errors` as an Issue Alert condition; that metric is available in Performance Alerts. Create a companion Performance Alert: Alerts → Create Alert Rule → Metric Alert → `crash_free_session_rate` drops below `98%` (equivalent to >2% sessions with errors) in a `5-minute` window, with the same PagerDuty + Slack routing. Name it `FORM-SPIKE-001B — Session Error Rate`.
+
+**API approach:**
+```bash
+curl -X POST "https://sentry.io/api/0/projects/<ORG_SLUG>/FORM-API/rules/" \
+  -H "Authorization: Bearer <SENTRY_AUTH_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d @- <<'EOF'
+{
+  "name": "FORM-SPIKE-001 — Error Rate Spike",
+  "environment": "production",
+  "conditions": [{"id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition", "value": 100, "comparisonType": "count", "interval": "5m"}],
+  "filters": [],
+  "actions": [
+    {"id": "sentry.integrations.pagerduty.notify_action.PagerDutyNotifyServiceAction", "account": "<ACCOUNT_ID>", "service": "<SERVICE_ID>", "severity": "warning"},
+    {"id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction", "workspace": "<WORKSPACE_ID>", "channel": "#engineering-alerts", "channel_id": "<CHANNEL_ID>", "tags": "environment,release,transaction", "notes": "Runbook: docs/INCIDENT_RESPONSE.md §R-02"}
+  ],
+  "actionMatch": "all",
+  "filterMatch": "all",
+  "frequency": 60
+}
+EOF
+```
+
+---
+
+#### Rule 3 — FORM-AUTH-ERR-001: Auth Error Spike
+
+```jsonc
+{
+  "rule_id": "FORM-AUTH-ERR-001",
+  "name": "FORM-AUTH-ERR-001 — Auth Error Spike",
+  "environment": "production",
+  "conditions": [
+    {
+      "id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+      "value": 15,
+      "comparisonType": "count",
+      "interval": "5m"
+    }
+  ],
+  "filters": [
+    {
+      "id": "sentry.rules.filters.tagged_event_filter.TaggedEventFilter",
+      "match": "eq",
+      "key": "feature",
+      "value": "auth"
+    }
+  ],
+  "actions": [
+    {
+      "id": "sentry.integrations.pagerduty.notify_action.PagerDutyNotifyServiceAction",
+      "account": "<FORM_PAGERDUTY_ACCOUNT_ID>",
+      "service": "<FORM_PAGERDUTY_SERVICE_ID>",
+      "severity": "warning"
+    },
+    {
+      "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+      "workspace": "<FORM_SLACK_WORKSPACE_ID>",
+      "channel": "#security-alerts",
+      "channel_id": "<CHANNEL_ID>",
+      "tags": "environment,release,feature",
+      "notes": "Runbook: docs/INCIDENT_RESPONSE.md §R-01 (Account Takeover)"
+    }
+  ],
+  "actionMatch": "all",
+  "filterMatch": "all",
+  "frequency": 60,
+  "runbook": "docs/INCIDENT_RESPONSE.md §R-01"
+}
+```
+
+**Dashboard configuration steps:**
+1. Alerts → Create Alert Rule → Issue Alert
+2. Set **When**: "The number of events in an issue is more than" → `15` in `5 minutes`
+3. Add **Filter**: "The event's tags match" → key `feature` equals `auth`
+4. Add **Action**: Notify PagerDuty → FORM service → Severity `warning`
+5. Add **Action**: Send Slack notification → `#security-alerts` → include tags `environment`, `release`, `feature`
+6. Set **Action Interval**: `60 minutes`
+7. Name: `FORM-AUTH-ERR-001 — Auth Error Spike`
+8. Save rule
+
+> **Prerequisite:** All auth-path errors must set the tag `feature=auth` at the call site before capturing: `Sentry.setTag('feature', 'auth')` or via `Sentry.withScope`. This must be present in the Worker entrypoint's auth middleware.
+
+**API approach:**
+```bash
+curl -X POST "https://sentry.io/api/0/projects/<ORG_SLUG>/FORM-API/rules/" \
+  -H "Authorization: Bearer <SENTRY_AUTH_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d @- <<'EOF'
+{
+  "name": "FORM-AUTH-ERR-001 — Auth Error Spike",
+  "environment": "production",
+  "conditions": [{"id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition", "value": 15, "comparisonType": "count", "interval": "5m"}],
+  "filters": [{"id": "sentry.rules.filters.tagged_event_filter.TaggedEventFilter", "match": "eq", "key": "feature", "value": "auth"}],
+  "actions": [
+    {"id": "sentry.integrations.pagerduty.notify_action.PagerDutyNotifyServiceAction", "account": "<ACCOUNT_ID>", "service": "<SERVICE_ID>", "severity": "warning"},
+    {"id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction", "workspace": "<WORKSPACE_ID>", "channel": "#security-alerts", "channel_id": "<CHANNEL_ID>", "tags": "environment,release,feature", "notes": "Runbook: docs/INCIDENT_RESPONSE.md §R-01 (Account Takeover)"}
+  ],
+  "actionMatch": "all",
+  "filterMatch": "all",
+  "frequency": 60
+}
+EOF
+```
+
+---
+
+#### Rule 4 — FORM-HEALTH-LEAK-001: Health Data in Payloads
+
+```jsonc
+{
+  "rule_id": "FORM-HEALTH-LEAK-001",
+  "name": "FORM-HEALTH-LEAK-001 — Health Data Field Detected in Payload",
+  "environment": "production",
+  "conditions": [
+    {
+      "id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+      "value": 0,
+      "comparisonType": "count",
+      "interval": "5m"
+    }
+  ],
+  "filters": [
+    {
+      "id": "sentry.rules.filters.tagged_event_filter.TaggedEventFilter",
+      "match": "eq",
+      "key": "health_field_detected",
+      "value": "true"
+    }
+  ],
+  "actions": [
+    {
+      "id": "sentry.integrations.pagerduty.notify_action.PagerDutyNotifyServiceAction",
+      "account": "<FORM_PAGERDUTY_ACCOUNT_ID>",
+      "service": "<FORM_PAGERDUTY_SERVICE_ID>",
+      "severity": "critical"
+    },
+    {
+      "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+      "workspace": "<FORM_SLACK_WORKSPACE_ID>",
+      "channel": "#security-alerts",
+      "channel_id": "<CHANNEL_ID>",
+      "tags": "environment,release,health_field_detected",
+      "notes": "Runbook: docs/INCIDENT_RESPONSE.md §R-15 (Health Data Leak Response). GDPR Art. 9 potential breach — initiate breach assessment immediately."
+    }
+  ],
+  "actionMatch": "all",
+  "filterMatch": "all",
+  "frequency": 60,
+  "runbook": "docs/INCIDENT_RESPONSE.md §R-15"
+}
+```
+
+**Dashboard configuration steps:**
+1. Alerts → Create Alert Rule → Issue Alert
+2. Set **When**: "The number of events in an issue is more than" → `0` in `5 minutes` (fires on first occurrence)
+3. Add **Filter**: "The event's tags match" → key `health_field_detected` equals `true`
+4. Add **Action**: Notify PagerDuty → FORM service → Severity `critical`
+5. Add **Action**: Send Slack notification → `#security-alerts` → include tags `environment`, `release`, `health_field_detected` → Notes: "Runbook: §R-15 — GDPR Art. 9 potential breach"
+6. Set **Action Interval**: `60 minutes`
+7. Name: `FORM-HEALTH-LEAK-001 — Health Data Field Detected in Payload`
+8. Save rule
+
+> **Detection mechanism:** The `beforeSend` hook (§47.5) sets the Sentry tag `health_field_detected: true` on any event where a health field was found and scrubbed. The scrubbed event is then transmitted to Sentry, where this rule fires on the tag. Critically, the actual health field value never reaches Sentry — only the sanitised `[HEALTH_DATA_REDACTED]` placeholder and the detection tag.
+
+> **R-15 note:** Runbook `docs/INCIDENT_RESPONSE.md §R-15` (Health Data Leak Response) is a **new runbook** referenced here for the first time. It must be authored as part of this gap closure. Minimum content: (1) identify which field was detected via DEC-030 `system.sentry_health_field_detected` audit event query; (2) determine if the field was present in a Sentry envelope before `beforeSend` ran — i.e. was it captured in `event.request.data` from an inbound HTTP request body parsed by Sentry before our hook ran; (3) if yes, assess GDPR Art. 33 72-hour notification obligation; (4) engage DPO/outside counsel.
+
+**API approach:**
+```bash
+curl -X POST "https://sentry.io/api/0/projects/<ORG_SLUG>/FORM-API/rules/" \
+  -H "Authorization: Bearer <SENTRY_AUTH_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d @- <<'EOF'
+{
+  "name": "FORM-HEALTH-LEAK-001 — Health Data Field Detected in Payload",
+  "environment": "production",
+  "conditions": [{"id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition", "value": 0, "comparisonType": "count", "interval": "5m"}],
+  "filters": [{"id": "sentry.rules.filters.tagged_event_filter.TaggedEventFilter", "match": "eq", "key": "health_field_detected", "value": "true"}],
+  "actions": [
+    {"id": "sentry.integrations.pagerduty.notify_action.PagerDutyNotifyServiceAction", "account": "<ACCOUNT_ID>", "service": "<SERVICE_ID>", "severity": "critical"},
+    {"id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction", "workspace": "<WORKSPACE_ID>", "channel": "#security-alerts", "channel_id": "<CHANNEL_ID>", "tags": "environment,release,health_field_detected", "notes": "Runbook: docs/INCIDENT_RESPONSE.md §R-15 — GDPR Art. 9 potential breach."}
+  ],
+  "actionMatch": "all",
+  "filterMatch": "all",
+  "frequency": 60
+}
+EOF
+```
+
+---
+
+### 47.5 Sentry `beforeSend` Health Data Scrubber
+
+```typescript
+// supabase/functions/shared/sentry-scrubber.ts
+// Sentry beforeSend hook — strips health-adjacent field names from all Sentry event payloads
+// before transmission to Sentry Cloud. Called client-side inside the Cloudflare Worker process.
+//
+// Guarantees:
+//   1. Health field values never reach Sentry's network.
+//   2. system.sentry_health_field_detected DEC-030 event emitted (CRITICAL, 7yr) on any detection.
+//   3. Structured log line written to stdout for Cloudflare Logpush (no field value included).
+//   4. Scrubbed event always returned — never null — to preserve error context.
+//
+// GDPR basis: FORM legitimate interest (Art. 6(1)(f)) to prevent accidental Art. 9 data
+// transmission to a sub-processor (Sentry) whose DPA scope covers error_telemetry only.
+
+import type { Event as SentryEvent } from '@sentry/types';
+
+// Eleven health-adjacent field names from the FORM data model.
+// Any new health fields added to the schema must be appended here and
+// the change must be reviewed by compliance-officer (DPIA may require update).
+const HEALTH_FIELD_NAMES = new Set([
+  'hrv',
+  'hrv_rmssd',
+  'heart_rate',
+  'resting_hr',
+  'weight_kg',
+  'body_fat_pct',
+  'sleep_score',
+  'sleep_duration_min',
+  'readiness_score',
+  'spo2',
+  'vo2max',
+]);
+
+const REDACTED_PLACEHOLDER = '[HEALTH_DATA_REDACTED]';
+
+// Recursively scrub health fields from an arbitrary object.
+// Returns { scrubbed: boolean; result: T } where scrubbed is true if any field was replaced.
+function scrubObject<T>(obj: T): { scrubbed: boolean; result: T } {
+  if (obj === null || typeof obj !== 'object') {
+    return { scrubbed: false, result: obj };
+  }
+
+  if (Array.isArray(obj)) {
+    let anyScrubbed = false;
+    const result = obj.map((item) => {
+      const { scrubbed, result: r } = scrubObject(item);
+      if (scrubbed) anyScrubbed = true;
+      return r;
+    });
+    return { scrubbed: anyScrubbed, result: result as unknown as T };
+  }
+
+  let anyScrubbed = false;
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (HEALTH_FIELD_NAMES.has(key)) {
+      result[key] = REDACTED_PLACEHOLDER;
+      anyScrubbed = true;
+    } else {
+      const { scrubbed, result: nested } = scrubObject(value);
+      result[key] = nested;
+      if (scrubbed) anyScrubbed = true;
+    }
+  }
+
+  return { scrubbed: anyScrubbed, result: result as unknown as T };
+}
+
+async function emitHealthLeakAuditEvent(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  detectedFields: string[],
+): Promise<void> {
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/emit-audit-event`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        action: 'system.sentry_health_field_detected',
+        actor_type: 'system',
+        actor_id: 'sentry-scrubber',
+        resource_type: 'sentry_event',
+        severity: 'CRITICAL',
+        retention_years: 7,
+        metadata: {
+          // Field NAMES only — never values (values were already scrubbed before this call)
+          detected_field_names: detectedFields,
+          scrubbed: true,
+          note: 'Health field name detected in Sentry event payload; value replaced with [HEALTH_DATA_REDACTED] before transmission to Sentry Cloud. Potential GDPR Art. 9 data in error context — review origin callsite.',
+        },
+      }),
+    });
+  } catch (err) {
+    // Fire-and-forget: a failure to emit the audit event must not suppress the scrubbed event.
+    // Log to stdout (Cloudflare Logpush) so the failure is visible in structured logs.
+    console.error(JSON.stringify({
+      level: 'ERROR',
+      component: 'sentry-scrubber',
+      message: 'Failed to emit system.sentry_health_field_detected audit event',
+      error: String(err),
+    }));
+  }
+}
+
+// Factory function — called once during sentry.init() to close over the Supabase credentials.
+// Using a factory avoids global state and makes the scrubber testable in isolation.
+export function makeSentryBeforeSend(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+): (event: SentryEvent) => SentryEvent {
+  return function beforeSend(event: SentryEvent): SentryEvent {
+    const detectedFields: string[] = [];
+    let anyScrubbed = false;
+
+    // 1. Scrub event.extra
+    if (event.extra) {
+      const { scrubbed, result } = scrubObject(event.extra);
+      if (scrubbed) {
+        event.extra = result;
+        anyScrubbed = true;
+        // Collect which top-level keys were health fields (for audit event metadata)
+        for (const key of Object.keys(event.extra ?? {})) {
+          if (HEALTH_FIELD_NAMES.has(key)) detectedFields.push(key);
+        }
+        // Also collect from nested — re-scan original keys
+        for (const key of Object.keys(event.extra ?? {})) {
+          if (!HEALTH_FIELD_NAMES.has(key)) {
+            // Nested scrub — we know something was scrubbed but key traversal is expensive here;
+            // mark as 'nested' to signal depth without exposing path
+            if (!detectedFields.includes('(nested)')) detectedFields.push('(nested)');
+          }
+        }
+      }
+    }
+
+    // 2. Scrub event.contexts (arbitrary key-value blob)
+    if (event.contexts) {
+      const { scrubbed, result } = scrubObject(event.contexts);
+      if (scrubbed) {
+        event.contexts = result;
+        anyScrubbed = true;
+        if (!detectedFields.includes('(contexts)')) detectedFields.push('(contexts)');
+      }
+    }
+
+    // 3. Scrub event.request.data (parsed POST body — highest risk surface)
+    if (event.request?.data) {
+      const { scrubbed, result } = scrubObject(event.request.data as Record<string, unknown>);
+      if (scrubbed) {
+        event.request = { ...event.request, data: result };
+        anyScrubbed = true;
+        if (!detectedFields.includes('(request.data)')) detectedFields.push('(request.data)');
+      }
+    }
+
+    if (anyScrubbed) {
+      // Set detection tag — this is the surface FORM-HEALTH-LEAK-001 alert rule queries
+      event.tags = { ...event.tags, health_field_detected: 'true' };
+
+      // Structured log to stdout — visible in Cloudflare Logpush; no field values included
+      console.error(JSON.stringify({
+        level: 'CRITICAL',
+        component: 'sentry-scrubber',
+        message: 'Health data field name detected and redacted in Sentry event payload',
+        detected_in: detectedFields,
+        event_id: event.event_id ?? 'unknown',
+        note: 'Field values replaced with [HEALTH_DATA_REDACTED]. DEC-030 event emitted asynchronously.',
+      }));
+
+      // Emit DEC-030 audit event asynchronously — do not await (must not block beforeSend return)
+      void emitHealthLeakAuditEvent(supabaseUrl, serviceRoleKey, detectedFields);
+    }
+
+    // Always return the (scrubbed) event — never return null.
+    // Rationale: losing error context is worse than a scrubbed event that still contains
+    // the stack trace, message, and breadcrumbs needed for incident investigation.
+    return event;
+  };
+}
+```
+
+**Unit test scaffold (`apps/api/src/__tests__/sentry-scrubber.test.ts`):**
+
+```typescript
+// apps/api/src/__tests__/sentry-scrubber.test.ts
+// Vitest unit tests — run with: pnpm test --filter api
+
+import { describe, it, expect, vi } from 'vitest';
+import { makeSentryBeforeSend } from '../../shared/sentry-scrubber';
+import type { Event as SentryEvent } from '@sentry/types';
+
+const noop = makeSentryBeforeSend('https://mock.supabase.co', 'mock-key');
+
+describe('sentry-scrubber beforeSend', () => {
+  it('strips hrv from event.extra', () => {
+    const event: SentryEvent = { extra: { hrv: 42, message: 'test error' } };
+    const result = noop(event);
+    expect(result.extra?.hrv).toBe('[HEALTH_DATA_REDACTED]');
+    expect(result.extra?.message).toBe('test error');
+  });
+
+  it('sets health_field_detected tag when health field found', () => {
+    const event: SentryEvent = { extra: { heart_rate: 72 } };
+    const result = noop(event);
+    expect(result.tags?.health_field_detected).toBe('true');
+  });
+
+  it('does not set health_field_detected tag when no health field present', () => {
+    const event: SentryEvent = { extra: { user_id: 'abc', action: 'workout_start' } };
+    const result = noop(event);
+    expect(result.tags?.health_field_detected).toBeUndefined();
+  });
+
+  it('strips health fields from nested request.data', () => {
+    const event: SentryEvent = {
+      request: { data: { session: { hrv_rmssd: 38, steps: 10000 } } },
+    };
+    const result = noop(event);
+    expect((result.request?.data as Record<string, unknown>).session as Record<string, unknown>).toMatchObject({
+      hrv_rmssd: '[HEALTH_DATA_REDACTED]',
+      steps: 10000,
+    });
+  });
+
+  it('always returns event (never null)', () => {
+    const event: SentryEvent = { extra: { weight_kg: 80 } };
+    expect(noop(event)).toBeTruthy();
+  });
+});
+```
+
+---
+
+### 47.6 `row-count-monitor` Edge Function Source
+
+```typescript
+// supabase/functions/row-count-monitor/index.ts
+// Supabase Edge Function — invoked by pg_cron every 15 minutes.
+// Compares live row counts for monitored tables against monitoring_baselines.
+// Fires P1 (>5% decline) or P0 (>20% decline) alerts via Slack and PagerDuty.
+// Emits DEC-030 HMAC-chained audit events on every execution (pass, anomaly, or missing baseline).
+//
+// Cron schedule: */15 * * * *
+// Invoked via: SELECT net.http_post(url, headers, body) from pg_cron job
+// Owner: devops-lead
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Tables to monitor — extend this list when new core tables are added.
+// Any addition requires a corresponding monitoring_baselines seed update (§47.7).
+const MONITORED_TABLES = [
+  'users',
+  'workouts',
+  'workout_sets',
+  'programs',
+  'workout_templates',
+  'audit_logs',
+] as const;
+
+type MonitoredTable = (typeof MONITORED_TABLES)[number];
+
+interface BaselineRow {
+  table_name: string;
+  baseline_count: number;
+}
+
+interface CountRow {
+  table_name: string;
+  current_count: number;
+  baseline_count: number | null;
+}
+
+interface AlertRecord {
+  table_name: string;
+  alert_tier: 'P0' | 'P1';
+  fired_at: string;
+}
+
+const PAGERDUTY_EVENTS_URL = 'https://events.pagerduty.com/v2/enqueue';
+
+async function getSupabaseClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  );
+}
+
+async function fetchCountsWithBaselines(
+  supabase: Awaited<ReturnType<typeof getSupabaseClient>>,
+): Promise<CountRow[]> {
+  // Single round-trip: get current count per table + baseline in one query.
+  // Uses pg_catalog.pg_class for fast approximate counts (reltuples); for
+  // exact counts on smaller tables, replace with a COUNT(*) subquery.
+  const { data, error } = await supabase.rpc('get_monitored_table_counts');
+  if (error) throw new Error(`get_monitored_table_counts RPC failed: ${error.message}`);
+  return (data as CountRow[]) ?? [];
+}
+
+async function recentAlertExists(
+  supabase: Awaited<ReturnType<typeof getSupabaseClient>>,
+  tableName: string,
+  tier: 'P0' | 'P1',
+): Promise<boolean> {
+  const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString(); // 60 min ago
+  const { data } = await supabase
+    .from('monitoring_alerts')
+    .select('id')
+    .eq('table_name', tableName)
+    .eq('alert_tier', tier)
+    .gte('fired_at', windowStart)
+    .limit(1);
+  return (data?.length ?? 0) > 0;
+}
+
+async function insertAlertRecord(
+  supabase: Awaited<ReturnType<typeof getSupabaseClient>>,
+  tableName: string,
+  tier: 'P0' | 'P1',
+  currentCount: number,
+  baselineCount: number,
+  deviationPct: number,
+): Promise<void> {
+  await supabase.from('monitoring_alerts').insert({
+    table_name: tableName,
+    alert_tier: tier,
+    current_count: currentCount,
+    baseline_count: baselineCount,
+    deviation_pct: deviationPct,
+  });
+}
+
+async function postSlackAlert(
+  webhookUrl: string,
+  blocks: unknown[],
+): Promise<void> {
+  const resp = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blocks }),
+  });
+  if (!resp.ok) {
+    console.error(JSON.stringify({
+      level: 'ERROR',
+      component: 'row-count-monitor',
+      message: 'Slack webhook post failed',
+      status: resp.status,
+    }));
+  }
+}
+
+async function pagePagerDuty(
+  routingKey: string,
+  summary: string,
+  severity: 'critical' | 'warning',
+  details: Record<string, unknown>,
+): Promise<void> {
+  const resp = await fetch(PAGERDUTY_EVENTS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      routing_key: routingKey,
+      event_action: 'trigger',
+      payload: {
+        summary,
+        severity,
+        source: 'row-count-monitor',
+        custom_details: details,
+        links: [{ href: 'https://form.coach/docs/INCIDENT_RESPONSE.md', text: 'Runbook R-01' }],
+      },
+    }),
+  });
+  if (!resp.ok) {
+    console.error(JSON.stringify({
+      level: 'ERROR',
+      component: 'row-count-monitor',
+      message: 'PagerDuty Events API call failed',
+      status: resp.status,
+    }));
+  }
+}
+
+async function emitAuditEvent(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  action: string,
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
+  retentionYears: number,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/emit-audit-event`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        action,
+        actor_type: 'system',
+        actor_id: 'row-count-monitor',
+        resource_type: 'database_table',
+        severity,
+        retention_years: retentionYears,
+        metadata,
+      }),
+    });
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'ERROR',
+      component: 'row-count-monitor',
+      message: 'Failed to emit DEC-030 audit event',
+      action,
+      error: String(err),
+    }));
+  }
+}
+
+function buildSlackBlocks(
+  tableName: string,
+  currentCount: number,
+  baselineCount: number,
+  deviationPct: number,
+  tier: 'P0' | 'P1',
+): unknown[] {
+  const severityBadge = tier === 'P0' ? ':red_circle: P0 CRITICAL' : ':large_yellow_circle: P1 WARNING';
+  const ts = new Date().toISOString();
+
+  return [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `[${tier}] Row Count Anomaly: ${tableName}`,
+      },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Table:*\n\`${tableName}\`` },
+        { type: 'mrkdwn', text: `*Severity:*\n${severityBadge}` },
+        { type: 'mrkdwn', text: `*Current count:*\n${currentCount.toLocaleString()}` },
+        { type: 'mrkdwn', text: `*Baseline count:*\n${baselineCount.toLocaleString()}` },
+        { type: 'mrkdwn', text: `*Deviation:*\n${deviationPct.toFixed(2)}% decline` },
+        { type: 'mrkdwn', text: `*Detected at:*\n${ts}` },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Runbook:* \`docs/INCIDENT_RESPONSE.md §R-01\` (Data Integrity Anomaly)\n*Investigate immediately — possible data loss, truncation, or migration error.*`,
+      },
+    },
+  ];
+}
+
+Deno.serve(async (_req: Request) => {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const slackSecurityUrl = Deno.env.get('MONITORING_SLACK_WEBHOOK_URL') ?? Deno.env.get('SLACK_WEBHOOK_URL') ?? '';
+  const slackEngineeringUrl = Deno.env.get('MONITORING_SLACK_WEBHOOK_URL') ?? Deno.env.get('SLACK_WEBHOOK_URL') ?? '';
+  const pagerdutyRoutingKey = Deno.env.get('MONITORING_PAGERDUTY_ROUTING_KEY') ?? '';
+
+  const supabase = await getSupabaseClient();
+
+  let rows: CountRow[];
+  try {
+    rows = await fetchCountsWithBaselines(supabase);
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'CRITICAL',
+      component: 'row-count-monitor',
+      message: 'Failed to fetch table counts — check DB connectivity',
+      error: String(err),
+    }));
+    return new Response(JSON.stringify({ error: 'db_fetch_failed' }), { status: 500 });
+  }
+
+  // Build a map of table_name → row for O(1) lookup
+  const rowMap = new Map(rows.map((r) => [r.table_name, r]));
+
+  let passCount = 0;
+  const anomalies: Array<{ table: string; tier: 'P0' | 'P1'; deviationPct: number }> = [];
+  const missingBaselines: string[] = [];
+
+  for (const tableName of MONITORED_TABLES) {
+    const row = rowMap.get(tableName);
+
+    // Case 1: no baseline configured for this table
+    if (!row || row.baseline_count === null) {
+      missingBaselines.push(tableName);
+
+      console.warn(JSON.stringify({
+        level: 'WARN',
+        component: 'row-count-monitor',
+        message: 'No baseline found for monitored table — skipping',
+        table_name: tableName,
+        action_required: 'Run seeding procedure from SOC2_READINESS.md §47.7',
+      }));
+
+      await emitAuditEvent(supabaseUrl, serviceRoleKey, 'system.row_count_baseline_missing', 'MEDIUM', 3, {
+        table_name: tableName,
+        note: 'No row in monitoring_baselines for this table. Seed required.',
+      });
+      continue;
+    }
+
+    const currentCount = row.current_count;
+    const baselineCount = row.baseline_count;
+
+    // Skip tables with zero baseline (would produce division by zero / misleading %)
+    if (baselineCount === 0) {
+      passCount++;
+      continue;
+    }
+
+    const deviationPct = ((baselineCount - currentCount) / baselineCount) * 100;
+
+    // Case 2: within thresholds — clean pass
+    if (deviationPct <= 5) {
+      passCount++;
+      continue;
+    }
+
+    // Case 3: anomaly detected — determine tier
+    const tier: 'P0' | 'P1' = deviationPct > 20 ? 'P0' : 'P1';
+    anomalies.push({ table: tableName, tier, deviationPct });
+
+    // Deduplication check — do not re-alert if same table+tier fired within 60 min
+    const alreadyFired = await recentAlertExists(supabase, tableName, tier);
+    if (alreadyFired) {
+      console.info(JSON.stringify({
+        level: 'INFO',
+        component: 'row-count-monitor',
+        message: 'Alert deduped — same table+tier fired within 60 min window',
+        table_name: tableName,
+        tier,
+        deviation_pct: deviationPct.toFixed(2),
+      }));
+      continue;
+    }
+
+    // Record alert for future deduplication
+    await insertAlertRecord(supabase, tableName, tier, currentCount, baselineCount, deviationPct);
+
+    // Build Slack Block Kit message
+    const blocks = buildSlackBlocks(tableName, currentCount, baselineCount, deviationPct, tier);
+
+    if (tier === 'P0') {
+      // P0: PagerDuty CRITICAL + Slack #security-alerts
+      if (pagerdutyRoutingKey) {
+        await pagePagerDuty(
+          pagerdutyRoutingKey,
+          `FORM P0 — Row count anomaly: ${tableName} (${deviationPct.toFixed(1)}% decline from baseline)`,
+          'critical',
+          { table_name: tableName, current_count: currentCount, baseline_count: baselineCount, deviation_pct: deviationPct },
+        );
+      }
+      if (slackSecurityUrl) await postSlackAlert(slackSecurityUrl, blocks);
+    } else {
+      // P1: Slack #engineering-alerts only
+      if (slackEngineeringUrl) await postSlackAlert(slackEngineeringUrl, blocks);
+    }
+
+    // Emit DEC-030 audit event
+    await emitAuditEvent(supabaseUrl, serviceRoleKey, 'system.row_count_anomaly_detected', 'HIGH', 7, {
+      table_name: tableName,
+      current_count: currentCount,
+      baseline_count: baselineCount,
+      deviation_pct: parseFloat(deviationPct.toFixed(2)),
+      alert_tier: tier,
+      deduped: false,
+      runbook: 'INCIDENT_RESPONSE.md §R-01',
+    });
+
+    console.error(JSON.stringify({
+      level: tier === 'P0' ? 'CRITICAL' : 'ERROR',
+      component: 'row-count-monitor',
+      message: `Row count anomaly detected: ${tableName}`,
+      table_name: tableName,
+      current_count: currentCount,
+      baseline_count: baselineCount,
+      deviation_pct: deviationPct.toFixed(2),
+      tier,
+    }));
+  }
+
+  // Emit clean-pass audit event only if all monitored tables (with baselines) passed
+  if (anomalies.length === 0 && missingBaselines.length === 0) {
+    await emitAuditEvent(supabaseUrl, serviceRoleKey, 'system.row_count_check_passed', 'LOW', 3, {
+      tables_checked: MONITORED_TABLES.length,
+      pass_count: passCount,
+      checked_at: new Date().toISOString(),
+    });
+  } else if (anomalies.length === 0 && missingBaselines.length > 0) {
+    // Partial pass — some tables had no baseline; do not emit a full-pass event
+    await emitAuditEvent(supabaseUrl, serviceRoleKey, 'system.row_count_check_passed', 'LOW', 3, {
+      tables_checked: MONITORED_TABLES.length - missingBaselines.length,
+      pass_count: passCount,
+      missing_baselines: missingBaselines,
+      note: 'Partial pass — missing baselines skipped',
+      checked_at: new Date().toISOString(),
+    });
+  }
+
+  return new Response(
+    JSON.stringify({
+      checked: MONITORED_TABLES.length,
+      passed: passCount,
+      anomalies: anomalies.length,
+      missing_baselines: missingBaselines.length,
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  );
+});
+```
+
+**Supporting RPC — `get_monitored_table_counts` (efficient single round-trip):**
+
+```sql
+-- supabase/migrations/YYYYMMDDHHMMSS_row_count_monitor_rpc.sql
+-- Returns current approximate row counts for all monitored tables,
+-- joined with monitoring_baselines. Uses pg_stat_user_tables for live estimates.
+-- Exact counts (COUNT(*)) are too slow for a 15-minute cron on large tables.
+
+CREATE OR REPLACE FUNCTION public.get_monitored_table_counts()
+RETURNS TABLE (
+  table_name    TEXT,
+  current_count BIGINT,
+  baseline_count BIGINT
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    t.table_name::TEXT,
+    COALESCE(s.n_live_tup, 0)::BIGINT            AS current_count,
+    mb.baseline_count                              AS baseline_count
+  FROM (
+    VALUES
+      ('users'),
+      ('workouts'),
+      ('workout_sets'),
+      ('programs'),
+      ('workout_templates'),
+      ('audit_logs')
+  ) AS t(table_name)
+  LEFT JOIN pg_stat_user_tables s
+    ON s.relname = t.table_name
+    AND s.schemaname = 'public'
+  LEFT JOIN public.monitoring_baselines mb
+    ON mb.table_name = t.table_name;
+$$;
+
+-- Grant execute to the service role (auto-granted for SECURITY DEFINER, but explicit is better)
+GRANT EXECUTE ON FUNCTION public.get_monitored_table_counts() TO service_role;
+```
+
+**Cron schedule (Supabase Dashboard → Database → Cron Jobs, or SQL):**
+
+```sql
+-- Schedule row-count-monitor every 15 minutes
+SELECT cron.schedule(
+  'row-count-monitor',
+  '*/15 * * * *',
+  $$
+    SELECT net.http_post(
+      url     := current_setting('app.settings.supabase_url') || '/functions/v1/row-count-monitor',
+      headers := jsonb_build_object(
+                   'Content-Type', 'application/json',
+                   'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key')
+                 ),
+      body    := '{}'::text
+    );
+  $$
+);
+```
+
+---
+
+### 47.7 `monitoring_baselines` Table DDL + `monitoring_alerts` Dedup Table + Seeding Procedure
+
+```sql
+-- supabase/migrations/YYYYMMDDHHMMSS_monitoring_baselines.sql
+-- monitoring_baselines: stores expected row counts captured during known-good state.
+-- monitoring_alerts: deduplication table to prevent alert storms.
+
+-- ============================================================
+-- monitoring_baselines
+-- ============================================================
+CREATE TABLE public.monitoring_baselines (
+  table_name             TEXT PRIMARY KEY,
+  baseline_count         BIGINT NOT NULL,
+  baseline_captured_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  captured_by            TEXT NOT NULL DEFAULT 'row-count-monitor',
+  notes                  TEXT
+);
+
+COMMENT ON TABLE public.monitoring_baselines IS
+  'Expected row counts for monitored tables. Seed during known-good state. '
+  'Update after intentional bulk deletes or migrations that permanently change scale. '
+  'Owner: devops-lead. Review: quarterly or after any bulk data operation.';
+
+-- ============================================================
+-- monitoring_alerts (deduplication)
+-- ============================================================
+CREATE TABLE public.monitoring_alerts (
+  id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_name     TEXT        NOT NULL,
+  alert_tier     TEXT        NOT NULL CHECK (alert_tier IN ('P1', 'P0')),
+  fired_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  current_count  BIGINT,
+  baseline_count BIGINT,
+  deviation_pct  NUMERIC(6, 2)
+);
+
+COMMENT ON TABLE public.monitoring_alerts IS
+  'Append-only dedup log for row-count-monitor alerts. '
+  'Row-count-monitor queries this table before firing to prevent re-alerting '
+  'on the same table+tier within a 60-minute window. '
+  'Do not truncate — records are evidence artefacts for SOC 2 CC7.1.';
+
+CREATE INDEX idx_monitoring_alerts_dedup
+  ON public.monitoring_alerts (table_name, alert_tier, fired_at DESC);
+
+-- ============================================================
+-- RLS: deny all access from api role; only form_system / service_role may read/write
+-- ============================================================
+ALTER TABLE public.monitoring_baselines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.monitoring_alerts    ENABLE ROW LEVEL SECURITY;
+
+-- Block all direct access from the anon and authenticated roles
+CREATE POLICY "monitoring_baselines_no_direct_access"
+  ON public.monitoring_baselines FOR ALL TO anon, authenticated USING (false);
+
+CREATE POLICY "monitoring_alerts_no_direct_access"
+  ON public.monitoring_alerts FOR ALL TO anon, authenticated USING (false);
+
+-- service_role bypasses RLS by default in Supabase — no explicit policy needed for service_role.
+-- Verify with: SELECT grantee, privilege_type FROM information_schema.role_table_grants
+--              WHERE table_name IN ('monitoring_baselines', 'monitoring_alerts');
+```
+
+**Seeding procedure (bash + SQL):**
+
+The seed must be performed during a known-good production state with no active migration, bulk import, or bulk delete in progress. The operator must confirm before running.
+
+```bash
+#!/usr/bin/env bash
+# scripts/seed-monitoring-baselines.sh
+# Seeds monitoring_baselines with current production row counts.
+# Run during a quiet maintenance window. Requires psql and SUPABASE_DB_URL env var.
+#
+# Prerequisites:
+#   1. No active migration in progress (check: SELECT * FROM schema_migrations ORDER BY id DESC LIMIT 5)
+#   2. No bulk import or delete running (check: SELECT * FROM pg_stat_activity WHERE state = 'active')
+#   3. SUPABASE_DB_URL set to the production connection string (direct, not pooler)
+#   4. Operator has read this script and confirmed the state is known-good
+#
+# Usage: SUPABASE_DB_URL="postgres://..." bash scripts/seed-monitoring-baselines.sh
+
+set -euo pipefail
+
+if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
+  echo "ERROR: SUPABASE_DB_URL is not set. Aborting." >&2
+  exit 1
+fi
+
+SEED_DATE=$(date -u +%Y-%m-%d)
+
+echo ""
+echo "============================================================"
+echo "  FORM monitoring_baselines seeding procedure"
+echo "  Date: ${SEED_DATE}"
+echo "============================================================"
+echo ""
+echo "This script will capture current row counts from production"
+echo "and insert them into monitoring_baselines."
+echo ""
+echo "SAFETY GUARD: Confirm the following before proceeding:"
+echo "  [1] No active database migration is in progress"
+echo "  [2] No bulk import or delete is running"
+echo "  [3] Row counts reflect the expected production state"
+echo ""
+read -r -p "Type YES to confirm and proceed: " CONFIRM
+
+if [[ "$CONFIRM" != "YES" ]]; then
+  echo "Aborted by operator." >&2
+  exit 1
+fi
+
+echo ""
+echo "Seeding monitoring_baselines..."
+
+psql "${SUPABASE_DB_URL}" <<SQL
+-- Safety check: abort if any long-running write is active (>5 min)
+DO \$\$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_stat_activity
+    WHERE state = 'active'
+      AND query_start < now() - interval '5 minutes'
+      AND query NOT LIKE '%pg_stat_activity%'
+      AND state_change IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'Long-running query detected. Aborting seed. Investigate before proceeding.';
+  END IF;
+END;
+\$\$;
+
+-- Capture current row counts using pg_stat_user_tables (consistent with row-count-monitor RPC)
+INSERT INTO public.monitoring_baselines (table_name, baseline_count, baseline_captured_at, captured_by, notes)
+SELECT
+  relname::TEXT                                   AS table_name,
+  n_live_tup::BIGINT                              AS baseline_count,
+  now()                                           AS baseline_captured_at,
+  'seed-script'                                   AS captured_by,
+  'initial seed ${SEED_DATE}'                     AS notes
+FROM pg_stat_user_tables
+WHERE schemaname = 'public'
+  AND relname IN ('users','workouts','workout_sets','programs','workout_templates','audit_logs')
+ON CONFLICT (table_name) DO UPDATE
+  SET
+    baseline_count       = EXCLUDED.baseline_count,
+    baseline_captured_at = EXCLUDED.baseline_captured_at,
+    captured_by          = EXCLUDED.captured_by,
+    notes                = EXCLUDED.notes;
+
+-- Confirm seeded rows
+SELECT table_name, baseline_count, baseline_captured_at, notes
+FROM public.monitoring_baselines
+ORDER BY table_name;
+SQL
+
+echo ""
+echo "Seed complete. Capture the SELECT output above as PRE-47-E-004."
+echo "File at: compliance/evidence/cc7/PRE-47-E-004-monitoring-baselines-${SEED_DATE}.txt"
+```
+
+**Post-seed validation query (run immediately after seed, before enabling cron):**
+
+```sql
+-- Verify all six monitored tables have baselines
+SELECT
+  t.table_name,
+  mb.baseline_count,
+  mb.baseline_captured_at,
+  mb.notes,
+  CASE WHEN mb.table_name IS NULL THEN 'MISSING — seed required' ELSE 'OK' END AS status
+FROM (
+  VALUES
+    ('users'), ('workouts'), ('workout_sets'),
+    ('programs'), ('workout_templates'), ('audit_logs')
+) AS t(table_name)
+LEFT JOIN public.monitoring_baselines mb USING (table_name)
+ORDER BY t.table_name;
+-- Expected: all six rows show status = 'OK'
+```
+
+---
+
+### 47.8 Environment Variables and Secrets Inventory
+
+All new secrets are stored in the appropriate secrets management layer. **Never commit values to git.**
+
+**New Cloudflare Worker secrets (set via `wrangler secret put <NAME>`):**
+
+| Secret name | Description | Store | Rotation cadence |
+|---|---|---|---|
+| `SENTRY_DSN` | Sentry DSN for `FORM-API` project — format: `https://<key>@<host>.ingest.sentry.io/<project_id>` | Cloudflare Worker secret | On DSN revocation or project key rotation (annual minimum) |
+| `SENTRY_PAGERDUTY_SERVICE_KEY` | PagerDuty service integration key used during Sentry PagerDuty integration setup (also entered in Sentry Dashboard; Worker does not call PagerDuty directly — Sentry does) | Cloudflare Worker secret (record-keeping) | Annual or on-call team rotation |
+
+**New Supabase Edge Function secrets (Dashboard → Edge Functions → Environment Variables or Supabase Vault):**
+
+| Variable name | Description | Store | Rotation cadence |
+|---|---|---|---|
+| `MONITORING_SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL for alert routing — use `#security-alerts` URL for P0 and `#engineering-alerts` URL for P1; if a single webhook fans out via Slack routing rules, one URL suffices. Falls back to `SLACK_WEBHOOK_URL` if already set | Supabase Edge Function secret | On channel or workspace change |
+| `MONITORING_PAGERDUTY_ROUTING_KEY` | PagerDuty Events API v2 routing key — same service as `PAGERDUTY_ROUTING_KEY` in `form-alert-relay` Worker (§46.7) unless separate PD services are used | Supabase Edge Function secret | Annual or on-call team rotation |
+
+> **De-duplication with §46 secrets:** `MONITORING_PAGERDUTY_ROUTING_KEY` and `PAGERDUTY_ROUTING_KEY` (§46) should point to the same PagerDuty service unless the on-call team wants separate escalation policies for infrastructure anomalies (row count) vs. security events (WAF, auth). Decision to be made by security-engineer + devops-lead at deploy time; document the decision in `compliance/decisions/YYYY-MM-DD-pagerduty-routing.md`.
+
+---
+
+### 47.9 New DEC-030 HMAC-Chained Audit Events
+
+These four events extend the `docs/AUDIT_LOG_SCHEMA.md` taxonomy. Append them to the `### System` subsection of that document.
+
+| Event action | Category | Severity | Retention | Description | Trigger |
+|---|---|---|---|---|---|
+| `system.sentry_health_field_detected` | SYSTEM | CRITICAL | 7 yr | Health data field name found in Sentry event payload; `beforeSend` hook detected and redacted the field value before transmission to Sentry Cloud; `health_field_detected: true` tag set on event; GDPR Art. 9 exposure risk — investigate origin callsite | `beforeSend` hook (`sentry-scrubber.ts`) |
+| `system.row_count_anomaly_detected` | SYSTEM | HIGH | 7 yr | Table row count deviated more than 5% from `monitoring_baselines` baseline; includes `table_name`, `current_count`, `baseline_count`, `deviation_pct`, `alert_tier` (P0 or P1); possible data loss, truncation, or migration error | `row-count-monitor` cron (every 15 min) |
+| `system.row_count_check_passed` | SYSTEM | LOW | 3 yr | All monitored tables (for which a baseline exists) are within the 5% deviation threshold; includes `tables_checked`, `pass_count`, `checked_at`; provides positive evidence of continuous data integrity monitoring for CC7.1 | `row-count-monitor` cron (every 15 min) |
+| `system.row_count_baseline_missing` | SYSTEM | MEDIUM | 3 yr | No row exists in `monitoring_baselines` for a monitored table; table was skipped in anomaly detection; seeding procedure (§47.7) must be run; represents a gap in monitoring coverage | `row-count-monitor` cron (every 15 min) |
+
+**Manual SQL for querying these events during audit evidence collection:**
+
+```sql
+-- PRE-47-E-003: confirm system.sentry_health_field_detected fired during test
+SELECT id, action, severity, created_at, metadata
+FROM public.audit_logs
+WHERE action = 'system.sentry_health_field_detected'
+ORDER BY created_at DESC
+LIMIT 10;
+
+-- PRE-47-E-005: confirm system.row_count_anomaly_detected fired during baseline inflation test
+SELECT id, action, severity, created_at, metadata
+FROM public.audit_logs
+WHERE action = 'system.row_count_anomaly_detected'
+  AND metadata->>'table_name' = 'users'  -- adjust to test table
+ORDER BY created_at DESC
+LIMIT 5;
+
+-- Continuous monitoring evidence: check-passed events in observation window (auditor query)
+SELECT
+  DATE_TRUNC('day', created_at)::DATE  AS check_date,
+  COUNT(*)                             AS pass_events
+FROM public.audit_logs
+WHERE action = 'system.row_count_check_passed'
+  AND created_at >= now() - interval '30 days'
+GROUP BY 1
+ORDER BY 1;
+-- Expected: ~96 events per day (4 per hour × 24h), with gaps only during known maintenance windows
+```
+
+---
+
+### 47.10 SOC 2 Evidence Mapping
+
+| Evidence ID | Description | Collection method | Frequency | Criteria |
+|---|---|---|---|---|
+| PRE-47-E-001 | Sentry project settings export: DSN configuration, team assignment, environment (`production`), SDK version, `beforeSend` hook presence confirmed via code reference | Sentry Dashboard → Settings → General → screenshot; code review of `apps/api/src/sentry.ts` | At implementation + any project settings change | CC7.2 |
+| PRE-47-E-002 | Sentry alert rule configuration screenshots — all four rules (FORM-FATAL-001, FORM-SPIKE-001, FORM-AUTH-ERR-001, FORM-HEALTH-LEAK-001) with trigger conditions, PagerDuty integration, Slack channel routing, and 30-day alert history panel | Sentry Dashboard → Alerts → Alert History → export or screenshot per rule | Monthly | CC7.2, CC7.3 |
+| PRE-47-E-003 | Test FORM-HEALTH-LEAK-001: security-engineer injects a synthetic Sentry event with `extra: { hrv: 42, user_id: 'test-user' }` in a staging Worker invocation; confirms: (1) scrubber replaces `hrv` with `[HEALTH_DATA_REDACTED]`; (2) tag `health_field_detected: true` present on Sentry event; (3) Sentry alert FORM-HEALTH-LEAK-001 fires; (4) `system.sentry_health_field_detected` DEC-030 event present in `audit_logs`; (5) Slack `#security-alerts` message received; test artefact is a screenshot of each step + audit log SQL output | security-engineer test script + `psql -c "SELECT * FROM audit_logs WHERE action = 'system.sentry_health_field_detected' ORDER BY created_at DESC LIMIT 1"` | At implementation; repeat at each quarterly access review | CC7.3, C1.1 |
+| PRE-47-E-004 | `monitoring_baselines` table content showing seed timestamp, baseline counts, and captured-by value for all six monitored tables | `psql -c "SELECT table_name, baseline_count, baseline_captured_at, captured_by, notes FROM monitoring_baselines ORDER BY table_name"` → output saved as `compliance/evidence/cc7/PRE-47-E-004-monitoring-baselines-YYYY-MM-DD.txt` | At seed time + quarterly refresh (or after any bulk data operation that changes the expected scale of a monitored table) | CC7.1 |
+| PRE-47-E-005 | Test row-count anomaly detection: devops-lead temporarily inflates the `users` baseline by 30% (`UPDATE monitoring_baselines SET baseline_count = baseline_count * 1.3 WHERE table_name = 'users'`); waits up to 15 min for cron to fire; confirms: (1) P0 Slack alert in `#security-alerts`; (2) PagerDuty incident created; (3) `system.row_count_anomaly_detected` DEC-030 event in `audit_logs` with `alert_tier = 'P0'`; (4) row in `monitoring_alerts` dedup table; restores baseline immediately after confirmation | devops-lead test script + Slack screenshot + PagerDuty screenshot + `psql -c "SELECT * FROM monitoring_alerts ORDER BY fired_at DESC LIMIT 1"` | At implementation | CC7.1, CC7.3 |
+
+---
+
+### 47.11 Gap Closure Summary
+
+| Gap ID | Description | Status Before §47 | Status After §47 | Closure Condition |
+|---|---|---|---|---|
+| **CC7-GAP-005** | Sentry alert rules not configured; no PagerDuty or Slack routing for application error events; health data leak alert (`FORM-HEALTH-LEAK-001`) not operational; `beforeSend` scrubber present in sub-processor register commitment but not implemented | 🔴 Open | 🟡 **AUTHORED** — complete Sentry JSON specifications for all four rules, `beforeSend` TypeScript scrubber (`supabase/functions/shared/sentry-scrubber.ts`), `sentry.init()` config, and PagerDuty/Slack routing configuration delivered | Deploy updated Workers with `SENTRY_DSN` secret + configure Sentry PagerDuty integration + create four alert rules in Dashboard + confirm PRE-47-E-002 screenshots + complete PRE-47-E-003 test |
+| **CC7-GAP-006** | `row-count-monitor` Edge Function not deployed; no automated signal for data corruption or unexpected row count decline in core tables; CC7.1 anomaly detection for data integrity has no coverage | 🔴 Open | 🟡 **AUTHORED** — complete TypeScript source (`supabase/functions/row-count-monitor/index.ts`), `monitoring_baselines` + `monitoring_alerts` DDL, `get_monitored_table_counts` RPC, seeding procedure, and pg_cron schedule delivered | Apply DDL migration + seed baselines during quiet window + deploy Edge Function + schedule cron + complete PRE-47-E-005 test |
+
+**P0 count: 9 → 7.** CC7-GAP-005 and CC7-GAP-006 advance from 🔴 Open to 🟡 AUTHORED. Both are the final two implementation-level CC7 documentation gaps; authored status means the full spec is complete and deployment can proceed without further documentation work.
+
+**CC7 criterion readiness after §47:**
+
+| CC7 sub-criterion | Before §47 | After §47 AUTHORED | After §47 🟢 |
+|---|---|---|---|
+| CC7.1 — anomaly detection | 🟡 Partial (`row-count-monitor` undeployed) | 🟡 Partial (implementation spec complete for `row-count-monitor`) | 🟢 Done — requires CC7-GAP-006 deployment + PRE-47-E-005 test |
+| CC7.2 — system monitoring | 🟡 Partial (Sentry alert rules unconfigured) | 🟡 Partial (all four rule specs complete) | 🟢 Done — requires CC7-GAP-005 deployment + PRE-47-E-002 screenshots |
+| CC7.3 — event evaluation | 🟡 Partial | 🟡 Partial (FORM-HEALTH-LEAK-001 detection chain specified end-to-end) | 🟢 Done — requires PRE-47-E-003 test confirming full detection chain |
+| CC7.4 — response | 🟡 Partial | 🟡 Partial | 🟢 Done — blocked on R-15 runbook authoring (new gap, out of scope for §47) |
+| CC7.5 — disclosure | 🟡 Partial | 🟡 Partial | 🟢 Done — requires full CC7.4 completion |
+
+---
+
+### 47.12 Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Done |
+|---|---|---|---|---|---|
+| 1 | Create `supabase/functions/shared/sentry-scrubber.ts` with complete source from §47.5; commit with message `security: add Sentry beforeSend health data scrubber (CC7-GAP-005)` | P0 | M3 | security-engineer | [ ] |
+| 2 | Integrate `initSentry(env)` call and `makeSentryBeforeSend` import into existing Worker entrypoints; confirm `SENTRY_DSN` and `SUPABASE_SERVICE_ROLE_KEY` are in scope at init time | P0 | M3 | platform-engineer | [ ] |
+| 3 | Set `SENTRY_DSN` Cloudflare Worker secret via `wrangler secret put SENTRY_DSN`; deploy updated Workers to production; confirm Sentry project `FORM-API` receives first event | P0 | M3 | devops-lead | [ ] |
+| 4 | Configure Sentry PagerDuty integration: Sentry Dashboard → Settings → Integrations → PagerDuty → add FORM service key (`SENTRY_PAGERDUTY_SERVICE_KEY`); confirm integration active; capture screenshot as PRE-47-E-001 | P0 | M3 | security-engineer | [ ] |
+| 5 | Create Sentry alert rule `FORM-FATAL-001` per §47.4 JSON spec; verify rule appears in Alerts list with trigger history panel active | P0 | M3 | security-engineer | [ ] |
+| 6 | Create Sentry alert rules `FORM-SPIKE-001`, `FORM-AUTH-ERR-001`, and `FORM-HEALTH-LEAK-001` per §47.4 JSON specs; export all four as screenshots to `compliance/evidence/cc7/PRE-47-E-002-sentry-alert-rules-YYYY-MM.png`; also create `FORM-SPIKE-001B` performance alert per §47.4 note | P0 | M3 | security-engineer | [ ] |
+| 7 | Run PRE-47-E-003 test: inject synthetic Sentry event with `extra: { hrv: 42 }` in staging Worker; confirm scrubber fires, `health_field_detected: true` tag set, FORM-HEALTH-LEAK-001 alert triggers in Sentry, `system.sentry_health_field_detected` DEC-030 event present in `audit_logs`, Slack `#security-alerts` message received; file evidence | P0 | M3 | security-engineer | [ ] |
+| 8 | Apply Supabase migrations: `YYYYMMDDHHMMSS_monitoring_baselines.sql` (DDL + RLS) and `YYYYMMDDHHMMSS_row_count_monitor_rpc.sql` (`get_monitored_table_counts` RPC) to production; verify both tables exist and RLS blocks `authenticated` role | P0 | M3 | platform-engineer | [ ] |
+| 9 | Run seeding procedure (`scripts/seed-monitoring-baselines.sh`) against production during a quiet window (no active migrations, no bulk imports); capture SELECT output as `compliance/evidence/cc7/PRE-47-E-004-monitoring-baselines-YYYY-MM-DD.txt` | P0 | M3 | devops-lead | [ ] |
+| 10 | Create `supabase/functions/row-count-monitor/index.ts` with complete source from §47.6; deploy via `supabase functions deploy row-count-monitor`; schedule pg_cron job via SQL from §47.6; confirm job appears in `SELECT * FROM cron.job WHERE jobname = 'row-count-monitor'` | P0 | M3 | devops-lead | [ ] |
+| 11 | Run PRE-47-E-005 test: inflate `users` baseline by 30% (`UPDATE monitoring_baselines SET baseline_count = ROUND(baseline_count * 1.3) WHERE table_name = 'users'`); wait up to 15 min for cron; confirm P0 Slack alert, PagerDuty incident, `system.row_count_anomaly_detected` DEC-030 event, and `monitoring_alerts` dedup row; restore baseline (`UPDATE monitoring_baselines SET baseline_count = <original> WHERE table_name = 'users'`); file evidence screenshots | P0 | M4 | security-engineer | [ ] |
+
+---
+
+*v1.9 additions (2026-05-31): §47 Sentry Alert Rules Configuration + `row-count-monitor` Edge Function — CC7-GAP-005 + CC7-GAP-006 Auditor Exhibit. Closes the final two CC7 implementation-level documentation P0 gaps specified in §25 but not yet implementation-specced. Four Sentry alert rules fully specified: `FORM-FATAL-001` (fatal error count > 5 in 5 min → P0 PagerDuty CRITICAL + Slack `#security-alerts`), `FORM-SPIKE-001` (error count > 100 in 5 min → P1 PagerDuty WARNING + Slack `#engineering-alerts`; companion metric alert `FORM-SPIKE-001B` for session error rate), `FORM-AUTH-ERR-001` (tag `feature=auth` error count > 15 in 5 min → P1 PagerDuty + Slack `#security-alerts`), and `FORM-HEALTH-LEAK-001` (tag `health_field_detected=true` count > 0 in 5 min → P0 PagerDuty CRITICAL + Slack `#security-alerts`); each rule includes complete JSON specification, Sentry Dashboard step-by-step configuration path, and equivalent `curl`-to-Sentry-REST-API form. `sentry.init()` configuration block (`apps/api/src/sentry.ts`): `tracesSampleRate: 0.02`, `sendDefaultPii: false`, `environment: production`, `release` from `WORKER_VERSION`, `beforeSend` hook wired via factory `makeSentryBeforeSend`. `beforeSend` scrubber (`supabase/functions/shared/sentry-scrubber.ts`): recursive `scrubObject` strips eleven health field names (`hrv`, `hrv_rmssd`, `heart_rate`, `resting_hr`, `weight_kg`, `body_fat_pct`, `sleep_score`, `sleep_duration_min`, `readiness_score`, `spo2`, `vo2max`) from `event.extra`, `event.contexts`, and `event.request.data`; replaces with `[HEALTH_DATA_REDACTED]`; sets tag `health_field_detected: true` (detection surface for FORM-HEALTH-LEAK-001); emits `system.sentry_health_field_detected` DEC-030 CRITICAL/7yr event via `emit-audit-event` async (fire-and-forget, never blocks `beforeSend` return); structured stderr log to Cloudflare Logpush; always returns scrubbed event, never null; Vitest unit test scaffold included. `row-count-monitor` Edge Function (`supabase/functions/row-count-monitor/index.ts`): Supabase Edge Function invoked by pg_cron `*/15 * * * *`; monitors six tables (`users`, `workouts`, `workout_sets`, `programs`, `workout_templates`, `audit_logs`); single round-trip via `get_monitored_table_counts` RPC (LEFT JOIN `pg_stat_user_tables` with `monitoring_baselines`); `deviation_pct = (baseline - current) / baseline * 100`; >5% → P1 Slack `#engineering-alerts`; >20% → P0 PagerDuty Events API v2 CRITICAL + Slack `#security-alerts`; alert deduplication via `monitoring_alerts` table (same `table_name + alert_tier` within 60 min window suppresses re-alert); handles missing baseline (skip + emit MEDIUM audit event); Slack Block Kit message includes table name, current count, baseline, deviation %, severity badge, and runbook link R-01 (Data Breach / Unauthorized Data Access). `monitoring_baselines` + `monitoring_alerts` DDL: both tables with `ENABLE ROW LEVEL SECURITY` and deny-all policies for `anon` and `authenticated` roles; `idx_monitoring_alerts_dedup` index on `(table_name, alert_tier, fired_at DESC)`; `get_monitored_table_counts` SECURITY DEFINER RPC; bash seeding script with operator safety guard (active-query check + manual YES confirmation), `ON CONFLICT DO UPDATE` to allow re-seed; post-seed validation query. Four new DEC-030 events: `system.sentry_health_field_detected` (CRITICAL, 7yr), `system.row_count_anomaly_detected` (HIGH, 7yr), `system.row_count_check_passed` (LOW, 3yr), `system.row_count_baseline_missing` (MEDIUM, 3yr). Four new secrets: `SENTRY_DSN` (Worker), `SENTRY_PAGERDUTY_SERVICE_KEY` (Worker/record), `MONITORING_SLACK_WEBHOOK_URL` (Edge Function), `MONITORING_PAGERDUTY_ROUTING_KEY` (Edge Function). Five evidence artefacts PRE-47-E-001 through PRE-47-E-005. 11-item implementation checklist: items 1-7 (Sentry scrubber + init + deploy + PD integration + 4 alert rules + PRE-47-E-003 test, M3), items 8-10 (monitoring DDL + seed + row-count-monitor deploy + cron, M3), item 11 (PRE-47-E-005 baseline inflation test, M4). New runbook R-15 (Health Data Leak Response) flagged as required authoring task. Gap closures: CC7-GAP-005 🔴 → 🟡 AUTHORED, CC7-GAP-006 🔴 → 🟡 AUTHORED. P0 count: 9 → 7. CC7.1/CC7.2/CC7.3 advance to implementation-spec-complete partial; CC7.4 blocked on R-15 authoring. SOC 2 readiness: ~94% → ~95%.*

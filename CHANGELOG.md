@@ -6,6 +6,17 @@
 
 ---
 
+## [1.34.0] — 2026-05-31
+
+### Added
+- `docs/SOC2_READINESS.md §47` — Sentry Alert Rules Configuration + `row-count-monitor` Edge Function — CC7-GAP-005 + CC7-GAP-006 Auditor Exhibit. Complete Sentry `sentry.init()` config, `beforeSend` health data scrubber (11 Art. 9 fields, recursive `scrubObject`), four alert rules (FORM-FATAL-001/SPIKE-001/AUTH-ERR-001/HEALTH-LEAK-001) з повним JSON + REST API specs. `row-count-monitor` Supabase Edge Function + `monitoring_baselines` DDL + seeding procedure. 4 нові DEC-030 події. 11 P0 checklist items. +1480 рядків, v1.9. CC7-GAP-005 🔴→🟡, CC7-GAP-006 🔴→🟡. P0: 9→7. SOC2: ~94%→~95%.
+- `docs/INCIDENT_RESPONSE.md §R-15` — Health Data Leak Response runbook (GDPR Art. 9). Triggered by FORM-HEALTH-LEAK-001. Covers investigation flow, GDPR Art. 33 assessment decision tree, code fix requirements. Fixes runbook number conflict (R-06 was already DDoS/WAF).
+
+### Fixes
+- `docs/SOC2_READINESS.md §47` — виправлено конфлікт runbook номерів: R-06 (Health Data Leak) → R-15, R-07 (row-count) → R-01 (Data Breach path)
+
+---
+
 ## [1.33.0] — 2026-05-31
 
 ### Added

@@ -4296,6 +4296,100 @@ A data engineer pushed an update to the DSAR export worker with a query bug: ins
 
 ---
 
+### R-15: Health Data Field Detected in Error Payload (GDPR Art. 9)
+
+**Trigger:** `FORM-HEALTH-LEAK-001` Sentry alert fires — tag `health_field_detected: true` detected on a Sentry event. The `beforeSend` scrubber (§47.5 of `docs/SOC2_READINESS.md`) fired and emitted a `system.sentry_health_field_detected` DEC-030 CRITICAL event.
+
+**Severity:** P0. Any detection of Art. 9 health data (HRV, heart rate, weight, body fat, sleep score, readiness, SpO₂, VO₂max) in an error payload is a GDPR Art. 9 potential breach until investigation proves otherwise.
+
+**Why this matters:** Sentry receives error events from production. If a health field name appears in `event.request.data`, `event.extra`, or `event.contexts` before the `beforeSend` hook scrubs it, the scrubber catches and redacts it before transmission — but the presence of the field indicates a code path that may be inadvertently logging Art. 9 data to error payloads. The scrubber prevents the leak to Sentry; this runbook investigates the upstream cause.
+
+#### Immediate Actions (first 15 minutes)
+
+```
+1. Open incident channel: #inc-YYYYMMDD-health-leak
+2. Page: IC + security-engineer + compliance-officer simultaneously
+3. Query DEC-030 audit log for the triggering event:
+   SELECT id, created_at, actor_id, metadata
+   FROM audit_logs
+   WHERE action = 'system.sentry_health_field_detected'
+   ORDER BY created_at DESC
+   LIMIT 10;
+4. Note: metadata.field_names contains which health fields were detected
+5. Note: metadata.sentry_event_id links to the specific Sentry issue
+6. DO NOT dismiss the Sentry alert — preserve it as evidence
+```
+
+#### Investigation (T+0h–T+4h)
+
+```
+1. Open the Sentry issue linked in the DEC-030 event metadata
+2. Review the scrubbed event: what endpoint / Worker route emitted it?
+3. Determine whether the field reached Sentry before beforeSend ran:
+   - beforeSend fires before transmission; scrubbed event = field was in the event object
+   - The field was NOT transmitted to Sentry in plaintext
+   - But: was it logged anywhere else? (Cloudflare Logpush, Supabase logs, console.error)
+4. Search Cloudflare Logpush for the same timestamp range:
+   SELECT * FROM cloudflare_logs WHERE timestamp BETWEEN T-5m AND T+5m
+   AND (message LIKE '%hrv%' OR message LIKE '%heart_rate%' OR message LIKE '%weight_kg%');
+5. Check Supabase Edge Function logs for the same window
+6. Identify the code path: what caused the health field to appear in the error context?
+   Common causes:
+   a. Developer passed a full user object to Sentry.setExtra() — contains health fields
+   b. A request body containing health data triggered an unhandled exception
+   c. A structured log statement included health data in error metadata
+```
+
+#### GDPR Assessment (T+4h)
+
+```
+If investigation concludes the field reached Sentry before scrubbing:
+  → GDPR Art. 33 72-hour clock starts at awareness time (DEC-030 event timestamp)
+  → Engage DPO and outside counsel immediately
+  → File partial Art. 33 notification if root-cause not resolved within 48h
+  → Follow R-01 (Data Breach) procedure from GDPR assessment step onward
+
+If investigation confirms field was scrubbed and not transmitted:
+  → No Art. 33 obligation (no personal data reached processor)
+  → Document conclusion in incident channel with supporting evidence
+  → File incident as "contained — no breach" in compliance/evidence/
+  → Required: code fix to prevent recurrence + post-incident review
+```
+
+#### Code Fix (required in all cases)
+
+```
+1. Identify the code path that introduced the health field into error context
+2. Fix: never pass raw user objects, workout objects, or health metric objects to:
+   - Sentry.setExtra() / Sentry.setContext()
+   - console.error() / console.log() with structured data
+   - Any logging path that may be captured by error monitoring
+3. Add a unit test to the Vitest scaffold (§47.5) covering this specific field
+4. Deploy fix + confirm FORM-HEALTH-LEAK-001 does not fire in staging
+```
+
+#### Evidence Preservation
+
+```
+1. Export DEC-030 events covering the incident window
+2. Export Sentry issue (scrubbed event JSON) as evidence
+3. If no breach: compliance/evidence/cc7/R15-YYYY-MM-DD-contained.md
+4. If breach: follow R-01 evidence preservation protocol
+```
+
+#### Post-Incident Review (mandatory)
+
+1. How did a health field reach the error payload? Code review of the fix.
+2. Are there other code paths that could produce the same result? Full audit.
+3. Is the `beforeSend` scrubber test suite covering this field name? Add test if not.
+4. Update `system.sentry_health_field_detected` DEC-030 event `metadata.field_names` with any new fields discovered.
+
+**Runbook owner:** security-engineer. **Escalation:** compliance-officer (Art. 33 assessment). **GDPR clock owner:** compliance-officer.
+
+*Added v1.9 (2026-05-31) — referenced by SOC2_READINESS.md §47.4 FORM-HEALTH-LEAK-001 alert rule.*
+
+---
+
 ## Appendix A — Quick Reference Card
 
 For use at 3am. IC: read §1 to classify, open the incident channel, then jump to the relevant runbook in §5.
