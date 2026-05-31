@@ -14974,3 +14974,635 @@ Track completion in `compliance/checklists/PRE-49-checklist.md`. Items are order
 ---
 
 *v2.1 additions (2026-05-31): §49 GitHub Organisation 2FA Enforcement + Cloudflare Access MFA + Supabase Tenant-Admin TOTP Gate — CC6-GAP-001/CC6-GAP-002/CC6-GAP-003 Auditor Exhibit. Closes three CC6 authentication assurance P0 gaps in a single implementation milestone. CC6-GAP-001: GitHub org `require_two_factor_authentication` enforcement via REST API (`PATCH /orgs/form-coach` with `two_factor_requirement_enabled: true`) and equivalent GraphQL mutation (`updateOrganization.requiresTwoFactorAuthentication`); pre-flight audit query to list members with 2FA disabled (`/orgs/form-coach/members?filter=2fa_disabled`); fine-grained PAT policy enforcement (classic PATs prohibited, 90-day max expiry, org-owner approval for write grants via `/orgs/form-coach/personal-access-tokens/policies`); branch protection API call enforcing required status checks (`snyk-scan`, `trivy-scan`, `build-and-test`), `enforce_admins: true`, 1 required approving review, `allow_force_pushes: false`; GitHub Actions OIDC federation policy (no long-lived PATs in secrets); two new DEC-030 events: `auth.github_2fa_enforcement_enabled` (HIGH, 7yr — `members_removed` field alerts on inadvertent org member removal) and `auth.github_member_2fa_failed` (HIGH, 7yr — emitted on `membership` webhook with `two_factor_requirement` removal reason). CC6-GAP-002: Terraform HCL (`infra/cloudflare/access.tf`) for three `cloudflare_access_application` resources (FORM Supabase Studio at `supabase-studio.security.form.coach`, FORM Workers Dashboard at `workers-dash.security.form.coach`, FORM Analytics at `analytics.security.form.coach`) each with a paired `cloudflare_access_policy` resource with `require { mfa = [{ type = "totp" }] }` enforcement; `session_duration = "4h"` for privileged tooling, `"8h"` for analytics; `auto_redirect_to_identity = true`; `allowed_email_domain = "form.coach"` include condition; Terraform outputs for application and policy IDs (PRE-49-E-002 evidence); three new DEC-030 events: `auth.cloudflare_access_mfa_challenge` (LOW, 3yr), `auth.cloudflare_access_mfa_passed` (MEDIUM, 3yr), `auth.cloudflare_access_mfa_failed` (HIGH, 7yr — `ip_hash` field, never raw IP; `application_name` field for per-app incident triage). CC6-GAP-003: `supabase/config.toml` changes enabling `[auth.mfa.totp]` with `enroll_enabled = true` and `verify_enabled = true`; `phone` and `web_authn` factors explicitly disabled (SIM-swap risk + no hardware key distribution policy yet); `auth.jwt_aal()` Postgres helper function reading `aal` from `auth.jwt() -> 'app_metadata' ->> 'aal'` with fallback to top-level `aal` claim and `aal1` default-on-absence; `RESTRICTIVE` RLS policy `require_aal2_for_admin_writes` applied via `DO $$ ... FOREACH` loop across five protected tables (`tenants`, `tenant_settings`, `tenant_users`, `user_profiles`, `subscription_plans`); complete `require-mfa` Edge Function TypeScript (`supabase/functions/require-mfa/index.ts`, ~130 lines): `decodeJwtPayload` (no-crypto fast path; relies on Postgres RLS for cryptographic verification), `extractAal`/`extractTenantId` helpers, `hmacHex` via `crypto.subtle`, `emitAuditEvent` fire-and-forget POST to `emit-audit-event` endpoint (§46) with full DEC-030 envelope including `prev_hmac` sentinel `"0".repeat(64)` + chain reconciliation via `audit-chain-daily-check` (§46), route protection via `PROTECTED_PREFIXES` array prefix-matching, `tenant_admin` role guard (non-admin roles pass through), `403` response with structured JSON body (`error: "mfa_required"`, `code: "AUTH_AAL2_REQUIRED"`, `docs` link) and `WWW-Authenticate: Bearer realm="form.coach", error="insufficient_aal"` header, `204` pass-through with `auth.mfa_challenge_success` emission for `aal2` sessions; `mfa_enforcement_log` DDL: `uuid` PK, `event_type` CHECK constraint, `severity` CHECK constraint, `retain_until` timestamptz, `idempotency_key uuid UNIQUE`, `entry_hmac` + `prev_hmac` chain fields; four indexes; RLS with `service_role_insert_only` RESTRICTIVE policy and `authenticated_read_own` permissive SELECT policy; `cron.schedule('mfa_enforcement_log_cleanup', '0 2 * * *', ...)` for retain_until-based expiry; four DEC-030 events: `auth.mfa_required_gate_blocked` (HIGH, 7yr), `auth.mfa_challenge_issued` (LOW, 3yr), `auth.mfa_challenge_success` (MEDIUM, 3yr), `auth.mfa_challenge_failed` (HIGH, 7yr); Supabase Auth webhook handler pattern for `auth.mfa_challenge_issued/success/failed` events from `MFA_CHALLENGE_CREATED` and `USER_UPDATED` Auth hooks. Five evidence artefacts PRE-49-E-001 through PRE-49-E-005: GitHub auth security screenshot + REST API confirmation (E-001); Cloudflare Access dashboard screenshot + Terraform state JSON (E-002); Supabase MFA settings screenshot + `supabase secrets list` (E-003); `mfa_enforcement_log` auditor query CSV at T+7d post-deployment (E-004); end-to-end `aal1`→`403` gate test output + `mfa_enforcement_log` row confirmation within 30 seconds (E-005). SOC 2 mapping: CC6.1 (MFA across all three privileged surfaces), CC6.2 (PAT approval workflow + Access IdP + MFA enrollment in provisioning), CC6.3 (access policy change DEC-030 trail), CC6.6 (GitHub + Cloudflare Access as identity-verified perimeter layers). 12-item implementation checklist: items 1-10 P0/M4 (2FA audit, enforcement enable, PAT policy, Cloudflare Access Terraform, Supabase MFA enable, DB migration, Edge Function deploy, E2E gate test, DEC-030 registry, gap table update), item 11 P1/M4+7d (mfa_enforcement_log evidence collection after live events), item 12 P2/quarterly (maintenance + review). Gap closure: CC6-GAP-001/002/003 🔴 Open → 🟡 Authored. P0 count: 6 → 3. SOC 2 readiness: ~95.5% → ~96%.*
+
+---
+
+## 50. TruffleHog CI Secret Scan + Terraform IaC Drift Detection — CC5-GAP-003 / CC5-GAP-005 Auditor Exhibit
+
+> **New section added 2026-05-31. This is a standalone auditor exhibit delivering the complete, ready-to-merge GitHub Actions configurations for two P1 security-hardening controls that close outstanding gaps in CC5.1 (risk-to-control matrix) and CC5.2 (technology general controls). CC5-GAP-003: TruffleHog verified credential scanner added as a sixth job in `.github/workflows/ci.yml` (§45), providing cryptographically verified credential detection as defence-in-depth alongside the pattern-matching `git-secrets` job already delivered in §45. CC5-GAP-005: New `.github/workflows/infra-drift.yml` workflow performs a daily `terraform plan` against the deployed Cloudflare infrastructure state; any non-zero plan output indicates an out-of-band manual change and triggers a Slack alert to `#ops-alerts` and a DEC-030 HIGH audit event.**
+>
+> **Gap closure:** CC5-GAP-003 🔴 Open (P1) → 🟡 **AUTHORED** (closes to 🟢 on first successful CI run with `trufflehog-scan` job green and PRE-50-E-001 filed) · CC5-GAP-005 🔴 Open (P1) → 🟡 **AUTHORED** (closes to 🟢 on first successful `infra-drift.yml` scheduled run with zero-diff output and PRE-50-E-002 filed at M5).
+> **P1 documentation gap count: 2 → 0.** P0 count unchanged at 3 (CC7-GAP-005/006/007 at 🟡 Authored — implementation-pending, not documentation gaps). SOC 2 readiness: ~96% → ~96.5%.
+
+---
+
+### 50.1 Purpose and Scope
+
+§27 (CC5 — Control Activities: Policy Framework, Technology Controls & Deployment) formally identified two technology control gaps in the CC5.1 risk-to-control matrix and CC5.2 automated monitoring table:
+
+- **CC5-GAP-003** (CC5-P1-003): TruffleHog CI scan — closes the credential leakage control gap (SR-05, risk register row 10). The `git-secrets` job in §45 provides pattern-based pre-commit and CI scanning; TruffleHog adds cryptographically verified detection against 800+ live credential patterns (Anthropic, Supabase, Stripe, ElevenLabs, Cloudflare, AWS, GitHub PATs, and others). A verified credential means TruffleHog has confirmed the credential is live against the issuing API — eliminating false positives and enabling immediate P0 incident response.
+
+- **CC5-GAP-005** (CC5-P1-005): Terraform IaC drift detection — closes the IaC enforcement gap in CC5.2. The WAF rules (§48), Cloudflare Access applications (§49), and all future Terraform resources could be manually edited in the Cloudflare dashboard, creating configuration drift that is invisible to the audit log and undermines the IaC-as-source-of-truth guarantee. A daily `terraform plan` diffing against deployed state and alerting on any non-empty plan output closes this gap.
+
+**Relationship to existing sections:**
+
+| Section | Role |
+|---|---|
+| §27 | CC5 framework — identifies CC5-GAP-003/005 and specifies the control requirements; §50 delivers the technical implementation |
+| §43 | Credential & Access Hardening Policy — `git-secrets` pre-commit hook specification; §50 adds TruffleHog as defence-in-depth |
+| §45 | GitHub Actions CI/CD pipeline — `ci.yml` with 5 jobs; §50 adds job 6 (`trufflehog-scan`) to the same workflow |
+| §48 | Cloudflare WAF Terraform — primary IaC resource whose drift §50 monitors |
+| §49 | Cloudflare Access Terraform — second primary IaC resource monitored for drift |
+
+---
+
+### 50.2 TruffleHog CI Secret Scan — CC5-GAP-003
+
+#### 50.2.1 Why TruffleHog Complements git-secrets
+
+The `secret-scan` job in §45 runs `git-secrets --scan-history` against a canonical pattern file. Pattern-based scanners match known credential shapes (regex against commit history) and are fast and low-dependency. Their weakness: they match patterns, not live credentials. A rotated secret that still matches a pattern produces a false positive; a novel credential format misses the regex entirely.
+
+TruffleHog's `--only-verified` mode addresses both failure modes:
+
+| Property | git-secrets (§45 job 5) | TruffleHog (§50 job 6) |
+|---|---|---|
+| Detection method | Regex pattern matching | Semantic detection + live API verification |
+| False positives | Medium (regex overmatch on rotated secrets) | Near-zero (verification eliminates stale/rotated credentials) |
+| Credential coverage | 6 FORM-specific patterns + AWS canonical patterns | 800+ detectors across 300+ credential types |
+| Verification call | None | Live API call to the issuing service |
+| Failure mode | Misses novel credential formats | Network-dependent (timeout on slow runners) |
+| SOC 2 control | CC6.6 (prevention) | CC5.1 row 10 (detection + verified alerting) |
+
+The two jobs are defence-in-depth at different control layers: git-secrets prevents pattern-matched leakage at commit time (pre-commit hook) and in CI; TruffleHog verifies that any credential present in the codebase is actually live — the signal that matters for incident response.
+
+#### 50.2.2 TruffleHog GitHub Actions Job — Addition to `ci.yml`
+
+Add the following job to the `jobs:` block of `.github/workflows/ci.yml` (§45 §45.2). This is job 6, appended after the `secret-scan` job. All five existing jobs and the overall workflow structure are unchanged.
+
+```yaml
+  # -----------------------------------------------------------------------
+  # Job 6: TruffleHog verified credential scan (CC5-GAP-003)
+  # Maps to: CC5.1 row 10 (credential leakage control), CC5.2 automated monitoring
+  # Complements job 5 (git-secrets pattern scan) — §45
+  # --only-verified: only fail on credentials confirmed live against the issuing API
+  # --fail: exit non-zero if any verified credential found (blocks merge)
+  # --no-update: pin to checked-out action version; prevents supply-chain via tag mutation
+  # -----------------------------------------------------------------------
+  trufflehog-scan:
+    name: TruffleHog verified credential scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for PR branch)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog scan — verified credentials only
+        uses: trufflesecurity/trufflehog@main
+        with:
+          # For pull_request events: scan commits introduced by the PR.
+          # For push events: scan the single pushed commit.
+          base: ${{ github.event.pull_request.base.sha || github.event.before }}
+          head: ${{ github.sha }}
+          extra_args: >-
+            --only-verified
+            --fail
+            --no-update
+
+      - name: Emit DEC-030 audit event on verified secret found
+        if: failure()
+        env:
+          EMIT_AUDIT_EVENT_URL: ${{ secrets.EMIT_AUDIT_EVENT_URL }}
+          EMIT_AUDIT_SECRET:    ${{ secrets.EMIT_AUDIT_SECRET }}
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          IDEMPOTENCY_KEY=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)
+          curl -sf -X POST "${EMIT_AUDIT_EVENT_URL}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${EMIT_AUDIT_SECRET}" \
+            -d @- << EOF || echo "::warning::DEC-030 emit failed — manual audit log entry required"
+          {
+            "id": "${IDEMPOTENCY_KEY}",
+            "schema_version": "1.0",
+            "timestamp": "${TIMESTAMP}",
+            "action": "security.trufflehog_verified_secret_found",
+            "actor_type": "ci_pipeline",
+            "actor_id": "github-actions/${GITHUB_ACTOR}",
+            "tenant_id": null,
+            "resource_type": "repository",
+            "resource_id": "${GITHUB_REPOSITORY}",
+            "severity": "CRITICAL",
+            "retain_until": "$(date -u -d '+7 years' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+7y +%Y-%m-%dT%H:%M:%SZ)",
+            "chain_position": "append",
+            "metadata": {
+              "commit_sha": "${GITHUB_SHA}",
+              "branch": "${GITHUB_REF_NAME}",
+              "actor": "${GITHUB_ACTOR}",
+              "run_id": "${GITHUB_RUN_ID}",
+              "run_url": "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}",
+              "pr_number": "${{ github.event.pull_request.number }}",
+              "gap_reference": "CC5-GAP-003",
+              "immediate_action_required": true,
+              "rotation_sla_hours": 1
+            }
+          }
+          EOF
+```
+
+**Integration note for branch protection.** After merging this addition, add `trufflehog-scan` to GitHub Settings → Branches → main → Required status checks. The §45.5 branch protection specification must be updated to include this sixth required check. Capture the updated screenshot as PRE-50-E-003.
+
+**Action version pinning.** The `trufflesecurity/trufflehog@main` reference resolves to the latest commit at workflow runtime. For a SOC 2 observation period, pin to a specific SHA digest after validating the release:
+
+```yaml
+# Pinned equivalent — update quarterly per §15 compliance calendar
+uses: trufflesecurity/trufflehog@abdcef1234567890abcdef1234567890abcdef12
+```
+
+The Dependabot configuration in §45 (`dependabot.yml`, GitHub Actions ecosystem, weekly) surfaces new TruffleHog releases as automated PRs reviewed by the `form-compliance` reviewer before merge.
+
+**Required secrets.** The DEC-030 emit step reuses `EMIT_AUDIT_EVENT_URL` and `EMIT_AUDIT_SECRET` already defined in §45/§46. No new secrets are needed for the scan itself — TruffleHog calls issuing APIs directly without a FORM-held credential.
+
+#### 50.2.3 Incident Response on Verified Secret Found
+
+When the `trufflehog-scan` job fails, the `security.trufflehog_verified_secret_found` DEC-030 event is emitted with `severity: CRITICAL`. This maps to P0 in the §46 alert pipeline:
+
+1. `form-alert-relay` Worker receives the audit event
+2. Slack CRITICAL block posted to `#security-alerts` with CI run link
+3. PagerDuty P0 incident created (CRITICAL → PagerDuty dispatch per §46 severity mapping)
+
+**Rotation SLA: 1 hour.** The credential must be rotated at the issuing service within 1 hour. The PR merge is blocked until: (a) the credential is rotated, (b) the commit is amended or the file removed, and (c) a fresh CI run passes clean.
+
+**Post-rotation procedure:**
+1. Rotate the credential at the issuing service (invalidate old, issue new)
+2. Update the secret in Cloudflare Workers Secrets (`wrangler secret put`) or Supabase Vault
+3. Remove the credential from git history: `git filter-repo --invert-paths --path <file>` (2-person approval required per §43)
+4. Push the cleaned branch; confirm CI green
+5. File `compliance/evidence/cc5/PRE-50-INCIDENT-YYYY-MM-DD.md` with the timeline, credential type, scope of exposure, and rotation confirmation
+
+#### 50.2.4 Manual DEC-030 Emission SQL
+
+For audit chain continuity when the CI emit step fails (network timeout, Edge Function cold start):
+
+```sql
+-- security.trufflehog_verified_secret_found — manual emission
+-- Replace placeholders before execution; compute HMAC externally with HMAC_CHAIN_SECRET
+INSERT INTO audit_logs (
+  id, schema_version, timestamp, action, actor_type, actor_id,
+  tenant_id, resource_type, resource_id, severity, retain_until,
+  entry_hmac, prev_hmac, metadata
+) VALUES (
+  gen_random_uuid(), '1.0', NOW(),
+  'security.trufflehog_verified_secret_found',
+  'ci_pipeline', 'github-actions/<ACTOR>',
+  NULL, 'repository', 'rbit27/form',
+  'CRITICAL', NOW() + INTERVAL '7 years',
+  '<ENTRY_HMAC>',
+  (SELECT entry_hmac FROM audit_logs ORDER BY timestamp DESC LIMIT 1),
+  jsonb_build_object(
+    'commit_sha', '<COMMIT_SHA>',
+    'branch', '<BRANCH_NAME>',
+    'actor', '<GITHUB_ACTOR>',
+    'run_id', '<RUN_ID>',
+    'gap_reference', 'CC5-GAP-003',
+    'immediate_action_required', true,
+    'rotation_sla_hours', 1,
+    'manual_emission_reason', '<REASON>'
+  )
+);
+```
+
+---
+
+### 50.3 Terraform IaC Drift Detection — CC5-GAP-005
+
+#### 50.3.1 Threat Model
+
+After §48 and §49, the Cloudflare infrastructure managed by Terraform covers high-security resources whose manual modification would silently undermine SOC 2 controls:
+
+| Terraform resource | Risk of undetected manual change |
+|---|---|
+| `cloudflare_ruleset.auth_ratelimit` (§48) | Manual rule deletion or threshold increase silently disables brute-force protection (CC7-GAP-007 coverage) |
+| `cloudflare_ruleset.api_ratelimit` (§48) | Disabling API rate limits creates DDoS/scraping exposure with no DEC-030 event |
+| `cloudflare_access_application.*` (§49) | Removing an Access application exposes Supabase Studio or the Workers dashboard to unauthenticated access |
+| `cloudflare_access_policy.*` (§49) | Weakening a policy (removing TOTP requirement) silently breaks CC6-GAP-002 MFA enforcement |
+| `cloudflare_notification_policy.*` (§48) | Disabling WAF alert notifications silences the §46 P1 alert pipeline |
+
+Each of these changes made outside Terraform leaves no Git commit, no Terraform state entry, and no DEC-030 audit event. The drift detection workflow closes this visibility gap.
+
+#### 50.3.2 Drift Detection Workflow — `.github/workflows/infra-drift.yml`
+
+File path: `.github/workflows/infra-drift.yml`
+
+```yaml
+name: Infra Drift Detection
+
+on:
+  schedule:
+    - cron: "0 6 * * *"          # daily 06:00 UTC — alerts before business hours
+  pull_request:
+    paths:
+      - "infra/cloudflare/**"    # also runs on planned Terraform change PRs
+  workflow_dispatch:              # manual trigger for on-demand audit
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION:     "1.7.5"
+  TF_WORKING_DIR: infra/cloudflare
+
+jobs:
+  drift-check:
+    name: Terraform drift check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false   # disable wrapper to capture raw exit codes
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          AWS_ACCESS_KEY_ID:    ${{ secrets.TF_STATE_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_SECRET_KEY }}
+        run: terraform init -input=false -no-color
+
+      - name: Terraform Plan (drift detection)
+        id: plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ZONE_ID:    ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          AWS_ACCESS_KEY_ID:     ${{ secrets.TF_STATE_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_SECRET_KEY }}
+          TF_VAR_cloudflare_plan: "free"
+        run: |
+          # -detailed-exitcode: 0 = no diff  |  1 = error  |  2 = diff present
+          set +e
+          terraform plan \
+            -detailed-exitcode \
+            -no-color \
+            -input=false \
+            -out=/tmp/tfplan \
+            2>&1 | tee /tmp/terraform-plan.txt
+          PLAN_EXIT=${PIPESTATUS[0]}
+          set -e
+
+          echo "plan_exit_code=${PLAN_EXIT}" >> "$GITHUB_OUTPUT"
+
+          if [ "${PLAN_EXIT}" -eq 0 ]; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Terraform plan clean — no infrastructure drift detected."
+          elif [ "${PLAN_EXIT}" -eq 2 ]; then
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            echo "::error::DRIFT DETECTED — Terraform plan produced a non-empty diff."
+          else
+            echo "drift=error" >> "$GITHUB_OUTPUT"
+            echo "::error::Terraform plan error (exit ${PLAN_EXIT})."
+            exit 1
+          fi
+
+      - name: Upload plan output to R2 (PRE-50-E-002 continuous evidence log)
+        env:
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npm install -g wrangler@latest --quiet 2>/dev/null || true
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          RUN_DATE=$(date -u +%Y/%m/%d)
+          DRIFT="${{ steps.plan.outputs.drift }}"
+          wrangler r2 object put \
+            "form-audit-logs/infra-drift/${RUN_DATE}/terraform-plan-${TIMESTAMP}-drift-${DRIFT}.txt" \
+            --file /tmp/terraform-plan.txt \
+            --content-type text/plain \
+            --account-id "${CLOUDFLARE_ACCOUNT_ID}" \
+            || echo "::warning::R2 upload failed — manual evidence filing required"
+
+      - name: Slack alert on drift detected
+        if: steps.plan.outputs.drift == 'true'
+        env:
+          SLACK_SECURITY_WEBHOOK: ${{ secrets.SLACK_SECURITY_WEBHOOK }}
+        run: |
+          EXCERPT=$(head -80 /tmp/terraform-plan.txt | tail -40 | sed 's/"/\\"/g')
+          curl -sf -X POST "${SLACK_SECURITY_WEBHOOK}" \
+            -H "Content-Type: application/json" \
+            -d "{\"blocks\":[{\"type\":\"header\",\"text\":{\"type\":\"plain_text\",\"text\":\"Infrastructure Drift Detected\"}},{\"type\":\"section\",\"fields\":[{\"type\":\"mrkdwn\",\"text\":\"*Severity:* HIGH\"},{\"type\":\"mrkdwn\",\"text\":\"*Gap:* CC5-GAP-005\"},{\"type\":\"mrkdwn\",\"text\":\"*Run:* <https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}|View run>\"},{\"type\":\"mrkdwn\",\"text\":\"*SLA:* 24h remediation\"}]},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"Review diff and either (a) PR a Terraform reconciliation, or (b) revert unauthorised dashboard change. File PRE-50-DRIFT evidence within 24h.\"}}]}" \
+            || echo "::warning::Slack alert failed — notify #ops-alerts manually"
+
+      - name: Emit DEC-030 event — drift detected
+        if: steps.plan.outputs.drift == 'true'
+        env:
+          EMIT_AUDIT_EVENT_URL: ${{ secrets.EMIT_AUDIT_EVENT_URL }}
+          EMIT_AUDIT_SECRET:    ${{ secrets.EMIT_AUDIT_SECRET }}
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          KEY=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)
+          curl -sf -X POST "${EMIT_AUDIT_EVENT_URL}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${EMIT_AUDIT_SECRET}" \
+            -d @- << EOF || echo "::warning::DEC-030 emit failed"
+          {
+            "id": "${KEY}",
+            "schema_version": "1.0",
+            "timestamp": "${TIMESTAMP}",
+            "action": "infra.terraform_drift_detected",
+            "actor_type": "ci_pipeline",
+            "actor_id": "github-actions/scheduled",
+            "tenant_id": null,
+            "resource_type": "cloudflare_terraform_state",
+            "resource_id": "${TF_WORKING_DIR}",
+            "severity": "HIGH",
+            "retain_until": "$(date -u -d '+7 years' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+7y +%Y-%m-%dT%H:%M:%SZ)",
+            "chain_position": "append",
+            "metadata": {
+              "workflow_run_id": "${GITHUB_RUN_ID}",
+              "run_url": "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}",
+              "plan_exit_code": 2,
+              "r2_evidence_key": "form-audit-logs/infra-drift/$(date -u +%Y/%m/%d)/",
+              "gap_reference": "CC5-GAP-005",
+              "remediation_sla_hours": 24
+            }
+          }
+          EOF
+
+      - name: Emit DEC-030 event — clean run (no drift)
+        if: steps.plan.outputs.drift == 'false'
+        env:
+          EMIT_AUDIT_EVENT_URL: ${{ secrets.EMIT_AUDIT_EVENT_URL }}
+          EMIT_AUDIT_SECRET:    ${{ secrets.EMIT_AUDIT_SECRET }}
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          KEY=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)
+          curl -sf -X POST "${EMIT_AUDIT_EVENT_URL}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${EMIT_AUDIT_SECRET}" \
+            -d @- << EOF || echo "::warning::DEC-030 emit failed"
+          {
+            "id": "${KEY}",
+            "schema_version": "1.0",
+            "timestamp": "${TIMESTAMP}",
+            "action": "infra.terraform_drift_check_clean",
+            "actor_type": "ci_pipeline",
+            "actor_id": "github-actions/scheduled",
+            "tenant_id": null,
+            "resource_type": "cloudflare_terraform_state",
+            "resource_id": "${TF_WORKING_DIR}",
+            "severity": "LOW",
+            "retain_until": "$(date -u -d '+3 years' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+3y +%Y-%m-%dT%H:%M:%SZ)",
+            "chain_position": "append",
+            "metadata": {
+              "workflow_run_id": "${GITHUB_RUN_ID}",
+              "gap_reference": "CC5-GAP-005"
+            }
+          }
+          EOF
+
+      - name: Fail job on drift
+        if: steps.plan.outputs.drift == 'true'
+        run: |
+          echo "::error::Infrastructure drift detected and logged. Resolve within 24h SLA."
+          exit 1
+```
+
+#### 50.3.3 Terraform Remote State Backend
+
+The drift workflow requires a remote state backend so GitHub Actions runners can read deployed state without local `.tfstate` files. Use the Cloudflare R2 S3-compatible API:
+
+```hcl
+# infra/cloudflare/backend.tf
+terraform {
+  backend "s3" {
+    bucket                      = "form-tf-state"
+    key                         = "cloudflare/terraform.tfstate"
+    region                      = "auto"
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_region_validation      = true
+    force_path_style            = true
+    endpoints = {
+      s3 = "https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com"
+    }
+  }
+}
+```
+
+**Required GitHub Actions secrets (drift workflow):**
+
+| Secret | Description | Source |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare provider auth | Already set in §45 |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account | Already set in §45 |
+| `CLOUDFLARE_ZONE_ID` | Zone for WAF resource vars | Already set in §48 |
+| `TF_STATE_ACCESS_KEY` | R2 access key for `form-tf-state` | Cloudflare → R2 → API tokens → Generate (separate from §48 WAF Logpush key) |
+| `TF_STATE_SECRET_KEY` | R2 secret key for `form-tf-state` | Same as above |
+| `EMIT_AUDIT_EVENT_URL` | DEC-030 emit endpoint | Already set in §46 |
+| `EMIT_AUDIT_SECRET` | DEC-030 emit bearer token | Already set in §46 |
+| `SLACK_SECURITY_WEBHOOK` | Slack incoming webhook for `#ops-alerts` | Slack → Apps → Incoming Webhooks → form-alerts |
+
+**Initial state migration:**
+
+```bash
+cd infra/cloudflare
+export AWS_ACCESS_KEY_ID="${TF_STATE_ACCESS_KEY}"
+export AWS_SECRET_ACCESS_KEY="${TF_STATE_SECRET_KEY}"
+terraform init -migrate-state
+# Expected: "Successfully configured the backend 'S3'!"
+```
+
+#### 50.3.4 Drift Remediation Procedure
+
+On `infra.terraform_drift_detected` event, complete the following within 24 hours:
+
+**Step 1 — Triage (within 1 hour):** Review the R2 plan file and Slack alert. Determine: (a) authorised change not yet in code, or (b) unauthorised manual change.
+
+**Step 2a — Authorised change:** Create a PR updating Terraform to match the deployed state. PR must pass CI (including drift workflow with exit 0) before merge. Log the reconciliation reason in the PR description with the R2 evidence key.
+
+**Step 2b — Unauthorised change (security incident):** Immediately revert the dashboard change to match Terraform state. Create a P1 Linear ticket. Audit the Cloudflare API token that made the change (Cloudflare Audit Log → Filter by resource). If token compromise is suspected, rotate all Cloudflare tokens and escalate to P0 per §INCIDENT_RESPONSE.md.
+
+**Step 3 — Evidence filing (within 24 hours):**
+
+```markdown
+# Terraform Drift Incident — <YYYY-MM-DD>
+
+**DEC-030 event ID:** <uuid>
+**R2 evidence key:** form-audit-logs/infra-drift/<date>/terraform-plan-<ts>-drift-true.txt
+**Classification:** Authorised reconciliation | Unauthorised change
+**Resource(s) affected:** <Terraform resource names from plan diff>
+**Detected at:** <UTC timestamp>
+**Resolved at:** <UTC timestamp>
+**Resolved by:** <name>
+**Resolution:** <PR link or Cloudflare revert action>
+**Token audit result:** <Cloudflare Audit Log query summary>
+```
+
+File to `compliance/evidence/cc5/PRE-50-DRIFT-YYYY-MM-DD.md`.
+
+---
+
+### 50.4 DEC-030 Audit Event Taxonomy
+
+Three new event types introduced in §50. Register in `docs/AUDIT_LOG_SCHEMA.md` under `### Security` (`trufflehog_verified_secret_found`) and a new `### Infrastructure` subsection (`terraform_drift_detected` and `terraform_drift_check_clean`).
+
+#### 50.4.1 `security.trufflehog_verified_secret_found` — CRITICAL · 7-year retention
+
+```json
+{
+  "id": "<uuid v4>",
+  "schema_version": "1.0",
+  "timestamp": "<ISO-8601 UTC>",
+  "action": "security.trufflehog_verified_secret_found",
+  "actor_type": "ci_pipeline",
+  "actor_id": "github-actions/<GITHUB_ACTOR>",
+  "tenant_id": null,
+  "resource_type": "repository",
+  "resource_id": "rbit27/form",
+  "severity": "CRITICAL",
+  "retain_until": "<timestamp + 7 years>",
+  "entry_hmac": "<HMAC-SHA256 of canonical entry fields>",
+  "prev_hmac": "<entry_hmac of preceding audit log row>",
+  "metadata": {
+    "commit_sha": "<40-char SHA>",
+    "branch": "<branch name>",
+    "actor": "<GitHub username>",
+    "run_id": "<GitHub Actions run ID>",
+    "run_url": "<GitHub Actions run URL>",
+    "pr_number": "<PR number or null>",
+    "gap_reference": "CC5-GAP-003",
+    "immediate_action_required": true,
+    "rotation_sla_hours": 1
+  }
+}
+```
+
+**Severity rationale:** CRITICAL — 7 years. A live verified credential in the codebase is a confirmed potential breach precursor. CRITICAL maps to P0 in §46 and triggers immediate PagerDuty dispatch.
+
+#### 50.4.2 `infra.terraform_drift_detected` — HIGH · 7-year retention
+
+```json
+{
+  "id": "<uuid v4>",
+  "schema_version": "1.0",
+  "timestamp": "<ISO-8601 UTC>",
+  "action": "infra.terraform_drift_detected",
+  "actor_type": "ci_pipeline",
+  "actor_id": "github-actions/scheduled",
+  "tenant_id": null,
+  "resource_type": "cloudflare_terraform_state",
+  "resource_id": "infra/cloudflare",
+  "severity": "HIGH",
+  "retain_until": "<timestamp + 7 years>",
+  "entry_hmac": "<HMAC-SHA256>",
+  "prev_hmac": "<prev entry_hmac>",
+  "metadata": {
+    "workflow_run_id": "<GitHub Actions run ID>",
+    "run_url": "<GitHub Actions run URL>",
+    "plan_exit_code": 2,
+    "r2_evidence_key": "form-audit-logs/infra-drift/<date>/",
+    "gap_reference": "CC5-GAP-005",
+    "remediation_sla_hours": 24
+  }
+}
+```
+
+#### 50.4.3 `infra.terraform_drift_check_clean` — LOW · 3-year retention
+
+```json
+{
+  "id": "<uuid v4>",
+  "schema_version": "1.0",
+  "timestamp": "<ISO-8601 UTC>",
+  "action": "infra.terraform_drift_check_clean",
+  "actor_type": "ci_pipeline",
+  "actor_id": "github-actions/scheduled",
+  "tenant_id": null,
+  "resource_type": "cloudflare_terraform_state",
+  "resource_id": "infra/cloudflare",
+  "severity": "LOW",
+  "retain_until": "<timestamp + 3 years>",
+  "entry_hmac": "<HMAC-SHA256>",
+  "prev_hmac": "<prev entry_hmac>",
+  "metadata": {
+    "workflow_run_id": "<GitHub Actions run ID>",
+    "gap_reference": "CC5-GAP-005"
+  }
+}
+```
+
+**Auditor note.** During the SOC 2 observation period, an auditor querying `SELECT COUNT(*) FROM audit_logs WHERE action = 'infra.terraform_drift_check_clean' AND timestamp > NOW() - INTERVAL '90 days'` should find approximately 90 rows (one per daily scheduled run). Any gap > 25 hours without a clean-run or drift-detected event must be investigated and explained in the management assertion.
+
+---
+
+### 50.5 Evidence Artefacts
+
+| ID | Description | Collection procedure | Cadence | Owner | Status |
+|---|---|---|---|---|---|
+| PRE-50-E-001 | First successful `trufflehog-scan` CI job log | Screenshot of GitHub Actions showing `trufflehog-scan` step with no verified secrets found on a merged PR green run. File to `compliance/evidence/cc5/PRE-50-E-001-trufflehog-first-green-YYYY-MM-DD.png`. | One-time (first merge) | security-engineer | [ ] |
+| PRE-50-E-002 | Terraform drift-check R2 log — 30-day sample | `wrangler r2 object list form-audit-logs --prefix=infra-drift/ --account-id <ID>` — confirm ≥30 objects. Download one representative clean-run file. File R2 listing JSON + sample plan file to `compliance/evidence/cc5/PRE-50-E-002-infra-drift-r2-sample-YYYY-MM.json`. | One-time at M5 (30 days post-merge) | devops-lead | [ ] |
+| PRE-50-E-003 | Branch protection screenshot with `trufflehog-scan` required check | GitHub Settings → Branches → main → Required status checks, showing `trufflehog-scan` listed. File to `compliance/evidence/cc5/PRE-50-E-003-branch-protection-trufflehog-YYYY-MM-DD.png`. | One-time (after branch protection update) | security-engineer | [ ] |
+
+---
+
+### 50.6 SOC 2 Criteria Mapping
+
+#### 50.6.1 CC5.1 — Control Activities Selected and Developed to Mitigate Risks
+
+| Risk area | Control added by §50 | Pre-§50 status | Post-§50 status |
+|---|---|---|---|
+| SR-05: Credential leakage | TruffleHog `--only-verified` CI scan — verified credential detection blocks PR merge | `git-secrets` pattern scan only; CC5-GAP-003 open | CC5-GAP-003 🔴 → 🟡 AUTHORED; closes to 🟢 on PRE-50-E-001 |
+| IaC configuration drift | Daily `terraform plan` — unauthorised Cloudflare changes detected within 24h | No automated monitoring; CC5-GAP-005 open | CC5-GAP-005 🔴 → 🟡 AUTHORED; closes to 🟢 on PRE-50-E-002 (30-day sample) |
+
+#### 50.6.2 CC5.2 — Technology General Controls
+
+| Control area | Before §50 | After §50 |
+|---|---|---|
+| Automated monitoring — credential hygiene | `git-secrets` + GitHub secret scanning | + TruffleHog verified scan with DEC-030 CRITICAL event and PagerDuty P0 dispatch |
+| Automated monitoring — IaC configuration integrity | Manual, ad-hoc, unlogged Cloudflare dashboard audits | Daily `terraform plan`; every run logged to R2; DEC-030 HIGH event on drift; continuous clean-run log for auditors |
+| Evidence continuity — IaC state | No automated IaC state evidence log | R2 archive of every plan output; `infra.terraform_drift_check_clean` events form a queryable daily log |
+
+#### 50.6.3 CC6.6 — Supplementary Cross-Reference
+
+The TruffleHog scan's primary classification is CC5.1, but it also strengthens CC6.6 (prevents exposure of logical access credentials — API keys, tokens — that would enable unauthorised access to production systems). Both cross-references should appear in the SOC 2 evidence package.
+
+---
+
+### 50.7 Gap Closure Status
+
+#### 50.7.1 Gap Table Update
+
+| Gap ID | Description | Pre-§50 | Post-§50 | Evidence path |
+|---|---|---|---|---|
+| CC5-GAP-003 | TruffleHog CI verified credential scan | 🔴 Open (P1) | 🟡 Authored | §50.2.2 `trufflehog-scan` job; closes to 🟢 on PRE-50-E-001 |
+| CC5-GAP-005 | Terraform IaC drift detection workflow | 🔴 Open (P1) | 🟡 Authored | §50.3.2 `infra-drift.yml` + R2 archive + DEC-030; closes to 🟢 on PRE-50-E-002 |
+
+#### 50.7.2 Readiness Update
+
+| Metric | Before §50 | After §50 |
+|---|---|---|
+| P0 gaps open | 3 | 3 (unchanged — CC7-GAP-005/006/007 are implementation-pending) |
+| P1 documentation gaps open | 2 (CC5-GAP-003, CC5-GAP-005) | 0 — all P1 documentation gaps now authored |
+| CC5.1 control status | 🟡 Partial (credential leakage + IaC drift gaps) | 🟡 Authored (both specified; close to 🟢 on deployment) |
+| CC5.2 control status | 🟡 Partial (two automated monitoring gaps) | 🟡 Authored (both monitoring controls specified) |
+| SOC 2 readiness | ~96% | ~96.5% |
+
+**Remaining implementation tasks after §50 (not documentation gaps):** CC5-GAP-004 (policy approval log CSV — implementation-only, no exhibit required); CC6-GAP-008 (Tailwind CDN SRI — platform engineering task); CC6-GAP-010 (MDM deployment — pending team growth). None of these block the SOC 2 observation period.
+
+---
+
+### 50.8 Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Done |
+|---|---|---|---|---|---|
+| 1 | Append `trufflehog-scan` job (§50.2.2) to `.github/workflows/ci.yml` as job 6, after the `secret-scan` job. Open PR; confirm job runs on the PR CI check. | P1 | M4 | security-engineer | [ ] |
+| 2 | Add `trufflehog-scan` to GitHub Settings → Branches → main → Required status checks. Capture screenshot as PRE-50-E-003; file to `compliance/evidence/cc5/`. | P1 | M4 | security-engineer | [ ] |
+| 3 | Provision R2 bucket `form-tf-state` (`wrangler r2 bucket create form-tf-state`). Generate separate R2 API credentials for state access (distinct from §48 WAF Logpush credentials). Set as GitHub Actions secrets `TF_STATE_ACCESS_KEY` and `TF_STATE_SECRET_KEY`. | P1 | M4 | devops-lead | [ ] |
+| 4 | Create `infra/cloudflare/backend.tf` with the R2 S3-compatible backend block (§50.3.3). Run `terraform init -migrate-state`. Confirm `Successfully configured the backend 'S3'!` output. | P1 | M4 | devops-lead | [ ] |
+| 5 | Create `.github/workflows/infra-drift.yml` (§50.3.2). Set `SLACK_SECURITY_WEBHOOK` secret (Slack incoming webhook for `#ops-alerts`). Trigger `workflow_dispatch` manually; confirm workflow runs, plan outputs exit 0, and `infra.terraform_drift_check_clean` DEC-030 event appears in `audit_logs`. | P1 | M4 | devops-lead | [ ] |
+| 6 | Smoke-test the Slack drift alert: temporarily add a dummy Terraform comment, trigger `workflow_dispatch`, confirm `⚠️ Infrastructure Drift Detected` Slack message appears in `#ops-alerts` with run URL, then revert the dummy change and re-trigger. | P1 | M4 | devops-lead | [ ] |
+| 7 | Register 3 new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md`: `security.trufflehog_verified_secret_found` (CRITICAL, 7yr — `### Security` subsection), `infra.terraform_drift_detected` (HIGH, 7yr — new `### Infrastructure` subsection), `infra.terraform_drift_check_clean` (LOW, 3yr — same subsection). | P1 | M4 | compliance-officer | [ ] |
+| 8 | On first green CI run after job 6 merge, capture the `trufflehog-scan` job log as PRE-50-E-001. File to `compliance/evidence/cc5/`. | P1 | M4 | security-engineer | [ ] |
+| 9 | Update CC5-GAP-003 and CC5-GAP-005 in §27 gap table from `🔴 Open` to `🟡 AUTHORED`. Update CC5.1 and CC5.2 status. Update P1 documentation gap count from 2 to 0. Update SOC 2 readiness from ~96% to ~96.5%. | P1 | M4 | compliance-officer | [ ] |
+| 10 | At 30 calendar days post-merge, collect PRE-50-E-002: `wrangler r2 object list form-audit-logs --prefix=infra-drift/` — confirm ≥30 objects. Download one representative plan file. File to `compliance/evidence/cc5/`. Advance CC5-GAP-005 from 🟡 AUTHORED to 🟢 Closed. | P1 | M5 | devops-lead | [ ] |
+| 11 | Add `infra-drift.yml` scheduled run to §15 compliance calendar under monthly monitoring checks. Add quarterly item: review TruffleHog action SHA pin and Terraform version pin; update if a new stable version is available. | P2 | M5 | compliance-officer | [ ] |
+| 12 | Quarterly: review TruffleHog action SHA pin (update to latest stable after reviewing release notes); review `TF_VERSION` pin; confirm R2 `form-tf-state` bucket access credentials are within 90-day rotation policy per §43. | P2 | Quarterly | security-engineer + devops-lead | [ ] |
+
+---
+
+*v2.2 additions (2026-05-31): §50 TruffleHog CI Secret Scan + Terraform IaC Drift Detection — CC5-GAP-003 / CC5-GAP-005 Auditor Exhibit. Closes both remaining P1 documentation gaps under CC5 control activities, advancing P1 documentation gap count from 2 to 0. CC5-GAP-003: `trufflehog-scan` GitHub Actions job appended to `.github/workflows/ci.yml` as job 6, after the `secret-scan` (git-secrets) job from §45. Uses `trufflesecurity/trufflehog@main` action with `--only-verified` flag (live API verification eliminates false positives from rotated secrets and unmatched regex patterns) and `--fail` flag (non-zero exit blocks PR merge on any verified credential). Scans PR diff commits via `base`/`head` SHA inputs (`github.event.pull_request.base.sha || github.event.before` + `github.sha`). On failure: DEC-030 `security.trufflehog_verified_secret_found` (CRITICAL, 7yr) emitted via §46 `emit-audit-event` Edge Function; §46 alert pipeline dispatches PagerDuty P0 incident and Slack CRITICAL alert to `#security-alerts`. Rotation SLA: 1 hour. Incident procedure: credential rotation at issuing service → secret update in Cloudflare Workers Secrets or Supabase Vault → `git filter-repo` history clean → force-push (2-person approval per §43) → `PRE-50-INCIDENT-YYYY-MM-DD.md` evidence filing. Action version management via §45.3 Dependabot GitHub Actions ecosystem weekly scan. CC5-GAP-005: New `.github/workflows/infra-drift.yml` with dual triggers: daily cron `0 6 * * *` (06:00 UTC, before business hours) + PR path filter `infra/cloudflare/**` (runs on planned Terraform change PRs) + `workflow_dispatch` for on-demand audit. `hashicorp/setup-terraform@v3` with `terraform_wrapper: false` for raw exit codes. `terraform plan -detailed-exitcode`: 0 = clean, 1 = error, 2 = drift. Every plan output archived to Cloudflare R2 `form-audit-logs/infra-drift/<date>/terraform-plan-<ts>-drift-<status>.txt` via `wrangler r2 object put` regardless of outcome — creates continuous evidence log. Drift path: Slack Block Kit alert to `#ops-alerts` (HIGH severity, run URL, 24h SLA callout) + DEC-030 `infra.terraform_drift_detected` (HIGH, 7yr) with `r2_evidence_key` metadata + job fails with exit 1. Clean path: DEC-030 `infra.terraform_drift_check_clean` (LOW, 3yr) — auditor-queryable continuous log (~90 rows in 90-day observation window). Terraform remote state: Cloudflare R2 S3-compatible backend (`form-tf-state` bucket, key `cloudflare/terraform.tfstate`); `backend.tf` with `force_path_style = true`, `skip_credentials_validation/metadata/region = true`, `endpoints.s3` override for R2 account URL; `terraform init -migrate-state` procedure. New GitHub Actions secrets: `TF_STATE_ACCESS_KEY` + `TF_STATE_SECRET_KEY` (separate R2 credentials from §48 WAF Logpush) + `SLACK_SECURITY_WEBHOOK`; `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`, `EMIT_AUDIT_EVENT_URL`, `EMIT_AUDIT_SECRET` reused from §45/§46/§48. Drift remediation procedure: 24h SLA; two paths — (a) authorised undocumented change → PR reconciling Terraform to match deployed state; (b) unauthorised change → immediate Cloudflare dashboard revert + P1 Linear ticket + Cloudflare Audit Log token audit + optional P0 escalation if token compromise suspected. Evidence filing template: `compliance/evidence/cc5/PRE-50-DRIFT-YYYY-MM-DD.md` with DEC-030 event ID, R2 evidence key, classification, resources affected, timeline, resolution, and token audit result. Three DEC-030 events: `security.trufflehog_verified_secret_found` (CRITICAL, 7yr), `infra.terraform_drift_detected` (HIGH, 7yr), `infra.terraform_drift_check_clean` (LOW, 3yr). Three evidence artefacts: PRE-50-E-001 (TruffleHog first green run screenshot), PRE-50-E-002 (Terraform R2 drift log 30-day sample), PRE-50-E-003 (branch protection screenshot with `trufflehog-scan` required check). 12-item implementation checklist: items 1-2 P1/M4 (trufflehog-scan job + branch protection); items 3-6 P1/M4 (R2 bucket + backend.tf migration + infra-drift.yml create + Slack smoke test); items 7-9 P1/M4 (DEC-030 registry + PRE-50-E-001 + gap table update); item 10 P1/M5 (PRE-50-E-002 30-day collection); items 11-12 P2 (compliance calendar + quarterly pin maintenance). Gap closure: CC5-GAP-003 🔴 Open → 🟡 Authored · CC5-GAP-005 🔴 Open → 🟡 Authored. P1 documentation gap count: 2 → 0. CC5.1/CC5.2 🟡 Partial → 🟡 Authored. SOC 2 readiness: ~96% → ~96.5%.*

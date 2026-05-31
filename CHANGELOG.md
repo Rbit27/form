@@ -6,6 +6,16 @@
 
 ---
 
+## [1.37.1] — 2026-05-31
+
+### Added
+- `docs/SOC2_READINESS.md §50` — TruffleHog CI Secret Scan + Terraform IaC Drift Detection — CC5-GAP-003 / CC5-GAP-005 Auditor Exhibit (+632 рядків). Закриває обидва залишкових P1 documentation gaps у CC5: CC5-GAP-003 (`trufflehog-scan` як job 6 у `ci.yml` — `trufflesecurity/trufflehog@main` з `--only-verified` + `--fail`; live API verification усуває false positives від ротованих секретів; DEC-030 `security.trufflehog_verified_secret_found` CRITICAL/7yr → PagerDuty P0 через §46 pipeline; rotation SLA 1h; incident procedure: rotation → git filter-repo → force-push 2-person approval) + CC5-GAP-005 (новий workflow `.github/workflows/infra-drift.yml` — daily cron `0 6 * * *` + PR path filter `infra/cloudflare/**` + `workflow_dispatch`; `terraform plan -detailed-exitcode` з R2 backend `form-tf-state`; кожен run архівується до `form-audit-logs/infra-drift/` незалежно від результату; drift → Slack Block Kit alert `#ops-alerts` + DEC-030 `infra.terraform_drift_detected` HIGH/7yr + job exit 1; clean → DEC-030 `infra.terraform_drift_check_clean` LOW/3yr — auditor-queryable continuous log ~90 rows/90d). 3 нових DEC-030 події: `security.trufflehog_verified_secret_found` (CRITICAL, 7yr), `infra.terraform_drift_detected` (HIGH, 7yr), `infra.terraform_drift_check_clean` (LOW, 3yr). 3 evidence artefacts PRE-50-E-001–003. 12 checklist items. CC5-GAP-003/005 🔴→🟡 Authored. P1 documentation gaps: 2→0. CC5.1/CC5.2 🟡 Partial→🟡 Authored. SOC2: ~96%→~96.5%.
+
+### Changed
+- `VERSION` → 1.37.1
+
+---
+
 ## [1.37.0] — 2026-05-31
 
 ### Added
