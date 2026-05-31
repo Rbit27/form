@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 165 cards (165 content posts authored), category filter, newsletter CTA | v1.39.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 167 cards (167 content posts authored), category filter, newsletter CTA | v1.41.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -249,6 +249,9 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-162-satellite-cells-muscle-hypertrophy.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-163-heat-shock-proteins-training.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-164-altitude-hypoxia-training.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-165-blood-flow-restriction-training.md | Blog | draft · clinical-safety PASS · sports-scientist DONE |
+| post-166-deload-strategies.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
+| post-167-hpa-axis-cortisol.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

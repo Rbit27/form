@@ -6,6 +6,19 @@
 
 ---
 
+## [1.41.0] — 2026-05-31
+
+### Added
+- `content/post-167-hpa-axis-cortisol.md` — Вісь HPA і кортизол у тренінгу — адаптивний сигнал, а не ворог (~13 хв, clinical-safety NOT REQUIRED). Selye (1936/1950) GAS як концептуальна основа. HPA-каскад: гіпоталамус → CRH → передній гіпофіз → ACTH → zona fasciculata → кортизол; GR-рецептори у практично кожній тканині. Viru & Viru (2004): кортизол як «permissive hormone» — ліполіз, глюконеогенез, субстратна мобілізація. Tremblay et al. (2005 Sports Med): значуща кортизольна відповідь при ≥60–70% VO₂max; пік через 30–60 хв після тренування. Häkkinen & Pakarinen (1993 Int J Sports Med): 10×10 squat → більший кортизольний сплеск, ніж важка малоповторна робота при тому ж тоннажі. FOXO1/3 → MuRF1/MAFbx (атрогени): катаболічний шлях вимагає хронічного, а не гострого підвищення кортизолу. Fry et al. (1998 JSCR): C:T ratio як маркер non-functional overreaching; LH/GnRH-пригнічення при хронічній HPA-активації. Cortisol Awakening Response (CAR): пік 6–8 AM. Leproult et al. (1997 Sleep): 24-год депривація → +21–37% денний/вечірній кортизол через порушення SWS-придушення HPA. 5 практичних висновків. sports_scientist_reviewed: true.
+
+### Changed
+- `blog.html` — додано картки Post 165 (BFR-тренінг), Post 166 (Розвантажувальний тиждень), Post 167 (Вісь HPA і кортизол); лічильник 164 → 167 карток; v1.39.0 → v1.41.0
+- `README.md` — post-165 [x] BFR; post-166 [x] deload; post-167 [x] HPA axis; post-168 переключено на overtraining recovery (⚠️ CS REQUIRED); додано нові теми post-173 (осмотична адаптація), post-174 (нейром'язова адаптація перший місяць), post-175 (RSI), post-176 (Fitness-Fatigue model)
+- `STATUS.md` — blog.html рядок: 165 → 167 карток, v1.39.0 → v1.41.0; додано рядки post-165/166/167 у content engine таблицю
+- `VERSION` → 1.41.0
+
+---
+
 ## [1.40.0] — 2026-05-31
 
 ### Added
