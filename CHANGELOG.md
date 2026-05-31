@@ -6,6 +6,18 @@
 
 ---
 
+## [1.45.0] — 2026-05-31
+
+### Added
+- `content/post-169-phosphocreatine-resynthesis.md` — «Фосфокреатин: кінетика ресинтезу і наука про паузи між підходами» (~13 хв); Harris et al. (1976), Hultman et al. (1996), Sahlin et al. (1979), Schoenfeld et al. (2016), Haff et al. (2003); pH-залежність ресинтезу, кластерні сети, практична матриця пауз; clinical-safety NOT REQUIRED
+- `README.md` — roadmap post-177..180: ANS/HRV, саркомерна механіка, спортивне серце, GLUT4/інсулінова сигналізація
+- `STATUS.md` — content engine: post-169 DONE; post-168 BLOCKED (clinical-safety REQUIRED — OTS psychological symptoms)
+
+### Changed
+- `VERSION` → 1.45.0
+
+---
+
 ## [1.44.0] — 2026-05-31
 
 ### Added

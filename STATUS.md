@@ -252,6 +252,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-165-blood-flow-restriction-training.md | Blog | draft · clinical-safety PASS · sports-scientist DONE |
 | post-166-deload-strategies.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | post-167-hpa-axis-cortisol.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
+| post-169-phosphocreatine-resynthesis.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE · ⚠️ post-168 BLOCKED pending clinical-safety (OTS psychological symptoms) |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
