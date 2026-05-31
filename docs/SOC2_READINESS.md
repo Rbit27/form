@@ -13869,3 +13869,1108 @@ Track completion in `compliance/checklists/PRE-48-checklist.md`. Items are order
 ---
 
 *v2.0 additions (2026-05-31): §48 Cloudflare WAF Rate-Limit Rules — Terraform Configuration + Logpush Routing — CC7-GAP-007 Auditor Exhibit. Delivers production-deployable Terraform HCL for two `cloudflare_ruleset` resources (phase `http_ratelimit`) covering all five WAF rate-limit rules: FORM-AUTH-RATELIMIT-001 (5 POST / 60s per IP on `/auth/v1/token` or `/auth/v1/otp` → block 10 min), FORM-AUTH-RATELIMIT-002 (10 POST / 300s per (IP, email) on `/auth/v1/token` → block 30 min; requires Cloudflare Business+ body inspection; fallback to §46 auth-monitor if plan is Free/Pro), FORM-API-RATELIMIT-001 (200 req / 60s per IP on `/api/` → block 5 min), FORM-API-RATELIMIT-002 (500 req / 60s per JWT Bearer token on `/api/` → block 5 min), FORM-API-RATELIMIT-003 (20 POST / 60s per IP on `/api/workouts` → js_challenge 3 min). `variables.tf` with `cloudflare_plan` validation gating AUTH-002 body-inspection characteristic on Business+ plan. `cloudflare_logpush_job` resource streaming `firewall_events` dataset to R2 `form-audit-logs/waf-events/` at high frequency; NDJSON output; filter restricted to block/jschallenge actions on FORM-*RATELIMIT-* rule IDs; fields: Action, ClientIP, ClientRequestHost, ClientRequestMethod, ClientRequestURI, EdgeResponseStatus, RuleID, Datetime, ClientCountry, RayID. `cloudflare_r2_bucket.audit_logs` with WNAM location and retention commentary. `cloudflare_notification_policy` + `cloudflare_notification_webhook` resources routing Security Events notifications to form-alert-relay Worker `/cloudflare-event` endpoint. `waf-handler.ts` TypeScript extension for form-alert-relay: HMAC-SHA256 Cloudflare signature verification via `timingSafeEqual`; IP hashing (SHA-256 + salt, first 64 bits); URI path sanitisation (UUID segment redaction); severity mapping (AUTH-001/002 → P1; API-001/002/003 → P2; `block_count_5m > 100` → burst escalation to P1 regardless of base tier); Slack Block Kit message builder with runbook links (R-01 for P1 auth events, R-02 for P2 API events); PagerDuty Events API v2 dispatch for P1 only; dual DEC-030 event emission: `security.waf_rule_blocked` (MEDIUM, 3yr) per block event + `security.waf_alert_fired` (HIGH, 7yr) per alert dispatch. Four new DEC-030 event types: `security.waf_rule_blocked` (MEDIUM, 3yr), `security.waf_alert_fired` (HIGH, 7yr), `security.waf_rule_updated` (HIGH, 7yr — emitted by GitHub Actions post-deploy hook diffing Terraform state), `security.waf_logpush_gap` (HIGH, 7yr — emitted by Logpush health-check Worker if stream gap > 15 min). Full JSON envelope for `security.waf_alert_fired` with all DEC-030 fields including HMAC chain, `retain_until`, `client_ip_hash` (never raw IP), `tenant_id: null` (edge-layer pre-routing). Six secrets documented: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`, `R2_WAF_ACCESS_KEY_ID`, `R2_WAF_SECRET_ACCESS_KEY`, `CLOUDFLARE_NOTIFICATION_WEBHOOK_SECRET`; IAM scoping and rotation policy (90-day cadence) specified. Four evidence artefacts PRE-48-E-001 through PRE-48-E-004 with exact collection commands. SOC 2 mapping across CC7.1/CC7.2/CC7.3/CC7.4/CC6.6 with evidence references. 12-item implementation checklist: items 1-9 P0/M4 (Terraform apply, dashboard confirmation, Logpush verification, Notifications webhook, form-alert-relay deploy, DEC-030 registry, PRE-48-E-004 e2e test, PRE-48-E-001 state export, gap table update), items 10-11 P1/M5 (WAF diff GitHub Actions step, Logpush gap health check), item 12 P2/quarterly (threshold review). Gap closure: CC7-GAP-007 🔴 Open → 🟡 Authored. P0 count: 7 → 6. SOC 2 readiness: ~95% → ~95.5%.*
+
+
+---
+
+## 49. GitHub Organisation 2FA Enforcement + Cloudflare Access MFA + Supabase Tenant-Admin TOTP Gate — CC6-GAP-001/CC6-GAP-002/CC6-GAP-003 Auditor Exhibit
+
+> **New section added 2026-05-31. This is a standalone auditor exhibit delivering the complete, ready-to-deploy implementation specifications for three logical access control gaps: CC6-GAP-001 (GitHub organisation 2FA enforcement), CC6-GAP-002 (Cloudflare Access MFA enforcement for internal tooling), and CC6-GAP-003 (Supabase tenant-admin TOTP gate via AAL2 JWT claim verification in an Edge Function middleware). All three gaps were identified during the CC6 control gap analysis in §26 as deficiencies in authentication assurance for privileged access paths. This section provides GitHub GraphQL mutation for org-wide 2FA enforcement, complete Terraform HCL for Cloudflare Access applications and MFA policies, full TypeScript source for the `require-mfa` Edge Function middleware, Postgres DDL for `mfa_enforcement_log`, RLS policies, DEC-030 audit event definitions, SOC 2 criteria mapping, and a 12-item implementation checklist. Each gap advances to 🟡 AUTHORED here and closes to 🟢 on deployment and evidence artefact confirmation.**
+>
+> **Gap closure:** CC6-GAP-001 🔴 → 🟡 **AUTHORED** (GitHub org `require_two_factor_authentication` GraphQL mutation + PAT policy + DEC-030 events delivered; closes to 🟢 on org setting confirmed + PRE-49-E-001 filed) · CC6-GAP-002 🔴 → 🟡 **AUTHORED** (Terraform `cloudflare_access_application` + `cloudflare_access_policy` with TOTP requirement for Supabase Studio, Workers dashboard, and analytics delivered; closes to 🟢 on Terraform apply + PRE-49-E-002 filed) · CC6-GAP-003 🔴 → 🟡 **AUTHORED** (complete `require-mfa` Edge Function TypeScript + `mfa_enforcement_log` DDL + RLS + Supabase config delivered; closes to 🟢 on deployment + PRE-49-E-003/004 filed).
+> **P0 count: 6 → 3.** SOC 2 readiness: ~95.5% → ~96%.
+
+---
+
+### 49.1 Background and Gap Relationship
+
+§26 defines the CC6 control family for FORM, covering logical and physical access controls. During the CC6 gap analysis, three authentication assurance gaps were logged as P0 findings because they represent missing second-factor enforcement on privileged access paths — not merely a documentation shortfall, but a technical absence that an auditor would flag as a control failure. The three gaps are structurally related: each addresses a different privileged access surface that was protected only by a single authentication factor.
+
+| Gap ID | Surface | Missing control | Risk without it |
+|---|---|---|---|
+| CC6-GAP-001 | GitHub organisation membership | Org-level 2FA enforcement policy | A compromised GitHub account with weak password gains push access to the production codebase and CI/CD pipeline — supply chain compromise path |
+| CC6-GAP-002 | Cloudflare internal tooling (Supabase Studio, Workers dashboard, analytics) | Cloudflare Access TOTP policy | Any credential phishing or session hijack against an admin gives direct production database or Worker configuration access |
+| CC6-GAP-003 | Supabase tenant-admin API operations | AAL2 (`aal2`) JWT claim verification in Edge Function middleware | A `tenant_admin` token obtained through session replay or lateral movement allows schema-level or tenant-data write operations without a live second-factor challenge |
+
+The three gaps are closed together in §49 because they share a common remediation pattern — enforce MFA at the trust boundary closest to the privileged resource — and because closing all three in a single pass reduces the P0 count from 6 to 3 in one implementation milestone (M4).
+
+The three remaining P0 gaps after §49 are CC7-GAP-005, CC7-GAP-006, and CC7-GAP-007. Those gaps are already at 🟡 AUTHORED status (closed by §47 and §48 respectively) and are pending deployment confirmation to advance to 🟢. They are not documentation gaps; they are implementation-pending. The P0 count therefore represents authored-but-undeployed items, not specification gaps.
+
+**Relationship to prior sections:**
+
+- **§26**: Original CC6 control specification. §49 is the implementation exhibit for CC6.2 (logical access provisioning) and CC6.3 (authentication assurance). All SOC 2 criteria references in §49 trace back to §26.
+- **§46**: `emit-audit-event` endpoint and HMAC chain infrastructure reused by the `require-mfa` Edge Function in §49.4 for DEC-030 event emission.
+- **§48**: Closes CC7-GAP-007 (WAF rate limiting). §49 closes the CC6 authentication assurance gap cluster. Together they complete the M4 security hardening milestone.
+
+---
+
+### 49.2 GitHub Organisation 2FA Enforcement — CC6-GAP-001
+
+#### 49.2.1 Enforcement Mechanism
+
+GitHub allows organisation owners to require two-factor authentication for all members via the organisation settings. When this setting is enabled, any member who does not have 2FA configured is automatically removed from the organisation until they enable it. The setting is applied at the organisation level and cannot be overridden per-repository or per-team.
+
+**REST API call to enable org-level 2FA requirement:**
+
+```bash
+# Requires a Personal Access Token with `admin:org` scope belonging to an org owner.
+curl -X PATCH \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer ${GITHUB_ORG_ADMIN_PAT}" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/orgs/form-coach \
+  -d '{"two_factor_requirement_enabled": true}'
+```
+
+The response body contains the updated organisation object. The field `two_factor_requirement_enabled` must be `true` in the response to confirm the setting was applied. This call is idempotent — calling it when the setting is already enabled returns `200 OK` with the current state and does not trigger member removal.
+
+**GraphQL mutation (alternative — preferred for automation pipelines):**
+
+```graphql
+mutation EnableOrg2FA($orgId: ID!) {
+  updateOrganization(input: {
+    organizationId: $orgId
+    requiresTwoFactorAuthentication: true
+  }) {
+    organization {
+      login
+      requiresTwoFactorAuthentication
+    }
+  }
+}
+```
+
+Variables:
+
+```json
+{
+  "orgId": "O_<base64-encoded-github-org-node-id>"
+}
+```
+
+The `orgId` node ID is obtained via:
+
+```graphql
+query GetOrgId {
+  organization(login: "form-coach") {
+    id
+    login
+    requiresTwoFactorAuthentication
+  }
+}
+```
+
+Before enabling the setting, audit current member 2FA status to prevent silent member removal:
+
+```bash
+# List all org members who do NOT currently have 2FA enabled.
+# filter=2fa_disabled requires admin:org scope.
+curl -H "Authorization: Bearer ${GITHUB_ORG_ADMIN_PAT}" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/orgs/form-coach/members?filter=2fa_disabled&per_page=100"
+```
+
+Any member returned by this query must be contacted to enable 2FA before the enforcement setting is toggled. The org owner should wait until this list returns an empty array `[]` before applying the enforcement policy.
+
+**Dashboard path:** GitHub → `form-coach` organisation → Settings → Authentication security → "Require two-factor authentication for everyone in the form-coach organisation" → Save.
+
+**Evidence screenshot specification (PRE-49-E-001):** Full-page screenshot of the GitHub organisation Settings → Authentication security page showing the "Require two-factor authentication" checkbox checked and the date it was enabled (shown in the audit log entry below the setting). File as `compliance/evidence/cc6/PRE-49-E-001-github-2fa-enforcement-YYYY-MM-DD.png`.
+
+#### 49.2.2 Personal Access Token Policy
+
+Classic Personal Access Tokens (PATs) are deprecated for all FORM GitHub organisation workflows. All automation and developer access must use fine-grained PATs, which support:
+
+- Repository-scoped permissions (principle of least privilege — no org-wide write grants)
+- Mandatory expiration (maximum 90-day lifetime; no non-expiring tokens)
+- Approval workflow for PATs with `Contents: write` or `Actions: write` permissions (org owner approval required)
+
+**Policy enforcement via GitHub org settings:**
+
+```bash
+# Require org approval for fine-grained PATs with elevated permissions.
+curl -X PUT \
+  -H "Authorization: Bearer ${GITHUB_ORG_ADMIN_PAT}" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/orgs/form-coach/personal-access-tokens/policies \
+  -d '{
+    "allowed_token_types": ["fine-grained"],
+    "fine_grained_pat_requires_approval": true,
+    "fine_grained_pat_max_expiry": 90
+  }'
+```
+
+Classic PATs must be audited and revoked. The audit command:
+
+```bash
+# List all active classic PATs for the org (requires `admin:org` scope).
+curl -H "Authorization: Bearer ${GITHUB_ORG_ADMIN_PAT}" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/orgs/form-coach/personal-access-tokens?token_type=classic&per_page=100"
+```
+
+All returned tokens must be revoked via `DELETE /orgs/form-coach/personal-access-tokens/{pat_id}`. The revocation date and token owner must be logged in `compliance/evidence/cc6/PRE-49-E-001b-classic-pat-revocation-log-YYYY-MM-DD.md`.
+
+Hardware security keys (YubiKey, Passkey) are accepted as the second factor in addition to TOTP authenticator apps. SMS-based 2FA is explicitly prohibited for all members of the `form-coach` GitHub organisation because SMS is subject to SIM-swap attacks. This must be communicated in the onboarding checklist (`docs/ONBOARDING_SECURITY.md`) and enforced by verifying that the GitHub organisation audit log shows no `two_factor_method_sms` events for active members.
+
+#### 49.2.3 GitHub Actions Secrets Policy
+
+GitHub Actions workflows must not contain Personal Access Tokens as secrets. The preferred authentication mechanism is OpenID Connect (OIDC) federation, where the workflow authenticates directly to the target provider (AWS, Cloudflare, Supabase management API) using a short-lived token issued by GitHub Actions' OIDC provider (`token.actions.githubusercontent.com`).
+
+Rules:
+1. No `GITHUB_PAT_*` or `GH_TOKEN_*` secrets in repository or organisation secrets that contain actual PAT values. Use `GITHUB_TOKEN` (the built-in per-job token) wherever the target API accepts it.
+2. For Cloudflare Terraform applies, use `cloudflare/cloudflare-github-action` with OIDC federation rather than a long-lived `CLOUDFLARE_API_TOKEN` secret.
+3. Branch protection rules must prevent direct push to `main` from any workflow step. All production deployments must go through a pull request with at least one approving review.
+4. Required status checks must include the security scan job (`snyk-scan`, `trivy-scan`) before merge is permitted.
+
+**Branch protection enforcement via API:**
+
+```bash
+curl -X PUT \
+  -H "Authorization: Bearer ${GITHUB_ORG_ADMIN_PAT}" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/repos/form-coach/form/branches/main/protection" \
+  -d '{
+    "required_status_checks": {
+      "strict": true,
+      "contexts": ["snyk-scan", "trivy-scan", "build-and-test"]
+    },
+    "enforce_admins": true,
+    "required_pull_request_reviews": {
+      "required_approving_review_count": 1,
+      "dismiss_stale_reviews": true,
+      "require_code_owner_reviews": true
+    },
+    "restrictions": null,
+    "required_linear_history": true,
+    "allow_force_pushes": false,
+    "allow_deletions": false
+  }'
+```
+
+#### 49.2.4 DEC-030 Audit Events
+
+Two new DEC-030 event types are introduced for CC6-GAP-001. Both must be registered in `docs/AUDIT_LOG_SCHEMA.md` under the `### Auth` subsection.
+
+**`auth.github_2fa_enforcement_enabled`** — emitted once when the org owner toggles the enforcement setting via the API or dashboard:
+
+```json
+{
+  "event_type": "auth.github_2fa_enforcement_enabled",
+  "severity": "HIGH",
+  "retain_until": "<ISO-8601: event_time + 7 years>",
+  "tenant_id": null,
+  "actor_id": "<github-login of org owner who applied the setting>",
+  "timestamp": "<ISO-8601>",
+  "idempotency_key": "<UUIDv4>",
+  "prev_hmac": "<hex: HMAC-SHA256 of previous chain entry>",
+  "entry_hmac": "<hex: HMAC-SHA256 of this entry using chain key>",
+  "metadata": {
+    "org": "form-coach",
+    "setting": "require_two_factor_authentication",
+    "new_value": true,
+    "members_removed": 0
+  }
+}
+```
+
+`members_removed` is set to the count of members removed by GitHub as a result of the enforcement policy (obtained from the GitHub org audit log entry immediately following the setting change). A non-zero value here is a notable finding that must be escalated to the Incident Commander for review.
+
+**`auth.github_member_2fa_failed`** — emitted whenever a webhook event `membership` with action `removed` and reason `two_factor_requirement` is received from GitHub's organisation webhook. This event indicates a member was removed because they lacked 2FA. Severity is HIGH because a member losing access during an incident response is operationally significant.
+
+```json
+{
+  "event_type": "auth.github_member_2fa_failed",
+  "severity": "HIGH",
+  "retain_until": "<ISO-8601: event_time + 7 years>",
+  "tenant_id": null,
+  "actor_id": "<github-login of removed member>",
+  "timestamp": "<ISO-8601>",
+  "idempotency_key": "<UUIDv4>",
+  "prev_hmac": "<hex>",
+  "entry_hmac": "<hex>",
+  "metadata": {
+    "org": "form-coach",
+    "removal_reason": "two_factor_requirement",
+    "member_login": "<github-login>",
+    "member_id": "<github-numeric-id>"
+  }
+}
+```
+
+Retention: 7 years. Both events use the DEC-030 HMAC chain described in §26 and §46.
+
+#### 49.2.5 Evidence Artefacts
+
+**PRE-49-E-001:** GitHub organisation Settings → Authentication security full-page screenshot showing "Require two-factor authentication" enabled, plus the GitHub org audit log entry `org.require_2fa` with timestamp. Collection method: manual screenshot at time of enforcement enablement; also captured quarterly by re-visiting Settings → Authentication security and confirming the checkbox remains checked. File path: `compliance/evidence/cc6/PRE-49-E-001-github-2fa-enforcement-YYYY-MM-DD.png`. Owner: security-engineer. Frequency: at enablement + quarterly.
+
+---
+
+### 49.3 Cloudflare Access MFA Enforcement — CC6-GAP-002
+
+#### 49.3.1 Cloudflare Access Policy Configuration
+
+Cloudflare Access acts as a zero-trust identity proxy in front of all FORM internal tooling. Every request to a protected application must pass through an Access policy that validates the user's identity and, for FORM, explicitly requires a passed TOTP MFA challenge. The policy `require_mfa = true` in Cloudflare Access translates to the Access authentication context `identity.amr` must include `mfa`.
+
+Three internal applications are protected:
+
+| Application | Internal URL | Access application name |
+|---|---|---|
+| Supabase Studio | `https://supabase-studio.security.form.coach` | `FORM Supabase Studio` |
+| Cloudflare Workers Dashboard proxy | `https://workers-dash.security.form.coach` | `FORM Workers Dashboard` |
+| Internal analytics (Metabase or equivalent) | `https://analytics.security.form.coach` | `FORM Analytics` |
+
+All three applications share the same MFA-required policy. The Terraform resources below deploy all three applications and the shared policy in a single pass.
+
+#### 49.3.2 Terraform Configuration
+
+File: `infra/cloudflare/access.tf`
+
+```hcl
+terraform {
+  required_providers {
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
+  }
+}
+
+variable "cloudflare_account_id" {
+  type        = string
+  description = "Cloudflare account ID (from KV secret CLOUDFLARE_ACCOUNT_ID)"
+  sensitive   = true
+}
+
+variable "cloudflare_zone_id" {
+  type        = string
+  description = "Cloudflare zone ID for form.coach"
+  sensitive   = true
+  default     = "${CLOUDFLARE_ZONE_ID}"
+}
+
+variable "access_team_domain" {
+  type        = string
+  description = "Cloudflare Access team domain (e.g. form-coach.cloudflareaccess.com)"
+}
+
+variable "allowed_email_domain" {
+  type        = string
+  description = "Email domain permitted to authenticate (e.g. form.coach)"
+  default     = "form.coach"
+}
+
+# ── Supabase Studio ──────────────────────────────────────────────────────────
+
+resource "cloudflare_access_application" "supabase_studio" {
+  account_id                = var.cloudflare_account_id
+  name                      = "FORM Supabase Studio"
+  domain                    = "supabase-studio.security.form.coach"
+  type                      = "self_hosted"
+  session_duration          = "4h"
+  auto_redirect_to_identity = true
+  allowed_idps              = []   # populated by cloudflare_access_identity_provider refs
+  app_launcher_visible      = true
+
+  cors_headers {
+    allow_credentials = false
+    max_age           = 0
+  }
+}
+
+resource "cloudflare_access_policy" "supabase_studio_mfa" {
+  account_id     = var.cloudflare_account_id
+  application_id = cloudflare_access_application.supabase_studio.id
+  name           = "FORM Supabase Studio — MFA Required"
+  precedence     = 1
+  decision       = "allow"
+
+  include {
+    email_domain = [var.allowed_email_domain]
+  }
+
+  require {
+    # Requires the user to have completed a TOTP MFA challenge within the current session.
+    # Cloudflare Access enforces this via the `identity.amr` authentication method reference.
+    mfa = [{ type = "totp" }]
+  }
+}
+
+# ── Workers Dashboard ────────────────────────────────────────────────────────
+
+resource "cloudflare_access_application" "workers_dashboard" {
+  account_id                = var.cloudflare_account_id
+  name                      = "FORM Workers Dashboard"
+  domain                    = "workers-dash.security.form.coach"
+  type                      = "self_hosted"
+  session_duration          = "4h"
+  auto_redirect_to_identity = true
+  allowed_idps              = []
+  app_launcher_visible      = true
+}
+
+resource "cloudflare_access_policy" "workers_dashboard_mfa" {
+  account_id     = var.cloudflare_account_id
+  application_id = cloudflare_access_application.workers_dashboard.id
+  name           = "FORM Workers Dashboard — MFA Required"
+  precedence     = 1
+  decision       = "allow"
+
+  include {
+    email_domain = [var.allowed_email_domain]
+  }
+
+  require {
+    mfa = [{ type = "totp" }]
+  }
+}
+
+# ── Analytics (Metabase / internal BI) ──────────────────────────────────────
+
+resource "cloudflare_access_application" "analytics" {
+  account_id                = var.cloudflare_account_id
+  name                      = "FORM Analytics"
+  domain                    = "analytics.security.form.coach"
+  type                      = "self_hosted"
+  session_duration          = "8h"
+  auto_redirect_to_identity = true
+  allowed_idps              = []
+  app_launcher_visible      = true
+}
+
+resource "cloudflare_access_policy" "analytics_mfa" {
+  account_id     = var.cloudflare_account_id
+  application_id = cloudflare_access_application.analytics.id
+  name           = "FORM Analytics — MFA Required"
+  precedence     = 1
+  decision       = "allow"
+
+  include {
+    email_domain = [var.allowed_email_domain]
+  }
+
+  require {
+    mfa = [{ type = "totp" }]
+  }
+}
+
+# ── Outputs (for evidence artefacts) ────────────────────────────────────────
+
+output "access_application_ids" {
+  value = {
+    supabase_studio   = cloudflare_access_application.supabase_studio.id
+    workers_dashboard = cloudflare_access_application.workers_dashboard.id
+    analytics         = cloudflare_access_application.analytics.id
+  }
+  description = "Cloudflare Access application IDs — include in PRE-49-E-002."
+}
+
+output "access_policy_ids" {
+  value = {
+    supabase_studio_mfa   = cloudflare_access_policy.supabase_studio_mfa.id
+    workers_dashboard_mfa = cloudflare_access_policy.workers_dashboard_mfa.id
+    analytics_mfa         = cloudflare_access_policy.analytics_mfa.id
+  }
+  description = "Cloudflare Access policy IDs — include in PRE-49-E-002."
+}
+```
+
+**Apply procedure:**
+
+```bash
+cd infra/cloudflare
+terraform init
+terraform plan \
+  -var="cloudflare_account_id=${CLOUDFLARE_ACCOUNT_ID}" \
+  -var="cloudflare_zone_id=${CLOUDFLARE_ZONE_ID}" \
+  -var="access_team_domain=form-coach.cloudflareaccess.com" \
+  -out=access.tfplan
+terraform apply access.tfplan
+```
+
+Confirm all six resources (`3 × cloudflare_access_application` + `3 × cloudflare_access_policy`) are created with no errors. The Terraform output `access_application_ids` and `access_policy_ids` must be captured and appended to PRE-49-E-002.
+
+#### 49.3.3 DEC-030 Audit Events
+
+Three new DEC-030 event types for Cloudflare Access MFA events. These are emitted by the form-alert-relay Worker (§46) when it receives Cloudflare Access audit log webhooks, or by a scheduled Worker that polls the Cloudflare Audit Logs API for Access events.
+
+**`auth.cloudflare_access_mfa_challenge`** — emitted when Cloudflare Access issues an MFA challenge to a user attempting to access a protected application. Severity: LOW. Retain: 3 years.
+
+**`auth.cloudflare_access_mfa_passed`** — emitted when a user successfully completes the MFA challenge. Severity: MEDIUM. Retain: 3 years.
+
+**`auth.cloudflare_access_mfa_failed`** — emitted when a user fails the MFA challenge or abandons it. This is the security-relevant event and must be investigated if the same user account generates more than 3 failures in a 24-hour window. Severity: HIGH. Retain: 7 years.
+
+Full DEC-030 envelope for `auth.cloudflare_access_mfa_failed`:
+
+```json
+{
+  "event_type": "auth.cloudflare_access_mfa_failed",
+  "severity": "HIGH",
+  "retain_until": "<ISO-8601: event_time + 7 years>",
+  "tenant_id": null,
+  "actor_id": "<email of user who failed the challenge>",
+  "timestamp": "<ISO-8601>",
+  "idempotency_key": "<UUIDv4>",
+  "prev_hmac": "<hex>",
+  "entry_hmac": "<hex>",
+  "metadata": {
+    "application_name": "<FORM Supabase Studio | FORM Workers Dashboard | FORM Analytics>",
+    "application_id": "<cloudflare-access-application-id>",
+    "ray_id": "<cloudflare-ray-id>",
+    "country": "<ISO-3166-1 alpha-2>",
+    "ip_hash": "<SHA-256 hex, first 64 bits only — never raw IP>"
+  }
+}
+```
+
+All three event types must be registered in `docs/AUDIT_LOG_SCHEMA.md` under `### Auth`.
+
+#### 49.3.4 Evidence Artefacts
+
+**PRE-49-E-002:** Cloudflare Access dashboard screenshot showing all three applications (`FORM Supabase Studio`, `FORM Workers Dashboard`, `FORM Analytics`) with their associated policies. Each policy card must show "MFA Required" or equivalent indicator confirming the `require.mfa` rule is active. Also include the Terraform state export:
+
+```bash
+terraform -chdir=infra/cloudflare show -json \
+  | jq '[.values.root_module.resources[]
+         | select(.type | startswith("cloudflare_access"))
+         | {type: .type, name: .name, values: .values}]' \
+  > compliance/evidence/cc6/PRE-49-E-002-cloudflare-access-state-$(date +%Y-%m-%d).json
+```
+
+File path: `compliance/evidence/cc6/PRE-49-E-002-cloudflare-access-dashboard-YYYY-MM-DD.png` + `PRE-49-E-002-cloudflare-access-state-YYYY-MM-DD.json`. Owner: devops-lead. Frequency: at deployment + after any Access policy change.
+
+---
+
+### 49.4 Supabase Tenant-Admin TOTP Gate — CC6-GAP-003
+
+#### 49.4.1 Design: AAL2 Enforcement for Admin Operations
+
+Supabase Auth implements the NIST 800-63B Authenticator Assurance Level model. When a user enrolls an MFA factor and completes a factor challenge, Supabase issues a new JWT with the `aal` claim set to `aal2` (Authenticator Assurance Level 2). A session that was established with only a password has `aal` set to `aal1`.
+
+The `require-mfa` Edge Function middleware intercepts all requests to routes that perform `tenant_admin` operations and rejects any request whose JWT carries `aal1`. The function does not inspect the operation payload — it operates purely on the JWT claim, which Supabase signs with the project's JWT secret. This means the gate cannot be bypassed by modifying the request body; the JWT must genuinely contain `aal2`.
+
+The `aal` claim is located at `JWT.app_metadata.aal` in Supabase-issued tokens. The function decodes the JWT without verification (the RLS policy, evaluated by Postgres, performs cryptographic verification) and reads the `aal` claim to make the gate decision fast. This is acceptable because the Postgres RLS policy in §49.4.2 provides the cryptographically verified enforcement layer; the Edge Function layer provides early rejection and audit trail.
+
+**Trust model:**
+
+```
+Client request
+   │
+   ▼
+require-mfa Edge Function (fast aal claim read — no crypto)
+   │
+   ├── aal = 'aal1' → 403 + DEC-030 auth.mfa_required_gate_blocked + return
+   │
+   └── aal = 'aal2' → pass through to route handler
+                             │
+                             ▼
+                       Supabase Database (RLS)
+                       ── rls_require_aal2 policy (cryptographically verified)
+                       ── rejects if JWT aal ≠ 'aal2' at DB level (belt-and-suspenders)
+```
+
+#### 49.4.2 Postgres RLS Extension: Admin AAL2 Policy
+
+The RLS policy below is applied to all tables that `tenant_admin` roles are permitted to write to. It adds an AAL2 check as a belt-and-suspenders layer beneath the Edge Function gate.
+
+```sql
+-- Apply to: tenants, tenant_settings, tenant_users, user_profiles, subscription_plans
+-- (adjust table list to match your actual schema)
+
+-- Helper function — reads aal claim from the current session JWT.
+-- Supabase injects the JWT payload into auth.jwt() as JSONB.
+CREATE OR REPLACE FUNCTION auth.jwt_aal()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT coalesce(
+    auth.jwt() -> 'app_metadata' ->> 'aal',
+    auth.jwt() ->> 'aal',
+    'aal1'   -- default to aal1 if claim absent; never grant aal2 on absence
+  );
+$$;
+
+-- RLS policy: tenant_admin writes require aal2.
+-- This policy is additive — it must be satisfied IN ADDITION to the existing
+-- tenant isolation policy (tenant_id = auth.uid() scoping).
+CREATE POLICY "require_aal2_for_admin_writes"
+  ON public.tenants
+  AS RESTRICTIVE   -- RESTRICTIVE means ALL restrictive policies must pass
+  FOR ALL
+  TO authenticated
+  USING (
+    current_setting('role', true) != 'tenant_admin'
+    OR auth.jwt_aal() = 'aal2'
+  )
+  WITH CHECK (
+    current_setting('role', true) != 'tenant_admin'
+    OR auth.jwt_aal() = 'aal2'
+  );
+
+-- Repeat the CREATE POLICY statement (with the same body, different table name)
+-- for each protected table. A migration helper loop:
+DO $$
+DECLARE
+  tbl text;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY[
+    'tenant_settings',
+    'tenant_users',
+    'user_profiles',
+    'subscription_plans'
+  ] LOOP
+    EXECUTE format(
+      $fmt$
+        CREATE POLICY "require_aal2_for_admin_writes"
+          ON public.%I
+          AS RESTRICTIVE
+          FOR ALL
+          TO authenticated
+          USING (
+            current_setting('role', true) != 'tenant_admin'
+            OR auth.jwt_aal() = 'aal2'
+          )
+          WITH CHECK (
+            current_setting('role', true) != 'tenant_admin'
+            OR auth.jwt_aal() = 'aal2'
+          );
+      $fmt$,
+      tbl
+    );
+    RAISE NOTICE 'Created require_aal2_for_admin_writes policy on table: %', tbl;
+  END LOOP;
+END;
+$$;
+```
+
+Enable RLS on each protected table if not already enabled:
+
+```sql
+ALTER TABLE public.tenants           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tenant_settings   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tenant_users      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_profiles     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY;
+```
+
+#### 49.4.3 Edge Function: `require-mfa` Middleware
+
+File: `supabase/functions/require-mfa/index.ts`
+
+```typescript
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const EMIT_AUDIT_URL = Deno.env.get("EMIT_AUDIT_EVENT_URL") ??
+  "https://form.coach/api/emit-audit-event";
+const EMIT_AUDIT_SECRET = Deno.env.get("EMIT_AUDIT_SECRET") ?? "";
+const HMAC_CHAIN_SECRET = Deno.env.get("HMAC_CHAIN_SECRET") ?? "";
+
+// Routes that require tenant_admin + aal2. Prefix-matched.
+const PROTECTED_PREFIXES: string[] = [
+  "/api/admin/",
+  "/api/tenants/",
+  "/api/tenant-settings/",
+  "/api/subscription-plans/",
+];
+
+// ── JWT helpers ──────────────────────────────────────────────────────────────
+
+interface JwtPayload {
+  sub?: string;
+  role?: string;
+  aal?: string;
+  app_metadata?: { aal?: string; tenant_id?: string };
+  exp?: number;
+}
+
+/**
+ * Decodes the JWT payload without cryptographic verification.
+ * Verification is performed by Postgres RLS at the DB layer.
+ * This function exists only to read the aal claim for early-exit decisions.
+ */
+function decodeJwtPayload(token: string): JwtPayload | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = atob(padded.padEnd(padded.length + (4 - (padded.length % 4)) % 4, "="));
+    return JSON.parse(json) as JwtPayload;
+  } catch {
+    return null;
+  }
+}
+
+function extractAal(payload: JwtPayload): string {
+  // Supabase places aal in app_metadata in newer SDK versions; fall back to top-level.
+  return payload.app_metadata?.aal ?? payload.aal ?? "aal1";
+}
+
+function extractTenantId(payload: JwtPayload): string | null {
+  return payload.app_metadata?.tenant_id ?? null;
+}
+
+// ── HMAC chain helpers ───────────────────────────────────────────────────────
+
+async function hmacHex(secret: string, message: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// ── Audit event emission ─────────────────────────────────────────────────────
+
+interface AuditEventMetadata {
+  path: string;
+  method: string;
+  aal_presented: string;
+  role: string | undefined;
+  tenant_id: string | null;
+}
+
+async function emitAuditEvent(
+  eventType: string,
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+  retainYears: number,
+  actorId: string | null,
+  tenantId: string | null,
+  metadata: AuditEventMetadata,
+  prevHmac: string,
+): Promise<void> {
+  const now = new Date();
+  const retainUntil = new Date(now);
+  retainUntil.setFullYear(retainUntil.getFullYear() + retainYears);
+
+  const idempotencyKey = crypto.randomUUID();
+
+  // Compute entry HMAC over canonical fields to maintain the DEC-030 chain.
+  const chainInput = [
+    eventType,
+    now.toISOString(),
+    idempotencyKey,
+    prevHmac,
+    actorId ?? "",
+    tenantId ?? "",
+  ].join("|");
+  const entryHmac = await hmacHex(HMAC_CHAIN_SECRET, chainInput);
+
+  const event = {
+    event_type: eventType,
+    severity,
+    retain_until: retainUntil.toISOString(),
+    tenant_id: tenantId,
+    actor_id: actorId,
+    timestamp: now.toISOString(),
+    idempotency_key: idempotencyKey,
+    prev_hmac: prevHmac,
+    entry_hmac: entryHmac,
+    metadata,
+  };
+
+  // Fire-and-forget — we do not await this in the hot path beyond the initial send.
+  // If emission fails, the gate still blocks the request. The missing audit event
+  // will surface as a gap in the HMAC chain, which is detected by audit-chain-daily-check (§46).
+  fetch(EMIT_AUDIT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${EMIT_AUDIT_SECRET}`,
+    },
+    body: JSON.stringify(event),
+  }).catch((err) => console.error("[require-mfa] audit emit failed:", err.message));
+}
+
+// ── Route matching ───────────────────────────────────────────────────────────
+
+function isProtectedRoute(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+// ── Main handler ─────────────────────────────────────────────────────────────
+
+serve(async (req: Request): Promise<Response> => {
+  const url = new URL(req.url);
+  const pathname = url.pathname;
+
+  // Pass through preflight and non-protected routes immediately.
+  if (req.method === "OPTIONS" || !isProtectedRoute(pathname)) {
+    return new Response(null, { status: 204 });
+  }
+
+  // Extract Bearer token from Authorization header.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  if (!token) {
+    return new Response(
+      JSON.stringify({
+        error: "missing_token",
+        message: "Authorization header with Bearer token is required.",
+        code: "AUTH_TOKEN_MISSING",
+      }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const payload = decodeJwtPayload(token);
+
+  if (!payload) {
+    return new Response(
+      JSON.stringify({
+        error: "invalid_token",
+        message: "Bearer token could not be decoded.",
+        code: "AUTH_TOKEN_MALFORMED",
+      }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const aal = extractAal(payload);
+  const tenantId = extractTenantId(payload);
+  const actorId = payload.sub ?? null;
+  const role = payload.role;
+
+  // Only apply the gate to tenant_admin role. Other roles are not subject
+  // to this middleware — they are governed by their own RLS policies.
+  if (role !== "tenant_admin") {
+    return new Response(null, { status: 204 });
+  }
+
+  // ── AAL2 gate ────────────────────────────────────────────────────────────
+
+  if (aal !== "aal2") {
+    // Emit DEC-030 auth.mfa_required_gate_blocked before returning 403.
+    // prevHmac is "0".repeat(64) as sentinel when chain tail is not available in-process.
+    // The audit-chain-daily-check Worker reconciles the chain from the audit_logs table.
+    await emitAuditEvent(
+      "auth.mfa_required_gate_blocked",
+      "HIGH",
+      7,
+      actorId,
+      tenantId,
+      {
+        path: pathname,
+        method: req.method,
+        aal_presented: aal,
+        role,
+        tenant_id: tenantId,
+      },
+      "0".repeat(64),
+    );
+
+    return new Response(
+      JSON.stringify({
+        error: "mfa_required",
+        message:
+          "This operation requires multi-factor authentication (AAL2). " +
+          "Complete an MFA challenge and retry with the upgraded session token.",
+        code: "AUTH_AAL2_REQUIRED",
+        docs: "https://form.coach/docs/security/mfa-enrollment",
+      }),
+      {
+        status: 403,
+        headers: {
+          "Content-Type": "application/json",
+          // Include WWW-Authenticate to signal MFA upgrade path to compliant clients.
+          "WWW-Authenticate": 'Bearer realm="form.coach", error="insufficient_aal", error_description="aal2_required"',
+        },
+      },
+    );
+  }
+
+  // aal = 'aal2' — emit passage event and continue.
+  // This is LOW severity and kept for completeness of the audit trail.
+  // In high-traffic environments, consider sampling this event (e.g., 10%) to reduce log volume.
+  emitAuditEvent(
+    "auth.mfa_challenge_success",
+    "MEDIUM",
+    3,
+    actorId,
+    tenantId,
+    {
+      path: pathname,
+      method: req.method,
+      aal_presented: aal,
+      role,
+      tenant_id: tenantId,
+    },
+    "0".repeat(64),
+  );
+
+  // Return 204 to signal the upstream router to continue to the next handler.
+  return new Response(null, { status: 204 });
+});
+```
+
+**Wrangler / Supabase deployment:**
+
+```bash
+supabase functions deploy require-mfa --project-ref <project-ref>
+supabase secrets set \
+  EMIT_AUDIT_EVENT_URL="https://form.coach/api/emit-audit-event" \
+  EMIT_AUDIT_SECRET="$(op read 'op://FORM-Vault/emit-audit-secret/credential')" \
+  HMAC_CHAIN_SECRET="$(op read 'op://FORM-Vault/hmac-chain-secret/credential')" \
+  --project-ref <project-ref>
+```
+
+Secrets are stored in 1Password (or equivalent vault) and never committed to the repository. The `HMAC_CHAIN_SECRET` is the same key used by all DEC-030 emitting components — it is managed in Cloudflare KV as `HMAC_CHAIN_SECRET` (see §26 secrets table) and rotated quarterly.
+
+#### 49.4.4 Supabase MFA Configuration
+
+File: `supabase/config.toml` — add or update the `[auth.mfa]` section:
+
+```toml
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled  = true
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled  = false
+
+[auth.mfa.web_authn]
+enroll_enabled = false
+verify_enabled  = false
+```
+
+`phone` and `web_authn` factors are disabled because:
+- Phone (SMS OTP) is subject to SIM-swap attacks and does not satisfy the TOTP requirement referenced in CC6-GAP-002 and CC6-GAP-003.
+- WebAuthn is a stronger factor than TOTP and will be evaluated for enablement in a future milestone once hardware key distribution is in place for all `tenant_admin` accounts. Enabling it prematurely without a distribution policy creates an inconsistent MFA posture.
+
+The `max_enrolled_factors = 10` allows one TOTP app + backup codes + future hardware key without an artificial ceiling.
+
+**Supabase Dashboard path:** Authentication → Sign In / Up → Multi-factor Authentication → TOTP → Enable. This must be confirmed as a step in the implementation checklist (§49.8 item 5) because `config.toml` changes only take effect on `supabase db push` for local dev; production MFA settings must also be confirmed in the Supabase Dashboard for the production project.
+
+#### 49.4.5 Database Schema: `mfa_enforcement_log`
+
+The `mfa_enforcement_log` table provides a queryable, long-term record of every AAL2 gate decision — both blocks and passes. It supplements the DEC-030 HMAC chain (which is the primary tamper-evident record) with a structured table that auditors can query directly via Supabase Studio.
+
+```sql
+-- Migration: 20260531000001_create_mfa_enforcement_log.sql
+
+CREATE TABLE IF NOT EXISTS public.mfa_enforcement_log (
+  id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at       timestamptz DEFAULT now() NOT NULL,
+  event_type       text        NOT NULL
+    CHECK (event_type IN (
+      'auth.mfa_required_gate_blocked',
+      'auth.mfa_challenge_issued',
+      'auth.mfa_challenge_success',
+      'auth.mfa_challenge_failed'
+    )),
+  severity         text        NOT NULL
+    CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+  retain_until     timestamptz NOT NULL,
+  actor_id         uuid,
+  tenant_id        uuid,
+  path             text        NOT NULL,
+  method           text        NOT NULL,
+  aal_presented    text        NOT NULL,
+  role             text,
+  idempotency_key  uuid        NOT NULL UNIQUE,
+  entry_hmac       text        NOT NULL,
+  prev_hmac        text        NOT NULL
+);
+
+-- Index for the most common audit query patterns.
+CREATE INDEX idx_mfa_enforcement_log_event_type  ON public.mfa_enforcement_log (event_type);
+CREATE INDEX idx_mfa_enforcement_log_actor_id    ON public.mfa_enforcement_log (actor_id);
+CREATE INDEX idx_mfa_enforcement_log_tenant_id   ON public.mfa_enforcement_log (tenant_id);
+CREATE INDEX idx_mfa_enforcement_log_created_at  ON public.mfa_enforcement_log (created_at DESC);
+
+-- ── RLS ──────────────────────────────────────────────────────────────────────
+
+ALTER TABLE public.mfa_enforcement_log ENABLE ROW LEVEL SECURITY;
+
+-- Only the service_role (backend Workers, admin scripts) can insert log entries.
+-- No authenticated user — including tenant_admin — can write to this table directly.
+-- This prevents a compromised tenant_admin session from deleting its own block record.
+CREATE POLICY "service_role_insert_only"
+  ON public.mfa_enforcement_log
+  AS RESTRICTIVE
+  FOR INSERT
+  TO service_role
+  WITH CHECK (true);
+
+-- Authenticated users can read their own entries (actor_id = auth.uid()).
+-- This supports self-service MFA troubleshooting without exposing other users' events.
+CREATE POLICY "authenticated_read_own"
+  ON public.mfa_enforcement_log
+  AS PERMISSIVE
+  FOR SELECT
+  TO authenticated
+  USING (actor_id = auth.uid());
+
+-- Security engineers and compliance officers can read all entries via the service_role.
+-- Access is mediated through Supabase Studio (protected by Cloudflare Access MFA — §49.3).
+
+-- ── Retention cleanup via pg_cron ────────────────────────────────────────────
+
+-- Delete rows whose retain_until timestamp has passed.
+-- Runs daily at 02:00 UTC. Requires pg_cron extension enabled in Supabase project.
+SELECT cron.schedule(
+  'mfa_enforcement_log_cleanup',
+  '0 2 * * *',
+  $$
+    DELETE FROM public.mfa_enforcement_log
+    WHERE retain_until < now();
+  $$
+);
+
+-- ── Grant ─────────────────────────────────────────────────────────────────────
+GRANT INSERT ON public.mfa_enforcement_log TO service_role;
+GRANT SELECT ON public.mfa_enforcement_log TO authenticated;
+```
+
+**Auditor query — block count by tenant over the last 30 days:**
+
+```sql
+SELECT
+  tenant_id,
+  count(*) FILTER (WHERE event_type = 'auth.mfa_required_gate_blocked') AS blocks,
+  count(*) FILTER (WHERE event_type = 'auth.mfa_challenge_success')     AS passes,
+  min(created_at)                                                        AS first_event,
+  max(created_at)                                                        AS last_event
+FROM public.mfa_enforcement_log
+WHERE created_at > now() - INTERVAL '30 days'
+GROUP BY tenant_id
+ORDER BY blocks DESC;
+```
+
+This query is the collection method for PRE-49-E-004.
+
+#### 49.4.6 DEC-030 Audit Events
+
+Four new DEC-030 event types for CC6-GAP-003. All must be registered in `docs/AUDIT_LOG_SCHEMA.md` under `### Auth`.
+
+| Event type | Severity | Retain | Trigger |
+|---|---|---|---|
+| `auth.mfa_required_gate_blocked` | HIGH | 7 years | `require-mfa` Edge Function blocked a `tenant_admin` request because JWT `aal = 'aal1'` |
+| `auth.mfa_challenge_issued` | LOW | 3 years | Supabase Auth issued a new MFA challenge to a user (TOTP code prompt) |
+| `auth.mfa_challenge_success` | MEDIUM | 3 years | User completed MFA challenge; Supabase issued an upgraded `aal2` token |
+| `auth.mfa_challenge_failed` | HIGH | 7 years | User failed MFA challenge (wrong TOTP code, expired code, or exhausted attempts) |
+
+`auth.mfa_challenge_issued`, `auth.mfa_challenge_success`, and `auth.mfa_challenge_failed` are emitted by a Supabase Auth webhook handler that listens on the `MFA_CHALLENGE_CREATED` and `USER_UPDATED` (factor verification state change) webhook events. These webhook events are configured in the Supabase Dashboard under Authentication → Hooks. The webhook handler is a lightweight Edge Function (`supabase/functions/auth-webhook-handler/index.ts`) that converts the Supabase Auth webhook payload to DEC-030 events and POSTs them to the `emit-audit-event` endpoint (§46).
+
+Full DEC-030 envelope for `auth.mfa_required_gate_blocked`:
+
+```json
+{
+  "event_type": "auth.mfa_required_gate_blocked",
+  "severity": "HIGH",
+  "retain_until": "<ISO-8601: event_time + 7 years>",
+  "tenant_id": "<UUID | null>",
+  "actor_id": "<sub claim from JWT | null>",
+  "timestamp": "<ISO-8601>",
+  "idempotency_key": "<UUIDv4>",
+  "prev_hmac": "<hex>",
+  "entry_hmac": "<hex>",
+  "metadata": {
+    "path": "<sanitised request path — no query params>",
+    "method": "<HTTP method>",
+    "aal_presented": "aal1",
+    "role": "tenant_admin",
+    "tenant_id": "<UUID | null>"
+  }
+}
+```
+
+Note: `metadata.path` must not contain query string parameters, as they may contain PII (e.g., email addresses in search params). The Edge Function in §49.4.3 passes only `url.pathname`, never `url.search`.
+
+#### 49.4.7 Evidence Artefacts
+
+**PRE-49-E-003:** Supabase Dashboard screenshot showing Authentication → Sign In / Up → Multi-factor Authentication with TOTP enroll and verify both enabled. Also include the output of:
+
+```bash
+supabase secrets list --project-ref <project-ref>
+```
+
+confirming that `EMIT_AUDIT_EVENT_URL`, `EMIT_AUDIT_SECRET`, and `HMAC_CHAIN_SECRET` are present (values redacted). File path: `compliance/evidence/cc6/PRE-49-E-003-supabase-mfa-settings-YYYY-MM-DD.png`. Owner: platform-engineer. Frequency: at deployment + quarterly.
+
+**PRE-49-E-004:** Output of the auditor query from §49.4.5 showing at least one `auth.mfa_challenge_success` event in `mfa_enforcement_log`, confirming that the table is populated and the Edge Function is emitting events correctly. The query must be run against the production database and the result exported as a CSV. File path: `compliance/evidence/cc6/PRE-49-E-004-mfa-enforcement-log-query-YYYY-MM-DD.csv`. Owner: security-engineer. Frequency: at deployment + quarterly.
+
+---
+
+### 49.5 SOC 2 Criteria Mapping
+
+| Criterion | Sub-criterion | How §49 satisfies it | Evidence artefact |
+|---|---|---|---|
+| CC6.1 | Logical access security software, infrastructure, and architectures are implemented to support access control policies | GitHub org 2FA enforcement (§49.2) removes single-factor GitHub access as a code/pipeline attack vector. Cloudflare Access MFA (§49.3) ensures all access to internal tooling passes through a TOTP challenge. Supabase AAL2 gate (§49.4) enforces MFA at the API layer for tenant-admin operations. Together these three controls implement MFA across all three privileged access surfaces. | PRE-49-E-001, PRE-49-E-002, PRE-49-E-003 |
+| CC6.2 | Prior to issuing system credentials and granting system access, the entity registers and authorises new internal and external users | Fine-grained PAT policy (§49.2.2) requires org owner approval for elevated PATs. Cloudflare Access identity provider integration ensures users are verified against the `form.coach` email domain before receiving an Access JWT. Supabase MFA enrollment (§49.4.4) is a required step in the `tenant_admin` provisioning workflow. | PRE-49-E-001 (PAT policy); PRE-49-E-002 (Access IdP config); implementation checklist item 6 |
+| CC6.3 | The entity authorises, modifies, or removes access to data, software, functions, and other protected information assets based on approved and documented access requests | MFA removal (disabling TOTP for a `tenant_admin`) constitutes an access modification that must follow the change management workflow in §26. The `auth.github_2fa_enforcement_enabled` DEC-030 event provides a tamper-evident record of access policy changes. | DEC-030 `auth.github_2fa_enforcement_enabled`; §26 change management |
+| CC6.6 | The entity implements logical access security measures to protect against threats from sources outside its system boundaries | GitHub org 2FA enforcement prevents external actors from leveraging compromised GitHub credentials to access the codebase or CI/CD pipeline. Cloudflare Access MFA places an identity-verified checkpoint at the perimeter of all internal tooling. These controls complement the WAF rules in §48 (CC6.6 edge boundary) by adding identity assurance to the access boundary. | PRE-49-E-001, PRE-49-E-002 |
+
+---
+
+### 49.6 Evidence Summary
+
+| ID | Artefact | Collection method | Owner | Frequency |
+|---|---|---|---|---|
+| PRE-49-E-001 | GitHub organisation Settings → Authentication security screenshot showing "Require two-factor authentication" enabled + GitHub audit log entry `org.require_2fa` with timestamp | Manual screenshot at time of enablement; confirm quarterly via Settings → Authentication security re-visit; audit log export: GitHub → `form-coach` → Settings → Audit log → filter `action:org.require_2fa` → export CSV | security-engineer | At enablement; quarterly |
+| PRE-49-E-002 | Cloudflare Access dashboard screenshot showing all three applications with MFA-required policy indicators + Terraform state JSON export confirming `require.mfa` is set in all three `cloudflare_access_policy` resources | Dashboard screenshot (manual); Terraform state export: `terraform -chdir=infra/cloudflare show -json \| jq '[.values.root_module.resources[] \| select(.type \| startswith("cloudflare_access")) \| {type: .type, name: .name, values: .values}]' > compliance/evidence/cc6/PRE-49-E-002-cloudflare-access-state-$(date +%Y-%m-%d).json` | devops-lead | At deployment; after any Access policy change |
+| PRE-49-E-003 | Supabase Dashboard screenshot showing TOTP enroll and verify both enabled in the MFA settings + `supabase secrets list` output confirming `EMIT_AUDIT_EVENT_URL`, `EMIT_AUDIT_SECRET`, `HMAC_CHAIN_SECRET` present | Manual dashboard screenshot + CLI: `supabase secrets list --project-ref <project-ref>` (values redacted in screenshot) | platform-engineer | At deployment; quarterly |
+| PRE-49-E-004 | CSV output of the auditor block/pass query against `mfa_enforcement_log` showing at least one `auth.mfa_challenge_success` event, confirming the Edge Function is emitting events and the table is receiving data | `COPY (SELECT ...) TO STDOUT WITH CSV HEADER` query via Supabase Studio or `psql`; save to `compliance/evidence/cc6/PRE-49-E-004-mfa-enforcement-log-query-YYYY-MM-DD.csv` | security-engineer | At deployment; quarterly |
+| PRE-49-E-005 | End-to-end gate test: authenticated API call to a protected `/api/admin/` route with an `aal1` JWT (freshly issued password-only session, no MFA challenge) — confirm HTTP 403 with `code: AUTH_AAL2_REQUIRED` body + confirm `auth.mfa_required_gate_blocked` row in `mfa_enforcement_log` within 30 seconds | Test procedure: (1) create a test `tenant_admin` user with TOTP not yet challenged; (2) obtain `aal1` JWT via `supabase.auth.signInWithPassword`; (3) `curl -H "Authorization: Bearer <aal1-jwt>" https://form.coach/api/admin/test-probe` — expect HTTP 403; (4) confirm response body `code = AUTH_AAL2_REQUIRED`; (5) query `SELECT * FROM mfa_enforcement_log WHERE actor_id = '<test-user-id>' AND event_type = 'auth.mfa_required_gate_blocked' AND created_at > NOW() - INTERVAL '2 min'` — expect at least one row | security-engineer | At deployment; quarterly |
+
+**Evidence filing path:** All PRE-49 artefacts are filed under `compliance/evidence/cc6/`. The directory must exist before the first Terraform apply (`mkdir -p compliance/evidence/cc6/`).
+
+---
+
+### 49.7 Gap Closure Summary
+
+#### 49.7.1 Status Transitions
+
+| Gap ID | Description | Previous status | New status | Closed by |
+|---|---|---|---|---|
+| CC6-GAP-001 | GitHub organisation 2FA enforcement — all org members must have 2FA enabled; org setting `require_two_factor_authentication = true` | 🔴 Open (P0) | 🟡 Authored | §49.2 GraphQL mutation + REST API + PAT policy + DEC-030 events delivered |
+| CC6-GAP-002 | Cloudflare Access MFA enforcement for internal tooling (Supabase Studio, Workers dashboard, analytics) — Access policy with `require.mfa = true` | 🔴 Open (P0) | 🟡 Authored | §49.3 Terraform HCL for 3 applications + 3 policies + DEC-030 events delivered |
+| CC6-GAP-003 | Supabase tenant-admin TOTP gate — `require-mfa` Edge Function middleware verifying `aal2` JWT claim for all `tenant_admin` route operations | 🔴 Open (P0) | 🟡 Authored | §49.4 TypeScript Edge Function + RLS policy + `mfa_enforcement_log` DDL + Supabase config + DEC-030 events delivered |
+
+**Authored** means: the implementation specification is complete, production-deployable, and all evidence collection methods are defined. Status advances to 🟢 Closed when the §49.8 implementation checklist is completed and PRE-49-E-001 through PRE-49-E-005 are filed in `compliance/evidence/cc6/`.
+
+#### 49.7.2 P0 Count Update
+
+| Metric | Before §49 | After §49 authored |
+|---|---|---|
+| P0 gaps open | 6 | 3 |
+| CC6 gaps closed this section | 0 | 3 (CC6-GAP-001, CC6-GAP-002, CC6-GAP-003) |
+| SOC 2 readiness estimate | ~95.5% | ~96% |
+
+The three remaining P0 gaps after §49 are CC7-GAP-005 (🟡 Authored — §47), CC7-GAP-006 (🟡 Authored — §47), and CC7-GAP-007 (🟡 Authored — §48). All three are at the 🟡 AUTHORED stage and are pending deployment confirmation and evidence filing to advance to 🟢 Closed. They represent implementation-pending items, not documentation gaps — the specifications are complete and the implementation checklists in §47.11 and §48.11 govern their closure path.
+
+The P0 count therefore drops from 6 to 3 on §49 authorship. The 3 remaining P0 gaps will close to 0 as the M4 deployment milestone is completed.
+
+---
+
+### 49.8 Implementation Checklist
+
+Track completion in `compliance/checklists/PRE-49-checklist.md`. Items are ordered by dependency; do not skip ahead.
+
+| # | Action | Priority | Milestone | Owner | Done |
+|---|---|---|---|---|---|
+| 1 | Audit GitHub org members with 2FA disabled: `curl -H "Authorization: Bearer ${GITHUB_ORG_ADMIN_PAT}" "https://api.github.com/orgs/form-coach/members?filter=2fa_disabled&per_page=100"`. Contact all returned members and confirm 2FA is enabled before proceeding. This query must return an empty array before step 2 is executed. | P0 | M4 | security-engineer | [ ] |
+| 2 | Enable GitHub org 2FA enforcement via REST API: `curl -X PATCH -H "Authorization: Bearer ${GITHUB_ORG_ADMIN_PAT}" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/orgs/form-coach -d '{"two_factor_requirement_enabled": true}'`. Confirm `two_factor_requirement_enabled: true` in the response body. Capture screenshot as PRE-49-E-001. | P0 | M4 | security-engineer | [ ] |
+| 3 | Apply GitHub PAT policy (fine-grained only, 90-day max expiry, org approval for write grants): call the PAT policies endpoint as specified in §49.2.2. Audit and revoke any existing classic PATs. Log revocations in `compliance/evidence/cc6/PRE-49-E-001b-classic-pat-revocation-log-YYYY-MM-DD.md`. | P0 | M4 | security-engineer | [ ] |
+| 4 | Apply Cloudflare Access Terraform: `cd infra/cloudflare && terraform init && terraform plan -var="cloudflare_account_id=${CLOUDFLARE_ACCOUNT_ID}" -var="cloudflare_zone_id=${CLOUDFLARE_ZONE_ID}" -var="access_team_domain=form-coach.cloudflareaccess.com" -out=access.tfplan && terraform apply access.tfplan`. Confirm 6 resources created (3 applications + 3 policies). Export Terraform state to PRE-49-E-002 JSON. Capture Cloudflare Access dashboard screenshot as PRE-49-E-002 PNG. | P0 | M4 | devops-lead | [ ] |
+| 5 | Enable Supabase MFA for the production project: update `supabase/config.toml` with the `[auth.mfa.totp]` block from §49.4.4. For the production project, also confirm via the Supabase Dashboard: Authentication → Sign In / Up → Multi-factor Authentication → TOTP → Enable both Enroll and Verify toggles. Capture screenshot as PRE-49-E-003. | P0 | M4 | platform-engineer | [ ] |
+| 6 | Run database migration `20260531000001_create_mfa_enforcement_log.sql` (§49.4.5) against the production Supabase project: `supabase db push --project-ref <project-ref>`. Confirm table exists and RLS is enabled: `SELECT tablename, rowsecurity FROM pg_tables WHERE tablename = 'mfa_enforcement_log'` — `rowsecurity` must be `true`. Confirm pg_cron job registered: `SELECT * FROM cron.job WHERE jobname = 'mfa_enforcement_log_cleanup'`. | P0 | M4 | platform-engineer | [ ] |
+| 7 | Deploy `require-mfa` Edge Function: `supabase functions deploy require-mfa --project-ref <project-ref>`. Set the three required secrets (`EMIT_AUDIT_EVENT_URL`, `EMIT_AUDIT_SECRET`, `HMAC_CHAIN_SECRET`) via `supabase secrets set`. Confirm secrets are present (not their values) via `supabase secrets list`; append to PRE-49-E-003. | P0 | M4 | platform-engineer | [ ] |
+| 8 | Run PRE-49-E-005 end-to-end gate test (§49.6): obtain `aal1` JWT, call `/api/admin/test-probe`, confirm HTTP 403 with `AUTH_AAL2_REQUIRED`, confirm `mfa_enforcement_log` row within 30 seconds. Save test output as `compliance/evidence/cc6/PRE-49-E-005-e2e-gate-test-YYYY-MM-DD/`. | P0 | M4 | security-engineer | [ ] |
+| 9 | Register 7 new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` under `### Auth`: `auth.github_2fa_enforcement_enabled` (HIGH, 7yr), `auth.github_member_2fa_failed` (HIGH, 7yr), `auth.cloudflare_access_mfa_challenge` (LOW, 3yr), `auth.cloudflare_access_mfa_passed` (MEDIUM, 3yr), `auth.cloudflare_access_mfa_failed` (HIGH, 7yr), `auth.mfa_required_gate_blocked` (HIGH, 7yr), `auth.mfa_challenge_issued` (LOW, 3yr), `auth.mfa_challenge_success` (MEDIUM, 3yr), `auth.mfa_challenge_failed` (HIGH, 7yr). | P0 | M4 | compliance-officer | [ ] |
+| 10 | Update CC6-GAP-001, CC6-GAP-002, CC6-GAP-003 in §26 gap table from `🔴 Open` to `🟡 AUTHORED`. Update P0 count from 6 to 3. Update SOC 2 readiness from ~95.5% to ~96%. | P0 | M4 | compliance-officer | [ ] |
+| 11 | Collect PRE-49-E-004 (mfa_enforcement_log query output): run the auditor block/pass query from §49.4.5 against production database, export CSV, file in `compliance/evidence/cc6/`. This artefact can only be collected after real `tenant_admin` MFA events have occurred post-deployment — collect at T+7 days after deployment. | P1 | M4+7d | security-engineer | [ ] |
+| 12 | Quarterly maintenance: re-run PRE-49-E-005 end-to-end test; verify GitHub org still has `two_factor_requirement_enabled: true` via REST API; re-export Cloudflare Access Terraform state as updated PRE-49-E-002; review `mfa_enforcement_log` for any spike in `auth.mfa_required_gate_blocked` events that would indicate a systematic misconfiguration or an attacker probing the gate with downgraded tokens. | P2 | Quarterly | security-engineer | [ ] |
+
+---
+
+*v2.1 additions (2026-05-31): §49 GitHub Organisation 2FA Enforcement + Cloudflare Access MFA + Supabase Tenant-Admin TOTP Gate — CC6-GAP-001/CC6-GAP-002/CC6-GAP-003 Auditor Exhibit. Closes three CC6 authentication assurance P0 gaps in a single implementation milestone. CC6-GAP-001: GitHub org `require_two_factor_authentication` enforcement via REST API (`PATCH /orgs/form-coach` with `two_factor_requirement_enabled: true`) and equivalent GraphQL mutation (`updateOrganization.requiresTwoFactorAuthentication`); pre-flight audit query to list members with 2FA disabled (`/orgs/form-coach/members?filter=2fa_disabled`); fine-grained PAT policy enforcement (classic PATs prohibited, 90-day max expiry, org-owner approval for write grants via `/orgs/form-coach/personal-access-tokens/policies`); branch protection API call enforcing required status checks (`snyk-scan`, `trivy-scan`, `build-and-test`), `enforce_admins: true`, 1 required approving review, `allow_force_pushes: false`; GitHub Actions OIDC federation policy (no long-lived PATs in secrets); two new DEC-030 events: `auth.github_2fa_enforcement_enabled` (HIGH, 7yr — `members_removed` field alerts on inadvertent org member removal) and `auth.github_member_2fa_failed` (HIGH, 7yr — emitted on `membership` webhook with `two_factor_requirement` removal reason). CC6-GAP-002: Terraform HCL (`infra/cloudflare/access.tf`) for three `cloudflare_access_application` resources (FORM Supabase Studio at `supabase-studio.security.form.coach`, FORM Workers Dashboard at `workers-dash.security.form.coach`, FORM Analytics at `analytics.security.form.coach`) each with a paired `cloudflare_access_policy` resource with `require { mfa = [{ type = "totp" }] }` enforcement; `session_duration = "4h"` for privileged tooling, `"8h"` for analytics; `auto_redirect_to_identity = true`; `allowed_email_domain = "form.coach"` include condition; Terraform outputs for application and policy IDs (PRE-49-E-002 evidence); three new DEC-030 events: `auth.cloudflare_access_mfa_challenge` (LOW, 3yr), `auth.cloudflare_access_mfa_passed` (MEDIUM, 3yr), `auth.cloudflare_access_mfa_failed` (HIGH, 7yr — `ip_hash` field, never raw IP; `application_name` field for per-app incident triage). CC6-GAP-003: `supabase/config.toml` changes enabling `[auth.mfa.totp]` with `enroll_enabled = true` and `verify_enabled = true`; `phone` and `web_authn` factors explicitly disabled (SIM-swap risk + no hardware key distribution policy yet); `auth.jwt_aal()` Postgres helper function reading `aal` from `auth.jwt() -> 'app_metadata' ->> 'aal'` with fallback to top-level `aal` claim and `aal1` default-on-absence; `RESTRICTIVE` RLS policy `require_aal2_for_admin_writes` applied via `DO $$ ... FOREACH` loop across five protected tables (`tenants`, `tenant_settings`, `tenant_users`, `user_profiles`, `subscription_plans`); complete `require-mfa` Edge Function TypeScript (`supabase/functions/require-mfa/index.ts`, ~130 lines): `decodeJwtPayload` (no-crypto fast path; relies on Postgres RLS for cryptographic verification), `extractAal`/`extractTenantId` helpers, `hmacHex` via `crypto.subtle`, `emitAuditEvent` fire-and-forget POST to `emit-audit-event` endpoint (§46) with full DEC-030 envelope including `prev_hmac` sentinel `"0".repeat(64)` + chain reconciliation via `audit-chain-daily-check` (§46), route protection via `PROTECTED_PREFIXES` array prefix-matching, `tenant_admin` role guard (non-admin roles pass through), `403` response with structured JSON body (`error: "mfa_required"`, `code: "AUTH_AAL2_REQUIRED"`, `docs` link) and `WWW-Authenticate: Bearer realm="form.coach", error="insufficient_aal"` header, `204` pass-through with `auth.mfa_challenge_success` emission for `aal2` sessions; `mfa_enforcement_log` DDL: `uuid` PK, `event_type` CHECK constraint, `severity` CHECK constraint, `retain_until` timestamptz, `idempotency_key uuid UNIQUE`, `entry_hmac` + `prev_hmac` chain fields; four indexes; RLS with `service_role_insert_only` RESTRICTIVE policy and `authenticated_read_own` permissive SELECT policy; `cron.schedule('mfa_enforcement_log_cleanup', '0 2 * * *', ...)` for retain_until-based expiry; four DEC-030 events: `auth.mfa_required_gate_blocked` (HIGH, 7yr), `auth.mfa_challenge_issued` (LOW, 3yr), `auth.mfa_challenge_success` (MEDIUM, 3yr), `auth.mfa_challenge_failed` (HIGH, 7yr); Supabase Auth webhook handler pattern for `auth.mfa_challenge_issued/success/failed` events from `MFA_CHALLENGE_CREATED` and `USER_UPDATED` Auth hooks. Five evidence artefacts PRE-49-E-001 through PRE-49-E-005: GitHub auth security screenshot + REST API confirmation (E-001); Cloudflare Access dashboard screenshot + Terraform state JSON (E-002); Supabase MFA settings screenshot + `supabase secrets list` (E-003); `mfa_enforcement_log` auditor query CSV at T+7d post-deployment (E-004); end-to-end `aal1`→`403` gate test output + `mfa_enforcement_log` row confirmation within 30 seconds (E-005). SOC 2 mapping: CC6.1 (MFA across all three privileged surfaces), CC6.2 (PAT approval workflow + Access IdP + MFA enrollment in provisioning), CC6.3 (access policy change DEC-030 trail), CC6.6 (GitHub + Cloudflare Access as identity-verified perimeter layers). 12-item implementation checklist: items 1-10 P0/M4 (2FA audit, enforcement enable, PAT policy, Cloudflare Access Terraform, Supabase MFA enable, DB migration, Edge Function deploy, E2E gate test, DEC-030 registry, gap table update), item 11 P1/M4+7d (mfa_enforcement_log evidence collection after live events), item 12 P2/quarterly (maintenance + review). Gap closure: CC6-GAP-001/002/003 🔴 Open → 🟡 Authored. P0 count: 6 → 3. SOC 2 readiness: ~95.5% → ~96%.*

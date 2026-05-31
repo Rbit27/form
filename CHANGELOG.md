@@ -6,6 +6,16 @@
 
 ---
 
+## [1.36.0] — 2026-05-31
+
+### Added
+- `docs/SOC2_READINESS.md §49` — GitHub Organisation 2FA Enforcement + Cloudflare Access MFA + Supabase Tenant-Admin TOTP Gate — CC6-GAP-001/CC6-GAP-002/CC6-GAP-003 Auditor Exhibit (+1,105 рядків). GitHub org `require_two_factor_authentication` via REST API + GraphQL (`PATCH /orgs/form-coach`), pre-flight member audit query, fine-grained PAT policy (classic PATs заборонені, 90-day expiry, OIDC federation для CI). Terraform HCL `infra/cloudflare/access.tf`: три `cloudflare_access_application` + три `cloudflare_access_policy` з `require { mfa = [{type = "totp"}] }` (4h/8h session, auto-redirect). `supabase/config.toml` MFA block, `auth.jwt_aal()` Postgres helper, `RESTRICTIVE` RLS policy на 5 таблицях. `require-mfa` Edge Function TypeScript (~130 рядків): AAL2 JWT перевірка, DEC-030 emit, 403 з `AUTH_AAL2_REQUIRED`, `mfa_enforcement_log` DDL (RESTRICTIVE insert policy). 7 нових DEC-030 подій (HIGH/7yr для blocked/failed). 5 evidence artefacts PRE-49-E-001–005. 12 checklist items. CC6-GAP-001/002/003 🔴→🟡 Authored. P0: 6→3. SOC2: ~95.5%→~96%.
+
+### Changed
+- `VERSION` → 1.36.0
+
+---
+
 ## [1.35.0] — 2026-05-31
 
 ### Added
