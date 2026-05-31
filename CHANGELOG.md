@@ -6,6 +6,16 @@
 
 ---
 
+## [1.35.0] — 2026-05-31
+
+### Added
+- `content/post-160-force-velocity-curve.md` — «Силова-швидкісна крива: фізіологія компромісу між силою і швидкістю». Sports-scientist reviewed. Модель Хілла (1938), F-V гіпербола, пік потужності (~30–70% 1RM залежно від рівня тренованості per Cormie et al. 2011), фізіологічна основа (cross-bridge kinetics, склад волокон, Ca²⁺ release, pennation angle), силово-швидкісний спектр (maximal strength → ballistic), RFD та перші 50–200 мс, PAP/contrast training, обмеження моделі. Clinical-safety not required (no body/food/mental/injury content). 10 citations.
+
+### Changed
+- `VERSION` → 1.35.0
+
+---
+
 ## [1.34.2] — 2026-05-31
 
 ### Added
