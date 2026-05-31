@@ -3482,4 +3482,235 @@ This checklist tracks the work required to make the financial machinery in §23 
 
 ---
 
-*v1.4 additions: §23 Enterprise NRR Engine & Expansion Revenue Model — formulaic monthly ARR bridge with six named rows and sample Month 12 computation (§23.1); tier migration economics with precise ACV calculations for Starter → Growth (+$7,200, +50%) and Growth → Enterprise (+$30,000, +56%) canonical migrations, multi-year discount pricing grid, and CSM migration trigger signals (§23.2); add-on revenue taxonomy with five SKUs (white-label, premium SLA, custom integration, advanced analytics, additional admin seats), price ranges, gross margin profiles, and Year 2 attach rate targets (§23.3); three-year cohort NRR projection table by tier (Starter 100%/105%/112%, Growth 105%/112%/120%, Enterprise 108%/118%/127%) with blended NRR calculation at §19.7 Base mix yielding ~114% Year 2 blended NRR (§23.4); blended NRR formula, mix-shift effect documentation, and Enterprise share sensitivity table (§23.5); annual price indexation clause with CPI+3% cap, 0% floor, 10% ceiling, three-year compounding scenarios across four CPI regimes, and EUR contract HICP note (§23.6); six DEC-030 expansion audit events (enterprise.seat_expanded HIGH, enterprise.seat_contracted HIGH, enterprise.tier_upgraded CRITICAL, enterprise.tier_downgraded CRITICAL, enterprise.addon_purchased HIGH, enterprise.contract_renewed STANDARD) with required metadata fields and per-tenant HMAC chaining specification (§23.7); NRR-to-ARR multiple table (90% NRR → 4–6×; 130% NRR → 16–22×) with implied valuation ranges at §19.7 Bear/Base/Bull ARR levels and NRR as a founder equity protection metric (§23.8); implementation checklist with P0/P1 priorities and M4/M5 milestones covering ARR bridge job, event instrumentation for all six audit events, tier NRR tracking, and quarterly review cadence (§23.9); OQ-28 (actual seat expansion rate), OQ-29 (add-on attach rate at first renewal), OQ-30 (FX impact on EUR-denominated contracts) (§23.10).*
+## 24. Series A Fundraising Economics & Dilution Modeling
+
+### 24.1 Purpose
+
+§22 models cash flow and runway — it tells the founder how long the company can survive on a given funding amount and when to initiate a fundraise. §23 models NRR and expansion revenue — it tells the founder how healthy the enterprise book is and whether it supports a premium valuation multiple. What neither section does is model the fundraise itself: how much to raise, at what valuation, on what instrument, and what the resulting dilution looks like across scenarios. This section fills that gap. It provides a structured framework for pre-seed through Series A capital planning, dilution arithmetic, bridge instrument analysis, and the event-level audit trail that institutional investors will expect during diligence. All figures are [ESTIMATE] unless sourced from another section of this document.
+
+---
+
+### 24.2 Seed Round Recap & Current Cap Table Baseline
+
+All figures below are placeholders until the pre-seed round closes. The table represents the intended post-pre-seed state; actuals will replace [ESTIMATE] markers after close.
+
+| Round | Amount | Pre-Money Valuation | Post-Money Valuation | Founder % | Investor % | ESOP Pool % |
+|---|---|---|---|---|---|---|
+| Formation (day zero) | — | — | — | 100% [ESTIMATE] | 0% | 0% |
+| Pre-seed (target) | $150,000–$300,000 [ESTIMATE] | $500,000–$1,000,000 [ESTIMATE] | $650,000–$1,300,000 [ESTIMATE] | 77–85% [ESTIMATE] | 5–10% [ESTIMATE] | 10% [ESTIMATE] |
+| Post-pre-seed (working baseline) | $200,000 [ESTIMATE] | $800,000 [ESTIMATE] | $1,000,000 [ESTIMATE] | 80% [ESTIMATE] | 10% [ESTIMATE] | 10% [ESTIMATE] |
+
+**Note:** All figures are placeholders until pre-seed closes. The ESOP pool is created pre-money (i.e., it dilutes the founder, not the incoming investor, unless negotiated otherwise). Ukrainian company law does not natively support stock options; a Cyprus or Delaware HoldCo structure is likely required before any option grants are issued — see OQ-33 below.
+
+---
+
+### 24.3 Series A Readiness Criteria
+
+§22.6.1 defines readiness criteria focused on operational metrics (ARR, logo count, NRR, W-ACSU, D30 retention). This section expands those criteria to include financial thresholds drawn from §19 Base scenario ARR projections, §23 NRR targets, and §6 gross margin targets. Both tables must be read together before initiating a Series A process.
+
+| Criterion | Target | Current Status | Source Section |
+|---|---|---|---|
+| Total ARR | ≥ $500,000 [ESTIMATE] | Pre-launch; $0 actual | §19.7 Base: $188k at Month 24; $500k requires Bull scenario or acceleration |
+| Enterprise ARR | ≥ $120,000 [ESTIMATE] | Pre-launch; $0 actual | §22.6.1 "strong" threshold |
+| Enterprise logo count | ≥ 3 signed pilots (at least 1 converted to paid) | 0 | §22.6.1; §21 pilot governance |
+| Net Revenue Retention (NRR) | ≥ 110% [ESTIMATE] | Not measurable pre-first-renewal | §23.5 blended NRR target; §23.8 valuation driver |
+| Gross margin | ≥ 70% [ESTIMATE] | Not measurable pre-launch | §6 gross margin targets |
+| Consumer Pro subscribers | ≥ 1,500 [ESTIMATE] | 0 | §22.6.1 "strong" threshold |
+| W-ACSU (NSM) | ≥ 3.5 sessions/week/active user | Not measurable pre-launch | METRICS.md; §22.6.1 |
+| D30 retention | ≥ 55% [ESTIMATE] | Not measurable pre-launch | §22.6.1 "strong" threshold |
+| Runway at raise (post-close) | ≥ 12 months [ESTIMATE] | Depends on raise amount; see §24.4 | §22.4 safe-harbor logic |
+| Data room readiness | Complete: all §§ cross-referenced, dashboards investor-grade | Not started | §24.11 checklist P0 item |
+
+**Observation:** The $500k total ARR threshold is more aggressive than the §22.6.1 enterprise-only threshold. Reaching $500k total ARR from the §19.7 Base scenario requires either a meaningfully larger consumer subscriber base than the Base case projects, or a Bull enterprise pipeline (7+ paid accounts by Month 18). Founders should treat $500k ARR as the aspirational Series A anchor, and $188k (Base Month 24) as the floor — a fundable story with appropriate narrative framing around trajectory.
+
+---
+
+### 24.4 Capital Requirements Model
+
+The raise amount at Series A should fund 18 months of operations at the post-hire burn rate with a 20% buffer for surprises. The table below models use of funds for a $2–4M raise [ESTIMATE], which is appropriate for a Ukrainian/CEE-market seed or seed-extension round. Note: for most Western VCs, a $2–4M raise at a $6–16M pre-money valuation is classified as a Seed or Seed-extension, not a Series A. The label used with any given investor should match their own stage taxonomy.
+
+| Use of Funds Category | Bear ($2M total) | Base ($2.5M total) | Bull ($4M total) | Assumptions |
+|---|---|---|---|---|
+| Engineering headcount (3 engineers × 18 months) | $540,000 [ESTIMATE] | $540,000 [ESTIMATE] | $900,000 [ESTIMATE] | $10,000/month/engineer [ESTIMATE] CEE market rate; Bull adds 2 senior engineers |
+| ML/CV infrastructure scale-up | $120,000 [ESTIMATE] | $180,000 [ESTIMATE] | $300,000 [ESTIMATE] | GPU inference, ClickHouse Cloud, PostHog scale; §13 infrastructure model |
+| Sales & marketing (enterprise GTM) | $200,000 [ESTIMATE] | $350,000 [ESTIMATE] | $600,000 [ESTIMATE] | Founder-led through Month 6; first AE hire at Month 9 per §19.4 |
+| Legal & compliance (HoldCo, SAFE, contracts) | $80,000 [ESTIMATE] | $100,000 [ESTIMATE] | $150,000 [ESTIMATE] | Delaware/Cyprus HoldCo if not pre-funded; GDPR legal review; MSA templates |
+| Working capital buffer (20% of total) | $333,000 [ESTIMATE] | $416,000 [ESTIMATE] | $666,000 [ESTIMATE] | API cost shock, hiring delays, enterprise sales cycle elongation per §17 |
+| G&A and founder salary | $240,000 [ESTIMATE] | $300,000 [ESTIMATE] | $360,000 [ESTIMATE] | $10,000–$15,000/month founder salary [ESTIMATE] — see OQ-27 |
+| **Subtotal before buffer** | ~$1,180,000 | ~$1,470,000 | ~$2,310,000 | — |
+| **Rounded raise target** | **$2,000,000 [ESTIMATE]** | **$2,500,000 [ESTIMATE]** | **$4,000,000 [ESTIMATE]** | Buffer absorbed; headline raise numbers for term sheet |
+
+**Target raise range: $2–4M [ESTIMATE].** The raise should be sized to guarantee ≥ 12 months of post-close runway under Base burn assumptions (§22.4), with sufficient upside to pursue the Bull engineering and GTM plan without a premature return to market.
+
+---
+
+### 24.5 Pre-Money Valuation Methodology
+
+Three independent methods are used to triangulate the pre-money valuation at Series A. All inputs are [ESTIMATE] until first term sheet received.
+
+#### 24.5.1 ARR Multiple Method
+
+| Scenario | ARR at Raise | Multiple Range | Implied Pre-Money |
+|---|---|---|---|
+| Bear (Month 18 Bear ARR) | $80,000 [ESTIMATE] | 3–5× [ESTIMATE] | $240,000–$400,000 [ESTIMATE] |
+| Base (Month 24 Base ARR) | $188,000 [ESTIMATE] | 5–8× [ESTIMATE] | $940,000–$1,504,000 [ESTIMATE] |
+| Bull (Month 18 Bull ARR) | $350,000 [ESTIMATE] | 8–12× [ESTIMATE] | $2,800,000–$4,200,000 [ESTIMATE] |
+
+Note: ARR multiples of 3–8× are appropriate for early-stage SaaS at this revenue scale in CEE/Ukrainian markets [ESTIMATE]. US/EU multiples at similar ARR but with AI-native differentiation can reach 10–20×; however, applying US multiples to a Ukrainian-founded company without a Delaware/Cyprus entity established is not supportable until the HoldCo structure is in place (OQ-33).
+
+#### 24.5.2 Comparable Transactions (Fitness / AI SaaS)
+
+| Company | Stage | Round Size | Pre-Money | ARR at Raise | ARR Multiple | Notes |
+|---|---|---|---|---|---|---|
+| AI coaching SaaS (undisclosed, CEE) | Seed | $1.5M [ESTIMATE] | $6M [ESTIMATE] | ~$400k [ESTIMATE] | ~15× [ESTIMATE] | Comparable geography; AI-native; [ESTIMATE] — unverified market intel |
+| B2B wellness SaaS (EU, 2023) | Series A | $3M [ESTIMATE] | $12M [ESTIMATE] | ~$800k [ESTIMATE] | ~15× [ESTIMATE] | Closer to FORM's target; [ESTIMATE] |
+| Consumer fitness app (US, 2022) | Seed | $2M [ESTIMATE] | $8M [ESTIMATE] | ~$300k [ESTIMATE] | ~27× [ESTIMATE] | US premium; not directly comparable [ESTIMATE] |
+| Enterprise HR-tech (CEE, 2024) | Seed | $2.5M [ESTIMATE] | $10M [ESTIMATE] | ~$600k [ESTIMATE] | ~17× [ESTIMATE] | B2B SaaS; CEE comparable [ESTIMATE] |
+
+**All comparable transaction figures are [ESTIMATE] and require verification against public data sources before use in investor presentations.**
+
+#### 24.5.3 Score-Based Method (Berkus-Adjacent)
+
+| Factor | Weight | Score (1–3) | Weighted Score | Notes |
+|---|---|---|---|---|
+| Team (founder + early hires) | 25% | [FOUNDER_INPUT: 1–3] | — | Solo founder pre-launch = 1; founding team of 2–3 with relevant background = 2–3 |
+| Traction (ARR, users, pilots) | 30% | [FOUNDER_INPUT: 1–3] | — | 0 ARR = 1; $50k ARR = 2; $200k+ ARR = 3 |
+| Market size (TAM/SAM) | 20% | 2 [ESTIMATE] | 0.40 | Global corporate wellness + consumer fitness; large but competitive |
+| Product differentiation (AI, NRR, retention) | 15% | 2 [ESTIMATE] | 0.30 | AI-native architecture; NRR ≥ 110% if achieved = strong differentiator |
+| NRR / revenue quality | 10% | [FOUNDER_INPUT: 1–3] | — | Pre-first-renewal = 1; NRR ≥ 100% = 2; NRR ≥ 115% = 3 |
+| **Total** | **100%** | — | **[computed post-launch]** | Score maps to: 1.0–1.5 → $500k–$2M pre; 1.5–2.0 → $2M–$6M pre; 2.0–2.5 → $6M–$12M pre; 2.5–3.0 → $12M+ pre [ESTIMATE] |
+
+---
+
+### 24.6 Dilution Scenarios
+
+The table below models founder dilution across three raise scenarios, including the effect of a 10% ESOP pool refresh required by most institutional investors as a pre-close condition. The ESOP pool is created pre-money (dilutes the founder before the investor's ownership is calculated), which increases the effective dilution beyond the headline percentage.
+
+#### 24.6.1 Primary dilution table
+
+| Scenario | Raise Amount | Pre-Money | Post-Money | Investor % | Founder % Pre-ESOP Refresh | ESOP Refresh (+10% pre-close) | Founder % Post-Refresh |
+|---|---|---|---|---|---|---|---|
+| Bear | $1,500,000 [ESTIMATE] | $6,000,000 [ESTIMATE] | $7,500,000 [ESTIMATE] | 20.0% [ESTIMATE] | 72.0% [ESTIMATE] | −9.0% [ESTIMATE] | 63.0% [ESTIMATE] |
+| Base | $2,500,000 [ESTIMATE] | $10,000,000 [ESTIMATE] | $12,500,000 [ESTIMATE] | 20.0% [ESTIMATE] | 72.0% [ESTIMATE] | −9.0% [ESTIMATE] | 63.0% [ESTIMATE] |
+| Bull | $4,000,000 [ESTIMATE] | $16,000,000 [ESTIMATE] | $20,000,000 [ESTIMATE] | 20.0% [ESTIMATE] | 72.0% [ESTIMATE] | −9.0% [ESTIMATE] | 63.0% [ESTIMATE] |
+
+#### 24.6.2 Dilution mechanics note
+
+The 10% ESOP pool refresh is applied to the pre-money capitalisation: if the pre-money cap table is 80% founder / 10% pre-seed investors / 10% existing ESOP, and a 10% refresh is required, the new pool is carved from all existing holders pro-rata (or from founder only if negotiated that way). The table above assumes the refresh is borne entirely by the founder, which is conservative. In practice, it is shared pro-rata across all pre-Series A holders. The headline investor ownership percentage is constant across scenarios because all three scenarios assume a 20% Series A stake — the variable is the pre-money valuation, which determines the price-per-share but not the ownership fraction.
+
+---
+
+### 24.7 Cap Table Evolution (Seed → Series A → Series B)
+
+All figures are [ESTIMATE]. The Series B row is illustrative only — no fundraise thesis has been developed for Series B at this stage.
+
+| Holder | Post-Formation | Post-Pre-Seed | Post-Series A (Base) | Post-Series B (illustrative) |
+|---|---|---|---|---|
+| Founder | 100% [ESTIMATE] | 80% [ESTIMATE] | 63% [ESTIMATE] | 47–52% [ESTIMATE] |
+| Pre-seed investors | 0% | 10% [ESTIMATE] | 8% [ESTIMATE] | 6% [ESTIMATE] |
+| ESOP pool | 0% | 10% [ESTIMATE] | 17% [ESTIMATE] | 17–20% [ESTIMATE] |
+| Series A investors | 0% | 0% | 20% [ESTIMATE] | 15% [ESTIMATE] |
+| Series B investors | 0% | 0% | 0% | 20% [ESTIMATE] |
+| **Total** | **100%** | **100%** | **108% [ESTIMATE]** | **105–115% [ESTIMATE]** |
+
+**Note:** Post-Series A total exceeds 100% in this table because the ESOP pool refresh is applied pre-money and the investor percentage is computed post-money, creating a double-counting artefact in a simplified illustration. A fully diluted cap table computed on actual share counts will reconcile to exactly 100%. The figures above are directional; use a dedicated cap table tool (e.g., Carta, Pulley, or equivalent) for legally accurate dilution modelling before any term sheet negotiation.
+
+---
+
+### 24.8 Bridge Financing Analysis
+
+A bridge round is preferable to a premature Series A when traction is insufficient to command a strong valuation but runway is deteriorating. The analysis below defines the conditions under which a bridge is the correct decision and models the dilution cost.
+
+#### 24.8.1 Bridge trigger criteria
+
+| Criterion | Bridge-Favourable Signal | Series A-Favourable Signal |
+|---|---|---|
+| Runway | < 6 months remaining [ESTIMATE] | ≥ 9 months remaining |
+| Total ARR | < $300,000 [ESTIMATE] | ≥ $500,000 [ESTIMATE] |
+| Qualified pipeline (enterprise) | ≥ 3 qualified leads, not yet signed | ≥ 3 signed pilots (at least 1 paid) |
+| NRR | First renewal cycle not yet completed | NRR ≥ 110% [ESTIMATE] on ≥ 2 renewals |
+| Investor interest level | Warm interest but no term sheets; process premature | ≥ 2 firms in active diligence |
+
+#### 24.8.2 Bridge instrument
+
+Preferred instrument: **SAFE with MFN (Most Favoured Nation) clause and valuation cap**. The MFN clause ensures that if a subsequent SAFE investor receives better terms, existing SAFE holders receive the same terms retroactively. The valuation cap protects bridge investors from an outsized up-round without limiting founder optionality.
+
+**Important:** A SAFE as typically structured under US law (Y Combinator standard form) is not recognised as a security under Ukrainian company law. A Cyprus or Delaware HoldCo is likely required before issuing any SAFE instrument to institutional investors. See OQ-33.
+
+#### 24.8.3 Bridge dilution model
+
+| Scenario | Bridge Amount | Valuation Cap | Discount Rate | Implied Conversion Price Ceiling | Estimated Dilution at Series A Conversion |
+|---|---|---|---|---|---|
+| Conservative bridge | $200,000 [ESTIMATE] | $4,000,000 [ESTIMATE] | 20% [ESTIMATE] | $3,200,000 effective [ESTIMATE] | ~5–6% [ESTIMATE] |
+| Standard bridge | $350,000 [ESTIMATE] | $6,000,000 [ESTIMATE] | 20% [ESTIMATE] | $4,800,000 effective [ESTIMATE] | ~6–7% [ESTIMATE] |
+| Aggressive bridge | $500,000 [ESTIMATE] | $8,000,000 [ESTIMATE] | 20% [ESTIMATE] | $6,400,000 effective [ESTIMATE] | ~6–8% [ESTIMATE] |
+
+**Observation:** A $350k bridge at a $6M cap adds approximately 6–7% dilution on top of the Series A round, reducing founder ownership from the §24.6 Base scenario of ~63% to approximately 56–57% [ESTIMATE]. This is meaningful but not fatal if the bridge buys sufficient time to reach the ARR and NRR thresholds that justify a $10M+ pre-money Series A.
+
+---
+
+### 24.9 Series A Timing Triggers
+
+The following trigger table operationalises the readiness criteria in §24.3 and §22.6.1 as discrete, monitorable thresholds. When all P0 triggers are green, the founder should initiate the fundraise preparation phase immediately (deck, data room, warm introductions). When any P0 trigger is red, assess whether a bridge is appropriate (§24.8).
+
+| Trigger | Threshold | Current Status | Priority | Action on Breach |
+|---|---|---|---|---|
+| ARR milestone | ≥ $500,000 total ARR [ESTIMATE] | Pre-launch; $0 | P0 | Track monthly per §19.7; initiate raise prep when ≥ $300k and trajectory to $500k within 4 months |
+| NRR milestone | ≥ 110% [ESTIMATE] on ≥ 2 enterprise renewal cycles | Not measurable | P0 | Track per §23.5; first measurable at Month 13+; use trailing NRR from most recent cohort |
+| Enterprise pilot count | ≥ 3 signed pilots (at least 1 converted to paid) | 0 | P0 | Track per §21 conversion governance; initiate raise only after 3rd pilot signed |
+| Gross margin floor | ≥ 70% blended [ESTIMATE] | Not measurable | P1 | Track per §6; monitor monthly once first revenue recognised; red if < 65% two months running |
+| Runway floor | ≥ 9 months post-close [ESTIMATE] | Depends on pre-seed close | P0 | If < 6 months before trigger set is green, go to §24.8 bridge analysis immediately |
+| Founder readiness | Deck complete, data room populated, legal structure resolved (OQ-33) | Not started | P0 | Start data room at M5; legal structure resolved before first institutional meeting |
+
+---
+
+### 24.10 DEC-030 Fundraising Audit Events
+
+Fundraising events generate legal and financial obligations that must be recorded with the same integrity as revenue-recognition events. The following DEC-030 events are required for a complete audit trail. All events are server-side only (never client-emitted), HMAC-chained in sequence, and retained for 7 years to satisfy financial record-keeping requirements under applicable company law.
+
+| Event Type | Severity | Key Metadata Fields | Retention | Notes |
+|---|---|---|---|---|
+| `fundraise.term_sheet_received` | HIGH | `round_name`, `lead_investor_id` (pseudonymous), `pre_money_valuation_usd`, `raise_amount_usd`, `term_sheet_date`, `expiry_date`, `received_by` (founder user_id) | 7 years | Emitted when founder receives and acknowledges receipt of term sheet in internal system; not on external signature |
+| `fundraise.round_closed` | CRITICAL | `round_name`, `total_raise_usd`, `pre_money_valuation_usd`, `post_money_valuation_usd`, `close_date`, `investor_count`, `wire_confirmed` (bool), `holdco_jurisdiction` | 7 years | Emitted only after wire received and confirmed in bank account; single emission per round close |
+| `fundraise.bridge_instrument_signed` | HIGH | `instrument_type` (SAFE/convertible_note/other), `amount_usd`, `valuation_cap_usd`, `discount_rate_pct`, `mfn_clause` (bool), `signing_date`, `investor_id` (pseudonymous) | 7 years | Emitted per instrument, not per investor if multiple instruments in same closing |
+| `fundraise.esop_pool_expanded` | HIGH | `previous_pool_pct`, `new_pool_pct`, `expansion_date`, `board_resolution_ref`, `total_authorised_shares_post`, `holdco_jurisdiction` | 7 years | Emitted on every pool expansion; triggers cap table recomputation job |
+| `fundraise.cap_table_updated` | CRITICAL | `update_reason` (round_close/esop_expansion/transfer/conversion), `founder_pct_post`, `investor_pct_post`, `esop_pct_post`, `fully_diluted_shares`, `update_date`, `verified_by` (founder user_id), `cap_table_tool_ref` | 7 years | Emitted after every material cap table change; must reconcile with cap table tool (Carta/Pulley/equivalent) within 48 hours of emission |
+
+**7-year retention note:** Financial records relating to share issuance, investment instruments, and cap table changes are subject to legal retention requirements that vary by jurisdiction (Ukrainian law: 5 years minimum; Cyprus/Delaware: 7+ years standard). All fundraising audit events are retained for 7 years as the conservative common denominator across likely HoldCo jurisdictions.
+
+---
+
+### 24.11 Implementation Checklist
+
+| Item | Priority | Milestone | Owner | Definition of Done |
+|---|---|---|---|---|
+| Pre-seed close and cap table documentation in authoritative tool (Carta or equivalent) | P0 | M4 | founder | Cap table tool populated with post-pre-seed state; founder % and ESOP pool confirmed; [FOUNDER_INPUT: tool selection] |
+| Legal structure review: HoldCo jurisdiction decision (Cyprus / Delaware / Ukraine-only) | P0 | M4 | founder + legal counsel | Written legal memo from qualified counsel; HoldCo resolution made before any institutional fundraise contact |
+| Data room skeleton: all relevant §§ cross-referenced and dashboards investor-grade | P0 | M5 | founder + data-engineer | Data room folder structure complete; §§ 6, 13, 14, 17, 18, 19, 22, 23, 24 linked or exported; Metabase dashboards accessible to founder |
+| ARR tracking vs. §24.9 Series A trigger ($500k threshold) | P0 | M5 | data-engineer | `arr_monthly` metric computed per §18.3 bridge methodology; trigger threshold monitored in Metabase; Slack alert on 80% threshold cross |
+| NRR tracking per §23.5 feeding into §24.3 readiness table | P0 | M5 | data-engineer | Cohort NRR query runs monthly; output piped to investor-facing dashboard; alert on NRR < 100% for any trailing quarter |
+| Gross margin tracking vs. §24.3 ≥ 70% floor | P1 | M5 | data-engineer | §6 gross margin computed monthly from Stripe + infrastructure invoices; alert on < 65% for two consecutive months |
+| Legal counsel engaged for SAFE / term sheet review | P0 | Pre-raise | founder | Retainer or engagement letter with counsel qualified in relevant HoldCo jurisdiction; completed before first institutional meeting |
+| DEC-030 event emission: all five fundraising audit events in §24.10 | P1 | M5 | security-engineer | Event schema validated in Zod; server-side emission confirmed in staging; HMAC chaining tested; 7-year retention policy applied in Supabase |
+| Cap table scenario model (§24.6 Bear/Base/Bull) populated with actual pre-seed figures | P1 | M4 | founder | §24.6.1 table updated with actual pre-seed close figures; [ESTIMATE] markers replaced where actuals known |
+| Bridge instrument analysis reviewed by legal counsel | P0 | Pre-bridge (if triggered) | founder + legal counsel | SAFE template reviewed for HoldCo jurisdiction compatibility; MFN clause and valuation cap confirmed; OQ-33 resolved before signing |
+
+---
+
+### 24.12 Open Questions
+
+**OQ-31: Pre-money valuation at first institutional round — CEE vs. US multiple compression**
+
+The §24.5.1 ARR multiple method uses a 3–8× range [ESTIMATE] for CEE/Ukrainian market conditions, versus 10–20× for comparable US-market AI SaaS at Series A. The key unknown is the actual compression factor that Ukrainian-founded companies face when raising from EU or US institutional investors without a Delaware/Cyprus HoldCo already in place. If the HoldCo structure is resolved early (OQ-33), the applicable multiple may be closer to the EU norm (8–15× at this ARR scale [ESTIMATE]), materially improving the pre-money valuation in the §24.6 Bear scenario. Owner: founder. Priority: P1. Resolution: after first term sheet received — prior to that, any specific multiple is speculation.
+
+**OQ-32: ESOP pool target — Ukrainian labour law implications for option issuance vs. phantom equity**
+
+§24.7 assumes a standard equity option pool. However, Ukrainian labour law does not recognise stock options as a legal construct in the same way US/UK law does. Depending on the HoldCo structure, employee equity participation may need to be structured as phantom equity (cash-settled), virtual equity in a Cyprus company, or options over Delaware shares. Each has materially different tax treatment for the employee and administrative cost for the company. The 10% ESOP pool figure in §24.2 and §24.6 may need to be sized differently (larger, to account for phantom equity cash-settlement cost being a COGS item rather than an equity item) depending on the resolution. Owner: founder + legal counsel. Priority: P1. Resolution: before first engineer hire with an equity component.
+
+**OQ-33: Bridge instrument choice — SAFE not recognised under Ukrainian company law; HoldCo structure required before institutional raise**
+
+A Y Combinator-form SAFE is a US legal instrument that presupposes a Delaware C-corp cap table. It is not natively recognised under Ukrainian company law and has limited enforceability in Cyprus without specific drafting. This means FORM cannot issue a SAFE to an institutional investor without first establishing a HoldCo in an appropriate jurisdiction (Delaware or Cyprus are the most common choices for Ukrainian founders targeting EU/US investors). The risk is that a bridge or pre-seed investor requests a SAFE before the HoldCo is ready, creating either a legal void or a costly retroactive restructuring. Resolution requires: (1) decision on HoldCo jurisdiction, (2) HoldCo incorporated, (3) qualified legal counsel sign-off on instrument form. Owner: founder + legal counsel. Priority: P0. Resolution: before any bridge instrument is signed or any institutional investor meeting where a term sheet is a realistic near-term outcome.
+
+---
+
+*v1.5 additions: §24 Series A Fundraising Economics & Dilution Modeling — purpose and gap-fill vs §22 (runway) and §23 (NRR) (§24.1); pre-seed cap table baseline with [ESTIMATE] placeholders for round amount ($200k), pre-money ($800k), and founder/investor/ESOP splits pending pre-seed close (§24.2); expanded Series A readiness criteria table adding $500k total ARR, ≥70% gross margin, ≥12 months post-close runway, and data room readiness to the §22.6.1 operational metrics (§24.3); capital requirements model for $2–4M raise across Bear/Base/Bull scenarios with per-category use-of-funds table (engineering headcount, ML/CV infra, enterprise GTM, legal, working capital, G&A) and CEE market rate assumptions (§24.4); three-method pre-money valuation framework: ARR multiple (3–8× range, $240k–$4.2M implied pre-money across scenarios), four-row comparable transactions table (CEE/EU/US fitness and B2B SaaS), and five-factor score-based method with 1–3 scale and [FOUNDER_INPUT] placeholders (§24.5); dilution scenarios table across Bear ($1.5M at $6M pre), Base ($2.5M at $10M pre), Bull ($4M at $16M pre) including 10% ESOP pool refresh impact reducing founder ownership to ~63% post-refresh across all scenarios (§24.6); three-round cap table evolution table (post-formation through illustrative Series B) with fully-diluted reconciliation caveat (§24.7); bridge financing analysis with trigger criteria table (runway < 6 months, ARR < $300k, pipeline > 3 qualified leads), SAFE instrument specification with MFN and valuation cap, three bridge size scenarios ($200k–$500k) with conversion dilution estimates, and Ukrainian SAFE law caveat (§24.8); Series A timing triggers table with six P0/P1 triggers (ARR, NRR, pilot count, gross margin, runway, founder readiness) and breach actions (§24.9); five DEC-030 fundraising audit events (fundraise.term_sheet_received HIGH, fundraise.round_closed CRITICAL, fundraise.bridge_instrument_signed HIGH, fundraise.esop_pool_expanded HIGH, fundraise.cap_table_updated CRITICAL) with key metadata fields and 7-year retention policy (§24.10); implementation checklist with P0/P1 priorities across M4/M5/pre-raise milestones covering cap table tooling, HoldCo legal structure, data room, ARR/NRR/gross margin tracking, legal counsel engagement, DEC-030 event emission, and bridge instrument legal review (§24.11); OQ-31 (pre-money valuation CEE vs US multiple compression — P1, owner: founder, resolution: after first term sheet), OQ-32 (ESOP pool — Ukrainian labour law phantom equity vs options — P1, owner: founder + legal counsel, resolution: before first equity hire), OQ-33 (SAFE not recognised under Ukrainian company law; HoldCo required before any institutional instrument — P0, owner: founder + legal counsel, resolution: before any bridge or institutional meeting) (§24.12).*
