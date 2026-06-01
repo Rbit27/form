@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 167 cards (167 content posts authored), category filter, newsletter CTA | v1.41.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 170 cards (170 content posts authored), category filter, newsletter CTA | v1.47.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -254,6 +254,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-167-hpa-axis-cortisol.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | post-168-neuromuscular-fatigue.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | post-169-phosphocreatine-resynthesis.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
+| post-171-sleep-sports-performance.md | Blog | draft · clinical-safety PASS · sports-scientist DONE |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
