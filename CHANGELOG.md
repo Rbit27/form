@@ -6,6 +6,19 @@
 
 ---
 
+## [1.51.0] — 2026-06-01
+
+### Added
+- `content/post-173-osmotic-muscle-adaptation.md` — "Осмотична адаптація м'яза: клітинне набухання як механотрансдукційний сигнал". Sports-science post on cell volume as a mechanotransduction signal. 11 sections (~3,100 words, Ukrainian). Covers: Häussinger et al. (1993 Lancet) — cell volume as protein catabolism determinant; Schliess & Häussinger (2002 Cell Physiol Biochem) — hypotonic swelling → PI3K → Akt → mTORC1 independent of insulin; Low et al. (1996 J Physiol) — osmotic modulation of glycogen synthesis in skeletal muscle; VRAC/LRRC8A channels and ATP-dependent regulatory volume decrease; distinction between osmotic vs mechanical mTOR pathways (partial additivity); 2%+ dehydration → suppressed anabolic signaling; creatine as a cell-volumizing osmotic mechanism; practical training implications. Clinical-safety: NOT REQUIRED (molecular biology, no dietary/body-composition/clinical claims). sports_scientist_reviewed: true.
+
+### Changed
+- `blog.html` → added cards for post-172 (cross-education effect) and post-173 (osmotic adaptation); card count updated
+- `README.md` → post-172 and post-173 marked `[x]`; grip strength topic moved to post-187 roadmap slot
+- `STATUS.md` → blog.html row updated to v1.51.0, 173 posts authored
+- `VERSION` → 1.51.0
+
+---
+
 ## [1.50.0] — 2026-06-01
 
 ### Added
