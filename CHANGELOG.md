@@ -6,6 +6,16 @@
 
 ---
 
+## [1.49.0] — 2026-06-01
+
+### Added
+- `content/post-172-cross-education-effect.md` — "Ефект перехресної адаптації: як тренування однієї руки зміцнює іншу". Sports-science post on bilateral transfer of strength (cross-education effect). 6 sections (~2,400 words, Ukrainian). Covers: phenomenon definition (~9% contralateral gain, Lee & Carroll 2007 meta-analysis), neurophysiological mechanism (ipsilateral CST fibres, transcallosal inhibition via corpus callosum, spinal interneurons, isometric > eccentric > concentric transfer order), cortical changes (MEP amplitude increase, M1 representation expansion, bilateral fMRI activation), practical application (rehabilitation immobilisation context, ≥70% 1RM / ≥3 sets / ≥3×/week threshold), effect limits (neural-only, no hypertrophy transfer, novice > advanced gradient). Clinical-safety: PASS (neuroscience/physiology only; no dietary, body-composition, or clinical rehabilitation claims). sports_scientist_reviewed: true.
+
+### Changed
+- `VERSION` → 1.49.0
+
+---
+
 ## [1.48.0] — 2026-06-01
 
 ### Added
