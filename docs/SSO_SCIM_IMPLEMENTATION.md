@@ -8054,3 +8054,290 @@ Five new alerting rules are added. Add all five to `docs/OBSERVABILITY.md §6.2`
 ---
 
 *v1.5 additions (2026-06-01): Section 23 — Continuous Access Evaluation (CAE) & Shared Signals Framework (SSF) — Real-Time IdP Risk Event Processing. Closes the complementary gap to §22: whereas §22 handles FORM-initiated session revocation, §23 handles the reverse signal direction — IdP-initiated risk events that FORM must receive and act on in real time. Gap closed: IdP security events (account disabled, password reset, MFA credential removed, session revoked from IdP admin console, high-risk sign-in, device compliance change) previously propagated to FORM only at JWT expiry (up to 15 minutes, §12 TTL). Target after §23: < 30 seconds from IdP event to FORM session invalidation via the §22 KV layer. Standards: IETF SSF (draft-ietf-sharedsignals-framework) as transport; OpenID CAEP as event vocabulary (Okta, Entra); OpenID RISC as Google-specific vocabulary; RFC 8417 Security Event Tokens (SET) as wire format. Architecture: FORM registers as SSF Receiver at each IdP; push delivery model (IdP POSTs SETs to `POST /enterprise/v1/sso/caep-receiver/{tenant_id}` Cloudflare Worker); 10-step processing pipeline: HMAC webhook secret validation → JWKS fetch/cache in SSO_KV (1h TTL) → SET JWT signature verification → replay check via set_jti UNIQUE constraint → user resolution → action dispatch → caep_events INSERT → DEC-030 emit → 202 Accepted. Eight event-type-to-action mappings: session-revoked (revoke specific session via §22 KV), credential-change (revoke all user sessions), token-claims-change (set force_reauth KV flag, TTL 24h, triggers 401 re-auth prompt not hard revocation), account-disabled (revoke sessions + set account_suspended KV flag + update tenant_users.status), account-enabled (clear account_suspended KV + restore active status), account-purged (revoke sessions + mark deleted_by_idp + enqueue GDPR deletion workflow), device-compliance-change (conditional revocation based on require_device_compliance tenant flag), Google RISC hijacking (immediate revocation + PagerDuty P0). Two new KV key patterns added to §22.5 schema: force_reauth:{tenant_id}:{user_id} (TTL 24h) and account_suspended:{tenant_id}:{user_id} (TTL 72h); isRevoked() extended with FORCE_REAUTH and ACCOUNT_SUSPENDED RevocationStatus values and corresponding middleware handling. Schema: six new columns on tenant_sso_configs (caep_stream_id, caep_delivery_mode, caep_webhook_secret BYTEA AES-256-GCM encrypted, caep_status ENUM, caep_last_event_at, caep_error_count); new caep_events table (id, tenant_id, user_id nullable, set_jti UNIQUE, event_type, idp_subject, action_taken, processed_at, raw_set_hash — all PII fields stored as SHA-256 hashes; RLS: form_system ALL, tenant_admin SELECT own tenant, form_api zero-rows). IdP-specific implementation: Entra CAE via Microsoft Graph API + EventGridEvent envelope unwrapping + two-layer JWT validation (outer Event Grid bearer token + inner SET signature) + CP1 client capability flag (xms_cc claim); Okta CAEP via SSF transmitter configuration endpoint + stream verification handshake + shared JWKS cache with §4.1 OIDC; Google RISC via Identity Toolkit API + non-standard JWKS format handling + Google Workspace OIDC tenants only. Security: SET replay prevention via set_jti UNIQUE constraint (202 on replay, not 409); JWKS cache poisoning prevention (fresh fetch on kid miss, HIGH audit event if still unresolved); HMAC-SHA256 webhook authenticity (constant-time comparison); rate limiting 1,000 events/h per tenant (429 + stream pause + AL-CAEP-05); tenant isolation (tenant_id URL path vs. SET iss/sub cross-validation, CRITICAL audit on mismatch); PII minimisation (set_jti, idp_subject, raw_set stored as SHA-256 hashes only). Six DEC-030 HMAC-chained audit events: sso.caep_event_received (STANDARD, 7yr — primary SOC 2 CC6.3 evidence), sso.caep_session_revoked (HIGH, 7yr), sso.caep_user_suspended (HIGH, 7yr), sso.caep_user_purged (CRITICAL, 7yr — GDPR deletion SLA start-of-clock; two-person rule on override; emitted before state mutation), sso.caep_stream_error (HIGH, 7yr — controlled error_type vocabulary), sso.caep_stream_registered (HIGH, 7yr). Five alerting rules: AL-CAEP-01 P1 (SET validation failure rate > 5% over 10 min — possible JWKS poisoning), AL-CAEP-02 P0 (account-purged received — GDPR clock starts), AL-CAEP-03 P2 (dead-man's switch: no events on active stream for 4h during business hours), AL-CAEP-04 P1 (Google RISC hijacking event), AL-CAEP-05 P2 (rate limit exceeded). SOC 2: CC6.3 (< 30 s IdP-event to FORM-revocation vs. ≤15 min previously), CC6.6 (credential-change and token-claims-change mapped to session invalidation), CC7.2 (5 alerting rules on stream health), CC7.3 (P0/P1 PagerDuty routing; GDPR workflow on account-purged). Four evidence artefacts: CC6-E-CAEP-001 (caep_events export), CC6-E-CAEP-002 (audit_log sso.caep_* export), CC6-E-CAEP-003 (CAEP stream registration records, sanitized), CC6-E-CAEP-004 (AL-CAEP-01 and AL-CAEP-03 PagerDuty history). Four open questions: OQ-SSO-23.1 (CAEP stream re-registration after §20 SAML cert rotation — security-engineer, P2, M5), OQ-SSO-23.2 (magic-link session coverage — platform-engineer, P1, before M4 deploy), OQ-SSO-23.3 (polling fallback interval vs. < 30 s SLA — platform-engineer, P2, M5), OQ-SSO-23.4 (§21 Google Directory group cache invalidation on RISC hijacking — platform-engineer, P2, M5). Implementation checklist: 15 tasks (8× P0 M4, 5× P1 M4/M5, 2× P1 M5).*
+
+---
+
+## 24. Privileged Access Management (PAM): Just-in-Time Privilege Escalation & Break-Glass Protocol for `form_admin` Operations
+
+### 24.1 Problem: Standing Privilege Risk
+
+The `form_admin` Postgres role grants cross-tenant `SELECT` and `UPDATE` access across all tenant schemas via Row-Level Security bypass. This role is necessary for internal customer-success operations (shadow login per §4, bulk remediation, compliance evidence extraction) but its current model grants **standing access** — credentials exist persistently in internal tooling, Cloudflare Access service tokens, and engineer workstations.
+
+Standing privilege violates the principle of least privilege and creates a direct exposure surface for SOC 2 Trust Service Criteria:
+
+| SOC 2 Criterion | Risk from Standing `form_admin` Credentials |
+|---|---|
+| CC6.1 — Logical access controls | `form_admin` is not scoped to a purpose, duration, or requestor |
+| CC6.2 — Access provisioning | No approval workflow exists prior to access being exercised |
+| CC6.3 — Timely deprovisioning | Access does not auto-expire; revocation requires manual credential rotation |
+
+PAM eliminates standing access by replacing it with **Just-in-Time (JIT) privilege escalation**: `form_admin` credentials are never stored persistently in engineer environments. Every session is request-scoped, time-limited, approval-gated, and fully recorded in the DEC-030 HMAC-chained audit log.
+
+**Non-goals:** PAM does not replace Cloudflare Access authentication for the admin dashboard (§16). PAM specifically governs direct Postgres `form_admin` role usage — the elevated privilege path that bypasses tenant RLS.
+
+---
+
+### 24.2 JIT Elevation Architecture
+
+The privileged access flow is mediated entirely by the `pam-elevation-service` Cloudflare Worker. No engineer or internal service holds a static `form_admin` Postgres password.
+
+```
+Engineer / CS Tool
+        |
+        | POST /internal/v1/pam/elevate
+        |   { access_level, justification, target_tenant_id? }
+        v
++---------------------------+
+|  pam-elevation-service    |  Cloudflare Worker
+|  (workers/pam-elevation)  |
++---------------------------+
+        |
+        |-- 1. Cloudflare Access JWT validation (mTLS service token or IdP identity)
+        |-- 2. Resolve admin_user_id from JWT sub claim
+        |-- 3. Determine access_level tier (read_only | read_write | destructive)
+        |-- 4. Approval gate (see §24.3)
+        |-- 5. TOTP/WebAuthn second factor verification
+        |-- 6. Generate pam_session_id (UUID v4, cryptographically random)
+        |-- 7. Write PAM KV record (see §24.5) with TTL
+        |-- 8. Emit pam.elevation_requested + pam.elevation_approved DEC-030 events
+        |-- 9. Return { pam_session_id, expires_at, access_level } — never returns Postgres credentials
+        v
++---------------------------+
+|  pam-db-proxy             |  Supabase Edge Function (privileged context only)
+|  (supabase/functions/     |
+|   pam-db-proxy)           |
++---------------------------+
+        |
+        |-- 1. Validate pam_session_id against PAM KV (must exist, not expired, not revoked)
+        |-- 2. Verify caller identity matches KV record admin_user_id
+        |-- 3. Open Postgres connection as form_system (connection pool)
+        |-- 4. SET ROLE form_admin;
+        |-- 5. SET app.pam_session_id = '<pam_session_id>';
+        |-- 6. Execute requested query (tenant_id injected for all cross-tenant ops)
+        |-- 7. RESET ROLE; (after each statement batch — session-level, not transaction-level)
+        |-- 8. Return results
+        v
+    Postgres (Supabase)
+    form_admin role active only within this connection's SET ROLE scope
+```
+
+**Key design invariants:**
+
+1. `pam-elevation-service` never touches Postgres directly. It only manages the KV session record.
+2. `pam-db-proxy` never issues elevation — it only validates an existing KV session and opens a scoped connection.
+3. `SET app.pam_session_id` is a Postgres session-level GUC. Audit triggers on sensitive tables read `current_setting('app.pam_session_id')` and include it in their `audit_log` row. This creates a database-level linkage between every privileged query and its PAM session — independent of the application-layer audit events.
+4. `RESET ROLE` is called after each statement batch, not at connection close. The connection pool (PgBouncer in session mode) resets role on checkout via `server_reset_query = RESET ROLE; RESET app.pam_session_id;`.
+5. The `pam-db-proxy` function is only reachable via a Cloudflare Access service token scoped to `internal-tools` audience — not exposed on the public API surface.
+
+---
+
+### 24.3 Approval Workflow by Access Level
+
+Three tiers of access are defined. The tier is determined by the operation category the requester declares at elevation time; `pam-db-proxy` enforces at execution time that the declared tier matches the actual SQL operation class (DML vs. DDL vs. cross-tenant mutation).
+
+| Access Level | Permitted Operations | Approval Requirement | Second Factor | TTL |
+|---|---|---|---|---|
+| `read_only` | `SELECT` only; single-tenant scope or cross-tenant aggregate (anonymized) | Self-approve (no external approval gate) | TOTP (RFC 6238) | 4 hours |
+| `read_write` | `SELECT` + `INSERT` + `UPDATE` on support tables; single-tenant scope only | Async manager approval via Slack webhook (see §24.3.1); 15-minute approval window; auto-deny on timeout | TOTP (RFC 6238) | 1 hour |
+| `destructive` | `DELETE`, `TRUNCATE`, cross-tenant `UPDATE`, schema migrations in flight | Dual-person rule: separate approver identity required (not the requester); approver must authenticate separately via FIDO2 WebAuthn hardware key | Requester: FIDO2 WebAuthn hardware key; Approver: FIDO2 WebAuthn hardware key | 15 minutes |
+
+**24.3.1 Async Manager Approval for `read_write`**
+
+When `read_write` elevation is requested, `pam-elevation-service`:
+
+1. Creates a PAM KV record with `status: pending_approval` and TTL of 15 minutes (approval window).
+2. POSTs a signed Slack webhook message to the `#form-pam-approvals` channel (webhook URL stored in Cloudflare Workers Secret `PAM_SLACK_WEBHOOK_URL`). Message includes: requester identity, declared justification, target tenant (if single-tenant), access level, request timestamp, approve/deny deep links.
+3. Approve/deny links invoke `POST /internal/v1/pam/approve/{pam_request_id}` or `.../deny/{pam_request_id}`, authenticated by the approver's Cloudflare Access JWT.
+4. On approval: KV record transitions to `status: approved`; requester is notified via Slack DM; requester must still present TOTP within 5 minutes to complete elevation.
+5. On timeout (15 minutes without approval action): KV record transitions to `status: denied_timeout`; `pam.elevation_denied` DEC-030 event emitted with `reason: approval_timeout`.
+6. The approver cannot be the same `admin_user_id` as the requester. `pam-elevation-service` enforces this at the approval step and emits a `pam.elevation_denied` event with `reason: self_approval_attempted` if violated.
+
+**24.3.2 Dual-Person Rule for `destructive`**
+
+For `destructive` tier:
+
+1. Requester initiates elevation: presents FIDO2 WebAuthn assertion; PAM KV record created with `status: awaiting_second_person`.
+2. A separate approver (different `admin_user_id`, different active Cloudflare Access session) navigates to `POST /internal/v1/pam/cosign/{pam_request_id}` and presents their own FIDO2 WebAuthn assertion.
+3. Both WebAuthn assertions are recorded in the KV record (`requester_webauthn_credential_id`, `approver_webauthn_credential_id`) and in the `pam.elevation_approved` DEC-030 audit event.
+4. KV record transitions to `status: approved`; TTL is set to 15 minutes from cosign completion.
+5. If no cosign occurs within 30 minutes, the KV record expires and `pam.elevation_denied` is emitted with `reason: cosign_timeout`.
+
+---
+
+### 24.4 Break-Glass Emergency Access Protocol
+
+Break-glass is used when the `pam-elevation-service` Worker is unavailable (Worker deployment failure, KV store outage, IdP connectivity loss) and a production incident requires immediate `form_admin` access.
+
+**Break-glass is not a privilege bypass — it is an independently audited high-urgency path with stricter post-hoc review requirements.**
+
+**24.4.1 Break-Glass Access Policy**
+
+A separate Cloudflare Access application (`form-break-glass`) is configured with:
+
+- Audience tag distinct from the standard PAM service (`CF_ACCESS_AUDIENCE_BREAK_GLASS`).
+- Policy: named list of at most 5 break-glass-authorized identities (managed in `cloudflare/access/break-glass-policy.tf`). This list is reviewed and re-approved quarterly.
+- Session duration: 2 hours maximum, non-renewable. Cloudflare Access will not issue a new session until the previous one has fully expired.
+- Certificate-bound session (`mtls_auth` policy requirement) — hardware key must be present.
+
+**24.4.2 Break-Glass Activation Sequence**
+
+```
+1. Engineer navigates to https://break-glass.internal.form.coach
+2. Cloudflare Access enforces mTLS + named-identity policy
+3. On successful Access auth, a Cloudflare Worker (workers/break-glass-notifier) fires immediately:
+   a. Writes pam:session:{session_id} KV record with is_break_glass: true, TTL 2h
+   b. Emits pam.break_glass_activated DEC-030 audit event (CRITICAL severity)
+   c. Triggers PagerDuty P0 incident via Events API v2 (routing key: PAM_PAGERDUTY_ROUTING_KEY)
+      - Title: "FORM PAM Break-Glass Activated — <admin_user_id>"
+      - Severity: critical
+      - Payload includes: admin_user_id, timestamp, cf_access_session_id (hashed), pam_session_id
+   d. Sends immediate email to compliance-officer@form.coach (via Cloudflare Email Workers)
+      - Subject: "[COMPLIANCE ALERT] PAM Break-Glass Activated"
+      - Body: same payload as PagerDuty; includes link to audit log filtered to pam_session_id
+4. Engineer has direct Postgres access via break-glass Supabase connection string
+   (stored in Cloudflare Workers Secret BREAK_GLASS_DB_URL — rotated quarterly)
+   Connection string uses a dedicated Postgres role `form_break_glass` with identical
+   privileges to `form_admin` but a distinct role name for audit log differentiation.
+5. All Postgres activity is captured by pg_audit (statement level) for the duration of
+   the break-glass session.
+6. At 2h: Cloudflare Access session expires; KV record TTL expires; pam.break_glass_expired
+   DEC-030 event emitted automatically by a Cloudflare Workers Cron job
+   (workers/pam-expiry-sweeper) that polls for expired break-glass KV keys.
+```
+
+**24.4.3 Post-Incident Review Requirement**
+
+Any break-glass activation triggers a mandatory post-incident review within 72 hours:
+
+- compliance-officer and security-engineer jointly review pg_audit logs for the session.
+- A GitHub Issue is auto-created in `form-internal/security-reviews` by the `break-glass-notifier` Worker, linked to the `pam_session_id`.
+- The review must produce one of: (a) "no anomaly — incident justified use", (b) "anomaly detected — escalate to security incident", or (c) "process gap — PAM reliability improvement required".
+- The review outcome is recorded in the `pam_break_glass_reviews` Postgres table (owned by `form_compliance` role) and linked to the original DEC-030 `pam.break_glass_activated` event via `pam_session_id`.
+
+---
+
+### 24.5 KV Schema
+
+All PAM session state lives in Cloudflare KV namespace `PAM_KV` (separate namespace from `SESSION_REVOCATION_KV` and `SSO_KV`).
+
+**Key pattern:** `pam:session:{pam_session_id}`
+
+**Value schema (JSON):**
+
+```jsonc
+{
+  "pam_session_id": "uuid-v4",          // matches KV key suffix
+  "admin_user_id": "uuid-v4",           // internal FORM user ID of the requester
+  "access_level": "read_only | read_write | destructive",
+  "status": "pending_approval | awaiting_second_person | approved | denied | revoked | expired",
+  "expires_at": "ISO-8601 UTC",         // absolute expiry; KV TTL set to same value
+  "approved_at": "ISO-8601 UTC | null",
+  "approver_id": "uuid-v4 | null",      // null for read_only (self-approve)
+  "pam_request_id": "uuid-v4",          // stable ID for Slack approval flow deep links
+  "is_break_glass": false,              // true only for §24.4 break-glass sessions
+  "justification_hash": "sha256-hex",   // SHA-256 of the free-text justification — stored hashed, not raw (PII minimisation)
+  "target_tenant_id": "uuid-v4 | null", // null for cross-tenant operations
+  "requester_webauthn_credential_id": "base64url | null",  // destructive tier only
+  "approver_webauthn_credential_id": "base64url | null",   // destructive tier only
+  "cf_access_jti": "sha256-hex"         // SHA-256 of the Cloudflare Access JWT jti claim — links PAM session to CF Access session without storing the JWT
+}
+```
+
+**TTL values by access level:**
+
+| Access Level | KV TTL | Notes |
+|---|---|---|
+| `read_only` | 14,400 s (4h) | Self-approved; starts at elevation completion |
+| `read_write` | 3,600 s (1h) | Starts at cosign/approval + TOTP confirmation |
+| `destructive` | 900 s (15 min) | Starts at dual cosign completion |
+| Break-glass | 7,200 s (2h) | Non-renewable; fixed at activation |
+| `pending_approval` | 900 s (15 min) | Auto-deny on KV expiry if still pending |
+| `awaiting_second_person` | 1,800 s (30 min) | Auto-deny on KV expiry if still awaiting |
+
+**Secondary index key:** `pam:by_admin:{admin_user_id}:{pam_session_id}` — TTL matches primary. Used by `pam-elevation-service` to look up all active sessions for a given admin without a full KV scan. Value: `{ "access_level": "...", "expires_at": "..." }` (minimal, for listing purposes only).
+
+---
+
+### 24.6 DEC-030 Audit Events
+
+All six PAM audit event types are HMAC-chained per the DEC-030 specification. Each event appends to the global audit log chain; no PAM-specific chain is maintained separately. The `pam_session_id` field provides the application-layer linkage across related events.
+
+| Event Type | Severity | Retention | Two-Person Rule | Description |
+|---|---|---|---|---|
+| `pam.elevation_requested` | HIGH | 7 years | No | Emitted when a PAM elevation request is received by `pam-elevation-service`, before approval. Fields: `admin_user_id`, `access_level`, `pam_request_id`, `target_tenant_id` (nullable), `justification_hash`. |
+| `pam.elevation_approved` | HIGH | 7 years | No | Emitted when approval gate passes and second factor is confirmed. Fields: `admin_user_id`, `approver_id` (nullable for `read_only`), `access_level`, `pam_session_id`, `expires_at`, `requester_webauthn_credential_id` (nullable), `approver_webauthn_credential_id` (nullable). |
+| `pam.elevation_denied` | HIGH | 7 years | No | Emitted on any denial path: self-approval attempt, approval timeout, cosign timeout, TOTP failure, second-factor mismatch. Fields: `admin_user_id`, `access_level`, `pam_request_id`, `reason` (enum: `self_approval_attempted`, `approval_timeout`, `cosign_timeout`, `totp_failure`, `webauthn_failure`, `policy_violation`). |
+| `pam.session_expired` | STANDARD | 7 years | No | Emitted by `pam-expiry-sweeper` Cron Worker when a PAM KV record reaches TTL. Fields: `admin_user_id`, `pam_session_id`, `access_level`, `expired_at`. Distinct from `pam.elevation_denied` — session was valid and completed its full TTL. |
+| `pam.break_glass_activated` | CRITICAL | 7 years | Yes — post-hoc (§24.4.3) | Emitted immediately on break-glass Cloudflare Access session creation. Fields: `admin_user_id`, `pam_session_id`, `cf_access_jti_hash`, `activated_at`. Triggers PagerDuty P0 + compliance email. The two-person rule here is post-hoc review (§24.4.3) rather than pre-authorization — the emergency nature makes pre-authorization infeasible. |
+| `pam.break_glass_expired` | HIGH | 7 years | No | Emitted by `pam-expiry-sweeper` when break-glass KV record TTL expires. Fields: `admin_user_id`, `pam_session_id`, `expired_at`, `review_issue_url` (GitHub issue auto-created at activation). |
+
+**Audit event field invariants (DEC-030 compliance):**
+
+- No free-text justification is stored in the audit log. Only `justification_hash` (SHA-256) appears.
+- No Postgres query text is stored in audit events. Query-level logging is handled by pg_audit at the database layer, not the application layer.
+- `target_tenant_id` is stored as a UUID. No tenant name, domain, or PII is stored in the event.
+- `admin_user_id` is the FORM internal UUID, not an email address.
+
+---
+
+### 24.7 Alerting Rules
+
+| Alert ID | Severity | Condition | Response | Channel |
+|---|---|---|---|---|
+| AL-PAM-01 | **P0** | `pam.break_glass_activated` event emitted | Immediate PagerDuty incident + compliance-officer email. On-call engineer confirms incident context and whether break-glass was authorized. If no active production incident is linked within 15 minutes of activation, auto-escalate to security-incident. | PagerDuty + Email Workers |
+| AL-PAM-02 | **P1** | `pam.elevation_denied` count > 3 from the same `admin_user_id` within any rolling 1-hour window | PagerDuty P1. Investigate: credential stuffing against PAM endpoint, TOTP desync, or insider threat pattern. Suspend PAM elevation for the affected `admin_user_id` pending review (write `pam:suspended:{admin_user_id}` KV key, TTL 24h). | PagerDuty |
+| AL-PAM-03 | **P2** | A PAM session is presented to `pam-db-proxy` with `expires_at` in the past but the KV record has not yet been evicted (KV/clock skew window) | PagerDuty P2. The `pam-db-proxy` must reject the session regardless (hard expiry check on `expires_at` field, not solely on KV key existence). Alert fires to track clock skew frequency. If AL-PAM-03 fires more than twice in 24 hours, escalate to P1 and investigate KV TTL reliability. | PagerDuty |
+
+All three alert rules are registered in `docs/OBSERVABILITY.md §6` under the `pam_session_health` subsection.
+
+---
+
+### 24.8 SOC 2 Mapping
+
+| SOC 2 Criterion | Control | PAM Evidence Artefact |
+|---|---|---|
+| CC6.1 — Logical access controls | `form_admin` Postgres role is never held as standing credential by any human or service account. Access is exclusively time-bound, request-scoped, and approval-gated via PAM. | `pam.elevation_approved` audit log export showing zero standing sessions; PAM KV TTL configuration screenshots. |
+| CC6.2 — Access provisioning | Every `read_write` and `destructive` elevation requires explicit manager or dual-person approval before access is granted. Approval is logged with approver identity and timestamp. | `pam.elevation_approved` events with non-null `approver_id`; Slack approval message archive. |
+| CC6.3 — Timely deprovisioning | PAM sessions auto-expire by KV TTL. `pam-expiry-sweeper` emits `pam.session_expired` events confirming deprovisioning. No manual revocation required for normal expiry. | `pam.session_expired` audit log export; demonstration that KV TTL matches declared TTL in §24.5. |
+| CC6.7 — Transmission confidentiality | All PAM API endpoints (`/internal/v1/pam/*`) are served over mTLS. The `pam-db-proxy` Supabase Edge Function communicates with Postgres over TLS (Supabase enforces `sslmode=require`). PAM KV values are encrypted at rest by Cloudflare KV. No PAM tokens are transmitted over plain HTTP. | Cloudflare Access mTLS policy configuration; Supabase TLS connection logs; network trace confirming no plaintext PAM token transmission. |
+
+**Evidence collection cadence:** CC6-E-PAM-001 through CC6-E-PAM-004 artefacts are collected 30 days after M4 go-live and stored in `compliance/evidence/pam/`. Artefact index:
+
+| Artefact ID | Description |
+|---|---|
+| CC6-E-PAM-001 | Export of `pam.elevation_approved` and `pam.elevation_denied` events from audit_log for a representative 30-day window. Demonstrates approval workflow is functioning. |
+| CC6-E-PAM-002 | Export of `pam.session_expired` events confirming automatic deprovisioning for all PAM sessions in the window. |
+| CC6-E-PAM-003 | PAM KV namespace TTL configuration screenshot + `pam-elevation-service` Worker source excerpt showing TTL constants. Demonstrates no standing access is possible beyond declared TTLs. |
+| CC6-E-PAM-004 | Break-glass policy configuration from `cloudflare/access/break-glass-policy.tf` (sanitized) + quarterly review sign-off record for the break-glass authorized identity list. |
+
+---
+
+### 24.9 Open Questions
+
+| ID | Question | Owner | Priority | Target |
+|---|---|---|---|---|
+| OQ-SSO-24.1 | Should `pam-db-proxy` use a dedicated Supabase Edge Function or a Cloudflare Worker with a direct Postgres connection via Hyperdrive? Hyperdrive would keep the privileged connection pool within the Cloudflare network boundary; Edge Function keeps it in the Supabase trust boundary. Security-engineer to assess mTLS profile of each path. | security-engineer | P1 | Before M4 deploy |
+| OQ-SSO-24.2 | `SET ROLE form_admin` within a Supabase connection pool (PgBouncer transaction mode) is not reliable — `SET ROLE` is session-scoped and PgBouncer in transaction mode does not guarantee session affinity. Decision: use PgBouncer **session mode** for PAM connections (separate pool, not the shared `form_api` pool). Confirm Supabase plan supports a dedicated session-mode pool without impacting existing connection limits. | platform-engineer | P0 | Before M4 deploy |
+| OQ-SSO-24.3 | The `form_break_glass` Postgres role (§24.4.2) has identical privilege to `form_admin`. Should they be merged (same role, different connection string) or kept distinct? Distinct roles produce clearer pg_audit attribution. Legal/compliance to advise whether distinct role names are required for audit trail segregation. | compliance-officer | P2 | M5 |
+| OQ-SSO-24.4 | FIDO2 WebAuthn hardware key requirement for `destructive` tier assumes all break-glass-eligible engineers own a FIDO2 key (YubiKey or equivalent). Confirm procurement and enrollment before M4 cutover — if keys are not in hand, `destructive` tier must block entirely rather than fall back to TOTP. | security-engineer + eng-manager | P0 | Before M4 deploy |
+
+---
+
+### 24.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Scaffold `workers/pam-elevation-service`: Cloudflare Worker with routes `POST /internal/v1/pam/elevate`, `POST /internal/v1/pam/approve/{id}`, `POST /internal/v1/pam/deny/{id}`, `POST /internal/v1/pam/cosign/{id}`. Implement Cloudflare Access JWT validation middleware (reuse pattern from §16 admin dashboard). Wire `PAM_KV` namespace binding. | platform-engineer | **P0** | M4 |
+| 2 | Implement KV schema (§24.5): `pam:session:{id}` primary record + `pam:by_admin:{admin_user_id}:{id}` secondary index. Implement TTL constants per access level. Add `pam:suspended:{admin_user_id}` key write on AL-PAM-02 trigger. | platform-engineer | **P0** | M4 |
+| 3 | Implement approval workflow (§24.3): self-approve path for `read_only`; async Slack webhook + approval deep-link for `read_write`; FIDO2 WebAuthn dual-cosign for `destructive`. Resolve OQ-SSO-24.4 (hardware key procurement) before `destructive` tier goes live. | platform-engineer + security-engineer | **P0** | M4 |
+| 4 | Scaffold `supabase/functions/pam-db-proxy`: validate `pam_session_id` against PAM KV; enforce hard expiry check on `expires_at` (AL-PAM-03); open Postgres connection as `form_system`; `SET ROLE form_admin`; `SET app.pam_session_id`; execute query; `RESET ROLE`. Resolve OQ-SSO-24.2 (PgBouncer session mode) before deploy. | platform-engineer | **P0** | M4 |
+| 5 | Add `app.pam_session_id` GUC audit triggers to sensitive Postgres tables (`tenant_users`, `tenant_sso_configs`, `enterprise_sessions`, `audit_log`): trigger reads `current_setting('app.pam_session_id', true)` and includes value in the `audit_log` row `metadata` JSONB field. This creates database-layer linkage between privileged queries and PAM sessions. | platform-engineer | **P0** | M4 |
+| 6 | Scaffold `workers/break-glass-notifier`: fires on Cloudflare Access `break-glass` audience JWT receipt; writes PAM KV with `is_break_glass: true`; emits `pam.break_glass_activated` DEC-030 event; triggers PagerDuty P0 via Events API v2; sends compliance email via Cloudflare Email Workers. Configure `cloudflare/access/break-glass-policy.tf` with named identity list (max 5). | devops-lead | **P0** | M4 |
+| 7 | Scaffold `workers/pam-expiry-sweeper`: Cloudflare Workers Cron (every 5 minutes); scan `pam:session:*` keys for `is_break_glass: true` with expired TTL; emit `pam.break_glass_expired` DEC-030 event; scan for `status: pending_approval` or `status: awaiting_second_person` keys with elapsed approval/cosign window; emit `pam.elevation_denied` with appropriate `reason`. | devops-lead | **P1** | M4 |
+| 8 | Register all 6 PAM DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry. Validate HMAC chain in staging: elevation_requested → elevation_approved → session_expired sequence. Validate break-glass chain: break_glass_activated → break_glass_expired. Confirm no PII (email, justification text, query text) appears in any event payload. | platform-engineer + security-engineer | **P0** | M4 |
+| 9 | Configure AL-PAM-01, AL-PAM-02, AL-PAM-03 in PagerDuty. Add all three rules to `docs/OBSERVABILITY.md §6` under `pam_session_health` subsection. Test AL-PAM-01 by triggering a synthetic break-glass activation against staging. Test AL-PAM-02 by submitting 4 denied elevation requests from the same `admin_user_id` within 1 hour in staging. | devops-lead | **P0** | M4 |
+| 10 | Collect CC6-E-PAM-001 through CC6-E-PAM-004 artefacts 30 days after M4 go-live; store in `compliance/evidence/pam/`; create entries in `docs/SOC2_READINESS.md` for CC6.1, CC6.2, CC6.3, CC6.7 mapping to PAM controls. Resolve OQ-SSO-24.3 (role naming decision) and OQ-SSO-24.1 (proxy placement decision) before M5 freeze. | compliance-officer + security-engineer | **P1** | M5 |
+
+---
+
+*v1.6 additions (2026-06-01): Section 24 — Privileged Access Management (PAM): Just-in-Time Privilege Escalation & Break-Glass Protocol for `form_admin` Operations. Eliminates standing `form_admin` Postgres credentials (SOC 2 CC6.1/CC6.3 risk). Architecture: `pam-elevation-service` Cloudflare Worker mediates all elevation requests; three access tiers (`read_only` 4h self-approve+TOTP, `read_write` 1h manager-approval+TOTP, `destructive` 15min dual-person+FIDO2 WebAuthn); `pam-db-proxy` Supabase Edge Function opens scoped Postgres connection via `SET ROLE form_admin` + `SET app.pam_session_id` GUC (database-layer audit linkage); `RESET ROLE` after each statement batch; PgBouncer session mode required (OQ-SSO-24.2). Break-glass: separate Cloudflare Access application (`form-break-glass`), mTLS + named identity list (max 5, quarterly review), 2h non-renewable session, immediate PagerDuty P0 + compliance email on activation, mandatory 72h post-incident review with GitHub Issue auto-creation, `pam_break_glass_reviews` Postgres table for outcome recording. KV: `PAM_KV` namespace (separate from SESSION_REVOCATION_KV and SSO_KV); `pam:session:{id}` primary + `pam:by_admin:{admin_user_id}:{id}` secondary index; `pam:suspended:{admin_user_id}` for AL-PAM-02 lockout. Six DEC-030 HMAC-chained audit events: `pam.elevation_requested` (HIGH, 7yr), `pam.elevation_approved` (HIGH, 7yr), `pam.elevation_denied` (HIGH, 7yr), `pam.session_expired` (STANDARD, 7yr), `pam.break_glass_activated` (CRITICAL, 7yr — post-hoc two-person review), `pam.break_glass_expired` (HIGH, 7yr). Three alerting rules: AL-PAM-01 P0 (break-glass activated), AL-PAM-02 P1 (> 3 denied elevations/1h same admin — auto-suspend), AL-PAM-03 P2 (session used after KV expiry — clock skew detection). SOC 2: CC6.1 (no standing access), CC6.2 (approval workflow), CC6.3 (auto-expiry via KV TTL), CC6.7 (mTLS on all PAM endpoints + TLS to Postgres). Four open questions: OQ-SSO-24.1 (proxy placement: Hyperdrive vs. Edge Function — security-engineer, P1, before M4), OQ-SSO-24.2 (PgBouncer session mode for PAM pool — platform-engineer, P0, before M4), OQ-SSO-24.3 (form_admin vs. form_break_glass role naming — compliance-officer, P2, M5), OQ-SSO-24.4 (FIDO2 hardware key procurement — security-engineer + eng-manager, P0, before M4). Implementation checklist: 10 tasks (6× P0 M4, 2× P1 M4, 2× P1 M5).*
