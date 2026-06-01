@@ -4929,6 +4929,421 @@ The git commit hash constitutes immutable sealing. Retain the full directory for
 
 ---
 
+## 16. DEC-030 Incident Lifecycle Audit Events & SIEM-Triggered Automation
+
+> Owner: security-engineer + devops-lead. Review: quarterly, or after any automation failure. Cross-references: OBSERVABILITY.md §27 (SIEM correlation rules CR-01–CR-04 and alert rules AL-SIEM-01–AL-SIEM-06), AUDIT_LOG_SCHEMA.md (DEC-030 event registry), §14 Continuous Improvement Program.
+
+---
+
+### 16.1 Purpose
+
+Every runbook in this document (R-01 through R-14) emits **domain-specific** DEC-030 events — `breach.*`, `legal.*`, `dsar.*`, `coaching.*`, `siem.*` — that capture what happened *within* a specific type of incident. What was missing until this section: a **cross-cutting audit trail of the incident management process itself**.
+
+Two problems that absence creates:
+
+1. **SOC 2 CC7.4** ("The entity has implemented policies and procedures to respond to security incidents") requires evidence that the incident response program is *actively used and evaluated*, not just documented. A log of `breach.awareness_declared` events proves a breach was discovered; a log of `incident.pir_closed` events proves the post-mortem process runs to completion. Both are required.
+
+2. **OBSERVABILITY.md §27** defines SIEM correlation rules (CR-01 through CR-04) and alert rules (AL-SIEM-01 through AL-SIEM-06) that *automatically trigger runbooks* — AL-SIEM-05 (HMAC chain break) auto-opens R-01; AL-SIEM-03 (impossible travel) routes to R-12. Until this section, that automation had no authoritative specification in the incident response runbook. Responders had no documented protocol for verifying that the auto-opened ticket was correct, escalating if automation failed, or confirming that SIEM-sourced incidents are covered by the same lifecycle obligations as manually declared ones.
+
+This section defines:
+- The ten `incident.*` DEC-030 events that form the universal lifecycle record for every FORM incident, regardless of type
+- The SIEM-triggered automation architecture that creates Linear tickets and emits `incident.opened` on behalf of correlation rules
+- Incident management meta-monitoring: SLOs on IC assignment time, PIR completion rate, and action item close rate
+- SOC 2 CC7.4 / CC7.5 / CC4.1 evidence mapping
+
+**Scope:** All incidents declared under this runbook — P0 through P2 — must emit the full `incident.*` lifecycle event set. P3 issues tracked in Linear are exempt from DEC-030 emission.
+
+---
+
+### 16.2 Incident Lifecycle Event Taxonomy
+
+Ten events form the universal lifecycle spine. Every incident emits them in sequence; domain-specific events (breach.*, legal.*, etc.) are emitted *in addition*, woven into the same HMAC chain so the chain reflects both the incident process and the domain-specific actions.
+
+| Event Type | Severity Level | Emitting Role | Trigger | Retention | SOC 2 Criterion |
+|---|---|---|---|---|---|
+| `incident.opened` | HIGH | Incident Commander (IC) or SIEM automation | IC declares incident OR SIEM AL-* rule auto-triggers (§16.4) | 7 years | CC7.3, CC7.4 |
+| `incident.ic_assigned` | MEDIUM | IC (self-reporting) or automation | First confirmed IC takes command | 7 years | CC7.4 |
+| `incident.severity_changed` | HIGH | IC | Any upgrade or IC-approved downgrade (§1.3) | 7 years | CC7.4 |
+| `incident.escalated` | HIGH | IC | Founder, board, or external counsel engaged | 7 years | CC7.4, CC2.2 |
+| `incident.update_posted` | STANDARD | IC or Communications Lead | Public status page update or enterprise tenant notification sent | 3 years | CC2.2 |
+| `incident.containment_verified` | HIGH | IC + security-engineer | Active threat vector confirmed closed; no further exfiltration possible | 7 years | CC7.4 |
+| `incident.eradicated` | HIGH | IC | Root cause removed; vulnerable code/config/credential no longer in production | 7 years | CC7.4 |
+| `incident.recovered` | HIGH | IC | All services restored to normal; SLAs re-met; monitoring confirmed clean | 7 years | CC7.4, CC7.5 |
+| `incident.pir_opened` | MEDIUM | Compliance officer | Post-incident review meeting scheduled; Linear PIR project created | 7 years | CC7.5 |
+| `incident.pir_closed` | HIGH | Compliance officer | PIR complete; all action items logged in §14 registry; document signed off | 7 years | CC7.5, CC4.1 |
+
+**Important:** Severity levels in this table refer to the DEC-030 audit event severity (how important the event is to preserve in the HMAC chain), not the incident severity classification (P0–P3). A P0 incident and a P2 incident both emit `incident.opened HIGH` — the event severity is the same; only the payload field `incident_severity` differs.
+
+---
+
+### 16.3 Incident Lifecycle Event Schema
+
+All ten events share a common base schema. Domain-specific events embed their own schemas; the lifecycle events below are always present in every incident's DEC-030 chain.
+
+```typescript
+// Common fields — present in all ten incident.* events
+interface IncidentLifecycleEvent {
+  event_type: `incident.${LifecyclePhase}`;
+  event_id: string;          // UUID v4, unique per event
+  incident_id: string;       // INC-YYYYMMDD-NNN (matches Linear ticket ID)
+  incident_severity: 'P0' | 'P1' | 'P2';
+  incident_runbook: RunbookId | RunbookId[] | 'TBD';  // e.g. "R-01", ["R-01","R-11"]
+  incident_source: 'manual' | 'siem_automation' | 'monitoring_alert';
+  actor_role: ActorRole;     // 'security-engineer' | 'devops-lead' | 'compliance-officer' | 'founder' | 'siem_worker'
+  actor_user_id: string | 'system'; // 'system' for SIEM-automation-triggered events
+  timestamp_utc: string;     // ISO 8601
+  linear_ticket_url: string; // always required; automation populates before emitting
+  hmac_prev: string;         // SHA-256 HMAC of previous event in chain (DEC-030)
+  hmac_current: string;      // SHA-256 HMAC of this event body
+}
+
+// Event-specific payloads (extend the common schema)
+
+// incident.opened
+interface IncidentOpenedPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.opened';
+  title: string;              // Short description (max 100 chars)
+  trigger_alert_id?: string;  // AL-SIEM-01 etc., if SIEM-triggered
+  trigger_correlation_rule?: 'CR-01' | 'CR-02' | 'CR-03' | 'CR-04'; // if applicable
+  siem_correlation_score?: number; // confidence score from correlation rule (0–1)
+}
+
+// incident.ic_assigned
+interface IncidentIcAssignedPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.ic_assigned';
+  ic_user_id: string;         // user_id of the IC
+  ic_role: ActorRole;
+  minutes_since_open: number; // lag between incident.opened and IC assignment
+}
+
+// incident.severity_changed
+interface IncidentSeverityChangedPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.severity_changed';
+  previous_severity: 'P0' | 'P1' | 'P2';
+  new_severity: 'P0' | 'P1' | 'P2';
+  direction: 'upgrade' | 'downgrade';
+  reason: string;             // IC-authored free text (required for downgrade per §1.3)
+  approver_user_id?: string;  // required for downgrade (IC approval per §1.3)
+}
+
+// incident.escalated
+interface IncidentEscalatedPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.escalated';
+  escalation_target: 'founder' | 'board' | 'legal_counsel' | 'dpa' | 'enterprise_tenant';
+  reason: string;
+  template_used?: string;     // e.g. "B-01", "E-01", "P2C-01"
+}
+
+// incident.update_posted
+interface IncidentUpdatePostedPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.update_posted';
+  channel: 'status_page' | 'enterprise_tenant_email' | 'board_email' | 'internal_slack';
+  audience_scope: 'public' | 'enterprise_tenants_affected' | 'all_enterprise' | 'internal';
+  privacy_floor_verified: boolean; // must be true; individual health data never in updates
+}
+
+// incident.containment_verified
+interface IncidentContainmentVerifiedPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.containment_verified';
+  containment_actions: string[];  // brief list of actions taken
+  data_exfiltration_confirmed: boolean;
+  hmac_chain_integrity: boolean;  // result of R-05 HMAC chain check post-containment
+}
+
+// incident.eradicated
+interface IncidentEradicatedPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.eradicated';
+  root_cause_category: 'config_error' | 'code_defect' | 'credential_compromise' |
+    'third_party_breach' | 'insider_threat' | 'hardware_failure' | 'unknown';
+  deploy_sha?: string;         // git SHA of the fix deploy, if applicable
+}
+
+// incident.recovered
+interface IncidentRecoveredPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.recovered';
+  duration_minutes: number;    // incident.opened → incident.recovered delta
+  services_verified: string[]; // list of service endpoints verified healthy
+  sla_breached: boolean;       // true if any enterprise SLA threshold was crossed
+}
+
+// incident.pir_opened
+interface IncidentPirOpenedPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.pir_opened';
+  pir_meeting_date: string;    // ISO 8601 date
+  pir_doc_url: string;         // Link to the §8 PIR document draft
+  deadline_utc: string;        // pir_closed must appear by this date (P0: +7d; P1: +14d)
+}
+
+// incident.pir_closed
+interface IncidentPirClosedPayload extends IncidentLifecycleEvent {
+  event_type: 'incident.pir_closed';
+  action_items_count: number;
+  critical_action_items: number; // priority 'Critical' per §14 registry
+  pir_doc_url: string;
+  days_since_recovery: number;
+}
+```
+
+**HMAC chain integrity rule:** All ten `incident.*` events for a given `incident_id` form a sub-chain within the master DEC-030 HMAC chain. The `incident.opened` event's `hmac_prev` links to the last event in the master chain before the incident; each subsequent `incident.*` event for that incident links to the previous one. Domain-specific events (breach.*, legal.*, etc.) emitted during the same incident also link into the same master chain, interleaved by timestamp. The result: a tamper-evident timeline of both what happened and how it was managed.
+
+---
+
+### 16.4 SIEM-Triggered Incident Automation
+
+OBSERVABILITY.md §27 defines six alert rules (AL-SIEM-01 through AL-SIEM-06) that fire when correlation rules detect anomalies. For two of those rules — AL-SIEM-03 (impossible travel, P1) and AL-SIEM-05 (HMAC chain break, P0) — the alert also *auto-opens* a FORM incident. This section specifies the automation architecture that bridges the OBSERVABILITY alerting layer to this runbook's lifecycle.
+
+#### 16.4.1 Alert-to-Runbook Mapping
+
+| Alert Rule | Severity | Auto-Open Incident | Auto-Assign Runbook | IC Paged | Human Confirmation Required |
+|---|---|---|---|---|---|
+| **AL-SIEM-01** | P2 (webhook delivery failure) | No — logged only | — | No | Engineer reviews within 2h |
+| **AL-SIEM-02** | P2 (pipeline lag > 5 min) | No — logged only | — | No | devops-lead reviews within 1h |
+| **AL-SIEM-03** | P1 (impossible travel match) | **Yes** | R-12 (Insider Threat) | Yes (PagerDuty) | IC must confirm P1 within 30 min of page |
+| **AL-SIEM-04** | P1 (bulk data access match) | **Yes** | R-12 (Insider Threat) or R-01 (Data Breach) — IC determines | Yes (PagerDuty) | IC must confirm P1 and choose runbook within 30 min |
+| **AL-SIEM-05** | P0 (HMAC chain break) | **Yes — P0 immediately** | R-01 (Data Breach), R-05 branch | Yes (PagerDuty P0 escalation) | IC must confirm P0 within 15 min |
+| **AL-SIEM-06** | P1 (zero-events dead-man's switch) | **Yes** | Devops runbook (platform health) | Yes (PagerDuty) | IC must confirm P1 and diagnose pipeline within 30 min |
+
+**Confirmation requirement:** Auto-opened incidents begin in status `AUTO_OPENED`. An IC must confirm the incident within the response window above, changing status to `IC_CONFIRMED`. If no confirmation arrives within the SLA window, a second PagerDuty escalation fires to the backup on-call.
+
+**False-positive downgrade:** If the IC confirms the SIEM auto-open was a false positive, they must:
+1. Set Linear ticket status to `FALSE_POSITIVE`
+2. Emit `incident.opened` followed immediately by `incident.pir_closed` with `action_items_count: 0` and a `false_positive: true` flag in the payload (non-standard field, noted in payload)
+3. Add a note to the `#inc-YYYYMMDD-xxx` channel explaining the false-positive basis
+4. Add one action item to the §14 registry to tune the correlation rule to avoid recurrence
+
+False positives are still emitted to DEC-030. The HMAC chain is never silent; a false-positive incident is evidence that the detection system is active and reviewed.
+
+#### 16.4.2 Auto-Open Worker Architecture
+
+The automation runs in a Cloudflare Worker `apps/api/src/workers/siem-incident-automator.ts`. It is triggered by PagerDuty Events API v2 webhooks (incident.trigger events from the FORM Security PagerDuty service defined in OBSERVABILITY §27).
+
+```
+PagerDuty Events API v2
+        │  incident.trigger webhook (HTTPS, HMAC-signed)
+        ▼
+[siem-incident-automator Worker]
+   1. Verify PagerDuty webhook HMAC (Workers Secret: PAGERDUTY_WEBHOOK_SECRET)
+   2. Parse alert rule ID from alert.body.custom_details.alert_rule_id
+   3. Look up runbook assignment from ALERT_RUNBOOK_MAP (§16.4.1)
+   4. If auto-open = true:
+      a. Create Linear issue via Linear API:
+         - Title: "[AUTO] <alert_rule_id>: <alert_summary>"
+         - Team: Security & Compliance
+         - Priority: Urgent (P0) or High (P1)
+         - Label: "SIEM_AUTO_OPEN", severity label
+         - Description: SIEM correlation details + runbook link
+      b. Generate incident_id: INC-<YYYYMMDD>-<seq>
+      c. Emit incident.opened DEC-030 event:
+         - incident_source: 'siem_automation'
+         - actor_user_id: 'system'
+         - trigger_alert_id: alert_rule_id
+         - trigger_correlation_rule: rule if applicable
+      d. Post to PagerDuty: acknowledge alert + add note with Linear URL
+      e. Post to #incidents Slack channel: "@on-call P<N> auto-opened INC-<id>"
+   5. Respond 200 OK to PagerDuty (within 3s to avoid retry)
+```
+
+The worker writes no user data and emits no telemetry. Its only I/O: PagerDuty inbound webhook → Linear API + DEC-030 emitter + Slack notification.
+
+**Failure mode:** If the worker fails to create the Linear ticket (Linear API down, rate limit), it still emits the `incident.opened` DEC-030 event with `linear_ticket_url: 'PENDING'` and pages the on-call engineer directly via PagerDuty. The engineer creates the Linear ticket manually and patches the DEC-030 event `linear_ticket_url` field via the audit log amendment procedure (AUDIT_LOG_SCHEMA.md §4.2). The HMAC chain is not broken by this amendment; the amendment is itself an HMAC-chained event.
+
+#### 16.4.3 IC Confirmation Flow
+
+On receiving a PagerDuty page for a SIEM-auto-opened incident, the IC must:
+
+1. Open the Linear ticket linked in the PagerDuty alert
+2. Review the SIEM correlation details (rule, matched events, time window)
+3. Within the response SLA (§16.4.1):
+   - If confirmed real: Change Linear status to `IC_CONFIRMED`; emit `incident.ic_assigned` DEC-030; proceed with the assigned runbook
+   - If false positive: Change Linear status to `FALSE_POSITIVE`; emit lifecycle pair per §16.4.1 false-positive procedure; tune the correlation rule
+4. Post first update to `#inc-YYYYMMDD-xxx` Slack channel within the response SLA
+
+If the IC cannot confirm within SLA (e.g., page was missed), the backup on-call receives a second escalation. The incident remains `AUTO_OPENED` until a human confirms. No automated action beyond ticket creation occurs — containment, evidence collection, and communication are always human-gated.
+
+---
+
+### 16.5 Incident Management Meta-Monitoring
+
+The incident response program is itself a system that can degrade. This section defines how FORM monitors the incident management process — watching the watchdog.
+
+#### 16.5.1 Incident Response SLOs
+
+These SLOs measure the *quality of the incident management process*, not the underlying platform. They feed into the §14 Quarterly Control Effectiveness Review as CC7.4 evidence.
+
+| SLO ID | Metric | Target | Measurement | Alert Threshold | Alert Route |
+|---|---|---|---|---|---|
+| **IR-SLO-01** | IC assignment lag: `incident.ic_assigned.minutes_since_open` | P0 ≤ 15 min; P1 ≤ 30 min | DEC-030 query on `incident.ic_assigned` events per month | > target for any P0/P1 in period | security-engineer + devops-lead Slack DM |
+| **IR-SLO-02** | PIR open rate: `incident.pir_opened` emitted for every P0/P1 `incident.recovered` | 100% | DEC-030 join: `incident.recovered` left join `incident.pir_opened` on `incident_id` | Any P0/P1 missing PIR open event after 48h post-recovery | compliance-officer Linear comment + Slack DM |
+| **IR-SLO-03** | PIR completion lag: `incident.pir_closed` within deadline field of `incident.pir_opened` | P0: ≤ 7 days; P1: ≤ 14 days | DEC-030 query on `incident.pir_closed.days_since_recovery` | Approaching deadline (T-24h) and still open | compliance-officer Slack DM |
+| **IR-SLO-04** | Critical action item closure: §14 registry `priority='Critical'` items closed by SLA | 100% within 14 days | Linear API query on `[IR] Action Items` project, `priority='Critical'`, `status != Done` | Open Critical item approaching 14-day SLA | devops-lead + founder Slack DM |
+| **IR-SLO-05** | SIEM false-positive rate: `incident.opened` events with `incident_source='siem_automation'` that result in `FALSE_POSITIVE` status | < 20% per quarter | DEC-030 query: `incident.opened` WHERE `incident_source='siem_automation'` GROUP BY false_positive flag, quarter | > 20% false-positive rate in trailing quarter | devops-lead + security-engineer: tune correlation rules |
+
+#### 16.5.2 Dead-Man's Switch: Overdue PIR Detection
+
+A pg_cron job runs daily at 06:00 UTC:
+
+```sql
+-- Detect P0/P1 incidents missing pir_opened after 48h post-recovery
+SELECT
+  recovered.incident_id,
+  recovered.incident_severity,
+  recovered.timestamp_utc AS recovered_at,
+  EXTRACT(EPOCH FROM (NOW() - recovered.timestamp_utc::timestamptz)) / 3600 AS hours_since_recovery
+FROM audit_log_events recovered
+WHERE recovered.event_type = 'incident.recovered'
+  AND recovered.incident_severity IN ('P0', 'P1')
+  AND recovered.timestamp_utc > NOW() - INTERVAL '30 days'
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log_events pir
+    WHERE pir.event_type = 'incident.pir_opened'
+      AND pir.incident_id = recovered.incident_id
+  )
+HAVING hours_since_recovery > 48;
+```
+
+If rows are returned: Slack alert to `#compliance` tagging `@compliance-officer`. If the same `incident_id` appears for 72h without `incident.pir_opened`, a Linear ticket is created automatically (P1 priority, `[IR] PIR Overdue` label) and the compliance-officer receives a PagerDuty low-urgency page.
+
+Similarly, a dead-man's switch detects PIR open without close past the deadline:
+
+```sql
+-- Detect pir_opened past its deadline without pir_closed
+SELECT
+  pir_open.incident_id,
+  pir_open.incident_severity,
+  pir_open.payload->>'deadline_utc' AS deadline_utc,
+  NOW() AS now_utc
+FROM audit_log_events pir_open
+WHERE pir_open.event_type = 'incident.pir_opened'
+  AND (pir_open.payload->>'deadline_utc')::timestamptz < NOW()
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log_events pir_close
+    WHERE pir_close.event_type = 'incident.pir_closed'
+      AND pir_close.incident_id = pir_open.incident_id
+  );
+```
+
+Rows returned → Slack alert to `#compliance` tagging `@compliance-officer` and `@security-engineer`. The §14 PIR escalation thresholds (Overdue Critical: founder paged) apply from the moment a deadline passes.
+
+#### 16.5.3 Monthly Meta-Monitoring Report
+
+The `audit-chain-daily-check` pg_cron job (OBSERVABILITY.md §14.3 / SOC2_READINESS.md §46) is extended to produce a monthly incident meta-monitoring summary:
+
+```sql
+-- Monthly incident lifecycle completeness report
+SELECT
+  DATE_TRUNC('month', opened.timestamp_utc::timestamptz) AS month,
+  opened.incident_severity,
+  COUNT(*) AS incidents_opened,
+  COUNT(ic_assigned.incident_id) AS with_ic_assigned,
+  COUNT(recovered.incident_id) AS with_recovered,
+  COUNT(pir_opened.incident_id) AS with_pir_opened,
+  COUNT(pir_closed.incident_id) AS with_pir_closed,
+  AVG(ic_assigned_ev.payload->>'minutes_since_open'::numeric) AS avg_ic_lag_min,
+  AVG(pir_closed_ev.payload->>'days_since_recovery'::numeric) AS avg_pir_days
+FROM audit_log_events opened
+LEFT JOIN audit_log_events ic_assigned_ev
+  ON ic_assigned_ev.event_type = 'incident.ic_assigned'
+  AND ic_assigned_ev.incident_id = opened.incident_id
+-- ... (additional joins for each lifecycle event)
+WHERE opened.event_type = 'incident.opened'
+  AND opened.incident_severity IN ('P0', 'P1', 'P2')
+GROUP BY 1, 2
+ORDER BY 1 DESC, 2;
+```
+
+Output is saved to `compliance/evidence/ir-meta-monitoring/YYYY-MM.json` and surfaced in the OBSERVABILITY §7 SOC 2 Evidence Dashboard. This is the primary CC7.4 evidence artefact that demonstrates the incident response program runs to completion on every incident, not just that it is documented.
+
+---
+
+### 16.6 DEC-030 Audit Event Registration
+
+The ten `incident.*` events must be registered in `docs/AUDIT_LOG_SCHEMA.md` event registry. Registration summary:
+
+| Event Type | Category | DEC-030 Severity | Retention | Privacy Notes |
+|---|---|---|---|---|
+| `incident.opened` | Incident Management | HIGH | 7 years | No user PII in payload; `incident_id` is pseudonymous INC-YYYYMMDD-NNN |
+| `incident.ic_assigned` | Incident Management | MEDIUM | 7 years | `ic_user_id` is internal role identifier, not end-user PII |
+| `incident.severity_changed` | Incident Management | HIGH | 7 years | `reason` field: IC must not include user PII; free-text field is audited |
+| `incident.escalated` | Incident Management | HIGH | 7 years | `escalation_target: 'enterprise_tenant'` must not include tenant employee names |
+| `incident.update_posted` | Incident Management | STANDARD | 3 years | `audience_scope` and `privacy_floor_verified` fields are mandatory |
+| `incident.containment_verified` | Incident Management | HIGH | 7 years | `containment_actions` list: must not include user data; reference R-number only |
+| `incident.eradicated` | Incident Management | HIGH | 7 years | `deploy_sha` is a git commit hash; no user data |
+| `incident.recovered` | Incident Management | HIGH | 7 years | `services_verified` list: endpoint names only, no user data |
+| `incident.pir_opened` | Incident Management | MEDIUM | 7 years | `pir_doc_url` links to internal doc; ensure link is not publicly accessible |
+| `incident.pir_closed` | Incident Management | HIGH | 7 years | `action_items_count` and `critical_action_items` are counts, no user data |
+
+**Chain break rule:** A break in the HMAC chain within the `incident.*` sub-chain for a given `incident_id` is treated identically to a break in the master chain: P0 per R-05, forensic write-freeze activated, external forensic investigator engaged. The sub-chain break implies either tampering with the incident record or a bug in the HMAC computation pipeline.
+
+---
+
+### 16.7 SOC 2 Evidence Mapping
+
+| Criterion | Evidence from §16 |
+|---|---|
+| **CC7.4** — Entity implements policies and procedures to respond to security incidents | `incident.opened` events provide the authoritative incident count and timing; `incident.ic_assigned` proves IC assignment SLO compliance; `incident.recovered` proves resolution; the complete lifecycle chain for each incident_id is the primary CC7.4 evidence corpus for the SOC 2 observation period |
+| **CC7.5** — Entity performs post-incident reviews to identify control deficiencies | `incident.pir_opened` and `incident.pir_closed` events directly evidence that PIR occurs for every P0/P1; `action_items_count` and `critical_action_items` in `incident.pir_closed` prove control deficiencies are identified; the §14 PIR Action Item Registry links from `incident.pir_closed` to the remediation record |
+| **CC4.1** — Entity uses information from ongoing monitoring to evaluate control effectiveness | §16.5 incident response SLOs (IR-SLO-01 through IR-SLO-05) are the ongoing monitoring mechanism; the monthly meta-monitoring report to `compliance/evidence/ir-meta-monitoring/` is the evaluation artefact; the quarterly control effectiveness review (§14.4) consumes this data for the CC4.1 self-assessment |
+| **CC4.2** — Entity evaluates and communicates internal control deficiencies | `incident.pir_closed.critical_action_items > 0` triggers a §14 registry entry; overdue Critical action items trigger founder escalation per §16.5.1 IR-SLO-04; the §14 quarterly review communicates aggregate deficiency trends to the compliance-officer and founder |
+| **CC7.2** — Entity monitors system components | IR-SLO-05 (false-positive rate monitoring) creates a feedback loop ensuring SIEM correlation rules are continuously tuned; the dead-man's switch queries (§16.5.2) themselves constitute monitoring of the incident response system |
+| **CC2.2** — Entity communicates information externally to users | `incident.update_posted` with `privacy_floor_verified: true` is the auditable record that external communications — status page updates, enterprise tenant notifications — were reviewed for privacy floor compliance before being sent |
+
+**Primary auditor evidence artefacts:**
+
+| Artefact ID | Description | Collection Method |
+|---|---|---|
+| **IR-META-E-001** | Complete `incident.*` lifecycle chain for all P0/P1 incidents in the observation period, with HMAC chain verified | `SELECT * FROM audit_log_events WHERE event_type LIKE 'incident.%' AND incident_severity IN ('P0','P1') AND timestamp_utc BETWEEN $obs_start AND $obs_end ORDER BY timestamp_utc` + `audit-chain-daily-check` verification report |
+| **IR-META-E-002** | Monthly IR meta-monitoring reports for each month in the observation period | `compliance/evidence/ir-meta-monitoring/YYYY-MM.json` — all months in observation window |
+| **IR-META-E-003** | PIR completion rate: join of `incident.recovered` and `incident.pir_closed` events proving 100% PIR rate for P0/P1 | Derived from IR-META-E-001 query; any missing `incident.pir_closed` for a P0/P1 is a gap finding |
+| **IR-META-E-004** | §14 PIR Action Item Registry export for the observation period | Linear export of `[IR] Action Items` project filtered to observation period; `compliance/evidence/ir-action-items/YYYY-MM.csv` series |
+| **IR-META-E-005** | SIEM-to-incident automation log: all `incident.opened` events with `incident_source='siem_automation'`, their AL-SIEM trigger rule, and final status (confirmed / false positive) | `SELECT * FROM audit_log_events WHERE event_type = 'incident.opened' AND incident_source = 'siem_automation' AND timestamp_utc BETWEEN $obs_start AND $obs_end` |
+
+---
+
+### 16.8 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Register all ten `incident.*` events in `docs/AUDIT_LOG_SCHEMA.md` event registry with schema, severity, and retention fields per §16.6 | security-engineer | **P0** | M4 |
+| Implement `incident.*` HMAC chain writer in the standard DEC-030 emitter (`apps/api/src/audit/emitter.ts`); validate sub-chain linking (each `incident.*` event's `hmac_prev` links to previous event in the master chain) in staging with a scripted test incident | platform-engineer | **P0** | M4 |
+| Build `siem-incident-automator` Cloudflare Worker (§16.4.2): PagerDuty webhook verification, Linear issue creation, `incident.opened` emission with `incident_source='siem_automation'`; deploy to production with Workers Secret `PAGERDUTY_WEBHOOK_SECRET` | platform-engineer | **P0** | M4 |
+| Configure PagerDuty → `siem-incident-automator` webhook for the FORM Security service: enable for `incident.trigger` events only; add HMAC signing; test with synthetic AL-SIEM-05 (HMAC chain break) trigger in staging | devops-lead | **P0** | M4 |
+| Wire IC confirmation flow: PagerDuty acknowledgement → Linear `IC_CONFIRMED` status update → `incident.ic_assigned` DEC-030 emission; validate confirmation lag is captured in `minutes_since_open` field | platform-engineer | **P1** | M4 |
+| Implement dead-man's switch pg_cron jobs (§16.5.2): PIR-missing detection (runs daily 06:00 UTC) and PIR-overdue detection; wire Slack notifications and Linear auto-ticket creation on breach | devops-lead | **P1** | M4 |
+| Extend `audit-chain-daily-check` pg_cron job to output monthly IR meta-monitoring summary SQL (§16.5.3); save output to `compliance/evidence/ir-meta-monitoring/YYYY-MM.json`; confirm first month's output is correctly formatted | devops-lead + data-engineer | **P1** | M5 |
+| Add IR-SLO-01 through IR-SLO-05 metric queries (§16.5.1) to the OBSERVABILITY §7 SOC 2 Evidence Dashboard in Metabase; set Slack alert thresholds per §16.5.1 table | devops-lead | **P1** | M5 |
+| Tabletop exercise validating the SIEM auto-open flow end-to-end: synthetic AL-SIEM-05 trigger → siem-incident-automator → Linear ticket → PagerDuty page → IC confirmation → `incident.ic_assigned` DEC-030 → R-01 runbook start; record elapsed time vs. 15-min P0 SLA; document in `compliance/evidence/annual-csa/YYYY-siem-automation-drill.md` | security-engineer + devops-lead | **P1** | M5 |
+| Update §14.3 Quarterly Control Effectiveness Review agenda to include IR-SLO-01–05 results and IR-META-E-001–E-005 review as standing agenda items | compliance-officer | **P2** | M5 |
+| Add `incident.update_posted` emission call to the §12 enterprise tenant notification templates (E-01 through E-04) and §13 board communication templates (B-01 through B-04); add `privacy_floor_verified: true` assertion as mandatory pre-send gate | platform-engineer | **P2** | M5 |
+| Update `docs/SOC2_READINESS.md` CC7.4 row from 🟡 to 🟢 after all P0 checklist items are verified in staging and first month of IR-META-E-001 artefact is available | compliance-officer | **P2** | M5 |
+
+---
+
+### 16.9 Open Questions
+
+**OQ-IR-01: DEC-030 sub-chain vs. master chain ordering for concurrent incidents**
+
+When two incidents are simultaneously active (e.g., a P0 breach discovered while a P1 SIEM false-positive is being adjudicated), both incident ID sequences write to the same master DEC-030 HMAC chain. The interleaving order is timestamp-based, which means the sub-chains for INC-A and INC-B are non-contiguous segments of the master chain. Auditors verifying INC-A's chain must skip INC-B events, which complicates verification tooling. Options: (a) Keep current design and document the skip-and-verify algorithm for auditors — acceptable complexity given concurrent incidents are rare. (b) Implement per-incident parallel HMAC sub-chains that rejoin the master chain at `incident.recovered` — cleaner for auditors but introduces a chain merge step not currently in the DEC-030 spec. Owner: security-engineer. Priority: P2 (resolve before SOC 2 Type II observation period opens). Resolution target: M6.
+
+**OQ-IR-02: Linear API as a control dependency**
+
+The `siem-incident-automator` Worker depends on the Linear API for ticket creation. If Linear is unavailable when a SIEM auto-open triggers, the worker falls back to PagerDuty-only notification (§16.4.2). However, if the engineer on call is paged via PagerDuty without a Linear ticket, they have no authoritative incident ID to attach to DEC-030 events until the ticket is manually created and the `linear_ticket_url` field is patched via the amendment procedure. This creates a short window where lifecycle events have `linear_ticket_url: 'PENDING'`, which auditors may flag. Options: (a) Generate the `incident_id` in the Worker before Linear API call so DEC-030 can emit immediately with the correct ID, and create Linear ticket asynchronously with the same ID as the title prefix. (b) Pre-generate a pool of incident IDs and consume the next available one on failure. Owner: platform-engineer. Priority: P1. Resolution target: M4 implementation sprint.
+
+**OQ-IR-03: Privacy floor for `incident.severity_changed.reason` free-text field**
+
+The `reason` field in `incident.severity_changed` is IC-authored free text. Under time pressure, an IC may inadvertently include a user's name, email, or health data category when describing why severity was upgraded. The DEC-030 record is retained for 7 years and cannot be deleted. Mitigation options: (a) Add a real-time regex filter in the emitter that rejects the event if the reason field matches patterns for email addresses, Ukrainian national ID numbers, or known health category terms — and prompts the IC to rephrase. (b) Document the prohibition clearly in the IC training checklist and accept residual risk. (c) Require reason field to reference only incident_id, runbook IDs, and DEC-030 event types, and enforce this constraint in the emitter schema validator using an allowlist. Owner: security-engineer + compliance-officer. Priority: P2. Resolution target: M4 emitter implementation review.
+
+---
+
+*v1.0 additions (2026-06-01): §16 DEC-030 Incident Lifecycle Audit Events & SIEM-Triggered Automation. Closes the gap between OBSERVABILITY.md §27 (added 2026-06-01), which defined AL-SIEM-05 auto-opening R-01 and AL-SIEM-03/04 routing to R-12, and the incident response runbook's lack of a documented, authoritative specification for that automation. §16.1 purpose statement: distinguishes domain-specific DEC-030 events (breach.*, legal.*, dsar.*) from the missing cross-cutting lifecycle audit trail; two-problem framing — SOC 2 CC7.4 evidence gap and undocumented SIEM automation. §16.2 ten-event lifecycle taxonomy table: incident.opened (HIGH, 7yr, CC7.3/CC7.4), incident.ic_assigned (MEDIUM, 7yr), incident.severity_changed (HIGH, 7yr — covers both upgrade and IC-approved downgrade per §1.3), incident.escalated (HIGH, 7yr, CC7.4/CC2.2), incident.update_posted (STANDARD, 3yr, CC2.2), incident.containment_verified (HIGH, 7yr), incident.eradicated (HIGH, 7yr), incident.recovered (HIGH, 7yr, CC7.4/CC7.5), incident.pir_opened (MEDIUM, 7yr, CC7.5), incident.pir_closed (HIGH, 7yr, CC7.5/CC4.1). §16.3 TypeScript schema for common base and all ten event-specific payload interfaces; HMAC sub-chain specification (incident.opened links to master chain; subsequent incident.* events link in sequence; domain-specific events interleave by timestamp; sub-chain break = P0 per R-05). §16.4 SIEM-triggered automation: six-row alert-to-runbook mapping table (AL-SIEM-01/02 log-only; AL-SIEM-03/04/06 auto-open P1 with R-12 or devops runbook; AL-SIEM-05 auto-open P0 with R-01 immediately); siem-incident-automator Cloudflare Worker architecture (PagerDuty Events API v2 webhook → Linear issue creation → incident.opened DEC-030 → Slack notification; 200 OK within 3s); false-positive protocol (FALSE_POSITIVE status → incident lifecycle pair emission → §14 action item for correlation rule tuning; HMAC chain never silent); IC confirmation flow (AUTO_OPENED → IC_CONFIRMED within P0 15 min / P1 30 min SLA; backup escalation on SLA breach). §16.5 incident management meta-monitoring: five IR-SLOs — IR-SLO-01 IC assignment lag (P0 ≤15 min, P1 ≤30 min), IR-SLO-02 PIR open rate (100% for P0/P1), IR-SLO-03 PIR completion lag (P0 ≤7 days, P1 ≤14 days), IR-SLO-04 Critical action item closure (100% within 14 days), IR-SLO-05 SIEM false-positive rate (< 20%/quarter); two dead-man's switch pg_cron queries (PIR-missing detection at T+48h post-recovery → Slack + Linear auto-ticket; PIR-overdue past deadline field → Slack + PagerDuty low-urgency); monthly meta-monitoring SQL report to compliance/evidence/ir-meta-monitoring/YYYY-MM.json. §16.6 AUDIT_LOG_SCHEMA.md registration table for all ten events with privacy notes (no end-user PII in any lifecycle event payload; free-text fields audited). §16.7 SOC 2 evidence mapping: CC7.4 (incident.opened/ic_assigned/recovered = primary evidence corpus), CC7.5 (incident.pir_opened/pir_closed), CC4.1 (IR-SLO data + monthly meta-monitoring report), CC4.2 (critical_action_items > 0 → §14 registry entry → founder escalation), CC7.2 (IR-SLO-05 creates SIEM tuning feedback loop), CC2.2 (incident.update_posted with privacy_floor_verified); five evidence artefacts IR-META-E-001 through IR-META-E-005 with collection SQL and file paths. §16.8 twelve-item implementation checklist: four P0 M4 items (event registry, HMAC emitter, siem-incident-automator Worker, PagerDuty webhook configuration); five P1 items (IC confirmation flow, dead-man's switch pg_cron jobs, monthly meta-monitoring extension, Metabase IR-SLO dashboard, SIEM automation tabletop drill M5); three P2 items (§14 agenda update, template emission integration, SOC2_READINESS CC7.4 row update). §16.9 three open questions: OQ-IR-01 (concurrent incident sub-chain interleaving — P2, security-engineer, M6); OQ-IR-02 (Linear API as control dependency — P1, platform-engineer, M4); OQ-IR-03 (privacy floor for free-text reason field in severity_changed — P2, security-engineer + compliance-officer, M4 emitter review). Advances INCIDENT_RESPONSE internal version v0.9 → v1.0. SOC 2 evidence: primary CC7.4 artefact corpus established.*
+
+---
+
+**v1.0 · 2026-06-01 · Owner: security-engineer + compliance-officer**
+**Review: after every P0/P1 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
+
+---
+
 *v0.9 additions (2026-05-30): §15 GDPR Article 33/34 Data Breach Notification Operational Runbook. Closes the gap between §10 (legal framework overview) and the step-by-step operational procedure required when a breach occurs — the two sections are complementary, not duplicative: §10 defines the law, §15 executes the procedure. Awareness clock taxonomy (§15.2): six trigger events mapped to the person responsible for determining clock start (devops-lead, compliance-officer, security-engineer), plus clock override rule for uncertain-but-probable breaches mandating partial Art. 33(4) filing within 72h. Incident-to-notification decision matrix (§15.3): ten breach scenarios mapped to Art. 33 required / Art. 34 required / optional with rationale and assessment authority assignments; Art. 9 data triggers Art. 34 presumption overridable only with documented mitigation. Multi-tenant breach scoping SQL (§15.4): three queries with form_admin BYPASSRLS — Query 1 (affected user count with Art. 9 / biometric / contact data breakdown), Query 2 (enterprise tenant list with affected_seat_count and has_art9_exposure flag for B2B notifications), Query 3 (HMAC chain integrity verification in exposure window; chain break = P0 per R-05); results routed exclusively to restricted incident channel. 72-hour clock procedure (§15.5): eleven timestamped steps from T+0h declaration through post-filing supplementary submissions with named owners and output artefacts. Template A33-01 (§15.6): complete Article 33 supervisory authority notification template with all required GDPR fields (controller details, breach description, data categories and approximate subject count, likely consequences, measures taken, partial-notification declaration, internal reference). Template A34-01 (§15.7): plain-language Article 34 data subject notification template with explicit instruction to omit Art. 9 category label from email subject line (prevents header-based re-exposure); delivery via Resend breach_notification slot; failed-delivery Art. 34(3)(c) exception path with 30-day status page substitute. Template P2C-01 (§15.8): Art. 28 processor-to-controller enterprise tenant notification with T+8h target, 48h contractual maximum, per-tenant tracking record. Ten DEC-030 HMAC-chained events (§15.9): breach.awareness_declared (CRITICAL, 7yr), breach.scope_assessment_completed (HIGH, 7yr), breach.art33_obligation_determined (HIGH, 7yr), breach.processor_notified_tenant (HIGH, 7yr), breach.art33_notification_filed (CRITICAL, 7yr — primary P7.1 auditor evidence with hours_since_awareness field), breach.art33_supplementary_filed (HIGH, 7yr), breach.art34_notifications_sent (HIGH, 7yr), data.breach_notification_sent (STANDARD, 7yr — per-user with email_hash not raw email), breach.art34_waiver_documented (HIGH, 7yr), breach.notification_case_closed (HIGH, 7yr); chain break on breach.* is P0 per R-05. Evidence directory structure (§15.10): eight subdirectories (scope-assessment, drafts, art33, art34, tenant-notifications, board, legal, dec030) with SHA-256 manifest generation command and git commit tamper-evident sealing. Post-notification follow-up (§15.11): supplementary Art. 33(4) cadence (within 7 days of material new information), DPA correspondence tracking protocol, bounce / Art. 34(3)(c) exception path, five PIR review questions specific to breach notification process quality. SOC 2 privacy criterion mapping (§15.12): P7.1 (timely notification — breach.art33_notification_filed CRITICAL event with hours_since_awareness is primary auditor evidence), P8.1 (disposal chain via PIR integration), P6.1 (processor-to-controller disclosure evidenced by breach.processor_notified_tenant), CC2.2 (board + tenant external communication), CC7.3 (§15.3 decision matrix as documented evaluation with auditable DEC-030 outcome). Implementation checklist (§15.13): twelve tasks across M4/M5 (7× P0 M4, 4× P1 M4, 1× P1 M5 tabletop drill Scenario J, 1× P2 M5 annual schedule integration). Advances SOC2_READINESS.md §35 P7.1 from 🟡 to target 🟢 on checklist completion.*
 
 ---
