@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v1.3
+# FORM · Observability & Monitoring Taxonomy v1.5
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -5317,7 +5317,7 @@ This section closes the complementary gap: *are users activating, and is the pro
 
 §25 defines FORM's product observability layer: the PostHog event taxonomy for F1–F8 user flows (see `docs/FLOWS.md`), the activation and engagement SLOs that sit alongside §2's infrastructure SLOs, the alerting rules that fire on product metric regressions, A/B test instrumentation standards, and the privacy constraints that govern what may and may not enter PostHog.
 
-PostHog (EU Cloud, Frankfurt) is the sole destination for all events in this section. It was selected in DEC-XXX (TBD) for open-source pedigree, EU data residency, combined feature flag and analytics surface, and competitive cost versus Amplitude at early-stage scale. See OQ-32 for the open Amplitude comparison question. PostHog is already referenced in the §1 Three Pillars table as the product metrics tool and in §12.5 as an instrumentation checkpoint.
+PostHog (EU Cloud, Frankfurt) is the sole destination for all events in this section. It was selected in DEC-026 for open-source pedigree, EU data residency, combined feature flag and analytics surface, and competitive cost versus Amplitude at early-stage scale. See OQ-32 for the open Amplitude comparison question. PostHog is already referenced in the §1 Three Pillars table as the product metrics tool and in §12.5 as an instrumentation checkpoint.
 
 **Privacy-first constraint:** FORM's workout data, body composition trends, recovery scores, and coaching content are GDPR Art. 9 health-adjacent special category data. Nothing in §25 permits health data to enter PostHog. All event schemas below are designed with this constraint as a hard gate. The clinical-safety team holds a veto on any proposed event property that is body-adjacent, injury-adjacent, or could reconstruct an individual's health status from the PostHog event stream.
 
@@ -5325,7 +5325,7 @@ PostHog (EU Cloud, Frankfurt) is the sole destination for all events in this sec
 
 ### 25.2 Activation Funnel Definition
 
-FORM defines **"activated"** as: a user who completes at least one full coaching session with CV pose feedback enabled within 7 days of registration [DEC-XXX TBD]. This is the D7 Activation metric (ACT-SLO-01). It is the primary product health signal pre-Series A.
+FORM defines **"activated"** as: a user who completes at least one full coaching session with CV pose feedback enabled within 7 days of registration (DEC-034). This is the D7 Activation metric (ACT-SLO-01). It is the primary product health signal pre-Series A.
 
 The activation journey maps to flows F1 through F4 in `docs/FLOWS.md`. Flows F5–F8 are engagement and monetisation steps that follow activation.
 
@@ -6196,3 +6196,396 @@ The SIEM pipeline itself emits DEC-030 events to make the pipeline observable wi
 ---
 
 *v1.4 additions (2026-06-01): Section 27 — SIEM Integration & Security Event Streaming — defines FORM's dual-mode security event streaming architecture: an internal Cloudflare Logpush → ClickHouse correlation pipeline (always active, CC7.2/CC7.3 evidence) and an enterprise tenant SIEM export layer (pull API + push webhook). §27.1 scopes streamed vs. internally-retained events; establishes privacy floor (user_id absent, user_email SHA-256 hashed, IP truncated to subnet); enumerates two streaming modes; cross-references DEC-030, SOC2_READINESS §46, INCIDENT_RESPONSE §3, SSO_SCIM §22. §27.2 fourteen-row event classification table mapping DEC-030 event types to CEF/LEEF severity levels (Informational through Critical) with tenant-SIEM export eligibility (yes/no/optional) for auth success/failure/anomaly, SCIM provisioning, session revocation, cert lifecycle, admin actions, privilege escalation, bulk data access, and SIEM control events. §27.3 internal pipeline: ClickHouse siem_events table schema (MergeTree, 730-day TTL, EU region); four correlation rules as ClickHouse SQL — CR-01 brute-force (≥ 10 failures/10 min/subnet), CR-02 impossible travel (cross-country login gap < 2 h via LAG() window function + MaxMind lookup), CR-03 privilege escalation (elevation within 30 min of preceding failure, JOIN-based), CR-04 bulk data access (≥ 5 bulk events/h or ≥ 10,000 records); PagerDuty routing table for all four rules to FORM Security service. §27.4 enterprise tenant SIEM export: pull API (`GET /enterprise/v1/audit-events`, cursor pagination, HMAC response header, 90-day retention, R2 archive); push webhook (SiemExportBuffer Durable Object, 500-event/30 s flush, X-FORM-Signature GitHub-convention signing, 5-attempt exponential retry to 2 h, 48 h queue persistence); five SIEM targets (Splunk HEC, Microsoft Sentinel Data Collector, Datadog Log Management, IBM QRadar LEEF, generic webhook); CEF/LEEF schema transformation with severity integer mapping; four-tier rate limits (10K free, 100K growth, 1M enterprise, unlimited add-on). §27.5 privacy floor (six mandatory redaction rules implementing GDPR Art. 5(1)(c)); five mandatory fields always present in exports; customer-configurable JSON filter rules with compliance-officer approval gate for admin/anomaly exclusion. §27.6 four SIEM SLOs: SIEM-SLO-01 (push P95 < 60 s), SIEM-SLO-02 (pull availability < 5 min), SIEM-SLO-03 (zero undelivered events after 24 h, zero-tolerance), SIEM-SLO-04 (zero HMAC chain breaks, zero-tolerance); measurement via siem_delivery_log ClickHouse table and extended audit-chain-daily-check pg_cron. §27.7 six alert rules AL-SIEM-01 through AL-SIEM-06: webhook delivery failure (P2), ClickHouse pipeline lag > 5 min (P2), impossible travel match (P1), bulk data access match (P1), HMAC chain break (P0 — R-01 auto-open, forensic freeze), zero events 30-min dead-man's switch (P1); SOC 2 CC7.2/CC7.3 note for P0 rule. §27.8 seven-panel "Security Event Stream" Better Stack + Metabase dashboard: ingestion rate time-series, severity stacked bar, top-10 event types table, webhook delivery success gauge, pipeline lag P95 time-series, active tenant export count, anomaly correlation hits table with rule_name + tenant_id. §27.9 six DEC-030 self-monitoring events: siem.webhook_delivery_success (STANDARD), siem.webhook_delivery_failed (HIGH, retry_count + destination_type), siem.pipeline_lag_alert (HIGH), siem.hmac_chain_break_detected (CRITICAL — R-01 auto, chain_integrity:false forensic flag), siem.tenant_export_enabled (HIGH, filter_rules_hash), siem.tenant_export_disabled (HIGH, reason). §27.10 SOC 2 mapping: CC7.2 (four correlation rules as documented anomaly monitors + meta-monitoring via AL-SIEM-06), CC7.3 (response SLAs + R-01/R-12 auto-escalation), C1.1 (privacy-floor redaction documented and CI-tested), CC9.2 (tenant SIEM endpoints as sub-processors, DPA clause update); four evidence artefacts SIEM-OBS-E-001 through SIEM-OBS-E-004. §27.11 ten-item implementation checklist: four P0 items (ClickHouse table + Logpush, SiemExportBuffer Durable Object, pull API, redaction test suite), six P1 items (CEF/LEEF transform, alert rule configuration, ClickHouse correlation rule deployment, dashboard, Admin Dashboard SIEM UI, DPA update); M4/M5 milestones, owners devops-lead/platform-engineer/security-engineer/compliance-officer. §27.12 three open questions: OQ-SIEM-01 (ClickHouse vs. Supabase/Analytics Engine for correlation rules pre-M9 — P0, platform-engineer + devops-lead, before M4), OQ-SIEM-02 (DPA consent scope for tenant-specified SIEM endpoints — P1, compliance-officer + legal, before M5), OQ-SIEM-03 (HMAC chain verification library vs. documentation for tenant consumers — P2, security-engineer + devops-lead, before enterprise GA M13).*
+
+---
+
+## 28. Mobile Application Performance Observability
+
+> Owner: mobile-engineer + devops-lead. Review: monthly or on any OTA update publish. SOC 2 evidence: A1.1, A1.2, CC7.2, CC7.3. References: `docs/TECHNICAL.md`, `docs/INCIDENT_RESPONSE.md R-02`, `docs/DATA_MODEL.md §15`, DEC-030, DEC-034.
+
+### 28.1 Purpose and Scope
+
+The infrastructure observability in §1–§27 monitors server-side system components. The mobile client — a React Native / Expo application running on heterogeneous iOS and Android hardware — introduces a category of failure that no server-side alert detects: crashes, ANRs, cold-start regressions, thermal throttling under CV inference load, and silent OTA update delivery failures.
+
+This section defines the complete mobile performance observability layer. It is distinct from:
+
+- **§18 (CV Pose Estimation Model Observability)** — §18 covers ML model quality metrics (confidence, tracking_lost rate, inference latency P95); §28 covers host OS and React Native runtime health that the model runs within.
+- **§25 (Product & Activation Funnel Observability)** — §25 covers user behavior events in PostHog; §28 covers client reliability and performance.
+- **§20 (Wearable Data Integration Observability)** — §20 covers sync health for HealthKit/Health Connect/third-party APIs; §28 is device-native.
+
+Enterprise relevance is high: a tenant deploying FORM to 200–1,000 employees on corporate-managed devices (MDM) needs assurance that the app is stable across their device fleet, that any bad OTA update can be detected and rolled back before it affects all seats, and that FORM's CV feature does not cause battery complaints to their IT helpdesk.
+
+**Tooling in scope:**
+- **Sentry React Native SDK** — crash and ANR reporting, performance transactions, breadcrumbs
+- **EAS (Expo Application Services)** — OTA JavaScript bundle delivery, rollout channels
+- **Cloudflare Workers Analytics Engine** — fleet-level counters (no user_id)
+- **PostHog** — session count denominator for crash-free rate calculation (privacy floor: distinct_id only)
+
+**Out of scope:** individual user-device telemetry, session recordings, GPS/location data, battery percentage as a continuous metric (captured only as a flag at thermal event, never stored per-user).
+
+---
+
+### 28.2 Mobile Performance SLIs and SLOs
+
+All SLOs are measured at fleet level. Enterprise tenants receive per-plan SLO tiers identical to §13.3 (Standard / Premium), applied to the server-side availability commitment. Mobile performance SLOs below are FORM-internal operational targets — they do not appear in the enterprise DPA, but breaches drive the same response urgency as server-side SLOs.
+
+| SLO ID | Signal | Definition | Target | Alert Threshold | Measurement Window | Platform | Owner |
+|---|---|---|---|---|---|---|---|
+| **MOBILE-SLO-01** | Cold start P95 | Time from cold process launch to first interactive frame (TTI) | < 2,000 ms | > 2,500 ms for 15 min | Rolling 24 h | iOS + Android | mobile-engineer |
+| **MOBILE-SLO-02** | Crash-free session rate (iOS) | % of Sentry sessions without a native crash | ≥ 99.5% | < 99.0% in any 1 h window | Rolling 7 days | iOS | mobile-engineer |
+| **MOBILE-SLO-03** | Crash-free session rate (Android) | % of Sentry sessions without a native crash | ≥ 99.5% | < 99.0% in any 1 h window | Rolling 7 days | Android | mobile-engineer |
+| **MOBILE-SLO-04** | ANR-free session rate (Android) | % of Android sessions without an Application Not Responding event | ≥ 99.0% | < 98.5% in any 1 h window | Rolling 7 days | Android | mobile-engineer |
+| **MOBILE-SLO-05** | Frame render rate | % of all rendered frames at ≥ 60 fps fleet-wide | ≥ 90% | < 85% for 30 min | Rolling 24 h | iOS + Android | mobile-engineer |
+| **MOBILE-SLO-06** | OTA update adoption | % of active devices running the latest published production channel bundle | ≥ 95% within 48 h of publish | < 90% at 72 h post-publish | Per update | iOS + Android | devops-lead |
+| **MOBILE-SLO-07** | CV session thermal throttle rate | % of CV sessions that trigger an OS thermal state warning (`.serious` on iOS, `THROTTLING` on Android) | ≤ 5% | > 10% in any 4 h window | Rolling 24 h | iOS + Android | ml-engineer |
+
+**Note on MOBILE-SLO-01 measurement:** Cold start P95 is captured as a Sentry Performance transaction `app.cold_start` from the moment the React Native runtime is initialised to the moment the home screen renders its first interactive frame. Warm starts (app brought to foreground from background) are measured separately as `app.warm_start` and excluded from MOBILE-SLO-01.
+
+---
+
+### 28.3 Sentry React Native Integration
+
+Sentry is the single authoritative source for crash, ANR, and error data. The SDK is initialised in `app/_layout.tsx` before any navigation or module load.
+
+**Privacy constraint — Breadcrumb deny-list:** Sentry breadcrumbs and error context must never include health-adjacent data. The following fields are on the deny-list and must be stripped before the Sentry envelope is transmitted:
+
+| Denied field | Type | Reason |
+|---|---|---|
+| `workoutId` | string | Links to health activity |
+| `exerciseName` | string | Workout content — not health, but links to session |
+| `weight` | number | Body composition — GDPR Art. 9 |
+| `heartRate` | number | Biometric — GDPR Art. 9 |
+| `calories` | number | Health metric — Art. 9 adjacent |
+| `cvKeypoints` | array | Biometric pose data — GDPR Art. 9 |
+| `formScore` | number | Derived health metric |
+| `mood` | string/number | Wellbeing — Art. 9 |
+| `readiness` | string/number | Wellbeing — Art. 9 |
+| `injuryFlag` | boolean | Medical — Art. 9 |
+| Any `recovery.*` prefixed key | any | Recovery data — Art. 9 adjacent |
+
+```typescript
+// app/_layout.tsx
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  environment: process.env.EXPO_PUBLIC_ENV, // 'production' | 'staging'
+  tracesSampleRate: 0.1,   // 10% of sessions traced; increase to 1.0 for crash investigations
+  profilesSampleRate: 0.05, // 5% CPU profiling in production
+
+  beforeSend(event) {
+    // Strip health fields from any breadcrumb or extra context before transmission
+    const DENIED_KEYS = new Set([
+      'workoutId', 'exerciseName', 'weight', 'heartRate', 'calories',
+      'cvKeypoints', 'formScore', 'mood', 'readiness', 'injuryFlag',
+    ]);
+
+    if (event.breadcrumbs?.values) {
+      event.breadcrumbs.values = event.breadcrumbs.values.map(crumb => {
+        if (!crumb.data) return crumb;
+        const clean: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(crumb.data)) {
+          if (!DENIED_KEYS.has(k) && !k.startsWith('recovery.')) clean[k] = v;
+        }
+        return { ...crumb, data: clean };
+      });
+    }
+
+    if (event.extra) {
+      for (const key of Object.keys(event.extra)) {
+        if (DENIED_KEYS.has(key) || key.startsWith('recovery.')) {
+          delete event.extra[key];
+        }
+      }
+    }
+
+    return event;
+  },
+});
+```
+
+**Session replay:** Disabled unconditionally across all screens. The `replaysSessionSampleRate` and `replaysOnErrorSampleRate` options must both be `0` in production. See OQ-MOBILE-02 for the conditional re-evaluation path.
+
+**User context:** Only `user.id` (the Supabase UUID — never name, email, or health identifier) is set in Sentry via `Sentry.setUser({ id: userId })`. This allows Sentry issue deduplication and affected-user counts without exposing PII. Sentry's DPA covers user UUID as a pseudonymous identifier.
+
+---
+
+### 28.4 Performance Monitoring (Sentry Performance Transactions)
+
+Sentry Performance captures transaction spans that map to user-perceptible performance events. The following transactions are required instrumentation for MOBILE-SLO-01 and MOBILE-SLO-05.
+
+| Transaction Name | Start Event | End Event | SLO Gate | P95 Target | Notes |
+|---|---|---|---|---|---|
+| `app.cold_start` | Native runtime init (before any JS execution) | Home screen `onLayout` completes | MOBILE-SLO-01 | < 2,000 ms | Measured by Expo `expo-launch-screen` + Sentry manual span |
+| `app.warm_start` | App brought to foreground | Main navigation stack renders | — | < 500 ms | Excluded from MOBILE-SLO-01; tracked for regression |
+| `session.cv.start` | `session.intent_started` PostHog event fires | Camera preview first frame rendered | — | < 1,500 ms | CV startup is the most user-visible latency after cold start |
+| `screen.load.<screen_name>` | `navigation.transition_start` | Screen `onLayout` completes | — | < 800 ms | Instrumented for all primary navigation screens |
+| `auth.sso.saml_redirect` | SSO button tap | Post-SAML assertion user session active | — | < 3,000 ms | Enterprise SSO; aligns with SSO-SLO-02 (§26.3) |
+
+```typescript
+// Pattern: wrapping a screen render in a Sentry transaction span
+import { startTransaction } from '@sentry/react-native';
+
+export function useScreenLoadTransaction(screenName: string) {
+  const txRef = React.useRef<ReturnType<typeof startTransaction> | null>(null);
+
+  React.useEffect(() => {
+    txRef.current = startTransaction({
+      name: `screen.load.${screenName}`,
+      op: 'ui.load',
+    });
+    return () => {
+      txRef.current?.finish();
+    };
+  }, [screenName]);
+}
+```
+
+**Frame rate monitoring:** React Native's `PerformanceObserver` for `'longtask'` entries captures JS thread blocks > 50 ms that cause dropped frames. Fleet-level dropped frame rate is aggregated via Cloudflare Analytics Engine (one counter increment per dropped frame, blobs: `[deviceTier, platform, appVersion]`; no user_id):
+
+```typescript
+// workers/mobile-telemetry/index.ts
+interface MobileTelemetryPayload {
+  event: 'frame_drop' | 'cold_start' | 'thermal_warning';
+  platform: 'ios' | 'android';
+  device_tier: 'tier1' | 'tier2' | 'tier3';
+  app_version: string;
+  value_ms?: number;       // cold_start duration; absent for frame_drop/thermal_warning
+  tenant_id?: string;      // present only for enterprise sessions
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const payload: MobileTelemetryPayload = await request.json();
+
+    // Rate limit: 500 events per session per hour (prevent abuse)
+    const key = `rl:mobile:${request.headers.get('CF-Connecting-IP')}`;
+    const count = await env.RATE_LIMIT_KV.get(key, { type: 'text' });
+    if (count && parseInt(count) >= 500) return new Response('429', { status: 429 });
+
+    env.ANALYTICS.writeDataPoint({
+      blobs: [
+        payload.platform,             // blobs[0]
+        payload.device_tier,          // blobs[1]
+        payload.app_version,          // blobs[2]
+        payload.event,                // blobs[3]
+        payload.tenant_id ?? 'none',  // blobs[4] — 'none' for consumer sessions
+      ],
+      doubles: [
+        payload.value_ms ?? 0,        // doubles[0]
+        1,                            // doubles[1] — count increment
+      ],
+      indexes: [payload.event],
+    });
+
+    return new Response('ok');
+  },
+};
+```
+
+**Device tier classification:** Reported by the React Native client at session start based on device model lookup. Tier definitions:
+
+| Tier | iOS examples | Android examples | Inference |
+|---|---|---|---|
+| `tier1` | iPhone 14 / 15 / 16 series, iPad Pro M1+ | Pixel 7/8/9, Galaxy S22/S23/S24 series, OnePlus 11+ | Full 60 fps CV, no thermal constraint |
+| `tier2` | iPhone 12/13, iPad Air 4/5 | Pixel 5/6, Galaxy A54, Xiaomi 12 | 30 fps CV target, monitor for thermal |
+| `tier3` | iPhone 11 or earlier, iPad mini 5 | Android 9–11 devices, Galaxy A33 and below | 24 fps CV; thermal alerts expected; MDM enterprise fleets may contain these |
+
+---
+
+### 28.5 EAS OTA Update Rollout Observability
+
+EAS delivers React Native JavaScript bundle updates over-the-air to avoid App Store review delays. For enterprise deployments, an unmonitored bad OTA can silently degrade the app for all employees simultaneously.
+
+**Channels:**
+- `production` — all consumer users + enterprise tenants on stable builds
+- `preview` — internal testing; 10% of enterprise pilot users during onboarding phase
+- `staging` — CI integration; no real users
+
+**Rollout health metrics:**
+
+| Metric | Source | MOBILE-SLO gate | Alert |
+|---|---|---|---|
+| Adoption rate (production channel) | EAS REST API → `ota_update_events` Postgres table | MOBILE-SLO-06: ≥ 95% at 48 h | AL-MOBILE-05 if < 90% at 72 h |
+| Download failure rate | EAS webhook → `mobile.ota_download_failed` DEC-030 event | < 1% | AL-MOBILE-05b (P2, Slack) |
+| Rollback trigger rate | `mobile.ota_rollback_triggered` DEC-030 event | Zero production rollbacks per 90-day observation period | AL-MOBILE-06 (P1) |
+| First-launch crash rate post-update | Sentry — crash rate spike correlated with OTA update `runtimeVersion` | < 99.0% crash-free in first hour post-update = automatic rollback consideration | AL-MOBILE-01/02 will fire first |
+
+```sql
+-- ota_update_events: tracks EAS update lifecycle
+CREATE TABLE ota_update_events (
+  id             uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
+  update_id      text          NOT NULL,
+  channel        text          NOT NULL,   -- 'production' | 'preview' | 'staging'
+  runtime_version text         NOT NULL,
+  event_type     text          NOT NULL,   -- 'published' | 'adoption_snapshot' | 'rollback'
+  adoption_pct   numeric(5, 2),            -- NULL for 'published'; set on adoption_snapshot rows
+  device_count   integer,
+  recorded_at    timestamptz   NOT NULL DEFAULT now(),
+  published_by   text,                     -- actor user_id (devops-lead)
+  rollback_reason text
+);
+
+CREATE INDEX idx_ota_channel_event ON ota_update_events (channel, event_type, recorded_at DESC);
+CREATE INDEX idx_ota_update_id ON ota_update_events (update_id);
+
+-- No RLS required: this table is internal FORM operations only. form_api role cannot read it.
+-- Accessible to: form_admin role, devops-lead, Metabase service account.
+```
+
+**Adoption snapshot pg_cron job** (runs every 6 hours, 03:00/09:00/15:00/21:00 UTC):
+
+```sql
+-- Fetch current adoption % from EAS API via Worker proxy and insert a snapshot row
+-- Worker: workers/eas-adoption-check/index.ts calls https://api.expo.dev/v2/updates
+-- and writes the result to this table via the service-role key.
+-- Emits mobile.ota_adoption_snapshot DEC-030 STANDARD event per channel per run.
+SELECT cron.schedule(
+  'ota-adoption-check',
+  '0 3,9,15,21 * * *',
+  $$
+    SELECT net.http_post(
+      url     := current_setting('app.eas_adoption_worker_url'),
+      headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.worker_secret')),
+      body    := jsonb_build_object('channels', ARRAY['production', 'preview'])
+    );
+  $$
+);
+```
+
+---
+
+### 28.6 Enterprise Device Fleet Considerations
+
+Enterprise customers deploying FORM through MDM (Microsoft Intune, Jamf Pro, VMware Workspace ONE) face constraints that affect OTA update adoption and device tier distribution:
+
+**MDM change control windows:** Many enterprise IT departments apply change freeze windows (e.g., no updates during payroll processing days or quarter-end). MOBILE-SLO-06 (95% adoption within 48 h) may be unachievable for tenants with strict MDM policies. The resolution is tracked in OQ-MOBILE-01.
+
+**Device tier distribution by segment:**
+- Consumer fleet: 70–80% Tier 1/2, 20–30% Tier 3 based on typical UA/EU market mix
+- Enterprise fleet (B2B): expectation is 50–60% Tier 1/2, 40–50% Tier 3 (corporate-issued mid-range Android devices are common in manufacturing, logistics, and healthcare verticals)
+
+**Per-tenant fleet health in Admin Dashboard:** Enterprise tenant admins receive an aggregated "App Health" panel in the Admin Dashboard (visible from M6). The panel shows:
+- Crash-free rate (fleet average, no user_id, k-anonymity n ≥ 10)
+- OTA update status (% of tenant's devices on latest production build)
+- Device tier distribution (% Tier 1 / Tier 2 / Tier 3)
+- Any active AL-MOBILE alert affecting their tenant
+
+**Privacy floor:** The Admin Dashboard fleet panel never exposes individual device identifiers, employee names, or crash stack traces. Crash details are accessible only to FORM's mobile-engineer via Sentry. The Admin Dashboard shows aggregate counts only.
+
+---
+
+### 28.7 DEC-030 Audit Events (Mobile Fleet, Fleet-Level Only)
+
+Mobile performance events are emitted at fleet level. Individual crash reports live in Sentry (accessed by mobile-engineer only). No DEC-030 event includes a `user_id` field for mobile performance — only `tenant_id` (slug, not UUID) is permitted when the event affects an enterprise session.
+
+| Event Type | Severity | Key Fields | Retention | Notes |
+|---|---|---|---|---|
+| `mobile.crash_rate_breach` | HIGH | `platform`, `app_version`, `crash_free_pct`, `window_minutes`, `tenant_id` (slug, optional) | 3 years | Emitted when AL-MOBILE-01 or AL-MOBILE-02 fires; fleet-level count only; no user_id |
+| `mobile.anr_spike` | HIGH | `app_version`, `anr_rate_pct`, `window_minutes`, `tenant_id` (slug, optional) | 3 years | Emitted when AL-MOBILE-03 fires; Android only |
+| `mobile.cold_start_regression` | STANDARD | `app_version`, `cold_start_p95_ms`, `baseline_p95_ms`, `delta_pct`, `platform` | 90 days | Emitted when MOBILE-SLO-01 is breached; informational; does not open an incident automatically |
+| `mobile.ota_update_published` | STANDARD | `channel`, `update_id`, `runtime_version`, `published_by` (actor user_id) | 3 years | Emitted when devops-lead publishes a new OTA update via EAS; actor is the FORM team member, not an end user |
+| `mobile.ota_rollback_triggered` | HIGH | `channel`, `previous_update_id`, `triggering_alert` (AL-MOBILE-01/06), `rolled_back_by` (actor user_id) | 3 years | Emitted when production channel is rolled back; triggers INCIDENT_RESPONSE.md §R-02 assessment |
+| `mobile.thermal_throttle_spike` | STANDARD | `platform`, `device_tier`, `throttle_rate_pct`, `window_hours`, `tenant_id` (slug, optional) | 90 days | Emitted when AL-MOBILE-07 fires; no user_id; `device_tier` enables ml-engineer to correlate with CV inference load |
+
+---
+
+### 28.8 Alert Rules (AL-MOBILE-*)
+
+| Rule ID | Trigger Condition | Severity | Route | First Response |
+|---|---|---|---|---|
+| **AL-MOBILE-01** | iOS crash-free session rate < 99.0% in any 1 h window | **P0** | PagerDuty → mobile-engineer + on-call | Check Sentry Releases for crash group; correlate `app_version` with most recent OTA update; if OTA published within 2 h, trigger rollback; open INCIDENT_RESPONSE.md R-02 |
+| **AL-MOBILE-02** | Android crash-free session rate < 99.0% in any 1 h window | **P0** | PagerDuty → mobile-engineer + on-call | Same runbook as AL-MOBILE-01 |
+| **AL-MOBILE-03** | Android ANR rate > 1.5% in any 1 h window | **P1** | PagerDuty → mobile-engineer | Check Sentry ANR traces for main-thread blocking call; likely a synchronous storage/network call on the JS thread; suspend OTA deploy if post-publish |
+| **AL-MOBILE-04** | Cold start P95 > 2,500 ms for 15 min (fleet-wide) | **P1** | Slack #alerts-mobile → mobile-engineer | Check bundle size delta vs previous OTA; check `app.cold_start` Sentry transaction breakdown for which initialisation step regressed |
+| **AL-MOBILE-05** | OTA update adoption < 90% at 72 h post-publish (production channel) | **P2** | Slack #devops → devops-lead | Check EAS delivery status dashboard; investigate download failure rate; not a user emergency unless combined with AL-MOBILE-01/02 |
+| **AL-MOBILE-06** | OTA rollback triggered on production channel | **P1** | PagerDuty → devops-lead + mobile-engineer | Immediate triage; document rollback reason in `ota_update_events`; notify enterprise tenant CSMs via Slack #csm-alerts if rollback during business hours (08:00–18:00 UTC); emit `mobile.ota_rollback_triggered` DEC-030 event before acknowledging PagerDuty |
+| **AL-MOBILE-07** | CV thermal throttle rate > 10% in any 4 h window | **P2** | Slack #alerts-mobile → ml-engineer | Break down by `device_tier`; if Tier 3 only, consider reducing CV inference frame rate from 24 → 15 fps via feature flag; if Tier 1/2 affected, escalate to P1 |
+| **AL-MOBILE-08** | Frame render rate < 85% at 60 fps fleet-wide for 30 min | **P2** | Slack #alerts-mobile → mobile-engineer | Check for animation/FlatList render regression in most recent OTA; use Sentry Performance flame graphs on `screen.load.*` transactions |
+
+**Alert deduplication:** AL-MOBILE-01 and AL-MOBILE-02 must not fire on the same incident window twice. PagerDuty deduplication key: `mobile-crash-{platform}-{app_version}`. Auto-resolve when crash-free rate recovers above 99.5% for two consecutive 15-min windows.
+
+---
+
+### 28.9 Dashboard: "Mobile Fleet Health"
+
+**Owner:** devops-lead. **Source:** Sentry API (crash/ANR metrics), Cloudflare Analytics Engine (frame rate, cold start), `ota_update_events` Postgres table. **Refresh:** 5 minutes.
+
+| Panel | Metric / Query | Visualisation |
+|---|---|---|
+| **Crash-free sessions (iOS)** | Sentry API: `sentry_crash_rate{platform="ios"}`, rolling 7-day window | Time-series; MOBILE-SLO-02 threshold line at 99.5%; acid-coloured below 99.0% |
+| **Crash-free sessions (Android)** | Sentry API: `sentry_crash_rate{platform="android"}`, rolling 7-day window | Time-series; MOBILE-SLO-03 threshold line at 99.5% |
+| **Cold start P95 trend** | Cloudflare AE: `QUANTILEWEIGHTED(0.95)(double1, 1)` from `mobile_telemetry` WHERE `blob3 = 'cold_start'`, 7-day rolling | Time-series; MOBILE-SLO-01 at 2,000 ms; alert shade above 2,500 ms |
+| **OTA adoption funnel** | `ota_update_events` WHERE `channel = 'production'` last 3 updates: adoption_pct at 24 h / 48 h / 72 h | Grouped bar (3 updates × 3 time points); MOBILE-SLO-06 line at 95% |
+| **Error rate by app version** | Sentry: top-5 error groups, broken down by `app_version` | Stacked bar (last 14 days, 1 day buckets); highlights version with highest error contribution |
+| **CV thermal throttle by device tier** | Cloudflare AE: `COUNTIF(blob3 = 'thermal_warning') / COUNT(*)` grouped by `blob1` (device_tier), last 24 h | Horizontal bar chart (Tier 1 / Tier 2 / Tier 3); MOBILE-SLO-07 line at 5% |
+| **Frame rate trend** | Cloudflare AE: `1 - (COUNTIF(blob3 = 'frame_drop') / COUNT(*))` last 24 h | Gauge + time-series; MOBILE-SLO-05 threshold at 90% |
+| **Active OTA update status** | `ota_update_events` latest production row | Stat panel: `update_id` (short), `adoption_pct`, `recorded_at`; green if ≥ 95%, amber 90–95%, red < 90% |
+
+---
+
+### 28.10 Privacy Constraints
+
+| Constraint | Enforcement Location | Rationale |
+|---|---|---|
+| Sentry breadcrumbs must not contain health fields | `beforeSend` hook in `app/_layout.tsx` (§28.3) | GDPR Art. 9 — biometric / health data must not exit the device boundary in crash reports |
+| `mobile_telemetry` Worker accepts no `user_id` field; requests with `user_id` in payload are rejected with 400 | Worker request handler validation (`workers/mobile-telemetry/index.ts`) | Fleet-level observability must not be linkable to individuals; DEC-030 events carry only `tenant_id` slug |
+| Device tier classification uses a device model lookup table, not biometric or location data | Client-side classification from React Native `Platform.constants.Model` | Device model is operational metadata; not GDPR Art. 9 |
+| Sentry session replay is disabled (`replaysSessionSampleRate: 0, replaysOnErrorSampleRate: 0`) | Sentry init options in `app/_layout.tsx` | Screen recordings could capture health-adjacent UI; disabled until clinical-safety review per OQ-MOBILE-02 |
+| Admin Dashboard fleet panel enforces k-anonymity (n ≥ 10 devices per cell) before rendering | Admin Dashboard API query: `HAVING COUNT(*) >= 10` | Prevents reverse-engineering of individual device state from aggregate fleet stats |
+| Sentry's DPA covers user UUID as a pseudonymous identifier; no other PII is transmitted | Sentry sub-processor entry in `docs/SECURITY.md §5` | GDPR Art. 28 compliance for Sentry as data processor |
+
+---
+
+### 28.11 SOC 2 Evidence Mapping
+
+| Criterion | Control | Evidence from §28 |
+|---|---|---|
+| **A1.1** | Current processing capacity is sufficient to meet commitments | MOBILE-SLO-01 through MOBILE-SLO-07 define the mobile client performance envelope; §28.2 documents targets and measurement methodology; continuous monitoring via Sentry and Cloudflare AE constitutes the capacity monitoring control |
+| **A1.2** | Environmental threats to availability are identified and monitored | OTA rollout health (§28.5, MOBILE-SLO-06) detects deployment regressions before they affect the full enterprise fleet; AL-MOBILE-06 forces immediate triage on any production rollback; thermal throttle monitoring (MOBILE-SLO-07) detects device-environment threats to the CV feature's continued operation |
+| **CC7.2** | The entity monitors system components for anomalies | Eight alert rules AL-MOBILE-01 through AL-MOBILE-08 with documented thresholds and PagerDuty/Slack routing constitute monitored controls; DEC-030 events `mobile.crash_rate_breach`, `mobile.ota_rollback_triggered`, and `mobile.anr_spike` provide an HMAC-chained audit trail of mobile anomaly detections; Sentry crash-free rate is polled by the devops-lead on-call rotation |
+| **CC7.3** | The entity evaluates and responds to identified anomalies | Response SLA and first-response actions are documented per rule in §28.8; P0 alerts (AL-MOBILE-01/02) route to mobile-engineer + on-call with a defined runbook that includes OTA rollback as a specific remediation step |
+
+**Auditor evidence artefacts:**
+
+| Artefact ID | Description | Collection method |
+|---|---|---|
+| **MOB-OBS-E-001** | Sentry crash-free session rate export — iOS and Android, full observation period | Sentry → Discover → `event.type:error` filtered by platform; export CSV; SHA-256 hash the file |
+| **MOB-OBS-E-002** | OTA update history — all production channel publishes and rollbacks for the observation period | `SELECT * FROM ota_update_events WHERE channel = 'production' AND recorded_at BETWEEN $obs_start AND $obs_end ORDER BY recorded_at` |
+| **MOB-OBS-E-003** | DEC-030 mobile event log — all `mobile.*` events for the observation period | `SELECT * FROM audit_log WHERE event_type LIKE 'mobile.%' AND event_ts BETWEEN $obs_start AND $obs_end ORDER BY event_ts` |
+| **MOB-OBS-E-004** | AL-MOBILE PagerDuty incident log — all mobile alert incidents for the observation period | PagerDuty → Incidents → filter by service "FORM Mobile" + date range → export CSV |
+
+---
+
+### 28.12 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Integrate Sentry React Native SDK in `app/_layout.tsx`; configure `beforeSend` breadcrumb deny-list per §28.3; add automated CI test asserting health fields absent from captured Sentry envelope | mobile-engineer | **P0** | M3 |
+| Wire Sentry crash-free session rate (iOS + Android) to §2 SLO table; confirm MOBILE-SLO-02/03 breach thresholds appear in Sentry Monitor rules | mobile-engineer + devops-lead | **P0** | M3 |
+| Configure AL-MOBILE-01 and AL-MOBILE-02 (P0 crash) in PagerDuty "FORM Mobile" service; wire to mobile-engineer on-call rotation | devops-lead | **P0** | M3 |
+| Instrument `app.cold_start` Sentry Performance transaction from native runtime init to home screen `onLayout`; validate transaction appears in Sentry Discover | mobile-engineer | **P1** | M4 |
+| Instrument `session.cv.start` Sentry Performance transaction from `session.intent_started` to CV camera first-frame render | mobile-engineer | **P1** | M4 |
+| Deploy `workers/mobile-telemetry/index.ts` Worker (§28.4); configure rate limit KV binding; validate frame drop counter increments in Analytics Engine staging | platform-engineer | **P1** | M4 |
+| Configure AL-MOBILE-03 through AL-MOBILE-08 in PagerDuty/Slack with deduplication keys per §28.8 | devops-lead | **P1** | M4 |
+| Add `mobile.crash_rate_breach` and `mobile.ota_rollback_triggered` DEC-030 event emission; validate HMAC chain integrity in staging | platform-engineer | **P1** | M4 |
+| Create `ota_update_events` Postgres table (§28.5 DDL); build EAS adoption-check Worker (`workers/eas-adoption-check/index.ts`); schedule pg_cron adoption snapshot job | devops-lead | **P1** | M4 |
+| Emit `mobile.ota_update_published` and `mobile.ota_adoption_snapshot` DEC-030 events from EAS adoption Worker | platform-engineer | **P2** | M5 |
+| Add `device_tier` thermal throttle metric to `cv_sdk_telemetry` (extends §18 schema; new column `thermal_state TEXT CHECK (thermal_state IN ('nominal','fair','serious','critical'))`) | ml-engineer | **P1** | M5 |
+| Build "Mobile Fleet Health" dashboard in Sentry org dashboard + Metabase per §28.9 (eight panels); share with devops-lead, mobile-engineer, enterprise CSM | devops-lead | **P2** | M5 |
+| Add "App Health" aggregate panel to enterprise Admin Dashboard (§28.6): crash-free rate, OTA status, device tier distribution; enforce k-anonymity n ≥ 10 in query | platform-engineer | **P2** | M6 |
+| File MOB-OBS-E-001 through MOB-OBS-E-004 evidence artefacts to `compliance/evidence/` before SOC 2 observation period start | devops-lead | **P1** | Observation period start |
+
+---
+
+### 28.13 Open Questions
+
+| OQ | Question | Owner | Resolution Target | Priority |
+|---|---|---|---|---|
+| OQ-MOBILE-01 | **EAS OTA adoption rate vs. enterprise MDM change windows.** MOBILE-SLO-06 (≥ 95% adoption within 48 h) may be unachievable for enterprise tenants whose IT teams enforce MDM change control windows (Intune, Jamf) that block OTA installs outside approved maintenance windows. Options: (a) make MOBILE-SLO-06 a FORM-internal SLO only, exclude from enterprise DPA; (b) define a per-tenant SLO exception flag in `tenants.ota_change_window_enabled`; (c) negotiate a 7-day adoption window for enterprise tenants on the Premium SLO tier. Decision needed before enterprise GA so CSM onboarding script is correct. | platform-engineer + customer-success | Before enterprise GA (M13) | **P2** |
+| OQ-MOBILE-02 | **Sentry session replay for enterprise UX debugging.** Sentry's React Native session replay captures screen recordings that could accelerate debugging of enterprise fleet issues (e.g., SSO login flow failures). However, session replay may capture health-adjacent UI elements (workout plan screens, progress screens). Proposal: enable replay only on explicitly approved screens (SSO login, onboarding flow, admin dashboard) with a screen allowlist, and disable globally elsewhere. Clinical-safety must review the allowlist before any replay config ships to production. | clinical-safety + security-engineer | M4 | **P1** |
+| OQ-MOBILE-03 | **Android WebView embedding for SSO redirect.** SAML IdP-initiated SSO redirects that land on a `custom://` URI scheme are handled by React Native's `Linking` API. Some enterprise IdPs (Okta, Azure AD B2C in specific tenant configurations) require an embedded WebView for the SAML assertion POST. Using an embedded WebView introduces a different attack surface than the system browser (lacking OS-level HTTPS certificate pinning and phishing detection). Decision needed: system browser only (current intent, may fail with some IdP configs) or embedded WebView with explicit security review. Cross-references SSO_SCIM_IMPLEMENTATION.md §1.4 (SP-initiated flow). | security-engineer + platform-engineer | Before first enterprise SSO customer (M10) | **P1** |
+
+---
+
+*v1.5 additions (2026-06-01): two DEC-XXX TBD references in §25 resolved — §25.1 PostHog platform selection now references DEC-026 (PostHog EU Cloud); §25.2 "activated" user definition now references DEC-034 (D7 activation metric definition formalised). Section 28 — Mobile Application Performance Observability — closes the gap between the crash-free SLIs in §2 and a complete mobile client reliability layer. §28.1 scopes the section to the React Native / Expo mobile application (iOS + Android) and distinguishes from §18 (CV model quality), §25 (product funnel), and §20 (wearable sync); enumerates four tooling components (Sentry, EAS, Cloudflare Analytics Engine, PostHog denominator). §28.2 seven MOBILE-SLOs: MOBILE-SLO-01 (cold start P95 < 2,000 ms), MOBILE-SLO-02 (iOS crash-free ≥ 99.5%), MOBILE-SLO-03 (Android crash-free ≥ 99.5%), MOBILE-SLO-04 (Android ANR-free ≥ 99.0%), MOBILE-SLO-05 (frame render ≥ 90% at 60 fps), MOBILE-SLO-06 (OTA adoption ≥ 95% within 48 h), MOBILE-SLO-07 (CV thermal throttle ≤ 5%); all measured at fleet level. §28.3 Sentry React Native SDK integration: `beforeSend` breadcrumb deny-list (11 denied keys including weight, heartRate, cvKeypoints, mood, recovery.*); session replay disabled unconditionally; user context limited to pseudonymous UUID; `beforeSend` TypeScript implementation. §28.4 performance monitoring: five required Sentry Performance transactions (app.cold_start, app.warm_start, session.cv.start, screen.load.*, auth.sso.saml_redirect); fleet-level frame drop counter via Cloudflare Analytics Engine Worker with rate-limit KV guard; `MobileTelemetryPayload` TypeScript interface; three-tier device classification table (Tier 1/2/3 with iOS/Android examples). §28.5 EAS OTA rollout observability: four channels (production/preview/staging); four rollout health metrics (adoption rate, download failure rate, rollback trigger rate, post-update crash rate correlation); `ota_update_events` Postgres DDL (uuid PK, channel, runtime_version, event_type, adoption_pct, published_by, rollback_reason); pg_cron adoption snapshot job (0 3,9,15,21 * * *) via Worker proxy. §28.6 enterprise device fleet considerations: MDM change control window impact on MOBILE-SLO-06; device tier distribution by segment (consumer vs. enterprise); per-tenant "App Health" Admin Dashboard panel spec (crash-free rate, OTA status, device tier %, active alerts; k-anonymity n ≥ 10). §28.7 six DEC-030 HMAC-chained mobile events: mobile.crash_rate_breach (HIGH), mobile.anr_spike (HIGH), mobile.cold_start_regression (STANDARD), mobile.ota_update_published (STANDARD), mobile.ota_rollback_triggered (HIGH, triggers R-02 assessment), mobile.thermal_throttle_spike (STANDARD); all fleet-level, no user_id, tenant_id as slug only; 3-year retention for HIGH events, 90-day for STANDARD. §28.8 eight alert rules AL-MOBILE-01 through AL-MOBILE-08: two P0 crash rules (AL-MOBILE-01/02 with OTA rollback runbook), ANR P1 (AL-MOBILE-03), cold start regression P1 (AL-MOBILE-04), OTA adoption P2 (AL-MOBILE-05), OTA rollback P1 (AL-MOBILE-06 with CSM notification), CV thermal P2 (AL-MOBILE-07 with Tier 3 feature flag path), frame rate P2 (AL-MOBILE-08); PagerDuty deduplication key specified. §28.9 eight-panel "Mobile Fleet Health" dashboard: crash-free time-series (iOS + Android), cold start P95 trend, OTA adoption funnel (last 3 updates × 24/48/72 h), error rate by app version stacked bar, CV thermal by device tier horizontal bar, frame rate gauge, active OTA status stat panel. §28.10 six privacy constraints: Sentry breadcrumb deny-list (enforced in beforeSend), no user_id in mobile telemetry Worker (400 rejection), device tier from model lookup (not biometric), session replay disabled, k-anonymity n ≥ 10 on fleet panel, Sentry DPA sub-processor entry. §28.11 SOC 2 mapping: A1.1 (seven SLOs as capacity monitoring), A1.2 (OTA rollback + thermal monitoring as environmental threat detection), CC7.2 (eight alert rules + three DEC-030 events as documented anomaly monitoring suite), CC7.3 (response SLA + runbook documentation per rule); four evidence artefacts MOB-OBS-E-001 through MOB-OBS-E-004. §28.12 fourteen-item implementation checklist: four P0 items (Sentry SDK + deny-list CI test, crash SLO wiring, P0 PagerDuty config), seven P1 items (cold start transaction, CV start transaction, telemetry Worker, alert rules, DEC-030 emission, OTA events table + cron, device_tier thermal column), three P2 items (DEC-030 adoption events, dashboard, Admin Dashboard fleet panel); M3/M4/M5/M6/observation period milestones. §28.13 three open questions: OQ-MOBILE-01 (MDM change window vs. MOBILE-SLO-06 adoption target — P2, customer-success + platform-engineer, before M13), OQ-MOBILE-02 (Sentry session replay allowlist — P1, clinical-safety + security-engineer, M4), OQ-MOBILE-03 (Android WebView vs. system browser for SSO redirect — P1, security-engineer + platform-engineer, before M10).*

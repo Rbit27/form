@@ -6,6 +6,12 @@
 
 ---
 
+## [1.57.1] — 2026-06-01
+
+### Changed
+- `docs/OBSERVABILITY.md` → v1.5: §28 Mobile Application Performance Observability (new section); two DEC-XXX TBD references resolved in §25. **DEC fixes:** §25.1 PostHog platform selection now cites DEC-026; §25.2 "activated" user definition now cites DEC-034. **§28 additions:** seven MOBILE-SLOs (cold start P95 < 2,000 ms, iOS/Android crash-free ≥ 99.5%, ANR-free ≥ 99.0%, frame render ≥ 90%, OTA adoption ≥ 95%/48 h, CV thermal throttle ≤ 5%); Sentry React Native integration spec with `beforeSend` health-data deny-list (11 blocked fields); five required Sentry Performance transactions (app.cold_start, session.cv.start, screen.load.*, auth.sso.saml_redirect); `MobileTelemetryPayload` Cloudflare Worker interface with fleet-level counters (no user_id); three-tier device classification (Tier 1/2/3 iOS + Android examples); EAS OTA rollout observability with `ota_update_events` Postgres DDL and pg_cron adoption snapshot job (every 6 h); enterprise MDM considerations (Intune/Jamf change window impact on MOBILE-SLO-06, k-anonymity n ≥ 10 on Admin Dashboard fleet panel); six DEC-030 HMAC-chained mobile events (fleet-level only, no user_id); eight alert rules AL-MOBILE-01 through AL-MOBILE-08 with PagerDuty/Slack routing and runbooks; eight-panel "Mobile Fleet Health" dashboard spec; six privacy constraints; SOC 2 A1.1/A1.2/CC7.2/CC7.3 evidence mapping with four artefacts MOB-OBS-E-001 through MOB-OBS-E-004; fourteen-item implementation checklist across M3/M4/M5/M6; three open questions (OQ-MOBILE-01 MDM OTA policy, OQ-MOBILE-02 session replay allowlist pending clinical-safety, OQ-MOBILE-03 Android WebView vs. system browser for SSO).
+- `docs/DECISION_LOG.md` → DEC-034 added: D7 activation metric definition formalised as primary pre-Series A product health signal (one full CV session within 7 days of registration; ACT-SLO-01 target ≥ 40% [ESTIMATE]; reverse cost Medium — invalidates historical cohort comparisons).
+
 ## [1.57.0] — 2026-06-01
 
 ### Added

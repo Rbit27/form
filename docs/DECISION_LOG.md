@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-06-01
+
+### DEC-034 · D7 activation metric definition: full coaching session with CV enabled within 7 days
+
+- **Decision:** FORM's primary pre-Series A product health signal is the D7 activation rate — the percentage of registered users who complete at least one full coaching session with CV pose feedback enabled within 7 days of registration. Target: ACT-SLO-01 ≥ 40% [ESTIMATE]. Activation tied to CV (not to a softer proxy such as app open or exercise logged) because CV feedback is the core value proposition that drives long-term retention. Documented in OBSERVABILITY.md §25.2 (DEC-034).
+- **Owner:** product-strategist + devops-lead
+- **Why:** Activation definitions anchored to the core wedge (DEC-006: camera-coaching) create a higher-quality cohort signal than soft metrics. Enterprise customers evaluate adoption by this metric in the 30/60/90-day review (ENTERPRISE.md §Implementation timeline). Changing the definition mid-cohort invalidates historical comparisons, so the definition must be fixed now and version-tracked in analytics schema.
+- **Reverse cost:** Medium (changing the activation definition invalidates historical cohort comparisons and requires a schema migration on `victor_quality_daily` and PostHog cohort definitions; permissible only with a major analytics version bump and re-baseline of ACT-SLO-01 target)
+
+---
+
 ## 2026-05-23
 
 ### DEC-033 · Blog milestone post-100 reached through sports-science only (no clinical-safety-blocked content)
