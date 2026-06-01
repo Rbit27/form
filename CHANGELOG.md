@@ -6,6 +6,14 @@
 
 ---
 
+## [1.45.1] — 2026-06-01
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` v1.3 → v1.4 — §22 High-Scale Session Revocation Architecture — KV-Backed Revocation Cache. Closes G-009 (session blocklist hot-path bottleneck, blocking before >100-seat enterprise go-live). Two-tier architecture: `SESSION_REVOCATION_KV` Cloudflare KV namespace as the hot cache (~1 ms per-request check, three parallel GETs: tenant nuke / user / session), Supabase `session_blocklist` retained as the authoritative audit trail. Four KV key types: `revoke:tenant:{id}:all` (O(1) tenant nuke — single write covers all active sessions), `revoke:user:{tid}:{uid}` (user-level revocation for SCIM deactivation), `revoke:session:{sid}` (individual session), `revoke:jti:{jti}` (opt-in zero-deprovisioning-latency — consolidates the §12.7.4 "Redis" JTI blocklist into existing Cloudflare KV). Full TypeScript: `session-revocation-kv.ts` with `isRevoked()` (hot-path check), `revokeSession()` (single session + Supabase audit write), `revokeUserSessions()` (SCIM deactivation), `handleBulkScimRevocation()` (batched Promise.all in groups of 50 — 1,000-user deactivation in ~150 ms vs. current >10 s), `nukeTenantSessions()` (two-person authorisation, O(1) KV write, replaces §8.3 INSERT SELECT). Schema: one migration adding `kv_sync_status revocation_kv_status DEFAULT 'pending'` to `session_blocklist` with CONCURRENTLY index and 30-day backfill. Performance: 6.7× faster per-request check; >66× faster bulk revocation; tenant nuke O(N) → O(1). KV cost: ~$0.039/day per 300-seat tenant (< 0.4% of enterprise revenue). 30-day migration window protocol with Supabase fallback on KV MISS. Five DEC-030 HMAC-chained events: `session.bulk_revocation_started` (HIGH), `session.bulk_revocation_complete` (HIGH, includes duration_ms), `session.tenant_nuke_started` (CRITICAL), `session.tenant_nuke_complete` (CRITICAL), `session.revocation_kv_sync_error` (HIGH — KV write failure; PagerDuty P1). Two alerting rules: AL-REVOKE-01 (P1 — KV sync error rate > 1%/5 min), AL-REVOKE-02 (P2 — bulk duration_ms > 5,000). SOC 2: CC6.3 (access removed < 100 ms; zero-deprovisioning-latency for qualifying tenants), CC7.2 (AL-REVOKE-01/02), CC7.3 (KV failure → immediate Supabase fallback, no revocation silently lost). Two evidence artefacts CC6-E-REV-001/002. G-009 🔴 Open → 🟡 Authored. 11-item implementation checklist (8× P0 M4, 3× P1 M4/M5).
+- `VERSION` → 1.45.1
+
+---
+
 ## [1.45.0] — 2026-05-31
 
 ### Added

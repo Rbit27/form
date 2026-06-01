@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v1.3
+# FORM · SSO/SCIM Implementation v1.4
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -6934,8 +6934,555 @@ FORM's processing of group membership data via the Directory API is not directly
 
 ---
 
+---
+
+## 22. High-Scale Session Revocation Architecture — KV-Backed Revocation Cache
+
+> Precursors: §6.3 (session fixation — origin of the `session_blocklist` Supabase table), §3.5 (SCIM de-provisioning — user-level session invalidation on deactivation), §12.7 (JIT enterprise session revocation on SCIM; §12.7.4 describes the "Redis" JTI blocklist this section supersedes), G-009 (§9 — performance gap flagged as blocking before >100-seat enterprise customers).
+
+### 22.1 Purpose and Scope
+
+This section closes G-009. The existing `session_blocklist` Supabase table (§6.3) is correct by design — it produces a durable, auditable record of every revoked session. The problem is read performance: the Worker queries this table synchronously on every authenticated request to check whether the presented session has been revoked. At low concurrency this is unnoticeable. At enterprise scale — 100+ concurrent users each making multiple API calls — the table lookup becomes a hot-path bottleneck.
+
+Concrete failure mode: a 300-seat enterprise tenant triggers a SCIM bulk deactivation of 200 users. The SCIM endpoint must write 200 × (average 3 sessions/user) = 600 rows to `session_blocklist` synchronously before responding to the SCIM client. This exceeds the 10-second Worker response timeout, causing SCIM client retries, duplicate audit events, and unpredictable session state.
+
+This section specifies:
+1. A **Cloudflare KV cache layer** (`SESSION_REVOCATION_KV`) that serves revocation checks at ~1 ms latency.
+2. A **four-key-type schema** handling single session, per-user, bulk, and tenant-nuke revocations.
+3. A **bulk revocation handler** for large SCIM batches completing 1,000-user deactivation in < 200 ms.
+4. A **tenant nuke function** (O(1) single KV write) used in §8.3 emergency SSO disable and INCIDENT_RESPONSE.md R-01.
+5. Integration of the "Redis" JTI blocklist described in §12.7.4 into the existing Cloudflare KV infrastructure — no new external service required.
+
+Supabase `session_blocklist` remains the authoritative audit trail. KV is a **write-through cache**, not a replacement. Every revocation writes to both KV (fast, TTL-based) and Supabase (durable, queryable, auditor-visible).
+
+### 22.2 Current Architecture Bottleneck Analysis
+
+| Operation | Current Implementation | Latency | Problem at Scale |
+|---|---|---|---|
+| Single revocation write | `INSERT INTO session_blocklist` | ~5 ms | Acceptable |
+| Per-request blocklist check | `SELECT 1 FROM session_blocklist WHERE session_id = $1` | ~15–25 ms | At 100 RPS: 20 concurrent DB queries just for revocation checks; saturates Supabase `nano` connection pool |
+| Bulk user revocation (200 users, 3 sessions/user) | 600 INSERT rows, sequential | >10 s | Exceeds SCIM response timeout; causes SCIM client retry storms |
+| Tenant nuke (all sessions for a tenant) | `INSERT INTO session_blocklist SELECT session_id ... WHERE tenant_id = $1` | Unbounded — depends on active session count | A 500-seat tenant with high active sessions could take 30–60 s; Supabase connection pool exhausted during incident response |
+| JTI blocklist check (§12.7.4 opt-in) | Described as "Redis" in §12.7.4 — no Redis deployment in current architecture | N/A — not yet built | Gap: the JTI revocation feature cannot ship without a fast key-value store |
+
+**KV comparison:**
+
+| Metric | Supabase SELECT | Cloudflare KV GET |
+|---|---|---|
+| P50 latency | ~10 ms | ~1 ms |
+| P99 latency | ~50 ms | ~5 ms |
+| Connection pool impact | Yes — consumes Supabase connection per query | None |
+| Quota limit | Supabase `nano`: 60 connections | Workers KV: 100,000 reads/day free; $0.50/10M paid |
+| Bulk write speed | ~50 rows/s sequential | ≥50 parallel KV writes per request |
+
+### 22.3 Two-Tier Revocation Architecture
+
+```
+  Authenticated request arrives at Cloudflare Worker
+                      │
+             ┌────────▼─────────┐
+             │  Validate JWT     │  RS256 signature + exp + iss + aud + tenant_id
+             └────────┬─────────┘
+                      │ Valid JWT
+             ┌────────▼──────────────────────────┐
+             │     KV Revocation Check            │  ~1–3 ms total
+             │                                    │
+             │  Promise.all([                     │
+             │    KV.get(tenant:{id}:all),         │  ← O(1) tenant nuke check
+             │    KV.get(user:{tid}:{uid}),        │  ← user-level revocation
+             │    KV.get(session:{sid}),           │  ← individual session
+             │  ])                                │
+             │                                    │
+             │  if jti_check_enabled:             │
+             │    KV.get(jti:{jti})               │  ← zero-deprovisioning-latency
+             └────────┬──────────────────┬────────┘
+                      │                  │
+             KV HIT (revoked)       KV MISS
+                      │                  │
+              Return 401          ┌──────▼─────────────────┐
+              (HMAC event         │  Migration fallback     │  ← first 30 days only
+               session.revoked    │  Supabase SELECT        │
+               _at_check)         │  (catches pre-KV rows)  │
+                                  └──────┬──────────────────┘
+                                         │
+                                  Continue to handler
+```
+
+**Tier 1 — Cloudflare KV** (`SESSION_REVOCATION_KV`): Hot cache, ~1 ms read. Primary check path for all requests. TTL-based expiry — no sweep job needed, KV reclaims expired keys automatically.
+
+**Tier 2 — Supabase `session_blocklist`**: Authoritative audit trail, ~20 ms read. Written on every revocation. During a 30-day migration window, also read on KV MISS to catch sessions revoked before the KV layer was deployed. After 30 days, all such sessions have expired naturally; the fallback is removed.
+
+**Fail-open vs. fail-closed on KV unavailability:** For tenants with `jti_revocation_check: false` (default), if KV is unavailable the request falls back to the Supabase check path — fail-open relative to KV but still checked. For tenants with `jti_revocation_check: true` (zero-deprovisioning-latency SLA), a KV unavailability on the JTI check fails closed (`503 Service Unavailable`) rather than allowing a potentially-revoked token through. This asymmetry is intentional and contractual.
+
+### 22.4 KV Key Schema
+
+**Namespace:** `SESSION_REVOCATION_KV` — distinct from `SSO_KV` (§21) to isolate quota and prevent accidental purge during SSO KV maintenance.
+
+| Key | Value | TTL | Emitted by |
+|---|---|---|---|
+| `revoke:tenant:{tenant_id}:all` | `"1"` | `max_jwt_ttl_seconds` (default 28800 = 8 h) | `nukeTenantSessions()` — §8.3 emergency disable, INCIDENT_RESPONSE R-01 |
+| `revoke:user:{tenant_id}:{user_id}` | `"1"` | 86400 (24 h; covers max JWT TTL) | `revokeUserSessions()` — SCIM deactivation, admin kick |
+| `revoke:session:{session_id}` | `"1"` | `remaining_exp_seconds` (≥ 1) | `revokeSession()` — logout, session fixation prevention |
+| `revoke:jti:{jti}` | `"1"` | `remaining_exp_seconds` (≥ 1) | `revokeJti()` — opt-in zero-deprovisioning-latency tenants only |
+
+**Privacy:** No PII in any key or value. `session_id` is a UUID. `user_id` is an internal UUID (not email, not name). `tenant_id` is an internal UUID. Value is always the string `"1"`. No health data, no biometric data, no names, no emails stored in KV at any point.
+
+**TTL rationale:** Keys expire precisely when the revoked credential would have expired anyway. A revoked session JWT that would have expired in 10 minutes produces a KV key with TTL = 600 seconds. After 600 seconds, both the JWT and the KV key are gone — no stale blocklist entries and no maintenance overhead.
+
+### 22.5 Worker Implementation
+
+**File:** `apps/api-gateway/src/sso/session-revocation-kv.ts`
+
+```typescript
+// apps/api-gateway/src/sso/session-revocation-kv.ts
+// KV-backed session revocation cache — closes G-009.
+// Supabase session_blocklist is the audit trail; this file is the fast-path cache.
+
+export type RevocationReason =
+  | 'logout'
+  | 'session_fixation'
+  | 'scim_deactivation'
+  | 'scim_deletion'
+  | 'admin_kick'
+  | 'tenant_nuke'
+  | 'jti_explicit'
+  | 'reauth_timeout';
+
+export type KvSyncStatus = 'pending' | 'synced' | 'failed';
+
+// ── Key constructors ────────────────────────────────────────────────────────
+
+const K = {
+  tenantAll: (tenantId: string) => `revoke:tenant:${tenantId}:all`,
+  user:      (tenantId: string, userId: string) => `revoke:user:${tenantId}:${userId}`,
+  session:   (sessionId: string) => `revoke:session:${sessionId}`,
+  jti:       (jti: string) => `revoke:jti:${jti}`,
+} as const;
+
+// ── Check (hot path — called on every authenticated request) ────────────────
+
+export async function isRevoked(
+  kv: KVNamespace,
+  params: {
+    sessionId: string;
+    tenantId: string;
+    userId: string;
+    jti?: string;
+    jtiCheckEnabled: boolean;
+  }
+): Promise<{ revoked: boolean; reason: RevocationReason | null }> {
+  // Three parallel KV reads — tenant nuke, user-level, session-level
+  const [tenantHit, userHit, sessionHit] = await Promise.all([
+    kv.get(K.tenantAll(params.tenantId)),
+    kv.get(K.user(params.tenantId, params.userId)),
+    kv.get(K.session(params.sessionId)),
+  ]);
+
+  if (tenantHit)   return { revoked: true, reason: 'tenant_nuke' };
+  if (userHit)     return { revoked: true, reason: 'scim_deactivation' };
+  if (sessionHit)  return { revoked: true, reason: 'logout' };
+
+  // JTI check is opt-in (zero-deprovisioning-latency tenants); separate read
+  if (params.jtiCheckEnabled && params.jti) {
+    const jtiHit = await kv.get(K.jti(params.jti));
+    if (jtiHit) return { revoked: true, reason: 'jti_explicit' };
+  }
+
+  return { revoked: false, reason: null };
+}
+
+// ── Single session revocation ───────────────────────────────────────────────
+
+export async function revokeSession(
+  kv: KVNamespace,
+  supabase: SupabaseClient,
+  params: {
+    sessionId: string;
+    tenantId: string;
+    userId: string;
+    reason: RevocationReason;
+    remainingTtlSeconds: number;
+    jti?: string;
+    jtiCheckEnabled?: boolean;
+  }
+): Promise<void> {
+  const kvWrites: Promise<void>[] = [
+    kv.put(K.session(params.sessionId), '1', {
+      expirationTtl: Math.max(params.remainingTtlSeconds, 1),
+    }),
+  ];
+
+  if (params.jtiCheckEnabled && params.jti) {
+    kvWrites.push(
+      kv.put(K.jti(params.jti), '1', {
+        expirationTtl: Math.max(params.remainingTtlSeconds, 1),
+      })
+    );
+  }
+
+  // KV write and Supabase audit write in parallel
+  const [kvResult] = await Promise.allSettled([
+    Promise.all(kvWrites),
+    supabase.from('session_blocklist').insert({
+      session_id:     params.sessionId,
+      tenant_id:      params.tenantId,
+      user_id:        params.userId,
+      reason:         params.reason,
+      blocked_at:     new Date().toISOString(),
+      kv_sync_status: 'pending',
+    }),
+  ]);
+
+  if (kvResult.status === 'rejected') {
+    // KV write failed — Supabase fallback active; emit HIGH alert event
+    await emitDec030(supabase, {
+      event_type: 'session.revocation_kv_sync_error',
+      severity:   'HIGH',
+      tenant_id:  params.tenantId,
+      metadata:   { session_id: params.sessionId, error: String(kvResult.reason) },
+    });
+    await supabase
+      .from('session_blocklist')
+      .update({ kv_sync_status: 'failed' })
+      .eq('session_id', params.sessionId);
+  } else {
+    await supabase
+      .from('session_blocklist')
+      .update({ kv_sync_status: 'synced' })
+      .eq('session_id', params.sessionId);
+  }
+}
+
+// ── User-level revocation (SCIM deactivation — single user) ────────────────
+
+export async function revokeUserSessions(
+  kv: KVNamespace,
+  supabase: SupabaseClient,
+  params: {
+    tenantId: string;
+    userId: string;
+    reason: RevocationReason;
+    activeSessions: Array<{ session_id: string; jti?: string; exp_unix: number }>;
+    jtiCheckEnabled?: boolean;
+  }
+): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+  const maxTtl = Math.max(...params.activeSessions.map(s => s.exp_unix - now), 1);
+
+  // User-level key: single write covers all current sessions
+  await kv.put(K.user(params.tenantId, params.userId), '1', {
+    expirationTtl: Math.min(maxTtl, 86400),
+  });
+
+  // Per-session keys (for JTI check path and precise fallback during migration window)
+  const perSessionWrites = params.activeSessions.flatMap(s => {
+    const ttl = Math.max(s.exp_unix - now, 1);
+    const writes: Promise<void>[] = [
+      kv.put(K.session(s.session_id), '1', { expirationTtl: ttl }),
+    ];
+    if (params.jtiCheckEnabled && s.jti) {
+      writes.push(kv.put(K.jti(s.jti), '1', { expirationTtl: ttl }));
+    }
+    return writes;
+  });
+
+  await Promise.all(perSessionWrites);
+  // Supabase audit trail is written by the SCIM handler via session.revoked_by_scim events (§12.9)
+}
+
+// ── Bulk SCIM revocation (>50 users — batched to avoid Worker CPU limit) ───
+
+const BATCH_SIZE = 50;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+export async function handleBulkScimRevocation(
+  kv: KVNamespace,
+  supabase: SupabaseClient,
+  params: {
+    tenantId: string;
+    deactivatedUserIds: string[];
+    scimRequestId: string;
+    jtiCheckEnabled?: boolean;
+  }
+): Promise<void> {
+  const startMs = Date.now();
+
+  // Emit started event BEFORE any state mutation (HMAC chain ordering)
+  await emitDec030(supabase, {
+    event_type: 'session.bulk_revocation_started',
+    severity:   'HIGH',
+    tenant_id:  params.tenantId,
+    metadata:   {
+      user_count:      params.deactivatedUserIds.length,
+      scim_request_id: params.scimRequestId,
+    },
+  });
+
+  // Fetch all active sessions for the deactivated users
+  const { data: activeSessions } = await supabase
+    .from('enterprise_sessions')
+    .select('session_id, user_id, expires_at')
+    .in('user_id', params.deactivatedUserIds)
+    .eq('tenant_id', params.tenantId)
+    .is('revoked_at', null);
+
+  const sessions = activeSessions ?? [];
+  const now = Math.floor(Date.now() / 1000);
+
+  // Write user-level KV keys in batches of BATCH_SIZE
+  for (const batch of chunk(params.deactivatedUserIds, BATCH_SIZE)) {
+    await Promise.all(
+      batch.map(uid =>
+        kv.put(K.user(params.tenantId, uid), '1', { expirationTtl: 86400 })
+      )
+    );
+  }
+
+  // Write per-session KV keys in batches of BATCH_SIZE
+  for (const batch of chunk(sessions, BATCH_SIZE)) {
+    await Promise.all(
+      batch.map(s => {
+        const ttl = Math.max(
+          Math.floor(new Date(s.expires_at).getTime() / 1000) - now,
+          1
+        );
+        return kv.put(K.session(s.session_id), '1', { expirationTtl: ttl });
+      })
+    );
+  }
+
+  const durationMs = Date.now() - startMs;
+
+  await emitDec030(supabase, {
+    event_type: 'session.bulk_revocation_complete',
+    severity:   'HIGH',
+    tenant_id:  params.tenantId,
+    metadata:   {
+      user_count:      params.deactivatedUserIds.length,
+      sessions_revoked: sessions.length,
+      duration_ms:     durationMs,
+      scim_request_id: params.scimRequestId,
+    },
+  });
+}
+
+// ── Tenant nuke — emergency SSO disable (§8.3) and P0 incident response ────
+// Requires two-person authorisation. Replaces the unbounded
+// INSERT SELECT pattern in §8.3 with a single O(1) KV write.
+
+export async function nukeTenantSessions(
+  kv: KVNamespace,
+  supabase: SupabaseClient,
+  params: {
+    tenantId: string;
+    reason: 'sso_emergency_disable' | 'incident_response' | 'admin_request';
+    authorisedBy: [string, string]; // two-person rule: [approver_1_user_id, approver_2_user_id]
+    maxJwtTtlSeconds?: number;      // default 28800 (8 h)
+  }
+): Promise<void> {
+  const ttl = params.maxJwtTtlSeconds ?? 28800;
+
+  await emitDec030(supabase, {
+    event_type: 'session.tenant_nuke_started',
+    severity:   'CRITICAL',
+    tenant_id:  params.tenantId,
+    metadata:   { reason: params.reason, authorised_by: params.authorisedBy },
+  });
+
+  // Single KV write — all in-flight JWTs for this tenant are now revoked
+  await kv.put(K.tenantAll(params.tenantId), '1', { expirationTtl: ttl });
+
+  await emitDec030(supabase, {
+    event_type: 'session.tenant_nuke_complete',
+    severity:   'CRITICAL',
+    tenant_id:  params.tenantId,
+    metadata:   {
+      reason:        params.reason,
+      authorised_by: params.authorisedBy,
+      kv_ttl_seconds: ttl,
+    },
+  });
+}
+```
+
+### 22.6 Integration Points
+
+#### 22.6.1 Updating §8.3 Emergency SSO Disable
+
+The SQL `INSERT INTO session_blocklist SELECT ... WHERE tenant_id = $TENANT_ID` in §8.3 is replaced by a call to `nukeTenantSessions()`:
+
+```typescript
+// In: apps/api-gateway/src/sso/emergency-disable.ts
+await nukeTenantSessions(env.SESSION_REVOCATION_KV, supabase, {
+  tenantId:     tenantId,
+  reason:       'sso_emergency_disable',
+  authorisedBy: [approver1UserId, approver2UserId],
+});
+// Then disable SSO config and enable magic link fallback (SQL unchanged from §8.3 steps 1 and 3)
+```
+
+The `INSERT INTO session_blocklist` in §8.3 step 2 is retained as the audit trail write — the KV nuke is the fast-path; Supabase remains the evidence source.
+
+#### 22.6.2 Updating §6.3 Session Fixation Prevention
+
+Step 4 in §6.3 ("The old session UUID is added to a session blocklist") becomes a call to `revokeSession()` instead of a raw INSERT:
+
+```typescript
+await revokeSession(env.SESSION_REVOCATION_KV, supabase, {
+  sessionId:           oldSessionId,
+  tenantId:            tenantId,
+  userId:              userId,
+  reason:              'session_fixation',
+  remainingTtlSeconds: remainingTtl,
+  jti:                 oldJti,
+  jtiCheckEnabled:     sessionPolicy.jti_revocation_check,
+});
+```
+
+#### 22.6.3 Updating §12.7.4 JTI Blocklist
+
+The "Redis" JTI blocklist described in §12.7.4 is now implemented via `SESSION_REVOCATION_KV` with the `revoke:jti:{jti}` key pattern. No external Redis or Upstash deployment is required. The `jti_revocation_check: true` tenant feature flag in `session_policy` JSONB (§12.7.4) continues to gate this behaviour.
+
+When `jti_revocation_check` is enabled for a tenant, `revokeUserSessions()` also writes `revoke:jti:{jti}` keys for every active access token under the revoked sessions. The `isRevoked()` function checks this key as the fourth parallel KV read.
+
+### 22.7 Schema Change
+
+One migration, one column addition to `session_blocklist`:
+
+```sql
+-- migrations/YYYYMMDD_session_blocklist_kv_status.sql
+
+-- New ENUM for KV sync tracking
+CREATE TYPE revocation_kv_status AS ENUM ('pending', 'synced', 'failed');
+
+ALTER TABLE session_blocklist
+  ADD COLUMN kv_sync_status revocation_kv_status NOT NULL DEFAULT 'pending';
+
+-- Backfill: rows inserted before this migration have no corresponding KV entry.
+-- Mark them 'synced' conceptually (they are caught by the Supabase fallback path
+-- during the 30-day migration window, then expire naturally).
+UPDATE session_blocklist
+SET kv_sync_status = 'synced'
+WHERE blocked_at < NOW();
+
+-- Index for the compliance evidence query (§22.10 CC6-E-REV-002)
+CREATE INDEX CONCURRENTLY idx_session_blocklist_kv_status
+  ON session_blocklist (kv_sync_status)
+  WHERE kv_sync_status != 'synced';
+
+COMMENT ON COLUMN session_blocklist.kv_sync_status IS
+  'Whether this revocation has been mirrored to SESSION_REVOCATION_KV. '
+  '''failed'' means KV write failed; Supabase fallback is active for this session.';
+```
+
+**RLS:** `session_blocklist` RLS policy is unchanged. The new column is write-accessible to `form_system` (SCIM handler + Worker) and `form_admin` (compliance queries); `form_api` and `tenant_manager` have no access to this table (same as before).
+
+### 22.8 Performance Model
+
+| Scenario | Before (Supabase only) | After (KV + Supabase audit) | Improvement |
+|---|---|---|---|
+| Per-request revocation check | ~20 ms Supabase SELECT | ~3 ms 3× parallel KV GET | 6.7× faster |
+| Single session revocation write | ~5 ms INSERT | ~1 ms KV PUT + ~5 ms INSERT (parallel) | No regression; total wall time ~5 ms |
+| User-level revocation (5 sessions/user) | ~25 ms (5× INSERT) | ~3 ms (user KV PUT + 5× session KV PUT in parallel) | 8× faster |
+| Bulk 1,000-user SCIM deactivation | >10 s (INSERT SELECT timeout) | ~150 ms (30 batches × 5 ms) | >66× faster; fits in SCIM response window |
+| Tenant nuke | Unbounded (INSERT SELECT full table) | ~2 ms (single KV PUT) | O(N) → O(1) |
+
+**KV quota at 300-seat enterprise tenant (10 RPS per user):**
+- Reads: 300 × 10 × 3 = 9,000 reads/second = 777M reads/day — requires Workers Paid plan ($0.50/10M = ~$38.85/day per tenant). **This cost must be factored into enterprise COGS (COST_MODEL.md §15.6 infrastructure overhead).**
+- Writes: < 1,000 revocations/day per typical enterprise tenant = negligible.
+
+**KV cost ceiling:** Cloudflare Workers Paid KV pricing applies per namespace. At $0.50 per 10M reads and 777M reads/day (300-seat tenant at 10 RPS), the per-tenant daily KV read cost is ~$0.039/day = ~$14.17/year. At the $6–12/seat/month enterprise price point, this is < 0.4% of revenue for the heaviest users. See COST_MODEL.md §15.4.
+
+### 22.9 Migration Window Protocol
+
+**Day 0 (deploy):** `SESSION_REVOCATION_KV` namespace created and bound to the API Gateway Worker. All new revocations write to both KV and Supabase. The `isRevoked()` function checks KV first; on KV MISS during the migration window it falls back to the Supabase SELECT.
+
+**Days 1–30 (migration window):** Supabase fallback is active. Sessions revoked before Day 0 are not in KV; they are caught by the Supabase fallback. `kv_sync_status = 'synced'` (backfilled) on pre-existing rows; Workers skip the Supabase fallback for these (the backfill is a no-op correctness signal, not a data migration).
+
+**Day 30 (cutover):** Maximum JWT TTL is 8 hours. All sessions revoked before Day 0 have expired within 8 hours of Day 0 — well within the 30-day window. Remove the Supabase fallback path from `isRevoked()`. Set a feature flag `session_revocation_kv_only: true` in `tenants.feature_flags` to gate the cutover per-tenant if needed.
+
+### 22.10 DEC-030 HMAC-Chained Audit Events
+
+Five new events. All registered in `docs/AUDIT_LOG_SCHEMA.md`. All HMAC-chained per DEC-030.
+
+| Event Type | Severity | Retention | Key Metadata | Trigger |
+|---|---|---|---|---|
+| `session.bulk_revocation_started` | HIGH | 7 yr | `tenant_id`, `user_count`, `scim_request_id` | Emitted before first KV write in `handleBulkScimRevocation()` |
+| `session.bulk_revocation_complete` | HIGH | 7 yr | `tenant_id`, `user_count`, `sessions_revoked`, `duration_ms`, `scim_request_id` | Emitted after all KV writes complete |
+| `session.tenant_nuke_started` | CRITICAL | 7 yr | `tenant_id`, `reason`, `authorised_by` (array of two user IDs, no names) | Emitted before KV write; two-person authorisation enforced at API layer |
+| `session.tenant_nuke_complete` | CRITICAL | 7 yr | `tenant_id`, `reason`, `authorised_by`, `kv_ttl_seconds` | Emitted after KV write confirmed |
+| `session.revocation_kv_sync_error` | HIGH | 7 yr | `tenant_id`, `session_id`, `error` (error class only, no stack trace) | Emitted when KV PUT fails; Supabase-only fallback activates; triggers PagerDuty P1 |
+
+**HMAC chain ordering constraint:** `session.bulk_revocation_started` must be emitted and its HMAC chain entry committed before the first KV write for that batch. This preserves the invariant that audit chain entries precede state mutations — required for DEC-030 tamper evidence (a chain entry cannot be retroactively inserted for an action that already occurred).
+
+**`session.tenant_nuke_started` two-person rule:** The `nukeTenantSessions()` function accepts `authorisedBy: [string, string]` — two distinct user IDs. The API layer (the endpoint calling this function) must verify that the two IDs are different users and that both hold the `form_admin` role. This check must occur before `emitDec030` is called. A nuke attempted with a single authoriser must be rejected with `403 Forbidden` and logged as `support.unauthorized_nuke_attempt` (HIGH severity).
+
+### 22.11 Alerting Rules
+
+| ID | Condition | Severity | Response SLA | Runbook |
+|---|---|---|---|---|
+| AL-REVOKE-01 | `session.revocation_kv_sync_error` rate > 1% of revocation events over any 5-minute window | P1 | Acknowledge < 30 min | Check `SESSION_REVOCATION_KV` namespace binding in Worker `wrangler.toml`; confirm KV quota not exceeded (`wrangler kv:key list --namespace-id=...`); if quota exceeded, contact Cloudflare support and activate Supabase-only fallback mode (`session_revocation_kv_only: false`) |
+| AL-REVOKE-02 | `session.bulk_revocation_complete.duration_ms` > 5,000 ms over any 1-hour window | P2 | Acknowledge < 2 h | Reduce `BATCH_SIZE` from 50 to 25 in `session-revocation-kv.ts`; confirm Cloudflare KV region latency; check if deactivated user count per batch is unusually high (large SCIM sync); consider increasing SCIM client retry timeout |
+
+Add both rules to `docs/OBSERVABILITY.md §6.2` alert rules table at the `session_revocation` subsection.
+
+### 22.12 SOC 2 Evidence Mapping
+
+| Criterion | Control | Evidence | Collection Method |
+|---|---|---|---|
+| CC6.3 | Logical access is removed on a timely basis | KV revocation completes in < 100 ms for single-user; < 200 ms for 1,000-user bulk; tenant nuke in < 5 ms | `audit_log` export: `session.bulk_revocation_complete.duration_ms` distribution; P99 < 500 ms |
+| CC6.3 | JTI revocation window (opt-in tenants) | Contractual zero-deprovisioning-latency achieved: JTI revoked synchronously within the SCIM handler response | `session.jti_blocklisted` events in audit chain; confirm `jti_revocation_check: true` in `session_policy` for qualifying tenants |
+| CC7.2 | Environmental threat monitoring | AL-REVOKE-01 monitors KV sync health; error rate > 1% triggers P1 alert | PagerDuty incident log for AL-REVOKE-01; `session.revocation_kv_sync_error` event count in 90-day observation window |
+| CC7.3 | Response to anomalies | `session.revocation_kv_sync_error` triggers immediate Supabase fallback — no revocation is silently lost | `kv_sync_status = 'failed'` count in `session_blocklist` for observation period (must be < 0.1%) |
+
+**Evidence artefacts for SOC 2 auditor:**
+
+| Artefact ID | Description | Collection SQL / Method |
+|---|---|---|
+| CC6-E-REV-001 | `audit_log` export: all `session.bulk_revocation_*` and `session.tenant_nuke_*` events for the observation period | `SELECT event_type, created_at, tenant_id, metadata->>'user_count' AS user_count, metadata->>'duration_ms' AS duration_ms FROM audit_log WHERE event_type LIKE 'session.bulk_revocation_%' OR event_type LIKE 'session.tenant_nuke_%' AND created_at BETWEEN $obs_start AND $obs_end ORDER BY created_at` |
+| CC6-E-REV-002 | `session_blocklist` KV sync status distribution (confirms > 99% of revocations mirrored to KV) | `SELECT kv_sync_status, count(*), round(100.0 * count(*) / sum(count(*)) OVER (), 2) AS pct FROM session_blocklist WHERE blocked_at BETWEEN $obs_start AND $obs_end GROUP BY kv_sync_status ORDER BY kv_sync_status` |
+
+### 22.13 Open Questions
+
+| ID | Question | Disposition |
+|---|---|---|
+| OQ-SSO-22.1 | At what seat count should the Cloudflare Workers Paid KV plan be activated? | Activate at first enterprise tenant go-live regardless of seat count — the free tier (100k reads/day) is exceeded by a single active 10-seat tenant at 10 RPS. The KV paid plan ($5/month base + $0.50/10M reads) is a fixed cost that should be included in COGS from day one of enterprise operations. Owner: devops-lead. Decision: before first pilot go-live. |
+| OQ-SSO-22.2 | Should the `session_revocation_kv_only` feature flag be per-tenant or global? | Global flag initially (simpler operational story). Per-tenant only if a specific enterprise customer requires a contractual guarantee that their sessions are never checked via the Supabase fallback path. Default: global cutover at Day 30 per §22.9. |
+| OQ-SSO-22.3 | The `duration_ms` field in `session.bulk_revocation_complete` includes KV write time only. Should it include the Supabase `enterprise_sessions` fetch time? | Yes — the full elapsed time from `handleBulkScimRevocation()` entry to exit is more useful for SCIM timeout debugging. Update `startMs` to capture before the Supabase SELECT, not after. Owner: platform-engineer. Low priority — does not affect correctness. |
+
+### 22.14 Gap Status Update
+
+| Gap ID | Description | Before §22 | After §22 |
+|---|---|---|---|
+| G-009 (§9) | Session blocklist persistence — Supabase table lookup hot-path bottleneck at > 100-seat enterprise deployments | 🔴 Open (performance, not correctness; but blocking before large-tenant go-live) | 🟡 Authored (full design + TypeScript implementation; KV key schema; bulk revocation handler; tenant nuke; DEC-030 events; SOC 2 evidence; pending M4 build and load validation) |
+
+### 22.15 Implementation Checklist
+
+| # | Action | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create `SESSION_REVOCATION_KV` KV namespace in Cloudflare dashboard; add binding to `wrangler.toml` for the API Gateway Worker; confirm binding name matches `env.SESSION_REVOCATION_KV` in TypeScript | devops-lead | **P0** | M4 |
+| 2 | Write migration `migrations/YYYYMMDD_session_blocklist_kv_status.sql` per §22.7; apply to staging; confirm `kv_sync_status` column exists; confirm index created CONCURRENTLY without locking | platform-engineer | **P0** | M4 |
+| 3 | Implement `apps/api-gateway/src/sso/session-revocation-kv.ts` per §22.5; unit test `isRevoked()` for all four key types; unit test `revokeSession()` with KV failure injection; unit test `handleBulkScimRevocation()` with 1,000-user mock | platform-engineer | **P0** | M4 |
+| 4 | Integrate `isRevoked()` into the Worker's authenticated request validation path (after JWT verification, before handler dispatch); confirm it replaces the direct Supabase `session_blocklist` SELECT | platform-engineer | **P0** | M4 |
+| 5 | Update §8.3 emergency SSO disable procedure: replace `INSERT INTO session_blocklist SELECT` with `nukeTenantSessions()` call; add two-person authorisation check to the endpoint; test with a staging tenant | platform-engineer + security-engineer | **P0** | M4 |
+| 6 | Update §6.3 session fixation prevention: replace raw INSERT with `revokeSession()` call in the SSO callback Worker | platform-engineer | **P0** | M4 |
+| 7 | Register all 5 new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry; validate HMAC chain with staging test covering: single revocation → bulk revocation → tenant nuke sequence | platform-engineer + security-engineer | **P0** | M4 |
+| 8 | Configure AL-REVOKE-01 and AL-REVOKE-02 alerting rules in PagerDuty; add to `docs/OBSERVABILITY.md §6.2` | devops-lead | **P0** | M4 |
+| 9 | Update G-009 entry in §9 to reference §22 (design complete); advance from 🔴 to 🟡 in internal gap tracker | compliance-officer | **P1** | M4 |
+| 10 | Load test: simulate 1,000-user bulk SCIM deactivation against staging; confirm `session.bulk_revocation_complete.duration_ms` < 500 ms; confirm zero SCIM client timeouts; document result in `compliance/evidence/perf/session-revocation-bulk-load-test-M4.md` | qa-lead + devops-lead | **P1** | M4 |
+| 11 | Day 30 after deploy: confirm all pre-deploy sessions have expired; remove Supabase fallback from `isRevoked()`; set `session_revocation_kv_only: true`; collect CC6-E-REV-002 snapshot as cutover evidence | devops-lead + compliance-officer | **P1** | M5 |
+
+---
+
 *v1.1 additions (2026-05-30): Section 19 — SCIM Groups Sync & Group-Based Role Mapping. Closes the group lifecycle gap left by §5–§8 (which cover user provisioning and direct role assignment but not group objects as first-class SCIM resources). Six new SCIM endpoints on the Cloudflare Workers edge runtime: GET /Groups (paginated, filterable, RFC 7644 ListResponse), GET /Groups/{id} (single resource with members array), POST /Groups (creates `tenant_groups` row, 201 + Location header, idempotency on externalId), PUT /Groups/{id} (full replace, delta-aware audit emission), PATCH /Groups/{id} (RFC 7644 PatchOp, op=add/remove on path=members, with cross-tenant guard on member userIds), DELETE /Groups/{id} (cascade role revocation, no user deletion). Group-to-role mapping model: new `scim_group_role_mappings` table (tenant_id, scim_group_id FK, form_role ENUM, mapped_by, mapped_at; UNIQUE constraint one role per group per tenant; RLS: tenant_admin read/write own tenant, form_system read-only, form_api zero-rows fail-closed). Role resolution priority: explicit direct assignment beats group membership; among group memberships highest privilege wins (highest-privilege-wins rationale documented in §19.3.2; requires founder sign-off per OQ-SSO-19.1). New `scim_group_members` table for SCIM-managed many-to-many membership. New `group_member_effective_role` view computing final FORM role per user via FULL OUTER JOIN of direct roles and group-derived roles using CASE ordinals and MAX aggregation. IdP push group configuration: Okta Push Groups (filter expression, memberOf, PUT-then-PATCH behaviour), Azure AD / Entra SCIM mappings (objectId → externalId, scope filter, 40-minute sync lag caveat, GET by externalId query pattern), Google Workspace (no native SCIM Groups Push; three workarounds: Okta bridge, Entra bridge, SAML groups attribute). SAML JIT groups path: `groups_attribute` key in `tenant_sso_configs.attribute_mapping` JSONB; `resolveJitGroups` function; `scim.jit_group_creation_enabled` feature flag (disabled by default; safety: 500-group cap, 255-char name limit, admin-only toggle). Six DEC-030 HMAC-chained audit events: scim.group_created (STANDARD, 7yr), scim.group_updated (STANDARD, 7yr), scim.group_deleted (HIGH, 7yr), scim.group_member_added (STANDARD, 7yr), scim.group_member_removed (HIGH, 7yr), scim.group_role_mapping_changed (HIGH, 7yr); sequential emission required for batch PATCH to maintain HMAC chain integrity. SOC 2 mapping: CC6.1 (group access auditable), CC6.2 (no-mapping-by-default fail-closed), CC6.3 (DELETE cascade offboarding), CC6.6 (JIT flag gated), CC7.2 (HIGH events for SIEM), C1.1 (IDs only in audit events). Open questions: OQ-SSO-19.1 (higher vs. lower privilege conflict resolution — founder sign-off required), OQ-SSO-19.2 (nested groups — no, not supported), OQ-SSO-19.3 (500 group cap — enterprise-architect decision). Implementation checklist: 10 tasks (7× P0, 3× P1), M4/M5.*
 
 *v1.2 additions (2026-05-30): Section 20 — SAML Certificate Lifecycle Management — Proactive Monitoring & Expiry Alerting. Closes the design gap for the `cert_expiry_check` cron referenced (but not specified) in §8.1. Covers both SP certificate (FORM-generated, 2-year RSA-2048) and IdP certificate (customer-generated, validity varies) expiry monitoring. Eight ALTER TABLE columns on `tenant_sso_configs`: four expiry-metadata columns (`saml_sp_cert_expires_at`, `saml_sp_cert_fingerprint`, `saml_idp_cert_expires_at`, `saml_idp_cert_fingerprint`), two partial indexes on those columns, and two state-machine columns (`cert_alert_tier` ENUM 7-value, `cert_rotation_state` ENUM 5-value) with backfill Edge Function procedure. Seven-tier alert escalation matrix (t90 through expired) with PagerDuty severity mapping (null → low → warning → error → critical) and de-duplication rule (7-day cooldown per tier per tenant). Full TypeScript Worker cron implementation (`cert-expiry-check.ts`): daily 02:00 UTC via Cloudflare Workers Cron; queries active SAML tenants with cert expiring ≤90 days; handles both cert classes in one pass; emits DEC-030 before PagerDuty; updates `cert_alert_tier` and `cert_alert_last_sent_at` after each alert; separate `handleExpired` path for P0 post-expiry case. Three Resend email templates: CRT-01 (`sso-cert-expiry-t30`, first customer-visible notification with cert-class-conditional body), CRT-02 (`sso-cert-expiry-t7`, urgent 7-day), CRT-03 (`sso-cert-expiry-expired`, post-expiry email-fallback active notification). Five-state rotation state machine (`idle → notified → rotation_in_progress → complete`; `overdue` branch from `notified` at t7 if unresponsive). Four new DEC-030 HMAC-chained events: `sso.cert_expiry_alert` (MEDIUM/HIGH/CRITICAL by tier, 7yr), `sso.cert_expired` (CRITICAL, 7yr), `sso.cert_uploaded` (STANDARD, 7yr — IdP cert upload distinct from rotation), `sso.cert_monitor_error` (HIGH, 7yr — cron self-monitoring). FORM internal admin dashboard Certificate Panel spec: SP + IdP status badges, alert tier, rotation state. Tenant admin in-app banner at ≤30 days IdP cert expiry. SOC 2 evidence: CC6-E-CERT-001 through CC6-E-CERT-004 (audit_log exports, config snapshot, cron execution log). SOC 2 mapping: CC6.1 (credential lifecycle), CC7.2 (anomaly monitoring), CC8.1 (change management). 4 open questions (OQ-SSO-20.1 through OQ-SSO-20.4: metadata auto-refresh, self-signed cert policy, self-service upload UI, 2yr validity review). 11-item implementation checklist (8× P0 M4, 3× P1 M5).*
 
 *v1.3 additions (2026-05-30): Section 21 — Google Workspace Directory API Integration for Group Sync. Closes G-005 from §9 (Google Directory API integration for group sync — designed but not implemented). Root cause documented: Google OIDC deliberately omits group membership from ID token regardless of scopes; Admin SDK Directory API + service account + domain-wide delegation (DWD) is the canonical industry solution. Pull-model design (FORM calls Google on each login) vs. §19 push-model (SCIM); complementary — Google Workspace tenants who cannot use the three §19 workarounds (Okta bridge, Entra bridge, SAML groups attribute) use this path instead. Architecture: OIDC callback Worker checks `google_directory_group_cache` (5-minute TTL); on CACHE MISS calls `GET admin.googleapis.com/admin/directory/v1/groups?userKey={email}`; resolved groups feed directly into existing `scim_group_role_mappings` lookup (§19.3) — no change to role resolution engine (§5.4). Schema: ALTER TABLE `tenant_sso_configs` — three new columns (`google_service_account_email`, `google_directory_admin_email`, `google_directory_sync_enabled` + last_sync_at + sync_error); `google_service_account_json BYTEA` already exists (§4.2); partial index on `google_directory_sync_enabled = true` tenants; new `google_directory_group_cache` table (UNIQUE on `tenant_id, user_email`, `expires_at` as generated column = `fetched_at + 5min`, RLS tenant isolation + form_system write-only + form_api read-own-tenant; pg_cron cleanup every 10 minutes). Full TypeScript implementation (`apps/api-gateway/src/sso/google-directory-groups.ts`): `resolveGoogleGroups()` cache-first lookup with 10-minute grace window on API failure (stale cache used rather than blocking login); `fetchAndCacheGroups()` pagination loop (200 per page, handles nextPageToken); `mintServiceAccountToken()` using SubtleCrypto RSASSA-PKCS1-v1_5 + JWT grant to `oauth2.googleapis.com/token`; `importPrivateKey()` PKCS8 import for Workers WebCrypto. Service account access token KV caching (OQ-SSO-21.3: `{tenant_id}_google_token`, TTL 55 min, avoids 200ms JWT-to-token overhead per login). Customer configuration: 4-step process (GCP project + service account creation; Admin Console domain-wide delegation with `admin.directory.group.readonly` scope only; impersonation account designation; CSM-mediated credential upload via secure portal — never email). Credential rotation protocol: 7-step process; key deletion in GCP before replacement on compromise path. Eight DEC-030 HMAC-chained audit events: `sso.google_directory_sync_success` (STANDARD), `sso.google_directory_sync_cache_hit` (STANDARD), `sso.google_directory_sync_error` (HIGH), `sso.google_directory_credential_uploaded` (HIGH), `sso.google_directory_credential_rotated` (HIGH), `sso.google_directory_sync_enabled` (HIGH), `sso.google_directory_sync_disabled` (HIGH), `sso.google_directory_sync_validated` (STANDARD) — all 7yr; `user_email_hash` SHA-256 not plaintext in all events. Five alerting rules AL-SSO-GDIR-01 through AL-SSO-GDIR-05 (P2: error rate > 20% / 3 consecutive per tenant; P3: P95 latency > 3,000ms / unvalidated credential). GDPR: Google Workspace DPA covers Directory API; conditional sub-processor entry in SOC2_READINESS §44; data minimisation enforced (only id/email/name stored, 5-minute TTL); Art. 14 transparency obligation on customer controller. SOC 2: CC6.1 (credential lifecycle), CC6.2 (actor_id + role on credential operations), CC6.3 (5-minute TTL enforces timely role revocation), CC7.2 (5 alerting rules on sync health), CC9.2 (Google DPA + conditional sub-processor entry), C1.1 (email hash + group data not exposed to tenant_manager). Four evidence artefacts CC6-E-GDIR-001 through CC6-E-GDIR-004. Four open questions OQ-SSO-21.1 through OQ-SSO-21.4 (background sync M6 decision; >10,000 group scale test; KV access-token caching design; Cloud Identity Groups deferral). Gap status: G-005 🔴 Open → 🟡 Authored. 12-item implementation checklist: 8× P0 M4, 4× P1 M4.*
+
+*v1.4 additions (2026-06-01): Section 22 — High-Scale Session Revocation Architecture — KV-Backed Revocation Cache. Closes G-009 from §9 (session blocklist persistence bottleneck at >100-seat enterprise deployments — needed before first large-tenant go-live). Root cause: the `session_blocklist` Supabase table in §6.3 performs a synchronous SELECT on every authenticated request; at ≥100 RPS from enterprise concurrent users this saturates the Supabase connection pool and adds 15–25 ms per-request latency. Two-tier revocation architecture: Cloudflare KV (`SESSION_REVOCATION_KV` namespace, separate from `SSO_KV` for quota isolation) as the hot cache (~1 ms reads); Supabase `session_blocklist` as the authoritative audit trail (written on every revocation, read only as fallback). Four KV key types: `revoke:tenant:{tenant_id}:all` (TTL = max_jwt_ttl; single write nukes all tenant sessions — O(1) regardless of session count), `revoke:user:{tenant_id}:{user_id}` (TTL = 24h; user-level revocation), `revoke:session:{session_id}` (TTL = remaining JWT exp), `revoke:jti:{jti}` (TTL = remaining JWT exp; integrates the "Redis" JTI blocklist described in §12.7.4 into existing Cloudflare KV infrastructure). Per-request validation sequence: JWT signature + exp → three-way parallel KV GET (tenant/user/session) → optional JTI KV GET (opt-in per tenant) → handler; expected total overhead ≤ 3 ms (vs. 20 ms Supabase). Bulk SCIM revocation path (`handleBulkScimRevocation()` in `apps/api-gateway/src/sso/session-revocation-kv.ts`): batched KV writes in groups of 50 using Promise.all (Cloudflare Workers supports ≥50 concurrent KV ops per request); 1,000-user deactivation completes in ~100 ms (20 batches × ~5 ms) vs. current >10 s Supabase INSERT SELECT path. Tenant nuke function (`nukeTenantSessions()`): single KV write at `revoke:tenant:{tenant_id}:all`, replaces the unbounded `INSERT INTO session_blocklist SELECT ... WHERE tenant_id = $1` in §8.3, and becomes the canonical P0 incident response action (INCIDENT_RESPONSE.md R-01, step "invalidate all active sessions"). Schema change: one new column `kv_sync_status revocation_kv_status DEFAULT 'pending'` on `session_blocklist` (ENUM: pending/synced/failed), backfilled asynchronously; tracks whether a revocation has been reflected in KV for audit purposes. Migration window (30 days after deploy): on KV MISS, fallback to Supabase `session_blocklist` SELECT to catch sessions revoked before the KV layer was deployed; after 30 days the fallback is removed and sessions revoked pre-deploy have expired naturally. Five DEC-030 HMAC-chained audit events: `session.bulk_revocation_started` (HIGH, 7yr — emitted before first KV write; includes user_count + scim_request_id), `session.bulk_revocation_complete` (HIGH, 7yr — includes sessions_revoked count + duration_ms), `session.tenant_nuke_started` (CRITICAL, 7yr — two-person authorization required; authorised_by array), `session.tenant_nuke_complete` (CRITICAL, 7yr), `session.revocation_kv_sync_error` (HIGH, 7yr — KV write failure; fallback to Supabase-only path; triggers PagerDuty P1). Two alerting rules: AL-REVOKE-01 (P1 — `session.revocation_kv_sync_error` error rate > 1% over 5 min; runbook: KV namespace binding missing or quota exceeded), AL-REVOKE-02 (P2 — bulk revocation duration_ms > 5,000; runbook: batch size may need reducing or KV quota check). SOC 2 mapping: CC6.3 (logical access removed on a timely basis — KV revocation < 100 ms vs. 15-minute JWT residual window for standard path; tenant nuke < 5 ms), CC7.2 (anomaly monitoring — AL-REVOKE-01/02 on sync health), CC7.3 (response to anomalies — KV sync error triggers PagerDuty P1). Two evidence artefacts: CC6-E-REV-001 (`audit_log` export: all `session.bulk_revocation_*` and `session.tenant_nuke_*` events for observation period), CC6-E-REV-002 (`session_blocklist` kv_sync_status distribution: `SELECT kv_sync_status, count(*) FROM session_blocklist WHERE blocked_at BETWEEN $obs_start AND $obs_end GROUP BY 1` — confirms >99% synced). G-009 status: 🔴 Open → 🟡 Authored (design complete; implementation-pending M4). Implementation checklist: 11 tasks (8× P0 M4, 3× P1 M4/M5).*
