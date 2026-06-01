@@ -6,6 +6,16 @@
 
 ---
 
+## [1.48.0] — 2026-06-01
+
+### Added
+- `docs/OBSERVABILITY.md` → v1.3: §26 SSO / SCIM Identity Observability — closes three explicit cross-references left open by `docs/SSO_SCIM_IMPLEMENTATION.md` §§20, 21, 22. §26.1 scopes the section to the full enterprise identity layer (SAML/OIDC, SCIM v2, SAML cert lifecycle, Google Directory sync, KV session revocation); privacy constraint (tenant_id only in metric signals; user_id only in DEC-030); SOC 2 CC6.1/CC6.3/CC7.2/CC7.3/CC9.2 mapping. §26.2 RED applied to six identity services. §26.3 five SSO/SCIM SLOs (SSO-SLO-01 through SSO-SLO-05): login success ≥ 99% per tenant, P95 latency < 3,000 ms, SCIM success ≥ 99.5%, revocation P99 < 200 ms, zero expired certs on active tenants; SSO-SLO-01/02 feed §23 Enterprise SLA credits. §26.4 four SCIM sync health metrics with P1/P2 thresholds; deprovision failure rule (silent swallowing prohibited; > 1% triggers P1 + R-12 cross-reference). §26.5 five SAML cert lifecycle alert rules AL-CERT-01 through AL-CERT-05: t60→P3, t30→P2, t7→P1, expired→P0, cron-failure→P1; 7-day de-dup cooldown per (tenant_id, cert_class); G-004 gap-closure dependency stated. §26.6 two session revocation KV alert rules AL-REVOKE-01 (P1 — KV sync error > 1%/5 min) and AL-REVOKE-02 (P2 — bulk P95 > 5,000 ms/1h) with SOC 2 evidence artefact CC6-E-REV-003. §26.7 five Google Directory sync alert rules AL-SSO-GDIR-01 through AL-SSO-GDIR-05 with full runbook detail; AL-SSO-GDIR-05 pg_cron SQL specified (form_audit role, 35-min window NOT EXISTS subquery). §26.8 §6.2 alert table additions: 13 new rows across three subsections (cert_lifecycle ×5, session_revocation ×2, google_directory_sync ×5). §26.9 twelve-panel "Enterprise Identity" dashboard spec (Metabase + Better Stack). §26.10 four DEC-030 SSO event health monitors including P0 tenant-nuke two-person auth violation monitor. §26.11 four evidence artefacts SSO-OBS-E-001 through SSO-OBS-E-004. §26.12 twelve-item implementation checklist (6× P0 M4, 6× P1 M4/M5). §26.13 two open questions. ToC §26 row added. Document header bumped v1.2 → v1.3.
+
+### Changed
+- `VERSION` → 1.48.0
+
+---
+
 ## [1.47.0] — 2026-06-01
 
 ### Added

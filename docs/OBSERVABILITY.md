@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v1.2
+# FORM · Observability & Monitoring Taxonomy v1.3
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -46,6 +46,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §23 | Enterprise SLA Reporting & Credit Calculation |
 | §24 | Subscription & Revenue Event Observability |
 | §25 | Product & Activation Funnel Observability |
+| §26 | SSO / SCIM Identity Observability |
 
 ---
 
@@ -5509,3 +5510,250 @@ The following constraints are enforced by design. They are hard requirements, no
 ---
 
 *v1.2 additions: §25 Product & Activation Funnel Observability — closes the gap between infrastructure observability (§1–§24) and product health by defining FORM's PostHog-backed product observability layer; §25.1 scopes the section and cross-references PostHog from §1 Three Pillars and §12 Developer Instrumentation Guide; §25.2 defines the "activated" user criterion (one full CV session within 7 days of registration) and maps F1–F8 flows (`docs/FLOWS.md`) to entry events, completion events, activation gate status, and max acceptable drop-off targets; §25.3 specifies the full PostHog event taxonomy (21 events), including explicit prohibitions on mood/readiness scores pending OQ-33, weight/load data, CV keypoints, free-text content, and plaintext user_id — each event row documents PII risk and PostHog retention decision; §25.4 defines six product SLOs (ACT-SLO-01 through ACT-SLO-06) covering D7 activation rate ≥ 40% [ESTIMATE], F1 onboarding completion ≥ 70% [ESTIMATE], F3→F4 session start completion ≥ 80% [ESTIMATE], D30 retention ≥ 35% [ESTIMATE], F8 paywall conversion ≥ 15% [ESTIMATE], and PostHog event delivery lag P95 < 60 s, with measurement windows, alerting thresholds, and owners; §25.5 specifies six alerting rules (AL-ACT-01 through AL-ACT-06) with severities P0–P2, response SLAs, and structured runbook descriptions — AL-ACT-06 (zero `app.opened` events in 6h peak window) is P0 as it signals client crash or CDN failure rather than a product metric regression; §25.6 specifies A/B test instrumentation rules (experiment definition requirements, `experiment.enrolled` / `experiment.converted` event schemas, clinical-safety veto on health-data segmentation, p < 0.05 significance threshold, 14-day minimum duration, MDE ≥ 5%); §25.7 lists seven privacy constraints (no health metrics; no free-text; no CV pose data; SHA-256 distinct_id; PostHog DPA as sub-processor; DSAR via PostHog deletion API documented in R-14; Session Recording disabled on health-adjacent screens); §25.8 provides a fourteen-item implementation checklist across M4/M5; §25.9 documents three open questions (OQ-31 D7 activation baseline, OQ-32 PostHog vs Amplitude enterprise portability, OQ-33 clinical-safety ruling on readiness/mood scores in PostHog — P0 resolution required before M4 deploy).*
+
+---
+
+## 26. SSO / SCIM Identity Observability
+
+### 26.1 Purpose & Scope
+
+This section defines the observability strategy for FORM's enterprise identity layer: SAML 2.0/OIDC single sign-on, SCIM v2 user and group provisioning, SAML certificate lifecycle, Google Workspace Directory API group sync, and the KV-backed session revocation cache.
+
+It closes three explicit cross-references left open by recent SSO/SCIM work:
+
+- `docs/SSO_SCIM_IMPLEMENTATION.md §20` checklist item 8: SAML certificate lifecycle alerts → `OBSERVABILITY §6`
+- `docs/SSO_SCIM_IMPLEMENTATION.md §21` checklist item 8: AL-SSO-GDIR-01 through AL-SSO-GDIR-05 → `OBSERVABILITY §6.2`
+- `docs/SSO_SCIM_IMPLEMENTATION.md §22` checklist item 8: AL-REVOKE-01 and AL-REVOKE-02 → `OBSERVABILITY §6.2` (session_revocation subsection)
+
+**Privacy constraint:** all SSO/SCIM observability signals propagate `tenant_id` labels, never individual `user_id` values — except inside DEC-030 HMAC-chained audit events where `user_id` is a required field. Error logs for SSO failures must not include SAML assertion content, attribute values, or response bodies. Certificate metadata (fingerprint, expiry timestamp) is permitted; certificate PEM content is not. Login failure reason codes (e.g. `cert_expired`, `assertion_invalid`) are permitted because they carry no personal data.
+
+**SOC 2 mapping:** CC6.1 (credential lifecycle — cert expiry monitoring), CC6.3 (access revocation timeliness — session revocation SLO), CC7.2 (anomaly monitoring — all alert rule groups), CC7.3 (response to anomalies — runbook cross-references), CC9.2 (vendor/sub-processor risk — Google Directory API conditional sub-processor).
+
+---
+
+### 26.2 RED Metrics for SSO / SCIM / Identity
+
+| Service | Rate (R) | Errors (E) | Duration (D) |
+|---|---|---|---|
+| **SAML / OIDC SSO** | `sso_login_attempts_total` assertions/min per tenant | `sso_login_failures_total{reason}` / total; label values: `cert_expired`, `assertion_invalid`, `attribute_missing`, `tenant_disabled`, `session_fixation` | P95 of SSO round-trip (SP redirect → session token issued); target < 3,000 ms |
+| **SCIM Provisioning API** | `scim_requests_total{operation="create\|update\|delete\|list"}` req/min | `scim_requests_total{outcome="error"}` / total; distinguish `4xx` (client/mapping error) vs `5xx` (FORM error) | `scim_request_duration_ms` P95 by operation; target < 2,000 ms |
+| **SCIM Group Sync (§19)** | SCIM GROUP events per minute (pushed by IdP) | `scim_group_errors_total` by `group_operation` | P95 group operation latency; target < 2,000 ms |
+| **Google Directory Sync (§21)** | `google_directory_syncs_total` per minute (login-driven pull) | `sso.google_directory_sync_error` DEC-030 HIGH events per 5-min window | `fetch_duration_ms` P95 from `google_directory_group_cache`; target < 1,500 ms |
+| **Session Revocation KV (§22)** | `session_revocations_total{type="tenant_nuke\|user\|session\|jti"}` per hour | `session.revocation_kv_sync_error` DEC-030 HIGH events per 5-min window | `session.bulk_revocation_complete.duration_ms` P95; target < 5,000 ms per 1,000-user batch |
+| **Cert Expiry Check cron (§20)** | 1 run/day at 02:00 UTC (success or failure) | `sso.cert_monitor_error` HIGH DEC-030 event | Not latency-sensitive; cron execution gap > 26 h is itself an alert condition (AL-CERT-05) |
+
+---
+
+### 26.3 SSO / SCIM SLOs
+
+| SLO ID | Description | SLI Expression | Target | Error Budget (30d) | Owner |
+|---|---|---|---|---|---|
+| **SSO-SLO-01** | Enterprise SSO login success rate — fraction of SAML/OIDC login attempts that result in a valid FORM session, evaluated per tenant per month | `1 - (sso_login_failures_total / sso_login_attempts_total)` per tenant, 30-min rolling | ≥ 99.0% | 7.2 h/month equivalent per tenant | devops-lead |
+| **SSO-SLO-02** | SSO round-trip P95 latency — SP redirect to session token issued | P95 of SSO round-trip span, 1-hour rolling | < 3,000 ms | > 3,000 ms for < 1% of login events per month | devops-lead |
+| **SSO-SLO-03** | SCIM provisioning success rate — fraction of SCIM API requests returning 2xx | `1 - (scim_requests_total{outcome="error"} / scim_requests_total)` | ≥ 99.5% | 3.6 h/month equivalent | devops-lead |
+| **SSO-SLO-04** | Session revocation latency — time from `revokeSession()` call to KV entry written | P99 of `revocation_latency_ms`, 1-hour rolling | < 200 ms | > 200 ms for < 0.1% of revocations per month | platform-engineer |
+| **SSO-SLO-05** | SAML certificate coverage — no active SAML tenant has an expired IdP or SP certificate | `COUNT(tenant_sso_configs WHERE cert_alert_tier = 'expired' AND sso_enabled = true) = 0` | 100% — zero tolerance | Not time-bucketed; any expired cert on an active tenant is an immediate P0 | devops-lead |
+
+**SLO-to-SLA linkage:** SSO-SLO-01 and SSO-SLO-02 feed the Enterprise SLA commitment documented in `docs/ENTERPRISE.md`. A per-tenant SSO outage that accumulates > 43.8 minutes of covered downtime in a calendar month (the 99.9% SLA threshold) is a credit-eligible event under `docs/OBSERVABILITY.md §23`. Evidence for SSO outage duration is drawn from `sla_incidents` rows with `incident_type = 'sso_outage'`.
+
+---
+
+### 26.4 SCIM Sync Health Metrics
+
+SCIM sync health is measured per-tenant via DEC-030 `scim.*` events and per-operation via `scim_requests_total`. The following four metrics are the primary SCIM health signals.
+
+| Metric | Source | Alert Threshold | Severity | Notes |
+|---|---|---|---|---|
+| `scim_user_create_error_rate` | `scim_requests_total{operation="create", outcome="error"}` / total CREATE requests per tenant, 15-min window | > 10% | P2 | Likely IdP attribute mapping misconfiguration; CSM notified for tenant follow-up |
+| `scim_user_delete_error_rate` | `scim_requests_total{operation="delete", outcome="error"}` / total DELETE requests | > 5% | P1 | Failed deprovision = potential access beyond employment; cross-reference INCIDENT_RESPONSE.md R-12 |
+| `scim_group_sync_lag_minutes` | `NOW() - MAX(created_at)` from `audit_log WHERE event_type LIKE 'scim.group_%'` per tenant | > 240 min for tenants with active SCIM group push | P2 | IdP-to-FORM group lag; user role assignments may be stale |
+| `scim_deprovisioning_complete_rate` | `scim_requests_total{operation="delete", outcome="success"}` / total DELETE requests | < 99% (i.e. > 1% error) | P1 | At > 1% failed deprovisioning FORM opens a P1; failed DELETE must never be silently swallowed |
+
+**Deprovision failure rule:** `scim_user_delete_error_rate > 1%` triggers P1 → devops-lead + CSM. The alert must not be suppressed under any retry scenario. A confirmed failed deprovision that cannot be resolved within 4 hours triggers INCIDENT_RESPONSE.md R-12 assessment (potential insider access-after-departure).
+
+---
+
+### 26.5 Alert Rules: SAML Certificate Lifecycle (AL-CERT-*)
+
+These alert rules close the `docs/SSO_SCIM_IMPLEMENTATION.md §20` cross-reference. They are derived from the `cert-expiry-check` Cloudflare Workers Cron (daily, 02:00 UTC) which emits `sso.cert_expiry_alert` DEC-030 events and advances the `cert_alert_tier` state column per tenant per cert class (SP or IdP).
+
+The full escalation ladder (t90 → t60 → t30 → t14 → t7 → t2 → expired) is defined in `docs/SSO_SCIM_IMPLEMENTATION.md §20.4`. The five alert rules below represent the PagerDuty/Slack routing decisions for the most operationally significant tiers.
+
+| Rule ID | Trigger | Severity | Routing | Response SLA | Runbook |
+|---|---|---|---|---|---|
+| **AL-CERT-01** | `cert_alert_tier` advances to `t60` for any `(tenant_id, cert_class)` pair — cert expires in ≤ 60 days | P3 | PagerDuty LOW + `#security-alerts` + CSM email to tenant IT contact | Acknowledge < 24 h; CSM opens rotation-scheduling thread with customer | SSO §8.1 (SP cert rotation) or SSO §20 (IdP cert guidance) |
+| **AL-CERT-02** | `cert_alert_tier` advances to `t30` for any `(tenant_id, cert_class)` pair — cert expires in ≤ 30 days | P2 | PagerDuty MEDIUM + `#security-alerts` + CSM email + tenant admin in-app banner | Acknowledge < 4 h; confirm rotation window is scheduled; escalate to founder if customer unresponsive | SSO §8.1 / SSO §20 |
+| **AL-CERT-03** | `cert_alert_tier` advances to `t7` for any `(tenant_id, cert_class)` pair — cert expires in ≤ 7 days | P1 | PagerDuty HIGH + `#security-alerts` + founder | Acknowledge < 30 min; CSM places phone call to customer IT; emergency rotation must begin same day | SSO §8.1 / SSO §20; INCIDENT_RESPONSE.md R-04 |
+| **AL-CERT-04** | `cert_alert_tier = 'expired'` for any active SAML tenant (`sso_enabled = true`) | P0 | PagerDuty CRITICAL + INCIDENT_RESPONSE.md R-04 opened automatically | Acknowledge < 15 min; all SSO users of this tenant cannot log in; email-magic-link fallback must be activated immediately | INCIDENT_RESPONSE.md R-04; SSO §8.3 (emergency SSO disable) |
+| **AL-CERT-05** | `sso.cert_monitor_error` HIGH DEC-030 event emitted by the `cert-expiry-check` cron, OR no cron execution record for > 26 hours | P1 | PagerDuty HIGH + `#security-alerts` | Acknowledge < 30 min; cert expiry state unknown; check Cloudflare Cron Trigger logs; if > 24 h missed, treat as if all cert expiry dates are unknown | SSO §20.6; ENGINEERING_RUNBOOK.md |
+
+**De-duplication:** once an alert tier fires for a `(tenant_id, cert_class)` pair, the `cert_alert_last_sent_at` column in `tenant_sso_configs` suppresses re-alerting for 7 days. This prevents alert fatigue while ensuring weekly repetition in the critical window. Advancing to the next tier resets the de-dup window.
+
+**G-004 closure dependency:** `docs/SSO_SCIM_IMPLEMENTATION.md §9 G-004` (certificate rotation automation — 🟡 Partial) closes to 🟢 when AL-CERT-01 through AL-CERT-05 are deployed in PagerDuty and wired to the `cert-expiry-check` cron output in staging with a verified test escalation.
+
+---
+
+### 26.6 Alert Rules: Session Revocation KV (AL-REVOKE-*)
+
+Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §22.8`. Reproduced here in full for the §6.2 consolidated alert registry. These two rules close the §22 checklist item 8 cross-reference.
+
+| Rule ID | Trigger | Severity | Routing | Response SLA | Runbook |
+|---|---|---|---|---|---|
+| **AL-REVOKE-01** | `session.revocation_kv_sync_error` DEC-030 HIGH events > 1% of total revocation events in any 5-minute window | P1 | PagerDuty → devops-lead; Slack `#sso-alerts` | Acknowledge < 30 min | Check `SESSION_REVOCATION_KV` namespace binding in Worker `wrangler.toml`; confirm KV quota not exceeded (`wrangler kv:key list --namespace-id=<id>`); if quota exceeded, activate Supabase-only fallback by setting `session_revocation_kv_only: false` in tenant config; verify KV write permissions in Cloudflare Dashboard |
+| **AL-REVOKE-02** | `session.bulk_revocation_complete.duration_ms` P95 > 5,000 ms over any 1-hour window | P2 | Slack `#sso-alerts` + PagerDuty LOW | Acknowledge < 2 h | Reduce `BATCH_SIZE` constant from 50 to 25 in `apps/api-gateway/src/sso/session-revocation-kv.ts`; confirm Cloudflare KV region latency; check whether a large SCIM sync batch is the root cause; consider increasing SCIM client retry timeout on the IdP side |
+
+**SOC 2 note:** AL-REVOKE-01 is evidence for CC7.2 (entity monitors for anomalous conditions) and CC7.3 (response to anomalies — KV sync error triggers P1, activating the Supabase fallback before any session is silently left un-revoked). The PagerDuty incident log for AL-REVOKE-01 during the observation period is evidence artefact CC6-E-REV-003 (complementing CC6-E-REV-001 and CC6-E-REV-002 from SSO §22.10).
+
+---
+
+### 26.7 Alert Rules: Google Workspace Directory Sync (AL-SSO-GDIR-*)
+
+Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §21.9`. Reproduced here in full for the §6.2 consolidated alert registry. These five rules close the §21 checklist item 8 cross-reference.
+
+| Rule ID | Trigger | Severity | Routing | Response SLA | Runbook |
+|---|---|---|---|---|---|
+| **AL-SSO-GDIR-01** | `sso.google_directory_sync_error` HIGH DEC-030 rate > 20% of Google Workspace logins in any 5-min window (fleet-wide or per-tenant) | P2 | PagerDuty MEDIUM + `#sso-alerts` | Acknowledge < 1 h | Likely invalid credential or DWD permission revoked on GCP side; query `tenant_sso_configs.google_directory_sync_error` for affected tenants; review Google Cloud Console IAM for DWD scope revocation; trigger fresh `sso.google_directory_sync_validated` test from Admin Dashboard |
+| **AL-SSO-GDIR-02** | 3 consecutive `sso.google_directory_sync_error` DEC-030 events for the same `tenant_id` with no intervening `sso.google_directory_sync_success` | P2 | PagerDuty MEDIUM + `#sso-alerts` + `#csm-alerts` (CSM notified for tenant-specific follow-up) | Acknowledge < 1 h; CSM contacts customer IT admin within 4 h | Tenant-specific failure; investigate per AL-SSO-GDIR-01 steps; may indicate domain-wide delegation revoked by customer's own GCP admin |
+| **AL-SSO-GDIR-03** | `fetch_duration_ms` P95 > 3,000 ms over any 1-hour window across Google Workspace tenants | P3 | Slack `#sso-alerts` | Acknowledge < 24 h (business hours) | Google Admin SDK API latency degradation; check Google Workspace Status Dashboard; stale-cache grace window (10 min) in `resolveGoogleGroups()` prevents login failures — note in incident log for SLA evidence |
+| **AL-SSO-GDIR-04** | `sso.google_directory_sync_disabled` DEC-030 HIGH event fires for any tenant that had `google_directory_sync_enabled = true` | P2 | PagerDuty MEDIUM + `#sso-alerts` + `#csm-alerts` | Acknowledge < 1 h | Unexpected disable; verify the `actor_id` field in the DEC-030 event matches an authorized CSM or tenant admin identity; if unauthorized actor, escalate to INCIDENT_RESPONSE.md R-12 (Insider Threat) |
+| **AL-SSO-GDIR-05** | `sso.google_directory_credential_uploaded` DEC-030 HIGH event with no corresponding `sso.google_directory_sync_validated` STANDARD event for the same `tenant_id` within 30 minutes | P3 | Slack `#sso-alerts` | Acknowledge < 24 h (business hours) | Credential uploaded but not validated; CSM must follow up with customer IT to trigger validation in the Admin Dashboard SSO panel; an unvalidated credential fails silently at login-time when `resolveGoogleGroups()` encounters a 401 response |
+
+**Implementation note for AL-SSO-GDIR-05:** This rule requires a pg_cron job (`*/30 * * * *`) that queries:
+```sql
+SELECT tenant_id, payload->>'uploaded_at' AS uploaded_at
+FROM audit_log
+WHERE event_type = 'sso.google_directory_credential_uploaded'
+  AND created_at > NOW() - INTERVAL '35 minutes'
+  AND NOT EXISTS (
+    SELECT 1 FROM audit_log al2
+    WHERE al2.event_type = 'sso.google_directory_sync_validated'
+      AND al2.tenant_id = audit_log.tenant_id
+      AND al2.created_at > audit_log.created_at
+      AND al2.created_at <= audit_log.created_at + INTERVAL '30 minutes'
+  );
+```
+Any returned row triggers the Slack `#sso-alerts` notification. This query runs as `form_audit` role (read-only on `audit_log`).
+
+---
+
+### 26.8 §6.2 Alert Rules Additions
+
+The rows below are to be inserted into the §6.2 consolidated alert rules table under three new subsection headers. They use the condensed format matching §6.2's existing structure; full runbook detail is in §26.5–§26.7.
+
+**Subsection: `cert_lifecycle` (insert after "SSL certificate expiry" row in §6.2):**
+
+| Alert condition | Trigger | Severity | Routing | Runbook |
+|---|---|---|---|---|
+| **SAML cert expiry ≤ 60 days** | `cert_alert_tier = 't60'` for any active SAML tenant | P3 | PagerDuty LOW + `#security-alerts` + CSM email | §26.5 AL-CERT-01 |
+| **SAML cert expiry ≤ 30 days** | `cert_alert_tier = 't30'` for any active SAML tenant | P2 | PagerDuty MEDIUM + `#security-alerts` + in-app banner | §26.5 AL-CERT-02 |
+| **SAML cert expiry ≤ 7 days** | `cert_alert_tier = 't7'` for any active SAML tenant | P1 | PagerDuty HIGH + founder | INCIDENT_RESPONSE.md R-04; §26.5 AL-CERT-03 |
+| **SAML cert expired on active tenant** | `cert_alert_tier = 'expired'` AND `sso_enabled = true` | P0 | PagerDuty CRITICAL + R-04 auto-open | INCIDENT_RESPONSE.md R-04; §26.5 AL-CERT-04 |
+| **Cert monitor cron failure** | `sso.cert_monitor_error` HIGH DEC-030 event or > 26 h since last cron run | P1 | PagerDuty HIGH + `#security-alerts` | §26.5 AL-CERT-05 |
+
+**Subsection: `session_revocation` (new subsection in §6.2):**
+
+| Alert condition | Trigger | Severity | Routing | Runbook |
+|---|---|---|---|---|
+| **Session revocation KV sync error** | `session.revocation_kv_sync_error` DEC-030 rate > 1% / 5 min | P1 | PagerDuty → devops-lead; `#sso-alerts` | §26.6 AL-REVOKE-01 |
+| **Bulk revocation slow** | `session.bulk_revocation_complete.duration_ms` P95 > 5,000 ms / 1 h | P2 | Slack `#sso-alerts` + PagerDuty LOW | §26.6 AL-REVOKE-02 |
+
+**Subsection: `google_directory_sync` (new subsection in §6.2):**
+
+| Alert condition | Trigger | Severity | Routing | Runbook |
+|---|---|---|---|---|
+| **Google Directory sync error rate high** | `sso.google_directory_sync_error` > 20% of logins / 5 min | P2 | PagerDuty MEDIUM + `#sso-alerts` | §26.7 AL-SSO-GDIR-01 |
+| **Google Directory tenant sync failure × 3** | 3 consecutive errors for same `tenant_id` without intervening success | P2 | PagerDuty MEDIUM + `#sso-alerts` + `#csm-alerts` | §26.7 AL-SSO-GDIR-02 |
+| **Google Directory API latency high** | `fetch_duration_ms` P95 > 3,000 ms / 1 h | P3 | Slack `#sso-alerts` | §26.7 AL-SSO-GDIR-03 |
+| **Google Directory sync unexpectedly disabled** | `sso.google_directory_sync_disabled` for previously-enabled tenant | P2 | PagerDuty MEDIUM + `#sso-alerts` + `#csm-alerts` | §26.7 AL-SSO-GDIR-04; INCIDENT_RESPONSE.md R-12 if unauthorized actor |
+| **Google Directory credential unvalidated 30 min** | Credential uploaded without validation event within 30 min | P3 | Slack `#sso-alerts` | §26.7 AL-SSO-GDIR-05 |
+
+---
+
+### 26.9 Enterprise Identity Dashboard
+
+**Owner:** devops-lead. **Refresh:** 1 minute (SSO health panels); 5 minutes (SCIM / cert / directory panels).
+
+A dedicated "Enterprise Identity" Metabase dashboard (Supabase-backed panels) and Better Stack board (metrics panels) surfaces the identity layer to on-call engineers and the CSM team.
+
+| Panel | Metric / Source | Visualization |
+|---|---|---|
+| **SSO login success rate** | `sso_login_attempts_total` vs `sso_login_failures_total` by tenant, 30-min rolling | Multi-tenant time-series; SSO-SLO-01 threshold at 99.0% |
+| **SSO P95 round-trip latency** | SSO round-trip P95 by tenant | Time-series; SSO-SLO-02 threshold at 3,000 ms |
+| **SSO error breakdown** | `sso_login_failures_total` by `reason` label | Pie chart; `cert_expired` segment triggers immediate cert expiry investigation |
+| **SCIM provisioning rate** | `scim_requests_total` by operation (create/update/delete) | Stacked bar, 1-hour buckets |
+| **SCIM error rate** | `scim_requests_total{outcome="error"}` / total | Time-series with SSO-SLO-03 threshold at 0.5% |
+| **Session revocation activity** | `session_revocations_total` by type (tenant_nuke / user / session / jti), 24 h | Stacked bar; `tenant_nuke` column is highlighted in ember — any value requires scrutiny |
+| **KV sync error rate** | `session.revocation_kv_sync_error` events / total revocations, 5-min rolling | Time-series; AL-REVOKE-01 threshold at 1% |
+| **Bulk revocation P95 duration** | `session.bulk_revocation_complete.duration_ms` P95 | Time-series; AL-REVOKE-02 threshold at 5,000 ms |
+| **SAML cert expiry countdown** | `cert_alert_tier` + `saml_idp_cert_expires_at` per active SAML tenant | Table: tenant slug, cert class (SP / IdP), days-to-expiry, tier badge; any `expired` row is acid-coloured red |
+| **Cert tier distribution** | `cert_alert_tier` value counts across all active SAML tenants | Horizontal bar chart; any `expired` bar requires immediate action |
+| **Google Directory sync health** | `sso.google_directory_sync_error` / `sso.google_directory_sync_success` ratio per tenant, 1-hour rolling | Heat map (tenants × hours); red cells trigger AL-SSO-GDIR-01/02 investigation |
+| **Active SSO tenants count** | `COUNT(tenant_sso_configs WHERE sso_enabled = true)` | Stat panel — baseline; unexpected drop is a P1 |
+
+---
+
+### 26.10 DEC-030 SSO Event Health Monitoring
+
+The identity layer emits a high volume of DEC-030 HMAC-chained events. Monitoring the audit log for sequence gaps or anomalous patterns is itself a security control separate from the per-service metric monitors above.
+
+| Monitor | Query | Alert Threshold | Severity |
+|---|---|---|---|
+| **SSO event chain continuity** | `SELECT COUNT(*) FROM audit_log WHERE event_type LIKE 'sso.%' AND created_at > NOW() - INTERVAL '1 hour'` | 0 events in 1 h during a period when ≥ 1 active SSO tenant exists | P1 — SSO flow is broken or audit emission has stopped |
+| **Tenant nuke two-person auth** | `SELECT * FROM audit_log WHERE event_type = 'session.tenant_nuke_started' AND array_length(authorised_by::uuid[], 1) < 2` | Any row | P0 — two-person authorization requirement violated; INCIDENT_RESPONSE.md R-01 immediately |
+| **Unexpected credential actor** | `SELECT * FROM audit_log WHERE event_type = 'sso.google_directory_credential_uploaded' AND actor_id NOT LIKE 'csm/%'` | Any row where `actor_id` is not a recognized CSM service identity | P1 — credential uploaded by unexpected actor; assess per INCIDENT_RESPONSE.md R-12 |
+| **Cert expired without prior alert** | `sso.cert_expired` CRITICAL DEC-030 event with no preceding `sso.cert_expiry_alert` for the same `(tenant_id, cert_class)` in the past 7 days | Any row | P1 — cert monitor cron may have failed before the expiry threshold was reached; investigate AL-CERT-05 |
+
+**Retention:** all `sso.*` and `session.*` DEC-030 events are retained for 7 years per DEC-030 policy. The `audit-chain-daily-check` pg_cron job (`docs/SOC2_READINESS.md §46`) verifies HMAC chain integrity across the full `audit_log` table, including these events.
+
+---
+
+### 26.11 SOC 2 Evidence Mapping
+
+| Criterion | Control | Evidence from §26 |
+|---|---|---|
+| **CC6.1** | Credentials (X.509 certs, service account keys, SCIM tokens) have a monitored lifecycle with defined rotation and revocation procedures | AL-CERT-01 through AL-CERT-05 provide continuous automated coverage; `sso.cert_expiry_alert` DEC-030 event log for observation period; `cert_alert_tier` snapshot (SSO-OBS-E-002) |
+| **CC6.3** | Logical access is removed on a timely basis when no longer authorized | AL-REVOKE-01 fires on KV sync failures that could delay revocation; SSO-SLO-04 (< 200 ms P99) is the quantitative commitment; `session.bulk_revocation_complete` events with `duration_ms` confirm timeliness (SSO-OBS-E-003) |
+| **CC7.2** | Entity monitors system components for anomalies | All fifteen alert rules (AL-CERT-01..05, AL-REVOKE-01..02, AL-SSO-GDIR-01..05, SCIM deprovisioning P1, SSO chain continuity P1) are continuous anomaly monitors with defined thresholds and owners |
+| **CC7.3** | Entity evaluates and responds to identified anomalies | Response SLA column in §26.5–§26.7; PagerDuty routing to named owners; INCIDENT_RESPONSE.md R-04/R-12 cross-references form the documented response procedure |
+| **CC9.2** | Risk from vendors and sub-processors is managed | Google Workspace Directory API is a conditional sub-processor (active only when `google_directory_sync_enabled = true`); AL-SSO-GDIR-04 fires on unexpected sync scope changes; DPA clause in SCIM contract template updated per SSO §21 checklist item 10 |
+
+**Auditor evidence artefacts:**
+
+| Artefact ID | Description | Collection method |
+|---|---|---|
+| **SSO-OBS-E-001** | `audit_log` export: all `sso.*` and `session.*` events for the observation period, HMAC chain verified | `SELECT * FROM audit_log WHERE (event_type LIKE 'sso.%' OR event_type LIKE 'session.%') AND created_at BETWEEN $obs_start AND $obs_end ORDER BY created_at` |
+| **SSO-OBS-E-002** | Certificate status snapshot — all active SAML tenants with tier, days-to-expiry, last check timestamp | `SELECT tenant_id, cert_alert_tier, (saml_idp_cert_expires_at - NOW())::INT AS idp_days_remaining, cert_alert_last_sent_at FROM tenant_sso_configs WHERE sso_enabled = true` |
+| **SSO-OBS-E-003** | PagerDuty incident log: all incidents fired by AL-CERT-*, AL-REVOKE-*, AL-SSO-GDIR-* rules for the observation period | PagerDuty → Incidents → filter by service "FORM SSO" + date range → export CSV |
+| **SSO-OBS-E-004** | SSO SLO-01 compliance report — login success rate per tenant per month | `SELECT tenant_id, DATE_TRUNC('month', created_at) AS month, SUM(CASE WHEN event_type = 'sso.login_success' THEN 1 ELSE 0 END)::FLOAT / COUNT(*) AS success_rate FROM audit_log WHERE event_type IN ('sso.login_success', 'sso.login_failed') AND created_at BETWEEN $obs_start AND $obs_end GROUP BY 1, 2` |
+
+---
+
+### 26.12 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Create PagerDuty service "FORM SSO Certs"; configure AL-CERT-01 through AL-CERT-05 event routing; wire `cert-expiry-check` cron DEC-030 output to PagerDuty Events API v2; validate escalation ladder in staging with a synthetic `cert_alert_tier = 't7'` test | devops-lead | **P0** | M4 |
+| Configure AL-REVOKE-01 and AL-REVOKE-02 in PagerDuty; validate with synthetic `session.revocation_kv_sync_error` DEC-030 test event in staging (inject a KV write failure); confirm P1 fires within 30 s | devops-lead | **P0** | M4 |
+| Configure AL-SSO-GDIR-01 and AL-SSO-GDIR-02 in PagerDuty (DEC-030 event stream filtering on `event_type = 'sso.google_directory_sync_error'`); configure `#sso-alerts` and `#csm-alerts` Slack routing | devops-lead | **P0** | M4 |
+| Configure AL-SSO-GDIR-03 in Better Stack as a latency monitor on `google_directory_group_cache.fetch_duration_ms` P95 > 3,000 ms / 1 h | devops-lead | **P0** | M4 |
+| Configure AL-SSO-GDIR-04 in PagerDuty (DEC-030 event type `sso.google_directory_sync_disabled`); add `#csm-alerts` notification | devops-lead | **P0** | M4 |
+| Deploy pg_cron job `*/30 * * * *` for AL-SSO-GDIR-05 unvalidated credential detection per §26.7 SQL; notify `#sso-alerts` on any returned row | platform-engineer | **P1** | M4 |
+| Deploy DEC-030 sequence monitor for tenant nuke two-person auth violation (§26.10 row 2); fire P0 PagerDuty CRITICAL on any `session.tenant_nuke_started` event with `array_length(authorised_by) < 2` | platform-engineer | **P0** | M4 |
+| Add §26.8 alert rule rows to §6.2 consolidated table under `cert_lifecycle`, `session_revocation`, and `google_directory_sync` subsection headers | devops-lead | **P0** | M4 |
+| Build "Enterprise Identity" Metabase + Better Stack dashboard per §26.9; wire all twelve panels to live data; set refresh intervals; share with CSM team | devops-lead + data-engineer | **P1** | M4 |
+| Add SSO-SLO-01 through SSO-SLO-05 to the §7.4 Enterprise Operations dashboard (existing dashboard) | devops-lead | **P1** | M5 |
+| Advance `docs/SSO_SCIM_IMPLEMENTATION.md §9 G-004` from 🟡 Partial to 🟢 Done after AL-CERT-01 through AL-CERT-05 are deployed and a live `t60` event is captured in staging | compliance-officer | **P1** | M4 |
+| File evidence artefacts SSO-OBS-E-001 through SSO-OBS-E-004 in `compliance/evidence/sso/` at observation period open | compliance-officer | **P1** | Observation period open |
+
+---
+
+### 26.13 Open Questions
+
+| OQ | Question | Owner | Resolution Target | Priority |
+|---|---|---|---|---|
+| OQ-SSO-OBS-01 | **Per-tenant vs. fleet-wide SSO-SLO-01 evaluation.** The current definition evaluates SSO-SLO-01 per tenant. A single tenant with a flaky IdP breaches its own SLO without indicating a systemic FORM platform issue. This is consistent with the per-tenant Enterprise SLA credit model in §23 but requires that PagerDuty alert thresholds in AL-CERT-* and AL-SSO-GDIR-* are also scoped per-tenant (via `tenant_id` label filtering). Confirm this is consistent with enterprise contract language before the first SLA review. | compliance-officer + enterprise-architect | Before first enterprise SLA review (Month 13) | P1 |
+| OQ-SSO-OBS-02 | **DEC-030 event stream vs. Cloudflare Analytics Engine as the signal source for AL-SSO-GDIR-01/02.** Querying Supabase `audit_log` for alert volume works in the observation period but may not scale to fleet-wide alerting once > 50 tenants are active, because each PagerDuty check requires a Supabase query. Cloudflare Analytics Engine data points (one per `sso.google_directory_sync_error` event emission) would enable faster, cheaper aggregation. Decision needed before M4 alert implementation. | platform-engineer + devops-lead | Before AL-SSO-GDIR-01 implementation (M4) | P1 |
+
+---
+
+*v1.3 additions: §26 SSO / SCIM Identity Observability — closes three explicit cross-references left open by `docs/SSO_SCIM_IMPLEMENTATION.md` §§20, 21, 22. §26.1 scopes the section to the full enterprise identity layer (SAML/OIDC SSO, SCIM v2, SAML cert lifecycle, Google Directory sync, KV session revocation); enumerates the three source cross-references; establishes privacy constraint (tenant_id propagation only, no user_id in metric signals); SOC 2 mapping CC6.1/CC6.3/CC7.2/CC7.3/CC9.2. §26.2 RED methodology applied to six identity services: SAML/OIDC SSO (login attempts/failures/P95 round-trip), SCIM Provisioning API (create/update/delete/list rates + error + P95), SCIM Group Sync (push rate + group errors), Google Directory Sync (DEC-030 event rate + fetch_duration_ms P95 < 1,500 ms), Session Revocation KV (revocations by type + kv_sync_error rate + bulk duration P95 < 5,000 ms), Cert Expiry cron (1/day; >26 h gap is itself an alert). §26.3 five SSO/SCIM SLOs: SSO-SLO-01 (login success ≥ 99% per tenant), SSO-SLO-02 (P95 latency < 3,000 ms), SSO-SLO-03 (SCIM success ≥ 99.5%), SSO-SLO-04 (revocation P99 < 200 ms), SSO-SLO-05 (zero expired certs on active tenants — zero-tolerance); SSO-SLO-01/02 feed §23 Enterprise SLA credits. §26.4 four SCIM sync health metrics: user create error rate (P2 > 10%), user delete error rate (P1 > 5%, R-12 cross-reference), group sync lag (P2 > 240 min), deprovisioning complete rate (P1 < 99%); deprovision failure rule: silent swallowing is prohibited, > 1% triggers P1 + CSM. §26.5 five SAML certificate lifecycle alert rules AL-CERT-01 through AL-CERT-05: maps SSO §20 seven-tier escalation ladder to five distinct PagerDuty/Slack rules (t60→P3, t30→P2, t7→P1, expired→P0, cron-failure→P1); de-duplication 7-day cooldown per (tenant_id, cert_class) pair; G-004 gap-closure dependency explicitly stated. §26.6 two session revocation KV alert rules AL-REVOKE-01 (P1 — KV sync error > 1%/5 min; SOC 2 CC7.2/CC7.3 evidence artefact CC6-E-REV-003) and AL-REVOKE-02 (P2 — bulk P95 > 5,000 ms/1h) reproduced verbatim from SSO §22 with evidence artefact reference. §26.7 five Google Directory sync alert rules AL-SSO-GDIR-01 through AL-SSO-GDIR-05 reproduced verbatim from SSO §21.9 with expanded runbook detail; AL-SSO-GDIR-05 pg_cron SQL specified in full (form_audit role, 35-min window, NOT EXISTS subquery for validation event). §26.8 §6.2 alert table additions: thirteen new rows across three subsections (cert_lifecycle: 5 rows, session_revocation: 2 rows, google_directory_sync: 5 rows) in condensed format matching §6.2 structure with §26.x runbook backlinks. §26.9 twelve-panel "Enterprise Identity" Metabase + Better Stack dashboard: SSO success rate (multi-tenant time-series), P95 latency, error breakdown (pie), SCIM provisioning stacked bar, SCIM error rate, revocation activity (ember-highlighted tenant_nuke), KV sync error rate, bulk revocation P95, SAML cert expiry countdown table, cert tier distribution bar, Google Directory heat map, active SSO tenant count. §26.10 four DEC-030 SSO event health monitors: chain continuity (P1 — zero events in 1h), tenant nuke two-person auth violation (P0 — immediate R-01), unexpected credential upload actor (P1 — R-12 assessment), cert expired without prior alert (P1 — cron failure investigation). §26.11 SOC 2 evidence mapping: CC6.1 (cert lifecycle monitoring), CC6.3 (revocation timeliness SLO + alert), CC7.2 (fifteen alert rules as anomaly monitors), CC7.3 (response SLA + runbook cross-references), CC9.2 (Google conditional sub-processor + AL-SSO-GDIR-04); four evidence artefacts SSO-OBS-E-001 through SSO-OBS-E-004. §26.12 twelve-item implementation checklist: six P0 items (PagerDuty cert/revoke/GDIR configs, tenant nuke auth monitor, §6.2 table update), six P1 items (GDIR-05 cron, dashboard build, SLO reporting, G-004 advance, evidence filing); M4/M5/observation period. §26.13 two open questions: OQ-SSO-OBS-01 (per-tenant vs. fleet-wide SSO-SLO-01 evaluation — P1, compliance-officer, Month 13) and OQ-SSO-OBS-02 (DEC-030 vs. Cloudflare Analytics Engine as alert signal source for GDIR volume — P1, platform-engineer + devops-lead, M4).*
