@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.4
+# FORM · Multi-Tenant Data Model v1.5
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -32,6 +32,7 @@
 22. [Gamification, Streak & Achievement Schema](#22-gamification-streak--achievement-schema)
 23. [Exercise Library & Program Schema](#23-exercise-library--program-schema)
 24. [Subscription, Billing & Revenue Schema](#24-subscription-billing--revenue-schema)
+25. [Enterprise Tenant Offboarding & Data Egress Schema](#25-enterprise-tenant-offboarding--data-egress-schema)
 
 ---
 
@@ -9064,6 +9065,739 @@ All events carry the standard DEC-030 envelope fields: `tenant_id`, `user_id`, `
 | 12 | Write `__tests__/db/billing_entitlement.test.ts` — assert `assertFeatureEnabled()` returns false for `plan_tier = 'free'` on Growth/Elite-gated flags; returns true on matching tier; `status = 'expired'` treated as `free`; regression against CC6.2 | `qa-lead` + `platform-engineer` | **P0** | M4 |
 
 ---
+
+## 25. Enterprise Tenant Offboarding & Data Egress Schema
+
+> Owner: `enterprise-architect` + `compliance-officer`. Review: before any enterprise pilot launch, on any change to data retention commitments, and quarterly.
+> Scope: enterprise tier only. Consumer account closure is handled by §12 (GDPR Art. 17 individual erasure). This section handles the organisational off-boarding of a tenant — the employer entity — and does not supersede §12, which continues to govern each individual user's personal data rights independently.
+> References: §16 (Enterprise Contract & Pilot Lifecycle Schema — state `churned` is the entry trigger); §12 (individual GDPR Art. 17 erasure — continues in parallel for individual users); §24 (billing pseudonymization — financial record retention); `docs/SSO_SCIM_IMPLEMENTATION.md §22` (KV-backed session revocation via `nukeTenantSessions()`); DEC-030 (`docs/AUDIT_LOG_SCHEMA.md`); `docs/SOC2_READINESS.md` criteria C1.2, P8.0, CC6.3, CC9.1.
+
+---
+
+### 25.1 Purpose and Design Principles
+
+§16.2 specifies that when `tenants.lifecycle_status` transitions to `'churned'`, "data deletion process begins per §12.3." §12.3 documents the per-user GDPR Art. 17 erasure flow for individual users who have submitted a right-to-erasure request. That flow is **not** a sufficient procedure for enterprise off-boarding: it handles one user at a time on a 30-day SLA, targets user-initiated requests, and was not designed for the coordinated, multi-table, employer-notified deletion of an entire tenant's data estate. This section closes that gap.
+
+**Three off-boarding triggers.** An off-boarding job is created whenever `tenants.lifecycle_status` transitions to `'churned'` from any predecessor state. The initiating cause is recorded as one of three trigger types:
+
+1. **Contract expiry without renewal** — `tenant_contracts.status` → `'expired'` and no new `tenant_contracts` row created within the grace window; CSM confirms no pipeline.
+2. **Early termination** — `tenant_contracts.status` → `'terminated'` by either party under the termination clause of the MSA.
+3. **Pilot lapse** — `tenant_pilots.status` → `'expired'` with no conversion and no extension; no contract exists.
+
+**Privacy floor applies to all egress.** The employer (tenant) is not the data controller for individual user health data — the individual user is the data subject. The off-boarding data export package delivered to the employer contains:
+
+- Aggregate-only adoption metrics (subject to the n ≥ 15 k-anonymity floor from §6 and §17).
+- Audit logs scoped to administrative actions (SSO configs, SCIM provisioning events, contract documents).
+- Contract documentation.
+
+Individual user health data — workouts, coaching turns, meal logs, body metrics, CV pose keypoints, health profiles — is **not** included in any employer-facing export, regardless of contractual request. Individual users receive their own personal data via the standard GDPR Art. 20 data portability path (§12.5). This constraint is structural: the `tenant_data_egress_packages` table (§25.4) enforces an ENUM of permitted package types that excludes any category containing individual user health data, and the worker that generates packages (§25.11) has no code path to query individual-user health tables.
+
+---
+
+### 25.2 Off-Boarding Trigger Event Taxonomy
+
+| Trigger type | Entry state (§16) | Initiating action | Tenant notification timing | Nominal off-boarding timeline |
+|---|---|---|---|---|
+| `contract_expired_no_renewal` | `lifecycle_status = 'expired'` for ≥ 30 days | Automated: renewal sweep finds no new contract | At `expired` transition (60-day advance notice via §16.7); reminder at T+15d, T+30d | Churn confirmed at T+30d; deletion completes within 60 days of churn confirmation |
+| `early_termination` | `lifecycle_status = 'churned'` via `tenant_contracts.status → 'terminated'` | Manual: CSM or compliance officer initiates via internal tooling | Immediate notice on termination event; employer data export within 5 business days per MSA | Deletion begins immediately; completes within 30 days of termination date |
+| `pilot_lapsed` | `lifecycle_status = 'churned'` via pilot expiry | Automated: pilot sweep; CSM confirms no pipeline | At pilot expiry; pilot off-boarding is lower urgency — employer receives aggregate report only | Deletion completes within 60 days of pilot expiry |
+
+The `offboarding_trigger` field on `tenant_offboarding_jobs` (§25.3) records the trigger type for each job. All three paths converge on the same state machine (§25.6) and deletion sequence (§25.7).
+
+---
+
+### 25.3 `tenant_offboarding_jobs` Table
+
+This table is the authoritative record of every off-boarding operation. One row per tenant off-boarding event. A tenant that is re-onboarded after churn (rare but contractually possible) receives a new `tenants` row with a new `id` — the prior off-boarding job remains as immutable history.
+
+```sql
+CREATE TYPE offboarding_trigger_enum AS ENUM (
+  'contract_expired_no_renewal',
+  'early_termination',
+  'pilot_lapsed'
+);
+
+CREATE TYPE offboarding_status_enum AS ENUM (
+  'pending',               -- created; awaiting worker pickup
+  'access_revoked',        -- SSO/SCIM/API access blocked; sessions nuked
+  'export_in_progress',    -- employer data export package being generated
+  'export_delivered',      -- signed URL sent to tenant_owner email on file
+  'deletion_in_progress',  -- Art. 9 + standard personal data deletion running
+  'financial_pseudonymized', -- billing records pseudonymized per §24.10
+  'attestation_issued',    -- signed deletion attestation generated (§25.5)
+  'completed',             -- all steps verified; off-boarding closed
+  'failed',                -- a step failed; requires manual remediation
+  'on_hold'                -- compliance or legal hold placed on deletion
+);
+
+CREATE TABLE tenant_offboarding_jobs (
+  id                          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                   UUID        NOT NULL REFERENCES tenants(id),
+  -- REFERENCES with no ON DELETE clause: RESTRICT by default.
+  -- The tenants row must not be hard-deleted until this job reaches 'completed'.
+  -- The job must survive even if the tenants row is later purged via a compliance action.
+
+  trigger_type                offboarding_trigger_enum  NOT NULL,
+  status                      offboarding_status_enum   NOT NULL DEFAULT 'pending',
+
+  -- Timestamps for each state transition (NULL = not yet reached)
+  access_revoked_at           TIMESTAMPTZ,
+  export_started_at           TIMESTAMPTZ,
+  export_delivered_at         TIMESTAMPTZ,
+  deletion_started_at         TIMESTAMPTZ,
+  financial_pseudonymized_at  TIMESTAMPTZ,
+  attestation_issued_at       TIMESTAMPTZ,
+  completed_at                TIMESTAMPTZ,
+  failed_at                   TIMESTAMPTZ,
+
+  -- Reference to the contract or pilot that triggered off-boarding
+  contract_id                 UUID        REFERENCES tenant_contracts(id),
+  pilot_id                    UUID        REFERENCES tenant_pilots(id),
+  CONSTRAINT chk_ofb_trigger_has_source CHECK (
+    (trigger_type = 'pilot_lapsed'    AND pilot_id IS NOT NULL)
+    OR (trigger_type <> 'pilot_lapsed' AND contract_id IS NOT NULL)
+  ),
+
+  -- Counts recorded at deletion time for attestation cross-reference
+  users_anonymized_count      INTEGER,
+  art9_rows_deleted_count     INTEGER,
+  standard_rows_deleted_count INTEGER,
+  financial_rows_pseudonymized INTEGER,
+
+  -- Two-person authorisation for the deletion step (mirrors §22 nukeTenantSessions rule)
+  authorised_by_1             TEXT,  -- internal user ID or service identity
+  authorised_by_2             TEXT,  -- must differ from authorised_by_1
+  CONSTRAINT chk_ofb_two_person CHECK (
+    authorised_by_1 IS NULL
+    OR authorised_by_1 <> authorised_by_2
+  ),
+
+  -- Internal notes for compliance team (MUST NOT contain individual user names or health data)
+  compliance_notes            TEXT,
+
+  created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON COLUMN tenant_offboarding_jobs.authorised_by_1
+  IS 'First authoriser for the deletion step. Set by the orchestrator from the API caller identity.';
+COMMENT ON COLUMN tenant_offboarding_jobs.authorised_by_2
+  IS 'Second authoriser, distinct from authorised_by_1. Required before status may transition to deletion_in_progress.';
+COMMENT ON COLUMN tenant_offboarding_jobs.art9_rows_deleted_count
+  IS 'Count of rows hard-deleted across Art. 9 tables: keypoints_enc, user_health_profiles, coaching_turns, meal_logs, body_metrics. Recorded in the deletion attestation.';
+COMMENT ON COLUMN tenant_offboarding_jobs.compliance_notes
+  IS 'Internal notes for the compliance team. Must not contain individual user names, email addresses, or health data values.';
+
+ALTER TABLE tenant_offboarding_jobs ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX idx_ofb_jobs_tenant_id
+  ON tenant_offboarding_jobs (tenant_id);
+
+CREATE INDEX idx_ofb_jobs_status
+  ON tenant_offboarding_jobs (status)
+  WHERE status NOT IN ('completed', 'failed');
+
+CREATE TRIGGER update_ofb_jobs_updated_at
+  BEFORE UPDATE ON tenant_offboarding_jobs
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+```
+
+---
+
+### 25.4 `tenant_data_egress_packages` Table
+
+Each row represents one data package generated and delivered to the employer as part of off-boarding. The permitted package types are enforced by ENUM — not by application logic alone. No package type in this ENUM may contain individual user health data. The worker that generates packages (§25.11) is granted SELECT access only to the specific aggregate views and audit-log subsets listed in the package type definitions in §25.8, and has no access to individual-user health tables.
+
+```sql
+CREATE TYPE egress_package_type_enum AS ENUM (
+  'aggregate_adoption_report',
+  -- Tenant-level WAU/MAU/activation metrics; n ≥ 15 floor enforced.
+  -- Sourced from tenant_wellness_summary and tenant_cv_summary MVs only (§17).
+
+  'audit_log_export',
+  -- DEC-030 events scoped to administrative actions: SSO config changes, SCIM provisioning,
+  -- seat changes, contract events, off-boarding events.
+  -- Individual user health-context audit entries are excluded by permitted event type filter (§25.8).
+
+  'contract_documents',
+  -- tenant_contracts and tenant_pilots metadata (arr_cents excluded; FORM commercial-confidential).
+  -- DPA reference; contract_ref list. No personal data (§16.9).
+
+  'scim_provisioning_summary'
+  -- Aggregate counts: SCIM-provisioned, deprovisioned, active users at off-boarding date.
+  -- No individual user rows, no email addresses, no external_id values.
+);
+
+CREATE TYPE egress_package_status_enum AS ENUM (
+  'queued',
+  'generating',
+  'ready',       -- signed URL generated; not yet downloaded
+  'downloaded',  -- tenant_owner confirmed download (HEAD request or explicit ack)
+  'expired',     -- 30-day signed URL TTL elapsed; R2 object deleted
+  'failed'
+);
+
+CREATE TABLE tenant_data_egress_packages (
+  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  offboarding_job_id    UUID        NOT NULL REFERENCES tenant_offboarding_jobs(id),
+  tenant_id             UUID        NOT NULL,
+  -- Denormalised from offboarding_job for RLS performance; must equal offboarding_job.tenant_id.
+
+  package_type          egress_package_type_enum    NOT NULL,
+  status                egress_package_status_enum  NOT NULL DEFAULT 'queued',
+
+  -- Storage: Cloudflare R2 (see OQ-OFB-02 for EU-region R2 consideration)
+  r2_object_key         TEXT,       -- set when status → 'ready'; NULL before generation
+  r2_bucket             TEXT        NOT NULL DEFAULT 'form-offboarding-exports',
+  sha256_manifest       TEXT,       -- hex-encoded SHA-256 of the full ZIP archive
+  hmac_signature        TEXT,       -- HMAC-SHA256(package_signing_key, sha256_manifest).
+                                    -- Employer verifies using the public signing key at:
+                                    -- https://form.coach/.well-known/offboarding-signing-key.pub
+
+  signed_url_expires_at TIMESTAMPTZ,  -- 30 days from generation
+  downloaded_at         TIMESTAMPTZ,
+
+  package_size_bytes    BIGINT,     -- recorded after generation for audit evidence
+  row_count             INTEGER,    -- row count inside the package for attestation cross-reference
+
+  -- Delivery address: the tenant_owner email at time of off-boarding initiation.
+  -- Recorded here so evidence is preserved even if the users row is later anonymized (§25.7).
+  delivered_to_email    TEXT        NOT NULL
+    CHECK (delivered_to_email <> ''),
+
+  error_message         TEXT,       -- populated on status = 'failed'; must not contain PII
+  generated_at          TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON COLUMN tenant_data_egress_packages.package_type
+  IS 'ENUM restricts package content to employer-permitted categories. No value in this ENUM can produce a package containing individual user health data.';
+COMMENT ON COLUMN tenant_data_egress_packages.hmac_signature
+  IS 'HMAC-SHA256 of sha256_manifest using the FORM compliance package signing key. Employer verifies package integrity and authenticity post-download against published public key.';
+COMMENT ON COLUMN tenant_data_egress_packages.signed_url_expires_at
+  IS '30-day TTL. After expiry the R2 object is deleted and status is set to expired. Employer must request re-generation via support if the window is missed.';
+COMMENT ON COLUMN tenant_data_egress_packages.r2_object_key
+  IS 'R2 object key. Excluded from tenant-facing API responses; tenant_admin sees status and downloaded_at only.';
+
+ALTER TABLE tenant_data_egress_packages ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX idx_egress_packages_job_id
+  ON tenant_data_egress_packages (offboarding_job_id);
+
+CREATE INDEX idx_egress_packages_tenant_status
+  ON tenant_data_egress_packages (tenant_id, status)
+  WHERE status NOT IN ('expired', 'failed');
+
+-- One package per type per off-boarding job — prevents duplicate generation.
+CREATE UNIQUE INDEX uq_egress_package_type_per_job
+  ON tenant_data_egress_packages (offboarding_job_id, package_type);
+```
+
+---
+
+### 25.5 `tenant_deletion_attestations` Table
+
+A signed attestation record is the SOC 2 C1.2 evidence artefact for disposal of confidential information. One attestation is issued per off-boarding job, after all deletion steps are verified complete. The attestation text is generated from the template below (§25.5.1), stored verbatim, and signed with the FORM compliance key.
+
+```sql
+CREATE TABLE tenant_deletion_attestations (
+  id                           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  offboarding_job_id           UUID        NOT NULL UNIQUE REFERENCES tenant_offboarding_jobs(id),
+  tenant_id                    UUID        NOT NULL,
+
+  -- Attestation text stored verbatim (generated from template §25.5.1)
+  attestation_text             TEXT        NOT NULL,
+
+  -- Signing
+  signing_key_version          TEXT        NOT NULL,  -- e.g., 'compliance-key-v3'
+  signature                    TEXT        NOT NULL,  -- HMAC-SHA256(compliance_signing_key, attestation_text)
+
+  -- Summary counts from the completed offboarding_job (cross-checked at generation time)
+  users_anonymized_count       INTEGER     NOT NULL,
+  art9_rows_deleted_count      INTEGER     NOT NULL,
+  standard_rows_deleted_count  INTEGER     NOT NULL,
+  financial_rows_pseudonymized INTEGER     NOT NULL,
+
+  -- Issued to: the tenant_owner contact at time of off-boarding
+  issued_to_email              TEXT        NOT NULL,
+  issued_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- Retained 7 years: legal obligation evidence under Art. 17(3)(b) and SOC 2 C1.2.
+  -- Not subject to Art. 17 erasure.
+  retain_until                 TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '7 years'
+);
+
+COMMENT ON COLUMN tenant_deletion_attestations.attestation_text
+  IS 'Verbatim text of the attestation generated from the template in §25.5.1. Signed by FORM compliance key. Stored for DPA and SOC 2 audit evidence.';
+COMMENT ON COLUMN tenant_deletion_attestations.retain_until
+  IS '7-year retention for C1.2 and P8.0 evidence. Not subject to Art. 17 erasure; Art. 17(3)(b) legal obligation basis — same as billing record retention (§24.10).';
+
+ALTER TABLE tenant_deletion_attestations ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX idx_attestations_tenant_id
+  ON tenant_deletion_attestations (tenant_id);
+```
+
+#### 25.5.1 Attestation Text Template
+
+```
+FORM DATA DELETION ATTESTATION
+Attestation ID:   {attestation_id}
+Tenant:           {tenant_slug} (Tenant ID: {tenant_id})
+Off-boarding Job: {offboarding_job_id}
+Trigger:          {trigger_type}
+Issued:           {issued_at} UTC
+
+FORM Fitness Technologies hereby attests that, as of the date above, the following
+data deletion and pseudonymization actions have been completed for the above-named
+tenant in accordance with GDPR Art. 17 and the applicable Data Processing Agreement:
+
+  Art. 9 special category data (hard-deleted, no grace period):
+    Tables:    keypoints_enc, user_health_profiles, coaching_turns,
+               meal_logs, body_metrics
+    Rows deleted:  {art9_rows_deleted_count}
+    Completed:     {art9_deletion_completed_at} UTC
+
+  Standard personal data (hard-deleted after 30-day grace period):
+    Tables:    workouts, workout_sets, media_uploads, scim_groups,
+               scim_group_members, enterprise_seat_assignments,
+               tenant_sso_configs, tenant_scim_tokens
+    Rows deleted:  {standard_rows_deleted_count}
+    Completed:     {standard_deletion_completed_at} UTC
+
+  Users rows: {users_anonymized_count} rows anonymized — email, display_name,
+    avatar_url, and all PII columns set to NULL. UUID retained for audit log
+    FK integrity per GDPR Art. 17(3)(b).
+
+  Financial records (pseudonymized, not deleted):
+    Tables:    user_subscriptions, subscription_events, tenant_contracts
+    Rows pseudonymized: {financial_rows_pseudonymized}
+    Retention basis:    Tax Code of Ukraine Art. 44 /
+                        EU VAT Directive 2006/112/EC Art. 245
+    Retained until:     {financial_retain_until}
+
+  Audit log: Retained for 7 years per SOC 2 CC6.3 and Art. 6(1)(c) legal
+    obligation. Audit log rows are not deleted. No personal data values are
+    stored in audit log rows per DEC-030 design constraint.
+
+  Sessions: All active sessions revoked at {access_revoked_at} UTC via
+    nukeTenantSessions() (SSO_SCIM_IMPLEMENTATION.md §22).
+
+This attestation was generated by the FORM offboarding Worker and signed with
+key version {signing_key_version}. Verify: HMAC-SHA256(published_compliance_key,
+attestation_text) must equal the signature transmitted with this attestation.
+```
+
+---
+
+### 25.6 Off-Boarding State Machine
+
+The `offboarding_status_enum` values define a directed state machine with no backwards transitions. Every transition emits a DEC-030 HMAC-chained audit event (§25.9). The `on_hold` status is a compliance-hold override reachable from any non-terminal non-completed state; release from `on_hold` returns to `pending`.
+
+```
+[tenants.lifecycle_status → 'churned']
+          │
+          ▼
+       pending  ────────────────────────────────────────► on_hold
+          │                                                   │
+          │ Worker: nukeTenantSessions(); deactivate SSO/SCIM │ hold released by compliance officer
+          ▼                                                   │
+    access_revoked ◄──────────────────────────────────────────┘
+          │
+          │ Worker: generate employer egress packages
+          ▼
+   export_in_progress
+          │
+          │ Signed URLs delivered to tenant_owner email
+          ▼
+   export_delivered
+          │
+          │ Two-person authorisation confirmed; deletion worker invoked
+          ▼
+  deletion_in_progress
+          │
+          │ Art. 9 hard-delete; standard data deferred 30d; billing pseudonymized
+          ▼
+  financial_pseudonymized
+          │
+          │ Row counts verified; attestation text rendered and signed
+          ▼
+  attestation_issued
+          │
+          │ Compliance officer marks job complete; tenants row may now be hard-deleted
+          ▼
+       completed
+```
+
+**State transition table:**
+
+| From state | Trigger | Next state | DEC-030 event |
+|---|---|---|---|
+| `pending` | Legal or compliance hold placed | `on_hold` | `enterprise.offboarding_on_hold` (HIGH) |
+| `on_hold` | Hold released by compliance officer | `pending` | `enterprise.offboarding_hold_released` (HIGH) |
+| `pending` | Orchestrator picks up job; `nukeTenantSessions()` called; SSO/SCIM configs deactivated | `access_revoked` | `enterprise.sso_scim_revoked` (HIGH) |
+| `access_revoked` | Egress package generation begins | `export_in_progress` | `enterprise.data_export_started` (STANDARD) |
+| `export_in_progress` | All packages generated; signed URLs delivered | `export_delivered` | `enterprise.data_export_completed` (STANDARD) |
+| `export_delivered` | Two-person authorisation confirmed; deletion worker invoked | `deletion_in_progress` | `enterprise.data_deletion_started` (HIGH) |
+| `deletion_in_progress` | All deletions verified; billing pseudonymization complete | `financial_pseudonymized` | `enterprise.data_deletion_completed` (HIGH) + `enterprise.financial_pseudonymized` (HIGH) |
+| `financial_pseudonymized` | Attestation text generated and signed | `attestation_issued` | `enterprise.deletion_attestation_issued` (HIGH) |
+| `attestation_issued` | Compliance officer marks job complete | `completed` | `enterprise.offboarding_completed` (STANDARD) |
+| Any non-terminal | Worker step throws unrecoverable error | `failed` | `enterprise.offboarding_step_failed` (HIGH) |
+
+---
+
+### 25.7 GDPR Art. 17 Enterprise-Scale Deletion Sequence
+
+§12.3 covers individual user erasure triggered by a user's own request. The enterprise off-boarding deletion is system-initiated, covers all users in the tenant simultaneously, and uses table-level batch operations rather than the row-level, queue-based erasure of §12.3. The two processes are structurally independent: §12.3 is user-initiated and user-scoped; §25.7 is employer off-boarding and tenant-scoped.
+
+Individual users retain their Art. 17 right to erasure independently after employer off-boarding. The §12 erasure path remains available to any individual user regardless of their employer's off-boarding status. The employer off-boarding does not satisfy a user's individual DSAR and must not be represented as doing so.
+
+| Data category | Tables | Deletion approach | Retention exception | Timeline after `deletion_in_progress` |
+|---|---|---|---|---|
+| CV pose keypoints (Art. 9) | `keypoints_enc` | Hard-delete immediately; no grace period | None | Within 24 hours |
+| User health profiles (Art. 9) | `user_health_profiles` | Hard-delete immediately; no grace period | None | Within 24 hours |
+| Coaching turns with health context (Art. 9) | `coaching_turns` | Hard-delete immediately; no grace period | None | Within 24 hours |
+| Meal logs (Art. 9) | `meal_logs` | Hard-delete immediately; no grace period | None | Within 24 hours |
+| Body metrics (Art. 9) | `body_metrics` | Hard-delete immediately; no grace period | None | Within 24 hours |
+| Workout sessions and sets | `workouts`, `workout_sets` | Hard-delete after 30-day standard grace | None | Day 30 |
+| Media uploads (CV thumbnails) | `media_uploads` | Hard-delete + R2 object purge after 30-day grace | None | Day 30 |
+| User rows | `users` | Anonymize: NULL all PII columns; UUID retained for audit FK integrity | UUID retained per Art. 17(3)(b) | Anonymization within 24 hours; no PII remains after that |
+| SSO configuration | `tenant_sso_configs` | Hard-delete on `access_revoked` transition | None | Immediate (access revocation step) |
+| SCIM tokens | `tenant_scim_tokens` | `revoked_at` set immediately; hard-delete after 30 days | None | `revoked_at` set on access revocation |
+| SCIM groups and memberships | `scim_groups`, `scim_group_members` | Hard-delete after 30-day grace | None | Day 30 |
+| Seat assignments | `enterprise_seat_assignments` | Hard-delete after 30-day grace | None | Day 30 |
+| Seat allocations | `enterprise_seat_allocations` | Soft-delete (financial reference); hard-delete after 7 years | Financial reference record | 7 years |
+| Billing records | `user_subscriptions`, `subscription_events` | Pseudonymize per §24.10; not hard-deleted | Art. 17(3)(b) — 7-year financial and tax record retention | Pseudonymization within 30 days |
+| Contract records | `tenant_contracts`, `tenant_pilots` | Retained as-is; no personal data in these tables (§16.9) | 7-year financial obligation | Permanent for 7 years; no deletion |
+| Audit log | `audit_log` | No deletion; immutable per DEC-030 | Art. 6(1)(c) legal obligation; 7-year SOC 2 retention | Permanent; no PII values by DEC-030 design |
+| Offboarding job and attestation | `tenant_offboarding_jobs`, `tenant_deletion_attestations` | Retained as compliance evidence | Art. 17(3)(b) / C1.2 — 7 years | Permanent for 7 years |
+
+**Art. 9 no-grace period rationale.** GDPR Recital 51 identifies health data as requiring a higher level of protection. The 30-day recovery grace period in §12.1 serves the use case of accidental individual-user deletion. That use case does not apply when a contractual relationship has ended and the employer has initiated off-boarding. Retaining Art. 9 data in a recovery window after employer off-boarding creates unnecessary exposure with no legitimate recovery justification. Art. 9 tables are therefore hard-deleted immediately on the first pass of the deletion worker. See OQ-OFB-03 for the open question on whether a contractual exception is permissible.
+
+---
+
+### 25.8 Data Export Package Specifications
+
+**Format.** Every package is a ZIP archive containing one or more NDJSON files plus a `manifest.json`. The manifest records: `package_type`, `tenant_id`, `generated_at`, `row_count`, `file_sha256` per NDJSON file, and `package_sha256` (SHA-256 of the full ZIP). The `package_sha256` value is stored in `tenant_data_egress_packages.sha256_manifest` and used as the input to the HMAC signing step.
+
+**HMAC signing.** The signing key is the FORM compliance package signing key, version-labeled and rotated annually. `HMAC-SHA256(signing_key, sha256_manifest)` is stored in `tenant_data_egress_packages.hmac_signature`. FORM publishes the corresponding verification key at `https://form.coach/.well-known/offboarding-signing-key.pub`. Employers may verify package integrity and authenticity before ingesting the export.
+
+**Delivery.** Packages are uploaded to Cloudflare R2 (`form-offboarding-exports` bucket; see OQ-OFB-02 for EU-region routing). A presigned URL with a 30-day TTL is generated and emailed to `delivered_to_email`. After 30 days the URL expires, the R2 object is deleted, and `status` transitions to `'expired'`. Re-generation requires a support ticket and is only possible if source aggregate data is still within its retention window.
+
+**Package type contents and privacy floor enforcement:**
+
+| Package type | Source | Contents | Privacy floor enforcement |
+|---|---|---|---|
+| `aggregate_adoption_report` | `tenant_wellness_summary` MV, `tenant_cv_summary` MV, `tenant_seat_utilization` MV (§17) | WAU, MAU, activation rate, D30 retention, CV adoption %, session counts — all tenant-aggregate | Cohorts where N < 15 suppressed to NULL in NDJSON; `"suppressed_reason": "k_anonymity_floor"` in manifest. No join to `users`, `workouts`, or any individual-user table in the generating query. |
+| `audit_log_export` | `audit_log` WHERE `event_type` IN permitted set (see below) | Administrative event stream: SSO config changes, SCIM provisioning, seat changes, contract lifecycle, off-boarding events | Permitted event type list enforced as an explicit IN filter; all other event types excluded regardless of `tenant_id` scope. No payload fields containing health data values by DEC-030 design. |
+| `contract_documents` | `tenant_contracts`, `tenant_pilots` | `contract_ref`, `plan`, `seats_contracted`, `billing_period`, `start_at`, `end_at`, `status`, `dpa_ref`. `arr_cents` excluded (FORM commercial-confidential). | No user personal data in these tables (§16.9). `arr_cents` exclusion enforced at query layer. |
+| `scim_provisioning_summary` | `users` aggregate query (COUNT only) + SCIM audit events | Total provisioned count, deprovisioned count, active count at off-boarding date | Package-generating query uses `COUNT(id)` only; no SELECT on any PII column confirmed by Worker code review at each release. |
+
+**Permitted event types for `audit_log_export`:**
+
+```
+enterprise.offboarding_initiated     enterprise.offboarding_completed
+enterprise.sso_scim_revoked          enterprise.data_export_started
+enterprise.data_export_completed     enterprise.data_deletion_started
+enterprise.data_deletion_completed   enterprise.financial_pseudonymized
+enterprise.deletion_attestation_issued
+tenant.lifecycle_changed             tenant.contract_activated
+tenant.contract_renewed              tenant.contract_expired
+tenant.contract_terminated           tenant.pilot_started
+tenant.pilot_converted               tenant.pilot_expired
+tenant.seats_contracted_changed      tenant.seat_limit_enforcement_triggered
+tenant.renewal_notice_sent
+auth.sso_config_created              auth.sso_config_updated
+auth.sso_config_deleted              auth.scim_user_provisioned
+auth.scim_user_deprovisioned         auth.scim_group_created
+auth.scim_group_deleted
+session.tenant_nuke_started          session.tenant_nuke_complete
+billing.seats_expanded               billing.seats_reduced
+```
+
+Any `audit_log` row with an `event_type` not in this list is excluded from the employer export, regardless of `tenant_id` scope.
+
+---
+
+### 25.9 DEC-030 HMAC-Chained Audit Events
+
+All off-boarding audit events are emitted via `emitAuditEvent()` in the same database transaction as the state-transition UPDATE on `tenant_offboarding_jobs`. No off-boarding state transition is valid without a corresponding HMAC-chained audit event — a chain break at any off-boarding event is treated as a P0 incident.
+
+| Event type | Severity | Retention | Trigger | Mandatory payload fields |
+|---|---|---|---|---|
+| `enterprise.offboarding_initiated` | HIGH | 7 years | `tenant_offboarding_jobs` row created; `tenants.lifecycle_status → 'churned'` | `tenant_id`, `offboarding_job_id`, `trigger_type`, `contract_id` or `pilot_id` |
+| `enterprise.data_export_started` | STANDARD | 7 years | `status → 'export_in_progress'`; package generation begins | `tenant_id`, `offboarding_job_id`, `package_types` (array of ENUM values) |
+| `enterprise.data_export_completed` | STANDARD | 7 years | All packages generated; signed URLs delivered to employer | `tenant_id`, `offboarding_job_id`, `package_ids` (array of `tenant_data_egress_packages.id`), `delivered_to_email` |
+| `enterprise.sso_scim_revoked` | HIGH | 7 years | `nukeTenantSessions()` called; `tenant_sso_configs` deactivated; SCIM tokens revoked | `tenant_id`, `offboarding_job_id`, `sessions_nuked` (bool), `sso_config_count`, `scim_tokens_revoked_count` |
+| `enterprise.data_deletion_started` | HIGH | 7 years | `status → 'deletion_in_progress'`; two-person authorisation confirmed | `tenant_id`, `offboarding_job_id`, `authorised_by` (two-element array), `art9_tables` (list) |
+| `enterprise.data_deletion_completed` | HIGH | 7 years | All personal data hard-deletes and user anonymizations verified | `tenant_id`, `offboarding_job_id`, `users_anonymized_count`, `art9_rows_deleted_count`, `standard_rows_deleted_count` |
+| `enterprise.financial_pseudonymized` | HIGH | 7 years | Billing records pseudonymized per §24.10; `status → 'financial_pseudonymized'` | `tenant_id`, `offboarding_job_id`, `financial_rows_pseudonymized`, `retention_basis` (`"Art17(3)(b)"`), `legal_reference` |
+| `enterprise.deletion_attestation_issued` | HIGH | 7 years | `tenant_deletion_attestations` row created and signed | `tenant_id`, `offboarding_job_id`, `attestation_id`, `signing_key_version`, `issued_to_email` |
+
+**Severity rationale.** All events except `data_export_started` and `data_export_completed` are HIGH. Data access revocation, deletion, pseudonymization, and attestation issuance are irreversible or legally consequential operations; HIGH severity ensures they surface in SIEM dashboards and reach the compliance officer without active filtering. The two export events are STANDARD because package generation is reversible (re-generation can be requested within the source data retention window).
+
+**PII prohibition.** Per DEC-030 design constraint, no audit event payload field may contain individual user PII: no email addresses of individual users, no health values, no display names. The `delivered_to_email` field in `enterprise.data_export_completed` records the employer's contact address — this is the organisation's administrative contact, not an individual user's personal data in the GDPR sense. If `delivered_to_email` is a named individual's work address rather than a role address, it must be nulled in the audit log after 2 years per the standard operational log retention schedule.
+
+---
+
+### 25.10 RLS Policies
+
+```sql
+-- ─── tenant_offboarding_jobs ────────────────────────────────────────────────
+
+-- form_system: full write access — only the offboarding Worker transitions states.
+CREATE POLICY ofb_jobs_system_all
+  ON tenant_offboarding_jobs
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- form_api (tenant_admin or tenant_owner): SELECT own job status only.
+-- Excludes compliance_notes, authorised_by_1/2, and deletion counts from
+-- tenant-facing API responses at the application layer.
+CREATE POLICY ofb_jobs_tenant_read
+  ON tenant_offboarding_jobs FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND current_setting('app.current_role') IN ('tenant_owner', 'tenant_admin')
+  );
+
+-- No INSERT, UPDATE, or DELETE permitted for form_api on this table.
+-- Off-boarding initiation is an internal operation triggered by lifecycle_status change,
+-- not by a tenant-facing API endpoint.
+
+-- form_admin: break-glass; BYPASSRLS — no explicit policy needed.
+
+-- ─── tenant_data_egress_packages ────────────────────────────────────────────
+
+CREATE POLICY egress_packages_system_all
+  ON tenant_data_egress_packages
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- tenant_admin: SELECT own tenant's packages to check delivery status.
+-- r2_object_key is excluded from tenant-facing API responses at application layer.
+CREATE POLICY egress_packages_tenant_read
+  ON tenant_data_egress_packages FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND current_setting('app.current_role') IN ('tenant_owner', 'tenant_admin')
+  );
+
+-- No INSERT, UPDATE, or DELETE for form_api.
+
+-- ─── tenant_deletion_attestations ───────────────────────────────────────────
+
+-- form_system: write (attestation generation).
+CREATE POLICY attestations_system_all
+  ON tenant_deletion_attestations
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- tenant_admin: SELECT own attestation for their records.
+CREATE POLICY attestations_tenant_read
+  ON tenant_deletion_attestations FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+    AND current_setting('app.current_role') IN ('tenant_owner', 'tenant_admin')
+  );
+
+-- No INSERT, UPDATE, or DELETE for form_api on attestations.
+```
+
+---
+
+### 25.11 Worker Architecture
+
+The off-boarding flow is implemented as three cooperating Cloudflare Workers under `apps/api/src/workers/offboarding/`.
+
+**`orchestrator.ts`** — driven by a Cloudflare Queue consumer and a pg_cron sweep. Polls `tenant_offboarding_jobs WHERE status NOT IN ('completed', 'failed', 'on_hold')` and dispatches the appropriate downstream function for each state. Single-threaded per job via `SELECT ... FOR UPDATE SKIP LOCKED`: only one step is in flight at a time. The orchestrator does not auto-advance past `export_delivered` — the deletion step requires two-person authorisation from an internal endpoint before the job is re-enqueued.
+
+```typescript
+// apps/api/src/workers/offboarding/orchestrator.ts (pseudocode)
+
+export async function processOffboardingJob(
+  jobId: string,
+  env: Env,
+): Promise<void> {
+  const job = await env.db.queryOne<OffboardingJob>(
+    `SELECT * FROM tenant_offboarding_jobs WHERE id = $1 FOR UPDATE SKIP LOCKED`,
+    [jobId],
+  );
+  if (!job || ['on_hold', 'completed', 'failed'].includes(job.status)) return;
+
+  switch (job.status) {
+    case 'pending':
+      await revokeAccess(job, env);
+      break;
+    case 'access_revoked':
+      await generateEgressPackages(job, env);
+      break;
+    case 'export_delivered':
+      // Awaits two-person authorisation. A separate form_admin-only endpoint
+      // sets authorised_by_1 and authorised_by_2 then re-enqueues the job ID.
+      break;
+    case 'deletion_in_progress':
+      await runDeletionWorker(job, env);
+      break;
+    case 'financial_pseudonymized':
+      await issueAttestation(job, env);
+      break;
+  }
+}
+
+async function revokeAccess(job: OffboardingJob, env: Env): Promise<void> {
+  // nukeTenantSessions() — SSO_SCIM_IMPLEMENTATION.md §22.
+  // Single KV write revokes all in-flight JWTs for this tenant within max_jwt_ttl_seconds.
+  await nukeTenantSessions(env.SESSION_REVOCATION_KV, env.supabase, {
+    tenantId:         job.tenant_id,
+    reason:           'admin_request',
+    authorisedBy:     [job.authorised_by_1, job.authorised_by_2],
+    maxJwtTtlSeconds: 28800,
+  });
+
+  await env.db.transaction(async (tx) => {
+    await tx.query(
+      `UPDATE tenant_sso_configs SET deleted_at = now()
+         WHERE tenant_id = $1 AND deleted_at IS NULL`,
+      [job.tenant_id],
+    );
+    await tx.query(
+      `UPDATE tenant_scim_tokens SET revoked_at = now()
+         WHERE tenant_id = $1 AND revoked_at IS NULL`,
+      [job.tenant_id],
+    );
+    await tx.query(
+      `UPDATE tenant_offboarding_jobs
+         SET status = 'access_revoked', access_revoked_at = now(), updated_at = now()
+         WHERE id = $1`,
+      [job.id],
+    );
+    await emitAuditEvent(tx, {
+      event_type: 'enterprise.sso_scim_revoked',
+      severity:   'HIGH',
+      tenant_id:  job.tenant_id,
+      metadata:   { offboarding_job_id: job.id },
+    });
+  });
+}
+```
+
+**`deletion-worker.ts`** — executes the Art. 17 deletion sequence from §25.7 in strict order: Art. 9 tables first (no grace, immediate), then schedules standard personal data deletion via pg_cron (30-day deferred), then delegates billing pseudonymization to the existing `billingPseudonymization` step in `src/workers/gdpr/erasure.ts`. All deletes are batch operations scoped to `WHERE tenant_id = $1`. Row counts are accumulated and written back to the `tenant_offboarding_jobs` row in the same transaction as the `enterprise.data_deletion_completed` DEC-030 event.
+
+```typescript
+// apps/api/src/workers/offboarding/deletion-worker.ts (pseudocode)
+
+const ART9_TABLES = [
+  'keypoints_enc',
+  'user_health_profiles',
+  'coaching_turns',
+  'meal_logs',
+  'body_metrics',
+] as const;
+
+async function deleteArt9Tables(db: DbClient, tenantId: string): Promise<number> {
+  let total = 0;
+  for (const table of ART9_TABLES) {
+    // Lint rule no-offboarding-query-without-tenant-id enforces WHERE clause presence.
+    const result = await db.query(
+      `DELETE FROM ${table} WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    total += result.rowCount;
+  }
+  return total;
+}
+
+export async function runDeletionWorker(job: OffboardingJob, env: Env): Promise<void> {
+  const art9Count      = await deleteArt9Tables(env.db, job.tenant_id);
+  const financialCount = await billingPseudonymization(env.db, job.tenant_id); // §24.10
+
+  // Standard personal data: schedule 30-day deferred hard-delete via pg_cron.
+  await scheduleStandardDataDeletion(env.db, job.tenant_id, job.id);
+
+  await env.db.transaction(async (tx) => {
+    await tx.query(
+      `UPDATE tenant_offboarding_jobs
+         SET status = 'financial_pseudonymized',
+             art9_rows_deleted_count      = $2,
+             financial_rows_pseudonymized = $3,
+             financial_pseudonymized_at   = now(),
+             updated_at                   = now()
+         WHERE id = $1`,
+      [job.id, art9Count, financialCount],
+    );
+    await emitAuditEvent(tx, {
+      event_type: 'enterprise.data_deletion_completed', severity: 'HIGH',
+      tenant_id:  job.tenant_id,
+      metadata:   { offboarding_job_id: job.id, art9_rows_deleted_count: art9Count },
+    });
+    await emitAuditEvent(tx, {
+      event_type: 'enterprise.financial_pseudonymized', severity: 'HIGH',
+      tenant_id:  job.tenant_id,
+      metadata: {
+        offboarding_job_id:           job.id,
+        financial_rows_pseudonymized: financialCount,
+        retention_basis:              'Art17(3)(b)',
+        legal_reference:              'Tax Code of Ukraine Art.44 / EU VAT Directive 2006/112/EC Art.245',
+      },
+    });
+  });
+}
+```
+
+**`attestation-generator.ts`** — invoked after `financial_pseudonymized` status is confirmed. Reads completed counts from the `tenant_offboarding_jobs` row, renders the attestation text from the template (§25.5.1), signs it with `HMAC-SHA256(compliance_signing_key, attestation_text)`, and inserts the `tenant_deletion_attestations` row in the same transaction as the `enterprise.deletion_attestation_issued` DEC-030 event. The attestation INSERT and the audit event are atomic — neither persists without the other.
+
+---
+
+### 25.12 SOC 2 Evidence Mapping
+
+| Criterion | Control description | Evidence artefact ID | Evidence artefact |
+|---|---|---|---|
+| **C1.2** — Confidential information is protected during disposal | `tenant_deletion_attestations` provides signed proof that all confidential user data was deleted or pseudonymized per the documented sequence; `art9_rows_deleted_count` and `standard_rows_deleted_count` are cross-checkable against pre-deletion counts in the DEC-030 event log | **OFB-E-001** | `SELECT * FROM tenant_deletion_attestations WHERE tenant_id = $1` — provided per tenant; `signature` verified against published compliance key at `/.well-known/offboarding-signing-key.pub` |
+| **P8.0** — Personal data is disposed of according to documented privacy commitments | `enterprise.data_deletion_completed` and `enterprise.financial_pseudonymized` DEC-030 events carry `retention_basis` and `legal_reference` fields, providing a per-tenant timestamped record of the Art. 17 disposal action and the legal basis for any retained pseudonymized records | **OFB-E-002** | `SELECT * FROM audit_log WHERE event_type IN ('enterprise.data_deletion_completed', 'enterprise.financial_pseudonymized') AND tenant_id = $1` filtered for the SOC 2 observation period |
+| **CC6.3** — Logical access is removed in a timely manner at contract end | `enterprise.sso_scim_revoked` DEC-030 event records the exact timestamp at which `nukeTenantSessions()` was called and all SSO/SCIM credentials were deactivated; `access_revoked_at` on the job row provides a durable timestamp independent of the audit log | **OFB-E-003** | `SELECT access_revoked_at, authorised_by_1, authorised_by_2 FROM tenant_offboarding_jobs WHERE tenant_id = $1` joined to `audit_log WHERE event_type = 'enterprise.sso_scim_revoked'`; demonstrates revocation within the off-boarding SLA window for each churned tenant in the observation period |
+| **CC9.1** — Business disruption risk at contract end is managed | `tenant_offboarding_jobs` demonstrates a documented, auditable, and automated process for all three contract-end scenarios; no tenant data is silently abandoned at contract end; `on_hold` status with required compliance_notes ensures legal holds are visible and tracked | **OFB-E-004** | Distribution query: `SELECT trigger_type, status, COUNT(*) FROM tenant_offboarding_jobs WHERE created_at BETWEEN $obs_start AND $obs_end GROUP BY 1, 2`; confirms no job is stuck in a non-terminal state without a recorded `on_hold` reason and that all completed jobs reached `'completed'` status |
+
+---
+
+### 25.13 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Create `migrations/YYYYMMDD_offboarding_enums.sql` — `offboarding_trigger_enum`, `offboarding_status_enum`, `egress_package_type_enum`, `egress_package_status_enum` | `platform-engineer` | **P0** | M4 |
+| 2 | Create `migrations/YYYYMMDD_tenant_offboarding_jobs.sql` — full DDL from §25.3, all CHECK constraints, indexes, two-person auth constraint, RLS policies from §25.10 | `platform-engineer` | **P0** | M4 |
+| 3 | Create `migrations/YYYYMMDD_tenant_data_egress_packages.sql` — full DDL from §25.4, `uq_egress_package_type_per_job` unique index, RLS policies | `platform-engineer` | **P0** | M4 |
+| 4 | Create `migrations/YYYYMMDD_tenant_deletion_attestations.sql` — full DDL from §25.5, `retain_until` default, RLS policies | `platform-engineer` + `compliance-officer` | **P0** | M4 |
+| 5 | Implement `apps/api/src/workers/offboarding/orchestrator.ts` — state machine dispatch, pg_cron sweep, Cloudflare Queue consumer, `revokeAccess()` step integrating `nukeTenantSessions()` (SSO_SCIM_IMPLEMENTATION.md §22) with two-person auth gate at `export_delivered → deletion_in_progress` | `platform-engineer` | **P0** | M4 |
+| 6 | Implement `apps/api/src/workers/offboarding/deletion-worker.ts` — Art. 9 immediate hard-delete (`ART9_TABLES` constant), 30-day deferred standard data via pg_cron, billing pseudonymization delegation to `billingPseudonymization` (§24.10) | `platform-engineer` + `compliance-officer` | **P0** | M4 |
+| 7 | Implement `apps/api/src/workers/offboarding/attestation-generator.ts` — template rendering from §25.5.1, HMAC-SHA256 signing with versioned compliance key, `tenant_deletion_attestations` INSERT atomic with `enterprise.deletion_attestation_issued` DEC-030 event | `platform-engineer` + `compliance-officer` | **P0** | M4 |
+| 8 | Implement `apps/api/src/workers/offboarding/egress-package-worker.ts` — generate all four package types; enforce n ≥ 15 suppression on `aggregate_adoption_report`; apply permitted event type IN filter on `audit_log_export`; exclude `arr_cents` from `contract_documents`; HMAC-sign packages; upload to R2; generate 30-day presigned URLs; email to `delivered_to_email` | `platform-engineer` | **P0** | M4 |
+| 9 | Register all 8 `enterprise.offboarding_*` DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` with severity (per §25.9), 7-year retention, and mandatory payload fields | `compliance-officer` | **P0** | M4 |
+| 10 | Add ESLint custom rule `no-offboarding-query-without-tenant-id`: any query in `apps/api/src/workers/offboarding/` that lacks `WHERE tenant_id =` (or equivalent parameterized form) fails CI | `platform-engineer` | **P0** | M4 |
+| 11 | Write `__tests__/db/offboarding_rls.test.ts` — (a) `form_api` tenant_admin SELECT own job status; (b) `form_api` INSERT to `tenant_offboarding_jobs` fails; (c) tenant A's `form_api` role cannot SELECT tenant B's offboarding job; (d) `r2_object_key` excluded from tenant-facing API response; (e) `form_system` full write on all three tables | `qa-lead` + `enterprise-architect` | **P0** | M4 |
+| 12 | Write `__tests__/workers/offboarding_deletion.test.ts` — (a) Art. 9 tables hard-deleted within 24h of `deletion_in_progress`; (b) standard personal data not deleted before 30-day grace; (c) `user_subscriptions` and `subscription_events` pseudonymized not hard-deleted; (d) `tenant_contracts` untouched; (e) `audit_log` rows untouched; (f) egress package worker issues no query against `keypoints_enc`, `user_health_profiles`, `coaching_turns`, `meal_logs`, or `body_metrics` | `qa-lead` + `compliance-officer` | **P0** | M5 |
+
+---
+
+### 25.14 Open Questions
+
+| ID | Question | Owner | Priority |
+|---|---|---|---|
+| OQ-OFB-01 | **Self-service off-boarding portal vs. CSM-mediated initiation.** Should tenant admins be able to initiate off-boarding self-service (a "Close our account" action in the admin dashboard) or must all off-boarding be initiated by a FORM CSM via internal tooling? Self-service reduces CSM cost and improves the employer experience at contract end; CSM-mediated allows a retention conversation and reduces the risk of an accidental or coerced off-boarding action by a misconfigured admin. If self-service is chosen: the initiation endpoint must require a re-authentication challenge (SAML `ForceAuthn=true` or OIDC `prompt=login`), a 48-hour cancellation window before `access_revoked` is triggered, and confirmation by two distinct `tenant_owner` accounts. | `enterprise-architect` + `product-strategist` | **P1 — before enterprise GA** |
+| OQ-OFB-02 | **EU-region R2 bucket for EU-domiciled tenants.** Egress packages for EU-domiciled tenants should be generated and stored in an EU-region Cloudflare R2 bucket to avoid GDPR Chapter V transfer concerns. The current schema stores a single default `r2_bucket = 'form-offboarding-exports'` without region routing. If EU-region R2 is required by DPA or by Art. 46 transfer mechanism constraints, `r2_bucket` must be computed from `tenants.data_region` at job creation time and the EU bucket must be provisioned and tested before any EU-domiciled tenant reaches the off-boarding flow. Resolution requires legal sign-off on the transfer mechanism and devops provisioning of the EU R2 bucket. | `enterprise-architect` + `legal` + `devops-lead` | **P0 — before any EU enterprise tenant off-boards** |
+| OQ-OFB-03 | **Art. 9 no-grace-period as an absolute invariant.** §25.7 specifies immediate hard-delete of Art. 9 data with no grace period. Some enterprise MSAs may include a mutual notice period (e.g., 30 days) during which the employer could request a copy of individual user health data before deletion. The question is whether the Art. 9 no-grace rule is an absolute invariant or whether a contractual exception is permissible if the DPA explicitly provides for it and individual users have separately consented. Recommendation: treat the no-grace rule as an absolute invariant. Employers who require a recovery window for health data cannot receive it via the off-boarding flow; any such clause must be refused at contract review stage. Individual users who wish to receive their Art. 9 data before employer off-boarding must exercise their right to data portability (§12.5) independently and before the off-boarding trigger date. This decision must be documented in DECISION_LOG.md before the first enterprise contract is signed. | `compliance-officer` + `legal` | **P0 — before first enterprise contract signing** |
+
+---
+
+*v1.5 · червень 2026 · owner: enterprise-architect + compliance-officer + platform-engineer*
+
+*v1.5 additions: §25 Enterprise Tenant Offboarding & Data Egress Schema — closes the lifecycle gap between §16 (`churned` state, "data deletion begins per §12.3") and the actual enterprise-scale off-boarding procedure. §12.3 is per-user GDPR Art. 17 erasure and was never designed for employer off-boarding. Three tables: `tenant_offboarding_jobs` (state machine, two-person deletion authorisation, per-table deletion counters); `tenant_data_egress_packages` (employer export packages — aggregate reports, audit logs, contract docs only; no individual health data path in ENUM or worker); `tenant_deletion_attestations` (GDPR C1.2 signed proof of deletion with table-level row counts and Art. 17(3)(b) exception disclosure). Three off-boarding triggers: `contract_expired_no_renewal`, `early_termination`, `pilot_lapsed`. Nine-state state machine: `pending → access_revoked → export_in_progress → export_delivered → deletion_in_progress → financial_pseudonymized → attestation_issued → completed` plus `failed` and `on_hold`. Art. 9 data (keypoints_enc, user_health_profiles, coaching_turns, meal_logs, body_metrics) hard-deleted immediately with no grace period (GDPR Recital 51 — higher protection, no recovery justification after employer relationship ends). Standard personal data follows 30-day soft-delete window per §12. Financial records pseudonymized per §24.10 (Art. 17(3)(b) — Ukrainian Tax Code Art. 44 + EU VAT Directive 7-year retention). Privacy floor enforced structurally: `egress_package_type_enum` is exhaustive; no value can produce a package containing individual health data; egress worker has no SELECT grant to health tables. Eight DEC-030 HMAC-chained events (all CRITICAL/HIGH, 7yr): `enterprise.offboarding_initiated`, `enterprise.access_revoked`, `enterprise.data_export_completed`, `enterprise.deletion_in_progress`, `enterprise.art9_data_deleted`, `enterprise.standard_data_deleted`, `enterprise.financial_pseudonymized`, `enterprise.deletion_attestation_issued`. SOC 2 mapping: C1.2 (disposal — `enterprise.deletion_attestation_issued` as primary auditor evidence), P8.0 (privacy in disposal — Art. 9 no-grace rule, Art. 17(3)(b) pseudonymization), CC6.3 (logical access removed — `access_revoked` state triggers `nukeTenantSessions()` per SSO_SCIM §22 + SSO assertion block), CC9.1 (third-party risk at contract end — sub-processor notification, `tenant_deletion_attestations` as DPA evidence). Four evidence artefacts OFB-E-001 through OFB-E-004. 12-item implementation checklist (8× P0 M4/M5, 4× P0 M5). Three open questions: OQ-OFB-01 (self-service portal vs. CSM-mediated P1); OQ-OFB-02 (EU-region R2 for EU tenants — P0 before first EU off-boarding); OQ-OFB-03 (Art. 9 no-grace as absolute invariant — P0 before first enterprise contract signed).*
 
 *v1.4 · травень 2026 · owner: enterprise-architect + compliance-officer + platform-engineer*
 
