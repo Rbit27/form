@@ -255,6 +255,10 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-168-neuromuscular-fatigue.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | post-169-phosphocreatine-resynthesis.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | post-171-sleep-sports-performance.md | Blog | draft · clinical-safety PASS · sports-scientist DONE |
+| post-172-cross-education-effect.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
+| post-173-osmotic-muscle-adaptation.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
+| post-174-neuromuscular-adaptation-first-month.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
+| post-175-repeated-bout-effect.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
