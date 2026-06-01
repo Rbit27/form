@@ -6,6 +6,13 @@
 
 ---
 
+## [1.57.2] — 2026-06-01
+
+### Added
+- [`content/post-178-mitochondrial-adaptation-strength-training.md`](content/post-178-mitochondrial-adaptation-strength-training.md) — мітохондріальна адаптація до силового тренування: PGC-1α, isoforms, mTORC1/AMPK інтерференція, Zone 2 для силовиків
+
+---
+
 ## [1.57.1] — 2026-06-01
 
 ### Changed
