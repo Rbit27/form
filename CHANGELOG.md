@@ -6,6 +6,16 @@
 
 ---
 
+## [1.58.1] — 2026-06-01
+
+### Added
+- [`content/post-179-athletic-heart-cardiac-adaptation.md`](content/post-179-athletic-heart-cardiac-adaptation.md) — серце атлета: concentric vs eccentric LV hypertrophy, Baggish & Wood (2011), athlete's heart vs HCM диференціація, VO₂max стеля у силовиків, мінімальна Zone 2 без interference
+- `blog.html` — картки для post-178 і post-179
+- `STATUS.md` — рядки для post-178 і post-179
+- `README.md` — post-178/179 відмічені як [x]; roadmap розширено до post-197 (нові теми: саркомерна механіка, ROS/гормезис, Central Governor, міофасціальна безперервність, когнітивна функція і тренінг)
+
+---
+
 ## [1.58.0] — 2026-06-01
 
 ### Added

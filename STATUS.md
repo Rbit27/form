@@ -261,6 +261,8 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-175-repeated-bout-effect.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | post-176-pape-post-activation-performance-enhancement.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | post-177-ans-hrv-autonomic-nervous-system.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-178-mitochondrial-adaptation-strength-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-179-athletic-heart-cardiac-adaptation.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
