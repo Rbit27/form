@@ -5757,3 +5757,442 @@ The identity layer emits a high volume of DEC-030 HMAC-chained events. Monitorin
 ---
 
 *v1.3 additions: §26 SSO / SCIM Identity Observability — closes three explicit cross-references left open by `docs/SSO_SCIM_IMPLEMENTATION.md` §§20, 21, 22. §26.1 scopes the section to the full enterprise identity layer (SAML/OIDC SSO, SCIM v2, SAML cert lifecycle, Google Directory sync, KV session revocation); enumerates the three source cross-references; establishes privacy constraint (tenant_id propagation only, no user_id in metric signals); SOC 2 mapping CC6.1/CC6.3/CC7.2/CC7.3/CC9.2. §26.2 RED methodology applied to six identity services: SAML/OIDC SSO (login attempts/failures/P95 round-trip), SCIM Provisioning API (create/update/delete/list rates + error + P95), SCIM Group Sync (push rate + group errors), Google Directory Sync (DEC-030 event rate + fetch_duration_ms P95 < 1,500 ms), Session Revocation KV (revocations by type + kv_sync_error rate + bulk duration P95 < 5,000 ms), Cert Expiry cron (1/day; >26 h gap is itself an alert). §26.3 five SSO/SCIM SLOs: SSO-SLO-01 (login success ≥ 99% per tenant), SSO-SLO-02 (P95 latency < 3,000 ms), SSO-SLO-03 (SCIM success ≥ 99.5%), SSO-SLO-04 (revocation P99 < 200 ms), SSO-SLO-05 (zero expired certs on active tenants — zero-tolerance); SSO-SLO-01/02 feed §23 Enterprise SLA credits. §26.4 four SCIM sync health metrics: user create error rate (P2 > 10%), user delete error rate (P1 > 5%, R-12 cross-reference), group sync lag (P2 > 240 min), deprovisioning complete rate (P1 < 99%); deprovision failure rule: silent swallowing is prohibited, > 1% triggers P1 + CSM. §26.5 five SAML certificate lifecycle alert rules AL-CERT-01 through AL-CERT-05: maps SSO §20 seven-tier escalation ladder to five distinct PagerDuty/Slack rules (t60→P3, t30→P2, t7→P1, expired→P0, cron-failure→P1); de-duplication 7-day cooldown per (tenant_id, cert_class) pair; G-004 gap-closure dependency explicitly stated. §26.6 two session revocation KV alert rules AL-REVOKE-01 (P1 — KV sync error > 1%/5 min; SOC 2 CC7.2/CC7.3 evidence artefact CC6-E-REV-003) and AL-REVOKE-02 (P2 — bulk P95 > 5,000 ms/1h) reproduced verbatim from SSO §22 with evidence artefact reference. §26.7 five Google Directory sync alert rules AL-SSO-GDIR-01 through AL-SSO-GDIR-05 reproduced verbatim from SSO §21.9 with expanded runbook detail; AL-SSO-GDIR-05 pg_cron SQL specified in full (form_audit role, 35-min window, NOT EXISTS subquery for validation event). §26.8 §6.2 alert table additions: thirteen new rows across three subsections (cert_lifecycle: 5 rows, session_revocation: 2 rows, google_directory_sync: 5 rows) in condensed format matching §6.2 structure with §26.x runbook backlinks. §26.9 twelve-panel "Enterprise Identity" Metabase + Better Stack dashboard: SSO success rate (multi-tenant time-series), P95 latency, error breakdown (pie), SCIM provisioning stacked bar, SCIM error rate, revocation activity (ember-highlighted tenant_nuke), KV sync error rate, bulk revocation P95, SAML cert expiry countdown table, cert tier distribution bar, Google Directory heat map, active SSO tenant count. §26.10 four DEC-030 SSO event health monitors: chain continuity (P1 — zero events in 1h), tenant nuke two-person auth violation (P0 — immediate R-01), unexpected credential upload actor (P1 — R-12 assessment), cert expired without prior alert (P1 — cron failure investigation). §26.11 SOC 2 evidence mapping: CC6.1 (cert lifecycle monitoring), CC6.3 (revocation timeliness SLO + alert), CC7.2 (fifteen alert rules as anomaly monitors), CC7.3 (response SLA + runbook cross-references), CC9.2 (Google conditional sub-processor + AL-SSO-GDIR-04); four evidence artefacts SSO-OBS-E-001 through SSO-OBS-E-004. §26.12 twelve-item implementation checklist: six P0 items (PagerDuty cert/revoke/GDIR configs, tenant nuke auth monitor, §6.2 table update), six P1 items (GDIR-05 cron, dashboard build, SLO reporting, G-004 advance, evidence filing); M4/M5/observation period. §26.13 two open questions: OQ-SSO-OBS-01 (per-tenant vs. fleet-wide SSO-SLO-01 evaluation — P1, compliance-officer, Month 13) and OQ-SSO-OBS-02 (DEC-030 vs. Cloudflare Analytics Engine as alert signal source for GDIR volume — P1, platform-engineer + devops-lead, M4).*
+
+---
+
+## 27. SIEM Integration & Security Event Streaming
+
+### 27.1 Scope & Design Decisions
+
+This section defines how FORM streams DEC-030 HMAC-chained audit log events to external SIEM systems operated by enterprise customers (Splunk, Microsoft Sentinel, Datadog, IBM QRadar) and how FORM operates its own internal SIEM-like correlation pipeline for SOC 2 CC7 compliance.
+
+**Events streamed vs. retained internally only:**
+
+- **Streamed to tenant SIEM (optional or mandatory per §27.2):** all `auth.*`, `session.*`, `scim.*`, `sso.*`, `admin.*`, and `anomaly.*` DEC-030 events with severity ≥ STANDARD.
+- **Retained internally only (never exported to tenant SIEM):** `siem.pipeline_lag_alert`, `siem.hmac_chain_break_detected`, and all internal platform infrastructure events (database vacuums, Cloudflare Worker cold-start metrics, EAS build events). These events contain FORM-internal operational detail that is not relevant to tenant security posture and may reveal platform internals.
+- **Internal-only by default, exportable on request:** `cert.*` events and `scim.group_sync.*` events are excluded from the default tenant export profile but can be enabled per tenant by devops-lead under a signed DPA addendum.
+
+**Privacy floor (enforced before any export):**
+
+- `user_id` is never present in SIEM export payloads. The `user_email_hash` field (`SHA-256(lowercase(user_email))`) is substituted wherever actor identity is needed.
+- `tenant_id` is always present in every exported event without exception.
+- IP addresses are truncated to `/24` subnet (IPv4) or `/48` prefix (IPv6) before export. Full IP is retained in FORM's internal ClickHouse pipeline only.
+- No SAML assertion content, SCIM attribute values, or session token material appears in any export.
+
+**Two streaming modes:**
+
+1. **FORM internal pipeline:** Cloudflare Logpush → Cloudflare Analytics Engine → ClickHouse (`siem_events` table, EU region). Correlation rules run as scheduled ClickHouse queries. Alerts route to PagerDuty and Slack. This pipeline is always active regardless of tenant SIEM configuration. It is the primary evidence source for SOC 2 CC7.2 / CC7.3.
+2. **Enterprise tenant SIEM export:** tenant configures an export target (pull API or push webhook) in the FORM Admin Dashboard. FORM applies privacy-floor redaction and customer-configured filters before delivery. The tenant receives a HMAC-verified event stream they can ingest into their own SIEM.
+
+**Cross-references:**
+
+- `docs/DEC-030.md` — HMAC-chained audit log schema and chain verification protocol
+- `docs/SOC2_READINESS.md §46` — security alert pipeline and `audit-chain-daily-check` pg_cron job
+- `docs/INCIDENT_RESPONSE.md §3` — detection & alerting procedures (P0/P1 response SLAs)
+- `docs/SSO_SCIM_IMPLEMENTATION.md §22` — session revocation events (`session.tenant_nuke_*`, `session.revocation_kv_sync_error`)
+
+---
+
+### 27.2 Event Classification for SIEM
+
+The table below maps DEC-030 event types to SIEM severity levels and indicates whether each event type should be exported to enterprise tenant SIEM targets. Severity levels follow the CEF/LEEF convention (Informational / Low / Medium / High / Critical) for compatibility with legacy SIEM parsers.
+
+| Event Type | Example `event_type` values | SIEM Severity | Stream to Tenant SIEM | Notes |
+|---|---|---|---|---|
+| **Authentication — success** | `sso.login_success`, `auth.magic_link_redeemed`, `auth.oauth_login_success` | Informational | Yes | Baseline for impossible-travel correlation |
+| **Authentication — failure** | `sso.login_failed`, `auth.magic_link_expired`, `auth.oauth_error` | Low | Yes | Reason code included; no SAML assertion content |
+| **Authentication — anomaly** | `anomaly.impossible_travel_detected`, `anomaly.brute_force_threshold_exceeded` | High | Yes | Generated by internal correlation rules (§27.3); tenant should ingest for their own SOC |
+| **SCIM provisioning — create/update** | `scim.user_created`, `scim.user_updated`, `scim.group_member_added` | Informational | Yes | Identity lifecycle baseline |
+| **SCIM provisioning — delete/deprovision** | `scim.user_deleted`, `scim.group_member_removed` | Low | Yes | Deprovision latency SLO evidence |
+| **SCIM provisioning — error** | `scim.user_create_failed`, `scim.user_delete_failed` | Medium | Yes | Failed deprovision is High if `operation = 'delete'`; see §26.4 |
+| **Session revocation** | `session.revoked`, `session.bulk_revocation_complete`, `session.tenant_nuke_complete` | Medium | Yes | `tenant_nuke_*` events are High; two-person-auth field included |
+| **Session revocation — error** | `session.revocation_kv_sync_error` | High | Optional | Internal pipeline detail; exported only if tenant has requested full revocation audit trail |
+| **SAML certificate lifecycle** | `sso.cert_expiry_alert`, `sso.cert_expired` | Medium / Critical | Optional | `cert_expired` is Critical; exported on request per §27.1 |
+| **Admin actions** | `admin.tenant_config_changed`, `admin.sso_disabled`, `admin.scim_token_rotated`, `admin.export_triggered` | High | Yes | Any admin action on tenant config is High; supports tenant's own change-control audit |
+| **Privilege escalation** | `admin.role_elevated`, `admin.super_admin_access_granted` | Critical | Yes | Triggers internal correlation rule CR-03 (§27.3) |
+| **Bulk data access** | `admin.export_triggered`, `api.bulk_records_accessed` | High | Yes | Triggers internal correlation rule CR-04 (§27.3); record count included |
+| **SIEM export control** | `siem.tenant_export_enabled`, `siem.tenant_export_disabled` | High | No | Internal FORM control event; not exported to tenant (would create circular reference) |
+| **HMAC chain integrity** | `siem.hmac_chain_break_detected` | Critical | No | Internal only; triggers INCIDENT_RESPONSE.md R-01; never sent to tenant SIEM |
+
+---
+
+### 27.3 Internal SIEM Pipeline (FORM-operated)
+
+**Pipeline architecture:**
+
+```
+Cloudflare Worker (DEC-030 emit)
+        │
+        ▼
+Cloudflare Logpush  ──────────────────────────►  Cloudflare Analytics Engine
+(structured JSON, EU region)                     (real-time event counts,
+                                                  5-min aggregates)
+        │
+        ▼
+ClickHouse Cloud (EU)
+  table: siem_events
+  partition: toYYYYMM(event_ts)
+  TTL: 730 days (2 years, SOC 2 retention minimum)
+        │
+        ▼
+Scheduled ClickHouse queries (correlation rules, §27.3 below)
+        │
+        ▼
+PagerDuty Events API v2  /  Slack webhooks  /  Better Stack
+```
+
+**ClickHouse `siem_events` schema (abbreviated):**
+
+```sql
+CREATE TABLE siem_events (
+    event_id        UUID,
+    event_ts        DateTime64(3, 'UTC'),
+    tenant_id       UUID,
+    event_type      LowCardinality(String),
+    severity        LowCardinality(String),   -- INFORMATIONAL|LOW|MEDIUM|HIGH|CRITICAL
+    actor_type      LowCardinality(String),   -- user|service|scim_client|system
+    user_email_hash FixedString(64),          -- SHA-256 hex; empty string if system actor
+    ip_subnet       String,                   -- /24 for IPv4, /48 for IPv6
+    payload         String,                   -- JSON, PII-stripped
+    hmac_signature  String,
+    ingested_at     DateTime64(3, 'UTC')      -- pipeline arrival time; lag = ingested_at - event_ts
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(event_ts)
+ORDER BY (tenant_id, event_ts, event_id)
+TTL event_ts + INTERVAL 730 DAY;
+```
+
+**Correlation rules (scheduled every 5 minutes unless stated):**
+
+**CR-01 — Brute-force login detection**
+
+```sql
+-- Fires when a single (tenant_id, ip_subnet) pair accumulates ≥ 10 sso.login_failed
+-- events within any rolling 10-minute window.
+SELECT
+    tenant_id,
+    ip_subnet,
+    COUNT(*) AS failure_count,
+    MIN(event_ts) AS window_start,
+    MAX(event_ts) AS window_end
+FROM siem_events
+WHERE event_type = 'sso.login_failed'
+  AND event_ts >= NOW() - INTERVAL 10 MINUTE
+GROUP BY tenant_id, ip_subnet
+HAVING failure_count >= 10;
+-- Alert: AL-SIEM-03 (see §27.7); emit anomaly.brute_force_threshold_exceeded DEC-030 event
+-- with fields: tenant_id, ip_subnet, failure_count, window_start, window_end.
+```
+
+**CR-02 — Impossible travel detection**
+
+```sql
+-- Fires when the same user_email_hash logs in successfully from two different /24 subnets
+-- whose estimated geographic distance implies travel time < observed login gap.
+-- Uses a pre-computed ip_subnet_country lookup table (MaxMind GeoLite2, refreshed weekly).
+WITH ranked AS (
+    SELECT
+        tenant_id,
+        user_email_hash,
+        ip_subnet,
+        event_ts,
+        LAG(ip_subnet)  OVER (PARTITION BY tenant_id, user_email_hash ORDER BY event_ts) AS prev_subnet,
+        LAG(event_ts)   OVER (PARTITION BY tenant_id, user_email_hash ORDER BY event_ts) AS prev_ts,
+        LAG(ipl.country_code) OVER (PARTITION BY tenant_id, user_email_hash ORDER BY event_ts) AS prev_country
+    FROM siem_events se
+    LEFT JOIN ip_subnet_country ipl ON se.ip_subnet = ipl.subnet
+    WHERE event_type = 'sso.login_success'
+      AND event_ts >= NOW() - INTERVAL 1 HOUR
+)
+SELECT tenant_id, user_email_hash, prev_subnet, ip_subnet, prev_ts, event_ts,
+       dateDiff('minute', prev_ts, event_ts) AS gap_minutes
+FROM ranked
+WHERE prev_country IS NOT NULL
+  AND ipl.country_code != prev_country        -- different countries
+  AND gap_minutes < 120;                      -- less than 2 hours apart
+-- Alert: AL-SIEM-03 (P1); emit anomaly.impossible_travel_detected DEC-030 event.
+```
+
+**CR-03 — Privilege escalation pattern**
+
+```sql
+-- Fires when admin.role_elevated or admin.super_admin_access_granted occurs within
+-- 30 minutes of a preceding sso.login_failed for the same (tenant_id, user_email_hash).
+-- Indicates potential credential-stuffing followed by privilege grab.
+SELECT
+    elev.tenant_id,
+    elev.user_email_hash,
+    elev.event_ts  AS escalation_ts,
+    fail.event_ts  AS preceding_failure_ts,
+    dateDiff('minute', fail.event_ts, elev.event_ts) AS gap_minutes
+FROM siem_events elev
+JOIN siem_events fail
+  ON  elev.tenant_id       = fail.tenant_id
+  AND elev.user_email_hash = fail.user_email_hash
+  AND fail.event_type      = 'sso.login_failed'
+  AND fail.event_ts        BETWEEN elev.event_ts - INTERVAL 30 MINUTE AND elev.event_ts
+WHERE elev.event_type IN ('admin.role_elevated', 'admin.super_admin_access_granted')
+  AND elev.event_ts >= NOW() - INTERVAL 1 HOUR;
+-- Alert: AL-SIEM-03 (P1); notify #security-alerts + PagerDuty HIGH.
+```
+
+**CR-04 — Bulk data access anomaly**
+
+```sql
+-- Fires when a single actor_type='user' generates ≥ 5 admin.export_triggered or
+-- api.bulk_records_accessed events within any 1-hour window for the same tenant.
+-- Baseline: ≤ 2 bulk access events per user per hour is normal for CSM/admin workflows.
+SELECT
+    tenant_id,
+    user_email_hash,
+    COUNT(*) AS bulk_event_count,
+    SUM(JSONExtractInt(payload, 'record_count')) AS total_records_accessed,
+    MIN(event_ts) AS window_start
+FROM siem_events
+WHERE event_type IN ('admin.export_triggered', 'api.bulk_records_accessed')
+  AND actor_type = 'user'
+  AND event_ts >= NOW() - INTERVAL 1 HOUR
+GROUP BY tenant_id, user_email_hash
+HAVING bulk_event_count >= 5
+    OR total_records_accessed >= 10000;
+-- Alert: AL-SIEM-04 (P1); emit anomaly.bulk_data_access DEC-030 HIGH event.
+-- Escalate to INCIDENT_RESPONSE.md R-12 if total_records_accessed >= 50000.
+```
+
+**Alert thresholds and PagerDuty routing:**
+
+| Correlation Rule | Threshold | Severity | PagerDuty Service | Slack Channel |
+|---|---|---|---|---|
+| CR-01 Brute-force | ≥ 10 failures / 10 min / (tenant, subnet) | P1 | FORM Security | `#security-alerts` |
+| CR-02 Impossible travel | Cross-country login gap < 2 h | P1 | FORM Security | `#security-alerts` |
+| CR-03 Privilege escalation | Escalation within 30 min of failure | P1 | FORM Security | `#security-alerts` + `#sso-alerts` |
+| CR-04 Bulk data access | ≥ 5 bulk events / 1 h or ≥ 10,000 records | P1 | FORM Security | `#security-alerts` |
+
+---
+
+### 27.4 Enterprise Tenant SIEM Export API
+
+#### Pull API
+
+```
+GET /enterprise/v1/audit-events?since={cursor}&limit=1000
+Authorization: Bearer {api_key}
+X-FORM-HMAC-Verify: {hmac_of_response_body}
+```
+
+- **Cursor:** opaque base64-encoded timestamp + event_id pair. First call omits `since`; server returns oldest available event. Subsequent calls pass the `next_cursor` value from the previous response.
+- **Limit:** 1–1,000 events per request. Default 500.
+- **HMAC verification:** response body is HMAC-SHA-256 signed with the tenant's export secret (configured in Admin Dashboard). The `X-FORM-HMAC-Verify` response header contains the hex digest. Tenant SIEM connector must verify this before ingesting.
+- **Retention window:** 90 days of events available via pull API. Events older than 90 days are archived to Cloudflare R2 (`audit-exports/{tenant_id}/YYYY/MM/`) and available on request via the compliance export flow (`docs/SOC2_READINESS.md §46`).
+- **Response envelope:**
+
+```json
+{
+  "events": [ /* array of redacted DEC-030 event objects */ ],
+  "next_cursor": "eyJ0cyI6MTc0ODc2...",
+  "total_available": 4821,
+  "generated_at": "2026-06-01T14:23:00.000Z"
+}
+```
+
+#### Push Webhook
+
+- **Configuration:** tenant provides endpoint URL and a webhook secret in the Admin Dashboard SSO/SIEM panel. FORM stores the secret encrypted at rest (Supabase Vault). The endpoint must accept `POST` requests with `Content-Type: application/json`.
+- **Delivery:** FORM buffers events in a Cloudflare Durable Object (`SiemExportBuffer`) per tenant. Flush triggers: (a) buffer reaches 500 events, or (b) 30-second flush timer expires — whichever comes first.
+- **Signature:** each POST includes `X-FORM-Signature: sha256={hex_hmac}` computed over the raw request body using the tenant's webhook secret. This follows the GitHub webhook signing convention for compatibility with existing SIEM connectors.
+- **Retry policy:** on non-2xx response or network timeout, retry with exponential backoff: 30 s, 2 min, 10 min, 30 min, 2 h. After 24 hours of failure, fire `siem.webhook_delivery_failed` DEC-030 HIGH event and trigger AL-SIEM-01 (§27.7).
+- **Idempotency:** each event batch includes a `delivery_id` UUID. Tenant systems should deduplicate on `delivery_id` + `event_id`.
+
+#### Supported SIEM Targets
+
+| Target | Integration Method | Format | Notes |
+|---|---|---|---|
+| **Splunk** | HTTP Event Collector (HEC) | JSON (native Splunk format) | Push webhook; `sourcetype=form:audit`; `index` configurable per tenant |
+| **Microsoft Sentinel** | Data Collector API (Log Analytics Workspace) | JSON → `FormAuditLog_CL` custom table | Push webhook; Workspace ID + Primary Key stored in FORM Vault |
+| **Datadog** | Log Management (HTTP intake) | JSON with `ddtags` field | Push webhook; `service:form-audit`, `env:production` tags injected |
+| **IBM QRadar** | LEEF syslog over TCP/TLS | LEEF 2.0 | Push webhook; FORM transforms to LEEF before delivery; CEF also available |
+| **Generic webhook** | Any HTTPS endpoint | JSON (FORM native) or CEF | Customer implements receiver; FORM sends HMAC-signed batches |
+
+#### Schema Transformation
+
+FORM native event format to CEF:
+
+```
+CEF:0|FORM|AuditLog|1.0|{event_type}|{event_type_display_name}|{cef_severity}|
+  rt={epoch_ms} dvchost=form.app
+  cs1={tenant_id} cs1Label=TenantId
+  cs2={user_email_hash} cs2Label=UserEmailHash
+  cs3={ip_subnet} cs3Label=IpSubnet
+  act={event_type} outcome={outcome}
+  msg={hmac_signature}
+```
+
+CEF severity mapping: Informational→0, Low→3, Medium→5, High→7, Critical→10.
+
+For LEEF (QRadar), the same fields are emitted in `key=value` tab-delimited format with `LEEF:2.0|FORM|AuditLog|1.0|{event_type}|` header.
+
+#### Rate Limits
+
+| Tier | Daily Event Limit | Burst (per min) | Overage behaviour |
+|---|---|---|---|
+| Free / Trial | 10,000 events/day | 500/min | Events queued; excess dropped after 24 h queue depth reached; `siem.webhook_delivery_failed` emitted |
+| Growth | 100,000 events/day | 2,000/min | Same as above |
+| Enterprise (standard) | 1,000,000 events/day | 20,000/min | Configurable per entitlement in `tenant_entitlements.siem_daily_event_limit` |
+| Enterprise (unlimited add-on) | Unlimited | 100,000/min | Available as a paid add-on; requires explicit DPA clause update |
+
+---
+
+### 27.5 Event Filtering & Redaction
+
+#### Privacy Floor (mandatory, non-configurable)
+
+Applied before any tenant export regardless of customer filter configuration. These rules implement GDPR Art. 5(1)(c) data minimisation:
+
+| Field | Rule | Output |
+|---|---|---|
+| `user_email` | SHA-256 hash of `lowercase(user_email)` | `user_email_hash` (hex string, 64 chars) |
+| `user_id` | Removed entirely | Field absent from export payload |
+| `ip_address` | Truncated to `/24` (IPv4) or `/48` (IPv6) | `ip_subnet` field only |
+| SAML assertion content | Removed entirely | Field absent |
+| SCIM attribute values | Removed entirely | Field absent; only `scim.operation` and `outcome` retained |
+| Session tokens / JWTs | Removed entirely | Field absent |
+| `hmac_signature` | Retained as-is | Allows tenant to verify chain integrity |
+
+#### Mandatory Fields Always Included
+
+Every exported event must contain these five fields regardless of filter configuration. A missing mandatory field is a pipeline error and triggers `siem.webhook_delivery_failed`:
+
+- `tenant_id`
+- `event_type`
+- `severity`
+- `timestamp` (ISO 8601 UTC)
+- `hmac_signature`
+
+#### Customer-Configurable Filter Rules
+
+Tenants configure filters in the Admin Dashboard SIEM panel. Filters are stored in `tenant_siem_configs.filter_rules` (JSONB array). Each rule has `action` (include/exclude), `field` (event_type / severity / actor_type), and `value` (string or array).
+
+Filter evaluation order: (1) mandatory include — events with HMAC chain break are always included regardless of filters; (2) customer exclude rules; (3) customer include rules; (4) default — include all events with severity ≥ LOW.
+
+Example filter rule (exclude informational SCIM events):
+
+```json
+[
+  { "action": "exclude", "field": "event_type", "value": ["scim.user_created", "scim.user_updated"] },
+  { "action": "exclude", "field": "severity",   "value": "INFORMATIONAL" }
+]
+```
+
+**SOC 2 note:** filter rules that would exclude `admin.*` or `anomaly.*` events require a compliance-officer approval flag (`filter_compliance_approved: true`) in `tenant_siem_configs` before taking effect. This prevents tenants from accidentally suppressing the events that FORM uses as CC7.2/CC7.3 evidence during a shared-responsibility audit.
+
+---
+
+### 27.6 SLOs for SIEM Export
+
+| SLO ID | Description | SLI Expression | Target | Error Budget (30d) | Owner |
+|---|---|---|---|---|---|
+| **SIEM-SLO-01** | Push webhook delivery latency P95 — time from DEC-030 event creation to confirmed delivery (2xx response from tenant endpoint) | P95 of `(delivery_confirmed_at - event_ts)` across all tenant push deliveries, 1-hour rolling | < 60 s | > 60 s for < 5% of deliveries per month | devops-lead |
+| **SIEM-SLO-02** | Pull API event availability — time from DEC-030 event creation to availability via pull API | P95 of `(ingested_at - event_ts)` in `siem_events` ClickHouse table, 1-hour rolling | < 5 min | > 5 min for < 1% of events per month | devops-lead |
+| **SIEM-SLO-03** | Zero data loss — no event goes undelivered beyond 24 hours | `COUNT(events WHERE delivery_attempts > 0 AND NOT delivered AND age > 24h)` = 0 | 100% — zero tolerance | Any undelivered event after 24 h is an immediate SLO breach; triggers retry + AL-SIEM-01 | devops-lead + platform-engineer |
+| **SIEM-SLO-04** | HMAC chain integrity — no broken HMAC chains in the `siem_events` table | `COUNT(chain_break_detected)` per month | 0 — zero tolerance | Any chain break is a P0 and immediate SLO breach; triggers INCIDENT_RESPONSE.md R-01 | security-engineer |
+
+**SLO measurement:** SIEM-SLO-01 and SIEM-SLO-02 are measured in ClickHouse via the `siem_delivery_log` table (one row per delivery attempt, columns: `event_id`, `tenant_id`, `attempt_number`, `attempted_at`, `outcome`, `response_code`, `latency_ms`). SIEM-SLO-03 uses a pg_cron job (`0 * * * *`) that queries `siem_delivery_log` for events older than 24 h with `outcome != 'delivered'`. SIEM-SLO-04 is verified by the existing `audit-chain-daily-check` pg_cron job (`docs/SOC2_READINESS.md §46`) which now covers the `siem_events` ClickHouse table in addition to the Supabase `audit_log` table.
+
+---
+
+### 27.7 Alert Rules (Internal FORM SIEM)
+
+| Rule ID | Trigger | Severity | Routing | Response SLA | Runbook |
+|---|---|---|---|---|---|
+| **AL-SIEM-01** | `siem.webhook_delivery_failed` DEC-030 HIGH event fires for any tenant (delivery unacknowledged for > 24 h after retry exhaustion), OR push webhook endpoint returns non-2xx on > 10% of delivery attempts in any 30-min window for any tenant | P2 | PagerDuty MEDIUM + `#security-alerts` + `#csm-alerts` (CSM notified for tenant follow-up) | Acknowledge < 1 h | Inspect `siem_delivery_log` for the affected `tenant_id`; verify tenant endpoint is reachable (`curl -X POST {endpoint}` with test payload); check for TLS cert expiry on tenant endpoint; if endpoint is deliberately offline, notify CSM to contact tenant IT; events accumulate in `SiemExportBuffer` Durable Object for up to 48 h |
+| **AL-SIEM-02** | ClickHouse pipeline lag P95 > 5 min — `(ingested_at - event_ts)` P95 exceeds 5 minutes over any 30-min window (measured in `siem_events` table) | P2 | PagerDuty MEDIUM + `#devops-alerts` | Acknowledge < 1 h | Query `SELECT quantile(0.95)(ingested_at - event_ts) FROM siem_events WHERE ingested_at > NOW() - INTERVAL 1 HOUR`; check Cloudflare Logpush delivery health in Cloudflare Dashboard → Analytics → Logpush; verify ClickHouse Cloud ingest quota not exceeded; SIEM-SLO-02 breach window starts immediately |
+| **AL-SIEM-03** | Correlation rule CR-02 match (impossible travel) — `anomaly.impossible_travel_detected` DEC-030 HIGH event for any `(tenant_id, user_email_hash)` | P1 | PagerDuty HIGH + `#security-alerts` | Acknowledge < 30 min | Review full event sequence for the `user_email_hash` in ClickHouse `siem_events` table for the 24-h window; confirm whether the hash maps to a known CSM or service account (check `actor_type` field); if `actor_type = 'user'` and travel is genuinely impossible, escalate to INCIDENT_RESPONSE.md R-12 (Insider Threat / Credential Compromise); notify tenant CSM within 1 h |
+| **AL-SIEM-04** | Correlation rule CR-04 match (bulk data access) — `anomaly.bulk_data_access` DEC-030 HIGH event for any tenant, OR single actor accessing ≥ 10,000 records in 1 h | P1 | PagerDuty HIGH + `#security-alerts` | Acknowledge < 30 min | Retrieve `total_records_accessed` from the DEC-030 event payload; identify `user_email_hash`; review `admin.export_triggered` events for the same actor in `siem_events`; if access is unauthorized or volume ≥ 50,000 records, trigger INCIDENT_RESPONSE.md R-12; notify tenant CSM; preserve ClickHouse query snapshot as evidence artefact |
+| **AL-SIEM-05** | `siem.hmac_chain_break_detected` DEC-030 CRITICAL event — HMAC chain integrity violation in `audit_log` or `siem_events` | **P0** | PagerDuty CRITICAL + INCIDENT_RESPONSE.md R-01 opened automatically + founder paged | Acknowledge < 15 min | A chain break indicates either a tampered audit record or a bug in the HMAC emission logic; immediately freeze all write operations to `audit_log` pending forensic review; pull full chain segment from `event_id` ± 100 rows; do NOT attempt to re-sign the chain — this would destroy forensic evidence; coordinate with security-engineer and compliance-officer before any remediation |
+| **AL-SIEM-06** | Zero `siem_events` rows ingested in any 30-min window during business hours (08:00–22:00 UTC) — pipeline health dead-man's switch | P1 | PagerDuty HIGH + `#devops-alerts` | Acknowledge < 30 min | `SELECT COUNT(*) FROM siem_events WHERE ingested_at > NOW() - INTERVAL 30 MINUTE`; a zero count during active hours indicates Cloudflare Logpush has stalled, a Worker has stopped emitting DEC-030 events, or ClickHouse ingest is down; check Cloudflare Logpush status, Worker error rates in Sentry, and ClickHouse Cloud health dashboard; if all three are healthy, the issue may be a genuine zero-event period (e.g., no logins) — confirm against live Worker request logs before clearing |
+
+**SOC 2 note:** AL-SIEM-05 (HMAC chain break P0) is the primary evidence point for CC7.2 (anomaly monitoring extended to audit log integrity) and CC7.3 (automated P0 response with R-01 invocation). AL-SIEM-03 and AL-SIEM-04 demonstrate continuous correlation-based anomaly detection per CC7.2. The PagerDuty incident log for all AL-SIEM-* rules during the observation period is evidence artefact SIEM-OBS-E-003 (§27.10).
+
+---
+
+### 27.8 Dashboard: "Security Event Stream"
+
+**Owner:** devops-lead. **Refresh:** 30 seconds (ingestion rate, delivery success rate); 5 minutes (all other panels).
+
+A dedicated "Security Event Stream" dashboard in Better Stack (metrics panels) and Metabase (ClickHouse-backed query panels) provides real-time visibility into the SIEM pipeline for on-call engineers and the security-engineer.
+
+| Panel | Metric / Source | Visualization |
+|---|---|---|
+| **Event ingestion rate** | `COUNT(*)` from `siem_events` grouped by `toStartOfMinute(ingested_at)`, rolling 60-min window | Time-series; expected baseline ~50–500 events/min during business hours; spike > 5× baseline triggers AL-SSO investigation |
+| **Events by severity** | `COUNT(*) GROUP BY severity, toStartOfHour(event_ts)` from `siem_events`, last 24 h | Stacked bar (Informational/Low/Medium/High/Critical); Critical bars are acid-coloured red — any Critical bar requires immediate review |
+| **Top 10 event types** | `SELECT event_type, COUNT(*) FROM siem_events WHERE event_ts > NOW() - INTERVAL 24 HOUR GROUP BY event_type ORDER BY COUNT(*) DESC LIMIT 10` | Table with sparkline per event_type; unexpected entries in top 10 (e.g., sudden rise in `admin.role_elevated`) trigger investigation |
+| **Webhook delivery success rate** | `siem_delivery_log`: `SUM(outcome='delivered') / COUNT(*)` per 1-h bucket, last 24 h | Gauge (0–100%); SIEM-SLO-01 target line at 95%; drop below 90% triggers AL-SIEM-01 investigation |
+| **Pipeline lag P95** | P95 of `(ingested_at - event_ts)` per 5-min bucket from `siem_events`, last 6 h | Time-series; SIEM-SLO-02 threshold line at 5 min; sustained breach triggers AL-SIEM-02 |
+| **Active tenant SIEM exports** | `COUNT(DISTINCT tenant_id) FROM tenant_siem_configs WHERE export_enabled = true` | Stat panel (count); baseline is current number of enterprise tenants with SIEM enabled; unexpected drop triggers CSM investigation |
+| **Anomaly correlation hits** | `SELECT event_ts, JSONExtractString(payload, 'rule_name') AS rule_name, tenant_id, user_email_hash, JSONExtractInt(payload, 'record_count') AS record_count FROM siem_events WHERE event_type LIKE 'anomaly.%' AND event_ts > NOW() - INTERVAL 24 HOUR ORDER BY event_ts DESC LIMIT 50` | Table with columns: timestamp, rule_name, tenant_id (slug), user_email_hash (truncated), record_count; each row links to the PagerDuty incident if one was opened |
+
+---
+
+### 27.9 DEC-030 Self-Monitoring Events
+
+The SIEM pipeline itself emits DEC-030 events to make the pipeline observable without relying on external monitoring tooling. These events are stored in the same `audit_log` table and `siem_events` ClickHouse table as all other DEC-030 events, but are filtered from tenant SIEM exports (they are FORM-internal).
+
+| Event Type | Severity | Fields | Notes |
+|---|---|---|---|
+| `siem.webhook_delivery_success` | STANDARD | `tenant_id`, `delivery_id`, `event_count`, `latency_ms`, `destination_type` (splunk/sentinel/datadog/qradar/generic) | Emitted once per successful batch delivery; used to compute SIEM-SLO-01 |
+| `siem.webhook_delivery_failed` | HIGH | `tenant_id`, `delivery_id`, `event_count`, `retry_count`, `destination_type`, `last_error_code`, `last_error_message` | Emitted after retry exhaustion (5 attempts, 24 h); triggers AL-SIEM-01 |
+| `siem.pipeline_lag_alert` | HIGH | `lag_p95_seconds`, `measurement_window_minutes`, `slo_threshold_seconds` | Emitted by the ClickHouse lag monitoring scheduled query when P95 lag > 5 min; triggers AL-SIEM-02 |
+| `siem.hmac_chain_break_detected` | CRITICAL | `broken_event_id`, `preceding_event_id`, `expected_hmac`, `actual_hmac`, `detected_by` (audit-chain-daily-check / real-time / manual) | Immediate P0; triggers INCIDENT_RESPONSE.md R-01 automatically; this event must itself be HMAC-signed by the detection process to preserve chain — if that is not possible (chain is broken), the event is stored with `chain_integrity: false` flag and a forensic note |
+| `siem.tenant_export_enabled` | HIGH | `tenant_id`, `actor_id`, `destination_type`, `filter_rules_hash` | Emitted when a tenant admin or FORM CSM enables SIEM export; `actor_id` is the FORM Admin Dashboard user; used to audit who enabled export and with what filter configuration |
+| `siem.tenant_export_disabled` | HIGH | `tenant_id`, `actor_id`, `reason` (optional free-text, max 256 chars) | Emitted when export is disabled; `reason` field allows CSM to record whether this was customer-initiated or due to a billing event |
+
+---
+
+### 27.10 SOC 2 Evidence Mapping
+
+| Criterion | Control | Evidence from §27 |
+|---|---|---|
+| **CC7.2** | Entity monitors system components for anomalies | Four ClickHouse correlation rules (CR-01 through CR-04) operate continuously as documented anomaly detectors with defined thresholds; AL-SIEM-01 through AL-SIEM-06 are the corresponding alert rules; `siem.pipeline_lag_alert` and AL-SIEM-06 monitor the monitoring pipeline itself (meta-monitoring); evidence artefact SIEM-OBS-E-001 (correlation rule execution log) |
+| **CC7.3** | Entity evaluates and responds to identified anomalies | Response SLA column in §27.7; PagerDuty routing to named owners (devops-lead, security-engineer); INCIDENT_RESPONSE.md R-01 auto-opened on AL-SIEM-05; R-12 cross-referenced for AL-SIEM-03/04; evidence artefact SIEM-OBS-E-003 (PagerDuty incident log) |
+| **C1.1** | Confidentiality — information designated as confidential is protected | Privacy floor (§27.5) enforces GDPR Art. 5(1)(c) data minimisation before any tenant export: `user_id` removed, `user_email` SHA-256 hashed, IP truncated to subnet, SAML/SCIM content stripped; mandatory redaction is non-configurable and applied in the `SiemExportBuffer` Durable Object before serialisation; evidence artefact SIEM-OBS-E-002 (export payload schema test log showing prohibited fields absent) |
+| **CC9.2** | Risk from vendors and sub-processors is managed | Enterprise tenant SIEM endpoints (Splunk HEC, Sentinel workspace, Datadog intake, QRadar) are data recipients under FORM's GDPR framework; each tenant's DPA must include a clause identifying their SIEM endpoint as a sub-processor or data controller (depending on jurisdiction); `siem.tenant_export_enabled` DEC-030 events provide an auditable log of when each export relationship began; DPA clause template updated in `docs/SUBPROCESSORS.md` |
+
+**Auditor evidence artefacts:**
+
+| Artefact ID | Description | Collection method |
+|---|---|---|
+| **SIEM-OBS-E-001** | ClickHouse correlation rule execution log — all `anomaly.*` DEC-030 events for the observation period | `SELECT * FROM siem_events WHERE event_type LIKE 'anomaly.%' AND event_ts BETWEEN $obs_start AND $obs_end ORDER BY event_ts` |
+| **SIEM-OBS-E-002** | Export payload redaction test log — automated test asserting prohibited fields absent from tenant export payloads | CI test run output from `packages/siem-export/src/__tests__/redaction.test.ts`; pipeline must be green before each production deployment |
+| **SIEM-OBS-E-003** | PagerDuty incident log — all AL-SIEM-* incidents for the observation period | PagerDuty → Incidents → filter by service "FORM Security" + date range → export CSV |
+| **SIEM-OBS-E-004** | HMAC chain integrity verification report — `audit-chain-daily-check` output for the full observation period, covering both Supabase `audit_log` and ClickHouse `siem_events` | `docs/SOC2_READINESS.md §46` pg_cron job output log; zero chain breaks required for clean CC7.2 evidence |
+
+---
+
+### 27.11 Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Create ClickHouse `siem_events` table with schema per §27.3; configure Cloudflare Logpush → ClickHouse ingest pipeline; validate end-to-end with a synthetic DEC-030 test event in staging | platform-engineer | **P0** | M4 |
+| Implement `SiemExportBuffer` Cloudflare Durable Object: batch accumulation (500 events / 30 s flush), HMAC signing, retry policy (5 attempts, exponential backoff, 24 h max), `siem.webhook_delivery_success` / `siem.webhook_delivery_failed` DEC-030 emission | platform-engineer | **P0** | M4 |
+| Build pull API endpoint `GET /enterprise/v1/audit-events` with cursor-based pagination, HMAC response signing, 90-day retention window, and rate-limit enforcement per `tenant_entitlements.siem_daily_event_limit` | platform-engineer | **P0** | M4 |
+| Implement privacy-floor redaction layer in `SiemExportBuffer` before serialisation: strip `user_id`, hash `user_email` to SHA-256, truncate IP to subnet, remove SAML/SCIM content; add automated redaction test (`packages/siem-export/src/__tests__/redaction.test.ts`) to CI pipeline | security-engineer | **P0** | M4 |
+| Implement schema transformation layer: FORM native → CEF (for Splunk/generic) and FORM native → LEEF (for QRadar); add destination-type routing in `SiemExportBuffer` | platform-engineer | **P1** | M4 |
+| Configure AL-SIEM-01 through AL-SIEM-06 alert rules in PagerDuty (FORM Security service); wire `siem.*` DEC-030 event stream to PagerDuty Events API v2; validate AL-SIEM-05 (HMAC chain break P0) with a synthetic chain break in staging | devops-lead | **P0** | M4 |
+| Deploy four ClickHouse correlation rules (CR-01 through CR-04) as scheduled queries (5-min cadence); validate each rule produces the expected `anomaly.*` DEC-030 event in staging using scripted test scenarios | security-engineer | **P1** | M5 |
+| Build "Security Event Stream" Better Stack + Metabase dashboard per §27.8; wire all seven panels to live ClickHouse data; set refresh intervals; share with devops-lead and security-engineer | devops-lead | **P1** | M5 |
+| Add SIEM export configuration UI to Admin Dashboard SIEM panel: endpoint URL, secret, destination type, filter rules editor, `filter_compliance_approved` gating for admin/anomaly exclusion filters | platform-engineer | **P1** | M5 |
+| Execute DPA addendum update for tenant SIEM endpoints as sub-processors / data recipients; update `docs/SUBPROCESSORS.md`; add `siem.tenant_export_enabled` event log review to onboarding checklist for new enterprise tenants | compliance-officer | **P1** | M5 |
+
+---
+
+### 27.12 Open Questions
+
+| OQ | Question | Owner | Resolution Target | Priority |
+|---|---|---|---|---|
+| OQ-SIEM-01 | **ClickHouse vs. Supabase as the correlation rule execution target.** The four correlation rules in §27.3 are specified as ClickHouse SQL. However, the ClickHouse Cloud instance is not provisioned until M9 per the current stack plan. Before M9, either (a) the same correlation rules can be expressed as Supabase pg_cron jobs against the Supabase `audit_log` table (higher latency, heavier Postgres load), or (b) Cloudflare Analytics Engine can be used for aggregated event counts sufficient for CR-01 and a simplified CR-04 but cannot support the JOIN-based CR-02 and CR-03. Decision needed before M4 alert implementation: which platform hosts the correlation rules for the M4 milestone, and what is the migration plan when ClickHouse is provisioned at M9? | platform-engineer + devops-lead | Before M4 implementation start | **P0** |
+| OQ-SIEM-02 | **Tenant SIEM export consent and DPA scope.** The current design treats any enterprise tenant as eligible to enable SIEM export once they have an API key. However, GDPR and some enterprise DPAs require explicit written consent before FORM transmits audit data (even redacted) to a third-party endpoint specified by the tenant. It is unclear whether the existing enterprise DPA template in `docs/SUBPROCESSORS.md` covers tenant-specified SIEM endpoints as downstream controllers. Legal must review whether the Admin Dashboard "enable SIEM export" UI action constitutes sufficient consent or whether a separate DPA addendum signature is required per tenant. | compliance-officer + legal | Before first enterprise SIEM export goes live (M5) | **P1** |
+| OQ-SIEM-03 | **HMAC chain verification responsibility for tenant SIEM consumers.** The pull API includes `X-FORM-HMAC-Verify` response headers and each event includes its `hmac_signature`. The push webhook batch also includes a batch-level `X-FORM-Signature`. However, the per-event HMAC chain (where each event's signature includes a hash of the preceding event) requires tenants to reconstruct the chain across multiple API calls to verify it. This is a non-trivial implementation burden for a Splunk or Sentinel operator. Should FORM provide an open-source chain-verification library (Python + Go), or is it sufficient to document the verification algorithm and let enterprise tenants implement their own? If a library is not provided, the "HMAC chain integrity" claim in marketing materials may be challenged. | security-engineer + devops-lead | Before enterprise GA (M13) | **P2** |
+
+---
+
+*v1.4 additions (2026-06-01): Section 27 — SIEM Integration & Security Event Streaming — defines FORM's dual-mode security event streaming architecture: an internal Cloudflare Logpush → ClickHouse correlation pipeline (always active, CC7.2/CC7.3 evidence) and an enterprise tenant SIEM export layer (pull API + push webhook). §27.1 scopes streamed vs. internally-retained events; establishes privacy floor (user_id absent, user_email SHA-256 hashed, IP truncated to subnet); enumerates two streaming modes; cross-references DEC-030, SOC2_READINESS §46, INCIDENT_RESPONSE §3, SSO_SCIM §22. §27.2 fourteen-row event classification table mapping DEC-030 event types to CEF/LEEF severity levels (Informational through Critical) with tenant-SIEM export eligibility (yes/no/optional) for auth success/failure/anomaly, SCIM provisioning, session revocation, cert lifecycle, admin actions, privilege escalation, bulk data access, and SIEM control events. §27.3 internal pipeline: ClickHouse siem_events table schema (MergeTree, 730-day TTL, EU region); four correlation rules as ClickHouse SQL — CR-01 brute-force (≥ 10 failures/10 min/subnet), CR-02 impossible travel (cross-country login gap < 2 h via LAG() window function + MaxMind lookup), CR-03 privilege escalation (elevation within 30 min of preceding failure, JOIN-based), CR-04 bulk data access (≥ 5 bulk events/h or ≥ 10,000 records); PagerDuty routing table for all four rules to FORM Security service. §27.4 enterprise tenant SIEM export: pull API (`GET /enterprise/v1/audit-events`, cursor pagination, HMAC response header, 90-day retention, R2 archive); push webhook (SiemExportBuffer Durable Object, 500-event/30 s flush, X-FORM-Signature GitHub-convention signing, 5-attempt exponential retry to 2 h, 48 h queue persistence); five SIEM targets (Splunk HEC, Microsoft Sentinel Data Collector, Datadog Log Management, IBM QRadar LEEF, generic webhook); CEF/LEEF schema transformation with severity integer mapping; four-tier rate limits (10K free, 100K growth, 1M enterprise, unlimited add-on). §27.5 privacy floor (six mandatory redaction rules implementing GDPR Art. 5(1)(c)); five mandatory fields always present in exports; customer-configurable JSON filter rules with compliance-officer approval gate for admin/anomaly exclusion. §27.6 four SIEM SLOs: SIEM-SLO-01 (push P95 < 60 s), SIEM-SLO-02 (pull availability < 5 min), SIEM-SLO-03 (zero undelivered events after 24 h, zero-tolerance), SIEM-SLO-04 (zero HMAC chain breaks, zero-tolerance); measurement via siem_delivery_log ClickHouse table and extended audit-chain-daily-check pg_cron. §27.7 six alert rules AL-SIEM-01 through AL-SIEM-06: webhook delivery failure (P2), ClickHouse pipeline lag > 5 min (P2), impossible travel match (P1), bulk data access match (P1), HMAC chain break (P0 — R-01 auto-open, forensic freeze), zero events 30-min dead-man's switch (P1); SOC 2 CC7.2/CC7.3 note for P0 rule. §27.8 seven-panel "Security Event Stream" Better Stack + Metabase dashboard: ingestion rate time-series, severity stacked bar, top-10 event types table, webhook delivery success gauge, pipeline lag P95 time-series, active tenant export count, anomaly correlation hits table with rule_name + tenant_id. §27.9 six DEC-030 self-monitoring events: siem.webhook_delivery_success (STANDARD), siem.webhook_delivery_failed (HIGH, retry_count + destination_type), siem.pipeline_lag_alert (HIGH), siem.hmac_chain_break_detected (CRITICAL — R-01 auto, chain_integrity:false forensic flag), siem.tenant_export_enabled (HIGH, filter_rules_hash), siem.tenant_export_disabled (HIGH, reason). §27.10 SOC 2 mapping: CC7.2 (four correlation rules as documented anomaly monitors + meta-monitoring via AL-SIEM-06), CC7.3 (response SLAs + R-01/R-12 auto-escalation), C1.1 (privacy-floor redaction documented and CI-tested), CC9.2 (tenant SIEM endpoints as sub-processors, DPA clause update); four evidence artefacts SIEM-OBS-E-001 through SIEM-OBS-E-004. §27.11 ten-item implementation checklist: four P0 items (ClickHouse table + Logpush, SiemExportBuffer Durable Object, pull API, redaction test suite), six P1 items (CEF/LEEF transform, alert rule configuration, ClickHouse correlation rule deployment, dashboard, Admin Dashboard SIEM UI, DPA update); M4/M5 milestones, owners devops-lead/platform-engineer/security-engineer/compliance-officer. §27.12 three open questions: OQ-SIEM-01 (ClickHouse vs. Supabase/Analytics Engine for correlation rules pre-M9 — P0, platform-engineer + devops-lead, before M4), OQ-SIEM-02 (DPA consent scope for tenant-specified SIEM endpoints — P1, compliance-officer + legal, before M5), OQ-SIEM-03 (HMAC chain verification library vs. documentation for tenant consumers — P2, security-engineer + devops-lead, before enterprise GA M13).*

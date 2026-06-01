@@ -6,6 +6,16 @@
 
 ---
 
+## [1.50.0] — 2026-06-01
+
+### Added
+- `docs/OBSERVABILITY.md` → v1.4: §27 SIEM Integration & Security Event Streaming (439 lines). §27.1 scopes the section: streamed vs. internally-retained events; non-configurable privacy floor (user_id absent, user_email → SHA-256 as user_email_hash, IP to /24 subnet); two modes — internal Cloudflare Logpush → ClickHouse pipeline and enterprise tenant SIEM export; cross-references DEC-030, SOC2_READINESS §46, INCIDENT_RESPONSE §3, SSO_SCIM §22. §27.2 14-row event classification table (auth, SCIM, session revocation, cert lifecycle, admin, privilege escalation, bulk data access, SIEM control events) with SIEM severity and tenant export eligibility. §27.3 internal SIEM pipeline: ClickHouse `siem_events` MergeTree schema (730-day TTL, EU region); four SQL correlation rules CR-01 through CR-04 (brute-force ≥10 failures/10 min/subnet, impossible travel via LAG() + MaxMind, privilege escalation JOIN within 30 min of failure, bulk data access ≥5 events/h or ≥10,000 records); PagerDuty routing table. §27.4 enterprise SIEM export API: pull API `GET /enterprise/v1/audit-events` (cursor pagination, HMAC response header, 90-day window, R2 archive); push webhook via `SiemExportBuffer` Durable Object (500-event/30 s flush, `X-FORM-Signature` HMAC signing, 5-attempt exponential retry); five targets (Splunk HEC, Microsoft Sentinel, Datadog Log Management, IBM QRadar LEEF, generic webhook); CEF/LEEF transformation; four-tier rate limits (10K free → unlimited enterprise add-on). §27.5 mandatory privacy-floor redaction (six-row table) + customer-configurable JSON filter rules with compliance-officer approval gate blocking admin/anomaly exclusion. §27.6 four SLOs: SIEM-SLO-01 push P95 < 60 s, SIEM-SLO-02 pull availability < 5 min, SIEM-SLO-03 zero data loss (zero-tolerance), SIEM-SLO-04 zero HMAC chain breaks (zero-tolerance). §27.7 six alert rules AL-SIEM-01 through AL-SIEM-06: webhook delivery failure (P2), pipeline lag > 5 min (P2), impossible travel match (P1), bulk data access match (P1), HMAC chain break (P0 — R-01 auto-open + forensic write-freeze), zero-events dead-man's switch (P1). §27.8 seven-panel "Security Event Stream" dashboard. §27.9 six DEC-030 self-monitoring events including CRITICAL `siem.hmac_chain_break_detected` with `chain_integrity:false` forensic flag. §27.10 SOC 2 mapping CC7.2/CC7.3/C1.1/CC9.2; four evidence artefacts SIEM-OBS-E-001 through SIEM-OBS-E-004. §27.11 ten-item implementation checklist (4× P0 M4, 6× P1 M4/M5). §27.12 three open questions (OQ-SIEM-01 ClickHouse vs. Analytics Engine pre-M9 P0; OQ-SIEM-02 DPA consent scope P1; OQ-SIEM-03 HMAC verification library P2).
+
+### Changed
+- `VERSION` → 1.50.0
+
+---
+
 ## [1.49.0] — 2026-06-01
 
 ### Added
