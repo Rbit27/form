@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v2.3
+# FORM · SOC 2 Type II Readiness v2.4
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -15950,3 +15950,340 @@ These constraints are enforced at the data layer (RLS + role definitions) and ar
 ---
 
 *v2.3 additions (2026-05-31): §51 Consolidated Gap Register + Observation Period Readiness Dashboard. Supersedes stale v1.3 Gap Analysis Summary (71% → 97%). Fulfils §49 checklist item 10 (CC6-GAP-001/002/003 §26 status update to 🟡 Authored) and §50 checklist item 9 (CC5-GAP-003/005 §27 status update to 🟡 Authored) via consolidated register rather than in-place edits. Master gap register covers all 5 TSCs across 32 sub-criteria; 14/32 criteria 🟢, 18/32 🟡, 0/32 🔴. Three remaining P0 gaps (CC7-GAP-005/006/007) consolidated with 13 gate criteria (G-01 through G-13) forming the pre-observation-period deployment checklist. Critical path: ~25–35 days from engineering sprint start to observation period open. Automated evidence streams documented (9 streams, continuous; ~8,640+ DEC-030 events in 90-day window). Manual evidence calendar: 8 recurring actions with responsible-party assignment. Privacy floor reminder section (§51.8) prohibits auditor queries against individual health data or CV keypoints — enforced at RLS layer. 16-item implementation checklist covers M4 deployment sprint through audit close. Document header updated from v2.1 → v2.3. P0 count: 3 (unchanged — CC7-GAP-005/006/007 remain at 🟡 Authored, implementation-pending). SOC 2 readiness: ~96.5% → ~97%.*
+
+---
+
+## 52. External Penetration Testing Program — Scope, Methodology, Vendor Selection, Remediation SLA & Auditor Evidence — CC7.1/CC9.1/CC6-GAP-004 Auditor Exhibit
+
+> Closes §51.9 checklist item #15. This section constitutes the authored specification that advances **CC6-GAP-004** (external penetration testing programme) from gap-identified to 🟡 Authored. Closure to 🟢 requires receipt and filing of the first pentest report with all high/critical findings resolved and PRE-52-E-001 through PRE-52-E-005 filed in the R2 evidence bucket.
+
+---
+
+### 52.1 SOC 2 Requirement Mapping
+
+This section directly satisfies the following Trust Services Criteria:
+
+| TSC Criterion | Criterion Text (abbreviated) | How §52 Satisfies It |
+|---|---|---|
+| **CC7.1** | The entity uses detection and monitoring procedures to identify changes to configurations or the introduction of new vulnerabilities. | Annual penetration test plus post-architecture-change triggered testing provides systematic vulnerability detection beyond automated scanning (Snyk, TruffleHog). |
+| **CC7.2** | The entity monitors system components and the operation of those components for anomalies indicative of malicious acts, natural disasters, or errors. | Gray-box authenticated testing exercises threat scenarios that passive monitoring cannot surface — IDOR across tenant boundary, JWT forgery, SCIM privilege escalation. |
+| **CC9.1** | The entity identifies, selects, and develops risk mitigation activities for risks arising from potential business disruptions and use of vendors and business partners. | The penetration testing firm is a third-party vendor. Vendor selection criteria (§52.4), NDA, data handling annex, and re-test confirmation requirements constitute vendor risk management for this engagement. |
+| **CC6.1** | Logical access security measures restrict access to information assets. | RLS boundary testing (FORM-PEN-001) and JWT tenant_id forgery testing (FORM-PEN-005) provide independent external validation that logical access controls operate as designed. |
+| **CC6.8** | The entity implements controls to prevent or detect and act upon the introduction of unauthorized or malicious software. | Supply-chain and dependency probing within pentest scope provides a validation layer beyond automated Snyk/TruffleHog scanning. |
+| **A1.2** (Availability) | The entity authorizes, designs, develops, implements, operates, and monitors environmental protections to meet availability commitments. | Rate limit bypass testing confirms availability protections hold against authenticated abuse patterns. |
+
+**Gap register cross-reference:** This section is the authored specification for **CC6-GAP-004** in §51.4. Evidence artefacts PRE-52-E-001 through PRE-52-E-005 (§52.7) are the closure evidence required to advance the gap to 🟢.
+
+---
+
+### 52.2 Testing Scope
+
+#### 52.2.1 In Scope
+
+| Target | Surface | Rationale |
+|---|---|---|
+| Supabase REST + GraphQL APIs | All authenticated and unauthenticated endpoints | Primary data plane; RLS enforcement boundary |
+| Cloudflare Workers (edge functions) | All Workers handling user requests or auth tokens | Attack surface for token manipulation and request smuggling |
+| Authentication flows | Sign-up, sign-in, MFA enrolment, session refresh, sign-out | Account takeover vector; Apple/Google SSO relay validation |
+| SCIM 2.0 provisioning endpoints | User create/update/delete, group membership sync | Privilege escalation via group-claim manipulation |
+| SSO / SAML flows | SP-initiated and IdP-initiated SAML assertion handling | SAML assertion forgery; XML signature wrapping attacks |
+| Row Level Security boundary | Cross-tenant data access via RLS bypass | Most critical isolation boundary in multi-tenant architecture |
+| CV session endpoints | Session create, keypoint submission, session read | Keypoint extraction attempt; on-device architecture validation |
+| Audit log integrity | DEC-030 HMAC chain: append, read, and verification endpoints | Audit log tampering to cover attacker tracks |
+| Admin dashboard | All admin-role routes and API calls | Privilege escalation; sensitive bulk-data export |
+| Data export pathways | DSAR export, bulk CSV export, API pagination | Exfiltration via over-permissioned export endpoints |
+| Rate limiting controls | All endpoints with per-user and per-IP limits | Abuse amplification; cost ceiling bypass |
+| Mobile API contract | Endpoints consumed by the React Native app (iOS + Android) | Token leakage; insecure deep-link handling |
+
+#### 52.2.2 Out of Scope
+
+| Excluded Target | Reason |
+|---|---|
+| Supabase managed infrastructure internals | Third-party SaaS; Supabase holds its own SOC 2 Type II report (obtain annually as vendor evidence) |
+| Cloudflare network infrastructure | Third-party infrastructure; outside contractual access |
+| Apple App Store / Google Play distribution pipeline | Apple/Google responsibility; outside FORM control plane |
+| ElevenLabs API internals | Third-party SaaS vendor |
+| Anthropic API internals | Third-party SaaS vendor |
+| Social engineering attacks against FORM personnel | Out of scope for technical pentest; covered by separate security awareness programme |
+| Physical security of FORM premises | FORM is fully remote; no physical premises in scope |
+| Production environment with real user data | Strictly prohibited — see §52.8 Privacy Constraints |
+| Denial-of-service at network layer (volumetric) | Covered by Cloudflare DDoS mitigation; destructive volumetric testing against shared infrastructure is prohibited |
+
+---
+
+### 52.3 Testing Frequency
+
+| Trigger | Cadence | Rationale |
+|---|---|---|
+| Annual mandatory | Once per calendar year, minimum | SOC 2 Type II ongoing operational requirement |
+| Pre-observation-period | Before SOC 2 audit observation clock starts | Auditors require evidence the system was independently tested before the observation period; all high/critical findings must be closed before Day 0 of the observation window |
+| Post-major-architecture-change | Within 60 days of: multi-tenancy launch, new SSO IdP integration, new SCIM provider, CV pipeline architecture change, or major Cloudflare Worker refactor | Architecture changes invalidate prior pentest coverage for the affected surface |
+| Post-critical-incident | Within 30 days of a P0 security incident per the incident response runbook | Confirms the root-cause attack class is fully remediated and no related vectors remain open |
+
+**Observation period hard gate:** The pre-observation-period pentest report must be received, all Critical findings must be closed, and all High findings must have documented remediation plans before the SOC 2 audit firm acknowledges the observation period start date. This gate is non-negotiable. See §51.9 item #15.
+
+---
+
+### 52.4 Vendor Selection Criteria
+
+#### 52.4.1 Mandatory Certifications
+
+At least one lead tester assigned to the engagement must hold at least two of the following credentials:
+
+| Certification | Issuing Body | Notes |
+|---|---|---|
+| CREST Certified Penetration Tester (CCT) or CREST Registered Penetration Tester (CRT) | CREST International | Preferred for UK/EU regulatory alignment |
+| OSCP (Offensive Security Certified Professional) | Offensive Security | Minimum bar for web application testing lead |
+| GPEN (GIAC Penetration Tester) | GIAC / SANS | Acceptable alternative to OSCP |
+| GWAPT (GIAC Web Application Penetration Tester) | GIAC / SANS | Preferred for web/API surface focus |
+| BSCP (Burp Suite Certified Practitioner) | PortSwigger | Acceptable supplementary credential |
+
+Firms at the calibre of Bishop Fox, Trail of Bits, or Doyensec are the reference tier. Any firm selected must provide CVs and current certification evidence for all assigned testers before contract execution.
+
+#### 52.4.2 Contractual Requirements
+
+The master services agreement with any pentest vendor must include all of the following before testing begins:
+
+- **Mutual NDA** executed before any scoping call where FORM architecture details are shared.
+- **Data handling annex** explicitly stating: (a) the vendor will not retain any FORM data after engagement close; (b) all findings, notes, and tooling outputs are deleted within 30 days of final report delivery; (c) vendor agrees to notify FORM within 24 hours if any FORM data is discovered outside the agreed staging environment.
+- **Prohibition on production access**: vendor personnel may not access, connect to, or query any FORM production environment. All testing is conducted against the isolated staging environment (§52.8).
+- **Background check attestation**: all personnel with access to FORM systems must have passed vendor-side background screening within the past 24 months.
+- **Responsible disclosure obligation**: any zero-day or novel finding must be disclosed to FORM before any public disclosure or third-party notification, with a minimum 90-day embargo.
+- **Sub-contractor disclosure**: vendor must identify any sub-contractors before engagement begins; FORM retains the right to reject sub-contractors.
+- **Insurance**: vendor must carry professional indemnity insurance of at least £1M / $1.25M USD per occurrence.
+
+#### 52.4.3 Evaluation Scorecard
+
+| Criterion | Weight | How Evaluated |
+|---|---|---|
+| Tester certifications (§52.4.1) | 25% | CV review and certification verification |
+| Relevant SaaS and multi-tenant pentest experience | 20% | Redacted sample reports from comparable engagements |
+| Methodology alignment (OWASP TGv4.2 and PTES) | 20% | Written methodology statement |
+| Data handling and privacy posture | 20% | MSA annex review; DPA if vendor is EU-based |
+| Price and timeline | 15% | Fixed-price quote; delivery within 4 weeks of kick-off |
+
+Minimum passing score: 70% weighted aggregate. Compliance-officer signs off on vendor selection; security-engineer provides technical scoring input.
+
+---
+
+### 52.5 Methodology
+
+#### 52.5.1 Testing Phases
+
+**Phase 1 — Black-Box (External Attacker Simulation)**
+
+The tester begins with no credentials and no internal documentation. The starting point is the public-facing API base URL and the iOS/Android app binary downloaded from TestFlight or an internal distribution channel. Objectives:
+
+- Enumerate all publicly reachable endpoints (authenticated and unauthenticated).
+- Identify information leakage in error messages, response headers, or API bodies that assists further attacks.
+- Attempt authentication bypass without valid credentials.
+- Test rate limiting on authentication endpoints for brute-force resistance.
+- Assess JWT validation: algorithm confusion (RS256 to HS256), none-algorithm attack, expired token acceptance.
+- Test CORS policy for credential-bearing cross-origin requests.
+- Inspect TLS configuration for weak cipher suites or downgrade exposure.
+
+**Phase 2 — Gray-Box (Authenticated User Simulation)**
+
+The tester receives two sets of staging credentials representing two separate tenants (Tenant A and Tenant B), each with at least one admin-role and one member-role account. The FORM OpenAPI spec is provided. Objectives:
+
+- Cross-tenant data access (RLS bypass): attempt to read Tenant B data from an active Tenant A session.
+- Horizontal privilege escalation within a tenant: member-role account accessing admin-role functionality.
+- Vertical privilege escalation: Tenant A admin escalating to super-admin or platform-admin.
+- IDOR against all resource IDs: workout sessions, CV sessions, audit log entries, DSAR requests.
+- SCIM provisioning abuse: manipulate group membership to escalate privilege or provision rogue admin users.
+- SAML assertion manipulation: replay, XML signature wrapping, attribute injection.
+- Audit log tampering: attempt to delete, modify, or inject entries into the DEC-030 HMAC chain.
+- JWT tenant_id claim forgery: sign a modified token or exploit weak validation to access another tenant's data.
+- Rate limit bypass: authenticated requests designed to exceed the cost ceiling or per-user rate limits.
+- CV session keypoint extraction: confirm keypoints are not returned in any API response and are not accessible to non-owning users.
+
+#### 52.5.2 Standards
+
+All testing follows:
+
+- **OWASP Testing Guide v4.2 (OTG)** — primary methodology reference for web and API testing.
+- **Penetration Testing Execution Standard (PTES)** — overall engagement structure (pre-engagement, intelligence gathering, threat modelling, exploitation, post-exploitation, reporting).
+- **OWASP API Security Top 10 (2023)** — specific checklist for API attack classes including BOLA/IDOR, broken authentication, excessive data exposure, lack of rate limiting, broken function-level authorisation, mass assignment, security misconfiguration, injection, improper inventory management, and unsafe API consumption.
+- **CVSS v3.1** — mandatory scoring standard for all findings.
+
+#### 52.5.3 Mandatory Attack Vector Coverage
+
+The following vectors must be explicitly documented in the pentest report as tested, with pass/fail status and supporting evidence. Any vector not tested must be documented as untested with a written justification.
+
+| Attack Vector | OTG Reference | OWASP API Top 10 (2023) |
+|---|---|---|
+| IDOR against tenant isolation (RLS boundary) | OTG-AUTHZ-004 | API1: Broken Object Level Authorisation |
+| JWT algorithm confusion and none-algorithm | OTG-SESS-010 | API2: Broken Authentication |
+| SCIM group-claim privilege escalation | OTG-AUTHZ-002 | API5: Broken Function Level Authorisation |
+| SAML XML signature wrapping | OTG-SESS-099 | API2: Broken Authentication |
+| Audit log HMAC chain injection and tampering | OTG-AUTHZ-004 | API8: Security Misconfiguration |
+| Rate limit bypass (per-user cost ceiling) | OTG-BUSLOGIC-004 | API4: Unrestricted Resource Consumption |
+| Mass assignment on user and tenant update endpoints | OTG-BUSLOGIC-009 | API6: Unrestricted Access to Sensitive Business Flows |
+| Excessive data exposure in API responses | OTG-SESS-004 | API3: Broken Object Property Level Authorisation |
+| CV session keypoint extraction | OTG-AUTHZ-001 | API1: Broken Object Level Authorisation |
+| SQL injection via Supabase REST filter parameters | OTG-INPVAL-005 | API10: Unsafe Consumption of APIs |
+
+---
+
+### 52.6 Remediation SLA by Severity
+
+All findings are scored using CVSS v3.1 Base Score. The following SLAs are mandatory. Deviation requires written approval from both security-engineer and compliance-officer, documented in the relevant Linear ticket with a formal justification comment.
+
+| Severity | CVSS v3.1 Range | Acknowledgement SLA | Remediation SLA | Additional Required Actions |
+|---|---|---|---|---|
+| **Critical** | >= 9.0 | 24 hours from report receipt | 7 calendar days | (1) Immediate DEC-030 security event logged. (2) Incident Commander notified within 2 hours of report receipt. (3) Affected endpoint disabled or access revoked within 4 hours if actively exploitable. (4) Re-test by pentest vendor required before Linear ticket closure. |
+| **High** | 7.0 – 8.9 | 48 hours from report receipt | 30 calendar days | (1) DEC-030 security event logged within 24 hours. (2) Linear ticket filed at P1 priority. (3) Re-test by pentest vendor required before Linear ticket closure. |
+| **Medium** | 4.0 – 6.9 | 5 business days from report receipt | 90 calendar days | Linear ticket filed at P2 priority. Re-test recommended; may be satisfied by internal QA validation with documented evidence. |
+| **Low** | 0.1 – 3.9 | Next sprint planning cycle | Next sprint cycle or next annual pentest, whichever comes first | Linear ticket filed at P3 priority. |
+| **Informational** | N/A | Next sprint planning cycle | At discretion of security-engineer | Documented in pentest report; security-engineer records disposition decision in the relevant Linear ticket. |
+
+**SLA clock definition:** The SLA clock starts from the date the final pentest report is delivered to FORM, not from verbal communication of findings during the active engagement.
+
+**SOC 2 audit gate:** Before the observation period start date is confirmed by the audit firm, all Critical and High findings from the pre-observation-period engagement must be in `Closed` status in Linear with a linked re-test confirmation from the pentest vendor. Medium findings must have a filed Linear ticket with an estimated closure date within the observation window.
+
+```sql
+-- Confirm all high/critical pentest findings are closed before
+-- SOC 2 observation period start date is confirmed with audit firm.
+-- Run against the Linear API export or equivalent finding tracker.
+SELECT
+  finding_id,
+  title,
+  cvss_score,
+  severity,
+  status,
+  linear_ticket_id,
+  remediation_confirmed_at,
+  retest_confirmed_at
+FROM pentest_findings
+WHERE
+  engagement_id = 'PRE-52-ENGAGEMENT-001'
+  AND severity IN ('Critical', 'High')
+  AND (status != 'Closed' OR retest_confirmed_at IS NULL);
+-- Expected result before observation period clock starts: 0 rows
+```
+
+---
+
+### 52.7 Evidence Collection for Auditors
+
+The following artefacts must be produced for every penetration testing engagement and filed in the designated evidence store (Cloudflare R2 bucket `form-soc2-evidence`, path `pentest/YYYY/`). Auditors are granted read-only access via a time-limited signed URL issued by compliance-officer.
+
+| Evidence ID | Artefact | Content | Produced By | Filing Deadline |
+|---|---|---|---|---|
+| **PRE-52-E-001** | Pentest Scoping Document | Signed scope agreement between FORM and pentest vendor; in-scope and out-of-scope targets; rules of engagement; staging environment access details | Security-engineer and pentest vendor | Before testing begins |
+| **PRE-52-E-002** | Test Plan | Methodology statement; specific attack vectors to be tested mapped to §52.5.3; engagement timeline; tester CV and certification evidence | Pentest vendor | Before testing begins |
+| **PRE-52-E-003** | Findings Report | Full pentest report with executive summary; all findings itemised with CVSS v3.1 score, reproduction steps, evidence screenshots, and recommended remediation; tested-and-passed items listed explicitly | Pentest vendor | Within 10 business days of testing completion |
+| **PRE-52-E-004** | Remediation Ticket Export | Export of all Linear tickets created for pentest findings, including ticket ID, severity, creation date, closure date, and link to re-test confirmation; for Critical/High findings, re-test confirmation email or vendor report section | Security-engineer | Within 7 days of report receipt for Critical; within 30 days for High |
+| **PRE-52-E-005** | Re-Test Confirmation Report | Vendor-authored confirmation that all Critical and High findings have been re-tested in staging and confirmed remediated; must explicitly state finding ID, remediation approach reviewed, and re-test outcome | Pentest vendor | Before SOC 2 observation period start date |
+
+**Auditor access note:** PRE-52-E-001 through PRE-52-E-005 are provided to the SOC 2 audit firm under the terms of the audit engagement NDA. PRE-52-E-003 (the findings report) is shared in full, including findings subsequently remediated. Auditors must see the complete picture, not a sanitised subset. The presence of findings in a pentest report is not a control failure; the absence of a documented remediation process is.
+
+**Naming convention for repeat engagements:**
+
+```
+PRE-52-E-001_2026.pdf             # First annual engagement
+PRE-52-E-001_2027.pdf             # Second annual engagement
+PRE-52-E-001_2026-POST-ARCH.pdf   # Post-architecture-change engagement
+```
+
+---
+
+### 52.8 Privacy Constraints
+
+The following constraints are non-negotiable and apply to all penetration testing engagements regardless of vendor, timing, or auditor request. These constraints are enforced at the contractual level (§52.4.2) and at the environment provisioning level (§52.10 item #2).
+
+1. **No production access.** The pentest vendor must not be granted credentials, API keys, network access, or database access to the FORM production environment. All testing is conducted against an isolated staging environment provisioned specifically for the engagement.
+
+2. **Synthetic data only.** The staging environment must be populated exclusively with synthetic (fake) user data. No real user records, no real health data, no real CV session keypoints, no real email addresses. The devops-lead is responsible for verifying data is synthetic before granting vendor access. This verification must be documented in writing.
+
+3. **Staging environment isolation.** The pentest staging environment must not share database instances, Cloudflare Workers, KV namespaces, or R2 buckets with the production environment. A separate Supabase project and a separate Cloudflare zone must be used.
+
+4. **clinical-safety veto.** If any proposed test vector, tool configuration, or data set requested by the pentest vendor could expose real user health data, CV keypoints, or personally identifiable health information, the `clinical-safety` agent holds veto power over that specific test vector. This veto is exercised by filing a written objection in the engagement Linear ticket before testing begins.
+
+5. **No data retention by vendor.** Per §52.4.2, the vendor must delete all FORM data (including synthetic staging data, screenshots, tooling outputs, and notes) within 30 days of final report delivery. Compliance-officer confirms deletion via written attestation from the vendor and files the attestation in the evidence bucket.
+
+6. **Keypoint field never decrypted in staging.** The `keypoints_enc` column must remain encrypted in the staging environment. The pentest vendor tests whether the field is accessible, not its decrypted contents. If populated CV session data is required, synthetic encrypted blobs must be used — not real keypoints re-encrypted under a different key.
+
+7. **Audit log payload column.** The `audit_log_events.payload` column in staging must contain synthetic payloads only. The pentest vendor is explicitly prohibited from requesting decrypted payload data as part of the engagement scope.
+
+---
+
+### 52.9 FORM-Specific Attack Scenarios
+
+The following five named attack scenarios are mandatory test cases for every engagement. Each must appear in the pentest report (PRE-52-E-003) with explicit pass/fail status and HTTP-level reproduction evidence.
+
+---
+
+**FORM-PEN-001: RLS Bypass to Access Cross-Tenant Workout Data**
+
+- **Threat mapped:** Cross-tenant data access (CRITICAL in threat model)
+- **Precondition:** Tester holds valid session tokens for Tenant A (attacker) and Tenant B (victim). Both tenants have workout sessions, CV sessions, and coaching data in the staging database.
+- **Attack vector:** Enumerate Tenant B resource IDs via any available channel (API response headers, incremental ID guessing, GraphQL introspection). Attempt to read Tenant B workout sessions, CV sessions, and coaching messages using a Tenant A bearer token. Attempt direct Supabase REST API calls with modified query parameters referencing Tenant B's `org_id`.
+- **Pass condition:** All cross-tenant read, write, and delete attempts return 403 or 404 with no data leakage. RLS policies are confirmed as the enforcement mechanism — not application-layer filtering alone.
+- **Failure condition:** Any Tenant B record is returned in a Tenant A session response. Any error message reveals Tenant B data structure, resource IDs, or content.
+- **Required evidence:** HTTP request/response pairs for all attempted cross-tenant reads; confirmation of RLS policy names enforcing the boundary via a `pg_policies` query against the staging database.
+
+---
+
+**FORM-PEN-002: HMAC Audit Chain Injection**
+
+- **Threat mapped:** Audit log tampering — insider abuse cover-up and regulatory non-compliance
+- **Precondition:** Tester holds a valid admin-role session for Tenant A in staging. The `audit_log_events` table is populated with HMAC-chained entries per the DEC-030 specification.
+- **Attack vector:** (a) Attempt to directly INSERT a forged entry via the Supabase REST API or PostgREST. (b) Attempt to UPDATE or DELETE an existing audit log entry. (c) Attempt to inject a valid-looking entry via any application endpoint that writes to the audit log by crafting a request with attacker-controlled audit content. (d) Attempt to break the HMAC chain by replaying an old event with a modified timestamp.
+- **Pass condition:** All direct INSERT, UPDATE, and DELETE attempts against `audit_log_events` are rejected by RLS. The HMAC chain validation function returns valid after the test. No injected entries appear in the chain.
+- **Failure condition:** Any audit log entry can be created, modified, or deleted by a non-platform-admin actor. The HMAC chain can be broken without detection.
+- **Required evidence:** HTTP request/response pairs for all attempted writes; output of `SELECT audit_chain_verify()` after the test; `pg_policies` output confirming insert restriction on `audit_log_events`.
+
+---
+
+**FORM-PEN-003: SCIM Group-Claim Privilege Escalation**
+
+- **Threat mapped:** Privilege escalation via SCIM provisioning in enterprise multi-tenancy
+- **Precondition:** Tester controls a SCIM provisioning token for Tenant A, as would be held by an enterprise IT admin or a compromised IdP. SCIM 2.0 endpoints are enabled in staging.
+- **Attack vector:** (a) Provision a new user with an admin-level group claim (`FORM_ADMIN` or equivalent) via the SCIM `/Users` endpoint without going through the normal admin-invite flow. (b) Modify an existing member-role user's group membership to admin via the SCIM `/Groups` endpoint. (c) Provision a user in Tenant B using a SCIM token issued to Tenant A (cross-tenant SCIM abuse). (d) Set the `tenant_id` claim on a SCIM-provisioned user to a value outside the token's authorised tenant.
+- **Pass condition:** SCIM provisioning enforces tenant isolation; group claims are validated against an allowlist; admin provisioning via SCIM requires a separate admin-invite confirmation step outside the SCIM flow.
+- **Failure condition:** A member-role user can be escalated to admin via SCIM without admin confirmation. A SCIM token for Tenant A can provision users in Tenant B.
+- **Required evidence:** SCIM API request/response pairs; FORM user table state before and after each attempt from the staging database (synthetic data only); confirmation of SCIM token scope validation in Cloudflare Worker logs.
+
+---
+
+**FORM-PEN-004: CV Session Keypoint Extraction**
+
+- **Threat mapped:** Camera frames and keypoint data exposure (CRITICAL in threat model — on-device-only architecture)
+- **Precondition:** Tester holds a valid member-role session. The staging database has CV sessions with synthetic encrypted keypoint blobs in `cv_sessions.keypoints_enc`. The on-device architecture means keypoints must never be returned by the server API.
+- **Attack vector:** (a) Attempt to read the `keypoints_enc` column via Supabase REST API, GraphQL, or any application API endpoint. (b) Attempt to read another user's CV session keypoints (IDOR). (c) Attempt to read own `keypoints_enc` value — even for the owning user, the server must not return the raw encrypted blob. (d) Inspect all API responses during a normal CV session workflow for any keypoint data leakage, partial or full. (e) Attempt to access CV session data via the admin dashboard.
+- **Pass condition:** `keypoints_enc` is never present in any API response. IDOR attempts against other users' CV sessions return 403 or 404. The admin dashboard does not expose raw keypoint data in any form.
+- **Failure condition:** Any API response contains `keypoints_enc` data, whether encrypted or in plaintext. Any CV session belonging to User B is accessible from User A's session.
+- **Required evidence:** Full HTTP response bodies for all CV session API calls during the test; confirmation that `keypoints_enc` is excluded from all PostgREST column exposure configurations; RLS policy covering `cv_sessions`.
+
+---
+
+**FORM-PEN-005: JWT Tenant_id Claim Forgery**
+
+- **Threat mapped:** Account takeover and cross-tenant data access via token manipulation
+- **Precondition:** Tester has a valid JWT for a member-role account in Tenant A. Tester has knowledge of Tenant B's `org_id` (treated as non-secret — org IDs are not a security boundary).
+- **Attack vector:** (a) Decode the JWT and modify the `tenant_id` claim to Tenant B's `org_id`; attempt to re-sign with a null algorithm (`alg: none`). (b) Algorithm confusion: if the JWT is RS256-signed, attempt to re-sign with the server's public key treated as an HMAC secret (HS256). (c) Use an expired JWT that had a valid Tenant A `tenant_id` claim. (d) Pass a JWT with a `tenant_id` claim that does not correspond to any real tenant and inspect error messages for internal claim structure disclosure. (e) Replay a captured JWT after the session has been explicitly revoked via sign-out or admin revocation.
+- **Pass condition:** All forged, modified, or expired tokens are rejected with 401. The none-algorithm and HS256 confusion attacks fail. Revoked tokens are rejected within the session invalidation window defined in the auth configuration. Error messages do not reveal internal claim structure.
+- **Failure condition:** Any modified token is accepted by any endpoint. A none-algorithm or algorithm-confusion attack succeeds. A revoked token remains valid beyond the documented invalidation window.
+- **Required evidence:** JWT decode and re-encode tooling output; HTTP request/response pairs for all token manipulation attempts; confirmation of Supabase JWT validation configuration including algorithm enforcement, expiry enforcement, and the revocation mechanism in use.
+
+---
+
+### 52.10 Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Select and contract pentest vendor per §52.4 criteria; execute mutual NDA and data handling annex before any scoping call; file vendor selection scorecard | P0 | M4 | security-engineer + compliance-officer | [ ] |
+| 2 | Provision isolated pentest staging environment: separate Supabase project, separate Cloudflare zone, synthetic data population; devops-lead to provide written confirmation that no production data is present before vendor access is granted | P0 | M4 | devops-lead | [ ] |
+| 3 | Complete pentest scoping document (PRE-52-E-001) and test plan (PRE-52-E-002) with vendor; confirm all 5 FORM-PEN scenarios (§52.9) and all 10 mandatory attack vectors (§52.5.3) are in scope and will be explicitly reported | P0 | M4 | security-engineer | [ ] |
+| 4 | Conduct penetration test engagement: black-box phase followed by gray-box phase per §52.5.1; security-engineer on-call during active testing window to answer environment questions without granting production access | P0 | M5 (Day 30–45) | pentest vendor + security-engineer | [ ] |
+| 5 | Receive final pentest findings report (PRE-52-E-003); triage all findings against §52.6 SLA table within 48 hours; file Linear tickets for all findings with severity, CVSS score, and SLA due date | P0 | M5 (Day 45) | security-engineer | [ ] |
+| 6 | Remediate all Critical findings within 7 days and all High findings within 30 days of report receipt; log DEC-030 security events for each Critical finding; confirm remediation with devops-lead and platform-engineer before marking ticket ready for re-test | P0 | M5 (Day 52 for Critical; Day 75 for High) | security-engineer + platform-engineer | [ ] |
+| 7 | Request re-test from pentest vendor for all Critical and High findings; receive re-test confirmation report (PRE-52-E-005) and file in R2 evidence bucket `pentest/2026/` | P0 | M5 (Day 60) | security-engineer | [ ] |
+| 8 | File remediation ticket export (PRE-52-E-004): Linear export of all pentest finding tickets with closure dates, re-test links, and DEC-030 event references for Critical items | P1 | M5 (Day 60) | compliance-officer | [ ] |
+| 9 | Confirm §51.9 item #15 closed: verify PRE-52-E-003 and PRE-52-E-005 are filed in R2; confirm zero open Critical/High tickets in Linear for the engagement; advance CC6-GAP-004 to 🟢 in the §51.4 gap register | P0 | M5 (Day 60) | compliance-officer | [ ] |
+| 10 | Schedule next annual pentest engagement (12 months from current engagement close); calendar entry filed with security-engineer and compliance-officer; post-architecture-change trigger criteria documented in the security runbook | P2 | M6 | security-engineer | [ ] |
+
+---
+
+*v2.4 additions (2026-06-01): §52 External Penetration Testing Program — Scope, Methodology, Vendor Selection, Remediation SLA & Auditor Evidence. Closes §51.9 checklist item #15 and advances CC6-GAP-004 from gap-identified to 🟡 Authored. Closure to 🟢 requires receipt and filing of PRE-52-E-001 through PRE-52-E-005 with all Critical and High findings resolved and re-test confirmed. Five mandatory FORM-specific attack scenarios defined: FORM-PEN-001 (RLS cross-tenant bypass), FORM-PEN-002 (HMAC audit chain injection), FORM-PEN-003 (SCIM group-claim privilege escalation), FORM-PEN-004 (CV session keypoint extraction), FORM-PEN-005 (JWT tenant_id claim forgery). Remediation SLAs: Critical 7 days, High 30 days, Medium 90 days. Privacy constraints enforce staging-only testing with synthetic data; clinical-safety veto applies to any test vector that could expose real health data. Vendor selection requires CREST/OSCP/GPEN certification and contractual data deletion within 30 days of engagement close. TSC mapping covers CC7.1, CC7.2, CC9.1, CC6.1, CC6.8, A1.2. Document header updated from v2.3 to v2.4.*

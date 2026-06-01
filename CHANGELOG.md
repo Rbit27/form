@@ -6,6 +6,13 @@
 
 ---
 
+## [1.58.0] — 2026-06-01
+
+### Added
+- [`docs/SOC2_READINESS.md §52`](docs/SOC2_READINESS.md) — External Penetration Testing Program: scope, methodology (OWASP TG v4.2 + PTES), vendor selection (CREST/OSCP/GPEN), remediation SLA by CVSS, 5 FORM-specific attack scenarios (FORM-PEN-001..005), evidence PRE-52-E-001..005. Closes §51.9 item #15, advances CC6-GAP-004 → 🟡 Authored. Doc v2.3 → v2.4
+
+---
+
 ## [1.57.2] — 2026-06-01
 
 ### Added
