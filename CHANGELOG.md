@@ -6,6 +6,13 @@
 
 ---
 
+## [1.54.0] — 2026-06-01
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md` → §23 Continuous Access Evaluation (CAE) & Shared Signals Framework (SSF) — Real-Time IdP Risk Event Processing (568 lines). Closes the §12 JWT residual-window gap: after an IdP security event (account disabled, password reset, MFA removed, device compliance change), FORM previously had no real-time notification path — sessions remained valid until 15-min JWT expiry. §23 implements FORM as an SSF stream receiver. §23.1 problem statement: six IdP event classes + 30 s latency target. §23.2 standards layering: SSF (IETF transport), SET RFC 8417, CAEP (event vocabulary), RISC (Google), Microsoft Entra CAE deviation (EventGrid, CP1 `xms_cc` claim required). §23.3 Cloudflare Worker receiver `POST /enterprise/v1/sso/caep-receiver/{tenant_id}`: JWKS validation, SET parsing, 10-step decision pipeline, 202 Accepted anti-retry-storm. §23.4 8-event-type → action mapping table: `force_reauth` KV key (soft re-auth), `account_suspended` flag, `revoke:user:*` (§22 integration), GDPR deletion queue trigger for `account-purged`. §23.5 schema: `tenant_sso_configs` 6 new columns, `caep_events` table DDL with idempotency `set_jti UNIQUE`, `ON DELETE SET NULL` on `user_id` edge case. §23.6 IdP-specific: Entra (EventGrid + CP1 xms_cc/xms_ssm), Okta SSF push, Google RISC. §23.7 security: SET replay prevention, JWKS cache integrity, webhook HMAC, 1K/h rate limit, tenant isolation guard. §23.8 six DEC-030 HMAC-chained audit events (STANDARD/HIGH/CRITICAL, 7yr). §23.9 five alerting rules AL-CAEP-01 through AL-CAEP-05 (P0–P2). §23.10 SOC 2: CC6.3 (15 min → 30 s revocation latency), CC6.6, CC7.2/CC7.3. §23.11 four open questions OQ-SSO-23.1–23.4. §23.12 14-item checklist (P0/P1, M4/M5).
+
+---
+
 ## [1.53.0] — 2026-06-01
 
 ### Added

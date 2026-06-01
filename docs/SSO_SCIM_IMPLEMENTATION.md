@@ -7486,3 +7486,571 @@ Add both rules to `docs/OBSERVABILITY.md §6.2` alert rules table at the `sessio
 *v1.3 additions (2026-05-30): Section 21 — Google Workspace Directory API Integration for Group Sync. Closes G-005 from §9 (Google Directory API integration for group sync — designed but not implemented). Root cause documented: Google OIDC deliberately omits group membership from ID token regardless of scopes; Admin SDK Directory API + service account + domain-wide delegation (DWD) is the canonical industry solution. Pull-model design (FORM calls Google on each login) vs. §19 push-model (SCIM); complementary — Google Workspace tenants who cannot use the three §19 workarounds (Okta bridge, Entra bridge, SAML groups attribute) use this path instead. Architecture: OIDC callback Worker checks `google_directory_group_cache` (5-minute TTL); on CACHE MISS calls `GET admin.googleapis.com/admin/directory/v1/groups?userKey={email}`; resolved groups feed directly into existing `scim_group_role_mappings` lookup (§19.3) — no change to role resolution engine (§5.4). Schema: ALTER TABLE `tenant_sso_configs` — three new columns (`google_service_account_email`, `google_directory_admin_email`, `google_directory_sync_enabled` + last_sync_at + sync_error); `google_service_account_json BYTEA` already exists (§4.2); partial index on `google_directory_sync_enabled = true` tenants; new `google_directory_group_cache` table (UNIQUE on `tenant_id, user_email`, `expires_at` as generated column = `fetched_at + 5min`, RLS tenant isolation + form_system write-only + form_api read-own-tenant; pg_cron cleanup every 10 minutes). Full TypeScript implementation (`apps/api-gateway/src/sso/google-directory-groups.ts`): `resolveGoogleGroups()` cache-first lookup with 10-minute grace window on API failure (stale cache used rather than blocking login); `fetchAndCacheGroups()` pagination loop (200 per page, handles nextPageToken); `mintServiceAccountToken()` using SubtleCrypto RSASSA-PKCS1-v1_5 + JWT grant to `oauth2.googleapis.com/token`; `importPrivateKey()` PKCS8 import for Workers WebCrypto. Service account access token KV caching (OQ-SSO-21.3: `{tenant_id}_google_token`, TTL 55 min, avoids 200ms JWT-to-token overhead per login). Customer configuration: 4-step process (GCP project + service account creation; Admin Console domain-wide delegation with `admin.directory.group.readonly` scope only; impersonation account designation; CSM-mediated credential upload via secure portal — never email). Credential rotation protocol: 7-step process; key deletion in GCP before replacement on compromise path. Eight DEC-030 HMAC-chained audit events: `sso.google_directory_sync_success` (STANDARD), `sso.google_directory_sync_cache_hit` (STANDARD), `sso.google_directory_sync_error` (HIGH), `sso.google_directory_credential_uploaded` (HIGH), `sso.google_directory_credential_rotated` (HIGH), `sso.google_directory_sync_enabled` (HIGH), `sso.google_directory_sync_disabled` (HIGH), `sso.google_directory_sync_validated` (STANDARD) — all 7yr; `user_email_hash` SHA-256 not plaintext in all events. Five alerting rules AL-SSO-GDIR-01 through AL-SSO-GDIR-05 (P2: error rate > 20% / 3 consecutive per tenant; P3: P95 latency > 3,000ms / unvalidated credential). GDPR: Google Workspace DPA covers Directory API; conditional sub-processor entry in SOC2_READINESS §44; data minimisation enforced (only id/email/name stored, 5-minute TTL); Art. 14 transparency obligation on customer controller. SOC 2: CC6.1 (credential lifecycle), CC6.2 (actor_id + role on credential operations), CC6.3 (5-minute TTL enforces timely role revocation), CC7.2 (5 alerting rules on sync health), CC9.2 (Google DPA + conditional sub-processor entry), C1.1 (email hash + group data not exposed to tenant_manager). Four evidence artefacts CC6-E-GDIR-001 through CC6-E-GDIR-004. Four open questions OQ-SSO-21.1 through OQ-SSO-21.4 (background sync M6 decision; >10,000 group scale test; KV access-token caching design; Cloud Identity Groups deferral). Gap status: G-005 🔴 Open → 🟡 Authored. 12-item implementation checklist: 8× P0 M4, 4× P1 M4.*
 
 *v1.4 additions (2026-06-01): Section 22 — High-Scale Session Revocation Architecture — KV-Backed Revocation Cache. Closes G-009 from §9 (session blocklist persistence bottleneck at >100-seat enterprise deployments — needed before first large-tenant go-live). Root cause: the `session_blocklist` Supabase table in §6.3 performs a synchronous SELECT on every authenticated request; at ≥100 RPS from enterprise concurrent users this saturates the Supabase connection pool and adds 15–25 ms per-request latency. Two-tier revocation architecture: Cloudflare KV (`SESSION_REVOCATION_KV` namespace, separate from `SSO_KV` for quota isolation) as the hot cache (~1 ms reads); Supabase `session_blocklist` as the authoritative audit trail (written on every revocation, read only as fallback). Four KV key types: `revoke:tenant:{tenant_id}:all` (TTL = max_jwt_ttl; single write nukes all tenant sessions — O(1) regardless of session count), `revoke:user:{tenant_id}:{user_id}` (TTL = 24h; user-level revocation), `revoke:session:{session_id}` (TTL = remaining JWT exp), `revoke:jti:{jti}` (TTL = remaining JWT exp; integrates the "Redis" JTI blocklist described in §12.7.4 into existing Cloudflare KV infrastructure). Per-request validation sequence: JWT signature + exp → three-way parallel KV GET (tenant/user/session) → optional JTI KV GET (opt-in per tenant) → handler; expected total overhead ≤ 3 ms (vs. 20 ms Supabase). Bulk SCIM revocation path (`handleBulkScimRevocation()` in `apps/api-gateway/src/sso/session-revocation-kv.ts`): batched KV writes in groups of 50 using Promise.all (Cloudflare Workers supports ≥50 concurrent KV ops per request); 1,000-user deactivation completes in ~100 ms (20 batches × ~5 ms) vs. current >10 s Supabase INSERT SELECT path. Tenant nuke function (`nukeTenantSessions()`): single KV write at `revoke:tenant:{tenant_id}:all`, replaces the unbounded `INSERT INTO session_blocklist SELECT ... WHERE tenant_id = $1` in §8.3, and becomes the canonical P0 incident response action (INCIDENT_RESPONSE.md R-01, step "invalidate all active sessions"). Schema change: one new column `kv_sync_status revocation_kv_status DEFAULT 'pending'` on `session_blocklist` (ENUM: pending/synced/failed), backfilled asynchronously; tracks whether a revocation has been reflected in KV for audit purposes. Migration window (30 days after deploy): on KV MISS, fallback to Supabase `session_blocklist` SELECT to catch sessions revoked before the KV layer was deployed; after 30 days the fallback is removed and sessions revoked pre-deploy have expired naturally. Five DEC-030 HMAC-chained audit events: `session.bulk_revocation_started` (HIGH, 7yr — emitted before first KV write; includes user_count + scim_request_id), `session.bulk_revocation_complete` (HIGH, 7yr — includes sessions_revoked count + duration_ms), `session.tenant_nuke_started` (CRITICAL, 7yr — two-person authorization required; authorised_by array), `session.tenant_nuke_complete` (CRITICAL, 7yr), `session.revocation_kv_sync_error` (HIGH, 7yr — KV write failure; fallback to Supabase-only path; triggers PagerDuty P1). Two alerting rules: AL-REVOKE-01 (P1 — `session.revocation_kv_sync_error` error rate > 1% over 5 min; runbook: KV namespace binding missing or quota exceeded), AL-REVOKE-02 (P2 — bulk revocation duration_ms > 5,000; runbook: batch size may need reducing or KV quota check). SOC 2 mapping: CC6.3 (logical access removed on a timely basis — KV revocation < 100 ms vs. 15-minute JWT residual window for standard path; tenant nuke < 5 ms), CC7.2 (anomaly monitoring — AL-REVOKE-01/02 on sync health), CC7.3 (response to anomalies — KV sync error triggers PagerDuty P1). Two evidence artefacts: CC6-E-REV-001 (`audit_log` export: all `session.bulk_revocation_*` and `session.tenant_nuke_*` events for observation period), CC6-E-REV-002 (`session_blocklist` kv_sync_status distribution: `SELECT kv_sync_status, count(*) FROM session_blocklist WHERE blocked_at BETWEEN $obs_start AND $obs_end GROUP BY 1` — confirms >99% synced). G-009 status: 🔴 Open → 🟡 Authored (design complete; implementation-pending M4). Implementation checklist: 11 tasks (8× P0 M4, 3× P1 M4/M5).*
+
+---
+
+## 23. Continuous Access Evaluation (CAE) & Shared Signals Framework (SSF) — Real-Time IdP Risk Event Processing
+
+### 23.1 Problem Statement
+
+§22 solved the FORM-initiated session revocation problem: when FORM itself decides to invalidate sessions — in response to a SCIM deprovisioning event, an admin action, or an emergency tenant nuke — the §22 KV layer ensures that those sessions are invalidated within milliseconds, long before the JWT's 15-minute TTL (§12) would naturally expire. However, §22 assumes that FORM is the initiator. There is a complementary and equally important gap: the identity provider itself continuously evaluates user risk and can determine, independently of any FORM-side action, that a user's access should be immediately revoked.
+
+The following IdP security events, if they occur during an active FORM session, currently propagate to FORM only when the access token expires — up to 15 minutes later (§12 access token TTL). This is the residual validity window:
+
+- **Account disabled or deleted at the IdP**: An HR system deprovisions an employee in Azure AD or Okta. The SCIM deprovisioning webhook (§5) may not arrive for several minutes if the IdP batches SCIM writes; and on some IdP configurations, deprovisioning does not trigger SCIM at all — it only invalidates the IdP-side session. During the SCIM lag window, the user's FORM access token remains valid.
+- **Password reset**: The user's credential was compromised; IT initiates a forced password reset. The IdP invalidates all refresh tokens for that user. The FORM access token, already minted, continues to work until its TTL expires.
+- **MFA credential removed or changed**: The user's authenticator was deleted by an admin (suspected device loss), or the user enrolled a new MFA factor (possible account takeover mid-enrollment). Neither event reaches FORM directly.
+- **Session revoked from IdP admin console**: An admin explicitly terminates a user's SSO session in the Okta admin panel or Azure AD "Revoke sessions" action. The IdP-side session ends; the FORM access token is unaffected.
+- **High-risk sign-in detected**: The IdP's risk engine flags the user's session as high-risk (impossible travel, leaked credentials, anomalous token usage). The IdP may downgrade the user's session confidence but cannot reach into downstream relying parties to enforce it.
+- **Device compliance change**: The user's registered device falls out of compliance (MDM policy violation, certificate expired). Conditional Access at the IdP would block new logins but cannot reach FORM sessions already established.
+
+Current FORM response time for all of the above: up to 15 minutes, bounded by access token TTL. The target after §23 is under 30 seconds from the moment the IdP emits the security event to the moment FORM's per-request revocation check (`isRevoked()`, §22.4) returns `true` for that user's sessions.
+
+This 30-second target is achievable because: (a) IdPs push events to FORM's webhook within seconds of the triggering action, (b) the FORM worker processes the SET and writes to the §22 KV in under 200 ms, and (c) `isRevoked()` reads from KV in under 3 ms on the next request. The pipeline latency is dominated by IdP-side event dispatch, which is typically 5–20 seconds after the triggering admin action.
+
+### 23.2 Standards Overview
+
+The problem of communicating risk signals between identity systems is addressed by two complementary IETF/OpenID specifications:
+
+**IETF Shared Signals Framework (SSF)** — `draft-ietf-sharedsignals-framework` — defines the transport and delivery model. SSF introduces the concepts of a Transmitter (the IdP, which detects security events) and a Receiver (FORM, which acts on them). It specifies how Receivers register streams, negotiate delivery mode (push vs. poll), and how Transmitters batch and deliver Security Event Tokens. SSF is protocol-agnostic about what the events mean; it is purely a transport specification.
+
+**OpenID CAEP (Continuous Access Evaluation Protocol)** defines the event vocabulary carried over SSF for access evaluation events. CAEP event types include `session-revoked`, `credential-change`, `token-claims-change`, `device-compliance-change`, and `account-disabled`. CAEP is the vocabulary that Okta, Microsoft, and other modern enterprise IdPs expose through their SSF endpoints.
+
+**OpenID RISC (Risk and Incident Sharing and Collaboration)** is an earlier but widely deployed Google-authored vocabulary, also carried over SSF transport, focused on account security risk events. RISC defines `hijacking`, `account-disabled`, `account-enabled`, and `account-purged`. Google Workspace OIDC tenants (§4.2) use RISC; Okta and Entra use CAEP. The two vocabularies overlap in semantics but not in event type URIs, so FORM's handler must recognise both namespaces.
+
+**Security Event Tokens (SET)** — RFC 8417 — are the wire format for individual events. A SET is a signed JWT. Its payload contains a standard `iss` (IdP identifier), `iat`, `jti` (unique event ID), `sub` (the affected user's IdP subject identifier), and an `events` claim — a JSON object keyed by event type URI, with event-specific payload as the value. The IdP signs the SET using its private key; FORM verifies the signature using the IdP's JWKS, which is published at a well-known endpoint.
+
+The relationship between the layers is:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Event Vocabulary Layer                                       │
+│  ┌──────────────────────┐  ┌──────────────────────────────┐  │
+│  │  OpenID CAEP          │  │  OpenID RISC (Google)        │  │
+│  │  (Okta, Entra, etc.)  │  │  (Google Workspace OIDC)     │  │
+│  └──────────────────────┘  └──────────────────────────────┘  │
+├──────────────────────────────────────────────────────────────┤
+│  Token Format Layer                                          │
+│  RFC 8417 Security Event Tokens (SET) — signed JWTs          │
+├──────────────────────────────────────────────────────────────┤
+│  Transport Layer                                             │
+│  IETF SSF (draft-ietf-sharedsignals-framework)               │
+│  Push delivery (IdP → FORM webhook) or Poll (FORM → IdP)     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Microsoft Entra Continuous Access Evaluation** is Microsoft's proprietary but CAEP-aligned implementation. Entra CAE does not use the SSF push model for third-party receivers in all configurations; instead it delivers events via Azure Event Grid webhooks. The SET format and CAEP event vocabulary are the same, but the registration mechanism differs (Microsoft Graph API rather than an SSF transmitter configuration endpoint). This distinction is covered in §23.6.
+
+### 23.3 FORM as SSF Stream Receiver
+
+#### 23.3.1 Stream Registration Model
+
+FORM registers as an SSF Receiver at each IdP that supports the protocol. A "stream" in SSF terminology is a persistent subscription between one Transmitter (IdP) and one Receiver (FORM). Each stream is scoped to a single tenant and a single IdP. A tenant using Okta for SSO has exactly one CAEP stream; a tenant using Entra has exactly one Entra CAE stream. A tenant using Google Workspace OIDC has one RISC stream. These are stored independently in the `tenant_sso_configs` table (new columns in §23.5).
+
+At stream creation, FORM provides the IdP with:
+
+1. A **push delivery endpoint URL**: `https://api.form.coach/enterprise/v1/sso/caep-receiver/{tenant_id}` — the Cloudflare Worker endpoint that receives SET payloads from the IdP via HTTP POST.
+2. A **verification token**: a random 32-byte token, URL-safe base64-encoded, that the IdP includes in a verification challenge before stream activation. FORM must echo this token back to complete the handshake. The token is stored in `tenant_sso_configs.caep_webhook_secret` and is separate from the HMAC signing secret used for payload integrity.
+3. A **set of requested event types**: FORM requests all CAEP and RISC event types it recognises (listed in §23.4). The IdP may deliver a subset based on its supported vocabulary.
+
+Stream registration is performed by FORM's admin dashboard backend when a tenant enables CAEP in their SSO settings. The registration flow calls the IdP's transmitter configuration endpoint (discovered from the SSF well-known metadata document at `{issuer}/.well-known/ssf-configuration`) and stores the returned `stream_id` in `caep_stream_id`.
+
+#### 23.3.2 CAEP Receiver Worker Endpoint
+
+The receiving endpoint is a dedicated Cloudflare Worker route:
+
+```
+POST /enterprise/v1/sso/caep-receiver/{tenant_id}
+```
+
+This endpoint is not part of the authenticated API surface — it is called by IdPs, not by tenant users or FORM clients. Authentication is provided by the SET signature itself (JWKS validation) and the HMAC webhook secret. The processing pipeline is:
+
+```
+Request arrives
+  │
+  ├─ 1. Extract tenant_id from URL path
+  │       Validate tenant exists + has active CAEP config (Supabase lookup, cached in SSO_KV, TTL 5 min)
+  │       On miss: 404 (do not reveal whether tenant exists)
+  │
+  ├─ 2. HMAC-SHA256 webhook secret validation
+  │       Read X-SSF-Signature header (or IdP-specific equivalent)
+  │       Compute HMAC-SHA256(raw_request_body, caep_webhook_secret)
+  │       Constant-time comparison
+  │       On failure: 401 + emit sso.caep_stream_error audit event
+  │
+  ├─ 3. Parse SET JWT header — extract kid
+  │       Fetch JWKS from SSO_KV (key: caep_jwks:{tenant_id}:{iss}, TTL 1h)
+  │       On KV miss: fetch from IdP's JWKS endpoint, store in KV
+  │       On kid mismatch after fresh fetch: reject + emit HIGH sso.caep_stream_error
+  │
+  ├─ 4. Verify SET JWT signature using resolved JWKS key
+  │       Verify iss matches expected IdP for this tenant
+  │       Verify iat is not in the future (clock skew tolerance: 60 s)
+  │       Verify jti not in caep_events (replay prevention, Supabase lookup)
+  │
+  ├─ 5. Extract event type from events claim (first key of events object)
+  │       Extract sub (IdP subject) and any event-specific payload fields
+  │
+  ├─ 6. Resolve FORM user_id from idp_subject
+  │       SELECT user_id FROM tenant_users WHERE tenant_id = $1 AND idp_subject = $2
+  │       (Same lookup as SAML JIT, §6.2 — idp_subject already indexed)
+  │
+  ├─ 7. Route to action handler (§23.4 mapping table)
+  │       Action handler writes to SESSION_REVOCATION_KV (§22.5 key patterns)
+  │
+  ├─ 8. Insert into caep_events (idempotent: ON CONFLICT (set_jti) DO NOTHING)
+  │
+  ├─ 9. Emit DEC-030 sso.caep_event_received audit event
+  │
+  └─ 10. Return 202 Accepted
+         (202, not 200 — signals to IdP that FORM received the event but processing
+          is asynchronous; prevents IdP retry storms on any transient downstream delay)
+```
+
+The choice of 202 Accepted is deliberate. SSF receivers are expected to return 2xx promptly to acknowledge receipt. If FORM returns a non-2xx status, well-behaved IdP transmitters will retry with exponential backoff, potentially delivering the same event multiple times. The `set_jti` UNIQUE constraint in `caep_events` (§23.5) makes processing idempotent, but generating unnecessary retry traffic is wasteful and could trigger FORM's own rate limiting. Returning 202 immediately and processing synchronously within the Worker request context (Cloudflare Workers have a 30-second CPU time limit, well above the ~200 ms required for this pipeline) avoids both problems.
+
+#### 23.3.3 Tenant Configuration Cache
+
+The per-tenant CAEP configuration (whether CAEP is enabled, the `caep_webhook_secret`, the expected IdP issuer) is loaded from Supabase on the first request and cached in `SSO_KV` with a 5-minute TTL under the key `caep_config:{tenant_id}`. This avoids a Supabase round-trip on every incoming CAEP event. The cache is invalidated proactively when a tenant admin updates their CAEP configuration via the admin dashboard (the dashboard backend writes to Supabase and issues a KV delete for the cache key).
+
+The JWKS for each IdP is cached separately under `caep_jwks:{tenant_id}:{iss}` with a 1-hour TTL — consistent with the SSO_KV JWKS caching pattern used in §12.7. On a `kid` miss in the cached JWKS (possible during IdP key rotation), FORM fetches the JWKS endpoint fresh and updates the KV entry. If the fresh JWKS also does not contain the presented `kid`, the SET is rejected and a HIGH severity `sso.caep_stream_error` audit event is emitted. This is the correct response: a `kid` that cannot be resolved after a fresh JWKS fetch is either a misconfiguration or a signature from an unknown key — both cases warrant rejection.
+
+### 23.4 Event Type to Action Mapping
+
+The `events` claim in the SET JWT is a JSON object where keys are event type URIs defined by the CAEP or RISC vocabulary. FORM extracts the first key of the object (SSF permits only one event type per SET in most IdP implementations, though the spec allows multiple) and dispatches to the corresponding action handler.
+
+| # | Event Type URI | Standard | Triggered By | FORM Action | KV Pattern (§22) |
+|---|---|---|---|---|---|
+| 1 | `https://schemas.openid.net/secevent/caep/event-type/session-revoked` | CAEP | Admin revokes specific IdP session | Revoke the specific FORM session identified by the `session_id` field in the event payload (if present) or fall back to user-level revocation | `revoke:session:{session_id}` or `revoke:user:{tenant_id}:{user_id}` |
+| 2 | `https://schemas.openid.net/secevent/caep/event-type/credential-change` | CAEP | Password reset, MFA credential added/removed/modified | Revoke all active sessions for the user across all devices | `revoke:user:{tenant_id}:{user_id}` (TTL 24h) |
+| 3 | `https://schemas.openid.net/secevent/caep/event-type/token-claims-change` | CAEP | Role change, group membership change at IdP that affects token claims | Set `force_reauth:{tenant_id}:{user_id}` flag in SESSION_REVOCATION_KV (TTL 24h); on next request, return 401 with `WWW-Authenticate: Bearer error="insufficient_user_authentication"` to prompt re-login | `force_reauth:{tenant_id}:{user_id}` (TTL 24h) |
+| 4 | `https://schemas.openid.net/secevent/caep/event-type/account-disabled` | CAEP | Account suspended in IdP (leave of absence, HR action, security hold) | Revoke all user sessions via user-level KV key; set `account_suspended:{tenant_id}:{user_id}` in KV (TTL 72h, renewably checked); write `status = 'suspended'` to `tenant_users` | `revoke:user:{tenant_id}:{user_id}` + `account_suspended:{tenant_id}:{user_id}` |
+| 5 | `https://schemas.openid.net/secevent/caep/event-type/account-enabled` | CAEP | Account re-enabled in IdP (suspension lifted) | Clear `account_suspended:{tenant_id}:{user_id}` KV key; update `tenant_users.status = 'active'`; emit audit event. No automatic session restoration — user must log in again | KV delete `account_suspended:{tenant_id}:{user_id}` |
+| 6 | `https://schemas.openid.net/secevent/caep/event-type/account-purged` | CAEP | Account permanently deleted at IdP | Full offboarding: revoke all sessions (user-level KV key); set `tenant_users.status = 'deleted_by_idp'`; set `tenant_users.deleted_at = NOW()`; queue GDPR deletion workflow (async Worker queue event); emit CRITICAL sso.caep_user_purged audit event. Two-person rule applies to any manual override of a purge action | `revoke:user:{tenant_id}:{user_id}` + GDPR queue |
+| 7 | `https://schemas.openid.net/secevent/caep/event-type/device-compliance-change` | CAEP | MDM reports device fell out of compliance | Conditional: if `tenant_sso_configs.session_policy->>'require_device_compliance' = 'true'` then revoke all user sessions; otherwise write `force_reauth:{tenant_id}:{user_id}` (softer response — force re-auth so Conditional Access at the IdP can block the next login if needed) | Conditional: `revoke:user:{tenant_id}:{user_id}` or `force_reauth:{tenant_id}:{user_id}` |
+| 8 | `https://schemas.openid.net/secevent/risc/event-type/hijacking` | RISC (Google) | Google detects active session hijacking (token theft, impossible travel, etc.) | Immediate session revocation for all user sessions; emit P0 PagerDuty alert (AL-CAEP-04); emit CRITICAL audit event. Applicable only to Google Workspace OIDC tenants (§4.2) | `revoke:user:{tenant_id}:{user_id}` + PagerDuty P0 |
+
+**`token-claims-change` and `force_reauth`:** The `force_reauth` KV pattern is a new key type not present in §22. It does not revoke the session outright — the session remains technically valid — but it causes `isRevoked()` to return a special `FORCE_REAUTH` signal rather than a hard `true`. The Worker's authentication middleware must handle this signal by returning a 401 with the `insufficient_user_authentication` error code, prompting the client to initiate a new SSO flow. This preserves the user's session context (draft workouts, current screen) while ensuring that the fresh SSO assertion reflects the updated claims. The TTL of 24 hours acts as a backstop: even if the client does not re-authenticate, the TTL eventually falls off and the next regular token expiry (15 minutes) handles it.
+
+**`account-purged` and the GDPR deletion workflow:** The `account-purged` event starts the GDPR data deletion clock. FORM must complete deletion of all user personal data within 30 days (per the GDPR data processing agreement). The `account-purged` action handler enqueues a message to a Cloudflare Workers Queue (`GDPR_DELETION_QUEUE`) with the `tenant_id`, `user_id`, and `idp_subject`. A separate background Worker consumer processes the queue, orchestrates deletion across Supabase tables, and emits a `gdpr.deletion_completed` audit event when done. The `sso.caep_user_purged` audit event is the evidence artefact that the GDPR deletion SLA timer started; the `gdpr.deletion_completed` event is the evidence that it was met.
+
+The action handler for event types 1–8 is implemented in `apps/api-gateway/src/sso/caep-action-handler.ts`. The Worker endpoint (`caep-receiver.ts`) calls `dispatchCaepAction()` with the resolved user_id, tenant_id, event type, and event payload. The function returns an `action_taken` string that is stored in `caep_events.action_taken` for audit and SOC 2 evidence.
+
+```typescript
+// In: apps/api-gateway/src/sso/caep-action-handler.ts
+
+export type CaepActionResult = {
+  action_taken: string;
+  kv_keys_written: string[];
+};
+
+export async function dispatchCaepAction(
+  kv: KVNamespace,
+  supabase: SupabaseClient,
+  params: {
+    tenantId:    string;
+    userId:      string | null;   // null only for account-purged before user_id resolved
+    eventType:   string;
+    eventPayload: Record<string, unknown>;
+    sessionPolicy: TenantSessionPolicy;
+  }
+): Promise<CaepActionResult> {
+  const { tenantId, userId, eventType, eventPayload, sessionPolicy } = params;
+
+  switch (eventType) {
+    case 'https://schemas.openid.net/secevent/caep/event-type/session-revoked': {
+      const sessionId = eventPayload['session_id'] as string | undefined;
+      if (sessionId) {
+        await kv.put(`revoke:session:${sessionId}`, '1', { expirationTtl: 3600 });
+        return { action_taken: 'session_revoked', kv_keys_written: [`revoke:session:${sessionId}`] };
+      }
+      // Fall through to user-level revocation if no specific session_id
+      await kv.put(`revoke:user:${tenantId}:${userId}`, '1', { expirationTtl: 86400 });
+      return { action_taken: 'user_sessions_revoked_no_session_id', kv_keys_written: [`revoke:user:${tenantId}:${userId}`] };
+    }
+
+    case 'https://schemas.openid.net/secevent/caep/event-type/credential-change': {
+      await kv.put(`revoke:user:${tenantId}:${userId}`, '1', { expirationTtl: 86400 });
+      return { action_taken: 'user_sessions_revoked_credential_change', kv_keys_written: [`revoke:user:${tenantId}:${userId}`] };
+    }
+
+    case 'https://schemas.openid.net/secevent/caep/event-type/token-claims-change': {
+      await kv.put(`force_reauth:${tenantId}:${userId}`, '1', { expirationTtl: 86400 });
+      return { action_taken: 'force_reauth_token_claims_change', kv_keys_written: [`force_reauth:${tenantId}:${userId}`] };
+    }
+
+    case 'https://schemas.openid.net/secevent/caep/event-type/account-disabled': {
+      await Promise.all([
+        kv.put(`revoke:user:${tenantId}:${userId}`, '1', { expirationTtl: 86400 }),
+        kv.put(`account_suspended:${tenantId}:${userId}`, '1', { expirationTtl: 259200 }), // 72h
+      ]);
+      await supabase
+        .from('tenant_users')
+        .update({ status: 'suspended' })
+        .eq('tenant_id', tenantId)
+        .eq('id', userId);
+      return {
+        action_taken: 'user_suspended_sessions_revoked',
+        kv_keys_written: [`revoke:user:${tenantId}:${userId}`, `account_suspended:${tenantId}:${userId}`],
+      };
+    }
+
+    case 'https://schemas.openid.net/secevent/caep/event-type/account-enabled': {
+      await kv.delete(`account_suspended:${tenantId}:${userId}`);
+      await supabase
+        .from('tenant_users')
+        .update({ status: 'active' })
+        .eq('tenant_id', tenantId)
+        .eq('id', userId);
+      return { action_taken: 'account_unsuspended', kv_keys_written: [] };
+    }
+
+    case 'https://schemas.openid.net/secevent/caep/event-type/account-purged': {
+      await kv.put(`revoke:user:${tenantId}:${userId}`, '1', { expirationTtl: 86400 });
+      await supabase
+        .from('tenant_users')
+        .update({ status: 'deleted_by_idp', deleted_at: new Date().toISOString() })
+        .eq('tenant_id', tenantId)
+        .eq('id', userId);
+      // Enqueue GDPR deletion workflow
+      // env.GDPR_DELETION_QUEUE.send({ tenantId, userId, triggeredBy: 'caep_account_purged' });
+      return { action_taken: 'account_purged_gdpr_queued', kv_keys_written: [`revoke:user:${tenantId}:${userId}`] };
+    }
+
+    case 'https://schemas.openid.net/secevent/caep/event-type/device-compliance-change': {
+      const requireDeviceCompliance = sessionPolicy.require_device_compliance ?? false;
+      if (requireDeviceCompliance) {
+        await kv.put(`revoke:user:${tenantId}:${userId}`, '1', { expirationTtl: 86400 });
+        return { action_taken: 'user_sessions_revoked_device_noncompliant', kv_keys_written: [`revoke:user:${tenantId}:${userId}`] };
+      }
+      await kv.put(`force_reauth:${tenantId}:${userId}`, '1', { expirationTtl: 86400 });
+      return { action_taken: 'force_reauth_device_compliance_soft', kv_keys_written: [`force_reauth:${tenantId}:${userId}`] };
+    }
+
+    case 'https://schemas.openid.net/secevent/risc/event-type/hijacking': {
+      await kv.put(`revoke:user:${tenantId}:${userId}`, '1', { expirationTtl: 86400 });
+      // PagerDuty P0 alert emitted by the caller (caep-receiver.ts) after this function returns,
+      // so the alert is guaranteed to fire even if the KV write above partially fails.
+      return { action_taken: 'user_sessions_revoked_risc_hijacking', kv_keys_written: [`revoke:user:${tenantId}:${userId}`] };
+    }
+
+    default:
+      // Unknown event type — log and return no-op; do not reject the SET
+      // (future IdP additions should not cause 4xx responses and trigger retry storms)
+      return { action_taken: `unrecognised_event_type_noop:${eventType}`, kv_keys_written: [] };
+  }
+}
+```
+
+The `isRevoked()` function from §22.4 must be extended to check the two new KV key patterns (`force_reauth:*` and `account_suspended:*`) in its parallel reads. The `force_reauth` check returns a new `RevocationStatus.FORCE_REAUTH` value rather than `RevocationStatus.REVOKED`, so the calling middleware can distinguish between "session hard-revoked" (return 401 and destroy client-side session) and "soft force re-auth" (return 401 with re-auth prompt but preserve client-side session context).
+
+### 23.5 Schema Changes
+
+#### 23.5.1 New Columns on `tenant_sso_configs`
+
+```sql
+-- migrations/YYYYMMDD_tenant_sso_configs_caep.sql
+
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN caep_stream_id       TEXT,
+  ADD COLUMN caep_delivery_mode   TEXT
+    CHECK (caep_delivery_mode IN ('push', 'poll')),
+  ADD COLUMN caep_webhook_secret  BYTEA,    -- AES-256-GCM encrypted at rest; managed by §13 secret rotation
+  ADD COLUMN caep_status          TEXT NOT NULL DEFAULT 'inactive'
+    CHECK (caep_status IN ('inactive', 'active', 'error', 'rate_limited')),
+  ADD COLUMN caep_last_event_at   TIMESTAMPTZ,
+  ADD COLUMN caep_error_count     INT NOT NULL DEFAULT 0;
+
+COMMENT ON COLUMN tenant_sso_configs.caep_stream_id IS
+  'IdP-assigned stream identifier returned at stream registration. NULL if CAEP not yet registered.';
+COMMENT ON COLUMN tenant_sso_configs.caep_delivery_mode IS
+  'Push: IdP POSTs SETs to FORM webhook. Poll: FORM polls IdP transmitter endpoint. '
+  'Push is strongly preferred; poll is fallback for IdPs that do not support push.';
+COMMENT ON COLUMN tenant_sso_configs.caep_webhook_secret IS
+  'HMAC-SHA256 signing secret for push delivery integrity validation. '
+  'AES-256-GCM encrypted at rest using the tenant KMS key (§13). '
+  'Never exposed in API responses; write-only from admin dashboard.';
+COMMENT ON COLUMN tenant_sso_configs.caep_status IS
+  'Stream health: inactive (not registered), active (receiving events), '
+  'error (SET validation failures, see caep_error_count), rate_limited (>1000 events/h).';
+COMMENT ON COLUMN tenant_sso_configs.caep_error_count IS
+  'Consecutive SET processing errors. Stream is paused when this exceeds 10. '
+  'Reset to 0 on next successful event processing.';
+
+-- Partial index: fast lookup of tenants with active CAEP streams
+CREATE INDEX CONCURRENTLY idx_tenant_sso_configs_caep_active
+  ON tenant_sso_configs (tenant_id)
+  WHERE caep_status = 'active';
+```
+
+#### 23.5.2 New Table `caep_events`
+
+```sql
+-- Same migration file
+
+CREATE TABLE caep_events (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id         UUID        REFERENCES tenant_users(id) ON DELETE SET NULL,
+  -- user_id is nullable: account-purged events delete the user row before the caep_events
+  -- insert; ON DELETE SET NULL preserves the event record as evidence even after user deletion.
+  set_jti         TEXT        NOT NULL UNIQUE,
+  -- SET JWT ID from the jti claim. UNIQUE constraint is the primary replay-prevention mechanism.
+  event_type      TEXT        NOT NULL,
+  idp_subject     TEXT        NOT NULL,
+  -- IdP subject identifier (e.g., Okta user ID, Entra object ID).
+  -- Stored as SHA-256 hash — see §23.7 privacy note.
+  action_taken    TEXT        NOT NULL,
+  processed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  raw_set_hash    TEXT        NOT NULL
+  -- SHA-256 of the raw SET JWT bytes. Provides evidence that the specific token was received
+  -- without storing the token itself (which may contain PII in claims).
+);
+
+-- Performance indexes
+CREATE INDEX idx_caep_events_tenant_processed
+  ON caep_events (tenant_id, processed_at DESC);
+-- Supports audit log viewer pagination in admin dashboard (§23 tab)
+
+CREATE UNIQUE INDEX idx_caep_events_set_jti
+  ON caep_events (set_jti);
+-- Redundant with PRIMARY KEY unique but explicit for documentation clarity;
+-- also used by ON CONFLICT (set_jti) DO NOTHING upsert pattern.
+
+COMMENT ON TABLE caep_events IS
+  'Immutable log of every CAEP/RISC Security Event Token received and processed by FORM. '
+  'Retention: 7 years per DEC-030. Soft-deleted records are not supported — '
+  'this table is append-only for compliance purposes.';
+```
+
+**RLS policies for `caep_events`:**
+
+```sql
+-- Enable RLS
+ALTER TABLE caep_events ENABLE ROW LEVEL SECURITY;
+
+-- form_system (SCIM handler + CAEP Worker) can INSERT and SELECT
+CREATE POLICY caep_events_form_system
+  ON caep_events
+  FOR ALL
+  TO form_system
+  USING (true)
+  WITH CHECK (true);
+
+-- tenant_admin can SELECT their own tenant's events (admin dashboard audit log viewer)
+CREATE POLICY caep_events_tenant_admin_select
+  ON caep_events
+  FOR SELECT
+  TO tenant_admin
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+-- form_api (the main application API role) has zero-row access — CAEP events are
+-- internal infrastructure records, not application data.
+CREATE POLICY caep_events_form_api_deny
+  ON caep_events
+  FOR ALL
+  TO form_api
+  USING (false);
+```
+
+### 23.6 IdP-Specific Implementation Notes
+
+#### 23.6.1 Microsoft Entra CAE (Push via Event Grid)
+
+Microsoft Entra's Continuous Access Evaluation implementation for third-party relying parties uses a different registration path than the SSF standard. Instead of discovering an SSF transmitter configuration endpoint, FORM registers via the Microsoft Graph API:
+
+```
+POST https://graph.microsoft.com/beta/identity/continuousAccessEvaluationPolicy/receivers
+Authorization: Bearer {FORM service principal token}
+Content-Type: application/json
+
+{
+  "notificationEndpoints": [
+    {
+      "subscriptionId": "{tenant_id}",
+      "notificationUrl": "https://api.form.coach/enterprise/v1/sso/caep-receiver/{tenant_id}"
+    }
+  ]
+}
+```
+
+Entra pushes events as `EventGridEvent` batches. The outer envelope is an array of Event Grid events; the `data` field of each event contains the SET JWT as a string. FORM's Entra-specific parser must unwrap the Event Grid envelope before proceeding to standard SET validation. The `EventGridEvent` itself carries an `Authorization: Bearer {token}` header; FORM validates this bearer token using Entra's published JWKS at `https://login.microsoftonline.com/common/discovery/v2.0/keys` (the standard Entra JWKS endpoint, the same one used for §3 SAML assertion signature verification). This is a two-layer validation: outer Event Grid bearer token (validates the delivery channel), inner SET JWT signature (validates the event payload).
+
+Entra CAE access tokens carry two additional claims that are relevant to FORM's implementation. The `xms_cc` claim (value: `{"cp1": true}`) indicates that the client application declared CAE capability during token acquisition. FORM's admin dashboard SPA and mobile clients should include `client_capabilities=CP1` in their OAuth2/OIDC requests to Entra so that Entra knows FORM can handle CAE revocation signals; without this, Entra may issue longer-lived tokens without CAE coverage. The `xms_ssm` claim provides session-level management metadata that FORM currently does not use but should preserve for future session-specific revocation targeting.
+
+#### 23.6.2 Okta CAEP (Push via SSF)
+
+Okta fully implements the SSF standard. The transmitter configuration metadata is at:
+
+```
+GET https://{org}.okta.com/.well-known/ssf-configuration
+```
+
+This document returns the `transmitter_configuration_endpoint`, `jwks_uri`, and the list of supported delivery methods and event types. FORM uses the `transmitter_configuration_endpoint` to create a stream:
+
+```
+POST {transmitter_configuration_endpoint}
+Authorization: Bearer {FORM API token, scoped to ssf.write}
+Content-Type: application/json
+
+{
+  "delivery": {
+    "method": "https://schemas.openid.net/secevent/risc/delivery-method/push",
+    "endpoint_url": "https://api.form.coach/enterprise/v1/sso/caep-receiver/{tenant_id}"
+  },
+  "events_requested": [
+    "https://schemas.openid.net/secevent/caep/event-type/session-revoked",
+    "https://schemas.openid.net/secevent/caep/event-type/credential-change",
+    "https://schemas.openid.net/secevent/caep/event-type/token-claims-change",
+    "https://schemas.openid.net/secevent/caep/event-type/account-disabled",
+    "https://schemas.openid.net/secevent/caep/event-type/account-enabled",
+    "https://schemas.openid.net/secevent/caep/event-type/account-purged",
+    "https://schemas.openid.net/secevent/caep/event-type/device-compliance-change"
+  ]
+}
+```
+
+Okta responds with a `stream_id` which is stored in `tenant_sso_configs.caep_stream_id`. Okta pushes individual SETs (not batches) to the FORM webhook, signed using its JWKS at `https://{org}.okta.com/oauth2/v1/keys` — the same JWKS endpoint used for Okta OIDC token verification in §4.1. FORM's `SSO_KV` already caches this JWKS for Okta tenants; the CAEP receiver shares the same KV entry under the same cache key to avoid redundant fetches.
+
+Okta implements a stream verification step before activating push delivery. After stream creation, Okta sends a verification request to the FORM webhook containing a `verification_state` value. FORM must respond with the same `verification_state` echoed back, confirming that the endpoint is genuinely controlled by FORM. The webhook handler's step 2 (HMAC validation) is skipped for this initial verification request — Okta signs it differently — and FORM recognises the verification request by the presence of a `https://schemas.openid.net/secevent/sse/event-type/verification` event type in the `events` claim.
+
+#### 23.6.3 Google RISC (Push Model)
+
+Google RISC uses the Google Identity Toolkit API for stream registration. FORM registers via:
+
+```
+POST https://risc.googleapis.com/v1beta/stream:update
+Authorization: Bearer {service account token, scope: https://www.googleapis.com/auth/risc.configuration.readonly}
+Content-Type: application/json
+
+{
+  "delivery": {
+    "delivery_method": "https://schemas.openid.net/secevent/risc/delivery-method/push",
+    "url": "https://api.form.coach/enterprise/v1/sso/caep-receiver/{tenant_id}"
+  },
+  "events_requested": [
+    "https://schemas.openid.net/secevent/risc/event-type/hijacking",
+    "https://schemas.openid.net/secevent/risc/event-type/account-disabled",
+    "https://schemas.openid.net/secevent/risc/event-type/account-enabled",
+    "https://schemas.openid.net/secevent/risc/event-type/account-purged"
+  ]
+}
+```
+
+Google signs RISC SETs using keys published at `https://www.googleapis.com/identitytoolkit/v3/relyingparty/publicKeys`. These keys are distinct from the standard Google OIDC JWKS (`https://www.googleapis.com/oauth2/v3/certs`) used in §4.2 for ID token verification. FORM must cache both JWKS endpoints separately in `SSO_KV`. The RISC JWKS uses a non-standard format (RSA public keys returned as a JSON object keyed by `kid` rather than the standard `keys` array); FORM's JWKS parser must handle both formats.
+
+Google RISC is only applicable to tenants using Google OIDC for SSO (§4.2). It is not applicable to Entra or Okta tenants, nor to tenants using Google Workspace with SAML (§3) — Google does not emit RISC events for SAML-authenticated sessions, only for Google OIDC sessions. This scope constraint is enforced in the FORM admin dashboard: the CAEP/RISC configuration panel only displays the Google RISC option for tenants whose `sso_type = 'oidc'` and `oidc_issuer` contains `accounts.google.com`.
+
+### 23.7 Security Considerations
+
+#### 23.7.1 SET Replay Prevention
+
+The `set_jti` claim in a SET JWT is a unique identifier for that specific security event token. FORM stores the `set_jti` in the `caep_events` table with a UNIQUE constraint. Before processing any SET, FORM checks whether the `set_jti` is already present in `caep_events` using a Supabase SELECT with the index on `(set_jti)`. If found, FORM returns 202 Accepted without re-processing — the action has already been taken. This makes the endpoint idempotent regardless of IdP retry behaviour. The 202 response on replay (rather than 409 Conflict) is intentional: returning a 4xx to an IdP retry causes the IdP to log an error and may pause the stream.
+
+The `set_jti` value stored in `caep_events` is stored as a SHA-256 hash (hex-encoded), not as the raw JTI string. This preserves replay-prevention semantics while avoiding storage of a value that could theoretically be used to correlate events across systems. The ON CONFLICT clause uses the hashed value as the uniqueness key.
+
+#### 23.7.2 JWKS Cache Poisoning Prevention
+
+The JWKS cache in `SSO_KV` is keyed by `caep_jwks:{tenant_id}:{iss}`. The TTL is capped at 1 hour. On every SET validation, FORM extracts the `kid` from the SET JWT header and looks it up in the cached JWKS. If the `kid` is not in the cached JWKS, FORM fetches the JWKS endpoint fresh and updates the KV entry. This handles key rotation without requiring manual intervention.
+
+If the `kid` is not found even in the freshly fetched JWKS, FORM rejects the SET and emits a HIGH severity `sso.caep_stream_error` audit event with `error_type: 'jwks_kid_not_found'`. This condition could indicate: (a) the IdP rotated keys and FORM's cache is stale (handled by the fresh fetch above), (b) the `kid` in the SET was forged (attempted signature bypass — a serious security event), or (c) an IdP misconfiguration. The HIGH audit event ensures this is visible in SIEM and to the compliance team.
+
+FORM never permits a SET to be "verified" with a self-provided or caller-supplied public key. The JWKS is always fetched from the IdP's published endpoint or served from the bounded KV cache. There is no API endpoint that allows a caller to register a JWKS override for a tenant.
+
+#### 23.7.3 Webhook Authenticity
+
+Before parsing the SET JWT, FORM validates the HMAC-SHA256 signature on the raw request body using `caep_webhook_secret`. This provides defence-in-depth: even if FORM's CAEP receiver URL were discovered, an attacker without the webhook secret cannot submit a forged SET that reaches the signature verification step. The HMAC validation uses constant-time comparison (via Web Crypto `timingSafeEqual`) to prevent timing oracle attacks.
+
+The `caep_webhook_secret` is stored encrypted at rest in `tenant_sso_configs` using AES-256-GCM, managed by the tenant KMS key (§13 key management). It is never returned in any API response. The admin dashboard can rotate it (triggering a stream re-registration with the new secret), but cannot read it.
+
+#### 23.7.4 Rate Limiting
+
+FORM enforces a rate limit of 1,000 CAEP events per hour per tenant. This limit exists because a malfunctioning IdP configuration could generate spurious events at high volume, creating a denial-of-service risk against the CAEP receiver Worker and against `caep_events` write throughput. The rate is tracked using a Cloudflare KV counter with a sliding 1-hour window under the key `caep_rate:{tenant_id}:{hour_bucket}`. When the limit is exceeded, FORM returns 429 Too Many Requests, sets `tenant_sso_configs.caep_status = 'rate_limited'`, and triggers AL-CAEP-05 (P2 PagerDuty). The stream is paused until the DevOps team acknowledges the alert and resets the rate limit counter.
+
+The 1,000 events/hour limit is generous for legitimate use: even a 10,000-seat enterprise with aggressive IT activity would not normally exceed a few hundred CAEP events per hour. An IdP that generates > 1,000 events/hour against a single tenant is almost certainly misconfigured.
+
+#### 23.7.5 Tenant Isolation
+
+The `tenant_id` in the webhook URL path is validated against the `sub_id` claim in the SET JWT's `sub_id` field (or the `iss`-derived tenant mapping in `tenant_sso_configs`). A SET delivered to tenant A's webhook with a `sub_id` or `iss` that resolves to tenant B is rejected immediately, and a CRITICAL severity `sso.caep_stream_error` audit event is emitted. This cross-tenant mismatch is never a legitimate IdP behaviour and always indicates either a misconfiguration (wrong webhook URL registered) or an active attack (attempting to inject a CAEP event into the wrong tenant's stream).
+
+#### 23.7.6 Privacy and PII Minimisation
+
+Raw SETs are never stored. The `raw_set_hash` field in `caep_events` stores only the SHA-256 hash of the raw SET JWT bytes (hex-encoded). This provides evidence that a specific token was received and processed without retaining the token's claims (which may include email addresses, device identifiers, or other PII). Similarly, `idp_subject` is stored as a SHA-256 hash rather than the raw IdP user identifier. The `set_jti` is also hashed. This means the `caep_events` table contains no PII in plaintext, consistent with the audit log PII policy established in §13.
+
+### 23.8 DEC-030 Audit Events
+
+Six new event types are added to `docs/AUDIT_LOG_SCHEMA.md`. All events are HMAC-chained per DEC-030. All have a 7-year retention period.
+
+| Event Type | Severity | Retention | Key Metadata Fields | Trigger |
+|---|---|---|---|---|
+| `sso.caep_event_received` | STANDARD | 7 yr | `tenant_id`, `event_type`, `action_taken`, `set_jti_hash` (SHA-256), `idp_subject_hash` (SHA-256) | Emitted on every successfully processed CAEP/RISC event (steps 1–9 of the pipeline completed without error). This is the primary SOC 2 evidence record for CC6.3. |
+| `sso.caep_session_revoked` | HIGH | 7 yr | `tenant_id`, `user_id_hash` (SHA-256), `session_id_hash` (SHA-256), `caep_event_type`, `set_jti_hash` | Emitted when a session is revoked specifically in response to a CAEP/RISC signal. Cross-references the `sso.caep_event_received` event via `set_jti_hash`. Complements the §22 `session.revocation_*` chain — CAEP-triggered revocations appear in both chains. |
+| `sso.caep_user_suspended` | HIGH | 7 yr | `tenant_id`, `user_id_hash`, `idp_subject_hash`, `caep_event_type` | Emitted on `account-disabled` CAEP event. Records that the user's status was set to `suspended` in `tenant_users` as a direct result of an IdP signal. |
+| `sso.caep_user_purged` | CRITICAL | 7 yr | `tenant_id`, `user_id_hash`, `idp_subject_hash`, `gdpr_deletion_queue_id` | Emitted on `account-purged` CAEP event. This is the GDPR deletion SLA start-of-clock event. The `gdpr_deletion_queue_id` links to the Cloudflare Workers Queue message ID so the deletion pipeline can be traced. Two-person rule: any manual intervention in the purge workflow (e.g., cancellation) requires two `form_admin` authorisers, enforced at the API layer identically to `nukeTenantSessions()`. |
+| `sso.caep_stream_error` | HIGH | 7 yr | `tenant_id`, `error_type` (one of: `hmac_invalid`, `jwks_kid_not_found`, `set_signature_invalid`, `set_replay_detected`, `tenant_mismatch`, `rate_limit_exceeded`), `set_jti_hash` (if parseable) | Emitted on any SET validation failure. The `error_type` is a controlled vocabulary — no free-form error messages that could contain PII or stack traces. Used as the primary signal for AL-CAEP-01. |
+| `sso.caep_stream_registered` | HIGH | 7 yr | `tenant_id`, `idp_type` (one of: `entra`, `okta`, `google_risc`), `caep_delivery_mode`, `admin_user_id_hash` | Emitted when a new CAEP stream is activated for a tenant. Records which admin user initiated the registration. |
+
+**HMAC chain ordering for `sso.caep_user_purged`:** The `sso.caep_user_purged` event must be emitted and its HMAC chain entry committed to `audit_log` before the `account-purged` action handler writes to `SESSION_REVOCATION_KV` or updates `tenant_users`. This preserves the DEC-030 invariant that audit events precede state mutations. Since `account-purged` is a terminal and irreversible action, the ordering constraint is especially important — there must be an immutable record that the action was triggered by a specific IdP signal before the user row is deleted.
+
+### 23.9 Alerting Rules
+
+Five new alerting rules are added. Add all five to `docs/OBSERVABILITY.md §6.2` under a new `caep_stream_health` subsection.
+
+| Rule ID | Severity | Condition | Response SLA | Runbook |
+|---|---|---|---|---|
+| AL-CAEP-01 | P1 | `sso.caep_stream_error` rate > 5% of all CAEP events for any single tenant over any 10-minute window | Acknowledge < 30 min | Check `error_type` distribution in `audit_log` for the affected tenant. If `jwks_kid_not_found`: verify IdP key rotation — FORM should have auto-refreshed JWKS, so a persistent miss suggests the IdP published a non-standard JWKS format or the `kid` field is missing. If `hmac_invalid`: possible webhook secret mismatch — tenant may need to re-register stream. If `tenant_mismatch`: potential security event — escalate to security-engineer immediately; do not self-remediate. Set `tenant_sso_configs.caep_status = 'error'` to pause stream until root cause is confirmed. |
+| AL-CAEP-02 | P0 | Any `sso.caep_user_purged` event received | Immediate (PagerDuty wake) | GDPR deletion SLA has started (30-day clock). Verify `gdpr_deletion_queue_id` is present in the event metadata. Confirm the GDPR_DELETION_QUEUE consumer Worker is healthy (check Worker error rate in Cloudflare dashboard). If the deletion queue is backlogged or the consumer is erroring, escalate to devops-lead and compliance-officer immediately — GDPR deletion failure within 30 days is a regulatory violation. |
+| AL-CAEP-03 | P2 | No CAEP events received on an active stream (`caep_status = 'active'`) for more than 4 hours during business hours (08:00–20:00 tenant local time) | Acknowledge < 2 h | Check IdP admin console to verify the CAEP stream is still configured (some IdP admin actions can silently delete streams). Check FORM's `caep_last_event_at` in `tenant_sso_configs`. If the IdP has no users online during the 4-hour window, this alert may be a false positive — suppress for tenants with fewer than 10 active users. Otherwise, re-register the stream via the admin dashboard CAEP configuration panel. |
+| AL-CAEP-04 | P1 | Any Google RISC `hijacking` event received | Acknowledge < 30 min | A Google RISC `hijacking` event indicates that Google's risk engine has detected active session hijacking for a user in a Google Workspace OIDC tenant. FORM has already revoked the user's sessions (§23.4 row 8). Verify that `revoke:user:{tenant_id}:{user_id}` is present in SESSION_REVOCATION_KV. Notify the tenant admin via the admin dashboard notification system (event type: `security_alert`) that a user's account was flagged by Google. Document in the security incident log. |
+| AL-CAEP-05 | P2 | CAEP rate limit exceeded for a tenant (> 1,000 events/hour, `caep_status = 'rate_limited'`) | Acknowledge < 2 h | Examine `caep_events` for the affected tenant: are the events all of one type? A flood of `session-revoked` events from a single IdP may indicate an IdP loop (e.g., Okta re-sending unacknowledged events). Check FORM's 202 response delivery — if FORM has been returning non-2xx (e.g., due to a downstream Supabase timeout), the IdP retry logic may be the cause. Reset the rate limit counter in KV (`caep_rate:{tenant_id}:{hour_bucket}` delete) after the root cause is identified. |
+
+### 23.10 SOC 2 Mapping
+
+| Criterion | Control Statement | How §23 Satisfies It |
+|---|---|---|
+| CC6.3 | Logical access is removed in a timely manner when no longer authorised | §23 reduces the IdP-event to FORM-session-revocation latency from ≤15 minutes (JWT TTL residual window, §12) to < 30 seconds from IdP event dispatch. The `sso.caep_event_received` event with `action_taken = 'user_sessions_revoked_*'` and its timestamp, compared against the SET `iat` claim, is the evidence of this SLA. |
+| CC6.6 | Changes to access credentials trigger access re-evaluation | CAEP `credential-change` events (password reset, MFA change) trigger immediate user-level session revocation (§23.4 row 2). CAEP `token-claims-change` events trigger forced re-authentication (§23.4 row 3). Both are evidenced by `sso.caep_session_revoked` and `sso.caep_event_received` audit events with the appropriate `caep_event_type` metadata. |
+| CC7.2 | The entity monitors system components for anomalies | Five alerting rules (AL-CAEP-01 through AL-CAEP-05) monitor CAEP stream health: SET validation failure rate (AL-CAEP-01), stream dead-man's switch (AL-CAEP-03), rate limit anomalies (AL-CAEP-05). PagerDuty routing ensures 24/7 on-call coverage. |
+| CC7.3 | Identified anomalies are responded to and resolved | P0 alert on `account-purged` (AL-CAEP-02) initiates GDPR deletion workflow; P1 alert on Google RISC `hijacking` (AL-CAEP-04) triggers security incident investigation; P1 alert on SET validation failure rate (AL-CAEP-01) triggers stream health investigation with runbook. All incidents are logged in PagerDuty with resolution timestamps. |
+
+**Evidence artefacts for SOC 2 auditor:**
+
+| Artefact ID | Description | Collection Method |
+|---|---|---|
+| CC6-E-CAEP-001 | `caep_events` table export for the observation period: event_type distribution and action_taken distribution. Demonstrates that IdP security events are received and actioned. | `SELECT event_type, action_taken, count(*), min(processed_at), max(processed_at) FROM caep_events WHERE tenant_id = $tenant AND processed_at BETWEEN $obs_start AND $obs_end GROUP BY event_type, action_taken ORDER BY count DESC` |
+| CC6-E-CAEP-002 | `audit_log` export — all `sso.caep_*` events for the observation period. Provides the HMAC-chained evidence trail. | `SELECT event_type, created_at, tenant_id, metadata FROM audit_log WHERE event_type LIKE 'sso.caep_%' AND created_at BETWEEN $obs_start AND $obs_end ORDER BY created_at` |
+| CC6-E-CAEP-003 | CAEP stream registration records for all active enterprise tenants as of the observation period end date (sanitized: `caep_stream_id` and `caep_webhook_secret` redacted). Demonstrates that all enterprise tenants have CAEP configured. | `SELECT tenant_id, idp_type, caep_status, caep_delivery_mode, caep_last_event_at FROM tenant_sso_configs WHERE caep_status IN ('active', 'error') ORDER BY tenant_id` |
+| CC6-E-CAEP-004 | AL-CAEP-01 and AL-CAEP-03 PagerDuty incident history for the observation period. Demonstrates stream health monitoring is operational and incidents are resolved within SLA. | PagerDuty Incidents API export filtered by service `form-caep-stream` and date range; include `created_at`, `resolved_at`, `resolution_note` fields |
+
+### 23.11 Open Questions
+
+| ID | Question | Owner | Priority | Resolution Target |
+|---|---|---|---|---|
+| OQ-SSO-23.1 | CAEP stream re-registration after SAML certificate rotation (§20) — should §20's cert rotation workflow automatically trigger CAEP stream re-registration at the IdP? Some IdPs (Okta in particular) tie the CAEP stream identity to the SSO application configuration; a SAML cert rotation may invalidate the stream token. Currently §20 has no hook into CAEP registration. The fix is straightforward (add a `caep_reregister_after_cert_rotation` step to the §20.4 rotation state machine) but requires coordination with the §20 implementation. | security-engineer | P2 | M5 |
+| OQ-SSO-23.2 | CAEP and magic-link fallback sessions (§10) — if a user's IdP account is disabled via a CAEP `account-disabled` event, FORM revokes all sessions using `revoke:user:{tenant_id}:{user_id}`. However, magic-link sessions (§10) may be stored under a different session type in `enterprise_sessions`. Confirm: does `revoke:user:{tenant_id}:{user_id}` (§22.5) cover magic-link sessions in addition to SSO sessions? Current assumption: yes, because `isRevoked()` checks the user-level KV key regardless of session type. platform-engineer to confirm that magic-link session creation and validation paths both pass through `isRevoked()`. | platform-engineer | P1 | Before M4 deploy |
+| OQ-SSO-23.3 | Polling fallback for IdPs that do not support push delivery — the SSF specification supports a pull/poll model where FORM periodically calls the IdP's transmitter endpoint to retrieve pending SETs, rather than the IdP pushing to FORM's webhook. Poll intervals of 5 minutes would still represent a significant improvement over the 15-minute JWT TTL but would not meet the < 30-second target. Is a < 30-second SLA contractually required, or is "significantly better than JWT TTL" sufficient? If a polling fallback is needed, what is the acceptable poll interval and the associated IdP API rate limit? | platform-engineer | P2 | M5 |
+| OQ-SSO-23.4 | CAEP and the §21 Google Directory API group cache — if a Google RISC `hijacking` event is received for a user in a Google Workspace OIDC tenant, FORM revokes the user's sessions. However, the `google_directory_group_cache` (§21) for that user may still contain stale group membership data with a 5-minute TTL. Should a RISC `hijacking` event also proactively delete the `google_directory_group_cache` row for the affected user? The current 5-minute TTL means stale cache data cannot be used to authenticate (since the session is revoked), but the cache row persisting for up to 5 minutes after a hijacking event could be considered a minor hygiene concern. | platform-engineer | P2 | M5 |
+
+### 23.12 Implementation Checklist
+
+| # | Action | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Write and apply migration `migrations/YYYYMMDD_tenant_sso_configs_caep.sql` per §23.5.1: add six new columns to `tenant_sso_configs`; create partial index on `caep_status = 'active'`; verify on staging | platform-engineer | **P0** | M4 |
+| 2 | Write and apply migration `migrations/YYYYMMDD_caep_events.sql` per §23.5.2: create `caep_events` table with RLS policies; create both indexes (`tenant_id, processed_at DESC` and `set_jti` UNIQUE); verify `ON CONFLICT (set_jti) DO NOTHING` semantics on staging | platform-engineer | **P0** | M4 |
+| 3 | Implement `apps/api-gateway/src/sso/caep-action-handler.ts` per §23.4 pseudocode: all 8 event type handlers; `force_reauth` KV write; `account-purged` GDPR queue enqueue; unit test each handler branch with KV mock injection | platform-engineer | **P0** | M4 |
+| 4 | Implement `apps/api-gateway/src/sso/caep-receiver.ts`: the 10-step pipeline per §23.3.2; HMAC-SHA256 validation; JWKS fetch + cache via `SSO_KV`; SET JWT verification; `dispatchCaepAction()` call; `caep_events` insert; `sso.caep_event_received` DEC-030 emit; 202 response | platform-engineer | **P0** | M4 |
+| 5 | Extend `isRevoked()` (§22.4) to check two new KV key types: `force_reauth:{tenant_id}:{user_id}` and `account_suspended:{tenant_id}:{user_id}`; update `RevocationStatus` enum to include `FORCE_REAUTH` and `ACCOUNT_SUSPENDED`; update the authenticated request middleware to handle both new statuses (FORCE_REAUTH → 401 with re-auth prompt; ACCOUNT_SUSPENDED → 403 with suspension message) | platform-engineer | **P0** | M4 |
+| 6 | Register CAEP streams for Okta tenants: implement `registerOktaCaepStream()` in the admin dashboard backend using the Okta SSF transmitter configuration endpoint per §23.6.2; include stream verification handshake; store `caep_stream_id` and `caep_delivery_mode` in `tenant_sso_configs` | platform-engineer | **P0** | M4 |
+| 7 | Register CAEP streams for Entra tenants: implement `registerEntraCaepStream()` using Microsoft Graph API per §23.6.1; handle `EventGridEvent` envelope unwrapping in `caep-receiver.ts` for Entra-delivered events; validate outer Event Grid bearer token using Entra JWKS | platform-engineer | **P0** | M4 |
+| 8 | Register RISC streams for Google Workspace OIDC tenants: implement `registerGoogleRiscStream()` per §23.6.3; handle Google RISC JWKS non-standard format; scope registration only to tenants with `sso_type = 'oidc'` and `oidc_issuer` matching `accounts.google.com`; implement AL-CAEP-04 PagerDuty trigger on `hijacking` event | platform-engineer | **P0** | M4 |
+| 9 | Register all 6 new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry; validate HMAC chain in staging with a test sequence: stream registration → CAEP event received → session revoked → user purged; confirm `sso.caep_user_purged` is emitted before `tenant_users.status` update (ordering constraint §23.8) | platform-engineer + security-engineer | **P0** | M4 |
+| 10 | Configure AL-CAEP-01 through AL-CAEP-05 in PagerDuty; add all five rules to `docs/OBSERVABILITY.md §6.2` under new `caep_stream_health` subsection; test AL-CAEP-02 by simulating a synthetic `account-purged` event against a staging tenant | devops-lead | **P0** | M4 |
+| 11 | Add CAEP configuration panel to admin dashboard (`apps/admin-dashboard/src/pages/sso/CAEPConfiguration.tsx`): enable/disable toggle; stream status badge (`inactive / active / error / rate_limited`); last event timestamp; manual stream re-registration button; `caep_events` audit log viewer tab (paginated, filtered by event_type) | frontend-engineer | **P1** | M4 |
+| 12 | Add `client_capabilities=CP1` parameter to Entra OIDC and OAuth2 token requests in FORM's mobile and admin dashboard clients; verify `xms_cc` claim appears in Entra-issued access tokens on staging; document in `docs/SSO_CLIENT_CONFIG.md` | platform-engineer | **P1** | M4 |
+| 13 | Implement AL-CAEP-03 dead-man's switch: Cloudflare Workers Cron (every 30 minutes); query `tenant_sso_configs WHERE caep_status = 'active' AND caep_last_event_at < NOW() - INTERVAL '4 hours'`; filter to business-hours windows; trigger PagerDuty P2 for each affected tenant | devops-lead | **P1** | M5 |
+| 14 | Resolve OQ-SSO-23.2 (magic-link session coverage) before M4 deploy: trace `isRevoked()` call graph to confirm magic-link session validation passes through the user-level KV check; write a specific integration test: create magic-link session, write `revoke:user:*` KV key, confirm magic-link session rejected on next request | platform-engineer | **P1** | M4 |
+| 15 | Collect CC6-E-CAEP-001 through CC6-E-CAEP-004 evidence artefacts 30 days after M4 go-live; store in `compliance/evidence/caep/`; advance G-010 (if applicable) or create a new gap entry for CAEP in the §9 gap tracker | compliance-officer | **P1** | M5 |
+
+---
+
+*v1.5 additions (2026-06-01): Section 23 — Continuous Access Evaluation (CAE) & Shared Signals Framework (SSF) — Real-Time IdP Risk Event Processing. Closes the complementary gap to §22: whereas §22 handles FORM-initiated session revocation, §23 handles the reverse signal direction — IdP-initiated risk events that FORM must receive and act on in real time. Gap closed: IdP security events (account disabled, password reset, MFA credential removed, session revoked from IdP admin console, high-risk sign-in, device compliance change) previously propagated to FORM only at JWT expiry (up to 15 minutes, §12 TTL). Target after §23: < 30 seconds from IdP event to FORM session invalidation via the §22 KV layer. Standards: IETF SSF (draft-ietf-sharedsignals-framework) as transport; OpenID CAEP as event vocabulary (Okta, Entra); OpenID RISC as Google-specific vocabulary; RFC 8417 Security Event Tokens (SET) as wire format. Architecture: FORM registers as SSF Receiver at each IdP; push delivery model (IdP POSTs SETs to `POST /enterprise/v1/sso/caep-receiver/{tenant_id}` Cloudflare Worker); 10-step processing pipeline: HMAC webhook secret validation → JWKS fetch/cache in SSO_KV (1h TTL) → SET JWT signature verification → replay check via set_jti UNIQUE constraint → user resolution → action dispatch → caep_events INSERT → DEC-030 emit → 202 Accepted. Eight event-type-to-action mappings: session-revoked (revoke specific session via §22 KV), credential-change (revoke all user sessions), token-claims-change (set force_reauth KV flag, TTL 24h, triggers 401 re-auth prompt not hard revocation), account-disabled (revoke sessions + set account_suspended KV flag + update tenant_users.status), account-enabled (clear account_suspended KV + restore active status), account-purged (revoke sessions + mark deleted_by_idp + enqueue GDPR deletion workflow), device-compliance-change (conditional revocation based on require_device_compliance tenant flag), Google RISC hijacking (immediate revocation + PagerDuty P0). Two new KV key patterns added to §22.5 schema: force_reauth:{tenant_id}:{user_id} (TTL 24h) and account_suspended:{tenant_id}:{user_id} (TTL 72h); isRevoked() extended with FORCE_REAUTH and ACCOUNT_SUSPENDED RevocationStatus values and corresponding middleware handling. Schema: six new columns on tenant_sso_configs (caep_stream_id, caep_delivery_mode, caep_webhook_secret BYTEA AES-256-GCM encrypted, caep_status ENUM, caep_last_event_at, caep_error_count); new caep_events table (id, tenant_id, user_id nullable, set_jti UNIQUE, event_type, idp_subject, action_taken, processed_at, raw_set_hash — all PII fields stored as SHA-256 hashes; RLS: form_system ALL, tenant_admin SELECT own tenant, form_api zero-rows). IdP-specific implementation: Entra CAE via Microsoft Graph API + EventGridEvent envelope unwrapping + two-layer JWT validation (outer Event Grid bearer token + inner SET signature) + CP1 client capability flag (xms_cc claim); Okta CAEP via SSF transmitter configuration endpoint + stream verification handshake + shared JWKS cache with §4.1 OIDC; Google RISC via Identity Toolkit API + non-standard JWKS format handling + Google Workspace OIDC tenants only. Security: SET replay prevention via set_jti UNIQUE constraint (202 on replay, not 409); JWKS cache poisoning prevention (fresh fetch on kid miss, HIGH audit event if still unresolved); HMAC-SHA256 webhook authenticity (constant-time comparison); rate limiting 1,000 events/h per tenant (429 + stream pause + AL-CAEP-05); tenant isolation (tenant_id URL path vs. SET iss/sub cross-validation, CRITICAL audit on mismatch); PII minimisation (set_jti, idp_subject, raw_set stored as SHA-256 hashes only). Six DEC-030 HMAC-chained audit events: sso.caep_event_received (STANDARD, 7yr — primary SOC 2 CC6.3 evidence), sso.caep_session_revoked (HIGH, 7yr), sso.caep_user_suspended (HIGH, 7yr), sso.caep_user_purged (CRITICAL, 7yr — GDPR deletion SLA start-of-clock; two-person rule on override; emitted before state mutation), sso.caep_stream_error (HIGH, 7yr — controlled error_type vocabulary), sso.caep_stream_registered (HIGH, 7yr). Five alerting rules: AL-CAEP-01 P1 (SET validation failure rate > 5% over 10 min — possible JWKS poisoning), AL-CAEP-02 P0 (account-purged received — GDPR clock starts), AL-CAEP-03 P2 (dead-man's switch: no events on active stream for 4h during business hours), AL-CAEP-04 P1 (Google RISC hijacking event), AL-CAEP-05 P2 (rate limit exceeded). SOC 2: CC6.3 (< 30 s IdP-event to FORM-revocation vs. ≤15 min previously), CC6.6 (credential-change and token-claims-change mapped to session invalidation), CC7.2 (5 alerting rules on stream health), CC7.3 (P0/P1 PagerDuty routing; GDPR workflow on account-purged). Four evidence artefacts: CC6-E-CAEP-001 (caep_events export), CC6-E-CAEP-002 (audit_log sso.caep_* export), CC6-E-CAEP-003 (CAEP stream registration records, sanitized), CC6-E-CAEP-004 (AL-CAEP-01 and AL-CAEP-03 PagerDuty history). Four open questions: OQ-SSO-23.1 (CAEP stream re-registration after §20 SAML cert rotation — security-engineer, P2, M5), OQ-SSO-23.2 (magic-link session coverage — platform-engineer, P1, before M4 deploy), OQ-SSO-23.3 (polling fallback interval vs. < 30 s SLA — platform-engineer, P2, M5), OQ-SSO-23.4 (§21 Google Directory group cache invalidation on RISC hijacking — platform-engineer, P2, M5). Implementation checklist: 15 tasks (8× P0 M4, 5× P1 M4/M5, 2× P1 M5).*
