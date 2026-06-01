@@ -6,6 +6,14 @@
 
 ---
 
+## [1.57.0] — 2026-06-01
+
+### Added
+- `content/post-177-ans-hrv-autonomic-nervous-system.md` — Автономна нервова система і тренінг: симпатовагальний баланс і HRV. Chapleau & Sabharwal (2011): вагусна модуляція СА-вузла і природа RMSSD; дихальна синусова аритмія як механізм HRV; Aubert, Seps & Beckers (2003 Sports Med): спектральний аналіз LF/HF у 89 атлетів — ендуранс домінує парасимпатично, силовики ближче до норми; LF/HF ≠ чистий симпатичний маркер (Billman 2013 Front Physiol, Task Force ESC 1996); Iellamo et al. (2002 Circulation): гребці vs важкоатлети — різна адаптація, єдиний напрямок; Kiviniemi et al. (2007 IJSPP): HRV-guided periodization RCT — вищий VO₂max приріст без накопиченої втоми; Carter et al. (2003 J Appl Physiol): 12 тижнів силового тренінгу → ↑ HF-потужність; cardiac autonomic neuropathy при OTS і двонаправлений ANS-маркер (Urhausen 1998, Meeusen 2013); Kiviniemi (2010 Scand J Med Sci Sports) підтвердження; 3-зонова система HRV-програмування (±5%/±10% від базової лінії). clinical-safety NOT REQUIRED.
+- `blog.html` — додані картки Post 176 (PAPE) і Post 177 (ANS/HRV); 162→166 карток.
+- `README.md` — roadmap: post-174/175/176/177 позначені [x]; нові теми post-188–192 додані як [].
+- `STATUS.md` — content engine: post-176 і post-177 додані до таблиці; blog.html статус оновлено до 166 cards / 177 posts authored / v1.57.0.
+
 ## [1.56.0] — 2026-06-01
 
 ### Added
