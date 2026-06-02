@@ -6,6 +6,16 @@
 
 ---
 
+## [1.66.0] — 2026-06-02
+
+### Added
+- `content/post-182-myostatin-inhibition-muscle-growth.md` — «Ваш м'яз знає, коли зупинитись» — міостатин (GDF-8) як молекулярний гальм гіпертрофії. McPherron et al. (1997 Nature): нокаут GDF-8 → 2–3× маса; Schuelke et al. (2004 NEJM): людський фенотип. MSTN → ActRIIB → Smad2/3 → пригнічення mTORC1 і MyoD. Фоллістатин: Lee & McPherron (2001 PNAS) надекспресія → 4× маса. Hittel et al. (2010 JSCR): силовий тренінг знижує сироватковий MSTN. Ruas et al. (2012 Cell): PGC-1α4 пригнічує MSTN mRNA. FAK-сигналізація при ексцентриці і блокування Smad3. Фармакологія: stamulumab, ACE-031, bimagrumab — 25 років без FDA-схвалення. ~13 хв. clinical-safety NOT REQUIRED. Owner: content-engine.
+- `blog.html` — картка post-182, лічильник 168 cards / 180 posts authored. v1.66.0.
+- `README.md` — roadmap: post-182 відмічено як [x] із розширеним описом.
+- `STATUS.md` — blog.html рядок оновлено до v1.66.0.
+
+---
+
 ## [1.65.0] — 2026-06-02
 
 ### Added
