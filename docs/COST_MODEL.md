@@ -2937,6 +2937,54 @@ Bear scenario implication: founding engineer hire must be deferred. Marketing/UA
 
 ---
 
+#### 22.3.5 Year 0 Compliance Capital Overlay (resolves OQ-34)
+
+> Cross-reference: §25.2.1 (SOC 2 Type II recertification cost), §25.9 (compliance implementation checklist), §25.10 OQ-34.
+
+**Gap statement:** The §22.3.2 Base scenario cash flow table includes a "Legal / compliance" column covering entity formation, ongoing IP counsel, and per-deal DPA/MSA execution costs (per §22.8 OQ-26). It does not include the **one-time Year 0 compliance readiness capital**: readiness consultant engagement and SOC 2 Type I audit fee. These are non-recurring capital outlays that occur before the first enterprise pilot and are a prerequisite for the enterprise revenue timeline assumed in §22.3.2 (first enterprise contract cash at Month 8). Omitting them materially understates the cash required to reach the enterprise milestone.
+
+**Compliance capital items and timing:**
+
+| Item | Milestone | Low [ESTIMATE] | Mid [ESTIMATE] | High [ESTIMATE] | Source |
+|---|---|---|---|---|---|
+| SOC 2 readiness consultant (gap assessment + remediation guidance) | M4 (before enterprise pilot at M5) | $15,000 | $20,000 | $25,000 | §25.9, item 2 |
+| SOC 2 Type I audit fee (audit firm engagement) | M6 (observation period start) | $10,000 | $20,000 | $30,000 | §25.9, item 5 |
+| **Total Year 0 compliance capital** | **M4–M6** | **$25,000** | **$40,000** | **$55,000** | **§25.10 OQ-34** |
+
+**Notes:**
+- These items are separate from the continuous compliance platform (Vanta/Drata, ~$18,000/year) which is modeled in §25.2.4 and begins at M4. The platform cost is a recurring annual line; the readiness consultant and Type I audit are one-time capital items.
+- The SOC 2 Type II audit ($40,000/year, per §25.2.1) is a Year 1+ recurring cost and does not appear in the Year 0 compliance capital table above.
+- Timing assumption: readiness consultant engaged at M4 to align with enterprise pilot target at M5. SOC 2 Type I audit initiated at M6 (6-month observation period required for Type II, targeting report at M12 per §25.9).
+
+**Adjusted Base scenario cumulative cash delta (compliance capital included):**
+
+The §22.3.2 table shows cumulative delta from Month 0 without compliance capital. The overlay below shows the midpoint impact ($40,000 total: $20,000 at M4 and $20,000 at M6):
+
+| Month | Base cumulative delta (§22.3.2) | Compliance capital outlay (mid) | Adjusted cumulative delta (mid) |
+|---|---|---|---|
+| 1–3 | $(6,390) | $0 | $(6,390) |
+| 4 | $(9,420) | $(20,000) | $(29,420) |
+| 5 | $(11,080) | $0 | $(31,080) |
+| 6 | $(12,820) | $(20,000) | $(52,820) |
+| 7 | $(14,185) | $0 | $(54,185) |
+| 8 | $(3,295) | $0 | $(43,295) |
+| 9 | $(4,335) | $0 | $(44,335) |
+| 10 | $(5,520) | $0 | $(45,520) |
+| 11 | $2,930 | $0 | $(37,070) |
+| 12 | $2,415 | $0 | $(37,585) |
+| 18 | $(18,038) | $0 | $(58,038) |
+
+**Low scenario ($25,000 total):** Month 6 adjusted cumulative delta = $(37,820); Month 18 = $(43,038).
+**High scenario ($55,000 total):** Month 6 adjusted cumulative delta = $(67,820); Month 18 = $(73,038).
+
+**Planning implication:** The adjusted cumulative delta at Month 6 in the mid scenario is approximately $(52,820). This represents the deepest cash trough before enterprise revenue begins at Month 8. Against a pre-seed round of $150,000 [FOUNDER_INPUT placeholder], this leaves a remaining balance of approximately $97,180 at Month 6 before enterprise cash arrives — materially lower than the $137,180 implied by §22.3.2 alone. The 6-month safe-harbor fundraise trigger from §22.4 should be evaluated against the compliance-capital-adjusted burn, not the original model.
+
+**Recommended founder action (OQ-34 resolution):** Update §22.3.2 with an explicit "Compliance capital" row added to the cash flow table — a one-time $(20,000) row at M4 and $(20,000) at M6 in the Base scenario, with footnotes anchored to §25.9. The [FOUNDER_INPUT] pre-seed capital target should account for the $40,000–$55,000 compliance capital on top of the operating burn modeled in §22.3.2. If the pre-seed raise is below $120,000, the SOC 2 Type I timeline may need to slip to M8 or later, which pushes the enterprise GA timeline by approximately 3 months.
+
+**OQ-34 status: ✅ Closed.** Compliance capital is confirmed as a material omission from §22.3 that should be included. The §22.3.5 overlay above is the quantified resolution. §22.3.2 remains a structural reference model; founders using it for actual runway planning should apply the overlay adjustments above. The §22.3.2 table may be updated to incorporate the compliance capital rows directly when the [FOUNDER_INPUT] pre-seed amount is confirmed (OQ-23).
+
+---
+
 ### 22.4 Runway Sensitivity Matrix
 
 The table below shows months of runway as a function of initial cash balance and average monthly net burn. "Net burn" is Total Cash Out minus Total Cash In per month, averaged across the period.
@@ -3091,9 +3139,13 @@ The Base scenario models a 45-day [ESTIMATE] lag between consumer subscription r
 
 §22.2 assumes $0 founder salary through Month 12. This assumption must be validated against the founder's personal financial position and the pre-seed funding amount. If the founder requires a market-rate or sustenance salary from Day 1, total monthly burn in §22.3 increases by $5,000–$10,000/month [ESTIMATE], reducing runway by 20–35% at the $150k initial cash level. This is not a judgment — it is a planning input that must be explicit. Owner: founder. Resolution: before company formation or within 30 days of first capital receipt.
 
+**OQ-34: Year 0 compliance capital omission from §22.3 cash flow model** ✅ **Closed**
+
+The §22.3.2 Base scenario cash flow table did not include the one-time Year 0 compliance readiness capital (SOC 2 readiness consultant + SOC 2 Type I audit fee), totaling $25,000–$55,000 [ESTIMATE] across M4 and M6. This was a material omission: at midpoint ($40,000), the Month 6 cumulative cash trough deepens from $(12,820) to $(52,820), materially changing the runway picture before enterprise revenue begins. §22.3.5 provides the quantified compliance capital overlay, adjusted cumulative cash delta table (low/mid/high scenarios), and planning implications for the pre-seed capital target. OQ-34 is closed: the overlay is the resolution. §22.3.2 should be updated with explicit compliance capital rows when OQ-23 (pre-seed capital amount) is confirmed. Owner: compliance-officer + founder. Cross-reference: §25.9 (compliance implementation checklist), §25.10 (OQ-34 original statement). Resolved: 2026-06-02 · §22.3.5.
+
 ---
 
-*v1.3 additions: §22 Year 1 Cash Flow Forecast & Runway Model — cash flow vs. P&L distinction and purpose (§22.1); funding assumptions structure with [FOUNDER_INPUT] placeholders (§22.2); month-by-month 18-month cash flow table across Base/Bull/Bear scenarios with per-category rows (infra, AI API, marketing, legal, hiring) aligned to §13.1 scaling tables and §19.7 enterprise revenue forecast (§22.3); runway sensitivity matrix (funding amount × monthly burn → months of runway) with 6-month safe-harbor fundraise trigger (§22.4); key cash flow triggers table covering App Store launch, first enterprise deal, Founding Engineer hire, AE hire, API cost shock, and infrastructure cliffs (§22.5); Series A fundraise timing model with readiness criteria table (ARR, NRR, logo count, W-ACSU, D30 retention) and 15–22-week process timeline (§22.6); cash management controls covering single-account policy, weekly 5-point cash review, variable-rate commitment gate (90-day max without founder approval), and expense recognition lag (§22.7); OQ-23 (pre-seed capital amount), OQ-24 (Founding Engineer hire cost), OQ-25 (App Store payout lag), OQ-26 (legal cost profile), OQ-27 (founder salary policy) (§22.8).*
+*v1.3 additions: §22 Year 1 Cash Flow Forecast & Runway Model — cash flow vs. P&L distinction and purpose (§22.1); funding assumptions structure with [FOUNDER_INPUT] placeholders (§22.2); month-by-month 18-month cash flow table across Base/Bull/Bear scenarios with per-category rows (infra, AI API, marketing, legal, hiring) aligned to §13.1 scaling tables and §19.7 enterprise revenue forecast (§22.3); runway sensitivity matrix (funding amount × monthly burn → months of runway) with 6-month safe-harbor fundraise trigger (§22.4); key cash flow triggers table covering App Store launch, first enterprise deal, Founding Engineer hire, AE hire, API cost shock, and infrastructure cliffs (§22.5); Series A fundraise timing model with readiness criteria table (ARR, NRR, logo count, W-ACSU, D30 retention) and 15–22-week process timeline (§22.6); cash management controls covering single-account policy, weekly 5-point cash review, variable-rate commitment gate (90-day max without founder approval), and expense recognition lag (§22.7); OQ-23 (pre-seed capital amount), OQ-24 (Founding Engineer hire cost), OQ-25 (App Store payout lag), OQ-26 (legal cost profile), OQ-27 (founder salary policy) (§22.8). v1.7 additions (2026-06-02): §22.3.5 Year 0 Compliance Capital Overlay — closes OQ-34 (P0, pre-seed close blocker). Two compliance capital line items not previously in §22.3.2: SOC 2 readiness consultant ($15–25k [ESTIMATE], M4) and SOC 2 Type I audit ($10–30k [ESTIMATE], M6); total Year 0 compliance capital $25–55k [ESTIMATE] (midpoint $40k). Adjusted cumulative cash delta table shows Base scenario trough deepens from $(12,820) to $(52,820) at Month 6 at midpoint — a material change to the runway picture before enterprise revenue at M8. Planning implication: pre-seed capital target should account for $40–55k compliance capital above operating burn; if raise < $120k, SOC 2 Type I timeline slips to M8 and enterprise GA delays ~3 months. OQ-34 closed; §22.8 updated with closure statement. Cross-references: §25.9 (compliance implementation checklist, P0 items at M4–M6), §25.10 (OQ-34 original statement), OQ-23 (pre-seed capital — §22.3.2 table to be updated when confirmed).*
 
 ---
 
