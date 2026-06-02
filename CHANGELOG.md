@@ -6,6 +6,16 @@
 
 ---
 
+## [1.62.0] — 2026-06-02
+
+### Added
+- `content/post-180-insulin-signaling-glut4.md` — «М'яз без інсуліну все одно поглинає глюкозу» — GLUT4 транслокація, інсулін-залежний (IR → PI3K/Akt → AS160) і вправа-залежний (Ca²⁺/CaMKII + AMPK → AS160) шляхи, хронічна GLUT4 upregulation, механізм зниження ризику T2D через тренінг. DeFronzo (1981), Richter & Hargreaves (2013), Holloszy (2011). ~13 хв. clinical-safety NOT REQUIRED. Owner: content-engine.
+- `blog.html` — картка post-180, лічильник 167 cards / 178 posts authored. v1.62.0.
+- `README.md` — roadmap: post-180 відмічено як [x]; додані нові теми post-198–202 (симпатоадреналова вісь, ангіогенез/капілярна адаптація, епігенетична пам'ять тренінгу, серцево-судинний дрейф, нейральна ефективність).
+- `STATUS.md` — blog.html рядок оновлено до v1.62.0.
+
+---
+
 ## [1.61.0] — 2026-06-02
 
 ### Added
