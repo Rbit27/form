@@ -6,6 +6,13 @@
 
 ---
 
+## [1.60.0] — 2026-06-02
+
+### Added
+- `docs/SOC2_READINESS.md §53` — Business Continuity Planning & Disaster Recovery Testing Program (A1.2/A1.3/CC9.1). Closes three 🔴/🟡 gaps: A1.2-GAP-DR-TEST (🔴→🟢 conditional), A1.2-GAP-COLD-BACKUP (🔴→🟡 Authored), A1.2-GAP-DR-RUNBOOK (🟡→🟢). Includes RTO/RPO per tier (Enterprise ≤2h/≤15min contractual), 5 named DR scenarios (FORM-DR-001..005), 12-step annual drill procedure, cold storage backup program (pg_dump nightly AES-256-GCM → R2), 6 auditor evidence artifacts (PRE-53-E-001..006). SOC2 v2.4→v2.5. Owner: compliance-officer + devops-lead.
+
+---
+
 ## [1.59.0] — 2026-06-02
 
 ### Added

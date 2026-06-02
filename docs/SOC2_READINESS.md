@@ -16287,3 +16287,490 @@ The following five named attack scenarios are mandatory test cases for every eng
 ---
 
 *v2.4 additions (2026-06-01): §52 External Penetration Testing Program — Scope, Methodology, Vendor Selection, Remediation SLA & Auditor Evidence. Closes §51.9 checklist item #15 and advances CC6-GAP-004 from gap-identified to 🟡 Authored. Closure to 🟢 requires receipt and filing of PRE-52-E-001 through PRE-52-E-005 with all Critical and High findings resolved and re-test confirmed. Five mandatory FORM-specific attack scenarios defined: FORM-PEN-001 (RLS cross-tenant bypass), FORM-PEN-002 (HMAC audit chain injection), FORM-PEN-003 (SCIM group-claim privilege escalation), FORM-PEN-004 (CV session keypoint extraction), FORM-PEN-005 (JWT tenant_id claim forgery). Remediation SLAs: Critical 7 days, High 30 days, Medium 90 days. Privacy constraints enforce staging-only testing with synthetic data; clinical-safety veto applies to any test vector that could expose real health data. Vendor selection requires CREST/OSCP/GPEN certification and contractual data deletion within 30 days of engagement close. TSC mapping covers CC7.1, CC7.2, CC9.1, CC6.1, CC6.8, A1.2. Document header updated from v2.3 to v2.4.*
+
+---
+
+## 53. Business Continuity Planning & Disaster Recovery Testing Program — A1.2/A1.3/CC9.1 Auditor Exhibit
+
+> Closes three gap register items from §51.4: **DR test performed annually** (🔴→🟢 with conditions), **cold storage backup** (🔴→🟡), and **DR runbook documented** (🟡→🟢). This section constitutes the authored specification that advances the A1.2 Availability criterion DR obligations from gap-identified to 🟡 Authored. Full 🟢 closure requires completion of the first live DR drill (PRE-53-E-001) and 90 days of verified cold backup logs (PRE-53-E-002 and PRE-53-E-003).
+
+---
+
+### 53.1 SOC 2 TSC Mapping
+
+This section directly satisfies the following Trust Services Criteria:
+
+| TSC Criterion | Criterion Text (abbreviated) | How §53 Satisfies It |
+|---|---|---|
+| **A1.1** | The entity maintains, monitors, and evaluates current processing capacity and use of system components to manage capacity demands. | Tiered RTO/RPO commitments (§53.3) define per-tier capacity recovery targets. Scenario catalog (§53.4) ensures all major system components have documented recovery capacity expectations. |
+| **A1.2** | The entity authorizes, designs, develops, implements, and operates environmental protections, software, data back-up processes, and recovery infrastructure to meet its availability commitments and system requirements. | Cold storage backup program (§53.6) provides a PITR-independent daily backup with 90-day retention, AES-256-GCM encryption, weekly automated verification, and HMAC-chained audit events. Annual DR drill program (§53.5) tests recovery infrastructure against documented RTO/RPO commitments. |
+| **A1.3** | The entity tests recovery plan procedures supporting system recovery to meet its availability commitments. | Annual DR drill procedure (§53.5) is the primary evidence artifact for A1.3. Drill types (tabletop minimum annually; live failover every two years), pass/fail criteria, evidence capture requirements, and re-drill protocol are fully specified. |
+| **CC9.1** | The entity identifies, selects, and develops risk mitigation activities for risks arising from potential business disruptions and use of vendors and business partners. | Scenario FORM-DR-004 (Anthropic API outage) and FORM-DR-005 (compound disaster) address third-party vendor dependency risk. Vendor dependency fallback postures are documented per scenario. BCP policy (§53.2) requires annual review with explicit founder authority for major DR decisions. |
+| **CC9.2** | The entity assesses and manages risks associated with vendors and business partners. | DR Scenario Catalog (§53.4) explicitly catalogs each critical third-party vendor as a potential failure origin. FORM-DR-004 (Anthropic/Victor outage) defines graceful degradation posture. Vendor recovery ETAs are documented in scenario runbooks. |
+
+**Gap register cross-reference:** This section is the authored specification for three items in §51.4 (A1.2 sub-criteria). Evidence artefacts PRE-53-E-001 through PRE-53-E-006 (§53.7) are the closure evidence required to advance gaps to 🟢.
+
+---
+
+### 53.2 BCP/DR Policy Summary
+
+| Attribute | Value |
+|---|---|
+| **Policy title** | Business Continuity and Disaster Recovery Policy |
+| **Policy owner** | devops-lead (operational execution) + compliance-officer (audit and regulatory obligations) |
+| **Authority** | Founder holds final decision authority on any DR action that modifies production data, changes service routing at a global level, or triggers enterprise customer SLA notifications |
+| **Scope** | All FORM production systems: Supabase (PostgreSQL + PITR), Cloudflare Workers (edge compute), Cloudflare R2 (object storage), ElevenLabs (TTS), Anthropic Claude (AI coaching/Victor), Stripe (billing), Sentry (error monitoring), PostHog (analytics) |
+| **Review cadence** | Annual minimum; triggered review required within 30 days of any P0 incident or major architecture change |
+| **Next scheduled review** | 2027-06-01 |
+| **Approval chain** | Drafted by devops-lead → reviewed by compliance-officer → approved by founder |
+| **Distribution** | All engineering hires acknowledge BCP policy during onboarding; acknowledgment logged as a DEC-030 `system.policy_acknowledged` event |
+
+**Incident Commander (IC) assignment during DR events:**
+
+| Severity | Incident Commander | Backup IC | Escalation to Founder |
+|---|---|---|---|
+| P0 (full outage, enterprise SLA breach) | devops-lead | security-engineer | Immediate; within 15 minutes of P0 declaration |
+| P1 (partial outage, growth tier degraded) | devops-lead | platform-engineer | If unresolved at 2h mark |
+| P2 (single component degraded, consumer tier only) | platform-engineer | devops-lead | Not required unless RTO at risk |
+
+---
+
+### 53.3 RTO/RPO Commitments by Tier
+
+RTO (Recovery Time Objective) and RPO (Recovery Point Objective) commitments are differentiated by customer tier. Enterprise commitments are contractual; Consumer and Growth commitments are operational targets enforced internally but not individually contractual.
+
+| Tier | RTO | RPO | SLA Enforcement | Notification Obligation |
+|---|---|---|---|---|
+| **Consumer** (free) | ≤8h | ≤4h | Best effort; internal target only; no contractual remedy | Status page update within 30 minutes of declared outage; resolved notification on restoration |
+| **Growth** ($15/mo) | ≤4h | ≤1h | Operational SLA; credit applied automatically if breach documented | Email notification within 15 minutes of declared P0/P1; update every 60 minutes |
+| **Enterprise** (contract) | ≤2h | ≤15min | Contractual SLA; breach triggers penalty clause per MSA schedule; devops-lead must personally notify enterprise contact | Phone + email within 10 minutes of P0 declaration; named IC assigned; update every 30 minutes; post-incident report within 48h |
+
+**RPO technical implementation note:** Enterprise ≤15min RPO is achievable via Supabase PITR (point-in-time recovery at 1-minute granularity). Cold storage backups (§53.6) provide a secondary recovery path with ≤24h RPO as a fallback if PITR is unavailable. For the ≤15min target, PITR is the primary mechanism and its availability is a prerequisite for enterprise tier onboarding.
+
+**SLA breach logging:**
+
+```sql
+-- Log an SLA breach event when RTO or RPO is exceeded for a given tier.
+-- Run at DR drill conclusion or during actual incident post-mortem.
+INSERT INTO audit_log_events (
+  event_type,
+  severity,
+  actor_type,
+  payload,
+  occurred_at
+) VALUES (
+  'system.sla_breach_recorded',
+  'HIGH',
+  'system',
+  jsonb_build_object(
+    'incident_id',    'FORM-INC-XXXX',
+    'tier',           'enterprise',
+    'rto_target_h',   2,
+    'rto_actual_h',   2.4,
+    'rpo_target_min', 15,
+    'rpo_actual_min', 22,
+    'breach_type',    ARRAY['rto', 'rpo'],
+    'ic',             'devops-lead',
+    'drill_or_live',  'live'
+  ),
+  now()
+);
+-- HMAC chain is computed by the audit_log_events insert trigger per DEC-030.
+```
+
+---
+
+### 53.4 DR Scenario Catalog
+
+Five named DR scenarios are maintained. Drills rotate through these scenarios annually. Each scenario has a permanent runbook in `docs/runbooks/dr/` (see §53.9 for the reference map).
+
+---
+
+**FORM-DR-001: Supabase Primary Region Total Outage**
+
+| Attribute | Value |
+|---|---|
+| **Scenario ID** | FORM-DR-001 |
+| **Severity classification** | P0 — Critical |
+| **Description** | The Supabase-managed PostgreSQL primary region (us-east-1) becomes completely unavailable. All read and write operations fail. PITR is inaccessible from the primary region. |
+| **Affected tiers** | All tiers |
+| **Estimated recovery time (PITR path)** | 60–90 minutes (PITR restore to new project) |
+| **Estimated recovery time (cold backup path)** | 3–5 hours (latest nightly pg_dump restore to ephemeral Postgres) |
+| **Primary runbook** | `docs/runbooks/dr/FORM-DR-001-supabase-outage.md` |
+| **RTO risk** | Enterprise RTO (≤2h) achievable via PITR path only; cold backup path may breach RTO |
+| **Key dependency** | Supabase PITR availability in a secondary region; cold backup encryption key in Workers Secrets |
+
+---
+
+**FORM-DR-002: Cloudflare Workers Global Edge Failure**
+
+| Attribute | Value |
+|---|---|
+| **Scenario ID** | FORM-DR-002 |
+| **Severity classification** | P0 — Critical |
+| **Description** | Cloudflare Workers globally unavailable due to a Cloudflare platform incident. All API requests fail. Supabase database is healthy but unreachable through the Workers proxy layer. |
+| **Affected tiers** | All tiers (entire API surface offline) |
+| **Estimated recovery time** | 30–60 minutes once Cloudflare recovers (no FORM action possible during outage); if partial, re-routing to Cloudflare alternate zone within 45 minutes |
+| **Primary runbook** | `docs/runbooks/dr/FORM-DR-002-workers-edge-failure.md` |
+| **RTO risk** | FORM has no control over Cloudflare platform recovery time; enterprise RTO may breach during prolonged Cloudflare outage; contract force-majeure clause applies for documented Cloudflare incidents |
+| **Key dependency** | Cloudflare status page (cloudflare.com/status); Sentry alert FORM-DR-EDGE-001 |
+
+---
+
+**FORM-DR-003: R2 Bucket Data Loss or Corruption**
+
+| Attribute | Value |
+|---|---|
+| **Scenario ID** | FORM-DR-003 |
+| **Severity classification** | P1 — High |
+| **Description** | The primary R2 bucket (`form-production`) experiences data loss or corruption. User-uploaded assets, CV session thumbnails, and coaching media are affected. Cold backup bucket (`form-cold-backups`) is separate and unaffected. |
+| **Affected tiers** | Consumer and Growth (media serving degraded); Enterprise (SLA degraded if coaching media unavailable) |
+| **Estimated recovery time** | 2–4 hours (restore from cold backup manifest; re-upload affected objects) |
+| **Primary runbook** | `docs/runbooks/dr/FORM-DR-003-r2-data-loss.md` |
+| **RTO risk** | P1 classification means Growth RTO (≤4h) is achievable; Enterprise RTO (≤2h) may require triage to restore highest-priority enterprise tenant assets first |
+| **Key dependency** | Cold backup manifest with SHA-256 checksums (PRE-53-E-002); `form-cold-backups` R2 bucket intact |
+
+---
+
+**FORM-DR-004: Anthropic API Sustained Outage (>2h) — Victor Non-Functional**
+
+| Attribute | Value |
+|---|---|
+| **Scenario ID** | FORM-DR-004 |
+| **Severity classification** | P1 — High |
+| **Description** | The Anthropic Claude API is unavailable for more than 2 consecutive hours. Victor (AI coaching) cannot generate coaching responses. All other FORM functionality (workout logging, CV analysis on-device, Stripe billing) remains operational. |
+| **Affected tiers** | All tiers (coaching feature only; core app remains functional) |
+| **Estimated recovery time** | Not applicable — recovery is contingent on Anthropic restoring their service |
+| **Fallback posture** | (1) Degrade gracefully: replace Victor responses with a static "coaching temporarily unavailable" message. (2) Queue user coaching requests with a 2h re-try window; surface queued state to the user in the app. (3) If outage exceeds 6h, compliance-officer to assess whether enterprise SLA credit applies. |
+| **Primary runbook** | `docs/runbooks/dr/FORM-DR-004-anthropic-outage.md` |
+| **RTO risk** | No FORM RTO applies — this is a vendor dependency; FORM's obligation is graceful degradation within 15 minutes of outage detection |
+| **Key dependency** | Sentry alert FORM-DR-AI-001; Anthropic status page; fallback message strings deployed in Workers |
+
+---
+
+**FORM-DR-005: Multi-Component Simultaneous Failure (Compound Disaster)**
+
+| Attribute | Value |
+|---|---|
+| **Scenario ID** | FORM-DR-005 |
+| **Severity classification** | P0 — Critical |
+| **Description** | Simultaneous failure of two or more components: e.g., Supabase primary outage coinciding with R2 bucket corruption, or Cloudflare Workers failure coinciding with Anthropic API outage. Compound disasters require prioritised triage and may breach Enterprise RTO. |
+| **Affected tiers** | All tiers |
+| **Estimated recovery time** | 4–6 hours (worst case; sequenced recovery per triage priority) |
+| **Triage priority order** | (1) Restore database access (FORM-DR-001 protocol). (2) Restore API layer (FORM-DR-002 protocol). (3) Restore object storage (FORM-DR-003 protocol). (4) Communicate AI degradation (FORM-DR-004 posture). |
+| **Primary runbook** | `docs/runbooks/dr/FORM-DR-005-compound-disaster.md` |
+| **RTO risk** | Enterprise RTO (≤2h) almost certainly breached; force-majeure assessment required; compliance-officer notifies enterprise contacts and logs breach via `system.sla_breach_recorded` |
+| **Key dependency** | All component runbooks; founder available for escalation decisions; all IC backup contacts reachable |
+
+---
+
+### 53.5 Annual DR Drill Procedure
+
+The DR drill program satisfies A1.3 directly. A minimum of one drill per calendar year is mandatory for SOC 2 Type II observation period evidence.
+
+---
+
+#### 53.5.1 Drill Scheduling
+
+- Drills are scheduled in Q1 of each calendar year for execution no later than Q2.
+- Devops-lead receives formal written notice (Slack DM + Linear ticket) no less than **14 calendar days** before the drill date.
+- Compliance-officer files the drill date in the annual evidence calendar and confirms observer availability before the drill date is locked.
+- Scenario assignment rotates annually through FORM-DR-001 → FORM-DR-002 → FORM-DR-003 → FORM-DR-004 → FORM-DR-005 → FORM-DR-001 (repeating). First drill: FORM-DR-001.
+
+| Drill Year | Scenario | Drill Type | Target Quarter |
+|---|---|---|---|
+| 2026 | FORM-DR-001 (Supabase outage) | Tabletop | Q2 2026 |
+| 2027 | FORM-DR-002 (Workers edge failure) | Live failover | Q2 2027 |
+| 2028 | FORM-DR-003 (R2 data loss) | Tabletop | Q2 2028 |
+| 2029 | FORM-DR-004 (Anthropic outage) | Live failover | Q2 2029 |
+| 2030 | FORM-DR-005 (Compound disaster) | Tabletop | Q2 2030 |
+
+#### 53.5.2 Drill Types
+
+| Drill Type | Description | Frequency | Production Impact |
+|---|---|---|---|
+| **Tabletop** | Structured walkthrough of the scenario runbook. Participants verbally step through each runbook action, identify gaps, and record deviations. No live system changes. | Annual minimum | None |
+| **Live failover** | Full execution of the scenario runbook against the isolated staging environment. Actual failover actions performed; RTO and RPO measured in real time. | Every 2 years | Staging only; zero production impact |
+
+Live failover drills are **strictly prohibited** against any production environment. Devops-lead is responsible for confirming the staging environment is isolated before any live drill begins (see §53.5.4 item 1).
+
+#### 53.5.3 12-Step Drill Execution Procedure
+
+| Step | Action | Responsible | Time Constraint |
+|---|---|---|---|
+| **1** | Issue formal drill notice: Slack DM to devops-lead + compliance-officer + security-engineer; Linear ticket FORM-DRILL-YYYY-QN created with scenario assigned | compliance-officer | T-14 days |
+| **2** | Pre-drill checklist completed and signed off (§53.5.4) | devops-lead + compliance-officer | T-24 hours |
+| **3** | Drill window opens: IC (devops-lead) declares drill start in the Linear ticket with timestamp | devops-lead | T=0 |
+| **4** | Scenario injection: compliance-officer reads the scenario description aloud (tabletop) or simulates the failure condition in staging (live failover) | compliance-officer | T+5 min |
+| **5** | IC executes runbook step-by-step; observer (compliance-officer or security-engineer) timestamps each completed step and records any deviation from the written runbook | devops-lead (IC), compliance-officer (observer) | Ongoing |
+| **6** | RTO clock started at T=0 (scenario injection); IC declares "service restored" with timestamp when recovery criteria are met | devops-lead | Within 4h window |
+| **7** | RPO checkpoint: IC confirms the recovery point achieved (e.g., last PITR timestamp used); observer records RPO achieved | devops-lead + observer | At recovery declaration |
+| **8** | Evidence capture: observer takes timestamped screenshots of terminal output, Supabase dashboard, Cloudflare dashboard, or DEC-030 log confirming restoration | compliance-officer | Within 15 min of step 6 |
+| **9** | Pass/fail assessment against §53.5.6 criteria; IC and observer agree on outcome; recorded in Linear ticket | devops-lead + compliance-officer | Within 30 min of step 6 |
+| **10** | If PASS: drill report drafted (§53.5.7 format); filed in `compliance/evidence/dr-drills/YYYY-QN-<scenario>/` within 5 business days | compliance-officer | T+5 business days |
+| **11** | If FAIL: 14-day remediation window begins; re-drill scheduled within 30 days (§53.5.8) | devops-lead | Immediately on fail verdict |
+| **12** | Final sign-off: compliance-officer + devops-lead + founder sign the drill report (§53.5.9); PRE-53-E-001 filed in R2 evidence bucket | All three | Within 10 business days of drill |
+
+#### 53.5.4 Pre-Drill Checklist
+
+All five items must be confirmed in writing in the Linear drill ticket before the drill window opens. Devops-lead confirms items 1–3; compliance-officer confirms items 4–5.
+
+| # | Item | Confirmed By |
+|---|---|---|
+| 1 | Staging environment isolated: no production database, no production R2 bucket, no production Workers routes connected to staging; devops-lead attestation in Linear ticket | devops-lead |
+| 2 | All relevant personnel notified: devops-lead, compliance-officer, security-engineer, and founder (awareness only) notified of drill date and time; no external notifications unless explicitly required | compliance-officer |
+| 3 | Evidence camera ready: screen recording or screenshot tool active on observer's machine; timestamping verified against UTC | compliance-officer |
+| 4 | Rollback plan confirmed: for live failover drills, a documented rollback procedure exists and has been reviewed within the past 7 days; for tabletop, N/A | devops-lead |
+| 5 | Compliance-officer observer confirmed present: compliance-officer (or designated security-engineer deputy) will be present for the full drill window | compliance-officer |
+
+#### 53.5.5 Evidence Capture Requirements
+
+The following evidence must be captured during every drill and included in the drill report (PRE-53-E-001):
+
+- Timestamped screenshots or screen recording clips for each runbook step completed (UTC timestamps mandatory).
+- RTO achieved: wall-clock time from scenario injection (step 4) to IC recovery declaration (step 6), recorded in minutes.
+- RPO achieved: data point in time recovered to, expressed as minutes before the scenario injection timestamp.
+- Any deviation from the written runbook: step number, expected action, actual action taken, and reason for deviation.
+- For live failover drills: DEC-030 audit log extract showing `system.dr_drill_started` and `system.dr_drill_completed` events with HMAC chain intact.
+
+#### 53.5.6 Pass/Fail Criteria
+
+A drill passes if and only if all four of the following conditions are met:
+
+| Condition | Pass Threshold |
+|---|---|
+| RTO within tier SLA | Enterprise scenario: actual RTO ≤2h. Growth scenario: actual RTO ≤4h. Consumer scenario: actual RTO ≤8h. Tabletop drills: estimated RTO documented and assessed as achievable by IC and observer. |
+| RPO within tier SLA | Enterprise scenario: actual RPO ≤15min. Growth scenario: actual RPO ≤1h. Tabletop drills: estimated RPO documented and assessed as achievable. |
+| No production data exposure | Zero production records accessed, modified, or exported during a live failover drill. Tabletop: N/A. |
+| Evidence package complete | All items in §53.5.5 captured and filed within 5 business days of drill completion. |
+
+#### 53.5.7 Drill Report Format
+
+```
+compliance/evidence/dr-drills/YYYY-QN-<scenario>/
+  drill-report.md          # Primary report (structured Markdown)
+  screenshots/             # Timestamped screenshots and/or screen recording
+  rto-rpo-log.csv          # Step-by-step timeline with UTC timestamps
+  deviation-log.md         # Any deviations from runbook (empty if none)
+  sign-off-page.md         # Compliance-officer + devops-lead + founder signatures and date
+```
+
+The `drill-report.md` must include: drill date, scenario ID, drill type (tabletop/live), IC name, observer name, scenario description, step-by-step execution log with timestamps, RTO achieved (minutes), RPO achieved (minutes), pass/fail verdict, deviation summary, and remediation actions if fail.
+
+#### 53.5.8 Fail Protocol
+
+If a drill fails any pass/fail criterion:
+
+1. IC and observer document the failure condition in the Linear ticket within 2 hours of fail verdict.
+2. A 14-day remediation window begins immediately. Devops-lead owns the remediation plan; compliance-officer tracks against the Linear ticket.
+3. A re-drill is scheduled within 30 calendar days of the original drill date. Re-drill uses the same scenario.
+4. Re-drill evidence is filed as a separate sub-directory: `compliance/evidence/dr-drills/YYYY-QN-<scenario>-redrill/`.
+5. If the re-drill also fails, compliance-officer escalates to founder and files a formal gap register update in §51.4, advancing the affected gap to 🔴.
+
+#### 53.5.9 Sign-Off Requirements
+
+The drill report is not considered complete and may not be filed as PRE-53-E-001 until all three of the following signatures are recorded in `sign-off-page.md`:
+
+| Signatory | Role | What the Signature Attests |
+|---|---|---|
+| compliance-officer | Audit and regulatory owner | Evidence is complete, pass/fail assessment is accurate, report is filed correctly |
+| devops-lead | Operational IC and execution owner | Runbook steps are accurately recorded, RTO/RPO measurements are correct |
+| founder | Final authority | Aware of drill outcome; if fail, authorises remediation plan and re-drill date |
+
+---
+
+### 53.6 Cold Storage Backup Program
+
+This subsection closes the 🔴 gap **"cold storage backup" (A1.2)** identified in §51.4. Supabase PITR provides continuous WAL-based point-in-time recovery but is managed by Supabase and is co-located with the primary region. The cold storage program provides an independent, FORM-controlled, encrypted, off-PITR backup.
+
+---
+
+#### 53.6.1 Architecture
+
+| Component | Detail |
+|---|---|
+| **Backup tool** | `pg_dump` (PostgreSQL native; format: custom compressed `-Fc`) |
+| **Source** | Supabase production PostgreSQL; connected via `DATABASE_URL` stored in Workers Secrets (read-only backup role) |
+| **Destination** | Cloudflare R2 bucket `form-cold-backups/` (separate from production bucket `form-production/` and evidence bucket `form-soc2-evidence/`) |
+| **Schedule** | Daily at 02:00 UTC via Cloudflare Cron Trigger on `backup-worker` |
+| **Encryption** | AES-256-GCM; key stored in Workers Secrets as `COLD_BACKUP_ENC_KEY` (distinct from `KEYPOINTS_ENC_KEY` and all other secrets) |
+| **Retention** | 90 days rolling; backup objects older than 90 days are deleted by R2 lifecycle rule |
+| **Backup naming** | `YYYY/MM/DD/form-db-backup-YYYY-MM-DD-HHMMSS-UTC.dump.enc` |
+
+#### 53.6.2 Backup Schedule and Verification
+
+| Activity | Schedule | Owner | Evidence Produced |
+|---|---|---|---|
+| Nightly `pg_dump` + encrypt + upload to R2 | Daily 02:00 UTC | backup-worker (automated) | R2 object + daily manifest entry (§53.6.3) |
+| Weekly automated restore test | Every Monday 04:00 UTC | restore-verify-worker (automated) | `system.backup_verification_completed` DEC-030 event |
+| Monthly manual spot-check | First business day of each month | devops-lead | Linear ticket comment with restore elapsed time and row count confirmation |
+| 90-day retention enforcement | Continuous R2 lifecycle rule | Cloudflare R2 (automated) | R2 lifecycle log |
+
+#### 53.6.3 Backup Manifest
+
+After each successful backup, the `backup-worker` writes a manifest entry to R2 at `manifests/YYYY/MM/backup-manifest-YYYY-MM-DD.json`:
+
+```json
+{
+  "backup_date": "2026-06-02",
+  "backup_file": "2026/06/02/form-db-backup-2026-06-02-020137-UTC.dump.enc",
+  "sha256_checksum": "a3f9e2b7c1d4...",
+  "file_size_bytes": 482073441,
+  "pg_dump_version": "16.3",
+  "encryption_algorithm": "AES-256-GCM",
+  "encryption_key_id": "COLD_BACKUP_ENC_KEY",
+  "upload_completed_at": "2026-06-02T02:04:17Z",
+  "worker_invocation_id": "01HZ5X..."
+}
+```
+
+SHA-256 checksums are computed over the encrypted file. Manifest files are append-only; the R2 bucket policy prohibits deletion of manifest objects.
+
+#### 53.6.4 Weekly Automated Restore Verification
+
+Every Monday at 04:00 UTC the `restore-verify-worker` executes the following sequence against an ephemeral Postgres container (Cloudflare Containers or equivalent isolated compute):
+
+1. Download the most recent backup object from `form-cold-backups/`.
+2. Verify SHA-256 checksum against the manifest entry.
+3. Decrypt using `COLD_BACKUP_ENC_KEY`.
+4. Restore to ephemeral Postgres instance via `pg_restore`.
+5. Execute verification query (below).
+6. Destroy the ephemeral container.
+7. Log result as a DEC-030 event.
+
+```sql
+-- Verification query executed inside the ephemeral restored database.
+-- Confirms the restore produced a structurally sound database with
+-- expected row counts in critical tables.
+SELECT
+  (SELECT COUNT(*) FROM auth.users)            AS user_count,
+  (SELECT COUNT(*) FROM workout_sessions)      AS session_count,
+  (SELECT COUNT(*) FROM audit_log_events)      AS audit_event_count,
+  (SELECT MAX(occurred_at) FROM audit_log_events) AS latest_audit_event,
+  (SELECT pg_size_pretty(pg_database_size(current_database()))) AS db_size;
+-- Result is compared against prior-day baseline stored in KV.
+-- If any count is 0 or drops >10% vs. baseline, the verification fails.
+```
+
+```sql
+-- Check pg_cron or backup worker invocation log to confirm
+-- verification jobs are running on schedule.
+-- Run against the operations database (not the restored backup).
+SELECT
+  job_id,
+  jobname,
+  last_run_started_at,
+  last_run_status,
+  last_run_duration
+FROM cron.job_run_details
+WHERE jobname = 'backup-restore-verify'
+ORDER BY last_run_started_at DESC
+LIMIT 10;
+-- Expected: all rows show status = 'succeeded'; no gap > 8 days between runs.
+```
+
+#### 53.6.5 DEC-030 Audit Events
+
+All backup and verification events are HMAC-chained per DEC-030 (hard requirement). The following events must be present in `audit_log_events`:
+
+| Event Type | Severity | Trigger | Payload Fields |
+|---|---|---|---|
+| `system.cold_backup_completed` | STANDARD | Successful nightly backup upload to R2 | `backup_file`, `sha256_checksum`, `file_size_bytes`, `upload_duration_s`, `backup_date` |
+| `system.cold_backup_failed` | CRITICAL | Any failure in pg_dump, encryption, or R2 upload | `failure_stage` (`pg_dump`/`encrypt`/`upload`), `error_message`, `backup_date`, `retry_count` |
+| `system.backup_verification_completed` | STANDARD | Successful weekly restore verification | `backup_file_verified`, `verification_duration_s`, `user_count`, `session_count`, `audit_event_count`, `db_size`, `checksum_valid` |
+| `system.backup_verification_failed` | HIGH | Failed weekly restore verification (checksum mismatch, restore error, or row count anomaly) | `backup_file_attempted`, `failure_reason`, `checksum_valid`, `restore_attempted` |
+
+```sql
+-- Query to confirm DEC-030 backup events are present and HMAC chain is valid.
+-- Run as part of auditor evidence collection (PRE-53-E-003).
+SELECT
+  id,
+  event_type,
+  severity,
+  occurred_at,
+  hmac_valid,
+  payload->>'backup_date'           AS backup_date,
+  payload->>'sha256_checksum'        AS checksum,
+  payload->>'backup_file'            AS file
+FROM audit_log_events
+WHERE event_type IN (
+  'system.cold_backup_completed',
+  'system.cold_backup_failed',
+  'system.backup_verification_completed',
+  'system.backup_verification_failed'
+)
+ORDER BY occurred_at DESC
+LIMIT 60;
+-- For a 4-week sample: expect 28 cold_backup_completed rows, 4 backup_verification_completed rows,
+-- 0 cold_backup_failed rows, 0 backup_verification_failed rows (healthy state).
+-- hmac_valid must be TRUE for all rows.
+```
+
+#### 53.6.6 Alerting
+
+| Alert ID | Condition | Severity | Channel | Remediation |
+|---|---|---|---|---|
+| FORM-DR-BACKUP-001 | Last successful backup age > 26 hours (backup missed or upload failed) | CRITICAL | Cloudflare alert → PagerDuty → devops-lead | Manually trigger backup-worker; investigate failure; file DEC-030 `system.cold_backup_failed` event if not already logged |
+| FORM-DR-BACKUP-002 | Weekly verification job has not produced a `system.backup_verification_completed` event in > 9 days | HIGH | Sentry alert → devops-lead | Inspect restore-verify-worker logs; manually trigger verification; escalate to compliance-officer if root cause unclear |
+
+FORM-DR-BACKUP-001 alert configuration must be captured as PRE-53-E-006 (Cloudflare dashboard screenshot) and filed in R2 before the SOC 2 observation period begins.
+
+---
+
+### 53.7 Evidence Package for Auditors
+
+The following artefacts must be produced and filed in the R2 evidence bucket `form-soc2-evidence/dr/YYYY/` for each annual audit cycle. Auditors are granted read-only access via a time-limited signed URL issued by compliance-officer.
+
+| Evidence ID | Artefact | Content | Produced By | Filing Deadline |
+|---|---|---|---|---|
+| **PRE-53-E-001** | Annual DR drill report | Drill date, scenario ID, drill type, IC name, observer name, RTO achieved (minutes), RPO achieved (minutes), pass/fail verdict, deviation log, sign-off page (compliance-officer + devops-lead + founder) | compliance-officer | Within 10 business days of drill |
+| **PRE-53-E-002** | Cold backup manifest sample | 30-day extract from R2 `manifests/` showing one manifest JSON per day; fields: backup date, file name, SHA-256 checksum, file size in bytes, upload timestamp | devops-lead | On auditor request; available continuously from R2 |
+| **PRE-53-E-003** | Weekly backup verification logs | DEC-030 `system.backup_verification_completed` events for a 4-week sample period; exported from `audit_log_events` with `hmac_valid = TRUE`; must show 4 consecutive weekly events with no gaps | compliance-officer | On auditor request; available continuously from audit log |
+| **PRE-53-E-004** | BCP policy acknowledgment | Signed acknowledgment page with founder + devops-lead + security-engineer names and dates confirming they have read and understood the BCP policy in §53.2; signatures may be DocuSign or equivalent e-signature with audit trail | compliance-officer | Before SOC 2 observation period start date |
+| **PRE-53-E-005** | RTO/RPO commitment table (enterprise) | Signed copy of §53.3 RTO/RPO table (or the equivalent schedule in an enterprise MSA) bearing founder signature and enterprise customer name (one example is acceptable; customer name may be redacted to initials for auditor copy) | founder | On auditor request; one example filed |
+| **PRE-53-E-006** | FORM-DR-BACKUP-001 alert configuration screenshot | Cloudflare dashboard screenshot showing the alert rule: condition (backup age > 26h), severity (CRITICAL), notification channel (PagerDuty/email), and enabled status | devops-lead | Before SOC 2 observation period start date |
+
+---
+
+### 53.8 Gap Register Closure Table
+
+| Gap ID | Gap Description | Previous Status | New Status | Closure Evidence | Conditions for Full 🟢 |
+|---|---|---|---|---|---|
+| A1.2-GAP-DR-TEST | DR test performed annually | 🔴 Not evidenced | 🟢 with conditions | PRE-53-E-001 (first drill report filed and signed) | First drill must be completed and PRE-53-E-001 filed; re-drill required if first drill fails; 🟢 advances to unconditional after second consecutive passing drill |
+| A1.2-GAP-COLD-BACKUP | Cold storage backup (PITR-independent) | 🔴 Not implemented | 🟡 Authored | §53.6 specification; PRE-53-E-006 (alert config) | Advances to 🟢 after: (a) backup-worker deployed and 90 days of `system.cold_backup_completed` events in audit log; (b) PRE-53-E-002 and PRE-53-E-003 filed with 4 consecutive weekly verification passes |
+| A1.2-GAP-DR-RUNBOOK | DR runbook documented | 🟡 Referenced in §19; not fully specified | 🟢 | §53.4 Scenario Catalog; §53.9 Runbook Reference Map; five `docs/runbooks/dr/FORM-DR-00X-*.md` files created | Runbook files must be created and reviewed by devops-lead; review date logged as a DEC-030 `system.policy_acknowledged` event |
+
+---
+
+### 53.9 Runbook Reference Map
+
+| Scenario ID | Scenario Name | Primary Runbook | INCIDENT_RESPONSE.md Section | OBSERVABILITY.md Section |
+|---|---|---|---|---|
+| FORM-DR-001 | Supabase primary region total outage | `docs/runbooks/dr/FORM-DR-001-supabase-outage.md` | §IR-4 Database Failure Response; §IR-6 P0 Declaration Protocol | §OBS-3 Supabase Health Checks; §OBS-7 PITR Recovery Procedure |
+| FORM-DR-002 | Cloudflare Workers global edge failure | `docs/runbooks/dr/FORM-DR-002-workers-edge-failure.md` | §IR-5 Edge Compute Failure; §IR-6 P0 Declaration Protocol | §OBS-2 Workers Health Checks; §OBS-8 Edge Routing Fallback |
+| FORM-DR-003 | R2 bucket data loss or corruption | `docs/runbooks/dr/FORM-DR-003-r2-data-loss.md` | §IR-7 Object Storage Incident; §IR-8 Data Integrity Response | §OBS-5 R2 Integrity Monitoring; §OBS-9 Cold Backup Restore Procedure |
+| FORM-DR-004 | Anthropic API sustained outage (>2h) | `docs/runbooks/dr/FORM-DR-004-anthropic-outage.md` | §IR-9 Vendor API Outage; §IR-10 Graceful Degradation Protocol | §OBS-6 Third-Party API Health; §OBS-10 Victor Fallback State |
+| FORM-DR-005 | Multi-component simultaneous failure | `docs/runbooks/dr/FORM-DR-005-compound-disaster.md` | §IR-6 P0 Declaration Protocol; §IR-11 Compound Incident Triage | §OBS-11 Compound Failure Dashboard; §OBS-12 Triage Sequencing |
+
+**Note:** INCIDENT_RESPONSE.md and OBSERVABILITY.md section numbers reflect the current document structure as of the date of this revision. If those documents are renumbered, the runbook reference map must be updated within 5 business days and a DEC-030 `system.policy_acknowledged` event logged confirming the update was reviewed.
+
+---
+
+### 53.10 Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Create all five DR runbook files: `docs/runbooks/dr/FORM-DR-001-supabase-outage.md` through `FORM-DR-005-compound-disaster.md`; each runbook must include step-by-step recovery procedure, RTO/RPO targets per tier, rollback steps, and evidence capture instructions | P0 | M4 | devops-lead | [ ] |
+| 2 | Deploy `backup-worker` Cloudflare Cron Trigger: implement `pg_dump`, AES-256-GCM encryption with `COLD_BACKUP_ENC_KEY`, R2 upload to `form-cold-backups/`, and manifest JSON write; confirm first successful backup logged as `system.cold_backup_completed` DEC-030 event | P0 | M4 | devops-lead + platform-engineer | [ ] |
+| 3 | Deploy `restore-verify-worker` Cloudflare Cron Trigger: implement weekly ephemeral Postgres restore, verification query execution, row count baseline comparison, and `system.backup_verification_completed` DEC-030 event logging | P0 | M4 | platform-engineer | [ ] |
+| 4 | Configure R2 lifecycle rule on `form-cold-backups/` bucket: delete objects older than 90 days; verify lifecycle rule is active via R2 dashboard; screenshot filed as supplementary evidence | P0 | M4 | devops-lead | [ ] |
+| 5 | Configure FORM-DR-BACKUP-001 Cloudflare alert: condition = last `system.cold_backup_completed` event age > 26h; severity = CRITICAL; notification channel = PagerDuty (or email if PagerDuty not yet integrated); take screenshot for PRE-53-E-006 | P0 | M4 | devops-lead | [ ] |
+| 6 | Obtain PRE-53-E-004 signatures: circulate §53.2 BCP policy summary to founder, devops-lead, and security-engineer for DocuSign acknowledgment; file signed document in R2 `form-soc2-evidence/dr/2026/` | P1 | M4 | compliance-officer | [ ] |
+| 7 | Schedule 2026 DR drill (FORM-DR-001, tabletop): create Linear ticket FORM-DRILL-2026-Q2; confirm compliance-officer observer availability; issue 14-day written notice to devops-lead | P0 | M5 | compliance-officer | [ ] |
+| 8 | Execute 2026 DR drill and complete 12-step procedure (§53.5.3): capture all evidence per §53.5.5; complete pass/fail assessment; draft drill report; obtain three-party sign-off; file PRE-53-E-001 in R2 | P0 | M5 | devops-lead (IC) + compliance-officer (observer) + founder (sign-off) | [ ] |
+| 9 | Collect PRE-53-E-002 and PRE-53-E-003 samples after 30 days of cold backup operation: export 30-day manifest extract from R2; export 4-week `system.backup_verification_completed` DEC-030 event log; file both in R2 evidence bucket | P1 | M5 | compliance-officer | [ ] |
+| 10 | Update §51.4 gap register after drill completion and 90-day cold backup evidence collection: advance A1.2-GAP-DR-TEST to 🟢 (conditional), A1.2-GAP-COLD-BACKUP to 🟢, and confirm A1.2-GAP-DR-RUNBOOK at 🟢; file gap closure update as a compliance-officer attestation | P1 | M6 | compliance-officer | [ ] |
+
+---
+
+*v2.5 additions (2026-06-02): §53 Business Continuity Planning and Disaster Recovery Testing Program. Closes three gap register items from §51.4: A1.2-GAP-DR-TEST (DR test performed annually) advances from 🔴 to 🟢 with conditions (first passing drill + PRE-53-E-001 filed required for unconditional closure); A1.2-GAP-COLD-BACKUP (cold storage backup) advances from 🔴 to 🟡 Authored (advances to 🟢 after backup-worker deployed with 90 days of verified events); A1.2-GAP-DR-RUNBOOK (DR runbook documented) advances from 🟡 to 🟢 (conditional on five runbook files created and reviewed). TSC mapping covers A1.1, A1.2, A1.3, CC9.1, CC9.2. RTO/RPO commitments formalised per tier: Enterprise ≤2h/≤15min (contractual), Growth ≤4h/≤1h (operational), Consumer ≤8h/≤4h (best effort). Five named DR scenarios defined: FORM-DR-001 (Supabase outage), FORM-DR-002 (Workers edge failure), FORM-DR-003 (R2 data loss), FORM-DR-004 (Anthropic API outage/Victor non-functional), FORM-DR-005 (compound disaster). Annual drill program: minimum one tabletop per year; live failover every two years; 12-step execution procedure; 14-day remediation window on fail; three-party sign-off (compliance-officer + devops-lead + founder). Cold storage backup program: pg_dump nightly 02:00 UTC, AES-256-GCM (`COLD_BACKUP_ENC_KEY`, distinct key), R2 `form-cold-backups/`, 90-day rolling retention, weekly automated restore verification against ephemeral Postgres, four DEC-030 HMAC-chained event types. Alert FORM-DR-BACKUP-001 triggers if backup age > 26h. Evidence package: PRE-53-E-001 through PRE-53-E-006. Document header updated from v2.4 to v2.5.*
