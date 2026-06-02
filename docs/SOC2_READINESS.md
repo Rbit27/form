@@ -17565,3 +17565,278 @@ Module M-07 (AI Safety & Victor Prompt Hygiene) covers ED-adjacent content and s
 ---
 
 *v2.7 additions (2026-06-02): §55 Security Awareness Training & Phishing Simulation Programme. Closes four documented gaps: CC1-GAP-001 (🔴 Not Started → 🟢 Done — annual all-hands training with eight modules, completion CSV, phishing simulation four waves, DEC-030 training events), CC1-GAP-002 (🔴 Not Started → 🟢 Done — §55.5 four-tier data classification with decision tree and SAT-E-006 sign-off), C1-GAP-001 (🟡 Partial → 🟢 Done — §55.5 handling rules + violation protocol), CC2-GAP-001 (🟡 Partial → 🟢 Done — attested completion CSV as formal policy communication evidence). Programme components: Annual All-Hands (eight modules, M-01 through M-08; 90–120 min; 80%/90% pass threshold; 28 Feb deadline; Cloudflare Access revoked for non-completions), Role-Based Deep-Dive (Engineering E-01 through E-05, Compliance C-01 through C-03, Customer-Facing CF-01 through CF-03), Quarterly Phishing Simulation (four waves; Wave 1 generic, Wave 2 spear-phishing, Wave 3 executive impersonation, Wave 4 vendor impersonation; 20% click rate threshold triggers curriculum review; pseudonymous DEC-030 event on click). Data classification §55.5: four tiers (Restricted Art. 9 / Confidential Business / Internal Operational / Public); decision tree; violation reporting protocol with DEC-030 HIGH event. Production access gate: training must be completed before any production credential is issued — not within 30 days, before access; referenced in HIRING_GUIDE.md onboarding checklist. Eight DEC-030 HMAC-chained training events: training.annual_training_completed (LOW), training.production_access_granted_post_training (STANDARD), training.production_access_revoked_training_incomplete (HIGH, 3yr), training.phishing_simulation_wave_completed (STANDARD), training.phishing_click_recorded (STANDARD, pseudonymous payload using role not name), training.data_handling_violation (HIGH, 3yr), training.contractor_access_granted_post_training (STANDARD), training.curriculum_updated (LOW). Evidence package SAT-E-001 through SAT-E-006. SOC 2 mapping: CC1.1 (no-blame ethical reporting), CC1.4 (role-proportional competence training), CC2.1 (policy communication via attested completion), CC1.2 (training metrics in board reports), A1.1 (phishing click rate as human-factor capacity indicator), C1.1 (four-tier classification attested by all team members), CC9.1 (contractor training gate). Three open questions: OQ-SAT-01 (KnowBe4 Growth vs. alternatives — P1, M5), OQ-SAT-02 (pseudonymous phishing Worker PII stripping — P1, before Wave 1), OQ-SAT-03 (M-07 Victor safety content clinical-safety gate — P1, before Year 1 opens). Twelve-item implementation checklist (3× P0, 8× P1, 1× P2). Document header updated from v2.6 to v2.7. Owner: compliance-officer + security-engineer.*
+## 56. Encryption Key Management & Cryptographic Controls Auditor Exhibit — CC6.7/CC6.8/C1.1/CC9.2
+
+> This section provides the auditor-facing evidence exhibit for FORM's encryption key management programme. It is the dedicated SOC 2 evidence companion to `docs/CRYPTOGRAPHY_POLICY.md` (which defines the policy) and closes the gap between the cryptography policy and the auditor-verifiable control evidence. Closes: **ENC-GAP-004** (service_role JWT not yet rotated — P0 → requires immediate action before enterprise GA). Advances: **CC6-GAP-006** (key management documentation — 🔴 Not Started → 🟡 Partial; reaches 🟢 Done on completion of the implementation checklist). References: CRYPTOGRAPHY_POLICY.md §3.1 (at rest), §5 (rotation schedule), §6 (custody), R-20 (insider threat detection for key abuse), R-05 (HMAC chain integrity), R-01 (co-activation on confirmed key compromise).
+
+---
+
+### 56.1 SOC 2 TSC Mapping
+
+This section directly satisfies the following Trust Services Criteria:
+
+| TSC Criterion | Criterion Text (abbreviated) | How §56 Satisfies It |
+|---|---|---|
+| **CC6.7** | The entity restricts the transmission, movement, and removal of information to authorised internal and external users and processes, and protects it during transmission. | Cloudflare TLS 1.3 enforced on all API endpoints; HSTS with `max-age=31536000; includeSubDomains; preload`; no internal plaintext channels (Workers → Neon TLS 1.3, Workers → Supabase HTTPS); certificate auto-renewal eliminates expiry-related plaintext exposure. |
+| **CC6.8** | The entity implements controls to prevent or detect and act upon the introduction of unauthorised or malicious software. | Eight-key inventory with documented rotation schedules and storage controls. Keys in Cloudflare Workers Secrets and Supabase Vault are inaccessible via API — only modifiable via authenticated CLI/dashboard sessions with audit trails. Key access is restricted to named roles per CRYPTOGRAPHY_POLICY §6. |
+| **C1.1** | The entity maintains, monitors, and evaluates current processing, and implements changes to processing so that the confidentiality commitments of the entity are met. | Application-layer encryption of `cv_sessions.keypoints_enc` (pgcrypto AES-256-CBC, per-installation key in Supabase Vault) and HMAC-SHA256 integrity chain on `audit_log_events` (DEC-030) ensure that FORM's confidentiality commitments for Art. 9 health data are enforced at the field level, not only at the platform encryption layer. |
+| **CC9.2** | The entity assesses and manages risks associated with vendors and business partners. | Neon Postgres (at-rest AES-256) evidenced by Neon SOC 2 Type II sub-processor report. WorkOS (SAML signing certificate lifecycle, SSO_SCIM §20) and Anthropic (API key rotation schedule) sub-processor encryption controls evidenced by their respective SOC 2 reports and sub-processor agreements. |
+
+---
+
+### 56.2 Background
+
+FORM employs a two-tier encryption model. The first tier is platform-managed encryption: Neon Postgres encrypts all data at rest using AES-256 (infrastructure level, evidenced by Neon's SOC 2 Type II report), and Cloudflare manages TLS 1.2+ in transit for all API endpoints (TLS 1.3 preferred; HSTS enforced with preloading). This tier provides baseline protection for all data stored in the platform without application-code involvement. Platform-managed encryption alone is insufficient for FORM's highest-sensitivity data surfaces, which is why a second tier exists.
+
+The second tier is application-layer encryption for fields whose sensitivity requires protection even against a database-level compromise. The primary instance is `cv_sessions.keypoints_enc`: computer vision keypoints derived from user workout video frames are encrypted using pgcrypto AES-256-CBC before `INSERT`, with a per-installation key stored in Supabase Vault (not in application code or environment variables). The DEC-030 audit chain adds a third cryptographic control: every `audit_log_events` row is HMAC-SHA256 chained over the previous row's hash, providing tamper-evident integrity for the audit log independent of database-level access controls. The HMAC chain key (`HMAC_AUDIT_CHAIN_KEY`) is stored in Cloudflare Workers Secrets, accessible only via Wrangler CLI with an authenticated Cloudflare account — not via any REST API.
+
+Key management for both tiers is governed by `docs/CRYPTOGRAPHY_POLICY.md`. This section translates that policy into auditor-facing evidence: a key inventory with rotation schedules, at-rest and in-transit control evidence, rotation procedure documentation, and a gap register. Three open questions (OQ-ENC-01 through OQ-ENC-03) document constraints that currently block or complicate key rotation for specific credential types. The most significant architectural constraint is OQ-ENC-02: the HMAC_AUDIT_CHAIN_KEY cannot be rotated without a dual-key verification window in the chain verification function, because old events were signed with the old key and cannot be re-signed historically.
+
+---
+
+### 56.3 Key Inventory
+
+| Key ID | Key Type | Algorithm | Storage | Rotation Schedule | Owner | Last Rotated |
+|---|---|---|---|---|---|---|
+| `SUPABASE_SERVICE_ROLE_JWT` | JWT signing secret | HS256 (HMAC-SHA256) | Supabase platform (managed) | 90 days, or immediately on compromise | security-engineer | — (pending §OQ-ENC-01; not rotated since infrastructure setup — see ENC-GAP-004) |
+| `HMAC_AUDIT_CHAIN_KEY` | HMAC chain integrity key (DEC-030) | HMAC-SHA256 | Cloudflare Workers Secret | On compromise only (chain continuity constraint — see OQ-ENC-02; scheduled rotation blocked until dual-key verification implemented) | security-engineer | — |
+| `KEYPOINTS_ENC_KEY` | CV keypoints field encryption | AES-256-CBC (pgcrypto) | Supabase Vault | 365 days, or on compromise | platform-engineer | — |
+| `CLOUDFLARE_API_KEY` | Terraform / Wrangler infrastructure API | Ed25519 bearer token | Cloudflare API token storage (Cloudflare account) | 180 days | devops-lead | — |
+| `WORKOS_API_KEY` | SSO/SCIM provisioning API | Opaque bearer token | Vercel environment secrets | 180 days | security-engineer | — |
+| `ANTHROPIC_API_KEY` | Claude AI API | Opaque bearer token | Vercel environment secrets | 90 days | platform-engineer | — |
+| `SENTRY_DSN` | Error telemetry token | Opaque bearer token | Vercel environment secrets | 180 days | devops-lead | — |
+| `SUPABASE_ANON_KEY` | Client-facing public JWT (anon-only scope) | JWT (HS256) | Vercel environment variables + client bundle | 365 days (low risk — anon-only RLS scope; no privileged operations possible) | platform-engineer | — |
+
+**Note on `last_rotated` column:** All entries show `—` because a key rotation log (`key_rotation_log` table or equivalent) does not yet exist in production. This is tracked as ENC-GAP-001. Until the rotation log is implemented, rotation dates must be reconstructed from Cloudflare Audit Log, Supabase dashboard history, and Vercel deployment records. ENC-GAP-004 specifically calls out `SUPABASE_SERVICE_ROLE_JWT` as a P0 gap because this key has not been rotated since initial infrastructure provisioning.
+
+---
+
+### 56.4 Encryption at Rest — Auditor Evidence
+
+#### 56.4.1 Neon Postgres (Infrastructure-Level AES-256)
+
+Neon Postgres encrypts all data at rest using AES-256 at the infrastructure level. This is a Neon-managed control, not an application control. Auditor evidence: the Neon SOC 2 Type II report, which documents Neon's at-rest encryption controls. Reference: CRYPTOGRAPHY_POLICY.md §3.1.
+
+**Evidence:** ENC-E-001 (Neon SOC 2 Type II sub-processor report) — see §56.7.
+
+The platform-level encryption covers all tables without exception, including `health_profiles`, `coaching_turns`, `cv_sessions`, `audit_log_events`, and `dsar_requests`. No application-code change is required to benefit from this control; it is enforced by the Neon platform on all storage operations.
+
+#### 56.4.2 Application-Layer Encryption: `cv_sessions.keypoints_enc`
+
+`cv_sessions.keypoints_enc` is encrypted at the application layer using pgcrypto AES-256-CBC before every `INSERT` into the table. The encryption key is a per-installation key stored in Supabase Vault (pgsodium-managed). The application fetches the key from Supabase Vault via the `pgsodium` extension at query time, without the key ever being returned to application code.
+
+This control means that even if the Neon database files were accessed at the infrastructure level (e.g., by a Neon platform engineer or through a storage-level compromise), `keypoints_enc` values would be unintelligible without the Vault key. The combination of platform-level AES-256 (§56.4.1) and application-layer AES-256-CBC creates defence in depth for the highest-sensitivity biometric field in FORM's schema.
+
+**Auditor verification query** — run as `form_admin` in a read-only forensic context:
+
+```sql
+-- Verify keypoints_enc is not stored as plaintext
+-- Expected output: enc_len > 0 AND prefix should be base64-encoded bytes,
+-- NOT a JSON object beginning with '{"keypoints"'.
+-- A prefix of '{"' indicates unencrypted storage — P0 finding.
+SELECT
+  id,
+  LENGTH(keypoints_enc::text)     AS enc_len,
+  LEFT(keypoints_enc::text, 10)   AS prefix
+  -- Should be base64-encoded ciphertext, not a parseable JSON object
+FROM cv_sessions
+WHERE keypoints_enc IS NOT NULL
+LIMIT 5;
+```
+
+> Expected: `prefix` values are base64-encoded strings (e.g., `\xd84b2a17f`), not JSON (`{"keypoints"`). Any row where `prefix` starts with `{` or `[` is a critical finding indicating plaintext storage.
+
+**pgcrypto installation verification:**
+
+```sql
+-- Verify pgcrypto extension is installed and active
+SELECT extname, extversion
+FROM pg_extension
+WHERE extname = 'pgcrypto';
+-- Expected: one row with extname = 'pgcrypto'
+```
+
+**Evidence:** ENC-E-002 (pgcrypto installation verification query output) + ENC-E-003 (Supabase Vault key isolation verification — see §56.7).
+
+#### 56.4.3 Supabase Vault Key Isolation
+
+The `KEYPOINTS_ENC_KEY` is stored in Supabase Vault (pgsodium-managed). It never appears in:
+- `audit_log_events` metadata (DEC-030 schema explicitly redacts key fields — any field named `*_key`, `*_secret`, or `*_token` in event metadata is replaced with `REDACTED` before HMAC computation)
+- Cloudflare Workers environment variables
+- Application code or source control
+- Error logs or Sentry payloads
+
+**Vault isolation verification:**
+
+```sql
+-- Verify no key material is stored in audit_log_events metadata
+-- Expected: 0 rows. Any result indicates a DEC-030 schema violation.
+SELECT id, event_type, created_at, metadata
+FROM audit_log_events
+WHERE metadata::text ILIKE '%_key%'
+  AND metadata::text NOT ILIKE '%REDACTED%'
+LIMIT 10;
+```
+
+---
+
+### 56.5 Encryption in Transit — Auditor Evidence
+
+#### 56.5.1 Cloudflare TLS Configuration
+
+All FORM API and edge endpoints terminate TLS at Cloudflare. Configuration:
+
+- **Minimum TLS version:** TLS 1.2. TLS 1.3 is the preferred negotiated version; TLS 1.2 is retained for client compatibility only.
+- **Cipher suites (TLS 1.2):** ECDHE + AES-256-GCM only ("Modern" Cloudflare security profile). RC4, 3DES, and CBC-mode ciphers are disabled.
+- **TLS 1.3:** All four standardised TLS 1.3 cipher suites supported.
+- **HSTS:** `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`. Enforced via Cloudflare Transform Rules on all responses from `*.form.coach`.
+- **Always HTTPS:** Cloudflare "Always Use HTTPS" rule active; all HTTP requests 301-redirect to HTTPS.
+- **Certificate management:** Cloudflare Universal SSL (auto-renew; no manual certificate management for the FORM wildcard domain). SAML signing certificates (per-enterprise-tenant) are WorkOS-managed; their lifecycle is documented in SSO_SCIM §20.
+
+**Auditor evidence:** ENC-E-004 (Cloudflare SSL/TLS configuration screenshot from Cloudflare Dashboard → SSL/TLS → Overview) + ENC-E-005 (HSTS header response — see §56.7).
+
+**HSTS preload verification (command-line):**
+
+```bash
+# Verify HSTS preload status for form.coach
+curl -I https://form.coach 2>/dev/null | grep -i strict-transport
+# Expected: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# Check HSTS preload list inclusion
+# https://hstspreload.org/?domain=form.coach
+```
+
+#### 56.5.2 Internal Service-to-Service Encryption
+
+No internal plaintext channels exist between FORM services:
+
+| Channel | Protocol | Evidence |
+|---|---|---|
+| Cloudflare Workers → Neon Postgres | TLS 1.3 (enforced by Neon connection string; Neon rejects non-TLS connections) | Neon SOC 2 report §Transport; Workers connection string uses `sslmode=require` |
+| Cloudflare Workers → Supabase REST API | HTTPS (TLS 1.3 via Cloudflare on Supabase's domain) | Supabase SOC 2 report; Workers fetch via `https://` URL only |
+| Cloudflare Workers → Cloudflare KV | Internal Cloudflare network (encrypted at infrastructure level; no application TLS required) | Cloudflare SOC 2 report |
+| Workers → Anthropic API | HTTPS (TLS 1.3) | Anthropic API documentation; enforced by Fetch API `https://` URL |
+| Workers → ElevenLabs API | HTTPS (TLS 1.3) | ElevenLabs API documentation |
+
+---
+
+### 56.6 Key Rotation Procedures
+
+| Key ID | Rotation Procedure | Verification Step | Constraints |
+|---|---|---|---|
+| `SUPABASE_SERVICE_ROLE_JWT` | Supabase Dashboard → Project Settings → API → Regenerate JWT secret. Update `SUPABASE_SERVICE_ROLE_KEY` in Cloudflare Workers Secrets via `wrangler secret put`. Redeploy Workers via `wrangler deploy`. Schedule in a maintenance window — invalidates all active service_role sessions. Full procedure: OQ-ENC-01. | Post-rotation: confirm Workers return HTTP 200 on health endpoint within 2 min; check Sentry for `JWTVerificationError` spike (should be zero). | Maintenance window required. Invalidates all service_role sessions platform-wide. Must coordinate with devops-lead + compliance-officer. Do not rotate during active enterprise onboarding sessions. |
+| `HMAC_AUDIT_CHAIN_KEY` | See HMAC chain rotation note below — chain continuity constraint blocks standard rotation. Interim: Cloudflare Workers Secret rotation via `wrangler secret put HMAC_AUDIT_CHAIN_KEY <new-key>`. | Post-rotation: verify new events are being chained with the new key. Run R-05 chain integrity check over the rotation boundary window (48h). | Chain continuity constraint: see OQ-ENC-02. Old key must be retained for historical verification. Dual-key verification window not yet implemented. Do not rotate without OQ-ENC-02 resolution. |
+| `KEYPOINTS_ENC_KEY` | Supabase Vault → rotate key via `pgsodium.rotate_key()`. Re-encrypt existing `cv_sessions.keypoints_enc` rows using the new key (migration script required; must run in a transaction with PITR branch safety net). | Post-rotation: run the §56.4.2 plaintext verification query; confirm all rows decrypt successfully with new key. | Re-encryption migration required for existing rows. Schedule PITR branch before migration. Test on staging with full cv_sessions dataset before production. |
+| `CLOUDFLARE_API_KEY` | Cloudflare Dashboard → My Profile → API Tokens → [token name] → Roll. Update in 1Password Operations vault and any CI/CD secrets that reference the token. | Run `wrangler whoami` with the new token to confirm authentication. Check Terraform plan with the new token. | Minimal downtime — CLI tools will fail until updated. Update all references atomically. |
+| `WORKOS_API_KEY` | WorkOS Dashboard → API Keys → Create new key → Update `WORKOS_API_KEY` in Vercel environment secrets → Vercel redeploy. Revoke old key in WorkOS after confirming new key works. | Run a test SSO authentication against a non-production tenant to confirm WorkOS API calls succeed with the new key. | Do not revoke old key before new key is confirmed working in production. Enterprise SSO is dependent on this key. |
+| `ANTHROPIC_API_KEY` | Anthropic Console → API Keys → Create key → Update `ANTHROPIC_API_KEY` in Vercel environment → Vercel redeploy → Revoke old key in Anthropic Console. | Post-rotation: confirm Victor AI coaching session succeeds end-to-end in staging. | User-facing impact if rotation window overlaps with high-traffic period. Prefer 03:00–05:00 UTC. |
+| `SENTRY_DSN` | Sentry Dashboard → [Project] → Settings → Client Keys → Rotate → Update in Vercel environment → Vercel redeploy. | Trigger a test Sentry event from staging to confirm the new DSN receives events. | Low risk — Sentry DSN exposure allows sending events to FORM's Sentry project, not reading events. |
+| `SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API → Regenerate anon key. Update in Vercel environment (both server-side and any client-bundle references). Vercel redeploy. | Post-rotation: confirm unauthenticated API calls (health check, public route) succeed. | Low risk — anon key has no privileged scope. However, rotation invalidates any in-flight unauthenticated sessions. Prefer off-peak rotation. |
+
+**HMAC chain key rotation — chain continuity constraint:**
+
+```
+# HMAC_AUDIT_CHAIN_KEY rotation — chain continuity constraint
+#
+# audit_log_events stores each row's HMAC computed over:
+#   HMAC-SHA256(prev_hmac || event_payload, HMAC_AUDIT_CHAIN_KEY)
+# where HMAC_AUDIT_CHAIN_KEY is the key active at the time of event creation.
+#
+# Rotating the key does NOT re-sign old events — historical events retain
+# their original HMAC values computed with the old key.
+#
+# After rotation, the chain verification function must:
+#   1. Identify the rotation boundary timestamp from the key_rotation_log table
+#      (OQ-ENC-03 — this table does not yet exist; OQ-ENC-02 resolution required first)
+#   2. Use the OLD key to verify events with created_at < rotation_boundary
+#   3. Use the NEW key to verify events with created_at >= rotation_boundary
+#   4. Accept BOTH keys during a 30-day overlap window for events near the boundary
+#      (within 30 days before and after rotation_boundary) to account for
+#      any clock skew or events that crossed the rotation window mid-chain.
+#
+# This dual-key verification window requires:
+#   - A `key_version` column added to audit_log_events (migration required)
+#   - An updated chain verification function that accepts a key map
+#     keyed by key_version
+#   - A key_rotation_log table or Workers Secret versioning mechanism
+#
+# Until OQ-ENC-02 is resolved, HMAC_AUDIT_CHAIN_KEY rotation is effectively
+# blocked. The current mitigating control is storage in Cloudflare Workers
+# Secrets — not accessible via REST API, only via Wrangler CLI with
+# authenticated Cloudflare account credentials. Compromise likelihood is LOW.
+```
+
+---
+
+### 56.7 Auditor Evidence Checklist
+
+| Evidence ID | Description | Location | SOC 2 Criterion | Status |
+|---|---|---|---|---|
+| **ENC-E-001** | Neon SOC 2 Type II sub-processor report (current year) listing at-rest AES-256 encryption control evidence | `compliance/evidence/sub-processors/neon-soc2-type-ii-YYYY.pdf`; also available at Neon Trust Center (`trust.neon.tech`) | CC6.7 (at rest), CC9.2 (sub-processor) | [ ] File annually |
+| **ENC-E-002** | pgcrypto installation verification query output — confirms `pgcrypto` extension is active in production Postgres | SQL query result from §56.4.2 pgcrypto check; run against production DB; export as JSON | C1.1 (field-level encryption for Art. 9 data), CC6.7 | [ ] File on auditor request |
+| **ENC-E-003** | Supabase Vault key isolation verification — confirms `KEYPOINTS_ENC_KEY` does not appear in `audit_log_events` metadata or any application log | SQL query result from §56.4.3 Vault isolation check + Sentry log search confirming no key material in error payloads | C1.1, CC6.8 | [ ] File on auditor request |
+| **ENC-E-004** | Cloudflare SSL/TLS configuration screenshot — shows TLS 1.3 preferred, TLS 1.2 minimum, "Modern" cipher profile, Always HTTPS enabled | Screenshot: Cloudflare Dashboard → `form.coach` zone → SSL/TLS → Overview | CC6.7 (in transit) | [ ] File quarterly |
+| **ENC-E-005** | HSTS response header evidence — confirms `max-age=31536000; includeSubDomains; preload` on live production endpoint | `curl -I https://form.coach` output showing `Strict-Transport-Security` header + HSTS preload list status page screenshot for `form.coach` | CC6.7 (HSTS enforcement) | [ ] File on auditor request |
+| **ENC-E-006** | Key rotation log (manual, current stage) — for any key rotated during the observation period, a record of: key ID, rotation date, rotating operator, authorising second operator, verification step outcome | `compliance/evidence/key-rotations/key-rotation-YYYY-MM-DD-<key-id>.md` per rotation event; DEC-030 `admin.encryption_key_rotated` event once OQ-ENC-03 is resolved | CC6.8 (key rotation control), CC6.7 | [ ] File per rotation |
+| **ENC-E-007** | `audit_log_events` key redaction verification — confirms no plaintext key material appears in DEC-030 event payloads | SQL query from §56.4.3 Vault isolation check run over observation period events; export result showing 0 rows with key material | C1.1, CC6.8 | [ ] File for observation period |
+| **ENC-E-008** | `docs/CRYPTOGRAPHY_POLICY.md` version history — confirms the cryptography policy was in force during the observation period and matches the controls described in this section | Git log output: `git log --oneline docs/CRYPTOGRAPHY_POLICY.md`; file at `compliance/evidence/policy-versions/cryptography-policy-gitlog-YYYY.txt` | CC6.7, CC6.8 | [ ] File at observation period start |
+
+**Auditor access note.** ENC-E-001 (Neon SOC 2 report) is available via Neon Trust Center (`trust.neon.tech`) upon request under NDA; forward the NDA request to compliance-officer. ENC-E-004 and ENC-E-005 can be reproduced live during auditor fieldwork. ENC-E-002, ENC-E-003, and ENC-E-007 are produced via read-only SQL queries run in the auditor's presence or delivered as time-limited signed R2 URLs issued by compliance-officer.
+
+---
+
+### 56.8 SOC 2 TSC Mapping
+
+| TSC Criterion | Control Activity | Evidence |
+|---|---|---|
+| **CC6.7** — Encryption at rest and in transit | Neon AES-256 at rest (infrastructure); pgcrypto AES-256-CBC for `cv_sessions.keypoints_enc` (application); Cloudflare TLS 1.3 + HSTS in transit; no internal plaintext channels | ENC-E-001 (Neon at rest), ENC-E-002 (pgcrypto), ENC-E-004 (Cloudflare TLS), ENC-E-005 (HSTS) |
+| **CC6.8** — Implementation controls for encryption | Eight-key inventory with rotation schedules; Supabase Vault for keypoints key; Cloudflare Workers Secrets for HMAC chain key; rotation procedures documented in §56.6; access restricted to named roles per CRYPTOGRAPHY_POLICY §6 | ENC-E-006 (rotation log), ENC-E-008 (policy version history) |
+| **C1.1** — Confidentiality protection | Art. 9 health data fields (`cv_sessions.keypoints_enc`) encrypted at field level independent of platform encryption; HMAC audit chain prevents silent modification of health data access records; no key material in DEC-030 event payloads | ENC-E-002 (pgcrypto), ENC-E-003 (Vault isolation), ENC-E-007 (audit log key redaction) |
+| **CC9.2** — Sub-processor encryption controls | Neon (at-rest AES-256 evidenced by SOC 2 Type II), WorkOS (SAML cert lifecycle per SSO_SCIM §20), Anthropic (API key rotation per 90-day schedule), ElevenLabs (API key rotation per 90-day schedule) | ENC-E-001 (Neon sub-processor report); WorkOS/Anthropic SOC 2 reports on file per §17 sub-processor review |
+
+---
+
+### 56.9 Gap Register
+
+| Gap ID | Description | TSC | Severity | Owner | Target | Status |
+|---|---|---|---|---|---|---|
+| **ENC-GAP-001** | No automated key rotation — all eight key rotations are currently manual. Risk: rotation schedule slips undetected; compliance-officer and security-engineer rely on manual calendar reminders. Action: implement rotation reminders via GitHub Actions scheduled workflow (`.github/workflows/key-rotation-reminder.yml`); store last_rotated dates in a `key_rotation_log` table; alert via `#security` Slack when a key's rotation deadline is within 14 days. | CC6.8 | MEDIUM | security-engineer | M8 | 🔴 Not Started |
+| **ENC-GAP-002** | `HMAC_AUDIT_CHAIN_KEY` has no documented rotation procedure due to chain continuity constraint (OQ-ENC-02). Risk: if the key is compromised, the HMAC chain cannot be re-signed historically, meaning all historical chain integrity guarantees become invalid for a new verifier. Current mitigating control: Cloudflare Workers Secrets storage — the key is not accessible via any REST API, only via Wrangler CLI with an authenticated Cloudflare account, making opportunistic exfiltration significantly harder than for keys stored in environment variables. Residual risk is LOW until OQ-ENC-02 is resolved. | CC6.8, C1.1 | MEDIUM | security-engineer | M9 | 🔴 Not Started |
+| **ENC-GAP-003** | No Supabase Vault access log emitted to DEC-030 chain — Supabase Vault (pgsodium) does not currently emit a DEC-030 event when `KEYPOINTS_ENC_KEY` is accessed. Risk: unauthorised key access (e.g., by a compromised service_role credential) is not detectable via the audit chain. Mitigation today: service_role key access is logged by Supabase's own audit trail (Supabase Dashboard → Logs → Database), but this is not HMAC-chained. Action: implement a Postgres trigger or application-layer wrapper that emits `admin.vault_key_accessed` DEC-030 event on `pgsodium` key fetch. | C1.1, CC6.8 | MEDIUM | platform-engineer | M8 | 🔴 Not Started |
+| **ENC-GAP-004** | `SUPABASE_SERVICE_ROLE_JWT` has not been rotated since initial infrastructure provisioning. Risk: if the key was exposed at any point during development (e.g., accidentally logged, included in a `.env` file that was viewed), the exposure window is unbounded. This is a P0 item: the key must be rotated before the first enterprise customer onboarding to avoid an enterprise customer's Art. 9 data being accessible via a potentially long-lived compromised credential. | CC6.8, CC6.7 | **P0 / CRITICAL** | security-engineer | Before M5 (enterprise GA) | 🔴 Not Started — action required |
+
+---
+
+### 56.10 Open Questions
+
+**OQ-ENC-01: `SUPABASE_SERVICE_ROLE_JWT` rotation procedure and maintenance window requirement**
+
+Rotating the Supabase JWT signing secret invalidates ALL active Supabase sessions simultaneously — both `service_role` sessions (used by Cloudflare Workers) and user `authenticated` sessions (used by mobile app clients). The user session impact means rotation must be coordinated with a maintenance window announcement and timed to the lowest-traffic period (typically 03:00–05:00 UTC, matching the backup and pg_cron window). The rotation procedure requires: (1) announcement to active enterprise tenants 24h in advance per Template E-06 (Planned Maintenance); (2) backup-worker and pg_cron jobs paused to avoid service_role connection failures mid-job; (3) Workers redeployed with new key within 5 minutes of rotation; (4) post-rotation health check confirming all Workers return HTTP 200. The procedure is not yet documented as a formal runbook step. Owner: security-engineer + devops-lead. Priority: **P0** (must resolve before enterprise GA, M5). Resolution: document rotation runbook, schedule first rotation as a planned maintenance event.
+
+**OQ-ENC-02: `HMAC_AUDIT_CHAIN_KEY` rotation with chain continuity — dual-key verification window**
+
+The DEC-030 chain verification function (`verify_audit_chain()` in the Worker) currently accepts a single key. To support rotation, it must: (a) accept a key map indexed by `key_version`; (b) a `key_version` column must be added to `audit_log_events` (populated at event creation time with the current key version identifier); (c) after rotation, a 30-day overlap window must accept both the old and new key for events within 30 days of the rotation boundary. Schema changes required: `ALTER TABLE audit_log_events ADD COLUMN key_version SMALLINT NOT NULL DEFAULT 1`. Until this is implemented, HMAC_AUDIT_CHAIN_KEY rotation is blocked — rotating the key without the dual-key verification window would cause R-05 to fire on every historical event (all of which were signed with the old key). Owner: security-engineer + platform-engineer. Priority: **P1**. Target: M7.
+
+**OQ-ENC-03: Key rotation audit events — `admin.encryption_key_rotated` not yet in AUDIT_LOG_SCHEMA.md**
+
+Key rotation operations should emit a DEC-030 HMAC-chained audit event (`admin.encryption_key_rotated`, CRITICAL severity, 7-year retention) capturing: `key_id` (logical key identifier, not the key material), `rotated_by_user_id`, `authorised_by_user_id`, `rotation_reason` (`scheduled` / `compromise` / `precautionary`), and `key_version_before` / `key_version_after`. These event types are not currently defined in `docs/AUDIT_LOG_SCHEMA.md`. Without this event type, key rotation history is only reconstructible from Cloudflare audit logs and Supabase dashboard history — neither of which is HMAC-chained or legally tamper-evident. Owner: security-engineer. Priority: **P1**. Target: M7 (in parallel with OQ-ENC-02 schema work).
+
+---
+
+### 56.11 Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Rotate `SUPABASE_SERVICE_ROLE_JWT` before enterprise GA: schedule maintenance window (24h advance notice to any pre-GA enterprise pilot users); pause backup-worker and pg_cron; rotate key in Supabase Dashboard; update Workers Secrets; redeploy Workers; confirm health; file ENC-E-006 rotation record; closes ENC-GAP-004 | P0 | Before M5 | security-engineer + devops-lead | [ ] |
+| 2 | Document `SUPABASE_SERVICE_ROLE_JWT` rotation runbook as a named procedure in CRYPTOGRAPHY_POLICY.md §5 (adds to rotation schedule table: maintenance window requirement, 24h notice template, pause/resume pg_cron steps, Workers redeploy sequence, health verification steps); closes OQ-ENC-01 | P0 | M5 | security-engineer | [ ] |
+| 3 | Add `key_version SMALLINT NOT NULL DEFAULT 1` column to `audit_log_events`; update `emitDec030Event` Worker function to populate `key_version` from the current HMAC key version; update `verify_audit_chain()` to accept a key map indexed by `key_version`; document dual-key 30-day overlap window; closes OQ-ENC-02 | P1 | M7 | security-engineer + platform-engineer | [ ] |
+| 4 | Register `admin.encryption_key_rotated` (CRITICAL, 7yr) in `docs/AUDIT_LOG_SCHEMA.md`; validate Zod schema; deploy Worker endpoint that emits this event as part of the key rotation procedures in §56.6; closes OQ-ENC-03 | P1 | M7 | security-engineer | [ ] |
+| 5 | Implement `key_rotation_log` table (`key_id TEXT`, `rotated_at TIMESTAMPTZ`, `rotated_by_user_id UUID`, `key_version_before SMALLINT`, `key_version_after SMALLINT`, `rotation_reason TEXT`); populate via `admin.encryption_key_rotated` DEC-030 event Worker; populate `last_rotated` column for all eight keys with best-available historical dates from Cloudflare audit log and Supabase dashboard; partially closes ENC-GAP-001 | P1 | M8 | security-engineer + platform-engineer | [ ] |
+| 6 | Implement GitHub Actions scheduled workflow `.github/workflows/key-rotation-reminder.yml`: runs weekly; queries `key_rotation_log` for any key whose `rotated_at + rotation_period_days < NOW() + 14 days`; posts to `#security` Slack; fully closes ENC-GAP-001 | P1 | M8 | devops-lead + security-engineer | [ ] |
+| 7 | Implement Postgres trigger or application-layer wrapper that emits `admin.vault_key_accessed` DEC-030 event (HIGH, 3yr) on every `pgsodium` key fetch for `KEYPOINTS_ENC_KEY`; deploy to staging; confirm event in `audit_log_events` with `hmac_valid = TRUE`; closes ENC-GAP-003 | P1 | M8 | platform-engineer | [ ] |
+| 8 | File ENC-E-001 through ENC-E-008 in R2 `form-soc2-evidence/encryption/2026/` for the observation period: Neon SOC 2 report, pgcrypto verification output, Vault isolation verification, Cloudflare TLS screenshot, HSTS header evidence, any rotation logs from observation period, audit log key redaction verification, CRYPTOGRAPHY_POLICY.md git history | P0 | Observation period start | compliance-officer | [ ] |
+| 9 | Add §56 key inventory table to quarterly security review agenda: confirm each key's last_rotated date against its rotation schedule; record any overdue rotations as Linear tickets with P0/P1 priority; file review record to `compliance/evidence/key-rotations/quarterly-review-YYYY-QN.md` | P2 | M6 (first review) | security-engineer + compliance-officer | [ ] |
+
+---
+
+*v1.0 (2026-06-02): New §56 fills the encryption key management gap — CRYPTOGRAPHY_POLICY.md has been in force since May 2026 but without a dedicated SOC 2 auditor evidence exhibit until now. Eight-key inventory covers all production secrets with algorithms, storage locations, rotation schedules, and owners: SUPABASE_SERVICE_ROLE_JWT (HS256, 90 days), HMAC_AUDIT_CHAIN_KEY (HMAC-SHA256, rotation blocked pending OQ-ENC-02), KEYPOINTS_ENC_KEY (AES-256-CBC via pgcrypto/Vault, 365 days), CLOUDFLARE_API_KEY (Ed25519, 180 days), WORKOS_API_KEY (opaque, 180 days), ANTHROPIC_API_KEY (opaque, 90 days), SENTRY_DSN (opaque, 180 days), SUPABASE_ANON_KEY (JWT, 365 days). Two-tier encryption model: platform-managed (Neon AES-256 at rest, Cloudflare TLS 1.3 in transit) plus application-layer (pgcrypto AES-256-CBC for cv_sessions.keypoints_enc, Supabase Vault for key isolation, HMAC-SHA256 DEC-030 chain for audit log integrity). Key architectural constraints: (1) HMAC_AUDIT_CHAIN_KEY rotation is blocked by chain continuity until OQ-ENC-02 dual-key verification is implemented; (2) SUPABASE_SERVICE_ROLE_JWT rotation is a platform-wide maintenance event requiring 24h advance notice and maintenance window coordination. Four gap items: ENC-GAP-001 (manual rotation — MEDIUM, M8), ENC-GAP-002 (HMAC key rotation blocked — MEDIUM, M9, mitigated by Cloudflare Workers Secrets), ENC-GAP-003 (no Vault key access DEC-030 event — MEDIUM, M8), ENC-GAP-004 (SUPABASE_SERVICE_ROLE_JWT not rotated since setup — P0 CRITICAL, must resolve before M5). Three open questions: OQ-ENC-01 (service_role JWT rotation runbook — P0, M5), OQ-ENC-02 (HMAC chain dual-key verification — P1, M7), OQ-ENC-03 (encryption_key_rotated DEC-030 event — P1, M7). Nine-item checklist (3× P0, 5× P1, 1× P2). TSC: CC6.7/CC6.8/C1.1/CC9.2. SOC 2 doc v2.7 → v2.8. Owner: security-engineer + platform-engineer + compliance-officer.*

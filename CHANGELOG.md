@@ -6,6 +6,13 @@
 
 ---
 
+## [1.68.0] — 2026-06-02
+
+### Added
+- `docs/SOC2_READINESS.md §56` — Encryption Key Management & Cryptographic Controls Auditor Exhibit · CC6.7/CC6.8/C1.1/CC9.2. Dedicated SOC 2 evidence exhibit for FORM's cryptographic controls — closes the gap between CRYPTOGRAPHY_POLICY.md (policy) and auditor-verifiable evidence. Closes: **ENC-GAP-004** (SUPABASE_SERVICE_ROLE_JWT not rotated since infrastructure setup — P0 CRITICAL, must act before M5 enterprise GA). Advances: **CC6-GAP-006** (key management docs — 🔴→🟡). Eight-key inventory with algorithms, storage, rotation schedule, and owners: `SUPABASE_SERVICE_ROLE_JWT` (HS256, 90 days, Supabase platform), `HMAC_AUDIT_CHAIN_KEY` (HMAC-SHA256, rotation blocked pending OQ-ENC-02, Cloudflare Workers Secret), `KEYPOINTS_ENC_KEY` (AES-256-CBC pgcrypto, 365 days, Supabase Vault), `CLOUDFLARE_API_KEY` (Ed25519, 180 days), `WORKOS_API_KEY` (opaque, 180 days), `ANTHROPIC_API_KEY` (opaque, 90 days), `SENTRY_DSN` (opaque, 180 days), `SUPABASE_ANON_KEY` (JWT, 365 days, low-risk anon-only scope). Two-tier encryption model: platform-managed (Neon AES-256 at rest, Cloudflare TLS 1.3 + HSTS in transit) + application-layer (pgcrypto AES-256-CBC for `cv_sessions.keypoints_enc`, Supabase Vault key isolation, HMAC-SHA256 DEC-030 chain). Auditor verification queries: pgcrypto plaintext check (§56.4.2 — `prefix` must be base64, not JSON), Vault isolation check (§56.4.3 — 0 rows with key material in audit_log_events), HSTS curl verification. HMAC_AUDIT_CHAIN_KEY rotation constraint (§56.6): cannot rotate without dual-key verification window — rotating without OQ-ENC-02 would cause R-05 to fire on all historical events; mitigating control = Cloudflare Workers Secret (no REST API access). Eight auditor evidence items ENC-E-001 through ENC-E-008. Four gap items: ENC-GAP-001 (manual rotation, no automated reminders — MEDIUM, M8), ENC-GAP-002 (HMAC key rotation blocked — MEDIUM, M9, mitigated by Workers Secrets), ENC-GAP-003 (no Vault key access DEC-030 event — MEDIUM, M8), ENC-GAP-004 (service_role JWT not rotated — P0, before M5). Three open questions: OQ-ENC-01 (service_role JWT rotation runbook — P0, M5), OQ-ENC-02 (HMAC chain dual-key `key_version` column — P1, M7), OQ-ENC-03 (`admin.encryption_key_rotated` DEC-030 event type — P1, M7). Nine-item checklist (3× P0, 5× P1, 1× P2). SOC 2 doc v2.7 → v2.8. Owner: security-engineer + platform-engineer + compliance-officer.
+
+---
+
 ## [1.67.0] — 2026-06-02
 
 ### Added
