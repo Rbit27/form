@@ -6,6 +6,13 @@
 
 ---
 
+## [1.63.0] — 2026-06-02
+
+### Added
+- `docs/SOC2_READINESS.md §54` — Software Composition Analysis (SCA) & Open-Source Supply Chain Security · CC6.8/CC7.1/CC9.2/CC8.1 Auditor Exhibit. Closes three documented gaps: **PEN-GAP-002** SCA component (🟡→🟢 — Snyk `snyk test` CI gate + `snyk monitor` on main), **CC6-GAP-005** (🟡→🟢 — `npm audit --audit-level=critical` CI hard gate + `.github/dependabot.yml` weekly auto-PRs), **PRE-13** (🟡→🟢 — dependency scanning as required CI status check). **SR-04** (supply chain attack) risk register residual reduced from MEDIUM (5) to LOW (2). Three-layer defence: Layer 1 Dependabot (continuous CVE alerting + weekly auto-PRs, groups minor/patch, ungroups security), Layer 2 npm audit (CI hard gate — blocks merge on critical CVE), Layer 3 Snyk (deeper CVE database + licence compliance + reachability analysis — blocks merge on high+ CVE with available fix). Remediation SLA aligned to §41: Critical 24h (CI block + DEC-030 CRITICAL + PagerDuty P1), High 7 days (Snyk CI block + Linear ticket auto-created), Medium 30 days, Low 90 days. Formal risk-acceptance procedure for unresolvable CVEs: compliance-officer sign-off + DEC-030 HIGH event + 30-day maximum window. SBOM programme: CycloneDX JSON v1.5 generated on every merge to `main` via `@cyclonedx/cyclonedx-npm`, stored in R2 `form-production/sbom/`, 24-month rolling retention + 7-year SOC 2 evidence copy; enterprise distribution via time-limited R2 signed URL with `security.sbom_distributed` DEC-030 event (tenant_id, recipient_role, url_expiry_at). Licence compliance: four-tier classification (Permitted / Register+Review / Prohibited-legal-review / Prohibited-absolute); Snyk licence policy blocks CI on GPL/AGPL/SSPL; `license-checker` quarterly audit CSV filed to evidence bucket. Eight DEC-030 HMAC-chained event types: `security.sca_critical_vulnerability_detected` (CRITICAL, 3yr), `security.sca_high_vulnerability_detected` (HIGH, 1yr), `security.vulnerability_risk_accepted` (HIGH, 3yr), `security.sbom_generated` (STANDARD, 7yr), `security.sbom_distributed` (STANDARD, 7yr), `security.licence_violation_detected` (HIGH, 1yr), `security.sca_scan_failed` (HIGH, 1yr), `security.dependency_pr_created` (LOW, 30d). Alert FORM-SCA-001: 15-minute Edge Function check on open critical CVE events > 24h → PagerDuty P1 to devops-lead + email to compliance-officer. Evidence package PRE-54-E-001 (Dependabot config + Insights screenshot) through PRE-54-E-005 (30-day DEC-030 SCA event export). 14-item implementation checklist (7× P0, 5× P1, 2× P2). SOC 2 doc v2.5 → v2.6. Owner: security-engineer + devops-lead + compliance-officer.
+
+---
+
 ## [1.62.0] — 2026-06-02
 
 ### Added

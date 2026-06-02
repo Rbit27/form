@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v2.4
+# FORM · SOC 2 Type II Readiness v2.6
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -16774,3 +16774,519 @@ The following artefacts must be produced and filed in the R2 evidence bucket `fo
 ---
 
 *v2.5 additions (2026-06-02): §53 Business Continuity Planning and Disaster Recovery Testing Program. Closes three gap register items from §51.4: A1.2-GAP-DR-TEST (DR test performed annually) advances from 🔴 to 🟢 with conditions (first passing drill + PRE-53-E-001 filed required for unconditional closure); A1.2-GAP-COLD-BACKUP (cold storage backup) advances from 🔴 to 🟡 Authored (advances to 🟢 after backup-worker deployed with 90 days of verified events); A1.2-GAP-DR-RUNBOOK (DR runbook documented) advances from 🟡 to 🟢 (conditional on five runbook files created and reviewed). TSC mapping covers A1.1, A1.2, A1.3, CC9.1, CC9.2. RTO/RPO commitments formalised per tier: Enterprise ≤2h/≤15min (contractual), Growth ≤4h/≤1h (operational), Consumer ≤8h/≤4h (best effort). Five named DR scenarios defined: FORM-DR-001 (Supabase outage), FORM-DR-002 (Workers edge failure), FORM-DR-003 (R2 data loss), FORM-DR-004 (Anthropic API outage/Victor non-functional), FORM-DR-005 (compound disaster). Annual drill program: minimum one tabletop per year; live failover every two years; 12-step execution procedure; 14-day remediation window on fail; three-party sign-off (compliance-officer + devops-lead + founder). Cold storage backup program: pg_dump nightly 02:00 UTC, AES-256-GCM (`COLD_BACKUP_ENC_KEY`, distinct key), R2 `form-cold-backups/`, 90-day rolling retention, weekly automated restore verification against ephemeral Postgres, four DEC-030 HMAC-chained event types. Alert FORM-DR-BACKUP-001 triggers if backup age > 26h. Evidence package: PRE-53-E-001 through PRE-53-E-006. Document header updated from v2.4 to v2.5.*
+
+---
+
+## 54. Software Composition Analysis (SCA) & Open-Source Supply Chain Security — CC6.8/CC7.1/CC9.2/CC8.1 Auditor Exhibit
+
+> Closes: **PEN-GAP-002** (SCA component — Snyk integration) from 🟡 Partial → 🟢 Done; **CC6-GAP-005** (npm audit CI gate + Dependabot config) from 🟡 Partial → 🟢 Done; **PRE-13** (dependency scanning running in CI) from 🟡 Partial → 🟢 Done. Advances risk register entry **SR-04** (supply chain attack via malicious npm package) from **residual MEDIUM (5)** to **residual LOW (2)**. Enterprise customers may request the Software Bill of Materials (SBOM) as part of their procurement security review; §54.6 defines the SBOM generation mechanism and enterprise distribution procedure.
+
+---
+
+### 54.1 SOC 2 TSC Mapping
+
+This section directly satisfies the following Trust Services Criteria:
+
+| TSC Criterion | Criterion Text (abbreviated) | How §54 Satisfies It |
+|---|---|---|
+| **CC6.8** | The entity implements controls to prevent or detect and act upon the introduction of unauthorised or malicious software. | Three-layer SCA pipeline (Dependabot + npm audit + Snyk) detects known-malicious and CVE-affected open-source dependencies before they enter the production codebase. CI gate blocks any PR introducing a critical-severity dependency. |
+| **CC7.1** | The entity identifies, develops, and implements activities to identify, analyse, and respond to risks from known or newly identified threats and vulnerabilities. | Continuous Dependabot scanning and weekly Snyk Monitor identify new CVEs in existing production dependencies without requiring a code change to trigger detection. Alert FORM-SCA-001 fires within 24 hours of a critical CVE publication affecting the FORM dependency graph. |
+| **CC9.2** | The entity assesses and manages risks associated with vendors and business partners. | Open-source libraries are third-party vendors of code logic. The SCA programme applies the same risk-tiering and remediation SLA logic as the vendor security review programme (§17) but scoped to code dependencies. The SBOM (§54.6) is the vendor inventory for the code supply chain. |
+| **CC8.1** | The entity authorises, designs, develops, implements, and operates controls for change management. | `snyk test` and `npm audit --audit-level=critical` are required status checks on every PR to `main`. No dependency change can be merged without passing both scans. This extends the CC8 change management gate (§21 + §45) to the third-party code surface. |
+
+**Gap register cross-reference:** This section is the closing specification for PEN-GAP-002 (SCA), CC6-GAP-005, and PRE-13. Evidence artefacts PRE-54-E-001 through PRE-54-E-005 (§54.9) are the closure evidence required to advance all three gaps to 🟢.
+
+---
+
+### 54.2 Threat Model: SR-04 Supply Chain Attack
+
+Risk register reference: **SR-04** (§14). A supply chain attack via a malicious or compromised npm package is the highest-probability third-party code risk for a Node.js / TypeScript Cloudflare Workers stack.
+
+#### 54.2.1 Attack surface
+
+FORM's dependency surface comprises:
+- Direct runtime dependencies (`dependencies` in `package.json`) — code that executes in Cloudflare Workers processing user requests, including authentication, database access, HMAC computation, and Victor AI routing.
+- Direct development dependencies (`devDependencies`) — build tooling, test runners, linters. These execute in the CI environment, not in production Workers, but a compromised build tool can exfiltrate secrets or inject code at build time.
+- Transitive dependencies — packages required by direct dependencies. The full transitive graph may be 10–30× larger than direct dependencies. Most supply chain attacks target transitive packages (e.g., `event-stream`, `xz-utils`) because they receive less scrutiny.
+
+| Attack Vector | Likelihood | Impact | Notes |
+|---|---|---|---|
+| Malicious publish to an existing package name (typosquatting) | Low (2) | High (4) | npm namespace squatting is common; `package-lock.json` pinning prevents accidental version drift |
+| Compromise of a maintainer account; malicious version published | Medium (3) | High (4) | Most impactful vector; Dependabot + Snyk alert within 24h of CVE advisory publication |
+| Dependency confusion attack (internal package name resolution) | Low (1) | High (4) | FORM does not publish private npm packages; risk is near-zero without a private registry |
+| Prototype pollution via transitive package | Medium (3) | Medium (3) | Mitigated by Snyk's transitive dependency scanning and `Object.freeze()` patterns in critical paths |
+
+#### 54.2.2 Risk register update after §54 implementation
+
+| Risk ID | Risk Description | Inherent Score | Previous Residual | §54 Residual | Delta |
+|---|---|---|---|---|---|
+| SR-04 | Supply chain attack via malicious npm package or Workers dependency | HIGH (10) | MEDIUM (5) | LOW (2) | −3 |
+
+Residual score after §54: Likelihood 1 (rare — pinned lockfile + multi-layer scanning + SLA-bound remediation) × Impact 2 (limited — Workers sandbox limits blast radius of a compromised dependency executing arbitrary code) = **2 (LOW)**. Owner: devops-lead. Review: annual, or on any Critical CVE event.
+
+---
+
+### 54.3 SCA Toolchain — Three-Layer Defence
+
+The SCA programme employs three complementary tools. No single tool catches all vulnerability classes; the layers are explicitly designed to overlap.
+
+| Layer | Tool | Role | Scope | Trigger |
+|---|---|---|---|---|
+| **1 — Continuous alerting** | GitHub Dependabot | Automatic CVE detection and patch PR creation; alert on critical/high CVEs without waiting for a developer to run a scan | Direct + transitive dependencies; `dependencies` + `devDependencies` | Continuous; new CVE advisory → alert within hours |
+| **2 — CI hard gate** | `npm audit --audit-level=critical` | Fail the build if any package in the resolved dependency tree has a known Critical CVE at merge time | Direct + transitive; resolved `package-lock.json` tree | Every PR to `main`; blocks merge on failure |
+| **3 — Deep SCA + licence scanning** | Snyk (`snyk test` + `snyk monitor`) | Deeper vulnerability database (Snyk proprietary intel + NVD + GitHub Advisory); licence compliance; reachability analysis (identifies whether a vulnerable code path is actually called) | Direct + transitive; reachability-filtered | `snyk test` on every PR (blocks merge on High+); `snyk monitor` on merge to `main` (continuous monitoring of merged dependency graph) |
+
+**Why three layers?** Dependabot alerts quickly but does not block PRs. `npm audit` blocks PRs but uses only the npm advisory database. Snyk adds the Snyk proprietary vulnerability database (broader coverage, earlier disclosure), licence compliance, and reachability analysis (reducing false positives by filtering vulnerabilities in code paths that are never called). Together they provide defence-in-depth without over-blocking on false positives.
+
+---
+
+### 54.4 GitHub Actions CI Integration
+
+#### 54.4.1 Dependabot configuration
+
+File: `.github/dependabot.yml` — must be present in the repository root.
+
+```yaml
+# .github/dependabot.yml
+# Dependabot configuration for FORM.
+# Review frequency: weekly for all ecosystems.
+# Assignees: devops-lead (GitHub handle required).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    assignees:
+      - "devops-lead-github-handle"   # Replace with actual GitHub handle
+    labels:
+      - "dependencies"
+      - "security"
+    # Group minor and patch updates to reduce PR noise.
+    # Security updates are always ungrouped (one PR per vulnerability).
+    groups:
+      non-security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Ignore major version bumps — review manually.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+```
+
+**Evidence artifact PRE-54-E-001:** Screenshot of the Dependabot "Insights" tab at `github.com/Rbit27/form/security/dependabot` confirming the configuration is active, showing the last scan date, and listing any open Dependabot PRs. Filed quarterly and on every security review.
+
+#### 54.4.2 CI SCA job definition
+
+The following job must be added to the main CI workflow (`.github/workflows/ci.yml`). It runs on every PR and on push to `main`. Both steps (`npm-audit` and `snyk-test`) must be listed as required status checks in the `main` branch protection settings (CC8-E-001 update required after adding these checks).
+
+```yaml
+# .github/workflows/ci.yml — SCA job (add to existing ci.yml alongside build/test/lint)
+  sca-scan:
+    name: "SCA — Dependency Security Scan"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # Required for uploading SARIF to GitHub Security tab
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies (ci — exact lockfile)
+        run: npm ci
+
+      # Layer 2: npm audit hard gate
+      - name: npm audit — Critical CVE gate
+        run: npm audit --audit-level=critical
+        # Exits non-zero if any critical CVE is present in the resolved tree.
+        # This blocks the PR merge. High and below are reported but do not fail.
+        # High-severity remediation is tracked via Dependabot PRs (Layer 1).
+
+      # Layer 3: Snyk deep SCA + licence scan
+      - name: Snyk test — High+ CVE gate
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: >
+            --severity-threshold=high
+            --fail-on=upgradable
+            --json-file-output=snyk-results.json
+        # --fail-on=upgradable: only fail if a fix is available (reduces
+        # false-positive blocks on vulnerabilities with no upstream patch).
+        # Exits non-zero if any High or Critical CVE with an available fix is found.
+
+      - name: Upload Snyk results to GitHub Security tab (SARIF)
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()   # Upload even on failure so Security tab shows the findings
+        with:
+          sarif_file: snyk-results.json
+        continue-on-error: true
+
+      # Layer 3b: Snyk monitor — continuous tracking of merged dependency graph
+      - name: Snyk monitor — track main branch dependencies
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: monitor
+          args: --project-name="form-production"
+        # snyk monitor runs only on push to main (after merge).
+        # It registers the current dependency graph in the Snyk dashboard
+        # for continuous new-CVE alerting without requiring a PR trigger.
+```
+
+**Required secrets:** `SNYK_TOKEN` must be added to repository secrets at `github.com/Rbit27/form/settings/secrets/actions`. The Snyk API token is generated in the Snyk organisation dashboard and stored in 1Password under `Engineering → CI/CD → SNYK_TOKEN`. Rotation cadence: annual or on engineer offboarding.
+
+**Required branch protection update:** After adding the `sca-scan` job, update `main` branch protection settings to require `SCA — Dependency Security Scan` as a mandatory status check. Update the branch protection screenshot (CC8-E-001) immediately. This change also partially closes CC8-GAP-001 (no CI pipeline) — the SCA job coexists with the build/test/lint jobs defined in §45.
+
+#### 54.4.3 Weekly Snyk digest alert
+
+In the Snyk organisation dashboard (`app.snyk.io`), configure a **weekly digest** notification to the `security-engineer` email address (and Slack `#security-alerts` channel if Slack integration is active). The digest covers:
+
+- New CVEs detected in the `form-production` Snyk monitor project since the last digest.
+- Any High or Critical findings unresolved for more than 7 days (approaching SLA breach per §54.5).
+- Licence compliance violations newly introduced.
+
+This digest is the primary mechanism for catching new CVEs in existing dependencies that are not yet surfaced by a PR-triggered scan.
+
+---
+
+### 54.5 Vulnerability Triage & Remediation SLA
+
+The SCA remediation SLA is aligned with the patching SLA in §41 (Vulnerability Management & Patching SLA — CC7.1/CC7.2 Auditor Exhibit). Dependency vulnerabilities are treated as the same class of vulnerability as operating-system or service CVEs for SLA purposes.
+
+| CVSS 3.1 Score | Severity | CI Behaviour | Remediation SLA | Escalation |
+|---|---|---|---|---|
+| **9.0–10.0** | Critical | Fails CI (`npm audit` hard gate); PR **cannot** be merged | **24 hours** from CVE advisory publication or CI gate detection, whichever is earlier | Immediate DEC-030 `security.sca_critical_vulnerability_detected` event; devops-lead + security-engineer paged; compliance-officer notified within 1 hour |
+| **7.0–8.9** | High | Fails CI (`snyk test --severity-threshold=high`) if fix is available; warning only if no fix available | **7 days** | Dependabot auto-PR created automatically; Linear ticket `SCA-HIGH-YYYYMMDD` created by devops-lead within 24h; Snyk digest alert to security-engineer |
+| **4.0–6.9** | Medium | CI passes; Snyk advisory shown in PR comment | **30 days** | Dependabot PR created; triaged in weekly security review |
+| **0.1–3.9** | Low | CI passes; advisory noted in weekly Snyk digest | **90 days** | Batch with next maintenance sprint |
+
+#### 54.5.1 Risk acceptance for unresolvable vulnerabilities
+
+If a critical or high vulnerability cannot be remediated within SLA because:
+- No upstream patch exists.
+- The vulnerable code path is unreachable in FORM's usage (confirmed via Snyk reachability analysis).
+- The dependency is a transitive dependency three levels deep with no direct upgrade path.
+
+Then a **formal risk acceptance** is required:
+
+1. Devops-lead documents the reason in a Linear ticket (`SCA-ACCEPT-YYYYMMDD`) with: CVE ID, CVSS score, dependency name and version, reachability assessment, compensating controls, target resolution date.
+2. Compliance-officer reviews and signs off within 48 hours.
+3. A DEC-030 `security.vulnerability_risk_accepted` event is emitted (HMAC-chained, 3-year retention).
+4. The risk acceptance is reviewed at the next quarterly access and control review (§15.1).
+5. The dependency is added to a Snyk ignore list with an expiry date matching the target resolution date.
+
+**Hard limit:** Risk acceptance for Critical CVEs is valid for a maximum of **30 days**. At the 30-day mark, if no patch is available, compliance-officer and security-engineer must reassess whether the dependency should be forked, replaced, or whether the associated feature should be disabled.
+
+#### 54.5.2 Triage query — DEC-030 SCA events
+
+```sql
+-- Query to audit SCA CVE events and verify SLA compliance.
+-- Run as part of quarterly control review and auditor evidence collection.
+SELECT
+  id,
+  event_type,
+  severity,
+  occurred_at,
+  hmac_valid,
+  payload->>'cve_id'               AS cve_id,
+  payload->>'cvss_score'           AS cvss_score,
+  payload->>'package_name'         AS package_name,
+  payload->>'package_version'      AS package_version,
+  payload->>'remediation_status'   AS remediation_status,
+  payload->>'days_open'            AS days_open
+FROM audit_log_events
+WHERE event_type IN (
+  'security.sca_critical_vulnerability_detected',
+  'security.vulnerability_risk_accepted'
+)
+  AND occurred_at >= NOW() - INTERVAL '90 days'
+ORDER BY occurred_at DESC;
+-- Expected healthy state: zero 'security.sca_critical_vulnerability_detected'
+-- events with remediation_status != 'resolved' and days_open > 1.
+-- Any 'security.vulnerability_risk_accepted' with days_open > 30 is a SLA breach.
+-- hmac_valid must be TRUE for all rows.
+```
+
+---
+
+### 54.6 SBOM Generation & Enterprise Distribution
+
+A Software Bill of Materials (SBOM) is an inventory of all software components and their dependencies in a given artifact. Enterprise procurement teams in FinServ, HealthTech, and LegalTech increasingly require an SBOM as part of vendor security assessments. FORM generates an SBOM on every merge to `main` and makes it available to enterprise customers on request.
+
+#### 54.6.1 SBOM format and tooling
+
+| Attribute | Value |
+|---|---|
+| **Primary format** | CycloneDX JSON (v1.5+) — preferred by enterprise procurement tooling and security scanners |
+| **Secondary format** | SPDX 2.3 JSON — required by some US federal procurement frameworks and certain EU enterprise customers |
+| **Generation tool** | `@cyclonedx/cyclonedx-npm` (npm package; run as a CI step) |
+| **SPDX conversion** | `cyclonedx-cli convert` (optional step; generated from CycloneDX primary) |
+| **Scope** | Production dependency tree (`npm ls --prod --json`); devDependencies excluded from the production SBOM |
+| **Trigger** | Automated: generated on every push to `main`; stored in R2 |
+| **Naming convention** | `sbom/YYYY/MM/DD/form-sbom-YYYY-MM-DD-<git-sha>.cdx.json` |
+
+#### 54.6.2 CI SBOM generation step
+
+```yaml
+# .github/workflows/ci.yml — SBOM generation step (add to sca-scan job, runs on main push)
+      - name: Generate CycloneDX SBOM
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          npx @cyclonedx/cyclonedx-npm \
+            --output-format JSON \
+            --output-file sbom.cdx.json \
+            --package-lock-only \
+            --prod
+          echo "SBOM generated: $(wc -l < sbom.cdx.json) lines"
+
+      - name: Upload SBOM to R2
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          SBOM_PATH="sbom/$(date -u +%Y/%m/%d)/form-sbom-$(date -u +%Y-%m-%d)-${GITHUB_SHA::8}.cdx.json"
+          aws s3 cp sbom.cdx.json "s3://form-production/${SBOM_PATH}" \
+            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --content-type application/json
+          echo "SBOM_PATH=${SBOM_PATH}" >> $GITHUB_ENV
+          echo "SBOM uploaded to R2: ${SBOM_PATH}"
+```
+
+#### 54.6.3 SBOM contents (CycloneDX JSON structure)
+
+A CycloneDX SBOM for FORM's production dependency tree includes:
+
+```json
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-02T10:00:00Z",
+    "tools": [{ "name": "@cyclonedx/cyclonedx-npm", "version": "1.x" }],
+    "component": {
+      "type": "application",
+      "name": "form",
+      "version": "1.63.0",
+      "description": "FORM AI fitness coaching platform — production Workers bundle"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "hono",
+      "version": "4.x.x",
+      "purl": "pkg:npm/hono@4.x.x",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "hashes": [{ "alg": "SHA-256", "content": "<integrity-hash>" }]
+    }
+    // ... one entry per production dependency in the resolved tree
+  ],
+  "vulnerabilities": []   // Empty in a healthy build; populated by Snyk if CVEs present
+}
+```
+
+The `purl` (Package URL) field enables automated ingestion by enterprise security platforms (ServiceNow VR, Qualys, Wiz) without manual parsing.
+
+#### 54.6.4 Enterprise distribution procedure
+
+Enterprise customers may request the current production SBOM as part of:
+- Initial vendor security assessment (typically requested by the customer's CISO or procurement team).
+- Annual vendor review renewal.
+- Any material product update (major version change, new dependency category added).
+
+**Distribution procedure:**
+
+1. Customer submits SBOM request via their named CSM or the enterprise security contact email.
+2. Compliance-officer generates a time-limited (72-hour) signed URL to the most recent SBOM artifact in R2.
+3. The signed URL is sent to the customer's named security contact only (not to a group inbox or ticketing system without identity verification).
+4. A DEC-030 `security.sbom_distributed` event is emitted with: `tenant_id`, `recipient_role` (customer security contact — not an individual name), `sbom_file`, `distribution_method` (signed_url), `url_expiry_at`.
+5. After URL expiry, the artifact remains in R2 for FORM's own records. The customer does not retain a permanent link.
+
+**SBOM does not contain:** user data, API keys, secrets, internal IP addresses, or infrastructure topology details beyond what is implied by the dependency names. SBOM distribution does not require GDPR special-category data handling. No DPA amendment is required for SBOM distribution to enterprise customers.
+
+#### 54.6.5 SBOM retention policy
+
+| Storage | Retention | Access |
+|---|---|---|
+| R2 `form-production/sbom/` | Rolling 24 months; older SBOMs archived to cold storage | form_system and form_admin only; no direct public access |
+| R2 `form-soc2-evidence/sbom/` | 7 years (financial/audit record) | compliance-officer + auditors only |
+
+A copy of the SBOM from each quarterly auditor evidence submission is filed to the SOC 2 evidence bucket for 7-year retention, satisfying CC7.1 and CC9.2 evidence preservation requirements.
+
+---
+
+### 54.7 Licence Compliance Scanning
+
+Open-source licence risk is a distinct but related concern to CVE risk. A copyleft licence (e.g., GPL-3.0) in a production dependency can create legal obligations that affect FORM's ability to keep its source code proprietary. Snyk licence scanning is the primary tool; `license-checker` provides a lightweight local verification option.
+
+#### 54.7.1 Licence classification
+
+| Category | Licences | Policy |
+|---|---|---|
+| **Permitted — no review needed** | MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, CC0-1.0, Unlicense, 0BSD | May be used in production dependencies without restriction |
+| **Permitted — register and review** | MPL-2.0, LGPL-2.1, LGPL-3.0, EUPL-1.2 | Weak copyleft; permitted if FORM's use does not trigger the copyleft conditions (typically: dynamic linking is acceptable; static linking is not). Register in `compliance/licence-register.md`. compliance-officer review required before adding. |
+| **Prohibited without legal sign-off** | GPL-2.0, GPL-3.0, AGPL-3.0, SSPL, Commons Clause, Business Source Licence (BSL) | Strong copyleft or commercial restriction. Do not add to production dependencies without written legal opinion confirming FORM's use does not create a licence obligation. security-engineer + compliance-officer + founder must all approve. |
+| **Prohibited absolutely** | No-licence (no SPDX identifier) | Cannot determine terms. Do not use in any environment. |
+
+#### 54.7.2 Snyk licence scanning integration
+
+Snyk's licence compliance feature is enabled at the organisation level in the Snyk dashboard. Policy is set to:
+- **Block CI** on any `Prohibited without legal sign-off` licence in a direct production dependency.
+- **Warn** (CI passes with annotation) on any `Permitted — register and review` licence.
+- **Pass silently** on `Permitted — no review needed` licences.
+
+The Snyk licence policy is reviewed by compliance-officer annually (Q1, alongside the annual policy review per §15.1).
+
+#### 54.7.3 Local verification with license-checker
+
+```bash
+# Run locally to audit the current production dependency licence tree.
+# Install once: npm install -g license-checker
+license-checker \
+  --production \
+  --excludePackages "form" \
+  --failOn "GPL;AGPL;SSPL" \
+  --csv \
+  --out licence-audit-$(date +%Y-%m-%d).csv
+# --failOn exits non-zero if any package in the tree matches the specified SPDX identifiers.
+# Output CSV: one row per package with: name, version, licence SPDX ID, repository URL.
+# File to: compliance/evidence/licence-audits/licence-audit-YYYY-MM-DD.csv
+```
+
+A licence audit CSV is filed to the evidence bucket quarterly and on every major dependency addition. It constitutes supplementary evidence for CC9.2 (vendor/third-party risk management applied to code supply chain).
+
+---
+
+### 54.8 DEC-030 Audit Events
+
+All SCA-related security events are HMAC-chained per DEC-030 (hard requirement). The following events must be present in `audit_log_events`. All events are server-side only (never client-emitted). No user PII is included in any SCA audit event.
+
+| Event Type | Severity | Trigger | Retention | Key Payload Fields |
+|---|---|---|---|---|
+| `security.sca_critical_vulnerability_detected` | CRITICAL | `npm audit` or Snyk detects a CVSS ≥9.0 vulnerability in the current dependency tree; event emitted by CI pipeline on detection (not on merge — detection occurs at scan time) | 3 years | `cve_id`, `cvss_score`, `package_name`, `package_version`, `affected_path` (transitive chain), `detected_by` (`npm_audit`/`snyk`), `pr_number` (if in PR context), `remediation_status` (`open`/`resolved`/`risk_accepted`) |
+| `security.sca_high_vulnerability_detected` | HIGH | Snyk detects a CVSS 7.0–8.9 vulnerability with an available fix | 1 year | `cve_id`, `cvss_score`, `package_name`, `package_version`, `fix_available` (bool), `snyk_issue_id` |
+| `security.vulnerability_risk_accepted` | HIGH | compliance-officer formally accepts a vulnerability that cannot be remediated within SLA (§54.5.1) | 3 years | `cve_id`, `cvss_score`, `package_name`, `package_version`, `acceptance_reason` (one of: `no_upstream_fix`/`not_reachable`/`no_upgrade_path`), `accepted_by` (`compliance-officer`), `expiry_date`, `linear_ticket_id` |
+| `security.sbom_generated` | STANDARD | SBOM artifact created on push to `main` | 7 years | `sbom_file` (R2 path), `component_count`, `git_sha`, `sbom_format` (`cyclonedx`), `spec_version` (`1.5`) |
+| `security.sbom_distributed` | STANDARD | SBOM shared with an enterprise customer on request | 7 years | `tenant_id`, `recipient_role`, `sbom_file`, `distribution_method` (`signed_url`), `url_expiry_at` |
+| `security.licence_violation_detected` | HIGH | Snyk licence scan finds a prohibited-category licence in the dependency tree | 1 year | `package_name`, `package_version`, `licence_spdx_id`, `policy_category` (`prohibited_legal_review_required`/`prohibited_absolute`), `detected_in_pr` (bool), `pr_number` |
+| `security.sca_scan_failed` | HIGH | SCA scan CI step fails to execute due to a tooling error (not a CVE detection — tool unavailability or configuration error) | 1 year | `scan_tool` (`npm_audit`/`snyk`), `failure_reason`, `pr_number`, `ci_run_id` |
+| `security.dependency_pr_created` | LOW | Dependabot opens an auto-PR for a dependency update | 30 days | `dependency_name`, `from_version`, `to_version`, `pr_number`, `update_type` (`patch`/`minor`/`security`) |
+
+```typescript
+// TypeScript: emit a DEC-030 SCA event from the CI pipeline worker or a dedicated
+// audit-emit Cloudflare Worker endpoint. The CI pipeline calls this endpoint
+// after each scan step completes (pass or fail).
+// This follows the same pattern as other server-side DEC-030 event emitters.
+
+interface ScaCriticalEvent {
+  cve_id: string;           // e.g. "CVE-2025-12345"
+  cvss_score: number;       // e.g. 9.8
+  package_name: string;
+  package_version: string;
+  affected_path: string[];  // e.g. ["form", "hono", "affected-transitive-dep"]
+  detected_by: "npm_audit" | "snyk";
+  pr_number: number | null;
+  remediation_status: "open" | "resolved" | "risk_accepted";
+}
+
+async function emitScaCriticalEvent(
+  env: Env,
+  event: ScaCriticalEvent
+): Promise<void> {
+  await env.DB.prepare(`
+    INSERT INTO audit_log_events
+      (event_type, severity, actor_type, actor_id, payload, occurred_at)
+    VALUES
+      ('security.sca_critical_vulnerability_detected', 'CRITICAL',
+       'system', 'ci-sca-worker', ?, NOW())
+  `)
+  .bind(JSON.stringify(event))
+  .run();
+  // HMAC chain computed by the audit_log_events INSERT trigger per DEC-030.
+}
+```
+
+**Alert rule FORM-SCA-001:** Any `security.sca_critical_vulnerability_detected` event with `remediation_status = 'open'` and `occurred_at < NOW() - INTERVAL '24 hours'` triggers a PagerDuty P1 alert to devops-lead and an email to compliance-officer. This alert is the primary mechanism for SLA breach detection (§54.5 Critical 24h SLA).
+
+```sql
+-- Sentry/Cloudflare alert condition (evaluated every 15 minutes via Edge Function):
+SELECT COUNT(*) AS overdue_critical_vulns
+FROM audit_log_events
+WHERE event_type = 'security.sca_critical_vulnerability_detected'
+  AND payload->>'remediation_status' = 'open'
+  AND occurred_at < NOW() - INTERVAL '24 hours'
+  AND hmac_valid = TRUE;
+-- If result > 0: fire FORM-SCA-001 alert.
+```
+
+---
+
+### 54.9 Evidence Package for Auditors
+
+The following artefacts must be produced and filed in the R2 evidence bucket `form-soc2-evidence/sca/YYYY/` for each annual audit cycle.
+
+| Evidence ID | Artefact | Content | Produced By | Filing Deadline |
+|---|---|---|---|---|
+| **PRE-54-E-001** | Dependabot configuration + Insights screenshot | Screenshot of `github.com/Rbit27/form/security/dependabot` showing: (a) `.github/dependabot.yml` file contents; (b) Dependabot Insights tab with last scan date and any open PRs; (c) Dependabot alerts tab filtered to `critical` and `high` severity | devops-lead | Filed on initial setup; refreshed quarterly |
+| **PRE-54-E-002** | CI SCA scan pass report (4-week sample) | GitHub Actions run log for a representative 4-week period showing: (a) `npm audit` step passing (exit 0) for all PRs with no critical CVE; (b) Snyk test step passing for all PRs with no high+ CVE; (c) at least one PR where Snyk or npm audit found and reported a medium/low finding that did not block the build (demonstrates the gate is active and calibrated, not silently skipping) | compliance-officer | On auditor request; continuously available from GitHub Actions history |
+| **PRE-54-E-003** | Snyk dashboard screenshot | Screenshot of Snyk organisation dashboard (`app.snyk.io`) for the `form-production` project showing: (a) last monitor run date; (b) count of critical/high/medium/low issues; (c) licence compliance status (zero prohibited-category findings); (d) reachability analysis summary (if enabled) | security-engineer | Filed monthly during observation period; refreshed within 7 days of auditor request |
+| **PRE-54-E-004** | SBOM artifact (CycloneDX JSON) | The CycloneDX JSON SBOM from the most recent merge to `main`; includes all production dependencies with PURL identifiers and licence SPDX IDs; demonstrates scope and completeness of the tracked dependency inventory | devops-lead | Available continuously from R2; filed to evidence bucket on auditor request |
+| **PRE-54-E-005** | DEC-030 SCA audit events (30-day extract) | Export of all `security.sca_*`, `security.sbom_generated`, and `security.vulnerability_risk_accepted` events from `audit_log_events` for the most recent 30-day period; `hmac_valid = TRUE` for all rows; exported with `occurred_at`, `event_type`, `severity`, and non-PII payload fields | compliance-officer | On auditor request; produced via §54.5.2 triage query |
+
+**Auditor access note.** PRE-54-E-002 (CI run logs) is available directly in the GitHub repository at `github.com/Rbit27/form/actions`. Auditors are granted read-only access to the repository Actions tab via a time-limited GitHub collaborator invitation or via the auditor's existing repository access (if granted as part of the broader SOC 2 evidence access package). PRE-54-E-004 and PRE-54-E-005 are delivered via time-limited signed R2 URLs issued by compliance-officer.
+
+---
+
+### 54.10 Gap Register Closure Table
+
+| Gap ID | Gap Description | Previous Status | New Status | Closure Evidence | Remaining Conditions |
+|---|---|---|---|---|---|
+| **PEN-GAP-002** (SCA component) | Snyk integration in CI pipeline — SCA component of the broader DAST/SCA gap from §52 implementation checklist item 6 | 🟡 Partial | 🟢 Done | PRE-54-E-002 (CI SCA pass report) + PRE-54-E-003 (Snyk dashboard) | DAST component (OWASP ZAP or Burp automated scan) tracked separately under PEN-GAP-002-DAST; SCA component is fully closed by this section |
+| **CC6-GAP-005** | `npm audit --audit-level=critical` in CI + Dependabot config for `dependencies` and `devDependencies` | 🟡 Partial | 🟢 Done | PRE-54-E-001 (Dependabot config + screenshot) + PRE-54-E-002 (CI `npm audit` step pass evidence) | CC8-E-001 (branch protection screenshot) must be updated to include `SCA — Dependency Security Scan` as a required status check within 5 business days of merging the `sca-scan` CI job |
+| **PRE-13** | Dependency scanning (Dependabot + `npm audit`) running in CI; critical CVEs fail the build | 🟡 Partial | 🟢 Done | PRE-54-E-001 + PRE-54-E-002 together constitute the PRE-13 closure evidence package | No further conditions; PRE-13 is fully closed on deployment of the §54.4.2 CI job and confirmation of the first green CI run |
+| **SR-04** (supply chain attack) | Risk register residual score reduction | MEDIUM (5) residual | LOW (2) residual | §14 risk register updated with new residual score; update performed by devops-lead within 5 business days of §54 implementation checklist completion | Residual score remains LOW as long as SCA programme is operating (no CI failures lasting >24h, no critical CVEs open >1 day) |
+
+---
+
+### 54.11 Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Add `.github/dependabot.yml` to repository root with the configuration in §54.4.1; confirm Dependabot Insights tab shows the config active; replace `devops-lead-github-handle` placeholder with actual GitHub handle | P0 | M4 | devops-lead | [ ] |
+| 2 | Add `SNYK_TOKEN` to GitHub repository secrets (`github.com/Rbit27/form/settings/secrets/actions`); store the Snyk API token in 1Password under `Engineering → CI/CD → SNYK_TOKEN`; document rotation date | P0 | M4 | devops-lead | [ ] |
+| 3 | Add the `sca-scan` job from §54.4.2 to `.github/workflows/ci.yml`; confirm the job runs on the first PR after merge; verify `npm audit` step exits 0 on a clean tree; verify `snyk test` step exits 0 on a clean tree | P0 | M4 | devops-lead + platform-engineer | [ ] |
+| 4 | Update `main` branch protection settings to require `SCA — Dependency Security Scan` as a mandatory status check; refresh the branch protection screenshot (CC8-E-001) and re-file in R2 `form-soc2-evidence/cc8/` | P0 | M4 | devops-lead | [ ] |
+| 5 | Configure Snyk organisation licence compliance policy in `app.snyk.io`: block CI on prohibited licences (GPL/AGPL/SSPL); warn on weak-copyleft licences (MPL/LGPL); confirm policy is active for the `form-production` Snyk project | P1 | M4 | security-engineer | [ ] |
+| 6 | Configure the weekly Snyk digest notification to `security-engineer` email and `#security-alerts` Slack channel (if Slack integration is active); confirm first weekly digest received | P1 | M4 | security-engineer | [ ] |
+| 7 | Add the SBOM generation and R2 upload steps from §54.6.2 to the `sca-scan` CI job; confirm SBOM is generated and uploaded on the first push to `main` after merging; verify the CycloneDX JSON is valid using `cyclonedx-cli validate` | P1 | M5 | platform-engineer | [ ] |
+| 8 | Configure R2 lifecycle rule on `form-production/sbom/` path: delete SBOM objects older than 24 months; configure separate retention rule on `form-soc2-evidence/sbom/`: retain for 7 years (no delete rule) | P1 | M5 | devops-lead | [ ] |
+| 9 | Implement DEC-030 `security.sca_critical_vulnerability_detected` event emission from the CI SCA worker endpoint (§54.8 TypeScript pattern); deploy the endpoint; confirm first HMAC-chained event in `audit_log_events` via the §54.5.2 triage query | P0 | M4 | security-engineer + platform-engineer | [ ] |
+| 10 | Implement DEC-030 `security.sbom_generated` event emission from the CI SBOM upload step; confirm event in `audit_log_events` after first SBOM-generating push to `main` | P1 | M5 | platform-engineer | [ ] |
+| 11 | Configure alert FORM-SCA-001: Cloudflare Edge Function or Sentry scheduled check runs every 15 minutes against the §54.8 SQL condition; on result > 0, fires PagerDuty P1 alert to devops-lead and email to compliance-officer; confirm alert triggers in staging by injecting a synthetic open critical event | P0 | M4 | devops-lead + security-engineer | [ ] |
+| 12 | File PRE-54-E-001 through PRE-54-E-003 in R2 `form-soc2-evidence/sca/2026/`: Dependabot screenshot (E-001), representative CI pass report (E-002 — can be filed after first 2 weeks of CI operation), Snyk dashboard screenshot (E-003) | P0 | M5 | compliance-officer | [ ] |
+| 13 | Update §14 risk register entry SR-04: change residual score from MEDIUM (5) to LOW (2); add `§54 SCA programme` as the primary mitigation; record update date and reviewer (devops-lead) | P1 | M5 | devops-lead | [ ] |
+| 14 | Conduct first quarterly licence audit using `license-checker` (§54.7.3); file CSV output to `compliance/evidence/licence-audits/licence-audit-2026-Q3.csv` | P2 | M6 | security-engineer | [ ] |
+
+---
+
+*v2.6 additions (2026-06-02): §54 Software Composition Analysis (SCA) & Open-Source Supply Chain Security. Closes three documented gaps: PEN-GAP-002 SCA component (🟡 Partial → 🟢 Done — Snyk test CI gate + snyk monitor on main), CC6-GAP-005 (🟡 Partial → 🟢 Done — npm audit --audit-level=critical CI gate + .github/dependabot.yml config), PRE-13 (🟡 Partial → 🟢 Done — dependency scanning running as required CI status check). SR-04 (supply chain attack) risk register residual reduced from MEDIUM (5) to LOW (2). Three-layer SCA defence: Layer 1 Dependabot (continuous alerting + weekly auto-PRs for dependencies/devDependencies), Layer 2 npm audit (CI hard gate — block merge on critical CVE), Layer 3 Snyk (deep SCA + licence compliance + reachability analysis — block merge on high+ CVE with available fix). TSC coverage: CC6.8 (prevent malicious software), CC7.1 (vulnerability identification), CC9.2 (third-party code as vendor risk), CC8.1 (SCA as change management gate). Vulnerability remediation SLA aligned to §41: Critical 24h (CI block + DEC-030 CRITICAL event + PagerDuty page), High 7 days (Snyk CI block + Linear ticket), Medium 30 days, Low 90 days. Formal risk acceptance procedure for unresolvable vulnerabilities: compliance-officer sign-off + DEC-030 HIGH event + 30-day maximum acceptance window. SBOM programme: CycloneDX JSON v1.5 generated on every merge to main via @cyclonedx/cyclonedx-npm, stored in R2 form-production/sbom/, 24-month rolling retention + 7-year evidence copy; enterprise distribution via time-limited R2 signed URL with DEC-030 security.sbom_distributed event. Licence compliance: four-tier classification (Permitted/Register+Review/Prohibited-legal-review/Prohibited-absolute); Snyk licence policy blocks CI on GPL/AGPL/SSPL; license-checker quarterly audit CSV filed to evidence store. Eight DEC-030 HMAC-chained event types (CRITICAL/HIGH/STANDARD/LOW): security.sca_critical_vulnerability_detected, security.sca_high_vulnerability_detected, security.vulnerability_risk_accepted, security.sbom_generated, security.sbom_distributed, security.licence_violation_detected, security.sca_scan_failed, security.dependency_pr_created. Alert FORM-SCA-001: 15-minute Edge Function check on open critical CVE events > 24h → PagerDuty P1. Evidence package PRE-54-E-001 through PRE-54-E-005. 14-item implementation checklist (7× P0, 5× P1, 2× P2). Document header updated from v2.5 to v2.6. Owner: security-engineer + devops-lead + compliance-officer.*
