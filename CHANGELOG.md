@@ -6,6 +6,20 @@
 
 ---
 
+## [1.74.0] — 2026-06-02
+
+### Added
+- `docs/COST_MODEL.md §22.3.5` — Year 0 Compliance Capital Overlay · v1.6 → v1.7. **Closes OQ-34** (P0, pre-seed close blocker). §22.3.2 Base scenario cash flow table previously omitted the one-time Year 0 compliance readiness capital that is a prerequisite for the enterprise revenue timeline assumed in that table. Two compliance capital items: SOC 2 readiness consultant ($15–25k [ESTIMATE], M4) and SOC 2 Type I audit fee ($10–30k [ESTIMATE], M6); total Year 0 compliance capital $25–55k [ESTIMATE] (midpoint $40k). Adjusted cumulative cash delta table — Base scenario trough deepens from $(12,820) to $(52,820) at Month 6 at midpoint, vs. a remaining balance of ~$97k against a $150k pre-seed raise (vs. $137k without compliance capital) — material runway impact. Low ($25k)/mid ($40k)/high ($55k) scenario table. Planning implication: pre-seed capital target should account for $40–55k compliance capital above operating burn; if raise < $120k, SOC 2 Type I slips to M8, enterprise GA delays ~3 months. OQ-34 closed in §22.8 with resolution statement. Cross-references: §25.9 (P0 compliance checklist items at M4–M6), §25.10 (OQ-34 original statement), OQ-23 (pre-seed capital — table to be updated when confirmed). Owner: compliance-officer + founder.
+
+---
+
+## [1.73.0] — 2026-06-02
+
+### Added
+- `content/post-186-velocity-based-training.md` — «Velocity-Based Training: як швидкість грифа замінює тест 1RM» — спортивно-наукове пояснення VBT для проміжних і просунутих атлетів. Gonzalez-Badillo & Sanchez-Medina (2010): надійна і відтворювана залежність між вагою та MCV (Mean Concentric Velocity) — основа методу. Профіль швидкості: 40–50% 1RM → ~1.20–1.45 м/с, 70–80% → 0.55–0.75 м/с, 95–100% → 0.15–0.25 м/с. MVT (Minimum Velocity Threshold) ~0.16–0.20 м/с у присіданні — нижнє граничне значення для екстраполяції сьогоднішнього 1RM без максимального тесту. LOV% (Loss of Velocity) як критерій зупинки підходу: ≤ 10% (нейронна робота, 4–6 RIR), ≤ 20% (баланс гіпертрофії/сили, 2–4 RIR), ≤ 30% (максимальна гіпертрофія); Pareja-Blanco et al. (2017). Внутрішньоденна варіабельність MCV на стандартній вазі як readiness-показник: відхилення > 8% від норми = коригування плану до початку важкої роботи. Обмеження VBT: ефективний для багатосуглобних вправ з чітким концентричним рухом; не замінює технічний контроль. FORM: CV-трекінг швидкості грифа через камеру телефону, персональний профіль швидкість–навантаження після 4–6 калібрувальних сесій, автоматичний LOV-стоп-сигнал. ~14 хв. clinical-safety PASS (cloud-agent · 2026-06-02). sports-scientist review PENDING.
+
+---
+
 ## [1.72.1] — 2026-06-02
 
 ### Added
