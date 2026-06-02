@@ -6,6 +6,13 @@
 
 ---
 
+## [1.61.0] — 2026-06-02
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-17` — Third-Party AI Service Outage (Anthropic API / ElevenLabs Unavailability). P1 for Anthropic down (Victor non-functional), P0 upgrade if active enterprise workout sessions. `victor_fallback_mode` graceful degradation. `system.clinical_safety_bypass` CRITICAL DEC-030 event per affected session. Force majeure gate at 4h. Vendor-naming prohibition in enterprise comms. Tabletop Scenario J. Multi-provider LLM fallback parked as open architectural question. v1.1→v1.2. Owner: security-engineer + devops-lead.
+
+---
+
 ## [1.60.0] — 2026-06-02
 
 ### Added

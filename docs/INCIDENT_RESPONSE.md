@@ -4702,6 +4702,262 @@ compliance/evidence/incident-comms/<incident-slug>/
 
 ---
 
+### R-17: Third-Party AI Service Outage (Anthropic API / ElevenLabs Unavailability)
+
+> **Scope:** Victor (FORM's AI coach) depends on the Anthropic Claude API for all coaching intelligence. ElevenLabs provides text-to-speech for voice coaching. This runbook covers service *availability* failures at either vendor — it is NOT a security breach runbook. For a security breach at a sub-processor (e.g., Anthropic reporting unauthorized data access), activate R-07 instead. For the Anthropic API key being exposed, activate R-16. References: §11.2 sub-processor registry (Anthropic, ElevenLabs), §12 Enterprise Tenant SLA Breach & Incident Communication Protocol, OBSERVABILITY.md §18 (AI service health monitoring).
+
+#### Trigger
+
+Alert `FORM-AI-OUTAGE-001` fires from the Cloudflare Workers health-check Worker when the Anthropic API (`api.anthropic.com`) returns HTTP 529, 503, or 500 for **five or more consecutive health-check cycles** (5 minutes at 1-minute cadence). Alert `FORM-VOICE-OUTAGE-001` fires when the ElevenLabs TTS endpoint returns 5xx for **ten or more consecutive cycles** (10 minutes). Both alerts route to PagerDuty → `#ops-ai-status` Slack channel → on-call platform-engineer.
+
+#### Severity Classification
+
+| Condition | Severity | Reason |
+|---|---|---|
+| Anthropic API down (any confirmed duration) | **P1** | Victor non-functional for all users; core product value destroyed |
+| Anthropic API down AND enterprise tenant has an active workout session in progress | **P0** | Live safety-critical coaching interrupted; enterprise SLA breach likely; clinical-safety gate cannot run |
+| Anthropic API down + ElevenLabs down simultaneously | **P1** | Compound failure accelerates enterprise SLA breach assessment; same P0 upgrade rule applies |
+| Anthropic partial degradation (P95 latency on `coaching_turns` > 30s) | **P2** | Degraded but functional; monitor closely for upgrade |
+| ElevenLabs TTS down, Anthropic API healthy | **P2** | Voice output degraded; text coaching intact; no safety-critical path affected |
+
+**P0 upgrade trigger:** If at any point during a P1 outage a platform-engineer confirms via scope SQL (below) that enterprise tenant users have active workout sessions, the IC must upgrade to P0 immediately, page founder + customer-success, and follow the enterprise communication SLA in §12.
+
+#### Why This Matters
+
+Victor is the product. Anthropic's API is not an enhancement — it is the mechanism by which FORM delivers its core value proposition. If the Anthropic API is unavailable, FORM cannot create `coaching_turns`, cannot generate workout programs, and cannot run RPE/fatigue check-ins. For enterprise customers with active wellness programs or team training sessions, an extended outage triggers contractual SLA obligations per §12.
+
+Unlike infrastructure incidents (R-02, R-09), FORM cannot remediate Anthropic's unavailability by deploying a fix. This runbook covers detection, graceful degradation, enterprise communication, and the multi-provider fallback architectural question that sits in DECISION_LOG as an open item.
+
+#### Immediate Actions (T+0 to T+15 min)
+
+```
+1. Open incident channel: #inc-YYYYMMDD-ai-outage
+   IC: platform-engineer (on-call)
+   Notify: devops-lead + customer-success immediately
+
+2. Confirm the outage source — is this FORM-specific or a global Anthropic outage?
+   → Check status.anthropic.com (Anthropic status page)
+   → Check status.elevenlabs.io if FORM-VOICE-OUTAGE-001 also fired
+   → A global outage = FORM cannot remediate; skip to Containment
+   → A FORM-specific error = investigate Workers config, IP allowlist, API key
+     (if API key suspected invalid, check R-16 trigger — do NOT rotate in this runbook)
+
+3. Confirm FORM's error rate in PostHog:
+   → Dashboard: "AI Coach Health" → coaching_turns failure rate (last 5 minutes)
+   → Threshold for incident confirmation: > 50% failure rate sustained for 5 min
+
+4. Check Sentry for Anthropic 5xx error events:
+   → Project: workers/victor-edge/*
+   → Filter: last 30 min, tag anthropic_http_status IN (500, 503, 529)
+   → Note: is the error hitting all users, or a specific tenant / geographic region?
+
+5. Scope assessment — active workout sessions (run as form_admin, BYPASSRLS):
+```
+
+```sql
+-- Identifies active workout sessions that may be experiencing Victor silence right now.
+-- Output goes to restricted incident channel only — not general engineering Slack.
+SELECT
+  cs.id            AS session_id,
+  cs.user_id,
+  u.tenant_id,
+  t.display_name   AS tenant_name,
+  t.billing_email  AS tenant_billing_email,
+  cs.started_at,
+  EXTRACT(EPOCH FROM (NOW() - cs.started_at)) / 60  AS session_age_minutes
+FROM cv_sessions cs
+JOIN users u  ON u.id  = cs.user_id
+JOIN tenants t ON t.id = u.tenant_id
+WHERE cs.ended_at IS NULL
+  AND cs.started_at > NOW() - INTERVAL '30 minutes'
+ORDER BY cs.started_at ASC;
+```
+
+```
+6. IF active enterprise workout sessions found (query returns rows):
+   → Upgrade to P0 immediately
+   → Page founder + customer-success within 5 min of P0 declaration
+   → Each affected session requires a system.clinical_safety_bypass DEC-030 event (see below)
+```
+
+#### Containment
+
+**If Anthropic API down > 10 minutes:**
+
+Set `victor_fallback_mode = true` in Cloudflare Workers environment. This degrades Victor to a pre-written response set rather than making live Anthropic API calls. Fallback mode is a Workers environment variable toggled by a platform-engineer with production access — no code deploy required.
+
+```
+wrangler secret put VICTOR_FALLBACK_MODE --env production
+# value: "true"
+# Confirm propagation: wrangler tail --env production | grep fallback_mode
+```
+
+**Victor fallback mode behavior (what still works):**
+1. The most recent successful AI response for a user's session is cached and replayed if the user asks the same coaching question within the session window
+2. Structured workout logging (sets, reps, weight entry, timer) continues to function with no AI dependency
+3. Victor displays a pre-written message: "I'm having a moment — here's your planned session" and surfaces the user's programmatic workout plan from the `workout_programs` table
+4. `coaching_turns` rows are NOT created — no Anthropic API calls are made, no billing impact, no cascading 5xx errors in logs
+
+**Victor fallback mode — what does NOT work (non-negotiable):**
+- Initial session personalization (first onboarding session requires a real-time Anthropic response)
+- RPE / fatigue check-ins — these feed the clinical-safety gate; if Victor cannot process RPE, the safety check cannot run
+- Injury-flag detection responses — Victor's response to a user reporting pain or injury requires a live Anthropic call; fallback mode cannot safely substitute
+- Progress analysis and workout trend responses
+- Workout program generation (requires real-time generation; pre-written responses are insufficient)
+
+**CRITICAL — clinical safety obligation during outage:** For every workout session started while Victor is in fallback mode, the RPE and injury-flag checks cannot run. Each such session must receive a `system.clinical_safety_bypass` DEC-030 CRITICAL event (7-year retention). This event is the audit record that FORM's clinical-safety gate was unavailable for a specific user session. The platform-engineer enabling fallback mode must trigger the clinical-safety-bypass event emitter, which runs the active-session scope SQL above and emits one event per affected session before confirming fallback is active.
+
+**If ElevenLabs TTS down, Anthropic API healthy:**
+
+Set `voice_coaching_enabled = false` in Workers environment. Victor continues to function with full AI intelligence; only voice audio output is suppressed. The UI falls back to text-only coaching display. No user data is affected; no clinical-safety gate is bypassed.
+
+```
+wrangler secret put VOICE_COACHING_ENABLED --env production
+# value: "false"
+```
+
+#### Blast Radius Assessment
+
+| Feature | Anthropic API Down | ElevenLabs TTS Down | Fallback Available |
+|---|---|---|---|
+| Real-time coaching guidance | Unavailable | Fully available | Cached last response only |
+| Workout program generation | Unavailable | Fully available | No |
+| RPE / fatigue check-in | Unavailable | Fully available | No (clinical-safety gate) |
+| Injury-flag detection | Unavailable | Fully available | No (clinical-safety gate) |
+| Voice cue delivery | Fully available | Unavailable | No (text-only mode) |
+| Set / rep / weight logging | Fully available | Fully available | N/A — no AI dependency |
+| Progress analysis | Unavailable | Fully available | No |
+| Wearable data sync | Fully available | Fully available | N/A — no AI dependency |
+| Workout plan display (pre-written) | Available via fallback | Fully available | Yes — fallback mode surfaces plan |
+
+#### Recovery Protocol (when Anthropic or ElevenLabs confirms resolution)
+
+```
+1. Confirm service restored:
+   → Anthropic status page shows green AND/OR ElevenLabs status page shows green
+   → Do not rely solely on status pages — run the canary test below before re-enabling
+
+2. Canary test — send 5 coaching_turns via synthetic user:
+   → Tenant: non-production canary tenant (tenant_slug: 'form-canary')
+   → User: synthetic canary user (user_id pre-provisioned in canary env)
+   → Assert: HTTP 200, response latency < 3s P95 (OBSERVABILITY §13 SLA baseline)
+   → Assert: coaching_turns row created in DB with non-null ai_response field
+
+3. If canary passes:
+   → Disable victor_fallback_mode:
+     wrangler secret put VICTOR_FALLBACK_MODE --env production
+     # value: "false"
+   → Emit system.victor_fallback_mode_disabled DEC-030 event
+
+4. If ElevenLabs is also recovering:
+   → Re-enable voice coaching:
+     wrangler secret put VOICE_COACHING_ENABLED --env production
+     # value: "true"
+
+5. Monitor for 30 minutes post-recovery:
+   → PostHog: coaching_turns failure rate — confirm return to baseline (< 1%)
+   → Sentry: confirm no new Anthropic 5xx events in workers/victor-edge/*
+   → OBSERVABILITY §13 AI coach P95 latency dashboard — confirm < 3s
+
+6. If error rate returns to baseline and canary is green for 30 min:
+   → IC closes #inc-YYYYMMDD-ai-outage channel
+   → Emit system.ai_service_recovery_confirmed DEC-030 event
+   → Update Linear ticket status to Resolved
+```
+
+#### Enterprise Tenant Communication
+
+**If outage duration > 15 minutes AND enterprise tenants had active or recently active users:**
+
+Send Template E-01 (§12) with AI service outage context substituted. The Customer Lead owns all external communications; IC approves all statements before sending.
+
+Approved template language for Victor outage:
+
+```
+Subject: FORM Service Update — [DATE] [TIME UTC]
+
+Victor coaching is currently limited due to an infrastructure dependency issue.
+Set and rep logging, wearable sync, and workout history are fully available.
+We are working to restore full coaching functionality and will update within
+[30 / 60] minutes. We apologise for the disruption to your team's sessions.
+
+FORM Team · enterprise@form.coach
+```
+
+Do NOT name Anthropic or ElevenLabs in tenant communications without explicit founder approval. Naming a sub-processor in an outage communication is a vendor disclosure decision with commercial and contractual implications. Use "infrastructure dependency issue" as the approved term.
+
+**If outage duration > 60 minutes:** SLA assessment per §12.3 — check whether the AI feature availability SLA has been breached. Enterprise contracts guarantee Victor API availability at >= 99.5% monthly uptime. An Anthropic outage counts toward FORM's SLA obligation regardless of root cause.
+
+**Force majeure clause review:** If the Anthropic outage exceeds 4 hours, the founder and external counsel must assess whether the force majeure clause in enterprise agreements applies to third-party AI service unavailability. This analysis must be documented before any credit commitment or SLA waiver is communicated to enterprise tenants. Do not promise SLA credit or invoke force majeure without counsel review.
+
+| Outage Duration | Communication Action | Owner |
+|---|---|---|
+| > 15 min with active enterprise users | Template E-01 — initial notification | Customer Lead, IC approval |
+| > 30 min | Template E-02 — 30-min status update | Customer Lead |
+| > 60 min | SLA breach assessment per §12.3; update enterprise contacts | Customer Lead + compliance-officer |
+| > 4 h | Force majeure clause review; founder + counsel required before any credit commitment | Founder + counsel |
+| Resolution | Template E-03 — resolution notification | Customer Lead |
+
+#### Post-Incident Review
+
+PIR is required for all P0 and P1 incidents within 5 business days of resolution (§8). For R-17 incidents, the PIR must address:
+
+1. Was the `FORM-AI-OUTAGE-001` alert integrated with the Anthropic status page at the time of the incident? If FORM's own health-check alert fired before `status.anthropic.com` showed the issue, that indicates status page webhook integration (OBSERVABILITY §18) is not yet live — add it to the P1 implementation checklist below.
+2. Was `victor_fallback_mode` activated within the 10-minute threshold? If not, what caused the delay?
+3. Did any active enterprise workout sessions experience Victor silence without fallback mode being active? If yes, document the gap between outage onset and fallback activation — this gap may represent unlogged clinical-safety-bypass sessions.
+4. How many `system.clinical_safety_bypass` CRITICAL events were emitted? Is the count consistent with the active-session scope SQL run at T+0?
+5. Does Anthropic's historical uptime record support a force majeure defense against enterprise SLA credit obligations, or does this outage represent a pattern requiring contract renegotiation?
+
+**Preventive controls to review at PIR:**
+
+1. **Anthropic status page webhook** — wire status change notifications from `status.anthropic.com` → `form-alert-relay` Cloudflare Worker → `#ops-ai-status` Slack alert. This provides early warning before FORM's own health check detects the outage (OBSERVABILITY §18). Owner: devops-lead.
+2. **ElevenLabs status page webhook** — same pipeline as above. Owner: devops-lead.
+3. **Multi-provider LLM fallback** (open architectural question — Milestone M6) — route to a secondary LLM provider if Anthropic returns 5xx for > 60 seconds. This is a significant architectural decision requiring product-strategist review for model parity, clinical-safety review for output quality consistency, and compliance-officer review for sub-processor DPA implications. Added to DECISION_LOG as open question `DQ-LLM-FALLBACK`. Do not implement without those reviews completed.
+4. **Pre-cached Victor response library** — build a library of 20 high-frequency coaching moments in Victor voice for use during fallback mode (replaces the current single-message fallback with more contextual responses). Owner: platform-engineer + ml-engineer + sports-scientist.
+5. **Quarterly Anthropic dependency review** — current model version in use, API version, FORM's usage tier (tier affects priority of outage communication from Anthropic account team), model deprecation timeline. Owner: platform-engineer.
+
+#### DEC-030 HMAC-Chained Audit Events
+
+All events are HMAC-chained per `docs/AUDIT_LOG_SCHEMA.md`. A break in any event in this set for a given `incident_id` is P0 per R-05.
+
+| Event Type | DEC-030 Severity | Retention | Trigger Condition | Key Metadata |
+|---|---|---|---|---|
+| `system.ai_service_outage_detected` | HIGH | 3 years | `FORM-AI-OUTAGE-001` or `FORM-VOICE-OUTAGE-001` alert fires and is IC-confirmed | `service` (anthropic / elevenlabs), `first_error_at`, `error_rate_pct`, `incident_id` |
+| `system.victor_fallback_mode_enabled` | HIGH | 3 years | platform-engineer sets `VICTOR_FALLBACK_MODE = true` in Workers env | `fallback_mode`, `trigger_incident_id`, `enabled_by`, `enabled_at` |
+| `system.clinical_safety_bypass` | CRITICAL | 7 years | Active workout session exists when Victor enters fallback mode — one event per affected session | `session_id`, `user_id`, `tenant_id`, `outage_started_at`, `bypass_reason: "anthropic_api_unavailable"` |
+| `system.ai_service_recovery_confirmed` | MEDIUM | 3 years | Canary test passes post-recovery and error rate returns to baseline | `service`, `recovery_confirmed_at`, `outage_duration_minutes`, `canary_latency_p95_ms` |
+| `system.victor_fallback_mode_disabled` | HIGH | 3 years | platform-engineer sets `VICTOR_FALLBACK_MODE = false` — normal operation restored | `fallback_disabled_at`, `disabled_by`, `incident_id` |
+| `system.ai_sla_breach_assessed` | HIGH | 7 years | Outage duration crosses enterprise SLA threshold (99.5% monthly uptime) | `tenant_ids_affected[]`, `duration_minutes`, `credit_assessed` (bool), `force_majeure_invoked` (bool) |
+
+**Retention note:** `system.clinical_safety_bypass` carries 7-year retention (vs. the 3-year default for system events) because it documents a moment when FORM's clinical-safety gate was unavailable for a specific user session. This is the closest R-17 comes to a health-data regulatory event and must survive the same retention window as Art. 9 breach records.
+
+#### SOC 2 TSC Mapping
+
+| TSC Criterion | How R-17 Satisfies It |
+|---|---|
+| **A1.1** (Availability commitments and system components) | Anthropic and ElevenLabs commitments are documented in §11.2 sub-processor registry; this runbook defines the outage response protocol and is the evidence that FORM has documented procedures for vendor-driven availability events |
+| **A1.2** (Recovery time and recovery point objectives) | Victor fallback mode and text-only degradation paths are documented availability protections; references DR-004 scenario (AI service dependency failure) in the disaster recovery plan |
+| **CC9.2** (Sub-processor monitoring and risk mitigation) | Status page webhook integration (preventive control 1 above) constitutes sub-processor monitoring; this runbook constitutes the vendor failure response procedure required by CC9.2 |
+| **CC7.2** (Monitoring for and evaluating system events) | `FORM-AI-OUTAGE-001` and `FORM-VOICE-OUTAGE-001` alerts cover anomaly detection for AI service degradation; the canary test protocol constitutes continuous monitoring post-recovery |
+
+#### Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Configure `FORM-AI-OUTAGE-001` Cloudflare Worker health-check alert: Anthropic endpoint health-check at 1-min cadence; fire after 5 consecutive 5xx responses; route to PagerDuty + `#ops-ai-status` | platform-engineer | **P0** | M4 |
+| Configure `FORM-VOICE-OUTAGE-001` ElevenLabs TTS endpoint health-check: fire after 10 consecutive 5xx responses; same PagerDuty + Slack routing | platform-engineer | **P1** | M4 |
+| Implement `VICTOR_FALLBACK_MODE` Workers env flag + fallback response logic in `apps/api/src/workers/victor-edge/`: cached-response replay, workout plan surface from `workout_programs` table, `coaching_turns` creation skip, `system.clinical_safety_bypass` DEC-030 emitter for all active sessions at fallback activation | platform-engineer | **P0** | M5 |
+| Build pre-cached Victor response library: 20 high-frequency coaching moments in Victor voice; reviewed by sports-scientist for accuracy and by clinical-safety for harm pattern compliance before deployment | ml-engineer + sports-scientist | **P1** | M5 |
+| Add Anthropic and ElevenLabs status page webhooks to `form-alert-relay` Worker → `#ops-ai-status` Slack channel (OBSERVABILITY §18) | devops-lead | **P1** | M5 |
+| Tabletop Scenario J: *Anthropic API enters a 90-minute outage at 07:30 UTC on a Tuesday; three enterprise tenants have team workout sessions in progress; FORM-AI-OUTAGE-001 fires at T+5 min; on-call engineer is platform-engineer; compliance-officer is not yet online*. Run and validate: fallback activation SLA, clinical-safety-bypass DEC-030 emission count vs. active-session scope SQL, enterprise E-01 communication timing, SLA breach threshold assessment. | security-engineer | **P2** | M5 |
+| Add multi-provider LLM fallback (route to secondary provider if Anthropic 5xx for > 60s) to DECISION_LOG as open architectural question `DQ-LLM-FALLBACK`; assign to product-strategist for review with clinical-safety and compliance-officer as co-reviewers | product-strategist | **P2** | M5 |
+
+---
+
+*v1.2 additions (2026-06-02): R-17 Third-Party AI Service Outage — new runbook covering Anthropic API and ElevenLabs TTS unavailability. Distinct from R-07 (sub-processor security breach — R-07 handles cases where a vendor reports unauthorized data access; R-17 handles service availability only) and from R-16 (API key exposure — R-16 handles the case where the Anthropic API key is compromised; R-17 handles the case where Anthropic's service is simply unavailable). Trigger matrix: FORM-AI-OUTAGE-001 (Anthropic endpoint 5xx for > 5 consecutive minutes) and FORM-VOICE-OUTAGE-001 (ElevenLabs TTS 5xx for > 10 consecutive minutes). Severity: P1 baseline for Anthropic down (Victor non-functional for all users); P0 upgrade if enterprise tenant has active workout sessions in progress (live safety-critical coaching interrupted; clinical-safety gate cannot run). Victor fallback mode: VICTOR_FALLBACK_MODE Workers env flag activates cached-response replay, workout plan surface from workout_programs table, coaching_turns creation skip (no billing impact, no cascading 5xx errors); does NOT apply to initial session personalization, RPE/fatigue check-ins, injury-flag detection, or program generation — all gated by clinical-safety. Clinical-safety bypass event: system.clinical_safety_bypass CRITICAL DEC-030 event (7-year retention) emitted once per active session during Anthropic outage — the audit record that FORM's clinical-safety gate was unavailable for a specific user session. Enterprise SLA protocol: enterprise contracts guarantee Victor API availability >= 99.5% monthly; Anthropic outage counts toward FORM's SLA obligation regardless of root cause; force majeure clause review required for outages > 4h (founder + counsel); do not name Anthropic or ElevenLabs in tenant communications without founder approval — use "infrastructure dependency issue." Six DEC-030 events: system.ai_service_outage_detected (HIGH, 3yr), system.victor_fallback_mode_enabled (HIGH, 3yr), system.clinical_safety_bypass (CRITICAL, 7yr — highest-retention event in this runbook), system.ai_service_recovery_confirmed (MEDIUM, 3yr), system.victor_fallback_mode_disabled (HIGH, 3yr), system.ai_sla_breach_assessed (HIGH, 7yr). SOC 2 mapping: A1.1 (vendor commitments and outage protocol documented), A1.2 (fallback mode as documented availability protection — DR-004 reference), CC9.2 (status page webhook as sub-processor monitoring; vendor failure response procedure), CC7.2 (FORM-AI-OUTAGE-001/FORM-VOICE-OUTAGE-001 anomaly detection; canary test post-recovery monitoring). Seven-item implementation checklist: two P0 (M4 FORM-AI-OUTAGE-001 alert, M5 VICTOR_FALLBACK_MODE logic + clinical-safety-bypass emitter), two P1 M4/M5 (FORM-VOICE-OUTAGE-001 alert, pre-cached response library, status page webhooks), two P2 M5 (Tabletop Scenario J, DECISION_LOG open question DQ-LLM-FALLBACK). Document header updated v1.1 → v1.2.*
+
+---
+
 *v1.1 additions (2026-06-02): R-16 Application Secret & Encryption Key Exposure — standalone runbook for the scenario where a Workers Secret, encryption key, or third-party API credential is discovered to be exposed. Distinct from R-03 (user credentials), R-04 (SSO certificate), R-08 (supply chain attack — secret rotation is remediation step there), R-09 (ransomware), R-11 (biometric breach — activated in parallel when keypoints_enc affected). Trigger matrix: 11 secret types mapped to severity (P0: keypoints_enc / JWT secret / service role key / SCIM master secret; P1: HMAC chain key / Stripe webhook / Anthropic API key / attestation signing key; P2: ElevenLabs / PostHog / Sentry DSN). Severity upgrade: any P1/P2 upgraded to P0 if exposure window > 24h or unauthorized access confirmed. Six trigger vectors: GHAS push, TruffleHog CI, Cloudflare audit log anomaly, external researcher, team member discovery, vendor usage spike. Exposure window assessment procedures per key type: service role key (Supabase API log SQL), Anthropic key (vendor console usage check), JWT secret (enterprise_sessions forged-session SQL), keypoints_enc (conditional — DB access required to decrypt; GDPR assessment deferred until access confirmed). Nine-step ordered rotation sequence: service role key first (no user impact); SCIM / API keys middle; HMAC chain key requires compliance-officer sign-off and epoch documentation; keypoints_enc requires biometric re-encryption Worker; JWT signing secret last (all sessions invalidated; 30 min E-ROTATE-01 notice to enterprise tenants). HMAC epoch transition procedure: pre-rotation chain verification export, compliance-officer sign-off file, old key cold storage for 7 years, `secret.hmac_epoch_transitioned` DEC-030 event distinguishes from R-05 unintended break, AUDIT_LOG_SCHEMA.md epoch boundary documentation. keypoints_enc re-encryption TypeScript scaffold: batched AES-256-GCM decrypt+re-encrypt; 5,000-row progress DEC-030 events; zero-row post-migration verification query; PAM destructive tier gate + two-person auth. JWT rotation procedure: E-ROTATE-01 template (30 min advance notice; immediate if P0), off-peak scheduling for P1, post-rotation auth surge monitoring via OBSERVABILITY §13. GDPR assessment matrix: keypoints_enc without DB access (case-by-case); keypoints_enc with DB access or service role key (presumed breach → R-01 + Art. 33); JWT (investigate forged sessions first); non-data keys (no Art. 33); HMAC key (epoch documentation + notify audit firm). Seven DEC-030 events: secret.exposure_discovered (CRITICAL, 7yr), secret.rotation_initiated (HIGH, 7yr), secret.rotation_completed (HIGH, 7yr), secret.biometric_re_encryption_progress (STANDARD, 3yr), secret.biometric_re_encryption_completed (CRITICAL, 7yr), secret.hmac_epoch_transitioned (CRITICAL, 7yr), secret.exposure_window_assessed (HIGH, 7yr); sub-chain keyed by incident_id; chain break = P0 per R-05. Evidence package: four directories (discovery, rotation, gdpr, dec030). Six post-incident preventive controls: TruffleHog CI path coverage, GHAS push protection, detect-secrets pre-commit, AL-SECRETS-01 Cloudflare alert, CRYPTOGRAPHY_POLICY.md rotation schedule, developer debrief. SOC 2 mapping: CC6.4 (credential lifecycle), CC7.1 (layered vulnerability detection via TruffleHog + GHAS + R-16 runbook), CC7.4 (DEC-030 sub-chain as incident timeline), CC5.2 (AL-SECRETS-01 monitoring). Seven-item implementation checklist: two P0 M4 (AUDIT_LOG_SCHEMA.md event registry, E-ROTATE-01 template), one P1 M4 (AL-SECRETS-01 Cloudflare alert), two P1 M5 (cv-key-migration Worker, Scenario K tabletop), two P2 M5 (detect-secrets onboarding, cross-references from R-11 and R-08). Document header updated v0.8 → v1.1 (v0.9, v1.0 additions preserved in body version notes).*
 
 ---
@@ -4761,6 +5017,13 @@ Secret / key exposed?        → R-16 (assess exposure window BEFORE rotating �
   HMAC audit chain key?      → R-16 + epoch transition procedure; compliance-officer sign-off required
   Anthropic / ElevenLabs?    → R-16 (check vendor usage logs; no user data exposure unless DB accessed)
   SCIM master token?         → R-16 (P0; re-sign all tenant SCIM tokens; notify CSM team)
+Anthropic API / ElevenLabs down? → R-17 (NOT R-07 — this is availability, not a security breach)
+  Active enterprise workout sessions? → R-17 P0 upgrade; page founder + customer-success NOW
+  Anthropic down > 10 min?   → R-17: set VICTOR_FALLBACK_MODE=true; emit clinical_safety_bypass DEC-030
+  ElevenLabs down only?      → R-17 P2: set VOICE_COACHING_ENABLED=false; text-only mode; no safety impact
+  Outage > 60 min?           → R-17: SLA breach assessment per §12.3; enterprise tenant comms via E-01
+  Outage > 4h?               → R-17: force majeure clause review; founder + counsel before any credit commitment
+  DO NOT name Anthropic/ElevenLabs in tenant comms without founder approval — use "infrastructure dependency issue"
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
@@ -5664,7 +5927,7 @@ The `reason` field in `incident.severity_changed` is IC-authored free text. Unde
 
 ---
 
-**v1.0 · 2026-06-01 · Owner: security-engineer + compliance-officer**
+**v1.2 · 2026-06-02 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
