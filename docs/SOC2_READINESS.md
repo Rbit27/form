@@ -18267,3 +18267,719 @@ The DEC-030 HMAC audit chain uses `HMAC_AUDIT_CHAIN_KEY` — a separate Cloudfla
 ---
 
 *v2.9 (2026-06-02): §57 Supabase `service_role` JWT Rotation Runbook — Scheduled & Emergency · CC6.7/CC6.8/C1.1. Closes ENC-GAP-004 (🔴 P0 CRITICAL → 🟡 Authored; 🟢 upon first rotation execution + ENC-E-009 through ENC-E-013 filed before M5). Closes OQ-ENC-01 (this section IS the runbook). Closes OQ-ENC-03 (`admin.encryption_key_rotated` CRITICAL event fully specified: key_name, rotation_type, pam_session_id, second_engineer_user_id, new_key_iat, consumers_updated[], hmac_chain_intact_post_rotation, next_rotation_due_iso; 7-year retention). Partially resolves OQ-ENC-02 (service_role rotation confirmed chain-safe; HMAC_AUDIT_CHAIN_KEY dual-key design deferred M7). Advances ENC-GAP-001 (automated reminder pipeline specified; 🟡 Authored; 🟢 upon workers/key-rotation-monitor deploy). Rotation scope: 7 consumers (pam-db-proxy Supabase Vault + 5 Cloudflare Workers Secrets + GitHub Actions). Three rotation types: Scheduled (90-day cadence, PAM read_write, 2-person, 45-min window), Emergency (P0 incident, PAM destructive, 2-person, 1-hour RTO, GDPR Art.33 clock, skip grace-period via Supabase support), Infrastructure repair (post-PITR, 4-hour RTO, R-18 co-activation). Eight-step scheduled procedure with 15-minute Supabase grace-period budget and 60-second Cloudflare propagation pause. Emergency trigger matrix: 6 conditions including TruffleHog detection, FORM-HEALTH-LEAK-001 alert, anomalous query volume, third-party report, team member suspicion (gut-call valid), PITR post-rotation. Hard DEC-030 invariant: admin.key_rotation_initiated CRITICAL event must precede all rotation steps — rotating without emitting this event triggers AL-PAM-01 review. Privacy invariant on evidence: JWT value must never appear in any DEC-030 event, Linear ticket, Slack message, or evidence artefact — ENC-E-009 captures only the iat Unix timestamp. Six DEC-030 events (all 7-year retention except admin.key_rotation_reminder LOW 3yr): admin.key_rotation_initiated (CRITICAL), admin.encryption_key_rotated (CRITICAL — closes OQ-ENC-03), admin.key_rotation_announced (HIGH), admin.emergency_key_rotation (CRITICAL — gdpr_art33_clock_started field), admin.key_rotation_reminder (LOW, 3yr), admin.key_rotation_overdue (HIGH). HMAC chain continuity analysis: service_role JWT is Postgres auth credential, not the HMAC signing key — rotation cannot break chain; dead-letter R2 path for 60-second propagation window documented; backfill responsibility until OQ-ENC-02 resolved. KEY_ROTATION_KV namespace: workers/key-rotation-monitor Cron daily 09:00 UTC; last_rotated_at + rotation_period_days = next_rotation_due; two alert rules AL-KEY-01 P1 (≤3 days) + AL-KEY-02 P0 (≤0 days) registered in OBSERVABILITY.md §6 key_rotation_health. Six evidence artefacts ENC-E-002 (existing from §56) + ENC-E-009 through ENC-E-013 (new): iat timestamp, Workers Secret list screenshots × 5, GitHub Actions secret list, HMAC chain check output, 1Password item history. Evidence stored at compliance/evidence/enc/service-role-rotation-{YYYY-MM-DD}/. SOC 2: CC6.7 (rotation limits transit exposure window), CC6.8 (24h dev env cleanup + AL-KEY enforcement), C1.1 (Restricted-tier credential lifecycle), CC7.2 (AL-KEY-01/02 continuous monitoring), CC9.2 (90-day exceeds Supabase annual baseline). 10-item checklist: 6× P0 (gitignore + TruffleHog + first rotation + 1Password + KV seed + AUDIT_LOG_SCHEMA registry), 3× P1 (key-rotation-monitor Worker + PagerDuty rules + tabletop), 1× P1 (§51 gap register update). Owner: security-engineer + devops-lead + compliance-officer.*
+
+---
+
+## 58. HMAC Audit Chain Key (`HMAC_AUDIT_CHAIN_KEY`) Rotation Runbook — Dual-Key Migration Design · CC6.7/CC6.8/C1.1/DEC-030 Chain Integrity · Auditor Exhibit
+
+> **Closes: OQ-ENC-02** (`HMAC_AUDIT_CHAIN_KEY` dual-key verification design — P1, M7 — fully specified in this section; no remaining open questions on chain-safe rotation architecture). **Closes: ENC-GAP-002** (HMAC key rotation blocked pending dual-key verification implementation — 🔴 MEDIUM → 🟡 Authored; 🟢 upon DDL migration execution + chain verification function update deployed + first rotation executed + ENC-E-018 through ENC-E-022 filed). SOC 2 doc v2.9 → v3.0. Owner: security-engineer + platform-engineer + compliance-officer.
+
+---
+
+### 58.1 Why `HMAC_AUDIT_CHAIN_KEY` Rotation Is Architecturally Different (vs `service_role` JWT)
+
+The `SUPABASE_SERVICE_ROLE_JWT` rotation documented in §57 is a credential substitution problem: all consumers are updated to the new credential within a 15-minute grace window, and the old credential becomes inert. The HMAC chain key rotation is a fundamentally different class of problem — it is a **cryptographic provenance problem**.
+
+The DEC-030 audit chain computes each event's `chain_hash` as:
+
+```
+chain_hash = HMAC-SHA256(HMAC_AUDIT_CHAIN_KEY, prev_hash ‖ event_id ‖ created_at ‖ event_type ‖ payload_sha256)
+```
+
+Every historical `chain_hash` value in `audit_log_events` is an irreversible cryptographic commitment made under the key that was active at the time of insertion. The table is **append-only by the DEC-030 hard invariant** (no UPDATE, no DELETE, enforced at the Postgres role level). This means:
+
+| Scenario | Outcome |
+|---|---|
+| Naive rotation: replace Workers Secret, continue appending | New events sign correctly. Old events verify correctly IF using old key. Cross-boundary verification (any function checking the full chain) fails — `prev_hash` inputs linking the v1 and v2 eras will produce wrong HMACs unless the function knows which key to use for which row. |
+| Re-signing old rows with new key | Constitutes tampering with the audit log. Violates the DEC-030 append-only invariant. Would itself be an integrity failure visible to any auditor who retained a snapshot of the old chain. |
+| Doing nothing (never rotating) | Accepted risk for a time-bounded period only. A key that is never rotatable is a key whose compromise permanently and retroactively invalidates the integrity of the entire audit history. |
+
+The correct solution is a **dual-key design**: the verification function learns which key signed each row by reading a `key_version` column stored alongside the event. Old rows retain their original `chain_hash` values — no re-signing, no tampering. The verification function selects the appropriate key for each row based on `key_version`. New rows after cutover use the new key and record the new version. The cryptographic link across the key boundary is preserved through the **rotation boundary invariant** (§58.6).
+
+**Comparison with §57:** §57.6 confirmed that rotating the `service_role` JWT cannot break the HMAC chain because the JWT is Postgres authentication material, not the HMAC signing key. That analysis also confirmed the chain-break risk is entirely contained within `HMAC_AUDIT_CHAIN_KEY`. This section resolves that remaining risk.
+
+---
+
+### 58.2 Dual-Key Design Specification
+
+The dual-key design has four components: a schema extension, a key naming convention, an updated verification function, and a rotation boundary invariant. Together they allow `HMAC_AUDIT_CHAIN_KEY` to be rotated any number of times while preserving the ability to verify the full historical chain using only archived keys.
+
+**Core principles:**
+
+1. **No re-signing.** Historical `chain_hash` values are permanent. The key that signed them is archived and used for verification of those rows only.
+2. **No key deletion.** Old keys are archived to the compliance vault (1Password FORM vault + Cloudflare R2 `form-compliance-vault/hmac-keys/`) and retained for 7 years — the full audit log retention period. Deleting an old key makes historical verification impossible, which is equivalent to destroying audit evidence.
+3. **Monotonic key versions.** Key versions are numeric and increase only: v1 → v2 → v3. Rollback to an old key version is not permitted. If a key is suspected compromised, rotate forward to the next version.
+4. **Append-only `key_version` column.** Once a row's `key_version` is set at INSERT time, it is never updated — consistent with the DEC-030 append-only invariant.
+5. **Single active key.** At any moment, exactly one key version is the "current" signing key for new events. There is no overlap window where two keys both sign new events simultaneously. The overlap is read-only: the old key is used only for verifying historical rows.
+6. **Rotation boundary integrity.** The last event signed with v1 and the first event signed with v2 are cryptographically linked via `prev_hash` — the boundary is visible in the chain and verifiable. See §58.6.
+
+**Secret naming convention (Cloudflare Workers Secrets):**
+
+| Secret name | Status after first rotation | Purpose |
+|---|---|---|
+| `HMAC_AUDIT_CHAIN_KEY` | Deprecated (renamed, removed) | Original name — eliminated to avoid ambiguity |
+| `HMAC_AUDIT_CHAIN_KEY_V1` | Archived (read-only in verification) | Signing key for all rows with `key_version = 'v1'` |
+| `HMAC_AUDIT_CHAIN_KEY_V2` | Active (current signing key) | Signing key for all rows with `key_version = 'v2'` |
+| `HMAC_AUDIT_CHAIN_KEY_V{N}` | Active or archived | Future rotation versions |
+
+**Consumers that must be updated during rotation:**
+
+| Consumer | Runtime | Update method | Key variable used |
+|---|---|---|---|
+| `workers/emit-audit-event` | Cloudflare Worker | `wrangler secret put` | Active key only (`HMAC_AUDIT_CHAIN_KEY_V{N}`) |
+| `workers/audit-chain-daily-check` | Cloudflare Worker | `wrangler secret put` | All archived keys + active key (for full-chain verification) |
+| `supabase/functions/audit-chain-verify` | Supabase Edge Function | `supabase secrets set` | All archived keys + active key |
+
+The `emit-audit-event` Worker needs only the current active key — it never re-signs historical rows. The `audit-chain-daily-check` Worker and `audit-chain-verify` Edge Function need all keys from v1 through vN to verify the full chain. They are updated with every new versioned key as part of the rotation runbook.
+
+---
+
+### 58.3 Key Version Naming Convention and Migration from Current State
+
+**Current state (pre-§58 implementation):**
+
+- A single Workers Secret named `HMAC_AUDIT_CHAIN_KEY` exists with no version suffix.
+- All existing `audit_log_events` rows were signed with this key.
+- The `audit_log_events` table has no `key_version` column.
+
+**Migration to versioned naming:**
+
+Step 1 of the migration (§58.7 scheduled rotation runbook, pre-rotation tasks) is a one-time rename:
+
+1. Read the current value of `HMAC_AUDIT_CHAIN_KEY` from 1Password FORM vault.
+2. Store that value as `HMAC_AUDIT_CHAIN_KEY_V1` in Cloudflare Workers Secrets across all three consumers.
+3. Delete the unversioned `HMAC_AUDIT_CHAIN_KEY` secret from all consumers.
+4. Update the `audit_log_events` rows via backfill (§58.4 DDL): all existing rows receive `key_version = 'v1'`.
+5. Archive the v1 key value to compliance vault (§58.9).
+
+After this migration, the system is in a stable versioned state: all historical rows are `key_version = 'v1'`, new events are emitted with `key_version = 'v1'` (the current active key is still V1), and the chain verification function is updated to read `key_version` and select the correct key. No chain hashes change during this migration — only the column is added and the Workers Secret is renamed.
+
+The **first actual key rotation** (generating V2, cutting over) is a separate subsequent operation that can be scheduled independently. The migration from unversioned to versioned state is a non-breaking infrastructure change that can and should be deployed before the first rotation.
+
+**Version string format:** `'v{N}'` where N is a positive integer with no leading zeros. Maximum expected version within any 7-year audit retention window: single-digit (annual rotation schedule means ≤ 7 versions per retention cohort). No version reuse after archival.
+
+---
+
+### 58.4 Schema Migration
+
+#### 58.4.1 DDL — Add `key_version` Column
+
+```sql
+-- Migration: add key_version column to audit_log_events
+-- Safe to run on a live table; backfill is separate step below
+-- Requires: service_role or superuser; PAM elevation required (§58.7 pre-rotation checklist item 2)
+
+BEGIN;
+
+ALTER TABLE audit_log_events
+  ADD COLUMN IF NOT EXISTS key_version VARCHAR(10) NOT NULL DEFAULT 'v1';
+
+-- Add check constraint: version must match expected format
+ALTER TABLE audit_log_events
+  ADD CONSTRAINT chk_key_version_format
+  CHECK (key_version ~ '^v[1-9][0-9]*$');
+
+-- Index for efficient per-version verification queries and histogram reporting (ENC-E-020)
+CREATE INDEX IF NOT EXISTS idx_audit_log_events_key_version
+  ON audit_log_events (key_version);
+
+-- Composite index to support boundary queries (last v1 event, first v2 event)
+CREATE INDEX IF NOT EXISTS idx_audit_log_events_key_version_seq
+  ON audit_log_events (key_version, sequence_number);
+
+COMMIT;
+```
+
+#### 58.4.2 DDL — Backfill Existing Rows
+
+```sql
+-- Backfill: all pre-migration rows receive key_version = 'v1'
+-- The DEFAULT 'v1' on the column handles this for newly added rows after the ALTER TABLE,
+-- but existing rows that pre-date the column addition must be backfilled explicitly.
+-- Run immediately after 58.4.1 in the same maintenance window.
+
+-- Verify count before backfill (record in ENC-E-018 evidence):
+SELECT
+  COUNT(*) AS total_rows,
+  COUNT(*) FILTER (WHERE key_version IS NULL) AS null_key_version_rows
+FROM audit_log_events;
+-- Expected: null_key_version_rows = 0 (DEFAULT handles it in Postgres)
+-- If > 0 (edge case on some Postgres versions with NOT NULL + DEFAULT):
+
+UPDATE audit_log_events
+  SET key_version = 'v1'
+  WHERE key_version IS NULL;
+
+-- Verify backfill complete:
+SELECT key_version, COUNT(*) AS row_count
+FROM audit_log_events
+GROUP BY key_version
+ORDER BY key_version;
+-- Expected single row: key_version='v1', row_count={total_rows}
+-- Screenshot this output for ENC-E-020 (key_version histogram artefact).
+```
+
+#### 58.4.3 DEC-030 Append-Only Invariant Confirmation
+
+The `key_version` column must be protected by the same append-only invariant as all other `audit_log_events` columns. Confirm that the existing Postgres trigger or RLS policy that blocks UPDATE on `audit_log_events` also covers `key_version`:
+
+```sql
+-- Confirm no UPDATE privilege on audit_log_events for form_api role:
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_name = 'audit_log_events'
+  AND grantee = 'form_api'
+  AND privilege_type = 'UPDATE';
+-- Expected: zero rows (UPDATE must not be granted)
+
+-- Confirm INSERT privilege is present (required for new event emission):
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_name = 'audit_log_events'
+  AND grantee = 'form_api'
+  AND privilege_type = 'INSERT';
+-- Expected: one row
+```
+
+If UPDATE is present, revoke it: `REVOKE UPDATE ON audit_log_events FROM form_api;` and re-run the verification. Document in ENC-E-018.
+
+---
+
+### 58.5 Chain Verification Function Update
+
+The `audit-chain-daily-check` Worker (and the `audit-chain-verify` Edge Function) must be updated to support multi-version verification. The current implementation assumes a single global `HMAC_AUDIT_CHAIN_KEY` value. After the migration it must select the correct key per row based on `key_version`.
+
+**Pseudocode — multi-version chain verification:**
+
+```
+function verifyFullChain(events: AuditLogEvent[], keyMap: Map<string, CryptoKey>):
+  VerificationResult
+
+  // events: ordered by sequence_number ASC, full table or windowed batch
+  // keyMap: { 'v1': CryptoKeyV1, 'v2': CryptoKeyV2, ... }
+  //   loaded from Workers Secrets: HMAC_AUDIT_CHAIN_KEY_V1, HMAC_AUDIT_CHAIN_KEY_V2, etc.
+  //   keyMap must contain an entry for every key_version value present in the events array
+
+  brokenLinks = []
+  prev_chain_hash = GENESIS_HASH  // well-known constant for row 1 prev_hash input
+
+  for each event in events (ordered by sequence_number ASC):
+
+    // 1. Retrieve the signing key for this row's key_version
+    signingKey = keyMap.get(event.key_version)
+    if signingKey is undefined:
+      brokenLinks.append({
+        sequence_number: event.sequence_number,
+        reason: "UNKNOWN_KEY_VERSION",
+        key_version: event.key_version
+      })
+      continue  // do not update prev_chain_hash — treat as gap
+
+    // 2. Compute expected chain_hash using this row's key_version key
+    input = concat(
+      prev_chain_hash,          // hex string of previous row's chain_hash (or GENESIS_HASH)
+      event.event_id,           // UUID string
+      event.created_at,         // ISO-8601 UTC string, exact value stored in DB
+      event.event_type,         // string
+      sha256hex(event.payload)  // hex SHA-256 of the canonical JSON payload
+    )
+    expected_chain_hash = hmac_sha256_hex(signingKey, input)
+
+    // 3. Compare to stored chain_hash
+    if !constantTimeEqual(event.chain_hash, expected_chain_hash):
+      brokenLinks.append({
+        sequence_number: event.sequence_number,
+        event_id: event.event_id,
+        reason: "HASH_MISMATCH",
+        key_version: event.key_version,
+        stored_hash_prefix: event.chain_hash[0:16] + "...",  // prefix only, not full hash
+        expected_hash_prefix: expected_chain_hash[0:16] + "..."
+      })
+      // Still update prev_chain_hash to the stored value for next iteration,
+      // so that one broken link does not cascade false positives to all subsequent rows
+
+    prev_chain_hash = event.chain_hash  // advance regardless of mismatch
+
+  return {
+    total_checked: events.length,
+    broken_links: brokenLinks.length,
+    key_versions_encountered: distinct(events.map(e => e.key_version)),
+    details: brokenLinks  // empty array = chain intact
+  }
+```
+
+**Key loading at Worker startup (Cloudflare Workers environment):**
+
+```javascript
+// In audit-chain-daily-check Worker — env binding pattern
+// Each versioned key is a separate Workers Secret binding
+async function buildKeyMap(env) {
+  const keyMap = new Map();
+  // Load all known versions — add new entries here when a new version is created
+  const versions = ['v1', 'v2'];  // extend as rotations occur
+  for (const version of versions) {
+    const secretName = `HMAC_AUDIT_CHAIN_KEY_${version.toUpperCase()}`;
+    const rawKey = env[secretName];  // e.g., env.HMAC_AUDIT_CHAIN_KEY_V1
+    if (rawKey) {
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(rawKey),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,     // not extractable
+        ['verify'] // verification Workers only; emit Workers use ['sign']
+      );
+      keyMap.set(version, cryptoKey);
+    }
+  }
+  return keyMap;
+}
+```
+
+**Boundary-specific verification query** — to confirm the rotation boundary invariant (§58.6) is intact, the daily check emits a targeted query for any rows at a key version boundary:
+
+```sql
+-- Identify all key version boundaries (transitions between consecutive key_version values)
+SELECT
+  a.sequence_number       AS boundary_seq,
+  a.key_version           AS from_version,
+  b.sequence_number       AS next_seq,
+  b.key_version           AS to_version,
+  a.chain_hash            AS boundary_chain_hash,
+  b.chain_hash            AS post_boundary_chain_hash
+FROM audit_log_events a
+JOIN audit_log_events b
+  ON b.sequence_number = a.sequence_number + 1
+WHERE a.key_version != b.key_version
+ORDER BY a.sequence_number;
+-- Returns one row per key_version transition.
+-- Expected for a single rotation: one row (v1 → v2).
+-- The cryptographic link is verified by the pseudocode above (step 2 uses b.key_version for b's hash).
+```
+
+---
+
+### 58.6 Rotation Boundary Invariant
+
+The rotation boundary invariant is the property that makes the dual-key design cryptographically sound across key version transitions. It is a hard architectural invariant with the same status as the DEC-030 append-only invariant.
+
+**Statement of the invariant:**
+
+> The `prev_hash` input to the first event signed with key version V{N+1} is the `chain_hash` value of the last event signed with key version V{N}. The HMAC for that first V{N+1} event is computed using the V{N+1} key over inputs that include the V{N} era's final chain_hash value. This input is never re-signed — the V{N} chain_hash is used as opaque bytes, not re-verified under V{N+1}.
+
+**Why this is sufficient:**
+
+An auditor verifying the boundary performs two separate operations:
+
+1. Verify the last V{N} event's `chain_hash` using the V{N} key — confirms that the V{N} era chain is intact up to and including the boundary event.
+2. Verify the first V{N+1} event's `chain_hash` using the V{N+1} key, where the `prev_hash` input is the V{N} boundary event's `chain_hash` — confirms that the V{N+1} era starts from an authenticated handoff point.
+
+The two eras are linked without requiring the V{N+1} key to have any knowledge of the V{N} key material. An attacker who compromises V{N+1} cannot retroactively forge V{N} events (V{N} key is separately archived). An attacker who compromises V{N} cannot forge V{N+1} events without also knowing V{N+1} key material.
+
+**Concrete example at first rotation (v1 → v2):**
+
+```
+Last v1 event:
+  sequence_number = 10,000
+  key_version     = 'v1'
+  chain_hash      = "a3f8...c291"  (computed with HMAC_AUDIT_CHAIN_KEY_V1)
+
+First v2 event:
+  sequence_number = 10,001
+  key_version     = 'v2'
+  prev_hash_input = "a3f8...c291"  (the last v1 chain_hash — used as raw bytes input)
+  chain_hash      = HMAC-SHA256(
+                      HMAC_AUDIT_CHAIN_KEY_V2,
+                      "a3f8...c291" ‖ event_id_10001 ‖ created_at_10001 ‖ event_type_10001 ‖ payload_sha256_10001
+                    )
+```
+
+The boundary is self-documenting in the table: a query on `key_version` transitions (§58.5 boundary query) reveals exactly where each rotation occurred and which events are on each side.
+
+**Tamper-detection at the boundary:** If an attacker attempts to insert a forged event between sequence 10,000 and 10,001, the `prev_hash` for sequence 10,001 would change, breaking the chain_hash computation for 10,001. This is detected by the daily check. The append-only invariant prevents deletion of sequence 10,000 to cover the tampering.
+
+**The boundary `chain_hash` value becomes a compliance artefact:** The `chain_hash` of the last event in the departing key era (e.g., sequence 10,000's `a3f8...c291`) is recorded in ENC-E-019 (chain verification report across the key boundary) and in the 1Password FORM vault key archival note. This value is the cryptographic handoff proof — it links the archived V{N} key to the active V{N+1} era.
+
+---
+
+### 58.7 Rotation Runbook — Scheduled
+
+**Trigger:** Annual calendar event (PagerDuty AL-KEY-03, created from KEY_ROTATION_KV `rotation:HMAC_AUDIT_CHAIN_KEY_V{current}`) or upon security advisory affecting HMAC-SHA256 key material. First scheduled rotation also includes the one-time migration from unversioned to versioned naming (§58.3).
+
+**Authorisation:** PAM `read_write` elevation (SSO_SCIM §24.3); security-engineer + platform-engineer dual-authorise; FIDO2 WebAuthn required. This is a two-person operation — a solo engineer must not execute any rotation step.
+
+**Window budget:** 60 minutes. The chain is never unavailable during rotation — new events continue to be emitted with the current active key throughout the pre-steps. The cutover (step 5 below) is a Workers Secret swap that takes effect within 30 seconds of `wrangler secret put` propagation.
+
+#### 58.7.1 Pre-Rotation Checklist
+
+Execute and record each item as a comment on the Linear issue opened by the PagerDuty scheduled event before starting Step 1. All items are blocking unless noted.
+
+| # | Pre-condition | Verification method | Blocking? |
+|---|---|---|---|
+| 1 | No active P0 incident in progress | `#incidents` Slack channel + Linear `priority:urgent is:open` | **Yes** — reschedule |
+| 2 | PAM `read_write` elevation obtained | Slack PAM approval thread + `pam.elevation_approved` DEC-030 event in audit log | **Yes** |
+| 3 | Second engineer (platform-engineer) confirmed available and co-present | Named in rotation issue; Slack DM confirmation | **Yes** |
+| 4 | HMAC chain integrity verified — zero broken links | `audit-chain-daily-check` most recent run: 0 broken links; or run boundary query from §58.5 manually and confirm 0 rows | **Yes** — broken chain → invoke R-05 before proceeding |
+| 5 | `key_version` column exists in `audit_log_events` with zero NULL values | `SELECT COUNT(*) FROM audit_log_events WHERE key_version IS NULL` → 0 | **Yes** — run §58.4 DDL if column is absent |
+| 6 | Current active key version determined | `SELECT key_version, COUNT(*) FROM audit_log_events GROUP BY key_version ORDER BY key_version DESC LIMIT 1` — note the highest version as `{current_version}` | **Yes** |
+| 7 | New key version string computed | `{new_version}` = increment `{current_version}` by 1 (e.g., 'v1' → 'v2') | **Yes** |
+| 8 | New HMAC key material generated | 256-bit cryptographically random bytes: `openssl rand -hex 32` — store immediately to 1Password FORM vault as `HMAC_AUDIT_CHAIN_KEY_V{new_version}` | **Yes** — do not store in any other location; clear shell history after |
+| 9 | `admin.hmac_key_rotation_initiated` DEC-030 CRITICAL event emitted (hard DEC-030 invariant — must precede all rotation steps) | Via `emit-audit-event` Worker; confirm event ID in `audit_log_events`; record event ID in rotation issue | **Yes** — do not proceed without confirmed event ID |
+
+**Mandatory pre-rotation DEC-030 event (hard invariant):**
+
+```jsonc
+{
+  "event_type": "admin.hmac_key_rotation_initiated",
+  "severity": "CRITICAL",
+  "retention_years": 7,
+  "actor_user_id": "{rotating_engineer_uuid}",
+  "metadata": {
+    "key_name": "HMAC_AUDIT_CHAIN_KEY",
+    "departing_version": "{current_version}",
+    "arriving_version": "{new_version}",
+    "rotation_type": "scheduled | emergency",
+    "pam_session_id": "{pam_session_id}",
+    "second_engineer_user_id": "{platform_engineer_uuid}",
+    "reason": "annual scheduled rotation | security advisory: {advisory_id}",
+    "pre_rotation_chain_status": "intact",
+    "pre_rotation_last_sequence_number": {last_seq},
+    "estimated_window_minutes": 60
+  }
+}
+```
+
+#### 58.7.2 Step-by-Step Rotation Procedure
+
+Execute steps in exact sequence. Do not parallelise across steps 4 and 5 — the cutover must be atomic from the Workers' perspective.
+
+**Step 1 — Generate and store new key material (< 5 min)**
+
+Already completed in pre-rotation checklist item 8. Confirm 1Password FORM vault item `HMAC_AUDIT_CHAIN_KEY_V{new_version}` exists and contains 64 hex characters (32 bytes). No other storage location is permitted before Workers Secrets are set.
+
+**Step 2 — If first rotation: rename unversioned secret to V1 across all consumers (< 10 min)**
+
+Skip this step on subsequent rotations (V2 → V3 and beyond).
+
+```bash
+# Read V1 key value from 1Password (already stored there as current HMAC_AUDIT_CHAIN_KEY)
+V1_KEY=$(op item get "HMAC_AUDIT_CHAIN_KEY_V1" --vault "FORM" --field password)
+
+# Set versioned secret on all three consumers
+for worker in emit-audit-event audit-chain-daily-check; do
+  echo "$V1_KEY" | wrangler secret put HMAC_AUDIT_CHAIN_KEY_V1 --name "$worker" \
+    && echo "V1 set on $worker"
+done
+
+supabase secrets set HMAC_AUDIT_CHAIN_KEY_V1="$V1_KEY" \
+  --project-ref "{project_ref}" \
+  && echo "V1 set on audit-chain-verify Edge Function"
+
+# Remove unversioned secret (after versioned is confirmed present):
+for worker in emit-audit-event audit-chain-daily-check; do
+  wrangler secret delete HMAC_AUDIT_CHAIN_KEY --name "$worker" \
+    && echo "Unversioned secret removed from $worker"
+done
+supabase secrets unset HMAC_AUDIT_CHAIN_KEY --project-ref "{project_ref}"
+
+unset V1_KEY  # clear from shell environment
+```
+
+**Step 3 — Update chain verification function to multi-version logic (< 10 min)**
+
+Deploy the updated `audit-chain-daily-check` Worker and `audit-chain-verify` Edge Function with the multi-version pseudocode from §58.5. The updated function must list all archived key versions including V{current_version} in its `buildKeyMap` function. Until Step 4, the function still uses only V1 (or V{current}) for all rows.
+
+```bash
+# Deploy updated Workers (must include both old and new key version bindings)
+wrangler deploy --name audit-chain-daily-check
+
+# Deploy updated Edge Function
+supabase functions deploy audit-chain-verify --project-ref "{project_ref}"
+```
+
+Trigger a manual chain verification run immediately after deploy and confirm: zero broken links, all key_version values recognised.
+
+**Step 4 — Set new key Workers Secrets across all consumers (< 5 min)**
+
+```bash
+V2_KEY=$(op item get "HMAC_AUDIT_CHAIN_KEY_V{new_version}" --vault "FORM" --field password)
+
+# Set on emit-audit-event (signing consumer — will switch to this key at Step 5)
+echo "$V2_KEY" | wrangler secret put HMAC_AUDIT_CHAIN_KEY_V{new_version} --name emit-audit-event
+
+# Set on verification consumers (needed for post-cutover verification)
+echo "$V2_KEY" | wrangler secret put HMAC_AUDIT_CHAIN_KEY_V{new_version} --name audit-chain-daily-check
+
+supabase secrets set HMAC_AUDIT_CHAIN_KEY_V{new_version}="$V2_KEY" \
+  --project-ref "{project_ref}"
+
+unset V2_KEY
+```
+
+**Step 5 — Update `emit-audit-event` Worker to use new active key version (cutover, < 5 min)**
+
+This is the cutover moment. Edit the `emit-audit-event` Worker environment variable or constant that specifies the active key version (`ACTIVE_KEY_VERSION = 'v{new_version}'`). Deploy the Worker. From this moment, all new events are emitted with `key_version = 'v{new_version}'` and signed with `HMAC_AUDIT_CHAIN_KEY_V{new_version}`.
+
+```bash
+# Update ACTIVE_KEY_VERSION Workers Secret (or hardcoded constant via deploy)
+echo "v{new_version}" | wrangler secret put ACTIVE_KEY_VERSION --name emit-audit-event
+wrangler deploy --name emit-audit-event
+```
+
+**Pause 30 seconds** after deploy for Cloudflare Workers Secret propagation to all edge PoPs before emitting the next audit event.
+
+**Step 6 — Emit a test event and verify boundary (< 5 min)**
+
+Emit a low-risk DEC-030 event (the `admin.hmac_key_rotated` event from §58.10 serves this purpose) and confirm it appears in `audit_log_events` with `key_version = 'v{new_version}'`. Then run the boundary verification query from §58.5 and confirm exactly one boundary row (v{current_version} → v{new_version}). Record the boundary `chain_hash` value as the compliance handoff proof (ENC-E-019).
+
+```sql
+-- Confirm first event with new key_version exists
+SELECT sequence_number, key_version, chain_hash, event_type
+FROM audit_log_events
+WHERE key_version = 'v{new_version}'
+ORDER BY sequence_number ASC
+LIMIT 1;
+
+-- Confirm boundary row
+SELECT
+  a.sequence_number AS last_old_seq,
+  a.key_version     AS departing_version,
+  a.chain_hash      AS handoff_chain_hash,
+  b.sequence_number AS first_new_seq,
+  b.key_version     AS arriving_version
+FROM audit_log_events a
+JOIN audit_log_events b ON b.sequence_number = a.sequence_number + 1
+WHERE a.key_version = 'v{current_version}'
+  AND b.key_version = 'v{new_version}'
+LIMIT 1;
+-- Screenshot for ENC-E-019.
+```
+
+**Step 7 — Run full chain verification across boundary (< 10 min)**
+
+Trigger `audit-chain-daily-check` manually (or invoke `audit-chain-verify` Edge Function). Confirm result: zero broken links, key_versions_encountered = ['v{current_version}', 'v{new_version}']. Screenshot for ENC-E-019.
+
+**Step 8 — Emit completion and archive (< 5 min)**
+
+Emit `admin.hmac_key_rotated` CRITICAL DEC-030 event (§58.10 field schema). Then archive the departing key per §58.9. Update KEY_ROTATION_KV. Close the rotation issue.
+
+---
+
+### 58.8 Rotation Runbook — Emergency
+
+**Trigger (R-05 co-trigger):** Any of the following. Do not wait to confirm scope — rotate first, scope-assess in parallel.
+
+| Trigger | Source | Auto-detect? |
+|---|---|---|
+| `HMAC_AUDIT_CHAIN_KEY` (any version) appears in git history, log pipeline, Sentry breadcrumb, or any external channel | TruffleHog CI (§50.1); FORM-HEALTH-LEAK-001 (§47.2) | Yes — CI block + PagerDuty P0 |
+| Chain verification reports broken links that cannot be explained by a known dead-letter event | `audit-chain-daily-check` result `broken_links > 0` | Yes — PagerDuty AL-CHAIN-01 |
+| Any engineer suspects HMAC key material has been observed by an unauthorised party | Direct report to `#security` | Manual |
+| Post-mortem of an insider threat incident implicates HMAC key access | INCIDENT_RESPONSE R-20 (insider threat) | Manual at R-20 invocation |
+
+**RTO: 30 minutes from detection to new key active.**
+
+**Emergency procedure:**
+
+1. **Declare P0 incident immediately** per INCIDENT_RESPONSE R-01. Record declaration timestamp. If chain-break is the trigger, also invoke R-05. GDPR Art. 33 clock: if the trigger is suspected exposure of a key that was used to sign audit events covering Art. 9 health data activity, the 72-hour supervisory authority notification window begins at first reasonable suspicion — not at confirmed scope.
+2. **Post to `#incidents`:** *"Emergency HMAC_AUDIT_CHAIN_KEY rotation in progress. Audit log integrity verification paused during rotation window (< 30 min). Details in P0 issue #{id}."*
+3. **Elevate PAM to `destructive` tier** (SSO_SCIM §24.3): founder + security-engineer dual-authorise; FIDO2 WebAuthn required; 15-minute session.
+4. **Emit `admin.hmac_key_rotation_initiated` DEC-030 CRITICAL event** — hard invariant, must precede rotation steps even in emergency mode. Use the same payload schema as §58.7.1, with `rotation_type: "emergency"`.
+5. **Generate new key immediately:** `openssl rand -hex 32` → store to 1Password FORM vault as `HMAC_AUDIT_CHAIN_KEY_V{next_version}`. Clear shell history.
+6. **Execute Steps 4–8 of §58.7.2** at emergency pace (two-person: one on Workers console, one on CLI). Skip Step 2 (first-rotation rename) and Step 3 (verification function update) unless the function is not yet at multi-version logic — if it is not, deploy the multi-version function first (5 min), then proceed. Target total elapsed: < 25 minutes from PAM elevation to new key active.
+7. **Do not delete the suspected-compromised key** until forensic scope assessment is complete. The compromised key is quarantined (removed from all consumer Workers Secrets) but retained in 1Password FORM vault under the label `HMAC_AUDIT_CHAIN_KEY_V{compromised_version}_QUARANTINE` with a note recording the suspicion reason and incident ID. Archive per §58.9 after scope assessment closes.
+8. **Scope assessment** (parallel to steps 5–6 where possible): query `audit_log_events` for the time window during which the suspected compromise was active. Determine which events were signed with the compromised key. Assess whether an attacker with knowledge of the key material could have forged or tampered with audit events during that window without detection. Document findings in the P0 post-mortem.
+9. **Enterprise tenant notification** if scope assessment cannot rule out audit log integrity impact for any tenant. The HMAC chain is a security control, not user health data — but a broken or unverifiable audit chain is itself a security incident disclosure for enterprise tenants whose compliance posture depends on it.
+
+---
+
+### 58.9 Old Key Archival and Retention Policy
+
+**Never delete an archived HMAC key.** Deleting a key that was used to sign any row in `audit_log_events` renders those rows permanently unverifiable. This is equivalent to destroying audit evidence and constitutes a C1.1 confidential-information disposition failure. It also eliminates the ability to respond to any future forensic inquiry about the integrity of historical events.
+
+**Retention period:** 7 years from the last event signed with that key version. This aligns with the `audit_log_events` table retention period (DEC-030 §4.1) and SOC 2 audit evidence retention requirements.
+
+**Archival procedure for departing key V{N}:**
+
+| Step | Action | Location |
+|---|---|---|
+| 1 | Confirm the last `sequence_number` signed with V{N} | `SELECT MAX(sequence_number) FROM audit_log_events WHERE key_version = 'v{N}'` — record in archival note |
+| 2 | Record the boundary `chain_hash` (the last V{N} event's chain_hash) | From ENC-E-019 boundary query — this is the cryptographic handoff value |
+| 3 | Store key material in 1Password FORM vault | Item: `HMAC_AUDIT_CHAIN_KEY_V{N}_ARCHIVED` — include: key value, archival date, last_sequence_number, boundary_chain_hash, rotation_reason, incident_id (if emergency), archival_engineer |
+| 4 | Store key material in Cloudflare R2 compliance vault | Object: `r2://form-compliance-vault/hmac-keys/HMAC_AUDIT_CHAIN_KEY_V{N}.enc` — encrypted at rest by R2 (AES-256); access restricted to PAM `read_write` elevation or above |
+| 5 | Remove key from all consumer Workers Secrets (production only) | `wrangler secret delete HMAC_AUDIT_CHAIN_KEY_V{N}` for `emit-audit-event` (verification consumers retain it for chain verification) |
+| 6 | Confirm archival in DEC-030 event | `admin.hmac_key_rotation_verified` HIGH event (§58.10) — metadata includes `archived_version`, `archival_locations`, `last_sequence_signed` |
+| 7 | File ENC-E-021 (old key archival confirmation artefact) | Compliance evidence path: `compliance/evidence/enc/hmac-key-rotation-{YYYY-MM-DD}/ENC-E-021-archival-confirmation.md` |
+
+**Annual archival audit:** During each annual SOC 2 observation period, compliance-officer confirms that 1Password FORM vault contains an archival item for every key version that has ever been active. The key_version histogram (ENC-E-020) provides the list of versions to check against.
+
+**Destruction schedule:** HMAC key archival items in 1Password and R2 are scheduled for destruction 7 years after the last event signed with that key version. Destruction requires PAM `destructive` elevation + compliance-officer sign-off + a recorded `admin.hmac_key_archive_destroyed` DEC-030 HIGH event (7-year retention; the destruction record itself must outlast the destroyed material — retain in R2 as a destruction certificate).
+
+---
+
+### 58.10 DEC-030 Events
+
+Three new event types are defined in this section. All three must be registered in `docs/AUDIT_LOG_SCHEMA.md` under the `### Admin` event registry as part of checklist item 7 (§58.14).
+
+#### Event 1: `admin.hmac_key_rotation_initiated` — CRITICAL — 7-year retention
+
+Emitted before any rotation step is taken (hard DEC-030 invariant). Serves as the tamper-evident record that a rotation was planned and authorised.
+
+```jsonc
+{
+  "event_type": "admin.hmac_key_rotation_initiated",
+  "severity": "CRITICAL",
+  "retention_years": 7,
+  "actor_user_id": "{rotating_engineer_uuid}",
+  "metadata": {
+    "key_name": "HMAC_AUDIT_CHAIN_KEY",
+    "departing_version": "{current_version}",          // e.g., "v1"
+    "arriving_version": "{new_version}",               // e.g., "v2"
+    "rotation_type": "scheduled | emergency",
+    "pam_session_id": "{pam_session_id}",
+    "second_engineer_user_id": "{platform_engineer_uuid}",
+    "reason": "annual scheduled rotation | security advisory: {id} | suspected compromise",
+    "pre_rotation_chain_status": "intact | broken_links_detected",
+    "pre_rotation_last_sequence_number": {integer},    // last sequence_number at initiation time
+    "estimated_window_minutes": 60                     // 30 for emergency
+  }
+}
+```
+
+#### Event 2: `admin.hmac_key_rotated` — CRITICAL — 7-year retention
+
+Emitted after the new key is active and the boundary is confirmed in `audit_log_events`. This event is itself signed with the new key version, making it the first production use of V{N+1} that is permanently recorded.
+
+```jsonc
+{
+  "event_type": "admin.hmac_key_rotated",
+  "severity": "CRITICAL",
+  "retention_years": 7,
+  "actor_user_id": "{rotating_engineer_uuid}",
+  "metadata": {
+    "key_name": "HMAC_AUDIT_CHAIN_KEY",
+    "departed_version": "{old_version}",
+    "active_version": "{new_version}",
+    "rotation_type": "scheduled | emergency",
+    "pam_session_id": "{pam_session_id}",
+    "second_engineer_user_id": "{platform_engineer_uuid}",
+    "boundary_last_sequence_old_era": {integer},       // last sequence_number with departed_version
+    "boundary_first_sequence_new_era": {integer},      // first sequence_number with active_version
+    "boundary_handoff_chain_hash_prefix": "{first_16_chars_of_handoff_hash}",
+                                                       // prefix only; full value in ENC-E-019
+    "consumers_updated": [
+      "emit-audit-event:cf-workers-secret",
+      "audit-chain-daily-check:cf-workers-secret",
+      "audit-chain-verify:supabase-vault"
+    ],
+    "chain_intact_post_rotation": true,
+    "next_rotation_due_iso": "{approximately_one_year_from_now_iso8601}"
+  }
+}
+```
+
+**Privacy invariant:** The HMAC key value must never appear in any DEC-030 event payload, Linear ticket, Slack message, or evidence artefact. The `boundary_handoff_chain_hash_prefix` field stores only the first 16 characters of the handoff chain_hash — sufficient to cross-reference with ENC-E-019 without exposing the full value (which, while not a secret, is an integrity-critical value that should be controlled).
+
+#### Event 3: `admin.hmac_key_rotation_verified` — HIGH — 7-year retention
+
+Emitted after the full chain verification run (Step 7) confirms zero broken links across the key boundary and old key archival is confirmed. This event closes the rotation record.
+
+```jsonc
+{
+  "event_type": "admin.hmac_key_rotation_verified",
+  "severity": "HIGH",
+  "retention_years": 7,
+  "actor_user_id": "{rotating_engineer_uuid}",
+  "metadata": {
+    "key_name": "HMAC_AUDIT_CHAIN_KEY",
+    "active_version": "{new_version}",
+    "archived_version": "{old_version}",
+    "verification_run_id": "{daily_check_run_id_or_manual_invocation_id}",
+    "total_events_verified": {integer},
+    "broken_links_found": 0,                           // must be 0; if > 0, do not emit this event
+    "key_versions_verified": ["{old_version}", "{new_version}"],
+    "archival_locations": [
+      "1password:FORM/HMAC_AUDIT_CHAIN_KEY_V{N}_ARCHIVED",
+      "r2://form-compliance-vault/hmac-keys/HMAC_AUDIT_CHAIN_KEY_V{N}.enc"
+    ],
+    "last_sequence_signed_with_archived_key": {integer},
+    "evidence_artefacts_filed": ["ENC-E-018", "ENC-E-019", "ENC-E-020", "ENC-E-021", "ENC-E-022"],
+    "linear_issue_id": "{rotation_issue_id}"
+  }
+}
+```
+
+---
+
+### 58.11 Evidence Artefacts
+
+| Artefact ID | Description | Collection method | Filed by | Cadence |
+|---|---|---|---|---|
+| **ENC-E-018** | DDL migration log — `key_version` column addition and backfill confirmation | Postgres `\d audit_log_events` schema output showing `key_version VARCHAR(10) NOT NULL DEFAULT 'v1'` + backfill verification query output (`SELECT key_version, COUNT(*) FROM audit_log_events GROUP BY key_version` showing 100% v1 pre-rotation) + UPDATE privilege revocation confirmation query | platform-engineer | Once (at migration execution) |
+| **ENC-E-019** | Chain verification report across key boundary — confirms rotation boundary invariant is satisfied | Boundary query output from §58.5 showing `departing_version`, `arriving_version`, `handoff_chain_hash` (full value); `audit-chain-daily-check` run result showing `broken_links: 0` and `key_versions_encountered: ['{old}', '{new}']`; timestamp of verification run | security-engineer | Per rotation |
+| **ENC-E-020** | `key_version` histogram — distribution of events across all key versions at observation period close | `SELECT key_version, COUNT(*) AS event_count, MIN(sequence_number) AS first_seq, MAX(sequence_number) AS last_seq FROM audit_log_events GROUP BY key_version ORDER BY key_version` — provides auditor visibility into all key eras represented in the audit log | compliance-officer | Annual (per observation period) |
+| **ENC-E-021** | Old key archival confirmation — 1Password and R2 archival confirmed for all retired key versions | Screenshot of 1Password FORM vault showing `HMAC_AUDIT_CHAIN_KEY_V{N}_ARCHIVED` item(s) with creation timestamp; `wrangler r2 object list form-compliance-vault --prefix=hmac-keys/` output showing archived key objects with ETags and last-modified timestamps | security-engineer | Per rotation |
+| **ENC-E-022** | DEC-030 event confirmation — all three new event types emitted and present in `audit_log_events` | `SELECT event_type, severity, created_at, metadata->>'active_version' AS active_version FROM audit_log_events WHERE event_type IN ('admin.hmac_key_rotation_initiated', 'admin.hmac_key_rotated', 'admin.hmac_key_rotation_verified') ORDER BY created_at DESC LIMIT 6` — confirms all three events are present and HMAC-chained | compliance-officer | Per rotation |
+
+**Evidence storage path:** `compliance/evidence/enc/hmac-key-rotation-{YYYY-MM-DD}/` in the private compliance repository. All five artefacts must be present before the rotation Linear issue is closed. ENC-E-020 is filed annually at observation period close regardless of whether a rotation occurred that period.
+
+**Auditor note on key material non-disclosure:** No evidence artefact may contain the actual HMAC key value — only metadata (archival timestamps, 1Password item names, R2 object paths, last sequence numbers, and the `boundary_handoff_chain_hash` as a cross-reference). The key value itself is accessible to auditors only under a formal key escrow disclosure process (PAM `destructive` elevation + compliance-officer sign-off + legal counsel notification) — an access event that itself generates a DEC-030 CRITICAL event.
+
+---
+
+### 58.12 SOC 2 Mapping
+
+| Criterion | Control | Evidence artefacts |
+|---|---|---|
+| **CC6.7** — Transmission and disclosure confidentiality | Annual HMAC key rotation limits the window of exposure for any compromised key. An attacker who obtains key material can verify (but not forge undetected) historical chain signatures only for the era covered by that version. The dual-key design ensures that rotation does not create an irrecoverable break in audit evidence — historical verification remains possible for the full 7-year retention period using archived keys. | ENC-E-019 (boundary integrity report); ENC-E-022 (rotation event log confirming cadence) |
+| **CC6.8** — Software protection against unauthorised access | The `key_version` column and multi-version verification function ensure that chain integrity can be continuously verified across all key eras without requiring the active signing key to have access to historical key material. The append-only invariant (DEC-030) and `form_api` role UPDATE revocation prevent any authenticated user from altering `key_version` retroactively. Two-person authorisation requirement for all rotation steps prevents a single insider from unilaterally rotating the key to discard historical chain integrity. | ENC-E-018 (DDL + privilege confirmation); ENC-E-021 (archival confirmation — no uncontrolled copies) |
+| **C1.1** — Confidential information commitments | The HMAC audit chain is FORM's primary control for detecting unauthorised access to or tampering with Art. 9 health data audit records. A key that cannot be rotated is a key whose compromise permanently and retroactively invalidates that control. The dual-key design restores the ability to rotate while maintaining full historical verifiability — closing the architectural gap that previously made rotation impossible without destroying evidence. | ENC-E-018 (key_version backfill confirms 100% coverage of historical events); ENC-E-019 (boundary verification confirms chain continuity across rotation); ENC-E-020 (histogram provides auditor visibility into all key eras) |
+| **CC7.2** — Monitoring for environmental threats | The `audit-chain-daily-check` Worker provides continuous automated monitoring of chain integrity. The multi-version update (§58.5) extends this monitoring to cover all key eras, not only the current one. A compromised historical key that was used to forge historical events would be detected by the daily check when the forged event's computed chain_hash (using the archived key) does not match the stored value downstream. The AL-KEY-03 reminder (annual, 14 days out) and AL-CHAIN-01 alert (broken links detected) provide coverage for both rotation cadence and runtime integrity. | ENC-E-022 (DEC-030 events confirm monitoring is active and producing verified results); ENC-E-019 (boundary verification result confirms monitoring covers the transition point) |
+
+---
+
+### 58.13 Gap and OQ Status Updates
+
+| Gap / OQ | Status before §58 | Status after §58 | Closes when |
+|---|---|---|---|
+| **ENC-GAP-002** — HMAC key rotation blocked pending dual-key verification implementation | 🔴 MEDIUM | 🟡 **Authored** | 🟢 DDL migration executed + chain verification function deployed at multi-version logic + first rotation completed + ENC-E-018 through ENC-E-022 filed |
+| **OQ-ENC-02** — `HMAC_AUDIT_CHAIN_KEY` dual-key verification design | Open (P1, M7) | ✅ **Closed** | §58 IS the full design. No remaining open questions on architecture. Operational cadence (annual rotation schedule) becomes the new steady state. |
+
+**§56 and §57 cross-references:**
+
+- §56.3 key inventory: update the `HMAC_AUDIT_CHAIN_KEY` row — rotation schedule advances from "Blocked — OQ-ENC-02" to "Annual (post-§58 implementation)"; storage column advances to note versioned naming convention `HMAC_AUDIT_CHAIN_KEY_V{N}`.
+- §57.6 dead-letter note: the `audit-chain-rehydration` pg_cron job referenced there as an OQ-ENC-02 M7 dependency is superseded by the full design in §58. Dead-letter events during any future rotation window are handled by the `audit-chain-daily-check` Worker's existing retry logic — no separate rehydration job is required once the multi-version verification function is deployed.
+- §51 Consolidated Gap Register: ENC-GAP-002 🔴 → 🟡 immediately (this section); → 🟢 upon first rotation execution + evidence filing at M9 target.
+
+---
+
+### 58.14 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Execute §58.4 DDL migration in production: add `key_version VARCHAR(10) NOT NULL DEFAULT 'v1'` column + constraint + indexes + backfill verification + UPDATE privilege revocation confirmation. File ENC-E-018. | platform-engineer | **P0** | M7 |
+| 2 | Deploy updated `audit-chain-daily-check` Worker and `audit-chain-verify` Edge Function with multi-version chain verification logic (§58.5 pseudocode). Trigger manual verification run; confirm zero broken links and `key_versions_encountered: ['v1']`. | platform-engineer | **P0** | M7 (immediately after item 1) |
+| 3 | Generate V1 key material archival: read current `HMAC_AUDIT_CHAIN_KEY` from 1Password; store as `HMAC_AUDIT_CHAIN_KEY_V1` in 1Password FORM vault and R2 compliance vault (`r2://form-compliance-vault/hmac-keys/HMAC_AUDIT_CHAIN_KEY_V1.enc`). File ENC-E-021 for V1. | security-engineer | **P0** | M7 (same window as items 1–2) |
+| 4 | Rename Workers Secret from `HMAC_AUDIT_CHAIN_KEY` to `HMAC_AUDIT_CHAIN_KEY_V1` across all three consumers (`emit-audit-event`, `audit-chain-daily-check`, Supabase Edge Function `audit-chain-verify`). Confirm each consumer returns healthy after rename. | platform-engineer | **P0** | M7 (same window; §58.7.2 Step 2) |
+| 5 | Execute first scheduled rotation (V1 → V2): generate V2 key material, set Workers Secrets, cut over `emit-audit-event` to `ACTIVE_KEY_VERSION = 'v2'`, verify boundary per §58.5, emit all three DEC-030 events (§58.10), archive V1 per §58.9. File ENC-E-019, ENC-E-020, ENC-E-022. | security-engineer + platform-engineer | **P0** | M9 (annual rotation; may be accelerated if security advisory) |
+| 6 | File all five evidence artefacts (ENC-E-018 through ENC-E-022) to `compliance/evidence/enc/hmac-key-rotation-{YYYY-MM-DD}/` in the compliance repository. Close the Linear rotation issue only after all five are confirmed present. | compliance-officer | **P0** | M9 (after item 5) |
+| 7 | Register all three new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` under `### Admin` event registry: `admin.hmac_key_rotation_initiated` (CRITICAL, 7yr), `admin.hmac_key_rotated` (CRITICAL, 7yr), `admin.hmac_key_rotation_verified` (HIGH, 7yr). | compliance-officer | **P1** | M7 |
+| 8 | Update §51 Consolidated Gap Register: ENC-GAP-002 🔴 → 🟡 Authored (immediately on §58 merge); → 🟢 after items 1–6 complete. Update §56.3 key inventory row for `HMAC_AUDIT_CHAIN_KEY` to reflect versioned naming and annual rotation schedule. | compliance-officer | **P1** | M7 (🟡); M9 (🟢) |
+| 9 | Conduct annual rotation tabletop with security-engineer + platform-engineer: execute dry-run against staging using §58.7 runbook; time against 60-minute budget; simulate emergency scenario against 30-minute RTO; document gaps. | security-engineer | **P1** | M8 (before first production rotation at M9) |
+| 10 | Add `rotation:HMAC_AUDIT_CHAIN_KEY` record to `KEY_ROTATION_KV` namespace (from §57.7): `last_rotated_at` = date of first rotation (item 5), `rotation_period_days: 365`, `next_rotation_due` = one year from item 5 date. Configure AL-KEY-03 PagerDuty alert (P2, 14 days before due; P1, 3 days before due) and register in `docs/OBSERVABILITY.md §6` under `key_rotation_health`. | platform-engineer | **P2** | M9 (after item 5) |
+
+---
+
+### 58.15 Open Questions
+
+| OQ | Status |
+|---|---|
+| **OQ-ENC-02** | ✅ **Closed.** §58 is the complete dual-key design specification, rotation runbook (scheduled and emergency), schema migration, verification function architecture, boundary invariant, archival policy, DEC-030 event definitions, and evidence artefact set. No remaining architectural questions. |
+
+**Ongoing operational cadence (new steady state):**
+
+OQ-ENC-02 is closed as a design question. What remains is operational execution: the annual rotation schedule (target: M9 for first rotation, then annually thereafter on the anniversary of the previous rotation date) becomes a standing operational item tracked via KEY_ROTATION_KV and AL-KEY-03. The rotation runbook (§58.7) is the definitive procedure for all future scheduled rotations. The emergency runbook (§58.8) applies to any R-05 co-trigger event. No further architectural specification is required unless a future decision changes the underlying HMAC algorithm (currently HMAC-SHA256) or the audit log storage architecture.
+
+**Post-implementation review:** After the first production rotation (M9, checklist item 5) is complete and all five evidence artefacts are filed, compliance-officer reviews this section and marks ENC-GAP-002 🟢 in the §51 Consolidated Gap Register. That review is the final closure gate for OQ-ENC-02.
+
+---
+
+*v3.0 (2026-06-02): §58 HMAC Audit Chain Key (`HMAC_AUDIT_CHAIN_KEY`) Rotation Runbook — Dual-Key Migration Design · CC6.7/CC6.8/C1.1/DEC-030 Chain Integrity. Fully closes OQ-ENC-02 (P1, M7 — HMAC_AUDIT_CHAIN_KEY dual-key verification design; §58 IS the complete specification). Closes ENC-GAP-002 (🔴 MEDIUM → 🟡 Authored; 🟢 upon DDL migration execution + chain verification function deployed + first rotation executed + ENC-E-018 through ENC-E-022 filed at M9). Core problem: naive HMAC key rotation breaks historical chain verification because old chain_hash values are irreversible HMAC commitments under the old key; re-signing constitutes tampering and violates the DEC-030 append-only invariant (DEC-030 hard invariant — no UPDATE, no DELETE). Dual-key design: four-component solution — (1) `key_version VARCHAR(10) NOT NULL DEFAULT 'v1'` column on `audit_log_events` with backfill; (2) versioned Workers Secret naming convention `HMAC_AUDIT_CHAIN_KEY_V{N}`; (3) multi-version chain verification function that selects correct key per row based on key_version; (4) rotation boundary invariant — last V{N} chain_hash becomes prev_hash input for first V{N+1} event, cryptographically linking eras without re-signing. Rotation boundary invariant: HMAC-SHA256(V{N+1} key, V{N} handoff_chain_hash ‖ event_id ‖ created_at ‖ event_type ‖ payload_sha256) — old era verified with archived V{N} key, new era verified with V{N+1} key, boundary proves continuity without key material overlap. Migration from current state: one-time rename of unversioned `HMAC_AUDIT_CHAIN_KEY` → `HMAC_AUDIT_CHAIN_KEY_V1` across all three consumers (emit-audit-event, audit-chain-daily-check, audit-chain-verify Edge Function); this is a non-breaking rename — no chain hashes change. Key archival policy: never delete; archived key versions retained in 1Password FORM vault + R2 `form-compliance-vault/hmac-keys/` for 7 years from last event signed; destruction only after 7 years with PAM destructive + compliance-officer + legal; destruction certificate event retained 7 years. Three new DEC-030 events (all 7-year retention): admin.hmac_key_rotation_initiated (CRITICAL — hard invariant, must precede all rotation steps; departing_version, arriving_version, pre_rotation_last_sequence_number fields), admin.hmac_key_rotated (CRITICAL — signed with new key, making it the first permanent V{N+1} production record; boundary_last_sequence_old_era, boundary_first_sequence_new_era, boundary_handoff_chain_hash_prefix fields), admin.hmac_key_rotation_verified (HIGH — emitted after full chain verification confirms zero broken links and archival confirmed; archival_locations[], key_versions_verified[] fields). Two rotation runbooks: Scheduled (annual, PAM read_write, 2-person auth security-engineer + platform-engineer, 60-minute window, 8-step procedure including pre-rotation checklist with 9 blocking items); Emergency (R-05 co-trigger — suspected key exposure or broken links, PAM destructive, 2-person founder + security-engineer, 30-minute RTO, quarantine before deletion). Five evidence artefacts ENC-E-018 through ENC-E-022: DDL migration log + UPDATE privilege revocation (ENC-E-018), chain verification report across key boundary with handoff_chain_hash (ENC-E-019), key_version histogram for full audit log (ENC-E-020), old key archival confirmation in 1Password + R2 (ENC-E-021), DEC-030 three-event confirmation query (ENC-E-022). SOC 2 mapping: CC6.7 (annual rotation limits exposure window; dual-key preserves 7-year historical verifiability), CC6.8 (key_version append-only + form_api UPDATE revocation + 2-person auth prevent insider unilateral rotation), C1.1 (dual-key design restores rotatability of primary audit integrity control without destroying historical evidence), CC7.2 (multi-version daily check covers all eras; AL-CHAIN-01 on broken links; AL-KEY-03 on rotation cadence). 10-item checklist: 6× P0 (DDL migration M7, multi-version verification function deploy M7, V1 archival M7, Workers Secret rename M7, first production rotation V1→V2 M9, evidence filing M9), 3× P1 (AUDIT_LOG_SCHEMA event registry M7, §51 + §56 gap register updates M7/M9, tabletop M8), 1× P2 (KEY_ROTATION_KV annual rotation record + AL-KEY-03 PagerDuty alert M9). References: §56 (key inventory — HMAC_AUDIT_CHAIN_KEY row to be updated); §57.6 (confirmed service_role rotation chain-safe; HMAC chain key confirmed as the separate risk vector fully addressed here); INCIDENT_RESPONSE R-05 (HMAC chain break), R-20 (insider threat), R-01 (P0 incident declaration).*

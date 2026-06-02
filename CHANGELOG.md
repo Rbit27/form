@@ -6,6 +6,13 @@
 
 ---
 
+## [1.71.0] — 2026-06-02
+
+### Added
+- `docs/SOC2_READINESS.md §58` — HMAC Audit Chain Key (`HMAC_AUDIT_CHAIN_KEY`) Rotation Runbook — Dual-Key Migration Design · CC6.7/CC6.8/C1.1/DEC-030 Chain Integrity. **Fully closes OQ-ENC-02** (P1, M7 — §58 IS the complete dual-key design and rotation runbook). **Closes ENC-GAP-002** (🔴 MEDIUM → 🟡 Authored; 🟢 upon DDL migration + chain verification function deploy + first rotation + ENC-E-018 through ENC-E-022 filed, M9). Core problem: naive HMAC key rotation breaks historical chain verification — old chain_hash values are irreversible HMAC commitments under old key; re-signing violates DEC-030 append-only invariant. Dual-key design: (1) `key_version VARCHAR(10) NOT NULL DEFAULT 'v1'` column with backfill on `audit_log_events`; (2) versioned Workers Secret naming convention `HMAC_AUDIT_CHAIN_KEY_V{N}`; (3) multi-version verification function selecting correct key per row; (4) rotation boundary invariant — last V{N} chain_hash becomes prev_hash input for first V{N+1} event, linking eras cryptographically without re-signing. Migration: one-time non-breaking rename of current `HMAC_AUDIT_CHAIN_KEY` → `HMAC_AUDIT_CHAIN_KEY_V1`. Key archival: never delete; 7-year retention in 1Password FORM vault + R2 compliance vault; destruction only after 7yr with PAM destructive + 2-person auth + destruction certificate. Three new DEC-030 events (all CRITICAL/HIGH, 7yr): `admin.hmac_key_rotation_initiated` (CRITICAL — hard invariant precondition), `admin.hmac_key_rotated` (CRITICAL — first V{N+1} production event, signed by new key), `admin.hmac_key_rotation_verified` (HIGH — full chain verification passed across all eras). Scheduled runbook: annual, PAM read_write, 2-person (security-engineer + platform-engineer), 60-min window, 8-step procedure. Emergency runbook: R-05 co-trigger, PAM destructive, 2-person (founder + security-engineer), 30-min RTO. Evidence: ENC-E-018 (DDL migration log), ENC-E-019 (chain verification report + boundary handoff_chain_hash), ENC-E-020 (key_version histogram), ENC-E-021 (old key archival confirmation), ENC-E-022 (DEC-030 event confirmation). SOC 2: CC6.7/CC6.8/C1.1/CC7.2. 10-item checklist: 6× P0, 3× P1, 1× P2. SOC 2 doc v2.9 → v3.0. Owner: security-engineer + platform-engineer + compliance-officer.
+
+---
+
 ## [1.70.0] — 2026-06-02
 
 ### Added
