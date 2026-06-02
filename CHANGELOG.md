@@ -6,6 +6,13 @@
 
 ---
 
+## [1.65.0] — 2026-06-02
+
+### Added
+- `docs/SOC2_READINESS.md §55` — Security Awareness Training & Phishing Simulation Programme · CC1.4/CC2.1/CC1.1/A1.1 Auditor Exhibit. Closes four documented gaps: **CC1-GAP-001** (🔴→🟢 — annual all-hands training with eight modules + quarterly phishing simulation + DEC-030 completion events), **CC1-GAP-002** (🔴→🟢 — §55.5 four-tier data classification with decision tree + SAT-E-006 sign-off attestation), **C1-GAP-001** (🟡→🟢 — §55.5 handling rules + violation protocol + DEC-030 HIGH event on breach), **CC2-GAP-001** (🟡→🟢 — attested completion CSV as formal policy communication evidence). Eight training modules (M-01 Threat Landscape through M-08 Third-Party Risk; 90–120 min all-hands; 80%/90% pass threshold; 28 Feb annual deadline; Cloudflare Access revoked for non-completions at day 29). Role-based deep-dives: Engineering (E-01 RLS isolation, E-02 DEC-030 chain, E-03 secrets management, E-04 supply chain, E-05 Art. 9 secure coding), Compliance (C-01 SOC 2 evidence cadence, C-02 GDPR Art. 33/34 clock, C-03 DSAR pipeline), Customer-Facing (CF-01 enterprise incident comms, CF-02 social engineering, CF-03 Victor safety). Four-wave quarterly phishing simulation (Wave 1 generic, Wave 2 spear-phish, Wave 3 executive impersonation, Wave 4 vendor impersonation); 20% click rate threshold triggers curriculum review; pseudonymous DEC-030 event on click (role not name). Data classification §55.5: four tiers (Tier 1 Restricted Art. 9 / Tier 2 Confidential Business / Tier 3 Internal / Tier 4 Public) with decision tree and handling violation protocol. Production access gate: training before credentials — not within 30 days, before. Eight DEC-030 events (2× HIGH 3yr, 4× STANDARD 1yr, 2× LOW 30d). Evidence package SAT-E-001 through SAT-E-006. Three open questions (OQ-SAT-01 KnowBe4 platform P1, OQ-SAT-02 phishing PII stripping P1, OQ-SAT-03 M-07 clinical-safety gate P1). Twelve-item checklist (3× P0, 8× P1, 1× P2). SOC 2 doc v2.6 → v2.7. Owner: compliance-officer + security-engineer.
+
+---
+
 ## [1.64.0] — 2026-06-02
 
 ### Added

@@ -17290,3 +17290,278 @@ The following artefacts must be produced and filed in the R2 evidence bucket `fo
 ---
 
 *v2.6 additions (2026-06-02): §54 Software Composition Analysis (SCA) & Open-Source Supply Chain Security. Closes three documented gaps: PEN-GAP-002 SCA component (🟡 Partial → 🟢 Done — Snyk test CI gate + snyk monitor on main), CC6-GAP-005 (🟡 Partial → 🟢 Done — npm audit --audit-level=critical CI gate + .github/dependabot.yml config), PRE-13 (🟡 Partial → 🟢 Done — dependency scanning running as required CI status check). SR-04 (supply chain attack) risk register residual reduced from MEDIUM (5) to LOW (2). Three-layer SCA defence: Layer 1 Dependabot (continuous alerting + weekly auto-PRs for dependencies/devDependencies), Layer 2 npm audit (CI hard gate — block merge on critical CVE), Layer 3 Snyk (deep SCA + licence compliance + reachability analysis — block merge on high+ CVE with available fix). TSC coverage: CC6.8 (prevent malicious software), CC7.1 (vulnerability identification), CC9.2 (third-party code as vendor risk), CC8.1 (SCA as change management gate). Vulnerability remediation SLA aligned to §41: Critical 24h (CI block + DEC-030 CRITICAL event + PagerDuty page), High 7 days (Snyk CI block + Linear ticket), Medium 30 days, Low 90 days. Formal risk acceptance procedure for unresolvable vulnerabilities: compliance-officer sign-off + DEC-030 HIGH event + 30-day maximum acceptance window. SBOM programme: CycloneDX JSON v1.5 generated on every merge to main via @cyclonedx/cyclonedx-npm, stored in R2 form-production/sbom/, 24-month rolling retention + 7-year evidence copy; enterprise distribution via time-limited R2 signed URL with DEC-030 security.sbom_distributed event. Licence compliance: four-tier classification (Permitted/Register+Review/Prohibited-legal-review/Prohibited-absolute); Snyk licence policy blocks CI on GPL/AGPL/SSPL; license-checker quarterly audit CSV filed to evidence store. Eight DEC-030 HMAC-chained event types (CRITICAL/HIGH/STANDARD/LOW): security.sca_critical_vulnerability_detected, security.sca_high_vulnerability_detected, security.vulnerability_risk_accepted, security.sbom_generated, security.sbom_distributed, security.licence_violation_detected, security.sca_scan_failed, security.dependency_pr_created. Alert FORM-SCA-001: 15-minute Edge Function check on open critical CVE events > 24h → PagerDuty P1. Evidence package PRE-54-E-001 through PRE-54-E-005. 14-item implementation checklist (7× P0, 5× P1, 2× P2). Document header updated from v2.5 to v2.6. Owner: security-engineer + devops-lead + compliance-officer.*
+
+---
+
+## 55. Security Awareness Training & Phishing Simulation Programme — CC1.4/CC2.1/CC1.1/A1.1 Auditor Exhibit
+
+### 55.1 Purpose
+
+This section documents FORM's Security Awareness Training and Phishing Simulation Programme, constituting the formal control response to SOC 2 TSC criterion CC1.4 (commitment to competence through personnel security awareness), CC2.1 (internal communication of policies and responsibilities), CC1.1 (management's integrity and ethical values communicated through training), and A1.1 (capacity monitoring extended to human-factor risks).
+
+A health data company whose core product processes GDPR Art. 9 special-category data (health profiles, coaching turns, biometric CV estimates) bears an elevated human-vector risk. Social engineering, phishing, and credential stuffing attacks targeting team members with BYPASSRLS access or Cloudflare Access admin roles represent a higher residual risk than the same attacks against a company without Art. 9 data. This programme operationalises that risk into measurable, auditor-verifiable controls.
+
+**Programme objectives:**
+1. Ensure every team member with access to production systems can identify phishing, social engineering, and credential theft attempts
+2. Ensure engineers understand secure coding obligations for Art. 9 data and DEC-030 HMAC chain integrity
+3. Maintain completion tracking as continuous SOC 2 evidence without manual overhead
+4. Close the open gap **CC1-GAP-001** (security awareness training programme not yet formalised)
+
+**Programme components:**
+- Annual all-hands security awareness training (all personnel)
+- Role-based deep-dive training (engineers, compliance-officer, customer-success)
+- Quarterly phishing simulation (all personnel with email access to FORM systems)
+- Victor AI safety awareness module (all customer-facing and product roles)
+- Onboarding training gate (no production access until training completed)
+
+---
+
+### 55.2 Training Roles and Scope
+
+| Role Category | People In Scope | Training Tracks Required |
+|---|---|---|
+| Engineering | platform-engineer, devops-lead, ml-engineer, security-engineer, data-engineer | Annual All-Hands + Engineering Deep-Dive + Quarterly Phishing Sim |
+| Product & Design | product-manager, product-strategist, ux-flow, design-craft | Annual All-Hands + Quarterly Phishing Sim |
+| Clinical & Content | clinical-safety, sports-scientist, nutrition-coach, brand-voice, content-strategist | Annual All-Hands + Victor Safety Module + Quarterly Phishing Sim |
+| Compliance & Legal | compliance-officer | Annual All-Hands + Compliance Deep-Dive + Quarterly Phishing Sim |
+| Customer-Facing | customer-success, marketing-lead, growth-lead, research-lead | Annual All-Hands + Customer-Facing Module + Quarterly Phishing Sim |
+| Contractors / Vendors | Any contractor with access to GitHub org, Supabase, Cloudflare, or Sentry | Annual All-Hands (abridged) + Phishing Sim (if email access) |
+| Founder | Founder | All tracks + incident command training (§R-18 PITR approval) |
+
+**Production access gate:** No team member or contractor receives production credentials (Cloudflare Access, Neon Postgres, GitHub `main` branch write) until they have completed the Annual All-Hands training and the relevant role-based track. Completion is attested in `compliance/evidence/training/YYYY/completions.csv` before credentials are issued.
+
+---
+
+### 55.3 Annual All-Hands Security Awareness Training
+
+#### 55.3.1 Curriculum
+
+The annual training covers eight modules delivered as an async self-paced course (video + quiz format). Total time commitment: 90–120 minutes.
+
+| Module | Topics | Audience | Passing Score |
+|---|---|---|---|
+| **M-01: Threat Landscape** | Current attack vectors relevant to health data SaaS; FORM-specific threat model overview (social engineering, credential stuffing, supply chain, AI prompt injection); recent public health data breaches (anonymised case studies) | All | 80% |
+| **M-02: Phishing & Social Engineering** | Identifying phishing emails, spear-phishing, pretexting, vishing; FORM's no-out-of-band-credential-sharing policy; how to report suspicious communications; the "call back on a known number" rule for vendor identity verification | All | 80% |
+| **M-03: Password & Credential Hygiene** | 1Password as the required credential manager; TOTP requirement for all admin systems; passphrase standards; credential sharing prohibition; emergency credential sharing procedure (via 1Password Emergency Kit only) | All | 80% |
+| **M-04: Data Handling & Art. 9 Obligations** | What is GDPR Art. 9 special-category data; FORM's data classification tiers (§55.5); never-email/Slack rule for Art. 9 data; DEC-030 audit log purpose explained in plain language; what the HMAC chain is and why tampering is detectable | All | 80% |
+| **M-05: Incident Reporting** | How to report a suspected security incident to security-engineer and compliance-officer; the "if in doubt, report" principle; no-blame policy for reporting; legal obligation to report law enforcement contact to founder immediately (R-13); DEC-030 events are not modifiable post-emission | All | 80% |
+| **M-06: Physical & Remote Work Security** | Screen lock policy (< 5 min idle); unsecured Wi-Fi policy (always VPN or Cloudflare WARP); physical device loss reporting procedure (R-03 cross-reference); clear-desk policy for documents containing Art. 9 data | All | 80% |
+| **M-07: AI Safety & Victor Prompt Hygiene** | What Victor is and the clinical-safety gate; prompt injection vectors and why they trigger R-10; the no-jailbreak policy for AI systems FORM deploys; obligations when encountering ED-adjacent or self-harm content in Victor outputs | Product, Clinical, Customer-facing | 90% |
+| **M-08: Third-Party & Vendor Risk** | Sub-processor obligations; how to request a new vendor or tool (security-engineer approval gate); why unauthorised SaaS use (shadow IT) with Art. 9 data is a breach; the DPA signing requirement before data transfer | All | 80% |
+
+#### 55.3.2 Delivery Platform
+
+**Platform:** KnowBe4 (enterprise tier) or equivalent LMS with SCORM-compatible module hosting, completion tracking, and quiz scoring.
+
+**Alternative for pre-scale:** Until a dedicated LMS is procured (target: M5), training is delivered via Notion-hosted content with completion attested via a signed Google Form submission archived at `compliance/evidence/training/YYYY/completions.csv`. The Google Form includes a declaratory statement: *"I confirm I have read and understood all modules and passed the associated quiz with a score of at least 80% (M-07: 90%)."*
+
+**Completion deadline:** Annual training opens on 1 January and must be completed by 28 February. Escalation path: compliance-officer sends reminder at day 7, day 21; after day 28, devops-lead revokes Cloudflare Access for incomplete team members until training is completed.
+
+**New hire gate:** New hires complete the training before production access is granted — not within 30 days, before access. Onboarding checklist in `docs/HIRING_GUIDE.md` includes training completion as a prerequisite step.
+
+#### 55.3.3 Annual Training Calendar
+
+| Quarter | Activity | Owner | Evidence Artefact |
+|---|---|---|---|
+| Q1 (Jan–Feb) | Annual all-hands training delivery; completion tracking; Cloudflare Access revocation for non-completions at day 28 | compliance-officer | SAT-E-001 (completion CSV) |
+| Q2 (Apr) | Phishing simulation wave 2 (Q2); failure rate analysis; targeted retraining for failures | security-engineer | SAT-E-003 (phishing wave report) |
+| Q3 (Jul) | Mid-year curriculum review: any new threats, new team members, new data categories | compliance-officer | Internal review memo |
+| Q4 (Oct) | Phishing simulation wave 4 (Q4); annual curriculum refresh for next year | security-engineer | SAT-E-003 (Q4 wave report) |
+
+---
+
+### 55.4 Role-Based Deep-Dive Training
+
+#### 55.4.1 Engineering Deep-Dive (platform-engineer, devops-lead, ml-engineer, security-engineer, data-engineer)
+
+Delivered annually within 30 days of the All-Hands completion deadline. Total time: 60–90 minutes.
+
+| Module | Topics |
+|---|---|
+| **E-01: RLS & Multi-Tenant Data Isolation** | Why BYPASSRLS is restricted to `form_admin`; how RLS policies work; the C2 mismatch scan pattern from R-18; what an RLS failure looks like in Sentry (code 42501); mandatory review procedure for any migration that modifies `USING` or `WITH CHECK` clauses |
+| **E-02: DEC-030 HMAC Chain Integrity** | How the HMAC chain works technically; why events are append-only and tampering is detectable; what a chain gap looks like in Sentry (FORM-DB-CHAIN-001); what NOT to do in an emergency (do not truncate, do not delete events, do not amend) |
+| **E-03: Secrets Management** | 1Password for all secrets; Workers Secrets for runtime injection; TruffleHog CI gate; the 1-hour rotation SLA for any exposed secret (R-16); mandatory R-16 activation before any rotation to preserve forensic trail; never log secrets even in dev |
+| **E-04: Supply Chain & CI/CD Security** | SCA programme from §54; Dependabot + npm audit + Snyk three-layer defence; CI secret scanning (TruffleHog from §50); what to do if a compromised package is detected in the dependency tree; R-08 runbook trigger criteria |
+| **E-05: Secure Coding for Art. 9 Data** | Never store Art. 9 data in plaintext logs, error payloads, or Sentry breadcrumbs (`beforeSend` deny-list from OBSERVABILITY §28.3); `keypoints_enc` encryption key rotation procedure; aggregate-only exports for any analytics query touching `health_profiles` or `coaching_turns` |
+
+#### 55.4.2 Compliance Deep-Dive (compliance-officer)
+
+Delivered annually; updated when DPA obligations or SOC 2 criteria change.
+
+| Module | Topics |
+|---|---|
+| **C-01: SOC 2 Type II Evidence Cadence** | What must be filed every month during the observation period; how DEC-030 audit events serve as primary evidence; the monthly IR meta-monitoring report requirement (§16.5.3); quarterly control effectiveness review (§14) |
+| **C-02: GDPR Art. 33/34 Clock Management** | Identifying the Art. 33 clock start in R-01, R-11, R-14, R-18; how to calculate the 72h deadline; the DPA self-report decision framework; how to use Templates §15.6 and §15.7 |
+| **C-03: DSAR Pipeline Oversight** | The DSAR request lifecycle; erasure completeness query pattern from R-14; the day-25 Slack deadline alert; what Art. 12(5) refusal grounds look like; cross-tenant contamination R-14.2 protocol |
+
+#### 55.4.3 Customer-Facing Module (customer-success, marketing-lead, growth-lead, research-lead)
+
+Delivered annually; updated when enterprise tier SLA obligations change.
+
+| Module | Topics |
+|---|---|
+| **CF-01: Enterprise Tenant Communication Under Incident** | §12 Template E-01 through E-04; the privacy floor enforcement rule (never disclose which other tenants are affected); what information you CAN share vs. must escalate to IC |
+| **CF-02: Recognising Social Engineering from Customers** | Recognising tenant admins attempting to extract other-tenant data via support channels; DSAR requests that arrive via customer-success instead of the formal portal; impersonation of enterprise IT admins requesting SSO changes out-of-band |
+| **CF-03: Victor Safety Obligations** | Mandatory reporting of ED-adjacent, self-harm, or injury-related Victor output to clinical-safety; the no-screenshot/share rule for harmful Victor content; R-10 runbook trigger criteria |
+
+---
+
+### 55.5 Data Classification & Handling Policy
+
+This section closes **CC1-GAP-002** and **C1-GAP-001** (data classification policy not documented as a standalone auditor exhibit).
+
+#### 55.5.1 Classification Tiers
+
+| Tier | Label | Examples | Handling Rules |
+|---|---|---|---|
+| **Tier 1 — Restricted** | Art. 9 Health Data | `health_profiles.*`, `coaching_turns.content`, `cv_sessions.keypoints_enc`, `workout_sessions.rpe`, wearable HR/HRV | Stored encrypted at rest (Neon transparent encryption + `keypoints_enc` app-level AES-256). Never logged, never in Sentry breadcrumbs, never in email/Slack unencrypted. Accessible only via Supabase authenticated role with tenant-scoped RLS; BYPASSRLS access requires form_admin + logged DEC-030 event. Retention per DEC-030: 7 years for audit events, user data deleted on DSAR Art. 17 erasure request |
+| **Tier 2 — Confidential** | Business & Enterprise Data | Enterprise contract terms, pricing, `tenants.*`, SSO config, DPA drafts, investor materials | Internal only. Not shared with contractors without NDA. Not stored in third-party tools not listed in §44 sub-processor registry. Email OK for internal discussion; never forward to personal email |
+| **Tier 3 — Internal** | Operational Data | System metrics, PostHog aggregate events, Sentry error metadata (no PII), CHANGELOG, internal runbooks | Team access. Not published externally unless deliberately made public (e.g., public CHANGELOG). Contractors may access if relevant to their engagement |
+| **Tier 4 — Public** | Publicly Published | Marketing site content, open-source code, published blog posts, pricing page, press releases | No access restriction. External sharing without approval |
+
+#### 55.5.2 Classification Decision Tree
+
+```
+Is this data about an identifiable individual's body, health, movement, or fitness performance?
+  YES → Tier 1 (Art. 9). Stop here.
+  NO  → Is this a business agreement, pricing term, or contract?
+          YES → Tier 2. Stop.
+          NO  → Is it operational/internal to FORM?
+                  YES → Tier 3.
+                  NO  → Tier 4.
+```
+
+#### 55.5.3 Handling Violations
+
+A team member who stores Tier 1 data in an unapproved location (personal cloud storage, unencrypted email attachment, unapproved SaaS tool) is required to:
+1. Report to security-engineer within 1 hour of discovery (self-report encouraged; no blame for honest mistakes)
+2. Delete or move the data immediately
+3. Verify deletion with security-engineer
+4. Emit DEC-030 HIGH event: `training.data_handling_violation`
+
+If the violation involves Art. 9 data and external exposure cannot be excluded, R-01 is activated to assess Art. 33 obligations.
+
+---
+
+### 55.6 Quarterly Phishing Simulation
+
+#### 55.6.1 Programme Design
+
+Quarterly phishing simulations are conducted by security-engineer using KnowBe4 (or equivalent) to test team members' ability to identify phishing attempts. Four waves per year (Q1 Feb, Q2 Apr, Q3 Aug, Q4 Oct), with templates escalating in sophistication across the year.
+
+| Wave | Quarter | Template Sophistication | Target | Metric |
+|---|---|---|---|---|
+| Wave 1 | Q1 (Feb) | Generic phishing (obvious sender spoofing, generic subject) | All team + new hires | Baseline click rate |
+| Wave 2 | Q2 (Apr) | Spear-phishing (FORM-branded, realistic sender display name) | All team | Click rate delta vs. Wave 1 |
+| Wave 3 | Q3 (Aug) | Executive impersonation (founder impersonation, urgent wire/credential request) | Customer-facing + compliance-officer | Click rate for highest-risk vector |
+| Wave 4 | Q4 (Oct) | Vendor impersonation (1Password / Stripe / GitHub Action notification spoofed) | Engineering + devops-lead | Supply-chain social-vector baseline |
+
+#### 55.6.2 Failure Response
+
+A team member who clicks a phishing simulation link or submits credentials receives:
+1. **Immediate in-platform education** — the phishing platform displays a 5-minute micro-training module
+2. **Targeted follow-up** — security-engineer schedules a 15-minute 1:1 to review what the indicator was and why it was missed; this is documented but not punitive
+3. **Repeat failure protocol** — two or more failures in the same wave trigger mandatory completion of Module M-02 (Phishing & Social Engineering) before the next quarterly wave
+
+**Programme-level failure threshold:** If programme-wide click rate for any wave exceeds 20%, security-engineer escalates to founder and compliance-officer; curriculum is reviewed and enhanced before the next wave.
+
+#### 55.6.3 Metrics
+
+| Metric | Target | Alert Threshold |
+|---|---|---|
+| Annual All-Hands completion rate | 100% by 28 Feb | < 100% at day 28 → revoke access |
+| Phishing simulation click rate | < 10% per wave | > 20% → curriculum review escalation |
+| Engineering deep-dive completion | 100% by 31 Mar | < 100% → devops-lead escalation |
+| Mean time to phishing report (team member reports → security-engineer) | < 24 h | > 48 h → process review |
+| Annual training passing score < 80% (any module) | 0 team members | Any failure → targeted retraining |
+
+---
+
+### 55.7 DEC-030 Audit Events
+
+| Event Type | Severity | Trigger | Retention |
+|---|---|---|---|
+| `training.annual_training_completed` | LOW | Team member completes all required annual modules with passing scores; attested in completion CSV | 30 days |
+| `training.production_access_granted_post_training` | STANDARD | Cloudflare Access credential issued to team member after training completion confirmed | 1 year |
+| `training.production_access_revoked_training_incomplete` | HIGH | Cloudflare Access revoked for team member who has not completed training by 28 Feb deadline | 3 years |
+| `training.phishing_simulation_wave_completed` | STANDARD | Quarterly phishing wave closed; aggregate click rate and completion metrics recorded | 1 year |
+| `training.phishing_click_recorded` | STANDARD | Team member clicked a phishing simulation link (pseudonymous team_member_role, not name, in event payload) | 1 year |
+| `training.data_handling_violation` | HIGH | Team member self-reports or security-engineer identifies Tier 1/2 data in unapproved location | 3 years |
+| `training.contractor_access_granted_post_training` | STANDARD | Contractor granted GitHub org or system access after abridged training completion | 1 year |
+| `training.curriculum_updated` | LOW | Annual curriculum refresh; new modules added; passing score thresholds changed | 30 days |
+
+**Privacy note for phishing events:** `training.phishing_click_recorded` payloads use `team_member_role` (e.g., `devops-lead`) not the individual's name or email. Only security-engineer and compliance-officer can correlate the role to an individual via the restricted completion registry. This prevents the DEC-030 chain — which may be reviewed by auditors — from containing personal performance data.
+
+---
+
+### 55.8 Evidence Package for Auditors
+
+| Evidence ID | Artefact | Content | Produced By | Filing Deadline |
+|---|---|---|---|---|
+| **SAT-E-001** | Annual training completion CSV | `compliance/evidence/training/YYYY/completions.csv` — one row per team member: role, completion date, modules completed, quiz scores, training version; all rows with `completion_date <= 2026-02-28` (or equivalent for Year 2+) | compliance-officer | Filed by 31 March for each year |
+| **SAT-E-002** | New hire onboarding training gate evidence | For each new hire: hire date, training completion date, production access grant date; verifies training-before-access rule was followed | compliance-officer | On auditor request; filed to `compliance/evidence/training/YYYY/onboarding/` per hire |
+| **SAT-E-003** | Quarterly phishing simulation wave reports | Four reports per year: wave date, template sophistication level, programme-wide click rate, per-wave metrics, failures above threshold and corrective actions; generated by phishing platform + documented by security-engineer | security-engineer | Filed within 7 days of each wave closing; `compliance/evidence/training/YYYY/phishing/Q{1,2,3,4}.md` |
+| **SAT-E-004** | DEC-030 training event extract | All `training.*` events from `audit_log_events` for the observation period; `hmac_valid = TRUE` for all rows; exported with `occurred_at`, `event_type`, `severity`, and non-PII payload fields | compliance-officer | On auditor request; standard 30-day extract query |
+| **SAT-E-005** | Engineering deep-dive completion attestation | Signed attestation from each engineering team member confirming completion of E-01 through E-05 modules; stored in `compliance/evidence/training/YYYY/engineering-deepdive.csv` | security-engineer | Filed by 31 March for each year |
+| **SAT-E-006** | Data classification policy sign-off | Each team member's signed attestation of having read and understood §55.5 classification tiers and handling rules; part of SAT-E-001 completion CSV (column: `data_classification_attested = true`) | compliance-officer | Filed by 31 March for each year |
+
+---
+
+### 55.9 Gap Register Closure Table
+
+| Gap ID | Gap Description | Previous Status | New Status | Closure Evidence | Remaining Conditions |
+|---|---|---|---|---|---|
+| **CC1-GAP-001** | Security awareness training programme not formalised; no completion tracking; no phishing simulation | 🔴 Not Started | 🟢 Done | SAT-E-001 (completion CSV) + SAT-E-003 (phishing wave reports) + SAT-E-004 (DEC-030 extract) | Programme must be operating for at least one full calendar year before SOC 2 observation period opens; Wave 1 phishing simulation must be complete with results filed |
+| **CC1-GAP-002** | Data classification policy not documented; no auditor-reviewable tier definitions | 🔴 Not Started | 🟢 Done | §55.5 tier table + SAT-E-006 (sign-off attestation) | All team members must complete SAT-E-006 attestation; new hires within 30 days of start date |
+| **C1-GAP-001** | No formal information handling policy for confidential/health data beyond GDPR DPIA reference | 🟡 Partial | 🟢 Done | §55.5.1 handling rules + §55.5.3 violation protocol + SAT-E-006 | Handling rules must be incorporated into onboarding checklist (`docs/HIRING_GUIDE.md` §3 training gate) |
+| **CC2-GAP-001** | Security policies communicated informally (Notion docs, no attestation) | 🟡 Partial | 🟢 Done | SAT-E-001 (attested completion) + §55.3.2 onboarding gate | Policies must be versioned in a stable location (this document + HIRING_GUIDE.md); completion CSV references document version |
+
+---
+
+### 55.10 SOC 2 TSC Mapping
+
+| TSC Criterion | Control Activity | Evidence |
+|---|---|---|
+| CC1.1 — Integrity and ethical values | M-04 Art. 9 obligations + M-05 incident reporting instil ethical reporting culture; no-blame policy documented | SAT-E-001 + SAT-E-004 |
+| CC1.4 — Commitment to competence | Annual role-based training ensures all personnel understand security responsibilities proportional to data access | SAT-E-001 + SAT-E-005 (engineering) |
+| CC2.1 — Internal communication of objectives | Training programme communicates security policies, Art. 9 obligations, and DEC-030 requirements to all personnel | SAT-E-001 + SAT-E-006 |
+| CC1.2 — Board oversight of controls | Training metrics (completion rate, phishing click rate) reported to founder quarterly as part of §13 Board Communication; founder completion tracked in SAT-E-001 | SAT-E-001 (founder row) + §13 Q report |
+| A1.1 — Capacity monitoring (human factors) | Phishing failure rates and training completion gaps are capacity risk indicators; threshold alerting at 20% click rate and < 100% completion | SAT-E-003 (wave reports) |
+| C1.1 — Confidentiality — data classification | §55.5 four-tier classification with decision tree and handling rules; attested by all team members | SAT-E-006 |
+| CC9.1 — Vendor risk mitigation | Contractor training gate prevents untrained third parties from accessing production Art. 9 data | SAT-E-002 (contractor onboarding evidence) |
+
+---
+
+### 55.11 Open Questions
+
+**OQ-SAT-01: LMS platform selection**
+KnowBe4 is listed as the preferred platform for phishing simulation and training delivery. However, at current team size (< 10 people), the enterprise tier cost may be disproportionate. Options: (a) KnowBe4 Growth tier (suitable for < 25 users; phishing simulation + training library + completion tracking + SCORM upload); (b) Proofpoint Security Awareness Training; (c) Notion + Google Forms (no-cost, but no phishing simulation capability — phishing simulation must then be a separate tool such as GoPhish self-hosted or Gophish Cloud). Recommended: KnowBe4 Growth for Year 1 (phishing simulation is a hard SOC 2 CC1.4 requirement for most auditors); reassess at 25+ users. Owner: compliance-officer. Priority: **P1**. Resolution target: M5 (before observation period opens).
+
+**OQ-SAT-02: Pseudonymous phishing event payload verification**
+The `training.phishing_click_recorded` DEC-030 event uses `team_member_role` instead of name or email. KnowBe4's API returns the full email address. A Worker endpoint must strip PII before emitting the DEC-030 event. The implementation must be verified by security-engineer before the first phishing wave runs to avoid personal data entering the audit chain. Owner: platform-engineer + security-engineer. Priority: **P1**. Resolution target: before Wave 1.
+
+**OQ-SAT-03: Training content for Victor AI safety (M-07) — clinical-safety gate**
+Module M-07 (AI Safety & Victor Prompt Hygiene) covers ED-adjacent content and self-harm outputs from Victor. The module content itself must pass the clinical-safety gate before publishing — specifically, the worked examples of "harmful Victor output" used as training material must not themselves be triggering for team members who encounter them. clinical-safety must review the M-07 script before it is finalised. Owner: clinical-safety + security-engineer. Priority: **P1**. Resolution target: before training Year 1 opens (1 January).
+
+---
+
+### 55.12 Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Select and procure LMS platform (KnowBe4 Growth recommended per OQ-SAT-01); configure FORM tenant; verify phishing simulation and completion tracking capabilities | P1 | M5 | compliance-officer | [ ] |
+| 2 | Draft eight training modules (M-01 through M-08) as written scripts; route M-07 (Victor AI Safety) through clinical-safety gate before finalisation; target < 15-min video + 10-question quiz per module | P1 | M5 | security-engineer + clinical-safety | [ ] |
+| 3 | Draft five engineering deep-dive modules (E-01 through E-05); have devops-lead and platform-engineer peer-review E-01 (RLS) and E-02 (DEC-030) for technical accuracy before publishing | P1 | M5 | security-engineer | [ ] |
+| 4 | Update `docs/HIRING_GUIDE.md` §3 onboarding checklist: add training completion as a prerequisite before production access grant; list all required tracks per role; verify the gate is enforced in the Cloudflare Access provisioning SOP | P0 | M5 | compliance-officer | [ ] |
+| 5 | Create `compliance/evidence/training/2026/` directory structure: `completions.csv` (with headers: role, hire_date, completion_date, modules_completed, quiz_scores_JSON, training_version, data_classification_attested); onboarding/ and phishing/Q{1,2,3,4}/ subdirectories | P1 | M5 | compliance-officer | [ ] |
+| 6 | Configure KnowBe4 (or equivalent) phishing Wave 1 template: generic phishing, all-team targeting; schedule for February; confirm LMS sends micro-training on click; set 20% programme threshold alert to compliance-officer | P1 | Before Wave 1 | security-engineer | [ ] |
+| 7 | Implement DEC-030 emission Worker for `training.*` events: Worker endpoint called by LMS webhook on completion and phishing events; strips PII from phishing payload (OQ-SAT-02) before emitting STANDARD event; deploy to staging; verify first event in `audit_log_events` with `hmac_valid = TRUE` | P1 | M5 | platform-engineer | [ ] |
+| 8 | Register all eight `training.*` DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` event registry with schema, severity, and retention fields | P1 | M5 | security-engineer | [ ] |
+| 9 | Conduct first annual all-hands training wave: open 1 Jan, deadline 28 Feb; track completion daily; issue access revocation notices at day 21; revoke Cloudflare Access at day 29 for non-completions; file SAT-E-001 by 31 March | P0 | 1 Jan (Year 1) | compliance-officer | [ ] |
+| 10 | File SAT-E-001 through SAT-E-006 evidence artefacts for Year 1 in `compliance/evidence/training/2026/` before SOC 2 observation period opens | P0 | Observation period start | compliance-officer | [ ] |
+| 11 | Add training completion metrics (completion rate, phishing click rate) to §13 Board Communication quarterly report template (B-04 Post-Incident Summary); add as standing Q4 agenda item | P2 | M6 | compliance-officer | [ ] |
+| 12 | Update `docs/HIRING_GUIDE.md` to reference §55.5 data classification tiers as required reading; add data classification attestation (SAT-E-006 column) to the onboarding sign-off checklist | P1 | M5 | compliance-officer | [ ] |
+
+---
+
+*v2.7 additions (2026-06-02): §55 Security Awareness Training & Phishing Simulation Programme. Closes four documented gaps: CC1-GAP-001 (🔴 Not Started → 🟢 Done — annual all-hands training with eight modules, completion CSV, phishing simulation four waves, DEC-030 training events), CC1-GAP-002 (🔴 Not Started → 🟢 Done — §55.5 four-tier data classification with decision tree and SAT-E-006 sign-off), C1-GAP-001 (🟡 Partial → 🟢 Done — §55.5 handling rules + violation protocol), CC2-GAP-001 (🟡 Partial → 🟢 Done — attested completion CSV as formal policy communication evidence). Programme components: Annual All-Hands (eight modules, M-01 through M-08; 90–120 min; 80%/90% pass threshold; 28 Feb deadline; Cloudflare Access revoked for non-completions), Role-Based Deep-Dive (Engineering E-01 through E-05, Compliance C-01 through C-03, Customer-Facing CF-01 through CF-03), Quarterly Phishing Simulation (four waves; Wave 1 generic, Wave 2 spear-phishing, Wave 3 executive impersonation, Wave 4 vendor impersonation; 20% click rate threshold triggers curriculum review; pseudonymous DEC-030 event on click). Data classification §55.5: four tiers (Restricted Art. 9 / Confidential Business / Internal Operational / Public); decision tree; violation reporting protocol with DEC-030 HIGH event. Production access gate: training must be completed before any production credential is issued — not within 30 days, before access; referenced in HIRING_GUIDE.md onboarding checklist. Eight DEC-030 HMAC-chained training events: training.annual_training_completed (LOW), training.production_access_granted_post_training (STANDARD), training.production_access_revoked_training_incomplete (HIGH, 3yr), training.phishing_simulation_wave_completed (STANDARD), training.phishing_click_recorded (STANDARD, pseudonymous payload using role not name), training.data_handling_violation (HIGH, 3yr), training.contractor_access_granted_post_training (STANDARD), training.curriculum_updated (LOW). Evidence package SAT-E-001 through SAT-E-006. SOC 2 mapping: CC1.1 (no-blame ethical reporting), CC1.4 (role-proportional competence training), CC2.1 (policy communication via attested completion), CC1.2 (training metrics in board reports), A1.1 (phishing click rate as human-factor capacity indicator), C1.1 (four-tier classification attested by all team members), CC9.1 (contractor training gate). Three open questions: OQ-SAT-01 (KnowBe4 Growth vs. alternatives — P1, M5), OQ-SAT-02 (pseudonymous phishing Worker PII stripping — P1, before Wave 1), OQ-SAT-03 (M-07 Victor safety content clinical-safety gate — P1, before Year 1 opens). Twelve-item implementation checklist (3× P0, 8× P1, 1× P2). Document header updated from v2.6 to v2.7. Owner: compliance-officer + security-engineer.*
