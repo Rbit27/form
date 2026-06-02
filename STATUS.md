@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 173 cards (185 posts authored), category filter, newsletter CTA | v1.72.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 175 cards (187 posts authored), category filter, newsletter CTA | v1.75.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -268,6 +268,8 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-183-cold-heat-adaptation-mechanisms.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-184-lactate-signaling-molecule.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-185-knee-mechanics-strength-training.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-186-velocity-based-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-187-minimum-effective-dose.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
