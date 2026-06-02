@@ -17840,3 +17840,430 @@ Key rotation operations should emit a DEC-030 HMAC-chained audit event (`admin.e
 ---
 
 *v1.0 (2026-06-02): New §56 fills the encryption key management gap — CRYPTOGRAPHY_POLICY.md has been in force since May 2026 but without a dedicated SOC 2 auditor evidence exhibit until now. Eight-key inventory covers all production secrets with algorithms, storage locations, rotation schedules, and owners: SUPABASE_SERVICE_ROLE_JWT (HS256, 90 days), HMAC_AUDIT_CHAIN_KEY (HMAC-SHA256, rotation blocked pending OQ-ENC-02), KEYPOINTS_ENC_KEY (AES-256-CBC via pgcrypto/Vault, 365 days), CLOUDFLARE_API_KEY (Ed25519, 180 days), WORKOS_API_KEY (opaque, 180 days), ANTHROPIC_API_KEY (opaque, 90 days), SENTRY_DSN (opaque, 180 days), SUPABASE_ANON_KEY (JWT, 365 days). Two-tier encryption model: platform-managed (Neon AES-256 at rest, Cloudflare TLS 1.3 in transit) plus application-layer (pgcrypto AES-256-CBC for cv_sessions.keypoints_enc, Supabase Vault for key isolation, HMAC-SHA256 DEC-030 chain for audit log integrity). Key architectural constraints: (1) HMAC_AUDIT_CHAIN_KEY rotation is blocked by chain continuity until OQ-ENC-02 dual-key verification is implemented; (2) SUPABASE_SERVICE_ROLE_JWT rotation is a platform-wide maintenance event requiring 24h advance notice and maintenance window coordination. Four gap items: ENC-GAP-001 (manual rotation — MEDIUM, M8), ENC-GAP-002 (HMAC key rotation blocked — MEDIUM, M9, mitigated by Cloudflare Workers Secrets), ENC-GAP-003 (no Vault key access DEC-030 event — MEDIUM, M8), ENC-GAP-004 (SUPABASE_SERVICE_ROLE_JWT not rotated since setup — P0 CRITICAL, must resolve before M5). Three open questions: OQ-ENC-01 (service_role JWT rotation runbook — P0, M5), OQ-ENC-02 (HMAC chain dual-key verification — P1, M7), OQ-ENC-03 (encryption_key_rotated DEC-030 event — P1, M7). Nine-item checklist (3× P0, 5× P1, 1× P2). TSC: CC6.7/CC6.8/C1.1/CC9.2. SOC 2 doc v2.7 → v2.8. Owner: security-engineer + platform-engineer + compliance-officer.*
+
+---
+
+## 57. Supabase `service_role` JWT Rotation Runbook — Scheduled & Emergency · CC6.7/CC6.8/C1.1 · Auditor Exhibit
+
+> **Closes: ENC-GAP-004** (SUPABASE_SERVICE_ROLE_JWT not rotated since infrastructure setup — P0 CRITICAL). **Closes: OQ-ENC-01** (service_role JWT rotation runbook — this section IS the runbook). **Closes: OQ-ENC-03** (`admin.encryption_key_rotated` DEC-030 event type — formally specified in §57.4.7). **Advances: OQ-ENC-02** (§57.6 confirms service_role JWT rotation does not affect HMAC chain; full dual-key `key_version` design for `HMAC_AUDIT_CHAIN_KEY` remains at M7). **Advances: ENC-GAP-001** (automated reminder pipeline specified in §57.7). SOC 2 doc v2.8 → v2.9. Owner: security-engineer + devops-lead + compliance-officer.
+
+---
+
+### 57.1 Why `service_role` JWT Rotation is a P0 Control
+
+The `SUPABASE_SERVICE_ROLE_JWT` is the single most privileged credential in the FORM infrastructure. It differs from the `SUPABASE_ANON_KEY` in one critical way: **it bypasses all Postgres Row Level Security policies**. Any Cloudflare Worker or Edge Function that initialises a Supabase client with the service_role key has unrestricted SELECT, INSERT, UPDATE, and DELETE access to every row in every table across all tenants — including:
+
+| Table | Data classification | GDPR basis |
+|---|---|---|
+| `keypoints_enc` | Restricted (Art. 9 biometric) | Explicit consent (DEC-018) |
+| `user_health_profiles` | Restricted (Art. 9 health) | Explicit consent (DEC-018) |
+| `coaching_turns` | Restricted (Art. 9 health-adjacent) | Explicit consent |
+| `meal_logs` | Restricted (Art. 9 health-adjacent) | Explicit consent |
+| `audit_log_events` | Confidential (HMAC-chained) | Art. 6(1)(c) — legal obligation |
+| `tenant_sso_configs` | Confidential (enterprise SSO secrets) | Art. 6(1)(b) — contract |
+
+The multi-tenant RLS architecture documented in `docs/DATA_MODEL.md §3–§4` provides complete tenant isolation for `form_api` role operations. It provides **zero isolation** for `service_role` operations — by design, to enable the administrative procedures specified in `docs/SSO_SCIM_IMPLEMENTATION.md §24` (PAM). This is the correct architecture, but it means that compromise of this single credential is equivalent to a full breach of all user health data across all tenants.
+
+**Current state per §56:** `SUPABASE_SERVICE_ROLE_JWT` was last rotated at initial infrastructure setup. Exact date unknown. ENC-GAP-004 flags this P0 CRITICAL with target before M5 (enterprise GA). This section provides the runbook to execute that rotation and all subsequent 90-day scheduled rotations.
+
+**Rotation consumers:** The service_role JWT is consumed by seven locations:
+
+| Consumer | Runtime | Secret storage | Update method |
+|---|---|---|---|
+| `supabase/functions/pam-db-proxy` | Supabase Edge Function | Supabase Vault | `supabase secrets set` CLI |
+| `workers/form-alert-relay` | Cloudflare Worker | Workers Secret | `wrangler secret put` |
+| `workers/emit-audit-event` | Cloudflare Worker | Workers Secret | `wrangler secret put` |
+| `workers/auth-monitor` | Cloudflare Worker | Workers Secret | `wrangler secret put` |
+| `workers/row-count-monitor` | Cloudflare Worker | Workers Secret | `wrangler secret put` |
+| `workers/audit-chain-daily-check` | Cloudflare Worker | Workers Secret | `wrangler secret put` |
+| GitHub Actions CI | Actions runner | GitHub Actions Secret | `gh secret set` |
+
+**Blast radius:** All seven consumers must be updated within the same maintenance window. Any consumer still using the old key after Supabase's 15-minute grace period expires will receive `JWT_INVALID` errors on all database operations — causing immediate P1/P0 incidents depending on the consumer. This is why two-person authorisation and a staged rollout sequence with a 60-second Cloudflare propagation pause are mandatory.
+
+**Privacy floor:** No local `.env` file containing `SUPABASE_SERVICE_ROLE_JWT` may be committed to git. TruffleHog CI scanning (§50.1) provides detection. `.gitignore` must include `.env*` before rotation day — confirmed in §57.11 checklist item 7.
+
+---
+
+### 57.2 Rotation Schedule
+
+| Rotation type | Trigger | RTO (rotation complete) | Authorisation |
+|---|---|---|---|
+| **Scheduled** | 90-day calendar trigger (PagerDuty AL-KEY-01 + Linear issue auto-created) | Within 24 hours of trigger | PAM `read_write` elevation (SSO_SCIM §24.3); security-engineer + devops-lead |
+| **Emergency** | Confirmed or suspected credential compromise (see §57.5 trigger matrix) | Within 1 hour | P0 incident declared (INCIDENT_RESPONSE R-01); PAM `destructive` elevation; two-person auth (founder + security-engineer) |
+| **Infrastructure repair** | PITR restore timestamp post-dates last known rotation | Within 4 hours of PITR completion | PAM `read_write` elevation; INCIDENT_RESPONSE R-18 co-activated |
+
+**90-day schedule enforcement:** The first rotation must occur before M5 enterprise GA (ENC-GAP-004). Subsequent rotations are tracked by `workers/key-rotation-monitor` (§57.7). Any rotation occurring after the 90-day window generates a `admin.key_rotation_overdue` HIGH DEC-030 event — an auditor-visible overdue record.
+
+---
+
+### 57.3 Pre-Rotation Checklist
+
+Execute and record each item as a comment on the GitHub Issue opened by the PagerDuty scheduled event **before starting Step 1.**
+
+| # | Pre-condition | Verification method | Blocking? |
+|---|---|---|---|
+| 1 | No active P0 incident in progress | `#incidents` Slack channel + Linear `priority:urgent is:open` | **Yes** — reschedule |
+| 2 | PAM elevation obtained at correct tier | Slack PAM approval thread + `pam.elevation_approved` DEC-030 event visible in audit log | **Yes** |
+| 3 | Second engineer confirmed available | Named in the rotation issue; confirmed via Slack DM | **Yes** |
+| 4 | HMAC chain integrity verified (zero broken links) | `SELECT COUNT(*) FROM audit_log_events WHERE prev_hmac IS DISTINCT FROM lag(hmac) OVER (ORDER BY sequence_number)` → returns 0 | **Yes** — broken chain → invoke R-05 before proceeding |
+| 5 | No in-progress Supabase PITR restore | Supabase dashboard → Backups → no active restore job | **Yes** |
+| 6 | All Workers error rate < 1% | Cloudflare dashboard → Workers & Pages → per-Worker error metrics; OBSERVABILITY AL-CF-01 not firing | No — proceed with degraded Worker noted |
+| 7 | Enterprise tenants notified of maintenance window (scheduled rotation only) | CSM posts to enterprise tenant Slack channels 24h in advance; OBSERVABILITY §23.3 template | **Yes for scheduled** — waive for emergency |
+| 8 | `admin.key_rotation_initiated` DEC-030 event emitted | Via `emit-audit-event` Edge Function; confirm event ID appears in `audit_log_events`; note the event ID in the rotation issue | **Yes** — DEC-030 audit trail must precede all rotation steps; this is a hard DEC-030 invariant |
+
+**Mandatory pre-rotation DEC-030 event (hard invariant — emit before Step 1):**
+
+```jsonc
+{
+  "event_type": "admin.key_rotation_initiated",
+  "severity": "CRITICAL",
+  "retention_years": 7,
+  "actor_user_id": "{rotating_engineer_uuid}",
+  "metadata": {
+    "key_name": "SUPABASE_SERVICE_ROLE_JWT",
+    "rotation_type": "scheduled | emergency | infrastructure_repair",
+    "pam_session_id": "{pam_session_id_from_elevation}",
+    "second_engineer_user_id": "{devops_lead_uuid}",
+    "reason": "90-day scheduled rotation | confirmed compromise | PITR restore post-dates rotation",
+    "pre_rotation_hmac_chain_status": "intact",
+    "estimated_window_minutes": 45
+  }
+}
+```
+
+**If `emit-audit-event` is unavailable:** Do not proceed. Escalate to P1 and resolve the Worker issue first. The audit trail must precede the action — rotating the key without emitting this event first constitutes an undocumented privileged action and triggers AL-PAM-01 review (SSO_SCIM §24.7).
+
+---
+
+### 57.4 Scheduled Rotation Procedure (Step-by-Step)
+
+Execute steps in exact sequence. Do not parallelise across the Supabase/Cloudflare boundary — confirm each step before proceeding. Total window budget: 45 minutes for a clean rotation.
+
+#### 57.4.1 Step 1 — Generate new JWT in Supabase platform (< 5 min)
+
+1. Navigate: `app.supabase.com` → FORM project → **Settings → API → Project API keys → service_role (secret)** → click **Rotate**.
+2. Supabase generates a new JWT. The old key remains valid for a **15-minute grace period**. Steps 2–7 must complete within this window.
+3. Copy the new JWT to **1Password** (FORM vault → `SUPABASE_SERVICE_ROLE_JWT`) immediately. Clear clipboard within 30 seconds.
+4. Confirm the new key begins with `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.` (HS256 JWT prefix). If it does not, abort and contact Supabase support — do not use an unverified key.
+5. Decode the `iat` (issued-at) claim from the JWT payload section — record this timestamp as the rotation date for ENC-E-009 evidence.
+
+#### 57.4.2 Step 2 — Update Supabase Vault (pam-db-proxy Edge Function)
+
+```bash
+supabase secrets set SUPABASE_SERVICE_ROLE_JWT="{new_jwt}" \
+  --project-ref "{project_ref}"
+
+# Confirm:
+supabase secrets list --project-ref "{project_ref}" | grep SERVICE_ROLE
+# Expected: SUPABASE_SERVICE_ROLE_JWT  [REDACTED]  updated: {timestamp}
+```
+
+#### 57.4.3 Step 3 — Update all five Cloudflare Workers Secrets
+
+```bash
+for worker in form-alert-relay emit-audit-event auth-monitor row-count-monitor audit-chain-daily-check; do
+  echo "{new_jwt}" | wrangler secret put SUPABASE_SERVICE_ROLE_JWT --name "$worker" \
+    && echo "✓ $worker updated"
+done
+```
+
+After all five Workers confirm, **pause 60 seconds** to allow Cloudflare's global Workers Secret propagation to all edge PoPs. Do not skip this pause — a Worker receiving a request before propagation completes will use the old key and fail after the grace period expires.
+
+#### 57.4.4 Step 4 — Update GitHub Actions Secret
+
+```bash
+gh secret set SUPABASE_SERVICE_ROLE_KEY \
+  --body "{new_jwt}" \
+  --repo Rbit27/form
+
+# Confirm:
+gh secret list --repo Rbit27/form | grep SUPABASE_SERVICE_ROLE_KEY
+# Expected: SUPABASE_SERVICE_ROLE_KEY  Updated {timestamp}
+```
+
+GitHub Actions secrets apply to new workflow runs immediately. Any in-progress CI run started before this update uses the old key — acceptable within the 15-minute grace period.
+
+#### 57.4.5 Step 5 — Announce developer environment rotation
+
+Post to `#engineering` Slack:
+
+> **[SECURITY] service_role JWT rotated.** Update your local `.env` / `.env.local` file from 1Password (FORM vault → SUPABASE_SERVICE_ROLE_JWT) within 24 hours. Old key expires in ~10 minutes from rotation time. TruffleHog CI will block any commit containing the old key.
+
+Emit `admin.key_rotation_announced` DEC-030 event immediately after the Slack post (payload in §57.5 event table).
+
+#### 57.4.6 Step 6 — Verify new key connectivity
+
+After the 60-second propagation pause, run all three checks:
+
+```bash
+# Check 1: pam-db-proxy Edge Function health
+curl -s -X POST "https://{project-ref}.supabase.co/functions/v1/pam-db-proxy" \
+  -H "Authorization: Bearer {cf_access_jwt}" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT 1 AS health_check", "pam_session_id": "rotation-verify-$(date +%s)"}' \
+  | jq '.health_check == 1'
+# Expected: true
+```
+
+```sql
+-- Check 2: Cloudflare Workers → Supabase connectivity (via emit-audit-event)
+-- Trigger a low-severity DEC-030 test event; confirm it appears in audit_log_events
+-- (The admin.key_rotation_announced event from Step 5 serves as this check)
+SELECT EXISTS(
+  SELECT 1 FROM audit_log_events
+  WHERE event_type = 'admin.key_rotation_announced'
+  ORDER BY event_ts DESC LIMIT 1
+) AS announcement_received;
+-- Expected: true
+```
+
+```sql
+-- Check 3: HMAC chain continuity post-rotation
+SELECT
+  COUNT(*) AS total_checked,
+  SUM(CASE WHEN prev_hmac IS DISTINCT FROM lag_hmac THEN 1 ELSE 0 END) AS broken_links
+FROM (
+  SELECT
+    prev_hmac,
+    LAG(hmac) OVER (ORDER BY sequence_number) AS lag_hmac
+  FROM audit_log_events
+  ORDER BY sequence_number DESC
+  LIMIT 200
+) t;
+-- Expected: broken_links = 0
+```
+
+**If Check 1 fails:** Cloudflare propagation may be incomplete. Wait 30 seconds and retry up to 3 times. If still failing after 3 retries, escalate to P1 — the old key has expired and a consumer is broken.
+
+**If Check 3 returns `broken_links > 0`:** Escalate to P0 and co-activate INCIDENT_RESPONSE R-05 (HMAC chain break). Do not emit the completion event until the chain is intact.
+
+#### 57.4.7 Step 7 — Emit completion DEC-030 events (closes OQ-ENC-03)
+
+Emit both events via `emit-audit-event` Edge Function. If the Edge Function itself is one of the failing consumers, use the Supabase SQL editor with service_role scope as an emergency fallback — document the fallback path in the rotation issue.
+
+```jsonc
+// Event 1: rotation complete (closes OQ-ENC-03 — formally specified here)
+{
+  "event_type": "admin.encryption_key_rotated",
+  "severity": "CRITICAL",
+  "retention_years": 7,
+  "actor_user_id": "{rotating_engineer_uuid}",
+  "metadata": {
+    "key_name": "SUPABASE_SERVICE_ROLE_JWT",
+    "rotation_type": "scheduled | emergency | infrastructure_repair",
+    "pam_session_id": "{pam_session_id}",
+    "second_engineer_user_id": "{devops_lead_uuid}",
+    "new_key_iat": "{jwt_issued_at_unix_timestamp}",
+    "consumers_updated": [
+      "pam-db-proxy:supabase-vault",
+      "form-alert-relay:cf-workers-secret",
+      "emit-audit-event:cf-workers-secret",
+      "auth-monitor:cf-workers-secret",
+      "row-count-monitor:cf-workers-secret",
+      "audit-chain-daily-check:cf-workers-secret",
+      "github-actions:SUPABASE_SERVICE_ROLE_KEY"
+    ],
+    "hmac_chain_intact_post_rotation": true,
+    "next_rotation_due_iso": "{90_days_from_today_iso8601}"
+  }
+}
+
+// Event 2: engineering team notified
+{
+  "event_type": "admin.key_rotation_announced",
+  "severity": "HIGH",
+  "retention_years": 7,
+  "actor_user_id": "{rotating_engineer_uuid}",
+  "metadata": {
+    "key_name": "SUPABASE_SERVICE_ROLE_JWT",
+    "announcement_channel": "slack:#engineering",
+    "local_env_rotation_deadline_iso": "{24_hours_from_now_iso8601}"
+  }
+}
+```
+
+**Privacy invariant on these events:** The `new_key_iat` field stores only the JWT `iat` claim (a Unix timestamp). The JWT value itself must never appear in any DEC-030 event payload, Linear ticket, Slack message, or evidence artefact. Storing an active credential in the audit log would itself constitute a C1.2 confidential-information disposal failure.
+
+#### 57.4.8 Step 8 — Close rotation record
+
+1. Update **1Password** FORM vault → `SUPABASE_SERVICE_ROLE_JWT` → item note: `Last rotated: {date} by {engineer}. Next due: {date+90}. Rotation issue: Linear #{issue_id}.`
+2. Close the **Linear** rotation issue with comment: `Rotation complete. Audit events: {event_ids}. Next rotation: {date+90}. Evidence filed: compliance/evidence/enc/service-role-rotation-{YYYY-MM-DD}/`.
+3. File **evidence artefacts ENC-E-009 through ENC-E-013** (§57.8) to `compliance/evidence/enc/service-role-rotation-{YYYY-MM-DD}/`.
+4. Update **`KEY_ROTATION_KV`** `rotation:SUPABASE_SERVICE_ROLE_JWT` record: set `last_rotated_at` = today, `next_rotation_due` = today + 90 days.
+
+---
+
+### 57.5 Emergency Rotation Procedure
+
+#### 57.5.1 Trigger Matrix
+
+Initiate emergency rotation immediately when ANY of the following are true:
+
+| Trigger | Source | Auto-detect? |
+|---|---|---|
+| `SUPABASE_SERVICE_ROLE_JWT` appears in any git commit (current or historical) | TruffleHog CI scan (§50.1) | Yes — CI blocks + Slack alert |
+| Key appears in Sentry breadcrumbs, Logpush, or any log pipeline | FORM-HEALTH-LEAK-001 alert (§47.2) | Yes — PagerDuty P0 |
+| Suspicious query volume on Supabase attributable to unknown consumer | Supabase dashboard query log anomaly | Manual detection |
+| Third-party security researcher or bug report references the key | HackerOne / email / direct report | Manual |
+| Any team member suspects key exposure (gut-call is valid) | Direct report to `#security` | Manual |
+| PITR restore in R-18 post-dates last confirmed rotation | INCIDENT_RESPONSE R-18 §57.2 trigger | Manual at R-18 invocation |
+
+**Do not wait to confirm scope.** Rotate first. Scope assessment runs in parallel, not before. A compromised service_role JWT provides access to all Art. 9 health data — the cost of a false alarm (one unnecessary rotation) is trivially lower than the cost of delayed response.
+
+#### 57.5.2 Emergency Steps
+
+1. **Declare P0 incident immediately** per INCIDENT_RESPONSE R-01 §1.3. Record the declaration timestamp — GDPR Art. 33 72-hour clock begins at first reasonable suspicion of exposure, not at confirmed scope.
+2. **Skip maintenance window notice.** Post to `#incidents`: *"Emergency service_role JWT rotation in progress. Short disruption possible. Updates in 15 minutes."*
+3. **Elevate PAM to `destructive` tier** (SSO_SCIM §24.3): founder + security-engineer dual-authorise; FIDO2 WebAuthn required; 15-minute session.
+4. **Emit `admin.emergency_key_rotation` DEC-030 CRITICAL event before Step 5.** This is the hard DEC-030 invariant even in emergency mode — the event must precede the rotation action:
+
+```jsonc
+{
+  "event_type": "admin.emergency_key_rotation",
+  "severity": "CRITICAL",
+  "retention_years": 7,
+  "actor_user_id": "{rotating_engineer_uuid}",
+  "metadata": {
+    "key_name": "SUPABASE_SERVICE_ROLE_JWT",
+    "trigger": "trufflehog_detection | log_leak | anomalous_query | third_party_report | pitr_post_rotation",
+    "incident_id": "{linear_p0_issue_id}",
+    "pam_session_id": "{destructive_tier_pam_session_id}",
+    "second_person_user_id": "{founder_uuid}",
+    "gdpr_art33_clock_started_iso": "{declaration_timestamp_iso8601}",
+    "gdpr_art33_deadline_iso": "{72h_from_declaration_iso8601}",
+    "scope_assessment_status": "in_progress"
+  }
+}
+```
+
+5. Execute §57.4.1 through §57.4.7 at emergency pace. Two-person mode: one operates Supabase console; one operates `wrangler` CLI + `gh` CLI. Skip the 45-minute budget — target < 20 minutes total.
+6. **Request Supabase immediate invalidation** (parallel to Step 5): open Supabase support ticket requesting instant invalidation of the old service_role key rather than waiting for the 15-minute grace period. Supabase support typically responds within 15 minutes for P0 requests.
+7. **Scope assessment after rotation complete:** query Supabase access log for the compromised key's last successful and last anomalous access. File as ENC-EMRG-E-001 evidence. Cross-reference `audit_log_events` for any events emitted using the compromised key.
+8. **Enterprise tenant notification** (INCIDENT_RESPONSE §6.2 Template E-02) if scope assessment cannot rule out cross-tenant data access. GDPR Art. 33 notification to supervisory authority (CNIL/ICO/Datatilsynet per tenant domicile) if Art. 9 data is confirmed in scope.
+
+---
+
+### 57.6 HMAC Chain Continuity During Rotation
+
+**Why service_role JWT rotation does not break the HMAC chain:**
+
+The DEC-030 HMAC audit chain uses `HMAC_AUDIT_CHAIN_KEY` — a separate Cloudflare Workers Secret — to sign each event. The `SUPABASE_SERVICE_ROLE_JWT` is the Postgres authentication credential; it is not used in HMAC computation. Therefore, rotating the service_role JWT does not affect chain integrity, provided:
+
+1. The `emit-audit-event` Worker has the new service_role JWT **before** any post-rotation audit events are attempted.
+2. The HMAC chain continuity verification in §57.4.6 Check 3 confirms zero broken links post-rotation.
+3. No audit events are permanently dropped during the 60-second propagation window (Workers retry with exponential backoff: 3 retries at 2s/4s/8s per DEC-030 §3.1).
+
+**Dead-letter handling for the propagation window:** Any events that exhaust retries during the 60-second window are written to `r2://form-audit-logs/dlq/` with `delivery_failed: true`. These events are not chain breaks — they are missing links documented and disclosed in ENC-E-012. Until the `audit-chain-rehydration` pg_cron job (OQ-ENC-02, M7) exists, dead-letter events are backfilled manually within 24 hours of rotation. The auditor is informed via ENC-E-012 that up to 3–4 events may appear in the dead-letter queue during each rotation window.
+
+**Partial resolution of OQ-ENC-02:** This analysis confirms that service_role JWT rotation is chain-safe without the `key_version` column. The full dual-key design required for `HMAC_AUDIT_CHAIN_KEY` rotation (a different and more complex operation) remains deferred to M7 per the original schedule — that rotation blocks on the chain continuity mechanism, not on the service_role mechanism.
+
+---
+
+### 57.7 Automated Rotation Reminder Pipeline (Advances ENC-GAP-001)
+
+**`workers/key-rotation-monitor`** — Cloudflare Workers Cron, daily at 09:00 UTC.
+
+**KV schema** (`KEY_ROTATION_KV` namespace, key: `rotation:{key_name}`):
+
+```jsonc
+{
+  "last_rotated_at": "2026-06-02T09:15:00Z",   // Set by §57.4.8 Step 4
+  "rotation_period_days": 90,
+  "next_rotation_due": "2026-08-31T09:15:00Z", // Computed: last_rotated_at + 90 days
+  "responsible_engineer": "security-engineer",
+  "pagerduty_schedule_id": "{pd_schedule_id}",
+  "linear_template_id": "{linear_template_id}",
+  "last_reminder_sent_at": "ISO-8601 UTC | null"
+}
+```
+
+**Reminder cadence:**
+
+| Days until expiry | DEC-030 event | Severity | PagerDuty action | Slack channel |
+|---|---|---|---|---|
+| 14 | `admin.key_rotation_reminder` LOW | Info | Scheduled event created; Linear issue auto-opened | `#security` |
+| 7 | `admin.key_rotation_reminder` LOW | Low | Scheduled event escalated | `#security` |
+| 3 | `admin.key_rotation_reminder` MEDIUM | P2 | P2 page to security-engineer | `#security` + DM |
+| 0 (overdue) | `admin.key_rotation_overdue` HIGH | P1 | P1 page to security-engineer + devops-lead | `#incidents` |
+| +3 (critical overdue) | `admin.key_rotation_overdue` HIGH | P0 | P0 page to founder + security-engineer | `#incidents` + PagerDuty |
+
+**Alert rules** (register in `docs/OBSERVABILITY.md §6` under `key_rotation_health`):
+
+| Alert ID | Condition | Severity | First response |
+|---|---|---|---|
+| **AL-KEY-01** | `days_until_expiry ≤ 3` for any key in `KEY_ROTATION_KV` | P1 | Security-engineer begins rotation planning within 4h |
+| **AL-KEY-02** | `days_until_expiry ≤ 0` for any key | P0 | Founder + security-engineer; rotate within 4h; if not complete by +3 days, declare P1 incident |
+
+---
+
+### 57.8 SOC 2 Evidence Artefacts
+
+| Artefact ID | Description | Collection method | Filed by | Cadence |
+|---|---|---|---|---|
+| **ENC-E-002** | Rotation event log — all `admin.encryption_key_rotated` DEC-030 events for the observation period | `SELECT * FROM audit_log_events WHERE event_type = 'admin.encryption_key_rotated' AND event_ts BETWEEN $obs_start AND $obs_end ORDER BY event_ts` | compliance-officer | Per observation period |
+| **ENC-E-009** | New key `iat` claim — decoded issued-at timestamp from rotated JWT (confirms rotation date; JWT itself is never stored) | Decode JWT payload section: `base64url_decode(split_part($jwt, '.', 2))->>'iat'`; store Unix timestamp only | security-engineer | Per rotation |
+| **ENC-E-010** | Workers Secret update confirmation — `wrangler secret list` output for all 5 Workers showing `SUPABASE_SERVICE_ROLE_JWT` updated timestamp | `wrangler secret list --name {worker}` for each of 5 Workers; screenshot per rotation | devops-lead | Per rotation |
+| **ENC-E-011** | GitHub Actions secret update confirmation | `gh secret list --repo Rbit27/form \| grep SUPABASE_SERVICE_ROLE_KEY`; screenshot showing update timestamp | devops-lead | Per rotation |
+| **ENC-E-012** | Post-rotation HMAC chain integrity report — zero broken links confirmed (plus dead-letter queue count if non-zero) | §57.4.6 Check 3 SQL output; dead-letter R2 object count from `wrangler r2 object list form-audit-logs --prefix=dlq/` | security-engineer | Per rotation |
+| **ENC-E-013** | 1Password item history — rotation actor and timestamp metadata (JWT value redacted) | 1Password → FORM vault → SUPABASE_SERVICE_ROLE_JWT → Item history export; redact the `secret` field; retain `updated_at`, `updated_by` metadata | compliance-officer | Per rotation |
+
+**Evidence storage path:** `compliance/evidence/enc/service-role-rotation-{YYYY-MM-DD}/` in the private compliance repository. All six artefacts must be present before the rotation Linear issue is closed.
+
+**Auditor note on JWT non-disclosure:** ENC-E-009 captures only the `iat` (issued-at Unix timestamp), not the JWT string. Storing the active credential in any evidence file constitutes a C1.2 confidential-information exposure — a control failure worse than the gap it purports to document. Auditors verify rotation cadence from the `iat` timestamp history, not from the JWT value.
+
+---
+
+### 57.9 Gap Closure Status
+
+| Gap / OQ | Status before §57 | Status after §57 | Closes when |
+|---|---|---|---|
+| **ENC-GAP-004** — service_role JWT not rotated since setup | 🔴 P0 CRITICAL | 🟡 **Authored** | 🟢 first scheduled rotation executed + ENC-E-009 through ENC-E-013 filed |
+| **ENC-GAP-001** — no automated rotation reminders | 🟡 MEDIUM | 🟡 **Authored** | 🟢 `workers/key-rotation-monitor` deployed + first reminder cycle complete |
+| **OQ-ENC-01** — service_role JWT rotation runbook | Open | ✅ **Resolved** | §57 IS the runbook |
+| **OQ-ENC-03** — `admin.encryption_key_rotated` DEC-030 event | Open | ✅ **Resolved** | §57.4.7 specifies full payload; register in AUDIT_LOG_SCHEMA.md per §57.11 item 6 |
+| **OQ-ENC-02** — HMAC chain `key_version` column | Open | ⚠️ **Partially resolved** | §57.6 confirms service_role rotation is chain-safe without `key_version`; full dual-key design for HMAC_AUDIT_CHAIN_KEY remains M7 |
+
+**§56 control table update:** The CC6.7 row `SUPABASE_SERVICE_ROLE_JWT rotation (90 days)` advances from 🔴 ENC-GAP-004 to 🟡 Authored. Advances to 🟢 upon execution of first rotation + evidence filing before M5.
+
+---
+
+### 57.10 SOC 2 Mapping
+
+| Criterion | Control | Evidence artefacts |
+|---|---|---|
+| **CC6.7** — Transmission and disclosure confidentiality | 90-day rotation limits exposure window of the highest-privilege credential; any credential observed in transit becomes worthless within 90 days | ENC-E-002 (rotation event log showing cadence); ENC-E-009 (`iat` history) |
+| **CC6.8** — Software protection against unauthorised access | Rotation removes standing credentials from developer machines (§57.4.5 24h deadline), CI pipelines (§57.4.4), and all edge Workers within the 15-minute grace period; AL-KEY-01/02 prevent expiry drift | ENC-E-010, ENC-E-011, ENC-E-013 |
+| **C1.1** — Identification of confidential information | `SUPABASE_SERVICE_ROLE_JWT` is classified Restricted per §13 data classification (bypasses all RLS, accesses Art. 9 data); 90-day rotation schedule exceeds the CRYPTOGRAPHY_POLICY.md minimum | ENC-E-002 + §56.3 key inventory |
+| **CC7.2** — Monitoring for environmental threats | AL-KEY-01 (P1, ≤3 days) and AL-KEY-02 (P0, overdue) provide continuous credential expiry monitoring; `admin.key_rotation_overdue` HIGH DEC-030 event creates tamper-evident overdue record | ENC-E-002 (overdue events = 0 in compliant periods) |
+| **CC9.2** — Third-party vendor risk | Rotation cadence (90 days) is more frequent than the Supabase platform's own rotation recommendation (annual); demonstrates active management of the highest-risk sub-processor credential | ENC-E-002 rotation cadence visible to auditor |
+
+---
+
+### 57.11 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Confirm `.env*` in `.gitignore`; run `git ls-files --error-unmatch .env` to confirm no env files are tracked; fix and commit if any are found | platform-engineer | **P0** | Immediately (today) |
+| 2 | Add `SUPABASE_SERVICE_ROLE_JWT` pattern to `trufflehog.toml` deny-list (§50.1 TruffleHog config); confirm CI blocks a test commit containing a fake service_role-format JWT | security-engineer | **P0** | Before M5 enterprise GA |
+| 3 | Execute first scheduled rotation using this runbook (§57.3 pre-checklist → §57.4 steps → §57.4.8 close). File ENC-E-009 through ENC-E-013 to `compliance/evidence/enc/service-role-rotation-{YYYY-MM-DD}/` | security-engineer + devops-lead | **P0** | Before M5 enterprise GA |
+| 4 | Update 1Password FORM vault `SUPABASE_SERVICE_ROLE_JWT` item note with rotation date, next-due date, and Linear issue ID (§57.4.8 Step 1) | security-engineer | **P0** | Immediately after item 3 |
+| 5 | Create `KEY_ROTATION_KV` Cloudflare Workers KV namespace; seed `rotation:SUPABASE_SERVICE_ROLE_JWT` record with `last_rotated_at` = date of first rotation (item 3) and `rotation_period_days: 90` | devops-lead | **P0** | Immediately after item 3 |
+| 6 | Register all six DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` under `### Admin` event registry: `admin.key_rotation_initiated` (CRITICAL, 7yr), `admin.encryption_key_rotated` (CRITICAL, 7yr), `admin.key_rotation_announced` (HIGH, 7yr), `admin.emergency_key_rotation` (CRITICAL, 7yr), `admin.key_rotation_reminder` (LOW, 3yr), `admin.key_rotation_overdue` (HIGH, 7yr) | compliance-officer | **P0** | Before M5 enterprise GA |
+| 7 | Scaffold `workers/key-rotation-monitor`: Cron Worker (daily 09:00 UTC); reads `KEY_ROTATION_KV`; computes days-until-expiry; emits `admin.key_rotation_reminder` DEC-030 LOW at 7 days; fires AL-KEY-01 at ≤3 days; fires AL-KEY-02 at ≤0 days; fires `admin.key_rotation_overdue` HIGH at ≤0 | platform-engineer | **P1** | M6 |
+| 8 | Configure AL-KEY-01 (P1, ≤3 days) and AL-KEY-02 (P0, ≤0 days) in PagerDuty; add both rules to `docs/OBSERVABILITY.md §6` under `key_rotation_health` subsection | devops-lead | **P1** | M6 |
+| 9 | Conduct emergency rotation tabletop (§57.5) with security-engineer + devops-lead: execute dry-run against staging project; time against 1-hour RTO target; document gaps | security-engineer | **P1** | M7 |
+| 10 | Update §51 Consolidated Gap Register: ENC-GAP-004 🔴 → 🟡 immediately (this section); → 🟢 after item 3 execution; ENC-GAP-001 🟡 → 🟡 Authored | compliance-officer | **P1** | After items 3 and 7 |
+
+---
+
+### 57.12 Open Questions
+
+| OQ | Resolution |
+|---|---|
+| **OQ-ENC-01** | ✅ **Closed.** §57 is the rotation runbook. No further specification needed. |
+| **OQ-ENC-03** | ✅ **Closed.** `admin.encryption_key_rotated` full payload specified in §57.4.7. Register in `docs/AUDIT_LOG_SCHEMA.md` per checklist item 6. |
+| **OQ-ENC-02** | ⚠️ **Partially resolved.** §57.6 confirms service_role JWT rotation is chain-safe (HMAC key is a separate Cloudflare Workers Secret). The full dual-key `key_version` migration for `HMAC_AUDIT_CHAIN_KEY` rotation remains at M7 — no new information changes that schedule. |
+
+---
+
+*v2.9 (2026-06-02): §57 Supabase `service_role` JWT Rotation Runbook — Scheduled & Emergency · CC6.7/CC6.8/C1.1. Closes ENC-GAP-004 (🔴 P0 CRITICAL → 🟡 Authored; 🟢 upon first rotation execution + ENC-E-009 through ENC-E-013 filed before M5). Closes OQ-ENC-01 (this section IS the runbook). Closes OQ-ENC-03 (`admin.encryption_key_rotated` CRITICAL event fully specified: key_name, rotation_type, pam_session_id, second_engineer_user_id, new_key_iat, consumers_updated[], hmac_chain_intact_post_rotation, next_rotation_due_iso; 7-year retention). Partially resolves OQ-ENC-02 (service_role rotation confirmed chain-safe; HMAC_AUDIT_CHAIN_KEY dual-key design deferred M7). Advances ENC-GAP-001 (automated reminder pipeline specified; 🟡 Authored; 🟢 upon workers/key-rotation-monitor deploy). Rotation scope: 7 consumers (pam-db-proxy Supabase Vault + 5 Cloudflare Workers Secrets + GitHub Actions). Three rotation types: Scheduled (90-day cadence, PAM read_write, 2-person, 45-min window), Emergency (P0 incident, PAM destructive, 2-person, 1-hour RTO, GDPR Art.33 clock, skip grace-period via Supabase support), Infrastructure repair (post-PITR, 4-hour RTO, R-18 co-activation). Eight-step scheduled procedure with 15-minute Supabase grace-period budget and 60-second Cloudflare propagation pause. Emergency trigger matrix: 6 conditions including TruffleHog detection, FORM-HEALTH-LEAK-001 alert, anomalous query volume, third-party report, team member suspicion (gut-call valid), PITR post-rotation. Hard DEC-030 invariant: admin.key_rotation_initiated CRITICAL event must precede all rotation steps — rotating without emitting this event triggers AL-PAM-01 review. Privacy invariant on evidence: JWT value must never appear in any DEC-030 event, Linear ticket, Slack message, or evidence artefact — ENC-E-009 captures only the iat Unix timestamp. Six DEC-030 events (all 7-year retention except admin.key_rotation_reminder LOW 3yr): admin.key_rotation_initiated (CRITICAL), admin.encryption_key_rotated (CRITICAL — closes OQ-ENC-03), admin.key_rotation_announced (HIGH), admin.emergency_key_rotation (CRITICAL — gdpr_art33_clock_started field), admin.key_rotation_reminder (LOW, 3yr), admin.key_rotation_overdue (HIGH). HMAC chain continuity analysis: service_role JWT is Postgres auth credential, not the HMAC signing key — rotation cannot break chain; dead-letter R2 path for 60-second propagation window documented; backfill responsibility until OQ-ENC-02 resolved. KEY_ROTATION_KV namespace: workers/key-rotation-monitor Cron daily 09:00 UTC; last_rotated_at + rotation_period_days = next_rotation_due; two alert rules AL-KEY-01 P1 (≤3 days) + AL-KEY-02 P0 (≤0 days) registered in OBSERVABILITY.md §6 key_rotation_health. Six evidence artefacts ENC-E-002 (existing from §56) + ENC-E-009 through ENC-E-013 (new): iat timestamp, Workers Secret list screenshots × 5, GitHub Actions secret list, HMAC chain check output, 1Password item history. Evidence stored at compliance/evidence/enc/service-role-rotation-{YYYY-MM-DD}/. SOC 2: CC6.7 (rotation limits transit exposure window), CC6.8 (24h dev env cleanup + AL-KEY enforcement), C1.1 (Restricted-tier credential lifecycle), CC7.2 (AL-KEY-01/02 continuous monitoring), CC9.2 (90-day exceeds Supabase annual baseline). 10-item checklist: 6× P0 (gitignore + TruffleHog + first rotation + 1Password + KV seed + AUDIT_LOG_SCHEMA registry), 3× P1 (key-rotation-monitor Worker + PagerDuty rules + tabletop), 1× P1 (§51 gap register update). Owner: security-engineer + devops-lead + compliance-officer.*
