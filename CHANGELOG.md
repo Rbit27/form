@@ -6,6 +6,13 @@
 
 ---
 
+## [1.59.0] — 2026-06-02
+
+### Added
+- [`docs/INCIDENT_RESPONSE.md §R-16`](docs/INCIDENT_RESPONSE.md) — R-16 Application Secret & Encryption Key Exposure: standalone runbook triggered by Workers Secret / encryption key / API credential discovery (TruffleHog CI, GHAS push alert, external researcher, vendor usage anomaly). Trigger matrix: 11 secret types across P0–P2 (P0: `keypoints_enc`, JWT signing secret, Supabase service role key, SCIM master token; P1: HMAC chain key, Stripe webhook, Anthropic API key, attestation signing key; P2: ElevenLabs, PostHog, Sentry DSN). Nine-step ordered rotation sequence with user-impact analysis; JWT secret last due to full session invalidation. Special procedures: HMAC chain epoch transition (compliance-officer sign-off, old key cold storage 7yr, `secret.hmac_epoch_transitioned` DEC-030 — distinct from R-05 unintended break); `keypoints_enc` re-encryption TypeScript scaffold (batched AES-256-GCM, PAM `destructive` tier gate, two-person auth, zero-row post-migration verification). GDPR assessment matrix: service role key = presumed breach → R-01; keypoints_enc + DB access → R-11; JWT + forged sessions → Art. 33 assessment. Seven DEC-030 HMAC-chained events (CRITICAL/HIGH/STANDARD, 7yr/3yr). Appendix A quick reference updated with R-15 and R-16 entries. Document header corrected v0.8 → v1.1 (v0.9 and v1.0 body additions were present but header was stale). SOC 2: CC6.4 (credential lifecycle), CC7.1 (TruffleHog + GHAS + R-16 layered detection), CC7.4 (DEC-030 sub-chain), CC5.2 (AL-SECRETS-01 alert).
+
+---
+
 ## [1.58.1] — 2026-06-01
 
 ### Added

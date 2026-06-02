@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v0.8
+# FORM · Incident Response Runbook v1.1
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -4390,6 +4390,322 @@ If investigation confirms field was scrubbed and not transmitted:
 
 ---
 
+### R-16: Application Secret & Encryption Key Exposure
+
+> **Scope:** Triggered when a Workers Secret, application encryption key, or third-party API credential is discovered to have been exposed — via TruffleHog CI, GitHub Advanced Security (GHAS), bug bounty report, or internal discovery. Distinct from R-03 (user credential compromise), R-04 (SAML certificate), R-08 (supply chain attack — rotation is remediation there), R-09 (ransomware), R-11 (CV biometric breach — activated in parallel when `keypoints_enc` is affected). References: `docs/CRYPTOGRAPHY_POLICY.md`, SOC2_READINESS.md §50 (TruffleHog), SSO_SCIM_IMPLEMENTATION.md §24 (PAM break-glass for destructive DB operations).
+
+#### Trigger Matrix
+
+| Secret | Storage | Blast Radius | Severity |
+|---|---|---|---|
+| `keypoints_enc` (AES-256-GCM key for CV biometric data) | Cloudflare Workers Secret | All `cv_sessions.keypoints_enc` decryptable — GDPR Art. 9 biometric data | **P0** — activate R-11 in parallel |
+| `SUPABASE_JWT_SECRET` (JWT signing key) | Supabase project setting | All user sessions forgeable; enterprise admin sessions at risk | **P0** |
+| Supabase service role key (`SUPABASE_SERVICE_ROLE_KEY`) | Cloudflare Workers Secret | BYPASSRLS — full DB read/write access across all tenants | **P0** — activate R-01 immediately |
+| SCIM bearer token master secret (`SCIM_TOKEN_SIGNING_SECRET`) | Cloudflare Workers Secret / KV | All SCIM integrations impersonatable; employee directory accessible | **P0** |
+| HMAC audit chain signing key (`AUDIT_HMAC_KEY`) | Cloudflare Workers Secret | Audit log integrity unverifiable; SOC 2 chain evidence invalidated | **P1** |
+| Stripe webhook signing secret (`STRIPE_WEBHOOK_SECRET`) | Cloudflare Workers Secret | Fraudulent Stripe events injectable; subscription manipulation | **P1** |
+| Anthropic API key (`ANTHROPIC_API_KEY`) | Cloudflare Workers Secret | AI API billing fraud; no user data exposure without DB access | **P1** |
+| Compliance attestation signing key (`ATTESTATION_SIGNING_KEY`) | Cloudflare Workers Secret | `tenant_deletion_attestations` HMAC signatures forgeable | **P1** |
+| ElevenLabs API key (`ELEVENLABS_API_KEY`) | Cloudflare Workers Secret | TTS billing fraud; no user data exposure | **P2** |
+| PostHog project key (`POSTHOG_API_KEY`) | Cloudflare Workers Secret | Analytics data poisoning; no GDPR Art. 9 data in PostHog | **P2** |
+| Sentry DSN (`SENTRY_DSN`) | Workers Secret / client bundle | Attacker can inject fake error events; no outbound PII risk if scrubber active | **P2** |
+
+**Severity upgrade rule:** Any P1 or P2 secret is upgraded to P0 if (a) the exposure window assessment (below) confirms unauthorized access, or (b) the secret was in a public repository for > 24 hours.
+
+#### Trigger Events
+
+1. **GitHub Advanced Security (GHAS) push alert** — credential detected before or after commit reaches GitHub
+2. **TruffleHog CI failure** — `trufflehog-scan` CI job detected a secret pattern (SOC2_READINESS.md §50 / CC5-GAP-003)
+3. **Cloudflare Audit Log anomaly** — Workers Secret read from unexpected IP or service account (AL-SECRETS-01)
+4. **External security researcher / bug bounty report** — credential found in public repository, pastebins, or leaked logs
+5. **Team member discovery** — production credentials found in a screenshot, shared document, or Slack message
+6. **Vendor usage anomaly** — unexpected spike in Anthropic, ElevenLabs, or Stripe API usage in the Anthropic/vendor console
+
+#### Immediate Actions (T+0 to T+15 min)
+
+```
+CRITICAL: DO NOT rotate immediately — rotation order matters and some rotations
+cause immediate user impact (JWT secret rotation = ALL sessions invalidated).
+
+1. Open restricted incident channel: #inc-YYYYMMDD-secrets
+   Members: IC + security-engineer + compliance-officer + founder only
+   Do NOT add HR or engineering team until legal review (R-12 insider exception
+   applies if internal team member caused the exposure)
+
+2. Identify WHICH secret was exposed (from trigger event details)
+
+3. Determine EXPOSURE WINDOW: when was the secret first accessible?
+   a. Git-committed credential:
+      git log --all --full-history -S "ANTHROPIC_API_KEY" --format="%H %ci" | head -5
+   b. GHAS alert: use GHAS first_detected_at timestamp
+   c. Public repo: assume exposure from commit timestamp (GitHub indexes within minutes)
+
+4. Open Linear ticket [R16-YYYYMMDD]; emit `incident.opened` DEC-030 event
+5. P0: page founder + security-engineer simultaneously
+6. P1: page security-engineer; notify founder within 30 min
+7. P2: security-engineer handles in business hours unless exposure window > 24h
+```
+
+#### Exposure Window Assessment (T+15 to T+60 min)
+
+**Goal: determine whether the secret was USED (accessed), not just exposed.**
+
+**Supabase service role key** — check for unexpected access:
+```sql
+-- Run via Supabase Dashboard → Logs → API Logs
+-- Any user_agent not matching expected FORM service accounts = R-01 immediately
+SELECT timestamp, path, method, status_code, user_agent
+FROM   supabase_api_logs
+WHERE  timestamp BETWEEN $exposure_start AND $exposure_end
+  AND  user_agent NOT LIKE 'FORM-Worker/%'
+ORDER  BY timestamp;
+```
+
+**Anthropic API key** — check Anthropic Console → Usage for the exposure window:
+```
+→ Look for: unexpected IPs, model versions FORM does not use, requests outside
+  expected volume patterns
+→ Estimate financial impact: unauthorized tokens × current Anthropic pricing
+→ No user data exposure from Anthropic key alone (Victor sessions require DB access too)
+```
+
+**JWT signing secret** — check for forged sessions:
+```sql
+SELECT tenant_id, user_id, created_at, ip_address, user_agent
+FROM   enterprise_sessions
+WHERE  created_at BETWEEN $exposure_start AND $exposure_end
+  AND  authenticated_via = 'direct'   -- non-SSO sessions most at risk of forgery
+ORDER  BY created_at;
+-- Any session with an unexpected IP not matching user's prior pattern?
+-- If yes: activate R-03 for those users + enterprise tenants
+```
+
+**keypoints_enc encryption key** — biometric exposure is conditional on DB access:
+```
+→ The key alone does not decrypt data — attacker also needs to access cv_sessions.
+→ Was Supabase accessible during the exposure window (via service role key or RLS bypass)?
+→ If YES: treat as R-11 + GDPR Art. 33 clock starts at awareness time.
+→ If NO confirmed DB access: rotation is required but Art. 33 may not be triggered.
+   Document this assessment with evidence in the incident channel.
+```
+
+#### Rotation Sequence
+
+**Order is critical. Follow this sequence when multiple secrets are exposed simultaneously:**
+
+| Step | Secret | User Impact | Notes |
+|---|---|---|---|
+| 1 | Supabase service role key | None | Assess R-01 before or in parallel |
+| 2 | SCIM bearer token master secret | SCIM re-provision cycle per tenant | Notify CSM team |
+| 3 | Anthropic API key | None | Parallel with step 2 |
+| 4 | ElevenLabs / PostHog / Sentry keys | None | Parallel with step 3 |
+| 5 | Stripe webhook signing secret | None | Update in Stripe Dashboard + Workers Secret |
+| 6 | Compliance attestation signing key | None | Old key to cold storage; document chain-of-custody |
+| 7 | HMAC audit chain signing key | SOC 2 chain epoch break | See §R-16 special procedure; compliance-officer approval required |
+| 8 | `keypoints_enc` encryption key | CV feature temporarily disabled | See §R-16 biometric re-encryption; R-11 parallel |
+| 9 | JWT signing secret | **ALL user sessions invalidated** | Last; 30 min pre-notification to enterprise tenants |
+
+**Never reorder without unanimous IC + security-engineer + compliance-officer agreement.**
+
+#### HMAC Audit Chain Key Rotation (Special Procedure)
+
+Rotating `AUDIT_HMAC_KEY` creates a **chain epoch boundary**. This is NOT the same as an R-05 (unintended chain break) — it is a planned, documented transition.
+
+```
+Before rotating AUDIT_HMAC_KEY:
+1. Export and verify the current chain:
+   SELECT verify_hmac_chain(
+     start_seq := (SELECT MIN(seq) FROM audit_log_events),
+     end_seq   := (SELECT MAX(seq) FROM audit_log_events)
+   ) AS chain_verified;
+   → Save output: compliance/evidence/audit-chain/pre-rotation-YYYYMMDD.json
+
+2. Compliance-officer signs off on the epoch transition:
+   File: compliance/evidence/audit-chain/epoch-transition-YYYYMMDD.md
+   Content: reason, IC identity, compliance-officer identity, last pre-rotation seq, timestamp
+
+3. Generate new key: openssl rand -hex 32
+   Deploy as AUDIT_HMAC_KEY in Cloudflare Workers Secrets
+
+4. Store old key in cold storage (encrypted, access-controlled) for 7 years
+   Required to verify pre-rotation chain events during future SOC 2 audits
+
+5. Emit `secret.hmac_epoch_transitioned` DEC-030 event with:
+   old_epoch_last_seq, new_epoch_first_seq, transition_reason, authorised_by
+
+6. Update docs/AUDIT_LOG_SCHEMA.md §5 to document the epoch boundary
+   (Auditors will see a verification gap without this cross-reference)
+```
+
+#### `keypoints_enc` Re-Encryption (biometric data)
+
+Always activate R-11 in parallel. Requires PAM `destructive` tier elevation (SSO_SCIM_IMPLEMENTATION.md §24) and two-person authorisation before execution.
+
+```typescript
+// workers/cv-key-migration/index.ts — triggered by form_admin via PAM elevation only
+async function reEncryptKeypoints(
+  oldKey: string,
+  newKey: string,
+  db: SupabaseClient,
+  incidentId: string,
+  rotationStartedAt: string,
+) {
+  const BATCH_SIZE = 500;
+  let cursor = 0;
+  let totalReEncrypted = 0;
+
+  while (true) {
+    const { data: rows } = await db
+      .from('cv_sessions')
+      .select('id, keypoints_enc')
+      .not('keypoints_enc', 'is', null)
+      .range(cursor, cursor + BATCH_SIZE - 1);
+
+    if (!rows || rows.length === 0) break;
+
+    for (const row of rows) {
+      const plaintext     = await aesGcmDecrypt(row.keypoints_enc, oldKey);
+      const newCiphertext = await aesGcmEncrypt(plaintext, newKey);
+      await db.from('cv_sessions').update({ keypoints_enc: newCiphertext }).eq('id', row.id);
+    }
+    totalReEncrypted += rows.length;
+    cursor += BATCH_SIZE;
+    if (totalReEncrypted % 5_000 === 0) {
+      await emitAuditEvent(db, {
+        event_type: 'secret.biometric_re_encryption_progress',
+        severity:   'STANDARD',
+        metadata:   { rows_completed: totalReEncrypted, incident_id: incidentId },
+      });
+    }
+  }
+
+  // Verify: no row remains encrypted with old key (check updated_at)
+  const { count } = await db
+    .from('cv_sessions')
+    .select('id', { count: 'exact' })
+    .not('keypoints_enc', 'is', null)
+    .lt('updated_at', rotationStartedAt);
+
+  if (count !== 0) throw new Error(`Re-encryption incomplete: ${count} rows not migrated`);
+
+  await emitAuditEvent(db, {
+    event_type: 'secret.biometric_re_encryption_completed',
+    severity:   'CRITICAL',
+    metadata:   {
+      incident_id:                        incidentId,
+      rows_re_encrypted:                  totalReEncrypted,
+      zero_remaining_old_key_rows_verified: true,
+    },
+  });
+}
+```
+
+After re-encryption: remove `KEYPOINTS_ENC_OLD` Workers Secret. Confirm all `cv_sessions.keypoints_enc` rows have `updated_at ≥ rotation_started_at`.
+
+#### JWT Signing Secret Rotation
+
+```
+Pre-rotation (30 min advance notice when timeline allows — immediate if P0):
+→ Send Template E-ROTATE-01 to all enterprise tenant admins (§6 Communication Templates):
+  Subject: "FORM planned authentication maintenance [DATE] [TIME UTC]"
+  Body:    "A brief maintenance window requires all users to re-authenticate.
+            SSO users are re-authenticated automatically via your identity provider.
+            Non-SSO users will need to log in again. Duration: ~5 minutes."
+
+Rotation:
+1. Supabase Dashboard → Project Settings → API → JWT Secret → Rotate
+2. Update SUPABASE_JWT_SECRET in all Cloudflare Workers: wrangler deploy --env production
+3. Confirm all Workers serving new JWT verification within 2 minutes
+
+Post-rotation monitoring (T+0 to T+30 min after rotation):
+→ Monitor OBSERVABILITY.md §13 SSO error rate dashboard
+→ Expected: authentication surge (normal — sessions re-establish)
+→ Alert threshold: SSO error rate > 5% sustained for > 5 min post-rotation
+  → Page security-engineer; Workers Secret propagation issue likely
+```
+
+#### GDPR Assessment
+
+| Secret Exposed | Art. 9 Data at Risk? | Art. 33 Required? | Action |
+|---|---|---|---|
+| `keypoints_enc` key only, no confirmed DB access | Possible | Case-by-case — consult compliance-officer | Art. 33 assessment within 12h; partial filing at T+48h if uncertain |
+| `keypoints_enc` + confirmed DB access | **YES** — biometric data | **YES** | R-01 + R-11 immediately; GDPR 72h clock owner: compliance-officer |
+| Supabase service role key (any exposure) | **YES** — BYPASSRLS across all tables | **YES — presumed breach** | R-01 immediately; Art. 34 assessment |
+| JWT secret exposed, unauthorized sessions found | Indirect (session forgery enables access) | Assessment required | Investigate sessions; if forged: Art. 33 clock starts |
+| Anthropic / ElevenLabs / PostHog / Sentry | NO | NO | No Art. 33 obligation; document in evidence |
+| HMAC chain key | NO (chain key ≠ data key) | NO | Epoch documentation; notify audit firm if SOC 2 observation period active |
+| Stripe webhook secret | NO | NO | Financial fraud assessment only |
+
+#### DEC-030 Audit Events
+
+| Event Type | Severity | Retention | Key Metadata |
+|---|---|---|---|
+| `secret.exposure_discovered` | CRITICAL | 7 years | `secret_type`, `exposure_vector`, `exposure_window_start_utc`, `access_confirmed` |
+| `secret.rotation_initiated` | HIGH | 7 years | `secret_type`, `initiated_by`, `estimated_user_impact` |
+| `secret.rotation_completed` | HIGH | 7 years | `secret_type`, `rotation_completed_at`, `re_encryption_required` |
+| `secret.biometric_re_encryption_progress` | STANDARD | 3 years | `rows_completed`, `incident_id` |
+| `secret.biometric_re_encryption_completed` | CRITICAL | 7 years | `rows_re_encrypted`, `zero_remaining_old_key_rows_verified` |
+| `secret.hmac_epoch_transitioned` | CRITICAL | 7 years | `old_epoch_last_seq`, `new_epoch_first_seq`, `authorised_by` |
+| `secret.exposure_window_assessed` | HIGH | 7 years | `access_confirmed`, `gdpr_art33_triggered`, `assessment_rationale` |
+
+**Sub-chain rule:** All `secret.*` events form a sub-chain within the master HMAC chain, keyed by `incident_id`. A break in this sub-chain is treated as P0 per R-05.
+
+#### Evidence Package
+
+```
+compliance/evidence/incident-comms/<incident-slug>/
+├── discovery/
+│   ├── trigger-artifact.json       # GHAS alert export / TruffleHog output / researcher report
+│   ├── exposure-window.md          # git log / vendor usage log analysis
+│   └── access-confirmed.md         # yes/no + supporting evidence per secret type
+├── rotation/
+│   ├── rotation-log.md             # timestamp + actor + secret_type per rotation step
+│   ├── tenant-notifications.md     # E-ROTATE-01 delivery confirmation (JWT rotation)
+│   ├── biometric-migration.md      # if keypoints_enc rotated: row counts + verification query
+│   └── hmac-epoch-transition.md    # if AUDIT_HMAC_KEY rotated: epoch boundary + chain export
+├── gdpr/
+│   ├── art33-assessment.md         # mandatory for P0 secrets
+│   └── breach-notification/        # if Art. 33 triggered — follow §15
+└── dec030/
+    └── secret-events-chain.json    # all secret.* DEC-030 events for this incident_id
+```
+
+#### Post-Incident Preventive Controls
+
+1. **TruffleHog CI** (SOC2_READINESS.md §50): confirm `trufflehog-scan` covers Cloudflare Worker config files and `wrangler.toml`, not only `.env` files
+2. **GHAS push protection**: verify enabled on the repository — secrets blocked before reaching GitHub's servers
+3. **Pre-commit hook** (`detect-secrets`): install on all engineer machines; blocks committed secrets before `git push`
+4. **Cloudflare Audit Log alert `AL-SECRETS-01`** (P1): Workers Secret read from IP outside expected Cloudflare CI/CD range → PagerDuty
+5. **CRYPTOGRAPHY_POLICY.md** rotation schedule review: update proactive rotation cadence for the affected secret type based on this incident
+6. **Developer debrief**: engineer involved in the exposure participates in PIR and refreshes secret handling training
+
+#### SOC 2 Evidence Mapping
+
+| Criterion | Control | Evidence Artefact |
+|---|---|---|
+| **CC6.4** — Credential lifecycle and revocation | Rotation procedure per key type; rotation log with timestamps and actor IDs | `secret.rotation_completed` DEC-030 events; `compliance/evidence/.../rotation-log.md` |
+| **CC7.1** — Vulnerability identification | TruffleHog CI + GHAS push protection (preventive) + R-16 runbook (detective/corrective) | TruffleHog CI green build artefacts; GHAS alert configuration screenshot |
+| **CC7.4** — Incident response procedures | `secret.exposure_discovered` → `secret.rotation_completed` HMAC chain = auditable timeline | DEC-030 sub-chain for `incident_id` |
+| **CC5.2** — Technology controls include monitoring | AL-SECRETS-01 (Cloudflare Workers Secret access monitoring) = automated credential monitoring | PagerDuty AL-SECRETS-01 rule configuration; Cloudflare audit log screenshot |
+
+#### Implementation Checklist
+
+| Task | Owner | Priority | Milestone |
+|---|---|---|---|
+| Register all 7 `secret.*` DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry with severity and retention | security-engineer | **P0** | M4 |
+| Add Template E-ROTATE-01 (JWT rotation advance notice) to §6 Communication Templates in this document | compliance-officer | **P0** | M4 |
+| Configure Cloudflare Audit Log → PagerDuty alert `AL-SECRETS-01` (P1): Workers Secret reads from IP outside expected Cloudflare CI/CD IP range | devops-lead | **P1** | M4 |
+| Scaffold `workers/cv-key-migration/index.ts` per §R-16.6 pseudocode; implement PAM `destructive` tier gate per SSO_SCIM_IMPLEMENTATION.md §24; add two-person authorisation check before execution | platform-engineer | **P1** | M5 |
+| Add Scenario K to §9 tabletop drill catalog: *Anthropic API key committed to public GitHub fork; 3-hour exposure window; no confirmed unauthorized usage; discovered via GHAS alert on a Friday at 18:42 UTC; on-call engineer is junior; compliance-officer is on PTO* | security-engineer + compliance-officer | **P1** | M5 |
+| Confirm `detect-secrets` pre-commit hook documented in `docs/ENGINEERING_RUNBOOK.md` onboarding checklist | devops-lead | **P2** | M5 |
+| Cross-reference R-16 from R-11 §R-11.3 (keypoints_enc re-encryption section) and R-08 §R-08.5 (full secrets rotation in supply chain scenario) | security-engineer | **P2** | M5 |
+
+---
+
+*v1.1 additions (2026-06-02): R-16 Application Secret & Encryption Key Exposure — standalone runbook for the scenario where a Workers Secret, encryption key, or third-party API credential is discovered to be exposed. Distinct from R-03 (user credentials), R-04 (SSO certificate), R-08 (supply chain attack — secret rotation is remediation step there), R-09 (ransomware), R-11 (biometric breach — activated in parallel when keypoints_enc affected). Trigger matrix: 11 secret types mapped to severity (P0: keypoints_enc / JWT secret / service role key / SCIM master secret; P1: HMAC chain key / Stripe webhook / Anthropic API key / attestation signing key; P2: ElevenLabs / PostHog / Sentry DSN). Severity upgrade: any P1/P2 upgraded to P0 if exposure window > 24h or unauthorized access confirmed. Six trigger vectors: GHAS push, TruffleHog CI, Cloudflare audit log anomaly, external researcher, team member discovery, vendor usage spike. Exposure window assessment procedures per key type: service role key (Supabase API log SQL), Anthropic key (vendor console usage check), JWT secret (enterprise_sessions forged-session SQL), keypoints_enc (conditional — DB access required to decrypt; GDPR assessment deferred until access confirmed). Nine-step ordered rotation sequence: service role key first (no user impact); SCIM / API keys middle; HMAC chain key requires compliance-officer sign-off and epoch documentation; keypoints_enc requires biometric re-encryption Worker; JWT signing secret last (all sessions invalidated; 30 min E-ROTATE-01 notice to enterprise tenants). HMAC epoch transition procedure: pre-rotation chain verification export, compliance-officer sign-off file, old key cold storage for 7 years, `secret.hmac_epoch_transitioned` DEC-030 event distinguishes from R-05 unintended break, AUDIT_LOG_SCHEMA.md epoch boundary documentation. keypoints_enc re-encryption TypeScript scaffold: batched AES-256-GCM decrypt+re-encrypt; 5,000-row progress DEC-030 events; zero-row post-migration verification query; PAM destructive tier gate + two-person auth. JWT rotation procedure: E-ROTATE-01 template (30 min advance notice; immediate if P0), off-peak scheduling for P1, post-rotation auth surge monitoring via OBSERVABILITY §13. GDPR assessment matrix: keypoints_enc without DB access (case-by-case); keypoints_enc with DB access or service role key (presumed breach → R-01 + Art. 33); JWT (investigate forged sessions first); non-data keys (no Art. 33); HMAC key (epoch documentation + notify audit firm). Seven DEC-030 events: secret.exposure_discovered (CRITICAL, 7yr), secret.rotation_initiated (HIGH, 7yr), secret.rotation_completed (HIGH, 7yr), secret.biometric_re_encryption_progress (STANDARD, 3yr), secret.biometric_re_encryption_completed (CRITICAL, 7yr), secret.hmac_epoch_transitioned (CRITICAL, 7yr), secret.exposure_window_assessed (HIGH, 7yr); sub-chain keyed by incident_id; chain break = P0 per R-05. Evidence package: four directories (discovery, rotation, gdpr, dec030). Six post-incident preventive controls: TruffleHog CI path coverage, GHAS push protection, detect-secrets pre-commit, AL-SECRETS-01 Cloudflare alert, CRYPTOGRAPHY_POLICY.md rotation schedule, developer debrief. SOC 2 mapping: CC6.4 (credential lifecycle), CC7.1 (layered vulnerability detection via TruffleHog + GHAS + R-16 runbook), CC7.4 (DEC-030 sub-chain as incident timeline), CC5.2 (AL-SECRETS-01 monitoring). Seven-item implementation checklist: two P0 M4 (AUDIT_LOG_SCHEMA.md event registry, E-ROTATE-01 template), one P1 M4 (AL-SECRETS-01 Cloudflare alert), two P1 M5 (cv-key-migration Worker, Scenario K tabletop), two P2 M5 (detect-secrets onboarding, cross-references from R-11 and R-08). Document header updated v0.8 → v1.1 (v0.9, v1.0 additions preserved in body version notes).*
+
+---
+
 ## Appendix A — Quick Reference Card
 
 For use at 3am. IC: read §1 to classify, open the incident channel, then jump to the relevant runbook in §5.
@@ -4435,6 +4751,16 @@ DSAR / data subject rights?  → R-14 (compliance-officer leads; note Art. 33 cl
   Missed 30-day deadline?    → R-14, P1; deliver ASAP; draft Template D-01 for DPA
   Enterprise employee DSAR?  → R-14.6; notify tenant admin; do not produce without instruction
   Bulk / coordinated abuse?  → R-14.5; Art. 12(5) assessment; notify compliance-officer
+Health data in Sentry error payload? → R-15 (P0 — FORM-HEALTH-LEAK-001 alert; scrubber fires)
+  Confirmed transmission to Sentry?  → R-15 → GDPR Art. 33 assessment → R-01 if breach confirmed
+  Scrubbed before transmission?       → R-15 — no Art. 33 obligation; fix code path + PIR
+Secret / key exposed?        → R-16 (assess exposure window BEFORE rotating — order matters)
+  keypoints_enc key?         → R-16 + R-11 parallel (biometric re-encryption required)
+  Service role key (SUPABASE_SERVICE_ROLE_KEY)? → R-16 + R-01 immediately (BYPASSRLS = presumed breach)
+  JWT signing secret?        → R-16 (all sessions invalidated; notify tenants 30 min before)
+  HMAC audit chain key?      → R-16 + epoch transition procedure; compliance-officer sign-off required
+  Anthropic / ElevenLabs?    → R-16 (check vendor usage logs; no user data exposure unless DB accessed)
+  SCIM master token?         → R-16 (P0; re-sign all tenant SCIM tokens; notify CSM team)
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
