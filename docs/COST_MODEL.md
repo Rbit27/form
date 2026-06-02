@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v1.5
+# FORM · Cost Model & Unit Economics v1.6
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -122,6 +122,17 @@
     - 24.10 DEC-030 Fundraising Audit Events
     - 24.11 Implementation Checklist
     - 24.12 Open Questions (OQ-31 to OQ-33)
+25. [Enterprise Compliance & Legal Infrastructure Cost Model](#25-enterprise-compliance--legal-infrastructure-cost-model)
+    - 25.1 Purpose & Scope
+    - 25.2 Annual Compliance Cost Inventory
+    - 25.3 Per-Deal Legal Overhead
+    - 25.4 Compliance Cost Amortization by Customer Count
+    - 25.5 Seat-Count Break-Even: When Compliance Is Self-Financing per Deal
+    - 25.6 Compliance Cost as % of Enterprise Revenue (operating leverage)
+    - 25.7 Compliance Moat vs. TAM Expansion
+    - 25.8 DEC-030 Compliance Spend Audit Events
+    - 25.9 Implementation Checklist
+    - 25.10 Open Questions (OQ-34 to OQ-36)
 
 ---
 
@@ -3714,3 +3725,439 @@ A Y Combinator-form SAFE is a US legal instrument that presupposes a Delaware C-
 ---
 
 *v1.5 additions: §24 Series A Fundraising Economics & Dilution Modeling — purpose and gap-fill vs §22 (runway) and §23 (NRR) (§24.1); pre-seed cap table baseline with [ESTIMATE] placeholders for round amount ($200k), pre-money ($800k), and founder/investor/ESOP splits pending pre-seed close (§24.2); expanded Series A readiness criteria table adding $500k total ARR, ≥70% gross margin, ≥12 months post-close runway, and data room readiness to the §22.6.1 operational metrics (§24.3); capital requirements model for $2–4M raise across Bear/Base/Bull scenarios with per-category use-of-funds table (engineering headcount, ML/CV infra, enterprise GTM, legal, working capital, G&A) and CEE market rate assumptions (§24.4); three-method pre-money valuation framework: ARR multiple (3–8× range, $240k–$4.2M implied pre-money across scenarios), four-row comparable transactions table (CEE/EU/US fitness and B2B SaaS), and five-factor score-based method with 1–3 scale and [FOUNDER_INPUT] placeholders (§24.5); dilution scenarios table across Bear ($1.5M at $6M pre), Base ($2.5M at $10M pre), Bull ($4M at $16M pre) including 10% ESOP pool refresh impact reducing founder ownership to ~63% post-refresh across all scenarios (§24.6); three-round cap table evolution table (post-formation through illustrative Series B) with fully-diluted reconciliation caveat (§24.7); bridge financing analysis with trigger criteria table (runway < 6 months, ARR < $300k, pipeline > 3 qualified leads), SAFE instrument specification with MFN and valuation cap, three bridge size scenarios ($200k–$500k) with conversion dilution estimates, and Ukrainian SAFE law caveat (§24.8); Series A timing triggers table with six P0/P1 triggers (ARR, NRR, pilot count, gross margin, runway, founder readiness) and breach actions (§24.9); five DEC-030 fundraising audit events (fundraise.term_sheet_received HIGH, fundraise.round_closed CRITICAL, fundraise.bridge_instrument_signed HIGH, fundraise.esop_pool_expanded HIGH, fundraise.cap_table_updated CRITICAL) with key metadata fields and 7-year retention policy (§24.10); implementation checklist with P0/P1 priorities across M4/M5/pre-raise milestones covering cap table tooling, HoldCo legal structure, data room, ARR/NRR/gross margin tracking, legal counsel engagement, DEC-030 event emission, and bridge instrument legal review (§24.11); OQ-31 (pre-money valuation CEE vs US multiple compression — P1, owner: founder, resolution: after first term sheet), OQ-32 (ESOP pool — Ukrainian labour law phantom equity vs options — P1, owner: founder + legal counsel, resolution: before first equity hire), OQ-33 (SAFE not recognised under Ukrainian company law; HoldCo required before any institutional instrument — P0, owner: founder + legal counsel, resolution: before any bridge or institutional meeting) (§24.12).*
+
+---
+
+## 25. Enterprise Compliance & Legal Infrastructure Cost Model
+
+> Owner: compliance-officer + security-engineer + founder. Review: annually at SOC 2 renewal; triggered by each new enterprise deal signed. Audience: founder, investors, enterprise buyers (security questionnaire support), future CFO.
+
+The COGS model in §3 and the enterprise deep-dive in §15 prove that FORM's infrastructure cost per enterprise seat is negligible ($0.34–$0.36/seat/month). What neither section models is the **fixed overhead of being enterprise-grade**: the compliance attestations, legal instruments, insurance policies, and tooling that an enterprise buyer requires before they will sign any contract. These costs are real, largely fixed, and the primary reason the minimum viable enterprise deal must exceed a floor ACV to generate acceptable gross margin. This section quantifies that overhead, models its amortization across the enterprise customer base, and derives the seat-count threshold below which a deal is compliance-cost-negative even at positive infrastructure margin.
+
+---
+
+### 25.1 Purpose & Scope
+
+**What this section answers:**
+
+1. What does it cost FORM annually to maintain enterprise-grade compliance posture, independent of how many customers have signed?
+2. What is the per-deal legal cost of onboarding each enterprise customer?
+3. At what number of enterprise customers does fixed compliance overhead stop being the binding margin constraint?
+4. What seat count is required for a single deal to cover its pro-rata share of annual compliance costs, at current pricing?
+5. How does compliance cost as a fraction of enterprise ARR evolve from $100k ARR to $2M ARR?
+
+**Scope inclusions:**
+
+- SOC 2 Type II audit and readiness costs (cross-reference: `docs/SOC2_READINESS.md`)
+- Annual penetration testing
+- Continuous compliance tooling (Vanta or equivalent)
+- Cyber liability and Errors & Omissions insurance
+- Privacy counsel retainer (GDPR, DPIA reviews)
+- Per-deal legal costs: DPA negotiation, SCC, MSA redline, security questionnaire
+
+**Scope exclusions:**
+
+- Internal engineering cost of building compliant features (modelled in §8.2)
+- DEC-030 HMAC audit log infrastructure (modelled in §15.4)
+- SCIM/SSO implementation engineering (modelled in §15.1–15.2)
+- GDPR breach notification costs (modelled in `docs/INCIDENT_RESPONSE.md` R-01 and R-08)
+
+---
+
+### 25.2 Annual Compliance Cost Inventory
+
+All figures are [ESTIMATE] based on publicly available pricing, comparable-stage B2B SaaS benchmarks, and Ukrainian-founder market conditions (CEE-adjusted legal costs where applicable). Ranges represent low/high depending on provider selection, deal volume, and scope.
+
+#### 25.2.1 SOC 2 Type II — Readiness and Audit
+
+| Line item | One-time (Year 0) | Annual recurring | Notes |
+|---|---|---|---|
+| Readiness consultant (gap assessment + control implementation) | $15,000–$35,000 [ESTIMATE] | $0 (one-time) | Required before first audit; cost eliminated after Year 0 unless scope expands materially |
+| SOC 2 Type II audit — reputable firm (A-LIGN, Schellman, or equivalent) | $0 (Year 0 = Type I) | $25,000–$55,000 [ESTIMATE] | Type I in Year 0 ($10–20k); Type II begins Year 1; annual recertification required |
+| SOC 2 Type I (Year 0 only, for early enterprise deals) | $10,000–$20,000 [ESTIMATE] | $0 | Enables enterprise sales before Type II completion; valid for 6–12 months |
+| Auditor travel and on-site time (if required) | $2,000–$5,000 [ESTIMATE] | $2,000–$5,000 [ESTIMATE] | Many firms now accept remote evidence reviews; on-site increasingly optional |
+| **SOC 2 subtotal (annual, post-Year 0)** | — | **$27,000–$60,000 [ESTIMATE]** | — |
+
+**Base assumption for this model:** $40,000/year [ESTIMATE] for annual SOC 2 Type II recertification with a mid-tier audit firm. Year 0 (Type I + readiness) total: $30,000 one-time [ESTIMATE]. These are the figures used in §25.4 amortization calculations.
+
+#### 25.2.2 Annual Penetration Testing
+
+| Line item | Annual cost | Notes |
+|---|---|---|
+| Web application + API pen test (OWASP scope, authenticated) | $10,000–$25,000 [ESTIMATE] | Required annually for SOC 2 CC7.1; must cover FORM API, admin dashboard, SSO flows |
+| Cloudflare Workers + edge security review | $3,000–$8,000 [ESTIMATE] | Often bundled with web app test; separate if provider scopes differently |
+| Mobile app pen test (iOS + Android, black-box) | $8,000–$18,000 [ESTIMATE] | Required if enterprise buyer security questionnaire requires it; SOC 2 does not mandate mobile specifically |
+| Retesting (remediation verification) | $2,000–$5,000 [ESTIMATE] | Bundled or separate; confirm before signing with testing firm |
+| **Pen test subtotal** | **$15,000–$40,000 [ESTIMATE]** | — |
+
+**Base assumption:** $25,000/year [ESTIMATE] covering web app, API, and edge; mobile pen test deferred until M8 enterprise GA milestone or first buyer requiring it.
+
+#### 25.2.3 Continuous Compliance Platform
+
+| Platform | Annual cost at FORM stage | Notes |
+|---|---|---|
+| Vanta (Compliance Automation) | $12,000–$30,000 [ESTIMATE] | Pricing is per-employee and per-audit-framework; SOC 2 + GDPR scope increases cost |
+| Drata | $12,000–$28,000 [ESTIMATE] | Similar model; pricing negotiable at early stage |
+| Sprinto | $8,000–$20,000 [ESTIMATE] | CEE-friendly pricing tier; lower upfront cost, fewer enterprise integrations |
+| **Base assumption (Vanta or Drata)** | **$18,000/year [ESTIMATE]** | — |
+
+Continuous compliance tooling is the connective tissue between the controls documented in `docs/SOC2_READINESS.md` and auditor-verifiable evidence: it automates cloud provider checks (Supabase, Cloudflare), monitors policy drift, and generates evidence artefacts per control. Without it, the SOC 2 audit evidence collection process consumes an estimated 40–80 founder/engineering hours annually — a hidden cost not captured in this model but relevant to §22.3 cash flow.
+
+#### 25.2.4 Cyber Liability and Errors & Omissions Insurance
+
+| Policy | Annual premium range | Coverage notes |
+|---|---|---|
+| Cyber liability (first-party + third-party) | $8,000–$20,000 [ESTIMATE] | Coverage: breach notification costs, ransomware, business interruption, third-party liability; $1M–$5M limit typical at pre-revenue stage |
+| Errors & Omissions (professional liability) | $4,000–$12,000 [ESTIMATE] | Covers SLA breach claims, failed deliverables; required by some enterprise MSA templates |
+| Directors & Officers (D&O) | $5,000–$15,000 [ESTIMATE] | Required by institutional investors post-Series A; not yet required pre-Series A founder-led stage |
+| **Insurance subtotal (cyber + E&O, no D&O)** | **$12,000–$32,000 [ESTIMATE]** | — |
+
+**Base assumption:** $20,000/year [ESTIMATE] for combined cyber liability ($1M limit) and E&O ($1M limit). D&O excluded until Series A close (OQ-33 HoldCo resolution required first).
+
+**Enterprise buyer requirement:** Many Fortune 500 and mid-market buyers require $1M–$5M cyber liability coverage as a contract condition. The $1M floor is the minimum viable insurance posture for the first three enterprise deals. Coverage must be increased to $5M+ before targeting regulated-industry buyers (HR tech for financial services, healthcare-adjacent wellness).
+
+#### 25.2.5 Privacy Counsel Retainer
+
+| Service | Annual cost | Notes |
+|---|---|---|
+| GDPR / privacy counsel retainer (EU-qualified) | $8,000–$20,000 [ESTIMATE] | Covers DPIA reviews, DPA template maintenance, breach notification support, Art. 9 compliance checks |
+| Ukrainian data protection compliance counsel | $3,000–$8,000 [ESTIMATE] | Law of Ukraine on Personal Data Protection (2010); required for any processing of Ukrainian residents |
+| Ad-hoc regulatory response (budget) | $3,000–$10,000 [ESTIMATE] | DSR escalations, supervisory authority correspondence, regulator inquiries |
+| **Privacy counsel subtotal** | **$14,000–$38,000 [ESTIMATE]** | — |
+
+**Base assumption:** $18,000/year [ESTIMATE] for a combined EU + Ukraine privacy counsel arrangement, with EU counsel as primary given enterprise buyer geography (EU-headquartered orgs dominate early pipeline per `docs/ENTERPRISE.md`).
+
+#### 25.2.6 Annual Compliance Cost Summary Table
+
+| Cost category | Low [ESTIMATE] | Base [ESTIMATE] | High [ESTIMATE] |
+|---|---|---|---|
+| SOC 2 Type II annual recertification | $27,000 | $40,000 | $60,000 |
+| Annual penetration testing | $15,000 | $25,000 | $40,000 |
+| Continuous compliance platform | $8,000 | $18,000 | $30,000 |
+| Cyber liability + E&O insurance | $12,000 | $20,000 | $32,000 |
+| Privacy counsel retainer | $14,000 | $18,000 | $38,000 |
+| **Total annual fixed compliance overhead** | **$76,000** | **$121,000** | **$200,000** |
+
+**Base model annual compliance overhead: $121,000 [ESTIMATE].** All subsequent calculations in this section use the base figure unless stated.
+
+**Year 0 additional one-time costs:** SOC 2 readiness consultant ($15,000–$35,000 [ESTIMATE]) + SOC 2 Type I audit ($10,000–$20,000 [ESTIMATE]) = $25,000–$55,000 one-time [ESTIMATE]. Year 0 total: $101,000–$255,000 [ESTIMATE]. Not included in §22.3 cash flow model (OQ-34 tracks this gap).
+
+---
+
+### 25.3 Per-Deal Legal Overhead
+
+Every enterprise contract requires legal instruments that go beyond the standard consumer ToS. These costs are **variable** (incurred per new deal signed) and must be included in the enterprise deal margin calculation alongside infrastructure COGS and CSM cost.
+
+#### 25.3.1 Data Processing Agreement (DPA)
+
+Under GDPR Art. 28, FORM acts as a data processor for the enterprise customer (controller). A compliant DPA must be executed before any personal data of the customer's employees is processed.
+
+| DPA scenario | Legal cost | Notes |
+|---|---|---|
+| Customer accepts FORM standard DPA template (no redlines) | $0–$500 [ESTIMATE] | Counsel review time only; standard template maintained by privacy counsel on retainer (§25.2.5) |
+| Customer submits their own DPA for review and redline | $1,500–$4,000 [ESTIMATE] | Common with larger enterprise buyers; 3–8 hours outside counsel at $200–$500/hour |
+| Customer DPA requires sub-processor addendum negotiation | $500–$1,500 [ESTIMATE] | Supabase, Cloudflare, Anthropic, WorkOS must each be listed as sub-processors with adequate contractual chain |
+| **DPA cost per deal (blended)** | **$500–$2,500 [ESTIMATE]** | Assumes 30% of deals require full DPA redline |
+
+#### 25.3.2 Standard Contractual Clauses (SCC) for US–EU Transfers
+
+Transfers of EU personal data to FORM's Cloudflare infrastructure (US-based edge) and Anthropic's API (US) require SCCs under GDPR Chapter V.
+
+| SCC scenario | Legal cost | Notes |
+|---|---|---|
+| Module 2 (controller → processor) SCCs executed | $0 [ESTIMATE] | Already embedded in FORM standard DPA; no additional cost if customer accepts standard DPA |
+| Customer requires bespoke SCC addendum | $500–$2,000 [ESTIMATE] | Rare below $200k ACV; more common with EU public sector buyers |
+| Transfer Impact Assessment (TIA) required by customer | $2,000–$5,000 [ESTIMATE] | Required by some German/Austrian buyers post-Schrems II; not yet a standard requirement |
+
+**Base assumption: $0–$500/deal [ESTIMATE]** (SCCs covered in standard DPA template; TIA deferred until buyer requires it).
+
+#### 25.3.3 Master Service Agreement (MSA) Redline
+
+Enterprise buyers almost always provide their standard MSA rather than accepting FORM's template. Redline negotiation is the single largest per-deal legal cost.
+
+| MSA complexity | Legal cost | Typical buyer profile |
+|---|---|---|
+| Minor redlines (3–8 clauses, no fundamental changes to liability cap or indemnities) | $1,500–$4,000 [ESTIMATE] | Startup-friendly tech buyers; Series B+ companies with lean legal teams |
+| Moderate redlines (10–20 clauses, liability cap negotiation, IP ownership, data deletion SLA) | $4,000–$8,000 [ESTIMATE] | Mid-market buyers ($500M–$2B revenue); procurement-led process |
+| Complex redlines (20+ clauses, multi-jurisdiction governing law, insurance certificate requirements, right-to-audit clause) | $8,000–$20,000 [ESTIMATE] | Enterprise buyers > $2B revenue; regulated sectors (FSI, pharma) |
+| **MSA cost per deal (blended across mix)** | **$3,000–$8,000 [ESTIMATE]** | Assumes 50% minor, 40% moderate, 10% complex in Year 1 pipeline |
+
+**Base assumption: $4,500/deal [ESTIMATE]** (blended).
+
+#### 25.3.4 Security Questionnaire Completion
+
+Enterprise buyers require completed security questionnaires as a procurement condition. Questionnaire formats include: CAIQ (CSA), SIG Lite, HECVAT, bespoke infosec spreadsheets.
+
+| Effort type | Internal cost | Notes |
+|---|---|---|
+| Standard questionnaire (50–100 questions, mostly covered by SOC 2 report) | 4–8 hours security-engineer time | At blended $75/hour internal opportunity cost = $300–$600 [ESTIMATE] |
+| Complex questionnaire (150–300 questions, architecture diagrams, pen test evidence required) | 16–32 hours across security-engineer + platform-engineer | $1,200–$2,400 [ESTIMATE] internal opportunity cost |
+| **Blended per deal** | **$500–$1,200 [ESTIMATE]** | — |
+
+**Key dependency:** SOC 2 Type II report eliminates 60–80% of questionnaire questions. Pre-SOC 2, questionnaire completion time is 2–3× higher and may require external consultant support ($2,000–$4,000/deal).
+
+#### 25.3.5 GDPR Data Protection Impact Assessment (DPIA) per Enterprise Onboarding
+
+Under GDPR Art. 35, a DPIA is required when processing is "likely to result in a high risk" — which applies to FORM's processing of Art. 9 health and wellness data. A single DPIA covering FORM's standard processing activities (maintained by privacy counsel) covers most deals. A customer-specific DPIA addendum may be required by large regulated-sector buyers.
+
+| DPIA scenario | Cost | Notes |
+|---|---|---|
+| FORM master DPIA covers deal (no customer-specific addendum) | $0/deal [ESTIMATE] | Master DPIA maintained by privacy counsel on retainer; annual update included |
+| Customer requires DPIA review and sign-off on addendum | $1,000–$3,000 [ESTIMATE] | 3–6 hours outside privacy counsel; more common in healthcare-adjacent or EU public sector |
+| **Blended per deal** | **$0–$600 [ESTIMATE]** | Assumes 20% of deals require addendum |
+
+#### 25.3.6 Per-Deal Legal Overhead Summary
+
+| Legal cost item | Low/deal [ESTIMATE] | Base/deal [ESTIMATE] | High/deal [ESTIMATE] |
+|---|---|---|---|
+| DPA (standard + sub-processor) | $0 | $800 | $2,500 |
+| SCC addendum | $0 | $200 | $2,000 |
+| MSA redline | $1,500 | $4,500 | $20,000 |
+| Security questionnaire completion | $300 | $750 | $2,400 |
+| DPIA addendum | $0 | $600 | $3,000 |
+| **Total per-deal legal overhead** | **$1,800** | **$6,850** | **$29,900** |
+
+**Base per-deal legal overhead: $6,850 [ESTIMATE].** High scenario ($29,900) is a regulated-industry complex deal; model as an exception requiring deal-specific approval from the discount authority matrix in §21.5.
+
+---
+
+### 25.4 Compliance Cost Amortization by Customer Count
+
+The $121,000 annual fixed compliance overhead is shared across all enterprise customers active in a given year. The per-customer compliance cost decreases as the customer base grows — this is the primary source of operating leverage in the enterprise cost model beyond infrastructure COGS.
+
+#### 25.4.1 Fixed compliance overhead per customer
+
+| Active enterprise customers | Annual fixed compliance cost per customer [ESTIMATE] |
+|---|---|
+| 1 | $121,000 |
+| 2 | $60,500 |
+| 3 | $40,333 |
+| 5 | $24,200 |
+| 8 | $15,125 |
+| 10 | $12,100 |
+| 15 | $8,067 |
+| 20 | $6,050 |
+| 30 | $4,033 |
+| 50 | $2,420 |
+
+**Observation:** At 1 enterprise customer, the entire $121,000/year compliance cost must be recovered from that single deal's ACV. At $6/seat/year pricing, this requires a 20,167-seat deal — obviously impossible and not the model. The compliance overhead model assumes the cost is treated as an operating expense (OPEX) funded by total enterprise ARR, not attributed to individual deals. The question §25.5 answers is: *at what total ARR level does compliance overhead represent an acceptable % of gross revenue?*
+
+#### 25.4.2 Variable compliance cost per deal (legal)
+
+The $6,850/deal legal overhead from §25.3.6 is paid at deal signing, making it a deal acquisition cost alongside sales CAC (§8.5). Unlike fixed annual overhead, it scales with deal volume:
+
+| Deals closed per year | Annual variable legal overhead | Per-deal average |
+|---|---|---|
+| 1 | $6,850 | $6,850 |
+| 3 | $20,550 | $6,850 |
+| 5 | $34,250 | $6,850 |
+| 10 | $68,500 | $6,850 |
+| 20 | $137,000 | $6,850 |
+
+**Note:** The $6,850/deal figure assumes a static deal mix. As the enterprise customer profile shifts toward larger, regulated-sector buyers, the blended per-deal legal cost may increase toward $10,000–$15,000. The §21.5 discount authority matrix must be updated to flag deals where estimated legal overhead exceeds $15,000 — these require founder sign-off before proceeding.
+
+#### 25.4.3 Total compliance cost by revenue scenario
+
+Combining fixed annual overhead ($121,000) with variable legal costs (at $6,850/deal):
+
+| Scenario | Deals/year | Active customers | Fixed overhead | Variable legal | Total compliance cost | Enterprise ARR | Compliance as % ARR |
+|---|---|---|---|---|---|---|---|
+| Pre-revenue | 0 | 0 | $121,000 | $0 | $121,000 | $0 | N/A |
+| Seed pilot | 2 | 2 | $121,000 | $13,700 | $134,700 | $60,000 [ESTIMATE] | 224% |
+| Early (Month 12) | 3 | 3 | $121,000 | $20,550 | $141,550 | $120,000 [ESTIMATE] | 118% |
+| Growth (Month 18) | 5 | 8 | $121,000 | $34,250 | $155,250 | $350,000 [ESTIMATE] | 44% |
+| Scale (Month 24) | 8 | 15 | $121,000 | $54,800 | $175,800 | $800,000 [ESTIMATE] | 22% |
+| Series A (Month 30) | 12 | 25 | $121,000 | $82,200 | $203,200 | $1,500,000 [ESTIMATE] | 14% |
+
+**Key insight:** Compliance cost is a **declining-ratio burden** that starts at >100% of ARR and decreases to ~14% by the time the enterprise business reaches Series A scale. This is characteristic of any fixed-compliance-overhead business model. The implication for enterprise pricing is that **early deals (Months 1–12) are compliance-subsidized**: FORM's compliance posture is funded primarily by the founders' capital, not by enterprise revenue. The risk is that investor expectations for enterprise contribution to gross margin may not be met until the 15+ customer milestone.
+
+---
+
+### 25.5 Seat-Count Break-Even: When Compliance Is Self-Financing per Deal
+
+This analysis answers: "at what seat count does a single enterprise deal's incremental contribution to compliance overhead coverage equal the deal's pro-rata compliance cost burden?"
+
+**Framework:** This is not a strict per-deal break-even (compliance is a shared fixed cost), but rather the question of when the ACV of a new deal is large enough to absorb its fair-share allocation of annual compliance overhead at the current customer count.
+
+#### 25.5.1 Break-even seat count at different customer base sizes
+
+Inputs:
+- Annual pricing: $8/seat/month [ESTIMATE] = $96/seat/year (Growth plan, most common expected deal type)
+- Annual fixed compliance overhead: $121,000 [ESTIMATE]
+- Per-deal variable legal: $6,850 [ESTIMATE]
+
+For each active customer count N, the per-customer compliance overhead allocation is $121,000 / N. The deal must also cover its own per-deal legal cost of $6,850.
+
+Total compliance burden per deal = ($121,000 / N) + $6,850
+
+Required ACV to cover compliance burden = ($121,000 / N) + $6,850
+
+Required seats at $96/seat/year:
+
+```
+Required_seats = (($121,000 / N) + $6,850) / $96
+```
+
+| Active customers (N) | Per-deal fixed allocation | Per-deal variable legal | Total compliance burden | Required seats (at $96/seat/year) |
+|---|---|---|---|---|
+| 1 | $121,000 | $6,850 | $127,850 | 1,332 [ESTIMATE] — not viable as single deal |
+| 3 | $40,333 | $6,850 | $47,183 | 492 [ESTIMATE] |
+| 5 | $24,200 | $6,850 | $31,050 | 324 [ESTIMATE] |
+| 8 | $15,125 | $6,850 | $21,975 | 229 [ESTIMATE] |
+| 10 | $12,100 | $6,850 | $18,950 | 198 [ESTIMATE] |
+| 15 | $8,067 | $6,850 | $14,917 | 155 [ESTIMATE] |
+| 20 | $6,050 | $6,850 | $12,900 | 134 [ESTIMATE] |
+| 30 | $4,033 | $6,850 | $10,883 | 113 [ESTIMATE] |
+| 50 | $2,420 | $6,850 | $9,270 | 97 [ESTIMATE] |
+
+**Critical observation:** Even at 50 enterprise customers, a deal must have ≥97 seats at $96/seat/year ($9,312 ACV) to cover its compliance burden. The current minimum deal framing ("50+ employees") aligns with this floor — but the seat floor should be monitored as compliance costs evolve.
+
+#### 25.5.2 Impact of pricing tier on break-even
+
+At different pricing tiers (using 15 active customers as the reference point, compliance burden = $14,917):
+
+| Plan | Price/seat/month | Price/seat/year | Seats to cover compliance burden |
+|---|---|---|---|
+| Starter | $6 | $72 | 207 seats [ESTIMATE] |
+| Growth | $8 | $96 | 155 seats [ESTIMATE] |
+| Enterprise | $12 | $144 | 104 seats [ESTIMATE] |
+
+**This is the quantitative justification for the minimum deal floor.** A Starter plan deal at 50 seats ($3,600 ACV) covers only 24% of its compliance burden allocation at 15 customers. The Starter plan is compliance-viable only at ≥207 seats (at 15 customers), which contradicts the entry-level positioning. Resolution options:
+
+1. **Raise Starter minimum to 150+ seats** — difficult from a sales perspective; eliminates a market segment
+2. **Absorb Starter compliance deficit as a marketing investment** — valid if Starter deals convert to Growth/Enterprise (§23.2 tier migration)
+3. **Reduce per-deal legal overhead** — achievable by investing in self-service DPA tooling and standard contract acceptance tracking (OQ-35)
+4. **Price Starter based on annual commitment only** — eliminates monthly flexibility, increases ACV by removing churn optionality
+
+**Current recommendation:** Treat Starter plan deals below 150 seats as **CAC investments, not margin generators**, until the enterprise customer base reaches 20+ and compliance amortization drops to <$6,050/customer. Founders must be aware of this dynamic before offering heavy discounts on Starter to close early deals.
+
+---
+
+### 25.6 Compliance Cost as % of Enterprise Revenue (Operating Leverage)
+
+Operating leverage in compliance: once the fixed overhead is covered, each incremental enterprise seat generates near-pure-margin revenue (limited only by infrastructure COGS of $0.34–$0.36/seat/month and CSM cost per §8.5).
+
+#### 25.6.1 Compliance overhead as % of enterprise ARR at milestones
+
+Compliance total cost = $121,000 (fixed) + ($6,850 × deals/year) (variable).
+
+| Enterprise ARR milestone | Est. active customers | Deals/year | Total compliance cost | Compliance as % ARR |
+|---|---|---|---|---|
+| $50,000 | 1 | 2 | $134,700 | 269% [ESTIMATE] — funded by capital |
+| $120,000 | 3 | 3 | $141,550 | 118% [ESTIMATE] — capital-subsidized |
+| $350,000 | 8 | 5 | $155,250 | 44% [ESTIMATE] — approaching sustainability |
+| $600,000 | 12 | 6 | $162,100 | 27% [ESTIMATE] — sustainable |
+| $1,000,000 | 18 | 8 | $175,800 | 18% [ESTIMATE] — healthy SaaS ratio |
+| $1,500,000 | 25 | 10 | $189,500 | 13% [ESTIMATE] — strong |
+| $2,000,000 | 35 | 12 | $203,200 | 10% [ESTIMATE] — software-like leverage |
+| $5,000,000 | 80 | 25 | $292,250 | 6% [ESTIMATE] — well-managed overhead |
+
+**Target ratio:** Compliance overhead below 15% of enterprise ARR is the threshold at which the enterprise business model is compliance-cost-healthy. This milestone corresponds to approximately $1,200,000 enterprise ARR [ESTIMATE], which aligns with the pre-Series A readiness criteria in §24.3.
+
+#### 25.6.2 Comparison to industry benchmarks
+
+| Stage | FORM (base model) | Comparable B2B SaaS benchmark |
+|---|---|---|
+| Pre-revenue | N/A | N/A |
+| $500k ARR | ~28% of ARR [ESTIMATE] | 20–40% for compliance-intensive SaaS |
+| $1M ARR | ~17% of ARR [ESTIMATE] | 10–20% mature |
+| $2M ARR | ~10% of ARR [ESTIMATE] | 8–15% mature |
+| $5M ARR | ~6% of ARR [ESTIMATE] | 5–10% mature |
+
+FORM's trajectory is in line with comparable health-data B2B SaaS (fitness, HR tech, mental health platforms) that operate under similar compliance regimes. The early-stage compliance-to-ARR ratio exceeding 100% is **not an anomaly** — it reflects the capital investment required to establish enterprise credibility before scale.
+
+---
+
+### 25.7 Compliance Moat vs. TAM Expansion
+
+Compliance investment is not a pure cost — it is a revenue gate and competitive moat.
+
+#### 25.7.1 TAM expansion unlocked by SOC 2
+
+Without SOC 2: enterprise sales are limited to buyers willing to accept a self-attested security posture. In practice, this segment is small:
+
+| Buyer profile | Will buy without SOC 2? | Notes |
+|---|---|---|
+| Series A–C startups (tech-forward) | Occasionally | At low ACV only; board/legal approval often blocked |
+| Mid-market ($100M–$1B revenue) | Rarely | Security questionnaire will block without evidence |
+| Enterprise ($1B+ revenue) | No | Procurement requires SOC 2 Type II or equivalent |
+| Regulated sectors (FSI, pharma, healthcare-adjacent) | No | Requirement is non-negotiable |
+| EU public sector | No | Requires GDPR DPA + ISAE 3000 or equivalent |
+
+SOC 2 Type II unlocks approximately 85% of the intended enterprise TAM (`docs/ENTERPRISE.md` §Why enterprise). Without it, the addressable market is limited to ~15% of the intended buyer universe at any meaningful ACV.
+
+#### 25.7.2 Time-to-close reduction
+
+| Sales process stage | Pre-SOC 2 time | Post-SOC 2 time | Notes |
+|---|---|---|---|
+| Security review / questionnaire | 3–6 weeks | 1–2 weeks | SOC 2 report answers 60–80% of questions automatically |
+| Legal / DPA negotiation | 4–8 weeks | 2–4 weeks | Standard DPA backed by SOC 2 controls reduces buyer legal pushback |
+| IT/CISO approval | 2–6 weeks | 1–2 weeks | CISO sign-off faster when audited evidence available |
+| **Total security-related delay** | **9–20 weeks** | **4–8 weeks** | Reduction of 5–12 weeks per deal |
+
+At a sales velocity target of 3.0 deals/quarter (§19.1), reducing security review time by 5–12 weeks means 1–2 additional deals per quarter with no incremental headcount — **the highest-ROI enterprise investment at the current stage**.
+
+#### 25.7.3 SOC 2 ROI calculation
+
+| Metric | Value [ESTIMATE] |
+|---|---|
+| Annual SOC 2 cost (§25.2.1) | $40,000 |
+| Additional deals/year enabled by SOC 2 | 3–6 [ESTIMATE] |
+| Average ACV of unlocked deals | $80,000 [ESTIMATE] |
+| Incremental ARR from SOC 2-enabled deals | $240,000–$480,000 [ESTIMATE] |
+| SOC 2 ROI (incremental ARR / SOC 2 cost) | 6×–12× [ESTIMATE] |
+
+**Assessment:** SOC 2 Type II is the single highest-ROI compliance investment at FORM's current stage. The $40,000/year annual audit cost generates $240,000–$480,000 in incremental ARR that would otherwise be blocked. This frames SOC 2 as a **revenue investment**, not a compliance tax — the framing that should be used in investor and board discussions.
+
+---
+
+### 25.8 DEC-030 Compliance Spend Audit Events
+
+Compliance expenditures are material financial events that must be tracked in the HMAC-chained audit log per DEC-030. This serves two purposes: (1) annual SOC 2 auditor visibility into compliance investment (CC9.2 — vendor management), and (2) investor data room financial accuracy (§24.10 complements). All events are server-side, 7-year retention.
+
+| Event type | Severity | Key metadata fields | Retention | Notes |
+|---|---|---|---|---|
+| `compliance.vendor_contract_signed` | HIGH | `vendor_name`, `service_category` (soc2_audit / pen_test / compliance_platform / insurance / legal_counsel), `annual_cost_usd`, `contract_start_date`, `contract_end_date`, `renewal_auto` (bool), `signed_by` (founder user_id) | 7 years | Emitted at contract execution, not at invoice payment; one event per contract, not per payment |
+| `compliance.audit_initiated` | HIGH | `audit_type` (soc2_type_i / soc2_type_ii / pen_test_web / pen_test_mobile), `auditor_firm_id` (pseudonymous internal ref), `scope_description`, `start_date`, `initiated_by` (founder user_id) | 7 years | Emitted when engagement letter signed and kick-off meeting scheduled |
+| `compliance.audit_report_received` | CRITICAL | `audit_type`, `report_date`, `outcome` (pass / pass_with_exceptions / qualified_opinion / adverse), `exception_count` (if pass_with_exceptions), `report_storage_ref` (S3/R2 object key, not the report contents), `received_by` (founder user_id) | 7 years | Report itself stored in compliance/evidence/ vault; only reference stored in audit event |
+| `compliance.insurance_renewed` | HIGH | `policy_type` (cyber_liability / e_and_o / d_and_o), `carrier_id` (pseudonymous), `coverage_limit_usd`, `annual_premium_usd`, `policy_start_date`, `policy_end_date`, `renewed_by` (founder user_id) | 7 years | Emitted at policy binding, not renewal notice |
+| `compliance.per_deal_legal_cost_recorded` | MEDIUM | `deal_id` (pseudonymous), `legal_items_completed` (array: dpa / scc / msa_redline / security_questionnaire / dpia), `total_outside_counsel_cost_usd`, `inside_hours_spent`, `recorded_by` (founder user_id), `acv_usd` (deal ACV for ratio monitoring) | 7 years | Optional event; required for deals where total per-deal legal cost exceeds $10,000 (§25.3.6 high scenario) |
+
+**Privacy invariant:** Vendor pricing, invoice amounts, and contract terms must never appear in any per-user or per-session audit event. All compliance spend events are admin-tier events with `actor_role: 'founder'` and no association with individual user sessions or health data.
+
+---
+
+### 25.9 Implementation Checklist
+
+| Item | Priority | Milestone | Owner | Definition of Done |
+|---|---|---|---|---|
+| Select and contract continuous compliance platform (Vanta or Drata) | P0 | M4 | compliance-officer + founder | Contract signed; Cloudflare, Supabase, GitHub integrations active; SOC 2 control list imported |
+| Engage SOC 2 readiness consultant | P0 | M4 | compliance-officer | Engagement letter signed; gap assessment scheduled; §56.6 gap register from `docs/SOC2_READINESS.md` used as input |
+| Obtain cyber liability + E&O insurance ($1M limits each) | P0 | M5 (before first enterprise pilot) | founder | Policy binders received; carrier confirmed; coverage certificates ready for enterprise buyer procurement |
+| Engage EU-qualified privacy counsel retainer | P0 | M5 | compliance-officer | Engagement letter signed; master DPA template reviewed and approved; master DPIA completed |
+| Complete SOC 2 Type I audit | P1 | M6 | compliance-officer + security-engineer | Type I report received (pass); stored in compliance/evidence/; `compliance.audit_report_received` DEC-030 event emitted |
+| Record per-deal legal overhead for first 5 enterprise deals | P1 | M7 | founder + compliance-officer | Per-deal legal cost tracked in deal CRM; `compliance.per_deal_legal_cost_recorded` event emitted for any deal exceeding $10k |
+| Commission annual penetration test (web app + API) | P0 | M7 | security-engineer | Scope letter signed; test executed; remediation report closed; `compliance.audit_report_received` event emitted; pen test evidence in SOC 2 control CC7.1 |
+| Complete SOC 2 Type II audit | P0 | M12 | compliance-officer | Type II report received (pass or pass_with_exceptions); stored; DEC-030 event emitted; report available for enterprise buyer security questionnaires |
+| Annual compliance cost tracking vs. §25.6.1 milestone table | P1 | M5 (ongoing) | data-engineer | Compliance cost as % ARR metric computed monthly from §25.2.6 total and Stripe ARR; visible in Metabase investor dashboard; alert if compliance ratio exceeds 150% for two consecutive months post-M9 |
+| Update discount authority matrix (§21.5) to reflect per-deal legal overhead threshold | P1 | M6 | compliance-officer + founder | §21.5 table updated with note: deals requiring legal overhead > $15,000 require founder sign-off; field added to deal qualification checklist |
+
+---
+
+### 25.10 Open Questions
+
+**OQ-34: Year 0 compliance capital requirement — should it be included in §22.3 cash flow model?**
+
+The §22.3 Month-by-Month Cash Flow Table does not currently include the one-time Year 0 compliance readiness costs ($25,000–$55,000 [ESTIMATE]: readiness consultant + SOC 2 Type I). These are non-trivial relative to the seed funding amount and could be the deciding factor in whether the enterprise milestone timeline (M5 enterprise pilot, M12 SOC 2 Type II) is achievable within pre-seed runway. Owner: founder + data-engineer. Priority: P0. Resolution: before pre-seed close; update §22.3 with a compliance-specific budget line.
+
+**OQ-35: Can self-service DPA tooling reduce per-deal legal overhead below $3,000?**
+
+The $4,500/deal base MSA + DPA cost (§25.3.6) is driven primarily by outside counsel hours on MSA redlines and DPA reviews. If FORM publishes a machine-readable standard DPA (GDPR Art. 28 compliant, sub-processor addendum included) and implements a DocuSign or equivalent self-service DPA acceptance flow, buyers who accept the standard DPA pay $0 in legal overhead. Estimated impact: if 60% of buyers accept standard DPA, blended per-deal legal drops from $6,850 to approximately $3,200 [ESTIMATE]. Owner: compliance-officer. Priority: P1. Resolution: evaluate after first 3 enterprise deals — measure what fraction of buyers require redlines vs. accept standard terms.
+
+**OQ-36: At what enterprise ARR should D&O insurance be added to the annual compliance stack?**
+
+Directors & Officers insurance ($5,000–$15,000/year [ESTIMATE]) is excluded from §25.2.6 because it is triggered by institutional investor requirements (typically post-Series A), not by enterprise buyer contracts. However, some large enterprise buyers (particularly publicly listed companies) require their vendors to carry D&O as a condition of contract. The threshold for adding D&O to the baseline annual compliance cost is unclear. Owner: compliance-officer + founder. Priority: P2. Resolution: add D&O to §25.2.6 cost model as a conditional line item if required by any of the first three enterprise buyers, or at Series A close (whichever comes first).
+
+---
+
+*v1.6 additions: §25 Enterprise Compliance & Legal Infrastructure Cost Model — purpose and gap-fill vs §15 (infrastructure COGS) and §8 (enterprise economics): §15 models SSO/SCIM/audit-log infrastructure costs ($0.002/seat/month) but does not model SOC 2 audit, pen testing, insurance, or legal overhead, which represent the binding margin constraint in the pre-scale phase (§25.1); annual compliance cost inventory across five categories — SOC 2 Type II recertification ($40,000 base), pen testing ($25,000 base), Vanta/Drata continuous compliance ($18,000 base), cyber liability + E&O insurance ($20,000 base), privacy counsel retainer ($18,000 base) — total base $121,000/year (§25.2); per-deal variable legal overhead model — DPA ($800 base), SCC ($200), MSA redline ($4,500), security questionnaire ($750), DPIA addendum ($600) — total $6,850/deal base (§25.3); compliance cost amortization table showing per-customer fixed compliance allocation declining from $121,000 at 1 customer to $2,420 at 50 customers, with total compliance cost by ARR scenario from $134,700 at $50k ARR (269% ratio) to $292,250 at $5M ARR (6% ratio) (§25.4); seat-count break-even analysis showing required seats per deal to cover compliance burden at each customer-count level — at 15 customers, Growth plan ($96/seat/year) requires 155 seats; Starter plan ($72/seat/year) requires 207 seats — quantifying why Starter deals below 150 seats should be treated as CAC investments, not margin generators, until 20+ customer milestone (§25.5); operating leverage trajectory showing compliance overhead declining from 44% ARR at $350k to 10% at $2M ARR, with 15% ARR as the health threshold corresponding to ~$1.2M enterprise ARR (§25.6); compliance moat analysis quantifying SOC 2 as unlocking ~85% of intended enterprise TAM, reducing time-to-close by 5–12 weeks, and delivering 6–12× ROI on $40,000 audit cost via $240–480k incremental ARR (§25.7); five DEC-030 HMAC-chained compliance spend audit events with 7-year retention: compliance.vendor_contract_signed (HIGH), compliance.audit_initiated (HIGH), compliance.audit_report_received (CRITICAL), compliance.insurance_renewed (HIGH), compliance.per_deal_legal_cost_recorded (MEDIUM) (§25.8); implementation checklist with 10 items across P0/P1 milestones M4–M12 (§25.9); OQ-34 (Year 0 compliance capital not yet in §22.3 cash flow — P0), OQ-35 (self-service DPA tooling to reduce per-deal legal from $6,850 to $3,200 — P1), OQ-36 (D&O insurance threshold — P2) (§25.10). Cross-references: docs/SOC2_READINESS.md §56 (encryption key management evidence), docs/AUDIT_LOG_SCHEMA.md (DEC-030 event registry), docs/INCIDENT_RESPONSE.md R-08 (GDPR breach notification costs), §8.5 (enterprise CAC), §15.4 (audit log infrastructure COGS), §21.5 (discount authority matrix), §22.3 (cash flow — OQ-34 gap), §24.3 (Series A readiness). Owner: compliance-officer + security-engineer + founder.*

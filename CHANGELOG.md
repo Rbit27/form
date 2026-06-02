@@ -6,6 +6,13 @@
 
 ---
 
+## [1.72.1] — 2026-06-02
+
+### Added
+- `docs/COST_MODEL.md §25` — Enterprise Compliance & Legal Infrastructure Cost Model · v1.5 → v1.6. Fills the gap between §15 (infrastructure COGS, $0.002/seat/month) and the enterprise deal economics in §8/§16: the binding pre-scale margin constraint is not server cost but fixed compliance overhead. **Annual fixed compliance stack (base): $121,000/year** — SOC 2 Type II recertification ($40k), annual pen test ($25k), Vanta/Drata continuous compliance platform ($18k), cyber liability + E&O insurance ($20k), EU + UA privacy counsel retainer ($18k). **Per-deal variable legal overhead (base): $6,850/deal** — MSA redline ($4,500), DPA negotiation ($800), security questionnaire completion ($750), DPIA addendum ($600), SCC ($200). Amortization table: compliance allocation per customer declines from $121,000 at 1 customer to $2,420 at 50 customers (§25.4). Seat-count break-even analysis: at 15 active enterprise customers, Growth plan ($96/seat/yr) requires 155 seats to cover compliance burden; Starter ($72/seat/yr) requires 207 seats — quantitative basis for treating Starter deals below 150 seats as CAC investments until 20+ customer milestone (§25.5). Operating leverage trajectory: compliance overhead ratio 44% ARR at $350k → 10% at $2M ARR; 15% ARR is the health threshold (~$1.2M enterprise ARR, §25.6). SOC 2 moat ROI: unlocks ~85% of enterprise TAM, reduces time-to-close by 5–12 weeks, 6–12× ROI on $40k audit spend (§25.7). Five DEC-030 HMAC-chained events (all 7yr): `compliance.vendor_contract_signed` (HIGH), `compliance.audit_initiated` (HIGH), `compliance.audit_report_received` (CRITICAL), `compliance.insurance_renewed` (HIGH), `compliance.per_deal_legal_cost_recorded` (MEDIUM, required when per-deal legal > $10k). 10-item implementation checklist: 5× P0 (continuous compliance platform M4, readiness consultant M4, insurance M5, privacy counsel M5, pen test M7), 5× P1 (SOC 2 Type I M6, per-deal legal tracking M7, SOC 2 Type II M12, compliance-% ARR metric M5, discount authority matrix update M6). OQ-34 (Year 0 one-time compliance capital $25–55k not in §22.3 cash flow — P0, owner: founder + data-engineer), OQ-35 (self-service DPA tooling to cut per-deal legal from $6,850 → $3,200 — P1, compliance-officer), OQ-36 (D&O insurance threshold — P2). Cross-references: docs/SOC2_READINESS.md §56, AUDIT_LOG_SCHEMA.md (DEC-030), INCIDENT_RESPONSE.md R-08 (GDPR breach costs), §8.5 (enterprise CAC), §15.4 (audit log COGS), §21.5 (discount authority matrix), §22.3 (cash flow), §24.3 (Series A readiness). Owner: compliance-officer + security-engineer + founder.
+
+---
+
 ## [1.72.0] — 2026-06-02
 
 ### Added
