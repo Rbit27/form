@@ -5956,3 +5956,444 @@ The `reason` field in `incident.severity_changed` is IC-authored free text. Unde
 *v0.6 additions: R-12 Insider Threat / Privileged Access Abuse — twelfth runbook; covers current and former team members or contractors with legitimate credentials misusing access for exfiltration, sabotage, or personal gain. Evidence-before-containment constraint reinforced (overrides standard flow; exception only for active live exfiltration); private restricted investigation channel (`#inc-YYYYMMDD-insider`: founder + security-engineer + compliance-officer only — not HR, not subject). Trigger matrix: 9 signal types from bulk Supabase Studio access to HMAC chain break co-incident with staff activity; severity table: P0 for Art. 9 data read or multi-tenant cross-access, P1 for bulk access without confirmed exfiltration or post-HR-process access, P2 for historical single anomalous event. Unique response constraints: graduated containment options C-1 (passive monitoring) through C-5 (Workers Secrets rotation) ordered by investigative stealth; legal counsel notification before HR briefing rule with jurisdiction notes (EU/GDPR proportionality, US at-will, Ukraine labour law); HMAC chain R2 archive as forensic truth (live `audit_log_events` table not used forensically). Scope assessment SQL: blast radius by table with Art. 9 classification, multi-tenant exposure query, enterprise tenant identification, `health_profiles` record count for impacted users. Legal and HR interface timeline with legal hold notice template. GDPR implications table: 8 data category rows mapping to Art. 33/34 requirements; 72h clock start note; data subject rights derogation for ongoing investigation (Art. 23(1)(f)); HR investigation records retention under Art. 9(2)(b). Evidence package: 11-item directory structure with SHA-256 manifest, R2 object versioning, 7-year retention per DEC-030. Post-incident preventive controls: 7 controls covering least-privilege audit, offboarding checklist, bulk-read alert rule, Workers Secrets access review, quarterly access review cadence, HMAC chain integrity alert on staff actor + audit log resource, AUP acknowledgment. SOC 2 mapping: CC6.2/CC6.3 (access lifecycle), CC7.2/CC7.3/CC7.4 (monitoring and response), CC9.1 (risk mitigation), CC1.2 (integrity and ethical values). Tabletop Scenario G added to §9 drill catalog: insider data exfiltration before resignation affecting 14 enterprise tenants; 14 discussion points covering forensic chain, legal timing, tenant notification, Art. 33 clock, graduated response. §14 Continuous Improvement Program — closes the PIR-to-action-item loop for SOC 2 CC4.1/CC4.2 evidence. PIR Action Item Registry: Linear project `[IR] Action Items` with 10-field schema (incident_id, severity, priority, title, owner, due_date, SOC2 criterion, status, close_date, verification_note); closure SLA table (Critical P0: 14 days → founder paged; Critical P1: 30 days; High: 30–60 days; Medium: 90 days; Low: 180 days); monthly Linear export to `compliance/evidence/ir-action-items/YYYY-MM.csv`. Escalation thresholds: 4 triggers (overdue Critical, recurring failure pattern, > 3 High items open, SOC 2 observation period breach). Quarterly control effectiveness review: 60-min agenda (action item registry / incident trend analysis / runbook gap check / SOC 2 evidence completeness / decisions); MTTD/MTTR/false-positive-rate metrics; output template stored at `compliance/evidence/quarterly-ir-review/YYYY-QN.md`. Runbook update protocol: 6 mandatory triggers with SLAs; 5-step update procedure with dual-approval gate (compliance-officer + security-engineer); tagged archive at each minor version bump. Annual control self-assessment: Q4 cadence; structured against CC4.1, CC4.2, CC7.2, CC7.4, CC7.5 criteria; self-rated readiness with gap list; stored `compliance/evidence/annual-csa/YYYY-ir-csa.md`; shared with audit firm at observation period open. SOC 2 evidence mapping for §14: CC4.1, CC4.2, CC7.5, CC2.1; complete evidence package list. Appendix A updated with R-12 and §14 quick references.*
 
 *v0.8 additions: R-14 DSAR / Data Subject Rights Incident — fourteenth runbook; operationalises GDPR Arts. 15, 17, 18, 19, 20 rights enforcement into an incident-level response procedure, closing the gap flagged in SOC2_READINESS.md (🔴 DSAR SLA, 🟡 DSAR process) and referenced in GDPR_DPIA.md §10.1.5. Seven-scenario severity matrix: P0 for cross-tenant contamination in export (simultaneous R-01 activation) and for Art. 9 health data confirmed present after erasure deadline; P1 for missed 30-day deadline or export worker complete failure; P2 for single DSAR in cure window or bulk DSAR with no immediate deadline risk. R-14.1 scope assessment SQL: in-flight DSAR register query with overdue flag, export delivery check, erasure completeness query per-table (6 health data tables). R-14.2 cross-tenant contamination protocol: immediate export link revocation (DEC-030 CRITICAL), parallel R-01 activation, Art. 33 clock start on Art. 9 data, enterprise tenant notification within 30 min via Template E-01 (§12), corrected re-delivery with dsar.export_redelivered event. R-14.3 failed erasure protocol: last-good erasure job lookup via audit_log_events, pg_cron log diagnosis, targeted per-table manual erasure with IC + compliance-officer authorization gate, Art. 9 access assessment for Art. 33 trigger, cv_sessions.keypoints_enc → R-11 cross-reference. R-14.4 missed deadline: cure-window (day 28–30) and post-deadline protocols; Art. 12(3) 90-day extension handling; DPA self-report decision framework with compliance-officer authority (no founder sign-off required for non-breach DSAR delays). R-14.5 bulk DSAR/coordinated abuse: Art. 12(5) refusal strategy, deadline escalation threshold, social-media campaign awareness. R-14.6 enterprise employee DSAR: joint-controller complexity where employer is controller for workplace fitness data; privacy floor enforcement — FORM cannot comply with an employer instruction that extinguishes an employee's Art. 15 right. Five communication templates: D-01 DPA voluntary notification (missed deadline), D-02 user delay notification, D-03 Art. 12(5) refusal, D-04 employee redirect to employer, E-DSAR-01 enterprise tenant notification. 14 DEC-030 HMAC-chained audit events covering full DSAR lifecycle from `dsar.request_received` (MEDIUM) through `dsar.export_link_revoked` (CRITICAL) and `dsar.erasure_manual_supplement` (CRITICAL). SOC 2 evidence mapping: P4.0 (data subject inquiries), P5.0 (data subject requests), P5.1 (consent/choice), P8.0 (disposal), CC2.2 (external communications), CC6.5 (logical access — disposal). Evidence package structure: `compliance/evidence/dsar/YYYY-MM/<dsar_id>/` with 6 subdirectories (request, verification, export manifest, erasure, comms, dec030); 7-year retention per DEC-030; read-only after case closure. Six post-incident preventive controls (day-25/29 Slack deadline alerts, monthly export canary, automated post-erasure verification query, cross-tenant isolation regression test, weekly DSAR register review, keypoints_enc NULL check). Tabletop Scenario I: DSAR export cross-tenant contamination affecting 420-user Growth-tier enterprise tenant (UK/Ireland); bug filters by tenant_id instead of user_id; 3 employees received full-tenant exports; all downloaded; Art. 33/34 assessment; ICO notification; evidence chain; re-delivery protocol; 10 discussion points. Document header corrected from v0.5 → v0.8 (intermediate versions v0.6 and v0.7 were committed out of order; header had not been updated past v0.5). Owner line corrected: devops-lead → compliance-officer (matching footer since v0.5). Appendix A updated with R-14 quick reference. SOC 2 scope line in document header updated to include P4.0, P5.0, P8.0.*
+
+---
+
+### R-18: Database Integrity & Neon Postgres Failover Incident
+
+> **Scope:** Covers all degradation and failure modes originating in FORM's primary data store — Neon Postgres (multi-tenant, RLS-enforced). Scenarios include: Neon-side failover/replica promotion, detected data corruption in any table, RLS policy failure or bypass (cross-tenant data bleed), pg_cron job failures affecting HMAC chain integrity or data lifecycle, and point-in-time recovery (PITR) activation. A database incident simultaneously threatens FORM's most sensitive data surfaces: `health_profiles`, `coaching_turns`, `cv_sessions`, `dsar_requests`, and the DEC-030 HMAC audit chain. This runbook operates in parallel with R-01 (Data Breach) if corruption confirms unauthorised data access; with R-05 (HMAC Chain Break) if `audit_log_events` integrity is affected; and with R-11 (CV Privacy) if `cv_sessions.keypoints_enc` is in scope.
+
+#### Trigger
+
+| Source | Alert ID | Condition |
+|---|---|---|
+| Neon Control Plane | `FORM-DB-FAILOVER-001` | Neon Postgres primary → replica failover event; email to devops-lead + `#db-alerts` Slack via Neon webhook |
+| `audit-chain-daily-check` Edge Function | `FORM-DB-CRON-001` | `hmac_valid = FALSE` returned for any row in `audit_log_events` |
+| Sentry | `FORM-DB-ERROR-001` | `PostgresError` code `42501` (RLS policy violation) for `anon` or `authenticated` role at rate > 0.1% of requests in any 5-min window |
+| Sentry | `FORM-DB-ERROR-002` | `PostgresError` code `P0001` or `23505` on `audit_log_events.chain_seq` — chain sequence collision indicating lost or duplicated event |
+| Cloudflare Dead-Man's Switch | `FORM-DB-CHAIN-001` | `audit_log_events` row count for `created_at > NOW() - INTERVAL '1 hour'` returns 0 during a known-active platform period; fires if HMAC chain silently paused |
+| Manual Detection | — | devops-lead observes Neon Console: write latency P95 > 500 ms, PgBouncer `cl_waiting` > 0 for > 60 s, or enterprise customer-success receives report of wrong-user data visible in UI |
+
+**All database integrity triggers are treated as potential P0 until §R-18.2 scope assessment confirms otherwise.**
+
+#### Severity Classification
+
+| Condition | Severity | Reason |
+|---|---|---|
+| RLS bypass confirmed: `authenticated` role query returning rows from another `tenant_id` or `user_id` | **P0** | Multi-tenant isolation failure; cross-tenant Art. 9 health/coaching data exposure; immediate R-01 co-activation required |
+| `audit_log_events` corruption or HMAC chain gap detected | **P0** | Chain break destroys SOC 2 audit evidence integrity; DEC-030 is the forensic foundation for all other runbooks |
+| `health_profiles`, `coaching_turns`, or `cv_sessions.keypoints_enc` corrupted or partially deleted | **P0** | Art. 9 health data destroyed or exposed; GDPR data integrity obligation breach; enterprise SLA breach likely |
+| Neon primary failover + write operations failing > 2 minutes | **P1** | Full write-path outage; coordinate with R-02; PITR may be needed if failover completes with inconsistent state |
+| pg_cron job failure halting DSAR erasure or `cv_session_fleet_stats` refresh | **P1** | DSAR erasure failure → Art. 17 obligation at risk; coordinate with R-14 for any in-window DSAR requests |
+| Connection pool exhaustion — no new connections accepted > 3 minutes | **P1** | Product non-functional; coordinate with R-02; root cause may be runaway query or ORM N+1 bug |
+| Neon failover completed cleanly; writes resumed < 2 min; no data loss on check C1 | **P2** | Normal Neon HA operation; confirm integrity; monitor 30 min; no R-01 activation needed |
+| Non-critical table corruption (`user_preferences`, `notification_settings`) | **P2** | No Art. 9 data; restore from PITR or pg_dump; notify affected users if data loss > 24 h |
+| Isolated pg_cron schedule drift < 5 min with no missed job window | **P3** | Monitor; root-cause analysis next business day |
+
+**P0 upgrade trigger:** If scope assessment (§R-18.2 Check C2) returns `cross_tenant_rows > 0`, or `cv_sessions.keypoints_enc` is readable by an incorrect `user_id`, immediately upgrade to P0 and activate R-01 (and R-11 if keypoints_enc confirmed in scope) in parallel.
+
+#### Why This Matters
+
+FORM's database is the product. Every workout, coaching turn, biometric estimate, and audit event exists only in Neon Postgres. Unlike application-tier failures mitigated with edge caching, a database integrity incident can simultaneously trigger: (1) user data loss, (2) cross-tenant health data exposure activating GDPR Art. 9 notification obligations, (3) destruction of the DEC-030 HMAC chain that every other runbook depends on for forensic evidence, and (4) SOC 2 audit evidence gaps that could affect the Type II opinion.
+
+The multi-tenant RLS architecture means a single missing `tenant_id = auth.jwt()->>'tenant_id'` filter on a new table creates silent cross-tenant data bleed detectable only by scope assessment queries. FORM currently has no real-time RLS regression test in CI for every table (tracked as OQ-DB-01 below).
+
+Neon's architectural guarantee is a 500 ms failover SLA for primary promotion. However, the window between primary failure and replica promotion can result in in-flight `INSERT`/`UPDATE` transactions being lost, and the first 30–60 seconds post-failover may return write errors while PgBouncer reconnects. This runbook covers both the clean-failover and dirty-failover (with confirmed data loss) paths.
+
+#### Immediate Actions (T+0 to T+15 min)
+
+```
+1. Open incident channel: #inc-YYYYMMDD-db-integrity
+   IC: devops-lead (or on-call platform-engineer if devops-lead unreachable)
+   Notify: platform-engineer + security-engineer immediately
+
+2. Classify trigger type — pick exactly one:
+   A) Neon failover event (FORM-DB-FAILOVER-001)
+      → Follow Immediate Path A below — confirm write path, run Check C1
+   B) HMAC chain break (FORM-DB-CRON-001 or FORM-DB-CHAIN-001)
+      → Activate R-05 IMMEDIATELY in parallel; this runbook handles DB-side forensics
+   C) RLS violation or cross-tenant bleed (FORM-DB-ERROR-001 or UI report)
+      → Activate R-01 in parallel; treat as P0 until C2 scan disproves
+   D) pg_cron failure (non-chain job)
+      → Identify which job failed; if DSAR erasure: coordinate with R-14; assess deadline risk
+
+3. Confirm connectivity and failover state (run as form_readonly):
+```
+
+```sql
+SELECT
+  pg_postmaster_start_time() AS pg_started_at,
+  pg_is_in_recovery()        AS is_replica,   -- TRUE = replica (failover still in progress)
+  current_database()         AS db_name,
+  NOW()                      AS query_time;
+```
+
+```sql
+-- Confirm write path health post-failover
+SELECT
+  relname AS table_name,
+  n_tup_ins AS inserts,
+  n_tup_upd AS updates,
+  last_autoanalyze
+FROM pg_stat_user_tables
+WHERE relname IN (
+  'audit_log_events','coaching_turns','health_profiles',
+  'cv_sessions','workout_sessions','dsar_requests'
+)
+ORDER BY relname;
+```
+
+```
+4. Post in #inc-YYYYMMDD-db-integrity within T+10 min:
+   - pg_is_in_recovery() result
+   - Write errors in Sentry (last 10 min)
+   - Which trigger fired and at what timestamp
+   - IC identity confirmed
+```
+
+**Immediate Path A (Neon Failover):**
+```
+A1. Check Neon Console → Project → Operations for failover event details:
+    - Start time, end time, duration
+    - Planned (Neon maintenance) vs. unplanned (primary death)
+    - Whether in-flight transactions were rolled back
+
+A2. Check for PgBouncer reconnect errors in Sentry:
+    - `connection refused` or `server closed the connection unexpectedly`
+    - Any pg_is_in_recovery() = FALSE but writes still failing?
+
+A3. Run Check C1 (row count consistency) within T+5 min of trigger
+
+A4. Classify clean vs. dirty failover:
+    - Clean: writes accepted, C1 consistent → P2, monitor 30 min, no R-01
+    - Dirty: write errors > 30 s post-failover OR C1 inconsistency → escalate to P1
+    - Very dirty: confirmed data loss in Art. 9 tables → P0, activate R-01
+```
+
+#### Scope Assessment SQL (§R-18.2)
+
+> Run all queries as `form_admin` with `row_security = off`. Output restricted to `#inc-YYYYMMDD-db-integrity` only — never share in general engineering channels.
+
+**Check C1: Row count consistency** (run post-failover to detect in-flight transaction loss)
+```sql
+-- Compares current row counts against the last pg_cron hourly snapshot
+-- table_row_count_snapshots is populated by OBSERVABILITY §7 dead-man's switch job
+-- If that table does not yet exist, compare manually against STATUS.md last-known counts
+SELECT
+  s.table_name,
+  s.row_count                                          AS snapshot_count,
+  s.snapshot_time,
+  ROUND(EXTRACT(EPOCH FROM (NOW() - s.snapshot_time)) / 60) AS minutes_since_snapshot,
+  c.live_count                                         AS current_count,
+  (c.live_count - s.row_count)                         AS delta,
+  CASE
+    WHEN ABS(c.live_count - s.row_count) > 100
+      AND s.table_name IN ('health_profiles','coaching_turns','cv_sessions','audit_log_events')
+    THEN '⚠️ INVESTIGATE'
+    ELSE '✅ OK'
+  END AS status
+FROM (
+  SELECT table_name, row_count, snapshot_time
+  FROM table_row_count_snapshots
+  WHERE snapshot_time = (SELECT MAX(snapshot_time) FROM table_row_count_snapshots)
+) s
+JOIN (
+  SELECT 'health_profiles' AS table_name, COUNT(*) AS live_count FROM health_profiles
+  UNION ALL SELECT 'coaching_turns',  COUNT(*) FROM coaching_turns
+  UNION ALL SELECT 'cv_sessions',     COUNT(*) FROM cv_sessions
+  UNION ALL SELECT 'audit_log_events',COUNT(*) FROM audit_log_events
+  UNION ALL SELECT 'workout_sessions',COUNT(*) FROM workout_sessions
+  UNION ALL SELECT 'dsar_requests',   COUNT(*) FROM dsar_requests
+) c ON s.table_name = c.table_name
+ORDER BY s.table_name;
+-- Expected: delta within ±100 for all tables. Larger negative delta = possible data loss.
+```
+
+**Check C2: RLS cross-tenant bleed detection** (run immediately on FORM-DB-ERROR-001 or any suspicion)
+```sql
+SET LOCAL role = 'form_admin';
+SET LOCAL row_security = off;
+
+WITH user_tenants AS (
+  SELECT id AS user_id, tenant_id AS assigned_tenant_id FROM users
+)
+SELECT 'coaching_turns' AS table_name, ct.id AS row_id,
+       ct.user_id, ct.tenant_id AS row_tenant, ut.assigned_tenant_id, 'MISMATCH' AS status
+FROM coaching_turns ct
+JOIN user_tenants ut ON ct.user_id = ut.user_id
+WHERE ct.tenant_id <> ut.assigned_tenant_id
+
+UNION ALL
+
+SELECT 'health_profiles', hp.id, hp.user_id,
+       hp.tenant_id, ut.assigned_tenant_id, 'MISMATCH'
+FROM health_profiles hp
+JOIN user_tenants ut ON hp.user_id = ut.user_id
+WHERE hp.tenant_id <> ut.assigned_tenant_id
+
+UNION ALL
+
+SELECT 'cv_sessions', cs.id, cs.user_id,
+       cs.tenant_id, ut.assigned_tenant_id, 'MISMATCH'
+FROM cv_sessions cs
+JOIN user_tenants ut ON cs.user_id = ut.user_id
+WHERE cs.tenant_id <> ut.assigned_tenant_id;
+
+-- Expected: 0 rows.
+-- ANY rows returned = P0. Activate R-01 immediately. Start Art. 33 clock.
+```
+
+**Check C3: HMAC chain continuity** (run if FORM-DB-CHAIN-001 fired or as post-failover validation)
+```sql
+SELECT
+  chain_seq,
+  LAG(chain_seq) OVER (ORDER BY chain_seq)                           AS prev_seq,
+  chain_seq - LAG(chain_seq) OVER (ORDER BY chain_seq)               AS gap,
+  created_at,
+  event_type
+FROM audit_log_events
+WHERE created_at >= NOW() - INTERVAL '2 hours'
+HAVING chain_seq - LAG(chain_seq) OVER (ORDER BY chain_seq) > 1
+ORDER BY chain_seq;
+-- Expected: 0 rows. Any gap = activate R-05 in parallel; document gap range and timestamp.
+```
+
+**Check C4: pg_cron job health** (run if FORM-DB-CRON-001 fired)
+```sql
+SELECT
+  j.jobname,
+  j.schedule,
+  d.status,
+  d.start_time  AS last_run,
+  d.return_message
+FROM cron.job j
+JOIN LATERAL (
+  SELECT status, start_time, return_message
+  FROM cron.job_run_details d2
+  WHERE d2.jobid = j.jobid
+  ORDER BY start_time DESC
+  LIMIT 1
+) d ON TRUE
+ORDER BY j.jobname;
+-- Failed jobs show status = 'failed'. Identify which job(s) and assess DSAR/chain impact.
+```
+
+#### Containment
+
+**Failover path:**
+```
+FA-1. If pg_is_in_recovery() = TRUE, do NOT attempt manual failover intervention.
+      Neon manages promotion automatically. Monitor Neon Console Operations tab.
+
+FA-2. If writes are failing > 5 min post-promotion:
+      → Check Workers connection strings (Neon HTTP endpoint vs. pool endpoint)
+      → Trigger Cloudflare Workers redeploy if connection strings are stale: wrangler deploy
+      → Do NOT restart the Neon project unless Neon support advises
+
+FA-3. Once writes are confirmed healthy, pause any active pg_cron DSAR erasure jobs:
+      → Prevents partial erasure commits during an unstable write period
+      → Resume only after C1 passes
+```
+
+**RLS bypass / cross-tenant bleed (P0):**
+```
+RLS-1. Set affected tenant(s) to read-only via feature flag:
+       UPDATE tenants SET read_only_mode = true WHERE id IN (<affected_tenant_ids>);
+       → customer-success notified immediately per §12 Template E-01
+
+RLS-2. Do NOT delete or modify mismatched rows — preserve as forensic evidence.
+       Snapshot the C2 result:
+         COPY (SELECT * FROM ...<C2 query>...) TO STDOUT CSV HEADER
+       Upload to R2: s3://form-soc2-evidence/incidents/<slug>/rls-mismatch-<timestamp>.csv
+
+RLS-3. Identify the code path that produced the mismatch:
+       → Git blame the migration that created/modified the affected table's RLS policy
+       → Check for a recent migration that removed or weakened USING/WITH CHECK clauses
+       → Check for an ORM model that inadvertently calls BYPASSRLS
+
+RLS-4. R-01 is now active and owns the Art. 33 clock. Feed it:
+       → Art. 9 data category: health_profiles (YES), coaching_turns (YES), cv_sessions (YES if keypoints_enc populated)
+       → Blast radius: unique user_ids and tenant_ids from C2 result
+       → Earliest affected timestamp: MIN(created_at) from mismatched rows
+```
+
+**HMAC chain break:**
+```
+Chain-1. R-05 is now the primary runbook. This runbook handles DB-side recovery.
+Chain-2. Restrict audit_log_events to service-role writes only:
+         REVOKE INSERT ON audit_log_events FROM authenticated, anon;
+         GRANT INSERT ON audit_log_events TO form_audit_writer;
+         → Prevents further chain extension that could obscure the break point
+Chain-3. Dump chain state to R2 immediately:
+         pg_dump --table=audit_log_events --data-only --format=custom \
+           $DATABASE_URL > /tmp/audit_log_snapshot_$(date +%Y%m%dT%H%M%S).dump
+         aws s3 cp /tmp/audit_log_snapshot_*.dump \
+           s3://form-soc2-evidence/incidents/<slug>/audit_log_snapshot.dump
+```
+
+#### Eradication: PITR Recovery Procedure
+
+> Activate only if P0 data corruption is confirmed. Requires three-party approval.
+
+```
+PITR-1. Identify the target recovery point:
+        → Last known-good timestamp BEFORE the corruption event
+        → Use C3 chain_seq gap to pinpoint the event window
+        → Cross-reference Neon Console Operations log for failover timestamp
+
+PITR-2. Create a PITR branch in Neon Console:
+        → Neon Console → Branches → "Create branch" → set timestamp to recovery point
+        → Branch name: inc-<slug>-recovery-<timestamp>
+        → DO NOT set as primary yet
+
+PITR-3. Validate the recovery branch:
+        → Connect via separate connection string
+        → Run C1, C2, and C3 against recovery branch
+        → Confirm corruption is absent; confirm chain is continuous to recovery point
+
+PITR-4. Quantify data loss:
+        → Compare recovery branch row counts vs. production branch for each table
+        → For each table with negative delta: classify whether rows are user-generated
+          (unrecoverable from server) or system-generated (reconstructible)
+
+PITR-5. THREE-PARTY APPROVAL GATE — founder + devops-lead + security-engineer:
+        → Document approval in #inc-YYYYMMDD-db-integrity with timestamps
+        → Emit DEC-030 CRITICAL event: database.pitr_activation_authorized
+        → If any enterprise tenants in scope: activate §12 Template E-01 BEFORE switching
+        → Two-party fallback: if third approver unreachable after 15 min, two-party approval
+          permitted for clean PITR (no confirmed data loss) only; dirty PITR always requires three.
+
+PITR-6. Switch primary to recovery branch (Neon Console):
+        → "Set as primary" on recovery branch
+        → Update Workers DATABASE_URL environment variable → wrangler deploy
+        → Monitor write-path health for 30 min; watch Sentry for PostgresError spike
+
+PITR-7. Post-PITR reconciliation:
+        → coaching_turns lost: users must re-trigger Victor for affected session dates
+        → workout_sessions lost: import from wearable sync if available
+        → health_profiles lost: user re-onboarding may be required; notify CSM for enterprise
+        → Emit DEC-030 event: database.pitr_recovery_completed
+```
+
+#### Recovery
+
+```
+R1. Validate all six Art. 9 tables intact and RLS policies functioning:
+    → Rerun C2 (RLS mismatch): expect 0 rows
+    → Rerun C1 (row count): document final counts vs. pre-incident snapshot
+
+R2. Resume pg_cron jobs in order:
+    1. audit-chain-daily-check (validate chain first)
+    2. cv_session_fleet_stats refresh
+    3. dsar_erasure_job (check for any DSAR requests that missed their deadline during incident)
+
+R3. Restore write access:
+    → GRANT INSERT ON audit_log_events TO authenticated, anon; (if revoked)
+    → UPDATE tenants SET read_only_mode = false WHERE id IN (<affected>);
+    → customer-success sends §12 Template E-03 (Resolution) to affected tenants
+
+R4. All-clear post to #ops-general and #inc-YYYYMMDD-db-integrity:
+    → Total incident duration, data loss assessment (none / quantified), tenants affected
+    → IC confirms PIR scheduled within 5 business days
+    → Emit DEC-030: incident.recovered
+```
+
+#### Regulatory Assessment
+
+| Scenario | Regulation | Obligation | Clock Start |
+|---|---|---|---|
+| C2 mismatch confirmed in `health_profiles`, `coaching_turns`, or `cv_sessions` (Art. 9 data) | GDPR Art. 33 + Art. 9 | Supervisory authority notification within 72 h | Time C2 confirmation query ran |
+| Data corruption destroying rows in `health_profiles` or `coaching_turns` | GDPR Art. 5(1)(f) integrity | Art. 33 if health data of > 0 users destroyed; availability breach assessment | IC P0 declaration time |
+| PITR activated with confirmed data loss | GDPR Art. 32 | PIR must document why PITR was the appropriate technical measure; DPA notification if large-scale health data lost | PITR activation time |
+| HMAC chain break in `audit_log_events` during SOC 2 observation period | SOC 2 CC7.4 | Audit evidence gap; auditor notification required | Chain break confirmed timestamp |
+
+**Art. 33 co-trigger:** If C2 returns rows in Art. 9 tables, R-01 owns the Art. 33 clock. This runbook feeds the Art. 9 data category classification and blast radius numbers into R-01's breach notification template.
+
+#### DEC-030 Audit Events
+
+| Event Type | Severity | Trigger | Retention |
+|---|---|---|---|
+| `database.failover_detected` | HIGH | Neon primary failover webhook received; `pg_is_in_recovery()` confirmed | 3 years |
+| `database.write_path_restored` | STANDARD | Post-failover writes confirmed healthy; latency P95 < 100 ms | 1 year |
+| `database.rls_mismatch_detected` | CRITICAL | C2 returns > 0 rows; cross-tenant data confirmed | 7 years |
+| `database.pitr_activation_authorized` | CRITICAL | Three-party approval documented; PITR branch created | 7 years |
+| `database.pitr_recovery_completed` | HIGH | Primary switch to recovery branch confirmed; C1 + C2 clean | 3 years |
+| `database.hmac_chain_gap_detected` | CRITICAL | C3 returns > 0 rows; chain_seq discontinuity confirmed | 7 years |
+| `database.pg_cron_job_failure` | HIGH | Any pg_cron job exits with error in `cron.job_run_details` | 3 years |
+| `database.rls_policy_corrected` | HIGH | Migration fix deployed; C2 reruns clean post-fix | 3 years |
+| `database.read_only_mode_activated` | HIGH | Tenant(s) set to `read_only_mode = true` pending investigation | 3 years |
+| `database.read_only_mode_lifted` | STANDARD | Tenant(s) restored to read-write post-recovery | 1 year |
+
+```typescript
+// DEC-030 emission for RLS mismatch (emitted by scope-assessment Worker endpoint)
+const event = {
+  event_type: 'database.rls_mismatch_detected',
+  severity: 'CRITICAL',
+  incident_id: incidentId,
+  payload: {
+    mismatch_row_count: result.rowCount,
+    affected_tables: result.tables,              // ['health_profiles', 'coaching_turns']
+    query_executed_at: new Date().toISOString(),
+    tenants_affected_count: result.tenantIds.length, // count only — no identifiers
+    art9_tables_in_scope: result.art9TablesInScope,  // true = R-01 auto-activation
+  },
+};
+await emitDec030Event(event, supabaseAdminClient);
+```
+
+#### Evidence Package
+
+| Evidence ID | Artefact | Collection Method | Location |
+|---|---|---|---|
+| **IR-DB-E-001** | Neon Console failover event log | Screenshot: Neon Console → Operations tab showing failover timestamp, duration, promotion type | `compliance/evidence/incidents/<slug>/neon-failover-log.png` |
+| **IR-DB-E-002** | C1 row count report (pre- and post-incident) | SQL query output from §R-18.2 Check C1 exported as JSON at T+0 and post-recovery | `compliance/evidence/incidents/<slug>/row-count-pre.json` + `row-count-post.json` |
+| **IR-DB-E-003** | C2 RLS mismatch scan output | Full SQL result (0 rows = clean; > 0 rows = breach evidence) as JSON | `compliance/evidence/incidents/<slug>/rls-mismatch-scan.json` |
+| **IR-DB-E-004** | C3 HMAC chain continuity check | SQL result showing chain_seq gaps (0 rows expected); R-05 chain verification report if activated | `compliance/evidence/incidents/<slug>/hmac-chain-check.json` |
+| **IR-DB-E-005** | DEC-030 `database.*` event extract | All `database.*` events from `audit_log_events` for incident window, HMAC-verified | `compliance/evidence/incidents/<slug>/dec030-database-events.json` |
+| **IR-DB-E-006** | pg_cron job health report (C4) | SQL output of `cron.job_run_details` for 24-hour window around incident | `compliance/evidence/incidents/<slug>/pgcron-health.json` |
+| **IR-DB-E-007** | PITR activation approval record (if activated) | Three-party approval from incident channel + `database.pitr_activation_authorized` event | `compliance/evidence/incidents/<slug>/pitr-approval.md` |
+| **IR-DB-E-008** | Post-recovery C1 + C2 clean run | Confirmation reruns of Checks C1 and C2; both expected clean | `compliance/evidence/incidents/<slug>/post-recovery-checks.json` |
+
+All evidence under `compliance/evidence/incidents/<slug>/` with SHA-256 manifest; 7-year retention per DEC-030 CRITICAL events; R2 object versioning enabled.
+
+#### SOC 2 TSC Mapping
+
+| TSC Criterion | Control | Evidence from This Runbook |
+|---|---|---|
+| CC7.2 — Anomaly monitoring | FORM-DB-ERROR-001/002 RLS alert, FORM-DB-CHAIN-001 dead-man's switch, pg_cron failure alert | Alert configurations + C2 automated daily scan as continuous monitoring evidence |
+| CC7.3 — Evaluate and communicate security events | Scope assessment C1–C4, severity classification matrix, IC role definition | IR-DB-E-001 through IR-DB-E-008 evidence package; documented query framework |
+| CC7.4 — Respond to identified security events | Containment procedures, PITR recovery, RLS fix, DEC-030 emission | PITR procedure + three-party approval gate as documented response authority |
+| A1.2 — Environmental threats | Neon failover handling, PITR activation, pg_cron resilience | IR-DB-E-001 (failover log) + IR-DB-E-007 (PITR approval): demonstrates recovery from HA events |
+| A1.3 — Recovery objectives | PITR procedure with target recovery point identification; < 2 min RTO for clean failover | PITR steps 1–7 as documented recovery procedure |
+| CC6.1 — Logical access controls | BYPASSRLS restricted to `form_admin`; RLS policy framework across all tables | C2 mismatch scan as ongoing control effectiveness check; RLS correction procedure |
+| CC6.5 — Logical access — disposal | PITR branch cleanup post-recovery; C2 mismatch row disposition without modification | IR-DB-E-003 + IR-DB-E-008: before/after evidence of RLS correction |
+
+#### Open Questions
+
+**OQ-DB-01: RLS regression testing in CI**
+No automated test currently validates that every user-facing table has a correct `tenant_id = auth.jwt()->>'tenant_id'` USING clause. A migration that adds a table without an RLS policy passes CI today. Options: (a) `pgTAP` test suite in the CI migration step asserting `RLS IS ENABLED` and `POLICY EXISTS` for every `public` schema table; (b) custom `check-rls.ts` script querying `pg_policies` via Supabase admin client in a migration smoke test. Option (a) is preferred (idiomatic pg testing). Owner: platform-engineer. Priority: **P1**. Resolution target: M5 (before first enterprise onboarding).
+
+**OQ-DB-02: PITR three-party approval out-of-band mechanism**
+Current approval relies on a Slack channel. If Slack is unavailable during the incident, there is no out-of-band path. Recommended resolution: PagerDuty incident command acknowledgement from three named responders constitutes formal approval; document as the out-of-band method. Two-party fallback for clean PITR (no confirmed data loss); three-party remains required for dirty PITR. Owner: security-engineer + devops-lead. Priority: **P2**. Resolution target: M6.
+
+**OQ-DB-03: `table_row_count_snapshots` table existence**
+Check C1 assumes a `table_row_count_snapshots` table from the OBSERVABILITY §7 dead-man's switch pg_cron job. Until it exists, Check C1 must be run manually against STATUS.md last-known counts. Owner: devops-lead. Priority: **P0** (blocking C1). Resolution target: M4.
+
+#### Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Create `table_row_count_snapshots` table + pg_cron job (every 30 min; row counts for 6 Art. 9 tables); confirm first snapshot within 30 min of deploy; closes OQ-DB-03 | P0 | M4 | devops-lead | [ ] |
+| 2 | Configure Neon Console webhook → `#db-alerts` Slack; confirm test delivery; register as `FORM-DB-FAILOVER-001` in OBSERVABILITY.md §3 alert registry | P0 | M4 | devops-lead | [ ] |
+| 3 | Implement `FORM-DB-ERROR-001` Sentry alert (42501 > 0.1% in 5-min window) and `FORM-DB-ERROR-002` (23505 on `audit_log_events.chain_seq`); wire to PagerDuty + `#db-alerts` | P0 | M4 | devops-lead + platform-engineer | [ ] |
+| 4 | Implement `FORM-DB-CHAIN-001` dead-man's switch: Cloudflare Edge Function (cron, every 15 min) checks `audit_log_events` row count for last 1 h; fires PagerDuty P1 to devops-lead if 0 during active platform hours | P0 | M4 | devops-lead | [ ] |
+| 5 | Add pgTAP test suite to CI migration step: assert RLS enabled + USING policy exists for every `public` table; fail CI if any table missing; closes OQ-DB-01 | P1 | M5 | platform-engineer | [ ] |
+| 6 | Document OQ-DB-02 PITR approval protocol in §R-18 PITR step 5: add two-party fallback rule for clean PITR; register PagerDuty IC acknowledgement as out-of-band approval path; closes OQ-DB-02 | P2 | M6 | security-engineer | [ ] |
+| 7 | Register all ten `database.*` DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` with schema, severity, and retention fields | P1 | M4 | security-engineer | [ ] |
+| 8 | Add automated daily C2 (RLS mismatch) scan: pg_cron job at 02:00 UTC; if result > 0, emit `database.rls_mismatch_detected` + PagerDuty P0; results to `compliance/evidence/rls-scans/YYYY-MM-DD.json` | P1 | M5 | platform-engineer | [ ] |
+| 9 | Confirm Neon project PITR retention window ≥ 7 days; document setting in OBSERVABILITY.md §3 database SLO entry | P1 | M4 | devops-lead | [ ] |
+| 10 | Add R-18 tabletop scenario to §9.5 Year 2 Testing Schedule: Neon dirty failover simulation + cross-tenant RLS mismatch discovery; enterprise CSM participates; record elapsed time vs. 15-min P0 SLA | P2 | M6 | security-engineer | [ ] |
+
+---
+
+*v1.0 additions (2026-06-02): R-18 Database Integrity & Neon Postgres Failover Incident. Eighteenth runbook in the taxonomy; fills the gap left by existing runbooks that assume the database as a given substrate — R-01 through R-17 all presuppose database availability and integrity. R-18 covers four distinct failure modes: (1) Neon primary failover (clean vs. dirty; PITR activation path for dirty failover), (2) RLS cross-tenant data bleed (C2 mismatch scan; immediate read-only containment; R-01 co-activation gate), (3) HMAC audit chain break (C3 chain continuity check; chain state R2 snapshot; R-05 co-activation), (4) pg_cron job failure (DSAR erasure and fleet stats jobs; R-14 coordination for in-window DSAR requests). Four scope assessment queries (C1 row count consistency, C2 RLS cross-tenant mismatch, C3 HMAC chain continuity, C4 pg_cron job health) — all with BYPASSRLS and restricted to incident channel. Severity table with seven tiers: P0 for RLS bypass with Art. 9 data, P0 for HMAC chain destruction, P0 for Art. 9 table corruption, P1 for failover write outage > 2 min, P1 for pg_cron DSAR failure, P1 for connection pool exhaustion, P2 for clean failover. PITR five-step procedure with three-party approval gate (founder + devops-lead + security-engineer); two-party fallback for clean PITR documented. Ten DEC-030 HMAC-chained events: database.failover_detected (HIGH), database.write_path_restored (STANDARD), database.rls_mismatch_detected (CRITICAL, 7-year retention), database.pitr_activation_authorized (CRITICAL, 7-year), database.pitr_recovery_completed (HIGH), database.hmac_chain_gap_detected (CRITICAL, 7-year), database.pg_cron_job_failure (HIGH), database.rls_policy_corrected (HIGH), database.read_only_mode_activated (HIGH), database.read_only_mode_lifted (STANDARD). Evidence package IR-DB-E-001 through IR-DB-E-008 with SHA-256 manifest and 7-year retention for CRITICAL events. SOC 2 mapping: CC7.2 (RLS + chain alerts), CC7.3 (scope assessment + IC framework), CC7.4 (containment + PITR), A1.2 (Neon HA + pg_cron resilience), A1.3 (PITR recovery objectives), CC6.1 (BYPASSRLS restriction + RLS policy framework), CC6.5 (mismatch row disposition evidence). Three open questions: OQ-DB-01 (RLS regression testing in CI — P1 pgTAP), OQ-DB-02 (PITR out-of-band approval — P2), OQ-DB-03 (table_row_count_snapshots existence — P0 blocking C1). Ten-item implementation checklist (4× P0, 4× P1, 2× P2). Owner: security-engineer + devops-lead.*

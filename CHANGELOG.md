@@ -6,6 +6,13 @@
 
 ---
 
+## [1.64.0] — 2026-06-02
+
+### Added
+- `docs/INCIDENT_RESPONSE.md R-18` — Database Integrity & Neon Postgres Failover Incident (eighteenth runbook). Covers four failure modes: Neon primary failover (clean vs. dirty, PITR activation path), RLS cross-tenant data bleed (C2 mismatch scan; immediate read-only containment; R-01 co-activation gate), HMAC audit chain break (C3 chain continuity check; R-05 co-activation), and pg_cron job failure (DSAR erasure + fleet stats; R-14 coordination). Four scope assessment queries (C1 row count consistency, C2 RLS cross-tenant mismatch, C3 HMAC chain continuity, C4 pg_cron health) with BYPASSRLS and incident-channel restriction. Seven-tier severity table: P0 for RLS bypass with Art. 9 data / HMAC chain destruction / Art. 9 table corruption; P1 for failover write outage > 2 min / pg_cron DSAR failure / pool exhaustion; P2 for clean failover. PITR five-step procedure with three-party approval gate (founder + devops-lead + security-engineer); two-party fallback for clean PITR documented. Ten DEC-030 events (3× CRITICAL 7-year, 5× HIGH 3-year, 2× STANDARD 1-year). Evidence package IR-DB-E-001 through IR-DB-E-008. SOC 2 mapping: CC7.2/CC7.3/CC7.4/A1.2/A1.3/CC6.1/CC6.5. Three open questions (OQ-DB-01 RLS regression CI P1, OQ-DB-02 PITR approval P2, OQ-DB-03 row-count snapshots P0). Ten-item implementation checklist (4× P0, 4× P1, 2× P2). Owner: security-engineer + devops-lead.
+
+---
+
 ## [1.63.0] — 2026-06-02
 
 ### Added
