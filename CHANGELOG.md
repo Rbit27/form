@@ -6,6 +6,16 @@
 
 ---
 
+## [1.68.1] — 2026-06-02
+
+### Added
+- `content/post-183-cold-heat-adaptation-mechanisms.md` — «Тіло вчиться виживати в екстремі» — термальна адаптація холоду і тепла. Nedergaard et al. (2009 AJPCEP): бурий жир у дорослих підтверджено ПЕТ-сканами. UCP1 і non-shivering thermogenesis: протонний шунт в обхід АТФ-синтази. McKemy et al. (2002 Nature): TRPM8 як первинний холодовий сенсор. Chondronikola et al. (2014 Cell Metab): 4 тижні холодової акліматизації → ↑ BAT + інсулінова чутливість. Теплова акліматизація: Périard et al. (2021 Exp Physiol) метааналіз 46 досліджень → +8–15% плазмовий об'єм, ↑ VO₂max ~5–8%. HSP70/90: Ritossa (1962), Morton et al. (2006 JAP), механізм рефолдингу і HSF1. CWI після силового тренінгу: Peake et al. (2017 J Physiol) − 29% гіпертрофія за 12 тижнів. Cross-adaptation холод→тепло: Garrett et al. (2012) — не підтверджена. Синтезна таблиця: CWI / теплова акліматизація / сауна / cross-adaptation. ~13 хв. clinical-safety NOT REQUIRED. Owner: content-engine.
+- `blog.html` — картка post-183, лічильник 169 cards / 183 posts authored. v1.68.1.
+- `STATUS.md` — оновлено рядок blog.html: 169 cards / 183 posts authored / v1.68.1.
+- `README.md` — post-183 відмічено [x] у roadmap.
+
+---
+
 ## [1.68.0] — 2026-06-02
 
 ### Added
