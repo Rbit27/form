@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v1.1
+# FORM · Incident Response Runbook v1.3
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -4974,7 +4974,13 @@ P2?  → Track in Linear. Handle in business hours unless escalating.
 Data breach?                → R-01
 Outage?                     → R-02
 Creds compromised?          → R-03
-SSO down?                   → R-04
+SSO login failures?
+  Customer IdP unavailable (Okta/Azure AD outage)? → R-19 (availability; NOT a security breach)
+    Multiple tenants on same IdP?  → R-19 P0; page compliance-officer + founder
+    Need IT admin access NOW?      → R-19: break-glass protocol (two-person auth required)
+    Outage > 30 min?               → R-19: SLA breach assessment per §23
+  SAML cert expired or compromised? → R-04 (security incident)
+  SAML assertion tampered / replay attack? → R-04 + R-01
 Chain break?                → R-05 (always P0)
 DDoS?                       → R-06
 Processor notified us?      → R-07 (72h clock starts NOW — page compliance-officer)
@@ -6393,6 +6399,541 @@ Check C1 assumes a `table_row_count_snapshots` table from the OBSERVABILITY §7 
 | 8 | Add automated daily C2 (RLS mismatch) scan: pg_cron job at 02:00 UTC; if result > 0, emit `database.rls_mismatch_detected` + PagerDuty P0; results to `compliance/evidence/rls-scans/YYYY-MM-DD.json` | P1 | M5 | platform-engineer | [ ] |
 | 9 | Confirm Neon project PITR retention window ≥ 7 days; document setting in OBSERVABILITY.md §3 database SLO entry | P1 | M4 | devops-lead | [ ] |
 | 10 | Add R-18 tabletop scenario to §9.5 Year 2 Testing Schedule: Neon dirty failover simulation + cross-tenant RLS mismatch discovery; enterprise CSM participates; record elapsed time vs. 15-min P0 SLA | P2 | M6 | security-engineer | [ ] |
+
+---
+
+### R-19: Enterprise IdP Outage & Break-Glass Authentication
+
+> **Scope:** This runbook covers the scenario where an enterprise tenant's identity provider (IdP) — Okta, Microsoft Azure AD / Entra ID, Google Workspace, Ping Identity, or any SAML/OIDC IdP configured in WorkOS — becomes unavailable or misconfigured, preventing enterprise users from authenticating into FORM via SSO. **This is an availability incident, not a security breach.** For SAML certificate compromise or a SAML authentication attack, activate R-04 instead. For FORM's own SSO infrastructure being down, activate R-02. References: `docs/SSO_SCIM_IMPLEMENTATION.md` §§1–2 (SAML/OIDC flows), `docs/OBSERVABILITY.md` §26 (SSO identity observability and AL-SSO-* alert rules), §12 (Enterprise Tenant SLA Breach & Communication Protocol), §23 (SLA credit calculation).
+
+#### Trigger
+
+Any of the following conditions activates this runbook:
+
+1. **Alert `AL-SSO-01`** fires from OBSERVABILITY §26: per-tenant SSO login success rate drops below 90% in a rolling 5-minute window, sustained for ≥ 3 consecutive evaluation cycles.
+2. **Alert `AL-SSO-02`** fires from OBSERVABILITY §26: P95 SSO round-trip latency exceeds 10,000 ms for a specific tenant for ≥ 3 consecutive minutes (indicative of IdP responding slowly rather than completely down).
+3. **CSM or enterprise tenant IT admin** reports SSO login failures to `#enterprise-support` Slack channel or via the enterprise support email address. Direct report from tenant supersedes alert timing — open the incident immediately.
+4. **WorkOS status page** or a known IdP public status page (Okta Trust, Azure Service Health, Google Workspace Status) shows a degradation or outage affecting the tenant's IdP service.
+
+**What this is NOT:**
+- FORM's own WorkOS/Auth0 integration being misconfigured → diagnose and fix as a platform bug (R-02 if user-facing)
+- SAML certificate expiry on FORM's side → R-04 (§20 of SSO_SCIM handles proactive certificate lifecycle)
+- SAML certificate expiry on the IdP's side → this runbook R-19 (customer-side certificate expiry is an IdP availability event)
+- A user's individual SSO account being locked or deprovisioned → SCIM deprovisioning flow (SSO_SCIM §§14–15); not an incident
+
+#### Severity Classification
+
+| Condition | Severity | Rationale |
+|---|---|---|
+| Single tenant IdP partial degradation (< 30% of tenant users affected; SSO still working for most) | **P2** | Monitor; no break-glass needed yet; CSM notifies tenant IT admin |
+| Single tenant IdP down > 15 min; > 50% of tenant users unable to log in | **P1** | Enterprise SLA clock starts; IC activates break-glass assessment; CSM E-04 notification |
+| Single tenant IdP down > 15 min AND tenant IT admin is also locked out of FORM admin dashboard | **P1 → P0 upgrade** | Break-glass mandatory; two-person auth required immediately |
+| Multiple tenants sharing the same IdP provider (e.g., Okta global outage) all affected | **P0** | Fleet-level event; page compliance-officer + founder; all affected tenant CSMs on bridge |
+| Tenant's on-premises IdP (ADFS) unreachable and no cloud fallback exists | **P1** | Different remediation path — on-prem ADFS requires tenant's network team; FORM break-glass is the only relief lever |
+
+**P0 upgrade trigger:** If five or more enterprise tenant users are actively locked out (cannot log in, have no cached session), and the outage duration exceeds 30 minutes with no IdP recovery timeline, upgrade to P0 immediately, page compliance-officer and founder, and notify all affected tenant CSMs.
+
+**Note on cached sessions:** Existing authenticated sessions in FORM's enterprise session store (`enterprise_sessions` table, backed by Cloudflare KV) remain valid during an IdP outage — affected users who are already logged in are not disrupted. Only users attempting a new SSO login are blocked. Scope the impact accordingly.
+
+#### Immediate Actions (T+0 to T+15 min)
+
+```
+1. Open incident channel: #inc-YYYYMMDD-idp-{tenant_slug} (one channel per affected tenant;
+   if multiple tenants → single channel #inc-YYYYMMDD-idp-fleet)
+   IC: platform-engineer (on-call)
+   Notify: customer-success + devops-lead immediately
+
+2. Confirm the outage source:
+   → Check the IdP's public status page for the affected tenant's provider:
+     Okta:             trust.okta.com
+     Microsoft Entra:  status.azure.com (filter: "Microsoft Entra ID")
+     Google Workspace: workspace.google.com/status
+     Ping Identity:    trust.pingidentity.com
+   → If the IdP status page is green: the issue may be tenant-specific misconfiguration
+     (SAML certificate expiry on tenant side, SCIM token rotation, IdP policy change).
+     Run scope queries C1 and C2 below immediately.
+   → If the IdP status page shows degradation or outage: this is out of FORM's control.
+     Skip C2 (not actionable); proceed to Containment.
+
+3. Confirm FORM's SSO infrastructure is healthy (rule out R-02):
+   → Check OBSERVABILITY §26 SSO fleet dashboard: is the outage tenant-specific, or is
+     FORM's WorkOS/Auth0 integration itself unhealthy?
+   → If WorkOS/Auth0 is reporting errors across all tenants → R-02 (service outage), not R-19
+
+4. Run scope assessment queries (as form_admin, BYPASSRLS; output to incident channel only):
+```
+
+#### Scope Assessment Queries
+
+```sql
+-- C1: Identify affected tenant(s), SSO provider, and recently active user count
+-- Run as form_admin (BYPASSRLS). Output restricted to incident channel.
+SELECT
+  t.slug                AS tenant_slug,
+  t.display_name        AS tenant_name,
+  t.sso_provider,       -- 'okta' | 'azure_ad' | 'google_workspace' | 'ping_identity' | 'saml_custom'
+  t.sso_domain,
+  t.admin_email,        -- Primary IT admin contact for break-glass notification
+  COUNT(u.id)           AS total_sso_users,
+  COUNT(u.id) FILTER (
+    WHERE u.last_seen_at > NOW() - INTERVAL '24 hours'
+  )                     AS active_users_last_24h,
+  COUNT(u.id) FILTER (
+    WHERE u.last_seen_at > NOW() - INTERVAL '1 hour'
+  )                     AS active_users_last_1h,
+  t.sla_tier            -- 'standard' | 'premium' — determines SLA credit threshold
+FROM tenants t
+JOIN users u ON u.tenant_id = t.id
+WHERE t.sso_enabled = true
+  AND t.sso_provider = $1  -- pass the suspected provider string, or remove WHERE for all SSO tenants
+GROUP BY t.id, t.slug, t.display_name, t.sso_provider, t.sso_domain, t.admin_email, t.sla_tier
+ORDER BY active_users_last_1h DESC;
+```
+
+```sql
+-- C2: Check for active sessions (users already logged in — NOT affected by IdP outage)
+-- These users' sessions are insulated; do not count them in the impact blast radius.
+SELECT
+  t.slug    AS tenant_slug,
+  COUNT(es.id) FILTER (WHERE es.expires_at > NOW()) AS active_valid_sessions,
+  COUNT(es.id) FILTER (WHERE es.expires_at < NOW()) AS expired_sessions
+FROM enterprise_sessions es
+JOIN users u  ON u.id  = es.user_id
+JOIN tenants t ON t.id = u.tenant_id
+WHERE t.sso_enabled = true
+  AND t.sso_provider = $1
+GROUP BY t.slug
+ORDER BY active_valid_sessions DESC;
+```
+
+```sql
+-- C3: Identify whether break-glass has already been activated for this tenant
+-- (guards against duplicate break-glass tokens for the same tenant)
+SELECT
+  event_type,
+  payload->>'tenant_slug'       AS tenant_slug,
+  payload->>'token_id'          AS token_id,
+  payload->>'break_glass_expires_at' AS expires_at,
+  payload->>'authorized_by_ic'  AS authorized_by_ic,
+  payload->>'authorized_by_cop' AS authorized_by_cop,
+  event_ts
+FROM audit_log_events
+WHERE event_type IN ('sso.break_glass_token_issued', 'sso.break_glass_token_revoked')
+  AND payload->>'tenant_slug' = $1
+  AND event_ts > NOW() - INTERVAL '24 hours'
+ORDER BY event_ts DESC;
+```
+
+```
+5. Determine user impact from C1 + C2:
+   Impact = (active_users_last_1h) - (active_valid_sessions for same tenant)
+   This is the number of users who will be blocked if they attempt to log in now.
+   Severity classification uses this number. Report it in the incident channel.
+
+6. Contact tenant IT admin via out-of-band channel:
+   → CSM reaches tenant IT admin via the pre-registered emergency contact in the
+     enterprise account record (admin_email from C1; supplemented by the Slack Connect
+     channel established during onboarding).
+   → DO NOT attempt to contact the tenant via SSO-authenticated channels — they may
+     not be able to read them.
+   → Initial message: Template E-04 initial notification (§19.1 below).
+   → Ask tenant IT admin: "Are you able to log in to your IdP admin console?
+     Do you have a recovery timeline from your IdP provider?"
+```
+
+#### Containment
+
+**Standard containment (IdP global outage — FORM cannot fix):**
+
+When the IdP's own status page confirms an outage, FORM cannot remediate the root cause. The only available relief lever is break-glass authentication for the tenant's IT admin.
+
+**Break-glass authentication — requirements before activation:**
+
+| Requirement | Detail |
+|---|---|
+| Two-person authorization | IC (on-call platform-engineer) AND compliance-officer must both approve. If compliance-officer is unavailable, founder substitutes. |
+| Tenant IT admin request | Break-glass is only issued in response to a direct request from the tenant's registered IT admin (verified via admin_email or Slack Connect). FORM does not pre-emptively issue break-glass tokens. |
+| Time-limited scope | Token expires in 4 hours by default. IT admin may request extension up to 8 hours with compliance-officer sign-off. |
+| Admin-only scope | Break-glass token grants access to the tenant's admin dashboard only (`/admin/*` routes, `is_admin = true` session flag). It does NOT grant access to individual employee fitness data. Privacy floor: this control is designed for IT operational continuity, not data access. |
+| DEC-030 mandatory | `sso.break_glass_token_issued` must be emitted with both authorizers' user_ids before the token is delivered. The token is not valid until this event is confirmed in the audit chain. |
+| Revocation commitment | Both authorizers commit to revoking the token within 30 minutes of IdP recovery confirmation. |
+
+**Break-glass issuance procedure:**
+
+```
+1. IC confirms two-person auth:
+   → IC: "I am authorizing break-glass for tenant {slug}, incident {inc_id}. I am {name}."
+   → Compliance-officer: "Confirmed. compliance-officer {name} co-authorizing."
+   → Both statements logged in #inc-YYYYMMDD-idp-{slug} before any token is generated.
+
+2. Platform-engineer calls the internal break-glass API endpoint
+   (Cloudflare Workers admin endpoint, not externally accessible):
+
+   POST /admin/v1/tenants/{tenant_slug}/break-glass
+   Authorization: Bearer {SERVICE_ROLE_KEY}
+   Content-Type: application/json
+
+   {
+     "incident_id": "inc-YYYYMMDD-idp-{slug}",
+     "authorized_by_ic_user_id": "{ic_user_id}",
+     "authorized_by_cop_user_id": "{cop_user_id}",
+     "expires_in_hours": 4,
+     "scope": "admin_only",
+     "reason": "IdP outage — {sso_provider} service degradation confirmed on status page"
+   }
+
+   Response includes:
+   {
+     "token_id": "bg-{uuid}",
+     "one_time_code": "{8-digit-numeric}",
+     "admin_login_url": "https://app.form.coach/enterprise/break-glass?token={signed_jwt}",
+     "expires_at": "{ISO8601}"
+   }
+
+3. Platform-engineer confirms that sso.break_glass_token_issued DEC-030 event is
+   present in audit_log_events before delivering the token.
+   → Query: SELECT id, event_ts FROM audit_log_events
+             WHERE event_type = 'sso.break_glass_token_issued'
+               AND payload->>'token_id' = '{token_id}'
+             LIMIT 1;
+   → If 0 rows: DO NOT deliver the token. Investigate DEC-030 emission failure.
+
+4. Deliver the break-glass token to the tenant IT admin:
+   → ONLY via the pre-registered emergency contact channel (Slack Connect or admin_email).
+   → Include: the login URL, the 8-digit one-time code, the 4-hour expiry time.
+   → NEVER send via a channel that requires the tenant's SSO to access.
+
+5. Confirm the IT admin has successfully logged in.
+   → Verify: check enterprise_sessions for a new session for admin_email within 5 min.
+   → If login fails: escalate immediately — investigate token delivery failure.
+```
+
+**Break-glass authentication — what the admin can do:**
+
+- View the admin dashboard: seat count, user list (aggregated, no individual health data), usage overview
+- Export the user list CSV to identify which employees are affected (name + work email only)
+- Send an in-app announcement to all tenant users via the admin broadcast feature
+- Contact FORM support directly from the admin dashboard without SSO re-authentication
+
+**Break-glass authentication — privacy floor:**
+
+The admin dashboard served via break-glass is identical to the normal admin session. The privacy floor applies equally:
+- HR/admin never sees individual workout logs, coaching turns, health profiles, or biometric data
+- Aggregate metrics visible: session counts, active user %, engagement trend — no individual breakdown
+- This is enforced at the API layer by `is_admin = true` session flag + RLS policy; break-glass does not expand data access
+
+**Containment for tenant-side SAML certificate expiry (IdP status page: green):**
+
+If C2 (scope assessment) and IdP status pages both indicate that FORM's SSO is healthy but a specific tenant's SSO is failing, the likely cause is an expired SAML certificate on the tenant's side, or an IdP policy change (conditional access policy added, IP restriction modified, MFA requirement changed).
+
+```
+1. Confirm with tenant IT admin: "Has your IdP admin team made any changes in the
+   last 24 hours to your SAML app configuration or certificate?"
+
+2. If certificate expiry suspected:
+   → Request tenant IT admin to check certificate expiry in their IdP admin console.
+   → SSO_SCIM_IMPLEMENTATION.md §20 documents the FORM SAML certificate lifecycle;
+     the tenant's IdP certificate is the tenant's responsibility.
+   → If tenant rotates their IdP certificate, they must re-upload the new
+     certificate fingerprint via FORM's admin dashboard or via WorkOS admin API.
+   → Platform-engineer assists with re-upload if tenant IT admin is struggling:
+     WorkOS Admin API: PUT /saml_connections/{connection_id}
+     with updated idp_sso_url and certificate field.
+
+3. After any IdP configuration change, run a test SSO login using the
+   FORM-canary synthetic user for that tenant's IdP domain.
+
+4. Monitor AL-SSO-01 for the affected tenant for 30 minutes post-fix.
+```
+
+#### Recovery Protocol (when IdP confirms restoration)
+
+```
+1. Confirm IdP service restored:
+   → IdP status page back to green AND tenant IT admin confirms SSO is working.
+   → Do not rely solely on status page: ask the IT admin to attempt a test login.
+
+2. Confirm FORM SSO metrics recovering:
+   → OBSERVABILITY §26 dashboard: per-tenant SSO success rate for affected tenant
+     returning to ≥ 99% in a rolling 5-minute window.
+   → AL-SSO-01 must self-resolve (auto-resolved when success rate returns above threshold).
+
+3. Revoke break-glass token immediately (do not wait for natural expiry):
+   POST /admin/v1/tenants/{tenant_slug}/break-glass/{token_id}/revoke
+   Authorization: Bearer {SERVICE_ROLE_KEY}
+   {
+     "revoked_by_user_id": "{ic_user_id}",
+     "revocation_reason": "IdP service restored; break-glass no longer required"
+   }
+   → Confirm sso.break_glass_token_revoked DEC-030 event is present before notifying tenant.
+   → Notify tenant IT admin: "Normal SSO access is restored. Your break-glass emergency
+     access has been revoked."
+
+4. Invalidate any enterprise sessions created via break-glass if the session owner
+   is not the registered admin_email (edge case — safety check):
+   SELECT es.id, es.user_id, u.email
+   FROM enterprise_sessions es
+   JOIN users u ON u.id = es.user_id
+   WHERE es.session_metadata->>'auth_method' = 'break_glass'
+     AND u.tenant_id = $1
+     AND es.expires_at > NOW();
+   -- Any unexpected non-admin sessions → revoke immediately + emit sso.break_glass_token_revoked
+
+5. Monitor for 30 minutes post-recovery:
+   → OBSERVABILITY §26 SSO dashboard: success rate, P95 latency stable.
+   → Sentry: no new SSO-related error events for affected tenant.
+   → Check enterprise_sessions: confirm new sessions are being created via SSO
+     (session_metadata->>'auth_method' = 'saml' or 'oidc', not 'break_glass').
+
+6. Close incident channel:
+   → IC declares incident resolved.
+   → Emit sso.idp_outage_resolved DEC-030 event.
+   → CSM sends Template E-04 resolution notification to tenant IT admin.
+   → If SLA breach threshold was crossed: CSM initiates credit assessment per §23.
+```
+
+#### Enterprise Tenant Communication Templates
+
+**Template E-04-Initial (IdP Outage — opening notification):**
+
+```
+Subject: FORM Service Update — SSO Login Disruption · [DATE] [TIME UTC]
+
+Hi [Tenant IT Admin Name],
+
+We're aware that some [Company Name] employees may be experiencing difficulty
+logging into FORM via [Okta / Microsoft Entra ID / Google Workspace] SSO.
+
+Our platform is operating normally. The issue appears to be with your
+identity provider's service. We are monitoring the situation closely.
+
+What still works for employees who are already logged in:
+• Workout logging, progress tracking, and coaching sessions continue uninterrupted.
+• Employees who are already authenticated are not affected.
+
+For employees who need to log in now:
+• We are standing by to provide emergency administrative access to your IT team.
+• If you need immediate admin access to FORM, please respond to this message or
+  reach your FORM customer success manager directly.
+
+We will send updates every 30 minutes until the issue is resolved.
+
+[FORM Customer Success Manager Name]
+enterprise@form.coach
+```
+
+**Template E-04-Update (30-minute status update):**
+
+```
+Subject: FORM Status Update — [TIME UTC] · SSO Login Disruption
+
+Hi [Tenant IT Admin Name],
+
+Update as of [TIME UTC]:
+
+• Status: [SSO login remains unavailable / SSO login is partially restored]
+• Impact: [N] employees affected (those without an active session)
+• Root cause: [IdP provider name] is reporting a service disruption on their
+  status page: [URL]
+• Estimated resolution: [Time from IdP provider / Unknown — monitoring]
+• FORM systems: all healthy; your team's data and progress are secure
+
+We will send the next update at [TIME + 30 min UTC] or sooner on resolution.
+
+[FORM Customer Success Manager Name]
+```
+
+**Template E-04-Resolution:**
+
+```
+Subject: FORM Resolved — SSO Login Restored · [DATE] [TIME UTC]
+
+Hi [Tenant IT Admin Name],
+
+SSO login via [Okta / Microsoft Entra ID / Google Workspace] has been restored
+for all [Company Name] employees as of [TIME UTC].
+
+Employees who were unable to log in during the disruption can now log in normally.
+No data was lost or affected.
+
+Outage summary:
+• Duration: [X] minutes
+• Affected: new SSO logins only; active sessions were uninterrupted
+• Root cause: [IdP provider name] service disruption
+
+[If break-glass was issued:]
+Emergency admin access issued during the incident has been fully revoked.
+Normal SSO is the only active authentication method for your organisation.
+
+[If SLA breach threshold crossed:]
+We will be in touch separately regarding SLA credit assessment per your agreement.
+
+Thank you for your patience.
+
+[FORM Customer Success Manager Name]
+```
+
+**Communication ownership and timing:**
+
+| Duration | Action | Owner |
+|---|---|---|
+| T+15 min (P1 declared) | Template E-04-Initial to tenant IT admin via Slack Connect + email | CSM; IC approval |
+| T+30 min | Template E-04-Update | CSM |
+| T+60 min | SLA breach threshold assessment (check against §23 credit table) | CSM + compliance-officer |
+| Every 30 min thereafter | Template E-04-Update | CSM |
+| Resolution | Template E-04-Resolution + break-glass revocation confirmation | CSM |
+| T+48h post-resolution | SLA credit calculation (if applicable) sent to tenant admin | CSM + compliance-officer |
+
+**Vendor naming policy:** In all tenant communications, name the IdP provider — unlike R-17 (Anthropic/ElevenLabs, where naming requires founder approval), an IdP outage is public information the tenant's own IT team is observing. Referring to the named provider (Okta, Microsoft, Google) is accurate and reduces confusion. Do not imply FORM caused the outage.
+
+#### SLA Breach Assessment
+
+Enterprise contracts guarantee SSO login availability at ≥ 99.0% of login attempts per calendar month per tenant. If an IdP outage causes the per-tenant SSO success rate to fall below 99.0% for the month, a credit is triggered per §23 of OBSERVABILITY.md.
+
+```sql
+-- SLA calculation: SSO availability for a tenant in the current calendar month
+-- Run at incident close; re-run at month-end for final credit calculation.
+SELECT
+  DATE_TRUNC('month', event_ts)                          AS billing_month,
+  COUNT(*) FILTER (WHERE payload->>'outcome' = 'success') AS successful_logins,
+  COUNT(*)                                               AS total_login_attempts,
+  ROUND(
+    COUNT(*) FILTER (WHERE payload->>'outcome' = 'success')::numeric
+    / NULLIF(COUNT(*), 0) * 100, 4
+  )                                                      AS success_rate_pct,
+  99.0                                                   AS sla_threshold_pct,
+  CASE
+    WHEN ROUND(
+      COUNT(*) FILTER (WHERE payload->>'outcome' = 'success')::numeric
+      / NULLIF(COUNT(*), 0) * 100, 4
+    ) < 99.0 THEN 'BREACHED'
+    ELSE 'WITHIN_SLA'
+  END                                                    AS sla_status
+FROM audit_log_events
+WHERE event_type = 'sso.login_attempt'
+  AND payload->>'tenant_slug' = $1
+  AND event_ts >= DATE_TRUNC('month', NOW())
+GROUP BY 1;
+```
+
+If `sla_status = 'BREACHED'`, initiate credit per §23. Record the credit assessment in a `sso.sla_breach_assessed` DEC-030 event (HIGH severity, 7-year retention).
+
+#### Post-Incident Review
+
+PIR is required for all P0 and P1 incidents within 5 business days of resolution (§8). For R-19 incidents, the PIR must address:
+
+1. **Was break-glass used?** If yes: were both authorizations captured in the incident channel before token issuance? Is the `sso.break_glass_token_issued` DEC-030 event present with both user_ids? Was the token revoked within 30 minutes of recovery?
+
+2. **What was the scope of user impact?** C1 + C2 delta from the scope assessment — how many users were effectively blocked vs. insulated by active sessions? Was the initial severity classification correct given the actual impact?
+
+3. **Was Template E-04-Initial sent within 15 minutes of P1 declaration?** If not, what caused the delay? The CSM communication SLA is 15 minutes for P1 IdP outage (faster than the 60-minute default in §12 because this is a high-visibility, customer-observed event).
+
+4. **Did the tenant IT admin have an active emergency contact method that worked?** If FORM could not reach the IT admin via Slack Connect or admin_email within 10 minutes, update the emergency contact record for that tenant.
+
+5. **Was the SLA threshold breached?** If yes: was the credit calculation initiated within 48 hours? Is the tenant's CSM satisfied with the communication?
+
+6. **Preventive controls to review:**
+   - Did OBSERVABILITY §26 `AL-SSO-01` fire at the right time? Was it the first signal, or did the CSM receive a report before the alert fired?
+   - Does the tenant have a secondary authentication method configured (e.g., an emergency local admin account in WorkOS) that FORM could recommend as a long-term mitigation?
+   - Should FORM recommend that enterprise tenants configure a backup IdP connection in WorkOS as a resilience mechanism?
+
+#### DEC-030 HMAC-Chained Audit Events
+
+All events are HMAC-chained per `docs/AUDIT_LOG_SCHEMA.md`. The `sso.break_glass_*` chain is a sub-chain keyed by `incident_id`; a break in this sub-chain is P0 per R-05.
+
+| Event Type | DEC-030 Severity | Retention | Trigger Condition | Key Metadata |
+|---|---|---|---|---|
+| `sso.idp_outage_detected` | HIGH | 3 years | AL-SSO-01 fires and IC opens incident channel | `tenant_slug`, `sso_provider`, `alert_id` (AL-SSO-01), `first_failure_at`, `incident_id` |
+| `sso.break_glass_protocol_initiated` | CRITICAL | 7 years | IC formally requests break-glass in incident channel; two-person auth verbally confirmed | `incident_id`, `tenant_slug`, `initiated_by_ic_user_id`, `cop_user_id`, `initiation_reason` |
+| `sso.break_glass_token_issued` | CRITICAL | 7 years | Break-glass API endpoint generates and returns a valid token | `incident_id`, `tenant_slug`, `token_id`, `admin_email` (SHA-256 hashed), `expires_at`, `authorized_by_ic_user_id`, `authorized_by_cop_user_id`, `scope: "admin_only"` |
+| `sso.break_glass_admin_login` | HIGH | 3 years | Tenant IT admin successfully authenticates using break-glass token | `incident_id`, `tenant_slug`, `token_id`, `session_id`, `login_at`, `ip_subnet` (last two octets masked) |
+| `sso.break_glass_token_revoked` | CRITICAL | 7 years | Platform-engineer calls revocation endpoint on recovery | `incident_id`, `tenant_slug`, `token_id`, `revoked_by_user_id`, `revocation_reason`, `revoked_at` |
+| `sso.idp_outage_resolved` | STANDARD | 1 year | SSO success rate returns to ≥ 99% AND IT admin confirms SSO working | `incident_id`, `tenant_slug`, `outage_duration_minutes`, `recovery_confirmed_at` |
+| `sso.sla_breach_assessed` | HIGH | 7 years | SLA calculation query shows success_rate_pct < 99.0% for billing month | `incident_id`, `tenant_slug`, `billing_month`, `success_rate_pct`, `credit_triggered` (bool), `credit_amount_usd` (if known) |
+
+**7-year retention for break-glass events:** The `sso.break_glass_token_issued` and `sso.break_glass_token_revoked` events carry 7-year retention because they document a deliberate bypass of the SSO security control — the only legitimate bypass mechanism in FORM's architecture. Any unexplained gap between `token_issued` and `token_revoked` events, or any `break_glass_admin_login` event without a preceding `token_issued` event, is a P0 security anomaly (R-01 activation).
+
+```typescript
+// DEC-030 emission for break-glass token issuance
+// Emitted by the break-glass API endpoint BEFORE returning the token to the caller.
+const event = {
+  event_type: 'sso.break_glass_token_issued',
+  severity: 'CRITICAL',
+  incident_id: incidentId,
+  payload: {
+    tenant_slug: tenantSlug,
+    token_id: tokenId,
+    admin_email_sha256: sha256(adminEmail),     // never plaintext admin_email
+    expires_at: expiresAt.toISOString(),
+    authorized_by_ic_user_id: icUserId,
+    authorized_by_cop_user_id: copUserId,
+    scope: 'admin_only',
+    sso_provider: tenant.sso_provider,
+  },
+};
+// Block token delivery until this event is confirmed in the chain.
+const emitted = await emitDec030Event(event, supabaseAdminClient);
+if (!emitted.success) {
+  throw new Error('DEC-030 emission failed — token issuance aborted');
+}
+return { token_id: tokenId, one_time_code: otp, admin_login_url: signedUrl, expires_at: expiresAt };
+```
+
+#### Evidence Package
+
+| Evidence ID | Artefact | Collection Method | Location |
+|---|---|---|---|
+| **IR-IDP-E-001** | C1 scope assessment output — affected tenant(s), SSO provider, user counts | SQL query output from §R-19 Check C1 exported as JSON at incident open; re-run at close | `compliance/evidence/incidents/<slug>/idp-scope-assessment.json` |
+| **IR-IDP-E-002** | IdP status page screenshot at time of detection | Screenshot of trust.okta.com / status.azure.com / workspace.google.com/status showing degradation | `compliance/evidence/incidents/<slug>/idp-status-page-T0.png` |
+| **IR-IDP-E-003** | DEC-030 `sso.*` event extract for incident window | `SELECT * FROM audit_log_events WHERE event_type LIKE 'sso.%' AND payload->>'incident_id' = $1 ORDER BY event_ts` | `compliance/evidence/incidents/<slug>/dec030-sso-events.json` |
+| **IR-IDP-E-004** | Break-glass authorization record (if break-glass used) | Incident channel log showing both IC and compliance-officer verbal authorization statements; plus `sso.break_glass_protocol_initiated` DEC-030 event JSON | `compliance/evidence/incidents/<slug>/break-glass-authorization.md` |
+| **IR-IDP-E-005** | Break-glass issuance and revocation confirmation (if used) | `sso.break_glass_token_issued` + `sso.break_glass_token_revoked` events with matching `token_id`; confirm no open tokens at incident close | `compliance/evidence/incidents/<slug>/break-glass-token-lifecycle.json` |
+| **IR-IDP-E-006** | SLA calculation query output (if SLA breach assessed) | SQL output from §R-19 SLA calculation query; billing month; credit assessment | `compliance/evidence/incidents/<slug>/sla-calculation.json` |
+| **IR-IDP-E-007** | AL-SSO-01 PagerDuty incident record | PagerDuty alert details: trigger time, acknowledge time, resolve time; correlated with incident open/close timestamps | `compliance/evidence/incidents/<slug>/pagerduty-al-sso-01.json` |
+| **IR-IDP-E-008** | Enterprise tenant communication log | All Template E-04 messages sent: timestamp, recipient (CSM channel), IC approval record | `compliance/evidence/incidents/<slug>/tenant-comms-log.md` |
+
+All evidence under `compliance/evidence/incidents/<slug>/` with SHA-256 manifest; 7-year retention for CRITICAL break-glass events; standard 3-year retention for availability events.
+
+#### SOC 2 TSC Mapping
+
+| TSC Criterion | Control | Evidence from This Runbook |
+|---|---|---|
+| **CC6.1** (Logical access controls) | Break-glass protocol enforces two-person authorization and admin-only scope; DEC-030 event chain provides tamper-evident record of every break-glass activation | IR-IDP-E-003 through IR-IDP-E-005: break-glass issuance, login, and revocation events form the access control audit trail; unexplained gaps are detectable anomalies |
+| **CC6.3** (Access removal timeliness) | Break-glass tokens are revoked within 30 minutes of IdP recovery; `sso.break_glass_token_revoked` event confirms revocation with timestamp | IR-IDP-E-005: token lifecycle evidence; revocation within SLA window documented |
+| **CC7.2** (Monitoring for and evaluating system events) | AL-SSO-01 provides per-tenant SSO success rate monitoring; C1 scope assessment systematically quantifies blast radius | IR-IDP-E-001 (scope assessment) + IR-IDP-E-007 (PagerDuty record): alert triggered before tenant report in well-implemented instances |
+| **CC7.3** (Evaluate and communicate anomalies) | Severity classification matrix, scope assessment, C1/C2/C3 queries, and break-glass issuance procedure constitute the documented response protocol | IR-IDP-E-001 through IR-IDP-E-008 as a complete evidence package for one incident |
+| **A1.1** (Availability commitments) | SSO availability SLA (≥ 99.0% per tenant per month) is committed in enterprise contracts; credit mechanism per §23 documents the consequence of SLA breach | IR-IDP-E-006: SLA calculation evidence demonstrates FORM measures and acts on the commitment |
+| **A1.2** (Resiliency and recovery) | Break-glass mechanism provides operational continuity for enterprise tenant administrators during IdP outage; OBSERVABILITY §26 monitors recovery | IR-IDP-E-004 + IR-IDP-E-005: break-glass activation and recovery evidence demonstrates a documented resiliency control for third-party IdP dependency |
+
+#### Open Questions
+
+**OQ-IDP-01: Break-glass API endpoint implementation status**
+
+The break-glass token issuance API (`POST /admin/v1/tenants/{slug}/break-glass`) does not yet exist. Until it is implemented (checklist item 1 below), the break-glass procedure requires a manual workaround: platform-engineer creates a temporary WorkOS "magic link" for the tenant admin's email via the WorkOS Admin Dashboard. This is less auditable than the DEC-030-gated API approach. The manual path must not be used without compliance-officer awareness. Owner: platform-engineer. Priority: **P0** (blocking clean break-glass activation). Resolution target: M6.
+
+**OQ-IDP-02: Tenant IT admin emergency contact completeness**
+
+The break-glass procedure depends on FORM being able to reach the tenant IT admin via an out-of-band channel (Slack Connect or admin_email). Not all enterprise tenant records may have a Slack Connect channel established or a verified admin_email. A tenant without an out-of-band contact cannot receive break-glass delivery. Audit current enterprise tenant records for completeness before the first enterprise SSO customer goes live. Owner: customer-success. Priority: **P1**. Resolution target: M10 (before first SSO customer onboarding).
+
+**OQ-IDP-03: Secondary IdP connection as a resilience recommendation**
+
+WorkOS supports configuring a secondary (backup) SAML connection for a tenant's organisation. If the primary Okta connection fails, WorkOS can failover to the secondary connection (e.g., Google Workspace as a backup IdP). Recommending this to enterprise customers during onboarding would reduce FORM's break-glass exposure. However, it adds complexity to the tenant's IdP configuration and requires the tenant to maintain two IdP apps. Decision needed: should FORM include secondary IdP configuration as a recommended onboarding step in the enterprise pilot runbook (SSO_SCIM §17)? Owner: enterprise-architect + customer-success. Priority: **P2**. Resolution target: M12 (before enterprise GA).
+
+#### Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Build break-glass API endpoint: `POST /admin/v1/tenants/{slug}/break-glass` and `POST /admin/v1/tenants/{slug}/break-glass/{token_id}/revoke`; enforce two-person auth via `authorized_by_ic_user_id` + `authorized_by_cop_user_id` validation against `form_admin` role; emit DEC-030 events before returning token; 4-hour default expiry with admin-only session scope; block if active unexpired break-glass token already exists for tenant | P0 | M6 | platform-engineer | [ ] |
+| 2 | Register `sso.idp_outage_detected`, `sso.break_glass_protocol_initiated`, `sso.break_glass_token_issued`, `sso.break_glass_admin_login`, `sso.break_glass_token_revoked`, `sso.idp_outage_resolved`, `sso.sla_breach_assessed` in `docs/AUDIT_LOG_SCHEMA.md` with full schema, severity, and retention fields; validate Zod schema for each in staging | P1 | M6 | security-engineer | [ ] |
+| 3 | Audit all enterprise tenant records: confirm `admin_email` is populated, verified, and has out-of-band contact (Slack Connect channel established or confirmed email deliverability); flag any tenant without a complete emergency contact record to CSM for resolution before M10 | P1 | M10 | customer-success | [ ] |
+| 4 | Add R-19 tabletop scenario to §9.5 Year 2 Testing Schedule: Okta global outage simulation; CSM attempts E-04-Initial within 15 min SLA; break-glass API called with two-person auth; token issued and delivered to simulated tenant IT admin; recovery procedure and revocation flow completed; PIR template filled for the exercise | P2 | M7 | security-engineer | [ ] |
+| 5 | Document the WorkOS magic-link manual break-glass fallback procedure (OQ-IDP-01 interim path) in a restricted internal ops runbook; require compliance-officer awareness log entry for every use; deprecate once break-glass API is live | P0 | M6 | platform-engineer + compliance-officer | [ ] |
+| 6 | Add AL-SSO-01 per-tenant SSO login monitoring to PagerDuty "FORM Enterprise SSO" service per OBSERVABILITY §26.5; confirm per-tenant routing (one PagerDuty incident per tenant, not fleet-wide merge); test with a synthetic SSO failure against a canary tenant | P1 | M10 | devops-lead | [ ] |
+| 7 | Evaluate secondary IdP connection recommendation for enterprise onboarding (OQ-IDP-03); if approved, add to SSO_SCIM §17 pilot runbook as a Day 1 configuration item with a how-to guide | P2 | M12 | enterprise-architect + customer-success | [ ] |
+
+---
+
+*v1.3 additions (2026-06-02): R-19 Enterprise IdP Outage & Break-Glass Authentication — nineteenth runbook in the taxonomy. Fills the gap between R-04 (SAML certificate compromise / authentication attack — security incident) and R-17 (Anthropic API availability — AI service dependency) by covering the enterprise-specific scenario where a tenant's identity provider (Okta, Microsoft Entra ID, Google Workspace, Ping Identity) is unavailable due to a service outage or tenant-side misconfiguration, preventing enterprise users from authenticating via SSO. Core design: existing authenticated sessions are insulated (enterprise_sessions / Cloudflare KV); only new SSO logins are blocked; break-glass is the relief lever for IT admin operational continuity. Trigger matrix: AL-SSO-01 (per-tenant SSO success rate < 90% sustained 5 min), AL-SSO-02 (P95 SSO latency > 10,000 ms sustained 3 min), direct CSM/IT admin report, or known IdP public status page event. Severity: P2 for < 30% impact partial degradation; P1 for > 50% of tenant users blocked or IT admin locked out; P0 for multiple tenants on same IdP affected simultaneously. Break-glass protocol: two-person authorization (IC + compliance-officer or founder); admin-only scope; 4-hour time limit; DEC-030 event emitted before token delivery (emission failure aborts issuance); token revoked within 30 min of IdP recovery. Three scope assessment queries: C1 (affected tenant SSO provider, user counts, admin_email), C2 (active insulated sessions per tenant — excludes from impact count), C3 (existing break-glass tokens guard against duplicate issuance). Privacy floor: break-glass admin session is identical to normal admin session — no access to individual health data, coaching turns, or biometric fields; enforced at API layer by RLS + is_admin flag. Four Enterprise Template E-04 messages: E-04-Initial (T+15 min P1), E-04-Update (every 30 min), E-04-Resolution (on recovery), SLA credit notification (T+48h if applicable). Vendor naming policy: IdP provider name may be used in tenant communications (public information, reduces confusion) — distinct from R-17 where Anthropic/ElevenLabs naming requires founder approval. Seven DEC-030 HMAC-chained events: sso.idp_outage_detected (HIGH, 3yr), sso.break_glass_protocol_initiated (CRITICAL, 7yr — two-person auth record), sso.break_glass_token_issued (CRITICAL, 7yr — contains SHA-256 hashed admin_email + both authorizer user_ids), sso.break_glass_admin_login (HIGH, 3yr), sso.break_glass_token_revoked (CRITICAL, 7yr — revocation within 30 min of recovery is mandatory), sso.idp_outage_resolved (STANDARD, 1yr), sso.sla_breach_assessed (HIGH, 7yr). SLA breach assessment SQL documented; success_rate_pct < 99.0% triggers credit per §23. Evidence package IR-IDP-E-001 through IR-IDP-E-008 with SHA-256 manifest. SOC 2 mapping: CC6.1 (break-glass two-person auth as documented access control bypass with tamper-evident audit trail), CC6.3 (30-min revocation SLA post-recovery), CC7.2 (AL-SSO-01 per-tenant monitoring), CC7.3 (severity matrix + scope assessment procedure), A1.1 (SSO SLA commitment + credit mechanism), A1.2 (break-glass as documented resiliency control for IdP dependency). Three open questions: OQ-IDP-01 (break-glass API not yet implemented — P0 blocking; interim: WorkOS magic-link manual path; resolve M6), OQ-IDP-02 (tenant admin emergency contact completeness audit — P1; resolve M10 before first SSO customer), OQ-IDP-03 (secondary IdP connection as resilience recommendation — P2; resolve M12). Seven-item implementation checklist (2× P0, 3× P1, 2× P2). Appendix A quick reference card updated: "SSO down?" disambiguated into IdP unavailability (R-19) and SAML cert compromise / SAML attack (R-04). Document header updated v1.1 → v1.3 (v1.2 = R-17 additions per body version note).*
 
 ---
 
