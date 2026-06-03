@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v1.6
+# FORM · Observability & Monitoring Taxonomy v1.7
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -50,6 +50,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §27 | SIEM Integration & Security Event Streaming |
 | §28 | Mobile Application Performance Observability |
 | §29 | PAM / Privileged Access Management Observability |
+| §30 | Key Management & Cryptography Observability |
 
 ---
 
@@ -6766,4 +6767,233 @@ Beyond the operational alert rules in §29.4, four health monitors verify the in
 
 ---
 
-*v1.6 additions (2026-06-03): §29 PAM / Privileged Access Management Observability — closes the cross-reference from `docs/SSO_SCIM_IMPLEMENTATION.md §24.8` (last sentence) and `§24.10` item 9, both of which state that AL-PAM-01/02/03 are registered in this document under §6 `pam_session_health`; those rules were added to the SSO implementation doc at v1.6 (2026-06-01) but the corresponding observability section was not written at the time. TOC updated to add §27 (SIEM Integration & Security Event Streaming), §28 (Mobile Application Performance Observability), and §29 (PAM / Privileged Access Management Observability) — §27 and §28 existed in the file since v1.3 and v1.5 respectively but were omitted from the TOC. §29.1 scopes the section to three PAM components (`pam-elevation-service` Cloudflare Worker, `pam-db-proxy` Supabase Edge Function, `pam-expiry-sweeper` Cron Worker); establishes privacy floor (admin_user_id pseudonymous UUID only; no query content in observability; justification_hash not justification_text); declares SOC 2 scope CC6.1/CC6.2/CC6.3/CC6.7/CC7.2/CC7.3; notes `target_tenant_id` propagation for per-tenant PAM reporting. §29.2 RED metrics table for all three PAM components: rate (elevation requests/h by access_level, break-glass/month), errors (denial rate, db-proxy expired-session rejections, RESET ROLE failures), duration (P95 approval notification latency by access_level, P95 proxy round-trip). §29.3 four PAM SLOs: PAM-SLO-01 (break-glass PagerDuty alert ≤ 60 s — 100% zero-tolerance), PAM-SLO-02 (approval notification P95 < 30 s for read_write), PAM-SLO-03 (zero standing form_admin sessions — monthly audit + pg_stat_activity check), PAM-SLO-04 (pam-expiry-sweeper runs every 5 min ± 90 s — Better Stack synthetic via `pam:sweeper:last_run` KV key). §29.4 AL-PAM-01/02/03 reproduced verbatim from SSO §24.7 with deduplication keys specified (`pam-break-glass-{pam_session_id}`, `pam-denial-spike-{admin_user_id}` 1 h window, `pam-clock-skew-{pam_session_id}`); AL-PAM-03 escalation rule (> 2 / 24 h → P1) documented. §29.5 §6.2 Alert Rules Additions: three-row `pam_session_health` subsection for insertion after `session_revocation` subsection; note on SIEM routing requirement for AL-PAM-01 (→ `siem.privileged_access_escalated` for affected-tenant SIEM delivery, CC6.1 evidence). §29.6 four DEC-030 PAM event health monitors: PAM-CHAIN-01 (P1, zero pam.* events in 24 h business hours — with sweeper health disambiguation), PAM-CHAIN-02 (P0, break-glass review overdue 72 h — mandatory post-hoc review clock), PAM-CHAIN-03 (P1, pam.elevation_approved without preceding pam.elevation_requested — HMAC sequence break, R-01 assessment), PAM-CHAIN-04 (P1, sweeper last-run age > 600 s for two consecutive checks); implementation note (PAM-CHAIN-01/02 as pg_cron, PAM-CHAIN-03 in weekly HMAC batch, PAM-CHAIN-04 as Better Stack synthetic). §29.7 eight-panel "Privileged Access Health" Metabase + Better Stack dashboard: elevation request rate by access_level (30 d time-series), approval latency P95 (7 d time-series), denial count & reason breakdown (stacked bar 7 d), active PAM sessions right now (KV scan stat), break-glass activations last 30 d (stat, ember highlight if > 0), sweeper last-run health indicator (green/amber/red by age), DEC-030 chain integrity status (last verified timestamp), suspension history (bar chart 30 d). §29.8 four privacy constraints: admin_user_id pseudonymous UUID only (not email/name, enforced in pam-elevation-service JWT-to-UUID resolution), justification_hash SHA-256 only (original text in KV + DEC-030 only, not observability tier), query content excluded from all signals (pam-db-proxy: only pam_session_id + access_level + duration_ms + outcome emitted), pam_break_glass_reviews table RLS (compliance-officer + security-engineer read; form_system write only; no tenant_admin access). §29.9 SOC 2 evidence mapping CC6.1/CC6.2/CC6.3/CC6.7/CC7.2/CC7.3; four existing artefacts CC6-E-PAM-001 through CC6-E-PAM-004 (verbatim from SSO §24.8); one new observability-layer artefact CC7-E-PAM-001 (PagerDuty incident log for AL-PAM-01/02/03 — export CSV with opened_at/acknowledged_at/resolved_at/alert_key). §29.10 ten-item implementation checklist: six P0 M4 items (AL-PAM-01/02/03 PagerDuty configs, §6.2 table update, HMAC chain validation in staging, `pam-suspended` KV auto-write), four P1 items across M4/M5/observation period (SLO registration, PAM-CHAIN-02 pg_cron, dashboard, §27.2 SIEM routing, evidence filing); note on Resolve OQ-SSO-24.1/24.2/24.4 from SSO §24.9 as blocking dependencies. §29.11 two open questions: OQ-PAM-OBS-01 (same UUID vs separate observability-layer pseudonym for admin_user_id — security-engineer + compliance-officer, P1, before M4; current intent same UUID with restricted Metabase access), OQ-PAM-OBS-02 (PAM activity exposure in enterprise Admin Dashboard — aggregate count only vs quarterly PDF report — customer-success + security-engineer, P2, before enterprise GA M13). Cross-references: docs/SSO_SCIM_IMPLEMENTATION.md §24 (PAM architecture), §6.2 (alert rules table to be updated per §29.5), §27.2 (SIEM event classification — pam.* rows to be added per §29.10 item 8), §2 (SLO table — PAM-SLO-01 through PAM-SLO-04 to be registered per §29.10 item 5), docs/AUDIT_LOG_SCHEMA.md (DEC-030 pam.* event registry — SSO §24.10 item 8), docs/SOC2_READINESS.md CC6 (evidence artefacts CC6-E-PAM-001 through CC6-E-PAM-004 to be linked per §29.10 item 10).*
+## 30. Key Management & Cryptography Observability
+
+### 30.1 Purpose & Scope
+
+This section defines observability coverage for FORM's cryptographic key lifecycle — rotation schedules, expiry monitoring, HMAC audit chain key health, and post-rotation verification. It is the operational counterpart to `docs/CRYPTOGRAPHY_POLICY.md` (policy owner: security-engineer) and `docs/SOC2_READINESS.md §56` (key inventory with eight production secrets).
+
+**SOC 2 scope:** CC5.2 (cryptographic controls defined and enforced), CC5.3 (key access monitored and restricted), CC6.7 (transmission and disclosure confidentiality maintained through rotation cadence), CC6.8 (key rotation requires multi-party authorization — 2-person rule), C1.1 (health data confidentiality in transit and at rest), CC7.2 (key lifecycle anomalies detected by monitoring).
+
+**Eight-key inventory** (from `docs/SOC2_READINESS.md §56.3`):
+
+| Key ID | Type | Rotation Schedule | SOC 2 Control |
+|---|---|---|---|
+| SUPABASE_SERVICE_ROLE_JWT | HS256 JWT | 90 days | CC6.7, C1.1 |
+| HMAC_AUDIT_CHAIN_KEY | HMAC-SHA256 | Annual (dual-key, §58) | CC6.7, CC6.8, C1.1 |
+| KEYPOINTS_ENC_KEY | AES-256-CBC (pgcrypto/Vault) | 365 days | CC5.3, C1.1 |
+| CLOUDFLARE_API_KEY | Ed25519 | 180 days | CC5.3, CC6.7 |
+| WORKOS_API_KEY | Opaque (WorkOS-managed) | 180 days | CC5.3 |
+| ANTHROPIC_API_KEY | Opaque (Anthropic-managed) | 90 days | CC5.3 |
+| SENTRY_DSN | Opaque (Sentry-managed) | 180 days | CC5.3 |
+| SUPABASE_ANON_KEY | JWT (public-facing) | 365 days | CC5.2 |
+
+**Privacy floor:** Observability signals for key management contain only `key_id` (the name from the table above), `key_version`, `event_timestamp`, and `days_until_rotation`. No key material, key bytes, partial values, or hash fragments are present in any metric, log, or dashboard. This constraint is enforced at the instrumentation layer — the `key-rotation-scheduler` Worker emits only key names, not values.
+
+**KV namespace:** Key rotation state is stored in Cloudflare KV namespace `form-crypto-health` with prefix `key:rotation:{key_id}`. Keys in this namespace store `{ last_rotated: ISO8601, next_rotation_due: ISO8601, version: string, days_overdue: number }`. Namespace access: platform-engineer (read/write), security-engineer (read), devops-lead (read). No tenant_admin access.
+
+---
+
+### 30.2 RED Metrics for Key Management
+
+| Component | Rate (R) | Errors (E) | Duration (D) |
+|---|---|---|---|
+| `key-rotation-scheduler` Worker | Scheduled checks/day (should be 1/day per key × 8) | Keys in `overdue` state (days_since_last_rotation > rotation_period × 1.1) | P95 KV read latency for rotation state lookup |
+| `key-rotation-verifier` Edge Function | Verification runs/month (should be 1 per rotation event) | Verification failures (chain break, hash mismatch, KV state inconsistency) | P95 verification run duration |
+| HMAC chain daily check (`audit-chain-daily-check`) | Checks/day | Chain breaks detected (`admin.hmac_chain_break` events, should be 0) | P95 check duration |
+| TLS certificate (external, via Better Stack SSL) | Checks/h per domain | Certificate validation failures | N/A (synthetic check result) |
+
+---
+
+### 30.3 Key Management SLOs
+
+| SLO ID | Description | Target | Measurement |
+|---|---|---|---|
+| KEY-SLO-01 | All production keys rotated within 110% of documented rotation schedule (e.g., 99-day limit for 90-day key) | 100% — zero-tolerance; SOC 2 CC5.3 requires documented rotation cadence | `days_overdue` field in `form-crypto-health` KV; weekly compliance query; violation = SOC 2 evidence gap |
+| KEY-SLO-02 | AL-KEY-01 (expiry imminent) fires ≥ 14 calendar days before rotation deadline | 100% — zero-tolerance; late alert = zero operational buffer | Better Stack synthetic verifying AL-KEY-01 fires on synthetic key with `next_rotation_due = now + 14d` injected in staging |
+| KEY-SLO-03 | HMAC chain verification (`admin.hmac_key_rotation_verified`) emitted within 24 h of `admin.hmac_key_rotated` | 100% — zero-tolerance; unverified rotation = broken chain evidence for SOC 2 | pg_cron: `SELECT COUNT(*) FROM audit_log WHERE event_type = 'admin.hmac_key_rotated' AND NOT EXISTS (SELECT 1 FROM audit_log b WHERE b.event_type = 'admin.hmac_key_rotation_verified' AND b.created_at BETWEEN a.created_at AND a.created_at + INTERVAL '24h')` |
+| KEY-SLO-04 | Zero keys in `red` rotation state (overdue > 7 days beyond schedule) for > 48 h without active P0/P1 incident | 100% — each violation requires post-incident review; documented in INCIDENT_RESPONSE.md R-05 | Daily pg_cron query against `form-crypto-health` KV; page security-engineer + devops-lead if condition met |
+
+---
+
+### 30.4 Alert Rules (AL-KEY-*)
+
+**AL-KEY-01 — Key Rotation Imminent (P1)**
+
+| Field | Value |
+|---|---|
+| Trigger | Any key in `form-crypto-health` KV has `days_until_rotation ≤ 14` |
+| Severity | **P1** (escalates to P0 if `days_until_rotation ≤ 3` — same alert, auto-escalation rule) |
+| Service | PagerDuty "FORM Security" service |
+| On-call | security-engineer + devops-lead |
+| Deduplication key | `key-rotation-imminent-{key_id}` (24 h window; re-alerts daily if not resolved) |
+| Resolution | Resolved when `last_rotated` updated to within current rotation window |
+| Runbook | `docs/CRYPTOGRAPHY_POLICY.md §5` (rotation procedures per key type); `docs/SOC2_READINESS.md §57` (service_role JWT runbook); `docs/SOC2_READINESS.md §58` (HMAC chain key runbook) |
+| SIEM routing | → `siem.key_rotation_imminent` — classification: security_event, severity: medium; no key material in payload |
+
+**AL-KEY-02 — Key Rotation Overdue (P0)**
+
+| Field | Value |
+|---|---|
+| Trigger | Any key has `days_overdue > 0` (i.e., current date > `next_rotation_due`) |
+| Severity | **P0** — SOC 2 CC5.3 requires rotation on documented schedule; breach = active compliance gap |
+| Service | PagerDuty "FORM Security" service |
+| On-call | security-engineer + founder |
+| Deduplication key | `key-rotation-overdue-{key_id}` (no dedup window — re-alerts every 4 h until resolved) |
+| Auto-escalation | If `days_overdue > 7` and no active incident: auto-escalate to founder + compliance-officer |
+| Resolution | Resolved when rotation completed and `admin.encryption_key_rotated` or `admin.hmac_key_rotated` DEC-030 event emitted |
+| SIEM routing | → `siem.key_rotation_overdue` — classification: compliance_event, severity: high |
+
+**AL-KEY-03 — HMAC Chain Cadence (P1)**
+
+| Field | Value |
+|---|---|
+| Trigger | `HMAC_AUDIT_CHAIN_KEY` last rotation was > 395 days ago (annual schedule + 30-day grace) |
+| Severity | **P1** |
+| Service | PagerDuty "FORM Security" service |
+| On-call | security-engineer + compliance-officer |
+| Deduplication key | `key-hmac-cadence-{year}` (1 per calendar year) |
+| Note | Distinct from AL-KEY-02: AL-KEY-02 fires when KV `next_rotation_due` is breached; AL-KEY-03 fires on elapsed time independently (belt-and-suspenders for the most critical key) |
+| Runbook | `docs/SOC2_READINESS.md §58` (dual-key rotation design) |
+| SOC 2 reference | CC6.7 — annual HMAC rotation cadence is a documented control |
+
+**AL-KEY-04 — HMAC Chain Verification Missing (P0)**
+
+| Field | Value |
+|---|---|
+| Trigger | `admin.hmac_key_rotated` event present in `audit_log_events` without a corresponding `admin.hmac_key_rotation_verified` event within 24 h |
+| Severity | **P0** — unverified chain rotation = potential HMAC break undetected in production |
+| Service | PagerDuty "FORM Security" service |
+| On-call | security-engineer + platform-engineer |
+| Implementation | pg_cron query (see KEY-SLO-03 measurement above); runs every 6 h |
+| Deduplication key | `key-hmac-verify-missing-{rotation_event_id}` |
+| Resolution | Resolved when `admin.hmac_key_rotation_verified` event emitted with `success: true` |
+
+---
+
+### 30.5 §6.2 Alert Rules Additions
+
+The following `crypto_key_health` subsection should be inserted into the §6.2 Alert Rules table after the `pam_session_health` subsection added in §29.5:
+
+```
+crypto_key_health:
+  AL-KEY-01:  key_rotation_imminent  — P1, ≤ 14 days, PagerDuty, SIEM medium
+  AL-KEY-02:  key_rotation_overdue   — P0, past deadline, PagerDuty, SIEM high, auto-escalate >7d
+  AL-KEY-03:  hmac_chain_cadence     — P1, >395 days since HMAC rotation
+  AL-KEY-04:  hmac_verify_missing    — P0, rotation without verification within 24h
+```
+
+---
+
+### 30.6 DEC-030 Key Event Health Monitoring
+
+Four monitors track the cryptographic key event chain in the `audit_log_events` table:
+
+**CRYPTO-CHAIN-01 (P1): Zero `admin.encryption_key_rotated` events in 91 days for SUPABASE_SERVICE_ROLE_JWT**
+
+Condition: `SELECT COUNT(*) = 0 FROM audit_log_events WHERE event_type = 'admin.encryption_key_rotated' AND metadata->>'key_id' = 'SUPABASE_SERVICE_ROLE_JWT' AND created_at > NOW() - INTERVAL '91 days'`
+
+If true: fire P1 to security-engineer + devops-lead. Note: this check complements AL-KEY-02 (KV-based) with an independent DEC-030-chain-based check. Both must fire for a rotation to be confirmed.
+
+**CRYPTO-CHAIN-02 (P0): `admin.hmac_key_rotated` without preceding `admin.hmac_key_rotation_initiated` within 1 h**
+
+Sequence check: every `admin.hmac_key_rotated` event must have a corresponding `admin.hmac_key_rotation_initiated` event with `arriving_version = hmac_key_rotated.key_version` within the 60 min preceding it. Violation = unauthorized rotation attempt (R-05 trigger, possible insider threat R-20).
+
+Run frequency: weekly HMAC batch (same as PAM-CHAIN-03).
+
+**CRYPTO-CHAIN-03 (P1): KEYPOINTS_ENC_KEY not rotated within 400 days**
+
+Condition: `SELECT COUNT(*) = 0 FROM audit_log_events WHERE event_type = 'admin.encryption_key_rotated' AND metadata->>'key_id' = 'KEYPOINTS_ENC_KEY' AND created_at > NOW() - INTERVAL '400 days'`
+
+If true: fire P1 to security-engineer + compliance-officer. 400 days = 365-day schedule + 35-day grace.
+
+**CRYPTO-CHAIN-04 (P1): `key-rotation-scheduler` Worker last-run age > 26 h**
+
+KV key: `form-crypto-health:scheduler:last_run` (ISO8601 timestamp; updated by `key-rotation-scheduler` after each successful check of all 8 keys). Better Stack synthetic: GET `https://api.cloudflare.com/client/v4/accounts/{id}/storage/kv/namespaces/{ns}/values/scheduler:last_run` via internal endpoint every 30 min; alert if value age > 26 h.
+
+If triggered: fire P1 to devops-lead. Worker may have crashed or been undeployed.
+
+---
+
+### 30.7 Dashboard: "Cryptographic Health"
+
+Nine-panel dashboard in Metabase + Better Stack. Access: devops-lead, security-engineer, compliance-officer.
+
+| Panel | Type | Source | Update Frequency |
+|---|---|---|---|
+| Key rotation status grid (8 keys × green/amber/red) | Status grid | `form-crypto-health` KV | Real-time (KV read on dashboard load) |
+| Days until next rotation per key (bar chart) | Horizontal bar, sorted by urgency | `form-crypto-health` KV | Real-time |
+| Last rotated date per key (table) | Table with key_id, last_rotated, version, rotation_period | `form-crypto-health` KV | Real-time |
+| HMAC chain integrity — last verified timestamp | Stat widget | `audit_log_events` (last `admin.hmac_key_rotation_verified`) | Daily |
+| HMAC chain last break detection (should be "Never") | Stat widget, red if < 90 days ago | `audit_log_events` (last `admin.hmac_chain_break`) | Daily |
+| AL-KEY-01/02/03/04 incident history (30 d) | Bar chart by alert type | PagerDuty API | Hourly |
+| TLS certificate expiry for form.coach and *.form.coach | Stat widgets (days remaining) | Better Stack SSL check | Every 30 min |
+| `key-rotation-scheduler` Worker last-run health | Green/amber/red by age | `form-crypto-health:scheduler:last_run` KV | Every 30 min |
+| SUPABASE_SERVICE_ROLE_JWT rotation countdown | Circular countdown (0–90 days) | `form-crypto-health` KV | Real-time |
+
+**Red state thresholds:**
+- `days_until_rotation ≤ 7` → red
+- `days_until_rotation ≤ 14` → amber
+- `days_until_rotation > 14` → green
+- HMAC chain break detected in last 90 days → red panel, page security-engineer immediately
+
+---
+
+### 30.8 Privacy Constraints
+
+Four hard constraints enforced at the instrumentation layer:
+
+1. **No key material in any signal.** The `key-rotation-scheduler` Worker reads `days_until_rotation` from KV state — it never reads or logs key values. Cloudflare Workers Secrets are accessible only via `env.SECRET_NAME` binding, not via any KV or Analytics Engine write path. Automated code review (Snyk + GitHub Actions) scans for accidental secret logging.
+
+2. **Key names are not secrets but are access-controlled.** Key IDs (e.g., `SUPABASE_SERVICE_ROLE_JWT`) are visible in the Cryptographic Health dashboard. Dashboard access is restricted to security-engineer, devops-lead, compliance-officer. Key names must not appear in per-tenant observability signals or tenant-accessible Admin Dashboard.
+
+3. **`key_version` in DEC-030 events but not in Analytics Engine metrics.** The version string (e.g., `v2`) appears in `admin.hmac_key_rotated` DEC-030 events (7-year retention, compliance access only). It does not appear in Cloudflare Analytics Engine metrics or Better Stack dashboards, which contain only `key_id` and the boolean `rotation_status`.
+
+4. **Certificate CN/SAN details in Better Stack, not in general logs.** TLS certificate subject information (domain names) appears only in Better Stack SSL monitor results. It must not be propagated to Sentry or Analytics Engine event payloads where it could be correlated with user session data.
+
+---
+
+### 30.9 SOC 2 Evidence Mapping
+
+| Control | Requirement | §30 Coverage | Evidence Artefact |
+|---|---|---|---|
+| CC5.2 | Cryptographic controls defined and enforced | KEY-SLO-01 (rotation cadence maintained) + AL-KEY-02 (overdue detection) | CRYPTO-E-001: Weekly KEY-SLO-01 compliance query export (CSV) — key_id, last_rotated, days_overdue, compliant(bool) |
+| CC5.2 | Algorithm deprecation monitored | Not directly — covered by `docs/CRYPTOGRAPHY_POLICY.md §9` deprecation process | CRYPTO-E-002: Quarterly `docs/CRYPTOGRAPHY_POLICY.md` review records (git history + owner attestation) |
+| CC5.3 | Key rotation performed on documented schedule | AL-KEY-01/02 + KEY-SLO-01 + `form-crypto-health` KV | CRYPTO-E-003: `form-crypto-health` KV export showing all 8 keys with last_rotated and next_rotation_due (snapshot at observation period start + end) |
+| CC5.3 | Key access monitored | Dashboard access logs (Metabase audit trail) | CRYPTO-E-004: Metabase access log for "Cryptographic Health" dashboard (observation period) |
+| CC6.7 | Transmission confidentiality maintained through rotation cadence | HMAC chain health (CRYPTO-CHAIN-01/02/03) + AL-KEY-03 cadence alert | CRYPTO-E-005: HMAC chain daily check pass log (extract from `audit_log_events`: `admin.hmac_chain_verified` events, observation period) |
+| CC6.8 | Key rotation requires multi-party authorization | CRYPTO-CHAIN-02 (rotation without preceding initiation = violation) | CRYPTO-E-006: DEC-030 event sequence log for any key rotation events during observation period — must show `initiated` → `rotated` → `verified` sequence for each |
+| C1.1 | Health data confidentiality maintained | TLS cert expiry panel (AL-TLS-01 via Better Stack SSL) + KEYPOINTS_ENC_KEY rotation (CRYPTO-CHAIN-03) | CRYPTO-E-007: Better Stack SSL certificate check screenshot for form.coach at observation period end (shows days remaining) |
+| CC7.2 | Key lifecycle anomalies detected | AL-KEY-01/02/03/04 + CRYPTO-CHAIN-01/02/03/04 | CRYPTO-E-008: PagerDuty incident export for `crypto_key_health` alert group — observation period (opened_at, alert_key, resolved_at) |
+
+---
+
+### 30.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Build `key-rotation-scheduler` Cloudflare Worker: reads rotation schedule config (hardcoded 8-key table), computes `days_until_rotation` per key from `form-crypto-health` KV state, writes updated KV records daily, updates `scheduler:last_run` key | platform-engineer | **P0** | M4 |
+| 2 | Initialise `form-crypto-health` KV namespace; write seed records for all 8 keys with current `last_rotated` values (retrieve from `docs/CRYPTOGRAPHY_POLICY.md §5` rotation log or set to deployment date if unknown); validate with security-engineer | platform-engineer + security-engineer | **P0** | M4 |
+| 3 | Configure AL-KEY-01 (imminent, ≤14d) and AL-KEY-02 (overdue) in PagerDuty "FORM Security" service; wire `key-rotation-scheduler` to emit to PagerDuty Events API; test with synthetic key injection in staging (set `next_rotation_due = now + 13d` for SUPABASE_ANON_KEY) | devops-lead | **P0** | M4 |
+| 4 | Configure AL-KEY-03 (HMAC cadence, >395d) and AL-KEY-04 (hmac verify missing, pg_cron 6h) in PagerDuty; validate AL-KEY-04 pg_cron fires on synthetic unverified rotation row in staging | devops-lead + platform-engineer | **P0** | M4 |
+| 5 | Add `crypto_key_health` subsection to §6.2 Alert Rules table (four rows: AL-KEY-01/02/03/04) per §30.5 | devops-lead | **P0** | M4 |
+| 6 | Register KEY-SLO-01 through KEY-SLO-04 in §2 SLO table; wire KEY-SLO-02 Better Stack synthetic (staging injection test) | devops-lead + compliance-officer | **P1** | M4 |
+| 7 | Register CRYPTO-CHAIN-01 through CRYPTO-CHAIN-04 as pg_cron or batch jobs; validate CRYPTO-CHAIN-02 (sequence check) fires on synthetic out-of-order event pair in staging | platform-engineer | **P1** | M5 |
+| 8 | Build "Cryptographic Health" dashboard (§30.7, nine panels) in Metabase + Better Stack; restrict access to devops-lead + security-engineer + compliance-officer; validate all 8 key rows render with correct `days_until_rotation` | devops-lead | **P1** | M5 |
+| 9 | Register CRYPTO-E-001 through CRYPTO-E-008 evidence artefact definitions in `docs/SOC2_READINESS.md` CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2 control evidence rows; schedule first evidence collection before SOC 2 observation period start | compliance-officer + security-engineer | **P1** | Observation period start |
+| 10 | Add `admin.encryption_key_rotated` DEC-030 event to `docs/AUDIT_LOG_SCHEMA.md` event registry (closes SOC2_READINESS.md §56.6 checklist item 4 / OQ-ENC-03); validate Zod schema; deploy to `emit-audit-event` Worker endpoint | security-engineer + platform-engineer | **P0** | M7 |
+
+---
+
+### 30.11 Open Questions
+
+| OQ | Question | Owner | Priority | Target |
+|---|---|---|---|---|
+| OQ-CRYPTO-OBS-01 | **Should `form-crypto-health` KV namespace be shared with `form-pam-health` KV (§29 PAM state), or kept as a separate namespace?** Shared namespace reduces KV namespace count (Cloudflare free tier: 100 namespaces) and simplifies Worker binding config. Separate namespace provides stricter blast radius isolation — a PAM Worker bug cannot accidentally overwrite crypto health state. Current intent: separate namespace. Confirm with platform-engineer before M4 deploy. | platform-engineer + security-engineer | **P1** | Before M4 deploy |
+| OQ-CRYPTO-OBS-02 | **Can TLS certificate expiry for form.coach and *.form.coach be monitored exclusively via Better Stack SSL monitoring (external synthetic check), or does the Cloudflare certificate API need to be queried directly?** Better Stack SSL monitoring checks the certificate presented at the TLS handshake — it detects expiry but not upcoming renewal failures or Cloudflare-side provisioning errors. The Cloudflare certificate API (via `GET /zones/{zone_id}/ssl/certificate_packs`) provides renewal status and error codes. Recommendation: Better Stack SSL as primary signal (CRYPTO-E-007); add Cloudflare API poll as secondary check if the first renewal failure goes undetected in staging. | devops-lead | **P2** | M5 |
+
+---
+
+*v1.6 (2026-06-03): §29 PAM / Privileged Access Management Observability — closes the cross-reference from `docs/SSO_SCIM_IMPLEMENTATION.md §24.8` (last sentence) and `§24.10` item 9, both of which state that AL-PAM-01/02/03 are registered in this document under §6 `pam_session_health`; those rules were added to the SSO implementation doc at v1.6 (2026-06-01) but the corresponding observability section was not written at the time. TOC updated to add §27 (SIEM Integration & Security Event Streaming), §28 (Mobile Application Performance Observability), and §29 (PAM / Privileged Access Management Observability) — §27 and §28 existed in the file since v1.3 and v1.5 respectively but were omitted from the TOC. §29.1 scopes the section to three PAM components (`pam-elevation-service` Cloudflare Worker, `pam-db-proxy` Supabase Edge Function, `pam-expiry-sweeper` Cron Worker); establishes privacy floor (admin_user_id pseudonymous UUID only; no query content in observability; justification_hash not justification_text); declares SOC 2 scope CC6.1/CC6.2/CC6.3/CC6.7/CC7.2/CC7.3; notes `target_tenant_id` propagation for per-tenant PAM reporting. §29.2 RED metrics table for all three PAM components: rate (elevation requests/h by access_level, break-glass/month), errors (denial rate, db-proxy expired-session rejections, RESET ROLE failures), duration (P95 approval notification latency by access_level, P95 proxy round-trip). §29.3 four PAM SLOs: PAM-SLO-01 (break-glass PagerDuty alert ≤ 60 s — 100% zero-tolerance), PAM-SLO-02 (approval notification P95 < 30 s for read_write), PAM-SLO-03 (zero standing form_admin sessions — monthly audit + pg_stat_activity check), PAM-SLO-04 (pam-expiry-sweeper runs every 5 min ± 90 s — Better Stack synthetic via `pam:sweeper:last_run` KV key). §29.4 AL-PAM-01/02/03 reproduced verbatim from SSO §24.7 with deduplication keys specified (`pam-break-glass-{pam_session_id}`, `pam-denial-spike-{admin_user_id}` 1 h window, `pam-clock-skew-{pam_session_id}`); AL-PAM-03 escalation rule (> 2 / 24 h → P1) documented. §29.5 §6.2 Alert Rules Additions: three-row `pam_session_health` subsection for insertion after `session_revocation` subsection; note on SIEM routing requirement for AL-PAM-01 (→ `siem.privileged_access_escalated` for affected-tenant SIEM delivery, CC6.1 evidence). §29.6 four DEC-030 PAM event health monitors: PAM-CHAIN-01 (P1, zero pam.* events in 24 h business hours — with sweeper health disambiguation), PAM-CHAIN-02 (P0, break-glass review overdue 72 h — mandatory post-hoc review clock), PAM-CHAIN-03 (P1, pam.elevation_approved without preceding pam.elevation_requested — HMAC sequence break, R-01 assessment), PAM-CHAIN-04 (P1, sweeper last-run age > 600 s for two consecutive checks); implementation note (PAM-CHAIN-01/02 as pg_cron, PAM-CHAIN-03 in weekly HMAC batch, PAM-CHAIN-04 as Better Stack synthetic). §29.7 eight-panel "Privileged Access Health" Metabase + Better Stack dashboard: elevation request rate by access_level (30 d time-series), approval latency P95 (7 d time-series), denial count & reason breakdown (stacked bar 7 d), active PAM sessions right now (KV scan stat), break-glass activations last 30 d (stat, ember highlight if > 0), sweeper last-run health indicator (green/amber/red by age), DEC-030 chain integrity status (last verified timestamp), suspension history (bar chart 30 d). §29.8 four privacy constraints: admin_user_id pseudonymous UUID only (not email/name, enforced in pam-elevation-service JWT-to-UUID resolution), justification_hash SHA-256 only (original text in KV + DEC-030 only, not observability tier), query content excluded from all signals (pam-db-proxy: only pam_session_id + access_level + duration_ms + outcome emitted), pam_break_glass_reviews table RLS (compliance-officer + security-engineer read; form_system write only; no tenant_admin access). §29.9 SOC 2 evidence mapping CC6.1/CC6.2/CC6.3/CC6.7/CC7.2/CC7.3; four existing artefacts CC6-E-PAM-001 through CC6-E-PAM-004 (verbatim from SSO §24.8); one new observability-layer artefact CC7-E-PAM-001 (PagerDuty incident log for AL-PAM-01/02/03 — export CSV with opened_at/acknowledged_at/resolved_at/alert_key). §29.10 ten-item implementation checklist: six P0 M4 items (AL-PAM-01/02/03 PagerDuty configs, §6.2 table update, HMAC chain validation in staging, `pam-suspended` KV auto-write), four P1 items across M4/M5/observation period (SLO registration, PAM-CHAIN-02 pg_cron, dashboard, §27.2 SIEM routing, evidence filing); note on Resolve OQ-SSO-24.1/24.2/24.4 from SSO §24.9 as blocking dependencies. §29.11 two open questions: OQ-PAM-OBS-01 (same UUID vs separate observability-layer pseudonym for admin_user_id — security-engineer + compliance-officer, P1, before M4; current intent same UUID with restricted Metabase access), OQ-PAM-OBS-02 (PAM activity exposure in enterprise Admin Dashboard — aggregate count only vs quarterly PDF report — customer-success + security-engineer, P2, before enterprise GA M13). Cross-references: docs/SSO_SCIM_IMPLEMENTATION.md §24 (PAM architecture), §6.2 (alert rules table to be updated per §29.5), §27.2 (SIEM event classification — pam.* rows to be added per §29.10 item 8), §2 (SLO table — PAM-SLO-01 through PAM-SLO-04 to be registered per §29.10 item 5), docs/AUDIT_LOG_SCHEMA.md (DEC-030 pam.* event registry — SSO §24.10 item 8), docs/SOC2_READINESS.md CC6 (evidence artefacts CC6-E-PAM-001 through CC6-E-PAM-004 to be linked per §29.10 item 10).*
+
+*v1.7 additions (2026-06-03): §30 Key Management & Cryptography Observability — operational counterpart to `docs/CRYPTOGRAPHY_POLICY.md` (policy) and `docs/SOC2_READINESS.md §56` (key inventory). TOC updated to add §30. §30.1 scopes the section to the eight-key production inventory (SUPABASE_SERVICE_ROLE_JWT 90d, HMAC_AUDIT_CHAIN_KEY annual dual-key, KEYPOINTS_ENC_KEY 365d, CLOUDFLARE_API_KEY 180d, WORKOS_API_KEY 180d, ANTHROPIC_API_KEY 90d, SENTRY_DSN 180d, SUPABASE_ANON_KEY 365d); establishes privacy floor (no key material in any signal, only key_id + days_until_rotation + key_version); declares SOC 2 scope CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2; introduces `form-crypto-health` Cloudflare KV namespace for rotation state. §30.2 RED metrics for `key-rotation-scheduler` Worker (checks/day, overdue key count, KV latency), `key-rotation-verifier` Edge Function (verifications/month, failures, duration), HMAC daily chain check, and Better Stack SSL synthetic for TLS certificates. §30.3 four KEY-SLOs: KEY-SLO-01 (all keys rotated within 110% of schedule — 100% zero-tolerance, SOC 2 CC5.3), KEY-SLO-02 (AL-KEY-01 fires ≥14 days before deadline — 100%), KEY-SLO-03 (hmac_key_rotation_verified emitted within 24h of hmac_key_rotated — 100%), KEY-SLO-04 (zero red-state keys >48h without active P0/P1 incident). §30.4 four AL-KEY-* alert rules: AL-KEY-01 (imminent ≤14d P1, auto-escalates to P0 at ≤3d, dedup 24h, SIEM medium), AL-KEY-02 (overdue P0, re-alerts 4h, auto-escalates at >7d to founder+compliance-officer, SIEM high), AL-KEY-03 (HMAC cadence >395d P1, belt-and-suspenders for HMAC_AUDIT_CHAIN_KEY), AL-KEY-04 (hmac verify missing within 24h of rotation P0, pg_cron 6h). §30.5 `crypto_key_health` §6.2 Alert Rules addition (four rows for §6.2 table insertion after `pam_session_health`). §30.6 four DEC-030 chain monitors: CRYPTO-CHAIN-01 (no SUPABASE_SERVICE_ROLE_JWT rotation in 91d), CRYPTO-CHAIN-02 (hmac_key_rotated without preceding hmac_key_rotation_initiated within 1h — unauthorized rotation, R-05/R-20 trigger), CRYPTO-CHAIN-03 (KEYPOINTS_ENC_KEY not rotated in 400d), CRYPTO-CHAIN-04 (key-rotation-scheduler Worker last-run age >26h — Better Stack synthetic). §30.7 nine-panel "Cryptographic Health" Metabase + Better Stack dashboard: key rotation status grid (8 keys green/amber/red), days until rotation bar chart, last rotated table, HMAC chain last verified stat, HMAC chain last break stat, AL-KEY-*/incident history bar chart 30d, TLS certificate expiry stat widgets, scheduler last-run health, SUPABASE_SERVICE_ROLE_JWT countdown. §30.8 four privacy constraints: no key material in any signal (enforced by Worker architecture — secrets accessible only via env binding, not KV write path), key names access-controlled (dashboard: devops-lead + security-engineer + compliance-officer only), key_version in DEC-030 only (not Analytics Engine), TLS CN/SAN in Better Stack only (not Sentry or Analytics Engine). §30.9 SOC 2 evidence mapping CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2 with eight artefacts CRYPTO-E-001 through CRYPTO-E-008: weekly KEY-SLO-01 query export, quarterly CRYPTOGRAPHY_POLICY review records, form-crypto-health KV export, Metabase access logs, HMAC chain verified event extract, DEC-030 rotation sequence log, Better Stack TLS screenshot, PagerDuty crypto incident export. §30.10 ten-item implementation checklist: 4× P0 M4 (key-rotation-scheduler Worker, KV seed, AL-KEY-01/02 PagerDuty, AL-KEY-03/04 PagerDuty + §6.2 update), 1× P0 M7 (admin.encryption_key_rotated DEC-030 event — closes SOC2_READINESS §56.6 OQ-ENC-03), 4× P1 M4-M5 (KEY-SLO-* §2 registration, CRYPTO-CHAIN-01/04 pg_cron/batch, dashboard, evidence artefact filing). §30.11 two open questions: OQ-CRYPTO-OBS-01 (form-crypto-health KV shared vs separate namespace from PAM — current intent separate, confirm with platform-engineer before M4), OQ-CRYPTO-OBS-02 (TLS cert expiry via Better Stack SSL only vs Cloudflare cert API — recommendation: Better Stack primary + Cloudflare API secondary if staging renewal failure goes undetected). Cross-references: docs/CRYPTOGRAPHY_POLICY.md §5 (rotation procedures per key type), docs/SOC2_READINESS.md §56 (key inventory), docs/SOC2_READINESS.md §57 (SUPABASE_SERVICE_ROLE_JWT rotation runbook), docs/SOC2_READINESS.md §58 (HMAC_AUDIT_CHAIN_KEY dual-key rotation runbook), docs/AUDIT_LOG_SCHEMA.md (admin.encryption_key_rotated event — OQ-ENC-03), §6.2 (alert rules table — crypto_key_health subsection), §2 (SLO table — KEY-SLO-01 through KEY-SLO-04), docs/INCIDENT_RESPONSE.md R-05 (HMAC chain break) and R-20 (insider threat).*
