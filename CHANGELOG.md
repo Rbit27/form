@@ -6,6 +6,20 @@
 
 ---
 
+## [1.81.0] — 2026-06-03
+
+### Added
+- `content/post-192-proprioception-joint-neuromuscular.md` — «Пропріоцепція суглобів і нейром'язова перебудова після травми» — Freeman et al. (1965 J Bone Joint Surg): перший доказ того, що balance training знижує повторні розтягнення через нейронний, а не м'язовий механізм. Механорецептори суглобових структур (Ruffini, Pacini, вільні нервові закінчення, м'язові веретена, органи Гольджі). Lephart et al. (1997): кількісний дефіцит joint position sense (JPS) після травми гомілкового і колінного суглобів. Arthrogenic muscle inhibition (AMI): рефлекторне спінальне гальмування квадрицепса через аберантний аферентний розряд при суглобовому ексудаті (Hopkins & Ingersoll 2000). Riemann & Lephart (2002): трирівнева нейром'язова модель контролю (рефлекс 30–40 мс → мозочок 50–80 мс → кора >120 мс). Witchalls et al. (2012 Br J Sports Med): знижений JPS як проспективний предиктор першого розтягнення (HR ~2.3). Sinkjaer et al. (2000 J Physiol): Ia-аференти і рефлекторне підсилення — нейральна основа wobble board ефекту. Eils & Rosenbaum (2001): 6-тижнева balance training покращила JPS і час відповіді перонеусів. Чому нестабільна поверхня — це мозочкове навчання через prediction errors, а не «core stability». ~12 хв. clinical-safety NOT REQUIRED.
+- `content/post-195-central-fatigue-governor-model.md` — «Центральна втома і Governor Model: мозок як регулятор зусилля» — Noakes (2012 Br J Sports Med): втома — мозкова емоція, Central Governor підсвідомо регулює рекрутування МО через аферентний feedback від III/IV волокон. Hill (1924): класична периферійна модель і чому вона неповна — атлети зупиняються з 10–30% рухових одиниць у резерві (Merton 1954). Amann (2011 J Physiol): блокада III/IV аферентів (epidural fentanyl) — суб'єкти генерують більше потужності, але з глибшим периферійним стомленням після — прямий доказ регуляторної ролі. Marcora (2010 Eur J Appl Physiol): Psychobiological Model — perception of effort як первинний ліміт, не периферійний статус. Pageaux et al. (2014): когнітивна стомленість підвищує RPE і знижує час до виснаження при стабільних периферійних параметрах. Marino et al. (2004): «фінішна зона» — Governor перераховує залишкову тривалість і дозволяє більше рекрутування. Для силового тренінгу: перші нейронні адаптації — Governor calibration; відмова в підході — частково нейронний вибір; RPE — вимірюваний вихід регуляторного процесу. ~13 хв. clinical-safety NOT REQUIRED.
+- `blog.html` — додано 2 нові картки: post-192 (пропріоцепція) і post-195 (central fatigue). Лічильник: 182 cards (194 posts authored).
+
+### Changed
+- `STATUS.md` — blog.html оновлено до 182 cards (194 posts authored), v1.81.0; статус-рядок v1.9.19 · 3 червня 2026
+- `README.md` — post-192 і post-195 позначено [x] у content engine roadmap
+- `VERSION` — 1.80.1 → 1.81.0
+
+---
+
 ## [1.80.1] — 2026-06-03
 
 ### Added
