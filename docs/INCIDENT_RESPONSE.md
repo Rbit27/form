@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v1.3
+# FORM · Incident Response Runbook v1.5
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -7252,5 +7252,250 @@ Today, evidence preservation requires a human to manually run the C1 snapshot qu
 ---
 
 *v1.4 additions (2026-06-02): R-20 Insider Threat & Privileged Access Abuse — the twentieth runbook and complement to R-01 (external breach). Key design decisions: (1) evidence preservation before remediation — destroying logs while rushing to contain is both forensically harmful and potentially legally harmful; suspending access 30 minutes later than the fastest possible time is always preferable to evidence spoliation; (2) legal notification at T+0, not after confirmation — in insider cases, legal must direct the investigation from the start; (3) two-person authorisation required for all suspension and revocation actions; (4) service_role key rotation is the nuclear option — invalidates all service_role connections platform-wide; (5) DEC-030 chain is simultaneously the primary detection signal and the evidentiary chain — chain tampering treated as P0 regardless of whether data access is confirmed. Trigger matrix: FORM-INSIDER-001 (admin ops outside PAM window), FORM-INSIDER-002 (bulk Art. 9 queries in service_role session), FORM-INSIDER-003 (PAM escalation not revoked within 4-hour hard limit), FORM-INSIDER-004 (Cloudflare Access device policy mismatch), manual HR/legal separation, manual #security report. Severity: P0 for confirmed exfiltration, audit chain tamper, or service_role key external leak; P1 for bulk Art. 9 queries without justification, unrevoked PAM escalation, unrecognised device/location; P2 for unusual admin UI without data queries; P3 for delayed-but-valid PAM revocation. Four SQL queries C1–C4. Six DEC-030 events all CRITICAL/HIGH 7-year retention. Evidence IR-INS-E-001 through IR-INS-E-007. SOC 2: CC6.1/CC6.2/CC6.3/CC6.6/CC7.2/CC7.3. Three open questions: OQ-INS-01 (admin_jit_escalations schema — P0, M6), OQ-INS-02 (bulk query middleware — P1, M8), OQ-INS-03 (legal hold API — P2, M10). Eight-item checklist (3× P0, 3× P1, 2× P2). Appendix A updated: "Internal suspicious behaviour?" → R-20. Owner: security-engineer + compliance-officer.*
+
+---
+
+### R-21: Key Rotation Failure & Scheduled Cryptographic Control Emergency
+
+**Owner:** security-engineer + devops-lead · **Reviewer:** compliance-officer
+**Triggers:** AL-KEY-01 (imminent ≤14d), AL-KEY-02 (overdue P0), AL-KEY-03 (HMAC cadence >395d), AL-KEY-04 (verification missing >24h), key-rotation-scheduler Worker silence
+**SOC 2 evidence:** CC5.2, CC5.3, CC6.7, CC6.8, C1.1, CC7.2, CC7.3
+
+> **Scope:** This runbook covers operational key rotation failures — keys that are overdue, rotation procedures that failed mid-execution, or verification events that did not follow rotation events. It does NOT cover unauthorized key rotation. If the trigger is `CRYPTO-CHAIN-02` (rotation event without a preceding initiation event within 1 hour), **stop and activate R-05 + R-20 immediately**. Do not continue with R-21.
+
+#### Severity Classification
+
+| Condition | Severity | Response SLA |
+|---|---|---|
+| Any key overdue (past scheduled rotation date) | **P0** | IC within 15 min; rotation within 2 hours |
+| `HMAC_AUDIT_CHAIN_KEY` cadence >400 days (AL-KEY-03 escalated) | **P0** | IC within 15 min; HMAC dual-key rotation within 4 hours |
+| `hmac_key_rotation_verified` missing >24h after `hmac_key_rotated` (AL-KEY-04) | **P0** | IC within 15 min; verification run within 1 hour |
+| key-rotation-scheduler Worker silent (no KV write in >26h) | **P1** | IC within 30 min; scheduler restart within 1 hour |
+| Any key within ≤14-day window (AL-KEY-01) | **P1** | IC within 4 hours; rotation before deadline |
+| `HMAC_AUDIT_CHAIN_KEY` cadence 366–399 days (AL-KEY-03) | **P1** | IC within 4 hours; schedule dual-key rotation |
+| TLS certificate expiry ≤30 days (Better Stack SSL) | **P2** | Inform devops-lead; schedule renewal within 7 days |
+
+**Upgrade rule:** Any P1 that reaches the key deadline without rotation automatically becomes P0.
+
+#### Trigger Matrix
+
+| Alert ID | Source | Severity | Action |
+|---|---|---|---|
+| AL-KEY-01 (≤14d remaining) | key-rotation-scheduler Worker → form-crypto-health KV → Better Stack | P1 | Open incident channel; identify affected key; schedule rotation |
+| AL-KEY-01 (≤3d remaining, auto-escalate) | Same, re-alert per OBSERVABILITY.md §30.4 | P0 | Immediate IC; emergency rotation if planned rotation is not achievable before deadline |
+| AL-KEY-02 (overdue) | key-rotation-scheduler → PagerDuty | P0 | Immediate IC; two-person auth; emergency rotation per key-type procedure below |
+| AL-KEY-03 (HMAC cadence >395d) | key-rotation-scheduler → PagerDuty | P1 | Open incident; activate HMAC dual-key rotation procedure (SOC2_READINESS §58) |
+| AL-KEY-04 (verify missing >24h) | pg_cron audit check → PagerDuty | P0 | Open incident; re-run verification immediately; if verification fails twice, treat as potential compromise → R-05 |
+| key-rotation-scheduler silent (>26h) | Better Stack synthetic via `crypto:scheduler:last_run` KV key | P1 | Restart Worker; confirm KV writes resume; check Sentry for errors |
+| CRYPTO-CHAIN-02 (rotation without initiation) | DEC-030 HMAC batch checker | **STOP — NOT R-21** | Activate R-05 + R-20 immediately |
+
+#### Immediate Actions (T+0 to T+15 min)
+
+```
+R21-OPEN. Open incident channel: #inc-YYYYMMDD-keyrot in Slack.
+           Assign IC (security-engineer or devops-lead on-call).
+           Emit DEC-030 admin.key_rotation_incident_opened BEFORE any rotation action.
+           If emission fails, abort and retry — the incident must be on-chain from the first moment.
+
+R21-ID.   Identify affected key from PagerDuty alert payload:
+           key_id (e.g., SUPABASE_SERVICE_ROLE_JWT, HMAC_AUDIT_CHAIN_KEY, KEYPOINTS_ENC_KEY)
+           days_overdue / days_until_rotation from form-crypto-health KV.
+           Confirm trigger is NOT CRYPTO-CHAIN-02 before continuing.
+
+R21-AUTH. Two-person authorisation for any P0 rotation action.
+           IC nominates second approver (compliance-officer or founder if security-engineer is IC).
+           Both user_ids captured in admin.encryption_key_rotation_initiated DEC-030 event.
+```
+
+#### Scope Assessment Queries
+
+All queries require PAM-authorised `service_role` access (SSO_SCIM §24). Run only after `admin.key_rotation_incident_opened` is confirmed on-chain.
+
+**Check C1: form-crypto-health KV state**
+
+```bash
+# Query Cloudflare KV for all key health records
+curl -s \
+  "https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/storage/kv/namespaces/<CRYPTO_KV_NS>/values/crypto:status" \
+  -H "Authorization: Bearer $CF_API_TOKEN" | jq .
+# Expected: JSON with key_id, days_until_rotation, key_version, last_checked_at for each key
+# Red flag: days_until_rotation < 0 (overdue), scheduler_healthy: false
+```
+
+**Check C2: Recent key rotation events in audit_log**
+
+```sql
+-- C2: Key rotation event history — last 60 days for the affected key
+SELECT
+  event_type,
+  created_at,
+  metadata->>'key_id'           AS key_id,
+  metadata->>'key_version'      AS key_version,
+  metadata->>'rotated_by'       AS rotated_by,
+  hmac_valid
+FROM audit_log_events
+WHERE event_type IN (
+  'admin.encryption_key_rotation_initiated',
+  'admin.encryption_key_rotated',
+  'admin.encryption_key_rotation_verified'
+)
+  AND metadata->>'key_id' = '<AFFECTED_KEY_ID>'
+  AND created_at >= NOW() - INTERVAL '60 days'
+ORDER BY created_at DESC;
+-- Expected: initiated → rotated → verified triples, all hmac_valid = TRUE.
+-- Red flag: rotated without preceding initiated → STOP, activate R-05 + R-20.
+-- Red flag: rotated without subsequent verified within 24h → AL-KEY-04 scenario.
+-- Red flag: no entries for the affected key in > rotation_period days → rotation skipped entirely.
+```
+
+**Check C3: key-rotation-scheduler Worker health**
+
+```bash
+# Check scheduler last-run timestamp from KV
+curl -s \
+  "https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/storage/kv/namespaces/<CRYPTO_KV_NS>/values/crypto:scheduler:last_run" \
+  -H "Authorization: Bearer $CF_API_TOKEN" | jq .
+# Expected: last_run_at within the last 25 hours
+# Red flag: last_run_at > 26 hours ago → scheduler crashed or misconfigured
+# Also check Sentry for key-rotation-scheduler Worker errors in the same window
+```
+
+**Check C4: HMAC_AUDIT_CHAIN_KEY cadence (AL-KEY-03 scenario)**
+
+```sql
+-- C4: HMAC_AUDIT_CHAIN_KEY last rotation date
+SELECT
+  created_at                                                        AS last_hmac_rotation,
+  NOW() - created_at                                               AS age,
+  EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400                 AS age_days
+FROM audit_log_events
+WHERE event_type = 'admin.encryption_key_rotated'
+  AND metadata->>'key_id' = 'HMAC_AUDIT_CHAIN_KEY'
+ORDER BY created_at DESC
+LIMIT 1;
+-- Expected: age_days < 366 (annual schedule with 10% buffer = AL-KEY-03 threshold at 395d)
+-- Red flag: age_days > 395 → dual-key rotation required per SOC2_READINESS §58
+-- Red flag: no result → HMAC_AUDIT_CHAIN_KEY has never been formally rotated → P0, R-05 assessment
+```
+
+> Document all C1–C4 outputs in `compliance/evidence/incidents/<slug>/scope-assessment.md` with SHA-256 hashes before proceeding to rotation.
+
+#### Response by Key Type
+
+**SUPABASE_SERVICE_ROLE_JWT (90-day schedule):** Follow `docs/SOC2_READINESS.md §57`. Generate new key in Supabase Dashboard → deploy to Cloudflare Workers Secrets (`wrangler secret put SUPABASE_SERVICE_ROLE_KEY`) → redeploy all Workers → confirm Sentry error rate returns to baseline → emit `admin.encryption_key_rotated` → verify within 24h.
+
+**HMAC_AUDIT_CHAIN_KEY (annual dual-key rotation):** Follow `docs/SOC2_READINESS.md §58`. Higher ceremony: emit `admin.encryption_key_rotation_initiated` BEFORE generating new key; activate dual-key mode (24-hour overlap window — old and new keys both valid); after overlap: deactivate old key, emit `admin.encryption_key_rotated`; verify HMAC chain integrity for all events written during the overlap window; emit `admin.encryption_key_rotation_verified`. Do NOT complete this rotation in less than 24 hours — a rush rotation without overlap breaks chain verification for events in the transition window.
+
+**KEYPOINTS_ENC_KEY (365-day schedule; Art. 9 biometric data):** Two-person auth required. Requires a maintenance window — communicate to enterprise tenants ≥72h in advance via Template K-01. Emit `admin.encryption_key_rotation_initiated` with `requires_reencryption: true`. Run re-encryption job in a transaction; confirm row count before and after matches. Emit `admin.encryption_key_rotated` and `admin.encryption_key_rotation_verified` within the same maintenance window. See OQ-KEY-02 for live re-encryption vs. maintenance window decision.
+
+**CLOUDFLARE_API_KEY, WORKOS_API_KEY, ANTHROPIC_API_KEY, SENTRY_DSN (API keys, 90–180d):** Lower ceremony. Generate new credential in provider dashboard → deploy to Cloudflare Workers Secrets → redeploy affected Workers → confirm service functionality via Sentry → revoke old credential in provider dashboard after confirming new key is live → emit `admin.encryption_key_rotated`.
+
+#### Communication Protocol
+
+**Planned-rotation-overdue (no compromise suspected):** Internal-only. No enterprise tenant notification unless KEYPOINTS_ENC_KEY requires a maintenance window (Template K-01). Compliance-officer notified at T+30 min for P0. Founder at T+1h if key remains unrotated.
+
+**Template K-01 — KEYPOINTS_ENC_KEY Maintenance Window (enterprise tenants)**
+
+```
+Subject: FORM · Scheduled Maintenance — [DATE] [TIME UTC]
+
+Hi [Customer Name],
+
+We are scheduling a maintenance window on [DATE] at [START TIME UTC]
+(estimated duration: [DURATION]) for routine security maintenance including
+a scheduled cryptographic key rotation.
+
+The FORM service will be unavailable for approximately [DURATION].
+No action is required from your team. Your data remains secure.
+
+We will send a follow-up confirmation when complete.
+
+The FORM Team
+```
+
+**Compromise-suspected escalation:** If C2 shows `admin.encryption_key_rotated` without a preceding `admin.encryption_key_rotation_initiated` within 1 hour — STOP. This is CRYPTO-CHAIN-02. Activate R-05 and R-20 immediately. If AL-KEY-04 fires and verification continues to fail after two retries, suspect compromise — activate R-05 and notify compliance-officer immediately.
+
+#### DEC-030 Audit Events
+
+All events HMAC-chained per `docs/AUDIT_LOG_SCHEMA.md`. Planned-rotation-failure events use 3-year retention; events with `rotated_by` or two-person auth (HMAC and KEYPOINTS_ENC_KEY) use 7-year retention.
+
+| Event Type | Severity | Retention | Key Metadata Fields |
+|---|---|---|---|
+| `admin.key_rotation_incident_opened` | HIGH | 3 years | `affected_key_id`, `trigger_alert_id` (AL-KEY-01/02/03/04 or `manual`), `ic_user_id`, `days_overdue`, `incident_slug` |
+| `admin.encryption_key_rotation_initiated` | HIGH | 7 years | `key_id`, `key_version_new`, `initiated_by_user_id`, `rotation_type` (`planned` / `emergency`), `authorised_by_user_id` (second approver for HMAC / KEYPOINTS), `incident_slug` |
+| `admin.encryption_key_rotated` | HIGH | 7 years | `key_id`, `key_version_old`, `key_version_new`, `rotated_by_user_id`, `rotation_duration_seconds`, `incident_slug` |
+| `admin.encryption_key_rotation_verified` | HIGH | 7 years | `key_id`, `key_version`, `verified_by_user_id`, `chain_integrity_checked` (bool), `verification_method`, `incident_slug` |
+| `admin.key_rotation_incident_closed` | STANDARD | 3 years | `affected_key_id`, `resolution` (`rotated_successfully` / `scheduled_for_maintenance_window`), `compromise_suspected` (bool), `incident_slug` |
+
+```typescript
+// DEC-030 emission for incident open — emitted BEFORE any rotation action
+const event = {
+  event_type: 'admin.key_rotation_incident_opened',
+  severity: 'HIGH',
+  incident_id: incidentId,
+  payload: {
+    affected_key_id: affectedKeyId,       // e.g., 'HMAC_AUDIT_CHAIN_KEY'
+    trigger_alert_id: triggerAlertId,     // 'AL-KEY-01'|'AL-KEY-02'|'AL-KEY-03'|'AL-KEY-04'|'manual'
+    ic_user_id: icUserId,
+    days_overdue: daysOverdue,            // 0 if AL-KEY-01 (not yet overdue)
+    incident_slug: incidentSlug,
+  },
+};
+const emitted = await emitDec030Event(event, supabaseAdminClient);
+if (!emitted.success) {
+  throw new Error('DEC-030 emission failed — key rotation incident aborted; retry required');
+}
+```
+
+#### Evidence Package
+
+| Evidence ID | Artefact | Collection Method | Location |
+|---|---|---|---|
+| **IR-KEY-E-001** | C1 form-crypto-health KV snapshot | `curl` output saved as JSON; SHA-256 recorded at T+15 min | `compliance/evidence/incidents/<slug>/c1-crypto-health-kv.json` |
+| **IR-KEY-E-002** | C2 audit_log key rotation event history | SQL output exported as JSONL; shows full initiated → rotated → verified chain for the affected key | `compliance/evidence/incidents/<slug>/c2-rotation-history.jsonl` |
+| **IR-KEY-E-003** | C3 scheduler health record | KV last-run value + Sentry Worker error extract | `compliance/evidence/incidents/<slug>/c3-scheduler-health.json` |
+| **IR-KEY-E-004** | C4 HMAC cadence query (AL-KEY-03 only) | SQL output with `age_days` value; primary CC5.3 cadence evidence | `compliance/evidence/incidents/<slug>/c4-hmac-cadence.jsonl` |
+| **IR-KEY-E-005** | Rotation completion confirmation | DEC-030 `admin.encryption_key_rotated` + `admin.encryption_key_rotation_verified` events as JSON; confirms triple on-chain | `compliance/evidence/incidents/<slug>/rotation-completion.json` |
+| **IR-KEY-E-006** | Two-person authorisation record | DEC-030 `admin.encryption_key_rotation_initiated` with both `initiated_by_user_id` and `authorised_by_user_id`; required for HMAC and KEYPOINTS_ENC_KEY rotations | `compliance/evidence/incidents/<slug>/two-person-auth.json` |
+
+All evidence under `compliance/evidence/incidents/<slug>/` with SHA-256 manifest. 3-year retention for IR-KEY-E-001 through IR-KEY-E-006 (7-year for IR-KEY-E-005 and IR-KEY-E-006 when HMAC_AUDIT_CHAIN_KEY is affected, given its audit-integrity role under SOC 2 CC8.1).
+
+#### SOC 2 TSC Mapping
+
+| TSC Criterion | Control | Evidence from This Runbook |
+|---|---|---|
+| **CC5.2** (Policies communicated) | Key rotation schedule in CRYPTOGRAPHY_POLICY.md §5 and OBSERVABILITY.md §30 KEY-SLO-01; responsible parties per §30.1 | IR-KEY-E-002: rotation event history demonstrates the schedule is actively monitored |
+| **CC5.3** (Control activities performed as designed) | KEY-SLO-01: all keys rotated within 110% of schedule; AL-KEY-02 P0 triggers this runbook within 15 min; verified by `admin.encryption_key_rotation_verified` | IR-KEY-E-005: rotation completion as primary CC5.3 evidence |
+| **CC6.7** (Encryption at rest and in transit) | KEYPOINTS_ENC_KEY rotation maintains encryption-at-rest for Art. 9 biometric data; SUPABASE_SERVICE_ROLE_JWT rotation maintains JWT signing integrity | IR-KEY-E-005: `admin.encryption_key_rotated` event for KEYPOINTS or SERVICE_ROLE_JWT |
+| **CC6.8** (Cryptographic key protection) | Two-person auth for HMAC and KEYPOINTS rotations enforces separation of duties; incident runbook demonstrates active management of the eight-key production inventory | IR-KEY-E-006: two-person auth record; IR-KEY-E-001: KV monitoring state snapshot |
+| **C1.1** (Privacy commitments maintained) | KEYPOINTS_ENC_KEY rotation protects Art. 9 biometric data per GDPR Art. 5(1)(f); maintenance window notice Template K-01 as transparency artefact | IR-KEY-E-005 for KEYPOINTS_ENC_KEY; Template K-01 customer communication record |
+| **CC7.2** (Monitoring for system events) | AL-KEY-01 through AL-KEY-04 as documented automated monitoring; OBSERVABILITY.md §30.6 DEC-030 chain monitors as continuous verification | IR-KEY-E-001 and IR-KEY-E-003: evidence that monitoring controls were operating at incident time |
+| **CC7.3** (Anomaly evaluation) | C1–C4 scope assessment procedure; CRYPTO-CHAIN-02 escalation to R-05 + R-20 draws the boundary between operational failure and security incident | IR-KEY-E-001 through IR-KEY-E-004: scope assessment evidence with incident slug traceability |
+
+#### Open Questions
+
+**OQ-KEY-01: Should `admin.key_rotation_incident_opened` be a new DEC-030 event type, or tracked only in the PagerDuty timeline?**
+
+Adding this event to the DEC-030 chain links the alert-to-resolution evidence package for auditors. However, it requires registration in `docs/AUDIT_LOG_SCHEMA.md` before any production incident can use it. The alternative (PagerDuty-only) loses the HMAC-chained incident-to-resolution link. Recommendation: register the event type as part of the R-21 implementation checklist item 1. Owner: security-engineer + compliance-officer. Priority: **P0 — must be registered before R-21 is used in a production incident.** Target: M7.
+
+**OQ-KEY-02: For KEYPOINTS_ENC_KEY rotation, is live re-encryption (dual-key overlap) or a maintenance window required?**
+
+Live re-encryption avoids service disruption but expands the attack surface during the dual-key overlap period. For Art. 9 biometric data, the conservative position is a maintenance window. Enterprise customers with SLA commitments must be notified ≥72h in advance. Decision required before the first KEYPOINTS_ENC_KEY rotation (Month 13). Owner: security-engineer + enterprise-architect + compliance-officer. Priority: **P1.** Target: M12.
+
+#### Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Register `admin.key_rotation_incident_opened` and `admin.key_rotation_incident_closed` as new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md`; validate Zod schema; deploy to `emit-audit-event` Worker endpoint; close OQ-KEY-01 | P0 | M7 | security-engineer | [ ] |
+| 2 | Add `runbook: "docs/INCIDENT_RESPONSE.md#r-21"` to AL-KEY-02 and AL-KEY-04 PagerDuty alert configs in OBSERVABILITY.md §30.4 and §30.5 §6.2 | P0 | M7 | devops-lead | [ ] |
+| 3 | Implement key-rotation-scheduler Worker and confirm AL-KEY-01/02 fire against a staging synthetic overdue-key scenario (per OBSERVABILITY.md §30.10 item 1) | P0 | M4 | platform-engineer + devops-lead | [ ] |
+| 4 | Write R-21 tabletop exercise: simulate AL-KEY-02 P0 for SUPABASE_SERVICE_ROLE_JWT; IC opens incident channel; C1–C4 queries run; rotation executed; DEC-030 events emitted; IR-KEY-E-001 through IR-KEY-E-006 collected; PIR completed; measure elapsed time vs. 2-hour rotation SLA | P1 | M8 | security-engineer | [ ] |
+| 5 | Resolve OQ-KEY-02 (KEYPOINTS_ENC_KEY live re-encryption vs. maintenance window) and document the decision in DECISION_LOG.md before M12 | P1 | M12 | security-engineer + enterprise-architect + compliance-officer | [ ] |
+| 6 | Update Appendix A quick reference: add "Key rotation overdue / AL-KEY-02?" → R-21; distinguish from "Audit chain break or unauthorized rotation (CRYPTO-CHAIN-02)" → R-05 + R-20 | P1 | M7 | security-engineer | [ ] |
+| 7 | File IR-KEY-E-001 through IR-KEY-E-006 evidence templates in `compliance/evidence/templates/key-rotation/` with SHA-256 checksum instructions | P2 | M7 | compliance-officer | [ ] |
+
+---
+
+*v1.5 additions (2026-06-03): Fixed header v1.3 → v1.5 (v1.4 additions dated 2026-06-02 added R-20 Insider Threat but did not update the document header). R-21 Key Rotation Failure & Scheduled Cryptographic Control Emergency — closes the runbook gap created when OBSERVABILITY.md §30 (Key Management & Cryptography Observability, v1.7, 2026-06-03) added AL-KEY-01 through AL-KEY-04 alert rules with no `runbook_url` cited; AL-KEY-02 (overdue P0) and AL-KEY-04 (verification missing P0) had no matching incident procedure. R-21 covers: CRYPTO-CHAIN-02 stop-gate (unauthorized rotation → R-05 + R-20, never R-21); severity classification table (P0/P1/P2 with upgrade rule); seven-row trigger matrix with CRYPTO-CHAIN-02 stop-gate row; four scope assessment queries (C1 KV state, C2 audit_log rotation history, C3 scheduler health, C4 HMAC cadence); per-key-type response procedures (SUPABASE_SERVICE_ROLE_JWT per SOC2_READINESS §57; HMAC_AUDIT_CHAIN_KEY dual-key per SOC2_READINESS §58; KEYPOINTS_ENC_KEY maintenance window pending OQ-KEY-02; API keys lower-ceremony); communication protocol with Template K-01 (enterprise tenant maintenance window notice for KEYPOINTS_ENC_KEY, ≥72h advance notice requirement); five DEC-030 HMAC-chained events (admin.key_rotation_incident_opened HIGH 3yr; admin.encryption_key_rotation_initiated HIGH 7yr; admin.encryption_key_rotated HIGH 7yr; admin.encryption_key_rotation_verified HIGH 7yr; admin.key_rotation_incident_closed STANDARD 3yr); evidence package IR-KEY-E-001 through IR-KEY-E-006 with SHA-256 manifest; SOC 2 mapping CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2/CC7.3; two open questions (OQ-KEY-01 DEC-030 event type registration — P0 M7; OQ-KEY-02 KEYPOINTS_ENC_KEY re-encryption strategy — P1 M12); seven-item implementation checklist (2× P0 M4/M7, 3× P1 M8/M12/M7, 2× P2 M7). Appendix A update pending checklist item 6. Cross-references: docs/OBSERVABILITY.md §30 (AL-KEY-01 through AL-KEY-04; CRYPTO-CHAIN-01 through CRYPTO-CHAIN-04; KEY-SLO-01 through KEY-SLO-04); docs/CRYPTOGRAPHY_POLICY.md §5 (rotation procedures per key type); docs/SOC2_READINESS.md §56 (key inventory); docs/SOC2_READINESS.md §57 (SUPABASE_SERVICE_ROLE_JWT rotation runbook); docs/SOC2_READINESS.md §58 (HMAC_AUDIT_CHAIN_KEY dual-key rotation runbook); docs/AUDIT_LOG_SCHEMA.md (admin.encryption_key_rotated — OQ-ENC-03 target event); docs/SSO_SCIM_IMPLEMENTATION.md §24 (PAM authorisation for rotation sessions); R-05 (HMAC chain break — escalation on CRYPTO-CHAIN-02); R-20 (insider threat — escalation on CRYPTO-CHAIN-02 or unauthorized rotation). Owner: security-engineer + devops-lead.*
 
 ---

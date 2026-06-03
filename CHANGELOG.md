@@ -6,6 +6,13 @@
 
 ---
 
+## [1.85.1] — 2026-06-03
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v1.3 → v1.5 — added R-21 Key Rotation Failure & Scheduled Cryptographic Control Emergency; fixed header version discrepancy (body contained v1.4 content for R-20 but header still read v1.3). R-21 closes the runbook gap created when `docs/OBSERVABILITY.md` §30 (v1.7, 2026-06-03) added AL-KEY-01 through AL-KEY-04 alert rules with no `runbook_url`. Covers: CRYPTO-CHAIN-02 stop-gate (→ R-05 + R-20); severity classification P0/P1/P2; 4 scope-assessment queries (C1 KV state, C2 audit_log history, C3 scheduler health, C4 HMAC cadence); per-key response procedures (SUPABASE_SERVICE_ROLE_JWT / HMAC_AUDIT_CHAIN_KEY dual-key / KEYPOINTS_ENC_KEY maintenance window / API keys); Template K-01 (enterprise maintenance window notice); 5 DEC-030 HMAC-chained events; evidence package IR-KEY-E-001–006; SOC 2 CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2/CC7.3; OQ-KEY-01 (event registration P0 M7), OQ-KEY-02 (KEYPOINTS_ENC_KEY re-encryption strategy P1 M12); 7-item implementation checklist.
+
+---
+
 ## [1.85.0] — 2026-06-03
 
 ### Added
