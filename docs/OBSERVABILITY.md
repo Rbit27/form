@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v1.5
+# FORM · Observability & Monitoring Taxonomy v1.6
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -47,6 +47,9 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §24 | Subscription & Revenue Event Observability |
 | §25 | Product & Activation Funnel Observability |
 | §26 | SSO / SCIM Identity Observability |
+| §27 | SIEM Integration & Security Event Streaming |
+| §28 | Mobile Application Performance Observability |
+| §29 | PAM / Privileged Access Management Observability |
 
 ---
 
@@ -6589,3 +6592,178 @@ Mobile performance events are emitted at fleet level. Individual crash reports l
 ---
 
 *v1.5 additions (2026-06-01): two DEC-XXX TBD references in §25 resolved — §25.1 PostHog platform selection now references DEC-026 (PostHog EU Cloud); §25.2 "activated" user definition now references DEC-034 (D7 activation metric definition formalised). Section 28 — Mobile Application Performance Observability — closes the gap between the crash-free SLIs in §2 and a complete mobile client reliability layer. §28.1 scopes the section to the React Native / Expo mobile application (iOS + Android) and distinguishes from §18 (CV model quality), §25 (product funnel), and §20 (wearable sync); enumerates four tooling components (Sentry, EAS, Cloudflare Analytics Engine, PostHog denominator). §28.2 seven MOBILE-SLOs: MOBILE-SLO-01 (cold start P95 < 2,000 ms), MOBILE-SLO-02 (iOS crash-free ≥ 99.5%), MOBILE-SLO-03 (Android crash-free ≥ 99.5%), MOBILE-SLO-04 (Android ANR-free ≥ 99.0%), MOBILE-SLO-05 (frame render ≥ 90% at 60 fps), MOBILE-SLO-06 (OTA adoption ≥ 95% within 48 h), MOBILE-SLO-07 (CV thermal throttle ≤ 5%); all measured at fleet level. §28.3 Sentry React Native SDK integration: `beforeSend` breadcrumb deny-list (11 denied keys including weight, heartRate, cvKeypoints, mood, recovery.*); session replay disabled unconditionally; user context limited to pseudonymous UUID; `beforeSend` TypeScript implementation. §28.4 performance monitoring: five required Sentry Performance transactions (app.cold_start, app.warm_start, session.cv.start, screen.load.*, auth.sso.saml_redirect); fleet-level frame drop counter via Cloudflare Analytics Engine Worker with rate-limit KV guard; `MobileTelemetryPayload` TypeScript interface; three-tier device classification table (Tier 1/2/3 with iOS/Android examples). §28.5 EAS OTA rollout observability: four channels (production/preview/staging); four rollout health metrics (adoption rate, download failure rate, rollback trigger rate, post-update crash rate correlation); `ota_update_events` Postgres DDL (uuid PK, channel, runtime_version, event_type, adoption_pct, published_by, rollback_reason); pg_cron adoption snapshot job (0 3,9,15,21 * * *) via Worker proxy. §28.6 enterprise device fleet considerations: MDM change control window impact on MOBILE-SLO-06; device tier distribution by segment (consumer vs. enterprise); per-tenant "App Health" Admin Dashboard panel spec (crash-free rate, OTA status, device tier %, active alerts; k-anonymity n ≥ 10). §28.7 six DEC-030 HMAC-chained mobile events: mobile.crash_rate_breach (HIGH), mobile.anr_spike (HIGH), mobile.cold_start_regression (STANDARD), mobile.ota_update_published (STANDARD), mobile.ota_rollback_triggered (HIGH, triggers R-02 assessment), mobile.thermal_throttle_spike (STANDARD); all fleet-level, no user_id, tenant_id as slug only; 3-year retention for HIGH events, 90-day for STANDARD. §28.8 eight alert rules AL-MOBILE-01 through AL-MOBILE-08: two P0 crash rules (AL-MOBILE-01/02 with OTA rollback runbook), ANR P1 (AL-MOBILE-03), cold start regression P1 (AL-MOBILE-04), OTA adoption P2 (AL-MOBILE-05), OTA rollback P1 (AL-MOBILE-06 with CSM notification), CV thermal P2 (AL-MOBILE-07 with Tier 3 feature flag path), frame rate P2 (AL-MOBILE-08); PagerDuty deduplication key specified. §28.9 eight-panel "Mobile Fleet Health" dashboard: crash-free time-series (iOS + Android), cold start P95 trend, OTA adoption funnel (last 3 updates × 24/48/72 h), error rate by app version stacked bar, CV thermal by device tier horizontal bar, frame rate gauge, active OTA status stat panel. §28.10 six privacy constraints: Sentry breadcrumb deny-list (enforced in beforeSend), no user_id in mobile telemetry Worker (400 rejection), device tier from model lookup (not biometric), session replay disabled, k-anonymity n ≥ 10 on fleet panel, Sentry DPA sub-processor entry. §28.11 SOC 2 mapping: A1.1 (seven SLOs as capacity monitoring), A1.2 (OTA rollback + thermal monitoring as environmental threat detection), CC7.2 (eight alert rules + three DEC-030 events as documented anomaly monitoring suite), CC7.3 (response SLA + runbook documentation per rule); four evidence artefacts MOB-OBS-E-001 through MOB-OBS-E-004. §28.12 fourteen-item implementation checklist: four P0 items (Sentry SDK + deny-list CI test, crash SLO wiring, P0 PagerDuty config), seven P1 items (cold start transaction, CV start transaction, telemetry Worker, alert rules, DEC-030 emission, OTA events table + cron, device_tier thermal column), three P2 items (DEC-030 adoption events, dashboard, Admin Dashboard fleet panel); M3/M4/M5/M6/observation period milestones. §28.13 three open questions: OQ-MOBILE-01 (MDM change window vs. MOBILE-SLO-06 adoption target — P2, customer-success + platform-engineer, before M13), OQ-MOBILE-02 (Sentry session replay allowlist — P1, clinical-safety + security-engineer, M4), OQ-MOBILE-03 (Android WebView vs. system browser for SSO redirect — P1, security-engineer + platform-engineer, before M10).*
+
+
+---
+
+## 29. PAM / Privileged Access Management Observability
+
+### 29.1 Purpose & Scope
+
+This section closes the cross-reference from `docs/SSO_SCIM_IMPLEMENTATION.md §24.8` (last sentence) and `§24.10` item 9, which state that AL-PAM-01, AL-PAM-02, and AL-PAM-03 are registered in this document under §6 `pam_session_health`. Those rules were documented in the SSO implementation doc at v1.6 (2026-06-01) but were not written here at the time; this section remedies that gap and provides the full observability layer for the PAM subsystem.
+
+**Scope:** the three components of the PAM subsystem:
+
+| Component | Type | Role |
+|---|---|---|
+| `pam-elevation-service` | Cloudflare Worker | Receives elevation requests; runs approval workflow; writes `PAM_KV`; emits DEC-030 `pam.elevation_requested`, `pam.elevation_approved`, `pam.elevation_denied` |
+| `pam-db-proxy` | Supabase Edge Function | Validates PAM KV record; enforces hard `expires_at` check; opens Postgres connection as `form_system`; `SET ROLE form_admin`; `SET app.pam_session_id`; executes query batch; `RESET ROLE` |
+| `pam-expiry-sweeper` | Cloudflare Workers Cron (every 5 min) | Scans `PAM_KV` for expired records; emits `pam.session_expired` and `pam.break_glass_expired`; also detects stalled approval windows and emits `pam.elevation_denied` with `reason: approval_timeout` or `reason: cosign_timeout` |
+
+**Privacy floor:** all PAM observability signals carry `admin_user_id` (pseudonymous internal UUID) only — never email, name, or role title. Query content executed during an elevated session is not present in any observability signal; only `pam_session_id` and the session outcome are observable. This is enforced at the Worker level: `pam-db-proxy` does not log the query string to Analytics Engine or Sentry — only duration, outcome, and session ID.
+
+**SOC 2 scope:** CC6.1 (no standing `form_admin` credentials), CC6.2 (access provisioning with approval), CC6.3 (timely deprovisioning via KV TTL auto-expiry), CC6.7 (mTLS on all PAM endpoints), CC7.2 (alert rules as continuous anomaly monitoring), CC7.3 (documented response procedures per alert).
+
+**Multi-tenant note:** PAM is an admin-tier subsystem. `target_tenant_id` in `pam.elevation_requested` is nullable — elevated sessions may be global (no specific tenant) or scoped to a tenant. Observability signals propagate `target_tenant_id` where non-null to enable per-tenant PAM activity reporting for enterprise buyers who require it (§29.9).
+
+---
+
+### 29.2 RED Metrics for PAM
+
+| Component | Rate (R) | Errors (E) | Duration (D) |
+|---|---|---|---|
+| **pam-elevation-service** | Elevation requests/hour by `access_level` (`read_only` / `read_write` / `destructive`); break-glass activations/month | `pam.elevation_denied` rate / total requests; `pam-elevation-service` 5xx errors / total requests | P95 time from request submission to approval-notification delivered to approver (by `access_level`); P95 time from approval to `pam.elevation_approved` event emission |
+| **pam-db-proxy** | Privileged query executions/hour by `access_level`; `SET ROLE form_admin` invocations/hour | `expires_at`-in-past rejections/hour (AL-PAM-03 signal); `pam-db-proxy` 5xx errors / total executions; `RESET ROLE` failures (connection pool poisoning risk) | P95 query execution duration by `access_level`; P99 total proxy round-trip (validation + SET ROLE + execute + RESET ROLE) |
+| **pam-expiry-sweeper** | Cron invocations/hour (target: 12/h ± 2); `pam.session_expired` events/hour; `pam.break_glass_expired` events/month | Cron invocation gaps > 6 minutes (missed sweep); DEC-030 emission failures from sweeper | P95 sweep duration (full KV scan + event emission batch); last-run age in seconds |
+
+**Metric instrumentation:** all rate and error counters are emitted as Cloudflare Analytics Engine `PAM_TELEMETRY` dataset events from `pam-elevation-service` and `pam-db-proxy`. The expiry sweeper emits its health signals via DEC-030 events (which are the canonical signal) rather than a separate Analytics Engine dataset, to avoid duplication. Better Stack scrapes the Analytics Engine GraphQL endpoint for dashboard panels.
+
+---
+
+### 29.3 PAM SLOs
+
+| SLO ID | Target | Measurement | Alert threshold | Notes |
+|---|---|---|---|---|
+| **PAM-SLO-01** | Break-glass PagerDuty P0 alert fires ≤ 60 s from `pam.break_glass_activated` emission | DEC-030 `pam.break_glass_activated.recorded_at` vs PagerDuty incident `opened_at` — delta computed weekly from PAM KV event log | > 60 s on any single activation | 100% target — no error budget; zero-tolerance. Every activation is a potential security incident. Failure to alert within 60 s is itself a P1 incident (monitoring failure). |
+| **PAM-SLO-02** | Approval notification delivered to approver P95 < 30 s for `read_write` elevations | `pam-elevation-service` Analytics Engine: `notification_delivered_at` − `elevation_requested_at` for `access_level = read_write`, P95 over 7-day rolling window | P95 > 30 s sustained over 1 h | Not applicable to `read_only` (self-approved, no notification) or `destructive` (dual cosign via WebAuthn, not Slack notification). |
+| **PAM-SLO-03** | Zero standing `form_admin` sessions at any point in time | Monthly audit: scan `PAM_KV` for records where `expires_at < now()` that are still readable (i.e., KV TTL has not evicted them yet AND `status != expired`). Any hit = SLO breach. Additionally: `SELECT COUNT(*) FROM pg_stat_activity WHERE usename = 'form_admin'` must equal 0 outside active pam-db-proxy execution windows. | Any breach = P0 | PAM-SLO-03 is a zero-tolerance invariant. It is verified monthly as a SOC 2 evidence artefact (CC6.1) rather than a continuous metric, because continuous querying of `pg_stat_activity` adds load and the risk of a standing session is mitigated by architectural controls (no standing credentials exist outside the PAM workflow). |
+| **PAM-SLO-04** | pam-expiry-sweeper cron runs every 5 min ± 90 s | Better Stack synthetic monitor: HTTP GET `workers/pam-expiry-sweeper/health` every 5 min; response `last_sweep_age_seconds` must be ≤ 390 s | `last_sweep_age_seconds` > 390 s for two consecutive checks (= 10 min without a sweep) | The sweeper health endpoint reads from a `PAM_KV` key `pam:sweeper:last_run` (written at the start of each sweep invocation). A cron gap > 10 min risks leaving expired break-glass KV records un-evicted, potentially delaying `pam.break_glass_expired` emission and the mandatory 72 h post-incident review clock. |
+
+---
+
+### 29.4 Alert Rules
+
+The following three alert rules are reproduced verbatim from `docs/SSO_SCIM_IMPLEMENTATION.md §24.7`. This is the canonical registration in `docs/OBSERVABILITY.md §6` — all three rules belong in the `pam_session_health` subsection of the §6.2 alert rules table (see §29.5 below for the table entries).
+
+| Alert ID | Severity | Condition | Response | Channel |
+|---|---|---|---|---|
+| AL-PAM-01 | **P0** | `pam.break_glass_activated` event emitted | Immediate PagerDuty incident + compliance-officer email. On-call engineer confirms incident context and whether break-glass was authorized. If no active production incident is linked within 15 minutes of activation, auto-escalate to security-incident. | PagerDuty + Email Workers |
+| AL-PAM-02 | **P1** | `pam.elevation_denied` count > 3 from the same `admin_user_id` within any rolling 1-hour window | PagerDuty P1. Investigate: credential stuffing against PAM endpoint, TOTP desync, or insider threat pattern. Suspend PAM elevation for the affected `admin_user_id` pending review (write `pam:suspended:{admin_user_id}` KV key, TTL 24h). | PagerDuty |
+| AL-PAM-03 | **P2** | A PAM session is presented to `pam-db-proxy` with `expires_at` in the past but the KV record has not yet been evicted (KV/clock skew window) | PagerDuty P2. The `pam-db-proxy` must reject the session regardless (hard expiry check on `expires_at` field, not solely on KV key existence). Alert fires to track clock skew frequency. If AL-PAM-03 fires more than twice in 24 hours, escalate to P1 and investigate KV TTL reliability. | PagerDuty |
+
+**Deduplication keys:**
+- AL-PAM-01: `pam-break-glass-{pam_session_id}` — one incident per break-glass session; re-fire on each new activation.
+- AL-PAM-02: `pam-denial-spike-{admin_user_id}` — dedup window 1 h (matches the rolling window condition); auto-resolves when suspension KV key expires (24 h) unless manually escalated.
+- AL-PAM-03: `pam-clock-skew-{pam_session_id}` — fires once per offending session; escalates to AL-PAM-03-ESCALATED if frequency exceeds 2 per 24 h (separate PagerDuty rule, same service).
+
+---
+
+### 29.5 §6.2 Alert Rules Additions
+
+The following rows are to be inserted into the §6.2 alert rules table under a new `pam_session_health` subsection, following the `session_revocation` subsection (added in §26.8):
+
+**Subsection: `pam_session_health`**
+
+| Alert ID | Service | Condition | Severity | Runbook | Channel |
+|---|---|---|---|---|---|
+| AL-PAM-01 | pam-elevation-service / break-glass-notifier | `pam.break_glass_activated` DEC-030 event emitted | **P0** | §29.4: confirm active incident context within 15 min; auto-escalate to security-incident if no linked incident. Emit `siem.privileged_access_escalated` to §27.4 SIEM export pipeline. | PagerDuty + Email Workers |
+| AL-PAM-02 | pam-elevation-service | `pam.elevation_denied` count > 3 / same `admin_user_id` / rolling 1 h | **P1** | §29.4: write `pam:suspended:{admin_user_id}` KV TTL 24 h; investigate credential stuffing vs TOTP desync vs insider threat | PagerDuty |
+| AL-PAM-03 | pam-db-proxy | PAM session presented with `expires_at` in past (clock skew or KV eviction lag) | **P2** | §29.4: session already rejected by hard `expires_at` check; track frequency — if > 2 / 24 h escalate to P1 | PagerDuty |
+
+**Note on SIEM routing:** AL-PAM-01 (break-glass activated) must also trigger a `siem.privileged_access_escalated` event via the §27.4 enterprise tenant SIEM export pipeline for any tenant whose data was accessed during the elevated session (`target_tenant_id` non-null). This is a mandatory SOC 2 CC6.1 evidence requirement — the affected tenant's SIEM must receive evidence that privileged access occurred on their data.
+
+---
+
+### 29.6 DEC-030 PAM Event Health Monitoring
+
+Beyond the operational alert rules in §29.4, four health monitors verify the integrity of the PAM DEC-030 event stream itself:
+
+| Monitor ID | Severity | Condition | Response |
+|---|---|---|---|
+| PAM-CHAIN-01 | **P1** | Zero `pam.*` DEC-030 events recorded in any 24-hour window during business hours (08:00–20:00 UTC, Mon–Fri) | Indicates pam-elevation-service is down, DEC-030 emission is broken, or no PAM activity occurred (acceptable outside hours). Distinguish: if `pam-expiry-sweeper` health endpoint returns `last_sweep_age_seconds < 600`, sweeper is alive — the absence of events is real zero-activity, not an emission failure. Page devops-lead P1. |
+| PAM-CHAIN-02 | **P0** | `pam.break_glass_activated` event emitted AND no row exists in `pam_break_glass_reviews` with `pam_session_id` matching the event after 72 hours | Post-hoc review is overdue. The 72 h mandatory review clock (SSO §24.4.3) has been violated. Page compliance-officer + security-engineer immediately. Create escalation GitHub Issue if not already present. |
+| PAM-CHAIN-03 | **P1** | `pam.elevation_approved` event exists in DEC-030 chain with no preceding `pam.elevation_requested` event sharing the same `pam_request_id` | HMAC chain sequence break for PAM approval path. Could indicate tampering or a `pam-elevation-service` bug that skipped the request event. Treat as R-01 (security incident assessment) until ruled out. |
+| PAM-CHAIN-04 | **P1** | `pam-expiry-sweeper` health endpoint returns `last_sweep_age_seconds > 600` for two consecutive 5-minute checks | Sweeper cron has failed. Expired break-glass sessions will not be evicted from `PAM_KV`; `pam.break_glass_expired` events and the review clock will not fire. Alert devops-lead; manually trigger sweeper via Worker cron trigger API. |
+
+**Implementation:** PAM-CHAIN-01 and PAM-CHAIN-02 are pg_cron jobs querying `audit_log` (for chain monitors) and `pam_break_glass_reviews` (for PAM-CHAIN-02) — they emit their own DEC-030 `admin.monitoring_check_failed` events on breach and trigger PagerDuty via the existing DEC-030 → PagerDuty pipeline documented in §27.3. PAM-CHAIN-03 is run as part of the weekly HMAC chain integrity verification batch (§29.9 artefact CC7-E-PAM-001). PAM-CHAIN-04 is a Better Stack synthetic monitor against the sweeper health endpoint.
+
+---
+
+### 29.7 Dashboard: "Privileged Access Health"
+
+**Location:** Metabase + Better Stack composite dashboard. Audience: devops-lead, security-engineer, compliance-officer. Not exposed to tenant admins (see OQ-PAM-OBS-02).
+
+| Panel | Type | Data source | Query / metric |
+|---|---|---|---|
+| Elevation request rate by access_level | Time-series (30 d) | Cloudflare Analytics Engine `PAM_TELEMETRY` | `elevation_requested` counter, GROUP BY `access_level`, 1h buckets |
+| Approval latency P95 by access_level | Time-series (7 d) | Analytics Engine `PAM_TELEMETRY` | `notification_delivered_ms` P95, GROUP BY `access_level` |
+| Denial count & reason breakdown | Stacked bar (7 d) | `audit_log` WHERE `event_type = 'pam.elevation_denied'` | GROUP BY `metadata->>'reason'`, daily |
+| Active PAM sessions right now | Stat | `PAM_KV` scan (Worker API) | Count of `pam:session:*` keys where `expires_at > now()` AND `status IN ('approved', 'active')` |
+| Break-glass activations — last 30 d | Stat (ember highlight if > 0) | `audit_log` WHERE `event_type = 'pam.break_glass_activated'` | COUNT over rolling 30 d; ember (#FF5733) background if count > 0 |
+| pam-expiry-sweeper last run | Timestamp + health indicator | Better Stack synthetic / `PAM_KV` `pam:sweeper:last_run` | Age in seconds; green ≤ 390 s, amber 391–600 s, red > 600 s |
+| DEC-030 chain integrity | Status (last verified) | `audit_log_integrity_checks` table | Last row from weekly HMAC validation batch; outcome + timestamp |
+| Suspension history | Bar chart (30 d) | `PAM_KV` `pam:suspended:*` write events via Analytics Engine | Daily count of new `pam:suspended` KV writes; any non-zero day warrants review |
+
+---
+
+### 29.8 Privacy Constraints
+
+| Constraint | Enforcement location | Rationale |
+|---|---|---|
+| `admin_user_id` in all PAM signals is the pseudonymous internal UUID — never email address, display name, or Cloudflare Access identity | `pam-elevation-service` Worker: identity claim from Cloudflare Access JWT is resolved to internal `admin_user_id` via `form_admins` table before being written to any KV record or DEC-030 event | Prevents personally identifiable admin identity from appearing in observability data stores (Analytics Engine, Better Stack, Metabase) which have broader access than the compliance-only DEC-030 audit log |
+| `justification_hash` is SHA-256 of the free-text justification field — original text is not stored in any observability signal | `pam-elevation-service`: hash computed client-side before submission; raw justification stored only in `pam:session:{id}` KV record (TTL-bounded) and the `pam.elevation_requested` DEC-030 event `metadata` field | Free-text justifications may contain customer names, ticket IDs, or sensitive context. The hash provides integrity evidence for auditors without exposing content to the observability tier. |
+| Query content executed during an elevated session does not appear in any observability signal | `pam-db-proxy`: query string is not passed to Analytics Engine or Sentry; only `pam_session_id`, `access_level`, `duration_ms`, and `outcome` are emitted | Privileged queries may touch raw tenant data; logging query text to observability would re-create data access patterns in a less-controlled data store. The `app.pam_session_id` GUC in Postgres provides the audit trail independently. |
+| `pam_break_glass_reviews` table is access-restricted | Postgres RLS: `SELECT` for `compliance-officer` role and `security-engineer` role; `INSERT`/`UPDATE` for `form_system` only. No `tenant_admin` access, no `form_api` read access. | Break-glass review outcomes may contain sensitive incident details. This table is compliance evidence, not operational data. |
+
+---
+
+### 29.9 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | Evidence artefact |
+|---|---|---|
+| **CC6.1 — Logical access controls** | `form_admin` Postgres role is never held as standing credential. All access is time-bound, request-scoped, and approval-gated via PAM. PAM-SLO-03 (zero standing sessions) is the continuous verification control. | CC6-E-PAM-001, CC6-E-PAM-003; PAM-SLO-03 monthly audit report |
+| **CC6.2 — Access provisioning** | Every `read_write` and `destructive` elevation requires explicit manager or dual-person approval before access is granted. Approval identity and timestamp are logged. | CC6-E-PAM-001 (`pam.elevation_approved` events with non-null `approver_id` for all non-read_only elevations) |
+| **CC6.3 — Timely deprovisioning** | PAM sessions auto-expire by KV TTL. `pam-expiry-sweeper` emits `pam.session_expired` confirming deprovisioning. No manual revocation required for normal expiry. | CC6-E-PAM-002 (`pam.session_expired` events); CC6-E-PAM-003 (TTL configuration screenshot) |
+| **CC6.7 — Transmission confidentiality** | All PAM API endpoints (`/internal/v1/pam/*`) are served over mTLS. `pam-db-proxy` communicates with Postgres over TLS (`sslmode=require`). PAM KV values encrypted at rest by Cloudflare KV. | CC6-E-PAM-003 (Cloudflare Access mTLS policy + Supabase TLS logs); network trace confirming no plaintext PAM token transmission |
+| **CC7.2 — System monitoring** | AL-PAM-01/02/03 and PAM-CHAIN-01 through PAM-CHAIN-04 constitute the continuous automated monitoring suite for the PAM subsystem as a system component. PAM-SLO-04 (sweeper health) ensures the monitoring layer itself is continuously verified. | CC7-E-PAM-001 (PagerDuty incident log for AL-PAM-01/02/03 during observation period) |
+| **CC7.3 — Anomaly response** | Response SLAs and first-response actions are documented per alert rule in §29.4. P0 break-glass activation (AL-PAM-01) has a 15-minute link-to-incident SLA before auto-escalation; P1 denial spike (AL-PAM-02) has a 24h investigation + suspension action; P2 clock skew (AL-PAM-03) has a defined escalation threshold (> 2 / 24 h → P1). | CC7-E-PAM-001 (incident log shows response times); `pam_break_glass_reviews` table (post-hoc review outcomes for CC7.3 evidence on break-glass events) |
+
+**Auditor evidence artefacts:**
+
+| Artefact ID | Description | Collection method |
+|---|---|---|
+| **CC6-E-PAM-001** | Export of `pam.elevation_approved` and `pam.elevation_denied` events from `audit_log` for a representative 30-day window. Demonstrates approval workflow is functioning and no self-approvals occurred for `read_write` or `destructive` tiers. | `SELECT * FROM audit_log WHERE event_type IN ('pam.elevation_approved','pam.elevation_denied') AND event_ts BETWEEN $obs_start AND $obs_end ORDER BY event_ts`; SHA-256 hash the export file |
+| **CC6-E-PAM-002** | Export of `pam.session_expired` events confirming automatic deprovisioning for all PAM sessions in the observation window. | `SELECT * FROM audit_log WHERE event_type = 'pam.session_expired' AND event_ts BETWEEN $obs_start AND $obs_end ORDER BY event_ts` |
+| **CC6-E-PAM-003** | PAM KV namespace TTL configuration screenshot (`PAM_KV` binding in `wrangler.toml`) + `pam-elevation-service` Worker source excerpt showing TTL constants. Demonstrates no standing access is possible beyond declared TTLs. | Screenshot + `workers/pam-elevation-service/src/constants.ts` TTL definitions (sanitized of any internal IDs) |
+| **CC6-E-PAM-004** | Break-glass policy configuration from `cloudflare/access/break-glass-policy.tf` (sanitized) + quarterly review sign-off record for the named break-glass identity list (max 5 identities). | Terraform plan output (sanitized) + break-glass identity list review Slack thread or GitHub Issue |
+| **CC7-E-PAM-001** | PagerDuty incident log for AL-PAM-01, AL-PAM-02, and AL-PAM-03 during the SOC 2 observation period. Demonstrates continuous monitoring is active and anomalies are acknowledged within SLA. | PagerDuty → Incidents → filter by service "FORM PAM" + date range → export CSV; include `opened_at`, `acknowledged_at`, `resolved_at`, `alert_key` columns |
+
+---
+
+### 29.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Configure AL-PAM-01 (P0, break-glass) in PagerDuty "FORM PAM" service; wire to security-engineer + compliance-officer on-call rotation; configure Email Workers trigger for compliance-officer notification; test with synthetic break-glass activation against staging | devops-lead | **P0** | M4 |
+| 2 | Configure AL-PAM-02 (P1, denial spike + auto-suspend) in PagerDuty; implement KV write `pam:suspended:{admin_user_id}` TTL 24h in `pam-elevation-service` as part of alert trigger logic; test by submitting 4 denied elevation requests from same `admin_user_id` in staging within 1 h | platform-engineer + devops-lead | **P0** | M4 |
+| 3 | Configure AL-PAM-03 (P2, clock skew) in PagerDuty; implement `last_expired_session_rejection` counter in `pam-db-proxy` Analytics Engine dataset; configure escalation rule (> 2 / 24 h → P1) | devops-lead | **P0** | M4 |
+| 4 | Add `pam_session_health` subsection rows (AL-PAM-01/02/03) to §6.2 alert rules table in this document | devops-lead | **P0** | M4 |
+| 5 | Register PAM-SLO-01 through PAM-SLO-04 in §2 SLO table; wire PAM-SLO-01 measurement (break-glass DEC-030 timestamp vs PagerDuty `opened_at`) to weekly compliance report | devops-lead + compliance-officer | **P1** | M4 |
+| 6 | Implement PAM-CHAIN-02 pg_cron monitor (72 h break-glass review overdue check against `pam_break_glass_reviews` table); validate it pages compliance-officer in staging | platform-engineer | **P1** | M4 |
+| 7 | Build "Privileged Access Health" dashboard (§29.7, eight panels) in Metabase + Better Stack; share with devops-lead, security-engineer, compliance-officer | devops-lead | **P1** | M4 |
+| 8 | Add `pam.*` event classification rows to §27.2 SIEM event table; wire AL-PAM-01 → `siem.privileged_access_escalated` export for affected-tenant SIEM delivery | platform-engineer + devops-lead | **P1** | M5 |
+| 9 | Validate HMAC chain sequence in staging: `pam.elevation_requested` → `pam.elevation_approved` → `pam.session_expired`; validate break-glass chain: `pam.break_glass_activated` → `pam.break_glass_expired`; confirm no PII in any event payload (PAM-CHAIN-03 check) | platform-engineer + security-engineer | **P0** | M4 |
+| 10 | Collect CC6-E-PAM-001 through CC6-E-PAM-004 and CC7-E-PAM-001 before SOC 2 observation period start; store in `compliance/evidence/pam/`; create entries in `docs/SOC2_READINESS.md` CC6.1/CC6.2/CC6.3/CC6.7 control evidence rows | compliance-officer + security-engineer | **P1** | Observation period start |
+
+---
+
+### 29.11 Open Questions
+
+| OQ | Question | Owner | Priority | Target |
+|---|---|---|---|---|
+| OQ-PAM-OBS-01 | **Should `admin_user_id` in observability signals use the same pseudonymous UUID as in DEC-030 events, or a separate observability-layer pseudonym?** Using the same UUID enables direct correlation between AL-PAM-02 (denial spike in Better Stack) and the DEC-030 `pam.elevation_denied` audit record — this is the primary forensic value. Using a separate pseudonym adds a privacy layer in case the observability tier (Analytics Engine, Metabase) is broader-access than the DEC-030 audit log. Current intent: same UUID, with access controls on Metabase PAM dashboard restricted to devops-lead + security-engineer + compliance-officer. Confirm access scope before M4 deploy. | security-engineer + compliance-officer | **P1** | Before M4 deploy |
+| OQ-PAM-OBS-02 | **Should PAM session activity on tenant data be surfaced in the enterprise Admin Dashboard for tenant admins?** Large enterprise buyers (FSI, pharma, public companies) often require evidence that privileged access to their data is controlled and audited — some procurement teams make this a contract requirement. Proposal: expose only the aggregate count of "admin operations performed on your tenant's data" sourced from `SELECT COUNT(*) FROM audit_log WHERE metadata->>'pam_session_id' IS NOT NULL AND tenant_id = $tenant_id AND event_ts BETWEEN $period_start AND $period_end` — no session details, no admin_user_id, no operation type. This count gives the tenant evidence that PAM controls are active without exposing FORM's internal access patterns. Alternative: a "Privileged Access Report" downloadable PDF generated quarterly by compliance-officer and shared on request (lower engineering cost, higher-touch). | customer-success + security-engineer | **P2** | Before enterprise GA (M13) |
+
+---
+
+*v1.6 additions (2026-06-03): §29 PAM / Privileged Access Management Observability — closes the cross-reference from `docs/SSO_SCIM_IMPLEMENTATION.md §24.8` (last sentence) and `§24.10` item 9, both of which state that AL-PAM-01/02/03 are registered in this document under §6 `pam_session_health`; those rules were added to the SSO implementation doc at v1.6 (2026-06-01) but the corresponding observability section was not written at the time. TOC updated to add §27 (SIEM Integration & Security Event Streaming), §28 (Mobile Application Performance Observability), and §29 (PAM / Privileged Access Management Observability) — §27 and §28 existed in the file since v1.3 and v1.5 respectively but were omitted from the TOC. §29.1 scopes the section to three PAM components (`pam-elevation-service` Cloudflare Worker, `pam-db-proxy` Supabase Edge Function, `pam-expiry-sweeper` Cron Worker); establishes privacy floor (admin_user_id pseudonymous UUID only; no query content in observability; justification_hash not justification_text); declares SOC 2 scope CC6.1/CC6.2/CC6.3/CC6.7/CC7.2/CC7.3; notes `target_tenant_id` propagation for per-tenant PAM reporting. §29.2 RED metrics table for all three PAM components: rate (elevation requests/h by access_level, break-glass/month), errors (denial rate, db-proxy expired-session rejections, RESET ROLE failures), duration (P95 approval notification latency by access_level, P95 proxy round-trip). §29.3 four PAM SLOs: PAM-SLO-01 (break-glass PagerDuty alert ≤ 60 s — 100% zero-tolerance), PAM-SLO-02 (approval notification P95 < 30 s for read_write), PAM-SLO-03 (zero standing form_admin sessions — monthly audit + pg_stat_activity check), PAM-SLO-04 (pam-expiry-sweeper runs every 5 min ± 90 s — Better Stack synthetic via `pam:sweeper:last_run` KV key). §29.4 AL-PAM-01/02/03 reproduced verbatim from SSO §24.7 with deduplication keys specified (`pam-break-glass-{pam_session_id}`, `pam-denial-spike-{admin_user_id}` 1 h window, `pam-clock-skew-{pam_session_id}`); AL-PAM-03 escalation rule (> 2 / 24 h → P1) documented. §29.5 §6.2 Alert Rules Additions: three-row `pam_session_health` subsection for insertion after `session_revocation` subsection; note on SIEM routing requirement for AL-PAM-01 (→ `siem.privileged_access_escalated` for affected-tenant SIEM delivery, CC6.1 evidence). §29.6 four DEC-030 PAM event health monitors: PAM-CHAIN-01 (P1, zero pam.* events in 24 h business hours — with sweeper health disambiguation), PAM-CHAIN-02 (P0, break-glass review overdue 72 h — mandatory post-hoc review clock), PAM-CHAIN-03 (P1, pam.elevation_approved without preceding pam.elevation_requested — HMAC sequence break, R-01 assessment), PAM-CHAIN-04 (P1, sweeper last-run age > 600 s for two consecutive checks); implementation note (PAM-CHAIN-01/02 as pg_cron, PAM-CHAIN-03 in weekly HMAC batch, PAM-CHAIN-04 as Better Stack synthetic). §29.7 eight-panel "Privileged Access Health" Metabase + Better Stack dashboard: elevation request rate by access_level (30 d time-series), approval latency P95 (7 d time-series), denial count & reason breakdown (stacked bar 7 d), active PAM sessions right now (KV scan stat), break-glass activations last 30 d (stat, ember highlight if > 0), sweeper last-run health indicator (green/amber/red by age), DEC-030 chain integrity status (last verified timestamp), suspension history (bar chart 30 d). §29.8 four privacy constraints: admin_user_id pseudonymous UUID only (not email/name, enforced in pam-elevation-service JWT-to-UUID resolution), justification_hash SHA-256 only (original text in KV + DEC-030 only, not observability tier), query content excluded from all signals (pam-db-proxy: only pam_session_id + access_level + duration_ms + outcome emitted), pam_break_glass_reviews table RLS (compliance-officer + security-engineer read; form_system write only; no tenant_admin access). §29.9 SOC 2 evidence mapping CC6.1/CC6.2/CC6.3/CC6.7/CC7.2/CC7.3; four existing artefacts CC6-E-PAM-001 through CC6-E-PAM-004 (verbatim from SSO §24.8); one new observability-layer artefact CC7-E-PAM-001 (PagerDuty incident log for AL-PAM-01/02/03 — export CSV with opened_at/acknowledged_at/resolved_at/alert_key). §29.10 ten-item implementation checklist: six P0 M4 items (AL-PAM-01/02/03 PagerDuty configs, §6.2 table update, HMAC chain validation in staging, `pam-suspended` KV auto-write), four P1 items across M4/M5/observation period (SLO registration, PAM-CHAIN-02 pg_cron, dashboard, §27.2 SIEM routing, evidence filing); note on Resolve OQ-SSO-24.1/24.2/24.4 from SSO §24.9 as blocking dependencies. §29.11 two open questions: OQ-PAM-OBS-01 (same UUID vs separate observability-layer pseudonym for admin_user_id — security-engineer + compliance-officer, P1, before M4; current intent same UUID with restricted Metabase access), OQ-PAM-OBS-02 (PAM activity exposure in enterprise Admin Dashboard — aggregate count only vs quarterly PDF report — customer-success + security-engineer, P2, before enterprise GA M13). Cross-references: docs/SSO_SCIM_IMPLEMENTATION.md §24 (PAM architecture), §6.2 (alert rules table to be updated per §29.5), §27.2 (SIEM event classification — pam.* rows to be added per §29.10 item 8), §2 (SLO table — PAM-SLO-01 through PAM-SLO-04 to be registered per §29.10 item 5), docs/AUDIT_LOG_SCHEMA.md (DEC-030 pam.* event registry — SSO §24.10 item 8), docs/SOC2_READINESS.md CC6 (evidence artefacts CC6-E-PAM-001 through CC6-E-PAM-004 to be linked per §29.10 item 10).*

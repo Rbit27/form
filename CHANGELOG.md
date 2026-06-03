@@ -6,6 +6,18 @@
 
 ---
 
+## [1.82.1] — 2026-06-03
+
+### Added
+- `docs/OBSERVABILITY.md §29` — PAM / Privileged Access Management Observability — closes the cross-reference from `docs/SSO_SCIM_IMPLEMENTATION.md §24.8` and `§24.10` item 9 (both claim AL-PAM-01/02/03 are in OBSERVABILITY §6 `pam_session_health`; that section was never written when SSO §24 was added at v1.6 on 2026-06-01). §29.1 scopes the section to three PAM components (`pam-elevation-service` Worker, `pam-db-proxy` Edge Function, `pam-expiry-sweeper` Cron); privacy floor: admin_user_id pseudonymous UUID only, justification_hash (not text), no query content in observability. §29.2 RED metrics per component. §29.3 four PAM SLOs: PAM-SLO-01 (break-glass PagerDuty ≤ 60 s — 100% zero-tolerance), PAM-SLO-02 (approval notification P95 < 30 s for read_write), PAM-SLO-03 (zero standing form_admin sessions — monthly audit), PAM-SLO-04 (pam-expiry-sweeper ≤ 5 min ± 90 s). §29.4 AL-PAM-01/02/03 verbatim from SSO §24.7 with dedup keys. §29.5 §6.2 `pam_session_health` subsection (three table rows + SIEM routing note for AL-PAM-01 → `siem.privileged_access_escalated`). §29.6 four DEC-030 chain health monitors: PAM-CHAIN-01 (zero pam.* events in 24 h P1), PAM-CHAIN-02 (break-glass review overdue 72 h P0), PAM-CHAIN-03 (elevation_approved without preceding elevation_requested P1), PAM-CHAIN-04 (sweeper gap > 10 min P1). §29.7 eight-panel "Privileged Access Health" dashboard (Metabase + Better Stack). §29.8 four privacy constraints (admin_user_id UUID-only, justification_hash, no query content, pam_break_glass_reviews RLS). §29.9 SOC 2 evidence mapping CC6.1/CC6.2/CC6.3/CC6.7/CC7.2/CC7.3; five evidence artefacts CC6-E-PAM-001 through CC6-E-PAM-004 (from SSO §24.8) + new CC7-E-PAM-001 (PagerDuty incident log). §29.10 ten-item implementation checklist (six P0 M4, four P1). §29.11 two open questions: OQ-PAM-OBS-01 (shared vs separate pseudonym for admin_user_id — P1 before M4), OQ-PAM-OBS-02 (PAM activity in enterprise Admin Dashboard — P2 before M13).
+
+### Changed
+- `docs/OBSERVABILITY.md` TOC — added §27 (SIEM Integration), §28 (Mobile Application Performance), §29 (PAM Observability); §27 and §28 existed in the file since v1.3/v1.5 but were missing from the TOC
+- `docs/OBSERVABILITY.md` header — v1.5 → v1.6
+- `VERSION` — 1.82.0 → 1.82.1
+
+---
+
 ## [1.82.0] — 2026-06-03
 
 ### Added
