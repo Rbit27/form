@@ -6,6 +6,19 @@
 
 ---
 
+## [1.82.0] — 2026-06-03
+
+### Added
+- `content/post-196-myofascial-continuity.md` — «Міофасціальна безперервність — де наука, де лор» — Myers (2001) Anatomy Trains: 7 фасціальних меридіанів як клінічна гіпотеза, позначена самим автором; Wilke et al. (2016 J Anat): пряме механічне тестування fascia thoracolumbalis у трупів — безперервність існує між суміжними структурами при преднатягу, але не єдиний кабель від стопи до голови; Huijing (1999 J Biomech): epimuscular myofascial force transmission ~5–15% від сухожилково-кісткового; Cheatham et al. (2015 Int J Sports Phys Ther): систематичний огляд foam rolling — ROM +5–10%, нейральний механізм (не механічний release); Schleip (2003 J Bodywork Mov Ther): ефекти мануальних технік через DNIC і спінальну модуляцію; Stecco et al. (2011): гіалуронова кислота між фасціями — тиксотропний ефект; Mense (2007): фасціальна іннервація і proprioception; McGill (2002): thoracolumbar fascia і стабілізація поперека. Що підтверджено: TLF, plantar fascia + windlass, суміжна міофасціальна передача. Що лор: меридіани Майерса, foam rolling як «release», «спайки» як причина обмеженого ROM у здорових. ~13 хв. clinical-safety NOT REQUIRED.
+- `blog.html` — додано картку post-196 (міофасціальна безперервність). Лічильник: 183 cards (195 posts authored).
+- `README.md` — post-196 позначено [x]; додано 4 нові теми у roadmap: post-207 (інтенсивність vs об'єм), post-208 (тренінг і мікробіом), post-209 (тренування в умовах термального стресу), post-210 (когнітивне навантаження і техніка).
+
+### Changed
+- `STATUS.md` — blog.html оновлено до 183 cards (195 posts authored), v1.82.0
+- `VERSION` — 1.81.0 → 1.82.0
+
+---
+
 ## [1.81.0] — 2026-06-03
 
 ### Added
