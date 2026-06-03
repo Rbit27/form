@@ -6,6 +6,17 @@
 
 ---
 
+## [1.84.0] — 2026-06-03
+
+### Added
+- [`content/post-200-epigenetic-memory-training.md`](content/post-200-epigenetic-memory-training.md) — Епігенетична пам'ять тренінгу: ДНК-метилювання (NCOR2, IGF1), гістонові модифікації (H3K4me3), Seaborne 2018 + Sharples 2019; механізм прискореного повернення після паузи; clinical-safety NOT REQUIRED
+- [`content/post-201-cardiovascular-drift-plasma-volume.md`](content/post-201-cardiovascular-drift-plasma-volume.md) — Серцево-судинний дрейф: механізм (Coyle & González-Alonso 2001, Rowell 1993), перерозподіл плазмового об'єму, HR-зони при тривалих сесіях, гідратація, акліматизація; clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — post-200 і post-201 позначені як `[x]`
+
+---
+
 ## [1.83.3] — 2026-06-03
 
 ### Added
