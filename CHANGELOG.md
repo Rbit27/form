@@ -6,6 +6,19 @@
 
 ---
 
+## [1.83.2] — 2026-06-03
+
+### Added
+- `content/post-199-angiogenesis-capillary-adaptation.md` — Ангіогенез і капілярна адаптація до тренінгу; Richardson et al. (1999 J Physiol): VEGF mRNA ×5 протягом 4 год після Zone 2; Hudlicka et al. (2009 Microcirculation): shear stress як механічний тригер capillary sprouting; capillary-to-fiber ratio у тренованих (4.0–6.0) vs нетренованих (1.5–2.0); HIF-1α/VEGFR-2/eNOS каскад; гіпертрофія без аеробного компонента відносно знижує капілярну щільність; мінімальна доза ≈135 хв Zone 2/тиждень для розвитку; Coyle et al. (1985): інтенсивність важливіша за об'єм для підтримки; Bebout et al. (1993): 50% покращення VO₂max — периферійні адаптації; практичне: Zone 2 як інфраструктурний тренінг; clinical-safety NOT REQUIRED
+- `blog.html` — додано картки для post-197, post-198, post-199 (186 cards total, 196 posts authored); v1.82.0 → v1.83.2
+- `STATUS.md` — оновлено рядок blog.html: 186 cards (196 posts authored), v1.83.2
+- `README.md` — post-199 відмічений як [x] у content roadmap
+
+### Fixed
+- `README.md` — post-197 і post-198 картки були додані у CHANGELOG 1.83.0 але відповідні blog.html картки були відсутні; тепер додано
+
+---
+
 ## [1.83.1] — 2026-06-03
 
 ### Added
