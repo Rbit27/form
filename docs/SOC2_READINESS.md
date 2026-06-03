@@ -19182,6 +19182,408 @@ Proactive vendor risk monitoring is not purely annual. The following signals tri
 
 ---
 
+## §60 Annual Privacy Programme Review — P-Series Operating Evidence & GDPR Art. 22 AI Automated Decision-Making Controls
+
+> **Owner:** compliance-officer (primary) · security-engineer (Art. 22 technical controls) · clinical-safety (veto authority on AI recommendation harm). **Review cadence:** Annual (January), plus ad-hoc trigger on any product change that introduces new data collection or automated decision logic. **Gap closure:** P-GAP-001 (privacy policy counsel review), P-GAP-002 (consent banner), P-GAP-003 (DSAR automation), P8.1 (annual privacy programme monitoring). **SOC 2 P-Series mapping:** P1.1, P2.1, P3.1, P4.1–P4.3, P5.1–P5.2, P6.1–P6.7, P7.1, P8.1.
+
+---
+
+### 60.1 Purpose and Scope
+
+FORM's Privacy Programme is the operational framework ensuring that FORM's privacy commitments — to end users, to enterprise customers, to regulators, and to the AICPA SOC 2 Privacy Trust Service Criteria — are continuously met, not merely documented once. This section provides the annual review procedure, the evidence artefacts, and the operational controls covering the full P-series.
+
+**Why a dedicated section is needed.** The §51 gap register identifies P-GAP-001 through P-GAP-003 and P8.1 as authored-but-not-yet-executed gaps. The annual privacy review is the cadenced event that drives their closure. Unlike the deployment-gated P0 gaps in §51.4 (which close on single engineering actions), privacy programme gaps close only when an ongoing process is running — counsel review, consent banner live, DSAR pipeline active, annual review cycle executed. This section defines those processes with sufficient specificity to satisfy SOC 2 Type II auditors who require evidence of operating effectiveness over the 90-day observation period, not just policy documentation.
+
+**Unique product consideration — Victor AI coaching.** FORM's core product is an AI coaching assistant (Victor) that generates personalised exercise recommendations using biometric data (HR, HRV, wearable integrations), computer vision pose data, and user-reported recovery. Under GDPR Article 22, automated decision-making that produces effects on individuals requires specific safeguards. This section documents FORM's Art. 22 controls and clinical-safety veto authority as a formal SOC 2 evidence exhibit. **No equivalent section exists in §1–§59.**
+
+**Privacy floor invariant (non-negotiable).** All procedures in this section must respect the FORM privacy floor: HR admin roles at enterprise customers never see individual user data. All privacy review queries use `tenant_aggregates` view only. The compliance-officer and clinical-safety retain veto authority over any evidence collection method that would expose individual health data. Reference: `docs/ENTERPRISE.md §Privacy floor for enterprise`, `docs/DATA_MODEL.md §6`.
+
+---
+
+### 60.2 P-Series — Annual Review Scope
+
+The annual privacy review covers all eight Privacy TSC criteria. The review is structured as a phased checklist executed each January (or at observation period start if earlier).
+
+| Phase | Criteria | Review Activity | Evidence Artefact | Owner |
+|---|---|---|---|---|
+| P-1 | P1.1 Privacy notice | Verify privacy policy at `form.coach/privacy` is current; confirm counsel has reviewed within 12 months; confirm all material changes in the past year are reflected | P-E-001: Privacy policy publication screenshot + counsel sign-off email (file in `compliance/evidence/privacy/YYYY/`) | compliance-officer |
+| P-2 | P2.1 Consent and choice | Verify consent banner is live and functional; test opt-out path; confirm `privacy.consent_granted` and `privacy.consent_withdrawn` DEC-030 events emitting correctly; review opt-out completion rate | P-E-002: Consent banner screenshot + DEC-030 event count query output | compliance-officer + platform-engineer |
+| P-3 | P3.1–P3.2 Collection | Verify GDPR_DPIA.md §4 data flow diagram reflects current product; confirm no new data collection points were added without a DPIA delta review in the past year; confirm `docs/SUBPROCESSORS.md` matches production integrations | P-E-003: DPIA annual review memo (1-page: changes in year, trigger criteria evaluated, no material change OR amended DPIA filed) | compliance-officer |
+| P-4 | P4.1–P4.3 Use, retention, disposal | Verify retention schedules in `docs/OBSERVABILITY.md §8.1` are still accurate; confirm DSAR erasure pipeline handled all completed requests within 30-day SLA; confirm `keypoints_enc` deletion on erasure is functional | P-E-004: DSAR completion rate report — query `SELECT COUNT(*), AVG(completed_at - submitted_at) FROM dsar_requests WHERE EXTRACT(YEAR FROM submitted_at) = YYYY` (aggregate only; no personal data in evidence) | compliance-officer |
+| P-5 | P5.1–P5.2 Access | Execute one DSAR access request against the production DSAR pipeline as a test; verify export produced within 30 days; verify export contains no other user's data; confirm enterprise admin cannot query individual user data through admin dashboard | P-E-005: DSAR test request confirmation (request ID, submitted_at, completed_at, erasure_confirmed — no content) + admin dashboard privacy floor verification screenshot | compliance-officer + platform-engineer |
+| P-6 | P6.1–P6.7 Disclosure | Review INCIDENT_RESPONSE.md §15 Art. 33/34 runbook for accuracy; confirm no unreported breaches in the past year; verify sub-processor list at `form.coach/legal/sub-processors` is current; confirm SCCs executed for all US sub-processors | P-E-006: Sub-processor list current-version screenshot + SCC confirmation table (vendor, SCC version, execution date) | compliance-officer |
+| P-7 | P7.1 Quality | Verify data accuracy correction path in DSAR pipeline (users can request correction); confirm no open DSAR correction requests older than 30 days | P-E-007: DSAR correction SLA audit query — `SELECT COUNT(*) FROM dsar_requests WHERE request_type = 'correction' AND status != 'completed' AND submitted_at < NOW() - INTERVAL '30 days'` (expected: 0 rows) | compliance-officer |
+| P-8 | P8.1 Monitoring | File this annual review memo + evidence artefacts P-E-001 through P-E-010 in `compliance/evidence/privacy/YYYY/`; emit `admin.privacy_review_completed` DEC-030 event; update §51.3 P8.1 status to 🟢 | P-E-008: DEC-030 `admin.privacy_review_completed` event ID + `compliance/evidence/privacy/YYYY/` R2 object listing | compliance-officer |
+
+---
+
+### 60.3 Privacy Policy Annual Review (P1.1)
+
+**Requirement.** P1.1 requires that the entity notifies individuals of its privacy practices. SOC 2 auditors look for evidence that: (a) a privacy notice exists and is accessible; (b) the notice is kept current; (c) legal review occurs on a defined cadence.
+
+**Publication target:** `https://form.coach/privacy` — page must be live before any production user data flows (pre-TestFlight beta gate).
+
+**Annual review trigger criteria (any one triggers a mandatory review):**
+
+| Trigger | Description |
+|---|---|
+| Calendar trigger | Every January regardless of changes |
+| New data collection | Any new field collected from users not listed in the current privacy policy |
+| New sub-processor | Addition of any Tier 1 or Tier 2 vendor that processes personal data |
+| New jurisdiction | First users onboarded in a jurisdiction with distinct privacy law (CCPA, PIPEDA, LGPD, etc.) |
+| Feature change | New AI feature, new wearable integration, new biometric data type, or new enterprise data sharing capability |
+| Incident trigger | Any GDPR Art. 33/34 notifiable breach — privacy policy must be reviewed within 30 days of DPA notification |
+
+**Counsel review protocol.** The privacy policy must be reviewed by EU-qualified privacy counsel (reference: `docs/COST_MODEL.md §25.3`) at least annually. Counsel review generates a written sign-off letter or email confirmation that is filed as P-E-001. The review is distinct from the publishing update — counsel may confirm "no changes required" and that is valid evidence. The review must complete before the observation period start if observation begins during the year.
+
+**DEC-030 event:** `admin.privacy_policy_reviewed` — HIGH severity, 7-year retention.
+
+| Field | Type | Description |
+|---|---|---|
+| `review_date` | ISO 8601 date | Date counsel sign-off received |
+| `policy_version` | string | Version slug of reviewed policy (e.g. `2026-01`) |
+| `material_changes` | boolean | Whether any substantive changes were made vs prior version |
+| `change_summary` | string \| null | If `material_changes: true`, brief description; null if no changes |
+| `counsel_firm_id` | string | Pseudonymous internal reference to counsel engagement |
+| `reviewed_by` | UUID | Founder or compliance-officer user ID |
+| `url` | string | Canonical URL of published policy |
+
+**Gap closure:** P-GAP-001 advances from 🟡 Authored → 🟢 Closed when: (a) privacy policy published at canonical URL, (b) P-E-001 counsel sign-off filed, (c) `admin.privacy_policy_reviewed` DEC-030 event emitted, (d) P8.1 annual review completed.
+
+---
+
+### 60.4 Consent Mechanism Verification (P2.1)
+
+**Requirement.** P2.1 requires that the entity provides individuals with choices about the collection, use, and disclosure of personal information. For FORM, this primarily governs: (a) cookie/analytics consent for web properties, (b) health data collection consent in the mobile app (opt-in flow), (c) enterprise employer notification to employees.
+
+#### 60.4.1 Web Properties Consent (GDPR Art. 7)
+
+**Cookie consent banner.** The marketing site (`form.coach`) and web application must present a consent banner before any analytics cookies are set. Banner requirements:
+
+| Requirement | Implementation | Evidence |
+|---|---|---|
+| Consent is freely given, specific, informed, unambiguous | Banner text reviewed by counsel; no pre-ticked boxes | P-E-002: Screenshot of banner in default (unconsented) state |
+| Granular controls: analytics vs. marketing cookies | Category-level toggles | P-E-002: Screenshot of preference centre |
+| Easy withdrawal (as easy as giving consent) | "Withdraw consent" link in footer → preference centre | Functional test at annual review |
+| Consent logged with timestamp | `privacy.consent_granted` DEC-030 event | Event count query output |
+| Withdrawal logged | `privacy.consent_withdrawn` DEC-030 event | Event count query output |
+
+**DEC-030 consent events.** These are defined in `docs/AUDIT_LOG_SCHEMA.md`. They must be verified as emitting correctly during the annual review:
+
+```sql
+-- Verify consent events in observation window (aggregate check — no user-level data)
+SELECT
+  event_type,
+  COUNT(*) AS event_count,
+  MIN(created_at) AS earliest,
+  MAX(created_at) AS latest
+FROM audit_log_events
+WHERE event_type IN ('privacy.consent_granted', 'privacy.consent_withdrawn')
+  AND created_at >= NOW() - INTERVAL '90 days'
+GROUP BY event_type;
+```
+
+Expected: at least one `privacy.consent_granted` event in observation period. Output filed as P-E-002-consent-event-counts.csv (aggregate only — no user IDs).
+
+**Gap closure:** P-GAP-002 advances from 🟡 Authored → 🟢 Closed when: (a) consent banner live on `form.coach`, (b) `privacy.consent_granted` event verified emitting in production, (c) P-E-002 filed, (d) annual review completed.
+
+#### 60.4.2 Mobile App Health Data Collection Consent
+
+The mobile app collects biometric and health data under explicit opt-in during onboarding. The consent architecture:
+
+- **Step 1 (iOS/Android):** System-level Health/HealthKit/Health Connect permission dialog — native OS prompt, no FORM UI required.
+- **Step 2:** FORM in-app data use explanation screen — shown before first workout session — explains that Victor AI uses biometric data to personalise coaching.
+- **Step 3:** First coach session consent — explicit "I understand Victor uses my workout history, heart rate, and recovery data to personalise coaching recommendations."
+
+SOC 2 evidence: screenshot of onboarding consent screen + `privacy.health_data_consent_granted` DEC-030 event. Filed as P-E-009.
+
+#### 60.4.3 Enterprise Employee Notification
+
+Enterprise tier: employer HR admins do not see individual employee data (privacy floor). However, enterprise customers must notify their employees that FORM is deployed as a wellness benefit. FORM's contractual obligation:
+
+- FORM provides a **standard employee privacy notice template** (linked in enterprise onboarding kit) that HR can send to employees before platform access is provisioned.
+- FORM's DPA with the enterprise customer (GDPR Art. 28) specifies that the enterprise customer is the data controller for employee data and is responsible for the employee notification under GDPR Art. 13/14.
+- FORM documents this split in the CUECs (§28 of the main SOC 2 readiness doc, line ~428).
+
+Evidence: enterprise onboarding kit version with employee notice template included. Filed as P-E-010 at first enterprise customer onboarding.
+
+---
+
+### 60.5 DSAR Handling SLA Audit (P5.1 / P5.2)
+
+**Requirement.** GDPR Art. 15–22 grants data subjects rights to access, correct, erase, restrict, and port their personal data. FORM must respond within 30 calendar days (extendable to 90 days for complex requests with notification). P5.1/P5.2 require that the entity provides individuals with access to their information and allows correction of inaccurate information.
+
+**DSAR pipeline status.** The DSAR runbook is in `docs/INCIDENT_RESPONSE.md R-14`. The DEC-030 events are `dsar.received`, `dsar.in_progress`, `dsar.completed`, `dsar.escalated_complex`. P-GAP-003 tracks the automation status.
+
+**Annual SLA audit queries.** The following queries are executed at each annual review. Results are aggregate counts — no personal data is returned.
+
+```sql
+-- DSAR SLA compliance audit (aggregate only — no user identifiers in output)
+SELECT
+  request_type,
+  COUNT(*) AS total_requests,
+  COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+  COUNT(*) FILTER (
+    WHERE status = 'completed'
+    AND completed_at - submitted_at > INTERVAL '30 days'
+  ) AS breached_sla,
+  AVG(EXTRACT(EPOCH FROM (completed_at - submitted_at))/86400)::NUMERIC(6,2) AS avg_days_to_complete,
+  MAX(EXTRACT(EPOCH FROM (completed_at - submitted_at))/86400)::NUMERIC(6,2) AS max_days_to_complete
+FROM dsar_requests
+WHERE EXTRACT(YEAR FROM submitted_at) = EXTRACT(YEAR FROM NOW()) - 1
+GROUP BY request_type
+ORDER BY request_type;
+```
+
+**Expected output for SOC 2 evidence:** `breached_sla = 0` for all request types. Any SLA breach triggers an incident review under `INCIDENT_RESPONSE.md R-14` and must be documented with root cause and remediation action before the annual evidence package is filed.
+
+**Gap closure:** P-GAP-003 advances from 🟡 Authored → 🟢 Closed when: (a) DSAR workflow deployed (Linear → `dsar_requests` table → compliance-officer email), (b) `dsar.*` DEC-030 events emitting, (c) first DSAR test request handled within 30 days, (d) P-E-004/005 filed.
+
+---
+
+### 60.6 GDPR Article 22 — Victor AI Automated Exercise Recommendation Controls
+
+**This is FORM's most legally unique privacy control.** Victor is an AI coaching assistant that generates personalised exercise recommendations using personal data including biometrics, health data, recovery scores, and movement patterns. GDPR Article 22(1) prohibits decisions based solely on automated processing that produce "legal or similarly significant effects" on individuals, unless specific conditions are met.
+
+**Does Art. 22 apply to FORM?**
+
+The question turns on whether Victor's exercise recommendations constitute "similarly significant effects." FORM's legal position:
+
+| Argument | Assessment |
+|---|---|
+| Victor makes exercise suggestions, not binding decisions | Strong mitigation — user always retains full choice to follow or ignore |
+| Health recommendations affecting body functioning could be "similarly significant" | Moderate risk — regulators (ICO, CNIL) have taken broad views on "significant" in health-adjacent products |
+| FORM collects Art. 9 biometric data (GDPR Art. 9(2)(a) explicit consent) — automated processing of Art. 9 data triggers Art. 22(4) prohibition | **High importance** — Art. 22(4) prohibits Art. 22(1) decisions based on Art. 9 data unless explicit consent AND suitable safeguards |
+
+**FORM's position:** To avoid regulatory uncertainty, FORM operates **as if Art. 22 fully applies** to Victor's exercise recommendations. This is a conservative position that strengthens the privacy programme beyond minimum requirements.
+
+**FORM's Art. 22 Safeguards:**
+
+#### 60.6.1 Human Override (Art. 22(3))
+
+Every Victor recommendation includes a visible "Skip" or "Modify" option. No recommendation is enforced. The user controls the actual exercise session. If the user does not act on a recommendation, no data flows. This human override is architecturally enforced — Victor's output is advisory text, never a system-enforced workout initiation.
+
+**Technical invariant:** Victor's output routing:
+
+```
+Victor AI (Anthropic API) → recommendation text → UI component
+                                                  → user action required before any session starts
+                                                  → session.intent_started event only on user tap
+```
+
+Victor output NEVER triggers:
+- Automatic session creation
+- Biometric data recording without user tap
+- Push notifications with "start now" deep links that bypass user confirmation
+
+Verified in: `docs/AUDIT_LOG_SCHEMA.md` — `session.intent_started` event is the first event in any session chain, and it requires user interaction.
+
+#### 60.6.2 Right to Explanation (Art. 22(3))
+
+Users can request an explanation of why Victor recommended a specific workout. Implementation:
+
+- **In-product:** Victor's conversation interface supports follow-up questions. Any user can type "why did you recommend this?" and Victor explains its reasoning in natural language.
+- **DSAR channel:** For formal Art. 22 explanation requests (rare), the DSAR pipeline (`INCIDENT_RESPONSE.md R-14`) handles them as `request_type = 'explanation'`. Victor's context window for the session (stripped of any Art. 9 raw values) is provided to the compliance-officer, who produces a summary explanation.
+
+**Important:** Victor's explanation must not reference specific raw biometric values (e.g., "your HRV was 47ms on Tuesday"). It references categories and patterns ("your recovery indicators suggested a lighter session was appropriate"). This protects the user from having sensitive health data echoed back in a support context.
+
+#### 60.6.3 Clinical Safety Veto (FORM-Specific Safeguard)
+
+`clinical-safety` has **mandatory veto authority** over all Victor prompt engineering, recommendation logic, and coaching tone. This is documented in `docs/VICTOR_PROMPT_GUIDE.md`. For SOC 2 purposes, it constitutes a human oversight control that supplements the Art. 22(3) human override at the system level.
+
+**Prohibited recommendation patterns** (clinical-safety hard veto):
+
+| Pattern | Reason |
+|---|---|
+| Weight-based coaching intensity (e.g., "you need to lose X kg before attempting Y") | Body image harm risk; wellness-as-punishment |
+| Injury rehabilitation protocols without medical clearance | Out of clinical scope |
+| Recommendations referencing raw biometric thresholds ("your HRV of 42ms means...") | Medicalisation of fitness data |
+| Overtraining encouragement ("push through the pain") | Injury risk |
+| Any language that positions rest or lighter training as failure | Psychological harm |
+
+These constraints are technically enforced in Victor's system prompt and verified on each prompt update by clinical-safety review. The clinical-safety veto is documented in commit history (all `VICTOR_PROMPT_GUIDE.md` changes require clinical-safety sign-off) and constitutes Art. 22(3) "suitable safeguards" evidence.
+
+#### 60.6.4 Explicit Consent for Art. 9 Data Processing
+
+GDPR Art. 22(4) requires explicit consent for automated decisions based on Art. 9 special category data (biometrics, health). FORM's consent chain:
+
+1. **Onboarding explicit consent** — "Victor uses your biometric data (heart rate, HRV, recovery) to personalise your training." Consent is recorded as `privacy.health_data_consent_granted` DEC-030 event.
+2. **Granular wearable consent** — separate consent for each wearable integration (HealthKit, Health Connect, Whoop, etc.) with explicit explanation of what data is accessed.
+3. **Withdrawal mechanism** — user can disable Victor's biometric access in settings; withdrawal triggers `privacy.health_data_consent_withdrawn` and Victor reverts to generic (non-personalised) coaching mode.
+
+**Privacy floor for enterprise:** Enterprise admin HR role cannot see whether an employee has enabled or disabled Victor's biometric access. Consent status is personal data and is stored in the `user_preferences` table, which is excluded from all `tenant_aggregates` views. Reference: `docs/DATA_MODEL.md §6`, `docs/ENTERPRISE.md §Privacy floor for enterprise`.
+
+#### 60.6.5 No-Go Customer Enforcement (Art. 22 Boundary)
+
+FORM's no-go customer policy (`docs/ENTERPRISE.md §When we say no`) directly prevents the highest-risk Art. 22 scenarios:
+
+| Prohibited use case | Art. 22 risk | Policy reference |
+|---|---|---|
+| Insurance risk scoring using Victor data | Would create legally significant effects (premium changes) | Hard no — `docs/ENTERPRISE.md §When we say no` |
+| Government agency deployment with attendance tracking | Coercive automated evaluation | Hard no |
+| Wellness-as-punishment HR systems (penalising non-use) | Legally significant employment effect | Hard no |
+| Employer access to individual workout data | Surveillance effect | Privacy floor invariant |
+
+These controls are enforced at the sales stage (compliance-officer veto on enterprise contract terms) and technically enforced at the data layer (RLS blocking employer queries on individual data).
+
+**DEC-030 event:** `admin.art22_safeguards_reviewed` — HIGH severity, 7-year retention.
+
+| Field | Type | Description |
+|---|---|---|
+| `review_date` | ISO 8601 date | Date of annual review |
+| `victor_prompt_version` | string | Current version of Victor system prompt |
+| `clinical_safety_sign_off` | boolean | Whether clinical-safety reviewed prompt in past 12 months |
+| `human_override_verified` | boolean | Whether session.intent_started invariant verified functional |
+| `no_go_enforcement_verified` | boolean | Whether no-go customer criteria reviewed in enterprise contracts |
+| `explanation_path_functional` | boolean | Whether DSAR explanation path tested |
+| `reviewed_by` | UUID | Compliance-officer user ID |
+
+---
+
+### 60.7 Sub-Processor List Annual Review (P6.7)
+
+P6.7 requires that the entity discloses personal information only for its stated purpose and only to entities that have committed to the same. The annual sub-processor review verifies that the published list at `form.coach/legal/sub-processors` matches actual production integrations.
+
+**Review procedure:**
+
+1. Pull the current production sub-processor list from `docs/SUBPROCESSORS.md` (maintained since v1.78.0).
+2. Compare against active Cloudflare Workers integrations, Supabase Edge Function outbound calls, and RevenueCat webhook targets.
+3. Verify that a DPA or equivalent is in place for each sub-processor per §59.7 requirements.
+4. Confirm the published list at `form.coach/legal/sub-processors` is identical to `docs/SUBPROCESSORS.md`.
+5. If any sub-processor was added or removed in the past year, verify that: (a) `admin.sub_processor_added` or `admin.sub_processor_removed` DEC-030 events were emitted at the time, and (b) enterprise customers were notified within 30 days per their DPA.
+
+**Evidence artefact P-E-006:** Sub-processor list diff from prior year (if changes) OR confirmation of no changes. SHA-256 hash of `docs/SUBPROCESSORS.md` content filed alongside the review memo.
+
+---
+
+### 60.8 DPIA Annual Refresh Trigger Assessment
+
+The GDPR DPIA (`docs/GDPR_DPIA.md`) must be kept current. FORM's DPIA was completed at initial documentation. Annual trigger assessment:
+
+| Trigger | Assessment action | Threshold for full DPIA refresh |
+|---|---|---|
+| New personal data type collected | Document in DPIA delta memo | Art. 9 data type → mandatory full refresh |
+| New AI model or AI feature | Assess Art. 22 risk delta | New automated decision logic → mandatory full refresh |
+| New enterprise customer in regulated sector | Sector-specific DPIA addendum | Healthcare, financial services → mandatory addendum |
+| Sub-processor change (Tier 1) | Update processing records in DPIA Annex A | New T1 processor → DPIA addendum |
+| Breach or near-miss involving personal data | DPIA re-assessment of relevant risk | Any Art. 33 reportable breach → DPIA section refresh |
+| Jurisdictional expansion | New jurisdiction assessment | Non-EU jurisdiction with distinct law → addendum |
+
+**Annual output:** P-E-003 DPIA review memo — 1-page assessment of each trigger criterion. If no material change: "No triggers met; DPIA remains current as of [date]." If triggers met: DPIA delta filed in `docs/GDPR_DPIA.md` with change summary and compliance-officer sign-off.
+
+---
+
+### 60.9 DEC-030 Privacy Programme Audit Events
+
+All annual privacy review lifecycle events are HMAC-chained per DEC-030 invariants (`docs/AUDIT_LOG_SCHEMA.md`). These events enable an auditor to verify that the privacy programme review occurred and was completed on schedule, without requiring the auditor to read the evidence file contents.
+
+| Event Type | Severity | Retention | Key Fields | Trigger |
+|---|---|---|---|---|
+| `admin.privacy_review_initiated` | HIGH | 7 years | `review_year`, `initiated_by`, `scope` (array of P-series criteria), `target_completion_date` | When compliance-officer begins the annual review cycle |
+| `admin.privacy_policy_reviewed` | HIGH | 7 years | `review_date`, `policy_version`, `material_changes` (bool), `counsel_firm_id`, `reviewed_by`, `url` | When counsel sign-off received (P1.1) |
+| `admin.consent_mechanism_verified` | MEDIUM | 3 years | `verification_date`, `banner_functional` (bool), `opt_out_tested` (bool), `consent_events_in_window` (int), `verified_by` | When consent banner functional test completed (P2.1) |
+| `admin.dsar_sla_audit_completed` | MEDIUM | 7 years | `audit_year`, `total_requests`, `completed_count`, `sla_breach_count` (must be 0), `avg_days_to_complete`, `audited_by` | When DSAR SLA audit query executed and results filed (P5.1/P5.2) |
+| `admin.art22_safeguards_reviewed` | HIGH | 7 years | `review_date`, `victor_prompt_version`, `clinical_safety_sign_off`, `human_override_verified`, `no_go_enforcement_verified`, `explanation_path_functional`, `reviewed_by` | When Art. 22 control verification completed (P3/P4) |
+| `admin.subprocessor_list_verified` | MEDIUM | 7 years | `verification_date`, `list_version`, `additions_since_last_review` (int), `removals_since_last_review` (int), `dpa_current_for_all` (bool), `verified_by` | When sub-processor list annual review completed (P6.7) |
+| `admin.dpia_trigger_assessment_completed` | MEDIUM | 7 years | `assessment_date`, `triggers_met` (array, may be empty), `full_refresh_required` (bool), `assessed_by` | When DPIA annual trigger assessment completed (P3.1) |
+| `admin.privacy_review_completed` | HIGH | 7 years | `review_year`, `evidence_paths` (array of R2 object keys), `gaps_closed` (array: P-GAP IDs), `gaps_remaining` (array), `completed_by` | When all P-series review activities completed and evidence filed (P8.1) |
+
+**Privacy constraint on event payloads.** None of these events may contain individual user identifiers, health data values, or DSAR request content. `dsar_sla_audit_completed.total_requests` is an aggregate count. `dsar_sla_audit_completed.sla_breach_count` is an aggregate count. If `sla_breach_count > 0`, a separate `incident.dsar_sla_breach` event (per `INCIDENT_RESPONSE.md R-14`) carries the incident metadata — never the personal data involved.
+
+---
+
+### 60.10 SOC 2 P-Series Evidence Artefacts
+
+The following evidence artefacts are filed annually to `compliance/evidence/privacy/YYYY/` (R2 bucket `form-compliance-vault`, EU jurisdiction restriction enabled — see OQ-VRM-03 §59.11).
+
+| Artefact ID | Description | Source | Filed at |
+|---|---|---|---|
+| **P-E-001** | Privacy policy publication screenshot + URL + counsel sign-off confirmation (email or letter) | `form.coach/privacy` + counsel correspondence | Privacy policy review (P1.1) |
+| **P-E-002** | Consent banner screenshot (default state + preference centre) + DEC-030 consent event aggregate count query output | `form.coach` + audit_log_events query | Consent verification (P2.1) |
+| **P-E-003** | DPIA annual trigger assessment memo (1 page) + DPIA delta (if triggers met) | `docs/GDPR_DPIA.md` + compliance memo | DPIA review (P3.1) |
+| **P-E-004** | DSAR SLA aggregate report — counts, averages, SLA breach count per request_type | `dsar_requests` aggregate query | DSAR SLA audit (P4.1/P5.1) |
+| **P-E-005** | DSAR test request confirmation — request ID, submitted_at, completed_at, elapsed days (no content) + admin dashboard privacy floor verification screenshot | DSAR pipeline test | DSAR access test (P5.2) |
+| **P-E-006** | Sub-processor list current version + diff from prior year + SHA-256 hash of `docs/SUBPROCESSORS.md` | `docs/SUBPROCESSORS.md` + `form.coach/legal/sub-processors` | Sub-processor review (P6.7) |
+| **P-E-007** | DSAR correction SLA query output — count of open correction requests older than 30 days (expected: 0) | `dsar_requests` aggregate query | Data quality audit (P7.1) |
+| **P-E-008** | DEC-030 `admin.privacy_review_completed` event ID + R2 `form-compliance-vault/privacy/YYYY/` object listing | `audit_log_events` + `wrangler r2 object list` | Annual review completion (P8.1) |
+| **P-E-009** | Mobile app onboarding consent screen screenshot + `privacy.health_data_consent_granted` DEC-030 event aggregate count | App screenshot + `audit_log_events` aggregate | Health data consent (P2.1 / Art. 22) |
+| **P-E-010** | Enterprise employee privacy notice template version + confirmation that template was included in first enterprise customer onboarding kit | Enterprise onboarding kit document | Enterprise deployment (P1.1 / Art. 13) |
+
+**Collection protocol.** Evidence queries must use the `compliance-officer` service role. Queries must not return individual rows from `users`, `health_profiles`, `workout_sessions`, `cv_sessions`, `dsar_requests` (content columns), or any Art. 9 table. Aggregate counts and event metadata only. The `clinical-safety` role has veto authority over any query that risks surfacing individual health data in the evidence file.
+
+---
+
+### 60.11 SOC 2 P-Series Criterion Mapping
+
+| Criterion | Description | FORM Control | Evidence |
+|---|---|---|---|
+| **P1.1** | Privacy notice describes the entity's privacy practices | Privacy policy at `form.coach/privacy`; employee notice template for enterprise | P-E-001, P-E-010 |
+| **P2.1** | Consent and choice | Web consent banner; health data opt-in in onboarding; withdrawal mechanism; `privacy.consent_*` DEC-030 events | P-E-002, P-E-009 |
+| **P3.1** | Collection consistent with notice | DPIA current; no new collection points without DPIA update; no undisclosed processing | P-E-003 |
+| **P3.2** | Sensitive data collected only with explicit consent or legal basis | GDPR Art. 9(2)(a) explicit consent for health/biometric data; DEC-030 `privacy.health_data_consent_granted` | P-E-009 |
+| **P4.1** | Use limited to purpose | Victor AI uses data for coaching only; no advertising use; no employer disclosure | Art. 22 controls §60.6 |
+| **P4.2** | Retention schedule documented and followed | Retention schedule in `OBSERVABILITY.md §8.1`; DSAR erasure pipeline | P-E-004 |
+| **P4.3** | Disposal per schedule | `keypoints_enc` deletion on erasure; `user_hard_delete` DSAR pipeline | P-E-004, P-E-005 |
+| **P5.1** | Access to personal information provided | DSAR access request pipeline; response within 30 days | P-E-004, P-E-005 |
+| **P5.2** | Correction of inaccurate information | DSAR correction path; `request_type = 'correction'` pipeline | P-E-007 |
+| **P6.1** | Disclosure only for stated purpose | No sale of personal data; no third-party disclosure without DPA | §59 VRM controls |
+| **P6.7** | Sub-processor list current and disclosed | `form.coach/legal/sub-processors`; `docs/SUBPROCESSORS.md`; DPAs executed | P-E-006 |
+| **P7.1** | Data quality maintained | Correction path; DSAR quality requests handled | P-E-007 |
+| **P8.1** | Privacy programme monitored | Annual review executed; evidence filed; `admin.privacy_review_completed` DEC-030 event | P-E-008 |
+
+---
+
+### 60.12 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone | Definition of Done |
+|---|---|---|---|---|---|
+| 1 | Publish privacy policy at `form.coach/privacy`; engage EU-qualified privacy counsel for review; file P-E-001 | compliance-officer | **P0** | M5 (before first production user) | Policy live at canonical URL; counsel sign-off email filed; `admin.privacy_policy_reviewed` DEC-030 event emitted |
+| 2 | Implement cookie consent banner on `form.coach`; verify `privacy.consent_granted` / `privacy.consent_withdrawn` DEC-030 events emit; file P-E-002 | platform-engineer + compliance-officer | **P0** | M5 | Banner functional in production; aggregate event count > 0; P-E-002 filed |
+| 3 | Deploy DSAR request intake workflow (Linear → `dsar_requests` → compliance-officer email alert); register `dsar.*` event types in `docs/AUDIT_LOG_SCHEMA.md` | platform-engineer + compliance-officer | **P1** | M6 | Intake form live; `dsar.received` event emitting; first test request handled within 30 days; P-E-005 test filed |
+| 4 | Build `dsar_requests` table DDL and migration; implement DSAR erasure pipeline (`user_hard_delete` function); verify `keypoints_enc` deletion on erasure | platform-engineer | **P0** | M5 | DDL migrated; erasure function tested in staging with synthetic user; `dsar.completed` event emits; erasure_confirmed_at populated |
+| 5 | Register all 8 DEC-030 privacy programme events in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | **P1** | M6 | All 8 event types appear in AUDIT_LOG_SCHEMA.md under `### Privacy` section |
+| 6 | Deploy mobile app onboarding health data consent screen; verify `privacy.health_data_consent_granted` event emits; file P-E-009 | platform-engineer + compliance-officer | **P0** | M5 | Consent screen in onboarding flow; event verified in staging; P-E-009 filed |
+| 7 | Create enterprise employee privacy notice template; include in enterprise onboarding kit; file P-E-010 at first enterprise customer | compliance-officer | **P1** | M7 (before first enterprise pilot) | Template reviewed by counsel; included in onboarding kit; P-E-010 filed at first enterprise onboarding |
+| 8 | Execute first annual privacy review (all 8 phases §60.2); file P-E-001 through P-E-010; emit `admin.privacy_review_completed` DEC-030 event | compliance-officer | **P1** | M8 (or observation period start if earlier) | All P-E artefacts in R2 `form-compliance-vault/privacy/2026/`; P8.1 advanced to 🟢; event ID recorded |
+| 9 | Add annual privacy review to compliance calendar (§15) as January recurring item with 8 phases and responsible-party assignment | compliance-officer | **P2** | M7 | Linear recurring issue created; §15.1 calendar updated |
+| 10 | Verify Art. 22 safeguards: test `session.intent_started` invariant (user tap required); confirm Victor prompt version in compliance-officer record; get clinical-safety sign-off on current prompt; emit `admin.art22_safeguards_reviewed` event | clinical-safety + compliance-officer | **P1** | M8 | All 5 fields in `admin.art22_safeguards_reviewed` event = `true`; Victor prompt version logged; DEC-030 event ID recorded |
+| 11 | Advance P-GAP-001 → 🟢 in §51.3 gap register on completion of items 1 + 8 | compliance-officer | **P1** | M8 | §51.3 P1.1 row updated to 🟢 |
+| 12 | Advance P-GAP-002 → 🟢 in §51.3 gap register on completion of items 2 + 8 | compliance-officer | **P1** | M8 | §51.3 P2.1 row updated to 🟢 |
+| 13 | Advance P-GAP-003 → 🟢 in §51.3 gap register on completion of items 3 + 4 + 8 | compliance-officer | **P1** | M8 | §51.3 P5.1/P5.2 rows updated to 🟢 |
+| 14 | Advance P8.1 → 🟢 in §51.3 gap register on first annual review completion | compliance-officer | **P1** | M8 | §51.3 P8.1 row updated to 🟢 |
+
+---
+
+### 60.13 Open Questions
+
+| OQ | Question | Owner | Priority | Resolution Target |
+|---|---|---|---|---|
+| **OQ-PRIV-01** | **Art. 22 scope determination — formal legal opinion.** FORM's current position is conservative (operates as if Art. 22 applies). Before enterprise GA, FORM should obtain a formal legal opinion on whether Victor's exercise recommendations constitute "solely automated processing" producing "similarly significant effects" under GDPR Art. 22(1). If the formal opinion concludes Art. 22 does not apply, some safeguards become best-practice rather than required — but the clinical-safety veto and human override should be retained regardless. Owner: compliance-officer + EU privacy counsel. Target: before M10 enterprise GA. Priority: P1. | compliance-officer + counsel | P1 | Before M10 enterprise GA |
+| **OQ-PRIV-02** | **CCPA compliance for US enterprise customers.** FORM's primary jurisdictional frame is GDPR. However, US enterprise customers from California (CCPA/CPRA), Virginia (VCDPA), Colorado (CPA), or other US state privacy laws may require: (a) a "Do Not Sell or Share My Personal Information" link; (b) a CPRA-compliant privacy notice; (c) opt-out of sensitive data use. FORM's current privacy policy is GDPR-centric. A US-law addendum or separate US privacy policy may be required before enterprise sales to California-headquartered companies. Owner: compliance-officer. Target: before first US enterprise customer. Priority: P1. | compliance-officer | P1 | Before first US enterprise customer |
+| **OQ-PRIV-03** | **Wearable provider Art. 9 data chain.** When a user connects a Whoop band or Oura Ring, FORM receives biometric data from the wearable provider's API. The wearable provider is an independent data controller for its own data processing. FORM's Art. 9 consent covers FORM's processing only. The question is whether FORM's privacy notice must explicitly identify each wearable provider as an independent controller and direct users to their privacy policies. Recommended approach: include a "Connected services" section in the privacy policy listing all supported wearable integrations with links to their privacy policies. Owner: compliance-officer. Target: before wearable integrations ship to production. Priority: P2. | compliance-officer | P2 | Before wearable production ship |
+
+---
+
+### 60.14 Privacy Floor Reminder for Reviewers
+
+All evidence collection in this section must comply with the FORM privacy floor. The following queries and actions are **explicitly prohibited** during privacy programme review activities:
+
+| Prohibited action | Reason |
+|---|---|
+| Querying `dsar_requests` content columns (export data, correction description) | Would expose personal data to compliance reviewer unnecessarily |
+| Joining `tenant_aggregates` to `users` or any health table | Privacy floor violation; enterprise admin role design boundary |
+| Viewing individual Victor coaching session content | Health-adjacent data; clinical-safety scope |
+| Pulling raw `privacy.consent_granted` event payloads to identify individual consenting users | Consent log is evidence of consent volume, not user identification tool |
+| Sharing evidence artefacts P-E-001 through P-E-010 with enterprise customer HR contacts | Evidence artefacts are FORM-internal compliance materials, not customer-facing reports |
+
+The compliance-officer must confirm adherence to these constraints as part of the `admin.privacy_review_completed` DEC-030 event. The privacy floor is enforced at the data layer (RLS) and cannot be overridden by any contractual request from audit firm or enterprise customer.
+
+---
+
+*v1.0 (2026-06-03): §60 Annual Privacy Programme Review — P-Series Operating Evidence & GDPR Art. 22 AI Automated Decision-Making Controls. Closes P-GAP-001 (privacy policy counsel review — procedure in §60.3 + P-E-001 artefact), P-GAP-002 (consent banner — procedure in §60.4 + P-E-002 artefact), P-GAP-003 (DSAR automation — procedure in §60.5 + P-E-004/005 artefacts), P8.1 (annual privacy monitoring — procedure in §60.2 + P-E-008 artefact). Primary cross-references: docs/ENTERPRISE.md §Privacy floor, docs/AUDIT_LOG_SCHEMA.md (DEC-030 events), docs/INCIDENT_RESPONSE.md R-14 (DSAR runbook), docs/GDPR_DPIA.md, docs/SUBPROCESSORS.md, docs/DATA_MODEL.md §6 (privacy floor enforcement). §60.1 purpose: first dedicated P-series operating exhibit in §1–§59; Art. 22 unique to FORM's AI coaching product. §60.2 8-phase annual review scope covering all P-series criteria (P1.1 through P8.1) with evidence artefacts. §60.3 privacy policy review cycle: trigger criteria (calendar, new collection, new sub-processor, new jurisdiction, feature change, incident), counsel review protocol, `admin.privacy_policy_reviewed` DEC-030 event (HIGH/7yr). §60.4 consent mechanism: web consent banner (GDPR Art. 7) with 4 requirements, DEC-030 consent event aggregate verification SQL, mobile app health data consent chain (3-step), enterprise employee notification contractual architecture. §60.5 DSAR SLA audit: aggregate SQL query (no personal data in output), breach condition (sla_breach_count = 0 required), gap closure criteria. §60.6 GDPR Art. 22 — Victor AI automated decision-making: legal analysis (Art. 22(4) most-relevant path via Art. 9 data); conservative compliance position; 4 safeguards: human override (session.intent_started invariant — user tap required), right to explanation (in-product conversation + DSAR explanation type), clinical-safety veto (mandatory on all prompt changes — documented prohibited patterns), explicit consent chain for Art. 9 data; no-go customer enforcement as Art. 22 boundary; `admin.art22_safeguards_reviewed` DEC-030 event (HIGH/7yr). §60.7 sub-processor list annual review: 5-step verification procedure; P-E-006 SHA-256 hash evidence. §60.8 DPIA annual refresh: 6 trigger criteria with mandatory refresh thresholds. §60.9 8 DEC-030 HMAC-chained privacy programme events (5× HIGH/7yr, 3× MEDIUM/3–7yr): admin.privacy_review_initiated, admin.privacy_policy_reviewed, admin.consent_mechanism_verified, admin.dsar_sla_audit_completed, admin.art22_safeguards_reviewed, admin.subprocessor_list_verified, admin.dpia_trigger_assessment_completed, admin.privacy_review_completed. §60.10 10 evidence artefacts P-E-001 through P-E-010 with collection protocol (aggregate queries only; clinical-safety veto on health data exposure). §60.11 P-series SOC 2 criterion mapping table (P1.1–P8.1). §60.12 14-item implementation checklist: 4× P0 (privacy policy, consent banner, DSAR erasure, health consent — all M5), 8× P1 (DSAR intake, AUDIT_LOG_SCHEMA registry, enterprise template, annual review, calendar, Art. 22 verification, 4× gap register advances), 2× P2 (compliance calendar, OQ resolutions). §60.13 3 open questions: OQ-PRIV-01 (Art. 22 formal legal opinion — P1, before M10 GA), OQ-PRIV-02 (CCPA US addendum — P1, before first US enterprise customer), OQ-PRIV-03 (wearable provider Art. 9 chain — P2, before wearable production). §60.14 privacy floor reminder: 5 explicitly prohibited actions during privacy review (dsar content queries, tenant join to users, individual coaching session viewing, individual consent identification, sharing evidence with enterprise HR).*
+
+---
+
 *v1.0 (2026-06-03): §59 Vendor Risk Management (CC9.2) — Third-Party Risk Program. Opens VRM-GAP-001 🔴 HIGH (DPAs for Supabase/Resend/RevenueCat/Sentry not yet executed). Defines 4-tier vendor classification (T1 Critical → T4 Peripheral), 10-vendor current register, due diligence questionnaire, annual reassessment checklist, offboarding procedure with `admin.vendor_offboarded` audit event, GDPR Art. 28 sub-processor list template, 10-clause contractual minimum for T1/T2, monitoring triggers (CISA KEV, SOC2 expiry, acquisition, volume spike), 10-item implementation checklist (4× P0 M6 DPA executions, 3× P1 M7 evidence/audit/calendar, 2× P2 M7 infrastructure, 1× P1 gap register). Three open questions: OQ-VRM-01 (Apple DPA gap — workaround documented), OQ-VRM-02 (EU residency for non-EU expansion — M12+ concern), OQ-VRM-03 (Cloudflare R2 EU jurisdiction flag — must confirm before production). SOC 2 mapping: CC9.2 (vendor due diligence + DPA execution + annual reassessment + offboarding); GDPR Art. 28 (sub-processor management + contractual controls); GDPR Art. 44–46 (transfer mechanisms via SCCs for US sub-processors). Evidence artefacts: VRM-E-001 through VRM-E-004 (DPAs), VRM-E-005 through VRM-E-009 (due diligence questionnaires), VRM-E-010 (sub-processor list publication confirmation).*
 
 ---

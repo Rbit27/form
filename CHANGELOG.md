@@ -6,6 +6,16 @@
 
 ---
 
+## [1.80.1] — 2026-06-03
+
+### Added
+- `docs/SOC2_READINESS.md §60` — Annual Privacy Programme Review — P-Series Operating Evidence & GDPR Art. 22 AI Automated Decision-Making Controls. Closes P-GAP-001 (privacy policy counsel review), P-GAP-002 (consent banner), P-GAP-003 (DSAR automation), P8.1 (annual privacy monitoring — P8.1). 8-phase annual review scope (P1.1–P8.1); privacy policy annual review cycle with counsel sign-off + DEC-030 `admin.privacy_policy_reviewed` event; consent mechanism verification (web banner + mobile health data opt-in + enterprise employee notice); DSAR SLA audit with aggregate-only SQL queries; GDPR Art. 22 safeguards for Victor AI automated exercise recommendations (human override via `session.intent_started` invariant, right to explanation, clinical-safety veto with prohibited patterns, explicit Art. 9 consent chain, no-go customer enforcement as Art. 22 boundary); sub-processor list annual review; DPIA annual refresh trigger criteria; 8 new DEC-030 HMAC-chained events (5× HIGH/7yr, 3× MEDIUM); 10 evidence artefacts P-E-001 through P-E-010; 14-item implementation checklist; 3 open questions (OQ-PRIV-01 Art. 22 formal opinion, OQ-PRIV-02 CCPA US addendum, OQ-PRIV-03 wearable provider Art. 9 chain). Privacy floor enforcement: 5 explicitly prohibited queries/actions during review.
+
+### Changed
+- `VERSION` — 1.80.0 → 1.80.1
+
+---
+
 ## [1.80.0] — 2026-06-03
 
 ### Added
