@@ -272,6 +272,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-187-minimum-effective-dose.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-188-stretch-mediated-hypertrophy.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-189-elastic-energy-tendons.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-202-neural-efficiency.md | Blog | draft · clinical-safety NOT REQUIRED |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

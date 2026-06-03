@@ -6,6 +6,18 @@
 
 ---
 
+## [1.85.0] — 2026-06-03
+
+### Added
+- [`content/post-202-neural-efficiency.md`](content/post-202-neural-efficiency.md) — Нейральна ефективність руху: economics of movement — Enoka (1994) рамка трьох рівнів (рекрутування, rate coding, координація); Semmler (2002 Exerc Sport Sci Rev): синхронізація МО і адаптивна специфічність; Lay et al. (2011 J Electromyogr Kinesiol): варіативність міжм'язової координації у новачків vs тренованих; коактивація антагоністів як прихована стаття витрат; Sale (1988) хронологія нейральної фази; чому техніка — економіка, а не естетика; clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — додано картку post-202
+- `STATUS.md` — додано рядок post-202
+- `README.md` — post-202 позначений як `[x]`
+
+---
+
 ## [1.84.0] — 2026-06-03
 
 ### Added
