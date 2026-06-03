@@ -6,6 +6,16 @@
 
 ---
 
+## [1.77.0] — 2026-06-03
+
+### Added
+- `content/post-189-elastic-energy-tendons.md` — «Сухожилля як пружина: пружна енергія, SSC і чому dead-stop squat — це інший рух» — Ker et al. (1987 Nature): ахіллове сухожилля зберігає ~35% кінетичної енергії при ходьбі — spring-mass model підтверджено. Wilson et al. (1991 Eur J Appl Physiol): пружний ефект дає ~31% підсилення продуктивності у SSC. CMJ vs SJ: 5–15% перевага countermovement — за рахунок elastic energy storage і stretch reflex. Fast SSC (<250 мс) vs slow SSC (>250 мс): різна роль м'яза і сухожилля. Bohm et al. (2014 J Physiol): 14 тижнів важкого тренінгу → +20% жорсткість ахіллового сухожилля. Lichtwark & Wilson (2006 J Exp Biol): литковий м'яз майже ізометричний під час бігу — рух забезпечує сухожилля. Hof et al. (2002 J Biomech): математична модель оптимальної жорсткості для пружного накопичення. Гістерезис: 10–25% розсіювання пружної енергії при кожному циклі. Dead-stop squat = навмисне відключення SSC: паузна вправа тренує чисту концентричну силу у специфічному положенні — інша адаптація, не краща чи гірша. Practical programming: dead-stop для sticking point, dynamic effort для SSC, плайометрика для fast SSC. FORM bar velocity profile як проксі SSC-ефективності без силової платформи. ~13 хв. clinical-safety NOT REQUIRED (чиста спортивна наука). sports-scientist review PENDING.
+- `blog.html` — картки для post-188 (stretch-mediated hypertrophy) і post-189 (elastic energy tendons) додані; лічильник 175→177 cards, 187→189 posts authored.
+- `STATUS.md` — рядки post-188 і post-189 додані до content engine table; blog.html рядок оновлено до v1.77.0.
+- `README.md` — post-188 позначено [x] у roadmap; post-189 позначено [x] у roadmap.
+
+---
+
 ## [1.76.0] — 2026-06-03
 
 ### Added
