@@ -6,6 +6,14 @@
 
 ---
 
+## [1.76.0] — 2026-06-03
+
+### Added
+- `content/post-188-stretch-mediated-hypertrophy.md` — «Гіпертрофія у розтягнутій позиції: чому діапазон руху важливіший, ніж ми думали» — огляд stretch-mediated hypertrophy: titin-based force enhancement у розтягнутому стані, mechanotransduction через mTORC1, регіональна специфічність гіпертрофії. Maeo et al. (2023 Eur J Sport Sci): більша гіпертрофія дистального відділу двоголового м'яза стегна при тренуванні з акцентом на розтягнуту позицію. Pedrosa et al. (2022 Eur J Sport Sci): lengthened partials ≥ full ROM при нижчій суб'єктивній стомленості. Kassiano et al. (2023 J Strength Cond Res): систематичний огляд — тренування у довшій позиції стабільно асоціюється з більшою гіпертрофією. Herzog (2023): titin як активний генератор сили у розтягнутому стані. Wackerhage et al. (2019): механочутливі рецептори (інтегрини, FAK-шлях) як тригери mTORC1. Практичний переклад: контроль нижньої точки вправи — пряма змінна гіпертрофічного стимулу, не лише технічна педантика; вибір вправ крізь призму «де навантаження у діапазоні». FORM-context: комп'ютерне бачення відстежує глибину присіду і контроль ексцентрики — пряме застосування stretch-mediated сигналу. ~14 хв. clinical-safety NOT REQUIRED (чиста спортивна наука).
+- `docs/SOC2_READINESS.md §59` — Vendor Risk Management (CC9.2) — Third-Party Risk Program. 4-тирова класифікація вендорів (T1 Critical → T4 Peripheral). Реєстр 10 поточних вендорів з DPA-статусом і датою наступного огляду. Due diligence questionnaire (8 пунктів, T1/T2). Annual reassessment checklist. Offboarding процедура з `admin.vendor_offboarded` audit event. GDPR Art. 28 sub-processor list (6 sub-processors, публікація на `form.coach/legal/sub-processors`). 10-пунктовий contractual minimum для T1/T2. Monitoring triggers (CISA KEV, SOC2 expiry, acquisition, volume spike). 10-item implementation checklist: 4× P0 M6 (DPA executions — Supabase, Resend, RevenueCat, Sentry), 3× P1 M7 (due diligence docs, sub-processor page, audit event schema), 2× P2 M7 (annual calendar, compliance dir structure), 1× P1 M6 (gap register VRM-GAP-001). Opens VRM-GAP-001 🔴 HIGH (DPAs not yet executed — blocking for CC9.2). 3 open questions: OQ-VRM-01 (Apple DPA gap), OQ-VRM-02 (EU residency expansion M12+), OQ-VRM-03 (Cloudflare R2 EU jurisdiction — must confirm M6).
+
+---
+
 ## [1.75.0] — 2026-06-02
 
 ### Added

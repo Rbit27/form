@@ -18982,4 +18982,208 @@ OQ-ENC-02 is closed as a design question. What remains is operational execution:
 
 ---
 
+---
+
+## §59 Vendor Risk Management (CC9.2) — Third-Party Risk Program
+
+**SOC 2 criteria:** CC9.2 — The entity assesses and manages risks associated with vendors and business partners.
+
+**Status:** 🟡 Authored — design complete; registry population and contractual execution pending M6–M8.
+
+**Owner:** compliance-officer + security-engineer
+
+**Priority:** P1 — required for SOC 2 Type II audit scope (examiner will request vendor register evidence)
+
+---
+
+### 59.1 Scope and Rationale
+
+FORM processes sensitive user health data (workout history, biometric estimates, body-weight context, sleep metrics) and relies on a set of third-party vendors for core infrastructure, ML inference, payments, and communications. Any vendor with access to this data — or to systems that process it — is a risk vector for CC9.2 compliance.
+
+A vendor risk program serves three SOC 2 purposes:
+1. **Evidence of due diligence** — demonstrates that FORM evaluated each vendor's security posture before onboarding
+2. **Contractual accountability** — DPAs and sub-processor agreements create enforceable obligations
+3. **Ongoing monitoring** — annual reassessment ensures vendor controls remain adequate as the vendor's own posture changes
+
+Without a documented program, an examiner will mark CC9.2 as a finding regardless of how secure the actual vendors are.
+
+---
+
+### 59.2 Vendor Tier Classification
+
+Not all vendors carry equal risk. FORM classifies vendors by data access and criticality:
+
+| Tier | Description | Examples | Review Cadence |
+|------|-------------|----------|----------------|
+| **T1 — Critical** | Direct access to production user PII/PHI; or infrastructure control plane with ability to affect availability | Supabase (DB), Cloudflare (CDN/Workers/R2), Apple (TestFlight/App Store push infra) | Annual + on material contract change |
+| **T2 — Significant** | Processes user data in transit or in analytics aggregates; or provides auth/identity services | Resend (transactional email), RevenueCat (subscription/payment event data), Sentry (error logs — may contain user IDs) | Annual |
+| **T3 — Standard** | No direct user data access; SaaS tooling for internal team | Linear (project management), Notion (docs), GitHub (code repo), 1Password (secrets vault) | Biennial or on major incident |
+| **T4 — Peripheral** | No data access; infrastructure adjacency only | Cloudflare Registrar, DNS providers, domain registrars | Ad hoc on security advisory |
+
+**Tier-1 vendors require a signed DPA before any production user data flows through them.** T2 vendors require DPA before handling any identifiable data. T3/T4 DPAs are best-effort.
+
+---
+
+### 59.3 Current Vendor Register
+
+| Vendor | Tier | Service | DPA Status | SOC 2 / ISO? | Last Reviewed | Next Review |
+|--------|------|---------|------------|--------------|---------------|-------------|
+| **Supabase** | T1 | PostgreSQL DB, Auth, Storage, Edge Functions, Realtime | ✅ DPA available (supabase.com/legal/dpa) — must be executed for production | SOC 2 Type II (2024) ✅ | — | M6 (pre-launch) |
+| **Cloudflare** | T1 | CDN, Workers (serverless), R2 (object storage), KV, Pages | ✅ DPA available; covered under Enterprise ToS | SOC 2 Type II ✅; ISO 27001 ✅ | — | M6 |
+| **Apple** | T1 | App Store distribution, push notifications (APNs), TestFlight | Standard Developer Agreement; no separate DPA — governed by Apple Developer Program License | SOC 2 not public; Apple publishes security whitepapers | — | M6 |
+| **Resend** | T2 | Transactional email (OTP, notifications) | ✅ DPA available (resend.com/dpa) | SOC 2 Type II ✅ | — | M7 |
+| **RevenueCat** | T2 | Subscription management, payment event webhooks | ✅ DPA available; execute before production payments | SOC 2 Type II ✅ | — | M7 |
+| **Sentry** | T2 | Error monitoring (may capture user IDs in stack traces) | ✅ DPA available; PII scrubbing must be configured | SOC 2 Type II ✅; GDPR-compliant | — | M7 |
+| **Linear** | T3 | Project management | ✅ DPA available | SOC 2 Type II ✅ | — | Biennial |
+| **GitHub** | T3 | Source code repository, CI/CD Actions | ✅ DPA via GitHub Enterprise / standard ToS | SOC 2 Type II ✅ | — | Biennial |
+| **1Password** | T3 | Secrets management, credential vault | ✅ DPA available | SOC 2 Type II ✅ | — | Biennial |
+| **Notion** | T3 | Internal documentation | ✅ DPA available | SOC 2 Type II ✅ | — | Biennial |
+
+**Gap:** DPAs for Supabase, Resend, RevenueCat, Sentry not yet executed for production. Must be executed before M7 launch (blocking item for CC9.2 evidence).
+
+---
+
+### 59.4 Due Diligence Process
+
+For each new T1 or T2 vendor, compliance-officer + security-engineer complete the following checklist before onboarding:
+
+**Pre-onboarding questionnaire (T1/T2):**
+
+- [ ] Does the vendor have SOC 2 Type II or ISO 27001 (or equivalent)? If not, is there a compensating control?
+- [ ] Does the vendor offer a Data Processing Agreement? Has it been reviewed by legal?
+- [ ] Where is data stored (region)? Does this satisfy GDPR Art. 46 transfer mechanisms (SCCs, adequacy, etc.)?
+- [ ] Does the vendor undergo penetration testing? When was the last test? Is the summary available to customers?
+- [ ] What is the vendor's breach notification SLA? (GDPR requires 72h notification to controller — does the vendor contractually commit to this?)
+- [ ] Does the vendor have a published vulnerability disclosure / responsible disclosure policy?
+- [ ] What is the vendor's data retention and deletion policy? Can FORM trigger deletion on user request (GDPR Art. 17)?
+- [ ] Is the vendor's engineering team > 5 people with a dedicated security function? If not, what is the compensating control?
+
+**Evidence artefact:** Completed questionnaire + signed DPA stored in `compliance/evidence/vendors/{vendor-slug}/due-diligence-YYYY-MM-DD.md`.
+
+---
+
+### 59.5 Annual Vendor Reassessment
+
+T1 vendors are reassessed annually; T2 annually; T3 biennially. Reassessment triggers:
+
+- **Scheduled:** Annual review calendar (January each year for T1/T2)
+- **Event-triggered:** Vendor announces a security incident, acquisition, or material platform change; regulatory body issues advisory; vendor's SOC 2 lapses
+
+**Reassessment checklist (abbreviated):**
+
+- [ ] Review vendor's latest SOC 2 Type II report (bridge letter if report > 12 months old)
+- [ ] Check for CVE advisories against vendor's platform in the past 12 months
+- [ ] Confirm DPA is still current (no superseded terms)
+- [ ] Confirm FORM's data minimisation: is FORM sending less data than contractually allowed?
+- [ ] Confirm deletion/export capabilities still functional (test on staging)
+- [ ] Review vendor's sub-processor list changes (Supabase, Cloudflare publish these)
+
+**Evidence artefact:** Reassessment summary in `compliance/evidence/vendors/{vendor-slug}/reassessment-YYYY.md` with conclusion: ✅ Continue / ⚠️ Continue with remediation plan / 🔴 Offboard.
+
+---
+
+### 59.6 Vendor Offboarding
+
+When a vendor relationship ends (migration, contract termination, vendor sunset):
+
+**Offboarding checklist:**
+
+1. Issue formal data deletion request under DPA Art. [deletion clause] within 5 business days of contract end
+2. Rotate all API keys, OAuth tokens, and secrets associated with the vendor (PAM read_write; log in audit trail)
+3. Confirm data deletion completion within vendor's stated SLA (typically 30–90 days); request written confirmation
+4. Store deletion confirmation in `compliance/evidence/vendors/{vendor-slug}/deletion-confirmation-YYYY-MM-DD.md`
+5. Remove vendor from active vendor register; archive entry with offboard date and reason
+6. If T1 vendor: notify DPO; review if GDPR Art. 28.4 sub-processor notification obligations apply to FORM's own customers
+
+**Audit event:** `admin.vendor_offboarded` — CRITICAL severity, 7-year retention. Fields: `vendor_id`, `offboard_reason`, `deletion_request_date`, `deletion_confirmed_date`, `rotating_operator`.
+
+---
+
+### 59.7 Sub-Processor Transparency
+
+GDPR Art. 28.2 requires FORM (as a data processor for enterprise customers) to maintain a sub-processor list and notify customers of material changes. FORM's public sub-processor disclosure:
+
+**Current sub-processors (GDPR Art. 28 disclosure list):**
+
+| Sub-Processor | Service | Data Categories | Processing Location |
+|---------------|---------|-----------------|---------------------|
+| Supabase (DigitalOcean-hosted, Frankfurt) | Database, Auth, Storage | User account, workout history, biometrics | EU (Frankfurt, de-fra1) |
+| Cloudflare, Inc. | CDN, edge compute, object storage | Usage data, cached content | Global (with EU data residency option for R2) |
+| Resend, Inc. | Transactional email | Email address, notification content | US (SCCs executed) |
+| RevenueCat, Inc. | Subscription management | Subscription status, payment events (no card data) | US (SCCs executed) |
+| Apple, Inc. | Push notifications | Device token, notification payload | US/Global (Apple Developer Agreement) |
+| Sentry, Inc. | Error monitoring | Error context (PII scrubbing configured) | US (SCCs executed) |
+
+**Publication:** This list must be published at `form.coach/legal/sub-processors` before enterprise customers are onboarded. Update cadence: within 30 days of adding or removing a sub-processor.
+
+**Audit event:** `admin.sub_processor_added` and `admin.sub_processor_removed` — HIGH severity, 7-year retention. Fields: `sub_processor_name`, `service_description`, `data_categories[]`, `dpa_executed_date`, `operator`.
+
+---
+
+### 59.8 Contractual Controls Checklist (T1/T2 Minimum)
+
+Every T1 and T2 DPA must contain or the vendor must commit to via addendum:
+
+| Clause | Required |
+|--------|----------|
+| Data Processing Agreement executed with FORM entity | ✅ Mandatory |
+| Processing only on FORM's documented instructions | ✅ Mandatory |
+| Confidentiality obligations on vendor personnel | ✅ Mandatory |
+| Security measures at least equivalent to FORM's own standards | ✅ Mandatory |
+| Sub-processor restrictions (vendor may not add sub-processors without notice) | ✅ Mandatory |
+| Breach notification ≤ 72 hours to FORM (to enable GDPR Art. 33 compliance) | ✅ Mandatory |
+| Data deletion on contract termination (within 90 days) | ✅ Mandatory |
+| Right to audit (or SOC 2 report in lieu) | ✅ Mandatory |
+| Return of data in portable format on request | ✅ Mandatory for T1; Best-effort T2 |
+| Data residency commitment (EU data stays EU) | ✅ Required for T1 with EU user data |
+
+**Gap VRM-GAP-001 🔴 HIGH:** DPAs not yet executed for Supabase, Resend, RevenueCat, Sentry. All four DPAs must be executed before first production user data flows. Target: M6 (pre-TestFlight beta). Blocking for CC9.2.
+
+---
+
+### 59.9 Monitoring and Alerting
+
+Proactive vendor risk monitoring is not purely annual. The following signals trigger ad-hoc review:
+
+| Signal | Action | Owner |
+|--------|--------|-------|
+| Vendor announces security incident (breach, CVE, advisory) | Immediate review: assess FORM data exposure; notify DPO if user data at risk | security-engineer, 24h |
+| Vendor's SOC 2 report expires without renewal (bridge letter > 6 months) | Engage vendor for updated report; if not available in 30 days, escalate to compliance-officer for risk decision | compliance-officer |
+| Vendor acquired by a third party | Review DPA assignment clause; verify acquiring entity maintains obligations; re-execute if required | compliance-officer + legal |
+| FORM's data volume to vendor increases > 10× | Re-assess data minimisation; update DPA schedule if necessary | platform-engineer + compliance-officer |
+| Vendor appears on CISA KEV (Known Exploited Vulnerabilities) advisory for a CVE in a product FORM uses | Assess exploitability in FORM's configuration; log risk decision; patch/mitigate within SLA per §INCIDENT_RESPONSE severity matrix | security-engineer, 48h |
+
+---
+
+### 59.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|------|-------|----------|-----------|
+| 1 | Execute Supabase DPA for FORM production organisation. Store signed copy in `compliance/evidence/vendors/supabase/dpa-YYYY-MM-DD.pdf`. File VRM-E-001. | compliance-officer | **P0** | M6 |
+| 2 | Execute Resend DPA. Store in `compliance/evidence/vendors/resend/dpa-YYYY-MM-DD.pdf`. File VRM-E-002. | compliance-officer | **P0** | M6 |
+| 3 | Execute RevenueCat DPA. Store in `compliance/evidence/vendors/revenuecat/dpa-YYYY-MM-DD.pdf`. File VRM-E-003. | compliance-officer | **P0** | M6 |
+| 4 | Execute Sentry DPA + configure PII scrubbing rules (beforeSend filter for user IDs, email addresses, device identifiers). Confirm PII scrubbing in staging before production enable. File VRM-E-004. | security-engineer + platform-engineer | **P0** | M6 |
+| 5 | Complete T1/T2 due diligence questionnaires for Supabase, Cloudflare, Resend, RevenueCat, Sentry, Apple. Archive in `compliance/evidence/vendors/{slug}/due-diligence-YYYY-MM-DD.md`. | compliance-officer | **P1** | M7 |
+| 6 | Publish sub-processor list at `form.coach/legal/sub-processors`. | platform-engineer | **P1** | M7 (required before enterprise onboarding) |
+| 7 | Register `admin.vendor_offboarded`, `admin.sub_processor_added`, `admin.sub_processor_removed` audit event types in `docs/AUDIT_LOG_SCHEMA.md`. | compliance-officer | **P1** | M7 |
+| 8 | Establish annual vendor review calendar in Linear: recurring issues for T1 (January each year), T2 (January each year), T3 (odd years). | compliance-officer | **P2** | M7 |
+| 9 | Set up `compliance/evidence/vendors/` directory structure in compliance repo with template files for due-diligence and reassessment docs. | compliance-officer | **P2** | M6 |
+| 10 | Register VRM-GAP-001 in §51 Consolidated Gap Register (🔴 HIGH, DPAs not executed). Update to 🟡 on DPA execution; 🟢 after M7 due diligence complete. | compliance-officer | **P1** | M6 (register); M7 (🟢) |
+
+---
+
+### 59.11 Open Questions
+
+| OQ | Status |
+|----|--------|
+| **OQ-VRM-01** | 🟡 Open. Apple DPA: Apple's standard Developer Program License Agreement does not offer a standalone DPA in the GDPR Art. 28 sense. For APNs (push notification delivery), Apple processes device tokens but not payload content in a durable way. Recommended approach: document in vendor register as "DPA not available — Apple Developer Agreement governs; data minimisation applied (no PII in push payload)". Legal review required before M7. |
+| **OQ-VRM-02** | 🟡 Open. EU data residency for Supabase: `de-fra1` (Frankfurt) satisfies GDPR Art. 44 for EU users. US users: no residency requirement. Problem arises if FORM expands to markets with strict data localisation (Russia, China, Turkey) — not a M7 concern but flag for M12+. |
+| **OQ-VRM-03** | 🟡 Open. Cloudflare R2 data residency: R2 stores data in Cloudflare's global network by default. R2 jurisdictional restriction feature (EU) must be explicitly enabled per bucket. Confirm `form-compliance-vault` bucket has EU restriction enabled before production evidence artefacts are stored there. Owner: platform-engineer. Target: M6. |
+
+---
+
+*v1.0 (2026-06-03): §59 Vendor Risk Management (CC9.2) — Third-Party Risk Program. Opens VRM-GAP-001 🔴 HIGH (DPAs for Supabase/Resend/RevenueCat/Sentry not yet executed). Defines 4-tier vendor classification (T1 Critical → T4 Peripheral), 10-vendor current register, due diligence questionnaire, annual reassessment checklist, offboarding procedure with `admin.vendor_offboarded` audit event, GDPR Art. 28 sub-processor list template, 10-clause contractual minimum for T1/T2, monitoring triggers (CISA KEV, SOC2 expiry, acquisition, volume spike), 10-item implementation checklist (4× P0 M6 DPA executions, 3× P1 M7 evidence/audit/calendar, 2× P2 M7 infrastructure, 1× P1 gap register). Three open questions: OQ-VRM-01 (Apple DPA gap — workaround documented), OQ-VRM-02 (EU residency for non-EU expansion — M12+ concern), OQ-VRM-03 (Cloudflare R2 EU jurisdiction flag — must confirm before production). SOC 2 mapping: CC9.2 (vendor due diligence + DPA execution + annual reassessment + offboarding); GDPR Art. 28 (sub-processor management + contractual controls); GDPR Art. 44–46 (transfer mechanisms via SCCs for US sub-processors). Evidence artefacts: VRM-E-001 through VRM-E-004 (DPAs), VRM-E-005 through VRM-E-009 (due diligence questionnaires), VRM-E-010 (sub-processor list publication confirmation).*
+
+---
+
 *v3.0 (2026-06-02): §58 HMAC Audit Chain Key (`HMAC_AUDIT_CHAIN_KEY`) Rotation Runbook — Dual-Key Migration Design · CC6.7/CC6.8/C1.1/DEC-030 Chain Integrity. Fully closes OQ-ENC-02 (P1, M7 — HMAC_AUDIT_CHAIN_KEY dual-key verification design; §58 IS the complete specification). Closes ENC-GAP-002 (🔴 MEDIUM → 🟡 Authored; 🟢 upon DDL migration execution + chain verification function deployed + first rotation executed + ENC-E-018 through ENC-E-022 filed at M9). Core problem: naive HMAC key rotation breaks historical chain verification because old chain_hash values are irreversible HMAC commitments under the old key; re-signing constitutes tampering and violates the DEC-030 append-only invariant (DEC-030 hard invariant — no UPDATE, no DELETE). Dual-key design: four-component solution — (1) `key_version VARCHAR(10) NOT NULL DEFAULT 'v1'` column on `audit_log_events` with backfill; (2) versioned Workers Secret naming convention `HMAC_AUDIT_CHAIN_KEY_V{N}`; (3) multi-version chain verification function that selects correct key per row based on key_version; (4) rotation boundary invariant — last V{N} chain_hash becomes prev_hash input for first V{N+1} event, cryptographically linking eras without re-signing. Rotation boundary invariant: HMAC-SHA256(V{N+1} key, V{N} handoff_chain_hash ‖ event_id ‖ created_at ‖ event_type ‖ payload_sha256) — old era verified with archived V{N} key, new era verified with V{N+1} key, boundary proves continuity without key material overlap. Migration from current state: one-time rename of unversioned `HMAC_AUDIT_CHAIN_KEY` → `HMAC_AUDIT_CHAIN_KEY_V1` across all three consumers (emit-audit-event, audit-chain-daily-check, audit-chain-verify Edge Function); this is a non-breaking rename — no chain hashes change. Key archival policy: never delete; archived key versions retained in 1Password FORM vault + R2 `form-compliance-vault/hmac-keys/` for 7 years from last event signed; destruction only after 7 years with PAM destructive + compliance-officer + legal; destruction certificate event retained 7 years. Three new DEC-030 events (all 7-year retention): admin.hmac_key_rotation_initiated (CRITICAL — hard invariant, must precede all rotation steps; departing_version, arriving_version, pre_rotation_last_sequence_number fields), admin.hmac_key_rotated (CRITICAL — signed with new key, making it the first permanent V{N+1} production record; boundary_last_sequence_old_era, boundary_first_sequence_new_era, boundary_handoff_chain_hash_prefix fields), admin.hmac_key_rotation_verified (HIGH — emitted after full chain verification confirms zero broken links and archival confirmed; archival_locations[], key_versions_verified[] fields). Two rotation runbooks: Scheduled (annual, PAM read_write, 2-person auth security-engineer + platform-engineer, 60-minute window, 8-step procedure including pre-rotation checklist with 9 blocking items); Emergency (R-05 co-trigger — suspected key exposure or broken links, PAM destructive, 2-person founder + security-engineer, 30-minute RTO, quarantine before deletion). Five evidence artefacts ENC-E-018 through ENC-E-022: DDL migration log + UPDATE privilege revocation (ENC-E-018), chain verification report across key boundary with handoff_chain_hash (ENC-E-019), key_version histogram for full audit log (ENC-E-020), old key archival confirmation in 1Password + R2 (ENC-E-021), DEC-030 three-event confirmation query (ENC-E-022). SOC 2 mapping: CC6.7 (annual rotation limits exposure window; dual-key preserves 7-year historical verifiability), CC6.8 (key_version append-only + form_api UPDATE revocation + 2-person auth prevent insider unilateral rotation), C1.1 (dual-key design restores rotatability of primary audit integrity control without destroying historical evidence), CC7.2 (multi-version daily check covers all eras; AL-CHAIN-01 on broken links; AL-KEY-03 on rotation cadence). 10-item checklist: 6× P0 (DDL migration M7, multi-version verification function deploy M7, V1 archival M7, Workers Secret rename M7, first production rotation V1→V2 M9, evidence filing M9), 3× P1 (AUDIT_LOG_SCHEMA event registry M7, §51 + §56 gap register updates M7/M9, tabletop M8), 1× P2 (KEY_ROTATION_KV annual rotation record + AL-KEY-03 PagerDuty alert M9). References: §56 (key inventory — HMAC_AUDIT_CHAIN_KEY row to be updated); §57.6 (confirmed service_role rotation chain-safe; HMAC chain key confirmed as the separate risk vector fully addressed here); INCIDENT_RESPONSE R-05 (HMAC chain break), R-20 (insider threat), R-01 (P0 incident declaration).*
