@@ -6,6 +6,13 @@
 
 ---
 
+## [1.83.3] — 2026-06-03
+
+### Added
+- `docs/COST_MODEL.md §26` — Customer Success Team Scaling Economics & CS Cost Model; fills the gap between §8.2's single CSM line-item ($250–500/month) and the full CS team cost, hiring trigger, and gross margin model; CS coverage model by tier (Starter email-only $150–200/month shared inbox; Growth named CSM 12–15 accounts; Enterprise dedicated CSM max 6 accounts); CSM capacity model: 7-activity time budget; hard capacity ceiling 15 Growth or 6 Enterprise accounts per CSM; ARR under management $810k–$1M (within $500k–$1.5M industry benchmark); CS team headcount vs. customer count: three stages (founder-led 1–3; first CS hire M13 4–15; Series A team 15–50+); CS cost as % ARR: 30–50% at stage → 8–12% at Series B; gross margin impact: VP CS hire depresses Growth account GM 7.8 pp until account base absorbs fixed cost; combined CS + compliance cost stack 27–33% ARR at $1M–$1.5M milestone (54–61% GM floor); five CS hiring triggers CS-HIRE-01 through CS-HIRE-05 with anti-trigger against premature VP CS hire; QBR fully-loaded cost $262.50 (7h at $37.50/h); QBR cost consistently ~2% ACV across tiers; QBR ROI 3.4× if one logo churn prevented per year; minimum viable QBR content table with privacy floor column (department breakdown, individual records, body composition, mental health flags all excluded); FEHS (FORM Enterprise Health Score): 6-signal composite 0–100 (activation 25%, WAU 25%, seat utilisation 20%, executive engagement 15%, support volume 10%, renewal distance 5%); four status bands green/yellow/red/critical; churn detection ROI 9× on $200–500/month infrastructure; six DEC-030 HMAC-chained CS events (aggregate-only, no user_id): enterprise.qbr_completed (STANDARD, 7yr), enterprise.health_score_updated (STANDARD, 3yr), enterprise.churn_signal_flagged (HIGH, 7yr), enterprise.renewal_negotiation_started (STANDARD, 7yr), enterprise.account_expanded (STANDARD, 7yr), enterprise.account_churned (CRITICAL, 7yr); nine-item implementation checklist (P0 M5–M6, P1 M6–M8); OQ-CS-01 (CS hire vs. engineer hire order — P0, Month 9 gate), OQ-CS-02 (FEHS customer visibility — P1), OQ-CS-03 (k-anonymity floor for health-adjacent QBR metrics — P1), OQ-CS-04 (signal weights in qbr_completed event — P2); v1.6 → v1.7; clinical-safety NOT REQUIRED
+
+---
+
 ## [1.83.2] — 2026-06-03
 
 ### Added

@@ -4213,3 +4213,361 @@ Directors & Officers insurance ($5,000–$15,000/year [ESTIMATE]) is excluded fr
 ---
 
 *v1.6 additions: §25 Enterprise Compliance & Legal Infrastructure Cost Model — purpose and gap-fill vs §15 (infrastructure COGS) and §8 (enterprise economics): §15 models SSO/SCIM/audit-log infrastructure costs ($0.002/seat/month) but does not model SOC 2 audit, pen testing, insurance, or legal overhead, which represent the binding margin constraint in the pre-scale phase (§25.1); annual compliance cost inventory across five categories — SOC 2 Type II recertification ($40,000 base), pen testing ($25,000 base), Vanta/Drata continuous compliance ($18,000 base), cyber liability + E&O insurance ($20,000 base), privacy counsel retainer ($18,000 base) — total base $121,000/year (§25.2); per-deal variable legal overhead model — DPA ($800 base), SCC ($200), MSA redline ($4,500), security questionnaire ($750), DPIA addendum ($600) — total $6,850/deal base (§25.3); compliance cost amortization table showing per-customer fixed compliance allocation declining from $121,000 at 1 customer to $2,420 at 50 customers, with total compliance cost by ARR scenario from $134,700 at $50k ARR (269% ratio) to $292,250 at $5M ARR (6% ratio) (§25.4); seat-count break-even analysis showing required seats per deal to cover compliance burden at each customer-count level — at 15 customers, Growth plan ($96/seat/year) requires 155 seats; Starter plan ($72/seat/year) requires 207 seats — quantifying why Starter deals below 150 seats should be treated as CAC investments, not margin generators, until 20+ customer milestone (§25.5); operating leverage trajectory showing compliance overhead declining from 44% ARR at $350k to 10% at $2M ARR, with 15% ARR as the health threshold corresponding to ~$1.2M enterprise ARR (§25.6); compliance moat analysis quantifying SOC 2 as unlocking ~85% of intended enterprise TAM, reducing time-to-close by 5–12 weeks, and delivering 6–12× ROI on $40,000 audit cost via $240–480k incremental ARR (§25.7); five DEC-030 HMAC-chained compliance spend audit events with 7-year retention: compliance.vendor_contract_signed (HIGH), compliance.audit_initiated (HIGH), compliance.audit_report_received (CRITICAL), compliance.insurance_renewed (HIGH), compliance.per_deal_legal_cost_recorded (MEDIUM) (§25.8); implementation checklist with 10 items across P0/P1 milestones M4–M12 (§25.9); OQ-34 (Year 0 compliance capital not yet in §22.3 cash flow — P0), OQ-35 (self-service DPA tooling to reduce per-deal legal from $6,850 to $3,200 — P1), OQ-36 (D&O insurance threshold — P2) (§25.10). Cross-references: docs/SOC2_READINESS.md §56 (encryption key management evidence), docs/AUDIT_LOG_SCHEMA.md (DEC-030 event registry), docs/INCIDENT_RESPONSE.md R-08 (GDPR breach notification costs), §8.5 (enterprise CAC), §15.4 (audit log infrastructure COGS), §21.5 (discount authority matrix), §22.3 (cash flow — OQ-34 gap), §24.3 (Series A readiness). Owner: compliance-officer + security-engineer + founder.*
+
+---
+
+## 26. Customer Success Team Scaling Economics & CS Cost Model
+
+### 26.1 Purpose and Scope
+
+> Cross-references: `docs/ENTERPRISE.md` (CSM per tier; QBR cadence; privacy floor), §8.2 (one-time implementation + recurring CSM line), §8.4 (enterprise vs. consumer margin comparison), §8.7 (expansion and churn economics), §22.3 (cash flow — CS hire deferred to Month 13), §23.1 (NRR engine), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 event registry).
+
+Section §8.2 records the marginal CSM cost per deal ($250–300/month for Growth, $400–500/month for Enterprise) as a line item in the deal P&L. It does not model:
+
+1. **CS team headcount as a function of total customer count** — at what deal threshold does a dedicated CS hire become economically justified vs. founder-led service?
+2. **CSM capacity** — how many accounts can one CSM carry before quality degrades or churn accelerates?
+3. **CS cost as % ARR** — how does the CS team cost evolve relative to ARR at each scale milestone, and where does it cross the "10% CS cost as % ARR" Series A benchmark?
+4. **QBR economics** — what is the fully-loaded cost of a Quarterly Business Review (QBR), and how does QBR frequency interact with CSM capacity?
+5. **Churn cost avoidance** — what is the NPV of CS investment if it improves net revenue retention by 5–10 pp?
+
+This section fills that gap. All figures are [ESTIMATE] until first 5 enterprise deals are tracked. Owner: customer-success + compliance-officer (privacy floor on any health data surfaced during QBRs) + data-engineer (health score metrics pipeline).
+
+**Privacy floor reminder:** The CS team interacts with aggregate, tenant-level metrics only. No CSM may access individual user health data, individual workout records, or individually-identified engagement scores. Any CS tooling (CRM, health score dashboard) must enforce the same aggregate-only constraint as the admin dashboard (see `docs/ENTERPRISE.md` §Privacy floor for enterprise; `docs/DATA_MODEL.md` §17).
+
+---
+
+### 26.2 CS Coverage Model by Tier
+
+`docs/ENTERPRISE.md` defines three support tiers. This section operationalises their cost structure:
+
+| Tier | Seat range | CS coverage | SLA | QBR frequency | Estimated CS cost/account/month |
+|---|---|---|---|---|---|
+| **Starter** | 50–200 seats | Email-only (no named CSM); shared inbox; 24h response SLA | 24h first response | None (email check-in at 30 days and 90 days) | $150–200 [ESTIMATE] (shared inbox + tooling) |
+| **Growth** | 200–1,000 seats | Named CSM, shared across 12–15 accounts | P0 < 1h, P1 < 4h | Quarterly | $250–300 [ESTIMATE] (§8.2) |
+| **Enterprise** | 1,000+ seats | Named CSM, dedicated (max 6 accounts); CS Director escalation path | P0 < 30 min, P1 < 2h | Monthly | $400–500 [ESTIMATE] (§8.2) |
+
+**Starter support note:** Starter tier does not include a named CSM. The $150–200/month shared inbox cost represents allocated time from the founder or first CS hire answering email, divided across active Starter customers. At 15 Starter customers, this totals $2,250–3,000/month in support cost that does not appear as a line item in any deal's P&L unless tracked explicitly.
+
+---
+
+### 26.3 CSM Capacity Model
+
+CSM capacity is the maximum number of accounts one CS manager can service before either QBR quality degrades or proactive churn signals are missed. Capacity is measured in "ARR under management" and "account count."
+
+#### 26.3.1 Time budget per CSM (Growth-tier accounts)
+
+Assumes a full-time CSM at $75,000 total annual compensation ($6,250/month). Working hours: 160h/month after leave.
+
+| Activity | Time per account per month | At 12 accounts | At 15 accounts | At 20 accounts |
+|---|---|---|---|---|
+| Quarterly QBR preparation (amortized) | 3h | 36h | 45h | 60h |
+| Quarterly QBR delivery (amortized) | 2h | 24h | 30h | 40h |
+| Monthly health score review | 1h | 12h | 15h | 20h |
+| Proactive outreach (at-risk accounts) | 2h [assumes 20% at-risk] | 4.8h | 6h | 8h |
+| Reactive support (P1/P2 escalations) | 1.5h | 18h | 22.5h | 30h |
+| Onboarding (new accounts joining cohort) | 8h one-time, amortized across 12mo | 8h | 10h | 13.3h |
+| Admin (CRM updates, DEC-030 events) | 0.5h | 6h | 7.5h | 10h |
+| **Total** | — | **108.8h** | **136h** | **181.3h** |
+
+**Capacity ceiling:** A single CSM can service 15 Growth-tier accounts within 160h/month with adequate margin (136h used, 24h buffer). At 20 accounts (181h), the CSM is over-capacity; QBR quality degrades first (prep time is cut), followed by proactive outreach. The **hard capacity ceiling is 15 Growth accounts per CSM**, with a soft warning at 13 to allow pipeline ramp-up time before a second hire is needed.
+
+**Enterprise-tier accounts:** Enterprise accounts require ~1.5× the time per account vs. Growth (monthly cadence vs. quarterly; higher escalation frequency; white-label complexity). Hard capacity: **6 Enterprise accounts per CSM**, soft warning at 5.
+
+**Starter accounts:** No dedicated CSM. Shared-inbox support is handled by the founder or first CS hire with a 30-minute daily triage allocation. At 20 Starter accounts, daily triage ≈ 45 minutes. At 40 accounts: 90 minutes. The inflection point where Starter support requires a dedicated support resource is **~30 accounts** (∼2h daily triage, incompatible with founder's sales and product responsibilities).
+
+#### 26.3.2 ARR under management per CSM
+
+ARR under management = total ACV of all accounts on one CSM's book. This is the standard Series A investor metric for CS efficiency.
+
+| CSM type | Account capacity | Representative deal ACV | ARR under management |
+|---|---|---|---|
+| CSM (Growth focus) | 15 accounts | $54,000 (500-seat Growth) | **$810,000** |
+| CSM (Enterprise focus) | 6 accounts | $168,000 (2,000-seat Enterprise) | **$1,008,000** |
+| CSM (mixed Growth + Starter) | 12 Growth + 5 Starter | $54,000 Growth / $14,400 Starter | **$720,000** |
+
+**Industry benchmark:** Early-stage enterprise SaaS CSMs typically manage $500k–$1.5M ARR. FORM's model ($810k–$1M ARR/CSM) sits within this range but should be recalibrated against actual QBR complexity once the first cohort of Growth accounts completes their first quarter. If QBR complexity is higher than modeled (e.g., customers require custom reporting not available in the admin dashboard), effective capacity may drop to 10–12 accounts, reducing ARR under management to $540k–$648k.
+
+---
+
+### 26.4 CS Team Headcount vs. Customer Count
+
+This section models the CS headcount requirement as a function of enterprise customer count, across the three stages defined in §22 (founder-led, first CS hire at M13, Series A CS team).
+
+#### 26.4.1 Stage 1: Founder-led CS (Months 1–12, 1–3 enterprise customers)
+
+During Stage 1, the founder serves as CSM for all enterprise accounts. No additional CS headcount. Cost: founder opportunity cost only (not a cash COGS item). This is economically justified at ≤3 Growth accounts — the founder can deliver 12 QBRs per year (3 accounts × 4 QBRs) within a 6–8h/month time allocation.
+
+**Stage 1 ceiling:** 3 enterprise accounts total. Above 3 accounts, the founder spends >15h/month on CS, which begins to crowd out product and sales capacity. At 4–5 accounts, a CS hire becomes a product velocity decision, not just a cost decision.
+
+#### 26.4.2 Stage 2: First CS hire (Months 13–24, 4–15 enterprise customers)
+
+First CS hire is a generalist Customer Success Manager at $75,000 total annual compensation. The hire carries all active enterprise accounts and inherits the existing 2–3 accounts from the founder.
+
+| Customer count | Starter | Growth | Enterprise | Total CSM requirement | Cash CS cost/month |
+|---|---|---|---|---|---|
+| 4 | 1 | 3 | 0 | 0.25 FTE (founder covers) | $0 [founder time] |
+| 8 | 2 | 5 | 1 | 0.65 FTE (first CS hire justified) | $4,063 [ESTIMATE] |
+| 12 | 3 | 8 | 1 | 0.85 FTE | $5,313 [ESTIMATE] |
+| 15 | 4 | 10 | 1 | 1.0 FTE (at capacity) | $6,250 |
+| 18 | 5 | 11 | 2 | 1.3 FTE (second CS hire trigger) | $8,125 [ESTIMATE] |
+
+**First hire timing:** The §22.3 cash flow model defers a "Founding Engineer" hire to Month 13. A CS hire competes for the same slot. Decision rule: if the customer count at Month 12 is ≥ 8 accounts (Base scenario: 2 deals in Year 1 = 2 accounts — well below threshold), the engineer hire remains the priority. If customer count exceeds 5 (unlikely in Base scenario, possible in Bull), the CS hire should be evaluated against the QBR quality risk of continued founder-led service.
+
+**Bull scenario implication:** In the Bull scenario (3 enterprise deals in Year 1, possible pilot pipeline of 5–6 by Month 12), a dedicated CS hire may be justified as early as Month 9–10, preceding the founding engineer hire. This changes the §22.3.3 Bull scenario burn by +$4,063–$6,250/month from that point.
+
+#### 26.4.3 Stage 3: Dedicated CS team (Months 24+, 15–50+ enterprise customers)
+
+Post-Series A CS team structure. At 30 enterprise customers (mix of Starter, Growth, Enterprise):
+
+| Role | Headcount | Annual compensation [ESTIMATE] | Accounts covered |
+|---|---|---|---|
+| VP of Customer Success | 1 | $140,000 | All (escalation path; board metrics) |
+| Senior CSM (Growth + Enterprise) | 2 | $85,000 each | 12–15 Growth or 5–6 Enterprise each |
+| CSM (Growth) | 1 | $70,000 | 12–15 Growth |
+| Support Specialist (Starter) | 1 | $55,000 | 20–30 Starter (email + async) |
+| **Total** | **5 FTE** | **$435,000/year · $36,250/month** | **30 accounts** |
+
+At 30 accounts (§19.7 Year 2 target of 12 new + 3 retained = 15 total; 30 is the Year 3 target), the CS team cost of $435,000/year against total enterprise ARR:
+
+| ARR at 30 accounts (representative) | CS cost | CS cost as % ARR |
+|---|---|---|
+| $810,000 (15 Growth × $54k ACV) | $435,000 | **53.7%** — unacceptable |
+| $1,620,000 (15 Growth + 10 Starter + 5 Enterprise) | $435,000 | **26.9%** — borderline |
+| $2,700,000 (30 accounts, mix weighting toward Growth) | $435,000 | **16.1%** — acceptable |
+| $4,500,000 (30 accounts, average $150k ACV) | $435,000 | **9.7%** — Series A benchmark met |
+
+**Implication:** A 5-person CS team is only justifiable when average ACV is above $90,000 or account count exceeds 40. Below that, a 2–3 person CS team is the correct structure. See §26.7 for the hiring trigger model.
+
+---
+
+### 26.5 CS Cost as % ARR at Scale Milestones
+
+The standard SaaS benchmark for CS cost as % ARR is **10–15%** at Series A stage and **8–12%** at Series B. Below that threshold, CS is either under-resourced (churn risk) or highly automated (product-led CS). Above 20%, CS is over-staffed relative to revenue — a margin problem that compounds with compliance costs (§25.6).
+
+| Scale milestone | Enterprise accounts | ARR [ESTIMATE] | CS team (FTE) | Annual CS cost | CS cost % ARR |
+|---|---|---|---|---|---|
+| **M12** — Year 1 close | 2–3 | $50k–$80k | 0 (founder-led) | $0 cash | 0% (founder time) |
+| **M18** — first CS hire live | 5–8 | $150k–$250k | 1.0 | $75,000 | **30–50%** — expected at this stage |
+| **M24** — Series A target | 12–15 | $500k–$750k | 1.5–2.0 | $112k–$150k | **15–25%** — declining toward target |
+| **Series A close** | 20–25 | $1M–$1.5M | 2.5–3.0 | $175k–$220k | **12–18%** — approaching benchmark |
+| **Series B target** | 40–50 | $3M–$5M | 4.0–5.0 | $315k–$435k | **8–12%** — benchmark achieved |
+
+**Interpretation:** CS cost as % ARR will be high (30–50%) during the 1–8 account phase. This is normal and expected — the cost is largely fixed (one person) and ARR is low. The path to Series A benchmarks (10–15%) runs through deal size, not headcount cuts: each Growth or Enterprise upgrade to higher-ACV accounts is a structural improvement in the CS cost ratio without any firing.
+
+---
+
+### 26.6 Gross Margin Impact of CS Team Growth
+
+CS cost is a COGS line for enterprise (not an operating expense), because it is directly required to deliver the contracted service level. This section traces how CS headcount scaling affects enterprise gross margin.
+
+Reference deal: Growth tier, 500 seats, $9/seat/month, ACV = $54,000.
+
+#### 26.6.1 Per-account CS cost at each stage
+
+| Stage | CS delivery model | Monthly CS cost per Growth account | Annualised |
+|---|---|---|---|
+| Stage 1 (founder-led) | Founder time (opportunity cost) | $0 cash | $0 |
+| Stage 2 (1 CSM, 12 accounts) | $6,250/mo CSM ÷ 12 accounts | $521 | $6,252 |
+| Stage 2 (1 CSM, 15 accounts) | $6,250/mo CSM ÷ 15 accounts | $417 | $5,004 |
+| Stage 3 (3 CSMs, 30 accounts) | blended cost per §26.4.3 | $375 | $4,500 |
+| Scale (5 CSMs, 50 accounts) | $36,250/mo ÷ 50 accounts | $725 | $8,700 |
+
+**Scale inversion warning:** As the VP CS hire ($140,000/year) enters the team, per-account CS cost temporarily rises from $375 to $725 until account count grows to absorb the fixed cost. This is the CS team cost cliff that must be anticipated in the hiring plan — the VP hire should coincide with a committed pipeline of 30+ accounts, not 20. Hiring the VP prematurely compresses gross margin by 3–5 pp per Growth account.
+
+#### 26.6.2 Gross margin trajectory — Growth account, 500 seats
+
+| Stage | ACV | Infra COGS | One-time impl (amortised Y1) | CS cost | Total COGS | Gross margin |
+|---|---|---|---|---|---|---|
+| Stage 1 (founder CS, Year 1) | $54,000 | $2,040 | $1,500 | $0 cash | $3,540 | **93.4%** |
+| Stage 2 (1 CSM, 12 accts) | $54,000 | $2,040 | $0 (Y2+) | $6,252 | $8,292 | **84.6%** |
+| Stage 2 (1 CSM, 15 accts) | $54,000 | $2,040 | $0 | $5,004 | $7,044 | **87.0%** |
+| Stage 3 (blended, 30 accts) | $54,000 | $2,040 | $0 | $4,500 | $6,540 | **87.9%** |
+| Scale (5 CSMs, 50 accts, pre-VP) | $54,000 | $2,040 | $0 | $4,500 | $6,540 | **87.9%** |
+| Scale (VP CS added, 25 accts) | $54,000 | $2,040 | $0 | $8,700 | $10,740 | **80.1%** |
+
+**Key insight:** The VP CS hire depresses gross margin by 7.8 pp on a Growth account — from 87.9% to 80.1% — if hired before the account base absorbs the fixed cost. At 50 accounts (blended, including larger Enterprise deals), the VP cost amortises to ~$2,800/account/year, restoring GM% to ~89–91%. This creates a strong incentive to time the VP hire to coincide with confirmed pipeline of 40+ accounts, not 20–25.
+
+**Minimum GM% floor for enterprise viability:** The compliance cost analysis in §25.6 identifies a 15% ARR compliance overhead threshold at ~$1.2M enterprise ARR. Combined with CS costs (12–18% ARR at Series A stage), the total support cost stack (CS + compliance) is 27–33% ARR at the $1M–$1.5M ARR milestone. This leaves 54–61% gross margin after both CS and compliance — acceptable for a pre-Series B SaaS business. Gross margin below 50% at this stage is a warning signal requiring investigation of either deal size (too many small Starter accounts) or CS overstaffing.
+
+---
+
+### 26.7 CS Hiring Triggers & Economic Thresholds
+
+The following decision rules operationalise the headcount model. Each trigger is binary (condition met = hire authorised).
+
+| Trigger | Condition | Action | Justification |
+|---|---|---|---|
+| **CS-HIRE-01** | Active enterprise accounts ≥ 5 AND founder QBR hours > 15h/month for two consecutive months | Initiate first CSM hire at $70k–$75k total comp | Founder crowding out product capacity; churn risk rising |
+| **CS-HIRE-02** | Active enterprise accounts ≥ 13 AND current CSM at-risk flag rate > 20% | Open second CSM hire | Single CSM approaching hard capacity ceiling (§26.3.1) |
+| **CS-HIRE-03** | Enterprise ARR ≥ $1.5M AND deal mix ≥ 30% Enterprise tier (1,000+ seats) | Evaluate VP CS hire | Enterprise-tier complexity (monthly QBRs, white-label, custom SLAs) exceeds standard CSM scope |
+| **CS-HIRE-04** | Starter account count ≥ 30 AND founder/CSM daily triage time > 90 min | Hire Support Specialist at $50k–$55k | Starter support volume requires specialised asynchronous support model |
+| **CS-HIRE-05** | Net Revenue Retention (NRR) < 100% for two consecutive quarters despite CS intervention | Hire senior CSM / CSM lead with enterprise expansion focus | NRR below 100% is an expansion motion failure, not just a churn problem; requires a CS profile that can identify and close expansion opportunities |
+
+**Anti-trigger (hiring guard):** Do not hire a VP CS before CS-HIRE-03 is met. The $140,000 VP hire is a margin-compressing fixed cost that does not generate revenue directly. A strong senior CSM ($85,000) with a VP title internally is preferable until $1.5M enterprise ARR — at which point a VP with external credibility (investor relations, QBR executive presence) generates positive ROI.
+
+---
+
+### 26.8 QBR Economics & Efficiency Ratios
+
+#### 26.8.1 Fully-loaded QBR cost
+
+A Quarterly Business Review (QBR) requires preparation, delivery, and follow-up. The fully-loaded cost includes CSM time and the customer's time (measured as a customer success investment, not a FORM cost, but relevant to whether customers participate).
+
+| Activity | FORM hours | FORM cost (CSM at $37.50/h) | Notes |
+|---|---|---|---|
+| Data pull and health score assembly | 2h | $75 | Pulling aggregate metrics from admin dashboard; structured report |
+| Slide/deck preparation | 3h | $112.50 | QBR template; customisation for customer's goals |
+| QBR delivery (60-min call) | 1h | $37.50 | CSM + (optional) CS Director or AE for at-risk accounts |
+| Action item follow-up and CRM update | 1h | $37.50 | DEC-030 event emission; CRM notes; action items to customer |
+| **Total per QBR** | **7h** | **$262.50** | — |
+| **Annual QBR cost per Growth account (4× per year)** | **28h** | **$1,050** | — |
+| **Annual QBR cost per Enterprise account (12× per year, monthly cadence)** | **84h** | **$3,150** | — |
+
+**QBR cost as % of ACV:**
+
+| Tier | ACV | Annual QBR cost | QBR cost % ACV |
+|---|---|---|---|
+| Growth (500 seats × $9/seat) | $54,000 | $1,050 | **1.9%** |
+| Enterprise (2,000 seats × $7/seat) | $168,000 | $3,150 | **1.9%** |
+| Starter — no formal QBR | $14,400 | $0 | 0% |
+
+The QBR cost is remarkably consistent at ~2% ACV across tiers. This is structurally sound — the QBR is the primary churn-prevention investment and its cost scales proportionally to the account's value to FORM.
+
+#### 26.8.2 QBR ROI: churn avoidance
+
+The economic case for QBRs is churn avoidance, not customer satisfaction per se. If a QBR prevents one logo churn per year (out of a 15-account book), the ROI is:
+
+| Prevented churn | Recovered ARR | QBR cost for 15 Growth accounts | QBR ROI |
+|---|---|---|---|
+| 1 Growth logo ($54,000 ACV) | $54,000 | $15,750/year | **3.4× in year 1** |
+| 1 Growth logo + 3-year LTV | $147,420 (§8.6) | $47,250 (3 years QBR) | **3.1× over 3 years** |
+
+If QBRs prevent even one logo churn out of 15, they pay for themselves 3× over. This is the investment framing for the CS hiring decision at CS-HIRE-01: the first CSM does not cost $75,000/year — they protect $540,000–$810,000 in ARR that would otherwise churn at 10–20% annually without structured engagement.
+
+#### 26.8.3 Minimum viable QBR content (privacy floor enforced)
+
+All QBR data shown to the customer must pass the privacy floor:
+
+| Metric | Shown in QBR? | Privacy status | Notes |
+|---|---|---|---|
+| % of invited employees who activated | ✅ Yes | Aggregate-only | Min denominator: 5 activated to display (k-anonymity) |
+| Weekly active % (of activated) | ✅ Yes | Aggregate-only | Same k-anonymity floor |
+| Average weekly workouts per activated user | ✅ Yes | Aggregate-only | No per-user breakdown |
+| Opt-in NPS (if collected) | ✅ Yes | Voluntary + aggregate | Individual responses never shown |
+| Engagement trend (month-over-month) | ✅ Yes | Aggregate time series | No individual trend lines |
+| Department-level breakdown | ❌ No | Privacy floor violation | Manager-reports never available per ENTERPRISE.md |
+| Individual user workout history | ❌ No | Privacy floor violation | HR never sees individual data — hard constraint |
+| Body composition metrics (any) | ❌ No | GDPR Art. 9 — never aggregated | Body composition data never aggregated to employer |
+| Mental health flag rates | ❌ No | GDPR Art. 9 — never aggregated | Mental health data never aggregated to employer |
+
+**CSM compliance training requirement:** Every CSM must complete a privacy-floor training module before their first QBR. The training must cover: (1) what data is and is not available in the admin dashboard; (2) how to respond to a customer's request for individual user data ("Our privacy floor is a contractual and architectural constraint — this data does not exist in a reportable form for any employer"); (3) the escalation path if a customer's procurement team pressures for individual data as a contract amendment condition (escalate to compliance-officer; answer is always no). Owner: compliance-officer + customer-success.
+
+---
+
+### 26.9 Churn Signal Detection & CS Cost Avoidance
+
+The CS investment is most efficiently deployed when churn is predicted 60–90 days in advance — far enough to intervene, close enough to be accurate. This section defines the health score model and its economic implications.
+
+#### 26.9.1 FORM Enterprise Health Score (FEHS)
+
+The FORM Enterprise Health Score is a 0–100 composite metric calculated monthly for each enterprise tenant. It combines leading indicators of churn risk. All inputs are aggregate-only (privacy floor compliant).
+
+| Signal | Weight | Green | Yellow | Red |
+|---|---|---|---|---|
+| Activation rate (% invited employees who activated) | 25% | ≥ 40% | 25–40% | < 25% |
+| Weekly active rate (% of activated, rolling 4-week) | 25% | ≥ 50% | 30–50% | < 30% |
+| Seat utilisation trend (month-over-month change) | 20% | Increasing | Flat | Declining ≥ 10% |
+| Last executive engagement (days since last QBR or champion contact) | 15% | < 45 days | 45–90 days | > 90 days |
+| Support ticket volume trend (month-over-month) | 10% | Stable or decreasing | Slight increase | ≥ 2× month-over-month |
+| Contract renewal distance (months until renewal) | 5% | > 6 months | 3–6 months | < 3 months (renewal risk) |
+
+**Score thresholds:**
+
+| FEHS | Status | CS action |
+|---|---|---|
+| 75–100 | Green — healthy | Routine QBR; expansion outreach when FEHS > 85 |
+| 50–74 | Yellow — at-risk | Proactive CSM outreach within 5 business days; root cause identification; remediation plan |
+| 25–49 | Red — high churn risk | CSM + CS Director joint outreach within 2 business days; executive sponsor engagement; recovery plan |
+| 0–24 | Critical — likely churning | Founder + CSM joint call within 24h; escalation path per INCIDENT_RESPONSE §12 |
+
+#### 26.9.2 Economic impact of early churn detection
+
+If FEHS drops to Red status 90 days before renewal vs. 30 days before renewal, the intervention window difference is 60 days. In that 60-day window, FORM can:
+- Complete one additional executive QBR
+- Deliver a custom adoption workshop
+- Offer a contract amendment (seat expansion, feature unlock) to re-engage the champion
+
+Estimated churn prevention probability increase with 90-day vs. 30-day detection: 30–40 pp [ESTIMATE — replace after first 5 churn events]. On a 10-account Growth cohort ($540,000 ARR), moving from 30-day to 90-day detection and increasing save rate by 30 pp prevents:
+
+```
+Prevented churn = 0.30 (save rate uplift) × 0.20 (base churn rate) × $540,000 ARR
+              = 0.06 × $540,000
+              = $32,400 ARR saved per cohort per year [ESTIMATE]
+```
+
+Against an annual FEHS computation infrastructure cost of approximately $200–500/month (data-engineer time + Supabase materialized view compute — see §26.11), the ROI is:
+
+```
+FEHS ROI = $32,400 ARR saved / $3,600 FEHS infrastructure cost = 9× [ESTIMATE]
+```
+
+This justifies full investment in the health score pipeline at any stage above 5 enterprise customers.
+
+---
+
+### 26.10 DEC-030 Customer Success Audit Events
+
+CS events must be emitted to the HMAC-chained audit log for two purposes: (1) SOC 2 A1.1 (availability commitments — QBR completion is evidence of SLA commitment fulfillment); (2) investor data room — CS metrics derived from audit events are the NRR foundation (§23.1) and Series A diligence artefacts (§24.3).
+
+**Privacy constraint:** All CS audit events are tenant-scoped aggregate events. No CS event may include `user_id`, individual session identifiers, or health data fields. Events include `tenant_id`, account-level metrics only. The CS event pipeline must be reviewed by compliance-officer before any new field is added.
+
+| Event type | Severity | Key metadata fields | Retention | Notes |
+|---|---|---|---|---|
+| `enterprise.qbr_completed` | STANDARD | `tenant_id`, `qbr_date`, `csm_user_id` (internal admin ID, not customer user), `qbr_type` (quarterly / monthly / kickoff / offboarding), `fehs_score_at_qbr` (0–100), `activation_rate_pct` (aggregate), `weekly_active_rate_pct` (aggregate), `action_items_count`, `customer_exec_attended` (bool) | 7 years | Emitted by CSM via admin tooling immediately after QBR completion; not self-reported — requires CSM authentication + `tenant_id` confirmation |
+| `enterprise.health_score_updated` | STANDARD | `tenant_id`, `fehs_score` (0–100), `fehs_status` (green/yellow/red/critical), `score_delta` (change from previous month), `primary_risk_signal` (enum: activation_low / wau_declining / seat_utilisation_falling / champion_dark / support_spike / renewal_imminent), `computed_by` (cron job identifier) | 3 years | Emitted monthly by FEHS computation cron; not by CSM; fully automated |
+| `enterprise.churn_signal_flagged` | HIGH | `tenant_id`, `signal_type` (enum: fehs_red / fehs_critical / seat_utilisation_below_threshold / champion_departure_reported / competitor_evaluation_flagged / renewal_declined / legal_hold_requested), `signal_date`, `csm_user_id` (CSM who flagged), `escalated_to_director` (bool), `recovery_plan_initiated` (bool) | 7 years | Emitted when CSM manually flags a churn signal OR when FEHS computation crosses Red threshold; both paths emit the same event type |
+| `enterprise.renewal_negotiation_started` | STANDARD | `tenant_id`, `current_acv_usd`, `proposed_acv_usd`, `renewal_date`, `seat_change` (delta: positive = expansion, negative = contraction), `negotiation_owner` (csm / founder / ae), `csm_user_id` | 7 years | Emitted when renewal outreach begins (typically 90 days before contract end); not at close — `subscription_events.subscription_renewed` (DATA_MODEL §24) handles the close event |
+| `enterprise.account_expanded` | STANDARD | `tenant_id`, `expansion_type` (enum: seat_add / tier_upgrade / new_module / multi_year_commit), `seats_before`, `seats_after`, `acv_before_usd`, `acv_after_usd`, `expansion_mrr_usd`, `csm_user_id`, `expansion_trigger` (enum: champion_led / csm_led / qbr_led / organic_usage) | 7 years | Emitted at contract amendment execution (not at opportunity creation); `expansion_trigger` field distinguishes CSM-driven expansion from organic |
+| `enterprise.account_churned` | CRITICAL | `tenant_id`, `churn_date`, `churn_reason` (enum: budget_cut / product_fit / champion_departure / competitor / employer_offboarding / privacy_concern / pricing / unknown), `final_acv_usd`, `total_lifetime_arr_usd`, `months_as_customer`, `fehs_at_churn`, `last_qbr_date`, `was_at_risk_flagged` (bool — was churn_signal_flagged emitted before churn?) | 7 years | CRITICAL severity because churn is the primary revenue risk; `was_at_risk_flagged` enables retrospective analysis of whether FEHS detected the churn in time; feeds §26.9 detection model calibration |
+
+**HMAC chain integrity:** All six events must be appended to the DEC-030 chain per `docs/AUDIT_LOG_SCHEMA.md`. The `enterprise.account_churned` CRITICAL event must be followed by the `enterprise.offboarding_initiated` event from `docs/DATA_MODEL.md §25` within 24 hours of `churn_date` confirmation. A gap between these two events (churn marked but offboarding not initiated) is a process failure that should appear in the FEHS audit trail.
+
+---
+
+### 26.11 Implementation Checklist
+
+| Item | Priority | Milestone | Owner | Definition of Done |
+|---|---|---|---|---|
+| Build FEHS computation cron (§26.9.1): monthly Supabase Edge Function reading aggregate metrics from `tenant_health_snapshots` materialized view (DATA_MODEL §17); compute weighted score per §26.9.1 formula; write result to `tenant_health_scores` table; emit `enterprise.health_score_updated` DEC-030 event | P0 | M5 (before first enterprise pilot) | data-engineer + platform-engineer | Cron runs monthly; FEHS scores visible in admin dashboard for internal use; DEC-030 event emitted; no individual user data in any table or event |
+| Implement CSM admin tooling for QBR completion logging: internal admin page (authenticated via Cloudflare Access) allowing CSM to record QBR completion, upload QBR deck link (not contents), note action items, and emit `enterprise.qbr_completed` DEC-030 event | P1 | M5 | platform-engineer | Admin page deployed; QBR event emitted correctly; CSM privacy-floor training completed before first QBR |
+| Register all six CS DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` with full Zod schema, severity, retention, and privacy notes | P0 | M5 | platform-engineer + compliance-officer | All events registered; HMAC chain linkage between `enterprise.account_churned` and `enterprise.offboarding_initiated` documented in runbook |
+| Build FEHS dashboard panel in admin dashboard (internal view — not customer-facing): show all enterprise tenants ranked by FEHS score, colour-coded by status; drill-down to signal breakdown per tenant | P1 | M6 | data-engineer + design-craft | FEHS panel deployed in admin dashboard internal view; no individual user data shown; CS director can view all tenants; CSM can view their own book |
+| CSM privacy-floor training module: written guide covering (1) what data is and is not available in admin dashboard; (2) how to respond to individual data requests; (3) escalation path; reviewed by compliance-officer | P0 | M5 (before first CSM hire or first QBR) | compliance-officer + customer-success | Training document complete and reviewed by compliance-officer; completion tracked (logged in CSM onboarding checklist) |
+| Add FEHS Red/Critical to PagerDuty alert routing: `enterprise.health_score_updated` event with `fehs_status: critical` triggers PagerDuty P1 to CS Director and founding team within 5 min of event emission | P1 | M6 | devops-lead | PagerDuty rule created; test critical event fired in staging; alert received within 5 minutes |
+| Add CS metrics to investor dashboard (Metabase): NRR by cohort (from `enterprise.account_expanded` and `enterprise.account_churned` events); average FEHS by tier; QBR completion rate (QBRs completed / QBRs scheduled per quarter) | P1 | M8 | data-engineer | Metabase dashboard panel deployed; NRR metric computation validated against §23.1 NRR engine; visible to founder and investors with read-only Metabase access |
+| Update §22.3 cash flow model to include CS hire scenario: add a conditional "CS hire at M10" column to §22.3.3 Bull scenario showing the cash impact of an early CS hire vs. the Base scenario M13 engineer hire | P2 | M6 | founder + data-engineer | §22.3 updated with CS-hire variant; OQ-CS-01 resolution path documented |
+| Document CS OKRs in OKRS_2026.md: add CS-specific OKRs for QBR completion rate (target 100%), FEHS average ≥ 70, NRR ≥ 105%, churn signal detection lead time ≥ 60 days | P2 | M6 | customer-success + product-manager | OKRs added; baseline for measurement set at first cohort QBR completion |
+
+---
+
+### 26.12 Open Questions
+
+**OQ-CS-01: Should the first CS hire precede or follow the founding engineer hire at Month 13?**
+
+The §22.3 Base scenario defers all hiring to Month 13, where a founding engineer is assumed. If the customer count at Month 12 exceeds 5 (possible in the Bull scenario or with an accelerated pilot pipeline), a CS hire becomes the higher-priority hire. The CS hire ($70k–$75k) is cheaper than an engineer ($100k in §22.3.3), provides faster time-to-value for at-risk accounts, and protects the ARR base that funds the engineer hire later. Decision rule proposal: at Month 9, if active enterprise customers ≥ 4 AND founder QBR hours ≥ 12h/month, replace the M13 engineer hire with a M11 CS hire + M16 engineer hire. Owner: founder + product-manager. Priority: **P0 — decision must be made before Month 9 to allow recruiting lead time.** Resolution: establish a clear decision gate at the Month 9 board review using the trigger criteria above.
+
+**OQ-CS-02: Should FEHS be visible to the customer in the admin dashboard, or is it internal-only?**
+
+The FEHS score computed in §26.9.1 uses data that is already visible to customers in the admin dashboard (activation rate, weekly active rate). Making FEHS visible to customers would (a) increase transparency and trust, (b) give customers a single headline metric for their health programme, and (c) reduce the CSM time spent explaining raw metrics. Risk: if FEHS drops to Red, a customer seeing their own Red score may panic and escalate before FORM has a recovery plan ready, compressing the intervention window. Alternative: provide a customer-facing "wellness programme health" label (Good / Needs Attention / At Risk) that is coarser than the internal 0–100 score. Owner: product-strategist + customer-success. Priority: **P1 — decide before admin dashboard v2.** Resolution: ship internal-only FEHS at M5; evaluate customer-facing version at M8 after first two QBR cycles.
+
+**OQ-CS-03: What is the right k-anonymity floor for QBR aggregate metrics?**
+
+§26.8.3 states a k=5 floor (at least 5 activated users before any aggregate metric is displayed). This matches the admin dashboard spec in `docs/DATA_MODEL.md §17`. However, for small Starter customers (50 seats, 30% activation = 15 activated users), a k=5 floor means QBR metrics become available from the first cohort. For very small pilots (25 seats, 30% activation = 7–8 activated), k=5 may still be too low for body-metric or health-adjacent aggregates. Recommendation: maintain k=5 for engagement metrics (activation rate, weekly active), but raise to k=10 for any aggregate that touches health-adjacent data (e.g., average workout frequency, recovery scores). Owner: compliance-officer + clinical-safety. Priority: **P1 — before first QBR.** Resolution: compliance-officer to confirm floor with outside counsel for GDPR Art. 9 data categories; update §26.8.3 and admin dashboard spec accordingly.
+
+**OQ-CS-04: Should `fehs_score_at_qbr` in the `enterprise.qbr_completed` event include the individual signal weights?**
+
+The `enterprise.qbr_completed` event records the FEHS score at the time of the QBR but not the breakdown by signal (activation, WAU, seat trend, etc.). Including the signal breakdown in the event payload would enable retrospective analysis of which signal types most reliably predict churn. Excluding it keeps the event payload simpler and reduces the risk of a future schema interpretation error. Risk: without signal-level granularity in the QBR event, the churn prediction model (§26.9.2) can only be calibrated against total FEHS score, not individual signals. Owner: data-engineer. Priority: **P2.** Resolution: include signal weights in a `fehs_breakdown` JSONB field from Day 1 — retrofitting this after 12 months of QBR data is significantly more expensive than including it upfront.
+
+---
+
+*v1.7 additions: §26 Customer Success Team Scaling Economics & CS Cost Model — fills the gap between §8.2's single CSM line-item ($250–500/month) and the full CS team cost, hiring trigger, and gross margin model. §26.1 purpose and privacy floor reminder (CS tooling must enforce aggregate-only constraint identical to admin dashboard; CSM may not access individual health data). §26.2 CS coverage model by tier: Starter email-only $150–200/month shared inbox; Growth named CSM shared 12–15 accounts $250–300/month; Enterprise dedicated CSM max 6 accounts $400–500/month. §26.3 CSM capacity model: 7-activity time budget per account; hard capacity ceiling 15 Growth accounts or 6 Enterprise accounts per CSM; ARR under management $810k–$1M per CSM (within $500k–$1.5M industry benchmark). §26.4 CS team headcount vs. customer count: three stages (founder-led 1–3 accounts; first CS hire M13 4–15 accounts; Series A team 15–50+ accounts); Bull scenario implication that CS hire may precede engineer hire. §26.5 CS cost as % ARR: 30–50% at 5–8 accounts (expected at stage); declining to 12–18% at Series A; reaching 8–12% Series B benchmark at $3M–$5M ARR. §26.6 gross margin impact: per-account CS cost range $375–$725/month depending on team structure; VP CS hire depresses Growth account GM by 7.8 pp until account base absorbs fixed cost; combined CS + compliance cost stack 27–33% ARR at $1M–$1.5M milestone (54–61% GM floor). §26.7 five CS hiring triggers (CS-HIRE-01 through CS-HIRE-05) with anti-trigger against premature VP CS hire. §26.8 QBR economics: fully-loaded QBR cost $262.50 per QBR (7h at $37.50/h CSM rate); QBR cost consistently ~2% ACV across tiers; QBR ROI 3.4× in Year 1 if one logo churn prevented per year; minimum viable QBR content table with privacy floor column (department-level breakdown, individual workout history, body composition, mental health flags all excluded). §26.9 FEHS (FORM Enterprise Health Score): 6-signal composite 0–100 score (activation 25%, WAU 25%, seat utilisation 20%, executive engagement 15%, support volume 10%, renewal distance 5%); four status bands green/yellow/red/critical with CS action SLAs; churn detection ROI 9× on $200–500/month infrastructure cost. §26.10 six DEC-030 HMAC-chained CS events with privacy constraint (aggregate-only, no user_id): enterprise.qbr_completed (STANDARD, 7yr), enterprise.health_score_updated (STANDARD, 3yr), enterprise.churn_signal_flagged (HIGH, 7yr), enterprise.renewal_negotiation_started (STANDARD, 7yr), enterprise.account_expanded (STANDARD, 7yr), enterprise.account_churned (CRITICAL, 7yr); HMAC chain linkage requirement between account_churned and offboarding_initiated events. §26.11 nine-item implementation checklist (5× P0 M5–M6, 3× P1 M6–M8, 1× P2 M6). §26.12 four open questions: OQ-CS-01 (CS hire vs. engineer hire order — P0, Month 9 decision gate), OQ-CS-02 (FEHS customer visibility — P1, admin dashboard v2), OQ-CS-03 (k-anonymity floor for health-adjacent QBR metrics — P1, before first QBR), OQ-CS-04 (signal weights in qbr_completed event — P2, include from Day 1). Cross-references: docs/ENTERPRISE.md (CSM per tier; QBR cadence; privacy floor), docs/DATA_MODEL.md §17 (aggregate-only admin reporting schema), docs/AUDIT_LOG_SCHEMA.md (DEC-030 registry), docs/INCIDENT_RESPONSE.md §12 (enterprise tenant SLA breach protocol), §8.2 (CSM line-item per deal), §8.7 (expansion and churn economics), §22.3 (cash flow — CS hire timing vs. engineer hire), §23.1 (NRR engine), §24.3 (Series A readiness), §25.6 (compliance cost as % ARR — combined with CS cost for total support stack analysis). Owner: customer-success + compliance-officer + data-engineer.*
