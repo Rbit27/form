@@ -6,6 +6,25 @@
 
 ---
 
+## [1.83.1] — 2026-06-03
+
+### Added
+- `docs/OBSERVABILITY.md §30` — Key Management & Cryptography Observability; operational counterpart to CRYPTOGRAPHY_POLICY.md (policy) і SOC2_READINESS.md §56 (key inventory); 8-key inventory table; `form-crypto-health` KV namespace; RED metrics для key-rotation-scheduler і key-rotation-verifier; чотири KEY-SLOs (rotation cadence, expiry alert lead time, HMAC verify sequencing, red-state duration); AL-KEY-01/02/03/04 (imminent/overdue/HMAC cadence/verify missing); CRYPTO-CHAIN-01/02/03/04 DEC-030 monitors; 9-panel "Cryptographic Health" dashboard; CRYPTO-E-001–E-008 SOC 2 evidence artefacts; closes OQ-ENC-03 (admin.encryption_key_rotated event) у чеклисті §30.10; v1.7 → header updated; clinical-safety NOT REQUIRED
+- `docs/OBSERVABILITY.md` TOC — додано §30 рядок
+
+---
+
+## [1.83.0] — 2026-06-03
+
+### Added
+- `content/post-197-training-cognitive-function.md` — Тренінг і когнітивна функція; Erickson et al. (2011 PNAS) гіпокамп +2% при аеробному тренінгу; BDNF (три молекулярних шляхи: IGF-1/іризин/CREB); Lambourne & Tomporowski (2010) мета-аналіз 40 досліджень гострих ефектів; аеробний vs силовий (різні когнітивні профілі: гіпокамп vs executive function); нейропротекція vs когнітивне покращення (чому ефект малий у молодих здорових); sleep як обов'язковий посередник BDNF-консолідації (Walker 2002, Tononi & Cirelli 2006); наслідки для програмування (аеробний компонент не баласт, тренінг перед розумовою роботою, технічна складність як кортикальна реорганізація); clinical-safety NOT REQUIRED
+- `content/post-198-sympathoadrenal-axis-training.md` — Симпатоадреналова вісь при тренінгу; Galbo (1983) катехоламінові піки при різних інтенсивностях (норадреналін лінійний від 30% VO2max, адреналін непропорційний при анаеробних зусиллях); архітектура осі (наднирковий мозок як нейроендокринний перетворювач); β1/β2/β3 і α1/α2 рецептори (глікогеноліз, ліполіз, вазоконстрикція); функціональний симпатоліз (Thomas 1997); β2 і MPS через mTOR (Hinkle 2004); хронічна адаптація — downregulation β-рецепторів у спокої (Brodde 1992); тренінг при психологічному стресі — адитивна катехоламінова відповідь (Sothmann 1996); недосипання і симпатична гіперактивація (Leproult 2010, Myllymäki 2011); overtraining симпатична vs парасимпатична форма (Meeusen 2013); кофеїн +50–100% адреналін (Bell 2002); наслідки для програмування (об'єм на тлі стресу, HRV як маркер, паузи між підходами, денний час тренінгу); clinical-safety NOT REQUIRED
+
+### Fixed
+- `README.md` — post-197 і post-198 відмічені як [x] у content roadmap
+
+---
+
 ## [1.82.1] — 2026-06-03
 
 ### Added
