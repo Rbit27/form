@@ -6,6 +6,13 @@
 
 ---
 
+## [1.86.0] — 2026-06-04
+
+### Added
+- [`content/post-206-strength-vs-power.md`](content/post-206-strength-vs-power.md) — Сила vs потужність: F-V крива, Wilson (1993), Behm & Sale (1993), Cormie et al. (2011), SSC (sports-scientist · clinical-safety: NOT REQUIRED)
+
+---
+
 ## [1.85.4] — 2026-06-04
 
 ### Added
