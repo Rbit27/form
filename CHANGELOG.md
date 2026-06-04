@@ -6,6 +6,13 @@
 
 ---
 
+## [1.93.0] — 2026-06-04
+
+### Added
+- `docs/SOC2_READINESS.md §63` — PI1 Processing Integrity Controls: CV coaching pipeline accuracy, completeness & timeliness. 10×P0 + 7×P1 + 3×P2 checklist items, 6 evidence artefacts (PI-E-001..006), 3 open questions (OQ-PI-01/02/03). OQ-PI-03 flagged as Type II observation period blocker. Owner: compliance-officer + ML eng.
+
+---
+
 ## [1.92.0] — 2026-06-04
 
 ### Added

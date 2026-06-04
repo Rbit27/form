@@ -20162,3 +20162,265 @@ OQ-PT-01 remains P2 priority. It does not block the M6 engagement letter. Resolu
 ---
 
 *v1.0 (2026-06-04): §62 Pentest Pre-Engagement Requirements: OQ-PT-02, OQ-PT-03, OQ-PT-04 Resolution — CC9.2 / P3.1 / CC6.1. Resolves all three P1 M5 open questions from §61.12 that block M6 engagement letter signing. §62.1 purpose: M5 deadline, three P1 OQs blocking engagement letter, compliance debt rationale. §62.2 OQ-PT-02 🟢 Resolved: Supabase AUP permits customer pentests without carve-out letter; two mandatory procedures: (1) notification email to security@supabase.com ≥5 business days before test start referencing project ref and dates, filed as PT-E-007; (2) engagement letter shared-responsibility carve-out clause limiting scope to FORM-controlled surfaces (PostgREST config, RLS policies, Auth callbacks, SCIM API, Cloudflare Worker logic) and excluding Supabase managed database engine, network infra, and hosting layer by name. §62.3 OQ-PT-03 🟢 Resolved: DPIA amendment NOT required provided all 5 conditions satisfied — C1 synthetic fixtures only (SBF-001: pseudorandom Float32Array[17×3], realistic joint coordinate ranges, never derived from real users, min 50 sessions, AES-256-GCM encrypted); C2 vendor zero access to production health tables; C3 staging environment isolation with synthetic data only; C4 halt-and-assess within 24h if production data accidentally accessed; C5 engagement letter biometric prohibition clause (per §61.7). SBF-001 protocol filed in R2 before test start. §62.4 OQ-PT-04 🟢 Resolved: two-layer decision — Layer A destructive tests (chain injection, replay, truncation, hash collision probe) staging ONLY never production; Layer B read-only production enumeration permitted under 4 conditions: B1 compliance-officer emits admin.pentest_chain_enumeration_authorised (NEW DEC-030 event: HIGH, 7yr, emit-audit-event Worker only, payload: engagement_id, authorised_by, authorisation_date, vendor_name, enumeration_scope, production_flag, staging_only_destructive_tests_confirmed) before any production query; B2 audit-chain-verify Edge Function aggregate query only (no free-form SQL, no payload content); B3 read-only service role scoped to audit_log_events SELECT only, 48hr max, immediate revocation; B4 no payload content in vendor findings. PT-E-005 clarification: post-remediation artefact run by security-engineer, NOT vendor deliverable, NOT part of adversarial test. §62.5 PT-E-007 added to artefact register: Supabase notification email, .eml in R2, 7yr retention, chain-of-custody via admin.pentest_initiated payload fields. §62.6 updated checklist: 5× P0 additions (PT-P0-06 through PT-P0-10) and 1× P1 addition (PT-P1-06 AUDIT_LOG_SCHEMA registration of new event type). §62.7 TSC mapping: CC9.2 (PT-E-007 + carve-out clause = vendor boundary management), P3.1 (SBF-001 + 5 conditions = Art. 9 data not disclosed to vendor), CC6.1 (Layer B credential scoping + authorisation event = logical access controls evidenced under adversarial conditions). §62.8 implementation checklist: 8 sequential items (event registry M5, engagement letter clauses M5, Supabase notification M6-5bdays, PT-E-007 R2 filing same day, SBF-001 generation M6-3bdays, engagement letter signing + admin.pentest_initiated event M6-1bday, Layer B authorisation event + credential issuance before first production query, PT-E-005 post-remediation chain verification M6+4wk). §62.9 open questions: OQ-PT-01 remains open P2 M10; OQ-PT-02/03/04 🟢 Resolved.*
+
+---
+
+## §63 Processing Integrity Controls — PI1 Trust Service Criteria: CV Coaching Pipeline Accuracy, Completeness & Timeliness
+
+### 63.1 Purpose
+
+This section establishes FORM's formal control framework for the PI1 Processing Integrity trust service criteria as they apply to the on-device computer vision (CV) coaching pipeline. Processing Integrity is an in-scope trust service criterion for the SOC 2 Type II engagement. It has not previously received a dedicated section in this document; §63 is its canonical home.
+
+PI1 requires that system processing is complete, valid, accurate, timely, and authorised. For FORM, the system being assessed is the end-to-end coaching pipeline: from video frame capture on-device, through Core ML pose estimation inference, through form scoring logic, to the coaching feedback delivered to the user. Because this pipeline operates primarily on-device and processes biometric data (joint keypoints constitute Art. 9 special-category personal data under GDPR and sensitive personal information under CCPA/CPRA), the PI1 controls intersect directly with §60 (Privacy — P-series) and must be read alongside it.
+
+Three design characteristics create non-trivial PI1 control challenges that an auditor will probe:
+
+1. **On-device inference.** The CV model runs inside iOS Core ML. FORM's servers never receive raw keypoint data unless the user explicitly opts in to form feedback sync. This means FORM cannot directly instrument the inference pipeline the way it can instrument server-side processing. Evidence of completeness and accuracy must be reconstructed from the structured data the device emits on sync, from DEC-030 audit events, and from the static guarantees of the Core ML runtime.
+
+2. **Offline operation.** A user may complete a coaching session without any network connectivity. The session record, including the model version that ran, must be included in the sync payload when connectivity is restored. Until OQ-PI-01 is resolved, there is a gap: if a device never syncs (e.g., app is uninstalled), the coaching record may be lost entirely. This is documented as an accepted limitation pending resolution.
+
+3. **Partial analysis.** When joints are occluded for more than 5 consecutive frames, the session is downgraded to `partial_analysis` status. This status affects the completeness and accuracy assertions FORM can make about that session's coaching output. Controls must ensure: (a) the downgrade is recorded durably; (b) the user is informed in the coaching feedback UI; (c) the audit trail reflects the degraded status. OQ-PI-02 tracks the UX disclosure wording.
+
+The confidence threshold of 0.6 is a design parameter chosen during model development. It has not yet been validated through a formal empirical accuracy study. Until such a study is completed and its results filed as PI-E-006, FORM cannot assert in a SOC 2 management assertion that the threshold produces outputs of known accuracy. OQ-PI-03 tracks this validation requirement as a P0 blocker for the Type II observation period.
+
+Cross-references: docs/DATA_MODEL.md (coaching_sessions schema), docs/OBSERVABILITY.md §22 (AI Coaching Quality Observability), docs/AUDIT_LOG_SCHEMA.md (DEC-030 coaching.* events).
+
+---
+
+### 63.2 PI1 Sub-Criteria Controls
+
+#### 63.2.1 PI1.1 — Completeness of Input Processing
+
+**Criterion statement (paraphrased):** The system processes inputs completely, capturing all data submitted for processing without silent omission.
+
+**FORM interpretation:** Every video frame submitted to the Core ML inference engine must be processed or, if skipped by design, the skip must be intentional, recorded, and bounded. Silent frame drops — frames that the capture pipeline accepted but the inference engine never processed — must be detectable.
+
+**Control PI1.1-C1: Frame capture integrity contract**
+
+The iOS AVFoundation capture session is configured at 30fps. Frames are delivered to the inference pipeline via a CMSampleBuffer queue. The inference pipeline is designed to process every 3rd frame (effective 10fps scoring rate) and discard the intervening 2 frames. This discard is intentional and bounded: discarded frames are not submitted to the inference engine; they are counted in a per-set `frames_captured` counter that is written to the `coaching_sessions` table on session completion. The ratio `frames_analyzed / frames_captured` must fall within [0.31, 0.36] for any session scored at full 10fps rate (accounting for minor timing jitter). Sessions where this ratio falls outside that band are flagged during sync with `analysis_status = partial_analysis` unless a specific `keypoints_missing_count` explanation accounts for the gap.
+
+Control owner: iOS engineering lead. Evidence: PI-E-001 (coaching_sessions schema extract showing frames_captured, frames_analyzed columns), PI-E-002 (unit test suite for AVFoundation frame queue and discard logic).
+
+**Control PI1.1-C2: No silent drops under memory pressure**
+
+iOS may invoke the OS-level frame drop mechanism under memory pressure, delivering a CMSampleBuffer with the `CMSampleBufferIsValid` flag false. The capture pipeline must detect this condition, increment a `frames_dropped_os` counter, and — if `frames_dropped_os` exceeds 5% of `frames_captured` in a given set — emit a `coaching.keypoint_missing` DEC-030 event with `reason: os_frame_drop` and downgrade the set to `partial_analysis`. This prevents FORM from asserting completeness for sessions where the OS silently discarded material input.
+
+Control owner: iOS engineering lead. Evidence: PI-E-002 (unit tests for CMSampleBuffer validity check and OS drop counter).
+
+**Control PI1.1-C3: Sync payload completeness assertion**
+
+When a completed session is synced to the backend (either immediately on connectivity or on reconnect after offline operation), the sync payload must include `frames_captured`, `frames_analyzed`, `frames_dropped_os`, `keypoints_missing_count`, and `analysis_status`. The backend `coaching_sessions` insert endpoint validates that `frames_analyzed <= frames_captured` and that `frames_dropped_os + keypoints_missing_count` is arithmetically consistent with the gap between `frames_captured` and `frames_analyzed`. Payloads that fail this validation are rejected with HTTP 422 and logged as `coaching.session_sync_rejected` (to be added to the DEC-030 registry — see §63.4).
+
+Control owner: backend engineering lead. Evidence: PI-E-001 (coaching_sessions schema), PI-E-003 (backend validation logic unit tests and integration test showing 422 rejection of arithmetically inconsistent payloads).
+
+---
+
+#### 63.2.2 PI1.2 — Accuracy of Input Processing
+
+**Criterion statement (paraphrased):** The system processes inputs accurately, applying defined logic without material error.
+
+**FORM interpretation:** The Core ML model produces a 17×3 Float32Array per frame (17 joints, each with x, y, confidence). Accuracy controls govern: (a) which outputs are trusted for form scoring; (b) what happens when trust is withdrawn for individual joints; (c) how the overall session accuracy characterisation is recorded.
+
+**Control PI1.2-C1: Confidence threshold gate**
+
+Keypoints with confidence < 0.6 are excluded from the form scoring computation. They are not zeroed out, averaged, or substituted; they are explicitly flagged and the scoring algorithm routes around them. The threshold value of 0.6 is stored as a named constant `KEYPOINT_CONFIDENCE_THRESHOLD` in the iOS codebase. It is NOT a magic number. Any change to this constant requires: (a) a PR with a compliance-officer review comment confirming the empirical accuracy validation study (PI-E-006) has been updated; (b) a new model version identifier committed alongside the threshold change; (c) a DEC-030 `coaching.model_config_changed` event emitted at next app launch on each device (event to be added to registry — see §63.4).
+
+Note: the threshold of 0.6 is currently a design parameter without empirical validation backing. OQ-PI-03 (§63.6) is a P0 open question requiring an accuracy validation study before the Type II observation period begins. Until PI-E-006 is filed, FORM's management assertion for PI1.2 must include a qualified statement acknowledging the unvalidated threshold.
+
+Control owner: ML engineering lead. Evidence: PI-E-001 (coaching_sessions schema showing confidence_median column), PI-E-004 (code review records showing KEYPOINT_CONFIDENCE_THRESHOLD constant definition and PR history), PI-E-006 (accuracy validation study — NOT YET FILED; see OQ-PI-03).
+
+**Control PI1.2-C2: Temporal interpolation bounds**
+
+When a joint's confidence drops below 0.6 for consecutive frames, the system applies temporal interpolation using the last known valid keypoint position, for up to 5 consecutive frames. After 5 frames of interpolation, the joint is considered missing and the `coaching.keypoint_missing` DEC-030 event is emitted. The 5-frame bound means that at 10fps effective scoring rate, FORM interpolates missing joints for at most 500ms before acknowledging the gap. Interpolation is not applied across set boundaries; if a set ends while a joint is in interpolation state, the interpolation count is not carried into the next set.
+
+The 5-frame interpolation window is a design parameter. It must be documented in the engineering spec and cross-referenced in PI-E-004. Any change to the interpolation window is a material change to accuracy controls and requires a compliance-officer sign-off (same procedure as §63.2.2 PI1.2-C1 threshold change).
+
+Control owner: ML engineering lead. Evidence: PI-E-002 (unit tests covering interpolation up to frame 5 and missing-joint event at frame 6), PI-E-004 (engineering spec for temporal interpolation).
+
+**Control PI1.2-C3: Model version recorded at session time**
+
+The `coaching_sessions` table includes a `model_version` column (type: text, not null). This column must be populated at session creation time, not on sync. The model version is embedded in the Core ML model bundle and is read at app initialisation; it is stored in the session record in device-local storage before inference begins. This ensures that even if the device is offline at the time of coaching, the model version that actually ran is durably recorded and included in the sync payload.
+
+This control is the implementation counterpart to OQ-PI-01. Until OQ-PI-01 is formally resolved and the `model_version` field is confirmed as required in the sync payload validation schema, this control is rated AMBER: the field exists in the schema but enforcement of its presence in offline sync payloads has not been tested end-to-end.
+
+Control owner: iOS engineering lead + backend engineering lead. Evidence: PI-E-001 (coaching_sessions schema showing model_version column, NOT NULL constraint), PI-E-003 (integration tests for offline sync payload including model_version field).
+
+---
+
+#### 63.2.3 PI1.3 — Timeliness of Processing
+
+**Criterion statement (paraphrased):** The system processes inputs in a timely manner, meeting defined service-level objectives.
+
+**FORM interpretation:** Two latency SLOs are in scope:
+
+- **SLO-PI-01:** On-device Core ML inference P95 < 25ms per frame (measured from CMSampleBuffer delivery to Float32Array output available).
+- **SLO-PI-02:** Form feedback delivery P95 < 100ms (measured from set completion signal to coaching feedback rendered in UI).
+
+These SLOs are defined for devices meeting FORM's minimum hardware specification (iPhone 12 or later with Neural Engine). On older or unsupported hardware, FORM may not guarantee these SLOs; the app should display a capability warning at onboarding. The capability check and warning are part of the PI1.3 control surface.
+
+**Control PI1.3-C1: On-device inference latency instrumentation**
+
+The iOS app measures inference latency per frame using `CACurrentMediaTime()` bracketing the Core ML `prediction(from:)` call. Per-frame latency samples are aggregated in-session into a running P95 estimate using a reservoir sampling approach (to avoid unbounded memory use during long sessions). The session-level P95 inference latency is written to `coaching_sessions.inference_latency_p95_ms` on session completion and included in the sync payload.
+
+Backend monitoring (docs/OBSERVABILITY.md §22) queries `coaching_sessions` to compute fleet-wide P95 inference latency by model_version and device_class. A Grafana alert is configured to fire when fleet-wide P95 exceeds 30ms (25ms SLO + 20% headroom) on any device_class for more than 10 consecutive sessions. Alert owner: ML engineering lead.
+
+Evidence: PI-E-001 (coaching_sessions schema showing inference_latency_p95_ms column), PI-E-005 (Grafana dashboard screenshot showing SLO-PI-01 tracking, exported quarterly for SOC 2 evidence package).
+
+**Control PI1.3-C2: Feedback delivery latency instrumentation**
+
+The iOS app measures feedback delivery latency from the `coaching.set_analyzed` event emit time to the first-frame-rendered timestamp of the feedback card. This is measured using the UIKit `traceAction` instrumentation wrapper and written to `coaching_sessions.feedback_latency_p95_ms`. Fleet-wide P95 feedback latency is monitored via the same Grafana dashboard as SLO-PI-01. A separate alert fires when fleet-wide P95 feedback latency exceeds 120ms (100ms SLO + 20% headroom).
+
+Evidence: PI-E-001 (coaching_sessions schema showing feedback_latency_p95_ms column), PI-E-005 (Grafana dashboard screenshot — same artefact as SLO-PI-01 monitoring, separate panel).
+
+**Control PI1.3-C3: Minimum hardware capability gate**
+
+At app first launch, FORM checks the device Neural Engine availability via `MLComputeUnits` and the iOS device model identifier against a maintained minimum-spec allowlist. If the device does not meet the minimum spec, the CV coaching feature is disabled with an in-app message: "Live form coaching requires iPhone 12 or later." The minimum-spec allowlist is maintained in the iOS app configuration and is versioned alongside model releases. This control prevents SLO breaches from being reported as pipeline failures when the root cause is a hardware capability gap below the supported floor.
+
+Control owner: iOS engineering lead. Evidence: PI-E-004 (minimum-spec allowlist and version history), PI-E-002 (unit test for hardware capability gate logic).
+
+---
+
+#### 63.2.4 PI1.4 — Authorisation of Processing
+
+**Criterion statement (paraphrased):** The system processes inputs only when processing has been authorised, preventing unauthorised use of the pipeline.
+
+**FORM interpretation:** Inference must not run for a user who has not: (a) completed onboarding consent for biometric processing; (b) been authenticated to an active session; (c) where applicable, been provisioned under a valid tenant (enterprise) with an active subscription. The authorisation gate must be enforced at the point of pipeline activation, not only at the point of data persistence.
+
+**Control PI1.4-C1: Consent gate at pipeline activation**
+
+The CV coaching pipeline is activated by the `CoachingSessionManager.startSession()` function. This function checks the device-local consent record before initialising the AVFoundation capture session. If the consent record is absent or has `biometric_processing_consented = false`, `startSession()` returns a `CoachingError.consentRequired` error and the pipeline is not activated. No frames are captured; no Core ML session is allocated. The consent record is written at onboarding completion and is immutable after the onboarding flow (changes to consent require the full revocation-and-re-consent flow in §60).
+
+Note: this consent gate operates on a device-local consent record. It does not make a network call. This means a revocation emitted by the user on a different device (e.g., via the DSAR web portal) does not propagate to a device that is offline at the time of revocation. The offline revocation propagation gap is an open issue tracked at the privacy layer (§60); it is noted here because it is also a PI1.4 control gap. Until the offline revocation propagation mechanism is implemented, FORM acknowledges that the authorisation gate on an offline device may be stale by up to the device's next sync interval.
+
+Control owner: iOS engineering lead + privacy engineering lead. Evidence: PI-E-003 (integration test: `startSession()` returns `consentRequired` when consent record is absent or false), PI-E-004 (code review history for `CoachingSessionManager.startSession()` consent gate).
+
+**Control PI1.4-C2: Authentication gate**
+
+`startSession()` also validates that a valid JWT access token exists in the device Keychain and has not expired. If the token is absent or expired, `startSession()` returns `CoachingError.authenticationRequired`. The inference pipeline is not activated. This prevents the CV pipeline from running for a user who has been de-provisioned server-side (e.g., subscription lapsed, account suspended) as long as their access token has expired (default token TTL: 1 hour).
+
+The 1-hour token TTL means that a de-provisioned user can continue coaching for up to 1 hour after de-provisioning if they are offline and their existing token has not yet expired. This is an acknowledged gap with a defined maximum exposure window (1 hour), which is acceptable under FORM's risk posture. The gap is noted in the DPIA.
+
+Control owner: iOS engineering lead + backend engineering lead. Evidence: PI-E-003 (integration test: `startSession()` returns `authenticationRequired` when token absent or expired).
+
+**Control PI1.4-C3: Per-tenant authorisation (enterprise)**
+
+For enterprise tenants, the backend provisioning record includes a `coaching_enabled` boolean per tenant. This flag is included in the JWT claims at token issuance. `startSession()` reads the `coaching_enabled` claim from the device-local JWT. If `coaching_enabled = false`, the pipeline is not activated. Enterprise admins can disable coaching for their tenant via the admin console; the disable takes effect at the next token refresh (maximum 1-hour propagation delay, same as PI1.4-C2).
+
+Control owner: backend engineering lead. Evidence: PI-E-003 (integration test: `startSession()` returns `CoachingError.notAuthorisedForTenant` when `coaching_enabled = false` in JWT claims).
+
+---
+
+#### 63.2.5 PI1.5 — Completeness and Accuracy of Outputs
+
+**Criterion statement (paraphrased):** System outputs are complete, accurate, and distributed only to intended recipients.
+
+**FORM interpretation:** The coaching feedback delivered to the user must faithfully represent what the system computed (no silent truncation, no fabricated corrections), must be complete relative to the joints the system was able to score, and must accurately disclose when completeness or accuracy was degraded (i.e., `partial_analysis` status must be surfaced in the UI).
+
+**Control PI1.5-C1: Feedback quality gate — minimum joint coverage**
+
+Before generating coaching feedback for a set, the scoring engine evaluates joint coverage: the fraction of joints in the target joint set for the exercise (e.g., squat requires bilateral hip, knee, ankle — 6 joints) that had confidence >= 0.6 for at least 50% of scored frames in the set. If joint coverage is below 70%, the set is not scored and is instead flagged with `analysis_status = insufficient_coverage`. Coaching feedback for an `insufficient_coverage` set reads: "We couldn't get a clear view of your [joint group] for this set. Try moving back from the camera or improving lighting." No form corrections are emitted for `insufficient_coverage` sets because the data does not support them.
+
+If joint coverage is >= 70% but < 90%, the set is scored with `analysis_status = partial_analysis`. Corrections are emitted for the joints that had sufficient coverage; joints that were below threshold are omitted from the correction list with no placeholder or interpolated correction. The UI must display the `partial_analysis` disclosure alongside the corrections (OQ-PI-02 tracks the exact wording).
+
+If joint coverage is >= 90%, the set is scored with `analysis_status = complete`. Full corrections are emitted for all target joints.
+
+The 70% and 90% thresholds are design parameters. They are named constants (`MINIMUM_JOINT_COVERAGE_FOR_PARTIAL`, `MINIMUM_JOINT_COVERAGE_FOR_COMPLETE`) and are subject to the same change-control procedure as the confidence threshold in PI1.2-C1.
+
+Control owner: ML engineering lead. Evidence: PI-E-001 (coaching_sessions schema: analysis_status enum, keypoints_missing_count), PI-E-002 (unit tests for joint coverage gate at 70% and 90% thresholds), PI-E-004 (named constants and PR history).
+
+**Control PI1.5-C2: Durable output logging**
+
+Every coaching output (form score, corrections list, analysis_status) is written to the `coaching_sessions` table on session completion. The row is immutable after insert: there is no UPDATE path for coaching output fields. If a sync failure requires a retry, the retry uses INSERT with conflict resolution (`ON CONFLICT (session_id) DO NOTHING`) rather than upsert, ensuring that a completed session's output record cannot be overwritten by a subsequent sync attempt. This immutability guarantee is part of the PI1.5 control surface: it means the output record in the database faithfully represents what the device computed at the time of the session, not a later reconciliation.
+
+Control owner: backend engineering lead. Evidence: PI-E-001 (coaching_sessions schema showing immutable output fields and ON CONFLICT DO NOTHING constraint), PI-E-003 (integration test: second sync of same session_id does not overwrite output fields).
+
+**Control PI1.5-C3: Output recipient restriction**
+
+Coaching output in the `coaching_sessions` table is row-level-security (RLS) gated. The RLS policy permits SELECT only for: (a) the `user_id` that owns the session; (b) the service role used by backend analytics functions (read-only, aggregate queries only — see §60 for the aggregate query constraint that prohibits re-identification). Enterprise tenant admins do NOT have SELECT access to individual `coaching_sessions` rows. This is a hard constraint enforced at the RLS layer, not a policy promise: FORM's compliance-officer has vetoed any feature that would expose individual coaching session outputs to employer/tenant-admin dashboards (see §63.1 and the VETO list in the compliance-officer role definition).
+
+Control owner: backend engineering lead. Evidence: PI-E-001 (RLS policy definition for coaching_sessions), PI-E-003 (integration test: tenant-admin JWT cannot SELECT coaching_sessions rows belonging to tenant users).
+
+---
+
+### 63.3 SOC 2 Evidence Mapping Table
+
+The following table maps each PI1 sub-criterion to the primary control, evidence artefact(s), and audit population source. The auditor will request these artefacts during fieldwork. All artefacts are stored in R2 at `form-compliance-vault/soc2/pi1/` unless otherwise noted. No artefact may contain user PII; only session_id, tenant_id, model_version, and aggregate metrics are permitted.
+
+| PI1 Sub-Criterion | Primary Control | Evidence Artefact ID | Artefact Description | Audit Population Source |
+|---|---|---|---|---|
+| PI1.1 Completeness | PI1.1-C1, PI1.1-C3 | PI-E-001 | coaching_sessions schema extract (columns: frames_captured, frames_analyzed, frames_dropped_os, keypoints_missing_count, analysis_status, model_version, inference_latency_p95_ms, feedback_latency_p95_ms, confidence_median). No PII. | docs/DATA_MODEL.md |
+| PI1.1 Completeness | PI1.1-C1, PI1.1-C2, PI1.2-C2, PI1.3-C3, PI1.4-C1/C2/C3, PI1.5-C1 | PI-E-002 | iOS unit and integration test suite results (CI output), specifically covering: frame queue discard logic, OS frame drop counter, CMSampleBuffer validity check, temporal interpolation boundary (frame 5 → emit), hardware capability gate, consent gate, authentication gate, joint coverage gates at 70%/90%. Exported as CI run artefact. | iOS CI pipeline |
+| PI1.1 Completeness | PI1.1-C3, PI1.2-C3, PI1.4-C2/C3, PI1.5-C2/C3 | PI-E-003 | Backend integration test results: sync payload 422 rejection, offline sync with model_version field, consentRequired/authenticationRequired/notAuthorisedForTenant error paths, immutable output ON CONFLICT test, RLS tenant-admin access denial. Exported as CI run artefact. | Backend CI pipeline |
+| PI1.2 Accuracy | PI1.2-C1, PI1.2-C2, PI1.3-C3, PI1.5-C1 | PI-E-004 | Engineering spec and code review records for: KEYPOINT_CONFIDENCE_THRESHOLD constant (current value: 0.6, PR history), temporal interpolation spec (5-frame window, PR history), minimum-spec allowlist (version history), named coverage threshold constants (MINIMUM_JOINT_COVERAGE_FOR_PARTIAL, MINIMUM_JOINT_COVERAGE_FOR_COMPLETE, PR history), CoachingSessionManager.startSession() consent gate PR history. | GitHub PR history (filtered, no personal data) |
+| PI1.3 Timeliness | PI1.3-C1, PI1.3-C2 | PI-E-005 | Grafana dashboard export: fleet-wide P95 inference latency (SLO-PI-01: < 25ms) and P95 feedback delivery latency (SLO-PI-02: < 100ms) by model_version and device_class, covering the SOC 2 Type II observation period. Exported quarterly as PNG + underlying JSON query. Alert configuration screenshots. | docs/OBSERVABILITY.md §22 |
+| PI1.2 Accuracy | PI1.2-C1 | PI-E-006 | Empirical accuracy validation study for confidence threshold 0.6: methodology, dataset description (synthetic or consented volunteer data only — no PII), results showing true-positive and false-positive rates for form correction at threshold 0.6 vs. 0.5 and 0.7. Filed by ML engineering lead before Type II observation period begins. **NOT YET FILED — OQ-PI-03 blocker.** | ML engineering team |
+
+---
+
+### 63.4 DEC-030 Events
+
+The following DEC-030 audit events are in scope for PI1. Events are append-only, HMAC-chained, and emitted via the `emit-audit-event` Cloudflare Worker exclusively. No event payload may include user PII (name, email, raw keypoint data). All events reference docs/AUDIT_LOG_SCHEMA.md for the authoritative DEC-030 schema.
+
+Two events in this table (`coaching.session_sync_rejected` and `coaching.model_config_changed`) are NEW and have not yet been registered in docs/AUDIT_LOG_SCHEMA.md. Registration is a P0 implementation checklist item (§63.5).
+
+| Event Name | Severity | Retention | PI1 Sub-Criterion | Trigger Condition | Required Payload Fields | Notes |
+|---|---|---|---|---|---|---|
+| `coaching.session_started` | LOW | 3yr | PI1.4 | User initiates a coaching session after passing all authorisation gates | session_id, tenant_id (if enterprise), model_version, device_class, coaching_enabled_claim | Existing event — confirm model_version and coaching_enabled_claim fields are present |
+| `coaching.set_analyzed` | LOW | 3yr | PI1.1, PI1.2, PI1.5 | A set within a coaching session completes form scoring | session_id, set_number, analysis_status, confidence_median, keypoints_missing_count, frames_captured, frames_analyzed, inference_latency_p95_ms | Existing event — confirm all listed payload fields are present |
+| `coaching.keypoint_missing` | HIGH (when > 20% of frames in set) / LOW (otherwise) | 7yr (HIGH) / 3yr (LOW) | PI1.1, PI1.2 | A joint exceeds the 5-frame interpolation limit OR OS frame drop rate exceeds 5% of frames_captured | session_id, set_number, joint_name, consecutive_missing_frames, reason (values: interpolation_limit_exceeded \| os_frame_drop), frames_captured_in_set | Existing event — confirm reason field and os_frame_drop value are implemented |
+| `coaching.session_completed` | LOW | 3yr | PI1.1, PI1.5 | Session ends normally (user stops session or rep target reached) | session_id, total_sets_analyzed, total_sets_partial, total_sets_insufficient, model_version, analysis_status (session-level rollup) | Existing event — confirm total_sets_partial, total_sets_insufficient, and session-level analysis_status rollup fields are present |
+| `coaching.session_sync_rejected` | MEDIUM | 7yr | PI1.1 | Backend rejects a sync payload due to arithmetic inconsistency (frames_captured vs frames_analyzed vs frames_dropped_os + keypoints_missing_count) or missing required fields | session_id, rejection_reason (enum: arithmetic_inconsistency \| missing_model_version \| missing_required_field), field_name (if missing_required_field) | **NEW — not yet in registry. P0 registration required before M7 (§63.5).** |
+| `coaching.model_config_changed` | MEDIUM | 7yr | PI1.2 | App detects that the model_version or any named threshold constant has changed since last launch | previous_model_version, new_model_version, changed_constants (array of constant names), device_class | **NEW — not yet in registry. P0 registration required before M7 (§63.5).** |
+
+**Audit chain integrity note:** The HIGH-severity `coaching.keypoint_missing` event (> 20% frame rate) is a signal for audit chain monitoring. The `audit-chain-verify` Edge Function must be run over `coaching.keypoint_missing` events as part of quarterly access reviews (§63.5 PI-P0-04). A spike in HIGH-severity `coaching.keypoint_missing` events without a corresponding `coaching.session_completed` analysis_status rollup of `partial_analysis` or `insufficient_coverage` is an anomaly that must be investigated.
+
+---
+
+### 63.5 Implementation Checklist
+
+Items are categorised P0 (blocks Type I or Type II observation period start), P1 (blocks Type II report), and P2 (best-practice, no hard block). Milestone months reference the shared FORM compliance roadmap (M4 = current month as of authoring; M13 = end of Type II observation window).
+
+#### P0 — Type I or Observation Period Blockers
+
+- [ ] **PI-P0-01** — Register `coaching.session_sync_rejected` in docs/AUDIT_LOG_SCHEMA.md with full DEC-030 spec per §63.4: MEDIUM severity, 7-year retention, `emit-audit-event` Worker only, required payload fields (session_id, rejection_reason enum, field_name). **Owner:** backend engineering lead. **Deadline:** M7.
+- [ ] **PI-P0-02** — Register `coaching.model_config_changed` in docs/AUDIT_LOG_SCHEMA.md with full DEC-030 spec per §63.4: MEDIUM severity, 7-year retention, `emit-audit-event` Worker only, required payload fields (previous_model_version, new_model_version, changed_constants array, device_class). **Owner:** ML engineering lead. **Deadline:** M7.
+- [ ] **PI-P0-03** — Verify that existing `coaching.session_started`, `coaching.set_analyzed`, `coaching.keypoint_missing`, and `coaching.session_completed` events contain all required payload fields listed in §63.4. File a gap report; if any field is missing, implement and deploy before M7. **Owner:** iOS engineering lead + backend engineering lead. **Deadline:** M7.
+- [ ] **PI-P0-04** — Implement PI1.1-C1 frame ratio validation: confirm `frames_analyzed / frames_captured` is within [0.31, 0.36] for full-rate sessions; flag sessions outside this band as `partial_analysis` during sync if not otherwise explained by keypoints_missing_count. Write integration test (PI-E-003 artefact). **Owner:** iOS engineering lead. **Deadline:** M7.
+- [ ] **PI-P0-05** — Implement PI1.1-C2 OS frame drop counter: CMSampleBuffer validity check, `frames_dropped_os` counter, 5% threshold triggering `coaching.keypoint_missing` with `reason: os_frame_drop` and `partial_analysis` downgrade. Write unit test (PI-E-002 artefact). **Owner:** iOS engineering lead. **Deadline:** M7.
+- [ ] **PI-P0-06** — Implement PI1.1-C3 sync payload completeness validation on backend: HTTP 422 rejection with `coaching.session_sync_rejected` event for arithmetic inconsistency or missing model_version. Write integration test (PI-E-003 artefact). **Owner:** backend engineering lead. **Deadline:** M7.
+- [ ] **PI-P0-07** — Confirm `model_version` column in `coaching_sessions` is NOT NULL and is populated from the Core ML model bundle identifier at session creation (not at sync time). Confirm offline sync payload includes model_version. Write integration test for offline sync scenario. **Owner:** iOS engineering lead + backend engineering lead. **Deadline:** M8. **Prerequisite for:** OQ-PI-01 resolution.
+- [ ] **PI-P0-08** — Commission and complete empirical accuracy validation study (PI-E-006) for confidence threshold 0.6. Study must cover: dataset description (synthetic or consented volunteer — no real-user PII without separate DPIA amendment), methodology, true-positive/false-positive rates at thresholds 0.5, 0.6, and 0.7, recommendation on whether 0.6 is the correct operating point. File PI-E-006 in R2 at `form-compliance-vault/soc2/pi1/PI-E-006-threshold-accuracy-study.pdf`. **Owner:** ML engineering lead. **Deadline:** M9 (must complete before Type II observation period begins at M10). **Resolves:** OQ-PI-03.
+- [ ] **PI-P0-09** — Implement and test PI1.4-C1 consent gate: `startSession()` returns `CoachingError.consentRequired` when consent record absent or biometric_processing_consented = false; confirm no frames are captured and no Core ML session is allocated in this path. Write integration test (PI-E-002/PI-E-003 artefacts). **Owner:** iOS engineering lead. **Deadline:** M7.
+- [ ] **PI-P0-10** — Add `coaching_enabled` claim to JWT issuance for enterprise tenants; implement PI1.4-C3 check in `startSession()`; write integration test confirming pipeline does not activate when claim is false. **Owner:** backend engineering lead + iOS engineering lead. **Deadline:** M8.
+
+#### P1 — Type II Report Blockers
+
+- [ ] **PI-P1-01** — Implement PI1.5-C1 joint coverage gate: `insufficient_coverage` path (< 70% joint coverage → no corrections, UI message), `partial_analysis` path (70-90% → corrections for available joints only, partial_analysis disclosure), `complete` path (>= 90%). Write unit tests for all three branches (PI-E-002 artefact). **Owner:** ML engineering lead. **Deadline:** M8.
+- [ ] **PI-P1-02** — Implement PI1.5-C2 immutable output: confirm `ON CONFLICT (session_id) DO NOTHING` on coaching output insert; confirm no UPDATE path exists for output fields. Write integration test (PI-E-003 artefact). **Owner:** backend engineering lead. **Deadline:** M8.
+- [ ] **PI-P1-03** — Implement and audit PI1.5-C3 RLS policy: confirm tenant-admin JWT cannot SELECT individual coaching_sessions rows; confirm user JWT can SELECT only own rows; confirm service-role analytics queries are aggregate only. File RLS policy definition in PI-E-001 artefact. **Owner:** backend engineering lead. **Deadline:** M8.
+- [ ] **PI-P1-04** — Implement SLO monitoring (PI-E-005 artefact): Grafana alerts for fleet-wide P95 inference latency > 30ms and fleet-wide P95 feedback latency > 120ms; confirm alerts fire correctly in staging. Configure quarterly Grafana export job for SOC 2 evidence package. **Owner:** ML engineering lead + observability lead. **Deadline:** M9. Cross-reference: docs/OBSERVABILITY.md §22.
+- [ ] **PI-P1-05** — Resolve OQ-PI-02: determine final wording and UX for `partial_analysis` disclosure in coaching feedback UI. Wording must not use technical jargon; must clearly inform the user that form analysis was limited due to camera coverage; must not imply medical accuracy. Compliance-officer and clinical-safety officer both review final wording. File approval record in R2. **Owner:** product lead + compliance-officer + clinical-safety officer. **Deadline:** M9.
+- [ ] **PI-P1-06** — Export PI-E-004 artefact: GitHub PR history for KEYPOINT_CONFIDENCE_THRESHOLD, temporal interpolation spec, minimum-spec allowlist, and coverage threshold constants. Strip any PII from PR author fields (use reviewer role labels, not names). File in R2 at `form-compliance-vault/soc2/pi1/PI-E-004-code-review-records.pdf`. **Owner:** compliance-officer. **Deadline:** M10 (at observation period start).
+- [ ] **PI-P1-07** — Add `coaching.model_config_changed` emission to app launch flow: read current model bundle identifier and compare to stored previous_model_version in UserDefaults; if changed, emit event via `emit-audit-event` Worker on next sync. **Owner:** iOS engineering lead. **Deadline:** M9.
+
+#### P2 — Best Practice
+
+- [ ] **PI-P2-01** — Implement PI1.3-C3 minimum-spec capability check and onboarding warning for unsupported hardware. While not a hard SOC 2 control, this prevents SLO data from being contaminated by out-of-spec devices, which would distort the PI-E-005 evidence artefact. **Owner:** iOS engineering lead. **Deadline:** M10.
+- [ ] **PI-P2-02** — Investigate offline consent revocation propagation gap identified in PI1.4-C1. This is primarily a privacy control gap (§60) but has a PI1.4 authorisation dimension. Coordinate with privacy engineering lead on the revocation propagation mechanism. **Owner:** iOS engineering lead + privacy engineering lead. **Deadline:** M11.
+- [ ] **PI-P2-03** — Consider adding a `coaching.session_sync_retried` event to distinguish first-sync attempts from retries in the audit log, to improve forensic clarity during an incident. Not required for SOC 2, but improves operational integrity of the evidence chain. **Owner:** backend engineering lead. **Deadline:** M12.
+
+---
+
+### 63.6 Open Questions
+
+§63 introduces three new open questions. All three are PI1-specific. OQ-PI-03 is a P0 blocker for the Type II observation period.
+
+| ID | Question | Priority | Owner | Target Resolution | Status |
+|---|---|---|---|---|---|
+| OQ-PI-01 | On-device inference runs without network connectivity. When the session syncs to the backend, the sync payload must include the model_version that actually ran at coaching time. The current implementation stores model_version at session creation (device-local), but the end-to-end offline sync test (confirming model_version is present in the payload and accepted by backend validation) has not been conducted. Required: implement and pass the offline sync integration test in PI-E-003 before M8; confirm model_version is a required field in the sync payload validation schema with HTTP 422 rejection if absent. If the test reveals that model_version is not durably stored device-locally before first sync, this becomes a P0 architecture gap requiring immediate escalation. | P0 | iOS engineering lead + backend engineering lead | M8 (PI-P0-07) | Open |
+| OQ-PI-02 | When a coaching set is scored with `analysis_status = partial_analysis`, the coaching feedback UI must disclose this to the user. The disclosure wording has not been finalised. Requirements: (a) non-technical language; (b) no implied medical accuracy claim; (c) clear communication that form corrections shown are based on partial camera coverage; (d) clinical-safety officer review required to ensure the wording does not create a false sense of diagnostic completeness. Proposed draft (for review, not approved): "Your form analysis for this set was limited because one or more joints weren't fully visible. Corrections shown are based on what we could see — reposition the camera for a more complete analysis." Compliance-officer and clinical-safety officer must both approve final wording. | P1 | product lead + compliance-officer + clinical-safety officer | M9 (PI-P1-05) | Open |
+| OQ-PI-03 | The confidence threshold of 0.6 used to gate keypoints from form scoring is a design parameter. It was chosen during model development and has not been validated through a formal empirical accuracy study. FORM cannot assert in the SOC 2 Type II management assertion that pipeline outputs are accurate without empirical evidence that the threshold produces outputs with known accuracy characteristics. Required before Type II observation period begins (M10): commission and complete an accuracy validation study (PI-E-006) covering the threshold value 0.6 and at least two neighbouring values (0.5, 0.7), using a dataset of synthetic or explicitly consented volunteer sessions (no real-user PII without a separate DPIA amendment). The study must produce a recommendation on the correct operating threshold. If the study recommends a threshold change, that change must go through the change-control procedure in PI1.2-C1 before the observation period begins, to avoid a threshold change mid-observation-window which would require auditor notification. | P0 | ML engineering lead | M9 (PI-P0-08) | Open — **Type II observation period blocker** |
+
+---
+
+*v1.1 (2026-06-04): §63 Processing Integrity Controls — PI1 Trust Service Criteria: CV Coaching Pipeline Accuracy, Completeness & Timeliness. First dedicated PI1 section in SOC2_READINESS.md; previously no §N section existed for Processing Integrity. §63.1 purpose: three structural challenges — on-device inference (no direct server-side instrumentation), offline operation (model_version gap, OQ-PI-01), partial analysis (analysis_status downgrade, OQ-PI-02); OQ-PI-03 P0 blocker (unvalidated confidence threshold). §63.2 PI1.1-PI1.5 controls: PI1.1-C1 frame ratio [0.31,0.36] gate + frames_captured/frames_analyzed counter; PI1.1-C2 CMSampleBuffer OS frame drop counter (5% threshold → partial_analysis + keypoint_missing event with reason:os_frame_drop); PI1.1-C3 backend sync 422 rejection for arithmetic inconsistency; PI1.2-C1 KEYPOINT_CONFIDENCE_THRESHOLD=0.6 named constant + change-control procedure; PI1.2-C2 temporal interpolation 5-frame bound + cross-set boundary reset; PI1.2-C3 model_version NOT NULL populated at session creation (AMBER until OQ-PI-01 resolved); PI1.3-C1 SLO-PI-01 P95<25ms inference + reservoir sampling + Grafana alert at 30ms; PI1.3-C2 SLO-PI-02 P95<100ms feedback + Grafana alert at 120ms; PI1.3-C3 minimum hardware spec gate (iPhone 12 / Neural Engine); PI1.4-C1 consent gate in startSession() — no frames captured if biometric_processing_consented=false — offline revocation gap acknowledged; PI1.4-C2 JWT expiry gate (1hr TTL, max 1hr exposure window acknowledged); PI1.4-C3 per-tenant coaching_enabled JWT claim gate (enterprise); PI1.5-C1 joint coverage gate: insufficient_coverage<70%/partial_analysis 70-90%/complete>=90%, named constants subject to same change-control as confidence threshold; PI1.5-C2 ON CONFLICT DO NOTHING immutability on coaching output; PI1.5-C3 RLS policy restricts coaching_sessions to owner user_id + aggregate-only service role; employer/tenant-admin SELECT vetoed. §63.3 SOC 2 evidence mapping table: PI-E-001 through PI-E-006 (PI-E-006 not yet filed, OQ-PI-03 blocker), artefact descriptions, audit population sources, R2 paths. §63.4 DEC-030 events: 4 existing events (session_started, set_analyzed, keypoint_missing, session_completed) with required payload field confirmations; 2 new events requiring registry registration: coaching.session_sync_rejected (MEDIUM, 7yr, PI-P0-01) and coaching.model_config_changed (MEDIUM, 7yr, PI-P0-02); HIGH-severity keypoint_missing anomaly detection note (spike without corresponding partial_analysis rollup = investigation trigger). §63.5 implementation checklist: 10 P0 items (M7-M9), 7 P1 items (M8-M10), 3 P2 items (M10-M12); P0 highlights: event registry registrations M7, frame ratio validation M7, OS drop counter M7, sync 422 rejection M7, model_version offline sync test M8, accuracy validation study M9 (OQ-PI-03 resolution); P1 highlights: joint coverage gate M8, RLS audit M8, SLO Grafana alerts M9, partial_analysis UX wording M9, code review artefact export M10. §63.6 three open questions: OQ-PI-01 model_version offline sync payload confirmation (P0, M8); OQ-PI-02 partial_analysis UI disclosure wording with proposed draft (P1, M9); OQ-PI-03 confidence threshold empirical accuracy validation study — P0 Type II observation period blocker (M9). Cross-references: docs/DATA_MODEL.md (coaching_sessions schema), docs/OBSERVABILITY.md §22 (AI Coaching Quality Observability), docs/AUDIT_LOG_SCHEMA.md (DEC-030 coaching.* events).*
