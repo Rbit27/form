@@ -6,6 +6,14 @@
 
 ---
 
+## [1.85.3] — 2026-06-04
+
+### Added
+- [`content/post-204-bfr-blood-flow-restriction.md`](content/post-204-bfr-blood-flow-restriction.md) — BFR-тренінг: гіпертрофія під низьким навантаженням (sports-scientist · clinical-safety: NOT REQUIRED)
+- [`docs/SOC2_READINESS.md`](docs/SOC2_READINESS.md) §61 — Penetration Testing Program (CC7.1/CC7.2/CC4.1) · PT-GAP-001 🔴 HIGH opened (compliance-officer + security-engineer)
+
+---
+
 ## [1.85.2] — 2026-06-04
 
 ### Added

@@ -19589,3 +19589,310 @@ The compliance-officer must confirm adherence to these constraints as part of th
 ---
 
 *v3.0 (2026-06-02): §58 HMAC Audit Chain Key (`HMAC_AUDIT_CHAIN_KEY`) Rotation Runbook — Dual-Key Migration Design · CC6.7/CC6.8/C1.1/DEC-030 Chain Integrity. Fully closes OQ-ENC-02 (P1, M7 — HMAC_AUDIT_CHAIN_KEY dual-key verification design; §58 IS the complete specification). Closes ENC-GAP-002 (🔴 MEDIUM → 🟡 Authored; 🟢 upon DDL migration execution + chain verification function deployed + first rotation executed + ENC-E-018 through ENC-E-022 filed at M9). Core problem: naive HMAC key rotation breaks historical chain verification because old chain_hash values are irreversible HMAC commitments under the old key; re-signing constitutes tampering and violates the DEC-030 append-only invariant (DEC-030 hard invariant — no UPDATE, no DELETE). Dual-key design: four-component solution — (1) `key_version VARCHAR(10) NOT NULL DEFAULT 'v1'` column on `audit_log_events` with backfill; (2) versioned Workers Secret naming convention `HMAC_AUDIT_CHAIN_KEY_V{N}`; (3) multi-version chain verification function that selects correct key per row based on key_version; (4) rotation boundary invariant — last V{N} chain_hash becomes prev_hash input for first V{N+1} event, cryptographically linking eras without re-signing. Rotation boundary invariant: HMAC-SHA256(V{N+1} key, V{N} handoff_chain_hash ‖ event_id ‖ created_at ‖ event_type ‖ payload_sha256) — old era verified with archived V{N} key, new era verified with V{N+1} key, boundary proves continuity without key material overlap. Migration from current state: one-time rename of unversioned `HMAC_AUDIT_CHAIN_KEY` → `HMAC_AUDIT_CHAIN_KEY_V1` across all three consumers (emit-audit-event, audit-chain-daily-check, audit-chain-verify Edge Function); this is a non-breaking rename — no chain hashes change. Key archival policy: never delete; archived key versions retained in 1Password FORM vault + R2 `form-compliance-vault/hmac-keys/` for 7 years from last event signed; destruction only after 7 years with PAM destructive + compliance-officer + legal; destruction certificate event retained 7 years. Three new DEC-030 events (all 7-year retention): admin.hmac_key_rotation_initiated (CRITICAL — hard invariant, must precede all rotation steps; departing_version, arriving_version, pre_rotation_last_sequence_number fields), admin.hmac_key_rotated (CRITICAL — signed with new key, making it the first permanent V{N+1} production record; boundary_last_sequence_old_era, boundary_first_sequence_new_era, boundary_handoff_chain_hash_prefix fields), admin.hmac_key_rotation_verified (HIGH — emitted after full chain verification confirms zero broken links and archival confirmed; archival_locations[], key_versions_verified[] fields). Two rotation runbooks: Scheduled (annual, PAM read_write, 2-person auth security-engineer + platform-engineer, 60-minute window, 8-step procedure including pre-rotation checklist with 9 blocking items); Emergency (R-05 co-trigger — suspected key exposure or broken links, PAM destructive, 2-person founder + security-engineer, 30-minute RTO, quarantine before deletion). Five evidence artefacts ENC-E-018 through ENC-E-022: DDL migration log + UPDATE privilege revocation (ENC-E-018), chain verification report across key boundary with handoff_chain_hash (ENC-E-019), key_version histogram for full audit log (ENC-E-020), old key archival confirmation in 1Password + R2 (ENC-E-021), DEC-030 three-event confirmation query (ENC-E-022). SOC 2 mapping: CC6.7 (annual rotation limits exposure window; dual-key preserves 7-year historical verifiability), CC6.8 (key_version append-only + form_api UPDATE revocation + 2-person auth prevent insider unilateral rotation), C1.1 (dual-key design restores rotatability of primary audit integrity control without destroying historical evidence), CC7.2 (multi-version daily check covers all eras; AL-CHAIN-01 on broken links; AL-KEY-03 on rotation cadence). 10-item checklist: 6× P0 (DDL migration M7, multi-version verification function deploy M7, V1 archival M7, Workers Secret rename M7, first production rotation V1→V2 M9, evidence filing M9), 3× P1 (AUDIT_LOG_SCHEMA event registry M7, §51 + §56 gap register updates M7/M9, tabletop M8), 1× P2 (KEY_ROTATION_KV annual rotation record + AL-KEY-03 PagerDuty alert M9). References: §56 (key inventory — HMAC_AUDIT_CHAIN_KEY row to be updated); §57.6 (confirmed service_role rotation chain-safe; HMAC chain key confirmed as the separate risk vector fully addressed here); INCIDENT_RESPONSE R-05 (HMAC chain break), R-20 (insider threat), R-01 (P0 incident declaration).*
+
+---
+
+## §61 Penetration Testing Program — CC7.1 / CC7.2 / CC4.1
+
+### 61.1 Purpose and Scope
+
+This section establishes FORM's Penetration Testing Program as a formal, repeatable control under SOC 2 Trust Service Criteria CC7.1 (system monitoring), CC7.2 (evaluation of security events), and CC4.1 (risk assessment). Penetration testing provides independent, adversarial verification that FORM's attack surface — including Cloudflare Workers edge compute, Supabase PostgreSQL with Row-Level Security, multi-tenant enterprise API routing, HMAC-chained audit infrastructure (DEC-030), and Art. 9 biometric data flows — resists exploitation by external and internal threat actors.
+
+The program is distinct from continuous automated scanning (covered in docs/OBSERVABILITY.md §30) and from incident response (docs/INCIDENT_RESPONSE.md). It provides the point-in-time, human-adversarial evidence that SOC 2 Type II auditors and enterprise procurement teams require as proof of security assurance beyond automated tooling.
+
+**Scope of this section:**
+
+- External network and application penetration testing against FORM production and staging environments
+- Internal privilege escalation and lateral movement testing within Supabase/Cloudflare infrastructure
+- Social engineering assessment (phishing simulation — scoped separately per engagement)
+- Art. 9 biometric data pathway testing: CV keypoint extraction, storage, and RLS boundary enforcement
+- HMAC audit chain integrity as an adversarial target (chain injection, replay, truncation attempts)
+- Multi-tenant isolation verification: enterprise tenant A cannot read or write tenant B data
+- Supply-chain component review: Cloudflare Workers dependencies, Supabase client libraries, RevenueCat SDK
+
+**Out of scope:** See §61.3.
+
+**PT-GAP-001** — 🔴 HIGH — No penetration test has been conducted against the FORM production environment. This gap must be closed before any enterprise contract is signed and before SOC 2 Type I report is issued. Target closure: M6 (pre-GA pentest).
+
+---
+
+### 61.2 Pentest Cadence and Trigger Criteria
+
+**Scheduled cadence:**
+
+| Window | Test Type | Milestone |
+|---|---|---|
+| M6 (pre-GA) | Full external + application pentest | Required before first enterprise contract |
+| M12 | Annual full-scope pentest | SOC 2 Type II observation window evidence |
+| M18+ | Annual recurring | Every 12 months from prior test initiation date |
+
+**Trigger criteria (unscheduled, must initiate within 30 days of trigger):**
+
+| Trigger | Rationale |
+|---|---|
+| New data category collected (e.g., new biometric modality beyond keypoints) | Art. 9 exposure change; DPIA trigger per §GDPR_DPIA.md |
+| Multi-tenant enterprise tier launch | Isolation boundary is a new adversarial surface |
+| Major infrastructure change (new Cloudflare Worker routing tier, Supabase major version upgrade) | Attack surface change invalidates prior test scope |
+| Critical CVE published affecting Cloudflare Workers runtime, Supabase PostgREST, or Deno | CVE-specific targeted re-test within 14 days |
+| Post-incident per docs/INCIDENT_RESPONSE.md (P0 or P1 security incident) | Confirms root cause eliminated and no lateral exposure |
+| Acquisition, merger, or significant new code contributor with privileged access | Personnel and codebase trust boundary change |
+
+**Minimum frequency floor:** No more than 14 months may elapse between any two full-scope engagements, regardless of trigger criteria. If the annual test slips, an interim scope-limited application test must be completed to maintain the observation window.
+
+---
+
+### 61.3 Scope Boundaries (In-Scope / Out-of-Scope)
+
+#### In-Scope
+
+| Surface | Detail |
+|---|---|
+| Cloudflare Workers edge API | All public endpoints; authentication bypass; rate-limit circumvention; CORS misconfiguration |
+| Supabase PostgREST API | Direct API access; RLS bypass attempts; privilege escalation via anon/service_role confusion |
+| Supabase Auth | JWT forgery, session fixation, OAuth misconfiguration, MFA bypass |
+| Multi-tenant isolation | Cross-tenant data read/write via manipulated tenant_id, JWT claim stuffing, row-level bypass |
+| HMAC audit chain (DEC-030) | Chain injection (insert unsigned event), replay (duplicate event_id), truncation (gap in sequence), hash collision probe |
+| Art. 9 biometric data pathways | Keypoint extraction endpoint; storage in Supabase (encrypted at rest); RLS enforcement on health tables |
+| RevenueCat webhook receiver | Spoofed webhook events; subscription privilege escalation |
+| Resend email delivery | Spoofed sender identity; unsubscribe bypass; email content injection |
+| Sentry error payloads | Health data leakage into error context; scrubbing bypass |
+| Admin and compliance-officer interfaces | Privilege escalation; unauthorized access to evidence artefacts |
+| Cloudflare R2 compliance vault | Public bucket misconfiguration; pre-signed URL abuse |
+
+#### Out-of-Scope
+
+| Surface | Reason |
+|---|---|
+| Cloudflare global network infrastructure | Third-party infrastructure; Cloudflare's own pentest program governs |
+| Supabase managed infrastructure layer | Same rationale; scoped to FORM's configuration and schema |
+| RevenueCat internal systems | Third-party; RevenueCat SOC 2 report is the evidence artefact |
+| Apple App Store / Google Play Store | Platform provider; out of FORM's control |
+| Physical premises | No FORM-operated data centre; Cloudflare/Supabase physical controls relied upon |
+| Denial-of-service / load testing | Conducted separately; must not be combined with security test to avoid production impact |
+| Social engineering of individual users | Phishing simulation limited to internal FORM team; user-directed attacks prohibited |
+
+**Staging vs. production:** Full-scope tests target the **staging environment** first. Production testing is permitted only for passive enumeration and authenticated application testing (no destructive payloads). Any active exploitation attempt against production requires written pre-authorisation from founder + compliance-officer, documented in the engagement letter.
+
+---
+
+### 61.4 Testing Methodology (OWASP WSTG, PTES, CVE Coverage)
+
+All engagements follow a documented methodology that maps to internationally recognised frameworks. The vendor's test plan (submitted pre-engagement) must reference the applicable framework sections for each test objective.
+
+**Primary frameworks:**
+
+| Framework | Application |
+|---|---|
+| OWASP Web Security Testing Guide (WSTG) v4.2 | All HTTP API and web application surfaces |
+| Penetration Testing Execution Standard (PTES) | Overall engagement structure (pre-engagement → reporting) |
+| OWASP API Security Top 10 (2023) | Cloudflare Workers REST and webhook endpoints |
+| OWASP Mobile Security Testing Guide (MASTG) | iOS application binary and network traffic analysis |
+| NIST SP 800-115 | Supplementary technical guidance for cloud-hosted targets |
+
+**Required test categories per engagement:**
+
+| Category | Framework Reference | FORM-Specific Targets |
+|---|---|---|
+| Authentication and session management | WSTG-AUTHN | Supabase Auth JWT, MFA flows, session expiry |
+| Authorisation and access control | WSTG-ATHZ | Multi-tenant RLS, admin role separation, compliance-officer privilege |
+| Input validation and injection | WSTG-INPV | PostgREST parameter injection, Worker input sanitisation |
+| Business logic | WSTG-BUSL | Subscription tier bypass (RevenueCat), workout plan manipulation |
+| Cryptography | WSTG-CRYP | TLS configuration (TLS 1.3 minimum), HMAC chain integrity, at-rest AES-256 |
+| Data exposure | WSTG-INFO + WSTG-CRYP | Art. 9 biometric data in error responses, logs, API responses |
+| Supply chain / dependency | PTES + CISA KEV | Cloudflare Worker npm dependencies, Supabase client library CVEs |
+| Infrastructure configuration | WSTG-CONF | Cloudflare R2 bucket ACLs, Supabase RLS misconfiguration, Worker secrets exposure |
+
+**CVE coverage requirement:** The vendor must cross-reference CISA Known Exploited Vulnerabilities (KEV) catalogue and NVD CVEs published in the 12 months preceding the test start date. Any KEV affecting in-scope components must be explicitly tested or documented as not applicable with rationale.
+
+**Biometric data special handling:** Test cases targeting Art. 9 keypoint data must be conducted with synthetic test data in the staging environment. Real user biometric data must not be used as test fixtures. The engagement letter must include a data handling clause confirming no biometric test data is retained by the vendor post-engagement.
+
+---
+
+### 61.5 Findings Classification (P0 Critical → P3 Low, SLA Table)
+
+All findings are classified using a severity tier that maps to remediation SLAs. The vendor's report must assign a tier to every finding; FORM's security-engineer reviews and may adjust tier with documented rationale.
+
+| Tier | Definition | Examples (FORM context) | Remediation SLA | Re-test Required |
+|---|---|---|---|---|
+| P0 Critical | Direct exploitation of production data; RCE; full tenant isolation breach; Art. 9 data exfiltration | Multi-tenant RLS bypass; HMAC chain injection accepted; Supabase service_role key exposed; biometric data returned to unauthorised caller | 24 hours (emergency patch); incident declared per docs/INCIDENT_RESPONSE.md R-01 | Yes — within 7 days of patch |
+| P1 High | Significant privilege escalation; authentication bypass; sensitive data disclosure without full exfiltration | JWT claim stuffing elevating anon to authenticated; Sentry leaking health data in error context; RevenueCat webhook spoofing; admin role accessible without MFA | 7 days | Yes — within 30 days of patch |
+| P2 Medium | Limited scope vulnerability; requires chaining with other issues; configuration weakness | CORS misconfiguration (credentialed but limited scope); missing security headers on Workers responses; weak rate-limiting on auth endpoint; R2 bucket listing (no sensitive data) | 30 days | Yes — within 60 days of patch |
+| P3 Low | Informational; defence-in-depth improvement; no direct exploitation path | Missing HSTS preload; verbose server headers; dependency with known CVE but no applicable exploit path; documentation gap | 90 days | No (compliance-officer discretion) |
+
+**SLA clock:** SLA begins from the date the final pentest report is delivered to FORM (not the test completion date). For P0 findings, the SLA begins from verbal notification during the engagement (before final report).
+
+**Escalation:** Any P0 finding triggers the incident response process in parallel with remediation — docs/INCIDENT_RESPONSE.md R-01 (P0 incident declaration). The compliance-officer must be notified within 1 hour of P0 verbal notification.
+
+**False positive process:** Vendor may dispute a tier assignment within 5 business days of report delivery. Disputes are resolved by security-engineer + compliance-officer with written rationale logged in the defect register (§61.6).
+
+---
+
+### 61.6 Remediation Tracking (Defect Register, Re-test Requirement)
+
+FORM maintains a Penetration Testing Defect Register (`PT-DEFECT-REGISTER`) as a living document updated after each engagement and after each remediation action. The register is stored in Cloudflare R2 `form-compliance-vault/pentests/defect-register/` and is access-controlled to security-engineer, compliance-officer, and auditor (read-only for auditor).
+
+**Register schema (per finding):**
+
+| Field | Description |
+|---|---|
+| `finding_id` | Unique identifier: `PT-{YYYY}-{NNN}` (e.g., PT-2026-001) |
+| `engagement_id` | Reference to PT-E-001 report artefact for the originating engagement |
+| `severity_tier` | P0 / P1 / P2 / P3 |
+| `title` | One-line description |
+| `affected_surface` | From §61.3 in-scope list |
+| `cwe_id` | CWE identifier if applicable |
+| `cvss_score` | CVSS v3.1 base score |
+| `reported_date` | Date of vendor verbal / written notification |
+| `sla_deadline` | Computed from reported_date + SLA per §61.5 |
+| `status` | Open / In-Remediation / Patched-Awaiting-Retest / Closed / Risk-Accepted |
+| `remediation_owner` | GitHub handle of responsible engineer |
+| `remediation_pr` | GitHub PR or commit SHA |
+| `retest_date` | Date re-test was completed (null if not yet required) |
+| `retest_outcome` | Fixed / Persistent / Partially-Fixed |
+| `risk_acceptance_approver` | compliance-officer + founder sign-off required for any Risk-Accepted status |
+| `dec030_event_id` | UUID of the `admin.pentest_finding_logged` DEC-030 event |
+
+**Closure criteria:** A finding is Closed only when:
+1. Remediation PR merged to main and deployed to production (or staging, if finding is staging-only).
+2. Re-test confirms the specific finding is no longer reproducible.
+3. `admin.pentest_finding_remediated` DEC-030 event emitted (§61.8).
+4. Defect register updated with retest_date, retest_outcome, and DEC-030 event_id.
+
+**Risk acceptance:** P0 and P1 findings may not be Risk-Accepted. P2 and P3 findings may be Risk-Accepted with written sign-off from compliance-officer and founder, a compensating control documented, and a scheduled remediation date no more than 90 days out (P2) or next annual pentest cycle (P3). Risk-accepted findings remain Open in the register until the scheduled date.
+
+**Re-test requirement:** Re-tests for P0 and P1 may be performed by the original vendor (preferred for continuity) or by FORM's security-engineer using the vendor's proof-of-concept. Re-tests for P2 may be self-performed by security-engineer with documented methodology. All re-tests require a DEC-030 event.
+
+---
+
+### 61.7 Vendor Selection Criteria (CREST/OSCP, Independence Requirement)
+
+FORM applies the following mandatory criteria when selecting a penetration testing vendor. Vendor selection must be documented in PT-E-002 (vendor qualification record) before the engagement letter is signed.
+
+**Mandatory criteria:**
+
+| Criterion | Requirement |
+|---|---|
+| Accreditation | Vendor organisation must hold CREST accreditation (preferred) or equivalent (Tigera STAR, CHECK for UK government targets). Individual testers must hold OSCP, CREST CRT, GPEN, or GWAPT at minimum |
+| Independence | Vendor must have no commercial relationship with FORM beyond the pentest engagement (no affiliation with FORM's cloud providers, SI partners, or investors) |
+| NDA + data handling | Signed NDA before scoping call. Engagement letter must include: no retention of FORM data post-engagement; no use of FORM findings for threat intelligence products; destruction of test artefacts within 30 days of report delivery |
+| Insurance | Vendor must hold professional indemnity insurance of at least £2M / $2.5M |
+| Conflict check | Compliance-officer performs conflict-of-interest check against FORM's vendor register (docs/SUBPROCESSORS.md) before selection |
+| Report format | Final report must include: executive summary, technical findings with proof-of-concept, CVSS scores, CWE mappings, remediation recommendations, and retest attestation section |
+| Biometric data clause | Engagement letter must contain explicit clause prohibiting retention of Art. 9 biometric test data; vendor must confirm synthetic-only test fixtures were used |
+
+**Vendor re-use:** FORM may re-use the same vendor for consecutive annual engagements, but must rotate to a new vendor at least every three years to maintain independence and fresh perspective. The rotation must be documented in the defect register and PT-E-002.
+
+**Preferred vendor tier:** For the M6 pre-GA engagement, FORM should target a vendor with demonstrated experience in: Cloudflare Workers / edge compute environments, Supabase / PostgREST security review, and mobile application testing (iOS). Budget: see compliance cost table in the master compliance overview ($15–30k per engagement per FORM's compliance cost schedule).
+
+---
+
+### 61.8 DEC-030 Audit Events (Pentest Initiated, Finding Logged, Remediated, Annual Report Filed)
+
+All penetration testing lifecycle events are recorded in the DEC-030 HMAC-chained audit log. These events are append-only and tamper-evident per the dual-key design in §58. No finding may be marked remediated without a corresponding DEC-030 event.
+
+| Event Type | Trigger | Severity | Retention | Required Payload Fields |
+|---|---|---|---|---|
+| `admin.pentest_initiated` | Engagement letter signed; test start confirmed | HIGH | 7 years | `engagement_id`, `vendor_name`, `vendor_accreditation`, `scope_summary`, `start_date`, `scheduled_end_date`, `authorised_by` (founder + compliance-officer), `staging_only_flag` |
+| `admin.pentest_finding_logged` | Finding identified by vendor (verbal or written) | HIGH | 7 years | `finding_id`, `engagement_id`, `severity_tier`, `title`, `affected_surface`, `cwe_id`, `cvss_score`, `reported_date`, `sla_deadline` |
+| `admin.pentest_finding_remediated` | Remediation PR deployed + re-test confirmed finding closed | HIGH | 7 years | `finding_id`, `engagement_id`, `remediation_pr`, `retest_date`, `retest_outcome`, `remediation_owner` |
+| `admin.pentest_report_filed` | Final pentest report delivered to FORM and stored in R2 compliance vault | HIGH | 7 years | `engagement_id`, `report_artefact_id` (PT-E-001 or equivalent), `report_sha256`, `finding_count_p0`, `finding_count_p1`, `finding_count_p2`, `finding_count_p3`, `r2_object_key`, `filed_by` |
+| `admin.pentest_retest_completed` | Re-test completed for any finding (pass or fail) | MEDIUM | 7 years | `finding_id`, `engagement_id`, `retest_date`, `retest_outcome`, `retest_performed_by`, `retest_method` (vendor / self) |
+| `admin.pentest_risk_accepted` | P2/P3 finding marked Risk-Accepted | HIGH | 7 years | `finding_id`, `severity_tier`, `risk_acceptance_rationale`, `compensating_control`, `scheduled_remediation_date`, `approved_by_compliance_officer`, `approved_by_founder` |
+
+**HMAC chain requirement:** Every event listed above must be emitted through the `emit-audit-event` Cloudflare Worker using the current active HMAC key version (per §58 dual-key design). Events must not be inserted directly into `audit_log_events` via Supabase SQL — all inserts must transit the Worker to ensure chain continuity.
+
+**Querying pentest events (audit read-only):**
+
+```sql
+-- Aggregate pentest event counts per engagement (no personal data exposed)
+SELECT
+  payload->>'engagement_id' AS engagement_id,
+  event_type,
+  COUNT(*) AS event_count,
+  MIN(created_at) AS first_event,
+  MAX(created_at) AS last_event
+FROM audit_log_events
+WHERE event_type LIKE 'admin.pentest_%'
+GROUP BY payload->>'engagement_id', event_type
+ORDER BY engagement_id, event_type;
+```
+
+This query returns only aggregate counts and is safe to run during SOC 2 audit evidence collection. Do not join to `users`, `sessions`, or any health table.
+
+---
+
+### 61.9 Evidence Artefacts (PT-E-001 through PT-E-006)
+
+The following evidence artefacts constitute the PT-series audit trail. All artefacts are stored in Cloudflare R2 `form-compliance-vault/pentests/{engagement_id}/` with access restricted to security-engineer and compliance-officer (read access for auditor via time-limited pre-signed URL).
+
+| Artefact ID | Name | Content | Collection Method | Retention |
+|---|---|---|---|---|
+| PT-E-001 | Pentest Final Report | Full vendor report: executive summary, technical findings, proof-of-concept details, CVSS scores, CWE mappings, remediation recommendations | Received from vendor; stored in R2; SHA-256 hash recorded in `admin.pentest_report_filed` DEC-030 event | 7 years |
+| PT-E-002 | Vendor Qualification Record | Vendor accreditation certificates, NDA, engagement letter, conflict-of-interest check, insurance certificate | Collected during vendor selection; filed before `admin.pentest_initiated` event | 7 years |
+| PT-E-003 | Defect Register Snapshot | Point-in-time export of PT-DEFECT-REGISTER at time of report filing, showing all finding statuses | Exported by security-engineer; SHA-256 hash filed | 7 years |
+| PT-E-004 | Re-test Attestation | Vendor (or self) attestation confirming re-test methodology and outcome per finding; signed by tester | Collected per finding closure; referenced in `admin.pentest_retest_completed` event | 7 years |
+| PT-E-005 | DEC-030 Pentest Event Chain Verification | Output of HMAC chain verification function covering all `admin.pentest_*` events for the engagement, confirming zero broken links | Run by security-engineer using audit-chain-verify Edge Function; output stored in R2 | 7 years |
+| PT-E-006 | Annual Pentest Summary Report (Internal) | FORM-authored one-page summary: engagement scope, finding count by tier, remediation status, outstanding risk-accepted items, next engagement date | Authored by compliance-officer; cross-referenced in SOC 2 Type II evidence package | 7 years |
+
+**Artefact access control:** PT-E-001 (full vendor report) contains proof-of-concept exploit details and must not be shared with enterprise customers, HR contacts, or any party outside FORM security team and auditor. The auditor receives a read-only pre-signed R2 URL valid for 72 hours. After audit completion, the URL expires; no persistent third-party access is granted.
+
+**Chain of custody:** Each artefact must be recorded in the DEC-030 log before it is considered filed. Artefacts stored without a corresponding DEC-030 event are not auditor-admissible evidence.
+
+---
+
+### 61.10 SOC 2 TSC Mapping Table
+
+| SOC 2 Criterion | Criterion Description | How §61 Controls Satisfy It |
+|---|---|---|
+| CC4.1 | The entity identifies and assesses risks | Pentest provides external adversarial risk identification beyond automated scanning. Annual cadence ensures risk assessment is current. CVE coverage requirement closes gap between static risk register and active threat landscape. |
+| CC7.1 | The entity uses detection controls to identify threats | Pentest validates that existing detection controls (Sentry, Cloudflare analytics, DEC-030 audit chain monitoring per docs/OBSERVABILITY.md §30) actually detect adversarial activity. Vendor attempts to evade detection; gaps become P1/P2 findings. |
+| CC7.2 | The entity monitors system components for anomalies | Re-test requirement confirms anomaly detection improvements after remediation. HMAC chain adversarial test (§61.3) directly validates that DEC-030 chain-break detection functions as designed. |
+| CC6.6 | The entity implements controls to prevent or detect and act upon the introduction of unauthorised software | Supply-chain component review (§61.4) tests that Cloudflare Worker dependencies do not introduce vulnerable or backdoored components. |
+| CC6.1 | Logical access security controls limit access | Multi-tenant isolation testing and RLS bypass attempts (§61.3) directly validate CC6.1 access control implementation. JWT claim stuffing test validates token-based access boundaries. |
+| CC9.2 | Vendor management | Vendor qualification record PT-E-002 (§61.9) satisfies CC9.2 evidence requirement for third-party security assessment of critical vendor relationships. |
+| A1.2 | Availability — recovery testing | Post-incident pentest trigger (§61.2) cross-references incident recovery; pentest confirms vulnerabilities exploited in incidents are fully remediated. |
+
+---
+
+### 61.11 Implementation Checklist
+
+Milestones use the same M-series convention as the rest of this document.
+
+#### P0 — Must complete before M6 (pre-GA) enterprise contract
+
+- [ ] **PT-P0-01** — Engage pentest vendor meeting §61.7 criteria; sign NDA and engagement letter; emit `admin.pentest_initiated` DEC-030 event. **Owner:** compliance-officer. **Deadline:** M5 (4 weeks before M6 test start).
+- [ ] **PT-P0-02** — Complete full-scope M6 pre-GA penetration test against staging environment (all §61.3 in-scope surfaces). **Owner:** security-engineer. **Deadline:** M6.
+- [ ] **PT-P0-03** — Receive final report; emit `admin.pentest_report_filed` DEC-030 event; store PT-E-001 in R2; log all findings in defect register with `admin.pentest_finding_logged` events. **Owner:** security-engineer + compliance-officer. **Deadline:** M6 + 2 weeks.
+- [ ] **PT-P0-04** — Remediate all P0 findings (if any) within 24-hour SLA; remediate all P1 findings within 7-day SLA. Emit `admin.pentest_finding_remediated` events on closure. **Owner:** engineering. **Deadline:** Per SLA from report delivery.
+- [ ] **PT-P0-05** — Close PT-GAP-001 (no pentest conducted) by filing PT-E-006 annual summary report and updating gap register. **Owner:** compliance-officer. **Deadline:** M6 + 4 weeks.
+
+#### P1 — Must complete before M12 (SOC 2 Type II observation window)
+
+- [ ] **PT-P1-01** — Remediate all P2 findings from M6 engagement within 30-day SLA; confirm re-tests complete; emit `admin.pentest_retest_completed` events. **Owner:** engineering + security-engineer. **Deadline:** M6 + 6 weeks.
+- [ ] **PT-P1-02** — Register all pentest DEC-030 event types (`admin.pentest_initiated`, `admin.pentest_finding_logged`, `admin.pentest_finding_remediated`, `admin.pentest_report_filed`, `admin.pentest_retest_completed`, `admin.pentest_risk_accepted`) in docs/AUDIT_LOG_SCHEMA.md event registry. **Owner:** security-engineer. **Deadline:** M6.
+- [ ] **PT-P1-03** — Establish annual pentest calendar entry; configure PagerDuty / compliance calendar alert at M11 (30-day advance notice before M12 test start). **Owner:** compliance-officer. **Deadline:** M7.
+- [ ] **PT-P1-04** — Complete M12 annual pentest; file PT-E-001 through PT-E-006 artefacts; emit all DEC-030 events. **Owner:** security-engineer + compliance-officer. **Deadline:** M12.
+- [ ] **PT-P1-05** — Verify HMAC chain integrity covers all `admin.pentest_*` events from M6 engagement; store PT-E-005 chain verification output. **Owner:** security-engineer. **Deadline:** M6 + 4 weeks.
+
+#### P2 — Operational improvements for M18+ recurring cycle
+
+- [ ] **PT-P2-01** — Evaluate vendor rotation per §61.7 three-year rotation requirement; document evaluation outcome in PT-E-002 addendum. **Owner:** compliance-officer. **Deadline:** M30 (at three-year mark from first engagement).
+- [ ] **PT-P2-02** — Consider phishing simulation program (currently out of scope) as standalone engagement; assess cost/benefit against social engineering risk register. **Owner:** compliance-officer. **Deadline:** M18.
+- [ ] **PT-P2-03** — Resolve open questions (§61.12) and update this section accordingly. **Owner:** compliance-officer. **Deadline:** Per OQ deadline below.
+
+---
+
+### 61.12 Open Questions
+
+| ID | Question | Priority | Owner | Target Resolution |
+|---|---|---|---|---|
+| OQ-PT-01 | Should FORM conduct a pre-launch bug bounty program (HackerOne / Bugcrowd) as a supplement to formal pentest, or only after M12 SOC 2 Type II report is issued? A bug bounty prior to SOC 2 Type I could surface P0 findings publicly before remediation SLAs are operationalised. Recommended: defer bug bounty to post-M12 when remediation infrastructure is fully proven. | P2 | compliance-officer + founder | M10 (before GA announcement) |
+| OQ-PT-02 | What is the correct scoping approach for the Supabase managed infrastructure layer? FORM's test scope (§61.3) excludes Supabase's internal infrastructure, but PostgREST configuration and RLS policies are in-scope as FORM-controlled. Clarify with pentest vendor whether Supabase's shared-responsibility model requires a specific carve-out letter from Supabase. | P1 | security-engineer | M5 (before M6 engagement letter signed) |
+| OQ-PT-03 | Does the Art. 9 biometric data (CV pose estimation keypoints) adversarial test require a DPIA amendment? The current GDPR_DPIA.md covers collection and storage; a pentest specifically targeting biometric data pathways could constitute a new processing activity (testing = accessing the data). Outside counsel opinion recommended before M6 test. | P1 | compliance-officer | M5 |
+| OQ-PT-04 | Should the HMAC audit chain adversarial test (chain injection / replay / truncation) be conducted in staging only, or is limited read-only enumeration of the production chain acceptable? Production chain enumeration would confirm chain continuity in the live environment but creates a risk of the vendor observing production audit event content. Recommended: staging only, with chain integrity confirmed via PT-E-005 automated verification. | P1 | security-engineer + compliance-officer | M5 (before engagement letter signed) |
+
+---
+
+*v1.0 (2026-06-04): §61 Penetration Testing Program — CC7.1 / CC7.2 / CC4.1. Opens PT-GAP-001 🔴 HIGH (no penetration test conducted against FORM production or staging environment; must close before first enterprise contract and SOC 2 Type I report). §61.1 purpose and scope: external network/application pentest, internal privilege escalation, Art. 9 biometric data pathway testing, HMAC audit chain adversarial testing (chain injection, replay, truncation), multi-tenant isolation verification, supply-chain component review; cross-references docs/INCIDENT_RESPONSE.md, docs/SECURITY.md, docs/OBSERVABILITY.md §30, docs/AUDIT_LOG_SCHEMA.md. §61.2 pentest cadence: M6 (pre-GA full-scope — required before enterprise contract), M12 (annual), M18+ (recurring annual); 6 trigger criteria for unscheduled tests (new Art. 9 data category, multi-tenant enterprise launch, major infrastructure change, critical CVE on Cloudflare Workers / Supabase / Deno, post-P0/P1 incident, acquisition); 14-month maximum gap floor. §61.3 scope boundaries: 11 in-scope surfaces (Cloudflare Workers edge API, Supabase PostgREST, Supabase Auth, multi-tenant RLS, DEC-030 HMAC chain, Art. 9 biometric pathways, RevenueCat webhook, Resend email, Sentry scrubbing, admin interfaces, R2 compliance vault); 7 out-of-scope items (Cloudflare/Supabase managed infra, RevenueCat internal, App Store/Play Store, physical premises, DoS/load testing, user-directed social engineering); staging-first policy with production passive enumeration only. §61.4 methodology: OWASP WSTG v4.2, PTES, OWASP API Security Top 10 (2023), MASTG (iOS), NIST SP 800-115; 8 required test categories; CISA KEV cross-reference requirement; Art. 9 synthetic-data requirement for biometric test fixtures. §61.5 findings classification: P0 Critical (24hr SLA, incident declaration R-01, 7-day re-test), P1 High (7-day SLA, 30-day re-test), P2 Medium (30-day SLA, 60-day re-test), P3 Low (90-day SLA, no mandatory re-test); SLA from verbal notification for P0; no risk acceptance for P0/P1. §61.6 defect register: PT-DEFECT-REGISTER in R2 compliance vault; 15-field schema (finding_id PT-{YYYY}-{NNN}, engagement_id, severity_tier, cwe_id, cvss_score, sla_deadline, remediation_pr, retest_outcome, dec030_event_id); 4-step closure criteria; risk acceptance requires compliance-officer + founder dual sign-off + compensating control + scheduled date. §61.7 vendor selection: CREST accreditation (org) + OSCP/CREST-CRT/GPEN/GWAPT (individual); independence requirement; NDA + biometric data retention prohibition clause; £2M/$2.5M professional indemnity; conflict-of-interest check against SUBPROCESSORS.md; 3-year vendor rotation requirement. §61.8 DEC-030 audit events: 6 HMAC-chained events (all HIGH/7yr except pentest_retest_completed MEDIUM/7yr): admin.pentest_initiated, admin.pentest_finding_logged, admin.pentest_finding_remediated, admin.pentest_report_filed, admin.pentest_retest_completed, admin.pentest_risk_accepted; aggregate-safe SQL query pattern for audit evidence collection. §61.9 evidence artefacts PT-E-001 through PT-E-006: final vendor report (SHA-256 in DEC-030), vendor qualification record, defect register snapshot, re-test attestation, DEC-030 chain verification output, annual summary report; PT-E-001 restricted to security-engineer + compliance-officer + auditor (72hr pre-signed URL only); chain-of-custody requirement (DEC-030 event before artefact is auditor-admissible). §61.10 SOC 2 TSC mapping: CC4.1 (risk identification via adversarial testing), CC7.1 (detection control validation), CC7.2 (anomaly monitoring verification + HMAC chain adversarial test), CC6.6 (supply-chain component review), CC6.1 (multi-tenant RLS + JWT boundary validation), CC9.2 (vendor qualification record), A1.2 (post-incident remediation confirmation). §61.11 implementation checklist: 5× P0 (vendor engagement M5, pre-GA test M6, report filing + finding logging M6+2wk, P0/P1 remediation per SLA, PT-GAP-001 closure M6+4wk), 5× P1 (P2 remediation M6+6wk, AUDIT_LOG_SCHEMA event registry M6, annual calendar M7, M12 annual pentest, PT-E-005 chain verification M6+4wk), 3× P2 (vendor rotation evaluation M30, phishing simulation assessment M18, OQ resolutions). §61.12 4 open questions: OQ-PT-01 (bug bounty timing — P2, M10), OQ-PT-02 (Supabase shared-responsibility scoping letter — P1, M5), OQ-PT-03 (Art. 9 biometric pentest DPIA amendment requirement — P1, M5 outside counsel), OQ-PT-04 (HMAC chain production vs staging test boundary — P1, M5).*
+
+---
