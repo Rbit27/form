@@ -19896,3 +19896,268 @@ Milestones use the same M-series convention as the rest of this document.
 *v1.0 (2026-06-04): §61 Penetration Testing Program — CC7.1 / CC7.2 / CC4.1. Opens PT-GAP-001 🔴 HIGH (no penetration test conducted against FORM production or staging environment; must close before first enterprise contract and SOC 2 Type I report). §61.1 purpose and scope: external network/application pentest, internal privilege escalation, Art. 9 biometric data pathway testing, HMAC audit chain adversarial testing (chain injection, replay, truncation), multi-tenant isolation verification, supply-chain component review; cross-references docs/INCIDENT_RESPONSE.md, docs/SECURITY.md, docs/OBSERVABILITY.md §30, docs/AUDIT_LOG_SCHEMA.md. §61.2 pentest cadence: M6 (pre-GA full-scope — required before enterprise contract), M12 (annual), M18+ (recurring annual); 6 trigger criteria for unscheduled tests (new Art. 9 data category, multi-tenant enterprise launch, major infrastructure change, critical CVE on Cloudflare Workers / Supabase / Deno, post-P0/P1 incident, acquisition); 14-month maximum gap floor. §61.3 scope boundaries: 11 in-scope surfaces (Cloudflare Workers edge API, Supabase PostgREST, Supabase Auth, multi-tenant RLS, DEC-030 HMAC chain, Art. 9 biometric pathways, RevenueCat webhook, Resend email, Sentry scrubbing, admin interfaces, R2 compliance vault); 7 out-of-scope items (Cloudflare/Supabase managed infra, RevenueCat internal, App Store/Play Store, physical premises, DoS/load testing, user-directed social engineering); staging-first policy with production passive enumeration only. §61.4 methodology: OWASP WSTG v4.2, PTES, OWASP API Security Top 10 (2023), MASTG (iOS), NIST SP 800-115; 8 required test categories; CISA KEV cross-reference requirement; Art. 9 synthetic-data requirement for biometric test fixtures. §61.5 findings classification: P0 Critical (24hr SLA, incident declaration R-01, 7-day re-test), P1 High (7-day SLA, 30-day re-test), P2 Medium (30-day SLA, 60-day re-test), P3 Low (90-day SLA, no mandatory re-test); SLA from verbal notification for P0; no risk acceptance for P0/P1. §61.6 defect register: PT-DEFECT-REGISTER in R2 compliance vault; 15-field schema (finding_id PT-{YYYY}-{NNN}, engagement_id, severity_tier, cwe_id, cvss_score, sla_deadline, remediation_pr, retest_outcome, dec030_event_id); 4-step closure criteria; risk acceptance requires compliance-officer + founder dual sign-off + compensating control + scheduled date. §61.7 vendor selection: CREST accreditation (org) + OSCP/CREST-CRT/GPEN/GWAPT (individual); independence requirement; NDA + biometric data retention prohibition clause; £2M/$2.5M professional indemnity; conflict-of-interest check against SUBPROCESSORS.md; 3-year vendor rotation requirement. §61.8 DEC-030 audit events: 6 HMAC-chained events (all HIGH/7yr except pentest_retest_completed MEDIUM/7yr): admin.pentest_initiated, admin.pentest_finding_logged, admin.pentest_finding_remediated, admin.pentest_report_filed, admin.pentest_retest_completed, admin.pentest_risk_accepted; aggregate-safe SQL query pattern for audit evidence collection. §61.9 evidence artefacts PT-E-001 through PT-E-006: final vendor report (SHA-256 in DEC-030), vendor qualification record, defect register snapshot, re-test attestation, DEC-030 chain verification output, annual summary report; PT-E-001 restricted to security-engineer + compliance-officer + auditor (72hr pre-signed URL only); chain-of-custody requirement (DEC-030 event before artefact is auditor-admissible). §61.10 SOC 2 TSC mapping: CC4.1 (risk identification via adversarial testing), CC7.1 (detection control validation), CC7.2 (anomaly monitoring verification + HMAC chain adversarial test), CC6.6 (supply-chain component review), CC6.1 (multi-tenant RLS + JWT boundary validation), CC9.2 (vendor qualification record), A1.2 (post-incident remediation confirmation). §61.11 implementation checklist: 5× P0 (vendor engagement M5, pre-GA test M6, report filing + finding logging M6+2wk, P0/P1 remediation per SLA, PT-GAP-001 closure M6+4wk), 5× P1 (P2 remediation M6+6wk, AUDIT_LOG_SCHEMA event registry M6, annual calendar M7, M12 annual pentest, PT-E-005 chain verification M6+4wk), 3× P2 (vendor rotation evaluation M30, phishing simulation assessment M18, OQ resolutions). §61.12 4 open questions: OQ-PT-01 (bug bounty timing — P2, M10), OQ-PT-02 (Supabase shared-responsibility scoping letter — P1, M5), OQ-PT-03 (Art. 9 biometric pentest DPIA amendment requirement — P1, M5 outside counsel), OQ-PT-04 (HMAC chain production vs staging test boundary — P1, M5).*
 
 ---
+
+---
+
+## §62 Pentest Pre-Engagement Requirements: OQ-PT-02, OQ-PT-03, OQ-PT-04 Resolution
+
+### 62.1 Purpose and Scope
+
+This section resolves three P1 M5 open questions from §61.12 that must be closed before the M6 penetration test engagement letter is signed. The three questions — OQ-PT-02 (Supabase shared-responsibility scoping), OQ-PT-03 (Art. 9 biometric pentest DPIA assessment), and OQ-PT-04 (HMAC chain test boundary) — each block contract execution if left undecided because they govern what the engagement letter must contain and what the vendor may and may not do. A signed engagement letter that is ambiguous on any of these three points creates documented compliance debt that cannot be remediated post-signature without re-issuing the letter.
+
+**Section ownership:** compliance-officer (primary) + security-engineer (secondary). **Version:** v1.0 (2026-06-04). **Replaces:** open question entries for OQ-PT-02, OQ-PT-03, and OQ-PT-04 in §61.12. OQ-PT-01 remains open and is tracked in §62.9.
+
+**Cross-references:** §61.3 (staging-first policy, production passive enumeration only), §61.7 (vendor selection and engagement letter requirements), §61.8 (DEC-030 audit events), §61.9 (PT-E-001 through PT-E-006 artefact register), §58 (DEC-030 dual-key HMAC design), docs/GDPR_DPIA.md (biometric data DPIA), docs/AUDIT_LOG_SCHEMA.md.
+
+---
+
+### 62.2 OQ-PT-02 Resolution — Supabase Shared-Responsibility Scoping
+
+**Status: 🟢 Resolved**
+
+#### 62.2.1 Decision
+
+Supabase's Acceptable Use Policy permits customers to conduct security testing against their own Supabase projects without requiring a formal carve-out authorisation letter from Supabase. No carve-out letter from Supabase is required to proceed with the M6 engagement.
+
+However, two mandatory procedural requirements apply before any test activity begins, and the engagement letter must contain an explicit shared-responsibility carve-out clause. These requirements are not optional formalities — they protect FORM from account suspension and limit the engagement letter's scope to surfaces FORM actually controls.
+
+#### 62.2.2 Rationale
+
+Supabase operates as a managed platform. FORM does not control the underlying database engine, network infrastructure, storage layer, or hosting environment — these are Supabase's managed responsibility. Testing those layers without Supabase's explicit authorisation would violate the Acceptable Use Policy and could result in account termination regardless of the project-level permissions FORM holds. The carve-out clause in the engagement letter is therefore a risk-limiting measure for FORM, not a courtesy to Supabase.
+
+The FORM-controlled surfaces within the Supabase boundary are well-defined: the PostgREST endpoint configuration (exposed column sets, function permissions, table exposure), Row-Level Security policy logic and policy bypass attempts, Auth callback handling (OAuth redirect validation, PKCE implementation, token refresh edge cases), SCIM API endpoint behaviour, and any Supabase Edge Functions deployed under FORM's project. These are in-scope. The managed database engine internals, Supabase network infrastructure, and hosting layer are out-of-scope and must be excluded by name in the engagement letter.
+
+#### 62.2.3 Required Procedures
+
+**Procedure 1 — Pre-test notification email (mandatory, not optional):**
+
+FORM's security-engineer must send a notification email to security@supabase.com at least 5 business days before the first test activity begins. The email must include:
+- FORM's Supabase project reference (project ref string from the Supabase dashboard)
+- The scheduled test start date and end date
+- A brief description of the test scope (PostgREST configuration, RLS policies, Auth callbacks — not the underlying infrastructure)
+- The name of the engaged pentest vendor
+
+This notification email is evidence artefact PT-E-007 (see §62.5). It must be filed in R2 `form-compliance-vault/pentests/{engagement_id}/PT-E-007-supabase-notification.eml` before the test start date. The corresponding DEC-030 filing event is `admin.pentest_initiated` (existing event type from §61.8), which is emitted when the engagement letter is signed — the PT-E-007 artefact reference is included in that event's payload as an additional field (`supabase_notification_filed: true`, `supabase_notification_date`).
+
+**Procedure 2 — Engagement letter shared-responsibility carve-out clause (mandatory):**
+
+The engagement letter signed with the pentest vendor must include a clause that explicitly:
+
+1. Limits the scope of Supabase-layer testing to FORM-controlled surfaces only: PostgREST endpoint configuration, RLS policy logic, Auth callback handling, SCIM API, and Cloudflare Worker business logic that interacts with Supabase.
+2. Excludes from scope: Supabase's managed database engine internals, Supabase network infrastructure, Supabase hosting layer, and any Supabase-managed service component not deployed or configured by FORM.
+3. Acknowledges that any test activity directed at excluded components constitutes out-of-scope activity requiring immediate halt and compliance-officer notification.
+4. Confirms the vendor has reviewed the scope boundaries and agrees that findings relating to Supabase-managed infrastructure are outside the engagement's remit.
+
+This clause must appear as a named section in the engagement letter (suggested heading: "Shared-Responsibility Scope Boundary — Supabase"). Its presence is a prerequisite for PT-P0-01 checklist item completion.
+
+#### 62.2.4 What Does Not Change
+
+The overall scope table in §61.3 is unchanged. PostgREST endpoint configuration and RLS policies remain in-scope. The Supabase managed infrastructure exclusion was already listed in §61.3's out-of-scope table — §62.2 adds the procedural mechanism (notification email) and the contractual mechanism (engagement letter clause) that enforce that boundary.
+
+---
+
+### 62.3 OQ-PT-03 Resolution — Art. 9 Biometric Pentest DPIA Assessment
+
+**Status: 🟢 Resolved**
+
+#### 62.3.1 Decision
+
+A DPIA amendment is NOT required for the M6 penetration test, provided the five conditions below are satisfied in full. If any condition is not satisfied before test start, the compliance-officer must halt the engagement and initiate an outside counsel opinion on whether a DPIA amendment is required before proceeding.
+
+The five conditions are non-negotiable and must each be evidenced before the vendor begins any test activity targeting Art. 9 data pathways (`keypoints_enc`, `sessions`, `workout_logs`, or any API endpoint that processes CV pose estimation biometric keypoints).
+
+#### 62.3.2 Rationale
+
+Under GDPR Art. 35, a DPIA is required when a new processing activity is likely to result in high risk to individuals. The question was whether conducting a pentest that targets biometric data pathways constitutes a new processing activity. The analysis is as follows:
+
+The pentest vendor accessing real Art. 9 biometric data (even in a read-only or exploratory capacity) would constitute a new processing activity — specifically, disclosure to a third party (the vendor) of data classified as special category under Art. 9. This would require a DPIA amendment because the original DPIA in docs/GDPR_DPIA.md does not cover disclosure to pentest vendors.
+
+However, if the vendor never accesses real Art. 9 data — because all test fixtures for biometric pathways are synthetic and the vendor has no access to production health tables — then no special category data is processed by the vendor. The processing activity is unchanged from what the DPIA already covers (FORM engineers processing biometric data in a controlled environment). A DPIA amendment is therefore not triggered.
+
+This is the operative condition: vendor access to Art. 9 data = DPIA amendment required. Vendor access to synthetic fixtures only = no amendment required.
+
+#### 62.3.3 Synthetic Biometric Fixture Protocol SBF-001
+
+The following synthetic fixture protocol governs all penetration test activity targeting Art. 9 biometric data pathways. This protocol must be documented in full at R2 `form-compliance-vault/pentests/{engagement_id}/synthetic-fixture-protocol.md` before the vendor begins any biometric pathway test. The R2 object path is mandatory; a local copy is insufficient.
+
+**Protocol identifier:** SBF-001
+
+**Purpose:** Provide test fixtures for CV pose estimation biometric keypoints that exercise the full data path (encryption, storage, retrieval, API response) without using data derived from any real person.
+
+**Fixture specification:**
+
+- Format: `Float32Array[17][3]` — 17 joints (COCO keypoint convention: nose, left/right eye, left/right ear, left/right shoulder, left/right elbow, left/right wrist, left/right hip, left/right knee, left/right ankle), each with `[x, y, confidence]` values.
+- `x` range: 0.0 to 1.0 (normalised frame width), uniform distribution.
+- `y` range: 0.0 to 1.0 (normalised frame height), uniform distribution.
+- `confidence` range: 0.3 to 1.0, weighted toward 0.7–0.95 to simulate realistic detection confidence.
+- Generation method: cryptographically seeded pseudorandom number generator (not `Math.random()`). Seed value must be recorded and stored alongside the fixture file for reproducibility.
+- Derivation prohibition: fixtures must NOT be derived from, seeded by, or statistically calibrated against any real user's keypoint data. No sampling from the `keypoints_enc` column (even in aggregate) is permitted during fixture generation.
+- Volume: minimum 50 synthetic sessions, maximum 500, covering edge cases (low-confidence joints, partial occlusion simulation via confidence < 0.3 for selected joints, single-frame sessions, maximum-length sessions).
+
+**Generation responsibility:** FORM security-engineer generates all SBF-001 fixtures before the vendor engagement begins. The vendor does not generate their own biometric fixtures. The security-engineer stores generated fixtures in the staging environment only.
+
+**Encryption:** All SBF-001 fixtures must be encrypted at rest using AES-256-GCM via the same encryption pathway used for production `keypoints_enc` data, so that the pentest exercises the real encryption/decryption code path.
+
+#### 62.3.4 Five Mandatory Conditions
+
+| Condition | Requirement | Evidence |
+|---|---|---|
+| C1 — Synthetic fixtures only | All pentest fixtures for biometric pathways use SBF-001 synthetic data; zero real user data used | SBF-001 protocol document filed in R2 before test start; security-engineer attestation in PT-E-002 addendum |
+| C2 — Production health table access prohibited | Vendor has no credentials, service role, or any access path (direct or indirect) to production `keypoints_enc`, `sessions`, or `workout_logs` | Engagement letter biometric data prohibition clause (per §61.7); staging-only credential issuance; access review before test start |
+| C3 — Staging environment isolation | All biometric pathway testing occurs in staging environment with SBF-001 fixtures only; staging has no replication of production health data | Security-engineer confirms staging health tables contain only synthetic data before vendor access is granted |
+| C4 — Halt and assess criteria | If vendor accidentally accesses production biometric data (even indirectly via mis-scoped credentials), testing halts immediately and compliance-officer initiates a DPIA incident assessment within 24 hours | Halt procedure documented in engagement letter; compliance-officer on-call during test window for immediate response |
+| C5 — Engagement letter biometric prohibition clause | Engagement letter contains explicit clause prohibiting retention of Art. 9 biometric test data, confirming synthetic-only fixture use, and confirming vendor agrees to immediate halt if production health data is encountered (consistent with §61.7 "biometric data retention prohibition clause") | Clause present in signed engagement letter before PT-P0-01 checklist item is marked complete |
+
+#### 62.3.5 Halt Criteria and Response Procedure
+
+If at any point during the engagement the vendor reports (or FORM detects) that production biometric data has been accessed:
+
+1. Security-engineer suspends all vendor access credentials within 1 hour of detection.
+2. Compliance-officer initiates DPIA incident assessment within 24 hours — this is not a full DPIA amendment but an assessment of whether Art. 35 processing risk has materialised.
+3. If the assessment concludes that real Art. 9 data was processed by the vendor, compliance-officer commissions an outside counsel opinion on DPIA amendment requirement and notifies the relevant supervisory authority if required under GDPR Art. 33.
+4. Engagement resumes only after compliance-officer confirms that the scope breach has been remediated and the conditions in §62.3.4 are re-established.
+
+This procedure is not hypothetical contingency planning — it must appear as a named clause in the engagement letter.
+
+---
+
+### 62.4 OQ-PT-04 Resolution — HMAC Chain Test Boundary
+
+**Status: 🟢 Resolved**
+
+#### 62.4.1 Decision
+
+A two-layer approach governs all penetration test activity targeting the DEC-030 HMAC-chained audit log. The two layers are: (A) destructive adversarial tests — staging only, never production; (B) read-only enumeration of the production chain — permitted under strict conditions.
+
+This decision is consistent with §61.3 ("staging-first policy, production passive enumeration only") and adds the specific authorisation event and access scoping that §61.3 did not specify.
+
+#### 62.4.2 Layer A — Destructive Tests: Staging Only
+
+The following test types are classified as destructive and must be conducted in the staging environment only. They may never be run against the production HMAC chain under any circumstances, including with read-only credentials:
+
+| Destructive Test Type | Description | Why Production Is Prohibited |
+|---|---|---|
+| Chain injection | Inserting an unsigned or invalidly-signed event into `audit_log_events`, bypassing the `emit-audit-event` Worker | Would create a permanently broken chain link in production; remediation requires chain rebuilding which constitutes a material change to tamper-evident evidence |
+| Replay attack | Submitting a duplicate `event_id` to test whether the chain rejects duplicate entries | Even a rejected duplicate creates noise in the production chain sequence that auditors must explain |
+| Truncation simulation | Introducing an intentional sequence gap by emitting events with non-consecutive sequence numbers | Any gap in production chain is a HIGH-severity finding in its own right and would require immediate DEC-030 investigation |
+| Hash collision probe | Submitting events with crafted payloads designed to test HMAC collision resistance | Introduces adversarial payloads into the production audit record regardless of whether the HMAC check passes |
+
+Staging environment requirements for Layer A tests: the staging HMAC chain must use a separate HMAC key from production (per §58 dual-key design), staging chain verification is run by security-engineer before and after Layer A tests to confirm the staging chain state, and Layer A test outcomes are recorded in the PT-DEFECT-REGISTER as findings regardless of pass/fail status.
+
+#### 62.4.3 Layer B — Read-Only Production Enumeration: Permitted Under Conditions
+
+Limited read-only enumeration of the production HMAC chain is permitted under the following conditions, all of which must be satisfied before the vendor runs any production query:
+
+**Condition B1 — Authorisation DEC-030 event:**
+
+Before the vendor runs any production chain query, the compliance-officer must emit the following DEC-030 event:
+
+| Field | Value |
+|---|---|
+| Event type | `admin.pentest_chain_enumeration_authorised` |
+| Severity | HIGH |
+| Retention | 7 years |
+| Emission method | `emit-audit-event` Cloudflare Worker — never direct SQL insert |
+| Required payload fields | `engagement_id`, `authorised_by` (compliance-officer identity), `authorisation_date`, `vendor_name`, `enumeration_scope` (value: `"audit_log_events SELECT only — no health tables"`), `production_flag` (value: `true`), `staging_only_destructive_tests_confirmed` (value: `true`) |
+
+This event is HMAC-chained per the DEC-030 dual-key design in §58. It is the compliance-officer's explicit authorisation on the chain — the equivalent of a signed gate that the vendor has been permitted to read the production chain aggregate query. If this event has not been emitted, the vendor may not run any production query.
+
+**Condition B2 — Query constraint:**
+
+The vendor may only execute the `audit-chain-verify` Edge Function aggregate query against the production chain. This is the same pattern documented in §61.8 — it returns sequence statistics, event counts, and HMAC link status without exposing event payload content. The vendor may not execute free-form SQL against `audit_log_events`, may not join to any other table, and may not retrieve individual event payloads.
+
+**Condition B3 — Credential scoping:**
+
+The vendor is issued a read-only Supabase service role credential scoped exclusively to `SELECT` on `audit_log_events`. This credential must not have access to `keypoints_enc`, `sessions`, `workout_logs`, `users`, or any other table. The credential is issued for the duration of the production enumeration window only (maximum 48 hours) and revoked immediately after. Credential issuance and revocation must each be recorded by security-engineer.
+
+**Condition B4 — No payload content in findings:**
+
+Any finding that references the production HMAC chain enumeration must describe the chain structure (sequence gaps, link counts, timing distribution) without including the content of individual audit event payloads. The vendor's final report must not reproduce `audit_log_events.payload` values from production. This constraint must appear in the engagement letter.
+
+#### 62.4.4 PT-E-005 Clarification
+
+PT-E-005 (DEC-030 Pentest Event Chain Verification) defined in §61.9 is a post-test artefact run by security-engineer after all findings are remediated. It is NOT part of the adversarial test itself and is NOT a vendor deliverable.
+
+The PT-E-005 collection procedure is:
+1. Security-engineer runs the `audit-chain-verify` Edge Function aggregate query against the production chain after all `admin.pentest_*` events from the engagement have been emitted.
+2. The output confirms: (a) zero broken HMAC links across the engagement event sequence; (b) all `admin.pentest_*` event types are present and correctly sequenced; (c) the `admin.pentest_chain_enumeration_authorised` event (if applicable) appears in the correct chronological position relative to the vendor's production enumeration window.
+3. Output is stored as PT-E-005 in R2 `form-compliance-vault/pentests/{engagement_id}/PT-E-005-chain-verification.json`.
+4. PT-E-005 is collected after remediation is complete, not during the test window, so that the chain verification reflects the final post-remediation state.
+
+The vendor's production enumeration under Layer B is a separate activity from PT-E-005. The vendor enumerates to look for anomalies; PT-E-005 is FORM's internal verification that the audit chain covering the pentest lifecycle is intact.
+
+---
+
+### 62.5 Updated Evidence Artefact Register (PT-E-007)
+
+The following artefact is added to the PT-series register established in §61.9. The full register (PT-E-001 through PT-E-006) is unchanged and remains in §61.9.
+
+| Artefact ID | Name | Content | Collection Method | Retention |
+|---|---|---|---|---|
+| PT-E-007 | Supabase Notification Email | Email sent to security@supabase.com at least 5 business days before test start, confirming FORM's project reference, test dates, scope description (FORM-controlled surfaces only), and vendor name | Sent by security-engineer; original `.eml` file stored in R2 `form-compliance-vault/pentests/{engagement_id}/PT-E-007-supabase-notification.eml`; send timestamp and recipient address recorded in `admin.pentest_initiated` DEC-030 event payload fields `supabase_notification_filed: true` and `supabase_notification_date` | 7 years |
+
+**Chain of custody:** PT-E-007 must be filed in R2 and the corresponding fields recorded in the `admin.pentest_initiated` DEC-030 event before the vendor begins any test activity. A notification email that has been sent but not filed in R2 with a corresponding DEC-030 event record is not auditor-admissible evidence.
+
+**Timing requirement:** The 5-business-day advance notice to Supabase is a hard floor, not a target. Filing PT-E-007 on the morning of test start does not satisfy the requirement even if the email was sent earlier. The `supabase_notification_date` recorded in the DEC-030 event must be at least 5 business days before the test start date confirmed in `admin.pentest_initiated`.
+
+---
+
+### 62.6 Updated §61.11 Checklist Items
+
+The following checklist items are added to the §61.11 implementation checklist. They supplement (and do not replace) the existing PT-P0 and PT-P1 items. Priority assignments follow the same convention as §61.11.
+
+#### P0 — Must complete before M6 engagement letter is signed
+
+- [ ] **PT-P0-06** — Send Supabase notification email (security@supabase.com) at least 5 business days before test start, referencing project ref and test dates; file as PT-E-007 in R2; record `supabase_notification_filed: true` and `supabase_notification_date` in `admin.pentest_initiated` DEC-030 event payload. **Owner:** security-engineer. **Deadline:** M6 minus 5 business days. **Resolves:** OQ-PT-02.
+- [ ] **PT-P0-07** — Confirm engagement letter contains Supabase shared-responsibility carve-out clause (§62.2.3 Procedure 2) limiting scope to FORM-controlled surfaces and excluding Supabase managed infrastructure by name. **Owner:** compliance-officer. **Deadline:** M6 minus 5 business days (before engagement letter signing). **Resolves:** OQ-PT-02.
+- [ ] **PT-P0-08** — Generate SBF-001 synthetic biometric fixtures (minimum 50 synthetic sessions, SBF-001 spec); store in staging environment only; file synthetic-fixture-protocol.md in R2 `form-compliance-vault/pentests/{engagement_id}/`; confirm staging health tables contain no real user data. **Owner:** security-engineer. **Deadline:** M6 minus 3 business days. **Resolves:** OQ-PT-03.
+- [ ] **PT-P0-09** — Confirm engagement letter contains biometric data prohibition clause (per §61.7 and §62.3.4 C5) and Art. 9 halt-and-assess procedure (§62.3.5). **Owner:** compliance-officer. **Deadline:** M6 minus 5 business days (before engagement letter signing). **Resolves:** OQ-PT-03.
+- [ ] **PT-P0-10** — If Layer B (production chain read-only enumeration) is approved for the M6 engagement: compliance-officer emits `admin.pentest_chain_enumeration_authorised` DEC-030 event via `emit-audit-event` Worker before vendor runs any production query; security-engineer issues scoped read-only credential for `audit_log_events SELECT` only; credential revocation scheduled. **Owner:** compliance-officer (event) + security-engineer (credential). **Deadline:** Before vendor's first production query. **Resolves:** OQ-PT-04.
+
+#### P1 — Must complete before M6 test start
+
+- [ ] **PT-P1-06** — Register `admin.pentest_chain_enumeration_authorised` event type in docs/AUDIT_LOG_SCHEMA.md event registry (alongside existing `admin.pentest_*` events per PT-P1-02). **Owner:** security-engineer. **Deadline:** M6. **Resolves:** OQ-PT-04.
+
+---
+
+### 62.7 SOC 2 TSC Mapping
+
+| SOC 2 Criterion | Criterion Description | How §62 Controls Satisfy It |
+|---|---|---|
+| CC9.2 | Vendor management — the entity manages vendor and business partner risk | OQ-PT-02 resolution: the Supabase shared-responsibility carve-out clause in the engagement letter constitutes documented vendor boundary management. PT-E-007 (Supabase notification email) is evidence of proactive coordination with the managed-platform vendor before security testing. Both artefacts satisfy CC9.2 requirements for documented vendor relationship management in the context of third-party security assessment. |
+| P3.1 | Privacy — the entity communicates privacy practices and protects personal information | OQ-PT-03 resolution: the SBF-001 synthetic fixture protocol and the five mandatory conditions (§62.3.4) collectively ensure that Art. 9 biometric data is not disclosed to the pentest vendor. The DPIA assessment confirming no amendment is required (because no real data is processed) is direct evidence that FORM's privacy architecture is designed to prevent unauthorised special-category data access, satisfying P3.1's requirement that personal information be protected according to the entity's privacy commitments. |
+| CC6.1 | Logical access security controls limit access | OQ-PT-04 resolution: the Layer B credential scoping (read-only `audit_log_events SELECT` only, no health tables, time-limited 48-hour issuance, immediate revocation) directly demonstrates CC6.1 logical access controls operating as designed even under adversarial enumeration conditions. The `admin.pentest_chain_enumeration_authorised` DEC-030 event provides auditable evidence that production access was explicitly authorised, time-bounded, and recorded before it occurred. |
+
+---
+
+### 62.8 Implementation Checklist
+
+The following actions must be completed in sequence before the M6 engagement letter is signed. This checklist is sequential — items with earlier deadlines must be complete before downstream items can proceed.
+
+- [ ] **62.8-01** — Register `admin.pentest_chain_enumeration_authorised` in docs/AUDIT_LOG_SCHEMA.md event registry with full DEC-030 spec (HIGH severity, 7-year retention, `emit-audit-event` Worker only, required payload fields per §62.4.3 Condition B1). **Owner:** security-engineer. **Deadline:** M5 (this month). **Prerequisite for:** PT-P0-10, PT-P1-06.
+- [ ] **62.8-02** — Draft and finalise engagement letter with: (a) Supabase shared-responsibility carve-out clause (§62.2.3 Procedure 2); (b) biometric data prohibition clause with SBF-001 synthetic fixture confirmation requirement; (c) Art. 9 halt-and-assess clause (§62.3.5); (d) Layer B production chain payload-content prohibition (§62.4.3 Condition B4). Compliance-officer reviews all four clauses before signing. **Owner:** compliance-officer. **Deadline:** M5 (before engagement letter signing date).
+- [ ] **62.8-03** — Send Supabase notification email at least 5 business days before scheduled test start; save `.eml` file locally for R2 filing. **Owner:** security-engineer. **Deadline:** M6 minus 5 business days.
+- [ ] **62.8-04** — File PT-E-007 (Supabase notification email) in R2 at `form-compliance-vault/pentests/{engagement_id}/PT-E-007-supabase-notification.eml` immediately after sending. **Owner:** security-engineer. **Deadline:** Same day as 62.8-03.
+- [ ] **62.8-05** — Generate SBF-001 synthetic biometric fixtures per §62.3.3 spec; load into staging environment; confirm staging `keypoints_enc` column contains only synthetic data; document fixture seed and count in `synthetic-fixture-protocol.md`; file in R2 at `form-compliance-vault/pentests/{engagement_id}/synthetic-fixture-protocol.md`. **Owner:** security-engineer. **Deadline:** M6 minus 3 business days.
+- [ ] **62.8-06** — Sign engagement letter; emit `admin.pentest_initiated` DEC-030 event via `emit-audit-event` Worker, including `supabase_notification_filed: true` and `supabase_notification_date` in payload. **Owner:** compliance-officer (signing + DEC-030 event). **Deadline:** M6 minus 1 business day.
+- [ ] **62.8-07** — If Layer B production enumeration is approved: compliance-officer emits `admin.pentest_chain_enumeration_authorised` DEC-030 event before any production query; security-engineer issues and records scoped read-only credential; compliance-officer and security-engineer confirm Layer A destructive tests are confined to staging before vendor begins. **Owner:** compliance-officer + security-engineer. **Deadline:** Before vendor's first production query within the M6 test window.
+- [ ] **62.8-08** — After all M6 findings are remediated: security-engineer runs `audit-chain-verify` Edge Function covering all `admin.pentest_*` events (including `admin.pentest_chain_enumeration_authorised` if emitted); stores output as PT-E-005 in R2. Confirm PT-E-005 shows zero broken HMAC links. **Owner:** security-engineer. **Deadline:** M6 + 4 weeks (per PT-P1-05 in §61.11).
+
+---
+
+### 62.9 Open Questions
+
+§62 closes OQ-PT-02, OQ-PT-03, and OQ-PT-04 from §61.12. One open question from §61.12 remains unresolved.
+
+| ID | Question | Priority | Owner | Target Resolution | Status |
+|---|---|---|---|---|---|
+| OQ-PT-01 | Should FORM conduct a pre-launch bug bounty program (HackerOne / Bugcrowd) as a supplement to formal pentest, or only after M12 SOC 2 Type II report is issued? A bug bounty prior to SOC 2 Type I could surface P0 findings publicly before remediation SLAs are operationalised. Recommended: defer bug bounty to post-M12 when remediation infrastructure is fully proven. | P2 | compliance-officer + founder | M10 (before GA announcement) | Open — no change from §61.12 |
+| OQ-PT-02 | Supabase shared-responsibility pentest scoping | P1 | security-engineer | M5 | 🟢 Resolved — §62.2 |
+| OQ-PT-03 | Art. 9 biometric pentest DPIA amendment requirement | P1 | compliance-officer | M5 | 🟢 Resolved — §62.3 |
+| OQ-PT-04 | HMAC chain production vs staging test boundary | P1 | security-engineer + compliance-officer | M5 | 🟢 Resolved — §62.4 |
+
+OQ-PT-01 remains P2 priority. It does not block the M6 engagement letter. Resolution is required before the M10 GA announcement. See §61.12 for the full question text and rationale.
+
+---
+
+*v1.0 (2026-06-04): §62 Pentest Pre-Engagement Requirements: OQ-PT-02, OQ-PT-03, OQ-PT-04 Resolution — CC9.2 / P3.1 / CC6.1. Resolves all three P1 M5 open questions from §61.12 that block M6 engagement letter signing. §62.1 purpose: M5 deadline, three P1 OQs blocking engagement letter, compliance debt rationale. §62.2 OQ-PT-02 🟢 Resolved: Supabase AUP permits customer pentests without carve-out letter; two mandatory procedures: (1) notification email to security@supabase.com ≥5 business days before test start referencing project ref and dates, filed as PT-E-007; (2) engagement letter shared-responsibility carve-out clause limiting scope to FORM-controlled surfaces (PostgREST config, RLS policies, Auth callbacks, SCIM API, Cloudflare Worker logic) and excluding Supabase managed database engine, network infra, and hosting layer by name. §62.3 OQ-PT-03 🟢 Resolved: DPIA amendment NOT required provided all 5 conditions satisfied — C1 synthetic fixtures only (SBF-001: pseudorandom Float32Array[17×3], realistic joint coordinate ranges, never derived from real users, min 50 sessions, AES-256-GCM encrypted); C2 vendor zero access to production health tables; C3 staging environment isolation with synthetic data only; C4 halt-and-assess within 24h if production data accidentally accessed; C5 engagement letter biometric prohibition clause (per §61.7). SBF-001 protocol filed in R2 before test start. §62.4 OQ-PT-04 🟢 Resolved: two-layer decision — Layer A destructive tests (chain injection, replay, truncation, hash collision probe) staging ONLY never production; Layer B read-only production enumeration permitted under 4 conditions: B1 compliance-officer emits admin.pentest_chain_enumeration_authorised (NEW DEC-030 event: HIGH, 7yr, emit-audit-event Worker only, payload: engagement_id, authorised_by, authorisation_date, vendor_name, enumeration_scope, production_flag, staging_only_destructive_tests_confirmed) before any production query; B2 audit-chain-verify Edge Function aggregate query only (no free-form SQL, no payload content); B3 read-only service role scoped to audit_log_events SELECT only, 48hr max, immediate revocation; B4 no payload content in vendor findings. PT-E-005 clarification: post-remediation artefact run by security-engineer, NOT vendor deliverable, NOT part of adversarial test. §62.5 PT-E-007 added to artefact register: Supabase notification email, .eml in R2, 7yr retention, chain-of-custody via admin.pentest_initiated payload fields. §62.6 updated checklist: 5× P0 additions (PT-P0-06 through PT-P0-10) and 1× P1 addition (PT-P1-06 AUDIT_LOG_SCHEMA registration of new event type). §62.7 TSC mapping: CC9.2 (PT-E-007 + carve-out clause = vendor boundary management), P3.1 (SBF-001 + 5 conditions = Art. 9 data not disclosed to vendor), CC6.1 (Layer B credential scoping + authorisation event = logical access controls evidenced under adversarial conditions). §62.8 implementation checklist: 8 sequential items (event registry M5, engagement letter clauses M5, Supabase notification M6-5bdays, PT-E-007 R2 filing same day, SBF-001 generation M6-3bdays, engagement letter signing + admin.pentest_initiated event M6-1bday, Layer B authorisation event + credential issuance before first production query, PT-E-005 post-remediation chain verification M6+4wk). §62.9 open questions: OQ-PT-01 remains open P2 M10; OQ-PT-02/03/04 🟢 Resolved.*
