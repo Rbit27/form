@@ -6,6 +6,13 @@
 
 ---
 
+## [1.92.0] — 2026-06-04
+
+### Added
+- `content/post-211-pcr-resynthesis-kinetics.md` — PCr resynthesis kinetics: biphasic curve, acidosis inhibition of creatine kinase, goal-specific rest interval programming (Harris 1976, Hultman 1987, Bogdanis 1995/1996, Greenhaff 1994). Clinical-safety: NOT REQUIRED.
+
+---
+
 ## [1.91.1] — 2026-06-04
 
 ### Changed
