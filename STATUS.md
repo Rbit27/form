@@ -280,6 +280,8 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-207-antagonist-agonist-paired-sets.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-208-intensity-vs-volume-hypertrophy-threshold.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-209-eccentric-overload.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-212-adherence-coefficient.md | Blog | draft · clinical-safety PASS WITH CONDITIONS (2026-06-04) · sports-scientist optional |
+| post-211-pcr-resynthesis-kinetics.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-210-cognitive-load-technique.md | Blog | draft · clinical-safety NOT REQUIRED |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |

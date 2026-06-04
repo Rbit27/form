@@ -6,6 +6,16 @@
 
 ---
 
+## [1.94.0] — 2026-06-04
+
+### Added
+- `content/post-212-adherence-coefficient.md` — "Adherence coefficient: чому найкраща програма — та, якій відповідає твоє реальне життя". Schoenfeld (2017 JSCR), Androulakis-Korakakis (2020 Sports Med), Bickel (2011 Med Sci Sports Exerc), Gentil (2017 PLoS ONE): тренувальний ефект = якість × коефіцієнт дотримання; програма-хопінг як проблема дизайну; MED як рівень структури для стійкого виконання; режим «виживання» як частина дизайну програми. Clinical-safety: PASS WITH CONDITIONS (2026-06-04) — умови виконані: відсутній shaming-фреймінг, FORM позиціонований як стале тренування, не нульовий опір.
+- `blog.html` — картки post-211 (PCr resynthesis kinetics) і post-212 (adherence coefficient) додані перед post-210.
+- `README.md` — roadmap оновлено: [x] post-211, [x] post-212, [ ] post-213 (immune function), [ ] post-214 (cognitive function), [ ] post-215 (specificity vs variety).
+- `STATUS.md` — рядки post-211 і post-212 додані до content engine table.
+
+---
+
 ## [1.93.0] — 2026-06-04
 
 ### Added
