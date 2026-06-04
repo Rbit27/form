@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v1.4
+# FORM · SSO/SCIM Implementation v1.7
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -29,6 +29,10 @@
 19. [SCIM Groups Sync & Group-Based Role Mapping](#19-scim-groups-sync--group-based-role-mapping)
 20. [SAML Certificate Lifecycle Management — Proactive Monitoring & Expiry Alerting](#20-saml-certificate-lifecycle-management--proactive-monitoring--expiry-alerting)
 21. [Google Workspace Directory API Integration for Group Sync](#21-google-workspace-directory-api-integration-for-group-sync)
+22. [High-Scale Session Revocation Architecture — KV-Backed Revocation Cache](#22-high-scale-session-revocation-architecture--kv-backed-revocation-cache)
+23. [Continuous Access Evaluation (CAE) & Shared Signals Framework (SSF)](#23-continuous-access-evaluation-cae--shared-signals-framework-ssf--real-time-idp-risk-event-processing)
+24. [Privileged Access Management (PAM): Just-in-Time Privilege Escalation & Break-Glass Protocol](#24-privileged-access-management-pam-just-in-time-privilege-escalation--break-glass-protocol-for-form_admin-operations)
+25. [Per-Tenant Authentication Policy Engine — IP Allowlist, MFA Enforcement & Session Policy](#25-per-tenant-authentication-policy-engine--ip-allowlist-mfa-enforcement--session-policy)
 
 ---
 
@@ -8341,3 +8345,477 @@ All three alert rules are registered in `docs/OBSERVABILITY.md §6` under the `p
 ---
 
 *v1.6 additions (2026-06-01): Section 24 — Privileged Access Management (PAM): Just-in-Time Privilege Escalation & Break-Glass Protocol for `form_admin` Operations. Eliminates standing `form_admin` Postgres credentials (SOC 2 CC6.1/CC6.3 risk). Architecture: `pam-elevation-service` Cloudflare Worker mediates all elevation requests; three access tiers (`read_only` 4h self-approve+TOTP, `read_write` 1h manager-approval+TOTP, `destructive` 15min dual-person+FIDO2 WebAuthn); `pam-db-proxy` Supabase Edge Function opens scoped Postgres connection via `SET ROLE form_admin` + `SET app.pam_session_id` GUC (database-layer audit linkage); `RESET ROLE` after each statement batch; PgBouncer session mode required (OQ-SSO-24.2). Break-glass: separate Cloudflare Access application (`form-break-glass`), mTLS + named identity list (max 5, quarterly review), 2h non-renewable session, immediate PagerDuty P0 + compliance email on activation, mandatory 72h post-incident review with GitHub Issue auto-creation, `pam_break_glass_reviews` Postgres table for outcome recording. KV: `PAM_KV` namespace (separate from SESSION_REVOCATION_KV and SSO_KV); `pam:session:{id}` primary + `pam:by_admin:{admin_user_id}:{id}` secondary index; `pam:suspended:{admin_user_id}` for AL-PAM-02 lockout. Six DEC-030 HMAC-chained audit events: `pam.elevation_requested` (HIGH, 7yr), `pam.elevation_approved` (HIGH, 7yr), `pam.elevation_denied` (HIGH, 7yr), `pam.session_expired` (STANDARD, 7yr), `pam.break_glass_activated` (CRITICAL, 7yr — post-hoc two-person review), `pam.break_glass_expired` (HIGH, 7yr). Three alerting rules: AL-PAM-01 P0 (break-glass activated), AL-PAM-02 P1 (> 3 denied elevations/1h same admin — auto-suspend), AL-PAM-03 P2 (session used after KV expiry — clock skew detection). SOC 2: CC6.1 (no standing access), CC6.2 (approval workflow), CC6.3 (auto-expiry via KV TTL), CC6.7 (mTLS on all PAM endpoints + TLS to Postgres). Four open questions: OQ-SSO-24.1 (proxy placement: Hyperdrive vs. Edge Function — security-engineer, P1, before M4), OQ-SSO-24.2 (PgBouncer session mode for PAM pool — platform-engineer, P0, before M4), OQ-SSO-24.3 (form_admin vs. form_break_glass role naming — compliance-officer, P2, M5), OQ-SSO-24.4 (FIDO2 hardware key procurement — security-engineer + eng-manager, P0, before M4). Implementation checklist: 10 tasks (6× P0 M4, 2× P1 M4, 2× P1 M5).*
+
+---
+
+## 25. Per-Tenant Authentication Policy Engine — IP Allowlist, MFA Enforcement & Session Policy
+
+> **Closes G-006 (🟡 → 🟢 upon deployment).** G-006 was first documented in §9 (Open Questions / Gaps): "Schema column exists; the Cloudflare Worker that enforces IP allowlist on SSO callbacks is not written." §16.10 added the admin UI design specification. This section adds the complete enforcement implementation: Worker middleware covering all authenticated routes (not only SSO callbacks), MFA enforcement policy evaluation, KV-backed policy cache, policy change management, admin lockout recovery, DEC-030 audit trail, alerting rules, and SOC 2 control mapping.
+>
+> **Cross-references:** §4.2 (`tenant_sso_configs` DDL) · §6 (security controls) · §12 (session token lifecycle) · §16.10 (IP allowlist admin UI design) · §22 (session revocation KV) · §24 (PAM break-glass, used in lockout recovery) · `docs/ENTERPRISE.md` ("IP allowlist (Enterprise only)", "MFA enforcement per tenant") · `docs/DATA_MODEL.md §19` (`security.ip_allowlist_enabled` feature flag) · `docs/AUDIT_LOG_SCHEMA.md` (DEC-030) · `docs/SOC2_READINESS.md` CC6.1/CC6.2/CC6.6/CC6.8.
+
+---
+
+### 25.1 Purpose and Scope
+
+Enterprise customers operate in regulated environments where not all authentication flows originate from trusted corporate networks. Two controls address this:
+
+1. **IP allowlist** — restricts SSO login and API session use to CIDR ranges declared by the customer's IT team. Employees on unrecognised networks (home Wi-Fi, airport, non-corporate VPN) cannot authenticate, regardless of whether their IdP credentials are valid. This is a compensating control for credential theft from a non-corporate endpoint.
+
+2. **MFA enforcement** — requires a second factor at every session creation, independent of what the IdP has already enforced. Relevant when a customer's IdP has MFA enabled for some but not all users, or when the contract requires FORM to independently verify MFA completion (regulated industry requirement).
+
+**Scope:** Enterprise and Growth tenants only. `security.ip_allowlist_enabled` feature flag (DATA_MODEL §19) must be active for a tenant before `ip_allowlist` enforcement is respected; attempting to configure allowlist CIDRs on Starter without this flag returns 403 from the Admin Dashboard API.
+
+**Out of scope:** Consumer mobile (Apple Sign In); form_admin PAM sessions (covered by §24); Cloudflare Access itself (managed externally to this document).
+
+**Privacy constraint:** IP addresses of blocked authentication attempts are sensitive. In DEC-030 events, blocked client IPs are stored as a SHA-256 hash (hex, first 32 chars) rather than plaintext, to avoid the audit log becoming a correlatable log of employee home network addresses. The full IP is available only to security-engineer under PAM `read_write` elevation, for incident investigation.
+
+---
+
+### 25.2 Policy Dimensions — What Is Enforced and When
+
+Three policy dimensions are evaluated in sequence on every authentication event. The evaluation order is critical — IP allowlist is evaluated first (before any credential validation), so a blocked IP receives no information about whether credentials would have been accepted.
+
+| # | Dimension | Enforcement trigger | Controlled by | Tier gate |
+|---|---|---|---|---|
+| 1 | **IP allowlist** | SSO callback (SAML/OIDC), token refresh, SCIM API | `ip_allowlist_enabled` feature flag + `ip_allowlist` JSONB | Enterprise only |
+| 2 | **MFA enforcement** | SSO callback (session creation); evaluated against IdP `amr` claim or FORM TOTP second factor | `mfa_enforcement_mode` column | Growth + Enterprise |
+| 3 | **Session policy** | Token refresh (§12); idle timeout sweeper | `session_max_duration_hours`, `idle_timeout_minutes`, `require_reauth_on_role_change` | All SSO tiers |
+
+Session policy (dimension 3) is already implemented in §12. This section adds dimensions 1 and 2, and adds the policy change management layer that governs all three.
+
+---
+
+### 25.3 Schema Additions to `tenant_sso_configs`
+
+The existing DDL (§4.2) has `ip_allowlist INET[]` (array of raw CIDR strings) and `require_mfa BOOLEAN`. Both are extended to richer types to support labelling, enforcement modes, and audit-safe representation.
+
+```sql
+-- Migration: 0047_auth_policy_engine.sql
+-- Replaces the flat INET[] and BOOLEAN with richer, labelled columns.
+-- Applies without a table lock (ALTER TABLE ... ADD COLUMN is fast on Postgres; USING clause handles type cast).
+
+BEGIN;
+
+-- 1. ip_allowlist: INET[] → JSONB (labels + enabled flag).
+-- Backfill: existing INET[] entries are migrated to the new JSONB format by the migration.
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN IF NOT EXISTS ip_allowlist_config JSONB NOT NULL DEFAULT '{"enabled": false, "entries": []}'::jsonb,
+  ADD COLUMN IF NOT EXISTS mfa_enforcement_mode TEXT NOT NULL DEFAULT 'none'
+    CHECK (mfa_enforcement_mode IN ('none', 'recommended', 'required')),
+  ADD COLUMN IF NOT EXISTS mfa_grace_hours INT NOT NULL DEFAULT 24
+    CHECK (mfa_grace_hours BETWEEN 1 AND 168);
+
+-- Backfill existing INET[] rows into the new JSONB column.
+UPDATE tenant_sso_configs
+SET ip_allowlist_config = jsonb_build_object(
+  'enabled', (ip_allowlist IS NOT NULL AND cardinality(ip_allowlist) > 0),
+  'entries', COALESCE(
+    (SELECT jsonb_agg(jsonb_build_object(
+      'id',    gen_random_uuid(),
+      'cidr',  elem::text,
+      'label', 'Migrated from legacy column',
+      'added_at', now()
+    ))
+    FROM unnest(ip_allowlist) AS elem),
+    '[]'::jsonb
+  )
+)
+WHERE ip_allowlist IS NOT NULL AND cardinality(ip_allowlist) > 0;
+
+-- Backfill require_mfa BOOLEAN → mfa_enforcement_mode TEXT.
+UPDATE tenant_sso_configs
+SET mfa_enforcement_mode = 'required'
+WHERE require_mfa = true;
+
+-- Drop legacy columns once backfill is confirmed (separate migration, run after 72h soak).
+-- ALTER TABLE tenant_sso_configs DROP COLUMN IF EXISTS ip_allowlist;
+-- ALTER TABLE tenant_sso_configs DROP COLUMN IF EXISTS require_mfa;
+
+COMMENT ON COLUMN tenant_sso_configs.ip_allowlist_config IS
+  'JSONB: {enabled: bool, entries: [{id: uuid, cidr: text, label: text, added_at: timestamptz, added_by: uuid}]}. Max 50 entries. Enforced by auth-policy-middleware Worker.';
+COMMENT ON COLUMN tenant_sso_configs.mfa_enforcement_mode IS
+  'none = no FORM-side MFA gate (IdP MFA still applies). recommended = display banner if IdP amr lacks MFA. required = block session creation if IdP amr lacks mfa/totp/otp/hwk.';
+
+COMMIT;
+```
+
+**`ip_allowlist_config` JSONB schema:**
+
+```typescript
+interface IpAllowlistConfig {
+  enabled: boolean;
+  entries: Array<{
+    id: string;          // UUID, immutable once created
+    cidr: string;        // e.g. "10.0.0.0/8" or "2001:db8::/32"
+    label: string;       // human-readable, max 100 chars, free text
+    added_at: string;    // ISO 8601 UTC
+    added_by: string;    // form_admin or tenant_owner UUID
+  }>;
+}
+
+// Constraints:
+// - Maximum 50 entries per tenant (enforced at API layer before DB write).
+// - Each CIDR must be a valid IPv4 or IPv6 prefix in canonical form.
+// - An empty entries array with enabled: true blocks ALL logins — the admin UI shows a hard warning before this state is saved.
+// - A /0 prefix (0.0.0.0/0 or ::/0) is rejected by the API layer — it is functionally equivalent to disabling the allowlist and is almost certainly a misconfiguration.
+```
+
+---
+
+### 25.4 KV-Backed Policy Cache (`SSO_KV`)
+
+Reading `tenant_sso_configs` from Supabase on every authenticated request is not acceptable at scale. The policy cache uses the existing `SSO_KV` namespace (introduced in §22 for session revocation metadata) with a separate key prefix.
+
+**Cache key schema:**
+
+```
+SSO_KV:auth_policy:{tenant_id}
+```
+
+**Value schema:**
+
+```typescript
+interface CachedAuthPolicy {
+  tenant_id: string;
+  ip_allowlist: IpAllowlistConfig;    // embedded full config
+  mfa_enforcement_mode: 'none' | 'recommended' | 'required';
+  mfa_grace_hours: number;
+  session_max_duration_hours: number;
+  idle_timeout_minutes: number | null;
+  cached_at: string;                  // ISO 8601 UTC
+  version: number;                    // monotonic, incremented on every policy write
+}
+```
+
+**TTL:** 60 seconds. The worst-case policy propagation lag for a newly blocked CIDR is 60 seconds. This is acceptable — the risk window of one minute is far smaller than the credential theft → account takeover timeline in practice.
+
+**Cache invalidation (active push):** When a `tenant_owner` or `tenant_admin` saves any authentication policy change via the Admin Dashboard API (`PATCH /v1/admin/sso/policy`), the API Worker atomically:
+1. Writes the new policy to `tenant_sso_configs` in Supabase (inside a transaction with the DEC-030 audit event emit).
+2. Immediately deletes `SSO_KV:auth_policy:{tenant_id}` (or writes the new value directly, bypassing the 60s TTL lag for the change initiator's own tenant).
+
+**Cache miss handling:** On a KV miss, the middleware fetches from Supabase and re-populates the cache. If Supabase is unavailable, the middleware fails **closed** (denies the request with `503 auth_policy_unavailable`) rather than failing open. This matches the §24 PAM fail-closed pattern — a brief Supabase hiccup should not transiently disable a tenant's IP security perimeter.
+
+---
+
+### 25.5 IP Allowlist Enforcement Middleware
+
+The §16.10 design restricted enforcement to SSO callback routes only. This section extends it to cover all authenticated Worker routes, which is necessary because a stolen FORM session token (§12) can be used directly against the API without going through SSO. An IP allowlist that only fires at login-time provides no protection against a session token exfiltrated to a non-corporate device.
+
+**Enforcement points:**
+
+| Route pattern | Enforcement | Notes |
+|---|---|---|
+| `POST /auth/saml/callback/*` | IP check before SAML assertion validation | §16.10 design — now fully implemented here |
+| `GET/POST /auth/oidc/callback` | IP check before OIDC token exchange | §16.10 design — now fully implemented here |
+| `POST /auth/token/refresh` | IP check before refresh token validation | NEW — prevents using stolen refresh tokens from non-allowlisted networks |
+| `* /v1/admin/*` (Admin Dashboard API) | IP check after JWT validation, before business logic | NEW — protects admin actions from non-corporate IPs |
+| `POST /v1/scim/*` | IP check after bearer token validation | NEW — protects SCIM provisioning endpoint (SCIM tokens are long-lived; limiting to IdP's IP range is defence-in-depth) |
+| `* /v1/api/*` (end-user API) | **Not enforced** — allowlist applies to admin/SSO surfaces only, not end-user API routes | Rationale: employees may use FORM app from home or on mobile; the allowlist is for administrative access, not product use |
+
+**Middleware implementation (`src/workers/auth-policy-middleware/ip-allowlist.ts`):**
+
+```typescript
+import { Netmask } from 'netmask';   // well-tested CIDR library, handles IPv4 + IPv6
+
+export interface IpAllowlistEntry {
+  id: string;
+  cidr: string;
+  label: string;
+}
+
+export interface IpAllowlistEnforcementResult {
+  allowed: boolean;
+  matched_entry_id: string | null;   // ID of matching allowlist entry, null if blocked
+  client_ip_hash: string;            // SHA-256 hex[:32] of client IP for DEC-030 event
+}
+
+export async function enforceIpAllowlist(
+  request: Request,
+  policy: CachedAuthPolicy,
+  env: Env,
+): Promise<IpAllowlistEnforcementResult | null> {
+  const { ip_allowlist } = policy;
+
+  // Pass-through if disabled or no entries configured.
+  if (!ip_allowlist.enabled || ip_allowlist.entries.length === 0) {
+    return null;
+  }
+
+  // CF-Connecting-IP is set by Cloudflare and cannot be spoofed by a request
+  // that reaches Workers via the Cloudflare network. It is the true client IP.
+  const clientIp = request.headers.get('CF-Connecting-IP');
+  if (!clientIp) {
+    // Should never happen on Cloudflare Workers — log as anomaly.
+    return { allowed: false, matched_entry_id: null, client_ip_hash: 'unknown' };
+  }
+
+  const clientIpHash = await hashIp(clientIp, env);
+
+  for (const entry of ip_allowlist.entries) {
+    try {
+      const block = new Netmask(entry.cidr);
+      if (block.contains(clientIp)) {
+        return { allowed: true, matched_entry_id: entry.id, client_ip_hash: clientIpHash };
+      }
+    } catch {
+      // Invalid CIDR in DB — skip entry, log as AUTH-POLICY-WARN.
+      // A malformed stored CIDR should not crash the allowlist check.
+      console.warn(`[auth-policy] invalid CIDR in allowlist entry ${entry.id}: ${entry.cidr}`);
+    }
+  }
+
+  return { allowed: false, matched_entry_id: null, client_ip_hash: clientIpHash };
+}
+
+async function hashIp(ip: string, env: Env): Promise<string> {
+  const data = new TextEncoder().encode(ip + env.IP_HASH_SALT);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 32);   // 128-bit prefix — sufficient for uniqueness, reduces storage
+}
+```
+
+**`IP_HASH_SALT`:** A Cloudflare Workers Secret, rotated annually. The salt prevents rainbow-table attacks against hashed IPs in the audit log. Rotation requires re-emitting no events — the salt only affects future events; historical events remain at their previously hashed values.
+
+**Response when blocked:**
+
+```typescript
+function ipBlockedResponse(tenantId: string, clientIpHash: string): Response {
+  return new Response(
+    JSON.stringify({
+      error: 'access_denied',
+      error_description:
+        'Your network is not authorised to access this organisation. Contact your IT administrator.',
+      tenant_id: tenantId,
+    }),
+    {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+}
+```
+
+The response deliberately omits the blocked IP and the list of allowed CIDRs — this prevents a blocked attacker from learning the network topology.
+
+---
+
+### 25.6 MFA Enforcement
+
+**`mfa_enforcement_mode` values:**
+
+| Mode | Behaviour | Use case |
+|---|---|---|
+| `none` | No FORM-side MFA gate. IdP MFA still applies per IdP policy. | Default; tenants where IdP already enforces MFA universally |
+| `recommended` | FORM checks for MFA in the IdP `amr` claim. If absent, the session is created but an Admin Dashboard banner shows: "X users logged in without MFA this week." | Useful for progressive rollout visibility before enforcing |
+| `required` | FORM blocks session creation if the IdP `amr` claim does not contain at least one of: `mfa`, `totp`, `otp`, `hwk`, `swk`, `fido`, `pop`. Returns `401 mfa_required` with a user-facing message. | Regulated industries; contracts specifying FORM-side MFA guarantee |
+
+**Where `amr` comes from:**
+
+- **OIDC (Okta, Azure AD, Google Workspace):** The `amr` claim is part of the OIDC ID token. FORM's OIDC callback (`/auth/oidc/callback`) already parses the ID token; the `amr` array is extracted and stored in `enterprise_sessions.auth_context JSONB` (§12.2).
+- **SAML 2.0:** The `AuthnContextClassRef` element in the SAML assertion maps to an MFA signal. FORM maps `urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport` → no MFA; all other values (SmartCard, TimeSyncToken, etc.) → MFA present. The IdP-specific mapping is defined per `tenant_sso_configs.saml_attribute_mapping`.
+
+**MFA enforcement middleware (`src/workers/auth-policy-middleware/mfa-enforcement.ts`):**
+
+```typescript
+const MFA_SATISFYING_AMR = new Set([
+  'mfa', 'totp', 'otp', 'hwk', 'swk', 'fido', 'pop', 'sms',
+]);
+
+export function evaluateMfaEnforcement(
+  amrClaims: string[],
+  mode: 'none' | 'recommended' | 'required',
+): { satisfied: boolean; warning: boolean } {
+  const hasMfa = amrClaims.some(claim => MFA_SATISFYING_AMR.has(claim));
+
+  if (mode === 'none') return { satisfied: true, warning: false };
+  if (mode === 'recommended') return { satisfied: true, warning: !hasMfa };
+  // mode === 'required'
+  return { satisfied: hasMfa, warning: false };
+}
+```
+
+**Grace period for existing sessions when `mfa_enforcement_mode` changes to `required`:**
+
+When a tenant admin upgrades from `none` or `recommended` to `required`, existing sessions without MFA signals should not be immediately invalidated — this would log out all users simultaneously. Instead:
+
+1. The policy change is written to `tenant_sso_configs` and the DEC-030 `sso.mfa_enforcement_changed` event is emitted.
+2. For `mfa_grace_hours` (default 24h, range 1–168h), existing sessions are evaluated against `recommended` semantics (pass-through with warning flag set in session context).
+3. After the grace window, the session sweeper (§12.5) marks sessions without `auth_context.mfa_satisfied: true` as `revoked_reason = 'mfa_policy_enforcement'`.
+4. A `sso.mfa_enforcement_sweep_completed` DEC-030 event records the count of sessions revoked and the count that already satisfied MFA.
+
+**`sms` in the satisfying set is intentional.** SMS-based OTP is weaker than TOTP but is acceptable as a FORM-side MFA signal. Enterprise customers with stricter requirements (phishing-resistant MFA only) must configure this at their IdP, where `amr` = `hwk` (hardware key) or `fido` enforces the stronger requirement. FORM enforces that *some* second factor was used; it does not adjudicate between factor types. If a customer requires phishing-resistant MFA only, they must configure that at their IdP and inform FORM via the onboarding checklist (§7.1).
+
+---
+
+### 25.7 Policy Change Management
+
+All authentication policy changes are sensitive: enabling an IP allowlist with a typo can lock out an entire tenant; disabling MFA enforcement removes a security control that may be mandated by contract. The following safeguards apply to every `PATCH /v1/admin/sso/policy` call.
+
+**Validation before write:**
+
+| Change | Validation | Block condition |
+|---|---|---|
+| `ip_allowlist.enabled = true` | Check that `request.headers.get('CF-Connecting-IP')` is within the submitted allowlist | Block if the admin's own IP is not in the new allowlist (lockout prevention) |
+| `ip_allowlist.entries` modified | Validate each CIDR using `Netmask` library; reject `/0` prefixes | Block on any invalid CIDR |
+| `mfa_enforcement_mode = 'required'` | Estimate sessions without MFA that would be revoked after grace period | Show count in API response; do not block (user accepted the impact) |
+| Any change | Rate-limit: max 5 policy changes per tenant per 5 minutes | Return `429 policy_change_rate_limit` if exceeded |
+
+**Propagation timeline:**
+
+| T+0 | Policy saved to `tenant_sso_configs`. DEC-030 event emitted in-transaction (§25.9). |
+| T+0 | `SSO_KV:auth_policy:{tenant_id}` deleted (active cache invalidation). |
+| T+0–60s | Workers serving this tenant start fetching updated policy from Supabase on cache miss. |
+| T+60s | All Workers have the new policy (maximum propagation lag = KV TTL). |
+| T+mfa_grace_hours | MFA sweep job runs for `required` mode transitions (§25.6). |
+
+**Session impact of policy tightening:**
+
+| Change | Session impact |
+|---|---|
+| `ip_allowlist.enabled = true` | No existing sessions invalidated. Next token refresh from a non-allowlisted IP returns `401`. |
+| `ip_allowlist.entries` narrowed (remove a CIDR) | No existing sessions invalidated. Next refresh from a removed CIDR returns `401`. |
+| `session_max_duration_hours` reduced | On next refresh, if `expires_at > now() + new_duration`, `expires_at` is capped (§12.4). |
+| `mfa_enforcement_mode = 'required'` | Grace period applies; sessions revoked after `mfa_grace_hours` if no MFA signal. |
+| `ip_allowlist.enabled = false` | No sessions affected. IP gate immediately drops on next Worker cache refresh. |
+
+---
+
+### 25.8 Admin Lockout Recovery
+
+Two lockout scenarios can occur. Both require FORM support intervention via PAM break-glass (§24.4).
+
+#### 25.8.1 IP Allowlist Lockout
+
+**Scenario:** A tenant admin enables the IP allowlist, or removes a CIDR, and accidentally locks out all tenant users — including themselves.
+
+**Detection:** AL-AUTH-POLICY-01 fires when `sso.ip_blocked` event rate for a given `tenant_id` exceeds 20 blocks in 5 minutes with zero successful logins in the same window.
+
+**Recovery procedure:**
+
+| Step | Action | Who |
+|---|---|---|
+| 1 | PagerDuty alert raised by AL-AUTH-POLICY-01; on-call engineer notified | devops-lead (on-call) |
+| 2 | Verify lockout: query `sso.ip_blocked` events for `tenant_id` in last 30 minutes — confirm 100% block rate | on-call engineer |
+| 3 | Obtain PAM `read_write` elevation (§24.3) — requires manager approval + TOTP | security-engineer |
+| 4 | Via PAM db-proxy: `UPDATE tenant_sso_configs SET ip_allowlist_config = jsonb_set(ip_allowlist_config, '{enabled}', 'false') WHERE tenant_id = '{tenant_id}'` | security-engineer under PAM |
+| 5 | Delete `SSO_KV:auth_policy:{tenant_id}` to force immediate cache invalidation | on-call engineer |
+| 6 | Emit `sso.auth_policy_lockout_recovery` DEC-030 CRITICAL event (§25.9) | security-engineer |
+| 7 | Contact tenant IT admin via CSM; inform them the allowlist has been disabled; walk through correct CIDR configuration | customer-success |
+| 8 | File post-incident note in tenant's CSM account record; add to CS FEHS risk signals (COST_MODEL §26.9) | customer-success |
+
+**Lockout prevention (primary):** The Admin Dashboard API validates that the admin's own `CF-Connecting-IP` is within the new allowlist before saving it (§25.7). This catches the most common case.
+
+#### 25.8.2 MFA Bypass for Locked-Out Individual User
+
+**Scenario:** A single user's MFA device is lost or reset, and `mfa_enforcement_mode = 'required'` is blocking their login.
+
+This is not a mass lockout — it is a routine IT support scenario. The tenant's own IT admin (role: `tenant_admin`) can grant a temporary bypass via the Admin Dashboard:
+
+`PATCH /v1/admin/users/{user_id}/mfa-bypass`
+
+This sets a `mfa_bypass_until` timestamp (maximum 48h from now) in `tenant_users` and emits `sso.mfa_bypass_granted` (CRITICAL, §25.9). The user can complete login without the MFA gate until the bypass expires or the user re-enrolls their MFA device. FORM support cannot grant this bypass directly — it must come from the tenant's own admin, preserving the chain of custody under the tenant's GDPR controller obligation.
+
+---
+
+### 25.9 DEC-030 HMAC-Chained Audit Events
+
+All events below are emitted through the `emit-audit-event` Cloudflare Worker (HMAC key version per §58 dual-key design). No event may be inserted directly to `audit_log_events` via Supabase SQL.
+
+**Privacy constraint:** `user_id` may only appear in events that follow a successful authentication. Events fired *before* authentication (specifically `sso.ip_blocked`, emitted before credentials are validated) must omit `user_id` entirely. The `client_ip_hash` field uses the `IP_HASH_SALT`-keyed SHA-256[:32] scheme from §25.5.
+
+| Event type | Severity | Retention | Key metadata fields | Trigger |
+|---|---|---|---|---|
+| `sso.auth_policy_updated` | HIGH | 7 years | `tenant_id`, `changed_by_user_id`, `policy_dimension` (ip_allowlist / mfa_enforcement / session_policy), `change_summary` (human-readable diff — no IP values, just CIDR count changes), `policy_version_before`, `policy_version_after` | Any `PATCH /v1/admin/sso/policy` that results in a DB write |
+| `sso.ip_allowlist_entry_added` | HIGH | 7 years | `tenant_id`, `changed_by_user_id`, `entry_id`, `cidr_prefix_length` (e.g. 24 for /24 — not the full CIDR, to avoid storing network topology in audit events), `label` | CIDR added to `ip_allowlist_config.entries` |
+| `sso.ip_allowlist_entry_removed` | HIGH | 7 years | `tenant_id`, `changed_by_user_id`, `entry_id`, `cidr_prefix_length`, `label` | CIDR removed from `ip_allowlist_config.entries` |
+| `sso.ip_allowlist_toggled` | HIGH | 7 years | `tenant_id`, `changed_by_user_id`, `enabled_before` (bool), `enabled_after` (bool), `entry_count_at_toggle` | `ip_allowlist_config.enabled` changed |
+| `sso.ip_blocked` | HIGH | 7 years | `tenant_id`, `client_ip_hash` (SHA-256[:32]), `enforcement_point` (saml_callback / oidc_callback / token_refresh / admin_api / scim_api), `policy_version` | Any request blocked by IP allowlist |
+| `sso.mfa_enforcement_changed` | HIGH | 7 years | `tenant_id`, `changed_by_user_id`, `mode_before`, `mode_after`, `mfa_grace_hours`, `estimated_sessions_affected` | `mfa_enforcement_mode` changed |
+| `sso.mfa_enforcement_sweep_completed` | STANDARD | 3 years | `tenant_id`, `sessions_revoked`, `sessions_already_satisfied`, `sweep_triggered_at`, `grace_expired_at` | After MFA grace period ends; sweep job runs |
+| `sso.mfa_bypass_granted` | CRITICAL | 7 years | `tenant_id`, `granted_by_user_id` (tenant_admin), `subject_user_id`, `bypass_duration_hours`, `reason` (free text, max 500 chars) | `tenant_admin` grants per-user MFA bypass |
+| `sso.auth_policy_lockout_recovery` | CRITICAL | 7 years | `tenant_id`, `recovery_type` (ip_allowlist_disabled / policy_reset), `recovery_performed_by` (PAM session ID — not user_id, as this is a FORM-internal action), `pam_session_id`, `affected_config_field`, `customer_notified` (bool) | FORM support performs lockout recovery via PAM |
+
+**HMAC chain requirement:** Every event must include `prev_hash` linking it to the preceding event in the chain. The `sso.ip_blocked` event fires on every blocked request; in high-block scenarios (misconfiguration lockout), this may emit hundreds of events per minute. The `emit-audit-event` Worker must handle burst writes without dropping events — use Cloudflare Queues (FIFO consumer) for block events to smooth write pressure while maintaining HMAC chain ordering. The queue consumer appends events to the chain sequentially.
+
+---
+
+### 25.10 Alerting Rules
+
+| Alert ID | Condition | Severity | Runbook | Owner |
+|---|---|---|---|---|
+| **AL-AUTH-POLICY-01** | `sso.ip_blocked` rate for a single `tenant_id` exceeds 20 events in 5 minutes **AND** zero `sso.session_created` events for the same tenant in the same window | **P1** | Check `sso.ip_allowlist_toggled` or `sso.ip_allowlist_entry_removed` in the 10 minutes preceding; if yes, possible misconfiguration lockout — follow §25.8.1. If no recent policy change, possible credential stuffing from non-corporate network — notify tenant's IT admin. | devops-lead |
+| **AL-AUTH-POLICY-02** | `sso.mfa_enforcement_changed` event with `mode_after = 'none'` on a tenant with `plan = 'enterprise'` | **P1** | Removing MFA enforcement on an enterprise tenant may violate the customer contract's security annexe. compliance-officer must review within 4h; if unauthorised, initiate §25.8 lockout recovery to restore policy. Emit `sso.auth_policy_lockout_recovery` with `recovery_type = 'policy_reset'` if restored. | compliance-officer |
+| **AL-AUTH-POLICY-03** | `sso.ip_blocked` event for an `enforcement_point = 'admin_api'` after no prior blocks for the same tenant in 7 days | **P2** | A previously-allowed admin IP is now blocked — could be a new office, VPN change, or travel. Notify CSM to check with tenant IT admin within 1 business day. Low urgency: users are not locked out (admin_api access is not required for end-user product use). | customer-success |
+
+---
+
+### 25.11 SOC 2 Evidence Mapping
+
+| Criterion | Description | How §25 Controls Satisfy It | Evidence artefact |
+|---|---|---|---|
+| CC6.1 | Logical and physical access security controls limit access | IP allowlist restricts authentication to declared corporate networks, adding a network-layer gate to credential-based access. `sso.ip_blocked` events provide auditor evidence of enforcement. | AUTH-POLICY-E-001: 30-day export of `sso.ip_blocked` events showing zero successful logins from non-allowlisted IPs during the observation period |
+| CC6.2 | Authentication requires appropriate credentials including MFA | `mfa_enforcement_mode = 'required'` enforces a second factor at FORM's session creation layer, independent of IdP configuration. Blocks session creation without MFA `amr` claim. | AUTH-POLICY-E-002: `sso.mfa_enforcement_changed` event log showing mode transitions and effective dates; cross-reference with `enterprise_sessions.auth_context` sample showing `mfa_satisfied: true` |
+| CC6.6 | Controls prevent introduction of unauthorised software | Not directly applicable to auth policy. *(IP allowlist is a network access control, not a software supply chain control.)* | — |
+| CC6.8 | Controls protect against unauthorised changes to configuration | All policy changes emit HMAC-chained DEC-030 events, creating a non-repudiable audit trail. The 5-change/5-minute rate limit prevents rapid-fire policy manipulation. | AUTH-POLICY-E-003: DEC-030 `sso.auth_policy_updated` event chain for the observation period showing all policy changes, their actors, and HMAC continuity verification |
+| CC7.2 | The entity monitors system components for anomalies | AL-AUTH-POLICY-01 detects lockout conditions (mass IP blocks). AL-AUTH-POLICY-02 detects unexpected MFA policy downgrades on enterprise tenants. Both alert within 5 minutes of the anomalous event. | AUTH-POLICY-E-004: PagerDuty alert history showing AL-AUTH-POLICY-01 and AL-AUTH-POLICY-02 configuration and any triggered incidents during the observation period |
+
+---
+
+### 25.12 Gap Status Update
+
+| Gap ID | Prior status | New status | Closed by |
+|---|---|---|---|
+| **G-006** | 🟡 Authored (§16.10 UI design; Worker implementation pending) | 🟢 **Closed** (upon deployment of `auth-policy-middleware` Worker per §25.14 checklist items 1–4) | §25.5 IP allowlist enforcement Worker full spec; §25.6 MFA enforcement middleware; §25.7 policy change management |
+
+---
+
+### 25.13 Open Questions
+
+| ID | Question | Priority | Owner | Target |
+|---|---|---|---|---|
+| OQ-SSO-25.1 | **SCIM endpoint IP allowlist scope.** The §25.5 enforcement table includes `POST /v1/scim/*` in the IP-enforced routes, reasoning that the SCIM token is long-lived and limiting the source IP to the IdP's known IP range is defence-in-depth. However, some SCIM clients (particularly Okta) do not originate from a fixed IP range and use shared infrastructure. If the tenant enables IP allowlist and enters only their office CIDRs, SCIM provisioning will break silently. Resolution options: (a) exclude `/v1/scim/*` from IP allowlist enforcement entirely; (b) add a separate `scim_ip_allowlist` field; (c) enforce allowlist on SCIM only when a separate `scim_ip_enforcement_enabled` flag is set. **Recommended: option (c) — separate flag, default off.** | P1 | enterprise-architect + platform-engineer | Before first IP allowlist-enabled enterprise customer |
+| OQ-SSO-25.2 | **`sms` in MFA satisfying set.** §25.6 includes `sms` as a satisfying MFA method. NIST SP 800-63B (AAL2) deprecated SMS OTP in 2017 due to SIM-swap attack risk. Some enterprise contracts in financial services may require FORM to enforce `hwk` or `fido` only. Resolution: add an optional `mfa_required_methods` JSONB array to `tenant_sso_configs` that overrides the default satisfying set (e.g., `["hwk", "fido"]` for phishing-resistant-only enforcement). Owner: security-engineer + compliance-officer. Priority: P2 — relevant only after first regulated-industry (financial services/healthcare) enterprise deal. | P2 | security-engineer + compliance-officer | Before first regulated-industry enterprise customer |
+| OQ-SSO-25.3 | **IP allowlist enforcement for direct API keys.** The §12 session layer uses JWTs. Some enterprise integrations use long-lived API keys (separate from JWT sessions) for webhook configuration and reporting pulls. The current §25.5 design enforces IP allowlist on the session-based flows; it does not cover API key routes. If an API key is exfiltrated, a non-allowlisted IP can use it freely. Resolution: add IP allowlist enforcement to the API key authentication middleware in `src/workers/auth/api-key-auth.ts`. | P1 | platform-engineer | M5 |
+| OQ-SSO-25.4 | **Policy version vector clock.** The `policy_version` field in `CachedAuthPolicy` is a monotonic integer scoped to a single tenant. If two tenant admins simultaneously submit policy changes (unlikely but possible), the last-write-wins database update will produce a monotonic increment but the intermediate state will be invisible to the audit log. Should policy changes use optimistic locking (`WHERE policy_version = $expected_version`)? Recommended: yes — add `policy_version INT NOT NULL DEFAULT 0` to `tenant_sso_configs` with a `RAISE EXCEPTION` if the write fails the optimistic lock, surfacing the conflict to the second admin. | P2 | enterprise-architect | M5 |
+
+---
+
+### 25.14 Implementation Checklist
+
+#### P0 — Must complete before first enterprise customer with IP allowlist or MFA enforcement
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Run migration `0047_auth_policy_engine.sql`: add `ip_allowlist_config JSONB`, `mfa_enforcement_mode TEXT`, `mfa_grace_hours INT` to `tenant_sso_configs`; backfill existing `ip_allowlist INET[]` and `require_mfa BOOLEAN` rows; verify zero NULL rows in new columns after migration. **Do not drop legacy columns until 72h soak (item 2).** | platform-engineer | **P0** | M4 |
+| 2 | 72h soak period after migration: confirm no production errors reading from new columns; run `SELECT COUNT(*) FROM tenant_sso_configs WHERE ip_allowlist_config IS NULL OR mfa_enforcement_mode IS NULL` — must return 0; then drop legacy columns in `0048_drop_legacy_auth_policy_columns.sql`. | platform-engineer | **P0** | M4 + 3 days |
+| 3 | Implement `src/workers/auth-policy-middleware/ip-allowlist.ts` per §25.5 spec. Add `netmask` npm dependency. Add `IP_HASH_SALT` Cloudflare Workers Secret. Wire into: SSO callback handlers (SAML + OIDC), `/auth/token/refresh`, `/v1/admin/*`. Resolve OQ-SSO-25.1 (SCIM endpoint scope — default: exclude SCIM from IP enforcement pending separate flag). | platform-engineer | **P0** | M4 |
+| 4 | Implement `src/workers/auth-policy-middleware/mfa-enforcement.ts` per §25.6 spec. Wire into SSO callback (SAML + OIDC) after assertion validation but before session creation. Write `mfa_satisfied: bool` to `enterprise_sessions.auth_context JSONB`. Implement MFA grace sweeper job (Cloudflare Workers Cron, runs hourly) that evaluates `mfa_grace_hours` and emits `sso.mfa_enforcement_sweep_completed` DEC-030 event. | platform-engineer | **P0** | M4 |
+| 5 | Implement `SSO_KV:auth_policy:{tenant_id}` cache layer per §25.4 spec: fetch-with-TTL-60s on cache miss; active invalidation on `PATCH /v1/admin/sso/policy`. Confirm fail-closed behaviour: disable Supabase in staging, confirm Worker returns `503 auth_policy_unavailable` (not fail-open). | platform-engineer | **P0** | M4 |
+| 6 | Register all nine DEC-030 event types from §25.9 in `docs/AUDIT_LOG_SCHEMA.md` event registry. Validate HMAC chain in staging for the full policy change → IP block → recovery sequence. Confirm `sso.ip_blocked` events use `client_ip_hash` and omit `user_id`. | platform-engineer + compliance-officer | **P0** | M4 |
+| 7 | Implement `IP_HASH_SALT`-keyed SHA-256[:32] IP hashing (§25.5 `hashIp`). Add `IP_HASH_SALT` rotation to the annual key rotation schedule (`CRYPTOGRAPHY_POLICY.md` §3 key inventory). Add `IP_HASH_SALT` to `SOC2_READINESS.md §56` key inventory table. | security-engineer | **P0** | M4 |
+| 8 | Configure Cloudflare Queues consumer for `sso.ip_blocked` events (§25.9 HMAC chain requirement under burst conditions). Test burst scenario: 100 simultaneous blocked requests to same tenant; verify all events appear in `audit_log_events` with unbroken HMAC chain. | devops-lead | **P0** | M4 |
+
+#### P1 — Before first enterprise pilot goes live
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 9 | Configure AL-AUTH-POLICY-01, AL-AUTH-POLICY-02, AL-AUTH-POLICY-03 in PagerDuty. Test AL-AUTH-POLICY-01 by triggering a synthetic lockout in staging (enable allowlist with a /32 CIDR that excludes the test client; confirm PagerDuty fires within 5 minutes). | devops-lead | **P1** | M5 |
+| 10 | Implement `PATCH /v1/admin/users/{user_id}/mfa-bypass` endpoint (§25.8.2): validate `tenant_admin` role; set `mfa_bypass_until` on `tenant_users`; emit `sso.mfa_bypass_granted` CRITICAL DEC-030 event; cap bypass at 48h. Add `mfa_bypass_until TIMESTAMPTZ` column to `tenant_users` (migration `0049_mfa_bypass.sql`). Wire bypass check into MFA enforcement middleware (§25.6). | platform-engineer | **P1** | M5 |
+| 11 | Add `security.ip_allowlist_enabled` feature flag check to `PATCH /v1/admin/sso/policy` — return 403 with `upgrade_required` error code if Starter tenant attempts to configure IP allowlist. Validate that `DATA_MODEL §19` `feature_flag_registry` has `security.ip_allowlist_enabled` with tier = Enterprise only. | platform-engineer | **P1** | M5 |
+| 12 | Collect AUTH-POLICY-E-001 through AUTH-POLICY-E-004 evidence artefacts (§25.11) 30 days after M4 go-live; store in `compliance/evidence/auth-policy/`; cross-reference in `docs/SOC2_READINESS.md` CC6.1 and CC6.2 evidence tables. Update G-006 status from 🟡 → 🟢 in `docs/SSO_SCIM_IMPLEMENTATION.md §9` gap register. | compliance-officer | **P1** | M5 |
+
+#### P2 — Post-GA improvements
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 13 | Resolve OQ-SSO-25.2 (`sms` in MFA satisfying set): add optional `mfa_required_methods JSONB` override column to `tenant_sso_configs` if first regulated-industry customer requires phishing-resistant MFA only. | security-engineer + compliance-officer | **P2** | Before first financial-services customer |
+| 14 | Resolve OQ-SSO-25.3 (API key IP enforcement): add IP allowlist check to `src/workers/auth/api-key-auth.ts`. | platform-engineer | **P1** | M5 |
+| 15 | Resolve OQ-SSO-25.4 (optimistic locking on policy version): add `policy_version INT NOT NULL DEFAULT 0` to `tenant_sso_configs` and optimistic-lock check in `PATCH /v1/admin/sso/policy`. | enterprise-architect | **P2** | M6 |
+
+---
+
+*v1.7 additions (2026-06-04): §25 Per-Tenant Authentication Policy Engine — IP Allowlist, MFA Enforcement & Session Policy. Closes G-006 (🟡 → 🟢 upon deployment of `auth-policy-middleware` Worker). TOC updated: added §22, §23, §24 entries (previously missing) and new §25. Header updated from v1.4 to v1.7. §25.1 purpose and scope: IP allowlist (network-layer gate for credential theft from non-corporate endpoint) and MFA enforcement (second factor at FORM session creation, independent of IdP); enterprise + growth tier only; `security.ip_allowlist_enabled` feature flag gate (DATA_MODEL §19); privacy constraint on client_ip_hash (SHA-256[:32] with `IP_HASH_SALT`, not plaintext). §25.2 three policy dimensions: (1) IP allowlist — all SSO/admin/SCIM routes except end-user API; (2) MFA enforcement — session creation; (3) session policy — already in §12; evaluation order: IP first (pre-credential) then MFA then session policy. §25.3 schema additions: `ip_allowlist_config JSONB` replacing `ip_allowlist INET[]` (adds per-entry labels, UUIDs, added_at, added_by); `mfa_enforcement_mode TEXT CHECK IN ('none','recommended','required')`; `mfa_grace_hours INT`; full migration `0047_auth_policy_engine.sql` with backfill; 48h-later legacy column drop migration `0048`; JSONB schema type definition with 50-entry limit, /0-prefix rejection, empty-enabled-block-all warning. §25.4 KV-backed policy cache: `SSO_KV:auth_policy:{tenant_id}` key, 60s TTL, active invalidation on policy write, fail-closed on Supabase unavailability (503, not fail-open). §25.5 IP allowlist enforcement middleware: extends §16.10 from SSO-callback-only to all authenticated routes (SSO callback, token refresh, admin API, SCIM API; end-user `/v1/api/*` excluded); TypeScript `enforceIpAllowlist()` using `netmask` npm library (IPv4+IPv6); `CF-Connecting-IP` header (Cloudflare-guaranteed, not spoofable); `hashIp()` with `IP_HASH_SALT` Workers Secret; error response omits IP and CIDR list; Cloudflare Queues consumer for burst ip_blocked events. §25.6 MFA enforcement: `evaluateMfaEnforcement()` against IdP `amr` claim (OIDC ID token) or SAML `AuthnContextClassRef`; 9 satisfying amr values; grace period for existing sessions when mode → required (mfa_grace_hours configurable 1–168h); sweep job emits `sso.mfa_enforcement_sweep_completed`. §25.7 policy change management: lockout-prevention pre-validation (admin's own IP must be in new allowlist); /0 prefix rejection; 5-changes/5-min rate limit; propagation timeline T+0 to T+60s; session impact matrix for each policy tightening type. §25.8 admin lockout recovery: IP lockout → PAM read_write elevation (§24.3) → UPDATE tenant_sso_configs → SSO_KV delete → `sso.auth_policy_lockout_recovery` CRITICAL event → CSM notification; MFA per-user bypass → tenant_admin only (not FORM support) → `mfa_bypass_until` timestamptz + `sso.mfa_bypass_granted` CRITICAL event, max 48h. §25.9 nine DEC-030 HMAC-chained events (all HIGH or CRITICAL, 7yr except `sso.mfa_enforcement_sweep_completed` STANDARD 3yr): sso.auth_policy_updated, sso.ip_allowlist_entry_added, sso.ip_allowlist_entry_removed, sso.ip_allowlist_toggled, sso.ip_blocked (no user_id, client_ip_hash only), sso.mfa_enforcement_changed, sso.mfa_enforcement_sweep_completed, sso.mfa_bypass_granted, sso.auth_policy_lockout_recovery. §25.10 three alerting rules: AL-AUTH-POLICY-01 P1 (mass ip_blocked with zero sessions → lockout), AL-AUTH-POLICY-02 P1 (MFA enforcement disabled on enterprise tenant → compliance risk), AL-AUTH-POLICY-03 P2 (admin_api block after 7-day silence → travel/VPN change, CSM notify). §25.11 SOC 2 mapping: CC6.1 (IP allowlist network gate, AUTH-POLICY-E-001), CC6.2 (MFA enforcement independent of IdP, AUTH-POLICY-E-002), CC6.8 (HMAC-chained policy change audit trail + rate limit, AUTH-POLICY-E-003), CC7.2 (AL-AUTH-POLICY-01/02 anomaly detection, AUTH-POLICY-E-004). §25.12 gap status: G-006 🟡 → 🟢 on deploy. §25.13 four open questions: OQ-SSO-25.1 SCIM endpoint IP scope P1 (recommend separate flag, default off), OQ-SSO-25.2 SMS in satisfying set P2 (regulated industries may require hwk/fido only), OQ-SSO-25.3 API key IP enforcement P1 M5, OQ-SSO-25.4 optimistic locking on policy version P2 M6. §25.14 15-item implementation checklist: 8× P0 M4 (migration, auth-policy-middleware Worker, KV cache, DEC-030 registration, IP hash salt, Queues consumer), 5× P1 M5 (alerting, MFA bypass endpoint, feature flag check, evidence collection), 2× P2 M5-M6. Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*
