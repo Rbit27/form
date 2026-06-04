@@ -6,6 +6,23 @@
 
 ---
 
+## [1.90.0] — 2026-06-04
+
+### Added
+- [`content/post-209-eccentric-overload.md`](content/post-209-eccentric-overload.md) — Ексцентрична фаза: чому опускання є тренуванням — Katz (1939 J Physiol): ексцентрична сила-ємність +20–60% відносно концентричної; нейрогенне інгібування у нетренованих (Dudley et al. 1990 JAP); Morgan (1990 J Exp Biol): «popping sarcomere» hypothesis — Z-disc disruption і titin strain як механізм ексцентричного пошкодження; Goldspink (2005 J Anat): MGF (splice-variant IGF-1) і активація сателітних клітин; McHugh et al. (1999 Sports Medicine): repeated bout effect (RBE) — DOMS і адаптивний захист; Schoenfeld (2010 JSCR): м'язове пошкодження як один з трьох механізмів гіпертрофії; Hortobágyi et al. (1996 JAP): ексцентричне тренування = більший приріст сили при зіставних інтенсивностях; Burd et al. (2012 J Physiol): TUT і синтез міофібрилярних протеїнів при контрольованому темпі; Tesch et al. (2004 Acta Physiol Scand): flywheel training і ексцентрично-концентричний коефіцієнт; протоколи: slow eccentrics (3–6 с), акцентоване ексцентричне, flywheel; програмування: блоки 4+4 тижнів з деload; clinical-safety NOT REQUIRED
+- `docs/AUDIT_LOG_SCHEMA.md` — нова секція «API Key credential events» — 9 DEC-030 HMAC-chained подій (`api_key.created`, `api_key.rotated`, `api_key.revoked`, `api_key.ip_enforcement_enabled`, `api_key.ip_enforcement_disabled`, `api_key.ip_blocked`, `scim.ip_enforcement_enabled`, `scim.ip_enforcement_disabled`, `scim.ip_blocked`) — HIGH severity, 7yr retention, `client_ip_hash` privacy floor на ip_blocked events; примітка щодо superseding consumer-tier `tenant.api_key_*` shorthand. Closes **SSO_SCIM_IMPLEMENTATION.md §26.11 item 5** (P0 M5)
+- `docs/CRYPTOGRAPHY_POLICY.md §5` — `API_KEY_HASH_SECRET` додано до Key Rotation Schedule (180 днів, immediate on compromise, re-hash `tenant_api_keys` під час maintenance window). Closes **SSO_SCIM_IMPLEMENTATION.md §26.11 item 7** (P0 M5)
+- `docs/CRYPTOGRAPHY_POLICY.md §6` — `API_KEY_HASH_SECRET` додано до Key Custody (Cloudflare Workers Secret + 1Password Operations vault)
+- `docs/SOC2_READINESS.md §56.3` — `API_KEY_HASH_SECRET` додано до Key Inventory table (HMAC-SHA256 keying material для `tenant_api_keys.key_hash`, 180d rotation, security-engineer owner, Cloudflare Workers Secret storage). Closes **SSO_SCIM_IMPLEMENTATION.md §26.11 item 7 partial** (SOC2 evidence cross-reference)
+
+- `docs/DATA_MODEL.md §26` — API Key Authentication Schema — повний канонічний DDL `tenant_api_keys` (supersedes SSO_SCIM §26.4.2 як canonical source); 5 constraints (`chk_api_key_label_length`, `chk_api_key_scopes_nonempty`, `chk_ip_allowlist_required`, `chk_ip_allowlist_shape`, partial unique on `key_hash WHERE revoked_at IS NULL`); 4 indexes (authentication hot-path `uq_tenant_api_keys_hash_active`); RLS: `form_system` full read/write, `form_api` tenant-isolated SELECT (no key_hash in API projections — CI lint rule `no-select-star-on-api-keys`), `form_admin` BYPASSRLS; §26.2 credential architecture cross-reference (JWT / SCIM bearer / API key — три роздільних шляхи); §26.3 off-boarding integration (§25 gap filled — `revoked_at` в `revokeAccess()` транзакції); §26.6 lifecycle TypeScript pseudocode (key creation 256-bit random + HMAC-SHA256, rotation 24h overlap per §16.6, revocation reason enum 5 values); §26.7 9 DEC-030 events (all HIGH, 7yr, chain requirement: `api_key.rotated` → `api_key.revoked` within 26h); §26.8 alerting AL-APIKEY-01/-02/-03 + AL-SCIM-IP-01; §26.9 SOC2 CC6.1/CC6.2/CC6.4/CC6.8/CC7.2 artefacts APIKEY-E-001–005; §26.10 TypeScript types; §26.11 17-scenario RLS test matrix; §26.12 OQ-SSO-26.1/26.2 cross-ref; §26.13 8× P0 M5 implementation checklist. Closes **SSO_SCIM_IMPLEMENTATION.md §26.11 item 12** (P1 M6)
+
+### Changed
+- `blog.html` — додано картку post-209 (Ексцентрична фаза)
+- `VERSION` — 1.89.1 → 1.90.0
+
+---
+
 ## [1.89.1] — 2026-06-04
 
 ### Added

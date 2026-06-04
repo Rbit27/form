@@ -95,6 +95,7 @@ This policy establishes mandatory cryptographic standards for all FORM systems t
 | OAuth tokens (wearable integrations) | 2-hour refresh cycle | User consent withdrawal triggers immediate revocation | Automated via DATA_MODEL.md §14.8 token refresh logic | engineering — platform | Token refresh log in Supabase Vault; revocation audit trail |
 | TLS certificates | Cloudflare auto-renew | 30-day expiry warning fires via Better Stack S-012 probe | Cloudflare-managed; Better Stack alert at T-30 days | security-engineer | Better Stack alert history; Cloudflare certificate dashboard |
 | Mobile cert pin (SHA-256 of Cloudflare leaf cert) | With each TLS certificate rotation | 90-day advance notice in release notes required before rotation | Manual; coordinated with mobile release cycle | security-engineer | Release notes; App Store and Play Store submission records |
+| API key hash secret (`API_KEY_HASH_SECRET`) | 180 days | Scheduled; immediate on suspected compromise | Manual: Cloudflare Workers Secrets re-deployment; rotation requires re-hashing all active `tenant_api_keys` rows during maintenance window | security-engineer | Cloudflare Workers Secrets deployment audit log; `tenant_api_keys` row count before/after re-hash migration |
 
 ---
 
@@ -110,6 +111,7 @@ This policy establishes mandatory cryptographic standards for all FORM systems t
 | HMAC audit chain key (DEC-030) | 1Password — security-engineer vault; 1Password — compliance-officer vault | security-engineer; compliance-officer | Yes — both vault entries required for key reconstruction | Dual 1Password vaults serve as mutual escrow |
 | JWT signing secret (Supabase Auth) | Supabase-managed; accessible only via Supabase dashboard | security-engineer; rotation requires authenticated Supabase dashboard session | No | Supabase platform |
 | SAML IDP certificates (per tenant) | Encrypted DB column (Supabase Vault) | Service role only; read at SAML assertion validation time | No | Supabase Vault |
+| API key hash secret (`API_KEY_HASH_SECRET`) | Cloudflare Workers Secret | security-engineer; `form_system` Worker reads at key creation and validation time only; never returned to API response | No | 1Password Operations vault |
 
 **Mandatory prohibitions:**
 

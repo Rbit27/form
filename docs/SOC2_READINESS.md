@@ -17606,6 +17606,7 @@ Key management for both tiers is governed by `docs/CRYPTOGRAPHY_POLICY.md`. This
 | `ANTHROPIC_API_KEY` | Claude AI API | Opaque bearer token | Vercel environment secrets | 90 days | platform-engineer | — |
 | `SENTRY_DSN` | Error telemetry token | Opaque bearer token | Vercel environment secrets | 180 days | devops-lead | — |
 | `SUPABASE_ANON_KEY` | Client-facing public JWT (anon-only scope) | JWT (HS256) | Vercel environment variables + client bundle | 365 days (low risk — anon-only RLS scope; no privileged operations possible) | platform-engineer | — |
+| `API_KEY_HASH_SECRET` | HMAC-SHA256 keying material for tenant API key hashing (`tenant_api_keys.key_hash`) | HMAC-SHA256 | Cloudflare Workers Secret | 180 days; immediate on suspected compromise; rotation requires re-hashing all active rows in `tenant_api_keys` during maintenance window (see CRYPTOGRAPHY_POLICY §5) | security-engineer | Cloudflare Workers Secrets deployment audit log; `tenant_api_keys` re-hash migration record (per SSO_SCIM_IMPLEMENTATION.md §26.11 item 7) |
 
 **Note on `last_rotated` column:** All entries show `—` because a key rotation log (`key_rotation_log` table or equivalent) does not yet exist in production. This is tracked as ENC-GAP-001. Until the rotation log is implemented, rotation dates must be reconstructed from Cloudflare Audit Log, Supabase dashboard history, and Vercel deployment records. ENC-GAP-004 specifically calls out `SUPABASE_SERVICE_ROLE_JWT` as a P0 gap because this key has not been rotated since initial infrastructure provisioning.
 

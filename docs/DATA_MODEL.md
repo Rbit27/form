@@ -9805,3 +9805,610 @@ export async function runDeletionWorker(job: OffboardingJob, env: Env): Promise<
 
 ---
 
+## 26. API Key Authentication Schema
+
+> Owner: `enterprise-architect` + `security-engineer`. Review: before any enterprise pilot launch, on any change to API key policy, and at every SOC 2 observation period start.
+> Scope: enterprise tier only. Consumer users do not hold API keys. This section defines the canonical schema for `tenant_api_keys` — the long-lived credential issued to tenant admins for headless integrations, reporting pulls, and admin automation.
+> References: `docs/SSO_SCIM_IMPLEMENTATION.md §26` (API Key Authentication Security — canonical implementation reference); §2 (`tenants` table FK target); §16 (enterprise contract lifecycle); §22 (session revocation — `nukeTenantSessions()` used at off-boarding, not for API keys); §25 (off-boarding — `tenant_api_keys` revoked as part of the `access_revoked` transition); `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 HMAC chain); `docs/SOC2_READINESS.md` criteria CC6.1, CC6.2, CC6.4, CC6.8, CC7.2.
+
+---
+
+### 26.1 Purpose and Design Principles
+
+`SSO_SCIM_IMPLEMENTATION.md §26.11` item 12 (P1 M6) required that `tenant_api_keys` be added to `docs/DATA_MODEL.md` as the canonical schema source cross-reference entry. `SSO_SCIM_IMPLEMENTATION.md §26.4.2` declared itself the canonical source for the table definition at the time of the §26 SSO_SCIM authoring pass. This DATA_MODEL section is now the canonical DDL record, superseding the informal schema in SSO_SCIM §26.4.2 for migration and RLS purposes. SSO_SCIM §26 remains authoritative for Worker implementation, alerting rules, and evidence collection procedures.
+
+**API key vs. JWT vs. SCIM bearer token.** FORM issues three categories of machine credential to enterprise tenants. They are structurally distinct and must not be conflated:
+
+| Credential type | Issued to | TTL / lifecycle | Auth path | IP enforcement |
+|---|---|---|---|---|
+| **JWT session token** | Individual human users | 1 hour; refreshed via OIDC/SAML assertion | `src/workers/auth/session.ts`; covered by §25 IP allowlist middleware | General tenant IP allowlist (§25.5) |
+| **SCIM bearer token** | IdP provisioning agent | Long-lived; rotated per §16.6 (24h overlap) | `src/workers/scim/auth.ts` | Separate `scim_ip_enforcement_enabled` flag on `tenant_sso_configs` (SSO_SCIM §26.3) |
+| **Tenant API key** | Admin dashboard; headless integrations, reporting bots, webhook receivers | Long-lived; rotation policy in §26.6 | `src/workers/auth/api-key-auth.ts` | Per-key `ip_enforcement_enabled` + `ip_allowlist_config` (§26.5) |
+
+**Key management is a `form_system`-only mutation path.** No `form_api` role may INSERT, UPDATE, or DELETE rows in `tenant_api_keys`. All mutations — creation, rotation, revocation, IP enforcement toggle — flow through the `api-key-auth.ts` and admin dashboard Workers running as `form_system`. This is the same principle applied to `user_subscriptions` (§24.11): preventing any client-side or API-layer code from issuing or upgrading credentials without a verified admin action.
+
+**Raw key is never stored.** The 256-bit random raw key (hex-encoded, 64 chars) is returned to the requesting admin exactly once at creation time and is not retained anywhere in the FORM backend. The stored `key_hash` is `HMAC-SHA256(API_KEY_HASH_SECRET, raw_key)` where `API_KEY_HASH_SECRET` is a Cloudflare Workers Secret (distinct from `IP_HASH_SALT`). This design means a database breach does not expose usable API credentials.
+
+**Scopes enforce least privilege.** Every API key carries an explicit `scopes` array. The `api-key-auth.ts` Worker validates scope against the required permission for the target route before dispatching to any handler. No route grants elevated access based on the absence of a scope check. Scope values are open-set at the DDL level (TEXT[]) but validated against the permitted set at the application layer. Current permitted values: `reporting:read` and `admin:write`. `scim:provision` is reserved and not issued in M5.
+
+**DEC-030 privacy floor.** No audit event in this section may contain a plaintext IP address, a raw API key, or the `key_hash` value. The `api_key.ip_blocked` event carries only a `client_ip_hash` (SHA-256 of the raw IP keyed with `IP_HASH_SALT`, truncated to 32 hex chars). Error responses to callers whose IP is blocked contain only `{"error": "api_key_ip_not_allowed"}` — no hint about which allowlist entry triggered the rejection, and no leak of `key_preview`, `tenant_id`, or scope.
+
+---
+
+### 26.2 Credential Architecture Cross-Reference
+
+The three credential types share infrastructure but use distinct lookup and enforcement paths. The diagram below shows where each type is handled and where §26 fits.
+
+```
+Incoming request to FORM API
+         │
+         ├─ Authorization: Bearer <jwt>
+         │         │
+         │         └─► session.ts
+         │                  └─► §25 IP allowlist middleware (general tenant allowlist)
+         │                  └─► JWT validation → user_id, tenant_id, roles
+         │
+         ├─ Authorization: Bearer <scim_token>  (SCIM routes only)
+         │         │
+         │         └─► scim/auth.ts
+         │                  └─► §26.3 SCIM IP allowlist (scim_ip_enforcement_enabled)
+         │                  └─► SCIM token hash lookup → tenant_scim_tokens
+         │
+         └─ Authorization: Bearer <api_key>  (integration / reporting routes)
+                   │
+                   └─► api-key-auth.ts                        ← §26.4 / §26.5
+                            └─► HMAC-SHA256(API_KEY_HASH_SECRET, raw_key) → key_hash lookup
+                            └─► tenant_api_keys: revoked_at check, scopes check
+                            └─► enforceApiKeyIpAllowlist()    ← §26.5
+                            └─► scope check vs. route requirement
+                            └─► waitUntil: UPDATE last_used_at
+```
+
+**No cross-path promotion.** A SCIM bearer token cannot be presented as an API key and vice versa. The two lookup paths (`tenant_scim_tokens.token_hash` vs. `tenant_api_keys.key_hash`) use different HMAC secrets (`SCIM_TOKEN_HASH_SECRET` vs. `API_KEY_HASH_SECRET`) and are evaluated in separate Worker functions. A hash collision between the two namespaces — even if computationally feasible — would produce an `invalid_api_key` response because the key record found in one table would fail the `revoked_at` or `scopes` check applicable to that table's contract.
+
+---
+
+### 26.3 Relationship to Off-Boarding (§25)
+
+During the §25 off-boarding flow, the `revokeAccess()` step (orchestrator.ts `pending → access_revoked` transition) must revoke all active API keys for the tenant in the same transaction as the `enterprise.sso_scim_revoked` DEC-030 event. The §25 attestation text template (§25.5.1) references SCIM token revocation but does not explicitly enumerate API key revocation. This section clarifies:
+
+- At the `pending → access_revoked` transition, the orchestrator MUST execute:
+
+```sql
+UPDATE tenant_api_keys
+   SET revoked_at = now()
+ WHERE tenant_id = $1
+   AND revoked_at IS NULL;
+```
+
+- A `api_key.revoked` DEC-030 event with `reason = 'offboarding'` must be emitted for each revoked key in the same transaction.
+- The `enterprise.sso_scim_revoked` audit event payload must include `api_keys_revoked_count` (integer count of keys whose `revoked_at` was set in this transaction).
+- The §25.5.1 attestation template will be updated in a subsequent DATA_MODEL revision to include the `api_keys_revoked_count` field. Until then, the DEC-030 event log is the authoritative evidence for API key revocation at off-boarding.
+
+This off-boarding revocation path produces `api_key.revoked` events with `reason = 'offboarding'` — distinct from `rotation`, `compromise`, `expiry_overlap`, and `admin_request` reasons used in the normal key lifecycle.
+
+---
+
+### 26.4 `tenant_api_keys` Table DDL
+
+This is the canonical schema definition for `tenant_api_keys`. The informal schema in `SSO_SCIM_IMPLEMENTATION.md §26.4.2` is superseded by this DDL for migration purposes. The migration file is `migrations/0051_tenant_api_keys.sql`.
+
+```sql
+CREATE TABLE tenant_api_keys (
+  id                       UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  tenant_id                UUID        NOT NULL
+    REFERENCES tenants(id) ON DELETE RESTRICT,
+  -- RESTRICT (not CASCADE): a tenant with active API keys must not be silently deleted.
+  -- The off-boarding orchestrator (§26.3) must revoke all keys before the tenants row
+  -- can be hard-deleted. If revocation is skipped, the FK prevents the delete and the
+  -- omission surfaces as a hard error rather than a silent data loss.
+
+  label                    TEXT        NOT NULL,
+  -- User-defined name: "HRIS sync", "Reporting bot", "CI/CD admin key".
+  -- Non-empty; max 80 chars. Enforced by CHECK constraint below.
+  -- Not unique per tenant — admins may have multiple keys with the same label (e.g., two
+  -- rotation-overlap keys for the same integration). Uniqueness is not a meaningful
+  -- constraint here; the key_preview distinguishes them in the dashboard.
+
+  key_hash                 TEXT        NOT NULL,
+  -- HMAC-SHA256(API_KEY_HASH_SECRET, raw_key), stored as lowercase hex (64 chars).
+  -- Raw key is never stored. API_KEY_HASH_SECRET is a Cloudflare Workers Secret.
+  -- Partial unique index on (key_hash) WHERE revoked_at IS NULL ensures no two
+  -- active keys share the same hash (which would be a generation fault or collision).
+
+  key_preview              TEXT        NOT NULL,
+  -- Last 8 characters of the raw key. Displayed in the admin dashboard table and
+  -- included (in label context only) in api_key.created DEC-030 event.
+  -- Not a secret — it is intentionally short and serves identification only.
+  -- Must not be used for authentication or hash input.
+
+  scopes                   TEXT[]      NOT NULL DEFAULT '{reporting:read}',
+  -- Permitted values: reporting:read | admin:write
+  -- reporting:read: GET /v1/admin/reports/* only.
+  -- admin:write: all admin mutation endpoints; quarterly rotation mandatory (§26.6).
+  -- scim:provision: reserved; not issued in M5.
+  -- Array must contain at least one element (CHECK constraint below).
+  -- Scope changes require explicit admin action; not inherited on rotation
+  -- (new key carries same scopes as rotated key unless admin modifies during rotation flow).
+
+  created_by               UUID        NOT NULL
+    REFERENCES users(id) ON DELETE RESTRICT,
+  -- The FORM user (tenant_admin or tenant_owner) who created the key.
+  -- RESTRICT: if the creating user row is deleted, created_by must be preserved
+  -- for audit trail completeness. User anonymization at off-boarding (§25.7) NULLs
+  -- PII columns on the users row but retains the UUID — this FK survives anonymization.
+
+  last_used_at             TIMESTAMPTZ,
+  -- Updated via Cloudflare Workers ctx.waitUntil() on each successful authenticated request.
+  -- waitUntil ensures the response is not delayed by the UPDATE.
+  -- NULL = key has never been used since creation.
+  -- Not updated on ip_blocked rejections — only on successful authentication.
+
+  expires_at               TIMESTAMPTZ,
+  -- NULL = no hard expiry set by admin.
+  -- Soft age-alert thresholds (not automatic revocation — see OQ-SSO-26.2):
+  --   age ≥ 365 days: amber warning in dashboard ("N days old — consider rotating").
+  --   age ≥ 730 days: red warning ("N days old — rotation required").
+  --   admin:write scope, age > 90 days: amber warning regardless of general threshold.
+  -- If set explicitly by admin: api-key-auth.ts checks expires_at < now() and
+  -- treats expired keys as revoked (same response as revoked_at IS NOT NULL).
+
+  revoked_at               TIMESTAMPTZ,
+  -- NULL = active. Non-NULL = revoked at this timestamp.
+  -- Set by: admin manual revoke, overlap cleanup pg_cron, off-boarding orchestrator.
+  -- Never cleared: revocation is permanent. A new key must be created; revoked rows
+  -- are retained for audit trail continuity (DEC-030 chain integrity).
+
+  ip_enforcement_enabled   BOOLEAN     NOT NULL DEFAULT false,
+  -- When true, every request authenticated with this key is checked against ip_allowlist_config.
+  -- Disabling this control after it has been enabled requires a DEC-030 event (§26.7)
+  -- and compliance-officer review if scopes includes admin:write.
+
+  ip_allowlist_config      JSONB       DEFAULT NULL,
+  -- Must be non-NULL when ip_enforcement_enabled = true (CHECK constraint below).
+  -- Must be NULL or a JSON object (not array, not scalar) — enforced by jsonb_typeof check.
+  -- Expected shape:
+  --   {
+  --     "enabled": true,
+  --     "entries": [
+  --       { "cidr": "203.0.113.0/24", "label": "Office London" },
+  --       { "cidr": "198.51.100.5/32", "label": "CI runner" }
+  --     ]
+  --   }
+  -- enforceApiKeyIpAllowlist() reads ip_allowlist_config.entries and calls checkCidrList()
+  -- (shared utility from §25.5 — same netmask npm dependency, no new import).
+  -- Maximum 50 CIDR entries per key (enforced at application layer, not CHECK constraint).
+
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- ─── Constraints ──────────────────────────────────────────────────────────
+
+  CONSTRAINT chk_api_key_label_length
+    CHECK (label <> '' AND char_length(label) <= 80),
+
+  CONSTRAINT chk_api_key_scopes_nonempty
+    CHECK (array_length(scopes, 1) > 0),
+
+  CONSTRAINT chk_ip_allowlist_required
+    CHECK (
+      NOT ip_enforcement_enabled
+      OR ip_allowlist_config IS NOT NULL
+    ),
+  -- When ip_enforcement_enabled = true, ip_allowlist_config must be present.
+  -- This prevents a configuration where enforcement appears "on" but no allowlist
+  -- exists to enforce against — which would pass every IP (security foot-gun).
+
+  CONSTRAINT chk_ip_allowlist_shape
+    CHECK (
+      ip_allowlist_config IS NULL
+      OR jsonb_typeof(ip_allowlist_config) = 'object'
+    )
+  -- Allowlist config must be a JSON object (not array, string, or null scalar).
+  -- The entries array lives at ip_allowlist_config->>'entries'.
+  -- Structural depth validation (CIDR format, max 50 entries) is performed
+  -- at the application layer in the admin Worker before INSERT/UPDATE.
+);
+```
+
+#### 26.4.1 Column Comments
+
+```sql
+COMMENT ON TABLE tenant_api_keys
+  IS 'Long-lived API credentials issued to tenant admins for headless integrations. Canonical schema — supersedes SSO_SCIM_IMPLEMENTATION.md §26.4.2 for migration purposes. Mutations via form_system only (api-key-auth.ts Worker).';
+
+COMMENT ON COLUMN tenant_api_keys.key_hash
+  IS 'HMAC-SHA256(API_KEY_HASH_SECRET, raw_key) stored as lowercase hex. Raw key never persisted. A breach of this table does not expose usable credentials unless API_KEY_HASH_SECRET is also compromised.';
+
+COMMENT ON COLUMN tenant_api_keys.key_preview
+  IS 'Last 8 chars of the raw key. Display-only identifier in the admin dashboard. Not a secret. Must not be used as a hash input or credential fragment.';
+
+COMMENT ON COLUMN tenant_api_keys.ip_allowlist_config
+  IS 'JSON object with shape { "enabled": bool, "entries": [{ "cidr": string, "label": string }] }. NULL when ip_enforcement_enabled = false. Max 50 CIDR entries enforced at application layer.';
+
+COMMENT ON COLUMN tenant_api_keys.last_used_at
+  IS 'Updated asynchronously via ctx.waitUntil() on each successful authentication. NULL = never used. Not updated on ip_blocked rejections.';
+
+COMMENT ON COLUMN tenant_api_keys.expires_at
+  IS 'Optional hard expiry set by admin. NULL = no hard expiry; age-alert thresholds (365d amber, 730d red, admin:write >90d amber) are soft UI controls only. See OQ-SSO-26.2 for hard-enforcement decision.';
+```
+
+#### 26.4.2 Indexes
+
+```sql
+-- Active key fast-path: lookup by tenant for dashboard listing.
+CREATE INDEX idx_tenant_api_keys_tenant_active
+  ON tenant_api_keys (tenant_id)
+  WHERE revoked_at IS NULL;
+
+-- Authentication hot-path: lookup by key_hash (partial — active keys only).
+-- This is the index hit on every authenticated API request.
+CREATE UNIQUE INDEX uq_tenant_api_keys_hash_active
+  ON tenant_api_keys (key_hash)
+  WHERE revoked_at IS NULL;
+-- UNIQUE here: two active keys must not share a hash. A revoked key's hash
+-- may be reused (effectively impossible given 256-bit key space, but the
+-- partial index permits it without requiring a full-table unique scan).
+
+-- Age-sweep: find keys approaching or past rotation thresholds.
+CREATE INDEX idx_tenant_api_keys_created_at_active
+  ON tenant_api_keys (created_at)
+  WHERE revoked_at IS NULL;
+
+-- Expiry sweep: find keys with explicit expires_at approaching.
+CREATE INDEX idx_tenant_api_keys_expires_at
+  ON tenant_api_keys (expires_at)
+  WHERE revoked_at IS NULL AND expires_at IS NOT NULL;
+```
+
+#### 26.4.3 Trigger
+
+```sql
+CREATE TRIGGER update_tenant_api_keys_updated_at
+  BEFORE UPDATE ON tenant_api_keys
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+```
+
+#### 26.4.4 RLS
+
+```sql
+ALTER TABLE tenant_api_keys ENABLE ROW LEVEL SECURITY;
+```
+
+RLS policies are defined in §26.5 below.
+
+---
+
+### 26.5 Row-Level Security Policies
+
+Three roles interact with `tenant_api_keys`. Their access levels reflect the principle that key material is strictly system-managed and that admin-dashboard users see only what is necessary for key lifecycle operations — never the `key_hash`.
+
+```sql
+-- ─── form_system: full read/write ─────────────────────────────────────────
+-- The sole INSERT/UPDATE/DELETE path. All mutations flow through api-key-auth.ts
+-- and the admin dashboard Worker, both running as form_system.
+
+CREATE POLICY api_keys_system_all
+  ON tenant_api_keys
+  TO form_system
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- ─── form_api: tenant-isolated SELECT (own tenant's keys only) ────────────
+-- Permits SELECT for any authenticated API request that needs to verify key
+-- existence or display key metadata. key_hash is excluded from tenant-facing
+-- API responses at the application layer (never returned in any JSON response
+-- to the admin dashboard — only key_preview, label, scopes, created_at,
+-- last_used_at, expires_at, revoked_at, ip_enforcement_enabled).
+-- No INSERT, UPDATE, or DELETE permitted for form_api on this table.
+
+CREATE POLICY api_keys_tenant_read
+  ON tenant_api_keys FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id')::UUID
+  );
+
+-- ─── tenant_admin function: SELECT own tenant's keys for dashboard display ─
+-- This policy is logically redundant with api_keys_tenant_read (form_api already
+-- scopes to current_tenant_id), but is declared explicitly to document the
+-- tenant_admin role's intended access boundary. Role check enforced at the
+-- application layer: only tenant_admin and tenant_owner may access the API Keys
+-- panel; tenant_manager and member roles receive 403 before the DB query executes.
+-- key_hash column: never returned via any tenant-facing API response path;
+-- application layer omits it from SELECT projections on the admin API route.
+
+-- No separate RLS policy for tenant_admin function — form_api policy covers it.
+-- The application layer performs role-based column filtering:
+--   Returned:  id, label, key_preview, scopes, created_at, last_used_at,
+--              expires_at, revoked_at, ip_enforcement_enabled
+--   Excluded:  key_hash, ip_allowlist_config entries detail (structure returned,
+--              CIDR values redacted for non-owner roles per §26.2)
+
+-- ─── form_admin: break-glass (BYPASSRLS) ──────────────────────────────────
+-- No explicit policy needed. form_admin uses BYPASSRLS for migration,
+-- compliance toolchain, and shadow-login audit operations. All form_admin
+-- access is logged via the shadow-login audit trail (no god mode in production).
+```
+
+**Column exclusion at application layer.** The `key_hash` column must never appear in any API response JSON. The admin dashboard's API route handler must use an explicit column list in its SELECT projection — not `SELECT *`. A CI lint rule (`no-select-star-on-api-keys`) must be added to enforce this at code review time and in the CI pipeline. This is belt-and-suspenders alongside the RLS boundary: RLS prevents cross-tenant access; the column exclusion prevents in-tenant key hash leakage to the admin UI.
+
+---
+
+### 26.6 API Key Lifecycle and Rotation Policy
+
+#### 26.6.1 Key Creation
+
+A new API key is created by a `tenant_admin` or `tenant_owner` via the admin dashboard "API Keys" panel. The creation flow in the admin Worker:
+
+```typescript
+// apps/api/src/workers/admin/api-keys.ts (pseudocode)
+
+import { hmacSha256 } from '../auth/crypto';
+
+export async function createApiKey(
+  request: CreateApiKeyRequest,
+  env:     Env,
+  ctx:     ExecutionContext,
+): Promise<CreateApiKeyResponse> {
+  // 1. Validate request: label length, scopes subset of permitted values.
+  validateApiKeyRequest(request); // throws 400 on violation
+
+  // 2. Generate 256-bit random key (hex-encoded = 64 chars).
+  const rawKeyBytes = crypto.getRandomValues(new Uint8Array(32));
+  const rawKey      = Array.from(rawKeyBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const keyPreview  = rawKey.slice(-8);
+
+  // 3. HMAC-SHA256 the raw key — this is all that is stored.
+  const keyHash = await hmacSha256(env.API_KEY_HASH_SECRET, rawKey);
+
+  // 4. INSERT via form_system (this Worker runs as form_system).
+  const keyId = await env.DB.prepare(`
+    INSERT INTO tenant_api_keys
+      (tenant_id, label, key_hash, key_preview, scopes,
+       created_by, ip_enforcement_enabled, ip_allowlist_config)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING id
+  `).bind(
+    request.tenantId, request.label, keyHash, keyPreview,
+    request.scopes,   request.createdBy,
+    request.ipEnforcementEnabled ?? false,
+    request.ipAllowlistConfig    ?? null,
+  ).first<{ id: string }>();
+
+  // 5. Emit DEC-030 api_key.created event in same transaction.
+  await emitAuditEvent(env.DB, {
+    event_type:            'api_key.created',
+    severity:              'HIGH',
+    tenant_id:             request.tenantId,
+    actor_id:              request.createdBy,
+    metadata: {
+      key_id:                keyId!.id,
+      label:                 request.label,
+      scopes:                request.scopes,
+      ip_enforcement_enabled: request.ipEnforcementEnabled ?? false,
+    },
+  });
+
+  // 6. Return raw key to caller ONCE. Never stored, never loggable.
+  return { keyId: keyId!.id, rawKey, keyPreview };
+}
+```
+
+The `rawKey` is returned in the HTTP response body exactly once. It is the caller's responsibility to copy it immediately. FORM does not provide a "re-show key" function — if the raw key is lost, rotation is required.
+
+#### 26.6.2 Rotation Flow
+
+1. Tenant admin navigates to Settings → API Keys in the admin dashboard.
+2. Clicks "Rotate" on the target key. Confirmation modal: *"This will start a 24-hour overlap window. Both the old and the new key will be valid during the overlap. After 24 hours, the old key is automatically revoked. Copy the new key before dismissing this dialog."*
+3. A new 256-bit random key is generated server-side and INSERTed. The old key is **not** immediately revoked — a **24-hour overlap window** begins (same pattern as SCIM token rotation in §16.6).
+4. New key is displayed once. Admin copies it to the integration.
+5. After 24 hours, `api_key_rotation_overlap_cleanup` pg_cron job runs hourly and sets `revoked_at = now()` on the predecessor key. `api_key.revoked` DEC-030 event is emitted with `reason = 'expiry_overlap'`.
+6. The `api_key.rotated` DEC-030 event is emitted at step 3 (new key creation), carrying `old_key_id` and `new_key_id`. The chain requirement (§26.7) mandates that `api_key.revoked` for `old_key_id` follows within 26 hours — if it does not, AL-APIKEY-02 fires.
+7. Admin may click "Revoke old key now" to cancel the overlap immediately (useful if they are confident the integration has been updated). This sets `revoked_at = now()` immediately and emits `api_key.revoked` with `reason = 'rotation'`.
+
+**Scope inheritance:** The new key carries the same `scopes` array as the rotated key unless the admin explicitly modifies scopes during the rotation flow.
+
+#### 26.6.3 Rotation Triggers
+
+| Trigger | Required action | Deadline |
+|---|---|---|
+| Key age ≥ 365 days | Amber age warning in dashboard; rotation recommended | No hard deadline (soft enforcement — see OQ-SSO-26.2) |
+| Key age ≥ 730 days (2 years) | Red age warning; CSM notifies tenant admin | Before next QBR |
+| `admin:write` scope key age > 90 days | Amber warning regardless of general threshold | Every 90 days (quarterly mandatory) |
+| Suspected compromise | Revoke immediately; issue replacement | Same-day |
+| Integration re-owner (staff departure, role change) | Rotate as part of access review | Within 5 business days |
+| Annual SOC 2 review | Review all active keys; rotate any older than 365 days | Before SOC 2 observation period start |
+| Tenant off-boarding (§26.3 / §25) | All keys revoked as part of `access_revoked` transition | Immediate at `pending → access_revoked` |
+
+#### 26.6.4 Revocation
+
+Revocation is permanent. A revoked key cannot be un-revoked. The `revoked_at` column is set once and never cleared. The DEC-030 `api_key.revoked` event records the reason. Valid reasons:
+
+| `reason` value | Set by | Triggered by |
+|---|---|---|
+| `admin_request` | `form_system` (admin Worker) | Tenant admin clicks "Revoke" in dashboard |
+| `rotation` | `form_system` (admin Worker) | Tenant admin clicks "Revoke old key now" during overlap |
+| `expiry_overlap` | `form_system` (pg_cron job) | 24-hour overlap window expires without manual revocation |
+| `compromise` | `form_system` (admin Worker) | Admin selects "Revoke — credential compromised" in dashboard; triggers AL-APIKEY-03 |
+| `offboarding` | `form_system` (off-boarding orchestrator, §26.3) | `pending → access_revoked` transition |
+
+---
+
+### 26.7 DEC-030 HMAC-Chained Audit Events
+
+All nine events in this section are appended to the FORM DEC-030 HMAC audit log chain (per `docs/AUDIT_LOG_SCHEMA.md`). All are HIGH severity with 7-year retention. No event in this section may contain a plaintext IP address, raw API key, `key_hash`, or individual user PII values. Events involving admin-initiated actions use `actor_type = 'user'`; automated system events (pg_cron overlap cleanup, off-boarding orchestrator) use `actor_type = 'system'`. The `actor_ip` field is omitted from all events in this section — IP data is captured only as `client_ip_hash` in `ip_blocked` events.
+
+| Event type | Severity | Retention | Trigger | Mandatory payload fields | Notes |
+|---|---|---|---|---|---|
+| `api_key.created` | HIGH | 7 years | New `tenant_api_keys` row inserted | `tenant_id`, `key_id`, `label`, `scopes`, `ip_enforcement_enabled`, `created_by` | Raw key never in payload; `key_preview` present in label context only |
+| `api_key.rotated` | HIGH | 7 years | New key inserted during rotation; overlap window opened | `tenant_id`, `key_id` (new UUID), `old_key_id`, `rotation_method` (`admin_manual` or `overlap_expiry`), `rotated_by` | `api_key.revoked` for `old_key_id` must follow within 26h (chain requirement below) |
+| `api_key.revoked` | HIGH | 7 years | `revoked_at` set on a `tenant_api_keys` row | `tenant_id`, `key_id`, `revoked_by`, `reason` (`admin_request` \| `rotation` \| `expiry_overlap` \| `compromise` \| `offboarding`) | `reason = 'compromise'` fires AL-APIKEY-03 |
+| `api_key.ip_enforcement_enabled` | HIGH | 7 years | `ip_enforcement_enabled` toggled from false to true | `tenant_id`, `key_id`, `cidr_count`, `enabled_by` | Enabling adds network-layer access control to an existing active credential |
+| `api_key.ip_enforcement_disabled` | HIGH | 7 years | `ip_enforcement_enabled` toggled from true to false | `tenant_id`, `key_id`, `disabled_by`, `reason` | Disabling removes a control — HIGH severity; compliance-officer review required if `scopes` includes `admin:write` |
+| `api_key.ip_blocked` | HIGH | 7 years | `enforceApiKeyIpAllowlist()` rejects a request | `tenant_id`, `key_id`, `client_ip_hash` | No `user_id`; `client_ip_hash` = SHA-256[:32] keyed with `IP_HASH_SALT`; bulk deduplication via Cloudflare Queues at > 20 blocks per 5 minutes |
+| `scim.ip_enforcement_enabled` | HIGH | 7 years | `scim_ip_enforcement_enabled` toggled from false to true on `tenant_sso_configs` | `tenant_id`, `cidr_count`, `enabled_by` | SCIM-specific IP enforcement toggle; stored in `tenant_sso_configs` (SSO_SCIM §26.3); documented here for completeness of the IP enforcement audit surface |
+| `scim.ip_enforcement_disabled` | HIGH | 7 years | `scim_ip_enforcement_enabled` toggled from true to false on `tenant_sso_configs` | `tenant_id`, `disabled_by` | |
+| `scim.ip_blocked` | HIGH | 7 years | `enforceScimIpAllowlist()` rejects an IdP SCIM request | `tenant_id`, `client_ip_hash` | IdP IP hashed; no IdP vendor name in payload (avoids naming vendor IPs in the audit chain) |
+
+**HMAC chain requirement.** `api_key.rotated` must be followed by `api_key.revoked` (for the `old_key_id`) within 26 hours. A gap — `api_key.rotated` visible in the chain with no matching `api_key.revoked` for `old_key_id` within 26 hours — is a chain anomaly. AL-APIKEY-02 fires. The pg_cron overlap cleanup job must emit the `api_key.revoked` event in the same transaction as the `UPDATE tenant_api_keys SET revoked_at = now()` — an UPDATE without a corresponding DEC-030 event is not a valid chain transition.
+
+**PII prohibition.** Per DEC-030 design constraint (same as §25.9): no audit event payload field may contain individual user PII — no email addresses, no health values, no display names. The `created_by` and `revoked_by` fields carry internal user UUIDs only. The `enabled_by` and `disabled_by` fields carry the same. No name resolution is performed at emit time. Any audit log viewer that displays human-readable names must resolve them from the `users` table at display time, not at storage time.
+
+---
+
+### 26.8 Alerting Rules
+
+These four alerting rules are defined in `SSO_SCIM_IMPLEMENTATION.md §26.7` and reproduced here for DATA_MODEL completeness. The canonical response procedures are in SSO_SCIM §26.7. PagerDuty configuration is checklist item 9 in §26.11.
+
+| Alert ID | Condition | Severity | Owner | Response summary |
+|---|---|---|---|---|
+| **AL-APIKEY-01** | `api_key.ip_blocked` events for a single `tenant_id` + `key_id` exceed 10 in 10 minutes | **P1** | devops-lead + customer-success | Possible credential stuffing or misconfigured integration. Check for a recent `api_key.ip_enforcement_enabled` event on the same key — if enforcement was just enabled, notify CSM to contact tenant IT admin. If enforcement was not recently changed, treat as credential compromise attempt. |
+| **AL-APIKEY-02** | `api_key.rotated` event with no corresponding `api_key.revoked` for `old_key_id` within 26 hours | **P1** | platform-engineer | Overlap window elapsed without pg_cron cleanup. Investigate `api_key_rotation_overlap_cleanup` cron logs. Manually set `revoked_at` if safe; emit `api_key.revoked` with `reason = 'expiry_overlap'`. |
+| **AL-APIKEY-03** | `api_key.revoked` with `reason = 'compromise'` | **P1** | security-engineer | Credential compromise declared. Trigger `docs/INCIDENT_RESPONSE.md §R-16` (Application Secret & Encryption Key Exposure) for API key subtype. Review `last_used_at` and Cloudflare access logs for the 7-day pre-revocation window to scope potential abuse. |
+| **AL-SCIM-IP-01** | `scim.ip_blocked` events for a single `tenant_id` exceed 5 in 15 minutes AND SCIM provisioning success rate for the same tenant drops below 50% in the same window | **P2** | customer-success | SCIM IP enforcement is blocking IdP provisioning — likely a misconfigured allowlist or an IdP IP range change. CSM notifies tenant IT admin. Temporary mitigation: disable SCIM IP enforcement from admin dashboard. Permanent fix: update SCIM allowlist with correct IdP CIDRs. |
+
+---
+
+### 26.9 SOC 2 Evidence Mapping
+
+The five evidence artefact IDs below (APIKEY-E-001 through APIKEY-E-005) are defined in `SSO_SCIM_IMPLEMENTATION.md §26.8`. They are cross-referenced here for the DATA_MODEL evidence inventory. The collection procedures, storage location (`compliance/evidence/api-key-auth/`), and cross-reference in `docs/SOC2_READINESS.md` CC6.1 and CC6.4 evidence tables are all documented in SSO_SCIM §26.8 and §26.11 item 10.
+
+| Criterion | Control description | How `tenant_api_keys` schema satisfies it | Evidence artefact ID |
+|---|---|---|---|
+| **CC6.1** — Logical access security controls limit access | IP allowlist enforcement on long-lived credentials prevents use of a compromised API key from non-authorised networks. The `ip_enforcement_enabled` flag and `ip_allowlist_config` JSONB are structurally present in the schema; `chk_ip_allowlist_required` prevents a configuration where enforcement appears enabled but no allowlist exists to enforce against. | `enforceApiKeyIpAllowlist()` in `api-key-auth.ts` evaluates `ip_enforcement_enabled` and `ip_allowlist_config.entries` on every authenticated request. | **APIKEY-E-001** |
+| **CC6.2** — Authentication requires appropriate credentials | Scopes enforce least-privilege access at the credential level. `reporting:read` keys cannot call admin mutation endpoints. `scopes TEXT[] NOT NULL` with `chk_api_key_scopes_nonempty` ensures every key has at least one explicit scope; scope validation occurs in `api-key-auth.ts` before route handler dispatch. | Scope check is a compile-time–enforced gate in the auth middleware, not an advisory UI control. | **APIKEY-E-002** |
+| **CC6.4** — Access is removed or modified when credentials change | API key rotation (§26.6.2) with 24-hour overlap and HMAC chain linkage between `api_key.rotated` and `api_key.revoked` (§26.7) provides auditable credential lifecycle. Immediate revocation path (`reason = 'compromise'`) available for incident response. `revoked_at` is permanent — once set it cannot be cleared. | `uq_tenant_api_keys_hash_active` partial unique index ensures a revoked key's hash is no longer matched on the authentication hot-path. | **APIKEY-E-003** |
+| **CC6.8** — Controls protect against unauthorised changes to configuration | `api_key.ip_enforcement_enabled` and `api_key.ip_enforcement_disabled` DEC-030 events create a non-repudiable audit trail for every change to the IP enforcement configuration. No form_api role can toggle `ip_enforcement_enabled` directly — all updates flow through form_system (RLS §26.5). | HMAC chain anchors every configuration change to a specific `enabled_by` / `disabled_by` actor UUID and timestamp. | **APIKEY-E-004** |
+| **CC7.2** — The entity monitors system components for anomalies | AL-APIKEY-01 detects credential stuffing attempts via sustained IP blocks. AL-APIKEY-02 detects rotation overlap failures (infrastructure anomaly — pg_cron not executing). AL-APIKEY-03 surfaces declared credential compromises within PagerDuty SLA. | All three alerts are triggered from DEC-030 events, not from application health-check polling, ensuring the alert path is independent of application-layer availability. | **APIKEY-E-005** |
+
+---
+
+### 26.10 TypeScript Types
+
+```typescript
+// apps/api/src/types/tenant-api-keys.ts
+
+export type ApiKeyScope = 'reporting:read' | 'admin:write';
+
+export interface TenantApiKey {
+  id:                      string;
+  tenant_id:               string;
+  label:                   string;
+  key_hash:                string;   // never returned in API responses; only used internally
+  key_preview:             string;
+  scopes:                  ApiKeyScope[];
+  created_by:              string;
+  last_used_at:            string | null;
+  expires_at:              string | null;
+  revoked_at:              string | null;
+  ip_enforcement_enabled:  boolean;
+  ip_allowlist_config:     IpAllowlistConfig | null;
+  created_at:              string;
+  updated_at:              string;
+}
+
+export interface IpAllowlistConfig {
+  enabled: boolean;
+  entries: IpAllowlistEntry[];
+}
+
+export interface IpAllowlistEntry {
+  cidr:  string;   // e.g. "203.0.113.0/24"
+  label: string;   // e.g. "Office London"
+}
+
+// Returned to tenant admin via API — key_hash excluded, ip_allowlist_config entries
+// returned with CIDRs visible only to tenant_owner role.
+export interface TenantApiKeyAdminView {
+  id:                      string;
+  label:                   string;
+  key_preview:             string;
+  scopes:                  ApiKeyScope[];
+  created_at:              string;
+  last_used_at:            string | null;
+  expires_at:              string | null;
+  revoked_at:              string | null;
+  ip_enforcement_enabled:  boolean;
+  cidr_count:              number | null;  // count of entries; CIDRs omitted for non-owner roles
+}
+
+export type ApiKeyRevocationReason =
+  | 'admin_request'
+  | 'rotation'
+  | 'expiry_overlap'
+  | 'compromise'
+  | 'offboarding';
+
+export interface CreateApiKeyRequest {
+  tenantId:               string;
+  label:                  string;
+  scopes:                 ApiKeyScope[];
+  createdBy:              string;
+  ipEnforcementEnabled?:  boolean;
+  ipAllowlistConfig?:     IpAllowlistConfig | null;
+}
+
+export interface CreateApiKeyResponse {
+  keyId:      string;
+  rawKey:     string;   // returned exactly once; never stored
+  keyPreview: string;
+}
+```
+
+---
+
+### 26.11 RLS Test Matrix
+
+The following test scenarios must be covered by `__tests__/db/api_keys_rls.test.ts`. These tests are complementary to the Worker-layer tests in SSO_SCIM §26.11 item 3.
+
+| # | Scenario | Expected result |
+|---|---|---|
+| 1 | `form_api` role with `app.current_tenant_id = tenant_A` SELECT on `tenant_api_keys` | Returns only rows where `tenant_id = tenant_A`; no rows from tenant_B |
+| 2 | `form_api` role with `app.current_tenant_id = tenant_A` SELECT on `tenant_api_keys` WHERE `tenant_id = tenant_B` | 0 rows returned |
+| 3 | `form_api` role INSERT into `tenant_api_keys` | Fails with `insufficient_privilege` |
+| 4 | `form_api` role UPDATE `tenant_api_keys` | Fails with `insufficient_privilege` |
+| 5 | `form_api` role DELETE from `tenant_api_keys` | Fails with `insufficient_privilege` |
+| 6 | `form_system` role SELECT `key_hash` from `tenant_api_keys` | Returns `key_hash` value (form_system has full access) |
+| 7 | API response handler for GET `/v1/admin/api-keys` using `form_api` role | Response JSON does not include `key_hash` field |
+| 8 | `form_system` INSERT a valid `tenant_api_keys` row | Succeeds; `updated_at` trigger fires on subsequent UPDATE |
+| 9 | `form_system` INSERT with `ip_enforcement_enabled = true` and `ip_allowlist_config = NULL` | Fails `chk_ip_allowlist_required` constraint |
+| 10 | `form_system` INSERT with `ip_enforcement_enabled = false` and `ip_allowlist_config = NULL` | Succeeds |
+| 11 | `form_system` INSERT with `ip_allowlist_config = '[]'::jsonb` (array, not object) | Fails `chk_ip_allowlist_shape` constraint |
+| 12 | `form_system` INSERT with `label = ''` | Fails `chk_api_key_label_length` constraint |
+| 13 | `form_system` INSERT with `label` of 81 characters | Fails `chk_api_key_label_length` constraint |
+| 14 | `form_system` INSERT with `scopes = '{}'` (empty array) | Fails `chk_api_key_scopes_nonempty` constraint |
+| 15 | Two active keys (revoked_at IS NULL) with the same `key_hash` | Fails `uq_tenant_api_keys_hash_active` unique index |
+| 16 | Revoked key and active key with the same `key_hash` | Permitted — partial index does not cover revoked rows |
+| 17 | `form_api` SELECT returns row with `revoked_at IS NOT NULL` | Returns revoked rows (RLS does not filter by revocation status; application layer filters active-only in dashboard) |
+
+---
+
+### 26.12 SOC 2 Open Questions
+
+| ID | Question | Priority | Owner | Target |
+|---|---|---|---|---|
+| **OQ-SSO-26.1** | **Should IP enforcement be mandatory for `admin:write` scope API keys?** The §26.6.3 rotation policy requires quarterly rotation of `admin:write` keys. Making IP enforcement also mandatory for `admin:write` keys eliminates the scenario where a compromised high-privilege API key is usable from any IP. Risk: CI/CD pipelines with dynamic IP allocation (GitHub Actions, Buildkite cloud runners) cannot use a static allowlist. Resolution options: (a) mandatory for `admin:write` on Enterprise plan only; (b) block `admin:write` key creation without IP enforcement unless tenant owner explicitly confirms waiver; (c) no mandatory enforcement but emit a STANDARD-severity DEC-030 advisory event if an `admin:write` key has `ip_enforcement_enabled = false` for >30 days. | P2 | security-engineer + enterprise-architect | Before first `admin:write` key issued to a customer |
+| **OQ-SSO-26.2** | **Should `expires_at` be hard-enforced with automatic revocation, or remain a soft control (age alerts only)?** Hard enforcement (automatic revocation at 365 days) provides a stronger SOC 2 CC6.4 posture — auditors see a system control rather than a procedural control. Risk: a customer whose integration engineer is on leave has their integration silently break. Soft enforcement (age alerts + CSM escalation) avoids unplanned outages but relies on human action. Recommendation: ship soft enforcement; revisit at first SOC 2 observation period start. If any key exceeds 365 days without rotation at that point, the procedural control is demonstrably not operating effectively and hard enforcement must be added. Decision must be documented in `docs/DECISION_LOG.md` before observation period start. | P1 | enterprise-architect + compliance-officer | Before first SOC 2 observation period start |
+
+---
+
+### 26.13 Implementation Checklist
+
+See `SSO_SCIM_IMPLEMENTATION.md §26.11` for the full 14-item checklist covering P0 M5, P1 M5–M6, and P2 M6 tasks. The table below summarises P0 M5 items only — all of which must be complete before the first enterprise pilot goes live.
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Run migration `migrations/0051_tenant_api_keys.sql` — full DDL from §26.4, all CHECK constraints, four indexes (§26.4.2), `updated_at` trigger (§26.4.3), RLS policies (§26.5). Use `ON DELETE RESTRICT` on both `tenant_id` FK and `created_by` FK. | platform-engineer | **P0** | M5 |
+| 2 | Run migration `migrations/0052_scim_ip_allowlist.sql` — add `scim_ip_enforcement_enabled BOOLEAN DEFAULT false` and `scim_ip_allowlist_config JSONB DEFAULT NULL` to `tenant_sso_configs`; add `chk_scim_ip_allowlist_required` CHECK constraint. (Separate from `tenant_api_keys` migration — `tenant_sso_configs` is a pre-existing table.) | platform-engineer | **P0** | M5 |
+| 3 | Update `src/workers/auth/api-key-auth.ts` — add `enforceApiKeyIpAllowlist()` call after key hash validation; add scope enforcement before route handler dispatch; update `last_used_at` via `ctx.waitUntil()`. Add `API_KEY_HASH_SECRET` as Cloudflare Workers Secret. | platform-engineer | **P0** | M5 |
+| 4 | Update `src/workers/auth-policy-middleware/ip-allowlist.ts` — add SCIM route branch calling `enforceScimIpAllowlist()` using `scim_ip_enforcement_enabled` and `scim_ip_allowlist_config` from `CachedAuthPolicy`. Update `CachedAuthPolicy` type to include new fields. | platform-engineer | **P0** | M5 |
+| 5 | Register all nine DEC-030 events (§26.7) in `docs/AUDIT_LOG_SCHEMA.md` event registry. Validate HMAC chain linkage between `api_key.rotated` and `api_key.revoked` in staging before M5 cut. | platform-engineer + compliance-officer | **P0** | M5 |
+| 6 | Implement API Keys panel in admin dashboard — table with label, key_preview, scopes, created_at, last_used_at, age warning pill (§26.6.3), IP enforcement toggle. Create, Rotate, and Revoke flows. Add SCIM IP Restriction section in SSO configuration panel (SSO_SCIM §26.3.4). Both panels gated by `security.ip_allowlist_enabled` feature flag. | platform-engineer + design-craft | **P0** | M5 |
+| 7 | Add `API_KEY_HASH_SECRET` to annual key rotation schedule in `docs/CRYPTOGRAPHY_POLICY.md §3` key inventory and `docs/SOC2_READINESS.md §56` key inventory table. Initial rotation schedule: 180 days. | security-engineer | **P0** | M5 |
+| 8 | Implement pg_cron job `api_key_rotation_overlap_cleanup` — runs hourly; sets `revoked_at = now()` on predecessor keys where the rotation overlap has expired (created_at of successor key > 24h ago AND predecessor `revoked_at IS NULL`); emits `api_key.revoked` DEC-030 event with `reason = 'expiry_overlap'` in the same transaction. | platform-engineer | **P0** | M5 |
+
+---
+
+*v1.6 · червень 2026 · owner: enterprise-architect + security-engineer + platform-engineer · Closes SSO_SCIM_IMPLEMENTATION.md §26.11 item 12 (P1 M6) — adds DATA_MODEL canonical entry for tenant_api_keys table.*
