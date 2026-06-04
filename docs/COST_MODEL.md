@@ -4571,3 +4571,265 @@ The `enterprise.qbr_completed` event records the FEHS score at the time of the Q
 ---
 
 *v1.7 additions: §26 Customer Success Team Scaling Economics & CS Cost Model — fills the gap between §8.2's single CSM line-item ($250–500/month) and the full CS team cost, hiring trigger, and gross margin model. §26.1 purpose and privacy floor reminder (CS tooling must enforce aggregate-only constraint identical to admin dashboard; CSM may not access individual health data). §26.2 CS coverage model by tier: Starter email-only $150–200/month shared inbox; Growth named CSM shared 12–15 accounts $250–300/month; Enterprise dedicated CSM max 6 accounts $400–500/month. §26.3 CSM capacity model: 7-activity time budget per account; hard capacity ceiling 15 Growth accounts or 6 Enterprise accounts per CSM; ARR under management $810k–$1M per CSM (within $500k–$1.5M industry benchmark). §26.4 CS team headcount vs. customer count: three stages (founder-led 1–3 accounts; first CS hire M13 4–15 accounts; Series A team 15–50+ accounts); Bull scenario implication that CS hire may precede engineer hire. §26.5 CS cost as % ARR: 30–50% at 5–8 accounts (expected at stage); declining to 12–18% at Series A; reaching 8–12% Series B benchmark at $3M–$5M ARR. §26.6 gross margin impact: per-account CS cost range $375–$725/month depending on team structure; VP CS hire depresses Growth account GM by 7.8 pp until account base absorbs fixed cost; combined CS + compliance cost stack 27–33% ARR at $1M–$1.5M milestone (54–61% GM floor). §26.7 five CS hiring triggers (CS-HIRE-01 through CS-HIRE-05) with anti-trigger against premature VP CS hire. §26.8 QBR economics: fully-loaded QBR cost $262.50 per QBR (7h at $37.50/h CSM rate); QBR cost consistently ~2% ACV across tiers; QBR ROI 3.4× in Year 1 if one logo churn prevented per year; minimum viable QBR content table with privacy floor column (department-level breakdown, individual workout history, body composition, mental health flags all excluded). §26.9 FEHS (FORM Enterprise Health Score): 6-signal composite 0–100 score (activation 25%, WAU 25%, seat utilisation 20%, executive engagement 15%, support volume 10%, renewal distance 5%); four status bands green/yellow/red/critical with CS action SLAs; churn detection ROI 9× on $200–500/month infrastructure cost. §26.10 six DEC-030 HMAC-chained CS events with privacy constraint (aggregate-only, no user_id): enterprise.qbr_completed (STANDARD, 7yr), enterprise.health_score_updated (STANDARD, 3yr), enterprise.churn_signal_flagged (HIGH, 7yr), enterprise.renewal_negotiation_started (STANDARD, 7yr), enterprise.account_expanded (STANDARD, 7yr), enterprise.account_churned (CRITICAL, 7yr); HMAC chain linkage requirement between account_churned and offboarding_initiated events. §26.11 nine-item implementation checklist (5× P0 M5–M6, 3× P1 M6–M8, 1× P2 M6). §26.12 four open questions: OQ-CS-01 (CS hire vs. engineer hire order — P0, Month 9 decision gate), OQ-CS-02 (FEHS customer visibility — P1, admin dashboard v2), OQ-CS-03 (k-anonymity floor for health-adjacent QBR metrics — P1, before first QBR), OQ-CS-04 (signal weights in qbr_completed event — P2, include from Day 1). Cross-references: docs/ENTERPRISE.md (CSM per tier; QBR cadence; privacy floor), docs/DATA_MODEL.md §17 (aggregate-only admin reporting schema), docs/AUDIT_LOG_SCHEMA.md (DEC-030 registry), docs/INCIDENT_RESPONSE.md §12 (enterprise tenant SLA breach protocol), §8.2 (CSM line-item per deal), §8.7 (expansion and churn economics), §22.3 (cash flow — CS hire timing vs. engineer hire), §23.1 (NRR engine), §24.3 (Series A readiness), §25.6 (compliance cost as % ARR — combined with CS cost for total support stack analysis). Owner: customer-success + compliance-officer + data-engineer.*
+
+---
+
+## 27. Engineering Team Cost Model
+
+### 27.1 Purpose and Scope
+
+§26 addressed CS team economics. §27 addresses the other major cost bucket at Series A: engineering. §22.3 Base scenario includes a single "founding engineer" at Month 13 with a $100k/year salary estimate. That figure is a planning placeholder, not a cost model. This section provides:
+
+1. **Founding engineer total compensation cost** including equity dilution, hardware, and onboarding overhead
+2. **Technical hiring sequence** — the order in which iOS, backend, ML, and platform roles add the most value per dollar
+3. **Infrastructure run-rate costs** by growth stage — what FORM spends on Cloudflare, Supabase, AI API, and observability at 0 / 1,000 / 10,000 / 50,000 users
+4. **Build vs. buy analysis** for the seven major third-party services in the FORM stack
+5. **Engineering cost as % ARR** trajectory from pre-revenue through Series A
+6. **CV/ML pipeline unit economics** — per-session inference cost on-device vs. server
+7. **Engineering burn rate gates** — the capital efficiency checkpoints that should gate the next hire
+
+This section is an operating document for the founder and intended as a Series A readiness artefact. All compensation figures are estimates based on 2026 market data for Ukraine-based or remote-friendly engineering talent; ranges are provided because point estimates would be false precision at this stage.
+
+---
+
+### 27.2 Founding Engineer: Total Compensation Cost
+
+The §22.3 "$100k/year" line item covers base salary only. Total first-year cost is higher.
+
+#### 27.2.1 Cash Compensation
+
+| Component | Estimate | Notes |
+|---|---|---|
+| Base salary (annual) | $80,000–$110,000 | UA-based senior iOS/fullstack: $70k–$90k; remote-competitive (US-matched band): $90k–$120k. $100k midpoint in §22.3 is realistic for UA-based hire with strong iOS CV + Supabase experience. |
+| Employer tax / social contributions | $13,000–$18,000 | ~16% of base; varies by employment structure (FOP vs. payroll) |
+| Hardware | $3,500–$5,000 | MacBook Pro M4 Max (~$3,200) + iPhone Pro test device (~$1,200) + peripherals. One-time. |
+| Onboarding overhead (founder time) | $4,000–$6,000 | ~80h of founder time at an implied opportunity cost rate of $50–75/h — access setup, codebase orientation, pair programming, architecture review. Not a cash cost; a time cost that compresses the founder's other work. |
+| Total first-year cash cost | **$100,500–$139,000** | Midpoint: ~$120,000 |
+
+**Practical implication for §22.3 cash flow:** the Base scenario's $100k line undercounts actual first-year cash outflow by $20k–$39k. At pre-seed runway, this is a material correction. The cash flow model should use $115k–$125k for the founding engineer line (base + taxes only, hardware amortised separately).
+
+#### 27.2.2 Equity Compensation
+
+Founding engineer equity is not a cash cost but has dilution implications for cap table planning (§24.7).
+
+| Stage | Typical equity grant | FORM intent |
+|---|---|---|
+| Pre-seed / pre-product (hire before any revenue) | 1.5%–4.0% (4-year cliff+vest) | 2.5%–3.5% reasonable — justifiable by the technical risk they absorb |
+| Seed-stage (hire after first revenue / funding) | 0.5%–1.5% | 1.0%–1.5% at $1.5M–$2.5M seed valuation |
+| Series A (hire after round close) | 0.1%–0.5% | ~0.25% typical at $8M–$15M Series A valuation |
+
+**FORM-specific consideration:** the founding engineer is responsible for building the CV pose-estimation pipeline — the technical moat. This is both the hardest hire and the highest-risk role. Equity at the upper end of the pre-seed range (3%–3.5%) is appropriate given that the CV pipeline is the product, not a feature. This creates a ~3.5% dilution event on the cap table — manageable within the §24.7 employee option pool reserved for early hires.
+
+---
+
+### 27.3 Technical Hiring Sequence
+
+Engineering hires create value in a specific order, and getting the order wrong is expensive. The sequence below assumes a pre-seed/seed stage; Series A hiring can parallelise more freely once capital is in.
+
+#### 27.3.1 Hire 1: Founding Engineer (iOS + Supabase) — Month 13 Base / Month 10–11 Bull
+
+**Primary deliverable:** working iOS app with auth, workout logging, Victor AI chat, and CV pipeline integration. Without this hire, nothing ships. This is the gate hire — it unblocks every other milestone.
+
+**Profile requirements:** strong iOS (SwiftUI, HealthKit), Supabase (RLS, Edge Functions), comfort with Python for ML model integration (not ML training — just inference calls to a served model). Bonus: React Native or any cross-platform experience reduces the iOS-only lock-in risk.
+
+**Cost:** $80k–$110k base + $13k–$18k taxes + hardware. See §27.2.1.
+
+#### 27.3.2 Hire 2: Platform / Backend Engineer (Cloudflare Workers + Supabase) — Month 18–22 (post-seed or post-first-ARR)
+
+**Primary deliverable:** FORM's enterprise backend — SSO/SCIM integration (§§23–26 of SSO_SCIM_IMPLEMENTATION.md), audit log HMAC chain, multi-tenant RLS hardening, and Cloudflare Workers edge layer. Currently documented in ~60,000 lines of operational specs. Needs an engineer to implement.
+
+**Profile requirements:** TypeScript, Cloudflare Workers, Supabase advanced (RLS, pg_cron, Edge Functions), familiarity with SAML/OIDC (WorkOS integration). Security mindset required — this engineer touches the SOC 2 surface.
+
+**Cost:** $75k–$100k base. Likely UA-based; this role does not require mobile expertise.
+
+**Trigger:** when the first enterprise contract is signed, or when the founder's time on enterprise backend tasks exceeds 15h/week — whichever comes first.
+
+#### 27.3.3 Hire 3: ML / CV Engineer — Month 24–30 (post-Series A)
+
+**Primary deliverable:** training and fine-tuning the pose-estimation model for the three base lifts (squat, deadlift, bench). The founding engineer integrates inference; this hire trains and improves the model.
+
+**Profile requirements:** PyTorch or TensorFlow, on-device model optimization (Core ML conversion, quantization), familiarity with human pose estimation architectures (MediaPipe, MoveNet, OpenPose, ViTPose). ONNX export workflow. Series A candidate — earlier is pre-mature unless the CV pipeline is the primary bottleneck.
+
+**Cost:** $90k–$130k base. This role is a global competitive hire; expect to pay above UA market rates or hire remotely.
+
+**Trigger:** CV pipeline is live, used by ≥ 200 daily active users, and model quality (e.g., rep-count accuracy, joint angle accuracy) is the #1 user complaint or the primary barrier to upsell.
+
+#### 27.3.4 Hire 4+: Series A Engineering Team (Months 28–36)
+
+At Series A ($1.5M–$2.5M raise, §24.9), target team of 4–6 engineers: Founding Engineer (tech lead / iOS), Platform Engineer (Hire 2), ML Engineer (Hire 3), a second iOS/Android engineer, and a data engineer to own the Metabase/analytics warehouse pipeline. VP Engineering is a Series B hire.
+
+| Role | Headcount | Annual cost (salary + taxes) |
+|---|---|---|
+| Founding Engineer / Tech Lead | 1 | $95k–$125k |
+| Platform / Backend Engineer | 1 | $80k–$105k |
+| ML / CV Engineer | 1 | $95k–$135k |
+| iOS or Android Engineer | 1 | $75k–$100k |
+| Data Engineer | 1 | $70k–$90k |
+| **Total Series A engineering payroll** | **5** | **$415k–$555k/year** |
+
+At $1.5M ARR (§22.3 Base scenario at Series A), engineering payroll = 28%–37% ARR — within the 25–40% benchmark for B2B SaaS pre-Series B. At $3M ARR (Bull scenario at Series A close), it compresses to 14%–18%.
+
+---
+
+### 27.4 Infrastructure Run-Rate Costs
+
+FORM's infrastructure is designed on a serverless-first, usage-based pricing model. Pre-revenue costs are minimal; cost scales with users.
+
+#### 27.4.1 Core Infrastructure Cost Table
+
+| Service | Pre-revenue (0 users) | 1,000 MAU | 10,000 MAU | 50,000 MAU | Notes |
+|---|---|---|---|---|---|
+| Cloudflare Workers (API layer) | $5/mo (paid plan) | $10–20/mo | $40–80/mo | $150–300/mo | Includes D1 database requests; most edge logic runs in free tier until 10M requests/day |
+| Supabase Pro | $25/mo | $25/mo | $25–100/mo (compute scale) | $599/mo (Enterprise) | Pro plan: 1 project + 8GB DB + 100GB bandwidth. Enterprise triggers at SOC 2 requirement (§26.3 SSO_SCIM_IMPLEMENTATION) |
+| Cloudflare R2 (storage — video, compliance vault) | $0 (10GB free) | $2–5/mo | $15–40/mo | $75–180/mo | $0.015/GB stored + $0.36/million Class B ops |
+| Anthropic API (Victor AI coaching) | $0 | $30–80/mo | $300–800/mo | $1,500–3,500/mo | Estimated at 3–5 coaching turns/session, 3 sessions/week per user; Claude Haiku at ~$0.00025/1K input tokens + $0.00125/1K output tokens |
+| Sentry (error tracking) | $26/mo | $26/mo | $89/mo (Team) | $89/mo | Capped at Team plan for most of FORM's scale |
+| PagerDuty (incident alerting) | $21/mo (2 users) | $21/mo | $63–105/mo (3–5 users) | $105–210/mo | Professional plan $21/user/month |
+| WorkOS (SSO/SCIM) | $0 (free tier ≤100 enterprise connections) | $0–125/mo | $125–250/mo | $250–800/mo | Free up to 100 enterprise connections; $125/month Starter for SSO; Enterprise pricing negotiable at scale |
+| Better Stack (uptime + log management) | $0 (free tier) | $20/mo | $40–60/mo | $150–300/mo | Scales with log ingestion volume |
+| Metabase (BI / dashboards) | $0 (self-hosted) | $0 | $0–500/mo (Cloud) | $500/mo | Self-hosted free on Cloudflare Workers or EC2 micro; Cloud plan at 10k MAU if ops overhead too high |
+| **Total infrastructure** | **~$77/mo** | **~$140–280/mo** | **~$680–1,300/mo** | **~$2,800–5,500/mo** | |
+
+**Pre-revenue infrastructure cost: ~$77/month.** This is the minimum viable tech stack for a production-grade B2B SaaS with SOC 2 trajectory. It is not a "bootstrap on free tiers" stack — it includes PagerDuty, Sentry, and Cloudflare Workers paid plans from Day 1 because those are required for enterprise-grade reliability commitments.
+
+**Anthropic API at scale:** at 50,000 MAU, AI coaching is the largest infrastructure line item ($1,500–$3,500/month). This is a product-differentiated cost (it provides Victor's coaching intelligence) and should be modelled as a COGS line, not pure infrastructure overhead. At the $79/month consumer price point, a user paying $79/month and consuming $0.10–0.15/month in Anthropic API costs represents a >500× revenue-to-API-cost ratio — extremely healthy.
+
+#### 27.4.2 Infrastructure as % of Revenue
+
+| ARR Stage | Monthly infra cost | Monthly ARR equivalent | Infra as % MRR |
+|---|---|---|---|
+| Pre-revenue | ~$77/mo | $0 | N/A (fixed cost below $1k/year) |
+| $100k ARR | ~$200–400/mo | ~$8,300/mo | 2.4%–4.8% |
+| $500k ARR | ~$800–1,500/mo | ~$41,700/mo | 1.9%–3.6% |
+| $1M ARR | ~$1,500–2,500/mo | ~$83,300/mo | 1.8%–3.0% |
+| $3M ARR | ~$4,000–7,000/mo | ~$250,000/mo | 1.6%–2.8% |
+
+Infrastructure cost as % MRR compresses steadily — standard SaaS characteristic. Infrastructure is not the gross margin problem; engineering payroll and CS payroll are.
+
+---
+
+### 27.5 Build vs. Buy Analysis
+
+Seven major third-party services in the FORM stack. Each represents a buy decision that was (or should be) evaluated against an in-house build.
+
+| Service | Monthly cost | Build cost estimate | Verdict | Rationale |
+|---|---|---|---|---|
+| **WorkOS** (SSO/SCIM/Directory Sync) | $125–800/mo | 6–10 engineering weeks (~$15k–$25k once; $5k–$10k/year maintenance) | **BUY** | SAML/OIDC and SCIM spec compliance is non-trivial, especially for enterprise IdP edge cases (Okta, Azure AD, Google Workspace quirks). WorkOS is the established standard; rebuilding provides zero differentiation. |
+| **Supabase** (Postgres + Auth + RLS + Edge Functions) | $25–599/mo | $40k–$80k/year (DBA + infra engineer time) | **BUY** | Self-managed Postgres at enterprise scale with SOC 2 RLS requirements is a full-time infrastructure job. Supabase provides the managed Postgres, pgvector, Row Level Security enforcement, and Auth stack FORM needs. The build-vs-buy line only becomes relevant above $5M ARR when Supabase Enterprise pricing exceeds a dedicated DBA hire cost. |
+| **Anthropic API** (Victor AI coaching) | $30–3,500/mo (usage-based) | Not applicable — no alternative; fine-tuning open-source models is $50k+/year in ML infra | **BUY** | The coaching intelligence is the product. Until FORM has the data volume and ML team to fine-tune a proprietary model, API is the only realistic path. Evaluate own-model cost at Series B when MAU > 100k. |
+| **PagerDuty** (incident alerting) | $21–210/mo | 2–4 engineering weeks (~$5k–$10k) | **BUY** | On-call routing, escalation chains, and on-call scheduling are not FORM's moat. PagerDuty is the category standard for SOC 2-auditable incident response (INCIDENT_RESPONSE.md R-* runbooks reference PagerDuty throughout). |
+| **Sentry** (error tracking + performance) | $26–89/mo | 1–2 engineering weeks ($2.5k–$5k) | **BUY** | Stack traces, source maps, session replay, and performance profiling are well-solved problems. Building in-house adds no differentiation and costs engineering time that should be on the CV pipeline. |
+| **CV pose estimation model** (on-device inference) | $0/session (on-device via Core ML) | $30k–$80k initial (model training + Core ML conversion); $10k–$20k/year (maintenance + retraining) | **BUILD** | This is FORM's technical moat. On-device inference is a privacy and latency requirement (no video leaves the device). Dependency on a third-party CV API would (a) create a cloud egress cost at scale, (b) introduce a privacy liability for GDPR/HIPAA-adjacent health data, (c) eliminate the hardware partnership narrative. The build cost is high but non-negotiable for the moat thesis. |
+| **Better Stack** (uptime monitoring + log management) | $0–300/mo | 1 engineering week ($2.5k) | **BUY** | Synthetic uptime monitoring, log aggregation, and incident status pages are commodity tooling. Better Stack's free tier covers pre-revenue needs. |
+
+**Build vs. Buy principle:** FORM builds what is the product (CV pipeline, Victor's coaching logic) and buys what is infrastructure. No differentiation comes from building your own SSO, error tracking, or alerting stack. Every in-house build of a commodity service is a hidden tax on engineering velocity.
+
+---
+
+### 27.6 CV / ML Pipeline Unit Economics
+
+The CV pipeline is the most cost-opaque component of the FORM stack. On-device inference eliminates per-session server cost at the expense of model size constraints and device compatibility.
+
+#### 27.6.1 On-Device Inference (Core ML)
+
+| Metric | Value | Source / Notes |
+|---|---|---|
+| Per-session cost | ~$0 marginal | Inference runs on device; no cloud GPU or API call |
+| Device requirement | iPhone 12+ (A14 Bionic Neural Engine) | Core ML quantized models run efficiently on A14+; acceptable on A13 with reduced frame rate |
+| Model size on-device | 15–40 MB (INT8 quantized) | MoveNet Lightning = 9MB; ViTPose-S INT8 = ~25MB; custom 3-lift fine-tuned = 20–35MB estimate |
+| Latency (P95, live camera) | 25–50 ms/frame (A15+) | 30 fps tracking requires < 33ms/frame; achievable on A15+, marginal on A13 |
+| Battery impact | +8–15% per hour of tracking | Neural Engine activation vs. CPU-only; acceptable for 45–90 min session |
+| Infrastructure cost scaling | Linear $0 | MAU growth does not increase server cost for inference |
+
+**Implication:** at 50,000 MAU doing 3 tracking sessions/week, on-device inference costs FORM $0 in server compute. This is the core economics of the CV moat — it is a cost floor advantage, not just a privacy story.
+
+#### 27.6.2 Server-Side Inference (Hypothetical — not FORM's current path)
+
+Included for comparison only to quantify the avoided cost:
+
+| Metric | Value |
+|---|---|
+| GPU instance for real-time pose inference | $0.40–$0.90/hour (e.g., AWS g4dn.xlarge at spot pricing) |
+| Sessions per GPU-hour (concurrent inference) | ~30–50 concurrent streams |
+| Per-session-hour cost | ~$0.009–$0.030 |
+| At 50,000 MAU × 3 sessions/week × 1h/session | ~$108k–$360k/year |
+
+On-device inference eliminates $108k–$360k/year of GPU compute cost at 50,000 MAU. This is both a gross margin advantage and a competitive moat: any competitor using cloud-side inference faces this cost structure at scale.
+
+---
+
+### 27.7 Engineering Cost as % ARR at Scale Milestones
+
+Combines engineering payroll (§27.3) and infrastructure (§27.4) into a total engineering cost line.
+
+| ARR Milestone | Engineering payroll (annual) | Infrastructure (annual) | Total engineering cost | Engineering as % ARR |
+|---|---|---|---|---|
+| Pre-revenue | $0 | ~$924 (~$77/mo) | ~$1k | N/A |
+| $100k ARR (first enterprise customers) | $80k–$110k (1 engineer) | ~$3k–$5k | ~$83k–$115k | **83%–115%** |
+| $500k ARR (seed traction) | $160k–$220k (2 engineers) | ~$10k–$18k | ~$170k–$238k | **34%–48%** |
+| $1M ARR (Series A gate) | $240k–$330k (3 engineers) | ~$18k–$30k | ~$258k–$360k | **26%–36%** |
+| $3M ARR (Series A scale) | $415k–$555k (5 engineers) | ~$50k–$84k | ~$465k–$639k | **16%–21%** |
+
+**The $100k ARR engineering cost ratio (83%–115%) looks alarming** but is expected at this stage: FORM has not yet hired an engineer, so the first hire is a step-function cost before the revenue curve catches up. The correct way to read this milestone: "engineering cost at $100k ARR is front-loaded; the ratio normalises as the second enterprise customer converts."
+
+The trajectory from 34%–48% at $500k ARR to 16%–21% at $3M ARR is the operating leverage story for Series A investors: the cost structure is fixed-heavy and compresses cleanly as revenue scales.
+
+---
+
+### 27.8 Engineering Burn Rate Gates
+
+These are the checkpoints that should trigger (or block) the next engineering hire. They connect §27.3 hiring sequence to the §22.3 cash flow model.
+
+| Gate | Trigger Condition | Hire Unlocked | Block Condition (don't hire if:) |
+|---|---|---|---|
+| **ENG-GATE-01** | First design prototype validated with ≥ 5 user interviews; investor pre-commitment of ≥ $300k exists | Founding Engineer (Hire 1) | No validated use case; no capital to fund the first 12 months of salary + taxes |
+| **ENG-GATE-02** | First enterprise contract signed OR LOI from ≥ 2 enterprise prospects AND ARR ≥ $50k | Platform Engineer (Hire 2) | ARR < $50k AND no signed enterprise contract; founder still has capacity to handle enterprise backend |
+| **ENG-GATE-03** | CV pipeline live with ≥ 200 DAU using tracking AND model accuracy is the #1 user feedback theme AND Series A round closed | ML/CV Engineer (Hire 3) | CV pipeline not yet live; model accuracy not yet a user-facing bottleneck |
+| **ENG-GATE-04** | ARR ≥ $1M (Series A close) AND team has 3+ engineers AND data pipeline is the analytics bottleneck | Data Engineer (Hire 4) | Team < 3 engineers; data work can still be done by platform engineer part-time |
+
+**Anti-pattern to avoid:** hiring an ML engineer before the product is in users' hands. The most common early-stage engineering mistake is optimising the CV model before validating that the product loop (auth → workout logging → Victor chat) retains users. Model quality matters only after product-market fit.
+
+---
+
+### 27.9 DEC-030 Engineering Spend Audit Events
+
+Engineering spend audit events are required for two purposes: (1) investor data room — evidence that engineering costs are tracked against milestones; (2) internal governance — prevent uncontrolled infrastructure cost escalation as user base grows.
+
+| Event type | Severity | Key metadata fields | Retention | Trigger |
+|---|---|---|---|---|
+| `ops.engineer_hired` | STANDARD | `hire_type` (founding / platform / ml / data / other), `start_date`, `annual_base_usd`, `equity_pct`, `hired_by` (founder internal ID) | 7 years | On first day of employment; emitted by founder via admin tooling |
+| `ops.infra_cost_threshold_crossed` | STANDARD | `threshold_usd_monthly` (100 / 500 / 1000 / 5000), `actual_usd_monthly`, `primary_driver` (service name), `month` | 3 years | When monthly infrastructure spend crosses the next $100/$500/$1,000/$5,000 tier; emitted by monthly cost reconciliation cron |
+| `ops.build_vs_buy_decision` | STANDARD | `service_name`, `decision` (build / buy / defer), `rationale_summary` (max 200 chars), `owner` (internal ID), `annual_cost_usd` (buy) or `build_cost_estimate_usd` (build) | 7 years | Whenever a significant build vs. buy decision is made (>$5k/year impact); emitted by founder or tech lead via admin tooling |
+
+---
+
+### 27.10 Implementation Checklist
+
+| Item | Priority | Milestone | Owner | Definition of Done |
+|---|---|---|---|---|
+| Update §22.3 cash flow model to use $115k–$125k for founding engineer (base + taxes, §27.2.1), replacing the current $100k placeholder | P0 | Before next investor conversation | founder + data-engineer | §22.3 updated; investor deck cash flow slide updated to match |
+| Open engineer search with JD on Djinni + Wellfound: Founding Engineer (iOS + Supabase + CV integration); equity 2.5%–3.5%, base $80k–$110k | P0 | M1 (open immediately) | founder | Job post live on at least two platforms; first screening calls scheduled |
+| Define ENG-GATE-01 criteria (§27.8) as a formal decision gate in the OKR doc and Notion board; assign monthly review checkpoint | P1 | M2 | founder + product-manager | Gate criteria documented in OKRS_2026.md; first gate review scheduled |
+| Add engineering infrastructure cost tracking to monthly metrics review: pull Cloudflare, Supabase, Anthropic API costs monthly; file in `ops.infra_cost_threshold_crossed` DEC-030 event format | P1 | M3 | data-engineer + devops-lead | Monthly cost report template created; first export filed |
+| Register three DEC-030 engineering spend events (`ops.engineer_hired`, `ops.infra_cost_threshold_crossed`, `ops.build_vs_buy_decision`) in `docs/AUDIT_LOG_SCHEMA.md` with full Zod schema | P1 | M4 | platform-engineer + compliance-officer | All three events registered in AUDIT_LOG_SCHEMA.md |
+| Document first formal build vs. buy decision log (CV pipeline BUILD decision): emit `ops.build_vs_buy_decision` event with rationale; cross-reference docs/TECHNICAL.md CV pipeline section | P2 | M3 | founder | Event emitted or logged; §27.5 CV BUILD rationale confirmed correct |
+
+---
+
+### 27.11 Open Questions
+
+**OQ-ENG-01: Should the founding engineer be a UA-based employee or a US-incorporated contractor?**
+
+UA-based employment: lower base cost ($70k–$90k), local hiring network, lower employer overhead. Risk: FX exposure on UAH salaries (engineers typically expect USD), wartime talent flight risk, complexity of termination if needed. US contractor structure: higher gross cost ($90k–$130k IRS 1099 equivalent), simpler for a US-incorporated parent company, no termination complexity. Recommendation: hire as UA FOP (self-employed contractor) invoicing monthly in USD — standard structure for UA tech startups, avoids payroll overhead, and allows conversion to employment if Series A is US-structured. Owner: founder + legal. Priority: **P0 — must be resolved before first offer letter.** Resolution: confirm with Ukrainian employment counsel and US incorporation counsel before making the offer.
+
+**OQ-ENG-02: What is the minimum viable Founding Engineer profile — iOS-specialist or fullstack?**
+
+iOS-specialist profile (SwiftUI-only) has higher supply in the UA market at lower cost but creates a backend dependency on the founder. Fullstack profile (iOS + Supabase + Cloudflare Workers) reduces the dependency but is a harder and more expensive hire. The risk of a pure iOS hire: the founder becomes the backend engineer by default, which is a sustainable strategy only if the founder has the Supabase/Workers depth. If not, the iOS-only hire delays backend work until Hire 2. Recommendation: minimum viable profile is iOS + Supabase Edge Functions + TypeScript; pure iOS-only is a gap that creates roadmap risk. Owner: founder. Priority: **P1 — before finalising the JD.** Resolution: founder self-assesses Supabase/backend depth; if strong, iOS-specialist acceptable; if weak, require Supabase in the JD.
+
+**OQ-ENG-03: When does on-device CV inference become a device-compatibility liability?**
+
+The §27.6.1 analysis assumes iPhone 12+ (A14) as the minimum. As of 2026, ~35%–40% of iOS devices are iPhone 12 or newer (global) vs. ~55%–60% in the core FORM market (Ukraine + Western EU, higher iPhone age profile). A device requirement floor of iPhone 12 excludes ~40%–45% of the global iOS user base. Options: (a) maintain A14 floor and accept the addressable market constraint; (b) ship a reduced-feature mode (no live CV tracking, manual logging only) for A13 and older; (c) invest in heavier model quantisation to bring inference to A13. Owner: ml-engineer + platform-engineer. Priority: **P2 — evaluate at TestFlight beta when device distribution data is available.** Resolution: instrument device model in analytics from Day 1; make the decision with real data at the 1,000 beta user mark.
+
+---
+
+*v1.8 (2026-06-04): §27 Engineering Team Cost Model — the cost and hiring counterpart to §26 CS Cost Model and the operational detail behind §22.3 cash flow. §27.1 scopes the section to seven deliverables covering founding engineer total comp, technical hiring sequence, infrastructure run-rate by stage, build vs. buy, CV pipeline unit economics, engineering as % ARR trajectory, and burn rate gates. §27.2 founding engineer total compensation: cash cost $100k–$139k (midpoint ~$120k) including base $80k–$110k, employer taxes ~16%, hardware $3.5k–$5k one-time, onboarding overhead ~$4k–$6k founder-time cost — corrects the §22.3 $100k placeholder by $20k–$39k; equity grant 2.5%–3.5% at pre-seed, 1.0%–1.5% at seed, ~0.25% at Series A. §27.3 four-hire technical sequence: Founding Engineer (iOS + Supabase, Month 13 Base / Month 10–11 Bull, $80k–$110k); Platform Engineer (Cloudflare Workers + Supabase enterprise backend, Month 18–22, $75k–$100k, triggered by first enterprise contract or 15h/week founder backend time); ML/CV Engineer (model training + Core ML, Month 24–30 post-Series A, $90k–$130k, triggered by CV pipeline live + model quality as #1 complaint); Series A team of 5 at $415k–$555k/year total payroll. §27.4 infrastructure cost table across eight services (Cloudflare Workers, Supabase, R2, Anthropic API, Sentry, PagerDuty, WorkOS, Better Stack) at four scale stages: pre-revenue ~$77/mo, 1k MAU ~$140–280/mo, 10k MAU ~$680–1,300/mo, 50k MAU ~$2,800–5,500/mo; Anthropic API becomes the largest single line at 50k MAU ($1,500–$3,500/mo) but remains <0.3% of revenue per user at $79/mo price point. §27.5 seven-service build-vs-buy analysis: BUY verdicts for WorkOS (6–10 engineering weeks saved per IdP), Supabase (full-time DBA alternative), Anthropic API (no viable build alternative pre-Series B), PagerDuty, Sentry, Better Stack; BUILD verdict for CV pose estimation (on-device moat, privacy requirement, avoids $108k–$360k/year in GPU compute at 50k MAU). §27.6 CV pipeline unit economics: on-device inference at $0 marginal per-session cost vs. ~$108k–$360k/year hypothetical server-side at 50k MAU; device floor A14 (iPhone 12+); model size 20–35 MB INT8 quantized; P95 latency 25–50ms on A15+. §27.7 engineering as % ARR trajectory: 83%–115% at $100k ARR (step-function hire before revenue catches up); 34%–48% at $500k; 26%–36% at $1M; 16%–21% at $3M — operating leverage curve consistent with B2B SaaS benchmarks. §27.8 four burn rate gates (ENG-GATE-01 through ENG-GATE-04) with trigger conditions and block conditions; anti-pattern warning against ML hire before product-market fit. §27.9 three DEC-030 engineering spend audit events: ops.engineer_hired (STANDARD, 7yr), ops.infra_cost_threshold_crossed (STANDARD, 3yr), ops.build_vs_buy_decision (STANDARD, 7yr). §27.10 six-item implementation checklist: 2× P0 (§22.3 cash flow correction, engineer JD live), 3× P1 (ENG-GATE-01 OKR, monthly infra tracking, DEC-030 event registration), 1× P2 (build-vs-buy decision log for CV). §27.11 three open questions: OQ-ENG-01 (UA FOP vs. US contractor structure — P0, before offer letter), OQ-ENG-02 (iOS-specialist vs. fullstack founding engineer profile — P1, before JD finalisation), OQ-ENG-03 (device-compatibility floor for CV — P2, decide at 1k beta users). Cross-references: §22.3 (cash flow model — founding engineer line correction), §24.7 (cap table — equity grant dilution for founding engineer), §25.6 (compliance cost as % ARR — combined with engineering for total support+engineering stack), §26.4 (CS vs. engineer hire order), docs/TECHNICAL.md (CV pipeline architecture), docs/SSO_SCIM_IMPLEMENTATION.md §§23–26 (enterprise backend workload for Platform Engineer), docs/MOBILE_ROADMAP.md (iOS engineering context), docs/AUDIT_LOG_SCHEMA.md (engineering spend DEC-030 events). Owner: founder + data-engineer + platform-engineer.*

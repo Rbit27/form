@@ -6,6 +6,16 @@
 
 ---
 
+## [1.96.0] — 2026-06-04
+
+### Added
+- `content/post-213-immune-function.md` — Тренування і імунна функція: Open Window Hypothesis (Gleeson 2007), J-крива Nieman 1994, IL-6 як міокін (Pedersen & Febbraio 2008); practical section з 5 clinical-safety guardrails; clinical-safety PASS WITH CONDITIONS (2026-06-04)
+- `content/post-214-strength-cognitive-function.md` — Сила і когнітивні функції: Northey et al. (2018 BJSM) meta-analysis ES 0.66; BDNF / IGF-1 / нейрогенез гіпокампу; Liu-Ambrose (2010) executive function; resistance training vs. aerobics cogntive domain comparison; clinical-safety NOT REQUIRED
+- `content/post-215-specificity-vs-variability.md` — Специфічність vs варіативність: SAID principle; Barnett et al. (2002) transfer of training; міф «тіло звикає»; блокова periodization як баланс між специфічністю та варіативністю; clinical-safety NOT REQUIRED
+- `docs/COST_MODEL.md §27` — Engineering Team Cost Model: §27.2 founding engineer total comp ($100k–$139k/year first-year including taxes, hardware, onboarding; equity 2.5%–3.5% pre-seed); §27.3 four-hire technical sequence (iOS/Supabase → Platform/Workers → ML/CV → Data Engineer) with milestone triggers; §27.4 infrastructure run-rate table (8 services, 4 scale stages; pre-revenue ~$77/mo, 50k MAU ~$2,800–$5,500/mo); §27.5 seven-service build-vs-buy (BUY: WorkOS/Supabase/Anthropic/PagerDuty/Sentry/Better Stack; BUILD: CV pipeline — avoids $108k–$360k/year GPU cost at 50k MAU); §27.6 CV on-device unit economics ($0 marginal per-session vs. ~$108k–$360k/year hypothetical server-side); §27.7 engineering as % ARR trajectory (83%–115% at $100k ARR → 16%–21% at $3M ARR); §27.8 four burn rate gates (ENG-GATE-01 through ENG-GATE-04); §27.9 three DEC-030 events; §27.11 three open questions (OQ-ENG-01 UA/US employment structure; OQ-ENG-02 iOS-specialist vs fullstack founding profile; OQ-ENG-03 device compatibility floor for CV)
+
+---
+
 ## [1.95.0] — 2026-06-04
 
 ### Added
