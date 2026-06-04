@@ -6,6 +6,16 @@
 
 ---
 
+## [1.91.0] — 2026-06-04
+
+### Added
+- [`content/post-210-cognitive-load-technique.md`](content/post-210-cognitive-load-technique.md) — Когнітивне навантаження і техніка: коли думати про рух — означає зробити його гірше — Fitts & Posner (1967): три стадії моторного навчання (когнітивна/асоціативна/автономна); Wulf & Lewthwaite (2016 Psychon Bull Rev): OPTIMAL theory — зовнішній фокус уваги стабільно перевершує внутрішній у досвідчених; Beilock & Carr (2001 Psychol Sci): choking under pressure — explicit monitoring hypothesis — явне моніторування руйнує автоматизовані рухи; Beilock et al. (2002 J Exp Psychol Gen): dual-task не погіршує виконання у досвідчених; Lohse & Sherwood (2012 JSCR): зовнішній фокус у жимі лежачи +5% пікова сила; Snyder & Ledbetter (2013 Eur J Sport Sci): внутрішній фокус функціональний для новачків у перші тижні; pre-lift routine як захист від явного моніторування; stagegate для типу cue; clinical-safety NOT REQUIRED
+- `blog.html` — картка #184 для post-210-cognitive-load-technique; лічильник оновлено до 184 cards (207 posts authored)
+- `STATUS.md` — content engine table оновлено: post-207, post-208, post-209, post-210 додані
+- `README.md` — post-210 відмічено як виконаний у content engine roadmap
+
+---
+
 ## [1.90.0] — 2026-06-04
 
 ### Added

@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 183 cards (206 posts authored), category filter, newsletter CTA | v1.90.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 184 cards (207 posts authored), category filter, newsletter CTA | v1.91.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -277,6 +277,10 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-204-bfr-blood-flow-restriction.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-205-motor-cortex-plasticity.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-206-strength-vs-power.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-207-antagonist-agonist-paired-sets.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-208-intensity-vs-volume-hypertrophy-threshold.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-209-eccentric-overload.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-210-cognitive-load-technique.md | Blog | draft · clinical-safety NOT REQUIRED |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
