@@ -6,6 +6,18 @@
 
 ---
 
+## [1.89.0] — 2026-06-04
+
+### Added
+- [`content/post-208-intensity-vs-volume-hypertrophy-threshold.md`](content/post-208-intensity-vs-volume-hypertrophy-threshold.md) — Інтенсивність vs об'єм: де насправді знаходиться гіпертрофійний поріг — Mitchell et al. (2012 J Appl Physiol): 30% vs 80% 1RM до відмови → еквівалентний MPS (синтез м'язових протеїнів); Burd et al. (2010 PLoS ONE): MMF як провідний модератор, а не % 1RM; Schoenfeld et al. (2017 JSCR): RCT 8RM vs 25–35RM до відмови → еквівалентна гіпертрофія, силова адаптація вища при 80% 1RM; Lasevicius et al. (2018 Eur J Sport Sci): нижній поріг ~30–40% 1RM — нижче якого навіть відмова субоптимальна; механічна напруга (FAK/ILK → mTORC1) і метаболічний стрес (AMPK, CaMK, MAPK) як паралельні сигнальні шляхи; Henneman size principle і рекрутування type II волокон при низькому навантаженні до відмови; провідна змінна — RIR 0–2, а не абсолютний % 1RM; нейральна специфіка (1RM-перенос) — єдина значима перевага високої інтенсивності перед низькою; clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — додано картку post-208 (Інтенсивність vs об'єм); лічильник: 182 cards, 205 posts authored
+- `STATUS.md` — оновлено рядок blog.html: 182 cards / 205 posts / v1.89.0
+- `VERSION` — 1.88.0 → 1.89.0
+
+---
+
 ## [1.88.0] — 2026-06-04
 
 ### Added
