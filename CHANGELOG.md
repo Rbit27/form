@@ -6,6 +6,17 @@
 
 ---
 
+## [1.89.1] — 2026-06-04
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §26` — API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy · v1.7 → v1.8. **Closes OQ-SSO-25.1** (🟡 P1 → 🟢: SCIM endpoint IP scope; `scim_ip_enforcement_enabled` flag, default false; separate `scim_ip_allowlist_config` JSONB; general IP allowlist never blocks SCIM routes; `enforceScimIpAllowlist()` middleware branch; migration `0052_scim_ip_allowlist.sql`; admin dashboard "Directory Sync IP Restriction" UI with Okta/Azure pre-populated CIDR import). **Closes OQ-SSO-25.3** (🟡 P1 M5 → 🟢: API key IP enforcement; formalised `tenant_api_keys` table schema with `ip_enforcement_enabled BOOLEAN DEFAULT false`, `ip_allowlist_config JSONB`, `scopes TEXT[]`, `key_hash` HMAC-SHA256, `key_preview` last-8-chars, `last_used_at`, `expires_at`, `revoked_at`; `enforceApiKeyIpAllowlist()` wired into `api-key-auth.ts` using shared `checkCidrList()` from §25 — no new dependency; scope enforcement before route handler). Rotation policy: 365d amber / 730d red age alerts; `admin:write` scope 90d mandatory; 24h overlap window. Nine DEC-030 HMAC-chained events (all HIGH, 7yr): `api_key.created`, `api_key.rotated`, `api_key.revoked`, `api_key.ip_enforcement_enabled`, `api_key.ip_enforcement_disabled`, `api_key.ip_blocked` (client_ip_hash only), `scim.ip_enforcement_enabled`, `scim.ip_enforcement_disabled`, `scim.ip_blocked`. Four alerting rules: AL-APIKEY-01 P1 (>10 blocks/key/10 min), AL-APIKEY-02 P1 (rotation overlap not cleaned up → cron failure), AL-APIKEY-03 P1 (revocation reason=compromise → R-16), AL-SCIM-IP-01 P2 (SCIM provisioning degraded + ip_blocked spike). SOC 2: CC6.1/CC6.2/CC6.4/CC6.8/CC7.2 with five evidence artefacts APIKEY-E-001 through APIKEY-E-005. Two new open questions: OQ-SSO-26.1 (mandatory IP enforcement for admin:write keys P2) and OQ-SSO-26.2 (expires_at hard vs soft enforcement P1). 14-item implementation checklist (8× P0 M5, 4× P1 M5-M6, 2× P2 M6). Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — header v1.7 → v1.8; TOC updated to add §26
+- `VERSION` — 1.89.0 → 1.89.1
+
+---
+
 ## [1.89.0] — 2026-06-04
 
 ### Added

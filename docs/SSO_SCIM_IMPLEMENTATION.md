@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v1.7
+# FORM · SSO/SCIM Implementation v1.8
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -33,6 +33,7 @@
 23. [Continuous Access Evaluation (CAE) & Shared Signals Framework (SSF)](#23-continuous-access-evaluation-cae--shared-signals-framework-ssf--real-time-idp-risk-event-processing)
 24. [Privileged Access Management (PAM): Just-in-Time Privilege Escalation & Break-Glass Protocol](#24-privileged-access-management-pam-just-in-time-privilege-escalation--break-glass-protocol-for-form_admin-operations)
 25. [Per-Tenant Authentication Policy Engine — IP Allowlist, MFA Enforcement & Session Policy](#25-per-tenant-authentication-policy-engine--ip-allowlist-mfa-enforcement--session-policy)
+26. [API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy](#26-api-key-authentication-security--scim-ip-scope-api-key-ip-enforcement--rotation-policy)
 
 ---
 
@@ -8819,3 +8820,452 @@ All events below are emitted through the `emit-audit-event` Cloudflare Worker (H
 ---
 
 *v1.7 additions (2026-06-04): §25 Per-Tenant Authentication Policy Engine — IP Allowlist, MFA Enforcement & Session Policy. Closes G-006 (🟡 → 🟢 upon deployment of `auth-policy-middleware` Worker). TOC updated: added §22, §23, §24 entries (previously missing) and new §25. Header updated from v1.4 to v1.7. §25.1 purpose and scope: IP allowlist (network-layer gate for credential theft from non-corporate endpoint) and MFA enforcement (second factor at FORM session creation, independent of IdP); enterprise + growth tier only; `security.ip_allowlist_enabled` feature flag gate (DATA_MODEL §19); privacy constraint on client_ip_hash (SHA-256[:32] with `IP_HASH_SALT`, not plaintext). §25.2 three policy dimensions: (1) IP allowlist — all SSO/admin/SCIM routes except end-user API; (2) MFA enforcement — session creation; (3) session policy — already in §12; evaluation order: IP first (pre-credential) then MFA then session policy. §25.3 schema additions: `ip_allowlist_config JSONB` replacing `ip_allowlist INET[]` (adds per-entry labels, UUIDs, added_at, added_by); `mfa_enforcement_mode TEXT CHECK IN ('none','recommended','required')`; `mfa_grace_hours INT`; full migration `0047_auth_policy_engine.sql` with backfill; 48h-later legacy column drop migration `0048`; JSONB schema type definition with 50-entry limit, /0-prefix rejection, empty-enabled-block-all warning. §25.4 KV-backed policy cache: `SSO_KV:auth_policy:{tenant_id}` key, 60s TTL, active invalidation on policy write, fail-closed on Supabase unavailability (503, not fail-open). §25.5 IP allowlist enforcement middleware: extends §16.10 from SSO-callback-only to all authenticated routes (SSO callback, token refresh, admin API, SCIM API; end-user `/v1/api/*` excluded); TypeScript `enforceIpAllowlist()` using `netmask` npm library (IPv4+IPv6); `CF-Connecting-IP` header (Cloudflare-guaranteed, not spoofable); `hashIp()` with `IP_HASH_SALT` Workers Secret; error response omits IP and CIDR list; Cloudflare Queues consumer for burst ip_blocked events. §25.6 MFA enforcement: `evaluateMfaEnforcement()` against IdP `amr` claim (OIDC ID token) or SAML `AuthnContextClassRef`; 9 satisfying amr values; grace period for existing sessions when mode → required (mfa_grace_hours configurable 1–168h); sweep job emits `sso.mfa_enforcement_sweep_completed`. §25.7 policy change management: lockout-prevention pre-validation (admin's own IP must be in new allowlist); /0 prefix rejection; 5-changes/5-min rate limit; propagation timeline T+0 to T+60s; session impact matrix for each policy tightening type. §25.8 admin lockout recovery: IP lockout → PAM read_write elevation (§24.3) → UPDATE tenant_sso_configs → SSO_KV delete → `sso.auth_policy_lockout_recovery` CRITICAL event → CSM notification; MFA per-user bypass → tenant_admin only (not FORM support) → `mfa_bypass_until` timestamptz + `sso.mfa_bypass_granted` CRITICAL event, max 48h. §25.9 nine DEC-030 HMAC-chained events (all HIGH or CRITICAL, 7yr except `sso.mfa_enforcement_sweep_completed` STANDARD 3yr): sso.auth_policy_updated, sso.ip_allowlist_entry_added, sso.ip_allowlist_entry_removed, sso.ip_allowlist_toggled, sso.ip_blocked (no user_id, client_ip_hash only), sso.mfa_enforcement_changed, sso.mfa_enforcement_sweep_completed, sso.mfa_bypass_granted, sso.auth_policy_lockout_recovery. §25.10 three alerting rules: AL-AUTH-POLICY-01 P1 (mass ip_blocked with zero sessions → lockout), AL-AUTH-POLICY-02 P1 (MFA enforcement disabled on enterprise tenant → compliance risk), AL-AUTH-POLICY-03 P2 (admin_api block after 7-day silence → travel/VPN change, CSM notify). §25.11 SOC 2 mapping: CC6.1 (IP allowlist network gate, AUTH-POLICY-E-001), CC6.2 (MFA enforcement independent of IdP, AUTH-POLICY-E-002), CC6.8 (HMAC-chained policy change audit trail + rate limit, AUTH-POLICY-E-003), CC7.2 (AL-AUTH-POLICY-01/02 anomaly detection, AUTH-POLICY-E-004). §25.12 gap status: G-006 🟡 → 🟢 on deploy. §25.13 four open questions: OQ-SSO-25.1 SCIM endpoint IP scope P1 (recommend separate flag, default off), OQ-SSO-25.2 SMS in satisfying set P2 (regulated industries may require hwk/fido only), OQ-SSO-25.3 API key IP enforcement P1 M5, OQ-SSO-25.4 optimistic locking on policy version P2 M6. §25.14 15-item implementation checklist: 8× P0 M4 (migration, auth-policy-middleware Worker, KV cache, DEC-030 registration, IP hash salt, Queues consumer), 5× P1 M5 (alerting, MFA bypass endpoint, feature flag check, evidence collection), 2× P2 M5-M6. Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*
+
+---
+
+## 26. API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy
+
+> Owner: enterprise-architect + security-engineer + platform-engineer. Review: on any credential schema change or quarterly.
+> SOC 2 evidence: CC6.1, CC6.2, CC6.4, CC6.8, CC7.2.
+> Closes: OQ-SSO-25.1 (SCIM endpoint IP allowlist scope) and OQ-SSO-25.3 (API key IP enforcement). Both were P1 items from §25.13.
+
+---
+
+### 26.1 Purpose and Scope
+
+§25 introduced IP allowlist enforcement across SSO and admin routes. Two P1 open questions remained unresolved at §25 ship:
+
+1. **OQ-SSO-25.1 — SCIM endpoint IP scope.** The §25.5 enforcement table includes SCIM endpoints in the IP allowlist check. This silently breaks SCIM provisioning from providers (notably Okta, Azure AD) that do not originate from a fixed IP range. The resolution must allow tenants with IP allowlist enabled to continue SCIM provisioning without exempting SCIM from all authentication controls.
+
+2. **OQ-SSO-25.3 — API key IP enforcement.** Long-lived tenant API keys used for webhook receivers, reporting integrations, and admin automation are not covered by the §25 IP allowlist middleware. A compromised API key can be used from any IP. This section adds IP enforcement to `src/workers/auth/api-key-auth.ts`.
+
+**Out of scope:** SCIM bearer token security beyond IP (token rotation is in §3.2 and §16.6). JWT session IP enforcement is in §25. Consumer-tier mobile sessions are excluded from all enterprise IP enforcement.
+
+**Privacy floor:** All IP fields in DEC-030 events from this section use `client_ip_hash` (SHA-256[:32] keyed with `IP_HASH_SALT`, same as §25.5). Plaintext IPs are never written to the audit log or any observability signal. The `IP_HASH_SALT` in use is the same Workers Secret established in §25 — no new secret is needed.
+
+---
+
+### 26.2 API Credential Architecture
+
+FORM's enterprise tier uses three credential types with different lifecycle and IP enforcement requirements. This section introduces the distinctions to inform the IP enforcement design in §26.3 and §26.4.
+
+| Credential | Type | Lifetime | IP enforcement pre-§26 | IP enforcement post-§26 |
+|---|---|---|---|---|
+| **JWT access token** | Short-lived bearer | 1h; refreshed at 55 min | Enforced at session creation (§25) | No change |
+| **SCIM bearer token** | Long-lived provisioning credential | No expiry (rotation recommended 90d / annual) | Blocked by §25.5 if tenant uses IP allowlist | Optional separate `scim_ip_allowlist_config` (§26.3) |
+| **Tenant API key** | Long-lived integration credential | No expiry (rotation policy in §26.6) | None — not covered by §25 | IP enforcement added in `api-key-auth.ts` (§26.4) |
+
+**SCIM bearer tokens** are per-tenant secrets issued via the admin dashboard (§16.6). They are 256-bit random strings stored as HMAC-SHA256 hashes. They do not carry user identity — they carry only `tenant_id`. Every SCIM request with a valid token is trusted to modify the tenant's user directory without further authentication. This makes them administratively equivalent to a `tenant_owner` credential.
+
+**Tenant API keys** are long-lived credentials used for:
+- Enterprise webhook consumer endpoints that need to call back into the FORM API (e.g., HRIS sync triggers)
+- Reporting integrations that pull aggregate metrics via REST (not admin dashboard)
+- Automated admin operations (bulk seat provisioning, RBAC changes) from customer-managed scripts
+
+These are distinct from SCIM tokens. SCIM tokens are IdP-issued and use the SCIM protocol path. API keys are human-issued via the admin dashboard and use general REST API paths. Both are long-lived and high-privilege; neither is covered by JWT expiry-based session controls.
+
+---
+
+### 26.3 OQ-SSO-25.1 Resolution: SCIM Endpoint IP Allowlist Scope
+
+#### 26.3.1 Problem Statement
+
+The §25.5 IP allowlist middleware applies to all authenticated routes including `/v1/scim/*`. When a tenant enables IP allowlist and enters only corporate office CIDRs, SCIM provisioning from an IdP (Okta, Azure AD, OneLogin) that routes traffic via shared cloud infrastructure will be blocked immediately. The failure mode is silent from the tenant's perspective: provisioning stops, no error is surfaced to the IdP admin, and FORM deprovisioning events are queued and undelivered.
+
+The options considered in OQ-SSO-25.1 were:
+- **(a)** Exclude `/v1/scim/*` from IP allowlist entirely — over-permissive; removes a useful defence-in-depth control for tenants who can provide their IdP's source IP range
+- **(b)** Add a separate `scim_ip_allowlist` field — adds schema complexity; customers would need to configure two separate allowlists
+- **(c)** Add a `scim_ip_enforcement_enabled BOOLEAN DEFAULT false` flag — SCIM enforcement is opt-in, defaulting to off; tenants who know their IdP's source IP range can opt in
+
+**Resolution: option (c).** `scim_ip_enforcement_enabled` defaults to false. The general IP allowlist never applies to SCIM routes regardless of the main `ip_enforcement_enabled` state. When a tenant sets `scim_ip_enforcement_enabled = true`, SCIM requests are checked against a separate `scim_ip_allowlist_config JSONB` field (not the general `ip_allowlist_config`), because IdP source IPs are distinct from corporate office CIDRs.
+
+#### 26.3.2 Schema Changes
+
+Migration `0052_scim_ip_allowlist.sql`:
+
+```sql
+ALTER TABLE tenant_sso_configs
+  ADD COLUMN scim_ip_enforcement_enabled BOOLEAN  NOT NULL DEFAULT false,
+  ADD COLUMN scim_ip_allowlist_config    JSONB    DEFAULT NULL;
+
+-- Constraint: if scim_ip_enforcement_enabled = true, scim_ip_allowlist_config must be non-null and non-empty
+ALTER TABLE tenant_sso_configs
+  ADD CONSTRAINT chk_scim_ip_allowlist_required
+    CHECK (
+      scim_ip_enforcement_enabled = false
+      OR (
+        scim_ip_allowlist_config IS NOT NULL
+        AND jsonb_array_length(scim_ip_allowlist_config->'entries') > 0
+      )
+    );
+```
+
+`scim_ip_allowlist_config` uses the same JSONB schema as `ip_allowlist_config` (§25.3):
+
+```typescript
+interface ScimIpAllowlistConfig {
+  enabled: boolean;          // must equal scim_ip_enforcement_enabled column
+  entries: Array<{
+    id:        string;       // UUID, client-generated
+    cidr:      string;       // IPv4 or IPv6 CIDR notation
+    label:     string;       // Human-readable: "Okta US region", "Azure AD EU"
+    added_at:  string;       // ISO 8601
+    added_by:  string;       // admin_user UUID
+  }>;
+}
+```
+
+**Entry limit:** 20 entries (lower than the 50-entry limit for the general allowlist — IdP IP ranges are fewer in number and more stable than office CIDRs).
+
+**Known IdP IP range guidance:** FORM provides pre-populated CIDR lists in the admin dashboard for Okta, Azure AD, Google Workspace, and OneLogin. These are informational — FORM does not auto-update them. Tenants must confirm accuracy with their IdP before enabling enforcement. Guidance note displayed in UI: *"IdP IP ranges change without notice. Confirm current ranges directly with your provider before enabling. A misconfigured SCIM allowlist will silently halt directory provisioning."*
+
+#### 26.3.3 Middleware Change
+
+Update `src/workers/auth-policy-middleware/ip-allowlist.ts`:
+
+```typescript
+// Before §26: SCIM routes were included in the general IP allowlist check
+// After §26: SCIM routes bypass general check; use their own enforcement path
+
+export async function enforceIpAllowlist(
+  request: Request,
+  policy: CachedAuthPolicy,
+  env: Env
+): Promise<Response | null> {
+  const path = new URL(request.url).pathname;
+
+  // End-user API routes: never enforce (§25.5 existing behaviour)
+  if (path.startsWith('/v1/api/')) return null;
+
+  // SCIM routes: use separate scim_ip_enforcement path (§26.3)
+  if (path.startsWith('/v1/scim/') || path.startsWith('/scim/')) {
+    return enforceScimIpAllowlist(request, policy, env);
+  }
+
+  // All other authenticated routes: general IP allowlist (§25.5 existing behaviour)
+  if (!policy.ip_enforcement_enabled || !policy.ip_allowlist_config?.enabled) {
+    return null; // not enforced for this tenant
+  }
+  // ... existing general allowlist logic
+}
+
+async function enforceScimIpAllowlist(
+  request: Request,
+  policy: CachedAuthPolicy,
+  env: Env
+): Promise<Response | null> {
+  // If SCIM IP enforcement is disabled for this tenant, pass through unconditionally
+  if (!policy.scim_ip_enforcement_enabled) return null;
+
+  const clientIp = request.headers.get('CF-Connecting-IP') ?? '';
+  const allowed  = checkCidrList(clientIp, policy.scim_ip_allowlist_config?.entries ?? []);
+
+  if (!allowed) {
+    await emitScimIpBlockedEvent(env, policy.tenant_id, clientIp);
+    return new Response(
+      JSON.stringify({ error: 'scim_ip_not_allowed', message: 'SCIM request origin not in allowlist' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  return null;
+}
+```
+
+`CachedAuthPolicy` in `SSO_KV:auth_policy:{tenant_id}` is updated to include `scim_ip_enforcement_enabled` and `scim_ip_allowlist_config`. Cache invalidation occurs on any `PATCH /v1/admin/sso/policy` write that touches either field, same as the general policy cache (§25.4).
+
+#### 26.3.4 Admin Dashboard UI
+
+In the admin dashboard SSO configuration panel (§16.6), add a new collapsible section **"Directory Sync IP Restriction"** below the existing "IP Allowlist" section:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Directory Sync IP Restriction           [Enterprise only]   │
+│                                                             │
+│ Restrict SCIM provisioning to specific IP ranges.           │
+│ Use this only if your IdP has stable, predictable           │
+│ source IPs. Most IdPs (Okta, Azure AD) do not.              │
+│                                                             │
+│  ○  Off — SCIM provisioning accepts requests from any IP   │
+│  ○  On  — Enforce allowlist below                           │
+│                                                             │
+│ [+ Add CIDR range]   [Import Okta ranges]  [Import Azure]   │
+│                                                             │
+│ ┌──────────────────────────────────────────────────────┐   │
+│ │  Label              CIDR              Added          │   │
+│ │  Okta US region     198.18.0.0/16     2026-05-01     │   │
+│ └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│ ⚠ Warning: enabling this will immediately block SCIM        │
+│   provisioning from IPs outside this list.                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+This section is gated by the `security.ip_allowlist_enabled` feature flag (same as the general IP allowlist — Enterprise only). A Starter or Growth tenant attempting to reach this configuration endpoint receives a 403 with `upgrade_required`.
+
+---
+
+### 26.4 OQ-SSO-25.3 Resolution: API Key IP Enforcement
+
+#### 26.4.1 Problem Statement
+
+`tenant_api_keys` are long-lived credentials issued via the admin dashboard for headless integrations. The current `api-key-auth.ts` Worker validates the key hash against the database but does not perform any IP check. A leaked API key is immediately and permanently usable from any network. Unlike a JWT (1h TTL), an API key that is not rotated remains exploitable indefinitely.
+
+The §25 IP allowlist middleware operates on the session layer (post-JWT validation). API keys bypass the JWT validation path entirely — they are a separate credential type. Adding IP enforcement to `api-key-auth.ts` closes this gap.
+
+#### 26.4.2 `tenant_api_keys` Schema
+
+`tenant_api_keys` is referenced in `docs/AUDIT_LOG_SCHEMA.md` (`tenant.api_key_created` / `tenant.api_key_revoked`) but the table definition has not been formalised. This section provides the canonical schema.
+
+```sql
+CREATE TABLE tenant_api_keys (
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id            UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  key_hash             TEXT        NOT NULL,       -- HMAC-SHA256 of the raw key; raw key never stored
+  key_preview          TEXT        NOT NULL,       -- Last 8 chars of the raw key; for UI display
+  label                TEXT        NOT NULL,       -- Human-readable: "HRIS sync", "Reporting bot"
+  created_by           UUID        REFERENCES tenant_users(id) ON DELETE SET NULL,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_used_at         TIMESTAMPTZ,                -- updated on each successful use; NULL = never used
+  expires_at           TIMESTAMPTZ,                -- NULL = no hard expiry; age alert fires at 365d
+  revoked_at           TIMESTAMPTZ,                -- NULL = active; non-NULL = revoked
+  revoked_by           UUID        REFERENCES tenant_users(id) ON DELETE SET NULL,
+  ip_enforcement_enabled BOOLEAN   NOT NULL DEFAULT false,
+  ip_allowlist_config  JSONB       DEFAULT NULL,   -- NULL when ip_enforcement_enabled = false
+  scopes               TEXT[]      NOT NULL DEFAULT '{"reporting:read"}',
+                                                   -- Enum: reporting:read, admin:write,
+                                                   --       webhooks:write, scim:provision
+  CONSTRAINT chk_api_key_ip_allowlist
+    CHECK (
+      ip_enforcement_enabled = false
+      OR (ip_allowlist_config IS NOT NULL
+          AND jsonb_array_length(ip_allowlist_config->'entries') > 0)
+    )
+);
+
+CREATE INDEX idx_tenant_api_keys_tenant_active
+  ON tenant_api_keys (tenant_id)
+  WHERE revoked_at IS NULL;
+
+CREATE UNIQUE INDEX idx_tenant_api_keys_hash
+  ON tenant_api_keys (key_hash)
+  WHERE revoked_at IS NULL;
+```
+
+**Key generation:** The raw key is 256-bit random (`crypto.getRandomValues`, hex-encoded = 64 chars). It is returned to the admin exactly once at creation time. The stored `key_hash` is `HMAC-SHA256(API_KEY_HASH_SECRET, raw_key)` where `API_KEY_HASH_SECRET` is a Cloudflare Workers Secret (separate from `IP_HASH_SALT`).
+
+**Scopes:** API keys carry explicit scopes. `reporting:read` permits only GET requests against `/v1/admin/reports/*`. `admin:write` is the highest scope and requires IC approval before issuance (see §26.6 rotation policy). `scim:provision` is reserved for future headless SCIM client use cases and is not issued in M5.
+
+**RLS:** `tenant_api_keys` is RLS-enforced. The `form_api` role reads only rows where `tenant_id = current_setting('app.current_tenant_id')`. The `form_admin` role (migration runner + compliance toolchain) bypasses RLS.
+
+#### 26.4.3 IP Enforcement Middleware
+
+Update `src/workers/auth/api-key-auth.ts`:
+
+```typescript
+import { enforceApiKeyIpAllowlist } from '../auth-policy-middleware/ip-allowlist';
+
+export async function authenticateApiKey(
+  request: Request,
+  env: Env
+): Promise<{ tenantId: string; keyId: string; scopes: string[] } | Response> {
+  const authHeader = request.headers.get('Authorization') ?? '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'missing_api_key' }), { status: 401 });
+  }
+
+  const rawKey  = authHeader.slice(7);
+  const keyHash = await hmacSha256(env.API_KEY_HASH_SECRET, rawKey);
+
+  // Fetch key record — includes ip_enforcement_enabled and ip_allowlist_config
+  const keyRecord = await env.DB.prepare(
+    `SELECT id, tenant_id, scopes, ip_enforcement_enabled, ip_allowlist_config, revoked_at
+     FROM tenant_api_keys WHERE key_hash = ?1 LIMIT 1`
+  ).bind(keyHash).first<TenantApiKey>();
+
+  if (!keyRecord || keyRecord.revoked_at !== null) {
+    return new Response(JSON.stringify({ error: 'invalid_api_key' }), { status: 401 });
+  }
+
+  // IP enforcement (new in §26)
+  const ipBlock = await enforceApiKeyIpAllowlist(request, keyRecord, env);
+  if (ipBlock) return ipBlock; // 403 with api_key.ip_blocked DEC-030 event already emitted
+
+  // Update last_used_at asynchronously (non-blocking; use waitUntil)
+  env.EXECUTION_CTX.waitUntil(
+    env.DB.prepare(`UPDATE tenant_api_keys SET last_used_at = now() WHERE id = ?1`)
+      .bind(keyRecord.id).run()
+  );
+
+  return { tenantId: keyRecord.tenant_id, keyId: keyRecord.id, scopes: keyRecord.scopes };
+}
+```
+
+`enforceApiKeyIpAllowlist` in `ip-allowlist.ts`:
+
+```typescript
+export async function enforceApiKeyIpAllowlist(
+  request: Request,
+  key: TenantApiKey,
+  env: Env
+): Promise<Response | null> {
+  if (!key.ip_enforcement_enabled || !key.ip_allowlist_config?.enabled) return null;
+
+  const clientIp = request.headers.get('CF-Connecting-IP') ?? '';
+  const allowed  = checkCidrList(clientIp, key.ip_allowlist_config.entries);
+
+  if (!allowed) {
+    // Emit DEC-030 api_key.ip_blocked event; ip_hash only — no plaintext IP
+    await emitApiKeyIpBlockedEvent(env, key.tenant_id, key.id, clientIp);
+    return new Response(
+      JSON.stringify({ error: 'api_key_ip_not_allowed' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  return null;
+}
+```
+
+`checkCidrList` is the shared utility from §25.5 (same `netmask` npm import). No new dependency.
+
+#### 26.4.4 Key ID in Error Context
+
+The `api_key.ip_blocked` DEC-030 event includes `key_id` (UUID) and `client_ip_hash` but **not** `raw_key`, `key_hash`, `key_preview`, or `tenant_id` in the plaintext error response returned to the caller. The caller receives only `{"error": "api_key_ip_not_allowed"}` — no hint about which allowlist entry rejected the request. This prevents enumeration of the allowlist from error responses.
+
+---
+
+### 26.5 Rotation Policy
+
+#### 26.5.1 Rotation Triggers
+
+| Trigger | Required action | Deadline |
+|---|---|---|
+| API key age ≥ 365 days | Amber age warning in admin dashboard; rotation recommended | No hard deadline — `expires_at` not enforced at 365d unless tenant sets it explicitly |
+| API key age ≥ 730 days (2 years) | Red age warning; CSM notifies tenant admin | Rotation required before next QBR as contractual hygiene |
+| Suspected compromise (key seen in logs from unexpected IP) | Revoke immediately; issue replacement | Same-day |
+| CSM departure, IT admin offboarding, integration re-owner | Rotate as part of access review | Within 5 business days of departure |
+| Annual security review (SOC 2 observation period) | Review all active keys; rotate any older than 365d | Before observation period start |
+| `admin:write` scope key | Quarterly rotation mandatory | Every 90 days |
+
+#### 26.5.2 Rotation Flow
+
+1. Tenant admin navigates to Settings → API Keys in the admin dashboard.
+2. Clicks "Rotate" on the target key. A confirmation modal appears: *"This will immediately invalidate the current key. Your integration will fail until you update it with the new key. Proceed?"*
+3. A new 256-bit random key is generated server-side. Old key is **not** immediately revoked — a **24-hour overlap window** is started (same pattern as SCIM token rotation in §16.6). During overlap, both old and new keys are valid.
+4. New key is displayed exactly once. Admin copies it.
+5. After 24 hours, the old key's `revoked_at` is set by a pg_cron job. `api_key.rotated` and `api_key.revoked` DEC-030 events are emitted.
+6. If the admin explicitly clicks "Revoke old key now", the overlap is cancelled immediately.
+
+**Scope inheritance:** The new key inherits the same scopes as the rotated key. Scope changes require explicit admin action in a separate flow.
+
+#### 26.5.3 Admin Dashboard Display
+
+The API Keys panel shows:
+
+| Label | Key preview | Scopes | Created | Last used | Age warning | IP enforcement |
+|---|---|---|---|---|---|---|
+| HRIS sync | `...4f9a` | `reporting:read` | 2026-01-10 | 2026-06-03 | — | Off |
+| Reporting bot | `...b12c` | `reporting:read` | 2025-05-15 | 2026-05-28 | 🟡 386 days old | On (3 CIDRs) |
+
+Age alert states:
+- **0–364 days:** No indicator
+- **365–729 days:** Amber pill "N days old — consider rotating"
+- **730+ days:** Red pill "N days old — rotation required"
+- **`admin:write` scope, >90 days:** Amber pill regardless of age
+
+---
+
+### 26.6 DEC-030 HMAC-Chained Events
+
+All events in this section are appended to the FORM DEC-030 HMAC audit log chain (per `docs/AUDIT_LOG_SCHEMA.md`). Events involving credential operations use `actor_type = 'user'` (for admin-initiated actions) or `actor_type = 'system'` (for automated rotation expiry). The `actor_ip` field is omitted from all events in this section — IP is captured only as `client_ip_hash` in `ip_blocked` events to prevent IP data accumulation in the audit chain.
+
+| Event | Severity | Retention | Payload fields | Notes |
+|---|---|---|---|---|
+| `api_key.created` | HIGH | 7 years | `tenant_id`, `key_id`, `label`, `scopes`, `ip_enforcement_enabled`, `created_by` | Raw key never in payload; `key_preview` (last 8 chars) in `label` context only |
+| `api_key.rotated` | HIGH | 7 years | `tenant_id`, `key_id` (new key UUID), `old_key_id`, `rotation_method` (enum: `admin_manual` \| `overlap_expiry`), `rotated_by` | Old key's `api_key.revoked` event always follows within 24h; HMAC chain must link both |
+| `api_key.revoked` | HIGH | 7 years | `tenant_id`, `key_id`, `revoked_by`, `reason` (enum: `rotation` \| `compromise` \| `offboarding` \| `expiry_overlap` \| `admin_request`) | `reason = 'compromise'` triggers P1 alert AL-APIKEY-03 |
+| `api_key.ip_enforcement_enabled` | HIGH | 7 years | `tenant_id`, `key_id`, `cidr_count`, `enabled_by` | Enabling adds network access control to existing credential |
+| `api_key.ip_enforcement_disabled` | HIGH | 7 years | `tenant_id`, `key_id`, `disabled_by`, `reason` | Disabling removes a control — HIGH severity; compliance-officer review required if `scopes` includes `admin:write` |
+| `api_key.ip_blocked` | HIGH | 7 years | `tenant_id`, `key_id`, `client_ip_hash` | No `user_id`; `client_ip_hash` = SHA-256[:32] keyed with `IP_HASH_SALT`; bulk deduplication via Cloudflare Queues at > 20 blocks/5 min |
+| `scim.ip_enforcement_enabled` | HIGH | 7 years | `tenant_id`, `cidr_count`, `enabled_by` | SCIM-specific IP enforcement toggle (§26.3) |
+| `scim.ip_enforcement_disabled` | HIGH | 7 years | `tenant_id`, `disabled_by` | |
+| `scim.ip_blocked` | HIGH | 7 years | `tenant_id`, `client_ip_hash` | IdP IP; hashed; no IdP name in payload (avoid naming vendor IPs in audit chain) |
+
+**HMAC chain requirement:** `api_key.rotated` must be followed by `api_key.revoked` (for the old key) within the same business day. A gap between these two events in the audit chain — i.e., `api_key.rotated` visible but no `api_key.revoked` for the `old_key_id` within 26 hours — is a chain anomaly that fires AL-APIKEY-02.
+
+---
+
+### 26.7 Alerting Rules
+
+| Alert ID | Condition | Severity | Response | Owner |
+|---|---|---|---|---|
+| **AL-APIKEY-01** | `api_key.ip_blocked` events for a single `tenant_id` + `key_id` exceed 10 in 10 minutes | **P1** | Possible credential stuffing or misconfigured integration. Check if IP enforcement was just enabled (recent `api_key.ip_enforcement_enabled` event for same key). If new enforcement: notify CSM to contact tenant IT admin. If enforcement was not recently changed: treat as credential compromise attempt — notify tenant admin, recommend key rotation. | devops-lead + customer-success |
+| **AL-APIKEY-02** | `api_key.rotated` event with no corresponding `api_key.revoked` for `old_key_id` within 26 hours | **P1** | Overlap window expired but old key was not revoked by the pg_cron job. Possible cron failure or schema error. Investigate `api_key_rotation_overlap_cleanup` pg_cron job logs; manually set `revoked_at` if safe; emit `api_key.revoked` DEC-030 event with `reason = 'expiry_overlap'`. | platform-engineer |
+| **AL-APIKEY-03** | `api_key.revoked` with `reason = 'compromise'` | **P1** | Credential compromise declared. Trigger `docs/INCIDENT_RESPONSE.md §R-16` (Application Secret & Encryption Key Exposure) for API key subtype. IC opens incident channel. Check `last_used_at` and CloudFlare access logs for the 7-day window before revocation to scope potential abuse. | security-engineer |
+| **AL-SCIM-IP-01** | `scim.ip_blocked` events for a single `tenant_id` exceed 5 in 15 minutes AND SCIM provisioning success rate for same tenant drops below 50% in same window | **P2** | SCIM IP enforcement is blocking IdP provisioning — likely a misconfigured allowlist or an IdP IP range change. Notify CSM to contact tenant IT admin. Temporary mitigation: tenant admin can disable SCIM IP enforcement from admin dashboard. Permanent fix: update SCIM allowlist with correct IdP CIDRs. | customer-success |
+
+---
+
+### 26.8 SOC 2 Evidence Mapping
+
+| Criterion | Description | How §26 Controls Satisfy It | Evidence artefact |
+|---|---|---|---|
+| **CC6.1** | Logical access security controls limit access | API key IP allowlist (`ip_enforcement_enabled + ip_allowlist_config`) adds a network-layer gate to long-lived credential access, preventing use of a compromised API key from non-authorised networks. SCIM IP allowlist (§26.3) provides the equivalent control for provisioning credentials. | **APIKEY-E-001:** 30-day export of `api_key.ip_blocked` events showing enforcement is active; cross-reference with `tenant_api_keys` table showing `ip_enforcement_enabled` and `ip_allowlist_config` for keys in `admin:write` scope |
+| **CC6.2** | Authentication requires appropriate credentials | API key scopes enforce least-privilege access at the credential level — `reporting:read` keys cannot call admin mutation endpoints. Scope is validated in `api-key-auth.ts` before route handler execution. | **APIKEY-E-002:** Code review record of `api-key-auth.ts` scope enforcement (PR review + CI gate). Optionally: integration test output showing `reporting:read` key rejected on `POST /v1/admin/seats` |
+| **CC6.4** | Access is removed or modified when credentials change | API key rotation (§26.5) with 24-hour overlap and DEC-030 chain linkage between `api_key.rotated` and `api_key.revoked` provides auditable credential lifecycle. Immediate revocation path available for compromise response. | **APIKEY-E-003:** DEC-030 event sequence log for any API key rotation events during the observation period — must show `api_key.rotated` → `api_key.revoked` (old key) sequence with HMAC continuity |
+| **CC6.8** | Controls protect against unauthorised changes to configuration | `api_key.ip_enforcement_enabled` and `api_key.ip_enforcement_disabled` DEC-030 events create a non-repudiable audit trail for every change to the IP enforcement configuration on API keys. | **APIKEY-E-004:** DEC-030 `api_key.ip_enforcement_*` event chain for the observation period; cross-reference with admin dashboard role of `enabled_by` actor |
+| **CC7.2** | The entity monitors system components for anomalies | AL-APIKEY-01 detects credential stuffing attempts via IP blocks. AL-APIKEY-02 detects rotation overlap failures (infrastructure anomaly). Both alert within PagerDuty SLA. | **APIKEY-E-005:** PagerDuty alert history showing AL-APIKEY-01/02/03 configuration and any triggered incidents during the observation period |
+
+---
+
+### 26.9 Open Questions Resolved
+
+| ID | Prior status | Resolution | Closed in |
+|---|---|---|---|
+| **OQ-SSO-25.1** | 🟡 P1 — SCIM IP scope ambiguity | 🟢 Resolved — separate `scim_ip_enforcement_enabled` flag (default false) with dedicated `scim_ip_allowlist_config` JSONB. General IP allowlist never applies to SCIM routes. SCIM IP enforcement is an explicit opt-in by the tenant. | §26.3 |
+| **OQ-SSO-25.3** | 🟡 P1 M5 — API key IP enforcement missing | 🟢 Resolved — `ip_enforcement_enabled` + `ip_allowlist_config` on `tenant_api_keys`; `enforceApiKeyIpAllowlist()` wired into `api-key-auth.ts`; `api_key.ip_blocked` DEC-030 event defined. | §26.4 |
+
+---
+
+### 26.10 Open Questions
+
+| ID | Question | Priority | Owner | Target |
+|---|---|---|---|---|
+| **OQ-SSO-26.1** | **Should IP enforcement be mandatory for `admin:write` scope API keys?** The §26.5 rotation policy requires quarterly rotation of `admin:write` keys. Making IP enforcement also mandatory for `admin:write` keys would eliminate the scenario where a compromised high-privilege API key is used freely from any IP. Risk: some customers use `admin:write` keys in CI/CD pipelines with dynamic IP allocation (GitHub Actions, Buildkite cloud runners), and enforcing a static allowlist would break those integrations. Resolution options: (a) mandatory for `admin:write` on Enterprise plan only; (b) block `admin:write` key creation without IP enforcement unless tenant owner confirms waiver; (c) no mandatory enforcement, but emit a STANDARD-severity DEC-030 advisory event if an `admin:write` key has `ip_enforcement_enabled = false` for >30 days. | P2 | security-engineer + enterprise-architect | Before first `admin:write` key issued to a customer |
+| **OQ-SSO-26.2** | **Should `expires_at` be hard-enforced with automatic revocation, or remain soft (age alerts only)?** Hard enforcement (automatic revocation at 365d) provides a stronger security posture and simplifies SOC 2 CC6.4 evidence collection — auditors see a system control rather than a procedural control. Risk: a customer whose integration engineer is on leave would have their integration silently break without a scheduled rotation. Soft enforcement (age alerts + CSM nudge) is less likely to cause unplanned outages but relies on human action. Recommendation: start with soft enforcement + CSM escalation path (§26.5 rotation triggers). Revisit at first SOC 2 observation period start — if any key exceeds 365d without rotation, the procedural control is demonstrably not operating effectively and hard enforcement should be added. | P1 | enterprise-architect + compliance-officer | Before first SOC 2 observation period start |
+
+---
+
+### 26.11 Implementation Checklist
+
+#### P0 — Must complete before first enterprise pilot goes live (M5)
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Run migration `0051_tenant_api_keys.sql`: create `tenant_api_keys` table with `ip_enforcement_enabled`, `ip_allowlist_config`, `scopes`, `key_hash`, `key_preview`, `expires_at`, `revoked_at`, `last_used_at`; create partial unique index on `key_hash WHERE revoked_at IS NULL`; add RLS policy for `form_api` role. | platform-engineer | **P0** | M5 |
+| 2 | Run migration `0052_scim_ip_allowlist.sql`: add `scim_ip_enforcement_enabled BOOLEAN DEFAULT false` and `scim_ip_allowlist_config JSONB DEFAULT NULL` to `tenant_sso_configs`; add `chk_scim_ip_allowlist_required` CHECK constraint. | platform-engineer | **P0** | M5 |
+| 3 | Update `src/workers/auth/api-key-auth.ts`: add `enforceApiKeyIpAllowlist()` call after key hash validation; add scope enforcement before route handler; update `last_used_at` via `waitUntil`. Add `API_KEY_HASH_SECRET` Cloudflare Workers Secret. | platform-engineer | **P0** | M5 |
+| 4 | Update `src/workers/auth-policy-middleware/ip-allowlist.ts`: add SCIM route branch; add `enforceScimIpAllowlist()` function using `scim_ip_enforcement_enabled` and `scim_ip_allowlist_config` from `CachedAuthPolicy`. Update `CachedAuthPolicy` type to include new fields. Update `SSO_KV:auth_policy:{tenant_id}` cache shape to include `scim_ip_enforcement_enabled` and `scim_ip_allowlist_config`. | platform-engineer | **P0** | M5 |
+| 5 | Register all nine DEC-030 events from §26.6 (`api_key.created`, `api_key.rotated`, `api_key.revoked`, `api_key.ip_enforcement_enabled`, `api_key.ip_enforcement_disabled`, `api_key.ip_blocked`, `scim.ip_enforcement_enabled`, `scim.ip_enforcement_disabled`, `scim.ip_blocked`) in `docs/AUDIT_LOG_SCHEMA.md` event registry. Validate HMAC chain linkage between `api_key.rotated` and `api_key.revoked` in staging. | platform-engineer + compliance-officer | **P0** | M5 |
+| 6 | Implement API Keys panel in admin dashboard (§26.5.3): table with label, key_preview, scopes, created, last_used_at, age warning pill, IP enforcement toggle. Add "Create key", "Rotate", and "Revoke" flows. Add "SCIM IP Restriction" section in SSO configuration panel (§26.3.4). Both panels gated by `security.ip_allowlist_enabled` feature flag. | platform-engineer + design-craft | **P0** | M5 |
+| 7 | Add `API_KEY_HASH_SECRET` to annual key rotation schedule in `docs/CRYPTOGRAPHY_POLICY.md` §3 key inventory and `docs/SOC2_READINESS.md §56` key inventory table. Initial rotation schedule: 180 days. | security-engineer | **P0** | M5 |
+| 8 | Implement pg_cron job `api_key_rotation_overlap_cleanup`: runs hourly; sets `revoked_at = now()` for any `tenant_api_keys` row where a rotation overlap has expired (`created_at` of successor key > 24h ago AND predecessor key `revoked_at IS NULL`); emits `api_key.revoked` DEC-030 event with `reason = 'expiry_overlap'`. | platform-engineer | **P0** | M5 |
+
+#### P1 — Before first enterprise customer with API keys in production
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 9 | Configure AL-APIKEY-01, AL-APIKEY-02, AL-APIKEY-03, AL-SCIM-IP-01 in PagerDuty. Test AL-APIKEY-01 by triggering synthetic ip_blocked events in staging (enable IP enforcement on a test key; make requests from non-allowlisted IP). | devops-lead | **P1** | M5 |
+| 10 | Collect APIKEY-E-001 through APIKEY-E-005 evidence artefacts (§26.8) after 30 days of production API key usage; store in `compliance/evidence/api-key-auth/`; cross-reference in `docs/SOC2_READINESS.md` CC6.1 and CC6.4 evidence tables. | compliance-officer | **P1** | M6 |
+| 11 | Resolve OQ-SSO-26.2 (`expires_at` hard enforcement): decision required before SOC 2 observation period start. Document resolution in `docs/DECISION_LOG.md`. | enterprise-architect + compliance-officer | **P1** | Before observation period start |
+| 12 | Add `tenant_api_keys` table to `docs/DATA_MODEL.md §24` (Subscription, Billing & Revenue Schema) or as a new §26 entry. The table is defined here as the canonical source of truth; cross-reference in DATA_MODEL. | enterprise-architect | **P1** | M6 |
+
+#### P2 — Post-GA improvements
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 13 | Resolve OQ-SSO-26.1 (mandatory IP enforcement for `admin:write` scope keys): evaluate after first customer issues an `admin:write` key. | security-engineer + enterprise-architect | **P2** | Before first `admin:write` key issued |
+| 14 | Add `admin:write` key age warning (amber at >90 days) to the dashboard API Keys panel, distinct from the 365-day general threshold. | platform-engineer | **P2** | M6 |
+
+---
+
+*v1.8 additions (2026-06-04): §26 API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy. Closes OQ-SSO-25.1 (🟡 P1 → 🟢 Resolved) and OQ-SSO-25.3 (🟡 P1 M5 → 🟢 Resolved) from §25.13. TOC updated to add §26. Header updated from v1.7 to v1.8. §26.1 purpose and scope: two P1 open questions from §25 resolved; privacy floor (client_ip_hash via IP_HASH_SALT in all DEC-030 events; no plaintext IP in audit chain). §26.2 credential architecture disambiguation: three credential types (JWT 1h, SCIM bearer long-lived provisioning, tenant API key long-lived integration); §26 covers the two non-JWT types that were not covered by §25 IP enforcement. §26.3 OQ-SSO-25.1 resolution — SCIM IP scope: option (c) selected (separate flag, default off); migration 0052_scim_ip_allowlist.sql adding `scim_ip_enforcement_enabled BOOLEAN DEFAULT false` and `scim_ip_allowlist_config JSONB DEFAULT NULL` to tenant_sso_configs; chk_scim_ip_allowlist_required CHECK constraint; `enforceScimIpAllowlist()` branch in ip-allowlist.ts (SCIM routes bypass general allowlist; use scim_ip_allowlist_config only when scim_ip_enforcement_enabled = true); admin dashboard "Directory Sync IP Restriction" UI (collapsible, Enterprise-gated, import buttons for Okta/Azure pre-populated CIDRs, warning banner about IdP IP range volatility). §26.4 OQ-SSO-25.3 resolution — API key IP enforcement: formalised tenant_api_keys table schema (UUID PK, key_hash HMAC-SHA256, key_preview last-8-chars, label, created_by, last_used_at, expires_at, revoked_at, ip_enforcement_enabled BOOLEAN DEFAULT false, ip_allowlist_config JSONB, scopes TEXT[] DEFAULT '{reporting:read}'; RLS for form_api; partial unique index on key_hash WHERE revoked_at IS NULL); api-key-auth.ts updated to call enforceApiKeyIpAllowlist() using shared checkCidrList() utility from §25 (no new dependency); scope enforcement before route handler; last_used_at updated via waitUntil; error response omits all IP/allowlist detail to prevent enumeration. §26.5 rotation policy: mandatory triggers (age ≥ 365d amber, ≥ 730d red, suspected compromise same-day, offboarding 5 business days, `admin:write` scope quarterly 90d); 24-hour overlap window (same as SCIM token rotation §16.6); admin dashboard age-alert pill states (0–364d none, 365–729d amber, 730d+ red, admin:write >90d amber). §26.6 nine DEC-030 HMAC-chained events (all HIGH, 7yr): api_key.created, api_key.rotated, api_key.revoked, api_key.ip_enforcement_enabled, api_key.ip_enforcement_disabled, api_key.ip_blocked (client_ip_hash only, Queues bulk dedup), scim.ip_enforcement_enabled, scim.ip_enforcement_disabled, scim.ip_blocked (client_ip_hash only); HMAC chain requirement: api_key.rotated must be followed by api_key.revoked (old key) within 26h or AL-APIKEY-02 fires. §26.7 four alerting rules: AL-APIKEY-01 P1 (>10 ip_blocked per key in 10 min → compromise attempt or misconfiguration), AL-APIKEY-02 P1 (rotation overlap not cleaned up within 26h → cron failure), AL-APIKEY-03 P1 (revoked with reason=compromise → trigger R-16), AL-SCIM-IP-01 P2 (SCIM ip_blocked >5 in 15 min AND provisioning success <50% → misconfigured allowlist). §26.8 SOC 2 evidence mapping CC6.1/CC6.2/CC6.4/CC6.8/CC7.2 with five artefacts APIKEY-E-001 through APIKEY-E-005. §26.9 OQ-SSO-25.1 and OQ-SSO-25.3 formally resolved. §26.10 two new open questions: OQ-SSO-26.1 (mandatory IP enforcement for admin:write keys P2, evaluated before first admin:write key issued), OQ-SSO-26.2 (expires_at hard enforcement vs soft alerts P1, decision before SOC 2 observation period start). §26.11 fourteen-item implementation checklist: 8× P0 M5 (tenant_api_keys migration, scim_ip_allowlist migration, api-key-auth.ts update, ip-allowlist.ts SCIM branch, DEC-030 event registry, admin dashboard panels, API_KEY_HASH_SECRET rotation schedule, pg_cron overlap cleanup), 4× P1 M5-M6 (alerting, evidence collection, OQ-SSO-26.2 decision, DATA_MODEL cross-reference), 2× P2 M6. Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*
