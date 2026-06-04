@@ -6,6 +6,13 @@
 
 ---
 
+## [1.85.2] — 2026-06-04
+
+### Added
+- [`content/post-203-tendon-mechanics-stiffness.md`](content/post-203-tendon-mechanics-stiffness.md) — Механіка сухожиль і адаптація жорсткості (sports-scientist · clinical-safety: NOT REQUIRED)
+
+---
+
 ## [1.85.1] — 2026-06-03
 
 ### Changed
