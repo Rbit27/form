@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v1.6
+# FORM · Cost Model & Unit Economics v1.9
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -133,6 +133,22 @@
     - 25.8 DEC-030 Compliance Spend Audit Events
     - 25.9 Implementation Checklist
     - 25.10 Open Questions (OQ-34 to OQ-36)
+26. [Customer Success Team Scaling Economics & CS Cost Model](#26-customer-success-team-scaling-economics--cs-cost-model)
+27. [Engineering Team Cost Model](#27-engineering-team-cost-model)
+28. [Marketing & Demand Generation Cost Model](#28-marketing--demand-generation-cost-model)
+    - 28.1 Purpose and Scope
+    - 28.2 Marketing Cost Taxonomy
+    - 28.3 Pre-Launch Marketing Budget (Months 1–4)
+    - 28.4 App Store Optimization (ASO) Investment
+    - 28.5 Consumer Paid Acquisition Economics
+    - 28.6 Enterprise Demand Generation Budget
+    - 28.7 Marketing Tooling Stack
+    - 28.8 First Marketing Hire Economics & Hiring Gates
+    - 28.9 S&M as % ARR: Industry Benchmarks vs. FORM Targets
+    - 28.10 Magic Number Model
+    - 28.11 DEC-030 Marketing Spend Audit Events
+    - 28.12 Implementation Checklist
+    - 28.13 Open Questions
 
 ---
 
@@ -4831,5 +4847,316 @@ iOS-specialist profile (SwiftUI-only) has higher supply in the UA market at lowe
 The §27.6.1 analysis assumes iPhone 12+ (A14) as the minimum. As of 2026, ~35%–40% of iOS devices are iPhone 12 or newer (global) vs. ~55%–60% in the core FORM market (Ukraine + Western EU, higher iPhone age profile). A device requirement floor of iPhone 12 excludes ~40%–45% of the global iOS user base. Options: (a) maintain A14 floor and accept the addressable market constraint; (b) ship a reduced-feature mode (no live CV tracking, manual logging only) for A13 and older; (c) invest in heavier model quantisation to bring inference to A13. Owner: ml-engineer + platform-engineer. Priority: **P2 — evaluate at TestFlight beta when device distribution data is available.** Resolution: instrument device model in analytics from Day 1; make the decision with real data at the 1,000 beta user mark.
 
 ---
+
+---
+
+## 28. Marketing & Demand Generation Cost Model
+
+### 28.1 Purpose and Scope
+
+§27 addressed engineering team economics. §28 addresses the last major cost bucket captured in §22.3's "Marketing / UA" line that has not yet been decomposed: marketing and demand generation. §22.3 allocates $500–$2,000/month to marketing but does not model what that budget buys, how it should be allocated across channels, when the first dedicated marketing hire becomes economical, or how FORM's S&M-as-%-ARR compares to B2B SaaS benchmarks.
+
+This section provides:
+
+1. A marketing cost taxonomy that maps each spend type to COGS vs. S&M classification for investor reporting
+2. A channel-level budget model for pre-launch, post-launch consumer, and enterprise demand gen phases
+3. App Store Optimization investment and ongoing cost
+4. Consumer paid acquisition economics with hard-ceiling logic tied to §14.5 LTV:CAC floors
+5. Enterprise demand generation spend — what founder-led sales costs in content and tooling before the first AE (§19.4)
+6. A marketing tooling stack with monthly cost
+7. First marketing hire economics: timing gates and compensation model
+8. S&M as % ARR trajectory benchmarked against Bessemer and SaaS Capital industry data
+9. Magic number calculation operationalising the §18.7 target > 0.75
+10. DEC-030 audit events for marketing spend governance
+11. Implementation checklist and open questions
+
+**Scope boundaries:**
+- **Not in scope:** enterprise CAC per deal (§8.5), consumer CAC payback curves (§14.4–14.5), enterprise GTM pipeline revenue model (§19). Those sections model what marketing *produces*; this section models what marketing *costs*.
+- **Privacy floor:** marketing analytics must never re-identify individual users. PostHog cohort reporting uses `distinct_id` only (§25 Product & Activation Funnel Observability); attribution models operate on channel-level aggregates, not user-level join to health data.
+
+---
+
+### 28.2 Marketing Cost Taxonomy
+
+**COGS vs. S&M classification** for P&L and investor reporting:
+
+| Cost item | Classification | Rationale |
+|---|---|---|
+| Paid acquisition (Meta, ASA, TikTok ads) | S&M | Direct acquisition spend; excluded from gross margin calculation |
+| Content production (sports science blog, video) | S&M | Demand generation; not a component of service delivery |
+| ASO asset creation (screenshots, preview video) | S&M (one-time) | Capitalised equivalent; amortise over 12 months for management accounts |
+| Marketing tooling (email, CRM, analytics) | S&M (fixed) | Support function for acquisition and retention |
+| PR and earned media | S&M | Brand and demand gen |
+| Customer referral credit / incentive | S&M | Acquisition incentive, not COGS |
+| Brand design (logo, brand book) | COGS-adjacent (shared) | Primarily product delivery surface; split 80/20 S&M/COGS is acceptable |
+| In-app onboarding copy creation | COGS | Part of service delivery; not demand gen |
+
+**Consumer vs. enterprise marketing cost split:** At pre-PMF (Months 1–12), the vast majority of marketing spend is consumer-facing (content, ASO, limited paid). Enterprise demand gen at this stage is ~100% founder time (no incremental cash spend beyond tools already paid). The split inverts post-Series A when an AE and a demand gen function are funded.
+
+---
+
+### 28.3 Pre-Launch Marketing Budget (Months 1–4)
+
+The §22.3 Base scenario allocates the following to Marketing / UA before App Store launch:
+
+| Month | §22.3 Marketing/UA allocation | Primary uses |
+|---|---|---|
+| M1 | $500 | Waitlist landing page copywriting; basic social presence setup; domain and hosting already in §22.3 Infra |
+| M2 | $500 | First long-form content piece (sports science); social scheduling tool; email marketing tool (Loops or Resend, ~$0 at pre-launch volume) |
+| M3 | $1,000 | App Store screenshot design (Figma); preview video raw footage edit; TestFlight waitlist email sequence setup; second long-form content piece |
+| M4 | $1,500 | App Store submission assets finalised; launch-day social content batch; first paid Apple Search Ads experiment ($200–$400 test) |
+
+**Total pre-launch marketing cash: $3,500 [ESTIMATE] (Months 1–4).**
+
+These are cash costs only. Founder time on content creation (estimated 10–15 hours/week) is the dominant pre-launch marketing input and is not a cash line. The content-strategist agent coordinates the editorial calendar and does not add direct cash cost at this stage.
+
+---
+
+### 28.4 App Store Optimization (ASO) Investment
+
+ASO is a one-time investment (creative assets) plus an ongoing iteration budget. It is classified as S&M — it directly drives organic installs at no per-install marginal cost.
+
+**Initial ASO asset creation [ESTIMATE]:**
+
+| Asset | Internal (founder) | External (contractor) | Notes |
+|---|---|---|---|
+| Screenshots (6 iOS + 6 Android) | 8h Figma work | $300–600 | Use brand-system templates; do not outsource first version |
+| App preview video (30 sec) | 4h edit | $400–800 | Screen record on device + CapCut/DaVinci; avoid agency at pre-seed |
+| App icon (already in brand-system) | Included in brand-system scope | — | Not a separate marketing cost |
+| Metadata copy (title, subtitle, keywords, description) | 3h founder + brand-voice | $0 | brand-voice agent; no external copywriter needed |
+| Localisation (UA + EN) | 2h per locale | $0 | Native founder + brand-voice agent covers UA/EN |
+
+**Total initial ASO investment: $700–$1,400 external cost [ESTIMATE]; 17h founder time [ESTIMATE].**
+
+**Ongoing ASO iteration budget:** $0–$200/month [ESTIMATE] for A/B testing via App Store Connect native experiments + occasional screenshot refresh. At pre-seed scale, founder handles this directly. This is already embedded in the §22.3 Marketing/UA line.
+
+**ASO expected return:** Health & Fitness category organic conversion rate from Product Page View to install: 3–8% [ESTIMATE, Apple App Store benchmark]. Optimised screenshots + preview video can improve this to 8–12%. At 1,000 monthly product page views (realistic at 6-month organic traction), the delta between 5% and 10% CVR is 50 incremental installs/month at $0 marginal cost — equivalent to acquiring those users at $0 CAC. This is the highest-leverage pre-launch marketing action.
+
+---
+
+### 28.5 Consumer Paid Acquisition Economics
+
+FORM's consumer paid acquisition strategy is deliberately constrained by the §14.5 LTV:CAC floors. This section models the budget envelope for paid channels given those floors.
+
+**Channel benchmarks for Health & Fitness app category [ESTIMATE — replace with actual PostHog attribution data after 3 months of paid spend]:**
+
+| Channel | CPI (cost per install) | Install-to-Pro conversion | Effective CAC | LTV:CAC at M24 (§14.5 model) | FORM verdict |
+|---|---|---|---|---|---|
+| Apple Search Ads (brand + competitor) | $2–$6 | 12–18% | **$17–$50** | 3.9×–11.4× | Tier 1 — always-on once App Store live |
+| Apple Search Ads (category / discovery) | $4–$10 | 5–10% | **$40–$200** | 1.0×–4.9× | Use only if CAC < $80; pause if > $80 |
+| Meta (Facebook/Instagram Reels) | $3–$8 | 3–7% | **$43–$267** | 0.7×–4.5× | Only above §14.5 minimum (≥ 3× at M24); requires 90-day attribution window |
+| TikTok (fitness/athlete creators) | $2–$6 | 2–5% | **$40–$300** | 0.7×–4.9× | High variance; test with $300 burst; pause if CAC > $100 |
+| Organic content / SEO (sports science blog) | ~$15–$30 (content creation amortized) | n/a — drives brand search | **$15–$30 [ESTIMATE]** | ≥ 5× (higher-intent users) | Tier 1 — prioritise over all paid |
+| Referral (existing Pro user invite) | $5–$15 (referral credit cost) | ~60% (warm install) | **$8–$25** | ≥ 6× | Build referral loop before scaling paid |
+
+**Hard ceiling on paid UA:** Do not commit to > $2,000/month in paid acquisition before validating D30 retention ≥ 40% [ESTIMATE]. The §22.3 Marketing/UA line is capped at $2,000/month through Month 18 precisely because: (a) the LTV model is unproven until the first cohort reaches M12, and (b) paid acquisition at poor retention burns pre-seed capital with no return.
+
+**Paid UA activation gate (MKT-UA-GATE-01):** Unlock paid acquisition budget above $1,000/month only when:
+- App Store live (not TestFlight)
+- D30 retention ≥ 35% on a cohort of ≥ 100 users [ESTIMATE]
+- Install-to-Pro conversion rate measured on ≥ 50 organic installs
+
+Until MKT-UA-GATE-01 is green, cap Marketing/UA at $1,000/month (ASO + content production only).
+
+---
+
+### 28.6 Enterprise Demand Generation Budget
+
+Enterprise demand gen at the pre-PMF founder-led phase (§19.3, Deals 0–3) is almost entirely founder time — not discretionary cash spend. This is structurally different from consumer marketing.
+
+**Founder-led enterprise demand gen cash cost (Months 1–18) [ESTIMATE]:**
+
+| Activity | Monthly cash cost | Owner | Notes |
+|---|---|---|---|
+| LinkedIn thought leadership content | $0 (founder writes) | founder + content-strategist | Minimum 3 posts/week; content-strategist agent drafts; no cash cost |
+| Long-form content (enterprise use cases, buyer guides) | $100–$200/month | brand-voice + content-strategist | Design/layout only; zero copywriting cash cost at this stage |
+| Sales enablement collateral (one-pager, ROI calculator) | $200–$400 one-time | design-craft agent | Figma; no external designer at pre-seed |
+| CRM tooling (HubSpot Free → Starter) | $0–$45/month | founder | Free tier adequate for < 10 active enterprise prospects; upgrade to Starter ($45/month) at 10+ prospects |
+| Events and conferences | $0–$500/event (selective) | founder | Attend 2–3 relevant HR tech / wellness events per year; budget $500 max per event for registration; travel from pre-seed capital if UA-based |
+| Cold outbound (email sequences, LinkedIn DMs) | $0–$60/month (Apollo.io or similar) | founder | Avoid at pre-seed — only if outbound is clearly faster than inbound; test with free tier first |
+
+**Total enterprise demand gen cash: $300–$1,200/month [ESTIMATE] at pre-seed, depending on conference activity.**
+
+This is included in the §22.3 Marketing/UA line alongside consumer marketing. The combined $1,500–$2,000/month envelope is shared across consumer and enterprise: approximately $500–$800 enterprise demand gen + $700–$1,200 consumer marketing in the Month 4–12 phase.
+
+**Post-Series A enterprise demand gen shift:** Once an AE is hired (§19.4, Month ~24), the demand gen model shifts materially:
+
+| Activity | Monthly cash cost (post-AE) | Notes |
+|---|---|---|
+| AE outbound tools (Outreach/Salesloft) | $100–$150/seat | Required for systematic outbound sequencing |
+| ABM ad spend (LinkedIn targeted at HR/VP People at ICP companies) | $1,500–$5,000/month | LinkedIn CPM ~$15–$35 for targeted B2B; start with $1,500 and measure pipeline contribution |
+| Content syndication (G2, Capterra listing) | $0–$300/month | Free listings first; paid placement only if inbound lead quality is verified |
+| Demand gen events (HR Tech, SHRM) | $2,000–$5,000/event (booth + travel) | Budget 2 events/year at Series A; $4,000–$10,000/year |
+| Content marketing agency (case studies, reports) | $2,000–$4,000/month | Only at Series A; founder-led content is the correct strategy pre-PMF |
+
+**Post-Series A enterprise demand gen: $7,600–$19,450/month [ESTIMATE].** This is an order of magnitude above the pre-seed level and must be modeled separately in the Series A budget (not in §22.3 which covers Months 1–18 only).
+
+---
+
+### 28.7 Marketing Tooling Stack
+
+The marketing tooling stack at each stage:
+
+**Pre-seed / pre-launch (Months 1–6) [ESTIMATE]:**
+
+| Tool | Purpose | Cost/month | Tier |
+|---|---|---|---|
+| Figma (already in engineering stack) | Design assets, landing pages, ASO screenshots | $0 (free) or $15 (Pro) | Free adequate |
+| Canva | Social media templates | $0 (free) | Free adequate |
+| Loops or Resend | Transactional + marketing email | $0 (free tier up to 1,000 contacts) | Free adequate |
+| PostHog (already in product stack) | Attribution analytics, UTM tracking, funnel analysis | $0 (free up to 1M events) | Already paid |
+| Buffer or Later | Social media scheduling | $0–$15/month | Free adequate pre-launch |
+| Notion | Content calendar, editorial planning | $0–$8/month | Free adequate |
+| HubSpot CRM | Enterprise prospect tracking | $0 (free CRM) | Free adequate to 10 prospects |
+| **Total marketing tooling** | | **$0–$38/month** | |
+
+**Post-launch / scaling (Months 7–18) [ESTIMATE]:**
+
+| Tool | Purpose | Cost/month | Upgrade trigger |
+|---|---|---|---|
+| Loops (paid) or Brevo | Email sequences, waitlist, onboarding drip | $15–$35 | > 1,000 email subscribers |
+| Apple Search Ads account | Paid UA (ASA) | Variable (ad spend) | App Store launch |
+| Meta Ads Manager | Paid UA | Variable (ad spend) | MKT-UA-GATE-01 unlocked |
+| Ahrefs or Semrush (Lite) | SEO + content keyword research | $19–$99/month | First long-form content series |
+| HubSpot Starter | Enterprise CRM + email sequences | $45/month | > 10 active enterprise prospects |
+| **Total tooling (excl. ad spend)** | | **$79–$179/month [ESTIMATE]** | |
+
+**Series A marketing tooling (not in §22.3 scope) [ESTIMATE]:**
+
+Outreach/Salesloft ($100–$150/seat), LinkedIn Sales Navigator ($80–$100/seat), Clearbit or Apollo.io ($150–$400/month), G2 Profile Management ($0 listing + optional paid), Notion AI ($16/month) — totalling $346–$666/month in tooling before ad spend.
+
+---
+
+### 28.8 First Marketing Hire Economics & Hiring Gates
+
+**Hiring gates:** The first dedicated marketing hire should not precede consumer PMF. Hiring a marketing hire before the product loop (auth → workout logging → Victor interaction → habit formation) is validated wastes salary on a product that has not yet earned organic traction.
+
+**Profile options and cost [ESTIMATE]:**
+
+| Profile | Base salary (UA-based) | Skills needed | Wrong hire if: |
+|---|---|---|---|
+| Content / Growth Writer | $25k–$40k | Long-form sports science, SEO, social | You need paid acquisition expertise or enterprise demand gen; this profile cannot own B2B marketing |
+| Growth Marketer | $40k–$60k | Paid acquisition, ASO, analytics, A/B testing | You do not yet have D30 retention data to optimise against; no paid UA without retention proof |
+| Product Marketing Manager (PMM) | $50k–$75k | Positioning, messaging, sales enablement, competitive | You are not yet ready for enterprise sales; this profile shines at the AE-hire stage (Month 22+) |
+| Head of Marketing / VP Marketing | $70k–$100k | Manages all of the above | Pre-Series A VP Marketing is usually wrong; hire a specialist, not a generalist manager |
+
+**FORM recommended first hire: Growth Marketer at Month 18–22 [ESTIMATE], post-consumer-PMF confirmation.**
+
+Trigger criteria (MKT-HIRE-01):
+- D30 retention ≥ 40% on ≥ 500 users [ESTIMATE]
+- App Store rating ≥ 4.5 on ≥ 50 reviews
+- Organic install rate > 500 installs/month without paid UA
+- ARR ≥ $50k (consumer + early enterprise combined)
+- Founder is spending > 8h/week on marketing tasks
+
+Block condition (do not hire if): Paid UA is the primary growth lever being tested but D30 retention < 35% — a Growth Marketer cannot fix retention; that is a product problem.
+
+**MKT-HIRE-02 (PMM, post-AE-hire):** Triggered by first AE hired (§19.4). PMM's first deliverable is the enterprise sales deck and ROI calculator that the AE will use. This hire should be concurrent with or follow the AE by 1–2 months, not precede it.
+
+**MKT-HIRE-03 (Head of Marketing, post-Series A):** Triggered when marketing team reaches 2–3 specialists with no coordination function. Series A budget should include this role at $70k–$90k [ESTIMATE] (UA rate; US-equivalents at $130k–$160k).
+
+**Cash cost impact on gross margin:** Unlike CS (§26.6) and engineering (§27.7), marketing hires are 100% S&M — they do not affect gross margin directly. Their impact is on net income / operating margin. Track marketing headcount cost as % of ARR, not as a COGS line.
+
+---
+
+### 28.9 S&M as % ARR: Industry Benchmarks vs. FORM Targets
+
+**Industry benchmarks [SaaS Capital / Bessemer Cloud Index / BVP State of the Cloud]:**
+
+| ARR milestone | Median S&M as % ARR | Best-in-class S&M as % ARR | Notes |
+|---|---|---|---|
+| < $1M ARR | 50–80% | 30–50% | Founder-led; high initial investment relative to revenue |
+| $1M–$5M ARR | 40–60% | 25–40% | First AE + growth marketer hired |
+| $5M–$20M ARR | 30–45% | 20–30% | Pipeline engine established |
+| $20M+ ARR | 20–35% | 15–25% | Series B+ scale efficiency |
+
+**FORM targets [ESTIMATE — replace with actuals at each milestone]:**
+
+| ARR milestone | FORM S&M target | Composition | Rationale |
+|---|---|---|---|
+| Pre-revenue → $100k ARR | 40–60% of ARR | $1,500–$2,000/month (§22.3 Marketing/UA); no marketing headcount | Consumer content + early ASO; below median because no paid AE yet |
+| $100k–$500k ARR | 35–50% of ARR | Marketing/UA $2,000/month + Growth Marketer (MKT-HIRE-01) ~$4,200/month | First hire drives LTV:CAC improvement; paid UA experiments begin |
+| $500k–$1M ARR | 30–40% of ARR | Marketing team + AE onboarding (§19.4) + enterprise demand gen tools | S&M spend grows but ARR growing faster; efficiency should hold |
+| $1M–$3M ARR | 25–35% of ARR | Full marketing function (Growth + PMM); ABM spend; two AEs (§19.5) | Scale phase; magic number (§28.10) must stay > 0.75 to justify spend |
+
+**Combined S&M + G&A target at Series A:** ≤ 50% of ARR. If S&M alone reaches 40% at $1M ARR, G&A must be kept below 10% of ARR — achievable at this stage with a lean back-office.
+
+---
+
+### 28.10 Magic Number Model
+
+The magic number measures sales and marketing efficiency: how much net new ARR does each dollar of S&M spend generate?
+
+**Formula:**
+
+```
+Magic Number = (Net New ARR in quarter Q) ÷ (S&M spend in quarter Q−1)
+```
+
+**Benchmark targets (§18.7):**
+- > 0.75: Efficient — S&M investment is working; safe to increase spend
+- 0.5–0.75: Acceptable — monitor for improvement; do not dramatically increase S&M
+- < 0.5: Inefficient — diagnose before adding spend; likely a retention or conversion problem, not a volume problem
+
+**FORM magic number model at key milestones [ESTIMATE]:**
+
+| Quarter | Net New ARR | Prior-quarter S&M spend | Magic Number | Interpretation |
+|---|---|---|---|---|
+| Q4 Year 1 (launch + 2 enterprise deals) | $28,800 [§19.7 Base — Q4 enterprise cash] | $4,500 (3 months × $1,500/month marketing) | **6.4×** | Anomalously high — enterprise deals dominate; consumer revenue is negligible |
+| Q2 Year 2 (post-launch growth) | $12,000 [ESTIMATE, modest consumer + 1 enterprise renewal] | $6,000 (3 months × $2,000/month) | **2.0×** | Strong — but enterprise-driven; need consumer cohort data to validate |
+| Q4 Year 2 (Series A build-up) | $25,000 [ESTIMATE, consumer + 3 enterprise deals] | $18,000 (includes Growth Marketer + tooling) | **1.4×** | Good; above 0.75 threshold |
+| Q2 Year 3 (AE hired, ABM active) | $60,000 [ESTIMATE — Series A ARR ramp] | $45,000 (AE + PMM + ABM tools) | **1.3×** | Target range; monitor as ABM spend stabilises |
+
+**Magic number interpretive note:** At pre-seed stage (Months 1–18), the magic number is not a reliable signal because enterprise deals are lumpy (a single $50k ACV contract spikes the numerator) and the denominator (S&M spend) is almost entirely founder time with minimal cash. Begin tracking magic number formally only after the first AE is hired and S&M spend is > $10k/quarter — at that point the signal is meaningful.
+
+**Data pipeline requirement:** Magic number requires ARR bridge data (§23.1), quarterly S&M expense data (classified per §28.2), and a consistent ARR recognition policy (§18.1). Assign to data-engineer to build the monthly S&M reconciliation report alongside the §27.4 infrastructure cost tracking.
+
+---
+
+### 28.11 DEC-030 Marketing Spend Audit Events
+
+Marketing spend events are required for: (1) Series A diligence — investors will audit S&M efficiency and want a defensible S&M spend log; (2) internal governance — prevent uncontrolled paid UA spend when LTV:CAC deteriorates; (3) SOC 2 Type II — not directly in scope, but the HMAC chain integrity model requires all material financial events to be recorded.
+
+| Event type | Severity | Key metadata fields | Retention | Trigger |
+|---|---|---|---|---|
+| `mkt.paid_ua_gate_unlocked` | STANDARD | `gate_id` (MKT-UA-GATE-01), `unlock_date`, `d30_retention_pct`, `install_count_at_unlock`, `arpu_at_unlock`, `unlocked_by` (founder internal ID) | 3 years | Emitted once when MKT-UA-GATE-01 criteria are first satisfied and paid UA budget > $1,000/month is approved; never re-emitted for the same gate |
+| `mkt.paid_channel_paused` | STANDARD | `channel` (asa / meta / tiktok / other), `pause_reason` (ltv_cac_breach / budget_exhausted / experiment_failed / founder_decision), `monthly_spend_at_pause_usd`, `cac_at_pause_usd` (if known), `paused_by` (founder internal ID), `pause_date` | 3 years | Emitted whenever a paid acquisition channel spending > $200/month is paused; key control event for CAC governance |
+| `mkt.marketing_hire_onboarded` | STANDARD | `hire_type` (growth_marketer / pmm / head_of_marketing / other), `start_date`, `annual_base_usd`, `hire_gate_satisfied` (MKT-HIRE-01 / MKT-HIRE-02 / MKT-HIRE-03), `hired_by` (founder internal ID) | 7 years | Emitted on first day of employment; mirrors `ops.engineer_hired` pattern from §27.9 |
+
+**HMAC chain note:** Marketing spend events are STANDARD severity and follow the same HMAC-chain append logic as all DEC-030 events (see `docs/AUDIT_LOG_SCHEMA.md §3`). They do not require multi-party sign-off (unlike CRITICAL events) but must be emitted within 24 hours of the triggering action. The `mkt.paid_channel_paused` event is the key LTV:CAC governance control — it creates an immutable record of every paid channel pause and the CAC at pause, enabling retrospective attribution quality audits for investors.
+
+---
+
+### 28.12 Implementation Checklist
+
+| Item | Priority | Milestone | Owner | Definition of Done |
+|---|---|---|---|---|
+| Instrument UTM parameters across all marketing channels in PostHog; confirm install-source attribution is firing for organic, ASA, and referral before any paid spend begins | P0 | Before App Store launch (M4) | platform-engineer + data-engineer | PostHog funnel report shows distinct_id attributed to channel source for ≥ 95% of new installs in staging; validated with test install from each source |
+| Create App Store product page assets (screenshots × 6 iOS, × 6 Android; preview video; metadata copy) and submit for App Store review; target M4 launch per §22.3 Base timeline | P0 | M4 | brand-system + brand-voice + founder | App Store listing live; first organic impressions visible in App Store Connect analytics |
+| Set up email waitlist / drip sequence in Loops (free tier): (a) waitlist confirmation; (b) 3-email nurture sequence; (c) launch announcement | P0 | M3 | brand-voice + founder | Waitlist captures ≥ 100 emails before App Store launch; drip sequence fires on schedule with < 2% bounce rate |
+| Define and document MKT-UA-GATE-01 trigger criteria in OKRS_2026.md and Notion board; assign monthly gate review | P1 | M4 | founder + growth-lead | Gate criteria documented; first gate review scheduled for Month 6 |
+| Build monthly marketing cost report: pull Loops/email tool cost, ad spend (ASA/Meta dashboard exports), CRM cost; reconcile against §22.3 Marketing/UA cash flow line; flag variance > 15% | P1 | M5 | data-engineer + founder | Monthly report template created; first export reconciled against §22.3 |
+| Register three DEC-030 marketing spend events (`mkt.paid_ua_gate_unlocked`, `mkt.paid_channel_paused`, `mkt.marketing_hire_onboarded`) in `docs/AUDIT_LOG_SCHEMA.md` with full Zod schema; add to `emit-audit-event` Worker | P1 | M6 | platform-engineer + compliance-officer | All three events registered in AUDIT_LOG_SCHEMA.md; Zod schemas validated; Worker endpoint updated |
+| Begin magic number tracking once AE is hired: build quarterly S&M reconciliation report (§28.10 formula); wire to data-engineer monthly ARR bridge (§23.1) | P2 | Post-AE hire (M22+) | data-engineer | Magic number report available in Metabase with trailing 4-quarter history; first result filed before Series A deck finalisation |
+
+---
+
+### 28.13 Open Questions
+
+**OQ-MKT-01: Should FORM invest in a content flywheel (sports science blog → SEO → organic installs) before or after paid UA?**
+
+The LTV:CAC analysis (§14.5) strongly favours organic / content-driven users (≥ 5× at M24) over paid social ($50–80 CAC, 3×–3.9× at M24). However, organic SEO has a 6–12 month compounding lag before it drives meaningful installs at scale. The risk of prioritising content-only before paid: the App Store launch cohort is small and D30 retention data takes longer to accumulate. The risk of prioritising paid-first: capital efficiency is poor before retention is proven. Recommended sequencing: content flywheel starts Month 1 (long lead time); ASA brand search starts at App Store launch (low CAC, high intent); Meta/social starts only after MKT-UA-GATE-01 is green. Owner: founder + content-strategist + growth-lead. Priority: **P0 — sequencing decision must be made before M3 content plan is locked.** Resolution: confirm content calendar priorities at M3 review; treat this OQ as closed once Month 3 content plan includes ≥ 2 long-form pieces with target keywords identified.
+
+**OQ-MKT-02: What is the right first-party referral mechanic for consumer — incentivised (credit/discount) vs. social-share (vanity/identity)?**
+
+Fitness app referral patterns split into two archetypes: (a) incentivised referral (Dropbox model — both parties get 1 free month of Pro) drives high volume but attracts discount-seekers with lower LTV; (b) identity/social sharing (Strava model — "I hit a PR, share to Instagram") drives lower volume but higher-LTV users who share because the product made them feel good. Given FORM's brand positioning (serious athlete, anti-gimmick), the incentivised model risks attracting users who are Pro only during the credit period. The social-sharing model is harder to engineer but more congruent with the brand. Recommended: ship social-share first (lower cash cost, higher brand alignment); test incentivised referral only after the first 500 Pro subscribers and D30 retention ≥ 40%. Owner: growth-lead + brand-system. Priority: **P1 — before App Store launch.** Resolution: decide referral mechanic at M3 product review; document in `docs/GROWTH_LOOPS.md`.
+
+**OQ-MKT-03: Should enterprise marketing collateral (one-pager, ROI calculator) be gated (form-fill) or ungated (public PDF)?**
+
+Gated collateral builds a B2B lead list that feeds HubSpot CRM. Ungated collateral removes friction and signals confidence in the product. In the founder-led sales phase (Deals 0–3), the lead qualification benefit of gating is minimal — the founder knows every prospect personally. Ungating removes friction for champions who want to share the ROI calculator with their CFO without a form-fill. Recommended: ungate all collateral in the founder-led phase; add gating only when a demand gen function exists to follow up on form fills (post-MKT-HIRE-02). Owner: founder + marketing-lead + customer-success. Priority: **P2 — decide before first enterprise collateral is published.** Resolution: default to ungated at pre-PMF; review at first quarterly marketing review post-App-Store-launch.
+
+---
+
+*v1.9 (2026-06-04): §28 Marketing & Demand Generation Cost Model — the cost and channel counterpart to §27 Engineering and the operational detail behind §22.3 "Marketing / UA" cash flow line. §28.1 scopes the section to ten deliverables: marketing cost taxonomy, pre-launch budget, ASO investment, consumer paid acquisition economics, enterprise demand gen budget, tooling stack, first marketing hire economics, S&M-as-%-ARR benchmarks, magic number model, and DEC-030 audit events. §28.2 marketing cost taxonomy: COGS vs. S&M classification for eight spend types; consumer vs. enterprise cost split noting that enterprise demand gen at pre-PMF is ~100% founder time (no incremental cash beyond tools). §28.3 pre-launch budget (M1–M4): $3,500 total cash across waitlist infrastructure, content creation, ASO screenshot design, and limited ASA test — directly mapped to §22.3 Marketing/UA line. §28.4 ASO investment: $700–$1,400 initial external cost plus 17h founder time; conversion rate improvement from 5% to 10% on 1,000 monthly product page views = 50 incremental installs/month at $0 marginal cost — highest-leverage pre-launch action. §28.5 consumer paid acquisition: channel benchmark table (ASA brand $17–$50 effective CAC, ASA discovery $40–$200, Meta $43–$267, TikTok $40–$300, organic ≥ $15–$30 with higher LTV); MKT-UA-GATE-01 hard ceiling (D30 ≥ 35%, App Store live, install-to-Pro rate measured on ≥ 50 organic); paid UA cap $1,000/month until gate is green. §28.6 enterprise demand gen: founder-led phase $300–$1,200/month (LinkedIn thought leadership $0 cash, HubSpot Free CRM, selective events $0–$500/event); post-Series A demand gen $7,600–$19,450/month (AE outbound tools, ABM LinkedIn $1,500–$5,000/month, events $4,000–$10,000/year, content agency $2,000–$4,000/month). §28.7 marketing tooling stack: pre-launch $0–$38/month (Figma free, Loops free, PostHog already paid, Buffer free, HubSpot Free CRM); post-launch $79–$179/month excluding ad spend; Series A $346–$666/month (Outreach, LinkedIn Sales Nav, Apollo.io, Clearbit). §28.8 first marketing hire economics: four profile options (Content Writer $25k–$40k, Growth Marketer $40k–$60k, PMM $50k–$75k, VP Marketing $70k–$100k UA rates); recommended first hire Growth Marketer at Month 18–22 post-consumer-PMF; three hiring gates (MKT-HIRE-01 D30 ≥ 40% + organic traction + founder time > 8h/week; MKT-HIRE-02 PMM concurrent with AE; MKT-HIRE-03 Head of Marketing post-Series A); marketing hires are 100% S&M — no gross margin impact (contrast with §26.6 CS gross margin impact). §28.9 S&M as % ARR: industry benchmarks (Bessemer/SaaS Capital) at four stages; FORM targets pre-revenue 40–60%, $100k–$500k ARR 35–50%, $500k–$1M ARR 30–40%, $1M–$3M ARR 25–35%; combined S&M + G&A target ≤ 50% ARR at Series A. §28.10 magic number model: formula (net new ARR ÷ prior quarter S&M spend); four-milestone table (Q4 Year 1 6.4× enterprise-driven anomaly, Q2 Year 2 2.0×, Q4 Year 2 1.4×, Q2 Year 3 1.3×); interpretive note that magic number is unreliable before first AE and > $10k/quarter S&M spend; data pipeline requirement (ARR bridge §23.1 + S&M expense classification + §18.1 ARR recognition). §28.11 three DEC-030 marketing spend audit events: mkt.paid_ua_gate_unlocked (STANDARD, 3yr, once per gate), mkt.paid_channel_paused (STANDARD, 3yr, on > $200/month channel pause — key CAC governance control), mkt.marketing_hire_onboarded (STANDARD, 7yr, mirrors ops.engineer_hired). §28.12 seven-item implementation checklist: 3× P0 M3–M4 (UTM attribution in PostHog, App Store assets, email drip sequence), 3× P1 M4–M6 (MKT-UA-GATE-01 OKR, monthly marketing cost report, DEC-030 event registration), 1× P2 post-AE (magic number reporting). §28.13 three open questions: OQ-MKT-01 (content flywheel vs. paid UA sequencing — P0, M3 content plan lock; recommended: content M1 + ASA at launch + Meta only after GATE-01), OQ-MKT-02 (incentivised referral vs. social-share mechanic — P1, before App Store launch; recommended social-share first as more brand-congruent), OQ-MKT-03 (gated vs. ungated enterprise collateral — P2, before first collateral published; recommended ungated at pre-PMF founder-led phase). Cross-references: §8.5 (enterprise CAC per deal — not duplicated here), §14.4–14.5 (consumer CAC payback and LTV:CAC floors — floor inputs for §28.5 paid UA ceiling), §18.7 (magic number > 0.75 target in SaaS glossary — operationalised in §28.10), §19.3–19.5 (enterprise GTM pipeline model — revenue side of the S&M efficiency ratio), §22.3 (cash flow — Marketing/UA line source data), §23.1 (ARR bridge — magic number numerator), §26.1 (CS cost taxonomy — privacy floor reminder applicable here), §27.9 (ops.engineer_hired DEC-030 pattern — mkt.marketing_hire_onboarded mirrors), docs/ENTERPRISE.md (enterprise pricing + no-go customers), docs/AUDIT_LOG_SCHEMA.md (DEC-030 event registry), docs/GROWTH_LOOPS.md (referral mechanic context). Owner: founder + marketing-lead + growth-lead + data-engineer.*
 
 *v1.8 (2026-06-04): §27 Engineering Team Cost Model — the cost and hiring counterpart to §26 CS Cost Model and the operational detail behind §22.3 cash flow. §27.1 scopes the section to seven deliverables covering founding engineer total comp, technical hiring sequence, infrastructure run-rate by stage, build vs. buy, CV pipeline unit economics, engineering as % ARR trajectory, and burn rate gates. §27.2 founding engineer total compensation: cash cost $100k–$139k (midpoint ~$120k) including base $80k–$110k, employer taxes ~16%, hardware $3.5k–$5k one-time, onboarding overhead ~$4k–$6k founder-time cost — corrects the §22.3 $100k placeholder by $20k–$39k; equity grant 2.5%–3.5% at pre-seed, 1.0%–1.5% at seed, ~0.25% at Series A. §27.3 four-hire technical sequence: Founding Engineer (iOS + Supabase, Month 13 Base / Month 10–11 Bull, $80k–$110k); Platform Engineer (Cloudflare Workers + Supabase enterprise backend, Month 18–22, $75k–$100k, triggered by first enterprise contract or 15h/week founder backend time); ML/CV Engineer (model training + Core ML, Month 24–30 post-Series A, $90k–$130k, triggered by CV pipeline live + model quality as #1 complaint); Series A team of 5 at $415k–$555k/year total payroll. §27.4 infrastructure cost table across eight services (Cloudflare Workers, Supabase, R2, Anthropic API, Sentry, PagerDuty, WorkOS, Better Stack) at four scale stages: pre-revenue ~$77/mo, 1k MAU ~$140–280/mo, 10k MAU ~$680–1,300/mo, 50k MAU ~$2,800–5,500/mo; Anthropic API becomes the largest single line at 50k MAU ($1,500–$3,500/mo) but remains <0.3% of revenue per user at $79/mo price point. §27.5 seven-service build-vs-buy analysis: BUY verdicts for WorkOS (6–10 engineering weeks saved per IdP), Supabase (full-time DBA alternative), Anthropic API (no viable build alternative pre-Series B), PagerDuty, Sentry, Better Stack; BUILD verdict for CV pose estimation (on-device moat, privacy requirement, avoids $108k–$360k/year in GPU compute at 50k MAU). §27.6 CV pipeline unit economics: on-device inference at $0 marginal per-session cost vs. ~$108k–$360k/year hypothetical server-side at 50k MAU; device floor A14 (iPhone 12+); model size 20–35 MB INT8 quantized; P95 latency 25–50ms on A15+. §27.7 engineering as % ARR trajectory: 83%–115% at $100k ARR (step-function hire before revenue catches up); 34%–48% at $500k; 26%–36% at $1M; 16%–21% at $3M — operating leverage curve consistent with B2B SaaS benchmarks. §27.8 four burn rate gates (ENG-GATE-01 through ENG-GATE-04) with trigger conditions and block conditions; anti-pattern warning against ML hire before product-market fit. §27.9 three DEC-030 engineering spend audit events: ops.engineer_hired (STANDARD, 7yr), ops.infra_cost_threshold_crossed (STANDARD, 3yr), ops.build_vs_buy_decision (STANDARD, 7yr). §27.10 six-item implementation checklist: 2× P0 (§22.3 cash flow correction, engineer JD live), 3× P1 (ENG-GATE-01 OKR, monthly infra tracking, DEC-030 event registration), 1× P2 (build-vs-buy decision log for CV). §27.11 three open questions: OQ-ENG-01 (UA FOP vs. US contractor structure — P0, before offer letter), OQ-ENG-02 (iOS-specialist vs. fullstack founding engineer profile — P1, before JD finalisation), OQ-ENG-03 (device-compatibility floor for CV — P2, decide at 1k beta users). Cross-references: §22.3 (cash flow model — founding engineer line correction), §24.7 (cap table — equity grant dilution for founding engineer), §25.6 (compliance cost as % ARR — combined with engineering for total support+engineering stack), §26.4 (CS vs. engineer hire order), docs/TECHNICAL.md (CV pipeline architecture), docs/SSO_SCIM_IMPLEMENTATION.md §§23–26 (enterprise backend workload for Platform Engineer), docs/MOBILE_ROADMAP.md (iOS engineering context), docs/AUDIT_LOG_SCHEMA.md (engineering spend DEC-030 events). Owner: founder + data-engineer + platform-engineer.*

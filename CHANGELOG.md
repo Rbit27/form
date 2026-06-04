@@ -6,6 +6,13 @@
 
 ---
 
+## [1.97.1] — 2026-06-04
+
+### Added
+- `docs/COST_MODEL.md §28` — Marketing & Demand Generation Cost Model: §28.1 scopes the section as the fourth operational cost function alongside §25 (compliance), §26 (CS), §27 (engineering) — fills the §22.3 "Marketing / UA" line ($500–$2,000/month) with a full decomposition; §28.2 COGS vs. S&M taxonomy for eight marketing spend types; §28.3 pre-launch budget M1–M4 ($3,500 total cash mapped to §22.3); §28.4 ASO investment ($700–$1,400 external + 17h founder time; 5%→10% CVR improvement = 50 incremental installs/month at $0 marginal cost); §28.5 consumer paid acquisition with channel table (ASA brand $17–$50 effective CAC, Meta $43–$267, TikTok $40–$300, organic ≥ $15–$30) and MKT-UA-GATE-01 hard ceiling; §28.6 enterprise demand gen (founder-led $300–$1,200/month; post-Series A $7,600–$19,450/month with ABM, AE tools, events); §28.7 marketing tooling stack (pre-launch $0–$38/month; post-launch $79–$179/month excl. ad spend; Series A $346–$666/month); §28.8 first marketing hire: four profile options + recommended Growth Marketer at Month 18–22 with three hiring gates (MKT-HIRE-01/02/03); §28.9 S&M as % ARR benchmarks (Bessemer/SaaS Capital) vs. FORM targets at four stages; §28.10 magic number model (net new ARR ÷ prior-quarter S&M spend; target > 0.75; four-milestone table; unreliable before first AE + > $10k/quarter S&M); §28.11 three DEC-030 HMAC-chained marketing spend events (mkt.paid_ua_gate_unlocked STANDARD 3yr, mkt.paid_channel_paused STANDARD 3yr, mkt.marketing_hire_onboarded STANDARD 7yr); §28.12 seven-item implementation checklist (3× P0 M3–M4: UTM attribution, App Store assets, email drip; 3× P1 M4–M6: GATE-01 OKR, monthly cost report, DEC-030 registration; 1× P2 post-AE: magic number reporting); §28.13 three open questions: OQ-MKT-01 (content flywheel vs. paid UA sequencing — P0, recommend content M1 + ASA at launch + Meta after GATE-01), OQ-MKT-02 (incentivised vs. social-share referral — P1, recommend social-share first), OQ-MKT-03 (gated vs. ungated enterprise collateral — P2, recommend ungated at pre-PMF). TOC updated with §26–§28 entries. Document version bumped to v1.9.
+
+---
+
 ## [1.97.0] — 2026-06-04
 
 ### Added
