@@ -6,6 +6,13 @@
 
 ---
 
+## [1.85.4] — 2026-06-04
+
+### Added
+- [`content/post-205-motor-cortex-plasticity.md`](content/post-205-motor-cortex-plasticity.md) — Пластичність моторної кори і сила: TMS, GABA, кортикальна карта (sports-scientist · clinical-safety: NOT REQUIRED)
+
+---
+
 ## [1.85.3] — 2026-06-04
 
 ### Added
