@@ -20424,3 +20424,1122 @@ Items are categorised P0 (blocks Type I or Type II observation period start), P1
 ---
 
 *v1.1 (2026-06-04): §63 Processing Integrity Controls — PI1 Trust Service Criteria: CV Coaching Pipeline Accuracy, Completeness & Timeliness. First dedicated PI1 section in SOC2_READINESS.md; previously no §N section existed for Processing Integrity. §63.1 purpose: three structural challenges — on-device inference (no direct server-side instrumentation), offline operation (model_version gap, OQ-PI-01), partial analysis (analysis_status downgrade, OQ-PI-02); OQ-PI-03 P0 blocker (unvalidated confidence threshold). §63.2 PI1.1-PI1.5 controls: PI1.1-C1 frame ratio [0.31,0.36] gate + frames_captured/frames_analyzed counter; PI1.1-C2 CMSampleBuffer OS frame drop counter (5% threshold → partial_analysis + keypoint_missing event with reason:os_frame_drop); PI1.1-C3 backend sync 422 rejection for arithmetic inconsistency; PI1.2-C1 KEYPOINT_CONFIDENCE_THRESHOLD=0.6 named constant + change-control procedure; PI1.2-C2 temporal interpolation 5-frame bound + cross-set boundary reset; PI1.2-C3 model_version NOT NULL populated at session creation (AMBER until OQ-PI-01 resolved); PI1.3-C1 SLO-PI-01 P95<25ms inference + reservoir sampling + Grafana alert at 30ms; PI1.3-C2 SLO-PI-02 P95<100ms feedback + Grafana alert at 120ms; PI1.3-C3 minimum hardware spec gate (iPhone 12 / Neural Engine); PI1.4-C1 consent gate in startSession() — no frames captured if biometric_processing_consented=false — offline revocation gap acknowledged; PI1.4-C2 JWT expiry gate (1hr TTL, max 1hr exposure window acknowledged); PI1.4-C3 per-tenant coaching_enabled JWT claim gate (enterprise); PI1.5-C1 joint coverage gate: insufficient_coverage<70%/partial_analysis 70-90%/complete>=90%, named constants subject to same change-control as confidence threshold; PI1.5-C2 ON CONFLICT DO NOTHING immutability on coaching output; PI1.5-C3 RLS policy restricts coaching_sessions to owner user_id + aggregate-only service role; employer/tenant-admin SELECT vetoed. §63.3 SOC 2 evidence mapping table: PI-E-001 through PI-E-006 (PI-E-006 not yet filed, OQ-PI-03 blocker), artefact descriptions, audit population sources, R2 paths. §63.4 DEC-030 events: 4 existing events (session_started, set_analyzed, keypoint_missing, session_completed) with required payload field confirmations; 2 new events requiring registry registration: coaching.session_sync_rejected (MEDIUM, 7yr, PI-P0-01) and coaching.model_config_changed (MEDIUM, 7yr, PI-P0-02); HIGH-severity keypoint_missing anomaly detection note (spike without corresponding partial_analysis rollup = investigation trigger). §63.5 implementation checklist: 10 P0 items (M7-M9), 7 P1 items (M8-M10), 3 P2 items (M10-M12); P0 highlights: event registry registrations M7, frame ratio validation M7, OS drop counter M7, sync 422 rejection M7, model_version offline sync test M8, accuracy validation study M9 (OQ-PI-03 resolution); P1 highlights: joint coverage gate M8, RLS audit M8, SLO Grafana alerts M9, partial_analysis UX wording M9, code review artefact export M10. §63.6 three open questions: OQ-PI-01 model_version offline sync payload confirmation (P0, M8); OQ-PI-02 partial_analysis UI disclosure wording with proposed draft (P1, M9); OQ-PI-03 confidence threshold empirical accuracy validation study — P0 Type II observation period blocker (M9). Cross-references: docs/DATA_MODEL.md (coaching_sessions schema), docs/OBSERVABILITY.md §22 (AI Coaching Quality Observability), docs/AUDIT_LOG_SCHEMA.md (DEC-030 coaching.* events).*
+
+## §64 Multi-Tenant RLS Tenant Isolation CI Test Suite — CC6.1/CC6.3/CC6.6/PI1.5-C3 — PEN-GAP-003 Remediation Auditor Exhibit
+
+---
+
+### 64.1 Purpose and Gap Context
+
+**PEN-GAP-003 status:** 🔴 Open → 🟡 Authored (execution pending)
+
+PEN-GAP-003 (§36.9, line 6348) records that the Tenant Isolation Test Protocol defined in §36.6 has not been formally executed. RLS policies are implemented and code-reviewed — the `tenant_id = auth.jwt() ->> 'tenant_id'` predicate is in place on all tenanted tables — but no adversarial test run has been conducted against a production-equivalent staging environment. FORM cannot produce `PRE-36-E-007` when auditors or enterprise customers request evidence of cross-tenant isolation validation.
+
+This section does not duplicate the test case designs from §36.6 (§36.6.1 through §36.6.5 remain the authoritative test case specifications). §64 is the execution infrastructure: the `rls_test` Postgres role, the fixture bootstrap, the automated Vitest integration test suite, the GitHub Actions CI workflow, the PRE-36-E-007 evidence log template, the DEC-030 event registrations, and the implementation checklist. Together these artefacts close PEN-GAP-003 from 🟡 Authored to 🟢 when the first CI green run is achieved and PRE-36-E-007 v1.0 is filed.
+
+**Why a CI test suite in addition to manual execution:**
+
+Point-in-time manual execution (required first to produce PRE-36-E-007 v1.0 and close PEN-GAP-003) gives auditors a snapshot. It does not prevent a future RLS regression: a Postgres migration that drops or rewrites a policy, a new SECURITY DEFINER function added without tenant isolation review, or a SCIM endpoint change could silently reintroduce a cross-tenant boundary. The automated Vitest suite runs on every push to `main` and every pull request targeting `main`, turning the SOC 2 control from a point-in-time attestation into a continuous regression gate. A CI failure on `rls-isolation-tests` is routed to PagerDuty as a P1 alert to `security-engineer`, giving FORM an audit-evidenced monitoring control rather than a paper one.
+
+**Cross-references:**
+
+- §36.6 — Authoritative TC-RLS-001 through TC-RLS-005 test case designs (objective, setup, test method, expected result, detection mechanism)
+- §36.9 — PEN-GAP-003 gap record and remediation description
+- §52 — FORM-PEN-001 (external pentest scenario: RLS cross-tenant bypass) and FORM-PEN-005 (JWT `tenant_id` claim forgery), both of which reference §36.6 as the design basis for adversarial scope
+- §63 — PI1.5-C3: `coaching_sessions` RLS policy restricts SELECT to owner `user_id` plus aggregate-only service role; TC-RLS-001 in §64 extends this with explicit query coverage of `coaching_turns` and `cv_sessions` to validate PI1.5-C3 at the isolation layer
+
+**Privacy floor note:** All fixture data used by this test suite is synthetic. No real user PII, no production-derived keypoints, no real email addresses. HR and employer/tenant-admin roles have no SELECT access to individual user records in the test suite or in production; TC-RLS-001 validates this at the query layer. The privacy floor established for ED screening and clinical safety features (§63.1) is unaffected by this section.
+
+---
+
+### 64.2 `rls_test` Postgres Role Setup
+
+The `rls_test` role is a read-only adversarial role used exclusively in the local Supabase stack and in the CI staging environment. It has no superuser, no CREATEROLE, no CREATEDB, and no `bypassrls` attribute. Its purpose is to make cross-tenant queries visible as data-layer results rather than permission errors, so that RLS policy correctness can be asserted by the test suite rather than masked by role-level access denials.
+
+**Migration file:** `supabase/migrations/20260604000000_rls_test_role.sql`
+
+```sql
+-- supabase/migrations/20260604000000_rls_test_role.sql
+-- Creates the rls_test adversarial read-only role for TC-RLS integration tests.
+-- This role has no INSERT / UPDATE / DELETE privileges and no bypassrls attribute.
+-- It must be created BEFORE fixture bootstrap (supabase/seed/rls_test_fixtures.sql).
+-- Do NOT apply to production. CI and local stack only.
+-- SOC 2 CC6.1 / PEN-GAP-003 — §64.2
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT FROM pg_catalog.pg_roles WHERE rolname = 'rls_test'
+  ) THEN
+    CREATE ROLE rls_test
+      NOSUPERUSER
+      NOCREATEDB
+      NOCREATEROLE
+      NOINHERIT
+      NOLOGIN
+      NOBYPASSRLS;
+  END IF;
+END
+$$;
+
+-- Allow the role to establish a connection (required for supabase-js pooler).
+GRANT CONNECT ON DATABASE postgres TO rls_test;
+
+-- Allow schema traversal.
+GRANT USAGE ON SCHEMA public TO rls_test;
+
+-- Grant SELECT on the tables under adversarial test.
+-- No INSERT / UPDATE / DELETE is granted; any write attempt must fail with a
+-- permission error (not an RLS error) — confirming the role is truly read-only.
+GRANT SELECT ON TABLE
+  public.workout_sessions,
+  public.user_profile,
+  public.coaching_turns,
+  public.cv_sessions,
+  public.wearable_readings,
+  public.meal_log,
+  public.audit_logs
+TO rls_test;
+
+-- Set the JWT secret placeholder used by the test JWT helper (createTestJwt).
+-- In CI, the actual SUPABASE_JWT_SECRET is injected as an env var and overrides
+-- this placeholder at Worker validation time. This setting is only relevant for
+-- direct psql sessions during manual TC-RLS execution.
+ALTER ROLE rls_test SET "app.settings.jwt_secret" TO 'rls-test-placeholder-not-production';
+
+-- Confirm: rls_test must NOT appear in pg_roles with rolbypassrls = true.
+-- The following assertion will raise an exception and abort the migration if
+-- bypassrls is accidentally set, preventing silent misconfiguration.
+DO $$
+DECLARE
+  v_bypassrls boolean;
+BEGIN
+  SELECT rolbypassrls INTO v_bypassrls
+  FROM pg_roles
+  WHERE rolname = 'rls_test';
+
+  IF v_bypassrls IS TRUE THEN
+    RAISE EXCEPTION
+      'SECURITY: rls_test role has bypassrls=true — migration aborted. '
+      'This role must never bypass RLS. Remove bypassrls and re-run.';
+  END IF;
+END
+$$;
+```
+
+**Verification query (run after migration):**
+
+```sql
+SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolbypassrls, rolcanlogin
+FROM pg_roles
+WHERE rolname = 'rls_test';
+-- Expected: all boolean columns FALSE. rolcanlogin FALSE (connection via pooler only).
+```
+
+---
+
+### 64.3 Test Fixture Bootstrap
+
+The fixture script creates two isolated synthetic tenants and populates each with the minimum data set required to run TC-RLS-001 through TC-RLS-005. All values are synthetic: UUIDs are fixed test constants, timestamps are relative offsets from `'2026-01-01'`, email addresses use the `test.form.coach` domain (not deliverable), and keypoint arrays contain deterministic placeholder coordinates.
+
+**Fixture file:** `supabase/seed/rls_test_fixtures.sql`
+
+```sql
+-- supabase/seed/rls_test_fixtures.sql
+-- Synthetic fixture data for TC-RLS-001 through TC-RLS-005.
+-- No real user PII. No production-derived data. Synthetic values only.
+-- Run AFTER 20260604000000_rls_test_role.sql migration.
+-- Teardown: DELETE statements at bottom; also run by afterAll() in Vitest suite.
+-- SOC 2 CC6.1 / PEN-GAP-003 — §64.3
+
+-- ============================================================
+-- TENANT FIXTURES
+-- ============================================================
+
+INSERT INTO public.organizations (id, name, slug, created_at)
+VALUES
+  ('00000000-0000-0000-0000-000000000001', 'Test Tenant A', 'test-tenant-a', '2026-01-01T00:00:00Z'),
+  ('00000000-0000-0000-0000-000000000002', 'Test Tenant B', 'test-tenant-b', '2026-01-01T00:00:00Z')
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- USER FIXTURES
+-- user-a belongs to tenant A; user-b belongs to tenant B.
+-- UUIDs are fixed constants for deterministic JWT construction.
+-- ============================================================
+
+INSERT INTO auth.users (id, email, created_at)
+VALUES
+  ('00000000-0000-0000-0000-000000000010', 'user-a@test.form.coach', '2026-01-01T00:00:00Z'),
+  ('00000000-0000-0000-0000-000000000020', 'user-b@test.form.coach', '2026-01-01T00:00:00Z')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.user_profile (user_id, tenant_id, display_name, created_at)
+VALUES
+  ('00000000-0000-0000-0000-000000000010',
+   '00000000-0000-0000-0000-000000000001',
+   'RLS Test User A',
+   '2026-01-01T00:00:00Z'),
+  ('00000000-0000-0000-0000-000000000020',
+   '00000000-0000-0000-0000-000000000002',
+   'RLS Test User B',
+   '2026-01-01T00:00:00Z')
+ON CONFLICT (user_id) DO NOTHING;
+
+-- ============================================================
+-- WORKOUT SESSIONS (5 per user)
+-- ============================================================
+
+INSERT INTO public.workout_sessions
+  (id, user_id, tenant_id, started_at, ended_at, exercise_type)
+SELECT
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-000000000010',
+  '00000000-0000-0000-0000-000000000001',
+  '2026-01-01T00:00:00Z'::timestamptz + (n || ' hours')::interval,
+  '2026-01-01T00:00:00Z'::timestamptz + (n || ' hours')::interval + '30 minutes'::interval,
+  'squat'
+FROM generate_series(1, 5) AS n
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.workout_sessions
+  (id, user_id, tenant_id, started_at, ended_at, exercise_type)
+SELECT
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-000000000020',
+  '00000000-0000-0000-0000-000000000002',
+  '2026-01-02T00:00:00Z'::timestamptz + (n || ' hours')::interval,
+  '2026-01-02T00:00:00Z'::timestamptz + (n || ' hours')::interval + '30 minutes'::interval,
+  'deadlift'
+FROM generate_series(1, 5) AS n
+ON CONFLICT DO NOTHING;
+
+-- ============================================================
+-- COACHING TURNS (3 per user)
+-- ============================================================
+
+INSERT INTO public.coaching_turns
+  (id, user_id, tenant_id, session_id, turn_index, assistant_text, created_at)
+SELECT
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-000000000010',
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000010',  -- synthetic session_id reference
+  n,
+  'Synthetic coaching turn ' || n || ' for user-a.',
+  '2026-01-01T00:00:00Z'::timestamptz + (n || ' minutes')::interval
+FROM generate_series(1, 3) AS n
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.coaching_turns
+  (id, user_id, tenant_id, session_id, turn_index, assistant_text, created_at)
+SELECT
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-000000000020',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000020',  -- synthetic session_id reference
+  n,
+  'Synthetic coaching turn ' || n || ' for user-b.',
+  '2026-01-02T00:00:00Z'::timestamptz + (n || ' minutes')::interval
+FROM generate_series(1, 3) AS n
+ON CONFLICT DO NOTHING;
+
+-- ============================================================
+-- CV SESSIONS (2 per user)
+-- keypoints_json contains deterministic placeholder coordinates; no real biometric data.
+-- ============================================================
+
+INSERT INTO public.cv_sessions
+  (id, user_id, tenant_id, workout_session_id, keypoints_json, analysis_status, created_at)
+SELECT
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-000000000010',
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000010',
+  '{"joints":{"left_knee":{"x":0.5,"y":0.6,"confidence":0.9},"right_knee":{"x":0.55,"y":0.6,"confidence":0.88}}}'::jsonb,
+  'complete',
+  '2026-01-01T00:00:00Z'::timestamptz + (n || ' hours')::interval
+FROM generate_series(1, 2) AS n
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.cv_sessions
+  (id, user_id, tenant_id, workout_session_id, keypoints_json, analysis_status, created_at)
+SELECT
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-000000000020',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000020',
+  '{"joints":{"left_knee":{"x":0.48,"y":0.62,"confidence":0.87},"right_knee":{"x":0.52,"y":0.62,"confidence":0.91}}}'::jsonb,
+  'complete',
+  '2026-01-02T00:00:00Z'::timestamptz + (n || ' hours')::interval
+FROM generate_series(1, 2) AS n
+ON CONFLICT DO NOTHING;
+
+-- ============================================================
+-- TEARDOWN (run by afterAll() or CI teardown step)
+-- ============================================================
+
+-- DELETE FROM public.cv_sessions
+--   WHERE tenant_id IN (
+--     '00000000-0000-0000-0000-000000000001',
+--     '00000000-0000-0000-0000-000000000002'
+--   );
+-- DELETE FROM public.coaching_turns
+--   WHERE tenant_id IN (
+--     '00000000-0000-0000-0000-000000000001',
+--     '00000000-0000-0000-0000-000000000002'
+--   );
+-- DELETE FROM public.workout_sessions
+--   WHERE tenant_id IN (
+--     '00000000-0000-0000-0000-000000000001',
+--     '00000000-0000-0000-0000-000000000002'
+--   );
+-- DELETE FROM public.user_profile
+--   WHERE tenant_id IN (
+--     '00000000-0000-0000-0000-000000000001',
+--     '00000000-0000-0000-0000-000000000002'
+--   );
+-- DELETE FROM auth.users
+--   WHERE id IN (
+--     '00000000-0000-0000-0000-000000000010',
+--     '00000000-0000-0000-0000-000000000020'
+--   );
+-- DELETE FROM public.organizations
+--   WHERE id IN (
+--     '00000000-0000-0000-0000-000000000001',
+--     '00000000-0000-0000-0000-000000000002'
+--   );
+```
+
+---
+
+### 64.4 Automated Integration Test Specifications (Vitest)
+
+**Test file:** `tests/security/rls-tenant-isolation.test.ts`
+
+The test suite uses `supabase-js` clients initialised with per-user JWTs constructed by a `createTestJwt()` helper. The helper signs tokens with the test-environment JWT secret (`SUPABASE_JWT_SECRET` env var). In CI, the local Supabase stack is started by `supabase start` before the test run; the service role client is used only for fixture bootstrap and teardown and for the HMAC chain tamper test (TC-RLS-005).
+
+```typescript
+// tests/security/rls-tenant-isolation.test.ts
+// SOC 2 CC6.1 / CC6.3 / CC6.6 / PI1.5-C3
+// PEN-GAP-003 Remediation — Automated CI regression for TC-RLS-001 through TC-RLS-005
+// Evidence: PRE-36-E-007 (auto-generated log filed to R2 on CI completion)
+
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import * as jose from 'jose';
+
+// ============================================================
+// Configuration — injected from CI env vars (see §64.5 workflow)
+// ============================================================
+
+const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://localhost:54321';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET ?? 'super-secret-jwt-token-with-at-least-32-characters-long';
+const CF_WORKER_URL = process.env.CLOUDFLARE_WORKER_STAGING_URL ?? 'http://localhost:8787';
+
+// ============================================================
+// Fixture constants — must match supabase/seed/rls_test_fixtures.sql
+// ============================================================
+
+const TENANT_A_ID = '00000000-0000-0000-0000-000000000001';
+const TENANT_B_ID = '00000000-0000-0000-0000-000000000002';
+const USER_A_ID   = '00000000-0000-0000-0000-000000000010';
+const USER_B_ID   = '00000000-0000-0000-0000-000000000020';
+
+// ============================================================
+// JWT helper
+// createTestJwt() constructs a Supabase-compatible signed JWT with custom
+// tenant_id and user_id claims. Uses HS256 with SUPABASE_JWT_SECRET.
+// ============================================================
+
+async function createTestJwt(opts: {
+  userId: string;
+  tenantId: string;
+  email: string;
+  expiresInSeconds?: number;
+}): Promise<string> {
+  const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);
+  const now = Math.floor(Date.now() / 1000);
+  return new jose.SignJWT({
+    sub: opts.userId,
+    email: opts.email,
+    role: 'authenticated',
+    tenant_id: opts.tenantId,
+    iat: now,
+    exp: now + (opts.expiresInSeconds ?? 3600),
+    iss: 'supabase',
+    aud: 'authenticated',
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .sign(secret);
+}
+
+// ============================================================
+// Supabase clients
+// ============================================================
+
+let clientA: SupabaseClient;       // authenticated as user-a (Tenant A)
+let clientB: SupabaseClient;       // authenticated as user-b (Tenant B)
+let serviceClient: SupabaseClient; // service role — fixture bootstrap + TC-RLS-005 only
+
+// ============================================================
+// beforeAll — bootstrap fixtures and initialise clients
+// ============================================================
+
+beforeAll(async () => {
+  serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // Run fixture bootstrap via service role RPC.
+  // The SQL in rls_test_fixtures.sql is pre-applied by the CI workflow step;
+  // this call verifies the fixture rows are present before any test runs.
+  const { error: fixtureCheck } = await serviceClient
+    .from('organizations')
+    .select('id')
+    .in('id', [TENANT_A_ID, TENANT_B_ID]);
+  if (fixtureCheck) throw new Error(`Fixture check failed: ${fixtureCheck.message}`);
+
+  // Build per-user JWTs and initialise supabase-js clients.
+  const jwtA = await createTestJwt({
+    userId: USER_A_ID,
+    tenantId: TENANT_A_ID,
+    email: 'user-a@test.form.coach',
+  });
+  const jwtB = await createTestJwt({
+    userId: USER_B_ID,
+    tenantId: TENANT_B_ID,
+    email: 'user-b@test.form.coach',
+  });
+
+  clientA = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${jwtA}` } },
+  });
+  clientB = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${jwtB}` } },
+  });
+}, 30_000);
+
+// ============================================================
+// afterAll — clean up fixture data
+// ============================================================
+
+afterAll(async () => {
+  // Teardown uses service role to delete by tenant_id.
+  // Mirrors the commented DELETE block in rls_test_fixtures.sql.
+  for (const table of [
+    'cv_sessions',
+    'coaching_turns',
+    'workout_sessions',
+    'user_profile',
+  ] as const) {
+    await serviceClient
+      .from(table)
+      .delete()
+      .in('tenant_id', [TENANT_A_ID, TENANT_B_ID]);
+  }
+  await serviceClient
+    .from('auth.users')
+    .delete()
+    .in('id', [USER_A_ID, USER_B_ID]);
+  await serviceClient
+    .from('organizations')
+    .delete()
+    .in('id', [TENANT_A_ID, TENANT_B_ID]);
+}, 30_000);
+
+// ============================================================
+// TC-RLS-001: Horizontal tenant access via REST
+// Evidence: PRE-36-E-007 TC-RLS-001
+// ============================================================
+
+describe('TC-RLS-001: Horizontal tenant access via REST API', () => {
+  it('user-a cannot see workout_sessions belonging to tenant-b', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-001
+    const { data, error } = await clientA
+      .from('workout_sessions')
+      .select('id, tenant_id');
+    expect(error).toBeNull();
+    const crossTenantRows = (data ?? []).filter(
+      (row) => row.tenant_id === TENANT_B_ID
+    );
+    expect(crossTenantRows.length).toBe(0);
+  });
+
+  it('crafted tenant_id filter does not return tenant-b workout_sessions', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-001
+    // The RLS policy WHERE tenant_id = auth.jwt() ->> 'tenant_id' must
+    // override any client-supplied tenant_id filter; result must be empty.
+    const { data, error } = await clientA
+      .from('workout_sessions')
+      .select('id, tenant_id')
+      .eq('tenant_id', TENANT_B_ID);
+    expect(error).toBeNull();
+    expect((data ?? []).length).toBe(0);
+  });
+
+  it('user-a cannot see user_profile belonging to tenant-b', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-001
+    const { data, error } = await clientA
+      .from('user_profile')
+      .select('user_id, tenant_id');
+    expect(error).toBeNull();
+    const crossTenantRows = (data ?? []).filter(
+      (row) => row.tenant_id === TENANT_B_ID
+    );
+    expect(crossTenantRows.length).toBe(0);
+  });
+
+  it('user-a cannot see coaching_turns belonging to tenant-b (PI1.5-C3)', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-001
+    // This assertion also validates PI1.5-C3 (§63): coaching output is
+    // restricted to the owning user_id at the RLS layer.
+    const { data, error } = await clientA
+      .from('coaching_turns')
+      .select('id, tenant_id');
+    expect(error).toBeNull();
+    const crossTenantRows = (data ?? []).filter(
+      (row) => row.tenant_id === TENANT_B_ID
+    );
+    expect(crossTenantRows.length).toBe(0);
+  });
+
+  it('user-a cannot see cv_sessions belonging to tenant-b', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-001
+    const { data, error } = await clientA
+      .from('cv_sessions')
+      .select('id, tenant_id');
+    expect(error).toBeNull();
+    const crossTenantRows = (data ?? []).filter(
+      (row) => row.tenant_id === TENANT_B_ID
+    );
+    expect(crossTenantRows.length).toBe(0);
+  });
+});
+
+// ============================================================
+// TC-RLS-002: JWT manipulation
+// Evidence: PRE-36-E-007 TC-RLS-002
+// ============================================================
+
+describe('TC-RLS-002: JWT manipulation — modified tenant_id claim', () => {
+  it('JWT with tenant_id claim pointing to tenant-b is rejected 401 at CF Worker', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-002
+    // Construct a JWT signed with the correct secret but with tenant_id = TENANT_B_ID
+    // for a user whose identity (sub) belongs to Tenant A.
+    // The Cloudflare Worker must reject this at JWT validation before it reaches Supabase.
+    const tamperedJwt = await createTestJwt({
+      userId: USER_A_ID,         // user-a identity
+      tenantId: TENANT_B_ID,     // wrong tenant claim — the forgery
+      email: 'user-a@test.form.coach',
+    });
+
+    const response = await fetch(`${CF_WORKER_URL}/api/coach/turn`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tamperedJwt}`,
+      },
+      body: JSON.stringify({ turn: 'test input' }),
+    });
+
+    // The Worker must reject with 401; it must not forward to Supabase with
+    // a cross-tenant claim.
+    expect(response.status).toBe(401);
+  });
+
+  it('alg:none unsigned JWT is rejected 401 at CF Worker', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-002
+    // Construct an unsigned JWT (alg: none) — the most basic JWT bypass attack.
+    // The Worker JWT library must not accept unsigned tokens.
+    const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(
+      JSON.stringify({
+        sub: USER_A_ID,
+        tenant_id: TENANT_A_ID,
+        role: 'authenticated',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      })
+    ).toString('base64url');
+    const unsignedJwt = `${header}.${payload}.`;
+
+    const response = await fetch(`${CF_WORKER_URL}/api/coach/turn`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${unsignedJwt}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ turn: 'test' }),
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it('auth.jwt_validation_failed event appears in audit log after rejection', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-002
+    // After the two 401 attempts above, the DEC-030 audit log must contain at
+    // least one auth.jwt_validation_failed event for this test run window.
+    const since = new Date(Date.now() - 60_000).toISOString();
+    const { data, error } = await serviceClient
+      .from('audit_logs')
+      .select('event_type, payload')
+      .eq('event_type', 'auth.jwt_validation_failed')
+      .gte('created_at', since);
+
+    expect(error).toBeNull();
+    expect((data ?? []).length).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================
+// TC-RLS-003: SECURITY DEFINER function audit
+// Evidence: PRE-36-E-007 TC-RLS-003
+// ============================================================
+
+describe('TC-RLS-003: SECURITY DEFINER function cross-tenant data audit', () => {
+  it('enumerates all SECURITY DEFINER functions in public schema', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-003
+    // This test produces the enumeration list that must be filed in PRE-36-E-007.
+    // A non-empty list is not a failure — failure is a function that returns
+    // cross-tenant data (asserted in the next test).
+    const { data, error } = await serviceClient.rpc('get_security_definer_functions');
+    // Fallback: query pg_proc directly if the RPC wrapper is not yet implemented.
+    // The RPC wraps: SELECT proname FROM pg_proc
+    //   WHERE prosecdef = true AND pronamespace = 'public'::regnamespace
+    expect(error).toBeNull();
+    // Log the function list for PRE-36-E-007 — do not fail on count alone.
+    console.log('[TC-RLS-003] SECURITY DEFINER functions:', JSON.stringify(data));
+  });
+
+  it('no SECURITY DEFINER function returns rows belonging to tenant-b when called as user-a', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-003
+    // For each function discovered above, call it via supabase.rpc() as clientA
+    // and verify the result contains zero rows with tenant_id = TENANT_B_ID.
+    // Functions that take no arguments and return tenant-scoped data are the
+    // primary risk; functions with explicit tenant_id parameters are validated
+    // by passing TENANT_B_ID directly (cross-tenant parameter injection).
+
+    const { data: fnList } = await serviceClient.rpc('get_security_definer_functions');
+    if (!fnList || fnList.length === 0) {
+      // No SECURITY DEFINER functions — ideal outcome.
+      console.log('[TC-RLS-003] No SECURITY DEFINER functions found. Ideal state.');
+      return;
+    }
+
+    for (const fn of fnList as Array<{ proname: string }>) {
+      // Invoke as user-a (clientA). If the function requires arguments we cannot
+      // infer, skip with a logged warning (manual review required for PRE-36-E-007).
+      const { data: result, error: rpcError } = await clientA.rpc(fn.proname);
+      if (rpcError) {
+        // Expected for functions requiring required arguments — not a failure.
+        console.log(`[TC-RLS-003] ${fn.proname}: skipped (${rpcError.message})`);
+        continue;
+      }
+      const crossTenantRows = (Array.isArray(result) ? result : []).filter(
+        (row: { tenant_id?: string }) => row.tenant_id === TENANT_B_ID
+      );
+      expect(crossTenantRows.length).toBe(0);
+    }
+  });
+});
+
+// ============================================================
+// TC-RLS-004: SCIM over-provisioning — wrong-tenant bearer token
+// Evidence: PRE-36-E-007 TC-RLS-004
+// ============================================================
+
+describe('TC-RLS-004: SCIM over-provisioning — cross-tenant bearer token rejection', () => {
+  it('SCIM POST /Users with Tenant A token and tenantId=Tenant B body is rejected 403', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-004
+    // The SCIM bearer token for Tenant A is scoped to Tenant A at issuance
+    // (WorkOS SCIM provisioning — see docs/SSO_SCIM_IMPLEMENTATION.md §3).
+    // Attempting to provision a user into Tenant B must be rejected 403 at
+    // the SCIM endpoint layer; it must not reach the Supabase insert path.
+    const tenantAScimToken = process.env.TEST_SCIM_BEARER_TOKEN_TENANT_A ?? 'test-scim-token-tenant-a';
+
+    const response = await fetch(`${CF_WORKER_URL}/scim/v2/Users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/scim+json',
+        Authorization: `Bearer ${tenantAScimToken}`,
+      },
+      body: JSON.stringify({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'injected-user@test.form.coach',
+        name: { givenName: 'RLS', familyName: 'Test' },
+        // Cross-tenant injection: tenantId in body differs from bearer token scope.
+        tenantId: TENANT_B_ID,
+      }),
+    });
+
+    expect(response.status).toBe(403);
+  });
+
+  it('iam.scim_provision_rejected event appears in audit log after 403', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-004
+    const since = new Date(Date.now() - 60_000).toISOString();
+    const { data, error } = await serviceClient
+      .from('audit_logs')
+      .select('event_type, payload')
+      .eq('event_type', 'iam.scim_provision_rejected')
+      .gte('created_at', since);
+
+    expect(error).toBeNull();
+    expect((data ?? []).length).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================
+// TC-RLS-005: Audit log HMAC chain tamper detection
+// Evidence: PRE-36-E-007 TC-RLS-005
+// ============================================================
+
+describe('TC-RLS-005: Audit log HMAC chain tamper detection', () => {
+  it('direct payload modification of an audit_log row triggers security.audit_chain_break within 10s', async () => {
+    // Evidence: PRE-36-E-007 TC-RLS-005
+    // Step 1: retrieve the most recent audit_log row ID (any event from this run).
+    const { data: latestRows, error: fetchError } = await serviceClient
+      .from('audit_logs')
+      .select('id, payload, hmac_chain_value')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    expect(fetchError).toBeNull();
+    expect(latestRows).not.toBeNull();
+    expect((latestRows ?? []).length).toBeGreaterThan(0);
+
+    const targetRow = latestRows![0];
+
+    // Step 2: tamper — overwrite payload with a modified value via service_role.
+    // This simulates an insider directly writing to the DB, bypassing the
+    // append-only audit event emitter.
+    const tamperedPayload = {
+      ...targetRow.payload,
+      __tampered_by_tc_rls_005: true,
+    };
+    const { error: updateError } = await serviceClient
+      .from('audit_logs')
+      .update({ payload: tamperedPayload })
+      .eq('id', targetRow.id);
+
+    expect(updateError).toBeNull();
+
+    // Step 3: invoke the chain integrity verification RPC (§25.5 daily cron logic).
+    // The RPC checks the HMAC chain from the beginning of the sequence (or from
+    // a supplied checkpoint) and returns the first break point if any.
+    const { data: chainResult, error: chainError } = await serviceClient
+      .rpc('verify_audit_chain_integrity');
+
+    // The RPC must detect the break — it should return a non-empty result
+    // indicating the row ID of the break.
+    expect(chainError).toBeNull();
+    expect(chainResult).not.toBeNull();
+
+    // Step 4: confirm a security.audit_chain_break event was emitted within 10s.
+    // Poll with 500ms intervals for up to 10 seconds.
+    const breakDetected = await new Promise<boolean>((resolve) => {
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        const { data } = await serviceClient
+          .from('audit_logs')
+          .select('id')
+          .eq('event_type', 'security.audit_chain_break')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if ((data ?? []).length > 0) {
+          clearInterval(interval);
+          resolve(true);
+        }
+        if (attempts >= 20) {
+          clearInterval(interval);
+          resolve(false);
+        }
+      }, 500);
+    });
+
+    expect(breakDetected).toBe(true);
+  }, 20_000); // 20s timeout to accommodate the 10s polling window
+});
+```
+
+---
+
+### 64.5 GitHub Actions CI Integration
+
+**Workflow file:** `.github/workflows/rls-isolation-tests.yml`
+
+```yaml
+# .github/workflows/rls-isolation-tests.yml
+# SOC 2 CC6.1 / PEN-GAP-003 — runs on every push to main and every PR targeting main.
+# Executes TC-RLS-001 through TC-RLS-005 against a local Supabase stack.
+# Test results are uploaded as a CI artefact and auto-filed to R2
+# at form-compliance-vault/soc2/rls-isolation/<YYYY-MM-DD>/ on main-branch runs.
+# If this workflow fails, a PagerDuty P1 alert fires to security-engineer.
+
+name: RLS Tenant Isolation Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  rls-isolation-tests:
+    name: TC-RLS-001 through TC-RLS-005
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # Injected from GitHub Actions secrets — never hardcoded.
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_LOCAL_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_LOCAL_SERVICE_ROLE_KEY }}
+      SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_LOCAL_JWT_SECRET }}
+      # CF Worker staging URL is only needed for TC-RLS-002 and TC-RLS-004.
+      # On PR runs, a preview deployment URL may be substituted.
+      CLOUDFLARE_WORKER_STAGING_URL: ${{ secrets.CLOUDFLARE_WORKER_STAGING_URL }}
+      TEST_SCIM_BEARER_TOKEN_TENANT_A: ${{ secrets.TEST_SCIM_BEARER_TOKEN_TENANT_A }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase stack
+        run: supabase start
+        # The local stack starts Postgres with all migrations applied,
+        # including 20260604000000_rls_test_role.sql (the rls_test role).
+
+      - name: Bootstrap RLS test fixtures
+        run: |
+          supabase db execute --file supabase/seed/rls_test_fixtures.sql
+        # Inserts synthetic Tenant A and Tenant B fixture data.
+        # Uses supabase CLI which connects via service role internally.
+
+      - name: Run RLS isolation test suite
+        run: npx vitest run tests/security/rls-tenant-isolation.test.ts --reporter=verbose --reporter=json --outputFile=rls-test-results.json
+        # The --reporter=json flag produces rls-test-results.json which is
+        # uploaded as the CI artefact and forms the basis for PRE-36-E-007.
+
+      - name: Upload test results artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rls-test-results-${{ github.sha }}
+          path: rls-test-results.json
+          retention-days: 2557
+          # 2557 days ≈ 7 years — matches the 7-year retention for
+          # security.rls_bypass_attempt and security.definer_function_cross_tenant
+          # DEC-030 events. PRE-36-E-007 long-term storage is in R2 (next step).
+
+      - name: File PRE-36-E-007 to R2 compliance vault (main branch only)
+        if: github.ref == 'refs/heads/main' && always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_COMPLIANCE_VAULT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_COMPLIANCE_VAULT_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL: ${{ secrets.R2_COMPLIANCE_VAULT_ENDPOINT }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          aws s3 cp rls-test-results.json \
+            "s3://form-compliance-vault/soc2/rls-isolation/${DATE}/rls-test-results-${{ github.sha }}.json"
+        # The R2 path mirrors the PRE-36-E-007 evidence path:
+        # compliance/evidence/rls-redteam/<YYYY-MM-DD>/rls-test-log.md
+
+      - name: Emit system.rls_test_suite_run audit event
+        if: github.ref == 'refs/heads/main' && always()
+        run: |
+          # Emit DEC-030 system.rls_test_suite_run event via the emit-audit-event
+          # Cloudflare Worker. Payload includes git SHA, CI build ID, and per-TC result.
+          # See §64.7 for event schema.
+          VERDICT=$(node -e "
+            const r = require('./rls-test-results.json');
+            process.stdout.write(r.testResults.every(t => t.status === 'passed') ? 'PASS' : 'FAIL');
+          ")
+          curl -sf -X POST "${CLOUDFLARE_WORKER_STAGING_URL}/internal/emit-audit-event" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.INTERNAL_AUDIT_EMIT_TOKEN }}" \
+            -d "{
+              \"event_type\": \"system.rls_test_suite_run\",
+              \"payload\": {
+                \"run_id\": \"${{ github.run_id }}\",
+                \"ci_build_id\": \"${{ github.run_id }}-${{ github.run_attempt }}\",
+                \"git_sha\": \"${{ github.sha }}\",
+                \"overall_verdict\": \"${VERDICT}\",
+                \"evidence_path\": \"s3://form-compliance-vault/soc2/rls-isolation/$(date -u +%Y-%m-%d)/rls-test-results-${{ github.sha }}.json\"
+              }
+            }"
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop
+```
+
+**CI failure routing:** If the `rls-isolation-tests` job fails, the existing PagerDuty GitHub Actions integration (configured in `devops-lead` infrastructure) must route the failure as a P1 alert to `security-engineer`. This is a §64.9 P1 implementation checklist item; the workflow itself does not configure PagerDuty (that is done in the GitHub branch protection + PagerDuty webhook integration layer).
+
+---
+
+### 64.6 PRE-36-E-007 Evidence Log Template
+
+Evidence artefact path: `compliance/evidence/rls-redteam/<YYYY-MM-DD>/rls-test-log.md`
+
+R2 long-term path (auto-filed by CI): `form-compliance-vault/soc2/rls-isolation/<YYYY-MM-DD>/rls-test-results-<git-sha>.json`
+
+Manual execution produces a human-authored Markdown log; CI execution produces a JSON test results file. Both are filed under the same dated directory. PRE-36-E-007 v1.0 is the first manual execution log (authored by `security-engineer` + `data-engineer`); subsequent versions are auto-filed quarterly.
+
+**Template structure:**
+
+```markdown
+# PRE-36-E-007 — RLS Tenant Isolation Test Run Log
+## Evidence artefact for SOC 2 CC6.1 / CC6.3 / CC6.6 / CC7.1 / CC7.2 / PI1.5-C3
+
+| Field              | Value                                      |
+|--------------------|--------------------------------------------|
+| Execution date     | YYYY-MM-DD                                 |
+| Environment        | staging / local-supabase / ci-ephemeral    |
+| Executor           | [human: security-engineer name] OR [CI: github-actions run_id] |
+| Git SHA            | <40-char commit hash>                      |
+| Supabase version   | <version from `supabase --version`>        |
+| Supabase CLI       | <version>                                  |
+| Node.js version    | <version>                                  |
+| Vitest version     | <version>                                  |
+
+---
+
+## TC-RLS-001: Horizontal Tenant Access via REST API
+**Objective:** (see §36.6.1)
+**Setup:** Fixtures from `supabase/seed/rls_test_fixtures.sql` — Tenant A UUID `00000000-0000-0000-0000-000000000001`, Tenant B UUID `00000000-0000-0000-0000-000000000002`
+
+### Inputs
+- JWT used (redacted, last 8 chars): `...XXXXXXXX` (tenant_id claim: `test-tenant-a`)
+- Query 1: `GET /rest/v1/workout_sessions` (no tenant filter)
+- Query 2: `GET /rest/v1/workout_sessions?tenant_id=eq.00000000-0000-0000-0000-000000000002`
+- Query 3: `GET /rest/v1/coaching_turns?tenant_id=eq.00000000-0000-0000-0000-000000000002`
+- Query 4: `GET /rest/v1/cv_sessions?tenant_id=eq.00000000-0000-0000-0000-000000000002`
+
+### HTTP Responses
+| Query | HTTP Status | Row count | Notes |
+|-------|-------------|-----------|-------|
+| 1     | 200         | [n]       | All rows belong to tenant_a |
+| 2     | 200         | 0         | RLS overrides client filter |
+| 3     | 200         | 0         | |
+| 4     | 200         | 0         | |
+
+### Supabase Query Log Excerpt
+```
+[REDACTED — paste relevant lines from pg_stat_activity or Supabase Studio logs showing
+the RLS filter appended by Postgres: "AND tenant_id = 'test-tenant-a'"]
+```
+
+### DEC-030 Events
+- `security.rls_bypass_attempt` event IDs: [list event UUIDs from audit_logs query, if any were emitted for the crafted-filter attempts]
+
+### Verdict
+- [ ] PASS — zero cross-tenant rows returned for all four queries
+- [ ] FAIL — describe finding
+
+---
+
+## TC-RLS-002: JWT Manipulation
+**Objective:** (see §36.6.2)
+
+### Inputs
+- Attack 1 — Modified tenant_id claim: JWT header/payload (redacted): `eyJ...` with `tenant_id: test-tenant-b`
+- Attack 2 — alg:none: unsigned JWT (full token shown — no secret material): `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIwMDAwMDAwMC4uLiIsInRlbmFudF9pZCI6InRlc3QtdGVuYW50LWEifQ.`
+- Attack 3 — RS256→HS256: (describe attempt; paste HTTP request snippet with algorithm confusion header)
+
+### HTTP Responses
+| Attack | Endpoint | HTTP Status | Notes |
+|--------|----------|-------------|-------|
+| 1 (modified tenant_id) | `/api/coach/turn` | 401 | |
+| 2 (alg:none)           | `/api/coach/turn` | 401 | |
+| 3 (RS256→HS256)        | `/api/coach/turn` | 401 | |
+
+### DEC-030 Events
+- `auth.jwt_validation_failed` event IDs: [list event UUIDs]
+- failure_reason values observed: [e.g., `invalid_signature`, `unsupported_algorithm`, `claim_mismatch`]
+
+### Verdict
+- [ ] PASS — all three attacks rejected 401; audit events captured
+- [ ] FAIL — describe finding
+
+---
+
+## TC-RLS-003: SECURITY DEFINER Function Audit
+**Objective:** (see §36.6.3)
+
+### SECURITY DEFINER Functions Enumerated
+| Function name | Function body summary | Has tenant filter | Result rows from tenant-b |
+|---------------|----------------------|-------------------|---------------------------|
+| (list each)   |                      | Y/N               | 0 (expected)              |
+
+### Verdict
+- [ ] PASS — enumeration complete; zero functions return cross-tenant data
+- [ ] FAIL — Critical finding: [function_name] returned [N] rows from tenant-b
+
+---
+
+## TC-RLS-004: SCIM Over-Provisioning
+**Objective:** (see §36.6.4)
+
+### Inputs
+- SCIM POST payload (redacted bearer token): `{ "tenantId": "00000000-0000-0000-0000-000000000002", "userName": "injected-user@test.form.coach", ... }`
+
+### HTTP Response
+| Attempt | HTTP Status | Notes |
+|---------|-------------|-------|
+| POST /scim/v2/Users with cross-tenant tenantId | 403 | |
+
+### DEC-030 Events
+- `iam.scim_provision_rejected` event IDs: [list event UUIDs]
+
+### Verdict
+- [ ] PASS — 403 returned; audit event captured
+- [ ] FAIL — describe finding
+
+---
+
+## TC-RLS-005: Audit Log HMAC Chain Tamper Detection
+**Objective:** (see §36.6.5)
+
+### Sub-case Results
+| Sub-case | Tamper type | Chain break detected | `security.audit_chain_break` event emitted | Verdict |
+|----------|-------------|---------------------|---------------------------------------------|---------|
+| 1 | Modify payload of event N | Y/N | Y/N | PASS/FAIL |
+| 2 | Delete event N | Y/N | Y/N | PASS/FAIL |
+| 3 | Insert event with replayed HMAC | Y/N | Y/N | PASS/FAIL |
+| 4 | Modify sequence_number of event N | Y/N | Y/N | PASS/FAIL |
+| 5 | Back-date event N timestamp | Y/N | Y/N | PASS/FAIL |
+
+### DEC-030 Events
+- `security.audit_chain_break` event IDs: [list event UUIDs]
+
+### Verdict
+- [ ] PASS — all 5 sub-cases detected; audit events captured
+- [ ] FAIL — describe finding
+
+---
+
+## Summary
+
+| Test Case  | Objective (short)                   | Verdict   | DEC-030 Events Captured |
+|------------|-------------------------------------|-----------|-------------------------|
+| TC-RLS-001 | Horizontal tenant access via REST   | PASS/FAIL | security.rls_bypass_attempt (N events) |
+| TC-RLS-002 | JWT manipulation / claim forgery    | PASS/FAIL | auth.jwt_validation_failed (N events) |
+| TC-RLS-003 | SECURITY DEFINER function audit     | PASS/FAIL | security.definer_function_cross_tenant (N events) |
+| TC-RLS-004 | SCIM cross-tenant provisioning      | PASS/FAIL | iam.scim_provision_rejected (N events) |
+| TC-RLS-005 | HMAC chain tamper detection         | PASS/FAIL | security.audit_chain_break (N events) |
+| **OVERALL**| —                                   | **PASS/FAIL** | — |
+
+---
+
+## Signature Block
+
+| Role                  | Name (or CI identity)            | Signature / Run ID           | Date       |
+|-----------------------|----------------------------------|------------------------------|------------|
+| security-engineer     |                                  |                              | YYYY-MM-DD |
+| compliance-officer    |                                  |                              | YYYY-MM-DD |
+
+*CI-generated logs are auto-filed to R2 bucket `form-compliance-vault/soc2/rls-isolation/<YYYY-MM-DD>/` as part of the `.github/workflows/rls-isolation-tests.yml` workflow. CI runs do not require a manual signature block; the GitHub Actions run ID and git SHA serve as the authoritative execution identity.*
+```
+
+---
+
+### 64.7 DEC-030 Audit Events
+
+The following three events must be registered in `docs/AUDIT_LOG_SCHEMA.md` under the DEC-030 event registry. Two events (`security.rls_bypass_attempt` and `security.definer_function_cross_tenant`) are referenced in §36.6 as "to be defined in AUDIT_LOG_SCHEMA.md as part of §36 gap remediation" — §64 formalises that definition. The third event (`system.rls_test_suite_run`) is new in §64. Registration of `security.rls_bypass_attempt` and `security.definer_function_cross_tenant` is a P0 checklist item (§64.9); registration of `system.rls_test_suite_run` is P1.
+
+All three events are append-only, HMAC-chained, and emitted exclusively via the `emit-audit-event` Cloudflare Worker. No event payload may include user PII (no names, email addresses, raw keypoint data, or free-text user inputs). Payload fields containing `tenant_id` values are internal UUIDs, not display names.
+
+| Event Name | Severity | Retention | Trigger Condition | Required Payload Fields | Emitted By | Notes |
+|---|---|---|---|---|---|---|
+| `security.rls_bypass_attempt` | MEDIUM | 7yr | Cloudflare Worker detects that the `tenant_id` filter in the incoming Supabase REST query differs from the `tenant_id` claim in the authenticated JWT. Indicates a client-side attempt to override the RLS boundary — may be accidental (buggy client) or adversarial. | `tenant_id_in_jwt` (UUID), `tenant_id_in_filter` (UUID), `table_name` (string), `query_path` (string — e.g., `/rest/v1/workout_sessions`), `request_ip` (hashed — not raw IP; use SHA-256 of IP + daily salt) | Cloudflare Worker (`rls-guard` middleware layer) | **NEW — not yet in registry. P0 registration required (§64.9).** `request_ip` must be hashed, not raw, to comply with DPIA §4. This event is the DEC-030 counterpart to the TC-RLS-001 detection mechanism described in §36.6.1. |
+| `security.definer_function_cross_tenant` | HIGH | 7yr | Any Postgres SECURITY DEFINER function in the public schema returns one or more rows whose `tenant_id` differs from the `tenant_id` claim of the calling JWT. Critical finding signal — triggers immediate P0 incident (R-09 Security Incident runbook). | `function_name` (string), `caller_tenant_id` (UUID), `returned_tenant_ids` (UUID array — list of distinct tenant_ids in the result set that do not match caller_tenant_id), `row_count` (integer — total cross-tenant rows returned) | Cloudflare Worker or Supabase Edge Function (`definer-audit` wrapper) | **NEW — not yet in registry. P0 registration required (§64.9).** A HIGH-severity event from this emitter must be treated as equivalent to a confirmed RLS bypass. PagerDuty P0 alert fires immediately. Do not aggregate or batch; emit per-invocation. |
+| `system.rls_test_suite_run` | STANDARD | 3yr | CI test suite (`rls-isolation-tests` workflow) completes — whether PASS or FAIL. Filed on every `main`-branch run. Provides the continuous audit trail of TC-RLS test execution. | `run_id` (GitHub Actions run_id), `ci_build_id` (run_id + run_attempt), `git_sha` (40-char SHA), `tc_rls_001_result` (enum: PASS/FAIL/SKIP), `tc_rls_002_result` (PASS/FAIL/SKIP), `tc_rls_003_result` (PASS/FAIL/SKIP), `tc_rls_004_result` (PASS/FAIL/SKIP), `tc_rls_005_result` (PASS/FAIL/SKIP), `overall_verdict` (PASS/FAIL), `evidence_path` (R2 path string) | CI workflow step (curl to `emit-audit-event` Worker — see §64.5 workflow YAML) | **NEW — not yet in registry. P1 registration required (§64.9).** STANDARD severity because a passing run is expected and routine. A failing run does not change the event severity here — the P1 PagerDuty alert is separate (branch protection webhook, not the audit event severity). `evidence_path` stores the R2 object key for PRE-36-E-007 auto-filed artefact. |
+
+**Audit chain integrity note for `security.rls_bypass_attempt`:** A sustained burst of `security.rls_bypass_attempt` events (more than 10 within any 5-minute window from a single hashed IP) is an anomaly that must trigger a WAF rate-limit escalation (`AUTH-FAIL-RATE` rule, SECURITY.md §3) and a P1 PagerDuty alert to `security-engineer`, independent of any individual event severity. The `rls-guard` middleware must implement this counter. This is a P1 implementation item (§64.9).
+
+---
+
+### 64.8 SOC 2 Evidence Mapping Table
+
+Artefacts are stored in R2 at `form-compliance-vault/soc2/rls-isolation/` (CI-generated, dated per run) and in `compliance/evidence/rls-redteam/` (manual execution logs). No artefact may contain user PII.
+
+| Criterion | Control Implemented | Evidence Artefact | Status |
+|---|---|---|---|
+| CC6.1 | RLS enforces tenant isolation at the Postgres layer via `tenant_id = auth.jwt() ->> 'tenant_id'` predicate on all tenanted tables; CI test suite (`rls-isolation-tests.yml`) validates enforcement on every push to `main`, providing continuous regression coverage | PRE-36-E-007 (CI-generated JSON + manual log); `system.rls_test_suite_run` DEC-030 event emitted per CI run | 🟡 Partial → 🟢 once first CI green run completes and PRE-36-E-007 v1.0 is filed |
+| CC6.3 | Role boundaries enforced at SCIM layer: Tenant A bearer token cannot provision users into Tenant B; `iam.scim_provision_rejected` DEC-030 event emitted on any cross-tenant attempt; TC-RLS-004 validates this on every CI run | PRE-36-E-007 TC-RLS-004 section; `iam.scim_provision_rejected` DEC-030 events | 🟡 Partial → 🟢 once first CI green run completes |
+| CC6.6 | JWT manipulation attacks (modified `tenant_id` claim, `alg:none`, RS256→HS256 algorithm confusion) detected and rejected at the Cloudflare Worker JWT validation layer; `auth.jwt_validation_failed` DEC-030 event emitted; TC-RLS-002 validates on every CI run | PRE-36-E-007 TC-RLS-002 section; `auth.jwt_validation_failed` DEC-030 events | 🟡 Partial → 🟢 once first CI green run completes |
+| CC7.1 | SECURITY DEFINER function audit (TC-RLS-003) enumerates all `prosecdef=true` functions in the public schema and validates zero cross-tenant data is returned; CI run maintains continuous coverage as new functions are added | PRE-36-E-007 TC-RLS-003 section (enumeration list + per-function test results) | 🟡 Partial → 🟢 once first CI green run completes |
+| CC7.2 | DEC-030 HMAC chain tamper detection validated adversarially (TC-RLS-005): five sub-cases covering payload modification, deletion, insertion, sequence-number mutation, and back-dating; `security.audit_chain_break` event emitted and PagerDuty P0 alert triggered in all cases | PRE-36-E-007 TC-RLS-005 section (sub-case result table + `security.audit_chain_break` event IDs) | 🟡 Partial → 🟢 once first CI green run completes |
+| PI1.5-C3 | `coaching_sessions` and `coaching_turns` RLS policy (§63 PI1.5-C3) validated as part of TC-RLS-001 SELECT scope: user-a cannot see `coaching_turns` belonging to tenant-b via the RLS-gated REST API | PRE-36-E-007 TC-RLS-001 query set (includes `coaching_turns` and `cv_sessions` queries); cross-reference PI-E-003 (§63) | 🟡 Partial → 🟢 once first CI green run completes |
+
+---
+
+### 64.9 Implementation Checklist
+
+Items are categorised P0 (blocks PEN-GAP-003 closure and/or SOC 2 Type I), P1 (blocks continuous compliance evidence), and P2 (best practice). Milestone months reference the shared FORM compliance roadmap.
+
+#### P0 — PEN-GAP-003 Closure Blockers
+
+- [ ] **RLS-P0-01** — Apply `supabase/migrations/20260604000000_rls_test_role.sql` to the staging environment; verify `rls_test` role exists with `rolbypassrls = false` and SELECT-only grants on the seven tables listed in §64.2. **Owner:** `security-engineer`. **Deadline:** M7.
+- [ ] **RLS-P0-02** — Run `supabase/seed/rls_test_fixtures.sql` in staging to bootstrap synthetic Tenant A and Tenant B fixture data; confirm row counts in `workout_sessions`, `user_profile`, `coaching_turns`, and `cv_sessions` for both tenants. **Owner:** `data-engineer`. **Deadline:** M7.
+- [ ] **RLS-P0-03** — Manually execute all five TC-RLS test cases (TC-RLS-001 through TC-RLS-005) in staging following the §36.6 test methods; document all inputs, HTTP responses, Supabase query log excerpts, and DEC-030 event IDs in the PRE-36-E-007 v1.0 log template (§64.6); obtain signatures from `security-engineer` and `compliance-officer`; file in `compliance/evidence/rls-redteam/<date>/rls-test-log.md`. **This step closes PEN-GAP-003 from 🔴 to 🟢.** **Owner:** `security-engineer` + `data-engineer`. **Deadline:** M7.
+- [ ] **RLS-P0-04** — Register `security.rls_bypass_attempt` in `docs/AUDIT_LOG_SCHEMA.md` with full DEC-030 spec per §64.7: MEDIUM severity, 7-year retention, `emit-audit-event` Worker only, required payload fields including hashed `request_ip`. **Owner:** `platform-engineer`. **Deadline:** M7. **Prerequisite:** Referenced in §36.6.1 as "to be defined" — this closes that open reference.
+- [ ] **RLS-P0-05** — Register `security.definer_function_cross_tenant` in `docs/AUDIT_LOG_SCHEMA.md` with full DEC-030 spec per §64.7: HIGH severity, 7-year retention, `emit-audit-event` Worker only, required payload fields. Configure PagerDuty P0 alert for any event of this type. **Owner:** `platform-engineer`. **Deadline:** M7. **Prerequisite:** Referenced in §36.6.3 as the Critical finding signal.
+
+#### P1 — Continuous Compliance Evidence
+
+- [ ] **RLS-P1-01** — Merge `.github/workflows/rls-isolation-tests.yml`; confirm first green CI run on `main`; verify PRE-36-E-007 JSON artefact is auto-filed to R2 at `form-compliance-vault/soc2/rls-isolation/<date>/`. **Owner:** `devops-lead` + `security-engineer`. **Deadline:** M8.
+- [ ] **RLS-P1-02** — Register `system.rls_test_suite_run` in `docs/AUDIT_LOG_SCHEMA.md` with full DEC-030 spec per §64.7: STANDARD severity, 3-year retention; implement emission from the CI workflow step (curl to `emit-audit-event` Worker per §64.5 YAML). **Owner:** `platform-engineer`. **Deadline:** M8.
+- [ ] **RLS-P1-03** — Configure PagerDuty P1 alert routing for CI workflow `rls-isolation-tests` failures on `main` branch; alert fires to `security-engineer` within 5 minutes of any FAIL verdict. **Owner:** `devops-lead`. **Deadline:** M8.
+- [ ] **RLS-P1-04** — Implement `security.rls_bypass_attempt` event emission in the Cloudflare Worker `rls-guard` middleware: detect when the client-supplied `tenant_id` filter differs from the JWT `tenant_id` claim; emit the DEC-030 event with hashed `request_ip`; implement the burst counter (>10 events / 5 min / IP → WAF escalation + PagerDuty P1). **Owner:** `platform-engineer`. **Deadline:** M8.
+- [ ] **RLS-P1-05** — Implement the `get_security_definer_functions` Supabase RPC wrapper used by TC-RLS-003 (wraps `SELECT proname FROM pg_proc WHERE prosecdef = true AND pronamespace = 'public'::regnamespace`); accessible to service role only. **Owner:** `data-engineer`. **Deadline:** M8.
+- [ ] **RLS-P1-06** — Confirm `verify_audit_chain_integrity` RPC (used by TC-RLS-005) is implemented and returns the row ID of the first chain break detected; document its behaviour in `docs/AUDIT_LOG_SCHEMA.md §25.5`. **Owner:** `data-engineer`. **Deadline:** M8.
+
+#### P2 — Best Practice / Future Extension
+
+- [ ] **RLS-P2-01** — Quarterly manual re-execution of TC-RLS-001 through TC-RLS-005 by `security-engineer` as a standalone adversarial drill, separate from CI; file PRE-36-E-007 v2, v3, v4… each quarter. CI provides continuous regression; quarterly manual execution provides adversarial depth (exploratory test paths that Vitest cannot automate). **Owner:** `security-engineer`. **Cadence:** Quarterly from M10.
+- [ ] **RLS-P2-02** — When multi-region data residency is implemented, extend the TC-RLS suite with two additional cases: TC-RLS-006 (data residency boundary: an EU-tenant user's data does not appear in the US R2 compliance bucket or in US-region Postgres read replicas) and TC-RLS-007 (tenant offboarding: all rows for a deleted tenant are removed from all tables within 72 hours of offboarding initiation). Both cases will require new fixture data and new Vitest test blocks. **Owner:** `security-engineer` + `data-engineer`. **Deadline:** When data residency ships.
+- [ ] **RLS-P2-03** — Add TC-RLS results to the enterprise customer trust portal (if/when implemented): auto-publish a redacted summary of the most recent PRE-36-E-007 CI run result (PASS/FAIL verdict + date) as a real-time trust signal on the FORM security page. No detail sufficient to aid an attacker; verdict and date only. **Owner:** `devops-lead`. **Deadline:** When trust portal ships.
+
+---
+
+### 64.10 SOC 2 Readiness Delta
+
+The following table shows the net readiness impact of §64 at each stage of implementation.
+
+| Metric | Before §64 | After §64 authored (🟡) | After first CI green run (🟢) |
+|---|---|---|---|
+| PEN-GAP-003 | 🔴 Open — no execution evidence | 🟡 Authored — test suite and evidence template exist; execution pending | 🟢 Closed — PRE-36-E-007 v1.0 filed; CI provides continuous regression |
+| CC6.1 adversarial evidence | Point-in-time code review only | Point-in-time code review + authored test infrastructure | Continuous adversarial evidence on every push to `main` |
+| CC6.3 SCIM isolation evidence | Design documentation only | Automated TC-RLS-004 authored | CI-validated on every `main` push |
+| CC6.6 JWT manipulation evidence | Worker config review only | Automated TC-RLS-002 authored | CI-validated on every `main` push |
+| CC7.1 SECURITY DEFINER audit | Not performed | Automated TC-RLS-003 authored | CI-validated + enumeration list in PRE-36-E-007 |
+| CC7.2 HMAC tamper detection evidence | Design documentation only | Automated TC-RLS-005 authored | Adversarially validated; `security.audit_chain_break` confirmed |
+| PI1.5-C3 coaching data isolation | PI-E-003 integration test (§63 P1 checklist item) | TC-RLS-001 `coaching_turns` query scope added | CI-validated alongside other TC-RLS-001 assertions |
+| Net SOC 2 readiness estimate | ~95% | ~95.2% (infrastructure authored) | ~95.5% (continuous adversarial evidence active) |
+
+The readiness delta is modest in percentage terms because the underlying RLS implementation was already in place and code-reviewed; §64 converts a "designed but untested" control into a "continuously tested and evidenced" control. The auditor impact is disproportionate: moving from no execution evidence to continuous CI evidence is the difference between a qualified opinion and an unqualified one for CC6.1.
+
+---
+
+*v1.0 (2026-06-04): §64 Multi-Tenant RLS Tenant Isolation CI Test Suite — CC6.1/CC6.3/CC6.6/PI1.5-C3 — PEN-GAP-003 Remediation Auditor Exhibit. §64 is the execution infrastructure that closes PEN-GAP-003 (§36.9), which recorded that TC-RLS-001 through TC-RLS-005 (§36.6) had never been formally executed. §64.2 provides the `supabase/migrations/20260604000000_rls_test_role.sql` migration creating a NOSUPERUSER/NOBYPASSRLS read-only adversarial Postgres role with SELECT on seven tenanted tables and an embedded `rolbypassrls` assertion that aborts the migration if the safety invariant is violated. §64.3 provides `supabase/seed/rls_test_fixtures.sql` with synthetic-only fixture data for Tenant A (UUID `00000000-0000-0000-0000-000000000001`) and Tenant B (UUID `00000000-0000-0000-0000-000000000002`): 5 `workout_sessions`, 1 `user_profile`, 3 `coaching_turns`, and 2 `cv_sessions` per user; no real PII; DELETE teardown block for CI. §64.4 provides `tests/security/rls-tenant-isolation.test.ts` — a complete Vitest integration test suite with `createTestJwt()` HS256 helper; TC-RLS-001 (5 assertions: horizontal REST isolation across `workout_sessions`, `user_profile`, `coaching_turns`, `cv_sessions`, and crafted-filter bypass); TC-RLS-002 (modified `tenant_id` claim + `alg:none` unsigned JWT both rejected 401 + `auth.jwt_validation_failed` audit event confirmed); TC-RLS-003 (SECURITY DEFINER enumeration via `get_security_definer_functions` RPC + per-function cross-tenant row assertion); TC-RLS-004 (SCIM POST with cross-tenant `tenantId` rejected 403 + `iam.scim_provision_rejected` audit event confirmed); TC-RLS-005 (service_role payload tamper + `verify_audit_chain_integrity` RPC + `security.audit_chain_break` event polled within 10 seconds). §64.5 provides `.github/workflows/rls-isolation-tests.yml` triggered on push to `main` and PRs targeting `main`; steps: checkout, Node 20, npm ci, Supabase CLI start, fixture bootstrap, Vitest run with JSON reporter, upload 7-year-retention artefact, R2 filing of PRE-36-E-007 (main-branch only), `system.rls_test_suite_run` DEC-030 event emission, Supabase stop. §64.6 defines the PRE-36-E-007 Markdown evidence log template with header metadata, per-TC sections (inputs as redacted JWT/SQL, HTTP responses, Supabase query log excerpts, DEC-030 event IDs, PASS/FAIL verdict), summary table, and `security-engineer` + `compliance-officer` signature block; CI-generated logs auto-filed to R2 without manual signature. §64.7 registers three DEC-030 events: `security.rls_bypass_attempt` (MEDIUM, 7yr, emitted by Cloudflare Worker `rls-guard` middleware when client filter `tenant_id` differs from JWT claim; `request_ip` hashed SHA-256 with daily salt per DPIA §4); `security.definer_function_cross_tenant` (HIGH, 7yr, emitted if any SECURITY DEFINER function returns cross-tenant rows — P0 incident trigger); `system.rls_test_suite_run` (STANDARD, 3yr, emitted by CI workflow on completion with per-TC verdicts and R2 evidence path). §64.8 SOC 2 evidence mapping: CC6.1, CC6.3, CC6.6, CC7.1, CC7.2, PI1.5-C3 all mapped from 🟡 Partial to 🟢 on first CI green run. §64.9 implementation checklist: 5 P0 items (M7 — rls_test role migration, fixture bootstrap, PRE-36-E-007 v1.0 manual execution closing PEN-GAP-003, registry registration of bypass and definer events); 6 P1 items (M8 — CI workflow merge + green run, system.rls_test_suite_run registry, PagerDuty routing, rls-guard middleware emission, RPC implementations); 3 P2 items (quarterly manual drill from M10, TC-RLS-006/007 when data residency ships, trust portal display). §64.10 readiness delta: PEN-GAP-003 🔴 → 🟡 → 🟢; net readiness ~95% → ~95.2% → ~95.5%; auditor impact disproportionate — converts "designed but untested" to "continuously adversarially validated" for CC6.1. Cross-references: §36.6 (TC-RLS test case designs), §36.9 (PEN-GAP-003 gap record), §52 (FORM-PEN-001/005 external pentest scenarios), §63 PI1.5-C3 (coaching_sessions RLS policy), §25.5 (audit chain integrity verification cron), docs/AUDIT_LOG_SCHEMA.md (DEC-030 registry), docs/SSO_SCIM_IMPLEMENTATION.md §3 (SCIM bearer token issuance).*

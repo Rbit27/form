@@ -6,6 +6,13 @@
 
 ---
 
+## [1.95.0] — 2026-06-04
+
+### Added
+- `docs/SOC2_READINESS.md §64` — Multi-Tenant RLS Tenant Isolation CI Test Suite — CC6.1/CC6.3/CC6.6/PI1.5-C3. PEN-GAP-003 remediation auditor exhibit (🔴 Open → 🟡 Authored). §64.2: `supabase/migrations/20260604000000_rls_test_role.sql` — `rls_test` Postgres role setup (SELECT-only, NOLOGIN, NOBYPASSRLS, idempotent DO-guard). §64.3: `supabase/seed/rls_test_fixtures.sql` — fixed-UUID test tenants (`...001`/`...002`) + 5 synthetic `workout_sessions` + 1 `user_profile` + 3 `coaching_turns` + 2 `cv_sessions` per tenant. §64.4: `tests/security/rls-tenant-isolation.test.ts` — Vitest TypeScript suite; `createTestJwt()` helper (jose HS256); five `describe` blocks for TC-RLS-001–005 including `alg:none` raw-encoding attack and 10-second polling loop for HMAC chain-break event. §64.5: `.github/workflows/rls-isolation-tests.yml` — triggers on push/PR to main; Supabase CLI local stack; R2 evidence filing gated to main branch; `retention-days: 2557` on artifact upload. §64.6: PRE-36-E-007 evidence log template (metadata + per-TC table + signature block + R2 path `form-compliance-vault/soc2/rls-isolation/<YYYY-MM-DD>/`). §64.7: three new DEC-030 events — `security.rls_bypass_attempt` (MEDIUM, 7yr; `request_ip` SHA-256+daily-salt per DPIA §4), `security.definer_function_cross_tenant` (HIGH, 7yr; P0 incident trigger), `system.rls_test_suite_run` (STANDARD, 3yr; stores R2 evidence path in payload). §64.8: SOC 2 evidence mapping — CC6.1/CC6.3/CC6.6/CC7.1/CC7.2/PI1.5-C3 all advance to 🟢 on first green CI run. §64.9: 8-item checklist (3× P0 M7, 3× P1 M8, 2× P2). §64.10: PEN-GAP-003 🔴 → 🟡 Authored; SOC 2 readiness ~95% → ~95.5%.
+
+---
+
 ## [1.94.0] — 2026-06-04
 
 ### Added
