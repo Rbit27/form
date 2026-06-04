@@ -6,6 +6,14 @@
 
 ---
 
+## [1.91.1] — 2026-06-04
+
+### Changed
+- `docs/OBSERVABILITY.md` — §6.2 Alert Rules table: п'ять відсутніх subsections додано — `cert_lifecycle` (AL-CERT-01–05, §26.8), `session_revocation` (AL-REVOKE-01–02, §26.8), `google_directory_sync` (AL-SSO-GDIR-01–05, §26.8), `pam_session_health` (AL-PAM-01–03, §29.5), `crypto_key_health` (AL-KEY-01–04, §30.5) — 19 рядків, закриває три P0 M4 checklist items: §26.12 item 6, §29.10 item 4, §30.10 item 5; SOC 2 CC6.1/CC7.2/CC7.3/CC5.3 coverage; версія v1.7 → v1.8
+- `VERSION` — 1.91.0 → 1.91.1
+
+---
+
 ## [1.91.0] — 2026-06-04
 
 ### Added
