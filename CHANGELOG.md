@@ -6,6 +6,16 @@
 
 ---
 
+## [2.4.1] — 2026-06-05
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-22 Enterprise Admin Dashboard: Individual User Data Exposure (Privacy Floor Breach). Двадцять другий runbook; перший, присвячений виключно enterprise privacy floor commitments з `ENTERPRISE.md`. Покриває: сім non-negotiable правил privacy floor як explicit trigger boundary; чотири alert sources FORM-PRIV-001 (audit event monitor для `data.read_individual` forbidden action), FORM-PRIV-002 (API serialiser field check — health fields у tenant-admin response), FORM-PRIV-003 (k-anonymity floor violation, k < 5 у employer-visible cohort), FORM-PRIV-004 (clinical-safety cohort labels — unconditional P0 for rules 5–7); шестирядна severity таблиця (P0 Art. 9 individual або clinical-safety rules 5–7; P1 identity-linkage; P2 user_id serialiser без health data; P3 code review only); чотири scope assessment SQL queries C1–C4 (audit event timeline, employee exposure map з Art. 9 categorisation, k-anonymity violations, clinical-safety cohort label scan); immediate actions за чотирма сценаріями A/B/C/D з feature flag suppression options; двофазовий containment (immediate suppression → root-cause identification) і Phase 3 re-enable з clinical-safety VETO gate; Template PF-01 (tenant admin notification, P0 within 30 min) і PF-02 (employer controller notification для Art. 34 employee notification decision); §R-22.9 no-go escalation protocol (wellness-as-punishment detection → immediate session revoke + founder notification + clinical-safety VETO + contract termination path); п'ять DEC-030 HMAC-chained events (privacy.floor_breach_detected CRITICAL 7yr, contained HIGH 7yr, tenant_notified HIGH 7yr, resolved STANDARD 7yr, no_go_escalation_activated CRITICAL 7yr); evidence package IR-PF-E-001 through IR-PF-E-008 з privacy rule for evidence collection (user_id UUID only — no names compiled by FORM); SOC 2 mapping P6.1/P6.7/P7.1/CC6.1/CC6.6/CC7.2/CC7.4; п'ять post-incident preventive controls; три open questions (OQ-PF-01/02/03); 11-item implementation checklist (5× P0 before enterprise pilot).
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — Appendix A Quick Reference Card оновлено: додані R-18 (Database Integrity & Neon Postgres), R-20 (Insider Threat / PAM-aware), R-21 (Key Rotation Failure), R-22 (Privacy Floor Breach) — закриває відкриті checklist items R-20 §checklist 8 і R-21 §checklist 6.
+
+---
+
 ## [2.4.0] — 2026-06-05
 
 ### Added

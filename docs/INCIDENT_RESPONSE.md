@@ -5030,6 +5030,28 @@ Anthropic API / ElevenLabs down? → R-17 (NOT R-07 — this is availability, no
   Outage > 60 min?           → R-17: SLA breach assessment per §12.3; enterprise tenant comms via E-01
   Outage > 4h?               → R-17: force majeure clause review; founder + counsel before any credit commitment
   DO NOT name Anthropic/ElevenLabs in tenant comms without founder approval — use "infrastructure dependency issue"
+Database integrity / Neon Postgres?  → R-18 (assess P0 upgrade if C2 cross_tenant_rows > 0 → also activate R-01)
+  HMAC chain affected?              → R-18 + R-05 simultaneously (chain break is always P0)
+  RLS bypass confirmed?             → R-18 P0 upgrade + R-01 immediately
+  Failover clean (< 2 min, no data loss)? → R-18 P2; confirm integrity; no R-01 activation needed
+  Art. 9 tables in scope?           → R-18 + Art. 33 clock; assess R-11 if cv_sessions.keypoints_enc affected
+Insider / privileged access (PAM-aware)?  → R-20 (evidence BEFORE containment — do NOT revoke first)
+  Form_admin ops outside PAM window? → R-20 via FORM-INSIDER-001; IC + compliance-officer + legal at T+0
+  FORM-INSIDER-001 fires?           → R-20 + legal counsel immediately before HR notification
+  Audit chain intact?               → R2 archive is forensic truth; do not use live audit_log_events
+  service_role key externally leaked? → R-20 P0 + R-01; rotate immediately after evidence snapshot
+  Post-separation access?           → R-20; confirm PAM window status; check jit_escalation_id on audit events
+  (Also see R-12 for historical insider incidents pre-PAM implementation)
+Key rotation overdue or failing?  → R-21 (AL-KEY-02 or AL-KEY-04 fires)
+  CRYPTO-CHAIN-02 stop-gate: unauthorized rotation? → STOP R-21; activate R-05 + R-20 instead
+  AL-KEY-02 fires (rotation overdue, P0)?  → R-21; 2-hour rotation SLA clock starts
+  AL-KEY-04 fires (verification missing)?  → R-21; check C1 KV state and C3 scheduler health first
+  KEYPOINTS_ENC_KEY rotation?       → R-21; maintenance window required (OQ-KEY-02); enterprise tenant 72h notice
+Admin dashboard showing individual employee data? → R-22 (privacy floor breach)
+  Any individual user health data visible to HR/tenant admin? → R-22 P0; disable admin dashboard immediately
+  ED screening / body composition / mental health in employer report? → R-22 P0; clinical-safety VETO activates
+  k-anonymity cohort < 5 in employer-visible report? → R-22 P1; suppress offending cohort
+  Tenant demanding individual data or punishing non-participants? → R-22.9 no-go escalation; founder authority only
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
@@ -7495,6 +7517,439 @@ Live re-encryption avoids service disruption but expands the attack surface duri
 | 7 | File IR-KEY-E-001 through IR-KEY-E-006 evidence templates in `compliance/evidence/templates/key-rotation/` with SHA-256 checksum instructions | P2 | M7 | compliance-officer | [ ] |
 
 ---
+
+---
+
+### R-22: Enterprise Admin Dashboard — Individual User Data Exposure (Privacy Floor Breach)
+
+**Owner:** compliance-officer + clinical-safety · **Reviewer:** security-engineer + enterprise-architect
+
+> **Scope:** Covers any scenario in which an enterprise tenant admin (HR lead, People team, tenant_owner or tenant_admin role) gains visibility into **individual employee health, coaching, or biometric data** through the FORM Admin Dashboard, API, or data export pipeline — in violation of the non-negotiable privacy floor defined in `docs/ENTERPRISE.md §"Privacy floor for enterprise"`. This runbook is NOT R-01 (external breach) — the exposing party is an authorised tenant admin user, not an external attacker. It is NOT R-11 (CV biometric) — this runbook activates when aggregate-only controls fail at the reporting layer, not at the encryption layer. Parallel activation with R-01 is required only if the individual data was sent to a third party outside the tenant.
+
+#### Privacy Floor Non-Negotiables
+
+The following seven controls are non-negotiable per `ENTERPRISE.md`. This runbook activates when ANY of them fails:
+
+1. HR can never see individual user data — aggregate only
+2. HR sees aggregates only: % active, % activated, opt-in NPS
+3. Manager-reports on direct reports are never available
+4. Employee can revoke company-association at any time
+5. ED-screening data is never aggregated to employer (clinical-safety floor)
+6. Body composition data is never aggregated to employer (clinical-safety floor)
+7. Mental health data is never aggregated to employer (clinical-safety floor)
+
+**Rules 5, 6, 7 apply even at the aggregate level.** An employer seeing "23% of employees screen positive for ED risk" is a floor violation. The employer sees only: "% activated", "% weekly active", and NPS aggregate — nothing further.
+
+#### Trigger
+
+| Source | Alert ID | Condition |
+|---|---|---|
+| `audit_log_events` monitor | `FORM-PRIV-001` | `data.read_individual` event emitted for `actor_type = 'user'` AND actor has `tenant_admin` or `tenant_owner` role — forbidden per `AUDIT_LOG_SCHEMA.md`; alert fires in real-time, no threshold |
+| Admin Dashboard API gateway | `FORM-PRIV-002` | Any HTTP response to `/api/admin/v1/users/*` route returning `user_id`-level health fields (`fitness_level`, `health_goal`, `coaching_turns`, `cv_sessions`, `meal_logs`, `weight`, `body_fat_pct`) for a `tenant_admin` actor — these fields are stripped at the API serialisation layer; a non-empty response indicates a serialiser bypass |
+| Aggregate reporting SQL monitor | `FORM-PRIV-003` | `enterprise_admin_reports.user_count_in_cohort < 5` AND `employer_visible = true` — k-anonymity floor violation; `DATA_MODEL.md §17.4` requires minimum cohort size ≥ 5 before any aggregate is returned |
+| Clinical-safety flag | `FORM-PRIV-004` | Any `cohort_label` containing `ed_screening`, `body_composition`, `mental_health`, `bmi`, `weight_trend`, or `calories_*` in a tenant-visible aggregate — unconditional floor violation regardless of cohort size |
+| Customer report | — | Tenant admin contacts CSM or support reporting they can see individual employee data, specific names, or health metrics they did not expect |
+| Code review finding | — | PR diff reveals a missing `aggregate_only = true` filter, a missing `WHERE employer_visible = true` clause, or a serialiser that includes `user_id` in a tenant-admin-accessible response |
+
+#### Severity Classification
+
+| Condition | Severity | Rationale |
+|---|---|---|
+| Any individual user's coaching turns, CV keypoints, meal logs, or health_profile fields visible to tenant admin | **P0** | Art. 9 special category health data exposed to an unauthorised processor (the employer); GDPR Art. 33 clock starts immediately |
+| ED screening, body composition, or mental health aggregate visible to employer (rules 5–7 breach) | **P0** | Clinical-safety floor breached; even aggregate exposure of these categories violates ENTERPRISE.md unconditional rule; clinical-safety VETO activates |
+| Individual user_id or user name mapped to any wellness metric in employer-visible report | **P1** | Privacy floor breach even if metric is non-Art. 9; identity linkage makes aggregate into individual data under GDPR Recital 26; assess Art. 33 threshold |
+| k-anonymity cohort < 5 exposed in employer-facing report (FORM-PRIV-003) | **P1** | Quasi-individual exposure; may not meet Art. 33 threshold but must be assessed; suppress the offending cohort immediately |
+| API serialiser returned `user_id` field in tenant-admin response (FORM-PRIV-002) but no health data in the response body | **P2** | Serialiser bug without confirmed health data exposure; suppress and fix; assess downstream use of the user_id |
+| Code review finding only — no evidence of production exposure | **P3** | Preventive fix before any user affected; no notification obligations; PIR and code fix required |
+
+**P0 upgrade trigger:** If FORM-PRIV-001 fires AND the actor is a `tenant_owner` with a commercial wellness incentive contract (wellness-as-punishment no-go flag) — upgrade to P0 regardless of data category and activate no-go escalation protocol (§R-22.9).
+
+#### Scope Assessment Queries
+
+Run all four queries immediately. Results determine GDPR Art. 33 obligation and communication scope.
+
+**C1 — Identify the exposure window and affected actor**
+
+```sql
+-- Determine when the privacy floor breach started and which tenant admin triggered it
+SELECT
+  e.id              AS event_id,
+  e.tenant_id,
+  e.actor_id,
+  e.action,
+  e.resource_type,
+  e.resource_id,
+  e.metadata,
+  e.created_at,
+  e.hmac_self
+FROM audit_log_events e
+WHERE e.action IN ('data.read_individual', 'data.export_initiated', 'data.read_aggregate')
+  AND e.outcome = 'success'
+  AND e.created_at >= NOW() - INTERVAL '72 hours'  -- extend if code review finding suggests longer window
+  AND e.actor_id IN (
+    SELECT user_id
+    FROM tenant_members
+    WHERE tenant_id = '<affected_tenant_id>'
+      AND role IN ('tenant_owner', 'tenant_admin', 'tenant_manager')
+  )
+ORDER BY e.created_at ASC;
+```
+
+**C2 — Identify which employee user_ids were exposed and whether Art. 9 data is involved**
+
+```sql
+-- Map exposed resource_ids to user health categories
+-- Run only if C1 returns resource_type = 'user' or 'health_profile' rows
+SELECT
+  r.user_id,
+  hp.fitness_level       IS NOT NULL AS has_fitness_profile,
+  hp.health_goal         IS NOT NULL AS has_health_goal,
+  COUNT(ct.id)           > 0         AS has_coaching_turns,
+  COUNT(cs.id)           > 0         AS has_cv_sessions,
+  COUNT(ml.id)           > 0         AS has_meal_logs
+FROM (
+  SELECT DISTINCT (metadata->>'exposed_user_id')::uuid AS user_id
+  FROM audit_log_events
+  WHERE id IN (<event_ids_from_C1>)
+    AND metadata ? 'exposed_user_id'
+) r
+LEFT JOIN health_profiles hp ON hp.user_id = r.user_id
+LEFT JOIN coaching_turns ct  ON ct.user_id = r.user_id AND ct.created_at >= '<exposure_window_start>'
+LEFT JOIN cv_sessions cs     ON cs.user_id = r.user_id AND cs.created_at >= '<exposure_window_start>'
+LEFT JOIN meal_logs ml       ON ml.user_id = r.user_id AND ml.created_at >= '<exposure_window_start>'
+GROUP BY r.user_id, hp.fitness_level, hp.health_goal;
+-- If coaching_turns or cv_sessions IS TRUE for any row → Art. 9 confirmed → P0 + Art. 33 clock
+-- If meal_logs IS TRUE → assess Art. 9 (nutrition data may constitute health data under GDPR)
+```
+
+**C3 — Check for k-anonymity floor violations in employer-visible reports**
+
+```sql
+-- Find cohorts below the k=5 threshold that were returned to employer-facing reports
+SELECT
+  r.tenant_id,
+  r.cohort_label,
+  r.user_count_in_cohort,
+  r.employer_visible,
+  r.generated_at,
+  r.requested_by_actor_id
+FROM enterprise_admin_reports r
+WHERE r.tenant_id = '<affected_tenant_id>'
+  AND r.employer_visible = true
+  AND r.user_count_in_cohort < 5
+  AND r.generated_at >= '<exposure_window_start>'
+ORDER BY r.generated_at ASC;
+-- Any returned rows = k-anonymity floor violated; assess if cohort_label is Art. 9 (rules 5–7)
+```
+
+**C4 — Clinical-safety flag: check for forbidden aggregate labels**
+
+```sql
+-- Detect if any employer-visible cohort was labelled with a clinical-safety protected category
+SELECT
+  r.tenant_id,
+  r.cohort_label,
+  r.generated_at,
+  r.employer_visible,
+  r.metric_value
+FROM enterprise_admin_reports r
+WHERE r.tenant_id = '<affected_tenant_id>'
+  AND r.employer_visible = true
+  AND r.generated_at >= '<exposure_window_start>'
+  AND (
+    r.cohort_label ILIKE '%ed_screening%'       OR
+    r.cohort_label ILIKE '%eating_disorder%'     OR
+    r.cohort_label ILIKE '%body_composition%'    OR
+    r.cohort_label ILIKE '%body_fat%'            OR
+    r.cohort_label ILIKE '%bmi%'                 OR
+    r.cohort_label ILIKE '%weight%'              OR
+    r.cohort_label ILIKE '%mental_health%'       OR
+    r.cohort_label ILIKE '%depression%'          OR
+    r.cohort_label ILIKE '%anxiety%'             OR
+    r.cohort_label ILIKE '%calories%'
+  )
+ORDER BY r.generated_at ASC;
+-- Any returned rows → clinical-safety floor breach → P0 regardless of cohort size
+-- Notify clinical-safety immediately; they have VETO on any re-enable decision
+```
+
+#### Immediate Actions (T+0 to T+20 min)
+
+```
+1. Open incident channel: #inc-YYYYMMDD-privacy-floor
+   IC: compliance-officer (primary) or clinical-safety (if rules 5–7 breach confirmed)
+   Notify immediately: security-engineer + clinical-safety + founder
+
+2. Classify the breach source (pick one before proceeding):
+   A) API serialiser bug (FORM-PRIV-002) — individual fields returned in API response
+      → Immediately set feature flag: admin_dashboard_user_lookup_enabled = false
+      → Block the specific API endpoint at Cloudflare WAF until fix deployed
+   B) Aggregate report query bug (FORM-PRIV-003, k-anonymity < 5)
+      → Set feature flag: enterprise_reporting_enabled = false for affected tenant
+   C) Forbidden cohort label (FORM-PRIV-004, clinical-safety rules 5–7)
+      → Set feature flag: enterprise_reporting_enabled = false for ALL tenants
+      → Page clinical-safety: VETO activation required before re-enable
+   D) No-code detection (customer report, code review — P3)
+      → No feature flag change required; assess scope before acting
+
+3. Run scope assessment C1, C2, C3, C4 in READ-ONLY mode
+   Do NOT DELETE any evidence rows — audit log is forensic record
+   Record all query results with timestamps in incident channel
+
+4. If C2 confirms Art. 9 data (coaching_turns, cv_sessions, meal_logs): P0 upgrade
+   → Start GDPR Art. 33 72h clock: exposure time from C1 results, NOT current time
+   → Notify compliance-officer to draft Art. 33 assessment (R-15 GDPR runbook §15.3)
+
+5. If C4 returns any rows: clinical-safety breach
+   → clinical-safety has unconditional VETO on dashboard re-enable
+   → Do NOT re-enable enterprise_reporting_enabled without clinical-safety sign-off
+   → Founder must be informed within 30 min (board trigger threshold per §13 applies
+     if any enterprise tenant is at risk of termination)
+```
+
+#### Containment
+
+**Phase 1 — Immediate suppression (T+0 to T+20 min)**
+
+| Action | Feature flag / mechanism | When to apply |
+|---|---|---|
+| Disable admin user-level lookup | `admin_dashboard_user_lookup_enabled = false` | API serialiser bug (Scenario A) |
+| Disable enterprise reporting for affected tenant | `enterprise_reporting_enabled = false` (per-tenant scope) | k-anonymity or cohort label violation (Scenarios B/D) |
+| Disable enterprise reporting globally | `enterprise_reporting_enabled = false` (global scope) | Clinical-safety rules 5–7 breach (Scenario C); reinstate only with clinical-safety sign-off |
+| Block API endpoint at WAF | Cloudflare WAF custom rule: `(http.request.uri.path contains "/api/admin/v1/users/") AND (cf.threat_score > 0 OR http.request.method eq "GET")` | Scenario A only; remove when serialiser fix deployed |
+
+**Phase 2 — Root cause identification (T+20 to T+60 min)**
+
+1. Review the relevant component (IC + platform-engineer, read-only):
+   - For Scenario A: `src/workers/admin-api/serialisers/user-aggregate.ts` — confirm `employer_visible` filter is applied before serialisation; check if `user_id` field is stripped
+   - For Scenario B: `src/workers/admin-api/reports/aggregate-query.ts` — confirm `HAVING COUNT(user_id) >= 5` is applied after `GROUP BY cohort_label`
+   - For Scenario C: `src/workers/admin-api/reports/cohort-labels.ts` — confirm `FORBIDDEN_COHORT_LABELS` blocklist is applied to all employer-visible reports
+   - For Scenario D (code review): the specific PR or commit that introduced the regression
+
+2. Capture the exact diff that caused the regression (git blame on affected file; cross-reference with recent PR merges since last known-good date)
+
+3. Do NOT push a fix to production without:
+   - Two-person review (security-engineer + compliance-officer)
+   - Passing the privacy floor test suite (`tests/enterprise/privacy-floor.spec.ts`)
+   - IC approval before deployment
+
+**Phase 3 — Eradication and re-enable (T+60 min to resolution)**
+
+1. Deploy the fix (requires two-person review and privacy floor test suite pass)
+2. Run C1, C2, C3, C4 queries again post-fix to confirm no further exposure
+3. Re-enable feature flags in reverse suppression order: per-tenant before global
+4. If Scenario C (clinical-safety): clinical-safety must run the C4 query independently and confirm zero rows before re-enabling `enterprise_reporting_enabled` globally
+5. Log re-enable decision in incident channel with timestamp and approver user_ids
+
+#### Communication Protocol
+
+**Enterprise tenant notification — Template PF-01 (required for P0, optional for P1 if employee data involved)**
+
+Send within:
+- P0: 30 minutes of declaration
+- P1 (employee identity linked to data): 60 minutes
+- P1 (k-anonymity floor only, no identity linkage): 2 hours
+- P2: next business day
+
+Delivery: encrypted email to `tenant_admin` registered contact + CSM Slack notification
+
+```
+Subject: Important security notice regarding your FORM dashboard
+
+Hi [Tenant Admin Name],
+
+We are writing to inform you that between [START_TIME] and [END_TIME] UTC,
+a configuration issue in FORM's Admin Dashboard may have presented wellness
+data for individual employees in a format that does not meet FORM's
+privacy floor commitments for enterprise customers.
+
+[IF SCENARIO A/B]:
+Specifically, [N] admin report(s) generated during this window may have
+shown wellness metrics that were not properly aggregated. No personally
+identifiable health data such as diagnostic information, body composition
+specifics, or mental health indicators was involved.
+
+[IF SCENARIO C]:
+Specifically, [N] admin report(s) generated during this window may have
+shown cohort labels for categories that FORM does not make visible to
+employers under any circumstances. We are treating this as a P0 incident.
+
+We have immediately suppressed the affected dashboard capability and are
+deploying a fix. The capability will be restored only after independent
+verification by our Clinical Safety team.
+
+Affected window: [START_TIME] – [END_TIME] UTC
+Affected report type(s): [COHORT_LABELS or API_ENDPOINTS]
+Individual employee data accessed: [YES (N employees) / NO — aggregate only]
+
+[IF Art. 9 health data confirmed]:
+We have a legal obligation to inform you as the data controller that
+special category health data (Article 9 GDPR) was accessed in a manner
+inconsistent with our Data Processing Agreement. Our compliance team
+will be in contact within 4 hours to discuss our Article 33 assessment
+and any joint notification obligations.
+
+Action required from your side: None at this time. Please ask your admin
+team to avoid generating dashboard reports until you receive our "all clear"
+notification.
+
+We apologise for this incident. Your CSM [CSM NAME] will follow up
+within [30 min for P0 / 60 min for P1].
+
+The FORM Enterprise Team
+```
+
+**Employee notification — Template PF-02 (required if C2 confirms Art. 9 exposure to employer)**
+
+FORM acts as data processor; the enterprise tenant (employer) is data controller for their employees' data. The Art. 34 individual notification decision lies with the controller.
+
+- Advise the tenant admin (controller) in writing within 2 hours of Art. 9 confirmation
+- Provide: number of affected employees (not names — privacy floor applies even in breach remediation), categories of data, exposure window
+- The employer decides whether to notify individual employees under Art. 34 — FORM does not notify employees directly without controller instruction
+- Exception: if the employer cannot be reached within 4 hours or is suspected of acting in bad faith (no-go escalation per §R-22.9), compliance-officer + founder decide on direct notification with legal counsel
+
+**Board / investor notification — §13 trigger assessment**
+
+| Condition | Threshold | Action |
+|---|---|---|
+| P0 with confirmed Art. 9 exposure to employer | Always | §13 board notification; Template B-01 within 4h |
+| Enterprise tenant issues formal complaint or terminates | Any severity | §13 board notification |
+| Wellness-as-punishment use confirmed (§R-22.9) | P0 upgrade | §13 board notification + legal counsel immediately |
+
+#### No-Go Escalation Protocol (§R-22.9)
+
+ENTERPRISE.md defines four wellness-as-punishment no-go scenarios. If this incident reveals that a customer is **intentionally using individual data to evaluate, discipline, or incentivise employees** — the following protocol overrides normal incident response:
+
+```
+1. Suspend access to FORM Admin Dashboard for the affected tenant immediately
+   (not a feature flag — revoke tenant admin sessions via SSO revocation endpoint)
+
+2. Notify founder within 15 minutes — founder has sole authority to proceed
+
+3. Founder reviews contract + DPA for "no individual data" obligation
+   → If contract clearly prohibits: initiate contract termination
+   → If contract is ambiguous: outside counsel within 1 business day before any further action
+
+4. Do NOT provide the tenant with individual data "for compliance" or "for HR records"
+   → clinical-safety + compliance-officer have VETO: any individual data disclosure
+     to an employer for performance management purposes is an unconditional no-go
+   → Losing the deal is preferable to enabling harm (ENTERPRISE.md §"When we say no")
+
+5. If the no-go concern is credible but not confirmed:
+   → compliance-officer documents the concern in DECISION_LOG.md with timestamp
+   → Increase monitoring cadence to 24h for this tenant
+   → Legal counsel notified within 48h
+```
+
+#### DEC-030 HMAC-Chained Audit Events
+
+All events are HMAC-chained per `docs/AUDIT_LOG_SCHEMA.md`. Failure to emit any P0 event aborts the corresponding response action.
+
+| Event Type | Severity | Retention | Key Metadata Fields |
+|---|---|---|---|
+| `privacy.floor_breach_detected` | CRITICAL | 7 years | `tenant_id`, `breach_source` (`api_serialiser` / `aggregate_query` / `cohort_label` / `code_review`), `scenario` (`A` / `B` / `C` / `D`), `clinical_safety_rules_violated` (bool), `art9_confirmed` (bool), `exposure_window_start`, `affected_employee_count` (integer or `unknown_pending_assessment`), `ic_user_id`, `incident_slug` |
+| `privacy.floor_breach_contained` | HIGH | 7 years | `tenant_id`, `containment_method` (`feature_flag` / `waf_rule` / `session_revoke`), `feature_flags_disabled` (array), `contained_by_user_id`, `incident_slug` |
+| `privacy.floor_breach_tenant_notified` | HIGH | 7 years | `tenant_id`, `notification_template` (`PF-01` / `PF-02`), `notified_at`, `notified_by_user_id`, `employee_count_disclosed_to_tenant`, `incident_slug` |
+| `privacy.floor_breach_resolved` | STANDARD | 7 years | `tenant_id`, `fix_commit_sha`, `fix_deployed_at`, `feature_flags_re_enabled` (array), `clinical_safety_approved` (bool), `two_person_approvers` (array of user_ids), `incident_slug` |
+| `privacy.no_go_escalation_activated` | CRITICAL | 7 years | `tenant_id`, `no_go_reason` (`wellness_as_punishment` / `individual_data_demand` / `manager_report_demand` / `insurance_risk_scoring`), `dashboard_suspended_at`, `founder_notified_at`, `legal_counsel_engaged` (bool), `incident_slug` |
+
+```typescript
+// DEC-030 emission — privacy floor breach detected
+// Must be emitted BEFORE any containment action (feature flag changes)
+const event = {
+  event_type: 'privacy.floor_breach_detected',
+  severity: 'CRITICAL',
+  incident_id: incidentId,
+  payload: {
+    tenant_id:                    affectedTenantId,
+    breach_source:                breachSource,          // 'api_serialiser' | 'aggregate_query' | 'cohort_label' | 'code_review'
+    scenario:                     scenario,              // 'A' | 'B' | 'C' | 'D'
+    clinical_safety_rules_violated: clinicalRulesViolated, // true if rules 5/6/7 breached
+    art9_confirmed:               art9Confirmed,         // pending C2 query result at detection time; update with privacy.floor_breach_assessment event
+    exposure_window_start:        exposureWindowStart,   // ISO 8601 UTC; from C1 query
+    affected_employee_count:      affectedCount,         // integer | 'unknown_pending_assessment'
+    ic_user_id:                   icUserId,
+    incident_slug:                incidentSlug,
+  },
+};
+const emitted = await emitDec030Event(event, supabaseAdminClient);
+if (!emitted.success) {
+  throw new Error('DEC-030 emission failed — privacy floor breach detection event aborted; retry required before feature flag changes');
+}
+```
+
+#### Evidence Package
+
+| Evidence ID | Artefact | Collection Method | Location |
+|---|---|---|---|
+| **IR-PF-E-001** | C1 audit_log_events query — exposure timeline | SQL output saved as JSONL; SHA-256 recorded; includes hmac_self for each row | `compliance/evidence/incidents/<slug>/c1-audit-timeline.jsonl` |
+| **IR-PF-E-002** | C2 employee exposure map | SQL output as CSV (user_id column only — no names; privacy floor applies to evidence collection); indicates Art. 9 data categories present | `compliance/evidence/incidents/<slug>/c2-exposure-map.csv` |
+| **IR-PF-E-003** | C3 k-anonymity floor violations | SQL output as CSV; cohort_label + user_count_in_cohort + generated_at | `compliance/evidence/incidents/<slug>/c3-k-anonymity-violations.csv` |
+| **IR-PF-E-004** | C4 clinical-safety cohort labels | SQL output as CSV; cohort_label + employer_visible + generated_at | `compliance/evidence/incidents/<slug>/c4-clinical-safety-labels.csv` |
+| **IR-PF-E-005** | Feature flag state — suppression record | Cloudflare Feature Flags audit log export; shows `enterprise_reporting_enabled` transition to `false` with actor and timestamp | `compliance/evidence/incidents/<slug>/feature-flag-suppression.json` |
+| **IR-PF-E-006** | Root cause diff | Git diff of the offending commit; PR link; privacy floor test suite results (before and after fix) | `compliance/evidence/incidents/<slug>/root-cause-diff.patch` |
+| **IR-PF-E-007** | Tenant notification record | Template PF-01 email (sent copy); delivery receipt from email service; CSM Slack DM transcript | `compliance/evidence/incidents/<slug>/tenant-notification/` |
+| **IR-PF-E-008** | Clinical-safety sign-off | clinical-safety written approval (email or DEC-030 `privacy.floor_breach_resolved` event with `clinical_safety_approved: true`) | `compliance/evidence/incidents/<slug>/clinical-safety-sign-off.eml` |
+
+All evidence under `compliance/evidence/incidents/<slug>/` with SHA-256 manifest. 7-year retention per DEC-030 for IR-PF-E-001 through IR-PF-E-008 (7 years is the standard for Art. 9 processing records under GDPR Art. 30).
+
+**Privacy rule for evidence collection:** IR-PF-E-002 (employee exposure map) contains only `user_id` (UUID) — never names, emails, or health values. The UUID mapping to a named employee is retrievable by the employer (data controller) but FORM does not compile or retain the mapping in evidence. Evidence collection itself must not violate the privacy floor.
+
+#### SOC 2 TSC Mapping
+
+| TSC Criterion | Control | Evidence from This Runbook |
+|---|---|---|
+| **P6.1** (Personal information access and disclosure limited) | Enterprise admin dashboard restricted to aggregate-only data per `DATA_MODEL.md §17`; `employer_visible = true` filter enforced at API serialisation layer; k-anonymity floor k ≥ 5 | IR-PF-E-006: fix diff demonstrates the serialiser and aggregate controls are in place; IR-PF-E-005: feature flag suppression shows rapid containment |
+| **P6.7** (Personal information disclosed only to authorised parties) | `data.read_individual` action is blocked for `tenant_admin` role at API middleware layer; AUDIT_LOG_SCHEMA.md defines this as a forbidden action with alert-on-attempt | IR-PF-E-001: audit log showing zero `data.read_individual` success events post-fix; C1 query establishes exposure window |
+| **P7.1** (Personal information quality maintained) | Aggregate reporting accuracy maintained through k-anonymity floor and cohort label blocklist; clinical-safety rules 5–7 protect against systematically misleading employer wellness data | IR-PF-E-003 + IR-PF-E-004: k-anonymity and cohort label evidence; IR-PF-E-008: clinical-safety sign-off |
+| **CC6.1** (Logical access controls) | Admin dashboard API enforces role-based access at serialisation layer; `tenant_admin` role cannot access individual user records via any documented API path | IR-PF-E-001 + IR-PF-E-006: combined audit evidence and code fix demonstrating the access control is designed and operating effectively |
+| **CC6.6** (Unauthorised access prevented) | Monitoring alert FORM-PRIV-001/002/003/004 provides real-time detection; feature flag suppression provides immediate containment within 20 min of detection | IR-PF-E-005: containment timeline evidence |
+| **CC7.2** (System events monitored) | Four alert rules FORM-PRIV-001 through FORM-PRIV-004 provide continuous monitoring at audit log, API gateway, aggregate report, and cohort label layers | IR-PF-E-001: audit event triggered the alert; DEC-030 chain provides continuous monitoring evidence |
+| **CC7.4** (Incident response program) | Runbook R-22 documents the complete response procedure including containment, evidence, communication, no-go escalation, and SOC 2 evidence mapping | This runbook is itself CC7.4 evidence; IR-PF-E-007: tenant notification demonstrates the communication control |
+
+#### Post-Incident Preventive Controls
+
+| Control | Description | Owner | Priority |
+|---|---|---|---|
+| Privacy floor test suite — CI gate | `tests/enterprise/privacy-floor.spec.ts` must pass on every PR that touches admin API serialisers, aggregate report queries, or cohort label definitions; gate blocks merge on failure | platform-engineer + qa-lead | **P0 — before enterprise GA** |
+| `data.read_individual` alert latency | FORM-PRIV-001 must fire within 60 seconds of the first forbidden `data.read_individual` event; test in staging with synthetic event | devops-lead | **P0 — before enterprise GA** |
+| k-anonymity floor enforcement in SQL layer | `HAVING COUNT(DISTINCT user_id) >= 5` added as a DB-layer constraint (view or materialized view) rather than application layer only; DB layer cannot be bypassed by a serialiser bug | platform-engineer | **P1 — M6** |
+| Cohort label blocklist review | Quarterly review of `FORBIDDEN_COHORT_LABELS` constant by clinical-safety; any new Victor coaching category must be assessed before adding to employer-visible reporting | clinical-safety | **P1 — quarterly** |
+| No-go customer monitoring | Tenant contracts flagged with `wellness_as_punishment_risk = true` receive increased dashboard access monitoring (FORM-PRIV-001 with lower threshold: >0 events in 24h rather than real-time) | compliance-officer + customer-success | **P2 — before Year 1 enterprise deals** |
+
+#### Open Questions
+
+**OQ-PF-01: Should the privacy floor test suite be enforced in production as a runtime assertion or only in CI?**
+
+A runtime assertion (middleware that re-validates `employer_visible` and k-anonymity before every API response) would catch regressions that bypass CI (e.g., a hotfix deployed without full test suite). Cost: adds ~2 ms to every admin dashboard API call. A CI-only gate is lighter but has a window between deploy and first use. Recommendation: CI gate as primary control; runtime assertion as belt-and-suspenders for Art. 9-adjacent endpoints only (`/api/admin/v1/reports/*`). Owner: platform-engineer + security-engineer. Priority: **P1 — before first enterprise pilot.** Target: M6.
+
+**OQ-PF-02: Should clinical-safety rules 5–7 (ED screening, body composition, mental health) be enforced at the data classification layer in `DATA_MODEL.md §5` rather than only at the reporting layer?**
+
+If the `data_classification` column of affected tables is tagged `clinical_safety_protected`, the API serialiser can enforce the rule independently of the cohort label blocklist — reducing the risk of a new coaching category bypassing the blocklist. Risk: adds a new data classification tier that must be maintained as new Victor features ship. Recommendation: implement as a `clinical_safety_protected BOOLEAN DEFAULT false` column on the `exercise_categories`, `coaching_turn_categories`, and `report_cohort_definitions` tables; annotate existing Art. 9 adjacent categories as `true`. Owner: clinical-safety + enterprise-architect. Priority: **P1 — before first enterprise pilot.** Target: M7. Cross-reference: DATA_MODEL.md §5 (Data Classification).
+
+**OQ-PF-03: How should FORM respond if a customer's legal team argues that FORM's privacy floor conflicts with their legal obligation to monitor employee wellness under a local labour law?**
+
+Some jurisdictions (e.g., certain EU member states with works council agreements) may give employers rights to aggregate wellness data that FORM's privacy floor currently denies. The privacy floor is a FORM non-negotiable, not a regulatory requirement on FORM's side — it reflects FORM's ethical commitment, not a legal obligation. If a customer claims a legal entitlement to data FORM will not provide, the correct response is: (a) confirm with outside counsel whether the customer's claim is valid under the applicable law; (b) if confirmed, assess whether serving the customer is consistent with FORM's ethics and no-go policy; (c) if not consistent, decline to expand data access and accept contract loss. No legal entitlement claimed by a customer can override clinical-safety's VETO on rules 5–7 data. Owner: compliance-officer + founder. Priority: **P1 — before first EU enterprise deal.** Target: M9.
+
+#### Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Implement FORM-PRIV-001 alert: Cloudflare Edge Function monitors `audit_log_events` in real-time for `data.read_individual` action with `tenant_admin` or `tenant_owner` actor; fires PagerDuty P1 immediately; confirm in staging with synthetic `data.read_individual` event for a `tenant_admin` actor | devops-lead + platform-engineer | **P0** | Before enterprise pilot | [ ] |
+| 2 | Implement FORM-PRIV-002 alert: Admin API gateway middleware logs response body sample for `/api/admin/v1/users/*` routes when response includes health field names; fires PagerDuty P1 if any health field detected; confirm in staging | platform-engineer | **P0** | Before enterprise pilot | [ ] |
+| 3 | Implement FORM-PRIV-003 alert: pg_cron job runs every 15 min; queries `enterprise_admin_reports` for `user_count_in_cohort < 5 AND employer_visible = true`; fires PagerDuty P1 on any result; confirm in staging with synthetic low-count cohort | platform-engineer + devops-lead | **P0** | Before enterprise pilot | [ ] |
+| 4 | Implement FORM-PRIV-004 alert: pg_cron job runs every 15 min; queries `enterprise_admin_reports` for clinical-safety cohort labels in `employer_visible = true` rows; fires PagerDuty P0 on any result; notify clinical-safety directly via PagerDuty escalation policy | platform-engineer + devops-lead + clinical-safety | **P0** | Before enterprise pilot | [ ] |
+| 5 | Write privacy floor test suite `tests/enterprise/privacy-floor.spec.ts`: 15+ test cases covering all four alert scenarios; add as CI gate on all PRs touching admin API serialisers and aggregate report code | qa-lead + platform-engineer | **P0** | Before enterprise pilot | [ ] |
+| 6 | Register all five DEC-030 events (`privacy.floor_breach_detected`, `privacy.floor_breach_contained`, `privacy.floor_breach_tenant_notified`, `privacy.floor_breach_resolved`, `privacy.no_go_escalation_activated`) in `docs/AUDIT_LOG_SCHEMA.md` with full payload schema, severity, and retention; validate Zod schema in staging | platform-engineer + compliance-officer | **P0** | Before enterprise pilot | [ ] |
+| 7 | Add `runbook: "docs/INCIDENT_RESPONSE.md#r-22"` to FORM-PRIV-001 through FORM-PRIV-004 PagerDuty alert configs; confirm runbook URL resolves correctly | devops-lead | **P1** | M6 | [ ] |
+| 8 | Add R-22 tabletop exercise to §9 drill catalog: Scenario J — tenant admin generates aggregate report; cohort for "ED screening awareness" label slips through blocklist due to synonym (`eating_habit_awareness`); FORM-PRIV-004 fires; clinical-safety VETO activated; global reporting suspended; 6 enterprise tenants affected; board notification threshold reached; 10 discussion points | clinical-safety + compliance-officer | **P1** | M9 | [ ] |
+| 9 | Resolve OQ-PF-01 (runtime assertion vs CI-only for privacy floor) and document in DECISION_LOG.md | platform-engineer + security-engineer | **P1** | Before enterprise pilot (M6) | [ ] |
+| 10 | Resolve OQ-PF-02 (data classification layer for clinical-safety rules 5–7) and update DATA_MODEL.md §5 if adopted | clinical-safety + enterprise-architect | **P1** | M7 | [ ] |
+| 11 | Update Appendix A: add "Admin dashboard showing individual data?" → R-22; add "Wellness-as-punishment use suspected?" → R-22.9 no-go escalation | compliance-officer | **P0** | With this release | [x] |
+
+---
+
+*v1.6 additions (2026-06-05): R-22 Enterprise Admin Dashboard — Individual User Data Exposure (Privacy Floor Breach) — twenty-second runbook; the first dedicated to FORM's enterprise privacy floor commitments. Fills the runbook gap between the product-level privacy floor in `docs/ENTERPRISE.md §"Privacy floor for enterprise"` (seven non-negotiable rules) and the technical enforcement in `DATA_MODEL.md §17` (aggregate-only admin reporting schema), `DATA_MODEL.md §5` (data classification), and `DATA_MODEL.md §6` (privacy floor enforcement). R-22 covers: seven privacy floor non-negotiable rules as the explicit trigger boundary; four alert sources FORM-PRIV-001 (audit event monitor), FORM-PRIV-002 (API serialiser field check), FORM-PRIV-003 (k-anonymity floor violation, k < 5), FORM-PRIV-004 (clinical-safety cohort labels — P0, unconditional for rules 5–7); six-row severity classification table (P0 for Art. 9 individual exposure or clinical-safety rules; P1 for identity-linkage; P2 for user_id serialiser without health data; P3 for code review finding only); four scope assessment SQL queries C1–C4 (audit event timeline, employee exposure map with Art. 9 categorisation, k-anonymity floor violations, clinical-safety cohort label scan); immediate actions four-path (Scenarios A/B/C/D) with feature flag suppression options; two-phase containment (immediate suppression then root-cause identification) and Phase 3 re-enable with clinical-safety VETO gate; communication Template PF-01 (tenant admin notification, P0 within 30 min) and Template PF-02 (employer controller notification for Art. 34 decision on employee notification); §R-22.9 no-go escalation protocol (wellness-as-punishment detection → immediate session revoke + founder notification + clinical-safety VETO + contract termination path); five DEC-030 HMAC-chained events (privacy.floor_breach_detected CRITICAL 7yr, privacy.floor_breach_contained HIGH 7yr, privacy.floor_breach_tenant_notified HIGH 7yr, privacy.floor_breach_resolved STANDARD 7yr, privacy.no_go_escalation_activated CRITICAL 7yr); evidence package IR-PF-E-001 through IR-PF-E-008 with privacy rule for evidence collection (user_id UUID only in IR-PF-E-002 — no names or health values compiled by FORM); SOC 2 mapping P6.1/P6.7/P7.1/CC6.1/CC6.6/CC7.2/CC7.4; five post-incident preventive controls (CI privacy floor test suite gate, FORM-PRIV-001 latency SLA, SQL-layer k-anonymity enforcement, quarterly cohort label review by clinical-safety, no-go customer monitoring); three open questions (OQ-PF-01 runtime assertion vs CI-only — P1, M6; OQ-PF-02 clinical-safety data classification layer — P1, M7; OQ-PF-03 employer legal entitlement claims — P1, M9); eleven-item implementation checklist (5× P0 before enterprise pilot: FORM-PRIV-001 through PRIV-004 alerts, privacy floor test suite, DEC-030 event registration; 5× P1 M6-M9; checklist item 11 Appendix A already closed [x]). Appendix A updated with R-18, R-20, R-21, R-22 quick reference entries (closes R-20 checklist item 8 and R-21 checklist item 6, both previously open). Cross-references: docs/ENTERPRISE.md §"Privacy floor for enterprise" (seven non-negotiable rules), docs/DATA_MODEL.md §17 (Enterprise Admin Reporting Schema — aggregate-only enforcement), docs/DATA_MODEL.md §5 (Data Classification — OQ-PF-02 target), docs/DATA_MODEL.md §6 (Privacy Floor Enforcement), docs/AUDIT_LOG_SCHEMA.md (five new DEC-030 event types to register — checklist item 6), docs/SOC2_READINESS.md §35 P1–P8 Privacy Deep-Dive (P6.1 and P7.1 criteria mapping), docs/OBSERVABILITY.md §13 (Per-Tenant Observability — FORM-PRIV-* alerts to be registered in §6.2 alert rules table), docs/SSO_SCIM_IMPLEMENTATION.md §3 (tenant_admin role definition — RBAC boundary that privacy floor builds on), R-01 (parallel activation if individual data sent to third party), R-10 (Victor AI coach safety — adjacent clinical-safety scope), R-11 (CV biometric privacy — parallel if cv_sessions data involved), R-14 (DSAR — if an employee later requests access to data the employer saw). Owner: compliance-officer + clinical-safety.*
 
 *v1.5 additions (2026-06-03): Fixed header v1.3 → v1.5 (v1.4 additions dated 2026-06-02 added R-20 Insider Threat but did not update the document header). R-21 Key Rotation Failure & Scheduled Cryptographic Control Emergency — closes the runbook gap created when OBSERVABILITY.md §30 (Key Management & Cryptography Observability, v1.7, 2026-06-03) added AL-KEY-01 through AL-KEY-04 alert rules with no `runbook_url` cited; AL-KEY-02 (overdue P0) and AL-KEY-04 (verification missing P0) had no matching incident procedure. R-21 covers: CRYPTO-CHAIN-02 stop-gate (unauthorized rotation → R-05 + R-20, never R-21); severity classification table (P0/P1/P2 with upgrade rule); seven-row trigger matrix with CRYPTO-CHAIN-02 stop-gate row; four scope assessment queries (C1 KV state, C2 audit_log rotation history, C3 scheduler health, C4 HMAC cadence); per-key-type response procedures (SUPABASE_SERVICE_ROLE_JWT per SOC2_READINESS §57; HMAC_AUDIT_CHAIN_KEY dual-key per SOC2_READINESS §58; KEYPOINTS_ENC_KEY maintenance window pending OQ-KEY-02; API keys lower-ceremony); communication protocol with Template K-01 (enterprise tenant maintenance window notice for KEYPOINTS_ENC_KEY, ≥72h advance notice requirement); five DEC-030 HMAC-chained events (admin.key_rotation_incident_opened HIGH 3yr; admin.encryption_key_rotation_initiated HIGH 7yr; admin.encryption_key_rotated HIGH 7yr; admin.encryption_key_rotation_verified HIGH 7yr; admin.key_rotation_incident_closed STANDARD 3yr); evidence package IR-KEY-E-001 through IR-KEY-E-006 with SHA-256 manifest; SOC 2 mapping CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2/CC7.3; two open questions (OQ-KEY-01 DEC-030 event type registration — P0 M7; OQ-KEY-02 KEYPOINTS_ENC_KEY re-encryption strategy — P1 M12); seven-item implementation checklist (2× P0 M4/M7, 3× P1 M8/M12/M7, 2× P2 M7). Appendix A update pending checklist item 6. Cross-references: docs/OBSERVABILITY.md §30 (AL-KEY-01 through AL-KEY-04; CRYPTO-CHAIN-01 through CRYPTO-CHAIN-04; KEY-SLO-01 through KEY-SLO-04); docs/CRYPTOGRAPHY_POLICY.md §5 (rotation procedures per key type); docs/SOC2_READINESS.md §56 (key inventory); docs/SOC2_READINESS.md §57 (SUPABASE_SERVICE_ROLE_JWT rotation runbook); docs/SOC2_READINESS.md §58 (HMAC_AUDIT_CHAIN_KEY dual-key rotation runbook); docs/AUDIT_LOG_SCHEMA.md (admin.encryption_key_rotated — OQ-ENC-03 target event); docs/SSO_SCIM_IMPLEMENTATION.md §24 (PAM authorisation for rotation sessions); R-05 (HMAC chain break — escalation on CRYPTO-CHAIN-02); R-20 (insider threat — escalation on CRYPTO-CHAIN-02 or unauthorized rotation). Owner: security-engineer + devops-lead.*
 
