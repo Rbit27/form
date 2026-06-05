@@ -6,6 +6,18 @@
 
 ---
 
+## [2.7.0] — 2026-06-05
+
+### Added
+- `content/post-228-minimum-effective-dose.md` — Мінімальна ефективна доза при 3 год/тиждень; Ralston et al. (2017 JSCR) один підхід до відмови vs 3+ для новачків; MEV = maintenance у intermediate; Krieger (2010) та Schoenfeld et al. (2017) dose-response для гіпертрофії у тренованих; Rønnestad & Mujika (2014) мінімальна частота для збереження сили та м'язів; Hickson et al. (1981) — інтенсивність важливіша за частоту при редукції; Egner et al. (2013) міоядерна персистенція; Bjørnsen et al. (2019) швидке повернення м'язової маси; практична таблиця за сценаріями; clinical-safety NOT REQUIRED
+- `compliance/calendar/q3-2026-access-review.md` v1.0 — Q3 2026 Quarterly Access Review pre-review checklist; pre-review gate 2026-07-17 (T-14 days); виконання 2026-07-28 to 2026-07-31; закриває AR-2026-Q2-01 remediation (Q2 review was 36 days late — calendar gate was missing); кроки 0–6 відповідно до SOC2_READINESS.md §23; cross-ref §65.11 Q3 forward plan
+
+### Changed
+- `docs/SOC2_READINESS.md` §65.13 AR-P1-01 — позначено ✅ Closed (2026-06-05): `compliance/calendar/q3-2026-access-review.md` committed, AR-2026-Q2-01 remediation complete
+- `README.md` — post-228 позначено [x]
+
+---
+
 ## [2.6.4] — 2026-06-05
 
 ### Fixed
