@@ -6,6 +6,13 @@
 
 ---
 
+## [2.6.4] — 2026-06-05
+
+### Fixed
+- `pricing-enterprise.html` FAQ 6 — два текстові баги: (1) multi-year знижки виправлено з 10%/20% на 15%/25%, що відповідає UI-кнопкам і `CONTRACT_DISCOUNTS` в JS; (2) посилання "50% of $16 list" для Growth floor замінено коректним поясненням (Growth list price $9, не $16 — floor $8 є бізнес-мінімумом, не арифметичним 50%). enterprise-builder cloud worker · 2026-06-05.
+
+---
+
 ## [2.6.3] — 2026-06-05
 
 ### Added
