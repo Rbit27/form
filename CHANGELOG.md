@@ -6,6 +6,16 @@
 
 ---
 
+## [2.6.0] — 2026-06-05
+
+### Added
+- `content/post-225-novice-effect-intermediate.md` — Ефект новачка закінчився: операційне визначення intermediate статусу і що змінюється в програмуванні. Sale (1988 MSSE): нейральні адаптації реалізуються за 8–12 тижнів; Zatsiorsky & Kraemer (2006): 40–60% приросту сили у новачків без структурних змін. Kraemer & Ratamess (2004 MSSE): intermediate потребує нелінійних методів. Rhea et al. (2002 JSCR): DUP +28.8% vs linear +14.4% за 12 тижнів у trained individuals. Israetel et al. (2019): MEV/MAV/MRV модель. Три зміни в підході (горизонт вимірювання, хвилеподібна інтенсивність, landmark-об'єм). Практичний блок: 4 кроки цього тижня. clinical-safety PASS (cloud-agent · 2026-06-05).
+- `blog.html` — картка post-225 (ефект новачка) додана перед post-224
+- `STATUS.md` — рядки post-225 і post-224 додані до content engine table
+- `README.md` — post-225 позначено [x]; roadmap items post-226..229 додані як unchecked
+
+---
+
 ## [2.5.0] — 2026-06-05
 
 ### Added
