@@ -280,6 +280,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-207-antagonist-agonist-paired-sets.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-208-intensity-vs-volume-hypertrophy-threshold.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-209-eccentric-overload.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-219-rest-pause-myo-rep.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-218-central-command-exercise-pressor-reflex.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-217-muscle-architecture.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-216-vo2-kinetics.md | Blog | draft · clinical-safety NOT REQUIRED |
