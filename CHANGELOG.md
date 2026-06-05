@@ -6,6 +6,13 @@
 
 ---
 
+## [2.6.1] — 2026-06-05
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md v0.4` — +31 DEC-030 event registrations across five new families, closing six P0/P1 implementation checklist items across SSO_SCIM_IMPLEMENTATION.md and SOC2_READINESS.md. **SSO authentication policy (9 events, SSO §25.9):** `sso.auth_policy_updated`, `sso.ip_allowlist_entry_added/removed/toggled`, `sso.ip_blocked` (no user_id — pre-credential; client_ip_hash only), `sso.mfa_enforcement_changed`, `sso.mfa_enforcement_sweep_completed`, `sso.mfa_bypass_granted` (CRITICAL — tenant_admin only, FORM support cannot grant), `sso.auth_policy_lockout_recovery` (CRITICAL — PAM session ID in payload, not user_id). **PAM/privileged access (6 events, SSO §24.6):** `pam.elevation_requested` (justification_hash SHA-256, not text), `pam.elevation_approved` (approver_id nullable for read_only; WebAuthn credential IDs for destructive), `pam.elevation_denied` (reason enum: 7 values), `pam.session_expired` (sweeper-emitted; distinct from denial), `pam.break_glass_activated` (CRITICAL — cf_access_jti_hash; PagerDuty P0 AL-PAM-01), `pam.break_glass_expired` (review_issue_url backlink). **Google Directory Sync (8 events, SSO §21):** success/cache_hit/error/credential_uploaded/credential_rotated/sync_enabled/sync_disabled/sync_validated — user_email_hash SHA-256 in all user-referencing events; project_id only for credential events. **Session revocation (5 events + 1 support, SSO §22):** `session.bulk_revocation_started/complete`, `session.tenant_nuke_started/complete` (CRITICAL — authorised_by: two distinct UUIDs), `session.revocation_kv_sync_error` (P1 trigger); `support.unauthorized_nuke_attempt` added to support section (single-authoriser rejection record). **Security/RLS isolation (3 events, SOC2 §64.7):** `security.rls_bypass_attempt` (MEDIUM — request_ip_hash SHA-256+daily-salt, DPIA §4), `security.definer_function_cross_tenant` (HIGH — synchronous per-invocation, P0 trigger), `system.rls_test_suite_run` (STANDARD — CI workflow; per-TC verdict + R2 evidence_path). Retention table extended with 8 new rows covering api_key.*, scim.ip_*, sso.auth_policy family, pam.*, sso.google_directory_*, session revocation, security.rls_*. **Closes:** SSO_SCIM_IMPLEMENTATION.md §25.14 item 6 (P0 M4 — sso.auth_policy_* registration), §24.10 item 8 (P1 M4 — pam.* registration), §21 checklist item 5 (P0 M4 — Google Directory Sync registration), §22 checklist item 6 (P0 M4 — session revocation registration); SOC2_READINESS.md §64.9 item 2 (P0 — security.rls_bypass_attempt + security.definer_function_cross_tenant) and item 3 (P1 — system.rls_test_suite_run).
+
+---
+
 ## [2.6.0] — 2026-06-05
 
 ### Added

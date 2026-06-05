@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v0.3
+# FORM · Audit Log Schema v0.4
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -120,6 +120,96 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 
 > **Note:** `tenant.api_key_created` and `tenant.api_key_revoked` listed in the Tenant administration section above are consumer-tier shorthand entries. Enterprise-tier API key lifecycle is fully covered by the `api_key.*` namespace above, which provides rotation, IP enforcement, and block events not available in the consumer shorthand.
 
+---
+
+### SSO authentication policy events (DEC-030 HMAC-chained · SSO §25.9)
+
+> Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §25.9`. Nine events covering IP allowlist enforcement, MFA policy changes, and admin lockout recovery. Privacy floor: `sso.ip_blocked` fires before credential validation — `user_id` is omitted entirely; only `client_ip_hash` (SHA-256[:32] keyed with `IP_HASH_SALT` Workers Secret) is stored. `change_summary` in policy-change events must contain only CIDR count changes, not IP values. CRITICAL events (`sso.mfa_bypass_granted`, `sso.auth_policy_lockout_recovery`) trigger compliance-officer notification within 4h. Burst writes for `sso.ip_blocked` are smoothed through Cloudflare Queues (FIFO consumer) to maintain HMAC chain ordering under misconfiguration lockout scenarios. Cross-ref: SOC 2 CC6.1/CC6.2/CC6.8/CC7.2; closes SSO_SCIM_IMPLEMENTATION.md §25.14 checklist item 6 (P0 M4).
+
+| Event type | Severity | Retention | Payload fields | Trigger |
+|---|---|---|---|---|
+| `sso.auth_policy_updated` | HIGH | 7 yr | `tenant_id`, `changed_by_user_id`, `policy_dimension` (`ip_allowlist` / `mfa_enforcement` / `session_policy`), `change_summary` (human-readable diff — CIDR count changes only, no IP values), `policy_version_before`, `policy_version_after` | Any `PATCH /v1/admin/sso/policy` resulting in a DB write |
+| `sso.ip_allowlist_entry_added` | HIGH | 7 yr | `tenant_id`, `changed_by_user_id`, `entry_id` (UUID), `cidr_prefix_length` (e.g. `24` for /24 — prefix length only, never the full CIDR), `label` | CIDR added to `ip_allowlist_config.entries` |
+| `sso.ip_allowlist_entry_removed` | HIGH | 7 yr | `tenant_id`, `changed_by_user_id`, `entry_id`, `cidr_prefix_length`, `label` | CIDR removed from `ip_allowlist_config.entries` |
+| `sso.ip_allowlist_toggled` | HIGH | 7 yr | `tenant_id`, `changed_by_user_id`, `enabled_before` (bool), `enabled_after` (bool), `entry_count_at_toggle` | `ip_allowlist_config.enabled` changed |
+| `sso.ip_blocked` | HIGH | 7 yr | `tenant_id`, `client_ip_hash` (SHA-256[:32] — **no `user_id`; emitted before credential validation**), `enforcement_point` (`saml_callback` / `oidc_callback` / `token_refresh` / `admin_api` / `scim_api`), `policy_version` | Request blocked by IP allowlist enforcement |
+| `sso.mfa_enforcement_changed` | HIGH | 7 yr | `tenant_id`, `changed_by_user_id`, `mode_before` (`none` / `recommended` / `required`), `mode_after`, `mfa_grace_hours`, `estimated_sessions_affected` | `mfa_enforcement_mode` changed via `PATCH /v1/admin/sso/policy` |
+| `sso.mfa_enforcement_sweep_completed` | STANDARD | 3 yr | `tenant_id`, `sessions_revoked`, `sessions_already_satisfied`, `sweep_triggered_at` (ISO 8601), `grace_expired_at` (ISO 8601) | MFA grace period ends; hourly sweep job runs |
+| `sso.mfa_bypass_granted` | CRITICAL | 7 yr | `tenant_id`, `granted_by_user_id` (tenant_admin — FORM support cannot grant), `subject_user_id`, `bypass_duration_hours` (max 48), `reason` (free text, max 500 chars) | Tenant admin grants per-user MFA bypass via `PATCH /v1/admin/users/{id}/mfa-bypass` |
+| `sso.auth_policy_lockout_recovery` | CRITICAL | 7 yr | `tenant_id`, `recovery_type` (`ip_allowlist_disabled` / `policy_reset`), `recovery_performed_by` (PAM session ID — not user_id; FORM-internal action), `pam_session_id`, `affected_config_field`, `customer_notified` (bool) | FORM support performs lockout recovery via PAM `read_write` elevation (§25.8.1) |
+
+**HMAC chain requirement:** All nine events must include `prev_hash`. `sso.ip_blocked` is the highest-volume event in this family; under misconfiguration lockout scenarios it may emit hundreds per minute — use Cloudflare Queues (FIFO consumer) for block events to smooth write pressure while maintaining chain ordering. `sso.auth_policy_lockout_recovery` must reference the `pam_session_id` of the PAM elevation used to perform the recovery, linking the policy change to the privileged access record.
+
+---
+
+### PAM (Privileged Access Management) events (DEC-030 HMAC-chained · SSO §24.6)
+
+> Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §24.6`. Six events covering JIT privilege escalation lifecycle and break-glass protocol. Privacy floor: `justification_hash` stores SHA-256 of the justification text — the original text is retained in `PAM_KV` (7yr TTL) but never enters the audit chain; `pam.break_glass_activated` uses `cf_access_jti_hash` (SHA-256 of the Cloudflare Access JTI — not the raw JTI). `target_tenant_id` is nullable (null means FORM infrastructure, not a customer tenant). CRITICAL event `pam.break_glass_activated` triggers immediate PagerDuty P0 (AL-PAM-01) and compliance-officer email. Break-glass sessions require a mandatory post-hoc two-person review within 72h, linked via `pam_session_id`. Cross-ref: SOC 2 CC6.1/CC6.2/CC6.3/CC6.7; closes SSO_SCIM_IMPLEMENTATION.md §24.10 checklist item 8 (P1 M4).
+
+| Event type | Severity | Retention | Two-person rule | Payload fields |
+|---|---|---|---|---|
+| `pam.elevation_requested` | HIGH | 7 yr | No | `admin_user_id`, `access_level` (`read_only` / `read_write` / `destructive`), `pam_request_id`, `target_tenant_id` (nullable), `justification_hash` (SHA-256) |
+| `pam.elevation_approved` | HIGH | 7 yr | Pre-auth for `read_write`/`destructive` | `admin_user_id`, `approver_id` (nullable for `read_only`), `access_level`, `pam_session_id`, `expires_at` (ISO 8601), `requester_webauthn_credential_id` (nullable), `approver_webauthn_credential_id` (nullable) |
+| `pam.elevation_denied` | HIGH | 7 yr | No | `admin_user_id`, `access_level`, `pam_request_id`, `reason` (`self_approval_attempted` / `approval_timeout` / `cosign_timeout` / `totp_failure` / `webauthn_failure` / `policy_violation`) |
+| `pam.session_expired` | STANDARD | 7 yr | No | `admin_user_id`, `pam_session_id`, `access_level`, `expired_at` (ISO 8601) — emitted by `pam-expiry-sweeper`; distinct from `pam.elevation_denied` (session completed its full TTL) |
+| `pam.break_glass_activated` | CRITICAL | 7 yr | Post-hoc (72h review, §24.4.3) | `admin_user_id`, `pam_session_id`, `cf_access_jti_hash` (SHA-256), `activated_at` (ISO 8601); triggers PagerDuty P0 + compliance email immediately on emission |
+| `pam.break_glass_expired` | HIGH | 7 yr | No | `admin_user_id`, `pam_session_id`, `expired_at` (ISO 8601), `review_issue_url` (GitHub issue auto-created at activation) |
+
+**HMAC chain requirement:** `pam.elevation_approved` must follow `pam.elevation_requested` with the same `pam_request_id` in the chain. If `pam.break_glass_activated` is emitted without a preceding `pam.elevation_requested` for the same session (break-glass is a separate Cloudflare Access path), this is expected — do not treat the missing predecessor as a chain violation. A post-hoc `pam.elevation_approved` is not emitted for break-glass; the `pam.break_glass_activated` CRITICAL event is the authorisation record.
+
+---
+
+### Google Directory Sync events (DEC-030 HMAC-chained · SSO §21)
+
+> Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §21`. Eight events covering Google Workspace Directory API group sync lifecycle. Privacy floor: `user_email_hash` (SHA-256) is used in all events that reference individual users — plaintext email never enters the audit chain. Credential events include only `project_id` from the service account JSON (never the key material or private key fingerprint). High-volume sync events (`sso.google_directory_sync_success`, `sso.google_directory_sync_cache_hit`) are STANDARD severity and may be deduplicated within a 5-minute window per `(tenant_id, user_email_hash)` to manage write pressure while preserving at least one event per sync cycle. Cross-ref: SOC 2 CC6.1/CC6.3/CC9.2; closes SSO_SCIM_IMPLEMENTATION.md §21 checklist item 5 (P0 M4).
+
+| Event type | Severity | Retention | Payload fields |
+|---|---|---|---|
+| `sso.google_directory_sync_success` | STANDARD | 7 yr | `tenant_id`, `user_email_hash` (SHA-256), `group_count`, `fetch_duration_ms`, `cache_hit: false` |
+| `sso.google_directory_sync_cache_hit` | STANDARD | 7 yr | `tenant_id`, `user_email_hash` (SHA-256), `group_count`, `cache_age_seconds` |
+| `sso.google_directory_sync_error` | HIGH | 7 yr | `tenant_id`, `user_email_hash` (SHA-256), `error_code`, `http_status`, `grace_window_used` (bool) — feeds AL-SSO-GDIR-01 error rate alert |
+| `sso.google_directory_credential_uploaded` | HIGH | 7 yr | `tenant_id`, `actor_id`, `uploaded_by_role`, `project_id` (from service account JSON — **never the key or fingerprint**) |
+| `sso.google_directory_credential_rotated` | HIGH | 7 yr | `tenant_id`, `actor_id`, `old_project_id`, `new_project_id` |
+| `sso.google_directory_sync_enabled` | HIGH | 7 yr | `tenant_id`, `actor_id`, `admin_email_hash` (SHA-256 of impersonation email) |
+| `sso.google_directory_sync_disabled` | HIGH | 7 yr | `tenant_id`, `actor_id`, `reason` (free text, max 200 chars) |
+| `sso.google_directory_sync_validated` | STANDARD | 7 yr | `tenant_id`, `actor_id`, `test_user_role` |
+
+**HMAC chain requirement:** `sso.google_directory_credential_rotated` must follow `sso.google_directory_credential_uploaded` for the new key in a traceable sequence — the `actor_id` on both events must match (or be a `form_system` service account for programmatic rotation). `sso.google_directory_sync_disabled` by a `form_system` actor without a preceding `sso.google_directory_credential_rotated` (compromise path) must trigger AL-SSO-GDIR-04 (unauthorized actor alert).
+
+---
+
+### Session revocation events (DEC-030 HMAC-chained · SSO §22)
+
+> Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §22`. Five events covering KV-backed bulk session revocation and tenant nuke operations. Privacy floor: `authorised_by` contains two user UUIDs only — no names, emails, or roles are stored in the audit event. CRITICAL events (`session.tenant_nuke_started`, `session.tenant_nuke_complete`) require two distinct user IDs in `authorised_by`; the API layer enforces this before the event can be emitted — a nuke attempted with a single authoriser is rejected 403 and logged as `support.unauthorized_nuke_attempt` (HIGH, 7yr). Cross-ref: SOC 2 CC6.3/CC7.2/CC7.3; closes SSO_SCIM_IMPLEMENTATION.md §22 checklist item 6 (P0 M4).
+
+| Event type | Severity | Retention | Payload fields |
+|---|---|---|---|
+| `session.bulk_revocation_started` | HIGH | 7 yr | `tenant_id`, `user_count`, `scim_request_id`; **emitted before first KV write** (DEC-030 ordering: chain entry precedes state mutation) |
+| `session.bulk_revocation_complete` | HIGH | 7 yr | `tenant_id`, `user_count`, `sessions_revoked`, `duration_ms`, `scim_request_id` |
+| `session.tenant_nuke_started` | CRITICAL | 7 yr | `tenant_id`, `reason`, `authorised_by` (array of exactly two user UUIDs — API layer rejects nuke if array length ≠ 2 or both IDs are identical); **emitted before KV write** |
+| `session.tenant_nuke_complete` | CRITICAL | 7 yr | `tenant_id`, `reason`, `authorised_by`, `kv_ttl_seconds` |
+| `session.revocation_kv_sync_error` | HIGH | 7 yr | `tenant_id`, `user_id`, `session_id`, `error_code`, `fallback_supabase` (bool) — triggers PagerDuty P1 (AL-REVOKE-01); fallback Supabase path engaged when `fallback_supabase: true` |
+
+**HMAC chain requirement:** `session.bulk_revocation_started` must be committed to the chain before `handleBulkScimRevocation()` writes the first KV key. `session.tenant_nuke_started` must be committed before `nukeTenantSessions()` writes the `revoke:tenant:{tenant_id}:all` KV key. These ordering constraints are mandatory for DEC-030 tamper evidence — a chain entry inserted retroactively for an action that already occurred is a chain violation.
+
+**`support.unauthorized_nuke_attempt` (HIGH, 7yr):** Emitted when a tenant nuke API call is received with a single authoriser or with two identical user IDs. Payload: `{tenant_id, attempted_by_user_id, reason_provided, rejection_code: 'single_authoriser' | 'duplicate_authoriser'}`. This event is in the `support.*` namespace because it records a violation of an internal safety control, not a customer-visible action.
+
+---
+
+### Security & tenant isolation events (DEC-030 HMAC-chained · SOC2 §64.7)
+
+> Defined in `docs/SOC2_READINESS.md §64.7`. Three events covering RLS tenant isolation monitoring and CI test evidence. Privacy floor: `request_ip_hash` in `security.rls_bypass_attempt` is SHA-256 of the client IP with a daily rotating salt (per DPIA §4 constraint) — never a raw IP. `security.definer_function_cross_tenant` must never be aggregated or batched — emit synchronously per invocation (HIGH severity treated equivalent to a confirmed RLS bypass; triggers immediate P0 incident via R-09). Cross-ref: SOC 2 CC6.1/CC6.3/CC6.6/PI1.5-C3; closes SOC2_READINESS.md §64.9 checklist items 2 (P0) and 3 (P1).
+
+| Event type | Severity | Retention | Emitter | Payload fields |
+|---|---|---|---|---|
+| `security.rls_bypass_attempt` | MEDIUM | 7 yr | Cloudflare Worker `rls-guard` middleware | `tenant_id_in_jwt` (UUID), `tenant_id_in_filter` (UUID), `table_name`, `query_path` (e.g. `/rest/v1/workout_sessions`), `request_ip_hash` (SHA-256 of IP + daily salt — **not raw IP**) |
+| `security.definer_function_cross_tenant` | HIGH | 7 yr | Cloudflare Worker or Supabase Edge Function `definer-audit` wrapper | `function_name`, `caller_tenant_id` (UUID), `returned_tenant_ids` (UUID array — distinct tenant_ids that do not match caller), `row_count` (total cross-tenant rows) — triggers PagerDuty P0 immediately |
+| `system.rls_test_suite_run` | STANDARD | 3 yr | CI workflow step in `rls-isolation-tests.yml` | `run_id` (GitHub Actions run_id), `ci_build_id` (run_id + run_attempt), `git_sha` (40-char), `tc_rls_001_result` / `tc_rls_002_result` / `tc_rls_003_result` / `tc_rls_004_result` / `tc_rls_005_result` (each: `PASS` / `FAIL` / `SKIP`), `overall_verdict` (`PASS` / `FAIL`), `evidence_path` (R2 object key for PRE-36-E-007 artefact) |
+
+**HMAC chain requirement:** `security.rls_bypass_attempt` is expected to be low-volume under normal conditions (rare client bugs or adversarial probes) — no Queues batching needed. A spike > 10 events / 10 min for a single `tenant_id_in_filter` value should be escalated to R-09 Security Incident. `system.rls_test_suite_run` fires on every push to `main` — this is a high-frequency routine event; STANDARD severity is intentional.
+
+---
+
 ### Integration
 - `integration.webhook_created` / `integration.webhook_fired`
 - `integration.connector_added` (Slack, MS Teams, etc.)
@@ -162,8 +252,18 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 | `system.deployment` | 5 years | Incident investigation |
 | `system.access_review_completed` | 7 years | SOC 2 CC6 quarterly audit evidence |
 | `system.credential_rotated` | 7 years | SOC 2 CC6 key management trail |
+| `system.rls_test_suite_run` | 3 years | CI tenant isolation test run log |
 | `admin.*` (key management) | 7 years | Encryption governance + incident investigation |
+| `api_key.*` | 7 years | SOC 2 CC6.4 credential lifecycle evidence |
+| `scim.ip_enforcement_*` / `scim.ip_blocked` | 7 years | SOC 2 CC6.1 network-layer access evidence |
+| `sso.auth_policy_updated` / `sso.ip_allowlist_*` / `sso.ip_blocked` / `sso.mfa_enforcement_changed` / `sso.mfa_bypass_granted` / `sso.auth_policy_lockout_recovery` | 7 years | SOC 2 CC6.1/CC6.2/CC6.8 auth policy audit trail |
+| `sso.mfa_enforcement_sweep_completed` | 3 years | Operational sweep completion; not required for SOC 2 observation evidence |
+| `pam.*` | 7 years | SOC 2 CC6.1/CC6.2/CC6.3 JIT privilege access evidence; break-glass record |
+| `sso.google_directory_*` | 7 years | SOC 2 CC6.3/CC9.2 Google Workspace Directory sync evidence |
+| `session.bulk_revocation_*` / `session.tenant_nuke_*` / `session.revocation_kv_sync_error` | 7 years | SOC 2 CC6.3 timely logical access removal evidence |
+| `security.rls_bypass_attempt` / `security.definer_function_cross_tenant` | 7 years | Tenant isolation breach evidence; SOC 2 CC6.6/PI1.5 |
 | `support.*` | 10 years | Trust + future legal discovery |
+| `support.unauthorized_nuke_attempt` | 7 years | Internal safety control violation record |
 | `integration.api_call` (sampled) | 30 days | Volume management |
 | `data.read_aggregate` | 90 days | Investigation but not unlimited |
 
@@ -234,6 +334,7 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 
 ---
 
-**v0.3 · червень 2026 · owner: compliance-officer + security-engineer**
+**v0.4 · червень 2026 · owner: compliance-officer + security-engineer**
+*v0.4 (2026-06-05): +31 events across five new families: SSO authentication policy (9 events: sso.auth_policy_updated, sso.ip_allowlist_entry_added, sso.ip_allowlist_entry_removed, sso.ip_allowlist_toggled, sso.ip_blocked, sso.mfa_enforcement_changed, sso.mfa_enforcement_sweep_completed, sso.mfa_bypass_granted, sso.auth_policy_lockout_recovery); PAM/privileged access (6 events: pam.elevation_requested, pam.elevation_approved, pam.elevation_denied, pam.session_expired, pam.break_glass_activated, pam.break_glass_expired); Google Directory Sync (8 events: sso.google_directory_sync_success/cache_hit/error/credential_uploaded/credential_rotated/sync_enabled/sync_disabled/sync_validated); session revocation (5 events: session.bulk_revocation_started/complete, session.tenant_nuke_started/complete, session.revocation_kv_sync_error + support.unauthorized_nuke_attempt in support section); security/RLS isolation (3 events: security.rls_bypass_attempt, security.definer_function_cross_tenant, system.rls_test_suite_run). Retention table updated with 8 new rows for all new event classes. Closes: SSO_SCIM_IMPLEMENTATION.md §25.14 item 6 (P0 M4 — sso.auth_policy_* registration), §24.10 item 8 (P1 M4 — pam.* registration), §21 checklist item 5 (P0 M4 — sso.google_directory_* registration), §22 checklist item 6 (P0 M4 — session revocation registration); SOC2_READINESS.md §64.9 items 2 (P0 — security.rls_bypass_attempt, security.definer_function_cross_tenant) and 3 (P1 — system.rls_test_suite_run).*
 *v0.3 (2026-06-05): +privacy.floor_breach_detected, +privacy.floor_breach_contained, +privacy.floor_breach_tenant_notified, +privacy.floor_breach_resolved, +privacy.no_go_escalation_activated. +privacy.floor_breach_* retention row. Closes INCIDENT_RESPONSE.md R-22 §checklist item 6 (P0 — DEC-030 registration for all five privacy floor breach events). Events are HMAC-chained, CRITICAL/HIGH/STANDARD severity per R-22 §DEC-030 table; payloads canonical to INCIDENT_RESPONSE.md §R-22 lines 7848–7854.*
 *v0.2 (2026-06-05): +system.access_review_completed, +system.credential_rotated, +admin.encryption_key_rotated, +admin.signing_key_rotated. Closes SOC2_READINESS §65.13 AR-P1-03/AR-P1-04/AR-P1-05.*
