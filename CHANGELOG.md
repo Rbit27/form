@@ -6,6 +6,16 @@
 
 ---
 
+## [2.1.0] — 2026-06-05
+
+### Added
+- `content/post-222-genetics-training-response.md` — Генетика і тренувальна відповідь: що ACTN3, ACE і HERITAGE говорять насправді. Yang et al. (2003 Am J Hum Genet): ACTN3 R577X — XX-генотип практично відсутній серед олімпійських спринтерів, але ефект-розмір для рекреаційних атлетів малий (d < 0.3, Pickering et al. 2017 JSCR); Scott et al. (2006 Genomics) — компенсаторна пластичність: підвищений кальпаїн-3 і зсув складу волокон до Type I у XX-індивідів. Montgomery et al. (1998 Nature): ACE I/D — II-генотип +189% vs DD +40% у 10-тижневому тренінгу передпліч; Sonna et al. (2001) і Ahmetov & Fedotovskaya (2013 Human Genetics): мета-аналітичний ефект ~1–2% варіації відповіді — нестабільний між популяціями. Bouchard et al. (1999 Med Sci Sports Exerc): HERITAGE Family Study — 481 учасник, 20 тижнів ідентичного протоколу, приріст VO₂max від <5% до >50% — heritability ~50%. Bouchard et al. (2011 Physiogenomics): 21 SNP разом пояснюють ~49% варіації, жоден окремий ген не пояснює >2% — winner's curse відомий. Bloomfield et al. (2004 J Appl Physiol): «non-responders» до стандартного протоколу стають responders при збільшенні частоти — low responder = потребує іншого стимулу. Чому PRS для тренувальної відповіді поки не валідований клінічно; порівняльна таблиця інформативності: генотип vs фенотипічний моніторинг (силовий приріст тиждень/тиждень, гіпертрофійна динаміка, відповідь на модифікацію протоколу). clinical-safety NOT REQUIRED
+- `blog.html` — картка post-222 (genetics/training response) додана перед post-221
+- `README.md` — post-222 позначено [x] done з детальним описом
+- `STATUS.md` — рядок post-222 у content engine table
+
+---
+
 ## [2.0.0] — 2026-06-05
 
 ### Added
