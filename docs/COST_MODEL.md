@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v1.9
+# FORM · Cost Model & Unit Economics v2.0
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -148,6 +148,17 @@
     - 29.8 DEC-030 Geo Audit Events
     - 29.9 Implementation Checklist
     - 29.10 Open Questions (OQ-GEO-01 to OQ-GEO-03)
+30. [G&A & Founder Compensation Cost Model](#30-ga--founder-compensation-cost-model)
+    - 30.1 Purpose and Scope
+    - 30.2 Founder Compensation Model (four phases)
+    - 30.3 Accounting & Finance Function
+    - 30.4 Administrative Tooling
+    - 30.5 Consolidated G&A Cost Table by Stage
+    - 30.6 G&A as % ARR Trajectory
+    - 30.7 Back-Office Hiring Sequence
+    - 30.8 DEC-030 G&A Audit Events
+    - 30.9 Implementation Checklist
+    - 30.10 Open Questions (OQ-GGA-01 to OQ-GGA-03)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -5587,3 +5598,253 @@ GDPR does not require a data controller to be an EU legal entity — a non-EU co
 *v1.9 (2026-06-04): §28 Marketing & Demand Generation Cost Model — the cost and channel counterpart to §27 Engineering and the operational detail behind §22.3 "Marketing / UA" cash flow line. §28.1 scopes the section to ten deliverables: marketing cost taxonomy, pre-launch budget, ASO investment, consumer paid acquisition economics, enterprise demand gen budget, tooling stack, first marketing hire economics, S&M-as-%-ARR benchmarks, magic number model, and DEC-030 audit events. §28.2 marketing cost taxonomy: COGS vs. S&M classification for eight spend types; consumer vs. enterprise cost split noting that enterprise demand gen at pre-PMF is ~100% founder time (no incremental cash beyond tools). §28.3 pre-launch budget (M1–M4): $3,500 total cash across waitlist infrastructure, content creation, ASO screenshot design, and limited ASA test — directly mapped to §22.3 Marketing/UA line. §28.4 ASO investment: $700–$1,400 initial external cost plus 17h founder time; conversion rate improvement from 5% to 10% on 1,000 monthly product page views = 50 incremental installs/month at $0 marginal cost — highest-leverage pre-launch action. §28.5 consumer paid acquisition: channel benchmark table (ASA brand $17–$50 effective CAC, ASA discovery $40–$200, Meta $43–$267, TikTok $40–$300, organic ≥ $15–$30 with higher LTV); MKT-UA-GATE-01 hard ceiling (D30 ≥ 35%, App Store live, install-to-Pro rate measured on ≥ 50 organic); paid UA cap $1,000/month until gate is green. §28.6 enterprise demand gen: founder-led phase $300–$1,200/month (LinkedIn thought leadership $0 cash, HubSpot Free CRM, selective events $0–$500/event); post-Series A demand gen $7,600–$19,450/month (AE outbound tools, ABM LinkedIn $1,500–$5,000/month, events $4,000–$10,000/year, content agency $2,000–$4,000/month). §28.7 marketing tooling stack: pre-launch $0–$38/month (Figma free, Loops free, PostHog already paid, Buffer free, HubSpot Free CRM); post-launch $79–$179/month excluding ad spend; Series A $346–$666/month (Outreach, LinkedIn Sales Nav, Apollo.io, Clearbit). §28.8 first marketing hire economics: four profile options (Content Writer $25k–$40k, Growth Marketer $40k–$60k, PMM $50k–$75k, VP Marketing $70k–$100k UA rates); recommended first hire Growth Marketer at Month 18–22 post-consumer-PMF; three hiring gates (MKT-HIRE-01 D30 ≥ 40% + organic traction + founder time > 8h/week; MKT-HIRE-02 PMM concurrent with AE; MKT-HIRE-03 Head of Marketing post-Series A); marketing hires are 100% S&M — no gross margin impact (contrast with §26.6 CS gross margin impact). §28.9 S&M as % ARR: industry benchmarks (Bessemer/SaaS Capital) at four stages; FORM targets pre-revenue 40–60%, $100k–$500k ARR 35–50%, $500k–$1M ARR 30–40%, $1M–$3M ARR 25–35%; combined S&M + G&A target ≤ 50% ARR at Series A. §28.10 magic number model: formula (net new ARR ÷ prior quarter S&M spend); four-milestone table (Q4 Year 1 6.4× enterprise-driven anomaly, Q2 Year 2 2.0×, Q4 Year 2 1.4×, Q2 Year 3 1.3×); interpretive note that magic number is unreliable before first AE and > $10k/quarter S&M spend; data pipeline requirement (ARR bridge §23.1 + S&M expense classification + §18.1 ARR recognition). §28.11 three DEC-030 marketing spend audit events: mkt.paid_ua_gate_unlocked (STANDARD, 3yr, once per gate), mkt.paid_channel_paused (STANDARD, 3yr, on > $200/month channel pause — key CAC governance control), mkt.marketing_hire_onboarded (STANDARD, 7yr, mirrors ops.engineer_hired). §28.12 seven-item implementation checklist: 3× P0 M3–M4 (UTM attribution in PostHog, App Store assets, email drip sequence), 3× P1 M4–M6 (MKT-UA-GATE-01 OKR, monthly marketing cost report, DEC-030 event registration), 1× P2 post-AE (magic number reporting). §28.13 three open questions: OQ-MKT-01 (content flywheel vs. paid UA sequencing — P0, M3 content plan lock; recommended: content M1 + ASA at launch + Meta only after GATE-01), OQ-MKT-02 (incentivised referral vs. social-share mechanic — P1, before App Store launch; recommended social-share first as more brand-congruent), OQ-MKT-03 (gated vs. ungated enterprise collateral — P2, before first collateral published; recommended ungated at pre-PMF founder-led phase). Cross-references: §8.5 (enterprise CAC per deal — not duplicated here), §14.4–14.5 (consumer CAC payback and LTV:CAC floors — floor inputs for §28.5 paid UA ceiling), §18.7 (magic number > 0.75 target in SaaS glossary — operationalised in §28.10), §19.3–19.5 (enterprise GTM pipeline model — revenue side of the S&M efficiency ratio), §22.3 (cash flow — Marketing/UA line source data), §23.1 (ARR bridge — magic number numerator), §26.1 (CS cost taxonomy — privacy floor reminder applicable here), §27.9 (ops.engineer_hired DEC-030 pattern — mkt.marketing_hire_onboarded mirrors), docs/ENTERPRISE.md (enterprise pricing + no-go customers), docs/AUDIT_LOG_SCHEMA.md (DEC-030 event registry), docs/GROWTH_LOOPS.md (referral mechanic context). Owner: founder + marketing-lead + growth-lead + data-engineer.*
 
 *v1.8 (2026-06-04): §27 Engineering Team Cost Model — the cost and hiring counterpart to §26 CS Cost Model and the operational detail behind §22.3 cash flow. §27.1 scopes the section to seven deliverables covering founding engineer total comp, technical hiring sequence, infrastructure run-rate by stage, build vs. buy, CV pipeline unit economics, engineering as % ARR trajectory, and burn rate gates. §27.2 founding engineer total compensation: cash cost $100k–$139k (midpoint ~$120k) including base $80k–$110k, employer taxes ~16%, hardware $3.5k–$5k one-time, onboarding overhead ~$4k–$6k founder-time cost — corrects the §22.3 $100k placeholder by $20k–$39k; equity grant 2.5%–3.5% at pre-seed, 1.0%–1.5% at seed, ~0.25% at Series A. §27.3 four-hire technical sequence: Founding Engineer (iOS + Supabase, Month 13 Base / Month 10–11 Bull, $80k–$110k); Platform Engineer (Cloudflare Workers + Supabase enterprise backend, Month 18–22, $75k–$100k, triggered by first enterprise contract or 15h/week founder backend time); ML/CV Engineer (model training + Core ML, Month 24–30 post-Series A, $90k–$130k, triggered by CV pipeline live + model quality as #1 complaint); Series A team of 5 at $415k–$555k/year total payroll. §27.4 infrastructure cost table across eight services (Cloudflare Workers, Supabase, R2, Anthropic API, Sentry, PagerDuty, WorkOS, Better Stack) at four scale stages: pre-revenue ~$77/mo, 1k MAU ~$140–280/mo, 10k MAU ~$680–1,300/mo, 50k MAU ~$2,800–5,500/mo; Anthropic API becomes the largest single line at 50k MAU ($1,500–$3,500/mo) but remains <0.3% of revenue per user at $79/mo price point. §27.5 seven-service build-vs-buy analysis: BUY verdicts for WorkOS (6–10 engineering weeks saved per IdP), Supabase (full-time DBA alternative), Anthropic API (no viable build alternative pre-Series B), PagerDuty, Sentry, Better Stack; BUILD verdict for CV pose estimation (on-device moat, privacy requirement, avoids $108k–$360k/year in GPU compute at 50k MAU). §27.6 CV pipeline unit economics: on-device inference at $0 marginal per-session cost vs. ~$108k–$360k/year hypothetical server-side at 50k MAU; device floor A14 (iPhone 12+); model size 20–35 MB INT8 quantized; P95 latency 25–50ms on A15+. §27.7 engineering as % ARR trajectory: 83%–115% at $100k ARR (step-function hire before revenue catches up); 34%–48% at $500k; 26%–36% at $1M; 16%–21% at $3M — operating leverage curve consistent with B2B SaaS benchmarks. §27.8 four burn rate gates (ENG-GATE-01 through ENG-GATE-04) with trigger conditions and block conditions; anti-pattern warning against ML hire before product-market fit. §27.9 three DEC-030 engineering spend audit events: ops.engineer_hired (STANDARD, 7yr), ops.infra_cost_threshold_crossed (STANDARD, 3yr), ops.build_vs_buy_decision (STANDARD, 7yr). §27.10 six-item implementation checklist: 2× P0 (§22.3 cash flow correction, engineer JD live), 3× P1 (ENG-GATE-01 OKR, monthly infra tracking, DEC-030 event registration), 1× P2 (build-vs-buy decision log for CV). §27.11 three open questions: OQ-ENG-01 (UA FOP vs. US contractor structure — P0, before offer letter), OQ-ENG-02 (iOS-specialist vs. fullstack founding engineer profile — P1, before JD finalisation), OQ-ENG-03 (device-compatibility floor for CV — P2, decide at 1k beta users). Cross-references: §22.3 (cash flow model — founding engineer line correction), §24.7 (cap table — equity grant dilution for founding engineer), §25.6 (compliance cost as % ARR — combined with engineering for total support+engineering stack), §26.4 (CS vs. engineer hire order), docs/TECHNICAL.md (CV pipeline architecture), docs/SSO_SCIM_IMPLEMENTATION.md §§23–26 (enterprise backend workload for Platform Engineer), docs/MOBILE_ROADMAP.md (iOS engineering context), docs/AUDIT_LOG_SCHEMA.md (engineering spend DEC-030 events). Owner: founder + data-engineer + platform-engineer.*
+
+---
+
+## 30. G&A & Founder Compensation Cost Model
+
+### 30.1 Purpose and Scope
+
+This section closes **OQ-27** (founder salary policy — §22.8) and supplies the detailed model behind the `G&A and founder salary` line in §24.4 Capital Requirements ($240,000–$360,000 [ESTIMATE] over 18 post-Series A months). Sections §25 through §29 modelled five functional cost centres (compliance, CS, engineering, marketing, geo-expansion). G&A is the sixth and final function, covering the costs of *running the company itself* — founder compensation, financial administration, and the thin layer of administrative tooling not already captured elsewhere.
+
+**Scope of this section:**
+
+| Category | Covered here | Covered elsewhere |
+|---|---|---|
+| Founder cash compensation | ✅ §30.2 | — |
+| Bookkeeping / accounting | ✅ §30.3 | — |
+| Fractional / full-time CFO | ✅ §30.7 | — |
+| Admin tooling (G-Suite, Notion) | ✅ §30.4 | — |
+| Cyber liability + E&O insurance | — | §25.2 |
+| D&O insurance | — | §25 OQ-36 |
+| Legal / compliance overhead | — | §25.3 |
+| Engineering infrastructure | — | §27.4 |
+| Marketing tooling | — | §28.7 |
+
+**Owner:** founder + data-engineer. **Review:** quarterly, or immediately after any compensation phase change.
+
+---
+
+### 30.2 Founder Compensation Model
+
+#### 30.2.1 Four-Phase Compensation Trajectory
+
+The founding phase of a capital-efficient startup in a CEE market is distinct from the Silicon Valley pattern where seed rounds routinely fund $150k+ founder salaries from Day 1. The FORM model assumes the founder has personal runway (savings, partner income, or family support) to cover living expenses through the validation phase, and transitions to company-funded compensation in stages tied to business milestones rather than arbitrary calendar dates.
+
+| Phase | Trigger | Monthly cash (UAH equivalent) | Rationale |
+|---|---|---|---|
+| **Phase 0 — Ramen** | M1 through first enterprise contract close (estimated M8–M12) | $0 [FOUNDER_INPUT] | Company pre-revenue; all cash preserved for product and compliance. §22.2 baseline assumption. |
+| **Phase 1 — Sustenance** | First enterprise contract signed AND 90-day pilot conversion rate ≥ 50% | $2,500–$5,000 [ESTIMATE] | Company demonstrates revenue can cover basic founder cost. Does not require full ARR coverage. |
+| **Phase 2 — Early Market** | ARR ≥ $100k AND gross margin ≥ 70% (§6.2 trajectory) | $6,000–$10,000 [ESTIMATE] | Business is demonstrably alive; founder can transition from pure capital-preservation to sustainable operations. |
+| **Phase 3 — Post-Series A** | Series A closed (§24.9 triggers met) | $10,000–$15,000 [ESTIMATE] | Investor expectation: founder draws a salary after institutional capital closes; below-market comp reduces dilution pressure and signals conviction. Upper bound $15k is consistent with §24.4 G&A assumptions. |
+
+**OQ-27 recommended resolution:** Phase 0 through first contract. Phase 1 at first enterprise contract close. Phase 2 at ARR ≥ $100k. Phase 3 at Series A. The founder's personal financial runway (savings + partner income) determines whether Phase 0 can hold to M12 — this is a [FOUNDER_INPUT] that must be documented privately before company formation, but must not be disclosed to employees or early hires. Owner: founder. Resolution: **before company formation or within 30 days of first capital receipt**.
+
+**Annual G&A impact of founder compensation:**
+
+| Phase | Annual founder comp cost (USD) | % of $150k initial funding | % of §24.4 Bear raise ($2M) |
+|---|---|---|---|
+| Phase 0 | $0 | 0% | 0% |
+| Phase 1 ($3,500/mo midpoint) | $42,000 [ESTIMATE] | 28% | 2.1% |
+| Phase 2 ($8,000/mo midpoint) | $96,000 [ESTIMATE] | 64% | 4.8% |
+| Phase 3 ($12,500/mo midpoint) | $150,000 [ESTIMATE] | — | 7.5% |
+
+#### 30.2.2 Ukrainian FOP Structure Note
+
+If the company operates as a Ukrainian LLC (ТОВ) and the founder is simultaneously a Ukrainian FOP (ФОП, фізична особа-підприємець — sole trader), the salary/compensation structure is more complex than Western equivalents:
+
+- A Ukrainian LLC can pay the founder either as an **employee** (зарплата, ~18% personal income tax + 22% social security on the employer side) or as a **service contract** with the founder's FOP entity (~5% simplified tax on FOP income for Group 3, or 2% for wartime temporary Group 3 regime).
+- The FOP route is significantly cheaper in total tax load (effective ~5–7% vs. ~40% combined employment taxes) but requires the founder to maintain a separate FOP and invoice the LLC.
+- **War-context complication:** Under martial law in Ukraine (as of 2026), certain FOP tax regimes have been modified. The 2% wartime rate for Group 3 FOP may be available to qualifying businesses. Confirm with Ukrainian tax counsel before structuring compensation.
+- **HoldCo implication:** If a Delaware C-Corp or Cyprus HoldCo is formed (§24.8 OQ-33), founder compensation may flow through the HoldCo entity instead, which changes the tax treatment entirely. Resolve legal structure before the first compensation payment.
+
+**Interaction with §27 OQ-ENG-01:** The engineering hire structure question (UA FOP vs. US contractor) has the same legal framework as founder compensation. Both should be resolved in a single legal consultation before the first hire. Cross-reference §27.11 OQ-ENG-01.
+
+---
+
+### 30.3 Accounting & Finance Function
+
+Accounting costs scale with business complexity, not headcount. The four stages below match FORM's operational phases.
+
+| Stage | Trigger | What's needed | Monthly cost [ESTIMATE] |
+|---|---|---|---|
+| **Pre-launch (M1–M4)** | Company formed, pre-revenue | Ukrainian accountant for FOP/LLC statutory filings; bank reconciliation; annual tax return | $150–$300 [ESTIMATE] |
+| **Post-launch (M4–M12)** | App Store live; first consumer revenue; enterprise pilot invoices | Xero or QuickBooks subscription + virtual bookkeeper (10h/month); accrual accounting set-up; deferred revenue tracking per §18.1 | $400–$700 [ESTIMATE] |
+| **Series A prep (M12–M18)** | ARR ≥ $100k; first investor diligence likely | CPA review engagement (not full audit) for 12 months of financials; audit-ready financial statements; cap table modelling per §24.7 | $8,000–$15,000 one-time [ESTIMATE] + $500–$800/month ongoing |
+| **Post-Series A (M18+)** | Institutional investors on cap table; Board formed | Fractional CFO ($3,000–$6,000/month [ESTIMATE]) for Board reporting, investor updates, budget-vs-actual analysis, Series B prep; statutory audit may be required at investor insistence (~$25,000–$50,000/year [ESTIMATE]) | $3,500–$6,800/month [ESTIMATE] |
+
+**Key inflection point — deferred revenue:** Enterprise annual contracts create deferred revenue from Day 1 of contract signing. Once the first enterprise contract closes, Xero must be configured for deferred revenue recognition (12 equal tranches per §18.1). This is not possible with a simple cash-basis spreadsheet and is the primary trigger for engaging a bookkeeper with SaaS accounting experience. Owner: founder + data-engineer.
+
+**CPA firm selection criteria:** At Series A prep, the CPA must have experience with: (a) SaaS revenue recognition (ASC 606 / IFRS 15); (b) cross-border entities (UA LLC + Delaware HoldCo if applicable); (c) Ukrainian statutory accounting requirements (P(S)BO or IFRS-light). A Big Four firm is unnecessary at this stage — a boutique with CEE SaaS experience is the right profile at $8,000–$15,000 for a review engagement.
+
+---
+
+### 30.4 Administrative Tooling
+
+This table covers G&A-category software tools that are not already modelled in §27.4 (engineering infrastructure) or §28.7 (marketing/sales tooling). Items where free tiers cover the pre-Series A phase are marked accordingly.
+
+| Tool | Purpose | Monthly cost (1–3 person stage) [ESTIMATE] | Monthly cost (5–10 person stage) [ESTIMATE] | Notes |
+|---|---|---|---|---|
+| Google Workspace Business Starter | Email (@form.coach), Drive, Docs, Meet | $6/user → $6–$18 | $6/user → $30–$60 | Mandatory for professional email and document collaboration |
+| Notion Team | Internal knowledge base, decision log, OKRs | $16/member → $0–$16 (free for 1 member) | $16/member → $48–$80 | Free for single member; Team plan required once second person joins internal docs |
+| Loom Business | Async video for investor updates, customer onboarding | $12.50/creator → $12.50 | $12.50/creator → $25–$37.50 | One creator seat sufficient pre-Series A; expand as CS hires join |
+| Calendly Teams | Scheduling for sales and enterprise demos | $16/member → $0 (basic free) | $16/member → $32–$48 | Free Calendly sufficient through first 3 enterprise pilots; Teams adds routing rules |
+| 1Password Teams | Password / secrets manager for team | $4/user → $4 (already in CRYPTOGRAPHY_POLICY §3) | $4/user → $20–$40 | Cross-reference: `docs/CRYPTOGRAPHY_POLICY.md §3`; counted here for G&A completeness |
+| **Admin tooling subtotal** | — | **$22–$51/month** [ESTIMATE] | **$135–$225/month** [ESTIMATE] | Excludes Slack (free up to 90-day message history), Zoom (free tier adequate for external calls pre-Series A) |
+
+**Excluded from this table (tracked in other sections):**
+- Slack Pro: $7.25/person/month — triggered at first hire; included in §27.4 at that point
+- Figma: marketing/design; §28.7
+- HubSpot CRM: sales tooling; §28.7
+- Sentry, PagerDuty, Better Stack: engineering observability; §27.4
+- PostHog: analytics; §27.4
+
+**Admin tooling is not a meaningful cost at the pre-Series A stage.** Total spend of $22–$225/month is noise against the founder compensation and accounting line. The importance is ensuring the right tools are in place for investor-grade documentation (data room readiness per §24.3) before the Series A process begins.
+
+---
+
+### 30.5 Consolidated G&A Cost Table by Stage
+
+All figures [ESTIMATE]. `—` means the cost is $0 (Phase 0 assumption) or not yet applicable.
+
+| G&A Category | Pre-launch M1–M4 | Phase 0: Pre-revenue M4–M12 | Phase 1–2: Post-first-deal M12–M18 | Phase 3: Post-Series A M18–M30 |
+|---|---|---|---|---|
+| Founder compensation | $0 | $0 | $2,500–$10,000/mo | $10,000–$15,000/mo |
+| Accounting / bookkeeping | $150–$300/mo | $400–$700/mo | $500–$800/mo | $3,500–$6,800/mo (incl. fractional CFO) |
+| Admin tooling | $22–$51/mo | $22–$51/mo | $50–$150/mo | $135–$225/mo |
+| CPA review (one-time) | — | — | $8,000–$15,000 (one-time at M12) | — |
+| Statutory audit (annual) | — | — | — | $25,000–$50,000/year (if required) |
+| **Monthly G&A total** | **$172–$351/mo** | **$422–$751/mo** | **$3,050–$10,950/mo** | **$13,635–$22,025/mo** |
+| **Annualised G&A** | **~$2,100–$4,200** | **~$5,000–$9,000** | **~$37,000–$131,000** | **~$164,000–$265,000** |
+
+**Reconciliation to §24.4:** The §24.4 Bear/Base/Bull G&A line ($240k–$360k over 18 months post-Series A) maps to Phase 3 annualised G&A ($164k–$265k) plus the one-time CPA review at M12 ($8k–$15k) and the first year of statutory audit if required. The §24.4 [ESTIMATE] labels are intentional: the dominant variable is the founder salary decision (OQ-GGA-03), which can shift the range by $60k–$90k depending on Phase 3 salary level chosen.
+
+---
+
+### 30.6 G&A as % ARR Trajectory
+
+**Important caveat:** G&A as a percentage of ARR is misleading at sub-$300k ARR because the denominator is too small. A founder drawing $10k/month against $50k ARR produces a 240% "G&A ratio" that signals nothing about operational efficiency. The useful metric at early stage is **absolute monthly G&A burn**, not a ratio.
+
+Once ARR exceeds $300k, the ratio becomes meaningful for investor benchmarking.
+
+| ARR milestone | Annual founder comp ($12.5k/mo Phase 3) | Accounting + CFO (annualised) | Admin tooling | Total annualised G&A | G&A % ARR [ESTIMATE] |
+|---|---|---|---|---|---|
+| $50k ARR | $150,000 | $36,000 | $600 | ~$186,600 | ~373% — meaningless |
+| $100k ARR | $150,000 | $42,000 | $1,200 | ~$193,200 | ~193% — still misleading |
+| $300k ARR | $150,000 | $48,000 | $1,800 | ~$199,800 | ~67% |
+| $500k ARR | $150,000 | $54,000 | $2,400 | ~$206,400 | ~41% |
+| $1M ARR | $150,000 | $66,000 | $2,700 | ~$218,700 | ~22% |
+| $3M ARR | $180,000 | $84,000 | $2,700 | ~$266,700 | ~9% |
+
+**SaaS benchmarks (Bessemer/SaaS Capital):**
+
+| Stage | Median G&A % Revenue |
+|---|---|
+| Pre-revenue / seed | Not meaningful |
+| Series A ($1–5M ARR) | 15–25% |
+| Series B ($5–20M ARR) | 8–15% |
+| Growth stage ($20M+ ARR) | 4–8% |
+
+**FORM targets:**
+
+| ARR | FORM G&A target | Basis |
+|---|---|---|
+| < $300k | < $200k absolute/year | Founder sustenance + lean accounting |
+| $300k–$1M | 20–30% ARR | Consistent with Bessemer Series A range |
+| $1M–$3M | 10–18% ARR | Operating leverage from revenue growth without incremental G&A headcount |
+| > $3M | < 10% ARR | Full-time CFO + established finance function; G&A growth decouples from revenue |
+
+**Relationship to §28.9 S&M constraint:** §28.9 requires combined S&M + G&A ≤ 50% ARR at Series A ($1M ARR). If S&M is 30–40% at $1M ARR (consistent with §28.9 FORM targets), G&A must stay below 10–20%. The §30.6 targets above are consistent: at $1M ARR, G&A is modelled at 22%, but the S&M lower bound of 30% leaves only 20% for G&A to stay within the 50% combined ceiling. **Practical implication:** founder salary discipline at Phase 3 ($10k–$15k/month, not $20k+) is required to maintain G&A within bounds at $1M ARR. A $20k/month founder salary at $1M ARR would push G&A to 28–30%, which combined with 30–40% S&M exceeds the 50% ceiling.
+
+---
+
+### 30.7 Back-Office Hiring Sequence
+
+G&A back-office hiring follows a fractional-before-full-time pattern consistent with the rest of the FORM hiring philosophy.
+
+| Role | Trigger conditions | Monthly cost [ESTIMATE] | Notes |
+|---|---|---|---|
+| **Ukrainian accountant** (FOP/LLC filing) | Company formation | $150–$300 | First hire (not a headcount — contractor engagement). Required for statutory compliance. |
+| **Virtual bookkeeper** (SaaS-experienced) | First enterprise invoice issued OR deferred revenue creates accounting complexity | $400–$700 | Remote contractor. Xero/QuickBooks fluency required. Must understand ASC 606 deferred revenue. |
+| **Fractional CFO** | Series A closed AND investor reporting required AND ARR ≥ $300k | $3,000–$6,000/month | 10–15h/month engagement. Deliverables: Board pack, budget-vs-actual, cash flow forecast, Series B narrative. |
+| **Financial Controller** (full-time) | ARR ≥ $1.5M AND statutory audit required AND fractional CFO time > 50h/month | $5,000–$8,000/month | First full-time finance hire. CEE market rate. Triggers statutory audit engagement. |
+
+**GGA-HIRE-01 (Fractional CFO trigger gate):**
+All four conditions must be met: (1) Series A closed; (2) investor reporting cadence established (Board meeting ≥ quarterly); (3) ARR ≥ $300k; (4) founder spending > 8h/week on financial reporting. If any condition is unmet, the founder continues to manage with the bookkeeper. A fractional CFO before these gates represents G&A overhead that does not yet deliver commensurate investor-grade value.
+
+**GGA-HIRE-02 (Financial Controller gate):**
+All three conditions must be met: (1) ARR ≥ $1.5M; (2) statutory audit required by investors or enterprise customers (some Fortune 500 procurement processes require vendor audited financials); (3) fractional CFO billing > 50h/month for two consecutive months. These conditions typically coincide with Series B prep.
+
+---
+
+### 30.8 DEC-030 G&A Audit Events
+
+G&A audit events serve two purposes: (1) creating an immutable record of founder compensation decisions for investor diligence and future governance; (2) providing an auditable trail for changes to the finance function infrastructure.
+
+| Event type | Severity | Key metadata fields | Retention | Trigger |
+|---|---|---|---|---|
+| `ops.founder_comp_updated` | HIGH | `phase` (`phase_0` / `phase_1` / `phase_2` / `phase_3`), `monthly_usd`, `structure` (`salary` / `fop_invoice` / `holdco_dividend`), `trigger_condition` (free-text, e.g., `first_enterprise_contract_signed`), `annual_run_rate_usd`, `updated_by` (founder user_id) | 7 years | Emitted on each compensation phase transition; also emitted at company formation to record Phase 0 ($0) decision. This is the OQ-27 resolution record. |
+| `ops.finance_function_onboarded` | STANDARD | `role` (`ua_accountant` / `bookkeeper` / `fractional_cfo` / `financial_controller`), `contractor_id` (pseudonymous), `monthly_engagement_usd`, `start_date`, `engagement_type` (`contractor` / `employee`), `onboarded_by` (founder user_id) | 7 years | Emitted when each finance role engagement begins. Mirrors `ops.engineer_hired` pattern (§27.9). |
+| `ops.ga_tooling_contracted` | STANDARD | `tool_name`, `plan_tier`, `monthly_cost_usd`, `seat_count`, `contract_start_date`, `contract_term_months`, `contracted_by` (founder user_id) | 3 years | Emitted when any admin tooling subscription is started or upgraded to a paid tier. Provides G&A tooling spend audit trail. Not required for free-tier activations. |
+
+**HMAC chain note:** All three events follow the standard DEC-030 HMAC chain append logic (`docs/AUDIT_LOG_SCHEMA.md §3`). `ops.founder_comp_updated` at Phase 0 ($0) must be emitted at or before the first `fundraise.round_closed` event (§24.10) — investors should see a documented Phase 0 salary decision before the round closes, not a retroactive record.
+
+---
+
+### 30.9 Implementation Checklist
+
+#### P0 — Before company formation or within 30 days of first capital receipt
+
+| # | Task | Owner | Priority | Milestone | Definition of Done |
+|---|---|---|---|---|---|
+| 1 | Decide and document founder Phase 0 compensation (OQ-27 / OQ-GGA-03): confirm whether Phase 0 is $0 or > $0; if > $0, update §22.3 Hiring row accordingly; emit `ops.founder_comp_updated` event at Phase 0 | founder | **P0** | M1 | DEC-030 event emitted; §22.3 cash flow table updated if non-zero; OQ-27 and OQ-GGA-03 closed in `docs/DECISION_LOG.md` |
+| 2 | Engage Ukrainian accountant for FOP/LLC statutory filing; confirm entity structure choice (FOP vs LLC vs HoldCo) aligns with §24.8 OQ-33 resolution; emit `ops.finance_function_onboarded` for `ua_accountant` role | founder | **P0** | M1 | Engagement letter signed; monthly filing schedule confirmed; DEC-030 event emitted |
+| 3 | Set up Google Workspace (one Business Starter seat); set up Notion (free plan until second member); contract admin tooling as needed; emit `ops.ga_tooling_contracted` for each paid subscription | founder | **P0** | M1 | form.coach email live; Notion workspace created; DEC-030 events emitted for paid subscriptions |
+
+#### P1 — Before first enterprise pilot goes live (M4–M5)
+
+| # | Task | Owner | Priority | Milestone | Definition of Done |
+|---|---|---|---|---|---|
+| 4 | Register `ops.founder_comp_updated`, `ops.finance_function_onboarded`, and `ops.ga_tooling_contracted` as DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md`; validate Zod schema; deploy to `emit-audit-event` Worker endpoint | data-engineer + platform-engineer | **P1** | M4 | Three event types in AUDIT_LOG_SCHEMA.md; events emittable from admin console; test events in staging |
+| 5 | Engage SaaS-experienced virtual bookkeeper; configure Xero/QuickBooks with deferred revenue recognition (12-month pro-ration of enterprise annual contracts per §18.1); emit `ops.finance_function_onboarded` | founder | **P1** | M4 (before first enterprise invoice) | Bookkeeper engaged; Xero deferred revenue configured; test journal entry for first pilot conversion confirms correct recognition |
+| 6 | Implement Phase 1 founder compensation gate check: create a shared decision doc with the Phase 1 trigger conditions (§30.2.1); review at first enterprise contract close; emit `ops.founder_comp_updated` when Phase 1 triggers | founder | **P1** | M8–M12 | Comp updated if Phase 1 trigger met; DEC-030 event emitted; §22.3 updated if Phase 1 changes burn rate |
+
+#### P2 — Post-Series A
+
+| # | Task | Owner | Priority | Milestone | Definition of Done |
+|---|---|---|---|---|---|
+| 7 | Evaluate fractional CFO engagement against GGA-HIRE-01 gate: four conditions checked at Series A close + quarterly thereafter; engage fractional CFO if all four conditions met; emit `ops.finance_function_onboarded` for `fractional_cfo` role | founder | **P2** | Series A +1 month | Gate conditions documented; fractional CFO engaged or gate conditions recorded as unmet with rationale in DECISION_LOG.md |
+
+---
+
+### 30.10 Open Questions
+
+**OQ-GGA-01: How should the founder compensation phase gate for Phase 1 account for UA wartime financial uncertainty?**
+
+The Phase 1 trigger condition "first enterprise contract signed AND 90-day pilot conversion rate ≥ 50%" assumes that a contract signing is a reliable cash signal. However, an enterprise contract signed with a Ukrainian corporate entity during martial law may have payment timeline uncertainty (banking restrictions, FX controls, delayed settlement). If contract cash-in lags the signing date by > 60 days — which is possible under Ukrainian martial law banking conditions — Phase 1 comp should be deferred until the first invoice payment is received, not the contract signing date.
+
+**Recommended resolution:** Phase 1 trigger is modified to: (a) first enterprise contract signed AND (b) first invoice payment received (cash confirmed in bank account). This removes the signing-to-payment lag risk and ensures the Phase 1 compensation decision is always cash-backed. Owner: founder. Priority: **P0 — before first enterprise contract is signed.** Resolution: document in `docs/DECISION_LOG.md` as part of OQ-27 closure.
+
+**OQ-GGA-02: Should founder compensation flow through UA FOP, through the future HoldCo entity, or through a UA LLC employment contract?**
+
+Three structures have materially different tax treatment and compliance implications:
+
+1. **UA FOP (ФОП Group 3):** Effective tax rate ~5–7% on gross income (wartime 2% rate if eligible). Requires the company (LLC) to pay the FOP as a contractor. Advantages: low tax burden, simple structure. Risks: tax authority scrutiny if the FOP's sole client is the founder's own company (may be re-classified as employment).
+
+2. **UA LLC employment:** Standard employment (зарплата). Tax cost to the company: ~18% PIT + 22% SSC on top of salary = ~40% on gross. Advantages: employment record, social benefits. Risks: expensive; 40% effective rate on founder salary is a meaningful cash drain pre-PMF.
+
+3. **HoldCo dividend:** If a Delaware C-Corp or Cyprus HoldCo is formed (§24.8 OQ-33), founder withdraws as dividends (US: 15–20% qualified dividend tax; Cyprus: 0% if structured via HoldCo + personal residency). Advantages: lowest effective rate in some scenarios; clean cross-border structure. Risks: requires HoldCo, adds legal overhead, requires founder personal tax residency planning.
+
+**Recommended resolution:** UA FOP Group 3 for Phase 0–2 (lowest cost at pre-Series A scale). Transition to HoldCo dividend structure at Series A close if OQ-33 HoldCo is formed. Owner: founder + UA tax counsel + OQ-33 counsel. Priority: **P0 — before first compensation payment.** Resolution: legal memo from UA tax counsel + OQ-33 resolution; decision documented in `docs/DECISION_LOG.md`.
+
+**OQ-GGA-03: What is the founder's actual monthly cash requirement in Phase 0 — and is the §22.2 $0 assumption valid?**
+
+§22.2 assumes $0 founder salary through Month 12. This assumption is valid only if the founder has sufficient personal runway (savings, partner income, family support) to cover living expenses without a company salary for 12+ months. If the founder requires > $0 from Day 1, §22.3 must be revised: the `Hiring` row increases by the founder compensation amount from Month 1, which reduces the runway calculated in §22.4 by 20–35% at the $150k initial cash level.
+
+**This is not a judgment on the founder's financial situation — it is a planning input.** The model cannot be accurate without this number. The founder must document their personal runway and either confirm $0 for Month 1–12 or provide the monthly amount that updates §22.3.
+
+**Recommended resolution:** Founder documents personal runway privately (not in this document — personal financial information stays outside the company record). The only output that enters this model is: (a) confirmed $0 for Phase 0, or (b) the monthly amount and start date for non-zero Phase 0 salary. Either way, emit `ops.founder_comp_updated` at company formation. Owner: founder. Priority: **P0 — before company formation.** Resolution: §22.3 cash flow table is accurate only after this decision is made.
+
+---
+
+*v2.0 (2026-06-05): §30 G&A & Founder Compensation Cost Model — the sixth and final functional cost centre in the §25–30 operating cost series, closing OQ-27 (founder salary policy, §22.8) and supplying the detailed model behind the `G&A and founder salary` line in §24.4 ($240k–$360k [ESTIMATE] over 18 post-Series A months). §30.1 scopes the section: founder comp, bookkeeping/accounting, admin tooling; explicitly excludes insurance (→ §25), legal/compliance overhead (→ §25), engineering infrastructure (→ §27), marketing tooling (→ §28). §30.2 founder compensation model: four phases — Phase 0 ramen $0 (M1 through first enterprise contract, §22.2 baseline); Phase 1 sustenance $2,500–$5,000/month (first enterprise contract signed + pilot conversion ≥ 50%); Phase 2 early-market $6,000–$10,000/month (ARR ≥ $100k + GM ≥ 70%); Phase 3 post-Series A $10,000–$15,000/month — provides annualised G&A impact table from $0 to $150k/year; UA FOP note — Group 3 FOP (5–7% effective rate) vs. LLC employment (~40% combined) vs. HoldCo dividend structure; wartime 2% rate caveat; interaction with §27 OQ-ENG-01 (same legal consultation covers both). §30.3 accounting/finance function: four-stage model from UA accountant ($150–$300/month M1–M4) through Xero + bookkeeper ($400–$700/month post-launch) through CPA review engagement ($8,000–$15,000 one-time at M12) through fractional CFO ($3,000–$6,000/month post-Series A); deferred revenue trigger note (first enterprise invoice = Xero deferred revenue config required); CPA firm selection criteria (SaaS ASC 606, CEE cross-border, Ukrainian statutory). §30.4 administrative tooling: five tools not covered in §27/§28 (Google Workspace $6/user, Notion Team $16/member, Loom Business $12.50/creator, Calendly Teams $16/member, 1Password Teams $4/user already in CRYPTOGRAPHY_POLICY); total $22–$51/month at 1–3 person stage, $135–$225/month at 5–10 person stage; Slack, Zoom free tiers excluded. §30.5 consolidated G&A cost table: four stages (M1–M4, M4–M12, M12–M18, M18–M30) with monthly and annualised totals ranging from $172/month (M1) to $22,025/month (Phase 3 high case); reconciliation to §24.4 Bear/Base/Bull G&A line — dominant variable is founder salary Phase 3 choice ($60k–$90k range impact). §30.6 G&A as % ARR: important caveat that ratio is meaningless pre-$300k ARR — absolute $ is the correct metric at early stage; five-row trajectory from 373% at $50k ARR (meaningless) to 9% at $3M ARR; SaaS benchmarks (Bessemer/SaaS Capital: 15–25% at Series A, 8–15% at Series B); FORM targets: < $200k absolute pre-$300k ARR, 20–30% at $300k–$1M, 10–18% at $1M–$3M, < 10% at > $3M; S&M interaction note — founder Phase 3 salary must stay ≤ $15k/month to maintain G&A < 20% at $1M ARR given 30–40% S&M ceiling from §28.9. §30.7 back-office hiring: four roles (UA accountant from M1, virtual bookkeeper at first enterprise invoice, fractional CFO post-Series A, financial controller at ARR ≥ $1.5M + audit required + fractional CFO > 50h/month); two gate conditions GGA-HIRE-01 (fractional CFO: 4 conditions) and GGA-HIRE-02 (financial controller: 3 conditions). §30.8 three DEC-030 G&A audit events (all 7-year retention except `ops.ga_tooling_contracted` at 3 years): `ops.founder_comp_updated` (HIGH — OQ-27 resolution record; emitted at company formation + each phase transition; must precede `fundraise.round_closed` for investor diligence integrity), `ops.finance_function_onboarded` (STANDARD — mirrors §27.9 `ops.engineer_hired` pattern; covers accountant, bookkeeper, fractional CFO, controller), `ops.ga_tooling_contracted` (STANDARD — paid subscription commits only; free-tier activations excluded). §30.9 seven-item implementation checklist: 3× P0 M1 (founder comp decision → DEC-030 event + §22.3 update if non-zero, UA accountant engagement, admin tooling setup), 3× P1 M4–M12 (DEC-030 event type registration + Zod schema, Xero deferred revenue config, Phase 1 gate review), 1× P2 post-Series A (fractional CFO gate evaluation). §30.10 three open questions: OQ-GGA-01 (Phase 1 trigger modification for UA wartime payment lag — P0, before first enterprise contract; recommended: trigger on cash receipt not contract signing), OQ-GGA-02 (UA FOP vs. LLC employment vs. HoldCo dividend — P0, before first compensation payment; recommended FOP Group 3 pre-Series A + HoldCo dividend at Series A), OQ-GGA-03 (OQ-27 resolution — is Phase 0 $0 assumption valid? — P0, before company formation; outcome updates §22.3). Cross-references: §22.2 (funding assumptions — Phase 0 salary assumption), §22.3 (cash flow table — Hiring row must be updated for non-zero Phase 0), §22.4 (runway sensitivity — Phase 0 salary shifts runway by 20–35% at $150k funding), §22.8 (OQ-27 — closed by this section), §24.4 (capital requirements — G&A line reconciled in §30.5), §24.8 OQ-33 (HoldCo requirement for institutional instruments — cross-referenced in OQ-GGA-02), §25.2 (insurance — cyber/E&O/D&O costs excluded from this section), §25.3 (per-deal legal overhead — excluded), §27.4 (engineering infrastructure — admin tooling exclusions defined in §30.4), §27.9 (ops.engineer_hired DEC-030 pattern — ops.finance_function_onboarded mirrors), §27.11 OQ-ENG-01 (UA FOP vs. contractor structure — same legal consultation covers both), §28.7 (marketing tooling — admin tooling exclusions defined in §30.4), §28.9 (S&M + G&A ≤ 50% ARR combined ceiling — §30.6 G&A targets calibrated to stay within this constraint), docs/DECISION_LOG.md (OQ-27, OQ-GGA-01/02/03 resolution records), docs/AUDIT_LOG_SCHEMA.md (DEC-030 event registry — three G&A events to be registered in P1 M4 checklist item 4), docs/CRYPTOGRAPHY_POLICY.md §3 (1Password Teams key inventory). Owner: founder + data-engineer.*
