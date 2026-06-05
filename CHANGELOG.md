@@ -6,6 +6,19 @@
 
 ---
 
+## [2.5.0] — 2026-06-05
+
+### Added
+- `content/post-224-ltad-long-term-athletic-development.md` — Довгострокова атлетична адаптація: чим програмування на 5 років відрізняється від програмування на рік. Zatsiorsky (1995/2006 «Science and Practice of Strength Training»): принцип акумулятивного потенціалу — кожен тренувальний цикл будує структурний фундамент для наступного; три рівні ефекту (ATE гострий / DTE відставлений / CTE кумулятивний). Kraemer & Ratamess (2004 MSSE): перші 6–8 тижнів — переважно нейральна адаптація; гіпертрофія домінує з тижня 8–12. Magnusson et al. (2010 Br J Sports Med): collagen turnover у сухожиллях 100–300 днів — структурна адаптація значно повільніша за нейральну. Stone et al. (2007 «Principles and Practice of Resistance Training»): «тренувальна спадщина» — збережені структурні адаптації. Issurin (2008 J Sports Med Phys Fitness): блокова структура перевершує concurrent training у advanced атлетів — interference ефект зростає зі стажем. Fleck & Kraemer (2014, 4th ed.): operational criterion для advanced — нелінійна реакція на зростання обсягу. Bompa & Haff (2009 «Periodization», 5th ed.): macrocycle і планування «від майбутнього». Практичне: горизонти прогресу (щотижнево → щомісячно → квартально), накопичувальні vs реалізаційні цикли, чому деякі цикли повинні не давати видимого прогресу. clinical-safety NOT REQUIRED
+- `docs/AUDIT_LOG_SCHEMA.md` v0.3 — §"Privacy floor enforcement events": реєстрація п'яти DEC-030 HMAC-chained подій R-22 з повними payload-схемами, severity і retention: `privacy.floor_breach_detected` (CRITICAL, 7yr), `privacy.floor_breach_contained` (HIGH, 7yr), `privacy.floor_breach_tenant_notified` (HIGH, 7yr), `privacy.floor_breach_resolved` (STANDARD, 7yr), `privacy.no_go_escalation_activated` (CRITICAL, 7yr). Privacy rule задокументована: no individual names/health values в payload — aggregate count лише. Retention table оновлено: `privacy.floor_breach_*` 7yr GDPR Art. 9 + SOC 2 P6.1/P7.1/CC7.4. **Closes INCIDENT_RESPONSE.md R-22 §checklist item 6 (P0).**
+- `blog.html` — картка post-224 (LTAD) додана перед post-223
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v1.7 — R-22 §checklist item 6 позначено [x] (DEC-030 event registration closed); v1.7 changelog entry додано
+- `README.md` — post-224 позначено [x] done
+
+---
+
 ## [2.4.1] — 2026-06-05
 
 ### Added
