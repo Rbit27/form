@@ -137,6 +137,17 @@
 27. [Engineering Team Cost Model](#27-engineering-team-cost-model)
 28. [Marketing & Demand Generation Cost Model](#28-marketing--demand-generation-cost-model)
     - 28.1 Purpose and Scope
+29. [Geographic Expansion Unit Economics & FX Risk Model](#29-geographic-expansion-unit-economics--fx-risk-model)
+    - 29.1 Purpose and Scope
+    - 29.2 Market-by-Market ARPU Analysis (UA / PL / DE-NL / US)
+    - 29.3 FX Risk Model (UAH/USD + EUR/USD stress tests)
+    - 29.4 Geo-Pricing Waterfall
+    - 29.5 Local Payment Infrastructure Costs
+    - 29.6 Regulatory Compliance Cost by Market
+    - 29.7 Expansion Sequencing (GEO-GATE-01/02)
+    - 29.8 DEC-030 Geo Audit Events
+    - 29.9 Implementation Checklist
+    - 29.10 Open Questions (OQ-GEO-01 to OQ-GEO-03)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -5156,6 +5167,422 @@ Fitness app referral patterns split into two archetypes: (a) incentivised referr
 Gated collateral builds a B2B lead list that feeds HubSpot CRM. Ungated collateral removes friction and signals confidence in the product. In the founder-led sales phase (Deals 0–3), the lead qualification benefit of gating is minimal — the founder knows every prospect personally. Ungating removes friction for champions who want to share the ROI calculator with their CFO without a form-fill. Recommended: ungate all collateral in the founder-led phase; add gating only when a demand gen function exists to follow up on form fills (post-MKT-HIRE-02). Owner: founder + marketing-lead + customer-success. Priority: **P2 — decide before first enterprise collateral is published.** Resolution: default to ungated at pre-PMF; review at first quarterly marketing review post-App-Store-launch.
 
 ---
+
+---
+
+## §29 Geographic Expansion Unit Economics & FX Risk Model
+
+> Owner: data-engineer + founder. Cross-references: §8 (enterprise economics), §14 (LTV:CAC model), §22 (cash flow), §28 (marketing & demand generation). Review: quarterly (FX), annually (market expansion gates).
+
+---
+
+### 29.1 Purpose and Scope
+
+This section models the full unit economics of FORM's geographic expansion from Ukraine (founding market) through EU entry (Phase 2) to US launch (Phase 3). It exists because geographic expansion is not merely a marketing decision — it is a cost, compliance, payment infrastructure, and FX risk decision that materially affects every upstream model from the §22.3 cash flow to the §14.2–14.3 cohort survival tables. A UA-only ARPU of $5–7/month is a fundamentally different unit economics profile than a US-only ARPU of $19.99/month, and a model that treats them interchangeably will produce an incorrect runway forecast, incorrect LTV:CAC floors, and incorrect Series A narrative.
+
+The six deliverables this section covers:
+
+1. **Market-by-market ARPU and COGS comparison** — effective revenue per user and gross margin contribution by geography (§29.2)
+2. **FX risk model for UAH/EUR/USD** — exposure analysis, natural hedge quantification, and stress tests (§29.3)
+3. **Geo-pricing waterfall** — how consumer and enterprise prices are set, governed, and changed across markets (§29.4)
+4. **Local payment infrastructure costs** — Stripe fees, alternative processors, and App Store tax interaction by market (§29.5)
+5. **Regulatory compliance cost by market** — data protection, legal review, and DPO costs mapped to markets (§29.6)
+6. **Expansion sequencing economics** — when to enter each market and the gate conditions that govern timing (§29.7)
+
+**What this section does not cover:** product localisation costs (engineering scope, not financial), UA-market political risk modelling beyond FX (outside cost model scope), and FORM's corporate structure in each market (OQ-GEO-03 below addresses entity questions; legal counsel owns resolution).
+
+---
+
+### 29.2 Market-by-Market ARPU Analysis
+
+#### 29.2.1 Framework
+
+FORM's consumer pricing is PPP-adjusted: the list price in each market is set at a level that represents equivalent purchasing-power burden to the US list price of $19.99/month. Enterprise pricing uses an anchor-based model — the global tier list ($299/$799/$1,499/month) is the anchor, and local enterprise prices are negotiated downward from it with a floor (UA floor ~$50–150/month; EU floor ~$199–499/month) reflecting local market willingness-to-pay and the strategic value of early anchor customers in a new geography.
+
+Effective ARPU is the net revenue per active subscriber after: (a) App Store / Google Play commission (15%–30%), (b) payment processing fees (§29.5), (c) any PPP discount vs. US list price. It is the correct numerator for LTV calculations (§14.2–14.3) — not the gross list price.
+
+Gross margin contribution at the user level = Effective ARPU minus per-user COGS. The COGS components (Anthropic API, Supabase read, Cloudflare Workers, push notifications) are denominated in USD and do not vary by geography — a UA user consumes the same server-side COGS as a US user. This means PPP-discounted UA users have materially lower gross margin in dollar terms, which is the core unit economics risk of the UA-heavy early cohort.
+
+#### 29.2.2 Consumer market table [ESTIMATE — replace with actual cohort data at M12]
+
+| Market | List Price | Effective ARPU (net of store fee + FX) | Per-user COGS ($/mo, §3.2) | Gross Margin per User | LTV at M24 (§14.2 survival) | CAC | Payback Period | Notes |
+|---|---|---|---|---|---|---|---|---|
+| Ukraine (UA) | $5.99–$6.99/mo | $4.30–$5.00 (30% App Store fee at launch tier; Stripe web ~$5.60–$6.60) | $0.58–$1.12 | **73%–84%** | $52–$75 | $10–$25 (organic-dominant; ASO + word-of-mouth) | **6–15 months** | PPP index ~0.32 vs. US. High churn risk (economic instability, war context). UA web billing via LiqPay/Fondy reduces App Store fee to 0% but adds ~$2k–$5k integration cost (§29.5.3). Annual plan adhesion likely lower than US cohort. |
+| Poland (PL) — EU-entry | $10.99–$11.99/mo | $7.50–$8.30 (App Store; Stripe web ~$10.40–$11.30) | $0.58–$1.12 | **80%–87%** | $90–$120 | $25–$60 (ASO + limited Meta; founder network proximity) | **8–16 months** | PPP index ~0.55 vs. US. Lower CAC than DE/NL due to founder network effect and eastern-European fitness community adjacency. GDPR compliance cost shared across all EU (§29.6.2). |
+| Germany + Netherlands (DE/NL) — EU core | €14.99/mo (~$16.50 at 0.91 EUR/USD) | $11.20–$12.00 (App Store; Stripe EUR web ~$13.50–$14.50) | $0.58–$1.12 | **83%–89%** | $134–$170 | $60–$150 (Meta + ASA; competitive fitness market) | **12–20 months** | Highest LTV in EU tier. EUR/USD FX slippage 2–4% on USD reporting (§29.3.2). GDPR compliance already paid (shared cost). Annual plan mix expected higher than PL (higher income, lower price sensitivity). |
+| United States (US) | $19.99/mo | $13.99–$16.99 (App Store 30%→15% after year 1; Stripe web ~$18.70) | $0.58–$1.12 | **85%–92%** | $168–$240 | $50–$150 (Meta/ASA; highest competition) | **10–18 months** | Full list price. Highest TAM. Highest CAC. Most competitive. Annual plan mix target 30–40% (§14.3 annual cohort table). No PPP discount. CCPA compliance ~$3k–$8k year 1 (§29.6.3). |
+
+**Key interpretive notes on the table:**
+
+(1) The UA gross margin per user (73%–84%) is lower than US (85%–92%) in percentage terms but directionally similar. The real unit economics difference is in LTV — $52–$75 at M24 for UA vs. $168–$240 for US. This 3–4× LTV gap is the economic argument for treating UA as a validation cohort rather than a revenue-scale market in the first 24 months. The §14.4 CAC payback analysis (which targets ≤ 12 months) is more easily satisfied in UA due to the low CAC ($10–$25 organic-dominant), even at the lower ARPU.
+
+(2) UA enterprise pricing ($50–$150/month anchor) is 17–50% of the US Starter price ($299/month) and reflects PPP-adjusted willingness-to-pay for B2B SaaS in the Ukrainian market. The unit economics of a UA enterprise deal are not modelled in the §8 enterprise economics section (which uses US/EU pricing as baseline) — data-engineer to build a UA enterprise COGS bridge at the first UA enterprise pilot.
+
+(3) Annual plan LTV uplift: a UA annual Pro subscriber at ₴1,999/year equivalent (~$50–55) has a shorter payback period than the monthly cohort survival model implies, because cash is received upfront. The §18.5 deferred revenue waterfall applies. However, in-app annual plans in Ukraine carry higher refund risk due to economic instability — see OQ-GEO-01 re: denominating enterprise contracts in USD.
+
+(4) COGS is denominated in USD regardless of user geography, which creates a natural gross margin improvement as users shift from UA (low ARPU) to EU/US (higher ARPU) — the same infrastructure cost base services a higher-revenue user mix. This is the core geo-expansion gross margin lever.
+
+---
+
+### 29.3 FX Risk Model
+
+#### 29.3.1 FORM's currency exposure stack
+
+FORM's functional currency for financial reporting is USD. The exposure structure by entity:
+
+| Cash flow type | Denominated in | FX pair at risk | Direction of risk | Magnitude |
+|---|---|---|---|---|
+| Consumer subscription revenue (UA App Store) | USD (Apple settles in USD even for UA region) | Indirect — UA user willingness-to-pay is UAH-denominated | UAH devaluation reduces UA users' ability to afford the $-denominated subscription | Medium |
+| Consumer subscription revenue (EU App Store) | EUR | EUR/USD | EUR weakness vs. USD reduces reported USD revenue | Medium |
+| Enterprise contract revenue (UA) | Recommended: USD (see OQ-GEO-01) | UAH/USD if billed in UAH | UAH devaluation erodes contract USD value if billed in UAH | High (if UAH-billed) |
+| Engineering payroll (UA-based team) | UAH (salary paid in UAH) | UAH/USD | UAH devaluation reduces USD cost of UA team — natural hedge on cost side | Positive (cost hedge) |
+| Stripe EUR payouts | EUR | EUR/USD | EUR weakness → lower USD settlement from EU revenue | Low–Medium |
+| Infrastructure/vendor costs | USD | None | No FX exposure — vendors bill in USD | None |
+
+#### 29.3.2 UAH/USD exposure model
+
+The UAH/USD rate has experienced significant structural devaluation since 2022: from approximately ₴27/$ in early 2022 to ₴38–41/$ in 2024, a 41–52% move over 24 months. The National Bank of Ukraine manages the rate with periodic resets rather than free-float, creating step-function risk rather than continuous drift.
+
+**Revenue-side UAH/USD impact:** FORM's UA consumer revenue is USD-denominated via Apple (App Store proceeds settle in USD at Apple's exchange rate, not spot UAH/USD). This means FORM does not directly receive UAH from UA App Store sales — the FX exposure is indirect: if UAH devalues further, the $5.99–$6.99/month UA Pro price represents a larger share of the average Ukrainian user's monthly income, increasing churn risk. A 20% UAH devaluation does not reduce FORM's USD revenue per active UA subscriber — it increases the probability that the subscriber churns.
+
+**Cost-side UAH/USD impact (natural hedge):** FORM's UA-based engineering team is compensated in UAH (or USD equivalent at prevailing rate per contract terms — see OQ-ENG-01 in §27.11). If a founding engineer is paid ₴3.6M/year (~$90k at ₴40/$), a 20% UAH devaluation to ₴48/$ would reduce the USD equivalent of that payroll to $75k without any contract renegotiation — a $15k/year cost saving in USD terms. This is a real natural hedge: the same geopolitical shock that increases UA consumer churn risk also reduces UA engineering cost in USD terms.
+
+**Net UAH/USD stress test — 20% UAH devaluation scenario:**
+
+| Impact | Direction | Magnitude |
+|---|---|---|
+| UA consumer churn rate increase (PPP burden increases) | Negative revenue | +3–8 percentage points on monthly churn [ESTIMATE] |
+| UA enterprise wilingness-to-pay decreases (if UAH-billed) | Negative revenue | Up to 17% effective price reduction on UAH-billed contracts |
+| UA engineering payroll in USD terms decreases | Positive cost | ~$15k–$20k/year per senior engineer at current UA salary bands |
+| Founder personal income (if UA-based) purchasing power | Negative (personal) | Out of scope for cost model |
+| Net P&L impact (assuming 50 UA Pro subscribers at M12) | Near-neutral | Revenue delta: ~-$150–$400/year from churn; cost delta: +$15k–$20k/year engineering hedge |
+
+**Conclusion on UAH/USD:** At current FORM scale (UA-dominant early cohort, UA-based team), UAH devaluation is net-neutral to slightly positive in P&L terms — the cost hedge outweighs the small UA revenue base. This changes when FORM scales EU/US revenue without scaling UA headcount proportionally, at which point the cost hedge naturally diminishes as a % of total cost.
+
+#### 29.3.3 EUR/USD exposure model
+
+EUR/USD has ranged from ~0.96 to ~1.12 over the 2022–2024 cycle — a ±15% peak-to-trough range. At EU entry (Phase 2, Month 12–24), FORM may have meaningful EUR-denominated revenue from EU App Store (settled in EUR by Apple) and EU enterprise contracts.
+
+**Stripe EUR settlement:** Stripe offers multi-currency settlement — EUR revenue can be held in a EUR Stripe balance and converted to USD on-demand or on a schedule. At small EU revenue volumes ($5k–$30k/month), the conversion fee is 1.5% of the converted amount, plus the spot rate applied by Stripe (typically 0.5–1% worse than mid-market). Total FX slippage on EUR→USD conversion: 2–4% of EUR revenue [ESTIMATE].
+
+**Mitigation option:** Hold EUR in Stripe EUR balance and use it to pay EUR-denominated vendors or contractors if/when FORM hires EU-based staff. At pre-Series A scale with a UA-based team, this netting opportunity is limited — EUR revenue will predominantly convert to USD. Budget 2–3% EUR/USD FX slippage in EU unit economics model.
+
+**EUR/USD stress test — 10% EUR depreciation (EUR/USD moves from 1.08 to 0.97):**
+
+| Line item | Before | After | Delta |
+|---|---|---|---|
+| EU consumer ARPU (USD-reported) | $11.20–$12.00 | $10.08–$10.80 | -$1.12–$1.20 per subscriber/month |
+| EU enterprise Starter contract ($299 equivalent, billed in EUR at €277) | $299/month | $269/month USD equivalent | -$30/month per contract |
+| EU contribution to ARR ($10k EUR ARR scenario) | $10,800 | $9,700 | -$1,100/year |
+
+**Conclusion on EUR/USD:** At EU entry revenue volumes ($10k–$50k ARR), EUR/USD exposure is a second-order effect — the absolute dollar impact is small relative to total P&L. It becomes material at $200k+ EU ARR. Mitigation: price EU enterprise contracts in USD where customers accept it (larger DE/NL enterprises typically accept USD billing); price EU consumer in EUR (customer expectation, App Store convention). Review FX policy at $100k EU ARR.
+
+#### 29.3.4 FX risk mitigation summary
+
+| Risk | Mitigation | Residual risk |
+|---|---|---|
+| UAH/USD step devaluation increases UA churn | UA Pro price already PPP-adjusted; monitor churn monthly; founder approval required for UA price change (§29.4.5) | UA churn spike in severe devaluation scenario |
+| UAH/USD devaluation erodes UA enterprise contract value | Bill UA enterprise in USD (OQ-GEO-01 resolution) | Customer may demand UAH billing; renegotiation risk |
+| EUR/USD drift reduces USD-reported EU revenue | Stripe multi-currency settlement; consider EUR-priced enterprise contracts; quarterly FX review | 2–4% annual slippage at current volumes |
+| EUR/USD moves trigger pricing review | geo.fx_threshold_exceeded event at ±15% (§29.8) triggers repricing review | Lag between rate move and price update (next App Store pricing cycle) |
+
+---
+
+### 29.4 Geo-Pricing Waterfall
+
+#### 29.4.1 Pricing philosophy
+
+FORM applies two distinct pricing philosophies depending on segment:
+
+- **Consumer (PPP-adjusted):** The UA consumer market cannot bear US list prices. A $19.99/month subscription is ~1.5–2% of an average Ukrainian monthly salary. The US list price represents ~0.1% of US median monthly income. PPP-adjusted pricing aims to maintain equivalent purchasing-power burden across markets — approximately 0.1–0.2% of median monthly income. This is consistent with how Spotify, Netflix, and major App Store publishers price in emerging markets.
+
+- **Enterprise (anchor-based with floor):** Enterprise pricing uses the global tier list as an anchor. Local pricing is negotiated downward based on market willingness-to-pay, competitive landscape, and strategic value of the customer as a reference. A floor exists below which FORM will not discount — the floor is set by the COGS floor plus minimum gross margin target (55% per §6.1). For UA enterprise, the floor is ~$50/month (Starter-equivalent adjusted for PPP); for EU, ~$199/month; for US, $299/month full list.
+
+#### 29.4.2 Consumer price points by market
+
+| Market | Monthly list price | Annual list price | vs. US list | PPP index basis | App Store tier (approximate) |
+|---|---|---|---|---|---|
+| Ukraine (UA) | $5.99/mo | $44.99/yr | 30% of US | UA PPP index ~0.32 (World Bank) | App Store Tier 5–7 (UA storefront) |
+| Poland (PL) | $10.99/mo | $79.99/yr | 55% of US | PL PPP index ~0.55 | App Store Tier 9–11 (EU storefront, PL pricing) |
+| Germany (DE) | €14.99/mo (~$16.50) | €109.99/yr (~$121) | 83% of US | DE near-parity with US | App Store Tier 13 (EU storefront) |
+| Netherlands (NL) | €14.99/mo (~$16.50) | €109.99/yr (~$121) | 83% of US | NL near-parity with US | App Store Tier 13 (EU storefront) |
+| United States (US) | $19.99/mo | $149.99/yr | 100% | Baseline | App Store Tier 17 (US storefront) |
+
+**iOS App Store pricing mechanics:** Apple's App Store pricing tiers are set per storefront. FORM must configure pricing in App Store Connect for each regional storefront. App Store Connect's "International Pricing" tool auto-suggests local prices based on an anchor price — use the US Tier 17 ($19.99) as anchor and manually override the UA storefront to Tier 5–7. Annual price follows the same tier structure. Apple controls the exact converted price for each market — the figures above are targets mapped to the nearest available tier. Data-engineer to validate actual tier mapping during App Store localisation (§29.9 checklist item P1).
+
+**Android / Google Play:** The same PPP-adjusted pricing applies to the Google Play storefront. Google Play's pricing tool offers similar regional tier controls. At pre-launch, prioritise iOS tier configuration; Android follows the same logic.
+
+#### 29.4.3 Enterprise price waterfall
+
+| Market | Starter | Growth | Performance | Floor (min deal size) | Notes |
+|---|---|---|---|---|---|
+| Ukraine (UA) | $50–150/mo | $150–400/mo | $300–800/mo | $50/mo | Anchor-based; heavily negotiated. PPP-adjusted. Recommended: USD-denominated (see OQ-GEO-01). |
+| Poland (PL) | €150–250/mo | €350–600/mo | €700–1,200/mo | €150/mo | Below EU standard; founder-network pricing. First 2–3 PL deals may be strategic reference pricing. |
+| Germany / Netherlands (DE/NL) | €199–299/mo | €599–799/mo | €999–1,499/mo | €199/mo | Near-full EU list price. DE/NL enterprises have lowest price sensitivity and highest compliance expectations. |
+| United States (US) | $299/mo | $799/mo | $1,499/mo | $299/mo | Full list per §8.1. No geo-discount. |
+
+**Enterprise pricing governance:** Any enterprise deal below the floor listed above requires founder sign-off. This is the same discount authority matrix as §21. The geo.price_change_approved audit event (§29.8) is emitted on approval of any below-floor deal.
+
+#### 29.4.4 Tax handling by market
+
+- **EU VAT:** Stripe Tax handles EU VAT collection and remittance automatically for digital services. EU consumers are charged VAT on top of the listed price (20–25% depending on member state). Stripe remits via OSS (One-Stop Shop) scheme. Cost to FORM: 0.5% of Stripe Tax transactions ($0.50 per $100 transaction). This cost is not a COGS item — it flows through net revenue as a revenue reduction (VAT is collected on behalf of tax authorities, not FORM revenue). Enterprise B2B sales in EU: VAT is reverse-charged to the customer (B2B VAT exemption under EU rules) — FORM does not collect or remit on EU enterprise invoices. Confirm with EU tax counsel by M8 (§29.9 P0 checklist).
+
+- **UA VAT:** Ukraine imposes 20% VAT on digital services sold to Ukrainian consumers by non-resident providers as of 2022 amendments. If FORM is a Ukrainian legal entity selling to Ukrainian users, normal Ukrainian VAT registration applies. If FORM is a foreign entity selling to Ukrainian users, the "Netflix tax" (non-resident digital VAT) applies — registration with Ukrainian tax authority required. Legal review required (§29.6.1). Stripe supports UA VAT collection for non-resident entities.
+
+- **US Sales Tax:** US does not have federal VAT. State-level sales tax on digital products varies — 27 states tax SaaS subscriptions. Stripe Tax handles US nexus analysis and state-level remittance. Cost similar to EU (0.5% of taxable transactions). Enterprise B2B in US: typically not subject to sales tax if customer provides tax-exempt certificate (enterprise procurement standard).
+
+#### 29.4.5 Price change governance
+
+**Consumer price change gate:** Any change to the UA consumer price (increase or decrease) requires explicit founder approval before the App Store pricing change is submitted. Rationale: UA is a war-context market where price increases carry outsized reputational risk and price decreases signal product devaluation. The geo.price_change_approved audit event (§29.8) must be emitted before the App Store change is submitted — the audit record precedes the price change, not follows it.
+
+**EU/US consumer price changes:** At current stage (pre-launch), EU and US prices are fixed at launch-time values. Any change requires geo.price_change_approved with justification. Changes must be accompanied by an updated ARPU model reconciling the impact to §22.3 cash flow forecasts.
+
+**FX-triggered price review:** When geo.fx_threshold_exceeded fires (EUR/USD or UAH/USD moves ≥ 15% vs. last pricing review date), the data-engineer runs a new ARPU impact model and presents to the founder within 14 days. The founder decides whether a price adjustment is warranted. For App Store price changes, Apple requires a minimum 30-day notice period for subscriber price increases — plan accordingly.
+
+---
+
+### 29.5 Local Payment Infrastructure Costs
+
+#### 29.5.1 Payment infrastructure overview
+
+FORM uses two payment rails: (1) App Store / Google Play in-app purchase (IAP) for consumer mobile subscriptions — Apple and Google handle all payment processing and remit net proceeds; (2) Stripe for web subscriptions and all enterprise billing — FORM directly bears Stripe processing fees. The interaction between these two rails has a significant cost implication: IAP fees are higher (15–30%) but include fraud management, churn recovery (Apple billing retry logic), and no incremental Stripe fee. Stripe web fees are lower (~3–4%) but require FORM to manage dunning, fraud, and tax independently.
+
+#### 29.5.2 Stripe fee model by market [ESTIMATE — verify against current Stripe pricing page]
+
+| Market | Card type | Stripe processing fee | Per-transaction fee | Net on $19.99 (US) or equivalent | Notes |
+|---|---|---|---|---|---|
+| US | Domestic card | 2.9% | + $0.30 | **$0.88** (4.4% effective) | Standard Stripe rate. For monthly Pro at $19.99: $19.11 net. |
+| US | Card-present (if ever applicable) | 2.7% | + $0.05 | N/A for SaaS | Not applicable at current stage |
+| EU | EU-issued card | 1.5% | + €0.25 | **€0.50** on €14.99 (3.9% effective) | Lower than US due to EU interchange cap (regulated at 0.3% for consumer cards). |
+| EU | Non-EU card (US tourist, etc.) | 2.9% | + €0.30 | **€0.74** on €14.99 (5.9% effective) | Rare for EU consumer base; more relevant for EU enterprise customers with US parent company cards |
+| EU | SEPA Direct Debit (enterprise) | 0.8% | capped at €5.00 | Max €5.00 per transaction | Preferred for EU enterprise recurring billing; lower fee but 2-day settlement lag. |
+| UA (web/enterprise, non-App-Store) | LiqPay (domestic UA cards) | 2.75% | no fixed fee | ~$0.17 on $5.99 (2.9% effective) | LiqPay integration cost: $2k–$3k engineering (§29.5.3). Only relevant for web Pro and enterprise billing in UA. |
+| UA (web/enterprise, non-App-Store) | Wayforpay | 2.5–3.0% | + ₴1–3 | ~$0.17–$0.20 on $5.99 | Alternative to LiqPay; similar fee; similar integration cost. |
+| UA (web/enterprise, non-App-Store) | Fondy | 2.0–3.5% | varies | ~$0.15–$0.22 on $5.99 | Broadest card support including Visa/MC in UA; supports USD billing to UA entities. |
+
+**App Store commission note (all markets):** Apple charges 30% commission on App Store IAP for developers with annual App Store proceeds > $1M/year. For FORM at pre-seed scale (well below $1M), the Small Business Program rate is 15%. Google Play matches at 15% for the first $1M in annual revenue. The COGS tables in §3 use 30% as a conservative estimate — at current scale, the actual rate is 15%. This is a ~$1.50/month per subscriber improvement in net ARPU vs. the §3 conservative model, and should be updated in the §22.3 cash flow model before the Series A deck is finalised.
+
+#### 29.5.3 UA payment infrastructure: why Stripe is not sufficient
+
+Stripe does not directly support UA-issued bank cards for charging (as of 2024 — verify before UA launch). Ukrainian consumers with Visa/MC issued by UA banks can use Apple Pay or Google Pay, which routes through Apple/Google (IAP). For web-based Pro subscriptions or enterprise billing in UA, FORM must integrate a UA-licensed payment processor.
+
+**Options and trade-offs:**
+
+| Processor | Pros | Cons | Engineering integration cost | Recommended? |
+|---|---|---|---|---|
+| LiqPay (PrivatBank) | Market leader; most UA users have PrivatBank cards; Stripe-like API; webhooks | PrivatBank state ownership (geopolitical consideration); limited English documentation | $2k–$3k (2–3 weeks engineer time) | Yes — first choice for UA web consumer |
+| Wayforpay | Widely used by UA SaaS companies; supports USD billing; good API | Smaller bank base than LiqPay; customer support quality variable | $2k–$3k | Yes — backup/enterprise UA |
+| Fondy | EU-regulated (Malta); supports UA+EU cards; GDPR-compliant | Higher fee; less recognisable brand in UA | $2k–$4k | Consider for EU expansion (dual-market processor) |
+
+**Integration timing:** UA payment processor integration is a P1 (before UA enterprise pilot) item — the App Store handles all UA consumer in-app payments, so the processor is only needed for: (a) web-based Pro subscriptions (if offered), and (b) enterprise billing in UA. Defer to Month 6–8 when first UA enterprise pilot is expected. See §29.9 implementation checklist.
+
+**Enterprise billing in UA: App Store 0% note.** Enterprise contracts are billed directly via Stripe (or UA processor) — not through the App Store. There is no App Store fee on enterprise revenue. This is consistent with the §8.1 enterprise gross margin model. The gross margin on a UA enterprise Starter deal ($50–$150/month) is lower than a US enterprise deal in absolute dollars but similar in percentage terms: COGS is $10–$25/month (infrastructure + AI API allocation per §15.7), leaving ~80–85% gross margin even at UA anchor prices — the margin is percentage-healthy but the absolute dollar contribution is low.
+
+#### 29.5.4 Annual payment processing cost model by market [ESTIMATE at 1,000 Pro subscribers]
+
+| Market | Consumer subscribers | Monthly list price | Net after App Store (15%) | Annual net revenue | Stripe web (blended ~5%) | Net after processing | Notes |
+|---|---|---|---|---|---|---|---|
+| UA | 400 (assumed 80% IAP) | $5.99 | $5.09 (IAP) / $5.60 (web) | $24,432 | ~$610 web only (20% web mix) | ~$23,822 | UA mix: 80% IAP (App Store 15%), 20% web (LiqPay 2.75%). |
+| EU | 400 (assumed 70% IAP) | €14.99 (~$16.50) | $14.03 (IAP) / $16.01 (web) | $79,200 | ~$1,300 web only (30% web mix) | ~$77,900 | EU IAP at 15%; EU Stripe cards at 1.5%+€0.25 average. |
+| US | 200 (assumed 75% IAP) | $19.99 | $16.99 (IAP) / $18.81 (web) | $47,976 | ~$700 web only (25% web mix) | ~$47,276 | US IAP at 15%; Stripe 2.9%+$0.30 on web. |
+| **Total 1,000 subscribers** | **1,000** | — | — | **~$151,608** | **~$2,610** | **~$149,000** | ~1.7% blended processing cost on gross billings |
+
+---
+
+### 29.6 Regulatory Compliance Cost by Market
+
+#### 29.6.1 Ukraine: data protection and martial law considerations
+
+Ukraine's primary data protection law is the Law of Ukraine "On Personal Data Protection" (2010, amended). It requires: (a) data processing notification to the Ukrainian Personal Data Protection Commissioner (Uповноважений Верховної Ради України з прав людини) — a registration-style requirement; (b) lawful basis for health data processing (fitness data is sensitive); (c) data subject rights (access, deletion, correction) consistent with GDPR in spirit.
+
+Under martial law conditions (effective from February 2022, extended), additional data rules apply, including restrictions on the export of certain categories of personal data and requirements for data storage within Ukraine or EU-equivalent jurisdictions for government and critical infrastructure sectors. FORM is not a critical infrastructure operator, but should obtain explicit legal advice on whether martial law data export restrictions affect fitness/health data processed for Ukrainian users.
+
+**Year 1 compliance cost for UA:**
+
+| Item | Estimated cost | Notes |
+|---|---|---|
+| Legal review: UA Personal Data Protection Law compliance + martial law data rules | $500–$1,000 | One-time; UA-based legal counsel; can be bundled with corporate/labour law review |
+| UA Commissioner registration (if required) | $0 (administrative fee only) | Founder submits; legal counsel prepares filing |
+| Privacy policy in Ukrainian (required for UA users) | $0–$200 | Translation of EN privacy policy; brand-voice agent handles draft; legal review recommended |
+| **Total Year 1 UA compliance cost** | **$500–$1,200** | Primarily one-time legal review |
+
+#### 29.6.2 European Union: GDPR health data requirements
+
+FORM processes health data — workout logs, body composition, training load, nutrition data. This is "data concerning health" under GDPR Art. 9(1) — a special category requiring explicit consent (Art. 9(2)(a)) or another Art. 9(2) legal basis. Art. 9 compliance is not optional and not achievable through a standard privacy policy — it requires a specific consent mechanism at onboarding.
+
+**GDPR compliance requirements for FORM at EU entry:**
+
+| Requirement | Basis | Cost estimate | Notes |
+|---|---|---|---|
+| Data Protection Impact Assessment (DPIA) — mandatory per GDPR Art. 35 for large-scale health data processing | Art. 35 | $1,500–$3,000 (one-time; external DPO advisory) | DPIA must be completed before EU launch, not after. Triggers: health data + potential high risk to data subjects. |
+| DPO advisory engagement (FORM does not require a formal DPO appointment unless it is a public authority or carries out large-scale systematic monitoring, but DPO advisory is recommended) | Art. 37 | $2,000–$5,000/year (retainer) | Outside counsel with GDPR specialisation. For an early-stage startup, a fractional DPO retainer is standard. |
+| EU GDPR Art. 27 EU Representative | Art. 27 (required if no EU establishment) | $500–$1,000/year | If FORM operates as a UA/non-EU entity serving EU users, it must appoint an EU representative. Services like DataRep or similar charge $400–$800/year. |
+| Standard Contractual Clauses (SCCs) for EU → non-EU data transfers | GDPR Chapter V | $500–$1,500 (legal review of SCC template) | Required if FORM's data processing infrastructure (Supabase, Cloudflare, Anthropic) is outside the EU. In practice, Supabase EU region + Cloudflare EU data residency mitigates but does not eliminate the SCC requirement. |
+| GDPR-compliant consent flows at onboarding | Art. 7 + Art. 9(2)(a) | $0 (engineering cost already in platform) | Engineering cost only; no incremental legal fee beyond DPIA |
+| EU localized privacy policy + terms | — | $500–$1,000 (legal review) | EU-specific addendum to global privacy policy; highlight Art. 9 consent, right to erasure, DPA contact |
+| DPA registration (some EU member states require formal registration) | National DPA requirements | $0–$500 (country-dependent) | Germany (BfDI): no registration fee for private companies; Netherlands (AP): no registration fee; Poland (UODO): no fee. |
+| **Total Year 1 EU compliance cost** | | **$5,000–$12,000** | DPO retainer is the largest recurring item; DPIA and SCCs are one-time |
+| **Ongoing annual EU compliance cost (Year 2+)** | | **$2,500–$6,000/year** | DPO retainer + EU representative + annual DPIA review |
+
+**GDPR operating leverage:** Once the DPIA is complete and DPO retainer is in place, the marginal cost of adding EU subscribers is $0 — compliance is a fixed cost that amortises over the EU subscriber base. At 400 EU subscribers (§29.2.2 table), Year 1 GDPR compliance cost is ~$12.50–$30 per EU subscriber — a significant cost per subscriber at entry, declining to ~$6–$15 at 800 EU subscribers in Year 2.
+
+#### 29.6.3 United States: CCPA, HIPAA adjacency, and state privacy laws
+
+FORM is not a HIPAA "covered entity" (it is not a healthcare provider, health plan, or healthcare clearinghouse) and is not a "business associate" of a covered entity. HIPAA does not directly apply. However, FORM processes health-adjacent data (workout performance, body composition, nutrition) that may be regulated as "sensitive personal information" under CCPA (California) and similar state laws.
+
+**US data privacy compliance requirements:**
+
+| Requirement | Basis | Cost estimate | Notes |
+|---|---|---|---|
+| CCPA compliance review: notice at collection, privacy policy, opt-out rights, deletion rights | CA Civil Code §1798.100+ | $1,500–$3,000 (one-time legal review) | California Privacy Rights Act (CPRA) expanded CCPA in 2023; sensitive PI provisions apply to health data. FORM must add "Do Not Sell or Share My Personal Information" if applicable and honor deletion requests. |
+| California Privacy Policy update | CCPA | $500–$1,000 (legal drafting) | "Fitness or exercise data" is explicit sensitive PI under CPRA §1798.140(ae)(1)(I). |
+| Virginia CDPA + Colorado CPA review | State law | $500–$1,000 (bundled review) | Virginia and Colorado have similar consumer data protection laws. Health data is sensitive PI. At sub-$25M revenue, FORM may not be a "controller" under VA CDPA threshold — confirm with counsel. |
+| US entity establishment (required for US market at scale) | Corporate law | $1,500–$3,000 (Delaware C-Corp or LLC) | Not a compliance cost per se, but a prerequisite for US enterprise contracts and US bank accounts. Bundle with Series A legal preparation. |
+| **Total Year 1 US compliance cost** | | **$4,000–$8,000** | One-time legal review + policy drafting; entity cost may be bundled with Series A legal |
+| **Ongoing annual US compliance cost (Year 2+)** | | **$1,000–$2,500/year** | Annual policy review + state law monitoring (new state privacy laws pass regularly) |
+
+**HIPAA note for future reference:** If FORM ever integrates with employer health plans (e.g., as a wellness benefit that intersects with EAP or HSA), the covered entity / business associate analysis must be re-run. This is relevant for the enterprise Performance tier ($1,499/month) targeting large employers. Flag for OQ resolution when first Performance-tier enterprise prospect is identified.
+
+#### 29.6.4 Compliance cost summary and operating leverage
+
+| Market | Year 1 compliance cost | Year 2+ annual | Per-subscriber at 400 subs | Per-subscriber at 1,000 subs |
+|---|---|---|---|---|
+| Ukraine | $500–$1,200 | ~$200–$500/year | $1.25–$3.00 | $0.50–$1.20 |
+| European Union | $5,000–$12,000 | $2,500–$6,000/year | $12.50–$30.00 | $5.00–$12.00 |
+| United States | $4,000–$8,000 | $1,000–$2,500/year | $10.00–$20.00 | $4.00–$8.00 |
+
+**Compliance moat note:** The EU GDPR and US CCPA compliance infrastructure, once built, creates a competitive moat for FORM in the enterprise segment — enterprise prospects in regulated industries (financial services, healthcare-adjacent, insurance) will require GDPR and CCPA compliance as a baseline contract requirement. The $5k–$12k Year 1 EU investment is simultaneously a compliance cost and a sales enablement cost that unlocks enterprise deals that would otherwise be blocked. Cross-reference §25.7 (compliance moat vs. TAM expansion) for the enterprise-specific analysis.
+
+---
+
+### 29.7 Expansion Sequencing Economics
+
+#### 29.7.1 Phase 1: Ukraine-only (M1–M12, pre-launch through first-year cohort)
+
+**Rationale:** Ukraine is the founding team's home market. It offers zero incremental compliance cost (§29.6.1 review is low-cost and bundled with launch legal), the highest founder engagement quality (founder can do in-person user research), the lowest CAC (organic and founder network), and serves as the validation cohort for D30 retention, activation funnel, and product-market fit before capital is deployed into higher-CAC markets.
+
+**Economic profile of Phase 1:**
+
+| Metric | Phase 1 (UA-only) | Notes |
+|---|---|---|
+| Effective ARPU | $4.30–$5.00/month | PPP-adjusted; App Store IAP dominant |
+| Blended gross margin | 73%–84% | Lower than EU/US but healthy |
+| Target cohort size by M12 | 200–500 Pro subscribers | §22.3 Base scenario target |
+| Target D30 retention | ≥ 40% | EU expansion gate (GEO-GATE-01); mirrors §28.5 paid UA gate |
+| Total compliance cost | $500–$1,200 | One-time |
+| Monthly marketing spend | $500–$1,500 | §22.3 Marketing/UA line; organic-dominant |
+
+**Phase 1 risk:** War-context churn events (mobilisation, power outages, banking disruption) can create step-function churn that invalidates the D30 retention signal. The founder should annotate the PostHog cohort data with external events (e.g., major mobilisation waves, grid outage periods) so that the D30 signal is interpreted in context — a 35% D30 during a severe grid outage period may represent a stronger cohort than a 42% D30 in a stable period. Data-engineer to add event annotation capability to the cohort dashboard.
+
+#### 29.7.2 Phase 2: EU expansion (M12–M24, post-consumer-PMF)
+
+**Gate (GEO-GATE-01):** EU expansion is triggered only when all of the following are satisfied:
+
+| Condition | Measurement | Source |
+|---|---|---|
+| D30 retention ≥ 40% on domestic (UA) cohort | PostHog cohort retention report | data-engineer monthly report |
+| GDPR DPIA complete | DPIA document signed and filed | compliance-officer + external DPO |
+| DPO advisory engaged (fractional DPO retainer signed) | Contract executed | founder |
+| EU Stripe account live and tested | Stripe dashboard EUR balance active; test transaction confirmed | platform-engineer |
+| EU App Store pricing configured (PL, DE, NL storefronts) | App Store Connect pricing live | platform-engineer |
+| SCCs signed with EU-region infrastructure providers | Supabase EU SCC, Cloudflare EU SCC | platform-engineer + legal |
+
+**Rationale for D30 ≥ 40% gate:** This is the same gate as MKT-UA-GATE-01 (§28.5). The logic is identical — EU expansion is capital-intensive (GDPR compliance, higher CAC, Stripe EUR setup) and should only proceed when the core product has proven it can retain users at a level that makes LTV:CAC ≥ 3× achievable. At D30 < 35%, EU expansion accelerates the burn of compliance and marketing budget without a proven retention foundation.
+
+**EU entry market order (see OQ-GEO-02):** Recommended entry order is Poland first, then Germany/Netherlands. Poland has lower CAC (founder network, Eastern European fitness community, adjacent to UA diaspora), lower compliance marginal cost (GDPR compliance is shared — Poland adds no incremental GDPR cost once the DPIA and DPO retainer are in place), and serves as a lower-risk test market for EU App Store distribution, pricing, and localisation. Germany/Netherlands follow with full-price EU SKU once the PL distribution and retention pattern is validated.
+
+**Phase 2 incremental economics:**
+
+| Cost item | One-time | Annual recurring |
+|---|---|---|
+| GDPR compliance (DPIA + DPO + SCCs + EU Rep) | $5,000–$12,000 | $2,500–$6,000 |
+| EU App Store localisation (PL, DE, NL screenshots + metadata) | $500–$1,500 (contractor) | $0 (refresh on new features) |
+| EU Stripe configuration + testing | $500 (engineer time) | $0 |
+| EU Meta / ASA campaign setup | $500–$1,000 (setup) | Ongoing per §28.5 CAC model |
+| **Total Phase 2 entry cost** | **$6,500–$14,500** | **$2,500–$6,000/year** |
+
+At 400 EU subscribers generating ~$77,900/year (§29.5.4 table), Year 1 EU compliance + setup cost ($6,500–$14,500) represents 8–19% of Year 1 EU net revenue — acceptable, and the ratio improves sharply in Year 2 when the one-time costs do not recur.
+
+#### 29.7.3 Phase 3: US expansion (M24+, post-Series A)
+
+**Gate (GEO-GATE-02):** US expansion requires:
+
+| Condition | Measurement | Source |
+|---|---|---|
+| EU ARR ≥ $50,000 | ARR bridge (§23.1) | data-engineer |
+| Series A closed | Cap table updated, funds wired | founder |
+| US legal entity established (Delaware C-Corp recommended) | Certificate of Incorporation | corporate counsel |
+| CCPA privacy policy live and reviewed by US counsel | Published URL + legal sign-off | compliance-officer |
+| MKT-HIRE-02 (PMM) hired or contracted | Offer letter signed | founder |
+| AE hire in process or contracted | Pipeline or offer letter | founder |
+
+**Rationale for GEO-GATE-02:** The US market has the highest CAC ($50–$150 for consumer, §28.5) and the most competitive fitness app landscape. Entering the US before Series A means doing so with insufficient capital to run the paid acquisition experiments needed to find a sustainable CAC, which is a capital destruction trap. The EU ARR ≥ $50k gate ensures FORM has a proven international revenue engine before entering the highest-cost market. The MKT-HIRE-02 and AE gates ensure FORM has the GTM headcount to compete.
+
+**Phase 3 economics summary:**
+
+| Metric | US market (Phase 3) |
+|---|---|
+| Effective ARPU | $16.99–$18.81 (after App Store 15%/Stripe) |
+| Target D30 retention | ≥ 40% (same gate applied to US cohort before scaling paid UA) |
+| CAC range (consumer) | $50–$150 (Meta + ASA, §28.5 table) |
+| CAC payback | 10–18 months (§29.2.2) |
+| Year 1 US compliance cost | $4,000–$8,000 |
+| Series A capital allocation to US | Defined in §24.4 capital requirements |
+| LTV at M24 | $168–$240 (highest of all three markets) |
+
+---
+
+### 29.8 DEC-030 Geographic Expansion Audit Events
+
+Geographic expansion events are required for: (1) investor diligence — Series A investors will ask when and why markets were entered, and an immutable log is the most credible answer; (2) compliance audit trail — GDPR DPAs may ask for evidence of when EU processing began and whether DPIA preceded it; (3) FX governance — the geo.fx_threshold_exceeded event creates a documented trigger for pricing reviews, preventing "we forgot to reprice" situations that erode gross margin silently.
+
+| Event type | Severity | Key metadata fields | Retention | Trigger |
+|---|---|---|---|---|
+| `geo.market_activated` | STANDARD | `market_code` (ISO 3166-1: UA / PL / DE / NL / US), `activation_date`, `pricing_tier_consumer_monthly_usd`, `pricing_tier_enterprise_starter_usd`, `compliance_checklist_ref` (link to §29.9 checklist completion record), `geo_gate_satisfied` (GEO-GATE-01 / GEO-GATE-02 / N/A for UA), `activated_by` (founder internal ID) | 7 years | Emitted once per market, on the date the first paying user or enterprise contract is recorded from that market; never re-emitted for the same market |
+| `geo.fx_threshold_exceeded` | STANDARD | `currency_pair` (EURUSD / UAHUSD), `rate_at_last_review`, `rate_current`, `pct_change`, `threshold_pct` (15%), `review_required_by_date` (14 days from event), `detected_by` (data-engineer pipeline or manual) | 3 years | Emitted when the monitored FX rate moves ≥ 15% vs. the rate recorded at the last pricing review date; triggers a mandatory pricing review within 14 days; does not itself change any prices |
+| `geo.price_change_approved` | STANDARD | `market_code`, `segment` (consumer / enterprise), `old_price_usd`, `new_price_usd`, `change_pct`, `effective_date`, `change_reason` (fx_adjustment / ppp_rebalance / competitive / founder_decision), `approved_by` (founder internal ID), `fx_rate_at_approval` (if fx_adjustment) | 7 years | Emitted on founder sign-off of any consumer or enterprise geo-pricing change, in any market; the audit record must be created before the App Store pricing change is submitted or the enterprise rate card is updated — the record precedes the action |
+
+**HMAC chain note:** All three geo expansion events are STANDARD severity and follow the same HMAC-chain append logic as all DEC-030 events (see `docs/AUDIT_LOG_SCHEMA.md §3`). The geo.market_activated event is particularly important — if the GDPR DPA ever asks for evidence that DPIA was completed before EU processing began, the `compliance_checklist_ref` field in this event is the audit trail. The DPA completion date must therefore precede the `geo.market_activated` activation_date. Data-engineer to enforce this ordering check in the event emission pipeline.
+
+---
+
+### 29.9 Implementation Checklist
+
+| Item | Priority | Milestone | Owner | Definition of Done |
+|---|---|---|---|---|
+| Configure UA consumer pricing in App Store Connect (Tier 5–7, UA storefront) and Stripe (for web Pro, if launched); confirm LiqPay or Wayforpay integration is either live or explicitly deferred; obtain UA legal review of Personal Data Protection Law compliance + martial law data rules | P0 | Before App Store launch (M4) | platform-engineer + founder + legal counsel | UA App Store pricing live; UA privacy policy in Ukrainian published; legal review memo filed in compliance records |
+| Complete GDPR DPIA (Data Protection Impact Assessment) for EU health data processing; engage fractional DPO advisory retainer; execute SCCs with Supabase EU, Cloudflare EU, and Anthropic (or confirm EU region data residency); appoint EU GDPR Art. 27 Representative | P0 | Before first EU user (before GEO-GATE-01 activation, targeting M12) | compliance-officer + external DPO + platform-engineer | DPIA document signed; DPO contract executed; SCCs filed; EU Representative service contracted; all items referenced in geo.market_activated compliance_checklist_ref |
+| Configure EU Stripe account (EUR settlement currency) and test end-to-end EU subscription flow (PL, DE, NL storefronts on App Store + Stripe web); validate EU VAT handling via Stripe Tax | P0 | Before EU App Store launch (M12) | platform-engineer | Test EU subscription charges EUR, VAT applied correctly, Stripe EUR balance receives settlement; confirmed in staging + production |
+| Complete EU App Store localisation: PL-language screenshots and metadata (App Store Connect PL storefront), DE/EN screenshots for DE/NL storefronts; configure pricing tiers per §29.4.2 | P1 | Before EU App Store launch (M12–M14) | brand-system + platform-engineer | EU storefronts live with localised assets; PL and DE metadata copy approved by brand-voice; pricing tiers confirmed in App Store Connect |
+| Complete CCPA privacy policy update and California DPA compliance review; establish US legal entity (Delaware C-Corp); confirm US entity is named as data controller for US users in privacy policy | P1 | Before US App Store launch (M24+, pre-GEO-GATE-02) | compliance-officer + US legal counsel + founder | CCPA-compliant privacy policy live; Delaware entity formed; US entity confirmed as controller; geo.market_activated event emitted for US on first US subscriber |
+| Implement FX rate monitoring pipeline: daily EUR/USD and UAH/USD rate fetch (ECB API + NBU API); compare vs. last pricing review rate; emit geo.fx_threshold_exceeded when ≥ 15% move detected; send Slack alert to founder and data-engineer | P2 | M6 (before EU entry, so monitoring is in place at EU launch) | data-engineer | Pipeline runs daily; test event emitted in staging; Slack alert confirmed; event registered in AUDIT_LOG_SCHEMA.md |
+| Track market-by-market P&L in §22 cash flow model: add geo-split revenue and compliance cost lines for UA / EU / US; reconcile against §29.2.2 ARPU table; update ARPU actuals vs. estimates quarterly | P2 | Ongoing from M12 | data-engineer | Metabase dashboard shows revenue, ARPU, and compliance cost by market; first reconciliation completed within 30 days of EU launch |
+
+---
+
+### 29.10 Open Questions
+
+**OQ-GEO-01: Should FORM offer UA enterprise pricing denominated in UAH or USD?**
+
+If FORM bills a UA enterprise customer in UAH at ₴6,000/month (approximately $150 at ₴40/$), a 20% UAH devaluation to ₴48/$ reduces the USD-equivalent contract value to $125/month without any renegotiation — a 17% effective price cut FORM absorbs. Billing in USD protects FORM's revenue but transfers FX risk to the customer, who may not be able to budget a USD-denominated SaaS subscription in the current macro environment. Billing in USD also signals that FORM is a global product, not a local one — which is a positioning advantage for a UA-founded company trying to establish international credibility.
+
+**Recommended resolution:** Bill UA enterprise contracts in USD with a UAH reference price in the contract addendum (for customer internal budgeting purposes only; the USD amount is the binding obligation). Include a clause allowing conversion to UAH billing upon customer request, subject to a UAH floor price that preserves the USD equivalent at the time of signing ±10%. Owner: founder. Priority: **P0 — before first UA enterprise pilot.** Resolution: confirm billing currency in enterprise contract template before first UA enterprise LOI is signed; document in `docs/ENTERPRISE.md`.
+
+**OQ-GEO-02: What is the right EU entry order — Germany first (highest LTV, highest CAC) or Poland first (lower CAC, adjacent to founder network)?**
+
+Germany represents the highest LTV EU market ($134–$170 at M24) but also the highest CAC ($80–$150 effective, competitive fitness market) and the most demanding compliance expectations (German users and enterprises have high data protection awareness). Poland represents lower LTV ($90–$120 at M24) but significantly lower CAC ($25–$60, founder network adjacency, Eastern European fitness community) and a linguistic/cultural bridge from the UA founding team. The standard startup argument favours Germany (larger market, higher LTV) but the unit economics argument favours Poland (faster payback, lower capital requirement at EU entry, lower risk of compliance misstep before GDPR machine is running smoothly).
+
+**Recommended resolution:** Enter Poland first as EU validation market; enter Germany/Netherlands six months later when PL App Store distribution, retention, and GDPR compliance operations are proven. The PL cohort validates the EU GDPR workflow at lower cost and CAC before FORM invests in DE-specific creative, Meta DE campaigns, and higher-CAC acquisition. Owner: founder + growth-lead. Priority: **P1 — before EU App Store launch (M12).** Resolution: confirm EU entry order in `docs/GROWTH_LOOPS.md` and encode in §28.6 EU demand gen plan.
+
+**OQ-GEO-03: Does FORM need a separate EU legal entity (e.g., Estonian e-Residency OÜ or Irish Ltd.) for GDPR data controller compliance, or can a Ukrainian legal entity with SCCs suffice?**
+
+GDPR does not require a data controller to be an EU legal entity — a non-EU controller can process EU personal data with appropriate safeguards (SCCs, adequacy decision, or BCRs). Ukraine has not received an EU adequacy decision (as of 2024 — verify before EU launch). FORM would therefore need Standard Contractual Clauses between its UA entity and its EU-region infrastructure providers, and would need to appoint an EU representative (Art. 27, ~$500–$1,000/year). This is the lean path. The alternative — an Estonian e-Residency OÜ or Irish Ltd. — simplifies GDPR compliance (EU controller = no SCCs needed for EU-to-EU transfers), unlocks EU banking and payment infrastructure, and signals EU commitment to enterprise prospects. The downside: cost ($2k–$5k to establish, $1k–$3k/year maintenance), tax complexity, and operational overhead for a pre-Series A company.
+
+**Recommended resolution:** Consult EU privacy counsel by Month 8 (4 months before target EU launch). Lean path (UA entity + SCCs + EU Representative) is viable at EU entry scale ($0–$50k ARR). Revisit EU entity question at Series A, when legal infrastructure budget allows and enterprise sales in EU may require an EU contracting entity. Owner: founder + EU privacy counsel. Priority: **P0 — before first EU user.** Resolution: legal memo from EU privacy counsel filed in compliance records; decision documented in `docs/ENTERPRISE.md` and referenced in geo.market_activated compliance_checklist_ref.
+
+---
+
+*v1.9 (2026-06-05): §29 Geographic Expansion Unit Economics & FX Risk Model — the geo-expansion counterpart to §28 Marketing and the financial underpinning of FORM's UA → EU → US market sequencing strategy. §29.1 scopes to six deliverables: market-by-market ARPU and COGS comparison, FX risk model (UAH/EUR/USD), geo-pricing waterfall, local payment infrastructure costs, regulatory compliance cost by market, and expansion sequencing economics. §29.2 market ARPU analysis: consumer table across UA ($4.30–$5.00 effective ARPU, $52–$75 M24 LTV, 73%–84% gross margin), Poland ($7.50–$8.30, $90–$120 LTV), Germany/Netherlands ($11.20–$12.00, $134–$170 LTV), and US ($13.99–$16.99, $168–$240 LTV); PPP index basis for pricing (UA 0.32, PL 0.55, DE/NL near-parity); core finding that UA users produce 3–4× lower LTV than US users but serve as the validation cohort at the lowest CAC; COGS is USD-denominated regardless of geography meaning PPP-discounted UA users have materially lower absolute gross margin contribution. §29.3 FX risk model: currency exposure stack (UAH/USD indirect consumer churn risk, EUR/USD Stripe settlement slippage 2–4%, UAH/USD natural hedge via UA team payroll); 20% UAH devaluation stress test (revenue impact: ~-$150–$400/year from churn at M12 scale; cost impact: +$15k–$20k/year engineering hedge — net P&L neutral to slightly positive at current scale); EUR/USD 10% depreciation stress test ($1,100/year impact on $10k EU ARR scenario — immaterial at entry scale); mitigation: hard-currency billing for enterprise, Stripe multi-currency settlement, quarterly FX review, geo.fx_threshold_exceeded monitoring. §29.4 geo-pricing waterfall: PPP-adjusted consumer pricing (UA $5.99, PL $10.99, DE/NL €14.99, US $19.99); anchor-based enterprise pricing (UA $50–$150 floor, PL €150–€250, DE/NL €199–€299, US $299 full list); iOS App Store tier mapping per market; EU VAT via Stripe Tax (B2B reverse-charge), UA VAT registration required; price change governance with founder approval gate on all UA consumer price changes and geo.price_change_approved audit event preceding any change. §29.5 payment infrastructure: Stripe fee table by market (US 2.9%+$0.30, EU domestic 1.5%+€0.25, EU SEPA 0.8% capped €5); UA payment processor necessity (Stripe does not support UA-issued cards for charging) — LiqPay, Wayforpay, and Fondy options at $2k–$5k integration cost; App Store 15% Small Business Program rate (not 30% as in §3 conservative estimate — represents ~$1.50/month per subscriber ARPU improvement; update §22.3 before Series A deck); 1,000-subscriber blended processing cost ~1.7% of gross billings. §29.6 regulatory compliance: UA $500–$1,200 one-time (Personal Data Protection Law + martial law data rules); EU $5k–$12k Year 1 (DPIA mandatory, DPO retainer $2k–$5k/year, EU Representative $500–$1k/year, SCCs) declining to $2.5k–$6k/year recurring; US $4k–$8k Year 1 (CCPA, CPRA sensitive PI, state law review) declining to $1k–$2.5k/year recurring; GDPR compliance as enterprise sales enablement moat (cross-reference §25.7). §29.7 expansion sequencing: Phase 1 UA-only M1–M12 (validation, lowest cost, founder engagement quality, war-context churn annotation requirement for PostHog cohort); Phase 2 EU entry M12–M24 gated by GEO-GATE-01 (D30 ≥ 40% domestic + GDPR DPIA complete + DPO engaged + EU Stripe live + SCCs signed); recommended EU order: Poland first (lower CAC, founder network, GDPR workflow validation), then DE/NL; Phase 2 incremental entry cost $6.5k–$14.5k (8–19% of Year 1 EU net revenue); Phase 3 US M24+ gated by GEO-GATE-02 (EU ARR ≥ $50k + Series A closed + US entity + CCPA live + PMM hired). §29.8 three DEC-030 geo audit events: geo.market_activated (STANDARD, 7yr, once per market — compliance_checklist_ref must precede activation_date for GDPR audit defence), geo.fx_threshold_exceeded (STANDARD, 3yr, at ≥ 15% FX move vs. last pricing review — triggers mandatory 14-day pricing review), geo.price_change_approved (STANDARD, 7yr, any geo pricing change — audit record precedes App Store submission). §29.9 seven-item implementation checklist: 3× P0 (UA App Store pricing + legal review, GDPR DPIA + DPO + SCCs + EU Rep, EU Stripe config), 2× P1 (EU App Store localisation, CCPA + US entity), 2× P2 ongoing (FX monitoring pipeline, market-by-market P&L tracking in Metabase). §29.10 three open questions: OQ-GEO-01 (UA enterprise billing currency UAH vs. USD — P0, before first UA enterprise LOI; recommended: USD with UAH reference clause), OQ-GEO-02 (EU entry order Germany-first vs. Poland-first — P1, before EU App Store launch; recommended: Poland first for lower CAC and GDPR workflow validation), OQ-GEO-03 (UA entity + SCCs vs. EU legal entity for GDPR controller — P0, before first EU user; recommended: consult EU privacy counsel by M8, lean path viable at EU entry scale). Cross-references: §8 (enterprise economics — UA enterprise COGS bridge to be built at first UA pilot), §14.2–14.3 (cohort survival tables — ARPU inputs must be geo-split), §14.4–14.5 (CAC payback floors — UA organic CAC satisfies ≤ 12-month payback even at PPP-adjusted ARPU), §18.1 (revenue recognition — EUR-billed contracts recognised in USD at spot rate, EUR/USD movement affects ARR bridge), §22.3 (cash flow — Marketing/UA + compliance cost lines updated by market stage), §23.1 (ARR bridge — geo-split ARR required for market P&L), §24.4 (Series A capital requirements — GEO-GATE-02 requires Series A as prerequisite), §25.7 (compliance moat — GDPR investment as enterprise sales enablement), §28.5 (MKT-UA-GATE-01 — D30 ≥ 35% paid UA gate mirrors GEO-GATE-01 D30 ≥ 40% EU entry gate), §28.6 (enterprise demand gen — EU/US demand gen budget references GEO-GATE-01/02 as unlock conditions), docs/ENTERPRISE.md (enterprise pricing + billing currency for UA deals), docs/AUDIT_LOG_SCHEMA.md (DEC-030 event registry — three geo events to be registered), docs/GROWTH_LOOPS.md (EU entry order and referral localisation). Owner: founder + data-engineer + compliance-officer.*
 
 *v1.9 (2026-06-04): §28 Marketing & Demand Generation Cost Model — the cost and channel counterpart to §27 Engineering and the operational detail behind §22.3 "Marketing / UA" cash flow line. §28.1 scopes the section to ten deliverables: marketing cost taxonomy, pre-launch budget, ASO investment, consumer paid acquisition economics, enterprise demand gen budget, tooling stack, first marketing hire economics, S&M-as-%-ARR benchmarks, magic number model, and DEC-030 audit events. §28.2 marketing cost taxonomy: COGS vs. S&M classification for eight spend types; consumer vs. enterprise cost split noting that enterprise demand gen at pre-PMF is ~100% founder time (no incremental cash beyond tools). §28.3 pre-launch budget (M1–M4): $3,500 total cash across waitlist infrastructure, content creation, ASO screenshot design, and limited ASA test — directly mapped to §22.3 Marketing/UA line. §28.4 ASO investment: $700–$1,400 initial external cost plus 17h founder time; conversion rate improvement from 5% to 10% on 1,000 monthly product page views = 50 incremental installs/month at $0 marginal cost — highest-leverage pre-launch action. §28.5 consumer paid acquisition: channel benchmark table (ASA brand $17–$50 effective CAC, ASA discovery $40–$200, Meta $43–$267, TikTok $40–$300, organic ≥ $15–$30 with higher LTV); MKT-UA-GATE-01 hard ceiling (D30 ≥ 35%, App Store live, install-to-Pro rate measured on ≥ 50 organic); paid UA cap $1,000/month until gate is green. §28.6 enterprise demand gen: founder-led phase $300–$1,200/month (LinkedIn thought leadership $0 cash, HubSpot Free CRM, selective events $0–$500/event); post-Series A demand gen $7,600–$19,450/month (AE outbound tools, ABM LinkedIn $1,500–$5,000/month, events $4,000–$10,000/year, content agency $2,000–$4,000/month). §28.7 marketing tooling stack: pre-launch $0–$38/month (Figma free, Loops free, PostHog already paid, Buffer free, HubSpot Free CRM); post-launch $79–$179/month excluding ad spend; Series A $346–$666/month (Outreach, LinkedIn Sales Nav, Apollo.io, Clearbit). §28.8 first marketing hire economics: four profile options (Content Writer $25k–$40k, Growth Marketer $40k–$60k, PMM $50k–$75k, VP Marketing $70k–$100k UA rates); recommended first hire Growth Marketer at Month 18–22 post-consumer-PMF; three hiring gates (MKT-HIRE-01 D30 ≥ 40% + organic traction + founder time > 8h/week; MKT-HIRE-02 PMM concurrent with AE; MKT-HIRE-03 Head of Marketing post-Series A); marketing hires are 100% S&M — no gross margin impact (contrast with §26.6 CS gross margin impact). §28.9 S&M as % ARR: industry benchmarks (Bessemer/SaaS Capital) at four stages; FORM targets pre-revenue 40–60%, $100k–$500k ARR 35–50%, $500k–$1M ARR 30–40%, $1M–$3M ARR 25–35%; combined S&M + G&A target ≤ 50% ARR at Series A. §28.10 magic number model: formula (net new ARR ÷ prior quarter S&M spend); four-milestone table (Q4 Year 1 6.4× enterprise-driven anomaly, Q2 Year 2 2.0×, Q4 Year 2 1.4×, Q2 Year 3 1.3×); interpretive note that magic number is unreliable before first AE and > $10k/quarter S&M spend; data pipeline requirement (ARR bridge §23.1 + S&M expense classification + §18.1 ARR recognition). §28.11 three DEC-030 marketing spend audit events: mkt.paid_ua_gate_unlocked (STANDARD, 3yr, once per gate), mkt.paid_channel_paused (STANDARD, 3yr, on > $200/month channel pause — key CAC governance control), mkt.marketing_hire_onboarded (STANDARD, 7yr, mirrors ops.engineer_hired). §28.12 seven-item implementation checklist: 3× P0 M3–M4 (UTM attribution in PostHog, App Store assets, email drip sequence), 3× P1 M4–M6 (MKT-UA-GATE-01 OKR, monthly marketing cost report, DEC-030 event registration), 1× P2 post-AE (magic number reporting). §28.13 three open questions: OQ-MKT-01 (content flywheel vs. paid UA sequencing — P0, M3 content plan lock; recommended: content M1 + ASA at launch + Meta only after GATE-01), OQ-MKT-02 (incentivised referral vs. social-share mechanic — P1, before App Store launch; recommended social-share first as more brand-congruent), OQ-MKT-03 (gated vs. ungated enterprise collateral — P2, before first collateral published; recommended ungated at pre-PMF founder-led phase). Cross-references: §8.5 (enterprise CAC per deal — not duplicated here), §14.4–14.5 (consumer CAC payback and LTV:CAC floors — floor inputs for §28.5 paid UA ceiling), §18.7 (magic number > 0.75 target in SaaS glossary — operationalised in §28.10), §19.3–19.5 (enterprise GTM pipeline model — revenue side of the S&M efficiency ratio), §22.3 (cash flow — Marketing/UA line source data), §23.1 (ARR bridge — magic number numerator), §26.1 (CS cost taxonomy — privacy floor reminder applicable here), §27.9 (ops.engineer_hired DEC-030 pattern — mkt.marketing_hire_onboarded mirrors), docs/ENTERPRISE.md (enterprise pricing + no-go customers), docs/AUDIT_LOG_SCHEMA.md (DEC-030 event registry), docs/GROWTH_LOOPS.md (referral mechanic context). Owner: founder + marketing-lead + growth-lead + data-engineer.*
 
