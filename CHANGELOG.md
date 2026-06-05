@@ -6,6 +6,16 @@
 
 ---
 
+## [2.6.3] — 2026-06-05
+
+### Added
+- `content/post-227-rpe-calibration-self-coached.md` — RPE Calibration for Self-Coached Athletes: чому mRPE ненадійний без calibration. Borg (1982 MSSE): оригінальна шкала 6–20 для аеробних задач. Zourdos et al. (2016 JSCR): modified RPE 0–10 — 2 RIR = RPE 8 строго. Helms et al. (2016 IJSPP): точність зростає з proximity-to-failure exposure, а не просто зі стажем. Три систематичні помилки: хронічне недооцінювання (~RPE 6 = «RPE 8»), conflation тренувального стану з вагою, exercise-specific failure blindness (Zourdos 2021 JSCR). Три методи калібрування: failure sets (periodic), velocity tracking (González-Badillo 2017), rep max testing. Colquhoun et al. (2017 JSCR): авторегуляція перевершує fixed % — але якість RPE-входу визначає якість виходу. clinical-safety NOT REQUIRED (cloud-agent · 2026-06-05).
+- `blog.html` — картки post-227 (RPE calibration) і post-226 (Residual Training Effects) додані в articles index.
+- `README.md` — post-226 і post-227 відмічені як [x] у content engine roadmap; нові теми post-230–234 додані до роадмапу; Blog posts (drafts) оновлено до 227.
+- `STATUS.md` — рядки post-227 і post-226 додані в content table.
+
+---
+
 ## [2.6.2] — 2026-06-05
 
 ### Changed
