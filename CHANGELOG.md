@@ -6,6 +6,14 @@
 
 ---
 
+## [2.3.0] — 2026-06-05
+
+### Added
+- `content/post-101-myofascial-vs-articular-mobility-limiters.md` — Міофасціальні vs суглобові обмежувачі рухливості: три джерела обмеження ROM (артикулярна капсула, м'язово-фасціальний компонент, нейральний); gap passive/active ROM як діагностичний маркер; PNF (contract-relax, GTO-механізм), end-range isometrics, joint mobilization; Schoenfeld & Grgic (2020) — full-range strength training. Clinical-safety: cleared.
+- `content/post-102-sleep-architecture-muscle-synthesis.md` — Архітектура сну та MPS: SWS N3 → GH-пульс (IGF-1/mTORC1) у перших двох циклах; REM у другій половині ночі → моторна консолідація (Walker 2009); Leproult & Van Cauter (2011) — 5-год обмеження → -10-15% тестостерон + ↑кортизол; катаболічний зсув при хронічній депривації (IL-6, TNF-α, убіквітин-протеасома); Stutz et al. (2019) мета-аналіз пізнього тренінгу. Протокол: зафіксований час пробудження, 17–19°C, -синє світло за 60–90хв, інтенсивний тренінг за 3+ год до сну. Clinical-safety: cleared.
+
+---
+
 ## [2.2.0] — 2026-06-05
 
 ### Added
