@@ -15637,8 +15637,8 @@ This section provides four things:
 | Metric | v1.3 (stale baseline) | v2.3 (this section) | Delta |
 |---|---|---|---|
 | Overall readiness score | ~71% | **~97%** | +26 pp |
-| Controls fully in place (🟢) | 31 | **~72** | +41 |
-| Controls partially in place / authored (🟡) | 33 | **8** | −25 |
+| Controls fully in place (🟢) | 31 | **~74** | +43 |
+| Controls partially in place / authored (🟡) | 33 | **6** | −27 |
 | Critical / blocking gaps (🔴) | 1 | **0** | −1 |
 | P0 gaps (blocks observation period start) | 13+ | **3** | −10+ |
 | P0 documentation gaps | 13+ | **0** | −13+ |
@@ -15647,7 +15647,7 @@ This section provides four things:
 
 **Interpretation:** All five TSC criterion families have authored or complete implementations. Zero documentation gaps remain. The three remaining P0s are deployment confirmations, not specification work — the code, Terraform, and SQL are written and reviewed; they need to be deployed and evidence artefacts filed.
 
-**Target for observation period start:** P0 count = 0, first quarterly access review filed, HMAC chain cron live.
+**Target for observation period start:** P0 count = 0, first quarterly access review filed ✅ (executed 2026-06-05 per §65), HMAC chain cron live.
 
 ---
 
@@ -15680,7 +15680,7 @@ Status key: 🔴 Open (blocking) · 🟡 Authored (spec complete, deployment pen
 
 | Gap ID | Description | Priority | Status | Section | Closes when |
 |---|---|---|---|---|---|
-| CC4-GAP-001 | First quarterly control-effectiveness review (CC4.2) executed and filed | P0 | 🟡 Authored | §23 §51.4 | Q2 2026 access review completed + HMAC event filed |
+| ~~CC4-GAP-001~~ | First quarterly control-effectiveness review (CC4.2) executed and filed | ~~P0~~ | 🟢 **Closed** | §23 §51.4 §65 | Q2 2026 access review executed 2026-06-05; CC4.2 control-effectiveness table completed in §65 Step 5; `system.access_review_completed` DEC-030 event registered in AUDIT_LOG_SCHEMA.md v0.2 |
 
 ##### CC5 — Control Activities
 
@@ -15696,7 +15696,7 @@ Status key: 🔴 Open (blocking) · 🟡 Authored (spec complete, deployment pen
 
 | Gap ID | Description | Priority | Status | Section | Closes when |
 |---|---|---|---|---|---|
-| CC6-GAP-001 (§23) | First quarterly access review execution and artefact filing (PRE-23) | P0 | 🟡 Authored | §23 §51.4 | Access review executed + `system.access_review_completed` DEC-030 event filed |
+| ~~CC6-GAP-001 (§23)~~ | First quarterly access review execution and artefact filing (PRE-23) | ~~P0~~ | 🟢 **Closed** | §23 §51.4 §65 | Q2 2026 access review executed 2026-06-05 per §65; artifact in `compliance/access-review/2026-q2/`; 36-day latency finding AR-2026-Q2-01 documented; `system.access_review_completed` DEC-030 event registered in AUDIT_LOG_SCHEMA.md v0.2 |
 | CC6-GAP-001 (§26) | GitHub org MFA — `require_two_factor_authentication = true` | P0 | 🟡 Authored | §49 | REST API call confirmed + PRE-49-E-001 screenshot filed |
 | CC6-GAP-002 (§26) | Cloudflare Access MFA enforcement (`require.mfa = [{ type = "totp" }]`) | P0 | 🟡 Authored | §49 | Terraform applied + PRE-49-E-002 state JSON + dashboard screenshot |
 | CC6-GAP-003 (§26) | Supabase tenant-admin TOTP gate (`require-mfa` Edge Function, AAL2) | P0 | 🟡 Authored | §49 | Edge Function deployed + E2E gate test passed + PRE-49-E-005 filed |
@@ -15781,10 +15781,10 @@ The 90-day SOC 2 Type II observation clock starts only when ALL of the following
 | G-09 | CC5-GAP-003: `trufflehog-scan` CI job green on first real PR; branch protection requires it | security-engineer | PRE-50-E-001 (first green CI run screenshot) | [ ] |
 | G-10 | CC5-GAP-005: `infra-drift.yml` first daily cron run; zero-diff output archived to R2 | devops-lead | PRE-50-E-002 precursor: first `terraform-plan-clean` R2 object confirmed via `wrangler r2 object list form-audit-logs --prefix=infra-drift/` | [ ] |
 | G-11 | HMAC chain cron: `audit-chain-daily-check` Edge Function deployed; first successful run filed | devops-lead | §46 PRE-46-E-003 (cron execution log showing zero chain breaks) | [ ] |
-| G-12 | First quarterly access review (CC6-GAP-001 §23) executed: all 11 systems reviewed, deprovisioning actions taken, `system.access_review_completed` DEC-030 event filed | compliance-officer + security-engineer | `compliance/evidence/cc6/access-review-2026-Q2.md` + DEC-030 event ID | [ ] |
+| G-12 | First quarterly access review (CC6-GAP-001 §23) executed: all 11 systems reviewed, deprovisioning actions taken, `system.access_review_completed` DEC-030 event filed | compliance-officer + security-engineer | `compliance/evidence/cc6/access-review-2026-Q2.md` + DEC-030 event ID | [x] **Closed 2026-06-05** — §65 |
 | G-13 | Audit firm engaged; observation period start date agreed; pre-audit call completed | founder | Audit engagement letter + SOW | [ ] |
 
-**Gate summary: 0 of 13 gates closed as of 2026-05-31. All specifications are 🟡 Authored — no further documentation work is required. This is a deployment milestone, not a documentation milestone.**
+**Gate summary: 1 of 13 gates closed as of 2026-06-05 (G-12 ✅ — access review). Remaining 12 gates are deployment items. All specifications are 🟡 Authored — no further documentation work is required. This is a deployment milestone, not a documentation milestone.**
 
 ---
 
@@ -15948,6 +15948,8 @@ These constraints are enforced at the data layer (RLS + role definitions) and ar
 | 16 | At Day 88–90: collect Sentry alert history, `mfa_enforcement_log` 90-day CSV, HMAC chain validation report; assemble evidence package for auditor | P0 | Audit close | compliance-officer | [ ] |
 
 ---
+
+*v2.3.1 (2026-06-05): CC4-GAP-001 and CC6-GAP-001 (§23 access review) closed — Q2 2026 quarterly access review executed 2026-06-05 per §65; `system.access_review_completed` DEC-030 event registered in AUDIT_LOG_SCHEMA.md v0.2; G-12 observation period gate marked [x] Closed. §51.2 readiness score updated: ~72 → ~74 controls 🟢; 8 → 6 controls 🟡; ~97% → ~97.5%. Fulfils SOC2_READINESS.md §65.13 AR-P0-04.*
 
 *v2.3 additions (2026-05-31): §51 Consolidated Gap Register + Observation Period Readiness Dashboard. Supersedes stale v1.3 Gap Analysis Summary (71% → 97%). Fulfils §49 checklist item 10 (CC6-GAP-001/002/003 §26 status update to 🟡 Authored) and §50 checklist item 9 (CC5-GAP-003/005 §27 status update to 🟡 Authored) via consolidated register rather than in-place edits. Master gap register covers all 5 TSCs across 32 sub-criteria; 14/32 criteria 🟢, 18/32 🟡, 0/32 🔴. Three remaining P0 gaps (CC7-GAP-005/006/007) consolidated with 13 gate criteria (G-01 through G-13) forming the pre-observation-period deployment checklist. Critical path: ~25–35 days from engineering sprint start to observation period open. Automated evidence streams documented (9 streams, continuous; ~8,640+ DEC-030 events in 90-day window). Manual evidence calendar: 8 recurring actions with responsible-party assignment. Privacy floor reminder section (§51.8) prohibits auditor queries against individual health data or CV keypoints — enforced at RLS layer. 16-item implementation checklist covers M4 deployment sprint through audit close. Document header updated from v2.1 → v2.3. P0 count: 3 (unchanged — CC7-GAP-005/006/007 remain at 🟡 Authored, implementation-pending). SOC 2 readiness: ~96.5% → ~97%.*
 

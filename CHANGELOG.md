@@ -6,6 +6,17 @@
 
 ---
 
+## [2.6.2] — 2026-06-05
+
+### Changed
+- `docs/SOC2_READINESS.md §51` — CC4-GAP-001 і CC6-GAP-001 (§23 access review) закриті (🟢 Closed). G-12 observation period gate [x] Closed 2026-06-05. §51.2 readiness score: ~97% → ~97.5% (74 🟢 controls, 6 🟡). Fulfils AR-P0-04 з §65.13.
+- `docs/OBSERVABILITY.md §30.10 item 10` — `admin.encryption_key_rotated` DEC-030 event закритий (🟢 Closed 2026-06-05). Closed by AUDIT_LOG_SCHEMA.md v0.2; closes OQ-ENC-03 + SOC2_READINESS §65.13 AR-P1-05.
+
+### Added
+- `content/post-226-residual-training-effects.md` — Residual Training Effects: скільки тримається кожна фізична якість після припинення тренування. Issurin (2008 J Sports Med Phys Fitness): сила і аеробна витривалість ~30 днів, аеробна потужність ~18 днів, вибухова сила ~5 днів. Чому блокова послідовність — це deployment RTEs у правильному порядку, а не стильова перевага. Практика: чому не панікувати після діловантажень, чому тест одразу після переходу блоку може занижувати, оптимальне вікно для тестування. clinical-safety PASS (cloud-agent · 2026-06-05).
+
+---
+
 ## [2.6.1] — 2026-06-05
 
 ### Changed
