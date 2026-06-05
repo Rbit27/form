@@ -6,6 +6,17 @@
 
 ---
 
+## [1.98.0] — 2026-06-05
+
+### Added
+- `content/post-217-muscle-architecture.md` — Архітектура м'яза: чому «більший» не означає «сильніший». Lieber & Fridén (2000 Muscle Nerve): три архітектурні параметри (pennation angle θ, fiber length Lf, PCSA = volume × cos θ / Lf); трейдоф pennated (висока сила, мала амплітуда) vs longitudinal (висока швидкість, мала сила). Fukunaga et al. (1997 Acta Physiol Scand) + Narici et al. (1996 J Physiol): in vivo ультразвук — ізометрія «на суглобі» ≠ ізометрія волокна (волокна вкорочуються в pennated м'язі навіть при стабільній довжині). Kawakami et al. (1993 J Biomech): gastrocnemius θ = 20–30°. Aagaard et al. (2001 J Appl Physiol): гіпертрофія збільшує θ → PCSA зростає більше, ніж передбачає анатомічний поперечний переріз. Практичне: хамстрінги (довгі волокна, низький θ) потребують повної ROM — leg curl у вкороченій позиції не дає повного стимулу; вибір вправ має враховувати архітектурний оптимум. FORM-контекст: ROM-tracking і velocity loss як непрямі маркери архітектурної ефективності. clinical-safety NOT REQUIRED
+- `content/post-218-central-command-exercise-pressor-reflex.md` — Центральна команда і exercise pressor reflex: як мозок керує серцем під навантаженням. Krogh & Lindhard (1913 J Physiol): feedforward-активація кардіоваскулярної системи до початку скорочення (ЧСС зростає ще при думці про підхід; ефект відтворюється у кураризованих суб'єктів — нейроанатомія, не «психологія»). Mitchell et al. (1983 J Physiol): exercise pressor reflex — групи III (механорецептори, швидкі: стрейч і тиск) і IV (метаборецептори, повільні: Pi, H⁺, лактат, брадикінін) аферентних волокон. Smith et al. (2006 Am J Physiol Heart Circ Physiol): ізольований внесок механо- і метаборецепторів. Amann et al. (2009 J Physiol): блокада груп III/IV інтратекальним фентанілом → атлети генерували вищу потужність до відмови, але мали більший периферичний збиток — ЦНС-гальмо є реальним захисним механізмом. Gandevia (2001 Physiol Rev): суперспінальний компонент — мотивація може «пробити» VA-gap (~80%→95%), але не знизити [Pi] у саркомері. FORM-контекст: RPE і velocity loss як проксі інтенсивності afferent feedback; Victor не рекомендує систематично тренуватись при RPE > 9 — хронічне підвищення базального аферентного сигналу знижує VA. clinical-safety NOT REQUIRED
+- `blog.html` — картки post-218 (central command + exercise pressor reflex) і post-217 (muscle architecture) додані перед post-216; лічильник: 184 → 186 карток
+- `README.md` — post-217 і post-218 позначені [x] done з коротким описом
+- `STATUS.md` — рядки post-217 і post-218 у content engine table; blog.html лічильник оновлено до 186 карток / 209 posts authored
+
+---
+
 ## [1.97.1] — 2026-06-04
 
 ### Added
