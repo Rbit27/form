@@ -6,6 +6,17 @@
 
 ---
 
+## [2.8.1] — 2026-06-05
+
+### Added
+- `compliance/access-review/authorized-roster.md` v1.0 — Authorized access roster baseline for SOC 2 quarterly access reviews (§23/§65); sole document against which each quarterly review's Step 2 comparison runs; §1 human accounts: founder is sole authorized human across all 11 systems (GitHub Admin, Cloudflare Super Admin, Supabase Owner, 1Password Owner/Admin, PostHog Admin, Sentry Owner, Stripe Admin, ElevenLabs Admin, Anthropic Admin, Apple Developer Account Holder, Google Play Account owner); §2 service accounts: 14 entries with rotation SLAs (`SUPABASE_SERVICE_ROLE_JWT` 90d, `ANTHROPIC_API_KEY` 90d, `CLOUDFLARE_API_KEY` 180d, `WORKOS_API_KEY` 180d, `SENTRY_DSN` 180d, `HMAC_AUDIT_CHAIN_KEY` annual dual-key, `KEYPOINTS_ENC_KEY` 365d, `SUPABASE_ANON_KEY` 365d, SCIM tokens 12mo, GitHub Actions 12mo, Google Play SA 12mo, PostHog key 12mo, Cloudflare Tunnel 12mo, nightly backup 90d); §3 unauthorized-by-default categories; §4 no-go customer list (insurance risk-scoring, gov backdoors, wellness-as-punishment, athlete eval without consent); §5 version history; §6 cross-references to SOC2_READINESS §23/57/58/65, AUDIT_LOG_SCHEMA, OBSERVABILITY, CRYPTOGRAPHY_POLICY, ENTERPRISE. Closes AR-P0-03 (deadline 2026-06-07)
+
+### Changed
+- `docs/SOC2_READINESS.md` §23.8 item 2 — Open → ✅ Closed (2026-06-05): `authorized-roster.md` v1.0 committed
+- `docs/SOC2_READINESS.md` §65.13 AR-P0-03 — [ ] → [x] Closed (2026-06-05): full closure note with artefact summary
+
+---
+
 ## [2.8.0] — 2026-06-05
 
 ### Added

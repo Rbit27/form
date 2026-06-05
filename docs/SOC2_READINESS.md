@@ -3101,7 +3101,7 @@ This compensating control expires at the moment a second person is granted any p
 | # | Action | Owner | Priority | Status |
 |---|---|---|---|---|
 | 1 | Create `compliance/access-review/` directory in private compliance repository | compliance-officer | P0 | Open |
-| 2 | Author `authorized-roster.md` with solo-founder role assignments (§23.5) | compliance-officer | P0 | Open |
+| 2 | Author `authorized-roster.md` with solo-founder role assignments (§23.5) | compliance-officer | P0 | ✅ Closed (2026-06-05): `compliance/access-review/authorized-roster.md` v1.0 committed — 11 human accounts, 14 service account rows, no-go customer list, v-history, cross-refs. AR-P0-03 closed. |
 | 3 | Complete first access review artifact (`access-review-2026-Q2.md`) per §23.4 | security-engineer + compliance-officer | P0 — PRE-23 | Open |
 | 4 | File SHA-256 of Q2 artifact as `system.access_review_completed` in HMAC audit log | security-engineer | P0 | Open |
 | 5 | Add `system.access_review_completed` to DEC-030 event taxonomy in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | P1 | Open |
@@ -21833,7 +21833,7 @@ Items required to fully close CC6-GAP-001 and maintain the quarterly access revi
 
 - [ ] **AR-P0-01** — Commit access review artifact to private `form-compliance` repository at path `compliance/access-review/2026-q2/access-review-2026-Q2.md`; record git commit SHA here. **Owner:** compliance-officer. **Deadline:** 2026-06-07 (2 days from execution date).
 - [ ] **AR-P0-02** — Compute SHA-256 of committed artifact (`sha256sum access-review-2026-Q2.md`); emit `system.access_review_completed` DEC-030 event with `artifact_sha256` field; record HMAC chain event ID here. **Owner:** compliance-officer. **Deadline:** 2026-06-07. **Prerequisite:** AR-P0-01.
-- [ ] **AR-P0-03** — Create `compliance/access-review/authorized-roster.md` v1.0 with §23.5 role assignments (founder = only authorized human account holder; all service accounts per §65.3.2 table). **Owner:** compliance-officer. **Deadline:** 2026-06-07. **Note:** This file is the baseline against which Q3 and all future reviews compare.
+- [x] **AR-P0-03** — Create `compliance/access-review/authorized-roster.md` v1.0 with §23.5 role assignments (founder = only authorized human account holder; all service accounts per §65.3.2 table). **Owner:** compliance-officer. **Deadline:** 2026-06-07. **Closed:** 2026-06-05 — `compliance/access-review/authorized-roster.md` v1.0 committed; 11 human accounts (founder-only across all 11 systems), 14 service account / API token rows with rotation SLAs, §3 unauthorized-by-default categories, §4 no-go customer list, version history, full cross-reference table. File is the v1.0 baseline for Q3 2026 review. **Note:** This file is the baseline against which Q3 and all future reviews compare.
 - [ ] **AR-P0-04** — Update §51 Consolidated Gap Register: mark CC6-GAP-001 as 🟢 Closed with reference to PRE-23-E-001 and DEC-030 event ID. **Owner:** compliance-officer. **Deadline:** 2026-06-07. **Note:** Gap register is in SOC2_READINESS.md §51; update the CC6-GAP-001 row in the gap table.
 - [ ] **AR-P0-05** — Verify three credential rotations (AR-2026-Q2-03/04/05) are reflected in `form-crypto-health` KV namespace: `last_rotated` and `next_rotation_due` updated for `SUPABASE_SERVICE_ROLE_JWT`, `ANTHROPIC_API_KEY`, and `nightly_backup_role`. **Owner:** platform-engineer. **Deadline:** 2026-06-07. **Cross-reference:** OBSERVABILITY §30.2 and §30.10 `form-crypto-health` KV state.
 
