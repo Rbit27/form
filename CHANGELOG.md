@@ -6,6 +6,18 @@
 
 ---
 
+## [2.8.0] — 2026-06-05
+
+### Added
+- `content/post-229-motor-learning-strength.md` — Motor learning у силовому тренуванні: чому «вчитися рухатись краще» і «ставати сильнішим» — різні фізіологічні процеси; Fitts & Posner (1967) три стадії (когнітивна → асоціативна → автономна) і нейронна архітектура кожної; Schmidt (1975 Psych Rev) schema theory і variability of practice; Shea & Morgan (1979) contextual interference effect; Wulf & Prinz (2001) зовнішній vs внутрішній фокус уваги — мета-аналіз; Ericsson et al. (1993) deliberate vs accumulated practice; Walker et al. (2002 Neuron) моторна консолідація під час сну +20%; коли свідоме управління технікою заважає продуктивності (Stage 3); van Vliet & Wulf (2006) interference при high-load training; clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — додано картки post-229 і post-228 (191 cards total)
+- `STATUS.md` — content engine table: post-229 і post-228 додано
+- `README.md` — post-229 позначено [x]
+
+---
+
 ## [2.7.0] — 2026-06-05
 
 ### Added

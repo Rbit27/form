@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 189 cards (212 posts authored), category filter, newsletter CTA | v2.4.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 191 cards (229 posts authored), category filter, newsletter CTA | v2.8.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -280,6 +280,8 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-207-antagonist-agonist-paired-sets.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-208-intensity-vs-volume-hypertrophy-threshold.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-209-eccentric-overload.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-229-motor-learning-strength.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-228-minimum-effective-dose.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-227-rpe-calibration-self-coached.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-226-residual-training-effects.md | Blog | draft · clinical-safety PASS (2026-06-05) · sports-scientist pending |
 | post-225-novice-effect-intermediate.md | Blog | draft · clinical-safety PASS (2026-06-05) · sports-scientist pending |
