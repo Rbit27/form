@@ -118,6 +118,15 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 - `system.maintenance_started` / `system.maintenance_completed`
 - `system.config_changed` (feature flag, environment var)
 - `system.deployment_completed` (release SHA, environment)
+- `system.access_review_completed` — quarterly access review completed (SOC 2 CC6.2/CC6.3/CC6.5/CC4.2); payload: `{reviewer_id, quarter, artifact_sha256, systems_reviewed_count, accounts_reviewed_count, findings_count, review_latency_days}`; STANDARD severity, 7yr retention; HMAC-chained; cross-ref: SOC2_READINESS §23, §65
+- `system.credential_rotated` — FORM-internal credential rotated (scheduled or triggered); payload: `{credential_name, rotation_trigger: 'scheduled'|'compromise'|'quarterly_review'|'key_ceremony', days_since_last_rotation, rotated_by}`; STANDARD severity, 7yr retention; HMAC-chained; cross-ref: SOC2_READINESS §56/§57, §65.9
+
+### Admin (key management)
+
+> HIGH severity · 7yr retention · HMAC-chained. Triggers PagerDuty P2 alert on unexpected rotation (outside scheduled window). Emitted synchronously inside KMS transaction — failure aborts rotation.
+
+- `admin.encryption_key_rotated` — master encryption key rotated in KMS; payload: `{key_id, key_version_old, key_version_new, rotation_trigger: 'scheduled'|'incident'|'compromise', rotated_by, kms_provider}`; HIGH severity, 7yr retention; cross-ref: SOC2_READINESS §56, OBSERVABILITY §30.10 item 10, DEC-030
+- `admin.signing_key_rotated` — HMAC chain signing key rotated; payload: `{key_id, rotation_trigger, rotated_by}`; HIGH severity, 7yr retention; DEC-030 chain continuity preserved via `key_transition` metadata
 
 ### Support actions (highest privilege)
 - `support.impersonation_started` — FORM employee acting as customer
@@ -138,6 +147,9 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 | `data.export/deletion` | 7 years | GDPR proof of compliance |
 | `privacy.consent_*` | 7 years | Regulatory disputes |
 | `system.deployment` | 5 years | Incident investigation |
+| `system.access_review_completed` | 7 years | SOC 2 CC6 quarterly audit evidence |
+| `system.credential_rotated` | 7 years | SOC 2 CC6 key management trail |
+| `admin.*` (key management) | 7 years | Encryption governance + incident investigation |
 | `support.*` | 10 years | Trust + future legal discovery |
 | `integration.api_call` (sampled) | 30 days | Volume management |
 | `data.read_aggregate` | 90 days | Investigation but not unlimited |
@@ -209,4 +221,5 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 
 ---
 
-**v0.1 · травень 2026 · owner: compliance-officer + security-engineer**
+**v0.2 · червень 2026 · owner: compliance-officer + security-engineer**
+*v0.2 (2026-06-05): +system.access_review_completed, +system.credential_rotated, +admin.encryption_key_rotated, +admin.signing_key_rotated. Closes SOC2_READINESS §65.13 AR-P1-03/AR-P1-04/AR-P1-05.*

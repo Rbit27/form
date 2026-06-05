@@ -6,6 +6,15 @@
 
 ---
 
+## [2.2.0] — 2026-06-05
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md v0.2` — чотири нові події: `system.access_review_completed` (SOC 2 CC6.2/CC6.3/CC6.5/CC4.2, STANDARD, 7yr, HMAC-chained), `system.credential_rotated` (rotation_trigger enum, STANDARD, 7yr), `admin.encryption_key_rotated` (KMS master key, HIGH, 7yr, PagerDuty P2), `admin.signing_key_rotated` (HMAC chain key, HIGH, 7yr). Новий підрозділ `### Admin (key management)`. Retention table доповнена. Закриває SOC2_READINESS §65.13 AR-P1-03/AR-P1-04/AR-P1-05 (OQ-ENC-03 closed).
+- `docs/SOC2_READINESS.md v1.2` — AR-P1-03/AR-P1-04/AR-P1-05 checkboxes закриті з датою 2026-06-05 та деталями реалізації.
+- `content/post-100-deload-protocols-strategic-undertraining.md` — Протоколи розвантажувальних тижнів: volume/intensity/frequency/full-rest deload; фітнес-втомна модель Banister (1975); три рівні відновлення (нейром'язовий 5–7 днів, м'язовий 7–14 днів, сухожилля 10–21 днів); cadence 4–6 тижнів при >15 підходів; маркери позапланового деавантаження. Clinical-safety: cleared.
+
+---
+
 ## [2.1.1] — 2026-06-05
 
 ### Added
