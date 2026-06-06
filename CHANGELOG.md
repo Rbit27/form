@@ -6,6 +6,13 @@
 
 ---
 
+## [2.39.0] — 2026-06-06
+
+### Added
+- `content/post-261-glycogen-resynthesis-compartments.md` — sports-science post: м'язовий глікоген, кінетика відновлення і розподіл по субклітинних компартментах (SSG/IMF/intramyofibrillar). Охоплює двофазну кінетику Ivy et al. 1988, компартментальне EM-картування Marchand et al. 2007, зв'язок IMF-деплеції з втомою Nielsen et al. 2011, fiber-type специфічність Essen et al. 1978, протокол-залежне виснаження при силовому тренінгу Robergs et al. 1991. clinical-safety NOT REQUIRED. sports-scientist.
+- `content/post-262-circadian-mtorc1-mps.md` — sports-science post: хронобіологія м'язової адаптації, добові ритми mTORC1 і синтез білка. Охоплює CLOCK/BMAL1 м'язовий годинник Harfmann et al. 2016, рибосомальний часовий контроль Jouffe et al. 2013, ефект часу доби Chtourou & Souissi 2012, ранкові vs вечірні адаптації Küüsmaa et al. 2016, соціальний jet lag і тренувальна консистентність. clinical-safety NOT REQUIRED. sports-scientist.
+- `VERSION` → 2.39.0
+
 ## [2.38.1] — 2026-06-06
 
 ### Added
