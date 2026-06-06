@@ -6,6 +6,14 @@
 
 ---
 
+## [2.31.0] — 2026-06-06
+
+### Added
+- `docs/VENDOR_REGISTRY.md` v1.0 — Standalone current-state Vendor Risk Registry covering all 15 vendors across T1–T4 tiers. Closes the "formal vendor registry needed" gap in `docs/SOC2_READINESS.md` §5 and §17.4 (embedded aspirational registry now has a standalone current-state counterpart). Introduces: composite risk scores for all 11 sub-processors (6-factor model per SOC2 §17.6); VRM-GAP-002 (ElevenLabs no SOC 2 cert) and VRM-GAP-003 (Resend no SOC 2 cert) as newly tracked gaps; 8-item security questionnaire template previously referenced in SOC2 §17.3 as `compliance/vendor-review/questionnaire-template.md` but not yet authored; T4 Peripheral register (GitHub, 1Password, Better Stack, Expo/EAS) absent from `docs/SUBPROCESSORS.md`; annual review evidence checklist (Steps 1–5, SOC2 §17.5) as auditor-facing summary; DEC-030 HMAC-chained audit event table for vendor lifecycle. SOC 2 evidence: CC9.1, CC9.2, CC9.3, P8.1, C1.1. compliance-officer + security-engineer. References: docs/SUBPROCESSORS.md, docs/SOC2_READINESS.md §17, docs/AUDIT_LOG_SCHEMA.md, docs/ENTERPRISE.md, DEC-030.
+- `VERSION` → 2.31.0
+
+---
+
 ## [2.30.0] — 2026-06-06
 
 ### Added
