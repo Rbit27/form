@@ -6,6 +6,16 @@
 
 ---
 
+## [2.12.0] — 2026-06-06
+
+### Added
+- `docs/KEY_ROTATION.md` — operational key rotation runbook v1.0: 11-key inventory (`SUPABASE_SERVICE_ROLE_JWT`, `HMAC_AUDIT_CHAIN_KEY`, `KEYPOINTS_ENC_KEY`, `CLOUDFLARE_API_TOKEN`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `STRIPE_LIVE_API_KEY`, `SENTRY_DSN`, `SUPABASE_ANON_KEY`, `BACKUP_ENC_KEY`, `API_KEY_HASH_SECRET`); per-key step-by-step rotation procedures; DEC-030 event sequences (`system.credential_rotated`, `admin.encryption_key_rotated`, `admin.signing_key_rotated`); post-rotation verification checklist; SOC 2 evidence artefact store layout (`compliance/evidence/enc/`); dual-custody rules for `HMAC_AUDIT_CHAIN_KEY` + `BACKUP_ENC_KEY`; annual key audit procedure (Q1-Jan); 8-item implementation checklist; SOC 2 CC5.2/CC5.3/CC6.4/CC6.7/CC6.8/C1.1 control mapping. Resolves CC6.7 evidence gap in `DATA_MODEL.md §7047`. Closes `INCIDENT_RESPONSE.md R-21` implementation checklist item 4 dependency. Operational complement to `docs/CRYPTOGRAPHY_POLICY.md`.
+
+### Changed
+- `VERSION` — 2.11.0 → 2.12.0
+
+---
+
 ## [2.11.0] — 2026-06-06
 
 ### Added
