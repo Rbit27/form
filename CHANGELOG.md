@@ -6,6 +6,13 @@
 
 ---
 
+## [2.38.0] — 2026-06-06
+
+### Added
+- `docs/runbooks/dr/FORM-DR-001-supabase-outage.md` — Disaster Recovery runbook: Supabase primary region (us-east-1) total outage. P0 / A1.1 A1.2 A1.3. Dual recovery paths: PITR restore to new project (60–90 min, satisfies Enterprise ≤2h RTO) and cold-backup pg_dump restore from R2 `form-cold-backups/` (3–5 h fallback). Step-by-step procedure with RLS verification (`supabase test db --filter=rls`), HMAC chain continuity check, `system.sla_breach_recorded` DEC-030 event for RTO breach, enterprise communication obligations (phone + email ≤10 min; update every 30 min; post-incident report ≤48 h). SOC 2 evidence: closes A1.2-GAP-DR-RUNBOOK (partial — 2/5 runbooks). devops-lead + compliance-officer + enterprise-architect.
+- `docs/runbooks/dr/FORM-DR-002-workers-edge-failure.md` — Disaster Recovery runbook: Cloudflare Workers global edge failure. P0 / A1.1 A1.2 CC9.2. FORM has no control over Cloudflare platform recovery; primary actions are correct detection (platform incident vs. FORM deployment issue via `wrangler deployments list`), emergency rollback path (`wrangler rollback` if FORM-caused), force-majeure clause activation for enterprise MSA, Cloudflare alternate-zone re-routing if partial regional failure. Enterprise SLA credit assessment if outage >2 h. `system.sla_breach_recorded` DEC-030 event. devops-lead + compliance-officer + enterprise-architect.
+- `VERSION` → 2.38.0
+
 ## [2.37.0] — 2026-06-06
 
 ### Added
