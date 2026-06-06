@@ -3100,16 +3100,16 @@ This compensating control expires at the moment a second person is granted any p
 
 | # | Action | Owner | Priority | Status |
 |---|---|---|---|---|
-| 1 | Create `compliance/access-review/` directory in private compliance repository | compliance-officer | P0 | Open |
+| 1 | Create `compliance/access-review/` directory in private compliance repository | compliance-officer | P0 | ✅ Closed (2026-06-05): directory created alongside `authorized-roster.md` v1.0 |
 | 2 | Author `authorized-roster.md` with solo-founder role assignments (§23.5) | compliance-officer | P0 | ✅ Closed (2026-06-05): `compliance/access-review/authorized-roster.md` v1.0 committed — 11 human accounts, 14 service account rows, no-go customer list, v-history, cross-refs. AR-P0-03 closed. |
-| 3 | Complete first access review artifact (`access-review-2026-Q2.md`) per §23.4 | security-engineer + compliance-officer | P0 — PRE-23 | Open |
-| 4 | File SHA-256 of Q2 artifact as `system.access_review_completed` in HMAC audit log | security-engineer | P0 | Open |
-| 5 | Add `system.access_review_completed` to DEC-030 event taxonomy in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | P1 | Open |
-| 6 | Schedule quarterly calendar reminders (Jan / Apr / Jul / Oct — due by end of month) | compliance-officer | P1 | Open |
+| 3 | Complete first access review artifact (`access-review-2026-Q2.md`) per §23.4 | security-engineer + compliance-officer | P0 — PRE-23 | ✅ Closed (2026-06-06): `compliance/access-review/access-review-2026-Q2.md` v1.0 committed — 11 human accounts, 14 service accounts, 0 unauthorized, 0 deprovisioning actions, 3 findings (1 closed: review latency; 2 open: MFA enforcement + CI pipeline), control effectiveness table complete, §23.7 compensating control active. PRE-23 closed. |
+| 4 | File SHA-256 of Q2 artifact as `system.access_review_completed` in HMAC audit log | security-engineer | P0 | 🟡 Pending — SHA-256 to be computed post-commit (`sha256sum access-review-2026-Q2.md`) and DEC-030 event emitted; payload specified in §8 of artifact |
+| 5 | Add `system.access_review_completed` to DEC-030 event taxonomy in `docs/AUDIT_LOG_SCHEMA.md` | compliance-officer | P1 | ✅ Closed (2026-06-05): event registered in `docs/AUDIT_LOG_SCHEMA.md` v0.2 — payload: `{reviewer_id, quarter, artifact_sha256, systems_reviewed_count, accounts_reviewed_count, findings_count, review_latency_days}`; 7yr retention. Closes AR-P1-03. |
+| 6 | Schedule quarterly calendar reminders (Jan / Apr / Jul / Oct — due by end of month) | compliance-officer | P1 | ✅ Closed (2026-06-05): `compliance/calendar/q3-2026-access-review.md` v1.0 committed — Q3 pre-gate 2026-07-17, execution window 2026-07-28/31; recurring cadence established. |
 | 7 | Add enterprise tenant inactive-account cron report to admin dashboard (§23.2.3 query on schedule) | platform-engineer | P1 | Open — required before enterprise tenants go live |
 | 8 | Confirm `tenant_scim_tokens.last_used_at` is populated on every SCIM API call (required for §23.2.2 service-account review) | platform-engineer | P1 | Open — required before SCIM G-001 ships |
 
-**PRE-23 status:** 🔴 Open → 🟡 Partial *(procedure documented; first execution pending)*
+**PRE-23 status:** ✅ **Closed** *(first quarterly access review executed 2026-06-06 — artifact: `compliance/access-review/access-review-2026-Q2.md`; SHA-256 HMAC event pending post-commit emission)*
 
 ---
 

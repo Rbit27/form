@@ -6,6 +6,16 @@
 
 ---
 
+## [2.9.0] — 2026-06-06
+
+### Added
+- `compliance/access-review/access-review-2026-Q2.md` v1.0 — Q2 2026 quarterly access review execution artifact (first review); closes **SOC2_READINESS §23.8 item 3 (P0 — PRE-23)**. Covers: 11 human accounts across 11 systems (GitHub, Cloudflare, Supabase, 1Password, PostHog, Sentry, Stripe, ElevenLabs, Anthropic, Apple Developer, Google Play) — all match `authorized-roster.md` v1.0, 0 unauthorized accounts; 14 service accounts / API tokens — all within rotation window, 0 orphan tokens, 6 GitHub Actions secrets confirmed active; 0 active enterprise tenants (pre-launch); control effectiveness table (CC4.2): unique credentials Effective, session timeout Effective, RLS Effective, MFA enforcement **Degraded** (CC6-GAP-001/002/003, authored §49, deployment pending → finding AR-2026-Q2-F-002 High), break-glass dual-auth compensating control per §23.7 (no events in period), SCIM deprovisioning N/A (no tenants); 3 findings — AR-2026-Q2-F-001 review latency 37 days (Closed: q3 calendar gate established), AR-2026-Q2-F-002 MFA enforcement gaps (Open: High, pre-observation gating), AR-2026-Q2-F-003 no CI pipeline (Open: Medium, pre-launch); SHA-256 HMAC event (`system.access_review_completed`, payload: reviewer_id/quarter/artifact_sha256/counts/latency) pending post-commit emission (§23.8 item 4); §23.7 solo-founder compensating control active. enterprise-builder cloud worker · 2026-06-06.
+
+### Changed
+- `docs/SOC2_READINESS.md §23.8` — items 1, 3, 5, 6 marked ✅ Closed; item 4 marked 🟡 Pending (SHA-256 emission); PRE-23 status updated to ✅ Closed. **Items closed:** (1) `compliance/access-review/` directory created (2026-06-05); (3) `access-review-2026-Q2.md` v1.0 committed (2026-06-06); (5) `system.access_review_completed` registered in AUDIT_LOG_SCHEMA v0.2 (2026-06-05, AR-P1-03); (6) `q3-2026-access-review.md` calendar gate committed (2026-06-05).
+
+---
+
 ## [2.8.2] — 2026-06-06
 
 ### Added
