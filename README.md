@@ -15,12 +15,12 @@
 This is a **pre-product** project repository. There is no app code yet (mobile development begins з Founding Engineer hire). What you'll find:
 
 - **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
-- **58+ markdown documents** — strategic, operational, content
-- **21 blog post drafts** — content engine ready для launch
+- **65+ markdown documents** — strategic, operational, content
+- **233+ evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
-- **5 sample programs/nutrition plans** — sport-science discipline reference
+- **3 sample training programs** — sports-science discipline reference
 - **24 specialized AI agents** — operating model embodied у `.claude/agents/`
-- **Public decision log** — 30 documented decisions з reverse-cost
+- **Public decision log** — 31 documented decisions з reverse-cost
 
 If you're здесь з first time, start з [STATUS.md](STATUS.md) для current snapshot.
 
@@ -307,7 +307,7 @@ Each iteration:
 | Tagged releases | 60+ |
 | HTML pages | 16 |
 | Markdown documents | 65+ |
-| Blog posts (drafts) | 227 |
+| Blog posts | 235 |
 | Social content assets | 7 (Twitter, LinkedIn, Reddit, press pitches, 3 newsletter issues) |
 | Total lines committed | 38,000+ |
 | AI agents defined | 24 |
@@ -556,8 +556,8 @@ Each iteration:
 - [x] post-231: Чому «functional training» — розмита категорія — SAID principle vs transfer of training; Specificity Paradox: чим вправа «функціональніша» у загальному сенсі, тим менш специфічний тренувальний стимул; Behm & Colado (2012 J Strength Cond Res): нестабільне середовище знижує силу при рівному або меншому м'язовому напруженні; де нестабільні умови обгрунтовані (спортсмени з конкретними потребами); clinical-safety NOT REQUIRED
 - [x] post-232: Механіка тапера для непрофесіонального атлета — чому тижень перед тестуванням вирішує більше, ніж більшість думає; три змінні тапера (об'єм, інтенсивність, частота); Mujika & Padilla (2000 Sports Med): зниження об'єму 40–60% при збереженні інтенсивності і частоти; короткий (5–7 днів) vs розширений (2–3 тижні) тапер; що робити з GPP-роботою; clinical-safety NOT REQUIRED
 - [x] post-233: Силовий тренінг і сон — двонапрямний зв'язок; Dattilo et al. (2011 Med Hypotheses): недосип → підвищений кортизол → знижений IGF-1/тестостерон; Leproult & Van Cauter (2011 JAMA): 1 тиждень 5h сну → -10–15% тестостерону у молодих чоловіків; Kredlow et al. (2015) мета-аналіз 66 RCT зворотний напрямок; програмування при хронічному недосипі (батьки, зміна); clinical-safety PASS WITH CONDITIONS (2026-06-06)
-- [ ] post-234: Адаптація до тренінгу у жінок: що реально відрізняється — Gentil et al. (2016): рівний гіпертрофійний відгук відносно базового рівня; Kraemer et al. (1993): нижчий абсолютний, але рівний відносний приріст сили; менструальний цикл і варіація сили (McNulty et al. 2020 Sports Med); наслідки для програмування; clinical-safety NOT REQUIRED
-- [ ] post-235: Вікова динаміка силової адаптації — як змінюється нейром'язова відповідь від 20 до 70 років; Lindle et al. (1997 J Appl Physiol): темп втрати сили прискорюється після 50; Aagaard et al. (2010): satellite cell response у старших атлетів; чому тренований 50-річний виграє у нетренованого 30-річного і за якими параметрами; clinical-safety NOT REQUIRED
+- [x] post-234: Адаптація до тренінгу у жінок: що реально відрізняється — Gentil et al. (2016): рівний гіпертрофійний відгук відносно базового рівня; Kraemer et al. (1993): нижчий абсолютний, але рівний відносний приріст сили; менструальний цикл і варіація сили (McNulty et al. 2020 Sports Med); наслідки для програмування; clinical-safety NOT REQUIRED
+- [x] post-235: Вікова динаміка силової адаптації — як змінюється нейром'язова відповідь від 20 до 70 років; Lindle et al. (1997 J Appl Physiol): темп втрати сили прискорюється після 50; Aagaard et al. (2010): satellite cell response у старших атлетів; чому тренований 50-річний виграє у нетренованого 30-річного і за якими параметрами; clinical-safety NOT REQUIRED
 - [ ] post-236: Concurrent training без interference — логіка розподілу аеробного і силового тренінгу для атлетів, що хочуть і силу, і витривалість; Coffey & Hawley (2007 Eur J Sport Sci): AMPK-mTOR conflict window ≈ 6 год; Hickson (1980) original interference effect; Wilson et al. (2012 meta-analysis): мінімізація при ≤ 3 кардіо-сесії і розподілі в часі; практичне програмування; clinical-safety NOT REQUIRED
 - [ ] post-237: Accentuated eccentric loading — тренінг вище 100% концентричного максимуму; Hody et al. (2019 Front Physiol): ексцентричний режим: нижча ЕМГ, вища механічна напруга; Roig et al. (2009 Br J Sports Med): мета-аналіз — eccentric training superior for strength gains (ES 0.85 vs 0.41); Nordic hamstring curl як benchmark; супрамаксимальні пристрої і методи; clinical-safety NOT REQUIRED
 - [ ] post-238: Proprioception і суглобова стабільність — як силовий тренінг формує sensorimotor контроль; Freeman et al. (1965 J Bone Joint Surg): оригінальне дослідження proprioception після травми; Bruhn et al. (2004 JSCR): силовий тренінг покращує суглобову позиційну точність; відмінність від «balance training»; наслідки для програмування реабілітації і превенції; clinical-safety NOT REQUIRED

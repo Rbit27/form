@@ -6,6 +6,19 @@
 
 ---
 
+## [2.13.0] — 2026-06-06
+
+### Added
+- `content/post-234-female-training-adaptation.md` — «Адаптація до тренінгу у жінок: що реально відрізняється»: Gentil et al. рівний відносний гіпертрофійний відгук; Kraemer et al. (1993) нижчий абсолютний але рівний відносний приріст сили; McNulty et al. (2020 Sports Med) мета-аналіз менструального циклу і варіації сили (SMD 1.8%, фолікулярна фаза); Hunter (2014) статеві відмінності у периферійній м'язовій втомі; естроген anti-inflammatory + glycogen sparing + мембраностабілізація; програмування без інфантилізації. clinical-safety PASS.
+- `content/post-235-age-strength-adaptation.md` — «Вікова динаміка силової адаптації»: Lindle et al. (1997) 654 учасники, 8–10%/десятиліття до 50, прискорення після; Lexell et al. (1988) Type II fiber atrophy як структурний механізм; Clark & Manini (2008) dynapenia ≠ sarcopenia; Wroblewski et al. (2011) МРТ майстер-атлетів — м'язовий перетин збережений; Aagaard et al. (2010) satellite cell response у тренованих 65+; Liu & Latham (2009) 121 RCT 6700 учасників 60+. clinical-safety PASS.
+- `blog.html` — картки Post 234 і Post 235 додано до grid
+
+### Changed
+- `README.md` — статистики оновлено: «21 blog post drafts» → «233+ evidence-based blog posts»; «58+ docs» → «65+ docs»; metrics table 227 → 235
+- `VERSION` — 2.12.0 → 2.13.0
+
+---
+
 ## [2.12.0] — 2026-06-06
 
 ### Added
