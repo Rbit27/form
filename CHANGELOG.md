@@ -6,6 +6,17 @@
 
 ---
 
+## [2.35.0] — 2026-06-06
+
+### Added
+- `content/post-257-heat-acclimation-training.md` — "Тренінг у спеку: теплова акліматизація і адаптація". Périard, Eijsvogels & Daanen (2021 Sports Med) systematic review: 4–5 core adaptations — plasma volume expansion +10–12%, earlier sweating onset, reduced core temp threshold, cardiac drift minimized after 10–14 days. Ely et al. (2010 J Appl Physiol): first 5–7 days — HR +20–30 bpm at same workload, RPE automatically rises 1.5–2 points. O'Brien et al. (2014 Sports Med): heat acclimatization → +7% VO₂max and +12% work capacity in heat conditions. Morrison et al. (2014 Appl Physiol Nutr Metab): 8–14 day protocol as optimal acclimatization window. Practical matrix for gym-without-AC summer training: week 1 — volume -15–20%, weeks 2–3 — gradual return, after 14 days — normal training. Deload timing alignment with heat season onset as adaptive strategy. Distinction from post-102 (heat performance) — this post focuses on physiology of acclimatization and practical adjustment, not competition-day performance. sports-scientist + brand-voice. clinical_safety: NOT REQUIRED.
+- `blog.html` — картка для post-257 додана (231 карток, 257 постів авторовано); VERSION → v2.35.0.
+- `README.md` — post-257 позначено [x].
+- `STATUS.md` — blog.html рядок: 231 cards (257 posts authored), v2.35.0; post-257 у content engine table; version header → 2.35.0.
+- `VERSION` → 2.35.0
+
+---
+
 ## [2.34.0] — 2026-06-06
 
 ### Added
