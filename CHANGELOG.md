@@ -6,6 +6,16 @@
 
 ---
 
+## [2.15.0] — 2026-06-06
+
+### Added
+- `docs/ONBOARDING_SECURITY.md` v1.0 — Security Onboarding Checklist: closes `docs/SOC2_READINESS.md §49.2.2` cross-reference (hardware key + no-SMS MFA policy "must be communicated in the onboarding checklist") and CC5-P2-007 (new-hire onboarding checklist). Eight-step sequential checklist — (1) AUP acknowledgment, (2) security awareness training, (3) MFA enrollment hard gate, (4) 1Password spot-check, (5) SSH key generation, (6) least-privilege access provisioning, (7) incident response orientation, (8) 30-day check-in. §5 MFA Enforcement Policy: FIDO2 hardware key (YubiKey 5 NFC/Passkey) preferred; TOTP acceptable; SMS-based 2FA explicitly prohibited with audit procedure (`gh api orgs/form-coach/members?filter=2fa_disabled`); per-platform enrollment procedures for GitHub, 1Password, Supabase, Cloudflare. §6 Access Scope Principles: least privilege, time-bound review, privacy floor (no individual user health data without PAM session). §8 SOC 2 evidence mapping: CC1.1/CC1.4/CC5.3/CC6.1/CC6.2/CC6.3/CC6.8 → CC1-E-002 completion record. §9 DEC-030 events. §11 six-item implementation checklist (3× P0, 2× P1, 1× P1-hardware-key). §12 three open questions: OQ-ONB-01 (30-day check-in DEC-030 event — P2 M5), OQ-ONB-02 (hardware key requirement for contractors with service_role — P1 before first contractor), OQ-ONB-03 (enterprise tenant SSO admins scope exclusion — P2 before M13). enterprise-builder cloud worker · 2026-06-06.
+
+### Changed
+- `VERSION` — 2.14.0 → 2.15.0
+
+---
+
 ## [2.14.0] — 2026-06-06
 
 ### Added
