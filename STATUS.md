@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 194 cards (232 posts authored), category filter, newsletter CTA | v2.10.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 195 cards (233 posts authored), category filter, newsletter CTA | v2.11.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -300,6 +300,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-212-adherence-coefficient.md | Blog | draft · clinical-safety PASS WITH CONDITIONS (2026-06-04) · sports-scientist optional |
 | post-211-pcr-resynthesis-kinetics.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-210-cognitive-load-technique.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-233-sleep-training-bidirectional.md | Blog | draft · clinical-safety PASS WITH CONDITIONS (2026-06-06) · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
@@ -513,6 +514,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v1.9.20 · 4 червня 2026**
-**Last update:** 4 червня 2026 · v1.90.0
+**v2.11.0 · 6 червня 2026**
+**Last update:** 6 червня 2026 · v2.11.0
 **Next planned update:** після hire of Founding Engineer
