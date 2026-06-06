@@ -6,6 +6,18 @@
 
 ---
 
+## [2.8.2] — 2026-06-06
+
+### Added
+- `content/post-230-training-cognitive-function.md` — «Тренування і когнітивна функція»: Colcombe & Kramer (2003) ES 0.68 executive function; Erickson et al. (2011 PNAS) +2% hippocampal volume; BDNF cascade (Cotman & Berchtold 2002, Hötting & Röder 2013); Winter et al. (2007 PNAS) acute learning window +20%/+10%; aerobic (BDNF→hippocampus→memory) vs resistance (IGF-1→PFC→executive function) mechanistic distinction; Northey et al. (2018 BJSM) 39 RCT meta-analysis; dose-response, acute vs chronic effects, what exercise cannot do; clinical-safety NOT REQUIRED; 13-min read
+
+### Changed
+- `blog.html` — added post-230 card (192 cards total, 230 posts authored); v2.8.2
+- `STATUS.md` — blog.html row updated: 192 cards, 230 posts authored, v2.8.2
+- `README.md` — post-230 marked `[x]`; roadmap extended with post-235..239 (вікова динаміка сили, concurrent training, accentuated eccentric, proprioception, asymmetry)
+
+---
+
 ## [2.8.1] — 2026-06-05
 
 ### Added
