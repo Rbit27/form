@@ -6,6 +6,16 @@
 
 ---
 
+## [2.18.0] — 2026-06-06
+
+### Added
+- `docs/SSO_CLIENT_CONFIG.md` v1.0 — FORM OAuth2/OIDC client application configuration reference. Closes `SSO_SCIM_IMPLEMENTATION.md §23` checklist item 12 (CP1 client capability documentation). Three client applications: `form-admin-dashboard` (SPA, PKCE-only, memory token storage), `form-mobile-ios` (native, PKCE, Keychain), `form-sso-exchange` (Cloudflare Worker, confidential, `client_secret_post`). Per-IdP registration parameters for Okta, Entra, Google Workspace, Generic SAML SP, Generic OIDC. §8 Entra CAE `client_capabilities=CP1` / `xms_cc` implementation with MSAL.js + MSAL Swift code samples, verification procedure, `CC6-E-CAE-CP1-001` evidence artifact, and CAE strict enforcement prerequisite. §7 JWKS caching policy (1h TTL, Durable Object lock on `kid` miss, stale fallback ≤ 6h). §6 token validation (RS256/PS256 only; HS256 rejected; nonce, `hd` for Google, `oid` preference for Entra). §4 PKCE mandatory — `plain` downgrade attempt emits HIGH audit event. §10 five DEC-030 events: `sso.client_config_updated` (HIGH), `sso.jwks_key_miss` (HIGH), `sso.jwks_fetch_failed` (HIGH), `sso.pkce_validation_failed` (HIGH), `sso.entra_cp1_verified` (STANDARD). §11 10-item implementation checklist (4× P0 M4, 4× P1 M4/M5, 2× P2 M5). §12 three open questions: OQ-SSC-01 (`private_key_jwt` Okta — P2), OQ-SSC-02 (Entra B2B guest accounts — P2), OQ-SSC-03 (plaintext diff in `sso.client_config_updated` — P1 pre-SOC 2). SOC 2 CC6.1/CC6.2/CC6.3/CC7.2/CC7.3. enterprise-builder cloud worker · 2026-06-06.
+
+### Changed
+- `VERSION` — 2.17.0 → 2.18.0
+
+---
+
 ## [2.17.0] — 2026-06-06
 
 ### Added
