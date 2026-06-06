@@ -6,6 +6,17 @@
 
 ---
 
+## [2.33.0] — 2026-06-06
+
+### Added
+- `content/post-256-strength-transfer-specificity.md` — "Перенесення сили між вправами: SAID-принцип і межі специфічності". Rutherford & Jones (1986 J Appl Physiol): +200% на тренованому тренажері vs +11% ізометрично — нейральна специфічність домінує ранній приріст; Bloomquist et al. (2013 Eur J Appl Physiol): 12 тижнів часткового vs повного присідання — часткове не переносить силу в глибокий ROM; Kaneko et al. (1983 Eur J Appl Physiol): швидкісна специфічність адаптацій — повільний тренінг не стає вибуховим; Abernethy & Jurimäe (1996 Eur J Appl Physiol): присідання → +24% у тязі, тяга → +11% у присяданні — асиметричне перенесення; Seitz, Trajano & Haff (2014 J Strength Cond Res): перенесення знижується з тренувальним стажем; Carroll et al. (2006 Exerc Sport Sci Rev): cross-education між кінцівками 6–10%; три механізми допоміжних вправ: структурний (гіпертрофія слабкої ланки), нейральний (схожий патерн/кут/швидкість), компенсаторний (усунення лімітатора); критерій «слабкої ланки» для відбору допоміжних вправ. sports-scientist + brand-voice. clinical_safety: NOT REQUIRED.
+- `blog.html` — картка для post-256 додана (230 карток, 256 постів авторовано); VERSION → v2.33.0.
+- `README.md` — roadmap: post-256 позначено [x]; додано теми post-258 і post-259.
+- `STATUS.md` — blog.html рядок: 230 cards (256 posts authored), v2.33.0; рядок post-256 у content engine table.
+- `VERSION` → 2.33.0
+
+---
+
 ## [2.32.0] — 2026-06-06
 
 ### Added

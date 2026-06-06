@@ -31,7 +31,7 @@ FORM is at v2.20.0 with 50+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 229 cards (255 posts authored), category filter, newsletter CTA | v2.32.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 230 cards (256 posts authored), category filter, newsletter CTA | v2.33.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -326,6 +326,7 @@ FORM is at v2.20.0 with 50+ tagged releases, 16 functional HTML pages (marketing
 | post-253-dose-response-training-volume.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-254-explosive-strength-hypertrophy-compatibility.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-255-mental-fatigue-physical-performance.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-256-strength-transfer-specificity.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
