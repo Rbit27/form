@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Security Trust Center</title>
+<meta name="description" content="FORM Security Trust Center — compliance documentation, sub-processor list, DPA template, and responsible disclosure policy for enterprise customers and security reviewers." />
+<!-- No tracking, no analytics, no cookies. GDPR Art. 25 by design. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: {
+      ink:   '#0B0A07',
+      deep:  '#13110C',
+      line:  '#1F1D16',
+      mute:  '#6F6A60',
+      dim:   '#A39D8E',
+      paper: '#F3EEE0',
+      cream: '#E7DFC8',
+      acid:  '#DDFF2D',
+      ember: '#FF5733',
+    },
+    fontFamily: {
+      serif: ['Fraunces', 'serif'],
+      sans:  ['Manrope', 'sans-serif'],
+      mono:  ['JetBrains Mono', 'monospace'],
+    },
+  }}};
+</script>
+<style>
+  html, body { background: #0B0A07; color: #F3EEE0; font-family: 'Manrope', sans-serif; }
+  body { font-feature-settings: "ss01", "cv11"; }
+  ::selection { background: #DDFF2D; color: #0B0A07; }
+
+  .grain::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000; opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 220px;
+  }
+
+  .display { font-family: 'Fraunces', serif; font-weight: 300; letter-spacing: -0.04em; line-height: 0.88; }
+  .display em { font-style: italic; font-weight: 300; }
+
+  .label  { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px; color: #6F6A60; }
+  .num    { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  .btn-acid {
+    background: #DDFF2D; color: #0B0A07;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 600;
+    transition: transform 0.15s, background 0.2s; padding: 14px 28px; border-radius: 9999px; display: inline-block;
+  }
+  .btn-acid:hover { background: #ECFF6B; transform: translateY(-1px); }
+
+  .btn-out {
+    border: 1px solid #2A2820; color: #F3EEE0;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 500;
+    padding: 14px 28px; border-radius: 9999px; display: inline-block; transition: border-color 0.2s;
+  }
+  .btn-out:hover { border-color: #DDFF2D; }
+
+  .divider { border: none; border-top: 1px solid #1F1D16; }
+
+  /* Resource cards */
+  .resource-card {
+    background: #13110C; border: 1px solid #1F1D16; border-radius: 20px; padding: 28px 32px;
+    display: flex; flex-direction: column; gap: 12px;
+    transition: border-color 0.2s;
+    text-decoration: none; color: inherit;
+  }
+  .resource-card:hover { border-color: #2A2820; }
+  .resource-card.gated { border-color: rgba(111,106,96,0.3); }
+  .resource-card.gated:hover { border-color: rgba(111,106,96,0.6); }
+
+  .resource-card .rc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .resource-card .rc-icon {
+    width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(221,255,45,0.08); border: 1px solid rgba(221,255,45,0.15);
+    font-size: 16px;
+  }
+  .resource-card.gated .rc-icon { background: rgba(111,106,96,0.08); border-color: rgba(111,106,96,0.2); }
+
+  .rc-title { font-family: 'Fraunces', serif; font-weight: 300; font-size: 20px; letter-spacing: -0.02em; color: #F3EEE0; line-height: 1.1; }
+  .rc-desc  { font-size: 13px; color: #6F6A60; line-height: 1.5; }
+  .rc-link  { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: #DDFF2D; margin-top: auto; }
+  .resource-card.gated .rc-link { color: #A39D8E; }
+
+  .nda-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+    color: #6F6A60; border: 1px solid #2A2820; border-radius: 9999px; padding: 3px 10px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+
+  /* Status bar */
+  .status-item {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 20px 28px; border-right: 1px solid #1F1D16;
+  }
+  .status-item:last-child { border-right: none; }
+
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .dot-green  { background: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.4); }
+  .dot-amber  { background: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.3); }
+  .dot-blue   { background: #60a5fa; }
+
+  /* Floor list */
+  .floor-item { display: flex; gap: 16px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid #1F1D16; }
+  .floor-item:last-child { border-bottom: none; }
+  .floor-num { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #DDFF2D; flex-shrink: 0; width: 28px; margin-top: 2px; }
+
+  /* Disclosure table */
+  .sev-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #1F1D16; }
+  .sev-row:last-child { border-bottom: none; }
+  .sev-badge { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; border-radius: 6px; padding: 3px 10px; font-weight: 600; }
+  .sev-critical { background: rgba(255,87,51,0.12); color: #FF5733; border: 1px solid rgba(255,87,51,0.25); }
+  .sev-high     { background: rgba(245,158,11,0.10); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+  .sev-medium   { background: rgba(221,255,45,0.08); color: #DDFF2D; border: 1px solid rgba(221,255,45,0.2); }
+  .sev-low      { background: rgba(111,106,96,0.12); color: #A39D8E; border: 1px solid rgba(111,106,96,0.2); }
+</style>
+</head>
+<body class="grain antialiased">
+
+<!-- ─── Header ─────────────────────────────────────────────── -->
+<header class="border-b border-line sticky top-0 z-50" style="background:rgba(11,10,7,0.94);backdrop-filter:blur(12px);">
+  <div class="max-w-[1280px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <div class="flex items-center gap-3">
+      <span class="label text-mute hidden md:inline">Security Trust Center</span>
+      <a href="mailto:security@form.coach" class="btn-out text-xs">security@form.coach</a>
+    </div>
+  </div>
+</header>
+
+<!-- ─── Hero ──────────────────────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 pt-24 pb-20">
+  <div class="max-w-4xl">
+    <div class="label mb-7 text-acid">Security · Trust Center</div>
+    <h1 class="display text-[76px] md:text-[96px] text-paper mb-8">
+      Security at <em>FORM.</em>
+    </h1>
+    <p class="text-dim text-lg leading-relaxed max-w-2xl mb-10" style="font-weight:300;">
+      Compliance documentation, sub-processor register, DPA template, and responsible
+      disclosure policy for enterprise customers, procurement teams, and external auditors.
+      Public pages require no login. SOC&nbsp;2 report and penetration test summary are
+      available under NDA&nbsp;— request access below.
+    </p>
+    <div class="flex flex-wrap gap-4 items-center">
+      <a href="mailto:security@form.coach" class="btn-acid">security@form.coach →</a>
+      <a href="mailto:enterprise@form.coach" class="btn-out">Enterprise sales</a>
+      <span class="label ml-2" id="last-updated">Updated 2026-06-06</span>
+    </div>
+  </div>
+</section>
+
+<hr class="divider max-w-[1280px] mx-auto px-8" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Compliance status bar ─────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 py-0">
+  <div class="bg-deep border border-line rounded-2xl overflow-hidden">
+    <div class="grid grid-cols-2 md:grid-cols-4">
+
+      <div class="status-item">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="status-dot dot-amber"></span>
+          <span class="label" style="color:#f59e0b;">SOC 2 Type II</span>
+        </div>
+        <p class="text-paper text-sm font-medium">Audit in progress</p>
+        <p class="text-mute text-xs mt-0.5">Target: Q1 2027 · security-engineer</p>
+      </div>
+
+      <div class="status-item">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="status-dot dot-green"></span>
+          <span class="label" style="color:#4ade80;">GDPR Art. 28</span>
+        </div>
+        <p class="text-paper text-sm font-medium">DPA available</p>
+        <p class="text-mute text-xs mt-0.5">EU data residency · SCC Module 2</p>
+      </div>
+
+      <div class="status-item">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="status-dot dot-green"></span>
+          <span class="label" style="color:#4ade80;">Audit log</span>
+        </div>
+        <p class="text-paper text-sm font-medium">HMAC-chained</p>
+        <p class="text-mute text-xs mt-0.5">Tamper-evident · DEC-030 · 7-year retention</p>
+      </div>
+
+      <div class="status-item" style="border-right:none;">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="status-dot dot-green"></span>
+          <span class="label" style="color:#4ade80;">Encryption</span>
+        </div>
+        <p class="text-paper text-sm font-medium">AES-256-GCM</p>
+        <p class="text-mute text-xs mt-0.5">At rest + TLS 1.3 in transit</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── Trust resources ───────────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 py-20">
+  <div class="label mb-10">Trust resources</div>
+
+  <!-- Public resources -->
+  <div class="label mb-5" style="color:#6F6A60;font-size:9px;letter-spacing:0.2em;">Public · No NDA required</div>
+  <div class="grid md:grid-cols-3 gap-5 mb-8">
+
+    <!-- Sub-processors -->
+    <a href="mailto:security@form.coach?subject=Sub-processor list" class="resource-card">
+      <div class="rc-header">
+        <div class="rc-icon">⬡</div>
+      </div>
+      <div class="rc-title">Sub-Processor<br/><em>Register</em></div>
+      <p class="rc-desc">Full list of third-party processors handling personal data under GDPR Art. 28. Includes DPA status, data categories, certification level, and region per processor. Updated quarterly.</p>
+      <div class="rc-link mt-2">View register → /sub-processors</div>
+    </a>
+
+    <!-- DPA -->
+    <a href="mailto:security@form.coach?subject=DPA template request" class="resource-card">
+      <div class="rc-header">
+        <div class="rc-icon">◈</div>
+      </div>
+      <div class="rc-title">Data Processing<br/><em>Agreement</em></div>
+      <p class="rc-desc">GDPR Art. 28(3)(a)–(h) compliant DPA template for enterprise customers. Includes SCC Module 2 for EU–US transfers and TOMs annex. Self-service acceptance available for standard terms.</p>
+      <div class="rc-link mt-2">Download DPA → /dpa</div>
+    </a>
+
+    <!-- Responsible disclosure -->
+    <a href="mailto:security@form.coach?subject=Security vulnerability disclosure" class="resource-card">
+      <div class="rc-header">
+        <div class="rc-icon">◎</div>
+      </div>
+      <div class="rc-title">Responsible<br/><em>Disclosure</em></div>
+      <p class="rc-desc">90-day coordinated disclosure window. CVSS&nbsp;3.1 severity scoring. Response SLAs: Critical 1&nbsp;BD, High 3&nbsp;BD, Medium 10&nbsp;BD. Hall-of-fame recognition. PGP key published below.</p>
+      <div class="rc-link mt-2">Disclose a finding → /disclosure</div>
+    </a>
+
+  </div>
+
+  <!-- Questionnaire -->
+  <div class="resource-card" style="flex-direction:row;align-items:center;gap:32px;padding:24px 32px;margin-bottom:8px;">
+    <div class="rc-icon flex-shrink-0" style="width:44px;height:44px;">◻</div>
+    <div class="flex-1 min-w-0">
+      <div class="rc-title text-base">Security Questionnaire Hub</div>
+      <p class="rc-desc text-xs mt-1">Pre-filled CAIQ Lite PDF available for immediate download. Custom SIG Lite or bespoke questionnaires: contact <span style="color:#A39D8E;">security@form.coach</span> — turnaround 5 business days.</p>
+    </div>
+    <a href="mailto:security@form.coach?subject=Security questionnaire" class="btn-out flex-shrink-0">Request →</a>
+  </div>
+
+  <!-- NDA-gated resources -->
+  <div class="label mt-10 mb-5" style="color:#6F6A60;font-size:9px;letter-spacing:0.2em;">NDA-gated · Identity verification required</div>
+  <div class="grid md:grid-cols-2 gap-5">
+
+    <!-- SOC 2 report -->
+    <a href="mailto:security@form.coach?subject=SOC 2 report request" class="resource-card gated">
+      <div class="rc-header">
+        <div class="rc-icon">⊠</div>
+        <span class="nda-badge">NDA required</span>
+      </div>
+      <div class="rc-title">SOC 2 Type II<br/><em>Report</em></div>
+      <p class="rc-desc">Independent auditor attestation covering Security, Availability, Processing Integrity, Confidentiality, and Privacy trust service criteria. Report issued upon audit completion — Q1&nbsp;2027 target. Available to current customers and qualified prospects under executed NDA.</p>
+      <div class="flex items-center gap-8 mt-2">
+        <div>
+          <div class="label mb-1" style="font-size:9px;">Current status</div>
+          <div class="text-xs text-paper">Audit in progress</div>
+        </div>
+        <div>
+          <div class="label mb-1" style="font-size:9px;">Auditor type</div>
+          <div class="text-xs text-paper">AICPA-licensed CPA firm</div>
+        </div>
+        <div>
+          <div class="label mb-1" style="font-size:9px;">Access path</div>
+          <div class="text-xs text-paper">DocuSign NDA → link</div>
+        </div>
+      </div>
+      <div class="rc-link mt-2">Request access → /soc2</div>
+    </a>
+
+    <!-- Pen test -->
+    <a href="mailto:security@form.coach?subject=Penetration test summary request" class="resource-card gated">
+      <div class="rc-header">
+        <div class="rc-icon">⬙</div>
+        <span class="nda-badge">NDA required</span>
+      </div>
+      <div class="rc-title">Penetration Test<br/><em>Summary</em></div>
+      <p class="rc-desc">Annual external penetration test covering API, authentication flows, SSO/SCIM, RLS-via-API, mobile apps, and Cloudflare edge. Executive summary shared with customers >$50k ACV. Scope: OWASP WSTG + ASVS L2 + PTES. Findings tracked to remediation.</p>
+      <div class="flex items-center gap-8 mt-2">
+        <div>
+          <div class="label mb-1" style="font-size:9px;">Current status</div>
+          <div class="text-xs text-paper">Pre-launch engagement</div>
+        </div>
+        <div>
+          <div class="label mb-1" style="font-size:9px;">Cadence</div>
+          <div class="text-xs text-paper">Annual + after major releases</div>
+        </div>
+        <div>
+          <div class="label mb-1" style="font-size:9px;">Remediation SLA</div>
+          <div class="text-xs text-paper">Critical 24h · High 7d</div>
+        </div>
+      </div>
+      <div class="rc-link mt-2">Request access → /pentest</div>
+    </a>
+
+  </div>
+</section>
+
+<hr class="divider max-w-[1280px] mx-auto px-8" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Architecture summary ──────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 py-20">
+  <div class="grid md:grid-cols-2 gap-16 items-start">
+
+    <!-- Left: controls overview -->
+    <div>
+      <div class="label mb-8">Security architecture</div>
+      <div class="space-y-6">
+
+        <div>
+          <div class="text-paper text-sm font-medium mb-1">Multi-tenant isolation</div>
+          <p class="text-mute text-sm leading-relaxed">Row-Level Security (RLS) on every table. <span class="font-mono text-xs text-dim">tenant_id</span> sourced from verified JWT claims — never client-supplied. Missing <span class="font-mono text-xs text-dim">tenant_id</span> returns zero rows, not all rows. Quarterly RLS policy audit.</p>
+        </div>
+
+        <hr class="divider" />
+
+        <div>
+          <div class="text-paper text-sm font-medium mb-1">Authentication</div>
+          <p class="text-mute text-sm leading-relaxed">SAML 2.0 and OIDC SSO for Okta, Azure AD, Google Workspace, OneLogin. SCIM v2 for automated provisioning. TOTP MFA enforced — SMS 2FA prohibited. Session max-age configurable per tenant.</p>
+        </div>
+
+        <hr class="divider" />
+
+        <div>
+          <div class="text-paper text-sm font-medium mb-1">Data residency</div>
+          <p class="text-mute text-sm leading-relaxed">EU tenants routed to Supabase <span class="font-mono text-xs text-dim">eu-central-1</span> (Frankfurt). AI inference via Anthropic Claude API — pseudonymised exercise context only, no PII in prompts. On-device CV processing — biometric keypoints never sent to cloud.</p>
+        </div>
+
+        <hr class="divider" />
+
+        <div>
+          <div class="text-paper text-sm font-medium mb-1">Incident response</div>
+          <p class="text-mute text-sm leading-relaxed">P0–P3 classification. 72-hour GDPR Art. 33 supervisory authority notification SLA. 8-hour processor-to-controller notification for enterprise tenants. Full runbook at <span class="font-mono text-xs text-dim">docs/INCIDENT_RESPONSE.md</span>.</p>
+        </div>
+
+        <hr class="divider" />
+
+        <div>
+          <div class="text-paper text-sm font-medium mb-1">Backup &amp; recovery</div>
+          <p class="text-mute text-sm leading-relaxed">Supabase Point-in-Time Recovery (PITR) — 1-second granularity. Enterprise RTO ≤ 2 hours, RPO ≤ 1 hour. Cold backups to Cloudflare R2 with AES-256-GCM encryption and HMAC-SHA-256 manifest. Annual DR drill.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Right: key facts table -->
+    <div>
+      <div class="label mb-8">Compliance facts</div>
+      <div class="bg-deep border border-line rounded-2xl overflow-hidden">
+        <table class="w-full text-sm">
+          <tbody>
+            <tr class="border-b border-line">
+              <td class="px-6 py-4 text-mute" style="width:44%;">Framework</td>
+              <td class="px-6 py-4 text-paper font-medium">GDPR, SOC 2 Type II (in progress), DPIA</td>
+            </tr>
+            <tr class="border-b border-line">
+              <td class="px-6 py-4 text-mute">Data categories</td>
+              <td class="px-6 py-4 text-paper">Fitness engagement · Identity (SSO) · Device telemetry</td>
+            </tr>
+            <tr class="border-b border-line">
+              <td class="px-6 py-4 text-mute">Health data (Art. 9)</td>
+              <td class="px-6 py-4 text-paper">Individual only — employer never sees individual data</td>
+            </tr>
+            <tr class="border-b border-line">
+              <td class="px-6 py-4 text-mute">Encryption at rest</td>
+              <td class="px-6 py-4 text-paper font-mono text-xs">AES-256-GCM · Supabase pgsodium</td>
+            </tr>
+            <tr class="border-b border-line">
+              <td class="px-6 py-4 text-mute">Encryption in transit</td>
+              <td class="px-6 py-4 text-paper font-mono text-xs">TLS 1.3 · HSTS enforced</td>
+            </tr>
+            <tr class="border-b border-line">
+              <td class="px-6 py-4 text-mute">Audit log</td>
+              <td class="px-6 py-4 text-paper font-mono text-xs">HMAC-SHA-256 chain · 7-year retention</td>
+            </tr>
+            <tr class="border-b border-line">
+              <td class="px-6 py-4 text-mute">Sub-processors</td>
+              <td class="px-6 py-4 text-paper">11 active · DPAs required before activation</td>
+            </tr>
+            <tr class="border-b border-line">
+              <td class="px-6 py-4 text-mute">AI training use</td>
+              <td class="px-6 py-4" style="color:#4ade80;">Never · Anthropic enterprise DPA prohibits</td>
+            </tr>
+            <tr class="border-b border-line">
+              <td class="px-6 py-4 text-mute">Vulnerability scan</td>
+              <td class="px-6 py-4 text-paper">Monthly · Dependabot + Snyk · Critical CVE ≤24h</td>
+            </tr>
+            <tr>
+              <td class="px-6 py-4 text-mute">Uptime SLA</td>
+              <td class="px-6 py-4 text-paper">99.9% monthly · Credits auto-applied</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider max-w-[1280px] mx-auto px-8" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Privacy floor ─────────────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 py-20">
+  <div class="grid md:grid-cols-2 gap-16 items-start">
+
+    <div>
+      <div class="label mb-6 text-acid">Privacy floor</div>
+      <h2 class="display text-5xl text-paper mb-6">
+        HR never sees<br/><em>individual data.</em>
+      </h2>
+      <p class="text-mute text-sm leading-relaxed max-w-sm">
+        These seven commitments are non-negotiable, enforced at the data layer, and cannot
+        be unlocked by any contract term — regardless of ARR. clinical-safety and
+        compliance-officer hold veto power.
+      </p>
+    </div>
+
+    <div>
+      <div class="floor-item">
+        <div class="floor-num">01</div>
+        <div>
+          <div class="text-paper text-sm font-medium">No individual user data for HR</div>
+          <p class="text-mute text-xs mt-1 leading-relaxed">Employer Admin Dashboard shows only aggregate metrics with k&nbsp;≥&nbsp;5 anonymity floor. No row-level drill-down, ever.</p>
+        </div>
+      </div>
+      <div class="floor-item">
+        <div class="floor-num">02</div>
+        <div>
+          <div class="text-paper text-sm font-medium">No manager-level reports on individuals</div>
+          <p class="text-mute text-xs mt-1 leading-relaxed">Reporting hierarchy is not a data-access hierarchy. Managers cannot view direct-report fitness data.</p>
+        </div>
+      </div>
+      <div class="floor-item">
+        <div class="floor-num">03</div>
+        <div>
+          <div class="text-paper text-sm font-medium">Employee can revoke company association anytime</div>
+          <p class="text-mute text-xs mt-1 leading-relaxed">Offboarding an employee moves their account to a personal free tier — FORM does not delete user data on the employer's behalf without user consent.</p>
+        </div>
+      </div>
+      <div class="floor-item">
+        <div class="floor-num">04</div>
+        <div>
+          <div class="text-paper text-sm font-medium">Body composition data never aggregated to employer</div>
+          <p class="text-mute text-xs mt-1 leading-relaxed">Weight, body-fat percentage, and composition trends are strictly personal. No aggregate or trend is visible to HR.</p>
+        </div>
+      </div>
+      <div class="floor-item">
+        <div class="floor-num">05</div>
+        <div>
+          <div class="text-paper text-sm font-medium">ED-screening signals never surface to employer</div>
+          <p class="text-mute text-xs mt-1 leading-relaxed">Eating-disorder risk flags are clinical signals accessible only to the individual user and their opted-in care providers.</p>
+        </div>
+      </div>
+      <div class="floor-item">
+        <div class="floor-num">06</div>
+        <div>
+          <div class="text-paper text-sm font-medium">Mental health data stays private</div>
+          <p class="text-mute text-xs mt-1 leading-relaxed">Mood, stress self-reports, and recovery scores are personal wellness context — not employer visibility, not aggregate wellness reports.</p>
+        </div>
+      </div>
+      <div class="floor-item" style="border-bottom:none;">
+        <div class="floor-num">07</div>
+        <div>
+          <div class="text-paper text-sm font-medium">No participation punishment mechanics</div>
+          <p class="text-mute text-xs mt-1 leading-relaxed">FORM does not provide non-participation lists, completion-rate tracking per individual, or any data that enables wellness-as-punishment program design.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider max-w-[1280px] mx-auto px-8" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Responsible disclosure ────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 py-20">
+  <div class="label mb-8">Responsible disclosure</div>
+  <div class="grid md:grid-cols-2 gap-16 items-start">
+
+    <div>
+      <h2 class="display text-4xl text-paper mb-6">Found something?<br/><em>Tell us first.</em></h2>
+      <p class="text-mute text-sm leading-relaxed mb-8 max-w-sm">
+        FORM operates a 90-day coordinated disclosure policy. Report findings to
+        <span class="font-mono text-xs text-paper">security@form.coach</span> with a
+        proof-of-concept where possible. We will acknowledge within one business day and
+        keep you updated throughout remediation.
+      </p>
+      <div class="space-y-4 mb-8">
+        <div class="text-paper text-sm font-medium">Scope</div>
+        <div class="text-mute text-sm leading-relaxed">
+          form.coach and subdomains · iOS/Android app · Cloudflare Workers API · admin.form.coach · security.form.coach · SCIM/SSO endpoints · Supabase RLS policies
+        </div>
+      </div>
+      <div class="space-y-4 mb-10">
+        <div class="text-paper text-sm font-medium">Out of scope</div>
+        <div class="text-mute text-sm leading-relaxed">
+          Social engineering · Physical attacks · DDoS · Findings in third-party services without demonstrable impact on FORM user data
+        </div>
+      </div>
+      <a href="mailto:security@form.coach?subject=Responsible disclosure" class="btn-acid">Report a finding →</a>
+    </div>
+
+    <div>
+      <div class="bg-deep border border-line rounded-2xl overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-line">
+          <div class="label" style="font-size:9px;">Response SLA by severity</div>
+        </div>
+        <div class="px-6 py-2">
+          <div class="sev-row">
+            <div class="sev-badge sev-critical" style="width:80px;text-align:center;">Critical</div>
+            <div class="flex-1">
+              <div class="text-paper text-sm">1 business day acknowledgement · patch within 24h</div>
+            </div>
+          </div>
+          <div class="sev-row">
+            <div class="sev-badge sev-high" style="width:80px;text-align:center;">High</div>
+            <div class="flex-1">
+              <div class="text-paper text-sm">3 business days acknowledgement · patch within 7d</div>
+            </div>
+          </div>
+          <div class="sev-row">
+            <div class="sev-badge sev-medium" style="width:80px;text-align:center;">Medium</div>
+            <div class="flex-1">
+              <div class="text-paper text-sm">10 business days · patch within 30d</div>
+            </div>
+          </div>
+          <div class="sev-row" style="border-bottom:none;">
+            <div class="sev-badge sev-low" style="width:80px;text-align:center;">Low</div>
+            <div class="flex-1">
+              <div class="text-paper text-sm">Next sprint · coordinated disclosure at 90d</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-deep border border-line rounded-2xl p-6">
+        <div class="label mb-4" style="font-size:9px;">Recognition</div>
+        <p class="text-mute text-sm leading-relaxed">
+          Valid unique findings receive public acknowledgement in our security hall of fame.
+          No cash bounties at this stage — we are pre-IPO and will revisit a paid programme at Series A.
+          All reporters receive a personal email from our security-engineer confirming resolution.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider max-w-[1280px] mx-auto px-8" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Customers we decline ──────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 py-16">
+  <div class="grid md:grid-cols-3 gap-px bg-line rounded-2xl overflow-hidden" style="background:rgba(31,29,22,0.6);">
+
+    <div class="bg-ink p-8">
+      <div class="label mb-4" style="color:#FF5733;font-size:9px;">We decline</div>
+      <div class="space-y-3">
+        <div class="text-mute text-sm">Insurance risk-scoring on employees</div>
+        <div class="text-mute text-sm">Government contracts requiring backdoors or data access</div>
+        <div class="text-mute text-sm">Wellness programs tied to insurance pricing</div>
+        <div class="text-mute text-sm">Wellness budgets that punish non-participants</div>
+        <div class="text-mute text-sm">Performance evaluation using fitness data</div>
+      </div>
+    </div>
+
+    <div class="bg-ink p-8">
+      <div class="label mb-4" style="color:#4ade80;font-size:9px;">We commit</div>
+      <div class="space-y-3">
+        <div class="text-mute text-sm">DPA executed before any pilot data flows</div>
+        <div class="text-mute text-sm">72-hour GDPR Art. 33 breach notification SLA</div>
+        <div class="text-mute text-sm">Annual penetration test summary shared with customers >$50k ACV</div>
+        <div class="text-mute text-sm">Quarterly compliance attestation letters</div>
+        <div class="text-mute text-sm">30-day advance notice of sub-processor changes</div>
+      </div>
+    </div>
+
+    <div class="bg-ink p-8">
+      <div class="label mb-4" style="color:#DDFF2D;font-size:9px;">Contact</div>
+      <div class="space-y-4">
+        <div>
+          <div class="text-mute text-xs mb-1">Security questions &amp; disclosure</div>
+          <a href="mailto:security@form.coach" class="text-paper text-sm font-mono hover:text-acid transition-colors">security@form.coach</a>
+        </div>
+        <div>
+          <div class="text-mute text-xs mb-1">Enterprise sales &amp; pilots</div>
+          <a href="mailto:enterprise@form.coach" class="text-paper text-sm font-mono hover:text-acid transition-colors">enterprise@form.coach</a>
+        </div>
+        <div>
+          <div class="text-mute text-xs mb-1">GDPR / DPA requests</div>
+          <a href="mailto:privacy@form.coach" class="text-paper text-sm font-mono hover:text-acid transition-colors">privacy@form.coach</a>
+        </div>
+        <div>
+          <div class="text-mute text-xs mb-1">Status page</div>
+          <a href="https://status.form.coach" target="_blank" rel="noopener" class="text-paper text-sm font-mono hover:text-acid transition-colors">status.form.coach</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ─── Footer ────────────────────────────────────────────── -->
+<footer class="border-t border-line">
+  <div class="max-w-[1280px] mx-auto px-8 py-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <span class="font-serif text-lg tracking-tight text-paper">FORM<span class="text-acid">.</span></span>
+      <span class="text-mute text-xs ml-2">Security Trust Center</span>
+    </div>
+    <div class="flex flex-wrap gap-6">
+      <a href="/enterprise.html" target="_blank" rel="noopener" class="label hover:text-paper transition-colors" style="font-size:9px;">Enterprise</a>
+      <a href="/pricing-enterprise.html" target="_blank" rel="noopener" class="label hover:text-paper transition-colors" style="font-size:9px;">Pricing</a>
+      <a href="/" target="_blank" rel="noopener" class="label hover:text-paper transition-colors" style="font-size:9px;">form.coach</a>
+    </div>
+    <div class="label" style="font-size:9px;">
+      No cookies · No analytics · GDPR Art. 25 · Updated 2026-06-06
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

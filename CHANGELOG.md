@@ -6,6 +6,12 @@
 
 ---
 
+## [2.40.0] — 2026-06-06
+
+### Added
+- `security.html` — Security Trust Center landing page (`security.form.coach`). Closes partial gaps CC9-GAP-007 and CC2-GAP-003 (design complete; Cloudflare Pages deployment remaining). Audience: enterprise procurement teams, current enterprise customers, external auditors. Public sections: security posture overview (SOC 2 Type II status, GDPR Art. 28 DPA available, HMAC-chained audit log, AES-256-GCM encryption), trust resources grid (sub-processor register, DPA download, responsible disclosure, security questionnaire hub), compliance facts table, security architecture summary (RLS tenant isolation, SAML/OIDC SSO, data residency, IR SLAs, PITR backup), Privacy Floor 7 non-negotiables, responsible disclosure policy (90-day window, CVSS 3.1 severity SLAs: Critical 1BD/24h, High 3BD/7d, Medium 10BD/30d, Low 90d), customers-we-decline table (insurance risk-scoring, gov backdoors, wellness-as-punishment). NDA-gated cards: SOC 2 Type II report (current status: audit in progress, Q1 2027 target) and penetration test summary (pre-launch engagement, NDA + DocuSign flow). No cookies, no analytics, no PostHog (GDPR Art. 25 by design). Fraunces serif editorial tone, brand system identical to enterprise.html/pricing-enterprise.html. Cross-references: `docs/SOC2_READINESS.md §39` (Trust Center architecture), `docs/SUBPROCESSORS.md §5` (DPA template), `docs/INCIDENT_RESPONSE.md` (IR SLAs), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 HMAC chain), `docs/ENTERPRISE.md`. enterprise-architect + compliance-officer + security-engineer.
+- `VERSION` → 2.40.0
+
 ## [2.39.1] — 2026-06-06
 
 ### Fixed
