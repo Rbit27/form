@@ -6,6 +6,18 @@
 
 ---
 
+## [2.20.0] — 2026-06-06
+
+### Added
+- `content/post-242-exercise-order-effects.md` — порядок вправ у сесії: ефект першої позиції, конкуренція за ресурс, практична рамка пріоритизації; clinical-safety NOT REQUIRED
+- `blog.html` → 3 нові картки (post-240, post-241, post-242) — синхронізовано з content/
+
+### Changed
+- `VERSION` → 2.20.0
+- `STATUS.md` → 242 пости, blog.html 201 картка
+
+---
+
 ## [2.19.0] — 2026-06-06
 
 ### Added
