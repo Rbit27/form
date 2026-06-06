@@ -50,7 +50,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Control | Status | Evidence |
 |---|---|---|
-| Security policies documented and accessible | 🟡 Partial | `docs/SECURITY.md` exists; formal Policy Pack (AUP, IRP, BCP) needed |
+| Security policies documented and accessible | ✅ Done | Formal Policy Pack complete: AUP (`docs/ACCEPTABLE_USE_POLICY.md`), IRP (`docs/INCIDENT_RESPONSE.md`), BCP (`docs/BUSINESS_CONTINUITY.md`) |
 | Privacy policy published | 🔴 Gap | form.coach/privacy — must exist before first enterprise pilot |
 | Vendor security review process | 🟡 Gap | DPAs signed with Anthropic, ElevenLabs, PostHog; formal vendor registry needed |
 | Internal security training | 🔴 Gap | Annual training required once team > 1 person |

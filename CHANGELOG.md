@@ -6,6 +6,15 @@
 
 ---
 
+## [2.28.0] — 2026-06-06
+
+### Added
+- `docs/BUSINESS_CONTINUITY.md` v1.0 — Standalone Business Continuity & Disaster Recovery Plan. Closes SOC 2 Policy Pack gap (AUP ✓, IRP ✓, BCP ✓ — was 🟡 Partial in SOC2_READINESS.md §CC1.2). Covers: Business Impact Analysis with MTD by tier, RTO/RPO targets (Enterprise 4h/1h; SSO 1h/15min), service dependency map, backup architecture (Supabase PITR + Backblaze B2 cold storage), 5 recovery runbooks (Scenario A–E: database unavailability, Cloudflare edge loss, data corruption, complete environment loss, SSO failure), DR drill procedure + report template, incident communication templates (initial/hourly/resolution/GDPR Art. 33), roles & responsibilities, and known gap register (BCP-01–BCP-06). References: docs/ENTERPRISE_SLA.md, docs/INCIDENT_RESPONSE.md, docs/DATA_MODEL.md §8–10, docs/OBSERVABILITY.md, docs/SOC2_READINESS.md §18, DEC-030. SOC 2 evidence: CC7.4, CC7.5, A1.1, A1.2, A1.3, CC9.2. Shareable under NDA with enterprise customers.
+- `docs/SOC2_READINESS.md` — Security policies row: 🟡 Partial → ✅ Done (Policy Pack now complete).
+- `VERSION` → 2.28.0
+
+---
+
 ## [2.27.0] — 2026-06-06
 
 ### Added
