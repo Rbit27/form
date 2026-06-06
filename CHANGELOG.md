@@ -6,6 +6,19 @@
 
 ---
 
+## [2.16.0] — 2026-06-06
+
+### Added
+- `content/post-237-accentuated-eccentric-loading.md` — «Accentuated eccentric loading: тренінг вище 100% концентричного максимуму»: Hody et al. (2019 Front Physiol) — ексцентричний режим: метаболічна вартість ≈20–25% концентричної, вища механічна напруга на саркомер, преференційне рекрутування Type II волокон, EIMD механізм. Roig et al. (2009 Br J Sports Med) мета-аналіз: ES 0.85 (eccentric) vs ES 0.41 (concentric) для приросту сили, доза-відповідь залежність. Методи AEL: weight releasers (Doan et al. 2002 — 105–120% 1RM ексцентрично), темпові ексцентрики (3–5 с), flywheel/YoYo (Naczk, Vicens-Bordas 2018), партнерські негативи. Nordic hamstring curl як benchmark: Petersen et al. (2011 Am J Sports Med) — 51% зниження ризику травми підколінних у 942 футболістів; Franchi et al. (2017 Front Physiol) — збільшення довжини пучків волокон при ексцентричному акценті (структурна адаптація, що зміщує force-velocity curve). Програмування: тільки для інтерміді­атів/просунутих, 2–3 сети × 3–6 повторів × 1–2×/тиждень, recovery window 48–72h. clinical-safety NOT REQUIRED.
+- `content/post-238-proprioception-joint-stability.md` — «Proprioception і суглобова стабільність: як силовий тренінг формує sensorimotor контроль»: Freeman et al. (1965 J Bone Joint Surg) — нейральний компонент нестабільності після травми гомілково-ступеневого суглоба: механічне загоєння ≠ функціональна стабільність. Riemann & Lephart (2002 JOSPT) — тришарова sensorimotor framework (периферійний/спінальний/супраспінальний); м'язові веретена (Ia), GTO (Ib), mechanoreceptors суглобової капсули. Bruhn et al. (2004 JSCR) — важке силове тренування покращує joint position sense; два механізми: пасивна жорсткість + нейральна точність. Behm & Colado (2012 JSCR): нестабільні поверхні знижують force output на 20–70% без компенсаторного рекрутування prime movers. Hewett et al. (2006 Am J Sports Med) — прогнозування ризику ACL-травми через landing mechanics; квадрицепс:підколінне co-contraction timing. Різниця між proprioception (аферентна якість), balance (sensorimotor output) і stability (пасивний+активний+нейральний). Програмування: унілатеральна навантажена робота, темпові повтори, варіативний ROM; коли BOSU виправданий (реабілітація, спорт-специфічні ситуації). clinical-safety NOT REQUIRED.
+- `blog.html` — картки Post 237 і Post 238 додані до grid (197 карток)
+
+### Changed
+- `README.md` — статистики оновлено: «235+» → «238+ evidence-based blog posts»; metrics table 235 → 238; post-237, post-238 позначені [x]
+- `VERSION` — 2.15.0 → 2.16.0
+
+---
+
 ## [2.15.0] — 2026-06-06
 
 ### Added
