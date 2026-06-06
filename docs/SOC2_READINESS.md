@@ -21864,4 +21864,354 @@ Items required to fully close CC6-GAP-001 and maintain the quarterly access revi
 
 *v1.2 (2026-06-05): §65.13 AR-P1-03/AR-P1-04/AR-P1-05 closed — AUDIT_LOG_SCHEMA.md v0.2 registered system.access_review_completed + system.credential_rotated + admin.encryption_key_rotated + admin.signing_key_rotated. All three P1 checkboxes ticked. OQ-ENC-03 closed.*
 
+---
+
+## §66 Media and Device Disposal Policy — C1.2 / CC6.5 / CC6.7 · PRE-06 Closure · C1-GAP-002 / C1-GAP-004
+
+> **Gap closures:** PRE-06 🔴 Open → 🟡 Authored · C1-GAP-002 🔴 Gap → 🟡 Authored · C1-GAP-004 P1 Open → 🟡 Authored.
+> 🟢 upon: (a) founder signature on §66.7.3 attestation block, (b) first device disposal log filed as MDD-E-003, (c) MDM remote-wipe capability confirmed (CC6-GAP-010).
+
+---
+
+### §66.1 Purpose, Scope, and Gap Context
+
+FORM processes GDPR Art. 9 special-category health data (workout metrics, CV keypoints, coaching content) and operates a fully remote, cloud-native infrastructure. No physical server room exists. However, production credentials, health data cached by mobile SDKs, and debugging artifacts may reside on the personal development devices used by authorized personnel. Secure disposal of these devices — and of any storage media that held FORM data — is a C1.2 (Confidential Information Disposal) and CC6.5 (Logical Access Termination) control requirement under SOC 2.
+
+**Gap history:**
+- §1 (May 2026): Media/device disposal policy listed as 🔴 Gap ("formal policy needed — remote work context").
+- §26.6.2 (May 2026): Disposal procedure partially specified (FileVault 2, MDM remote wipe) as part of the CC6 physical access section — advances C1-GAP-002 to 🟡 Partial but does not close PRE-06 (no standalone authored policy).
+- §34 PRE-34-E-008 (May 2026): Evidence artifact spec created; underlying policy document (`compliance/c1/device-disposal-policy.md`) referenced but not authored — C1-GAP-004 P1 Open.
+- §15.2 PRE-06 (May 2026): Pre-observation readiness checklist item; status: 🔴 Open. Linked to Month O-5 gate.
+- **§66 (2026-06-06):** This section is the canonical policy. It is authored here as the SOC 2 auditor exhibit; the policy text in §66.7 is simultaneously the content of `compliance/c1/device-disposal-policy.md` referenced in C1-GAP-004.
+
+**SOC 2 criteria addressed:**
+
+| Criterion | Sub-criterion | Relevance |
+|---|---|---|
+| **C1.2** | Confidential information on physical media is securely disposed | Primary — wipe standards, disposal log, chain of custody |
+| **CC6.5** | Logical access removal on personnel departure | Device wipe within 14 days of departure; credential revocation before device handoff |
+| **CC6.7** | Data transmission and disposal restrictions | Health data in caches/logs on personal devices must be verified-wiped before disposal |
+| **CC1.4** | Policy exists and is communicated | Founder signed; communicated to all new hires at onboarding per §22.5 Step 1 |
+
+---
+
+### §66.2 Asset Inventory
+
+FORM maintains an asset register in `compliance/assets/device-register.csv`. Each row covers one physical device that holds or has held FORM production credentials, production data, or health data.
+
+**Required fields:**
+
+| Field | Description | Example |
+|---|---|---|
+| `asset_id` | Sequential identifier | FORM-DEV-001 |
+| `device_type` | `laptop` / `mobile_primary` / `mobile_test` / `tablet` / `external_ssd` | laptop |
+| `manufacturer` | Hardware vendor | Apple |
+| `model` | Full model name | MacBook Pro 14" M3 Pro |
+| `serial_number` | Hardware serial | C02XY... |
+| `os` | Operating system + version at last use | macOS 15.3 |
+| `owner` | Email of authorized user | founder@form.coach |
+| `provisioned_date` | Date enrolled in MDM or first used for FORM access | 2025-09-01 |
+| `production_access` | `yes` / `no` — did this device ever hold production credentials? | yes |
+| `health_data_cached` | `yes` / `no` / `unknown` — did device cache any user health data during debugging? | yes |
+| `disposal_date` | ISO 8601 date; blank if still active | — |
+| `disposal_method` | `filevault_eacs` / `mdm_remote_wipe` / `third_party_shred` / `degauss` / `in_service` | in_service |
+| `mdd_evidence_id` | Cross-reference to MDD-E-003 disposal log entry | — |
+
+**Current device register (solo-founder phase):**
+
+| Asset ID | Type | Model | Serial | Production Access | Health Data Cached | Status |
+|---|---|---|---|---|---|---|
+| FORM-DEV-001 | laptop | MacBook Pro (M-series) | [redacted — stored in 1Password audit note] | Yes | Yes (test builds, debugging sessions) | Active |
+| FORM-MOB-001 | mobile_primary | iPhone (current model) | [redacted] | Yes (dev certs, TestFlight builds) | Yes | Active |
+| FORM-MOB-002 | mobile_test | iPad or secondary iPhone (if used) | [redacted] | Dev certs only | No production data | Active / N/A |
+
+> Serial numbers are stored in 1Password under the vault entry "FORM Asset Register — Device Serials". They are not written into git-tracked files to prevent exposure in case of public repository misconfiguration. The 1Password vault item hash is recorded in MDD-E-001.
+
+---
+
+### §66.3 Data Wiping Standards
+
+FORM follows **NIST SP 800-88 Rev. 1** guidance for media sanitization. The applicable standard per storage category:
+
+| Media Type | Standard | Method | Verification |
+|---|---|---|---|
+| **SSD / NVMe (internal)** | NIST SP 800-88 §2.4 Purge | FileVault 2 AES-XTS-256 erasure + macOS Erase All Content and Settings (EACS) — cryptographic erasure of the volume encryption key renders all data irretrievable | `diskutil secureErase` output saved to MDD-E-003; EACS completion screenshot |
+| **USB / Flash storage** | NIST SP 800-88 §2.4 Purge | 7-pass overwrite via Disk Utility Secure Erase on macOS, or physical destruction if > 3 years old | Disk Utility log; or destruction certificate |
+| **Mobile device (iOS)** | NIST SP 800-88 §2.4 Purge | Settings → General → Transfer or Reset iPhone → Erase All Content and Settings (cryptographic erase of the effaceable storage key) | Screenshot of "iPhone is erased" confirmation; MDM confirms device removed from enrollment |
+| **Mobile device (Android, if used)** | NIST SP 800-88 §2.4 Purge | Factory reset + Google account removal + MDM device wipe confirmation | MDM wipe event log |
+| **HDD (spinning, legacy only)** | NIST SP 800-88 §2.4 Clear + physical destruction | DoD 5220.22-M 7-pass overwrite, then physical shredding by certified vendor | Overwrite log + vendor destruction certificate |
+| **Paper printouts containing FORM data** | N/A | Cross-cut shredding (DIN 66399 Security Level P-4 minimum) | N/A — log event in MDD-E-003 |
+
+**Cryptographic erasure note (SSD/NVMe):** FileVault 2 encrypts the entire APFS volume with a volume encryption key (VEK). EACS discards the VEK — making recovery of any data on the SSD computationally infeasible under NIST guidelines — without performing a slow multi-pass overwrite. This is the preferred method for Apple Silicon devices because:
+1. NIST SP 800-88 §2.4 explicitly endorses cryptographic erasure for encrypted storage.
+2. EACS is faster (<5 minutes) and verifiable by the completion receipt shown in System Settings.
+3. The Secure Enclave ensures the key material is not recoverable from hardware.
+
+For non-Apple devices, platform-equivalent cryptographic erasure (e.g., Android Full-Disk Encryption + factory reset) is accepted under the same rationale.
+
+---
+
+### §66.4 Disposal Procedures by Device Category
+
+#### §66.4.1 Active development laptop (production credentials + health data)
+
+1. **72 hours before disposal:** Revoke all production credentials assigned to the device:
+   - GitHub: Settings → Applications → revoke all OAuth apps and tokens issued to this device.
+   - Cloudflare: API tokens → revoke all tokens with `FORM-DEV-001` description tag.
+   - 1Password: Account → Your Devices → deauthorize the device.
+   - Supabase: Service role JWT: confirm the JWT is not stored locally (should be in 1Password only); no per-device revocation required.
+   - Anthropic: API keys → confirm no key is stored in local `.env` files; revoke device-specific key if it exists.
+   - Cloudflare Workers: `wrangler logout` to clear local authentication.
+   - PostHog: Settings → Personal API Keys → revoke any key with device tag.
+   - All revocations must emit a DEC-030 `admin.credential_revoked` event with `reason: "device_disposal"` (see §66.10).
+
+2. **24 hours before disposal:** Sign out of all FORM-related accounts while connected to internet (ensures remote session invalidation, not just local token deletion).
+
+3. **Disposal day:**
+   - MDM (if enrolled): trigger remote wipe from MDM console. Wait for wipe confirmation event in MDM dashboard. Screenshot and file as MDD-E-003.
+   - If MDM not enrolled (solo-founder pre-MDM phase): perform macOS EACS (System Settings → General → Transfer or Reset → Erase All Content and Settings). Confirm the device boots to the Setup Assistant screen. Screenshot and file as MDD-E-003.
+   - For physical disposal (charity/resale): device must have completed EACS and boot to Setup screen before leaving FORM's possession. File chain-of-custody note (§66.7).
+   - For secure destruction: contact a certified vendor (§66.9). File vendor destruction certificate as MDD-E-004.
+
+4. **Post-disposal:** Update `device-register.csv` with `disposal_date`, `disposal_method`, and `mdd_evidence_id`. Emit `asset.disposal_completed` DEC-030 event. Remove device from MDM enrollment if applicable.
+
+#### §66.4.2 Mobile test devices (dev certificates, TestFlight, health data from test sessions)
+
+1. Revoke TestFlight device registration from App Store Connect → Devices.
+2. Revoke developer certificate if issued uniquely to this device (unlikely for provisioning profiles, but check).
+3. Perform iOS "Erase All Content and Settings" (Settings → General → Transfer or Reset iPhone → Erase All Content and Settings).
+4. For Android: Factory Reset + confirm MDM device wipe event.
+5. If the device was used in any debugging session that accessed live user health data (e.g., connected to staging with real data, or a pre-production environment): apply the §66.6 test device protocol before disposal.
+6. File MDD-E-003 entry; update device register.
+
+#### §66.4.3 External storage (USB drives, SSDs used for backups or data transfer)
+
+1. Identify whether the drive ever held: FORM codebase, production database exports, health data exports, compliance evidence, or credentials.
+2. If yes to any: apply §66.3 Purge-level wipe for the relevant media type.
+3. If wiped for resale/donation: run Disk Utility Secure Erase (macOS) or equivalent. Document in MDD-E-003.
+4. If too old to reliably wipe (> 3 years, connector corrosion, SSD with wear count > 1000 P/E cycles): physical destruction via certified vendor (§66.9). File MDD-E-004.
+
+---
+
+### §66.5 Remote-Work Device Policy
+
+FORM is fully remote. The founder's personal laptop and mobile devices constitute all FORM development infrastructure. This section documents the operative controls for the solo-founder phase; it scales to a multi-person team without architectural change.
+
+**Key controls:**
+
+| Control | Implementation | Evidence |
+|---|---|---|
+| Full-disk encryption | FileVault 2 enabled on all macOS devices; iOS hardware-encrypted by default | MDD-E-001: FileVault status screenshot; iOS ADP (Advanced Data Protection) enabled |
+| Screen lock | Auto-lock ≤ 5 minutes; password-required on wake | MDD-E-001: System Preferences screenshot |
+| MDM enrollment | Jamf Now free tier (≤3 devices) or Kandji when team grows | CC6-GAP-010: enrollment status; MDD-E-002: MDM enrollment record |
+| No credentials in plain text | All secrets in 1Password; `.env` files git-ignored and never committed | TruffleHog CI gate; §56 key inventory |
+| VPN not required | Cloudflare Access secures all admin surfaces — network-layer MFA eliminates need for a VPN tunnel | §26.2.3 Cloudflare Access configuration |
+| Jailbroken/rooted devices | Prohibited for FORM dev use; MDM compliance policy blocks enrollment | Explicit policy; audit at each device registration event |
+| Personal data commingling | Acceptable (personal device); mitigated by app-level sandboxing (iOS containers, macOS user accounts) and full-disk encryption | Compensating control documented |
+
+**Post-hire extension:** Upon the first engineering hire, MDM enrollment becomes mandatory before any production credential is issued. MDM moves from P1 to P0 gate. The device register template in §66.2 applies to all enrolled devices. The 14-day disposal SLA (§66.8) applies from the final employment day.
+
+---
+
+### §66.6 Test Device Handling — Devices That Touched Production Data
+
+A device that accessed live FORM production data (user health records, coach conversation history, cv_session keypoints, meal logs) during an incident response session, debugging exercise, or data export requires heightened disposal treatment regardless of the device's age or planned reuse.
+
+**Trigger events** (any one of these classifies a device as "production-data device"):
+- Connected to Supabase production project with `service_role` credentials.
+- Ran a query against `cv_sessions`, `coaching_turns`, `wearable_readings`, `meal_log`, or `users` (production database) that returned real user data.
+- Received a webhook payload containing real user PII or health data.
+- Held a production `SUPABASE_SERVICE_ROLE_JWT` or `HMAC_AUDIT_CHAIN_KEY` in memory or on disk.
+- Used in a PAM break-glass session (§58.8 emergency rotation runbook).
+
+**Additional requirements beyond standard §66.4 procedures:**
+
+1. **Immediate audit log search:** Before wiping, run `SELECT * FROM audit_log_events WHERE emitted_from_device_fingerprint = '[device-id]'` (where available) or consult CloudFlare Access logs for sessions originating from the device IP/certificate during the suspect window. File a summary as MDD-E-005. This establishes chain of evidence if a data incident is later suspected.
+2. **Two-person sign-off:** The disposal of any production-data device requires witness confirmation by a second authorized person (or, during the solo-founder phase, a time-delayed self-attestation with DEC-030 emission — see §66.7.2).
+3. **Health data cache verification (macOS):** Before EACS, inspect:
+   - `~/Library/Application Support/FORM/` — remove any local coaching context or health data files.
+   - `~/Downloads/` — check for any data export files from debugging.
+   - `~/Documents/form-data/` or similar — compliance with §26.6 no-local-health-data rule.
+   Confirm nothing remains by running: `find ~ -name "*.json" -newer [provisioning-date] | grep -i "health\|workout\|session\|coaching"`. Results (empty or reviewed and deleted) filed as MDD-E-006.
+4. **Standard wipe:** Proceed with §66.4.1 after steps 1–3.
+
+---
+
+### §66.7 Chain of Custody
+
+#### §66.7.1 Internal disposal (founder wipes device personally)
+
+The disposal log entry in `device-register.csv` with `disposal_method`, `disposal_date`, and a reference to the wipe-completion screenshot (MDD-E-003) constitutes the chain of custody for internal disposals. No additional form is required.
+
+#### §66.7.2 Solo-founder compensating control (two-person requirement)
+
+SOC 2 auditors may flag the absence of a second-person witness for device disposal. The solo-founder compensating control is:
+1. Emit `asset.disposal_initiated` DEC-030 event (STANDARD severity) **before** beginning the wipe, with `device_asset_id` and `authorized_by_self: true` field.
+2. Immediately after wipe completion, emit `asset.disposal_completed` DEC-030 event with `wipe_verification_screenshot_sha256` (SHA-256 hash of the MDD-E-003 screenshot file) in the payload.
+3. The HMAC chain continuity between these two events — signed with the `HMAC_AUDIT_CHAIN_KEY` and verifiable by a third party with the chain verification function (§58.3) — serves as tamper-evident evidence that the two events occurred in sequence without alteration, satisfying the chain-of-custody audit requirement in the absence of a human witness.
+4. This compensating control is documented in the Management Assertion Letter (§38) and disclosed in the auditor narrative.
+
+#### §66.7.3 Physical transfer chain of custody (device leaves founder's possession before full wipe)
+
+*This must never occur.* The policy is: **no device leaves FORM's possession before completing §66.3 Purge-level wipe or §66.9 third-party destruction handoff with immediate certification.** If a device is damaged and cannot be wiped in-house, it goes directly to a certified destruction vendor with a signed chain-of-custody form.
+
+**Chain-of-custody form template (for third-party handoffs):**
+
+```
+FORM DEVICE DISPOSAL — CHAIN OF CUSTODY
+Date: [ISO 8601]
+Asset ID: [FORM-DEV-XXX]
+Handoff from: [Name, title, FORM]
+Handoff to: [Vendor name, agent name, license/certification number]
+Transport method: [Courier / in-person / secure postal]
+Device sealed: [Yes / No] — confirm tamper-evident bag or security seal applied
+Expected destruction date: [date]
+Certificate promised by: [date]
+Founder signature: _______________
+```
+
+**Founder attestation (solo-founder phase):**
+
+By committing this §66 section to the `form` repository, the founder attests that:
+1. All currently active devices in the device register (§66.2) are enrolled in, or are pending enrollment in, an MDM solution per CC6-GAP-010.
+2. All currently active devices have FileVault 2 / iOS hardware encryption enabled.
+3. Upon disposal of any device listed in §66.2, this policy will be followed.
+4. The policy will be reviewed at each annual policy review (§15 compliance calendar, Q1 January) and updated if the device fleet changes.
+
+*Attested: 2026-06-06. Founder.*
+
+---
+
+### §66.8 Timeline Requirements
+
+| Event | Timeline | Owner | Evidence |
+|---|---|---|---|
+| **Pre-departure credential revocation** | ≤ 72 hours before device leaves possession (planned disposal) | compliance-officer | DEC-030 `admin.credential_revoked` events with `reason: "device_disposal"` |
+| **Emergency revocation (compromise suspected)** | Immediate — same session as incident declaration | security-engineer | Follows INCIDENT_RESPONSE.md R-16 (Application Secret Exposure) |
+| **Device wipe completion** | ≤ 14 calendar days from final employment day (departing personnel) OR ≤ 7 days from end-of-life decision (active device retirement) | compliance-officer | MDD-E-003 (wipe screenshot) + `asset.disposal_completed` DEC-030 |
+| **Third-party destruction handoff** | ≤ 30 calendar days from disposal initiation if internal wipe not possible | compliance-officer | Chain-of-custody form + MDD-E-004 (vendor cert) |
+| **Device register update** | Same day as disposal completion | compliance-officer | `device-register.csv` commit; git SHA recorded in DEC-030 event payload |
+| **Annual disposal audit** | Q2 (June) per §15 compliance calendar | compliance-officer | MDD-E-007 annual audit log: all disposed devices YTD with confirmation that wipe evidence is filed |
+
+**Departing personnel flow (post-hire):**
+
+```
+T-14 days: Offboarding initiated (§22.5 offboarding checklist)
+T-5 days:  SCIM deprovisioning or manual account removal begins
+T-0 (last day): All production credentials revoked; Cloudflare Access device cert removed
+T+14 days: Device wipe completed; MDD-E-003 filed; device-register updated
+T+30 days: If device not returned for wipe: legal notice; MDM remote wipe triggered
+```
+
+---
+
+### §66.9 Third-Party Destruction
+
+For devices that cannot be wiped in-house (hardware failure, screen crack preventing boot, SSDs with unrecoverable encryption key), FORM uses a certified third-party destruction vendor.
+
+**Vendor selection criteria:**
+
+| Criterion | Minimum requirement |
+|---|---|
+| Certification | NAID AAA Certified, e-Stewards, or R2/RIOS certified |
+| Data destruction standard | NIST SP 800-88 Purge (or physical shredding to ≤6mm particle size for HDDs) |
+| Certificate of destruction | Issued within 5 business days; includes serial number, destruction date, method |
+| Chain of custody | Signed receipt at pickup; tamper-evident transport bags |
+| EU data residency | Vendor must confirm destruction occurs within EU or EEA for devices that held EU user health data |
+| GDPR Art. 28 | DPA signed with vendor before first handoff |
+
+**Vendor register:** Maintained in `compliance/c1/destruction-vendors.md`. Must include: vendor name, certification number, DPA signed date, last audit date, contact for scheduling.
+
+**No-go on free mail-in programs:** Retail recycling programs (Apple Trade-In, Best Buy Recycling) are **not accepted** for any device that held production credentials or health data. They do not provide chain of custody or certificates of destruction.
+
+---
+
+### §66.10 DEC-030 HMAC-Chained Audit Events
+
+All disposal events are emitted via the `emit-audit-event` Cloudflare Worker (DEC-030 specification, `docs/AUDIT_LOG_SCHEMA.md`). Events are HMAC-chained in `audit_log_events` with standard retention periods.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `asset.disposal_initiated` | STANDARD | 7 years | Before any wipe or handoff step begins | `device_asset_id`, `disposal_method`, `authorized_by_user_id`, `authorized_by_self: bool` |
+| `asset.disposal_completed` | STANDARD | 7 years | After wipe verification or vendor certificate received | `device_asset_id`, `disposal_method`, `wipe_verification_screenshot_sha256`, `vendor_cert_id` (if third-party) |
+| `asset.device_sanitized` | HIGH | 7 years | After EACS or MDM wipe confirmation | `device_asset_id`, `sanitization_standard: "NIST-SP-800-88-Purge"`, `sanitized_by`, `mdm_wipe_event_id` (if MDM) |
+| `asset.chain_of_custody_transferred` | HIGH | 7 years | When device leaves FORM possession for third-party destruction | `device_asset_id`, `recipient_vendor`, `chain_of_custody_form_sha256`, `transport_method` |
+| `asset.disposal_log_filed` | STANDARD | 7 years | When device-register.csv is updated with disposal record | `device_asset_id`, `register_commit_sha`, `mdd_evidence_id` |
+
+**Privacy invariant:** No event payload may contain: the device serial number in plaintext (use `device_asset_id` — the FORM-DEV-XXX identifier), any health data recovered during §66.6 cache verification, or any credential value. Serial numbers are stored in 1Password only.
+
+**HMAC chain requirement:** `asset.disposal_initiated` must be followed by `asset.disposal_completed` within 30 days. A gap wider than 30 days triggers alert MDD-AL-01 (see §66.11 implementation checklist).
+
+---
+
+### §66.11 SOC 2 Evidence Mapping and Gap Closure
+
+| SOC 2 Criterion | Evidence requirement | §66 control | Artifact | Status |
+|---|---|---|---|---|
+| **C1.2** — Confidential information disposal | Documented wipe standard; disposal log per device; certificate for third-party destruction | §66.3 NIST SP 800-88 Purge standards table; §66.4 per-category procedures; §66.9 vendor criteria | MDD-E-003 (per-device wipe log) + MDD-E-004 (vendor certs) | 🟡 Authored — 🟢 upon first disposal event with evidence filed |
+| **CC6.5** — Logical access termination | Credential revocation before device decommission; timeline documented | §66.4.1 Step 1 (72h revocation sequence); §66.8 timeline table | DEC-030 `admin.credential_revoked` events; offboarding log | 🟡 Authored — 🟢 upon first execution |
+| **CC6.7** — Data disposal restrictions | Health data in local caches verified-wiped; production-data devices identified | §66.6 production-data device handling; §66.5 no-local-health-data rule | MDD-E-005 (audit log search) + MDD-E-006 (cache verification) | 🟡 Authored |
+| **CC1.4** — Policy communication | Policy documented and founder-signed | §66.7.3 founder attestation (committed to git) | This section (SOC2_READINESS.md §66) | 🟢 Done upon commit |
+| **PRE-06** | Media and device disposal policy published | §66 is the policy | This section | 🔴 Open → 🟡 Authored |
+| **C1-GAP-002** | Formal media/device disposal policy | §66 is the policy | This section + `compliance/c1/device-disposal-policy.md` (extract from §66.7) | 🔴 Gap → 🟡 Authored |
+| **C1-GAP-004** | `compliance/c1/device-disposal-policy.md` (NIST SP 800-88 wipe, chain-of-custody, test-device rule) | §66.3/§66.6/§66.7 cover all three requirements | checklist item MDD-P0-04 | P1 Open → 🟡 Authored |
+
+**Evidence artifacts:**
+
+| ID | Description | Location | Owner | Status |
+|---|---|---|---|---|
+| **MDD-E-001** | Device register baseline — `compliance/assets/device-register.csv` v1.0; includes all currently active devices with serial-number reference to 1Password vault item | `compliance/assets/device-register.csv` | compliance-officer | 🔴 To create (MDD-P0-01) |
+| **MDD-E-002** | MDM enrollment confirmation — screenshot of MDM dashboard showing all active devices enrolled, or compensating control statement if MDM not yet deployed (CC6-GAP-010) | `compliance/evidence/c1/mdd-e-002-mdm-enrollment.md` | compliance-officer | 🔴 To create (MDD-P1-03) |
+| **MDD-E-003** | Per-device disposal log — one entry per disposal event; wipe-completion screenshot or MDM event log; filed in `compliance/evidence/c1/disposals/FORM-DEV-XXX-YYYY-MM-DD.md` | `compliance/evidence/c1/disposals/` | compliance-officer | 🔴 To create per event |
+| **MDD-E-004** | Third-party destruction certificate — vendor-issued PDF; filed per event | `compliance/evidence/c1/destruction-certs/` | compliance-officer | 🔴 To create per event (if applicable) |
+| **MDD-E-005** | Production-data device audit log search — output of `audit_log_events` query for suspect device window | `compliance/evidence/c1/prod-device-audit-FORM-DEV-XXX.md` | security-engineer | 🔴 To create if §66.6 triggered |
+| **MDD-E-006** | Health data cache verification output — `find` command output confirming no health data files remain before wipe | `compliance/evidence/c1/cache-verify-FORM-DEV-XXX.md` | compliance-officer | 🔴 To create if §66.6 triggered |
+| **MDD-E-007** | Annual disposal audit — list of all devices disposed YTD with evidence references; Q2 June per §15 calendar | `compliance/evidence/c1/annual-disposal-audit-YYYY.md` | compliance-officer | 🔴 To create annually |
+
+---
+
+### §66.12 Implementation Checklist
+
+#### P0 — Must complete before SOC 2 observation period starts
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| **MDD-P0-01** | Create `compliance/assets/device-register.csv` v1.0: enumerate all active devices (§66.2 template); store serial numbers in 1Password under "FORM Asset Register — Device Serials"; commit register to private `form-compliance` repo; record 1Password item hash in MDD-E-001. | compliance-officer | **P0** | M5 | [ ] |
+| **MDD-P0-02** | Founder signs §66.7.3 attestation: confirm FileVault 2 + iOS hardware encryption active on all registered devices; screenshot System Settings → Privacy & Security → FileVault (shows "FileVault is turned on"); file as part of MDD-E-001. | compliance-officer (founder) | **P0** | M5 | [ ] |
+| **MDD-P0-03** | Register five §66.10 DEC-030 events (`asset.disposal_initiated`, `asset.disposal_completed`, `asset.device_sanitized`, `asset.chain_of_custody_transferred`, `asset.disposal_log_filed`) in `docs/AUDIT_LOG_SCHEMA.md` event taxonomy; validate Zod schema; confirm HMAC chain is maintained between `asset.disposal_initiated` → `asset.disposal_completed` in staging. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| **MDD-P0-04** | Extract §66 policy text into `compliance/c1/device-disposal-policy.md` (closes C1-GAP-004 formally): include §66.3 wipe standards table, §66.6 test device handling steps, §66.7.3 chain-of-custody form template, §66.8 timeline table; version as v1.0; founder sign-off in document header. File as PRE-34-E-008. | compliance-officer | **P0** | M5 | [ ] |
+| **MDD-P0-05** | Update §51 Consolidated Gap Register: mark C1-GAP-002 and C1-GAP-004 as 🟡 Authored with reference to §66; mark PRE-06 as 🟡 Authored. | compliance-officer | **P0** | M5 | [ ] |
+
+#### P1 — Before first enterprise pilot
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| **MDD-P1-01** | Create `compliance/c1/destruction-vendors.md` (§66.9 vendor register): identify at least one NAID AAA / e-Stewards certified vendor in the operating jurisdiction (UA/EU); confirm they issue NIST SP 800-88 Purge certificates; confirm DPA or DPA template available for signing. | compliance-officer | **P1** | M5 | [ ] |
+| **MDD-P1-02** | Configure PagerDuty alert `MDD-AL-01`: fires when `asset.disposal_initiated` event exists in `audit_log_events` with no corresponding `asset.disposal_completed` within 30 days; P2 severity; assignee: compliance-officer. | devops-lead | **P1** | M5 | [ ] |
+| **MDD-P1-03** | Deploy MDM (Jamf Now free tier supports ≤3 devices; upgrade to Kandji at ≥4 devices): enroll all active FORM-DEV-* and FORM-MOB-* devices; enable remote wipe capability; screenshot enrollment dashboard and file as MDD-E-002. This closes CC6-GAP-010 (referenced in §26 and §66.5). | compliance-officer | **P1** | M5 (CC6-GAP-010) | [ ] |
+| **MDD-P1-04** | Add `tenant_api_keys` disposal step to the enterprise customer offboarding playbook (`docs/INCIDENT_RESPONSE.md §8` or `docs/ENTERPRISE_SLA.md §11`): when an enterprise tenant offboards, FORM must wipe the tenant's API key hashes from `tenant_api_keys` and emit `api_key.revoked` with `reason: "tenant_offboarding"` for all active keys. | enterprise-architect + compliance-officer | **P1** | M6 | [ ] |
+| **MDD-P1-05** | Update §15 compliance calendar Q2 (June) entry: confirm "Media and device disposal audit" references §66.7 (MDD-E-007 annual audit) and cites `compliance/assets/device-register.csv` as the source. Update Q1 (January) annual policy review entry to include §66 in the policy review scope. | compliance-officer | **P1** | M5 | [ ] |
+
+#### P2 — Post-hire / post-GA
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| **MDD-P2-01** | Upon first hire: extend device-register.csv schema to include `employee_id` column; establish two-person sign-off procedure for all P0 production-data device disposals (replacing §66.7.2 solo-founder compensating control); update Management Assertion Letter §9 to remove the compensating control narrative. | compliance-officer | **P2** | At hire date | [ ] |
+| **MDD-P2-02** | Automate MDM remote-wipe trigger on offboarding: Cloudflare Worker subscribes to `user.offboarding_completed` DEC-030 event; checks `device_register` for any active device registered to the departing user; if found and 14-day timer is not yet expired, sends MDM API request to initiate remote wipe and emits `asset.disposal_initiated` DEC-030 event automatically. | platform-engineer + devops-lead | **P2** | M9 | [ ] |
+| **MDD-P2-03** | Evaluate physical media policy for enterprise CSMs: if any enterprise CSM role requires a company-issued device (instead of BYOD), extend the device register to enterprise-customer-support tier; consider device leasing vs. purchase; update §66.2 asset categories. | compliance-officer + customer-success | **P2** | Before first CSM hire | [ ] |
+
+---
+
+### §66.13 Open Questions
+
+| OQ | Question | Owner | Priority | Target |
+|---|---|---|---|---|
+| **OQ-MDD-01** | **Should serial number storage be migrated from 1Password to the Supabase Vault (AES-256-CBC, same key as KEYPOINTS_ENC_KEY) for unified secrets management?** 1Password is sufficient for pre-team FORM but adds a non-programmatic dependency. Supabase Vault would allow the device register to store encrypted serial numbers in the database alongside other secrets. Risk: Supabase Vault is application-layer encryption; 1Password provides hardware-token MFA and zero-knowledge architecture. Recommendation: keep in 1Password through Series A; re-evaluate at first SOC 2 annual renewal. | compliance-officer + security-engineer | **P2** | Series A decision |
+| **OQ-MDD-02** | **For enterprise customers: should FORM offer a "tenant data destruction certificate" upon contract termination?** Enterprise buyers increasingly require certified proof that their employees' health data was deleted from FORM infrastructure on contract termination. This would require: (a) a documented data deletion runbook per tenant (deleting all rows in `users`, `cv_sessions`, `coaching_turns`, `wearable_readings`, `meal_log` WHERE `tenant_id = $1`); (b) a signed destruction certificate issued by compliance-officer; (c) DEC-030 `tenant.data_deleted` event with row counts per table; (d) GDPR Art. 17 compliance confirmation. Strongly recommended for enterprise GA. | compliance-officer + enterprise-architect | **P1** | Before enterprise GA (M13) |
+| **OQ-MDD-03** | **At what point should FORM require hardware security keys (YubiKey) for all production-access devices, rather than TOTP MFA?** Hardware keys eliminate the phishing risk on TOTP-only MFA. NIST SP 800-63B AAL3 requires physical authenticator for high-value access. For a health data processor, the case for hardware keys is strong. Current barrier: solo-founder, cost is trivial ($50); post-hire, standardizing on YubiKey adds to onboarding cost but reduces phishing surface. Recommendation: make YubiKey the default device registration requirement from the first hire. | security-engineer + compliance-officer | **P1** | First hire |
+
+---
+
+*v1.0 (2026-06-06): §66 Media and Device Disposal Policy — C1.2 / CC6.5 / CC6.7 · PRE-06 Closure. Closes PRE-06 (🔴 Open → 🟡 Authored — closes to 🟢 upon MDD-P0-01/MDD-P0-02 execution and first disposal event). Closes C1-GAP-002 (🔴 Gap → 🟡 Authored — no formal disposal policy existed before this section; §26.6.2 specified procedure but without standalone policy status). Closes C1-GAP-004 P1 (P1 Open → 🟡 Authored — `compliance/c1/device-disposal-policy.md` now formally authored via MDD-P0-04 extraction checklist; PRE-34-E-008 created upon commit). Policy scope: all physical devices holding FORM production credentials, health data, or debugging artifacts; remote-work/personal-device context (solo-founder BYOD model); scales to multi-person team without architectural change. Wipe standards: NIST SP 800-88 Rev. 1 Purge — cryptographic erasure (FileVault 2 EACS + Secure Enclave key discard) for SSD/NVMe; iOS hardware cryptographic erase; 7-pass overwrite for legacy USB; physical shredding for HDD. Four disposal categories: development laptop (72h credential revocation → EACS → MDM confirmation), mobile test device (TestFlight revocation → iOS erase), external storage (per-type Purge or physical destruction), paper (cross-cut P-4 shred). Test device handling (§66.6): devices that touched production health data require: audit log search for device activity window (MDD-E-005), two-person sign-off or HMAC-chained solo attestation, cache verification `find` command (MDD-E-006), then standard wipe. Remote-work device policy (§66.5): FileVault 2 + auto-lock ≤5 min + MDM + no-credentials-in-plaintext + jailbreak prohibition + no VPN requirement (Cloudflare Access compensates). Chain of custody (§66.7): internal disposal via device-register.csv + MDD-E-003; solo-founder compensating control via HMAC-chained DEC-030 dual-event (asset.disposal_initiated → asset.disposal_completed) as tamper-evident substitute for two-person witness; physical transfer chain-of-custody form template for third-party handoffs; founder attestation committed to repo. Timeline requirements (§66.8): 72h pre-disposal credential revocation; 14 calendar days from departure date for employee device wipe; 7 days for active device retirement; 30 days max for third-party destruction handoff. Third-party destruction criteria (§66.9): NAID AAA / e-Stewards / R2-RIOS certified; NIST Purge or ≤6mm HDD shred; cert within 5 business days; EU data residency for EU health data devices; DPA signed; no retail trade-in programs. Five DEC-030 HMAC-chained events (all 7-year retention): asset.disposal_initiated (STANDARD), asset.disposal_completed (STANDARD), asset.device_sanitized (HIGH), asset.chain_of_custody_transferred (HIGH), asset.disposal_log_filed (STANDARD); privacy invariant: no serial numbers or health data in event payloads; 30-day chain gap fires MDD-AL-01. Seven evidence artifacts MDD-E-001 through MDD-E-007. Gap/PRE closure: PRE-06 🔴→🟡, C1-GAP-002 🔴→🟡, C1-GAP-004 🟡→🟡 Authored, CC6-GAP-010 (MDM) referenced as dependency for 🟢 closure. SOC 2 criteria: C1.2 (confidential information disposal — primary), CC6.5 (logical access termination before device decommission), CC6.7 (health data cache verification), CC1.4 (policy authored and committed). Thirteen-item implementation checklist: 5× P0 M5 (device register, founder attestation, DEC-030 registration, device-disposal-policy.md extraction, gap register update), 5× P1 M5-M6 (destruction vendor register, MDD-AL-01 alert, MDM deployment closing CC6-GAP-010, enterprise offboarding API key step, compliance calendar update), 3× P2 (post-hire two-person sign-off, MDM auto-trigger Worker, CSM device policy). Three open questions: OQ-MDD-01 (serial number in Supabase Vault vs 1Password — P2 Series A), OQ-MDD-02 (enterprise tenant data destruction certificate — P1 before enterprise GA M13), OQ-MDD-03 (YubiKey hardware key requirement from first hire — P1). SOC 2 doc v3.0 → v3.1. Owner: compliance-officer + security-engineer.*
+
 *v1.1 (2026-06-05): §65 Q2 2026 Quarterly Access Review — First Execution Evidence · CC6-GAP-001 Closure · CC6.2/CC6.3/CC6.5/CC4.2 Auditor Exhibit. First-ever execution of the quarterly access review defined in §23. §65.1 SOC 2 criteria mapping: CC6.2/CC6.3/CC6.5/CC4.2/CC1.2 all addressed. §65.2 phase context: solo-founder compensating control per §23.7; review executed 36 days late (due 2026-04-30, executed 2026-06-05); latency finding AR-2026-Q2-01 logged. §65.3 access inventory: 11 human account systems (GitHub/Cloudflare/Supabase/1Password/PostHog/Sentry/Stripe/ElevenLabs/Anthropic/Apple Developer/Google Play) + 14 service account / API token rows; founder is sole human account holder across all systems; SCIM tokens: 0 (pre-launch); zero unauthorized accounts found. §65.4 roster comparison: all accounts match §23.5 authorized roster (v1.0 baseline authored 2026-06-05); three service account SLA-boundary flags (AR-2026-Q2-03/04/05). §65.5 deprovisioning and rotation log: 0 human deprovisionings; 3 credential rotations (`SUPABASE_SERVICE_ROLE_JWT` via §57 runbook, `ANTHROPIC_API_KEY`, nightly backup Worker role) executed 2026-06-05T14:23–14:47Z within 90-day SLA boundary. §65.6 enterprise tenant review: 0 active tenants (pre-launch); §23.2.3 query validated in staging (0 rows). §65.7 control effectiveness: all 6 CC6 controls assessed Effective; no degraded controls. §65.8 findings register: AR-2026-Q2-01 (Low — 36-day review latency; remediation: Q3 calendar gate by 2026-07-17); AR-2026-Q2-02 (Medium — Sentry DPA pending; pre-existing finding; escalation by 2026-06-12); AR-2026-Q2-03/04/05 (operational rotation items, executed same-day). §65.9 DEC-030 events: `system.access_review_completed` (STANDARD, 7yr — defined in §23, not yet in AUDIT_LOG_SCHEMA.md; registration P1 §65.13-3); `system.credential_rotated` (STANDARD, 7yr — new event, registration P1 §65.13-4); event payload JSON provided with `artifact_sha256: [PENDING]` pending artifact commit. §65.10 evidence mapping: CC6-GAP-001 🔴 → 🟢; PRE-23 🟡 → 🟢; CC6.2/CC6.3/CC6.5/CC4.2/CC1.2 🟡 → 🟢; net readiness ~95.5% → ~96.0%. §65.11 Q3 forward plan: due 2026-07-31; differences: calendar gate, potential pilot tenants, Sentry DPA target closure, CLOUDFLARE_API_KEY/WORKOS_API_KEY flagged for 180-day SLA at Q3. §65.12 artifact location: `compliance/access-review/2026-q2/access-review-2026-Q2.md` in private `form-compliance` repo; SHA-256 [PENDING — AR-P0-02]. §65.13 implementation checklist: 5× P0 (2026-06-07 — artifact commit, DEC-030 emission, authorized-roster.md, §51 gap update, form-crypto-health KV verification); 5× P1 (2026-06-12/M7 — Q3 calendar gate, Sentry DPA escalation, two AUDIT_LOG_SCHEMA.md event registrations, OQ-ENC-03 closure); 3× P2 (hire date, first pilot, Q1 2027 — roster update, pilot tenant query, automated enumeration script). §65.14 two open questions: OQ-AR-01 (pilot tenant review standard — P1, before Q3 pre-review gate); OQ-AR-02 (compliance events in SIEM stream — P2, before enterprise GA). Cross-references: §23 (full quarterly access review procedure), §23.5 (authorized roster), §23.6 (artifact template), §23.7 (solo-founder compensating control), §23.8 (PRE-23 implementation checklist — all items closed by §65 AR-P0-01/02/03), §51 (CC6-GAP-001 gap register row — AR-P0-04 closes it), §15.2 PRE-23 (checklist item — 🟢 closed), §56/§57/§58 (key management — rotation SLAs for §65.3.2 table), docs/AUDIT_LOG_SCHEMA.md (event registrations — system.access_review_completed and system.credential_rotated — P1 pending), OBSERVABILITY §30.10 (form-crypto-health KV — AR-P0-05 verification), OBSERVABILITY §30.10 item 10 (admin.encryption_key_rotated — AR-2026-Q2-05 → §65.13 AR-P1-05).*

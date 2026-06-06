@@ -6,6 +6,14 @@
 
 ---
 
+## [2.22.1] — 2026-06-06
+
+### Changed
+- `docs/SOC2_READINESS.md` v3.0 → v3.1 — §66 Media and Device Disposal Policy (C1.2 / CC6.5 / CC6.7). Closes PRE-06 (🔴 Open → 🟡 Authored), C1-GAP-002 (🔴 Gap → 🟡 Authored), C1-GAP-004 P1 (Open → 🟡 Authored; `compliance/c1/device-disposal-policy.md` extraction via MDD-P0-04). NIST SP 800-88 Rev. 1 Purge standards for SSD/NVMe (FileVault 2 EACS cryptographic erasure), iOS, legacy USB, HDD, and paper. Four disposal categories: development laptop (72h credential revocation sequence → EACS → MDM confirmation), mobile test device, external storage, paper. §66.6 production-data device handling (devices that touched production health data): audit log search MDD-E-005, two-person sign-off or HMAC-chained solo attestation, cache verification `find` command MDD-E-006. §66.5 remote-work device policy: FileVault 2 + auto-lock ≤5 min + MDM (CC6-GAP-010) + no-plaintext-credentials + jailbreak prohibition. §66.7 chain of custody: internal wipe via device-register.csv + MDD-E-003; solo-founder compensating control via HMAC-chained `asset.disposal_initiated` → `asset.disposal_completed` DEC-030 pair (tamper-evident substitute for two-person witness); physical transfer chain-of-custody form template; founder attestation committed to repo. §66.8 timelines: 72h pre-disposal credential revocation, 14-day from departure for employee device wipe, 30-day max third-party handoff. §66.9 third-party destruction criteria: NAID AAA / e-Stewards / R2-RIOS certified; NIST Purge or ≤6mm shred; EU data residency for EU health data devices; DPA required; no retail trade-in programs. §66.10 five DEC-030 HMAC-chained events (all 7yr): `asset.disposal_initiated` (STANDARD), `asset.disposal_completed` (STANDARD), `asset.device_sanitized` (HIGH), `asset.chain_of_custody_transferred` (HIGH), `asset.disposal_log_filed` (STANDARD). §66.11 evidence artifacts MDD-E-001 through MDD-E-007. §66.12 thirteen-item implementation checklist: 5× P0 M5 (device register, founder attestation + FileVault screenshot, DEC-030 event registration, device-disposal-policy.md extraction, gap register update), 5× P1 M5-M6 (destruction vendor register, MDD-AL-01 PagerDuty alert, MDM deployment closing CC6-GAP-010, enterprise offboarding API key step, compliance calendar update), 3× P2 post-hire. §66.13 three open questions: OQ-MDD-01 (serial number in Supabase Vault vs 1Password — P2), OQ-MDD-02 (enterprise tenant data destruction certificate — P1 before GA M13), OQ-MDD-03 (YubiKey mandatory from first hire — P1). Owner: compliance-officer + security-engineer.
+- `VERSION` → 2.22.1
+
+---
+
 ## [2.22.0] — 2026-06-06
 
 ### Added
