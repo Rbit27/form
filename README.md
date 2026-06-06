@@ -16,7 +16,7 @@ This is a **pre-product** project repository. There is no app code yet (mobile d
 
 - **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
 - **65+ markdown documents** — strategic, operational, content
-- **238+ evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
+- **239+ evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **3 sample training programs** — sports-science discipline reference
 - **24 specialized AI agents** — operating model embodied у `.claude/agents/`
@@ -307,7 +307,7 @@ Each iteration:
 | Tagged releases | 60+ |
 | HTML pages | 16 |
 | Markdown documents | 65+ |
-| Blog posts | 238 |
+| Blog posts | 239 |
 | Social content assets | 7 (Twitter, LinkedIn, Reddit, press pitches, 3 newsletter issues) |
 | Total lines committed | 38,000+ |
 | AI agents defined | 24 |
@@ -561,7 +561,12 @@ Each iteration:
 - [x] post-236: Concurrent training без interference — логіка розподілу аеробного і силового тренінгу для атлетів, що хочуть і силу, і витривалість; Coffey & Hawley (2007 Eur J Sport Sci): AMPK-mTOR conflict window ≈ 6 год; Hickson (1980) original interference effect; Wilson et al. (2012 meta-analysis): мінімізація при ≤ 3 кардіо-сесії і розподілі в часі; практичне програмування; clinical-safety NOT REQUIRED
 - [x] post-237: Accentuated eccentric loading — тренінг вище 100% концентричного максимуму; Hody et al. (2019 Front Physiol): ексцентричний режим: нижча ЕМГ, вища механічна напруга; Roig et al. (2009 Br J Sports Med): мета-аналіз — eccentric training superior for strength gains (ES 0.85 vs 0.41); Nordic hamstring curl як benchmark; супрамаксимальні пристрої і методи; clinical-safety NOT REQUIRED
 - [x] post-238: Proprioception і суглобова стабільність — як силовий тренінг формує sensorimotor контроль; Freeman et al. (1965 J Bone Joint Surg): оригінальне дослідження proprioception після травми; Bruhn et al. (2004 JSCR): силовий тренінг покращує суглобову позиційну точність; відмінність від «balance training»; наслідки для програмування реабілітації і превенції; clinical-safety NOT REQUIRED
-- [ ] post-239: Asymmetry і сила — коли дисбаланс ліво-право є проблемою, а коли — нормою; Bishop et al. (2018 Sports Med): мета-аналіз asym і ризик травми — зв'язок слабкий при <15%; Exell et al. (2017): нормативний діапазон; де одностороннє тренування обгрунтоване; practical threshold для атлетів і рекреаційних тренуючихся; clinical-safety NOT REQUIRED
+- [x] post-239: Asymmetry і сила — коли дисбаланс ліво-право є проблемою, а коли — нормою; Bishop et al. (2018 Sports Med): мета-аналіз asym і ризик травми — зв'язок слабкий при <15%; Exell et al. (2017): нормативний діапазон; де одностороннє тренування обгрунтоване; practical threshold для атлетів і рекреаційних тренуючихся; clinical-safety NOT REQUIRED
+- [ ] post-240: Warm-up варіативність — чому один warm-up не підходить для всіх цілей; динамічний vs статичний стретчинг перед силовою роботою (Behm & Chaouachi 2011 Appl Physiol Nutr Metab); PAP primer sets; temperature-dependent viscoelastic properties; протокол за типом тренування (max strength / power / hypertrophy); clinical-safety NOT REQUIRED
+- [ ] post-241: Heat stress і тренінг — cardiovascular drift, thermoregulatory competition, fluid balance; Robergs et al. (1993): serum lactate at elevated ambient temperature; Lorenzo et al. (2010 J Appl Physiol): 10-денна heat acclimatization → plasma volume +6.5%, VO₂max +5%; як регулювати навантаження у спеку без втрати адаптаційного стимулу; clinical-safety NOT REQUIRED
+- [ ] post-242: Оптимальна варіативність вправ — нудьга і специфічність: де баланс; Fonseca et al. (2014 J Strength Cond Res): різні вправи для гіпертрофії різних ділянок квадрицепса; SAID-принцип і вікно «корисної» варіації; практична матриця: ядро вправ + ротація аксесуарів; clinical-safety NOT REQUIRED
+- [ ] post-243: Тренувальний журнал як діагностичний інструмент — що записувати, чого не треба і як читати тренд; RPE-drift як early warning; load-volume tracking; common logging errors; чому тренувальний журнал ≠ мотиваційний щоденник; clinical-safety NOT REQUIRED
+- [ ] post-244: Тренування при обмеженому обладнанні — методологія вибору замінних вправ; функціональна класифікація рухів (push/pull/hinge/squat/carry); як зберегти training stimulus при переході з штанги на гантелі або на власну вагу; часті помилки при «домашньому» тренуванні; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
