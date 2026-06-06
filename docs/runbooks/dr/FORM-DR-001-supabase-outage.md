@@ -1,11 +1,11 @@
-# FORM-DR-001 · Supabase Primary Region Outage
+# FORM-DR-001 · Supabase Primary Region Total Outage
 
 > **Runbook ID:** FORM-DR-001
 > **Severity:** P0
 > **Owner:** devops-lead · reviewed by: compliance-officer · enterprise-architect
 > **Last reviewed:** 2026-06-06
 > **SOC 2 TSC:** A1.1, A1.2, A1.3
-> **Cross-refs:** docs/SOC2_READINESS.md §53, §53.4, §53.6.3; docs/DATA_MODEL.md §10; docs/INCIDENT_RESPONSE.md §IR-1; docs/OBSERVABILITY.md §OBS-1
+> **Cross-refs:** docs/SOC2_READINESS.md §53; docs/INCIDENT_RESPONSE.md §IR-1; docs/OBSERVABILITY.md §OBS-3; docs/DATA_MODEL.md §10
 
 ---
 
@@ -13,12 +13,12 @@
 
 | Field | Value |
 |---|---|
-| **ID** | FORM-DR-001 |
-| **Severity** | P0 |
-| **Description** | Supabase PostgreSQL primary region (us-east-1) is completely unavailable. All DB reads and writes fail. PITR is inaccessible from the primary region endpoint. |
-| **Affected tiers** | Enterprise, Growth, Consumer — all authenticated functionality fails |
-| **RTO (PITR path)** | 60–90 min (satisfies Enterprise ≤2h) |
-| **RTO (cold backup path)** | 3–5h (breaches Enterprise RTO; trigger `system.sla_breach_recorded`) |
+| ID | FORM-DR-001 |
+| Severity | P0 |
+| Description | Supabase PostgreSQL primary region (us-east-1) total outage. All DB reads and writes fail. PITR inaccessible from primary region endpoint. |
+| Affected tiers | Enterprise, Growth, Consumer — all authenticated functionality fails |
+| Estimated RTO — PITR path | 60–90 min (satisfies Enterprise ≤2 h) |
+| Estimated RTO — Cold backup path | 3–5 h (breaches Enterprise RTO; trigger `system.sla_breach_recorded`) |
 
 ---
 
@@ -26,134 +26,130 @@
 
 | Tier | RTO | RPO | SLA Enforcement |
 |---|---|---|---|
-| Enterprise | ≤2h | ≤15min | Contractual; breach triggers MSA penalty clause |
-| Growth | ≤4h | ≤1h | Operational SLA |
-| Consumer | ≤8h | ≤4h | Best effort |
+| Enterprise | ≤ 2 h | ≤ 15 min | Contractual; breach triggers MSA penalty clause |
+| Growth | ≤ 4 h | ≤ 1 h | Operational SLA |
+| Consumer | ≤ 8 h | ≤ 4 h | Best effort |
 
-PITR granularity: 1-minute. Retention: 7 days (Supabase Pro).
-Cold backup RPO: up to 24h (nightly pg_dump; AES-256-GCM encrypted in R2 `form-cold-backups/`).
+PITR granularity: 1-minute. PITR retention: 7 days (Supabase Pro). Cold backup RPO: up to 24 h (nightly pg_dump). Cold backup retention: 90 days in R2 `form-cold-backups/`.
 
 ---
 
 ## 3. Detection Signals
 
-- **Sentry alert FORM-DR-DB-001** — Supabase health-check failing >2 consecutive checks
-- **`https://status.supabase.com`** — incident banner present on DB or API component
-- **API 503/500 responses** — all authenticated endpoints returning DB connection errors
+- **Sentry alert FORM-DR-DB-001** — Supabase health-check failing > 2 consecutive checks; pages devops-lead immediately
+- **https://status.supabase.com** — incident declared on DB or API component
+- **All authenticated API calls returning 503 / 500** with `DB_CONNECTION_ERROR` in response body
 - **PostHog** — sharp drop in `session_started` events (leading indicator)
-- **Better Stack / Grafana Cloud** — `supabase_db_reachable` metric = 0 for >2min
+- **Better Stack / Grafana Cloud** — `supabase_db_reachable` metric = 0 for > 2 min
 
-Escalate to founder within 15min of P0 declaration (IC: devops-lead; backup IC: security-engineer).
+Escalate to founder within 15 min of P0 declaration. IC: devops-lead; backup IC: security-engineer.
 
 ---
 
 ## 4. Pre-Flight Checklist
 
-- [ ] Confirm outage is Supabase-side: check `https://status.supabase.com`
-- [ ] Confirm it is not a FORM misconfiguration: verify `DATABASE_URL` Workers Secret is unchanged (`wrangler secret list --env production`)
-- [ ] Confirm Sentry alert FORM-DR-DB-001 is active (not a false-positive test)
+- [ ] Confirm outage is Supabase-side: check https://status.supabase.com
+- [ ] Confirm this is not a FORM misconfiguration: verify `DATABASE_URL` Workers Secret is unchanged via `wrangler secret list --env production`
+- [ ] Confirm Sentry alert FORM-DR-DB-001 is active (not a false-positive drill)
 - [ ] Open Linear incident ticket — P0, tag `db-outage`, link to Supabase status page
-- [ ] Page backup IC (security-engineer) if devops-lead unavailable
-- [ ] Confirm founder is reachable (≤15min from P0 declaration)
+- [ ] Page backup IC (security-engineer) if devops-lead is unavailable
+- [ ] Confirm founder is reachable within 15 min of P0 declaration
 - [ ] Confirm compliance-officer is reachable (for SLA breach assessment)
-- [ ] Identify current PITR restore window: last known good timestamp before outage
+- [ ] Identify PITR restore target timestamp: last clean DB write before first error (from Sentry breadcrumbs or PostHog event stream)
 
 ---
 
 ## 5. Step-by-Step Recovery Procedure
 
-### Path A — PITR Restore (Primary; target RTO 60–90min)
+### Path A — PITR Restore (Primary; target RTO 60–90 min)
 
-Use if Supabase primary region outage exceeds 60min with no ETA, or immediately if PITR is accessible from another region.
+Use if Supabase primary region outage exceeds 60 min with no ETA, or immediately if PITR is accessible from another region.
 
-**1. Check Supabase status and set timer**
+**1. Monitor Supabase status and set decision timer** (devops-lead; T+0, repeat every 15 min)
 
 ```bash
-# Every 15min during outage — log each check in the Linear ticket
-curl -s https://status.supabase.com/api/v2/summary.json | jq '.components[] | select(.name | test("Database|API"))'
+curl -s https://status.supabase.com/api/v2/summary.json \
+  | jq '.components[] | select(.name | test("Database|API"))'
 ```
 
-Responsible: devops-lead | Time constraint: continuous until decision at T+60min
+Log each check result in the Linear ticket. Decision gate at T+60 min: if no ETA from Supabase, initiate PITR restore.
 
-**2. Create new Supabase project in secondary region**
+**2. Create new Supabase project in secondary region** (devops-lead; T+60 min)
 
-- Region: `eu-west-1` (or nearest non-us-east-1 region)
+- Via Supabase dashboard: New Project → Region: `eu-west-1` (or nearest non-us-east-1)
 - Plan: Pro (required for PITR)
 - Name: `form-production-dr-YYYYMMDD`
+- Record new project `ref` in Linear ticket
 
-Responsible: devops-lead | Time constraint: complete by T+65min
-
-**3. Initiate PITR restore**
+**3. Initiate PITR restore** (devops-lead; T+65 min)
 
 ```bash
-# Via Supabase dashboard: Project Settings → Backups → Point in Time Recovery
-# Or via Supabase Management API:
+# Via Supabase Management API
 curl -X POST "https://api.supabase.com/v1/projects/${DR_PROJECT_REF}/database/backups/restore" \
   -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"recovery_time_target_unix": <LAST_GOOD_UNIX_TS>}'
+  -d "{\"recovery_time_target_unix\": ${LAST_GOOD_UNIX_TS}}"
 ```
 
-Target `recovery_time_target_unix`: last clean timestamp before incident (from Sentry breadcrumbs or PostHog event stream). Responsible: devops-lead | Time constraint: initiated by T+70min
+See `docs/DATA_MODEL.md §10` for full restore command reference. Target timestamp: 5 min before first detected error to guarantee RPO margin.
 
-**4. Update `DATABASE_URL` Workers Secret**
-
-```bash
-# After new project is healthy and accepting connections
-wrangler secret put DATABASE_URL --env production
-# Paste new Supabase connection string when prompted
-```
-
-Responsible: devops-lead | Time constraint: T+80min
-
-**5. Redeploy Cloudflare Workers**
-
-```bash
-wrangler deploy --env production
-```
-
-Responsible: devops-lead | Time constraint: T+85min
-
-**6. Verify RLS enforcement**
+**4. Verify RLS enforcement on restored cluster** (devops-lead + platform-engineer; T+80 min)
 
 ```bash
 supabase test db --filter=rls --db-url "${NEW_DATABASE_URL}"
 ```
 
-All RLS tests must pass before declaring recovery. Responsible: devops-lead + platform-engineer | Time constraint: T+90min
+All RLS tests must pass before routing any traffic. If any test fails: halt, do not update `DATABASE_URL`, escalate to platform-engineer.
 
-**7. Verify HMAC audit-log chain continuity**
+**5. Verify HMAC audit-log chain continuity** (devops-lead; T+82 min)
 
 ```sql
--- Run against new DB; confirm no gap in sequence numbers
+-- Run against the new restored cluster
 SELECT
   id,
   occurred_at,
-  hmac_sha256(prev_hash || event_type || actor_uuid || occurred_at::text, current_setting('app.audit_hmac_key')) AS expected_hash,
+  hmac_sha256(prev_hash || event_type || actor_uuid || occurred_at::text,
+              current_setting('app.audit_hmac_key')) AS expected_hash,
   chain_hash
 FROM audit_log_events
 ORDER BY id DESC
 LIMIT 20;
+-- All expected_hash values must match chain_hash; any mismatch must be reported to compliance-officer immediately
 ```
 
-Any mismatch must be reported to compliance-officer immediately. Responsible: devops-lead | Time constraint: T+90min
+**6. Update DATABASE_URL Workers Secret** (devops-lead; T+85 min)
 
-**8. Smoke-test critical user paths**
+```bash
+wrangler secret put DATABASE_URL --env production
+# Paste new Supabase connection string when prompted
+```
 
-- Authenticated login (Supabase Auth)
-- Workout log write
-- CV session thumbnail read
-- Coaching turn insert
+**7. Redeploy Cloudflare Workers** (devops-lead; T+87 min)
 
-Responsible: platform-engineer | Time constraint: T+95min
+```bash
+wrangler deploy --env production
+```
+
+**8. Smoke-test critical user paths** (platform-engineer; T+90 min)
+
+```bash
+# Health endpoint
+curl -sf https://api.formcoach.app/health | jq .
+
+# Authenticated endpoint — expect non-empty array
+curl -sf -H "Authorization: Bearer ${TEST_TOKEN}" \
+  https://api.formcoach.app/api/v1/sessions/recent | jq 'length'
+```
+
+Paths to verify: authenticated login, workout log write, CV session thumbnail read, coaching turn insert.
 
 ---
 
-### Path B — Cold Backup Restore (Fallback; target RTO 3–5h)
+### Path B — Cold Backup Restore (Fallback; target RTO 3–5 h)
 
-Use only if PITR is unavailable. This path likely breaches Enterprise RTO.
+Use only if PITR is unavailable. Enterprise RTO will be breached — emit `system.sla_breach_recorded` immediately.
 
-**1. Emit `system.sla_breach_recorded`**
+**1. Emit SLA breach event** (devops-lead; at decision point to use Path B)
 
 ```sql
 INSERT INTO audit_log_events (event_type, severity, actor_type, payload, occurred_at)
@@ -162,90 +158,96 @@ VALUES (
   'HIGH',
   'system',
   jsonb_build_object(
-    'breach_type', ARRAY['enterprise_rto'],
-    'runbook', 'FORM-DR-001',
-    'path', 'cold_backup',
-    'expected_rto_min', 120,
+    'breach_type',       ARRAY['enterprise_rto'],
+    'runbook',           'FORM-DR-001',
+    'path',              'cold_backup',
+    'expected_rto_min',  120,
     'projected_rto_min', 300,
-    'incident_ref', '<LINEAR_TICKET_ID>'
+    'reason',            'PITR unavailable; falling back to cold backup restore',
+    'incident_ref',      '<LINEAR_TICKET_ID>'
   ),
   now()
 );
 ```
 
-**2. Download latest cold backup from R2**
+**2. Retrieve cold backup manifest from R2** (devops-lead)
 
 ```bash
-# List available backups
-wrangler r2 object get form-cold-backups/manifests/$(date +%Y/%m)/backup-manifest-$(date +%Y-%m-%d).json \
-  --file manifest.json
+wrangler r2 object get \
+  "form-cold-backups/manifests/$(date +%Y/%m)/backup-manifest-$(date +%Y-%m-%d).json" \
+  --file /tmp/manifest.json
 
-# Download the backup file listed in the manifest
-BACKUP_FILE=$(jq -r '.backup_file' manifest.json)
-wrangler r2 object get "form-cold-backups/${BACKUP_FILE}" --file backup.sql.enc
+cat /tmp/manifest.json
+# Fields: backup_date, backup_file, sha256_checksum, file_size_bytes
 ```
 
-**3. Decrypt backup**
+**3. Download and decrypt cold backup** (devops-lead)
 
 ```bash
-# COLD_BACKUP_ENC_KEY is in Workers Secret — retrieve via wrangler or 1Password
-openssl enc -d -aes-256-gcm -in backup.sql.enc -out backup.sql \
+BACKUP_FILE=$(jq -r '.backup_file' /tmp/manifest.json)
+wrangler r2 object get "form-cold-backups/${BACKUP_FILE}" --file /tmp/backup.sql.enc
+
+# COLD_BACKUP_ENC_KEY retrieved from Workers Secret (pre-exported to secure session env)
+openssl enc -d -aes-256-gcm -in /tmp/backup.sql.enc -out /tmp/backup.sql \
   -pass env:COLD_BACKUP_ENC_KEY -pbkdf2
+
+# Verify checksum before restore
+EXPECTED=$(jq -r '.sha256_checksum' /tmp/manifest.json)
+ACTUAL=$(sha256sum /tmp/backup.sql | awk '{print $1}')
+[ "$EXPECTED" = "$ACTUAL" ] && echo "Checksum OK" || { echo "CHECKSUM MISMATCH — HALT"; exit 1; }
 ```
 
-**4. Restore to ephemeral Postgres**
-
-Provision a Cloudflare Container or temporary Supabase project, then:
+**4. Restore to ephemeral Postgres** (devops-lead)
 
 ```bash
-psql "${EPHEMERAL_DB_URL}" < backup.sql
+# Provision a temporary Supabase project or Cloudflare Container
+psql "${EPHEMERAL_DB_URL}" < /tmp/backup.sql
 ```
 
-**5. Update `DATABASE_URL` and redeploy Workers** — same as Path A steps 4–5.
-
-**6. Verify RLS and HMAC chain** — same as Path A steps 6–7.
+**5. Continue from Path A steps 4–8** — run RLS verification, HMAC chain check, update Workers Secret, redeploy, smoke-test.
 
 ---
 
 ## 6. Rollback / Abort Procedure
 
-- If new Supabase project fails health checks after PITR restore: do not update `DATABASE_URL`. Re-evaluate cold backup path.
-- If Workers redeploy causes errors: `wrangler rollback --env production` within 30 seconds.
-- If RLS tests fail: halt all user traffic by setting `MAINTENANCE_MODE=true` in Cloudflare KV; escalate to platform-engineer immediately.
-- Never discard the ephemeral DR project until primary is confirmed stable for ≥30min.
+- If new Supabase project fails health checks after PITR restore: do not update `DATABASE_URL`; reassess cold backup path.
+- If Workers redeploy after secret update causes cascading errors: run `wrangler rollback --env production` within 30 s; revert `DATABASE_URL` to original project ref for read-only partial service.
+- If RLS tests fail: set `MAINTENANCE_MODE=true` in Cloudflare KV to halt all user traffic; escalate to platform-engineer immediately.
+- Never destroy the DR Supabase project until primary is confirmed stable for ≥ 30 min.
 
 ---
 
 ## 7. Evidence Capture Instructions
 
-Capture the following and upload to R2 `form-cold-backups/incidents/<LINEAR_TICKET_ID>/`:
+Upload all evidence to R2 `form-cold-backups/incidents/<LINEAR_TICKET_ID>/`:
 
-- [ ] Terminal output: full PITR restore command and new cluster endpoint
-- [ ] Screenshot: Supabase dashboard showing new project status = "Healthy"
+- [ ] Terminal output: full PITR restore API call and response showing new cluster endpoint
+- [ ] Screenshot: Supabase dashboard showing restored project status = Healthy
 - [ ] Terminal output: `supabase test db --filter=rls` — all tests passing
-- [ ] Terminal output: HMAC chain verification query output (no mismatches)
-- [ ] Screenshot: `https://status.supabase.com` at time of detection and at time of recovery
-- [ ] DEC-030 event: emit `system.dr_drill_completed` if this execution was a drill
+- [ ] Terminal output: HMAC chain verification SQL query — no mismatches
+- [ ] Terminal output: `curl /health` confirming recovery
+- [ ] Screenshot: https://status.supabase.com at time of detection and at time of recovery
+- [ ] DEC-030 `system.sla_breach_recorded` SQL output (if Path B was used)
+- [ ] DEC-030 `system.dr_drill_completed` event if this execution was a drill:
 
 ```sql
--- For live drills only
 INSERT INTO audit_log_events (event_type, severity, actor_type, payload, occurred_at)
 VALUES (
   'system.dr_drill_completed',
   'INFO',
   'system',
   jsonb_build_object(
-    'runbook', 'FORM-DR-001',
-    'drill_started_at', '<ISO8601>',
-    'drill_completed_at', now()::text,
-    'path_tested', 'pitr',
-    'rto_achieved_min', <ACTUAL_MINUTES>
+    'runbook',             'FORM-DR-001',
+    'drill_started_at',    '<ISO8601>',
+    'drill_completed_at',  now()::text,
+    'path_tested',         'pitr',
+    'rto_achieved_min',    '<ACTUAL_MINUTES>'
   ),
   now()
 );
 ```
 
-All audit log payloads must use `actor_uuid` (not name), `client_ip_hash` (SHA-256 with `IP_HASH_SALT`), and must not contain plaintext health data.
+Privacy floor: all payloads must use `actor_uuid` (not names), `client_ip_hash` (SHA-256 with `IP_HASH_SALT`). No plaintext health data, individual names, or raw IPs in any captured output or audit event.
 
 ---
 
@@ -255,23 +257,23 @@ All audit log payloads must use `actor_uuid` (not name), `client_ip_hash` (SHA-2
 
 | Tier | Channel | Timing | Frequency |
 |---|---|---|---|
-| Enterprise | Phone + email | Within 10min of P0 declaration | Every 30min until resolved |
-| Growth | Email | Within 15min of P0 declaration | Every 60min until resolved |
-| Consumer | Status page | Within 30min of P0 declaration | On change |
+| Enterprise | Phone + email | Within 10 min of P0 declaration | Every 30 min until resolved |
+| Growth | Email | Within 15 min of P0 declaration | Every 60 min until resolved |
+| Consumer | Status page (statuspage.io) | Within 30 min of P0 declaration | On change |
 
-Post-incident report for Enterprise: within 48h of resolution (root cause, timeline, remediation steps).
+Post-incident report for Enterprise: due within 48 h of resolution. Include root cause, timeline, RPO/RTO achieved vs. target, and remediation steps.
 
 ### SLA Breach Assessment
 
-- If Path B was used: compliance-officer assesses MSA penalty clause applicability for each Enterprise tenant affected.
-- Log breach in `audit_log_events` with `system.sla_breach_recorded` (see Path B step 1).
+If Path B was used: compliance-officer reviews MSA penalty clause applicability for each Enterprise tenant. Breach event must be emitted as shown in Path B step 1. Document in Linear ticket.
 
 ### Post-Mortem
 
 - Trigger: always for P0
-- Timeline: within 48h of resolution
+- Timeline: within 48 h of resolution
 - Owner: devops-lead
-- Include: MTTD, MTTR, RTO achieved vs target, RPO achieved vs target, action items with owners and due dates
+- Template: docs/INCIDENT_RESPONSE.md §IR-1
+- Required: MTTD, MTTR, RTO/RPO achieved vs. target, action items with owners and due dates
 
 ---
 
@@ -279,9 +281,9 @@ Post-incident report for Enterprise: within 48h of resolution (root cause, timel
 
 | TSC | How this runbook satisfies it |
 |---|---|
-| A1.1 | RTO/RPO targets defined per tier; PITR and cold backup paths documented |
-| A1.2 | Recovery procedures tested via scheduled DR drills; evidence captured to R2 |
-| A1.3 | Restoration procedures verified via RLS tests and HMAC chain continuity checks; post-incident review required |
+| A1.1 | RTO/RPO commitments defined per tier; recovery capacity (PITR + cold backup) documented and scoped |
+| A1.2 | Two recovery paths tested via scheduled DR drills; evidence uploaded to R2; post-mortem required |
+| A1.3 | RLS verification and HMAC chain continuity check required before traffic cutover; audit events emitted per DEC-030 |
 
 ---
 

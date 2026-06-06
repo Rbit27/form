@@ -6,6 +6,20 @@
 
 ---
 
+## [2.38.1] — 2026-06-06
+
+### Added
+- `docs/runbooks/dr/FORM-DR-003-r2-data-loss.md` — DR runbook: Cloudflare R2 `form-production` bucket data loss or corruption. P1 / A1.2 A1.3. Scope triage (spot-check query vs. `cv_sessions.thumbnail_r2_key` / `coaching_turns.media_r2_key`), partial vs. full restore from `form-cold-backups` manifest with SHA-256 checksum verification, enterprise-first triage order (tenant_id filter) to satisfy ≤2 h RTO within the ≤4 h P1 window, re-upload verification. devops-lead + compliance-officer + enterprise-architect.
+- `docs/runbooks/dr/FORM-DR-004-anthropic-outage.md` — DR runbook: Anthropic Claude API sustained outage (>2 h), Victor non-functional. P1 / CC9.1 CC9.2. No FORM RTO applies — vendor dependency. FORM's obligation: graceful degradation within 15 min via `VICTOR_FALLBACK=true` KV flag, static coaching-unavailable message, Cloudflare Queues coaching-request buffering with 2 h re-try window, ElevenLabs TTS disable, enterprise SLA credit assessment at 6 h, priority-ordered queue flush on Anthropic recovery. devops-lead + platform-engineer + compliance-officer.
+- `docs/runbooks/dr/FORM-DR-005-compound-disaster.md` — DR runbook: multi-component simultaneous failure. P0 / A1.1 A1.2 A1.3 CC9.1 CC9.2. Triage order: (1) DB → DR-001, (2) API layer → DR-002, (3) R2 → DR-003, (4) AI degradation → DR-004. Hard safety gate: Workers must not redeploy until `supabase test db --filter=rls` passes (prevents pointing Workers at partially-restored cluster). Enterprise RTO (≤2 h) expected to breach; `system.sla_breach_recorded` with `breach_type` array; force-majeure assessment required. Post-mortem timeline extended to 72 h (vs. standard 48 h). `system.dr_drill_started` / `system.dr_drill_completed` DEC-030 events for live drills. devops-lead + compliance-officer + enterprise-architect.
+
+### Changed
+- `docs/runbooks/dr/FORM-DR-001-supabase-outage.md` — minor formatting improvements: consistent table cell style, spacing normalisation (≤ 2 h), cross-ref tidied.
+- `docs/runbooks/dr/FORM-DR-002-workers-edge-failure.md` — minor formatting improvements matching DR-001 style.
+- `VERSION` → 2.38.1
+
+**Gap A1.2-GAP-DR-RUNBOOK** in `docs/SOC2_READINESS.md §53.8`: all five `docs/runbooks/dr/FORM-DR-00X-*.md` files now created. Condition for 🟢 satisfied — requires devops-lead review date logged as DEC-030 `system.policy_acknowledged` event.
+
 ## [2.38.0] — 2026-06-06
 
 ### Added
