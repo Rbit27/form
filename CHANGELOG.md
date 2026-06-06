@@ -6,6 +6,17 @@
 
 ---
 
+## [2.19.0] — 2026-06-06
+
+### Added
+- `content/post-240-blood-flow-restriction-training.md` — BFR механізм, протокол, застосування для аматора; clinical-safety NOT REQUIRED
+- `content/post-241-mev-mrv-volume-landmarks.md` — MEV/MAV/MRV як система координат для тренувального об'єму; clinical-safety NOT REQUIRED
+
+### Changed
+- `STATUS.md` → v1.3.3: версія оновлена до 2.19.0, TL;DR актуалізовано (241 пост, 34 рішення, enterprise-стек), таблиця доків розширена на 14 нових рядків (SOC2, SSO_SCIM, INCIDENT_RESPONSE, DATA_MODEL, OBSERVABILITY, COST_MODEL, KEY_ROTATION, ONBOARDING_SECURITY, SSO_CLIENT_CONFIG, CRYPTOGRAPHY_POLICY, GDPR_DPIA, ACCEPTABLE_USE_POLICY, SUBPROCESSORS), DEC-034 додано в decision highlights, footer синхронізовано
+
+---
+
 ## [2.18.0] — 2026-06-06
 
 ### Added
