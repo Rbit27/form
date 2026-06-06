@@ -1,7 +1,7 @@
-# FORM · Project Status v1.3.2
+# FORM · Project Status v1.3.3
 
-**Date:** 16 травня 2026
-**Version:** 0.47.1
+**Date:** 6 червня 2026
+**Version:** 2.20.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing site, product mockups, investor one-pager, careers, enterprise landing, enterprise pricing calculator, and articles index), 58+ markdown documents covering every operational domain, 16 blog posts ready for distribution, 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), an investor DD FAQ (DD_FAQ.md — 7-block due diligence prep), a user research screener toolkit (RESEARCH_SCREENER.md — screener survey with pass/reject criteria, Reddit/X/Telegram recruiting messages, interview tracker columns, gift card payment flow, anti-bias checklist — ready to use immediately without waiting for site launch), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish with a full deployment strategy, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, a public GitHub repo with 29 documented decisions, a growth loops playbook (GROWTH_LOOPS.md — 5 viral/organic loops, clinical-safety constraints on share content, FE implementation priority), a pre-launch Twitter/X playbook (TWITTER_PLAYBOOK.md — account setup, 5 content pillars with example tweets, build-in-public formula, beta recruiting via X, voice rules for X vs LinkedIn vs newsletter, quick-start checklist George can act on today without domain or FE hire), an investor CRM and relationship management framework (INVESTOR_PIPELINE.md — 7-stage pipeline model, Google Sheets schema, cadence rules, interest signal taxonomy, close mechanics, realistic raise timeline), and a LinkedIn strategy playbook (LINKEDIN_PLAYBOOK.md — profile setup with headline variants and About draft, 4 content pillars, 3-tier connection strategy, hiring InMail templates for FE + Design Lead, investor visibility playbook, build-in-public translation guide from X, 2-3x/week cadence, voice rules, SSI metrics, 10-item quick-start checklist). Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v2.20.0 with 50+ tagged releases, 16 functional HTML pages (marketing site, product mockups, investor one-pager, careers, enterprise landing, enterprise pricing calculator, and articles index), 68+ markdown documents covering every operational domain, **242 evidence-based blog posts** ready for distribution (sports-science corpus, clinical-safety cleared, zero blocked posts in production), 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), an investor DD FAQ (DD_FAQ.md — 7-block due diligence prep), a user research screener toolkit (RESEARCH_SCREENER.md — screener survey with pass/reject criteria, Reddit/X/Telegram recruiting messages, interview tracker columns, gift card payment flow, anti-bias checklist — ready to use immediately without waiting for site launch), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish with a full deployment strategy, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, a public GitHub repo with 34 documented decisions, a growth loops playbook (GROWTH_LOOPS.md — 5 viral/organic loops, clinical-safety constraints on share content, FE implementation priority), a pre-launch Twitter/X playbook (TWITTER_PLAYBOOK.md), an investor CRM and relationship management framework (INVESTOR_PIPELINE.md — 7-stage pipeline model, Google Sheets schema, cadence rules, interest signal taxonomy, close mechanics, realistic raise timeline), a LinkedIn strategy playbook (LINKEDIN_PLAYBOOK.md), a full enterprise documentation stack (SOC2_READINESS.md 500+ controls, SSO_SCIM_IMPLEMENTATION.md SAML/OIDC/SCIM, INCIDENT_RESPONSE.md 13-runbook, DATA_MODEL.md multi-tenant RLS, OBSERVABILITY.md metrics/logs/traces, COST_MODEL.md unit econ per tier, KEY_ROTATION.md cryptographic lifecycle, ONBOARDING_SECURITY.md enterprise security onboarding, SSO_CLIENT_CONFIG.md per-IdP setup guides), and an activation metric definition anchored to CV coaching (DEC-034). Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -31,7 +31,7 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 184 cards (207 posts authored), category filter, newsletter CTA | v1.91.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 201 cards (242 posts authored), category filter, newsletter CTA | v2.20.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -88,6 +88,19 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | RETENTION_PLAYBOOK.md | Retention strategy — D0/D7/D30/D90 windows, notification types + cadence, weekly streak mechanics, Victor personalization arc, re-engagement protocol (3-attempt cap), Pause>Cancel design, clinical-safety copy constraints | growth-lead + clinical-safety |
 | VICTOR_PROMPT_GUIDE.md | LLM implementation guide — 5-layer system prompt architecture, TypeScript context schema (HRV, sleep, streak, ED-flag, form score), 4 tone modes with UA/EN examples, 22 scenario library, ED-flag restricted mode, Victor silence rules, 7 open questions for FE | platform-engineer + brand-voice |
 | GROWTH_LOOPS.md | Viral and organic growth mechanics — 5 loops (Form Share, Streak Share, Victor WOM, Referral, Beta FOMO), clinical-safety constraints on share content, FE implementation priority, PostHog events, K-factor targets | growth-lead + clinical-safety |
+| SOC2_READINESS.md | SOC2 Type II gap analysis — Trust Services Criteria mapping, 500+ controls, evidence matrix, auditor readiness timeline | compliance-officer |
+| SSO_SCIM_IMPLEMENTATION.md | SAML/OIDC + SCIM provisioning spec — full enterprise IdP integration, Okta/Azure AD/Google Workspace flows, attribute mapping | enterprise-architect + security-engineer |
+| INCIDENT_RESPONSE.md | Security incident runbook — 13 response procedures (R-01 to R-13), SLA tiers, escalation matrix, law enforcement no-backdoor policy | security-engineer + devops-lead |
+| DATA_MODEL.md | Multi-tenant schema — RLS rules, tenant isolation, HIPAA-adjacent data handling, Postgres schema with pgcrypto | enterprise-architect + platform-engineer |
+| OBSERVABILITY.md | Metrics/logs/traces taxonomy — SLO definitions, D7 activation rate (ACT-SLO-01), PostHog + Grafana stack, victor quality daily | devops-lead |
+| COST_MODEL.md | Unit economics per tier — Consumer/Team/Enterprise CAC, LTV, infrastructure cost model, payback period | data-engineer |
+| KEY_ROTATION.md | Cryptographic key lifecycle — rotation schedules, HMAC audit log chaining, BYOK for enterprise, emergency rotation protocol | security-engineer |
+| ONBOARDING_SECURITY.md | Enterprise security onboarding — security checklist for new enterprise tenants, SSO activation, MFA enforcement, RBAC setup | enterprise-architect |
+| SSO_CLIENT_CONFIG.md | Per-IdP SSO configuration guides — Okta, Azure AD, Google Workspace, JumpCloud step-by-step with screenshots placeholder | enterprise-architect |
+| CRYPTOGRAPHY_POLICY.md | Cryptography standards — approved algorithms, key lengths, rotation frequency, prohibited ciphers | security-engineer |
+| GDPR_DPIA.md | GDPR Data Protection Impact Assessment — Art. 9 special category health data, lawful basis, retention periods, DSR procedures | compliance-officer |
+| ACCEPTABLE_USE_POLICY.md | Enterprise acceptable use policy — AI coaching constraints, prohibited content, clinical-safety scope, user obligations | compliance-officer |
+| SUBPROCESSORS.md | Third-party subprocessor registry — data flows, contractual protections, geographic processing locations | compliance-officer |
 
 ### Content engine (markdown у `content/`)
 
@@ -280,6 +293,19 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-207-antagonist-agonist-paired-sets.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-208-intensity-vs-volume-hypertrophy-threshold.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-209-eccentric-overload.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-229-motor-learning-strength.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-228-minimum-effective-dose.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-227-rpe-calibration-self-coached.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-226-residual-training-effects.md | Blog | draft · clinical-safety PASS (2026-06-05) · sports-scientist pending |
+| post-225-novice-effect-intermediate.md | Blog | draft · clinical-safety PASS (2026-06-05) · sports-scientist pending |
+| post-224-ltad-long-term-athletic-development.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-223-placebo-nocebo-training.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-222-genetics-training-response.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-221-drop-sets.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-220-oxidative-capacity-strength.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-219-rest-pause-myo-rep.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-218-central-command-exercise-pressor-reflex.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-217-muscle-architecture.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-216-vo2-kinetics.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-215-specificity-vs-variability.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-214-strength-cognitive-function.md | Blog | draft · clinical-safety NOT REQUIRED |
@@ -287,6 +313,13 @@ FORM is at v0.47.0 with 46+ tagged releases, 16 functional HTML pages (marketing
 | post-212-adherence-coefficient.md | Blog | draft · clinical-safety PASS WITH CONDITIONS (2026-06-04) · sports-scientist optional |
 | post-211-pcr-resynthesis-kinetics.md | Blog | draft · clinical-safety NOT REQUIRED |
 | post-210-cognitive-load-technique.md | Blog | draft · clinical-safety NOT REQUIRED |
+| post-233-sleep-training-bidirectional.md | Blog | draft · clinical-safety PASS WITH CONDITIONS (2026-06-06) · sports-scientist pending |
+| post-234-female-training-adaptation.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-235-age-strength-adaptation.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-236-concurrent-training-no-interference.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-237-accentuated-eccentric-loading.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-238-proprioception-joint-stability.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-239-strength-asymmetry.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
@@ -441,8 +474,9 @@ M10-M12 (Q2 2027)
 - DEC-031: Agent team expanded 14 → 24 agents
 - DEC-032: Law enforcement no-backdoor policy formalized (INCIDENT_RESPONSE R-13)
 - DEC-033: Post-100 milestone: quality over velocity (clinical-safety-blocked posts remain deferred)
+- DEC-034: D7 activation metric definition — full CV coaching session within 7 days (ACT-SLO-01 ≥ 40% [ESTIMATE])
 
-33 total documented decisions з reverse-cost assessment.
+34 total documented decisions з reverse-cost assessment.
 
 ---
 
@@ -500,6 +534,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v1.9.20 · 4 червня 2026**
-**Last update:** 4 червня 2026 · v1.90.0
+**v2.19.0 · 6 червня 2026**
+**Last update:** 6 червня 2026 · v2.19.0
 **Next planned update:** після hire of Founding Engineer

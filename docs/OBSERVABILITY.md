@@ -7025,7 +7025,7 @@ Four hard constraints enforced at the instrumentation layer:
 | 7 | Register CRYPTO-CHAIN-01 through CRYPTO-CHAIN-04 as pg_cron or batch jobs; validate CRYPTO-CHAIN-02 (sequence check) fires on synthetic out-of-order event pair in staging | platform-engineer | **P1** | M5 |
 | 8 | Build "Cryptographic Health" dashboard (§30.7, nine panels) in Metabase + Better Stack; restrict access to devops-lead + security-engineer + compliance-officer; validate all 8 key rows render with correct `days_until_rotation` | devops-lead | **P1** | M5 |
 | 9 | Register CRYPTO-E-001 through CRYPTO-E-008 evidence artefact definitions in `docs/SOC2_READINESS.md` CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2 control evidence rows; schedule first evidence collection before SOC 2 observation period start | compliance-officer + security-engineer | **P1** | Observation period start |
-| 10 | Add `admin.encryption_key_rotated` DEC-030 event to `docs/AUDIT_LOG_SCHEMA.md` event registry (closes SOC2_READINESS.md §56.6 checklist item 4 / OQ-ENC-03); validate Zod schema; deploy to `emit-audit-event` Worker endpoint | security-engineer + platform-engineer | **P0** | M7 |
+| ~~10~~ | ~~Add `admin.encryption_key_rotated` DEC-030 event to `docs/AUDIT_LOG_SCHEMA.md` event registry (closes SOC2_READINESS.md §56.6 checklist item 4 / OQ-ENC-03); validate Zod schema; deploy to `emit-audit-event` Worker endpoint~~ | security-engineer + platform-engineer | ~~**P0**~~ | **Closed 2026-06-05** — `admin.encryption_key_rotated` + `admin.signing_key_rotated` registered in AUDIT_LOG_SCHEMA.md v0.2; closes OQ-ENC-03 and SOC2_READINESS §65.13 AR-P1-05 |
 
 ---
 

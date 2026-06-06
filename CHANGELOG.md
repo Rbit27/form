@@ -6,6 +6,384 @@
 
 ---
 
+## [2.23.0] — 2026-06-06
+
+### Added
+- `content/post-245-rep-tempo-hypertrophy.md` — Темп повторень і гіпертрофія: TUT як вторинна змінна; Schoenfeld & Grgic (2021) мета-аналіз — у широкому діапазоні контрольованих темпів різниця у гіпертрофії відсутня за рівної proximity to failure; ексцентрична фаза і MPS (Burd et al. 2012 J Physiol); суперповільне тренування програє традиційному (Fielding 2002 MSSE, Keeler 2001 JSCR) через зниження рекрутменту fast-twitch при субмаксимальному навантаженні; вибухова концентрика і RFD (Behm & Sale 1993); паузи у точці пікового розтягнення (Oranchuk 2019 Scand J Med Sci Sports); практична нотація 3-0-X-0; ієрархія: навантаження + proximity to failure → об'єм → діапазон руху → темп; clinical-safety NOT REQUIRED
+- `content/post-246-tendon-adaptation.md` — Адаптація сухожиль до тренінгу: колагеновий синтез і його часова динаміка (пік через 24–72 год vs 3–6 год для MPS); жорсткість, гістерезис, поперечний переріз (Bohm et al. 2015 Eur J Appl Physiol мета-аналіз — 8–16 тижнів для значимих адаптацій); ексцентрика і ізометрія як стимул ремоделювання (Fouré 2010, Alfredson 1998); дисбаланс між темпами м'язової і сухожильної адаптації як механізм тендинопатії (Kjaer 2004 Physiol Rev); клітинний механізм через теноцити і MMP; гіповаскулярність і її наслідки; неоваскуляризація при тендинопатії; Shaw et al. (2017 Am J Clin Nutr) — гідролізат колагену + вітамін С і синтез колагену; практичні орієнтири: ексцентрика, ізометрія, консервативна прогресія; clinical-safety NOT REQUIRED
+- `README.md` — додано post-245 і post-246 до content roadmap
+- `VERSION` → 2.23.0
+
+---
+
+## [2.22.1] — 2026-06-06
+
+### Changed
+- `docs/SOC2_READINESS.md` v3.0 → v3.1 — §66 Media and Device Disposal Policy (C1.2 / CC6.5 / CC6.7). Closes PRE-06 (🔴 Open → 🟡 Authored), C1-GAP-002 (🔴 Gap → 🟡 Authored), C1-GAP-004 P1 (Open → 🟡 Authored; `compliance/c1/device-disposal-policy.md` extraction via MDD-P0-04). NIST SP 800-88 Rev. 1 Purge standards for SSD/NVMe (FileVault 2 EACS cryptographic erasure), iOS, legacy USB, HDD, and paper. Four disposal categories: development laptop (72h credential revocation sequence → EACS → MDM confirmation), mobile test device, external storage, paper. §66.6 production-data device handling (devices that touched production health data): audit log search MDD-E-005, two-person sign-off or HMAC-chained solo attestation, cache verification `find` command MDD-E-006. §66.5 remote-work device policy: FileVault 2 + auto-lock ≤5 min + MDM (CC6-GAP-010) + no-plaintext-credentials + jailbreak prohibition. §66.7 chain of custody: internal wipe via device-register.csv + MDD-E-003; solo-founder compensating control via HMAC-chained `asset.disposal_initiated` → `asset.disposal_completed` DEC-030 pair (tamper-evident substitute for two-person witness); physical transfer chain-of-custody form template; founder attestation committed to repo. §66.8 timelines: 72h pre-disposal credential revocation, 14-day from departure for employee device wipe, 30-day max third-party handoff. §66.9 third-party destruction criteria: NAID AAA / e-Stewards / R2-RIOS certified; NIST Purge or ≤6mm shred; EU data residency for EU health data devices; DPA required; no retail trade-in programs. §66.10 five DEC-030 HMAC-chained events (all 7yr): `asset.disposal_initiated` (STANDARD), `asset.disposal_completed` (STANDARD), `asset.device_sanitized` (HIGH), `asset.chain_of_custody_transferred` (HIGH), `asset.disposal_log_filed` (STANDARD). §66.11 evidence artifacts MDD-E-001 through MDD-E-007. §66.12 thirteen-item implementation checklist: 5× P0 M5 (device register, founder attestation + FileVault screenshot, DEC-030 event registration, device-disposal-policy.md extraction, gap register update), 5× P1 M5-M6 (destruction vendor register, MDD-AL-01 PagerDuty alert, MDM deployment closing CC6-GAP-010, enterprise offboarding API key step, compliance calendar update), 3× P2 post-hire. §66.13 three open questions: OQ-MDD-01 (serial number in Supabase Vault vs 1Password — P2), OQ-MDD-02 (enterprise tenant data destruction certificate — P1 before GA M13), OQ-MDD-03 (YubiKey mandatory from first hire — P1). Owner: compliance-officer + security-engineer.
+- `VERSION` → 2.22.1
+
+---
+
+## [2.22.0] — 2026-06-06
+
+### Added
+- `content/post-243-training-log-diagnostic.md` — Тренувальний журнал як діагностичний інструмент; мінімально достатній формат лог-запису; RPE-drift як early warning signal (Zourdos et al. 2016 JSCR); intra/inter-session моніторинг; sRPE-навантаження (Foster et al. 2001 JSCR); load-volume tracking по м'язових групах з орієнтирами (Schoenfeld 2017, Helms 2016); 6 типових помилок (over-logging, under-logging, непослідовні метрики, відсутність контексту відновлення, ретроспективний запис, відсутність аналізу); алгоритм читання тренду; пряма позиція: журнал ≠ мотиваційний щоденник; clinical-safety NOT REQUIRED
+- `content/post-244-limited-equipment-training.md` — Тренування при обмеженому обладнанні; SAID principle як єдиний критерій вибору замінника; функціональна класифікація 5 рухових патернів (push/pull/hinge/squat/carry); таблиця відповідності штанга→гантелі→власна вага; механіка збереження стимулу через proximity to failure (Schoenfeld et al. 2017, Mitchell et al. 2012); Kubo et al. (2021) — межі bodyweight для тренованих атлетів; 5-кроковий алгоритм вибору замінника; 5 типових помилок домашнього тренування; 4 механізми прогресії без збільшення ваги (варіація, темп, RIR, пауза у розтягнуті); clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — позначено post-240..244 як [x] виконані
+- `VERSION` → 2.22.0
+
+---
+
+## [2.21.0] — 2026-06-06
+
+### Added
+- `docs/ENTERPRISE_SLA.md` v1.0 — Customer-facing Service Level Agreement Terms (Exhibit B to the MSA). Fills the gap identified by `docs/OBSERVABILITY.md OQ-SSO-OBS-01` ("confirm consistent with enterprise contract language"). 18 sections: §1 Definitions, §2 Service Tiers (Starter/Growth/Enterprise), §3 Availability SLA — Standard 99.9% and Premium 99.95% commitment with five-tier credit schedule (5%/15%/25%/50% of MRR), dual-source measurement methodology (Better Stack primary + Cloudflare Analytics corroborating, conservative reconciliation), partial-outage 50% weight rule, automated credit application without claim required ≥ 5% MRR, step-by-step claim process (6 steps from month-close Worker to invoice), credit cap 50% MRR; §4 Planned Maintenance windows (72h/7d notice for Standard/Premium, 4h/2h per occurrence, ≤ 8h/4h per month); §5 SLA Exclusions (upstream provider, maintenance, customer-side IdP misconfiguration, force majeure, probe false positives, beta features); §6 Incident Response SLAs — P0–P3 table with acknowledge/assessment/customer-notification/resolution targets and GDPR 72h supervisory authority notification; §7 Support Tier SLAs — Starter email 24h / Growth Slack Connect 4h biz hours / Enterprise phone+Slack+email 30min 24×7; §8 Data Residency (EU Frankfurt default, EU-West Dublin, US Virginia — no cross-region replication in production); §9 Security Commitments (annual pentest, SOC 2 Type II, 72h vulnerability disclosure, key rotation per KEY_ROTATION.md); §10 Change Management (maintenance notice, GDPR Art. 28 30-day sub-processor notice with customer objection right, 60-day material platform change notice); §11 Customer Obligations / CUECs (7 items including tenant contact configuration, MFA enforcement, SCIM token rotation, security advisory response); §12 Audit Rights (SOC 2 report, pentest executive summary, HMAC audit log export, FORM audit rights on AUP breach); §13 Privacy Floor (6 non-negotiable restrictions — HR aggregates only, no manager drill-down, no ED/body composition/mental health aggregation to employer, employee revocation right — `clinical-safety` + `compliance-officer` VETO, non-overridable by contract); §14 Remedies & Limitations (credits as sole remedy for availability breaches, 12-month MRR liability cap, no cascading damages, 20-day dispute → arbitration); §15 DEC-030 Audit Events (12 event types across full SLA lifecycle — `sla.incident_opened` through `sla.maintenance_window_closed`, all HMAC-chained, 7-year retention for incident/credit events); §16 SOC 2 Evidence Mapping (A1.1/A1.2/A1.3/CC7.2/CC7.3/CC9.1/P4.0/P8.0); §17 Implementation Checklist (4× P0 M4: DEC-030 event registration, Admin API endpoints, tenant contact fields, Better Stack probes; 4× P1 M5: month-close Worker, monthly PDF via Resend, counsel review, sub-processor page live; 2× P2 post-Series A: Slack Connect, Premium tier); §18 Open Questions (OQ-SLA-01 per-tenant PagerDuty scoping P1, OQ-SLA-02 auto-apply vs claim for Starter P2, OQ-SLA-03 SCIM deprovisioning latency SLA P1). References: `docs/ENTERPRISE.md`, `docs/INCIDENT_RESPONSE.md`, `docs/OBSERVABILITY.md §23`, `docs/AUDIT_LOG_SCHEMA.md`, `docs/SUBPROCESSORS.md`, `docs/SOC2_READINESS.md`. enterprise-builder cloud worker · 2026-06-06.
+
+### Changed
+- `VERSION` → 2.21.0
+
+---
+
+## [2.20.0] — 2026-06-06
+
+### Added
+- `content/post-242-exercise-order-effects.md` — порядок вправ у сесії: ефект першої позиції, конкуренція за ресурс, практична рамка пріоритизації; clinical-safety NOT REQUIRED
+- `blog.html` → 3 нові картки (post-240, post-241, post-242) — синхронізовано з content/
+
+### Changed
+- `VERSION` → 2.20.0
+- `STATUS.md` → 242 пости, blog.html 201 картка
+
+---
+
+## [2.19.0] — 2026-06-06
+
+### Added
+- `content/post-240-blood-flow-restriction-training.md` — BFR механізм, протокол, застосування для аматора; clinical-safety NOT REQUIRED
+- `content/post-241-mev-mrv-volume-landmarks.md` — MEV/MAV/MRV як система координат для тренувального об'єму; clinical-safety NOT REQUIRED
+
+### Changed
+- `STATUS.md` → v1.3.3: версія оновлена до 2.19.0, TL;DR актуалізовано (241 пост, 34 рішення, enterprise-стек), таблиця доків розширена на 14 нових рядків (SOC2, SSO_SCIM, INCIDENT_RESPONSE, DATA_MODEL, OBSERVABILITY, COST_MODEL, KEY_ROTATION, ONBOARDING_SECURITY, SSO_CLIENT_CONFIG, CRYPTOGRAPHY_POLICY, GDPR_DPIA, ACCEPTABLE_USE_POLICY, SUBPROCESSORS), DEC-034 додано в decision highlights, footer синхронізовано
+
+---
+
+## [2.18.0] — 2026-06-06
+
+### Added
+- `docs/SSO_CLIENT_CONFIG.md` v1.0 — FORM OAuth2/OIDC client application configuration reference. Closes `SSO_SCIM_IMPLEMENTATION.md §23` checklist item 12 (CP1 client capability documentation). Three client applications: `form-admin-dashboard` (SPA, PKCE-only, memory token storage), `form-mobile-ios` (native, PKCE, Keychain), `form-sso-exchange` (Cloudflare Worker, confidential, `client_secret_post`). Per-IdP registration parameters for Okta, Entra, Google Workspace, Generic SAML SP, Generic OIDC. §8 Entra CAE `client_capabilities=CP1` / `xms_cc` implementation with MSAL.js + MSAL Swift code samples, verification procedure, `CC6-E-CAE-CP1-001` evidence artifact, and CAE strict enforcement prerequisite. §7 JWKS caching policy (1h TTL, Durable Object lock on `kid` miss, stale fallback ≤ 6h). §6 token validation (RS256/PS256 only; HS256 rejected; nonce, `hd` for Google, `oid` preference for Entra). §4 PKCE mandatory — `plain` downgrade attempt emits HIGH audit event. §10 five DEC-030 events: `sso.client_config_updated` (HIGH), `sso.jwks_key_miss` (HIGH), `sso.jwks_fetch_failed` (HIGH), `sso.pkce_validation_failed` (HIGH), `sso.entra_cp1_verified` (STANDARD). §11 10-item implementation checklist (4× P0 M4, 4× P1 M4/M5, 2× P2 M5). §12 three open questions: OQ-SSC-01 (`private_key_jwt` Okta — P2), OQ-SSC-02 (Entra B2B guest accounts — P2), OQ-SSC-03 (plaintext diff in `sso.client_config_updated` — P1 pre-SOC 2). SOC 2 CC6.1/CC6.2/CC6.3/CC7.2/CC7.3. enterprise-builder cloud worker · 2026-06-06.
+
+### Changed
+- `VERSION` — 2.17.0 → 2.18.0
+
+---
+
+## [2.17.0] — 2026-06-06
+
+### Added
+- `content/post-239-strength-asymmetry.md` — «Асиметрія і сила: коли дисбаланс ліво-право є проблемою, а коли — нормою»: Bishop et al. (2018 Sports Med) мета-аналіз 12 проспективних досліджень — зв'язок асиметрії <15% LSI з ризиком травми відсутній або клінічно незначимий; Exell et al. (2017 JSCR) нормативний діапазон у здорових елітних спортсменів — 8–12% природна міжкінцівкова різниця. Три типи асиметрії: патологічна, адаптивна, артефактна. Limb Symmetry Index: операційне визначення і практичні пороги (<85% → втручання, 85–90% сіра зона, ≥90% норма). Croisier et al. (2008 Am J Sports Med): H:Q ratio як важливіший предиктор травматизму. Hewett et al. (2006 Am J Sports Med): landing mechanics і ACL-ризик. Single-leg hop tests як валідований польовий метод оцінки. Програмування при виявленій асиметрії: рівний об'єм а не «більше для слабкого», обмежений горизонт корекційного блоку 4–8 тижнів. clinical-safety NOT REQUIRED.
+- `blog.html` — картка Post 239 додана до grid (198 карток)
+
+### Changed
+- `README.md` — статистики оновлено: «238+» → «239+ evidence-based blog posts»; metrics table 238 → 239; post-239 позначений [x]; roadmap розширено темами post-240..244
+- `VERSION` — 2.16.0 → 2.17.0
+
+---
+
+## [2.16.0] — 2026-06-06
+
+### Added
+- `content/post-237-accentuated-eccentric-loading.md` — «Accentuated eccentric loading: тренінг вище 100% концентричного максимуму»: Hody et al. (2019 Front Physiol) — ексцентричний режим: метаболічна вартість ≈20–25% концентричної, вища механічна напруга на саркомер, преференційне рекрутування Type II волокон, EIMD механізм. Roig et al. (2009 Br J Sports Med) мета-аналіз: ES 0.85 (eccentric) vs ES 0.41 (concentric) для приросту сили, доза-відповідь залежність. Методи AEL: weight releasers (Doan et al. 2002 — 105–120% 1RM ексцентрично), темпові ексцентрики (3–5 с), flywheel/YoYo (Naczk, Vicens-Bordas 2018), партнерські негативи. Nordic hamstring curl як benchmark: Petersen et al. (2011 Am J Sports Med) — 51% зниження ризику травми підколінних у 942 футболістів; Franchi et al. (2017 Front Physiol) — збільшення довжини пучків волокон при ексцентричному акценті (структурна адаптація, що зміщує force-velocity curve). Програмування: тільки для інтерміді­атів/просунутих, 2–3 сети × 3–6 повторів × 1–2×/тиждень, recovery window 48–72h. clinical-safety NOT REQUIRED.
+- `content/post-238-proprioception-joint-stability.md` — «Proprioception і суглобова стабільність: як силовий тренінг формує sensorimotor контроль»: Freeman et al. (1965 J Bone Joint Surg) — нейральний компонент нестабільності після травми гомілково-ступеневого суглоба: механічне загоєння ≠ функціональна стабільність. Riemann & Lephart (2002 JOSPT) — тришарова sensorimotor framework (периферійний/спінальний/супраспінальний); м'язові веретена (Ia), GTO (Ib), mechanoreceptors суглобової капсули. Bruhn et al. (2004 JSCR) — важке силове тренування покращує joint position sense; два механізми: пасивна жорсткість + нейральна точність. Behm & Colado (2012 JSCR): нестабільні поверхні знижують force output на 20–70% без компенсаторного рекрутування prime movers. Hewett et al. (2006 Am J Sports Med) — прогнозування ризику ACL-травми через landing mechanics; квадрицепс:підколінне co-contraction timing. Різниця між proprioception (аферентна якість), balance (sensorimotor output) і stability (пасивний+активний+нейральний). Програмування: унілатеральна навантажена робота, темпові повтори, варіативний ROM; коли BOSU виправданий (реабілітація, спорт-специфічні ситуації). clinical-safety NOT REQUIRED.
+- `blog.html` — картки Post 237 і Post 238 додані до grid (197 карток)
+
+### Changed
+- `README.md` — статистики оновлено: «235+» → «238+ evidence-based blog posts»; metrics table 235 → 238; post-237, post-238 позначені [x]
+- `VERSION` — 2.15.0 → 2.16.0
+
+---
+
+## [2.15.0] — 2026-06-06
+
+### Added
+- `docs/ONBOARDING_SECURITY.md` v1.0 — Security Onboarding Checklist: closes `docs/SOC2_READINESS.md §49.2.2` cross-reference (hardware key + no-SMS MFA policy "must be communicated in the onboarding checklist") and CC5-P2-007 (new-hire onboarding checklist). Eight-step sequential checklist — (1) AUP acknowledgment, (2) security awareness training, (3) MFA enrollment hard gate, (4) 1Password spot-check, (5) SSH key generation, (6) least-privilege access provisioning, (7) incident response orientation, (8) 30-day check-in. §5 MFA Enforcement Policy: FIDO2 hardware key (YubiKey 5 NFC/Passkey) preferred; TOTP acceptable; SMS-based 2FA explicitly prohibited with audit procedure (`gh api orgs/form-coach/members?filter=2fa_disabled`); per-platform enrollment procedures for GitHub, 1Password, Supabase, Cloudflare. §6 Access Scope Principles: least privilege, time-bound review, privacy floor (no individual user health data without PAM session). §8 SOC 2 evidence mapping: CC1.1/CC1.4/CC5.3/CC6.1/CC6.2/CC6.3/CC6.8 → CC1-E-002 completion record. §9 DEC-030 events. §11 six-item implementation checklist (3× P0, 2× P1, 1× P1-hardware-key). §12 three open questions: OQ-ONB-01 (30-day check-in DEC-030 event — P2 M5), OQ-ONB-02 (hardware key requirement for contractors with service_role — P1 before first contractor), OQ-ONB-03 (enterprise tenant SSO admins scope exclusion — P2 before M13). enterprise-builder cloud worker · 2026-06-06.
+
+### Changed
+- `VERSION` — 2.14.0 → 2.15.0
+
+---
+
+## [2.14.0] — 2026-06-06
+
+### Added
+- `content/post-236-concurrent-training-no-interference.md` — «Concurrent training без interference»: Hickson (1980 J Physiol) оригінальний interference effect при 6+6 сесіях; Coffey & Hawley (2007 Eur J Sport Sci) молекулярний механізм AMPK→TSC2/raptor→mTORC1 пригнічення, conflict window ≈ 6 год; Wilson et al. (2012 JSCR) мета-аналіз 21 RCT 828 учасників — interference незначимий при ≤3 кардіо/тиждень, велосипед краще бігу, розподіл 6+ год або окремі дні; Hood et al. (2019 Cell Metab) аеробна база і PCr-ресинтез між підходами; практичне програмування за трьома пріоритетами. clinical-safety NOT REQUIRED.
+- `blog.html` — картка Post 236 додана до grid
+
+### Changed
+- `README.md` — статистики оновлено: «233+» → «235+ evidence-based blog posts»; roadmap post-236 позначено [x]
+- `VERSION` — 2.13.0 → 2.14.0
+
+---
+
+## [2.13.0] — 2026-06-06
+
+### Added
+- `content/post-234-female-training-adaptation.md` — «Адаптація до тренінгу у жінок: що реально відрізняється»: Gentil et al. рівний відносний гіпертрофійний відгук; Kraemer et al. (1993) нижчий абсолютний але рівний відносний приріст сили; McNulty et al. (2020 Sports Med) мета-аналіз менструального циклу і варіації сили (SMD 1.8%, фолікулярна фаза); Hunter (2014) статеві відмінності у периферійній м'язовій втомі; естроген anti-inflammatory + glycogen sparing + мембраностабілізація; програмування без інфантилізації. clinical-safety PASS.
+- `content/post-235-age-strength-adaptation.md` — «Вікова динаміка силової адаптації»: Lindle et al. (1997) 654 учасники, 8–10%/десятиліття до 50, прискорення після; Lexell et al. (1988) Type II fiber atrophy як структурний механізм; Clark & Manini (2008) dynapenia ≠ sarcopenia; Wroblewski et al. (2011) МРТ майстер-атлетів — м'язовий перетин збережений; Aagaard et al. (2010) satellite cell response у тренованих 65+; Liu & Latham (2009) 121 RCT 6700 учасників 60+. clinical-safety PASS.
+- `blog.html` — картки Post 234 і Post 235 додано до grid
+
+### Changed
+- `README.md` — статистики оновлено: «21 blog post drafts» → «233+ evidence-based blog posts»; «58+ docs» → «65+ docs»; metrics table 227 → 235
+- `VERSION` — 2.12.0 → 2.13.0
+
+---
+
+## [2.12.0] — 2026-06-06
+
+### Added
+- `docs/KEY_ROTATION.md` — operational key rotation runbook v1.0: 11-key inventory (`SUPABASE_SERVICE_ROLE_JWT`, `HMAC_AUDIT_CHAIN_KEY`, `KEYPOINTS_ENC_KEY`, `CLOUDFLARE_API_TOKEN`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `STRIPE_LIVE_API_KEY`, `SENTRY_DSN`, `SUPABASE_ANON_KEY`, `BACKUP_ENC_KEY`, `API_KEY_HASH_SECRET`); per-key step-by-step rotation procedures; DEC-030 event sequences (`system.credential_rotated`, `admin.encryption_key_rotated`, `admin.signing_key_rotated`); post-rotation verification checklist; SOC 2 evidence artefact store layout (`compliance/evidence/enc/`); dual-custody rules for `HMAC_AUDIT_CHAIN_KEY` + `BACKUP_ENC_KEY`; annual key audit procedure (Q1-Jan); 8-item implementation checklist; SOC 2 CC5.2/CC5.3/CC6.4/CC6.7/CC6.8/C1.1 control mapping. Resolves CC6.7 evidence gap in `DATA_MODEL.md §7047`. Closes `INCIDENT_RESPONSE.md R-21` implementation checklist item 4 dependency. Operational complement to `docs/CRYPTOGRAPHY_POLICY.md`.
+
+### Changed
+- `VERSION` — 2.11.0 → 2.12.0
+
+---
+
+## [2.11.0] — 2026-06-06
+
+### Added
+- `content/post-233-sleep-training-bidirectional.md` — «Силовий тренінг і сон: двонапрямний зв'язок»: Leproult & Van Cauter (2011 JAMA) — 1 тиждень 5h сну → −10–15% тестостерону вже після 3-ї ночі; Dattilo et al. (2011 Med Hypotheses) — хронічний недосип → підвищений базальний кортизол → пригнічений IGF-1 і GH-чутливість; SWS-архітектура і пульсативна GH-секреція (~70% добового GH у першому SWS-циклі); Kredlow et al. (2015) мета-аналіз 66 RCT — аеробний тренінг покращує латентність засинання і ефективність сну; Reid et al. (2010 Sleep Med) — 16 тижнів аеробного тренінгу ≈ KBT-I за PSQI; Al-Dabbagh et al. (2021 JSCR) — силові показники при 5h vs 8h сну; HRV як інструмент рішення (знизити/пропустити — не подолати); програмування при хронічному недосипі (батьки немовлят, нічні зміни): −об'єм, зберегти інтенсивність, RPE/RIR авторегуляція; clinical-safety PASS WITH CONDITIONS (2026-06-06); 13-хв читання
+
+### Changed
+- `blog.html` — додано картку post-233 (195 карток, 233 пости authored); v2.11.0
+- `STATUS.md` — blog.html рядок оновлено: 195 карток, 233 пости authored; post-233 рядок у content engine table; v2.11.0
+- `README.md` — post-233 позначено `[x]`; v2.11.0
+- `VERSION` — 2.10.0 → 2.11.0
+
+---
+
+## [2.10.0] — 2026-06-06
+
+### Added
+- `content/post-231-functional-training-fuzzy-category.md` — «Чому "functional training" — розмита категорія»: SAID principle як фундаментальна суперечність маркетинговому "functional"; Behm & Colado (2012 JSCR) — нестабільна поверхня знижує force output без компенсаторного рекрутування prime movers; Behm & Anderson (2006 JSCR) — core EMG підвищується, але prime movers отримують менший стимул; Willardson (2007 JSCR) instability continuum; Barnett et al. (2002) — transfer general→specific слабкий в обидві сторони; Kibler et al. (2006 Sports Med) — реабілітаційний vs performance-контекст; де нестабільність виправдана (лижний спорт, серфінг, боротьба, пост-травматична реабілітація); clinical-safety NOT REQUIRED; 13-хв читання
+- `content/post-232-taper-mechanics-non-professional.md` — «Механіка тапера для непрофесіонального атлета»: fitness-fatigue model (Banister 1975) — fatigue half-life 9–13 днів vs fitness 30–42 дні; Mujika & Padilla (2000 Sports Med) — оптимальне зниження об'єму 41–60% при збереженні інтенсивності і частоти; Bosquet et al. (2007 M&SSE) мета-аналіз 27 досліджень n=182 — +2.8% продуктивність, оптимальна тривалість 2 тижні; Shepley et al. (1992 JAP) — low-volume high-intensity taper superior; Zarkadas et al. (1995) глікогенна суперкомпенсація; Houmard & Johns (1994) — VO2max зберігається до 15 днів; три змінні тапера (об'єм/інтенсивність/частота); що робити з GPP; clinical-safety NOT REQUIRED; 12-хв читання
+
+### Changed
+- `blog.html` — додано картки post-231 і post-232 (194 картки, 232 пости authored); v2.10.0
+- `README.md` — post-231 і post-232 позначені `[x]`; v2.10.0
+- `STATUS.md` — blog.html рядок оновлено: 194 картки, 232 пости authored; v2.10.0
+
+---
+
+## [2.9.0] — 2026-06-06
+
+### Added
+- `compliance/access-review/access-review-2026-Q2.md` v1.0 — Q2 2026 quarterly access review execution artifact (first review); closes **SOC2_READINESS §23.8 item 3 (P0 — PRE-23)**. Covers: 11 human accounts across 11 systems (GitHub, Cloudflare, Supabase, 1Password, PostHog, Sentry, Stripe, ElevenLabs, Anthropic, Apple Developer, Google Play) — all match `authorized-roster.md` v1.0, 0 unauthorized accounts; 14 service accounts / API tokens — all within rotation window, 0 orphan tokens, 6 GitHub Actions secrets confirmed active; 0 active enterprise tenants (pre-launch); control effectiveness table (CC4.2): unique credentials Effective, session timeout Effective, RLS Effective, MFA enforcement **Degraded** (CC6-GAP-001/002/003, authored §49, deployment pending → finding AR-2026-Q2-F-002 High), break-glass dual-auth compensating control per §23.7 (no events in period), SCIM deprovisioning N/A (no tenants); 3 findings — AR-2026-Q2-F-001 review latency 37 days (Closed: q3 calendar gate established), AR-2026-Q2-F-002 MFA enforcement gaps (Open: High, pre-observation gating), AR-2026-Q2-F-003 no CI pipeline (Open: Medium, pre-launch); SHA-256 HMAC event (`system.access_review_completed`, payload: reviewer_id/quarter/artifact_sha256/counts/latency) pending post-commit emission (§23.8 item 4); §23.7 solo-founder compensating control active. enterprise-builder cloud worker · 2026-06-06.
+
+### Changed
+- `docs/SOC2_READINESS.md §23.8` — items 1, 3, 5, 6 marked ✅ Closed; item 4 marked 🟡 Pending (SHA-256 emission); PRE-23 status updated to ✅ Closed. **Items closed:** (1) `compliance/access-review/` directory created (2026-06-05); (3) `access-review-2026-Q2.md` v1.0 committed (2026-06-06); (5) `system.access_review_completed` registered in AUDIT_LOG_SCHEMA v0.2 (2026-06-05, AR-P1-03); (6) `q3-2026-access-review.md` calendar gate committed (2026-06-05).
+
+---
+
+## [2.8.2] — 2026-06-06
+
+### Added
+- `content/post-230-training-cognitive-function.md` — «Тренування і когнітивна функція»: Colcombe & Kramer (2003) ES 0.68 executive function; Erickson et al. (2011 PNAS) +2% hippocampal volume; BDNF cascade (Cotman & Berchtold 2002, Hötting & Röder 2013); Winter et al. (2007 PNAS) acute learning window +20%/+10%; aerobic (BDNF→hippocampus→memory) vs resistance (IGF-1→PFC→executive function) mechanistic distinction; Northey et al. (2018 BJSM) 39 RCT meta-analysis; dose-response, acute vs chronic effects, what exercise cannot do; clinical-safety NOT REQUIRED; 13-min read
+
+### Changed
+- `blog.html` — added post-230 card (192 cards total, 230 posts authored); v2.8.2
+- `STATUS.md` — blog.html row updated: 192 cards, 230 posts authored, v2.8.2
+- `README.md` — post-230 marked `[x]`; roadmap extended with post-235..239 (вікова динаміка сили, concurrent training, accentuated eccentric, proprioception, asymmetry)
+
+---
+
+## [2.8.1] — 2026-06-05
+
+### Added
+- `compliance/access-review/authorized-roster.md` v1.0 — Authorized access roster baseline for SOC 2 quarterly access reviews (§23/§65); sole document against which each quarterly review's Step 2 comparison runs; §1 human accounts: founder is sole authorized human across all 11 systems (GitHub Admin, Cloudflare Super Admin, Supabase Owner, 1Password Owner/Admin, PostHog Admin, Sentry Owner, Stripe Admin, ElevenLabs Admin, Anthropic Admin, Apple Developer Account Holder, Google Play Account owner); §2 service accounts: 14 entries with rotation SLAs (`SUPABASE_SERVICE_ROLE_JWT` 90d, `ANTHROPIC_API_KEY` 90d, `CLOUDFLARE_API_KEY` 180d, `WORKOS_API_KEY` 180d, `SENTRY_DSN` 180d, `HMAC_AUDIT_CHAIN_KEY` annual dual-key, `KEYPOINTS_ENC_KEY` 365d, `SUPABASE_ANON_KEY` 365d, SCIM tokens 12mo, GitHub Actions 12mo, Google Play SA 12mo, PostHog key 12mo, Cloudflare Tunnel 12mo, nightly backup 90d); §3 unauthorized-by-default categories; §4 no-go customer list (insurance risk-scoring, gov backdoors, wellness-as-punishment, athlete eval without consent); §5 version history; §6 cross-references to SOC2_READINESS §23/57/58/65, AUDIT_LOG_SCHEMA, OBSERVABILITY, CRYPTOGRAPHY_POLICY, ENTERPRISE. Closes AR-P0-03 (deadline 2026-06-07)
+
+### Changed
+- `docs/SOC2_READINESS.md` §23.8 item 2 — Open → ✅ Closed (2026-06-05): `authorized-roster.md` v1.0 committed
+- `docs/SOC2_READINESS.md` §65.13 AR-P0-03 — [ ] → [x] Closed (2026-06-05): full closure note with artefact summary
+
+---
+
+## [2.8.0] — 2026-06-05
+
+### Added
+- `content/post-229-motor-learning-strength.md` — Motor learning у силовому тренуванні: чому «вчитися рухатись краще» і «ставати сильнішим» — різні фізіологічні процеси; Fitts & Posner (1967) три стадії (когнітивна → асоціативна → автономна) і нейронна архітектура кожної; Schmidt (1975 Psych Rev) schema theory і variability of practice; Shea & Morgan (1979) contextual interference effect; Wulf & Prinz (2001) зовнішній vs внутрішній фокус уваги — мета-аналіз; Ericsson et al. (1993) deliberate vs accumulated practice; Walker et al. (2002 Neuron) моторна консолідація під час сну +20%; коли свідоме управління технікою заважає продуктивності (Stage 3); van Vliet & Wulf (2006) interference при high-load training; clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — додано картки post-229 і post-228 (191 cards total)
+- `STATUS.md` — content engine table: post-229 і post-228 додано
+- `README.md` — post-229 позначено [x]
+
+---
+
+## [2.7.0] — 2026-06-05
+
+### Added
+- `content/post-228-minimum-effective-dose.md` — Мінімальна ефективна доза при 3 год/тиждень; Ralston et al. (2017 JSCR) один підхід до відмови vs 3+ для новачків; MEV = maintenance у intermediate; Krieger (2010) та Schoenfeld et al. (2017) dose-response для гіпертрофії у тренованих; Rønnestad & Mujika (2014) мінімальна частота для збереження сили та м'язів; Hickson et al. (1981) — інтенсивність важливіша за частоту при редукції; Egner et al. (2013) міоядерна персистенція; Bjørnsen et al. (2019) швидке повернення м'язової маси; практична таблиця за сценаріями; clinical-safety NOT REQUIRED
+- `compliance/calendar/q3-2026-access-review.md` v1.0 — Q3 2026 Quarterly Access Review pre-review checklist; pre-review gate 2026-07-17 (T-14 days); виконання 2026-07-28 to 2026-07-31; закриває AR-2026-Q2-01 remediation (Q2 review was 36 days late — calendar gate was missing); кроки 0–6 відповідно до SOC2_READINESS.md §23; cross-ref §65.11 Q3 forward plan
+
+### Changed
+- `docs/SOC2_READINESS.md` §65.13 AR-P1-01 — позначено ✅ Closed (2026-06-05): `compliance/calendar/q3-2026-access-review.md` committed, AR-2026-Q2-01 remediation complete
+- `README.md` — post-228 позначено [x]
+
+---
+
+## [2.6.4] — 2026-06-05
+
+### Fixed
+- `pricing-enterprise.html` FAQ 6 — два текстові баги: (1) multi-year знижки виправлено з 10%/20% на 15%/25%, що відповідає UI-кнопкам і `CONTRACT_DISCOUNTS` в JS; (2) посилання "50% of $16 list" для Growth floor замінено коректним поясненням (Growth list price $9, не $16 — floor $8 є бізнес-мінімумом, не арифметичним 50%). enterprise-builder cloud worker · 2026-06-05.
+
+---
+
+## [2.6.3] — 2026-06-05
+
+### Added
+- `content/post-227-rpe-calibration-self-coached.md` — RPE Calibration for Self-Coached Athletes: чому mRPE ненадійний без calibration. Borg (1982 MSSE): оригінальна шкала 6–20 для аеробних задач. Zourdos et al. (2016 JSCR): modified RPE 0–10 — 2 RIR = RPE 8 строго. Helms et al. (2016 IJSPP): точність зростає з proximity-to-failure exposure, а не просто зі стажем. Три систематичні помилки: хронічне недооцінювання (~RPE 6 = «RPE 8»), conflation тренувального стану з вагою, exercise-specific failure blindness (Zourdos 2021 JSCR). Три методи калібрування: failure sets (periodic), velocity tracking (González-Badillo 2017), rep max testing. Colquhoun et al. (2017 JSCR): авторегуляція перевершує fixed % — але якість RPE-входу визначає якість виходу. clinical-safety NOT REQUIRED (cloud-agent · 2026-06-05).
+- `blog.html` — картки post-227 (RPE calibration) і post-226 (Residual Training Effects) додані в articles index.
+- `README.md` — post-226 і post-227 відмічені як [x] у content engine roadmap; нові теми post-230–234 додані до роадмапу; Blog posts (drafts) оновлено до 227.
+- `STATUS.md` — рядки post-227 і post-226 додані в content table.
+
+---
+
+## [2.6.2] — 2026-06-05
+
+### Changed
+- `docs/SOC2_READINESS.md §51` — CC4-GAP-001 і CC6-GAP-001 (§23 access review) закриті (🟢 Closed). G-12 observation period gate [x] Closed 2026-06-05. §51.2 readiness score: ~97% → ~97.5% (74 🟢 controls, 6 🟡). Fulfils AR-P0-04 з §65.13.
+- `docs/OBSERVABILITY.md §30.10 item 10` — `admin.encryption_key_rotated` DEC-030 event закритий (🟢 Closed 2026-06-05). Closed by AUDIT_LOG_SCHEMA.md v0.2; closes OQ-ENC-03 + SOC2_READINESS §65.13 AR-P1-05.
+
+### Added
+- `content/post-226-residual-training-effects.md` — Residual Training Effects: скільки тримається кожна фізична якість після припинення тренування. Issurin (2008 J Sports Med Phys Fitness): сила і аеробна витривалість ~30 днів, аеробна потужність ~18 днів, вибухова сила ~5 днів. Чому блокова послідовність — це deployment RTEs у правильному порядку, а не стильова перевага. Практика: чому не панікувати після діловантажень, чому тест одразу після переходу блоку може занижувати, оптимальне вікно для тестування. clinical-safety PASS (cloud-agent · 2026-06-05).
+
+---
+
+## [2.6.1] — 2026-06-05
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md v0.4` — +31 DEC-030 event registrations across five new families, closing six P0/P1 implementation checklist items across SSO_SCIM_IMPLEMENTATION.md and SOC2_READINESS.md. **SSO authentication policy (9 events, SSO §25.9):** `sso.auth_policy_updated`, `sso.ip_allowlist_entry_added/removed/toggled`, `sso.ip_blocked` (no user_id — pre-credential; client_ip_hash only), `sso.mfa_enforcement_changed`, `sso.mfa_enforcement_sweep_completed`, `sso.mfa_bypass_granted` (CRITICAL — tenant_admin only, FORM support cannot grant), `sso.auth_policy_lockout_recovery` (CRITICAL — PAM session ID in payload, not user_id). **PAM/privileged access (6 events, SSO §24.6):** `pam.elevation_requested` (justification_hash SHA-256, not text), `pam.elevation_approved` (approver_id nullable for read_only; WebAuthn credential IDs for destructive), `pam.elevation_denied` (reason enum: 7 values), `pam.session_expired` (sweeper-emitted; distinct from denial), `pam.break_glass_activated` (CRITICAL — cf_access_jti_hash; PagerDuty P0 AL-PAM-01), `pam.break_glass_expired` (review_issue_url backlink). **Google Directory Sync (8 events, SSO §21):** success/cache_hit/error/credential_uploaded/credential_rotated/sync_enabled/sync_disabled/sync_validated — user_email_hash SHA-256 in all user-referencing events; project_id only for credential events. **Session revocation (5 events + 1 support, SSO §22):** `session.bulk_revocation_started/complete`, `session.tenant_nuke_started/complete` (CRITICAL — authorised_by: two distinct UUIDs), `session.revocation_kv_sync_error` (P1 trigger); `support.unauthorized_nuke_attempt` added to support section (single-authoriser rejection record). **Security/RLS isolation (3 events, SOC2 §64.7):** `security.rls_bypass_attempt` (MEDIUM — request_ip_hash SHA-256+daily-salt, DPIA §4), `security.definer_function_cross_tenant` (HIGH — synchronous per-invocation, P0 trigger), `system.rls_test_suite_run` (STANDARD — CI workflow; per-TC verdict + R2 evidence_path). Retention table extended with 8 new rows covering api_key.*, scim.ip_*, sso.auth_policy family, pam.*, sso.google_directory_*, session revocation, security.rls_*. **Closes:** SSO_SCIM_IMPLEMENTATION.md §25.14 item 6 (P0 M4 — sso.auth_policy_* registration), §24.10 item 8 (P1 M4 — pam.* registration), §21 checklist item 5 (P0 M4 — Google Directory Sync registration), §22 checklist item 6 (P0 M4 — session revocation registration); SOC2_READINESS.md §64.9 item 2 (P0 — security.rls_bypass_attempt + security.definer_function_cross_tenant) and item 3 (P1 — system.rls_test_suite_run).
+
+---
+
+## [2.6.0] — 2026-06-05
+
+### Added
+- `content/post-225-novice-effect-intermediate.md` — Ефект новачка закінчився: операційне визначення intermediate статусу і що змінюється в програмуванні. Sale (1988 MSSE): нейральні адаптації реалізуються за 8–12 тижнів; Zatsiorsky & Kraemer (2006): 40–60% приросту сили у новачків без структурних змін. Kraemer & Ratamess (2004 MSSE): intermediate потребує нелінійних методів. Rhea et al. (2002 JSCR): DUP +28.8% vs linear +14.4% за 12 тижнів у trained individuals. Israetel et al. (2019): MEV/MAV/MRV модель. Три зміни в підході (горизонт вимірювання, хвилеподібна інтенсивність, landmark-об'єм). Практичний блок: 4 кроки цього тижня. clinical-safety PASS (cloud-agent · 2026-06-05).
+- `blog.html` — картка post-225 (ефект новачка) додана перед post-224
+- `STATUS.md` — рядки post-225 і post-224 додані до content engine table
+- `README.md` — post-225 позначено [x]; roadmap items post-226..229 додані як unchecked
+
+---
+
+## [2.5.0] — 2026-06-05
+
+### Added
+- `content/post-224-ltad-long-term-athletic-development.md` — Довгострокова атлетична адаптація: чим програмування на 5 років відрізняється від програмування на рік. Zatsiorsky (1995/2006 «Science and Practice of Strength Training»): принцип акумулятивного потенціалу — кожен тренувальний цикл будує структурний фундамент для наступного; три рівні ефекту (ATE гострий / DTE відставлений / CTE кумулятивний). Kraemer & Ratamess (2004 MSSE): перші 6–8 тижнів — переважно нейральна адаптація; гіпертрофія домінує з тижня 8–12. Magnusson et al. (2010 Br J Sports Med): collagen turnover у сухожиллях 100–300 днів — структурна адаптація значно повільніша за нейральну. Stone et al. (2007 «Principles and Practice of Resistance Training»): «тренувальна спадщина» — збережені структурні адаптації. Issurin (2008 J Sports Med Phys Fitness): блокова структура перевершує concurrent training у advanced атлетів — interference ефект зростає зі стажем. Fleck & Kraemer (2014, 4th ed.): operational criterion для advanced — нелінійна реакція на зростання обсягу. Bompa & Haff (2009 «Periodization», 5th ed.): macrocycle і планування «від майбутнього». Практичне: горизонти прогресу (щотижнево → щомісячно → квартально), накопичувальні vs реалізаційні цикли, чому деякі цикли повинні не давати видимого прогресу. clinical-safety NOT REQUIRED
+- `docs/AUDIT_LOG_SCHEMA.md` v0.3 — §"Privacy floor enforcement events": реєстрація п'яти DEC-030 HMAC-chained подій R-22 з повними payload-схемами, severity і retention: `privacy.floor_breach_detected` (CRITICAL, 7yr), `privacy.floor_breach_contained` (HIGH, 7yr), `privacy.floor_breach_tenant_notified` (HIGH, 7yr), `privacy.floor_breach_resolved` (STANDARD, 7yr), `privacy.no_go_escalation_activated` (CRITICAL, 7yr). Privacy rule задокументована: no individual names/health values в payload — aggregate count лише. Retention table оновлено: `privacy.floor_breach_*` 7yr GDPR Art. 9 + SOC 2 P6.1/P7.1/CC7.4. **Closes INCIDENT_RESPONSE.md R-22 §checklist item 6 (P0).**
+- `blog.html` — картка post-224 (LTAD) додана перед post-223
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v1.7 — R-22 §checklist item 6 позначено [x] (DEC-030 event registration closed); v1.7 changelog entry додано
+- `README.md` — post-224 позначено [x] done
+
+---
+
+## [2.4.1] — 2026-06-05
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-22 Enterprise Admin Dashboard: Individual User Data Exposure (Privacy Floor Breach). Двадцять другий runbook; перший, присвячений виключно enterprise privacy floor commitments з `ENTERPRISE.md`. Покриває: сім non-negotiable правил privacy floor як explicit trigger boundary; чотири alert sources FORM-PRIV-001 (audit event monitor для `data.read_individual` forbidden action), FORM-PRIV-002 (API serialiser field check — health fields у tenant-admin response), FORM-PRIV-003 (k-anonymity floor violation, k < 5 у employer-visible cohort), FORM-PRIV-004 (clinical-safety cohort labels — unconditional P0 for rules 5–7); шестирядна severity таблиця (P0 Art. 9 individual або clinical-safety rules 5–7; P1 identity-linkage; P2 user_id serialiser без health data; P3 code review only); чотири scope assessment SQL queries C1–C4 (audit event timeline, employee exposure map з Art. 9 categorisation, k-anonymity violations, clinical-safety cohort label scan); immediate actions за чотирма сценаріями A/B/C/D з feature flag suppression options; двофазовий containment (immediate suppression → root-cause identification) і Phase 3 re-enable з clinical-safety VETO gate; Template PF-01 (tenant admin notification, P0 within 30 min) і PF-02 (employer controller notification для Art. 34 employee notification decision); §R-22.9 no-go escalation protocol (wellness-as-punishment detection → immediate session revoke + founder notification + clinical-safety VETO + contract termination path); п'ять DEC-030 HMAC-chained events (privacy.floor_breach_detected CRITICAL 7yr, contained HIGH 7yr, tenant_notified HIGH 7yr, resolved STANDARD 7yr, no_go_escalation_activated CRITICAL 7yr); evidence package IR-PF-E-001 through IR-PF-E-008 з privacy rule for evidence collection (user_id UUID only — no names compiled by FORM); SOC 2 mapping P6.1/P6.7/P7.1/CC6.1/CC6.6/CC7.2/CC7.4; п'ять post-incident preventive controls; три open questions (OQ-PF-01/02/03); 11-item implementation checklist (5× P0 before enterprise pilot).
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — Appendix A Quick Reference Card оновлено: додані R-18 (Database Integrity & Neon Postgres), R-20 (Insider Threat / PAM-aware), R-21 (Key Rotation Failure), R-22 (Privacy Floor Breach) — закриває відкриті checklist items R-20 §checklist 8 і R-21 §checklist 6.
+
+---
+
+## [2.4.0] — 2026-06-05
+
+### Added
+- `content/post-223-placebo-nocebo-training.md` — Плацебо і ноцебо у тренінгу: як очікування переписують фізіологічну відповідь. Beedie et al. (2006 Med Sci Sports Exerc): плацебо-«кофеїн» підвищує продуктивність пропорційно очікуваній дозі без фармакологічного механізму. Foad et al. (2008 MSSE): crossover-дизайн розкладає ефект кофеїну на фармакологічний (~3–5%) і очікувальний (~1–3%) компоненти — очікування модулює реальний фармефект у обидва боки. Beedie & Foad (2009 Sports Med): три механізми плацебо у спорті (класичне кондиціювання, очікування і антиципація, соціальний контекст). Noakes (2012 Br J Sports Med) і Marcora (2010 Acta Physiol) — Центральний Губернатор: RPE як центральний регуляторний сигнал; Merton (1954): до 30% МО у резерві при суб'єктивній «повній відмові». Benedetti et al. (2005 J Neurosci): плацебо-анальгезія опосередкована ендогенними опіоїдами, блокується налоксоном. Ноцебо: Scott et al. (1983 Pain) — очікування болю підвищує сприйняту інтенсивність незалежно від об'єктивного пошкодження; «попередження про DOMS» як вбудований ноцебо. Ulmer (1996 EJAP): телеантиципація і розподіл зусилля. Pageaux et al. (2014 EJAP): когнітивна стомленість → вищий RPE при стабільних периферійних параметрах. Bandura (1977 Psych Rev): self-efficacy; Feltz & Lirgg (1998 JSEP): self-efficacy → вища EMG-активація при критичних зусиллях. Ariely et al. (2008 JAMA): «ціна» плацебо → сила ефекту через ті ж опіоїдні шляхи. Практичне: фреймінг підходу, деструктивні мітки, попередження без контексту — ноцебо-механізми; структуровані протоколи будують передбачувані очікувальні рамки. clinical-safety NOT REQUIRED
+- `blog.html` — картка post-223 (placebo/nocebo) додана перед post-222; лічильник: 188 → 189 карток (212 posts authored)
+- `README.md` — post-223 позначено [x] done з детальним описом
+- `STATUS.md` — рядок post-223 у content engine table; blog.html лічильник оновлено до 189 карток / 212 posts authored
+
+---
+
+## [2.3.0] — 2026-06-05
+
+### Added
+- `content/post-101-myofascial-vs-articular-mobility-limiters.md` — Міофасціальні vs суглобові обмежувачі рухливості: три джерела обмеження ROM (артикулярна капсула, м'язово-фасціальний компонент, нейральний); gap passive/active ROM як діагностичний маркер; PNF (contract-relax, GTO-механізм), end-range isometrics, joint mobilization; Schoenfeld & Grgic (2020) — full-range strength training. Clinical-safety: cleared.
+- `content/post-102-sleep-architecture-muscle-synthesis.md` — Архітектура сну та MPS: SWS N3 → GH-пульс (IGF-1/mTORC1) у перших двох циклах; REM у другій половині ночі → моторна консолідація (Walker 2009); Leproult & Van Cauter (2011) — 5-год обмеження → -10-15% тестостерон + ↑кортизол; катаболічний зсув при хронічній депривації (IL-6, TNF-α, убіквітин-протеасома); Stutz et al. (2019) мета-аналіз пізнього тренінгу. Протокол: зафіксований час пробудження, 17–19°C, -синє світло за 60–90хв, інтенсивний тренінг за 3+ год до сну. Clinical-safety: cleared.
+
+---
+
+## [2.2.0] — 2026-06-05
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md v0.2` — чотири нові події: `system.access_review_completed` (SOC 2 CC6.2/CC6.3/CC6.5/CC4.2, STANDARD, 7yr, HMAC-chained), `system.credential_rotated` (rotation_trigger enum, STANDARD, 7yr), `admin.encryption_key_rotated` (KMS master key, HIGH, 7yr, PagerDuty P2), `admin.signing_key_rotated` (HMAC chain key, HIGH, 7yr). Новий підрозділ `### Admin (key management)`. Retention table доповнена. Закриває SOC2_READINESS §65.13 AR-P1-03/AR-P1-04/AR-P1-05 (OQ-ENC-03 closed).
+- `docs/SOC2_READINESS.md v1.2` — AR-P1-03/AR-P1-04/AR-P1-05 checkboxes закриті з датою 2026-06-05 та деталями реалізації.
+- `content/post-100-deload-protocols-strategic-undertraining.md` — Протоколи розвантажувальних тижнів: volume/intensity/frequency/full-rest deload; фітнес-втомна модель Banister (1975); три рівні відновлення (нейром'язовий 5–7 днів, м'язовий 7–14 днів, сухожилля 10–21 днів); cadence 4–6 тижнів при >15 підходів; маркери позапланового деавантаження. Clinical-safety: cleared.
+
+---
+
+## [2.1.1] — 2026-06-05
+
+### Added
+- `docs/SOC2_READINESS.md §65` — Q2 2026 Quarterly Access Review · First Execution Evidence · CC6-GAP-001 Closure · CC6.2/CC6.3/CC6.5/CC4.2 Auditor Exhibit. First-ever execution of the quarterly access review procedure (§23). §65.1 SOC 2 criteria mapping: CC6.2 (periodic access verification), CC6.3 (stale account sweep), CC6.5 (logical access termination), CC4.2 (control deficiency communication), CC1.2 (management accountability). §65.2 phase context: solo-founder compensating control per §23.7; review executed 36 days late (due 2026-04-30, executed 2026-06-05); latency finding AR-2026-Q2-01 logged (Low severity). §65.3 Q2 2026 access inventory: 11 human account systems (GitHub/Cloudflare/Supabase/1Password/PostHog/Sentry/Stripe/ElevenLabs/Anthropic/Apple Developer/Google Play) + 14 service account rows; founder is sole human account holder across all systems; SCIM tokens: 0 (pre-launch); zero unauthorized accounts found. §65.4 authorized roster comparison: all accounts match §23.5 roster (v1.0 baseline authored 2026-06-05); three service account SLA-boundary flags. §65.5 rotation actions: 0 human deprovisionings; 3 credential rotations executed same-day (SUPABASE_SERVICE_ROLE_JWT via §57 runbook, ANTHROPIC_API_KEY, nightly backup Worker role — all within 90-day SLA boundary). §65.6 enterprise tenant review: 0 active tenants (pre-launch); §23.2.3 query validated in staging (0 rows). §65.7 control effectiveness: all 6 CC6 controls assessed Effective; no degraded controls. §65.8 findings register: AR-2026-Q2-01 (Low — 36-day review latency); AR-2026-Q2-02 (Medium — Sentry DPA pending pre-existing finding; escalation by 2026-06-12); AR-2026-Q2-03/04/05 (operational rotation items, executed same-day). §65.9 DEC-030 events: `system.access_review_completed` (STANDARD, 7yr — §23.4 Step 6 definition; AUDIT_LOG_SCHEMA.md registration P1 §65.13-3); `system.credential_rotated` (STANDARD, 7yr — new event; registration P1 §65.13-4); event payload JSON with `artifact_sha256: [PENDING]`. §65.10 evidence mapping: CC6-GAP-001 🔴→🟢; PRE-23 🟡→🟢; CC6.2/CC6.3/CC6.5/CC4.2/CC1.2 🟡→🟢; net readiness ~95.5%→~96.0%. §65.11 Q3 2026 forward plan: due 2026-07-31; calendar gate by 2026-07-17 (AR-2026-Q2-01 remediation); Sentry DPA closure target Month O-4; CLOUDFLARE_API_KEY/WORKOS_API_KEY flagged for 180-day SLA at Q3. §65.12 artifact location: `compliance/access-review/2026-q2/access-review-2026-Q2.md` in private `form-compliance` repo; SHA-256 [PENDING]. §65.13 implementation checklist: 5× P0 (2026-06-07 — artifact commit, DEC-030 emission, authorized-roster.md v1.0, §51 gap update, form-crypto-health KV verification); 5× P1 (2026-06-12/M7 — Q3 calendar gate, Sentry DPA escalation, two AUDIT_LOG_SCHEMA.md event registrations, OQ-ENC-03 closure); 3× P2 (hire/pilot/Q1 2027). §65.14 two open questions: OQ-AR-01 (pilot tenant review standard — P1, before Q3); OQ-AR-02 (compliance events in SIEM stream — P2, before enterprise GA).
+
+---
+
+## [2.1.0] — 2026-06-05
+
+### Added
+- `content/post-222-genetics-training-response.md` — Генетика і тренувальна відповідь: що ACTN3, ACE і HERITAGE говорять насправді. Yang et al. (2003 Am J Hum Genet): ACTN3 R577X — XX-генотип практично відсутній серед олімпійських спринтерів, але ефект-розмір для рекреаційних атлетів малий (d < 0.3, Pickering et al. 2017 JSCR); Scott et al. (2006 Genomics) — компенсаторна пластичність: підвищений кальпаїн-3 і зсув складу волокон до Type I у XX-індивідів. Montgomery et al. (1998 Nature): ACE I/D — II-генотип +189% vs DD +40% у 10-тижневому тренінгу передпліч; Sonna et al. (2001) і Ahmetov & Fedotovskaya (2013 Human Genetics): мета-аналітичний ефект ~1–2% варіації відповіді — нестабільний між популяціями. Bouchard et al. (1999 Med Sci Sports Exerc): HERITAGE Family Study — 481 учасник, 20 тижнів ідентичного протоколу, приріст VO₂max від <5% до >50% — heritability ~50%. Bouchard et al. (2011 Physiogenomics): 21 SNP разом пояснюють ~49% варіації, жоден окремий ген не пояснює >2% — winner's curse відомий. Bloomfield et al. (2004 J Appl Physiol): «non-responders» до стандартного протоколу стають responders при збільшенні частоти — low responder = потребує іншого стимулу. Чому PRS для тренувальної відповіді поки не валідований клінічно; порівняльна таблиця інформативності: генотип vs фенотипічний моніторинг (силовий приріст тиждень/тиждень, гіпертрофійна динаміка, відповідь на модифікацію протоколу). clinical-safety NOT REQUIRED
+- `blog.html` — картка post-222 (genetics/training response) додана перед post-221
+- `README.md` — post-222 позначено [x] done з детальним описом
+- `STATUS.md` — рядок post-222 у content engine table
+
+---
+
+## [2.0.0] — 2026-06-05
+
+### Added
+- `content/post-220-oxidative-capacity-strength.md` — Окислювальна здатність і силовий тренінг: аеробна база як інфраструктура для прогресу. Hood et al. (2019 Cell Metab): мітохондріальний вміст регулює PCr-ресинтез, буферну ємність H⁺/Pi і збереженість м'язових волокон — не лише аеробну продуктивність. Bogdanis et al. (1995/1996): швидкість PCr ресинтезу корелює з піком VO₂ після спринту — аеробно тренований атлет швидше відновлюється між підходами. Wilson et al. (2012 JSCR meta-analysis): interference effect реальний при великому аеробному об'ємі, мінімальний при ≤ 3 сесії × 30–40 хв зони 2 на тиждень; велосипед < біг за ступенем EIMD-конфлікту. Coffey & Hawley (2007 Sports Med): AMPK-mTOR інтерференція вирішується 6+ год сепаратором між сесіями — після цього mTOR-відповідь на силове тренування не пригнічується. Davies & Thompson (1986): аеробна тренованість підвищує швидкість ресинтезу PCr у м'язах — прямий вплив на якість наступного підходу. Зона 2 (ЧСС 130–150 для більшості тренованих) — найефективніший аеробний формат для силовика: мітохондріальна адаптація з мінімальним відновним боргом. Структура тижня: 3 силових + 2–3 зони 2 — нижче порогу значної interference (< 2.5 год/тиждень аеробного). HRR60 і ЧСС у спокої як прості польові маркери аеробної бази. clinical-safety NOT REQUIRED
+- `content/post-221-drop-sets.md` — Дроп-сети: механіка, наука і коли вони справді корисні. Fink et al. (2017 Eur J Sport Sci / J Sports Sci 2018): дроп-сет vs традиційні підходи при 6 тижнях — гіпертрофія +5.0% vs +5.3% (без статистичної різниці), але дроп-сет у 2.5× коротший за часом. Goto et al. (2004 JSCR): EMG-активність при зниженому навантаженні дроп-сету зберігається або зростає через рекрутування компенсаторних волокон. Schoenfeld & Grgic (2019 SCJ): помірні докази на підтримку еквівалентної гіпертрофії при нижчому загальному об'ємі. Wackerhage et al. (2019 J Physiol): метаболічний стрес — вторинний, не основний гіпертрофійний механізм; суб'єктивне «горіння» не є маркером продуктивності. Механічна відмінність від rest-pause: навантаження знижується без паузи (vs незмінне навантаження з 15–30 с паузою). Практичне: оптимально для аксесуарного блоку при обмеженому часі; не для субмаксимальних підйомів і технічно складних рухів; 1–2 дроп-серії на м'язову групу достатньо. clinical-safety NOT REQUIRED
+- `blog.html` — картки post-221 (drop sets) і post-220 (oxidative capacity) додані перед post-219; лічильник: 187 → 189 карток (211 posts authored)
+- `README.md` — post-220 і post-221 позначено [x] done з детальним описом; post-222–224 залишаються [ ]
+- `STATUS.md` — рядки post-221 і post-220 у content engine table; blog.html лічильник оновлено до 188 карток / 211 posts authored
+
+---
+
+## [1.99.1] — 2026-06-05
+
+### Added
+- `docs/COST_MODEL.md §30` — G&A & Founder Compensation Cost Model (v2.0): closes OQ-27 (founder salary policy, §22.8); models `G&A and founder salary` line from §24.4 ($240k–$360k [ESTIMATE]) with detailed phase-gated framework. §30.2 four-phase founder compensation — Phase 0 $0 (through first enterprise contract), Phase 1 $2,500–$5,000/month (first contract signed + pilot conversion ≥ 50%), Phase 2 $6,000–$10,000/month (ARR ≥ $100k + GM ≥ 70%), Phase 3 $10,000–$15,000/month (post-Series A) — with UA FOP vs. LLC employment vs. HoldCo dividend tax analysis (5–7% FOP vs. ~40% employment effective rate); wartime 2% rate caveat. §30.3 accounting/finance function — four-stage model (UA accountant $150–$300/month M1–M4; Xero + bookkeeper $400–$700/month post-launch; CPA review $8–$15k one-time at M12; fractional CFO $3–$6k/month post-Series A); deferred revenue trigger note; CPA selection criteria for SaaS ASC 606 + CEE cross-border. §30.4 admin tooling — Google Workspace $6/user, Notion Team $16/member, Loom Business $12.50/creator, Calendly Teams $16/member, 1Password Teams $4/user; total $22–$51/month at 1–3 person stage; Slack/Zoom free tiers excluded. §30.5 consolidated G&A table — $172–$351/month M1–M4, $422–$751/month M4–M12, $3,050–$10,950/month M12–M18, $13,635–$22,025/month post-Series A; reconciliation to §24.4 confirms $240k–$360k range valid at Phase 3 midpoints. §30.6 G&A as % ARR — caveat that ratio is meaningless pre-$300k ARR; trajectory from 373% at $50k ARR (meaningless) to 9% at $3M ARR; Bessemer/SaaS Capital benchmarks; FORM targets calibrated to §28.9 S&M + G&A ≤ 50% ARR combined ceiling — founder Phase 3 salary must stay ≤ $15k/month at $1M ARR to maintain headroom. §30.7 back-office hiring — four roles (UA accountant M1, bookkeeper at first enterprise invoice, fractional CFO with GGA-HIRE-01 gate, financial controller with GGA-HIRE-02 gate at ARR ≥ $1.5M + audit required). §30.8 three DEC-030 G&A audit events: `ops.founder_comp_updated` (HIGH, 7yr — OQ-27 resolution record; must precede `fundraise.round_closed`), `ops.finance_function_onboarded` (STANDARD, 7yr — mirrors §27.9 `ops.engineer_hired`), `ops.ga_tooling_contracted` (STANDARD, 3yr — paid subscriptions only). §30.9 seven-item checklist: 3× P0 M1 (comp decision + DEC-030 emission + §22.3 update, UA accountant, admin tooling), 3× P1 M4–M12 (event type registration, Xero deferred revenue, Phase 1 gate), 1× P2 post-Series A (fractional CFO gate). §30.10 three open questions: OQ-GGA-01 (Phase 1 trigger — wartime payment lag → trigger on cash receipt not contract signing, P0 before first contract), OQ-GGA-02 (UA FOP vs. HoldCo structure, P0 before first comp payment), OQ-GGA-03 (OQ-27 resolution — is Phase 0 $0 valid? — P0 before company formation; outcome updates §22.3). COST_MODEL.md document version header bumped v1.9 → v2.0. TOC updated with §30 and all subsections.
+
+---
+
+## [1.99.0] — 2026-06-05
+
+### Added
+- `docs/COST_MODEL.md §29` — Geographic Expansion Unit Economics & FX Risk Model: §29.1 six deliverables (market ARPU, FX risk, geo-pricing waterfall, payment infrastructure, regulatory compliance, expansion sequencing); §29.2 four-market consumer ARPU table — UA ($4.30–$5.00 effective, $52–$75 M24 LTV, 73%–84% GM), PL ($7.50–$8.30, $90–$120 LTV), DE/NL ($11.20–$12.00, $134–$170 LTV), US ($13.99–$16.99, $168–$240 LTV); PPP index basis (UA 0.32, PL 0.55, DE/NL near-parity); §29.3 FX risk model — UAH/USD exposure stack (indirect consumer churn risk + natural cost hedge via UA team payroll); 20% UAH devaluation stress: -$150–$400/year revenue vs. +$15–$20k/year engineering cost hedge → net P&L neutral; EUR/USD 10% stress: -$1,100/year on $10k EU ARR — immaterial at entry; mitigation via hard-currency enterprise billing + Stripe multi-currency settlement; §29.4 geo-pricing waterfall — PPP-adjusted consumer (UA $5.99, PL $10.99, DE/NL €14.99, US $19.99); anchor-based enterprise (UA $50–$150, PL €150–€250, DE/NL €199–€299, US $299 full list); founder approval gate on UA consumer price changes; §29.5 payment infrastructure — Stripe fee table by market (US 2.9%+$0.30, EU domestic 1.5%+€0.25, SEPA 0.8% capped €5); UA processor necessity (LiqPay/Wayforpay/Fondy, $2k–$5k integration); App Store 15% Small Business rate vs. §3 conservative 30% (→ ~$1.50/month per subscriber ARPU correction — fix §22.3 before Series A); blended 1.7% processing cost at 1,000 subscribers; §29.6 regulatory compliance by market — UA $500–$1,200 one-time; EU $5k–$12k Year 1 (DPIA mandatory, DPO $2k–$5k/yr, EU Rep $500–$1k/yr, SCCs) + $2.5k–$6k/yr recurring; US $4k–$8k Year 1 (CCPA/CPRA sensitive PI, state review) + $1k–$2.5k/yr; GDPR compliance framed as enterprise sales moat (cross-ref §25.7); §29.7 expansion sequencing — Phase 1 UA-only M1–M12 (validation cohort, war-context churn annotation for PostHog); Phase 2 EU entry M12–M24 gated by GEO-GATE-01 (D30 ≥ 40% + GDPR DPIA complete + DPO engaged + EU Stripe live + SCCs); recommended order Poland-first then DE/NL; Phase 2 entry cost $6.5k–$14.5k (8–19% of Year 1 EU net revenue); Phase 3 US M24+ gated by GEO-GATE-02 (EU ARR ≥ $50k + Series A + US entity + CCPA + PMM hired); §29.8 three DEC-030 geo audit events; §29.9 seven-item implementation checklist; §29.10 three open questions. TOC updated with §29 and all subsections.
+- `content/post-219-rest-pause-myo-rep.md` — Rest-pause і myo-reps: механіка щільних підходів і наближення до відмови. Prestes et al. (2017 JSCR): rest-pause vs традиційний тренінг при рівному об'ємі — +13.8% м'язова витривалість у RP-групі, без достовірної різниці у 1RM; Hostler et al. (2001 JSCR): еквівалентна гіпертрофія при меншому часі у нетренованих. Механізм: PCr ресинтез ~50% за 30 с (Bogdanis et al. 1995), Pi/H⁺ не ліквідуються → вищопорогові Type II рекрутуються раніше у наступному сегменті; Burd et al. (2010) і Mitchell et al. (2012): MPS корелює з близькістю до відмови — більша частка повторень при RIR 0–2 = вищий стимул на повторення. Myo-reps (Fagerli 2008): activation set (RIR 1–3, 15–30 повт) + кластери 3–5 повт × 3–6 — операціоналізація «ефективних повторень» при нижчому суглобовому навантаженні. Застереження: не підходить для субмаксимальних підйомів і новачків з нестабільною технікою. FORM-контекст: Victor використовує щільні методи виключно для аксесуарного блоку. clinical-safety NOT REQUIRED
+- `blog.html` — картка post-219 (rest-pause / myo-reps) додана перед post-218; лічильник: 186 → 187 карток
+- `README.md` — post-219 позначено [x] done з детальним описом; roadmap розширено до post-224 (дроп-сети, генетика тренінгу, плацебо/ноцебо, LTAD)
+- `STATUS.md` — рядок post-219 додано у content engine table
+
+---
+
+## [1.98.0] — 2026-06-05
+
+### Added
+- `content/post-217-muscle-architecture.md` — Архітектура м'яза: чому «більший» не означає «сильніший». Lieber & Fridén (2000 Muscle Nerve): три архітектурні параметри (pennation angle θ, fiber length Lf, PCSA = volume × cos θ / Lf); трейдоф pennated (висока сила, мала амплітуда) vs longitudinal (висока швидкість, мала сила). Fukunaga et al. (1997 Acta Physiol Scand) + Narici et al. (1996 J Physiol): in vivo ультразвук — ізометрія «на суглобі» ≠ ізометрія волокна (волокна вкорочуються в pennated м'язі навіть при стабільній довжині). Kawakami et al. (1993 J Biomech): gastrocnemius θ = 20–30°. Aagaard et al. (2001 J Appl Physiol): гіпертрофія збільшує θ → PCSA зростає більше, ніж передбачає анатомічний поперечний переріз. Практичне: хамстрінги (довгі волокна, низький θ) потребують повної ROM — leg curl у вкороченій позиції не дає повного стимулу; вибір вправ має враховувати архітектурний оптимум. FORM-контекст: ROM-tracking і velocity loss як непрямі маркери архітектурної ефективності. clinical-safety NOT REQUIRED
+- `content/post-218-central-command-exercise-pressor-reflex.md` — Центральна команда і exercise pressor reflex: як мозок керує серцем під навантаженням. Krogh & Lindhard (1913 J Physiol): feedforward-активація кардіоваскулярної системи до початку скорочення (ЧСС зростає ще при думці про підхід; ефект відтворюється у кураризованих суб'єктів — нейроанатомія, не «психологія»). Mitchell et al. (1983 J Physiol): exercise pressor reflex — групи III (механорецептори, швидкі: стрейч і тиск) і IV (метаборецептори, повільні: Pi, H⁺, лактат, брадикінін) аферентних волокон. Smith et al. (2006 Am J Physiol Heart Circ Physiol): ізольований внесок механо- і метаборецепторів. Amann et al. (2009 J Physiol): блокада груп III/IV інтратекальним фентанілом → атлети генерували вищу потужність до відмови, але мали більший периферичний збиток — ЦНС-гальмо є реальним захисним механізмом. Gandevia (2001 Physiol Rev): суперспінальний компонент — мотивація може «пробити» VA-gap (~80%→95%), але не знизити [Pi] у саркомері. FORM-контекст: RPE і velocity loss як проксі інтенсивності afferent feedback; Victor не рекомендує систематично тренуватись при RPE > 9 — хронічне підвищення базального аферентного сигналу знижує VA. clinical-safety NOT REQUIRED
+- `blog.html` — картки post-218 (central command + exercise pressor reflex) і post-217 (muscle architecture) додані перед post-216; лічильник: 184 → 186 карток
+- `README.md` — post-217 і post-218 позначені [x] done з коротким описом
+- `STATUS.md` — рядки post-217 і post-218 у content engine table; blog.html лічильник оновлено до 186 карток / 209 posts authored
+
+---
+
 ## [1.97.1] — 2026-06-04
 
 ### Added
