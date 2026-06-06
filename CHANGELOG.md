@@ -6,6 +6,14 @@
 
 ---
 
+## [2.43.0] — 2026-06-06
+
+### Added
+- `docs/SECURITY_QUESTIONNAIRE.md` — Pre-filled CAIQ Lite (all 16 CSA domains: AIS, AAC, BCR, CCC, DSP, DCS, EKM, GRC, HRS, IAM, IVS, IPY, LOG, SEF, STA, TVM) + §2 extended enterprise DDQ sections (data residency, Privacy Floor non-negotiables, incident SLAs per tier, compliance status matrix, evidence package index). Source document for the security questionnaire hub referenced in `security.html`. All answers grounded in `docs/SOC2_READINESS.md`, `docs/CRYPTOGRAPHY_POLICY.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 HMAC chain), `docs/SUBPROCESSORS.md`, `docs/INCIDENT_RESPONSE.md`, `docs/DATA_MODEL.md`, `docs/ENTERPRISE.md`. Privacy Floor and no-go customer policy (insurance risk-scoring, government backdoors, wellness-as-punishment) explicitly stated as per `docs/ENTERPRISE.md`. SOC 2 Type II status accurately disclosed as in-progress (Q1 2027 target). Evidence artefact ID: SQ-E-001. security-engineer + compliance-officer.
+- `VERSION` → 2.43.0
+
+---
+
 ## [2.42.0] — 2026-06-06
 
 ### Added
