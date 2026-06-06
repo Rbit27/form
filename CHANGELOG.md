@@ -6,6 +6,19 @@
 
 ---
 
+## [2.10.0] — 2026-06-06
+
+### Added
+- `content/post-231-functional-training-fuzzy-category.md` — «Чому "functional training" — розмита категорія»: SAID principle як фундаментальна суперечність маркетинговому "functional"; Behm & Colado (2012 JSCR) — нестабільна поверхня знижує force output без компенсаторного рекрутування prime movers; Behm & Anderson (2006 JSCR) — core EMG підвищується, але prime movers отримують менший стимул; Willardson (2007 JSCR) instability continuum; Barnett et al. (2002) — transfer general→specific слабкий в обидві сторони; Kibler et al. (2006 Sports Med) — реабілітаційний vs performance-контекст; де нестабільність виправдана (лижний спорт, серфінг, боротьба, пост-травматична реабілітація); clinical-safety NOT REQUIRED; 13-хв читання
+- `content/post-232-taper-mechanics-non-professional.md` — «Механіка тапера для непрофесіонального атлета»: fitness-fatigue model (Banister 1975) — fatigue half-life 9–13 днів vs fitness 30–42 дні; Mujika & Padilla (2000 Sports Med) — оптимальне зниження об'єму 41–60% при збереженні інтенсивності і частоти; Bosquet et al. (2007 M&SSE) мета-аналіз 27 досліджень n=182 — +2.8% продуктивність, оптимальна тривалість 2 тижні; Shepley et al. (1992 JAP) — low-volume high-intensity taper superior; Zarkadas et al. (1995) глікогенна суперкомпенсація; Houmard & Johns (1994) — VO2max зберігається до 15 днів; три змінні тапера (об'єм/інтенсивність/частота); що робити з GPP; clinical-safety NOT REQUIRED; 12-хв читання
+
+### Changed
+- `blog.html` — додано картки post-231 і post-232 (194 картки, 232 пости authored); v2.10.0
+- `README.md` — post-231 і post-232 позначені `[x]`; v2.10.0
+- `STATUS.md` — blog.html рядок оновлено: 194 картки, 232 пости authored; v2.10.0
+
+---
+
 ## [2.9.0] — 2026-06-06
 
 ### Added
