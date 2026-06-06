@@ -6,6 +6,18 @@
 
 ---
 
+## [2.22.0] — 2026-06-06
+
+### Added
+- `content/post-243-training-log-diagnostic.md` — Тренувальний журнал як діагностичний інструмент; мінімально достатній формат лог-запису; RPE-drift як early warning signal (Zourdos et al. 2016 JSCR); intra/inter-session моніторинг; sRPE-навантаження (Foster et al. 2001 JSCR); load-volume tracking по м'язових групах з орієнтирами (Schoenfeld 2017, Helms 2016); 6 типових помилок (over-logging, under-logging, непослідовні метрики, відсутність контексту відновлення, ретроспективний запис, відсутність аналізу); алгоритм читання тренду; пряма позиція: журнал ≠ мотиваційний щоденник; clinical-safety NOT REQUIRED
+- `content/post-244-limited-equipment-training.md` — Тренування при обмеженому обладнанні; SAID principle як єдиний критерій вибору замінника; функціональна класифікація 5 рухових патернів (push/pull/hinge/squat/carry); таблиця відповідності штанга→гантелі→власна вага; механіка збереження стимулу через proximity to failure (Schoenfeld et al. 2017, Mitchell et al. 2012); Kubo et al. (2021) — межі bodyweight для тренованих атлетів; 5-кроковий алгоритм вибору замінника; 5 типових помилок домашнього тренування; 4 механізми прогресії без збільшення ваги (варіація, темп, RIR, пауза у розтягнуті); clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — позначено post-240..244 як [x] виконані
+- `VERSION` → 2.22.0
+
+---
+
 ## [2.21.0] — 2026-06-06
 
 ### Added
