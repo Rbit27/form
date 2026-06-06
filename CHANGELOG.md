@@ -6,6 +6,15 @@
 
 ---
 
+## [2.32.0] — 2026-06-06
+
+### Added
+- `content/post-254-explosive-strength-hypertrophy-compatibility.md` — "Вибухова сила і гіпертрофія — чи сумісні?". Frost, Cronin & Newton (2016 J Strength Cond Res): балістична vs повільна група — гіпертрофія -50% у балістичній, RFD +22% vs +7%; Newton et al. (1996 J Appl Physiol): EMG-профіль балістичних і контрольованих рухів — різний час і характер рекрутування Type II волокон; Tillin & Bishop (2009 Sports Med): RFD переважно нейральний, а не структурний; Alegre et al. (2006 Eur J Appl Physiol): архітектурні адаптації (fascicle length vs pennation angle) при різних типах тренінгу; Cormie, McGuigan & Newton (2011 Sports Med): plyometrics у гіпертрофійному блоці без interference ефекту за умов управління об'ємом; PAP (post-activation potentiation): contrast sets 85% 1RM + box jump, +4–9% peak power (Robbins 2005, Seitz & Mitchell 2014); блокова структура гіпертрофія → сила → потужність. sports-scientist + brand-voice. clinical_safety: NOT REQUIRED.
+- `content/post-255-mental-fatigue-physical-performance.md` — "Ментальна втома і фізична продуктивність". Marcora, Staiano & Manning (2009 J Appl Physiol): AX-CPT × велоергометр — -15.3% витривалості при тому самому RPE, без різниці ЧСС/лактату; психобіологічна модель Marcora (2008): RPE = інтегральна оцінка мозку, а не прямий сигнал м'язів — prefrontal ресурс знижений → RPE вищий при тому самому зусиллі; Pageaux & Lepers (2018 Sports Med) огляд 22 досліджень: ізометрична витривалість -12–18%, peak MVC — мінімальний вплив, технічні рухи — значний вплив; Wiehler et al. (2022 Current Biology): glutamate accumulation у lateral PFC після 6+ годин когнітивної роботи; Boksem & Tops (2008): нейронні кореляти — dlPFC активність ↓, аденозин ↑; кофеїн (Beedie & Foad 2009, Ganio et al. 2011): часткове відновлення -15% → -7%; адаптована матриця тренінгу при ментальній стомленості (об'єм -20%, RIR +1, паузи +60 с). sports-scientist + brand-voice. clinical_safety: NOT REQUIRED.
+- `VERSION` → 2.32.0
+
+---
+
 ## [2.31.0] — 2026-06-06
 
 ### Added
