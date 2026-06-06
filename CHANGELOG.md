@@ -6,6 +6,17 @@
 
 ---
 
+## [2.42.0] — 2026-06-06
+
+### Added
+- `content/post-266-strength-plateau-diagnosis.md` — editorial-brutalist post (13 хв): операційна діагностика тренувального плато для intermediate атлета. Три причини плато (акомодація до стимулу, накопичена втома, дефіцит специфічного об'єму) і три відповідні виходи. Zatsiorsky & Kraemer (2006): принцип акомодації. Rhea et al. (2002 JSCR): DUP +28.8% vs linear +14.4%. Bosquet et al. (2007 JSCR): tapering +2–3% без змін програми. Rutherford & Jones (1986 J Appl Physiol): нейральна специфічність вправи. Banister (1975) fitness-fatigue model. Meeusen et al. (2013 EJSS): збільшення навантаження не виходить із хронічного дисбалансу. Практичний протокол 4 тижні. clinical-safety PASS. sports-scientist pending.
+- `blog.html` — картка для post-266 додана (240 карток, 266 постів авторовано). data-cat="training".
+- `README.md` — roadmap: post-266 позначено [x]; додані 4 нові теми [  ] post-267–270 з описами і clinical-safety нотатками.
+- `STATUS.md` — версія → 2.42.0; blog.html 239→240 карток, 265→266 постів авторовано; рядок для post-266 у content engine table.
+- `VERSION` → 2.42.0
+
+---
+
 ## [2.41.0] — 2026-06-06
 
 ### Added
