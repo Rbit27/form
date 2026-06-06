@@ -6,6 +6,18 @@
 
 ---
 
+## [2.14.0] — 2026-06-06
+
+### Added
+- `content/post-236-concurrent-training-no-interference.md` — «Concurrent training без interference»: Hickson (1980 J Physiol) оригінальний interference effect при 6+6 сесіях; Coffey & Hawley (2007 Eur J Sport Sci) молекулярний механізм AMPK→TSC2/raptor→mTORC1 пригнічення, conflict window ≈ 6 год; Wilson et al. (2012 JSCR) мета-аналіз 21 RCT 828 учасників — interference незначимий при ≤3 кардіо/тиждень, велосипед краще бігу, розподіл 6+ год або окремі дні; Hood et al. (2019 Cell Metab) аеробна база і PCr-ресинтез між підходами; практичне програмування за трьома пріоритетами. clinical-safety NOT REQUIRED.
+- `blog.html` — картка Post 236 додана до grid
+
+### Changed
+- `README.md` — статистики оновлено: «233+» → «235+ evidence-based blog posts»; roadmap post-236 позначено [x]
+- `VERSION` — 2.13.0 → 2.14.0
+
+---
+
 ## [2.13.0] — 2026-06-06
 
 ### Added
