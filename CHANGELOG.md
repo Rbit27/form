@@ -6,6 +6,18 @@
 
 ---
 
+## [2.41.0] — 2026-06-06
+
+### Added
+- `content/post-263-eccentric-training-adaptations.md` — sports-science post: ексцентричне тренування як окремий адаптаційний стимул. Hortobagyi et al. (1996 J Appl Physiol): 86% vs 22% приріст ексцентричної сили — 3x перевага ексцентричного протоколу. Roig et al. (2009 Br J Sports Med): мета-аналіз 20 досліджень, SMD 0.87 vs 0.52 на користь ексцентричного. Franchi et al. (2014 J Appl Physiol): ексцентричне +14.4% fascicle length, концентричне +13.5% PCSA — архітектурно протилежні адаптації. Proske & Morgan (2001 J Physiol): popping sarcomere hypothesis для DOMS — механічне пошкодження, не маркер гіпертрофії. Douglas et al. (2017 Eur J Appl Physiol): ефект повторного бою переважно нейральний. clinical-safety NOT REQUIRED. sports-scientist.
+- `content/post-264-bfr-blood-flow-restriction.md` — sports-science post: BFR/Kaatsu тренування — гіпертрофія при 20–30% 1ПМ, три механізми (метаболічний стрес, клітинне набрякання, рекрутування Type II), протокол і безпека. Takarada et al. (2000 J Appl Physiol): GH-відповідь 290x вища vs контроль. Scott et al. (2015 Sports Med): трьохканальна модель гіпертрофічного стимулу при BFR. Loenneke et al. (2012 Med Sci Sports Exerc): мета-аналіз ES 0.73 (BFR) vs 0.79 (традиційне) — порівнянно. Pearson & Hussain (2015 J Strength Cond Res): 40–80% LOP, схема 30-15-15-15. Hughes et al. (2017 Eur J Appl Physiol): реабілітація і тренований атлет. clinical-safety NOT REQUIRED. sports-scientist.
+- `content/post-265-deload-timing-design.md` — sports-science post: ділоад через модель фітнес-втома — реактивний vs запланований, volume vs intensity deload, коли НЕ ділоадити. Mujika & Padilla (2000 Med Sci Sports Exerc): асиметрія таймкурсів — нейром'язова функція зберігається 3–4 тижні, гормональний фон відновлюється за 2–3 тижні. Bosquet et al. (2007 Med Sci Sports Exerc): мета-аналіз — оптимальне зниження об'єму 41–60%, 1–4 тижні. Zourdos et al. (2016 J Strength Cond Res): fitness-fatigue model — ділоад знімає втому, яка маскує фітнес. Häkkinen et al. (1988 Int J Sports Med): відновлення T/C ratio після перевантаження — 2–3 тижні. Meeusen et al. (2013 Med Sci Sports Exerc): NFO vs OTS диференціація. clinical-safety NOT REQUIRED. sports-scientist.
+- `blog.html` — картки для post-263, post-264, post-265 додані (239 карток, 265 постів авторовано); виправлено 2 наявні друкарські помилки «Спортівна» → «Спортивна».
+- `STATUS.md` — версія → 2.41.0, blog.html 236→239 карток, 262→265 постів авторовано, рядки для post-263/264/265 у content engine table.
+- `VERSION` → 2.41.0
+
+---
+
 ## [2.40.0] — 2026-06-06
 
 ### Added
