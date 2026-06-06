@@ -1,7 +1,7 @@
 # FORM · Project Status v1.3.3
 
 **Date:** 6 червня 2026
-**Version:** 2.35.0
+**Version:** 2.36.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -31,7 +31,7 @@ FORM is at v2.20.0 with 50+ tagged releases, 16 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 231 cards (257 posts authored), category filter, newsletter CTA | v2.35.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 233 cards (259 posts authored), category filter, newsletter CTA | v2.36.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 
@@ -328,6 +328,8 @@ FORM is at v2.20.0 with 50+ tagged releases, 16 functional HTML pages (marketing
 | post-255-mental-fatigue-physical-performance.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-256-strength-transfer-specificity.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-257-heat-acclimation-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-258-concurrent-training-amateur.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-259-isometric-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

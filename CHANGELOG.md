@@ -6,6 +6,18 @@
 
 ---
 
+## [2.36.0] — 2026-06-06
+
+### Added
+- `content/post-258-concurrent-training-amateur.md` — "Ефект сумісного тренінгу для аматора: що реально відбувається, коли поєднуєш силовий тренінг і кардіо". Hickson (1980 Eur J Appl Physiol): оригінальне спостереження інтерференції — протокол 6+6 сесій/тиждень, неузагальнюваний на аматорів. Wilson et al. (2012 J Strength Cond Res) мета-аналіз: гіпертрофія ES 0.27, сила ES 0.34, потужність ES 0.53 — ефект найвищий при надмірних кардіо-об'ємах. Murach & Bagley (2016 Sports Med): для аматорів без елітних об'ємів interference real but manageable. AMPK→TSC2/Rheb і AMPK→Raptor: молекулярні маршрути пригнічення mTORC1, але AMPK нормалізується через 3–6 год після помірного кардіо. Schumann et al. (2022 Brit J Sports Med): порядок і модальність як топ-2 модератори. Давитт et al. (2014): сила до кардіо — пряме підтвердження порядку. 5 практичних сценаріїв для аматора + числова таблиця «safe zone vs risk zone». Явно відрізняється від post-47 і post-78 (механізм та докази) — цей пост відповідає на питання розкладу. sports-scientist + brand-voice. clinical_safety: NOT REQUIRED.
+- `content/post-259-isometric-training.md` — "Ізометричний тренінг — де він дійсно працює і де — ні". Behm & Sale (1993 J Appl Physiol): намір виконати максимальне зусилля — умова нейральної адаптації; субмаксимальне утримання без наміру дає значно менший ефект. Weir et al. (1994 Eur J Appl Physiol): кут-специфічність — +44% на тренованому куті, +21% при ±30°. Naugle et al. (2012 J Pain) мета-аналіз: ізометрика активує descending inhibitory pathways — гіпоалгетичний механізм незалежно від структурних змін сухожилля. Rio et al. (2015 Brit J Sports Med): клінічне застосування при тендинопатії — 45 с × 70–80% MVIC (механізм, без реабілітаційних рекомендацій). Lum & Barbosa (2019 Front Physiol) огляд: сила при довгій довжині м'яза, titin внесок, sarcomerogenesis. Folland et al. (2005 Eur J Appl Physiol): повторювані короткі скорочення > sustained для силової адаптації. Sale & MacDougall (1981): velocity-specificity означає нульовий transfer ізометрики на крайні точки F-v кривої. 3 use cases де ізометрика виграє, 2 де програє; обмеження моніторингу прогресу без dynamometry. sports-scientist + brand-voice. clinical_safety: NOT REQUIRED.
+- `blog.html` — картки для post-258 і post-259 додані (233 картки, 259 постів авторовано); VERSION → v2.36.0.
+- `README.md` — post-258 і post-259 позначено [x].
+- `STATUS.md` — blog.html рядок: 233 cards (259 posts authored), v2.36.0; post-258 і post-259 у content engine table; version header → 2.36.0.
+- `VERSION` → 2.36.0
+
+---
+
 ## [2.35.0] — 2026-06-06
 
 ### Added
