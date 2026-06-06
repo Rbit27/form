@@ -6,6 +6,14 @@
 
 ---
 
+## [2.34.0] — 2026-06-06
+
+### Added
+- `compliance/vendor-review/questionnaire-template.md` v1.0 — Standalone FORM Vendor Security Questionnaire template. Closes the "not yet authored" gap referenced in `docs/SOC2_READINESS.md §17.3` and `docs/VENDOR_REGISTRY.md` v1.0 changelog. Eight-item questionnaire covering: (1) Encryption (AES-256 at rest, TLS 1.3 in transit, key rotation), (2) Access Control (RBAC model, MFA enforcement, privileged access review), (3) Incident Notification (≤24h breach SLA, named security contact, prior incident disclosure), (4) Penetration Testing (annual cadence, exec summary sharing, bug bounty), (5) Data Deletion (≤30-day SLA, written confirmation, derivative data handling), (6) Subprocessors (complete disclosure, 30-day change notice per GDPR Art. 28(2)), (7) Data Residency (EEA storage, EU region availability, SCC Module 2 transfer mechanism), (8) Security Posture (SOC 2 / ISO cert status, SDLC gates, BCP/DR RTO/RPO). Includes: tier applicability matrix (T1 mandatory, T2 in-lieu-of-cert, T3 self-attestation, T4 none); acceptance criteria table with blocking vs non-blocking thresholds; evidence filing checklist; SOC 2 mapping (CC9.1, CC9.2, CC9.3, P8.1, C1.1); DEC-030 HMAC-chained audit events (`admin.vendor_questionnaire_received`, `admin.vendor_dpa_executed`). compliance-officer + security-engineer. References: `docs/SOC2_READINESS.md §17.3`, `docs/VENDOR_REGISTRY.md §8`, `docs/AUDIT_LOG_SCHEMA.md`, `docs/ENTERPRISE.md`, DEC-030.
+- `VERSION` → 2.34.0
+
+---
+
 ## [2.33.0] — 2026-06-06
 
 ### Added
