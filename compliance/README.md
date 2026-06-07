@@ -17,6 +17,26 @@ Artifacts for SOC 2 CC1 (Control Environment) — security training, AUP acknowl
 | `cc1/README.md` | Evidence index for CC1 artifacts (CC1-E-001 through CC1-E-005) and gap status | — |
 | `cc1/security-training-log.md` | Founder annual security training completion record — log template and workflow | CC1-E-001 |
 
+### `cc2/` — CC2 Communication and Information
+
+Evidence index for SOC 2 CC2 (Communication and Information) — policy communication, external disclosures, breach notification procedures.
+
+| File | Description |
+|---|---|
+| `cc2/README.md` | Evidence index for CC2 artifacts; criteria coverage (CC2.1–CC2.3), external communication obligations table, internal communication channels, gap status (CC2-GAP-001 through CC2-GAP-006) |
+
+**Critical gaps in this directory:** CC2-GAP-001 (privacy policy live URL) and CC2-GAP-002 (sub-processor list live URL) are P0 before first enterprise pilot.
+
+### `cc3/` — CC3 Risk Assessment
+
+Evidence index for SOC 2 CC3 (Risk Assessment) — risk register, fraud risk consideration, change impact assessment.
+
+| File | Description |
+|---|---|
+| `cc3/README.md` | Evidence index for CC3 artifacts; criteria coverage (CC3.1–CC3.4), 18-risk register summary table, fraud risk surface analysis, review cadence, gap status (CC3-GAP-001 through CC3-GAP-004) |
+
+**Primary gap:** CC3-GAP-001 (first formal risk register review, `compliance/cc3/risk-register-review-2026-Q3.md`) must be executed before SOC 2 observation period starts.
+
 ### `cc4/` — CC4 Monitoring Activities
 
 Artifacts remediating the three CC4.2 monitoring gaps identified in `docs/SOC2_READINESS.md §32`.
@@ -27,12 +47,21 @@ Artifacts remediating the three CC4.2 monitoring gaps identified in `docs/SOC2_R
 | `cc4/evidence-collection-plan.md` | Execution schedule for all CC4.1 ongoing and separate evaluation controls — what is collected, how often, where it is stored, and who is responsible. Collection begins at launch. | CC4-E-002 |
 | `cc4/deficiency-communication-procedure.md` | Three-tier compensating control for CC4.2 board communication (P0 gap): Tier 1 founder monthly self-review, Tier 2 advisory board quarterly notification, Tier 3 investor observer quarterly update. Expires 90 days after Series A close. | CC4-E-003 |
 
+### `cc5/` — CC5 Control Activities
+
+Artifacts for SOC 2 CC5 (Control Activities) — access control policy, separation of duties, change management linkage.
+
+| File | Description |
+|---|---|
+| `cc5/README.md` | Evidence index for CC5 artifacts and gap status |
+
 ### `cc6/` — CC6 Logical and Physical Access
 
 Artifacts for SOC 2 CC6 (Logical and Physical Access Controls).
 
 | File | Description |
 |---|---|
+| `cc6/README.md` | Evidence index for CC6 artifacts (CC6-E-001 through CC6-E-014) and gap status (14 gap items, P0: 6, P1: 4, P2: 4) |
 | `cc6/offboarding-procedure.md` | Employee and contractor offboarding checklist — credential revocation, NDA reminder, device return. Addresses CC6.3 access termination. |
 
 ### `cc7/` — CC7 System Operations
@@ -43,6 +72,22 @@ Policy documents and evidence index for SOC 2 CC7 (System Operations) — vulner
 |---|---|---|
 | `cc7/README.md` | Evidence index for CC7 artifacts (CC7-E-001 through CC7-E-009) and gap status | — |
 | `cc7/vuln-management-policy.md` | **Vulnerability Management & Patching SLA Policy v1.0** — standalone policy (POL-010). Closes PRE-15 and CC5.3. Four discovery sources, CVSS classification with FORM-specific uplift rules, binding patching SLAs (Critical 24 h / High 7 d / Medium 30 d / Low 90 d), DEC-030 audit events, enterprise disclosure templates. | CC5-E-003 |
+
+### `cc8/` — CC8 Change Management
+
+Artifacts for SOC 2 CC8 (Change Management) — change control policy, CI gate evidence.
+
+| File | Description |
+|---|---|
+| `cc8/change-management-policy.md` | **Change Management Policy v1.0** (POL-011) — PR-based change control, CI gates, Security Review tag trigger (§4), emergency change process (24h retroactive approval), rollback capability by component. Closes CC8 control requirements. |
+
+### `cc9/` — CC9 Risk Mitigation (Vendor Management)
+
+Artifacts for SOC 2 CC9 (Risk Mitigation) — vendor risk programme, sub-processor management, DR runbook references.
+
+| File | Description |
+|---|---|
+| `cc9/README.md` | Evidence index for CC9 artifacts; criteria coverage (CC9.1–CC9.3), vendor tier table (Critical/High/Standard), gap status (CC9-GAP-001 through CC9-GAP-005) |
 
 ### `c1/` — C1 Confidentiality
 

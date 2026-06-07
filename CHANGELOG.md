@@ -6,6 +6,18 @@
 
 ---
 
+## [2.53.0] — 2026-06-07
+
+### Added
+- `compliance/cc2/README.md` — CC2 Communication and Information evidence index. Documents all three CC2 criteria (CC2.1–CC2.3) with current status; evidence file table (14 artifacts — AUP, IRP, BCP, Privacy Policy, SECURITY.md, SUBPROCESSORS.md, SECURITY_QUESTIONNAIRE.md, ENTERPRISE_SLA.md, ENTERPRISE.md, security-training-log.md, policy-approval-log.csv, security.html, ONBOARDING_SECURITY.md, and two pending artifacts); internal communication channels table (four channels at solo-founder stage); external communication obligations table (9 obligations with owner and status); 6 gap items (CC2-GAP-001 through CC2-GAP-006, P0: 2, P1: 3, P2: 1); SOC 2 auditor notes including compensating control acceptances that expire at first hire. Critical P0 gaps: CC2-GAP-001 (privacy policy not yet published at `form.coach/privacy`) and CC2-GAP-002 (sub-processor list not yet published, shared with CC9-GAP-004). compliance-officer + security-engineer.
+- `compliance/cc3/README.md` — CC3 Risk Assessment evidence index. Documents all four CC3 criteria (CC3.1–CC3.4) with current status; evidence file table (15 artifacts — risk register §14, OKRS_2026.md, ENTERPRISE_SLA.md, PRODUCT_SPEC.md, GDPR_DPIA.md, control-deficiency-log.csv, vuln-management-policy.md, change-management-policy.md, DECISION_LOG.md, INCIDENT_RESPONSE.md R-20, AUDIT_LOG_SCHEMA.md, SSO_SCIM_IMPLEMENTATION.md §24, SOC2_READINESS.md §22, and two pending artifacts); risk register summary table by category (6 categories, 18 risks total, no HIGH/CRITICAL residual scores); fraud risk surface analysis table (5 fraud vectors with current controls and status); risk review cadence table; 4 gap items (CC3-GAP-001 through CC3-GAP-004, P1: 3, P2: 1); SOC 2 auditor notes with Type I vs Type II evidence requirements. Primary gap: CC3-GAP-001 (first formal risk register review `compliance/cc3/risk-register-review-2026-Q3.md`, scheduled Q3 2026). compliance-officer + security-engineer.
+- `compliance/README.md` updated — added `cc2/` and `cc3/` directory sections; expanded `cc5/`, `cc6/`, `cc8/`, `cc9/` entries to match their actual content (cc6 gap count, cc8 policy reference, cc9 README description).
+
+### Changed
+- `VERSION` → 2.53.0.
+
+---
+
 ## [2.52.0] — 2026-06-07
 
 ### Added
