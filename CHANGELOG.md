@@ -6,6 +6,16 @@
 
 ---
 
+## [2.50.0] — 2026-06-07
+
+### Added
+- `compliance/cc5/README.md` — CC5 Control Activities evidence index. Documents CC5.1 (risk-to-control matrix), CC5.2 (technology general controls), CC5.3 (policy framework) criteria coverage; lists all evidence files with SOC 2 criteria mapping and current status; tracks five gap items with updated closed/open status; defines compliance calendar (annual policy review, security training, new-hire onboarding sign-off, cipher suite spot-check); four open action items (CC5-P0-001 counsel, CC5-P1-003 TruffleHog, CC5-P1-005 IaC drift, CC5-P2-007 onboarding checklist). Gap closures recorded: CC5-GAP-002 (Cryptography Policy in force), CC5-GAP-004 (policy-approval-log.csv created). CC5-GAP-001 (AUP) downgraded 🔴 → 🟡. compliance-officer + security-engineer.
+
+### Changed
+- `docs/SOC2_READINESS.md` — §27 CC5 gap closure update. Policy inventory rows 11/12: AUP status 🔴 → 🟡 Authored·pending counsel (`docs/ACCEPTABLE_USE_POLICY.md` POL-001); Cryptography Policy 🔴 → 🟢 In Force (`docs/CRYPTOGRAPHY_POLICY.md` POL-002). CC1 cross-reference note updated to reflect docs existence. CC5-P1-004 narrative updated: `compliance/policy-approval-log.csv` exists with POL-001–POL-011. Control procedure deployment table rows 11/12 updated. CC5.3 gap analysis row updated (9 of 12 in force, CC5-GAP-002 closed). Implementation checklist CC5-P0-001 partially closed, CC5-P0-002 fully closed, CC5-P1-004 fully closed. Readiness delta table updated. Open items §27.7: CC5-GAP-002 and CC5-GAP-004 marked closed. Annex A header superseded with pointer to `docs/ACCEPTABLE_USE_POLICY.md`. §29.2 CC1.1 row updated. §29.3 CC1-GAP-001 downgraded. Readiness: ~77% → ~79%.
+
+---
+
 ## [2.49.0] — 2026-06-07
 
 ### Added

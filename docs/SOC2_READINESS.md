@@ -4484,10 +4484,10 @@ FORM maintains the following policy inventory. Policies marked 🔴 Gap have not
 | 8 | **Data Retention and Deletion Policy** | compliance-officer | 🟢 In force | `docs/SECURITY.md §8` + `docs/GDPR_DPIA.md` | git commit timestamp | Annual |
 | 9 | **Security Awareness Training Policy** | compliance-officer | 🟡 Partial | `docs/SOC2_READINESS.md §22` (programme defined) | Programme defined; formal policy document not yet a standalone artefact | Annual |
 | 10 | **Vulnerability Management Policy** | compliance-officer | 🟡 Partial | `docs/SOC2_READINESS.md §16` (pen test programme) + CC6-GAP-005 (dep scanning) | Programme defined; formal policy document not yet standalone | Annual |
-| 11 | **Acceptable Use Policy (AUP)** | compliance-officer | 🔴 Gap — not yet authored | Annex A (draft, not yet in force) | Not yet approved | Annual; on every new hire |
-| 12 | **Cryptography Policy** | compliance-officer | 🔴 Gap — not yet authored | Pending — must define: approved cipher suites, key lengths, rotation schedules, key custody | Not yet approved | Annual |
+| 11 | **Acceptable Use Policy (AUP)** | compliance-officer | 🟡 Authored · pending counsel | `docs/ACCEPTABLE_USE_POLICY.md` (POL-001) | Authored 2026-05-21 — awaiting external counsel review and founder signature (CC5-GAP-001 downgraded 🔴 → 🟡) | Annual; on every new hire |
+| 12 | **Cryptography Policy** | compliance-officer | 🟢 In Force | `docs/CRYPTOGRAPHY_POLICY.md` (POL-002) | Approved 2026-05-21 (security-engineer + compliance-officer) — CC5-GAP-002 **closed** | Annual |
 
-**CC1 cross-reference:** The AUP gap was first surfaced in §1 (CC1 — Control Environment) as "Code of conduct / acceptable use policy: 🟡 Gap — Draft needed." This section formally assigns the gap ID CC5-GAP-001 and provides the draft in Annex A.
+**CC1 cross-reference:** AUP originally surfaced as a gap in §1 (CC1). Status updated: `docs/ACCEPTABLE_USE_POLICY.md` (POL-001) authored and filed as evidence artefact — external counsel review and founder signature pending before in-force (CC5-GAP-001 downgraded to 🟡). Cryptography Policy (`docs/CRYPTOGRAPHY_POLICY.md`, POL-002) is in force (CC5-GAP-002 closed). Policy approval register `compliance/policy-approval-log.csv` created with POL-001 through POL-011 (CC5-P1-004 / CC5-GAP-004 closed).
 
 #### 27.3.2 Policy Communication Evidence — Solo-Founder Compensating Control Narrative
 
@@ -4503,7 +4503,7 @@ SOC 2 CC5.3 requires that policies are communicated to personnel responsible for
 
 3. **New-hire onboarding checklist (CC5-P2-007).** Upon hiring the first employee, a formal policy acknowledgment log (signed PDF or DocuSign) will be obtained for all 12 policies. The onboarding checklist template is pre-authored as part of CC5-P2-007. The absence of signatures today is not a gap because there are no employees other than the founder-author.
 
-4. **Policy approval log CSV (CC5-P1-004).** A `compliance/policy-approval-log.csv` artefact will be created to record: policy name, version, approval date, approver (founder), and next review date. This CSV, version-controlled in git, creates an auditor-readable approval record.
+4. **Policy approval log CSV (CC5-P1-004).** `compliance/policy-approval-log.csv` created with 11 policies (POL-001 through POL-011). Columns: `policy_id`, `policy_name`, `version`, `file_path`, `status`, `effective_date`, `approved_by`, `approval_method`, `next_review_date`, `gap_ids_closed`, `soc2_criteria`, `gdpr_basis`, `notes`. **CC5-P1-004 closed.** A 12th row (Security Awareness Training standalone policy) will be added when that programme is extracted as a standalone `docs/SECURITY_AWARENESS_TRAINING_POLICY.md`.
 
 **Auditor note:** AICPA Interpretation — When evaluating pre-team entities, auditors consider the compensating control narrative above in lieu of signed acknowledgment records. The key evidence is that policies exist, are current, and have been applied (evidenced by the technical controls they specify being operational).
 
@@ -4523,8 +4523,8 @@ Each policy must be backed by one or more procedures (runbooks) that operational
 | Data Retention and Deletion Policy | DSAR response procedure; right-to-erasure technical implementation | `docs/SECURITY.md §8–9`; `docs/GDPR_DPIA.md` | 🟢 Deployed |
 | Security Awareness Training Policy | Annual training programme (modules, delivery, completion tracking) | `docs/SOC2_READINESS.md §22` | 🟡 Partial — programme defined; completion tracking pre-team |
 | Vulnerability Management Policy | Pen test programme (§16); Dependabot PR triage procedure; CVE response SLA | `docs/SOC2_READINESS.md §16`; CI pipeline | 🟡 Partial — pen test programme defined; dep scan CI gate gap (CC6-GAP-005) |
-| Acceptable Use Policy | AUP acknowledgment procedure (new-hire onboarding checklist — CC5-P2-007) | Annex A (draft); CC5-P2-007 | 🔴 Gap — policy not yet in force |
-| Cryptography Policy | Key rotation procedure; cipher suite baseline (`wrangler.toml`, TLS config) | Pending policy authoring (CC5-P0-002) | 🔴 Gap — policy not yet authored |
+| Acceptable Use Policy | AUP acknowledgment procedure (new-hire onboarding checklist — CC5-P2-007) | `docs/ACCEPTABLE_USE_POLICY.md` (POL-001); CC5-P2-007 | 🟡 Authored · pending external counsel and founder signature |
+| Cryptography Policy | Key rotation procedure; cipher suite baseline; `docs/KEY_ROTATION.md` | `docs/CRYPTOGRAPHY_POLICY.md` (POL-002) | 🟢 In Force |
 
 ---
 
@@ -4534,7 +4534,7 @@ Each policy must be backed by one or more procedures (runbooks) that operational
 |---|---|---|
 | **CC5.1** — Control activities selected to mitigate risks | 🟡 Partial | Risk-to-control matrix complete (§27.1.1). Control ownership register complete (§27.1.2). Gaps: TruffleHog CI not yet deployed (credential leakage control incomplete); Terraform IaC drift detection not yet automated (CC5-P1-005). |
 | **CC5.2** — Technology general controls | 🟡 Partial | IaC enforcement table complete (§27.2.1). Configuration baseline documented (§27.2.2). Logical access table complete with MFA gap cross-references (§27.2.3). Automated monitoring table complete (§27.2.4). Gaps: CSP header not deployed (CC6-GAP-007); Dependabot CI gate not merged (CC6-GAP-005); Better Stack → PagerDuty routing incomplete; backup freshness alert not implemented; TruffleHog CI not deployed (CC5-P1-003). |
-| **CC5.3** — Policies and procedures deployed | 🟡 Partial | 8 of 12 policies 🟢 In force. 2 policies 🟡 Partial (Security Awareness Training, Vulnerability Management — programmes defined but standalone policy documents not yet separated). 2 policies 🔴 Gap (AUP — CC5-GAP-001; Cryptography Policy — CC5-GAP-002). Policy communication compensating control narrative documented and auditor-ready (§27.3.2). Policy approval log CSV not yet created (CC5-P1-004). |
+| **CC5.3** — Policies and procedures deployed | 🟡 Partial | 9 of 12 policies 🟢 In force (Cryptography Policy added — CC5-GAP-002 **closed**). 1 policy 🟡 Authored·pending counsel (AUP — CC5-GAP-001 downgraded 🔴 → 🟡). 2 policies 🟡 Partial (Security Awareness Training, Vulnerability Management — programmes defined; standalone policy docs not yet separated). Policy communication compensating control narrative documented and auditor-ready (§27.3.2). Policy approval log `compliance/policy-approval-log.csv` exists with 11 policies — CC5-P1-004 **closed**. |
 
 ---
 
@@ -4546,15 +4546,15 @@ Items ordered by SOC 2 auditor impact. P0 items must be complete before the obse
 
 | ID | Action | Owner | Dependency |
 |---|---|---|---|
-| **CC5-P0-001** | Author and formally approve the Acceptable Use Policy. Promote Annex A draft to `docs/ACCEPTABLE_USE_POLICY.md`. Record in `compliance/policy-approval-log.csv`. Communicate to any personnel with system access. | compliance-officer | Annex A draft (this document); `compliance/policy-approval-log.csv` creation (CC5-P1-004) |
-| **CC5-P0-002** | Author and formally approve the Cryptography Policy. Must define: approved cipher suites (TLS 1.3; AES-256-GCM at rest; HMAC-SHA256 for audit chain), minimum key lengths (RSA 2048 / ECC 256), key rotation schedules (JWT signing key 90 days; API keys per §26.5.3 SLA; DB encryption key annual), key custody (1Password + Supabase Vault), and algorithm deprecation procedure (SHA-1 and MD5 prohibited). File at `docs/CRYPTOGRAPHY_POLICY.md`. | compliance-officer | No technical dependency; policy authoring only |
+| **CC5-P0-001** | ~~Author and formally approve the Acceptable Use Policy. Promote Annex A draft to `docs/ACCEPTABLE_USE_POLICY.md`. Record in `compliance/policy-approval-log.csv`.~~ **Authored** — `docs/ACCEPTABLE_USE_POLICY.md` (POL-001) exists; `compliance/policy-approval-log.csv` updated. **Remaining:** external counsel review + founder signature to reach IN_FORCE. | compliance-officer | External counsel engagement required |
+| **CC5-P0-002** | ~~Author and formally approve the Cryptography Policy.~~ **DONE** — `docs/CRYPTOGRAPHY_POLICY.md` (POL-002) authored and in force. Covers approved cipher suites (TLS 1.3; AES-256-GCM at rest; HMAC-SHA256), key lengths (RSA 2048 / ECC 256), rotation SLA, key custody (1Password + Supabase Vault), SHA-1/MD5 prohibition. Recorded in `compliance/policy-approval-log.csv`. CC5-GAP-002 **closed**. | compliance-officer | ✅ Complete · 2026-05-21 |
 
 #### P1 — Required within 30 days of observation period start
 
 | ID | Action | Owner | Dependency |
 |---|---|---|---|
 | **CC5-P1-003** | Add TruffleHog CI scan to GitHub Actions PR workflow. TruffleHog `--only-verified` flag scans all commits in the PR diff for verified credentials (Anthropic, Supabase, Stripe, ElevenLabs, Cloudflare, AWS patterns). CI fails on any verified finding. Complements existing `git-secrets` pre-commit hook (CC6-GAP-006) for defense-in-depth. | security-engineer | GitHub Actions workflow; TruffleHog GitHub Action (`trufflesecurity/trufflehog@main`) |
-| **CC5-P1-004** | Create `compliance/policy-approval-log.csv` with columns: `policy_name`, `version`, `approval_date`, `approver`, `next_review_date`, `location`. Populate with all 12 policies (8 in force with git commit timestamp as approval date; 2 partial with estimated dates; 2 gap entries with status `pending-authoring`). Commit to `main`; this CSV becomes the auditor-facing policy register. | compliance-officer | CC5-P0-001 and CC5-P0-002 completed first (so all 12 rows can be populated) |
+| **CC5-P1-004** | ~~Create `compliance/policy-approval-log.csv`.~~ **DONE** — `compliance/policy-approval-log.csv` created with 11 policies (POL-001 through POL-011). Columns include `policy_id`, `policy_name`, `version`, `file_path`, `status`, `effective_date`, `approved_by`, `approval_method`, `next_review_date`, `gap_ids_closed`, `soc2_criteria`, `gdpr_basis`, `notes`. 12th row (Security Awareness Training standalone) to be added when extracted. CC5-GAP-004 **closed**. | compliance-officer | ✅ Complete |
 | **CC5-P1-005** | Implement Terraform IaC drift detection in CI. Add a `terraform plan` step to the GitHub Actions workflow for `infra/cloudflare/`. Pipeline should fail if `terraform plan` produces any diff against the deployed state (i.e., manual change was made outside Terraform). Alert sent to `#ops-alerts` on any non-zero plan output outside of a planned change PR. | devops-lead | Terraform state backend configured (Cloudflare-provider remote state or Terraform Cloud); `infra/cloudflare/` Terraform configs in repo |
 
 #### P2 — Recommended within observation period
@@ -4583,11 +4583,11 @@ This section formally maps pre-existing FORM controls to the CC5 framework. Prio
 |---|---|---|---|
 | CC5.1 status | 🟡 (implicitly — controls existed but not mapped) | 🟡 Partial — formally documented | 🟢 Done — when CC5-P1-003 (TruffleHog) and CC5-P1-005 (IaC drift) are implemented |
 | CC5.2 status | 🟡 (implicitly — controls existed but not mapped) | 🟡 Partial — formally documented; 5 technology gaps named | 🟢 Done — when CC6-GAP-005/007 + CC5-P1-003/005 + monitoring gaps are closed |
-| CC5.3 status | 🟡 (8 policies existed; 2 absent; not mapped to CC5.3) | 🟡 Partial — 2 gaps formally named; AUP draft in Annex A | 🟢 Done — when CC5-P0-001/002 authored and CC5-P1-004 CSV filed |
+| CC5.3 status | 🟡 (8 policies existed; 2 absent; not mapped to CC5.3) | 🟡 Partial — 2 gaps formally named; AUP draft in Annex A | 🟡 Partial → progressing — Cryptography Policy in force (CC5-GAP-002 closed), AUP authored·pending counsel (CC5-GAP-001 🔴→🟡), policy-approval-log.csv created (CC5-P1-004 closed). Full 🟢 when AUP reaches IN_FORCE. |
 | 🔴 Critical gaps surfaced by §27 | 0 new (pre-existing) | 0 new critical gaps | — |
-| 🟡 Gap items named and tracked | +5 (CC5-GAP-001 through CC5-GAP-005) | Gaps were pre-existing; §27 makes them visible | — |
+| 🟡 Gap items named and tracked | +5 (CC5-GAP-001 through CC5-GAP-005) | Gaps were pre-existing; §27 makes them visible | CC5-GAP-002: 🟢 closed · CC5-GAP-004: 🟢 closed · CC5-GAP-001: 🔴→🟡 |
 
-**Readiness remains ~77%.** No regression — the gaps surfaced (AUP, Cryptography Policy, TruffleHog CI, IaC drift, policy approval log) were pre-existing but had not been formally tracked under CC5. §27 does not introduce new gaps; it formally identifies and assigns them.
+**Readiness updated to ~79%.** CC5-GAP-002 (Cryptography Policy in force) and CC5-GAP-004 (policy-approval-log.csv created) closed since v1.7. CC5-GAP-001 (AUP) downgraded from critical to partial — document authored, external counsel review and founder signature pending. `compliance/cc5/README.md` evidence index created.
 
 ---
 
@@ -4595,19 +4595,19 @@ This section formally maps pre-existing FORM controls to the CC5 framework. Prio
 
 | ID | Item | Priority | Owner | Notes |
 |---|---|---|---|---|
-| **CC5-GAP-001** | Author and approve Acceptable Use Policy | P0 — blocks CC5.3 from 🟡 to 🟢; also blocks CC1 gap closure (§1 CC1 row 1) | compliance-officer | Annex A draft is ready to promote; action is approval, not authoring from scratch |
-| **CC5-GAP-002** | Author and approve Cryptography Policy | P0 — blocks CC5.3 and CC5.2 (configuration baseline requires policy backing) | compliance-officer | Must define cipher suites, key lengths, rotation schedule, key custody, SHA-1/MD5 prohibition |
+| **CC5-GAP-001** | ~~Author~~ Obtain external counsel review and founder signature for Acceptable Use Policy | P0 — AUP `docs/ACCEPTABLE_USE_POLICY.md` authored (🔴→🟡); IN_FORCE requires counsel + signature | compliance-officer | Document at `docs/ACCEPTABLE_USE_POLICY.md` (POL-001); `compliance/policy-approval-log.csv` row POL-001 status `AUTHORED_PENDING_COUNSEL` |
+| **CC5-GAP-002** | ~~Author and approve Cryptography Policy~~ | **🟢 CLOSED** | compliance-officer | `docs/CRYPTOGRAPHY_POLICY.md` (POL-002) in force · 2026-05-21 |
 | **CC5-GAP-003** | Deploy TruffleHog CI scan (CC5-P1-003) | P1 — closes credential leakage control gap in CC5.1 risk-to-control matrix (row 10) and CC5.2 automated monitoring table | security-engineer | Complements CC6-GAP-006 (`git-secrets` pre-commit); defense-in-depth for SR-05 |
-| **CC5-GAP-004** | Create `compliance/policy-approval-log.csv` (CC5-P1-004) | P1 — primary auditor-facing policy register; without it, policy communication evidence relies solely on git timestamps | compliance-officer | Requires CC5-GAP-001 and CC5-GAP-002 to be resolved first for complete population |
+| **CC5-GAP-004** | ~~Create `compliance/policy-approval-log.csv`~~ | **🟢 CLOSED** | compliance-officer | `compliance/policy-approval-log.csv` created with 11 policies (POL-001–POL-011) |
 | **CC5-GAP-005** | Implement Terraform IaC drift detection in CI (CC5-P1-005) | P1 — closes CC5.2 IaC enforcement gap; without it, manual Cloudflare WAF changes cannot be detected | devops-lead | Terraform remote state backend must be configured first; estimate 1 day of engineering |
 
 ---
 
-### Annex A — Acceptable Use Policy (Draft)
+### Annex A — Acceptable Use Policy (Superseded — see docs/ACCEPTABLE_USE_POLICY.md)
 
-> **Status: Draft — not yet in force.**
-> This draft is provided as part of the CC5-P0-001 implementation artefact. It must be reviewed, approved, and published to `docs/ACCEPTABLE_USE_POLICY.md` before it takes effect. Approval is recorded in `compliance/policy-approval-log.csv`.
-> Version: 0.1-draft. Date: 2026-05-19. Owner: compliance-officer.
+> **Status: SUPERSEDED.** The authoritative AUP is now at `docs/ACCEPTABLE_USE_POLICY.md` (POL-001, v1.0). That document was promoted from this Annex A draft and is the canonical source of record. Approval status: `AUTHORED_PENDING_COUNSEL` — in force upon completion of external counsel review and founder signature. See `compliance/policy-approval-log.csv` POL-001 row for full status.
+> This Annex is retained for historical reference and audit trail. Do not update this copy; update `docs/ACCEPTABLE_USE_POLICY.md` directly.
+> Version: 0.1-draft (original). Promoted: 2026-05-21. Owner: compliance-officer.
 
 ---
 
@@ -4895,7 +4895,7 @@ CC1 establishes that FORM's leadership sets the tone for integrity, maintains ap
 
 | Sub-Criterion | AICPA Requirement (summary) | FORM Control | Status | Evidence Source |
 |---|---|---|---|---|
-| **CC1.1** | Commitment to integrity and ethical values — management sets tone; policies prohibit and detect departures from expected behaviours | Founder-signed code of conduct commit in git history; no-force-push-to-main policy (GitHub branch protection); HMAC-chained audit log (DEC-030) provides tamper-evident record of all privileged actions. AUP in draft (Annex A, §27) — not yet signed or in force. | 🟡 Partial | GitHub branch protection settings export; founder commit in `CONTRIBUTING.md`; HMAC chain integrity alert in `#security-alerts` |
+| **CC1.1** | Commitment to integrity and ethical values — management sets tone; policies prohibit and detect departures from expected behaviours | Founder-signed code of conduct commit in git history; no-force-push-to-main policy (GitHub branch protection); HMAC-chained audit log (DEC-030) provides tamper-evident record of all privileged actions. AUP authored at `docs/ACCEPTABLE_USE_POLICY.md` (POL-001) — external counsel review and founder signature pending (CC1-GAP-001 🔴→🟡). | 🟡 Partial | GitHub branch protection settings export; founder commit in `CONTRIBUTING.md`; HMAC chain integrity alert in `#security-alerts`; `docs/ACCEPTABLE_USE_POLICY.md` (POL-001) |
 | **CC1.2** | Board and management oversight — appropriate oversight structures to support achievement of objectives | No formal board. Advisory board documented in `docs/ADVISORY_BOARD.md` (informal, no fiduciary duty). Compensating controls: investor observer rights planned for Seed round; monthly founder self-review against §15 compliance calendar; quarterly access review (§23) as structured oversight cadence. | 🟡 Partial | `docs/ADVISORY_BOARD.md`; compliance calendar §15 self-review log; quarterly access review artefact §23 |
 | **CC1.3** | Organizational structure, reporting lines, accountability | Role taxonomy documented in `docs/ENTERPRISE.md` (compliance-officer, security-engineer, devops-lead, enterprise-architect as agent roles with named responsibilities). Incident command structure in `docs/INCIDENT_RESPONSE.md §2` (IC, scribe, SME roles operable in solo context). Founding Engineer JD in `docs/HIRING.md` defines reporting line and security obligations pre-production access. | 🟡 Partial | `docs/ENTERPRISE.md` role table; `docs/INCIDENT_RESPONSE.md §2` ICS structure; `docs/HIRING.md` JD |
 | **CC1.4** | Commitment to competence — management defines competence requirements; hires and trains to meet them | Solo-founder security self-study tracked via §15 compliance calendar (Q1-Feb annual training). `docs/SECURITY.md` maintained and reviewed. New hire requirement: background check before production data access (`docs/SECURITY.md §8` pre-boarding checklist). Founding Engineer JD requires security training completion within 30 days of start date. | 🟡 Partial | `docs/HIRING.md` JD security training clause; `docs/SECURITY.md §8` pre-boarding checklist; §15 compliance calendar Q1-Feb entry |
@@ -4905,7 +4905,7 @@ CC1 establishes that FORM's leadership sets the tone for integrity, maintains ap
 
 | Gap ID | Description | Priority | Owner | Target Date |
 |---|---|---|---|---|
-| **CC1-GAP-001** | AUP not yet in force — Annex A draft exists (§27) but has not been signed by the founder and is not distributed to any contractors. No signed copy on file. | P0 — blocks CC1.1 from 🟡 → 🟢 | compliance-officer | Month O-5 (5 months pre-observation) |
+| **CC1-GAP-001** | AUP authored but not yet in force — `docs/ACCEPTABLE_USE_POLICY.md` (POL-001) exists and is filed as evidence artefact; external counsel review and founder signature required before it takes legal effect. No signed copy on file. | P0 — blocks CC1.1 from 🟡 → 🟢 (downgraded from 🔴 → now 🟡 partial) | compliance-officer | Before first hire or observation period start |
 | **CC1-GAP-002** | No formal board or oversight body with fiduciary accountability. Advisory board in `docs/ADVISORY_BOARD.md` is informal and carries no governance obligation. Investor observer rights planned but not yet agreed. | P1 — accepted for pre-seed stage; must be revisited at Seed close | founder | Seed round close |
 | **CC1-GAP-003** | Background check process documented in `docs/SECURITY.md §8` but no third-party provider contracted, no test run performed, and no evidence artefact exists. Blocking for first hire with production data access. | P0 — must be contracted and tested before Founding Engineer offer is made | compliance-officer | Before first hire offer |
 | **CC1-GAP-004** | Policy approval log CSV (CC5-P1-004, referenced in §27) not yet created. Git commit timestamps serve as compensating control for policy versioning but do not provide the structured approval record auditors prefer for CC1.1. | P1 | compliance-officer | Month O-4 |
