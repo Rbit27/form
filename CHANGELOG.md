@@ -6,6 +6,18 @@
 
 ---
 
+## [2.57.0] — 2026-06-07
+
+### Added
+- `content/post-278-intraabdominal-pressure-bracing.md` — «Внутрішньочеревний тиск: що тримає хребет під важкою штангою». Harman et al. (1988 J Strength Cond Res): IAP під час підйому і стрибків — масштаб тиску; Cholewicki et al. (1999 Clinical Biomechanics): механічна стабільність поперекового відділу і роль IAP; McGill *Low Back Disorders*: механіка Valsalva і 360° bracing; Richardson & Hodges vs McGill: дебат hollowing vs. bracing — з поясненням контексту реабілітація/тренінг; практична таблиця стратегій дихання за % 1RM. 13 хв читання. sports-scientist pending. clinical-safety NOT REQUIRED.
+- `content/post-279-internal-external-attentional-focus.md` — «Зовнішній vs внутрішній фокус уваги: де думати під час тренінгу». Wulf (2007): internal vs external focus визначення; Wulf et al. (2001 RQES): Constrained Action Hypothesis — external > internal для моторного навчання; Calatayud et al. (2016 Eur J Hum Mov): internal focus → вищий EMG pec/deltoid при 60% 1RM; Snyder & Fry (2012 J Strength Cond Res): словесна інструкція змінює EMG до 22%; Schoenfeld & Contreras (2016 Strength Cond J): practical framework — external для технічних вправ, internal для ізоляції; конкретні cues для присідання/жиму/тяги/curl. 11 хв читання. sports-scientist pending. clinical-safety NOT REQUIRED.
+- `compliance/cc8/quarterly-change-review-YYYYQQ.md` — SOC 2 CC8.1 quarterly change review template (CC8-E-006). Секції: change volume summary (10 метрик vs попереднього кварталу), emergency change log (ID/date/CI-bypass/retroactive-approval/24h-compliance/DEC-030), CI/CD gate compliance per POL-011 §5.1 (7 checks), branch protection violations (direct commits/force-push/–no-verify), rollback events (trigger/component/MTTR/RCA), control effectiveness rating CC8.1-a–h, open findings → cc4/control-deficiency-log.csv, sign-off із evidence artefact manifest. Aligned з emergency-change-log.csv schema і POL-011 §§5,7,8,11,12.
+
+### Changed
+- `VERSION` → 2.57.0.
+
+---
+
 ## [2.55.0] — 2026-06-07
 
 ### Added
