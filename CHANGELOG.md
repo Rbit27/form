@@ -6,6 +6,20 @@
 
 ---
 
+## [2.62.0] — 2026-06-07
+
+### Added
+- `content/post-284-minimal-effective-training-protocol.md` — Мінімальний ефективний протокол: скільки насправді потрібно для гіпертрофії. Schoenfeld & Grgic (2020 JSCR): 3 підходи двічі на тиждень = значуща гіпертрофія; 6 підходів/тиждень/група як валідна стратегія, не план Б. Ralston et al. (2017 JSCR): малий обсяг + висока інтенсивність → сила. Burd et al. (2012): MPS при різних режимах навантаження. Практична матриця: 2×45хв / 3×30хв / щоденні 20хв. Де MV ≠ MEV і як це розпізнати. clinical-safety NOT REQUIRED.
+- `content/post-286-iap-valsalva-belt-spine-stability.md` — IAP, Valsalva і пояс: що насправді стабілізує хребет під час підйому. McGill et al. (1990 J Biomech): внутрішньочеревний тиск як гідравлічний стовп — знімає компресію/зсув з дисків. Harman et al. (1989 Med Sci Sports Exerc): пояс підвищує IAP без зниження EMG розгиначів — підсилює брейсинг, не замінює. Lander et al. (1992 Med Sci Sports Exerc): belt і абсолютна сила у присіданні. Valsalva механіка і межі застосування. Операційна схема: коли пояс доцільний. clinical-safety NOT REQUIRED.
+- `blog.html` — картки post-284 і post-286 додані до сітки.
+
+### Changed
+- `README.md` — content roadmap: post-284 і post-286 позначені [x].
+- `VERSION` → 2.62.0.
+- `STATUS.md` — версія оновлена до v2.62.0.
+
+---
+
 ## [2.61.1] — 2026-06-07
 
 ### Changed
