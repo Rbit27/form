@@ -6,6 +6,18 @@
 
 ---
 
+## [2.47.0] — 2026-06-07
+
+### Added
+- `compliance/cc7/vuln-management-policy.md` — **Vulnerability Management & Patching SLA Policy v1.0** (POL-010). Standalone auditor exhibit filing `docs/SOC2_READINESS.md §41`. Closes PRE-15 (🔴 Open → 🟢 Done) and CC5.3 (standalone Vulnerability Management Policy 🟡 → 🟢). Content: 4 discovery sources (Dependabot, `npm audit` CI gate, annual pentest, 7 vendor advisory channels); CVSS v3.1 severity classification with 3 FORM-specific uplift rules (U-01 Art. 9 health data, U-02 RLS bypass → always Critical + never Risk Acceptance eligible, U-03 HMAC chain integrity); binding patching SLA table (Critical 24 h / High 7 d / Medium 30 d / Low 90 d); SLA clock mechanics (start = earliest of Dependabot alert / NVD publication / pentest report / responsible disclosure; stop = PR merged + deployed to production); full 7-stage CVE triage workflow with Linear ticket field schema; vendor-managed component patching table (6 components, FORM response SLAs); Risk Acceptance protocol (U-02 never eligible; Critical requires joint founder + compliance-officer approval; max 7 d extension; Won't Fix only for CVSS ≤ 3.9 confirmed unreachable code); enterprise customer disclosure policy (Template E-VULN-01 mandatory within 2 h for cross-tenant Critical; E-VULN-02 within 24 h for Critical no cross-tenant risk; High in quarterly attestation); 5 DEC-030 HMAC-chained audit events (`vuln.cve_discovered`, `vuln.patch_deployed`, `vuln.sla_exception_granted`, `vuln.wont_fix_closed`, `vuln.enterprise_notified`, all MEDIUM/HIGH 7-year retention, all privacy-safe); SOC 2 evidence mapping for CC7.1–CC7.4 and CC5.3; 9 evidence artefacts CC7-E-001 through CC7-E-009; 12-item implementation checklist (6× P0, 4× P1, 1× P2). Privacy floor enforced throughout: no user_id, health data, or coaching content in any `vuln.*` event payload. security-engineer + compliance-officer. Grounded in `docs/SOC2_READINESS.md §41`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/INCIDENT_RESPONSE.md`, `docs/ENTERPRISE.md`.
+- `compliance/cc7/README.md` — evidence index for CC7 artifacts with gap status table.
+- `compliance/evidence/vuln-management/README.md` — evidence directory structure for CC7-E-001 through CC7-E-009; collection cadence table; first-year observation timeline. Closes checklist item §41.14 #8 (P0).
+- `compliance/policy-approval-log.csv` — POL-010 row added (Vulnerability Management & Patching SLA Policy v1.0, IN_FORCE, 2026-06-07, quarterly review).
+- `compliance/README.md` — all subdirectories now documented: cc1/, cc4/, cc6/, cc7/ (new), c1/, p1/, access-review/, vendor-review/, calendar/, evidence/ (including new `evidence/vuln-management/` sub-path).
+- `VERSION` → 2.47.0
+
+---
+
 ## [2.46.0] — 2026-06-07
 
 ### Added
