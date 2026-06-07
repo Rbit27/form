@@ -16,7 +16,7 @@ This is a **pre-product** project repository. There is no app code yet (mobile d
 
 - **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
 - **65+ markdown documents** — strategic, operational, content
-- **270+ evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
+- **296 evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **3 sample training programs** — sports-science discipline reference
 - **24 specialized AI agents** — operating model embodied у `.claude/agents/`
@@ -118,7 +118,7 @@ G:\\Клод\\form\\
 │   ├── GROWTH_LOOPS.md      — 5 viral/organic loops, clinical-safety share constraints, FE priority, K-factor
 │   └── FOUNDER.md           ← founder narrative · INTERNAL
 │
-├── content/                ← 35 blog posts + social
+├── content/                ← 296 blog posts + social
 │   ├── post-01-hrv-is-lying.md
 │   ├── post-02-what-good-form-means.md
 │   ├── post-03-we-tested-8-ai-trainers.md
@@ -154,6 +154,16 @@ G:\\Клод\\form\\
 │   ├── post-33-energy-systems-for-strength.md ← (clinical-safety ✓)
 │   ├── post-34-supersets-antagonist-pairs.md  ← (clinical-safety ✓)
 │   └── post-35-tempo-training.md              ← (clinical-safety ✓)
+│   ├── … post-36 … post-294 (спортивна наука · технічний корпус)
+│   ├── post-295-strength-plateau-vs-life-plateau.md ← editorial · clinical-safety PASS
+│   │
+│   │   ── ROADMAP (наступні editorial теми) ──────────────────────────
+│   ├── post-296: RPE-калібрування без тренера — як читати власне зусилля точніше
+│   ├── post-297: «Достатньо добра» програма vs ідеальна — compliance premium
+│   ├── post-298: Як тренуватись при нестабільному розкладі (не мотиваційний BS)
+│   ├── post-299: Сила без залу — мінімальний ефективний протокол для відрядження
+│   └── post-300: Що ти зберігаєш під час детренування — і що втрачаєш першим
+│   │
 │   ├── twitter-launch-thread.md
 │   ├── linkedin-posts.md
 │   ├── press-pitch-templates.md
@@ -609,9 +619,14 @@ Each iteration:
 - [ ] post-290: Чому люди кидають тренувати — і що насправді утримує: Ryan & Deci (2000 Am Psychol): Self-Determination Theory — autonomous vs controlled motivation; Teixeira et al. (2012 Int J Behav Nutr Phys Act): мета-аналіз 66 досліджень SDT і фізична активність; Lally et al. (2010 Eur J Soc Psychol): habit formation — 18–254 дні, не 21; Schwarzer (2008): Health Action Process Approach — intention vs action gap; операційна модель adherence без гейміфікації і streak-shaming; clinical-safety NOT REQUIRED
 - [x] post-291: Адаптація, яку не бачиш — нейральна vs структурна фаза, саркоплазматична надбудова (Haun 2019), міоядерний домен (Bamman 2007), парадокс шостого тижня (Ogasawara 2013), епігенетична пам'ять (Seaborne 2018), практичні маркери ранньої адаптації; clinical-safety NOT REQUIRED
 - [x] post-292: Технічна відмова vs м'язова відмова — де зупиняти підхід: Calatayud et al. (2016) і зміна м'язової активації при погіршенні техніки; практичний протокол «зупинка до технічного збою»; чому компенсаторні рухи — не прогрес; відмінність від психологічної відмови (post-268); clinical-safety NOT REQUIRED
-- [ ] post-293: Силовий тренінг при хронічному недосипі — SRA-крива при системному дефіциті; Leproult & Van Cauter (2011): −10–15% тестостерону за тиждень 5h сну; IGF-1 і GH-пульс при скороченому SWS; практична матриця корекції об'єму і інтенсивності; clinical-safety PASS (тема не зачіпає їжу або харчові патерни)
-- [ ] post-294: Прогресивне перевантаження без лінійного приросту ваги — double progression, rep-range cycling, intensification blocks, RPE-drift як тригер переходу; Ralston et al. (2017): специфічний об'єм > загальний для 1RM; чому «плюс 2.5 кг щотижня» ламається через 3 місяці; clinical-safety NOT REQUIRED
-- [ ] post-295: Програмування без обладнання — прогресія власною вагою: механізми прогресії (leverage, tempo, ROM, односторонні варіанти); де calisthenics реально обмежує і де перевершує; рамка вибору вправ при обмеженому доступі до залу; clinical-safety NOT REQUIRED
+- [x] post-293: central-vs-peripheral-fatigue — центральна vs периферична втома; clinical-safety NOT REQUIRED
+- [x] post-294: lengthened-position-hypertrophy — гіпертрофія в подовженому положенні, тітін, Maeo 2021; clinical-safety NOT REQUIRED
+- [x] post-295: strength-plateau-vs-life-plateau — плато сили vs плато обставин; 4 діагностичних питання, матриця RPE-drift, протоколи для обох сценаріїв; clinical-safety PASS
+- [ ] post-296: RPE-калібрування без зовнішнього тренера — суб'єктивне vs об'єктивне зусилля; систематичне викривлення RPE (недооцінка у початківців, переоцінка при перевтомі); практика: anchor sets, velocity reference, відеопорівняння; clinical-safety NOT REQUIRED
+- [ ] post-297: Compliance premium — чому «достатньо добра» програма, яку ти виконуєш, б'є ідеальну, яку ти кидаєш; дані по adherence у несупервайзованому тренінгу; що насправді визначає результат за 12 місяців; clinical-safety NOT REQUIRED
+- [ ] post-298: Тренінг при нестабільному розкладі — не мотиваційний BS; мінімально ефективний протокол при ≤2 сесій/тиждень; як програмувати коли дні непередбачувані; рефрейм «провального тижня»; clinical-safety NOT REQUIRED
+- [ ] post-299: Детренування — що ти зберігаєш і що втрачаєш першим; нейральна vs структурна деадаптація; muscle memory і міоядерний домен; практика повернення після паузи 2/4/8+ тижнів; clinical-safety NOT REQUIRED
+- [ ] post-300: Сила і когнітивна продуктивність — двонаправлений зв'язок; нейротрофіни і BDNF при силовому тренінгу; optimal dose для когнітивних benefitів; що знають дослідження і де дані слабкі; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
