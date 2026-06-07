@@ -6,6 +6,16 @@
 
 ---
 
+## [2.67.0] — 2026-06-07
+
+### Added
+- `docs/RESPONSIBLE_DISCLOSURE.md` — POL-013 candidate · Coordinated Vulnerability Disclosure Policy v1.0. Closes `/disclosure` P0 gap from `docs/SOC2_READINESS.md §39`. Intake channel `security@form.coach` with PGP encryption (key block placeholder for M4 deployment). 90-day coordinated disclosure window with 14-day extension and 104-day hard cap. CVSS 3.1 severity bands with three FORM-specific uplift rules: U-01 (GDPR Art. 9 health data exposure path elevates +1 tier), U-02 (RLS / tenant isolation bypass auto-elevates to Critical — no downgrade, no Risk Acceptance), U-03 (HMAC chain integrity affects +1 tier); uplifts cumulative. Response SLA table: Critical 24 h, High 7 d, Medium 30 d, Low 90 d from validation. Seven-stage response lifecycle (intake → triage → validation → remediation → re-test → disclosure coordination → close). Enterprise customer notification templates: E-VULN-01 (Critical, within 2 h of patch), E-VULN-02 (High, within 24 h). Hall of Fame (no-cash bounty); Bug Bounty roadmap at Month 6 post-launch ($50–$2,500 range, HackerOne or Bugcrowd). Eight DEC-030 HMAC-chained `vuln.*` events (disclosure_received, triaged, accepted, rejected, patch_deployed, enterprise_notified, disclosure_closed, sla_breach); all 7-year retention, no `user_id`, reporter pseudonymous only. SOC 2 controls: CC7.1, CC7.2, CC7.3, CC7.4, CC2.3, C1.2. Five evidence artefacts CVD-E-001 through CVD-E-005. `/disclosure` gap: 🔴 Open → 🟡 Partial (policy authored; 🟢 when `security.form.coach/disclosure` deployed). security-engineer + compliance-officer.
+
+### Changed
+- `VERSION` → 2.67.0.
+
+---
+
 ## [2.66.0] — 2026-06-07
 
 ### Added
