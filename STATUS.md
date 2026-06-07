@@ -356,6 +356,7 @@ FORM is at v2.69.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-298-training-unstable-schedule.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-299-strength-without-gym.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-300-detraining-what-you-keep.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-301-strength-cognition-bidirectional.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist DONE |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

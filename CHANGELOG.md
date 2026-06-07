@@ -6,6 +6,18 @@
 
 ---
 
+## [2.73.0] — 2026-06-07
+
+### Added
+- `content/post-301-strength-cognition-bidirectional.md` — Силовий тренінг і когнітивна продуктивність. Двонаправлений зв'язок: гострі (BDNF пік 15–30 хв, механізми через IGF-1/irisin/катехоламіни) vs хронічні ефекти (структурні нейропластичні зміни при 12–24 тижнях). Executive function: Colcombe & Kramer (2003, d=0.68), Cassilhas et al. (2007), Best et al. (2014 meta-analysis), Northey et al. (2018 Br J Sports Med), Tsai et al. (2014), Liu-Ambrose et al. (2010). Нейротрофіни: BDNF, IGF-1, VEGF, cathepsin B — механізм та сила доказів для кожного. Дозо-відповідь: 2–3×/тиж. достатньо, 50% vs 80% 1RM comparable (Cassilhas). Чесний розбір обмежень: домінування аеробних RCT, sedentary baseline confound, short duration, гетерогенні когнітивні метрики. clinical_safety_status: NOT REQUIRED.
+- `README.md` — post-296..300 marked [x] з уточненими описами; post-301..305 додані як roadmap-записи.
+- `STATUS.md` — рядки для post-296..301.
+
+### Changed
+- `VERSION` → 2.73.0.
+
+---
+
 ## [2.72.0] — 2026-06-07
 
 ### Added
