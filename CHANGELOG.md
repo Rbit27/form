@@ -6,6 +6,19 @@
 
 ---
 
+## [2.89.0] — 2026-06-07
+
+### Added
+- `content/post-320-easy-feeling-vs-real-stimulus.md` — суб'єктивне сприйняття зусилля і реальний тренувальний стимул: Borg (1970/1982) RPE як інтегральний конструкт, Hampson et al. (2001) efference copy механізм, Eston (2012) RPE огляд, Fitts & Posner (1967) моторна автоматизація і когнітивне навантаження, Pageaux & Lepers (2018) когнітивна втома підвищує RPE, Zourdos et al. (2016) JSCR RIR r=0.78, Helms et al. (2016) IJSPP валідація, Smits et al. (2014) звикання перцепції, Roberts et al. (2018) residual fatigue і RPE Monday; два типи RPE-дрейфу, чотириступеневий діагностичний протокол; 320 рядків; clinical-safety NOT REQUIRED
+- `blog.html` — додано картку post-320 (easy-feeling-vs-real-stimulus)
+
+### Changed
+- `README.md` — post-320 відмічено [x] у roadmap із розгорнутим описом референсів
+- `STATUS.md` — TL;DR оновлено: 319 → 320 posts, blog.html рядок v2.89.0, 278 → 279 cards, version 2.88.0 → 2.89.0
+- `VERSION` — 2.88.0 → 2.89.0
+
+---
+
 ## [2.88.0] — 2026-06-07
 
 ### Added
