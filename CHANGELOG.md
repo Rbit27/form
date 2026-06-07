@@ -6,6 +6,19 @@
 
 ---
 
+## [2.55.0] — 2026-06-07
+
+### Added
+- `content/post-277-detraining-comeback-timeline.md` — «Детренінг і повернення: скільки реально втрачається і за який час». Mujika & Padilla (2000 Med Sci Sports Exerc): кінетика втрат — сила тримається до 4 тижнів, VO2max падає за 1–2 тижні, гіпертрофія між; Häkkinen et al. (1985 Eur J Appl Physiol): нейральна (EMG) деградація випереджає структурну — пояснення «важкого відчуття» при поверненні; Seaborne et al. (2018 Sci Rep): гіпометиляція NCOR2/IGF1 зберігається після детренінгу — молекулярна основа м'язової пам'яті; Ogasawara et al. (2013 Eur J Appl Physiol): periodic training (6 он / 3 офф) = continuous за 24 тижні гіпертрофії; Bickel et al. (2011 Med Sci Sports Exerc): 1/3 об'єму достатньо для підтримки; три операційні сценарії повернення (2 тижні / 4–8 тижнів / 2+ місяці); 13 хв читання. sports-scientist pending. clinical-safety NOT REQUIRED.
+- Blog card for post-277 added to `blog.html`.
+- `README.md` roadmap: post-277 позначено [x]; додані теми post-280–284 (heat training, autoregulation variability, plyometrics, inter-individual response variability, minimal time protocol).
+
+### Changed
+- `STATUS.md` — рядок post-277 додано до content engine table.
+- `VERSION` → 2.55.0.
+
+---
+
 ## [2.54.0] — 2026-06-07
 
 ### Added
