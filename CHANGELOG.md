@@ -6,6 +6,13 @@
 
 ---
 
+## [2.76.1] — 2026-06-07
+
+### Added
+- `content/post-307-training-sleep.md` — Тренінг і сон: двонаправлений зв'язок; GH/SWS, Leproult & Van Cauter 2011 (testosterone/sleep), Blumert 2006 (performance), Dattilo 2011 (mTOR), Dolezal 2017 (training→sleep), Stutz 2019 (evening exercise myth); практична рамка для спортсмена з дефіцитом сну без порад щодо добавок; clinical-safety NOT REQUIRED.
+
+---
+
 ## [2.76.0] — 2026-06-07
 
 ### Added
