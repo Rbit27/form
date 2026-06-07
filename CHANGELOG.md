@@ -6,6 +6,19 @@
 
 ---
 
+## [2.92.0] — 2026-06-07
+
+### Added
+- `content/post-324-passive-mobility-constraints.md` — пасивні обмеження рухливості: три механізми (капсульне, фасціально-м'язове, нейральне), Weppler &amp; Magnusson (2010) stretch tolerance vs mechanical stiffness, Aquino et al. (2010) нейральне гальмування hamstrings +12–18° PNF vs +4–7° статика, Vicenzino et al. (2011) суглобова мобілізація &gt; стретчинг при капсульному обмеженні, Freitas et al. (2015) хронічна програма 12+ тижнів і реальна зміна жорсткості, Behm et al. (2016) дозування і силовий ефект, Morton et al. (2019) full ROM тренінг vs ізольований стретчинг, діагностичний алгоритм і протоколи для кожного механізму; owner: sports-scientist; clinical-safety: NOT REQUIRED
+
+### Changed
+- `blog.html` — додано 5 нових карток (post-320 вже була, додано 321–324): 284 картки всього
+- `README.md` — roadmap: post-324 → [x], додано post-325; лічильник постів → 324; version footer → v2.92.0
+- `STATUS.md` — blog.html row → 284 cards (324 posts authored) · v2.92.0
+- `VERSION` — 2.91.0 → 2.92.0
+
+---
+
 ## [2.91.0] — 2026-06-07
 
 ### Added
