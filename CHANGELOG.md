@@ -6,6 +6,17 @@
 
 ---
 
+## [2.82.0] — 2026-06-07
+
+### Added
+- `content/post-312-strength-standards.md` — стандарти сили: Wilks/DOTS/IPF GL коефіцієнти, bodyweight multipliers за рівнями (novice/intermediate/advanced/elite), реалістична траєкторія новачок→intermediate, як використовувати стандарти без пастки порівняння; 12 хв читання; clinical-safety NOT REQUIRED
+- `content/post-313-breathing-during-set.md` — дихання під час підходу: повна механіка Valsalva (субглотальний тиск → IAP → жорсткість хребта), McGill 2007/Hackett & Chow 2013/Tobin et al. 1983/Hodges & Gandevia 2000, breath-reset стратегія у багатоповторних сетах, матриця тип вправи × % 1RM × стратегія дихання; 11 хв читання; clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — post-312, post-313 відмічено як [x]; roadmap post-314–315 на черзі
+
+---
+
 ## [2.81.0] — 2026-06-07
 
 ### Added
