@@ -637,6 +637,14 @@ Each iteration:
 - [x] post-308: Сила у нестандартних положеннях — чому unilateral і offset-loading розвивають нейром'язову стабільність, яку білатеральний тренінг не покриває; carry patterns, asymmetrical loading, clinical-safety NOT REQUIRED
 - [x] post-309: Програмування для батьків маленьких дітей — не «як знайти мотивацію», а як реорганізувати структуру тренінгу при хронічному недосипі, нестабільному розкладі і дефіциті часу; clinical-safety NOT REQUIRED
 - [x] post-310: Суперсети і ефективність тренування — pre-exhaust (Brentano 2017: ЕМГ не зростає, об'єм падає), mechanical drop sets (механіка кутової специфічності), PAP через антагоністичні пари (Robbins 2010); матриця вибору техніки за метою; clinical-safety NOT REQUIRED
+- [x] post-311: Внутрішньочеревний тиск і брейсинг — IAP як механічна система стабілізації (не вправа на прес); brace vs. draw-in (Grenier & McGill 2007: bracing значно вища жорсткість хребта); антиципаторна активація ТА (Cresswell 1992, Hodges & Richardson 1997); Valsalva механіка і безпека; пояс як підсилювач IAP; clinical-safety NOT REQUIRED
+
+#### Roadmap post-312+
+
+- [ ] post-312: Стандарти сили — чи є «достатньо сильний» і що говорять Wilks/DOTS/відносна сила про реалістичні цілі для різного тренувального стажу; clinical-safety NOT REQUIRED
+- [ ] post-313: Дихання під час підходу — VAP, Valsalva в субмаксимальних, де затримка дихання виправдана і де надмірна; breathing pattern у багатоповторних підходах; clinical-safety NOT REQUIRED
+- [ ] post-314: Памп і клітинне набрякання — метаболічний стрес як механізм гіпертрофії (Schoenfeld 2013 cell swelling hypothesis), що відрізняє продуктивний памп від «просто накачалось»; clinical-safety NOT REQUIRED
+- [ ] post-315: Де закінчується новачок — ознаки завершення новачкового ефекту, що змінюється в програмуванні, частоті і відновленні після переходу на intermediate; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 

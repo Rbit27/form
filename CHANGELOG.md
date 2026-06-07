@@ -6,6 +6,17 @@
 
 ---
 
+## [2.80.0] — 2026-06-07
+
+### Added
+- `content/post-311-intraabdominal-pressure-bracing.md` — внутрішньочеревний тиск і брейсинг: brace vs. draw-in (Grenier & McGill 2007 — bracing значно вища жорсткість хребта), антиципаторна активація ТА (Cresswell 1992, Hodges & Richardson 1997), Valsalva механіка і безпека, пояс як підсилювач IAP (Harman 1989: +25–40% IAP); 13 хв читання; clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — post-311 відмічено як [x]; додано roadmap post-312–315 (стандарти сили, дихання в підходах, памп/клітинне набрякання, межа новачок→intermediate)
+- `STATUS.md` — додано рядки post-310 і post-311 до content engine таблиці
+
+---
+
 ## [2.79.0] — 2026-06-07
 
 ### Added

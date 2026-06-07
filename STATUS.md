@@ -365,6 +365,8 @@ FORM is at v2.69.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-307-training-sleep.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-308-unilateral-asymmetric.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-309-programming-for-parents.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-310-supersets-preexhaust-mechanical-dropsets.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-311-intraabdominal-pressure-bracing.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
