@@ -6,6 +6,19 @@
 
 ---
 
+## [2.83.0] — 2026-06-07
+
+### Added
+- `content/post-314-pump-cellular-swelling-hypertrophy.md` — памп і клітинне набрякання: тріада гіпертрофії Schoenfeld (2010, 2013), cell swelling hypothesis, mTORC1-активація через набрякання (Loenneke 2012), BFR як природний експеримент (Pearson & Hussain 2015), межі доказів, памп як діагностика проти пампу як мети; 13 хв читання; clinical-safety NOT REQUIRED
+- `blog.html` — додано 5 карток: post-310 (supersets), post-311 (IAP/bracing), post-312 (strength standards), post-313 (breathing), post-314 (pump)
+
+### Changed
+- `STATUS.md` — додано рядки для post-312, post-313, post-314 у content engine table
+- `README.md` — post-314 відмічено [x] у roadmap; додано post-316–318 до roadmap
+- `VERSION` — 2.82.0 → 2.83.0
+
+---
+
 ## [2.82.0] — 2026-06-07
 
 ### Added
