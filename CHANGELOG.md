@@ -6,6 +6,15 @@
 
 ---
 
+## [2.44.0] — 2026-06-07
+
+### Added
+- `content/post-267-training-without-plan.md` — editorial-brutalist post (~12 хв): механіка хаотичної активності vs структурованого стимулу. SRA-крива і два патерни провалу (передчасний і запізнілий ре-стимул). Dankel et al. (2017 Eur J Appl Physiol): частота і об'єм, нелінійна залежність. MEV-концепція (Helms et al. 2014 JISSN): чому мінімальний ефективний стимул зростає з тренувальним віком. Mujika & Padilla (2000 Med Sci Sports Exerc): межа детренування. Чому «просто рухатись» валідно для maintenance але не для прогресу. clinical-safety NOT REQUIRED. sports-scientist reviewed.
+- `content/post-268-psychology-of-stopping-a-set.md` — editorial-brutalist post (~11 хв): нейронаукова механіка рішення зупинити підхід. Merton (1954): interpolated twitch technique, 20–30% резерв мотонейронів при суб'єктивній відмові. Marcora (2010 J Appl Physiol) Psychobiological Model: perception of effort як окремо генерований сигнал, не відображення периферії. Marcora, Staiano & Manning (2009 JAP): ментальна втома і витривалість. Central Governor (Noakes 2001 J Exp Biol): телеологічна регуляція. Таксономія трьох механізмів зупинки. RPE-калібрування і SFR-логіка. Без мотиваційного контенту. clinical-safety NOT REQUIRED. sports-scientist reviewed.
+- `VERSION` → 2.44.0
+
+---
+
 ## [2.43.0] — 2026-06-06
 
 ### Added
