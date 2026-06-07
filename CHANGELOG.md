@@ -6,6 +6,18 @@
 
 ---
 
+## [2.75.0] — 2026-06-07
+
+### Added
+- `content/post-302-subjective-vs-objective-readiness.md` — Суб'єктивна vs об'єктивна готовність: алостатичне навантаження, чотири квадранти готовності, коли HRV вводить в оману (Plews 2013, Buchheit 2014, Saw 2016, McEwen 1998, Meeusen 2013). clinical-safety NOT REQUIRED.
+- `content/post-303-self-coach-programming-log.md` — Програмування для самокоуча: мінімальна документація для максимальної діагностики; RPE/RIR-логування, ACWR, autoregulation, periodization як гіпотезне тестування (Zourdos 2016, Helms 2016, Gabbett 2016, Kiely 2012). clinical-safety NOT REQUIRED.
+- `content/post-304-tempo-effective-rm.md` — Темп і ефективний RM: tempo notation (4010/3111/2011), як швидкість руху змінює дозування навантаження; практичні корекції навантаження при переході між темпами (Schoenfeld 2015, Wilk 2020, Lacerda 2016, Burd 2012, Roig 2009). clinical-safety NOT REQUIRED.
+
+### Changed
+- `VERSION` → 2.75.0.
+
+---
+
 ## [2.74.0] — 2026-06-07
 
 ### Added
