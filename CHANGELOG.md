@@ -6,6 +6,19 @@
 
 ---
 
+## [2.76.0] — 2026-06-07
+
+### Added
+- `compliance/c1/device-disposal-policy.md` — POL-013 v1.0 IN_FORCE: Media and Device Disposal Policy. Extracted from `docs/SOC2_READINESS.md §66` per MDD-P0-04. NIST SP 800-88 Rev. 1 wipe standards (FileVault 2 EACS cryptographic erasure for SSD/NVMe; 7-pass Disk Utility for USB; iOS EACS; certified vendor shredding for HDDs); per-category disposal procedures (laptop / mobile test device / external storage); remote-work device policy (FileVault 2 + auto-lock ≤5 min + MDM + no-credentials-in-plaintext); test device handling for devices that touched production health data (audit log search → two-person sign-off or HMAC-chain compensating control → health data cache verification → standard wipe); chain of custody (solo-founder compensating control via `asset.disposal_initiated` → `asset.disposal_completed` HMAC chain sequence; third-party handoff form template; founder attestation); 6-event timeline table; third-party destruction vendor criteria (NAID AAA / e-Stewards / R2-RIOS; NIST Purge or ≤6 mm shred; cert within 5 days; EU data residency for EU health-data devices; DPA required); SOC 2 evidence mapping (C1.2 / CC6.5 / CC6.7 / CC1.4). Registered as PRE-34-E-008. Closes: C1-GAP-002 (🔴 → 🟡 Authored), C1-GAP-004 (P1 Open → 🟡 Authored), PRE-06 (🔴 → 🟡 Authored). References: `docs/SOC2_READINESS.md §66`, `docs/AUDIT_LOG_SCHEMA.md`, DEC-030.
+- `compliance/assets/device-register.csv` — Device register baseline v1.0 (MDD-P0-01 template). Three rows for solo-founder phase (FORM-DEV-001 laptop, FORM-MOB-001 primary mobile, FORM-MOB-002 test device). Serial numbers placeholder to 1Password vault. Fields: asset_id, device_type, manufacturer, model, serial_number, os, owner, provisioned_date, production_access, health_data_cached, disposal_date, disposal_method, mdd_evidence_id.
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` → v0.5: +5 `asset.*` device disposal events (`asset.disposal_initiated` STANDARD, `asset.disposal_completed` STANDARD, `asset.device_sanitized` HIGH, `asset.chain_of_custody_transferred` HIGH, `asset.disposal_log_filed` STANDARD — all 7-year retention). New "Asset & Device Management" section with HMAC-chain requirement (30-day `initiated` → `completed` gap triggers MDD-AL-01 alert). Retention table updated with `asset.*` row. Closes MDD-P0-03 (SOC2_READINESS §66.12).
+- `compliance/policy-approval-log.csv` — POL-013 registered: Media and Device Disposal Policy v1.0 IN_FORCE.
+- `VERSION` → 2.76.0.
+
+---
+
 ## [2.75.1] — 2026-06-07
 
 ### Added

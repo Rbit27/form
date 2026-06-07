@@ -1,0 +1,4 @@
+asset_id,device_type,manufacturer,model,serial_number,os,owner,provisioned_date,production_access,health_data_cached,disposal_date,disposal_method,mdd_evidence_id,notes
+FORM-DEV-001,laptop,Apple,MacBook Pro (M-series),[see 1Password: FORM Asset Register — Device Serials],macOS 15,founder@form.coach,2025-09-01,yes,yes (test builds / debugging sessions),,in_service,,Active development machine. FileVault 2 enabled. Solo-founder phase.
+FORM-MOB-001,mobile_primary,Apple,iPhone (current model),[see 1Password: FORM Asset Register — Device Serials],iOS 18,founder@form.coach,2025-09-01,yes (dev certs / TestFlight),yes,,in_service,,Primary test device. iOS hardware encryption enabled.
+FORM-MOB-002,mobile_test,Apple,iPad or secondary iPhone,[see 1Password: FORM Asset Register — Device Serials],iOS 18,founder@form.coach,2025-09-01,dev certs only,no,,in_service,,Secondary test device. Use in_service or N/A if not applicable.
