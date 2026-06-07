@@ -6,6 +6,17 @@
 
 ---
 
+## [2.51.0] — 2026-06-07
+
+### Added
+- `compliance/cc6/README.md` — CC6 Logical and Physical Access Controls evidence index. Documents all 8 CC6 criteria (CC6.1–CC6.8) with current status (🟡/🟢); lists evidence files (offboarding-procedure.md, Q2 access review, SSO_SCIM_IMPLEMENTATION.md, DATA_MODEL.md, CRYPTOGRAPHY_POLICY.md); tracks 14 gap items (CC6-GAP-001 through CC6-GAP-014, P0: 6, P1: 4, P2: 4) with owners and close conditions; defines compliance calendar (quarterly access reviews, annual policy review, offboarding events, break-glass events); 10 open action items. security-engineer + platform-engineer + compliance-officer.
+- `compliance/cc9/` — New directory for CC9 Risk Mitigation (final missing CC directory; CC2, CC3 directories still absent — CC9 is highest-priority for enterprise audits given vendor management requirements).
+- `compliance/cc9/README.md` — CC9 Risk Mitigation evidence index. Documents CC9.1 (business disruption risk mitigation), CC9.2 (vendor risk assessment), CC9.3 (vendor obligation compliance) with current status (🟡 Partial — programme designed, first evidence cycle Q1 2027); vendor tier table (Critical: Supabase/Cloudflare/WorkOS/Anthropic; High: Stripe/ElevenLabs; Standard: PostHog/Sentry); 5 gap items including CC9-GAP-001 (Sentry DPA, P1 escalation 2026-06-12), CC9-GAP-004 (sub-processor page, P0 before enterprise GA); compliance calendar (annual vendor review, BCP/DR review, DR tabletop tests, sub-processor currency); 6 open action items. compliance-officer + devops-lead.
+- `content/post-274-triphasic-training-eccentric-isometric-concentric-blocks.md` — «Трифазне тренування: чому послідовність ексцентрик → ізометрик → концентрик дає більше, ніж "просто підіймати важче"». Cal Dietz triphasic model; ексцентричні адаптації (саркомерогенез Lynn & Morgan 1994, фасикулярна довжина Reeves 2009, оптимальний кут Brockett 2001, сухожильне ремоделювання Malliaras 2013); ізометричні адаптації (кутова специфічність Tillin & Bishop 2009, сухожильна жорсткість і потужність Bojsen-Møller 2005, Bohm 2015); концентрична фаза і RFD; фізіологічна логіка послідовності блоків; обмеження (не для початківців, не для <9 тижнів); спрощена 9-тижнева версія для аматора. 14 хв читання. sports-scientist pending. clinical-safety NOT REQUIRED.
+- `content/post-275-compensatory-acceleration-training-intent-neural-specificity.md` — «Навмисна швидкість: чому "намір бути вибуховим" при субмаксимальних вагах дає нейральні адаптації, яких не дає "просто важка" робота». Fred Hatfield CAT (1989); F = ma логіка прискорення; size principle і HTMU рекрутмент (Henneman 1965); rate coding і doublet discharges (Van Cutsem 1998 — 5% → 33% doublets, RFD +53%); Behm & Sale 1993 — намір до швидкості в ізометрику дає адаптацію навіть без зовнішньої швидкості; крива сила-швидкість (Hill 1938); 4-зонна таблиця тренування; CAT vs VBT (цільові м/с для присідання, жиму, тяги); прогресія для аматора (3 місяці). 12 хв читання. sports-scientist pending. clinical-safety NOT REQUIRED.
+
+---
+
 ## [2.50.0] — 2026-06-07
 
 ### Added
