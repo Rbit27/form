@@ -6,6 +6,20 @@
 
 ---
 
+## [2.85.0] — 2026-06-07
+
+### Added
+- `content/post-315-novice-to-intermediate-transition.md` — де закінчується новачок: нейральна фаза (Sale 1988, Moritani & deVries 1979), 4 операційні сигнали переходу (LP stall 2-3×, RPE-дрейф, відновлення >72h, тренувальний стаж 6-18 міс), DUP vs LP (Rhea et al. 2003: +28.8% vs +14.4%), зміни у частоті і відновленні; 14 хв читання; clinical-safety NOT REQUIRED
+- `content/post-316-training-response-variability.md` — варіативність відповіді на тренінг: HERITAGE Family Study (Bouchard 1999, 0–100% VO₂max), Hubal et al. (2005, -2% до +59% CSA), ACTN3 R577X / ACE I/D, non-responder міф (Hecksteden 2015), консистентність vs генетика (47/53%); 14 хв читання; clinical-safety NOT REQUIRED
+- `blog.html` — додано 2 картки: post-315 (novice-to-intermediate), post-316 (response variability)
+
+### Changed
+- `STATUS.md` — TL;DR оновлено: 314 → 316 posts, blog.html рядок v2.85.0, 273 → 275 cards
+- `README.md` — post-315, post-316 відмічено [x] у roadmap
+- `VERSION` — 2.83.0 → 2.85.0
+
+---
+
 ## [2.83.0] — 2026-06-07
 
 ### Added
