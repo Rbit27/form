@@ -6,6 +6,19 @@
 
 ---
 
+## [2.59.0] — 2026-06-07
+
+### Added
+- `enterprise/runbooks/FORM-DR-003.md` — Supabase primary-region failure and PITR failover runbook. Pre-execution checklist, failure classification (platform vs FORM-side), §2 maintenance mode activation (wrangler KV flag + enterprise notification via IRP E-02 template), §3 PITR initiation with RPO breach assessment and founder approval gate, §4 DEC-030 HMAC chain integrity verification (SQL chain-check query + P0 escalation path if broken), §5 Privacy Floor verification (cross-tenant RLS test + admin aggregate user_id check) + F1–F8 smoke test suite, §6 maintenance lift with audit_events emission (`system.maintenance_lifted`, `system.pitr_restore_completed`), §7 evidence filing to `compliance/evidence/cc7/incidents/FORM-DR-003-[DATE]/` + post-mortem SLA credit trigger. Aligned with `docs/BUSINESS_CONTINUITY.md §6.1`, DEC-030, `docs/ENTERPRISE_SLA.md §5`. SOC 2: CC7.4, CC7.5, A1.2, A1.3, CC9.1.
+- `enterprise/runbooks/FORM-DR-004.md` — Cloudflare Workers degradation and Worker-bug rollback runbook. Two-path failure classification (platform incident vs FORM Worker regression); §2 platform incident response (KV maintenance flag with graceful failure on Cloudflare outage, Better Uptime fallback status, 4-hour SLA credit trigger); §3 Worker bug rollback (`wrangler rollback` primary path + manual `git checkout` fallback with exact commands); §4 post-recovery smoke test F1–F8 including F6 Privacy Floor (`has("user_id")` must return false on admin aggregate endpoint) and Worker version git-sha verification; §5 maintenance lift with audit event emission; §6 evidence filing + post-mortem action item requiring a CI regression test for the offending change. Known gap R-004 (no secondary CDN — Post-Series-A scope) documented. SOC 2: CC7.4, CC7.5, A1.2, A1.3.
+- `enterprise/runbooks/FORM-DR-005.md` — Total vendor outage (nuke scenario) cold-restore runbook. Pre-execution checklist with 10 gates including founder presence requirement and GDPR 72-hour clock trigger; §1 enterprise tenant and regulatory communication within 15 minutes; §2 credential recovery (1Password standard path + emergency account-recovery path if 1Password compromised); §3 Backblaze B2 cold backup download (SHA1 verification + GPG signature check with hard-stop on signature failure) → new Supabase project provisioning → `pg_restore` + Supabase CLI migration-to-HEAD; §4 Cloudflare Worker re-deployment with all secrets rotated (HMAC_SIGNING_KEY and IP_HASH_SALT must be new values, never reused); §5 WorkOS SSO + SCIM + Stripe re-integration verification; §6 Privacy Floor SQL tests (4 checks) + row count delta + audit chain gap assessment (gap is expected and documented, not a chain break); §7 full F1–F8 smoke test suite; §8 maintenance lift + data-impact enterprise notification template + GDPR Art. 33/34 conditional filing + credential cleanup (`shred`) + `system.cold_restore_completed` audit event; §9 mandatory evidence package (14 items) + post-mortem additional sections. Known gaps: BCP-04 (no cold backup automation — RPO breach expected), BCP-03 (sole operator). SOC 2: CC7.4, CC7.5, A1.2, A1.3, CC9.1.
+- `enterprise/runbooks/` directory created — closes structural gap referenced in `compliance/cc9/README.md` (DR runbooks listed as 🟢 Authored v2.38.1 but directory did not exist until this commit).
+
+### Changed
+- `VERSION` → 2.59.0.
+
+---
+
 ## [2.58.0] — 2026-06-07
 
 ### Added
