@@ -31,7 +31,7 @@ FORM is at v2.69.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 284 cards (324 posts authored), category filter, newsletter CTA | v2.92.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 284 cards (326 posts authored), category filter, newsletter CTA | v2.93.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 | [`security.html`](security.html) | Security Trust Center — SOC 2 status, sub-processors, responsible disclosure | v2.40.0 ✓ |
@@ -584,6 +584,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v2.91.0 · 7 червня 2026**
-**Last update:** 7 червня 2026 · v2.91.0
+**v2.93.0 · 7 червня 2026**
+**Last update:** 7 червня 2026 · v2.93.0
 **Next planned update:** після hire of Founding Engineer

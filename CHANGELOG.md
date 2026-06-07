@@ -6,6 +6,18 @@
 
 ---
 
+## [2.93.0] — 2026-06-07
+
+### Added
+- `content/post-325-strength-training-bone-density.md` — Силовий тренінг і кісткова щільність: механотрансдукція (Duncan & Turner 1995), Frost mechanostat, Turner's 3 rules (1998), Guadalupe-Grau meta-analysis (2009), LIFTMOR trial Watson et al. (2018) 85% 1RM → +3.2% hip BMD / +2.9% lumbar, регіональна специфічність навантаження; clinical-safety NOT REQUIRED; owner: sports-scientist
+- `content/post-326-sleep-training-adaptation.md` — Сон і тренувальна адаптація: SWS/GH cascade (Van Cauter 2000), sleep debt → тестостерон -10–15% (Leproult & Van Cauter 2010 JAMA), катаболічний дисбаланс (Dattilo 2011), -11% MVC за 24h депривації, 1.7× injury risk <8h (Milewski 2014), sleep extension +5% sprint / +9% free throw (Mah 2011); клінічно-безпечний фізіологічний контент; clinical-safety NOT REQUIRED; owner: sports-scientist
+
+### Changed
+- `README.md` — post-325 + post-326 позначені як ✅ у content roadmap
+- `VERSION` — 2.92.1 → 2.93.0
+
+---
+
 ## [2.92.1] — 2026-06-07
 
 ### Changed

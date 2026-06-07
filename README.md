@@ -654,7 +654,8 @@ Each iteration:
 - [x] post-322: Тренінг з нестабільним розкладом — як будувати прогресію, коли немає передбачуваних трьох днів на тиждень; мінімальні ефективні стратегії, пріоритизація; clinical-safety NOT REQUIRED
 - [x] post-323: Жорсткість сухожиль і передача сили — чому слабкі сухожилля обмежують силовий вихід незалежно від м'язової маси; протоколи адаптації; clinical-safety NOT REQUIRED
 - [x] post-324: Пасивні обмеження рухливості — де реально «стоїть» мобільність і чому розтяжки недостатньо; капсула vs фасція vs нейральне гальмування; Weppler &amp; Magnusson (2010) stretch tolerance vs mechanical stiffness, Aquino et al. (2010) нейральне гальмування hamstrings, Vicenzino et al. (2011) суглобова мобілізація; clinical-safety NOT REQUIRED
-- [ ] post-325: Силовий тренінг і кісткова щільність — механотрансдукція у кістковій тканині, осьове навантаження vs. ударне, доза-відповідь для BMD, Wolff's law у сучасному прочитанні; clinical-safety NOT REQUIRED
+- [x] post-325: Силовий тренінг і кісткова щільність — механотрансдукція у кістковій тканині, осьове навантаження vs. ударне, доза-відповідь для BMD, Wolff's law у сучасному прочитанні; Duncan & Turner (1995), Watson et al. LIFTMOR (2018); clinical-safety NOT REQUIRED
+- [x] post-326: Сон і тренувальна адаптація — GH/SWS cascade, Van Cauter (2000/2010), Dattilo (2011) sleep debt → катаболічний дисбаланс, Milewski (2014) 1.7× injury risk, Mah (2011) sleep extension; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
