@@ -79,7 +79,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Access control policies (least privilege) | ✅ Done | `docs/AUDIT_LOG_SCHEMA.md` — role matrix; break-glass procedure |
 | MFA enforced for all admin access | 🟡 Gap | Enforce for Cloudflare dashboard, Supabase, 1Password |
 | Separation of duties | 🟡 Partial | Founder is single-person; 2-person approval for break-glass is compensating control |
-| Change management (code review, CI gates) | 🟡 Gap | Define PR review requirements and CI test gates |
+| Change management (code review, CI gates) | 🟢 Done | `compliance/cc8/change-management-policy.md` — POL-011 |
 
 ### CC6 — Logical and Physical Access Controls
 
@@ -107,9 +107,9 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Control | Status | Evidence |
 |---|---|---|
 | All changes via version-controlled repo | ✅ Done | GitHub public repo (DEC-010) |
-| Production deploy requires CI pass | 🟡 Gap | Enforce branch protection + required CI checks |
-| Rollback capability documented | 🟡 Gap | Define rollback runbook in `docs/ENGINEERING_RUNBOOK.md` |
-| Emergency change process | 🟡 Gap | Define; log as `system.config_changed` in audit log |
+| Production deploy requires CI pass | 🟢 Done | `compliance/cc8/change-management-policy.md` §5 — CI gates defined |
+| Rollback capability documented | 🟢 Done | `compliance/cc8/change-management-policy.md` §8 — rollback by component |
+| Emergency change process | 🟢 Done | `compliance/cc8/change-management-policy.md` §7 — 24 h retroactive approval |
 
 ### CC9 — Risk Mitigation (Vendor Management)
 

@@ -552,6 +552,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v2.41.0 · 6 червня 2026**
-**Last update:** 6 червня 2026 · v2.41.0
+**v2.48.0 · 7 червня 2026**
+**Last update:** 7 червня 2026 · v2.48.0
 **Next planned update:** після hire of Founding Engineer

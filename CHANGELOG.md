@@ -6,6 +6,18 @@
 
 ---
 
+## [2.48.0] — 2026-06-07
+
+### Added
+- `compliance/cc8/change-management-policy.md` — **Change Management & SDLC Policy v1.0** (POL-011). Covers change classification (Standard/Normal/Emergency), branch protection rules (no force push, PR required), CI/CD pipeline gates (7 required checks: tsc, lint, tests, integration, npm audit, build, bundle size), code review requirements with solo-founder compensating control, emergency change process with 24-h retroactive approval and DEC-030 `system.deploy emergency: true` event, rollback procedures by component (Workers/Pages < 5 min, schema PITR ≤ 4 h), prohibited operations table, compliance calendar, and 8 SOC 2 evidence artefacts CC8-E-001 through CC8-E-008. Closes four `SOC2_READINESS.md` CC8 gaps: "Change management (code review, CI gates)", "Production deploy requires CI pass", "Emergency change process", "Rollback capability documented" — all 🟡 → 🟢. devops-lead + security-engineer.
+- `compliance/cc8/README.md` — CC8 evidence index with gap status, artefact table, and compliance calendar.
+- `compliance/policy-approval-log.csv` — POL-011 row added.
+- `docs/SOC2_READINESS.md` — CC8 gap table updated: 4 items 🟡/🟡 → 🟢 Done.
+- `content/post-271-rest-intervals-hypertrophy-strength.md` — «Скільки відпочивати між підходами: наука проти залу». Розбір гіпотези метаболічного стресу, ключове дослідження Schoenfeld 2016 (1 хв vs 3 хв), механізм PCr-відновлення (Harris 1976), практичні рекомендації за ціллю (сила 3–5 хв, гіпертрофія 2–3 хв). 12 хв читання. sports-scientist pending. clinical-safety NOT REQUIRED.
+- `content/post-272-stretch-shortening-cycle-ssc.md` — «Цикл розтягування-скорочення: як тіло зберігає і повертає пружну енергію». SSC механізм (пружна енергія SEC + міотатичний рефлекс), швидкий vs повільний SSC, RSI (Flanagan & Comyns 2008), адаптації до пліометики (Taube 2012, Kyröläinen 2005), практичні методи (drop jump, CMJ, bound drill) та прогресія. 14 хв читання. sports-scientist pending. clinical-safety NOT REQUIRED.
+
+---
+
 ## [2.47.0] — 2026-06-07
 
 ### Added
