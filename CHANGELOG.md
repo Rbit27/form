@@ -6,6 +6,14 @@
 
 ---
 
+## [2.77.0] — 2026-06-07
+
+### Added
+- `content/post-306-female-progression.md` — Прогресія для жінок: Morton 2018 (PNAS, equivalent relative response), Roberts 2023, естроген як анаболічний/антикатаболічний агент (ERα/IGF-1, NF-κB), менструальний цикл і тренінг (McNulty 2020, Wikström-Frisén 2017, Sung 2014), відмінності у відновленні (Hunter 2014, Enns & Tiidus 2010), градація доказів (strong/moderate/weak); clinical-safety NOT REQUIRED.
+- `content/post-308-unilateral-asymmetric.md` — Сила у нестандартних положеннях: bilateral deficit (Kuruganti & Murphy 2008, Magnus 2010), lateral stabilizer chain (McGill 2010), carry taxonomy (farmer/suitcase/overhead/Zercher), cross-education (Carroll 2006, 7–18%), offset loading як GPP-інструмент; clinical-safety NOT REQUIRED.
+
+---
+
 ## [2.76.1] — 2026-06-07
 
 ### Added
