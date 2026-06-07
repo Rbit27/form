@@ -16,7 +16,7 @@ This is a **pre-product** project repository. There is no app code yet (mobile d
 
 - **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
 - **65+ markdown documents** — strategic, operational, content
-- **317 evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
+- **320 evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **3 sample training programs** — sports-science discipline reference
 - **24 specialized AI agents** — operating model embodied у `.claude/agents/`
@@ -650,9 +650,10 @@ Each iteration:
 - [x] post-318: Адаптаційна стеля і як зрозуміти, що ти до неї наближаєшся — тренувальний стаж, темп прогресії, де межа між «ще ростемо» і «вже біля максимуму»; clinical-safety NOT REQUIRED
 - [x] post-319: Ізометричний тренінг — де сила не рухається, але зростає; кутова специфічність, IMTP та intra-repetition isometrics, клінічні застосування і практичне програмування; clinical-safety NOT REQUIRED
 - [x] post-320: Чому відчуття «легко» не означає «мало» — суб'єктивне сприйняття зусилля і реальний тренувальний стимул; RPE-дрейф, звикання, і коли «легко» треба поважати; Borg (1970/1982), Hampson et al. (2001) efference copy, Pageaux &amp; Lepers (2018) когнітивна втома, Zourdos et al. (2016) RIR r=0.78, Helms et al. (2016), Smits et al. (2014) звикання, Roberts et al. (2018) residual fatigue; clinical-safety NOT REQUIRED
-- [ ] post-321: Пік сили vs силова витривалість — два окремих фенотипи, різні механізми адаптації, різне програмування; де вони перетинаються і де ні; clinical-safety NOT REQUIRED
-- [ ] post-322: Тренінг з нестабільним розкладом — як будувати прогресію, коли немає передбачуваних трьох днів на тиждень; мінімальні ефективні стратегії, пріоритизація; clinical-safety NOT REQUIRED
-- [ ] post-323: Жорсткість сухожиль і передача сили — чому слабкі сухожилля обмежують силовий вихід незалежно від м'язової маси; протоколи адаптації; clinical-safety NOT REQUIRED
+- [x] post-321: Пік сили vs силова витривалість — два окремих фенотипи, різні механізми адаптації, різне програмування; де вони перетинаються і де ні; clinical-safety NOT REQUIRED
+- [x] post-322: Тренінг з нестабільним розкладом — як будувати прогресію, коли немає передбачуваних трьох днів на тиждень; мінімальні ефективні стратегії, пріоритизація; clinical-safety NOT REQUIRED
+- [x] post-323: Жорсткість сухожиль і передача сили — чому слабкі сухожилля обмежують силовий вихід незалежно від м'язової маси; протоколи адаптації; clinical-safety NOT REQUIRED
+- [ ] post-324: Пасивні обмеження рухливості — де реально «стоїть» мобільність і чому розтяжки недостатньо; капсула vs фасція vs нейральне гальмування; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -697,4 +698,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 7 червня 2026 · v2.52.0
+**Last update:** 7 червня 2026 · v2.91.0

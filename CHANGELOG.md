@@ -6,6 +6,19 @@
 
 ---
 
+## [2.91.0] — 2026-06-07
+
+### Added
+- `content/post-321-peak-strength-vs-strength-endurance.md` — пік сили vs силова витривалість: нейральний vs метаболічний примат, AMPK/mTORC1 інтерференція, Sale (1988) нейральна адаптація, Folland & Williams (2007) механізми, Spiering et al. (2008) метаболічні адаптації, Rhea et al. (2003) конвертація сили, блокова vs паралельна структура; owner: sports-scientist; clinical-safety: NOT REQUIRED
+- `content/post-322-training-with-unstable-schedule.md` — тренінг з нестабільним розкладом: мінімальна ефективна доза (Ralston et al. 2017 meta-analysis), деренування Mujika & Padilla (2000) часові рамки, пріоритетна ієрархія рухів рівень 1-3, плаваюча частота за вікнами відновлення, full-body vs пріоритетний рух vs повторювана пара, авторегуляція AMRAP-тест; owner: sports-scientist; clinical-safety: NOT REQUIRED
+- `content/post-323-tendon-stiffness-force-transmission.md` — жорсткість сухожиль і передача сили: механіка stiffness k=ΔF/ΔL, RFD детермінант Bohm et al. (2015), колагеновий синтез Kjaer et al. (2005), адаптація Magnusson & Kjaer (2003), кутова специфічність Arampatzis et al. (2007), HSR-протокол Kongsgaard et al. (2009), ізометрія Rio et al. (2015), SSC пружна енергія Farris & Sawicki (2012), практичне програмування; owner: sports-scientist; clinical-safety: NOT REQUIRED
+
+### Changed
+- `README.md` — roadmap: post-321/322/323 → [x], додано post-324; лічильник постів → 320; version footer → v2.91.0
+- `VERSION` — 2.90.0 → 2.91.0
+
+---
+
 ## [2.90.0] — 2026-06-07
 
 ### Added
