@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v0.4
+# FORM · Audit Log Schema v0.6
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -246,6 +246,24 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 
 ---
 
+### Vulnerability Management events (DEC-030 HMAC-chained · CC7.1 / CC7.2)
+
+> Defined in `compliance/cc7/vuln-management-policy.md §10` (POL-010). Five events covering the full CVE lifecycle: discovery, patch deployment, SLA exception, Won't Fix closure, and enterprise tenant notification. Privacy floor: no `vuln.*` payload may contain `user_id`, `session_id`, health data, or coaching content — `cve_id`, `component`, and `affected_version` are infrastructure identifiers with no user data linkage. A chain break on any `vuln.*` event is a P0 incident per `docs/INCIDENT_RESPONSE.md §R-05`. Cross-ref: SOC 2 CC7.1 (threat identification) / CC7.2 (vulnerability monitoring and remediation tracking) / CC5.3 (standalone Vulnerability Management Policy — POL-010). Closes `compliance/cc7/vuln-management-policy.md` checklist item 6 (P1 M3).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `vuln.cve_discovered` | MEDIUM | 7 yr | Linear `[SEC]` ticket created for CVSS ≥ 4.0 finding | `cve_id`, `cvss_base`, `final_severity`, `uplift_applied` (bool), `uplift_rules[]` (`U-01`\|`U-02`\|`U-03`), `component`, `affected_version`, `sla_deadline` (ISO 8601) |
+| `vuln.patch_deployed` | MEDIUM | 7 yr | Production deploy of the patch PR confirmed (CI post-deploy hook) | `cve_id`, `patch_pr_url`, `merged_at` (ISO 8601), `deployed_at` (ISO 8601), `sla_met` (bool), `elapsed_hours` |
+| `vuln.sla_exception_granted` | HIGH | 7 yr | Risk acceptance approved per vuln-management-policy §7.2 | `cve_id`, `original_severity`, `approved_by[]` (UUID array — joint approval per §7.2 matrix), `new_deadline` (ISO 8601), `compensating_control` (free text, max 500 chars), `rationale_ref` (Linear ticket URL) |
+| `vuln.wont_fix_closed` | MEDIUM | 7 yr | Linear ticket closed as Won't Fix per vuln-management-policy §7.3 | `cve_id`, `cvss_base`, `rationale` (free text, max 500 chars), `approved_by` (UUID — security-engineer) |
+| `vuln.enterprise_notified` | MEDIUM | 7 yr | Template E-VULN-01 or E-VULN-02 sent to enterprise tenant | `cve_id`, `tenant_id`, `template_used` (`E-VULN-01`\|`E-VULN-02`), `sent_by` (UUID), `notified_at` (ISO 8601) |
+
+**HMAC chain requirement:** `vuln.patch_deployed` must reference the same `cve_id` as a preceding `vuln.cve_discovered` in the chain. `vuln.sla_exception_granted` must reference a `cve_id` with an open `vuln.cve_discovered` and no `vuln.patch_deployed`. `vuln.wont_fix_closed` and `vuln.patch_deployed` are mutually exclusive for the same `cve_id` — both present in the chain for the same `cve_id` is a chain anomaly detected by the weekly audit batch. **Uplift rule U-02 (RLS bypass potential) makes a finding permanently ineligible for Won't Fix** — emitting `vuln.wont_fix_closed` with `uplift_rules: ['U-02']` is a policy violation; the weekly chain audit flags this and triggers PagerDuty P1 (no compliant path exists for an RLS-bypass Won't Fix).
+
+**Emitter assignment:** `vuln.cve_discovered` — `security-engineer` (manual via admin API); `vuln.patch_deployed` — `devops-lead` (automated via CI post-deploy hook, implementation: vuln-management-policy.md checklist item #7 P1 M4); `vuln.sla_exception_granted` — `compliance-officer` (manual); `vuln.wont_fix_closed` — `security-engineer` (manual); `vuln.enterprise_notified` — `customer-success` (manual when Template E-VULN-01/E-VULN-02 is sent).
+
+---
+
 ### Support actions (highest privilege)
 - `support.impersonation_started` — FORM employee acting as customer
 - `support.impersonation_ended`
@@ -279,6 +297,7 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 | `session.bulk_revocation_*` / `session.tenant_nuke_*` / `session.revocation_kv_sync_error` | 7 years | SOC 2 CC6.3 timely logical access removal evidence |
 | `security.rls_bypass_attempt` / `security.definer_function_cross_tenant` | 7 years | Tenant isolation breach evidence; SOC 2 CC6.6/PI1.5 |
 | `asset.*` (device disposal) | 7 years | SOC 2 C1.2 confidential media disposal + CC6.5 access termination evidence |
+| `vuln.*` (vulnerability management) | 7 years | SOC 2 CC7.1 threat identification + CC7.2 remediation tracking evidence; `vuln.sla_exception_granted` also maps to CC7.4 (response to identified events) |
 | `support.*` | 10 years | Trust + future legal discovery |
 | `support.unauthorized_nuke_attempt` | 7 years | Internal safety control violation record |
 | `integration.api_call` (sampled) | 30 days | Volume management |
@@ -351,7 +370,8 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 
 ---
 
-**v0.5 · червень 2026 · owner: compliance-officer + security-engineer**
+**v0.6 · 2026-06-07 · owner: compliance-officer + security-engineer**
+*v0.6 (2026-06-07): +5 `vuln.*` vulnerability management events (vuln.cve_discovered, vuln.patch_deployed, vuln.sla_exception_granted, vuln.wont_fix_closed, vuln.enterprise_notified). All MEDIUM/HIGH severity, 7-year retention, HMAC-chained. Uplift rule U-02 (RLS bypass) enforced as Won't Fix blocker in chain audit. Retention table updated with `vuln.*` row. Closes `compliance/cc7/vuln-management-policy.md` (POL-010) checklist item 6 (P1 M3); cross-ref: SOC 2 CC7.1/CC7.2/CC5.3.*
 *v0.4 (2026-06-05): +31 events across five new families: SSO authentication policy (9 events: sso.auth_policy_updated, sso.ip_allowlist_entry_added, sso.ip_allowlist_entry_removed, sso.ip_allowlist_toggled, sso.ip_blocked, sso.mfa_enforcement_changed, sso.mfa_enforcement_sweep_completed, sso.mfa_bypass_granted, sso.auth_policy_lockout_recovery); PAM/privileged access (6 events: pam.elevation_requested, pam.elevation_approved, pam.elevation_denied, pam.session_expired, pam.break_glass_activated, pam.break_glass_expired); Google Directory Sync (8 events: sso.google_directory_sync_success/cache_hit/error/credential_uploaded/credential_rotated/sync_enabled/sync_disabled/sync_validated); session revocation (5 events: session.bulk_revocation_started/complete, session.tenant_nuke_started/complete, session.revocation_kv_sync_error + support.unauthorized_nuke_attempt in support section); security/RLS isolation (3 events: security.rls_bypass_attempt, security.definer_function_cross_tenant, system.rls_test_suite_run). Retention table updated with 8 new rows for all new event classes. Closes: SSO_SCIM_IMPLEMENTATION.md §25.14 item 6 (P0 M4 — sso.auth_policy_* registration), §24.10 item 8 (P1 M4 — pam.* registration), §21 checklist item 5 (P0 M4 — sso.google_directory_* registration), §22 checklist item 6 (P0 M4 — session revocation registration); SOC2_READINESS.md §64.9 items 2 (P0 — security.rls_bypass_attempt, security.definer_function_cross_tenant) and 3 (P1 — system.rls_test_suite_run).*
 *v0.3 (2026-06-05): +privacy.floor_breach_detected, +privacy.floor_breach_contained, +privacy.floor_breach_tenant_notified, +privacy.floor_breach_resolved, +privacy.no_go_escalation_activated. +privacy.floor_breach_* retention row. Closes INCIDENT_RESPONSE.md R-22 §checklist item 6 (P0 — DEC-030 registration for all five privacy floor breach events). Events are HMAC-chained, CRITICAL/HIGH/STANDARD severity per R-22 §DEC-030 table; payloads canonical to INCIDENT_RESPONSE.md §R-22 lines 7848–7854.*
 *v0.5 (2026-06-07): +5 asset.* device disposal events (asset.disposal_initiated, asset.disposal_completed, asset.device_sanitized, asset.chain_of_custody_transferred, asset.disposal_log_filed). Retention table updated with `asset.*` 7-year row. Closes MDD-P0-03 (SOC2_READINESS §66.12); cross-ref: compliance/c1/device-disposal-policy.md POL-013 §8, SOC 2 C1.2/CC6.5/CC6.7.*

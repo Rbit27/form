@@ -6,6 +6,13 @@
 
 ---
 
+## [2.78.1] — 2026-06-07
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v0.5 → v0.6 — +5 `vuln.*` DEC-030 HMAC-chained events (`vuln.cve_discovered`, `vuln.patch_deployed`, `vuln.sla_exception_granted`, `vuln.wont_fix_closed`, `vuln.enterprise_notified`); retention table row for `vuln.*` (7 yr, CC7.1/CC7.2); uplift-rule U-02 Won't Fix blocker enforced in chain audit. Closes `compliance/cc7/vuln-management-policy.md` (POL-010) checklist item 6 (P1 M3).
+
+---
+
 ## [2.78.0] — 2026-06-07
 
 ### Added
