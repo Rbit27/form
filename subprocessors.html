@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Sub-Processors · GDPR Art. 13(1)(e) Disclosure</title>
+<meta name="description" content="FORM's complete list of sub-processors handling personal data under GDPR Art. 28. Required under Art. 13(1)(e) prior to enterprise DPA execution." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: {
+      ink:   '#0B0A07',
+      deep:  '#13110C',
+      line:  '#1F1D16',
+      mute:  '#6F6A60',
+      dim:   '#A39D8E',
+      paper: '#F3EEE0',
+      cream: '#E7DFC8',
+      acid:  '#DDFF2D',
+      ember: '#FF5733',
+    },
+    fontFamily: {
+      serif: ['Fraunces', 'serif'],
+      sans:  ['Manrope', 'sans-serif'],
+      mono:  ['JetBrains Mono', 'monospace'],
+    },
+  }}};
+</script>
+<style>
+  html, body { background: #0B0A07; color: #F3EEE0; font-family: 'Manrope', sans-serif; }
+  body { font-feature-settings: "ss01", "cv11"; }
+  ::selection { background: #DDFF2D; color: #0B0A07; }
+
+  .grain::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000; opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 220px;
+  }
+
+  .display { font-family: 'Fraunces', serif; font-weight: 300; letter-spacing: -0.04em; line-height: 0.9; }
+  .display em { font-style: italic; }
+
+  .label { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px; color: #6F6A60; }
+
+  .btn-acid {
+    background: #DDFF2D; color: #0B0A07;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 600;
+    transition: transform 0.15s, background 0.2s; padding: 14px 28px; border-radius: 9999px; display: inline-block;
+  }
+  .btn-acid:hover { background: #ECFF6B; transform: translateY(-1px); }
+
+  .btn-out {
+    border: 1px solid #2A2820; color: #F3EEE0;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 500;
+    padding: 14px 28px; border-radius: 9999px; display: inline-block; transition: border-color 0.2s;
+  }
+  .btn-out:hover { border-color: #DDFF2D; }
+
+  .divider { border: none; border-top: 1px solid #1F1D16; margin: 0; }
+
+  /* Table styles */
+  .sp-table { width: 100%; border-collapse: collapse; }
+  .sp-table th {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: #6F6A60; text-align: left; padding: 12px 16px; border-bottom: 1px solid #1F1D16;
+    white-space: nowrap;
+  }
+  .sp-table td { padding: 16px 16px; border-bottom: 1px solid #1F1D16; font-size: 13px; vertical-align: top; line-height: 1.5; }
+  .sp-table tr:last-child td { border-bottom: none; }
+  .sp-table tr:hover td { background: rgba(221,255,45,0.02); }
+
+  /* Tier badges */
+  .tier-t1 {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 3px 7px; border-radius: 4px;
+    background: rgba(221,255,45,0.1); color: #DDFF2D; border: 1px solid rgba(221,255,45,0.3);
+    white-space: nowrap;
+  }
+  .tier-t2 {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 3px 7px; border-radius: 4px;
+    background: rgba(125,211,252,0.1); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.3);
+    white-space: nowrap;
+  }
+
+  /* Transfer mechanism pills */
+  .xfer-pill {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em;
+    padding: 2px 7px; border-radius: 4px; display: inline-block; margin-top: 3px;
+    background: rgba(163,157,142,0.1); color: #A39D8E; border: 1px solid rgba(163,157,142,0.2);
+    white-space: nowrap;
+  }
+
+  /* Change notice callout */
+  .notice-card {
+    background: #13110C; border: 1px solid #1F1D16; border-radius: 16px; padding: 28px;
+  }
+  .notice-card.warn {
+    border-color: rgba(221,255,45,0.25);
+  }
+
+  /* Privacy floor strip */
+  .floor-strip {
+    background: rgba(255,87,51,0.06); border: 1px solid rgba(255,87,51,0.2); border-radius: 12px;
+    padding: 16px 20px; display: flex; gap: 12px; align-items: flex-start;
+  }
+  .floor-strip .marker {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+    color: #FF5733; background: rgba(255,87,51,0.15); border: 1px solid rgba(255,87,51,0.3);
+    padding: 3px 8px; border-radius: 9999px; white-space: nowrap; flex-shrink: 0; margin-top: 1px;
+  }
+
+  /* Metadata row */
+  .meta-item { display: flex; flex-direction: column; gap: 3px; }
+  .meta-item .meta-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: #6F6A60; }
+  .meta-item .meta-val { font-size: 13px; color: #F3EEE0; }
+</style>
+</head>
+<body class="grain antialiased">
+
+<!-- ─── Header ────────────────────────────────────────────── -->
+<header class="border-b border-line sticky top-0 z-50" style="background:rgba(11,10,7,0.92);backdrop-filter:blur(12px);">
+  <div class="max-w-[1200px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 font-mono text-[11px] tracking-widest uppercase text-mute">
+      <a href="/enterprise.html" class="hover:text-paper transition-colors">Enterprise</a>
+      <a href="/pricing-enterprise.html" class="hover:text-paper transition-colors">Pricing</a>
+      <a href="/admin-dashboard.html" class="hover:text-paper transition-colors">Admin demo</a>
+      <a href="/security.html" class="hover:text-paper transition-colors">Security</a>
+    </nav>
+    <a href="mailto:legal@form.coach" class="btn-out hidden md:inline-block">Contact legal</a>
+  </div>
+</header>
+
+<!-- ─── Hero ──────────────────────────────────────────────── -->
+<section class="max-w-[1200px] mx-auto px-8 pt-20 pb-16">
+  <div class="label mb-6 text-acid">Legal · GDPR Art. 13(1)(e)</div>
+  <h1 class="display text-[64px] md:text-[80px] text-paper mb-6">
+    Sub-<em>Processor</em><br/>Register
+  </h1>
+  <p class="text-dim text-lg leading-relaxed max-w-2xl mb-10" style="font-weight:300;">
+    FORM processes personal data from consumer users and enterprise employees.
+    This page lists every third-party sub-processor that receives personal data on our behalf,
+    as required under <span class="text-paper">GDPR Art. 13(1)(e)</span> and
+    your enterprise Data Processing Agreement (Art. 28(3)(d)).
+  </p>
+
+  <!-- Metadata row -->
+  <div class="flex flex-wrap gap-10 mb-6 py-6 border-y border-line">
+    <div class="meta-item">
+      <span class="meta-label">Last updated</span>
+      <span class="meta-val font-mono">2026-06-07</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Next review</span>
+      <span class="meta-val font-mono">2026-09-03</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Active sub-processors</span>
+      <span class="meta-val font-mono text-acid">11</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Change notice lead-time</span>
+      <span class="meta-val font-mono">30 days (enterprise)</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Objections / GDPR requests</span>
+      <span class="meta-val"><a href="mailto:legal@form.coach" class="text-acid hover:underline font-mono">legal@form.coach</a></span>
+    </div>
+  </div>
+
+  <!-- Privacy floor strip -->
+  <div class="floor-strip">
+    <span class="marker">Privacy floor</span>
+    <p class="text-dim text-sm leading-relaxed">
+      No sub-processor listed below ever receives individual employee health data, CV keypoints, workout weights, or meal logs linked to an employer.
+      All sub-processor data flows carry pseudonymous session identifiers only.
+      The employer's Admin Dashboard surfaces <em>aggregated</em> engagement metrics (n ≥ 5 anonymity threshold) — never individual records.
+      This is a hard architectural constraint, not a contractual promise.
+    </p>
+  </div>
+</section>
+
+<hr class="divider max-w-[1200px] mx-auto" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Tier legend ────────────────────────────────────────── -->
+<section class="max-w-[1200px] mx-auto px-8 py-10">
+  <div class="label mb-4">Tier classification</div>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="notice-card">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="tier-t1">T1 · Critical</span>
+        <span class="text-paper text-sm font-medium">Primary data stores · SOC 2 in-scope</span>
+      </div>
+      <p class="text-mute text-sm leading-relaxed">Processes health-adjacent or identity data directly. Annual SOC 2 report review + full Art. 28(3)(a)–(h) DPA + right to audit. An outage constitutes a platform-level incident.</p>
+    </div>
+    <div class="notice-card">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="tier-t2">T2 · Important</span>
+        <span class="text-paper text-sm font-medium">Operational dependencies</span>
+      </div>
+      <p class="text-mute text-sm leading-relaxed">Operational dependency; processes personal data but not Art. 9 health data directly. SOC 2 bridge letter or 8-item security questionnaire. Standard Art. 28(3) clauses + SCCs Module 2.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider max-w-[1200px] mx-auto" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Sub-processor table ────────────────────────────────── -->
+<section class="max-w-[1200px] mx-auto px-8 py-12">
+  <div class="label mb-6">Current register · 11 sub-processors</div>
+
+  <div class="overflow-x-auto">
+    <table class="sp-table">
+      <thead>
+        <tr>
+          <th>Sub-Processor</th>
+          <th>Service</th>
+          <th>Data categories</th>
+          <th>Processing location</th>
+          <th>Transfer basis</th>
+          <th>Tier</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- SP-01 Supabase -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">Supabase, Inc.</div>
+            <div class="text-mute text-xs">DigitalOcean infrastructure</div>
+          </td>
+          <td class="text-dim max-w-[180px]">Database, authentication, file storage, audit log</td>
+          <td class="text-dim max-w-[200px]">User account, workout history, health profile, CV session metadata, audit log, meal log</td>
+          <td>
+            <div class="text-dim text-sm">EU: Frankfurt <span class="font-mono text-xs">(de-fra1)</span></div>
+            <div class="text-mute text-xs mt-1">US: <span class="font-mono">us-east-1</span> for US tenants</div>
+          </td>
+          <td>
+            <div class="xfer-pill">EU Adequacy (Frankfurt)</div>
+            <div class="xfer-pill mt-1">SCCs Module 2 (US)</div>
+          </td>
+          <td><span class="tier-t1">T1 Critical</span></td>
+        </tr>
+
+        <!-- SP-02 Cloudflare -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">Cloudflare, Inc.</div>
+          </td>
+          <td class="text-dim max-w-[180px]">CDN, Edge Workers, R2 object storage, WAF, Zero Trust access, email routing</td>
+          <td class="text-dim max-w-[200px]">Usage metadata (request IP — truncated to /24), cached content, encrypted compliance-vault objects</td>
+          <td>
+            <div class="text-dim text-sm">Global edge</div>
+            <div class="text-mute text-xs mt-1">R2: EU jurisdictional restriction for EU tenant data</div>
+          </td>
+          <td>
+            <div class="xfer-pill">Cloudflare GDPR DPA</div>
+            <div class="xfer-pill mt-1">SCCs Module 2</div>
+            <div class="xfer-pill mt-1">DPF participant</div>
+          </td>
+          <td><span class="tier-t1">T1 Critical</span></td>
+        </tr>
+
+        <!-- SP-03 Resend -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">Resend, Inc.</div>
+          </td>
+          <td class="text-dim max-w-[180px]">Transactional email delivery</td>
+          <td class="text-dim max-w-[200px]">Email address, non-health notification content, DSAR encrypted payload delivery links</td>
+          <td>
+            <div class="text-dim text-sm">US <span class="font-mono text-xs">(us-east-1)</span></div>
+          </td>
+          <td>
+            <div class="xfer-pill">SCCs Module 2</div>
+          </td>
+          <td><span class="tier-t2">T2 Important</span></td>
+        </tr>
+
+        <!-- SP-04 RevenueCat -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">RevenueCat, Inc.</div>
+          </td>
+          <td class="text-dim max-w-[180px]">Subscription lifecycle management, entitlement verification</td>
+          <td class="text-dim max-w-[200px]">Subscription status, entitlement events, platform receipt (iOS/Android). No payment card data — handled natively by Apple / Google.</td>
+          <td>
+            <div class="text-dim text-sm">US</div>
+          </td>
+          <td>
+            <div class="xfer-pill">SCCs Module 2</div>
+          </td>
+          <td><span class="tier-t2">T2 Important</span></td>
+        </tr>
+
+        <!-- SP-05 Apple -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">Apple, Inc.</div>
+            <div class="text-mute text-xs">T1 Special · compensating control</div>
+          </td>
+          <td class="text-dim max-w-[180px]">Push notification delivery (Apple Push Notification service — APNs)</td>
+          <td class="text-dim max-w-[200px]">Device push token, notification payload. <strong class="text-paper">No health values in push content</strong> — payload carries non-identifying notification text only.</td>
+          <td>
+            <div class="text-dim text-sm">US / Global</div>
+          </td>
+          <td>
+            <div class="xfer-pill">Apple Developer Agreement</div>
+            <div class="text-mute text-xs mt-1.5 leading-relaxed" style="max-width:140px;">No standalone GDPR DPA commercially available. Compensating controls documented internally (payload minimisation + risk acceptance).</div>
+          </td>
+          <td><span class="tier-t1">T1 Critical</span></td>
+        </tr>
+
+        <!-- SP-06 Sentry -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">Sentry, Inc.</div>
+          </td>
+          <td class="text-dim max-w-[180px]">Error monitoring, crash reporting</td>
+          <td class="text-dim max-w-[200px]">Error context (stack traces, breadcrumbs). PII and health data scrubbed at SDK level via <span class="font-mono text-xs">beforeSend</span> deny-list before any data leaves the device.</td>
+          <td>
+            <div class="text-dim text-sm">US <span class="font-mono text-xs">(us-east-1)</span></div>
+          </td>
+          <td>
+            <div class="xfer-pill">SCCs Module 2</div>
+          </td>
+          <td><span class="tier-t2">T2 Important</span></td>
+        </tr>
+
+        <!-- SP-07 Anthropic -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">Anthropic, PBC</div>
+          </td>
+          <td class="text-dim max-w-[180px]">AI inference — Victor coaching (LLM completion API)</td>
+          <td class="text-dim max-w-[200px]">Pseudonymised exercise context only — <strong class="text-paper">no PII, no health values in prompts</strong>. Coaching response text. Session-scoped token replaces user_id. Anthropic enterprise DPA prohibits training on customer data.</td>
+          <td>
+            <div class="text-dim text-sm">US</div>
+          </td>
+          <td>
+            <div class="xfer-pill">SCCs Module 2</div>
+            <div class="xfer-pill mt-1">Enterprise DPA</div>
+          </td>
+          <td><span class="tier-t1">T1 Critical</span></td>
+        </tr>
+
+        <!-- SP-08 ElevenLabs -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">ElevenLabs, Inc.</div>
+          </td>
+          <td class="text-dim max-w-[180px]">Text-to-speech voice synthesis (Victor voice)</td>
+          <td class="text-dim max-w-[200px]">Coaching text cues only — <strong class="text-paper">no user PII in payload</strong>. Opt-in feature. Payload generated by FORM Workers before calling the TTS API.</td>
+          <td>
+            <div class="text-dim text-sm">US</div>
+          </td>
+          <td>
+            <div class="xfer-pill">SCCs Module 2</div>
+          </td>
+          <td><span class="tier-t2">T2 Important</span></td>
+        </tr>
+
+        <!-- SP-09 PostHog -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">PostHog, Inc.</div>
+            <div class="text-mute text-xs">EU Cloud instance</div>
+          </td>
+          <td class="text-dim max-w-[180px]">Product analytics event stream</td>
+          <td class="text-dim max-w-[200px]">Anonymised event stream — <strong class="text-paper">no health metrics</strong>. Pseudonymous <span class="font-mono text-xs">distinct_id</span> (SHA-256 of user UUID). No workout weights, meal content, CV keypoints, or health values in any analytics event.</td>
+          <td>
+            <div class="text-dim text-sm">EU: Frankfurt</div>
+            <div class="text-mute text-xs mt-1">PostHog EU Cloud — data stays in EU</div>
+          </td>
+          <td>
+            <div class="xfer-pill">EU Adequacy (Frankfurt)</div>
+            <div class="xfer-pill mt-1">PostHog GDPR DPA</div>
+          </td>
+          <td><span class="tier-t2">T2 Important</span></td>
+        </tr>
+
+        <!-- SP-10 Stripe -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">Stripe, Inc.</div>
+          </td>
+          <td class="text-dim max-w-[180px]">Subscription billing events (webhook notifications to FORM)</td>
+          <td class="text-dim max-w-[200px]">Subscription status, payment event metadata only. <strong class="text-paper">No card data processed by FORM</strong> — PCI-DSS scope is Stripe-only.</td>
+          <td>
+            <div class="text-dim text-sm">US + EU</div>
+          </td>
+          <td>
+            <div class="xfer-pill">SCCs Module 2</div>
+            <div class="xfer-pill mt-1">Stripe DPA (Business ToS)</div>
+          </td>
+          <td><span class="tier-t2">T2 Important</span></td>
+        </tr>
+
+        <!-- SP-11 WorkOS -->
+        <tr>
+          <td>
+            <div class="text-paper font-medium mb-0.5">WorkOS, Inc.</div>
+            <div class="text-mute text-xs">Enterprise tier only</div>
+          </td>
+          <td class="text-dim max-w-[180px]">Enterprise SSO (SAML 2.0 / OIDC) and SCIM 2.0 directory sync</td>
+          <td class="text-dim max-w-[200px]">Enterprise employee identity (email, display name, group membership) for SSO-provisioned tenants only. <strong class="text-paper">No consumer user data.</strong></td>
+          <td>
+            <div class="text-dim text-sm">US</div>
+          </td>
+          <td>
+            <div class="xfer-pill">SCCs Module 2</div>
+          </td>
+          <td><span class="tier-t1">T1 Critical</span></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider max-w-[1200px] mx-auto" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Change notification ───────────────────────────────── -->
+<section class="max-w-[1200px] mx-auto px-8 py-16">
+  <div class="grid md:grid-cols-2 gap-12 items-start">
+
+    <div>
+      <div class="label mb-6">Change notification procedure</div>
+      <h2 class="display text-[44px] text-paper mb-6">30 days<br/><em>advance notice</em><br/>— always.</h2>
+      <p class="text-dim text-base leading-relaxed mb-6" style="font-weight:300;">
+        Before we add or replace any T1 or T2 sub-processor, we notify all enterprise customers with active DPAs by in-app notification and email to the designated legal contact — at least <span class="text-paper">30 calendar days</span> before the effective date.
+      </p>
+      <p class="text-dim text-sm leading-relaxed">
+        If you object to a change within the 30-day window, email <a href="mailto:legal@form.coach" class="text-acid hover:underline font-mono">legal@form.coach</a> with the subject line <span class="font-mono text-xs bg-deep border border-line px-2 py-1 rounded">Sub-Processor Objection — [Company Name]</span>.
+        Silence within 30 days constitutes acceptance per your DPA Art. 28(3)(d).
+      </p>
+    </div>
+
+    <div class="space-y-4">
+      <div class="notice-card warn">
+        <div class="label mb-3">What triggers a 30-day notice</div>
+        <div class="space-y-3 text-dim text-sm leading-relaxed">
+          <div class="flex gap-3"><span class="text-acid flex-shrink-0">▸</span><span>Adding any new T1 or T2 sub-processor</span></div>
+          <div class="flex gap-3"><span class="text-acid flex-shrink-0">▸</span><span>Replacing a sub-processor with a functionally equivalent one</span></div>
+          <div class="flex gap-3"><span class="text-acid flex-shrink-0">▸</span><span>Changing the processing location or transfer mechanism for an existing sub-processor</span></div>
+          <div class="flex gap-3"><span class="text-acid flex-shrink-0">▸</span><span>Adding new data categories to an existing sub-processor's scope</span></div>
+        </div>
+      </div>
+
+      <div class="notice-card">
+        <div class="label mb-3">What does not require a notice</div>
+        <div class="space-y-3 text-dim text-sm leading-relaxed">
+          <div class="flex gap-3"><span class="text-mute flex-shrink-0">—</span><span>T3 / T4 vendor changes (no personal data processed)</span></div>
+          <div class="flex gap-3"><span class="text-mute flex-shrink-0">—</span><span>Removing a sub-processor (7-day informational notice only)</span></div>
+          <div class="flex gap-3"><span class="text-mute flex-shrink-0">—</span><span>Emergency replacements due to vendor breach — best-effort notice of ≥ 48h</span></div>
+        </div>
+      </div>
+
+      <div class="notice-card">
+        <div class="label mb-3">Change log</div>
+        <div class="space-y-2 text-dim text-sm">
+          <div class="flex justify-between">
+            <span class="font-mono text-xs">2026-06-07</span>
+            <span>Initial publication — all 11 sub-processors listed</span>
+          </div>
+          <div class="flex justify-between text-mute">
+            <span class="font-mono text-xs">Next update</span>
+            <span>2026-09-03 (quarterly review)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider max-w-[1200px] mx-auto" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Transfer mechanisms ────────────────────────────────── -->
+<section class="max-w-[1200px] mx-auto px-8 py-16">
+  <div class="label mb-6">International transfer mechanisms</div>
+  <p class="text-dim text-base max-w-3xl mb-8 leading-relaxed" style="font-weight:300;">
+    FORM processes data from EU/EEA and UK users. For US-based sub-processors, we rely on the following transfer mechanisms approved under GDPR Chapter V.
+  </p>
+  <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+    <div class="notice-card">
+      <div class="label mb-2">EU Adequacy</div>
+      <div class="text-paper text-sm font-medium mb-2">GDPR Art. 45</div>
+      <p class="text-mute text-xs leading-relaxed">Data does not leave the EU/EEA. Applies to Supabase (Frankfurt) and PostHog (Frankfurt EU Cloud).</p>
+    </div>
+
+    <div class="notice-card">
+      <div class="label mb-2">SCCs Module 2</div>
+      <div class="text-paper text-sm font-medium mb-2">EU Commission Decision 2021/914</div>
+      <p class="text-mute text-xs leading-relaxed">Controller-to-processor clauses. Applies to Resend, RevenueCat, Sentry, Anthropic, ElevenLabs, Stripe, and WorkOS.</p>
+    </div>
+
+    <div class="notice-card">
+      <div class="label mb-2">Cloudflare DPA</div>
+      <div class="text-paper text-sm font-medium mb-2">Cloudflare GDPR DPA</div>
+      <p class="text-mute text-xs leading-relaxed">Cloudflare's GDPR Data Processing Addendum incorporates SCCs Module 2. Cloudflare is also a DPF participant.</p>
+    </div>
+
+    <div class="notice-card">
+      <div class="label mb-2">UK IDTA / Addendum</div>
+      <div class="text-paper text-sm font-medium mb-2">UK ICO-approved</div>
+      <p class="text-mute text-xs leading-relaxed">UK International Data Transfer Agreement or UK Addendum to EU SCCs. Applies to all US sub-processors listed above for UK data subjects.</p>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider max-w-[1200px] mx-auto" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Enterprise DPA + rights ──────────────────────────── -->
+<section class="max-w-[1200px] mx-auto px-8 py-16">
+  <div class="grid md:grid-cols-2 gap-12">
+
+    <div>
+      <div class="label mb-6">Enterprise DPA</div>
+      <h2 class="display text-[40px] text-paper mb-6"><em>Your</em> DPA,<br/>on your schedule.</h2>
+      <p class="text-dim text-base leading-relaxed mb-6" style="font-weight:300;">
+        Enterprise customers on annual contracts can accept FORM's standard DPA (DPA-FORM-001) directly via the Admin Dashboard → Legal panel — no outside counsel required for standard terms.
+        Customers that need redlines have a 10-business-day review path with FORM's compliance team.
+      </p>
+      <div class="space-y-3">
+        <div class="flex gap-3 text-dim text-sm">
+          <span class="text-acid flex-shrink-0 mt-0.5">▸</span>
+          <span><span class="text-paper font-medium">Self-service acceptance</span> — Admin Dashboard → Legal → Data Processing Agreement</span>
+        </div>
+        <div class="flex gap-3 text-dim text-sm">
+          <span class="text-acid flex-shrink-0 mt-0.5">▸</span>
+          <span><span class="text-paper font-medium">GDPR Art. 28(3)(a)–(h)</span> — full clause set in standard template</span>
+        </div>
+        <div class="flex gap-3 text-dim text-sm">
+          <span class="text-acid flex-shrink-0 mt-0.5">▸</span>
+          <span><span class="text-paper font-medium">Sub-processor snapshot hash</span> — this page's state is SHA-256-hashed at DPA acceptance time</span>
+        </div>
+        <div class="flex gap-3 text-dim text-sm">
+          <span class="text-acid flex-shrink-0 mt-0.5">▸</span>
+          <span><span class="text-paper font-medium">HMAC-chained audit trail</span> — every DPA acceptance event logged with 7-year retention (DEC-030)</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="label mb-6">Your rights</div>
+      <div class="space-y-4">
+        <div class="notice-card">
+          <div class="text-paper text-sm font-medium mb-1">Right to object (Art. 28.2)</div>
+          <p class="text-mute text-xs leading-relaxed">Enterprise customers may object to any new sub-processor within 30 days of the change notice. Email <a href="mailto:legal@form.coach" class="text-acid hover:underline">legal@form.coach</a>.</p>
+        </div>
+        <div class="notice-card">
+          <div class="text-paper text-sm font-medium mb-1">Right to audit (Art. 28.3(h))</div>
+          <p class="text-mute text-xs leading-relaxed">Annual SOC 2 Type II report available under NDA. On-site audits for Enterprise+ customers with ≥ 30 days' written notice.</p>
+        </div>
+        <div class="notice-card">
+          <div class="text-paper text-sm font-medium mb-1">Data subject rights (Art. 15–22)</div>
+          <p class="text-mute text-xs leading-relaxed">FORM provides a <span class="font-mono text-xs">/enterprise/v1/dsar</span> API endpoint for data access, erasure, and portability requests. DSARs acknowledged within 72 hours; completed within 30 days.</p>
+        </div>
+        <div class="notice-card">
+          <div class="text-paper text-sm font-medium mb-1">Breach notification (Art. 33/34)</div>
+          <p class="text-mute text-xs leading-relaxed">FORM notifies your designated legal contact within <strong class="text-paper">8 hours</strong> of a confirmed breach affecting your tenant data. GDPR supervisory authority notification: 72 hours from FORM's awareness.</p>
+        </div>
+        <div class="notice-card">
+          <div class="text-paper text-sm font-medium mb-1">Data deletion on termination (Art. 28.3(g))</div>
+          <p class="text-mute text-xs leading-relaxed">Request deletion or export via Admin Dashboard within 90 days of contract end. HMAC-chained audit log entries retained in access-controlled compliance vault for the legally required period (7 years), then irreversibly destroyed.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider max-w-[1200px] mx-auto" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── CTA ────────────────────────────────────────────────── -->
+<section class="max-w-[1200px] mx-auto px-8 py-20 text-center">
+  <div class="max-w-xl mx-auto">
+    <div class="label mb-6">Questions?</div>
+    <h2 class="display text-[56px] text-paper mb-6">
+      Talk to our<br/><em>compliance team.</em>
+    </h2>
+    <p class="text-dim text-base mb-10 leading-relaxed" style="font-weight:300;">
+      Our compliance officer responds to DPA, TIA, and sub-processor questions within 2 business days.
+      Enterprise customers on pilots get a named legal contact.
+    </p>
+    <div class="flex flex-wrap gap-4 justify-center">
+      <a href="mailto:legal@form.coach" class="btn-acid">Email legal@form.coach →</a>
+      <a href="/enterprise.html" class="btn-out">Enterprise overview</a>
+    </div>
+    <p class="text-mute text-xs mt-8 font-mono">
+      FORM · DPA-FORM-001 v1.0 · Sub-processor list version 2026-06-07
+    </p>
+  </div>
+</section>
+
+<!-- ─── Footer ─────────────────────────────────────────────── -->
+<footer class="border-t border-line">
+  <div class="max-w-[1200px] mx-auto px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <span class="font-serif text-lg tracking-tight text-paper">FORM<span class="text-acid">.</span></span>
+      <span class="label ml-2">Legal</span>
+    </div>
+    <nav class="flex flex-wrap gap-6 font-mono text-[11px] tracking-widest uppercase text-mute justify-center">
+      <a href="/enterprise.html" class="hover:text-paper transition-colors">Enterprise</a>
+      <a href="/pricing-enterprise.html" class="hover:text-paper transition-colors">Pricing</a>
+      <a href="/security.html" class="hover:text-paper transition-colors">Security</a>
+      <a href="/admin-dashboard.html" class="hover:text-paper transition-colors">Admin demo</a>
+      <a href="mailto:legal@form.coach" class="hover:text-paper transition-colors">legal@form.coach</a>
+    </nav>
+    <div class="text-mute text-xs font-mono text-center md:text-right">
+      © 2026 FORM · GDPR Art. 13(1)(e) disclosure<br/>
+      <span>Last updated: 2026-06-07 · Next review: 2026-09-03</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

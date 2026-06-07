@@ -6,6 +6,11 @@
 
 ---
 
+## [2.81.0] — 2026-06-07
+
+### Added
+- `subprocessors.html` — публічна GDPR Art. 13(1)(e) сторінка з реєстром всіх 11 sub-processors; закриває CC9-GAP-004 (P0 перед enterprise GA); editorial-brutalist дизайн (Fraunces + Manrope + JBMono, warm-black palette); розкриває: тир-класифікацію (T1/T2), категорії даних, локацію обробки, механізм передачі (EU Adequacy / SCCs Module 2 / Cloudflare DPA / UK IDTA), процедуру 30-денного повідомлення, права суб'єктів даних, breach notification SLA (8h до Enterprise tenant), посилання на DPA-FORM-001 v1.0; privacy floor strip ("жоден SP не отримує health data linked to employer"); change log; CTA до legal@form.coach; cross-ref: `docs/SUBPROCESSORS.md`, `docs/SOC2_READINESS.md §44`, DEC-030
+
 ## [2.80.0] — 2026-06-07
 
 ### Added
