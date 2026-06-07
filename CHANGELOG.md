@@ -6,6 +6,16 @@
 
 ---
 
+## [2.90.0] — 2026-06-07
+
+### Added
+- `docs/ENTERPRISE_ONBOARDING.md` — CSM playbook covering the full enterprise customer journey: pre-launch checklist (commercial, security review delivery, technical readiness), contract week kick-off, tenant provisioning with DEC-030 HMAC chain events (`tenant.created`, `tenant.sla_tier_set`, `admin.rbac_role_assigned`), SSO SAML/OIDC + SCIM setup, pilot rollout + employee announcement templates, admin dashboard training with privacy-floor script (HR never sees individual data), 30/60/90-day success metrics by tier (Starter/Growth/Enterprise), QBR agenda, seat expansion + white-label upgrade checklist + multi-year renewal, incident communication protocol, contract termination data offboarding timeline with hard-delete cascade per DATA_MODEL.md §12 and DEC-030 termination audit events, CSM handoff procedure, no-go use case escalation script; owner: customer-success + enterprise-architect + compliance-officer
+
+### Changed
+- `VERSION` — 2.89.0 → 2.90.0
+
+---
+
 ## [2.89.0] — 2026-06-07
 
 ### Added
