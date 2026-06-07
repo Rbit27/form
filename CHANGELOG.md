@@ -6,6 +6,19 @@
 
 ---
 
+## [2.60.0] — 2026-06-07
+
+### Added
+- `content/post-281-autoregulation-program-vs-reality.md` — Чому програма на папері рідко виглядає так само у залі. Zourdos et al. (2016 JSCR): ±5–10% інтраіндивідуальна варіабельність 1RM у тренованих атлетів. Haff & Triplett (2016): зовнішнє vs внутрішнє навантаження. Helms et al. (2018 JSCR): RPE-базоване програмування vs відсоткова точність — три проблеми (застарілий максимум, контекстуальна варіація, пропагована неточність). Практична система авторегуляції: RPE-ціль замість відсотка, RIR-журнал, пом'якшувач об'єму при «поганих днях». clinical-safety NOT REQUIRED.
+- `content/post-282-plyometrics-for-strength-athletes.md` — Пліометрика для силових атлетів. Markovic & Mikulic (2010 Sports Med): мета-аналіз 26 RCT — +7.5% CMJ. Wilson et al. (1993 J Appl Physiol): поєднання пліометрики і силового тренінгу перевершує обидва окремо. Cormie et al. (2010 JSCR): важке навантаження vs потужнісний vs комбінований протокол — RFD і пікова потужність; комбінований > обидва для RFD. Механізми SSC (рефлекторна активація, сухожильна жорсткість, нейральна специфічність). Практична матриця: для кого пліометрика має сенс, обмеження (відновлення, технічний поріг), об'єм за профілем. clinical-safety NOT REQUIRED.
+- `content/post-283-interindividual-variability-training-response.md` — Варіабельність між людьми у реакції на тренінг. Hubal et al. (2005 Med Sci Sports Exerc): 585 учасників, ідентичний протокол, −2% до +59% гіпертрофії. Timmons (2011 J Appl Physiol): VO₂max responders vs non-responders — зміна протоколу конвертує low responders. ACTN3 R577X і ACE I/D: реальний ефект-розмір малий, пояснюють кілька відсотків варіабельності, не десятки. Що реально пояснює варіабельність: базовий рівень, м'язова пам'ять, сон і відновлення, відповідність типу навантаження, behavioral compliance. Порівняння з іншими — статистично некоректне. clinical-safety NOT REQUIRED.
+- `compliance/cc5/onboarding-checklist-template.md` — New-hire security onboarding checklist (SOC 2 CC5-P2-007). 6 секцій: провізіонування доступу (GitHub 2FA, 1Password, principle of least privilege), безпека пристроїв (FDE, auto-lock, OS-updates), підписання 12 політик (POL-001..011 + CoC), брифінг з безпеки (фішинг, credential hygiene, secret handling, data handling, incident reporting, social engineering), offboarding pre-briefing, sign-off. Архів — `compliance/evidence/cc1/onboarding/`. Satisfies CC1.4, CC5.3, CC6.1, CC6.2, CC6.3.
+
+### Changed
+- `VERSION` → 2.60.0.
+
+---
+
 ## [2.59.0] — 2026-06-07
 
 ### Added
