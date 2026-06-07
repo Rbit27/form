@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v2.6
+# FORM · SOC 2 Type II Readiness v2.7
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -59,7 +59,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Control | Status | Evidence |
 |---|---|---|
-| Formal risk assessment documented | ✅ Done | Section 14 — Formal Risk Register (18 risks, 6 categories, L×S scoring) |
+| Formal risk assessment documented | ✅ Done | Section 14 — Formal Risk Register (19 risks, 6 categories, L×S scoring) |
 | Risk register maintained, reviewed annually | 🟡 Partial | Section 14 exists; first annual formal review not yet performed (scheduled August 2026) |
 | Vendor / third-party risk assessment | 🟡 Partial | Processor list in `docs/SECURITY.md` §5; needs formal scoring |
 
@@ -729,7 +729,7 @@ These map to SOC 2 Privacy criteria P2, P3, and P6, and simultaneously satisfy G
 |---|---|---|---|---|---|---|---|---|
 | SR-01 | **JWT / session token compromise** — attacker obtains a valid token via MITM or device compromise, gains access to user data | 3 | 5 | **15 HIGH** | TLS 1.3 mandatory; JWT 1h expiry; 30-day session rotation; RLS fail-closed (token cannot escalate beyond its `tenant_id`); certificate pinning (mobile) | **6 MEDIUM** | security-engineer | Mitigated |
 | SR-02 | **Credential stuffing / auth brute force** — automated bot replays leaked credentials against FORM login | 3 | 4 | **12 HIGH** | Cloudflare WAF rate limits (50 req/min/IP cap); `supabase_auth_failures_total` alert (>50/min → P1 page); future: CAPTCHA after 5 failures | **4 LOW** | security-engineer | Mitigated |
-| SR-03 | **Insider threat** — future employee with production access exfiltrates user health data or tampers with audit logs | 2 | 5 | **10 MEDIUM** | RBAC (least privilege); break-glass dual-authorization; HMAC-chained audit log (DEC-030); `data.read_individual` audit event + `#security-alerts`; access reviewed quarterly | **4 LOW** | compliance-officer | Mitigated |
+| SR-03 | **Insider threat** — future employee with production access exfiltrates user health data or tampers with audit logs | 2 | 5 | **10 MEDIUM** | RBAC (least privilege); break-glass dual-authorization; HMAC-chained audit log (DEC-030); `data.read_individual` audit event + `#security-alerts`; access reviewed quarterly; first access review executed Q3-2026 (`compliance/cc3/risk-register-review-2026-Q3.md` — CC3-RRR-2026-Q3) | **3 LOW** | compliance-officer | Mitigated |
 | SR-04 | **Supply chain attack** — malicious npm package or Cloudflare Worker dependency introduces backdoor | 2 | 5 | **10 MEDIUM** | Dependabot + `npm audit` in CI; `package-lock.json` pinned; planned: CI fails on critical CVEs (Phase 2 roadmap) | **5 MEDIUM** | devops-lead | Partially mitigated |
 | SR-05 | **API key / secret exposure** — credentials committed to codebase or leaked via CI logs | 2 | 4 | **8 MEDIUM** | All secrets in GitHub Secrets + 1Password; `git-secrets` pre-commit hook; GitHub secret scanning enabled; no `.env` committed policy | **3 LOW** | security-engineer | Mitigated |
 
@@ -770,6 +770,7 @@ These map to SOC 2 Privacy criteria P2, P3, and P6, and simultaneously satisfy G
 | VR-01 | **Anthropic pricing increase or service termination** — LLM infrastructure costs double or primary vendor exits market | 2 | 4 | **8 MEDIUM** | Model tiering flexibility (Haiku for classification, Sonnet for coaching); prompt caching reduces token consumption ~35–40%; cost sensitivity analysis (COST_MODEL.md §10.1 — 2× API cost moves GM only 1.4 pp); architecture does not hard-code Anthropic SDK in mobile client | **5 MEDIUM** | founder | Accept and monitor |
 | VR-02 | **Sentry DPA not confirmed** — processing EU crash data without valid DPA creates GDPR Art. 28 gap | 3 | 3 | **9 MEDIUM** | Sentry DPA review in progress; EU Sentry server (sentry.io EU region) available as alternative; `beforeSend` health data filter (partially implemented) limits sensitive data in crash reports | **6 MEDIUM** | compliance-officer | In progress |
 | OR-01 | **Key person dependency** — founder incapacitation; no other person can operate production systems | 2 | 5 | **10 MEDIUM** | All infrastructure documented in `docs/` repo; all code in GitHub; break-glass credentials in 1Password shared vault (emergency-access contact defined); `docs/ENGINEERING_RUNBOOK.md` covers all operational procedures | **7 MEDIUM** | founder | Accept; revisit at first engineering hire |
+| OR-02 | **Billing / subscription fraud** — insider modifies subscription status in FORM's database to grant enterprise features to non-paying customers, or suppresses churn signals for investor reporting | 1 | 3 | **3 LOW** | Stripe webhook HMAC-SHA256 signature validation on every event; subscription status derived from Stripe webhooks, not from a locally mutable field without a corresponding Stripe event; no FORM admin UI allows status changes outside Stripe dashboard; `billing.subscription_change` HMAC-chained audit event on every status transition (DEC-030); nightly Stripe↔FORM reconciliation job (Phase 3 roadmap — compensating: Stripe dashboard is independent ground truth) | **2 LOW** | founder (billing); compliance-officer (audit) | Mitigated |
 
 ### 14.3 Risk Heatmap Summary
 
@@ -782,7 +783,7 @@ Likelihood ↓
 2-Unlikely            AR-03         VR-01        AR-01,SR-05  SR-01,SR-03,SR-04
                                                  IR-01        AR-02,IR-02
                                                               CR-01,CR-02
-1-Rare                AR-03
+1-Rare                              OR-02        AR-03
 ```
 
 **Inherent risks requiring active mitigation (score ≥ 12):** SR-01 (15), SR-02 (12), PR-01 (12). All three have residual scores ≤ 6 with current controls.

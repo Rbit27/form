@@ -6,6 +6,14 @@
 
 ---
 
+## [2.61.1] — 2026-06-07
+
+### Changed
+- `docs/SOC2_READINESS.md` — §14 Formal Risk Register patch (v2.6 → v2.7). Two changes per `compliance/cc3/risk-register-review-2026-Q3.md` (CC3-RRR-2026-Q3): (1) **SR-03 insider threat** residual score decreased 4 → 3 LOW on first access review execution (evidence: Q3-2026 access review); (2) **OR-02 Billing / subscription fraud** added to Vendor/Operational Risks category (inherent 1×3 = 3 LOW; residual 2 LOW; controls: Stripe HMAC-SHA256 webhook validation, subscription status derived from Stripe not local mutable field, `billing.subscription_change` DEC-030 HMAC-chained audit event, nightly reconciliation planned Phase 3). Risk count updated 18 → 19. Heatmap updated: OR-02 at 1-Rare / 3-Moderate. Does not change SOC 2 readiness scorecard. compliance-officer + security-engineer.
+- `VERSION` → 2.61.1.
+
+---
+
 ## [2.61.0] — 2026-06-07
 
 ### Added
