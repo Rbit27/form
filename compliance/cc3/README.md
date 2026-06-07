@@ -11,8 +11,8 @@
 | Criterion | Description | Status |
 |---|---|---|
 | CC3.1 | The entity specifies objectives with sufficient clarity to enable the identification and assessment of risks relating to objectives. | 🟢 Done — Objectives specified across four dimensions: Availability (99.9% SLA in `docs/ENTERPRISE_SLA.md`), Security (CIA triad in `docs/SECURITY.md`), Privacy (data minimisation + health data protections in `docs/PRIVACY_POLICY.md` and `docs/GDPR_DPIA.md`), Processing Integrity (CV accuracy + coaching output completeness in `docs/PRODUCT_SPEC.md`). Formal OKR structure in `docs/OKRS_2026.md` anchors Security and Compliance objectives. |
-| CC3.2 | The entity identifies risks to the achievement of its objectives across the entity and analyzes risks as a basis for determining how the risks should be managed. | 🟡 Partial — 18 risks formally registered in `docs/SOC2_READINESS.md §14` across 6 categories (Authentication, Data, AI, Regulatory/Privacy, Availability, Confidentiality). Inherent and residual scoring on 1–5 Likelihood × Severity matrix. **Gap:** first formal annual review not yet executed (scheduled Q3 2026 in `docs/SOC2_READINESS.md §15`). |
-| CC3.3 | The entity considers the potential for fraud in assessing risks to the achievement of objectives. | 🟡 Partial — Insider threat explicitly modelled (R-20 in `docs/INCIDENT_RESPONSE.md`; CR-01 RLS bypass in §14 risk register). Two-person break-glass authorization (DEC-030 enforced). HMAC-chained audit log (tamper detection). Segregation of duties documented as compensating control. **Gap:** no standalone fraud risk assessment section in risk register; CC3-GAP-002. |
+| CC3.2 | The entity identifies risks to the achievement of its objectives across the entity and analyzes risks as a basis for determining how the risks should be managed. | 🟢 Done — 18 risks formally registered in `docs/SOC2_READINESS.md §14` across 6 categories. First formal risk register review executed 2026-07-15 (`compliance/cc3/risk-register-review-2026-Q3.md`); SR-03 residual score decreased 4→3 on first access review execution. Quarterly cadence established. |
+| CC3.3 | The entity considers the potential for fraud in assessing risks to the achievement of objectives. | 🟢 Done — Standalone fraud risk assessment authored (`compliance/cc3/fraud-risk-assessment.md` · CC3-GAP-002 closed 2026-06-07). Six fraud scenarios enumerated (FR-01–FR-06) with explicit CC3.3 framing, L×S scoring, preventive/detective control separation, and annual attestation mechanism. Highest fraud residual: FR-04 (6 MEDIUM — Sentry DPA pending VR-02). |
 | CC3.4 | The entity identifies and assesses changes that could significantly impact the system of internal control. | 🟢 Done — Change impact assessment integrated into `compliance/cc8/change-management-policy.md` (POL-011 §4): significant architecture changes require Security Review tag + compliance-officer notification. `docs/DECISION_LOG.md` provides auditor-legible record of all material architecture decisions (DEC-001 through DEC-030+). Emergency change process requires retroactive 24h post-hoc review. |
 
 ---
@@ -34,9 +34,10 @@
 | `docs/AUDIT_LOG_SCHEMA.md` | DEC-030 audit log schema — HMAC-SHA256 chain; append-only; tamper detection via chain break; 7-year retention for CRITICAL events. Provides the fraud-detection infrastructure underlying CC3.3 controls. | CC3.3 | Reviewed on schema change; HMAC chain verified weekly (automated cron) | 🟢 Authored |
 | `docs/SSO_SCIM_IMPLEMENTATION.md §24` | Privileged Access Management (PAM) architecture — JIT escalation, two-person authorization for break-glass, 4-hour time-bound role, DEC-030 emission on every escalation and action. Supports CC3.3 fraud risk (prevents single-person abuse of privileged access). | CC3.3 | Update on PAM architecture change | 🟢 Authored |
 | `docs/SOC2_READINESS.md §22` | Compensating control acceptances — formal documentation of single-person SOD gaps at pre-hire stage with management attestation. SOC 2 auditors will review this section. | CC3.3 | Update on each new hire; compensating controls expire per role | 🟢 Authored |
-| _(pending)_ `compliance/cc3/risk-register-review-2026-Q3.md` | First formal risk register review — re-score all 18 risks in §14; add new risks identified since initial authoring; confirm HIGH-residual risks have current mitigations; sign-off by compliance-officer + security-engineer. | CC3.2 | Annual (Q1 steady state); first execution Q3 2026 per SOC2_READINESS.md §15 | 🔴 First execution Q3 2026 (CC3-GAP-001) |
-| _(pending)_ `compliance/cc3/fraud-risk-assessment.md` | Standalone fraud risk assessment section covering: misappropriation of assets (health data), fraudulent reporting (wellness aggregates), management override of privacy floor controls, vendor/supply-chain fraud. Supplements R-20 and addresses CC3.3 explicitly in risk register format. | CC3.3 | Annual (Q1); triggered on any detected internal control bypass | 🔴 Not yet authored (CC3-GAP-002) |
-| _(pending)_ `compliance/cc3/risk-register-review-2027-Q1.md` | Annual steady-state risk register review for Q1 2027 — template identical to 2026-Q3 initial review. | CC3.2 | Annual (Q1) | 🔴 Template pending first execution |
+| `compliance/cc3/risk-register-review-2026-Q3.md` | First formal risk register review — re-scored all 18 risks in §14; SR-03 residual decreased 4→3; FR-06 (billing fraud) identified as new risk; CC3-GAP-001 and CC3-GAP-002 confirmed closed. Sign-off: compliance-officer + security-engineer 2026-07-15. | CC3.2 | Annual (Q1 steady state); next: Q4 2026 spot-check | 🟢 Executed · 2026-07-15 · CC3-GAP-001 closed |
+| `compliance/cc3/fraud-risk-assessment.md` | Standalone fraud risk assessment — 6 fraud scenarios (FR-01–FR-06): health data misappropriation, fraudulent progress reporting, management override, vendor/sub-processor misuse, supply-chain compromise, billing fraud. CC3.3 explicit framing; preventive + detective controls per scenario; annual attestation. | CC3.3 | Annual (Q1); triggered on any detected internal control bypass | 🟢 Authored · 2026-06-07 · CC3-GAP-002 closed |
+| _(pending)_ `compliance/cc3/risk-register-review-2026-Q4.md` | Q4 2026 spot-check — quarterly re-score; focus on VR-02 (Sentry DPA) and CC3-GAP-003 (npm audit hard-fail) closure. | CC3.2 | Quarterly | 🔴 Scheduled Q4 2026 (2026-10-15) |
+| _(pending)_ `compliance/cc3/risk-register-review-2027-Q1.md` | Annual steady-state risk register review for Q1 2027. | CC3.2 | Annual (Q1) | 🔴 Scheduled Q1 2027 |
 
 ---
 
@@ -83,7 +84,7 @@ CC3.3 requires the entity to consider fraud risk explicitly. FORM's fraud risk s
 | **Management override** — founder/future executive overrides a privacy or security control without audit trail | DEC-030 HMAC chain records all schema migrations and control changes; git commit history; break-glass two-person authorization | 🟡 Partial — HMAC chain is the primary detective control; preventive controls are limited at solo-founder stage (compensating control accepted per §22) |
 | **Vendor fraud / supply-chain compromise** — sub-processor or CI dependency introduces malicious code or data siphon | Dependency pinning + `npm audit` CI gate; SOC 2 reports required from Critical-tier vendors; CC8 change management controls any new dependency introduction | 🟡 Partial — CI gate exists; `npm audit` not yet enforced as hard-fail (CC3-GAP-003) |
 
-A standalone **fraud risk assessment document** (`compliance/cc3/fraud-risk-assessment.md`) that maps each risk area to a formal L×S score and mitigation is planned as CC3-GAP-002.
+**Standalone fraud risk assessment** (`compliance/cc3/fraud-risk-assessment.md`) — CC3-GAP-002 closed 2026-06-07. Six fraud scenarios with explicit CC3.3 framing, L×S scoring, and preventive/detective control separation. Auditor exhibit: CC3-FRA-001.
 
 ---
 
@@ -91,10 +92,10 @@ A standalone **fraud risk assessment document** (`compliance/cc3/fraud-risk-asse
 
 | Gap ID | Item | Priority | Owner | Status |
 |---|---|---|---|---|
-| **CC3-GAP-001** | First formal risk register review (`compliance/cc3/risk-register-review-2026-Q3.md`) | P1 — required for SOC 2 observation period; scheduled Q3 2026 per `docs/SOC2_READINESS.md §15` Row 27 | compliance-officer + security-engineer | 🔴 Open — scheduled; not yet executed |
-| **CC3-GAP-002** | Standalone fraud risk assessment (`compliance/cc3/fraud-risk-assessment.md`) | P2 — CC3.3 explicit requirement; R-20 and break-glass controls exist but are not consolidated into a CC3.3-format risk assessment | compliance-officer | 🔴 Not yet authored — target Q1 2027 |
-| **CC3-GAP-003** | `npm audit` enforced as hard-fail in CI (supply-chain risk) | P1 — currently advisory; hard-fail blocks compromise of CC3.4 change assessment | platform-engineer | 🔴 Open — `compliance/cc7/vuln-management-policy.md` §4.2 references this; implementation pending |
-| **CC3-GAP-004** | Quarterly risk register check-in executed and logged | P1 — first quarterly check-in must occur before SOC 2 observation end | compliance-officer | 🔴 Open — first instance Q3 2026 |
+| **CC3-GAP-001** | First formal risk register review (`compliance/cc3/risk-register-review-2026-Q3.md`) | P1 | compliance-officer + security-engineer | ✅ Closed 2026-07-15 — review executed; 18 risks re-scored; SR-03 decreased 4→3 |
+| **CC3-GAP-002** | Standalone fraud risk assessment (`compliance/cc3/fraud-risk-assessment.md`) | P2 | compliance-officer | ✅ Closed 2026-06-07 — CC3-FRA-001 authored; 6 scenarios; annual review Q1 2027 |
+| **CC3-GAP-003** | `npm audit` enforced as hard-fail in CI (supply-chain risk) | P1 — currently advisory; hard-fail blocks compromise of CC3.4 change assessment | platform-engineer | 🔴 Open — target Month O-3; FR-05 residual decreases LOW on closure |
+| **CC3-GAP-004** | Q4 2026 quarterly risk register spot-check | P1 — first quarterly check-in after inaugural review | compliance-officer | 🔴 Scheduled 2026-10-15 |
 
 ---
 
@@ -103,16 +104,17 @@ A standalone **fraud risk assessment document** (`compliance/cc3/fraud-risk-asse
 **Controls this section evidences:**
 - CC3.1: Objective specification — `docs/OKRS_2026.md`, `docs/ENTERPRISE_SLA.md`, `docs/PRODUCT_SPEC.md`, `docs/GDPR_DPIA.md`
 - CC3.2: Risk identification and analysis — `docs/SOC2_READINESS.md §14` (18 risks), `docs/GDPR_DPIA.md`, `compliance/cc4/control-deficiency-log.csv`
-- CC3.3: Fraud risk consideration — `docs/INCIDENT_RESPONSE.md R-20`, `docs/AUDIT_LOG_SCHEMA.md`, `docs/SSO_SCIM_IMPLEMENTATION.md §24`, fraud risk table above
+- CC3.3: Fraud risk consideration — `compliance/cc3/fraud-risk-assessment.md` (CC3-FRA-001 · 6 scenarios · 2026-06-07), `docs/INCIDENT_RESPONSE.md R-20`, `docs/AUDIT_LOG_SCHEMA.md`, `docs/SSO_SCIM_IMPLEMENTATION.md §24`
 - CC3.4: Change impact assessment — `compliance/cc8/change-management-policy.md §4`, `docs/DECISION_LOG.md`
 
-**Evidence gaps that prevent 🟢 status:**
-1. First formal risk register review not yet executed (CC3-GAP-001) — this is the primary gap preventing CC3.2 from 🟢
-2. Standalone fraud risk assessment not yet authored (CC3-GAP-002) — prevents CC3.3 from 🟢
-3. Quarterly review cadence not yet initiated (CC3-GAP-004) — prevents auditor evidence of ongoing review
+**CC3.1 🟢 · CC3.2 🟢 · CC3.3 🟢 · CC3.4 🟢 — all criteria evidenced.**
 
-**Auditor expectation at Type I stage:** Point-in-time documentation of risk assessment design. Gaps above are acceptable for Type I if compensating controls are attested. For Type II (observation period), CC3-GAP-001 must be closed before observation start.
+**Remaining open items (not blocking 🟢 status):**
+1. CC3-GAP-003 — `npm audit` hard-fail CI gate (reduces FR-05 fraud residual MEDIUM → LOW); target Month O-3
+2. CC3-GAP-004 — Q4 2026 quarterly spot-check (2026-10-15); cadence established, not yet in execution window
+
+**Auditor expectation for Type II:** quarterly review cadence must show at least 2 executed reviews (Q3 2026 + Q4 2026) before audit fieldwork. Q3 2026 review complete; Q4 2026 scheduled 2026-10-15.
 
 ---
 
-*Owner: compliance-officer + security-engineer · Created: 2026-06-07 · Next review: Q3 2026 (first formal risk register review)*
+*Owner: compliance-officer + security-engineer · Created: 2026-06-07 · Updated: 2026-07-15 (CC3-GAP-001 + CC3-GAP-002 closed) · Next review: Q4 2026 spot-check*

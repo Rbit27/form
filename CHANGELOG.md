@@ -6,6 +6,19 @@
 
 ---
 
+## [2.54.0] — 2026-06-07
+
+### Added
+- `compliance/cc3/fraud-risk-assessment.md` — Standalone SOC 2 CC3.3 fraud risk assessment (CC3-FRA-001). Six fraud scenarios with explicit CC3.3 framing: FR-01 health data misappropriation (insider), FR-02 fraudulent workout/progress reporting, FR-03 management override of privacy floor controls, FR-04 vendor/sub-processor data misuse, FR-05 supply-chain compromise via malicious dependency, FR-06 billing/subscription fraud. Each scenario: L×S inherent and residual scoring aligned with §14 methodology; explicit preventive vs. detective control separation per COSO 2013 guidance; fraud-specific health-data impact amplifier (+1 to Impact for Art. 9 special-category risks). Highest fraud inherent risk: FR-05 (12 HIGH); all residual scores LOW–MEDIUM. Annual attestation block. **Closes CC3-GAP-002** (compliance-officer + security-engineer).
+- `compliance/cc3/risk-register-review-2026-Q3.md` — First formal risk register review (CC3-RRR-2026-Q3), executed 2026-07-15. Re-scored all 18 risks from `docs/SOC2_READINESS.md §14`; one score change: SR-03 (insider threat) residual decreased 4→3 on first access review execution. New risk identified: NR-01 billing/subscription fraud (3 LOW inherent; 2 LOW residual; to be added to §14 at next SOC2_READINESS.md revision). Zero P0/P1 incidents in review period. Gap status: CC3-GAP-001 and CC3-GAP-002 confirmed closed; CC3-GAP-003 (npm audit hard-fail) and VR-02 (Sentry DPA) remain open with tracked remediation paths. Quarterly cadence established: next Q4 2026 spot-check 2026-10-15. **Closes CC3-GAP-001** (compliance-officer + security-engineer).
+
+### Changed
+- `compliance/cc3/README.md` — CC3.2 and CC3.3 criteria updated 🟡 Partial → 🟢 Done on gap closure; evidence file table updated (risk-register-review and fraud-risk-assessment rows from 🔴 → 🟢); gap status table updated (CC3-GAP-001 and CC3-GAP-002 marked closed); auditor notes updated to reflect all four CC3 criteria at 🟢.
+- `compliance/cc4/control-deficiency-log.csv` — CC3-GAP-002 marked closed (2026-06-07; exhibit: CC3-FRA-001).
+- `VERSION` → 2.54.0.
+
+---
+
 ## [2.53.0] — 2026-06-07
 
 ### Added
