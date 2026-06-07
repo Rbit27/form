@@ -6,6 +6,19 @@
 
 ---
 
+## [2.65.0] — 2026-06-07
+
+### Added
+- `content/post-287-muscle-synergy-patterns.md` — Синергетичні патерни м'язів: ЦНС управляє групами, а не окремими м'язами. Tresch et al. (1999 Nature Neurosci): спинальна локалізація синергій. d'Avella & Bizzi (2005 PNAS): NMF аналіз — 4–6 компонентів пояснюють >90% ЕМГ варіабельності. Lacquaniti et al. (2012 J Physiol): патерни локомоції і модуляція ваг. Bizzi & Cheung (2013 Front Comput Neurosci): нейронне походження синергій. Три фази технічного прогресу: синергетична → нейронна → автоматизація. clinical-safety NOT REQUIRED.
+- `content/post-288-thoracolumbar-fascia-force-transfer.md` — Торако-люмбальна фасція і передача зусилля: що відбувається між широчайшим і сідницею. Vleeming et al. (1995 Spine): діагональний крос-ланцюг latissimus↔gluteus через TLF. Barker & Briggs (1999 Spine): прикріплення posterior layer. Willard et al. (2012 J Anat): три шари TLF, крос-ламіновані волокна. Gracovetsky et al. (1977/1981): фасціальний механізм стабілізації хребта. clinical-safety APPROVED WITH NOTES — disclaimer додано.
+- `content/post-289-velocity-specificity-strength-training.md` — Специфічність швидкості в силовому тренінгу: чому темп вправи визначає тип адаптації. Behm & Sale (1993 J Appl Physiol): намір, а не реальна швидкість визначає velocity-specific адаптацію. Duchateau & Hainaut (1984 J Appl Physiol): ізометрія vs ізотонія — різна нейронна адаптація. Morrissey et al. (1995 Med Sci Sports Exerc): перенос від повільного до швидкого менш ефективний. Maximum concentric intent як стандарт. clinical-safety NOT REQUIRED.
+- `content/post-290-feedforward-anticipatory-postural-adjustments.md` — Feedforward і антиципаторні постуральні корекції: що ЦНС робить до того, як навантаження прикладене. Cordo & Nashner (1982 J Neurophysiol): постуральні м'язи активні на 50–100 мс раніше від агоністів. Hodges & Richardson (1997 Exp Brain Res): TrA перша в APA-ланцюгу, ~29 мс до руху. Massion (1992 Prog Neurobiol): feedforward vs feedback модель. Стандартизований сетап як умова надійного feedforward. clinical-safety APPROVED WITH NOTES — framed in healthy athletic performance.
+
+### Changed
+- `VERSION` → 2.65.0.
+
+---
+
 ## [2.64.0] — 2026-06-07
 
 ### Added
