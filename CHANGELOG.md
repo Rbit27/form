@@ -6,6 +6,19 @@
 
 ---
 
+## [2.88.0] — 2026-06-07
+
+### Added
+- `content/post-318-adaptation-ceiling.md` — адаптаційна стеля і як зрозуміти, що ти до неї наближаєшся: принцип diminishing returns (Aaberg 2007, Heaselgrave et al. 2019 JSCR), три рівні тренувального стажу (Zatsiorsky & Kraemer 2006, Helms et al. 2018), адаптаційна стеля ≠ генетичний ліміт (Haugen et al. 2020, Haun et al. 2019 Frontiers), 4 операційних сигнали наближення, деловд як діагностичний інструмент (Roberts et al. 2018), rate of gain tracking; 264 рядки; clinical-safety NOT REQUIRED
+- `content/post-319-isometric-training.md` — ізометричний тренінг: кутова специфічність ±15–20° (Lindh 1979, Kitai & Sale 1989), IMTP як золотий стандарт (Haff et al. 2015 JHUKIN, ICC > 0.97), паузовий тренінг і жорсткість сухожиль (Kubo et al. 2002), гіпертрофія при ізометрії (Oranchuk et al. 2019), patellar tendinopathy (Rio et al. 2015 BJSM), post-tetanic potentiation (Tillin & Bishop 2009), практичне програмування; 250 рядків; clinical-safety NOT REQUIRED
+- `blog.html` — додано 2 картки: post-318 (adaptation-ceiling), post-319 (isometric-training)
+
+### Changed
+- `README.md` — post-318, post-319 відмічено [x] у roadmap; виправлено YMCA → IMTP у описі post-319
+- `VERSION` — 2.87.0 → 2.88.0
+
+---
+
 ## [2.87.0] — 2026-06-07
 
 ### Added
