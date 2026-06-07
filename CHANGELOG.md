@@ -6,6 +6,19 @@
 
 ---
 
+## [2.52.0] — 2026-06-07
+
+### Added
+- `content/post-276-first-month-neural-structural-adaptation.md` — «Чому перший місяць у залі обманює: нейральна адаптація, структурна гіпертрофія і що насправді означають "ранні результати"». Moritani & deVries (1979 Am J Phys Med): 8-тижневий EMG-експеримент — перші 3–4 тижні приріст сили майже виключно нейральний без зміни CSA; Sale (1988 Med Sci Sports Exerc): три механізми нейральної адаптації (рекрутування HTMU, rate coding, міжм'язова координація); Zatsiorsky & Kraemer (2006): новачок vs intermediate як різні адаптаційні режими; Schoenfeld et al. (2017 JSCR): гіпертрофія — статистично з 6–8 тиж, візуально — 10–12+; Seaborne et al. (2018): епігенетична пам'ять і прискорене повернення; чотирифазний таймлайн адаптації; чому відчуття «стало легше» на тижні 3–4 є реальним нейральним сигналом, а не звиканням до болю. 13 хв читання. sports-scientist pending. clinical-safety NOT REQUIRED.
+- Blog card for post-276 added to `blog.html`.
+
+### Changed
+- `README.md` — post-276 відмічено [x] у roadmap.
+- `STATUS.md` — content engine table оновлено: post-276 додано, загальна кількість постів 276.
+- `VERSION` → 2.52.0.
+
+---
+
 ## [2.51.0] — 2026-06-07
 
 ### Added
