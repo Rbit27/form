@@ -338,6 +338,13 @@ FORM is at v2.46.0 with 50+ tagged releases, 17 functional HTML pages (marketing
 | post-264-bfr-blood-flow-restriction.md | Blog | published · clinical-safety NOT REQUIRED · sports-scientist ✓ |
 | post-265-deload-timing-design.md | Blog | published · clinical-safety NOT REQUIRED · sports-scientist ✓ |
 | post-266-strength-plateau-diagnosis.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-267-training-without-plan.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-268-psychology-of-stopping-a-set.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-269-warmup-first-set-effect.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-270-perfect-program-trap.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-271-rest-intervals-hypertrophy-strength.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-272-stretch-shortening-cycle-ssc.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-273-social-facilitation-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

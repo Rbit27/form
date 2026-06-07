@@ -6,6 +6,16 @@
 
 ---
 
+## [2.49.0] — 2026-06-07
+
+### Added
+- `content/post-273-social-facilitation-training.md` — «Соціальна фасилітація у тренінгу: чому ти піднімаєш більше (або менше), коли хтось дивиться». Triplett (1898) перший ефект; Zajonc (1965 Science) arousal + домінантна відповідь; Bond & Titus (1983 Psych Bull) мета-аналіз 241 дослідження / 24 000+ учасників — ефект залежить від складності задачі; Cottrell et al. (1968) evaluation apprehension як медіатор; audience vs coaction; Baron (1986) дистракційно-конфліктна теорія; Duval & Wicklund (1972) objective self-awareness. Операційна матриця: зал vs вдома, прості vs технічні рухи, максимальні спроби vs технічна робота. 13 хв читання. sports-scientist pending. clinical-safety NOT REQUIRED.
+- `blog.html` — картки для post-273 (соціальна фасилітація), post-272 (SSC), post-271 (rest intervals) додані до індексу.
+- `STATUS.md` — рядки content engine table для post-267 через post-273 додані.
+- `README.md` — post-271, post-272, post-273 відмічені [x] з фактичним контентом; roadmap поповнено post-274 через post-277 (нейральна адаптація новачка, детренінг і повернення, суперсети матриця, математика консистентності).
+
+---
+
 ## [2.48.0] — 2026-06-07
 
 ### Added
