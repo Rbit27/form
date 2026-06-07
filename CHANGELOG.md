@@ -6,6 +6,20 @@
 
 ---
 
+## [2.68.0] — 2026-06-07
+
+### Added
+- `content/post-279-rest-pause-intraset-rest-motor-unit-recruitment.md` — Rest-pause тренінг: нейром'язова механіка внутрішньосетного відпочинку. Fills numbering gap (278→280). Henneman size principle і рекрутування тип II при підходах до відмови. Prestes et al. (2017 JSCR): rest-pause = схожа гіпертрофія + вища сила 1ПМ при рівному тоннажі. Кінетика PCr: 15–20 с → 50–60% відновлення. Різниця cluster sets / Myo-reps / rest-pause: Gonzalez-Badillo et al. (2016 IJSPP). Матриця застосування: ізоляція + обмежений час — так; базові рухи і початок мезоциклу — ні. clinical-safety NOT REQUIRED.
+- `content/post-293-central-vs-peripheral-fatigue.md` — Центральна vs периферична втома: що насправді зупиняє підхід. Fitts (1994 Physiol Rev): Pi, а не лактат — основний фактор периферичної відмови. Allen, Lamb & Westerblad (2008 Physiol Rev): лактатна гіпотеза спростована in vivo. Enoka & Duchateau (2008 J Physiol): twitch interpolation technique, voluntary drive. Noakes Central Governor — евристика, не вирішена теорія. Матриця: 1–5 рп → переважно периферична; 8–20 рп → центральна гальмівна активується раніше справжньої периферичної відмови. RPE як інтегральний сигнал ЦНС. clinical-safety NOT REQUIRED.
+- `content/post-294-lengthened-position-hypertrophy.md` — Гіпертрофія в подовженому положенні: чому глибина важливіша за скорочення. Maeo et al. (2021 J Physiol): Nordic curls повний vs скорочений ROM — значно більша дистальна гіпертрофія при повному ROM. Herzog (2018 J Biomechanics): тітін і пасивна силова надбавка при великій довжині саркомера. Goto et al. (2019 JSCR), McMahon et al. (2014 Eur J Appl Physiol). Практика: incline curl > preacher; глибина присідань; повний RDL ROM; контрольована ексцентрика — не «ціна», а механізм. clinical-safety NOT REQUIRED.
+- `blog.html` — 3 нові картки (post-279, post-293, post-294) додано; hero stats оновлено: 10 → 295 статей, 121 → 3 835 хв читання; label оновлено до «295 постів · clinical-safety cleared».
+- `STATUS.md` — оновлено: v2.68.0, 295 posts, 255 cards, 60+ releases, 75+ docs.
+
+### Changed
+- `VERSION` → 2.68.0.
+
+---
+
 ## [2.67.0] — 2026-06-07
 
 ### Added
