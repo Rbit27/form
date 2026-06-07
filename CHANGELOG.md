@@ -3738,6 +3738,19 @@
 
 ---
 
+## [2.56.0] — 2026-06-07
+
+### Why MINOR
+- New compliance evidence index: `compliance/cc4/README.md` — CC4 Monitoring Activities evidence index, the last missing CC directory README (cc1–cc9 now all have README.md)
+
+### Added
+- `compliance/cc4/README.md` — CC4 Monitoring Activities evidence index. Documents both CC4 sub-criteria (CC4.1 ongoing + separate evaluations; CC4.2 deficiency communication) with current status (🟡 Partial); evidence file table (12 artifacts — control-deficiency-log.csv, evidence-collection-plan.md, deficiency-communication-procedure.md, and 9 pending launch-time evidence artifacts: monthly memos, daily HMAC chain probe S-007 logs, weekly Supabase exports, monthly Cloudflare exports, quarterly access review, annual pentest, advisory brief, investor update confirmations, annual SOC 2 review); gap status table (CC4-GAP-001 🟢 Closed; CC4-GAP-002 🔴 Open — resolves launch+6mo; CC4-GAP-003 P0 🟡 compensating control active — three-tier board-less structure, expires 90 days post-Series-A); compliance calendar (10 cadences from continuous HMAC probe to Series A audit committee trigger); 5 open action items. Completes CC directory README coverage: all nine CC criteria directories (cc1–cc9) now have README.md evidence indexes. compliance-officer + security-engineer.
+
+### Changed
+- `VERSION` → 2.56.0.
+
+---
+
 ## [0.35.0] — 2026-05-16
 
 ### Why MINOR
