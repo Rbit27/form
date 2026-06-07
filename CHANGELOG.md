@@ -6,6 +6,16 @@
 
 ---
 
+## [2.70.0] — 2026-06-07
+
+### Added
+- `compliance/licence-register.md` — OSS-LIC-001 v1.0. Open-source licence register for weak-copyleft production dependencies (MPL-2.0, LGPL-2.1, LGPL-3.0, EUPL-1.2). Required by `docs/SOC2_READINESS.md §54.7.1`; closes the `compliance/licence-register.md` reference gap. Pre-launch baseline: zero weak-copyleft dependencies registered. Schema includes: licence classification reference (permissive → register-and-review → prohibited), dependency layers (iOS/Cloudflare Workers/Android/build tooling), Snyk CI gate policy (block on GPL/AGPL/SSPL, warn on MPL/LGPL/EUPL), `license-checker` CLI procedure for quarterly npm audits, process for adding new weak-copyleft entries (5-step: identify → trigger-analysis → register → compliance-officer review → DEC-030 event), three-person approval process for prohibited-licence exceptions, DEC-030 HMAC-chained audit events (`security.licence_weak_copyleft_added`, `security.licence_violation_detected`, `security.licence_register_reviewed`, `security.licence_audit_filed`), quarterly evidence filing cadence (Q1/Q2/Q3/Q4 audit CSVs to `compliance/evidence/licence-audits/`), SHA-256 hash filing to `compliance/checksums.sha256`. SOC 2 controls: CC9.2 (supply-chain licence risk), CC6.8 (unauthorised software prevention), CC5.2 (software inventory). compliance-officer + security-engineer.
+
+### Changed
+- `VERSION` → 2.70.0.
+
+---
+
 ## [2.69.0] — 2026-06-07
 
 ### Added
