@@ -6,6 +6,17 @@
 
 ---
 
+## [2.46.0] — 2026-06-07
+
+### Added
+- `content/post-270-perfect-program-trap.md` — editorial-brutalist post (~13 хв): синдром «ідеальної програми» — чому pошук кращої програми є формою прокрастинації. Математика adherence: 90% виконання посередньої програми vs 50% оптимальної. Ogasawara et al. (2013 Eur J Appl Physiol): periodic vs continuous — гіпертрофія еквівалентна при рівному сумарному часі. Rhea et al. (2002 JSCR): DUP +28.8% vs linear +14.4% — реальна різниця між протоколами вимагає відповідного виконання. Schoenfeld et al. (2017 JSCR): мінімальний поріг об'єму. Sale (1988), Folland & Williams (2007): тижні 4–6 як точка вразливості нейральної фази. Критерій «достатньо хорошої» програми (3 ознаки). Коли перемикання виправдане. clinical-safety NOT REQUIRED. sports-scientist reviewed.
+- `blog.html` — картка post-270 додана
+- `README.md` — post-270 позначено [x], нові теми post-271..273 додані до roadmap
+- `STATUS.md` — 266 → 270 posts, v2.42.0 → v2.46.0
+- `VERSION` → 2.46.0
+
+---
+
 ## [2.45.0] — 2026-06-07
 
 ### Added

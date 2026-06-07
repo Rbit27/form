@@ -16,7 +16,7 @@ This is a **pre-product** project repository. There is no app code yet (mobile d
 
 - **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
 - **65+ markdown documents** — strategic, operational, content
-- **239+ evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
+- **270+ evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **3 sample training programs** — sports-science discipline reference
 - **24 specialized AI agents** — operating model embodied у `.claude/agents/`
@@ -307,7 +307,7 @@ Each iteration:
 | Tagged releases | 60+ |
 | HTML pages | 16 |
 | Markdown documents | 65+ |
-| Blog posts | 239 |
+| Blog posts | 270 |
 | Social content assets | 7 (Twitter, LinkedIn, Reddit, press pitches, 3 newsletter issues) |
 | Total lines committed | 38,000+ |
 | AI agents defined | 24 |
@@ -586,7 +586,10 @@ Each iteration:
 - [x] post-267: Тренування без плану — чим відрізняється хаотична активність від структурованого стимулу і коли перша прийнятна; SRA-крива і мінімальні вимоги до тренувального стимулу; Dankel et al. (2017 Eur J Appl Physiol): яка частота і об'єм мають значення; чому «просто рухатись» є валідною стратегією для підтримки, але не для прогресу; clinical-safety NOT REQUIRED
 - [x] post-268: Психологія відмови в підході — Marcora (2010): відчуття зусилля, а не м'язова відмова, зупиняє підхід; Merton (1954): до 30% мотонейронів у резерві при суб'єктивній відмові; Central Governor і регуляція темпу; практичні наслідки для RPE-calibration і роботи до відмови; без мотиваційного контенту — суто механіка рішення зупинитись; clinical-safety NOT REQUIRED
 - [x] post-269: Перший підхід і разминковий ефект — де межа між warm-up і робочим підходом; PAP activation sets vs рамкові розминкові підходи; кінетика температурної адаптації м'яза (Bennett 1985, Ranatunga 1998); чому перший робочий підхід майже завжди підпорогового RPE і що з цим робити; практичний протокол warm-up за типом тренування; clinical-safety NOT REQUIRED
-- [ ] post-270: Синдром «ідеальної програми» — чому пошук кращої програми є формою прокрастинації; Adherence coefficient (Schoenfeld 2017) математика: 90% виконання посередньої програми перемагає 50% виконання оптимальної; Ogasawara et al. (2013): 3-тижнева перерва не втрачає гіпертрофічний приріст; program-hopping як структурна проблема, не проблема характеру; критерій достатньо «хорошої» програми; clinical-safety PASS
+- [x] post-270: Синдром «ідеальної програми» — чому пошук кращої програми є формою прокрастинації; Adherence coefficient математика: 90% виконання посередньої програми перемагає 50% виконання оптимальної; Ogasawara et al. (2013 Eur J Appl Physiol): 3-тижнева перерва не знищує гіпертрофічний приріст; Rhea et al. (2002): DUP vs linear — реальна різниця існує але вимагає виконання; Schoenfeld et al. (2017 JSCR): мінімальний поріг об'єму для гіпертрофії; тижні 4–6 як точка вразливості: нейральна фаза сповільнюється → хибний сигнал «не працює»; структурна причина program-hopping, не характер; clinical-safety NOT REQUIRED
+- [ ] post-271: Тренування двох м'язових груп за одну сесію — механіка поєднання, порядок вправ і коли суперсети шкодять відновленню: Weakley et al. (2017 Eur J Appl Physiol) — антагоністичні суперсети зберігають силу при скороченні часу на 27%; Simpson et al. (2022): agonist суперсети знижують обсяг у другій вправі; Murach & Bagley (2016): накопичення метаболітів між блоками; практична матриця: що можна поєднувати і що ні; clinical-safety NOT REQUIRED
+- [ ] post-272: Детренінг і повернення до тренінгу — скільки реально втрачається і за який час: Mujika & Padilla (2000 Med Sci Sports Exerc): сила тримається 4 тижні, гіпертрофія — 3 тижні, аеробна витривалість падає швидше; epigenetic memory (Seaborne et al. 2018 Sci Rep): ядерний домен зберігає «пам'ять» гіпертрофії — повернення швидше першого циклу; Ogasawara et al. (2013): periodic vs continuous — загальний приріст еквівалентний; практичний протокол повернення після 2, 4, 8+ тижнів паузи; clinical-safety NOT REQUIRED
+- [ ] post-273: Чому перший місяць у залі обманює — нейральна адаптація vs структурна і що означають перші «результати»: Moritani & deVries (1979 Am J Phys Med): 8-тижневий експеримент — перші 3–4 тижні приріст сили майже виключно нейральний, без збільшення площі поперечного перерізу; Sale (1988 Med Sci Sports Exerc): EMG-активація, рекрутування і синхронізація — три нейральні механізми; Zatsiorsky & Kraemer (2006): новачок і intermediate — різні рамки для оцінки прогресу; практичний висновок: що означає «бачити результати» на тижні 3 vs тижні 12; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -631,4 +634,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 4 червня 2026 · v1.86.0
+**Last update:** 7 червня 2026 · v2.46.0
