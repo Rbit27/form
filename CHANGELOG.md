@@ -6,6 +6,16 @@
 
 ---
 
+## [2.74.0] — 2026-06-07
+
+### Added
+- `compliance/c1/nda-template.md` — Employee / Contractor Non-Disclosure & Confidentiality Agreement template (C1-NDA-001, PRE-34-E-003). Closes SOC 2 drafting gap C1-GAP-001 (pre-hire gate). Ten clauses per `docs/SOC2_READINESS.md §42.3.2`: Parties, Confidential Information definition (Art. 9 health data explicitly enumerated: workout records, coaching turns, CV sessions, wearable readings, meal logs, biometric inference data), Obligations (strict confidence, use limitation, GDPR Art. 32 standard of care, 1-hour breach notification feeding Art. 33 clock), Exclusions (standard four + health-data carve-out), Data Protection Obligations (GDPR Art. 9/28/32/33; process only as directed; no secondary ML training use; deletion-on-termination + 3-day cert), IP Assignment (work-for-hire; explicit coverage of model weights, training data annotations, LoRA adapters, CV pipeline improvements), Non-solicitation (12 months post-termination; employees + customers; counsel enforceability note), Term (5-year Confidentiality Period; health data indefinite survival; IP assignment perpetual), Governing law (Ukraine primary; EU GDPR precedence on data protection; Kyiv Commercial Court; amendment note for incorporation jurisdiction), Remedies + GDPR Art. 83 penalty notice. Includes filing instructions (DocuSign → SHA-256 hash → nda-register.csv → DEC-030 `personnel.nda_signed` event → `personnel.hire_check_passed` gate). Template status: authored · pending outside counsel review (UA/EU jurisdiction) before first execution. Reference: `docs/SOC2_READINESS.md §42`, `docs/AUDIT_LOG_SCHEMA.md`, DEC-030.
+
+### Changed
+- `VERSION` → 2.74.0.
+
+---
+
 ## [2.73.0] — 2026-06-07
 
 ### Added
