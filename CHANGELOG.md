@@ -6,6 +6,19 @@
 
 ---
 
+## [2.75.1] — 2026-06-07
+
+### Added
+- `content/post-305-strength-training-longevity.md` — Силовий тренінг і довголіття: доза-відповідь між обсягом MSA і all-cause mortality; J-крива (Liu 2019 BJSM, Momma 2022 BJSM, n=1.29M); м'язова сила як незалежний предиктор смертності (Ruiz 2008 BMJ, Leong 2015 Lancet — PURE); grip strength vs систолічний тиск; міокіни і м'яз як ендокринний орган; де перетинаються «тренуватись для здоров'я» і «тренуватись для сили». clinical-safety NOT REQUIRED.
+- `blog.html` — card для post-305 (264 cards total).
+- `README.md` — post-305 відмічений виконаним; додано roadmap post-306–310.
+- `STATUS.md` — рядки post-302–305 у content engine table.
+
+### Changed
+- `VERSION` → 2.75.1.
+
+---
+
 ## [2.75.0] — 2026-06-07
 
 ### Added
