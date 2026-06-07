@@ -351,6 +351,11 @@ FORM is at v2.69.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-277-detraining-comeback-timeline.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-280-heat-training-thermal-stress.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-295-strength-plateau-vs-life-plateau.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-296-rpe-calibration.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-297-good-enough-program.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-298-training-unstable-schedule.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-299-strength-without-gym.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-300-detraining-what-you-keep.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
