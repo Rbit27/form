@@ -2604,6 +2604,8 @@ This section closes two documented gaps and upgrades one from red to partial. Th
 
 ## 22 · Security Awareness & Training Program
 
+> **Standalone policy extracted.** The operative policy is now `docs/SECURITY_AWARENESS_TRAINING_POLICY.md` (POL-012, v1.0, 2026-06-07). This section retains the SOC 2 control mapping and evidence artefact specifications for auditor reference; the standalone policy adds governance structure (scope table, DEC-030 event registry, non-compliance escalation procedure). Both documents are consistent; this section is authoritative for SOC 2 evidence mapping, the standalone policy is authoritative for operational procedure.
+>
 > **CC1.4 / CC2.2 gap closure.** This section documents the formal security awareness and training programme required by the CC1 (Control Environment) and CC2 (Communication and Information) Trust Service Criteria. It closes two previously open gaps: the absence of a documented training programme and the absence of a new-hire security onboarding checklist.
 
 ---
@@ -4504,7 +4506,7 @@ SOC 2 CC5.3 requires that policies are communicated to personnel responsible for
 
 3. **New-hire onboarding checklist (CC5-P2-007).** Upon hiring the first employee, a formal policy acknowledgment log (signed PDF or DocuSign) will be obtained for all 12 policies. The onboarding checklist template is pre-authored as part of CC5-P2-007. The absence of signatures today is not a gap because there are no employees other than the founder-author.
 
-4. **Policy approval log CSV (CC5-P1-004).** `compliance/policy-approval-log.csv` created with 11 policies (POL-001 through POL-011). Columns: `policy_id`, `policy_name`, `version`, `file_path`, `status`, `effective_date`, `approved_by`, `approval_method`, `next_review_date`, `gap_ids_closed`, `soc2_criteria`, `gdpr_basis`, `notes`. **CC5-P1-004 closed.** A 12th row (Security Awareness Training standalone policy) will be added when that programme is extracted as a standalone `docs/SECURITY_AWARENESS_TRAINING_POLICY.md`.
+4. **Policy approval log CSV (CC5-P1-004).** `compliance/policy-approval-log.csv` updated to 12 policies (POL-001 through POL-012). **CC5-P1-004 closed.** POL-012 (Security Awareness & Training Policy) extracted as standalone `docs/SECURITY_AWARENESS_TRAINING_POLICY.md` — the planned 12th row is now present. The standalone policy formalises the §22 programme with added governance structure: standalone policy statement, scope table, DEC-030 audit event registry, and non-compliance escalation procedure with access-suspension SLAs. `docs/SOC2_READINESS.md §22` remains the primary SOC 2 evidence mapping reference; `docs/SECURITY_AWARENESS_TRAINING_POLICY.md` (POL-012) is the operative policy artefact.
 
 **Auditor note:** AICPA Interpretation — When evaluating pre-team entities, auditors consider the compensating control narrative above in lieu of signed acknowledgment records. The key evidence is that policies exist, are current, and have been applied (evidenced by the technical controls they specify being operational).
 

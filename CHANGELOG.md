@@ -6,6 +6,18 @@
 
 ---
 
+## [2.64.0] — 2026-06-07
+
+### Added
+- `docs/SECURITY_AWARENESS_TRAINING_POLICY.md` — POL-012 · Security Awareness & Training Policy v1.0. Standalone extraction from `docs/SOC2_READINESS.md §22`. 8-topic curriculum (OWASP Top 10, phishing, data classification, incident response, credential hygiene, secure code review, GDPR/privacy, vendor risk awareness). Solo-founder annual training plan with evidence artefact registry. New hire security onboarding checklist — 8 sequential steps, MFA hard gate (Step 3 non-negotiable pre-credential gate). Annual refresher cadence: Q1 28 Feb (all topics) + Q3 31 Aug (OWASP refresher) + post-incident ad-hoc (within 14 days). Phishing simulation programme (post-hire): KnowBe4/GoPhish, quarterly, no-punitive-action policy, aggregate-results-only for SOC 2. Evidence package CC1-E-001 through CC1-E-005. DEC-030 HMAC-chained audit events for training completions, onboarding, MFA gate, phishing results, access suspension/reinstatement. Non-compliance escalation: Day 1–7 reminder → Day 8–14 founder escalation → Day 15+ access suspension. Fills CC1.4 / CC2.2 / CC9.2 gaps. compliance-officer + security-engineer.
+
+### Changed
+- `compliance/policy-approval-log.csv` — POL-012 row added (Security Awareness & Training Policy, v1.0, `AUTHORED_PENDING_APPROVAL`, 2026-06-07). Register now covers POL-001 through POL-012. Closes CC5 gap: "12th row pending SECURITY_AWARENESS_TRAINING_POLICY.md extraction" noted in §27.3.2.
+- `docs/SOC2_READINESS.md` — §22 header annotated: standalone policy POL-012 extracted to `docs/SECURITY_AWARENESS_TRAINING_POLICY.md`; §27.3.2 policy log note updated from "11 policies, 12th pending" to "12 policies, POL-012 extracted".
+- `VERSION` → 2.64.0.
+
+---
+
 ## [2.63.0] — 2026-06-07
 
 ### Added
