@@ -6,6 +6,16 @@
 
 ---
 
+## [2.87.0] — 2026-06-07
+
+### Added
+- `docs/CLINICAL_SAFETY.md` — post-generation clinical safety classifier spec for Victor AI coach: two-phase safety model (LLM prompt layer + async output classifier), 5 risk categories (CS-01 ED restriction, CS-02 purge/compensatory, CS-03 body shame, CS-04 self-harm/distress, CS-05 overtraining/injury), CRITICAL/HIGH severity levels + PagerDuty P1 wiring, full ED-flag mode spec (set/unset/invisibility principle), TypeScript implementation contract for `src/workers/coaching/safety-classifier.ts`, pattern registry amendment process (clinical-safety + compliance-officer dual approval), monthly review process + SOC 2 CC7.2 mapping; 541 lines; referenced by `docs/DATA_MODEL.md` §21.16 item 10 as P0
+
+### Changed
+- `VERSION` — 2.86.0 → 2.87.0
+
+---
+
 ## [2.86.0] — 2026-06-07
 
 ### Added
