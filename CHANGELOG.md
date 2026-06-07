@@ -6,6 +6,16 @@
 
 ---
 
+## [2.92.1] — 2026-06-07
+
+### Changed
+- `docs/SOC2_READINESS.md` — §67 Tenant Data Deletion & Destruction Certificate (GDPR Art. 17 / CC6.5 / C1.2 / P5.2): closes OQ-MDD-02 (P1 before enterprise GA); 12-table deletion runbook in SERIALIZABLE transaction; pre-deletion 7-gate checklist; four DEC-030 HMAC-chained events at 10yr retention (tenant.data_deletion_initiated, .completed, tenant.r2_data_purged, tenant.destruction_certificate_issued); signed destruction certificate template (TDD-CERT-{YYYY}-{NNN}); five evidence artifacts (TDD-E-001…TDD-E-005); R2 prefix purge Worker spec; 13-item implementation checklist (P0/P1/P2); privacy invariant: no health values in event payloads; SOC 2 doc v3.1 → v3.2; owner: compliance-officer + enterprise-architect
+
+### Changed
+- `VERSION` — 2.92.0 → 2.92.1
+
+---
+
 ## [2.92.0] — 2026-06-07
 
 ### Added

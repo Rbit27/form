@@ -22215,6 +22215,388 @@ All disposal events are emitted via the `emit-audit-event` Cloudflare Worker (DE
 
 ---
 
+---
+
+## §67 Tenant Data Deletion & Destruction Certificate — GDPR Art. 17 / CC6.5 / C1.2 / P5.2 · OQ-MDD-02 Resolution
+
+> Owner: `compliance-officer` + `enterprise-architect`. Triggered on contract termination, GDPR Art. 17 request, or no-go use-case discovery post-signature.
+> SOC 2 criteria: **CC6.5** (logical and physical access removal), **C1.2** (confidential information disposal), **P5.2** (privacy notice — data retention limits communicated), **P6.6** (personal data disposed at end of retention period).
+> Cross-references: `docs/ENTERPRISE_ONBOARDING.md §11` (termination timeline), `docs/DATA_MODEL.md §12` (hard-delete cascade), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 HMAC chain), `docs/GDPR_DPIA.md` (Art. 17 legal basis).
+> Closes: **OQ-MDD-02** (🟡 Open → 🟡 Authored — closes to 🟢 upon first executed deletion with TDD-E-001/TDD-E-002 filed).
+
+---
+
+### §67.1 Purpose and Legal Basis
+
+Enterprise customers increasingly require formal, auditable proof that FORM has deleted their employees' health data upon contract termination. This section defines the complete technical runbook, the DEC-030 HMAC-chained audit trail, and the signed destruction certificate template that satisfies:
+
+| Requirement | Source | Obligation |
+|---|---|---|
+| Right to Erasure | GDPR Art. 17(1)(b) — personal data no longer necessary for the purpose for which it was collected | Obligatory |
+| Processor obligation | GDPR Art. 28(3)(g) — processor must delete all personal data upon termination of the processing service | Obligatory |
+| Enterprise DPA term | `docs/SUBPROCESSORS.md §5` — Clause 11: data deletion or return at the end of the processing service | Contractual |
+| SOC 2 CC6.5 | Logical access and data removed at end of authorised use period | SOC 2 Type II control |
+| SOC 2 C1.2 | Confidential information disposed of using procedures that prevent misappropriation | SOC 2 Type II control |
+| SOC 2 P5.2 / P6.6 | Privacy notice includes retention limits; data disposed at end of retention | SOC 2 Type II control |
+
+**Privacy floor invariant:** The destruction certificate is issued to the enterprise customer's designated privacy officer or legal contact. It must not contain individual user data, user names, or health values — only per-table row counts and aggregate confirmation of deletion. This invariant is enforced by the certificate template in §67.7.
+
+---
+
+### §67.2 Trigger Conditions
+
+This runbook is initiated under four conditions. Condition A is the primary path; conditions B–D are accelerated.
+
+| Condition | Description | Notice period | Timeline start |
+|---|---|---|---|
+| **A — Non-renewal / planned termination** | Customer does not renew at contract end; or either party gives written notice per MSA | 30-day data export window (see §11, `docs/ENTERPRISE_ONBOARDING.md`) | Contract end date |
+| **B — Customer-initiated early termination** | Customer exercises early termination clause in MSA | 14-day data export window | Notice receipt date |
+| **C — FORM-initiated termination (no-go use case)** | `clinical-safety` veto or no-go use case discovered post-signature (see `docs/ENTERPRISE.md §no-go`) | Accelerated 14-day deletion; no service credits | Founder decision date |
+| **D — GDPR Art. 17 individual request** | A data subject exercises their right to erasure for their own data within a tenant | No data export window (applies to one user, not the whole tenant) | Request receipt date |
+
+Condition D follows a separate per-user flow defined in `docs/INCIDENT_RESPONSE.md R-14` (DSAR handling). This section covers conditions A, B, and C — tenant-level deletion.
+
+---
+
+### §67.3 Data Scope: What Is Deleted vs What Is Retained
+
+#### Deleted (hard delete, irreversible)
+
+All rows in the following tables where `tenant_id = $TENANT_ID`:
+
+| Table | Data category | GDPR Art. 9? | ON DELETE CASCADE from `tenants`? |
+|---|---|---|---|
+| `user_health_profiles` | Health metrics, clinical flags, ED screening output | **Yes** | No — explicit delete required |
+| `wearable_readings` | Heart rate, HRV, sleep, steps, GPS | **Yes** | No — explicit delete required |
+| `workout_sets` | Rep counts, loads, RPE, CV keypoints (encrypted) | **Yes** | No — explicit delete required |
+| `workouts` | Session timestamps, exercise names, totals | **Yes** | No — explicit delete required |
+| `coaching_turns` | LLM coaching transcript (pseudonymised) | Indirectly | No — explicit delete required |
+| `coaching_sessions` | Session metadata | No | No — explicit delete required |
+| `meal_logs` | Food entries, macros | **Yes** | No — explicit delete required |
+| `scim_provisioning_log` | SCIM event log per user | No | No — explicit delete required |
+| `users` | Email, display name, tenant role | No | **Yes** — cascades on `tenants` delete |
+| `tenant_feature_flags` | Tenant feature configuration | No | **Yes** — cascades on `tenants` delete |
+| `tenant_sso_configs` | SAML/OIDC configuration, certificate | No | **Yes** — cascades on `tenants` delete |
+| `tenant_scim_tokens` | SCIM bearer token hashes | No | **Yes** — cascades on `tenants` delete |
+| `tenants` | Tenant name, billing tier, domain, config | No | — (root record) |
+
+**R2 object storage:** Any encrypted keypoint blobs in `form-cv-data/{tenant_id}/` R2 prefix are deleted by an R2 `list + delete` pass in §67.5 Step 9. Encrypted at rest under `KEYPOINTS_ENC_KEY` — deletion removes both ciphertext and the ability to decrypt even if the key were compromised.
+
+**Backups:** Cold backup snapshots (§53 cold storage, `form-cold-backups/`) include all tenant data. After the primary deletion, the backup rotation schedule naturally purges the tenant's data within the standard 90-day retention window. For customers requiring accelerated backup purge confirmation, see §67.8 OQ-TDD-02.
+
+#### Retained (WORM — cannot be deleted on customer request)
+
+| Data | Reason for retention | Retention period |
+|---|---|---|
+| `audit_log_events` rows where `tenant_id = $TENANT_ID` | DEC-030 HMAC chain integrity; SOC 2 evidence; GDPR Art. 17(3)(e) — legal claims | 7 years from event creation date |
+| SLA credit records and dispute resolution records | ENTERPRISE_SLA.md §6; contractual obligation | 7 years from contract end |
+| The destruction certificate itself (TDD-E-002) | Evidence that deletion was performed | 10 years from issuance |
+
+This retention policy is disclosed in the enterprise DPA (`docs/SUBPROCESSORS.md §5`, Clause 14 — audit log exception) and in the privacy policy. Customers are informed at the time of signing that audit log events cannot be deleted on request due to their role as WORM tamper-evident records required for regulatory compliance. The audit log retains pseudonymised event metadata (event type, timestamps, row counts) — it does not retain the deleted health values themselves.
+
+---
+
+### §67.4 Pre-Deletion Checklist
+
+Before executing the deletion runbook, the `compliance-officer` must verify:
+
+| # | Check | Owner | Verification |
+|---|---|---|---|
+| TDD-PRE-01 | Written termination notice received and filed at `compliance/tenants/{tenant_id}/termination-notice.pdf` | compliance-officer | File exists with date ≤ deletion date |
+| TDD-PRE-02 | Data export window has elapsed (30 days for condition A, 14 days for B/C) OR customer has waived export window in writing | compliance-officer | Written waiver or calendar confirmation |
+| TDD-PRE-03 | All active tenant users have been notified of service termination via the customer's HR/People lead | customer-success | CSM sign-off email |
+| TDD-PRE-04 | SSO/SCIM deprovisioned — WorkOS tenant disabled; SCIM token revoked; `tenant_sso_configs.enabled = false` confirmed in Supabase | enterprise-architect | Query result from Step 1 below |
+| TDD-PRE-05 | Any pending SLA credit disputes resolved (`sla.dispute_status != 'open'` for this tenant) | compliance-officer | Query result |
+| TDD-PRE-06 | PAM elevation (break-glass) initiated; second approver confirmed (post-hire) or HMAC-chained solo compensating control (pre-hire) per `docs/AUDIT_LOG_SCHEMA.md §break-glass` | security-engineer | DEC-030 `admin.break_glass_initiated` event ID |
+| TDD-PRE-07 | `tenant.data_deletion_initiated` DEC-030 event emitted with `tenant_id`, `trigger_condition` (A/B/C), and `authorized_by_user_id` before any DELETE statement executes | platform-engineer | Event ID logged; HMAC verified |
+
+---
+
+### §67.5 Deletion Runbook
+
+Execute in a single serialisable transaction. If any step fails, the transaction rolls back; the `tenant.data_deletion_initiated` event remains in the audit log as evidence of the attempt. Re-run after root-cause fix; re-emit `tenant.data_deletion_initiated` for the second attempt with `attempt_number: 2`.
+
+**Prerequisite:** All steps below run as a `service_role` credential elevated via the break-glass PAM procedure. Connection string uses the primary read-write endpoint — not a replica.
+
+```sql
+BEGIN ISOLATION LEVEL SERIALIZABLE;
+
+-- Step 1: Verify tenant state and capture metadata
+SELECT
+  t.id                  AS tenant_id,
+  t.name                AS tenant_name,    -- for certificate; masked in DEC-030 payload
+  t.deleted_at          AS soft_deleted_at,
+  t.billing_tier        AS tier,
+  COUNT(DISTINCT u.id)  AS user_count
+FROM tenants t
+LEFT JOIN users u ON u.tenant_id = t.id
+WHERE t.id = $TENANT_ID
+GROUP BY t.id, t.name, t.deleted_at, t.billing_tier;
+-- Assert: exactly 1 row returned; soft_deleted_at IS NOT NULL (tenant must be soft-deleted first)
+
+-- Step 2: Capture pre-deletion row counts (stored in TDD-E-001 and DEC-030 payload)
+SELECT 'user_health_profiles'   AS tbl, COUNT(*) AS rows FROM user_health_profiles   WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'wearable_readings',              COUNT(*)          FROM wearable_readings              WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'workout_sets',                   COUNT(*)          FROM workout_sets                   WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'workouts',                       COUNT(*)          FROM workouts                       WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'coaching_turns',                 COUNT(*)          FROM coaching_turns                 WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'coaching_sessions',              COUNT(*)          FROM coaching_sessions              WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'meal_logs',                      COUNT(*)          FROM meal_logs                      WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'scim_provisioning_log',          COUNT(*)          FROM scim_provisioning_log          WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'users',                          COUNT(*)          FROM users                          WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'tenant_feature_flags',           COUNT(*)          FROM tenant_feature_flags           WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'tenant_sso_configs',             COUNT(*)          FROM tenant_sso_configs             WHERE tenant_id = $TENANT_ID
+UNION ALL
+SELECT 'tenant_scim_tokens',             COUNT(*)          FROM tenant_scim_tokens             WHERE tenant_id = $TENANT_ID;
+
+-- Step 3: Delete Art. 9 health data first (minimise exposure window)
+DELETE FROM user_health_profiles   WHERE tenant_id = $TENANT_ID;
+DELETE FROM wearable_readings      WHERE tenant_id = $TENANT_ID;
+
+-- Step 4: Delete workout data (workout_sets must precede workouts if no CASCADE)
+DELETE FROM workout_sets           WHERE tenant_id = $TENANT_ID;
+DELETE FROM workouts               WHERE tenant_id = $TENANT_ID;
+
+-- Step 5: Delete coaching data
+DELETE FROM coaching_turns         WHERE tenant_id = $TENANT_ID;
+DELETE FROM coaching_sessions      WHERE tenant_id = $TENANT_ID;
+
+-- Step 6: Delete meal data
+DELETE FROM meal_logs              WHERE tenant_id = $TENANT_ID;
+
+-- Step 7: Delete provisioning log
+DELETE FROM scim_provisioning_log  WHERE tenant_id = $TENANT_ID;
+
+-- Step 8: Hard-delete the tenant root record
+-- ON DELETE CASCADE removes: users, tenant_feature_flags, tenant_sso_configs, tenant_scim_tokens
+DELETE FROM tenants WHERE id = $TENANT_ID;
+
+-- Step 9 (post-commit): R2 prefix deletion — execute via Cloudflare Worker after COMMIT
+-- await env.CV_BUCKET.list({ prefix: `${tenantId}/` })
+-- for each object: await env.CV_BUCKET.delete(object.key)
+-- Emit DEC-030 `tenant.r2_data_purged` event with object_count
+
+-- Step 10: Verify post-deletion row counts (all must be 0)
+SELECT 'user_health_profiles'   AS tbl, COUNT(*) AS rows FROM user_health_profiles   WHERE tenant_id = $TENANT_ID
+UNION ALL SELECT 'wearable_readings',    COUNT(*) FROM wearable_readings    WHERE tenant_id = $TENANT_ID
+UNION ALL SELECT 'workout_sets',         COUNT(*) FROM workout_sets         WHERE tenant_id = $TENANT_ID
+UNION ALL SELECT 'workouts',             COUNT(*) FROM workouts             WHERE tenant_id = $TENANT_ID
+UNION ALL SELECT 'coaching_turns',       COUNT(*) FROM coaching_turns       WHERE tenant_id = $TENANT_ID
+UNION ALL SELECT 'coaching_sessions',    COUNT(*) FROM coaching_sessions    WHERE tenant_id = $TENANT_ID
+UNION ALL SELECT 'meal_logs',            COUNT(*) FROM meal_logs            WHERE tenant_id = $TENANT_ID
+UNION ALL SELECT 'scim_provisioning_log',COUNT(*) FROM scim_provisioning_log WHERE tenant_id = $TENANT_ID;
+-- Assert: all rows = 0. If any row > 0, ROLLBACK and investigate.
+
+COMMIT;
+```
+
+**Step 11 — WorkOS tenant deactivation (if not already done in TDD-PRE-04):**
+```
+POST https://api.workos.com/organizations/{organization_id}/deactivate
+Authorization: Bearer $WORKOS_API_KEY
+```
+
+**Step 12 — DEC-030 completion event:** Emit `tenant.data_deletion_completed` via `emit-audit-event` Worker with the row counts captured in Step 2 and verified-zero counts from Step 10. This event is the machine-readable destruction record.
+
+---
+
+### §67.6 DEC-030 HMAC-Chained Audit Events
+
+Three new event types are registered in `docs/AUDIT_LOG_SCHEMA.md`:
+
+| Event type | Severity | Retention | Trigger | Required payload fields |
+|---|---|---|---|---|
+| `tenant.data_deletion_initiated` | HIGH | **10 years** | Before any DELETE executes (TDD-PRE-07) | `tenant_id`, `trigger_condition` (A/B/C), `authorized_by_user_id`, `attempt_number`, `break_glass_event_id` |
+| `tenant.data_deletion_completed` | CRITICAL | **10 years** | After Step 10 verifies all counts = 0 and COMMIT succeeds | `tenant_id`, `trigger_condition`, `pre_deletion_row_counts` (JSON — per-table), `post_deletion_row_counts` (all zeros), `r2_objects_deleted`, `duration_seconds`, `transaction_id` |
+| `tenant.destruction_certificate_issued` | HIGH | **10 years** | When TDD-E-002 certificate PDF is signed and filed | `tenant_id`, `certificate_id` (TDD-CERT-{YYYY}-{NNN}), `recipient_email` (privacy officer contact — not a user), `certificate_sha256`, `data_deletion_completed_event_id` |
+
+**Retention rationale:** 10 years (vs the standard 7) because this event IS the destruction evidence. If challenged in litigation or by a regulator, FORM must be able to produce proof of deletion for a decade after contract end.
+
+**Privacy invariant:** No event payload may contain individual user names, email addresses, health values, or any data from the deleted rows. Only aggregate row counts and the pseudonymised `tenant_id` UUID. The tenant's display name (`tenants.name`) must not appear in any event payload — use `tenant_id` only.
+
+---
+
+### §67.7 Destruction Certificate Template
+
+Issued as a PDF signed by `compliance-officer`. Filed at `compliance/tenants/{tenant_id}/destruction-certificate-{YYYY-MM-DD}.pdf`. Certificate ID format: `TDD-CERT-{YYYY}-{NNN}` (sequential within calendar year).
+
+```
+─────────────────────────────────────────────────────────────────
+FORM · TENANT DATA DESTRUCTION CERTIFICATE
+Certificate ID: TDD-CERT-{YYYY}-{NNN}
+─────────────────────────────────────────────────────────────────
+
+Issued to:       {Customer legal entity name}
+                 {Privacy Officer name and title}
+                 {Privacy Officer email}
+
+Issued by:       FORM Health Technologies / FORM
+                 Compliance Officer
+                 compliance@form.coach
+
+Termination date:  {Contract end date or termination notice date}
+Deletion executed: {UTC timestamp of COMMIT in §67.5}
+Certificate date:  {Date of this certificate}
+
+─────────────────────────────────────────────────────────────────
+DELETION SCOPE
+─────────────────────────────────────────────────────────────────
+
+This certificate confirms that FORM has permanently and
+irreversibly deleted all personal data processed on behalf of
+{Customer legal entity name} under the Data Processing Agreement
+dated {DPA date}, in accordance with GDPR Art. 28(3)(g) and
+Art. 17(1)(b).
+
+Data deleted from FORM's production database:
+
+  Table                     Rows deleted
+  ─────────────────────     ────────────
+  user_health_profiles        {N}
+  wearable_readings           {N}
+  workout_sets                {N}
+  workouts                    {N}
+  coaching_turns              {N}
+  coaching_sessions           {N}
+  meal_logs                   {N}
+  scim_provisioning_log       {N}
+  users                       {N}
+  tenant_feature_flags        {N}
+  tenant_sso_configs          {N}
+  tenant_scim_tokens          {N}
+  ─────────────────────     ────────────
+  TOTAL                       {N}
+
+Encrypted CV keypoint objects deleted from object storage:
+  R2 prefix form-cv-data/{tenant_id}/: {N} objects
+
+─────────────────────────────────────────────────────────────────
+AUDIT TRAIL
+─────────────────────────────────────────────────────────────────
+
+The deletion is recorded in FORM's tamper-evident HMAC-chained
+audit log (DEC-030) under the following event IDs:
+
+  tenant.data_deletion_initiated:  {event_id}
+  tenant.data_deletion_completed:  {event_id}
+  tenant.r2_data_purged:           {event_id}
+  tenant.destruction_certificate_issued: {event_id}
+
+These events are retained for 10 years and can be provided to
+regulators or in legal proceedings upon written request.
+
+─────────────────────────────────────────────────────────────────
+RETAINED DATA (NOT SUBJECT TO DELETION)
+─────────────────────────────────────────────────────────────────
+
+In accordance with GDPR Art. 17(3)(e) and our DPA Clause 14,
+the following data is retained and cannot be deleted on request:
+
+  • Audit log events (pseudonymised event metadata only —
+    no health values) — retained 7 years from event date
+  • This destruction certificate — retained 10 years
+
+─────────────────────────────────────────────────────────────────
+CERTIFICATION
+─────────────────────────────────────────────────────────────────
+
+I certify that the deletion described in this certificate was
+executed in accordance with FORM's documented data deletion
+runbook (docs/SOC2_READINESS.md §67) and that post-deletion
+row count verification confirmed zero remaining rows for all
+deleted tables.
+
+Signed: ___________________________
+         Compliance Officer, FORM
+         {Date}
+
+─────────────────────────────────────────────────────────────────
+```
+
+---
+
+### §67.8 Evidence Artifacts
+
+| ID | Description | Location | Owner | Status |
+|---|---|---|---|---|
+| **TDD-E-001** | Pre- and post-deletion row count report — SQL output from §67.5 Steps 2 and 10; exported as CSV; SHA-256 hash filed in the DEC-030 `tenant.data_deletion_completed` event payload | `compliance/tenants/{tenant_id}/deletion-row-counts-{YYYY-MM-DD}.csv` | compliance-officer | 🔴 To create per event |
+| **TDD-E-002** | Signed destruction certificate PDF — template from §67.7; compliance-officer wet or digital signature; SHA-256 recorded in `tenant.destruction_certificate_issued` DEC-030 event | `compliance/tenants/{tenant_id}/destruction-certificate-{YYYY-MM-DD}.pdf` | compliance-officer | 🔴 To create per event |
+| **TDD-E-003** | DEC-030 event chain export — the three audit events as JSON, exported from `audit_log_events` with HMAC chain verification output; confirms chain integrity from `tenant.data_deletion_initiated` through `tenant.destruction_certificate_issued` | `compliance/tenants/{tenant_id}/audit-chain-export-{YYYY-MM-DD}.json` | security-engineer | 🔴 To create per event |
+| **TDD-E-004** | Backup rotation confirmation — written statement from `devops-lead` confirming the date on which the last cold backup containing this tenant's data will age out (= deletion date + 90 days); filed as compliance note | `compliance/tenants/{tenant_id}/backup-rotation-confirmation.md` | devops-lead | 🔴 To create per event |
+| **TDD-E-005** | WorkOS tenant deactivation confirmation — API response or dashboard screenshot confirming the WorkOS organisation was deactivated; date matches or precedes deletion date | `compliance/tenants/{tenant_id}/workos-deactivation-{YYYY-MM-DD}.png` | enterprise-architect | 🔴 To create per event |
+
+Artifacts for each tenant are stored in the private `form-compliance` repo under `compliance/tenants/{tenant_id}/`. The folder is created at contract signature and populated across the tenant lifecycle.
+
+---
+
+### §67.9 SOC 2 Criteria Mapping
+
+| SOC 2 Criterion | Control | §67 implementation | Status |
+|---|---|---|---|
+| **CC6.5** | Logical access removed at end of authorised period | Step 1 TDD-PRE-04 (SSO/SCIM disabled); Step 8 (users hard-deleted); Step 11 (WorkOS deactivated) | 🟡 Authored — 🟢 upon first execution |
+| **C1.2** | Confidential information disposed using procedures preventing misappropriation | §67.5 deletion runbook; §67.7 destruction certificate; TDD-E-001 through TDD-E-003 | 🟡 Authored — 🟢 upon first execution |
+| **P5.2** | Privacy notice includes retention limits; end-of-retention disposal | §67.3 retention table; cross-reference to DPA Clause 14 | 🟡 Authored |
+| **P6.6** | Personal data disposed at end of retention period | §67.5 deletion runbook; §67.6 DEC-030 events | 🟡 Authored |
+| **CC6.5 (access removal)** | Service access revoked before or during data deletion | §67.4 TDD-PRE-04 gate; Step 11 WorkOS deactivation | 🟡 Authored |
+
+---
+
+### §67.10 Implementation Checklist
+
+#### P0 — Must complete before first enterprise customer signs
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| **TDD-P0-01** | Register three DEC-030 event types (`tenant.data_deletion_initiated`, `tenant.data_deletion_completed`, `tenant.destruction_certificate_issued`) in `docs/AUDIT_LOG_SCHEMA.md` — add Zod schema, severity, retention period (10yr), and privacy-invariant notes. Add `tenant.r2_data_purged` as a fourth event. | platform-engineer | **P0** | M6 | [ ] |
+| **TDD-P0-02** | Create `compliance/tenants/` directory structure with `.gitkeep` and `README.md` describing the tenant lifecycle folder schema; commit to private `form-compliance` repo. | compliance-officer | **P0** | M6 | [ ] |
+| **TDD-P0-03** | Implement the R2 prefix deletion Worker (`tenant-data-purge` Cloudflare Worker): accepts `tenant_id` via signed internal request; lists all objects under `form-cv-data/{tenant_id}/`; deletes in batches of 1,000; emits `tenant.r2_data_purged` event with `object_count`; retries on partial failure with exponential backoff. | platform-engineer + devops-lead | **P0** | M7 | [ ] |
+| **TDD-P0-04** | Draft the destruction certificate template (§67.7) as a fillable PDF using the exact field layout above; store template at `compliance/templates/destruction-certificate-template.pdf` in `form-compliance` repo; compliance-officer signs and dates the template with a "SPECIMEN" watermark. | compliance-officer | **P0** | M6 | [ ] |
+| **TDD-P0-05** | Add §67 runbook reference to `docs/ENTERPRISE_ONBOARDING.md §11.2` (audit events at termination): link to §67.6 DEC-030 events and §67.7 certificate; confirm the 30-day / 14-day data export windows in §11 match the trigger conditions in §67.2. | customer-success + compliance-officer | **P0** | M6 | [ ] |
+
+#### P1 — Before first regulated-industry enterprise customer (financial services, healthcare)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| **TDD-P1-01** | Stage a dry-run deletion on a test tenant in the staging environment: execute §67.5 Steps 2–10 against a seeded test `tenant_id`; verify all post-deletion counts are zero; verify DEC-030 events are emitted and chain-verifiable. File dry-run report as `compliance/runbooks/tenant-deletion-dry-run-{date}.md`. | security-engineer + platform-engineer | **P1** | M7 | [ ] |
+| **TDD-P1-02** | Implement the `tenant.data_deletion_completed` event payload schema enforcement: the `pre_deletion_row_counts` field must be a JSON object with exactly 12 keys (one per table in §67.3); Zod validation rejects events with missing tables. | platform-engineer | **P1** | M7 | [ ] |
+| **TDD-P1-03** | Add a backup rotation confirmation workflow: after deletion, `devops-lead` calculates deletion_date + 90 days and creates TDD-E-004 confirmation note; add this step to the `ENTERPRISE_ONBOARDING.md §11` termination timeline as Day +1. | devops-lead | **P1** | M8 | [ ] |
+| **TDD-P1-04** | Add the right-to-erasure response time commitment to `docs/ENTERPRISE_SLA.md`: "Data deletion runbook executed and destruction certificate issued within 5 business days of the data export window closing." Define the corresponding Better Stack SLA probe or Linear ticket type. | compliance-officer + customer-success | **P1** | M8 | [ ] |
+| **TDD-P1-05** | Confirm DPA Clause 14 (audit log retention exception) is in the executed DPA with all new enterprise customers — add a checklist item to `docs/ENTERPRISE_ONBOARDING.md §1` (pre-launch checklist) under "Legal". | compliance-officer | **P1** | M6 | [ ] |
+
+#### P2 — Post-GA, at scale
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| **TDD-P2-01** | Automate the deletion runbook as a Cloudflare Worker (`tenant-hard-delete`) triggered by a `tenant.soft_delete_grace_expired` scheduled event (30 days after `tenants.deleted_at`). Worker executes §67.5 steps, emits events, and queues the certificate generation step. Full automation removes human-error risk on time-sensitive Art. 17 obligations. | platform-engineer + devops-lead | **P2** | M12 | [ ] |
+| **TDD-P2-02** | Implement accelerated cold backup purge for regulated-industry customers who require immediate backup deletion (not the standard 90-day rotation). Architecture: mark the tenant's backup snapshots in the R2 `form-cold-backups/` manifest with `purge_immediately: true`; `backup-purge-worker` deletes affected snapshots and emits `tenant.backup_purged` DEC-030 event with snapshot IDs. | devops-lead | **P2** | M14 | [ ] |
+| **TDD-P2-03** | Post-Series A: evaluate whether destruction certificates should be countersigned by an independent auditor (e.g., the SOC 2 auditor) for enterprise customers in highly regulated industries. This adds credibility at the cost of $2–5k per certificate. Decision gate: first regulated-industry customer request. | compliance-officer + founder | **P2** | Series A | [ ] |
+
+---
+
+### §67.11 Open Questions
+
+| OQ | Question | Owner | Priority | Target |
+|---|---|---|---|---|
+| **OQ-TDD-01** | **Should the destruction certificate include the customer's DPA execution date and a reference to the specific Art. 28 processing activities (PA-01…PA-12 from `docs/GDPR_DPIA.md`) that have now ended?** Adding DPIA cross-references strengthens the Art. 17 paper trail but increases certificate length. Recommendation: include DPA date and a one-line summary of processing activities; omit individual PA IDs (too technical for privacy officers). | compliance-officer | **P1** | Before first certificate issuance |
+| **OQ-TDD-02** | **Can FORM commit to accelerated cold backup purge (< 30 days) for enterprise customers who contractually require it?** Standard policy is 90-day rotation. Accelerated purge requires identifying and deleting individual snapshots by tenant prefix in R2 — technically feasible (TDD-P2-02) but operationally expensive. Recommendation: offer as an Enterprise+ add-on (not standard); charge $500 one-time for manual execution pre-automation. | devops-lead + compliance-officer | **P1** | First regulated-industry pilot |
+| **OQ-TDD-03** | **Should FORM disclose the count of tenant data deletions performed per year in the annual SOC 2 transparency report?** Aggregate count (not customer identities) would demonstrate the control is operationally active, not just documented. Risk: zero deletions in year 1 looks like unused controls. Recommendation: include once FORM has executed at least two real deletions. | compliance-officer | **P2** | First SOC 2 annual renewal |
+
+---
+
+*v1.0 (2026-06-07): §67 Tenant Data Deletion & Destruction Certificate — GDPR Art. 17 / CC6.5 / C1.2 / P5.2. Closes OQ-MDD-02 (🟡 P1 Open → 🟡 Authored; closes to 🟢 upon TDD-P0-01 through TDD-P0-04 complete and first deletion executed with TDD-E-001/TDD-E-002 filed). Legal basis: GDPR Art. 17(1)(b) necessity lapse + Art. 28(3)(g) processor obligation + Art. 17(3)(e) legal claims retention carve-out; enterprise DPA Clause 11 (deletion obligation) and Clause 14 (audit log exception — `docs/SUBPROCESSORS.md §5`). Four trigger conditions: A (non-renewal, 30-day export window), B (customer early termination, 14-day window), C (FORM no-go termination, 14-day accelerated), D (per-user Art. 17 → routes to INCIDENT_RESPONSE R-14). Twelve tables deleted: user_health_profiles, wearable_readings, workout_sets, workouts, coaching_turns, coaching_sessions, meal_logs, scim_provisioning_log, users, tenant_feature_flags, tenant_sso_configs, tenant_scim_tokens; ON DELETE CASCADE from `tenants` handles users + SSO/SCIM config tables; R2 prefix `form-cv-data/{tenant_id}/` purged by `tenant-data-purge` Worker (TDD-P0-03). Retained data: audit_log_events (7yr WORM; only pseudonymised event metadata, no health values) + destruction certificate (10yr). Four DEC-030 HMAC-chained events (all 10-year retention — higher than standard to ensure destruction evidence outlasts any litigation window): tenant.data_deletion_initiated (HIGH), tenant.data_deletion_completed (CRITICAL — IS the machine-readable destruction record, carries per-table row counts), tenant.r2_data_purged (HIGH), tenant.destruction_certificate_issued (HIGH). Privacy invariant: no individual user names, email addresses, or health values in any event payload or certificate; only aggregate row counts and pseudonymous tenant_id UUID. Destruction certificate (§67.7): formal PDF signed by compliance-officer; certificate ID TDD-CERT-{YYYY}-{NNN}; includes pre-deletion row counts per table, DEC-030 event IDs, retained-data disclosure (DPA Clause 14), and compliance-officer signature; filed in private form-compliance repo under compliance/tenants/{tenant_id}/. Pre-deletion checklist (§67.4): 7 gates including TDD-PRE-01 (written termination notice), TDD-PRE-04 (SSO/SCIM deprovisioned), TDD-PRE-06 (break-glass PAM elevation), TDD-PRE-07 (initiated event emitted before first DELETE). Deletion runbook (§67.5): single SERIALIZABLE transaction; Art. 9 data deleted first (health_profiles, wearables); cascade-safe order; post-commit R2 purge Worker call; post-deletion zero-count verification assertion; WorkOS tenant deactivation (Step 11); completion event (Step 12). SOC 2 criteria: CC6.5 (access removal), C1.2 (confidential disposal), P5.2 (retention notice), P6.6 (disposal at retention end). Five evidence artifacts: TDD-E-001 (deletion row-count CSV with SHA-256 in DEC-030 payload), TDD-E-002 (signed certificate PDF), TDD-E-003 (DEC-030 chain export JSON), TDD-E-004 (backup rotation confirmation), TDD-E-005 (WorkOS deactivation screenshot). Implementation checklist: 5× P0 M6-M7 (event registration, compliance/tenants/ directory, R2 purge Worker, certificate template PDF, ENTERPRISE_ONBOARDING cross-reference), 5× P1 M7-M8 (staging dry-run, Zod schema enforcement, backup confirmation workflow, SLA commitment in ENTERPRISE_SLA.md, DPA Clause 14 pre-launch gate), 3× P2 (automated tenant-hard-delete Worker, accelerated backup purge for regulated industries, countersigned certificate option). Three open questions: OQ-TDD-01 (DPIA PA IDs in certificate — P1), OQ-TDD-02 (accelerated cold backup purge commitment — P1), OQ-TDD-03 (annual transparency report count — P2). Gap closures: OQ-MDD-02 🟡 → 🟡 Authored. SOC 2 doc v3.1 → v3.2. Owner: compliance-officer + enterprise-architect.*
+
+---
+
 *v1.0 (2026-06-06): §66 Media and Device Disposal Policy — C1.2 / CC6.5 / CC6.7 · PRE-06 Closure. Closes PRE-06 (🔴 Open → 🟡 Authored — closes to 🟢 upon MDD-P0-01/MDD-P0-02 execution and first disposal event). Closes C1-GAP-002 (🔴 Gap → 🟡 Authored — no formal disposal policy existed before this section; §26.6.2 specified procedure but without standalone policy status). Closes C1-GAP-004 P1 (P1 Open → 🟡 Authored — `compliance/c1/device-disposal-policy.md` now formally authored via MDD-P0-04 extraction checklist; PRE-34-E-008 created upon commit). Policy scope: all physical devices holding FORM production credentials, health data, or debugging artifacts; remote-work/personal-device context (solo-founder BYOD model); scales to multi-person team without architectural change. Wipe standards: NIST SP 800-88 Rev. 1 Purge — cryptographic erasure (FileVault 2 EACS + Secure Enclave key discard) for SSD/NVMe; iOS hardware cryptographic erase; 7-pass overwrite for legacy USB; physical shredding for HDD. Four disposal categories: development laptop (72h credential revocation → EACS → MDM confirmation), mobile test device (TestFlight revocation → iOS erase), external storage (per-type Purge or physical destruction), paper (cross-cut P-4 shred). Test device handling (§66.6): devices that touched production health data require: audit log search for device activity window (MDD-E-005), two-person sign-off or HMAC-chained solo attestation, cache verification `find` command (MDD-E-006), then standard wipe. Remote-work device policy (§66.5): FileVault 2 + auto-lock ≤5 min + MDM + no-credentials-in-plaintext + jailbreak prohibition + no VPN requirement (Cloudflare Access compensates). Chain of custody (§66.7): internal disposal via device-register.csv + MDD-E-003; solo-founder compensating control via HMAC-chained DEC-030 dual-event (asset.disposal_initiated → asset.disposal_completed) as tamper-evident substitute for two-person witness; physical transfer chain-of-custody form template for third-party handoffs; founder attestation committed to repo. Timeline requirements (§66.8): 72h pre-disposal credential revocation; 14 calendar days from departure date for employee device wipe; 7 days for active device retirement; 30 days max for third-party destruction handoff. Third-party destruction criteria (§66.9): NAID AAA / e-Stewards / R2-RIOS certified; NIST Purge or ≤6mm HDD shred; cert within 5 business days; EU data residency for EU health data devices; DPA signed; no retail trade-in programs. Five DEC-030 HMAC-chained events (all 7-year retention): asset.disposal_initiated (STANDARD), asset.disposal_completed (STANDARD), asset.device_sanitized (HIGH), asset.chain_of_custody_transferred (HIGH), asset.disposal_log_filed (STANDARD); privacy invariant: no serial numbers or health data in event payloads; 30-day chain gap fires MDD-AL-01. Seven evidence artifacts MDD-E-001 through MDD-E-007. Gap/PRE closure: PRE-06 🔴→🟡, C1-GAP-002 🔴→🟡, C1-GAP-004 🟡→🟡 Authored, CC6-GAP-010 (MDM) referenced as dependency for 🟢 closure. SOC 2 criteria: C1.2 (confidential information disposal — primary), CC6.5 (logical access termination before device decommission), CC6.7 (health data cache verification), CC1.4 (policy authored and committed). Thirteen-item implementation checklist: 5× P0 M5 (device register, founder attestation, DEC-030 registration, device-disposal-policy.md extraction, gap register update), 5× P1 M5-M6 (destruction vendor register, MDD-AL-01 alert, MDM deployment closing CC6-GAP-010, enterprise offboarding API key step, compliance calendar update), 3× P2 (post-hire two-person sign-off, MDM auto-trigger Worker, CSM device policy). Three open questions: OQ-MDD-01 (serial number in Supabase Vault vs 1Password — P2 Series A), OQ-MDD-02 (enterprise tenant data destruction certificate — P1 before enterprise GA M13), OQ-MDD-03 (YubiKey hardware key requirement from first hire — P1). SOC 2 doc v3.0 → v3.1. Owner: compliance-officer + security-engineer.*
 
 *v1.1 (2026-06-05): §65 Q2 2026 Quarterly Access Review — First Execution Evidence · CC6-GAP-001 Closure · CC6.2/CC6.3/CC6.5/CC4.2 Auditor Exhibit. First-ever execution of the quarterly access review defined in §23. §65.1 SOC 2 criteria mapping: CC6.2/CC6.3/CC6.5/CC4.2/CC1.2 all addressed. §65.2 phase context: solo-founder compensating control per §23.7; review executed 36 days late (due 2026-04-30, executed 2026-06-05); latency finding AR-2026-Q2-01 logged. §65.3 access inventory: 11 human account systems (GitHub/Cloudflare/Supabase/1Password/PostHog/Sentry/Stripe/ElevenLabs/Anthropic/Apple Developer/Google Play) + 14 service account / API token rows; founder is sole human account holder across all systems; SCIM tokens: 0 (pre-launch); zero unauthorized accounts found. §65.4 roster comparison: all accounts match §23.5 authorized roster (v1.0 baseline authored 2026-06-05); three service account SLA-boundary flags (AR-2026-Q2-03/04/05). §65.5 deprovisioning and rotation log: 0 human deprovisionings; 3 credential rotations (`SUPABASE_SERVICE_ROLE_JWT` via §57 runbook, `ANTHROPIC_API_KEY`, nightly backup Worker role) executed 2026-06-05T14:23–14:47Z within 90-day SLA boundary. §65.6 enterprise tenant review: 0 active tenants (pre-launch); §23.2.3 query validated in staging (0 rows). §65.7 control effectiveness: all 6 CC6 controls assessed Effective; no degraded controls. §65.8 findings register: AR-2026-Q2-01 (Low — 36-day review latency; remediation: Q3 calendar gate by 2026-07-17); AR-2026-Q2-02 (Medium — Sentry DPA pending; pre-existing finding; escalation by 2026-06-12); AR-2026-Q2-03/04/05 (operational rotation items, executed same-day). §65.9 DEC-030 events: `system.access_review_completed` (STANDARD, 7yr — defined in §23, not yet in AUDIT_LOG_SCHEMA.md; registration P1 §65.13-3); `system.credential_rotated` (STANDARD, 7yr — new event, registration P1 §65.13-4); event payload JSON provided with `artifact_sha256: [PENDING]` pending artifact commit. §65.10 evidence mapping: CC6-GAP-001 🔴 → 🟢; PRE-23 🟡 → 🟢; CC6.2/CC6.3/CC6.5/CC4.2/CC1.2 🟡 → 🟢; net readiness ~95.5% → ~96.0%. §65.11 Q3 forward plan: due 2026-07-31; differences: calendar gate, potential pilot tenants, Sentry DPA target closure, CLOUDFLARE_API_KEY/WORKOS_API_KEY flagged for 180-day SLA at Q3. §65.12 artifact location: `compliance/access-review/2026-q2/access-review-2026-Q2.md` in private `form-compliance` repo; SHA-256 [PENDING — AR-P0-02]. §65.13 implementation checklist: 5× P0 (2026-06-07 — artifact commit, DEC-030 emission, authorized-roster.md, §51 gap update, form-crypto-health KV verification); 5× P1 (2026-06-12/M7 — Q3 calendar gate, Sentry DPA escalation, two AUDIT_LOG_SCHEMA.md event registrations, OQ-ENC-03 closure); 3× P2 (hire date, first pilot, Q1 2027 — roster update, pilot tenant query, automated enumeration script). §65.14 two open questions: OQ-AR-01 (pilot tenant review standard — P1, before Q3 pre-review gate); OQ-AR-02 (compliance events in SIEM stream — P2, before enterprise GA). Cross-references: §23 (full quarterly access review procedure), §23.5 (authorized roster), §23.6 (artifact template), §23.7 (solo-founder compensating control), §23.8 (PRE-23 implementation checklist — all items closed by §65 AR-P0-01/02/03), §51 (CC6-GAP-001 gap register row — AR-P0-04 closes it), §15.2 PRE-23 (checklist item — 🟢 closed), §56/§57/§58 (key management — rotation SLAs for §65.3.2 table), docs/AUDIT_LOG_SCHEMA.md (event registrations — system.access_review_completed and system.credential_rotated — P1 pending), OBSERVABILITY §30.10 (form-crypto-health KV — AR-P0-05 verification), OBSERVABILITY §30.10 item 10 (admin.encryption_key_rotated — AR-2026-Q2-05 → §65.13 AR-P1-05).*
