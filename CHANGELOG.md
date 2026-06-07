@@ -6,6 +6,20 @@
 
 ---
 
+## [2.86.0] — 2026-06-07
+
+### Added
+- `content/post-317-eccentric-emphasis-no-equipment.md` — ексцентричний акцент без спеціального обладнання: Hortobágyi et al. (1996) +20–50% ексцентрична сила, тітін і сарокомерогенез (Nishikawa 2020, Franchi 2014), Roig et al. (2009) мета-аналіз, 4 практичних методи (tempo, 1.5-rep, AEL, Nordic curl), repeated bout effect, програмна інтеграція; 13 хв читання; clinical-safety NOT REQUIRED
+- `blog.html` — додано картку post-317 (eccentric-emphasis-no-equipment)
+- `README.md` — roadmap пост-317 відмічено [x], додано теми post-319–323
+
+### Changed
+- `STATUS.md` — TL;DR оновлено: 316 → 317 posts, blog.html рядок v2.86.0, 275 → 276 cards, version 2.83.0 → 2.86.0
+- `README.md` — post count 296 → 317
+- `VERSION` — 2.85.0 → 2.86.0
+
+---
+
 ## [2.85.0] — 2026-06-07
 
 ### Added

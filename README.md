@@ -16,7 +16,7 @@ This is a **pre-product** project repository. There is no app code yet (mobile d
 
 - **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
 - **65+ markdown documents** — strategic, operational, content
-- **296 evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
+- **317 evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **3 sample training programs** — sports-science discipline reference
 - **24 specialized AI agents** — operating model embodied у `.claude/agents/`
@@ -646,8 +646,13 @@ Each iteration:
 - [x] post-314: Памп і клітинне набрякання — метаболічний стрес як механізм гіпертрофії (Schoenfeld 2010/2013 cell swelling hypothesis), BFR як природний експеримент, де докази слабнуть, памп як діагностика проти пампу як мети; clinical-safety NOT REQUIRED
 - [x] post-315: Де закінчується новачок — ознаки завершення новачкового ефекту, що змінюється в програмуванні, частоті і відновленні після переходу на intermediate; clinical-safety NOT REQUIRED
 - [x] post-316: Варіативність відповіді на тренінг — чому однакова програма дає різні результати у різних людей; генетика vs конситенсі; що реально під контролем; clinical-safety NOT REQUIRED
-- [ ] post-317: Ексцентричний акцент без спеціального обладнання — практичні методи перевантаження ексцентричної фази при звичайному тренінгу; механіка і застосування; clinical-safety NOT REQUIRED
+- [x] post-317: Ексцентричний акцент без спеціального обладнання — практичні методи перевантаження ексцентричної фази при звичайному тренінгу; механіка і застосування; clinical-safety NOT REQUIRED
 - [ ] post-318: Адаптаційна стеля і як зрозуміти, що ти до неї наближаєшся — тренувальний стаж, темп прогресії, де межа між «ще ростемо» і «вже біля максимуму»; clinical-safety NOT REQUIRED
+- [ ] post-319: Ізометричний тренінг — де сила не рухається, але зростає; кутова специфічність, YMCA та intra-repetition isometrics, клінічні застосування і практичне програмування; clinical-safety NOT REQUIRED
+- [ ] post-320: Чому відчуття «легко» не означає «мало» — суб'єктивне сприйняття зусилля і реальний тренувальний стимул; RPE-дрейф, звикання, і коли «легко» треба поважати; clinical-safety NOT REQUIRED
+- [ ] post-321: Пік сили vs силова витривалість — два окремих фенотипи, різні механізми адаптації, різне програмування; де вони перетинаються і де ні; clinical-safety NOT REQUIRED
+- [ ] post-322: Тренінг з нестабільним розкладом — як будувати прогресію, коли немає передбачуваних трьох днів на тиждень; мінімальні ефективні стратегії, пріоритизація; clinical-safety NOT REQUIRED
+- [ ] post-323: Жорсткість сухожиль і передача сили — чому слабкі сухожилля обмежують силовий вихід незалежно від м'язової маси; протоколи адаптації; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
