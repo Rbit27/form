@@ -6,6 +6,17 @@
 
 ---
 
+## [2.71.0] — 2026-06-07
+
+### Added
+- `content/post-296-rpe-calibration.md` — RPE-калібрування без тренера. Проблема anchor drift у самокоучингу, три об'єктивних сигнали (velocity loss, темп дихання, деградація форми), практичний метод калібрувальних сетів, типові помилки — систематичне заниження vs завищення. Посилання: Zourdos et al. 2016, Helms et al. 2016, González-Badillo & Sánchez-Medina 2010. clinical_safety_status: NOT REQUIRED.
+- `content/post-299-strength-without-gym.md` — Мінімальний ефективний протокол для відрядження. Реальні дані по детренуванню за 3–7 днів (Mujika & Padilla 2000), три рухових паттерни без обладнання, прогресія через tempo/паузи/unilateral, чек-лист для пакування, коли NOT тренуватись. Мета — maintenance, не прогрес. clinical_safety_status: NOT REQUIRED.
+
+### Changed
+- `VERSION` → 2.71.0.
+
+---
+
 ## [2.70.0] — 2026-06-07
 
 ### Added
