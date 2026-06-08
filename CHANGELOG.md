@@ -6,6 +6,18 @@
 
 ---
 
+## [2.98.2] — 2026-06-08
+
+### Added
+- `content/post-335-reading-training-research.md` — як читати тренувальне дослідження: п'ять фільтрів (population match, тривалість, effect size vs p-value, ecological validity, publication bias); Cohen (1992), Hecksteden et al. (2015), Ioannidis (2005); (sports-scientist, clinical-safety NOT REQUIRED)
+- `README.md` — roadmap post-333/334/335 marked [x]; new planned posts 338–341 added
+- `STATUS.md` — content engine rows for post-333, post-334, post-335
+
+### Changed
+- `VERSION` — 2.98.1 → 2.98.2
+
+---
+
 ## [2.98.1] — 2026-06-08
 
 ### Added

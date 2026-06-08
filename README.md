@@ -665,11 +665,15 @@ Each iteration:
 
 #### Roadmap post-333+
 
-- [ ] post-333: Прогресія у мобільності для силовика — де обмеження реально стоїть (капсула, нейральне гальмування vs пасивна жорсткість); PNF vs статичний стретчинг після силового тренінгу; як інтегрувати без окремої «мобілайті-сесії»; Weppler & Magnusson (2010); clinical-safety NOT REQUIRED
-- [ ] post-334: Тренінг після хвороби — як повернутися без регресу; правило 7-10 днів, RPE-керований comeback, де залишкова втома прихована; чого не робити в перший тиждень; clinical-safety NOT REQUIRED
-- [ ] post-335: Чому «functional training» — нечітка категорія — SAID principle як єдина об'єктивна рамка; де «функціональні вправи» перевершують класичні, де ні; Rutherford & Jones (1986) specificity; clinical-safety NOT REQUIRED
+- [x] post-333: Типи м'язової відмови — м'язова vs технічна vs метаболічна відмова; матриця RIR для базових/ізольованих вправ; коли тренуватися до відмови, коли ні; clinical-safety NOT REQUIRED
+- [x] post-334: Тренувальний спліт: full-body, upper/lower або PPL — порівняльна матриця і рекомендація для середньостажованого; MPS-вікно і частота стимулу; clinical-safety NOT REQUIRED
+- [x] post-335: Як читати тренувальне дослідження: п'ять фільтрів для самокерованого атлета — population match, тривалість, effect size vs p-value, ecological validity, publication bias; Cohen (1992), Hecksteden et al. (2015), Ioannidis (2005); clinical-safety NOT REQUIRED
 - [ ] post-336: Мінімальна підтримуюча доза — скільки тренінгу достатньо щоб не втрачати; Bickel et al. (2011) 1/9 обсягу підтримує 100% сили; наслідки для зайнятих атлетів і паузи; clinical-safety NOT REQUIRED
 - [ ] post-337: Тренувальний стаж проти хронологічного віку після 40 — де вікові обмеження реальні, де перебільшені; Wroblewski et al. (2011) Master Athletes MRI; чому досвідчений 45-річний обганяє новачка 25-річного; clinical-safety NOT REQUIRED
+- [ ] post-338: Тренування без партнера — межі сольного до-відмови, self-spotting техніки, стратегія безпеки для базових вправ без страхувальника; clinical-safety NOT REQUIRED
+- [ ] post-339: Вибір вправ: мінімальний набір для покриття гіпертрофійного стимулу — шість патернів руху (горизонтальний тяг/жим, вертикальний тяг/жим, шарнір, присід), evidence for exercise variety vs familiarity (Fonseca et al. 2014); clinical-safety NOT REQUIRED
+- [ ] post-340: Час тренування і циркадна ритміка — чи має значення ранок vs вечір для адаптації; Chtourou & Souissi (2012) циркадні піки сили та потужності; де гнучкість розкладу перевершує оптимізацію часу; clinical-safety NOT REQUIRED
+- [ ] post-341: Техніка vs обсяг для початківця — проблема когнітивного навантаження в перші 6 місяців; чому неможливо одночасно оптимізувати техніку і прогресивне навантаження; Fitts & Posner (1967) cognitive/associative/autonomous stage і bandwidth; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 

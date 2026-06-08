@@ -128,6 +128,9 @@ FORM is at v2.69.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-330-rpe-rir-autoregulation.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
 | post-331-hrv-self-coached-athlete.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
 | post-332-dual-goal-strength-hypertrophy.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
+| post-333-failure-types-resistance-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
+| post-334-training-splits-evidence.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
+| post-335-reading-training-research.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
 | post-18-rest-intervals.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-20-doms-muscle-soreness.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-21-cv-vs-wearables.md | Blog | draft · clinical-safety PASS · sports-scientist pending · platform-engineer pending |
