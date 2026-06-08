@@ -1,7 +1,7 @@
 # FORM · Project Status v1.3.4
 
 **Date:** 8 червня 2026
-**Version:** 2.95.0
+**Version:** 2.97.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -125,6 +125,9 @@ FORM is at v2.69.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-16-ai-coach-vs-pt.md | Blog | draft · clinical-safety PASS · sports-scientist N/A · blog card: Читати → |
 | post-17-overtraining-vs-laziness.md | Blog | draft · clinical-safety PASS · sports-scientist pending · blog card: Читати → |
 | post-329-1rm-testing-protocol.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
+| post-330-rpe-rir-autoregulation.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
+| post-331-hrv-self-coached-athlete.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
+| post-332-dual-goal-strength-hypertrophy.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
 | post-18-rest-intervals.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-20-doms-muscle-soreness.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-21-cv-vs-wearables.md | Blog | draft · clinical-safety PASS · sports-scientist pending · platform-engineer pending |

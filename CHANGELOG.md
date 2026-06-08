@@ -6,6 +6,16 @@
 
 ---
 
+## [2.97.0] — 2026-06-08
+
+### Added
+- `content/post-332-dual-goal-strength-hypertrophy.md` — Сила і гіпертрофія одночасно: Schoenfeld et al. 2017 (JSCR) — схожа гіпертрофія 6–12 і 25–35 rep-range при вирівняному обсязі; Morton et al. 2016 (J Appl Physiol) — підтвердження; де конфлікт реальний (нейральна специфічність > 85% 1RM); DUP Rhea et al. 2002 (JSCR) +28% vs +14% лінійна за 12 тижнів; powerbuilding шаблон; матриця рішень по тренувальному стажу; клінічна безпека NOT REQUIRED
+- `blog.html` — картки post-330, post-331, post-332 додані; загальна кількість карток ↑3
+- `README.md` — post-330/331/332 відмічені [x]; roadmap розширений: post-333–337 (мобільність, тренінг після хвороби, functional training SAID, мінімальна підтримуюча доза, вікові адаптації)
+- `STATUS.md` — рядки post-330/331/332 додані до content engine table
+
+---
+
 ## [2.96.1] — 2026-06-08
 
 ### Added
