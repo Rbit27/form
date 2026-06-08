@@ -6,6 +6,13 @@
 
 ---
 
+## [3.0.2] — 2026-06-08
+
+### Changed
+- `enterprise.html` — added FAQ section (6 accordion items: privacy floor, SSO/SCIM setup time, tenant isolation, employee opt-out, home-gym CV support, minimum commitment); FAQ CSS styles + `toggleFaq` JS; link to pricing-enterprise.html FAQ for billing/contract questions; `VERSION` 3.0.1 → 3.0.2
+
+---
+
 ## [3.0.1] — 2026-06-08
 
 ### Added

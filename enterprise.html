@@ -114,6 +114,22 @@
   .stat-pill { display: inline-flex; align-items: baseline; gap: 6px; background: #13110C; border: 1px solid #1F1D16; border-radius: 9999px; padding: 8px 20px; }
 
   .divider { border: none; border-top: 1px solid #1F1D16; margin: 0; }
+
+  /* ── FAQ ── */
+  .faq-item { border-bottom: 1px solid #1F1D16; }
+  .faq-item:first-child { border-top: 1px solid #1F1D16; }
+  .faq-btn {
+    width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+    padding: 24px 0; display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    color: #F3EEE0; font-family: 'Manrope', sans-serif; font-size: 15px; font-weight: 500;
+    transition: color 0.15s;
+  }
+  .faq-btn:hover { color: #DDFF2D; }
+  .faq-icon { font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #6F6A60; flex-shrink: 0; transition: transform 0.2s, color 0.15s; }
+  .faq-body { display: none; padding-bottom: 24px; color: #A39D8E; font-size: 14px; line-height: 1.75; max-width: 680px; }
+  .faq-item.open .faq-body { display: block; }
+  .faq-item.open .faq-icon { transform: rotate(45deg); color: #DDFF2D; }
+  .faq-item.open .faq-btn { color: #F3EEE0; }
 </style>
 </head>
 <body class="grain antialiased">
@@ -684,6 +700,91 @@
 
 <hr class="divider" style="margin:0 2rem;" />
 
+<!-- ─── FAQ ───────────────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24">
+  <div class="grid md:grid-cols-[380px_1fr] gap-16 items-start">
+
+    <!-- Left col: heading -->
+    <div class="md:sticky md:top-28">
+      <div class="label mb-6">Common questions</div>
+      <h2 class="display text-[48px] md:text-[52px] text-paper mb-6">
+        Answers for<br/><em>IT, HR,</em><br/>and procurement.
+      </h2>
+      <p class="text-mute text-sm leading-relaxed" style="font-weight:300;">
+        Pricing, billing, and contract questions?<br/>
+        See the <a href="/pricing-enterprise.html" style="color:#A39D8E;text-decoration:underline;text-underline-offset:3px;" class="hover:text-paper transition-colors">pricing calculator FAQ →</a>
+      </p>
+    </div>
+
+    <!-- Right col: accordion -->
+    <div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq1')">
+          <span>What data does HR actually see in the admin dashboard?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq1">
+          Aggregate opt-in metrics only — % of seats activated, weekly active rate, and opt-in NPS. HR never sees individual workout history, body composition, coaching conversation content, or CV pose keypoints. The privacy floor is enforced at the Postgres row-level security layer, not in application code. No contract term, feature flag, or admin role unlocks individual employee data for employer view. Manager–direct-report visibility is explicitly prohibited regardless of org hierarchy.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq2')">
+          <span>How long does SSO / SCIM setup take?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq2">
+          Typically 2–4 hours for your IT admin. FORM supports Okta, Azure AD / Entra ID, Google Workspace, and OneLogin — and any SAML 2.0 or OIDC-compatible provider. SCIM v2 automated provisioning is configured in the same session; directory groups map directly to FORM's three RBAC roles (owner, admin, manager). Our implementation engineer is on the call — we don't hand over a PDF and disappear. Guides and attribute maps for each IdP are included in the onboarding package.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq3')">
+          <span>How is our company's data isolated from other tenants?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq3">
+          Postgres row-level security gates every query to your <span class="font-mono text-xs" style="color:#DDFF2D;">tenant_id</span> from the JWT claim — no user from another company can reach your rows regardless of how the query is constructed. We run an adversarial CI test suite on every deployment that attempts cross-tenant reads using a Postgres role with <span class="font-mono text-xs" style="color:#DDFF2D;">NOBYPASSRLS</span> — any regression blocks the deploy. CV pose keypoints are AES-256 encrypted with a per-tenant key; even FORM engineers cannot read them without a key rotation event logged to the tamper-evident HMAC audit chain.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq4')">
+          <span>What happens if an employee wants to opt out or leaves the company?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq4">
+          Employees control their own data. Any employee can disconnect their company association at any time from Settings → Company — HR loses visibility for that user immediately, with no bulk export available to the company post-disconnection. When someone leaves, SCIM de-provisioning removes access within minutes. Employee fitness history belongs to the employee, not the company. If they keep a personal FORM account, their training history stays with them.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq5')">
+          <span>Does FORM work in a home gym or non-standard environment?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq5">
+          Yes. CV pose feedback runs on any rear-facing phone camera (iOS 15+, Android 10+) in reasonable lighting — home gym, spare room, corporate fitness centre, or hotel room. When the camera angle or lighting is insufficient, the system degrades gracefully to rep-counting via accelerometer; the coaching session continues uninterrupted. Admins can set a tenant-wide "CV optional" policy so employees in constrained environments aren't penalised in activation metrics.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq6')">
+          <span>What's the minimum commitment to get started?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq6">
+          Zero. We run a 90-day free pilot with 50–250 seats — no payment, no credit card. The DPA is signed before any employee data enters FORM. Success criteria are agreed upfront; you pay the annual contract only if the metrics hit. The pilot includes full Growth-tier feature access: SSO / SCIM, admin dashboard, dedicated CSM, and weekly check-ins. For accounts where procurement policy requires a billing relationship, a $1/seat paid pilot is available — the full amount credits toward Year 1 if you convert.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
 <!-- ─── CTA ────────────────────────────────────────────────── -->
 <section class="max-w-[1440px] mx-auto px-8 py-24 text-center">
   <div class="max-w-2xl mx-auto">
@@ -719,5 +820,12 @@
   </div>
 </footer>
 
+<script>
+function toggleFaq(id) {
+  const body = document.getElementById(id);
+  if (!body) return;
+  body.closest('.faq-item').classList.toggle('open');
+}
+</script>
 </body>
 </html>
