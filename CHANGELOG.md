@@ -6,6 +6,17 @@
 
 ---
 
+## [2.99.0] — 2026-06-08
+
+### Added
+- `docs/OBSERVABILITY.md §12.6` — pg_cron health monitoring job registry: canonical table of 9 production pg_cron jobs under `pg-cron-health-monitor` surveillance; freshness windows (1 h for `row-count-monitor`, 2 h for `audit-event-flush`, 26 h for all daily jobs); PagerDuty routing (P0 for audit-chain-daily-check / row-count-monitor / audit-event-flush; P1 for remaining 6); DEC-030 event table (`system.cron_job_stale` HIGH/7yr, `system.cron_health_check_passed` LOW/3yr, `system.cron_health_check_failed` HIGH/7yr); privacy invariant (no user_id/tenant_id); A1-GAP-004 deployment status; closes SOC2_READINESS.md §70.11 item 10 + §71.8 item 5 (both P0/P1 M5)
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v0.7 — +3 `system.cron_*` DEC-030 events registered: `system.cron_job_stale` (HIGH, 7yr), `system.cron_health_check_passed` (LOW, 3yr), `system.cron_health_check_failed` (HIGH, 7yr); retention table updated (+3 rows); closes SOC2_READINESS.md §71.8 item 2 (P0 M5); cross-ref OBSERVABILITY §12.6
+- `VERSION` — 2.98.2 → 2.99.0
+
+---
+
 ## [2.98.2] — 2026-06-08
 
 ### Added

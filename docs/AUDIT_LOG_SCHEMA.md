@@ -222,6 +222,9 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 - `system.deployment_completed` (release SHA, environment)
 - `system.access_review_completed` — quarterly access review completed (SOC 2 CC6.2/CC6.3/CC6.5/CC4.2); payload: `{reviewer_id, quarter, artifact_sha256, systems_reviewed_count, accounts_reviewed_count, findings_count, review_latency_days}`; STANDARD severity, 7yr retention; HMAC-chained; cross-ref: SOC2_READINESS §23, §65
 - `system.credential_rotated` — FORM-internal credential rotated (scheduled or triggered); payload: `{credential_name, rotation_trigger: 'scheduled'|'compromise'|'quarterly_review'|'key_ceremony', days_since_last_rotation, rotated_by}`; STANDARD severity, 7yr retention; HMAC-chained; cross-ref: SOC2_READINESS §56/§57, §65.9
+- `system.cron_job_stale` — `pg-cron-health-monitor` detected that a monitored pg_cron job exceeded its freshness window; payload: `{job_name, schedule, last_successful_run, hours_since_last_run, freshness_window_hours}`; HIGH severity, 7yr retention; HMAC-chained; emits PagerDuty P1 for most jobs (P0 for `audit-chain-daily-check`, `row-count-monitor`, `audit-event-flush` — see OBSERVABILITY §12.6 job registry); cross-ref: SOC2_READINESS §71.2.2, OBSERVABILITY §12.6, DEC-030
+- `system.cron_health_check_passed` — `pg-cron-health-monitor` completed its hourly check with all 9 monitored jobs within their freshness windows; payload: `{jobs_checked, all_healthy: true}`; LOW severity, 3yr retention; HMAC-chained; no alert (steady-state confirmation event); cross-ref: SOC2_READINESS §71.2.2, DEC-030
+- `system.cron_health_check_failed` — `pg-cron-health-monitor` Edge Function itself errored (DB unreachable, `cron.job_run_details` query failure, or unhandled exception); payload: `{error_message, jobs_checked}`; HIGH severity, 7yr retention; HMAC-chained; PagerDuty P0 → devops-lead + platform-engineer; cross-ref: SOC2_READINESS §71.2.2, DEC-030
 
 ### Admin (key management)
 
@@ -287,6 +290,9 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 | `system.access_review_completed` | 7 years | SOC 2 CC6 quarterly audit evidence |
 | `system.credential_rotated` | 7 years | SOC 2 CC6 key management trail |
 | `system.rls_test_suite_run` | 3 years | CI tenant isolation test run log |
+| `system.cron_job_stale` | 7 years | SOC 2 A1.1 — pg_cron freshness breach; operational capacity monitoring evidence |
+| `system.cron_health_check_passed` | 3 years | Routine pg_cron health confirmation; operational audit trail |
+| `system.cron_health_check_failed` | 7 years | SOC 2 A1.1 — `pg-cron-health-monitor` Edge Function failure record |
 | `admin.*` (key management) | 7 years | Encryption governance + incident investigation |
 | `api_key.*` | 7 years | SOC 2 CC6.4 credential lifecycle evidence |
 | `scim.ip_enforcement_*` / `scim.ip_blocked` | 7 years | SOC 2 CC6.1 network-layer access evidence |
@@ -369,6 +375,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v0.7 · 2026-06-08 · owner: compliance-officer + devops-lead**
+*v0.7 (2026-06-08): +3 `system.cron_*` pg_cron health monitoring events — `system.cron_job_stale` (HIGH, 7yr), `system.cron_health_check_passed` (LOW, 3yr), `system.cron_health_check_failed` (HIGH, 7yr). All HMAC-chained; emitted by `pg-cron-health-monitor` Supabase Edge Function (schedule: `0 * * * *`). Payload fields per §71.2.2 DEC-030 event table. Retention table updated with 3 new rows. Closes SOC2_READINESS.md §71.8 item 2 (P0 M5 — DEC-030 registration for all three cron health event types). Cross-ref: SOC2_READINESS.md §71.2.2 (9-job registry + freshness windows), OBSERVABILITY.md §12.6 (canonical pg_cron job registry). Privacy note: no `user_id` or `tenant_id` in any cron health event — operational metadata only.*
 
 **v0.6 · 2026-06-07 · owner: compliance-officer + security-engineer**
 *v0.6 (2026-06-07): +5 `vuln.*` vulnerability management events (vuln.cve_discovered, vuln.patch_deployed, vuln.sla_exception_granted, vuln.wont_fix_closed, vuln.enterprise_notified). All MEDIUM/HIGH severity, 7-year retention, HMAC-chained. Uplift rule U-02 (RLS bypass) enforced as Won't Fix blocker in chain audit. Retention table updated with `vuln.*` row. Closes `compliance/cc7/vuln-management-policy.md` (POL-010) checklist item 6 (P1 M3); cross-ref: SOC 2 CC7.1/CC7.2/CC5.3.*
