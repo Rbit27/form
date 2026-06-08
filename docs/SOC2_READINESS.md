@@ -23795,3 +23795,423 @@ PRE-24 closes to 🟢 when:
 ---
 
 *v1.0 (2026-06-08): §70 DSAR Lifecycle Automation & 30-Day SLA Monitoring — P5.1/P5.2/P4.1/P4.3 Auditor Exhibit. Closes P-GAP-003 and P-GAP-005 / PRV-34 from 🔴/🟡 Gap → 🟡 Authored. Core deliverables: `dsar_requests` table DDL and migration (`migrations/0053_dsar_requests.sql`) with five request types (access, portability, erasure, rectification, restriction), five-state status lifecycle, generated `sla_deadline` column (submitted_at + 30 days), `export_expires_at` 7-day window, per-export HKDF-derived AES-256-GCM encryption key (separate from `KEYPOINTS_ENC_KEY`). pg_cron automation: three jobs (`dsar-sla-day25-alert`, `dsar-sla-day29-alert`, `dsar-export-expiry-cleanup`) in `migrations/0054_dsar_cron_jobs.sql`; day-25 fires PagerDuty P1 to compliance-officer via `dsar-sla-relay` Edge Function; day-29 fires P0 to compliance-officer + founder; day-0-breach fires P0 critical to compliance-officer + founder + legal (belt-and-suspenders if day-25/29 alerts failed to trigger resolution). Privacy floor: `form_api` role has zero access to `dsar_requests` (tenant admins cannot enumerate employee DSARs — enforced at RLS layer); PagerDuty alert payloads contain only `dsar_id` UUID, not `user_id` or email; PRE-70-E-006 annual extract excludes `user_id`. Eight DEC-030 HMAC-chained events (dsar.request_submitted HIGH 7yr, dsar.identity_verified HIGH 7yr, dsar.request_acknowledged STANDARD 7yr, dsar.access_export_created HIGH 7yr, dsar.erasure_completed CRITICAL 7yr, dsar.request_fulfilled HIGH 7yr, dsar.sla_alert_fired HIGH 7yr, dsar.request_rejected HIGH 7yr); relationship to pre-existing `data.export_initiated` event documented (UI action precedes DSAR record for in-app channel; email-channel skips `data.export_initiated`). DSAR export manifest.json schema specified for P5.1 Art. 15(1)(a)–(h) completeness; export delivery via Cloudflare R2 presigned URL (24h TTL); export file purged at 7-day expiry by cleanup cron. RLS: `compliance_officer` read + status update (cannot INSERT, DELETE, or set status='withdrawn'); `form_system` full access; `form_api` zero access. Eight evidence artefacts PRE-70-E-001 through PRE-70-E-008: DDL migration, cron job SQL, AUDIT_LOG_SCHEMA.md commit SHA, PagerDuty screenshot, end-to-end test (PRE-24 closure), annual DSAR log extract, zero-missed-SLA attestation, annual export schema review. Gap tracker: P-GAP-003 🟡 Partial → 🟡 Authored (closes to 🟢 on migrations deployed + PRE-70-E-001/002 filed); P-GAP-005 / PRV-34 🔴 Gap → 🟡 Authored (closes to 🟢 on DSAR-ALERT-01/02/03 live + PRE-70-E-004 filed); PRV-31/32 🟡 Partial → 🟡 Authored. PRE-24 closure path documented (§70.9.2). SOC 2 criteria: P5.1 (access — export delivery + SLA compliance), P5.2 (erasure/rectification — lifecycle tracking into DATA_MODEL §12.3), P4.1 (retention — export_expires_at 7-day window + cleanup cron), P4.3 (disposal — dsar.erasure_completed CRITICAL event with per-table row counts), P8.1 (monitoring — DSAR-ALERT-01/02 + annual PRE-70-E-007 attestation). Cross-references: §35.7.1 (PRV-31/32/33/34 controls), §35.7.2 (P5.2 erasure), DATA_MODEL.md §12 (erasure procedure), DATA_MODEL.md §12.5 (portability export format), INCIDENT_RESPONSE.md R-14 (DSAR incident runbook), AUDIT_LOG_SCHEMA.md (dsar.* event registry — checklist item 5), §51 (Gap Register P5.1/P5.2 update — checklist item 9), §15 (compliance calendar Q2 annual DSAR test), §67 (Tenant Data Deletion Certificate — enterprise erasure complement). Owner: compliance-officer (SLA oversight) + platform-engineer (automation).*
+
+---
+
+## §71 Availability Trust Service Criteria (A1) — Capacity Management, Infrastructure Redundancy & Disaster Recovery
+
+> Owner: `devops-lead` + `compliance-officer`. Review: after each DR drill, after any infrastructure change that affects RTO/RPO capacity thresholds, or annually at minimum.
+> SOC 2 controls: **A1.1** (Capacity management and monitoring), **A1.2** (Environmental protections and backup infrastructure), **A1.3** (Recovery plan testing).
+> This section is the consolidated A1 auditor exhibit, synthesising and extending the design-level work in §18, §19, §20, and §33 into a single, evidence-anchored narrative suitable for Type II fieldwork. It does not duplicate those sections; it cross-references them, adds the pg_cron operational health framework, and introduces the formal pg_cron availability-monitoring control that was identified as a gap at §33.9 (monthly capacity review cadence — 🟡 gap, PRE-33-E-002) and in the §51 A-series gap register (A1-GAP-003: annual DR drill not yet executed).
+
+---
+
+### §71.1 Control Objective
+
+This section establishes that FORM:
+
+1. Continuously monitors the processing capacity and utilisation of all production system components against defined thresholds, and has documented procedures for expanding capacity before those thresholds are breached (A1.1).
+2. Operates environmental protections, redundant infrastructure, encrypted multi-tier backup systems, and HMAC-integrity-preserving audit log backups that collectively constrain data loss to the contractual RPO of 1 hour for enterprise tenants (A1.2).
+3. Tests its disaster recovery procedures at least annually using a documented drill procedure with two-person sign-off, quantitative RTO/RPO pass criteria, and a tamper-evident DEC-030 audit event as the primary evidence artefact (A1.3).
+
+The 99.9% API availability SLA documented in `docs/ENTERPRISE_SLA.md` and the RTO/RPO targets established in `docs/INCIDENT_RESPONSE.md` (RTO: 4 hours; RPO: 1 hour) are the governing commitments that these controls exist to satisfy. Any control gap that creates a credible path to breaching either commitment is treated as a P0 remediation item regardless of where it appears in the milestone schedule.
+
+---
+
+### §71.2 [A1.1] Capacity Management & Monitoring
+
+**Policy statement:** FORM shall maintain real-time or near-real-time visibility into the resource utilisation of each tier of its production stack. Defined upgrade-trigger thresholds exist for each bottleneck metric. No single threshold breach shall be permitted to persist beyond its defined response window without a documented owner action. The capacity review cadence is monthly (devops-lead) and quarterly (capacity forecast against `docs/COST_MODEL.md §7` scaling model).
+
+#### §71.2.1 Per-Tier Capacity Controls and Alert Thresholds
+
+| Tier | Metric | Warning threshold | Critical threshold | Response window | Alert destination | Evidence |
+|---|---|---|---|---|---|---|
+| **Cloudflare Workers** | HTTP 5xx error rate | > 0.5% over 5 min | > 1% over 5 min | 15 min | PagerDuty `form-ops` + `#engineering-alerts` | Better Stack + Cloudflare Analytics; §20.3 probe S-001 |
+| **Cloudflare Workers** | CPU-time p99 per request | > 35 ms | > 45 ms (approaching 50 ms hard limit) | 4 h investigation | `#engineering-alerts` | Cloudflare Analytics Engine |
+| **Supabase PgBouncer** | Connection-wait p99 | > 5 ms sustained 30 min | > 10 ms sustained 48 h | Immediate: page devops-lead; 48 h: upgrade ticket | PagerDuty `form-ops` | OBSERVABILITY.md §6.2 alert rule `DB-CONN-SAT`; PRE-33-E-001 |
+| **Supabase Postgres** | Storage used | > 70% of provisioned | > 80% of provisioned | 7-day upgrade plan | `#ops-alerts` | Supabase dashboard export |
+| **Supabase Postgres** | Query p95 latency | > 200 ms sustained 15 min | > 500 ms sustained 5 min | 15 min triage | PagerDuty `form-ops` | OBSERVABILITY.md §3.1 |
+| **Anthropic Claude API** | Requests/min headroom | > 50% of tier limit (4,000 RPM) sustained 7 days | > 75% sustained 48 h | 7-day: request tier upgrade; 48 h: P1 alert | `#ops-alerts`; devops-lead + founder | COST_MODEL.md §3.1; OBSERVABILITY.md §3.1 |
+| **ElevenLabs TTS** | Characters consumed / month | > 50% of plan cap | > 80% of plan cap | 50%: evaluate upgrade; 80%: upgrade within 5 business days | `#ops-alerts` | OBSERVABILITY.md §17 cost monitor |
+| **Cloudflare R2** | Backup object age | Latest nightly dump > 25 h old | Latest nightly dump > 49 h old | 25 h: page devops-lead; 49 h: P0 incident | PagerDuty `form-ops` | `system.backup_verification_completed` DEC-030 event; §53 restore-verify-worker |
+
+#### §71.2.2 pg_cron Operational Health: Capacity-Affecting Background Jobs
+
+All pg_cron jobs that affect availability, data integrity, or compliance SLAs are subject to a "last-run freshness" check. The canonical registry of production pg_cron jobs is maintained in `OBSERVABILITY.md §12`. The subset with direct A1.1 relevance — because their failure would degrade service, cause data loss, or breach a compliance deadline — is enumerated below.
+
+The freshness check query below is executed by the `pg-cron-health-monitor` Edge Function (scheduled at `0 * * * *` — top of every hour) and emits a `system.cron_job_stale` DEC-030 HIGH event if any monitored job has not recorded a successful run within its defined freshness window. A PagerDuty P1 alert fires immediately on any `system.cron_job_stale` event.
+
+```sql
+-- pg-cron-health-monitor: staleness detection query
+-- Invoked hourly by the pg-cron-health-monitor Edge Function via net.http_post
+-- Emit system.cron_job_stale DEC-030 HIGH event for each stale row returned.
+SELECT
+  j.jobname,
+  j.schedule,
+  MAX(r.start_time)                         AS last_successful_run,
+  NOW() - MAX(r.start_time)                 AS time_since_last_run,
+  m.freshness_window_hours,
+  CASE
+    WHEN MAX(r.start_time) IS NULL
+      THEN 'never_run'
+    WHEN NOW() - MAX(r.start_time) > (m.freshness_window_hours || ' hours')::INTERVAL
+      THEN 'stale'
+    ELSE 'ok'
+  END                                       AS health_status
+FROM cron.job j
+JOIN (
+  VALUES
+    ('dsar-sla-day25-alert',          26),
+    ('dsar-sla-day29-alert',          26),
+    ('dsar-export-expiry-cleanup',    26),
+    ('audit-chain-daily-check',       26),
+    ('row-count-monitor',              1),
+    ('mfa-enforcement-log-cleanup',   26),
+    ('workout-export',                26),
+    ('audit-event-flush',              2),
+    ('security-counter-daily-cleanup',26)
+) AS m(jobname, freshness_window_hours)
+  ON j.jobname = m.jobname
+LEFT JOIN cron.job_run_details r
+  ON r.jobid = j.jobid
+ AND r.status = 'succeeded'
+GROUP BY j.jobname, j.schedule, m.freshness_window_hours
+HAVING
+  MAX(r.start_time) IS NULL
+  OR NOW() - MAX(r.start_time) > (m.freshness_window_hours || ' hours')::INTERVAL
+ORDER BY time_since_last_run DESC NULLS FIRST;
+```
+
+**Job registry for A1.1 purposes:**
+
+| Job name | Schedule (UTC) | Freshness window | A1 relevance | Alert if stale |
+|---|---|---|---|---|
+| `dsar-sla-day25-alert` | `0 7 * * *` | 26 h | P5.1 SLA compliance — GDPR Art. 15 clock | PagerDuty P1 → compliance-officer |
+| `dsar-sla-day29-alert` | `0 7 * * *` | 26 h | P5.1 SLA compliance — GDPR Art. 15 clock | PagerDuty P1 → compliance-officer |
+| `dsar-export-expiry-cleanup` | `0 3 * * *` | 26 h | P4.1 retention — R2 export object purge | PagerDuty P1 → compliance-officer |
+| `audit-chain-daily-check` | `0 6 * * *` | 26 h | DEC-030 HMAC chain integrity verification | PagerDuty P0 → security-engineer + devops-lead |
+| `row-count-monitor` | `*/15 * * * *` | 1 h | CC7.1/A1.2 data-integrity sentinel | PagerDuty P0 → devops-lead |
+| `mfa-enforcement-log-cleanup` | `0 2 * * *` | 26 h | CC6.1 MFA log retention | PagerDuty P1 → devops-lead |
+| `workout-export` | `0 1 * * *` | 26 h | A1.2 — user data export pipeline; stale = user-facing feature failure | PagerDuty P1 → devops-lead |
+| `audit-event-flush` | `*/30 * * * *` | 2 h | A1.2 / DEC-030 — audit event buffer flush to append-only store; stale = potential event loss | PagerDuty P0 → platform-engineer |
+| `security-counter-daily-cleanup` | `0 4 * * *` | 26 h | CC7.2 — `security_counters` table hygiene; stale = rate-limit memory growth | PagerDuty P1 → devops-lead |
+
+**DEC-030 events emitted by `pg-cron-health-monitor`:**
+
+| Event name | Severity | Retention | Trigger | Payload fields |
+|---|---|---|---|---|
+| `system.cron_job_stale` | HIGH | 7 yr | Any monitored job exceeds its freshness window | `job_name`, `schedule`, `last_successful_run`, `hours_since_last_run`, `freshness_window_hours` |
+| `system.cron_health_check_passed` | LOW | 3 yr | All monitored jobs within freshness window | `jobs_checked`, `all_healthy: true` |
+| `system.cron_health_check_failed` | HIGH | 7 yr | Edge Function itself errors (DB unreachable, etc.) | `error_message`, `jobs_checked` |
+
+#### §71.2.3 Auto-Scaling Controls Summary
+
+| Component | Scaling model | Manual trigger | Documented trigger threshold |
+|---|---|---|---|
+| Cloudflare Workers API | Serverless; horizontal scale automatic; no instance cap at anticipated FORM scale | None required pre-Series A | CPU p99 > 45 ms — escalate to Cloudflare Enterprise review |
+| Supabase PgBouncer | Pool size tuned; read replicas available on Enterprise plan | devops-lead upgrades plan or activates replica | Connection-wait p99 > 10 ms sustained 48 h (§33.2.3 `DB-CONN-SAT`) |
+| Cloudflare R2 | Object storage scales automatically; no IOPS ceiling relevant to FORM's audit-event throughput | None | Not applicable |
+| Anthropic API | Per-key rate limits; overflow → HTTP 429 → exponential backoff + queue (client-side) | Founder requests tier upgrade | > 4,000 RPM (50% of Tier 4 limit) sustained 7 days (§33.2.3) |
+| ElevenLabs TTS | Concurrent-stream cap; overflow → text-only fallback (< 1 min RTO, zero data loss) | devops-lead upgrades plan | > 250k chars/month consumed (50% of plan cap) |
+
+#### §71.2.4 Monthly Capacity Review Cadence
+
+The devops-lead conducts a capacity review on the first business day of each calendar month. The review covers:
+
+1. API p95/p99 latency trend over the prior 30 days (Better Stack + Cloudflare Analytics export).
+2. Supabase connection saturation: max connection-wait p99 in the prior 30 days.
+3. Supabase storage growth: current storage used vs. provisioned, projected months-to-threshold.
+4. Anthropic token consumption: average daily RPM against tier limit.
+5. ElevenLabs character consumption: month-to-date vs. plan cap.
+6. R2 backup volume growth: current backup size vs. prior month.
+7. pg_cron health summary: count of `system.cron_job_stale` events in the prior 30 days, by job name.
+
+Output: a markdown log entry filed to `form-compliance:/evidence/a1/capacity-reviews/YYYY-MM.md`. If any metric has crossed its warning threshold in the prior 30 days, the log entry must include the root cause and the remediation action taken or planned. The capacity review log is evidence artefact **PRE-71-E-001**.
+
+---
+
+### §71.3 [A1.2] Environmental Protections & Backup Architecture
+
+**Policy statement:** FORM shall operate layered infrastructure protections that eliminate single points of failure at the API and storage tiers, maintain continuous WAL-based backup of all production Postgres data with a recovery point granularity of less than 5 minutes, retain nightly logical-dump backups for 90 days, retain monthly cold-storage backups for 7 years under WORM Object Lock, and ensure that the DEC-030 HMAC-chained audit log is independently backed up and re-anchorable after any restore event.
+
+#### §71.3.1 Cloudflare Workers Geographic Redundancy
+
+FORM's API layer runs exclusively on Cloudflare Workers. The Workers runtime operates across more than 300 points of presence on Cloudflare's anycast network. Incoming requests are routed to the nearest healthy PoP; a PoP-level failure is transparent to end users — no single availability zone or data centre outage can cause a service interruption. This architecture satisfies A1.2's requirement for "environmental protections" at the application tier without any FORM-operated infrastructure.
+
+**Evidence basis:** Cloudflare's published network architecture documentation; §33.5.1 control table; `docs/TECHNICAL.md`. No additional FORM-operated redundancy mechanism is required or warranted at this tier until post-Series-A scale (see §28.3.6 single-vendor concentration risk acceptance).
+
+**Cloudflare Workers hard limits relevant to A1.2:**
+- CPU time per request: 50 ms (Paid plan). FORM API requests average < 5 ms CPU time (excludes Supabase I/O wait time, which does not count against the CPU limit).
+- Memory per isolate: 128 MB. Peak FORM request memory usage (coaching session with full context window): estimated < 20 MB.
+- Neither limit is at risk of being reached at anticipated FORM scale. Alert fires at CPU p99 > 45 ms (§71.2.1) as an early warning before the hard ceiling.
+
+#### §71.3.2 Supabase PostgreSQL Backup Configuration
+
+FORM's database backup strategy implements the three-tier architecture defined in §19.2. The configuration parameters relevant to the A1.2 auditor narrative are:
+
+**Tier 1 — Supabase PITR (operational recovery):**
+- WAL archiving enabled on Supabase Enterprise plan; archive streamed continuously to Supabase-managed S3.
+- PITR retention window: 35 days (Enterprise plan).
+- WAL stream latency to warm standby: < 5 minutes (Supabase contractual guarantee on Enterprise plan with Multi-AZ).
+- Effective RPO: 1 hour (contractual commitment in `docs/ENTERPRISE_SLA.md`); actual recovery granularity under normal conditions is < 5 minutes.
+- Restore procedure: `docs/DATA_MODEL.md §10` (single-tenant isolated cluster restore with RLS verification and HMAC re-anchoring steps).
+
+**Tier 2 — Nightly logical dump to Cloudflare R2:**
+
+```sql
+-- Verification query executed by restore-verify-worker after each nightly R2 restore test
+-- Confirms: (1) restore completed, (2) row counts within 1% of baseline, (3) RLS not bypassed
+SELECT
+  'users'         AS tbl, COUNT(*) AS restored_count FROM users
+UNION ALL SELECT 'workouts',      COUNT(*) FROM workouts
+UNION ALL SELECT 'workout_sets',  COUNT(*) FROM workout_sets
+UNION ALL SELECT 'programs',      COUNT(*) FROM programs
+UNION ALL SELECT 'audit_logs',    COUNT(*) FROM audit_logs;
+-- Cross-reference against monitoring_baselines table; deviation > 1% = FAIL
+```
+
+- Schedule: `0 1 * * *` (01:00 UTC, after `workout-export` at 01:00 and before `audit-event-flush` at 00:30/01:00 cycle). Logical dump via `pg_dump --format=custom` compressed with gzip, encrypted AES-256-GCM using a per-dump key derived from the backup KMS CMK.
+- Retention: 90 days rolling TTL enforced by R2 Object Lifecycle rule.
+- Storage path: `r2://form-backups/nightly/YYYY/MM/DD/dump-<sha256>.dump.gz.enc`.
+- RPO for this tier: ≤ 24 hours (prior night's dump).
+- RTO for this tier: 4–8 hours (§33.5.2 scenario 5).
+
+**Tier 3 — Monthly Backblaze B2 WORM cold archive:**
+- Schedule: first Sunday of each month, 02:00 UTC.
+- Object Lock mode: COMPLIANCE (not GOVERNANCE); lock duration 7 years from upload timestamp.
+- Encryption: AES-256-GCM, same KMS key chain as Tier 2.
+- RPO for this tier: ≤ 30 days; RTO: 24–48 hours (§33.5.2 scenario 6).
+- 7-year retention satisfies GDPR Art. 5(1)(e) storage limitation defence for audit records and SOC 2 A1.2 long-term environmental protection evidence.
+
+Full specification: `docs/SOC2_READINESS.md §19`.
+
+#### §71.3.3 Cloudflare R2 Object Storage Durability
+
+Cloudflare R2 stores all objects with automatic 3-replica durability within the configured storage region. R2 does not expose a regional replica configuration to customers — durability is platform-managed. This covers:
+- Nightly pg_dump backup objects.
+- DSAR export zip files (7-day TTL; see §70.7).
+- Incident history archives (§20.7.2; 7-year retention).
+- Static evidence artefacts filed under `r2://form-compliance/`.
+
+R2 does not provide cross-region replication by default. The Backblaze B2 WORM tier (§71.3.2 Tier 3) provides the independent geographic copy for the most critical backup data. Evidence of R2 object durability for audit purposes: Cloudflare Trust Hub SLA documentation (filed as PRE-71-E-002).
+
+#### §71.3.4 DEC-030 Audit Log Backup and Survivability
+
+The `audit_logs` table is subject to the same three-tier backup strategy as all other production Postgres tables. Two additional controls protect the audit log specifically:
+
+**Control 1 — Append-only HMAC chain (DEC-030):** The audit log is an append-only table with an HMAC-SHA256 chain linking each row to its predecessor. Any attempt to alter, delete, or insert out-of-sequence rows is detectable by the `audit-chain-daily-check` Edge Function (runs at 06:00 UTC; last 1,000 rows verified; `system.audit_chain_break_detected` CRITICAL event fires on any mismatch). This means that even a complete Tier 1 PITR restore of the audit log produces a verifiably intact chain up to the restore point, with a re-anchoring `system.restore_completed` event as the first post-restore entry.
+
+**Control 2 — `audit-event-flush` staleness monitoring:** The `audit-event-flush` pg_cron job (schedule: `*/30 * * * *`) flushes buffered audit events from the Workers KV staging buffer to the `audit_logs` Postgres table. A freshness window of 2 hours is enforced by the `pg-cron-health-monitor` query (§71.2.2). If `audit-event-flush` fails to run within 2 hours, a `system.cron_job_stale` HIGH DEC-030 event fires and PagerDuty P0 pages the platform-engineer. The 2-hour staleness window ensures that at most 2 hours of audit events could be lost in a scenario where both the `audit-event-flush` job fails and Supabase suffers a simultaneous unrecoverable failure before the next flush — a scenario requiring two independent simultaneous failures.
+
+**Re-anchoring procedure on restore:**
+```sql
+-- Execute immediately after completing a PITR restore that includes audit_logs rows.
+-- Establishes a new chain anchor at the restore boundary.
+-- The emit-audit-event Worker must be the only writer; run before re-enabling any other writers.
+INSERT INTO audit_logs (
+  actor_id, actor_type, action, severity, data_class,
+  data, hmac_prev, hmac_curr, sequence_number
+)
+SELECT
+  'system',
+  'system',
+  'system.restore_completed',
+  'HIGH',
+  'internal',
+  jsonb_build_object(
+    'restore_timestamp',  NOW(),
+    'pitr_target',        :'PITR_TARGET_TIMESTAMP',
+    'restored_by',        :'ENGINEER_ID',
+    'last_sequence_pre_restore', MAX(sequence_number),
+    'chain_reanchored',   TRUE
+  ),
+  hmac_curr,               -- last row in restored chain becomes new hmac_prev
+  'PENDING_HMAC_RECALC',   -- emit-audit-event Worker recalculates on insert
+  MAX(sequence_number) + 1
+FROM audit_logs
+ORDER BY sequence_number DESC
+LIMIT 1;
+-- After this INSERT, the emit-audit-event Worker recalculates the HMAC for the new row.
+-- Reference: DEC-030; docs/AUDIT_LOG_SCHEMA.md HMAC chaining specification.
+```
+
+#### §71.3.5 Multi-AZ Database Configuration
+
+Supabase High Availability (primary + read replica, automatic failover) is required to be active on the production project for the enterprise tier. The replica is in a separate AWS Availability Zone from the primary within the same region (`eu-central-1` for EU tenants; `us-east-1` for US tenants). Automatic failover promotes the replica to primary without manual intervention; WAL lag at time of promotion represents the RPO for that specific failure (typically < 5 minutes under normal conditions, well within the 1-hour contractual RPO).
+
+**Configuration verification query** (run by devops-lead at each quarterly access review):
+
+```sql
+-- Confirm HA replica is present and WAL lag is within acceptable bounds.
+-- Run on the Supabase project's primary connection.
+SELECT
+  client_addr,
+  state,
+  sent_lsn,
+  write_lsn,
+  flush_lsn,
+  replay_lsn,
+  (sent_lsn - replay_lsn)  AS replication_lag_bytes,
+  sync_state
+FROM pg_stat_replication;
+-- Expected: at least one row with state = 'streaming' and replication_lag_bytes < 10MB.
+-- If no rows returned: HA is not active. Escalate to Supabase support immediately.
+```
+
+Screenshot of this query output filed as PRE-71-E-003 at each quarterly access review.
+
+---
+
+### §71.4 [A1.3] Disaster Recovery Plan & Test Evidence
+
+**Policy statement:** FORM shall conduct a disaster recovery drill at minimum once per SOC 2 observation calendar year. The drill validates the PITR restore procedure against live infrastructure, measures actual RTO and RPO against contractual targets, and produces a six-artefact evidence package (PRE-33-E-006 through PRE-33-E-011, defined in §33.6.2). §71 does not duplicate the DR drill procedure specification in §33.6.1; it establishes the operational readiness requirements, the DEC-030 audit trail, and the criteria under which A1-GAP-003 closes to 🟢.
+
+#### §71.4.1 RTO/RPO Targets and Contractual Basis
+
+| Scenario | RTO target | RPO target | Contractual basis | Credit if breached |
+|---|---|---|---|---|
+| Supabase database partial corruption (PITR restore) | 4 hours | 1 hour | `docs/ENTERPRISE_SLA.md`; `docs/INCIDENT_RESPONSE.md §18.2` | Enterprise credit schedule §33.4.2 |
+| Supabase region outage (replica failover) | 1–4 hours | < 15 min (replica WAL lag) | Same | Same |
+| Worker bug / bad deploy (rollback) | < 5 min | 0 (stateless) | §21 rollback procedure | N/A — below detection threshold |
+| Cold restore from R2 nightly dump | 4–8 hours | ≤ 24 hours | Pro tier SLA | Not enterprise-tier credit eligible |
+| Catastrophic loss (B2 WORM restore) | 24–48 hours | ≤ 30 days | Best-effort | Not credit eligible; force-majeure scenario |
+
+*Auditor note: The 4-hour RTO for the PITR scenario is validated by the annual DR drill (§33.6.1 Step requirement: wall-clock time from drill start to cluster destroy < 4 hours). The 1-hour RPO is validated by the restore-verify-worker weekly automated test (§53) which confirms that the most recent restorable backup is always < 25 hours old, and by the PITR WAL lag monitoring (§71.3.5 replica query).*
+
+#### §71.4.2 DR Test Procedure Reference and Evidence Requirements
+
+The DR drill procedure is fully specified in §33.6.1 (five-step scope, quantitative pass criteria) and §33.6.2 (six-artefact evidence package: PRE-33-E-006 through PRE-33-E-011). §71 adds the following requirements that supplement §33.6:
+
+**Requirement 1 — DEC-030 audit log chain integrity check before and after drill.** Immediately before initiating Step 1 of the drill, the devops-lead shall run the `audit-chain-daily-check` verification manually (or confirm that the most recent 06:00 UTC run returned `system.audit_chain_verified`) to establish a clean chain baseline. Immediately after the drill's PITR restore completes and before the restore cluster is destroyed, a `system.restore_completed` re-anchoring event shall be inserted per §71.3.4. This confirms that the HMAC chain survives a real restore and that the re-anchoring procedure works as specified.
+
+**Requirement 2 — pg_cron job resumption check.** After the drill, the devops-lead shall confirm that all monitored pg_cron jobs (§71.2.2) have run at least once since the drill completed, by querying `cron.job_run_details`. This confirms that the drill did not inadvertently interfere with the production Supabase project's cron scheduler. Result filed as an addendum to PRE-33-E-010 (sign-off form).
+
+```sql
+-- Post-drill pg_cron resumption check.
+-- Run on production Supabase project after drill completes.
+-- All jobs must show a successful run AFTER the drill start timestamp.
+SELECT
+  j.jobname,
+  MAX(r.start_time)  AS last_successful_run,
+  CASE
+    WHEN MAX(r.start_time) > :'DRILL_START_TIMESTAMP'
+    THEN 'resumed_ok'
+    ELSE 'not_yet_run_post_drill'
+  END                AS post_drill_status
+FROM cron.job j
+JOIN cron.job_run_details r
+  ON r.jobid = j.jobid
+ AND r.status = 'succeeded'
+WHERE j.jobname IN (
+  'dsar-sla-day25-alert', 'dsar-sla-day29-alert', 'dsar-export-expiry-cleanup',
+  'audit-chain-daily-check', 'row-count-monitor', 'mfa-enforcement-log-cleanup',
+  'workout-export', 'audit-event-flush', 'security-counter-daily-cleanup'
+)
+GROUP BY j.jobname
+ORDER BY j.jobname;
+```
+
+**Requirement 3 — DSAR SLA clock continuity.** If the DR drill involves a PITR restore to a timestamp in the past, the devops-lead shall confirm that no `dsar_requests` rows have a `sla_deadline` that has been retroactively altered by the restore. The check: `SELECT COUNT(*) FROM dsar_requests WHERE sla_deadline < NOW() AND status NOT IN ('fulfilled','rejected','withdrawn')` must return 0 on the production database after the drill. If any rows are returned, this is a P0 compliance finding (DSAR SLA breach risk); the compliance-officer must be notified immediately.
+
+#### §71.4.3 Annual DR Drill Schedule and Observation-Period Evidence
+
+| Drill | Target window | Scheduling requirement | Evidence path |
+|---|---|---|---|
+| Year 1 — first mandatory drill | Within 30 days of first enterprise customer go-live | §15 compliance calendar entry: Q-ENT-01 "DR drill within 30 days of first enterprise go-live" | `form-compliance:/evidence/a1/dr-drills/YYYY-MM-DD/` |
+| Year 2 onwards | Q1 of each calendar year (January–March window) | §15 compliance calendar entry: Q1-DR "Annual DR drill — January–March" | Same path, year-specific subfolder |
+
+**Missed-drill protocol:** If the Q1 window closes without a completed drill and no documented postponement reason exists, the compliance-officer shall:
+1. File a gap finding in the §51 A-series gap register as A1-GAP-004 (new gap).
+2. Open a P0 Linear ticket assigned to devops-lead with a 14-day SLA for drill completion.
+3. Disclose the missed drill to the audit firm in the next scheduled check-in call.
+4. Complete the overdue drill and file the evidence package before the next quarterly access review.
+
+Failure to complete a drill within the observation period is a SOC 2 Type II finding that cannot be remediated retroactively. The observation period must include at least one completed drill with a PASS verdict to satisfy A1.3.
+
+---
+
+### §71.5 Evidence Artefacts (PRE-71-E-001 through PRE-71-E-007)
+
+All artefacts are filed to `form-compliance:/evidence/a1/` unless a more specific sub-path is indicated.
+
+| Artefact ID | Description | Source / format | Filing frequency | SOC 2 criterion |
+|---|---|---|---|---|
+| **PRE-71-E-001** | Monthly capacity review log — devops-lead markdown entry covering 7 metrics (§71.2.4): API p95/p99 latency trend, Supabase connection saturation, storage growth, Anthropic RPM headroom, ElevenLabs chars/month, R2 backup volume, pg_cron stale-event count | Markdown file in `form-compliance:/evidence/a1/capacity-reviews/YYYY-MM.md` | Monthly (first business day of month) | A1.1 |
+| **PRE-71-E-002** | Cloudflare R2 and Cloudflare Workers SLA/durability documentation — Cloudflare Trust Hub PDF or URL export confirming 3-replica R2 durability and Workers 99.99% global network SLA | Cloudflare Trust Hub export; filed once and updated annually if documentation changes | At observation period start; annually | A1.2 |
+| **PRE-71-E-003** | Supabase HA replica verification — screenshot of `pg_stat_replication` query output confirming streaming replica with `state = 'streaming'` and `replication_lag_bytes < 10MB` | `psql` query output screenshot; filed at each quarterly access review | Quarterly (aligned with §23 access review) | A1.2 |
+| **PRE-71-E-004** | `pg-cron-health-monitor` Edge Function deployment confirmation — screenshot of `SELECT * FROM cron.job WHERE jobname = 'pg-cron-health-monitor'` showing the hourly schedule, plus the first successful `system.cron_health_check_passed` DEC-030 event in `audit_logs` | Supabase dashboard screenshot + `psql` query output | At deployment | A1.1 |
+| **PRE-71-E-005** | `pg-cron-health-monitor` stale-job test — devops-lead manually disables one monitored job (e.g., `SELECT cron.unschedule('workout-export')`), waits up to 2 hours for the next hourly check, confirms: (1) `system.cron_job_stale` DEC-030 HIGH event fired with correct `job_name`; (2) PagerDuty P1 created in `form-ops` service; (3) re-enables job with `cron.schedule(...)` and confirms `system.cron_health_check_passed` on next run | Test script + PagerDuty screenshot + DEC-030 event export | Before observation period start | A1.1 |
+| **PRE-71-E-006** | Post-DR-drill pg_cron resumption query output — devops-lead executes the query from §71.4.2 Requirement 2 on the production project and screenshots the result; all rows must show `post_drill_status = 'resumed_ok'` | `psql` query output screenshot; filed as addendum to PRE-33-E-010 | After each annual DR drill | A1.3 |
+| **PRE-71-E-007** | DSAR SLA continuity check output — devops-lead executes `SELECT COUNT(*) FROM dsar_requests WHERE sla_deadline < NOW() AND status NOT IN ('fulfilled','rejected','withdrawn')` on production after each DR drill; result must be 0 | `psql` query output screenshot; filed alongside PRE-71-E-006 | After each annual DR drill | A1.3, P5.1 |
+
+*Cross-reference:* The DR drill evidence package (PRE-33-E-006 through PRE-33-E-011) defined in §33.6.2 remains the primary A1.3 evidence set. PRE-71-E-006 and PRE-71-E-007 are supplemental artefacts introduced by §71 that extend the drill evidence package with availability-specific post-drill verification steps.
+
+---
+
+### §71.6 Gap Tracker Update
+
+#### §71.6.1 A-Series Gap Register Rows Affected
+
+| Gap ID | Prior description | Pre-§71 status | §71 status | Closes to 🟢 when |
+|---|---|---|---|---|
+| **A1-GAP-001** | Status page live at `status.form.coach` | 🟡 Authored (§20) | 🟡 Authored — no change; §71 cross-references §20 as the mechanism | `status.form.coach` published with 90-day uptime history; PRE-25-E-002 filed |
+| **A1-GAP-002** | Better Stack uptime monitors provisioned (synthetic probes S-001 through S-008) | 🟡 Authored (§16, §20) | 🟡 Authored — no change; §71 references these as A1.1 capacity signal sources | Better Stack account configured; all 6 component probes verified; PagerDuty `form-ops` routing confirmed |
+| **A1-GAP-003** | Annual DR drill executed and filed | 🟡 Authored (§18, §33) | 🟡 **Authored** — §71.4 adds three supplemental requirements (DEC-030 chain check, pg_cron resumption check, DSAR SLA continuity check) to the §33.6 drill procedure; first drill still pending | First DR drill completed with PASS verdict + PRE-33-E-006 through PRE-33-E-011 filed + PRE-71-E-006 and PRE-71-E-007 filed |
+| **A1-GAP-004 (new)** | `pg-cron-health-monitor` Edge Function not deployed; no automated detection if a critical background job (e.g., `audit-event-flush`, `dsar-sla-day29-alert`) silently stops running | 🔴 **Open** — this gap is formally introduced by §71 | 🟡 **Authored** — `pg-cron-health-monitor` query (§71.2.2), DEC-030 event taxonomy, PagerDuty routing, and 9-job registry fully specified | `pg-cron-health-monitor` Edge Function deployed + hourly cron scheduled + PRE-71-E-004 filed + PRE-71-E-005 stale-job test passed |
+| **A1-GAP-005 (new)** | Monthly capacity review log not yet established; devops-lead capacity reviews are informal and unrecorded; no A1.1 evidence trail exists for the observation period | 🔴 **Open** — this gap is formally introduced by §71 | 🟡 **Authored** — review scope, cadence, 7-metric content requirement, and filing path fully specified (§71.2.4) | First monthly capacity review log filed as PRE-71-E-001; subsequent monthly logs filed continuously through observation period |
+
+#### §71.6.2 Pre-Launch Readiness Checklist Rows Affected
+
+| Checklist ID | Description | Pre-§71 status | §71 status |
+|---|---|---|---|
+| **PRE-19** | Backup PITR confirmed active; restore runbook tested (RTO ≤ 4h, RPO ≤ 1h) | 🟢 Done (per SECURITY.md §10) | 🟢 Confirmed — §71.3.2 provides the operational configuration narrative and verification query |
+| **A1-GAP-004 / PRE-71-CHECK-01** | `pg-cron-health-monitor` deployed and PRE-71-E-005 stale-job test passed | 🔴 New | 🟡 Authored — deployment pending |
+| **A1-GAP-005 / PRE-71-CHECK-02** | First monthly capacity review (PRE-71-E-001) filed before observation period start | 🔴 New | 🟡 Authored — requires launch + 30 days |
+
+---
+
+### §71.7 SOC 2 Criteria Mapping Summary
+
+| Criterion | AICPA requirement (paraphrased) | §71 mechanism | Primary evidence artefact(s) | Current status |
+|---|---|---|---|---|
+| **A1.1** — Capacity management | Entity maintains, monitors, and evaluates current processing capacity; implements additional capacity to meet objectives | Per-tier alert threshold table (§71.2.1); `pg-cron-health-monitor` 9-job registry with hourly freshness checks and PagerDuty P0/P1 routing (§71.2.2); auto-scaling controls summary (§71.2.3); monthly capacity review cadence with 7-metric scope (§71.2.4) | PRE-71-E-001 (monthly capacity review log); PRE-71-E-004 (pg-cron-health-monitor deployment); PRE-71-E-005 (stale-job test); PRE-33-E-001 (Supabase PgBouncer config) | 🟡 Authored — spec complete; PRE-71-E-004/005 deployment pending; PRE-71-E-001 cadence begins post-launch |
+| **A1.2** — Environmental protections & backup | Entity authorizes, implements, operates, and monitors environmental protections, backup processes, and recovery infrastructure | Cloudflare Workers 300+ PoP redundancy (§71.3.1); three-tier backup: Supabase PITR 35-day (§71.3.2 Tier 1), nightly R2 dump 90-day (§71.3.2 Tier 2), monthly B2 WORM 7-year (§71.3.2 Tier 3); R2 3-replica object durability (§71.3.3); DEC-030 audit log survivability with HMAC re-anchoring on restore (§71.3.4); Supabase Multi-AZ HA with `pg_stat_replication` monitoring (§71.3.5) | PRE-71-E-002 (Cloudflare SLA docs); PRE-71-E-003 (quarterly HA replica query); PRE-33-E-003 (cross-ref to §19 backup artefacts); §53 PRE-53-E-003 (`system.backup_verification_completed` weekly events) | 🟡 Authored — architecture fully specified and substantially implemented; PRE-71-E-003 quarterly evidence cadence begins at first quarterly access review |
+| **A1.3** — Recovery testing | Entity tests recovery plan procedures supporting system recovery to meet its objectives | §33.6 DR drill procedure (five-step, quantitative pass criteria, 4h RTO validation); §71.4 supplemental requirements (DEC-030 chain integrity before/after, pg_cron resumption check, DSAR SLA continuity check); annual schedule with missed-drill protocol (§71.4.3) | PRE-33-E-006 through PRE-33-E-011 (§33.6 drill package); PRE-71-E-006 (pg_cron resumption); PRE-71-E-007 (DSAR SLA continuity); `system.dr_drill_completed` DEC-030 HMAC-chained event | 🟡 Authored — procedure fully specified; first drill pending (A1-GAP-003); must be completed within 30 days of first enterprise go-live |
+
+---
+
+### §71.8 Implementation Checklist
+
+#### P0 — Before First Enterprise Pilot (Must Complete Before Any Enterprise Contract Is Signed)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Write and deploy `pg-cron-health-monitor` Supabase Edge Function: implements the freshness detection query from §71.2.2 against the 9-job registry; emits `system.cron_job_stale` HIGH DEC-030 event for each stale job; emits `system.cron_health_check_passed` LOW DEC-030 event when all jobs are healthy; emits `system.cron_health_check_failed` HIGH on DB error; dispatches PagerDuty P1 to `form-ops` service for each stale job (deduplication key: `cron-health-{job_name}-{date}`). Schedule via `SELECT cron.schedule('pg-cron-health-monitor', '0 * * * *', $$SELECT net.http_post(url, headers, body) FROM ... $$)`. | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Register three new DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md`: `system.cron_job_stale` (HIGH, 7yr), `system.cron_health_check_passed` (LOW, 3yr), `system.cron_health_check_failed` (HIGH, 7yr). Add Zod schema validation for each. Deploy to `emit-audit-event` Worker endpoint. | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Confirm `SELECT * FROM cron.job WHERE jobname = 'pg-cron-health-monitor'` shows schedule `0 * * * *` in production. Wait for first successful run (top of the hour). Confirm `system.cron_health_check_passed` DEC-030 event appears in `audit_logs`. Screenshot both. File as PRE-71-E-004 to `form-compliance:/evidence/a1/`. | devops-lead | **P0** | M5 | [ ] |
+| 4 | Run PRE-71-E-005 stale-job test: `SELECT cron.unschedule('workout-export')` in production (low-risk job; no active users at test time — perform between 02:00–04:00 UTC). Wait up to 2 hours. Confirm `system.cron_job_stale` HIGH DEC-030 event with `job_name = 'workout-export'` in `audit_logs`. Confirm PagerDuty P1 in `form-ops`. Re-enable: `SELECT cron.schedule('workout-export', '0 1 * * *', $$...$$)`. Confirm `system.cron_health_check_passed` on next run. File all screenshots as PRE-71-E-005. | devops-lead | **P0** | M5 | [ ] |
+| 5 | Add `system.cron_job_stale`, `system.cron_health_check_passed`, and `system.cron_health_check_failed` to OBSERVABILITY.md §12 pg_cron health monitoring table alongside existing job entries. Update `dsar_sla_day25_alert`, `dsar_sla_day29_alert`, `dsar_export_expiry_cleanup` entries (from §70.11 item 10) to reference the new centralised `pg-cron-health-monitor` as the monitoring mechanism. | devops-lead | **P0** | M5 | [ ] |
+| 6 | Verify Supabase HA replica is active in the production project: run `pg_stat_replication` query from §71.3.5 and confirm at least one row with `state = 'streaming'`. Screenshot. File as PRE-71-E-003 (first instance). Add to quarterly access review checklist (§23) as standing step. | devops-lead | **P0** | M5 | [ ] |
+
+#### P1 — Before Observation Period Start (Month O-1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | File first monthly capacity review log (PRE-71-E-001) to `form-compliance:/evidence/a1/capacity-reviews/YYYY-MM.md`. Log must cover all seven metrics from §71.2.4. If any metric has crossed its warning threshold in the prior 30 days, root cause and remediation must be documented. | devops-lead | **P1** | Month O-1 (30 days post-launch) | [ ] |
+| 8 | Obtain Cloudflare Trust Hub documentation for R2 durability (3-replica) and Workers global network SLA (99.99%). Download PDF or export URL with access date. File as PRE-71-E-002 to `form-compliance:/evidence/a1/cloudflare-sla-docs-YYYY.pdf`. | devops-lead | **P1** | Before observation period start | [ ] |
+| 9 | Add §15 compliance calendar entries: (a) "Monthly capacity review — first business day of each month, devops-lead, PRE-71-E-001 cadence"; (b) "Quarterly Supabase HA replica verification — aligned with §23 access review, PRE-71-E-003 cadence". | compliance-officer | **P1** | M5 | [ ] |
+| 10 | Update §51 A-series gap register with A1-GAP-004 (pg-cron-health-monitor) and A1-GAP-005 (monthly capacity review log) as formally opened gaps. Close A1-GAP-004 entry immediately if PRE-71-E-004 and PRE-71-E-005 have been filed. Close A1-GAP-005 entry when first PRE-71-E-001 is filed. | compliance-officer | **P1** | M5 | [ ] |
+| 11 | Confirm that the first annual DR drill (A1-GAP-003) is scheduled in the §15 compliance calendar under "Within 30 days of first enterprise go-live". Confirm that devops-lead and a second engineer (second-in-command or founding team member) are both available on the scheduled date. | devops-lead + compliance-officer | **P1** | Before first enterprise go-live | [ ] |
+
+#### P2 — Post-Observation Period / Ongoing
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 12 | Execute first annual DR drill per §33.6.1 and §71.4. Immediately after drill: run pg_cron resumption check (§71.4.2 Requirement 2 query); run DSAR SLA continuity check (§71.4.2 Requirement 3 query); file PRE-71-E-006 and PRE-71-E-007. Ensure `system.dr_drill_completed` DEC-030 event is emitted with `verdict: "pass"`. Close A1-GAP-003. | devops-lead + second engineer | **P2** | Within 30 days of first enterprise go-live | [ ] |
+| 13 | At each quarterly access review: run Supabase HA replica verification query (§71.3.5); screenshot; file updated PRE-71-E-003 with date suffix. Confirm Better Stack monitors S-001 through S-008 are all in active/healthy state (A1-GAP-002 maintenance). | devops-lead | **P2** | Quarterly (aligned with §23) | [ ] |
+| 14 | At observation period end: export 12 months of `system.cron_job_stale` and `system.cron_health_check_passed` events from `audit_logs` as a CSV; file to `form-compliance:/evidence/a1/cron-health-obs-period-YYYY.csv`. This is the A1.1 operating-effectiveness record showing that background job monitoring was continuously active. | compliance-officer | **P2** | Observation period end | [ ] |
+| 15 | Annual Cloudflare Trust Hub documentation refresh: confirm R2 durability and Workers SLA terms are unchanged; file updated PRE-71-E-002 with year suffix. If any Cloudflare SLA terms have changed materially, notify compliance-officer and update §71.3.1 and §71.3.3 accordingly. | devops-lead | **P2** | Annual (Q1) | [ ] |
+
+---
+
+*v1.0 (2026-06-08): §71 Availability Trust Service Criteria (A1) — Capacity Management, Infrastructure Redundancy & Disaster Recovery. Synthesises and extends the design-level A1 work in §18 (BCP/DRP), §19 (three-tier backup), §20 (status page), and §33 (A1 deep-dive) into a consolidated auditor exhibit with an operational-evidence cadence suitable for Type II fieldwork. New formal contributions: (1) `pg-cron-health-monitor` Edge Function — hourly freshness check across 9 production pg_cron jobs (`dsar-sla-day25-alert`, `dsar-sla-day29-alert`, `dsar-export-expiry-cleanup`, `audit-chain-daily-check`, `row-count-monitor`, `mfa-enforcement-log-cleanup`, `workout-export`, `audit-event-flush`, `security-counter-daily-cleanup`); PagerDuty P0/P1 routing on stale events; three new DEC-030 event types (`system.cron_job_stale` HIGH/7yr, `system.cron_health_check_passed` LOW/3yr, `system.cron_health_check_failed` HIGH/7yr); staleness window enforcement via `cron.job_run_details` JOIN against a values table with per-job freshness windows (1h for `row-count-monitor`; 2h for `audit-event-flush`; 26h for all daily jobs). (2) Monthly capacity review cadence (§71.2.4) covering seven metrics with a markdown log filing protocol (PRE-71-E-001). (3) Supabase Multi-AZ HA replica verification query (`pg_stat_replication`) with quarterly filing cadence (PRE-71-E-003). (4) DEC-030 audit log HMAC re-anchoring SQL procedure for use during PITR restore events (§71.3.4). (5) Three supplemental DR drill requirements added to §33.6 procedure: DEC-030 chain integrity check before/after drill, pg_cron resumption query post-drill (PRE-71-E-006), DSAR SLA continuity check post-drill (PRE-71-E-007). (6) Missed-drill protocol with A1-GAP-004 (new gap) escalation path. Gap tracker: A1-GAP-003 (DR drill not yet executed) remains 🟡 Authored — unchanged from §33; supplemental requirements added. A1-GAP-004 (pg-cron-health-monitor not deployed) 🔴 Open → 🟡 Authored — `pg-cron-health-monitor` fully specified; deployment pending M5. A1-GAP-005 (monthly capacity review log not established) 🔴 Open → 🟡 Authored — scope and cadence specified; first log pending post-launch. Seven evidence artefacts PRE-71-E-001 through PRE-71-E-007: PRE-71-E-001 (monthly capacity review log, A1.1), PRE-71-E-002 (Cloudflare Trust Hub SLA docs, A1.2), PRE-71-E-003 (Supabase HA replica query, quarterly, A1.2), PRE-71-E-004 (pg-cron-health-monitor deployment confirmation, A1.1), PRE-71-E-005 (stale-job test, A1.1), PRE-71-E-006 (post-drill cron resumption check, A1.3), PRE-71-E-007 (post-drill DSAR SLA continuity check, A1.3 + P5.1). 15-item implementation checklist (6× P0, 5× P1, 4× P2). Cross-references: §18 (BCP/DRP; RTO/RPO commitments), §19 (three-tier backup architecture), §20 (status page; A1-GAP-001/002), §33 (A1 deep-dive; capacity upgrade triggers; DR drill procedure PRE-33-E-006 through PRE-33-E-011; `system.dr_drill_completed` DEC-030 event), §46 (`audit-chain-daily-check` Edge Function; chain integrity verification), §47 (`row-count-monitor` Edge Function), §53 (`restore-verify-worker`; weekly backup verification), §70 (DSAR pg_cron jobs; privacy floor on PRE-71-E-007 DSAR SLA check), DATA_MODEL.md §10 (PITR restore runbook; HMAC re-anchoring), ENTERPRISE_SLA.md (99.9% uptime commitment), INCIDENT_RESPONSE.md §18.2 (RTO/RPO targets), OBSERVABILITY.md §12 (pg_cron health monitoring table — items 5, 9, 13 update this table). Owner: devops-lead (operational monitoring, DR drill execution) + compliance-officer (evidence cadence, gap tracker).*

@@ -6,6 +6,13 @@
 
 ---
 
+## [2.98.1] — 2026-06-08
+
+### Added
+- `docs/SOC2_READINESS.md §71` — Availability Trust Service Criteria A1.1/A1.2/A1.3: capacity management, infrastructure redundancy, DR test evidence; PRE-71-E-001–007; `pg-cron-health-monitor` Edge Function spec; A1-GAP-004/005 formally opened (compliance-officer + devops-lead)
+
+---
+
 ## [2.98.0] — 2026-06-08
 
 ### Added
