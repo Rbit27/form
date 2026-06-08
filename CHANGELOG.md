@@ -6,6 +6,14 @@
 
 ---
 
+## [2.98.0] — 2026-06-08
+
+### Added
+- `content/post-333-failure-types-resistance-training.md` — м'язова vs технічна відмова, RIR-матриця для базових/ізольованих вправ (sports-scientist, clinical-safety NOT REQUIRED)
+- `content/post-334-training-splits-evidence.md` — full-body vs upper/lower vs PPL: порівняльна матриця і рекомендація для середньостажованого (sports-scientist, clinical-safety NOT REQUIRED)
+
+---
+
 ## [2.97.1] — 2026-06-08
 
 ### Changed
