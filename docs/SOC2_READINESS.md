@@ -23375,3 +23375,423 @@ PRE-22 moves from **🔴 Open** to **🟢 Done** when all of the above boxes are
 ---
 
 *v1.0 (2026-06-08): §69 Security Awareness Training Execution Evidence — CC1.4/CC2.2/CC1.3/CC1.2 Auditor Exhibit. Execution evidence framework and completion attestation templates supplementing the programme design in §22. Defines seven evidence artefacts (CC1-E-001 through CC1-E-007), solo-founder signed attestation format, new-hire onboarding training gate protocol (production access withheld until CC1-E-007 filed), role-based training matrix (Engineering/Operations/Contractor), annual phishing simulation programme (GoPhish quarterly cadence, 20% click-rate failure threshold). Gap tracker: "Internal security training" 🔴 Gap → 🟡 Partial (programme designed §22 + execution templates §69; closes to 🟢 on first year evidence filing). PRE-22 closure criteria documented. SOC 2 criteria: CC1.4 (commitment to competence — curriculum + evidence), CC2.2 (internal communication — structured delivery), CC1.2 (management accountability — founder annual attestation), CC1.3 (organisational structure — role-based differentiation). Owner: compliance-officer (content) + security-engineer (delivery).*
+
+---
+
+## §70 DSAR Lifecycle Automation & 30-Day SLA Monitoring — P5.1 / P5.2 / P4.1 / P4.3 Auditor Exhibit
+
+**SOC 2 Criteria:** P5.1 / P5.2 / P4.1 / P4.3
+**GDPR Articles:** Art. 15 (access) · Art. 16 (rectification) · Art. 17 (erasure) · Art. 20 (portability) · Art. 5(1)(e) (storage limitation)
+**Owner:** compliance-officer (SLA oversight) + platform-engineer (automation)
+**Evidence path:** `form-compliance` repo → `/evidence/p5/dsar/YYYY/`
+**Closes:** P-GAP-003 🟡 Partial → 🟡 Authored (spec complete, deployment pending) · PRV-34 🔴 Gap → 🟡 Authored
+**Cross-references:** §35.7.1 (P5.1 PRV-31/32/33/34 controls), §35.7.2 (P5.2 erasure), DATA_MODEL.md §12 (soft-delete + erasure flow), DATA_MODEL.md §12.5 (portability export format), INCIDENT_RESPONSE.md R-14 (DSAR incident runbook), AUDIT_LOG_SCHEMA.md (dsar.* event registry), §51 (Gap Register — P5.1/P5.2 row), PRE-24 (DSAR end-to-end test checkpoint).
+
+---
+
+### §70.1 Purpose — What This Section Adds Beyond §35.7 and DATA_MODEL §12
+
+§35.7.1 (P5.1) and §35.7.2 (P5.2) state the existence of controls PRV-31 through PRV-34 but three of those four controls are still 🟡 Partial or 🔴 Gap as of §69:
+
+| Control | §35 status | Root cause |
+|---|---|---|
+| PRV-31 — in-app DSAR trigger | 🟡 Partial | Trigger built; no `dsar_requests` tracking table; end-to-end not tested |
+| PRV-32 — Art. 15 JSON export format | 🟡 Partial | Schema defined in DATA_MODEL §12.5; export assembly not tested end-to-end |
+| PRV-33 — in-app erasure flow | 🟡 Partial | Erasure queue in DATA_MODEL §12.3; no SLA clock or status table |
+| **PRV-34 — 30-day SLA monitoring alert** | **🔴 Gap** | PagerDuty alert not configured; no `dsar_requests` table to query |
+
+This section specifies the missing automation layer: the `dsar_requests` table (SLA clock anchor), the pg_cron day-25/day-29 PagerDuty alert jobs, the DEC-030 DSAR event chain, and the evidence artefact catalogue required to demonstrate GDPR Art. 15–17 and P5.1/P5.2 operating effectiveness to a SOC 2 auditor.
+
+> **What this section does NOT replace:** DATA_MODEL §12.3 remains the canonical erasure procedure (what happens to rows after a verified erasure request). INCIDENT_RESPONSE R-14 remains the incident procedure (what to do when a DSAR is missed or contested). §70 is the operational automation layer between the user-facing request and those downstream processes.
+
+---
+
+### §70.2 SOC 2 and GDPR Criteria Addressed
+
+| Criterion | AICPA requirement (paraphrased) | §70 mechanism |
+|---|---|---|
+| **P5.1** | Entity provides data subjects access to their personal information upon request | `dsar_requests` tracks 'access' and 'portability' types; automated export assembly via Edge Function; signed R2 URL delivery within 72h target |
+| **P5.2** | Entity provides data subjects mechanisms to correct, delete, or restrict their personal information | `dsar_requests` tracks 'erasure' and 'rectification' types; erasure jobs in DATA_MODEL §12.3 triggered from this table; status visible to compliance-officer |
+| **P4.1** | Personal information retained only as long as necessary to fulfil disclosed purposes | `dsar_requests.export_expires_at` enforces 7-day export access window; export R2 object auto-purged after expiry by `dsar_export_expiry_cleanup` pg_cron job |
+| **P4.3** | Personal information disposed of by secure methods at end of retention | Erasure path in DATA_MODEL §12.3 is triggered and tracked via `dsar_requests`; `dsar.erasure_completed` DEC-030 event captures row counts per table as disposal record |
+| **P8.1** | Entity monitors and evaluates privacy programme compliance | Day-25/29 pg_cron alerts provide automated SLA monitoring; annual PRE-70-E-005 log extract is the operating effectiveness record |
+
+**GDPR mapping:**
+
+| Article | Right | Request type in `dsar_requests` | SLA |
+|---|---|---|---|
+| Art. 15 | Access — copy of data | `access` | 30 days |
+| Art. 16 | Rectification — correct inaccurate data | `rectification` | 30 days |
+| Art. 17 | Erasure — right to be forgotten | `erasure` | 30 days |
+| Art. 18 | Restriction | `restriction` | 30 days |
+| Art. 20 | Portability — machine-readable export | `portability` | 30 days |
+
+---
+
+### §70.3 `dsar_requests` Table — DDL and Migration
+
+**Migration file:** `migrations/0053_dsar_requests.sql`
+
+```sql
+CREATE TABLE dsar_requests (
+  id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id               UUID        REFERENCES tenants(id) ON DELETE RESTRICT,
+  -- NULL for consumer (non-enterprise) users
+  user_id                 UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- FK to anonymised UUID row; ON DELETE RESTRICT prevents accidental user row deletion
+  -- while a DSAR is in-flight.
+
+  request_type            TEXT        NOT NULL
+                          CHECK (request_type IN ('access','portability','erasure','rectification','restriction')),
+  channel                 TEXT        NOT NULL
+                          CHECK (channel IN ('in_app','email','support_ticket')),
+
+  -- Timestamps
+  submitted_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  acknowledged_at         TIMESTAMPTZ,           -- T+1 business day target
+  identity_verified_at    TIMESTAMPTZ,
+  fulfilled_at            TIMESTAMPTZ,
+  withdrawn_at            TIMESTAMPTZ,
+
+  -- SLA control columns
+  sla_deadline            TIMESTAMPTZ NOT NULL
+                          GENERATED ALWAYS AS (submitted_at + INTERVAL '30 days') STORED,
+  sla_day_25_alert_fired  BOOLEAN     NOT NULL DEFAULT false,
+  sla_day_29_alert_fired  BOOLEAN     NOT NULL DEFAULT false,
+
+  -- Status lifecycle
+  status                  TEXT        NOT NULL DEFAULT 'pending'
+                          CHECK (status IN ('pending','acknowledged','in_progress','fulfilled','rejected','withdrawn')),
+  rejection_reason        TEXT,
+  -- allowed rejection reasons: 'identity_unverifiable', 'request_unfounded_or_excessive',
+  --   'legal_obligation_basis' (Art. 17(3) retention exception e.g. audit log rows)
+
+  -- Identity verification
+  identity_method         TEXT
+                          CHECK (identity_method IN ('re_auth','email_confirmation','support_verification')),
+
+  -- Export fields (access + portability types only)
+  export_r2_key           TEXT,         -- R2 object key; never a public URL
+  export_sha256           TEXT,         -- SHA-256 of encrypted zip archive
+  export_expires_at       TIMESTAMPTZ,  -- 7-day window from export creation
+  export_download_count   SMALLINT      NOT NULL DEFAULT 0,
+  export_max_downloads    SMALLINT      NOT NULL DEFAULT 3,
+
+  -- Internal
+  notes                   TEXT,         -- compliance-officer only; never surfaced to user
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- updated_at trigger
+CREATE TRIGGER dsar_requests_set_updated_at
+  BEFORE UPDATE ON dsar_requests
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Indexes
+CREATE INDEX idx_dsar_requests_user_id    ON dsar_requests (user_id);
+CREATE INDEX idx_dsar_requests_tenant_id  ON dsar_requests (tenant_id) WHERE tenant_id IS NOT NULL;
+CREATE INDEX idx_dsar_requests_status     ON dsar_requests (status) WHERE status NOT IN ('fulfilled','rejected','withdrawn');
+-- Partial index on open requests only — the SLA monitoring queries exclusively target open requests
+CREATE INDEX idx_dsar_requests_sla_open   ON dsar_requests (sla_deadline, sla_day_25_alert_fired, sla_day_29_alert_fired)
+  WHERE status NOT IN ('fulfilled','rejected','withdrawn');
+```
+
+#### §70.3.1 Check Constraints — Business Rules
+
+| Constraint | SQL | Rationale |
+|---|---|---|
+| `chk_export_fields_coherent` | `CHECK ((request_type IN ('access','portability') AND export_r2_key IS NOT NULL) OR request_type NOT IN ('access','portability') OR status = 'pending' OR status = 'acknowledged' OR status = 'in_progress')` | Export fields must be populated before status reaches 'fulfilled' for access/portability requests |
+| `chk_rejection_reason_required` | `CHECK (status != 'rejected' OR rejection_reason IS NOT NULL)` | Every rejected request must record the rejection reason for Art. 12(4) obligation |
+| `chk_fulfilled_at_coherent` | `CHECK (status != 'fulfilled' OR fulfilled_at IS NOT NULL)` | Fulfilled status requires a timestamp |
+| `chk_identity_verified_before_fulfilled` | `CHECK (status NOT IN ('fulfilled') OR identity_verified_at IS NOT NULL)` | Identity must be verified before any DSAR is fulfilled — no anonymous fulfilment |
+
+#### §70.3.2 FK Design Note
+
+`ON DELETE RESTRICT` on both `user_id` and `tenant_id` foreign keys is intentional. A DSAR request in-flight (`status != 'fulfilled'`) must not be silently orphaned by a user deletion. If an erasure request for user A arrives while an access DSAR for the same user is `in_progress`, the access DSAR must be explicitly cancelled or fulfilled before the erasure can proceed. This prevents the edge case where a user submits both simultaneously and the erasure races ahead of the access export delivery.
+
+The resolution procedure is in INCIDENT_RESPONSE R-14 §concurrent-request-conflict.
+
+---
+
+### §70.4 SLA Automation — pg_cron Alert Jobs
+
+Two pg_cron jobs enforce the 30-day GDPR SLA. Both jobs run daily at 07:00 UTC (start of business day, low false-positive risk from timezone variation).
+
+```sql
+-- Job 1: Day-25 early warning — P1 to compliance-officer
+SELECT cron.schedule('dsar-sla-day25-alert', '0 7 * * *', $$
+  WITH overdue AS (
+    SELECT id, user_id, request_type, submitted_at, sla_deadline,
+           EXTRACT(EPOCH FROM (NOW() - submitted_at)) / 86400 AS days_elapsed
+    FROM dsar_requests
+    WHERE status NOT IN ('fulfilled','rejected','withdrawn')
+      AND sla_day_25_alert_fired = false
+      AND submitted_at <= NOW() - INTERVAL '25 days'
+  )
+  UPDATE dsar_requests
+     SET sla_day_25_alert_fired = true
+   WHERE id IN (SELECT id FROM overdue)
+  RETURNING id, user_id, request_type, submitted_at, sla_deadline, days_elapsed;
+  -- The RETURNING rows are consumed by the `dsar-sla-relay` Edge Function
+  -- (invoked via pg_net or Supabase Realtime trigger) which fires PagerDuty P1
+  -- to compliance-officer only. See §70.4.1 for Edge Function spec.
+$$);
+
+-- Job 2: Day-29 final warning — P0 to compliance-officer + founder
+SELECT cron.schedule('dsar-sla-day29-alert', '0 7 * * *', $$
+  WITH critical AS (
+    SELECT id, user_id, request_type, submitted_at, sla_deadline,
+           EXTRACT(EPOCH FROM (NOW() - submitted_at)) / 86400 AS days_elapsed
+    FROM dsar_requests
+    WHERE status NOT IN ('fulfilled','rejected','withdrawn')
+      AND sla_day_29_alert_fired = false
+      AND submitted_at <= NOW() - INTERVAL '29 days'
+  )
+  UPDATE dsar_requests
+     SET sla_day_29_alert_fired = true
+   WHERE id IN (SELECT id FROM critical)
+  RETURNING id, user_id, request_type, submitted_at, sla_deadline, days_elapsed;
+$$);
+
+-- Job 3: Export expiry cleanup — purge R2 objects and nullify export fields
+SELECT cron.schedule('dsar-export-expiry-cleanup', '0 8 * * *', $$
+  UPDATE dsar_requests
+     SET export_r2_key   = NULL,
+         export_sha256   = NULL,
+         updated_at      = NOW()
+   WHERE export_expires_at < NOW()
+     AND export_r2_key IS NOT NULL;
+  -- Actual R2 object deletion is handled by the calling Edge Function
+  -- which reads rows where export_r2_key is about to be nulled.
+  -- Nulling the column first prevents signed URL generation for expired exports.
+$$);
+```
+
+#### §70.4.1 `dsar-sla-relay` Edge Function Specification
+
+The pg_cron jobs above update rows and return the affected IDs. A Supabase Edge Function (`dsar-sla-relay`) listens for the realtime change (or is called via `pg_net.http_post`) and dispatches PagerDuty events.
+
+| Alert ID | Trigger | Severity | Escalation | PagerDuty service |
+|---|---|---|---|---|
+| **DSAR-ALERT-01** | `sla_day_25_alert_fired` set to `true` | P1 | compliance-officer | `form-privacy` |
+| **DSAR-ALERT-02** | `sla_day_29_alert_fired` set to `true` | P0 | compliance-officer + founder | `form-privacy` |
+| **DSAR-ALERT-03** | `fulfilled_at IS NULL AND NOW() > sla_deadline` (SLA actually breached — should never fire if ALERT-01/02 worked) | P0 | compliance-officer + founder + legal | `form-privacy` (critical) |
+
+```
+PagerDuty payload (DSAR-ALERT-01):
+{
+  "routing_key": "<form-privacy-integration-key>",
+  "event_action": "trigger",
+  "dedup_key": "dsar-sla-day25-{dsar_requests.id}",
+  "payload": {
+    "summary": "DSAR SLA warning: request {id} is at day 25 of 30 (type: {request_type})",
+    "severity": "warning",
+    "source": "dsar-sla-relay",
+    "custom_details": {
+      "dsar_id": "{id}",
+      "request_type": "{request_type}",
+      "submitted_at": "{submitted_at}",
+      "sla_deadline": "{sla_deadline}",
+      "days_elapsed": "{days_elapsed}",
+      "status": "{status}",
+      "channel": "{channel}"
+    }
+  }
+}
+```
+
+**Privacy constraint on alert payload:** The PagerDuty alert body must contain only `dsar_id` (UUID), `request_type`, `submitted_at`, `sla_deadline`, and `status`. It must NOT contain `user_id`, `email`, or any personal identifier. The compliance-officer uses the `dsar_id` to look up the request in the admin console (form_system role only) to take action.
+
+**Deduplication keys:** `dsar-sla-day25-{id}` and `dsar-sla-day29-{id}` ensure each request fires at most one alert per tier. If a day-25 alert fires and the request is not fulfilled before day 29, the day-29 alert fires independently — both are expected and both are evidence of the SLA monitoring control operating.
+
+---
+
+### §70.5 DEC-030 DSAR Event Chain
+
+Eight HMAC-chained events track the complete DSAR lifecycle. All are appended to `audit_log_events` via the `emit-audit-event` Worker endpoint using the standard DEC-030 chain append logic (`docs/AUDIT_LOG_SCHEMA.md §3`).
+
+> **Privacy constraint:** `user_id` in DSAR events is the pseudonymous UUID — never email, name, or any direct identifier. The `export_r2_key` field (if present) is included only in `dsar.access_export_created` and only as a key path prefix (bucket name + directory prefix), not the full signed URL. Signed URLs are single-use and delivered to the user's verified email by the Edge Function; they are never logged.
+
+| Event type | Severity | Retention | Trigger | Key metadata fields |
+|---|---|---|---|---|
+| `dsar.request_submitted` | HIGH | 7 years | User submits DSAR via in-app flow or email verified by support | `dsar_id`, `request_type`, `channel`, `submitted_at`, `tenant_id` (nullable) |
+| `dsar.identity_verified` | HIGH | 7 years | Identity confirmed via re-auth, email confirmation, or support verification | `dsar_id`, `identity_method`, `verified_at` |
+| `dsar.request_acknowledged` | STANDARD | 7 years | Compliance-officer marks request acknowledged (T+1 business day target) | `dsar_id`, `acknowledged_by` (compliance-officer user_id UUID), `acknowledged_at` |
+| `dsar.access_export_created` | HIGH | 7 years | For 'access'/'portability' requests: encrypted export zip created and stored in R2 | `dsar_id`, `export_sha256`, `export_r2_key_prefix` (bucket+dir, no filename), `export_expires_at`, `record_counts` (per-table breakdown) |
+| `dsar.erasure_completed` | CRITICAL | 7 years | Hard-delete and anonymisation steps in DATA_MODEL §12.3 complete | `dsar_id`, `tables_affected` (list), `record_counts` (per-table breakdown), `completed_at`; mirrors `erasure.completed` event in §12.3 |
+| `dsar.request_fulfilled` | HIGH | 7 years | Final status transition to 'fulfilled'; export delivered or erasure confirmed | `dsar_id`, `fulfilled_at`, `elapsed_days` (integer), `request_type` |
+| `dsar.sla_alert_fired` | HIGH | 7 years | DSAR-ALERT-01 or DSAR-ALERT-02 fires for a request still open at day 25 or 29 | `dsar_id`, `alert_tier` (`day_25` or `day_29`), `days_elapsed`, `pagerduty_incident_id` |
+| `dsar.request_rejected` | HIGH | 7 years | Request rejected for a documented reason | `dsar_id`, `rejection_reason`, `rejected_at`, `rejected_by` (compliance-officer UUID) |
+
+**HMAC chain note:** `dsar.request_submitted` → `dsar.identity_verified` → `dsar.access_export_created` or `dsar.erasure_completed` → `dsar.request_fulfilled` is the expected sequence for a clean fulfilment. Any break in this sequence (e.g., `dsar.request_fulfilled` without a preceding `dsar.identity_verified`) triggers HMAC chain verification failure and routes to INCIDENT_RESPONSE R-14 §chain-sequence-violation.
+
+**Relationship to existing `data.export_initiated` event:** The existing `data.export_initiated` event (defined in AUDIT_LOG_SCHEMA.md before this section) is fired at the point the user triggers the export in Settings. It precedes `dsar.request_submitted` in the chain for in-app requests — `data.export_initiated` is the UI action; `dsar.request_submitted` is the formal DSAR record. For email-channel DSARs there is no `data.export_initiated` event; `dsar.request_submitted` is the first chain event.
+
+---
+
+### §70.6 RLS Constraints and Privacy Floor
+
+The `dsar_requests` table contains personal data (user_id FK, request_type, identity_method, notes). Access is restricted to two roles.
+
+```sql
+-- form_system: full read-write access (used by Edge Functions and pg_cron jobs)
+ALTER TABLE dsar_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "dsar_requests_system_all" ON dsar_requests
+  FOR ALL
+  TO form_system
+  USING (true)
+  WITH CHECK (true);
+
+-- compliance_officer: read + status updates (no INSERT — requests come only via in-app or support)
+CREATE POLICY "dsar_requests_compliance_read_update" ON dsar_requests
+  FOR SELECT
+  TO compliance_officer
+  USING (true);
+
+CREATE POLICY "dsar_requests_compliance_update" ON dsar_requests
+  FOR UPDATE
+  TO compliance_officer
+  USING (true)
+  WITH CHECK (status IN ('acknowledged','in_progress','fulfilled','rejected'));
+-- compliance_officer cannot INSERT or DELETE rows from this table.
+-- compliance_officer cannot set status = 'withdrawn' (only user can withdraw their own request).
+
+-- form_api role: NO access — tenant admins must never see DSAR records for their employees
+-- This enforces the privacy floor: an employer cannot query whether their employees
+-- have submitted DSARs. DSAR records are between FORM and the individual data subject.
+-- There is no CREATE POLICY for form_api role; default deny applies.
+```
+
+**Privacy floor enforcement:** A `tenant_admin` or `tenant_owner` using the enterprise admin dashboard must never be able to determine whether specific employees have submitted DSARs. This is enforced at the RLS layer (no `form_api` access) and at the API layer (no DSAR endpoint exposed on the tenant admin API). Enterprise DPAs must acknowledge that FORM processes DSARs directly with the data subject without routing through the employer — this is a non-negotiable privacy floor commitment.
+
+**Audit of access:** All `SELECT` and `UPDATE` operations on `dsar_requests` by the `compliance_officer` role emit `audit.dsar_table_accessed` DEC-030 events (STANDARD severity, 7-year retention) through the standard Supabase audit log extension. This ensures an immutable record of who accessed the DSAR registry and when.
+
+---
+
+### §70.7 DSAR Export Schema and Delivery
+
+For `request_type IN ('access', 'portability')`, the export assembly Edge Function (`dsar-export-assembler`) builds a JSON archive following the schema defined in DATA_MODEL §12.5. The SOC 2-specific additions beyond §12.5 are:
+
+**Export manifest file (`manifest.json`):** Required for P5.1 auditor evidence. Included in every export zip alongside the data files.
+
+```json
+{
+  "form_version": "1.0",
+  "dsar_id": "<uuid>",
+  "request_type": "access",
+  "submitted_at": "<ISO8601>",
+  "generated_at": "<ISO8601>",
+  "sha256_per_file": {
+    "profile.json": "<sha256>",
+    "workouts.json": "<sha256>",
+    "coaching_sessions.json": "<sha256>",
+    "meal_logs.json": "<sha256>",
+    "body_metrics.json": "<sha256>",
+    "README.txt": "<sha256>"
+  },
+  "data_categories_included": ["personal_profile", "fitness_activity", "ai_coaching", "nutrition", "body_metrics"],
+  "data_categories_excluded": ["audit_log_events"],
+  "exclusion_reason": "Audit log records are retained under GDPR Art. 6(1)(c) legal obligation basis and are not subject to Art. 15 access right per Art. 15(4) limitation where release would adversely affect the rights of others.",
+  "sub_processors_at_export_time": ["Supabase", "Cloudflare", "Anthropic", "ElevenLabs"],
+  "retention_notice": "Data retained under consent basis (Art. 6(1)(a)); you may withdraw consent or request erasure at any time via Settings → Privacy.",
+  "your_rights": ["access", "rectification", "erasure", "portability", "restriction", "objection"]
+}
+```
+
+**Delivery mechanism:** Signed Cloudflare R2 presigned URL (not Supabase Storage) — 24-hour TTL on the link itself; export file expires at `export_expires_at` (7 days after creation). After expiry, the R2 object is deleted by the `dsar-export-expiry-cleanup` pg_cron job and the field is nulled. A second download request after expiry requires submitting a new DSAR.
+
+**Encryption:** Export zip is encrypted with AES-256-GCM using a per-export ephemeral key derived from the `DSAR_EXPORT_KEY` Worker Secret (separate from `KEYPOINTS_ENC_KEY` — different threat model). The ephemeral key is derived via HKDF with the `dsar_id` as info parameter. The derived key is not stored anywhere; it is re-derived on the presigned URL generation path.
+
+---
+
+### §70.8 Evidence Artefact Catalogue
+
+All artefacts are filed to `form-compliance:/evidence/p5/dsar/YYYY/`.
+
+| Artefact ID | Name | Source | Filing frequency | SOC 2 criteria |
+|---|---|---|---|---|
+| **PRE-70-E-001** | `dsar_requests` table DDL migration + RLS policy file | `migrations/0053_dsar_requests.sql` + RLS policy SQL | At deployment | P5.1, P5.2, P4.1 |
+| **PRE-70-E-002** | pg_cron job definitions — DSAR-ALERT-01/02/03 + export cleanup | `migrations/0054_dsar_cron_jobs.sql` | At deployment | P5.1, P8.1 |
+| **PRE-70-E-003** | DEC-030 event registration in AUDIT_LOG_SCHEMA.md (eight `dsar.*` events) | Commit SHA of `docs/AUDIT_LOG_SCHEMA.md` update | At deployment | P5.1, P5.2, P4.3 |
+| **PRE-70-E-004** | PagerDuty alert configuration screenshot — `form-privacy` service with DSAR-ALERT-01/02/03 rules | PagerDuty dashboard screenshot | At deployment | P5.1, P8.1 |
+| **PRE-70-E-005** | Test DSAR end-to-end elapsed time confirmation — PRE-24 closure | Internal test DSAR: submission timestamp, export delivery timestamp, elapsed hours, completeness checklist | Before observation period start (PRE-24) | P5.1, P5.2 |
+| **PRE-70-E-006** | Annual DSAR log extract — observation period | `SELECT id, request_type, channel, submitted_at, fulfilled_at, status, elapsed_days FROM dsar_requests WHERE submitted_at BETWEEN <obs_start> AND <obs_end> ORDER BY submitted_at` (compliance_officer role; excludes user_id per privacy floor) | At observation period end | P5.1, P5.2, P4.3 |
+| **PRE-70-E-007** | Zero-missed-SLA attestation — annual compliance-officer sign-off | Signed attestation: "No DSAR in observation period exceeded 30-day SLA" or "The following DSARs exceeded SLA: [list with root cause]" | Annual | P5.1, P8.1 |
+| **PRE-70-E-008** | Export schema compliance review — Art. 15 field completeness check | Compliance-officer review of `manifest.json` fields against GDPR Art. 15(1)(a)–(h) required disclosures; sign-off memo | Annual | P5.1 |
+
+> **Auditor note on PRE-70-E-006:** The query above deliberately excludes `user_id` from the extract. The auditor receives request counts, types, SLA outcomes, and channels — sufficient to assess P5.1/P5.2 operating effectiveness — without receiving a list of which users exercised their data rights. This is consistent with the privacy floor enforcement in §51.8 and with GDPR Art. 5(1)(c) data minimisation applied to the audit process itself.
+
+---
+
+### §70.9 P-GAP-003 / P-GAP-005 / PRV-34 Closure Criteria & Gap Tracker Update
+
+#### §70.9.1 Gap Tracker Rows Affected
+
+| Gap ID | §51 / §35 description | Pre-§70 status | §70 status | Closes to 🟢 when |
+|---|---|---|---|---|
+| **P-GAP-003** | DSAR handling SLA automation (30-day clock, monitoring alert) | 🟡 Partial — procedure documented in R-14; no automation | 🟡 **Authored** — `dsar_requests` DDL, pg_cron jobs, PagerDuty alerts specified | `migrations/0053` and `0054` deployed; DSAR-ALERT-01/02/03 live in PagerDuty; PRE-70-E-001 through PRE-70-E-004 filed |
+| **P-GAP-005** | DSAR SLA monitoring alert not configured (PRV-34 🔴 Gap) | 🔴 Gap — PagerDuty alert for day-25/29 not implemented | 🟡 **Authored** — DSAR-ALERT-01/02 pg_cron + Edge Function specified; PagerDuty payload documented | DSAR-ALERT-01/02/03 deployed; first synthetic test DSAR confirmed alerts fire at day 0+1 (test); PRE-70-E-004 filed |
+| **PRV-31** | In-app DSAR trigger + `data.export_initiated` DEC-030 event | 🟡 Partial | 🟡 **Authored** — `dsar_requests.status` lifecycle fully specified; `dsar.request_submitted` event closes the gap between UI action and SLA record | `migrations/0053` deployed; `dsar.request_submitted` emitted on first real DSAR submission |
+| **PRV-32** | Art. 15 JSON export format tested end-to-end | 🟡 Partial | 🟡 **Authored** — `manifest.json` schema specified in §70.7; PRE-70-E-005 (PRE-24) defines the end-to-end test | PRE-70-E-005 filed with elapsed_hours ≤ 72 and completeness checklist signed |
+| **PRV-34** | 30-day SLA monitoring alert | 🔴 Gap | 🟡 **Authored** | Same as P-GAP-005 above |
+
+#### §70.9.2 PRE-24 Checkpoint Closure Path
+
+PRE-24 states: "DSAR handling procedure tested end-to-end; elapsed time ≤30 days confirmed | compliance-officer | Month O-1 | 🟡 Partial"
+
+PRE-24 closes to 🟢 when:
+- [ ] `migrations/0053` and `0054` deployed to production
+- [ ] Compliance-officer submits a test DSAR via `Settings → Privacy → Download My Data`
+- [ ] Export zip received at verified email within 72 hours
+- [ ] Compliance-officer verifies `manifest.json` fields against Art. 15(1)(a)–(h) checklist
+- [ ] PRE-70-E-005 filed to `form-compliance:/evidence/p5/dsar/YYYY/PRE-70-E-005-end-to-end-test.md`
+
+---
+
+### §70.10 SOC 2 Criteria Mapping Summary
+
+| SOC 2 Criterion | AICPA requirement (paraphrased) | §70 mechanism | Primary evidence artefact(s) | Current status |
+|---|---|---|---|---|
+| **P5.1** — Access | Entity provides data subjects access to their personal information | In-app DSAR trigger (PRV-31) + `dsar_requests` SLA tracking + automated export delivery (§70.7) + DSAR-ALERT-01/02 for SLA compliance | PRE-70-E-005 (end-to-end test), PRE-70-E-006 (annual log), PRE-70-E-007 (zero-missed-SLA attestation) | 🟡 Authored — spec complete; deployment pending |
+| **P5.2** — Correction/Deletion | Entity provides mechanisms to correct, delete, or restrict | `dsar_requests` tracks erasure/rectification types; erasure path in DATA_MODEL §12.3 triggered from this table; `dsar.erasure_completed` CRITICAL event | PRE-70-E-006 (annual log), DATA_MODEL §12.3 erasure procedure, §67 (Tenant Data Deletion Certificate for enterprise) | 🟡 Authored — spec complete; deployment pending |
+| **P4.1** — Retention | Personal information retained only as long as necessary | `export_expires_at` 7-day window + `dsar-export-expiry-cleanup` pg_cron job + DATA_MODEL §12.2 retention windows | PRE-70-E-001 (DDL shows `export_expires_at` + cleanup cron) | 🟡 Authored |
+| **P4.3** — Disposal | Personal information disposed of securely | Erasure job from DATA_MODEL §12.3 triggered via `dsar_requests`; `dsar.erasure_completed` documents row counts per table | PRE-70-E-006 (erasure_completed events in annual extract) | 🟡 Authored |
+| **P8.1** — Monitoring | Entity monitors privacy programme compliance | Day-25/29 PagerDuty alerts + annual PRE-70-E-007 attestation + quarterly compliance calendar review (§15 Q2 DSAR test) | PRE-70-E-004 (PagerDuty config), PRE-70-E-007 (annual attestation) | 🟡 Authored |
+
+---
+
+### §70.11 Implementation Checklist
+
+#### P0 — Before First Enterprise Pilot (Must Complete Before Any Enterprise User Can Submit a DSAR)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `migrations/0053_dsar_requests.sql` — full DDL from §70.3, all CHECK constraints, four indexes, updated_at trigger, RLS policies (§70.6). Verify `ON DELETE RESTRICT` on both FKs in staging before production apply. | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Run migration `migrations/0054_dsar_cron_jobs.sql` — three pg_cron jobs from §70.4 (dsar-sla-day25-alert, dsar-sla-day29-alert, dsar-export-expiry-cleanup). Validate job registration with `SELECT * FROM cron.job WHERE jobname LIKE 'dsar%'`. | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Deploy `dsar-sla-relay` Edge Function — consumes pg_cron RETURNING rows (via pg_net or Supabase Realtime); dispatches PagerDuty DSAR-ALERT-01/02/03 with deduplication keys from §70.4.1; enforces privacy floor (no user_id in payload). Test in staging: set `submitted_at = NOW() - INTERVAL '25 days'` on a test row and confirm PagerDuty P1 fires within 5 minutes of the next cron window. | platform-engineer | **P0** | M5 | [ ] |
+| 4 | Deploy `dsar-export-assembler` Edge Function — builds JSON zip per DATA_MODEL §12.5 + `manifest.json` from §70.7; derives ephemeral AES-256-GCM key via HKDF from `DSAR_EXPORT_KEY` Worker Secret; stores encrypted zip to R2; sets `export_r2_key`, `export_sha256`, `export_expires_at` on the `dsar_requests` row; emits `dsar.access_export_created` DEC-030 event. | platform-engineer | **P0** | M5 | [ ] |
+| 5 | Register all eight `dsar.*` DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md` event registry (§70.5 table). Validate Zod schema for each event type. Deploy to `emit-audit-event` Worker endpoint. File commit SHA as PRE-70-E-003. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 6 | Configure DSAR-ALERT-01, DSAR-ALERT-02, DSAR-ALERT-03 in PagerDuty `form-privacy` service; set escalation policies (ALERT-01 → compliance-officer P1; ALERT-02 → compliance-officer + founder P0; ALERT-03 → compliance-officer + founder + legal P0 critical). File PagerDuty dashboard screenshot as PRE-70-E-004. | devops-lead | **P0** | M5 | [ ] |
+| 7 | Add `DSAR_EXPORT_KEY` to Cloudflare Workers Secrets and to annual key rotation schedule in `docs/CRYPTOGRAPHY_POLICY.md §3`; add to `docs/SOC2_READINESS.md §56` key inventory. Rotation schedule: 180 days (matches API key tier). | security-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before Observation Period Start (PRE-24 Closure)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Compliance-officer submits test DSAR via in-app flow. Verify: `dsar_requests` row created with correct `status = 'pending'`; `dsar.request_submitted` DEC-030 event emitted and HMAC-chained; export zip received at verified email within 72 hours; `manifest.json` fields mapped to Art. 15(1)(a)–(h) checklist. File PRE-70-E-005 as PRE-24 closure artefact. | compliance-officer | **P1** | Month O-1 | [ ] |
+| 9 | Register PRE-70-E-001 through PRE-70-E-008 evidence artefact definitions in §51 Gap Register (P5.1/P5.2 row) and in `form-compliance` repo `README.md` evidence index. | compliance-officer | **P1** | Before obs. period | [ ] |
+| 10 | Add `dsar_sla_day25_alert`, `dsar_sla_day29_alert`, `dsar_export_expiry_cleanup` to OBSERVABILITY.md §12 pg_cron health monitoring table (jobs that must have run within the last 26 hours). | devops-lead | **P1** | M5 | [ ] |
+| 11 | Add `dsar_requests` RLS test cases to `__tests__/db/dsar_requests_rls.test.ts`: (a) `form_api` role SELECT returns 0 rows (privacy floor — tenant admin cannot list DSARs), (b) `compliance_officer` SELECT returns all rows, (c) `form_system` INSERT succeeds, (d) `compliance_officer` UPDATE to status 'withdrawn' fails, (e) `form_system` UPDATE to status 'withdrawn' succeeds. | qa-lead + platform-engineer | **P1** | M5 | [ ] |
+
+#### P2 — Post-Observation Period
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 12 | At observation period end: run PRE-70-E-006 query; file annual DSAR log extract; compliance-officer signs PRE-70-E-007 zero-missed-SLA attestation. File both to `form-compliance:/evidence/p5/dsar/YYYY/`. | compliance-officer | **P2** | Obs. period end | [ ] |
+| 13 | Annual export schema review: verify `manifest.json` fields remain compliant with current Art. 15(1) requirements (check for any EU GDPR guidance updates). File PRE-70-E-008 review memo. | compliance-officer | **P2** | Annual (Q1) | [ ] |
+
+---
+
+*v1.0 (2026-06-08): §70 DSAR Lifecycle Automation & 30-Day SLA Monitoring — P5.1/P5.2/P4.1/P4.3 Auditor Exhibit. Closes P-GAP-003 and P-GAP-005 / PRV-34 from 🔴/🟡 Gap → 🟡 Authored. Core deliverables: `dsar_requests` table DDL and migration (`migrations/0053_dsar_requests.sql`) with five request types (access, portability, erasure, rectification, restriction), five-state status lifecycle, generated `sla_deadline` column (submitted_at + 30 days), `export_expires_at` 7-day window, per-export HKDF-derived AES-256-GCM encryption key (separate from `KEYPOINTS_ENC_KEY`). pg_cron automation: three jobs (`dsar-sla-day25-alert`, `dsar-sla-day29-alert`, `dsar-export-expiry-cleanup`) in `migrations/0054_dsar_cron_jobs.sql`; day-25 fires PagerDuty P1 to compliance-officer via `dsar-sla-relay` Edge Function; day-29 fires P0 to compliance-officer + founder; day-0-breach fires P0 critical to compliance-officer + founder + legal (belt-and-suspenders if day-25/29 alerts failed to trigger resolution). Privacy floor: `form_api` role has zero access to `dsar_requests` (tenant admins cannot enumerate employee DSARs — enforced at RLS layer); PagerDuty alert payloads contain only `dsar_id` UUID, not `user_id` or email; PRE-70-E-006 annual extract excludes `user_id`. Eight DEC-030 HMAC-chained events (dsar.request_submitted HIGH 7yr, dsar.identity_verified HIGH 7yr, dsar.request_acknowledged STANDARD 7yr, dsar.access_export_created HIGH 7yr, dsar.erasure_completed CRITICAL 7yr, dsar.request_fulfilled HIGH 7yr, dsar.sla_alert_fired HIGH 7yr, dsar.request_rejected HIGH 7yr); relationship to pre-existing `data.export_initiated` event documented (UI action precedes DSAR record for in-app channel; email-channel skips `data.export_initiated`). DSAR export manifest.json schema specified for P5.1 Art. 15(1)(a)–(h) completeness; export delivery via Cloudflare R2 presigned URL (24h TTL); export file purged at 7-day expiry by cleanup cron. RLS: `compliance_officer` read + status update (cannot INSERT, DELETE, or set status='withdrawn'); `form_system` full access; `form_api` zero access. Eight evidence artefacts PRE-70-E-001 through PRE-70-E-008: DDL migration, cron job SQL, AUDIT_LOG_SCHEMA.md commit SHA, PagerDuty screenshot, end-to-end test (PRE-24 closure), annual DSAR log extract, zero-missed-SLA attestation, annual export schema review. Gap tracker: P-GAP-003 🟡 Partial → 🟡 Authored (closes to 🟢 on migrations deployed + PRE-70-E-001/002 filed); P-GAP-005 / PRV-34 🔴 Gap → 🟡 Authored (closes to 🟢 on DSAR-ALERT-01/02/03 live + PRE-70-E-004 filed); PRV-31/32 🟡 Partial → 🟡 Authored. PRE-24 closure path documented (§70.9.2). SOC 2 criteria: P5.1 (access — export delivery + SLA compliance), P5.2 (erasure/rectification — lifecycle tracking into DATA_MODEL §12.3), P4.1 (retention — export_expires_at 7-day window + cleanup cron), P4.3 (disposal — dsar.erasure_completed CRITICAL event with per-table row counts), P8.1 (monitoring — DSAR-ALERT-01/02 + annual PRE-70-E-007 attestation). Cross-references: §35.7.1 (PRV-31/32/33/34 controls), §35.7.2 (P5.2 erasure), DATA_MODEL.md §12 (erasure procedure), DATA_MODEL.md §12.5 (portability export format), INCIDENT_RESPONSE.md R-14 (DSAR incident runbook), AUDIT_LOG_SCHEMA.md (dsar.* event registry — checklist item 5), §51 (Gap Register P5.1/P5.2 update — checklist item 9), §15 (compliance calendar Q2 annual DSAR test), §67 (Tenant Data Deletion Certificate — enterprise erasure complement). Owner: compliance-officer (SLA oversight) + platform-engineer (automation).*

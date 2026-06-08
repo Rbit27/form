@@ -6,6 +6,14 @@
 
 ---
 
+## [2.97.1] — 2026-06-08
+
+### Changed
+- `docs/SOC2_READINESS.md §70` — DSAR Lifecycle Automation & 30-Day SLA Monitoring (P5.1/P5.2/P4.1/P4.3 Auditor Exhibit): closes P-GAP-003 and P-GAP-005/PRV-34 from 🔴/🟡 Gap → 🟡 Authored; `dsar_requests` table DDL (`migrations/0053`) with five request types, generated `sla_deadline`, `export_expires_at` 7-day window, per-export HKDF-derived AES-256-GCM encryption; pg_cron automation (`migrations/0054`): day-25 P1 + day-29 P0 + SLA-breach P0-critical PagerDuty alerts via `dsar-sla-relay` Edge Function; eight DEC-030 HMAC-chained `dsar.*` events (dsar.request_submitted/identity_verified/request_acknowledged/access_export_created/erasure_completed/request_fulfilled/sla_alert_fired/request_rejected, HIGH–CRITICAL 7yr); RLS privacy floor — `form_api` zero access (tenant admins cannot enumerate employee DSARs); export manifest.json schema for Art. 15(1)(a)–(h) completeness; eight evidence artefacts PRE-70-E-001–PRE-70-E-008; PRE-24 closure path documented; SOC 2 P5.1/P5.2/P4.1/P4.3/P8.1
+- `VERSION` — 2.97.0 → 2.97.1
+
+---
+
 ## [2.97.0] — 2026-06-08
 
 ### Added
