@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v2.7
+# FORM · SOC 2 Type II Readiness v3.3
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -22600,3 +22600,282 @@ Artifacts for each tenant are stored in the private `form-compliance` repo under
 *v1.0 (2026-06-06): §66 Media and Device Disposal Policy — C1.2 / CC6.5 / CC6.7 · PRE-06 Closure. Closes PRE-06 (🔴 Open → 🟡 Authored — closes to 🟢 upon MDD-P0-01/MDD-P0-02 execution and first disposal event). Closes C1-GAP-002 (🔴 Gap → 🟡 Authored — no formal disposal policy existed before this section; §26.6.2 specified procedure but without standalone policy status). Closes C1-GAP-004 P1 (P1 Open → 🟡 Authored — `compliance/c1/device-disposal-policy.md` now formally authored via MDD-P0-04 extraction checklist; PRE-34-E-008 created upon commit). Policy scope: all physical devices holding FORM production credentials, health data, or debugging artifacts; remote-work/personal-device context (solo-founder BYOD model); scales to multi-person team without architectural change. Wipe standards: NIST SP 800-88 Rev. 1 Purge — cryptographic erasure (FileVault 2 EACS + Secure Enclave key discard) for SSD/NVMe; iOS hardware cryptographic erase; 7-pass overwrite for legacy USB; physical shredding for HDD. Four disposal categories: development laptop (72h credential revocation → EACS → MDM confirmation), mobile test device (TestFlight revocation → iOS erase), external storage (per-type Purge or physical destruction), paper (cross-cut P-4 shred). Test device handling (§66.6): devices that touched production health data require: audit log search for device activity window (MDD-E-005), two-person sign-off or HMAC-chained solo attestation, cache verification `find` command (MDD-E-006), then standard wipe. Remote-work device policy (§66.5): FileVault 2 + auto-lock ≤5 min + MDM + no-credentials-in-plaintext + jailbreak prohibition + no VPN requirement (Cloudflare Access compensates). Chain of custody (§66.7): internal disposal via device-register.csv + MDD-E-003; solo-founder compensating control via HMAC-chained DEC-030 dual-event (asset.disposal_initiated → asset.disposal_completed) as tamper-evident substitute for two-person witness; physical transfer chain-of-custody form template for third-party handoffs; founder attestation committed to repo. Timeline requirements (§66.8): 72h pre-disposal credential revocation; 14 calendar days from departure date for employee device wipe; 7 days for active device retirement; 30 days max for third-party destruction handoff. Third-party destruction criteria (§66.9): NAID AAA / e-Stewards / R2-RIOS certified; NIST Purge or ≤6mm HDD shred; cert within 5 business days; EU data residency for EU health data devices; DPA signed; no retail trade-in programs. Five DEC-030 HMAC-chained events (all 7-year retention): asset.disposal_initiated (STANDARD), asset.disposal_completed (STANDARD), asset.device_sanitized (HIGH), asset.chain_of_custody_transferred (HIGH), asset.disposal_log_filed (STANDARD); privacy invariant: no serial numbers or health data in event payloads; 30-day chain gap fires MDD-AL-01. Seven evidence artifacts MDD-E-001 through MDD-E-007. Gap/PRE closure: PRE-06 🔴→🟡, C1-GAP-002 🔴→🟡, C1-GAP-004 🟡→🟡 Authored, CC6-GAP-010 (MDM) referenced as dependency for 🟢 closure. SOC 2 criteria: C1.2 (confidential information disposal — primary), CC6.5 (logical access termination before device decommission), CC6.7 (health data cache verification), CC1.4 (policy authored and committed). Thirteen-item implementation checklist: 5× P0 M5 (device register, founder attestation, DEC-030 registration, device-disposal-policy.md extraction, gap register update), 5× P1 M5-M6 (destruction vendor register, MDD-AL-01 alert, MDM deployment closing CC6-GAP-010, enterprise offboarding API key step, compliance calendar update), 3× P2 (post-hire two-person sign-off, MDM auto-trigger Worker, CSM device policy). Three open questions: OQ-MDD-01 (serial number in Supabase Vault vs 1Password — P2 Series A), OQ-MDD-02 (enterprise tenant data destruction certificate — P1 before enterprise GA M13), OQ-MDD-03 (YubiKey hardware key requirement from first hire — P1). SOC 2 doc v3.0 → v3.1. Owner: compliance-officer + security-engineer.*
 
 *v1.1 (2026-06-05): §65 Q2 2026 Quarterly Access Review — First Execution Evidence · CC6-GAP-001 Closure · CC6.2/CC6.3/CC6.5/CC4.2 Auditor Exhibit. First-ever execution of the quarterly access review defined in §23. §65.1 SOC 2 criteria mapping: CC6.2/CC6.3/CC6.5/CC4.2/CC1.2 all addressed. §65.2 phase context: solo-founder compensating control per §23.7; review executed 36 days late (due 2026-04-30, executed 2026-06-05); latency finding AR-2026-Q2-01 logged. §65.3 access inventory: 11 human account systems (GitHub/Cloudflare/Supabase/1Password/PostHog/Sentry/Stripe/ElevenLabs/Anthropic/Apple Developer/Google Play) + 14 service account / API token rows; founder is sole human account holder across all systems; SCIM tokens: 0 (pre-launch); zero unauthorized accounts found. §65.4 roster comparison: all accounts match §23.5 authorized roster (v1.0 baseline authored 2026-06-05); three service account SLA-boundary flags (AR-2026-Q2-03/04/05). §65.5 deprovisioning and rotation log: 0 human deprovisionings; 3 credential rotations (`SUPABASE_SERVICE_ROLE_JWT` via §57 runbook, `ANTHROPIC_API_KEY`, nightly backup Worker role) executed 2026-06-05T14:23–14:47Z within 90-day SLA boundary. §65.6 enterprise tenant review: 0 active tenants (pre-launch); §23.2.3 query validated in staging (0 rows). §65.7 control effectiveness: all 6 CC6 controls assessed Effective; no degraded controls. §65.8 findings register: AR-2026-Q2-01 (Low — 36-day review latency; remediation: Q3 calendar gate by 2026-07-17); AR-2026-Q2-02 (Medium — Sentry DPA pending; pre-existing finding; escalation by 2026-06-12); AR-2026-Q2-03/04/05 (operational rotation items, executed same-day). §65.9 DEC-030 events: `system.access_review_completed` (STANDARD, 7yr — defined in §23, not yet in AUDIT_LOG_SCHEMA.md; registration P1 §65.13-3); `system.credential_rotated` (STANDARD, 7yr — new event, registration P1 §65.13-4); event payload JSON provided with `artifact_sha256: [PENDING]` pending artifact commit. §65.10 evidence mapping: CC6-GAP-001 🔴 → 🟢; PRE-23 🟡 → 🟢; CC6.2/CC6.3/CC6.5/CC4.2/CC1.2 🟡 → 🟢; net readiness ~95.5% → ~96.0%. §65.11 Q3 forward plan: due 2026-07-31; differences: calendar gate, potential pilot tenants, Sentry DPA target closure, CLOUDFLARE_API_KEY/WORKOS_API_KEY flagged for 180-day SLA at Q3. §65.12 artifact location: `compliance/access-review/2026-q2/access-review-2026-Q2.md` in private `form-compliance` repo; SHA-256 [PENDING — AR-P0-02]. §65.13 implementation checklist: 5× P0 (2026-06-07 — artifact commit, DEC-030 emission, authorized-roster.md, §51 gap update, form-crypto-health KV verification); 5× P1 (2026-06-12/M7 — Q3 calendar gate, Sentry DPA escalation, two AUDIT_LOG_SCHEMA.md event registrations, OQ-ENC-03 closure); 3× P2 (hire date, first pilot, Q1 2027 — roster update, pilot tenant query, automated enumeration script). §65.14 two open questions: OQ-AR-01 (pilot tenant review standard — P1, before Q3 pre-review gate); OQ-AR-02 (compliance events in SIEM stream — P2, before enterprise GA). Cross-references: §23 (full quarterly access review procedure), §23.5 (authorized roster), §23.6 (artifact template), §23.7 (solo-founder compensating control), §23.8 (PRE-23 implementation checklist — all items closed by §65 AR-P0-01/02/03), §51 (CC6-GAP-001 gap register row — AR-P0-04 closes it), §15.2 PRE-23 (checklist item — 🟢 closed), §56/§57/§58 (key management — rotation SLAs for §65.3.2 table), docs/AUDIT_LOG_SCHEMA.md (event registrations — system.access_review_completed and system.credential_rotated — P1 pending), OBSERVABILITY §30.10 (form-crypto-health KV — AR-P0-05 verification), OBSERVABILITY §30.10 item 10 (admin.encryption_key_rotated — AR-2026-Q2-05 → §65.13 AR-P1-05).*
+
+---
+
+## §68 US State Privacy Law Compliance — CCPA/CPRA & Multi-State · OQ-PRIV-02 Resolution · P3.1/P5.2/P6.1/P6.7 Auditor Exhibit
+
+> **Owner:** compliance-officer (primary) · security-engineer · enterprise-architect. **Review cadence:** Annual (January, with §60 Annual Privacy Programme Review) and on each new US enterprise customer contract signature. **Gap closure:** OQ-PRIV-02 (CCPA US addendum — P1, before first US enterprise customer) from §60.13. **SOC 2 P-Series mapping:** P3.1 (personal information collection limited to purposes notified), P5.2 (personal information disposed of when no longer needed), P6.1 (personal information disclosed only as consistent with privacy notice), P6.7 (personal information not shared with parties other than those disclosed). **New-customer trigger:** US state of incorporation or billing address on enterprise order form triggers §68.4 DSAR cooperation setup and §68.3 SPA addendum workflow before data flows.
+
+---
+
+### §68.1 US State Privacy Law Landscape and FORM's Applicability
+
+FORM is incorporated and operated pre-Series A from Ukraine; its enterprise customers are primarily US-headquartered companies. This creates a specific compliance profile: FORM is a **data processor / service provider** under US state privacy law, not a controller/business in the primary sense. The analysis below maps each applicable law to FORM's actual position.
+
+**Laws in scope:**
+
+| Law | Jurisdiction | Effective | Business threshold | FORM threshold met? |
+|---|---|---|---|---|
+| **CCPA / CPRA** | California | CCPA: Jan 2020; CPRA: Jan 2023 | Annual gross revenue > $25M **or** buy/sell/share PI of ≥100,000 CA consumers/year **or** ≥50% revenue from selling PI | 🟡 Not met today (pre-revenue); triggers at $25M ARR or 100k CA consumer records |
+| **VCDPA** | Virginia | Jan 2023 | Control/process PI of ≥100,000 VA residents/year or ≥25,000 with ≥50% revenue from PI sale | 🟡 Not met today |
+| **CPA** | Colorado | Jul 2023 | Control/process PI of ≥100,000 CO residents/year or ≥25,000 with ≥50% revenue from PI | 🟡 Not met today |
+| **CTDPA** | Connecticut | Jul 2023 | Control/process PI of ≥100,000 CT residents/year or ≥25,000 with ≥25% revenue from PI | 🟡 Not met today |
+| **UCPA** | Utah | Dec 2023 | Control/process PI of ≥100,000 UT residents/year | 🟡 Not met today |
+| **MOPIPA** | Montana | Oct 2024 | Control/process PI of ≥50,000 MT residents/year | 🟡 Not met today |
+
+**Applicability today:** No US state privacy law directly applies to FORM as a "business" or "controller" during the pre-$25M-ARR, pre-100k-consumer phase. However:
+
+1. **Enterprise customers** who are California "businesses" will contractually require FORM to enter a CCPA Service Provider Agreement (SPA) before enterprise pilots involving California employees.
+2. **Enterprise employees** within a customer's workforce are **consumers** under CPRA since 1 January 2023 — the workforce data exemption in the original CCPA (Cal. Civ. Code § 1798.145(m)) expired when CPRA took effect.
+3. **SOC 2 P-Series criteria** require FORM to maintain consistent privacy practices across all jurisdictions served, regardless of direct regulatory applicability threshold.
+
+**Compliance position:** FORM implements a CCPA-compliant Service Provider posture **before signing its first US enterprise customer**, regardless of the direct applicability threshold, because enterprise procurement teams (IT, Legal, Privacy) routinely require a signed CCPA SPA as a contract prerequisite, and because FORM processes CPRA-defined sensitive personal information on behalf of California-based employees within enterprise tenants.
+
+---
+
+### §68.2 B2B and Workforce Data Analysis Under CPRA
+
+**Key distinction:** FORM processes personal information in two contexts within enterprise deployments:
+
+| Context | Data subject | CPRA category | FORM's role | Notes |
+|---|---|---|---|---|
+| Enterprise employee using FORM app | Natural person / California employee | Consumer (post-CPRA Jan 2023) | Service Provider (Cal. Civ. Code § 1798.140(ag)) | Fitness and CV biometric data = "sensitive personal information" under CPRA § 1798.140(ae)(1)(C) |
+| Enterprise admin / HR lead using admin dashboard | Natural person / employee | Consumer | Service Provider | Accesses only aggregate wellness metrics — FORM privacy floor prohibits individual health data exposure at the data layer |
+| Enterprise contract counterparty (legal entity) | Legal entity | Not PI | Contractual counterparty | Standard B2B commercial data; not regulated by CPRA |
+
+**Sensitive Personal Information (SPI) classification under CPRA § 1798.140(ae)(1)(C):**
+
+The following FORM data categories qualify as SPI under CPRA:
+- CV pose keypoints and form scores (biometric data adjacent — skeletal geometry derived from camera)
+- Recovery scores and HRV readings from wearables (health metrics)
+- Body composition trends (where user opts in)
+- Workout performance data coupled with health identifiers
+
+As a **Service Provider** under CPRA § 1798.140(ag)(2), FORM's obligations:
+1. Process PI only for the **Business Purpose** specified in the SPA addendum (§68.3.1)
+2. Not **sell** or **share** PI (§68.3.2)
+3. Not retain, use, or disclose PI outside the contracted service context
+4. Provide the same level of privacy protection required of the enterprise customer
+5. Notify the enterprise customer within 72h if FORM can no longer meet its CPRA obligations (tied to INCIDENT_RESPONSE.md enterprise notification SLA)
+6. Grant the enterprise customer annual audit rights (SOC 2 report share satisfies for Enterprise tier; questionnaire for Growth tier)
+
+---
+
+### §68.3 CCPA / CPRA Compliance Architecture
+
+**Service Provider Agreement (SPA) addendum architecture:**
+
+FORM's CCPA compliance is implemented as a DPA addendum specific to US enterprise customers. The SPA addendum (template: `compliance/templates/us-privacy-spa-addendum-v{N}.pdf`, USP-E-005) is appended to the Master Service Agreement and supplements — does not replace — the GDPR DPA that is signed before any data flows. Both instruments are executed in a single DocuSign envelope for US enterprise customers.
+
+**SPA addendum required clauses (CPRA § 1798.100(d) + Cal. Privacy Regs. § 7051):**
+
+| Clause | CPRA requirement | FORM implementation |
+|---|---|---|
+| Business Purpose limitation | Processing only for enumerated purposes | §68.3.1 — five permitted purposes defined; SPI limited to service delivery only |
+| No sale or sharing | SPA must prohibit PI sale or sharing for cross-context advertising | §68.3.2 — explicit prohibition; adtech inventory confirmed clean |
+| Subcontractor flow-down | SPA terms must flow to sub-processors | §68.3.3 — eight existing sub-processors have DPAs; new sub-processors require written authorisation |
+| Consumer rights assistance | Service Provider must cooperate with Business's consumer rights obligations | §68.4 — DSAR cooperation protocol with 30-business-day SLA |
+| Sensitive PI handling | Use and disclosure limitation for SPI | §68.3.1 Purpose 1 — SPI used only for service delivery; no advertising or profiling outside the service |
+| Audit rights | Business can verify compliance | §68.8 USP-E-001 — annual audit right; SOC 2 report share under NDA satisfies for Enterprise tier |
+| Notification of inability to comply | Must notify if FORM cannot meet CPRA obligations | 72h notification SLA; routes to INCIDENT_RESPONSE.md enterprise notification workflow |
+
+#### §68.3.1 Permitted Business Purposes
+
+1. **Service delivery:** Providing AI fitness coaching, CV pose analysis, adaptive programming, and wearable data aggregation to authorised users within the enterprise tenant.
+2. **Security:** Detecting, preventing, and investigating security incidents, fraud, and abuse; maintaining the integrity and security of the HMAC audit log chain (DEC-030).
+3. **Legal compliance:** Complying with applicable law, responding to valid legal process, and meeting GDPR, CCPA/CPRA, and US state privacy law obligations.
+4. **Quality and safety:** Improving accuracy and safety of AI coaching outputs **using only aggregated, de-identified data** — never individual user data or health records. No enterprise customer PI is used for model training or fine-tuning (see `docs/ENTERPRISE.md §Compliance` and DPA § 7).
+5. **Compliance evidence:** Maintaining the tamper-evident audit log and generating the SOC 2 Type II evidence set required for enterprise tier contractual compliance obligations.
+
+#### §68.3.2 No Sale or Sharing
+
+FORM does not "sell" or "share" personal information as defined under CPRA § 1798.140(ad) and § 1798.140(ah):
+- No PI is disclosed to third parties for monetary or other valuable consideration in exchange for the PI.
+- No PI is disclosed to third parties for cross-context behavioural advertising or interest-based advertising.
+- Sub-processor disclosures (Anthropic, Supabase, ElevenLabs, PostHog, Cloudflare, Sentry, Apple, Google — see `docs/SUBPROCESSORS.md` and `security.form.coach/sub-processors`) are **Service Provider** disclosures under CPRA, not sales or shares — they are made solely to enable FORM's Business Purposes in providing the contracted service.
+
+PostHog operates in EU-only hosted mode (`eu.posthog.com`) for FORM enterprise tenants. This eliminates CPRA § 1798.140(ah) "sharing" risk from cross-context advertising data flows. The `analytics_opt_out` flag is applied at the data layer for all enterprise tenant users.
+
+#### §68.3.3 Subcontractor Flow-Down
+
+All eight existing sub-processors have signed Data Processing Agreements (see `compliance/p1/sub-processor-register.md`, P1-SUB-001). Before adding any new sub-processor that will process enterprise tenant PI:
+1. Written authorisation from the enterprise customer is required if the new sub-processor materially changes the data processing (CPRA § 1798.100(d)(3)).
+2. A DPA with CCPA Service Provider terms must be in place before data flows.
+3. The sub-processor list at `security.form.coach/sub-processors` is updated and the `trust_center.sub_processor_list_updated` DEC-030 event is emitted (§44).
+
+---
+
+### §68.4 Consumer Rights Implementation
+
+Under CPRA, California employees using FORM via an enterprise contract have the following rights. FORM, as a Service Provider, cooperates with the enterprise customer (as Business) in fulfilling these rights:
+
+| Right | CPRA citation | FORM's obligation | Implementation |
+|---|---|---|---|
+| Right to Know | § 1798.100 | Provide category-level data export on Business's instruction | §68.4.1 DSAR cooperation; `compliance/c1/data-asset-inventory.md` (C1-E-001) |
+| Right to Delete | § 1798.105 | Execute individual erasure on Business's instruction | INCIDENT_RESPONSE.md §R-14 individual DSAR runbook; §67 for full tenant deletion |
+| Right to Correct | § 1798.106 | Correct inaccurate PI on Business's instruction | Admin dashboard profile correction; `user.profile_corrected` DEC-030 event |
+| Right to Opt-Out of Sale/Sharing | § 1798.120 | FORM does not sell or share PI — confirmed in §68.3.2; non-issue in practice | SPA addendum §2 no-sale/no-share attestation |
+| Right to Limit Use of SPI | § 1798.121 | Limit SPI use to service delivery and legal purposes only | §68.3.1 Permitted Purposes enumeration |
+| Right to Non-Discrimination | § 1798.125 | Cannot deny service or change terms for exercising rights | FORM privacy floor prohibits wellness-as-punishment; DSAR exercise cannot affect employment status (enforced at data layer, not policy) |
+| Right to Data Portability | § 1798.100(d) | Provide PI in machine-readable format | Admin dashboard CSV export; raw data export via §67.2 export window (JSON/CSV) |
+
+#### §68.4.1 DSAR Cooperation Protocol (Individual Request)
+
+When an enterprise customer (Business) receives a CCPA Right to Know, Delete, or Correct request from one of their employees, FORM's cooperation procedure:
+
+**Step 1** (Business → FORM, Day 0): Enterprise admin submits request via `enterprise@form.coach` with subject line `CCPA DSAR — [Request Type] — [Tenant ID]`. Required: User UUID (from admin dashboard), request type (Know / Delete / Correct), written confirmation that the requestor's identity has been verified by the Business.
+
+**Step 2** (FORM, within 2 business days): Compliance-officer acknowledges receipt; confirms user UUID belongs to the tenant; logs intake in `compliance/tenants/{tenant_id}/dsar-log.csv` (USP-E-003); emits `compliance.ccpa_dsar_received` DEC-030 event (§68.7).
+
+**Step 3** (FORM, within 10 business days of verification): Executes the requested action:
+- *Right to Know:* Exports all PI categories per `compliance/c1/data-asset-inventory.md` as JSON/CSV; includes all production tables in §67.3 scope.
+- *Right to Delete:* Executes individual user erasure via INCIDENT_RESPONSE.md §R-14. **Not** a full tenant deletion — only the individual user record is erased; HMAC audit log entries (pseudonymised event metadata) are retained per §67.9 GDPR Art. 17(3)(e) carve-out.
+- *Right to Correct:* Updates the user profile record via admin-role API endpoint; emits `user.profile_corrected` DEC-030 event.
+
+**Step 4** (FORM, same day as execution): Emits `compliance.ccpa_dsar_completed` DEC-030 event (§68.7) with `sla_met` boolean and `tables_accessed[]` category names (not raw PI).
+
+**Step 5** (FORM → Business, within 30 business days of receipt): Confirms completion to enterprise admin contact. Written confirmation includes: request type, completion date, tables/categories accessed, DEC-030 event ID for audit trail.
+
+**Break-glass access note:** DSAR fulfilment for Right to Know requires the compliance-officer to query the individual user record. This constitutes a privileged access event under §26 PAM controls — a time-bound role elevation with 2-person approval (solo-founder phase: DEC-030 dual-event compensating control per §66.4.2). The `compliance.dsar_data_access` DEC-030 event (§68.7) records tables accessed and row counts — no health values or coaching content appear in the event payload (same privacy invariant as §67.9).
+
+---
+
+### §68.5 VCDPA, CPA, and Multi-State Harmonisation
+
+**Architectural position:** FORM's CPRA-compliant SPA addendum is designed as a floor that satisfies the material Service Provider obligations under all currently-enacted US state privacy laws. Deviations:
+
+| State law | Key difference from CPRA | FORM position |
+|---|---|---|
+| **VCDPA** | No opt-in requirement for SPI — opt-out is sufficient | FORM exceeds VCDPA by implementing CPRA's higher opt-in standard for health data SPI |
+| **CPA** | Universal opt-out mechanism (GPC browser signal) required since Jul 2023 | GPC signal detection scheduled P2 (USP-P2-01); interim: `analytics_opt_out` flag applied at data layer |
+| **CTDPA** | Minor differences in DSAR response disclosure format | FORM's §68.4.1 response format satisfies CTDPA category-disclosure requirements |
+| **UCPA** | No right to correct; no opt-in for SPI | FORM provides correction as an above-UCPA-floor offering; SPI handling follows CPRA as the highest-standard baseline |
+| **MOPIPA** | Lower consumer threshold (50,000 MT residents) | No direct applicability today; same SPA addendum applies when threshold is met |
+
+**Single US Privacy Addendum approach:** FORM maintains one US Privacy Addendum with an annually-updated Exhibit A listing applicable state laws. The addendum states: *"FORM processes personal information as a Service Provider under applicable US state privacy laws, including the laws listed in Exhibit A. FORM's obligations under this Addendum satisfy the service provider / processor obligations under each listed law as of the Addendum effective date."* Exhibit A is updated on each annual SPA renewal or on enactment of a new state law whose threshold FORM meets.
+
+---
+
+### §68.6 "Do Not Sell or Share" Confirmation and AdTech Isolation
+
+FORM's enterprise product does not use behavioural advertising or interest-based advertising technology. Annual confirmation:
+
+| Technology | Used in FORM enterprise? | CPRA "sharing" risk | Mitigation |
+|---|---|---|---|
+| Google Ads / Meta Pixel | **No** | N/A | Not installed on admin dashboard (`apps/admin-dashboard/`) or FORM mobile app |
+| PostHog analytics | **Yes — EU-hosted** | PostHog EU (`eu.posthog.com`) processes data within the EU; cross-context advertising disabled by configuration; events are FORM-controlled, not shared for PostHog's own advertising | EU-hosted mode; `capture_pageview: false` for enterprise tenant sub-domains; `analytics_opt_out` flag honoured per user record |
+| Sentry error monitoring | **Yes** | Sentry is a Service Provider for error telemetry; no PI in Sentry payloads by SDK configuration (SP-06 compensating control in `compliance/p1/sub-processor-register.md`) | SDK-level PII scrubbing; no `user_id`, email, or health data in event payloads pending Sentry DPA signature |
+| Cloudflare Analytics | **Yes** | Cloudflare Web Analytics (§20) is privacy-first — no cookies, no cross-site tracking | `data-cf-beacon` sets no cookies and does not fingerprint users |
+
+**Annual no-sale/no-share attestation procedure** (Part of §60 Annual Privacy Programme Review, Phase 7):
+
+1. Confirm no new adtech pixels or tracking tags were added to `apps/admin-dashboard/` or FORM mobile app (git log review: `git log --all --oneline -- 'apps/admin-dashboard/**/*.{html,tsx,ts}'` since last attestation).
+2. Verify PostHog EU hosting: `curl -s https://eu.posthog.com/healthcheck` must return `{"status":"ok"}`.
+3. Confirm `analytics_opt_out = true` for all enterprise tenant users: `SELECT count(*) FROM user_profiles WHERE tenant_id IS NOT NULL AND analytics_opt_out = false;` — must return 0.
+4. Screenshot Sentry project settings confirming PII scrubbing rules are active.
+5. File signed attestation as `compliance/p1/no-sale-attestation-{YYYY}.md` (USP-E-002) with evidence screenshots.
+
+---
+
+### §68.7 DEC-030 HMAC-Chained Events for US Privacy Compliance
+
+Four new DEC-030 event types. All follow the base schema in `docs/AUDIT_LOG_SCHEMA.md`. Privacy invariant: no individual health values, no raw coaching content, no email addresses in any event payload — aggregate counts and pseudonymous UUIDs only.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `compliance.ccpa_dsar_received` | HIGH | 7 years | Step 1 §68.4.1 — Business submits DSAR request | `tenant_id`, `request_type` (know/delete/correct), `request_source` (enterprise_admin), `requestor_verification` (verified/unverified), `sla_deadline` (ISO 8601, 30 business days from receipt) |
+| `compliance.ccpa_dsar_completed` | HIGH | 7 years | Step 4 §68.4.1 — FORM confirms DSAR execution | `tenant_id`, `request_type`, `tables_accessed[]` (category labels, not table names), `row_counts` (per-category integer), `completion_date`, `sla_met` (boolean), `sla_deadline` |
+| `compliance.dsar_data_access` | HIGH | 7 years | Any compliance-officer query of individual user records for DSAR fulfilment | `tenant_id`, `actor_id` (compliance-officer UUID), `access_reason` (dsar_know/dsar_delete/dsar_correct), `tables_accessed[]`, `row_count` (total rows inspected), `pam_elevation_id` (DEC-030 event ID of the §26 break-glass elevation) |
+| `compliance.us_spa_signed` | STANDARD | 7 years | Enterprise customer executes the US Privacy SPA addendum | `tenant_id`, `spa_version` (semantic version of addendum template), `state_laws_covered[]` (e.g. `["CCPA/CPRA","VCDPA","CPA"]`), `effective_date`, `docusign_envelope_id` |
+
+**Manual emission SQL template (replace `{...}` values):**
+
+```sql
+SELECT emit_audit_event(
+  p_tenant_id      := '{tenant_id}'::uuid,
+  p_actor_id       := auth.uid(),
+  p_actor_type     := 'compliance',
+  p_action         := 'compliance.ccpa_dsar_received',
+  p_resource_type  := 'tenant',
+  p_resource_id    := '{tenant_id}'::uuid,
+  p_outcome        := 'success',
+  p_metadata       := jsonb_build_object(
+    'request_type',            '{know|delete|correct}',
+    'request_source',          'enterprise_admin',
+    'requestor_verification',  'verified',
+    'sla_deadline',            (now() + interval '30 business days')::text,
+    'retain_until',            (now() + interval '7 years')::text
+  )
+);
+```
+
+---
+
+### §68.8 Evidence Artefacts
+
+| ID | Description | Location | Owner | Cadence | Status |
+|---|---|---|---|---|---|
+| **USP-E-001** | Executed US Privacy SPA addendum (PDF, DocuSign-signed) — one file per US enterprise customer | `compliance/tenants/{tenant_id}/us-spa-{effective-date}.pdf` | compliance-officer | Per US enterprise customer signature | 🔴 To create per event |
+| **USP-E-002** | Annual no-sale/no-share attestation — signed statement with PostHog EU health check, `analytics_opt_out` SQL count, and adtech inventory screenshots | `compliance/p1/no-sale-attestation-{YYYY}.md` | compliance-officer | Annual (January, with §60) | 🔴 To create (first year) |
+| **USP-E-003** | DSAR cooperation log — append-only CSV with columns: `request_id`, `received_date`, `request_type`, `verification_status`, `assigned_to`, `sla_deadline`, `completed_date`, `sla_met`, `dec030_event_id`; no PI columns | `compliance/tenants/{tenant_id}/dsar-log.csv` | compliance-officer | Per DSAR received | 🔴 To create per event |
+| **USP-E-004** | `compliance.ccpa_dsar_completed` DEC-030 event chain export — JSON with HMAC chain verification output for all completed DSARs in the SOC 2 observation period | `compliance/evidence/p6/ccpa-dsar-chain-{YYYY-Qn}.json` | security-engineer | Quarterly (observation period) | 🔴 To create (per quarter) |
+| **USP-E-005** | US Privacy SPA addendum template (unsigned master) — version-controlled PDF with "SPECIMEN" watermark; baseline for all US enterprise customer addendum executions | `compliance/templates/us-privacy-spa-addendum-v{N}.pdf` | compliance-officer + outside counsel | On each template version update | 🔴 To create (USP-P0-01) |
+| **USP-E-006** | Annual CCPA applicability threshold review — memo confirming whether FORM has crossed the CCPA $25M ARR / 100k consumer thresholds; signed by founder or CFO | `compliance/p1/ccpa-threshold-review-{YYYY}.md` | founder | Annual (January) | 🔴 To create (first year) |
+
+---
+
+### §68.9 SOC 2 Criteria Mapping
+
+| SOC 2 Criterion | Description | §68 implementation | Evidence |
+|---|---|---|---|
+| **P3.1** | PI collection limited to purposes notified in privacy notice | Permitted Business Purposes (§68.3.1) enumerate the five purposes; SPI use limited to service delivery only | §68.3.1 enumeration; USP-E-001 SPA addendum §2 |
+| **P5.2** | PI retained only as long as necessary | CPRA § 1798.121 SPI limitation; FORM retention schedule (`compliance/p1/retention-decisions.md` P1-RET-001); §67 deletion runbook on tenant termination | USP-E-001 + P1-RET-001 |
+| **P6.1** | PI disclosed only consistent with privacy notice | No-sale/no-share attestation (USP-E-002); sub-processor disclosures consistent with `form.coach/privacy` and `security.form.coach/sub-processors` | USP-E-002; §44 sub-processor Worker |
+| **P6.7** | PI not shared with parties beyond those disclosed | Adtech isolation confirmation (§68.6); PostHog EU-only; no cross-context advertising data flows | USP-E-002 PostHog EU health check screenshot + SQL count |
+| **P4.1** | Privacy notice available and accessible | SPA addendum references `form.coach/privacy`; CCPA disclosures added via USP-P0-02 | USP-E-001; `form.coach/privacy` public URL |
+
+---
+
+### §68.10 Implementation Checklist
+
+#### P0 — Must complete before first US enterprise customer
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| **USP-P0-01** | Draft US Privacy SPA Addendum template (§68.3 required clauses): Business Purpose enumeration (§68.3.1), no-sale/no-share prohibition (§68.3.2), subcontractor flow-down (§68.3.3), DSAR cooperation protocol (§68.4.1), SPI handling limitation, audit rights, inability-to-comply 72h notification obligation. Submit to outside counsel for review (same counsel engagement as GDPR DPA). Target length: 3–4 pages, self-contained, referencing FORM DPA as the master data processing instrument. File master template as `compliance/templates/us-privacy-spa-addendum-v1.pdf` (USP-E-005). | compliance-officer + outside counsel | **P0** | M6 | [ ] |
+| **USP-P0-02** | Add CCPA/CPRA-specific disclosures to `docs/PRIVACY_POLICY.md` and `form.coach/privacy`: (a) "Shine the Light" (Cal. Civ. Code § 1798.83) disclosure confirming no PI shared with third parties for direct marketing; (b) CPRA sensitive personal information categories processed; (c) "Do Not Sell or Share My Personal Information" confirmation statement; (d) California / Virginia / Colorado resident rights list (Know, Delete, Correct, Opt-Out, Limit SPI, Non-Discrimination, Portability); (e) 30-business-day DSAR response SLA; (f) `privacy@form.coach` as submission address. | compliance-officer | **P0** | M6 | [ ] |
+| **USP-P0-03** | Register four new DEC-030 event types from §68.7 in `docs/AUDIT_LOG_SCHEMA.md`: `compliance.ccpa_dsar_received`, `compliance.ccpa_dsar_completed`, `compliance.dsar_data_access`, `compliance.us_spa_signed`. Add Zod schemas, severity ratings, 7-year retention periods, and privacy-invariant notes (aggregate counts only, no health values). | platform-engineer | **P0** | M6 | [ ] |
+| **USP-P0-04** | Create `compliance/tenants/{tenant_id}/dsar-log.csv` template in `form-compliance` repo (same tenant lifecycle folder structure as §67). CSV schema: `request_id` (UUID), `received_date`, `request_type` (know/delete/correct), `verification_status`, `assigned_to`, `sla_deadline`, `completed_date`, `sla_met` (Y/N), `dec030_event_id`. No PI or health values in any column. | compliance-officer | **P0** | M6 | [ ] |
+| **USP-P0-05** | Add §68 reference to `docs/ENTERPRISE_ONBOARDING.md §1` (Pre-Launch Legal Checklist): "US enterprise customers — execute US Privacy SPA Addendum (§68.3) before contract signature. GDPR DPA and US Privacy SPA can be co-executed in a single DocuSign envelope. File executed addendum as USP-E-001 in `compliance/tenants/{tenant_id}/`." | customer-success + compliance-officer | **P0** | M6 | [ ] |
+
+#### P1 — Before first regulated-industry US enterprise customer (HealthTech, FinServ, EdTech)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| **USP-P1-01** | Complete first annual CCPA applicability threshold review (USP-E-006): document FORM's annual gross revenue, estimated California consumer record count, and revenue-from-PI-sale percentage; sign as founder attestation. Set a $10M ARR internal alert (50% of the $25M CCPA threshold) in the compliance calendar (§15). File in `compliance/p1/ccpa-threshold-review-{YYYY}.md`. | founder | **P1** | M8 | [ ] |
+| **USP-P1-02** | Complete first annual no-sale/no-share attestation (USP-E-002): execute the four-step verification in §68.6 (PostHog EU health check, `analytics_opt_out` SQL count, adtech inventory scan, UI screenshots); sign and file in `compliance/p1/no-sale-attestation-{YYYY}.md`. Integrate into §60 Annual Privacy Programme Review Phase 7 calendar. | compliance-officer | **P1** | M8 (and annually) | [ ] |
+| **USP-P1-03** | Close OQ-PRIV-02 formally: update §60.13 OQ-PRIV-02 status from 🟡 Open to 🟢 Closed with cross-reference to §68 on completion of USP-P0-01 (SPA template authored and counsel-reviewed) and first US customer SPA execution. Update §51 gap register P-Series P6.7 row to 🟢 once USP-E-002 is filed. Update §38.3 Privacy TSC readiness. | compliance-officer | **P1** | M8 | [ ] |
+| **USP-P1-04** | Obtain outside counsel opinion on automated decision-making under US state privacy laws (cross-reference OQ-PRIV-01 §60.13): confirm whether FORM's Victor AI coaching pipeline constitutes "automated decision-making" with significant effects under VCDPA § 59.1-578 or CPA § 6-1-1309, which grant consumers an opt-out right. Document the legal position in `compliance/p1/us-adm-opinion-{YYYY}.md`. | compliance-officer + outside counsel | **P1** | M10 (before GA) | [ ] |
+
+#### P2 — Post-GA, at scale
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| **USP-P2-01** | Implement GPC (Global Privacy Control) signal detection: read the `Sec-GPC: 1` HTTP request header in the Cloudflare Workers API layer; treat as CCPA/CPA opt-out of sharing; apply `analytics_opt_out: true` to the user session; emit `compliance.gpc_signal_received` DEC-030 event (STANDARD, 3yr). Colorado CPA requires GPC honoring since Jul 2023. | platform-engineer | **P2** | M12 | [ ] |
+| **USP-P2-02** | Evaluate BIPA (Illinois Biometric Information Privacy Act, 740 ILCS 14) applicability: CV pose keypoints (joint angle arrays, skeletal tracking) may qualify as "biometric identifiers" under BIPA § 10. Key question: does on-device inference (Apple Vision / ML Kit) with cloud transmission of derived keypoints — rather than raw images — constitute "collection" under BIPA? Obtain outside counsel opinion before the first enterprise customer with confirmed Illinois-based employees. See OQ-CCPA-01. | compliance-officer + outside counsel | **P2 (P1 for IL customers)** | Series A | [ ] |
+| **USP-P2-03** | Publish a US privacy centre page at `security.form.coach/us-privacy` (supplementing §39 Security Trust Center): (a) "Do Not Sell or Share" opt-out link; (b) California / Virginia / Colorado resident rights request form; (c) Download link for US Privacy SPA addendum template; (d) Current CCPA applicability threshold status statement; (e) `privacy@form.coach` contact. | platform-engineer + compliance-officer | **P2** | M14 | [ ] |
+
+---
+
+### §68.11 Open Questions
+
+| OQ | Question | Owner | Priority | Target |
+|---|---|---|---|---|
+| **OQ-CCPA-01** | **Does FORM's on-device CV pose estimation pipeline constitute "collection" of biometric data under the Illinois BIPA (740 ILCS 14/10)?** CV keypoints (joint angle arrays, skeletal geometry) are inferred on-device via Apple Vision / ML Kit and transmitted to Supabase for adaptive programming. BIPA covers "scan of hand or face geometry." If keypoints qualify, FORM requires: a BIPA-specific written release before collection, a maximum 3-year retention schedule (or deletion within 3 years of last interaction), and a formal destruction policy. This is a P2 question but becomes P1 when FORM signs its first enterprise customer with confirmed Illinois employees. See USP-P2-02. | compliance-officer + outside counsel | **P2 (P1 for first IL enterprise customer)** | Pre-Series A, or first IL customer |
+| **OQ-CCPA-02** | **Should FORM's US Privacy SPA addendum be folded into a single "Global Privacy Addendum" covering both GDPR DPA and US state law SPA obligations?** A unified addendum reduces procurement friction (one document to review, one DocuSign envelope) but increases maintenance complexity as GDPR and CCPA use different controller/processor terminology and rights frameworks. Recommendation: keep separate instruments until Series A counsel recommends consolidation; the current GDPR DPA is well-tested and auditors prefer jurisdictionally-scoped documents. | compliance-officer | **P2** | Series A |
+| **OQ-CCPA-03** | **At what ARR threshold should FORM commission an independent CCPA compliance audit?** Direct CCPA "business" applicability triggers at $25M ARR. A formal third-party CCPA audit should be commissioned 6 months before that threshold to allow remediation time. Recommendation: set an internal board/investor trigger at $12M ARR (48% of the $25M threshold — same early-warning logic as USP-P1-01). | compliance-officer + founder | **P2** | $12M ARR milestone |
+
+---
+
+*v1.0 (2026-06-08): §68 US State Privacy Law Compliance — CCPA/CPRA & Multi-State · OQ-PRIV-02 Resolution · P3.1/P5.2/P6.1/P6.7 Auditor Exhibit. Closes OQ-PRIV-02 (CCPA US addendum — P1, before first US enterprise customer) from §60.13 open questions. Applicability analysis (§68.1): six US state privacy laws surveyed (CCPA/CPRA, VCDPA, CPA, CTDPA, UCPA, MOPIPA); no law directly applies to FORM as a "business" at pre-$25M-ARR stage; however, enterprise customers who are California "businesses" contractually require a CCPA Service Provider Agreement before pilots involving California employees, and CPRA workforce exemption expired 1 Jan 2023 meaning all enterprise employees are full "consumers." B2B and workforce data analysis (§68.2): enterprise employees using FORM are CPRA consumers; CV pose keypoints, recovery scores, HRV readings, and body composition trends qualify as "sensitive personal information" under CPRA § 1798.140(ae)(1)(C); FORM's role is Service Provider, not controller/business. CCPA compliance architecture (§68.3): US Privacy SPA addendum — standalone 3–4 page instrument supplementing (not replacing) GDPR DPA, executed in single DocuSign envelope for US enterprise customers; 7 required CPRA § 1798.100(d) / Cal. Privacy Regs. § 7051 clauses; five Permitted Business Purposes (service delivery, security, legal compliance, quality/safety using only de-identified data, compliance evidence); explicit no-sale/no-share prohibition; subcontractor flow-down to all 8 existing sub-processors; 72h inability-to-comply notification SLA. Consumer rights implementation (§68.4): all 7 CPRA rights mapped (Know, Delete, Correct, Opt-Out-of-Sale, Limit-SPI, Non-Discrimination, Portability); 5-step DSAR cooperation protocol with 2-business-day acknowledgement, 10-business-day execution, 30-business-day total SLA; break-glass PAM access under §26 controls for Right to Know data export; privacy invariant: no health values in `compliance.dsar_data_access` event payload. Multi-state harmonisation (§68.5): single US Privacy Addendum with annually-updated Exhibit A; CPRA as highest-standard baseline; GPC signal detection scheduled P2. AdTech isolation (§68.6): no adtech pixels; PostHog EU-hosted (`eu.posthog.com`), `analytics_opt_out` enforced at data layer; Sentry PII scrubbing via SDK; Cloudflare Web Analytics cookie-free; annual no-sale/no-share attestation procedure with 4 verification steps. Four new DEC-030 HMAC-chained events (§68.7): `compliance.ccpa_dsar_received` (HIGH/7yr), `compliance.ccpa_dsar_completed` (HIGH/7yr), `compliance.dsar_data_access` (HIGH/7yr — break-glass access log for DSAR execution), `compliance.us_spa_signed` (STANDARD/7yr) — all privacy-safe: aggregate counts and pseudonymous UUIDs only. Six evidence artefacts USP-E-001 through USP-E-006. Implementation checklist: 5× P0 M6 (SPA template, CCPA privacy policy update, DEC-030 event registration, DSAR log template, ENTERPRISE_ONBOARDING cross-reference); 4× P1 M8–M10 (CCPA threshold review, no-sale attestation, OQ-PRIV-02 formal closure, US ADM opinion); 3× P2 M12–M14/Series-A (GPC signal detection, BIPA counsel opinion, US privacy centre page). SOC 2 criteria: P3.1 (Permitted Purposes §68.3.1 — purpose limitation), P5.2 (retention schedule via P1-RET-001 + §67 deletion runbook), P6.1 (no-sale attestation USP-E-002 + sub-processor Worker §44), P6.7 (adtech isolation §68.6 annual verification), P4.1 (CCPA disclosures added to privacy policy USP-P0-02). Three open questions: OQ-CCPA-01 (BIPA / CV keypoints — P2/P1-for-IL-customers; on-device inference may not constitute "collection" under BIPA but requires counsel opinion before first IL enterprise customer), OQ-CCPA-02 (unified vs. separate Global Privacy Addendum — P2, Series A), OQ-CCPA-03 (independent CCPA audit threshold — recommend $12M ARR early-warning trigger). OQ-PRIV-02 🟡 Open → 🟡 Authored (closes to 🟢 on USP-P0-01 SPA template execution + first US enterprise customer SPA signature + USP-P1-03 gap register updates). SOC 2 doc v3.2 → v3.3. Primary cross-references: docs/ENTERPRISE.md §Privacy floor (no-go customers: insurance risk-scoring, gov backdoors, wellness-as-punishment), docs/AUDIT_LOG_SCHEMA.md (DEC-030 events §68.7), docs/INCIDENT_RESPONSE.md §R-14 (individual DSAR runbook), §67 (tenant data deletion — full-tenant CPRA Right to Delete), §60 (Annual Privacy Programme Review — OQ-PRIV-02 gap origin), §44 (sub-processor Worker — P6.1 evidence), §26 (PAM — break-glass access for DSAR), §51 (gap register — P6.7 row). Owner: compliance-officer + enterprise-architect.*

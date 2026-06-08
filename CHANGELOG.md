@@ -6,6 +6,14 @@
 
 ---
 
+## [2.95.1] — 2026-06-08
+
+### Changed
+- `docs/SOC2_READINESS.md` — §68 US State Privacy Law Compliance (CCPA/CPRA & Multi-State) · OQ-PRIV-02 Resolution · P3.1/P5.2/P6.1/P6.7 Auditor Exhibit: applicability analysis for 6 US state privacy laws; FORM's Service Provider posture pre-$25M ARR; CPRA workforce data analysis (SPI classification for CV/biometric/health data); US Privacy SPA addendum architecture (7 CPRA § 1798.100(d) clauses, 5 Permitted Business Purposes, no-sale/no-share prohibition, subcontractor flow-down); 7 CPRA consumer rights implementation with 5-step DSAR cooperation protocol; multi-state harmonisation (VCDPA, CPA, CTDPA, UCPA, MOPIPA); AdTech isolation confirmation (PostHog EU-only, analytics_opt_out); 4 new DEC-030 HMAC-chained events (compliance.ccpa_dsar_received/completed/dsar_data_access/us_spa_signed, all HIGH or STANDARD / 7yr); 6 evidence artefacts USP-E-001–USP-E-006; 5 P0 tasks M6, 4 P1 tasks M8–M10, 3 P2 tasks; 3 open questions (OQ-CCPA-01 BIPA/CV, OQ-CCPA-02 unified addendum, OQ-CCPA-03 audit threshold); doc header v2.7 → v3.3; owner: compliance-officer + enterprise-architect
+- `VERSION` — 2.95.0 → 2.95.1
+
+---
+
 ## [2.95.0] — 2026-06-08
 
 ### Added
