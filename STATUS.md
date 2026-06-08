@@ -378,6 +378,7 @@ FORM is at v2.69.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-312-strength-standards.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-313-breathing-during-set.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
 | post-314-pump-cellular-swelling-hypertrophy.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending |
+| post-344-postpartum-return-to-training.md | Blog | draft · **clinical-safety PASS WITH CONDITIONS** 2026-06-08 · sports-scientist pending |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |

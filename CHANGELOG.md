@@ -6,6 +6,19 @@
 
 ---
 
+## [3.2.0] — 2026-06-08
+
+### Added
+- `content/post-344-postpartum-return-to-training.md` — Повернення до силового тренінгу після пологів: ремоделювання колагену тип III→I, поширеність DRA (Mota et al. 2015), IAP-координація тазового дна і TVA, RCOG/POGP (2021) клінічний консенсус як фреймворк для провайдерів, стоп-сигнали симптомів; (**clinical-safety PASS WITH CONDITIONS** 2026-06-08: обов'язковий disclaimer, без самодіагностики діастазу, таймлайни як питання до провайдера, PPD signpost)
+
+### Changed
+- `blog.html` — додано картку post-344; v2.95.0 → v2.96.0
+- `STATUS.md` — content engine table: post-344 PASS WITH CONDITIONS
+- `README.md` — post-344 marked `[x]`; post-345 roadmap entry added; last update → 8 червня 2026 · v3.2.0
+- `VERSION` — 3.1.0 → 3.2.0
+
+---
+
 ## [3.1.0] — 2026-06-08
 
 ### Added

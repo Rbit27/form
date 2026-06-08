@@ -676,7 +676,8 @@ Each iteration:
 - [x] post-341: Техніка vs обсяг для початківця — проблема когнітивного навантаження в перші 6 місяців; чому неможливо одночасно оптимізувати техніку і прогресивне навантаження; Fitts & Posner (1967) cognitive/associative/autonomous stage і bandwidth; clinical-safety NOT REQUIRED
 - [x] post-342: Тренування при хронічному болі в попереку — різниця між дискогенним, фасетковим і м'язово-спастичним механізмом; механізми як освітній контекст (не самодіагностика); McGill (2007) spine stability, Steele et al. (2015) lumbar extension (дослідницький контекст); clinical-safety PASS WITH CONDITIONS — reviewed 2026-06-08
 - [x] post-343: Ментальне відновлення і тренінг — cognitive fatigue як незалежний фактор зниження продуктивності (Marcora et al. 2009 EJAP); чи можна тренуватися «на вичерпаній батарейці»; RPE drift після когнітивного навантаження; clinical-safety NOT REQUIRED
-- [ ] post-344: Підйом ваги після пологів — фізіологія відновлення сполучної тканини, діастаз, internal pressure і IAP, коли повертатися до базових вправ; клінічний консенсус vs популярні рекомендації; clinical-safety REQUIRED — route through clinical-safety before publish
+- [x] post-344: Повернення до силового тренінгу після пологів — ремоделювання колагену (тип III → I), діастаз прямих м'язів без самодіагностики, IAP-координація і тазове дно, RCOG/POGP (2021) клінічний консенсус як фреймворк для розмови з провайдером; clinical-safety PASS WITH CONDITIONS 2026-06-08
+- [ ] post-345: Тренування під час подорожей і відряджень — принцип мінімального ефективного стимулу без обладнання, що зберігає адаптацію vs що її руйнує, residual effects і реалістичний протокол для готелю/перерви; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -721,4 +722,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 7 червня 2026 · v2.91.0
+**Last update:** 8 червня 2026 · v3.2.0
