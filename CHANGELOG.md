@@ -6,6 +6,14 @@
 
 ---
 
+## [2.96.0] — 2026-06-08
+
+### Added
+- `content/post-330-rpe-rir-autoregulation.md` — RPE та RIR: авторегуляція інтенсивності без зовнішніх приладів; Borg 1970 (Acta Physiol Scand) — чому кардіо-шкала не підходить для силового; Zourdos et al. 2016 (JSCR) — modified RPE 1–10, RPE↔RIR таблиця; Helms 2016 (IJSPP) — half-point точність; Gonzalez-Badillo 2017 (Br J Sports Med) — velocity як об'єктивний proxy; коли % б'ють RPE і навпаки; 3-кроковий протокол калібрації; clinical-safety NOT REQUIRED
+- `content/post-331-hrv-self-coached-athlete.md` — HRV для самокерованого атлета: RMSSD vs SDNN, протокол вимірювання (ранок, supine, 5 хв відпочинку), Buchheit 2014 (Eur J Appl Physiol), Svensson 2020 (Alcohol) — вплив алкоголю, Kiviniemi 2010 (Scand J Med Sci Sports) — HRV-guided training; 3-зонова модель (>+5%/±5%/<−5% від rolling average); помилки вимірювання; інтеграція з FORM через Oura/Apple Health/Garmin; clinical-safety NOT REQUIRED
+
+---
+
 ## [2.95.1] — 2026-06-08
 
 ### Changed
