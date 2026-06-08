@@ -6,6 +6,23 @@
 
 ---
 
+## [3.3.0] — 2026-06-08
+
+### Added
+- `docs/runbooks/RB-SUB-01.md` — P0 · Subscription state inconsistency: impossible `(from_state, to_state)` transition detected OR `users.subscription_tier` ≠ latest terminal `subscription_events` row. Steps: scope check, root-cause triage (RevenueCat/Stripe/manual_admin), append-only correction-event INSERT, HMAC chain verification. DEC-030 evidence checklist. SOC 2 CC7.2/PI1.2/PI1.5.
+- `docs/runbooks/RB-SUB-02.md` — P0 · Grace period overshoot: user in `past_due`/`canceled` state with `valid_to < now() - 72h` retaining premium access. Steps: pg_cron grace-period-enforcer diagnostic, forced `billing.access_revoked` DEC-030 CRITICAL event, `users.subscription_tier` correction, Privacy Floor verification. SOC 2 CC7.2/PI1.5.
+- `docs/runbooks/RB-SUB-03.md` — P1 · Webhook error rate elevated: `billing.webhook.processed{outcome="error"}` / total > 2% over 15-min rolling window. Steps: error-category triage (signature invalid / parse error / idempotency conflict / DB write failure), RevenueCat/Stripe status check, secret rotation gate, Cloudflare Analytics Engine queries. SOC 2 CC7.2/PI1.1.
+- `docs/runbooks/RB-SUB-04.md` — P1 · **Enterprise seat drift**: `tenant_seats.seat_count` ≠ Stripe `subscription.quantity` for any `tenant_id` persisting > 5 min. Steps: per-tenant drift query, Stripe API seat-count fetch, compensating UPDATE with DEC-030 `billing.seat_drift_detected` CRITICAL event, SLA credit assessment against `docs/ENTERPRISE_SLA.md`, customer-success notification. No-go clause: insurance risk-scoring / gov backdoor contracts not applicable. SOC 2 CC7.2/A1.1/PI1.2.
+- `docs/runbooks/RB-SUB-05.md` — P1 · Webhook delivery lag: `billing.webhook.lag_ms` P95 > 60,000 ms over 5-min window. Steps: RevenueCat/Stripe status check, Cloudflare Workers CPU/wall-clock diagnostic, DB write latency check, queue backlog assessment. SOC 2 CC7.2/PI1.1.
+- `docs/runbooks/RB-SUB-06.md` — P2 · Elevated refund rate: refund events in trailing 7 days > 5% of renewal events. Steps: refund cohort query (no PII), abuse-pattern detection, fraud-review escalation, RevenueCat entitlement audit. SOC 2 CC7.2.
+- `docs/runbooks/RB-SUB-07.md` — P2 · **Enterprise invoice overdue**: `enterprise_invoice_overdue` event for any `tenant_id` with `created_at < now() - 30 days`. Steps: overdue-tenant query, Stripe invoice status fetch, customer-success escalation ≤ 1h, contract-term review, DPA/billing contact outreach. No-go reconfirmation: insurance risk-scoring / gov backdoor / wellness-as-punishment contracts explicitly declined regardless of ARR. SOC 2 CC7.2/A1.1.
+- `docs/runbooks/RB-SUB-08.md` — P3 · Subscription state orphan: `user_id` in `subscription_events` with no matching row in `users` table. Steps: orphan-count query, GDPR erasure check (account may have been deleted post-erasure-request — do NOT restore), cleanup-event INSERT with `actor_id`. SOC 2 CC7.2/PI1.5.
+
+### Changed
+- `VERSION` — 3.2.0 → 3.3.0
+
+---
+
 ## [3.2.0] — 2026-06-08
 
 ### Added
