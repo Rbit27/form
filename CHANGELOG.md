@@ -6,6 +6,19 @@
 
 ---
 
+## [2.95.0] — 2026-06-08
+
+### Added
+- `content/post-329-1rm-testing-protocol.md` — Тестування 1RM: рамп-протокол розминки, правило трьох спроб, вибір ваги, тест vs е1RM де формули помиляються, частота тестування по стажу, відновлення після MVC; Haff & Triplett (NSCA 2016), Zourdos et al. (2016), Linnamo et al. (1998), Bogdanis et al. (1995), Aagaard et al. (2002); clinical-safety NOT REQUIRED; owner: sports-scientist
+
+### Changed
+- `blog.html` — post-11/12/13/15/16/17 картки оновлено з "Незабаром" → "Читати →"; post-329 картка додана; лічильник: 291 карток (329 постів authored); v2.93.0 → v2.95.0
+- `STATUS.md` — content engine table post-11–17 blog card статуси оновлено; post-329 додано; blog.html рядок оновлено; версія → v2.95.0
+- `README.md` — post-329 додано до content roadmap
+- `VERSION` — 2.94.0 → 2.95.0
+
+---
+
 ## [2.94.0] — 2026-06-08
 
 ### Added

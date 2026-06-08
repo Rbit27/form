@@ -1,7 +1,7 @@
-# FORM · Project Status v1.3.3
+# FORM · Project Status v1.3.4
 
-**Date:** 7 червня 2026
-**Version:** 2.89.0
+**Date:** 8 червня 2026
+**Version:** 2.95.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -31,7 +31,7 @@ FORM is at v2.69.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 284 cards (326 posts authored), category filter, newsletter CTA | v2.93.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 291 cards (329 posts authored), category filter, newsletter CTA | v2.95.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 | [`security.html`](security.html) | Security Trust Center — SOC 2 status, sub-processors, responsible disclosure | v2.40.0 ✓ |
@@ -117,13 +117,14 @@ FORM is at v2.69.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-08-why-no-free-tier.md | Blog | draft |
 | post-09-building-victor-voice.md | Blog | draft |
 | post-10-why-programs-assume-youre-always-ready.md | Blog | draft · sports-scientist + clinical-safety pending |
-| post-11-deload-weeks.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
-| post-12-technique-over-intensity.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
-| post-13-rir-rpe-autoregulation.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
-| post-14-sleep-deprived-training.md | Blog | draft · clinical-safety PENDING · sports-scientist DONE |
-| post-15-training-frequency.md | Blog | draft · clinical-safety PASS · sports-scientist DONE |
-| post-16-ai-coach-vs-pt.md | Blog | draft · clinical-safety PASS · sports-scientist N/A |
-| post-17-overtraining-vs-laziness.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
+| post-11-deload-weeks.md | Blog | draft · clinical-safety PASS · sports-scientist pending · blog card: Читати → |
+| post-12-technique-over-intensity.md | Blog | draft · clinical-safety PASS · sports-scientist pending · blog card: Читати → |
+| post-13-rir-rpe-autoregulation.md | Blog | draft · clinical-safety PASS · sports-scientist pending · blog card: Читати → |
+| post-14-sleep-deprived-training.md | Blog | draft · clinical-safety PENDING · sports-scientist DONE · blog card: Незабаром (pending CS review) |
+| post-15-training-frequency.md | Blog | draft · clinical-safety PASS · sports-scientist DONE · blog card: Читати → |
+| post-16-ai-coach-vs-pt.md | Blog | draft · clinical-safety PASS · sports-scientist N/A · blog card: Читати → |
+| post-17-overtraining-vs-laziness.md | Blog | draft · clinical-safety PASS · sports-scientist pending · blog card: Читати → |
+| post-329-1rm-testing-protocol.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → |
 | post-18-rest-intervals.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-20-doms-muscle-soreness.md | Blog | draft · clinical-safety PASS · sports-scientist pending |
 | post-21-cv-vs-wearables.md | Blog | draft · clinical-safety PASS · sports-scientist pending · platform-engineer pending |
@@ -584,6 +585,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v2.93.0 · 7 червня 2026**
-**Last update:** 7 червня 2026 · v2.93.0
+**v2.95.0 · 8 червня 2026**
+**Last update:** 8 червня 2026 · v2.95.0
 **Next planned update:** після hire of Founding Engineer
