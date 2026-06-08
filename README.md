@@ -670,10 +670,13 @@ Each iteration:
 - [x] post-335: Як читати тренувальне дослідження: п'ять фільтрів для самокерованого атлета — population match, тривалість, effect size vs p-value, ecological validity, publication bias; Cohen (1992), Hecksteden et al. (2015), Ioannidis (2005); clinical-safety NOT REQUIRED
 - [ ] post-336: Мінімальна підтримуюча доза — скільки тренінгу достатньо щоб не втрачати; Bickel et al. (2011) 1/9 обсягу підтримує 100% сили; наслідки для зайнятих атлетів і паузи; clinical-safety NOT REQUIRED
 - [ ] post-337: Тренувальний стаж проти хронологічного віку після 40 — де вікові обмеження реальні, де перебільшені; Wroblewski et al. (2011) Master Athletes MRI; чому досвідчений 45-річний обганяє новачка 25-річного; clinical-safety NOT REQUIRED
-- [ ] post-338: Тренування без партнера — межі сольного до-відмови, self-spotting техніки, стратегія безпеки для базових вправ без страхувальника; clinical-safety NOT REQUIRED
+- [x] post-338: Тренування без партнера — класифікація ризику по вправах, RIR як параметр управління ризиком, налаштування страхувальних упорів, roll of shame обмеження, матриця вправа/ризик/рішення; Aasa et al. (2017) BJSM, Helms et al. (2016) IJSPP; clinical-safety NOT REQUIRED
 - [ ] post-339: Вибір вправ: мінімальний набір для покриття гіпертрофійного стимулу — шість патернів руху (горизонтальний тяг/жим, вертикальний тяг/жим, шарнір, присід), evidence for exercise variety vs familiarity (Fonseca et al. 2014); clinical-safety NOT REQUIRED
 - [ ] post-340: Час тренування і циркадна ритміка — чи має значення ранок vs вечір для адаптації; Chtourou & Souissi (2012) циркадні піки сили та потужності; де гнучкість розкладу перевершує оптимізацію часу; clinical-safety NOT REQUIRED
 - [ ] post-341: Техніка vs обсяг для початківця — проблема когнітивного навантаження в перші 6 місяців; чому неможливо одночасно оптимізувати техніку і прогресивне навантаження; Fitts & Posner (1967) cognitive/associative/autonomous stage і bandwidth; clinical-safety NOT REQUIRED
+- [ ] post-342: Тренування при хронічному болі в попереку — різниця між дискогенним, фасетковим і м'язово-спастичним механізмом; які вправи загострюють, які реабілітують; McGill (2007) spine stability, Steele et al. (2015) lumbar extension; clinical-safety REQUIRED — route through clinical-safety before publish
+- [ ] post-343: Ментальне відновлення і тренінг — cognitive fatigue як незалежний фактор зниження продуктивності (Marcora et al. 2009 EJAP); чи можна тренуватися «на вичерпаній батарейці»; RPE drift після когнітивного навантаження; clinical-safety NOT REQUIRED
+- [ ] post-344: Підйом ваги після пологів — фізіологія відновлення сполучної тканини, діастаз, internal pressure і IAP, коли повертатися до базових вправ; клінічний консенсус vs популярні рекомендації; clinical-safety REQUIRED — route through clinical-safety before publish
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 

@@ -6,6 +6,16 @@
 
 ---
 
+## [3.0.1] — 2026-06-08
+
+### Added
+- `content/post-338-solo-training-without-spotter.md` — Тренування без страхувальника: класифікація ризику по вправах, стратегія RIR як параметр управління ризиком, налаштування страхувальних упорів, roll of shame технічні обмеження, матриця вправа/ризик/рішення; Aasa et al. (2017) BJSM injury epidemiology, Helms et al. (2016) RIR efficacy, Zourdos et al. (2016) RPE scale; (sports-scientist reviewed, clinical-safety NOT REQUIRED)
+
+### Changed
+- `VERSION` — 3.0.0 → 3.0.1
+
+---
+
 ## [3.0.0] — 2026-06-08
 
 ### Added
