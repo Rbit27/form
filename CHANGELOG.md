@@ -6,6 +6,13 @@
 
 ---
 
+## [2.96.1] — 2026-06-08
+
+### Added
+- `docs/SOC2_READINESS.md §69` — Security Awareness Training Annual Execution Evidence & Completion Attestation Framework (CC1.4/CC2.2/CC1.3/CC1.2 Auditor Exhibit, 496 lines): design-vs-execution distinction vs §22; solo-founder signed attestation template (CC1-E-006); 7 evidence artefacts CC1-E-001–CC1-E-007 з naming convention, retention 7yr, filing paths; new-hire access gate (Day-0: 1Password/Supabase/GitHub withheld until CC1-E-007 filed); role-based matrix (Engineering all 8 topics / Operations 6 topics / Contractor-<30d 3 topics); annual phishing simulation programme (GoPhish quarterly, 20% click-rate threshold, 5-day remediation window); PRE-22 closure criteria; gap tracker: "Internal security training" 🔴 Gap → 🟡 Partial; closes to 🟢 on first evidence filing
+
+---
+
 ## [2.96.0] — 2026-06-08
 
 ### Added

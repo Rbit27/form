@@ -22879,3 +22879,499 @@ SELECT emit_audit_event(
 ---
 
 *v1.0 (2026-06-08): §68 US State Privacy Law Compliance — CCPA/CPRA & Multi-State · OQ-PRIV-02 Resolution · P3.1/P5.2/P6.1/P6.7 Auditor Exhibit. Closes OQ-PRIV-02 (CCPA US addendum — P1, before first US enterprise customer) from §60.13 open questions. Applicability analysis (§68.1): six US state privacy laws surveyed (CCPA/CPRA, VCDPA, CPA, CTDPA, UCPA, MOPIPA); no law directly applies to FORM as a "business" at pre-$25M-ARR stage; however, enterprise customers who are California "businesses" contractually require a CCPA Service Provider Agreement before pilots involving California employees, and CPRA workforce exemption expired 1 Jan 2023 meaning all enterprise employees are full "consumers." B2B and workforce data analysis (§68.2): enterprise employees using FORM are CPRA consumers; CV pose keypoints, recovery scores, HRV readings, and body composition trends qualify as "sensitive personal information" under CPRA § 1798.140(ae)(1)(C); FORM's role is Service Provider, not controller/business. CCPA compliance architecture (§68.3): US Privacy SPA addendum — standalone 3–4 page instrument supplementing (not replacing) GDPR DPA, executed in single DocuSign envelope for US enterprise customers; 7 required CPRA § 1798.100(d) / Cal. Privacy Regs. § 7051 clauses; five Permitted Business Purposes (service delivery, security, legal compliance, quality/safety using only de-identified data, compliance evidence); explicit no-sale/no-share prohibition; subcontractor flow-down to all 8 existing sub-processors; 72h inability-to-comply notification SLA. Consumer rights implementation (§68.4): all 7 CPRA rights mapped (Know, Delete, Correct, Opt-Out-of-Sale, Limit-SPI, Non-Discrimination, Portability); 5-step DSAR cooperation protocol with 2-business-day acknowledgement, 10-business-day execution, 30-business-day total SLA; break-glass PAM access under §26 controls for Right to Know data export; privacy invariant: no health values in `compliance.dsar_data_access` event payload. Multi-state harmonisation (§68.5): single US Privacy Addendum with annually-updated Exhibit A; CPRA as highest-standard baseline; GPC signal detection scheduled P2. AdTech isolation (§68.6): no adtech pixels; PostHog EU-hosted (`eu.posthog.com`), `analytics_opt_out` enforced at data layer; Sentry PII scrubbing via SDK; Cloudflare Web Analytics cookie-free; annual no-sale/no-share attestation procedure with 4 verification steps. Four new DEC-030 HMAC-chained events (§68.7): `compliance.ccpa_dsar_received` (HIGH/7yr), `compliance.ccpa_dsar_completed` (HIGH/7yr), `compliance.dsar_data_access` (HIGH/7yr — break-glass access log for DSAR execution), `compliance.us_spa_signed` (STANDARD/7yr) — all privacy-safe: aggregate counts and pseudonymous UUIDs only. Six evidence artefacts USP-E-001 through USP-E-006. Implementation checklist: 5× P0 M6 (SPA template, CCPA privacy policy update, DEC-030 event registration, DSAR log template, ENTERPRISE_ONBOARDING cross-reference); 4× P1 M8–M10 (CCPA threshold review, no-sale attestation, OQ-PRIV-02 formal closure, US ADM opinion); 3× P2 M12–M14/Series-A (GPC signal detection, BIPA counsel opinion, US privacy centre page). SOC 2 criteria: P3.1 (Permitted Purposes §68.3.1 — purpose limitation), P5.2 (retention schedule via P1-RET-001 + §67 deletion runbook), P6.1 (no-sale attestation USP-E-002 + sub-processor Worker §44), P6.7 (adtech isolation §68.6 annual verification), P4.1 (CCPA disclosures added to privacy policy USP-P0-02). Three open questions: OQ-CCPA-01 (BIPA / CV keypoints — P2/P1-for-IL-customers; on-device inference may not constitute "collection" under BIPA but requires counsel opinion before first IL enterprise customer), OQ-CCPA-02 (unified vs. separate Global Privacy Addendum — P2, Series A), OQ-CCPA-03 (independent CCPA audit threshold — recommend $12M ARR early-warning trigger). OQ-PRIV-02 🟡 Open → 🟡 Authored (closes to 🟢 on USP-P0-01 SPA template execution + first US enterprise customer SPA signature + USP-P1-03 gap register updates). SOC 2 doc v3.2 → v3.3. Primary cross-references: docs/ENTERPRISE.md §Privacy floor (no-go customers: insurance risk-scoring, gov backdoors, wellness-as-punishment), docs/AUDIT_LOG_SCHEMA.md (DEC-030 events §68.7), docs/INCIDENT_RESPONSE.md §R-14 (individual DSAR runbook), §67 (tenant data deletion — full-tenant CPRA Right to Delete), §60 (Annual Privacy Programme Review — OQ-PRIV-02 gap origin), §44 (sub-processor Worker — P6.1 evidence), §26 (PAM — break-glass access for DSAR), §51 (gap register — P6.7 row). Owner: compliance-officer + enterprise-architect.*
+
+---
+
+## §69 Security Awareness Training — Annual Execution Evidence & Completion Attestation Framework
+
+**SOC 2 Criteria:** CC1.4 / CC2.2 / CC1.3 / CC1.2
+**Owner:** compliance-officer (content) + security-engineer (delivery)
+**Evidence path:** `form-compliance` repo → `/evidence/cc1/training/YYYY/`
+**Observation window dependency:** Evidence artefacts filed within this path form the CC1.4 population sample for any SOC 2 Type II audit covering the relevant year.
+**Cross-references:** §22 (Security Awareness Training Programme Design), §15 (Compliance Calendar), §26 (PAM / access gate), §51 (Gap Register), PRE-22 checkpoint tracker.
+
+---
+
+### §69.1 Purpose — What This Section Adds Beyond §22
+
+§22 of this document defines the **programme design** for FORM's security awareness training: the curriculum topics, the resource list, the solo-founder training schedule, and the post-hire training plan. Programme design answers the question "what will we train people on, and how is the programme structured?"
+
+§69 defines the **execution evidence framework**: the templates, artefact specifications, and attestation formats that prove the programme was actually carried out. Execution evidence answers the question that auditors ask during fieldwork — "show me proof that people completed this training."
+
+The distinction matters because SOC 2 Type II audits test **operating effectiveness**, not design. A well-written policy is design evidence. A signed completion attestation with linked artefact IDs is execution evidence. Both are required; neither substitutes for the other.
+
+> **Auditor note:** AICPA SOC 2 CC1.4 (Commitment to Competence) requires not only that the entity define training requirements but that it demonstrate individuals actually received and completed relevant training during the observation period. The AICPA's pre-revenue / solo-founder guidance acknowledges that phishing simulations and multi-person completion records are structural impossibilities in a single-person entity; compensating controls (documented curriculum + external certification evidence + signed self-attestation) are accepted substitutes when the auditor documents the structural context. This section provides those compensating controls explicitly.
+
+The relationship between §22 and §69 is:
+
+| Dimension | §22 (Programme Design) | §69 (Execution Evidence) |
+|---|---|---|
+| What it contains | Curriculum topics, resource list, schedule | Attestation templates, artefact specifications, completion certificates |
+| What it proves | The programme exists and is designed appropriately | The programme was executed and individuals completed it |
+| SOC 2 test type | Design effectiveness | Operating effectiveness |
+| When it is written | Once (updated annually if curriculum changes) | Once (framework); instances filed per training cycle |
+| Filed artefact | The §22 document itself | CC1-E-001 through CC1-E-007 per cycle |
+
+---
+
+### §69.2 SOC 2 Criteria Addressed
+
+| SOC 2 Criterion | Criterion Title | Requirement Relevant to Training | What §69 Provides |
+|---|---|---|---|
+| **CC1.4** | Commitment to Competence | Management demonstrates a commitment to attract, develop, and retain competent individuals in alignment with objectives. Requires evidence that individuals have skills and knowledge to fulfil their responsibilities. | Annual completion attestation (CC1-E-006); evidence artefacts for each training topic (CC1-E-001 through CC1-E-004); role-based training matrix (§69.6) showing topic coverage per function. |
+| **CC2.2** | Internal Communication | Entity internally communicates information, including objectives and responsibilities for internal control, necessary to support the functioning of internal control. | Structured delivery framework (§69.5 new-hire onboarding gate; §69.6 role matrix) documenting that security policies and responsibilities are formally communicated, not assumed. New-hire access gate creates a documented communication checkpoint. |
+| **CC1.2** | Management Accountability | Board and management demonstrate a commitment to integrity and ethical values. Management's performance is evaluated and personnel held accountable. | Founder annual attestation (§69.3) creates a documented record that the accountable principal personally completed training and attests to it under signature. This is the management accountability artefact for CC1.2 in the solo phase. |
+| **CC1.3** | Organisational Structure | Management establishes structures, reporting lines, and appropriate authorities and responsibilities. | Role-based training differentiation matrix (§69.6) documents that training responsibilities are allocated by function, not uniformly applied regardless of role. This is the structural evidence that FORM considers organisational context when defining control requirements. |
+
+---
+
+### §69.3 Solo-Founder Phase — Completion Attestation Template
+
+This section provides the exact document format for the annual completion attestation that the founder must sign and file to `form-compliance:/evidence/cc1/training/YYYY/CC1-E-006-YYYY-annual-attestation.pdf` each year during the solo-founder phase.
+
+The template is reproduced below. It must be completed in full, signed (electronic signature via DocuSign or equivalent is acceptable), converted to PDF, and filed before the Q1-February deadline set in the compliance calendar (§15).
+
+> **Auditor note:** Self-attestation is the compensating control for solo-phase completion evidence. The structural limitation — that there is no second person to independently verify the training — is inherent to the solo-founder context and is documented here. When evaluating this control, the auditor should assess: (1) whether the curriculum in §22 represents reasonable, industry-standard training content; (2) whether the external evidence artefacts (CC1-E-001 through CC1-E-004) provide independent verification of completion for vendor-based training topics; and (3) whether the self-attestation format captures sufficient specificity (completion dates, artefact IDs, resource names) to be credible. AICPA pre-revenue guidance treats documented curriculum + external completion certificates + signed self-attestation as a complete compensating control set for entities with fewer than three personnel.
+
+---
+
+**FORM Security Awareness Training Annual Completion Attestation**
+
+```
+===========================================================================
+FORM SECURITY AWARENESS TRAINING — ANNUAL COMPLETION ATTESTATION
+===========================================================================
+
+Document reference:  CC1-E-006-[YYYY]-annual-attestation
+Training year:       [YYYY]
+Participant name:    [Full legal name]
+Participant role:    [Title, e.g. Founder & CEO / Solo Engineer]
+Attestation date:    [YYYY-MM-DD]
+Filing path:         form-compliance:/evidence/cc1/training/[YYYY]/
+                     CC1-E-006-[YYYY]-annual-attestation.pdf
+
+===========================================================================
+SECTION 1 — TRAINING TOPIC COMPLETION RECORD
+===========================================================================
+
+The following table documents completion of all eight topics defined in
+§22.3 of the SOC2_READINESS.md programme design. For each topic, the
+participant must record the resource or method used, the date of completion,
+and the evidence artefact ID filed to the evidence path above.
+
++---------+----------------------------------------------+------------------+------------------+------------------------+
+| Topic # | Topic Name                                   | Resource / Method| Completion Date  | Evidence Artefact ID   |
++---------+----------------------------------------------+------------------+------------------+------------------------+
+| 1       | OWASP Top 10 / Web Application Security      |                  | [YYYY-MM-DD]     | CC1-E-001-[YYYY]-[slug]|
++---------+----------------------------------------------+------------------+------------------+------------------------+
+| 2       | Phishing & Social Engineering Recognition    |                  | [YYYY-MM-DD]     | [see §69.4 / solo N/A] |
++---------+----------------------------------------------+------------------+------------------+------------------------+
+| 3       | Data Classification & Handling               |                  | [YYYY-MM-DD]     | CC1-E-003-[YYYY]-[slug]|
++---------+----------------------------------------------+------------------+------------------+------------------------+
+| 4       | Incident Response Basics / Tabletop          |                  | [YYYY-MM-DD]     | [self-study record]    |
++---------+----------------------------------------------+------------------+------------------+------------------------+
+| 5       | Credential Hygiene & Access Management       |                  | [YYYY-MM-DD]     | CC1-E-002-[YYYY]-[slug]|
++---------+----------------------------------------------+------------------+------------------+------------------------+
+| 6       | Secure Code Review Practices                 |                  | [YYYY-MM-DD]     | [self-study record]    |
++---------+----------------------------------------------+------------------+------------------+------------------------+
+| 7       | Privacy & GDPR Obligations for Engineers     |                  | [YYYY-MM-DD]     | CC1-E-004-[YYYY]-[slug]|
++---------+----------------------------------------------+------------------+------------------+------------------------+
+| 8       | Vendor / Third-Party Risk Awareness          |                  | [YYYY-MM-DD]     | [self-study record]    |
++---------+----------------------------------------------+------------------+------------------+------------------------+
+
+Note: Topic 2 phishing simulation is classified as a post-hire control
+(requires >= 2 personnel). Solo-phase completion of Topic 2 via self-study
+resource (documented reading of Anti-Phishing Working Group reports or
+equivalent) is the accepted compensating control. Record the resource and
+date; no CC1-E-005 artefact is required in the solo phase (documented
+absence, not a finding — see §69.4).
+
+===========================================================================
+SECTION 2 — DECLARATION
+===========================================================================
+
+I confirm that I have completed the above training activities during the
+training year [YYYY] and that the linked evidence artefacts are filed to
+/evidence/cc1/training/[YYYY]/ in the form-compliance repository. The
+artefact IDs recorded above correspond to files that exist in that path
+at the time of signing this attestation.
+
+I understand that this attestation will be provided to SOC 2 auditors as
+evidence of compliance with CC1.4 (Commitment to Competence), CC2.2
+(Internal Communication), CC1.2 (Management Accountability), and CC1.3
+(Organisational Structure).
+
+===========================================================================
+SECTION 3 — SIGNATURE
+===========================================================================
+
+Signed:      ___________________________________
+
+Print name:  ___________________________________
+
+Role:        ___________________________________
+
+Date:        ___________________________________
+
+Document ID: CC1-E-006-[YYYY]-annual-attestation
+
+===========================================================================
+AUDITOR CONTEXT NOTE (do not remove)
+===========================================================================
+
+This attestation is filed in the solo-founder phase of FORM's operations.
+Self-attestation is the compensating control for the structural absence of
+an independent reviewer. The auditor is directed to evaluate:
+
+  (a) §22 of docs/SOC2_READINESS.md for the underlying curriculum design;
+  (b) CC1-E-001 through CC1-E-004 in this evidence path for external or
+      vendor-issued completion evidence supplementing this attestation;
+  (c) The AICPA pre-revenue / small-entity guidance on compensating
+      controls for single-person entities.
+
+This note should be retained in all copies filed to the evidence repository.
+===========================================================================
+```
+
+---
+
+### §69.4 Evidence Artefact Catalogue
+
+Each training-related evidence artefact is assigned a permanent identifier in the `CC1-E-NNN` series. Artefacts are filed to `form-compliance:/evidence/cc1/training/YYYY/` and retained for 7 years from the end of the training year to which they relate (consistent with the retention schedule in §27 and the SOC 2 audit evidence retention standard).
+
+**Naming convention:** `CC1-E-00N-YYYY-[descriptive-slug].[ext]`
+
+- `CC1-E-00N` — artefact series identifier
+- `YYYY` — training year (not filing date; the year the training was completed)
+- `[descriptive-slug]` — short lowercase hyphenated description, e.g. `owasp-webgoat-cert`, `gdpr-self-assessment`
+- `[ext]` — file extension: `pdf`, `png`, `md`, or `zip` (for multi-file evidence packages)
+
+Example: `CC1-E-001-2026-owasp-webgoat-completion.png`
+
+---
+
+#### CC1-E-001 — OWASP / Web Application Security Completion Evidence
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC1-E-001 |
+| **Description** | Screenshot or exported certificate demonstrating completion of OWASP WebGoat, OWASP Security Knowledge Framework (SKF), or equivalent interactive web application security training. The artefact must show the participant's name or account identifier, the completion date, and the module or course completed. If using a platform that does not issue certificates (e.g., self-guided WebGoat), a timestamped screenshot of the completion screen plus a brief text record in the attestation table is acceptable. |
+| **Accepted formats** | PDF (preferred for certificates), PNG/JPG (screenshots), MD (self-study log with timestamps) |
+| **Naming convention** | `CC1-E-001-YYYY-[slug].[ext]` e.g. `CC1-E-001-2026-owasp-webgoat-completion.png` |
+| **Retention** | 7 years from end of training year |
+| **Filing path** | `form-compliance:/evidence/cc1/training/YYYY/` |
+| **Phase** | Solo founder + post-hire (required every year for all Engineering-role personnel) |
+| **Auditor relevance** | Primary CC1.4 evidence — demonstrates the technical competence training required for the engineering function was completed. |
+
+---
+
+#### CC1-E-002 — Cloudflare Security Learning Path Completion Evidence
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC1-E-002 |
+| **Description** | Screenshot or exported completion record from Cloudflare's security learning path or equivalent vendor security documentation review. Cloudflare provides free learning resources covering DDoS mitigation, WAF configuration, zero-trust networking, and certificate management — all directly relevant to FORM's infrastructure posture. If Cloudflare's learning portal issues a badge or certificate, that is the preferred artefact. If not, a timestamped screenshot of completed modules is acceptable. |
+| **Accepted formats** | PDF, PNG/JPG, MD |
+| **Naming convention** | `CC1-E-002-YYYY-[slug].[ext]` e.g. `CC1-E-002-2026-cloudflare-learning-complete.pdf` |
+| **Retention** | 7 years from end of training year |
+| **Filing path** | `form-compliance:/evidence/cc1/training/YYYY/` |
+| **Phase** | Solo founder + post-hire (Engineering and Operations roles) |
+| **Auditor relevance** | CC1.4 evidence for infrastructure security competence; also supports CC6.6 (logical access — network layer controls) as a secondary citation. |
+
+---
+
+#### CC1-E-003 — Supabase Security Documentation Review Attestation
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC1-E-003 |
+| **Description** | Signed attestation (short-form Markdown or PDF) confirming that the participant reviewed Supabase's security documentation, including: Row-Level Security (RLS) policy best practices, auth configuration guidance, database encryption documentation, and Supabase's SOC 2 report summary (available to authenticated users in the Supabase dashboard). This is a self-study artefact; no external certificate is issued. The attestation must record the specific documents reviewed, the review date, and confirm that no open security misconfigurations were identified or, if identified, that they were remediated and the remediation is cross-referenced by ticket ID. |
+| **Accepted formats** | MD (preferred — version-controlled in `form-compliance` repo), PDF |
+| **Naming convention** | `CC1-E-003-YYYY-[slug].[ext]` e.g. `CC1-E-003-2026-supabase-security-review.md` |
+| **Retention** | 7 years from end of training year |
+| **Filing path** | `form-compliance:/evidence/cc1/training/YYYY/` |
+| **Phase** | Solo founder + post-hire (Engineering role) |
+| **Auditor relevance** | CC1.4 (competence in data-layer security); also supports CC6.1 (logical access — database) and CC7.1 (system monitoring) as secondary citations. |
+
+---
+
+#### CC1-E-004 — GDPR Controller Self-Assessment Completion Record
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC1-E-004 |
+| **Description** | Completed self-assessment record demonstrating review of FORM's data controller obligations under GDPR. Acceptable resources: ICO's online GDPR self-assessment tool (ico.org.uk), CNIL's GDPR readiness checklist, or the EDPB's controller accountability guidance. The artefact must record: the tool or resource used, the date completed, the score or completion status, and any action items identified with their resolution status. If FORM's internal DPIA template (§41) was reviewed as part of this training cycle, note the DPIA document version reviewed. |
+| **Accepted formats** | PDF (ICO tool exports a PDF report), MD, PNG (screenshot of completion screen) |
+| **Naming convention** | `CC1-E-004-YYYY-[slug].[ext]` e.g. `CC1-E-004-2026-gdpr-controller-self-assessment.pdf` |
+| **Retention** | 7 years from end of training year |
+| **Filing path** | `form-compliance:/evidence/cc1/training/YYYY/` |
+| **Phase** | Solo founder + post-hire (all roles — privacy obligations apply universally) |
+| **Auditor relevance** | CC1.4 (privacy competence); direct evidence for P1.1 (privacy policy consistent with commitments) and P2.1 (data collection limited to stated purposes) as a secondary citation. |
+
+---
+
+#### CC1-E-005 — Phishing Simulation Completion Records
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC1-E-005 |
+| **Description** | Exported results report from the quarterly phishing simulation programme (§69.7). The report must include: simulation date, template type used, number of participants, click rate (%), number of credential submissions (if applicable), and remediation training completion records for any individuals who exceeded the 20% click-rate failure threshold. In the post-hire phase with two or more people, four reports per year are expected (Q1, Q2, Q3, Q4). Each quarterly report is filed as a separate instance with a quarter suffix in the slug. **Solo-founder phase: CC1-E-005 is N/A.** The absence of CC1-E-005 in the solo phase is documented here and is not treated as a finding per AICPA pre-revenue guidance, because a phishing simulation requires a minimum of two participants (simulator and target) and is structurally impossible for a single-person entity. The documented absence is the artefact — this paragraph, combined with the gap tracker note in §69.8, constitutes the compensating control record. |
+| **Accepted formats** | PDF (GoPhish export), CSV + PDF summary |
+| **Naming convention** | `CC1-E-005-YYYY-Q[N]-phishing-sim-results.[ext]` e.g. `CC1-E-005-2027-Q1-phishing-sim-results.pdf` |
+| **Retention** | 7 years from end of training year |
+| **Filing path** | `form-compliance:/evidence/cc1/training/YYYY/` |
+| **Phase** | Post-hire (two or more personnel) only; solo phase: documented N/A |
+| **Auditor relevance** | CC1.4 (phishing recognition competence verification); CC2.2 (structured internal communication of security threats). |
+
+---
+
+#### CC1-E-006 — Annual Completion Attestation
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC1-E-006 |
+| **Description** | The signed annual completion attestation document defined in §69.3. One attestation per in-scope person per training year. In the solo-founder phase, one attestation total per year. In the post-hire phase, one attestation per employee and contractor within scope per year. The attestation template in §69.3 is the canonical format; no deviations are permitted without compliance-officer approval and a documented rationale filed alongside the artefact. |
+| **Accepted formats** | PDF (required — wet signature or DocuSign/equivalent electronic signature) |
+| **Naming convention** | `CC1-E-006-YYYY-[initials-or-id]-annual-attestation.pdf` e.g. `CC1-E-006-2026-founder-annual-attestation.pdf` |
+| **Retention** | 7 years from end of training year |
+| **Filing path** | `form-compliance:/evidence/cc1/training/YYYY/` |
+| **Phase** | Solo founder + post-hire (all in-scope persons) |
+| **Auditor relevance** | The primary CC1.4 execution evidence artefact. This is the document auditors will request first when testing the security awareness training control. All other CC1-E-NNN artefacts are referenced from within this document. |
+
+---
+
+#### CC1-E-007 — New-Hire Onboarding Training Completion Record
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CC1-E-007 |
+| **Description** | Completion record for the new-hire onboarding training gate defined in §69.5. Filed once per new hire within 30 days of their start date. The record must include: employee or contractor name and role, start date, completion dates for each of the five Day-0 topics (Topics 1, 2, 3, 5, 7), completion dates for each of the three 30-day topics (Topics 4, 6, 8) once completed, artefact IDs for supporting completion evidence, founder countersignature confirming review of the completion evidence, and the date the access gate was lifted (1Password access, Supabase invite, and GitHub main branch access granted). The Day-0 gate must be lifted only after Topics 1, 2, 3, 5, 7 are documented; the 30-day topics are tracked on the compliance calendar but do not gate Day-0 access. |
+| **Accepted formats** | PDF (preferred), MD (with electronic signature block) |
+| **Naming convention** | `CC1-E-007-YYYY-[hire-initials-or-id]-onboarding-training.pdf` e.g. `CC1-E-007-2027-hire-001-onboarding-training.pdf` |
+| **Retention** | 7 years from end of training year; retained for the full employment period plus 7 years if longer |
+| **Filing path** | `form-compliance:/evidence/cc1/training/YYYY/` |
+| **Phase** | Post-hire; filed per hire |
+| **Auditor relevance** | CC1.4 (competence at onboarding); CC2.2 (formal communication of security responsibilities at hire); supports CC6.2 (new user provisioning controls — access gate evidence). |
+
+---
+
+### §69.5 New-Hire Onboarding Training Gate
+
+This section defines the access gate protocol that applies when FORM makes its first hire. The protocol is designed to create a documented, enforceable link between training completion and production system access — ensuring that CC1-E-007 is a meaningful access-control artefact and not a retrospective form-fill.
+
+#### §69.5.1 Day-0 Gate — Access Withheld Until Completion
+
+Before any production access is granted to a new employee or contractor, the following five topics from §22.3 must be completed and evidenced:
+
+| Topic # | Topic Name | Why Required at Day 0 |
+|---|---|---|
+| 1 | OWASP Top 10 / Web Application Security | New hire will have access to production code and infrastructure; must understand the threat landscape before touching production. |
+| 2 | Phishing & Social Engineering Recognition | Credentials are granted at Day 0; phishing awareness must precede credential issuance. |
+| 3 | Data Classification & Handling | New hire will encounter user health data immediately; classification rules must be understood before access. |
+| 5 | Credential Hygiene & Access Management | 1Password onboarding is part of Day 0; hygiene rules must be understood before the vault is populated. |
+| 7 | Privacy & GDPR Obligations for Engineers | Health data is GDPR special-category; privacy obligations must be understood before access to any user data. |
+
+The following access grants are **withheld** until CC1-E-007 is signed by both the new hire and the founder (countersignature):
+
+- 1Password team vault invitation
+- Supabase project invite (read and/or write)
+- GitHub organisation membership with push access to any branch other than personal feature branches
+
+> **Auditor note:** The access gate is enforced procedurally in the solo-founder phase; no automated provisioning system is in place at this stage. The founder countersignature on CC1-E-007 is the enforcement checkpoint. When FORM deploys an IDP (§37) or SCIM provisioning, this gate should be automated using a "training incomplete" attribute that blocks provisioning workflows. Until then, the manual gate with a signed artefact is the equivalent control.
+
+#### §69.5.2 30-Day Topics — Tracked But Not Blocking
+
+The following three topics must be completed within 30 days of the hire's start date but do not block Day-0 access:
+
+| Topic # | Topic Name | 30-Day Deadline |
+|---|---|---|
+| 4 | Incident Response Basics / Tabletop | Day 30 |
+| 6 | Secure Code Review Practices | Day 30 |
+| 8 | Vendor / Third-Party Risk Awareness | Day 30 |
+
+These topics are tracked on the compliance calendar (§15). Failure to complete by Day 30 is escalated to the founder for remediation; the hire's probationary review (if applicable) should reference completion status.
+
+#### §69.5.3 Evidence Chain for CC1-E-007
+
+CC1-E-007 must contain a complete evidence chain:
+
+1. New hire's name, role, and start date
+2. For each of the five Day-0 topics: completion date + artefact ID of supporting evidence (e.g., `CC1-E-001-YYYY-[slug]` for Topic 1)
+3. Founder countersignature and date of review
+4. Date the Day-0 access gate was lifted (the date 1Password invitation was sent)
+5. For each of the three 30-day topics: completion date + artefact ID (added to the document when each is completed, within the 30-day window)
+6. Final completion date (when all eight topics are done) — this date marks the training cycle as fully closed for the hire's first year
+
+#### §69.5.4 Contractor Variant
+
+For contractors engaged for fewer than 30 days, the full eight-topic gate does not apply. See §69.6 for the Contractor (<30 days) role column, which specifies AUP review plus Topics 2, 3, and 5 only. CC1-E-007 is still filed for contractors but uses the abbreviated completion table defined in §69.6.
+
+---
+
+### §69.6 Role-Based Training Differentiation Matrix
+
+Training requirements are differentiated by role to reflect the actual risk exposure of each function. Requiring secure code review training from a short-term contractor who has no repository access creates administrative burden without security benefit; excluding it from a senior engineer creates a genuine gap. The matrix below defines which of the eight topics in §22.3 apply to each role.
+
+| Topic # | Topic Name | Engineering (Full-time / Long-term Contractor) | Operations / Support | Contractor (<30 days) |
+|---|---|---|---|---|
+| 1 | OWASP Top 10 / Web Application Security | Required | Not required | Not required |
+| 2 | Phishing & Social Engineering Recognition | Required | Required | Required |
+| 3 | Data Classification & Handling | Required | Required | Required |
+| 4 | Incident Response Basics / Tabletop | Required | Required | Not required |
+| 5 | Credential Hygiene & Access Management | Required | Required | Required |
+| 6 | Secure Code Review Practices | Required | Not required | Not required |
+| 7 | Privacy & GDPR Obligations for Engineers | Required | Required | Not required |
+| 8 | Vendor / Third-Party Risk Awareness | Required | Not required | Not required |
+| AUP Review | Acceptable Use Policy sign-off | Required (Day 0) | Required (Day 0) | Required (Day 0) |
+
+**Notes on role definitions:**
+
+- **Engineering** covers all roles with production repository access, infrastructure access, or database access. Includes: Software Engineer, Senior Engineer, Platform Engineer, Security Engineer, ML Engineer. In the solo-founder phase, the founder is classified as Engineering.
+- **Operations / Support** covers roles with access to user-facing tooling and support systems but not to production code repositories or database write access. Includes: Customer Success, Community Manager, Support Engineer (read-only). This role category does not exist in the solo phase but is defined here for pre-hire planning.
+- **Contractor (<30 days)** covers short-term engagements (design, legal, finance, content) where production system access is not granted. If a contractor unexpectedly requires production access, they are reclassified to Engineering for training purposes regardless of engagement length.
+
+**AUP review** is a prerequisite for all roles and all engagement lengths. The AUP (Acceptable Use Policy) is filed at `form-compliance:/policies/AUP.md`. Signature on the AUP is a separate onboarding step; it is not one of the eight training topics but is listed here because it is the universal Day-0 requirement that precedes even the access gate.
+
+> **Auditor note:** The role-based matrix satisfies CC1.3 (Organisational Structure) by demonstrating that training responsibilities are allocated in alignment with job function and access level, not applied uniformly. Auditors testing CC1.3 should request the matrix above plus CC1-E-007 records for the most recent hires to verify that the correct topic set was completed for each role.
+
+---
+
+### §69.7 Annual Phishing Simulation Programme (Post-Hire)
+
+The phishing simulation programme is a post-hire control that activates when FORM's team reaches two or more persons (any combination of employees and long-term contractors). It is a compensating control for the ongoing effectiveness of Topic 2 (Phishing & Social Engineering Recognition) training.
+
+> **Auditor note:** AICPA CC2.2 requires that internal communication of security responsibilities be structured and recurring, not a one-time onboarding event. Quarterly phishing simulations serve as a recurring operational test of whether the Topic 2 training is producing durable behaviour change, distinct from whether the training was completed (which CC1-E-006 attests). This distinction — "we trained them" vs. "the training is working" — is the difference between a paper control and an effective one.
+
+#### §69.7.1 Tool Options
+
+| Option | Type | Cost | Notes |
+|---|---|---|---|
+| **GoPhish** | Self-hosted, open source | Free | Preferred for early stage; requires a sending domain and SMTP relay. Can be hosted on a $5/month VPS separate from production infrastructure. Results exported as CSV + HTML report. |
+| **KnowBe4** | Commercial SaaS | ~$18-30/user/year | Preferred once team reaches 10+ people; includes LMS integration, automated remediation training, and compliance reporting. |
+| **Hoxhunt** | Commercial SaaS | ~$20-35/user/year | Strong for teams with high phishing risk tolerance; gamified simulation. |
+
+For the first post-hire year, GoPhish is the recommended tool given cost profile. Migration to KnowBe4 or Hoxhunt should be evaluated at the §15 annual training review when the team reaches 5 or more people.
+
+#### §69.7.2 Simulation Cadence
+
+Simulations are run quarterly, aligned to the compliance calendar (§15):
+
+| Quarter | Target Run Window | Results Review | Evidence Artefact Due |
+|---|---|---|---|
+| Q1 | February | Q1 Security Review (§15) | `CC1-E-005-YYYY-Q1-phishing-sim-results.pdf` |
+| Q2 | May | Q2 Security Review (§15) | `CC1-E-005-YYYY-Q2-phishing-sim-results.pdf` |
+| Q3 | August | Q3 Security Review (§15) | `CC1-E-005-YYYY-Q3-phishing-sim-results.pdf` |
+| Q4 | November | Q4 Security Review (§15) | `CC1-E-005-YYYY-Q4-phishing-sim-results.pdf` |
+
+#### §69.7.3 Simulation Template Types
+
+Each quarter should use a different template type to avoid habituation:
+
+| Quarter | Template Type | Description |
+|---|---|---|
+| Q1 | Credential harvesting | Fake login page mimicking a service FORM uses (e.g., GitHub, Google Workspace). Link leads to a GoPhish landing page that records the click and optionally credential entry attempt. |
+| Q2 | Fake vendor email | Spoofed email from a plausible vendor (e.g., "Supabase billing alert", "Cloudflare security notice") requesting urgent action. Tests whether employees verify sender identity before clicking. |
+| Q3 | Urgent invoice / finance | Email appearing to be from a finance contact requesting approval of an unexpected invoice. Tests executive impersonation / BEC (Business Email Compromise) awareness. |
+| Q4 | Rotate from above | Security-engineer selects the template type that produced the highest click rate in Q1-Q3 and re-tests, to verify that any remediation training was effective. |
+
+Template configuration files (GoPhish JSON exports) are stored at `form-compliance:/evidence/cc1/training/phishing-templates/` and reused across years with annual review for freshness.
+
+#### §69.7.4 Failure Threshold and Remediation
+
+- **Click rate > 20%** across the team in any single quarterly simulation triggers mandatory remediation training.
+- Remediation training must be completed within **5 business days** of the simulation results being reviewed.
+- Remediation content: targeted review of Topic 2 resources from §22.3 (Anti-Phishing Working Group materials, internal phishing recognition guide).
+- Remediation completion is documented in a short-form record appended to the relevant `CC1-E-005-YYYY-Q[N]` artefact.
+- Individual performance data: the click rate threshold is assessed **at the team level**, not at the individual level, to avoid punitive dynamics. Individual results are visible only to the security-engineer and compliance-officer. No individual results are communicated to managers, reported to the board, or included in performance reviews.
+
+#### §69.7.5 Privacy of Simulation Results
+
+Phishing simulation result data is classified **Internal** under FORM's data classification policy (§17). Handling rules:
+
+| Rule | Detail |
+|---|---|
+| Access | Security-engineer + compliance-officer only. No manager access to individual results. |
+| Storage | `form-compliance:/evidence/cc1/training/YYYY/` — same restricted-access path as all CC1 evidence. |
+| Reporting | Only aggregate click rate (%) and team-level remediation status reported in security reviews and to the board. |
+| Retention | 7 years from end of training year (consistent with other CC1 evidence). |
+| No HR use | Simulation results must not be referenced in disciplinary proceedings, performance reviews, or termination decisions. |
+
+This privacy protection is required both to maintain trust with the team (simulation programmes are counterproductive if employees perceive them as punitive surveillance) and to avoid potential employment law exposure in EU jurisdictions where processing behavioural test results may require specific lawful basis under GDPR Article 6.
+
+---
+
+### §69.8 PRE-22 Closure Criteria & Gap Tracker Update
+
+#### §69.8.1 PRE-22 Checkpoint Definition
+
+The pre-launch compliance checklist (§1 and §20) includes the following checkpoint:
+
+> **PRE-22:** "Security awareness training first cohort completed (all current employees and contractors)" — status: **🔴 Open**
+
+This checkpoint cannot be closed by programme design alone. It closes when execution evidence is filed. The following criteria define the closure conditions.
+
+#### §69.8.2 PRE-22 Closure Checklist
+
+- [ ] **Annual completion attestation (CC1-E-006) filed** for all in-scope persons (solo phase: founder only; post-hire phase: all employees and in-scope contractors).
+- [ ] **CC1-E-001 filed** — OWASP / web application security completion evidence for the relevant training year.
+- [ ] **CC1-E-002 filed** — Cloudflare security learning path completion evidence for the relevant training year.
+- [ ] **CC1-E-003 filed** — Supabase security documentation review attestation for the relevant training year.
+- [ ] **CC1-E-004 filed** — GDPR controller self-assessment completion record for the relevant training year.
+- [ ] **Compliance calendar (§15) updated** — next year's Q1-February training deadline is set and shows as a scheduled item.
+- [ ] **For post-hire phase:** CC1-E-007 filed for each new hire within 30 days of start date before PRE-22 can be considered fully closed at the post-hire level.
+- [ ] **Filing path confirmed:** `form-compliance:/evidence/cc1/training/YYYY/` directory exists and contains all of the above artefacts with correct naming convention.
+
+PRE-22 moves from **🔴 Open** to **🟢 Done** when all of the above boxes are checked for the most recently completed training year. The status resets to 🟡 Partial on 1 January each year and returns to 🟢 Done when the new year's artefacts are filed (deadline: Q1-February).
+
+#### §69.8.3 Gap Tracker Update
+
+| Control | Previous Status | §69 Status | Closes to 🟢 When |
+|---|---|---|---|
+| Internal security training | 🔴 Gap (§1 gap tracker) | 🟡 Partial (programme designed §22; execution evidence templates defined §69) | First year's evidence artefacts (CC1-E-001 through CC1-E-004 + CC1-E-006) filed and signed; §15 calendar updated with next deadline. |
+| New-hire security onboarding | 🔴 Gap | 🟡 Partial (gate protocol defined §69.5; CC1-E-007 template defined §69.4) | CC1-E-007 filed for first hire, countersigned by founder, and access gate lift date recorded. |
+| CC1.4 Commitment to Competence | 🔴 Gap | 🟡 Partial (curriculum defined §22; attestation framework defined §69) | Same as "Internal security training" above — CC1-E-006 signed + supporting artefacts filed. |
+| Phishing simulation programme | 🔴 Gap | 🟡 Partial (programme defined §69.7; N/A until two or more personnel) | First quarterly GoPhish simulation run, CC1-E-005-YYYY-Q1 filed, results reviewed at Q1 security review. |
+
+> **Auditor note on 🟡 Partial status:** "Partial" in this context means the control has been fully designed and the evidence framework is in place, but execution artefacts for a full observation period have not yet been accumulated. This is the expected state at the beginning of the SOC 2 Type II observation window. Auditors should confirm that the framework documents (§22 and §69) are in the evidence repository and that the first year's artefacts are filed before classifying CC1.4 as "effective" for the observation period.
+
+---
+
+### §69.9 SOC 2 Criteria Mapping Summary
+
+| SOC 2 Criterion | AICPA Requirement (paraphrased) | §69 Mechanism | Primary Evidence Artefact(s) | Current Status |
+|---|---|---|---|---|
+| **CC1.4** — Commitment to Competence | Entity demonstrates commitment to attract, develop, and retain competent individuals in alignment with objectives. Training completion is the primary operating effectiveness indicator. | Annual completion attestation (§69.3); evidence artefact catalogue (§69.4); role-based differentiation matrix (§69.6). | CC1-E-006 (attestation); CC1-E-001, CC1-E-002, CC1-E-003, CC1-E-004 (topic-specific completion). | 🟡 Partial — framework complete; first-year execution artefacts pending filing. |
+| **CC2.2** — Internal Communication | Entity internally communicates information necessary to support functioning of internal controls, including security-related responsibilities. | New-hire onboarding training gate (§69.5) creates a documented communication checkpoint at each hire. Quarterly phishing simulations (§69.7) provide recurring communication of security threat landscape. | CC1-E-007 (new-hire gate); CC1-E-005 (phishing simulation results — post-hire). | 🟡 Partial — gate protocol defined; CC1-E-007 pending first hire; CC1-E-005 pending two or more personnel. |
+| **CC1.2** — Management Accountability | Board and management demonstrate a commitment to integrity and ethical values; management performance is evaluated and personnel held accountable for internal control responsibilities. | Founder annual attestation (§69.3) creates a signed, dated record that the accountable principal personally completed the training cycle. Filed as CC1-E-006 with reference to supporting artefacts. | CC1-E-006 (founder-signed attestation). | 🟡 Partial — template defined; first-year signed document pending. |
+| **CC1.3** — Organisational Structure | Management establishes structures, reporting lines, and appropriate authorities and responsibilities in pursuit of objectives. | Role-based training differentiation matrix (§69.6) documents that training responsibilities are allocated by function and risk exposure, not applied uniformly. | §69.6 matrix (inline in this document, cited in audit); CC1-E-007 for each role category hired. | 🟡 Partial — matrix defined; operational evidence pending first post-hire training cycle. |
+
+---
+
+### §69.10 Implementation Checklist
+
+#### P0 — Before Observation Period Opens (Complete Before SOC 2 Type I / Type II Clock Starts)
+
+- [ ] Complete all four solo-phase training activities: OWASP/WebGoat or equivalent (CC1-E-001), Cloudflare security learning path (CC1-E-002), Supabase security documentation review (CC1-E-003), GDPR controller self-assessment (CC1-E-004).
+- [ ] Sign and file annual completion attestation using §69.3 template (CC1-E-006) for the first training year. File to `form-compliance:/evidence/cc1/training/YYYY/`.
+- [ ] Set Q1-February training deadline in compliance calendar (§15) for the following year so the annual cycle is continuous, not reactive.
+- [ ] Confirm `form-compliance:/evidence/cc1/training/YYYY/` directory structure exists with correct permissions (access restricted to compliance-officer and security-engineer roles in the `form-compliance` repo).
+- [ ] File §22 (programme design document) to `form-compliance:/evidence/cc1/training/programme-design-v1.md` as the design evidence companion to the execution artefacts.
+
+#### P1 — Before First Hire (Complete Before Any Employment Offer Accepted)
+
+- [ ] Configure GoPhish (or KnowBe4 if budget allows) with the three quarterly template types defined in §69.7.3. Test against a founder-controlled inbox before first use.
+- [ ] Prepare new-hire onboarding training pack: pre-built resource links for all five Day-0 topics (§22.3 Topics 1, 2, 3, 5, 7) in a single document filed at `form-compliance:/procedures/new-hire-training-pack.md`.
+- [ ] Configure 1Password, Supabase, and GitHub access provisioning workflows to reference CC1-E-007 as a prerequisite gate — even if enforcement is manual in the early stage, the procedure document must reference the gate.
+- [ ] Template CC1-E-007 as a fillable PDF and file to `form-compliance:/templates/CC1-E-007-new-hire-training-template.pdf` so it is ready before the first hire starts.
+- [ ] Confirm AUP (Acceptable Use Policy) is drafted and filed at `form-compliance:/policies/AUP.md` — required for all roles as a universal Day-0 prerequisite (§69.6).
+
+#### P2 — Post-GA / Growing Team
+
+- [ ] Run first quarterly phishing simulation (Q1 of first post-hire year). Export GoPhish results report, file as `CC1-E-005-YYYY-Q1-phishing-sim-results.pdf`. Review results at Q1 security review.
+- [ ] Conduct first LMS evaluation (Hoxhunt or KnowBe4) when team reaches 5+ people. Decision to migrate from GoPhish to commercial LMS should be documented in a short options memo filed to `form-compliance:/decisions/`.
+- [ ] Update role-based training matrix (§69.6) if new role categories emerge that do not fit the Engineering / Operations / Contractor-<30-days schema.
+- [ ] Schedule first annual training programme review (§22, §69) as part of the Q4 compliance calendar review to assess whether curriculum topics remain current and whether evidence artefact specifications need updating.
+
+---
+
+*v1.0 (2026-06-08): §69 Security Awareness Training Execution Evidence — CC1.4/CC2.2/CC1.3/CC1.2 Auditor Exhibit. Execution evidence framework and completion attestation templates supplementing the programme design in §22. Defines seven evidence artefacts (CC1-E-001 through CC1-E-007), solo-founder signed attestation format, new-hire onboarding training gate protocol (production access withheld until CC1-E-007 filed), role-based training matrix (Engineering/Operations/Contractor), annual phishing simulation programme (GoPhish quarterly cadence, 20% click-rate failure threshold). Gap tracker: "Internal security training" 🔴 Gap → 🟡 Partial (programme designed §22 + execution templates §69; closes to 🟢 on first year evidence filing). PRE-22 closure criteria documented. SOC 2 criteria: CC1.4 (commitment to competence — curriculum + evidence), CC2.2 (internal communication — structured delivery), CC1.2 (management accountability — founder annual attestation), CC1.3 (organisational structure — role-based differentiation). Owner: compliance-officer (content) + security-engineer (delivery).*
