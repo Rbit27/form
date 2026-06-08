@@ -6,6 +6,16 @@
 
 ---
 
+## [3.0.0] — 2026-06-08
+
+### Added
+- `content/post-337-eccentric-phase-hypertrophy.md` — Ексцентрична фаза: де насправді відбувається гіпертрофія; titin як активний механічний елемент (Herzog et al. 2012), крива сила-швидкість (120–140% від концентричного 1RM), stretch-mediated hypertrophy (Pedrosa et al. 2022), механотрансдукція (McMahon et al. 2014), meta-analysis eccentric vs. concentric (Roig et al. 2009); (sports-scientist reviewed, clinical-safety NOT REQUIRED)
+
+### Changed
+- `VERSION` — 2.99.2 → 3.0.0
+
+---
+
 ## [2.99.2] — 2026-06-08
 
 ### Added
