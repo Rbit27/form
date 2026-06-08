@@ -6,6 +6,21 @@
 
 ---
 
+## [3.1.0] — 2026-06-08
+
+### Added
+- `content/post-339-exercise-selection-minimum-set.md` — Вибір вправ: мінімальний набір для покриття гіпертрофійного стимулу; шість патернів руху, Fonseca et al. (2014) варіативність вправ, нейральна ефективність і familiarity, матриця мінімального набору; (sports-scientist reviewed, clinical-safety NOT REQUIRED)
+- `content/post-340-training-time-circadian-rhythm.md` — Час тренування і циркадна ритміка: ранок vs вечір; Chtourou & Souissi (2012) мета-аналіз 100+ досліджень, циркадний піковий час 15:00–20:00, акліматизація до ранкового тренінгу, практична перевага консистентності над оптимізацією; (sports-scientist reviewed, clinical-safety NOT REQUIRED)
+- `content/post-341-technique-vs-volume-beginners.md` — Техніка vs обсяг для початківця: когнітивне навантаження в перші 6 місяців; Fitts & Posner (1967) cognitive/associative/autonomous stages, Wulf & Prinz (2001) attentional focus, субмаксимальна практика під час освоєння, bandwidth method, сигнали переходу до прогресивного навантаження; (sports-scientist reviewed, clinical-safety NOT REQUIRED)
+- `content/post-342-chronic-low-back-pain-training.md` — Тренування при хронічному болі в попереку: механізми як освітній контекст, McGill (2007) spine stability, Steele et al. (2015) дослідницький контекст, межі самостійного рішення; (sports-scientist reviewed, **clinical-safety PASS WITH CONDITIONS** 2026-06-08: тільки для хронічного болю >3 міс з підтвердженим діагнозом, обов'язкові клінічні disclaimers, Steele — не домашній протокол)
+- `content/post-343-mental-recovery-training.md` — Ментальне відновлення і тренінг: когнітивна втома як незалежний фактор; Marcora et al. (2009) EJAP 15.1% зниження витривалості, психобіологічна модель втоми, RPE drift при когнітивному навантаженні, Van Cutsem et al. (2017) систематичний огляд; (sports-scientist reviewed, clinical-safety NOT REQUIRED)
+
+### Changed
+- `README.md` — checklist posts 339–342 marked `[x]`; post-342 annotated with clinical-safety PASS WITH CONDITIONS date
+- `VERSION` — 3.0.2 → 3.1.0
+
+---
+
 ## [3.0.2] — 2026-06-08
 
 ### Changed
