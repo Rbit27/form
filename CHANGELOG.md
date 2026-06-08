@@ -6,6 +6,18 @@
 
 ---
 
+## [2.94.0] — 2026-06-08
+
+### Added
+- `content/post-327-bilateral-deficit.md` — Білатеральний дефіцит: двосторонній MVC < сума унілатеральних (5–15%); міжлімбальна інгібіція через комісуральні інтернейрони і corpus callosum; Howard & Enoka (1991) J Appl Physiol, Koh et al. (1993) step-vs-ramp, Jakobi & Cafarelli (1998) контроверза; балістична фасилітація у тренованих атлетів; наслідки для тестування асиметрій (LSI), унілатерального програмування і оцінки нейронного потенціалу; clinical-safety NOT REQUIRED; owner: sports-scientist
+- `content/post-328-aerobic-base-strength.md` — Аеробна база і силовий тренінг: PCr ресинтез — аеробний процес (Harris et al. 1976, τ = 3–5 хв); Greenhaff et al. (1994) креатин збільшує резервуар, не τ; Bogdanis et al. (1995 J Physiol) аеробний внесок у PCr між спринтами; серцевий резерв і ударний об'єм; MacDougall et al. (1982) мітохондрії у силових атлетів; Dolezal & Potteiger (1998) concurrent без значної інтерференції при правильній структурі; Buchheit & Laursen (2013) HIIT ефективність; мінімальна доза: 2×/тиж Zone 2 або 1×/тиж HIIT; клінічно безпечний контент; clinical-safety NOT REQUIRED; owner: sports-scientist
+
+### Changed
+- `README.md` — post-327 + post-328 додані до content roadmap
+- `VERSION` — 2.93.0 → 2.94.0
+
+---
+
 ## [2.93.0] — 2026-06-07
 
 ### Added

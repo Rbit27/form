@@ -656,6 +656,8 @@ Each iteration:
 - [x] post-324: Пасивні обмеження рухливості — де реально «стоїть» мобільність і чому розтяжки недостатньо; капсула vs фасція vs нейральне гальмування; Weppler &amp; Magnusson (2010) stretch tolerance vs mechanical stiffness, Aquino et al. (2010) нейральне гальмування hamstrings, Vicenzino et al. (2011) суглобова мобілізація; clinical-safety NOT REQUIRED
 - [x] post-325: Силовий тренінг і кісткова щільність — механотрансдукція у кістковій тканині, осьове навантаження vs. ударне, доза-відповідь для BMD, Wolff's law у сучасному прочитанні; Duncan & Turner (1995), Watson et al. LIFTMOR (2018); clinical-safety NOT REQUIRED
 - [x] post-326: Сон і тренувальна адаптація — GH/SWS cascade, Van Cauter (2000/2010), Dattilo (2011) sleep debt → катаболічний дисбаланс, Milewski (2014) 1.7× injury risk, Mah (2011) sleep extension; clinical-safety NOT REQUIRED
+- [x] post-327: Білатеральний дефіцит — чому двосторонній MVC < сума унілатеральних; інтерлімбальна інгібіція, corpus callosum, кортикоспінальний драйв; Howard & Enoka (1991), Koh et al. (1993), Jakobi & Cafarelli (1998); наслідки для тестування, виявлення асиметрій і програмування унілатерального тренінгу; clinical-safety NOT REQUIRED
+- [x] post-328: Аеробна база і силовий тренінг — чому VO₂ capacity важлива для силовика; PCr resynthesis залежить від окисного фосфорилювання; Bogdanis et al. (1995), MacDougall et al. (1988); мінімальна аеробна доза для силового атлета; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
