@@ -6,6 +6,16 @@
 
 ---
 
+## [2.99.1] — 2026-06-08
+
+### Added
+- `docs/SOC2_READINESS.md §72` — Processing Integrity Operating Evidence: PI-GAP-001 / PI-GAP-002 / PI-GAP-003 closure spec (🔴 Open → 🟡 Authored across all three). PI-GAP-001: `coaching-completeness-monitor` 5-min pg_cron watchdog + Cloudflare Worker that auto-escalates stuck `coaching_turns` rows ≥ 90 s from `processing` → `failed`; `coaching.completeness_timeout` HIGH DEC-030 per affected row; `coaching.completeness_check_passed` LOW DEC-030 heartbeat; PagerDuty P1 on detection; added as job 10 to pg-cron-health-monitor registry (§71.2.2). PI-GAP-002: `coaching.output_filter_applied` STANDARD DEC-030 event on every Victor coaching turn's clinical safety filter; PI1 Accuracy observability panel (4 metrics: pass_rate/block_rate/latency_p95/filter_version staleness) with critical thresholds → PagerDuty P1. PI-GAP-003: migration `0047_meal_log_not_null_macros.sql` (COALESCE backfill + NOT NULL on `protein_g`, `fat_g`, `carbohydrate_g` + `meal_log_macros_non_negative` CHECK); mobile UI validation gate; PI-GAP-003a opened (P2 — computed `calories_kcal` column). Six evidence artefacts PRE-72-E-001 through PRE-72-E-006; 13-item implementation checklist (5× P0, 5× P1, 3× P2). SOC 2 criteria: PI1.1/PI1.2/PI1.3. Owner: platform-engineer + compliance-officer
+
+### Changed
+- `VERSION` — 2.99.0 → 2.99.1
+
+---
+
 ## [2.99.0] — 2026-06-08
 
 ### Added

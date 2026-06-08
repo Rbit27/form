@@ -24215,3 +24215,279 @@ All artefacts are filed to `form-compliance:/evidence/a1/` unless a more specifi
 ---
 
 *v1.0 (2026-06-08): §71 Availability Trust Service Criteria (A1) — Capacity Management, Infrastructure Redundancy & Disaster Recovery. Synthesises and extends the design-level A1 work in §18 (BCP/DRP), §19 (three-tier backup), §20 (status page), and §33 (A1 deep-dive) into a consolidated auditor exhibit with an operational-evidence cadence suitable for Type II fieldwork. New formal contributions: (1) `pg-cron-health-monitor` Edge Function — hourly freshness check across 9 production pg_cron jobs (`dsar-sla-day25-alert`, `dsar-sla-day29-alert`, `dsar-export-expiry-cleanup`, `audit-chain-daily-check`, `row-count-monitor`, `mfa-enforcement-log-cleanup`, `workout-export`, `audit-event-flush`, `security-counter-daily-cleanup`); PagerDuty P0/P1 routing on stale events; three new DEC-030 event types (`system.cron_job_stale` HIGH/7yr, `system.cron_health_check_passed` LOW/3yr, `system.cron_health_check_failed` HIGH/7yr); staleness window enforcement via `cron.job_run_details` JOIN against a values table with per-job freshness windows (1h for `row-count-monitor`; 2h for `audit-event-flush`; 26h for all daily jobs). (2) Monthly capacity review cadence (§71.2.4) covering seven metrics with a markdown log filing protocol (PRE-71-E-001). (3) Supabase Multi-AZ HA replica verification query (`pg_stat_replication`) with quarterly filing cadence (PRE-71-E-003). (4) DEC-030 audit log HMAC re-anchoring SQL procedure for use during PITR restore events (§71.3.4). (5) Three supplemental DR drill requirements added to §33.6 procedure: DEC-030 chain integrity check before/after drill, pg_cron resumption query post-drill (PRE-71-E-006), DSAR SLA continuity check post-drill (PRE-71-E-007). (6) Missed-drill protocol with A1-GAP-004 (new gap) escalation path. Gap tracker: A1-GAP-003 (DR drill not yet executed) remains 🟡 Authored — unchanged from §33; supplemental requirements added. A1-GAP-004 (pg-cron-health-monitor not deployed) 🔴 Open → 🟡 Authored — `pg-cron-health-monitor` fully specified; deployment pending M5. A1-GAP-005 (monthly capacity review log not established) 🔴 Open → 🟡 Authored — scope and cadence specified; first log pending post-launch. Seven evidence artefacts PRE-71-E-001 through PRE-71-E-007: PRE-71-E-001 (monthly capacity review log, A1.1), PRE-71-E-002 (Cloudflare Trust Hub SLA docs, A1.2), PRE-71-E-003 (Supabase HA replica query, quarterly, A1.2), PRE-71-E-004 (pg-cron-health-monitor deployment confirmation, A1.1), PRE-71-E-005 (stale-job test, A1.1), PRE-71-E-006 (post-drill cron resumption check, A1.3), PRE-71-E-007 (post-drill DSAR SLA continuity check, A1.3 + P5.1). 15-item implementation checklist (6× P0, 5× P1, 4× P2). Cross-references: §18 (BCP/DRP; RTO/RPO commitments), §19 (three-tier backup architecture), §20 (status page; A1-GAP-001/002), §33 (A1 deep-dive; capacity upgrade triggers; DR drill procedure PRE-33-E-006 through PRE-33-E-011; `system.dr_drill_completed` DEC-030 event), §46 (`audit-chain-daily-check` Edge Function; chain integrity verification), §47 (`row-count-monitor` Edge Function), §53 (`restore-verify-worker`; weekly backup verification), §70 (DSAR pg_cron jobs; privacy floor on PRE-71-E-007 DSAR SLA check), DATA_MODEL.md §10 (PITR restore runbook; HMAC re-anchoring), ENTERPRISE_SLA.md (99.9% uptime commitment), INCIDENT_RESPONSE.md §18.2 (RTO/RPO targets), OBSERVABILITY.md §12 (pg_cron health monitoring table — items 5, 9, 13 update this table). Owner: devops-lead (operational monitoring, DR drill execution) + compliance-officer (evidence cadence, gap tracker).*
+
+---
+
+## §72 Processing Integrity Operating Evidence — PI1 Gap Remediation · PI-GAP-001 / PI-GAP-002 / PI-GAP-003 Closure · PI1.1/PI1.2/PI1.3 Auditor Exhibit
+
+> **Purpose:** This section closes three PI1 gaps introduced in §37 (Processing Integrity Controls — CV Coaching Pipeline): PI-GAP-001 (stuck-row escalation job not implemented), PI-GAP-002 (output-filter rejection rate not tracked in observability), and PI-GAP-003 (macro arithmetic NOT NULL constraint absent). Each gap represents a control specification that was authored but not deployed. §72 provides the deployment specification, evidence artefact catalogue, and operating evidence cadence required for PI1 Type II fieldwork. Upon full deployment, PI1.1/PI1.2/PI1.3 advance from 🟡 Partial to 🟢 Done across all five processing surfaces documented in §37.2.
+>
+> **SOC 2 criteria addressed:** PI1.1 (inputs captured completely and accurately), PI1.2 (processing is complete, accurate, timely, and authorized), PI1.3 (outputs are complete and accurate)
+>
+> **Owner:** platform-engineer (implementation) + compliance-officer (evidence cadence). Review: at each quarterly access review (§23).
+
+---
+
+### §72.1 Control Objective
+
+Processing Integrity (PI1) requires that system processing is complete, accurate, timely, and authorized. For FORM, this obligation is operationally consequential: the product delivers health and fitness coaching that users act on. Incomplete, inaccurate, or unauthorized processing of:
+
+- **Coaching turns** (Victor AI responses): silently dropped or incorrectly filtered responses mislead users about their training
+- **CV rep counts**: systematically high or low counts corrupt progressive overload decisions
+- **Wearable HRV data**: duplicate or missed readings distort recovery coaching
+- **Macro arithmetic**: silently zero-filled nutrient fields produce incorrect calorie and macro totals
+- **SCIM provisioning**: incomplete role assignments create access control failures (CC6.1 intersection)
+
+§37 documented five processing surfaces and their PI1.1/PI1.2/PI1.3 control specifications. Three gaps remained open at §37 authorship: the stuck-row escalation job (PI-GAP-001), the accuracy-signal observability metric (PI-GAP-002), and the macro NOT NULL constraint (PI-GAP-003). §72 closes all three.
+
+---
+
+### §72.2 PI-GAP-001 Closure — `coaching-completeness-monitor` pg_cron Job
+
+#### §72.2.1 Gap Definition
+
+PI-GAP-001 was opened in §37.4 because the `coaching_turns` state machine — which advances rows from `processing` to `completed` or `failed` — had no automated watchdog for rows that remained in `processing` indefinitely. Such rows indicate a dropped AI response, a timed-out Anthropic call, or a silent Worker crash. Under SOC 2 PI1.2 (completeness), every initiated processing transaction must reach a terminal state; FORM is unable to attest completeness if rows can stagnate in `processing` without detection.
+
+#### §72.2.2 `coaching-completeness-monitor` Job Specification
+
+A Supabase pg_cron job `coaching-completeness-monitor` runs every 5 minutes:
+
+```sql
+SELECT cron.schedule(
+  'coaching-completeness-monitor',
+  '*/5 * * * *',
+  $$
+    SELECT net.http_post(
+      url := 'https://api.form.coach/internal/coaching-completeness-check',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || current_setting('app.internal_worker_secret'),
+        'Content-Type', 'application/json'
+      ),
+      body := jsonb_build_object('triggered_by', 'pg_cron', 'ts', now()::text)
+    )
+  $$
+);
+```
+
+The `coaching-completeness-check` Cloudflare Worker implements the following logic:
+
+```typescript
+// Escalation threshold: 90 seconds in 'processing' (3× p95 Anthropic latency)
+const STUCK_THRESHOLD_SECONDS = 90;
+
+const { data: stuckRows } = await supabase
+  .from('coaching_turns')
+  .select('id, user_id, tenant_id, created_at')
+  .eq('status', 'processing')
+  .lt('created_at', new Date(Date.now() - STUCK_THRESHOLD_SECONDS * 1000).toISOString());
+
+for (const row of stuckRows ?? []) {
+  await supabase
+    .from('coaching_turns')
+    .update({ status: 'failed', error_code: 'COMPLETENESS_TIMEOUT', resolved_by: 'pg_cron_monitor' })
+    .eq('id', row.id);
+
+  await emitAuditEvent({
+    event_type: 'coaching.completeness_timeout',
+    severity: 'HIGH',
+    retention_years: 3,
+    payload: {
+      coaching_turn_id: row.id,
+      tenant_id: row.tenant_id,
+      stuck_duration_seconds: Math.round((Date.now() - new Date(row.created_at).getTime()) / 1000)
+    }
+  });
+}
+
+await emitAuditEvent({
+  event_type: 'coaching.completeness_check_passed',
+  severity: 'LOW',
+  retention_years: 3,
+  payload: { stuck_rows_found: stuckRows?.length ?? 0, check_ts: new Date().toISOString() }
+});
+```
+
+**PagerDuty routing:** If `stuckRows.length > 0`, dispatch PagerDuty P1 to `form-ops` service with deduplication key `coaching-completeness-{date}` and title `PI1.2 COMPLETENESS: {N} coaching turn(s) stuck in processing`.
+
+#### §72.2.3 New DEC-030 Event Types
+
+| Event type | Severity | Retention | Trigger |
+|---|---|---|---|
+| `coaching.completeness_timeout` | HIGH | 3 years | A `coaching_turns` row has been in `processing` for ≥ 90 seconds; row auto-failed; one event per affected row per check cycle |
+| `coaching.completeness_check_passed` | LOW | 3 years | Every 5-minute `coaching-completeness-monitor` run completed without error; operating evidence heartbeat |
+
+Both event types must be registered in `docs/AUDIT_LOG_SCHEMA.md` §6 event catalogue and Zod schemas deployed to the `emit-audit-event` Worker endpoint before PRE-72-E-001 can be filed.
+
+---
+
+### §72.3 PI-GAP-002 Closure — Output-Filter Rejection Rate Observability Metric
+
+#### §72.3.1 Gap Definition
+
+PI-GAP-002 was opened in §37.4 because the clinical safety output filter — which gates Victor coaching responses before delivery — did not emit a machine-readable rejection signal trackable in observability tooling. Under SOC 2 PI1.2 (accuracy), FORM must demonstrate that outputs are screened and that the screening mechanism is operating correctly. Without a rejection-rate metric, FORM cannot attest that the filter is active across all coaching sessions, cannot detect filter degradation, and cannot provide the auditor with an evidence extract showing the filter's operating history.
+
+#### §72.3.2 `coaching.output_filter_applied` DEC-030 Event
+
+Every Victor coaching turn that passes through the clinical safety output filter must emit a `coaching.output_filter_applied` DEC-030 event, regardless of whether the filter blocked or passed the response:
+
+```typescript
+await emitAuditEvent({
+  event_type: 'coaching.output_filter_applied',
+  severity: 'STANDARD',
+  retention_years: 3,
+  payload: {
+    coaching_turn_id: turn.id,
+    filter_result: filterResult.action,          // 'pass' | 'block' | 'redact'
+    filter_version: filterResult.version,
+    filter_latency_ms: filterResult.latencyMs,
+    block_reason_category: filterResult.action !== 'pass'
+      ? filterResult.blockCategory               // 'injury_advice' | 'ed_risk' | 'mental_health' | 'other'
+      : undefined
+    // Coaching content must NOT appear in the event payload
+  }
+});
+```
+
+**Privacy invariant:** Coaching turn content (user prompt, Victor response) must not appear in the event payload. The `block_reason_category` field uses a controlled four-value vocabulary.
+
+#### §72.3.3 Observability Dashboard — PI1.2 Accuracy Panel
+
+A dedicated **PI1 Accuracy** panel in the primary FORM observability dashboard (reference: OBSERVABILITY.md §4):
+
+| Metric | Definition | Warning threshold | Critical threshold |
+|---|---|---|---|
+| `coaching_output_filter_pass_rate` | `filter_result = 'pass'` events / total events, rolling 24h | < 97% | < 90% |
+| `coaching_output_filter_block_rate` | `filter_result = 'block'` events / total, rolling 24h | > 3% | > 10% |
+| `coaching_output_filter_latency_p95` | p95 of `filter_latency_ms`, rolling 1h | > 500ms | > 1000ms |
+| `coaching_output_filter_version` | Most recent `filter_version` seen; alert if unchanged > 90 days | Stale > 90 days | Stale > 180 days |
+
+Critical thresholds route to PagerDuty `form-ops` P1 with deduplication key `coaching-filter-{alert_type}-{date}`.
+
+---
+
+### §72.4 PI-GAP-003 Closure — Macro Arithmetic NOT NULL Constraint
+
+#### §72.4.1 Gap Definition
+
+PI-GAP-003 was opened in §37.4 because `meal_log_entries` allowed `protein_g`, `fat_g`, and `carbohydrate_g` to be NULL, and the mobile UI permitted partial saves with implied zeros. Under SOC 2 PI1.1 (inputs captured completely and accurately), all required fields in a processing transaction must be present before the transaction is committed. A NULL macro field produces silently incorrect calorie totals (treating NULL as 0), constituting a PI1.2 (accuracy) failure for every nutrition summary page rendered from that entry.
+
+#### §72.4.2 Migration Specification
+
+```sql
+-- Migration: 0047_meal_log_not_null_macros.sql
+-- PI-GAP-003 remediation
+BEGIN;
+
+UPDATE meal_log_entries
+SET
+  protein_g      = COALESCE(protein_g, 0),
+  fat_g          = COALESCE(fat_g, 0),
+  carbohydrate_g = COALESCE(carbohydrate_g, 0)
+WHERE protein_g IS NULL OR fat_g IS NULL OR carbohydrate_g IS NULL;
+
+INSERT INTO audit_logs (event_type, severity, payload, created_at)
+VALUES (
+  'system.migration_backfill_completed',
+  'STANDARD',
+  jsonb_build_object(
+    'migration', '0047_meal_log_not_null_macros',
+    'rows_affected', (SELECT COUNT(*) FROM meal_log_entries
+                      WHERE protein_g = 0 AND fat_g = 0 AND carbohydrate_g = 0),
+    'pi_gap', 'PI-GAP-003'
+  ),
+  now()
+);
+
+ALTER TABLE meal_log_entries
+  ALTER COLUMN protein_g      SET NOT NULL,
+  ALTER COLUMN fat_g          SET NOT NULL,
+  ALTER COLUMN carbohydrate_g SET NOT NULL;
+
+ALTER TABLE meal_log_entries
+  ADD CONSTRAINT meal_log_macros_non_negative
+  CHECK (protein_g >= 0 AND fat_g >= 0 AND carbohydrate_g >= 0);
+
+COMMIT;
+```
+
+**Mobile UI requirement:** The iOS app must reject the "Save" action if any macro field is empty or non-numeric, displaying an inline validation error before the API call. This is a UI-layer gate — the NOT NULL constraint is the database-layer gate. Both must be active before PI-GAP-003 closes to 🟢.
+
+**PI-GAP-003a (new, P2):** `calories_kcal` is a derived field; a computed-column migration (`GENERATED ALWAYS AS (ROUND(protein_g * 4 + fat_g * 4 + carbohydrate_g * 9, 2)) STORED`) is tracked separately and closes at mobile v1.0 feature freeze.
+
+---
+
+### §72.5 Evidence Artefacts (PRE-72-E-001 through PRE-72-E-006)
+
+| Evidence ID | Description | Format | Cadence | Criterion |
+|---|---|---|---|---|
+| **PRE-72-E-001** | `coaching.completeness_check_passed` event extract — confirms 5-minute PI1.2 completeness monitoring was continuously active for the 30-day window preceding fieldwork | CSV export from `audit_logs`; filed to `form-compliance:/evidence/pi1/completeness-checks/YYYY-MM.csv` | Monthly | PI1.2 |
+| **PRE-72-E-002** | `coaching.completeness_timeout` event extract — confirms any stuck coaching rows were detected and auto-resolved; zero-row CSV is a valid positive result | CSV export from `audit_logs` | At fieldwork | PI1.2 |
+| **PRE-72-E-003** | `coaching.output_filter_applied` event extract — confirms filter was applied to all coaching turns during the 30-day window preceding fieldwork | CSV export from `audit_logs`; filed to `form-compliance:/evidence/pi1/filter-applied/YYYY-MM.csv` | Monthly | PI1.2 |
+| **PRE-72-E-004** | PI1 Accuracy panel screenshot — `coaching_output_filter_pass_rate` ≥ 97% for 30 days preceding fieldwork | PNG screenshot from observability dashboard | At fieldwork | PI1.2 |
+| **PRE-72-E-005** | `\d meal_log_entries` psql screenshot — confirms NOT NULL constraints on macro fields and `meal_log_macros_non_negative` check constraint active | psql output screenshot | At deployment | PI1.1 |
+| **PRE-72-E-006** | Mobile UI inline validation screenshot — confirms empty macro field triggers validation error before save | Annotated screenshot | At feature release | PI1.1 |
+
+---
+
+### §72.6 Gap Tracker Update
+
+| Gap ID | Description | Pre-§72 status | §72 status | Closes to 🟢 when |
+|---|---|---|---|---|
+| **PI-GAP-001** | `coaching_turns` stuck-row escalation job not implemented | 🔴 Open | 🟡 **Authored** — `coaching-completeness-monitor` pg_cron job and Worker fully specified; two new DEC-030 event types defined | Job deployed + first `coaching.completeness_check_passed` event in `audit_logs` + PRE-72-E-001 filed |
+| **PI-GAP-002** | Output-filter rejection rate not tracked in observability | 🔴 Open | 🟡 **Authored** — `coaching.output_filter_applied` DEC-030 event specified; PI1 Accuracy panel specified with 4 metrics and alert thresholds | Event deployed to all coaching turns + PI1 Accuracy panel live + PRE-72-E-003 filed |
+| **PI-GAP-003** | `meal_log_entries` macro fields nullable; silent zero-fill produces incorrect calorie totals | 🔴 Open | 🟡 **Authored** — migration `0047_meal_log_not_null_macros.sql` fully specified; mobile UI validation requirement documented | Migration deployed + mobile UI validation confirmed + PRE-72-E-005 and PRE-72-E-006 filed |
+| **PI-GAP-003a (new)** | `calories_kcal` not enforced as computed column; can drift from macro values | 🔴 New — opened by §72 | 🔴 **Open** | `GENERATED ALWAYS AS` migration deployed + all calorie values verified |
+
+#### §72.6.1 Pre-Launch Readiness Checklist Rows Affected
+
+| Checklist ID | Description | Pre-§72 status | §72 status |
+|---|---|---|---|
+| **PI-GAP-001 / PRE-72-CHECK-01** | `coaching-completeness-monitor` deployed and PRE-72-E-001 filed | 🔴 New | 🟡 Authored — deployment pending |
+| **PI-GAP-002 / PRE-72-CHECK-02** | `coaching.output_filter_applied` event deployed + PI1 Accuracy panel live | 🔴 New | 🟡 Authored — deployment pending |
+| **PI-GAP-003 / PRE-72-CHECK-03** | Migration 0047 deployed + PRE-72-E-005 filed | 🔴 New | 🟡 Authored — deployment pending |
+
+---
+
+### §72.7 SOC 2 Criteria Mapping Summary
+
+| Criterion | AICPA requirement (paraphrased) | §72 mechanism | Primary evidence artefact(s) | Current status |
+|---|---|---|---|---|
+| **PI1.1** — Inputs complete and accurate | System captures inputs completely and accurately | `meal_log_entries` NOT NULL macro constraints (§72.4.2) + `meal_log_macros_non_negative` check constraint + mobile UI field validation | PRE-72-E-005; PRE-72-E-006 | 🟡 Authored — migration specified; deployment pending |
+| **PI1.2** — Processing complete, accurate, timely, authorized | Processing is complete, accurate, timely, and authorized | `coaching-completeness-monitor` 5-minute watchdog (§72.2); `coaching.completeness_timeout` HIGH DEC-030 for stuck rows; `coaching.output_filter_applied` STANDARD DEC-030 for every filtered turn; PI1 Accuracy observability panel (§72.3.3) | PRE-72-E-001/E-002 (completeness); PRE-72-E-003/E-004 (filter accuracy) | 🟡 Authored — job, event, and dashboard specified; deployment pending |
+| **PI1.3** — Outputs complete and accurate | System produces complete and accurate outputs | `coaching.output_filter_applied` events with `filter_result` confirm output gate active on every turn; `filter_version` confirms correct model/rules in use | PRE-72-E-003; PRE-72-E-004 | 🟡 Authored — event carries output-gate evidence; deployment pending |
+
+---
+
+### §72.8 Implementation Checklist
+
+#### P0 — Before First Enterprise Pilot
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy `coaching-completeness-monitor` pg_cron job (§72.2.2): schedule `*/5 * * * *`; confirm in `SELECT * FROM cron.job`; wait for first run; confirm `coaching.completeness_check_passed` LOW DEC-030 event in `audit_logs`; file confirmation as PRE-72-E-001 seed. | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Register `coaching.completeness_timeout` (HIGH, 3yr) and `coaching.completeness_check_passed` (LOW, 3yr) in `docs/AUDIT_LOG_SCHEMA.md` §6 with Zod schema; deploy to `emit-audit-event` Worker. | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Add `coaching.output_filter_applied` DEC-030 event (STANDARD, 3yr) to `docs/AUDIT_LOG_SCHEMA.md` §6; deploy to `emit-audit-event` Worker; instrument clinical safety output filter in Victor pipeline to emit event on every turn. | platform-engineer | **P0** | M5 | [ ] |
+| 4 | Deploy migration `0047_meal_log_not_null_macros.sql` to production Supabase; run `\d meal_log_entries` to confirm NOT NULL constraints and check constraint active; screenshot; file as PRE-72-E-005. | platform-engineer | **P0** | M5 | [ ] |
+| 5 | Confirm mobile build includes UI validation for macro fields (§72.4.2): empty or non-numeric macro field blocks "Save" tap with inline error; file annotated screenshot as PRE-72-E-006. | platform-engineer + ml-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before Observation Period Start (Month O-1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Deploy PI1 Accuracy observability panel (§72.3.3): four metrics with PagerDuty routing for critical thresholds; confirm all four metrics populate from `coaching.output_filter_applied` events. | devops-lead | **P1** | M5 | [ ] |
+| 7 | Add §15 compliance calendar entries: (a) "Monthly PI1.2 completeness evidence export — first business day of each month, PRE-72-E-001"; (b) "Monthly PI1.2 filter-applied evidence export — first business day of each month, PRE-72-E-003". | compliance-officer | **P1** | M5 | [ ] |
+| 8 | Update §51 Consolidated Gap Register: mark PI-GAP-001, PI-GAP-002, PI-GAP-003 as 🟡 Authored; open PI-GAP-003a (P2). | compliance-officer | **P1** | M5 | [ ] |
+| 9 | Add `coaching-completeness-monitor` to `pg-cron-health-monitor` 9-job registry in §71.2.2 as job 10: freshness window 15 minutes (3× the 5-minute schedule). Update OBSERVABILITY.md §12 pg_cron health monitoring table. | platform-engineer | **P1** | M5 | [ ] |
+| 10 | Add `coaching_output_filter_pass_rate` drop below 97% (24h rolling) as a new OBSERVABILITY.md §5 alert with PagerDuty P1 routing; add to INCIDENT_RESPONSE.md as a "PI1.2 accuracy incident" trigger. | devops-lead | **P1** | M5 | [ ] |
+
+#### P2 — Post-Observation Period / Ongoing
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | Deploy computed calories column (PI-GAP-003a): `calories_kcal NUMERIC(8,2) GENERATED ALWAYS AS (ROUND(protein_g * 4 + fat_g * 4 + carbohydrate_g * 9, 2)) STORED`; update API layer to remove client-supplied `calories_kcal`; file updated `\d meal_log_entries` as PRE-72-E-005b. | platform-engineer | **P2** | M6 | [ ] |
+| 12 | At observation period end: export full-period `coaching.completeness_check_passed` and `coaching.output_filter_applied` event CSVs to `form-compliance:/evidence/pi1/obs-period-YYYY/`. | compliance-officer | **P2** | Observation period end | [ ] |
+| 13 | Extend PI1.2 accuracy signal to CV pipeline: add `cv.rep_count_confidence_below_threshold` DEC-030 event for each low-confidence rep (threshold: keypoint confidence < 0.65 per §37.5); dashboard panel showing daily low-confidence rep rate. | ml-engineer | **P2** | M6 | [ ] |
+
+---
+
+*v1.0 (2026-06-08): §72 Processing Integrity Operating Evidence — PI1 Gap Remediation · PI-GAP-001 / PI-GAP-002 / PI-GAP-003 Closure. Closes three open PI1 gaps from §37: PI-GAP-001 (🔴 Open → 🟡 Authored — `coaching-completeness-monitor` 5-minute pg_cron watchdog; auto-escalates stuck `coaching_turns` rows ≥ 90s from `processing` to `failed`; `coaching.completeness_timeout` HIGH DEC-030 per affected row; `coaching.completeness_check_passed` LOW DEC-030 heartbeat per 5-minute cycle; PagerDuty P1 on stuck-row detection; job 10 added to `pg-cron-health-monitor` registry with 15-minute freshness window), PI-GAP-002 (🔴 Open → 🟡 Authored — `coaching.output_filter_applied` STANDARD DEC-030 on every Victor coaching turn's clinical safety output filter; PI1 Accuracy observability panel with 4 metrics: pass_rate/block_rate/latency_p95/filter_version-staleness; critical thresholds route to PagerDuty P1; privacy invariant: no coaching content in payload; block_reason_category uses 4-value controlled vocabulary), PI-GAP-003 (🔴 Open → 🟡 Authored — migration `0047_meal_log_not_null_macros.sql`: COALESCE backfill + NOT NULL constraints on `protein_g`, `fat_g`, `carbohydrate_g` + `meal_log_macros_non_negative` CHECK constraint; mobile UI validation blocks "Save" on empty/non-numeric macro fields; `system.migration_backfill_completed` STANDARD DEC-030 at migration time). New gap PI-GAP-003a (P2 — computed `calories_kcal` column; closes at mobile v1.0 feature freeze). Six evidence artefacts PRE-72-E-001 through PRE-72-E-006. 13-item implementation checklist (5× P0 M5, 5× P1 M5, 3× P2). SOC 2 criteria: PI1.1 (meal log NOT NULL), PI1.2 (completeness watchdog + filter accuracy), PI1.3 (filter event as output-gate evidence). Cross-references: §37 (PI1 controls baseline), §37.4 (coaching pipeline state machine), §37.5 (CV rep count confidence threshold), §71.2.2 (pg_cron health monitor — extended to 10 jobs by §72), AUDIT_LOG_SCHEMA.md §6 (new event types), OBSERVABILITY.md §5 (PI1.2 accuracy alert), OBSERVABILITY.md §12 (pg_cron health table update), INCIDENT_RESPONSE.md (PI1.2 accuracy incident trigger). Owner: platform-engineer (implementation) + compliance-officer (evidence cadence).*
