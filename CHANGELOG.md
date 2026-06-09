@@ -6,6 +6,18 @@
 
 ---
 
+## [3.15.0] — 2026-06-09
+
+### Added
+- [`content/post-369-neural-efficiency-vs-hypertrophy.md`](content/post-369-neural-efficiency-vs-hypertrophy.md) — Нейральна ефективність vs гіпертрофія: Moritani & deVries (1979) EMG, Folland & Williams (2007) хронологія, практичний діагноз; clinical-safety NOT REQUIRED
+- [`content/post-370-caffeine-training.md`](content/post-370-caffeine-training.md) — Кофеїн і тренування: Astorino & Roberson (2010) мета-аналіз, механізм аденозинової блокади, толерантність і wash-out, 3–6 мг/кг дозування, CYP1A2 варіабельність; clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — roadmap секція ROADMAP (post-365+): оновлено статуси posts 365–368 (фактичні теми замість планованих), додано posts 369–370 як виконані, встановлено roadmap post-371+
+- `README.md` — чекліст posts 360, 361 позначено як [x] з посиланням на фактичні файли (post-369, post-370)
+
+---
+
 ## [3.14.1] — 2026-06-09
 
 ### Changed
