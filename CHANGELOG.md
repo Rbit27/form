@@ -6,6 +6,15 @@
 
 ---
 
+## [3.5.1] — 2026-06-09
+
+### Changed
+- `docs/OBSERVABILITY.md` → v2.0 — §6.2 `c1_erasure_sla` subsection added: AL-C1-01 (GDPR Art. 17 erasure SLA day-33 warning, P1, PagerDuty `form-compliance` → compliance-officer, dedup `c1-erasure-sla-breach-{dsar_request_id}`, 24 h re-alert, SOC 2 C1.2/P5.2). Closes cross-reference from SOC2_READINESS.md §73.
+- `docs/AUDIT_LOG_SCHEMA.md` → v0.8 — new `Compliance operating evidence events` section: 4 HMAC-chained DEC-030 events (`compliance.data_asset_inventory_reviewed` STANDARD/3yr, `compliance.encryption_verified` STANDARD/3yr, `compliance.erasure_sla_alert_fired` HIGH/7yr, `compliance.disposal_audit_completed` STANDARD/3yr). Retention table updated. Closes SOC2_READINESS.md §73 AUDIT_LOG_SCHEMA cross-reference.
+- `VERSION` — 3.5.0 → 3.5.1
+
+---
+
 ## [3.5.0] — 2026-06-09
 
 ### Added

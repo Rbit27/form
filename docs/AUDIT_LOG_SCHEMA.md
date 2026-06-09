@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v0.6
+# FORM · Audit Log Schema v0.8
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -267,6 +267,23 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 
 ---
 
+### Compliance operating evidence events (DEC-030 HMAC-chained · C1.1/C1.2/P5.2 · SOC2_READINESS.md §73)
+
+> Defined in `docs/SOC2_READINESS.md §73`. Four events providing the C1 Confidentiality TSC operating evidence cadence — the operational counterparts to the A1 (`system.cron_*`) and PI1 (`billing.*` / `coaching.*`) evidence streams. Privacy invariant: no `user_id`, `dsar_request_id`, tenant email, health values, or disposal serial numbers in any payload — operational counts, compliance metadata, and `device_asset_id` references only. The `erasure_sla_alert_fired` payload contains only `breach_count` (integer) and alert metadata; a chain audit that exposes individual DSAR identifiers is a privacy floor violation. Cross-ref: SOC 2 C1.1/C1.2/P5.2; `docs/OBSERVABILITY.md §6.2 c1_erasure_sla` subsection.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `compliance.data_asset_inventory_reviewed` | STANDARD | 3 yr | Quarterly data asset inventory review completed per §73.2.1 cadence | `review_date`, `reviewer_user_id`, `asset_register_commit_sha`, `items_reviewed_count`, `changes_detected` (bool) |
+| `compliance.encryption_verified` | STANDARD | 3 yr | Annual DDL encryption-at-rest verification completed per §73.2.2 | `verification_date`, `verifier_user_id`, `tables_verified_count`, `all_encrypted` (bool), `evidence_path` (`compliance/evidence/c1/encryption-verification-YYYY.md`) |
+| `compliance.erasure_sla_alert_fired` | HIGH | 7 yr | pg_cron `c1-erasure-sla-monitor` (daily 08:00 UTC) detects ≥ 1 open Art. 17 erasure request with `submitted_at < now() - INTERVAL '33 days'`; implements AL-C1-01 in §73.3.1 | `breach_count` (integer — count only, no IDs), `alert_id: "AL-C1-01"`, `threshold_days: 33` |
+| `compliance.disposal_audit_completed` | STANDARD | 3 yr | Quarterly/annual device disposal audit completed per §73.3.2 cadence | `audit_date`, `auditor_user_id`, `audit_scope` (`quarterly`\|`annual`), `devices_reviewed_count`, `disposals_completed_count`, `evidence_path` |
+
+**HMAC chain requirement:** `compliance.erasure_sla_alert_fired` is HIGH severity and must be emitted synchronously within the pg_cron job — if the `net.http_post` call to `emit-audit-event` fails, the pg_cron job failure surfaces as `system.cron_job_stale` (AL-CRON-01 via §12.6 health monitor). C1-CHAIN-01/02/03 monitors (defined in SOC2_READINESS.md §73.2–§73.3) enforce that each cadenced event type recurs within 100 days; absence triggers PagerDuty P1 on the `form-compliance` service.
+
+**Emitter assignment:** `compliance.data_asset_inventory_reviewed` and `compliance.encryption_verified` — `compliance-officer` (manual via admin API at cadence); `compliance.erasure_sla_alert_fired` — `form_system` (automated, pg_cron `c1-erasure-sla-monitor`); `compliance.disposal_audit_completed` — `compliance-officer` (manual at audit completion).
+
+---
+
 ### Support actions (highest privilege)
 - `support.impersonation_started` — FORM employee acting as customer
 - `support.impersonation_ended`
@@ -304,6 +321,8 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 | `security.rls_bypass_attempt` / `security.definer_function_cross_tenant` | 7 years | Tenant isolation breach evidence; SOC 2 CC6.6/PI1.5 |
 | `asset.*` (device disposal) | 7 years | SOC 2 C1.2 confidential media disposal + CC6.5 access termination evidence |
 | `vuln.*` (vulnerability management) | 7 years | SOC 2 CC7.1 threat identification + CC7.2 remediation tracking evidence; `vuln.sla_exception_granted` also maps to CC7.4 (response to identified events) |
+| `compliance.erasure_sla_alert_fired` | 7 years | SOC 2 C1.2/P5.2 GDPR Art. 17 erasure SLA monitoring evidence; belt-and-suspenders secondary signal to §70 DSAR automation |
+| `compliance.data_asset_inventory_reviewed` / `compliance.encryption_verified` / `compliance.disposal_audit_completed` | 3 years | C1 operating evidence cadence records; routine compliance audit completion records per SOC2_READINESS.md §73 |
 | `support.*` | 10 years | Trust + future legal discovery |
 | `support.unauthorized_nuke_attempt` | 7 years | Internal safety control violation record |
 | `integration.api_call` (sampled) | 30 days | Volume management |
@@ -375,6 +394,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v0.8 · 2026-06-09 · owner: compliance-officer + devops-lead**
+*v0.8 (2026-06-09): +4 `compliance.*` C1 operating evidence events — `compliance.data_asset_inventory_reviewed` (STANDARD, 3yr), `compliance.encryption_verified` (STANDARD, 3yr), `compliance.erasure_sla_alert_fired` (HIGH, 7yr), `compliance.disposal_audit_completed` (STANDARD, 3yr). All HMAC-chained; defined in `docs/SOC2_READINESS.md §73`. Privacy invariant: no user_id, dsar_request_id, or health values in any payload. Retention table updated with 2 new rows. Closes SOC2_READINESS.md §73 cross-reference to AUDIT_LOG_SCHEMA.md ("four new DEC-030 events"). Emitters: form_system for erasure_sla_alert_fired (automated pg_cron `c1-erasure-sla-monitor`); compliance-officer (manual) for the other three cadenced events. Cross-ref: OBSERVABILITY.md §6.2 `c1_erasure_sla` subsection (AL-C1-01); SOC2_READINESS.md §73.4 (C1 DEC-030 event table).*
 
 **v0.7 · 2026-06-08 · owner: compliance-officer + devops-lead**
 *v0.7 (2026-06-08): +3 `system.cron_*` pg_cron health monitoring events — `system.cron_job_stale` (HIGH, 7yr), `system.cron_health_check_passed` (LOW, 3yr), `system.cron_health_check_failed` (HIGH, 7yr). All HMAC-chained; emitted by `pg-cron-health-monitor` Supabase Edge Function (schedule: `0 * * * *`). Payload fields per §71.2.2 DEC-030 event table. Retention table updated with 3 new rows. Closes SOC2_READINESS.md §71.8 item 2 (P0 M5 — DEC-030 registration for all three cron health event types). Cross-ref: SOC2_READINESS.md §71.2.2 (9-job registry + freshness windows), OBSERVABILITY.md §12.6 (canonical pg_cron job registry). Privacy note: no `user_id` or `tenant_id` in any cron health event — operational metadata only.*

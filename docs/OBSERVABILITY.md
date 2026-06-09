@@ -478,6 +478,12 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 | **HMAC chain cadence breach** | `HMAC_AUDIT_CHAIN_KEY` last rotation > 395 days ago | P1 | PagerDuty → security-engineer + compliance-officer | §30.4 AL-KEY-03; SOC2_READINESS.md §58 |
 | **HMAC chain verification missing** | `admin.hmac_key_rotated` event with no `admin.hmac_key_rotation_verified` within 24 h | P0 | PagerDuty → security-engineer + platform-engineer | §30.4 AL-KEY-04; INCIDENT_RESPONSE.md R-21 |
 
+**Subsection: `c1_erasure_sla` (AL-C1-01 — SOC2_READINESS.md §73.3.1):**
+
+| Alert Name | Trigger Condition | Severity | Notification Channel | Runbook |
+|---|---|---|---|---|
+| **GDPR erasure SLA day-33 warning** | Any open Art. 17 erasure request in `dsar_requests` (type = `erasure`, status ≠ `fulfilled`/`rejected`) where `submitted_at < now() - INTERVAL '33 days'`; pg_cron `c1-erasure-sla-monitor` (daily 08:00 UTC, job 11 in §12.6 pg_cron registry); re-alerts every 24 h; dedup key `c1-erasure-sla-breach-{dsar_request_id}` | P1 | PagerDuty `form-compliance` → compliance-officer; Slack `#security-alerts` HIGH | SOC2_READINESS.md §73.3.1 AL-C1-01; INCIDENT_RESPONSE.md R-14 (per-user Art. 17 escalation path); belt-and-suspenders to §70 DSAR day-25/day-29 P0/P1 alerts |
+
 ### 6.3 Alert Tuning Rules
 
 - An alert that fires as a false positive more than twice in 30 days must be tuned. Do not suppress — adjust the threshold or add a stabilization window.
@@ -7069,6 +7075,8 @@ Four hard constraints enforced at the instrumentation layer:
 | OQ-CRYPTO-OBS-02 | **Can TLS certificate expiry for form.coach and *.form.coach be monitored exclusively via Better Stack SSL monitoring (external synthetic check), or does the Cloudflare certificate API need to be queried directly?** Better Stack SSL monitoring checks the certificate presented at the TLS handshake — it detects expiry but not upcoming renewal failures or Cloudflare-side provisioning errors. The Cloudflare certificate API (via `GET /zones/{zone_id}/ssl/certificate_packs`) provides renewal status and error codes. Recommendation: Better Stack SSL as primary signal (CRYPTO-E-007); add Cloudflare API poll as secondary check if the first renewal failure goes undetected in staging. | devops-lead | **P2** | M5 |
 
 ---
+
+*v2.0 (2026-06-09): §6.2 `c1_erasure_sla` subsection — AL-C1-01 GDPR Art. 17 erasure SLA day-33 warning added to the consolidated §6.2 Alert Rules table. Closes the cross-reference from `docs/SOC2_READINESS.md §73` ("docs/OBSERVABILITY.md §6.2 — AL-C1-01 to be added to c1_erasure_sla alert rules subsection"). Trigger: pg_cron `c1-erasure-sla-monitor` (daily 08:00 UTC, job 11 in §12.6 pg_cron registry) fires when any open erasure request is > 33 days old; P1 severity; PagerDuty `form-compliance` service → compliance-officer + Slack `#security-alerts` HIGH; re-alerts every 24 h; dedup key `c1-erasure-sla-breach-{dsar_request_id}`; belt-and-suspenders to §70 DSAR day-25/day-29 P0/P1 alerts. SOC 2 C1.2/P5.2 evidence. Cross-ref: SOC2_READINESS.md §73.3.1 AL-C1-01; INCIDENT_RESPONSE.md R-14; AUDIT_LOG_SCHEMA.md v0.8 `compliance.erasure_sla_alert_fired` (HIGH, 7yr). Owner: devops-lead.*
 
 *v1.9 (2026-06-08): §12.6 pg_cron health monitoring job registry — canonical registry of 9 production pg_cron jobs monitored by the `pg-cron-health-monitor` Edge Function (schedule: `0 * * * *`). Table columns: job name, UTC schedule, freshness window, compliance relevance, PagerDuty routing. P0 alert jobs: `audit-chain-daily-check` (26 h), `row-count-monitor` (1 h), `audit-event-flush` (2 h). P1 alert jobs: `dsar-sla-day25-alert`, `dsar-sla-day29-alert`, `dsar-export-expiry-cleanup`, `mfa-enforcement-log-cleanup`, `workout-export`, `security-counter-daily-cleanup` (all 26 h). DEC-030 event table: `system.cron_job_stale` (HIGH, 7yr), `system.cron_health_check_passed` (LOW, 3yr), `system.cron_health_check_failed` (HIGH, 7yr) — all registered in AUDIT_LOG_SCHEMA.md v0.7. Privacy invariant documented (no user_id/tenant_id in any cron health event). Closes SOC2_READINESS.md §70.11 item 10 (P1 M5 — DSAR cron jobs added to pg_cron registry) and §71.8 item 5 (P0 M5 — all three cron health events added alongside job registry). Deployment status: A1-GAP-004 🟡 Authored. Owner: devops-lead.*
 
