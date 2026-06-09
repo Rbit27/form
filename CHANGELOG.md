@@ -6,6 +6,16 @@
 
 ---
 
+## [3.10.0] — 2026-06-09
+
+### Added
+- [`docs/MSA_TEMPLATE.md`](docs/MSA_TEMPLATE.md) — Master Service Agreement template v0.1. 19-article commercial contract governing all enterprise customer relationships. Covers: license grant and restrictions, Privacy Floor (§8, non-negotiable, 8 specific restrictions), Acceptable Use / prohibited use-cases (§9, insurance risk-scoring, gov backdoors, wellness-as-punishment), CUEC obligations (§10), data export and deletion windows (30-day non-renewal / 14-day early termination), Art. 9 health data zero-grace-period deletion (DEC-036), AI training prohibition (§5.3, aligns with Anthropic enterprise DPA), 72h GDPR breach notification (§16), white-label conditionality (≥$50k ARR), CCPA SPA addendum path for US customers. Exhibits: Exhibit A (Order Form), Exhibit B (→ `docs/ENTERPRISE_SLA.md`), Exhibit C (→ `docs/SUBPROCESSORS.md §5` DPA), Exhibit D (TOMs summary), Exhibit E (AUP). References: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md`. Pre-legal-review draft — outside counsel review required before first execution. Closes gap identified in `docs/ENTERPRISE_ONBOARDING.md` ("MSA counter-signed by both parties" step) and `docs/GDPR_DPIA.md §10.2.3` ("DPA template for enterprise customers — controller-to-controller addendum, Month 3").
+
+### Changed
+- `VERSION` — 3.9.0 → 3.10.0
+
+---
+
 ## [3.9.0] — 2026-06-09
 
 ### Added
