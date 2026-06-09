@@ -6,6 +6,19 @@
 
 ---
 
+## [3.19.0] — 2026-06-09
+
+### Added
+- `content/post-375-adaptation-vs-result.md` — Адаптація vs результат: Selye GAS, Damas et al. (2016) SMP lag, Moritani & deVries нейральна фаза, Cholewa (2017) дискордантність, Seaborne (2018) епігенетична пам'ять, 5 практичних маркерів адаптації без дзеркала. Clinical-safety NOT REQUIRED. ~12 хв читання.
+- `content/post-376-shift-workers-programming.md` — Програмування для двозмінників: Ralston et al. (2017) об'єм > частота, Bickel (2011) поріг збереження 1/9, A/B/C сесійний тиринг, обробка пауз 48–96 год і 5+ днів, деловантаження за станом. Clinical-safety NOT REQUIRED. ~11 хв читання.
+- `content/post-377-listen-to-your-body-myth.md` — Чому «прислухайся до тіла» не є порадою: Noakes (2011) центральний губернатор, Morgan (1994) упередженість настрою, Buchheit (2014) HRV-тренд vs одиночне читання, Halperin (2015) RPE-дискордантність. Операційна заміна з порогами. Clinical-safety NOT REQUIRED. ~12 хв читання.
+
+### Changed
+- `blog.html` — +3 картки (post-375/376/377); лічильники: 296 → 319 статей, 3 848 → 3 883 хв читання, hero label оновлено.
+- `VERSION` — 3.18.1 → 3.19.0
+
+---
+
 ## [3.18.1] — 2026-06-09
 
 ### Changed
