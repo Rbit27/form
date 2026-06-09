@@ -6,6 +6,20 @@
 
 ---
 
+## [3.4.0] — 2026-06-09
+
+### Added
+- `content/post-347-aerobic-base-strength-training.md` — «Кардіо не вбиває м'язи. Але низький VO2max вбиває твій об'єм»: Wilson та ін. (2012) мета-аналіз 21 дослідження — interference на гіпертрофію і силу <5%; Zone 2 як база аеробної ємності; Bogdanis та ін. (1995) — ресинтез PCr між підходами корелює з VO2max; Mitchell та ін. (2018) — aerobic capacity = capacity to recover; практична інтеграція (модальність / тривалість / частота / separation). Clinical-safety NOT REQUIRED. 9 хв читання.
+- `content/post-350-self-managed-training-journal.md` — «Тренувальний журнал без додатків — чотири параметри, які замінюють все»: вправа+конфігурація / вага / повторення / RPE або RIR; шкала Tuchscherer/Zourdos (2016 JSCR) + Helms (2016 IJSPP); стагнація (RPE повзе вгору) vs плато (RPE стабільна, прогрес зупинився) — різні проблеми, різні рішення; шаблон тижня; аргументи за папір vs апп; ретроспектива кожні 4 тижні. Clinical-safety NOT REQUIRED. 9 хв читання.
+- `blog.html` — дві нові картки post-347 і post-350 (294 cards total)
+- `README.md` — post-347 і post-350 позначено [x]
+- `STATUS.md` — оновлено лічильник постів (347 authored), blog.html до v3.4.0
+
+### Changed
+- `VERSION` — 3.3.2 → 3.4.0
+
+---
+
 ## [3.3.2] — 2026-06-09
 
 ### Added
