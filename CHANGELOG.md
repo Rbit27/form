@@ -6,6 +6,14 @@
 
 ---
 
+## [3.14.1] — 2026-06-09
+
+### Changed
+- `docs/SOC2_READINESS.md` v3.5.3 — **PRE-01 / P-GAP-001 stale-status patch**: aligns 9 gap-register locations with DEC-037 (`privacy.html` created 2026-06-09). PRE-01 pre-observation checklist (§15.2): 🔴 Open → 🟡 Authored. First-Year Priority table (§15.3): 🔴 P1 → 🟡 P1 with remaining steps. CC2-GAP-002 description + checklist (§30.3/§30.4): note `privacy.html` authored, update priority to 🟡 P0 partially mitigated. PRV-01 (§35.3): 🔴 Gap — P-GAP-001 → 🟡 Authored. PRV-03 (§35.3): 🔴 Gap — P-GAP-003 → 🟡 Authored (§74 `form-consent-gate`). PRV-04 (§35.3): 🔴 Gap → 🟡 Partial. P-GAP-001 (§35.11): priority P0 pre-launch blocker → P1 🟡 Authored; remediation ✅ authored + Remaining. P-GAP-003 (§35.11): priority P1 → P1 🟡 Authored; remediation ✅ §74 + Remaining deployment. Doc header v3.3 → v3.5.3. Owner: compliance-officer (DEC-037 reference: `docs/DECISION_LOG.md`).
+- `VERSION` — 3.14.0 → 3.14.1
+
+---
+
 ## [3.14.0] — 2026-06-09
 
 ### Added
