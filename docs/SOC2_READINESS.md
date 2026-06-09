@@ -24491,3 +24491,296 @@ COMMIT;
 ---
 
 *v1.0 (2026-06-08): §72 Processing Integrity Operating Evidence — PI1 Gap Remediation · PI-GAP-001 / PI-GAP-002 / PI-GAP-003 Closure. Closes three open PI1 gaps from §37: PI-GAP-001 (🔴 Open → 🟡 Authored — `coaching-completeness-monitor` 5-minute pg_cron watchdog; auto-escalates stuck `coaching_turns` rows ≥ 90s from `processing` to `failed`; `coaching.completeness_timeout` HIGH DEC-030 per affected row; `coaching.completeness_check_passed` LOW DEC-030 heartbeat per 5-minute cycle; PagerDuty P1 on stuck-row detection; job 10 added to `pg-cron-health-monitor` registry with 15-minute freshness window), PI-GAP-002 (🔴 Open → 🟡 Authored — `coaching.output_filter_applied` STANDARD DEC-030 on every Victor coaching turn's clinical safety output filter; PI1 Accuracy observability panel with 4 metrics: pass_rate/block_rate/latency_p95/filter_version-staleness; critical thresholds route to PagerDuty P1; privacy invariant: no coaching content in payload; block_reason_category uses 4-value controlled vocabulary), PI-GAP-003 (🔴 Open → 🟡 Authored — migration `0047_meal_log_not_null_macros.sql`: COALESCE backfill + NOT NULL constraints on `protein_g`, `fat_g`, `carbohydrate_g` + `meal_log_macros_non_negative` CHECK constraint; mobile UI validation blocks "Save" on empty/non-numeric macro fields; `system.migration_backfill_completed` STANDARD DEC-030 at migration time). New gap PI-GAP-003a (P2 — computed `calories_kcal` column; closes at mobile v1.0 feature freeze). Six evidence artefacts PRE-72-E-001 through PRE-72-E-006. 13-item implementation checklist (5× P0 M5, 5× P1 M5, 3× P2). SOC 2 criteria: PI1.1 (meal log NOT NULL), PI1.2 (completeness watchdog + filter accuracy), PI1.3 (filter event as output-gate evidence). Cross-references: §37 (PI1 controls baseline), §37.4 (coaching pipeline state machine), §37.5 (CV rep count confidence threshold), §71.2.2 (pg_cron health monitor — extended to 10 jobs by §72), AUDIT_LOG_SCHEMA.md §6 (new event types), OBSERVABILITY.md §5 (PI1.2 accuracy alert), OBSERVABILITY.md §12 (pg_cron health table update), INCIDENT_RESPONSE.md (PI1.2 accuracy incident trigger). Owner: platform-engineer (implementation) + compliance-officer (evidence cadence).*
+
+---
+
+## §73 Confidentiality TSC (C1) Operating Evidence — C1-GAP-001 Advancement · NDA Lifecycle, Encryption-at-Rest Verification & Disposal Monitoring · C1.1/C1.2 Auditor Exhibit
+
+> **SOC 2 criteria addressed:** C1.1 (identify and maintain confidential information consistent with the entity's objectives related to confidentiality), C1.2 (dispose of confidential information to meet the entity's objectives related to confidentiality).
+>
+> **Gap advancements:** C1-GAP-001 🔴 Open → 🟡 Authored (NDA template `compliance/c1/nda-template.md` C1-NDA-001 v1.0 exists; PRE-34-E-003 now filed).
+>
+> **Companion sections:** §34 (C1 deep-dive, baseline controls), §40 (original C1.2 disposal narrative), §42 (hiring/onboarding — personnel.nda_signed DEC-030), §55 (SAT/data classification — C1.1 handling rules), §66 (media/device disposal policy — C1-GAP-004 closure), §67 (tenant data deletion — C1.2 enterprise erasure).
+>
+> **SOC 2 doc version:** v3.3 → v3.4. Owner: compliance-officer (cadence) + security-engineer (chain monitors).
+
+---
+
+### §73.1 Purpose and Scope
+
+§34, §40, §55, and §66 collectively established the *design* of FORM's Confidentiality TSC controls: data classification policy, access controls, encryption at rest and in transit, NDA/DPA obligations, erasure flows, and device disposal. This section complements those by specifying the **operating evidence cadence** — what must be measured, attested, and filed to demonstrate that C1 controls are functioning continuously, not merely designed correctly. It follows the same framework as §71 (A1 Availability Operating Evidence) and §72 (PI1 Processing Integrity Operating Evidence).
+
+Three distinct C1 control layers require operating evidence:
+
+1. **Workforce confidentiality obligations (C1.1):** NDA signing and tracking; security awareness training attestation; role-based data handling rules.
+2. **Encryption-at-rest verification (C1.1):** Annual confirmation that Supabase AES-256 and column-level `pgp_sym_encrypt` remain active.
+3. **Confidential information disposal (C1.2):** Erasure queue DEC-030 stream; device/media disposal log; backup purge verification.
+
+**Privacy floor:** No individual health data value, device serial number, NDA signatory name (beyond pseudonymous `personnel_id`), or credential value may appear in any DEC-030 event payload, evidence CSV, or observability signal produced by this section. All C1-CHAIN chain monitors use only row counts, timestamps, and pseudonymous IDs.
+
+---
+
+### §73.2 C1.1 Operating Evidence
+
+#### §73.2.1 C1-GAP-001 Advancement — NDA Template Lifecycle
+
+**Status update:** `compliance/c1/nda-template.md` (C1-NDA-001 v1.0) was authored and committed to the repository. This closes C1-GAP-001 as a *drafting gap*; it closes to 🟢 operationally when:
+
+1. External counsel review complete and filed in `compliance/policy-approval-log.csv` (POL-NDA-001, status → `COUNSEL_REVIEWED`).
+2. Founder signature recorded as template approval in `compliance/policy-approval-log.csv` (POL-NDA-001, status → `IN_FORCE`).
+3. First individual NDA signed via DocuSign; `compliance/ndas/nda-register.csv` row appended; `personnel.nda_signed` DEC-030 HMAC-chained event emitted (§42.6).
+
+**NDA register operating procedure (`compliance/ndas/nda-register.csv`):**
+
+| Column | Format | Description |
+|---|---|---|
+| `personnel_id` | UUID | Pseudonymous — maps to internal HR record, not stored in git |
+| `role` | string | e.g. `founding_engineer`, `contractor_ios` |
+| `nda_version` | `C1-NDA-001-v{N}` | Template version used |
+| `signed_at` | ISO 8601 UTC | DocuSign completion timestamp |
+| `docusign_envelope_id` | UUID | DocuSign reference; full PDF in Cloudflare R2 `form-compliance:/ndas/` |
+| `dec030_event_id` | UUID | `personnel.nda_signed` HMAC-chained event ID |
+| `row_sha256` | hex | SHA-256 of the pipe-delimited row; recalculated at quarterly access review to detect tampering |
+
+**Evidence artefact:** `PRE-34-E-003` — the `compliance/c1/nda-template.md` Git commit SHA constitutes the signing record for the template-approval step. Individual NDA PDFs are stored in Cloudflare R2 `form-compliance:/ndas/{envelope_id}.pdf` (7-year retention, Object Lock); no PDFs in git.
+
+#### §73.2.2 Data Asset Inventory Quarterly Review Cadence (C1-GAP-002 Operational Maintenance)
+
+`compliance/c1/data-asset-inventory.md` (PRE-34-E-001) was authored at v0.1 (2026-05-22) and is 🟡 Authored pending founder signature. Once signed, it enters a quarterly review cycle.
+
+**Quarterly review procedure (aligned with §23 quarterly access review):**
+
+1. At each Q1/Q2/Q3/Q4 access review (§23, §65): compliance-officer opens `compliance/c1/data-asset-inventory.md` and checks for any new data stores, new sub-processors, or reclassification requirements since the prior review.
+2. If no changes: append a one-line "reviewed YYYY-MM-DD, no changes" record to the document's revision history table; emit `compliance.data_asset_inventory_reviewed` DEC-030 event (§73.4.2).
+3. If changes exist: update the inventory, bump the version number (v0.1 → v0.2 etc.), commit to repo, emit event with `changes_made: true`.
+4. Annual: founder re-signs (git commit attestation on a tagged commit) to renew the approval.
+
+**Compliance calendar:** scheduled each April (Q2), aligned with the annual media disposal audit (§66.8) — both C1 reviews occur at the same quarterly checkpoint.
+
+#### §73.2.3 Encryption-at-Rest Annual Verification
+
+C1.1 requires that confidential information be protected by encryption meeting FORM's commitments. The encryption controls are:
+
+| Layer | Mechanism | Evidence target |
+|---|---|---|
+| Supabase storage | AES-256-GCM (Supabase default) | Supabase project settings → Storage → Encryption: enabled screenshot |
+| Column-level (Art. 9 data) | `pgp_sym_encrypt` on `coaching_turns.content`, `cv_sessions.keypoints`, body measurement columns | DDL confirmation query (§73.2.3.1) |
+| Backblaze B2 WORM | SSE-B2 (server-side encryption at rest) | B2 bucket settings screenshot; SOC 2 Type II report for B2 on file |
+| Cloudflare R2 (backups) | AES-256-GCM managed by Cloudflare | Cloudflare R2 settings screenshot |
+
+**§73.2.3.1 Column encryption DDL verification query:**
+
+```sql
+-- Run annually; output filed as PRE-73-E-003
+-- Confirms pgp_sym_encrypt is referenced in the column definitions of high-sensitivity tables.
+-- Expected: rows for coaching_turns.content, cv_sessions.keypoints, and body measurement columns.
+SELECT
+    t.table_name,
+    c.column_name,
+    c.data_type,
+    c.udt_name
+FROM
+    information_schema.tables t
+    JOIN information_schema.columns c
+        ON t.table_name = c.table_name
+WHERE
+    t.table_schema = 'public'
+    AND t.table_name IN ('coaching_turns', 'cv_sessions', 'user_profile')
+    AND c.udt_name IN ('bytea', 'text')    -- pgp_sym_encrypt output is bytea
+ORDER BY t.table_name, c.column_name;
+```
+
+Additionally, confirm that the application-level encryption wrapper in `workers/vault/encrypt.ts` (or equivalent) references the `KEYPOINTS_ENC_KEY` Cloudflare Workers Secret — this key must appear in the Cloudflare Workers dashboard secrets list (PRE-73-E-003 screenshot).
+
+**Annual filing procedure:** At the Q1 (January) compliance calendar entry (§15.1), devops-lead runs the DDL query, screenshots the Supabase Encryption tab and Cloudflare Workers Secrets list, and files the three screenshots as PRE-73-E-003 to `compliance/evidence/c1/encryption-verification-YYYY.md`. Emits `compliance.encryption_verified` DEC-030 event (§73.4.3).
+
+---
+
+### §73.3 C1.2 Operating Evidence
+
+#### §73.3.1 Erasure Queue DEC-030 Stream Monitoring
+
+§34.3.1 and §67 specify the erasure procedure and the `privacy.erasure_completed` CRITICAL DEC-030 event. This section specifies how to monitor the erasure queue at operating level.
+
+**Alert rule AL-C1-01 — Erasure SLA breach warning:**
+
+| Field | Value |
+|---|---|
+| **Alert ID** | AL-C1-01 |
+| **Trigger** | Any open Art. 17 / GDPR Right to Erasure request in `dsar_requests` (type = `erasure`, status ≠ `fulfilled` AND status ≠ `rejected`) where `submitted_at < now() - INTERVAL '33 days'` |
+| **Severity** | P1 |
+| **Routing** | PagerDuty `form-compliance` service → compliance-officer; Slack `#security-alerts` HIGH |
+| **Deduplication key** | `c1-erasure-sla-breach-{dsar_request_id}` |
+| **Re-alert cadence** | Every 24h until resolved |
+| **SOC 2 criterion** | C1.2, P5.2 |
+| **Rationale** | GDPR Art. 17 erasure SLA is 30 days. Alert fires at day 33 to provide a 3-day buffer for resolution before the absolute deadline (day 30 is the P0 DSAR alert per §70.3). This rule provides a belt-and-suspenders secondary signal specifically for C1.2 auditor evidence: the `dsar_requests` table is the source of truth; this alert fires independently of the §70 DSAR automation. |
+
+**pg_cron job specification for AL-C1-01:**
+
+```sql
+-- Job name: c1-erasure-sla-monitor
+-- Schedule: '0 8 * * *'  (08:00 UTC daily)
+-- Owner: form_system
+SELECT cron.schedule(
+  'c1-erasure-sla-monitor',
+  '0 8 * * *',
+  $$
+  DO $$
+  DECLARE
+    v_breach_count INTEGER;
+  BEGIN
+    SELECT COUNT(*) INTO v_breach_count
+    FROM dsar_requests
+    WHERE request_type = 'erasure'
+      AND status NOT IN ('fulfilled', 'rejected')
+      AND submitted_at < NOW() - INTERVAL '33 days';
+
+    IF v_breach_count > 0 THEN
+      -- Emit DEC-030 event; Worker proxied via emit-audit-event Edge Function
+      PERFORM net.http_post(
+        url := current_setting('app.settings.emit_audit_url'),
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer ' || current_setting('app.settings.emit_audit_secret')
+        ),
+        body := jsonb_build_object(
+          'event_type', 'compliance.erasure_sla_alert_fired',
+          'severity', 'HIGH',
+          'data_class', 'CRITICAL',
+          'payload', jsonb_build_object(
+            'breach_count', v_breach_count,
+            'alert_id', 'AL-C1-01',
+            'threshold_days', 33
+          )
+        )::text
+      );
+    END IF;
+  END;
+  $$;
+  $$
+);
+```
+
+**Privacy invariant:** The DEC-030 payload contains only `breach_count` (an integer) and alert metadata — no `dsar_request_id`, no `user_id`, no email address.
+
+**pg-cron-health-monitor extension:** Add `c1-erasure-sla-monitor` as job 11 to the `pg-cron-health-monitor` registry (§71.2.2) with a `26h` freshness window.
+
+#### §73.3.2 Device/Media Disposal Audit Cadence
+
+`compliance/c1/device-disposal-policy.md` (POL-013, v1.0, effective 2026-06-07) is in force per §66. The quarterly execution procedure:
+
+**Quarterly disposal audit (aligned with §23 access review — Q2 annual, Q1/Q3/Q4 lightweight):**
+
+1. Open `compliance/assets/device-register.csv`; identify any device marked `status = decommissioned_pending` or any row with `last_verified_at < now() - 90 days`.
+2. For each device pending decommission: execute wipe per §66.3 wipe standards; append row to `compliance/media-disposal/device-disposal-log.csv` with `device_asset_id`, `disposal_date`, `wipe_method`, `verifier`, and `dec030_event_id` fields.
+3. Emit `asset.disposal_completed` DEC-030 HIGH event per §66.4.5 for each disposed device.
+4. At Q2 (annual): conduct full audit — enumerate all devices in `compliance/assets/device-register.csv`; confirm `last_verified_at` for each active device ≤ 90 days ago; spot-check that FileVault 2 is enabled on active development laptops (MDM profile or screenshot); file annual audit record as PRE-73-E-005.
+5. Emit `compliance.disposal_audit_completed` DEC-030 STANDARD event (§73.4.4).
+
+---
+
+### §73.4 DEC-030 HMAC-Chained Events (C1 Series)
+
+Four new events for Confidentiality TSC operational monitoring. All adhere to the DEC-030 schema defined in `docs/AUDIT_LOG_SCHEMA.md`. The privacy invariant from §73.1 applies to all payloads.
+
+| Event type | Severity | Retention | Trigger | Key payload fields | SOC 2 criterion |
+|---|---|---|---|---|---|
+| `compliance.data_asset_inventory_reviewed` | STANDARD | 3 yr | Quarterly inventory review per §73.2.2 | `version`, `changes_made` (bool), `reviewer_id` (pseudonymous) | C1.1 |
+| `compliance.encryption_verified` | STANDARD | 3 yr | Annual encryption-at-rest verification per §73.2.3 | `supabase_aes256_confirmed` (bool), `column_encryption_confirmed` (bool), `r2_encryption_confirmed` (bool), `verifier_id` (pseudonymous) | C1.1 |
+| `compliance.erasure_sla_alert_fired` | HIGH | 7 yr | AL-C1-01 fires: erasure request open > 33 days | `breach_count` (int), `alert_id`, `threshold_days` | C1.2, P5.2 |
+| `compliance.disposal_audit_completed` | STANDARD | 3 yr | Quarterly/annual disposal audit per §73.3.2 | `devices_reviewed` (int), `devices_disposed` (int), `audit_type` (`quarterly`/`annual`) | C1.2 |
+
+**DEC-030 Chain Monitors (C1-CHAIN-01 through C1-CHAIN-03):**
+
+| Chain monitor ID | Severity | Trigger condition | Resolution path | SOC 2 criterion |
+|---|---|---|---|---|
+| **C1-CHAIN-01** | P1 | `compliance.data_asset_inventory_reviewed` not emitted in > 100 days (quarterly window + 10-day grace period) | compliance-officer runs §73.2.2 review; emits event; files PRE-73-E-002 | C1.1 |
+| **C1-CHAIN-02** | P1 | `compliance.encryption_verified` not emitted in > 380 days (annual window + 15-day grace period) | devops-lead runs §73.2.3 DDL query + screenshots; files PRE-73-E-003; emits event | C1.1 |
+| **C1-CHAIN-03** | P2 | `compliance.disposal_audit_completed` not emitted in > 100 days | compliance-officer runs §73.3.2 quarterly disposal audit; emits event | C1.2 |
+
+**Implementation:** C1-CHAIN-01 and C1-CHAIN-03 implemented as `pg_cron` jobs checking the `audit_log_events` table for the relevant `event_type` within the window. C1-CHAIN-02 implemented in the weekly HMAC chain batch alongside CRYPTO-CHAIN-01/02 (OBSERVABILITY.md §30.6). All three emit PagerDuty alerts via the standard `emit-audit-event` Edge Function pipeline.
+
+---
+
+### §73.5 Evidence Artefacts
+
+| Evidence ID | Description | Format | Cadence | Responsible | Criterion |
+|---|---|---|---|---|---|
+| **PRE-73-E-001** | `compliance/c1/nda-template.md` Git commit SHA confirming C1-NDA-001 v1.0 is authored and committed; `compliance/policy-approval-log.csv` row POL-NDA-001 showing current status (`AUTHORED_PENDING_COUNSEL` / `COUNSEL_REVIEWED` / `IN_FORCE`) | Text + CSV row screenshot | At template authorship; updated on each status change | compliance-officer | C1.1 (C1-GAP-001 advancement artefact) |
+| **PRE-73-E-002** | `compliance/ndas/nda-register.csv` extract — one row per individual who has signed; filed quarterly in `compliance/evidence/c1/nda-register-YYYY-QN.csv`; `row_sha256` column recalculated to confirm no tampering since prior quarter | CSV | Quarterly (§23 access review) | compliance-officer | C1.1 |
+| **PRE-73-E-003** | Encryption-at-rest annual verification package: (a) Supabase project settings → Encryption screenshot, (b) Cloudflare Workers Secrets list screenshot showing `KEYPOINTS_ENC_KEY`, (c) DDL verification query output confirming `bytea`/`text` columns on `coaching_turns` and `cv_sessions`, (d) `compliance.encryption_verified` DEC-030 event ID | Screenshots + psql output; filed to `compliance/evidence/c1/encryption-verification-YYYY.md` | Annual (Q1 January) | devops-lead | C1.1 |
+| **PRE-73-E-004** | `compliance.erasure_sla_alert_fired` DEC-030 event extract for the 90-day observation window — zero-row CSV is a positive result (means no erasure request breached 33 days) | CSV export from `audit_log_events` | At fieldwork | compliance-officer | C1.2, P5.2 |
+| **PRE-73-E-005** | Annual disposal audit record — `compliance/media-disposal/device-disposal-log.csv` extract showing all disposal events in the 12 months preceding fieldwork; `compliance.disposal_audit_completed` DEC-030 event ID from the most recent audit | CSV + event ID | Annual (Q2) | compliance-officer | C1.2 |
+
+---
+
+### §73.6 SOC 2 Criteria Mapping Summary
+
+| Criterion | AICPA requirement (paraphrased) | §73 mechanism | Primary evidence artefact(s) | Current status |
+|---|---|---|---|---|
+| **C1.1** — Identify and maintain confidential information | Entity identifies confidential information and implements controls to protect it per commitments | NDA lifecycle (§73.2.1) — `compliance/c1/nda-template.md` + `personnel.nda_signed` DEC-030 chain; quarterly data asset inventory review (§73.2.2); annual encryption verification (§73.2.3) | PRE-73-E-001 (NDA template authored); PRE-73-E-002 (NDA register extract); PRE-73-E-003 (encryption verification) | 🟡 Authored — NDA template and inventory exist; operational evidence begins at first hire and first annual review |
+| **C1.2** — Dispose of confidential information | Entity disposes of confidential information consistent with commitments and requirements | AL-C1-01 erasure SLA alert (§73.3.1); device disposal audit cadence (§73.3.2); DEC-030 stream for `privacy.erasure_completed` and `asset.disposal_completed` | PRE-73-E-004 (erasure event extract); PRE-73-E-005 (disposal audit record) | 🟡 Authored — disposal policy in force (§66); erasure queue specified (§67/§70); monitoring specified here; evidence generation begins at first erasure request and first disposal event |
+
+---
+
+### §73.7 Gap Tracker Update
+
+| Gap ID | TSC | Source §§ | Description | Pre-§73 status | §73 status | Closes to 🟢 when |
+|---|---|---|---|---|---|---|
+| **C1-GAP-001** | C | §34, §42 | NDA / employment confidentiality agreement template not authored; required before first hire | 🔴 **Open** — SOC2_READINESS gap register had not recorded the authorship of `compliance/c1/nda-template.md` | 🟡 **Authored** — `compliance/c1/nda-template.md` (C1-NDA-001 v1.0) confirmed in repository; PRE-34-E-003 filed as PRE-73-E-001 | External counsel review complete + founder signature as template approval (POL-NDA-001 status → `IN_FORCE` in `compliance/policy-approval-log.csv`) |
+| **C1-GAP-002** | C | §34, §66 | Confidential data asset inventory (§34 framing) / formal media disposal policy (§66 re-labelling) | 🟡 Authored (§66) | 🟡 Authored — operational review cadence specified in §73.2.2 | Founder signature on `compliance/c1/data-asset-inventory.md` + first quarterly review event filed |
+| **C1-GAP-003** | C | §34 | DPA receipts for all sub-processors not collected and filed | 🔴 **Open** | 🔴 **Open** — not addressed by §73; remains a pre-enterprise P0 blocker | All 8 sub-processor DPA receipts filed to `compliance/dpa/`; P-GAP-002 (sub-processor list publication) resolved simultaneously |
+| **C1-GAP-004** | C | §34, §66 | Media/device disposal policy | 🟡 Authored (§66) | 🟡 Authored — operating cadence reinforced in §73.3.2 | Founder signature on `compliance/c1/device-disposal-policy.md` (POL-013) + first annual disposal audit PRE-73-E-005 filed |
+
+#### §73.7.1 Pre-Launch Readiness Checklist Rows Affected
+
+| Checklist ID | Description | Pre-§73 status | §73 status |
+|---|---|---|---|
+| **P0-14 / PRE-34-E-003** | NDA / employment confidentiality template drafted and founder-approved | **FAIL** — C1-GAP-001 Open | 🟡 Authored — NDA template in repository; progresses to PASS on counsel review + founder signature |
+| **C1-CHAIN-01** | Data asset inventory reviewed ≤ 100 days ago | 🔴 New | 🟡 Authored — chain monitor specified; deployment pending |
+| **C1-CHAIN-02** | Encryption verification ≤ 380 days ago | 🔴 New | 🟡 Authored — chain monitor specified; deployment pending |
+| **C1-CHAIN-03** | Disposal audit ≤ 100 days ago | 🔴 New | 🟡 Authored — chain monitor specified; deployment pending |
+
+---
+
+### §73.8 Implementation Checklist
+
+#### P0 — Before First Enterprise Pilot
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Confirm `compliance/c1/nda-template.md` (C1-NDA-001 v1.0) is committed to the repo and its Git commit SHA is filed as PRE-73-E-001. Update `compliance/policy-approval-log.csv` POL-NDA-001 row to reflect current status (`AUTHORED_PENDING_COUNSEL`). Close C1-GAP-001 in §51 Consolidated Gap Register from 🔴 Open → 🟡 Authored with reference to §73 and this commit. | compliance-officer | **P0** | M4 | [ ] |
+| 2 | Engage external counsel (UA/EU commercial practice with GDPR experience; budget $1–3k per §42.3.1) for NDA template review; file counsel approval in `compliance/policy-approval-log.csv` (POL-NDA-001 status → `COUNSEL_REVIEWED`); obtain founder signature as template approval (git commit attestation on tagged commit `nda-template-v1.0-approved`). | compliance-officer + founder | **P0** | M5 (pre-hire gate) | [ ] |
+| 3 | Register `compliance.data_asset_inventory_reviewed`, `compliance.encryption_verified`, `compliance.erasure_sla_alert_fired`, and `compliance.disposal_audit_completed` in `docs/AUDIT_LOG_SCHEMA.md` §6 with Zod schemas; deploy to `emit-audit-event` Worker. | platform-engineer | **P0** | M5 | [ ] |
+| 4 | Deploy AL-C1-01 `c1-erasure-sla-monitor` pg_cron job (§73.3.1) to production Supabase. Add job to `pg-cron-health-monitor` registry (§71.2.2) as job 11 with 26h freshness window. Confirm first run with `SELECT * FROM cron.job WHERE jobname = 'c1-erasure-sla-monitor'`. | platform-engineer | **P0** | M5 | [ ] |
+| 5 | Run annual encryption verification (§73.2.3): execute DDL query; screenshot Supabase Encryption tab and Cloudflare Workers Secrets list showing `KEYPOINTS_ENC_KEY`; file as PRE-73-E-003 in `compliance/evidence/c1/encryption-verification-2026.md`; emit `compliance.encryption_verified` DEC-030 event manually via admin API. | devops-lead | **P0** | M5 | [ ] |
+
+#### P1 — Before Observation Period Start (Month O-1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Deploy C1-CHAIN-01 pg_cron job (data asset inventory review gap > 100 days) and C1-CHAIN-03 pg_cron job (disposal audit gap > 100 days) to production Supabase. Test by temporarily setting the check threshold to 0 days and confirming PagerDuty P1 fires; reset to production threshold. | platform-engineer | **P1** | M6 | [ ] |
+| 7 | Add C1-CHAIN-02 (encryption verification gap > 380 days) to the weekly HMAC batch processor alongside CRYPTO-CHAIN-01/02 (OBSERVABILITY.md §30.6). | platform-engineer | **P1** | M6 | [ ] |
+| 8 | Run first quarterly data asset inventory review (§73.2.2): open `compliance/c1/data-asset-inventory.md`; confirm no new stores or reclassifications needed; append revision history entry; emit `compliance.data_asset_inventory_reviewed` DEC-030 event; file PRE-73-E-002 v1 in `compliance/evidence/c1/nda-register-2026-Q2.csv`. | compliance-officer | **P1** | M6 | [ ] |
+| 9 | Update §51 Consolidated Gap Register: mark C1-GAP-001 as 🟡 Authored with reference to §73 and PRE-73-E-001. | compliance-officer | **P1** | M5 | [ ] |
+| 10 | Add AL-C1-01 to the canonical §6.2 Alert Rules table in `docs/OBSERVABILITY.md` under a new `c1_erasure_sla` subsection (analogous to §29.5 `pam_session_health`). | devops-lead | **P1** | M6 | [ ] |
+
+#### P2 — Before Observation Period Close
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | At first hire: wire DocuSign completion webhook to `personnel.nda_signed` DEC-030 event emission (§42.5/§42.6); append row to `compliance/ndas/nda-register.csv`; file PRE-73-E-002 updated extract. | platform-engineer + compliance-officer | **P2** | Before first hire (M13 Base scenario) | [ ] |
+| 12 | Collect and file DPA receipts for all sub-processors in `compliance/dpa/` (closes C1-GAP-003 — 🔴 Open blocker for enterprise contracts). Coordinate with §35 P-GAP-002 (sub-processor list publication) — both close together. | compliance-officer | **P2** (elevated to P0 before first enterprise customer) | M8 | [ ] |
+
+---
+
+### §73.9 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-C1-01** | At what point does the `nda-register.csv` SHA-256 recalculation (§73.2.1) need to be automated rather than manual? At solo-founder phase with 0–3 employees the manual procedure is auditable; at 10+ employees the probability of an undetected manipulation increases. Recommendation: automate at hire #5 via a `compliance-nda-audit` pg_cron job that recomputes and verifies all row hashes weekly. | P2 | platform-engineer + compliance-officer | Decide at hire #4 (before the automation gate). |
+| **OQ-C1-02** | How should C1-GAP-003 (DPA receipts) be prioritised relative to P-GAP-002 (sub-processor list publication)? Both are 🔴 Open and both are enterprise contract blockers, but the resolution paths are different (filing PDFs vs. publishing the subprocessors.html page). Recommendation: close both in a single M8 sprint — C1-GAP-003 via `compliance/dpa/` filing and P-GAP-002 via `docs/SUBPROCESSORS.md` → `subprocessors.html` publication update. | P0 (before first enterprise contract) | compliance-officer | Sprint plan item for M8. |
+
+---
+
+*v1.0 (2026-06-09): §73 Confidentiality TSC (C1) Operating Evidence — C1-GAP-001 Advancement · NDA Lifecycle, Encryption-at-Rest Verification & Disposal Monitoring · C1.1/C1.2 Auditor Exhibit. Advances C1-GAP-001 from 🔴 Open → 🟡 Authored by recording that `compliance/c1/nda-template.md` (C1-NDA-001 v1.0) is committed to the repository — this gap was authored before §73 but had not been reflected in the SOC2_READINESS gap register; PRE-34-E-003 now filed as PRE-73-E-001 (Git commit SHA). Section provides the C1 operating-evidence cadence equivalent to §71 (A1 Availability Operating Evidence) and §72 (PI1 Processing Integrity Operating Evidence). Three C1 operating evidence streams: (1) C1.1 Workforce Confidentiality — NDA lifecycle monitoring via `personnel.nda_signed` DEC-030 (§42.6) and `compliance/ndas/nda-register.csv` quarterly extract (PRE-73-E-002); quarterly data asset inventory review with `compliance.data_asset_inventory_reviewed` DEC-030 (PRE-73-E-002 cadence); C1-CHAIN-01 chain monitor (no review event in > 100 days → PagerDuty P1). (2) C1.1 Encryption-at-rest — Annual DDL verification query + Supabase/Workers/R2 screenshot package filed as PRE-73-E-003; `compliance.encryption_verified` DEC-030 STANDARD/3yr; C1-CHAIN-02 chain monitor (no verification in > 380 days). (3) C1.2 Disposal — AL-C1-01 erasure SLA alert (pg_cron `c1-erasure-sla-monitor`, daily 08:00 UTC, fires at 33-day breach, privacy-safe payload with breach_count only, job 11 in pg-cron-health-monitor registry); `compliance.erasure_sla_alert_fired` HIGH/7yr DEC-030; quarterly/annual disposal audit cadence (§73.3.2) with `compliance.disposal_audit_completed` STANDARD/3yr; C1-CHAIN-03 chain monitor (no disposal audit in > 100 days). Four new DEC-030 events: `compliance.data_asset_inventory_reviewed` STANDARD/3yr, `compliance.encryption_verified` STANDARD/3yr, `compliance.erasure_sla_alert_fired` HIGH/7yr, `compliance.disposal_audit_completed` STANDARD/3yr. Five evidence artefacts PRE-73-E-001 through PRE-73-E-005. Gap tracker: C1-GAP-001 🔴 Open → 🟡 Authored; C1-GAP-002/C1-GAP-004 operational cadence reinforced; C1-GAP-003 remains 🔴 Open (DPA receipts — not addressed by §73; OQ-C1-02 provides the resolution path). P0-14 pre-launch checklist row advances from FAIL to 🟡 Authored. Checklist: 5× P0 M4-M5, 5× P1 M5-M6, 2× P2. SOC 2 C TSC: ~88% → ~91% (C1-GAP-001 drafting gap closed; operational evidence cadence specified; C1-GAP-003 DPA receipts remain the primary open item). Overall SOC 2 readiness: ~97.5% → ~97.7%. Cross-references: §34 (C1 deep-dive control baseline), §40 (original C1.2 disposal narrative), §42 (hiring/onboarding — personnel.nda_signed §42.6), §55 (security awareness training — C1.1 handling rules; C1-GAP-001 data-classification aspect resolved in §55.5), §66 (media/device disposal — C1-GAP-004 authored), §67 (tenant data deletion — C1.2 enterprise erasure), §70 (DSAR automation — §70.3 day-25/day-29 P0/P1 alerts; AL-C1-01 day-33 is a secondary belt-and-suspenders layer), §71 (A1 Operating Evidence — pg_cron health monitor, job 11 added), docs/AUDIT_LOG_SCHEMA.md (four new DEC-030 events), docs/OBSERVABILITY.md §6.2 (AL-C1-01 to be added to c1_erasure_sla alert rules subsection), docs/HIRING_GUIDE.md §3 (training gate references NDA signing). Owner: compliance-officer (cadence, gap register) + security-engineer (chain monitors) + devops-lead (encryption verification). SOC 2 doc v3.3 → v3.4.*

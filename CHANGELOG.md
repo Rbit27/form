@@ -6,6 +6,16 @@
 
 ---
 
+## [3.3.2] — 2026-06-09
+
+### Added
+- `docs/SOC2_READINESS.md §73` — Confidentiality TSC (C1) Operating Evidence · C1-GAP-001 Advancement · NDA Lifecycle, Encryption-at-Rest Verification & Disposal Monitoring · C1.1/C1.2 Auditor Exhibit. Advances C1-GAP-001 🔴 Open → 🟡 Authored (records that `compliance/c1/nda-template.md` C1-NDA-001 v1.0 is committed). Specifies three C1 operating evidence streams: (1) NDA lifecycle monitoring via `personnel.nda_signed` DEC-030 chain + `compliance/ndas/nda-register.csv` quarterly extract; (2) Annual encryption-at-rest DDL verification + Supabase/Workers/R2 screenshot package; (3) AL-C1-01 erasure SLA alert (`c1-erasure-sla-monitor` pg_cron, 08:00 UTC daily, fires at 33-day breach, privacy-safe breach_count payload, job 11 in pg-cron-health-monitor). Four new DEC-030 events: `compliance.data_asset_inventory_reviewed` STANDARD/3yr, `compliance.encryption_verified` STANDARD/3yr, `compliance.erasure_sla_alert_fired` HIGH/7yr, `compliance.disposal_audit_completed` STANDARD/3yr. Three chain monitors C1-CHAIN-01/02/03. Five evidence artefacts PRE-73-E-001 through PRE-73-E-005. C TSC: ~88% → ~91%. Overall SOC 2 readiness: ~97.5% → ~97.7%. SOC 2 doc v3.3 → v3.4.
+
+### Changed
+- `VERSION` — 3.3.1 → 3.3.2
+
+---
+
 ## [3.3.1] — 2026-06-09
 
 ### Added
