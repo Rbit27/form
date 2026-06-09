@@ -394,6 +394,7 @@ Triggered by: non-renewal, early termination, or FORM exercising contract termin
 | 0 | Disable new SCIM provisioning | enterprise-architect |
 | 0–30 | Customer exports data via Admin Dashboard → Data Export (includes all user-consented data in JSON; excludes audit log which is FORM's compliance artefact) | `tenant_owner` |
 | 30 | SSO revocation: all active sessions terminated; SCIM tokens revoked | enterprise-architect |
+| 30 | **API key revocation:** all active rows in `tenant_api_keys` for this tenant are wiped; `api_key.revoked` with `reason: 'tenant_offboarding'` is emitted per active key (DEC-030, HIGH severity, 7-year retention, HMAC-chained in insertion order). Keys are revoked after SCIM tokens to prevent race between deprovisioning and API access. | enterprise-architect |
 | 30 | Tenant soft-delete: user accounts deactivated, all RLS-governed data becomes inaccessible | enterprise-architect |
 | 30–37 | Hard-delete cascade per `DATA_MODEL.md §12`: workouts, meals, coaching sessions, user profiles, media in R2 | enterprise-architect |
 | 37 | Deletion confirmation letter sent (email + DocuSign) | compliance-officer |
@@ -408,6 +409,7 @@ Triggered by: non-renewal, early termination, or FORM exercising contract termin
 
 | Event | Severity | When |
 |---|---|---|
+| `api_key.revoked` (one per active key) | HIGH | Day 30 — after SCIM token revocation, before soft-delete; `reason: 'tenant_offboarding'`; `revoked_by: 'system/tenant_offboarding_job'`; see `docs/AUDIT_LOG_SCHEMA.md api_key.*` |
 | `tenant.data_deleted` | HIGH | After hard-delete cascade completes |
 | `tenant.deletion_confirmed` | STANDARD | After deletion confirmation letter sent |
 | `admin.tenant_deprovisioned` | HIGH | When SSO/SCIM revoked and tenant set to inactive |
@@ -481,5 +483,7 @@ If a customer asks for individual-level data or proposes an excluded use case:
 Do not offer workarounds, do not say "we can look into it," do not escalate to engineering. Escalate to founder only.
 
 ---
+
+*v0.2 (2026-06-09): §11.1 Contract termination timeline — API key revocation step added at Day 30 (MDD-P1-04): all active `tenant_api_keys` rows for the departing tenant are wiped immediately after SCIM token revocation; `api_key.revoked` (reason: `'tenant_offboarding'`) is emitted per active key (DEC-030 HIGH, 7-year retention, HMAC-chained in insertion order). §11.2 DEC-030 event table updated with `api_key.revoked` row. `docs/AUDIT_LOG_SCHEMA.md api_key.revoked` reason enum updated to include `tenant_offboarding`. Closes MDD-P1-04 in `docs/SOC2_READINESS.md`. SOC 2 CC6.4 (credential lifecycle — departed tenant API keys no longer valid post-30d). enterprise-architect + compliance-officer.*
 
 *v0.1 (2026-06-07): Initial onboarding playbook. Covers: pre-launch checklist (commercial + security review delivery + technical readiness), contract week kick-off, tenant provisioning with DEC-030 HMAC chain events (`tenant.created`, `tenant.sla_tier_set`, `admin.rbac_role_assigned`), SSO SAML/OIDC + SCIM provisioning steps, pilot rollout + announcement templates, admin dashboard training with privacy floor script, 30/60/90-day success criteria by tier, QBR agenda, expansion (seat expansion, white-label upgrade checklist, multi-year renewal), incident communication protocol, contract termination data offboarding timeline with hard-delete cascade per DATA_MODEL.md §12 and DEC-030 termination audit events, CSM handoff procedure, Appendix A checklists. Privacy floor enforcement language throughout. No-go use case escalation path (ENTERPRISE.md §no-go). Owner: customer-success + enterprise-architect + compliance-officer.*

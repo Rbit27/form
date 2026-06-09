@@ -6,6 +6,16 @@
 
 ---
 
+## [3.12.1] — 2026-06-09
+
+### Changed
+- `docs/ENTERPRISE_ONBOARDING.md` v0.2 — §11.1 Contract termination timeline: API key revocation step added at Day 30 (MDD-P1-04). All active `tenant_api_keys` rows for the departing tenant are wiped after SCIM token revocation; `api_key.revoked` (reason: `'tenant_offboarding'`) emitted per active key (DEC-030 HIGH, 7-year retention, HMAC-chained in insertion order). §11.2 DEC-030 event table updated with `api_key.revoked` row. SOC 2 CC6.4 credential lifecycle evidence.
+- `docs/AUDIT_LOG_SCHEMA.md` — `api_key.revoked` reason enum extended: `'tenant_offboarding'` added alongside existing `'manual'|'expiry_overlap'|'compromise'` values; inline note links to `ENTERPRISE_ONBOARDING.md §11.1` for bulk-revocation sequence.
+- `docs/SOC2_READINESS.md` — MDD-P1-04 marked [x] Closed 2026-06-09 in the data model gap register (§22.11).
+- `VERSION` — 3.12.0 → 3.12.1
+
+---
+
 ## [3.12.0] — 2026-06-09
 
 ### Added
