@@ -6,6 +6,18 @@
 
 ---
 
+## [3.7.2] — 2026-06-09
+
+### Fixed
+- `docs/DATA_MODEL.md §3.8` — **SOC 2 OQ-P2-03 closure**: виявлено і виправлено критичну помилку дизайну RLS для `consent_records`. Оригінальна політика `consent_records_tenant_isolation` була задекларована як `PERMISSIVE FOR SELECT` з перевіркою лише `tenant_id` — у Postgres PERMISSIVE-політики OR-яться, що дозволило б tenant-адмінам читати записи згоди всіх співробітників тенанту. Виправлення: політика перейменована в `consent_records_cross_tenant_block` і задекларована як `RESTRICTIVE` — AND-логіка з PERMISSIVE `consent_records_user_read` (перевірка `user_id`) гарантує, що кожен бачить лише власний рядок. Додано CI-тест: tenant admin → 0 рядків для чужого `user_id`.
+
+### Added
+- `docs/DATA_MODEL.md §2.11` — `consent_records` table DDL (migration `0037_consent_records.sql`): append-only таблиця з RULE-захистом від UPDATE/DELETE; privacy invariant (без email/IP/Art.9-значень); посилання на SOC 2 критерії P2.1/P8.1.
+- `docs/DATA_MODEL.md §5` — Confidential-класифікація для `consent_records` (псевдонімні рішення про згоду; доступ лише власнику через §3.8 RLS; tenant-адмін заблокований).
+- `docs/SOC2_READINESS.md §74.4 + §74.11` — оновлено опис tenant admin restriction та OQ-P2-03 → 🟢 Resolved; канонічна назва/тип політики тепер вказує на DATA_MODEL.md §3.8.
+
+---
+
 ## [3.7.1] — 2026-06-09
 
 ### Changed

@@ -382,6 +382,80 @@ ALTER TABLE scim_provisioning_log ENABLE ROW LEVEL SECURITY;
 
 ---
 
+### 2.11 Consent Records
+
+The `consent_records` table is the authoritative, tamper-evident record of all user consent decisions — web cookie consent (GDPR Art. 6) and mobile health data consent (GDPR Art. 9). It is **append-only**: `UPDATE` and `DELETE` are blocked at the Postgres RULE layer for all application roles. Withdrawals are recorded as a new row with `event_type = 'withdrawn'`.
+
+Cross-reference: `docs/SOC2_READINESS.md §74.4` (P2.1/P8.1 SOC 2 evidence specification). Migration: `0037_consent_records.sql`.
+
+**Privacy invariant:** no email address, phone number, full IP address, or Art. 9 category value is stored in this table. `user_id` is a pseudonymous UUID; `consent_token` is an opaque UUID not linkable to email without joining `user_profile`. Maximum geographic granularity: `ip_country` (2-char country code).
+
+```sql
+-- Migration: 0037_consent_records.sql
+-- SOC 2 criteria: P2.1 (Consent), P8.1 (Monitoring and Enforcement)
+CREATE TABLE consent_records (
+    id                   uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id            uuid         REFERENCES tenants(id) ON DELETE RESTRICT,
+    user_id              uuid         REFERENCES user_profile(id) ON DELETE RESTRICT,
+    -- NULL for anonymous pre-authentication web consent (consent_token only)
+
+    consent_token        text         NOT NULL,
+    -- UUID v4; stored in __form_consent cookie + Cloudflare KV key consent:{token}
+
+    event_type           text         NOT NULL CHECK (event_type IN ('granted', 'withdrawn', 'updated')),
+    consent_version      text         NOT NULL,
+    -- Matches CONSENT_SCHEMA_VERSION env var at time of event; e.g. '1.0', '1.1'
+
+    consent_surface      text         NOT NULL
+                                      CHECK (consent_surface IN ('web_cookie', 'mobile_art9', 'web_art9')),
+    granted_categories   text[]       NOT NULL DEFAULT '{}',
+    -- web_cookie: ['analytics'], ['analytics','functional'], etc.
+    -- mobile/web art9: ['health_data'], ['health_data','biometric']
+    -- withdrawn rows: empty array; populated withdrawn_categories instead
+
+    withdrawn_categories text[]       NOT NULL DEFAULT '{}',
+    -- Populated on event_type = 'withdrawn'; empty on 'granted'
+
+    ip_country           char(2),
+    -- ISO 3166-1 alpha-2 country code only; never full IP address
+
+    user_agent_hash      text,
+    -- SHA-256 of normalised user-agent string; not reversible to original UA
+
+    dec030_event_id      uuid         NOT NULL,
+    -- References audit_log_events.id; confirms DEC-030 HMAC chain linkage
+
+    created_at           timestamptz  NOT NULL DEFAULT now()
+    -- No updated_at: append-only table; each change is a new row
+);
+
+-- Append-only enforcement (Postgres RULE layer)
+CREATE RULE consent_records_no_update AS ON UPDATE TO consent_records DO INSTEAD NOTHING;
+CREATE RULE consent_records_no_delete AS ON DELETE TO consent_records DO INSTEAD NOTHING;
+
+-- Indexes
+CREATE INDEX consent_records_user_id_idx     ON consent_records (user_id);
+CREATE INDEX consent_records_tenant_id_idx   ON consent_records (tenant_id);
+CREATE INDEX consent_records_token_idx       ON consent_records (consent_token);
+CREATE INDEX consent_records_created_idx     ON consent_records (created_at);
+CREATE INDEX consent_records_event_type_idx  ON consent_records (event_type);
+```
+
+**Append-only integrity check (run annually; file as PRE-74-E-002):**
+
+```sql
+-- Positive result: n_tup_upd = 0 AND n_tup_del = 0
+-- Non-zero values indicate a RULE bypass — treat as P1 security incident
+SELECT schemaname, tablename,
+       n_tup_ins AS rows_inserted,
+       n_tup_upd AS rows_updated,   -- must be 0
+       n_tup_del AS rows_deleted    -- must be 0
+FROM pg_stat_user_tables
+WHERE tablename = 'consent_records';
+```
+
+---
+
 ## 3. Row-Level Security Policies
 
 ### 3.1 Policy Design Principles
@@ -588,6 +662,64 @@ The `token_hash` column in `tenant_scim_tokens` is never returned by any API end
 
 ---
 
+### 3.8 Consent Records RLS Policies
+
+> **OQ-P2-03 closure** (`docs/SOC2_READINESS.md §74.11`): This section confirms the hard RLS guarantee that enterprise tenant admins **cannot** read consent records belonging to other employees.
+
+**Policy design rationale:** In PostgreSQL, multiple `PERMISSIVE` policies for the same command are OR-ed together — a row is returned if *any* permissive policy passes. If `consent_records_tenant_isolation` were declared `PERMISSIVE FOR SELECT` using only a `tenant_id` check, any user in the same tenant (including tenant admins) could read all employees' consent records by satisfying that single policy. This would be a privacy violation.
+
+The correct design uses **two-layer enforcement**:
+
+1. **PERMISSIVE `consent_records_user_read`** — users may read only rows where their `user_id` matches (their own consent history shown in Settings → Data).
+2. **RESTRICTIVE `consent_records_cross_tenant_block`** — AND-ed with all permissive results; ensures that even if a future permissive policy is inadvertently added, no row is ever returned unless it belongs to the authenticated user's own tenant.
+
+Result: a tenant admin JWT resolves to a single `user_id`; the permissive policy only passes for that user's own row; the restrictive policy additionally enforces the tenant boundary. Tenant admins cannot read any employee's consent record.
+
+```sql
+ALTER TABLE consent_records ENABLE ROW LEVEL SECURITY;
+
+-- PERMISSIVE: users may read only their own consent rows
+CREATE POLICY consent_records_user_read ON consent_records
+    AS PERMISSIVE FOR SELECT
+    USING (
+        user_id = (SELECT id FROM user_profile WHERE auth_user_id = auth.uid())
+    );
+
+-- RESTRICTIVE: cross-tenant defence-in-depth.
+-- AND-ed with all permissive policies; blocks reads from any other tenant
+-- even if a new permissive policy is added in future.
+CREATE POLICY consent_records_cross_tenant_block ON consent_records
+    AS RESTRICTIVE FOR SELECT
+    USING (
+        tenant_id = (SELECT tenant_id FROM user_profile WHERE auth_user_id = auth.uid())
+    );
+
+-- INSERT: form-consent-gate Worker uses service-role key (bypasses RLS).
+-- This policy documents intent for anon/authed roles — they may not INSERT directly.
+CREATE POLICY consent_records_service_insert ON consent_records
+    FOR INSERT
+    WITH CHECK (TRUE);
+```
+
+**Tenant admin access test (must pass in CI RLS isolation suite):**
+
+```sql
+-- Connect as a tenant_admin JWT (app.current_role = 'tenant_admin')
+-- Set context to a valid tenant_id but a different user_id from the row under test
+SET LOCAL app.current_tenant_id = '<tenant_uuid>';
+SET LOCAL app.current_user_id   = '<admin_user_uuid>';
+
+-- Must return 0 rows — admin cannot read employee consent records
+SELECT COUNT(*) FROM consent_records WHERE user_id = '<employee_user_uuid>';
+-- Expected: 0
+```
+
+This test is added to `__tests__/db/rls_isolation.test.ts` alongside the existing cross-tenant isolation tests (§3.5).
+
+> **Note on SOC2_READINESS.md §74.4 DDL:** The original DDL in §74.4 named the second policy `consent_records_tenant_isolation` and declared it `PERMISSIVE`. The canonical policy name and type are those defined here in §3.8 (`consent_records_cross_tenant_block`, `RESTRICTIVE`). The migration `0037_consent_records.sql` must use the §3.8 definitions.
+
+---
+
 ## 4. Tenant Isolation Guarantees
 
 ### 4.1 What We Guarantee
@@ -638,6 +770,7 @@ export async function tenantContext(req: Request, res: Response, next: NextFunct
 | **Internal** | User email, display name, role | Standard RDS encryption | `form_api` (RLS) |
 | **Confidential** | Health goals, restrictions, HRV baseline; `coaching_turns.content`; `workout_sets.cv_flags` | Standard RDS encryption | Owner user only (RLS) |
 | **Sensitive** | CV raw pose data, meal log items; `tenant_sso_configs.oidc_client_secret_enc`; `tenant_sso_configs.idp_certificate` | Per-tenant AES-256-GCM + KMS | Owner user / `form_system` only; `form_admin` via break-glass |
+| **Confidential** | `consent_records` rows (pseudonymous consent decisions; `consent_token`, `ip_country`, `user_agent_hash`, `granted_categories`) | Standard RDS encryption; HMAC-chained via `dec030_event_id` | Owner user only (§3.8 RLS); tenant admins blocked (§3.8 OQ-P2-03 closure) |
 | **Restricted** | Audit log HMAC keys; `tenant_scim_tokens.token_hash` (write-only; never returned) | KMS only; never in DB (token) or KMS-derived (HMAC key) | `form_audit` role + KMS policy; SCIM auth function only |
 
 ### 5.1 Encryption Details
@@ -10411,4 +10544,4 @@ See `SSO_SCIM_IMPLEMENTATION.md §26.11` for the full 14-item checklist covering
 
 ---
 
-*v1.6 · червень 2026 · owner: enterprise-architect + security-engineer + platform-engineer · Closes SSO_SCIM_IMPLEMENTATION.md §26.11 item 12 (P1 M6) — adds DATA_MODEL canonical entry for tenant_api_keys table.*
+*v1.7 · червень 2026 · owner: enterprise-architect + compliance-officer + platform-engineer · §2.11 consent_records table DDL (migration 0037_consent_records.sql); §3.8 Consent Records RLS Policies — fixes OQ-P2-03 from SOC2_READINESS.md §74.11: `consent_records_tenant_isolation` (PERMISSIVE) replaced by `consent_records_cross_tenant_block` (RESTRICTIVE) to prevent tenant admins from reading employee consent rows via OR-merge of permissive policies; CI test added for tenant admin zero-row assertion; §5 Data Classification updated with consent_records (Confidential classification). Cross-ref: docs/SOC2_READINESS.md §74.4, §74.11 (OQ-P2-03 → 🟢 Resolved).*
