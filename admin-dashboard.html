@@ -133,6 +133,10 @@
         <span class="font-mono">⚐</span>
         <span>Audit log</span>
       </div>
+      <div class="sidebar-item" data-screen="siem">
+        <span class="font-mono">⇆</span>
+        <span>SIEM Export</span>
+      </div>
     </nav>
 
     <!-- User -->
@@ -1070,7 +1074,7 @@
             Chain intact · verified 4 min ago
           </div>
           <button class="btn-ghost">Export NDJSON</button>
-          <button class="btn-ghost">SIEM webhook</button>
+          <button class="btn-ghost" onclick="navigateTo('siem')">SIEM Export →</button>
         </div>
       </div>
 
@@ -1217,6 +1221,267 @@
       </div>
     </div>
 
+    <!-- ═══════════════════════════════════ SIEM EXPORT ═══════════════════════════════════ -->
+    <div id="screen-siem" class="screen">
+      <div class="flex items-end justify-between mb-10">
+        <div>
+          <div class="label mb-2">SIEM Export · Acme Corp</div>
+          <h1 class="font-serif text-paper text-5xl font-light leading-tight">
+            Event streaming<br>
+            <em class="text-mute text-3xl">HMAC-signed · zero-gap delivery</em>
+          </h1>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 text-acid text-xs font-mono">
+            <div class="w-2 h-2 bg-acid rounded-full"></div>
+            Active · Splunk HEC · last delivery 2 min ago
+          </div>
+          <label class="toggle" aria-label="SIEM export enabled">
+            <input type="checkbox" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- SLO health row -->
+      <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="stat-card" style="border-color:rgba(221,255,45,0.2)">
+          <div class="label mb-1">Push P95 latency</div>
+          <div class="text-acid font-mono text-2xl font-light mt-2">18 ms</div>
+          <div class="text-mute text-xs font-mono mt-2">SIEM-SLO-01 · limit 60 s · ✓</div>
+        </div>
+        <div class="stat-card" style="border-color:rgba(221,255,45,0.2)">
+          <div class="label mb-1">Pull API availability</div>
+          <div class="text-acid font-mono text-2xl font-light mt-2">99.97%</div>
+          <div class="text-mute text-xs font-mono mt-2">SIEM-SLO-02 · &lt;5 min downtime · ✓</div>
+        </div>
+        <div class="stat-card">
+          <div class="label mb-1">Events · rolling 30 d</div>
+          <div class="data text-paper text-2xl font-light mt-2">847,293</div>
+          <div class="text-mute text-xs font-mono mt-2">/ 1,000,000 enterprise quota</div>
+        </div>
+        <div class="stat-card" style="border-color:rgba(221,255,45,0.2)">
+          <div class="label mb-1">HMAC chain</div>
+          <div class="text-acid font-mono text-sm font-bold mt-2">✓ INTACT</div>
+          <div class="text-mute text-xs font-mono mt-2">SIEM-SLO-04 · zero breaks · all events signed</div>
+        </div>
+      </div>
+
+      <!-- Config + filters -->
+      <div class="grid grid-cols-2 gap-4 mb-4">
+
+        <!-- Left: webhook configuration -->
+        <div class="stat-card">
+          <div class="label mb-4">Webhook configuration</div>
+
+          <div class="space-y-4">
+            <div>
+              <div class="text-dim text-xs font-mono mb-1 uppercase tracking-widest">Destination type</div>
+              <select class="input-field" style="width:100%">
+                <option selected>Splunk HEC</option>
+                <option>Microsoft Sentinel Data Collector</option>
+                <option>Datadog Log Management</option>
+                <option>IBM QRadar LEEF</option>
+                <option>Generic webhook</option>
+              </select>
+            </div>
+
+            <div>
+              <div class="text-dim text-xs font-mono mb-1 uppercase tracking-widest">Endpoint URL</div>
+              <input type="url" class="input-field" value="https://splunk.acme.internal:8088/services/collector/event" />
+            </div>
+
+            <div>
+              <div class="text-dim text-xs font-mono mb-1 uppercase tracking-widest">Webhook secret</div>
+              <div class="flex gap-2">
+                <input type="password" id="siemSecret" class="input-field" value="siem_sec_8kQw3mPxRnVtY2zL9cDjFbHsAeUoN5G7" style="flex:1; letter-spacing:0.1em" />
+                <button class="btn-ghost" onclick="
+                  const f = document.getElementById('siemSecret');
+                  f.type = f.type === 'password' ? 'text' : 'password';
+                  this.textContent = f.type === 'password' ? 'reveal' : 'hide';
+                ">reveal</button>
+                <button class="copy-btn" onclick="
+                  navigator.clipboard.writeText(document.getElementById('siemSecret').value);
+                  this.textContent = 'copied!';
+                  setTimeout(() => this.textContent = 'copy', 1400);
+                ">copy</button>
+              </div>
+              <div class="text-mute text-xs font-mono mt-1">Response header: X-FORM-HMAC-Verify — verify before ingesting</div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+              <button class="btn-ghost">Rotate secret</button>
+              <button class="btn-ghost">Send test event</button>
+            </div>
+          </div>
+
+          <div class="section-divider" style="margin:20px 0"></div>
+
+          <div class="label mb-3">Pull API</div>
+          <div class="space-y-3">
+            <div>
+              <div class="text-dim text-xs font-mono mb-1 uppercase tracking-widest">Endpoint</div>
+              <div class="flex items-center gap-2">
+                <code class="data text-xs" style="color:#DDFF2D; background:#0B0A07; padding:6px 10px; border-radius:6px; border:1px solid #1F1D16; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">GET /enterprise/v1/audit-events?cursor=…&amp;limit=500</code>
+                <button class="copy-btn">copy</button>
+              </div>
+            </div>
+            <div>
+              <div class="text-dim text-xs font-mono mb-1 uppercase tracking-widest">API key</div>
+              <div class="flex items-center gap-2">
+                <code class="data text-xs" style="color:#A39D8E; background:#0B0A07; padding:6px 10px; border-radius:6px; border:1px solid #1F1D16; flex:1;">ent_••••••••••••••••••••••••••••••</code>
+                <button class="copy-btn">copy</button>
+              </div>
+            </div>
+            <div class="text-mute text-xs font-mono">90-day queryable window · 7-year cold archive (R2) · cursor-paginated</div>
+          </div>
+        </div>
+
+        <!-- Right: filter rules -->
+        <div class="stat-card">
+          <div class="flex items-center justify-between mb-4">
+            <div class="label">Filter rules</div>
+            <button class="btn-ghost" style="padding:6px 14px; font-size:10px">+ Add rule</button>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>Field</th>
+                <th>Value</th>
+                <th>Approved</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-active" style="font-size:9px">include</span></td>
+                <td class="text-dim data" style="font-size:12px">event_type</td>
+                <td class="hmac-tag">auth.*</td>
+                <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+                <td class="text-mute text-xs"><button class="hover:text-paper transition-colors">remove</button></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-active" style="font-size:9px">include</span></td>
+                <td class="text-dim data" style="font-size:12px">event_type</td>
+                <td class="hmac-tag">tenant.*</td>
+                <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+                <td class="text-mute text-xs"><button class="hover:text-paper transition-colors">remove</button></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-active" style="font-size:9px">include</span></td>
+                <td class="text-dim data" style="font-size:12px">severity</td>
+                <td class="hmac-tag">HIGH</td>
+                <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+                <td class="text-mute text-xs"><button class="hover:text-paper transition-colors">remove</button></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-active" style="font-size:9px">include</span></td>
+                <td class="text-dim data" style="font-size:12px">severity</td>
+                <td class="hmac-tag">CRITICAL</td>
+                <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+                <td class="text-mute text-xs"><button class="hover:text-paper transition-colors">remove</button></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-lapsed" style="font-size:9px">exclude</span></td>
+                <td class="text-dim data" style="font-size:12px">event_type</td>
+                <td class="hmac-tag">auth.login_success</td>
+                <td>
+                  <span class="badge" style="background:rgba(251,191,36,0.12);color:#FBBF24;border:1px solid rgba(251,191,36,0.3);font-size:9px">⚠ pending</span>
+                </td>
+                <td class="text-mute text-xs"><button class="hover:text-paper transition-colors">remove</button></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="mt-4 p-3 rounded-lg" style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2)">
+            <div class="text-xs font-mono" style="color:#FBBF24; margin-bottom:4px">⚠ Compliance gate active</div>
+            <div class="text-mute text-xs leading-relaxed">
+              Filters that exclude <span class="font-mono" style="color:#A39D8E">admin.*</span> or <span class="font-mono" style="color:#A39D8E">anomaly.*</span> events require compliance-officer approval before taking effect (<span class="font-mono" style="color:#A39D8E">filter_compliance_approved: false</span> blocks export of that rule). The pending exclude rule above is staged but not active. Contact your CSM to initiate approval.
+            </div>
+          </div>
+
+          <div class="section-divider" style="margin:16px 0"></div>
+
+          <div class="label mb-2">Privacy floor</div>
+          <div class="text-mute text-xs leading-relaxed">
+            Applied unconditionally before export: <span class="font-mono" style="color:#A39D8E">user_id</span> absent; <span class="font-mono" style="color:#A39D8E">user_email</span> SHA-256 hashed; <span class="font-mono" style="color:#A39D8E">ip_address</span> truncated to /24 subnet; <span class="font-mono" style="color:#A39D8E">workout_data</span>, <span class="font-mono" style="color:#A39D8E">cv_keypoints</span>, <span class="font-mono" style="color:#A39D8E">body_metrics</span> removed. These redactions cannot be disabled by filter rules.
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent deliveries -->
+      <div class="stat-card">
+        <div class="flex items-center justify-between mb-4">
+          <div class="label">Recent push deliveries</div>
+          <div class="text-mute text-xs font-mono">500 events / batch · P95 flush ≤ 30 s</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp (UTC)</th>
+              <th>Batch size</th>
+              <th>Latency</th>
+              <th>HTTP status</th>
+              <th>HMAC prefix</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-06-09 11:42:07</td>
+              <td class="data text-paper" style="font-size:12px">312 events</td>
+              <td class="data text-paper" style="font-size:12px">18 ms</td>
+              <td class="hmac-tag">200 OK</td>
+              <td class="hmac-tag">a3f8b2c1…</td>
+              <td><span class="badge badge-active" style="font-size:9px">delivered</span></td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-06-09 11:11:58</td>
+              <td class="data text-paper" style="font-size:12px">500 events</td>
+              <td class="data text-paper" style="font-size:12px">22 ms</td>
+              <td class="hmac-tag">200 OK</td>
+              <td class="hmac-tag">d91e4a07…</td>
+              <td><span class="badge badge-active" style="font-size:9px">delivered</span></td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-06-09 10:41:31</td>
+              <td class="data text-paper" style="font-size:12px">500 events</td>
+              <td class="data text-paper" style="font-size:12px">15 ms</td>
+              <td class="hmac-tag">200 OK</td>
+              <td class="hmac-tag">c4b5d3e9…</td>
+              <td><span class="badge badge-active" style="font-size:9px">delivered</span></td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-06-09 10:10:44</td>
+              <td class="data text-paper" style="font-size:12px">500 events</td>
+              <td class="data text-paper" style="font-size:12px">31 ms</td>
+              <td class="hmac-tag">200 OK</td>
+              <td class="hmac-tag">f2a1c8b4…</td>
+              <td><span class="badge badge-active" style="font-size:9px">delivered</span></td>
+            </tr>
+            <tr>
+              <td class="text-dim data" style="font-size:12px">2026-06-09 09:40:02</td>
+              <td class="data text-paper" style="font-size:12px">287 events</td>
+              <td class="data text-paper" style="font-size:12px">19 ms</td>
+              <td class="hmac-tag">200 OK</td>
+              <td class="hmac-tag">e7d2f5a3…</td>
+              <td><span class="badge badge-active" style="font-size:9px">delivered</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="flex justify-between items-center mt-4 text-mute text-xs font-mono">
+          <div>5-attempt exponential retry · 48 h queue persistence · SiemExportBuffer Durable Object</div>
+          <div class="flex gap-3">
+            <button class="hover:text-paper transition-colors">← prev</button>
+            <span>1 / 12</span>
+            <button class="hover:text-paper transition-colors">next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -1234,6 +1499,15 @@
       if (s) s.classList.add('active');
     });
   });
+
+  function navigateTo(target) {
+    nav.forEach(n => n.classList.remove('active'));
+    screens.forEach(s => s.classList.remove('active'));
+    const item = document.querySelector(`[data-screen="${target}"]`);
+    if (item) item.classList.add('active');
+    const s = document.getElementById('screen-' + target);
+    if (s) s.classList.add('active');
+  }
 
   document.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', () => {

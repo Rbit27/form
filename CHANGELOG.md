@@ -6,6 +6,14 @@
 
 ---
 
+## [3.18.1] — 2026-06-09
+
+### Changed
+- `admin-dashboard.html` — SIEM Export screen added (v3.18.1). New sidebar nav item "⇆ SIEM Export". Full `screen-siem` panel: four SLO health cards (SIEM-SLO-01 push P95 18 ms / limit 60 s, SIEM-SLO-02 pull availability 99.97% / <5 min downtime, rolling 30 d event counter 847,293 / 1,000,000 enterprise quota, SIEM-SLO-04 HMAC chain INTACT); webhook configuration form (destination type selector — Splunk HEC / Microsoft Sentinel / Datadog / IBM QRadar LEEF / Generic webhook; endpoint URL; masked secret with reveal/copy/rotate; pull API endpoint + API key); filter rules table with include/exclude rules, `filter_compliance_approved` compliance gate (⚠ pending badge for admin/anomaly exclusion filters requiring CSM approval before activation); privacy floor disclosure (user_id absent, user_email SHA-256 hashed, ip_address /24, workout/CV/body fields removed — non-bypassable); recent push deliveries table (batch size, P95 latency, HTTP status, HMAC prefix, delivery status). Audit log "SIEM webhook" button wired to navigate to SIEM screen via `navigateTo()` helper. References: `docs/OBSERVABILITY.md §27`, DEC-030, `docs/AUDIT_LOG_SCHEMA.md`.
+- `VERSION` — 3.18.0 → 3.18.1
+
+---
+
 ## [3.18.0] — 2026-06-09
 
 ### Added
