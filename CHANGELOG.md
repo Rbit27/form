@@ -6,6 +6,18 @@
 
 ---
 
+## [3.8.0] — 2026-06-09
+
+### Added
+- `content/post-356-exercise-rotation-frequency.md` — **Content engine post-356**: Частота заміни вправ — коли перемикатись і коли це зрада прогресу. ~13 хв читання. Охоплює: SRA-крива для технічного навчання (Fitts & Posner motor learning phases), Fonseca et al. (2014) exercise variety і hypertrophy, Vigotsky & Contreras length-tension logic, Carroll et al. (2006) cross-education, матриця anchor/accessory/variation по стажу. clinical-safety NOT REQUIRED.
+- `content/post-357-progress-rate-different-lifts.md` — **Content engine post-357**: Темп прогресу у різних ліфтах — чому жим лежачи прогресує повільніше за присід. ~12 хв читання. Охоплює: lever arm mechanics, Zatsiorsky & Kraemer muscle mass principle, Häkkinen et al. (1993) hormonal responses, structural/anthropometric constraints, realistic monthly progress figures, 5-step bench diagnostic. clinical-safety NOT REQUIRED.
+- `content/post-358-self-programming-vs-template.md` — **Content engine post-358**: Самопрограмування vs готова програма — матриця вибору по стажу і цілях. ~14 хв читання. Охоплює: training-age threshold (Helms 3-5yr), Baumeister ego depletion, 4 systematic self-programming error modes, minimum viable program, hybrid autoregulation model (Seiler/Kjerland, Plisk/Stone). clinical-safety NOT REQUIRED.
+- `docs/DECISION_LOG.md` DEC-035 — API key expiry: soft enforcement (age alerts + CSM escalation) vs hard revocation. Provisional — revisit at SOC 2 observation period start. Resolves OQ-SSO-26.2.
+- `docs/DECISION_LOG.md` DEC-036 — Art. 9 health data no-grace period as absolute invariant during enterprise off-boarding. Resolves OQ-OFB-03. Required before first enterprise contract signing.
+- `docs/DATA_MODEL.md` — OQ-OFB-03 і OQ-SSO-26.2 відмічені як 🟢 Resolved з посиланнями на DEC-036 і DEC-035 відповідно.
+
+---
+
 ## [3.7.3] — 2026-06-09
 
 ### Added

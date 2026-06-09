@@ -13,6 +13,26 @@
 
 ---
 
+## 2026-06-09
+
+### DEC-036 · Art. 9 health data: no-grace period is an absolute invariant during enterprise off-boarding
+
+- **Decision:** During enterprise tenant off-boarding, Art. 9 health data (`keypoints_enc`, `user_health_profiles`, `coaching_turns`, `meal_logs`, `body_metrics`) is hard-deleted immediately with no grace period. This rule is an absolute invariant — it cannot be overridden by an enterprise MSA, even if the contract includes a mutual notice period or a DPA clause purporting to allow a recovery window. Enterprise customers who require a data export of individual health data must instruct their employees to exercise the right to data portability (DATA_MODEL.md §12.5) independently and before the off-boarding trigger date. Any enterprise MSA clause requesting a health-data recovery window must be refused at contract review stage. Resolves OQ-OFB-03 (DATA_MODEL.md §25.8).
+- **Owner:** compliance-officer + legal
+- **Why:** GDPR Recital 51 identifies health data as requiring a higher level of protection. A grace period for Art. 9 data after the employer relationship ends creates unnecessary exposure with no legitimate recovery justification; the 30-day soft-delete window (DATA_MODEL.md §12.1) exists for accidental individual-user deletion, not for employer off-boarding scenarios. If the first enterprise contract is signed before this is logged, the legal baseline is ambiguous — the decision must precede any contract signature.
+- **Reverse cost:** Cannot reverse without renegotiating the privacy policy, DPA template, and notifying existing enterprise customers (constitutive data handling promise)
+
+---
+
+### DEC-035 · API key expiry: soft enforcement (age alerts + CSM escalation) not automatic revocation
+
+- **Decision:** The `expires_at` field on `tenant_api_keys` (DATA_MODEL.md §26.4) is enforced as a soft control — age-alert UI warnings (amber at 365 days, red at 730 days) plus CSM escalation — not as hard automatic revocation at the `expires_at` timestamp. This default is explicitly provisional: if any key exceeds 365 days without rotation at the first SOC 2 observation period start, the soft control is demonstrably not operating effectively and hard enforcement must be added before the observation period ends. Resolves OQ-SSO-26.2 (DATA_MODEL.md §26.12).
+- **Owner:** enterprise-architect + compliance-officer
+- **Why:** Hard automatic revocation at 365 days provides a stronger SOC 2 CC6.4 posture (system control vs. procedural control). However, enterprise customers with CI/CD pipelines on dynamic-IP runners (GitHub Actions, Buildkite cloud) cannot use static IP allowlists and may not notice key age until revocation silently breaks their integration. Soft enforcement with CSM escalation avoids unplanned production outages for early enterprise pilots while providing documented evidence that the policy is operating. The provisional nature is a hard commitment: if evidence at observation-period start shows the soft control is insufficient, hard enforcement ships immediately.
+- **Reverse cost:** Low initially (provisionally soft); escalates to High if soft control is retained past observation period without documented operating effectiveness evidence
+
+---
+
 ## 2026-06-01
 
 ### DEC-034 · D7 activation metric definition: full coaching session with CV enabled within 7 days
