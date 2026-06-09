@@ -6,6 +6,16 @@
 
 ---
 
+## [3.3.1] — 2026-06-09
+
+### Added
+- `content/post-345-training-while-traveling.md` — Тренування під час подорожей і відряджень: Issurin (2008) резидуальні ефекти (сила 25–35 днів), Bickel et al. (2011) maintenance MED, готельний протокол 40 хв, матриця рішень (1–3 / 4–7 / 14+ днів), RIR 1–2 як ключова умова. Clinical-safety NOT REQUIRED. 13 хв читання.
+- `blog.html` — нова картка post-345 (292 cards total)
+- `README.md` — post-345 позначено [x]; додано roadmap-теми post-346..350
+- `STATUS.md` — оновлено лічильник постів (345), картка blog.html до v3.3.1
+
+---
+
 ## [3.3.0] — 2026-06-08
 
 ### Added
