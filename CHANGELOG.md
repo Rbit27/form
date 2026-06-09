@@ -6,6 +6,18 @@
 
 ---
 
+## [3.16.0] — 2026-06-09
+
+### Added
+- [`content/post-371-microbiome-training.md`](content/post-371-microbiome-training.md) — Мікробіом і тренування: Clarke et al. (2014, Gut) Akkermansia muciniphila у атлетів, Allen et al. (2018) зміна мікробіому незалежно від дієти і зворотність ефекту, Scheiman et al. (2019, Nature Medicine) лактат→Veillonella→пропіонат цикл, exercise-induced endotoxemia при перетренуванні, 3 практичних висновки; clinical-safety PASS (без харчових рекомендацій, без контенту про вагу тіла)
+- `blog.html` — три відсутні картки для posts 369–371 додані до індексу
+
+### Changed
+- `README.md` — post-371 позначено як виконано (v3.16.0), додано roadmap post-372–376
+- `VERSION` — 3.15.0 → 3.16.0
+
+---
+
 ## [3.15.0] — 2026-06-09
 
 ### Added
