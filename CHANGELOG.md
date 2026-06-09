@@ -6,6 +6,17 @@
 
 ---
 
+## [3.14.0] — 2026-06-09
+
+### Added
+- [`content/post-368-exercise-order-training-session.md`](content/post-368-exercise-order-training-session.md) — «Порядок вправ у тренуванні — що наука каже насправді» — ~13 хв читання. Spreuwenberg et al. (2006) J Strength Cond Res: присідання 3-ю вправою — менше повторень, вищий RPE; Dias et al. (2010): 12-тижневий цикл, м'язи в кінці сесії ростуть менше; Simão et al. (2012) систематичний огляд; Miranda et al. (2010) верхня частина тіла; принцип пріоритету; pre-exhaustion — умови виправданості; три сценарії (сила / гіпертрофія / загальна підготовка); Ratamess et al. (2009) NSCA. clinical-safety NOT REQUIRED.
+- `blog.html` — картка post-368. Загальна кількість карток: 315.
+
+### Changed
+- `VERSION` — 3.13.0 → 3.14.0
+
+---
+
 ## [3.13.0] — 2026-06-09
 
 ### Added
