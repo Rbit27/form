@@ -6,6 +6,17 @@
 
 ---
 
+## [3.20.0] — 2026-06-09
+
+### Added
+- `content/post-378-how-to-read-study-5-min.md` — Як перевірити тренувальне дослідження за 5 хвилин: мінімальний фільтр якості; п'ять фільтрів (вибірка, тривалість, n і статистична потужність, ефект-розмір, екологічна валідність); Cohen (1988) statistical power; Schoenfeld (2017) різні криві дозо-відповіді у тренованих/нетренованих; publication bias і industry-sponsored research; практичний 5-хвилинний маршрут по статті; 13 хв читання; editorial-brutalist; clinical-safety NOT REQUIRED
+- `blog.html` — +1 картка post-378 (320 cards total)
+- `README.md` — post-378 позначено як виконаний; додано roadmap post-380, 381, 382
+- `STATUS.md` — версія оновлена до v3.20.0; 378 posts; blog.html 320 cards
+- `VERSION` — 3.19.0 → 3.20.0
+
+---
+
 ## [3.19.0] — 2026-06-09
 
 ### Added
