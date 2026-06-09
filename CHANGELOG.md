@@ -6,6 +6,20 @@
 
 ---
 
+## [3.13.0] — 2026-06-09
+
+### Added
+- [`content/post-365-neuroplasticity-strength-training.md`](content/post-365-neuroplasticity-strength-training.md) — «Нейропластичність і силовий тренінг: чому техніка — це нейральна інвестиція» — ~12 хв читання. Pascual-Leone et al. (1995 PNAS) M1 expansion; Kleim et al. (2002 J Neurosci) синаптогенез після рухового навчання; Pearce et al. (2013 Eur J Neurosci) SICI/ICF кортикоспінальні зміни після 4 тижнів силового тренінгу; Carroll et al. (2006) cross-education ~8% transfer; техніка як нейральна інвестиція. clinical-safety NOT REQUIRED.
+- [`content/post-366-grip-strength-anatomy-training.md`](content/post-366-grip-strength-anatomy-training.md) — «Сила хвату: функціональна анатомія і тренінг» — ~11 хв читання. Три механізми хвату (crush/pinch/support); FDS vs FDP анатомія; Leong et al. (2015 Lancet) PURE study 139 703 осіб: −5 кг grip = +17% смертність; Bohannon (2019 JSCR) grip як longevity proxy; ремінці на становій — аналіз; 12-тижневий протокол. clinical-safety NOT REQUIRED.
+- [`content/post-367-minimum-maintenance-dose.md`](content/post-367-minimum-maintenance-dose.md) — «Мінімальна підтримуюча доза: скільки тренінгу достатньо щоб не втрачати» — ~11 хв читання. Bickel et al. (2011): 1/9 обсягу при збереженні інтенсивності — 100% сили за 8 місяців; Mujika & Padilla (2001) ієрархія деадаптації; Bruusgaard (2010 PNAS) міоядерна персистенція; практичний формат підтримуючого тижня. clinical-safety NOT REQUIRED.
+- `blog.html` — 3 нові картки: post-365, 366, 367. Загальна кількість карток: 314.
+- `README.md` — post-186, 187, 336 відмічено як [x] (написані як post-365/366/367).
+
+### Changed
+- `VERSION` — 3.12.1 → 3.13.0
+
+---
+
 ## [3.12.1] — 2026-06-09
 
 ### Changed
