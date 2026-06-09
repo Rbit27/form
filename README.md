@@ -691,8 +691,11 @@ Each iteration:
 - [x] post-356: Частота заміни вправ — коли перемикатись і коли це зрада прогресу; SRA-крива для технічного навчання; variety vs specificity trade-off; Fonseca et al. (2014) exercise variety and hypertrophy; clinical-safety NOT REQUIRED
 - [x] post-357: Темп прогресу у різних ліфтах — чому жим лежачи прогресує повільніше за присід; lever arms, м'язова маса, тренувальна економія; як керувати очікуваннями по руху; clinical-safety NOT REQUIRED
 - [x] post-358: Самопрограмування vs готова програма — матриця вибору по стажу і цілях; коли template перевершує custom і навпаки; де помилки програмування стають системними; clinical-safety NOT REQUIRED
-- [ ] post-359: Тренування в умовах теплового стресу — cardiovascular drift, thermoregulatory threshold, протоколи адаптації до жари; Chtourou & Souissi (2012) циркадні ефекти; клінічно-безпечний контекст (не медичні поради); clinical-safety NOT REQUIRED
+- [x] post-359: Тренування в умовах теплового стресу — cardiovascular drift, thermoregulatory threshold, WBGT-матриця, протоколи акліматизації; Nybo & Nielsen (2001) центральна теплова втома; O'Brien (2014) +7% VO₂max; Chtourou & Souissi (2012) циркадні ефекти; пасивна акліматизація сауна; clinical-safety REVIEWED PASS (MD-referral вбудований у матрицю)
 - [ ] post-360: Нейральна ефективність vs гіпертрофія: як розрізнити джерело сили що зростає — Moritani & deVries (1979) класичний EMG-експеримент; часова шкала нейральної та структурної фаз; що означає «я стаю сильнішим, але не більшим» і навпаки; clinical-safety NOT REQUIRED
+- [ ] post-361: Тренування і кофеїн — що підтверджено дослідженнями і що є маркетингом; Astorino & Roberson (2010) мета-аналіз; толерантність і wash-out; дозування і вікно ефекту; clinical-safety NOT REQUIRED
+- [ ] post-362: Як читати дослідження про тренування — ієрархія доказів для практика; RCT vs observational; effect size проти p-value; Schoenfeld «resistance training recommendations» як зразок; clinical-safety NOT REQUIRED
+- [ ] post-363: Індивідуальна варіативність відповіді на тренування — чому однакова програма дає різні результати; responder vs non-responder (Timmons 2010); гетерогенність гіпертрофічної відповіді; що це означає для програмування; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 

@@ -6,6 +6,19 @@
 
 ---
 
+## [3.8.1] — 2026-06-09
+
+### Added
+- `content/post-359-heat-stress-training.md` — **Content engine post-359**: Тренування в умовах теплового стресу — cardiovascular drift, thermoregulatory threshold, WBGT-матриця, протоколи акліматизації. ~13 хв читання. Охоплює: серцево-судинний дрейф (Ekelund 1967), центральна теплова втома (Nybo & Nielsen 2001 J Physiol), WBGT операційні пороги, теплова акліматизація O'Brien et al. (2014 Sports Med): +7% VO₂max, +12% робочої ємності, Ely et al. (2010 J Appl Physiol), циркадні ефекти Chtourou & Souissi (2012 BJSM), пасивна акліматизація через сауну, силовий vs аеробний тренінг у спеку, матриця рішень з MD-referral. clinical-safety REVIEWED PASS.
+- `blog.html` — чотири нові картки: post-356 (Частота заміни вправ), post-357 (Темп прогресу ліфтів), post-358 (Самопрограмування vs шаблон), post-359 (Тепловий стрес). Загальна кількість карток: 303. Оновлено версію до v3.8.1.
+- `README.md §Content engine roadmap` — post-359 позначено виконаним; додано нові теми post-361–363 (кофеїн і тренування, читання досліджень, індивідуальна варіативність відповіді).
+
+### Changed
+- `STATUS.md` — blog.html: 299 → 303 картки, 355 → 359 постів authored; TL;DR: 348 → 359 evidence-based posts; blog.html версія → v3.8.1.
+- `VERSION` — 3.8.0 → 3.8.1
+
+---
+
 ## [3.8.0] — 2026-06-09
 
 ### Added
