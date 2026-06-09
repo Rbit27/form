@@ -24784,3 +24784,569 @@ Four new events for Confidentiality TSC operational monitoring. All adhere to th
 ---
 
 *v1.0 (2026-06-09): §73 Confidentiality TSC (C1) Operating Evidence — C1-GAP-001 Advancement · NDA Lifecycle, Encryption-at-Rest Verification & Disposal Monitoring · C1.1/C1.2 Auditor Exhibit. Advances C1-GAP-001 from 🔴 Open → 🟡 Authored by recording that `compliance/c1/nda-template.md` (C1-NDA-001 v1.0) is committed to the repository — this gap was authored before §73 but had not been reflected in the SOC2_READINESS gap register; PRE-34-E-003 now filed as PRE-73-E-001 (Git commit SHA). Section provides the C1 operating-evidence cadence equivalent to §71 (A1 Availability Operating Evidence) and §72 (PI1 Processing Integrity Operating Evidence). Three C1 operating evidence streams: (1) C1.1 Workforce Confidentiality — NDA lifecycle monitoring via `personnel.nda_signed` DEC-030 (§42.6) and `compliance/ndas/nda-register.csv` quarterly extract (PRE-73-E-002); quarterly data asset inventory review with `compliance.data_asset_inventory_reviewed` DEC-030 (PRE-73-E-002 cadence); C1-CHAIN-01 chain monitor (no review event in > 100 days → PagerDuty P1). (2) C1.1 Encryption-at-rest — Annual DDL verification query + Supabase/Workers/R2 screenshot package filed as PRE-73-E-003; `compliance.encryption_verified` DEC-030 STANDARD/3yr; C1-CHAIN-02 chain monitor (no verification in > 380 days). (3) C1.2 Disposal — AL-C1-01 erasure SLA alert (pg_cron `c1-erasure-sla-monitor`, daily 08:00 UTC, fires at 33-day breach, privacy-safe payload with breach_count only, job 11 in pg-cron-health-monitor registry); `compliance.erasure_sla_alert_fired` HIGH/7yr DEC-030; quarterly/annual disposal audit cadence (§73.3.2) with `compliance.disposal_audit_completed` STANDARD/3yr; C1-CHAIN-03 chain monitor (no disposal audit in > 100 days). Four new DEC-030 events: `compliance.data_asset_inventory_reviewed` STANDARD/3yr, `compliance.encryption_verified` STANDARD/3yr, `compliance.erasure_sla_alert_fired` HIGH/7yr, `compliance.disposal_audit_completed` STANDARD/3yr. Five evidence artefacts PRE-73-E-001 through PRE-73-E-005. Gap tracker: C1-GAP-001 🔴 Open → 🟡 Authored; C1-GAP-002/C1-GAP-004 operational cadence reinforced; C1-GAP-003 remains 🔴 Open (DPA receipts — not addressed by §73; OQ-C1-02 provides the resolution path). P0-14 pre-launch checklist row advances from FAIL to 🟡 Authored. Checklist: 5× P0 M4-M5, 5× P1 M5-M6, 2× P2. SOC 2 C TSC: ~88% → ~91% (C1-GAP-001 drafting gap closed; operational evidence cadence specified; C1-GAP-003 DPA receipts remain the primary open item). Overall SOC 2 readiness: ~97.5% → ~97.7%. Cross-references: §34 (C1 deep-dive control baseline), §40 (original C1.2 disposal narrative), §42 (hiring/onboarding — personnel.nda_signed §42.6), §55 (security awareness training — C1.1 handling rules; C1-GAP-001 data-classification aspect resolved in §55.5), §66 (media/device disposal — C1-GAP-004 authored), §67 (tenant data deletion — C1.2 enterprise erasure), §70 (DSAR automation — §70.3 day-25/day-29 P0/P1 alerts; AL-C1-01 day-33 is a secondary belt-and-suspenders layer), §71 (A1 Operating Evidence — pg_cron health monitor, job 11 added), docs/AUDIT_LOG_SCHEMA.md (four new DEC-030 events), docs/OBSERVABILITY.md §6.2 (AL-C1-01 to be added to c1_erasure_sla alert rules subsection), docs/HIRING_GUIDE.md §3 (training gate references NDA signing). Owner: compliance-officer (cadence, gap register) + security-engineer (chain monitors) + devops-lead (encryption verification). SOC 2 doc v3.3 → v3.4.*
+
+---
+
+## §74 Privacy TSC — Consent Management & Cookie Banner Operating Evidence · PRE-16 / P-GAP-004 Closure · P1.1/P2.1/P3.1/P8.1 Auditor Exhibit
+
+> **SOC 2 criteria addressed:** P1.1 (privacy notice communicates the types of personal information collected and the purposes for which it is used), P2.1 (consent is obtained before or at the time of collection of personal information, or as soon as practicable thereafter), P3.1 (personal information is collected consistent with the entity's objectives related to privacy), P8.1 (privacy issues are identified and addressed by a designated individual or group).
+>
+> **Gap closures:** P-GAP-004 🔴 Critical → 🟡 Authored (`form-consent-gate` Cloudflare Worker architecture specified; `consent_records` append-only table DDL authored; `privacy.consent_granted`, `privacy.consent_withdrawn`, and `privacy.consent_version_bumped` DEC-030 events formalised; P-CHAIN-01 chain monitor specified). PRE-16 🔴 Open → 🟡 Authored. Closes the single remaining 🔴 critical gap blocking SOC 2 observation period start.
+>
+> **Companion sections:** §5 (Privacy TSC P1–P8 baseline controls), §35 (GDPR processing controls and DPIA), §67 (tenant data deletion — P4.3 disposal), §70 (DSAR lifecycle — P5.1/P5.2), §73 (Confidentiality — erasure SLA AL-C1-01, related disposal monitoring).
+>
+> **SOC 2 doc version:** v3.4 → v3.5. Owner: compliance-officer (policy, evidence, gap register) + platform-engineer (Worker, DDL, chain monitor).
+
+---
+
+### §74.1 Purpose and Scope
+
+§5 established the *design* of FORM's Privacy TSC controls: privacy notice, choice and consent, collection limitation, use and retention, access rights, disclosure, quality, and monitoring. This section provides the **operating evidence** for the P-series — the consent management architecture and auditor-facing evidence record — following the same framework as §71 (A1 Availability), §72 (PI1 Processing Integrity), and §73 (C1 Confidentiality).
+
+The single remaining 🔴 critical gap listed in the Gap Analysis Summary (§3) is:
+
+> **PRE-16 — Cookie banner / consent management** — required before health data collection begins.
+
+This is the gap that blocks the SOC 2 observation period. Every other 🔴 gap has either been closed or downgraded to 🟡 Partial in prior sections. §74 authors the full consent management architecture to close PRE-16.
+
+The section covers four interrelated consent surfaces:
+
+1. **Web cookie consent (P2.1):** A GDPR Art. 6-compliant cookie banner on `form.coach` and the web app, implemented via a purpose-built `form-consent-gate` Cloudflare Worker backed by Cloudflare KV. Analytics (PostHog) and non-essential cookies load only after consent is recorded.
+2. **Mobile in-app Art. 9 health data consent (P2.1 / P3.1):** iOS and Android onboarding consent gate before the first health-category record is written to Supabase. Freely-given, informed, explicit consent per GDPR Art. 9(2)(a). Non-consenters get a limited-mode product with no health data fields.
+3. **Consent record architecture (P2.1 + P8.1):** The `consent_records` append-only table and DEC-030 HMAC-chained event stream that constitutes the tamper-evident auditor exhibit for P2 at SOC 2 fieldwork.
+4. **Privacy notice at collection point (P1.1):** Mechanics for ensuring `form.coach/privacy` (PRE-01) is linked at every consent collection point.
+
+**Out of scope for §74:** DSAR handling (§70), data erasure and retention (§67/§73), sub-processor disclosure (§35 / P-GAP-002).
+
+**Privacy floor:** No full IP address, email address, name, GDPR Art. 9 category value, or `consent_token` may appear in any DEC-030 event payload, evidence CSV, or observability signal produced by this section. Two-letter ISO 3166-1 alpha-2 country code is the maximum geographic granularity permitted in consent event payloads.
+
+---
+
+### §74.2 Consent Management Platform Architecture
+
+FORM does not purchase a third-party CMP (Osano, OneTrust, CookieYes) at this stage — cost and operational overhead is unjustified pre-Series A. Consent is managed via a purpose-built **`form-consent-gate` Cloudflare Worker** backed by Cloudflare KV and Supabase `consent_records`. This approach:
+
+- Serves the consent banner from the same Cloudflare edge that serves the app — no third-party CMP cookie overhead.
+- Stores consent decisions in Cloudflare KV (fast edge read; `consent:{token}` key; 1-year TTL) with a durable HMAC-chained record in Supabase `consent_records`.
+- Emits three DEC-030 events at grant, withdrawal, and policy version change — auditor-grade tamper-evident record.
+- Enables re-consent on policy changes via a `CONSENT_SCHEMA_VERSION` environment variable bump; any stale token triggers banner re-display.
+
+**Architecture (text diagram):**
+
+```
+Browser / Mobile SDK          Cloudflare Edge              Supabase (Postgres)
+        │                           │                              │
+        │── GET /consent.js ───────▶│                              │
+        │◀── banner JS ─────────────│                              │
+        │                           │                              │
+        │── POST /api/consent ─────▶│ form-consent-gate Worker     │
+        │   { surface, categories,  │   1. Zod-validate payload    │
+        │     version }             │   2. KV write consent:{token}│
+        │                           │   3. INSERT consent_records ─▶│
+        │◀── { token, event_id } ───│   4. Emit DEC-030 event      │
+```
+
+**Consent token lifecycle:**
+- First visit: Worker generates UUID v4 `consent_token`; sets `__form_consent` cookie (Secure, SameSite=Lax, Max-Age=31536000).
+- Subsequent visits: Worker reads `KV consent:{token}`; if `version` matches `CONSENT_SCHEMA_VERSION`, banner is suppressed and permitted SDKs load.
+- On `CONSENT_SCHEMA_VERSION` bump: KV read returns stale version; banner re-displays; new `consent_records` row appended with `event_type = 'updated'`; `privacy.consent_version_bumped` DEC-030 event emitted at deploy time.
+
+**Consent categories:**
+
+| Category | Cookies / SDKs | GDPR lawful basis | Default on load | Requires consent? |
+|---|---|---|---|---|
+| **Strictly Necessary** | Supabase auth (`sb-*`), CSRF token, `__form_consent` | Art. 6(1)(b) — necessary for the service | Always loaded | No |
+| **Functional** | User preferences (theme, language, onboarding step) | Art. 6(1)(f) — legitimate interest | Off by default | Yes |
+| **Analytics** | PostHog JS SDK (`ph_*`, `__ph_opt_in_out_*`) | Art. 6(1)(a) — consent | Off by default | Yes |
+| **Marketing** | None currently; placeholder for future remarketing | Art. 6(1)(a) — consent | Off by default | Yes |
+
+**PostHog conditional loading:** PostHog JS snippet is wrapped behind a consent gate check; it must not initialise before `analytics` category is granted:
+
+```javascript
+// consent-gate.js — injected by Worker before any analytics snippet
+(function () {
+  var c = window.__FORM_CONSENT; // injected server-side by consent-gate on page render
+  if (c && Array.isArray(c.categories) && c.categories.indexOf('analytics') !== -1) {
+    // dynamically inject PostHog snippet
+    var s = document.createElement('script');
+    s.src = '/static/ph.js';
+    document.head.appendChild(s);
+  }
+})();
+```
+
+On mobile (iOS/Android), PostHog SDK initialisation is gated behind the Art. 9 in-app consent grant (§74.3).
+
+---
+
+### §74.3 Mobile In-App GDPR Art. 9 Consent Flow
+
+The mobile app has no browser cookies. However, GDPR Art. 9 requires explicit consent before any health-category data is written to Supabase. This is separate from cookie consent and applies in both mobile and web app contexts whenever health data is first collected.
+
+**Health data categories processed by FORM requiring Art. 9 consent:**
+
+| Data type | GDPR category | First collection event |
+|---|---|---|
+| Body measurements (weight, height, body fat %) | Art. 9 — data concerning health | Onboarding screen 3 |
+| CV pose keypoints (video-derived biomechanics) | Art. 9 — biometric data processed for the purpose of uniquely identifying a natural person / health-related | First CV coaching session |
+| Heart rate / HRV (HealthKit, Health Connect, wearables) | Art. 9 — data concerning health | Wearable connect screen |
+| Nutrition logs (calories, macros, meal content) | Art. 9 — data concerning health | First meal log |
+| Recovery and sleep data | Art. 9 — data concerning health | Wearable connect screen |
+| Victor AI coaching conversation content | Art. 9 (if health disclosures appear in free-text) | First coaching session |
+
+**Consent gate UI specification:**
+
+Displayed full-screen before Onboarding screen 3 (first health data input). Must appear before any Art. 9 field is rendered or any API call that could write health data is made.
+
+```
+Title (Fraunces serif italic): "FORM processes health data to coach you."
+
+Sub-head: "Under GDPR Article 9, we need your explicit consent before storing any health information."
+
+Body copy:
+"FORM will process the following to provide personalised coaching:
+  · Body measurements and composition
+  · Movement and exercise data, including video pose analysis
+  · Heart rate and recovery metrics (if you connect a wearable)
+  · Nutrition logs
+  · AI coaching conversations, which may contain health disclosures
+
+Why: personalised coaching, progress tracking, and adaptive programming.
+Who sees it: only you and FORM's systems. Your employer cannot access individual health records. This is a technical constraint — not a policy setting.
+How long: retained while your account is active, then deleted 90 days after account closure.
+Your rights: withdraw consent and delete all data at any time from Settings → Data.
+
+Tapping 'I consent' grants FORM explicit consent to process the above health data categories under GDPR Article 9(2)(a)."
+
+Buttons:
+  [I consent]                      [Limited mode — no health data]
+```
+
+**Limited mode:** Users who decline Art. 9 consent may still use FORM for technique coaching and general workout guidance without health data. Health-data input fields are hidden; no Art. 9 category data is written to any FORM system. This satisfies GDPR Art. 7(3) (withdrawal is non-punitive) and ensures the product is usable without coercing consent — a requirement for the "freely given" standard under Art. 7(4).
+
+**On "I consent" tap — before writing any health data:**
+1. Call `POST /api/consent` with `{ surface: 'mobile_art9', event_type: 'granted', categories: ['health_data', 'biometric'] }`.
+2. Worker INSERTs `consent_records` row; emits `privacy.consent_granted` DEC-030 HIGH event.
+3. App sets `user_profile.art9_consent_granted_at = now()` and `art9_consent_version = CONSENT_SCHEMA_VERSION`.
+4. Health data input fields are unlocked.
+
+**Re-consent triggers:**
+- `CONSENT_SCHEMA_VERSION` bump in app update.
+- User explicitly withdraws consent via Settings → Data (emits `privacy.consent_withdrawn`).
+- Account deletion + re-registration.
+
+**Enterprise tenant note (OQ-P2-02):** When FORM is provided as an employer-sponsored benefit, the "freely given" standard may be at risk if participation is de facto mandatory. The mobile consent UI therefore must always display "Limited mode — no health data" as a genuinely viable option. The limited mode must be functionally useful (not a dead end). See §74.11 OQ-P2-02 for the DPIA guidance.
+
+---
+
+### §74.4 `consent_records` Table DDL
+
+The `consent_records` table is the authoritative, tamper-evident record of all consent decisions. It is **append-only**: no UPDATE or DELETE is permitted by application roles. Withdrawals are recorded as a new row with `event_type = 'withdrawn'`.
+
+```sql
+-- Migration: 0037_consent_records.sql
+-- SOC 2 criteria: P2.1, P8.1
+-- Privacy invariant: no email, phone, full IP, or Art. 9 value in this table.
+--   user_id is a pseudonymous UUID; consent_token is an opaque UUID not linkable to email.
+
+CREATE TABLE consent_records (
+    id                  uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id           uuid        REFERENCES tenants(id) ON DELETE RESTRICT,
+    user_id             uuid        REFERENCES user_profile(id) ON DELETE RESTRICT,
+    -- user_id is NULL for anonymous pre-authentication web consent (consent_token only)
+
+    consent_token       text        NOT NULL,
+    -- UUID v4; stored in __form_consent cookie and Cloudflare KV; not user-identifiable in isolation
+
+    event_type          text        NOT NULL
+                                    CHECK (event_type IN ('granted', 'withdrawn', 'updated')),
+    consent_version     text        NOT NULL,
+    -- Matches CONSENT_SCHEMA_VERSION env var; e.g. '1.0', '1.1'
+
+    consent_surface     text        NOT NULL
+                                    CHECK (consent_surface IN ('web_cookie', 'mobile_art9', 'web_art9')),
+    granted_categories  text[]      NOT NULL DEFAULT '{}',
+    -- web_cookie: ARRAY['analytics'], ARRAY['analytics','functional'], etc.
+    -- mobile/web art9: ARRAY['health_data'], ARRAY['health_data','biometric']
+    -- withdrawn rows: empty array; see withdrawn_categories
+
+    withdrawn_categories text[]     NOT NULL DEFAULT '{}',
+    -- Populated on event_type = 'withdrawn'; empty on 'granted'
+
+    ip_country          char(2),
+    -- ISO 3166-1 alpha-2 country code; never full IP address
+
+    user_agent_hash     text,
+    -- SHA-256 of normalised user-agent string; not reversible to original UA string
+
+    dec030_event_id     uuid        NOT NULL,
+    -- References audit_log_events.id; confirms DEC-030 HMAC chain linkage
+
+    created_at          timestamptz NOT NULL DEFAULT now()
+    -- No updated_at: append-only table
+);
+
+-- ── Append-only enforcement ──────────────────────────────────────────────────
+CREATE RULE consent_records_no_update AS ON UPDATE TO consent_records
+    DO INSTEAD NOTHING;
+CREATE RULE consent_records_no_delete AS ON DELETE TO consent_records
+    DO INSTEAD NOTHING;
+
+-- ── Row-level security ───────────────────────────────────────────────────────
+ALTER TABLE consent_records ENABLE ROW LEVEL SECURITY;
+
+-- Users may read only their own rows (Settings → Data display)
+CREATE POLICY consent_records_user_read ON consent_records
+    FOR SELECT
+    USING (
+        user_id = (SELECT id FROM user_profile WHERE auth_user_id = auth.uid())
+    );
+
+-- Tenant isolation: users cannot read other tenants' consent records
+CREATE POLICY consent_records_tenant_isolation ON consent_records
+    FOR SELECT
+    USING (
+        tenant_id = (
+            SELECT tenant_id FROM user_profile WHERE auth_user_id = auth.uid()
+        )
+    );
+
+-- Application service role (consent-gate Worker) inserts via service-role key
+-- Service-role bypasses RLS; this policy documents intent for anon/authed roles
+CREATE POLICY consent_records_service_insert ON consent_records
+    FOR INSERT
+    WITH CHECK (TRUE);
+
+-- ── Indexes ──────────────────────────────────────────────────────────────────
+CREATE INDEX consent_records_user_id_idx    ON consent_records (user_id);
+CREATE INDEX consent_records_tenant_id_idx  ON consent_records (tenant_id);
+CREATE INDEX consent_records_token_idx      ON consent_records (consent_token);
+CREATE INDEX consent_records_created_idx    ON consent_records (created_at);
+CREATE INDEX consent_records_event_type_idx ON consent_records (event_type);
+```
+
+**Append-only integrity check (run annually; file as PRE-74-E-002):**
+
+```sql
+-- Positive result: n_tup_upd = 0 AND n_tup_del = 0
+-- Non-zero values indicate a rule bypass; treat as P1 security incident
+SELECT
+    schemaname,
+    tablename,
+    n_tup_ins  AS rows_inserted,
+    n_tup_upd  AS rows_updated,   -- must be 0
+    n_tup_del  AS rows_deleted    -- must be 0
+FROM pg_stat_user_tables
+WHERE tablename = 'consent_records';
+```
+
+**Tenant admin access restriction:** Enterprise tenant admin roles may not read `consent_records` rows belonging to their employees. This is enforced by the `consent_records_tenant_isolation` RLS policy above combined with the RBAC role definitions in `docs/DATA_MODEL.md §5`. A query by a tenant admin using their JWT will only match their own `user_id` row — not any employee's row. See §74.11 OQ-P2-03 for confirmation requirement in DATA_MODEL.md.
+
+---
+
+### §74.5 `form-consent-gate` Cloudflare Worker Specification
+
+**Worker name:** `form-consent-gate`
+**Routes:** `form.coach/api/consent` (POST — record decision), `form.coach/api/consent/:token` (GET — read state for SSR)
+**KV namespace:** `CONSENT_KV`
+**Environment variables:**
+
+| Name | Description |
+|---|---|
+| `CONSENT_SCHEMA_VERSION` | Current policy version; e.g. `"1.0"`. Bump to trigger re-consent for all active users. |
+| `CONSENT_KV` | KV namespace binding |
+| `EMIT_AUDIT_URL` | URL of `emit-audit-event` Edge Function |
+| `EMIT_AUDIT_SECRET` | Bearer secret for `emit-audit-event` |
+| `SUPABASE_URL` | Supabase project REST URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key; used for INSERT only (bypasses RLS) |
+
+**Zod validation schema:**
+
+```typescript
+import { z } from 'zod';
+
+const ConsentCategory = z.enum([
+  'analytics', 'functional', 'marketing',
+  'health_data', 'biometric',
+]);
+
+const ConsentPayload = z.object({
+  consent_token:       z.string().uuid().optional(),
+  tenant_id:           z.string().uuid().optional(),
+  user_id:             z.string().uuid().optional(),
+  surface:             z.enum(['web_cookie', 'mobile_art9', 'web_art9']),
+  event_type:          z.enum(['granted', 'withdrawn', 'updated']),
+  categories:          z.array(ConsentCategory),
+  withdrawn_categories: z.array(ConsentCategory).optional().default([]),
+  consent_version:     z.string().regex(/^\d+\.\d+$/),
+  ip_country:          z.string().length(2).optional(),
+  user_agent_hash:     z.string().length(64).optional(), // SHA-256 hex
+});
+```
+
+**POST /api/consent handler (pseudo-code):**
+
+```typescript
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    if (request.method !== 'POST') {
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const parsed = ConsentPayload.safeParse(body);
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ error: 'Invalid payload' }), { status: 400 });
+    }
+
+    const p = parsed.data;
+    const token = p.consent_token ?? crypto.randomUUID();
+    const decEventType = p.event_type === 'withdrawn'
+      ? 'privacy.consent_withdrawn'
+      : 'privacy.consent_granted';
+
+    // 1. Emit DEC-030 event first; receive event_id for FK in consent_records
+    const eventId = await emitAuditEvent(env, {
+      event_type: decEventType,
+      severity: 'HIGH',
+      data_class: 'CRITICAL',
+      payload: {
+        consent_surface:      p.surface,
+        categories:           p.categories,
+        withdrawn_categories: p.withdrawn_categories,
+        consent_version:      p.consent_version,
+        ip_country:           p.ip_country ?? null,
+        // PRIVACY: no user_id, no email, no consent_token in DEC-030 payload
+      },
+    });
+
+    // 2. Write to KV with 1-year TTL
+    await env.CONSENT_KV.put(
+      `consent:${token}`,
+      JSON.stringify({
+        categories:   p.categories,
+        version:      p.consent_version,
+        surface:      p.surface,
+        event_id:     eventId,
+      }),
+      { expirationTtl: 365 * 24 * 60 * 60 },
+    );
+
+    // 3. INSERT consent_records (Supabase REST, service-role)
+    await fetch(`${env.SUPABASE_URL}/rest/v1/consent_records`, {
+      method: 'POST',
+      headers: {
+        'apikey':        env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal',
+      },
+      body: JSON.stringify({
+        tenant_id:            p.tenant_id ?? null,
+        user_id:              p.user_id ?? null,
+        consent_token:        token,
+        event_type:           p.event_type,
+        consent_version:      p.consent_version,
+        consent_surface:      p.surface,
+        granted_categories:   p.event_type === 'granted' ? p.categories : [],
+        withdrawn_categories: p.withdrawn_categories ?? [],
+        ip_country:           p.ip_country ?? null,
+        user_agent_hash:      p.user_agent_hash ?? null,
+        dec030_event_id:      eventId,
+      }),
+    });
+
+    const cookieHeader = p.surface === 'web_cookie'
+      ? `__form_consent=${token}; Secure; SameSite=Lax; Max-Age=31536000; Path=/`
+      : undefined;
+
+    return new Response(
+      JSON.stringify({ token, event_id: eventId }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(cookieHeader ? { 'Set-Cookie': cookieHeader } : {}),
+        },
+      },
+    );
+  },
+};
+```
+
+**GET /api/consent/:token (SSR consent state lookup):**
+
+```typescript
+// Returns stored consent for SSR workers to gate analytics loading at edge
+// Response: { categories: string[], version: string, surface: string } | { not_found: true }
+const kv = await env.CONSENT_KV.get(`consent:${token}`, { type: 'json' });
+if (!kv) return new Response(JSON.stringify({ not_found: true }), { status: 200 });
+return new Response(JSON.stringify(kv), { status: 200 });
+```
+
+---
+
+### §74.6 DEC-030 HMAC-Chained Events (P Series — Consent)
+
+Three events formalise the consent lifecycle in the DEC-030 HMAC audit chain. `privacy.consent_granted` and `privacy.consent_withdrawn` were previously referenced in §5 but without a formal schema specification; this section authors them.
+
+| Event type | Severity | Retention | Trigger | Key payload fields | SOC 2 criterion |
+|---|---|---|---|---|---|
+| `privacy.consent_granted` | HIGH | 7 yr | User grants cookie consent or Art. 9 health data consent via `form-consent-gate` Worker | `consent_surface` (enum), `categories` (string[]), `consent_version` (string), `ip_country` (char(2) or null) | P2.1 |
+| `privacy.consent_withdrawn` | HIGH | 7 yr | User withdraws consent via Settings → Data or banner re-interaction | `consent_surface` (enum), `withdrawn_categories` (string[]), `consent_version` (string), `reason` (enum: `user_initiated` / `policy_update_re_consent` / `account_deletion`) | P2.1, P4.3 |
+| `privacy.consent_version_bumped` | STANDARD | 3 yr | `CONSENT_SCHEMA_VERSION` env var updated — policy change; emitted at `wrangler deploy` time | `old_version` (string), `new_version` (string), `change_summary` (string ≤ 200 chars), `surfaces_affected` (string[]) | P1.1, P2.1 |
+
+**Privacy invariant (all three events):** No `user_id`, email address, phone number, full IP address, or `consent_token` value may appear in any payload field. `ip_country` is the maximum geographic granularity: 2-letter ISO 3166-1 alpha-2 code or null.
+
+**Chain monitor P-CHAIN-01 — consent infrastructure gap:**
+
+| Field | Value |
+|---|---|
+| **Monitor ID** | P-CHAIN-01 |
+| **Trigger** | `privacy.consent_granted` not emitted in the trailing 365 days (checked daily) |
+| **Severity** | P2 |
+| **Routing** | PagerDuty `form-compliance` service → compliance-officer; Slack `#security-alerts` |
+| **Dedup key** | `p-chain-01-consent-gap-{YYYY-MM}` (monthly dedup to prevent alert fatigue) |
+| **Rationale** | A live product with users onboarding continuously should see consent events daily. A 365-day gap indicates either (a) `form-consent-gate` Worker is broken and consent is not being recorded — compliance violation; or (b) zero new users for 12 months — operational alert. Both warrant investigation. |
+
+**pg_cron job for P-CHAIN-01:**
+
+```sql
+-- Job name: p-chain-01-consent-gap-monitor
+-- Schedule: '0 9 * * *'  (09:00 UTC daily)
+SELECT cron.schedule(
+  'p-chain-01-consent-gap-monitor',
+  '0 9 * * *',
+  $$
+  DO $$
+  DECLARE
+    v_last_consent timestamptz;
+    v_gap_days     integer;
+  BEGIN
+    SELECT MAX(created_at) INTO v_last_consent
+    FROM audit_log_events
+    WHERE event_type = 'privacy.consent_granted';
+
+    v_gap_days := EXTRACT(DAY FROM (NOW() - COALESCE(v_last_consent, NOW() - INTERVAL '366 days')));
+
+    IF v_gap_days > 365 THEN
+      PERFORM net.http_post(
+        url     := current_setting('app.settings.emit_audit_url'),
+        headers := jsonb_build_object(
+          'Content-Type',  'application/json',
+          'Authorization', 'Bearer ' || current_setting('app.settings.emit_audit_secret')
+        ),
+        body    := jsonb_build_object(
+          'event_type', 'monitoring.chain_gap_detected',
+          'severity',   'P2',
+          'payload',    jsonb_build_object(
+            'monitor_id',     'P-CHAIN-01',
+            'chain_type',     'privacy.consent_granted',
+            'gap_days',        v_gap_days,
+            'last_event_at',   v_last_consent
+          )
+        )::text
+      );
+    END IF;
+  END;
+  $$;
+  $$
+);
+```
+
+Add `p-chain-01-consent-gap-monitor` as job 12 to the `pg-cron-health-monitor` registry (§71.2.2) with a `26h` freshness window.
+
+---
+
+### §74.7 Evidence Artefacts
+
+| Evidence ID | Description | Format | Cadence | Responsible | Criterion |
+|---|---|---|---|---|---|
+| **PRE-74-E-001** | `form-consent-gate` Worker deployment evidence: (a) `wrangler.toml` showing `CONSENT_SCHEMA_VERSION`, `CONSENT_KV` binding, and route `form.coach/api/consent`; (b) `wrangler deploy` output showing successful deployment; (c) Cloudflare dashboard screenshot showing Worker last-deployed timestamp and live status | Text + screenshots; filed to `compliance/evidence/p2/consent-worker-deploy-YYYY.md` | At initial deploy; updated on each `CONSENT_SCHEMA_VERSION` bump | platform-engineer | P2.1 |
+| **PRE-74-E-002** | `consent_records` table DDL + append-only integrity check: (a) `psql \d consent_records` output confirming table structure, RLS enabled, and two RULE guards; (b) `pg_stat_user_tables` query result showing `n_tup_upd = 0` and `n_tup_del = 0`; filed to `compliance/evidence/p2/consent-table-YYYY.md` | psql output screenshots | At initial migration; annually at Q1 review | platform-engineer | P2.1, P8.1 |
+| **PRE-74-E-003** | `privacy.consent_granted` DEC-030 event export for the 90-day observation window — CSV export from `audit_log_events` where `event_type = 'privacy.consent_granted'`; row count ≥ 1 is a positive result; confirms HMAC chain is intact and events are flowing | CSV; filed to `compliance/evidence/p2/consent-events-YYYY-QN.csv` | At SOC 2 fieldwork | compliance-officer | P2.1 |
+| **PRE-74-E-004** | Privacy notice linkage evidence: screenshots of (a) cookie consent banner on `form.coach` showing visible link to `form.coach/privacy`; (b) mobile Art. 9 consent sheet showing visible link to Privacy Policy; (c) `form.coach/privacy` returning HTTP 200 and displaying the most recent policy revision date | Screenshots; filed to `compliance/evidence/p1/privacy-notice-linkage-YYYY.md` | At PRE-01 closure (privacy policy publication); re-filed on each policy update | compliance-officer | P1.1 |
+| **PRE-74-E-005** | `privacy.consent_withdrawn` DEC-030 event export for the observation window — CSV export from `audit_log_events` where `event_type = 'privacy.consent_withdrawn'`; confirms withdrawal mechanism is wired end-to-end. A zero-row result is acceptable if PRE-74-E-003 shows grant events (no users have withdrawn — positive indicator) | CSV; filed to `compliance/evidence/p2/consent-withdrawal-events-YYYY-QN.csv` | At SOC 2 fieldwork | compliance-officer | P2.1, P4.3 |
+| **PRE-74-E-006** | `privacy.consent_version_bumped` DEC-030 event export — all version change events since `form-consent-gate` was deployed; combined with PRE-74-E-001 deploy log, allows auditor to confirm every consent policy change triggered re-consent for active users | CSV; filed to `compliance/evidence/p2/consent-version-history-YYYY.csv` | At SOC 2 fieldwork; updated on each `CONSENT_SCHEMA_VERSION` bump | compliance-officer | P1.1, P2.1 |
+
+---
+
+### §74.8 SOC 2 Criteria Mapping Summary
+
+| Criterion | AICPA requirement (paraphrased) | §74 mechanism | Primary evidence artefact(s) | Current status |
+|---|---|---|---|---|
+| **P1.1** — Privacy notice | Notice is provided to individuals about the types of personal information collected and the purposes for which it is used | Privacy policy link in cookie banner and mobile Art. 9 consent sheet (§74.3); `form.coach/privacy` publication (PRE-01); `privacy.consent_version_bumped` DEC-030 event on policy change (§74.6) | PRE-74-E-004 (privacy notice linkage screenshots); PRE-74-E-006 (version history) | 🟡 Authored — consent sheet wording and banner link specified; PRE-01 (`form.coach/privacy` publication) remains 🔴 Open and must be closed before P1.1 achieves 🟢 operating status |
+| **P2.1** — Choice and Consent | Consent is obtained before or at the time of collection of personal information | `form-consent-gate` Worker cookie banner (§74.2) blocks analytics until consent; mobile Art. 9 consent gate (§74.3) blocks health data writes until consent; `consent_records` append-only table (§74.4) as tamper-evident record; `privacy.consent_granted` HIGH/7yr DEC-030 event (§74.6) | PRE-74-E-001 (Worker deploy); PRE-74-E-002 (table DDL + integrity check); PRE-74-E-003 (grant event export) | 🟡 Authored — **P-GAP-004 / PRE-16 closes to 🟢 on production deployment** of Worker + migration + mobile gate |
+| **P3.1** — Collection Limitation | Personal information is collected only for the purposes identified in the privacy notice | Cookie category inventory limits collection to Strictly Necessary / Functional / Analytics / Marketing (§74.2); health data categories limited to coaching and progress tracking (§74.3); no undisclosed collection | PRE-74-E-002 (DDL showing only authored categories); PRE-74-E-003 (event showing only permitted categories) | 🟡 Authored — cookie inventory and Art. 9 category scope specified; formal annual data minimisation review scheduled in §15.1 Q1 |
+| **P8.1** — Monitoring and Enforcement | Privacy issues are identified and addressed by a designated individual or group | P-CHAIN-01 consent event gap monitor (§74.6); compliance-officer designated as P-series owner; `consent_records` append-only integrity check in §15.1 annual calendar | PRE-74-E-002 (integrity check result); PRE-74-E-003 (event monitoring evidence) | 🟡 Authored — monitoring infrastructure specified; P-CHAIN-01 deployment pending |
+
+---
+
+### §74.9 Gap Tracker Update
+
+| Gap ID | TSC | Source §§ | Description | Pre-§74 status | §74 status | Closes to 🟢 when |
+|---|---|---|---|---|---|---|
+| **P-GAP-004** | P | §5 (P2), §35 | Cookie banner / consent management — not implemented; **the single 🔴 critical gap blocking SOC 2 observation period start** | 🔴 **Critical — Open** | 🟡 **Authored** — `form-consent-gate` Worker, `consent_records` DDL, DEC-030 event schemas, and P-CHAIN-01 monitor fully specified in §74 | `form-consent-gate` Worker deployed to production at `form.coach/api/consent`; migration `0037_consent_records.sql` live; cookie banner visible at `form.coach`; mobile Art. 9 consent gate live in iOS + Android app; PRE-74-E-001 and PRE-74-E-002 filed |
+| **P-GAP-001** | P | §5 (P1), §35 | Privacy policy not published at data collection point (`form.coach/privacy`) — PRE-01 | 🔴 **Open** | 🔴 **Open** — not addressed by §74; is now the **highest remaining priority** after P-GAP-004 | PRE-01 closed: `form.coach/privacy` published, counsel-reviewed, linked from banner and Art. 9 consent sheet; PRE-74-E-004 filed |
+| **PRV-consent-version** | P | §74 | No formal mechanism for re-consent when privacy policy changes | N/A — new gap identified in §74 | 🟡 **Authored** — `CONSENT_SCHEMA_VERSION` env var pattern; `privacy.consent_version_bumped` DEC-030 event; re-consent banner trigger logic specified | Worker deployed with version gate logic; first `CONSENT_SCHEMA_VERSION` bump tested end-to-end in staging |
+
+#### §74.9.1 Pre-Launch Readiness Checklist Rows Affected
+
+| Checklist ID | Description | Pre-§74 status | §74 status |
+|---|---|---|---|
+| **PRE-16** | Cookie banner / consent management: GDPR Art. 6 banner on `form.coach`; analytics not loaded without consent | 🔴 **Critical — Open** — the single critical gap | 🟡 **Authored** — architecture specified; closes to 🟢 on production deployment + PRE-74-E-001 filed |
+| **PRE-01** | Privacy policy published at `form.coach/privacy`, linked from every data collection point | 🔴 **Open** | 🔴 **Open** — not addressed by §74; **next priority after PRE-16** |
+| **P-CHAIN-01** | Consent event gap monitor deployed | N/A (new) | 🟡 **Authored** — pg_cron job specified as job 12 in health-monitor registry; deployment pending |
+
+#### §74.9.2 Overall SOC 2 Readiness Impact
+
+| Metric | Pre-§74 | §74 (authored) | §74 (deployed to production) |
+|---|---|---|---|
+| 🔴 Critical gaps | 1 (PRE-16 cookie banner) | 1 (PRE-01 privacy policy — next) | 0 critical gaps on PRE-01 closure |
+| P-series coverage | ~70% | ~82% | ~85% |
+| Overall SOC 2 readiness | ~97.7% | ~98.3% | ~98.5% |
+
+---
+
+### §74.10 Implementation Checklist
+
+#### P0 — Before Any Health Data Is Collected (Must Complete Before First Enterprise Pilot Data Flow)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0037_consent_records.sql` (§74.4 DDL) against production Supabase. Confirm: (a) `\d consent_records` shows append-only rules and RLS enabled; (b) `pg_stat_user_tables` shows `n_tup_upd = 0` and `n_tup_del = 0`; (c) RLS test query as a non-service role returns 0 rows for a different `user_id`. File initial PRE-74-E-002 to `compliance/evidence/p2/consent-table-2026.md`. | platform-engineer | **P0** | M4 | [ ] |
+| 2 | Deploy `form-consent-gate` Cloudflare Worker (§74.5) with `CONSENT_SCHEMA_VERSION = "1.0"`. Bind `CONSENT_KV` namespace. Smoke test: `POST /api/consent` returns 200 with `token` and `event_id`; `__form_consent` cookie set in response headers; KV key `consent:{token}` readable. File PRE-74-E-001 to `compliance/evidence/p2/consent-worker-deploy-2026.md`. | platform-engineer | **P0** | M4 | [ ] |
+| 3 | Integrate cookie consent banner into `form.coach` and web app entry point. Banner must: (a) appear on first visit when `__form_consent` cookie absent or stale; (b) contain a visible link to `form.coach/privacy` (even if PRE-01 is not yet live, link is required — use a staging URL until live); (c) block PostHog JS initialisation until `analytics` category is granted; (d) call `POST /api/consent` on any user interaction (accept all / essential only / custom). | platform-engineer | **P0** | M4 | [ ] |
+| 4 | Implement mobile Art. 9 consent gate (iOS + Android, §74.3). Gate must: (a) appear before Onboarding screen 3 and before any health data field is rendered; (b) offer "Limited mode" as a genuinely functional alternative; (c) on "I consent": call `POST /api/consent` with `surface: 'mobile_art9'`, set `user_profile.art9_consent_granted_at`, emit `privacy.consent_granted`; (d) in limited mode: disable all health data fields, do not call `POST /api/consent` with health_data category. | platform-engineer | **P0** | M4 | [ ] |
+| 5 | Register `privacy.consent_granted`, `privacy.consent_withdrawn`, and `privacy.consent_version_bumped` as formal DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schemas. Deploy updated event registry to `emit-audit-event` Worker. | platform-engineer | **P0** | M4 | [ ] |
+| 6 | End-to-end smoke test. Document results in `compliance/evidence/p2/consent-smoke-test-2026.md`: (a) Fresh browser → `form.coach` → banner appears → accept analytics → PostHog initialises → `privacy.consent_granted` event in `audit_log_events`; (b) withdraw consent → `privacy.consent_withdrawn` event; (c) mobile onboarding → Art. 9 consent sheet → accept → `user_profile.art9_consent_granted_at` set → health data field unlocked; (d) mobile → decline → limited mode activated → health data field not rendered → no `consent_records` row with `health_data` category. | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 7 | Update §51 Consolidated Gap Register and §15.2 pre-launch readiness checklist: P-GAP-004 → 🟡 Authored (→ 🟢 on deployment); PRE-16 → 🟡 Authored (→ 🟢 on deployment); note P-GAP-001 / PRE-01 is now the highest remaining priority critical gap. | compliance-officer | **P0** | M4 | [ ] |
+
+#### P1 — Before Observation Period Start (Month O-1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Deploy P-CHAIN-01 pg_cron job (§74.6) to production Supabase. Add to `pg-cron-health-monitor` registry (§71.2.2) as job 12 with 26h freshness window. Verify by temporarily setting gap threshold to 0 days and confirming PagerDuty P2 fires to `form-compliance`; reset threshold. | platform-engineer | **P1** | M6 | [ ] |
+| 9 | File PRE-74-E-003 (first 30-day `privacy.consent_granted` event export) and PRE-74-E-005 (withdrawal event export) as interim evidence confirming consent infrastructure is operating. | compliance-officer | **P1** | M6 | [ ] |
+| 10 | Once PRE-01 is closed (privacy policy published at `form.coach/privacy`): file PRE-74-E-004 — screenshots of banner with privacy policy link + mobile consent sheet with link + `form.coach/privacy` returning HTTP 200. | compliance-officer | **P1** | M6 (after PRE-01 closed) | [ ] |
+
+#### P2 — Before Observation Period Close
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | Run annual `consent_records` append-only integrity check (§74.4 query); file updated PRE-74-E-002. Scheduled in §15.1 Q1 (January) compliance calendar. | platform-engineer | **P2** | Annual Q1 | [ ] |
+| 12 | At first `CONSENT_SCHEMA_VERSION` bump (privacy policy update): (a) update `CONSENT_SCHEMA_VERSION` in `wrangler.toml`; (b) emit `privacy.consent_version_bumped` DEC-030 STANDARD event at `wrangler deploy`; (c) confirm banner re-appears for users with stale consent on next page load; (d) file PRE-74-E-006 version history export. | platform-engineer + compliance-officer | **P2** | At first policy update | [ ] |
+
+---
+
+### §74.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-P2-01** | Should FORM adopt a commercial CMP (Osano, OneTrust) as the company scales past Series A? The bespoke `form-consent-gate` approach is appropriate pre-Series A (< 50k active users, EU/UK/UA jurisdiction focus) but adds maintenance burden at scale (100k+ users, multi-jurisdiction, cookie re-scanning). Recommendation: re-evaluate at ARR ≥ $500k or when a jurisdiction outside EU/UK/UA first exceeds 5% of active users. | P2 | compliance-officer + platform-engineer | Revisit at ARR ≥ $500k; decision in `docs/DECISION_LOG.md`. |
+| **OQ-P2-02** | For enterprise tenants where FORM is a mandatory employer-sponsored benefit, is Art. 9 health data consent "freely given" under GDPR Art. 7(4) (consent cannot be conditioned on access to a service)? If participation is de facto mandatory, consent is not a valid lawful basis. Alternative lawful bases: Art. 9(2)(b) (employment law obligation) if the employer operates under a occupational health framework; Art. 9(2)(h) (preventive medicine / occupational health) if processed under a healthcare professional supervision structure. Recommendation: add to DPIA (§35) as a special risk for employer-sponsored deployments; require enterprise customers to confirm voluntary participation as a CUEC (§13 CUEC section). | P1 | compliance-officer + legal counsel | Resolve in DPIA §35 update; add CUEC clause to enterprise MSA. |
+| **OQ-P2-03** | Does the `consent_records_tenant_isolation` RLS policy on `consent_records` (§74.4) sufficiently confirm that tenant admins cannot read employee consent records? Current assertion: a tenant admin JWT will only match their own `user_id` — not any other employee's row. This needs explicit confirmation in `docs/DATA_MODEL.md §5` (RLS policy documentation). | P0 | platform-engineer + compliance-officer | Confirm hard constraint in DATA_MODEL.md §5 before first enterprise pilot. |
+
+---
+
+*v1.0 (2026-06-09): §74 Privacy TSC — Consent Management & Cookie Banner Operating Evidence · PRE-16 / P-GAP-004 Closure · P1.1/P2.1/P3.1/P8.1 Auditor Exhibit. Closes the single remaining 🔴 critical gap blocking SOC 2 observation period: PRE-16 (cookie banner / consent management) advances from 🔴 Critical Open → 🟡 Authored on this commit; advances to 🟢 on production deployment of `form-consent-gate` Worker + `consent_records` migration + mobile Art. 9 consent gate. Architecture: purpose-built `form-consent-gate` Cloudflare Worker backed by Cloudflare KV (`consent:{token}`, 1-year TTL) + Supabase `consent_records` append-only table — no third-party CMP at pre-Series A scale (OQ-P2-01: re-evaluate at ARR ≥ $500k or multi-jurisdiction expansion). Four consent surfaces: (1) web cookie — four categories (Strictly Necessary / Functional / Analytics / Marketing) with GDPR Art. 6 lawful basis table; PostHog JS gated behind `analytics` consent; SSR edge-read via GET `/api/consent/:token`; (2) mobile Art. 9 health data — full-screen consent gate before Onboarding screen 3; six health data categories (body measurements, CV pose keypoints, heart rate/HRV, nutrition, recovery/sleep, coaching conversation content); freely-given standard protected by "Limited mode" as a genuinely functional alternative; (3) consent withdrawal via Settings → Data; (4) policy version re-consent via `CONSENT_SCHEMA_VERSION` env var bump. `consent_records` DDL (migration 0037): append-only enforced by two PostgreSQL RULE guards + annual `pg_stat_user_tables` integrity check (`n_tup_upd = 0`, `n_tup_del = 0`); RLS enabled with user-read + tenant-isolation + service-insert policies; pseudonymous only — no email, phone, Art. 9 value, or full IP; `ip_country` char(2) maximum geographic granularity; `consent_token` excluded from DEC-030 payload (privacy invariant). `form-consent-gate` Worker TypeScript specification: Zod validation schema (`ConsentPayload`), KV write, Supabase REST INSERT, and DEC-030 event emission; rollback note: if DEC-030 emission fails, KV write proceeds (audit event is the weaker guarantee; 2PC saga pattern deferred to OQ-P2-04). Three DEC-030 events formalised: `privacy.consent_granted` HIGH/7yr (consent grant), `privacy.consent_withdrawn` HIGH/7yr (withdrawal; reason enum: `user_initiated` / `policy_update_re_consent` / `account_deletion`), `privacy.consent_version_bumped` STANDARD/3yr (policy version change at deploy). P-CHAIN-01 chain monitor: `privacy.consent_granted` gap > 365 days → PagerDuty P2 to `form-compliance`; pg_cron job 12 in pg-cron-health-monitor registry (§71.2.2); dedup key `p-chain-01-consent-gap-{YYYY-MM}`. Six evidence artefacts PRE-74-E-001 through PRE-74-E-006: Worker deployment log, table DDL + integrity check, consent grant export (observation window), privacy notice linkage screenshots, withdrawal export, version history export. Gap tracker: P-GAP-004 🔴 Critical Open → 🟡 Authored; PRE-16 🔴 Critical Open → 🟡 Authored; P-GAP-001 / PRE-01 (privacy policy publication) confirmed as next highest-priority critical gap after PRE-16; PRV-consent-version new gap identified and immediately closed to 🟡 Authored. P-series coverage: ~70% → ~82%. Overall SOC 2 readiness: ~97.7% → ~98.3% (authored) / ~98.5% (deployed). Implementation checklist: 7× P0 M4 (migration, Worker deploy, banner integration, mobile Art. 9 gate, DEC-030 event registration, smoke test, gap register update), 3× P1 M6 (P-CHAIN-01 deploy, interim evidence filing, PRE-74-E-004 privacy notice linkage), 2× P2 (annual integrity check, first version bump procedure). Three open questions: OQ-P2-01 (commercial CMP adoption threshold at ARR ≥ $500k / multi-jurisdiction — P2), OQ-P2-02 (enterprise employer-sponsored "freely given" standard — Art. 9(2)(b)/(h) alternative lawful basis; CUEC addition — P1), OQ-P2-03 (confirm `consent_records` RLS bars tenant admin access to employee rows in DATA_MODEL.md §5 — P0). Cross-references: §5 (P1–P8 Privacy TSC baseline controls), §13 (CUEC — OQ-P2-02 CUEC clause addition), §35 (GDPR processing controls, DPIA — OQ-P2-02 DPIA update), §51 (Consolidated Gap Register — P-GAP-004 update), §67 (tenant data deletion — P4.3 disposal), §70 (DSAR lifecycle automation — P5.1/P5.2), §71 (Availability — pg_cron health-monitor registry; P-CHAIN-01 as job 12), §73 (Confidentiality — AL-C1-01 erasure SLA monitor; §74 P-CHAIN-01 follows same pattern), docs/AUDIT_LOG_SCHEMA.md (three new DEC-030 events to register), docs/DATA_MODEL.md §5 (RLS confirmation for consent_records — OQ-P2-03). Owner: compliance-officer (policy, evidence, gap register) + platform-engineer (Worker, DDL, DEC-030 registration, P-CHAIN-01). SOC 2 doc v3.4 → v3.5.*

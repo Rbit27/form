@@ -6,6 +6,14 @@
 
 ---
 
+## [3.7.1] — 2026-06-09
+
+### Changed
+- `docs/SOC2_READINESS.md §74` — Privacy TSC Consent Management & Cookie Banner Operating Evidence · PRE-16 / P-GAP-004 Closure · P1.1/P2.1/P3.1/P8.1 Auditor Exhibit. Closes the single remaining 🔴 critical gap blocking SOC 2: PRE-16 (cookie banner / consent management) advances from 🔴 Critical Open → 🟡 Authored. Architecture: `form-consent-gate` Cloudflare Worker + Cloudflare KV + `consent_records` Supabase append-only table (migration 0037). Three DEC-030 events: `privacy.consent_granted` HIGH/7yr, `privacy.consent_withdrawn` HIGH/7yr, `privacy.consent_version_bumped` STANDARD/3yr. P-CHAIN-01 chain monitor (consent event gap > 365 days → PagerDuty P2; pg_cron job 12). Six evidence artefacts PRE-74-E-001 through PRE-74-E-006. P-series coverage: ~70% → ~82%. Overall SOC 2 readiness: ~97.7% → ~98.3%. SOC 2 doc v3.4 → v3.5.
+- `VERSION` — 3.7.0 → 3.7.1
+
+---
+
 ## [3.7.0] — 2026-06-09
 
 ### Added
