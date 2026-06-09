@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v1.5
+# FORM · Incident Response Runbook v1.8
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -130,6 +130,78 @@ Founder is IC for all P0. Founding engineer as primary on-call Technical Lead. W
 - No engineer on primary on-call for more than 1 week in 3
 
 **Rotation schedule documented in:** PagerDuty schedule (source of truth). This runbook documents the structure; PagerDuty holds the live roster.
+
+### 2.2.1 Phase 0 Permanent On-Call: Compensating Control Statement
+
+**SOC 2 criterion:** CC2.2 — External communication of commitments and responsibilities.
+**Gap reference:** CC2-GAP-005 (`docs/SOC2_READINESS.md §30.3`).
+**Owner:** security-engineer. **Effective:** 2026-06-09. **Next review:** within 30 days of second engineering hire joining.
+
+#### Acknowledgement
+
+During Phase 0 (solo founder), FORM does not operate an on-call rotation. The founder is permanently on-call 24/7. FORM acknowledges this to auditors as **CC2-GAP-005**, accepted at P1 risk, with the compensating controls below in lieu of a rotation.
+
+No enterprise customer contract will be signed until Phase 1 is reached, or until the customer has accepted the Phase 0 on-call arrangement in writing as a documented, recorded risk. This gate is enforced in `docs/ENTERPRISE.md §Pre-conditions for enterprise GA`.
+
+#### Compensating Controls
+
+| Control | Mechanism | Evidence artefact |
+|---|---|---|
+| Permanent coverage | Founder carries PagerDuty mobile 24/7 with critical alerts enabled, overriding silent/DND mode (iOS Critical Alerts entitlement active) | PagerDuty notification policy export — CC2-E-004 |
+| Multi-escalation on silence | PagerDuty escalation policy: T+3 min phone call, T+8 min SMS + second call, T+15 min emergency contact page (registered out-of-band contact in PagerDuty off-hours escalation policy) | PagerDuty escalation policy screenshot — CC2-E-004 |
+| Independent uptime failsafe | Better Uptime synthetic probes run every 30 s from three regions. Three consecutive failures (90 s) trigger an emergency SMS + email to a secondary address, independent of PagerDuty | Better Uptime alert config export — CC2-E-005 |
+| Audit chain dead-man's switch | HMAC chain integrity pg_cron runs every 10 min. A chain break fires a PagerDuty P0 using the escalation policy above. No acknowledgement is required to advance to the next escalation tier; the timer starts at alert creation, not at acknowledgement. | `audit_log` pg_cron job schedule — CC2-E-004 |
+
+#### PagerDuty Escalation Path (Phase 0)
+
+```
+T+0  min  Alert fires
+          ↳ PagerDuty high-urgency push notification + SMS → founder mobile
+
+T+3  min  No acknowledgement
+          ↳ PagerDuty phone call → founder mobile (voice read-aloud of alert title + service)
+
+T+8  min  No acknowledgement
+          ↳ PagerDuty SMS retry + second phone call → founder mobile
+
+T+15 min  No acknowledgement — escalation tier 2
+          ↳ PagerDuty off-hours policy → phone call to registered emergency contact
+          ↳ Slack #security-alerts auto-post (persists regardless of PagerDuty acknowledgement state)
+          ↳ Better Uptime failsafe email → secondary address (independent delivery path)
+```
+
+No alert is dropped silently. At T+15, three independent notification channels have fired (PagerDuty, Slack, Better Uptime email) and an out-of-band emergency contact has been paged. This is the maximum automation available for a single-person organisation.
+
+#### Acceptance Statement
+
+This arrangement is accepted at **P1 risk**. The gap cannot be closed until a second engineering hire joins and a real rotation is in place. Expiry trigger: second engineering hire joins → Phase 1 rotation schedule published in PagerDuty within 30 days → CC2-GAP-005 status updated to 🟢 Closed in `docs/SOC2_READINESS.md §30.3`.
+
+#### Phase 1 Trigger Checklist
+
+When the second engineering hire joins, complete the following within 30 days:
+
+```
+[ ] Publish Phase 1 PagerDuty rotation schedule (founding engineer + founder alternating weekly)
+[ ] Update § 2.2 Phase 0 note with a link to the live PagerDuty schedule
+[ ] Archive this section as §2.2.2 Historical: Phase 0 Compensating Control (closed YYYY-MM-DD)
+[ ] Notify compliance-officer to update CC2-GAP-005 in SOC2_READINESS.md §30.3: 🟡 Partial → 🟢 Closed
+[ ] File PagerDuty Phase 1 schedule export as CC2-E-006
+```
+
+#### Phase 1 Rotation Schedule Placeholder
+
+```
+Primary on-call:  [Founding engineer — to be named]    Weeks starting: [YYYY-MM-DD]
+Secondary backup: [Founder]                            All weeks
+On-call stipend:  $200/week for primary on-call slot
+PagerDuty:        https://form-coach.pagerduty.com/schedules/[SCHEDULE_ID]
+
+Handoff cadence:  Monday 09:00 Kyiv time
+P0 rule:          Founder is always secondary for P0 regardless of rotation week
+Security page:    security-engineer paged simultaneously with primary on-call for all P0
+```
+
+---
 
 ### 2.3 Extended Incident Handoff Protocol (>4 hours)
 
@@ -7948,6 +8020,8 @@ Some jurisdictions (e.g., certain EU member states with works council agreements
 | 11 | Update Appendix A: add "Admin dashboard showing individual data?" → R-22; add "Wellness-as-punishment use suspected?" → R-22.9 no-go escalation | compliance-officer | **P0** | With this release | [x] |
 
 ---
+
+*v1.8 additions (2026-06-09): §2.2.1 Phase 0 Permanent On-Call: Compensating Control Statement — closes the documentation action required by CC2-GAP-005 (`docs/SOC2_READINESS.md §30.4`). Auditor-facing acknowledgement that Phase 0 is a solo-founder permanent on-call arrangement, not a rotation. Four compensating controls documented: (1) PagerDuty critical alerts 24/7 on founder mobile overriding DND (CC2-E-004); (2) multi-escalation policy — T+3 min phone call, T+8 min SMS retry + second call, T+15 min out-of-band emergency contact paged + Slack #security-alerts auto-post (CC2-E-004); (3) Better Uptime independent failsafe — 30 s probes from three regions, 90 s failure = SMS + email to secondary address independent of PagerDuty (CC2-E-005); (4) HMAC audit chain dead-man's switch — pg_cron every 10 min, chain break = PagerDuty P0 on escalation policy with no silence possible (CC2-E-004). Acceptance statement: P1 risk accepted; no enterprise contract before Phase 1 or written customer acceptance. Phase 1 trigger checklist: five items to complete within 30 days of second engineering hire. Phase 1 rotation schedule placeholder: fields pre-populated for founding engineer + founder alternating weekly. Document header corrected v1.5 → v1.8 (v1.4 through v1.7 additions did not update the header). SOC 2 evidence: CC2.2 — external communication of on-call commitments; CC2-GAP-005 status updated from open → 🟡 Partial (documented; CC2-E-004 screenshot pending as an implementation task). Owner: security-engineer.*
 
 *v1.7 additions (2026-06-05): R-22 §checklist item 6 closed — all five DEC-030 HMAC-chained privacy floor breach events (`privacy.floor_breach_detected` CRITICAL, `privacy.floor_breach_contained` HIGH, `privacy.floor_breach_tenant_notified` HIGH, `privacy.floor_breach_resolved` STANDARD, `privacy.no_go_escalation_activated` CRITICAL) registered in `docs/AUDIT_LOG_SCHEMA.md` v0.3 §"Privacy floor enforcement events" with full payload schema and retention. Cross-ref: AUDIT_LOG_SCHEMA.md v0.3 changelog.*
 

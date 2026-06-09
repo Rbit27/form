@@ -6,6 +6,15 @@
 
 ---
 
+## [3.16.1] — 2026-06-09
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v1.8 — §2.2.1 Phase 0 Permanent On-Call: Compensating Control Statement added. Closes CC2-GAP-005 documentation action: formal auditor-facing acknowledgement that Phase 0 is a solo-founder permanent on-call arrangement (not a rotation); four compensating controls documented (PagerDuty 24/7 critical alerts, 4-tier escalation path T+0/T+3/T+8/T+15, Better Uptime independent failsafe, HMAC audit chain dead-man's switch); Phase 1 trigger checklist + rotation schedule placeholder in place. Document header corrected from v1.5 → v1.8. References: `docs/AUDIT_LOG_SCHEMA.md`, DEC-030, CC2-GAP-005.
+- `docs/SOC2_READINESS.md` — CC2-GAP-005 gap row updated: 🔴 open → 🟡 Partial (compensating control documented; CC2-E-004 screenshot pending implementation). Checklist row marked ✅ for documentation action. CC2.2 readiness delta updated.
+- `VERSION` — 3.16.0 → 3.16.1
+
+---
+
 ## [3.16.0] — 2026-06-09
 
 ### Added
