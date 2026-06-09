@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Privacy Policy</title>
+<meta name="description" content="FORM Privacy Policy — how we collect, use, and protect your personal data, including health data processed under GDPR Art. 9. Full disclosure for EU, UA, and US users." />
+<!-- No tracking, no analytics, no cookies. GDPR Art. 25 by design. -->
+<link rel="canonical" href="https://form.coach/privacy" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: {
+      ink:   '#0B0A07',
+      deep:  '#13110C',
+      line:  '#1F1D16',
+      mute:  '#6F6A60',
+      dim:   '#A39D8E',
+      paper: '#F3EEE0',
+      cream: '#E7DFC8',
+      acid:  '#DDFF2D',
+      ember: '#FF5733',
+    },
+    fontFamily: {
+      serif: ['Fraunces', 'serif'],
+      sans:  ['Manrope', 'sans-serif'],
+      mono:  ['JetBrains Mono', 'monospace'],
+    },
+  }}};
+</script>
+<style>
+  html, body { background: #0B0A07; color: #F3EEE0; font-family: 'Manrope', sans-serif; }
+  body { font-feature-settings: "ss01", "cv11"; }
+  ::selection { background: #DDFF2D; color: #0B0A07; }
+
+  .grain::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000; opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 220px;
+  }
+
+  .display { font-family: 'Fraunces', serif; font-weight: 300; letter-spacing: -0.04em; line-height: 0.88; }
+  .display em { font-style: italic; font-weight: 300; }
+
+  .label  { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px; color: #6F6A60; }
+
+  .btn-acid {
+    background: #DDFF2D; color: #0B0A07;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 600;
+    transition: transform 0.15s, background 0.2s; padding: 14px 28px; border-radius: 9999px; display: inline-block;
+  }
+  .btn-acid:hover { background: #ECFF6B; transform: translateY(-1px); }
+
+  .btn-out {
+    border: 1px solid #2A2820; color: #F3EEE0;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 500;
+    padding: 14px 28px; border-radius: 9999px; display: inline-block; transition: border-color 0.2s;
+  }
+  .btn-out:hover { border-color: #DDFF2D; }
+
+  .divider { border: none; border-top: 1px solid #1F1D16; }
+
+  /* Policy content prose */
+  .prose h2 {
+    font-family: 'Fraunces', serif; font-weight: 300; font-size: 32px; letter-spacing: -0.03em;
+    color: #F3EEE0; margin: 3rem 0 1.25rem; line-height: 1.1;
+  }
+  .prose h3 {
+    font-family: 'Manrope', sans-serif; font-weight: 600; font-size: 15px;
+    color: #E7DFC8; margin: 2rem 0 0.75rem; letter-spacing: 0.01em;
+  }
+  .prose p {
+    color: #A39D8E; font-size: 14px; line-height: 1.75; margin-bottom: 1rem;
+  }
+  .prose p strong { color: #F3EEE0; font-weight: 600; }
+  .prose ul { list-style: none; margin: 1rem 0 1.5rem; padding: 0; }
+  .prose ul li {
+    color: #A39D8E; font-size: 14px; line-height: 1.65; padding: 6px 0 6px 20px; position: relative;
+    border-bottom: 1px solid rgba(31,29,22,0.6);
+  }
+  .prose ul li:last-child { border-bottom: none; }
+  .prose ul li::before { content: "–"; position: absolute; left: 0; color: #DDFF2D; }
+  .prose ol { list-style: none; margin: 1rem 0 1.5rem; padding: 0; counter-reset: olist; }
+  .prose ol li {
+    color: #A39D8E; font-size: 14px; line-height: 1.65; padding: 6px 0 6px 28px; position: relative;
+    border-bottom: 1px solid rgba(31,29,22,0.6); counter-increment: olist;
+  }
+  .prose ol li:last-child { border-bottom: none; }
+  .prose ol li::before {
+    content: counter(olist) "."; position: absolute; left: 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #DDFF2D; top: 9px;
+  }
+  .prose a { color: #DDFF2D; text-decoration: none; }
+  .prose a:hover { text-decoration: underline; }
+
+  /* Tables */
+  .policy-table { width: 100%; border-collapse: collapse; margin: 1.25rem 0 2rem; font-size: 12px; overflow-x: auto; display: block; }
+  .policy-table th {
+    text-align: left; padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: #6F6A60; border-bottom: 1px solid #1F1D16; white-space: nowrap;
+  }
+  .policy-table td {
+    padding: 10px 14px; color: #A39D8E; border-bottom: 1px solid rgba(31,29,22,0.8); vertical-align: top;
+    line-height: 1.55;
+  }
+  .policy-table td strong { color: #F3EEE0; }
+  .policy-table tr:last-child td { border-bottom: none; }
+  .policy-table tr:hover td { background: rgba(31,29,22,0.4); }
+
+  /* TOC */
+  .toc-link {
+    display: block; padding: 7px 12px; font-size: 12px; color: #6F6A60;
+    border-left: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
+    text-decoration: none;
+  }
+  .toc-link:hover { color: #F3EEE0; border-left-color: #DDFF2D; }
+
+  /* Draft badge */
+  .draft-banner {
+    background: rgba(255, 87, 51, 0.08); border: 1px solid rgba(255, 87, 51, 0.25);
+    border-radius: 12px; padding: 16px 20px;
+  }
+
+  /* Section anchor offset */
+  .section-anchor { scroll-margin-top: 80px; }
+
+  /* Info cards */
+  .info-card {
+    background: #13110C; border: 1px solid #1F1D16; border-radius: 16px; padding: 20px 24px;
+  }
+  .info-card.acid-border { border-color: rgba(221,255,45,0.2); }
+
+  /* Status items */
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .dot-red    { background: #FF5733; box-shadow: 0 0 8px rgba(255,87,51,0.4); }
+  .dot-amber  { background: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.3); }
+  .dot-green  { background: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.4); }
+</style>
+</head>
+<body class="grain">
+
+<!-- ─── Header ────────────────────────────────────────────── -->
+<header class="border-b border-line sticky top-0 z-50" style="background:rgba(11,10,7,0.94);backdrop-filter:blur(12px);">
+  <div class="max-w-[1280px] mx-auto px-8 h-16 flex items-center justify-between gap-6">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <span class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></span>
+    </a>
+    <nav class="hidden md:flex items-center gap-8">
+      <a href="/security.html" class="label hover:text-paper transition-colors" style="font-size:9px;">Security</a>
+      <a href="/enterprise.html" class="label hover:text-paper transition-colors" style="font-size:9px;">Enterprise</a>
+      <a href="/pricing.html" class="label hover:text-paper transition-colors" style="font-size:9px;">Pricing</a>
+    </nav>
+    <a href="mailto:privacy@form.coach" class="btn-out text-xs" style="padding:10px 18px;">privacy@form.coach</a>
+  </div>
+</header>
+
+<!-- ─── Draft notice ──────────────────────────────────────── -->
+<div class="max-w-[1280px] mx-auto px-8 pt-8">
+  <div class="draft-banner flex flex-col md:flex-row items-start md:items-center gap-4">
+    <div class="flex items-center gap-3 flex-shrink-0">
+      <span class="status-dot dot-red"></span>
+      <span class="font-mono text-xs font-semibold" style="color:#FF5733;letter-spacing:0.12em;text-transform:uppercase;">Draft — Pending Counsel Review</span>
+    </div>
+    <p class="text-mute text-xs leading-relaxed">
+      This privacy policy is a pre-legal draft (v0.1.0). It is not yet effective and does not constitute a legally binding document.
+      FORM must obtain counsel review across EU (GDPR), UA (Закон «Про захист персональних даних»), and US (CCPA/CPRA)
+      jurisdictions before publication. Effective date: TBD at counsel sign-off.
+      Contact <a href="mailto:privacy@form.coach" class="text-acid">privacy@form.coach</a> with questions.
+    </p>
+  </div>
+</div>
+
+<!-- ─── Hero ──────────────────────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 pt-16 pb-12">
+  <div class="max-w-4xl">
+    <div class="label mb-7 text-acid">Legal · Privacy</div>
+    <h1 class="display text-[64px] md:text-[84px] text-paper mb-8">
+      Privacy <em>Policy.</em>
+    </h1>
+    <p class="text-dim text-lg leading-relaxed max-w-2xl mb-10" style="font-weight:300;">
+      How FORM collects, uses, and protects your personal data — including health data
+      processed under GDPR Art.&nbsp;9. Covers EU, Ukraine, and US users.
+      The FORM app is built so your health data stays yours.
+    </p>
+
+    <!-- Metadata bar -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <div class="info-card">
+        <div class="label mb-1" style="font-size:9px;">Version</div>
+        <div class="text-paper text-sm font-mono">0.1.0-draft</div>
+      </div>
+      <div class="info-card">
+        <div class="label mb-1" style="font-size:9px;">Status</div>
+        <div class="text-sm" style="color:#FF5733;">Pre-legal review</div>
+      </div>
+      <div class="info-card">
+        <div class="label mb-1" style="font-size:9px;">Effective</div>
+        <div class="text-mute text-sm">TBD on publication</div>
+      </div>
+      <div class="info-card">
+        <div class="label mb-1" style="font-size:9px;">Draft date</div>
+        <div class="text-paper text-sm font-mono">2026-05-17</div>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-4">
+      <a href="mailto:privacy@form.coach?subject=Privacy policy question" class="btn-acid">privacy@form.coach →</a>
+      <a href="/security.html" class="btn-out">Security Trust Center</a>
+    </div>
+  </div>
+</section>
+
+<hr class="divider max-w-[1280px] mx-auto" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Content + TOC ─────────────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 py-16">
+  <div class="grid md:grid-cols-[220px_1fr] gap-16 items-start">
+
+    <!-- TOC sidebar -->
+    <aside class="hidden md:block sticky top-24 self-start">
+      <div class="label mb-4" style="font-size:9px;">Contents</div>
+      <nav class="space-y-0.5 border-l border-line">
+        <a class="toc-link" href="#s1">1. Who We Are</a>
+        <a class="toc-link" href="#s2">2. Scope</a>
+        <a class="toc-link" href="#s3">3. Data We Collect</a>
+        <a class="toc-link" href="#s4">4. Legal Basis</a>
+        <a class="toc-link" href="#s5">5. How We Use Data</a>
+        <a class="toc-link" href="#s6">6. Sub-Processors</a>
+        <a class="toc-link" href="#s7">7. Retention</a>
+        <a class="toc-link" href="#s8">8. Your Rights</a>
+        <a class="toc-link" href="#s9">9. DSAR</a>
+        <a class="toc-link" href="#s10">10. Age Restrictions</a>
+        <a class="toc-link" href="#s11">11. International Transfers</a>
+        <a class="toc-link" href="#s12">12. Analytics &amp; Tracking</a>
+        <a class="toc-link" href="#s13">13. Policy Changes</a>
+        <a class="toc-link" href="#s14">14. Contact</a>
+      </nav>
+    </aside>
+
+    <!-- Policy body -->
+    <div class="prose max-w-3xl">
+
+      <!-- §1 -->
+      <div id="s1" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 1</div>
+        <h2>Who We Are</h2>
+        <p>
+          FORM is an AI-powered strength coaching application for iOS and Android.
+          Our service is operated by <strong>[LEGAL ENTITY NAME — to be confirmed]</strong>, a company incorporated under [JURISDICTION — to be confirmed] ("the Controller").
+        </p>
+        <div class="info-card mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="label mb-1" style="font-size:9px;">Privacy contact</div>
+              <a href="mailto:privacy@form.coach" class="text-acid text-sm font-mono">privacy@form.coach</a>
+            </div>
+            <div>
+              <div class="label mb-1" style="font-size:9px;">Security contact</div>
+              <a href="mailto:security@form.coach" class="text-acid text-sm font-mono">security@form.coach</a>
+            </div>
+            <div>
+              <div class="label mb-1" style="font-size:9px;">Registered address</div>
+              <span class="text-mute text-sm">[To be confirmed]</span>
+            </div>
+            <div>
+              <div class="label mb-1" style="font-size:9px;">DPO (EU)</div>
+              <span class="text-mute text-sm">[To be confirmed at launch]</span>
+            </div>
+          </div>
+        </div>
+        <p>
+          FORM acts as a <strong>data controller</strong> for the personal data you provide when using the FORM application and related services.
+          Where we engage third-party service providers to process data on our behalf, those providers act as <strong>data processors</strong> (sub-processors).
+          A complete list of our sub-processors is in Section 6.
+        </p>
+        <p>
+          <strong>Enterprise deployments:</strong> If you access FORM through an employer-sponsored programme, your employer acts as a separate controller for account provisioning.
+          FORM acts as controller for all health and coaching data you generate. Your employer has contractually agreed never to access your individual health data.
+        </p>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §2 -->
+      <div id="s2" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 2</div>
+        <h2>Scope of This Policy</h2>
+        <p>This Privacy Policy applies to:</p>
+        <ul>
+          <li>The FORM iOS and Android applications</li>
+          <li>The FORM web application at form.coach</li>
+          <li>Any related services, APIs, or integrations operated by FORM</li>
+        </ul>
+        <p>This Policy does not apply to:</p>
+        <ul>
+          <li>Third-party applications you choose to connect to FORM (Apple Health, Google Health Connect, wearables) — governed by their own privacy policies</li>
+          <li>FORM enterprise customer organisations acting as separate controllers for internal HR and identity data</li>
+          <li>Payment processing handled by Apple App Store or Google Play Store — FORM never receives or stores your payment card data</li>
+        </ul>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §3 -->
+      <div id="s3" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 3</div>
+        <h2>Data We Collect</h2>
+        <p>We collect the following categories of personal data, indicating whether collection is mandatory, optional, or automatic.</p>
+
+        <h3>3.1 Account and Identity Data</h3>
+        <table class="policy-table">
+          <thead><tr><th>Data element</th><th>How collected</th><th>Mandatory / Optional</th></tr></thead>
+          <tbody>
+            <tr><td>Email address</td><td>Apple Sign In or direct registration</td><td>Mandatory</td></tr>
+            <tr><td>Display name</td><td>You provide at onboarding</td><td>Mandatory</td></tr>
+            <tr><td>Authentication token (Apple User ID)</td><td>Apple Sign In (opaque identifier)</td><td>Mandatory</td></tr>
+            <tr><td>Account creation date and time</td><td>Automatic</td><td>Automatic</td></tr>
+            <tr><td>Device type, OS version</td><td>Automatic</td><td>Automatic</td></tr>
+          </tbody>
+        </table>
+
+        <h3>3.2 Health Profile Data <span style="font-size:10px;color:#FF5733;vertical-align:middle;margin-left:6px;font-family:monospace;">GDPR Art. 9</span></h3>
+        <div class="draft-banner mb-4 text-xs" style="padding:12px 16px;">
+          <strong style="color:#FF5733;">Apple App Store Notice:</strong> The following data constitutes health and fitness data under Apple App Store Review Guidelines.
+          It is collected solely to personalise your AI coaching experience. It is never used for advertising, sold to third parties, or shared with employers in identifiable form.
+        </div>
+        <table class="policy-table">
+          <thead><tr><th>Data element</th><th>How collected</th><th>Mandatory / Optional</th></tr></thead>
+          <tbody>
+            <tr><td>Date of birth (for age calculation)</td><td>You provide at onboarding</td><td>Mandatory</td></tr>
+            <tr><td>Biological sex (for exercise programming)</td><td>You provide at onboarding</td><td>Optional</td></tr>
+            <tr><td>Height</td><td>You provide at onboarding</td><td>Optional</td></tr>
+            <tr><td>Weight (current and historical)</td><td>You provide; user-controlled</td><td>Optional</td></tr>
+            <tr><td>Body composition goal</td><td>You provide at onboarding</td><td>Optional</td></tr>
+            <tr><td>Resting heart rate</td><td>You provide or synced from wearable</td><td>Optional</td></tr>
+            <tr><td>HRV baseline</td><td>Synced via HealthKit / Health Connect</td><td>Optional</td></tr>
+            <tr><td>Injuries or physical restrictions</td><td>You provide at onboarding</td><td>Optional</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Legal basis:</strong> Explicit consent (GDPR Art. 9(2)(a)). You provide separate, granular consent per health data category during onboarding. You may withdraw consent at any time in Settings → Privacy.</p>
+
+        <h3>3.3 Workout Data</h3>
+        <table class="policy-table">
+          <thead><tr><th>Data element</th><th>How collected</th><th>Mandatory / Optional</th></tr></thead>
+          <tbody>
+            <tr><td>Workout type, date, duration</td><td>You initiate a workout session</td><td>Mandatory when using workout features</td></tr>
+            <tr><td>Exercises performed (name, sets, reps, weight)</td><td>You log or app detects</td><td>Generated by use</td></tr>
+            <tr><td>Perceived exertion (RPE)</td><td>You provide</td><td>Optional</td></tr>
+            <tr><td>Movement quality score ("form score", 0–100)</td><td>Computed on-device from camera analysis</td><td>Generated by use</td></tr>
+            <tr><td>Rep count</td><td>Computed on-device</td><td>Generated by use</td></tr>
+            <tr><td>Workout programme phase and training block</td><td>Assigned by Victor AI coach</td><td>Generated by use</td></tr>
+          </tbody>
+        </table>
+        <div class="info-card acid-border mb-4">
+          <div class="label mb-2" style="font-size:9px;color:#DDFF2D;">Camera data — architectural commitment</div>
+          <p style="font-size:13px;margin:0;">Raw camera frames and video are <strong>never</strong> uploaded to FORM's servers or any third party.
+          Movement analysis runs entirely on-device (Apple Neural Engine or Android NPU). Only the derived form_score and rep_count are transmitted.
+          This is an architectural commitment — no upload API exists for raw frames.</p>
+        </div>
+
+        <h3>3.4 Food and Nutrition Logs <span style="font-size:10px;color:#f59e0b;vertical-align:middle;margin-left:6px;font-family:monospace;">Optional opt-in</span></h3>
+        <p>Food and nutrition data is treated as health-adjacent special category data. You must separately opt in to the food logging feature. Nutrition data is <strong>never</strong> included in any enterprise dashboard or aggregate report.</p>
+
+        <h3>3.5 Wearable and Biometric Data</h3>
+        <p>Wearable data integration requires your explicit permission on both FORM and the wearable platform (HealthKit or Health Connect). You may revoke access at any time in your device's Health settings.</p>
+
+        <h3>3.6 AI Coaching Conversation History</h3>
+        <p>
+          When you send a message to Victor, FORM assembles a coaching context and sends it to our AI inference provider (Anthropic).
+          <strong>The context sent to Anthropic contains only pseudonymised exercise data — your sets, reps, RPE, programme phase, and equipment.
+          Your name, email, age, weight, body metrics, and all other personal data are excluded from prompts.</strong>
+          The Anthropic DPA prohibits use of FORM's data to train Anthropic's models.
+        </p>
+
+        <h3>3.7 Eating Disorder Awareness Screen</h3>
+        <p>At onboarding, FORM conducts a brief non-diagnostic awareness screen. This cannot be skipped.</p>
+        <div class="draft-banner mb-4 text-xs" style="padding:12px 16px;">
+          <strong style="color:#FF5733;">Clinical safety note:</strong> This is not a clinical diagnosis. Results are stored as a binary UX flag only —
+          never as a clinical record, never included in any employer-visible report, never shared with any third party, never exported in identifiable form.
+        </div>
+
+        <h3>3.8 Device and Usage Data</h3>
+        <p>Anonymous event data (screen views, feature interactions), crash reports (anonymised), and device/OS version. No health data values are included in analytics events. Legal basis: Legitimate interest (GDPR Art. 6(1)(f)).</p>
+
+        <h3>3.9 Payment Metadata</h3>
+        <p>FORM does not process payment card data. All payments are handled by Apple App Store and Google Play Store. FORM receives only: subscription tier, purchase date/expiry, and refund/cancellation status.</p>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §4 -->
+      <div id="s4" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 4</div>
+        <h2>Legal Basis for Processing</h2>
+
+        <h3>4.1 Consumer tier</h3>
+        <table class="policy-table">
+          <thead><tr><th>Processing activity</th><th>Legal basis</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Account creation and management</td><td>Art. 6(1)(b) — contract performance</td><td>Necessary to provide the service</td></tr>
+            <tr><td>Health profile (body metrics, goals)</td><td>Art. 9(2)(a) — explicit consent</td><td>Granular consent per category; withdrawable</td></tr>
+            <tr><td>CV-based workout analysis</td><td>Art. 9(2)(a) + Art. 6(1)(b)</td><td>Health inference requires Art. 9; service delivery requires Art. 6(1)(b)</td></tr>
+            <tr><td>Food and nutrition logging</td><td>Art. 9(2)(a) — explicit consent</td><td>Requires separate opt-in</td></tr>
+            <tr><td>Wearable data integration</td><td>Art. 9(2)(a) — explicit consent</td><td>Per-device, per-data-type; revocable independently</td></tr>
+            <tr><td>AI coaching conversations (Victor)</td><td>Art. 6(1)(b) — contract performance</td><td>Pseudonymised context only; no health data in AI prompts by design</td></tr>
+            <tr><td>Voice synthesis via ElevenLabs</td><td>Art. 6(1)(b) — contract performance</td><td>Coaching text cues only; no user personal data transmitted</td></tr>
+            <tr><td>Eating disorder awareness screen</td><td>Art. 9(2)(a) + Art. 6(1)(f)</td><td>UX flag only; not a clinical record</td></tr>
+            <tr><td>Product analytics (PostHog)</td><td>Art. 6(1)(f) — legitimate interest</td><td>Anonymous events; opt-out available</td></tr>
+            <tr><td>Error monitoring (Sentry)</td><td>Art. 6(1)(f) — legitimate interest</td><td>PII scrubbed at SDK</td></tr>
+            <tr><td>Audit logging</td><td>Art. 6(1)(c) — legal obligation</td><td>SOC 2 / GDPR Art. 30 record-keeping</td></tr>
+            <tr><td>Breach notification</td><td>Art. 6(1)(c) — legal obligation</td><td>GDPR Art. 33/34</td></tr>
+          </tbody>
+        </table>
+
+        <h3>4.2 Enterprise tier (additional bases)</h3>
+        <table class="policy-table">
+          <thead><tr><th>Processing activity</th><th>Legal basis</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>SSO/SCIM provisioning</td><td>Art. 6(1)(b) — contract</td><td>Joint controller with employer; governed by enterprise DPA</td></tr>
+            <tr><td>Aggregate wellness reporting to HR dashboard</td><td>Art. 6(1)(f) — legitimate interest</td><td>Strictly k-anonymised; groups &lt;5 users suppressed; individual data never exposed</td></tr>
+            <tr><td>Audit log for tenant admin</td><td>Art. 6(1)(c) + Art. 6(1)(f)</td><td>Administrative access log only; no health data in admin-visible entries</td></tr>
+          </tbody>
+        </table>
+
+        <h3>4.3 Consent management</h3>
+        <p>When you provide consent for health data processing, FORM records the following in our tamper-evident audit log: the policy version you agreed to, the specific data categories consented to, the date and time, and the consent mechanism (e.g., in-app onboarding screen).</p>
+        <p>You may <strong>withdraw consent</strong> at any time by going to Settings → Privacy → Data Permissions in the FORM app, or by emailing privacy@form.coach. Withdrawal does not affect the lawfulness of prior processing.</p>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §5 -->
+      <div id="s5" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 5</div>
+        <h2>How We Use Your Data</h2>
+
+        <h3>5.1 Core coaching and personalisation</h3>
+        <p>We use your workout data, health profile, wearable data, food logs (if enabled), and coaching conversation history to generate personalised workout programmes, analyse movement quality, track training progress, adapt coaching intensity based on recovery signals (HRV, sleep, readiness), provide nutritional guidance (if food logging is enabled), and synthesise voice coaching cues.</p>
+        <p><strong>Your health data is used exclusively to provide you with a better coaching experience.</strong> We do not use your health data for advertising, profiling unrelated to fitness, or any purpose beyond those stated in this Policy.</p>
+
+        <h3>5.2 Service reliability and safety</h3>
+        <p>We use anonymous usage events and crash reports to identify and fix bugs, monitor service uptime, detect unusual security-related activity, and ensure accuracy of coaching outputs. Health event content is never included in analytics events.</p>
+
+        <h3>5.3 Enterprise deployments — privacy floor</h3>
+        <p>These protections apply unconditionally as <strong>technical controls enforced at the database level</strong>, not merely policy commitments:</p>
+        <ul>
+          <li><strong>Your employer never sees your individual health data.</strong> No HR administrator, manager, or executive can access your individual workout records, body metrics, food logs, HRV data, coaching conversations, or eating disorder screening results.</li>
+          <li><strong>Aggregate wellness data shown to employers is k-anonymised.</strong> Individual data is mathematically suppressed if a group contains fewer than five members. Body composition, nutrition, and eating disorder screening results are excluded from all employer-visible aggregates.</li>
+          <li><strong>You can disconnect from your employer at any time</strong> via Settings → Privacy → "Disconnect from employer." Your personal health data remains yours.</li>
+          <li><strong>No sharing with employer outside the k-anonymised dashboard.</strong> No exceptions. Enforced technically (database RLS policies) and contractually.</li>
+        </ul>
+
+        <h3>5.4 What we do not do</h3>
+        <ul>
+          <li>Sell your personal data or health data to any third party</li>
+          <li>Share your data with insurance companies, healthcare providers, or government agencies (except as required by law)</li>
+          <li>Use your data to train external AI models (Anthropic's enterprise DPA prohibits this)</li>
+          <li>Use your health data for advertising targeting, on or off the FORM platform</li>
+          <li>Share aggregate or de-identified wellness data with your employer that could enable individual re-identification</li>
+          <li>Use your eating disorder screening results for any purpose other than calibrating coaching language</li>
+        </ul>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §6 -->
+      <div id="s6" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 6</div>
+        <h2>Data Sharing and Sub-Processors</h2>
+        <p>FORM engages the following sub-processors. Each has signed a Data Processing Agreement (DPA) with FORM. For EU users, Standard Contractual Clauses (SCCs) Module 2 are in place for transfers outside the EEA.</p>
+
+        <h3>6.1 Sub-processor register</h3>
+        <table class="policy-table">
+          <thead><tr><th>Sub-Processor</th><th>Purpose</th><th>Data involved</th><th>DPA Status</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Supabase Inc</strong> · San Francisco, US</td><td>Managed PostgreSQL database, auth, file storage — primary data store</td><td>All personal data categories (Section 3)</td><td>Signed · SCC Module 2 · EU residency available</td></tr>
+            <tr><td><strong>Amazon Web Services (AWS)</strong> · Seattle, US</td><td>Cloud infrastructure (via Supabase)</td><td>All data through Supabase</td><td>Covered by Supabase DPA</td></tr>
+            <tr><td><strong>Cloudflare Inc</strong> · San Francisco, US</td><td>CDN, DDoS protection, edge compute (API gateway)</td><td>IP addresses, request metadata; no health data passes unencrypted</td><td>Enterprise DPA · SCC Module 2</td></tr>
+            <tr><td><strong>Anthropic PBC</strong> · San Francisco, US</td><td>LLM inference — powers Victor AI coach</td><td>Pseudonymised exercise context only: sets, reps, RPE, programme phase, equipment. No PII. No health metrics.</td><td>Signed · SCC Module 2</td></tr>
+            <tr><td><strong>ElevenLabs Inc</strong> · New York, US</td><td>Text-to-speech voice synthesis (coaching cues)</td><td>Coaching text cues only — no user personal data</td><td>Signed · SCC Module 2</td></tr>
+            <tr><td><strong>PostHog Inc</strong> · San Francisco, US</td><td>Product analytics — anonymous event tracking</td><td>Anonymous event data, device type; no PII; no health event content</td><td>Signed · SCC Module 2 · EU hosting available</td></tr>
+            <tr><td><strong>Functional Software Inc (Sentry)</strong> · San Francisco, US</td><td>Error monitoring and crash reporting</td><td>Anonymised stack traces, session IDs; health data scrubbed at SDK level</td><td>In progress — DPA review underway; PII scrubbing at SDK is compensating control</td></tr>
+            <tr><td><strong>Apple Inc / Google LLC</strong></td><td>In-app purchase processing (IAP) for consumer subscriptions</td><td>Subscription tier, purchase date, expiry status; FORM never receives card data</td><td>Governed by developer agreements</td></tr>
+            <tr><td><strong>Stripe Inc</strong> · San Francisco, US</td><td>Payment processing for enterprise direct billing</td><td>Billing contact name, company name, invoice data; no health data</td><td>Signed · SCC Module 2</td></tr>
+          </tbody>
+        </table>
+
+        <h3>6.2 Key data minimisation commitments</h3>
+        <ul>
+          <li><strong>Anthropic receives no personally identifiable information.</strong> Prompts contain only pseudonymised exercise context. Validated in automated testing.</li>
+          <li><strong>ElevenLabs receives no user data.</strong> Text-to-speech requests contain only the coaching text cue.</li>
+          <li><strong>PostHog events contain no health data.</strong> Specific health values are never included in analytics events.</li>
+          <li><strong>Sentry payloads are scrubbed before transmission.</strong> The Sentry SDK is configured to strip all health data fields from crash reports before leaving your device.</li>
+        </ul>
+
+        <h3>6.3 New sub-processors</h3>
+        <p>FORM will notify enterprise customers at least <strong>30 days in advance</strong> before engaging a new sub-processor that will process their tenant data. Consumer users will be notified through a Privacy Policy update.</p>
+
+        <h3>6.4 Government and law enforcement requests</h3>
+        <p>FORM does not provide backdoor access to any government or law enforcement agency. We will only disclose user data in response to a lawful court order or equivalent compulsory legal process, and only to the extent required. Where permitted by law, we will notify affected users before complying.</p>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §7 -->
+      <div id="s7" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 7</div>
+        <h2>Data Retention</h2>
+
+        <h3>7.1 Retention schedule</h3>
+        <table class="policy-table">
+          <thead><tr><th>Data category</th><th>Retention period</th><th>Basis</th></tr></thead>
+          <tbody>
+            <tr><td>Account and identity data</td><td>Duration of account; deleted within 30 days of account closure</td><td>Contract performance</td></tr>
+            <tr><td>Health profile data</td><td>Duration of account; user can delete at any time; deleted within 30 days of closure</td><td>Consent; user control</td></tr>
+            <tr><td>Workout logs and form scores</td><td>Duration of account; user can delete individual sessions; deleted within 30 days of closure</td><td>Contract performance; user control</td></tr>
+            <tr><td>Food and nutrition logs</td><td>Duration of account; user can delete individual logs; deleted within 30 days of closure</td><td>Consent; user control</td></tr>
+            <tr><td>Wearable data (HRV, heart rate, sleep)</td><td>Duration of account; user can revoke and delete at any time; deleted within 30 days of closure</td><td>Consent; user control</td></tr>
+            <tr><td>AI coaching conversation history</td><td>Duration of account; user can delete individual sessions; deleted within 30 days of closure</td><td>Contract performance</td></tr>
+            <tr><td>Eating disorder screening flag</td><td>Duration of account; deleted within 30 days of closure</td><td>Consent</td></tr>
+            <tr><td>Anonymous analytics events</td><td>Up to 24 months in PostHog; anonymised; not recoverable to individual identity</td><td>Legitimate interest</td></tr>
+            <tr><td>Error monitoring data (Sentry)</td><td>90 days in Sentry; automatically purged</td><td>Legitimate interest</td></tr>
+            <tr><td><strong>Audit log (HMAC-chained)</strong></td><td><strong>7 years</strong> — SOC 2 Type II audit evidence + legal compliance; entries anonymised on account deletion (user ID removed; action + timestamp retained)</td><td>Legal obligation (Art. 6(1)(c))</td></tr>
+            <tr><td>Backup copies</td><td>Maximum 90 days in encrypted backup storage; purged on scheduled rotation</td><td>Operational necessity</td></tr>
+          </tbody>
+        </table>
+
+        <h3>7.2 Account deletion and right to erasure</h3>
+        <p>When you delete your FORM account (Settings → Profile → Delete Account):</p>
+        <ol>
+          <li>Your account is immediately marked for deletion and becomes inaccessible.</li>
+          <li>A 30-day grace period begins. You may restore your account by contacting privacy@form.coach.</li>
+          <li>After 30 days, all personal data in your user record is hard-deleted from our primary database.</li>
+          <li>Backup copies are purged within 60 days of the deletion date (next backup rotation after the grace period).</li>
+          <li>Audit log entries are anonymised: your user ID is removed; action type, timestamp, and system metadata are retained for audit integrity.</li>
+          <li>You receive a confirmation email when deletion is complete.</li>
+        </ol>
+        <p><strong>Total maximum retention after deletion request: 90 days</strong> (30-day grace + 60-day backup purge). After this, no data identifiable to you exists in FORM's systems or backups, except for anonymised audit log entries.</p>
+
+        <h3>7.3 Data you can delete yourself</h3>
+        <ul>
+          <li><strong>Individual workout sessions</strong> — delete from training history in the app</li>
+          <li><strong>Food log entries</strong> — delete individual entries within the food log</li>
+          <li><strong>Wearable data sync</strong> — revoke HealthKit / Health Connect access and delete previously synced data</li>
+          <li><strong>All your data</strong> — Settings → Profile → Delete Account</li>
+        </ul>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §8 -->
+      <div id="s8" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 8</div>
+        <h2>Your Rights</h2>
+
+        <table class="policy-table">
+          <thead><tr><th>Right</th><th>GDPR Article</th><th>How to exercise</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Right of access</strong></td><td>Art. 15</td><td>In-app: Settings → Privacy → Export My Data (JSON, 48h delivery); or email privacy@form.coach</td></tr>
+            <tr><td><strong>Right to rectification</strong></td><td>Art. 16</td><td>Update most profile data directly in the app; or email privacy@form.coach — corrected within 30 days</td></tr>
+            <tr><td><strong>Right to erasure</strong></td><td>Art. 17</td><td>Delete account in app; or email privacy@form.coach for specific data category erasure</td></tr>
+            <tr><td><strong>Right to data portability</strong></td><td>Art. 20</td><td>Settings → Privacy → Export My Data — JSON format including all personal data; delivered within 48h</td></tr>
+            <tr><td><strong>Right to object</strong></td><td>Art. 21</td><td>Opt out of analytics: Settings → Privacy → Analytics; opt out of error monitoring: email privacy@form.coach</td></tr>
+            <tr><td><strong>Right to withdraw consent</strong></td><td>Art. 7(3)</td><td>Settings → Privacy → Data Permissions — toggle off any individual health data category</td></tr>
+            <tr><td><strong>Right to restriction</strong></td><td>Art. 18</td><td>Email privacy@form.coach to request processing restriction while a rectification request is assessed</td></tr>
+            <tr><td><strong>Right not to be subject to automated decision-making</strong></td><td>Art. 22</td><td>FORM does not make consequential automated decisions. Request human review of any AI coaching recommendation at support@form.coach</td></tr>
+            <tr><td><strong>Right to lodge a complaint</strong></td><td>Art. 77</td><td>Contact your local supervisory authority. FORM's anticipated lead SA: Data Protection Commission (Ireland) or your local EU member state SA. Ukrainian users: Commissioner for Personal Data Protection.</td></tr>
+          </tbody>
+        </table>
+
+        <p><strong>California users (CPRA):</strong> FORM does not sell or share your personal information as defined under CPRA. Your CPRA rights are substantially equivalent to those above. Contact privacy@form.coach.</p>
+        <p>We encourage you to contact us at privacy@form.coach before lodging a complaint, so we can attempt to resolve the issue directly.</p>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §9 -->
+      <div id="s9" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 9</div>
+        <h2>Data Subject Access Requests (DSAR)</h2>
+
+        <h3>9.1 How to submit</h3>
+        <ol>
+          <li><strong>In-app (preferred):</strong> Settings → Privacy → Export My Data or Delete My Data — automated processing begins immediately</li>
+          <li><strong>Email:</strong> privacy@form.coach — subject line: "DSAR Request — [your name]"</li>
+          <li><strong>Postal mail:</strong> [REGISTERED ADDRESS — to be confirmed] — marked "DSAR"</li>
+        </ol>
+
+        <h3>9.2 Response timeline</h3>
+        <table class="policy-table">
+          <thead><tr><th>Request type</th><th>Response time</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Acknowledgement</td><td>Within 72 hours</td><td>Automated for in-app requests; manual for email/postal</td></tr>
+            <tr><td>Data export (access / portability)</td><td>Within 30 calendar days</td><td>Secure download link, available for 7 days</td></tr>
+            <tr><td>Account deletion confirmation</td><td>Within 30 calendar days</td><td>Includes deletion certificate on request</td></tr>
+            <tr><td>Rectification</td><td>Within 30 calendar days</td><td>Confirmation of correction provided</td></tr>
+            <tr><td>Complex requests</td><td>Up to 90 calendar days</td><td>GDPR Art. 12(3) permits extension; you will be notified within the initial 30 days</td></tr>
+          </tbody>
+        </table>
+        <p>FORM does not charge a fee for DSARs.</p>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §10 -->
+      <div id="s10" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 10</div>
+        <h2>Children and Age Restrictions</h2>
+        <p><strong>FORM is not designed for or directed at children under the age of 16.</strong></p>
+        <p>We do not knowingly collect personal data from anyone under 16. By creating a FORM account, you confirm you are at least 16 years old.</p>
+        <p>For users between 16 and 18 years of age, FORM provides age-appropriate coaching parameters (intensity limits, exercise selection constraints) and excludes certain features that may be inappropriate for developing physiology. These constraints are applied automatically based on the date of birth you provide at onboarding.</p>
+        <p>If you believe that a person under 16 has provided personal data to FORM, contact privacy@form.coach immediately. We will delete any such data as quickly as practicable.</p>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §11 -->
+      <div id="s11" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 11</div>
+        <h2>International Data Transfers</h2>
+        <p>FORM's infrastructure is primarily located in the United States, with EU data residency options available for enterprise customers.</p>
+
+        <h3>11.1 Transfers to the United States</h3>
+        <p>For transfers from the EEA, UK, or Ukraine to US-based processors, we rely on <strong>Standard Contractual Clauses (SCCs) Module 2</strong> (controller-to-processor). SCCs are in place with Anthropic, ElevenLabs, Cloudflare, Supabase, PostHog, and Stripe. Sentry SCCs are being finalised.</p>
+
+        <h3>11.2 EU data residency option</h3>
+        <p>Enterprise customers may elect to store their data in the EU (AWS <code>eu-central-1</code> Frankfurt or <code>eu-west-1</code> Ireland). With EU data residency: all database data is stored and processed within the EU; backups remain within the EU; Supabase EU and PostHog EU instances are used. Anthropic and Cloudflare remain US-based (SCCs in place). EU data residency is contractually bound at tenant creation and cannot be changed post-deployment without a full data migration engagement.</p>
+
+        <h3>11.3 UK transfers</h3>
+        <p>Transfers from the UK to US processors are covered by the UK International Data Transfer Agreement (IDTA), used in conjunction with SCC-equivalent addenda with our US sub-processors.</p>
+
+        <h3>11.4 Ukrainian users</h3>
+        <p>Transfers from Ukraine to processors outside Ukraine are subject to the Law of Ukraine on Personal Data Protection (Закон України «Про захист персональних даних»). FORM relies on contractual safeguards (DPAs and SCCs) with all processors receiving data from Ukrainian users.</p>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §12 -->
+      <div id="s12" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 12</div>
+        <h2>Analytics and Tracking</h2>
+
+        <h3>12.1 PostHog product analytics</h3>
+        <p>FORM uses PostHog Inc to collect anonymous product analytics — which features are used, navigation patterns, where we can improve.</p>
+
+        <div class="grid md:grid-cols-2 gap-4 mb-6">
+          <div class="info-card">
+            <div class="label mb-2" style="font-size:9px;color:#4ade80;">PostHog collects</div>
+            <ul style="margin:0;">
+              <li>Screen views and navigation events</li>
+              <li>Feature interaction events</li>
+              <li>Session duration</li>
+              <li>Device type and OS version (not linked to identity)</li>
+              <li>Analytics opt-out status</li>
+            </ul>
+          </div>
+          <div class="info-card">
+            <div class="label mb-2" style="font-size:9px;color:#FF5733;">PostHog does NOT collect</div>
+            <ul style="margin:0;">
+              <li>Name, email, or any personally identifiable information</li>
+              <li>Health data values (no form scores, body metrics, HRV, food log contents)</li>
+              <li>Coaching conversation content</li>
+              <li>Raw IP address (truncated at source)</li>
+            </ul>
+          </div>
+        </div>
+
+        <p><strong>Legal basis:</strong> Legitimate interest (GDPR Art. 6(1)(f)). A Legitimate Interest Assessment has been completed.</p>
+        <p><strong>Opt out:</strong> Settings → Privacy → Analytics → toggle to "Off". All PostHog event transmission stops immediately and persists across devices and reinstallations.</p>
+
+        <h3>12.2 Sentry error monitoring</h3>
+        <p>Sentry receives anonymised crash reports (error type, stack trace, app version, device type, anonymised session identifier). All health data fields are scrubbed at the SDK level before transmission. A formal DPA with Sentry is being finalised; SDK-level PII scrubbing is the compensating control.</p>
+
+        <h3>12.3 No cross-site tracking or advertising trackers</h3>
+        <p>FORM does not use advertising tracking pixels, Google Analytics, Facebook Pixel, or any cross-site tracking technology. We do not participate in any advertising network data sharing. We do not sell, share, or rent your data to any advertising or data broker platform.</p>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §13 -->
+      <div id="s13" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 13</div>
+        <h2>Changes to This Policy</h2>
+        <p>We will notify you of material changes at least <strong>30 days before</strong> they take effect, through an in-app notification, an email to your registered address, or a prominent notice on form.coach/privacy.</p>
+        <p>For changes that expand our use of your health data or introduce new sub-processors who receive health data, we will ask for your renewed consent before the change takes effect.</p>
+
+        <h3>13.1 Version history</h3>
+        <table class="policy-table">
+          <thead><tr><th>Version</th><th>Date</th><th>Summary</th></tr></thead>
+          <tbody>
+            <tr><td>0.1.0-draft</td><td>2026-05-17</td><td>Initial draft — pre-legal-review, pre-launch. Covers all data categories. Not yet effective.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="divider my-10" />
+
+      <!-- §14 -->
+      <div id="s14" class="section-anchor">
+        <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Section 14</div>
+        <h2>Contact and Supervisory Authority</h2>
+
+        <div class="grid md:grid-cols-2 gap-5 mb-8">
+          <div class="info-card acid-border">
+            <div class="label mb-3" style="font-size:9px;color:#DDFF2D;">Privacy contact</div>
+            <p style="color:#A39D8E;font-size:13px;margin-bottom:12px;">For privacy questions, DSAR requests, consent withdrawal, rectification, and data subject rights.</p>
+            <a href="mailto:privacy@form.coach" class="text-acid font-mono text-sm">privacy@form.coach</a>
+          </div>
+          <div class="info-card">
+            <div class="label mb-3" style="font-size:9px;">Security contact</div>
+            <p style="color:#A39D8E;font-size:13px;margin-bottom:12px;">For security vulnerabilities, data breach concerns, and responsible disclosure.</p>
+            <a href="mailto:security@form.coach" class="text-acid font-mono text-sm">security@form.coach</a>
+          </div>
+          <div class="info-card">
+            <div class="label mb-3" style="font-size:9px;">Supervisory authority — EU</div>
+            <p style="color:#A39D8E;font-size:13px;margin:0;">Anticipated lead SA: Data Protection Commission (Ireland) at dataprotection.ie. You may also lodge a complaint with the SA in the EU member state where you reside or work.</p>
+          </div>
+          <div class="info-card">
+            <div class="label mb-3" style="font-size:9px;">Supervisory authority — Ukraine</div>
+            <p style="color:#A39D8E;font-size:13px;margin:0;">Commissioner for the Protection of Personal Data — Уповноважений Верховної Ради України з прав людини — under the Law of Ukraine on Personal Data Protection.</p>
+          </div>
+        </div>
+
+        <p>We encourage you to contact us at <a href="mailto:privacy@form.coach">privacy@form.coach</a> before lodging a complaint with a supervisory authority, so we can attempt to resolve the issue directly.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider max-w-[1280px] mx-auto" style="margin-left:2rem;margin-right:2rem;" />
+
+<!-- ─── Bottom CTA ─────────────────────────────────────────── -->
+<section class="max-w-[1280px] mx-auto px-8 py-16">
+  <div class="grid md:grid-cols-3 gap-px bg-line rounded-2xl overflow-hidden" style="background:rgba(31,29,22,0.6);">
+    <div class="bg-ink p-8">
+      <div class="label mb-4" style="color:#FF5733;font-size:9px;">Important notice</div>
+      <div class="space-y-3">
+        <div class="text-mute text-sm">This is a draft policy, not yet legally effective</div>
+        <div class="text-mute text-sm">Counsel review required across EU, UA, and US jurisdictions</div>
+        <div class="text-mute text-sm">Effective date to be confirmed on counsel sign-off</div>
+        <div class="text-mute text-sm">Do not rely on this document as a legally binding commitment</div>
+      </div>
+    </div>
+    <div class="bg-ink p-8">
+      <div class="label mb-4" style="color:#4ade80;font-size:9px;">Privacy by design</div>
+      <div class="space-y-3">
+        <div class="text-mute text-sm">Camera frames never leave your device</div>
+        <div class="text-mute text-sm">AI prompts contain no personal data by architecture</div>
+        <div class="text-mute text-sm">HMAC-chained audit log — tamper-evident, 7yr retention</div>
+        <div class="text-mute text-sm">k-anonymised employer dashboard — individual data never exposed</div>
+        <div class="text-mute text-sm">Consent before any health data field is rendered</div>
+      </div>
+    </div>
+    <div class="bg-ink p-8">
+      <div class="label mb-4" style="color:#DDFF2D;font-size:9px;">Contact</div>
+      <div class="space-y-4">
+        <div>
+          <div class="text-mute text-xs mb-1">Privacy questions &amp; DSAR</div>
+          <a href="mailto:privacy@form.coach" class="text-paper text-sm font-mono hover:text-acid transition-colors">privacy@form.coach</a>
+        </div>
+        <div>
+          <div class="text-mute text-xs mb-1">Security &amp; vulnerability disclosure</div>
+          <a href="mailto:security@form.coach" class="text-paper text-sm font-mono hover:text-acid transition-colors">security@form.coach</a>
+        </div>
+        <div>
+          <div class="text-mute text-xs mb-1">Enterprise &amp; DPA requests</div>
+          <a href="mailto:enterprise@form.coach" class="text-paper text-sm font-mono hover:text-acid transition-colors">enterprise@form.coach</a>
+        </div>
+        <div>
+          <div class="text-mute text-xs mb-1">Full compliance documentation</div>
+          <a href="/security.html" class="text-paper text-sm font-mono hover:text-acid transition-colors">form.coach/security</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Footer ────────────────────────────────────────────── -->
+<footer class="border-t border-line">
+  <div class="max-w-[1280px] mx-auto px-8 py-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <span class="font-serif text-lg tracking-tight text-paper">FORM<span class="text-acid">.</span></span>
+      <span class="text-mute text-xs ml-2">Privacy Policy</span>
+    </div>
+    <div class="flex flex-wrap gap-6">
+      <a href="/security.html" class="label hover:text-paper transition-colors" style="font-size:9px;">Security</a>
+      <a href="/enterprise.html" class="label hover:text-paper transition-colors" style="font-size:9px;">Enterprise</a>
+      <a href="/subprocessors.html" class="label hover:text-paper transition-colors" style="font-size:9px;">Sub-processors</a>
+      <a href="/" class="label hover:text-paper transition-colors" style="font-size:9px;">form.coach</a>
+    </div>
+    <div class="label" style="font-size:9px;">
+      v0.1.0-draft · Pre-legal review · GDPR Art. 25 · Updated 2026-06-09
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

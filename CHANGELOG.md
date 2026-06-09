@@ -6,6 +6,19 @@
 
 ---
 
+## [3.9.0] — 2026-06-09
+
+### Added
+- [`privacy.html`](privacy.html) — `form.coach/privacy` URL target; presents all 14 sections of `docs/PRIVACY_POLICY.md` v0.1.0-draft in FORM brand style (dark theme, editorial-brutalist); prominent draft/pending-counsel-review banner; sticky TOC sidebar; sub-processor table; data retention schedule; full DSAR procedure; contact cards; mobile-responsive. Advances SOC 2 PRE-01 / P-GAP-001 from 🔴 Open → 🟡 Authored. Closes to 🟢 on counsel sign-off + deployment. (DEC-037)
+- [`content/post-360-mev-mav-mrv-volume-landmarks.md`](content/post-360-mev-mav-mrv-volume-landmarks.md) — «MEV, MAV, MRV: що це таке, звідки взялись і як це використовувати» — 243 рядки, ~11 хв; volume landmarks for hypertrophy; cites Schoenfeld et al. 2017, Krieger 2010, Israetel RP framework, Meeusen et al. 2013, Heaselwood et al. 2022; population estimates table with explicit caveat; 5-step personal landmark protocol; decision matrix; clinical-safety REVIEWED PASS (programming methodology, no food/body-image/injury concerns)
+- [`content/post-361-creatine-mechanism-practical-use.md`](content/post-361-creatine-mechanism-practical-use.md) — «Креатин — механізм дії та практичне використання (без маркетингу)» — 238 рядків, ~12 хв; PCr energy system; ISSN position stand (Kreider et al. 2017); Lanhers et al. 2017 meta-analysis; Chilibeck et al. 2017; loading vs. maintenance; non-responder data; kidney disclaimer; under-18 note; hydration protocol; clinical-safety REVIEWED PASS з умовами (kidney + under-18 disclaimers mandatory)
+- `docs/DECISION_LOG.md` — DEC-037: privacy.html authored as form.coach/privacy URL target; PRE-01 advances to 🟡 Authored
+
+### Changed
+- `VERSION` — 3.8.2 → 3.9.0
+
+---
+
 ## [3.8.2] — 2026-06-09
 
 ### Fixed

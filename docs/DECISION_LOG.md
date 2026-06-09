@@ -15,6 +15,15 @@
 
 ## 2026-06-09
 
+### DEC-037 · privacy.html authored as form.coach/privacy URL target; PRE-01 advances to 🟡 Authored
+
+- **Decision:** Create `privacy.html` as the deployable HTML page at `form.coach/privacy`, rendering all 14 sections of `docs/PRIVACY_POLICY.md` v0.1.0-draft in FORM brand style. The page carries a prominent "DRAFT — Pending Counsel Review" banner and is not legally effective until counsel sign-off. This advances SOC 2 gap PRE-01 / P-GAP-001 from 🔴 Open to 🟡 Authored. Closes to 🟢 on: (a) outside counsel reviews the policy across EU/UA/US jurisdictions; (b) page is deployed to Cloudflare Pages at form.coach/privacy; (c) counsel sign-off is filed as CC2-E-001 in `compliance/cc2/`.
+- **Owner:** compliance-officer
+- **Why:** PRE-01 was the highest remaining critical gap after PRE-16 (cookie banner) was advanced to 🟡 Authored in v3.8.2. The privacy policy URL must exist and be stable before any enterprise pilot data flows and before the SOC 2 observation period starts. Creating the HTML page now unblocks the form.coach/privacy link required in the cookie consent banner (PRE-16 §74.3) even while counsel review is pending — the draft banner makes the pre-legal status transparent to any user who visits the URL.
+- **Reverse cost:** Low (page can be updated or retracted before counsel sign-off at negligible cost; the legal commitment attaches at counsel sign-off and publication, not at HTML authoring)
+
+---
+
 ### DEC-036 · Art. 9 health data: no-grace period is an absolute invariant during enterprise off-boarding
 
 - **Decision:** During enterprise tenant off-boarding, Art. 9 health data (`keypoints_enc`, `user_health_profiles`, `coaching_turns`, `meal_logs`, `body_metrics`) is hard-deleted immediately with no grace period. This rule is an absolute invariant — it cannot be overridden by an enterprise MSA, even if the contract includes a mutual notice period or a DPA clause purporting to allow a recovery window. Enterprise customers who require a data export of individual health data must instruct their employees to exercise the right to data portability (DATA_MODEL.md §12.5) independently and before the off-boarding trigger date. Any enterprise MSA clause requesting a health-data recovery window must be refused at contract review stage. Resolves OQ-OFB-03 (DATA_MODEL.md §25.8).
