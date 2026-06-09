@@ -16,7 +16,7 @@ This is a **pre-product** project repository. There is no app code yet (mobile d
 
 - **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
 - **65+ markdown documents** — strategic, operational, content
-- **320 evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
+- **374 evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **3 sample training programs** — sports-science discipline reference
 - **24 specialized AI agents** — operating model embodied у `.claude/agents/`
@@ -179,9 +179,12 @@ G:\\Клод\\form\\
 │   ├── post-373: Тренувальний стаж проти хронологічного віку після 40 ✓ (виконано · v3.17.0)
 │   │
 │   │   ── ROADMAP (наступні editorial теми · post-374+) ───────────────
-│   ├── post-374: Чому тренувальні протоколи з соцмереж не працюють — анатомія вірусної некомпетентності
+│   ├── post-374: Чому тренувальні протоколи з соцмереж не працюють — анатомія вірусної некомпетентності ✓ (виконано · v3.18.0)
 │   ├── post-375: Адаптація vs результат — коли тренування «працює» але прогрес стоїть
-│   └── post-376: Програмування для двозмінників — нестабільний графік без жертви прогресом
+│   ├── post-376: Програмування для двозмінників — нестабільний графік без жертви прогресом
+│   ├── post-377: Чому «прислухайся до тіла» — найгірша тренувальна порада — і що замість неї
+│   ├── post-378: Як читати тренувальне дослідження за 5 хвилин — мінімальний фільтр якості
+│   └── post-379: Суперпозиція втоми — коли сума двох «легких» стресів стає одним важким
 │   │
 │   ├── twitter-launch-thread.md
 │   ├── linkedin-posts.md
