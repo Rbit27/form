@@ -6,6 +6,16 @@
 
 ---
 
+## [3.8.2] — 2026-06-09
+
+### Fixed
+- `docs/SOC2_READINESS.md §3 Gap Analysis Summary` — **PRE-16 stale reference closure**: Gap Analysis Summary table (written at doc v1.3) still listed PRE-16 as the sole 🔴 Critical gap blocking SOC 2 observation period start, and the pre-audit readiness checklist (§38.8 / pre-audit table) still showed PRE-16 as 🔴 Open — both inconsistent with §74 (authored 2026-06-09, v3.5) which explicitly closed PRE-16 to 🟡 Authored. Four-point patch: (1) 🔴 Critical count 1 → 0; (2) 🟡 Partial count 33 → 34 with PRE-16 added to examples; (3) readiness score updated ~71% → ~98.3% and doc version v1.3 → v3.5; (4) PRE-16 pre-audit checklist row updated 🔴 Open → 🟡 Authored (`form-consent-gate` Worker + `consent_records` DDL — §74; 2026-06-09).
+
+### Changed
+- `VERSION` — 3.8.1 → 3.8.2
+
+---
+
 ## [3.8.1] — 2026-06-09
 
 ### Added

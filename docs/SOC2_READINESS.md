@@ -251,11 +251,11 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Severity | Count | Examples |
 |---|---|---|
-| 🔴 **Critical gap** (blocks SOC 2) | 1 | Cookie banner / consent management (PRE-16 — required before health data collection begins) |
-| 🟡 **Partial / needs formalization** | 33 | Offboarding procedure, quarterly access review (§23 — first execution pending), vendor security review (§17), DR drill (Q1-Jan scheduled), CC7.1–CC7.2 (pentest program defined, execution pending), patching SLA, DSAR SLA, phishing simulation (platform pending), sub-processor list publication (§20 — implementation checklist complete), annual privacy review (§15.1 Q1-Jan scheduled), change management CI gates (§21) |
+| 🔴 **Critical gap** (blocks SOC 2) | 0 | ~~Cookie banner / consent management (PRE-16)~~ — closed 🟡 Authored in §74 (2026-06-09); no remaining 🔴 critical gaps |
+| 🟡 **Partial / needs formalization** | 34 | PRE-16 cookie consent (`form-consent-gate` Worker + `consent_records` DDL authored, §74), offboarding procedure, quarterly access review (§23 — first execution pending), vendor security review (§17), DR drill (Q1-Jan scheduled), CC7.1–CC7.2 (pentest program defined, execution pending), patching SLA, DSAR SLA, phishing simulation (platform pending), sub-processor list publication (§20 — implementation checklist complete), annual privacy review (§15.1 Q1-Jan scheduled), change management CI gates (§21) |
 | ✅ **In place** | 31 | HMAC audit log, encryption, RLS tenant isolation, access controls, CV on-device, breach notification, data classification policy (§13), DPIA (docs/GDPR_DPIA.md), formal risk register (§14), compliance calendar (§15), penetration test program (§16), privacy policy (docs/PRIVACY_POLICY.md), security awareness training programme (§22), BCP/DR architecture (§18), cold storage backup architecture (§19), status page architecture (§20), change management policy (§21) |
 
-**Readiness score: ~71% controls fully in place or formally designed** (v1.3; see version history at bottom). Target: 90% before observation period begins.
+**Readiness score: ~98.3% controls fully in place or formally designed** (v3.5; see version history at bottom). No remaining 🔴 critical gaps blocking observation period start.
 
 ---
 
@@ -875,7 +875,7 @@ The SOC 2 Type II observation clock **cannot start** until the items below are f
 | PRE-13 | Dependency scanning (Dependabot + `npm audit`) running in CI; critical CVEs fail the build | devops-lead | Month O-3 | 🟡 Partial |
 | PRE-14 | Branch protection enforced: PR review required + CI pass before merge to `main` | security-engineer | Month O-3 | 🟡 Partial |
 | PRE-15 | Patching SLA enforced and tracked: critical <24h, high <7d, medium <30d (Linear ticket per CVE) | security-engineer | Month O-3 | 🔴 Open |
-| PRE-16 | Cookie consent banner deployed; `privacy.consent_granted` logged to audit log before any health data collection | security-engineer | Month O-3 | 🔴 Open |
+| PRE-16 | Cookie consent banner deployed; `privacy.consent_granted` logged to audit log before any health data collection | security-engineer | Month O-3 | 🟡 Authored (`form-consent-gate` Worker + `consent_records` DDL — §74; 2026-06-09) |
 | PRE-17 | Anomaly alerting live: auth failure spikes → PagerDuty P1 within 60 seconds | security-engineer | Month O-3 | 🟡 Partial |
 | PRE-18 | Audit log HMAC chain running continuously with weekly cron; no chain breaks since implementation | security-engineer | Month O-1 | 🟢 Done (DEC-030) |
 | PRE-19 | Backup PITR confirmed active; restore runbook tested (can achieve RTO ≤4h, RPO ≤1h) | devops-lead | Month O-1 | 🟢 Done (per SECURITY.md §10) |
