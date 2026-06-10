@@ -6,6 +6,16 @@
 
 ---
 
+## [3.44.3] — 2026-06-10
+
+### Added
+- [`docs/VULNERABILITY_MANAGEMENT.md`](docs/VULNERABILITY_MANAGEMENT.md) — Standalone Vulnerability Management & Patching SLA Policy (POL-010). Closes policy register status 🟡 Partial → 🟢 In force. Covers: four discovery sources (Dependabot, `npm audit` CI gate, annual pentest, vendor advisories); CVSS v3.1 severity tiers with three FORM-specific uplift rules (U-01 Art. 9 health data, U-02 RLS bypass — never risk-acceptable, U-03 HMAC chain integrity); patching SLAs (Critical 24h, High 7d, Medium 30d, Low 90d); remediation workflow with Linear ticket schema; risk acceptance matrix; enterprise customer disclosure tiers (E-VULN-01/E-VULN-02 templates); DEC-030 audit events (`vuln.cve_discovered`, `vuln.patch_deployed`, `vuln.sla_exception_granted`, `vuln.wont_fix_closed`, `vuln.enterprise_notified`); SOC 2 control mapping (CC7.1, CC7.2, CC7.3, CC7.4, CC5.3, CC6.8); compliance calendar integration. Companion to `docs/SOC2_READINESS.md §41` (operational runbook). clinical-safety NOT REQUIRED.
+
+### Changed
+- `VERSION` — 3.44.2 → 3.44.3.
+
+---
+
 ## [3.44.2] — 2026-06-10
 
 ### Added
