@@ -6,6 +6,20 @@
 
 ---
 
+## [3.28.0] — 2026-06-10
+
+### Added
+- `content/post-392-specificity-vs-transferability.md` — SAID principle, specificity spectrum, cross-education (Carroll et al. 2006), functional training critique, health vs sport programming logic (~2,700 words, UA)
+- `content/post-393-aerobic-base-strength-athlete.md` — concurrent training interference (Wilson et al. 2012), Zone 2 mechanisms, PCr resynthesis, VO₂max and aging strength retention, practical dose framework (~2,700 words, UA)
+- `content/post-394-psychological-fatigue-physical-limit.md` — Central Governor Model (Noakes), psychobiological model (Marcora et al. 2009), Van Cutsem meta-analysis 2017, dopamine and motor reserve, cognitive fatigue effect on RPE (~2,500 words, UA)
+- `content/post-395-plateau-breaking-seven-evidence-based-exits.md` — 7 evidence-based plateau exits: stimulus variation, deaccommodation block, volume progression, tempo/eccentric, recovery audit, technical refinement, lifestyle audit; Zatsiorsky, Fonseca et al. 2014, Ralston et al. 2017 (~2,800 words, UA)
+- README: posts 392–395 marked done; roadmap extended to posts 396–399
+
+### Changed
+- `VERSION` → 3.28.0 (MINOR: new editorial batch, 4 posts)
+
+---
+
 ## [3.27.1] — 2026-06-10
 
 ### Fixed
