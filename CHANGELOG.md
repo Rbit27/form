@@ -6,6 +6,19 @@
 
 ---
 
+## [3.44.4] — 2026-06-10
+
+### Added
+- [`content/post-445-detraining-return-to-training.md`](content/post-445-detraining-return-to-training.md) — Детренованість і повернення до тренувань: Bickel et al. (2011) 1/9 volume maintenance 32 weeks; Issurin (2008) residual effects hierarchy (strength 25–35d, endurance 18–25d, speed-strength 5–10d); Bruusgaard et al. (2010) myonuclear retention mechanism; 5-row decision matrix by break duration; "надолужити" framed as a programming error; RIR-anchor return protocol; clinical-safety NOT REQUIRED.
+- [`content/post-446-drop-sets-mechanics-application.md`](content/post-446-drop-sets-mechanics-application.md) — Дроп-сети: механіка і застосування: Fink et al. (2018) Journal of Sports Sciences — equivalent hypertrophy to traditional sets in matched time; three mechanisms (metabolic stress H+/Pi/lactate; Henneman size principle MU recruitment under fatigue; cell swelling mTOR signaling); operational algorithm (10–20% drops, 2–3 drops, 6–10 reps per drop); exercise selection hierarchy (machines best → isolation free weights → barbell compounds problematic → Olympic lifts avoid); program placement (end of session, 1–2× per muscle per week); clinical-safety NOT REQUIRED.
+- [`content/post-447-concurrent-training-interference-effect.md`](content/post-447-concurrent-training-interference-effect.md) — Конкурентне тренування і interference effect: Kraemer et al. (1995) original finding; Wilson et al. (2012) meta-analysis 21 studies — running > cycling interference, volume-dependent threshold, 6h+ separation, AMPK/mTORC1 molecular conflict; mode hierarchy (running → rowing → cycling → Zone 2); decision matrix by goal; weekly plan for time-constrained intermediate; clinical-safety NOT REQUIRED.
+
+### Changed
+- `VERSION` — 3.44.3 → 3.44.4.
+- `README.md` — posts 445, 446, 447 marked [x].
+
+---
+
 ## [3.44.3] — 2026-06-10
 
 ### Added
