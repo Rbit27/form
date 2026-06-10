@@ -6,6 +6,23 @@
 
 ---
 
+## [3.26.0] — 2026-06-10
+
+### Added
+- `content/post-386-time-deficit-training-30-minute-protocol.md` — Тренінг в умовах часового дефіциту: Schoenfeld & Grgic (2019) мінімальний ефективний стимул; Rhea et al. (2003) мета-аналіз частоти — 3 сесії/тиждень ефективні навіть за скороченого об'єму; Schoenfeld et al. (2015): рівний тижневий об'єм = рівна гіпертрофія незалежно від розподілу; Mangine et al. (2015): 1 vs 4 підходи — різниця незначна для початківців; Dankel et al. (2017): BFR як альтернатива при часовому дефіциті; практичний протокол «two big movements + finish»: compound push + compound pull + 6-хвилинний фінішер; таблиця адаптації для різних м'язових груп; 12 хв читання; clinical-safety NOT REQUIRED
+- `content/post-387-doms-muscle-soreness-science.md` — Крепатура (DOMS): Armstrong (1984) перша систематична модель EIMD; Proske & Morgan (2001, J Physiol) пошкодження саркомерів і роль ексцентричної фази; Malm et al. (2004) запальний каскад — IL-6, TNF-α, нейтрофіли → макрофаги; Brentano & Martins Kruel (2011, RBCM) DOMS ≠ гіпертрофія (дані огляду); Flann et al. (2011) гіпертрофія без DOMS; Morgan & Proske (2004) repeated bout effect — м'язи адаптуються без зниження адаптивної відповіді; три практичні помилки програмування з DOMS-логікою; диференціація коли DOMS = сигнал а коли = шум; 13 хв читання; clinical-safety REVIEW RECOMMENDED PASS
+- `content/post-388-beginner-gains-window-progression.md` — Прогресія новачка: Moritani & deVries (1979, Am J Phys Med) перші 4–6 тижнів — нейральна адаптація домінує; Folland & Williams (2007, Sports Med) нейральні vs структурні адаптації по фазах; McLester, Bishop & Guilliams (2003) 3 дні/тиждень перевершують 1 день при рівному об'ємі; Colquhoun et al. (2018, Front Physiol) стабільність і прогресивність — ключові змінні, не варіативність; вікно 12–18 місяців; чотири помилки що руйнують вікно; лінійна прогресія як оптимальний інструмент початківця; 14 хв читання; clinical-safety NOT REQUIRED
+- `content/post-389-strength-asymmetry-left-right-difference.md` — Силова асиметрія: Hewett et al. (2005, Am J Sports Med) LSI < 85% = функціональний дефіцит; Bishop et al. (2021, Sports Med) тризонова схема <10% норма / 10–15% жовта / >15% корекція; Dos'Santos et al. (2019) змінна vs постійна асиметрія — постійна значно небезпечніша; Bazyler et al. (2014, JSCR) асиметрія в ізометричній тязі корелює з травмами у пауерліфтерів; Teyhen et al. (2012) нормальна асиметрія у правшів 5–8%; two-step self-діагностика (жим ногами + тяга гантелей); протокол корекції — слабша сторона першою, unilateral emphasis; 14 хв читання; clinical-safety REVIEW RECOMMENDED PASS
+- `content/post-390-training-during-illness-above-neck-rule.md` — Тренування під час хвороби: Nieman (1994, Int J Sports Med) перший формальний опис neck check rule; Weidner et al. (1998, Med Sci Sports Exerc) RCT — помірне тренування при ГРВІ не погіршує симптоми; Simpson et al. (2020, Exercise Immunol Rev) J-крива — помірна активність знижує ризик URTI; Phelan et al. (2020, AHA/ACC) вірусний міокардит і системні симптоми; Melin et al. форс-мажорне тренування при хворобі — 30–50% зниження якості; тристепеневий алгоритм прийняття рішення; жорсткий дисклеймер: температура, біль у грудях, задишка — стоп; 13 хв читання; clinical-safety REVIEW RECOMMENDED PASS
+
+### Changed
+- `blog.html` — +5 карток (post-386–390), лічильник 325 → 330 статей, хв читання 3 896 → 3 962
+- `README.md` — post-386–390 позначено ✓ (виконано · v3.26.0)
+- `STATUS.md` — blog.html рядок оновлено (331 cards, 390 posts authored), +5 рядків постів, версія оновлена до v3.26.0
+- `VERSION` — 3.25.1 → 3.26.0
+
+---
+
 ## [3.25.1] — 2026-06-10
 
 ### Changed
