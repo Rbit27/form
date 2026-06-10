@@ -6,6 +6,19 @@
 
 ---
 
+## [3.44.2] — 2026-06-10
+
+### Added
+- [`content/post-444-supersets-hypertrophy-antagonist-agonist.md`](content/post-444-supersets-hypertrophy-antagonist-agonist.md) — Суперсети для гіпертрофії: агоністичні, антагоністичні і компаунд (13 хв). Weakley et al. (2017) JSCR: −27% часу при ≈збереженому об'ємі; Robbins et al. (2010) PAP і реципрокне гальмування антагоністичних пар; Brentano et al. (2017) pre-exhaust не підвищує EMG, об'єм падає; таксономія трьох типів суперсетів; матриця вибору за метою; операційний протокол upper/lower за 45 хвилин; чесні обмеження. clinical-safety NOT REQUIRED.
+
+### Changed
+- `README.md` — post-444 відмічено [x]; додано теми post-446–450 у роадмап.
+- `STATUS.md` — TL;DR: 443 → 444 posts; blog.html рядок: 387 → 388 карток; content engine table: новий рядок post-444.
+- `blog.html` — додана картка post-444.
+- `VERSION` — 3.44.1 → 3.44.2.
+
+---
+
 ## [3.44.1] — 2026-06-10
 
 ### Added
