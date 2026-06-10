@@ -785,10 +785,12 @@ Each iteration:
 - [x] post-422: Дилоад-тиждень — коли розвантаження є тренуванням; наука відновлення; протоколи; clinical-safety NOT REQUIRED · v3.39.0
 - [x] post-423: Діапазони повторень — сила і гіпертрофія; Schoenfeld et al. (2017); strength of evidence; clinical-safety NOT REQUIRED · v3.39.0
 - [x] post-424: Ефективні підходи — скільки з 20 запланованих сетів реально дають гіпертрофічний стимул; stimulating reps; Morton et al. (2016) proximity to failure; Henneman принцип; Amirthalingam et al. (2017) спадна віддача; junk volume; clinical-safety NOT REQUIRED · v3.39.2
-- [ ] post-425: Програмування у форматі A/B/C — коли і навіщо більше двох варіантів тижневої схеми; ротація рухових паттернів при 3+ сесіях; clinical-safety NOT REQUIRED
-- [ ] post-426: Тривалість тренувального блоку — чому 4-тижневий мезоцикл не є золотим стандартом; 3 vs 4 vs 6 тижнів: доказова база; clinical-safety NOT REQUIRED
-- [ ] post-427: Силове тренування і VO2max — серцево-судинна адаптація при чистому силовому протоколі; clinical-safety NOT REQUIRED
-- [ ] post-428: Силові стандарти як маяки прогресу — відносна сила (ratio до BW) корисніша за абсолютну; Wilks/IPF-нормалізація; clinical-safety NOT REQUIRED
+- [x] post-425: Програмування A/B/C — SRA recovery windows, три архітектурні схеми (PPL/Upper-Lower/Squat-Hinge-Upper), аудит перекриття; clinical-safety NOT REQUIRED · v3.40.0
+- [x] post-426: Тривалість тренувального блоку — Haff & Triplett мезоцикл 3–6 тижнів, Issurin блокова, Painter MEV/MRV як реальний тригер деловання; clinical-safety NOT REQUIRED · v3.40.0
+- [x] post-427: Силове тренування і VO2max — Hagerman (1996) пауерліфтери і VO2max, концентрична LV гіпертрофія, Murlasits (2018) concurrent мета-аналіз; clinical-safety NOT REQUIRED · v3.40.0
+- [x] post-428: Силові стандарти — Stone et al. алометрія, Wilks/IPF GL нормалізація, таблиця BW-кратних стандартів; clinical-safety NOT REQUIRED · v3.40.0
+- [ ] post-429: Прогресія у ізоляційних вправах — специфіка накопичення сили у односуглобних рухах, відмінність від базових, коли plateau нормальний; clinical-safety NOT REQUIRED
+- [ ] post-430: Навантаження на суглоби — як силовий тренінг впливає на суглобовий хрящ, зв'язки та менісків (без клінічних рекомендацій); clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 

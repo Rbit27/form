@@ -6,6 +6,19 @@
 
 ---
 
+## [3.40.0] — 2026-06-10
+
+### Added
+- [`content/post-425-ab-c-programming-weekly-structure.md`](content/post-425-ab-c-programming-weekly-structure.md) — Програмування A/B/C: коли двох варіантів тижня вже недостатньо (14 хв). Schoenfeld et al. (2016) мета-аналіз: 2+ сесії/тиждень ефективніші за 1×; SRA recovery windows (72–120h lower body, 48–72h upper body) і логіка ротації; три архітектурні схеми (Push/Pull/Legs, Upper A/Lower/Upper B, Squat/Hinge/Upper) з ратіоналом; аудит перекриття рухових паттернів між суміжними сесіями; покрокова побудова A/B/C тижня; інтеграція авторегуляції (Helms et al. RPE/RIR); критерії успіху на тижнях 6 і 12; типові помилки (інфляція обсягу, трицепс-оверлеп, ігнорування нижньої спини). clinical-safety NOT REQUIRED. Owner: sports-scientist.
+- [`content/post-426-training-block-duration-mesocycle-length.md`](content/post-426-training-block-duration-mesocycle-length.md) — Тривалість тренувального блоку: чому 4 тижні — це конвенція, а не фізіологія (14 хв). Haff & Triplett (2016): мезоцикл визначено як 3–6 тижнів; Bompa & Haff (2009) теорія; Issurin (2010) *Sports Medicine* блокова та залишкові тренувальні ефекти; Painter et al. (2012) *IJSPP* volume landmarks (MEV/MAV/MRV) як реальний тригер деловання; різні оптимальні довжини для лінійної, DUP та блокової моделей; 5-факторна матриця (тренувальний стаж, інтенсивність, відновлення, модель, ціль) для визначення тривалості; читання сигналів накопиченого стомлення (RPE-дрейф, VBT, якість сну, суб'єктивна готовність); практичне рішення: «MRV або просто гучний тиждень?». clinical-safety NOT REQUIRED. Owner: sports-scientist.
+- [`content/post-427-strength-training-vo2max-cardiovascular-adaptation.md`](content/post-427-strength-training-vo2max-cardiovascular-adaptation.md) — Силове тренування і VO2max: що відбувається з серцево-судинною системою, коли ти не бігаєш (14 хв). Hagerman et al. (1996): VO2max елітних пауерліфтерів на рівні нетренованих (принцип SAID); концентрична vs ексцентрична LV гіпертрофія (Levine & Stray-Gundersen 2005); що силовий тренінг реально дає (ударний об'єм, ЧСС у спокої, мітохондріальна щільність на одиницю об'єму); Fleck (1988) circuit training і кардіореспіраторна адаптація; Murlasits et al. (2018) мета-аналіз concurrent training і VO2max; аеробна база для PCr-ресинтезу (Bogdanis et al. 1995); мінімальний ефективний протокол Zone 2 (2×30 хв/тиждень на велоергометрі) і коли він опціональний. clinical-safety NOT REQUIRED. Owner: sports-scientist.
+- [`content/post-428-strength-standards-relative-strength-bodyweight-ratio.md`](content/post-428-strength-standards-relative-strength-bodyweight-ratio.md) — Силові стандарти як маяки прогресу: відносна сила і нормалізація за масою тіла (14 хв). Stone et al. (2002) алометричне масштабування: абсолютні кг без BW-нормалізації — некоректне порівняння; Kraemer & Ratamess (2004) стандарт нормалізації сили в дослідженнях; Wilks (2004) поліноміальна формула, її актуальність і відомі обмеження (важкі категорії дрейфують від 1990-х); IPF GL (Schwartz & Malone 2020) — поточний стандарт; DOTS як open-formula відповідь спільноти; таблиця BW-кратних стандартів (присід/жим/тяга) за рівнями beginner–intermediate–advanced (Baechle & Earle 2008, Hoffman 2006, Ruiz et al. 2008 BMJ поріг довголіття); як стандарти визначають наступний мезоцикл; застереження при змінах маси тіла. clinical-safety NOT REQUIRED. Owner: sports-scientist.
+- `blog.html` — 4 нові картки (post-425–428); лічильники оновлено 371→375 статей, 4 208→4 264 хв читання.
+- `README.md` — posts 425–428 відмічено ✓ у roadmap; додано теми post-429–430.
+- `STATUS.md` — оновлено до 428 постів, 375 карток, v3.40.0 · v1.3.7.
+
+---
+
 ## [3.39.3] — 2026-06-10
 
 ### Added
