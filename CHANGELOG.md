@@ -6,6 +6,16 @@
 
 ---
 
+## [3.42.0] — 2026-06-10
+
+### Added
+- [`docs/OBSERVABILITY.md §29 / §6.2 / §12.6`](docs/OBSERVABILITY.md) — AL-PAM-BG-01 break-glass review overdue alert. Closes `DATA_MODEL.md §29.10` items 7–8 (P1 M7). New alert rule fires when `pam_break_glass_reviews.review_due_at < now() AND reviewed_at IS NULL`; P1, re-alerts every 24 h, 96-hour escalation to security-engineer. Registered in §6.2 `pam_session_health` subsection (header updated to "AL-PAM-01 through AL-PAM-BG-01") and §29.4 PAM alert table with dedup key `pam-bg-review-overdue-{pam_session_id}`. Two new pg_cron jobs in §12.6 registry: job 20 `pam_postgres_sync` (every 30 min, 35 h freshness, CC6.2/CC6.6 KV↔Postgres sync audit) and job 21 `pam_bg_review_alert` (daily 08:00 UTC, 26 h freshness, CC6.6 break-glass SLA). Doc version bumped v2.4 → v2.5.
+
+### Changed
+- `VERSION` — 3.41.5 → 3.42.0.
+
+---
+
 ## [3.41.5] — 2026-06-10
 
 ### Added
