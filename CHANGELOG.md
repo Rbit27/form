@@ -6,6 +6,19 @@
 
 ---
 
+## [3.27.0] — 2026-06-10
+
+### Added
+- `content/post-391-reading-research-pvalue-effect-size.md` — Як читати дослідження про тренування: Wasserstein & Lazar (2016, ASA) офіційна заява про p-values; Amrhein, Greenland & McShane (2019, Nature) 800 вчених проти бінарного порогу 0.05; Nuzzo (2014, Nature) механізм помилок p-value у спортивних медіа; Cohen (1988, 1962) d = 0.2/0.5/0.8 як мала/середня/велика величина ефекту; ecological validity — recreationally active ≠ trained intermediate, lab ≠ gym, 8-12 тижнів ≠ довгострокова адаптація; статистична потужність — n = 10 на групу → 30–40% потужність (підкидання монети); funding bias — Yordanova et al. (2022): індустріальні дослідження показують ефект вдвічі більший; 4-питання протокол швидкої оцінки будь-якої статті; таблиця червоних і зелених прапорців; 13 хв читання; clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — +1 картка (post-391), лічильник 331 → 332 карток
+- `README.md` — post-391 позначено ✓ (виконано · v3.27.0)
+- `STATUS.md` — blog.html рядок оновлено (332 cards, 391 posts authored), +1 рядок поста, версія оновлена до v3.27.0
+- `VERSION` — 3.26.0 → 3.27.0
+
+---
+
 ## [3.26.0] — 2026-06-10
 
 ### Added
