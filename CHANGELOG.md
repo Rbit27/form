@@ -6,6 +6,19 @@
 
 ---
 
+## [3.38.0] — 2026-06-10
+
+### Added
+- [`content/post-412-exercise-variation-overuse.md`](content/post-412-exercise-variation-overuse.md) — Надлишкова варіація вправ (14 хв). SRA-крива для м'язу vs моторної навички; Shea & Morgan (1979) contextual interference effect (blocked vs random practice); Fonseca et al. (2014) регіональна гіпертрофія і варіація вправ; decision matrix — коли міняти вправи, коли утримуватись; типові помилки; практичний протокол для self-coached атлета. clinical-safety NOT REQUIRED.
+- [`content/post-413-training-after-40.md`](content/post-413-training-after-40.md) — Тренування після 40 (15 хв). Wroblewski et al. (2011) MRI майстер-атлетів; Distefano & Goodpaster (2018) саркопенія як синдром бездіяльності; Kumar et al. (2009) mTORC1-відповідь у 60–75-річних; відновлення +24–48 год, тестостерон −1–2%/рік і збережена тренувальна відповідь; сухожилля як реальне обмеження; чому тренувальний вік > хронологічного; корективи для програмування. clinical-safety NOT REQUIRED.
+- [`content/post-414-strength-longevity.md`](content/post-414-strength-longevity.md) — Сила і довголіття (16 хв). Ruiz et al. (2008) BMJ незалежний предиктор смертності; Leong et al. (2015) Lancet PURE study 139 691 учасників; три механізми (GLUT4/метаболічний буфер, фізіологічний резерв, Frost 1987 mechanostat/BMD); проблема зворотньої каузальності; J-shaped vs лінійна доза-відповідь; де handgrip обмежений як предиктор. clinical-safety NOT REQUIRED.
+- [`content/post-415-training-for-parents.md`](content/post-415-training-for-parents.md) — Тренування для батьків (15 хв). Гостре ATSD vs хронічне PSR — різна фізіологія; Knowles et al. (2018) 1RM −3–7% vs витривалість −10–20% при PSR; Bickel et al. (2011) 1/9 об'єму підтримує м'язи 32 тижні; Schoenfeld et al. (2016) 2×/тиждень достатньо; ієрархія Tier 1 рухів; MEV таблиця; матриця рішень; adherence > оптимізації. clinical-safety NOT REQUIRED.
+- `blog.html` — 9 нових карток (posts 406–410, 412–415); лічильник 330→362 статей, 3 962→4 084 хв читання
+- `README.md` — posts 412–415 відмічені ✓ у roadmap-дереві та у `#### Roadmap post-364+`
+- `STATUS.md` — оновлено до 415 постів, 362 карток, v3.38.0
+
+---
+
 ## [3.37.2] — 2026-06-10
 
 ### Added
