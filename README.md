@@ -776,6 +776,19 @@ Each iteration:
 - [x] post-413: Тренувальний стаж після 40 — де вікові обмеження реальні, де перебільшені; Wroblewski et al. (2011) Master Athletes MRI; Distefano & Goodpaster (2018) саркопенія як синдром бездіяльності; відновлення, частота, вибір навантаження; чому досвідчений 45-річний обганяє новачка 25-річного; clinical-safety NOT REQUIRED · v3.38.0
 - [x] post-414: Сила та довголіття — механізми, а не кореляції; м'язова маса як метаболічний резерв; Ruiz et al. (2008) рак, Leong et al. (2015) PURE study; що насправді вимірює handgrip і де він обмежений як предиктор; clinical-safety NOT REQUIRED · v3.38.0
 - [x] post-415: Програмування для батьків — тренувальна адаптація при хронічному недосипанні і нестабільному розкладі; мінімальний ефективний обсяг, пріоритизація рухів, стратегії відновлення; Knowles et al. (2018) sleep restriction; Schoenfeld et al. (2016) frequency; clinical-safety NOT REQUIRED · v3.38.0
+- [x] post-416: Частота тренувань по м'язових групах — Schoenfeld, Ogborn & Krieger (2016) мета-аналіз; МБС і вікно частоти; 2× vs 3+/тиждень; clinical-safety NOT REQUIRED · v3.39.0
+- [x] post-417: Кластерні сети і внутрішньосетовий відпочинок — Tufano et al. (2016); Oliver et al. (2013); PCr-ресинтез; REST-PAUSE; clinical-safety NOT REQUIRED · v3.39.0
+- [x] post-418: BFR-тренування — Loenneke et al. (2012) механізми; Hughes et al. (2017) безпека; реабілітаційне застосування; clinical-safety NOT REQUIRED · v3.39.0
+- [x] post-419: Унілатеральне vs білатеральне — Behm et al. (2010) bilateral deficit; Speirs et al. (2016) трансфер; clinical-safety NOT REQUIRED · v3.39.0
+- [x] post-420: Щільність тренування як змінна прогресії — Schoenfeld (2010) метаболічний стрес; EDT density blocks; clinical-safety NOT REQUIRED · v3.39.1
+- [x] post-421: Прогресивне перевантаження — механізми, не мантри; типи прогресії; clinical-safety NOT REQUIRED · v3.39.0
+- [x] post-422: Дилоад-тиждень — коли розвантаження є тренуванням; наука відновлення; протоколи; clinical-safety NOT REQUIRED · v3.39.0
+- [x] post-423: Діапазони повторень — сила і гіпертрофія; Schoenfeld et al. (2017); strength of evidence; clinical-safety NOT REQUIRED · v3.39.0
+- [x] post-424: Ефективні підходи — скільки з 20 запланованих сетів реально дають гіпертрофічний стимул; stimulating reps; Morton et al. (2016) proximity to failure; Henneman принцип; Amirthalingam et al. (2017) спадна віддача; junk volume; clinical-safety NOT REQUIRED · v3.39.2
+- [ ] post-425: Програмування у форматі A/B/C — коли і навіщо більше двох варіантів тижневої схеми; ротація рухових паттернів при 3+ сесіях; clinical-safety NOT REQUIRED
+- [ ] post-426: Тривалість тренувального блоку — чому 4-тижневий мезоцикл не є золотим стандартом; 3 vs 4 vs 6 тижнів: доказова база; clinical-safety NOT REQUIRED
+- [ ] post-427: Силове тренування і VO2max — серцево-судинна адаптація при чистому силовому протоколі; clinical-safety NOT REQUIRED
+- [ ] post-428: Силові стандарти як маяки прогресу — відносна сила (ratio до BW) корисніша за абсолютну; Wilks/IPF-нормалізація; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
