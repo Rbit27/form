@@ -6,6 +6,20 @@
 
 ---
 
+## [3.39.0] — 2026-06-10
+
+### Added
+- [`content/post-416-training-frequency-per-muscle.md`](content/post-416-training-frequency-per-muscle.md) — Частота тренувань по м'язових групах: мета-аналіз (15 хв). Schoenfeld, Ogborn & Krieger (2016) мета-аналіз: 2×/тиждень > 1×/тиждень; МБС і «вікно частоти»; Colquhoun et al. (2018) рівний об'єм різна частота; де 3+ має переваги; практика програмування. clinical-safety NOT REQUIRED.
+- [`content/post-417-cluster-sets-intraset-rest.md`](content/post-417-cluster-sets-intraset-rest.md) — Кластерні сети і внутрішньосетовий відпочинок (14 хв). Tufano et al. (2016) огляд; Oliver et al. (2013) збереження потужності; Haff et al. (2008) фосфокреатин і якість повторень; REST-PAUSE як спрощений варіант; коли застосовувати, коли ні. clinical-safety NOT REQUIRED.
+- [`content/post-418-blood-flow-restriction-training.md`](content/post-418-blood-flow-restriction-training.md) — BFR-тренування (15 хв). Loenneke et al. (2012) механізми і гіпертрофія; Yasuda et al. (2010) малі навантаження; Hughes et al. (2017) безпека і протипоказання; реабілітаційне застосування; хто отримає користь. clinical-safety NOT REQUIRED.
+- [`content/post-419-unilateral-vs-bilateral-training.md`](content/post-419-unilateral-vs-bilateral-training.md) — Унілатеральне vs білатеральне тренування (14 хв). Behm et al. (2010) bilateral deficit; Speirs et al. (2016) трансфер сили; McCurdy et al. (2010) single-leg vs back squat; Škarabot et al. (2016) огляд; асиметрія як сигнал; практична інтеграція. clinical-safety NOT REQUIRED.
+- [`content/post-421-progressive-overload-mechanisms.md`](content/post-421-progressive-overload-mechanisms.md) — Прогресивне перевантаження: механізми, не мантри (14 хв). Механізми адаптації; типи прогресії. clinical-safety NOT REQUIRED.
+- [`content/post-422-deload-week-science.md`](content/post-422-deload-week-science.md) — Дилоад-тиждень: коли розвантаження є тренуванням (13 хв). Наука відновлення; дилоад-протоколи. clinical-safety NOT REQUIRED.
+- [`content/post-423-rep-ranges-hypertrophy-strength.md`](content/post-423-rep-ranges-hypertrophy-strength.md) — Діапазони повторень: сила і гіпертрофія (14 хв). Schoenfeld et al. (2017); Strength of Evidence. clinical-safety NOT REQUIRED.
+- `docs/INCIDENT_RESPONSE.md §R-23` — Victor AI Coach Safety Incident: 14-секційний runbook (scope, severity P0–P3, 15-хвилинні immediate actions, scope assessment SQL C1–C4, containment tiers, communication templates V-01/02/03, root-cause investigation, re-enable procedure, post-incident controls, 5 DEC-030 events, evidence package IR-V-E-001–006, SOC 2 mapping CC7.2/CC7.3/CC7.4/CC9.2/A1.2, 2 open questions, 10-item checklist). Clinical-safety VETO = unconditional Tier 3 global disable for P0 incidents. Owner: security-engineer + clinical-safety + sports-scientist.
+
+---
+
 ## [3.38.1] — 2026-06-10
 
 ### Added

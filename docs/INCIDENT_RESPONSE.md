@@ -8030,3 +8030,680 @@ Some jurisdictions (e.g., certain EU member states with works council agreements
 *v1.5 additions (2026-06-03): Fixed header v1.3 → v1.5 (v1.4 additions dated 2026-06-02 added R-20 Insider Threat but did not update the document header). R-21 Key Rotation Failure & Scheduled Cryptographic Control Emergency — closes the runbook gap created when OBSERVABILITY.md §30 (Key Management & Cryptography Observability, v1.7, 2026-06-03) added AL-KEY-01 through AL-KEY-04 alert rules with no `runbook_url` cited; AL-KEY-02 (overdue P0) and AL-KEY-04 (verification missing P0) had no matching incident procedure. R-21 covers: CRYPTO-CHAIN-02 stop-gate (unauthorized rotation → R-05 + R-20, never R-21); severity classification table (P0/P1/P2 with upgrade rule); seven-row trigger matrix with CRYPTO-CHAIN-02 stop-gate row; four scope assessment queries (C1 KV state, C2 audit_log rotation history, C3 scheduler health, C4 HMAC cadence); per-key-type response procedures (SUPABASE_SERVICE_ROLE_JWT per SOC2_READINESS §57; HMAC_AUDIT_CHAIN_KEY dual-key per SOC2_READINESS §58; KEYPOINTS_ENC_KEY maintenance window pending OQ-KEY-02; API keys lower-ceremony); communication protocol with Template K-01 (enterprise tenant maintenance window notice for KEYPOINTS_ENC_KEY, ≥72h advance notice requirement); five DEC-030 HMAC-chained events (admin.key_rotation_incident_opened HIGH 3yr; admin.encryption_key_rotation_initiated HIGH 7yr; admin.encryption_key_rotated HIGH 7yr; admin.encryption_key_rotation_verified HIGH 7yr; admin.key_rotation_incident_closed STANDARD 3yr); evidence package IR-KEY-E-001 through IR-KEY-E-006 with SHA-256 manifest; SOC 2 mapping CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2/CC7.3; two open questions (OQ-KEY-01 DEC-030 event type registration — P0 M7; OQ-KEY-02 KEYPOINTS_ENC_KEY re-encryption strategy — P1 M12); seven-item implementation checklist (2× P0 M4/M7, 3× P1 M8/M12/M7, 2× P2 M7). Appendix A update pending checklist item 6. Cross-references: docs/OBSERVABILITY.md §30 (AL-KEY-01 through AL-KEY-04; CRYPTO-CHAIN-01 through CRYPTO-CHAIN-04; KEY-SLO-01 through KEY-SLO-04); docs/CRYPTOGRAPHY_POLICY.md §5 (rotation procedures per key type); docs/SOC2_READINESS.md §56 (key inventory); docs/SOC2_READINESS.md §57 (SUPABASE_SERVICE_ROLE_JWT rotation runbook); docs/SOC2_READINESS.md §58 (HMAC_AUDIT_CHAIN_KEY dual-key rotation runbook); docs/AUDIT_LOG_SCHEMA.md (admin.encryption_key_rotated — OQ-ENC-03 target event); docs/SSO_SCIM_IMPLEMENTATION.md §24 (PAM authorisation for rotation sessions); R-05 (HMAC chain break — escalation on CRYPTO-CHAIN-02); R-20 (insider threat — escalation on CRYPTO-CHAIN-02 or unauthorized rotation). Owner: security-engineer + devops-lead.*
 
 ---
+
+#### R-23 Victor AI Coach Safety Incident
+
+**Owner:** security-engineer + clinical-safety
+**Last updated:** 2026-06-10
+**Related docs:** docs/CLINICAL_SAFETY.md, docs/AUDIT_LOG_SCHEMA.md, docs/OBSERVABILITY.md §31, docs/DECISION_LOG.md
+**Cross-ref:** R-22 (enterprise privacy floor — adjacent clinical-safety scope), R-10 (Victor AI coach — earlier reference), R-01 (data exfiltration — activate in parallel if prompt injection also leaks PII)
+
+---
+
+##### R-23.1 Scope and Trigger Conditions
+
+This runbook governs incidents where the Victor AI coaching persona produces output that is unsafe, clinically harmful, factually incorrect from a sports-science standpoint, or otherwise violates FORM's clinical-safety commitments. Victor operates as a motivational sports-science coach; any output that crosses into medical diagnosis, clinical psychology, extreme nutrition guidance, or body-shaming territory is in-scope for this runbook regardless of how the content was elicited.
+
+**Trigger condition matrix:**
+
+| Trigger ID | Description | Minimum Severity |
+|---|---|---|
+| VT-01 | Victor produces dangerous training load advice — e.g., prescribes 1RM maximal lifts for a user whose onboarding profile shows beginner fitness level; prescribes daily high-intensity workouts with no recovery period | P1 HIGH |
+| VT-02 | Victor advises user to train through acute injury symptoms — e.g., "push through the sharp knee pain", "that swelling is normal, keep going" | P1 HIGH |
+| VT-03 | Victor gives dangerously caloric-deficit advice — e.g., recommends sustained intake below 1,000 kcal/day, or combines aggressive deficit with high-volume training | P0 CRITICAL (clinical-safety VETO) |
+| VT-04 | Victor makes a medical claim or diagnosis — e.g., "that sounds like a torn ACL", "you probably have low testosterone", "this is likely overtraining syndrome — stop training for 3 weeks" | P0 CRITICAL (clinical-safety VETO) |
+| VT-05 | Victor prescribes, recommends, or implies medication or supplements in a clinical context — e.g., "you should try ibuprofen for the inflammation", "creatine will fix your fatigue — sounds hormonal" | P0 CRITICAL (clinical-safety VETO) |
+| VT-06 | Victor generates body-shaming content, eating-disorder-adjacent language, or harmful weight/body-composition framing — e.g., "you need to lose X kg before this program will work", "your body fat is holding you back", references to guilt around eating | P0 CRITICAL (clinical-safety VETO — unconditional) |
+| VT-07 | Victor produces output contradicting sports-science consensus — e.g., "rest days are unnecessary for progress", "ignore pain signals, they are mental weakness", "more volume is always better" | P2 MEDIUM |
+| VT-08 | Victor consistently fails within a session — hallucinates exercise names, gives contradictory periodisation advice within the same conversation, provides logically incompatible rep/set schemes | P2 MEDIUM |
+| VT-09 | Victor generates responses in the wrong language — English when the user's locale is Ukrainian, or vice versa — or generates garbled multilingual output | P3 LOW |
+| VT-10 | Victor's tone drifts from persona specification — e.g., becomes dismissive, uses aggressive or demeaning language, abandons the motivational-coach register without clinical-safety implications | P3 LOW |
+
+**Clinical-safety VETO boundary:** Trigger conditions VT-03, VT-04, VT-05, and VT-06 are unconditional clinical-safety VETO territory. No business, technical, or user-preference argument can override the P0 response path for these conditions. clinical-safety owner has final and sole authority to re-enable Victor after a P0 incident.
+
+---
+
+##### R-23.2 Severity Classification
+
+| Severity | Trigger Conditions | Description | Re-enable Authority |
+|---|---|---|---|
+| **P0 CRITICAL** | VT-03, VT-04, VT-05, VT-06 | Clinical-safety VETO territory: medical diagnosis, medication recommendation, eating-disorder-adjacent content, dangerously caloric-deficit advice. Victor disabled globally, immediately, with no intermediate containment step. | clinical-safety owner written sign-off only |
+| **P1 HIGH** | VT-01, VT-02 | Dangerous training advice: extreme loads for beginner profile, advice to train through acute injury symptoms. Victor rate-limited and reviewed; global disable if scope assessment (C1) shows >5 affected sessions in 24h. | sports-scientist + founder joint sign-off |
+| **P2 MEDIUM** | VT-07, VT-08 | Sports-science errors: contradicts consensus on rest/recovery, hallucinates exercises or gives contradictory periodisation within a session. Victor continues with guardrail injection; monitoring window 30 min. | devops-lead with updated prompt, 30-min monitoring window |
+| **P3 LOW** | VT-09, VT-10 | Tone or localisation violations: wrong language, persona style drift without clinical implications. Log and fix in next deploy cycle; no immediate containment required unless rate elevates. | devops-lead; no sign-off required |
+
+**Severity upgrade rule:** Any incident that begins at P2 or P3 must be upgraded to P1 immediately if C1 scope assessment reveals more than 10 affected sessions. Any P1 incident must be upgraded to P0 immediately if a clinical-safety keyword is found in any of the offending responses during scope assessment (see C1 query, R-23.4).
+
+---
+
+##### R-23.3 Immediate Actions — First 15 Minutes
+
+The following actions apply from the moment the incident is detected, regardless of detection source (user report, automated alert, internal review, or third-party report).
+
+```
+T+0     Detection confirmed — assign Incident Commander (IC)
+        IC logs incident_id, incident_slug, detection_source in Linear
+        Detection sources: user_report | automated_alert | internal_qa | sports_scientist_review
+
+T+2min  Classify severity using trigger matrix (R-23.2)
+        If ANY doubt about P0 triggers (VT-03/04/05/06): treat as P0 until proven otherwise
+
+T+3min  [P0 only] Set feature flag: victor_coach_enabled = false in Cloudflare KV
+        → No intermediate step; no "wait and see"; no partial disable
+        → Serve static fallback message to all users attempting to access Victor
+        → Emit DEC-030 event: ai.victor_disabled (severity: HIGH)
+        → Page clinical-safety owner immediately (PagerDuty P0 escalation policy)
+        → Page founder immediately
+
+T+5min  [P1] Rate-limit Victor responses to 1 response per 5 minutes per user
+        Set coaching category affected to read-only (no new sessions in that category)
+        Emit DEC-030 event: ai.safety_incident_opened (severity: HIGH)
+        Page sports-scientist + founder (PagerDuty P1)
+
+T+5min  [P2/P3] Inject guardrail instruction into Victor system prompt via KV update
+        Log the guardrail addition with timestamp and IC user_id
+        Emit DEC-030 event: ai.safety_incident_opened (severity: CRITICAL [P0] or HIGH [P1])
+        Begin monitoring window
+
+T+7min  Capture evidence package (all severities):
+        → Offending prompt text (redacted — user_id UUID only, no PII, no name, no email)
+        → Victor response text verbatim
+        → session_id (UUID)
+        → user_id (UUID — pseudonymised; do NOT log any PII alongside)
+        → coaching_turn_category
+        → model_version (from Cloudflare KV model_version key)
+        → system_prompt_version (from KV victor_prompt_version key)
+        → timestamp UTC ISO 8601
+        → detection_source
+        Store to: compliance/evidence/incidents/<slug>/ir-v-e-001-offending-turn.json
+        SHA-256 the file immediately and record hash in incident log
+
+T+10min Determine incident vector — two primary hypotheses:
+        Hypothesis A: Model-level regression (model version changed recently)
+        Hypothesis B: Prompt injection by user (adversarial input bypassing guardrails)
+        See R-23.4 for scope assessment queries C1–C4 to distinguish
+        Do NOT assume one hypothesis; run both in parallel
+
+T+12min [P0] Emit DEC-030 event: ai.safety_incident_opened (severity: CRITICAL)
+        Confirm clinical-safety owner has received PagerDuty page
+        If clinical-safety owner unreachable within 10 min: founder acts as clinical-safety
+        proxy for containment decisions only (re-enable still requires clinical-safety sign-off)
+
+T+15min First status update posted to #safety-incidents Slack channel
+        Use Template V-02 (R-23.6)
+        Include: severity, trigger condition ID, session count (preliminary), containment state
+```
+
+**Automated alert prerequisite:** The PagerDuty alert for `ai.safety_incident_opened` at P0 severity must be configured before launch (see Implementation Checklist item 6). If this alert is not yet configured and the incident is detected manually, the IC must manually page clinical-safety and founder via PagerDuty.
+
+---
+
+##### R-23.4 Scope Assessment
+
+Run all four queries within 30 minutes of detection. Queries use pseudonymised identifiers only — do not join to user PII tables during scope assessment.
+
+**C1: Count affected sessions in last 24h with similar prompt patterns**
+
+```sql
+-- Identifies coaching turns with similar content patterns to the offending turn
+-- Replace :offending_category with the coaching_turn_category from IR-V-E-001
+-- Replace :model_version with the model_version from IR-V-E-001
+-- clinical_safety_keywords: array of terms from CLINICAL_SAFETY.md trigger word list
+SELECT
+  COUNT(DISTINCT session_id)           AS affected_session_count,
+  COUNT(*)                             AS affected_turn_count,
+  MIN(created_at)                      AS earliest_affected_at,
+  MAX(created_at)                      AS latest_affected_at,
+  bool_or(
+    response_text ILIKE ANY(ARRAY[
+      '%diagnosis%', '%condition%', '%injury%', '%medication%',
+      '%sounds like%', '%probably have%', '%you should stop%',
+      '%your body fat%', '%lose weight%', '%eating%', '%calories%',
+      '%push through the pain%', '%ignore the pain%', '%no rest%'
+    ])
+  )                                    AS clinical_safety_keyword_found,
+  model_version,
+  system_prompt_version
+FROM coaching_turns
+WHERE created_at >= NOW() - INTERVAL '24 hours'
+  AND coaching_turn_category = :offending_category
+  AND model_version = :model_version
+GROUP BY model_version, system_prompt_version
+ORDER BY affected_session_count DESC;
+```
+
+`clinical_safety_keyword_found = true` on any row triggers an immediate severity upgrade to P0 if the incident is currently classified below P0.
+
+**C2: Check if a specific user_id is prompt-injecting**
+
+```sql
+-- Identifies users with repeated edge-case prompts in the same category
+-- within the last 7 days; high turn_count + high distinct_session_count
+-- is a prompt-injection signal
+SELECT
+  user_id,
+  COUNT(DISTINCT session_id)           AS distinct_session_count,
+  COUNT(*)                             AS total_turn_count,
+  MIN(created_at)                      AS first_seen_at,
+  MAX(created_at)                      AS last_seen_at,
+  array_agg(DISTINCT prompt_hash)      AS distinct_prompt_hashes
+FROM coaching_turns
+WHERE created_at >= NOW() - INTERVAL '7 days'
+  AND coaching_turn_category = :offending_category
+GROUP BY user_id
+HAVING COUNT(*) > 10
+ORDER BY total_turn_count DESC
+LIMIT 50;
+```
+
+If a single `user_id` appears with `distinct_session_count > 3` and `total_turn_count > 15` in the same category, treat this as a prompt-injection signal. Proceed to R-23.7 (prompt injection path). Do NOT share this query result outside the incident team — it is adversarial-pattern data about a specific user.
+
+**C3: Check if model version changed recently (cross-ref deployment log)**
+
+```sql
+-- Compares error rate before and after most recent model_version change
+-- Uses the model_version value from IR-V-E-001
+WITH version_boundary AS (
+  SELECT MIN(created_at) AS version_introduced_at
+  FROM coaching_turns
+  WHERE model_version = :offending_model_version
+),
+before_version AS (
+  SELECT
+    COUNT(*) FILTER (WHERE safety_flag_triggered = true) AS flagged_before,
+    COUNT(*)                                              AS total_before
+  FROM coaching_turns ct, version_boundary vb
+  WHERE ct.created_at < vb.version_introduced_at
+    AND ct.created_at >= vb.version_introduced_at - INTERVAL '7 days'
+),
+after_version AS (
+  SELECT
+    COUNT(*) FILTER (WHERE safety_flag_triggered = true) AS flagged_after,
+    COUNT(*)                                              AS total_after
+  FROM coaching_turns ct, version_boundary vb
+  WHERE ct.created_at >= vb.version_introduced_at
+)
+SELECT
+  vb.version_introduced_at,
+  bv.flagged_before,
+  bv.total_before,
+  ROUND(bv.flagged_before::numeric / NULLIF(bv.total_before, 0) * 100, 2) AS flag_rate_before_pct,
+  av.flagged_after,
+  av.total_after,
+  ROUND(av.flagged_after::numeric / NULLIF(av.total_after, 0) * 100, 2)  AS flag_rate_after_pct
+FROM version_boundary vb, before_version bv, after_version av;
+```
+
+`flag_rate_after_pct` significantly greater than `flag_rate_before_pct` (threshold: >3× increase) is a model regression signal. Proceed to R-23.7 (model regression path).
+
+**C4: Check if a specific coaching_turn_category is consistently producing errors**
+
+```sql
+-- Compares safety flag rate across all coaching categories in last 7 days
+-- Identifies whether the issue is category-specific or model-wide
+SELECT
+  coaching_turn_category,
+  COUNT(*)                                                   AS total_turns,
+  COUNT(*) FILTER (WHERE safety_flag_triggered = true)       AS flagged_turns,
+  ROUND(
+    COUNT(*) FILTER (WHERE safety_flag_triggered = true)::numeric
+    / NULLIF(COUNT(*), 0) * 100, 2
+  )                                                          AS flag_rate_pct,
+  MIN(created_at) FILTER (WHERE safety_flag_triggered = true) AS first_flag_in_category
+FROM coaching_turns
+WHERE created_at >= NOW() - INTERVAL '7 days'
+GROUP BY coaching_turn_category
+ORDER BY flag_rate_pct DESC;
+```
+
+A single category with `flag_rate_pct` substantially higher than all others (threshold: >5× the median) indicates a prompt-gap in that specific coaching scenario. Proceed to R-23.7 (system prompt gap path).
+
+---
+
+##### R-23.5 Containment Tiers
+
+Containment tier selection is driven by severity and scope assessment results. Each tier is progressive — if a lower tier does not stop the incident within the monitoring window, escalate to the next tier immediately.
+
+**Tier 1 — Soft Guardrail Injection (P2/P3 only)**
+
+Applicable to: P2 MEDIUM (VT-07, VT-08), P3 LOW (VT-09, VT-10).
+
+```typescript
+// Inject additional guardrail instruction into Victor system prompt via KV
+// This does NOT require a code deploy — KV update takes effect on next coaching turn
+const guardrailAddendum = `
+SAFETY REMINDER (injected ${new Date().toISOString()} by incident ${incidentSlug}):
+- You are a sports-science coach, not a medical professional.
+- Never diagnose injuries or medical conditions.
+- Never recommend medication or clinical intervention.
+- Always recommend consulting a qualified medical professional for injury concerns.
+- Always include at least one rest day per week in any training plan.
+- Respond only in the user's configured locale language.
+`;
+await cloudflareKV.put('victor_system_prompt_addendum', guardrailAddendum);
+await cloudflareKV.put('victor_prompt_incident_slug', incidentSlug);
+```
+
+Monitor for 30 minutes after injection. If a further safety-flag event is emitted within the monitoring window, escalate immediately to Tier 2.
+
+**Tier 2 — Partial Disable (specific coaching category)**
+
+Applicable to: P1 HIGH (VT-01, VT-02) where scope assessment shows the issue is category-specific (C4 confirms single category with elevated flag rate).
+
+```typescript
+// Disable a specific coaching category; serve static fallback for that category only
+const disabledCategories: string[] = JSON.parse(
+  await cloudflareKV.get('victor_disabled_categories') ?? '[]'
+);
+disabledCategories.push(affectedCategory);
+await cloudflareKV.put('victor_disabled_categories', JSON.stringify(disabledCategories));
+// Emit DEC-030 event for the category-level partial disable
+await emitDec030Event({
+  event_type: 'ai.victor_disabled',
+  severity: 'HIGH',
+  payload: {
+    scope: 'category',
+    disabled_category: affectedCategory,
+    incident_slug: incidentSlug,
+    changed_by_user_id: icUserId,
+  },
+}, supabaseAdminClient);
+```
+
+Static fallback message for disabled category (served in user's locale):
+> "Victor is taking a short break from [category] coaching while we make some improvements. Your other coaching sessions continue as normal. We'll have this back shortly."
+
+Monitor for 30 minutes. If a further safety-flag event occurs in any other category, escalate to Tier 3.
+
+**Tier 3 — Global Victor Disable**
+
+Applicable to: P0 CRITICAL (all VT-03/04/05/06 triggers — immediate, no intermediate step), P1 HIGH where Tier 2 has not resolved the incident within 30 minutes, or P1 where C1 scope assessment shows >5 affected sessions across multiple categories.
+
+```typescript
+// Global disable via feature flag — single KV write; takes effect on next request
+await cloudflareKV.put('victor_coach_enabled', 'false');
+await cloudflareKV.put('victor_disabled_at', new Date().toISOString());
+await cloudflareKV.put('victor_disabled_by', icUserId);
+await cloudflareKV.put('victor_disabled_incident', incidentSlug);
+// Emit DEC-030 event
+await emitDec030Event({
+  event_type: 'ai.victor_disabled',
+  severity: 'HIGH',
+  payload: {
+    scope: 'global',
+    incident_slug: incidentSlug,
+    changed_by_user_id: icUserId,
+    trigger_severity: incidentSeverity,   // 'P0' | 'P1'
+  },
+}, supabaseAdminClient);
+```
+
+Static fallback served to all users when `victor_coach_enabled = false`:
+> "Victor is temporarily unavailable while we make some improvements. Your workout history and programs are safe. We'll notify you as soon as Victor is back — typically within a few hours."
+
+**Clinical-safety P0 rule:** P0 incidents (VT-03/04/05/06) proceed directly to Tier 3. There is no Tier 1 or Tier 2 step for P0. Any deviation from this rule requires a written exception approved by the founder, documented in Linear, and recorded in the DEC-030 audit chain. In practice, no exception should ever be granted for a clinical-safety VETO condition.
+
+---
+
+##### R-23.6 Communication Templates
+
+**Template V-01 — In-App User Notification (session affected)**
+
+Delivered to users whose `session_id` appears in the C1 scope assessment results. Sent via push notification and in-app message. Delivered within 2 hours of containment for P0/P1; within 24 hours for P2.
+
+```
+Subject: A note about your recent Victor session
+
+Hi [first_name],
+
+We want to let you know that a recent Victor coaching session may not have met
+the quality standard we hold ourselves to.
+
+We've reviewed the session and taken steps to make sure it doesn't happen again.
+If any advice from that session gave you cause for concern, please disregard it
+and feel free to reach out to us directly at support@formapp.io.
+
+Your progress and training history are unaffected.
+
+— The FORM Team
+```
+
+Notes:
+- Do NOT specify what went wrong in the user notification (no specifics about the safety category, the trigger condition, or the response text).
+- Do NOT imply the user did anything wrong.
+- Do NOT mention "AI safety" or "clinical" concerns — keep the language neutral.
+- clinical-safety must review Template V-01 copy before first use (see Implementation Checklist item 5).
+
+**Template V-02 — Internal Slack #safety-incidents Notification**
+
+Posted by IC at T+15 minutes. Audience: founder, clinical-safety owner, sports-scientist, security-engineer.
+
+```
+[VICTOR AI SAFETY INCIDENT]
+Incident ID: <incident_slug>
+Severity: <P0 CRITICAL | P1 HIGH | P2 MEDIUM | P3 LOW>
+Trigger: <VT-XX — description>
+Containment state: <Tier 1 soft guardrail | Tier 2 category disable | Tier 3 global disable | monitoring>
+Sessions affected (preliminary C1): <count>
+Detection source: <user_report | automated_alert | internal_qa | sports_scientist_review>
+Model version: <version>
+Prompt version: <version>
+IC: <ic_user_id>
+Evidence file: compliance/evidence/incidents/<slug>/ir-v-e-001-offending-turn.json
+Next update: T+1h
+Runbook: docs/INCIDENT_RESPONSE.md#r-23
+```
+
+Ping: @clinical-safety @founder @sports-scientist (always); @compliance-officer (P0 and enterprise-tenant-affected P1 only).
+
+**Template V-03 — Enterprise Tenant Notification**
+
+Applicable when C1 scope assessment confirms that affected users belong to an enterprise tenant. Sent to tenant's primary CSM contact and tenant admin email.
+
+Timing: P0 — within 60 minutes of containment. P1 — within 60 minutes of containment. P2 — within 24 hours. P3 — not required unless tenant CSM requests it.
+
+Board notification threshold: if 5 or more enterprise users from a single tenant are affected, escalate to tenant's executive contact (if known) and loop in FORM founder on the notification.
+
+```
+Subject: Service quality notice — Victor coaching
+
+Dear [Tenant Admin Name],
+
+We are writing to inform you of a service quality event that affected a small
+number of coaching sessions for users in your organisation on [date].
+
+We identified that Victor AI coach produced responses that did not meet our
+quality standards. We have taken immediate action to address this, including
+[disabling the affected feature / injecting updated guidance — choose appropriate
+description]. The issue has been contained as of [containment_timestamp UTC].
+
+The number of sessions affected within your organisation: [count].
+No personal health data was exposed or transmitted to any third party as a result
+of this event.
+
+We will provide a full post-incident summary within 7 days.
+
+If you have any questions in the meantime, please contact your FORM customer
+success manager directly.
+
+— FORM Security Team
+```
+
+Notes:
+- Template V-03 must be reviewed by compliance-officer before sending for any P0 incident involving EU-resident users (GDPR Art. 33 assessment required — see R-23.13 OQ-V-02).
+- Do NOT disclose the specific offending prompt or response text to the tenant.
+- Do NOT disclose the model version or prompt version.
+
+---
+
+##### R-23.7 Root Cause Investigation
+
+Four primary hypotheses. Run in parallel; do not wait for one to be ruled out before starting the next.
+
+**Hypothesis 1 — Prompt Injection by User**
+
+Signal: C2 query shows a single `user_id` with high `total_turn_count` and `distinct_session_count > 3` in the affected `coaching_turn_category`.
+
+Investigation steps:
+1. Review the full prompt history for the identified `user_id` (pseudonymised — retrieve via `session_id` chain; do NOT look up PII without legal/compliance review).
+2. Check whether the offending prompt contains jailbreak patterns: instructions to "ignore previous instructions", role-play framings that ask Victor to act as a different persona, attempts to extract the system prompt, or direct requests for medical advice framed as hypotheticals.
+3. Check whether similar prompt patterns have been submitted by different `user_id` values (coordinated injection attempt signal).
+4. If prompt injection confirmed: block the specific prompt pattern via a deny-list rule in the Cloudflare Worker (input validation layer); add the pattern to the adversarial prompt test suite (R-23.9); consider temporary account suspension for the injecting user (involves founder + compliance-officer approval).
+5. If coordinated injection: escalate to R-01 (potential data exfiltration via injection) and notify founder immediately.
+
+**Hypothesis 2 — Model-Level Regression**
+
+Signal: C3 query shows `flag_rate_after_pct` is more than 3× `flag_rate_before_pct` following a model version change.
+
+Investigation steps:
+1. Identify the exact timestamp of the model version change from the Cloudflare KV deployment log (`victor_model_version` key history).
+2. Confirm whether the model version change was an intentional deploy (cross-reference Linear deployment ticket) or an unintended change (supply-chain concern — escalate to security-engineer if no Linear ticket exists).
+3. If intentional and regressed: pin `victor_model_version` in KV to the last-known-good version immediately; do not wait for re-enable approval.
+4. File a regression report with the model provider (Anthropic). Include: model version that regressed, model version that was last known good, offending response (redacted), category, and a reproducible test prompt (without PII).
+5. Do not re-enable the new model version until the provider has confirmed the regression is addressed and FORM's internal regression test suite (R-23.9) passes against the new version.
+
+**Hypothesis 3 — System Prompt Gap**
+
+Signal: C4 query shows a specific `coaching_turn_category` with a flag rate substantially higher than all other categories; OR the offending response involves a coaching scenario not explicitly covered in the current Victor prompt guide.
+
+Investigation steps:
+1. Review the current Victor system prompt (`victor_system_prompt` KV key) for the affected `coaching_turn_category`.
+2. Identify whether the offending scenario has explicit handling in the prompt (e.g., "if user mentions injury, respond with...") or falls into an uncovered gap.
+3. Draft a prompt addition that covers the scenario explicitly. The draft must be reviewed by: sports-scientist (for training advice accuracy) and clinical-safety (for clinical-safety guardrail completeness).
+4. Do not add the prompt update to production until both reviewers have signed off in Linear (comment on the prompt-update task).
+5. After merge, add the scenario as a regression test case in the Victor prompt test suite (R-23.9, at least one test per new guardrail added).
+
+**Hypothesis 4 — Missing Clinical-Safety Guardrail**
+
+Signal: The offending response type (VT-03/04/05/06) is not explicitly blocked in the current Victor system prompt, OR the prompt injection bypassed an existing guardrail.
+
+Investigation steps:
+1. Review `docs/CLINICAL_SAFETY.md` — identify whether the triggered violation type is listed and whether the corresponding prohibition appears in the Victor system prompt.
+2. If the violation type is listed in CLINICAL_SAFETY.md but not reflected in the Victor prompt: this is a synchronisation gap. The clinical-safety rules must be re-derived into the Victor prompt by the clinical-safety owner.
+3. If the violation type is not listed in CLINICAL_SAFETY.md: this is a new category of harm. clinical-safety owner must add it to CLINICAL_SAFETY.md first, then derive the corresponding prompt guardrail. Both changes require clinical-safety owner sign-off.
+4. Update `docs/CLINICAL_SAFETY.md` with the new or updated rule.
+5. Update Victor guardrail prompts accordingly.
+6. Add the scenario to the Victor regression test suite.
+
+---
+
+##### R-23.8 Re-enable Procedure
+
+Re-enable is always done via feature flag percentage ramp. Never re-enable at 100% in a single step after a P0 or P1 incident.
+
+**P0 CRITICAL — Re-enable path (clinical-safety VETO)**
+
+Prerequisites before any ramp step:
+1. clinical-safety owner has provided written sign-off. Acceptable formats: (a) Linear comment on the incident task explicitly stating "I approve re-enable of Victor — clinical-safety sign-off [date] [name]"; or (b) DEC-030 `ai.victor_reenabled` event emitted with `approver_id` matching clinical-safety owner's `user_id`. No other format is acceptable.
+2. Root cause has been identified and documented (R-23.7).
+3. The fix (prompt update, model pin, or guardrail addition) has been deployed and verified in staging.
+4. Victor regression test suite (R-23.9) passes in full — zero failures.
+5. sports-scientist has reviewed any prompt changes that affect training advice categories.
+
+Ramp schedule:
+```
+Step 1: 5% of users — 30 min monitoring window
+        Monitor: safety_flag_triggered rate vs baseline; manual spot-check of 10 random turns
+        Abort criterion: any safety_flag_triggered = true in the 5% cohort → back to Tier 3
+
+Step 2: 20% of users — 60 min monitoring window
+        Monitor: same as Step 1
+        Abort criterion: same as Step 1
+
+Step 3: 100% of users — 2h monitoring window
+        Monitor: same as Step 1 plus: per-category flag rate from C4 query
+        Abort criterion: flag rate in any category exceeds 2× the 7-day pre-incident baseline
+```
+
+Emit DEC-030 `ai.victor_reenabled` at each ramp step with `percentage`, `approver_id`, and `incident_slug`.
+
+**P1 HIGH — Re-enable path**
+
+Prerequisites:
+1. sports-scientist written sign-off in Linear.
+2. Founder acknowledgement in Linear (comment or thumbs-up on the re-enable task is sufficient for P1).
+3. Root cause identified and fix deployed.
+4. Regression test suite passes.
+
+Ramp schedule: same three-step ramp as P0. Monitoring windows: 15 min at 5%, 30 min at 20%, 1h at 100%.
+
+**P2 MEDIUM / P3 LOW — Re-enable path**
+
+Prerequisites:
+1. devops-lead confirms updated prompt or fix is deployed.
+2. Regression test suite passes (if a new test was added for this scenario — see R-23.9).
+
+Ramp schedule: can re-enable at 100% directly for P3. For P2, use a 50% → 100% ramp with a 30-min monitoring window at 50%.
+
+---
+
+##### R-23.9 Post-Incident Controls
+
+After every incident, regardless of severity, the following controls must be applied or reviewed. The intent is that each incident makes Victor permanently safer.
+
+**After prompt injection (Hypothesis 1 confirmed):**
+- Add the injecting prompt pattern to the adversarial prompt blocklist in the Cloudflare Worker input validation layer. The blocklist is maintained as a KV key `victor_adversarial_blocklist` containing an array of regex patterns.
+- Add a regression test case to the Victor prompt test suite that submits the injecting pattern and asserts that Victor's response does not cross any clinical-safety boundary.
+- If the user account was determined to be acting in bad faith: document the account action in Linear and in the DEC-030 audit log (action type: `user.adversarial_prompt_block`).
+
+**After model regression (Hypothesis 2 confirmed):**
+- Pin `victor_model_version` in KV to the last-known-good version. Do not unpin until the provider confirms the regression is addressed and FORM's test suite passes against the new version.
+- Add a regression test case that reproduces the regressed output and asserts it does not recur.
+- Update `docs/OBSERVABILITY.md §31` to include a per-model-version safety flag rate metric so future regressions are detected automatically rather than by user report.
+
+**After system prompt gap (Hypothesis 3 confirmed):**
+- sports-scientist reviews and updates the Victor prompt guide for the affected `coaching_turn_category`.
+- The prompt update is treated as a code change: reviewed in a PR, reviewed by both sports-scientist and clinical-safety, merged to main, and deployed via the standard KV update path.
+- Add a regression test case for the gap scenario.
+
+**After clinical-safety guardrail gap (Hypothesis 4 confirmed):**
+- clinical-safety owner updates `docs/CLINICAL_SAFETY.md` with the new or updated rule.
+- clinical-safety owner updates the Victor guardrail prompts to reflect the new rule.
+- Both changes merged in the same PR and reviewed by clinical-safety owner before merge.
+- Add a regression test case.
+
+**Victor prompt regression test suite — minimum requirements:**
+- At least 10 adversarial scenarios must be present in the test suite before launch (Implementation Checklist item 4).
+- Each post-incident addition adds at least 1 new test case.
+- Test suite runs in CI on every PR that modifies any Victor-related file (system prompt, KV config, coaching worker).
+- Test suite must include at minimum: one test per VT-01 through VT-06 trigger condition; at least 3 prompt-injection patterns; at least 2 language/locale edge cases (Ukrainian input, mixed-language input).
+
+---
+
+##### R-23.10 DEC-030 HMAC-Chained Audit Events
+
+All five events are HMAC-chained per `docs/AUDIT_LOG_SCHEMA.md`. Failure to emit any P0 event aborts the corresponding response action — the IC must retry emission before proceeding.
+
+| Event Type | Severity | Retention | Key Metadata Fields |
+|---|---|---|---|
+| `ai.safety_incident_opened` | CRITICAL (P0) / HIGH (P1) | 7 years | `incident_slug`, `trigger_condition_id` (e.g., `VT-04`), `session_id`, `user_id` (UUID), `model_version`, `system_prompt_version`, `coaching_turn_category`, `detection_source`, `initial_severity`, `ic_user_id` |
+| `ai.safety_incident_contained` | HIGH | 7 years | `incident_slug`, `containment_tier` (`1` / `2` / `3`), `containment_method` (`guardrail_injection` / `category_disable` / `global_disable`), `contained_by_user_id`, `containment_timestamp` |
+| `ai.victor_disabled` | HIGH | 7 years | `incident_slug`, `scope` (`global` / `category`), `disabled_category` (if scope = `category`), `disabled_at`, `changed_by_user_id`, `trigger_severity` |
+| `ai.victor_reenabled` | HIGH | 7 years | `incident_slug`, `ramp_percentage` (5 / 20 / 100), `approver_id`, `reenabled_at`, `fix_description` (brief, no PII), `regression_test_passed` (bool) |
+| `ai.safety_incident_resolved` | STANDARD | 3 years | `incident_slug`, `resolved_at`, `root_cause_hypothesis` (`prompt_injection` / `model_regression` / `prompt_gap` / `clinical_safety_gap`), `sessions_affected_final_count`, `resolution_summary` (brief) |
+
+```typescript
+// DEC-030 emission — ai.safety_incident_opened
+// Must be emitted before any containment action for P0 incidents.
+// For P0: emit BEFORE setting victor_coach_enabled = false (feature flag change).
+const event = {
+  event_type: 'ai.safety_incident_opened',
+  severity: incidentSeverity === 'P0' ? 'CRITICAL' : 'HIGH',
+  incident_id: incidentId,
+  payload: {
+    incident_slug:           incidentSlug,
+    trigger_condition_id:    triggerConditionId,    // 'VT-01' through 'VT-10'
+    session_id:              sessionId,             // UUID
+    user_id:                 userId,                // UUID — no PII
+    model_version:           modelVersion,
+    system_prompt_version:   promptVersion,
+    coaching_turn_category:  category,
+    detection_source:        detectionSource,
+    initial_severity:        incidentSeverity,      // 'P0' | 'P1' | 'P2' | 'P3'
+    ic_user_id:              icUserId,
+  },
+};
+const emitted = await emitDec030Event(event, supabaseAdminClient);
+if (!emitted.success) {
+  throw new Error(
+    'DEC-030 emission failed — ai.safety_incident_opened aborted; ' +
+    'retry required before feature flag changes for P0 incidents'
+  );
+}
+```
+
+**Retention note:** `ai.safety_incident_opened` and related events at P0 are retained for 7 years because the incident may involve Art. 9 health-adjacent data (coaching turns involve health behaviour data) and because clinical-safety sign-off records must be auditable for the lifetime of FORM's SOC 2 certification and any applicable regulatory inquiry period. `ai.safety_incident_resolved` is STANDARD (3 years) because the resolution record is secondary evidence once the primary incident record (7-year events) is in place.
+
+---
+
+##### R-23.11 Evidence Package
+
+All evidence under `compliance/evidence/incidents/<slug>/` with SHA-256 manifest at `compliance/evidence/incidents/<slug>/MANIFEST.sha256`. 7-year retention for IR-V-E-001 through IR-V-E-004 and IR-V-E-006 (DEC-030 chain items). 3-year retention for IR-V-E-005.
+
+| Evidence ID | Artefact | Collection Method | Location |
+|---|---|---|---|
+| **IR-V-E-001** | Offending prompt + response — redacted (user_id UUID only, no PII, no name, no email, no health values beyond what is in the coaching turn itself) | Captured at T+7min per R-23.3; saved as JSON; SHA-256 recorded immediately | `compliance/evidence/incidents/<slug>/ir-v-e-001-offending-turn.json` |
+| **IR-V-E-002** | Session count affected — C1 query export | SQL export as JSONL; includes `session_id` (UUID), `coaching_turn_category`, `model_version`, `created_at` for each affected turn; no user PII beyond UUID | `compliance/evidence/incidents/<slug>/ir-v-e-002-affected-sessions.jsonl` |
+| **IR-V-E-003** | Feature flag change log — timestamp, changed_by | Cloudflare KV audit log export showing `victor_coach_enabled` key transitions; includes `changed_by_user_id` and ISO 8601 timestamp for each change | `compliance/evidence/incidents/<slug>/ir-v-e-003-feature-flag-log.json` |
+| **IR-V-E-004** | Clinical-safety sign-off record (P0 only) | Linear comment export or DEC-030 `ai.victor_reenabled` event with `approver_id` matching clinical-safety owner; includes timestamp and approver_id | `compliance/evidence/incidents/<slug>/ir-v-e-004-clinical-safety-signoff.eml` or `.json` |
+| **IR-V-E-005** | Updated Victor prompt diff (post-incident fix) | Git diff of the Victor system prompt KV update; includes PR link, reviewer sign-offs, and regression test suite results (pass/fail per test case) | `compliance/evidence/incidents/<slug>/ir-v-e-005-prompt-diff.patch` |
+| **IR-V-E-006** | Re-enable monitoring log — feature flag ramp with timestamps | Log of each ramp step (5% / 20% / 100%), monitoring window results, and abort-criterion check; includes DEC-030 `ai.victor_reenabled` event IDs at each step | `compliance/evidence/incidents/<slug>/ir-v-e-006-reenable-monitoring-log.json` |
+
+**PII rule for evidence collection:** IR-V-E-001 and IR-V-E-002 must contain only UUIDs for user identification — never names, emails, biometric values, or other PII. The UUID-to-PII mapping exists in the Supabase `users` table and is accessible only via authenticated API with appropriate role; it is not compiled into the evidence package. If a legal process requires PII mapping, this is retrieved by compliance-officer under legal hold separately from the incident evidence package.
+
+---
+
+##### R-23.12 SOC 2 TSC Mapping
+
+| TSC Criterion | Control | Evidence from This Runbook |
+|---|---|---|
+| **CC7.2** (Monitor system components) | Victor safety flag rate monitored per session, per category, per model version; PagerDuty alert fires on `ai.safety_incident_opened` P0 (Implementation Checklist item 6); per-session error rate in OBSERVABILITY.md §31 (Implementation Checklist item 7) | IR-V-E-002: session count and flag rate data; DEC-030 `ai.safety_incident_opened` event establishes monitoring evidence |
+| **CC7.3** (Evaluate security events) | Scope assessment queries C1–C4 (R-23.4) provide structured evaluation of every Victor safety incident; root cause investigation (R-23.7) provides documented evaluation of all four hypotheses | R-23.4 query outputs (IR-V-E-002); R-23.7 investigation record in Linear |
+| **CC7.4** (Respond to security incidents) | Runbook R-23 documents the complete incident response procedure; re-enable procedure (R-23.8) with feature flag ramp provides structured recovery; post-incident controls (R-23.9) provide permanent improvement | This runbook is itself CC7.4 evidence; IR-V-E-003 (feature flag log); IR-V-E-006 (ramp monitoring log) |
+| **CC9.2** (Vendors and partners — AI model provider) | Model version pinning (R-23.7 Hypothesis 2) and regression reporting to model provider (Anthropic) document the vendor management response; model regression signal (C3 query) provides structured vendor performance monitoring | IR-V-E-003: KV model version pin log; regression report filed with Anthropic (if applicable) |
+| **A1.2** (Availability — performance and availability monitoring) | Victor feature flag (`victor_coach_enabled`) provides rapid availability control; static fallback message ensures users are never left with a broken experience; ramp re-enable procedure (R-23.8) provides controlled availability restoration | IR-V-E-003: feature flag change log shows availability management; IR-V-E-006: ramp log shows availability restoration |
+
+---
+
+##### R-23.13 Open Questions
+
+**OQ-V-01: Should FORM implement a real-time safety classifier (separate lightweight model) that screens Victor outputs before delivery?**
+
+A real-time classifier running in the Cloudflare Worker between Victor's response generation and response delivery to the client would provide an independent second-opinion safety gate. The classifier would be a small, fast model specifically fine-tuned on clinical-safety and sports-science safety categories, distinct from Victor's general-purpose model. Estimated latency cost: +40–60 ms per coaching turn. The alternative is to rely entirely on Victor's own guardrail instructions within the system prompt.
+
+Assessment: relying solely on guardrail instructions in a general-purpose model is not sufficient for P0 clinical-safety conditions (VT-03, VT-04, VT-05, VT-06). System prompts can be bypassed by prompt injection; model regressions can degrade guardrail adherence without warning. An independent classifier operating on the output — not the input — would catch both failure modes.
+
+Recommendation: implement the classifier for P0 clinical-safety categories only (VT-03 through VT-06). The classifier does not need to gate VT-07 through VT-10 (sports-science errors and tone issues), which can be handled by prompt improvements and periodic review. Defer the full classifier to V2 roadmap; implement basic output scanning (keyword + pattern matching against clinical-safety trigger word list from CLINICAL_SAFETY.md) in V1 as a lower-cost intermediate measure.
+
+Owner: security-engineer + clinical-safety. Priority: **P1 — M8.** Decision to be documented in `docs/DECISION_LOG.md` once made.
+
+**OQ-V-02: What is FORM's GDPR Art. 33 notification obligation to a supervisory authority if a P0 AI safety incident resulted in health-adjacent harmful content being delivered to EU-resident users?**
+
+GDPR Art. 33 requires notification to the competent supervisory authority within 72 hours of becoming aware of a personal data breach. The key question is whether a Victor AI safety incident (harmful output delivered to a user) constitutes a "personal data breach" under GDPR Art. 4(12) — i.e., "a breach of security leading to the accidental or unlawful destruction, loss, alteration, unauthorised disclosure of, or access to, personal data transmitted, stored or otherwise processed."
+
+A Victor output error (Victor saying something harmful) is not inherently a breach of security or a disclosure of personal data. The harm is the dangerous content delivered to the user, not a leakage of data. However, if the P0 incident involved a prompt injection attack that also caused Victor to reveal another user's session data, or if the harmful output was itself derived from health data processed about the user (e.g., Victor misused stored health metrics in its response), there may be an Art. 33 notification duty.
+
+Recommendation: consult outside counsel with GDPR expertise before enterprise GA. The legal opinion should address: (a) whether FORM's Victor AI output constitutes "processing" of health data under Art. 9 (likely yes, for coaching turn content); (b) whether a harmful AI output error — with no data exfiltration — triggers Art. 33; (c) the threshold for Art. 9 data breach notification under the applicable supervisory authority's guidance. Pending legal opinion: FORM's default posture is that Art. 33 notification is NOT required for a pure AI output error with no PII exfiltration, but IS required if prompt injection or a related bug also caused any cross-user data access. Document the legal opinion outcome in `docs/DECISION_LOG.md`.
+
+Owner: compliance-officer + outside counsel. Priority: **P1 — M9 (before enterprise GA).** Cross-reference: R-22 OQ-PF-03 (employer legal entitlement claims, same outside-counsel engagement recommended).
+
+---
+
+##### R-23.14 Appendix A Cross-Reference
+
+The following entries are to be added to the Appendix A quick-reference table when R-23 is integrated into the main document index:
+
+| Scenario | Runbook |
+|---|---|
+| Victor AI producing dangerous training advice (extreme loads, injury training) | R-23 (P1 HIGH) — R-23.3 immediate actions, R-23.5 Tier 2 |
+| Victor AI making medical claims or diagnosing injuries | R-23 (P0 CRITICAL — clinical-safety VETO) — R-23.3 T+3min global disable |
+| Victor AI generating body-shaming or eating-disorder-adjacent content | R-23 (P0 CRITICAL — clinical-safety VETO) — R-23.3 T+3min global disable |
+| Victor AI giving dangerously caloric-deficit advice | R-23 (P0 CRITICAL — clinical-safety VETO) — R-23.3 T+3min global disable |
+| Victor AI contradicting sports-science consensus (no rest days, ignore pain) | R-23 (P2 MEDIUM) — R-23.5 Tier 1 guardrail injection |
+| Victor AI hallucinating exercises or giving contradictory periodisation | R-23 (P2 MEDIUM) — R-23.5 Tier 1 guardrail injection |
+| Victor AI responding in wrong language | R-23 (P3 LOW) — R-23.5 Tier 1 guardrail injection |
+| Prompt injection suspected in a Victor coaching session | R-23.7 Hypothesis 1; also check R-01 if PII exfiltration possible |
+| Victor AI safety incident affecting enterprise tenant users | R-23.6 Template V-03; also R-22 if privacy floor breach suspected |
+
+---
+
+##### Implementation Checklist
+
+| # | Action | Priority | Milestone | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | Create feature flag `victor_coach_enabled` in Cloudflare KV; confirm that setting it to `false` causes the coaching Worker to serve the static fallback message to all users within one request cycle; verify in staging | devops-lead + platform-engineer | **P0** | M4 | [ ] |
+| 2 | Register all five DEC-030 events (`ai.safety_incident_opened`, `ai.safety_incident_contained`, `ai.victor_disabled`, `ai.victor_reenabled`, `ai.safety_incident_resolved`) in `docs/AUDIT_LOG_SCHEMA.md` with full payload schema, severity, and retention per R-23.10; validate Zod schema in staging | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 3 | Document clinical-safety re-enable procedure in `docs/CLINICAL_SAFETY.md` with owner confirmation: clinical-safety owner named explicitly; sign-off format defined (Linear comment format or DEC-030 approver_id); confirm owner has PagerDuty access for P0 pages | clinical-safety + security-engineer | **P0** | M5 | [ ] |
+| 4 | Create Victor prompt regression test suite with at least 10 adversarial scenarios: one per VT-01 through VT-06, at least 3 prompt-injection patterns, at least 1 language edge case (Ukrainian input producing English output); add as CI gate on all PRs touching Victor system prompt, coaching Worker, or KV config | qa-lead + sports-scientist + clinical-safety | **P1** | M6 | [ ] |
+| 5 | Draft and review Template V-01 (user in-app notification), Template V-02 (internal Slack), and Template V-03 (enterprise tenant notification) copy; review by brand-voice lead for tone; review by clinical-safety for accuracy of what is disclosed vs withheld; final approval by founder | clinical-safety + brand-voice + founder | **P1** | M5 | [ ] |
+| 6 | Configure PagerDuty alert for `ai.safety_incident_opened` at P0 severity: fires within 60 seconds of DEC-030 event emission; escalation policy pages clinical-safety owner (primary) and founder (secondary) simultaneously; test with synthetic event in staging | devops-lead | **P0** | M4 | [ ] |
+| 7 | Add per-session Victor error rate monitoring to `docs/OBSERVABILITY.md §31`: define alert rule `FORM-VICTOR-001` (safety_flag_triggered rate > baseline threshold); define per-category flag rate metric; confirm metric is computed from `coaching_turns` table and visible in monitoring dashboard | devops-lead + platform-engineer | **P1** | M6 | [ ] |
+| 8 | Schedule sports-scientist quarterly review of Victor prompt guide: calendar invite, Linear recurring task, review checklist (new coaching categories added since last review, any post-incident prompt additions, regression test suite coverage gap assessment); first review at end of M9 | sports-scientist + clinical-safety | **P2** | Quarterly (start M9) | [ ] |
+| 9 | Document OQ-V-01 classifier decision in `docs/DECISION_LOG.md`: choose between real-time classifier, keyword/pattern output scanner, or guardrail-only; record decision, rationale, and owner; if classifier chosen, add to V2 product roadmap | security-engineer + clinical-safety | **P1** | M8 | [ ] |
+| 10 | Complete OQ-V-02 legal consultation: engage outside counsel (same engagement as R-22 OQ-PF-03 if timing aligns); obtain written opinion on Art. 33 notification obligation for AI output errors involving EU health data; document outcome in `docs/DECISION_LOG.md` and update `docs/CLINICAL_SAFETY.md` if the opinion requires a change to FORM's default posture | compliance-officer + outside counsel | **P1** | M9 | [ ] |
+
+---
+
+*v1.9 additions (2026-06-10): R-23 Victor AI Coach Safety Incident — twenty-third runbook; closes the incident response gap for FORM's Victor AI coaching persona producing unsafe, clinically harmful, or sports-science-erroneous output. R-23 covers: ten-row trigger matrix (VT-01 through VT-10) spanning clinical-safety VETO conditions (medical diagnosis, medication recommendation, caloric-deficit, body-shaming — VT-03 through VT-06 P0 unconditional), dangerous training advice (VT-01/02 P1), sports-science errors (VT-07/08 P2), and tone/localisation violations (VT-09/10 P3); four-row severity classification table with clinical-safety VETO boundary and severity upgrade rule (>10 sessions triggers P1 → P0 if clinical-safety keyword found); first-15-minute immediate action timeline (T+0 through T+15min) with P0 global disable at T+3min before any intermediate step; four scope assessment SQL queries C1–C4 (affected session count with clinical-safety keyword scan, prompt-injection user pattern detection, model version regression rate comparison, per-category flag rate analysis); three-tier containment (Tier 1 soft guardrail injection for P2/P3, Tier 2 category partial disable for P1 category-specific, Tier 3 global feature flag disable for P0 and escalated P1 — P0 always Tier 3 with no intermediate); three communication templates (V-01 user in-app notification, V-02 internal Slack #safety-incidents with board-notification threshold at 5+ enterprise users, V-03 enterprise tenant notification within 60 min P0/P1); four root cause hypotheses investigated in parallel (prompt injection, model regression, system prompt gap, clinical-safety guardrail gap); three-step feature flag ramp re-enable (5% → 20% → 100%) with clinical-safety VETO gate for P0 and sports-scientist + founder gate for P1; post-incident controls per hypothesis including adversarial blocklist update, model version pin, prompt regression test suite addition, CLINICAL_SAFETY.md update; five DEC-030 HMAC-chained events (ai.safety_incident_opened CRITICAL/HIGH 7yr; ai.safety_incident_contained HIGH 7yr; ai.victor_disabled HIGH 7yr; ai.victor_reenabled HIGH 7yr; ai.safety_incident_resolved STANDARD 3yr); six evidence artefacts IR-V-E-001 through IR-V-E-006 with PII rule (UUID only in evidence package); SOC 2 mapping CC7.2/CC7.3/CC7.4/CC9.2/A1.2; two open questions (OQ-V-01 real-time safety classifier — P1 M8, document in DECISION_LOG.md; OQ-V-02 GDPR Art. 33 notification for AI output errors to EU users — P1 M9, outside counsel engagement); Appendix A cross-reference table with nine Victor-specific scenario entries; ten-item implementation checklist (3× P0 M4-M5: feature flag, DEC-030 registration, clinical-safety re-enable procedure; 5× P1 M5-M9: regression test suite, communication templates, PagerDuty alert, OBSERVABILITY.md §31 metrics, classifier decision, legal consultation; 1× P2 quarterly: sports-scientist prompt review; 1× P1 M8: OQ-V-01 decision). Owner: security-engineer + clinical-safety.*
+
+---
