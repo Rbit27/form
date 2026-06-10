@@ -6,6 +6,17 @@
 
 ---
 
+## [3.21.0] — 2026-06-10
+
+### Added
+- `content/post-379-fatigue-superposition.md` — Суперпозиція втоми: коли сума двох «легких» стресів стає одним важким; Marcora et al. (2009) когнітивне навантаження −18% витривалість при ідентичних VO₂/HR/лактаті; Pageaux & Lepers (2018) мета-аналіз 22 РКД; Halperin et al. (2015) психологічний стрес і RPE-дрейф; McEwen & Stellar (1993) алостатичне навантаження; Meeusen et al. (2013) NFOR за підвищеного загального стресу; Sapolsky (2004) HPA-недиференційована відповідь; практика паралельного логу і реактивного деload; 13 хв читання; editorial-brutalist; clinical-safety PASS
+- `blog.html` — +1 картка post-379 (321 cards total)
+- `README.md` — post-379 позначено як виконаний; додано roadmap post-383–386
+- `STATUS.md` — версія оновлена до v3.21.0; 379 posts; blog.html 321 cards
+- `VERSION` — 3.20.0 → 3.21.0
+
+---
+
 ## [3.20.0] — 2026-06-09
 
 ### Added
