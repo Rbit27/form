@@ -6,6 +6,16 @@
 
 ---
 
+## [3.44.1] — 2026-06-10
+
+### Added
+- [`content/post-100-deload-protocols.md`](content/post-100-deload-protocols.md) — Розвантаження: коли, скільки, і чому дані можуть вас здивувати (14 хв). Fitness-fatigue model Banister (1975); три рівні відновлення (нейром'язовий 5–7d, м'язовий 7–14d, сухожильний 10–21d); чотири типи деавантаження (volume/intensity/frequency/full rest) з показаннями; cadence кожні 4–6 тижнів при >15 робочих підходів (Schoenfeld 2010); позапланові маркери (HRV-тренд, RPE-дрейф, суб'єктивна втома); типові помилки; практичний протокол. clinical-safety PASS.
+
+### Changed
+- `VERSION` — 3.44.0 → 3.44.1.
+
+---
+
 ## [3.44.0] — 2026-06-10
 
 ### Changed
