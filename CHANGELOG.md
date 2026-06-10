@@ -6,6 +6,19 @@
 
 ---
 
+## [3.22.0] — 2026-06-10
+
+### Added
+- `content/post-380-neural-efficiency-beginner-effect.md` — Чому новачок росте від будь-чого — а досвідчений атлет ні; Sale (1988) neural adaptation review — нейральні фактори домінують у ранніх силових адаптаціях нетренованих; три механізми пластичності початківця: рекрутування high-threshold МО (Enoka 2002 — incomplete recruitment at sub-maximum voluntary force), doublet discharges і rate coding (Van Cutsem et al. 1998), зниження коактивації антагоністів; Rhea et al. (2002) — крива чутливості початківця зсунута ліворуч; Moritani & deVries (1979) часова шкала нейральної фази; три програмувальних помилки (надскладні програми, часта зміна, передчасні техніки); три сигнали завершення новачкового вікна; 12 хв читання; editorial-brutalist; clinical-safety NOT REQUIRED
+- `content/post-381-weight-selection-rir-anchor.md` — Як вибрати вагу для підходу: не «відчувай», а калібруй — практика RIR-якоря; Cronin & Sleivert (2005) ±5–8% щоденна варіативність 1RM; Zourdos et al. (2016) кореляція між % 1RM і реальною RPE між сесіями; Jukic et al. (2020) системне відхилення від цільової інтенсивності без зворотного зв'язку; Helms et al. (2016) консервативний старт в авторегуляції; RIR-якір як концепція: перший підхід з буфером RIR+2 як калібрувальна точка; п'ятикроковий протокол; тижневий дрейф і кумулятивна втома між підходами; числовий приклад 4×6 присідання; 11 хв читання; editorial-brutalist; clinical-safety NOT REQUIRED
+- `content/post-382-minimum-effective-dose-adaptation.md` — Мінімальна ефективна доза: скільки насправді потрібно для прогресу; відмінність від post-367 (підтримка) — цей пост про мінімум для ПРОГРЕСУ; Schoenfeld et al. (2017) доза-відповідь плато при >20 підходах; Krieger (2010) 2-3 vs 1 сет; Ralston et al. (2017) 4-6 підходів ≈ 7+ за гіпертрофією; Rhea et al. (2003) 4 підходи/2-3 дні оптимально для intermediate; MEV vs MED vs MAV (Israetel); junk volume і відновлювальна ємність; ітераційний протокол: старт 3 підходи → прогрес → + 1 підхід; 12 хв читання; editorial-brutalist; clinical-safety NOT REQUIRED
+- `blog.html` — +3 картки (post-380/381/382); 321 → 324 cards total
+- `README.md` — post-380/381/382 позначено як виконані (v3.22.0)
+- `STATUS.md` — версія оновлена до v3.22.0; 379 → 382 posts; 321 → 324 blog cards
+- `VERSION` — 3.21.1 → 3.22.0
+
+---
+
 ## [3.21.1] — 2026-06-10
 
 ### Changed
