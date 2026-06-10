@@ -6,6 +6,21 @@
 
 ---
 
+## [3.33.0] — 2026-06-10
+
+### Added
+- `content/post-402-chronic-low-back-pain-training.md` — Тренінг при хронічному болю у спині (14 хв читання). CNSLBP only; acute/specific pathology explicitly excluded. Hayden et al. (2005) Cochrane, O'Sullivan et al. (2018) cognitive functional therapy, McGill graded loading, Waddell & Burton (2004). Clinical-safety APPROVED.
+- `content/post-403-sleep-strength-bidirectional.md` — Сон і силовий тренінг: двонапрямний зв'язок (14 хв). Blumert et al. (2007), Fullagar et al. (2015), Stutz et al. (2019), Youngstedt & Kline (2006). Практичний протокол для трьох сценаріїв: одна погана ніч, хронічне недосипання, передсонне вікно.
+- `content/post-404-self-programming-first-program.md` — Як скласти першу програму тренувань (13 хв). MEV/MAV/MRV, Schoenfeld et al. (2016) frequency, Peterson et al. (2011) intensity, Rhea et al. (2002/2003) linear progression. Скелет 3-денної і 4-денної програми.
+
+### Changed
+- `blog.html` — додано 3 нові картки для posts 402–404 (v3.33.0)
+- `README.md` — posts 402–404 позначені як ✓ виконано; roadmap post-405+ залишається
+- `STATUS.md` — виправлено TL;DR: v3.30.0 → v3.32.0; футери → v3.32.0
+- `VERSION` → 3.33.0 (MINOR: 3 нові posts, 1 clinical-safety approved)
+
+---
+
 ## [3.32.0] — 2026-06-10
 
 ### Added
