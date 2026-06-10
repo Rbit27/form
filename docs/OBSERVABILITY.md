@@ -51,6 +51,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §28 | Mobile Application Performance Observability |
 | §29 | PAM / Privileged Access Management Observability |
 | §30 | Key Management & Cryptography Observability |
+| §31 | API Key Authentication & Usage Observability |
 
 ---
 
@@ -7075,6 +7076,218 @@ Four hard constraints enforced at the instrumentation layer:
 | OQ-CRYPTO-OBS-02 | **Can TLS certificate expiry for form.coach and *.form.coach be monitored exclusively via Better Stack SSL monitoring (external synthetic check), or does the Cloudflare certificate API need to be queried directly?** Better Stack SSL monitoring checks the certificate presented at the TLS handshake — it detects expiry but not upcoming renewal failures or Cloudflare-side provisioning errors. The Cloudflare certificate API (via `GET /zones/{zone_id}/ssl/certificate_packs`) provides renewal status and error codes. Recommendation: Better Stack SSL as primary signal (CRYPTO-E-007); add Cloudflare API poll as secondary check if the first renewal failure goes undetected in staging. | devops-lead | **P2** | M5 |
 
 ---
+
+## 31. API Key Authentication & Usage Observability
+
+### 31.1 Purpose & Scope
+
+This section is the observability companion to `docs/SSO_SCIM_IMPLEMENTATION.md §26` (API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy) and `docs/DATA_MODEL.md §26` (API Key Authentication Schema). Together, these three sections form the complete specification for API key lifecycle management: SSO_SCIM §26 owns the Worker implementation and security policy; DATA_MODEL §26 owns the canonical schema and RLS; this section owns the operational monitoring, alert rules, and SOC 2 audit evidence.
+
+**Scope:** two production components:
+
+| Component | Type | Role |
+|---|---|---|
+| `api-key-auth.ts` | Cloudflare Worker (inline module in auth gateway) | Validates tenant API key HMAC hash against `tenant_api_keys.key_hash`; enforces IP allowlist if `ip_enforcement_enabled = true`; checks `scopes` against required route permission; updates `last_used_at` via `waitUntil`; emits `api_key.ip_blocked` DEC-030 events |
+| `ip-allowlist.ts` SCIM branch | Cloudflare Worker middleware (inline in auth-policy-middleware) | Enforces per-tenant SCIM IP allowlist (`scim_ip_enforcement_enabled`, `scim_ip_allowlist_config`) on all `/scim/v2/*` routes; emits `scim.ip_blocked` DEC-030 event on rejection |
+
+**Privacy floor:** all observability signals involving an API key carry only `key_id` (UUID of the `tenant_api_keys` row — not the key itself, not the HMAC hash, not the `key_preview`) and `client_ip_hash` (SHA-256 of the raw IP keyed with `IP_HASH_SALT`, truncated to 32 hex chars — as defined in SSO_SCIM §26.6). No plaintext IP address, no raw key material, and no `key_preview` appears in any Analytics Engine, Sentry, or Better Stack signal. This invariant is enforced at the Worker layer.
+
+**SOC 2 scope:** CC6.2 (authentication with appropriate credentials — scope enforcement), CC6.4 (access modification when credentials change — rotation and revocation lifecycle), CC6.8 (controls against unauthorised configuration changes — IP enforcement audit trail), CC6.1 (logical access — IP allowlist network gate), CC7.2 (system monitoring for anomalies — AL-APIKEY-01/02/03, AL-SCIM-IP-01).
+
+**Multi-tenant note:** `key_id` and `tenant_id` are propagated in all Analytics Engine events. Per-tenant API key usage can be generated for enterprise customers who require visibility into headless integration health — at the `key_id` / `tenant_id` level only, never at the caller IP level.
+
+---
+
+### 31.2 RED Metrics for API Key Authentication
+
+| Component | Rate (R) | Errors (E) | Duration (D) |
+|---|---|---|---|
+| `api-key-auth.ts` | API key auth requests/hour by `scope_required`; requests by `tenant_id` per hour (per-tenant usage profile) | Auth rejection rate broken down by `rejection_reason` (`ip_blocked`, `scope_insufficient`, `key_revoked`, `hmac_mismatch`, `key_not_found`); 5xx errors / total requests | P95 `api-key-auth.ts` validation latency (HMAC lookup in Supabase + `ip_enforcement_enabled` KV read + scope check, excluding `waitUntil` last_used_at write) |
+| SCIM IP enforcement (`ip-allowlist.ts`) | SCIM requests processed per hour with `scim_ip_enforcement_enabled = true` vs `false` | `scim.ip_blocked` events / total SCIM requests for enforcement-enabled tenants | P95 SCIM IP allowlist lookup latency (KV read of `CachedAuthPolicy` for the tenant) |
+
+**Metric instrumentation:** `api-key-auth.ts` emits per-request Analytics Engine events to `APIKEY_TELEMETRY` dataset: `key_id` (UUID), `tenant_id`, `scope_required`, `rejection_reason` (nullable — null on success), `latency_ms`. The `client_ip_hash` is **never** written to `APIKEY_TELEMETRY` — only to DEC-030 audit events via the `api_key.ip_blocked` event path. SCIM IP enforcement metrics are emitted to `SSO_TELEMETRY` (same dataset as SSO_SCIM identity observability) to avoid fragmenting the SCIM signal.
+
+---
+
+### 31.3 API Key Authentication SLOs
+
+| SLO ID | Description | Target | Measurement |
+|---|---|---|---|
+| **APIKEY-SLO-01** | API key authentication false-rejection rate ≤ 0.1% (valid, non-revoked keys with correct scope and authorised IP) | 99.9% success rate for correctly configured keys over 7-day rolling window | `APIKEY_TELEMETRY`: `auth_rejections WHERE rejection_reason NOT IN ('scope_insufficient','ip_blocked','key_revoked')` / total requests. Transient false rejections (HMAC lookup timeout, KV policy staleness) must remain ≤ 0.1%. |
+| **APIKEY-SLO-02** | API key auth validation P95 latency < 50 ms (excluding `waitUntil` last_used_at write) | 99.5% of requests below threshold — 30-minute error budget window | `APIKEY_TELEMETRY.latency_ms` P95 over 7-day rolling window per `scope_required` |
+| **APIKEY-SLO-03** | Every `api_key.rotated` DEC-030 event is followed by `api_key.revoked` for the predecessor `old_key_id` within 26 hours | 100% — zero tolerance. Failure = HMAC chain anomaly (AL-APIKEY-02) and SOC 2 CC6.4 evidence gap. | pg_cron daily: `SELECT COUNT(*) FROM audit_log WHERE event_type = 'api_key.rotated' AND created_at > now() - INTERVAL '26h' AND NOT EXISTS (SELECT 1 FROM audit_log r WHERE r.event_type = 'api_key.revoked' AND r.metadata->>'old_key_id' = audit_log.metadata->>'key_id' AND r.created_at <= audit_log.created_at + INTERVAL '26h')` — result must be 0 |
+| **APIKEY-SLO-04** | Zero tenant API keys with `age > 365 days` and `revoked_at IS NULL` without an active P1/P0 rotation-overdue incident | 100% — soft enforcement per OQ-APIKEY-OBS-02. Each breach requires post-incident review after SOC 2 observation period. | Weekly pg_cron query against `tenant_api_keys`; pages security-engineer + customer-success via AL-APIKEY-02 amber alert if any key reaches 300 d; red + P1 at 365 d |
+
+---
+
+### 31.4 Alert Rules (AL-APIKEY-* and AL-SCIM-IP-01)
+
+The following four alert rules are reproduced verbatim from `docs/SSO_SCIM_IMPLEMENTATION.md §26.7`. This section is the canonical registration in `docs/OBSERVABILITY.md §6` — all four rules belong in the `api_key_health` subsection of the §6.2 alert rules table (§31.5 below).
+
+**AL-APIKEY-01 — Credential Stuffing or Misconfiguration (P1)**
+
+| Field | Value |
+|---|---|
+| Trigger | `api_key.ip_blocked` DEC-030 events for a single `tenant_id` + `key_id` exceed 10 in 10 minutes |
+| Severity | **P1** |
+| Service | PagerDuty "FORM Security" service |
+| On-call | devops-lead + customer-success |
+| Deduplication key | `apikey-ip-blocked-{tenant_id}-{key_id}` (10-min window; re-alerts every 30 min if not resolved) |
+| Response | Check if IP enforcement was just enabled (recent `api_key.ip_enforcement_enabled` event for same key). If new enforcement: notify CSM to contact tenant IT admin. If enforcement was not recently changed: treat as credential compromise attempt — notify tenant admin, recommend key rotation. Trigger `INCIDENT_RESPONSE.md R-03` if compromise confirmed. |
+| SIEM routing | → `siem.api_key_ip_blocked_spike` — classification: security_event, severity: medium |
+
+**AL-APIKEY-02 — Rotation Overlap Expired Without Revocation (P1)**
+
+| Field | Value |
+|---|---|
+| Trigger | `api_key.rotated` DEC-030 event with no corresponding `api_key.revoked` for `old_key_id` within 26 hours |
+| Severity | **P1** |
+| Service | PagerDuty "FORM Security" service |
+| On-call | platform-engineer |
+| Deduplication key | `apikey-rotation-overlap-{old_key_id}` (no dedup window — re-alerts every 2 h until resolved) |
+| Response | Overlap window expired but old key was not revoked by `api_key_rotation_overlap_cleanup` pg_cron job. Investigate pg_cron job logs; manually set `revoked_at = now()` on old key if safe; emit `api_key.revoked` DEC-030 event with `reason = 'expiry_overlap'`. This is an APIKEY-SLO-03 breach. |
+| SIEM routing | → `siem.api_key_rotation_gap` — classification: compliance_event, severity: high |
+
+**AL-APIKEY-03 — Key Compromise Declared (P1)**
+
+| Field | Value |
+|---|---|
+| Trigger | `api_key.revoked` DEC-030 event emitted with `reason = 'compromise'` |
+| Severity | **P1** |
+| Service | PagerDuty "FORM Security" service |
+| On-call | security-engineer |
+| Deduplication key | `apikey-compromise-{key_id}` (fires once per key; does not auto-resolve) |
+| Response | Trigger `INCIDENT_RESPONSE.md R-16` (Application Secret & Encryption Key Exposure) for API key subtype. Incident Commander opens incident channel. Check `last_used_at` and Cloudflare access logs for the 7-day window before revocation to scope potential abuse. |
+| SIEM routing | → `siem.api_key_compromised` — classification: security_incident, severity: critical |
+
+**AL-SCIM-IP-01 — SCIM IP Allowlist Blocking Provisioning (P2)**
+
+| Field | Value |
+|---|---|
+| Trigger | `scim.ip_blocked` DEC-030 events for a single `tenant_id` exceed 5 in 15 minutes AND SCIM provisioning success rate for same tenant drops below 50% in same window |
+| Severity | **P2** |
+| Service | PagerDuty "FORM Customer Success" service |
+| On-call | customer-success |
+| Deduplication key | `scim-ip-blocked-{tenant_id}` (15-min window) |
+| Response | SCIM IP enforcement is blocking IdP provisioning — likely a misconfigured allowlist or an IdP IP range change. Notify CSM to contact tenant IT admin. Temporary mitigation: tenant admin can disable SCIM IP enforcement from admin dashboard. Permanent fix: update SCIM allowlist with correct IdP CIDRs. |
+| SIEM routing | Not routed to SIEM (customer-operational issue, not a security event) |
+
+---
+
+### 31.5 §6.2 Alert Rules Additions
+
+The following rows are to be inserted into the §6.2 alert rules table under a new `api_key_health` subsection, following the `crypto_key_health` subsection (added in §30.5):
+
+**Subsection: `api_key_health`**
+
+| Alert ID | Service | Condition | Severity | Runbook | Channel |
+|---|---|---|---|---|---|
+| AL-APIKEY-01 | api-key-auth.ts / APIKEY_TELEMETRY | `api_key.ip_blocked` > 10 / same `tenant_id` + `key_id` / 10 min | **P1** | §31.4: check recent IP enforcement toggle; if no toggle → credential compromise response; trigger R-03 on confirmation | PagerDuty "FORM Security" |
+| AL-APIKEY-02 | pg_cron `api_key_rotation_overlap_cleanup` | `api_key.rotated` with no `api_key.revoked` for `old_key_id` within 26 h | **P1** | §31.4: investigate pg_cron job; manually set `revoked_at`; emit `api_key.revoked` with `reason=expiry_overlap` | PagerDuty "FORM Security" |
+| AL-APIKEY-03 | emit-audit-event Worker | `api_key.revoked` emitted with `reason = 'compromise'` | **P1** | §31.4: trigger R-16; scope abuse window via `last_used_at` + Cloudflare access logs | PagerDuty "FORM Security" |
+| AL-SCIM-IP-01 | ip-allowlist.ts / SSO_TELEMETRY | `scim.ip_blocked` > 5 / same `tenant_id` / 15 min AND SCIM success rate < 50% | **P2** | §31.4: notify CSM; temp mitigation = disable SCIM IP enforcement from admin dashboard | PagerDuty "FORM Customer Success" |
+
+---
+
+### 31.6 DEC-030 API Key Event Health Monitoring
+
+Three chain monitors verify the integrity of the `api_key.*` DEC-030 event stream:
+
+| Monitor ID | Severity | Condition | Response |
+|---|---|---|---|
+| APIKEY-CHAIN-01 | **P1** | Zero `api_key.created` or `api_key.rotated` events in any 90-day window, AND `tenant_api_keys` has rows with `created_at > 90 days ago` and `revoked_at IS NULL` | Indicates API key creation bypassed the DEC-030 emission path (Worker bug or admin SQL workaround). Investigate: `SELECT key_id FROM tenant_api_keys WHERE created_at > now() - INTERVAL '90d' AND NOT EXISTS (SELECT 1 FROM audit_log WHERE event_type = 'api_key.created' AND metadata->>'key_id' = tenant_api_keys.key_id::text)`. Non-empty result → treat as potential bypass, page security-engineer. |
+| APIKEY-CHAIN-02 | **P1** | `api_key.rotated` event exists with no subsequent `api_key.revoked` for `old_key_id` within 26 hours (the AL-APIKEY-02 trigger condition, verified at HMAC batch level) | This is the pg_cron `api_key_rotation_overlap_cleanup` failure scenario. APIKEY-CHAIN-02 provides the HMAC chain integrity verification that the operational alert AL-APIKEY-02 cannot guarantee on its own. pg_cron `api_key_chain_monitor` runs the chain check daily at 03:00 UTC and emits `admin.monitoring_check_failed` if any open-overlap records are found. |
+| APIKEY-CHAIN-03 | **P1** | `api_key.revoked` event emitted with no preceding `api_key.created` or `api_key.rotated` event sharing the same `key_id` | Orphan revocation — a key was revoked that has no creation record in the HMAC chain. Could indicate chain truncation, a manually constructed SQL INSERT bypassing the Worker mutation path, or an administrative deletion without the proper Worker flow. Page security-engineer immediately; treat as `INCIDENT_RESPONSE.md R-01` (security incident) until ruled out. |
+
+**Implementation:** APIKEY-CHAIN-01 and APIKEY-CHAIN-02 are pg_cron jobs running daily at 03:00 UTC; they emit `admin.monitoring_check_failed` DEC-030 events (HIGH severity, 7yr retention) on any breach and trigger PagerDuty via the DEC-030 → PagerDuty pipeline. APIKEY-CHAIN-03 is run as part of the weekly HMAC chain integrity verification batch.
+
+---
+
+### 31.7 Dashboard: "API Key Health"
+
+**Location:** Metabase + Better Stack composite dashboard. Audience: devops-lead, security-engineer, compliance-officer, customer-success. Tenant admins see a restricted view via the Admin Dashboard "API Keys" panel (`docs/SSO_SCIM_IMPLEMENTATION.md §26.5.3`) — they never see this FORM-internal dashboard.
+
+| Panel | Type | Data source | Query / metric |
+|---|---|---|---|
+| API key request rate by scope | Time-series (7 d) | `APIKEY_TELEMETRY` Analytics Engine | `requests_total` GROUP BY `scope_required`, 1h buckets |
+| Auth rejection breakdown | Stacked bar (7 d) | `APIKEY_TELEMETRY` | `rejection_reason` distribution: `ip_blocked`, `scope_insufficient`, `key_revoked`, `hmac_mismatch`, `key_not_found` |
+| Auth validation P95 latency | Time-series (7 d) | `APIKEY_TELEMETRY` | `latency_ms` P95 per 1h bucket — alert-threshold line at 50 ms |
+| Keys approaching age limit | Table | `tenant_api_keys` WHERE `revoked_at IS NULL` | `key_id`, `tenant_id`, `scopes`, `age_days`, `last_used_at` — amber background ≥ 300 d, red ≥ 365 d |
+| SCIM IP blocks by tenant | Bar chart (24 h) | `SSO_TELEMETRY` via `scim.ip_blocked` DEC-030 events | COUNT per `tenant_id`; any bar > 5 in the window warrants AL-SCIM-IP-01 investigation |
+| Rotation overlap health | Stat | pg_cron APIKEY-CHAIN-02 result | Last chain monitor run: pass / fail + timestamp; red if fail |
+| Recent key lifecycle events | Event log (last 50) | `audit_log` WHERE `event_type IN ('api_key.created','api_key.rotated','api_key.revoked','api_key.ip_enforcement_enabled','api_key.ip_enforcement_disabled')` | `event_type`, `tenant_id`, `key_id` (first 8 chars for legibility), `created_at` — descending; `api_key.revoked` rows with `reason = 'compromise'` highlighted in red |
+
+---
+
+### 31.8 Privacy Constraints
+
+| Constraint | Enforcement location | Rationale |
+|---|---|---|
+| No raw API key in any observability signal | `api-key-auth.ts`: the key is received on inbound request, HMAC is computed in-process, and the raw value is immediately discarded; only `key_id` is propagated to Analytics Engine | Raw API keys are long-lived credentials; logging them to any signal store wider than the DEC-030 audit log creates credential exposure risk |
+| `client_ip_hash` in DEC-030 events only — no IP value in Analytics Engine datasets | `api-key-auth.ts` and `ip-allowlist.ts`: raw client IP is hashed with `IP_HASH_SALT` before being written to `api_key.ip_blocked` or `scim.ip_blocked` DEC-030 payload; no IP value of any form is written to `APIKEY_TELEMETRY` or `SSO_TELEMETRY` | IP addresses are personal data under GDPR Art. 4(1) in EU jurisdictions; server-side keyed hashing satisfies pseudonymisation while preserving correlation capability without raw IP exposure |
+| `key_preview` (last 8 chars) reserved for tenant Admin Dashboard — excluded from FORM-internal observability | Metabase API Key Health dashboard panels use `key_id` (UUID) as the identifier; `key_preview` not written to Analytics Engine or Better Stack | `key_preview` allows a tenant admin to visually identify a key; exposing it in the FORM-internal observability tier would leak tenant-facing credential metadata to FORM operators |
+| Per-tenant usage metrics available to devops-lead, security-engineer, compliance-officer, customer-success only; tenants see only their own `last_used_at` and `request_count_30d` | Metabase access controls on `api_key_health` dashboard; `GET /api/admin/v1/api-keys/{key_id}/usage` response scoped to requesting tenant only with no cross-tenant fields | Usage patterns across tenants reveal commercial intelligence and must not be accessible across tenant boundaries |
+
+---
+
+### 31.9 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | Evidence artefact |
+|---|---|---|
+| **CC6.2 — Authentication requires appropriate credentials** | Scope enforcement in `api-key-auth.ts` prevents `reporting:read` keys from calling admin mutation routes. Scope validated before route handler execution — HTTP 403 `insufficient_scope` on failure. | **APIKEY-E-001:** Code review record of `api-key-auth.ts` scope enforcement (PR review + CI gate); optionally: integration test output showing `reporting:read` key rejected on `POST /v1/admin/seats` |
+| **CC6.4 — Access modification when credentials change** | API key rotation with 24-hour overlap window ensures continuity; `api_key.revoked` DEC-030 event for the predecessor key provides HMAC-chained evidence of credential retirement. APIKEY-SLO-03 (rotation gap ≤ 26 h) governs this control. | **APIKEY-E-002:** DEC-030 event sequence export for any API key rotation events during the observation period — must show `api_key.rotated` → `api_key.revoked` (old key) sequence with HMAC continuity |
+| **CC6.8 — Controls against unauthorised configuration changes** | `api_key.ip_enforcement_enabled` and `api_key.ip_enforcement_disabled` DEC-030 HMAC-chained events (HIGH severity, 7yr retention) create a non-repudiable trail of every change to IP enforcement state on API keys. | **APIKEY-E-003:** 30-day export of `api_key.ip_enforcement_*` events from `audit_log`; cross-reference `enabled_by` actor UUID against `form_admins` to confirm all changes were made by authorised actors |
+| **CC7.2 — System monitoring for anomalies** | AL-APIKEY-01 (IP block spike), AL-APIKEY-02 (rotation gap), AL-APIKEY-03 (compromise declaration), and AL-SCIM-IP-01 (SCIM provisioning disruption) provide continuous automated monitoring of the API key authentication layer. | **APIKEY-E-004:** PagerDuty incident export for `api_key_health` alert group during the observation period (opened_at, acknowledged_at, resolved_at, alert_key) |
+| **CC6.1 — Logical access security controls** | API key IP allowlist (`ip_enforcement_enabled + ip_allowlist_config`) adds a network-layer gate to long-lived credential access — a compromised key cannot be used from a non-authorised network. SCIM IP allowlist adds equivalent protection for the provisioning credential. | **APIKEY-E-005:** 30-day export of `api_key.ip_blocked` and `scim.ip_blocked` events showing enforcement is active; cross-reference with `tenant_api_keys` showing `ip_enforcement_enabled = true` and `ip_allowlist_config` for keys in `admin:write` scope |
+
+**Auditor evidence collection SQL:**
+
+| Artefact | Collection |
+|---|---|
+| APIKEY-E-002 | `SELECT * FROM audit_log WHERE event_type IN ('api_key.rotated','api_key.revoked') AND event_ts BETWEEN $obs_start AND $obs_end ORDER BY event_ts` |
+| APIKEY-E-003 | `SELECT * FROM audit_log WHERE event_type LIKE 'api_key.ip_enforcement%' AND event_ts BETWEEN $obs_start AND $obs_end` |
+| APIKEY-E-004 | PagerDuty → Incidents → filter service "FORM Security" + alert_key prefix `apikey-` → export CSV |
+| APIKEY-E-005 | `SELECT * FROM audit_log WHERE event_type IN ('api_key.ip_blocked','scim.ip_blocked') AND event_ts BETWEEN $obs_start AND $obs_end` |
+
+---
+
+### 31.10 Implementation Checklist
+
+#### P0 — Must complete before first API key issued to any enterprise customer (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Configure AL-APIKEY-01 in PagerDuty "FORM Security": trigger condition (`api_key.ip_blocked` > 10 / key / 10 min from `APIKEY_TELEMETRY`); dedup key `apikey-ip-blocked-{tenant_id}-{key_id}`; SIEM routing `siem.api_key_ip_blocked_spike`. Test with synthetic IP-blocked events in staging (enable IP enforcement on test key; 11 requests from non-allowlisted IP in 9 min). | devops-lead | **P0** | M5 | [ ] |
+| 2 | Configure AL-APIKEY-02 in PagerDuty "FORM Security": trigger condition (pg_cron `api_key_chain_monitor` outputs non-zero APIKEY-CHAIN-02 result); dedup key `apikey-rotation-overlap-{old_key_id}`; re-alert every 2 h. Test: inject rotation record with `created_at = 28h ago` and no `revoked_at` on old key; confirm alert fires. | devops-lead | **P0** | M5 | [ ] |
+| 3 | Configure AL-APIKEY-03 in PagerDuty "FORM Security": trigger on `api_key.revoked` DEC-030 event with `reason = 'compromise'`; dedup key `apikey-compromise-{key_id}`; no auto-resolve. Test: emit synthetic `api_key.revoked` with `reason = 'compromise'` via staging `emit-audit-event` Worker; confirm PagerDuty P1 fires. | devops-lead | **P0** | M5 | [ ] |
+| 4 | Configure AL-SCIM-IP-01 in PagerDuty "FORM Customer Success": trigger condition (`scim.ip_blocked` > 5 / tenant / 15 min AND SCIM success rate < 50%); dedup key `scim-ip-blocked-{tenant_id}` (15-min window). Test with staging SCIM IP enforcement enabled + 6 blocked requests in 14 min. | devops-lead | **P0** | M5 | [ ] |
+| 5 | Add `api_key_health` subsection rows (AL-APIKEY-01/02/03, AL-SCIM-IP-01) to §6.2 alert rules table per §31.5. | devops-lead | **P0** | M5 | [ ] |
+| 6 | Implement pg_cron `api_key_chain_monitor` job (daily 03:00 UTC): runs APIKEY-CHAIN-01 and APIKEY-CHAIN-02 queries; emits `admin.monitoring_check_failed` DEC-030 event if non-zero result; triggers PagerDuty via DEC-030 pipeline. Add to §12.6 pg_cron job registry (job 13). | platform-engineer | **P0** | M5 | [ ] |
+| 7 | Wire `APIKEY_TELEMETRY` Analytics Engine dataset in `api-key-auth.ts`: per-request events with `key_id`, `tenant_id`, `scope_required`, `rejection_reason` (nullable), `latency_ms`. Confirm no `client_ip_hash`, no `key_preview`, no raw key in dataset schema. | platform-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before first API key used in production (M5/M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Register APIKEY-SLO-01 through APIKEY-SLO-04 in §2 SLO table; wire APIKEY-SLO-03 pg_cron daily check (rotation gap ≤ 26 h); confirm APIKEY-SLO-04 weekly query is scheduled. | devops-lead + compliance-officer | **P1** | M5 | [ ] |
+| 9 | Implement APIKEY-CHAIN-03 as part of the weekly HMAC chain integrity verification batch; confirm it fires on synthetic orphan-revocation test in staging. | platform-engineer + security-engineer | **P1** | M5 | [ ] |
+| 10 | Build "API Key Health" dashboard (§31.7, seven panels) in Metabase + Better Stack; restrict access to devops-lead + security-engineer + compliance-officer + customer-success. Validate "Keys approaching age limit" panel shows amber ≥ 300 d / red ≥ 365 d. | devops-lead | **P1** | M5 | [ ] |
+| 11 | Add `api_key.*` and `scim.ip_*` event classification rows to §27.2 SIEM event table; confirm AL-APIKEY-03 routes to `siem.api_key_compromised` with `severity: critical`. | platform-engineer + devops-lead | **P1** | M5 | [ ] |
+| 12 | Collect APIKEY-E-001 through APIKEY-E-005 evidence artefacts (§31.9) after 30 days of production API key usage; store in `compliance/evidence/api-key-auth/`; cross-reference in `docs/SOC2_READINESS.md` CC6.2, CC6.4, CC6.8, CC6.1, CC7.2 control evidence rows per `docs/SSO_SCIM_IMPLEMENTATION.md §26.8` APIKEY-E-001 through APIKEY-E-005. | compliance-officer | **P1** | M6 | [ ] |
+| 13 | Resolve OQ-APIKEY-OBS-02 (expires_at hard enforcement decision — closes OQ-SSO-26.2 from `docs/SSO_SCIM_IMPLEMENTATION.md §26.10`); record decision in `docs/DECISION_LOG.md`. | enterprise-architect + compliance-officer | **P1** | Before SOC 2 observation period start | [ ] |
+
+---
+
+### 31.11 Open Questions
+
+| OQ | Question | Owner | Priority | Resolution path |
+|---|---|---|---|---|
+| **OQ-APIKEY-OBS-01** | **Should per-tenant API key usage metrics be surfaced to tenant admins in the Admin Dashboard beyond `last_used_at`?** A `request_count_30d` field and a `last_rejection_reason` field (from `APIKEY_TELEMETRY` aggregate) would give FSI-tier customers evidence that their integrations are functioning — a common procurement requirement. Risk: adds a query path that must be scope-enforced at the API layer (per-tenant only; zero cross-tenant). Recommendation: add `request_count_30d` and `last_rejection_reason` to `GET /api/admin/v1/api-keys/{key_id}` response — P1 before enterprise GA. Owner: customer-success + enterprise-architect. | customer-success + enterprise-architect | **P1** | Resolve before enterprise GA M13; update `docs/ENTERPRISE_ADMIN_API.md` |
+| **OQ-APIKEY-OBS-02** | **Closes OQ-SSO-26.2 from `docs/SSO_SCIM_IMPLEMENTATION.md §26.10`: should `expires_at` be hard-enforced with automatic revocation, or remain soft (age alerts + CSM escalation only)?** Hard enforcement strengthens SOC 2 CC6.4 evidence — auditors see a system control. Risk: an integration engineer on leave causes an unplanned integration outage at the 365-day mark. Recommendation: **soft enforcement initially** (APIKEY-SLO-04 + AL-APIKEY-02 amber at 300 d + red at 365 d). If any key reaches 365 days without rotation in the first SOC 2 observation period, the procedural control is demonstrably failing — at that point implement hard enforcement via pg_cron `api_key_hard_revocation_sweep` setting `revoked_at = now()` for keys at `age > 365d` with `reason = 'age_policy'`. Decision must be documented in `docs/DECISION_LOG.md` before observation period start. | enterprise-architect + compliance-officer | **P1** | Record decision in `docs/DECISION_LOG.md` before SOC 2 observation period start |
+
+---
+
+*v2.1 (2026-06-10): §31 API Key Authentication & Usage Observability — observability companion to `docs/SSO_SCIM_IMPLEMENTATION.md §26` (API Key Auth Security) and `docs/DATA_MODEL.md §26` (API Key Schema). Fills the monitoring gap: SSO_SCIM §26 defined AL-APIKEY-01/02/03 and AL-SCIM-IP-01 but no corresponding OBSERVABILITY section was authored at that time. TOC updated to add §31. §31.1: two-component scope (`api-key-auth.ts` Worker and `ip-allowlist.ts` SCIM branch); privacy floor (`key_id` + `client_ip_hash` only in DEC-030 — no raw key, no raw IP, no `key_preview` in any Analytics Engine or dashboard signal); SOC 2 scope CC6.2/CC6.4/CC6.8/CC6.1/CC7.2. §31.2 RED metrics: `APIKEY_TELEMETRY` Analytics Engine dataset (`key_id`, `tenant_id`, `scope_required`, `rejection_reason`, `latency_ms`); `SSO_TELEMETRY` for SCIM IP events; `client_ip_hash` excluded from both datasets (DEC-030 only). §31.3 four APIKEY-SLOs: APIKEY-SLO-01 (false-rejection rate ≤ 0.1% / 7-day rolling), APIKEY-SLO-02 (auth P95 latency < 50 ms), APIKEY-SLO-03 (rotation gap ≤ 26 h / 100% zero-tolerance / CC6.4 HMAC chain evidence), APIKEY-SLO-04 (zero keys ≥ 365 d without rotation or active incident / 100%). §31.4 four alert rules: AL-APIKEY-01 (P1, IP block spike > 10 / key / 10 min → credential stuffing or misconfiguration; dedup `apikey-ip-blocked-{tenant_id}-{key_id}` 10-min; SIEM `siem.api_key_ip_blocked_spike` medium), AL-APIKEY-02 (P1, rotation overlap expired without revocation → APIKEY-SLO-03 breach; re-alert 2h; SIEM `siem.api_key_rotation_gap` high), AL-APIKEY-03 (P1, `api_key.revoked` reason=compromise → trigger R-16; SIEM `siem.api_key_compromised` critical; dedup per key_id, no auto-resolve), AL-SCIM-IP-01 (P2, SCIM IP blocking provisioning → CSM escalation; "FORM Customer Success" PagerDuty service; not SIEM). §31.5 `api_key_health` §6.2 addition: four rows after `crypto_key_health` subsection. §31.6 three DEC-030 chain monitors: APIKEY-CHAIN-01 (P1, zero `api_key.created/rotated` in 90 d with live unmatched `tenant_api_keys` rows — bypass detection), APIKEY-CHAIN-02 (P1, rotation gap at HMAC batch level — same condition as AL-APIKEY-02; pg_cron `api_key_chain_monitor` 03:00 UTC), APIKEY-CHAIN-03 (P1, orphan revocation — `api_key.revoked` with no preceding creation/rotation for same key_id — R-01 trigger). §31.7 seven-panel "API Key Health" dashboard: request rate by scope (7 d), rejection breakdown (stacked bar 7 d), P95 latency with 50 ms line (7 d), keys approaching age limit (amber ≥ 300 d / red ≥ 365 d), SCIM IP blocks by tenant (24 h), rotation overlap health stat, recent lifecycle event log. §31.8 four privacy constraints: no raw key (discarded in-Worker post-HMAC), `client_ip_hash` in DEC-030 only, `key_preview` excluded from internal observability, per-tenant usage restricted to authorised internal roles. §31.9 five SOC 2 evidence artefacts APIKEY-E-001 through APIKEY-E-005: CC6.2 (scope enforcement code review), CC6.4 (rotation DEC-030 chain sequence), CC6.8 (IP enforcement change audit), CC7.2 (PagerDuty alert history), CC6.1 (IP block events export). §31.10 thirteen-item implementation checklist: 7× P0 M5 (four PagerDuty alert configs, §6.2 table update, pg_cron chain monitor job 13, APIKEY_TELEMETRY dataset wiring), 6× P1 M5-M6 (SLO registration, APIKEY-CHAIN-03, dashboard, SIEM event table, evidence collection, OQ-APIKEY-OBS-02 DECISION_LOG entry). §31.11 two open questions: OQ-APIKEY-OBS-01 (per-tenant usage metrics `request_count_30d` + `last_rejection_reason` in Admin Dashboard — P1 before GA M13), OQ-APIKEY-OBS-02 (closes OQ-SSO-26.2 — soft enforcement initially; hard enforcement trigger if first SOC 2 observation period shows any key at 365 d; decision to DECISION_LOG before observation period start). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §26` (API key auth; §26.7 alert rules reproduced verbatim in §31.4), `docs/DATA_MODEL.md §26` (canonical `tenant_api_keys` schema), `docs/AUDIT_LOG_SCHEMA.md` (nine DEC-030 events registered at v0.9: `api_key.created`, `api_key.rotated`, `api_key.revoked`, `api_key.ip_enforcement_enabled`, `api_key.ip_enforcement_disabled`, `api_key.ip_blocked`, `scim.ip_enforcement_enabled`, `scim.ip_enforcement_disabled`, `scim.ip_blocked`), `docs/INCIDENT_RESPONSE.md R-03` (credential compromise), `docs/INCIDENT_RESPONSE.md R-16` (key exposure), `docs/SOC2_READINESS.md` CC6.2/CC6.4/CC6.8/CC6.1/CC7.2 (evidence artefacts APIKEY-E-001 through APIKEY-E-005), §6.2 (`api_key_health` subsection — 4 rows), §12.6 (pg_cron registry: `api_key_chain_monitor` as job 13), §27.2 (SIEM event table: `api_key.*` and `scim.ip_*` rows). Owner: devops-lead + security-engineer + platform-engineer + compliance-officer. FORM repo: v3.37.1 → v3.37.2.*
 
 *v2.0 (2026-06-09): §6.2 `c1_erasure_sla` subsection — AL-C1-01 GDPR Art. 17 erasure SLA day-33 warning added to the consolidated §6.2 Alert Rules table. Closes the cross-reference from `docs/SOC2_READINESS.md §73` ("docs/OBSERVABILITY.md §6.2 — AL-C1-01 to be added to c1_erasure_sla alert rules subsection"). Trigger: pg_cron `c1-erasure-sla-monitor` (daily 08:00 UTC, job 11 in §12.6 pg_cron registry) fires when any open erasure request is > 33 days old; P1 severity; PagerDuty `form-compliance` service → compliance-officer + Slack `#security-alerts` HIGH; re-alerts every 24 h; dedup key `c1-erasure-sla-breach-{dsar_request_id}`; belt-and-suspenders to §70 DSAR day-25/day-29 P0/P1 alerts. SOC 2 C1.2/P5.2 evidence. Cross-ref: SOC2_READINESS.md §73.3.1 AL-C1-01; INCIDENT_RESPONSE.md R-14; AUDIT_LOG_SCHEMA.md v0.8 `compliance.erasure_sla_alert_fired` (HIGH, 7yr). Owner: devops-lead.*
 

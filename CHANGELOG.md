@@ -6,6 +6,16 @@
 
 ---
 
+## [3.37.2] — 2026-06-10
+
+### Added
+- `docs/OBSERVABILITY.md §31` — API Key Authentication & Usage Observability: observability companion to `docs/SSO_SCIM_IMPLEMENTATION.md §26` and `docs/DATA_MODEL.md §26`. RED metrics (`APIKEY_TELEMETRY` Analytics Engine dataset), four SLOs (APIKEY-SLO-01 through APIKEY-SLO-04), four alert rules (AL-APIKEY-01/02/03 + AL-SCIM-IP-01 — canonical §6.2 registration), three DEC-030 chain monitors (APIKEY-CHAIN-01 through APIKEY-CHAIN-03), seven-panel "API Key Health" dashboard spec, privacy constraints (`key_id` + `client_ip_hash` only — no raw key, no plaintext IP), SOC 2 evidence artefacts APIKEY-E-001 through APIKEY-E-005 (CC6.2/CC6.4/CC6.8/CC6.1/CC7.2), thirteen-item implementation checklist (7× P0 M5, 6× P1 M5–M6). OQ-APIKEY-OBS-02 provides the resolution path for OQ-SSO-26.2 (soft enforcement initially; hard enforcement trigger if any key reaches 365 d in first SOC 2 observation period). Owner: devops-lead + security-engineer + platform-engineer + compliance-officer.
+
+### Changed
+- `docs/OBSERVABILITY.md` — TOC updated to add §31; version header bumped v2.0 → v2.1; `OBSERVABILITY.md` now at 31 sections
+
+---
+
 ## [3.37.1] — 2026-06-10
 
 ### Added
