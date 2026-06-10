@@ -6,6 +6,16 @@
 
 ---
 
+## [3.39.1] — 2026-06-10
+
+### Added
+- [`content/post-420-training-density-progression.md`](content/post-420-training-density-progression.md) — Щільність тренування як змінна прогресії (14 хв). Schoenfeld (2010) метаболічний стрес; Robbins et al. (2012) паузи і адаптація; EDT Staley density blocks; Paoli et al. (2012); інтеграція в блокову періодизацію. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — 8 нових карток (posts 416–423): виправлено hrefs для 416 (training-frequency), 417 (cluster-sets), 418 (BFR); додано картки для 419 (unilateral), 420 (density), 421 (progressive-overload), 422 (deload), 423 (rep-ranges).
+
+---
+
 ## [3.39.0] — 2026-06-10
 
 ### Added
