@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v2.3
+# FORM · Observability & Monitoring Taxonomy v2.4
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -53,6 +53,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §30 | Key Management & Cryptography Observability |
 | §31 | API Key Authentication & Usage Observability |
 | §32 | Victor AI Safety Monitoring & Clinical-Safety Observability |
+| §33 | Enterprise Tenant Engagement Health & QBR Metrics Observability |
 
 ---
 
@@ -7681,3 +7682,522 @@ The following invariants apply to all signals, datasets, dashboards, and evidenc
 *v2.2 (2026-06-10): §32 Victor AI Safety Monitoring & Clinical-Safety Observability — closes `docs/INCIDENT_RESPONSE.md` R-23 Implementation Checklist item 7 (P1 M6): "Add per-session Victor error rate monitoring to `docs/OBSERVABILITY.md §31`: define alert rule `FORM-VICTOR-001` (safety_flag_triggered rate > baseline threshold); define per-category flag rate metric; confirm metric is computed from `coaching_turns` table and visible in monitoring dashboard." (The checklist referenced §31 as a placeholder for the then-current last section; §32 is the canonical home for this content since §31 was subsequently authored for API Key Auth.) TOC updated to add §32. Header bumped v1.8 → v2.2 (aligns with v2.1 as the immediately prior version note). §32.1 scopes to safety-only observability (distinct from §22 quality observability); establishes privacy invariant (no `coaching_turns.content` in any telemetry signal); declares SOC 2 scope CC7.2/CC7.3/CC7.4/CC9.2/A1.2; lists five DEC-030 events from R-23.10 as the chain-of-custody backbone. §32.2 `VICTOR_SAFETY_TELEMETRY` Cloudflare Analytics Engine dataset: ten-column schema (`session_id` UUID, `tenant_id` nullable, `trigger_category` VT-01 through VT-10, `severity_class` P0–P3, `detection_source` four-value enum, `model_version`, `prompt_version`, `flags_count`, `incident_id` nullable, `timestamp`); no content, no user PII; schema extension `coaching_turns.safety_classification` nullable TEXT CHECK with VT-01 through VT-10 plus `clean`; migration `0054_coaching_turns_safety_classification.sql`; REVOKE SELECT on column from `form_api`; column included in GDPR erasure Worker; eight RED metrics covering rate (safety flag rate per 1k turns, P0 rate, 24h incident rate), errors (false positive rate, regression rate by version), and duration (MTTR P0/P1, re-enable ramp duration). §32.3 four SLOs: VICTOR-SLO-01 (zero P0 incidents per 30-day window — unconditional zero-tolerance); VICTOR-SLO-02 (FORM-VICTOR-001 fires within 5 min of P0 signal — 100% zero-tolerance); VICTOR-SLO-03 (MTTR P0 ≤ 4 h, MTTR P1 ≤ 24 h); VICTOR-SLO-04 (zero `ai.victor_reenabled` without preceding `ai.safety_incident_resolved` — VSAFETY-CHAIN-03 enforced). §32.4 four alert rules: `FORM-VICTOR-001` (P0, VT-03/04/05/06, single event fires, no auto-resolve, "FORM Clinical Safety" PagerDuty service, clinical-safety + founder 0-min); `FORM-VICTOR-002` (P1, VT-01/02, 3× 30d baseline / 30-min window); `FORM-VICTOR-003` (P2, VT-07/08, 5× baseline / 1-h); `FORM-VICTOR-004` (P3, VT-09/10, 10× baseline / 2-h or jailbreak CI); baseline computed nightly by pg_cron `victor_safety_baseline_refresh` (job 14); 60-min suppression on prompt version deploy for FORM-VICTOR-002 through -004 (no suppression for FORM-VICTOR-001). §32.5 §6.2 `victor_safety_health` subsection: four rows FORM-VICTOR-001 through -004; SIEM routing `siem.victor_safety_p0` (CRITICAL) and `siem.victor_safety_p1` (HIGH) for §27.2. §32.6 three DEC-030 chain monitors: VSAFETY-CHAIN-01 (P1, P0 incident open with no containment > 60 min — see OQ-VSAFETY-02 for 15-min refinement); VSAFETY-CHAIN-02 (P1, Victor disabled > 48 h with no re-enable); VSAFETY-CHAIN-03 (P0, `ai.victor_reenabled` with no matching `ai.safety_incident_resolved` — real-time write-time guard in `emit-audit-event` Worker, not post-hoc); SQL provided for VSAFETY-CHAIN-01/02; chain monitor job 15 in §12.6 pg_cron registry. §32.7 eight-panel "Victor AI Safety Health" Metabase + Better Stack dashboard: feature flag status (KV synthetic), safety flags last 24h (stacked bar by VT category), P0 incidents last 90 days (stat, red if > 0), flag rate vs 30d baseline (line chart), MTTC gauge, per-model version bar chart, DEC-030 chain health stat, recent events log (UUID-only). §32.8 six privacy constraints: no content in telemetry, UUID-only session ID, column-level privilege on `safety_classification`, tenant_id for internal use only, evidence PII rule (R-23.11), safety classification describes Victor output category not user health state. §32.9 four SOC 2 evidence artefacts VSAFETY-E-001 (CC7.2 — PagerDuty FORM-VICTOR-001 config + 90d incident history), VSAFETY-E-002 (CC7.3 — VICTOR_SAFETY_TELEMETRY observation window export), VSAFETY-E-003 (CC7.4 — chain monitor config + VSAFETY-CHAIN-03 zero-fire attestation), VSAFETY-E-004 (A1.2 — KV feature flag change log + DEC-030 disable/re-enable export); all 7-year retention. §32.10 thirteen-item implementation checklist: 7× P0 M4 (VICTOR_SAFETY_TELEMETRY dataset + Worker emission, migration 0054, FORM-VICTOR-001 PagerDuty config, FORM-VICTOR-002/003/004 + baseline job 14, §6.2 + §27.2 table updates, VSAFETY-CHAIN-03 Worker guard, DEC-030 event registration in AUDIT_LOG_SCHEMA.md); 5× P1 M5-M6 (chain monitor job 15, SLO registration + §11 SLI expressions, dashboard, evidence collection, R-23 checklist item 7 closure); 1× P2 quarterly (baseline threshold calibration from M9). §32.11 two open questions: OQ-VSAFETY-01 (tenant_id exposure to CSMs — P1, before enterprise GA M13; recommendation: zero/non-zero count only); OQ-VSAFETY-02 (VSAFETY-CHAIN-01 timeout 60 min vs 15 min for P0 — P1, refine in next IR quarterly review). Cross-references: `docs/INCIDENT_RESPONSE.md` R-23 (primary source — trigger matrix, severity classification, DEC-030 events, implementation checklist item 7); `docs/INCIDENT_RESPONSE.md` R-10 (earlier Victor safety runbook — §32 complements; §22.5 signals remain active); `docs/DATA_MODEL.md §2.9` (`coaching_turns` schema — `safety_classification` column addition); `docs/AUDIT_LOG_SCHEMA.md` (five DEC-030 events to be registered: `ai.safety_incident_opened` CRITICAL/HIGH 7yr, `ai.safety_incident_contained` HIGH 7yr, `ai.victor_disabled` HIGH 7yr, `ai.victor_reenabled` HIGH 7yr, `ai.safety_incident_resolved` STANDARD 3yr); `docs/SOC2_READINESS.md` CC7.2/CC7.3/CC7.4/CC9.2/A1.2 (evidence artefacts VSAFETY-E-001 through VSAFETY-E-004); §6.2 (`victor_safety_health` subsection — four rows); §12.6 (pg_cron registry — jobs 14 and 15); §22 (AI Coaching Quality Observability — quality signals; §32 is the safety companion); §27.2 (SIEM event table — `siem.victor_safety_p0` CRITICAL, `siem.victor_safety_p1` HIGH); `docs/CLINICAL_SAFETY.md` (re-enable procedure — P0 clinical-safety sign-off; §32.10 item 7 cross-references R-23 checklist item 2 for AUDIT_LOG_SCHEMA.md registration). Owner: devops-lead + security-engineer + clinical-safety + compliance-officer.*
 
 *v1.7 additions (2026-06-03): §30 Key Management & Cryptography Observability — operational counterpart to `docs/CRYPTOGRAPHY_POLICY.md` (policy) and `docs/SOC2_READINESS.md §56` (key inventory). TOC updated to add §30. §30.1 scopes the section to the eight-key production inventory (SUPABASE_SERVICE_ROLE_JWT 90d, HMAC_AUDIT_CHAIN_KEY annual dual-key, KEYPOINTS_ENC_KEY 365d, CLOUDFLARE_API_KEY 180d, WORKOS_API_KEY 180d, ANTHROPIC_API_KEY 90d, SENTRY_DSN 180d, SUPABASE_ANON_KEY 365d); establishes privacy floor (no key material in any signal, only key_id + days_until_rotation + key_version); declares SOC 2 scope CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2; introduces `form-crypto-health` Cloudflare KV namespace for rotation state. §30.2 RED metrics for `key-rotation-scheduler` Worker (checks/day, overdue key count, KV latency), `key-rotation-verifier` Edge Function (verifications/month, failures, duration), HMAC daily chain check, and Better Stack SSL synthetic for TLS certificates. §30.3 four KEY-SLOs: KEY-SLO-01 (all keys rotated within 110% of schedule — 100% zero-tolerance, SOC 2 CC5.3), KEY-SLO-02 (AL-KEY-01 fires ≥14 days before deadline — 100%), KEY-SLO-03 (hmac_key_rotation_verified emitted within 24h of hmac_key_rotated — 100%), KEY-SLO-04 (zero red-state keys >48h without active P0/P1 incident). §30.4 four AL-KEY-* alert rules: AL-KEY-01 (imminent ≤14d P1, auto-escalates to P0 at ≤3d, dedup 24h, SIEM medium), AL-KEY-02 (overdue P0, re-alerts 4h, auto-escalates at >7d to founder+compliance-officer, SIEM high), AL-KEY-03 (HMAC cadence >395d P1, belt-and-suspenders for HMAC_AUDIT_CHAIN_KEY), AL-KEY-04 (hmac verify missing within 24h of rotation P0, pg_cron 6h). §30.5 `crypto_key_health` §6.2 Alert Rules addition (four rows for §6.2 table insertion after `pam_session_health`). §30.6 four DEC-030 chain monitors: CRYPTO-CHAIN-01 (no SUPABASE_SERVICE_ROLE_JWT rotation in 91d), CRYPTO-CHAIN-02 (hmac_key_rotated without preceding hmac_key_rotation_initiated within 1h — unauthorized rotation, R-05/R-20 trigger), CRYPTO-CHAIN-03 (KEYPOINTS_ENC_KEY not rotated in 400d), CRYPTO-CHAIN-04 (key-rotation-scheduler Worker last-run age >26h — Better Stack synthetic). §30.7 nine-panel "Cryptographic Health" Metabase + Better Stack dashboard: key rotation status grid (8 keys green/amber/red), days until rotation bar chart, last rotated table, HMAC chain last verified stat, HMAC chain last break stat, AL-KEY-*/incident history bar chart 30d, TLS certificate expiry stat widgets, scheduler last-run health, SUPABASE_SERVICE_ROLE_JWT countdown. §30.8 four privacy constraints: no key material in any signal (enforced by Worker architecture — secrets accessible only via env binding, not KV write path), key names access-controlled (dashboard: devops-lead + security-engineer + compliance-officer only), key_version in DEC-030 only (not Analytics Engine), TLS CN/SAN in Better Stack only (not Sentry or Analytics Engine). §30.9 SOC 2 evidence mapping CC5.2/CC5.3/CC6.7/CC6.8/C1.1/CC7.2 with eight artefacts CRYPTO-E-001 through CRYPTO-E-008: weekly KEY-SLO-01 query export, quarterly CRYPTOGRAPHY_POLICY review records, form-crypto-health KV export, Metabase access logs, HMAC chain verified event extract, DEC-030 rotation sequence log, Better Stack TLS screenshot, PagerDuty crypto incident export. §30.10 ten-item implementation checklist: 4× P0 M4 (key-rotation-scheduler Worker, KV seed, AL-KEY-01/02 PagerDuty, AL-KEY-03/04 PagerDuty + §6.2 update), 1× P0 M7 (admin.encryption_key_rotated DEC-030 event — closes SOC2_READINESS §56.6 OQ-ENC-03), 4× P1 M4-M5 (KEY-SLO-* §2 registration, CRYPTO-CHAIN-01/04 pg_cron/batch, dashboard, evidence artefact filing). §30.11 two open questions: OQ-CRYPTO-OBS-01 (form-crypto-health KV shared vs separate namespace from PAM — current intent separate, confirm with platform-engineer before M4), OQ-CRYPTO-OBS-02 (TLS cert expiry via Better Stack SSL only vs Cloudflare cert API — recommendation: Better Stack primary + Cloudflare API secondary if staging renewal failure goes undetected). Cross-references: docs/CRYPTOGRAPHY_POLICY.md §5 (rotation procedures per key type), docs/SOC2_READINESS.md §56 (key inventory), docs/SOC2_READINESS.md §57 (SUPABASE_SERVICE_ROLE_JWT rotation runbook), docs/SOC2_READINESS.md §58 (HMAC_AUDIT_CHAIN_KEY dual-key rotation runbook), docs/AUDIT_LOG_SCHEMA.md (admin.encryption_key_rotated event — OQ-ENC-03), §6.2 (alert rules table — crypto_key_health subsection), §2 (SLO table — KEY-SLO-01 through KEY-SLO-04), docs/INCIDENT_RESPONSE.md R-05 (HMAC chain break) and R-20 (insider threat).*
+
+---
+
+## §33 Enterprise Tenant Engagement Health & QBR Metrics Observability
+
+### 33.1 Purpose and Scope
+
+Infrastructure observability (§13, §7.4) answers: *is FORM available and fast for this tenant?* Engagement health observability answers: *are this tenant's employees actually using FORM, and is the deployment succeeding?* This section defines the latter — the behavioral engagement signal layer that feeds CSM workflows, churn risk identification, and Quarterly Business Review (QBR) metric packages.
+
+**Distinction from related sections:**
+
+| Section | Signal type | Primary consumer | Privacy surface |
+|---|---|---|---|
+| §7.4 Enterprise Per-Tenant SLA | Infra availability, SSO success rate, SCIM events | Tenant admin (external) | Aggregate infra stats only |
+| §13 Per-Tenant Observability | `tenant_id` propagation, SLO breach detection, isolation verification | devops-lead, compliance-officer | Internal only |
+| **§33 Engagement Health** | Seat utilization, coaching engagement, onboarding progress, Customer Health Score | CSM (internal FORM) | Aggregate behavioral — k-anonymity floor n ≥ 10 |
+
+**Privacy floor (non-negotiable, see `docs/ENTERPRISE.md §Privacy floor for enterprise` and DEC-030):**
+
+1. Every metric in this section is computed at **tenant aggregate level only** — no per-user breakdown is stored, surfaced, or delivered to any party.
+2. **k-anonymity floor:** any metric for a tenant with fewer than 10 active seats in the measurement window is suppressed entirely — the row is withheld from the CSM dashboard and the QBR package, with a note: "Engagement metrics not surfaced for tenants < 10 active seats."
+3. **HR invariant:** employer HR departments, tenant admins, and any employer representative NEVER see per-user engagement data. The CSM engagement view is internal to FORM only and is NOT shared with the customer in this form. QBR packages expose only the metrics listed in §33.6 — nothing else.
+4. **No health data:** engagement metrics are session counts, feature adoption flags, and utilization ratios — never workout content, health measurements, coaching conversation topics, or CV pose data.
+
+**SOC 2 scope:** C1.1 (Confidentiality — behavioral data is internal-only and individual data is never disclosed to employer), CC2.2 (Communication — QBR package constitutes formal structured communication about service value), CC7.2 (Monitoring — engagement anomalies detected before they become contract risks).
+
+**Owners:** customer-success (CSM alert design, QBR package), product-manager (engagement metric definitions), compliance-officer (privacy floor enforcement, QBR content review), devops-lead (pg_cron jobs, dashboard).
+
+---
+
+### 33.2 Engagement Metric Taxonomy
+
+All metrics computed nightly by `tenant_engagement_daily` pg_cron job (§33.8) and stored in `tenant_engagement_snapshots` table (§33.7). Measurement window is the calendar day (UTC midnight to midnight) unless otherwise noted.
+
+| Metric name | Definition | Source tables | Retention | Notes |
+|---|---|---|---|---|
+| `provisioned_seats` | COUNT of rows in `tenant_members` with `status = 'active'` | `tenant_members` | 36 months | Updated in real-time by SCIM; snapshot is point-in-time at 02:00 UTC |
+| `active_seats_wau` | COUNT DISTINCT `user_id` from session events where `session_started_at >= NOW() - INTERVAL '7 days'` AND `tenant_id = ?` | PostHog `app.opened` join via `user_profiles.tenant_id` | 36 months | Pseudonymous UUID join — no PII in metric |
+| `seat_utilization_7d` | `active_seats_wau / NULLIF(provisioned_seats, 0)` | Derived | 36 months | Primary churn-risk signal; 0–1 ratio |
+| `coaching_sessions_30d` | COUNT of distinct coaching sessions (`coaching_turns` grouped by `session_id`) in last 30 days for tenant | `coaching_turns` (tenant_id, session_id, created_at only — no content) | 36 months | ZERO access to `coaching_turns.content` in this computation; SELECT on session_id + tenant_id + created_at only |
+| `coaching_sessions_per_active_seat_30d` | `coaching_sessions_30d / NULLIF(active_seats_wau, 0)` | Derived | 36 months | Coaching engagement depth signal |
+| `onboarding_completion_rate` | COUNT of `user_profiles` where `onboarding_completed_at IS NOT NULL` / `provisioned_seats` for users provisioned in last 180 days | `user_profiles` (onboarding_completed_at, tenant_id only) | 36 months | Suppressed for tenants > 180 days old — use `cohort_retention_30d` instead |
+| `cohort_retention_30d` | Proportion of users active in Week 1 of this tenant's deployment who are also active in the most recent 7-day window | `user_profiles` + PostHog | 36 months | For mature tenants (> 180d); complexity: computed monthly not nightly |
+| `feature_adoption_sso` | 1 if tenant has SSO configured (`tenants.sso_provider IS NOT NULL`), else 0 | `tenants` | 36 months | Binary flag |
+| `feature_adoption_scim` | 1 if tenant has SCIM provisioning active (`tenants.scim_enabled = true`) | `tenants` | 36 months | Binary flag |
+| `feature_adoption_admin_login_30d` | 1 if any tenant admin (`tenant_members.role = 'admin'`) has logged into the Admin Dashboard in the last 30 days | `audit_log_events` filtered on `action = 'admin.dashboard_viewed'` + `tenant_id` | 36 months | Proxy for admin engagement with the account |
+| `feature_adoption_wearable` | 1 if ≥ 1 active seat has a connected wearable (`wearable_connections.status = 'active'`) | `wearable_connections` | 36 months | Optional feature — not expected on all accounts |
+| `chs_score` | Customer Health Score 0–100 (see §33.3) | Derived | 36 months | Computed in `tenant_chs_compute` pg_cron job (§33.8) after `tenant_engagement_daily` completes |
+| `chs_band` | Enum: `healthy` (≥ 70), `at_risk` (40–69), `critical` (< 40) | Derived from `chs_score` | 36 months | Primary CSM alert trigger |
+
+**Privacy enforcement in SQL:** the `tenant_engagement_daily` Worker uses `form_analytics` Supabase role, which has:
+- SELECT on `tenant_members (tenant_id, user_id, status, role)` only — no `email`, no `display_name`, no `phone`
+- SELECT on `coaching_turns (session_id, tenant_id, created_at)` only — `content`, `model_response`, `safety_classification` are excluded via column-level privilege
+- SELECT on `user_profiles (user_id, tenant_id, onboarding_completed_at)` only
+- SELECT on `tenants (id, slug, sso_provider, scim_enabled)` only
+
+---
+
+### 33.3 Customer Health Score (CHS) Model
+
+CHS is a composite 0–100 score computed nightly per tenant. It is an *internal* signal only — it is never shared directly with tenant admins or employer HR. The CSM may share qualitative observations derived from CHS during a QBR call, but the numeric score itself is not in the standard QBR package.
+
+#### CHS Component Weights
+
+| Component | Weight | Metric used | Scoring |
+|---|---|---|---|
+| **Seat Utilization** | 40% | `seat_utilization_7d` | ≥ 0.70 → 100pts; 0.50–0.70 → 75pts; 0.35–0.50 → 50pts; 0.20–0.35 → 25pts; < 0.20 → 0pts |
+| **Coaching Engagement** | 30% | `coaching_sessions_per_active_seat_30d` | ≥ 8 sessions → 100pts; 4–8 → 75pts; 2–4 → 50pts; 0.5–2 → 25pts; < 0.5 → 0pts |
+| **Onboarding / Retention** | 20% | `onboarding_completion_rate` (< 180d tenants); `cohort_retention_30d` (≥ 180d tenants) | ≥ 0.90 → 100pts; 0.70–0.90 → 75pts; 0.50–0.70 → 50pts; 0.30–0.50 → 25pts; < 0.30 → 0pts |
+| **Feature Adoption** | 10% | Sum of four adoption flags × 25 | Each flag = 25pts; max 100pts |
+
+**CHS formula:**
+
+```
+chs_score = ROUND(
+  (seat_utilization_pts   * 0.40) +
+  (coaching_engage_pts    * 0.30) +
+  (onboarding_retain_pts  * 0.20) +
+  (feature_adoption_pts   * 0.10)
+)
+```
+
+#### CHS Bands
+
+| Band | Score range | Meaning | Default CSM cadence |
+|---|---|---|---|
+| **Healthy** | 70–100 | Tenant is engaged and realising value | Quarterly QBR only |
+| **At Risk** | 40–69 | One or more components underperforming; proactive outreach warranted | Monthly check-in + QBR |
+| **Critical** | < 40 | Significant engagement gap; churn risk elevated | Weekly CSM contact + escalation to CS lead |
+
+**k-anonymity gate:** if `provisioned_seats < 10` at snapshot time, `chs_score` and `chs_band` are stored as NULL and the CSM dashboard shows "Metrics suppressed — tenant below minimum size threshold." The alert rules in §33.4 do NOT fire for sub-threshold tenants.
+
+---
+
+### 33.4 CSM Alert Rules (AL-ENGAGE-01 through AL-ENGAGE-06)
+
+All alerts route to the "FORM Customer Success" PagerDuty service (not SIEM — these are business health signals, not security signals). Deduplication is per-tenant per calendar week unless noted. No suppression rule applies because false positives here mean a CSM makes an unnecessary proactive call — far preferable to missing a genuine churn signal.
+
+| Alert ID | Trigger condition | Severity | Routing | Dedup key | Runbook |
+|---|---|---|---|---|---|
+| **AL-ENGAGE-01** | `seat_utilization_7d < 0.40` for 14+ consecutive daily snapshots AND `provisioned_seats >= 10` | P2 | Slack `#csm-alerts` only (not PagerDuty) | `engage-util-low-{tenant_id}-{YYYY-WW}` | CSM: send proactive email to primary admin; review admin dashboard login cadence; schedule check-in call within 5 business days |
+| **AL-ENGAGE-02** | `seat_utilization_7d < 0.25` for 7+ consecutive daily snapshots AND `provisioned_seats >= 10` | P1 | PagerDuty "FORM Customer Success" → CSM primary (0-min) + CS lead (15-min) | `engage-util-critical-{tenant_id}` (no auto-resolve; re-alert after 7 days if persisting) | CSM: immediate phone/video contact with primary admin; assess whether rollout support or product issue; involve CS lead if no response within 24h; document outcome in CRM |
+| **AL-ENGAGE-03** | Zero `coaching_sessions_30d` for a tenant where `active_seats_wau >= 5` in the same window | P1 | PagerDuty "FORM Customer Success" → CSM primary (0-min) | `engage-zero-coaching-{tenant_id}-{YYYY-MM}` | CSM: confirm Victor is enabled for tenant (check `tenants.victor_enabled`); if disabled, check INCIDENT_RESPONSE.md R-23 for context; if enabled, contact admin to understand usage barrier |
+| **AL-ENGAGE-04** | Tenant age < 90 days AND `onboarding_completion_rate < 0.50` at the 30-day snapshot checkpoint | P2 | Slack `#csm-alerts` + PagerDuty "FORM Customer Success" → CSM primary | `engage-onboarding-lag-{tenant_id}-30d` | CSM: review technical setup completion in ENTERPRISE_ONBOARDING.md §3; offer onboarding webinar; confirm employee communication has been sent per §4.3 assets |
+| **AL-ENGAGE-05** | `chs_score < 40` (newly entered Critical band from previous At Risk or Healthy band) AND `provisioned_seats >= 10` | P2 | Slack `#csm-alerts` with CHS component breakdown (aggregate scores only — no user data) | `engage-chs-critical-{tenant_id}-{YYYY-WW}` | CSM: review which CHS component drove the drop; address the weakest component first (seat utilization → admin outreach; coaching engagement → re-training session; onboarding → ENTERPRISE_ONBOARDING §3 checklist review) |
+| **AL-ENGAGE-06** | `chs_score < 30` AND CHS declining for 3+ consecutive weekly snapshots (trend: each week's `chs_score` < prior week's, minimum 3 data points) | P1 | PagerDuty "FORM Customer Success" → CSM primary (0-min) + CS lead (0-min) + customer-success VP (15-min) | `engage-chs-freefall-{tenant_id}` (re-alert weekly) | CS lead: treat as formal churn risk; convene internal call within 24h; prepare executive outreach plan; review whether contract terms allow for structured re-onboarding; emit `tenant.churn_risk_flagged` DEC-030 event manually if not yet emitted by pg_cron |
+
+**Privacy requirement for all alerts:** alert messages must not include any individual user names, individual session counts, individual health or workout data, or any field that could identify a specific employee. Alert payloads are limited to `tenant_id` (internal slug only — not full UUID in Slack), aggregate metric values, and trend direction.
+
+---
+
+### 33.5 §6.2 Alert Rules Table Addition — `engagement_health` Subsection
+
+The following rows are to be inserted into the §6.2 Alert Rules table after the `api_key_health` subsection (§31.5):
+
+```
+| — | **engagement_health** | — | — | — | — | — |
+| AL-ENGAGE-01 | Seat utilization < 40% for 14+ days (provisioned_seats ≥ 10) | P2 | Slack #csm-alerts | engage-util-low-{tenant_id}-{YYYY-WW} | None | §33.4 |
+| AL-ENGAGE-02 | Seat utilization < 25% for 7+ days (provisioned_seats ≥ 10) | P1 | PagerDuty "FORM Customer Success" | engage-util-critical-{tenant_id} | 7 days | §33.4 |
+| AL-ENGAGE-03 | Zero coaching sessions for tenant with ≥ 5 active seats / 30 days | P1 | PagerDuty "FORM Customer Success" | engage-zero-coaching-{tenant_id}-{YYYY-MM} | None | §33.4 |
+| AL-ENGAGE-04 | New tenant (< 90d): onboarding completion < 50% at Day 30 checkpoint | P2 | Slack #csm-alerts + PagerDuty | engage-onboarding-lag-{tenant_id}-30d | None | §33.4 |
+| AL-ENGAGE-05 | CHS newly entered Critical band (< 40, provisioned_seats ≥ 10) | P2 | Slack #csm-alerts | engage-chs-critical-{tenant_id}-{YYYY-WW} | None | §33.4 |
+| AL-ENGAGE-06 | CHS < 30 and declining 3+ consecutive weeks | P1 | PagerDuty "FORM Customer Success" | engage-chs-freefall-{tenant_id} | 7 days | §33.4 |
+```
+
+---
+
+### 33.6 QBR Metrics Package
+
+The QBR package is generated quarterly per active enterprise tenant and shared with the primary admin contact. It is a structured PDF/slide summary. **Content is restricted to the metrics listed below** — the compliance-officer must approve any addition to this list before it is included in a delivered QBR package.
+
+**Approved QBR metrics (aggregate, no per-user data):**
+
+| Metric | Description | Visual format |
+|---|---|---|
+| Seat utilization (quarterly trend) | `seat_utilization_7d` weekly trend over the prior 90 days | Line chart |
+| Active seats vs. provisioned seats | `active_seats_wau` and `provisioned_seats` side by side, weekly | Dual time-series |
+| Total coaching sessions (quarter) | `coaching_sessions_30d` summed to quarterly (3× monthly) | Stat + bar chart by month |
+| Coaching sessions / active seat / month | `coaching_sessions_per_active_seat_30d` monthly average | Stat |
+| Onboarding completion (if < 180d) | `onboarding_completion_rate` point-in-time | Single stat with benchmark |
+| Feature adoption summary | SSO, SCIM, admin dashboard login, wearable — four binary flags | Four-cell icon grid |
+| SLA uptime summary | From §7.4 / §13.3 SLA API — availability % for the quarter | Stat per SLA commitment |
+| Incidents affecting this tenant | Count from PagerDuty filtered by tenant label | Stat (ideally 0) |
+
+**What is NOT in the QBR package:**
+- Individual employee names, session counts, or activity data
+- Coaching conversation topics or content
+- Health metrics (weight, HRV, body composition)
+- CHS score (internal signal only)
+- Comparison to other tenants
+- Any PostHog raw event data
+
+**QBR generation process:**
+1. `tenant_qbr_report_generate` pg_cron job (manual trigger by CSM via Edge Function API call — not automatic, see §33.8) pulls approved metrics from `tenant_engagement_snapshots` and §7.4 SLA API.
+2. Formatted as a JSON payload delivered to the CSM dashboard QBR section.
+3. CSM exports to slide deck using the approved FORM Enterprise QBR template.
+4. compliance-officer spot-checks one QBR per quarter for content policy adherence; files ENGAGE-E-003 artefact (§33.11).
+5. `tenant.qbr_report_generated` DEC-030 event emitted on each generation (§33.10).
+
+---
+
+### 33.7 `tenant_engagement_snapshots` Postgres DDL
+
+```sql
+-- Migration 0057_tenant_engagement_snapshots.sql
+CREATE TABLE IF NOT EXISTS tenant_engagement_snapshots (
+  id                                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  snapshot_date                     DATE NOT NULL,
+
+  -- Seat metrics
+  provisioned_seats                 INTEGER NOT NULL CHECK (provisioned_seats >= 0),
+  active_seats_wau                  INTEGER NOT NULL CHECK (active_seats_wau >= 0),
+  seat_utilization_7d               NUMERIC(5, 4) CHECK (seat_utilization_7d BETWEEN 0 AND 1),
+
+  -- Coaching engagement
+  coaching_sessions_30d             INTEGER NOT NULL DEFAULT 0 CHECK (coaching_sessions_30d >= 0),
+  coaching_sessions_per_active_seat NUMERIC(6, 2) CHECK (coaching_sessions_per_active_seat >= 0),
+
+  -- Onboarding / retention
+  onboarding_completion_rate        NUMERIC(5, 4) CHECK (onboarding_completion_rate BETWEEN 0 AND 1),
+  cohort_retention_30d              NUMERIC(5, 4) CHECK (cohort_retention_30d BETWEEN 0 AND 1),
+
+  -- Feature adoption (binary flags)
+  feature_sso_enabled               BOOLEAN NOT NULL DEFAULT false,
+  feature_scim_enabled              BOOLEAN NOT NULL DEFAULT false,
+  feature_admin_login_30d           BOOLEAN NOT NULL DEFAULT false,
+  feature_wearable_active           BOOLEAN NOT NULL DEFAULT false,
+
+  -- Customer Health Score (computed by separate pg_cron job after engagement job)
+  chs_score                         INTEGER CHECK (chs_score BETWEEN 0 AND 100),
+  chs_band                          TEXT CHECK (chs_band IN ('healthy', 'at_risk', 'critical')),
+  chs_seat_util_pts                 INTEGER CHECK (chs_seat_util_pts BETWEEN 0 AND 100),
+  chs_coaching_pts                  INTEGER CHECK (chs_coaching_pts BETWEEN 0 AND 100),
+  chs_onboarding_pts                INTEGER CHECK (chs_onboarding_pts BETWEEN 0 AND 100),
+  chs_feature_pts                   INTEGER CHECK (chs_feature_pts BETWEEN 0 AND 100),
+
+  -- k-anonymity gate
+  below_k_threshold                 BOOLEAN NOT NULL DEFAULT false,
+  -- true when provisioned_seats < 10; chs_score, chs_band, and all behavioral metrics are NULL when true
+
+  computed_at                       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE (tenant_id, snapshot_date)
+);
+
+-- Indexes
+CREATE INDEX idx_tes_tenant_date     ON tenant_engagement_snapshots (tenant_id, snapshot_date DESC);
+CREATE INDEX idx_tes_chs_band_date   ON tenant_engagement_snapshots (chs_band, snapshot_date DESC)
+  WHERE below_k_threshold = false;
+CREATE INDEX idx_tes_util_low        ON tenant_engagement_snapshots (tenant_id, snapshot_date DESC)
+  WHERE seat_utilization_7d < 0.40 AND below_k_threshold = false;
+
+-- 36-month rolling retention
+SELECT cron.schedule(
+  'tenant_engagement_cleanup',
+  '0 4 1 * *',
+  $$DELETE FROM tenant_engagement_snapshots WHERE snapshot_date < NOW() - INTERVAL '36 months'$$
+);
+
+-- RLS
+ALTER TABLE tenant_engagement_snapshots ENABLE ROW LEVEL SECURITY;
+
+-- form_analytics role: INSERT only (nightly job writes)
+CREATE POLICY tes_analytics_insert ON tenant_engagement_snapshots
+  FOR INSERT TO form_analytics WITH CHECK (true);
+
+-- form_system role: full access for maintenance
+CREATE POLICY tes_system_all ON tenant_engagement_snapshots
+  FOR ALL TO form_system USING (true) WITH CHECK (true);
+
+-- customer_success role: SELECT on all rows where below_k_threshold = false
+CREATE POLICY tes_csm_read ON tenant_engagement_snapshots
+  FOR SELECT TO customer_success
+  USING (below_k_threshold = false);
+
+-- No tenant_admin access: tenant admins see infra SLOs via §7.4 SLA API (§13.3), NOT engagement behavioral data.
+-- HR invariant: employer has zero access to this table by design.
+```
+
+---
+
+### 33.8 pg_cron Jobs
+
+#### Job 16 — `tenant_engagement_daily` (nightly at 02:00 UTC)
+
+```sql
+-- Registered in §12.6 pg_cron registry as job 18 (jobs 16 and 17 reserved by DATA_MODEL.md §28)
+SELECT cron.schedule(
+  'tenant_engagement_daily',
+  '0 2 * * *',
+  $$
+  INSERT INTO tenant_engagement_snapshots (
+    tenant_id, snapshot_date,
+    provisioned_seats, active_seats_wau,
+    seat_utilization_7d,
+    coaching_sessions_30d, coaching_sessions_per_active_seat,
+    onboarding_completion_rate,
+    feature_sso_enabled, feature_scim_enabled,
+    feature_admin_login_30d, feature_wearable_active,
+    below_k_threshold
+  )
+  SELECT
+    t.id                                              AS tenant_id,
+    CURRENT_DATE                                      AS snapshot_date,
+    -- Provisioned seats
+    COUNT(DISTINCT tm.user_id)
+      FILTER (WHERE tm.status = 'active')             AS provisioned_seats,
+    -- Active seats WAU (pseudonymous UUID join only)
+    COUNT(DISTINCT ae.user_id)
+      FILTER (WHERE ae.created_at >= NOW() - INTERVAL '7 days'
+                AND ae.action = 'session.started')    AS active_seats_wau,
+    -- Seat utilization ratio
+    ROUND(
+      COUNT(DISTINCT ae.user_id) FILTER (WHERE ae.created_at >= NOW() - INTERVAL '7 days' AND ae.action = 'session.started')::numeric /
+      NULLIF(COUNT(DISTINCT tm.user_id) FILTER (WHERE tm.status = 'active'), 0),
+      4
+    )                                                 AS seat_utilization_7d,
+    -- Coaching sessions (session_id count, no content)
+    COUNT(DISTINCT ct.session_id)
+      FILTER (WHERE ct.created_at >= NOW() - INTERVAL '30 days') AS coaching_sessions_30d,
+    ROUND(
+      COUNT(DISTINCT ct.session_id) FILTER (WHERE ct.created_at >= NOW() - INTERVAL '30 days')::numeric /
+      NULLIF(COUNT(DISTINCT ae.user_id) FILTER (WHERE ae.created_at >= NOW() - INTERVAL '7 days' AND ae.action = 'session.started'), 0),
+      2
+    )                                                 AS coaching_sessions_per_active_seat,
+    -- Onboarding completion (members provisioned in last 180d)
+    ROUND(
+      COUNT(DISTINCT up.user_id) FILTER (WHERE up.onboarding_completed_at IS NOT NULL AND tm.created_at >= NOW() - INTERVAL '180 days')::numeric /
+      NULLIF(COUNT(DISTINCT tm.user_id) FILTER (WHERE tm.created_at >= NOW() - INTERVAL '180 days' AND tm.status = 'active'), 0),
+      4
+    )                                                 AS onboarding_completion_rate,
+    -- Feature flags
+    (t.sso_provider IS NOT NULL)                      AS feature_sso_enabled,
+    COALESCE(t.scim_enabled, false)                   AS feature_scim_enabled,
+    EXISTS (
+      SELECT 1 FROM audit_log_events ale2
+      WHERE ale2.tenant_id = t.id
+        AND ale2.action = 'admin.dashboard_viewed'
+        AND ale2.created_at >= NOW() - INTERVAL '30 days'
+      LIMIT 1
+    )                                                 AS feature_admin_login_30d,
+    EXISTS (
+      SELECT 1 FROM wearable_connections wc
+      INNER JOIN tenant_members tm2 ON wc.user_id = tm2.user_id
+      WHERE tm2.tenant_id = t.id AND wc.status = 'active'
+      LIMIT 1
+    )                                                 AS feature_wearable_active,
+    -- k-anonymity gate
+    (COUNT(DISTINCT tm.user_id) FILTER (WHERE tm.status = 'active') < 10) AS below_k_threshold
+  FROM tenants t
+  LEFT JOIN tenant_members tm ON tm.tenant_id = t.id
+  LEFT JOIN audit_log_events ae ON ae.tenant_id = t.id
+  LEFT JOIN coaching_turns ct ON ct.tenant_id = t.id
+  LEFT JOIN user_profiles up ON up.tenant_id = t.id AND up.user_id = tm.user_id
+  WHERE t.tier = 'enterprise' AND t.status = 'active'
+  GROUP BY t.id, t.sso_provider, t.scim_enabled
+  ON CONFLICT (tenant_id, snapshot_date) DO UPDATE SET
+    provisioned_seats              = EXCLUDED.provisioned_seats,
+    active_seats_wau               = EXCLUDED.active_seats_wau,
+    seat_utilization_7d            = EXCLUDED.seat_utilization_7d,
+    coaching_sessions_30d          = EXCLUDED.coaching_sessions_30d,
+    coaching_sessions_per_active_seat = EXCLUDED.coaching_sessions_per_active_seat,
+    onboarding_completion_rate     = EXCLUDED.onboarding_completion_rate,
+    feature_sso_enabled            = EXCLUDED.feature_sso_enabled,
+    feature_scim_enabled           = EXCLUDED.feature_scim_enabled,
+    feature_admin_login_30d        = EXCLUDED.feature_admin_login_30d,
+    feature_wearable_active        = EXCLUDED.feature_wearable_active,
+    below_k_threshold              = EXCLUDED.below_k_threshold,
+    computed_at                    = NOW();
+  $$
+);
+```
+
+**Privacy note:** the SELECT list never reads `coaching_turns.content`, `coaching_turns.model_response`, `coaching_turns.safety_classification`, `user_profiles.email`, `user_profiles.display_name`, `tenant_members.email`, or any field containing health data values. The `form_analytics` role enforces this via column-level privilege — any SELECT on excluded columns returns a permission error, not a NULL. CI test must assert this via a negative-privilege integration test.
+
+#### Job 17 — `tenant_chs_compute` (nightly at 02:30 UTC, after job 16)
+
+```sql
+SELECT cron.schedule(
+  'tenant_chs_compute',
+  '30 2 * * *',
+  $$
+  UPDATE tenant_engagement_snapshots tes
+  SET
+    chs_seat_util_pts = CASE
+      WHEN tes.seat_utilization_7d >= 0.70 THEN 100
+      WHEN tes.seat_utilization_7d >= 0.50 THEN 75
+      WHEN tes.seat_utilization_7d >= 0.35 THEN 50
+      WHEN tes.seat_utilization_7d >= 0.20 THEN 25
+      ELSE 0
+    END,
+    chs_coaching_pts = CASE
+      WHEN tes.coaching_sessions_per_active_seat >= 8   THEN 100
+      WHEN tes.coaching_sessions_per_active_seat >= 4   THEN 75
+      WHEN tes.coaching_sessions_per_active_seat >= 2   THEN 50
+      WHEN tes.coaching_sessions_per_active_seat >= 0.5 THEN 25
+      ELSE 0
+    END,
+    chs_onboarding_pts = CASE
+      WHEN tes.onboarding_completion_rate >= 0.90 THEN 100
+      WHEN tes.onboarding_completion_rate >= 0.70 THEN 75
+      WHEN tes.onboarding_completion_rate >= 0.50 THEN 50
+      WHEN tes.onboarding_completion_rate >= 0.30 THEN 25
+      WHEN tes.onboarding_completion_rate IS NULL  THEN 75  -- mature tenants: assume retained until monthly cohort_retention_30d available
+      ELSE 0
+    END,
+    chs_feature_pts = (
+      (tes.feature_sso_enabled::int +
+       tes.feature_scim_enabled::int +
+       tes.feature_admin_login_30d::int +
+       tes.feature_wearable_active::int) * 25
+    ),
+    chs_score = CASE WHEN tes.below_k_threshold THEN NULL ELSE
+      ROUND(
+        (CASE WHEN tes.seat_utilization_7d >= 0.70 THEN 100 WHEN tes.seat_utilization_7d >= 0.50 THEN 75 WHEN tes.seat_utilization_7d >= 0.35 THEN 50 WHEN tes.seat_utilization_7d >= 0.20 THEN 25 ELSE 0 END) * 0.40 +
+        (CASE WHEN tes.coaching_sessions_per_active_seat >= 8 THEN 100 WHEN tes.coaching_sessions_per_active_seat >= 4 THEN 75 WHEN tes.coaching_sessions_per_active_seat >= 2 THEN 50 WHEN tes.coaching_sessions_per_active_seat >= 0.5 THEN 25 ELSE 0 END) * 0.30 +
+        (CASE WHEN tes.onboarding_completion_rate >= 0.90 THEN 100 WHEN tes.onboarding_completion_rate >= 0.70 THEN 75 WHEN tes.onboarding_completion_rate >= 0.50 THEN 50 WHEN tes.onboarding_completion_rate >= 0.30 THEN 25 WHEN tes.onboarding_completion_rate IS NULL THEN 75 ELSE 0 END) * 0.20 +
+        ((tes.feature_sso_enabled::int + tes.feature_scim_enabled::int + tes.feature_admin_login_30d::int + tes.feature_wearable_active::int) * 25) * 0.10
+      )
+    END,
+    chs_band = CASE WHEN tes.below_k_threshold THEN NULL ELSE
+      CASE
+        WHEN ROUND(
+          (CASE WHEN tes.seat_utilization_7d >= 0.70 THEN 100 WHEN tes.seat_utilization_7d >= 0.50 THEN 75 WHEN tes.seat_utilization_7d >= 0.35 THEN 50 WHEN tes.seat_utilization_7d >= 0.20 THEN 25 ELSE 0 END) * 0.40 +
+          (CASE WHEN tes.coaching_sessions_per_active_seat >= 8 THEN 100 WHEN tes.coaching_sessions_per_active_seat >= 4 THEN 75 WHEN tes.coaching_sessions_per_active_seat >= 2 THEN 50 WHEN tes.coaching_sessions_per_active_seat >= 0.5 THEN 25 ELSE 0 END) * 0.30 +
+          (CASE WHEN tes.onboarding_completion_rate >= 0.90 THEN 100 WHEN tes.onboarding_completion_rate >= 0.70 THEN 75 WHEN tes.onboarding_completion_rate >= 0.50 THEN 50 WHEN tes.onboarding_completion_rate >= 0.30 THEN 25 WHEN tes.onboarding_completion_rate IS NULL THEN 75 ELSE 0 END) * 0.20 +
+          ((tes.feature_sso_enabled::int + tes.feature_scim_enabled::int + tes.feature_admin_login_30d::int + tes.feature_wearable_active::int) * 25) * 0.10
+        ) >= 70 THEN 'healthy'
+        WHEN ROUND(
+          (CASE WHEN tes.seat_utilization_7d >= 0.70 THEN 100 WHEN tes.seat_utilization_7d >= 0.50 THEN 75 WHEN tes.seat_utilization_7d >= 0.35 THEN 50 WHEN tes.seat_utilization_7d >= 0.20 THEN 25 ELSE 0 END) * 0.40 +
+          (CASE WHEN tes.coaching_sessions_per_active_seat >= 8 THEN 100 WHEN tes.coaching_sessions_per_active_seat >= 4 THEN 75 WHEN tes.coaching_sessions_per_active_seat >= 2 THEN 50 WHEN tes.coaching_sessions_per_active_seat >= 0.5 THEN 25 ELSE 0 END) * 0.30 +
+          (CASE WHEN tes.onboarding_completion_rate >= 0.90 THEN 100 WHEN tes.onboarding_completion_rate >= 0.70 THEN 75 WHEN tes.onboarding_completion_rate >= 0.50 THEN 50 WHEN tes.onboarding_completion_rate >= 0.30 THEN 25 WHEN tes.onboarding_completion_rate IS NULL THEN 75 ELSE 0 END) * 0.20 +
+          ((tes.feature_sso_enabled::int + tes.feature_scim_enabled::int + tes.feature_admin_login_30d::int + tes.feature_wearable_active::int) * 25) * 0.10
+        ) >= 40 THEN 'at_risk'
+        ELSE 'critical'
+      END
+    END,
+    computed_at = NOW()
+  WHERE tes.snapshot_date = CURRENT_DATE;
+  $$
+);
+```
+
+**pg_cron registry updates:** add to §12.6 table as jobs 18 and 19 (jobs 16 and 17 are already registered in `docs/DATA_MODEL.md §28` for rate-limit violation cleanup and quota archive respectively):
+- Job 18: `tenant_engagement_daily` · `0 2 * * *` · owner: platform-engineer · freshness window: 26h
+- Job 19: `tenant_chs_compute` · `30 2 * * *` · owner: platform-engineer · depends on job 18; freshness window: 26h
+
+**QBR generation function:** `tenant_qbr_report_generate(tenant_id UUID)` is an Edge Function callable by CSM via authenticated Admin API (`POST /admin/tenants/:id/qbr`). It reads from `tenant_engagement_snapshots` (last 90 days) and the §13.3 SLA API, emits `tenant.qbr_report_generated` DEC-030 event, and returns a JSON payload. Not a pg_cron job — triggered manually by CSM before each QBR meeting.
+
+---
+
+### 33.9 Privacy Constraints
+
+| Constraint | Enforcement point | Test assertion |
+|---|---|---|
+| No per-user engagement data in any metric | `form_analytics` role column-level privilege: SELECT excludes all PII and content columns | CI integration test: `SET ROLE form_analytics; SELECT email FROM user_profiles;` must return `ERROR: permission denied for column email` |
+| k-anonymity floor (n ≥ 10) | `below_k_threshold` column gates CHS and all behavioral metrics; CSM dashboard WHERE clause filters `below_k_threshold = false` | QA assertion: synthetic tenant with 9 members must have `chs_score = NULL` in snapshot |
+| No CHS score in QBR package | `tenant_qbr_report_generate` function approved metric list hardcoded; no `chs_score` or `chs_band` field in return schema | Code review gate: PR touching this function requires compliance-officer approval |
+| No tenant comparison in QBR | QBR function is scoped to a single `tenant_id`; no cross-tenant query is possible with `tenant_id = ?` binding | Structural: single-tenant parameterized query; no UNION or subquery referencing other tenant_ids |
+| HR invariant: no individual user data to employer | `tenant_engagement_snapshots` RLS: zero policy for `tenant_admin` role; zero policy for any employer-controlled identity | RLS test: `SET ROLE tenant_admin; SELECT * FROM tenant_engagement_snapshots;` must return 0 rows |
+| CSM sees aggregate slug only in alerts | Alert payload generator uses `tenants.slug` (short identifier) not `tenants.id` (UUID) | Alert template review in alert-payload.ts |
+| No health data in any snapshot column | Schema review: no weight, HRV, body composition, coaching content, or Art. 9 category data in `tenant_engagement_snapshots` DDL | DDL schema diff must be reviewed by compliance-officer before migration |
+
+---
+
+### 33.10 DEC-030 Audit Events
+
+Four new DEC-030 events to be registered in `docs/AUDIT_LOG_SCHEMA.md §6`:
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `tenant.churn_risk_flagged` | HIGH | 3 years | AL-ENGAGE-02 fires (seat utilization < 25% for 7+ days) OR AL-ENGAGE-06 fires (CHS freefall); emitted by the alert evaluation pg_cron job that detects the condition | `tenant_id` (UUID), `trigger_rule` (enum: `AL-ENGAGE-02` / `AL-ENGAGE-06`), `chs_score` (integer), `seat_utilization_7d` (numeric), `consecutive_days_below_threshold` (integer), `csm_user_id` (UUID of assigned CSM, nullable) |
+| `tenant.engagement_milestone_achieved` | STANDARD | 90 days | CHS crosses from at_risk/critical into healthy band (chs_band changes to 'healthy' AND prior 7-day average was < 70) | `tenant_id` (UUID), `prior_band` (enum), `new_chs_score` (integer), `snapshot_date` (date) |
+| `tenant.qbr_report_generated` | STANDARD | 90 days | `tenant_qbr_report_generate` Edge Function called successfully | `tenant_id` (UUID), `generated_by` (CSM user_id UUID), `quarter` (e.g. `2026-Q3`), `metrics_included` (string array of approved metric names — confirms content policy adherence), `report_id` (UUID for correlation) |
+| `analytics.tenant_engagement_computed` | LOW | 30 days | `tenant_engagement_daily` pg_cron job completes; emitted once per run (not per tenant) | `tenants_processed` (integer count), `tenants_below_k_threshold` (integer), `run_duration_ms` (integer), `snapshot_date` (date) |
+
+**Zod schema for `tenant.churn_risk_flagged`:**
+```typescript
+const TenantChurnRiskFlaggedPayload = z.object({
+  tenant_id:                     z.string().uuid(),
+  trigger_rule:                  z.enum(['AL-ENGAGE-02', 'AL-ENGAGE-06']),
+  chs_score:                     z.number().int().min(0).max(100).nullable(),
+  seat_utilization_7d:           z.number().min(0).max(1).nullable(),
+  consecutive_days_below_threshold: z.number().int().min(0),
+  csm_user_id:                   z.string().uuid().nullable(),
+});
+```
+
+**Privacy invariant:** none of the four events contain individual user_id values, employee PII, coaching content, or health data. `tenant_id` is the only identifier. The `generated_by` field in `tenant.qbr_report_generated` is the FORM internal CSM's user_id (not a customer employee).
+
+---
+
+### 33.11 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | Evidence from this section |
+|---|---|---|
+| **C1.1** — Confidential information protected from disclosure | Engagement behavioral data is internal-only (RLS: `tenant_admin` = zero access); k-anonymity floor prevents identification of individuals even at aggregate level; CHS score never shared with employer | ENGAGE-E-001: `tenant_engagement_snapshots` RLS policy export showing zero `tenant_admin` policy; negative-privilege test log showing `SET ROLE tenant_admin` returns 0 rows |
+| **C1.2** — Confidential information disposed of appropriately | 36-month retention with pg_cron cleanup; behavioral metrics not forwarded to any external analytics platform | ENGAGE-E-001: pg_cron `tenant_engagement_cleanup` schedule export |
+| **CC2.2** — Internal and external communications about FORM commitments | QBR package is a formal, structured, compliance-reviewed communication to enterprise customers; content policy list enforced at code level; compliance-officer spot-check quarterly | ENGAGE-E-002: one anonymised QBR package per quarter showing only approved metrics; compliance-officer spot-check sign-off in Linear |
+| **CC7.2** — Monitoring for anomalies | Six AL-ENGAGE-* alert rules provide systematic monitoring of engagement health; CHS freefall detection spans three consecutive weekly observations (reducing false positives while catching sustained decline) | ENGAGE-E-003: PagerDuty "FORM Customer Success" alert history for AL-ENGAGE-01 through AL-ENGAGE-06 over observation window; `tenant.churn_risk_flagged` DEC-030 event export |
+| **A1.1** — Capacity and performance objectives for availability | Seat utilization monitoring (AL-ENGAGE-01/02) provides leading indicator of whether FORM is delivering value relative to contracted capacity | ENGAGE-E-003: AL-ENGAGE-01/02 alert history; ENGAGE-E-002: QBR seat utilization trend charts |
+
+**Evidence artefacts (to be collected after 30 days of enterprise tenant data):**
+
+| Artefact ID | Description | Location | Retention |
+|---|---|---|---|
+| **ENGAGE-E-001** | `tenant_engagement_snapshots` DDL export + RLS policy list + negative-privilege test log (form_analytics column denial, tenant_admin zero-row test) | `compliance/evidence/engagement/engage-e-001-ddl-rls-2026.md` | 3 years |
+| **ENGAGE-E-002** | Anonymised QBR package sample (one per quarter, tenant_id redacted) demonstrating approved metric list adherence; compliance-officer spot-check sign-off | `compliance/evidence/engagement/engage-e-002-qbr-sample-YYYY-QN.pdf` | 3 years |
+| **ENGAGE-E-003** | PagerDuty AL-ENGAGE-* alert history export + `tenant.churn_risk_flagged` DEC-030 event log for observation window | `compliance/evidence/engagement/engage-e-003-alert-history-YYYY.csv` | 3 years |
+
+---
+
+### 33.12 Implementation Checklist
+
+#### P0 — Before First Enterprise Tenant Goes Live (Must Complete Before M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0057_tenant_engagement_snapshots.sql` against production Supabase. Confirm: (a) `\d tenant_engagement_snapshots` matches DDL in §33.7; (b) RLS enabled; (c) negative-privilege tests pass: `SET ROLE form_analytics; SELECT email FROM user_profiles;` returns permission error; `SET ROLE tenant_admin; SELECT * FROM tenant_engagement_snapshots;` returns 0 rows; (d) `SET ROLE customer_success; SELECT * FROM tenant_engagement_snapshots WHERE below_k_threshold = true;` returns 0 rows. File ENGAGE-E-001 to `compliance/evidence/engagement/`. | platform-engineer | **P0** | M13 | [ ] |
+| 2 | Deploy `tenant_engagement_daily` pg_cron job (job 18, §33.8): confirm first run at 02:00 UTC produces rows in `tenant_engagement_snapshots`; confirm `below_k_threshold = true` for all tenants with < 10 active members; add to §12.6 pg_cron registry as job 18. | platform-engineer | **P0** | M13 | [ ] |
+| 3 | Deploy `tenant_chs_compute` pg_cron job (job 19, §33.8): confirm `chs_score` and `chs_band` populated for all non-threshold tenants after 02:30 UTC run; `chs_score = NULL` for below-threshold tenants. Add to §12.6 pg_cron registry as job 19. | platform-engineer | **P0** | M13 | [ ] |
+| 4 | Configure AL-ENGAGE-02 in PagerDuty "FORM Customer Success" service: trigger on pg_cron alert evaluation output (seat_utilization_7d < 0.25 for 7 consecutive daily snapshots); dedup key `engage-util-critical-{tenant_id}`; escalation to CSM (0-min) + CS lead (15-min); test with a synthetic tenant at 20% utilization for 7 days in staging. | devops-lead | **P0** | M13 | [ ] |
+| 5 | Configure AL-ENGAGE-03 in PagerDuty "FORM Customer Success": trigger on `coaching_sessions_30d = 0` AND `active_seats_wau >= 5`; dedup key `engage-zero-coaching-{tenant_id}-{YYYY-MM}`; test with synthetic tenant with zero coaching_turns rows in staging. | devops-lead | **P0** | M13 | [ ] |
+| 6 | Register all four DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schemas (§33.10); deploy updated event registry to `emit-audit-event` Worker; validate `tenant.churn_risk_flagged` event emits correctly in staging by manually triggering a below-threshold utilization condition. | platform-engineer + compliance-officer | **P0** | M13 | [ ] |
+
+#### P1 — Within 30 Days of First Enterprise Tenant (M13–M14)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Configure AL-ENGAGE-01, AL-ENGAGE-04, AL-ENGAGE-05 as Slack `#csm-alerts` notifications: webhook integration with message template showing tenant slug, metric value, and recommended runbook step (no individual user data in message). | devops-lead | **P1** | M14 | [ ] |
+| 8 | Configure AL-ENGAGE-06 in PagerDuty: trigger on 3 consecutive weekly snapshots with declining CHS < 30; requires weekly CHS trend evaluation query in pg_cron (extend job 17 or create job 18); dedup key `engage-chs-freefall-{tenant_id}`; re-alert after 7 days if persisting. | platform-engineer + devops-lead | **P1** | M14 | [ ] |
+| 9 | Build "Enterprise Engagement Health" Metabase dashboard (access: customer-success + devops-lead only; no external access): (a) CHS band distribution across all active enterprise tenants (count of healthy / at_risk / critical); (b) seat utilization time-series per tenant (last 90d); (c) coaching sessions per active seat per tenant (last 30d); (d) tenant health score table (slug, chs_score, chs_band, snapshot_date — suppressed for below_k_threshold); (e) feature adoption matrix (four flags × active tenants); (f) AL-ENGAGE-* alert fire frequency (last 90d). | devops-lead | **P1** | M14 | [ ] |
+| 10 | Implement `tenant_qbr_report_generate` Edge Function (§33.8): authenticated POST `/admin/tenants/:id/qbr`; reads last 90 days from `tenant_engagement_snapshots` + §13.3 SLA API; approved metric list hardcoded; emits `tenant.qbr_report_generated` DEC-030 event; review by compliance-officer before first production use. | platform-engineer + compliance-officer | **P1** | M14 | [ ] |
+| 11 | Collect ENGAGE-E-001 (RLS tests) immediately after P0 migration; collect ENGAGE-E-002 after first QBR (anonymised package); schedule quarterly ENGAGE-E-003 collection in compliance calendar (§15.1). | compliance-officer | **P1** | M14 then quarterly | [ ] |
+| 12 | Add `engagement_health` subsection to §6.2 alert rules table (six rows per §33.5). | devops-lead + compliance-officer | **P1** | M14 | [ ] |
+| 13 | Add ENGAGE-E-001, ENGAGE-E-002, ENGAGE-E-003 evidence artefact references to `docs/SOC2_READINESS.md` C1.1, CC2.2, CC7.2, A1.1 control evidence rows. | compliance-officer | **P1** | M14 | [ ] |
+
+#### P2 — Ongoing
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 14 | Validate CHS component weights against first 3 enterprise tenants after 90 days of data: if AL-ENGAGE-02 fires but tenant renews (false positive churn risk), consider adjusting thresholds. Document weight calibration decision in `docs/DECISION_LOG.md`. | customer-success + product-manager | **P2** | M16 | [ ] |
+| 15 | Implement `cohort_retention_30d` computation for mature tenants (> 180d): monthly pg_cron job computing Week-1 cohort → current week retention; update `tenant_engagement_snapshots` monthly `chs_onboarding_pts` for tenants where `onboarding_completion_rate` is suppressed due to age. | platform-engineer | **P2** | M16 | [ ] |
+| 16 | Resolve OQ-ENGAGE-03 (seat utilization threshold calibration — see §33.13): if first 5 enterprise renewals show no correlation between CHS < 40 and actual churn, recalibrate seat utilization scoring bands. | customer-success + compliance-officer | **P2** | After 5 renewal events | [ ] |
+
+---
+
+### 33.13 Open Questions
+
+| OQ | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-ENGAGE-01** | **Should FORM surface a simplified version of seat utilization (not the full CHS) to tenant admins in the Admin Dashboard, as a "your team's adoption progress" widget?** Tenant admins currently see only infrastructure SLOs (§7.4). A utilization widget would help admins drive internal adoption without exposing individual user data. Constraint: the widget must use the same k-anonymity floor (n ≥ 10 active seats), show only the aggregate rate (no names, no individual counts), and pass through the privacy floor review in `docs/CLINICAL_SAFETY.md`. Recommendation: implement after first enterprise pilot completes; scope to seat utilization rate only (not CHS score or coaching metrics). Update `docs/ENTERPRISE_ADMIN_API.md` when decision is finalised. | P1 | product-manager + compliance-officer + customer-success | Resolve before M16 (post-pilot); document in `docs/DECISION_LOG.md` |
+| **OQ-ENGAGE-02** | **At what seat count should the k-anonymity threshold be raised from n ≥ 10 to a higher floor?** n = 10 is appropriate at current scale (50–500 seat tenants). If FORM signs a 5,000-seat enterprise deal, aggregate metrics at the full tenant level may still expose individuals in edge cases (e.g., "the company has 4,997 active seats — 3 people didn't open the app this week"). Recommendation: for tenants > 1,000 seats, the k-anonymity floor requirement is structurally met by the group size, but the privacy analysis should be reviewed before rolling out engagement metrics to new enterprise tiers. | P2 | compliance-officer + enterprise-architect | Trigger review when first 1,000-seat contract is signed |
+| **OQ-ENGAGE-03** | **Are the current CHS component weights (40% utilization / 30% coaching / 20% onboarding / 10% feature adoption) correctly calibrated for predicting churn risk?** The weights are set by design intuition, not empirical data. After 5+ enterprise renewal cycles, FORM will have enough data to validate whether CHS < 40 is a reliable leading indicator of churn. If feature adoption (10%) turns out to be more predictive than currently weighted, a rebalancing is warranted. Recommendation: conduct a retrospective after first 5 renewal events; if Pearson correlation between CHS < 40 and non-renewal is < 0.5, recalibrate. Document in `docs/DECISION_LOG.md`. | P2 | customer-success + product-manager | After 5 renewal events (estimated M18–M20) |
+
+---
+
+*v2.4 (2026-06-10): §33 Enterprise Tenant Engagement Health & QBR Metrics Observability — closes the gap between FORM's infrastructure observability (§7.4 Per-Tenant SLA, §13 per-tenant `tenant_id` propagation) and behavioral engagement signals needed for CSM-led churn prevention and QBR delivery. §33.1 scope: distinguishes engagement observability (behavioral, CSM-facing, internal) from infrastructure SLOs (availability, tenant-admin-facing, external); establishes three non-negotiable privacy constraints (aggregate-only, k-anonymity n ≥ 10, HR-never-sees-individual invariant); SOC 2 scope C1.1/CC2.2/CC7.2/A1.1; owners customer-success + product-manager + compliance-officer + devops-lead. §33.2 twelve-metric engagement taxonomy: `provisioned_seats` (tenant_members), `active_seats_wau` (PostHog pseudonymous join), `seat_utilization_7d` (ratio), `coaching_sessions_30d` (coaching_turns session_id count — no content access), `coaching_sessions_per_active_seat` (ratio), `onboarding_completion_rate` (user_profiles.onboarding_completed_at), `cohort_retention_30d` (monthly mature-tenant retention), four binary `feature_adoption_*` flags (SSO, SCIM, admin dashboard login, wearable), `chs_score` (0–100 integer), `chs_band` (three-value enum); `form_analytics` role column-level privilege enforced for all source tables — prohibits SELECT on PII and content columns. §33.3 CHS model: four-component weighted score (seat utilization 40%, coaching engagement 30%, onboarding/retention 20%, feature adoption 10%); five-tier scoring bands per component; three CHS bands (healthy ≥ 70, at_risk 40–69, critical < 40) with default CSM cadence per band; k-anonymity gate: `chs_score = NULL` and CSM dashboard suppression for tenants < 10 provisioned seats. §33.4 six AL-ENGAGE-* alert rules: AL-ENGAGE-01 (P2 Slack, seat util < 40% for 14d), AL-ENGAGE-02 (P1 PagerDuty, seat util < 25% for 7d, 7-day re-alert), AL-ENGAGE-03 (P1 PagerDuty, zero coaching sessions with ≥ 5 active seats), AL-ENGAGE-04 (P2 Slack + PagerDuty, new tenant onboarding completion < 50% at Day 30), AL-ENGAGE-05 (P2 Slack, CHS newly critical), AL-ENGAGE-06 (P1 PagerDuty, CHS < 30 freefall for 3 consecutive weeks, VP escalation); all alert payloads limited to tenant slug + aggregate metrics — no individual user data. §33.5 six-row §6.2 `engagement_health` subsection addition. §33.6 QBR package: eight approved metrics (seat utilization trend, active vs provisioned seats, coaching sessions, coaching sessions per seat, onboarding completion, feature adoption grid, SLA uptime, incident count); explicit prohibition list (no individual data, no CHS score, no tenant comparison, no health data); generation via `tenant_qbr_report_generate` Edge Function + `tenant.qbr_report_generated` DEC-030 event; compliance-officer quarterly spot-check. §33.7 `tenant_engagement_snapshots` DDL (migration 0057): sixteen columns including k-anonymity gate `below_k_threshold` boolean; UNIQUE (tenant_id, snapshot_date); three indexes; four RLS policies (`form_analytics` INSERT-only, `form_system` full, `customer_success` SELECT where `below_k_threshold = false`, zero `tenant_admin` policy — HR invariant enforced at DDL level); 36-month rolling pg_cron cleanup (monthly). §33.8 two pg_cron jobs: job 16 `tenant_engagement_daily` (02:00 UTC, full engagement snapshot INSERT with ON CONFLICT UPDATE; privacy note: column-level privilege prevents content/PII access; CI negative-privilege test required) and job 17 `tenant_chs_compute` (02:30 UTC, CHS formula UPDATE on same-day snapshot rows; SQL provided in full including NULL handling for mature tenants where onboarding_completion_rate is suppressed); `tenant_qbr_report_generate` is an Edge Function (manual CSM trigger, not pg_cron). §33.9 seven privacy constraints with enforcement point and test assertion for each: column-level privilege (negative-privilege CI test), k-anonymity gate (synthetic 9-member tenant test), CHS score exclusion from QBR (compliance-officer code review gate), no tenant comparison (single-tenant parameterized query), tenant_admin zero-row RLS test, CSM alert slug-only (not UUID), no health data DDL column review. §33.10 four DEC-030 events: `tenant.churn_risk_flagged` (HIGH 3yr, AL-ENGAGE-02/06 trigger; Zod schema provided), `tenant.engagement_milestone_achieved` (STANDARD 90d, CHS recovery to healthy), `tenant.qbr_report_generated` (STANDARD 90d, approved metric list in payload confirms content policy), `analytics.tenant_engagement_computed` (LOW 30d, nightly run proof). §33.11 SOC 2 evidence mapping: C1.1 (RLS zero-access for tenant_admin — ENGAGE-E-001), C1.2 (36-month retention + no external forwarding — ENGAGE-E-001), CC2.2 (QBR package compliance-reviewed content — ENGAGE-E-002), CC7.2 (six alert rules + churn_risk_flagged DEC-030 — ENGAGE-E-003), A1.1 (seat utilization monitoring as capacity leading indicator — ENGAGE-E-003); three evidence artefacts ENGAGE-E-001 through ENGAGE-E-003 with 3-year retention. §33.12 implementation checklist: 6× P0 M13 (migration, job 18, job 19, AL-ENGAGE-02 PagerDuty, AL-ENGAGE-03 PagerDuty, DEC-030 registration), 7× P1 M13–M14 (AL-ENGAGE-01/04/05 Slack, AL-ENGAGE-06 PagerDuty, Metabase dashboard, QBR Edge Function, evidence collection, §6.2 table update, SOC2_READINESS cross-reference), 3× P2 M16+ (CHS weight validation, cohort_retention_30d computation, OQ-ENGAGE-03 threshold calibration). §33.13 three open questions: OQ-ENGAGE-01 (simplified seat utilization widget for tenant admins in Admin Dashboard — P1 M16, product-manager + compliance-officer; scope to utilization rate only, not CHS; update ENTERPRISE_ADMIN_API.md when decided), OQ-ENGAGE-02 (k-anonymity floor adequacy for 1,000+ seat tenants — P2, trigger review at first 1,000-seat contract), OQ-ENGAGE-03 (CHS component weight calibration vs actual churn correlation — P2, retrospective after 5 renewal events M18–M20). Cross-references: `docs/ENTERPRISE_ONBOARDING.md §6` (30/60/90-day checkpoint metrics that §33 formalises into an observability pipeline), `docs/ENTERPRISE_SLA.md §7` (support tier SLAs — §33 engagement monitoring is separate from SLA credits), `docs/COST_MODEL.md §8.7` (Expansion and Churn Economics — CHS is the leading indicator for the NRR model), `docs/ENTERPRISE.md §Privacy floor for enterprise` (HR invariant — §33 operationalises it at the observability layer), `docs/AUDIT_LOG_SCHEMA.md` (four new DEC-030 events: `tenant.churn_risk_flagged` HIGH 3yr, `tenant.engagement_milestone_achieved` STANDARD 90d, `tenant.qbr_report_generated` STANDARD 90d, `analytics.tenant_engagement_computed` LOW 30d), `docs/DATA_MODEL.md` (migration 0057 — `tenant_engagement_snapshots` table; depends on `tenants`, `tenant_members`, `coaching_turns`, `user_profiles`, `wearable_connections`, `audit_log_events`), §6.2 (`engagement_health` subsection — six rows), §7.4 (Enterprise Per-Tenant SLA dashboard — §33 is the behavioral complement; tenant admins see §7.4, CSM sees §33), §12.6 (pg_cron registry: jobs 18 and 19 — note jobs 16 and 17 are reserved by `docs/DATA_MODEL.md §28` for rate-limit cleanup), §13 (Per-Tenant Observability Implementation — §33 builds on `tenant_id` propagation established there), `docs/SOC2_READINESS.md` C1.1/C1.2/CC2.2/CC7.2/A1.1 (evidence artefacts ENGAGE-E-001 through ENGAGE-E-003). Owner: customer-success + compliance-officer + devops-lead + platform-engineer.*
