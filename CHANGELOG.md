@@ -6,6 +6,14 @@
 
 ---
 
+## [3.21.1] — 2026-06-10
+
+### Changed
+- `enterprise.html` — +2 new sections: **Integrations ecosystem** (IdP grid: Okta/Azure AD/Google Workspace/OneLogin/any SAML-OIDC; wearables: HealthKit, Health Connect, Whoop, Oura, Garmin; SIEM: Datadog, Splunk, Sumo Logic, S3, webhook/REST) and **Data ownership & portability** (employee offboarding via SCIM, GDPR Art. 20 self-serve JSON export, 90-day wind-down window on contract end, 30-day tenant purge + deletion certificate); +3 FAQ items (which IdPs are supported, what happens on contract end, employee data export rights); 831 → 994 lines
+- `VERSION` — 3.21.0 → 3.21.1
+
+---
+
 ## [3.21.0] — 2026-06-10
 
 ### Added

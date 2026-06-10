@@ -700,6 +700,181 @@
 
 <hr class="divider" style="margin:0 2rem;" />
 
+<!-- ─── Integrations ───────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24">
+  <div class="label mb-4">Ecosystem</div>
+  <h2 class="display text-[52px] text-paper mb-4">Slots into your<br/><em>existing stack.</em></h2>
+  <p class="text-dim text-lg mb-14" style="font-weight:300;">No rip-and-replace. FORM connects to the identity layer you already run, the wearables employees carry, and the SIEM your security team trusts.</p>
+
+  <div class="grid md:grid-cols-3 gap-6">
+
+    <div class="feature-card">
+      <div class="label mb-5 text-acid">Identity providers</div>
+      <div class="space-y-4">
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Okta</div>
+            <div class="text-mute text-xs">SAML 2.0 + OIDC · SCIM v2 · Okta groups → FORM roles</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Azure AD / Entra ID</div>
+            <div class="text-mute text-xs">OIDC preferred · SAML 2.0 for legacy AD FS policies · Entra groups sync</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Google Workspace</div>
+            <div class="text-mute text-xs">OIDC + Directory API group sync · Admin console setup &lt; 15 min</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">OneLogin · Ping · ADFS</div>
+            <div class="text-mute text-xs">Any SAML 2.0 or OIDC-compatible provider. JumpCloud, Rippling, Workday also supported.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="label mb-5">Wearable data sources</div>
+      <p class="text-mute text-xs mb-5 leading-relaxed">All wearable data is employee-initiated and stays private. Zero visibility to HR.</p>
+      <div class="space-y-4">
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Apple HealthKit</div>
+            <div class="text-mute text-xs">HR, HRV, sleep stages, active energy. iOS 15+. On-device processing.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Android Health Connect</div>
+            <div class="text-mute text-xs">Unified Android health data API. Same privacy model as HealthKit. Android 10+.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Whoop · Oura · Garmin</div>
+            <div class="text-mute text-xs">Recovery score, HRV, strain, readiness — used to adapt programming. Victor cites the source. HR sees none of it.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="label mb-5">SIEM &amp; audit export</div>
+      <p class="text-mute text-xs mb-5 leading-relaxed">Tamper-evident HMAC-SHA256 chain (DEC-030). Stream to your SIEM or pull on schedule.</p>
+      <div class="space-y-4">
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Datadog · Splunk · Sumo Logic</div>
+            <div class="text-mute text-xs">Native log forwarder. Events include <span class="font-mono text-acid" style="font-size:11px;">tenant_id</span>, actor, resource, and HMAC digest.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">S3 / GCS / R2 export</div>
+            <div class="text-mute text-xs">Nightly or hourly NDJSON to any S3-compatible object store.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="icon">▸</span>
+          <div>
+            <div class="text-paper text-sm font-medium mb-0.5">Webhook + REST pull API</div>
+            <div class="text-mute text-xs">Real-time push or cursor-based pull. P95 delivery &lt; 5 s from event creation.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
+<!-- ─── Data portability ────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-24">
+  <div class="grid md:grid-cols-2 gap-16 items-start">
+
+    <div>
+      <div class="label mb-6">Data ownership &amp; portability</div>
+      <h2 class="display text-[52px] text-paper mb-6">
+        Your data leaves<br/>with you —<br/><em>both of you.</em>
+      </h2>
+      <p class="text-dim text-base leading-relaxed" style="font-weight:300;">
+        Employee fitness data belongs to the employee. Tenant configuration belongs to the company. When either relationship ends, data goes with the owner — not with FORM.
+      </p>
+    </div>
+
+    <div class="space-y-4">
+
+      <div class="feature-card">
+        <div class="label mb-3">Employee leaves the company</div>
+        <div class="space-y-3">
+          <div class="check-item">
+            <span class="icon">▸</span>
+            <span class="text-mute text-sm leading-relaxed">SCIM deprovision removes company access <span class="text-paper">within minutes</span> of the HR system change. No manual step required.</span>
+          </div>
+          <div class="check-item">
+            <span class="icon">▸</span>
+            <span class="text-mute text-sm leading-relaxed">The employee keeps their FORM account. Training history, coaching conversations, and progress data stay with them.</span>
+          </div>
+          <div class="check-item">
+            <span class="icon">▸</span>
+            <span class="text-mute text-sm leading-relaxed">HR receives no export of departing employees — no summary, no trend, no notification of what data the account held.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="label mb-3">Employee requests data export (GDPR Art. 20)</div>
+        <div class="space-y-3">
+          <div class="check-item">
+            <span class="icon">▸</span>
+            <span class="text-mute text-sm leading-relaxed">Self-serve machine-readable JSON export from Settings → Privacy → Export. Fulfilled within 30 days, typically under 24 hours.</span>
+          </div>
+          <div class="check-item">
+            <span class="icon">▸</span>
+            <span class="text-mute text-sm leading-relaxed">Includes workout history, CV session keypoints, coaching transcripts, biometric trends, and connected wearable data. The company has no visibility into this request.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="label mb-3">Contract ends</div>
+        <div class="space-y-3">
+          <div class="check-item">
+            <span class="icon">▸</span>
+            <span class="text-mute text-sm leading-relaxed"><span class="text-paper font-medium">90-day wind-down window.</span> Tenant admins retain read access for report export. Employees transition to free consumer accounts unless they opt out.</span>
+          </div>
+          <div class="check-item">
+            <span class="icon">▸</span>
+            <span class="text-mute text-sm leading-relaxed"><span class="text-paper font-medium">Tenant data purged 30 days</span> after the wind-down window closes. Configuration, provisioning records, and org-level reports deleted.</span>
+          </div>
+          <div class="check-item">
+            <span class="icon">▸</span>
+            <span class="text-mute text-sm leading-relaxed"><span class="text-paper font-medium">Deletion certificate</span> issued on request — scope, date, and method attested. Satisfies GDPR Art. 17 right-to-erasure obligations.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
 <!-- ─── FAQ ───────────────────────────────────────────────── -->
 <section class="max-w-[1440px] mx-auto px-8 py-24">
   <div class="grid md:grid-cols-[380px_1fr] gap-16 items-start">
@@ -776,6 +951,36 @@
         </button>
         <div class="faq-body" id="efaq6">
           Zero. We run a 90-day free pilot with 50–250 seats — no payment, no credit card. The DPA is signed before any employee data enters FORM. Success criteria are agreed upfront; you pay the annual contract only if the metrics hit. The pilot includes full Growth-tier feature access: SSO / SCIM, admin dashboard, dedicated CSM, and weekly check-ins. For accounts where procurement policy requires a billing relationship, a $1/seat paid pilot is available — the full amount credits toward Year 1 if you convert.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq7')">
+          <span>Which identity providers does FORM support?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq7">
+          Natively tested: Okta (SAML 2.0 and OIDC), Azure AD / Entra ID (OIDC preferred, SAML 2.0 for legacy AD FS policies), Google Workspace (OIDC + Directory API for group sync), and OneLogin. Any standards-compliant SAML 2.0 or OIDC provider works without custom engineering — Ping Identity, ADFS, JumpCloud, Rippling, Workday. SCIM v2 provisioning is available for any IdP that supports it. Our implementation engineer joins the setup call. We don't hand over a PDF and disappear.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq8')">
+          <span>What happens to our data when the contract ends?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq8">
+          A 90-day wind-down window opens at contract expiry — tenant admins retain read access to export aggregate reports. After that window closes, FORM purges all tenant-level configuration, provisioning records, and aggregate reporting data within 30 days and issues a written deletion certificate on request (satisfies GDPR Art. 17). Employees' personal fitness accounts transition to free-tier consumer accounts unless they opt out — their training history stays with them, not with the company or with FORM.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq('efaq9')">
+          <span>Can employees export their personal training history?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-body" id="efaq9">
+          Yes, self-serve, no IT ticket required. Any employee can request a machine-readable JSON export from Settings → Privacy → Export. This is a GDPR Art. 20 data portability right exercisable regardless of employment status. Export includes workout history, CV session keypoints, AI coaching transcripts, biometric trends, and connected wearable data. Typical fulfilment: under 24 hours; legal maximum: 30 days. The company has no visibility into whether an individual has made this request.
         </div>
       </div>
 
