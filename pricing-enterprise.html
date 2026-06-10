@@ -937,7 +937,7 @@
           <span class="faq-icon">+</span>
         </button>
         <div class="faq-body">
-          <strong style="color:#F3EEE0;">Multi-year discounts</strong> apply as an annual reduction to your per-seat rate: 2-year contracts receive 15% off list price each year; 3-year contracts receive 25% off list price each year. These stack with the upfront-payment discount (additional 10% off when you pay each year's invoice upfront rather than monthly). Discounts are applied multiplicatively, not additively. <strong style="color:#F3EEE0;">Price floors</strong> are hard minimums — no approval level can override them: Starter tier floor is $6/seat/month (50% of $12 list); Growth tier floor is $8/seat/month (note: multi-year + upfront stacking is absorbed by the floor at this tier — effective rate will not drop below $8). Enterprise custom pricing has a reference floor of $7/seat/month. If a multi-year or stacked discount would take your effective rate below floor, the floor applies and the remaining discount is absorbed — not rolled into other concessions. Floor prices cannot be waived by a single approver; a commercial exception requires founder plus investor lead sign-off pre-Series A.
+          <strong style="color:#F3EEE0;">Multi-year discounts</strong> apply as an annual reduction to your per-seat rate: 2-year contracts receive 15% off list price each year; 3-year contracts receive 25% off list price each year. These stack with the upfront-payment discount (additional 10% off when you pay each year's invoice upfront rather than monthly). Discounts are applied multiplicatively, not additively. <strong style="color:#F3EEE0;">Price floors</strong> are hard minimums — no approval level can override them: Starter tier floor is $6.00/seat/month (50% of $12 list); Growth tier floor is $4.50/seat/month (50% of $9 list); Enterprise tier floor is $4.00/seat/month (50% of $8 list reference rate). If a multi-year or stacked discount would take your effective rate below floor, the floor applies and the remaining discount is absorbed — not rolled into other concessions. Floor prices cannot be waived by a single approver; a commercial exception requires founder plus investor lead sign-off pre-Series A.
         </div>
       </div>
     </div>
@@ -1135,6 +1135,12 @@
     // Discounts are applied multiplicatively: (1 - contract) * (1 - upfront)
     var effectiveRate = baseRate * (1 - contractDisc) * (1 - upfrontDisc);
 
+    // Price floors per COST_MODEL §31.5 — 50% of list; no approval level can override
+    var PRICE_FLOORS = { starter: 6.00, growth: 4.50, enterprise: 4.00 };
+    var floor = PRICE_FLOORS[tierKey];
+    var floorEnforced = effectiveRate < floor;
+    if (floorEnforced) effectiveRate = floor;
+
     var annualTotal    = effectiveRate * seats * 12;
     var multiyearTotal = annualTotal * years;
 
@@ -1149,6 +1155,7 @@
       contractDisc:     contractDisc,
       upfrontDisc:      upfrontDisc,
       effectiveRate:    effectiveRate,
+      floorEnforced:    floorEnforced,
       annualTotal:      annualTotal,
       multiyearTotal:   multiyearTotal,
       savings:          savings,
@@ -1244,8 +1251,13 @@
 
     if (c.tierKey === 'enterprise') {
       effectiveRateDisplay.textContent = '$6.00–$8.00 / seat / mo';
+      effectiveRateDisplay.style.color = '';
+    } else if (c.floorEnforced) {
+      effectiveRateDisplay.textContent = fmtRate(c.effectiveRate) + ' / seat / mo · price floor applied';
+      effectiveRateDisplay.style.color = '#FB923C';
     } else {
       effectiveRateDisplay.textContent = fmtRate(c.effectiveRate) + ' / seat / mo';
+      effectiveRateDisplay.style.color = '';
     }
 
     // Summary footer

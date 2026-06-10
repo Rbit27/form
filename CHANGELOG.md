@@ -6,6 +6,17 @@
 
 ---
 
+## [3.27.1] — 2026-06-10
+
+### Fixed
+- `pricing-enterprise.html` — price floor enforcement added to calculator JS: `PRICE_FLOORS = { starter: $6.00, growth: $4.50, enterprise: $4.00 }` clamped via `Math.max(effectiveRate, floor)`; `floorEnforced` flag propagated to `render()` where `effectiveRateDisplay` shows amber "price floor applied" indicator when triggered; closes COST_MODEL §31.9 P0 item 2
+- `pricing-enterprise.html` — FAQ #6 floor values corrected to match COST_MODEL §31.5: Growth $8 → $4.50/seat/mo (50% of $9 list); Enterprise $7 → $4.00/seat/mo (50% of $8 list reference rate); Starter $6 unchanged and correct
+
+### Changed
+- `VERSION` — 3.27.0 → 3.27.1
+
+---
+
 ## [3.27.0] — 2026-06-10
 
 ### Added
