@@ -6,6 +6,15 @@
 
 ---
 
+## [3.44.0] — 2026-06-10
+
+### Changed
+- [`docs/AUDIT_LOG_SCHEMA.md`](docs/AUDIT_LOG_SCHEMA.md) — v1.0 → v1.2: +2 `vendor.*` sub-processor management events (`vendor.sub_processor_added` HIGH/7yr, `vendor.sub_processor_removed` STANDARD/3yr) per SOC2_READINESS §75.2.4; +10 `legal.*` government request lifecycle events (`legal.disclosure_executed` and `legal.disclosure_declined` CRITICAL/7yr; 8× procedural HIGH/7yr; `legal.transparency_tally_updated` STANDARD/3yr) per SOC2_READINESS §75.5.3. LEGAL-CHAIN-01 chain guard documented (HTTP 422 on `legal.request_received` ordering violation). Privacy invariant: no plain-text authority names or user identifiers — `recipient_authority_hash` SHA-256 only. Retention table updated with 4 new rows. Closes SOC2_READINESS.md §75.8 checklist items 5 and 8 (both P1 Pre-GA).
+- [`docs/SOC2_READINESS.md §75.8`](docs/SOC2_READINESS.md) — checklist items 5 (`vendor.*` registration) and 8 (`legal.*` registration) marked `[x]` done; P-GAP-006 updated: condition (c) met 2026-06-10; conditions (a) outside counsel review and (b) founder sign-off still pending.
+- `VERSION` — 3.43.1 → 3.44.0.
+
+---
+
 ## [3.43.1] — 2026-06-10
 
 ### Changed

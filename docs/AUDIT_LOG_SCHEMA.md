@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v1.0
+# FORM · Audit Log Schema v1.2
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -319,6 +319,42 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 
 ---
 
+### Vendor & Sub-Processor Management events (DEC-030 HMAC-chained · SOC2_READINESS §75.2.4)
+
+> Defined in `docs/SOC2_READINESS.md §75.2.4`. Two events covering the sub-processor roster lifecycle — addition and removal. Required for P6.1 (sub-processor disclosure) and CC9.2 (vendor monitoring) SOC 2 controls. **Privacy invariant:** no user_id, session data, or health values in any payload — infrastructure vendor identifiers only (`SP-XX` codes, service metadata). `vendor.sub_processor_added` is emitted at the effective date (30 days after notice sent to enterprise tenants per Art. 28(2)), not at the notice dispatch; the notice dispatch is a separate operational record. Cross-ref: SOC2_READINESS §75.2.4 (procedure), `docs/SUBPROCESSORS.md §8.2` (notification procedure), PRE-75-E-002 (first-use evidence artifact), P6.1/CC9.2. Closes SOC2_READINESS.md §75.8 checklist item 5 (P1 Pre-GA).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `vendor.sub_processor_added` | HIGH | 7 yr | At effective date of addition (30 days after notice sent); emitted by `compliance-officer` (manual via admin console) | `resource_type: "sub_processor"`, `resource_id` (SP-XX), `metadata.vendor_name`, `metadata.service_role`, `metadata.data_categories[]`, `metadata.processing_location`, `metadata.transfer_mechanism`, `metadata.effective_date` (ISO 8601), `metadata.notice_sent_date` (ISO 8601), `metadata.notice_period_days: 30`, `metadata.enterprise_tenants_notified` (integer) |
+| `vendor.sub_processor_removed` | STANDARD | 3 yr | At effective date of removal; emitted by `compliance-officer` (manual via admin console) | `resource_type: "sub_processor"`, `resource_id` (SP-XX), `metadata.vendor_name`, `metadata.service_role`, `metadata.data_categories[]`, `metadata.processing_location`, `metadata.transfer_mechanism`, `metadata.effective_date` (ISO 8601), `metadata.notice_sent_date` (ISO 8601), `metadata.enterprise_tenants_notified` (integer), `metadata.deletion_certificate_ref` (string) |
+
+**HMAC chain requirement:** Both events must include `prev_hash`. `vendor.sub_processor_added` records the addition becoming effective; a chain entry for the notice dispatch does not exist (the 30-day notice is tracked in the operational record at `compliance/dpa/sub-processor-notices/`). `vendor.sub_processor_removed` must be emitted synchronously at the point of removal so the audit chain accurately reflects the sub-processor roster at any point in the SOC 2 observation window.
+
+---
+
+### Government & Legal Disclosure events (DEC-030 HMAC-chained · SOC2_READINESS §75.5.3)
+
+> Defined in `docs/SOC2_READINESS.md §75.5.3`. Ten events covering the complete government and law enforcement request lifecycle — from receipt through legal hold, legal assessment, and resolution (disclosure or decline). **CRITICAL privacy rule:** No user names, email addresses, or authority names in plain text in any payload. `users_named_count` and `users_affected_count` are aggregate integers only. `recipient_authority_hash` is SHA-256 of the authority name — never plain text. `request_id` is an internal UUID; it must not encode jurisdiction or authority identity. **CRITICAL events** (`legal.disclosure_executed`, `legal.disclosure_declined`) trigger PagerDuty P0 and compliance-officer notification immediately on emission. `legal.disclosure_declined` must be emitted even when the request is declined at the initial review stage — a declined attempt is not a no-op. **HMAC chain ordering (LEGAL-CHAIN-01):** `legal.request_received` must precede `legal.disclosure_executed` or `legal.disclosure_declined` for the same `request_id`; the chain guard in `emit-audit-event` Worker returns HTTP 422 on violation. Cross-ref: SOC 2 P6.5 (government disclosure) / CC1.4 (integrity) / A1.1 (legal hold affects data availability); SOC2_READINESS §75.5.3; `compliance/p1/gov-request-policy.md` (P1-CIP-002). Closes SOC2_READINESS.md §75.8 checklist item 8 (P1 Pre-GA).
+
+| Event type | Severity | Retention | Key payload fields |
+|---|---|---|---|
+| `legal.request_received` | HIGH | 7 yr | `request_id` (UUID), `request_jurisdiction` (`"UA"` \| `"EU"` \| `"US"`), `legal_process_type` (`"court_order"` \| `"subpoena"` \| `"national_security_letter"` \| `"voluntary_request"` \| `"regulatory_inquiry"`), `request_received_at` (ISO 8601), `data_categories_requested` (string array), `users_named_count` (integer — **aggregate count only, no IDs**) |
+| `legal.founder_notified` | HIGH | 7 yr | `request_id`, `request_jurisdiction`, `legal_process_type`, `notified_at` (ISO 8601), `channel` (`"signal"` \| `"encrypted_email"`) |
+| `legal.counsel_retained` | HIGH | 7 yr | `request_id`, `request_jurisdiction`, `legal_process_type`, `retained_at` (ISO 8601), `counsel_ref` (string — internal code, **no personal name**) |
+| `legal.legal_hold_activated` | HIGH | 7 yr | `request_id`, `request_jurisdiction`, `legal_process_type`, `hold_scope` (string, max 200 chars — data categories only, **no user IDs**), `hold_activated_at` (ISO 8601) |
+| `legal.art48_assessed` | HIGH | 7 yr | `request_id`, `request_jurisdiction`, `legal_process_type`, `treaty_basis_found` (bool), `assessment_summary` (string, max 300 chars — **no PII**) |
+| `legal.founder_signoff_obtained` | HIGH | 7 yr | `request_id`, `request_jurisdiction`, `legal_process_type`, `signoff_at` (ISO 8601) |
+| `legal.disclosure_executed` | **CRITICAL** | 7 yr | `request_id`, `request_jurisdiction`, `legal_process_type`, `disclosed_at` (ISO 8601), `data_categories_disclosed` (string array), `users_affected_count` (integer — **aggregate only**), `recipient_authority_hash` (SHA-256 of authority name — **never plain text**) |
+| `legal.subject_notified` | HIGH | 7 yr | `request_id`, `request_jurisdiction`, `legal_process_type`, `notified_count` (integer), `gag_order_exception` (bool), `notification_channel` (`"in_app"` \| `"email"` \| `"gag_order_blocked"`) |
+| `legal.transparency_tally_updated` | STANDARD | 3 yr | `request_id`, `request_jurisdiction`, `legal_process_type`, `report_year` (integer), `category` (string), `range_low` (integer), `range_high` (integer) |
+| `legal.disclosure_declined` | **CRITICAL** | 7 yr | `request_id`, `request_jurisdiction`, `legal_process_type`, `declined_at` (ISO 8601), `decline_reason` (`"no_go_category"` \| `"insufficient_legal_basis"` \| `"art48_no_treaty"` \| `"founder_veto"`) |
+
+**HMAC chain requirement (LEGAL-CHAIN-01):** `legal.request_received` must be the first event emitted for any given `request_id`. Procedural events (`legal.founder_notified`, `legal.counsel_retained`, `legal.legal_hold_activated`, `legal.art48_assessed`, `legal.founder_signoff_obtained`) may be emitted in any order between `legal.request_received` and the terminal event. Terminal events `legal.disclosure_executed` and `legal.disclosure_declined` are mutually exclusive for the same `request_id` — both present is a chain anomaly detected by the weekly audit batch. Both CRITICAL terminal events trigger PagerDuty P0 + compliance-officer notification immediately. `legal.disclosure_declined` must be emitted even when declined at the initial review stage (immediately after `legal.request_received` with no intervening procedural events).
+
+**Emitter assignment:** `compliance-officer` (manual via admin console) for all `legal.*` events.
+
+---
+
 ### Support actions (highest privilege)
 - `support.impersonation_started` — FORM employee acting as customer
 - `support.impersonation_ended`
@@ -361,6 +397,10 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 | `enterprise.pricing_exception_approved` / `enterprise.consumer_price_updated` / `enterprise.list_price_updated` / `enterprise.price_floor_override_requested` | 7 years | SOC 2 CC1.4 pricing integrity evidence; COST_MODEL.md §31.8 pricing governance trail; CRITICAL-severity `enterprise.price_floor_override_requested` also maps to CC5.2 |
 | `ai.safety_incident_opened` / `ai.safety_incident_contained` / `ai.victor_disabled` / `ai.victor_reenabled` | 7 years | Victor AI P0/P1 clinical-safety incident evidence; SOC 2 CC7.2 (threat monitoring) / CC7.4 (incident response); GDPR Art. 9 health data integrity record; VSAFETY-CHAIN-01/02/03 chain monitor evidence |
 | `ai.safety_incident_resolved` | 3 years | Incident closure record; resolution method and post-incident controls; not required as long-term SOC 2 evidence (covered by the 7yr `ai.safety_incident_opened` record) |
+| `vendor.sub_processor_added` | 7 years | SOC 2 CC9.2 / P6.1 sub-processor addition evidence; 30-day advance notice compliance record |
+| `vendor.sub_processor_removed` | 3 years | SOC 2 CC9.2 sub-processor removal record; deletion certificate reference |
+| `legal.*` (except `legal.transparency_tally_updated`) | 7 years | SOC 2 P6.5 government disclosure evidence; CC1.4 integrity record; A1.1 legal hold record; GDPR Art. 6 lawful processing documentation |
+| `legal.transparency_tally_updated` | 3 years | Annual transparency report tally; operational record not required as long-term SOC 2 evidence |
 | `support.*` | 10 years | Trust + future legal discovery |
 | `support.unauthorized_nuke_attempt` | 7 years | Internal safety control violation record |
 | `integration.api_call` (sampled) | 30 days | Volume management |
@@ -432,6 +472,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v1.2 · 2026-06-10 · owner: compliance-officer + security-engineer**
+*v1.2 (2026-06-10): +2 `vendor.*` sub-processor management events (vendor.sub_processor_added HIGH/7yr, vendor.sub_processor_removed STANDARD/3yr) per SOC2_READINESS §75.2.4; +10 `legal.*` government request lifecycle events (legal.disclosure_executed and legal.disclosure_declined CRITICAL/7yr; 8× procedural HIGH/7yr; legal.transparency_tally_updated STANDARD/3yr) per SOC2_READINESS §75.5.3. LEGAL-CHAIN-01 chain guard documented (HTTP 422 on ordering violation). Privacy invariant: no plain-text authority names or user identifiers in any `legal.*` payload — `recipient_authority_hash` SHA-256 only. Retention table updated with 4 new rows. Closes SOC2_READINESS.md §75.8 checklist items 5 and 8 (both P1 Pre-GA). Cross-ref: docs/SUBPROCESSORS.md §8.2 (notification procedure), SOC2_READINESS §75.2.4 and §75.5.3, P6.1/P6.5/CC9.2. Owner: compliance-officer + platform-engineer.*
 
 **v1.0 · 2026-06-10 · owner: compliance-officer + security-engineer**
 *v1.0 (2026-06-10): +5 `ai.*` Victor AI safety events — `ai.safety_incident_opened` (CRITICAL/HIGH, 7yr), `ai.safety_incident_contained` (HIGH, 7yr), `ai.victor_disabled` (HIGH, 7yr), `ai.victor_reenabled` (HIGH, 7yr), `ai.safety_incident_resolved` (STANDARD, 3yr). All HMAC-chained per DEC-030. VSAFETY-CHAIN-01/02/03 ordering invariants enforced by `emit-audit-event` Worker write-guard (HTTP 422 on violation → PagerDuty P0). Privacy floor: no user_id, coaching content, or health values in any payload — incident_id (UUID) and affected_session_count (aggregate integer) only. Retention table updated with 2 new rows. Closes OBSERVABILITY.md §32.10 checklist item 7 (P0 M4) and INCIDENT_RESPONSE.md R-23 checklist item 2 (P0 M4). Cross-ref: OBSERVABILITY.md §32.5 (FORM-VICTOR-001 through -004 alert rules), §2.1 (VICTOR-SLO-01 through -04), §32.7 (VSAFETY-CHAIN monitors); INCIDENT_RESPONSE.md R-23 §R-23.3 (T+3min auto-disable path); SOC 2 CC7.2/CC7.4; GDPR Art. 9.*
