@@ -7104,7 +7104,8 @@ Legal hold is a first-class requirement in this runbook. Unlike external breach 
    REQUIREMENT: Two-person authorisation required (IC + compliance-officer or founder).
    Record both authorising user IDs in the incident channel BEFORE executing the suspension.
    WorkOS suspension: WorkOS Admin Dashboard → Users → Suspend.
-   PAM revocation: DELETE /admin/v1/jit-escalations/<id> (PAM API — see OQ-INS-01).
+   PAM revocation: DELETE /admin/v1/jit-escalations/<id> via `pam-elevation-service` Worker
+   (`admin_jit_escalations` schema: DATA_MODEL §29, migration 0058_pam_schema.sql; API endpoint implementation pending DATA_MODEL §29.10 item 2).
 
 6. If service_role key is in scope:
    Rotate Supabase service_role key immediately (Supabase Dashboard → Project Settings → API).
@@ -7170,7 +7171,7 @@ WHERE ale.actor_user_id = '<suspect_user_id>'
 ORDER BY ale.created_at DESC;
 -- Expected for authorised ops: auth_status = 'WITHIN_WINDOW' for all rows.
 -- NO_PAM_WINDOW or OUTSIDE_WINDOW = unauthorised operation; escalate immediately.
--- NOTE: Depends on admin_jit_escalations table — see OQ-INS-01.
+-- admin_jit_escalations table: DATA_MODEL §29 (migration 0058_pam_schema.sql). jit_escalation_id injected by fn_inject_pam_session_id() trigger.
 ```
 
 **Check C3: Quantify Art. 9 data exposure — rows queried per sensitive table**
@@ -7224,10 +7225,11 @@ SUSPEND-1. WorkOS SSO suspension (two-person auth confirmed in incident channel)
            Emit DEC-030 event: admin.user_access_suspended
 
 SUSPEND-2. PAM escalation revocation (all active JIT sessions for suspect user):
-           DELETE /admin/v1/jit-escalations/<id> for each active session
-           (Interim manual path until PAM API is implemented — see OQ-INS-01:
-            manually update admin_jit_escalations.revoked_at = NOW() in production DB
-            with two-person authorisation and compliance-officer awareness)
+           DELETE /admin/v1/jit-escalations/<id> for each active session via `pam-elevation-service` Worker
+           (admin_jit_escalations schema: DATA_MODEL §29 migration 0058_pam_schema.sql;
+            API endpoint implementation pending DATA_MODEL §29.10 item 2 — manual fallback:
+            UPDATE admin_jit_escalations SET status='revoked', revoked_at=NOW()
+            WHERE actor_user_id='<suspect>' AND status='approved' [BYPASSRLS; two-person auth])
            Emit DEC-030 event: admin.jit_escalation_emergency_revoked
 
 SUSPEND-3. Cloudflare Access revocation (if Cloudflare admin access is in scope):
@@ -7300,7 +7302,7 @@ if (!emitted.success) {
 | **IR-INS-E-003** | C3 query output — Art. 9 data exposure quantification | SQL output from §R-20.2 Check C3 showing `total_rows_queried` per sensitive table; primary blast-radius record for GDPR Art. 33 notification if R-01 is activated | `compliance/evidence/incidents/<slug>/c3-art9-exposure.jsonl` |
 | **IR-INS-E-004** | C4 HMAC chain integrity check output | SQL output from §R-20.2 Check C4; if `broken_links > 0`, R-05 evidence package supplements this record | `compliance/evidence/incidents/<slug>/c4-hmac-integrity.jsonl` |
 | **IR-INS-E-005** | Access suspension log | WorkOS Admin audit log extract showing suspension event + timestamp; DEC-030 `admin.user_access_suspended` event with both authorising user IDs | `compliance/evidence/incidents/<slug>/access-suspension.json` |
-| **IR-INS-E-006** | PAM revocation record | DEC-030 `admin.jit_escalation_emergency_revoked` event + manual record of `admin_jit_escalations` row update (incident channel screenshot until PAM API is implemented — OQ-INS-01) | `compliance/evidence/incidents/<slug>/pam-revocation.json` |
+| **IR-INS-E-006** | PAM revocation record | DEC-030 `admin.jit_escalation_emergency_revoked` event + `admin_jit_escalations` row export confirming `status = 'revoked'` and `revoked_at` timestamp (schema: DATA_MODEL §29.3) | `compliance/evidence/incidents/<slug>/pam-revocation.json` |
 | **IR-INS-E-007** | Credential rotation evidence | If service_role rotated: Supabase key rotation confirmation screenshot + `admin.service_role_key_rotated` DEC-030 event + Sentry error rate post-rotation baseline screenshot confirming no connectivity degradation | `compliance/evidence/incidents/<slug>/credential-rotation.json` |
 
 All evidence under `compliance/evidence/incidents/<slug>/` with SHA-256 manifest. 7-year retention for all IR-INS-E-* artefacts due to litigation hold. R2 object versioning enabled; no lifecycle deletion rule applies to evidence paths.
@@ -7318,9 +7320,9 @@ All evidence under `compliance/evidence/incidents/<slug>/` with SHA-256 manifest
 
 #### Open Questions
 
-**OQ-INS-01: `admin_jit_escalations` table and `jit_escalation_id` foreign key — production schema does not yet exist**
+**OQ-INS-01: 🟢 Resolved** — `admin_jit_escalations` schema defined in `docs/DATA_MODEL.md §29` (migration `0058_pam_schema.sql`); `pam_break_glass_reviews` schema included; `fn_inject_pam_session_id()` trigger unblocks C2 forensic query.
 
-The C2 query (§R-20.2), FORM-INSIDER-001 alert, and PAM revocation API (`DELETE /admin/v1/jit-escalations/<id>`) all depend on an `admin_jit_escalations` table and a `jit_escalation_id` field in `audit_log_events.metadata`. Neither exists in the current production schema. SSO_SCIM §24 describes the PAM architecture but implementation is pending. Until this table exists: (a) C2 cannot be run as written and must be replaced by a manual review of admin operation timestamps against calendar records of authorised maintenance windows; (b) FORM-INSIDER-001 alert cannot fire automatically and must be run as a periodic manual query; (c) PAM revocation must be performed manually via the WorkOS Admin Dashboard. This is a **P0 blocker** for the automated insider detection programme. Owner: platform-engineer + security-engineer. Target: M6.
+~~The C2 query (§R-20.2), FORM-INSIDER-001 alert, and PAM revocation API all depend on `admin_jit_escalations` and `jit_escalation_id` in `audit_log_events.metadata` — neither existed in production schema.~~ **Resolved by `docs/DATA_MODEL.md §29` (2026-06-10, migration `0058_pam_schema.sql`):** both tables authored with full RLS, indexes, and audit trigger. C2 query is now executable once migration `0058` is deployed to production. FORM-INSIDER-001 automated detection is unblocked — implement per DATA_MODEL §29.10 item 9 (P1 M7, security-engineer + platform-engineer). PAM revocation API (`DELETE /admin/v1/jit-escalations/<id>`) pending DATA_MODEL §29.10 item 2; manual fallback documented in SUSPEND-2 above.
 
 **OQ-INS-02: Bulk query detection for `service_role` sessions (FORM-INSIDER-002) — requires row count audit logging**
 
@@ -7334,8 +7336,8 @@ Today, evidence preservation requires a human to manually run the C1 snapshot qu
 
 | # | Action | Priority | Milestone | Owner | Status |
 |---|---|---|---|---|---|
-| 1 | Create `admin_jit_escalations` schema: `id UUID PK`, `actor_user_id UUID FK users`, `escalation_start TIMESTAMPTZ`, `escalation_expiry TIMESTAMPTZ`, `revoked_at TIMESTAMPTZ`, `authorised_by_ic_user_id UUID`, `authorised_by_cop_user_id UUID`, `business_justification TEXT`; add `jit_escalation_id UUID` to `audit_log_events.metadata` schema; close OQ-INS-01 | P0 | M6 | platform-engineer | [ ] |
-| 2 | Implement PAM revocation API endpoint `DELETE /admin/v1/jit-escalations/<id>`; enforce two-person auth (IC + compliance-officer); emit `admin.jit_escalation_emergency_revoked` DEC-030 event before returning 200; block revocation of already-revoked escalations; close OQ-INS-01 PAM revocation path | P0 | M6 | platform-engineer | [ ] |
+| 1 | Create `admin_jit_escalations` + `pam_break_glass_reviews` schemas; add `fn_inject_pam_session_id()` audit trigger on all six sensitive tables; close OQ-INS-01 schema blocker | P0 | M6 | platform-engineer | [x] — **Done**: `docs/DATA_MODEL.md §29` (migration `0058_pam_schema.sql`, 2026-06-10); see DATA_MODEL §29.10 for remaining deployment checklist |
+| 2 | Implement PAM revocation API endpoint `DELETE /admin/v1/jit-escalations/<id>`; enforce two-person auth (IC + compliance-officer); emit `admin.jit_escalation_emergency_revoked` DEC-030 event before returning 200; block revocation of already-revoked escalations | P0 | M6 | platform-engineer | [ ] — schema prerequisite (item 1) now unblocked via DATA_MODEL §29 |
 | 3 | Implement FORM-INSIDER-001 alert: Cloudflare Edge Function (cron, every 15 min) queries `audit_log_events` for `form_admin` ops on Art. 9 tables with NULL or mismatched `jit_escalation_id`; fires PagerDuty P0 to security-engineer + IC on any result; confirm in staging with synthetic mismatched event | P0 | M6 | devops-lead + security-engineer | [ ] |
 | 4 | Implement FORM-INSIDER-002 alert: Worker middleware shim to log `service_role` query response cardinality; emit `admin.bulk_query_detected` DEC-030 event when row count > 50 on Art. 9 table in a single session not matching pg_cron schedule; close OQ-INS-02 | P1 | M8 | platform-engineer | [ ] |
 | 5 | Register all six `admin.insider_threat_*` and `admin.jit_escalation_*` DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md` with full schema, severity, and 7-year retention fields; validate Zod schema for each event type in staging | P1 | M6 | security-engineer | [ ] |
@@ -7345,7 +7347,9 @@ Today, evidence preservation requires a human to manually run the C1 snapshot qu
 
 ---
 
-*v1.4 additions (2026-06-02): R-20 Insider Threat & Privileged Access Abuse — the twentieth runbook and complement to R-01 (external breach). Key design decisions: (1) evidence preservation before remediation — destroying logs while rushing to contain is both forensically harmful and potentially legally harmful; suspending access 30 minutes later than the fastest possible time is always preferable to evidence spoliation; (2) legal notification at T+0, not after confirmation — in insider cases, legal must direct the investigation from the start; (3) two-person authorisation required for all suspension and revocation actions; (4) service_role key rotation is the nuclear option — invalidates all service_role connections platform-wide; (5) DEC-030 chain is simultaneously the primary detection signal and the evidentiary chain — chain tampering treated as P0 regardless of whether data access is confirmed. Trigger matrix: FORM-INSIDER-001 (admin ops outside PAM window), FORM-INSIDER-002 (bulk Art. 9 queries in service_role session), FORM-INSIDER-003 (PAM escalation not revoked within 4-hour hard limit), FORM-INSIDER-004 (Cloudflare Access device policy mismatch), manual HR/legal separation, manual #security report. Severity: P0 for confirmed exfiltration, audit chain tamper, or service_role key external leak; P1 for bulk Art. 9 queries without justification, unrevoked PAM escalation, unrecognised device/location; P2 for unusual admin UI without data queries; P3 for delayed-but-valid PAM revocation. Four SQL queries C1–C4. Six DEC-030 events all CRITICAL/HIGH 7-year retention. Evidence IR-INS-E-001 through IR-INS-E-007. SOC 2: CC6.1/CC6.2/CC6.3/CC6.6/CC7.2/CC7.3. Three open questions: OQ-INS-01 (admin_jit_escalations schema — P0, M6), OQ-INS-02 (bulk query middleware — P1, M8), OQ-INS-03 (legal hold API — P2, M10). Eight-item checklist (3× P0, 3× P1, 2× P2). Appendix A updated: "Internal suspicious behaviour?" → R-20. Owner: security-engineer + compliance-officer.*
+*v1.5 (2026-06-10): R-20 cross-reference patch — OQ-INS-01 resolved by `docs/DATA_MODEL.md §29` (migration `0058_pam_schema.sql`, 2026-06-10). Five locations updated: (1) SUSPEND-2 containment step — interim manual path note replaced with `admin_jit_escalations` schema reference + manual SQL fallback with explicit column names (`status='revoked'`, `revoked_at=NOW()`); (2) C2 forensic query — "Depends on admin_jit_escalations table — see OQ-INS-01" removed; replaced with canonical schema reference + `fn_inject_pam_session_id()` trigger note; (3) PAM revocation step 5 — PAM API note updated to reference DATA_MODEL §29.10 item 2 (implementation pending); (4) IR-INS-E-006 evidence description — "manual record … incident channel screenshot" replaced with `admin_jit_escalations` row export description confirming `status = 'revoked'` and `revoked_at`; (5) OQ-INS-01 open question — heading updated to 🟢 Resolved; body replaced with resolution narrative citing DATA_MODEL §29; checklist item 1 status updated to `[x] Done` with migration reference; checklist item 2 (PAM revocation API) remains `[ ]` open but notes schema prerequisite now unblocked. Remaining open items: OQ-INS-02 (bulk query middleware — P1 M8), OQ-INS-03 (legal hold API — P2 M10), FORM-INSIDER-001 automation (P1 M7 — DATA_MODEL §29.10 item 9). Cross-references: `docs/DATA_MODEL.md §29` (admin_jit_escalations + pam_break_glass_reviews schemas; fn_inject_pam_session_id trigger), `docs/SSO_SCIM_IMPLEMENTATION.md §24` (PAM KV architecture; DEC-030 events; AL-PAM-01/02/03), `docs/OBSERVABILITY.md §29` (PAM observability; AL-PAM-BG-01). Owner: security-engineer + compliance-officer.*
+
+*v1.4 additions (2026-06-02): R-20 Insider Threat & Privileged Access Abuse — the twentieth runbook and complement to R-01 (external breach). Key design decisions: (1) evidence preservation before remediation — destroying logs while rushing to contain is both forensically harmful and potentially legally harmful; suspending access 30 minutes later than the fastest possible time is always preferable to evidence spoliation; (2) legal notification at T+0, not after confirmation — in insider cases, legal must direct the investigation from the start; (3) two-person authorisation required for all suspension and revocation actions; (4) service_role key rotation is the nuclear option — invalidates all service_role connections platform-wide; (5) DEC-030 chain is simultaneously the primary detection signal and the evidentiary chain — chain tampering treated as P0 regardless of whether data access is confirmed. Trigger matrix: FORM-INSIDER-001 (admin ops outside PAM window), FORM-INSIDER-002 (bulk Art. 9 queries in service_role session), FORM-INSIDER-003 (PAM escalation not revoked within 4-hour hard limit), FORM-INSIDER-004 (Cloudflare Access device policy mismatch), manual HR/legal separation, manual #security report. Severity: P0 for confirmed exfiltration, audit chain tamper, or service_role key external leak; P1 for bulk Art. 9 queries without justification, unrevoked PAM escalation, unrecognised device/location; P2 for unusual admin UI without data queries; P3 for delayed-but-valid PAM revocation. Four SQL queries C1–C4. Six DEC-030 events all CRITICAL/HIGH 7-year retention. Evidence IR-INS-E-001 through IR-INS-E-007. SOC 2: CC6.1/CC6.2/CC6.3/CC6.6/CC7.2/CC7.3. Original open questions: OQ-INS-01 (admin_jit_escalations schema — resolved v1.5), OQ-INS-02 (bulk query middleware — P1, M8), OQ-INS-03 (legal hold API — P2, M10). Eight-item checklist (3× P0, 3× P1, 2× P2). Appendix A updated: "Internal suspicious behaviour?" → R-20. Owner: security-engineer + compliance-officer.*
 
 ---
 

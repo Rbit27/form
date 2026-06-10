@@ -6,6 +6,15 @@
 
 ---
 
+## [3.42.2] — 2026-06-10
+
+### Changed
+- [`docs/INCIDENT_RESPONSE.md §R-20`](docs/INCIDENT_RESPONSE.md) — OQ-INS-01 cross-reference patch: `admin_jit_escalations` schema now exists (`docs/DATA_MODEL.md §29`, migration `0058_pam_schema.sql`). Five locations updated: (1) SUSPEND-2 containment step — interim manual path note replaced with schema reference + SQL fallback; (2) C2 forensic query — OQ-INS-01 dependency note replaced with canonical DATA_MODEL §29 reference and `fn_inject_pam_session_id()` trigger note; (3) PAM revocation step 5 — updated to reference DATA_MODEL §29.10 item 2 (API implementation pending); (4) IR-INS-E-006 evidence description — updated from "manual screenshot" to `admin_jit_escalations` row export format; (5) OQ-INS-01 heading updated 🔴 Open → 🟢 Resolved; checklist item 1 marked `[x] Done` with migration reference; item 2 remains open (API endpoint). Runbook version v1.4 → v1.5.
+- [`docs/SSO_SCIM_IMPLEMENTATION.md §24.8`](docs/SSO_SCIM_IMPLEMENTATION.md) — CC6-E-PAM-005 through CC6-E-PAM-008 added to PAM evidence artefact index: four Postgres-layer evidence artefacts from `admin_jit_escalations` + `pam_break_glass_reviews` (DATA_MODEL §29) covering CC6.1/CC6.2/CC6.3/CC6.6; collected at M7. Evidence collection cadence note updated; artefact table expanded with SOC 2 criterion and source columns; checklist item 10 updated to include M7 Postgres artefact milestone. Section version v1.6 → v1.8.
+- `VERSION` — 3.42.1 → 3.42.2.
+
+---
+
 ## [3.42.1] — 2026-06-10
 
 ### Added
