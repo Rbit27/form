@@ -6,6 +6,16 @@
 
 ---
 
+## [3.37.1] — 2026-06-10
+
+### Added
+- [`content/post-411-first-set-rpe-warm-up-diagnostics.md`](content/post-411-first-set-rpe-warm-up-diagnostics.md) — перший підхід і RPE-діагностика: три механізми завищення (м'язова температура, нейральна неготовність, efference copy), RPE-траєкторія як інструмент авторегуляції, матриця рішень по двох підходах; Helms et al. (2016), Naclerio et al. (2013), Chtourou & Souissi (2012); clinical-safety NOT REQUIRED
+- `blog.html` — картка post-411 додана (348 карток загалом)
+- `README.md` — `#### Roadmap post-364+` з post-411 (✓) та запланованими post-412–415
+- `STATUS.md` — оновлено до 411 постів, v3.37.1, 348 карток у blog.html
+
+---
+
 ## [3.37.0] — 2026-06-10
 
 ### Added

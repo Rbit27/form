@@ -769,6 +769,14 @@ Each iteration:
 - [x] post-362: Як читати дослідження про тренування — ієрархія доказів для практика; RCT vs observational; effect size проти p-value; Schoenfeld «resistance training recommendations» як зразок; clinical-safety NOT REQUIRED
 - [x] post-363: Індивідуальна варіативність відповіді на тренування — чому однакова програма дає різні результати; responder vs non-responder (Timmons 2010); гетерогенність гіпертрофічної відповіді; що це означає для програмування; clinical-safety NOT REQUIRED
 
+#### Roadmap post-364+
+
+- [x] post-411: Перший підхід завжди брехун — чому RPE першого робочого підходу систематично завищений; три механізми (м'язова температура, нейральна неготовність, efference copy); як читати RPE-траєкторію, а не точку; матриця рішень по двох підходах; Helms et al. (2016) RIR надійність, Naclerio et al. (2013) розминка −1.2 RPE, Chtourou & Souissi (2012) ранкові vs вечірні сесії; clinical-safety NOT REQUIRED
+- [ ] post-412: Надлишкова варіація вправ — як часта зміна рухів саботує прогрес; SRA-крива для технічного навчання vs м'язового розвитку; Fonseca et al. (2014) variety and hypertrophy; коли різноманіття допомагає, коли шкодить; clinical-safety NOT REQUIRED
+- [ ] post-413: Тренувальний стаж після 40 — де вікові обмеження реальні, де перебільшені; Wroblewski et al. (2011) Master Athletes MRI; відновлення, частота, вибір навантаження; чому досвідчений 45-річний обганяє новачка 25-річного; clinical-safety NOT REQUIRED
+- [ ] post-414: Сила та довголіття — механізми, а не кореляції; м'язова маса як метаболічний резерв; Ruiz et al. (2008) рак, Leong et al. (2015) PURE study; що насправді вимірює handgrip і де він обмежений як предиктор; clinical-safety NOT REQUIRED
+- [ ] post-415: Програмування для батьків — тренувальна адаптація при хронічному недосипанні і нестабільному розкладі; мінімальний ефективний обсяг, пріоритизація рухів, стратегії відновлення; clinical-safety NOT REQUIRED
+
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
 ---
