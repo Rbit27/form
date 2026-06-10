@@ -6,6 +6,14 @@
 
 ---
 
+## [3.40.2] — 2026-06-10
+
+### Changed
+- [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) v2.3 — Closed three open checklist items from §32.10 (added at v2.2): §6.2 gains `victor_safety_health` subsection (FORM-VICTOR-001 through FORM-VICTOR-004 alert rows for VT-03/04/05/06 P0 CRITICAL and VT-01/02 P1/VT-07/08 P2/VT-09/10 P3); §2.1 gains VICTOR-SLO-01 through VICTOR-SLO-04 (zero-tolerance P0 rate, alert latency, MTTR, re-enable chain integrity); §27.2 gains `siem.victor_safety_p0` (CRITICAL) and `siem.victor_safety_p1` (HIGH) SIEM routing rows; §11.11 adds Cloudflare Analytics Engine SQL for `victor_safety_flag_rate_per_1k_turns` (30-min rolling segmented by trigger_category/model_version/prompt_version), P0 zero-tolerance check, VICTOR-SLO-02 alert latency query, and 30-day rolling baseline SQL for pg_cron job 14 (`victor_safety_baseline_refresh`, nightly 01:00 UTC). Items 5, 7, 9 in §32.10 marked `[x] Closed v2.3`.
+- [`docs/AUDIT_LOG_SCHEMA.md`](docs/AUDIT_LOG_SCHEMA.md) v0.9 → v1.0 — +5 `ai.*` Victor AI safety DEC-030 events: `ai.safety_incident_opened` (CRITICAL for VT-03/04/05/06, HIGH otherwise, 7yr), `ai.safety_incident_contained` (HIGH, 7yr), `ai.victor_disabled` (HIGH, 7yr), `ai.victor_reenabled` (HIGH, 7yr), `ai.safety_incident_resolved` (STANDARD, 3yr). All HMAC-chained. VSAFETY-CHAIN-01/02/03 ordering enforced by `emit-audit-event` Worker write-guard (HTTP 422 + PagerDuty P0 on violation). Retention table updated with 2 new rows. Closes OBSERVABILITY.md §32.10 checklist item 7 (P0 M4) and INCIDENT_RESPONSE.md R-23 checklist item 2 (P0 M4). Privacy floor: no user_id, coaching content, or health values in any payload.
+
+---
+
 ## [3.40.1] — 2026-06-10
 
 ### Added

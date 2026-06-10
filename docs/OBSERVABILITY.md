@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v2.2
+# FORM · Observability & Monitoring Taxonomy v2.3
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -121,6 +121,10 @@ SLIs (Service Level Indicators) are the specific measurements. SLOs (Service Lev
 | **EAS Update delivery** | % of OTA update checks that successfully resolve a bundle | 99.5% | < 98% in 30-min window | Rolling 7 days | devops-lead |
 | **Audit log write latency** | P95 time added to request by `auditLog()` middleware | < 50 ms | > 100 ms P95 sustained 5 min | Rolling 7 days | platform-engineer |
 | **HMAC chain integrity** | Binary: chain unbroken across all tenants | 100% (any break = P0) | Any break detected | Weekly batch | security-engineer |
+| **VICTOR-SLO-01 · Victor P0 safety triggers** | `victor_p0_trigger_rate` = 0 per observation window — zero P0 clinical-safety incidents (VT-03/04/05/06); any single event constitutes an immediate SLO breach with no error budget to burn | **Zero — unconditional** | Any P0 event | 30-day rolling | clinical-safety + security-engineer |
+| **VICTOR-SLO-02 · Victor P0 alert latency** | `FORM-VICTOR-001` PagerDuty alert fires within 5 minutes of first `VICTOR_SAFETY_TELEMETRY` P0 row; measured as `pagerduty_alert_at - first_flag_timestamp ≤ 5 min` | 100% of P0 events | Alert not fired within 5 min | Per-incident | devops-lead |
+| **VICTOR-SLO-03 · Victor MTTR** | P0 incidents: resolved (or Victor globally disabled + ramp-re-enable complete) within 4 hours; P1 incidents: resolved within 24 hours | P0: ≤ 4 h (zero-tolerance for containment); P1: ≤ 24 h (target) | P0 containment gap > 4 h; P1 resolution gap > 24 h | Per-incident rolling 90 d | security-engineer + clinical-safety |
+| **VICTOR-SLO-04 · Victor re-enable chain integrity** | Zero `ai.victor_reenabled` DEC-030 events without a preceding `ai.safety_incident_resolved` for the same `incident_id`; enforced by VSAFETY-CHAIN-03 real-time write-guard in `emit-audit-event` Worker | **Zero — zero-tolerance** | VSAFETY-CHAIN-03 fires (HTTP 422 + PagerDuty) | Continuous | security-engineer + compliance-officer |
 
 ### 2.2 Error Budget Policy
 
@@ -486,6 +490,17 @@ Alerts route through Better Stack (or PagerDuty once team size warrants). All P0
 |---|---|---|---|---|
 | **GDPR erasure SLA day-33 warning** | Any open Art. 17 erasure request in `dsar_requests` (type = `erasure`, status ≠ `fulfilled`/`rejected`) where `submitted_at < now() - INTERVAL '33 days'`; pg_cron `c1-erasure-sla-monitor` (daily 08:00 UTC, job 11 in §12.6 pg_cron registry); re-alerts every 24 h; dedup key `c1-erasure-sla-breach-{dsar_request_id}` | P1 | PagerDuty `form-compliance` → compliance-officer; Slack `#security-alerts` HIGH | SOC2_READINESS.md §73.3.1 AL-C1-01; INCIDENT_RESPONSE.md R-14 (per-user Art. 17 escalation path); belt-and-suspenders to §70 DSAR day-25/day-29 P0/P1 alerts |
 
+**Subsection: `victor_safety_health` (FORM-VICTOR-001 through FORM-VICTOR-004 — §32.5):**
+
+| Alert Name | Trigger Condition | Severity | Notification Channel | Runbook |
+|---|---|---|---|---|
+| **Victor P0 clinical-safety trigger** | Any `VICTOR_SAFETY_TELEMETRY` row with `trigger_category IN ('VT-03','VT-04','VT-05','VT-06')` — single event fires; no threshold; no auto-resolve; dedup key `victor-p0-{session_id}` | P0 | PagerDuty `FORM Clinical Safety` → clinical-safety owner (0-min) + founder (0-min) + security-engineer (5-min); SIEM → `siem.victor_safety_p0` (CRITICAL) | §32.4 FORM-VICTOR-001; INCIDENT_RESPONSE.md R-23 §R-23.3 T+0 → T+3min global disable; clinical-safety VETO activated unconditionally |
+| **Victor P1 dangerous-advice flag spike** | `victor_safety_flag_rate_per_1k_turns` for `trigger_category IN ('VT-01','VT-02')` exceeds 3× 30-day rolling baseline in any 30-minute window; re-alert 1 h; dedup key `victor-p1-vt01vt02-{prompt_version}-{window_start}`; suppressed 60 min after prompt version deploy | P1 | PagerDuty `FORM Clinical Safety`; SIEM → `siem.victor_safety_p1` (HIGH) | §32.4 FORM-VICTOR-002; INCIDENT_RESPONSE.md R-23 §R-23.2 P1 path |
+| **Victor P2 sports-science error spike** | `victor_safety_flag_rate_per_1k_turns` for `trigger_category IN ('VT-07','VT-08')` exceeds 5× 30-day rolling baseline in any 1-hour window; re-alert 4 h; suppressed 60 min post-deploy | P2 | PagerDuty `FORM Engineering` + Slack `#alerts-safety` | §32.4 FORM-VICTOR-003; INCIDENT_RESPONSE.md R-23 §R-23.2 P2 path — guardrail injection |
+| **Victor P3 tone/localisation spike or CI failure** | `victor_safety_flag_rate_per_1k_turns` for `trigger_category IN ('VT-09','VT-10')` exceeds 10× 30-day baseline in any 2-hour window; OR any jailbreak test suite CI failure for VT-09/10 | P3 | Slack `#alerts-quality` only | §32.4 FORM-VICTOR-004; INCIDENT_RESPONSE.md R-23 §R-23.2 P3 path — next deploy fix |
+
+**SIEM note (victor_safety_health):** `FORM-VICTOR-001` and `FORM-VICTOR-002` route to the §27.2 SIEM export pipeline as `siem.victor_safety_p0` (CRITICAL) and `siem.victor_safety_p1` (HIGH). For enterprise tenants, these events are delivered to the tenant's SIEM only when the incident involves sessions from that tenant (`tenant_id` non-null in `VICTOR_SAFETY_TELEMETRY`). SOC 2 evidence: VSAFETY-E-001 (§32.9). No suppression permitted for `FORM-VICTOR-001`.
+
 ### 6.3 Alert Tuning Rules
 
 - An alert that fires as a false positive more than twice in 30 days must be tuned. Do not suppress — adjust the threshold or add a stabilization window.
@@ -845,6 +860,80 @@ error_budget_consumed =
 ```
 
 Alert fires at 50% consumed. Feature freeze at 0% (SLO breach). See §2.2 for policy.
+
+### 11.11 Victor AI safety flag rate per 1,000 coaching turns
+
+Supports VICTOR-SLO-01 and VICTOR-SLO-02. Source: `VICTOR_SAFETY_TELEMETRY` Cloudflare Analytics Engine dataset (§32.2). All expressions use a 30-minute rolling window unless otherwise noted.
+
+```sql
+-- Cloudflare Analytics Engine SQL
+-- victor_safety_flag_rate_per_1k_turns (all categories, 30-min window)
+SELECT
+  trigger_category,
+  model_version,
+  prompt_version,
+  COUNT(*) * 1000.0 / NULLIF(total_turns.count, 0) AS flag_rate_per_1k
+FROM victor_safety_telemetry
+CROSS JOIN (
+  SELECT COUNT(*) AS count
+  FROM coaching_turn_telemetry  -- total coaching turns same window
+  WHERE timestamp >= now() - INTERVAL '30 minutes'
+) AS total_turns
+WHERE timestamp >= now() - INTERVAL '30 minutes'
+GROUP BY trigger_category, model_version, prompt_version, total_turns.count
+ORDER BY flag_rate_per_1k DESC;
+
+-- P0 rate (VICTOR-SLO-01): zero-tolerance check
+-- Returns rows only when SLO is breached (any P0 event = breach)
+SELECT
+  session_id,
+  trigger_category,
+  severity_class,
+  timestamp
+FROM victor_safety_telemetry
+WHERE severity_class = 'P0'
+  AND trigger_category IN ('VT-03','VT-04','VT-05','VT-06')
+  AND timestamp >= (now() - INTERVAL '30 days')
+ORDER BY timestamp DESC;
+-- SLO target: zero rows. Any row = immediate breach. FORM-VICTOR-001 fires on first row.
+
+-- VSAFETY-SLO-02: alert latency (requires PagerDuty webhook to populate pagerduty_alerts table)
+-- Measures time from first VICTOR_SAFETY_TELEMETRY P0 row to PagerDuty FORM-VICTOR-001 creation
+SELECT
+  v.incident_id,
+  MIN(v.timestamp)                          AS first_flag_ts,
+  MIN(p.created_at)                         AS alert_created_at,
+  EXTRACT(EPOCH FROM (MIN(p.created_at) - MIN(v.timestamp))) AS latency_seconds
+FROM victor_safety_telemetry v
+JOIN pagerduty_alerts p ON p.dedup_key = 'victor-p0-' || v.session_id::text
+WHERE v.severity_class = 'P0'
+  AND v.timestamp >= now() - INTERVAL '90 days'
+GROUP BY v.incident_id
+HAVING EXTRACT(EPOCH FROM (MIN(p.created_at) - MIN(v.timestamp))) > 300;
+-- SLO target: zero rows. Rows = P0 alerts that fired > 5 min after first signal.
+```
+
+**30-day rolling baseline** (used by FORM-VICTOR-002/003/004 threshold computation — nightly pg_cron `victor_safety_baseline_refresh`, job 14 in §12.6 registry):
+
+```sql
+-- Baseline: average flag_rate_per_1k_turns by trigger_category over prior 30 days
+-- Stored in system.victor_safety_baselines KV: vsafety:baseline:{trigger_category}:{date}
+SELECT
+  trigger_category,
+  AVG(daily_rate) AS baseline_rate_per_1k
+FROM (
+  SELECT
+    trigger_category,
+    DATE_TRUNC('day', timestamp) AS day,
+    COUNT(*) * 1000.0 / NULLIF(SUM(COUNT(*)) OVER (PARTITION BY DATE_TRUNC('day', timestamp)), 0) AS daily_rate
+  FROM victor_safety_telemetry
+  WHERE timestamp >= now() - INTERVAL '30 days'
+  GROUP BY trigger_category, DATE_TRUNC('day', timestamp)
+) daily_rates
+GROUP BY trigger_category;
+```
+
+**Privacy note:** All queries reference `session_id` (UUID) only. `coaching_turns.content` is never queried by any §11.11 expression — the coaching turn content is inaccessible to `form_api` (REVOKE SELECT enforced at migration `0054`). The `victor_safety_flag_rate_per_1k_turns` metric measures *Victor's output classification*, not the user's health state or coaching content. Cross-ref: §32.2 (schema), §32.3 (SLOs), §32.4 (alert thresholds).
 
 ---
 
@@ -5901,6 +5990,8 @@ The table below maps DEC-030 event types to SIEM severity levels and indicates w
 | **Bulk data access** | `admin.export_triggered`, `api.bulk_records_accessed` | High | Yes | Triggers internal correlation rule CR-04 (§27.3); record count included |
 | **SIEM export control** | `siem.tenant_export_enabled`, `siem.tenant_export_disabled` | High | No | Internal FORM control event; not exported to tenant (would create circular reference) |
 | **HMAC chain integrity** | `siem.hmac_chain_break_detected` | Critical | No | Internal only; triggers INCIDENT_RESPONSE.md R-01; never sent to tenant SIEM |
+| **Victor AI P0 clinical-safety trigger** | `siem.victor_safety_p0` — emitted when `FORM-VICTOR-001` fires (VT-03/04/05/06 P0 clinical-safety VETO); `incident_id` UUID included for tenant correlation; no coaching content, no user PII beyond `session_id` UUID | Critical | Optional (tenant-scoped: only if `tenant_id` non-null and tenant has SIEM export enabled) | CC7.2/CC7.4 SOC 2 evidence; delivered to affected enterprise tenant CSM per INCIDENT_RESPONSE.md R-23 Template V-03; never auto-resolved — requires `ai.safety_incident_resolved` DEC-030 event to close |
+| **Victor AI P1 dangerous-advice flag spike** | `siem.victor_safety_p1` — emitted when `FORM-VICTOR-002` fires (VT-01/02 P1); 30-min window rate exceeds 3× baseline; `trigger_category` and `prompt_version` included | High | Optional (tenant-scoped: only for affected tenant) | CC7.2 SOC 2 evidence; routing via §27.4 enterprise SIEM export; privacy floor: no per-user flag count exposed — aggregate rate only |
 
 ---
 
@@ -7554,16 +7645,16 @@ The following invariants apply to all signals, datasets, dashboards, and evidenc
 | 2 | Apply migration `0054_coaching_turns_safety_classification.sql` (ALTER TABLE ADD COLUMN `safety_classification TEXT CHECK (...)` nullable; REVOKE SELECT on this column from `form_api`); add column to GDPR Art. 17 erasure Worker deletion list alongside `coaching_turns.content`. | platform-engineer | **P0** | M4 | [ ] |
 | 3 | Configure `FORM-VICTOR-001` in PagerDuty "FORM Clinical Safety" service: trigger on single `VICTOR_SAFETY_TELEMETRY` row with `severity_class = 'P0'`; escalation to clinical-safety owner (0-min) + founder (0-min) + security-engineer (5-min); urgency `high`; no auto-resolve; dedup key `victor-p0-{session_id}`; test with synthetic P0 row in staging and confirm PagerDuty fires within 60 s. | devops-lead | **P0** | M4 | [ ] |
 | 4 | Configure `FORM-VICTOR-002`, `FORM-VICTOR-003`, and `FORM-VICTOR-004` in PagerDuty per §32.4; add baseline computation pg_cron job `victor_safety_baseline_refresh` (nightly 01:00 UTC, writes to `system.victor_safety_baselines` KV namespace); add as job 14 in §12.6 pg_cron registry. | devops-lead | **P0** | M4 | [ ] |
-| 5 | Add `victor_safety_health` subsection to §6.2 Alert Rules table per §32.5 (four rows: FORM-VICTOR-001 through FORM-VICTOR-004); add `siem.victor_safety_p0` and `siem.victor_safety_p1` rows to §27.2 SIEM event classification table. | devops-lead | **P0** | M4 | [ ] |
+| 5 | Add `victor_safety_health` subsection to §6.2 Alert Rules table per §32.5 (four rows: FORM-VICTOR-001 through FORM-VICTOR-004); add `siem.victor_safety_p0` and `siem.victor_safety_p1` rows to §27.2 SIEM event classification table. | devops-lead | **P0** | M4 | [x] Closed v2.3 |
 | 6 | Implement VSAFETY-CHAIN-03 in `emit-audit-event` Worker: before emitting `ai.victor_reenabled`, query for matching `ai.safety_incident_resolved`; reject with HTTP 422 if none found; page FORM-VICTOR-001 equivalent on rejection. Test in staging: attempt to emit `ai.victor_reenabled` with a non-existent `incident_id`; confirm 422 and PagerDuty page. | platform-engineer + security-engineer | **P0** | M4 | [ ] |
-| 7 | Register all five DEC-030 events (`ai.safety_incident_opened`, `ai.safety_incident_contained`, `ai.victor_disabled`, `ai.victor_reenabled`, `ai.safety_incident_resolved`) in `docs/AUDIT_LOG_SCHEMA.md` with full payload schema, severity, and retention per R-23.10. (This item was also INCIDENT_RESPONSE.md R-23 checklist item 2 — mark both as closed on completion.) | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 7 | Register all five DEC-030 events (`ai.safety_incident_opened`, `ai.safety_incident_contained`, `ai.victor_disabled`, `ai.victor_reenabled`, `ai.safety_incident_resolved`) in `docs/AUDIT_LOG_SCHEMA.md` with full payload schema, severity, and retention per R-23.10. (This item was also INCIDENT_RESPONSE.md R-23 checklist item 2 — mark both as closed on completion.) | platform-engineer + compliance-officer | **P0** | M4 | [x] Closed v2.3 / AUDIT_LOG_SCHEMA.md v1.0 |
 
 #### P1 — Before first Victor session in production (M5/M6)
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 8 | Implement `victor_safety_chain_monitor` pg_cron job (daily 00:30 UTC): runs VSAFETY-CHAIN-01 and VSAFETY-CHAIN-02 SQL queries; emits `admin.monitoring_check_failed` DEC-030 on non-zero result; add as job 15 in §12.6 pg_cron registry; test in staging by inserting a synthetic `ai.safety_incident_opened` with no paired `ai.safety_incident_contained`. | platform-engineer | **P1** | M5 | [ ] |
-| 9 | Register VICTOR-SLO-01 through VICTOR-SLO-04 in §2 SLO table; add `victor_safety_flag_rate_per_1k_turns` to §11 SLI Calculation Expressions table. | devops-lead + compliance-officer | **P1** | M5 | [ ] |
+| 9 | Register VICTOR-SLO-01 through VICTOR-SLO-04 in §2 SLO table; add `victor_safety_flag_rate_per_1k_turns` to §11 SLI Calculation Expressions table. | devops-lead + compliance-officer | **P1** | M5 | [x] Closed v2.3 |
 | 10 | Build "Victor AI Safety Health" dashboard (§32.7, eight panels) in Metabase + Better Stack; restrict access to devops-lead + security-engineer + clinical-safety + founder; validate "P0 incidents last 90 days" stat panel shows red background with a synthetic P0 event injected in staging. | devops-lead | **P1** | M5 | [ ] |
 | 11 | Collect VSAFETY-E-001 through VSAFETY-E-004 evidence artefacts (§32.9) after 30 days of Victor in production; store in `compliance/evidence/victor-safety/`; cross-reference in `docs/SOC2_READINESS.md` CC7.2, CC7.3, CC7.4, A1.2 control evidence rows. | compliance-officer | **P1** | M6 | [ ] |
 | 12 | Mark INCIDENT_RESPONSE.md R-23 Implementation Checklist item 7 as closed (this §32 section satisfies the requirement for "per-session Victor error rate monitoring" and `FORM-VICTOR-001` definition per R-23.12 CC7.2 evidence). | devops-lead + compliance-officer | **P1** | M6 | [ ] |
@@ -7584,6 +7675,8 @@ The following invariants apply to all signals, datasets, dashboards, and evidenc
 | **OQ-VSAFETY-02** | **Should the VSAFETY-CHAIN-01 containment timeout be 60 minutes or shorter (e.g., 15 minutes) for P0 incidents, matching the R-23.3 T+3min global disable target?** The R-23 timeline says Victor should be globally disabled at T+3min for P0 incidents. A 60-minute containment timeout in VSAFETY-CHAIN-01 gives too wide a window before the chain monitor flags a breach. Recommendation: reduce VSAFETY-CHAIN-01 timeout to 15 minutes for P0 incidents (separately monitor P1 at 60 min). This requires VSAFETY-CHAIN-01 to segmented by `severity` from the `ai.safety_incident_opened` event metadata. | P1 | security-engineer + clinical-safety | Resolve in next INCIDENT_RESPONSE.md quarterly review; implement via updated `victor_safety_chain_monitor` query condition |
 
 ---
+
+*v2.3 (2026-06-10): §6.2/§27.2/§2/§11 — Victor AI safety table updates — closes §32.10 checklist items 5 (P0 M4) and 9 (P1 M5); also closes §32.10 item 7 (P0 M4) in conjunction with AUDIT_LOG_SCHEMA.md v1.0. §6.2 `victor_safety_health` subsection added (four rows: FORM-VICTOR-001 P0 clinical-safety single-event, FORM-VICTOR-002 P1 dangerous-advice baseline spike, FORM-VICTOR-003 P2 sports-science error spike, FORM-VICTOR-004 P3 tone/localisation spike or CI failure; each row includes trigger condition, severity, PagerDuty service, dedup key, suppression rule, and runbook cross-reference). §27.2 SIEM event classification table: two new rows (`siem.victor_safety_p0` CRITICAL tenant-scoped optional — V-03 template delivery evidence; `siem.victor_safety_p1` HIGH tenant-scoped optional — aggregate rate only, no per-user flag count). §2.1 SLO table: four rows added (VICTOR-SLO-01 zero P0 events / 30d / unconditional zero-budget; VICTOR-SLO-02 FORM-VICTOR-001 latency ≤ 5 min / per-incident / zero-tolerance; VICTOR-SLO-03 MTTR P0 ≤ 4 h / P1 ≤ 24 h / per-incident rolling 90 d; VICTOR-SLO-04 zero ai.victor_reenabled without ai.safety_incident_resolved / continuous / zero-tolerance — VSAFETY-CHAIN-03 enforced). §11.11 Victor AI safety flag rate SLI: Cloudflare Analytics Engine SQL for `victor_safety_flag_rate_per_1k_turns` (30-min rolling by trigger_category + model_version + prompt_version); P0 zero-tolerance check (returns rows only on breach); VICTOR-SLO-02 alert latency query (requires PagerDuty webhook to pagerduty_alerts table); 30-day rolling baseline SQL for pg_cron `victor_safety_baseline_refresh` (nightly 01:00 UTC, job 14). Privacy note: all expressions reference session_id (UUID) only; coaching_turns.content inaccessible (REVOKE SELECT, migration 0054). Owner: devops-lead + compliance-officer.*
 
 *v2.2 (2026-06-10): §32 Victor AI Safety Monitoring & Clinical-Safety Observability — closes `docs/INCIDENT_RESPONSE.md` R-23 Implementation Checklist item 7 (P1 M6): "Add per-session Victor error rate monitoring to `docs/OBSERVABILITY.md §31`: define alert rule `FORM-VICTOR-001` (safety_flag_triggered rate > baseline threshold); define per-category flag rate metric; confirm metric is computed from `coaching_turns` table and visible in monitoring dashboard." (The checklist referenced §31 as a placeholder for the then-current last section; §32 is the canonical home for this content since §31 was subsequently authored for API Key Auth.) TOC updated to add §32. Header bumped v1.8 → v2.2 (aligns with v2.1 as the immediately prior version note). §32.1 scopes to safety-only observability (distinct from §22 quality observability); establishes privacy invariant (no `coaching_turns.content` in any telemetry signal); declares SOC 2 scope CC7.2/CC7.3/CC7.4/CC9.2/A1.2; lists five DEC-030 events from R-23.10 as the chain-of-custody backbone. §32.2 `VICTOR_SAFETY_TELEMETRY` Cloudflare Analytics Engine dataset: ten-column schema (`session_id` UUID, `tenant_id` nullable, `trigger_category` VT-01 through VT-10, `severity_class` P0–P3, `detection_source` four-value enum, `model_version`, `prompt_version`, `flags_count`, `incident_id` nullable, `timestamp`); no content, no user PII; schema extension `coaching_turns.safety_classification` nullable TEXT CHECK with VT-01 through VT-10 plus `clean`; migration `0054_coaching_turns_safety_classification.sql`; REVOKE SELECT on column from `form_api`; column included in GDPR erasure Worker; eight RED metrics covering rate (safety flag rate per 1k turns, P0 rate, 24h incident rate), errors (false positive rate, regression rate by version), and duration (MTTR P0/P1, re-enable ramp duration). §32.3 four SLOs: VICTOR-SLO-01 (zero P0 incidents per 30-day window — unconditional zero-tolerance); VICTOR-SLO-02 (FORM-VICTOR-001 fires within 5 min of P0 signal — 100% zero-tolerance); VICTOR-SLO-03 (MTTR P0 ≤ 4 h, MTTR P1 ≤ 24 h); VICTOR-SLO-04 (zero `ai.victor_reenabled` without preceding `ai.safety_incident_resolved` — VSAFETY-CHAIN-03 enforced). §32.4 four alert rules: `FORM-VICTOR-001` (P0, VT-03/04/05/06, single event fires, no auto-resolve, "FORM Clinical Safety" PagerDuty service, clinical-safety + founder 0-min); `FORM-VICTOR-002` (P1, VT-01/02, 3× 30d baseline / 30-min window); `FORM-VICTOR-003` (P2, VT-07/08, 5× baseline / 1-h); `FORM-VICTOR-004` (P3, VT-09/10, 10× baseline / 2-h or jailbreak CI); baseline computed nightly by pg_cron `victor_safety_baseline_refresh` (job 14); 60-min suppression on prompt version deploy for FORM-VICTOR-002 through -004 (no suppression for FORM-VICTOR-001). §32.5 §6.2 `victor_safety_health` subsection: four rows FORM-VICTOR-001 through -004; SIEM routing `siem.victor_safety_p0` (CRITICAL) and `siem.victor_safety_p1` (HIGH) for §27.2. §32.6 three DEC-030 chain monitors: VSAFETY-CHAIN-01 (P1, P0 incident open with no containment > 60 min — see OQ-VSAFETY-02 for 15-min refinement); VSAFETY-CHAIN-02 (P1, Victor disabled > 48 h with no re-enable); VSAFETY-CHAIN-03 (P0, `ai.victor_reenabled` with no matching `ai.safety_incident_resolved` — real-time write-time guard in `emit-audit-event` Worker, not post-hoc); SQL provided for VSAFETY-CHAIN-01/02; chain monitor job 15 in §12.6 pg_cron registry. §32.7 eight-panel "Victor AI Safety Health" Metabase + Better Stack dashboard: feature flag status (KV synthetic), safety flags last 24h (stacked bar by VT category), P0 incidents last 90 days (stat, red if > 0), flag rate vs 30d baseline (line chart), MTTC gauge, per-model version bar chart, DEC-030 chain health stat, recent events log (UUID-only). §32.8 six privacy constraints: no content in telemetry, UUID-only session ID, column-level privilege on `safety_classification`, tenant_id for internal use only, evidence PII rule (R-23.11), safety classification describes Victor output category not user health state. §32.9 four SOC 2 evidence artefacts VSAFETY-E-001 (CC7.2 — PagerDuty FORM-VICTOR-001 config + 90d incident history), VSAFETY-E-002 (CC7.3 — VICTOR_SAFETY_TELEMETRY observation window export), VSAFETY-E-003 (CC7.4 — chain monitor config + VSAFETY-CHAIN-03 zero-fire attestation), VSAFETY-E-004 (A1.2 — KV feature flag change log + DEC-030 disable/re-enable export); all 7-year retention. §32.10 thirteen-item implementation checklist: 7× P0 M4 (VICTOR_SAFETY_TELEMETRY dataset + Worker emission, migration 0054, FORM-VICTOR-001 PagerDuty config, FORM-VICTOR-002/003/004 + baseline job 14, §6.2 + §27.2 table updates, VSAFETY-CHAIN-03 Worker guard, DEC-030 event registration in AUDIT_LOG_SCHEMA.md); 5× P1 M5-M6 (chain monitor job 15, SLO registration + §11 SLI expressions, dashboard, evidence collection, R-23 checklist item 7 closure); 1× P2 quarterly (baseline threshold calibration from M9). §32.11 two open questions: OQ-VSAFETY-01 (tenant_id exposure to CSMs — P1, before enterprise GA M13; recommendation: zero/non-zero count only); OQ-VSAFETY-02 (VSAFETY-CHAIN-01 timeout 60 min vs 15 min for P0 — P1, refine in next IR quarterly review). Cross-references: `docs/INCIDENT_RESPONSE.md` R-23 (primary source — trigger matrix, severity classification, DEC-030 events, implementation checklist item 7); `docs/INCIDENT_RESPONSE.md` R-10 (earlier Victor safety runbook — §32 complements; §22.5 signals remain active); `docs/DATA_MODEL.md §2.9` (`coaching_turns` schema — `safety_classification` column addition); `docs/AUDIT_LOG_SCHEMA.md` (five DEC-030 events to be registered: `ai.safety_incident_opened` CRITICAL/HIGH 7yr, `ai.safety_incident_contained` HIGH 7yr, `ai.victor_disabled` HIGH 7yr, `ai.victor_reenabled` HIGH 7yr, `ai.safety_incident_resolved` STANDARD 3yr); `docs/SOC2_READINESS.md` CC7.2/CC7.3/CC7.4/CC9.2/A1.2 (evidence artefacts VSAFETY-E-001 through VSAFETY-E-004); §6.2 (`victor_safety_health` subsection — four rows); §12.6 (pg_cron registry — jobs 14 and 15); §22 (AI Coaching Quality Observability — quality signals; §32 is the safety companion); §27.2 (SIEM event table — `siem.victor_safety_p0` CRITICAL, `siem.victor_safety_p1` HIGH); `docs/CLINICAL_SAFETY.md` (re-enable procedure — P0 clinical-safety sign-off; §32.10 item 7 cross-references R-23 checklist item 2 for AUDIT_LOG_SCHEMA.md registration). Owner: devops-lead + security-engineer + clinical-safety + compliance-officer.*
 

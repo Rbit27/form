@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v0.9
+# FORM · Audit Log Schema v1.0
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -301,6 +301,24 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 
 ---
 
+### Victor AI safety events (DEC-030 HMAC-chained · OBSERVABILITY §32 · INCIDENT_RESPONSE R-23)
+
+> Defined in `docs/INCIDENT_RESPONSE.md §R-23` and `docs/OBSERVABILITY.md §32`. Five events covering the full Victor AI clinical-safety incident lifecycle — from P0 trigger through containment, global disable, staged re-enable, and resolution. **Privacy floor:** no per-user coaching content, no user health values, no `user_id` in any payload — `incident_id` (UUID), `session_id` (UUID), and aggregate counts only. `clinical_safety_rules_violated` is a boolean; the specific rule text is in the incident record, not the audit chain. VSAFETY-CHAIN-01/02/03 DEC-030 chain monitors (defined in OBSERVABILITY.md §32.7) enforce ordering: `ai.safety_incident_opened` must precede `ai.victor_disabled`; `ai.victor_reenabled` requires a preceding `ai.safety_incident_resolved` for the same `incident_id` — chain guard in `emit-audit-event` Worker returns HTTP 422 on violation. **CRITICAL events (`ai.safety_incident_opened` for VT-03/04/05/06) trigger PagerDuty `FORM Clinical Safety` P0 and clinical-safety VETO unconditionally.** Cross-ref: SOC 2 CC7.2/CC7.4; GDPR Art. 9 (health data integrity record); `docs/OBSERVABILITY.md §32.5` (FORM-VICTOR-001 through FORM-VICTOR-004 alert rules); `docs/OBSERVABILITY.md §2.1` (VICTOR-SLO-01 through VICTOR-SLO-04); closes OBSERVABILITY.md §32.10 checklist item 7 (P0 M4) and INCIDENT_RESPONSE.md R-23 checklist item 2 (P0 M4).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `ai.safety_incident_opened` | **CRITICAL** (trigger_category ∈ {VT-03, VT-04, VT-05, VT-06}); HIGH (all other categories) | 7 yr | First `VICTOR_SAFETY_TELEMETRY` P0 row detected; fires before containment (DEC-030 ordering: chain entry precedes state mutation) | `incident_id` (UUID), `severity_class` (`P0`\|`P1`\|`P2`), `trigger_category` (`VT-01`…`VT-10`), `affected_session_count` (integer — aggregate only), `model_version`, `prompt_version`, `clinical_safety_rules_violated` (bool) |
+| `ai.safety_incident_contained` | HIGH | 7 yr | Containment step applied (Victor feature flag suppressed or rate-limit engaged); emitted by `incident-response` Worker synchronously inside containment transaction | `incident_id` (UUID), `containment_method` (`feature_flag_disable`\|`rate_limit`\|`prompt_version_rollback`), `contained_by_user_id` (UUID — `form_system` for automated path) |
+| `ai.victor_disabled` | HIGH | 7 yr | `victor_coach_enabled` feature flag set to `false` globally; triggered by P0 clinical-safety VETO path in INCIDENT_RESPONSE.md R-23 §R-23.3 T+3min | `incident_id` (UUID), `disabled_by` (UUID — clinical-safety owner or `form_system` on auto-disable), `feature_flag_key`: `"victor_coach_enabled"` |
+| `ai.victor_reenabled` | HIGH | 7 yr | Staged re-enable ramp step applied; requires `ai.safety_incident_resolved` for same `incident_id` to already exist in chain — VSAFETY-CHAIN-03 write-guard blocks this event (HTTP 422) if resolved event is absent | `incident_id` (UUID), `ramp_percentage` (integer 0–100), `approved_by_user_id` (UUID), `clinical_safety_approved` (bool — must be `true`; chain guard rejects if `false`) |
+| `ai.safety_incident_resolved` | STANDARD | 3 yr | Incident closed by clinical-safety + security-engineer sign-off; root cause documented; post-incident controls agreed | `incident_id` (UUID), `resolution_method` (`prompt_patch`\|`model_rollback`\|`guardrail_injection`\|`feature_disabled_permanently`), `root_cause_hypothesis` (free text, max 500 chars — **no user PII**), `post_incident_controls` (string array) |
+
+**HMAC chain requirement:** `ai.safety_incident_opened` must precede all other `ai.*` events for the same `incident_id` (VSAFETY-CHAIN-01 enforced). `ai.victor_disabled` must follow `ai.safety_incident_opened` for the same `incident_id` (VSAFETY-CHAIN-02 enforced — an `ai.victor_disabled` without a preceding `ai.safety_incident_opened` is a chain violation, P0 via PagerDuty). `ai.victor_reenabled` requires a preceding `ai.safety_incident_resolved` for the same `incident_id` in the chain — VSAFETY-CHAIN-03 write-guard in `emit-audit-event` Worker returns HTTP 422 and fires PagerDuty P0 if this constraint is violated. All five events must carry `prev_hash`. High-frequency non-P0 scenarios (VT-01/02 P1 flag spikes producing multiple `ai.safety_incident_opened` HIGH events during model evaluation) are deduplicated by `incident_id` in the PagerDuty integration layer but must each enter the HMAC chain individually.
+
+**Emitter assignment:** `ai.safety_incident_opened` — `form_system` (automated, fired by `FORM-VICTOR-001` Cloudflare Workers pipeline on first `VICTOR_SAFETY_TELEMETRY` P0 row, or manually by clinical-safety owner via admin console); `ai.safety_incident_contained` — `form_system` (automated containment Worker) or `clinical-safety` (manual); `ai.victor_disabled` — `form_system` (automated P0 path, T+3min per R-23 §R-23.3) or `clinical-safety` (manual); `ai.victor_reenabled` — `clinical-safety` + `security-engineer` (manual two-party re-enable; `form_system` path not permitted); `ai.safety_incident_resolved` — `clinical-safety` + `security-engineer` (manual joint sign-off required).
+
+---
+
 ### Support actions (highest privilege)
 - `support.impersonation_started` — FORM employee acting as customer
 - `support.impersonation_ended`
@@ -341,6 +359,8 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 | `compliance.erasure_sla_alert_fired` | 7 years | SOC 2 C1.2/P5.2 GDPR Art. 17 erasure SLA monitoring evidence; belt-and-suspenders secondary signal to §70 DSAR automation |
 | `compliance.data_asset_inventory_reviewed` / `compliance.encryption_verified` / `compliance.disposal_audit_completed` | 3 years | C1 operating evidence cadence records; routine compliance audit completion records per SOC2_READINESS.md §73 |
 | `enterprise.pricing_exception_approved` / `enterprise.consumer_price_updated` / `enterprise.list_price_updated` / `enterprise.price_floor_override_requested` | 7 years | SOC 2 CC1.4 pricing integrity evidence; COST_MODEL.md §31.8 pricing governance trail; CRITICAL-severity `enterprise.price_floor_override_requested` also maps to CC5.2 |
+| `ai.safety_incident_opened` / `ai.safety_incident_contained` / `ai.victor_disabled` / `ai.victor_reenabled` | 7 years | Victor AI P0/P1 clinical-safety incident evidence; SOC 2 CC7.2 (threat monitoring) / CC7.4 (incident response); GDPR Art. 9 health data integrity record; VSAFETY-CHAIN-01/02/03 chain monitor evidence |
+| `ai.safety_incident_resolved` | 3 years | Incident closure record; resolution method and post-incident controls; not required as long-term SOC 2 evidence (covered by the 7yr `ai.safety_incident_opened` record) |
 | `support.*` | 10 years | Trust + future legal discovery |
 | `support.unauthorized_nuke_attempt` | 7 years | Internal safety control violation record |
 | `integration.api_call` (sampled) | 30 days | Volume management |
@@ -412,6 +432,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v1.0 · 2026-06-10 · owner: compliance-officer + security-engineer**
+*v1.0 (2026-06-10): +5 `ai.*` Victor AI safety events — `ai.safety_incident_opened` (CRITICAL/HIGH, 7yr), `ai.safety_incident_contained` (HIGH, 7yr), `ai.victor_disabled` (HIGH, 7yr), `ai.victor_reenabled` (HIGH, 7yr), `ai.safety_incident_resolved` (STANDARD, 3yr). All HMAC-chained per DEC-030. VSAFETY-CHAIN-01/02/03 ordering invariants enforced by `emit-audit-event` Worker write-guard (HTTP 422 on violation → PagerDuty P0). Privacy floor: no user_id, coaching content, or health values in any payload — incident_id (UUID) and affected_session_count (aggregate integer) only. Retention table updated with 2 new rows. Closes OBSERVABILITY.md §32.10 checklist item 7 (P0 M4) and INCIDENT_RESPONSE.md R-23 checklist item 2 (P0 M4). Cross-ref: OBSERVABILITY.md §32.5 (FORM-VICTOR-001 through -004 alert rules), §2.1 (VICTOR-SLO-01 through -04), §32.7 (VSAFETY-CHAIN monitors); INCIDENT_RESPONSE.md R-23 §R-23.3 (T+3min auto-disable path); SOC 2 CC7.2/CC7.4; GDPR Art. 9.*
 
 **v0.9 · 2026-06-10 · owner: compliance-officer + security-engineer**
 *v0.9 (2026-06-10): +4 `enterprise.*` pricing governance events — `enterprise.pricing_exception_approved` (HIGH, 7yr), `enterprise.consumer_price_updated` (HIGH, 7yr), `enterprise.list_price_updated` (HIGH, 7yr), `enterprise.price_floor_override_requested` (CRITICAL, 7yr). All HMAC-chained per DEC-030. Ordering rule: `enterprise.pricing_exception_approved` must precede quote dispatch; `enterprise.price_floor_override_requested` records even denied attempts. `enterprise.pricing_exception_approved` links to `enterprise.contract_signed` (§23.7) via `pricing_exception_event_id`. Privacy invariant: no PII, company names, or health values in any payload. Retention table updated with 1 new row for `enterprise.*` events (SOC 2 CC1.4/CC5.2). Emitter: founder (manual) for exception-approved / price-updated / list-price-updated; pricing calculator server-side API (automated) for floor-override-requested. Closes COST_MODEL.md §31.9 checklist item 1 (P0, M4 — register four pricing event types in AUDIT_LOG_SCHEMA.md; Zod schema validation and `emit-audit-event` Worker deployment are implementation items for platform-engineer + data-engineer per §31.9 item 1 DoD). Cross-ref: COST_MODEL.md §31.8 (event definitions), §31.6 (discount authority matrix), §31.5 (price floors); ENTERPRISE.md §Pricing; MSA_TEMPLATE.md (price escalation clause — §31.7.2); DECISION_LOG.md.*
