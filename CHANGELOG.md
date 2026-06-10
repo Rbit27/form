@@ -6,6 +6,19 @@
 
 ---
 
+## [3.31.0] — 2026-06-10
+
+### Added
+- `content/post-401-mind-muscle-connection-attention-focus.md` — Чому ти не відчуваєш м'язи, які тренуєш: Henneman (1965) size principle + синергістична домінантність; Calatayud et al. (2016) EMG — внутрішній фокус +22% ЕМГ грудних на ≤40% 1RM, ефект зникає на 60–80%; Schoenfeld & Contreras (2016) огляд; Wulf & Lewthwaite (2016) OPTIMAL-теорія — зовнішній фокус кращий для важких підйомів і моторного навчання; Wackerhage et al. (2019) mechanical tension як основний драйвер гіпертрофії; протокол: ізоляція → активаційний сет → внутрішній фокус на розминці → зовнішній на роботі; clinical-safety PASS (~2,400 words, UA)
+- `blog.html` — +1 картка (post-401), лічильник 342 → 343 карток
+- `README.md` — post-397–400 відмічено ✓ (виконано), post-401 ✓, додані теми post-405–410 у роадмап
+
+### Changed
+- `STATUS.md` — версія 3.30.0 → 3.31.0; пост-лічильник 400 → 401; blog.html рядок оновлений
+- `VERSION` → 3.31.0 (MINOR: post-401 content, blog.html card, README roadmap update)
+
+---
+
 ## [3.30.0] — 2026-06-10
 
 ### Added
