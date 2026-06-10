@@ -6,6 +6,14 @@
 
 ---
 
+## [3.40.3] — 2026-06-10
+
+### Added
+- [`content/post-430-autoregulation-rpe-rir-self-coached.md`](content/post-430-autoregulation-rpe-rir-self-coached.md) — Авторегуляція у силовому тренуванні: RPE і RIR як практичні інструменти для self-coached проміжних атлетів (14 хв). Zourdos et al. (2016) валідація RIR-based шкали RPE; Hackett et al. (2017) точність оцінки RIR; Helms et al. (2018) RPE vs %1ПМ; Graham & Cleather (2019) авторегуляція і відновлення; Tuchscherer (2008) RTS-метод. Чому відсоток від 1ПМ нестабільний (±5–8% день-до-дня); повна RIR-шкала (0–10); калібрувальні помилки self-coached атлетів; коли авторегуляція НЕ підходить (новачки, нові рухи); практична інтеграція у тренувальний журнал. clinical-safety NOT REQUIRED.
+- [`content/post-431-eccentric-training-phase-mechanisms-hypertrophy.md`](content/post-431-eccentric-training-phase-mechanisms-hypertrophy.md) — Ексцентрична фаза: механіка, гіпертрофія і практичне застосування для силових атлетів (14 хв). Schoenfeld (2010) три механізми гіпертрофії; Franchi et al. (2017) архітектурні адаптації після ексцентричних програм (дистальна гіпертрофія, довжина пучків); Proske & Morgan (2001) механізм «popping» саркомерів і DOMS; Douglas et al. (2017) структурні адаптації ексцентричного тренування; Wolf et al. (2023) lengthened position синергія; Hody et al. (2019) ексцентричне перевантаження. Темп-нотація 2-0-1/3-1-2/4-0-1; техніки ексцентричного перевантаження (accentuated eccentrics, bands, flywheel); DOMS як фізіологія, не травма. clinical-safety NOT REQUIRED.
+
+---
+
 ## [3.40.2] — 2026-06-10
 
 ### Changed
