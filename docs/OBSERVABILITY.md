@@ -6372,7 +6372,7 @@ The SIEM pipeline itself emits DEC-030 events to make the pipeline observable wi
 
 | OQ | Question | Owner | Resolution Target | Priority |
 |---|---|---|---|---|
-| OQ-SIEM-01 | **ClickHouse vs. Supabase as the correlation rule execution target.** The four correlation rules in §27.3 are specified as ClickHouse SQL. However, the ClickHouse Cloud instance is not provisioned until M9 per the current stack plan. Before M9, either (a) the same correlation rules can be expressed as Supabase pg_cron jobs against the Supabase `audit_log` table (higher latency, heavier Postgres load), or (b) Cloudflare Analytics Engine can be used for aggregated event counts sufficient for CR-01 and a simplified CR-04 but cannot support the JOIN-based CR-02 and CR-03. Decision needed before M4 alert implementation: which platform hosts the correlation rules for the M4 milestone, and what is the migration plan when ClickHouse is provisioned at M9? | platform-engineer + devops-lead | Before M4 implementation start | **P0** |
+| **OQ-SIEM-01** | **🟢 Resolved** — §34 (2026-06-10). Decision: hybrid bridge approach. CR-01 (brute force) and CR-04 (bulk data access) via **Cloudflare Analytics Engine** (real-time, < 10 s detection lag — pure aggregation, no JOIN required). CR-02 (impossible travel) and CR-03 (privilege escalation) via **Supabase pg_cron bridge** every 5 minutes (≤ 5 min detection lag — LAG() window + self-JOIN not available in Analytics Engine). Full migration to ClickHouse MergeTree at M9. Interim detection-lag SLO SIEM-SLO-BRIDGE-01 accepted for M4–M8 as a bounded, documented constraint. See §34 for full implementation: DDL (`0059_siem_bridge.sql`), pg_cron jobs 22–23, Analytics Engine queries, M9 migration plan, evidence artefacts SIEM-BRIDGE-E-001 through SIEM-BRIDGE-E-003. | platform-engineer + devops-lead | **🟢 Resolved — §34** | ~~P0~~ |
 | OQ-SIEM-02 | **Tenant SIEM export consent and DPA scope.** The current design treats any enterprise tenant as eligible to enable SIEM export once they have an API key. However, GDPR and some enterprise DPAs require explicit written consent before FORM transmits audit data (even redacted) to a third-party endpoint specified by the tenant. It is unclear whether the existing enterprise DPA template in `docs/SUBPROCESSORS.md` covers tenant-specified SIEM endpoints as downstream controllers. Legal must review whether the Admin Dashboard "enable SIEM export" UI action constitutes sufficient consent or whether a separate DPA addendum signature is required per tenant. | compliance-officer + legal | Before first enterprise SIEM export goes live (M5) | **P1** |
 | OQ-SIEM-03 | **HMAC chain verification responsibility for tenant SIEM consumers.** The pull API includes `X-FORM-HMAC-Verify` response headers and each event includes its `hmac_signature`. The push webhook batch also includes a batch-level `X-FORM-Signature`. However, the per-event HMAC chain (where each event's signature includes a hash of the preceding event) requires tenants to reconstruct the chain across multiple API calls to verify it. This is a non-trivial implementation burden for a Splunk or Sentinel operator. Should FORM provide an open-source chain-verification library (Python + Go), or is it sufficient to document the verification algorithm and let enterprise tenants implement their own? If a library is not provided, the "HMAC chain integrity" claim in marketing materials may be challenged. | security-engineer + devops-lead | Before enterprise GA (M13) | **P2** |
 
@@ -8208,3 +8208,482 @@ const TenantChurnRiskFlaggedPayload = z.object({
 *v2.4 (2026-06-10): §33 Enterprise Tenant Engagement Health & QBR Metrics Observability — closes the gap between FORM's infrastructure observability (§7.4 Per-Tenant SLA, §13 per-tenant `tenant_id` propagation) and behavioral engagement signals needed for CSM-led churn prevention and QBR delivery. §33.1 scope: distinguishes engagement observability (behavioral, CSM-facing, internal) from infrastructure SLOs (availability, tenant-admin-facing, external); establishes three non-negotiable privacy constraints (aggregate-only, k-anonymity n ≥ 10, HR-never-sees-individual invariant); SOC 2 scope C1.1/CC2.2/CC7.2/A1.1; owners customer-success + product-manager + compliance-officer + devops-lead. §33.2 twelve-metric engagement taxonomy: `provisioned_seats` (tenant_members), `active_seats_wau` (PostHog pseudonymous join), `seat_utilization_7d` (ratio), `coaching_sessions_30d` (coaching_turns session_id count — no content access), `coaching_sessions_per_active_seat` (ratio), `onboarding_completion_rate` (user_profiles.onboarding_completed_at), `cohort_retention_30d` (monthly mature-tenant retention), four binary `feature_adoption_*` flags (SSO, SCIM, admin dashboard login, wearable), `chs_score` (0–100 integer), `chs_band` (three-value enum); `form_analytics` role column-level privilege enforced for all source tables — prohibits SELECT on PII and content columns. §33.3 CHS model: four-component weighted score (seat utilization 40%, coaching engagement 30%, onboarding/retention 20%, feature adoption 10%); five-tier scoring bands per component; three CHS bands (healthy ≥ 70, at_risk 40–69, critical < 40) with default CSM cadence per band; k-anonymity gate: `chs_score = NULL` and CSM dashboard suppression for tenants < 10 provisioned seats. §33.4 six AL-ENGAGE-* alert rules: AL-ENGAGE-01 (P2 Slack, seat util < 40% for 14d), AL-ENGAGE-02 (P1 PagerDuty, seat util < 25% for 7d, 7-day re-alert), AL-ENGAGE-03 (P1 PagerDuty, zero coaching sessions with ≥ 5 active seats), AL-ENGAGE-04 (P2 Slack + PagerDuty, new tenant onboarding completion < 50% at Day 30), AL-ENGAGE-05 (P2 Slack, CHS newly critical), AL-ENGAGE-06 (P1 PagerDuty, CHS < 30 freefall for 3 consecutive weeks, VP escalation); all alert payloads limited to tenant slug + aggregate metrics — no individual user data. §33.5 six-row §6.2 `engagement_health` subsection addition. §33.6 QBR package: eight approved metrics (seat utilization trend, active vs provisioned seats, coaching sessions, coaching sessions per seat, onboarding completion, feature adoption grid, SLA uptime, incident count); explicit prohibition list (no individual data, no CHS score, no tenant comparison, no health data); generation via `tenant_qbr_report_generate` Edge Function + `tenant.qbr_report_generated` DEC-030 event; compliance-officer quarterly spot-check. §33.7 `tenant_engagement_snapshots` DDL (migration 0057): sixteen columns including k-anonymity gate `below_k_threshold` boolean; UNIQUE (tenant_id, snapshot_date); three indexes; four RLS policies (`form_analytics` INSERT-only, `form_system` full, `customer_success` SELECT where `below_k_threshold = false`, zero `tenant_admin` policy — HR invariant enforced at DDL level); 36-month rolling pg_cron cleanup (monthly). §33.8 two pg_cron jobs: job 16 `tenant_engagement_daily` (02:00 UTC, full engagement snapshot INSERT with ON CONFLICT UPDATE; privacy note: column-level privilege prevents content/PII access; CI negative-privilege test required) and job 17 `tenant_chs_compute` (02:30 UTC, CHS formula UPDATE on same-day snapshot rows; SQL provided in full including NULL handling for mature tenants where onboarding_completion_rate is suppressed); `tenant_qbr_report_generate` is an Edge Function (manual CSM trigger, not pg_cron). §33.9 seven privacy constraints with enforcement point and test assertion for each: column-level privilege (negative-privilege CI test), k-anonymity gate (synthetic 9-member tenant test), CHS score exclusion from QBR (compliance-officer code review gate), no tenant comparison (single-tenant parameterized query), tenant_admin zero-row RLS test, CSM alert slug-only (not UUID), no health data DDL column review. §33.10 four DEC-030 events: `tenant.churn_risk_flagged` (HIGH 3yr, AL-ENGAGE-02/06 trigger; Zod schema provided), `tenant.engagement_milestone_achieved` (STANDARD 90d, CHS recovery to healthy), `tenant.qbr_report_generated` (STANDARD 90d, approved metric list in payload confirms content policy), `analytics.tenant_engagement_computed` (LOW 30d, nightly run proof). §33.11 SOC 2 evidence mapping: C1.1 (RLS zero-access for tenant_admin — ENGAGE-E-001), C1.2 (36-month retention + no external forwarding — ENGAGE-E-001), CC2.2 (QBR package compliance-reviewed content — ENGAGE-E-002), CC7.2 (six alert rules + churn_risk_flagged DEC-030 — ENGAGE-E-003), A1.1 (seat utilization monitoring as capacity leading indicator — ENGAGE-E-003); three evidence artefacts ENGAGE-E-001 through ENGAGE-E-003 with 3-year retention. §33.12 implementation checklist: 6× P0 M13 (migration, job 18, job 19, AL-ENGAGE-02 PagerDuty, AL-ENGAGE-03 PagerDuty, DEC-030 registration), 7× P1 M13–M14 (AL-ENGAGE-01/04/05 Slack, AL-ENGAGE-06 PagerDuty, Metabase dashboard, QBR Edge Function, evidence collection, §6.2 table update, SOC2_READINESS cross-reference), 3× P2 M16+ (CHS weight validation, cohort_retention_30d computation, OQ-ENGAGE-03 threshold calibration). §33.13 three open questions: OQ-ENGAGE-01 (simplified seat utilization widget for tenant admins in Admin Dashboard — P1 M16, product-manager + compliance-officer; scope to utilization rate only, not CHS; update ENTERPRISE_ADMIN_API.md when decided), OQ-ENGAGE-02 (k-anonymity floor adequacy for 1,000+ seat tenants — P2, trigger review at first 1,000-seat contract), OQ-ENGAGE-03 (CHS component weight calibration vs actual churn correlation — P2, retrospective after 5 renewal events M18–M20). Cross-references: `docs/ENTERPRISE_ONBOARDING.md §6` (30/60/90-day checkpoint metrics that §33 formalises into an observability pipeline), `docs/ENTERPRISE_SLA.md §7` (support tier SLAs — §33 engagement monitoring is separate from SLA credits), `docs/COST_MODEL.md §8.7` (Expansion and Churn Economics — CHS is the leading indicator for the NRR model), `docs/ENTERPRISE.md §Privacy floor for enterprise` (HR invariant — §33 operationalises it at the observability layer), `docs/AUDIT_LOG_SCHEMA.md` (four new DEC-030 events: `tenant.churn_risk_flagged` HIGH 3yr, `tenant.engagement_milestone_achieved` STANDARD 90d, `tenant.qbr_report_generated` STANDARD 90d, `analytics.tenant_engagement_computed` LOW 30d), `docs/DATA_MODEL.md` (migration 0057 — `tenant_engagement_snapshots` table; depends on `tenants`, `tenant_members`, `coaching_turns`, `user_profiles`, `wearable_connections`, `audit_log_events`), §6.2 (`engagement_health` subsection — six rows), §7.4 (Enterprise Per-Tenant SLA dashboard — §33 is the behavioral complement; tenant admins see §7.4, CSM sees §33), §12.6 (pg_cron registry: jobs 18 and 19 — note jobs 16 and 17 are reserved by `docs/DATA_MODEL.md §28` for rate-limit cleanup), §13 (Per-Tenant Observability Implementation — §33 builds on `tenant_id` propagation established there), `docs/SOC2_READINESS.md` C1.1/C1.2/CC2.2/CC7.2/A1.1 (evidence artefacts ENGAGE-E-001 through ENGAGE-E-003). Owner: customer-success + compliance-officer + devops-lead + platform-engineer.*
 
 *v2.5 (2026-06-10): §29 PAM Observability — AL-PAM-BG-01 break-glass review overdue alert + §12.6 pg_cron jobs 20–21. Closes `docs/DATA_MODEL.md §29.10` items 7 and 8 (P1 M7). Three locations updated: (1) §6.2 `pam_session_health` subsection header updated from "AL-PAM-01 through AL-PAM-03" to "AL-PAM-01 through AL-PAM-BG-01"; one new row added — "Break-glass review overdue" (P1, `pam_bg_review_alert` pg_cron daily 08:00 UTC, job 21, PagerDuty `form-compliance`; dedup key `pam-bg-review-overdue-{pam_session_id}`). (2) §29.4 alert table: AL-PAM-BG-01 row added after AL-PAM-03 — trigger: `pam_break_glass_reviews.review_due_at < now() AND reviewed_at IS NULL`; P1; re-alert every 24 h; 96-hour escalation to security-engineer; deduplication key added to the dedup-keys list. (3) §12.6 pg_cron registry table: two rows appended — `pam_postgres_sync` (every 30 min, freshness 35 h, CC6.2/CC6.6 KV↔Postgres audit sync integrity, gap emits `security.pam_postgres_sync_gap` DEC-030 HIGH + PagerDuty P2 to security-engineer; DATA_MODEL §29.10 item 7, job 20) and `pam_bg_review_alert` (daily 08:00 UTC, freshness 26 h, CC6.6 break-glass 72-hour post-hoc review SLA enforcement, AL-PAM-BG-01, PagerDuty P1 to compliance-officer; DATA_MODEL §29.10 item 8, job 21). Cross-references: `docs/DATA_MODEL.md §29.10` (items 7 and 8 — implementation checklist P1 M7 tasks that spawned this update); `docs/SSO_SCIM_IMPLEMENTATION.md §24` (PAM KV architecture — AL-PAM-BG-01 is the Postgres-layer complement to the KV-layer AL-PAM-01/02/03); `docs/SOC2_READINESS.md §24.8` (CC6.6 evidence — AL-PAM-BG-01 and `pam_bg_review_alert` are the enforcement mechanism for the 72-hour break-glass review SLA referenced in evidence artefact PAM-E-004; `pam_postgres_sync` is the enforcement mechanism for PAM-E-005 through PAM-E-008 Postgres audit row coverage). Owner: devops-lead + compliance-officer + security-engineer.*
+
+---
+
+## §34 SIEM Correlation Rules — Supabase Bridge Implementation (M4–M8) & ClickHouse Migration Plan
+
+> **Closes: OQ-SIEM-01** (`docs/OBSERVABILITY.md §27.12` — P0, before M4 implementation start). Decision: hybrid bridge. CR-01 (brute force) and CR-04 (bulk data access) via Cloudflare Analytics Engine (real-time, < 10 s). CR-02 (impossible travel) and CR-03 (privilege escalation) via Supabase pg_cron every 5 minutes (≤ 5 min lag — require LAG() window + self-JOIN unavailable in Analytics Engine). Full migration to ClickHouse MergeTree at M9.
+
+### 34.1 Purpose and Scope
+
+Section §27.3 specified all four SIEM correlation rules (CR-01 through CR-04) as ClickHouse SQL against the `siem_events` MergeTree table. The ClickHouse Cloud instance is not provisioned until M9 per the current stack plan (§21 ClickHouse Analytics Observability). This creates a gap for M4 alert implementation: without a correlation rule engine, none of the four `FORM-CORR-*` PagerDuty alerts can fire, and SOC 2 CC7.2 evidence for anomaly monitoring is absent until M9.
+
+OQ-SIEM-01 asked which platform hosts the correlation rules at M4 and what the migration plan is at M9. This section resolves that question with a hybrid bridge architecture:
+
+- **Analytics Engine bridge (real-time, < 10 s):** CR-01 and CR-04 require only aggregated counts with no JOIN or window functions. They are implementable as Cloudflare Analytics Engine SQL API queries executed by a `siem-correlation-checker` Worker on a Cron Trigger every 5 minutes. The `SIEM_BRIDGE_EVENTS` Analytics Engine dataset is already written by the `audit-correlation-bridge` Worker during the existing DEC-030 Logpush pipeline.
+
+- **Supabase pg_cron bridge (5-minute polling, ≤ 5 min lag):** CR-02 (impossible travel) and CR-03 (privilege escalation) require LAG() window functions or multi-table JOINs that Cloudflare Analytics Engine cannot express in its aggregation SQL dialect. These run as Supabase pg_cron jobs against `audit_log_events` every 5 minutes under `security_reviewer` role. On a match, they POST to the `emit-audit-event` Worker via `pg_net` to emit a `siem.correlation_rule_matched` DEC-030 event, which triggers the PagerDuty pipeline via the existing `alert-relay` Worker (SOC2_READINESS §46).
+
+- **Detection lag:** CR-01 and CR-04 fire within seconds of the threshold breach. CR-02 and CR-03 have a maximum 5-minute detection lag. This is documented as SIEM-SLO-BRIDGE-01 and accepted for M4–M8 as a bounded, auditable constraint; it is eliminated at M9.
+
+**SOC 2 scope:** CC7.2 (anomaly monitoring with documented detection lag), CC7.3 (response SLAs account for bridge latency), CC9.2 (bridge architecture documented and auditable). **Privacy floor:** All correlation queries operate on `actor_ip_subnet` (not full IP), `actor_user_id` SHA-256 pseudonym, and `tenant_id`. No `coaching_turns`, `cv_sessions`, or `user_health_profiles` content is accessed in any query. **Owners:** platform-engineer + devops-lead. **Bridge milestones:** M4 (both Analytics Engine and pg_cron rules live). **Migration milestone:** M9 (ClickHouse full migration).
+
+---
+
+### 34.2 Platform Decision Table
+
+| Rule | Description | Threshold | Bridge Platform | Rationale | Max Detection Lag |
+|---|---|---|---|---|---|
+| **CR-01** | Brute-force authentication | ≥ 10 `auth.*` failures / 10 min / source subnet | Cloudflare Analytics Engine | Pure COUNT aggregation; no JOIN; real-time API query | < 10 s |
+| **CR-02** | Impossible travel | Cross-continent login gap < 2 h for same `actor_user_id` | Supabase pg_cron | Requires self-JOIN on `audit_log_events` over ordered (actor_user_id, event_ts) — not expressible in Analytics Engine aggregation SQL | ≤ 5 min |
+| **CR-03** | Privilege escalation after denial | `pam.elevation_denied` → `pam.session_started` for same actor within 30 min | Supabase pg_cron | Requires two-event JOIN on event_type for same actor_user_id — not expressible in Analytics Engine | ≤ 5 min |
+| **CR-04** | Bulk data access | ≥ 5 `data.read_*` events / 1 h / session, OR single `data.bulk_export` > 10,000 rows | Cloudflare Analytics Engine | COUNT + GROUP BY session; two-pattern UNION; no JOIN required | < 10 s |
+
+---
+
+### 34.3 Analytics Engine Bridge — CR-01 and CR-04
+
+The `audit-correlation-bridge` Cloudflare Worker writes to the `SIEM_BRIDGE_EVENTS` Analytics Engine dataset (one data point per qualifying DEC-030 event). The `siem-correlation-checker` Worker executes the queries below on a Cron Trigger (`*/5 * * * *`) and also on an event-driven fast path whenever `auth.login_failed` events are received in bulk.
+
+#### §34.3.1 SIEM_BRIDGE_EVENTS Dataset Schema
+
+| Field | Type | Value |
+|---|---|---|
+| `blob1` | string | `event_type` (e.g. `"auth.login_failed"`, `"data.bulk_export"`) |
+| `blob2` | string | `actor_ip_subnet` — pre-truncated to /24 in Worker before write |
+| `blob3` | string | `actor_user_sha256` — SHA-256 of actor_user_id UUID |
+| `blob4` | string | `tenant_id` UUID string (or `"none"`) |
+| `blob5` | string | `session_id` UUID (or `"none"` for sessionless events) |
+| `double1` | number | `row_count` — exported row count for bulk events; 0 for auth events |
+| `double2` | number | `country_code_numeric` — ISO 3166-1 numeric; 0 if unknown |
+
+No user PII, no coaching content, no health data. Dataset is already written by the existing Logpush pipeline — no write-path changes required.
+
+#### §34.3.2 CR-01 — Brute Force (Analytics Engine SQL API)
+
+```sql
+-- Executed every 5 min by siem-correlation-checker Worker Cron Trigger.
+-- Also executed immediately on any batch of ≥ 3 auth.login_failed events
+-- received in a single Logpush batch (event-driven fast path).
+-- Pattern: ≥ 10 auth failures from the same /24 subnet in any rolling 10-minute window.
+
+SELECT
+  blob2                         AS actor_ip_subnet,
+  blob4                         AS tenant_id,
+  SUM(_sample_interval)         AS failure_count,
+  MAX(timestamp)                AS last_seen_ts
+FROM SIEM_BRIDGE_EVENTS
+WHERE
+  blob1 IN (
+    'auth.login_failed',
+    'sso.login_failed',
+    'auth.token_refresh_failed',
+    'api_key.ip_blocked'
+  )
+  AND timestamp > NOW() - INTERVAL '600' SECOND
+GROUP BY actor_ip_subnet, tenant_id
+HAVING SUM(_sample_interval) >= 10
+ORDER BY failure_count DESC
+LIMIT 50
+```
+
+On non-empty result: emit `siem.correlation_rule_matched` DEC-030 event (HIGH severity, `rule_id: 'CR-01'`), then call PagerDuty CR-01 routing key via `alert-relay` Worker. Dedup key: `siem-cr01-{subnet_hash}-{10min_bucket}`.
+
+#### §34.3.3 CR-04 — Bulk Data Access (Analytics Engine SQL API)
+
+```sql
+-- Pattern A: ≥ 5 data.read_* events from a single session within 1 hour.
+SELECT
+  blob5                         AS session_id,
+  blob4                         AS tenant_id,
+  blob3                         AS actor_user_sha256,
+  SUM(_sample_interval)         AS read_event_count,
+  'pattern_a_session_reads'     AS match_type
+FROM SIEM_BRIDGE_EVENTS
+WHERE
+  blob1 LIKE 'data.read_%'
+  AND timestamp > NOW() - INTERVAL '3600' SECOND
+  AND blob5 != 'none'
+GROUP BY session_id, tenant_id, actor_user_sha256
+HAVING SUM(_sample_interval) >= 5
+
+UNION ALL
+
+-- Pattern B: single data.bulk_export event with row_count > 10,000.
+SELECT
+  blob5                         AS session_id,
+  blob4                         AS tenant_id,
+  blob3                         AS actor_user_sha256,
+  double1                       AS read_event_count,
+  'pattern_b_bulk_export'       AS match_type
+FROM SIEM_BRIDGE_EVENTS
+WHERE
+  blob1 = 'data.bulk_export'
+  AND double1 > 10000
+  AND timestamp > NOW() - INTERVAL '3600' SECOND
+LIMIT 50
+```
+
+On non-empty result: emit `siem.correlation_rule_matched` DEC-030 event (HIGH severity, `rule_id: 'CR-04'`), then call PagerDuty CR-04 routing key. Dedup key: `siem-cr04-{session_id_hash}-{1h_bucket}`.
+
+---
+
+### 34.4 Supabase pg_cron Bridge — CR-02 and CR-03
+
+Both jobs run under `security_reviewer` role (SELECT on `audit_log_events`) via pg_cron every 5 minutes. On a match they call `emit-audit-event` Worker via `pg_net.http_post` to emit a `siem.correlation_rule_matched` DEC-030 event. The `alert-relay` Worker (SOC2_READINESS §46) then fires the PagerDuty routing key for the matched rule.
+
+**Prerequisites:** `pg_net` extension enabled in the Supabase project. `app.emit_audit_event_worker_url` GUC set to the `emit-audit-event` Worker URL (with NOT NULL assertion in function body per OQ-SIEM-BRIDGE-02). `security_reviewer` role has SELECT on `audit_log_events` and EXECUTE on both bridge functions.
+
+**BYPASSRLS:** not required — `security_reviewer` has an explicit SELECT policy on `audit_log_events`. BYPASSRLS is reserved for incident forensic queries (INCIDENT_RESPONSE §R-18).
+
+#### §34.4.1 Migration 0059 — `siem_country_continent` Lookup Table
+
+CR-02 requires continent-level country classification. This table contains only static reference data — no user data, no RLS needed.
+
+```sql
+-- Migration: 0059_siem_bridge.sql (partial — lookup table + helper function)
+
+CREATE TABLE IF NOT EXISTS siem_country_continent (
+  country_code  CHAR(2)  PRIMARY KEY,   -- ISO 3166-1 alpha-2
+  continent     TEXT     NOT NULL
+    CHECK (continent IN ('EU', 'NA', 'SA', 'AS', 'AF', 'OC', 'AN'))
+);
+
+-- Seed (representative; full 249-country seed in migration script)
+INSERT INTO siem_country_continent (country_code, continent) VALUES
+  ('DE','EU'),('FR','EU'),('GB','EU'),('UA','EU'),('NL','EU'),('PL','EU'),
+  ('SE','EU'),('NO','EU'),('CH','EU'),('AT','EU'),('ES','EU'),('IT','EU'),
+  ('US','NA'),('CA','NA'),('MX','NA'),
+  ('BR','SA'),('AR','SA'),('CO','SA'),
+  ('CN','AS'),('JP','AS'),('IN','AS'),('KR','AS'),('SG','AS'),('IL','AS'),
+  ('AU','OC'),('NZ','OC'),
+  ('ZA','AF'),('NG','AF'),('EG','AF'),('KE','AF')
+ON CONFLICT (country_code) DO NOTHING;
+
+-- Helper: map country_code → continent. Returns 'UNKNOWN' for unmapped codes.
+CREATE OR REPLACE FUNCTION fn_siem_continent(p_country_code TEXT)
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT COALESCE(
+    (SELECT continent FROM siem_country_continent
+     WHERE country_code = upper(p_country_code)),
+    'UNKNOWN'
+  )
+$$;
+
+-- form_api may SELECT (reference data); form_admin may INSERT/UPDATE corrections.
+GRANT SELECT ON siem_country_continent TO form_api;
+GRANT INSERT, UPDATE ON siem_country_continent TO form_admin;
+GRANT EXECUTE ON FUNCTION fn_siem_continent(TEXT) TO security_reviewer;
+```
+
+#### §34.4.2 CR-02 — Impossible Travel (pg_cron job 22)
+
+```sql
+-- Migration: 0059_siem_bridge.sql (continued)
+
+CREATE OR REPLACE FUNCTION fn_siem_bridge_cr02()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_match      RECORD;
+  v_worker_url TEXT := current_setting('app.emit_audit_event_worker_url', true);
+BEGIN
+  -- Guard: fail loudly if Worker URL is not configured.
+  IF v_worker_url IS NULL OR v_worker_url = '' THEN
+    RAISE EXCEPTION
+      'fn_siem_bridge_cr02: app.emit_audit_event_worker_url GUC is not set — '
+      'impossible travel detection disabled. Set via: ALTER DATABASE form '
+      'SET app.emit_audit_event_worker_url = ''https://...'';';
+  END IF;
+
+  FOR v_match IN
+    WITH login_events AS (
+      SELECT
+        actor_user_id,
+        event_ts,
+        metadata->>'ip_country_code'  AS country_code,
+        tenant_id,
+        id
+      FROM audit_log_events
+      WHERE
+        event_type IN ('sso.login_succeeded', 'auth.token_created')
+        AND event_ts > NOW() - INTERVAL '2 hours'
+        AND metadata->>'ip_country_code' IS NOT NULL
+        AND actor_user_id IS NOT NULL
+    )
+    SELECT
+      a1.actor_user_id,
+      a1.country_code                                              AS country_from,
+      a2.country_code                                              AS country_to,
+      fn_siem_continent(a1.country_code)                          AS continent_from,
+      fn_siem_continent(a2.country_code)                          AS continent_to,
+      a1.event_ts                                                  AS ts_first,
+      a2.event_ts                                                  AS ts_second,
+      EXTRACT(EPOCH FROM (a2.event_ts - a1.event_ts))::int        AS gap_seconds,
+      COALESCE(a1.tenant_id::text, 'none')                        AS tenant_id,
+      a2.id                                                        AS trigger_event_id
+    FROM login_events a1
+    JOIN login_events a2
+      ON  a2.actor_user_id = a1.actor_user_id
+      AND a2.event_ts      > a1.event_ts
+      AND a2.event_ts      < a1.event_ts + INTERVAL '2 hours'
+    WHERE
+      -- Flag only intercontinental pairs (same-continent cross-border is allowed)
+      fn_siem_continent(a1.country_code) != fn_siem_continent(a2.country_code)
+      AND fn_siem_continent(a1.country_code) != 'UNKNOWN'
+      AND fn_siem_continent(a2.country_code) != 'UNKNOWN'
+      -- Dedup: do not re-fire for the same login-pair trigger event
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log_events dedup
+        WHERE dedup.event_type  = 'siem.correlation_rule_matched'
+          AND dedup.metadata->>'rule_id'         = 'CR-02'
+          AND dedup.metadata->>'trigger_event_id' = a2.id::text
+      )
+    ORDER BY a2.event_ts DESC
+    LIMIT 10  -- safety cap: at most 10 pg_net calls per 5-minute run
+  LOOP
+    PERFORM pg_net.http_post(
+      url     := v_worker_url || '/internal/emit-audit-event',
+      body    := json_build_object(
+        'event_type',      'siem.correlation_rule_matched',
+        'severity',        'HIGH',
+        'retention_years', 3,
+        'metadata', json_build_object(
+          'rule_id',             'CR-02',
+          'actor_user_sha256',   encode(sha256(v_match.actor_user_id::text::bytea), 'hex'),
+          'continent_from',      v_match.continent_from,
+          'continent_to',        v_match.continent_to,
+          'country_from',        v_match.country_from,
+          'country_to',          v_match.country_to,
+          'gap_seconds',         v_match.gap_seconds,
+          'trigger_event_id',    v_match.trigger_event_id,
+          'tenant_id',           v_match.tenant_id,
+          'detection_source',    'supabase_pg_cron_bridge',
+          'bridge_phase',        'M4-M8'
+        )
+      )::text,
+      headers := '{"Content-Type": "application/json"}'::jsonb,
+      timeout_milliseconds := 5000
+    );
+  END LOOP;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION fn_siem_bridge_cr02() TO security_reviewer;
+
+SELECT cron.schedule(
+  'siem_bridge_cr02_impossible_travel',
+  '*/5 * * * *',
+  'SELECT fn_siem_bridge_cr02()'
+);
+```
+
+**Privacy invariant:** `actor_user_id` is SHA-256 hashed before including in the DEC-030 payload. Raw UUID does not appear in any monitoring surface. Country codes (not full IP) are included only in the DEC-030 chain (7-year secure storage), not in PagerDuty alert bodies or dashboards.
+
+#### §34.4.3 CR-03 — Privilege Escalation After Denial (pg_cron job 23)
+
+```sql
+-- Migration: 0059_siem_bridge.sql (continued)
+
+CREATE OR REPLACE FUNCTION fn_siem_bridge_cr03()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_match      RECORD;
+  v_worker_url TEXT := current_setting('app.emit_audit_event_worker_url', true);
+BEGIN
+  IF v_worker_url IS NULL OR v_worker_url = '' THEN
+    RAISE EXCEPTION
+      'fn_siem_bridge_cr03: app.emit_audit_event_worker_url GUC is not set.';
+  END IF;
+
+  FOR v_match IN
+    SELECT
+      denied.actor_user_id,
+      denied.event_ts                                            AS denied_at,
+      granted.event_ts                                           AS granted_at,
+      EXTRACT(EPOCH FROM (granted.event_ts - denied.event_ts))::int AS gap_seconds,
+      COALESCE(denied.tenant_id::text, 'none')                  AS tenant_id,
+      denied.metadata->>'target_tenant_id'                      AS target_tenant_id,
+      denied.metadata->>'access_level'                          AS access_level,
+      granted.id                                                 AS trigger_event_id
+    FROM audit_log_events denied
+    JOIN audit_log_events granted
+      ON  granted.actor_user_id  = denied.actor_user_id
+      AND granted.event_type     = 'pam.session_started'
+      AND granted.event_ts       > denied.event_ts
+      AND granted.event_ts       < denied.event_ts + INTERVAL '30 minutes'
+      AND granted.event_ts       > NOW() - INTERVAL '30 minutes'
+      AND granted.event_ts       < NOW()
+    WHERE
+      denied.event_type = 'pam.elevation_denied'
+      -- Only cross-tenant and break-glass elevations are flagged;
+      -- same-tenant elevation denial → grant is normal operational flow.
+      AND COALESCE(denied.metadata->>'access_level', '') IN ('cross_tenant', 'break_glass')
+      -- Dedup: do not re-fire for the same grant event
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log_events dedup
+        WHERE dedup.event_type  = 'siem.correlation_rule_matched'
+          AND dedup.metadata->>'rule_id'          = 'CR-03'
+          AND dedup.metadata->>'trigger_event_id'  = granted.id::text
+      )
+    ORDER BY granted.event_ts DESC
+    LIMIT 10
+  LOOP
+    PERFORM pg_net.http_post(
+      url     := v_worker_url || '/internal/emit-audit-event',
+      body    := json_build_object(
+        'event_type',      'siem.correlation_rule_matched',
+        'severity',        'HIGH',
+        'retention_years', 7,   -- CR-03 = privilege escalation; 7yr matches CC6.6
+        'metadata', json_build_object(
+          'rule_id',             'CR-03',
+          'actor_user_sha256',   encode(sha256(v_match.actor_user_id::text::bytea), 'hex'),
+          'access_level',        v_match.access_level,
+          'denied_at',           v_match.denied_at,
+          'granted_at',          v_match.granted_at,
+          'gap_seconds',         v_match.gap_seconds,
+          'target_tenant_id',    v_match.target_tenant_id,
+          'tenant_id',           v_match.tenant_id,
+          'trigger_event_id',    v_match.trigger_event_id,
+          'detection_source',    'supabase_pg_cron_bridge',
+          'bridge_phase',        'M4-M8'
+        )
+      )::text,
+      headers := '{"Content-Type": "application/json"}'::jsonb,
+      timeout_milliseconds := 5000
+    );
+  END LOOP;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION fn_siem_bridge_cr03() TO security_reviewer;
+
+SELECT cron.schedule(
+  'siem_bridge_cr03_priv_escalation',
+  '*/5 * * * *',
+  'SELECT fn_siem_bridge_cr03()'
+);
+```
+
+**7-year DEC-030 retention** for CR-03 matches CC6.6 privilege-escalation event retention — this is a litigable event category and must survive the full audit evidence window.
+
+---
+
+### 34.5 §12.6 pg_cron Registry Additions — Jobs 22 and 23
+
+Append the following two rows to the §12.6 pg_cron job registry table:
+
+| Job name | UTC schedule | Freshness window | Compliance relevance | On-failure action |
+|---|---|---|---|---|
+| `siem_bridge_cr02_impossible_travel` | `*/5 * * * *` | 6 min | CC7.2 — SIEM bridge CR-02 impossible travel; emits `siem.correlation_rule_matched` HIGH via pg_net on match; closes OQ-SIEM-01 | PagerDuty P2 `form-devops` → platform-engineer; freshness breach = CR-02 detection blind; check pg_cron + pg_net health (job 22) |
+| `siem_bridge_cr03_priv_escalation` | `*/5 * * * *` | 6 min | CC7.2/CC6.6 — SIEM bridge CR-03 privilege escalation; 7-year retention on match event; emits `siem.correlation_rule_matched` HIGH via pg_net on match | PagerDuty P2 `form-devops` → platform-engineer; freshness breach = CR-03 detection blind (job 23) |
+
+---
+
+### 34.6 Interim SLO and Bridge Alert Rules
+
+**New SLO — SIEM-SLO-BRIDGE-01** (add to §27.6 SIEM SLOs table; deprecated at M9):
+
+| SLO ID | Description | Target | Zero-budget | Window | Deprecated |
+|---|---|---|---|---|---|
+| SIEM-SLO-BRIDGE-01 | CR-02 and CR-03 pg_cron bridge detection lag | P95 ≤ 5 min | No (5-min lag is by design; alert fires on staleness) | Per-run | M9 (ClickHouse migration complete) |
+
+**New alert rules** (add to §6.2 `siem_health` subsection):
+
+| Alert rule | Severity | Trigger | Routing | Dedup key |
+|---|---|---|---|---|
+| **AL-SIEM-BRIDGE-01** | P2 | `siem_bridge_cr02_impossible_travel` pg_cron stale > 6 min (from `pg-cron-health-monitor`) | PagerDuty `form-devops` → platform-engineer | `siem-bridge-cr02-stale` |
+| **AL-SIEM-BRIDGE-02** | P2 | `siem_bridge_cr03_priv_escalation` pg_cron stale > 6 min (from `pg-cron-health-monitor`) | PagerDuty `form-devops` → platform-engineer | `siem-bridge-cr03-stale` |
+
+---
+
+### 34.7 M9 ClickHouse Migration Plan
+
+When ClickHouse Cloud is provisioned at M9 per §21, the bridge is retired in three steps:
+
+**Step 1 — Shadow mode (M9, Weeks 1–2):** Deploy §27.3 ClickHouse correlation rules against `siem_events` MergeTree. Run both ClickHouse and bridge in parallel. Suppress bridge PagerDuty emissions (`SIEM_BRIDGE_ALERT_ENABLED = false` in Cloudflare KV). Compare match sets daily; document discrepancies in `compliance/evidence/siem/bridge-migration-comparison-YYYY-MM.md`.
+
+**Step 2 — ClickHouse primary (M9, Weeks 3–4):** Route all PagerDuty alerts exclusively to ClickHouse rules. Keep bridge jobs running for cross-validation but suppress their alert emissions. Monitor for two weeks.
+
+**Step 3 — Bridge decommission (M9 + 2 weeks):** Disable pg_cron jobs:
+```sql
+SELECT cron.unschedule('siem_bridge_cr02_impossible_travel');
+SELECT cron.unschedule('siem_bridge_cr03_priv_escalation');
+```
+Emit `siem.bridge_decommissioned` DEC-030 STANDARD event. Remove Analytics Engine write path for `SIEM_BRIDGE_EVENTS` from `audit-correlation-bridge` Worker (or archive). Clean up §27.6 (remove SIEM-SLO-BRIDGE-01), §6.2 (remove AL-SIEM-BRIDGE-01/02), §12.6 (mark jobs 22–23 decommissioned). Update §27.12 OQ-SIEM-01 note from "bridge" to "ClickHouse".
+
+**Migration evidence artefact SIEM-BRIDGE-E-003:** shadow-mode comparison report demonstrating ClickHouse CR-02/CR-03 match sets are equivalent to or a superset of the pg_cron bridge matches. Required for SOC 2 CC7.2 control-continuity evidence during the migration window.
+
+---
+
+### 34.8 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | Evidence |
+|---|---|---|
+| **CC7.2** — Monitoring for anomalies | Four correlation rules active at M4; documented detection lag ≤ 5 min for CR-02/CR-03 is bounded and auditable; AL-SIEM-BRIDGE-01/02 monitor bridge health continuously | SIEM-BRIDGE-E-001: DDL export + `security_reviewer` grant export + pg_cron schedule screenshot |
+| **CC7.3** — Evaluation and communication of anomalies | Alert routing from bridge to PagerDuty documented; SOC 2 auditor note: detection lag is a known, accepted constraint, not a control gap | SIEM-BRIDGE-E-002: `siem.correlation_rule_matched` DEC-030 event export — one CR-02 and one CR-03 match from observation window (pseudonymous — `actor_user_sha256` only) |
+| **CC9.2** — Risk mitigation | Bridge uses `security_reviewer` SELECT (no BYPASSRLS, no Art. 9 content access); `pg_net` call goes to internal Worker endpoint only | SIEM-BRIDGE-E-001: `security_reviewer` GRANT export |
+
+**Evidence artefacts:**
+
+| Artefact ID | Description | Location | Retention |
+|---|---|---|---|
+| **SIEM-BRIDGE-E-001** | `siem_country_continent` DDL + `fn_siem_bridge_cr02/cr03` function bodies + `security_reviewer` GRANT export + pg_cron schedule export (jobs 22–23) | `compliance/evidence/siem/bridge-e-001-ddl-grants-YYYY-MM.md` | 3 years |
+| **SIEM-BRIDGE-E-002** | `siem.correlation_rule_matched` DEC-030 event export — one representative CR-02 match + one CR-03 match from observation window; `actor_user_sha256` only, no raw user_id | `compliance/evidence/siem/bridge-e-002-match-sample-YYYY.json` | 7 years |
+| **SIEM-BRIDGE-E-003** | M9 migration comparison report — shadow-mode match-set equivalence; compliance-officer sign-off | `compliance/evidence/siem/bridge-e-003-migration-YYYY-MM.md` | 3 years |
+
+---
+
+### 34.9 Implementation Checklist
+
+#### P0 — Must complete before M4 SIEM alert implementation
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Author and run migration `0059_siem_bridge.sql` against production Supabase. Creates: `siem_country_continent` table (full 249-country seed), `fn_siem_continent()` STABLE function, `fn_siem_bridge_cr02()` SECURITY DEFINER, `fn_siem_bridge_cr03()` SECURITY DEFINER. Verify: `SELECT fn_siem_continent('DE')` returns `'EU'`; `SELECT fn_siem_continent('US')` returns `'NA'`; `\df fn_siem_bridge*` returns two functions. | platform-engineer | **P0** | M4 | [ ] |
+| 2 | Set `app.emit_audit_event_worker_url` GUC on production Supabase project: `ALTER DATABASE form SET app.emit_audit_event_worker_url = 'https://form-emit-audit-event.workers.dev';` (exact URL from Cloudflare Workers deployment). Verify: `SHOW app.emit_audit_event_worker_url` in `psql` returns the URL; `SELECT fn_siem_bridge_cr02()` completes without the NULL GUC exception. | platform-engineer | **P0** | M4 | [ ] |
+| 3 | Grant `security_reviewer` EXECUTE on `fn_siem_bridge_cr02()` and `fn_siem_bridge_cr03()`; run negative-privilege test: `SET ROLE security_reviewer; SELECT content FROM coaching_turns LIMIT 1` must return `ERROR: permission denied`. File SIEM-BRIDGE-E-001 to `compliance/evidence/siem/`. | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 4 | Register pg_cron jobs via `cron.schedule()` calls in `0059_siem_bridge.sql`; confirm both appear in `cron.job` table; verify first run completes within 5 min of deploy (check `cron.job_run_details`); add as jobs 22 and 23 to §12.6 pg_cron registry table. | platform-engineer | **P0** | M4 | [ ] |
+| 5 | Deploy `siem-correlation-checker` Cloudflare Worker: CR-01 and CR-04 Analytics Engine SQL queries (§34.3.2–3); Cron Trigger `*/5 * * * *`; Worker bound to `SIEM_BRIDGE_EVENTS` dataset. Staging test: insert ≥ 10 synthetic `auth.login_failed` events with matching `blob2` subnet; verify CR-01 query returns non-empty result; verify `siem.correlation_rule_matched` DEC-030 event emitted (check `audit_log_events` in staging). | platform-engineer + devops-lead | **P0** | M4 | [ ] |
+| 6 | Configure AL-SIEM-BRIDGE-01 and AL-SIEM-BRIDGE-02 in PagerDuty `form-devops` service (triggered by `pg-cron-health-monitor` staleness events); dedup keys `siem-bridge-cr02-stale` and `siem-bridge-cr03-stale`; add both rows to §6.2 `siem_health` subsection. | devops-lead | **P0** | M4 | [ ] |
+
+#### P1 — Before first production correlation match (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Register `siem.correlation_rule_matched` in `docs/AUDIT_LOG_SCHEMA.md §6` with full Zod schema: `rule_id` enum CR-01/CR-02/CR-03/CR-04; severity HIGH; retention 3yr default, 7yr override for `rule_id = 'CR-03'`; deploy updated schema to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P1** | M5 | [ ] |
+| 8 | Add SIEM-SLO-BRIDGE-01 to §27.6 SIEM SLOs table with deprecation note (M9). Update §27.12 OQ-SIEM-01 row to 🟢 Resolved per §34.6 patch (already applied in this edit). | compliance-officer | **P1** | M5 | [ ] |
+| 9 | Collect SIEM-BRIDGE-E-001 immediately after P0 items 1–3; collect SIEM-BRIDGE-E-002 after first production CR-02 or CR-03 match (or inject synthetic match in staging for observation-period-start). File to `compliance/evidence/siem/`. | compliance-officer | **P1** | M5 | [ ] |
+
+#### P2 — M9 ClickHouse migration
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | Execute M9 bridge-to-ClickHouse migration per §34.7 three-step plan: shadow mode (Weeks 1–2), ClickHouse primary (Weeks 3–4), bridge decommission (+2 weeks). File SIEM-BRIDGE-E-003. | platform-engineer + devops-lead | **P2** | M9 | [ ] |
+| 11 | After bridge decommission: remove SIEM-SLO-BRIDGE-01 from §27.6, remove AL-SIEM-BRIDGE-01/02 from §6.2, mark jobs 22–23 decommissioned in §12.6. Update §27.12 OQ-SIEM-01 resolution note from "bridge" to "ClickHouse". | compliance-officer + devops-lead | **P2** | M9 + 3 weeks | [ ] |
+
+---
+
+### 34.10 Open Questions
+
+| OQ | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-SIEM-02** | **Tenant SIEM export consent and DPA scope** (carried from §27.12 — still open). Does the Admin Dashboard "enable SIEM export" UI action constitute sufficient GDPR Art. 6(1)(a) consent, or is a separate DPA addendum signature required per tenant before FORM transmits audit data to a tenant-specified endpoint? | **P1** | compliance-officer + legal | Before first enterprise SIEM export goes live (M5). Document outcome in `docs/DECISION_LOG.md`. |
+| **OQ-SIEM-03** | **HMAC chain verification library for tenant SIEM consumers** (carried from §27.12 — still open). Provide open-source library (Python + Go) vs. documentation only? Recommendation: documentation first; offer library if a Splunk-GA customer explicitly requests it during enterprise pilot. | **P2** | security-engineer + devops-lead | Before enterprise GA (M13). Document outcome in `docs/DECISION_LOG.md`. |
+| **OQ-SIEM-BRIDGE-01** | **Postgres load impact of 5-minute CR-02 self-JOIN at scale.** The CR-02 query performs a self-JOIN on `audit_log_events` over a 2-hour rolling window. At < 10,000 events/2h this is negligible. Above ~100,000 events/2h, seq_scan count may increase. Mitigation: `CREATE INDEX CONCURRENTLY idx_siem_cr02 ON audit_log_events (actor_user_id, event_ts) WHERE event_type IN ('sso.login_succeeded', 'auth.token_created')` (migration `0059b_siem_bridge_idx.sql`). Monitor `pg_stat_user_tables.seq_scan` for `audit_log_events` post-deploy. | **P2** | platform-engineer | Assess at M5 after first production run data available; index if seq_scan regresses. |
+| **OQ-SIEM-BRIDGE-02** | **`app.emit_audit_event_worker_url` GUC vs. hard-coded Worker URL.** Using a GUC allows URL changes without DDL, but a misconfigured GUC silently disables the bridge (pg_net call to NULL URL is a no-op). Mitigation already applied: explicit `RAISE EXCEPTION` on NULL GUC at function entry (§34.4.2–3). Confirm: `SELECT fn_siem_bridge_cr02()` when GUC is unset raises an exception that appears in `cron.job_run_details.return_message`. | **P1** | platform-engineer | Verify in staging before M4 checklist item 1. Mark resolved once staging test passes. |
+
+---
+
+*v2.6 (2026-06-10): §34 SIEM Correlation Rules — Supabase Bridge Implementation (M4–M8) & ClickHouse Migration Plan. Closes OQ-SIEM-01 (P0 from §27.12 — blocked M4 SIEM alert implementation since §27 was authored). Decision: hybrid bridge. CR-01 (brute force) and CR-04 (bulk data access) via Cloudflare Analytics Engine (real-time < 10 s — pure aggregation, no JOIN). CR-02 (impossible travel) and CR-03 (privilege escalation) via Supabase pg_cron every 5 minutes (≤ 5 min lag — LAG() window + self-JOIN not available in Analytics Engine aggregation SQL). §34.1 purpose: gap between §27.3 ClickHouse spec (M9) and M4 alert requirement; bridge closes the gap with documented, bounded detection lag. §34.2 four-row platform decision table with detection-lag column. §34.3 Analytics Engine bridge: `SIEM_BRIDGE_EVENTS` seven-column schema (blob1 event_type, blob2 actor_ip_subnet /24, blob3 actor_user_sha256, blob4 tenant_id, blob5 session_id, double1 row_count, double2 country_code_numeric); CR-01 query (GROUP BY subnet HAVING ≥ 10 auth failures / 600s, dedup key subnet_hash+10min_bucket); CR-04 two-pattern UNION (Pattern A: ≥ 5 data.read_* per session / 3600s; Pattern B: bulk_export > 10,000 rows). §34.4 Supabase pg_cron bridge: migration `0059_siem_bridge.sql` — `siem_country_continent` static reference table (249-country seed, EU/NA/SA/AS/AF/OC/AN continents, no RLS); `fn_siem_continent()` STABLE SQL function; `fn_siem_bridge_cr02()` SECURITY DEFINER (pg_cron job 22, `*/5 * * * *`) — self-JOIN on login events 2h window, continent-pair check, NOT EXISTS dedup on trigger_event_id, `pg_net.http_post` to `emit-audit-event` Worker, NULL GUC guard with RAISE EXCEPTION, 10-match safety cap, SHA-256 actor pseudonym; `fn_siem_bridge_cr03()` SECURITY DEFINER (pg_cron job 23, `*/5 * * * *`) — JOIN `pam.elevation_denied` → `pam.session_started` within 30 min, cross_tenant/break_glass access_level filter, NOT EXISTS dedup, 7-year DEC-030 retention for CC6.6. §34.5 §12.6 pg_cron registry additions jobs 22–23 (both `*/5 * * * *`, 6-min freshness window, P2 PagerDuty on stale). §34.6 SIEM-SLO-BRIDGE-01 (P95 ≤ 5 min, deprecated M9); AL-SIEM-BRIDGE-01/02 (staleness alerts, both P2 `form-devops`). §34.7 three-step M9 migration: shadow mode (parallel run, suppress bridge alerts), ClickHouse primary (suppress bridge, 2 weeks), decommission (cron.unschedule, STANDARD DEC-030 event, §6.2/§27.6/§12.6 cleanup). §34.8 SOC 2 evidence: CC7.2 (four rules active M4, lag bounded) SIEM-BRIDGE-E-001 (DDL + grants); CC7.3 (alert routing documented) SIEM-BRIDGE-E-002 (DEC-030 match sample 7yr); CC9.2 (security_reviewer SELECT, no BYPASSRLS) SIEM-BRIDGE-E-001. §34.9 implementation checklist: 6× P0 M4 (migration 0059 deploy, GUC configuration, security_reviewer grants + negative-privilege test, pg_cron registration, siem-correlation-checker Worker deploy + staging test, AL-SIEM-BRIDGE PagerDuty config), 3× P1 M5 (AUDIT_LOG_SCHEMA registration, SLO update, evidence collection), 2× P2 M9 (ClickHouse migration + post-decommission cleanup). §34.10 four open questions: OQ-SIEM-02 (DPA consent for tenant SIEM export — P1 M5, from §27.12), OQ-SIEM-03 (HMAC verification library — P2 M13, from §27.12), OQ-SIEM-BRIDGE-01 (Postgres seq_scan load at scale — P2, monitor M5), OQ-SIEM-BRIDGE-02 (NULL GUC guard verification — P1, verify in staging before M4). TOC addition: §34 after §33. Cross-references: `docs/OBSERVABILITY.md §27.3` (ClickHouse CR SQL — §34 is the pre-M9 bridge; ClickHouse specs are preserved and are the M9 target); `docs/OBSERVABILITY.md §27.12` (OQ-SIEM-01 — resolution patch applied in this version update); `docs/OBSERVABILITY.md §21` (ClickHouse Analytics — M9 target platform); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — jobs 22 and 23 to be appended); `docs/OBSERVABILITY.md §6.2` (alert rules table — AL-SIEM-BRIDGE-01/02 to be appended to `siem_health` subsection); `docs/AUDIT_LOG_SCHEMA.md` (`siem.correlation_rule_matched` — HIGH 3yr default, 7yr for CR-03; to be registered); `docs/SOC2_READINESS.md §46` (alert-relay Worker — pg_net bridge emissions go through the existing Logpush→alert-relay pipeline); `docs/INCIDENT_RESPONSE.md R-01` (cross-referenced from CR-04 bulk access match — large data access triggers R-01 parallel assessment); `docs/DATA_MODEL.md §2.4` (`audit_log_events` — source table for pg_cron bridge queries); `docs/SSO_SCIM_IMPLEMENTATION.md §24` (PAM KV — `pam.elevation_denied` events sourced from PAM service). Owner: platform-engineer + devops-lead + compliance-officer.*

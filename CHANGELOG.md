@@ -6,6 +6,17 @@
 
 ---
 
+## [3.45.0] — 2026-06-10
+
+### Added
+- [`docs/OBSERVABILITY.md §34`](docs/OBSERVABILITY.md) — SIEM Correlation Rules: Supabase Bridge Implementation (M4–M8) & ClickHouse Migration Plan. Closes OQ-SIEM-01 (P0 from §27.12 — blocked M4 SIEM alert implementation). Decision: hybrid bridge — CR-01 (brute force) and CR-04 (bulk data access) via Cloudflare Analytics Engine (real-time < 10 s); CR-02 (impossible travel) and CR-03 (privilege escalation) via Supabase pg_cron every 5 minutes (≤ 5 min lag; self-JOIN + LAG() unavailable in Analytics Engine). Migration `0059_siem_bridge.sql`: `siem_country_continent` lookup table (249-country seed), `fn_siem_continent()` STABLE function, `fn_siem_bridge_cr02()` SECURITY DEFINER (pg_cron job 22, continent-pair check, NOT EXISTS dedup, SHA-256 pseudonym, NULL-GUC guard), `fn_siem_bridge_cr03()` SECURITY DEFINER (pg_cron job 23, PAM elevation_denied → session_started JOIN, 7-year retention). `siem-correlation-checker` Cloudflare Worker with CR-01 + CR-04 Analytics Engine SQL. Interim SLO SIEM-SLO-BRIDGE-01 + alert rules AL-SIEM-BRIDGE-01/02. Three-step M9 ClickHouse migration plan. Evidence artefacts SIEM-BRIDGE-E-001 through SIEM-BRIDGE-E-003. 9× P0/P1 checklist items M4/M5. SOC 2 CC7.2/CC7.3/CC9.2. clinical-safety NOT REQUIRED.
+
+### Changed
+- `docs/OBSERVABILITY.md §27.12` — OQ-SIEM-01 updated to 🟢 Resolved, pointing to §34.
+- `VERSION` — 3.44.5 → 3.45.0.
+
+---
+
 ## [3.44.5] — 2026-06-10
 
 ### Added
