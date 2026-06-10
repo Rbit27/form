@@ -6,6 +6,23 @@
 
 ---
 
+## [3.42.3] — 2026-06-10
+
+### Added
+- [`content/post-438-velocity-based-training-vbt-autoregulation.md`](content/post-438-velocity-based-training-vbt-autoregulation.md) — Velocity-Based Training: як швидкість штанги замінює відсотки від 1ПМ (12 хв). Load-velocity relationship (Gonzalez-Badillo & Sanchez-Medina 2010); MCV як денний показник готовності; velocity loss thresholds: 20% для сили vs 40% для гіпертрофії — Pareja-Blanco et al. (2017) прямий RКД; побудова особистого профілю; смартфон-альтернативи vs GymAware; VBT vs RPE/RIR trade-offs. clinical-safety NOT REQUIRED.
+- [`content/post-439-tendon-adaptation-strength-training-collagen.md`](content/post-439-tendon-adaptation-strength-training-collagen.md) — Сухожилля і силовий тренінг: чому найповільніша тканина визначає прогрес (13 хв). Magnusson et al. (2008) часова шкала 3–6 місяців; жорсткість як ключова функціональна адаптація (Arampatzis et al. 2007); Type I vs III колаген; Bohm, Mersmann & Arampatzis (2015) мета-аналіз ізометрики; HSR-протокол Kongsgaard et al. (2009) при тендинопатії; правило 10%; три bottleneck-сценарії. clinical-safety NOT REQUIRED.
+- [`content/post-440-rate-of-force-development-rfd-explosive-strength.md`](content/post-440-rate-of-force-development-rfd-explosive-strength.md) — Rate of Force Development: чому швидкість набору сили важливіша за максимальну силу (13 хв). Aagaard et al. (2002) RFD і нейральні адаптації; 0–200ms вікно — early (нейральний, 0–50ms) vs late RFD (100–200ms) — Tillin & Bishop (2009); maximal vs explosive strength (Folland & Williams 2007); intent-to-move-fast; балістичні вправи 20–50% 1ПМ; CMJ як польовий проксі; блокова інтеграція. clinical-safety NOT REQUIRED.
+- [`content/post-441-heat-cold-recovery.md`](content/post-441-heat-cold-recovery.md) — Heat і cold exposure у відновленні: що дає крижана ванна, що дає сауна і що є перебільшенням (6 хв). Roberts et al. (2015, J Physiology) CWI блокує mTORC1 і знижує гіпертрофійний сигнал; Laukkanen et al. (2018) сауна і серцево-судинна адаптація; Bleakley et al. (2012) Cochrane review; Søberg et al. (2021) норадреналін +200–300%; три вікна тайменгу CWI; практичний протокол для сили vs витривалості. clinical-safety PASS.
+
+### Changed
+- [`docs/SSO_SCIM_IMPLEMENTATION.md §26.10`](docs/SSO_SCIM_IMPLEMENTATION.md) — OQ-SSO-26.2 stale-status patch: 🟡 P1 Open → 🟢 Resolved, citing DEC-035 (2026-06-01). Soft enforcement confirmed: age-alert UI (amber ≥ 365d, red ≥ 730d) + CSM escalation; no automatic revocation at `expires_at` timestamp; provisional hard-enforcement trigger if soft control is insufficient at first SOC 2 observation period start. §26.11 checklist item 11 marked [x] Done. Doc version v1.8 → v1.8.1.
+- `blog.html` — 4 нових картки (post-438–441); лічильники: 381→385 статей, 4 345→4 389 хвилин читання.
+- `README.md` — roadmap: [x] post-438–441 з темами і джерелами; post-442–443 — нові планові записи для тем подвійної прогресії і силових стандартів.
+- `STATUS.md` — TL;DR: 437→441 постів; blog.html row: 381→385 карток; content engine: +4 нові рядки post-438–441; версійний штамп v3.40.1→v3.42.3.
+- `VERSION` — 3.42.2 → 3.42.3.
+
+---
+
 ## [3.42.2] — 2026-06-10
 
 ### Changed
