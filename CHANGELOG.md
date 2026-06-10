@@ -6,6 +6,21 @@
 
 ---
 
+## [3.41.3] — 2026-06-10
+
+### Added
+- [`content/post-433-isometric-training-strength-tendon-adaptation.md`](content/post-433-isometric-training-strength-tendon-adaptation.md) — Ізометричне тренування: де статична сила зустрічається з реальним прогресом (14 хв). Folland et al. (2005) joint-angle specificity ±15–20° (тренований кут ± дальній кут = суттєво нижче перенесення); Bohm et al. (2015) yielding ізометрика 3–5×45–60 с @ 70% MVC — ремоделювання колагену і сухожильна адаптація; overcoming isometric (IMTP, силова рама, максимальне зусилля без переміщення) vs yielding (wall sit, плита, утримання); Maffiuletti et al. (2016) нейральна активація і rate coding — MVIC як нейральний праймер; Haff et al. (2015) IMTP як предиктор атлетичної продуктивності; Sale (2002) і Robbins (2005) PAP-механізм і протокол (overcoming 3–5 с → 5–7 хв відпочинку → важкий динамічний підхід); три практичні режими включення: warm-up активація (overcoming 6 с × 2–3 до першого підходу), кутова корекція у слабкій точці (yielding pause в цільовому куті 3×10 с @ 50–60% RM), сухожильна підтримка 4–5×/тиждень. clinical-safety NOT REQUIRED.
+- [`content/post-434-sleep-athletic-performance-recovery-neuroscience.md`](content/post-434-sleep-athletic-performance-recovery-neuroscience.md) — Сон і атлетична продуктивність: нейробіологія відновлення поза «відпочивай більше» (15 хв). Van Cauter et al. (2000) нічний GH-пульс пов'язаний із SWS, не з часом доби — 60–70% добової GH-секреції; Walker (2005) REM як моторне навчання — консолідація рухових патернів у другій половині ночі; Fullagar et al. (2015) систематичний огляд: тотальна депривація →сила −8–11%, витривалість −20–30%; хронічне 6 год/ніч = когнітивне погіршення рівне 24 годинам тотальної депривації але без суб'єктивного відчуття; Mah et al. (2011) basketball sleep extension +9% точності 3-очкових; Samuels (2008) 10-годинний сон спортсменів; Atkinson & Reilly (1996) пік нейром'язової продуктивності 16:00–20:00; Wittmann et al. (2006) соціальний джетлаг; Stein & Friedmann (2006) алкоголь і SWS-пригнічення. Архітектура сну (NREM SWS → перші 4 год, REM → останні 2–3 год); T:C ratio і кортизол при депривації; температура кімнати 16–19°C; мінімальний ефективний базис (тривалість + регулярність + SWS-умови). clinical-safety NOT REQUIRED.
+- [`content/post-435-mechanical-tension-metabolic-stress-hypertrophy-evidence.md`](content/post-435-mechanical-tension-metabolic-stress-hypertrophy-evidence.md) — Механічна напруга проти метаболічного стресу: що насправді рухає гіпертрофію у 2020-х (13 хв). Damas et al. (2016) Acta Physiologica — пошкодження м'язів не є необхідним, MPS вищий після адаптації (RBE); Schoenfeld & Contreras (2013) пошкодження — побічний продукт, не механізм; Mitchell et al. (2012) 30% vs 80% RM до відмови — схожа гіпертрофія, але обидві групи тренувались до відмови; Morton et al. (2016) навантаження не визначає гіпертрофію — proximity to failure є ключовою умовою; Schoenfeld et al. (2017) JSCR 8–12% vs 25–35% RM при рівній відстані до відмови; Wolf et al. (2023) stretch-mediated hypertrophy у lengthened position навіть при нижчому об'ємі; Hornberger et al. (2006) mTORC1 активація механотрансдукцією незалежно від амінокислот; Pearson & Hussain (2015) BFR-ефект і метаболічний стрес; Laplante & Sabatini (2012) mTOR сигналінг. Ревізія трьохмеханізмної моделі 2020-х: пошкодження м'язів — виключено як самостійний механізм; метаболічний стрес — реальний але менш незалежний (BFR-контекст); механічна напруга — домінуючий механізм; практична ієрархія: proximity to failure > вибір вправ (lengthened position) > об'єм > метаболічна щільність. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — додано 3 нові картки (post-433, post-434, post-435); лічильники оновлено 376→379 статей, 4 277→4 319 хв читання.
+- `README.md` — roadmap: [x] post-433, [x] post-434, [x] post-435 з фактичними темами і джерелами.
+- `STATUS.md` — TL;DR: 432→435 постів, blog.html row: 376→379 карток; content engine: +3 нові рядки.
+- `VERSION` — 3.41.2 → 3.41.3.
+
+---
+
 ## [3.41.2] — 2026-06-10
 
 ### Changed
