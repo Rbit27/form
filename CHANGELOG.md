@@ -6,6 +6,16 @@
 
 ---
 
+## [3.38.1] — 2026-06-10
+
+### Added
+- `docs/DATA_MODEL.md §27` — Enterprise Invite & Pending-Seat Provisioning Schema: resolves OQ-BILL-04 (DATA_MODEL §24.14, P1 before enterprise GA). Migration 0053 extends `enterprise_seat_assignments` (nullable `user_id`, `invitation_id FK`, `chk_seat_assignment_not_orphan` CHECK). New `tenant_invitations` table: `invited_email` (personal data — auto-erased at expiry+30d by pg_cron `invite_email_expiry_cleanup` + Art. 17 step INV-1 in erasure Worker), `invited_email_hash` (SHA-256 keyed with `INVITE_HASH_SALT`, retained post-erasure for HMAC chain reference), `token_hash` (32-byte CSPRNG, single-use, never stored plaintext), 4-state machine (pending→accepted|expired|revoked), `source` (manual|csv_import), `assignment_id FK`. New `bulk_seat_import_jobs` table: CSV import job tracking (max 500 rows; `error_summary` with `email_hash` only — never plaintext email), R2 object key tombstone, status machine (processing→completed|partially_failed|failed). Three provisioning paths: manual invite, bulk CSV import (max 500 rows), SCIM auto-link on registration. Seat reservation policy: pending invitations count against contracted seat total — `assertSeatAvailable()` extended to count `user_id IS NULL, revoked_at IS NULL` assignment rows. RLS: `form_api` SELECT own-tenant only + RESTRICTIVE cross-tenant block; `form_system` full access; `tenant_manager` read-only (Worker RBAC layer). GDPR Art. 17: pg_cron `invite_email_expiry_cleanup` daily 04:00 UTC + erasure Worker step INV-1. Six DEC-030 HMAC-chained events: `tenant.invite_sent` (STANDARD 7yr), `tenant.invite_accepted` (STANDARD 7yr, `linked_via: registration|scim`), `tenant.invite_expired` (STANDARD 3yr), `tenant.invite_revoked` (HIGH 7yr), `tenant.bulk_invite_started` (STANDARD 3yr), `tenant.bulk_invite_completed` (STANDARD 3yr). SOC 2 mapping: CC6.1 (INV-E-001), CC6.2 (INV-E-002), CC6.3 (INV-E-003), P4.2 (INV-E-004), P5.2 (INV-E-005). TypeScript types: `TenantInvitation` (no `invited_email` in API type), `TenantInvitationAdminView` (`email_preview: first3***@domain`), `BulkSeatImportJob`, `BulkImportError` (`email_hash` only). Three open questions: OQ-INV-01 (custom expiry 7–30d — P1), OQ-INV-02 (email preview format — P2), OQ-INV-03 (resend token rotation vs. new row — P1). Seventeen-item implementation checklist (7× P0 M5, 7× P1 M5–M6, 3× P2 M7+). Owner: enterprise-architect + platform-engineer + compliance-officer.
+
+### Changed
+- `docs/DATA_MODEL.md` — version header v1.5 → v1.8 (syncs with last-applied version note); TOC updated to add §26 (API Key Authentication Schema) and §27 (Enterprise Invite & Pending-Seat Provisioning Schema); OQ-BILL-04 in §24.14 marked 🟢 Resolved with resolution summary pointing to §27.
+
+---
+
 ## [3.38.0] — 2026-06-10
 
 ### Added

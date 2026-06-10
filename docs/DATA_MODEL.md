@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.5
+# FORM · Multi-Tenant Data Model v1.8
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -33,6 +33,8 @@
 23. [Exercise Library & Program Schema](#23-exercise-library--program-schema)
 24. [Subscription, Billing & Revenue Schema](#24-subscription-billing--revenue-schema)
 25. [Enterprise Tenant Offboarding & Data Egress Schema](#25-enterprise-tenant-offboarding--data-egress-schema)
+26. [API Key Authentication Schema](#26-api-key-authentication-schema)
+27. [Enterprise Invite & Pending-Seat Provisioning Schema](#27-enterprise-invite--pending-seat-provisioning-schema)
 
 ---
 
@@ -9175,7 +9177,7 @@ All events carry the standard DEC-030 envelope fields: `tenant_id`, `user_id`, `
 | OQ-BILL-01 | **Trial length configurability.** Should trial duration be configurable per enterprise tenant (e.g. 30-day pilot negotiated in §16 enterprise contract) or fixed at 14 days for consumer? If per-tenant: `trial_duration_days` must be added to `enterprise_contracts` (§16) and the billing Worker must read it when computing `trial_ends_at`. If fixed: simpler; pilots handled by comped subscription rather than extended trial. **P0 — affects `trial_ends_at` computation in billing Worker; founder decision before enterprise pilot.** | `founder` + `enterprise-architect` | **P0 — pre-M4** |
 | OQ-BILL-02 | **Currency localization.** Should UAH pricing be stored as a separate `price_uah_kopecks` column or computed at display time from USD via a fixed exchange rate? Separate storage is more accurate (avoids forex volatility in displayed prices) but requires pricing sync on rate changes. Display-time conversion is simpler but can show jarring price changes. Recommendation: store a `display_prices JSONB` column on `plan_tier_definitions` (new table) with per-currency display amounts, independent of `price_usd_cents` which remains the internal accounting unit. | `product-strategist` + `enterprise-architect` | **P1 — before UA market launch** |
 | OQ-BILL-03 | **Refund policy encoding.** Full refund within 24 hours? Pro-rated? Store-platform refunds (Apple/Google) differ from Stripe refunds. The `billing.refunded` event `amount_usd_cents` field needs a policy decision: (a) always = full period price; (b) pro-rated = `price_usd_cents × (days_remaining / period_days)`; (c) platform-determined (use whatever Apple/Google/Stripe reports). Option (c) is strongly preferred: trust the platform's amount and record it verbatim. Needs legal sign-off for consumer contracts in Ukraine. | `legal` + `compliance-officer` | **P1 — before public launch** |
-| OQ-BILL-04 | **Invite-based seat provisioning.** Should `enterprise_seat_assignments` allow a `tenant_admin` to assign a seat to an email address not yet in the `users` table? This enables invite-then-provision flow (admin assigns seat → user receives invite → user creates account → account auto-linked to assignment). Requires a `pending_email TEXT` column on `enterprise_seat_assignments` and a linking step in the SCIM provisioning flow (§SSO_SCIM_IMPLEMENTATION.md §19). Without this, tenant admins must provision users via SCIM before assigning seats — a multi-step friction point. | `enterprise-architect` + `platform-engineer` | **P1 — before enterprise GA** |
+| ~~OQ-BILL-04~~ **🟢 Resolved — DATA_MODEL §27 (2026-06-10)** | ~~**Invite-based seat provisioning.**~~ **Resolved:** separate `tenant_invitations` table preferred over `pending_email` column on `enterprise_seat_assignments`. `enterprise_seat_assignments` extended with nullable `user_id` + `invitation_id FK` + `chk_seat_assignment_not_orphan` CHECK. Full schema, state machine, SCIM auto-link path, GDPR Art. 17 erasure handling, and six DEC-030 events documented in `DATA_MODEL.md §27`. | `enterprise-architect` + `platform-engineer` | **🟢 Resolved** |
 | OQ-BILL-05 | **Art. 17 pseudonymization: FK constraint approach.** The `user_id UUID NOT NULL REFERENCES users(id)` FK on `subscription_events` cannot hold a pseudonymized string. Two options: (a) sentinel UUID — insert a permanent `[erased-user]` row in `users` table; set `user_id` to this sentinel on erasure; (b) split column — add `erased_user_reference TEXT` column; null the FK on erasure; populate the text column with the pseudonym. Option (a) is schema-simpler but creates a real row in `users` that must itself be excluded from all queries. Option (b) is cleaner but requires schema migration and query changes everywhere `subscription_events.user_id IS NOT NULL` is assumed. | `enterprise-architect` + `platform-engineer` + `compliance-officer` | **P0 — before any erasure path ships** |
 
 ---
@@ -10545,3 +10547,629 @@ See `SSO_SCIM_IMPLEMENTATION.md §26.11` for the full 14-item checklist covering
 ---
 
 *v1.7 · червень 2026 · owner: enterprise-architect + compliance-officer + platform-engineer · §2.11 consent_records table DDL (migration 0037_consent_records.sql); §3.8 Consent Records RLS Policies — fixes OQ-P2-03 from SOC2_READINESS.md §74.11: `consent_records_tenant_isolation` (PERMISSIVE) replaced by `consent_records_cross_tenant_block` (RESTRICTIVE) to prevent tenant admins from reading employee consent rows via OR-merge of permissive policies; CI test added for tenant admin zero-row assertion; §5 Data Classification updated with consent_records (Confidential classification). Cross-ref: docs/SOC2_READINESS.md §74.4, §74.11 (OQ-P2-03 → 🟢 Resolved).*
+
+---
+
+## 27. Enterprise Invite & Pending-Seat Provisioning Schema — OQ-BILL-04 Resolution
+
+> Owner: `enterprise-architect` + `platform-engineer` + `compliance-officer`. Review: before enterprise GA, on any invitation-flow code change, and at every SOC 2 observation period start.
+> Scope: enterprise tier only. Covers three non-SCIM provisioning paths: manual invite, bulk CSV import, and SCIM auto-link on registration. SCIM direct provisioning (POST /Users) is documented in `docs/SSO_SCIM_IMPLEMENTATION.md §5–§7` and is unaffected by this schema.
+> References: §24 (`enterprise_seat_allocations`, `enterprise_seat_assignments`, OQ-BILL-04 → 🟢 Resolved); §16 (`assertSeatAvailable()`); §25 (offboarding — invitation cleanup on tenant termination); `docs/SSO_SCIM_IMPLEMENTATION.md §5–§7` (SCIM auto-link path); `docs/AUDIT_LOG_SCHEMA.md` (DEC-030); `docs/ENTERPRISE.md §Privacy floor`; `docs/GDPR_DPIA.md §4` (invited-email as personal data).
+
+---
+
+### 27.1 Purpose — OQ-BILL-04 Resolution
+
+**OQ-BILL-04** (DATA_MODEL §24.14, P1 — before enterprise GA) asked:
+
+> *Should `enterprise_seat_assignments` allow a `tenant_admin` to assign a seat to an email address not yet in the `users` table? This enables invite-then-provision flow (admin assigns seat → user receives invite → user creates account → account auto-linked to assignment). Requires a `pending_email TEXT` column on `enterprise_seat_assignments` and a linking step in the SCIM provisioning flow.*
+
+**Resolution: separate `tenant_invitations` table preferred over `pending_email` column on `enterprise_seat_assignments`.**
+
+The OQ proposed adding `pending_email TEXT` to `enterprise_seat_assignments`. After evaluation, a separate `tenant_invitations` table is architecturally preferred for four reasons:
+
+1. **Clean separation of concerns.** An `enterprise_seat_assignments` row represents a confirmed seat assignment for a known user. Mixing confirmed and pending states in a single table with a nullable `user_id` FK makes partial-unique-index logic brittle and forces every query on `enterprise_seat_assignments` to filter on `user_id IS NOT NULL`.
+2. **Invitation-specific lifecycle.** Token management, expiry, resend, and revocation are invitation concepts — not seat assignment concepts. They belong in their own table with their own status machine.
+3. **GDPR Art. 17 hygiene.** `invited_email` has a different retention curve than a seat assignment: invites should auto-purge on expiry + 30 days even if the tenant persists. A separate table makes the pg_cron erasure job targeted and safe.
+4. **Bulk import state.** CSV-import jobs need their own `bulk_seat_import_jobs` table regardless; a `pending_email` column on `enterprise_seat_assignments` would not capture job-level state (total rows, partial failures, R2 object key).
+
+`enterprise_seat_assignments` is extended with an optional `invitation_id FK` column (nullable) to create the link once an invitation is accepted. The existing `user_id NOT NULL` constraint is relaxed to allow NULL during the pending window; a CHECK constraint ensures exactly one of (`user_id`, `invitation_id`) is non-null for any active assignment row.
+
+---
+
+### 27.2 Three Provisioning Paths
+
+| Path | Trigger | Tables touched | Seat reserved immediately? |
+|---|---|---|---|
+| **Manual invite** | `tenant_admin` invites by email via admin dashboard | `tenant_invitations` INSERT; `enterprise_seat_assignments` INSERT (pending) | Yes — `assertSeatAvailable()` called before INSERT (§27.8) |
+| **Bulk CSV import** | `tenant_admin` uploads CSV; `form_system` Worker processes | `bulk_seat_import_jobs` INSERT; `tenant_invitations` INSERT per row; `enterprise_seat_assignments` INSERT per row | Yes — capacity check per row; seat reserved on INSERT |
+| **SCIM auto-link** | SCIM POST /Users for a user whose email matches a pending invitation | `tenant_invitations` UPDATE (`status = 'accepted'`); `enterprise_seat_assignments` UPDATE (`user_id = $new_user_id`) | Already reserved at invite time |
+
+**What SCIM direct provisioning does NOT use.** When a SCIM POST /Users arrives for a user with no matching pending invitation, the existing `SSO_SCIM_IMPLEMENTATION.md §5–§7` flow applies: a `users` row is created and a seat is assigned immediately without creating a `tenant_invitations` row.
+
+---
+
+### 27.3 Migration 0053 — `enterprise_seat_assignments` Extension
+
+```sql
+-- migrations/0053_enterprise_invite_schema.sql
+-- Part 1: extend enterprise_seat_assignments to support pending state.
+
+-- Allow nullable user_id for pending-invite assignments.
+ALTER TABLE enterprise_seat_assignments
+  ALTER COLUMN user_id DROP NOT NULL;
+
+-- FK to the originating invitation.
+-- NULL for SCIM-provisioned or direct assignments (pre-§27 rows).
+ALTER TABLE enterprise_seat_assignments
+  ADD COLUMN invitation_id UUID REFERENCES tenant_invitations(id) ON DELETE SET NULL;
+-- ON DELETE SET NULL: if an invitation row is hard-deleted post-expiry cleanup,
+-- the seat assignment record is retained with invitation_id = NULL for audit trail.
+
+-- Exactly one of (user_id, invitation_id) must be non-null for any active assignment.
+ALTER TABLE enterprise_seat_assignments
+  ADD CONSTRAINT chk_seat_assignment_not_orphan
+    CHECK (user_id IS NOT NULL OR invitation_id IS NOT NULL);
+
+-- Index for invitation lookup (SCIM auto-link path; revocation sweep).
+CREATE INDEX idx_seat_assignments_invitation
+  ON enterprise_seat_assignments (invitation_id)
+  WHERE invitation_id IS NOT NULL;
+```
+
+> **Migration note.** Existing rows have `user_id NOT NULL` and `invitation_id NULL`. `chk_seat_assignment_not_orphan` is satisfied for all existing rows because `user_id IS NOT NULL`. The partial unique index `uq_tenant_user_active_seat` (§24.5.2) remains valid — it covers `(tenant_id, user_id) WHERE revoked_at IS NULL`, and pending assignments with `user_id IS NULL` are excluded from that index's scope. Both DDL changes are safe to apply in a single migration transaction.
+
+---
+
+### 27.4 `tenant_invitations` Table
+
+```sql
+-- migrations/0053_enterprise_invite_schema.sql (continued)
+-- Part 2: tenant_invitations.
+
+CREATE TABLE tenant_invitations (
+  id                  UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id           UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  allocation_id       UUID        NOT NULL REFERENCES enterprise_seat_allocations(id),
+  -- The allocation that authorizes this seat. assertSeatAvailable() was called
+  -- at invitation creation time using this allocation's total_seats.
+
+  -- ── Invitee identity ───────────────────────────────────────────────────────
+  invited_email       TEXT        NOT NULL,
+  -- Personal data (GDPR Art. 4(1)). Nullified at expiry+30d by pg_cron (§27.10.1)
+  -- or on Art. 17 erasure of the accepted user (§27.10.2). Never in any DEC-030 payload.
+  invited_email_hash  TEXT        NOT NULL,
+  -- SHA-256(invited_email || ':' || tenant_id::text) keyed with INVITE_HASH_SALT.
+  -- Used for: (1) duplicate-invite dedup; (2) SCIM auto-link lookup;
+  -- (3) DEC-030 payload identifier (replaces plaintext in all audit events).
+  -- Retained after invited_email is nullified — needed for HMAC chain verification.
+
+  -- ── Invite token ───────────────────────────────────────────────────────────
+  token_hash          TEXT        NOT NULL,
+  -- SHA-256(raw_token || ':' || id::text) keyed with INVITE_HASH_SALT.
+  -- Raw token: 32-byte CSPRNG; returned once to Worker for email delivery; discarded after send.
+  CONSTRAINT uq_invite_token_hash UNIQUE (token_hash),
+
+  -- ── Status machine ─────────────────────────────────────────────────────────
+  status              TEXT        NOT NULL DEFAULT 'pending',
+  CONSTRAINT chk_invite_status
+    CHECK (status IN ('pending', 'accepted', 'expired', 'revoked')),
+
+  -- ── Actors ─────────────────────────────────────────────────────────────────
+  invited_by          UUID        REFERENCES users(id) ON DELETE SET NULL,
+  -- NULL for SCIM-initiated bulk flows where no human actor exists.
+  accepted_by         UUID        REFERENCES users(id) ON DELETE SET NULL,
+  revoked_by          UUID        REFERENCES users(id) ON DELETE SET NULL,
+
+  -- ── Linked seat assignment ──────────────────────────────────────────────────
+  assignment_id       UUID        REFERENCES enterprise_seat_assignments(id) ON DELETE SET NULL,
+  -- Created at invite time (pending); retained after acceptance.
+
+  -- ── Source ─────────────────────────────────────────────────────────────────
+  source              TEXT        NOT NULL DEFAULT 'manual',
+  CONSTRAINT chk_invite_source
+    CHECK (source IN ('manual', 'csv_import')),
+  bulk_import_job_id  UUID        REFERENCES bulk_seat_import_jobs(id) ON DELETE SET NULL,
+  CONSTRAINT chk_bulk_job_consistency
+    CHECK (
+      (source = 'csv_import' AND bulk_import_job_id IS NOT NULL)
+      OR (source = 'manual'   AND bulk_import_job_id IS NULL)
+    ),
+
+  -- ── Lifecycle timestamps ────────────────────────────────────────────────────
+  expires_at          TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '7 days',
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  accepted_at         TIMESTAMPTZ,
+  revoked_at          TIMESTAMPTZ,
+
+  -- ── Coherence constraints ────────────────────────────────────────────────────
+  CONSTRAINT chk_invite_accepted_coherent
+    CHECK (
+      (status = 'accepted' AND accepted_at IS NOT NULL AND accepted_by IS NOT NULL)
+      OR (status <> 'accepted' AND accepted_at IS NULL AND accepted_by IS NULL)
+    ),
+  CONSTRAINT chk_invite_revoked_coherent
+    CHECK (
+      (status = 'revoked' AND revoked_at IS NOT NULL)
+      OR (status <> 'revoked' AND revoked_at IS NULL)
+    )
+);
+
+-- Prevent duplicate pending invitations for the same email within a tenant.
+CREATE UNIQUE INDEX uq_tenant_invite_email_pending
+  ON tenant_invitations (tenant_id, invited_email_hash)
+  WHERE status = 'pending';
+
+-- Fast lookup by token hash (accept-invite Worker path).
+CREATE INDEX idx_invite_token_hash
+  ON tenant_invitations (token_hash)
+  WHERE status = 'pending';
+
+-- Fast lookup for SCIM auto-link.
+CREATE INDEX idx_invite_email_hash_tenant
+  ON tenant_invitations (tenant_id, invited_email_hash)
+  WHERE status = 'pending';
+
+-- pg_cron expiry sweep.
+CREATE INDEX idx_invite_expires_pending
+  ON tenant_invitations (expires_at)
+  WHERE status = 'pending';
+```
+
+#### 27.4.1 Column Notes
+
+| Column | Notes |
+|---|---|
+| `invited_email` | GDPR Art. 4(1) personal data. Nullified (→ `'[erased]'`) by pg_cron 30 days after `expires_at` for unaccepted invitations; nullified immediately on Art. 17 erasure of `accepted_by` user. Never in any DEC-030 payload, log, or metric. |
+| `invited_email_hash` | `SHA-256(invited_email \|\| ':' \|\| tenant_id::text)` using `INVITE_HASH_SALT` Workers Secret. Retained after `invited_email` is nullified — needed for HMAC chain event verification. Not personally identifiable without the salt. |
+| `token_hash` | `SHA-256(raw_token \|\| ':' \|\| id::text)` using `INVITE_HASH_SALT`. Verification: Worker receives raw token in the accept URL, hashes it, looks up by hash. |
+| `assignment_id` | Points to the `enterprise_seat_assignments` row created at invite time (pending, `user_id IS NULL`). On acceptance, the assignment is updated: `user_id = $new_user_id`. The FK from `enterprise_seat_assignments.invitation_id` back to this invitation is retained as an audit trail — NOT cleared after acceptance. |
+| `expires_at` | Default 7 days. On resend, the existing row's `expires_at` is extended (OQ-INV-03 resolution path: option a). Re-sending emits a fresh `tenant.invite_sent` DEC-030 event. |
+
+---
+
+### 27.5 `bulk_seat_import_jobs` Table
+
+```sql
+-- migrations/0053_enterprise_invite_schema.sql (continued)
+-- Part 3: bulk_seat_import_jobs.
+
+CREATE TABLE bulk_seat_import_jobs (
+  id              UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id       UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  allocation_id   UUID        NOT NULL REFERENCES enterprise_seat_allocations(id),
+  initiated_by    UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- RESTRICT: job record must persist for audit even if initiating admin is removed.
+
+  status          TEXT        NOT NULL DEFAULT 'processing',
+  CONSTRAINT chk_bulk_job_status
+    CHECK (status IN ('processing', 'completed', 'partially_failed', 'failed')),
+
+  total_rows      INTEGER     NOT NULL CHECK (total_rows >= 1 AND total_rows <= 500),
+  -- 500-row maximum per import; larger provisioning events require SCIM.
+  invited_count   INTEGER     NOT NULL DEFAULT 0,
+  skipped_count   INTEGER     NOT NULL DEFAULT 0,
+  -- skipped: email is already an active user in this tenant — no invite needed.
+  failed_count    INTEGER     NOT NULL DEFAULT 0,
+  -- failed: invalid email format, seat limit reached mid-import, duplicate pending.
+
+  error_summary   JSONB,
+  -- [{"row": N, "email_hash": "...", "reason": "invalid_email"|"seat_limit_reached"|"duplicate_pending"}]
+  -- email_hash only — never plaintext email (privacy floor). NULL if status = 'completed'.
+
+  r2_object_key   TEXT        NOT NULL,
+  -- Cloudflare R2 key of the uploaded CSV. Deleted by Worker after processing;
+  -- max R2 retention 30 days from upload. Key retained here as tombstone for audit.
+
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at    TIMESTAMPTZ,
+
+  CONSTRAINT chk_bulk_job_counts
+    CHECK (invited_count + skipped_count + failed_count <= total_rows),
+  CONSTRAINT chk_bulk_job_completed_coherent
+    CHECK (
+      (status IN ('completed', 'partially_failed', 'failed') AND completed_at IS NOT NULL)
+      OR (status = 'processing' AND completed_at IS NULL)
+    )
+);
+
+CREATE INDEX idx_bulk_jobs_tenant
+  ON bulk_seat_import_jobs (tenant_id, created_at DESC);
+```
+
+**CSV format:** `email` (required, RFC 5322, max 254 chars), `first_name` (optional, used only in invite email greeting — never stored), `last_name` (optional, same). `first_name` and `last_name` are processed in-Worker memory and discarded after email dispatch; they never touch any DB table or DEC-030 event.
+
+**Processing behaviour:** The CSV Worker processes rows sequentially. On `assertSeatAvailable()` failure mid-import: sets job `status = 'partially_failed'`, records `seat_limit_reached` error for that row and all subsequent rows, stops processing. Already-sent invitations are NOT rolled back (fail-forward). The admin dashboard displays a "seat limit reached at row N — N-1 invitations sent" notice.
+
+---
+
+### 27.6 Invite Flow State Machine
+
+```
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  tenant_admin (or CSV Worker) creates invitation                         │
+  │  assertSeatAvailable() → blocks if at seat ceiling                       │
+  │  INSERT tenant_invitations (status='pending', expires_at=now()+7d)       │
+  │  INSERT enterprise_seat_assignments (user_id=NULL, invitation_id=FK)     │
+  │  Email sent with raw_token embedded in accept URL                        │
+  │  DEC-030: tenant.invite_sent (STANDARD)                                  │
+  └──────────────────────┬───────────────────────────────────────────────────┘
+                         │
+         ┌───────────────┼────────────────────────┐
+         │               │                        │
+         ▼               ▼                        ▼
+  User clicks      expires_at passes       tenant_admin revokes
+  accept link      (no acceptance)         (or offboarding)
+         │               │                        │
+         ▼               ▼                        ▼
+  Token verified    pg_cron sweep:         UPDATE status='revoked'
+  (hash match)      status='expired'       enterprise_seat_assignments
+  status='accepted' seat released          .revoked_at = now()
+  seat_assignment   DEC-030:               DEC-030:
+  .user_id set      tenant.invite_expired  tenant.invite_revoked (HIGH)
+  DEC-030:          ────────────────
+  tenant.invite_    30d later:
+  accepted          pg_cron nullifies
+  (STANDARD)        invited_email→'[erased]'
+                    (§27.10 privacy cleanup)
+```
+
+Also triggered by SCIM auto-link — same `accepted` outcome, `linked_via: 'scim'` in DEC-030 event (§27.7).
+
+**Status transition table:**
+
+| From | To | Trigger | Seat effect |
+|---|---|---|---|
+| `pending` | `accepted` | User accepts via URL (token hash match) | `enterprise_seat_assignments.user_id` set |
+| `pending` | `accepted` | SCIM POST /Users with matching `invited_email_hash` | Same; SCIM auto-link path (§27.7) |
+| `pending` | `expired` | pg_cron: `expires_at < now()` | `enterprise_seat_assignments.revoked_at = now()` |
+| `pending` | `revoked` | `tenant_admin` manual revocation or §25 offboarding | `enterprise_seat_assignments.revoked_at = now()` |
+| `accepted` | — | Terminal. No further transitions. | Seat remains active until offboarding (§25) |
+
+---
+
+### 27.7 SCIM Auto-Link Path
+
+When the SCIM Worker receives `POST /Users` for a user whose email matches a pending invitation in the same tenant, it auto-accepts the invitation rather than creating a standalone seat assignment.
+
+```typescript
+// workers/scim/users/create.ts (addition for §27)
+async function handleScimUserCreate(
+  req: ScimUserCreateRequest,
+  tenantId: string,
+  db: DbClient,
+): Promise<ScimUser> {
+
+  const emailHash = await computeInviteEmailHash(
+    req.email, tenantId, env.INVITE_HASH_SALT,
+  );
+
+  const pendingInvite = await db.queryOne<PendingInvitation>(
+    `SELECT id, assignment_id
+     FROM tenant_invitations
+     WHERE tenant_id = $1
+       AND invited_email_hash = $2
+       AND status = 'pending'
+       AND expires_at > now()
+     LIMIT 1`,
+    [tenantId, emailHash],
+  );
+
+  if (pendingInvite) {
+    const newUser = await createUserRecord(req, db);
+    await db.transaction(async (tx) => {
+      await tx.execute(
+        `UPDATE tenant_invitations
+         SET status = 'accepted', accepted_at = now(), accepted_by = $1
+         WHERE id = $2`,
+        [newUser.id, pendingInvite.id],
+      );
+      // Guard: WHERE user_id IS NULL prevents race condition on duplicate SCIM requests.
+      await tx.execute(
+        `UPDATE enterprise_seat_assignments
+         SET user_id = $1
+         WHERE id = $2 AND user_id IS NULL`,
+        [newUser.id, pendingInvite.assignment_id],
+      );
+      await emitDec030Event({
+        event_type: 'tenant.invite_accepted',
+        severity: 'STANDARD',
+        payload: {
+          tenant_id: tenantId,
+          invitation_id: pendingInvite.id,
+          accepted_by: newUser.id,
+          assignment_id: pendingInvite.assignment_id,
+          source: 'scim_auto_link',
+          linked_via: 'scim',
+        },
+      }, tx);
+    });
+    return toScimUser(newUser);
+  }
+
+  // No matching invitation — standard SCIM provisioning path (SSO_SCIM §5–§7).
+  return handleScimDirectProvision(req, tenantId, db);
+}
+```
+
+**Key invariants:** `assertSeatAvailable()` is NOT called in the auto-link path — the seat was reserved at invitation creation. If the invitation has expired by the time SCIM arrives, the lookup returns no rows and standard provisioning runs (the expired invitation's seat is released independently by pg_cron).
+
+---
+
+### 27.8 Seat Reservation Policy
+
+**Pending invitations count against the tenant's contracted seat total.**
+
+`assertSeatAvailable()` (§16.5) is extended to count pending assignment rows:
+
+```typescript
+// workers/provisioning/seat-gate.ts (§27 extension)
+const row = await db.queryOne<{ used_seats: number; max_seats: number }>(
+  `SELECT
+     COUNT(esa.id) FILTER (WHERE esa.revoked_at IS NULL) AS used_seats,
+     -- Counts both active assignments (user_id IS NOT NULL)
+     -- AND pending invite assignments (user_id IS NULL, invitation_id IS NOT NULL).
+     ea.total_seats AS max_seats
+   FROM enterprise_seat_allocations ea
+   LEFT JOIN enterprise_seat_assignments esa ON esa.allocation_id = ea.id
+   WHERE ea.tenant_id = $1 AND ea.effective_to IS NULL
+   GROUP BY ea.total_seats`,
+  [tenantId],
+);
+```
+
+**Rationale.** Not counting pending invitations would allow a tenant with a 50-seat contract to send 500 invitations. FORM commits to a deterministic seat ceiling for billing and access control purposes; a pending invite is a contractual reservation, not a speculative one.
+
+**Over-invitation protection (bulk CSV):** The CSV Worker stops adding invitations when `assertSeatAvailable()` fails. `bulk_seat_import_jobs.error_summary` records the first row that exceeded the limit with `reason: 'seat_limit_reached'`.
+
+---
+
+### 27.9 RLS Policies
+
+```sql
+-- migrations/0053_enterprise_invite_schema.sql (continued)
+-- Part 4: Row-Level Security.
+
+-- ── tenant_invitations ────────────────────────────────────────────────────────
+
+ALTER TABLE tenant_invitations ENABLE ROW LEVEL SECURITY;
+
+-- form_api: tenant_admin/tenant_owner can read own tenant's invitations.
+-- Mutations go through form_system Workers only.
+CREATE POLICY invite_tenant_isolation ON tenant_invitations
+  FOR SELECT TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+CREATE POLICY invite_system_full ON tenant_invitations
+  FOR ALL TO form_system
+  USING (true) WITH CHECK (true);
+
+-- Defence-in-depth: RESTRICTIVE policy blocks cross-tenant reads even if
+-- a permissive policy is inadvertently widened.
+CREATE POLICY invite_cross_tenant_block ON tenant_invitations
+  AS RESTRICTIVE FOR ALL TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+-- ── bulk_seat_import_jobs ─────────────────────────────────────────────────────
+
+ALTER TABLE bulk_seat_import_jobs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY bulk_job_tenant_isolation ON bulk_seat_import_jobs
+  FOR SELECT TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+CREATE POLICY bulk_job_system_full ON bulk_seat_import_jobs
+  FOR ALL TO form_system
+  USING (true) WITH CHECK (true);
+
+CREATE POLICY bulk_job_cross_tenant_block ON bulk_seat_import_jobs
+  AS RESTRICTIVE FOR ALL TO form_api
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+```
+
+**Role access summary:**
+
+| Actor | `tenant_invitations` | `bulk_seat_import_jobs` |
+|---|---|---|
+| `form_api` (tenant_admin/owner/manager) | SELECT own tenant only | SELECT own tenant only |
+| `form_system` | Full | Full |
+| `form_api` (other tenant) | ZERO rows (RESTRICTIVE) | ZERO rows (RESTRICTIVE) |
+
+**Who can send invitations?** `tenant_owner` and `tenant_admin` only. `tenant_manager` (third ENTERPRISE.md persona) may view invitation status but cannot create or revoke. Enforced at Worker RBAC layer (`assertRole(['tenant_owner','tenant_admin'])`); not distinguishable at RLS layer.
+
+---
+
+### 27.10 GDPR Art. 17 Erasure Handling
+
+`invited_email` is personal data under GDPR Art. 4(1). Two erasure paths apply.
+
+#### 27.10.1 Expiry + 30 Days (Automatic, pg_cron)
+
+```sql
+-- pg_cron: invite_email_expiry_cleanup (daily 04:00 UTC)
+-- Nullifies invited_email on expired/revoked invitations older than 30 days.
+-- invited_email_hash retained for HMAC chain reference.
+UPDATE tenant_invitations
+SET invited_email = '[erased]'
+WHERE status IN ('expired', 'revoked')
+  AND expires_at < now() - INTERVAL '30 days'
+  AND invited_email <> '[erased]';
+```
+
+This is privacy-by-design retention enforcement, not a data-subject request. The 30-day window allows CSM to investigate failed invite delivery before the email is purged. The `invited_email_hash` is never erased.
+
+#### 27.10.2 Art. 17 Erasure of Accepted User
+
+When a registered user (who joined via an invitation) submits an Art. 17 erasure request, `workers/gdpr/erasure.ts` includes:
+
+```sql
+-- Step INV-1: nullify invited_email for invitations accepted by the erased user.
+-- invited_email_hash, accepted_by, assignment_id, invited_by retained (UUIDs; not
+-- personal data of the erased subject).
+UPDATE tenant_invitations
+SET invited_email = '[erased]'
+WHERE accepted_by = $erased_user_id
+  AND invited_email <> '[erased]';
+-- Covered by existing data.individual_deletion HIGH DEC-030 event (§12 erasure Worker).
+-- No separate invite-specific event required.
+```
+
+**Privacy rule for evidence collection:** SQL exports involving `tenant_invitations` must project `invited_email_hash` only — never `invited_email`.
+
+---
+
+### 27.11 DEC-030 HMAC-Chained Audit Events
+
+All six events must be registered in `docs/AUDIT_LOG_SCHEMA.md` under a new **"Enterprise seat invitation events"** subsection.
+
+| Event type | Severity | Retention | Payload fields | When emitted |
+|---|---|---|---|---|
+| `tenant.invite_sent` | STANDARD | 7 yr | `tenant_id`, `invitation_id`, `email_hash`, `invited_by` (UUID), `source` (`manual`\|`csv_import`), `allocation_id`, `expires_at` (ISO 8601), `bulk_import_job_id` (UUID or null) | After invite INSERT + email dispatch confirmed |
+| `tenant.invite_accepted` | STANDARD | 7 yr | `tenant_id`, `invitation_id`, `accepted_by` (new user UUID), `assignment_id`, `source`, `linked_via` (`registration`\|`scim`) | On successful acceptance (token verify or SCIM auto-link) |
+| `tenant.invite_expired` | STANDARD | 3 yr | `tenant_id`, `invitation_id`, `source`, `bulk_import_job_id` (UUID or null) | pg_cron `invite_expiry_sweep` marks `status = 'expired'` |
+| `tenant.invite_revoked` | HIGH | 7 yr | `tenant_id`, `invitation_id`, `revoked_by` (UUID), `reason` (`admin_action`\|`offboarding`\|`seat_reduction`), `source` | Manual revocation or §25 offboarding |
+| `tenant.bulk_invite_started` | STANDARD | 3 yr | `tenant_id`, `bulk_import_job_id`, `total_rows`, `initiated_by` (UUID), `allocation_id` | CSV Worker begins row processing |
+| `tenant.bulk_invite_completed` | STANDARD | 3 yr | `tenant_id`, `bulk_import_job_id`, `invited_count`, `skipped_count`, `failed_count`, `status` | CSV Worker finishes |
+
+**HMAC chain ordering for bulk imports:** `tenant.bulk_invite_started` must precede all `tenant.invite_sent` events with the same `bulk_import_job_id`; `tenant.bulk_invite_completed` must follow all of them.
+
+**Privacy invariant:** `invited_email` never appears in any event payload. `email_hash` uses the same `INVITE_HASH_SALT` as the DB column — auditors can verify event-to-DB linkage by recomputing the hash.
+
+---
+
+### 27.12 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | Evidence artefact |
+|---|---|---|
+| **CC6.1 — Logical access controls** | `assertSeatAvailable()` called before every invitation; pending assignments count against contracted seat total. | **INV-E-001:** `enterprise_seat_allocations` + `enterprise_seat_assignments` (including `user_id IS NULL` pending rows) export for a 30-day window — demonstrates seat ceiling was not exceeded at any point. |
+| **CC6.2 — Access authorised** | Every invitation is authorised by a `tenant_admin` or `tenant_owner`; DEC-030 `tenant.invite_sent` with `invited_by` UUID provides the authorisation record. | **INV-E-002:** DEC-030 `tenant.invite_sent` events for the audit period — every new seat authorised by a named actor. |
+| **CC6.3 — Access removed when changed** | Invitation revocation (`tenant.invite_revoked`) releases the reserved seat. §25 offboarding revokes all pending invitations for the departing tenant. | **INV-E-003:** DEC-030 `tenant.invite_revoked` events for the audit period — demonstrates prompt removal of pending access. |
+| **P4.2 — Privacy notice prior to processing** | Invite email includes visible link to FORM's Privacy Policy and one-sentence data processing summary before account creation. Template is version-controlled. | **INV-E-004:** Version-controlled invite email HTML template in `compliance/evidence/invitations/invite-email-template-v{N}.html`. |
+| **P5.2 — Personal data disposed per policy** | pg_cron `invite_email_expiry_cleanup` (daily 04:00 UTC) purges `invited_email` 30 days post-expiry. Art. 17 step INV-1 nullifies `invited_email` for accepted users on erasure request. | **INV-E-005:** pg_cron `invite_email_expiry_cleanup` execution log over the audit period — demonstrates scheduled erasure is operating. |
+
+---
+
+### 27.13 TypeScript Types
+
+```typescript
+// apps/api/src/types/tenant-invitations.ts
+
+export type InviteStatus   = 'pending' | 'accepted' | 'expired' | 'revoked';
+export type InviteSource   = 'manual' | 'csv_import';
+export type InviteLinkedVia = 'registration' | 'scim';
+
+export interface TenantInvitation {
+  id:                  string;
+  tenant_id:           string;
+  allocation_id:       string;
+  // invited_email intentionally omitted — raw email is never returned by the admin API.
+  invited_email_hash:  string;
+  status:              InviteStatus;
+  invited_by:          string | null;
+  accepted_by:         string | null;
+  revoked_by:          string | null;
+  assignment_id:       string | null;
+  source:              InviteSource;
+  bulk_import_job_id:  string | null;
+  expires_at:          string;
+  created_at:          string;
+  accepted_at:         string | null;
+  revoked_at:          string | null;
+}
+
+// View returned to tenant_admin — shows email preview, not hash.
+export interface TenantInvitationAdminView {
+  id:            string;
+  email_preview: string;    // Worker: first3***@domain (e.g. joh***@example.com)
+  status:        InviteStatus;
+  invited_by:    string | null;
+  source:        InviteSource;
+  expires_at:    string;
+  created_at:    string;
+  accepted_at:   string | null;
+}
+
+export interface BulkSeatImportJob {
+  id:             string;
+  tenant_id:      string;
+  allocation_id:  string;
+  initiated_by:   string;
+  status:         'processing' | 'completed' | 'partially_failed' | 'failed';
+  total_rows:     number;
+  invited_count:  number;
+  skipped_count:  number;
+  failed_count:   number;
+  error_summary:  BulkImportError[] | null;
+  created_at:     string;
+  completed_at:   string | null;
+}
+
+export interface BulkImportError {
+  row:        number;
+  email_hash: string;   // never plaintext email
+  reason:     'invalid_email' | 'seat_limit_reached' | 'duplicate_pending';
+}
+
+export interface CreateInviteRequest {
+  tenantId:          string;
+  email:             string;
+  allocationId:      string;
+  invitedBy:         string;
+  customExpiryDays?: number;   // 7–30; default 7 (OQ-INV-01)
+}
+
+export interface CreateInviteResponse {
+  invitationId: string;
+  expiresAt:    string;
+}
+```
+
+---
+
+### 27.14 Open Questions
+
+| ID | Question | Owner | Priority | Resolution path |
+|---|---|---|---|---|
+| **OQ-INV-01** | **Custom invite expiry window (7–30 days).** Default `expires_at = now() + INTERVAL '7 days'`. Enterprise HR onboarding cycles often run 2–4 weeks. Should `tenant_owner` be allowed to set a custom expiry of 7–30 days? Implementation: `custom_expiry_days INTEGER CHECK (custom_expiry_days BETWEEN 7 AND 30)` column on `tenant_invitations`; Worker reads from per-invite override or `tenant_settings.default_invite_expiry_days`. Risk: longer expiry windows increase phishing window for a hijacked invite link — partially mitigated by single-use token design. Recommendation: allow per-invite override for `tenant_owner` only; `tenant_admin` uses tenant-wide default. | enterprise-architect + customer-success | **P1 — before GA** | Evaluate after first enterprise pilot feedback; document decision in `docs/DECISION_LOG.md`. |
+| **OQ-INV-02** | **Email preview format in admin dashboard.** `TenantInvitationAdminView.email_preview` computed as `first3***@domain`. Lets admins confirm they invited the right person without exposing full email. Risk: some domains are small enough that first-3-chars + domain is re-identifying. Alternative: domain-only (`***@example.com`). Recommendation: `first3***@domain` is industry-standard (Gmail recovery display) and acceptable for the admin dashboard context — the admin already knows who they invited. If any enterprise customer raises a GDPR concern, switch to domain-only. | compliance-officer + enterprise-architect | **P2 — before public admin API docs** | Document decision in `docs/DECISION_LOG.md`; update type if domain-only adopted. |
+| **OQ-INV-03** | **Resend flow: extend-expiry vs. create-new-row.** On resend: (a) extend `expires_at` + rotate `token_hash` on the existing row (invalidates old link); (b) mark old invitation `revoked`, create a new row. Recommendation: option (a) — simpler, no `revoked` row pollution for non-security resend events. A fresh `tenant.invite_sent` DEC-030 event is emitted on resend regardless, preserving the audit trail. | platform-engineer + security-engineer | **P1 — before invite email UI ships** | Document in `docs/DECISION_LOG.md`. |
+
+---
+
+### 27.15 Implementation Checklist
+
+#### P0 — Before any tenant sees the invite feature (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0053_enterprise_invite_schema.sql` (Parts 1–4): ALTER `enterprise_seat_assignments`; CREATE `tenant_invitations` + `bulk_seat_import_jobs`; CREATE RLS policies. Test: existing seat assignment rows still pass `chk_seat_assignment_not_orphan`; `form_api` SELECT on `tenant_invitations` for wrong tenant returns 0 rows. | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Extend `assertSeatAvailable()` (§27.8) to count pending invite assignments. CI test: tenant at 50-seat limit with 49 active + 1 pending invite → next invite creation fails `SeatLimitReachedError`. | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Add `INVITE_HASH_SALT` as Cloudflare Workers Secret. Document in `docs/CRYPTOGRAPHY_POLICY.md §3` key inventory (rotation schedule: 365 days). | security-engineer | **P0** | M5 | [ ] |
+| 4 | Implement `workers/invitations/create-invite.ts`: role check (`tenant_owner`/`tenant_admin`); `assertSeatAvailable()`; compute `invited_email_hash` + `token_hash`; INSERT `tenant_invitations` + INSERT `enterprise_seat_assignments` (pending); dispatch invite email; emit `tenant.invite_sent` DEC-030. | platform-engineer | **P0** | M5 | [ ] |
+| 5 | Implement `workers/invitations/accept-invite.ts`: token hash verification; user registration; UPDATE `tenant_invitations` (`status = 'accepted'`) + UPDATE `enterprise_seat_assignments` (`user_id = $new_user_id`); emit `tenant.invite_accepted` DEC-030 (`linked_via: 'registration'`). Idempotency: already-accepted token → HTTP 200 "already accepted". | platform-engineer | **P0** | M5 | [ ] |
+| 6 | Add SCIM auto-link path to `workers/scim/users/create.ts` (§27.7): email hash lookup; auto-accept on match; emit `tenant.invite_accepted` (`linked_via: 'scim'`). Staging test: create pending invite → SCIM POST /Users for same email → verify `assignment_id.user_id` set + invite `status = 'accepted'`. | platform-engineer | **P0** | M5 | [ ] |
+| 7 | Register all six DEC-030 events (§27.11) in `docs/AUDIT_LOG_SCHEMA.md` under new "Enterprise seat invitation events" subsection with severity, retention, and payload fields. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+
+#### P1 — Before first enterprise pilot with invitations enabled
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Implement pg_cron `invite_expiry_sweep` (daily 02:30 UTC): UPDATE `tenant_invitations` pending rows past `expires_at` → `expired`; UPDATE `enterprise_seat_assignments.revoked_at`; emit `tenant.invite_expired` per expired invite (batch, HMAC-chained). Add to `docs/OBSERVABILITY.md §12.6` pg_cron registry as job 14. | platform-engineer + devops-lead | **P1** | M5 | [ ] |
+| 9 | Implement pg_cron `invite_email_expiry_cleanup` (daily 04:00 UTC, §27.10.1): nullify `invited_email → '[erased]'` for expired/revoked rows older than 30 days. Add to `docs/OBSERVABILITY.md §12.6` as job 15. | platform-engineer | **P1** | M5 | [ ] |
+| 10 | Add Art. 17 erasure step INV-1 to `workers/gdpr/erasure.ts` (§27.10.2): `UPDATE tenant_invitations SET invited_email='[erased]' WHERE accepted_by=$user_id AND invited_email<>'[erased]'`. Test: erasure request for user who joined via invite → verify `tenant_invitations.invited_email = '[erased]'`. | platform-engineer + compliance-officer | **P1** | M5 | [ ] |
+| 11 | Implement bulk CSV import: `POST /api/v1/admin/invitations/bulk` (multipart); CSV validation (RFC 5322, max 500 rows); R2 upload; `bulk_seat_import_jobs` INSERT; async Durable Object processing; emit `tenant.bulk_invite_started` + `tenant.bulk_invite_completed`. Admin dashboard import-history panel. | platform-engineer + design-craft | **P1** | M6 | [ ] |
+| 12 | Add invitation management panel to admin dashboard: pending-invites table (`email_preview`, status, `expires_at`, resend + revoke actions); bulk-import history (status, counts, error summary); seat utilisation counter updated to reflect pending + active seats. Gate on `enterprise.invite_flow_enabled` feature flag. | platform-engineer + design-craft | **P1** | M6 | [ ] |
+| 13 | Add §25 offboarding integration: on `access_revoked` transition, revoke all pending invitations for the tenant (UPDATE `tenant_invitations SET status='revoked', revoked_at=now(), revoked_by=NULL`; emit `tenant.invite_revoked` per invite with `reason='offboarding'`; SET `enterprise_seat_assignments.revoked_at=now()` per pending assignment). | platform-engineer | **P1** | M5 | [ ] |
+| 14 | Collect INV-E-001 through INV-E-005 evidence artefacts (§27.12) after 30 days of production invitation usage; store in `compliance/evidence/invitations/`; cross-reference in `docs/SOC2_READINESS.md` CC6.1, CC6.2, CC6.3, P4.2, P5.2 evidence tables. | compliance-officer | **P1** | M6 | [ ] |
+
+#### P2 — Post-GA improvements
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 15 | Resolve OQ-INV-01 (custom expiry 7–30 days) and implement if adopted; document in `docs/DECISION_LOG.md`. | enterprise-architect + customer-success | **P2** | M7 | [ ] |
+| 16 | Resolve OQ-INV-02 (email preview format) and update `TenantInvitationAdminView` if domain-only adopted. | compliance-officer + enterprise-architect | **P2** | Before public admin API docs | [ ] |
+| 17 | Resolve OQ-INV-03 (resend: extend-expiry vs. create-new) and implement. | platform-engineer + security-engineer | **P1** | Before invite email UI ships | [ ] |
+
+---
+
+*v1.8 · червень 2026 · owner: enterprise-architect + platform-engineer + compliance-officer · §27 Enterprise Invite & Pending-Seat Provisioning Schema — resolves OQ-BILL-04 (DATA_MODEL §24.14, P1 before enterprise GA). Migration 0053 extends `enterprise_seat_assignments` (nullable `user_id`, `invitation_id FK`, `chk_seat_assignment_not_orphan` CHECK) and adds two new tables. `tenant_invitations`: `invited_email` (personal data — auto-erased at expiry+30d by pg_cron `invite_email_expiry_cleanup` + Art. 17 step INV-1 in erasure Worker), `invited_email_hash` (SHA-256 keyed with `INVITE_HASH_SALT`, retained post-erasure for HMAC chain reference), `token_hash` (32-byte CSPRNG, single-use, never stored plaintext), 4-state machine (pending→accepted|expired|revoked), `source` (manual|csv_import), `assignment_id FK` (retained post-acceptance as audit trail), `bulk_import_job_id FK`. `bulk_seat_import_jobs`: CSV import job tracking (max 500 rows; `error_summary` contains `email_hash` only — never plaintext email), R2 object key tombstone, status machine (processing→completed|partially_failed|failed). Three provisioning paths: manual invite (§27.3–§27.6), bulk CSV import (§27.5–§27.6), SCIM auto-link on registration (§27.7). Seat reservation policy (§27.8): pending invitations count against contracted seat total — `assertSeatAvailable()` extended to include `user_id IS NULL, revoked_at IS NULL` rows. RLS (§27.9): `form_api` SELECT own-tenant only + RESTRICTIVE cross-tenant block; `form_system` full access; `tenant_manager` read-only (enforced at Worker RBAC layer). GDPR Art. 17 (§27.10): pg_cron `invite_email_expiry_cleanup` daily 04:00 UTC + erasure Worker step INV-1. Six DEC-030 HMAC-chained events (§27.11): `tenant.invite_sent` (STANDARD 7yr), `tenant.invite_accepted` (STANDARD 7yr, `linked_via: registration|scim`), `tenant.invite_expired` (STANDARD 3yr), `tenant.invite_revoked` (HIGH 7yr, `reason: admin_action|offboarding|seat_reduction`), `tenant.bulk_invite_started` (STANDARD 3yr), `tenant.bulk_invite_completed` (STANDARD 3yr). SOC 2 mapping (§27.12): CC6.1 (seat ceiling enforced at invite creation — INV-E-001), CC6.2 (invite = authorised provisioning decision with DEC-030 `invited_by` — INV-E-002), CC6.3 (revocation on offboarding — INV-E-003), P4.2 (privacy notice in invite email template — INV-E-004), P5.2 (scheduled email erasure — INV-E-005). TypeScript types (§27.13): `TenantInvitation` (no `invited_email` field in API type), `TenantInvitationAdminView` (`email_preview: first3***@domain`), `BulkSeatImportJob`, `BulkImportError` (`email_hash` only), `CreateInviteRequest/Response`. Three open questions: OQ-INV-01 (custom expiry 7–30d — P1), OQ-INV-02 (email preview format — P2), OQ-INV-03 (resend token rotation vs. new row — P1). Seventeen-item implementation checklist (7× P0 M5, 7× P1 M5–M6, 3× P2 M7+). Cross-references: §24 (OQ-BILL-04 → 🟢 Resolved; `enterprise_seat_allocations`/`enterprise_seat_assignments` base tables), §16 (`assertSeatAvailable()` extension), §25 (offboarding: pending invite revocation on tenant termination), `docs/SSO_SCIM_IMPLEMENTATION.md §5–§7` (SCIM auto-link is additive; direct SCIM provisioning path unaffected), `docs/AUDIT_LOG_SCHEMA.md` (six new event types to register), `docs/CRYPTOGRAPHY_POLICY.md §3` (`INVITE_HASH_SALT` key inventory entry), `docs/ENTERPRISE.md §Admin Dashboard` (three provisioning paths — manual, CSV, SCIM — all now schema-documented and schema-backed), `docs/OBSERVABILITY.md §12.6` (pg_cron registry: `invite_expiry_sweep` job 14, `invite_email_expiry_cleanup` job 15).*
