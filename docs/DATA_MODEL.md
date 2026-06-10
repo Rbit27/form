@@ -11173,3 +11173,605 @@ export interface CreateInviteResponse {
 ---
 
 *v1.8 · червень 2026 · owner: enterprise-architect + platform-engineer + compliance-officer · §27 Enterprise Invite & Pending-Seat Provisioning Schema — resolves OQ-BILL-04 (DATA_MODEL §24.14, P1 before enterprise GA). Migration 0053 extends `enterprise_seat_assignments` (nullable `user_id`, `invitation_id FK`, `chk_seat_assignment_not_orphan` CHECK) and adds two new tables. `tenant_invitations`: `invited_email` (personal data — auto-erased at expiry+30d by pg_cron `invite_email_expiry_cleanup` + Art. 17 step INV-1 in erasure Worker), `invited_email_hash` (SHA-256 keyed with `INVITE_HASH_SALT`, retained post-erasure for HMAC chain reference), `token_hash` (32-byte CSPRNG, single-use, never stored plaintext), 4-state machine (pending→accepted|expired|revoked), `source` (manual|csv_import), `assignment_id FK` (retained post-acceptance as audit trail), `bulk_import_job_id FK`. `bulk_seat_import_jobs`: CSV import job tracking (max 500 rows; `error_summary` contains `email_hash` only — never plaintext email), R2 object key tombstone, status machine (processing→completed|partially_failed|failed). Three provisioning paths: manual invite (§27.3–§27.6), bulk CSV import (§27.5–§27.6), SCIM auto-link on registration (§27.7). Seat reservation policy (§27.8): pending invitations count against contracted seat total — `assertSeatAvailable()` extended to include `user_id IS NULL, revoked_at IS NULL` rows. RLS (§27.9): `form_api` SELECT own-tenant only + RESTRICTIVE cross-tenant block; `form_system` full access; `tenant_manager` read-only (enforced at Worker RBAC layer). GDPR Art. 17 (§27.10): pg_cron `invite_email_expiry_cleanup` daily 04:00 UTC + erasure Worker step INV-1. Six DEC-030 HMAC-chained events (§27.11): `tenant.invite_sent` (STANDARD 7yr), `tenant.invite_accepted` (STANDARD 7yr, `linked_via: registration|scim`), `tenant.invite_expired` (STANDARD 3yr), `tenant.invite_revoked` (HIGH 7yr, `reason: admin_action|offboarding|seat_reduction`), `tenant.bulk_invite_started` (STANDARD 3yr), `tenant.bulk_invite_completed` (STANDARD 3yr). SOC 2 mapping (§27.12): CC6.1 (seat ceiling enforced at invite creation — INV-E-001), CC6.2 (invite = authorised provisioning decision with DEC-030 `invited_by` — INV-E-002), CC6.3 (revocation on offboarding — INV-E-003), P4.2 (privacy notice in invite email template — INV-E-004), P5.2 (scheduled email erasure — INV-E-005). TypeScript types (§27.13): `TenantInvitation` (no `invited_email` field in API type), `TenantInvitationAdminView` (`email_preview: first3***@domain`), `BulkSeatImportJob`, `BulkImportError` (`email_hash` only), `CreateInviteRequest/Response`. Three open questions: OQ-INV-01 (custom expiry 7–30d — P1), OQ-INV-02 (email preview format — P2), OQ-INV-03 (resend token rotation vs. new row — P1). Seventeen-item implementation checklist (7× P0 M5, 7× P1 M5–M6, 3× P2 M7+). Cross-references: §24 (OQ-BILL-04 → 🟢 Resolved; `enterprise_seat_allocations`/`enterprise_seat_assignments` base tables), §16 (`assertSeatAvailable()` extension), §25 (offboarding: pending invite revocation on tenant termination), `docs/SSO_SCIM_IMPLEMENTATION.md §5–§7` (SCIM auto-link is additive; direct SCIM provisioning path unaffected), `docs/AUDIT_LOG_SCHEMA.md` (six new event types to register), `docs/CRYPTOGRAPHY_POLICY.md §3` (`INVITE_HASH_SALT` key inventory entry), `docs/ENTERPRISE.md §Admin Dashboard` (three provisioning paths — manual, CSV, SCIM — all now schema-documented and schema-backed), `docs/OBSERVABILITY.md §12.6` (pg_cron registry: `invite_expiry_sweep` job 14, `invite_email_expiry_cleanup` job 15).*
+
+---
+
+## 28. Rate Limiting, Quota Enforcement & Abuse Prevention Schema
+
+> Owner: `enterprise-architect` + `platform-engineer` + `security-engineer`. Review: before any enterprise pilot launch, on any change to quota tiers or API key policy, and at every SOC 2 observation period start.
+> Scope: all tiers. Consumer Pro users are subject to KV sliding-window limits and DB quota tracking where `tenant_id IS NULL`. Enterprise tenants have contract-tier limits recorded in `api_quota_usage.quota_limit`. The Cloudflare WAF layer is documented here for architectural completeness only — it has no Postgres representation.
+> References: §26 (`api_keys` table — FK target for `api_key_id`); §13 (analytics events — separate from rate-limit event tracking); §16 (enterprise contract lifecycle — source of `quota_limit` values); `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 HMAC chain); `docs/OBSERVABILITY.md §12.6` (pg_cron job registry); INCIDENT_RESPONSE R-06 (DDoS / WAF Bypass runbook).
+
+---
+
+### 28.1 Scope — Three-Layer Architecture
+
+Rate limiting and quota enforcement operate at three distinct layers. Only the third layer has a Postgres representation; the first two are documented here so that the enforcement contract is legible end-to-end.
+
+```
+Incoming request
+      │
+      ▼
+┌─────────────────────────────────────────────────────┐
+│  Layer 1 — Cloudflare WAF (L3/L4/L7)               │
+│  Volumetric DDoS, TLS fingerprint, geo-block.       │
+│  Drops traffic before it reaches Workers.           │
+│  No Postgres state. Runbook: INCIDENT_RESPONSE R-06 │
+└──────────────────────┬──────────────────────────────┘
+                       │ passes WAF
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│  Layer 2 — Cloudflare KV sliding-window (§28.5)     │
+│  Per-API-key, per-endpoint-category, per-window.    │
+│  Key: rl:{api_key_id}:{endpoint_category}:{window}  │
+│  Returns HTTP 429 on window breach.                 │
+│  No Postgres state. TTL-managed in KV.              │
+└──────────────────────┬──────────────────────────────┘
+                       │ passes KV check
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│  Layer 3 — DB quota tracking (Postgres — this §)    │
+│  Monthly cumulative counter per api_key +           │
+│  endpoint_category. Hard block at quota_limit +     │
+│  overage grace. Source of truth for billing and     │
+│  enterprise contract enforcement.                   │
+│  Tables: api_quota_usage, rate_limit_violations,    │
+│          abuse_flags                                │
+└─────────────────────────────────────────────────────┘
+```
+
+**Why three layers?** Cloudflare WAF handles volumetric attacks before they consume compute. KV handles per-session burst limits at microsecond latency without a database round-trip. Postgres tracks monthly quota consumption because billing evidence and contract enforcement require durable, auditable, tenant-scoped records that survive request lifecycle and Cloudflare KV TTL expiry. The three layers are additive: a request that passes all three layers is both in-session-budget and in-monthly-budget.
+
+---
+
+### 28.2 Tables
+
+#### 28.2.1 `api_quota_usage`
+
+Monthly quota consumption per API key and endpoint category. This table is the billing source of truth for enterprise overage detection and the basis for SOC 2 CC6.1 access-boundary evidence.
+
+```sql
+-- migrations/0055_rate_limiting_schema.sql
+-- Part 1: api_quota_usage
+
+CREATE TABLE api_quota_usage (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  api_key_id          UUID        NOT NULL
+    REFERENCES api_keys(id) ON DELETE CASCADE,
+  -- CASCADE: quota records are billing-adjacent but not standalone billing evidence;
+  -- if an API key is hard-deleted, its usage rows go with it. Billing-period snapshots
+  -- for invoicing must be taken before key deletion. See §28.10 OQ-RL-01.
+
+  tenant_id           UUID
+    REFERENCES tenants(id),
+  -- NULL for consumer Pro users (no enterprise tenant). Always non-null for enterprise
+  -- API keys. Denormalized from api_keys for RLS performance (avoids per-row join).
+
+  period_month        DATE        NOT NULL,
+  -- Always the first calendar day of the billing month: 2026-06-01, 2026-07-01, etc.
+  -- Enforced by CHECK constraint; application layer must truncate to month before insert.
+  CONSTRAINT chk_quota_period_is_month_start
+    CHECK (EXTRACT(DAY FROM period_month) = 1),
+
+  endpoint_category   TEXT        NOT NULL
+    CHECK (endpoint_category IN (
+      'coaching',
+      'analytics_read',
+      'webhook_mgmt',
+      'admin',
+      'bulk_import'
+    )),
+
+  request_count       BIGINT      NOT NULL DEFAULT 0,
+  -- Atomically incremented on every admitted request (request_count + 1).
+  -- Never decremented; corrections are made via overage_count and hard_blocked_at.
+
+  tokens_consumed     BIGINT      NOT NULL DEFAULT 0,
+  -- Claude API tokens billed to this key in this period and category.
+  -- Incremented by the coaching Worker after receiving the Anthropic usage object.
+  -- NULL-safe: non-coaching categories may never increment this field.
+
+  quota_limit         BIGINT,
+  -- Monthly request ceiling from the enterprise contract tier.
+  -- NULL = unlimited (Consumer Pro plan; no hard block enforced).
+  -- Populated at row creation time from the tenant's active contract (§16).
+
+  overage_count       BIGINT      NOT NULL DEFAULT 0,
+  -- Requests admitted past quota_limit during the overage grace window.
+  -- When overage_count reaches OVERAGE_GRACE (application constant), hard_blocked_at is set.
+
+  hard_blocked_at     TIMESTAMPTZ,
+  -- NULL = not blocked for this period.
+  -- SET by quota-check.ts Worker when overage_count exceeds grace threshold.
+  -- Cleared automatically on period_month rollover (new row, not cleared in place).
+
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT uq_quota_key_period_category
+    UNIQUE (api_key_id, period_month, endpoint_category)
+);
+
+-- Retention: 36 months (SOC 2 CC4.1 billing evidence).
+-- Rows older than 36 months are archived by pg_cron api_quota_usage_archive (§28.7).
+
+ALTER TABLE api_quota_usage ENABLE ROW LEVEL SECURITY;
+
+-- Composite index supports the quota-check lookup (hot path).
+CREATE INDEX idx_quota_usage_key_period
+  ON api_quota_usage (api_key_id, period_month, endpoint_category);
+
+-- Tenant-scoped index for admin dashboard quota panel.
+CREATE INDEX idx_quota_usage_tenant_period
+  ON api_quota_usage (tenant_id, period_month)
+  WHERE tenant_id IS NOT NULL;
+```
+
+#### 28.2.2 `rate_limit_violations`
+
+Append-only log of rate limit breach events. Written on the non-hot path (Worker `waitUntil`) and used for abuse pattern detection, SOC 2 CC6.6 unauthorized-attempt evidence, and INCIDENT_RESPONSE R-06 triage. Not queried during request handling.
+
+```sql
+-- migrations/0055_rate_limiting_schema.sql
+-- Part 2: rate_limit_violations
+
+CREATE TABLE rate_limit_violations (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  api_key_id                UUID
+    REFERENCES api_keys(id) ON DELETE SET NULL,
+  -- Nullable: unauthenticated requests (no valid API key) still produce violation rows.
+  -- SET NULL on API key deletion preserves the violation record for abuse analysis.
+
+  user_id                   UUID
+    REFERENCES users(id) ON DELETE SET NULL,
+  -- Nullable: not present for machine-credential requests or pre-auth probes.
+
+  tenant_id                 UUID
+    REFERENCES tenants(id) ON DELETE SET NULL,
+  -- Nullable: consumer tier (no tenant) or unauthenticated.
+
+  ip_country                CHAR(2),
+  -- ISO 3166-1 alpha-2 country code only. Never a full IP address.
+  -- Privacy floor: full IP is not stored anywhere in Postgres. Cloudflare CF-IPCountry header.
+
+  endpoint                  TEXT        NOT NULL,
+  -- Path template, not a full URL. E.g. '/v1/coaching/session' not '/v1/coaching/session?user=...'.
+  -- No query parameters, no path IDs that could encode PII.
+
+  violation_type            TEXT        NOT NULL
+    CHECK (violation_type IN (
+      'per_second',
+      'per_minute',
+      'per_hour',
+      'monthly_quota',
+      'burst'
+    )),
+
+  layer                     TEXT        NOT NULL
+    CHECK (layer IN (
+      'cloudflare_waf',
+      'kv_sliding_window',
+      'db_quota'
+    )),
+  -- Cloudflare WAF violations are forwarded via logpush to this table for unified abuse analysis.
+  -- KV and db_quota violations are written directly by the Worker.
+
+  request_count_at_violation INT,
+  -- The counter value that triggered the violation. Useful for threshold tuning.
+
+  limit_value               INT,
+  -- The limit that was breached (e.g. 10 for a 10 req/min rule).
+
+  resolved                  BOOLEAN     NOT NULL DEFAULT FALSE,
+  -- Set TRUE by security reviewer or automated abuse flag resolution (§28.2.3).
+
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  -- No updated_at: this table is append-only for violation rows.
+  -- resolved flag is the only mutable field; updated by form_system or security_reviewer.
+);
+
+-- Retention: 90 days rolling. Cleaned by pg_cron rate_limit_violations_cleanup (§28.7).
+-- Privacy note: no full IP, no request body, no user-agent string, no path parameters
+-- that could encode user content.
+
+ALTER TABLE rate_limit_violations ENABLE ROW LEVEL SECURITY;
+
+-- Index for abuse-pattern queries (api_key + time window).
+CREATE INDEX idx_rlv_api_key_created
+  ON rate_limit_violations (api_key_id, created_at)
+  WHERE api_key_id IS NOT NULL;
+
+-- Index for tenant-scoped security review.
+CREATE INDEX idx_rlv_tenant_created
+  ON rate_limit_violations (tenant_id, created_at)
+  WHERE tenant_id IS NOT NULL;
+
+-- Index for pg_cron cleanup sweep.
+CREATE INDEX idx_rlv_created_at
+  ON rate_limit_violations (created_at);
+```
+
+#### 28.2.3 `abuse_flags`
+
+Pattern-based abuse detection records requiring manual or automated action. This table is an internal security signal — tenant admins have zero access. Every row creation and every `action_taken` change emits a DEC-030 HMAC-chained audit event (§28.6).
+
+```sql
+-- migrations/0055_rate_limiting_schema.sql
+-- Part 3: abuse_flags
+
+CREATE TABLE abuse_flags (
+  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  flagged_entity_type   TEXT        NOT NULL
+    CHECK (flagged_entity_type IN (
+      'api_key',
+      'user',
+      'tenant',
+      'ip_country'
+    )),
+
+  flagged_entity_id     TEXT        NOT NULL,
+  -- Stores the UUID of the api_key, user, or tenant, cast to TEXT; or a 2-char country
+  -- code for ip_country flags. TEXT (not UUID) to accommodate the country-code case
+  -- without a nullable UUID column and a separate country_code column.
+  -- Application layer must validate format against flagged_entity_type before INSERT.
+
+  flag_type             TEXT        NOT NULL
+    CHECK (flag_type IN (
+      'credential_stuffing',
+      'scraping',
+      'quota_abuse',
+      'prompt_injection_pattern',
+      'bulk_export_anomaly',
+      'suspicious_oauth'
+    )),
+
+  severity              TEXT        NOT NULL
+    CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+
+  auto_actioned         BOOLEAN     NOT NULL DEFAULT FALSE,
+  -- TRUE = Cloudflare Worker auto-applied an action (rate_limited, api_key_revoked)
+  --        based on deterministic threshold rules. No human actor at creation time.
+  -- FALSE = flag raised for manual security review; no action taken yet.
+
+  action_taken          TEXT        NOT NULL DEFAULT 'none'
+    CHECK (action_taken IN (
+      'none',
+      'rate_limited',
+      'suspended',
+      'api_key_revoked',
+      'tenant_suspended'
+    )),
+
+  evidence_summary      TEXT,
+  -- Statistical metadata only. No PII, no request content, no user-generated text.
+  -- Acceptable: "450 requests in 60s from single api_key_id abc123"
+  -- Acceptable: "14 distinct endpoints probed in 8s; pattern matches scraping signature v3"
+  -- NOT acceptable: prompt content, email address, IP address, user name.
+
+  reviewed_by           UUID
+    REFERENCES users(id) ON DELETE SET NULL,
+  -- The FORM internal security reviewer who triaged this flag.
+  -- NULL for auto_actioned = TRUE rows until a human confirms or overrides.
+
+  reviewed_at           TIMESTAMPTZ,
+
+  resolved              BOOLEAN     NOT NULL DEFAULT FALSE,
+
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT chk_abuse_review_coherent
+    CHECK (
+      (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL)
+      OR (reviewed_by IS NULL AND reviewed_at IS NULL)
+    )
+);
+
+-- DEC-030 trigger events: see §28.6.
+-- security.abuse_flag_raised on INSERT.
+-- security.abuse_action_taken on UPDATE WHERE action_taken <> OLD.action_taken.
+
+ALTER TABLE abuse_flags ENABLE ROW LEVEL SECURITY;
+
+-- Index for open-flag review queue (security dashboard).
+CREATE INDEX idx_abuse_flags_open
+  ON abuse_flags (severity, created_at)
+  WHERE resolved = FALSE;
+
+-- Index for entity-scoped lookups (is this api_key already flagged?).
+CREATE INDEX idx_abuse_flags_entity
+  ON abuse_flags (flagged_entity_type, flagged_entity_id)
+  WHERE resolved = FALSE;
+```
+
+---
+
+### 28.3 RLS Policies
+
+The three tables in §28.2 have distinct access profiles. `api_quota_usage` is billing-adjacent and visible to the key owner and their tenant admins. `rate_limit_violations` is log-forward only — app users never read it directly. `abuse_flags` is a pure internal security signal: tenant admins have zero access regardless of role.
+
+```sql
+-- migrations/0055_rate_limiting_schema.sql
+-- Part 4: Row-Level Security.
+
+-- ── api_quota_usage ───────────────────────────────────────────────────────────
+
+-- PERMISSIVE: API key owner or tenant admin can read own quota usage.
+CREATE POLICY quota_usage_owner_read ON api_quota_usage
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    api_key_id IN (
+      SELECT id FROM api_keys
+      WHERE user_id = current_setting('app.current_user_id', TRUE)::UUID
+         OR tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    )
+  );
+
+-- RESTRICTIVE: defence-in-depth cross-tenant block.
+-- Ensures a misconfigured permissive policy cannot leak rows across tenants.
+CREATE POLICY quota_usage_cross_tenant_block ON api_quota_usage
+  AS RESTRICTIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    OR tenant_id IS NULL  -- consumer rows: only accessible if no tenant context is set
+  );
+
+-- form_system: full access (quota-check.ts Worker, billing jobs).
+CREATE POLICY quota_usage_system_full ON api_quota_usage
+  FOR ALL TO form_system
+  USING (TRUE) WITH CHECK (TRUE);
+
+-- ── rate_limit_violations ─────────────────────────────────────────────────────
+
+-- form_api: INSERT only. App users and Workers can log violations; they cannot read them.
+-- SELECT is intentionally withheld from form_api — violation history is not a user-facing feature.
+CREATE POLICY rlv_api_insert_only ON rate_limit_violations
+  AS PERMISSIVE FOR INSERT
+  TO form_api
+  WITH CHECK (TRUE);
+
+-- tenant_manager role: SELECT own-tenant rows for security triage support.
+-- Does not expose user_id rows for other tenants; tenant_id must match.
+CREATE POLICY rlv_tenant_manager_read ON rate_limit_violations
+  AS PERMISSIVE FOR SELECT
+  TO form_api
+  USING (
+    tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID
+    AND current_setting('app.current_role', TRUE) IN ('tenant_owner', 'tenant_admin', 'tenant_manager')
+  );
+
+-- form_system: full access (cleanup jobs, abuse detection Workers).
+CREATE POLICY rlv_system_full ON rate_limit_violations
+  FOR ALL TO form_system
+  USING (TRUE) WITH CHECK (TRUE);
+
+-- ── abuse_flags ───────────────────────────────────────────────────────────────
+
+-- form_api: NO access. Tenant admins and members cannot read, write, or enumerate
+-- abuse flags regardless of role. This is an internal security signal only.
+-- No permissive policy is created for form_api on this table; default-deny applies.
+
+-- security_reviewer role: SELECT + UPDATE for review workflow.
+-- security_reviewer is a Postgres role granted to FORM internal security staff only.
+-- It may not INSERT or DELETE — flags are created by Workers (form_system) and
+-- are never hard-deleted (they are resolved = TRUE).
+CREATE POLICY abuse_flags_reviewer_read ON abuse_flags
+  AS PERMISSIVE FOR SELECT
+  TO security_reviewer
+  USING (TRUE);
+
+CREATE POLICY abuse_flags_reviewer_update ON abuse_flags
+  AS PERMISSIVE FOR UPDATE
+  TO security_reviewer
+  USING (TRUE)
+  WITH CHECK (TRUE);
+
+-- form_system: full access (auto-actioning Workers, DEC-030 event emission).
+CREATE POLICY abuse_flags_system_full ON abuse_flags
+  FOR ALL TO form_system
+  USING (TRUE) WITH CHECK (TRUE);
+```
+
+**Role access summary:**
+
+| Actor | `api_quota_usage` | `rate_limit_violations` | `abuse_flags` |
+|---|---|---|---|
+| `form_api` (tenant_admin / owner) | SELECT own-tenant rows | INSERT only; SELECT own-tenant (manager+) | ZERO access |
+| `form_api` (tenant_member) | SELECT own-key rows | INSERT only | ZERO access |
+| `form_api` (other tenant) | ZERO rows (RESTRICTIVE) | ZERO rows | ZERO access |
+| `form_system` | Full | Full | Full |
+| `security_reviewer` | None (not granted) | None (not granted) | SELECT + UPDATE |
+
+---
+
+### 28.4 Quota Enforcement Flow
+
+The `quota-check.ts` Cloudflare Worker middleware executes on every authenticated API request after Layer 1 WAF and Layer 2 KV checks have passed. It enforces the monthly quota ceiling tracked in `api_quota_usage`.
+
+```
+quota-check.ts middleware (runs before API handler)
+│
+├── 1. UPSERT api_quota_usage row for (api_key_id, period_month, endpoint_category)
+│         INSERT ... ON CONFLICT (api_key_id, period_month, endpoint_category)
+│         DO UPDATE SET request_count = api_quota_usage.request_count + 1,
+│                       updated_at = NOW()
+│         RETURNING request_count, quota_limit, overage_count, hard_blocked_at
+│
+├── 2. If hard_blocked_at IS NOT NULL
+│         → Return HTTP 429
+│           Retry-After: first day of next month (ISO 8601)
+│           X-Quota-Reset: <next_month_first_day>
+│           Body: {"error": "monthly_quota_hard_blocked", "resets_at": "..."}
+│           Log rate_limit_violations row (layer: 'db_quota', violation_type: 'monthly_quota')
+│           STOP
+│
+├── 3. If quota_limit IS NOT NULL AND request_count > quota_limit
+│         ├── If overage_count < OVERAGE_GRACE (application constant; see OQ-RL-02)
+│         │       → UPDATE api_quota_usage
+│         │             SET overage_count = overage_count + 1, updated_at = NOW()
+│         │         Allow request; add response header:
+│         │           X-Quota-Warning: overage; X-Quota-Overage: <overage_count>
+│         │
+│         └── If overage_count >= OVERAGE_GRACE
+│                 → UPDATE api_quota_usage
+│                       SET hard_blocked_at = NOW(), updated_at = NOW()
+│                   Emit DEC-030 security.quota_hard_block (§28.6)
+│                   Return HTTP 429 (same as step 2)
+│                   STOP
+│
+└── 4. quota_limit IS NULL (Consumer Pro unlimited) OR request_count <= quota_limit
+          → Allow request; proceed to API handler
+```
+
+**Atomicity note.** The UPSERT in step 1 uses a single SQL statement (`INSERT ... ON CONFLICT DO UPDATE ... RETURNING`). This ensures `request_count` is incremented atomically; no separate SELECT + UPDATE pattern that could double-count under concurrent requests. The Supabase REST endpoint for this upsert uses `Prefer: return=representation` to retrieve the post-update row in one round-trip.
+
+**Privacy invariant.** The Worker never logs the request body, query parameters, path parameters that encode user IDs, or any header that could contain user content (e.g., `Authorization` raw value). Only counters and categorical metadata are written to `api_quota_usage` and `rate_limit_violations`.
+
+**80% consumption notification.** When `request_count` crosses 80% of `quota_limit` for the first time in a period, the Worker emits a `data.quota_threshold_warning` DEC-030 STANDARD event (1yr retention). This drives a CSM notification email; it does not block the request.
+
+---
+
+### 28.5 KV Sliding-Window (Edge Layer — Not Postgres)
+
+This subsection is documented here for architectural completeness. No Postgres schema is involved.
+
+**Key format:** `rl:{api_key_id}:{endpoint_category}:{window_minutes}`
+
+**Value:** atomic counter (Cloudflare KV atomic increment via Durable Objects counter, not plain KV put/get, to avoid race conditions under concurrent requests).
+
+**TTL:** `window_minutes * 60` seconds. The key expires automatically; no cleanup job needed.
+
+**Enforcement:** If the counter exceeds the tier limit for that window, the Worker returns HTTP 429 with `Retry-After: <window_seconds>` and writes a `rate_limit_violations` row (layer: `'kv_sliding_window'`) via `waitUntil` (non-blocking).
+
+**Tier limits (FORM-RL-001 config):**
+
+| Tier | `coaching` (req/min) | `analytics_read` (req/min) | `webhook_mgmt` (req/min) | `admin` (req/min) | `bulk_import` (req/min) |
+|---|---|---|---|---|---|
+| Consumer Pro | 10 | 100 | 20 | 20 | 5 |
+| Enterprise Starter | 50 | 200 | 50 | 50 | 20 |
+| Enterprise Growth | 200 | 500 | 100 | 100 | 50 |
+| Enterprise Custom | configurable | configurable | configurable | configurable | configurable |
+
+Enterprise Custom limits are stored in the enterprise contract record (§16) and loaded into the Worker at request time via a KV cache keyed on `tenant_limits:{tenant_id}` (TTL: 5 minutes). This avoids a Postgres round-trip per request for limit lookup.
+
+---
+
+### 28.6 DEC-030 HMAC-Chained Audit Events
+
+Three events must be registered in `docs/AUDIT_LOG_SCHEMA.md` under a new **"Rate limiting and abuse events"** subsection.
+
+| Event type | Severity | Retention | Payload fields | When emitted |
+|---|---|---|---|---|
+| `security.quota_hard_block` | HIGH | 3 yr | `api_key_id`, `tenant_id` (UUID or null), `period_month` (ISO 8601 date), `endpoint_category`, `overage_count` (integer at time of block) | When `hard_blocked_at` is SET on `api_quota_usage`; emitted by quota-check.ts Worker in same transaction as the UPDATE |
+| `security.abuse_flag_raised` | HIGH | 7 yr | `flag_id` (UUID), `flag_type`, `severity`, `flagged_entity_type`, `flagged_entity_id` (api_key UUID or tenant UUID — `user_id` included only if `flagged_entity_type = 'user'`), `auto_actioned` (boolean) | On `abuse_flags` INSERT; emitted by the abuse-detection Worker (form_system) |
+| `security.abuse_action_taken` | HIGH | 7 yr | `flag_id` (UUID), `previous_action`, `new_action`, `reviewed_by` (UUID or null for automated action), `auto_actioned` (boolean) | On `abuse_flags` UPDATE where `action_taken` changes from its previous value |
+
+**Privacy invariants for all three events:**
+- No full IP address in any payload field.
+- No request body or user-generated content.
+- No `invited_email` or plaintext credentials.
+- `flagged_entity_id` carries a UUID (api_key, user, or tenant) or a 2-char country code for `ip_country` flags. Never an email address or display name.
+
+---
+
+### 28.7 pg_cron Maintenance Jobs
+
+Both jobs must be added to `docs/OBSERVABILITY.md §12.6` pg_cron registry.
+
+#### Job 16 — `rate_limit_violations_cleanup`
+
+```sql
+-- Registered in docs/OBSERVABILITY.md §12.6 as job 16.
+-- Schedule: daily 03:00 UTC
+-- Retention policy: 90 days rolling.
+
+DELETE FROM rate_limit_violations
+WHERE created_at < NOW() - INTERVAL '90 days';
+
+-- Expected row count: varies by traffic volume.
+-- Alert if DELETE count = 0 for 7 consecutive days (indicates job stall, not zero violations).
+-- Alert if runtime > 60s (index idx_rlv_created_at must be present).
+```
+
+#### Job 17 — `api_quota_usage_archive`
+
+```sql
+-- Registered in docs/OBSERVABILITY.md §12.6 as job 17.
+-- Schedule: 1st of each month, 00:30 UTC
+-- Retention policy: 36 months (SOC 2 CC4.1 billing evidence).
+
+-- Step 1: identify rows past the 36-month window.
+-- Step 2: emit a DEC-030 STANDARD 1yr event before deletion.
+-- Step 3: delete.
+
+-- The Worker wraps steps 2 and 3 in a transaction; the audit event is HMAC-chained
+-- to the preceding event before the DELETE commits.
+
+WITH archived AS (
+  DELETE FROM api_quota_usage
+  WHERE period_month < DATE_TRUNC('month', NOW()) - INTERVAL '36 months'
+  RETURNING id, api_key_id, tenant_id, period_month, endpoint_category,
+            request_count, tokens_consumed
+)
+-- application layer reads the RETURNING clause and emits:
+-- DEC-030 event: data.quota_records_archived, STANDARD, 1yr
+-- Payload: { archived_count: <n>, earliest_period_month: <date>, latest_period_month: <date> }
+-- No per-row payload — aggregate only; no PII.
+SELECT COUNT(*) AS archived_count FROM archived;
+```
+
+---
+
+### 28.8 SOC 2 Mapping
+
+| SOC 2 Criterion | Control | Evidence artefact |
+|---|---|---|
+| **CC6.1 — Logical access controls** | `api_quota_usage.quota_limit` enforces the authorized request ceiling per enterprise contract. Requests past the ceiling are blocked (hard_blocked_at) or warned (overage_count). Consumer Pro users have NULL quota_limit (unlimited); this is an explicit contract decision, not an absence of control. | **RL-E-001:** `api_quota_usage` export for an enterprise tenant over a 30-day audit window — demonstrates that `request_count` never exceeded `quota_limit + OVERAGE_GRACE` before `hard_blocked_at` was set. |
+| **CC6.6 — Unauthorized access attempts logged** | `rate_limit_violations` records every layer-2 and layer-3 breach event with timestamp, violation type, layer, and anonymized entity identifiers. 90-day rolling retention covers the SOC 2 observation period. | **RL-E-002:** `rate_limit_violations` export for the audit period (all tenants; tenant_id anonymized for multi-tenant aggregates). Demonstrates unauthorized-rate breach events were captured and can be correlated with `abuse_flags`. |
+| **CC7.2 — Monitoring for anomalous activity** | `abuse_flags` provides pattern-based detection with severity classification and a human-review workflow. `auto_actioned = TRUE` rows demonstrate automated response to deterministic abuse patterns. DEC-030 `security.abuse_flag_raised` and `security.abuse_action_taken` events provide a tamper-evident chain from detection to resolution. | **RL-E-003:** `abuse_flags` rows created during the audit period plus corresponding DEC-030 `security.abuse_flag_raised` and `security.abuse_action_taken` events — demonstrates anomaly monitoring is operating and findings are actioned. |
+
+---
+
+### 28.9 Implementation Checklist
+
+#### P0 — M4: Schema and enforcement foundation
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0055_rate_limiting_schema.sql` (Parts 1–4): CREATE `api_quota_usage`, `rate_limit_violations`, `abuse_flags`; CREATE all indexes; CREATE all RLS policies. CI test: `form_api` SELECT on `abuse_flags` returns zero rows; cross-tenant SELECT on `api_quota_usage` returns zero rows. | platform-engineer | **P0** | M4 | [ ] |
+| 2 | Implement `workers/middleware/quota-check.ts`: UPSERT `api_quota_usage`; overage grace logic; `hard_blocked_at` SET; HTTP 429 response with `Retry-After`; `X-Quota-Warning` header; 80% threshold notification; `waitUntil` violation log write. | platform-engineer | **P0** | M4 | [ ] |
+| 3 | Define `FORM-RL-001` KV limits config (Cloudflare Workers environment): tier-to-limit mapping for all five endpoint categories; load into tenant-limits KV cache keyed on `tenant_limits:{tenant_id}` with 5-minute TTL. | platform-engineer + enterprise-architect | **P0** | M4 | [ ] |
+| 4 | Register three DEC-030 events (`security.quota_hard_block`, `security.abuse_flag_raised`, `security.abuse_action_taken`) in `docs/AUDIT_LOG_SCHEMA.md` under new "Rate limiting and abuse events" subsection with severity, retention, and payload fields. | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+
+#### P1 — M5: Abuse detection and admin visibility
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Implement abuse detection Workers: credential-stuffing detector (N failed auths from single api_key in T seconds → INSERT `abuse_flags`); scraping detector (M distinct endpoints in W seconds → INSERT); prompt-injection-pattern classifier (statistical signal from coaching turn metadata — never content). | security-engineer + platform-engineer | **P1** | M5 | [ ] |
+| 6 | Admin dashboard quota panel: per-tenant monthly `request_count` vs. `quota_limit` bar chart; overage indicator; `hard_blocked_at` alert banner; top-5 endpoint categories by usage. Gate on `enterprise.quota_panel_enabled` feature flag. | platform-engineer + design-craft | **P1** | M5 | [ ] |
+| 7 | Collect RL-E-001 through RL-E-003 evidence artefacts (§28.8) after 30 days of production usage; store in `compliance/evidence/rate-limiting/`; cross-reference in `docs/SOC2_READINESS.md` CC6.1, CC6.6, CC7.2 evidence tables. | compliance-officer | **P1** | M5 | [ ] |
+| 8 | Add pg_cron jobs 16 (`rate_limit_violations_cleanup`, daily 03:00 UTC) and 17 (`api_quota_usage_archive`, monthly 00:30 UTC) to `docs/OBSERVABILITY.md §12.6` registry with expected row counts, alert thresholds, and runbook links. | devops-lead | **P1** | M5 | [ ] |
+
+#### P2 — Post-GA
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | Per-tenant configurable limits: allow Enterprise Custom tenants to set per-endpoint-category KV limits via admin dashboard. Persist overrides in a `tenant_rate_limit_overrides` table (FK to `tenants`, one row per endpoint_category); load into `tenant_limits:{tenant_id}` KV cache. Requires contract-tier guard: only `enterprise_custom` plan tenants may call the override endpoint. | enterprise-architect + platform-engineer | **P2** | M7 | [ ] |
+| 10 | Resolve OQ-RL-01 (billing source of truth — §28.10) and OQ-RL-02 (OVERAGE_GRACE threshold — §28.10); document decisions in `docs/DECISION_LOG.md`. | enterprise-architect + finance | **P2** | M7 | [ ] |
+
+---
+
+### 28.10 Open Questions
+
+| ID | Question | Owner | Priority | Resolution path |
+|---|---|---|---|---|
+| **OQ-RL-01** | **`api_quota_usage.tokens_consumed` as billing source of truth.** Should `tokens_consumed` be the authoritative field for enterprise overage charges (Claude API token billing), or should a separate `billing_metering` table be created for Stripe Metered integration? Using `api_quota_usage` is simpler through M7 and avoids a new table. Risk: `api_quota_usage` is scoped per api_key + endpoint_category; a billing summary across all keys for a tenant requires aggregation, which is feasible but less direct than a purpose-built metering table. Recommendation: use `api_quota_usage` as the source of truth through M7; create a dedicated `billing_metering` table if MRR exceeds $50k or if a Stripe Metered billing integration is contractually required. | enterprise-architect + finance | **P2 — before Stripe Metered integration** | Evaluate at M7 planning; document decision in `docs/DECISION_LOG.md`. |
+| **OQ-RL-02** | **OVERAGE_GRACE threshold: at what `overage_count` value does the hard block trigger?** The application constant `OVERAGE_GRACE` determines how many requests past `quota_limit` are admitted before `hard_blocked_at` is set. Too low → legitimate traffic cut off at month boundary; too high → material overage exposure before block. Recommendation: set `OVERAGE_GRACE = 500` requests (approximately 1% of a 50,000 req/month Enterprise Starter quota). CSM notification at 80% `quota_limit` consumption (already in §28.4 enforcement flow). Alert at 95% to give CSMs a second window before hard block. Both thresholds should be configurable as Cloudflare Workers environment variables, not hard-coded, to allow per-tier tuning without a code deploy. | enterprise-architect + customer-success | **P0 — must be set before quota enforcement ships** | Decision by enterprise-architect before M4 migration runs in production; document in `docs/DECISION_LOG.md`. |
+
+---
+
+*v1.0 (2026-06-10): §28 Rate Limiting, Quota Enforcement & Abuse Prevention Schema. Three-layer enforcement architecture: Cloudflare WAF (L3/L4/L7 volumetric, no Postgres state), Cloudflare KV sliding-window (per-api-key per-endpoint per-window burst limits, no Postgres state), and Postgres DB-layer quota tracking (durable monthly counters for billing evidence and enterprise contract enforcement). Migration 0055 adds three tables. `api_quota_usage`: monthly request and token counter per `(api_key_id, period_month, endpoint_category)`; `quota_limit` from contract tier (NULL = Consumer Pro unlimited); `overage_count` grace window before `hard_blocked_at`; 36-month retention (SOC 2 CC4.1). `rate_limit_violations`: append-only breach event log; `ip_country` (2-char only — no full IP); `layer` discriminates cloudflare_waf | kv_sliding_window | db_quota; 90-day rolling retention via pg_cron job 16. `abuse_flags`: pattern-based detection records with severity classification (low | medium | high | critical); `auto_actioned` flag distinguishes Worker-automated responses from pending manual review; `evidence_summary` contains statistical metadata only — no PII, no request content; `security_reviewer` Postgres role holds the only non-system SELECT + UPDATE grant; tenant admins have zero access. RLS (§28.3): `api_quota_usage` — PERMISSIVE owner/tenant-admin SELECT + RESTRICTIVE cross-tenant block + `form_system` full; `rate_limit_violations` — `form_api` INSERT-only, tenant manager SELECT own-tenant, `form_system` full; `abuse_flags` — `form_api` zero access, `security_reviewer` SELECT + UPDATE, `form_system` full. Quota enforcement flow (§28.4): `quota-check.ts` Worker UPSERT with atomic `request_count + 1`; hard_blocked_at check first (HTTP 429 with Retry-After pointing to next month); overage grace window (X-Quota-Warning header); 80% threshold CSM notification. KV sliding-window tier limits (§28.5, FORM-RL-001 config): Consumer Pro 10 req/min coaching / 100 analytics_read; Enterprise Starter 50 / 200; Enterprise Growth 200 / 500; Enterprise Custom configurable from contract. Three DEC-030 events (§28.6): `security.quota_hard_block` HIGH 3yr (payload: api_key_id, tenant_id, period_month, endpoint_category, overage_count); `security.abuse_flag_raised` HIGH 7yr (payload: flag_type, severity, flagged_entity_type, flagged_entity_id, auto_actioned); `security.abuse_action_taken` HIGH 7yr (payload: flag_id, previous_action, new_action, reviewed_by). pg_cron jobs: job 16 `rate_limit_violations_cleanup` daily 03:00 UTC (DELETE rows > 90 days); job 17 `api_quota_usage_archive` monthly 00:30 UTC (DELETE rows > 36 months; emit `data.quota_records_archived` DEC-030 STANDARD 1yr before delete). SOC 2 mapping (§28.8): CC6.1 (quota_limit enforces authorized access boundary — RL-E-001), CC6.6 (rate_limit_violations logs unauthorized access attempts — RL-E-002), CC7.2 (abuse_flags + DEC-030 chain documents anomaly monitoring and response — RL-E-003). Implementation checklist: 4× P0 M4 (migration 0055, quota-check.ts middleware, FORM-RL-001 KV config, DEC-030 event registration); 4× P1 M5 (abuse detection Workers, admin dashboard quota panel, SOC 2 evidence collection, pg_cron registry); 2× P2 M7+ (per-tenant configurable limits, OQ resolutions). Two open questions: OQ-RL-01 (tokens_consumed as billing source of truth vs. dedicated billing_metering table — P2, evaluate at M7); OQ-RL-02 (OVERAGE_GRACE = 500 requests recommended — P0, must be set before quota enforcement ships). Owner: enterprise-architect + platform-engineer + security-engineer.*

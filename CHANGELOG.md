@@ -6,6 +6,13 @@
 
 ---
 
+## [3.41.0] — 2026-06-10
+
+### Added
+- [`docs/DATA_MODEL.md §28`](docs/DATA_MODEL.md) — Rate Limiting, Quota Enforcement & Abuse Prevention Schema. Three-layer architecture: Cloudflare WAF (L3/L4/L7), KV sliding-window (FORM-RL-001 config), Postgres DB-layer quota tracking. Migration 0055: три таблиці — `api_quota_usage` (monthly request + token counters per api_key/endpoint_category, 36-month retention SOC 2 CC4.1), `rate_limit_violations` (append-only breach log, ip_country 2-char only — no full IP, 90-day rolling), `abuse_flags` (pattern-based detection; security_reviewer-only access, tenant admins = zero; evidence_summary = statistical metadata тільки). RLS: PERMISSIVE + RESTRICTIVE cross-tenant block на api_quota_usage; INSERT-only для form_api на rate_limit_violations; form_api zero access на abuse_flags. quota-check.ts Worker: атомарний UPSERT request_count+1; overage grace window; hard_blocked_at + HTTP 429 Retry-After; 80% threshold CSM notification. Три DEC-030 події: security.quota_hard_block HIGH 3yr, security.abuse_flag_raised HIGH 7yr, security.abuse_action_taken HIGH 7yr. pg_cron job 16 (violations cleanup 90d) + job 17 (quota archive 36mo). SOC 2: CC6.1 RL-E-001, CC6.6 RL-E-002, CC7.2 RL-E-003. OQ-RL-02 (OVERAGE_GRACE = 500 req recommended) позначено P0 — має бути підтверджено до production deploy. Owner: enterprise-architect + platform-engineer + security-engineer.
+
+---
+
 ## [3.40.3] — 2026-06-10
 
 ### Added
