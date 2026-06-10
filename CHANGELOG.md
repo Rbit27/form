@@ -6,6 +6,19 @@
 
 ---
 
+## [3.42.1] — 2026-06-10
+
+### Added
+- [`content/post-437-force-curves-exercise-selection.md`](content/post-437-force-curves-exercise-selection.md) — Криві сили і вибір вправ: чому штанга, гантель і кабель дають різний стимул при однаковій вазі (13 хв). Behm & Sale (1993) кутова специфічність — сила адаптується ±15–20° від тренованого кута; Cameron & Adams (1994) resistance profiles — три типи (ascending/descending/bell-shaped); крива сили м'яза vs крива опору вправи — механізм розходження; штанга vs гантель vs кабель для біцепса, жиму грудних і трицепса — різні точки ROM-навантаження; Kassiano et al. (2022) incline dumbbell curl — significant additional hypertrophy в elongated position; Wolf et al. (2023) leg curl lengthened position; titin-опосередкована механотрансдукція (Freundt & Linke 2019) — механізм stretch-mediated сигналу; матриця вправ за профілем кривої для 4 груп (грудні/біцепс/трицепс/м'язи стегна); три операційних правила для self-coached атлета. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — додано картку post-437; лічильники: 380→381 статей, 4 332→4 345 хвилин читання.
+- `README.md` — roadmap: [x] post-437 з темою і джерелами.
+- `STATUS.md` — TL;DR: 436→437 постів; blog.html row: 380→381 карток; content engine: +1 новий рядок post-437.
+- `VERSION` — 3.42.0 → 3.42.1.
+
+---
+
 ## [3.42.0] — 2026-06-10
 
 ### Added
