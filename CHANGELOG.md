@@ -6,6 +6,17 @@
 
 ---
 
+## [3.32.0] — 2026-06-10
+
+### Added
+- `docs/ENTERPRISE_ADMIN_API.md` — Enterprise Admin REST API specification (v0.1, 1,079 lines). Covers: API key management (create/rotate/revoke, IP allowlisting, scope system); RBAC roles (tenant_owner/admin/manager/member, role escalation events); tenant configuration; SSO/IdP management (SAML 2.0, OIDC, certificate rotation); user provisioning (list, suspend, deprovision); SCIM v2 endpoint index; aggregate reporting (/wellness, /engagement, /features, /cohorts, /export — privacy-floor enforced, k-anonymity N≥5, DPA gate); audit log pull API + HMAC chain verification; webhook management (create/delete, signature verification, retry policy); GDPR endpoints (export, erasure with Art. 9 immediate nullification); rate limit table; 22 DEC-030 event types; 11 error codes; privacy floor enforcement (8 prohibited operations with clinical-safety vetoes); SOC 2 mapping (CC6.1–CC6.4, CC7.2, CC7.4, A1.1, C1.1, P1.1, P5.1, P4.3); implementation notes for Founding Engineer. Cross-references: `docs/DATA_MODEL.md §17`, `docs/AUDIT_LOG_SCHEMA.md`, `docs/SSO_SCIM_IMPLEMENTATION.md`, `docs/ENTERPRISE_SLA.md`, `docs/ENTERPRISE_ONBOARDING.md`.
+
+### Changed
+- `VERSION` → 3.32.0 (MINOR: new enterprise doc `ENTERPRISE_ADMIN_API.md`)
+- `STATUS.md` — версія 3.31.0 → 3.32.0; ENTERPRISE_ADMIN_API.md додано до enterprise documentation stack
+
+---
+
 ## [3.31.0] — 2026-06-10
 
 ### Added
