@@ -6,6 +6,14 @@
 
 ---
 
+## [3.37.0] — 2026-06-10
+
+### Added
+- [`content/post-407-creatine-evidence-review.md`](content/post-407-creatine-evidence-review.md) — повний evidence review по креатину: механізм PCr, effect sizes, loading vs no-loading, форми, безпека (нирки, DHT — Class C), responders/non-responders
+- [`content/post-409-deload-protocols-science.md`](content/post-409-deload-protocols-science.md) — діловантаж: planned vs reactive, маркери готовності (HRV 14–30d baseline), типи (volume/intensity/frequency), тривалість, частота за тренувальним досвідом
+
+---
+
 ## [3.36.0] — 2026-06-10
 
 ### Added
