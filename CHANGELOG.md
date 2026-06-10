@@ -6,6 +6,18 @@
 
 ---
 
+## [3.41.1] — 2026-06-10
+
+### Added
+- [`content/post-432-information-overload-analysis-paralysis-training.md`](content/post-432-information-overload-analysis-paralysis-training.md) — Надмірно ускладнений атлет: як інформаційне перевантаження руйнує тренувальний прогрес (13 хв). Sweller (1988) cognitive load theory (intrinsic / extraneous / germane load); Iyengar & Lepper (2000) парадокс вибору і тренувальний вибір; Gollwitzer (1999) implementation intentions і зниження cognitive load під час виконання; Miller (1956) working memory capacity; Moritani & deVries (1979) нейральна фаза і вартість program hopping; Fonseca et al. (2014) варіативність вправ знижує гіпертрофійний відгук; Morton et al. (2016) proximity to failure; Timmons et al. (2010) responder variability. Механізм program hopping як SRA-переривання; ієрархія факторів прогресу (adherence → progressive overload → proximity to failure); мінімальний ефективний когнітивний базис для intermediate; n-of-1 logic vs RCT; протокол когнітивного deload (8-тижнева фіксація); роль Victor як фільтра шуму, а не генератора нового. clinical-safety NOT REQUIRED.
+
+### Changed
+- `README.md` — roadmap: [x] post-430, [x] post-431 (фактичний зміст замість placeholder), [x] post-432; додані заплановані теми post-433 (суглобове навантаження), post-434 (мотивація vs дисципліна), post-435 (PAP-комплекси).
+- `STATUS.md` — content engine table: +3 нові рядки (post-430, post-431, post-432 · v3.41.1); оновлено лічильник до 432 evidence-based posts.
+- `VERSION` — 3.41.0 → 3.41.1.
+
+---
+
 ## [3.41.0] — 2026-06-10
 
 ### Added
