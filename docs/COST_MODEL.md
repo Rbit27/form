@@ -159,6 +159,17 @@
     - 30.8 DEC-030 G&A Audit Events
     - 30.9 Implementation Checklist
     - 30.10 Open Questions (OQ-GGA-01 to OQ-GGA-03)
+31. [Pricing Architecture, Competitive Benchmarking & Discount Governance](#31-pricing-architecture-competitive-benchmarking--discount-governance)
+    - 31.1 Purpose and Scope
+    - 31.2 Consumer Pro Price Point Derivation ($19/month)
+    - 31.3 Enterprise Price Point Derivation ($12 / $9 / $6–8/seat/month)
+    - 31.4 Corporate Wellness Competitive Benchmarking
+    - 31.5 Price Floor Analysis (COGS-Anchored Minimum Viable Price)
+    - 31.6 Discount Authority Matrix
+    - 31.7 Pricing Change Governance
+    - 31.8 DEC-030 Pricing Audit Events
+    - 31.9 Implementation Checklist
+    - 31.10 Open Questions (OQ-PRICE-01 to OQ-PRICE-03)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -5848,3 +5859,411 @@ Three structures have materially different tax treatment and compliance implicat
 ---
 
 *v2.0 (2026-06-05): §30 G&A & Founder Compensation Cost Model — the sixth and final functional cost centre in the §25–30 operating cost series, closing OQ-27 (founder salary policy, §22.8) and supplying the detailed model behind the `G&A and founder salary` line in §24.4 ($240k–$360k [ESTIMATE] over 18 post-Series A months). §30.1 scopes the section: founder comp, bookkeeping/accounting, admin tooling; explicitly excludes insurance (→ §25), legal/compliance overhead (→ §25), engineering infrastructure (→ §27), marketing tooling (→ §28). §30.2 founder compensation model: four phases — Phase 0 ramen $0 (M1 through first enterprise contract, §22.2 baseline); Phase 1 sustenance $2,500–$5,000/month (first enterprise contract signed + pilot conversion ≥ 50%); Phase 2 early-market $6,000–$10,000/month (ARR ≥ $100k + GM ≥ 70%); Phase 3 post-Series A $10,000–$15,000/month — provides annualised G&A impact table from $0 to $150k/year; UA FOP note — Group 3 FOP (5–7% effective rate) vs. LLC employment (~40% combined) vs. HoldCo dividend structure; wartime 2% rate caveat; interaction with §27 OQ-ENG-01 (same legal consultation covers both). §30.3 accounting/finance function: four-stage model from UA accountant ($150–$300/month M1–M4) through Xero + bookkeeper ($400–$700/month post-launch) through CPA review engagement ($8,000–$15,000 one-time at M12) through fractional CFO ($3,000–$6,000/month post-Series A); deferred revenue trigger note (first enterprise invoice = Xero deferred revenue config required); CPA firm selection criteria (SaaS ASC 606, CEE cross-border, Ukrainian statutory). §30.4 administrative tooling: five tools not covered in §27/§28 (Google Workspace $6/user, Notion Team $16/member, Loom Business $12.50/creator, Calendly Teams $16/member, 1Password Teams $4/user already in CRYPTOGRAPHY_POLICY); total $22–$51/month at 1–3 person stage, $135–$225/month at 5–10 person stage; Slack, Zoom free tiers excluded. §30.5 consolidated G&A cost table: four stages (M1–M4, M4–M12, M12–M18, M18–M30) with monthly and annualised totals ranging from $172/month (M1) to $22,025/month (Phase 3 high case); reconciliation to §24.4 Bear/Base/Bull G&A line — dominant variable is founder salary Phase 3 choice ($60k–$90k range impact). §30.6 G&A as % ARR: important caveat that ratio is meaningless pre-$300k ARR — absolute $ is the correct metric at early stage; five-row trajectory from 373% at $50k ARR (meaningless) to 9% at $3M ARR; SaaS benchmarks (Bessemer/SaaS Capital: 15–25% at Series A, 8–15% at Series B); FORM targets: < $200k absolute pre-$300k ARR, 20–30% at $300k–$1M, 10–18% at $1M–$3M, < 10% at > $3M; S&M interaction note — founder Phase 3 salary must stay ≤ $15k/month to maintain G&A < 20% at $1M ARR given 30–40% S&M ceiling from §28.9. §30.7 back-office hiring: four roles (UA accountant from M1, virtual bookkeeper at first enterprise invoice, fractional CFO post-Series A, financial controller at ARR ≥ $1.5M + audit required + fractional CFO > 50h/month); two gate conditions GGA-HIRE-01 (fractional CFO: 4 conditions) and GGA-HIRE-02 (financial controller: 3 conditions). §30.8 three DEC-030 G&A audit events (all 7-year retention except `ops.ga_tooling_contracted` at 3 years): `ops.founder_comp_updated` (HIGH — OQ-27 resolution record; emitted at company formation + each phase transition; must precede `fundraise.round_closed` for investor diligence integrity), `ops.finance_function_onboarded` (STANDARD — mirrors §27.9 `ops.engineer_hired` pattern; covers accountant, bookkeeper, fractional CFO, controller), `ops.ga_tooling_contracted` (STANDARD — paid subscription commits only; free-tier activations excluded). §30.9 seven-item implementation checklist: 3× P0 M1 (founder comp decision → DEC-030 event + §22.3 update if non-zero, UA accountant engagement, admin tooling setup), 3× P1 M4–M12 (DEC-030 event type registration + Zod schema, Xero deferred revenue config, Phase 1 gate review), 1× P2 post-Series A (fractional CFO gate evaluation). §30.10 three open questions: OQ-GGA-01 (Phase 1 trigger modification for UA wartime payment lag — P0, before first enterprise contract; recommended: trigger on cash receipt not contract signing), OQ-GGA-02 (UA FOP vs. LLC employment vs. HoldCo dividend — P0, before first compensation payment; recommended FOP Group 3 pre-Series A + HoldCo dividend at Series A), OQ-GGA-03 (OQ-27 resolution — is Phase 0 $0 assumption valid? — P0, before company formation; outcome updates §22.3). Cross-references: §22.2 (funding assumptions — Phase 0 salary assumption), §22.3 (cash flow table — Hiring row must be updated for non-zero Phase 0), §22.4 (runway sensitivity — Phase 0 salary shifts runway by 20–35% at $150k funding), §22.8 (OQ-27 — closed by this section), §24.4 (capital requirements — G&A line reconciled in §30.5), §24.8 OQ-33 (HoldCo requirement for institutional instruments — cross-referenced in OQ-GGA-02), §25.2 (insurance — cyber/E&O/D&O costs excluded from this section), §25.3 (per-deal legal overhead — excluded), §27.4 (engineering infrastructure — admin tooling exclusions defined in §30.4), §27.9 (ops.engineer_hired DEC-030 pattern — ops.finance_function_onboarded mirrors), §27.11 OQ-ENG-01 (UA FOP vs. contractor structure — same legal consultation covers both), §28.7 (marketing tooling — admin tooling exclusions defined in §30.4), §28.9 (S&M + G&A ≤ 50% ARR combined ceiling — §30.6 G&A targets calibrated to stay within this constraint), docs/DECISION_LOG.md (OQ-27, OQ-GGA-01/02/03 resolution records), docs/AUDIT_LOG_SCHEMA.md (DEC-030 event registry — three G&A events to be registered in P1 M4 checklist item 4), docs/CRYPTOGRAPHY_POLICY.md §3 (1Password Teams key inventory). Owner: founder + data-engineer.*
+
+---
+
+## §31 Pricing Architecture, Competitive Benchmarking & Discount Governance
+
+> Owner: founder + product-strategist. Review: before any price change, before each enterprise sales cycle refresh (quarterly). Audience: founder, investor diligence, enterprise sales, future VP of Sales.
+
+### 31.1 Purpose and Scope
+
+This section documents the **derivation methodology** behind FORM's price points — both consumer ($19/month Pro) and enterprise ($12/$9/$6–8/seat/month) — and benchmarks them against the corporate wellness SaaS market. It also formalises the discount authority matrix referenced informally in §21 (pilot economics and conversion governance).
+
+**Why this matters for the cost model:** Pricing is not independent of economics. A price that clears COGS by a thin margin cannot absorb CAC and still produce acceptable gross margin. A price that clears COGS by a wide margin but sits above WTP produces low conversion. This section proves that FORM's price points satisfy three conditions simultaneously: (1) COGS coverage with acceptable gross margin, (2) competitive positioning vs. direct corporate wellness substitutes, and (3) alignment with enterprise buyer WTP signals from the market.
+
+**Scope:**
+- §31.2 — Consumer Pro price derivation ($19/month)
+- §31.3 — Enterprise price point derivation ($12/$9/$6–8/seat)
+- §31.4 — Corporate wellness competitive benchmarking
+- §31.5 — Price floor analysis (COGS-anchored minimum viable price)
+- §31.6 — Discount authority matrix
+- §31.7 — Pricing change governance (raise/reduce policy)
+- §31.8 — DEC-030 pricing audit events
+- §31.9 — Implementation checklist
+- §31.10 — Open questions
+
+**Out of scope:** Consumer geo-pricing tiers (→ §4 and §29), enterprise NRR and expansion pricing (→ §23), enterprise deal economics and pilot conversion rates (→ §21).
+
+---
+
+### 31.2 Consumer Pro Price Point Derivation ($19/month)
+
+#### 31.2.1 WTP Anchor Analysis
+
+FORM's $19/month Pro price was set against a matrix of consumer fitness and coaching substitutes, not against COGS alone. The logic: pricing below substitutes in perceived value destroys revenue unnecessarily; pricing above substitutes requires a demonstrably superior value proposition. [ESTIMATE on all competitor price data — confirm annually.]
+
+| Product category | Example products | Monthly price range | Value prop overlap with FORM |
+|---|---|---|---|
+| **Human personal trainer (in-person)** | Local gym PT, boutique PT | $200–$600 | High (adaptive programming, feedback) — FORM undercuts 10–30× |
+| **AI personal trainer (high-end)** | Future ($149/month), Caliber ($149–$199) | $149–$199 | Very high — FORM undercuts 8–10× |
+| **Smart fitness app (personalised)** | Whoop (device + membership $30/mo), Oura Ring ($6/mo + $300 device) | $6–$30 | Partial (recovery data, readiness) |
+| **AI coaching app (mid-tier)** | Fitbod ($15/mo), Ladder ($20/mo) | $14–$20 | Moderate (programming, no CV feedback) |
+| **General fitness apps** | Nike Training Club (free), Apple Fitness+ ($10/mo) | $0–$10 | Low — no personalisation at scale |
+
+**Key insight:** FORM competes on the "AI personal trainer" axis (vs. Future, Caliber), not the "fitness tracking" axis (vs. Whoop, Fitbod). At $19/month FORM is 85–90% cheaper than human-supervised AI coaching while delivering comparable session-by-session programming quality and adding CV pose feedback that Future does not offer. The $19 anchor is positioned just above Fitbod ($15) to signal higher value, and just below Ladder ($20) and Apple Fitness+ + Whoop bundle territory ($40+).
+
+#### 31.2.2 COGS Coverage at $19/month
+
+From §3–4: Pro infrastructure COGS = $0.50/user/month at modelled usage. At $19 list with 15% App Store Small Business Program fee:
+
+```
+Net revenue after store fee (SBP 15%):  $19.00 × 0.85 = $16.15
+Infrastructure COGS:                    $0.50
+Gross profit per user:                  $15.65
+Gross margin (COGS-only):               $15.65 / $16.15 = 96.9%
+```
+
+At standard 30% App Store rate (above $1M annual revenue threshold):
+
+```
+Net revenue after store fee (30%):      $19.00 × 0.70 = $13.30
+Infrastructure COGS:                    $0.50
+Gross profit per user:                  $12.80
+Gross margin (COGS-only):               $12.80 / $13.30 = 96.2%
+```
+
+**Conclusion:** $19/month is effectively unconstrained by COGS. Even at the worst-case store fee, COGS consumes only 3.8% of net revenue. The economic constraint on consumer pricing is conversion and retention, not margin. A price increase to $24–$29 would improve LTV by 26–53% without changing COGS. A price decrease to $14 would reduce LTV by 26% while barely changing COGS. The $19 price is set by competitive positioning, not economics.
+
+#### 31.2.3 Price Sensitivity Range for Consumer
+
+| Scenario | List price | SBP net | Gross margin | Notes |
+|---|---|---|---|---|
+| Bear (floor) | $12 | $10.20 | 95.1% | Competitive with Fitbod; lower LTV; high conversion potential |
+| Current | $19 | $16.15 | 96.9% | Primary market positioning |
+| Bull (ceiling) | $29 | $24.65 | 98.0% | Future/Caliber price compression territory; conversion risk |
+| Stretch (validate first) | $39 | $33.15 | 98.5% | Only viable with strong brand and completion-guarantee framing |
+
+**Price floor for consumer:** $12/month — at this price, annual Pro subscription = $144/year, App Store's alternative minimum billing threshold. Below $12, the economics are structurally sound (COGS is ~4% of revenue) but the product is positioned as a commodity app, not a coaching product. The $19 point preserves the "AI coach, not a fitness tracker" framing.
+
+---
+
+### 31.3 Enterprise Price Point Derivation ($12 / $9 / $6–8/seat/month)
+
+#### 31.3.1 Derivation Methodology
+
+Enterprise pricing was derived from three inputs, applied in order of constraint:
+
+1. **COGS floor + target gross margin** — what price covers all-in COGS (infrastructure + CSM labour allocation) at an acceptable margin?
+2. **Competitive WTP ceiling** — what do enterprise buyers currently pay for comparable corporate wellness platforms?
+3. **Value anchor vs. consumer** — enterprise should cost less per seat than the consumer Pro plan (signal: bulk pricing) but more than a commodity app (signal: compliance, SSO, support).
+
+These three inputs were then mapped to a tier structure that creates natural seat-count-driven upgrade pressure.
+
+#### 31.3.2 Tier-by-Tier Derivation
+
+**Starter tier ($12/seat/month · 50–200 seats)**
+
+The Starter price equals the consumer Pro list price ($19 → $12 direct-billed, no App Store fee). Rationale: the value of removing the App Store fee (from ~$2.85–$5.70/seat/month) is passed partly to the customer as the "enterprise discount" and partly retained as margin improvement. At $12 direct-billed:
+
+```
+Revenue per seat:          $12.00
+Infrastructure COGS (§3):   $0.34 (enterprise usage profile)
+CSM labour allocation:       $1.67 (Starter email-only, shared; §26.2 = $150–200/month / 100 avg seats)
+Total allocated COGS:        $2.01
+Gross margin (fully loaded): ($12.00 − $2.01) / $12.00 = 83.3%
+```
+
+83% fully-loaded gross margin at Starter is acceptable for early-stage B2B SaaS (Bessemer Cloud Index 2024 median gross margin = 72–76%). Implementation COGS ($500–$700/deal for SSO setup at Starter, amortised over 24 months = $21–$29/month) reduces this by ~2–3pp in Year 1 only.
+
+**Growth tier ($9/seat/month · 201–1,000 seats)**
+
+Volume discount of 25% vs. Starter ($12 → $9). Rationale: at 300 seats, the deal is $32,400/year — large enough to justify a named CSM. The CSM cost per seat drops significantly at scale (§26.2 CSM model: one CSM serves 12–15 Growth accounts at $250–300/month fully-loaded; at 300 seats average, per-seat CSM cost = $300 / 300 = $1.00/seat/month).
+
+```
+Revenue per seat:          $9.00
+Infrastructure COGS (§3):  $0.34
+CSM labour allocation:     $1.00 (Growth named CSM; §26.2)
+Total allocated COGS:      $1.34
+Gross margin (fully loaded): ($9.00 − $1.34) / $9.00 = 85.1%
+```
+
+Higher fully-loaded gross margin than Starter despite lower ASP, because CSM labour cost per seat declines faster than price. The Growth tier is FORM's most efficient revenue band.
+
+**Enterprise tier ($6–8/seat/month · 1,001+ seats)**
+
+Custom pricing. The $7 midpoint (used in §8 and the pricing calculator) and the $6–8 range reflect:
+
+- **Floor:** $6/seat — see §31.5 COGS floor analysis; below $6, fully-loaded gross margin falls below 60% at dedicated CSM coverage.
+- **Ceiling:** $8/seat — above $8, large enterprise procurement will compare to Gympass/Wellhub corporate offering and find FORM expensive-relative-to-network.
+- **Midpoint:** $7/seat for modelling purposes; actual negotiated rate depends on seat count, contract length, and whether white-label or dedicated support add cost.
+
+```
+Revenue per seat (midpoint): $7.00
+Infrastructure COGS (§3):    $0.34
+CSM labour (dedicated 6-acct max; §26.2 = $400–500/month / 1,000+ seats): $0.40–$0.50
+Total allocated COGS:         $0.74–$0.84
+Gross margin (fully loaded):  ($7.00 − $0.84) / $7.00 = 88.0% [ESTIMATE]
+```
+
+White-label add-on (CNAME + custom logo, §15.5): +$50–100/month incremental COGS absorbed within the negotiated rate. Does not change the price floor but compresses margin by ~0.5pp at 1,000 seats.
+
+#### 31.3.3 ACV Floor by Tier
+
+Minimum viable deal size — below which the deal does not generate adequate gross profit to justify sales motion and CSM overhead.
+
+| Tier | Min seats | List price | Min ACV | Fully-loaded GM | Floor rationale |
+|---|---|---|---|---|---|
+| Starter | 50 | $12 | $7,200/year | 83% | Below 50 seats, email support still profitable but implementation cost (SSO setup ~$700) erodes Year 1 margin to < 70% |
+| Growth | 201 | $9 | $21,708/year | 85% | Named CSM is economically justified at ≥ 201 seats; below 201 the CSM cost per seat exceeds the Starter email support model |
+| Enterprise | 1,001 | $7 est. | $84,084/year | 88% | Dedicated CSM + custom SLA requires ≥ 1,001 seats to keep per-seat CSM below $0.50/seat/month |
+
+**OQ-11 resolution note:** §11 OQ-11 asks whether the 50-seat Starter floor needs to rise to 75+ seats to maintain acceptable Year 1 GM. §31.3.3 analysis confirms: 50-seat floor at $12/seat produces $7,200/year ACV. Implementation cost ($700 one-time) amortised over 12 months = $58/month = $1.17/seat/month at 50 seats. This raises effective Year 1 COGS to $2.01 + $1.17 = $3.18/seat/month, reducing Year 1 gross margin to ($12.00 − $3.18) / $12.00 = 73.5%. Still acceptable. Floor of 50 seats is defensible; 75-seat floor would improve Year 1 margins to ~76% but reduces TAM. Recommendation: keep 50-seat floor; monitor Year 1 margins on first five Starter deals and update if < 70%.
+
+---
+
+### 31.4 Corporate Wellness Competitive Benchmarking
+
+> [ESTIMATE] on all competitor pricing. Corporate wellness pricing is almost never publicly listed; figures are derived from published reports (Mercer, SHRM, KFF), industry analyst estimates, procurement conversations documented in public forums (G2, Capterra reviews), and job listings that reference budget ranges. Treat all figures as directional, not contractually verified.
+
+#### 31.4.1 Primary Competitive Set (Direct Substitutes)
+
+These platforms compete directly for the same HR/People budget as FORM. Enterprise buyers will compare FORM to at least one of these during procurement.
+
+| Platform | Category | Est. price range / seat / month | Key differentiator | FORM positioning |
+|---|---|---|---|---|
+| **Wellhub (fmr. Gympass)** | Gym network access + wellbeing apps | $8–$45 (plan-dependent) [ESTIMATE] | Access to 50k+ gym/studio network in 11 countries; well-known brand | FORM is a coaching product, not a gym access network. Not direct substitutes for companies with distributed/remote workforces. |
+| **Headspace for Work** | Guided meditation + sleep | $10–$14/seat/month [ESTIMATE] | Strong consumer brand; Calm competitor | No exercise programming, no CV feedback, no wearable integration. HR might buy both. FORM is not a mental wellness product. |
+| **Calm for Business** | Meditation, sleep, stress | $10–$15/seat/month [ESTIMATE] | Sleep and stress focus; large library of content | Same as Headspace — no physical coaching component. |
+| **Virgin Pulse (now Personify Health)** | Comprehensive wellness platform | $40–$75/seat/month [ESTIMATE] | Incentive management, biometric screening, health coaching | Broad platform but legacy architecture; used by large self-insured employers for incentive-based programs. FORM explicitly does not sell incentive/risk-scoring features. |
+| **Noom for Work** | Behavioural weight management | $30–$50/seat/month [ESTIMATE] | Structured weight loss program; strong outcomes data | Weight-loss framing conflicts with FORM's body-neutrality policy. FORM cannot and will not compete on this axis. |
+| **Peloton Corporate (Peloton for Business)** | Connected fitness hardware + subscription | $20–$40/seat/month (hardware lease included) [ESTIMATE] | Brand recognition, live classes | Hardware dependency; facilities-based. Remote/distributed workforces underserve. |
+| **Whoop for Teams** | Recovery monitoring wearable | $18–$30/seat/month (device included) [ESTIMATE] | HRV/recovery science; used by elite sports teams | Device dependency; no exercise programming; strong in athletic performance context. Wearable-only, not coaching. |
+| **Future (enterprise)** | Human coach via app | $99–$149/seat/month [ESTIMATE] | Real human coaches; strong outcomes | 8–12× FORM's Enterprise price. Human coaching supply constraint limits scale. |
+
+#### 31.4.2 FORM Competitive Positioning Matrix
+
+```
+                    Low price / seat ◄────────────────────────► High price / seat
+                         $5-10          $10-20           $20-50            $50+
+                          │              │                │                 │
+Exercise programming  ┌───┤              ├────────────────┤                 │
++ AI coaching         │   │              │   ← FORM →    │                 │
+                      │   │              │   ($6-12)     │                 │
+                      │   │              │               ├──── Future ─────┤
+                      │   │   Headspace  │               │   ($99-149)     │
+                      │   │   Calm       │               │                 │
+Mental wellness       │   │  ($10-15)    │               │                 │
+                      │   │              │               │                 │
+Gym network access    │   ├── Wellhub ───┤               │                 │
+                      │   │  ($8-45)     │               │                 │
+                      │   │              │               │                 │
+Incentive platform    │   │              │               ├── VirginPulse ──┤
+                      │   │              │               │  ($40-75)       │
+                      └───┴──────────────┴───────────────┴─────────────────┘
+```
+
+**Positioning conclusion:** FORM occupies the "$6–12 AI coaching" quadrant — the only product in this price band that offers exercise programming, CV pose feedback, and wearable integration without device dependency. The nearest competitor on price is Wellhub, but Wellhub is a gym access network, not a coaching product. The nearest competitor on features is Future, at 8–12× FORM's price.
+
+**Key enterprise sales insight:** FORM is not replacing Wellhub (gym network) or Headspace (mental wellness). It is replacing the gym stipend ($600–$1,800/employee/year), which is untracked, non-measurable, and generates no engagement data for HR. The substitution story for buyers is: "Cancel or redirect your gym stipend budget; use FORM instead. You get measurable activation, engagement reporting, and a coaching outcome — for $72–$144/employee/year."
+
+#### 31.4.3 Price Anchoring in Sales Conversations
+
+When an enterprise prospect asks "how does your pricing compare to the market," the recommended framing is:
+
+1. **Do not compare to Wellhub** — different category (gym access vs. coaching). Wellhub comparison anchors the price wrong.
+2. **Compare to the gym stipend** — $600–$1,800/year vs. $72–$144/year. FORM at $12/seat is 8–12× cheaper than the stipend it replaces, with measurable outcomes.
+3. **Compare to Future for the coaching angle** — $99–$149/month (human coach) vs. $12/month (AI coach with CV feedback). FORM delivers comparable programming quality at 8–12× lower cost.
+4. **Acknowledge Headspace/Calm for HR budgets** — some procurement teams will have both. Frame as additive: FORM for physical activity; mindfulness products for mental wellness. The ROI model (§20) covers both value levers independently.
+
+---
+
+### 31.5 Price Floor Analysis (COGS-Anchored Minimum Viable Price)
+
+The price floor is the minimum price at which FORM can serve a seat while covering all directly attributable costs and maintaining a positive contribution margin. This is distinct from the gross margin target — it is the hard floor below which a deal destroys value regardless of strategic reasons to close it.
+
+#### 31.5.1 Price Floor Calculation by Tier
+
+The price floor is defined as: `Infrastructure COGS + Labour COGS allocation + 10% buffer`. The 10% buffer accounts for billing overhead, payment processing fees, and unmodelled cost variance.
+
+| Tier | Infra COGS/seat | CSM labour/seat | Compliance overhead/seat | Total loaded COGS | + 10% buffer | **Hard price floor** |
+|---|---|---|---|---|---|---|
+| Starter (50–200 seats) | $0.34 | $1.67 | $0.15 [ESTIMATE] | $2.16 | $2.38 | **$3.00/seat/month** |
+| Growth (201–1,000 seats) | $0.34 | $1.00 | $0.15 | $1.49 | $1.64 | **$2.00/seat/month** |
+| Enterprise (1,001+ seats) | $0.34 | $0.45 | $0.15 | $0.94 | $1.03 | **$1.50/seat/month** |
+
+**These floors are theoretical — they indicate the breakeven COGS point, not the minimum contractually permitted price.** The contractual price floors (below which no approval level can go) are defined in §31.6.3 and are set significantly above the COGS floor to preserve gross margin.
+
+**Compliance overhead per seat** ($0.15 [ESTIMATE]) allocates a share of the §25 Enterprise Compliance & Legal Infrastructure Cost Model across the enterprise seat base. At $50k ARR (~400 seats at $10.4/seat average), compliance cost = $600–$800/month; per-seat allocation ≈ $1.50–$2.00/seat. At $500k ARR (~4,000 seats), compliance cost scales more slowly (not linear with seats); per-seat allocation drops to ~$0.10–$0.20/seat. The $0.15 figure is a steady-state estimate at $300k–$1M ARR scale.
+
+#### 31.5.2 Why the Contractual Floor Must Exceed the COGS Floor
+
+The COGS floor ($1.50–$3.00/seat) leaves zero contribution margin for fixed cost absorption, sales cost amortisation, or product R&D. At the COGS floor, FORM is a break-even fulfilment operation, not a business. The contractual discount floors in §31.6 are set at 50% of list price per tier, which is:
+
+- Starter floor: $12 × 50% = **$6.00/seat/month**
+- Growth floor: $9 × 50% = **$4.50/seat/month**
+- Enterprise floor: $8 × 50% = **$4.00/seat/month**
+
+At these contractual floors, fully-loaded gross margin still exceeds 55% — sufficient to absorb fixed costs at $300k+ ARR. See §31.6 for floor governance.
+
+---
+
+### 31.6 Discount Authority Matrix
+
+This section formalises the discount authority governance first referenced in §21 (Pilot Economics, Conversion Governance & Discount Authority Matrix). The matrix governs every discount from standard list price, including: multi-year contract discounts, upfront payment discounts, pilot conversion discounts, and ad-hoc negotiated concessions.
+
+#### 31.6.1 Standard Discount Schedule (Pre-Approved — No Approval Required)
+
+These discounts are built into the pricing calculator (`pricing-enterprise.html`) and can be offered by any sales representative without additional approval:
+
+| Discount type | Amount | Conditions | Stackable? |
+|---|---|---|---|
+| 2-year contract | –15% | Minimum 2-year term commitment | Yes — stackable with upfront |
+| 3-year contract | –25% | Minimum 3-year term commitment | Yes — stackable with upfront |
+| Annual upfront payment | –10% | Full annual invoice paid upfront (not monthly) | Yes — stackable with contract discount |
+| **Maximum pre-approved effective discount** | **–32.5%** | 3-year + upfront (multiplicative: 1 − (1−0.25)×(1−0.10) = 32.5%) | — |
+
+**Discount stacking rule:** All discounts are multiplicative, not additive. A 25% contract discount + 10% upfront discount = 32.5% total reduction, not 35%. This is enforced in the pricing calculator logic.
+
+#### 31.6.2 Non-Standard Discount Schedule (Approval Required)
+
+Discounts beyond the pre-approved schedule require explicit approval before presentation to the customer. All approved non-standard discounts must be documented as a DEC-030 `enterprise.pricing_exception_approved` event (see §31.8) before the quote is sent.
+
+| Discount level | Effective rate after discount | Approval required | Conditions |
+|---|---|---|---|
+| Up to –40% total | Starter: ≥ $7.20/seat · Growth: ≥ $5.40/seat · Enterprise: ≥ $4.80/seat | Founder only | Strategic account, volume ≥ 500 seats, 2-year minimum |
+| Up to –50% total (contractual floor) | Starter: ≥ $6.00/seat · Growth: ≥ $4.50/seat · Enterprise: ≥ $4.00/seat | Founder + investor lead (pre-Series A) | Exceptional circumstances only; requires written rationale |
+| Below contractual floor | Below $6.00/$4.50/$4.00/seat | NOT PERMITTED | No approval level overrides the contractual price floor |
+
+**Price floor enforcement:** The contractual price floors ($6.00/$4.50/$4.00/seat) cannot be waived. A deal that requires pricing below the floor must be restructured (fewer seats, shorter contract, reduced features) or declined. Pre-Series A: any exception attempt requires founder + investor lead countersignature. Post-Series A: requires board approval.
+
+#### 31.6.3 Contractual Price Floor Summary
+
+| Tier | List price | Contractual floor | Floor as % of list | Maximum total discount |
+|---|---|---|---|---|
+| Starter | $12.00/seat | **$6.00/seat** | 50% | 50% |
+| Growth | $9.00/seat | **$4.50/seat** | 50% | 50% — Note: maximum pre-approved (32.5%) will not breach floor; additional 17.5% available with approval |
+| Enterprise | $8.00/seat (ceiling of range) | **$4.00/seat** | 50% | 50% |
+| Enterprise | $6.00/seat (floor of range) | **$4.00/seat** | 67% | 33% (note: floor constrains enterprise deals heavily at $6/seat list) |
+
+**Note on Enterprise $6/seat edge case:** At the low end of Enterprise list pricing ($6/seat, typically for deals ≥ 2,000 seats on a 3-year contract), the contractual floor of $4.00/seat allows only a 33% maximum discount. The pre-approved 3-year + upfront discount (32.5%) nearly exhausts the available headroom. Any additional negotiated concession requires founder approval and cannot result in a quote below $4.00/seat.
+
+#### 31.6.4 Non-Pricing Concessions (Do Not Require Pricing Approval)
+
+The following concessions can be offered without pricing approval because they affect delivery scope, not unit economics:
+
+- Extended pilot duration (90 days → 180 days) — requires founder approval for accounts > 500 seats (see §21)
+- Custom SLA upgrade from Growth to Enterprise SLA — included in Enterprise list, not a pricing concession
+- Additional admin seats (above the standard RBAC seat count) — currently included in all tiers
+- Priority SSO setup scheduling — included in CSM scope
+- Executive sponsor introduction or architecture call — no cost
+
+**What requires pricing approval:** Any change to the per-seat rate, total contract value, or payment terms that reduces revenue relative to standard list.
+
+---
+
+### 31.7 Pricing Change Governance
+
+#### 31.7.1 Consumer Pricing Changes
+
+FORM may adjust the consumer Pro price ($19/month) in response to market conditions, competitor pricing moves, or strategic repositioning. Governance rules:
+
+**Minimum notice:** 30 days to existing subscribers before any price increase takes effect. App Store customers receive pricing change notice via the platform's standard upgrade flow. Direct subscribers receive email.
+
+**Grandfathering policy:** Existing annual subscribers are locked at their contracted rate for the remainder of their annual term. Price increases apply at the next renewal. No mid-term price increases on annual contracts.
+
+**Price decrease:** No grandfathering obligation. Price decreases take effect immediately for new subscribers; existing annual subscribers may contact support for credit adjustment (not obligated, but recommended for NPS).
+
+**Approval required for consumer price change:** Founder-level decision. Document in `docs/DECISION_LOG.md` with WTP research and competitive data supporting the change. Emit `enterprise.consumer_price_updated` DEC-030 event.
+
+#### 31.7.2 Enterprise Pricing Changes
+
+Enterprise pricing changes are significantly more complex because of multi-year contracts and contractual commitments.
+
+**List price changes:** Any change to standard list prices ($12/$9/$6–8/seat) requires:
+1. Review of all active contracts to identify customers at list price (most will have negotiated rates unaffected by list change)
+2. 90-day notice to existing annual customers at renewal (not mid-term)
+3. Investor lead consultation pre-Series A (post-Series A: board notification)
+4. Update to `pricing-enterprise.html` calculator and `docs/ENTERPRISE.md`
+5. DEC-030 `enterprise.list_price_updated` event
+
+**Annual price indexation:** Starting at the second renewal of any multi-year contract, FORM may apply an annual price escalation clause (CPI-linked, typically 3–5%) if the MSA includes this clause. The MSA template (`docs/MSA_TEMPLATE.md`) should include a standard price escalation clause of "CPI + 1%" capped at 5% per year. This clause enables §23.6 annual price indexation as an NRR expansion lever.
+
+**Rate lock commitment:** Customers on a signed multi-year contract are rate-locked for the committed term at their contracted per-seat rate. FORM cannot increase the per-seat rate during the contracted term regardless of list price changes. At renewal, the customer is subject to current list pricing (with applicable discounts from §31.6).
+
+#### 31.7.3 When to Consider a Price Increase
+
+The following signals indicate that the current price may be leaving money on the table:
+
+| Signal | Implication | Threshold for action |
+|---|---|---|
+| Win rate > 80% in competitive deals | Pricing is below WTP ceiling | Consider 10–15% list price increase at next review |
+| Prospect never negotiates (accepts list price) | No price resistance | Possible underprice; survey 10 customers on perceived value |
+| Churn rate near zero AND NPS > 60 | High satisfaction; loyalty signals | Safe to increase at renewal without significant churn |
+| COGS increases materially (Anthropic volume rate changes) | Margin compression | Pass-through price increase justified; 60-day notice |
+
+| Signal | Implication | Action |
+|---|---|---|
+| Win rate drops below 50% | Possible overprice OR competitive entry | Diagnose reason before cutting price; price is often not the issue |
+| Competitor cuts price by > 20% | Competitive pressure | Respond with value differentiation first, price last |
+| Conversion rate from pilot drops below 40% | Possible price-to-value gap | Investigate activation quality before cutting price |
+
+---
+
+### 31.8 DEC-030 Pricing Audit Events
+
+Pricing decisions are high-governance, investor-relevant events. All non-standard pricing decisions must produce a tamper-evident DEC-030 audit record before the quote or contract is presented to the customer.
+
+| Event type | Severity | Key metadata fields | Retention | Trigger |
+|---|---|---|---|---|
+| `enterprise.pricing_exception_approved` | HIGH | `deal_id`, `tier` (`starter`/`growth`/`enterprise`), `list_price_usd`, `approved_price_usd`, `effective_discount_pct`, `seat_count`, `contract_years`, `approver_user_id`, `approval_level` (`founder`/`founder_plus_investor`), `rationale_text` (free-text, 200 char max), `quote_ref` | 7 years | Emitted when any non-standard discount (beyond pre-approved schedule) is approved. Must be emitted **before** the quote is sent to the prospect. If the deal closes, `enterprise.contract_signed` (§23.7) links back to this event via `pricing_exception_event_id` field. |
+| `enterprise.consumer_price_updated` | HIGH | `previous_price_usd`, `new_price_usd`, `effective_date`, `grandfathering_policy` (free-text), `updated_by` (founder user_id), `rationale_ref` (link to DECISION_LOG.md entry) | 7 years | Emitted when consumer Pro list price is changed. Includes explicit grandfathering policy statement. |
+| `enterprise.list_price_updated` | HIGH | `tier` (`starter`/`growth`/`enterprise`), `previous_price_usd`, `new_price_usd`, `effective_date`, `updated_by` (founder user_id), `active_contracts_affected` (count of contracts at prior list rate), `rationale_ref` | 7 years | Emitted when enterprise tier list prices are updated. Captures count of active contracts that will face price change at renewal. |
+| `enterprise.price_floor_override_requested` | CRITICAL | `deal_id`, `tier`, `requested_price_usd`, `floor_price_usd`, `requester_user_id`, `decision` (`approved`/`denied`/`restructured`), `approver_chain` (array of user IDs) | 7 years | Emitted if anyone attempts to quote below the contractual price floor. Even a denied request creates an audit record. Decision `denied` means the quote was not sent; `restructured` means the deal terms were changed to bring it within floor. |
+
+**HMAC chain note:** All four events follow the standard DEC-030 append logic (`docs/AUDIT_LOG_SCHEMA.md §3`). `enterprise.price_floor_override_requested` must generate a record even when the outcome is `denied` — the absence of a denied request does not mean no floor breach was attempted; it means the system is working. Auditors can query for CRITICAL-severity pricing events to verify floor integrity over the observation window.
+
+---
+
+### 31.9 Implementation Checklist
+
+#### P0 — Before first enterprise quote is sent
+
+| # | Task | Owner | Priority | Milestone | Definition of Done |
+|---|---|---|---|---|---|
+| 1 | Register `enterprise.pricing_exception_approved`, `enterprise.consumer_price_updated`, `enterprise.list_price_updated`, `enterprise.price_floor_override_requested` as DEC-030 event types in `docs/AUDIT_LOG_SCHEMA.md`; validate Zod schemas; deploy to `emit-audit-event` Worker endpoint | data-engineer + platform-engineer | **P0** | M4 (before first enterprise pilot launch) | Four event types in AUDIT_LOG_SCHEMA.md; emittable from admin console or CRM workflow; test events in staging with valid HMAC chain |
+| 2 | Add price floor enforcement to pricing calculator (`pricing-enterprise.html`): client-side validation that prevents quote generation below $6.00/$4.50/$4.00 contractual floors; display clear error message if floor is breached | platform-engineer | **P0** | M4 | Calculator cannot produce a quote below floor; floor breach attempt logs to console with a clear error; no DEC-030 event required for client-side prevention (only for server-side approval requests) |
+| 3 | Document the pricing exception approval process in the CRM (or, pre-CRM, as a written procedure in `docs/DECISION_LOG.md`): step-by-step for how founder approves a non-standard discount, including the requirement to emit DEC-030 event before quote is sent | founder | **P0** | M4 | Written procedure exists; founder can follow it; first test non-standard quote produces a DEC-030 event |
+
+#### P1 — Before first enterprise contract is signed
+
+| # | Task | Owner | Priority | Milestone | Definition of Done |
+|---|---|---|---|---|---|
+| 4 | Add annual price escalation clause to `docs/MSA_TEMPLATE.md`: "CPI + 1%, capped at 5% per year, applied at second and subsequent renewals; requires 60-day written notice" | compliance-officer + founder | **P1** | M5 (before first MSA is sent) | MSA template updated; clause reviewed by legal counsel; rate lock for current term explicitly stated |
+| 5 | Create a competitive pricing intelligence update process: once per quarter, update §31.4 with current market intelligence from G2 reviews, procurement conversations, and industry analyst reports; emit no DEC-030 event (internal research artefact, not a pricing decision) | product-strategist | **P1** | M6 (first update at 90 days post-launch) | §31.4 reviewed and updated (or explicitly confirmed as current); date of last review noted at top of §31.4 table |
+| 6 | Update `docs/COMPETITIVE.md` to add a "Corporate Wellness Enterprise" section that covers the same platforms as §31.4, maintaining separate documents for consumer competitors (current COMPETITIVE.md) and enterprise substitutes (new section) | product-strategist | **P1** | M6 | New section in COMPETITIVE.md; no duplication with §31.4 (cross-reference only) |
+
+#### P2 — Post-launch (first 6 months)
+
+| # | Task | Owner | Priority | Milestone | Definition of Done |
+|---|---|---|---|---|---|
+| 7 | Conduct WTP validation study with 5–10 enterprise pilot participants: structured interview on perceived value vs. price, competitive alternatives considered, and price at which they would not proceed; update §31.2.1 and §31.3.2 with real data | product-strategist + customer-success | **P2** | M9 (after first cohort of pilots completes 90 days) | Interview notes in research repo; §31 price derivation updated from [ESTIMATE] to [VALIDATED] where confirmed |
+| 8 | Run first annual pricing review: gather win/loss data, analyse whether pre-approved discount schedule matches field reality, update §31.4 competitive benchmarks, revise floors if COGS have changed materially | founder + product-strategist | **P2** | M12 (first anniversary of commercial launch) | Pricing review meeting notes; §31 updated; any price change decisions documented in DECISION_LOG.md |
+
+---
+
+### 31.10 Open Questions
+
+**OQ-PRICE-01: Should FORM offer a non-profit or education discount tier?**
+
+Non-profit organisations and educational institutions (universities with student wellness programs) represent a meaningful potential market but have constrained procurement budgets. A standard "50% off Growth list = $4.50/seat" for verified 501(c)(3)s or accredited universities would stay above the contractual floor but require approval under §31.6.2. The strategic question: does a non-profit/edu tier create pipeline for subsequent commercial deals (companies who saw FORM at university and adopt it at work), or does it create complexity without commercial return?
+
+**Recommended resolution:** Defer non-profit/edu pricing until three commercial deals have closed. If three commercial customers mention they discovered FORM in a non-profit/edu context, the conversion channel is real and the discount tier is worth formalising. Owner: product-strategist + founder. Priority: P2. Resolution: document in DECISION_LOG.md after first five commercial closings.
+
+**OQ-PRICE-02: At what ARR level should FORM review its consumer $19/month price?**
+
+§31.2.3 establishes that FORM could plausibly increase consumer pricing to $24–$29/month without significant COGS impact. The question is when — too early and it signals desperation; too late and it leaves LTV on the table. The price increase is most defensible after: (a) NPS ≥ 60 across three consecutive months, (b) D90 retention ≥ 40%, and (c) consumer ARR ≥ $200k (proving the product has paying users). At those conditions, a price increase to $24/month raises consumer LTV by 26% (from §14 model) without requiring new features.
+
+**Recommended resolution:** Trigger condition for consumer price review = D90 ≥ 40% AND NPS ≥ 60 AND consumer ARR ≥ $200k. At those conditions, survey 100 random Pro subscribers on price sensitivity before changing. Owner: growth-lead + product-strategist. Priority: P2. Resolution: checkpoint at M12 (first annual review per §31.9 item 8).
+
+**OQ-PRICE-03: How should FORM price CV-optional enterprise deals (e.g. customers in environments where camera use is restricted by policy)?**
+
+Some enterprise customers — particularly financial services, government contractors, and manufacturing floors — may have IT policies restricting camera use on corporate devices. For these customers, the CV pose feedback feature (FORM's primary technical moat) is unavailable. Should the price be lower for CV-disabled seats, or should the price remain the same because the coaching, programming, and wearable integration value remains intact?
+
+**Implication:** A two-SKU model (CV-enabled vs. CV-optional) adds quoting complexity and potentially signals that CV is the only differentiating value. A single-price model (same price regardless of CV availability) is simpler but may face procurement objection: "we're paying for something we can't use."
+
+**Recommended resolution:** Single-price model for now (pre-Series A). The coaching, wearable integration, and admin dashboard value is sufficient to justify the price without CV for most use cases. If CV-restriction becomes a recurring objection in > 3 enterprise deals, create a dedicated "Professional" SKU at $8/seat (between Growth and Enterprise) without CV. Owner: product-manager + founder. Priority: P2. Resolution: track CV-restriction objections in CRM; review at M12 pricing review.
+
+---
+
+*v1.0 (2026-06-10): §31 Pricing Architecture, Competitive Benchmarking & Discount Governance — closes the gap between FORM's price list and the documented rationale behind it. §31.1 scopes the section: consumer Pro derivation, enterprise tier derivation, corporate wellness benchmarking, COGS-anchored price floors, discount authority matrix, pricing change governance, DEC-030 events, checklist, open questions. §31.2 consumer Pro price derivation ($19/month): WTP anchor table against human PT ($200–$600), AI coaching (Future/Caliber $149–$199), smart fitness (Whoop/Oura $6–$30), personalised apps (Fitbod $15/Ladder $20), general apps (free–$10); key insight — FORM competes on AI coach axis, not fitness tracker axis; 85–90% cheaper than human-supervised AI coaching; COGS-coverage analysis at $19 confirms 96.9% gross margin (SBP) and 96.2% (standard 30%); price sensitivity range bear $12 through stretch $39 with GM table; consumer price floor $12/month with reasoning. §31.3 enterprise price derivation: three-input methodology (COGS floor + target GM, competitive WTP ceiling, value anchor vs. consumer); Starter $12 derivation (removes App Store fee; fully-loaded GM 83.3% with email CSM allocation $1.67/seat); Growth $9 derivation (25% volume discount; fully-loaded GM 85.1% with named CSM $1.00/seat at 300-seat average — higher fully-loaded GM than Starter due to labour scale); Enterprise $6–8 derivation ($7 midpoint for modelling; floor $6 from §31.5; ceiling $8 from competitive benchmarking; fully-loaded GM 88.0% at $7 midpoint with dedicated CSM $0.40–0.50/seat at 1,000+ seats); ACV floor table: Starter 50 seats = $7,200/year, Growth 201 seats = $21,708, Enterprise 1,001 seats = $84,084; OQ-11 resolution: 50-seat Starter floor defensible at 73.5% Year 1 GM including implementation cost amortisation; recommend keep 50-seat floor. §31.4 corporate wellness competitive benchmarking: eight platforms benchmarked with [ESTIMATE] price ranges — Wellhub/Gympass ($8–$45 gym network), Headspace for Work ($10–$14 meditation), Calm for Business ($10–$15), Virgin Pulse/Personify Health ($40–$75 incentive platform), Noom for Work ($30–$50 weight management; FORM cannot compete here by ethics), Peloton Corporate ($20–$40 hardware-dependent), Whoop for Teams ($18–$30 wearable-only), Future enterprise ($99–$149 human coach); ASCII positioning matrix; positioning conclusion: FORM occupies unique $6–12 AI coaching quadrant with no direct competitor at this price/feature intersection; sales framing: FORM replaces gym stipend ($600–$1,800/year) not Wellhub (gym network) or Headspace (mental wellness); four-point anchor script for sales conversations. §31.5 COGS-anchored price floor analysis: COGS floor table (Starter $3.00/seat, Growth $2.00, Enterprise $1.50) including $0.15 compliance overhead amortisation; rationale that COGS floor is theoretical; contractual price floors set at 50% of list (Starter $6.00, Growth $4.50, Enterprise $4.00) to preserve > 55% GM at floor; Enterprise $6/seat edge case noted — floor allows only 33% headroom at lowest list price. §31.6 discount authority matrix: pre-approved schedule (2yr –15%, 3yr –25%, upfront –10%; max –32.5% multiplicative — enforced in calculator); non-standard discount levels (up to –40% = founder-only, up to –50%/floor = founder + investor pre-Series A; below floor NOT PERMITTED at any approval level); contractual floor summary table with floor as % of list and maximum discount per tier; non-pricing concessions list (extended pilot, priority scheduling, executive call — no pricing approval required). §31.7 pricing change governance: consumer changes (30-day notice, annual grandfathering, price decrease immediate, founder approval + DECISION_LOG); enterprise list price changes (active contract audit, 90-day notice at renewal, investor consult, MSA update, DEC-030 event); annual price indexation clause CPI+1% capped 5% (references §23.6 NRR expansion lever); rate lock commitment for contracted term; four signals indicating underprice vs. four signals indicating overprice or competitive pressure. §31.8 four DEC-030 pricing audit events: `enterprise.pricing_exception_approved` (HIGH, 7yr — before quote sent; links to `enterprise.contract_signed` via `pricing_exception_event_id`), `enterprise.consumer_price_updated` (HIGH, 7yr — includes grandfathering policy text), `enterprise.list_price_updated` (HIGH, 7yr — captures count of active contracts at prior list), `enterprise.price_floor_override_requested` (CRITICAL, 7yr — records even denied attempts). §31.9 eight-item checklist: 3× P0/M4 (DEC-030 event registration + Zod schemas, calculator floor enforcement, exception approval procedure), 2× P1/M5–M6 (MSA price escalation clause, quarterly competitive intelligence update process), 1× P1/M6 (COMPETITIVE.md enterprise section), 2× P2/M9–M12 (WTP validation study with pilot participants, annual pricing review). §31.10 three open questions: OQ-PRICE-01 (non-profit/edu discount tier — defer until three commercial deals close; track conversion channel signal), OQ-PRICE-02 (consumer $19 price review trigger — D90 ≥ 40% + NPS ≥ 60 + ARR ≥ $200k before increasing to $24/month; P2 checkpoint M12), OQ-PRICE-03 (CV-optional enterprise deals — single-price model for now; create "Professional" SKU at $8/seat if CV restriction objection recurs in > 3 deals; P2 M12 review). Cross-references: §3 (infrastructure COGS used in §31.2 and §31.3 margin calculations), §4 (unit economics table — §31.2.2 cross-checks GM figures), §8 (Enterprise Economics — §31.3 extends the enterprise pricing rationale), §11 OQ-11 (Starter 50-seat floor — resolved in §31.3.3), §15 (Enterprise Infrastructure COGS — compliance overhead allocation in §31.5), §20 (Customer ROI Model — gym stipend substitution in §31.4.2 sales framing), §21 (Pilot Economics & Discount Governance — §31.6 formalises the authority matrix referenced there), §23.6 (Annual price indexation — MSA clause in §31.7.2 enables this NRR lever), §26 (CSM Cost Model — labour allocations in §31.3.2 and §31.5), docs/ENTERPRISE.md (pricing table and sales process), docs/MSA_TEMPLATE.md (price escalation clause — §31.7.2 requires update), docs/COMPETITIVE.md (consumer competitors — enterprise benchmarks to be added per §31.9 item 6), docs/DECISION_LOG.md (pricing change decisions), docs/AUDIT_LOG_SCHEMA.md (four new DEC-030 event types). Owner: founder + product-strategist + compliance-officer.*
