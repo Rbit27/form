@@ -6,6 +6,16 @@
 
 ---
 
+## [3.35.0] — 2026-06-10
+
+### Added
+- `compliance/p1/gov-request-policy.md` — Government Request Handling Policy (PRE-35-E-006, draft v0.1). Closes P-GAP-006 to 🟡 Authored (🔴 Open → 🟡 Authored; closes to 🟢 upon outside counsel review + founder signature at v1.0). Four governing principles: (1) legal review before any action — no data released without outside counsel and founder sign-off; (2) narrowest possible response — scope minimization to named users/date range/data categories, Art. 9 higher-standard requirement, CV keypoints architecturally never producible; (3) user notification where legally permitted — pre-disclosure default, gag-order exception logged and reflected in Transparency Report; (4) annual Transparency Report — published annually, first due 12 months post-enterprise launch or first legal request (whichever sooner), "0 to N" range for NSL/FISA. Ten mandatory process gates G-01–G-10 covering: receive+log, founder notified via Signal, DEC-030 `legal.request_received` event at T+0, counsel retained (2h P0/P1, 24h P2), legal hold activated, GDPR Art. 48 assessment for non-EU orders, founder written sign-off, `legal.disclosure_executed` DEC-030 event, user notification, transparency tally. Ten DEC-030 HMAC-chained `legal.*` events (all 7-year retention, CRITICAL severity for disclosure_executed and emergency_voluntary_disclosure). GDPR Art. 48 summary (Supabase eu-west-1 anchor, MLAT requirement, BfDI/DPC notification). No-go reaffirmation (five unconditional refusal categories from ENTERPRISE.md). SOC 2 mapping: P6.5, CC6.1, CC6.3, C1.1, CC9.1. Evidence artefact table (PRE-35-E-006). Operational runbook pointer to INCIDENT_RESPONSE.md §R-13. Requires outside counsel + founder signature before PRE-35-E-006 is effective. Owner: compliance-officer + outside counsel.
+
+### Changed
+- `VERSION` → 3.35.0 (MINOR: new compliance policy doc `compliance/p1/gov-request-policy.md`)
+
+---
+
 ## [3.34.0] — 2026-06-10
 
 ### Added
