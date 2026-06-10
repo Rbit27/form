@@ -6,6 +6,16 @@
 
 ---
 
+## [3.39.3] — 2026-06-10
+
+### Added
+- `docs/OBSERVABILITY.md §32` — Victor AI Safety Monitoring & Clinical-Safety Observability: closes `docs/INCIDENT_RESPONSE.md` R-23 Implementation Checklist item 7 (P1 M6). Delivers `VICTOR_SAFETY_TELEMETRY` Cloudflare Analytics Engine dataset (10-column schema: `session_id` UUID, `tenant_id`, `trigger_category` VT-01–VT-10, `severity_class` P0–P3, `detection_source`, `model_version`, `prompt_version`, `flags_count`, `incident_id`, `timestamp` — no content, no PII beyond UUID); `coaching_turns.safety_classification` nullable TEXT column (migration `0054`; `form_api` REVOKE; included in GDPR erasure Worker); four alert rules (`FORM-VICTOR-001` P0 single-event for VT-03/04/05/06 clinical-safety VETO; `FORM-VICTOR-002` P1 VT-01/02 3× baseline; `FORM-VICTOR-003` P2 VT-07/08 5× baseline; `FORM-VICTOR-004` P3 VT-09/10 10× baseline); four SLOs (VICTOR-SLO-01 zero P0 per observation window — unconditional; VICTOR-SLO-02 FORM-VICTOR-001 fires ≤5 min; VICTOR-SLO-03 MTTR P0≤4h/P1≤24h; VICTOR-SLO-04 zero re-enables without incident_resolved — VSAFETY-CHAIN-03); three DEC-030 chain monitors (VSAFETY-CHAIN-01 P0 containment gap > 60 min; VSAFETY-CHAIN-02 disable > 48 h with no re-enable; VSAFETY-CHAIN-03 real-time write-guard in `emit-audit-event` Worker); §6.2 `victor_safety_health` subsection (four rows) + §27.2 SIEM routing (`siem.victor_safety_p0` CRITICAL, `siem.victor_safety_p1` HIGH); eight-panel "Victor AI Safety Health" Metabase + Better Stack dashboard; four SOC 2 evidence artefacts VSAFETY-E-001–E-004 (CC7.2/CC7.3/CC7.4/A1.2, 7yr); 13-item checklist (7× P0 M4, 5× P1 M5–M6, 1× P2 quarterly); two open questions (OQ-VSAFETY-01 tenant_id CSM exposure — P1; OQ-VSAFETY-02 VSAFETY-CHAIN-01 15-min vs 60-min timeout — P1). clinical-safety NOT REQUIRED (observability layer; no coaching content). Owner: devops-lead + security-engineer + clinical-safety + compliance-officer.
+
+### Changed
+- `docs/OBSERVABILITY.md` — TOC updated to add §32; version header v1.8 → v2.2 (aligns with v2.1 as immediately prior version note).
+
+---
+
 ## [3.39.2] — 2026-06-10
 
 ### Added
