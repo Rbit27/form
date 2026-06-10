@@ -6,6 +6,18 @@
 
 ---
 
+## [3.29.1] — 2026-06-10
+
+### Added
+- `docs/COST_MODEL.md §32` — Pricing Exception Approval Procedure: closes the last open P0 gap in `§31.9` implementation checklist. Seven-step runbook: (1) confirm exception applies via `effective_rate vs list × 0.675` threshold; (2) floor check; (3) structured approval request template; (4) approval routing (founder-only –32.5%–40%; founder + investor lead –40%–floor); (5) DEC-030 `enterprise.pricing_exception_approved` INSERT SQL with `floor_respected: true` invariant and `pricing_exception_event_id` linkage to `enterprise.contract_signed`; (6) quote preparation cross-check; (7) DECISION_LOG.md entry template. Floor enforcement protocol (§32.4): CRITICAL-severity `enterprise.price_floor_override_requested` event emitted even for denied below-floor attempts; escalation chain to compliance-officer and investor lead. Pre-CRM record-keeping structure (§32.5): `pricing-exceptions/YYYY-MM-DD_[tier]_[slug]/` with 5 artefact files. SOC 2 mapping (§32.6): CC1.4 / CC5.2 / CC5.3 / CC1.2.
+- `docs/DECISION_LOG.md` — DEC-038: records the decision to formalise the pricing exception procedure; cross-references §32; provides the DECISION_LOG entry required by §31.9 item 3 definition of done.
+
+### Changed
+- `docs/COST_MODEL.md` — TOC updated to include §32; version note updated from v1.0 → v1.1.
+- `VERSION` → 3.29.1 (PATCH: extension of existing doc, closes P0 checklist item)
+
+---
+
 ## [3.29.0] — 2026-06-10
 
 ### Added

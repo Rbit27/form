@@ -170,6 +170,14 @@
     - 31.8 DEC-030 Pricing Audit Events
     - 31.9 Implementation Checklist
     - 31.10 Open Questions (OQ-PRICE-01 to OQ-PRICE-03)
+32. [Pricing Exception Approval Procedure](#32-pricing-exception-approval-procedure)
+    - 32.1 Scope
+    - 32.2 Approval Authority
+    - 32.3 Step-by-Step Procedure
+    - 32.4 Price Floor Enforcement
+    - 32.5 Record Keeping
+    - 32.6 SOC 2 Relevance
+    - 32.7 Checklist Closure
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -6263,6 +6271,340 @@ Some enterprise customers — particularly financial services, government contra
 **Implication:** A two-SKU model (CV-enabled vs. CV-optional) adds quoting complexity and potentially signals that CV is the only differentiating value. A single-price model (same price regardless of CV availability) is simpler but may face procurement objection: "we're paying for something we can't use."
 
 **Recommended resolution:** Single-price model for now (pre-Series A). The coaching, wearable integration, and admin dashboard value is sufficient to justify the price without CV for most use cases. If CV-restriction becomes a recurring objection in > 3 enterprise deals, create a dedicated "Professional" SKU at $8/seat (between Growth and Enterprise) without CV. Owner: product-manager + founder. Priority: P2. Resolution: track CV-restriction objections in CRM; review at M12 pricing review.
+
+---
+
+---
+
+## 32. Pricing Exception Approval Procedure
+
+> Owner: `founder` + `compliance-officer`. Review: after every non-standard discount, minimum annually.
+> References: §31.5 (price floors), §31.6 (discount authority matrix), §31.8 (DEC-030 events), `docs/AUDIT_LOG_SCHEMA.md`, `docs/ENTERPRISE.md`, DEC-038.
+> Closes: `docs/COST_MODEL.md §31.9` item 3 (P0, M4).
+>
+> Pre-CRM note: until a CRM is deployed, all exception requests and approvals are tracked via Linear tickets or Slack threads preserved in the `pricing-exceptions` channel. Each approved exception must also have a corresponding DEC entry in `docs/DECISION_LOG.md`.
+
+---
+
+### 32.1 Scope
+
+This procedure applies to every enterprise quote where the proposed effective per-seat rate falls **below the pre-approved maximum discount** from §31.6.1 (–32.5% multiplicative: 3-year contract + annual upfront).
+
+| What this procedure covers | What it does NOT cover |
+|---|---|
+| Any discount that, alone or stacked, exceeds –32.5% vs list price | Standard discounts within the pre-approved schedule (no approval needed) |
+| Any per-seat rate below: Starter $8.10 · Growth $6.075 · Enterprise $5.40 | Non-pricing concessions (extended pilot, priority scheduling, exec intro — see §31.6.4) |
+| Any combination of discounts that approaches or reaches the contractual floor | Consumer Pro price changes (→ §31.7.1) |
+| Any below-floor rate request (cannot be approved — see §32.4) | Enterprise list price changes (→ §31.7.2) |
+
+**Quick test — does this discount need approval?**
+
+```
+effective_rate = list_price × (1 − contract_discount) × (1 − upfront_discount)
+
+If effective_rate ≥ (list_price × 0.675):  standard schedule, no approval
+If effective_rate < (list_price × 0.675):  this procedure applies
+If effective_rate < contractual_floor:     cannot proceed — see §32.4
+```
+
+Contractual floors (from §31.5): Starter $6.00 · Growth $4.50 · Enterprise $4.00/seat/month.
+
+---
+
+### 32.2 Approval Authority
+
+From §31.6.2:
+
+| Effective discount after all stacking | Minimum required approver | Conditions |
+|---|---|---|
+| –32.5% to –40% | **Founder** (written) | Strategic account; volume ≥ 500 seats; 2-year minimum term |
+| –40% to –50% / contractual floor | **Founder + investor lead** (both written, pre-Series A) | Exceptional circumstances only; written rationale required in advance |
+| Below contractual floor | **Not permitted** — no approval level overrides the floor | See §32.4 |
+
+**Post-Series A:** replace "investor lead" with "board approval" for the –40% to floor band.
+
+---
+
+### 32.3 Step-by-Step Procedure
+
+#### Step 1 — Confirm that the exception applies
+
+Before opening the approval process, calculate:
+
+1. Seat count and tier (Starter / Growth / Enterprise)
+2. Proposed contract length (1 / 2 / 3 year)
+3. Upfront payment elected? (yes/no)
+4. Any additional negotiated discount beyond the standard schedule
+5. Effective per-seat rate after all proposed discounts stacked multiplicatively
+
+If the effective rate after stacking is **at or above** `list_price × 0.675` — the standard schedule applies. Stop: no approval needed.
+
+If below, continue.
+
+#### Step 2 — Check the contractual floor
+
+| Tier | List price | Contractual floor |
+|---|---|---|
+| Starter | $12.00/seat | **$6.00/seat** |
+| Growth | $9.00/seat | **$4.50/seat** |
+| Enterprise (reference) | $8.00/seat | **$4.00/seat** |
+
+If the proposed rate is **below the contractual floor**: STOP. Route to §32.4 immediately. This deal must be restructured or declined. No approval unlocks a below-floor rate.
+
+If at or above the floor, continue.
+
+#### Step 3 — Prepare the approval request
+
+Create a written approval request (Linear ticket, Slack thread in `#pricing-exceptions`, or email to founder). The request must include:
+
+```
+Account:           [name — can be anonymised as "Prospect A — [industry]" pre-NDA]
+Tier:              [Starter / Growth / Enterprise]
+Seat count:        [N seats]
+Contract length:   [1 / 2 / 3 years]
+Upfront payment:   [yes / no]
+List price/seat:   $[list]
+Standard max rate: $[list × 0.675] (–32.5%)
+Proposed rate:     $[proposed]/seat/month
+Effective discount: [X]% vs list
+Contractual floor: $[floor]/seat — respected? [yes]
+ACV at this rate:  $[seats × rate × 12] annually
+
+Justification:
+- [Strategic reason: anchor account, reference customer, competitive pressure, etc.]
+- [Volume / market context]
+- [Risk of losing the deal at standard pricing]
+
+Margin impact:
+- Fully-loaded gross margin at proposed rate: [X]% (vs [Y]% at standard list)
+- Annual revenue impact vs standard pricing: –$[Z]/year
+
+Precedent risk:
+- [Are other accounts in the same vertical / size band that could use this as a floor?]
+- [Is this discount justified by unique deal context, not repeatable as a category?]
+```
+
+The request must be written and preserved before approval is sought. Verbal approval is not sufficient.
+
+#### Step 4 — Obtain approval
+
+Route per §32.2:
+
+**For –32.5% to –40% discounts (founder-only):**
+1. Send the approval request to the founder directly (Slack DM or Linear assign)
+2. Founder replies in writing with explicit "approved at $[rate]/seat" — not just "LGTM" or a thumbs-up
+3. Screenshot or preserve the approval reply. Note the timestamp.
+4. If the founder does not respond within 48 hours, the quote cannot be sent. Escalate via a second message referencing the deal timeline.
+
+**For –40% to floor (founder + investor lead, pre-Series A):**
+1. Send the approval request to both simultaneously
+2. Both must reply in writing with explicit approval
+3. Investor lead approval must precede or be simultaneous with founder approval — sequential approval is acceptable; founder approval alone is not sufficient at this level
+4. Preserve both approvals before proceeding
+
+Approval must be obtained **before the quote is prepared or sent**. A quote sent without prior approval is a compliance violation and triggers an immediate DEC-030 `enterprise.price_floor_override_requested` event at CRITICAL severity regardless of whether the floor was technically breached.
+
+#### Step 5 — Emit the DEC-030 event
+
+After written approval is in hand and **before** the quote is opened in any document tool:
+
+```sql
+-- Emit via the emit-audit-event Worker endpoint or directly via Edge Function
+-- Reference: docs/AUDIT_LOG_SCHEMA.md §enterprise.pricing_exception_approved
+
+INSERT INTO audit_log_events (
+  id,
+  action,
+  actor_id,
+  resource_type,
+  resource_id,
+  metadata,
+  severity,
+  occurred_at,
+  prev_hash,
+  hash
+)
+SELECT
+  gen_random_uuid(),
+  'enterprise.pricing_exception_approved',
+  '<founder_user_uuid>',
+  'enterprise_quote',
+  '<opportunity_id_or_slug>',
+  jsonb_build_object(
+    'tier',                   '<starter|growth|enterprise>',
+    'seats',                  <seat_count>,
+    'contract_years',         <contract_years>,
+    'upfront_payment',        <true|false>,
+    'list_price_per_seat',    <list_price>,
+    'approved_rate_per_seat', <approved_rate>,
+    'effective_discount_pct', <discount_as_decimal>,   -- e.g. 0.38 for 38%
+    'list_price_x_0675',      <list_price * 0.675>,    -- pre-approved ceiling
+    'contractual_floor',      <floor>,
+    'floor_respected',        true,
+    'approver_founder',       '<founder_user_uuid>',
+    'co_approver_investor',   '<investor_uuid_or_null>',
+    'rationale_ref',          '<linear_ticket_url_or_slack_thread_permalink>',
+    'account_anonymised',     '<Prospect A — Fintech>',
+    'avc_annual',             <seats * approved_rate * 12>
+  ),
+  'HIGH',
+  now(),
+  <prev_hash_from_latest_audit_row>,
+  hmac(<canonical_payload>, <HMAC_AUDIT_CHAIN_KEY>, 'sha256')
+FROM (
+  SELECT hash AS prev_hash
+  FROM audit_log_events
+  ORDER BY occurred_at DESC
+  LIMIT 1
+) latest;
+```
+
+**`floor_respected` must be `true`.** If it is false, stop immediately — this signals an attempted below-floor quote and triggers §32.4 regardless of whether the approval was obtained.
+
+**`pricing_exception_event_id`** — record the UUID returned by this INSERT. It must be linked to the `enterprise.contract_signed` event when the deal closes, creating a two-event chain that proves the exception was approved before the contract was signed.
+
+#### Step 6 — Prepare and send the quote
+
+Only after the DEC-030 event has been written to the audit log:
+
+- [ ] Prepare the quote at exactly the `approved_rate_per_seat` from the DEC-030 event — not higher, not lower
+- [ ] Confirm the quote reflects the correct contract length and upfront terms
+- [ ] Include the `pricing_exception_event_id` in internal deal metadata (CRM field or deal note, not visible to customer)
+- [ ] Send the quote
+
+A quote that differs from the approved rate by any amount is a new exception request that must restart at Step 3.
+
+#### Step 7 — Document in DECISION_LOG.md
+
+After the quote is sent, add an entry to `docs/DECISION_LOG.md` with:
+
+```markdown
+### DEC-XXX · Pricing exception: [Prospect identifier] — [tier], [N] seats, $[rate]/seat
+
+- **Decision:** Non-standard discount of [X]% approved for [Prospect identifier]
+  ([tier], [N] seats, [Y]-year contract). Approved rate: $[rate]/seat/month
+  (effective discount [Z]% vs. list $[list]/seat; contractual floor $[floor]/seat respected).
+  Approval authority: [founder / founder + investor lead]. DEC-030 event emitted:
+  `enterprise.pricing_exception_approved`, event_id `[uuid]`.
+- **Owner:** founder
+- **Why:** [Brief justification — e.g. "anchor account in fintech vertical with reference potential"]
+- **Reverse cost:** Medium — if this deal becomes a pricing floor expectation for the vertical,
+  future deals in the segment will require the same level, compressing GM by ~[N]pp.
+```
+
+---
+
+### 32.4 Price Floor Enforcement
+
+The contractual price floors (**Starter $6.00 · Growth $4.50 · Enterprise $4.00/seat/month**) cannot be waived at any approval level. This section governs what happens if a below-floor rate is requested.
+
+**When a below-floor request arrives:**
+
+1. **STOP immediately.** Do not begin approval routing — there is nothing to approve.
+2. **Notify the account manager** that the proposed rate is below the contractual floor and the deal must be restructured. Options: reduce the discount to bring the rate above the floor; reduce scope (fewer premium features, self-serve onboarding instead of dedicated CSM); explore whether a longer contract term can be used to reach a lower nominal rate within the approved schedule.
+3. **Emit the DEC-030 event** — even for denied requests:
+
+```sql
+INSERT INTO audit_log_events (
+  action,
+  actor_id,
+  resource_type,
+  resource_id,
+  metadata,
+  severity,
+  ...
+)
+VALUES (
+  'enterprise.price_floor_override_requested',
+  '<requesting_actor_uuid>',
+  'enterprise_quote',
+  '<opportunity_id>',
+  jsonb_build_object(
+    'tier',              '<tier>',
+    'seats',             <seats>,
+    'requested_rate',    <requested_rate>,
+    'applicable_floor',  <floor>,
+    'undershoot_amount', <floor - requested_rate>,
+    'decision',          'DENIED',
+    'denied_by',         'floor_enforcement',
+    'reason',            'below_contractual_floor',
+    'rationale_ref',     '<ticket_or_thread_url>'
+  ),
+  'CRITICAL',
+  ...
+);
+```
+
+**Severity is CRITICAL regardless of how far below the floor the request falls.** A $5.99/seat request for a Starter deal (one cent below the $6.00 floor) is as categorically impermissible as a $2.00/seat request.
+
+4. **Add a DECISION_LOG.md entry** noting that a below-floor rate was requested and declined. Account name can be anonymised.
+
+**If there is any pressure to override the floor:**
+
+Escalate to compliance-officer immediately. The compliance-officer has blocking authority on any deal that would breach the floor. If the compliance-officer is pressured, they escalate to the investor lead (pre-Series A) or board (post-Series A). This is a non-negotiable contractual and compliance commitment — it cannot be unlocked by urgency, deal size, or relationship pressure.
+
+---
+
+### 32.5 Record Keeping
+
+| Record | Location | Retention |
+|---|---|---|
+| Approval request (Linear ticket / Slack thread) | `#pricing-exceptions` Slack channel or Linear `Pricing Exceptions` project | 7 years |
+| Founder approval reply | Same channel / ticket thread as the request | 7 years |
+| Investor co-approval reply (where applicable) | Same thread or separate email thread preserved in deal folder | 7 years |
+| DEC-030 `enterprise.pricing_exception_approved` event | `audit_log_events` table, HMAC-chained | 7 years (HIGH severity) |
+| DEC-030 `enterprise.price_floor_override_requested` event (denied) | `audit_log_events` table, HMAC-chained | 7 years (CRITICAL severity) |
+| `DECISION_LOG.md` entry | `docs/DECISION_LOG.md`, version-controlled | Indefinitely |
+| `pricing_exception_event_id` linked to `enterprise.contract_signed` | `audit_log_events` table | 7 years |
+
+Pre-CRM: until a CRM is deployed, the deal folder structure is:
+
+```
+pricing-exceptions/
+  YYYY-MM-DD_[tier]_[prospect-slug]/
+    01_request.md           -- approval request from Step 3
+    02_founder_approval.txt -- copy of founder's written approval
+    03_co_approver.txt      -- investor lead approval (if applicable)
+    04_audit_event_id.txt   -- UUID of the DEC-030 event
+    05_quote_sent.txt       -- date sent + quote document reference
+```
+
+---
+
+### 32.6 SOC 2 Relevance
+
+The audit trail produced by this procedure is evidence for:
+
+| SOC 2 Criterion | How this procedure addresses it |
+|---|---|
+| **CC1.4** — Management communicates commitment to integrity | Documented pricing governance with floor enforcement demonstrates that pricing decisions require authorisation and are not discretionary |
+| **CC5.2** — Policies and procedures for commitments to customers | The discount authority matrix (§31.6) and this procedure constitute a formal pricing policy; the DEC-030 trail proves the policy is followed |
+| **CC5.3** — Monitoring effectiveness of controls | CRITICAL-severity DEC-030 events on every floor-breach attempt (including denied ones) provide a continuous signal that floor enforcement is active |
+| **CC1.2** — Integrity and ethical values | Even denied below-floor requests produce a DEC-030 event — demonstrating that integrity is enforced at the system level, not at the individual level |
+
+The four `enterprise.*` DEC-030 events emitted through this procedure appear in FORM's quarterly compliance attestation. Enterprise customers who request an audit log extract will see evidence that pricing exceptions are subject to documented approval and HMAC-chained immutable records.
+
+---
+
+### 32.7 Checklist Closure
+
+This section closes `docs/COST_MODEL.md §31.9` item 3 (P0, M4).
+
+| Definition of done item | Status |
+|---|---|
+| Written procedure exists (this section) | ✅ Done |
+| Founder can follow it (step-by-step in §32.3) | ✅ Done |
+| First test non-standard quote produces a DEC-030 event | ⬜ Closes on first use — verify Step 5 against `emit-audit-event` Worker in staging before enterprise pilot launch |
+
+**Remaining P0 actions before first enterprise quote can be sent:**
+1. Founder reads and acknowledges this procedure in writing (Slack thread or Linear ticket, preserved per §32.5)
+2. Test the `emit-audit-event` Worker endpoint with a dummy `enterprise.pricing_exception_approved` event in staging; confirm HMAC chain integrity
+3. Create the `pricing-exceptions/` folder structure in the deal tracking system (pre-CRM: shared folder, drive, or Linear project)
+4. Add DEC-038 entry to `docs/DECISION_LOG.md` (done in this commit)
+
+---
+
+*v1.1 (2026-06-10): §32 Pricing Exception Approval Procedure — closes `docs/COST_MODEL.md §31.9` item 3 (P0, M4). Previously items 1 (DEC-030 event types in AUDIT_LOG_SCHEMA.md, v3.25.1) and 2 (price floor enforcement in pricing-enterprise.html calculator, v3.27.1) were closed; item 3 was the last open P0 gap. §32.1 scope: quick-test formula to determine whether approval is needed (effective_rate vs. list_price × 0.675 threshold); four-column table distinguishing covered vs. excluded scenarios. §32.2 approval authority: three-band table (–32.5% to –40% founder-only; –40% to floor founder + investor lead; below floor not permitted); post-Series A board replacement note. §32.3 step-by-step procedure: 7 steps — (1) confirm exception applies with rate calculation; (2) floor check with tier table; (3) approval request template with account/tier/seats/contract/rate/justification/margin/precedent fields; (4) approval routing with 48-hour escalation note and co-approver sequencing; (5) DEC-030 INSERT SQL with `floor_respected: true` invariant and `pricing_exception_event_id` linkage requirement; (6) quote preparation and cross-check to approved_rate; (7) DECISION_LOG.md entry template with DEC-XXX placeholder. §32.4 floor enforcement: four-step response to below-floor request; DEC-030 `enterprise.price_floor_override_requested` INSERT SQL with CRITICAL severity; escalation chain to compliance-officer and investor lead / board. §32.5 record keeping: seven-row retention table; pre-CRM folder structure `pricing-exceptions/YYYY-MM-DD_[tier]_[prospect-slug]/` with five artefact files. §32.6 SOC 2 relevance: CC1.4 / CC5.2 / CC5.3 / CC1.2 mapping. §32.7 checklist closure: three-row Definition of Done table; four remaining P0 actions before first enterprise quote. Cross-references: §31.5 (price floors), §31.6 (discount authority matrix), §31.8 (DEC-030 event specs), §31.9 (checklist being closed), docs/AUDIT_LOG_SCHEMA.md (enterprise.pricing_exception_approved + enterprise.price_floor_override_requested), docs/ENTERPRISE.md (pricing table and sales process), docs/DECISION_LOG.md (DEC-038). Owner: founder + compliance-officer.*
 
 ---
 

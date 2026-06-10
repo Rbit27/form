@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-06-10
+
+### DEC-038 · Pricing exception approval procedure formalised in COST_MODEL.md §32; closes §31.9 P0 item 3
+
+- **Decision:** The enterprise pricing exception approval procedure is now documented as `docs/COST_MODEL.md §32`. The procedure covers: (a) when exception approval is required (any effective discount exceeding the pre-approved –32.5% maximum); (b) approval authority by band (founder-only for –32.5% to –40%; founder + investor lead for –40% to contractual floor); (c) the seven-step process from approval request through DEC-030 event emission to quote send; (d) floor enforcement protocol for below-floor requests, including CRITICAL-severity DEC-030 event even for denied attempts; (e) pre-CRM record-keeping structure. This is the pre-CRM "written procedure in `docs/DECISION_LOG.md`" required by §31.9 item 3 — the full procedure lives in §32, and this entry serves as the formal DEC record. Closes §31.9 item 3 (P0, M4): two prior P0 items — DEC-030 event type registration (v3.25.1) and calculator price floor enforcement (v3.27.1) — were already closed.
+- **Owner:** founder + compliance-officer
+- **Why:** Without a documented procedure, the first non-standard discount request has no defined approval chain, no DEC-030 emission trigger, and no audit trail — creating a SOC 2 CC5.2 gap (no policy for pricing commitments). The procedure must exist before the first enterprise quote is sent, not after. DEC-030 event `enterprise.pricing_exception_approved` (HIGH, 7yr) and `enterprise.price_floor_override_requested` (CRITICAL, 7yr) were registered in AUDIT_LOG_SCHEMA.md at v3.25.1; the pricing calculator floor enforcement was added at v3.27.1; the missing piece was the human-facing approval runbook.
+- **Reverse cost:** Low (procedure can be revised; the DEC-030 event schema is more costly to change — any field rename requires schema migration and re-audit). The contractual floor levels themselves ($6.00/$4.50/$4.00/seat) cannot be changed without notifying active enterprise customers per §31.7.2.
+
+---
+
 ## 2026-06-09
 
 ### DEC-037 · privacy.html authored as form.coach/privacy URL target; PRE-01 advances to 🟡 Authored
