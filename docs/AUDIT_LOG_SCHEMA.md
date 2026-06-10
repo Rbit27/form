@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v0.8
+# FORM · Audit Log Schema v0.9
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -284,6 +284,23 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 
 ---
 
+### Enterprise pricing governance events (DEC-030 HMAC-chained · COST_MODEL §31.8)
+
+> Defined in `docs/COST_MODEL.md §31.8`. Four events covering the full pricing-decision audit trail — non-standard discounts, consumer price changes, enterprise list-price changes, and price-floor breach attempts. Required for COST_MODEL §31.9 item 1 (P0, M4 — before first enterprise quote is sent). Privacy invariant: no prospect company names, customer PII, health values, or employee names in any payload. `deal_id` is an internal CRM reference only. `rationale_text` and `rationale_ref` must not contain PII. **Ordering rule:** `enterprise.pricing_exception_approved` **must be emitted before the quote is sent** — a chain entry inserted after the quote was sent is a compliance violation detectable by the weekly chain audit. `enterprise.price_floor_override_requested` must emit a record regardless of `decision` value (`approved`/`denied`/`restructured`); the absence of a denied attempt is not evidence that none occurred. Cross-ref: SOC 2 CC1.4 (commitment to values of integrity), CC5.2 (management establishes pricing controls), A1.1 (capacity management); `docs/ENTERPRISE.md` §Pricing; `docs/MSA_TEMPLATE.md`; DECISION_LOG.md (pricing change decisions).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `enterprise.pricing_exception_approved` | HIGH | 7 yr | Non-standard discount (beyond pre-approved schedule in §31.6) approved by founder or investor; **must be emitted before the quote is sent to the prospect** | `deal_id` (CRM ref), `tier` (`starter`\|`growth`\|`enterprise`), `list_price_usd`, `approved_price_usd`, `effective_discount_pct`, `seat_count`, `contract_years`, `approver_user_id`, `approval_level` (`founder`\|`founder_plus_investor`), `rationale_text` (free text, max 200 chars — **no PII or company name**), `quote_ref` |
+| `enterprise.consumer_price_updated` | HIGH | 7 yr | Consumer Pro list price changed; emitted by founder via admin console | `previous_price_usd`, `new_price_usd`, `effective_date` (ISO 8601), `grandfathering_policy` (free text — describes treatment of existing subscribers), `updated_by` (founder `user_id`), `rationale_ref` (DECISION_LOG.md entry slug) |
+| `enterprise.list_price_updated` | HIGH | 7 yr | Enterprise tier list prices updated; emitted by founder | `tier` (`starter`\|`growth`\|`enterprise`), `previous_price_usd`, `new_price_usd`, `effective_date` (ISO 8601), `updated_by` (founder `user_id`), `active_contracts_affected` (integer — count of contracts at prior list rate that will face change at renewal), `rationale_ref` |
+| `enterprise.price_floor_override_requested` | CRITICAL | 7 yr | Quote below contractual floor (`$6.00`/`$4.50`/`$4.00` per §31.5) requested — **record emitted even when `decision = 'denied'`** | `deal_id`, `tier`, `requested_price_usd`, `floor_price_usd`, `requester_user_id`, `decision` (`approved`\|`denied`\|`restructured`), `approver_chain` (array of user UUIDs — empty array if denied at requester stage) |
+
+**HMAC chain requirement:** All four events must include `prev_hash`. `enterprise.pricing_exception_approved` links forward to `enterprise.contract_signed` (§23.7) via `pricing_exception_event_id` when the deal closes — auditors can traverse the chain from exception approval to signed contract. `enterprise.price_floor_override_requested` is CRITICAL severity: emitting it fires PagerDuty P2 and a compliance-officer email regardless of `decision`. A denied floor-breach attempt is not a no-op — the record exists so auditors can verify that no unrecorded floor breaches occurred during the observation window. Under no circumstance may `enterprise.price_floor_override_requested` be suppressed because the outcome was `denied`.
+
+**Emitter assignment:** `enterprise.pricing_exception_approved` — founder (manual via admin console, required before quote is sent); `enterprise.consumer_price_updated` — founder (manual at price change); `enterprise.list_price_updated` — founder (manual at list price change); `enterprise.price_floor_override_requested` — pricing calculator (client-side prevention emits no audit record; server-side approval request emits this event automatically when a below-floor request reaches the API).
+
+---
+
 ### Support actions (highest privilege)
 - `support.impersonation_started` — FORM employee acting as customer
 - `support.impersonation_ended`
@@ -323,6 +340,7 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 | `vuln.*` (vulnerability management) | 7 years | SOC 2 CC7.1 threat identification + CC7.2 remediation tracking evidence; `vuln.sla_exception_granted` also maps to CC7.4 (response to identified events) |
 | `compliance.erasure_sla_alert_fired` | 7 years | SOC 2 C1.2/P5.2 GDPR Art. 17 erasure SLA monitoring evidence; belt-and-suspenders secondary signal to §70 DSAR automation |
 | `compliance.data_asset_inventory_reviewed` / `compliance.encryption_verified` / `compliance.disposal_audit_completed` | 3 years | C1 operating evidence cadence records; routine compliance audit completion records per SOC2_READINESS.md §73 |
+| `enterprise.pricing_exception_approved` / `enterprise.consumer_price_updated` / `enterprise.list_price_updated` / `enterprise.price_floor_override_requested` | 7 years | SOC 2 CC1.4 pricing integrity evidence; COST_MODEL.md §31.8 pricing governance trail; CRITICAL-severity `enterprise.price_floor_override_requested` also maps to CC5.2 |
 | `support.*` | 10 years | Trust + future legal discovery |
 | `support.unauthorized_nuke_attempt` | 7 years | Internal safety control violation record |
 | `integration.api_call` (sampled) | 30 days | Volume management |
@@ -394,6 +412,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v0.9 · 2026-06-10 · owner: compliance-officer + security-engineer**
+*v0.9 (2026-06-10): +4 `enterprise.*` pricing governance events — `enterprise.pricing_exception_approved` (HIGH, 7yr), `enterprise.consumer_price_updated` (HIGH, 7yr), `enterprise.list_price_updated` (HIGH, 7yr), `enterprise.price_floor_override_requested` (CRITICAL, 7yr). All HMAC-chained per DEC-030. Ordering rule: `enterprise.pricing_exception_approved` must precede quote dispatch; `enterprise.price_floor_override_requested` records even denied attempts. `enterprise.pricing_exception_approved` links to `enterprise.contract_signed` (§23.7) via `pricing_exception_event_id`. Privacy invariant: no PII, company names, or health values in any payload. Retention table updated with 1 new row for `enterprise.*` events (SOC 2 CC1.4/CC5.2). Emitter: founder (manual) for exception-approved / price-updated / list-price-updated; pricing calculator server-side API (automated) for floor-override-requested. Closes COST_MODEL.md §31.9 checklist item 1 (P0, M4 — register four pricing event types in AUDIT_LOG_SCHEMA.md; Zod schema validation and `emit-audit-event` Worker deployment are implementation items for platform-engineer + data-engineer per §31.9 item 1 DoD). Cross-ref: COST_MODEL.md §31.8 (event definitions), §31.6 (discount authority matrix), §31.5 (price floors); ENTERPRISE.md §Pricing; MSA_TEMPLATE.md (price escalation clause — §31.7.2); DECISION_LOG.md.*
 
 **v0.8 · 2026-06-09 · owner: compliance-officer + devops-lead**
 *v0.8 (2026-06-09): +4 `compliance.*` C1 operating evidence events — `compliance.data_asset_inventory_reviewed` (STANDARD, 3yr), `compliance.encryption_verified` (STANDARD, 3yr), `compliance.erasure_sla_alert_fired` (HIGH, 7yr), `compliance.disposal_audit_completed` (STANDARD, 3yr). All HMAC-chained; defined in `docs/SOC2_READINESS.md §73`. Privacy invariant: no user_id, dsar_request_id, or health values in any payload. Retention table updated with 2 new rows. Closes SOC2_READINESS.md §73 cross-reference to AUDIT_LOG_SCHEMA.md ("four new DEC-030 events"). Emitters: form_system for erasure_sla_alert_fired (automated pg_cron `c1-erasure-sla-monitor`); compliance-officer (manual) for the other three cadenced events. Cross-ref: OBSERVABILITY.md §6.2 `c1_erasure_sla` subsection (AL-C1-01); SOC2_READINESS.md §73.4 (C1 DEC-030 event table).*

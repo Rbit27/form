@@ -6,6 +6,14 @@
 
 ---
 
+## [3.25.1] — 2026-06-10
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v0.8 → v0.9 — +4 `enterprise.*` pricing governance DEC-030 events: `enterprise.pricing_exception_approved` (HIGH, 7yr — emitted before non-standard-discount quote is sent; links to `enterprise.contract_signed` via `pricing_exception_event_id`), `enterprise.consumer_price_updated` (HIGH, 7yr — includes grandfathering policy), `enterprise.list_price_updated` (HIGH, 7yr — captures count of active contracts at prior rate), `enterprise.price_floor_override_requested` (CRITICAL, 7yr — records even denied floor-breach attempts). All HMAC-chained per DEC-030. Retention table updated with `enterprise.*` row (SOC 2 CC1.4/CC5.2). Closes `docs/COST_MODEL.md §31.9` checklist item 1 (P0, M4).
+- `VERSION` — 3.25.0 → 3.25.1
+
+---
+
 ## [3.25.0] — 2026-06-10
 
 ### Added
