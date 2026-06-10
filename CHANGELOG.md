@@ -6,6 +6,21 @@
 
 ---
 
+## [3.30.0] — 2026-06-10
+
+### Added
+- `content/post-397-sleep-training-adaptation.md` — Сон і тренувальна адаптація: Van Cauter et al. SWS + СТГ пульс; Res et al. (2012) нічний казеїн +22% MPS; Dattilo (2011) + Fullagar (2015) сон < 6 год — тестостерон −10–15%, СТГ пригнічений, відновлення уповільнене; Mah et al. (2011) sleep extension +2 год → спринт +5%, точність +9%; HRV як сурогат якості сну — тільки на 14-денному baseline; practical: 7–9 год vs 6 год, timing тренінгу, drills; clinical-safety PASS (~2,200 words, UA)
+- `content/post-398-blood-flow-restriction-bfr-training.md` — Тренінг із обмеженням кровотоку (BFR): Sato (2005) kaatsu origin; Schoenfeld (2010) metabolic stress mechanism; Takarada (2000), Abe (2005), Loenneke (2012) мета-аналіз; практика — 40–80% LOP, 30-15-15-15, 20–30% 1RM, 30–60 с відпочинку з манжетою; Hughes et al. (2017) BFR ≈ традиційне за гіпертрофією; протипоказання: серцево-судинні, гіпертонія, ТГВ, вагітність — explicit; clinical-safety PASS with contraindications (~2,000 words, UA)
+- `content/post-399-velocity-based-training-vbt.md` — VBT: González-Badillo & Sánchez-Medina (2010) load-velocity profile r = 0.98; MPV при volitional failure ~0.15–0.20 м/с; Pareja-Blanco et al. (2017) VL 20% vs 40% — різні силові / гіпертрофічні відповіді; González-Badillo et al. (2011) день-до-дня readiness via velocity; velocity zones (< 0.35 / 0.35–0.75 / 0.75–1.0 м/с); qualitative VBT без обладнання; GymAware/TENDO vs смартфон accuracy; clinical-safety PASS (~2,100 words, UA)
+- `content/post-400-cluster-sets-intra-set-rest.md` — Cluster-сети: Harris et al. (1976) ФКр 50% за 30 с, 95% за 3 хв; Haff et al. (2003/2004) mid-set velocity + power preservation; Oliver et al. (2013/2016) нейральні адаптації; Tufano et al. (2016/2017) volume-equated hypertrophy review; 1/1/1 та 2+2+2 cluster протоколи; коли не використовувати — початківці, metabolic goals, стиснутий час; clinical-safety PASS (~2,100 words, UA)
+- `blog.html` — +4 картки (post-397–400), лічильник 338 → 342 карток
+
+### Changed
+- `STATUS.md` — версія виправлена 3.24.0 → 3.30.0; пост-лічильник 396 → 400; рішення 28/34 → 38; DEC-035–038 додані до decision history; blog.html рядок оновлений
+- `VERSION` → 3.30.0 (MINOR: +4 content posts, blog.html cards, STATUS sync)
+
+---
+
 ## [3.29.1] — 2026-06-10
 
 ### Added

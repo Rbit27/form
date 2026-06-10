@@ -1,7 +1,7 @@
 # FORM · Project Status v1.3.5
 
 **Date:** 10 червня 2026
-**Version:** 3.24.0
+**Version:** 3.30.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -9,7 +9,7 @@
 
 ## TL;DR (one paragraph)
 
-FORM is at v3.29.0 with 60+ tagged releases, 17 functional HTML pages (marketing site, product mockups, investor one-pager, careers, enterprise landing, enterprise pricing calculator, security trust center, and articles index), 75+ markdown documents covering every operational domain, **396 evidence-based blog posts** ready for distribution (sports-science corpus, clinical-safety cleared, zero blocked posts in production), 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), an investor DD FAQ (DD_FAQ.md — 7-block due diligence prep), a user research screener toolkit (RESEARCH_SCREENER.md — screener survey with pass/reject criteria, Reddit/X/Telegram recruiting messages, interview tracker columns, gift card payment flow, anti-bias checklist — ready to use immediately without waiting for site launch), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish with a full deployment strategy, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, a public GitHub repo with 34 documented decisions, a growth loops playbook (GROWTH_LOOPS.md — 5 viral/organic loops, clinical-safety constraints on share content, FE implementation priority), a pre-launch Twitter/X playbook (TWITTER_PLAYBOOK.md), an investor CRM and relationship management framework (INVESTOR_PIPELINE.md — 7-stage pipeline model, Google Sheets schema, cadence rules, interest signal taxonomy, close mechanics, realistic raise timeline), a LinkedIn strategy playbook (LINKEDIN_PLAYBOOK.md), a full enterprise documentation stack (SOC2_READINESS.md 500+ controls, SSO_SCIM_IMPLEMENTATION.md SAML/OIDC/SCIM, INCIDENT_RESPONSE.md 13-runbook, DATA_MODEL.md multi-tenant RLS, OBSERVABILITY.md metrics/logs/traces, COST_MODEL.md unit econ per tier, KEY_ROTATION.md cryptographic lifecycle, ONBOARDING_SECURITY.md enterprise security onboarding, SSO_CLIENT_CONFIG.md per-IdP setup guides), and an activation metric definition anchored to CV coaching (DEC-034). Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
+FORM is at v3.30.0 with 60+ tagged releases, 17 functional HTML pages (marketing site, product mockups, investor one-pager, careers, enterprise landing, enterprise pricing calculator, security trust center, and articles index), 75+ markdown documents covering every operational domain, **400 evidence-based blog posts** ready for distribution (sports-science corpus, clinical-safety cleared, zero blocked posts in production), 2 newsletter issues (drafts, clinical-safety cleared), a full advisory board recruitment playbook (ADVISORY_BOARD.md — 4 advisor profiles, outreach templates, trial protocol, timeline), a platform-by-platform hiring guide (HIRING_GUIDE.md — Djinni/DOU/LinkedIn/Wellfound, screening protocol, response templates), a verbal pre-seed pitch narrative (SEED_NARRATIVE.md — 6-block investor call script, objection playbook, audience variants), an investor DD FAQ (DD_FAQ.md — 7-block due diligence prep), a user research screener toolkit (RESEARCH_SCREENER.md — screener survey with pass/reject criteria, Reddit/X/Telegram recruiting messages, interview tracker columns, gift card payment flow, anti-bias checklist — ready to use immediately without waiting for site launch), a full press kit (HTML + markdown), hiring JDs ready to post with a designed careers page, a newsletter setup guide, 12 LinkedIn posts ready to publish with a full deployment strategy, a complete beta community playbook, a beta recruiting playbook (channels, scoring, incentives, timeline to 200 users), a 30-assumption pre-research register (ASSUMPTIONS_REGISTER.md) with confidence levels and pivot criteria, sample programs and nutrition plans, full legal drafts, a public GitHub repo with 38 documented decisions, a growth loops playbook (GROWTH_LOOPS.md — 5 viral/organic loops, clinical-safety constraints on share content, FE implementation priority), a pre-launch Twitter/X playbook (TWITTER_PLAYBOOK.md), an investor CRM and relationship management framework (INVESTOR_PIPELINE.md — 7-stage pipeline model, Google Sheets schema, cadence rules, interest signal taxonomy, close mechanics, realistic raise timeline), a LinkedIn strategy playbook (LINKEDIN_PLAYBOOK.md), a full enterprise documentation stack (SOC2_READINESS.md 500+ controls, SSO_SCIM_IMPLEMENTATION.md SAML/OIDC/SCIM, INCIDENT_RESPONSE.md 13-runbook, DATA_MODEL.md multi-tenant RLS, OBSERVABILITY.md metrics/logs/traces, COST_MODEL.md unit econ per tier, KEY_ROTATION.md cryptographic lifecycle, ONBOARDING_SECURITY.md enterprise security onboarding, SSO_CLIENT_CONFIG.md per-IdP setup guides), and an activation metric definition anchored to CV coaching (DEC-034). Built solo by founder + AI agent team + 2-hour cloud iteration cycle. No code shipped yet — that begins with Founding Engineer hire post-Seed. Product spec for FE available: `docs/PRODUCT_SPEC.md`. Analytics instrumentation guide: `docs/ANALYTICS_SETUP.md`.
 
 ---
 
@@ -31,7 +31,7 @@ FORM is at v3.29.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 337 cards (396 posts authored), category filter, newsletter CTA | v3.29.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 342 cards (400 posts authored), category filter, newsletter CTA | v3.30.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 | [`security.html`](security.html) | Security Trust Center — SOC 2 status, sub-processors, responsible disclosure | v2.40.0 ✓ |
@@ -64,7 +64,7 @@ FORM is at v3.29.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | LAUNCH_CHECKLIST.md | P0/P1/P2 launch gate | founder |
 | I18N.md | Localization plan UA+EN, DE/PL/ES | marketing-lead |
 | APP_STORE.md | App Store listing draft (cloud) | marketing-lead |
-| DECISION_LOG.md | 28 documented decisions | process-keeper |
+| DECISION_LOG.md | 38 documented decisions | process-keeper |
 | ENGINEERING_RUNBOOK.md | On-call, deploy, monitoring | platform-engineer |
 | INVESTOR_UPDATE_TEMPLATE.md | Monthly update format | founder |
 | SUPPORT.md | Customer support playbook | founder |
@@ -555,8 +555,12 @@ M10-M12 (Q2 2027)
 - DEC-032: Law enforcement no-backdoor policy formalized (INCIDENT_RESPONSE R-13)
 - DEC-033: Post-100 milestone: quality over velocity (clinical-safety-blocked posts remain deferred)
 - DEC-034: D7 activation metric definition — full CV coaching session within 7 days (ACT-SLO-01 ≥ 40% [ESTIMATE])
+- DEC-035: API key expiry — soft enforcement (age alerts + CSM escalation), not automatic revocation at 365 days; escalates to hard if soft control not operating at SOC 2 observation start
+- DEC-036: Art. 9 health data — no grace period during enterprise off-boarding; hard-delete immediate; Art. 9 recovery window clauses refused at MSA review
+- DEC-037: privacy.html authored as form.coach/privacy URL target; PRE-01 advances to 🟡 Authored (→ 🟢 on counsel sign-off + Cloudflare Pages deploy)
+- DEC-038: Pricing exception approval procedure formalised in COST_MODEL.md §32; closes §31.9 P0 item 3; DEC-030 audit trail required before first enterprise quote
 
-34 total documented decisions з reverse-cost assessment.
+38 total documented decisions з reverse-cost assessment.
 
 ---
 
@@ -614,6 +618,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v3.27.0 · 10 червня 2026**
-**Last update:** 10 червня 2026 · v3.27.0
+**v3.30.0 · 10 червня 2026**
+**Last update:** 10 червня 2026 · v3.30.0
 **Next planned update:** після hire of Founding Engineer
