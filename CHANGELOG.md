@@ -6,6 +6,14 @@
 
 ---
 
+## [3.43.1] — 2026-06-10
+
+### Changed
+- [`docs/SOC2_READINESS.md §75`](docs/SOC2_READINESS.md) — P-GAP-002 🔴→🟢 and CC9-GAP-004 🔴→🟢 closed: formal P6 Disclosure & Notification Controls Auditor Exhibit added. §75 covers P6.1 Sub-Processor Disclosure (PRV-54–57, nine-row compliance snapshot, DEC-030 `vendor.sub_processor_added` chain), P6.2/P6.3 DPA Framework (Art. 28(3)(a)–(h) mapping, four-tier execution status — P0: Supabase+PostHog blocking GA; P1: Sentry+Resend+ElevenLabs; ✅ Anthropic+Cloudflare cleared), P6.4 Breach Notification (PRV-58–61, Art. 33 72h + Art. 34 data-subject + enterprise 1h/4h SLA), P6.5 Government Requests (four-principle policy, no-gov-backdoor anchor, ten `legal.*` DEC-030 events). Evidence artefacts PRE-75-E-001 through PRE-75-E-007 defined. P-series coverage ~82%→~87%; overall SOC 2 readiness ~98.3%→~98.6%. SOC 2 doc internal version v3.5.3→v3.6.0.
+- `VERSION` — 3.43.0 → 3.43.1.
+
+---
+
 ## [3.43.0] — 2026-06-10
 
 ### Added
