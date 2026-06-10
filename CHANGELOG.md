@@ -6,6 +6,20 @@
 
 ---
 
+## [3.43.0] — 2026-06-10
+
+### Added
+- [`content/post-442-double-progression.md`](content/post-442-double-progression.md) — Подвійна прогресія: систематичний підхід до просування між вагами (13 хв). Алгоритм «репи → вага → репи»; Zourdos et al. (2016) RIR-anchored progression; чому відсоткові схеми погано описують реальний тренувальний процес проміжного атлета; rep creep, передчасне підвищення ваги, дрейф RIR — три типові помилки; три маркери деловаду в рамках подвійної прогресії; порівняння з лінійною periodизацією і хвильовим завантаженням (Plisk & Stone 2003, Helms). clinical-safety NOT REQUIRED.
+- [`content/post-443-strength-standards-self-assessment.md`](content/post-443-strength-standards-self-assessment.md) — Силові стандарти і самооцінка прогресу: методологія порівняння без змагальних орієнтирів (13 хв). Алометричне масштабування Stone et al. (1991), Vanderburgh & Dooman (2000), Batterham & George (1997); Wilks і IPF GL — математика і обмеження; Swinton et al. (2014) нормативні дані; три питання самооцінки для self-coached атлета (RIR-proximity, volume-at-RPE, техніка); коли стандарти корисні і коли є пасткою; індивідуальна траєкторія проти популяційних бенчмарків. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — 2 нові картки (post-442–443); лічильники: 385→387 статей, 4 389→4 415 хвилин читання.
+- `STATUS.md` — TL;DR: 441→443 постів; blog.html row: 387 карток; content engine: +2 нові рядки post-442–443; версійний штамп v3.42.3→v3.43.0.
+- `README.md` — roadmap: [x] post-442–443 відмічені виконаними; post-444–445 — нові планові записи.
+- `VERSION` — 3.42.3 → 3.43.0.
+
+---
+
 ## [3.42.3] — 2026-06-10
 
 ### Added
