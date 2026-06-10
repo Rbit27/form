@@ -6,6 +6,16 @@
 
 ---
 
+## [3.41.5] — 2026-06-10
+
+### Added
+- [`docs/DATA_MODEL.md §29`](docs/DATA_MODEL.md) — PAM / Privileged Access Management Postgres Schema (migration 0058). Adds `admin_jit_escalations` and `pam_break_glass_reviews` tables with full RLS policies (`RESTRICTIVE` cross-tenant block; `security_reviewer` SELECT on justification text; `form_compliance` ownership of break-glass reviews). `fn_inject_pam_session_id()` SECURITY DEFINER trigger injected onto 6 sensitive audit tables. New DEC-030 event `pam.break_glass_review_completed` (severity HIGH, 7-year retention) with Zod schema. C2 forensic query enabling auditor evidence artefacts PAM-E-001–PAM-E-004. FORM-INSIDER-001 automated detection query closes open question **OQ-INS-01** (P0 blocker from INCIDENT_RESPONSE.md §R-20). pg_cron jobs 20 (`pam_postgres_sync`, 1 min) and 21 (`pam_bg_review_alert`, 5 min) registered. Header bumped v1.8 → v1.9. SOC 2 CC6.1/CC6.2/CC6.3/CC6.6 auditor evidence section included.
+
+### Changed
+- `VERSION` — 3.41.4 → 3.41.5.
+
+---
+
 ## [3.41.4] — 2026-06-10
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.8
+# FORM · Multi-Tenant Data Model v1.9
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -11775,3 +11775,493 @@ SELECT COUNT(*) AS archived_count FROM archived;
 ---
 
 *v1.0 (2026-06-10): §28 Rate Limiting, Quota Enforcement & Abuse Prevention Schema. Three-layer enforcement architecture: Cloudflare WAF (L3/L4/L7 volumetric, no Postgres state), Cloudflare KV sliding-window (per-api-key per-endpoint per-window burst limits, no Postgres state), and Postgres DB-layer quota tracking (durable monthly counters for billing evidence and enterprise contract enforcement). Migration 0055 adds three tables. `api_quota_usage`: monthly request and token counter per `(api_key_id, period_month, endpoint_category)`; `quota_limit` from contract tier (NULL = Consumer Pro unlimited); `overage_count` grace window before `hard_blocked_at`; 36-month retention (SOC 2 CC4.1). `rate_limit_violations`: append-only breach event log; `ip_country` (2-char only — no full IP); `layer` discriminates cloudflare_waf | kv_sliding_window | db_quota; 90-day rolling retention via pg_cron job 16. `abuse_flags`: pattern-based detection records with severity classification (low | medium | high | critical); `auto_actioned` flag distinguishes Worker-automated responses from pending manual review; `evidence_summary` contains statistical metadata only — no PII, no request content; `security_reviewer` Postgres role holds the only non-system SELECT + UPDATE grant; tenant admins have zero access. RLS (§28.3): `api_quota_usage` — PERMISSIVE owner/tenant-admin SELECT + RESTRICTIVE cross-tenant block + `form_system` full; `rate_limit_violations` — `form_api` INSERT-only, tenant manager SELECT own-tenant, `form_system` full; `abuse_flags` — `form_api` zero access, `security_reviewer` SELECT + UPDATE, `form_system` full. Quota enforcement flow (§28.4): `quota-check.ts` Worker UPSERT with atomic `request_count + 1`; hard_blocked_at check first (HTTP 429 with Retry-After pointing to next month); overage grace window (X-Quota-Warning header); 80% threshold CSM notification. KV sliding-window tier limits (§28.5, FORM-RL-001 config): Consumer Pro 10 req/min coaching / 100 analytics_read; Enterprise Starter 50 / 200; Enterprise Growth 200 / 500; Enterprise Custom configurable from contract. Three DEC-030 events (§28.6): `security.quota_hard_block` HIGH 3yr (payload: api_key_id, tenant_id, period_month, endpoint_category, overage_count); `security.abuse_flag_raised` HIGH 7yr (payload: flag_type, severity, flagged_entity_type, flagged_entity_id, auto_actioned); `security.abuse_action_taken` HIGH 7yr (payload: flag_id, previous_action, new_action, reviewed_by). pg_cron jobs: job 16 `rate_limit_violations_cleanup` daily 03:00 UTC (DELETE rows > 90 days); job 17 `api_quota_usage_archive` monthly 00:30 UTC (DELETE rows > 36 months; emit `data.quota_records_archived` DEC-030 STANDARD 1yr before delete). SOC 2 mapping (§28.8): CC6.1 (quota_limit enforces authorized access boundary — RL-E-001), CC6.6 (rate_limit_violations logs unauthorized access attempts — RL-E-002), CC7.2 (abuse_flags + DEC-030 chain documents anomaly monitoring and response — RL-E-003). Implementation checklist: 4× P0 M4 (migration 0055, quota-check.ts middleware, FORM-RL-001 KV config, DEC-030 event registration); 4× P1 M5 (abuse detection Workers, admin dashboard quota panel, SOC 2 evidence collection, pg_cron registry); 2× P2 M7+ (per-tenant configurable limits, OQ resolutions). Two open questions: OQ-RL-01 (tokens_consumed as billing source of truth vs. dedicated billing_metering table — P2, evaluate at M7); OQ-RL-02 (OVERAGE_GRACE = 500 requests recommended — P0, must be set before quota enforcement ships). Owner: enterprise-architect + platform-engineer + security-engineer.*
+
+---
+
+## 29. PAM / Privileged Access Management Postgres Schema — OQ-INS-01 Resolution · CC6.1/CC6.2/CC6.3/CC6.6 Auditor Evidence
+
+> **Closes OQ-INS-01** from `docs/INCIDENT_RESPONSE.md §R-20` (P0 blocker — automated insider detection programme blocked until `admin_jit_escalations` table exists).  
+> **Companion section:** `docs/SSO_SCIM_IMPLEMENTATION.md §24` (PAM architecture, KV session schema, DEC-030 events, alert rules). This section provides the **Postgres-durable persistence layer** that makes KV state forensically auditable and enables SQL-based detection queries.  
+> **Cross-references:** `docs/INCIDENT_RESPONSE.md §R-20` (C2 query depends on this table), `docs/INCIDENT_RESPONSE.md §R-20 checklist item 1` (creates this schema), `docs/OBSERVABILITY.md §29` (PAM / PAM Observability — AL-PAM-* alerting), `docs/SOC2_READINESS.md` CC6.1/CC6.2/CC6.3/CC6.6, `docs/AUDIT_LOG_SCHEMA.md` (PAM DEC-030 events registered in SSO §24.6).  
+> **SOC 2 criteria:** CC6.1 (logical access controls), CC6.2 (access provisioning with approval), CC6.3 (timely deprovisioning / auto-expiry evidence), CC6.6 (privilege escalation audit trail).  
+> **Owner:** enterprise-architect + security-engineer + compliance-officer. Migration: `0058_pam_schema.sql`.
+
+---
+
+### 29.1 Purpose and Scope
+
+`docs/SSO_SCIM_IMPLEMENTATION.md §24` specifies the full PAM architecture: `pam-elevation-service` Cloudflare Worker, KV session records with TTL, approval workflow, break-glass protocol, and six DEC-030 HMAC-chained audit events. The KV store (`PAM_KV`) is the **enforcement plane** — it controls whether a given `pam_session_id` grants access at query time. However KV records are ephemeral: they expire with the session TTL (4h maximum for `read_only`; 15 min for `destructive`) and cannot be queried after expiry.
+
+This creates a gap for the two workloads that require durable, queryable PAM state:
+
+1. **Forensic incident response (INCIDENT_RESPONSE R-20 C2 query):** When an insider threat investigation opens, the IC must query: *"Did this admin have an active, legitimately-approved JIT escalation for the window in question?"* KV cannot answer this query after the TTL expires. Postgres can.
+
+2. **SOC 2 auditor evidence (CC6.2 / CC6.3):** The auditor needs exportable records showing that every `form_admin` privilege use was pre-approved and auto-expired. DEC-030 events satisfy part of this, but structured relational records allow column-level queries that raw JSONB exports do not.
+
+Migration 0058 adds two tables:
+
+| Table | Purpose |
+|---|---|
+| `admin_jit_escalations` | Durable record of every JIT privilege escalation session; one row per PAM session; FK to `audit_log_events` DEC-030 chain. Closes OQ-INS-01. |
+| `pam_break_glass_reviews` | Post-incident review records for every break-glass activation; mandated by SSO §24.4.3 within 72 hours of activation. |
+
+**Out of scope for §29:** The KV schema (`pam:session:{id}`, TTL constants, approval workflow state) — that is specified in SSO §24.5 and managed entirely by the `pam-elevation-service` Worker. §29 does not duplicate KV schema.
+
+---
+
+### 29.2 KV ↔ Postgres Duality
+
+The two stores are complementary, not redundant:
+
+| Dimension | Cloudflare KV (`PAM_KV`) | Postgres (`admin_jit_escalations`) |
+|---|---|---|
+| **Primary use** | Real-time enforcement — `pam-db-proxy` validates before granting `SET ROLE form_admin` | Forensic audit trail — IR investigations, SOC 2 evidence export, compliance queries |
+| **Write path** | `pam-elevation-service` Worker (on elevation approval) | `pam-elevation-service` Worker (same transaction; Postgres INSERT via `emit-audit-event` Worker or direct Supabase REST) |
+| **Expiry behaviour** | TTL-based eviction (4h max) | Retained 7 years; no automatic deletion |
+| **Query model** | Key lookup only (`pam:session:{id}`, `pam:by_admin:{admin_user_id}:{id}`) | Full SQL — JOINs, date ranges, role filters, count aggregates |
+| **Privacy invariant** | `justification_hash` only (no free-text justification) | `business_justification` stored in plain text for IR forensics — restricted to `security_reviewer` role only |
+| **SOC 2 role** | Demonstrates access is time-limited (CC6.3) | Demonstrates approval was obtained (CC6.2) and access was scoped (CC6.1) |
+
+**Write sequencing:** `pam-elevation-service` writes to Postgres **after** KV write succeeds and the DEC-030 `pam.elevation_approved` event is emitted. Postgres write failure does not block session approval — KV remains authoritative for enforcement. A background reconciliation job (`pam_postgres_sync`, pg_cron job 20) detects missing Postgres rows by comparing `pam.elevation_approved` DEC-030 events against `admin_jit_escalations` and alerts on gaps > 30 minutes.
+
+---
+
+### 29.3 Migration 0058 — `admin_jit_escalations` and `pam_break_glass_reviews`
+
+```sql
+-- migrations/0058_pam_schema.sql
+-- SOC 2 criteria: CC6.1, CC6.2, CC6.3, CC6.6
+-- Owner: enterprise-architect + security-engineer
+-- Depends on: users (for FK), audit_log_events (for dec030_event_id FK)
+-- PAM KV schema companion: docs/SSO_SCIM_IMPLEMENTATION.md §24.5
+
+-- ─── Table 1: admin_jit_escalations ──────────────────────────────────────────
+-- One row per approved PAM escalation session.
+-- Closes OQ-INS-01 from docs/INCIDENT_RESPONSE.md §R-20.
+
+CREATE TABLE admin_jit_escalations (
+    -- ── Identity ───────────────────────────────────────────────────────────────
+    id                          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    pam_session_id              uuid        NOT NULL UNIQUE,
+    -- Matches the pam_session_id in PAM_KV record and DEC-030 event payload.
+    -- UNIQUE enforces one Postgres row per KV session — no duplicates.
+
+    -- ── Actor ─────────────────────────────────────────────────────────────────
+    actor_user_id               uuid        NOT NULL
+                                            REFERENCES users(id) ON DELETE RESTRICT,
+    -- The FORM internal admin user who requested elevation.
+    -- RESTRICT: disallow user deletion while an escalation record exists (7yr retention).
+
+    -- ── Access tier ───────────────────────────────────────────────────────────
+    access_level                text        NOT NULL
+                                            CHECK (access_level IN ('read_only', 'read_write', 'destructive')),
+    target_tenant_id            uuid        REFERENCES tenants(id) ON DELETE SET NULL,
+    -- NULL = cross-tenant operation (e.g. DSAR compliance export).
+    -- SET NULL on tenant deletion: the actor may have accessed a now-deleted tenant;
+    -- retain the row for IR forensics but allow tenant record to be purged.
+
+    -- ── Timing ────────────────────────────────────────────────────────────────
+    escalation_start            timestamptz NOT NULL DEFAULT now(),
+    escalation_expiry           timestamptz NOT NULL,
+    -- Derived from access_level TTL (read_only 4h, read_write 1h, destructive 15m).
+    -- Must match the TTL on the corresponding PAM_KV record.
+    revoked_at                  timestamptz,
+    -- Non-NULL if session was explicitly revoked before TTL expiry (e.g. IR R-20 response).
+
+    -- ── Approval ──────────────────────────────────────────────────────────────
+    authorised_by_ic_user_id    uuid        REFERENCES users(id) ON DELETE SET NULL,
+    -- IC = primary approver (manager for read_write; co-signer for destructive).
+    -- NULL for read_only (self-approve tier).
+    authorised_by_cop_user_id   uuid        REFERENCES users(id) ON DELETE SET NULL,
+    -- CoP = second cosigner; only populated for destructive tier dual-person rule.
+    -- NULL for read_only and read_write.
+
+    -- ── Justification ─────────────────────────────────────────────────────────
+    business_justification      text,
+    -- Plain-text justification — stored here for IR forensics under security_reviewer
+    -- access only. Never exposed to tenant_admin. Never appears in DEC-030 payloads
+    -- (those use justification_hash only — privacy invariant from SSO §24.6).
+    justification_hash          text        NOT NULL,
+    -- SHA-256 of business_justification. Cross-reference to DEC-030 event payload.
+
+    -- ── Break-glass flag ──────────────────────────────────────────────────────
+    is_break_glass              boolean     NOT NULL DEFAULT false,
+    -- true = session created via form-break-glass Cloudflare Access app (SSO §24.4).
+    -- When true, authorised_by_ic_user_id is NULL at session start;
+    -- populated post-hoc when pam_break_glass_reviews row is created.
+
+    -- ── Status ────────────────────────────────────────────────────────────────
+    status                      text        NOT NULL DEFAULT 'approved'
+                                            CHECK (status IN ('approved', 'revoked', 'expired')),
+    -- 'approved': session was valid; expired naturally at escalation_expiry.
+    -- 'revoked':  explicitly revoked before expiry (revoked_at IS NOT NULL).
+    -- 'expired':  pam-expiry-sweeper confirmed expiry; equivalent to 'approved' for most queries.
+
+    -- ── DEC-030 linkage ───────────────────────────────────────────────────────
+    dec030_elevation_approved_event_id  uuid,
+    -- References audit_log_events.id for the pam.elevation_approved event.
+    -- Nullable (INSERT may race with DEC-030 event emission; updated by reconciliation job).
+    dec030_session_expired_event_id     uuid,
+    -- References audit_log_events.id for the pam.session_expired event; populated by expiry sweeper.
+
+    -- ── Metadata ──────────────────────────────────────────────────────────────
+    created_at                  timestamptz NOT NULL DEFAULT now()
+    -- No updated_at: the only mutable columns are revoked_at, status,
+    -- dec030_session_expired_event_id, and authorised_by_ic_user_id (break-glass post-hoc fill).
+);
+
+-- ── Indexes ──────────────────────────────────────────────────────────────────
+CREATE INDEX idx_jit_actor          ON admin_jit_escalations (actor_user_id, escalation_start DESC);
+-- Supports C2 query: all sessions by this actor in a date range.
+
+CREATE INDEX idx_jit_tenant         ON admin_jit_escalations (target_tenant_id, escalation_start DESC)
+    WHERE target_tenant_id IS NOT NULL;
+-- Supports: all admin accesses to a specific tenant (per-tenant IR scope query).
+
+CREATE INDEX idx_jit_break_glass    ON admin_jit_escalations (is_break_glass, escalation_start DESC)
+    WHERE is_break_glass = true;
+-- Supports: all break-glass sessions (small subset; fast scan for quarterly review).
+
+CREATE INDEX idx_jit_active         ON admin_jit_escalations (escalation_expiry DESC)
+    WHERE status = 'approved' AND revoked_at IS NULL;
+-- Supports: FORM-INSIDER-001 alert — "is there an active approved session for this actor right now?".
+-- Partial index keeps it small.
+
+-- ─── Table 2: pam_break_glass_reviews ────────────────────────────────────────
+-- One row per break-glass activation, recording the mandatory 72-hour post-incident review
+-- required by SSO §24.4.3. Owned by compliance-officer role.
+
+CREATE TABLE pam_break_glass_reviews (
+    id                          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    pam_session_id              uuid        NOT NULL UNIQUE
+                                            REFERENCES admin_jit_escalations(pam_session_id) ON DELETE RESTRICT,
+    -- UNIQUE: one review per break-glass session. RESTRICT: do not allow escalation record
+    -- deletion while review record exists (forensic chain must remain intact).
+
+    -- ── Timing ────────────────────────────────────────────────────────────────
+    review_due_at               timestamptz NOT NULL,
+    -- = escalation_start + 72 hours. Computed at INSERT by trigger or application layer.
+    reviewed_at                 timestamptz,
+    -- NULL = review not yet completed. Drives AL-PAM-BG-01 alert (overdue review).
+
+    -- ── Outcome ───────────────────────────────────────────────────────────────
+    outcome                     text
+                                CHECK (outcome IN ('no_anomaly', 'anomaly_detected', 'process_gap')),
+    -- NULL until reviewed_at is set.
+    -- 'no_anomaly':       break-glass was justified by the active incident; no follow-up required.
+    -- 'anomaly_detected': unexpected query pattern or scope; escalate to security incident (R-20).
+    -- 'process_gap':      break-glass occurred due to PAM reliability issue; file reliability ticket.
+
+    -- ── Reviewers ─────────────────────────────────────────────────────────────
+    reviewed_by_security        uuid        REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_by_compliance      uuid        REFERENCES users(id) ON DELETE SET NULL,
+    -- Both must be non-NULL for outcome to be accepted (two-reviewer sign-off).
+
+    -- ── Evidence ──────────────────────────────────────────────────────────────
+    github_issue_url            text,
+    -- Auto-created by break-glass-notifier Worker at activation; format:
+    -- https://github.com/form-internal/security-reviews/issues/{n}
+    pg_audit_lines_reviewed     integer,
+    -- Count of pg_audit statement log lines reviewed by security-engineer.
+    -- NULL if pg_audit was not available during the session (e.g. PgBouncer restart).
+
+    notes                       text,
+    -- Free-text reviewer notes. Never exposed outside form_compliance role.
+    -- Contains summary of pg_audit findings and decision rationale.
+
+    -- ── DEC-030 linkage ───────────────────────────────────────────────────────
+    dec030_break_glass_activated_event_id   uuid,
+    -- References audit_log_events.id for pam.break_glass_activated event.
+    dec030_review_completed_event_id        uuid,
+    -- References audit_log_events.id for pam.break_glass_review_completed event (§29.6).
+
+    created_at                  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_bg_review_due ON pam_break_glass_reviews (review_due_at ASC)
+    WHERE reviewed_at IS NULL;
+-- Supports AL-PAM-BG-01: find overdue reviews efficiently.
+```
+
+---
+
+### 29.4 Row-Level Security
+
+#### 29.4.1 `admin_jit_escalations`
+
+```sql
+ALTER TABLE admin_jit_escalations ENABLE ROW LEVEL SECURITY;
+
+-- form_system: full access (for pam-elevation-service Worker and reconciliation job).
+CREATE POLICY jit_system_full ON admin_jit_escalations
+    AS PERMISSIVE FOR ALL TO form_system USING (true) WITH CHECK (true);
+
+-- security_reviewer: SELECT-only across all rows (IR investigations, SOC 2 evidence).
+CREATE POLICY jit_security_reviewer_read ON admin_jit_escalations
+    AS PERMISSIVE FOR SELECT TO security_reviewer USING (true);
+
+-- form_compliance: SELECT-only (compliance-officer SOC 2 evidence export).
+CREATE POLICY jit_compliance_read ON admin_jit_escalations
+    AS PERMISSIVE FOR SELECT TO form_compliance USING (true);
+
+-- form_api: INSERT-only, no SELECT (pam-elevation-service creates rows; cannot read back).
+CREATE POLICY jit_api_insert ON admin_jit_escalations
+    AS PERMISSIVE FOR INSERT TO form_api WITH CHECK (true);
+
+-- RESTRICTIVE cross-tenant block: tenant_admin NEVER sees PAM records.
+-- A tenant admin logged in as their own RBAC role cannot query this table.
+CREATE POLICY jit_no_tenant_admin ON admin_jit_escalations
+    AS RESTRICTIVE FOR ALL
+    USING (current_setting('app.role', true) NOT IN ('tenant_owner', 'tenant_admin', 'tenant_manager'));
+```
+
+**Privacy invariant:** `business_justification` is a plain-text column accessible only to `security_reviewer` and `form_compliance` roles. The `form_api` INSERT policy does not grant SELECT; `form_api` cannot read back justification text after writing it. The DEC-030 event (`pam.elevation_approved`) stores only `justification_hash` — never the plain text.
+
+#### 29.4.2 `pam_break_glass_reviews`
+
+```sql
+ALTER TABLE pam_break_glass_reviews ENABLE ROW LEVEL SECURITY;
+
+-- form_compliance: full access (compliance-officer owns the review process).
+CREATE POLICY bgr_compliance_full ON pam_break_glass_reviews
+    AS PERMISSIVE FOR ALL TO form_compliance USING (true) WITH CHECK (true);
+
+-- security_reviewer: SELECT (security-engineer participates in review but does not own it).
+CREATE POLICY bgr_security_read ON pam_break_glass_reviews
+    AS PERMISSIVE FOR SELECT TO security_reviewer USING (true);
+
+-- form_system: INSERT only (break-glass-notifier Worker creates the stub row on activation).
+CREATE POLICY bgr_system_insert ON pam_break_glass_reviews
+    AS PERMISSIVE FOR INSERT TO form_system WITH CHECK (true);
+
+-- All other roles: no access.
+CREATE POLICY bgr_deny_all ON pam_break_glass_reviews
+    AS RESTRICTIVE FOR ALL
+    USING (current_role IN ('form_compliance', 'security_reviewer', 'form_system'));
+```
+
+---
+
+### 29.5 Audit Trigger Pattern — `app.pam_session_id` GUC
+
+SSO §24.2 specifies that `pam-db-proxy` executes `SET app.pam_session_id = '<id>'` before each privileged query batch and `RESET app.pam_session_id` after. Triggers on sensitive Postgres tables read this GUC and inject `pam_session_id` into their `audit_log` row metadata, creating a **database-layer linkage** between every privileged query and the PAM session that authorised it — independent of application-layer DEC-030 events.
+
+The following tables must carry this trigger:
+
+| Table | Trigger name | Rationale |
+|---|---|---|
+| `tenant_sso_configs` | `trg_pam_audit_sso_config` | SSO configuration changes are high-blast-radius; every change under `form_admin` must be traceable to a PAM session |
+| `tenant_members` | `trg_pam_audit_tenant_members` | Seat provisioning / deprovisioning by an admin requires PAM-session traceability |
+| `enterprise_seat_assignments` | `trg_pam_audit_seat_assignments` | Same rationale as `tenant_members` |
+| `user_profiles` | `trg_pam_audit_user_profiles` | Admin access to individual user records is Art. 9 scope |
+| `cv_sessions` | `trg_pam_audit_cv_sessions` | CV keypoint data is biometric (Art. 9); admin access must be PAM-traced |
+| `audit_log_events` | `trg_pam_audit_audit_log` | Any admin modification to the audit log itself must be traceable — meta-audit |
+
+**Trigger template (applied to each table above):**
+
+```sql
+CREATE OR REPLACE FUNCTION fn_inject_pam_session_id()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_pam_session_id text;
+BEGIN
+    v_pam_session_id := current_setting('app.pam_session_id', true);
+    -- 'true' = return NULL if GUC is not set (non-PAM sessions have no pam_session_id).
+
+    IF v_pam_session_id IS NOT NULL AND v_pam_session_id <> '' THEN
+        -- Append to the row's metadata JSONB (assumes a metadata JSONB column exists).
+        -- For tables without a metadata column, write to audit_log_events instead.
+        NEW.metadata := COALESCE(NEW.metadata, '{}'::jsonb)
+            || jsonb_build_object('pam_session_id', v_pam_session_id);
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+-- Applied to each table:
+CREATE TRIGGER trg_pam_audit_sso_config
+    BEFORE INSERT OR UPDATE ON tenant_sso_configs
+    FOR EACH ROW EXECUTE FUNCTION fn_inject_pam_session_id();
+-- (Repeat for each table in the list above)
+```
+
+**Non-PAM sessions:** When `app.pam_session_id` is not set (normal `form_api` request), `current_setting(..., true)` returns NULL and the trigger is a no-op. No performance overhead outside PAM sessions.
+
+---
+
+### 29.6 DEC-030 Events
+
+All six core PAM audit events (`pam.elevation_requested`, `pam.elevation_approved`, `pam.elevation_denied`, `pam.session_expired`, `pam.break_glass_activated`, `pam.break_glass_expired`) are defined in `docs/SSO_SCIM_IMPLEMENTATION.md §24.6` and registered in `docs/AUDIT_LOG_SCHEMA.md`. §29 does not add new PAM events.
+
+One event is added by §29 to close the break-glass review lifecycle:
+
+| Event | Severity | Retention | Trigger | Payload |
+|---|---|---|---|---|
+| `pam.break_glass_review_completed` | HIGH | 7 years | Emitted by compliance-officer via admin API when `pam_break_glass_reviews.reviewed_at` is set | `pam_session_id`, `outcome` (enum), `reviewed_by_security`, `reviewed_by_compliance`, `review_completed_at`, `github_issue_url` |
+
+This event closes the break-glass DEC-030 chain: `pam.break_glass_activated` → `pam.break_glass_expired` → `pam.break_glass_review_completed`. An auditor can confirm the full break-glass lifecycle in the HMAC chain by querying these three event types with the same `pam_session_id`.
+
+**`pam.break_glass_review_completed` Zod schema:**
+
+```typescript
+import { z } from 'zod';
+
+const PamBreakGlassReviewCompletedPayload = z.object({
+  pam_session_id:        z.string().uuid(),
+  outcome:               z.enum(['no_anomaly', 'anomaly_detected', 'process_gap']),
+  reviewed_by_security:  z.string().uuid(),
+  reviewed_by_compliance: z.string().uuid(),
+  review_completed_at:   z.string().datetime(),
+  github_issue_url:      z.string().url().optional(),
+  pg_audit_lines_reviewed: z.number().int().nonneg().optional(),
+});
+```
+
+---
+
+### 29.7 C2 Query — INCIDENT_RESPONSE R-20 FORM-INSIDER-001 Automation
+
+The C2 query from INCIDENT_RESPONSE R-20 requires `admin_jit_escalations` to be populated. The query determines whether a detected admin operation had a valid, legitimately-approved JIT escalation window:
+
+```sql
+-- C2: Active or recently-expired PAM escalation for a given actor
+-- Run by IR IC when FORM-INSIDER-001 alert fires for admin_user_id = :actor_id
+-- Replace :actor_id and :window_start / :window_end with investigation parameters.
+
+SELECT
+    jit.id,
+    jit.pam_session_id,
+    jit.access_level,
+    jit.target_tenant_id,
+    jit.escalation_start,
+    jit.escalation_expiry,
+    jit.revoked_at,
+    jit.status,
+    jit.is_break_glass,
+    jit.business_justification,         -- available to security_reviewer role only
+    jit.authorised_by_ic_user_id,
+    jit.authorised_by_cop_user_id,
+    CASE
+        WHEN jit.revoked_at IS NOT NULL THEN 'REVOKED'
+        WHEN now() BETWEEN jit.escalation_start AND jit.escalation_expiry THEN 'ACTIVE'
+        ELSE 'EXPIRED'
+    END AS session_state
+FROM admin_jit_escalations jit
+WHERE
+    jit.actor_user_id = :actor_id
+    AND jit.escalation_start BETWEEN :window_start AND :window_end
+ORDER BY jit.escalation_start DESC;
+```
+
+**Interpretation guide:**
+
+| Result | Interpretation |
+|---|---|
+| Row with `session_state = 'ACTIVE'` or `'EXPIRED'`, `authorised_by_ic_user_id IS NOT NULL` | Admin operation was within a legitimately-approved PAM window. Low suspicion — continue standard IR triage. |
+| Zero rows for the query window | Admin operation occurred with **no approved PAM session** — this is the FORM-INSIDER-001 trigger condition. Treat as unauthorised `form_admin` access. Escalate immediately per R-20 response procedure. |
+| Row with `is_break_glass = true` | Break-glass session — check `pam_break_glass_reviews` for linked review outcome. If `reviewed_at IS NULL`, review is overdue (breach of §24.4.3 72-hour requirement). |
+| Row with `status = 'revoked'` and `revoked_at` before the suspicious operation timestamp | Session was revoked before the operation occurred. Operation was **outside** the revocation window — treat as potentially unauthorised. |
+
+**Automation note:** Once migration 0058 is deployed, the FORM-INSIDER-001 alert (currently manual per OQ-INS-01) can be implemented as a `pg_cron` job or a Cloudflare Worker that polls for `audit_log_events` where `actor_role = 'form_admin'` with no matching `admin_jit_escalations` row within the operation timestamp's range. Checklist item 2 (§29.10) tracks this automation.
+
+---
+
+### 29.8 FORM-INSIDER-001 Automation Path
+
+Before §29 (OQ-INS-01 open), FORM-INSIDER-001 could not fire automatically:
+
+> *"C2 cannot be run as written and must be replaced by a manual review of admin operation timestamps against calendar records."* — INCIDENT_RESPONSE R-20 OQ-INS-01
+
+After §29 (migration 0058 deployed), the automation path is:
+
+1. **Source signal:** `audit_log_events` where `event_type = 'pam.*'` provides the DEC-030 chain. Any `form_admin` Postgres operation via `pam-db-proxy` emits `SET app.pam_session_id` → trigger row captures `pam_session_id` in table metadata.
+
+2. **Detection query** (to be run by a pg_cron monitoring job every 15 minutes):
+
+```sql
+-- FORM-INSIDER-001 candidate: form_admin-class audit events without a valid PAM session
+-- Fires when any audit_log_events row has metadata.pam_session_id set
+-- but no matching admin_jit_escalations row covers that timestamp.
+
+SELECT DISTINCT ale.id AS audit_event_id,
+       ale.actor_id,
+       ale.occurred_at,
+       ale.metadata->>'pam_session_id' AS claimed_pam_session_id
+FROM audit_log_events ale
+WHERE
+    -- Only audit events that carry a PAM session claim
+    ale.metadata->>'pam_session_id' IS NOT NULL
+    -- Only recent window (15-minute look-back for cron cadence)
+    AND ale.occurred_at >= now() - INTERVAL '15 minutes'
+    -- No matching approved escalation covers this timestamp
+    AND NOT EXISTS (
+        SELECT 1
+        FROM admin_jit_escalations jit
+        WHERE jit.pam_session_id = (ale.metadata->>'pam_session_id')::uuid
+          AND ale.occurred_at BETWEEN jit.escalation_start AND jit.escalation_expiry
+          AND jit.revoked_at IS NULL
+    );
+```
+
+3. **Alert action:** If any rows returned, emit `security.insider_threat_candidate` DEC-030 event (HIGH, 7yr) with `audit_event_id`, `actor_id`, `claimed_pam_session_id`, fire PagerDuty P0 routing key `PAM_PAGERDUTY_ROUTING_KEY`.
+
+This closes the operational gap identified in OQ-INS-01 and makes the insider detection programme fully automated.
+
+---
+
+### 29.9 SOC 2 Evidence Mapping
+
+| Criterion | Control | §29 mechanism | Evidence artefact | Status |
+|---|---|---|---|---|
+| **CC6.1** — Logical access controls | `form_admin` role is never held as standing credential; every privileged session is recorded in `admin_jit_escalations` with explicit scope and TTL | `admin_jit_escalations` with `target_tenant_id` scope + `escalation_expiry` TTL column; `ACTIVE`/`EXPIRED` session state computation | **PAM-E-001:** 30-day export of `admin_jit_escalations` showing zero rows with `target_tenant_id IS NULL` for single-tenant operations (confirms tenant scope enforcement); all rows have `escalation_expiry ≤ escalation_start + 4h` (confirms max TTL) | 🟡 Authored — closes on migration 0058 deploy + first 30-day export |
+| **CC6.2** — Access provisioning | Every `read_write` or `destructive` elevation carries a non-NULL `authorised_by_ic_user_id`; `destructive` also carries `authorised_by_cop_user_id` | `admin_jit_escalations.authorised_by_ic_user_id NOT NULL` for non-read_only rows (enforced by `pam-elevation-service`); CHECK constraint added in §29.10 | **PAM-E-002:** Export of all `admin_jit_escalations` rows where `access_level IN ('read_write', 'destructive')` for the observation period; all rows show non-NULL approver; cross-reference with DEC-030 `pam.elevation_approved` events confirming approval predates session start | 🟡 Authored — closes on first elevation of `read_write` or `destructive` tier |
+| **CC6.3** — Timely deprovisioning | Sessions auto-expire by KV TTL; Postgres records `escalation_expiry` and `status`; reconciliation job closes any gap between KV expiry and Postgres record | `admin_jit_escalations.status = 'expired'` rows populated by `pam-expiry-sweeper`; reconciliation job (pg_cron job 20) detects missing rows | **PAM-E-003:** Export of `pam.session_expired` DEC-030 events + matching `admin_jit_escalations` rows showing `status = 'expired'`; zero rows with `escalation_expiry < now() AND status = 'approved'` (confirms no orphaned approved-but-expired rows) | 🟡 Authored |
+| **CC6.6** — Privilege escalation audit trail | Every elevation, denial, break-glass, and expiry event is HMAC-chained in DEC-030; break-glass sessions also have a mandatory post-incident review record | `pam_break_glass_reviews` table; `pam.break_glass_review_completed` DEC-030 event; 72-hour review SLA enforced by AL-PAM-BG-01 alert | **PAM-E-004:** Export of all `pam_break_glass_reviews` rows for the observation period; all rows show `reviewed_at IS NOT NULL` and `outcome` set; cross-reference with `pam.break_glass_review_completed` DEC-030 events confirming both reviewers signed off | 🟡 Authored |
+
+All four artefacts are stored in `compliance/evidence/pam/` and cross-referenced in `docs/SOC2_READINESS.md §24.8` (SSO §24 PAM evidence artefacts CC6-E-PAM-001 through CC6-E-PAM-004 → updated to include §29 Postgres evidence as CC6-E-PAM-005 through CC6-E-PAM-008).
+
+---
+
+### 29.10 Implementation Checklist
+
+#### P0 — Must complete before FORM-INSIDER-001 alert can be automated (M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0058_pam_schema.sql`: CREATE `admin_jit_escalations` (with all columns, indexes, and RLS policies from §29.3 and §29.4.1); CREATE `pam_break_glass_reviews` (with all columns, index, and RLS policies from §29.3 and §29.4.2). Confirm: (a) `\d admin_jit_escalations` shows UNIQUE on `pam_session_id`, RLS enabled; (b) `form_api` INSERT succeeds, SELECT returns 0 rows (INSERT-only RLS confirmed); (c) `tenant_admin`-role query on `admin_jit_escalations` returns 0 rows (RESTRICTIVE policy confirmed). | platform-engineer | **P0** | M6 | [ ] |
+| 2 | Update `pam-elevation-service` Worker: on `pam.elevation_approved` DEC-030 event emission, also INSERT a row into `admin_jit_escalations` via Supabase REST. Columns: `pam_session_id`, `actor_user_id`, `access_level`, `target_tenant_id`, `escalation_start`, `escalation_expiry`, `business_justification` (plaintext, not the hash), `justification_hash`, `is_break_glass`, `authorised_by_ic_user_id`, `authorised_by_cop_user_id`, `dec030_elevation_approved_event_id`. Postgres INSERT failure must not block session approval — KV remains authoritative. Log Postgres INSERT failure to Sentry with pam_session_id for reconciliation. | platform-engineer | **P0** | M6 | [ ] |
+| 3 | Update `break-glass-notifier` Worker: on break-glass activation, INSERT stub row into `pam_break_glass_reviews` with `pam_session_id`, `review_due_at = now() + INTERVAL '72 hours'`, `github_issue_url` (from auto-created GitHub issue), `dec030_break_glass_activated_event_id`. `reviewed_at`, `outcome`, `reviewed_by_*` remain NULL until compliance-officer completes review. | devops-lead | **P0** | M6 | [ ] |
+| 4 | Update `pam-expiry-sweeper` Worker: when emitting `pam.session_expired` DEC-030 event, also UPDATE `admin_jit_escalations SET status = 'expired', dec030_session_expired_event_id = <event_id> WHERE pam_session_id = <id>`. This ensures Postgres `status` column tracks KV expiry confirmation. | devops-lead | **P0** | M6 | [ ] |
+| 5 | Add `fn_inject_pam_session_id()` trigger to all six tables listed in §29.5 (`tenant_sso_configs`, `tenant_members`, `enterprise_seat_assignments`, `user_profiles`, `cv_sessions`, `audit_log_events`). Run integration test: start a `read_only` PAM session, execute a SELECT on `tenant_sso_configs` via `pam-db-proxy`, confirm that the query row in `audit_log_events` (generated by the table-level trigger) carries `metadata.pam_session_id = <session_id>`. | platform-engineer | **P0** | M6 | [ ] |
+| 6 | Register `pam.break_glass_review_completed` as a new DEC-030 event type in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schema from §29.6. Deploy updated event registry to `emit-audit-event` Worker. | platform-engineer | **P0** | M6 | [ ] |
+
+#### P1 — Before FORM-INSIDER-001 alert goes to PagerDuty (M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Implement pg_cron job 20 `pam_postgres_sync` (§29.2 reconciliation job): runs every 30 minutes; selects `pam.elevation_approved` DEC-030 events from `audit_log_events` in the last 60 minutes; for each event, confirms a matching `admin_jit_escalations` row exists (`pam_session_id = event.payload.pam_session_id`); if missing, emits `security.pam_postgres_sync_gap` DEC-030 event (HIGH, 3yr) and fires PagerDuty P2 to `security-engineer`. Add to `docs/OBSERVABILITY.md §12.6` pg_cron registry as job 20, freshness window 35 minutes. | devops-lead | **P1** | M7 | [ ] |
+| 8 | Add AL-PAM-BG-01 alert rule: `pam_break_glass_reviews.review_due_at < now()` AND `reviewed_at IS NULL` → PagerDuty P1 to `form-compliance`. Query: `SELECT pam_session_id, review_due_at FROM pam_break_glass_reviews WHERE review_due_at < now() AND reviewed_at IS NULL`. Cadence: pg_cron daily 08:00 UTC. Implement as pg_cron job 21. Add to `docs/OBSERVABILITY.md §29` (PAM Observability) alert table alongside AL-PAM-01/02/03. | devops-lead + compliance-officer | **P1** | M7 | [ ] |
+| 9 | Implement FORM-INSIDER-001 automated detection (§29.8 detection query) as a Cloudflare Worker Cron (every 15 minutes) or pg_cron job. On match: emit `security.insider_threat_candidate` DEC-030 event (HIGH, 7yr); fire PagerDuty P0 routing key `PAM_PAGERDUTY_ROUTING_KEY`. Update INCIDENT_RESPONSE.md R-20 to mark OQ-INS-01 as 🟢 Resolved, pointing to this checklist item. | security-engineer + platform-engineer | **P1** | M7 | [ ] |
+| 10 | Collect PAM-E-001 through PAM-E-004 evidence artefacts (§29.9) 30 days after M6 go-live; store in `compliance/evidence/pam/`; update `docs/SOC2_READINESS.md §24.8` to reference CC6-E-PAM-005 through CC6-E-PAM-008. | compliance-officer | **P1** | M7 | [ ] |
+| 11 | Add CHECK constraint to `admin_jit_escalations`: `chk_jit_approver_required CHECK (access_level = 'read_only' OR authorised_by_ic_user_id IS NOT NULL)`. This enforces at the DB layer that non-`read_only` escalations always carry an approver — preventing a scenario where `pam-elevation-service` fails to write the approver UUID. Deploy as a separate migration `0058b_pam_approver_constraint.sql`. | platform-engineer | **P1** | M7 | [ ] |
+
+#### P2 — Post-GA
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 12 | Implement `tenant_admin`-facing PAM session transparency report: a quarterly report (generated by `form_compliance` role) listing the count of `form_admin` sessions that accessed a given tenant's data in the prior quarter, with `access_level` distribution (no actor names, no business_justification). Satisfies enterprise customer transparency expectation and supports GDPR Art. 28 processor accountability. Update `docs/ENTERPRISE_ADMIN_API.md` with the new reporting endpoint. | compliance-officer + platform-engineer | **P2** | M10 | [ ] |
+| 13 | Resolve OQ-PAM-01 (§29.11): decide whether `admin_jit_escalations` rows with `is_break_glass = true` should be visible to `form_compliance` in a separate, more restricted query path that requires dual-authentication (both compliance-officer and security-engineer signatures on the query). | compliance-officer + security-engineer | **P2** | M8 | [ ] |
+
+---
+
+### 29.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-PAM-01** | **Should `admin_jit_escalations` rows with `is_break_glass = true` require dual-role authentication to query?** Standard `security_reviewer` SELECT covers all rows including break-glass. Given that break-glass sessions represent the highest-privilege access, some organisations require a co-approval step even for read-access to break-glass audit records. Risk: adding a query-time approval gate for IR investigations would slow down incident response significantly — the opposite of what break-glass is for. Recommendation: keep current model (`security_reviewer` SELECT for all rows) but add an alert (`security.break_glass_audit_record_accessed` DEC-030 HIGH) whenever `admin_jit_escalations WHERE is_break_glass = true` is queried, so every access to break-glass records is itself recorded. | P2 | compliance-officer + security-engineer | Decide before first break-glass activation in production; document in `docs/DECISION_LOG.md`. |
+| **OQ-PAM-02** | **Should `business_justification` (plain-text) ever be included in the SOC 2 auditor evidence export?** Current stance: `business_justification` stays in Postgres under `security_reviewer` access only; auditors see `justification_hash` in DEC-030 events and can confirm the hash matches the plaintext on request during fieldwork. Risk: some auditors require the plaintext justification to assess whether escalations were "reasonable" (a CC6.2 qualitative element). Mitigation: provide plaintext justification examples in a redacted sample (sanitised to remove any PII or customer-specific identifiers) rather than a bulk export. Recommendation: redacted sample approach; document in `compliance/evidence/pam/justification-sample.md`. | P1 | compliance-officer | Before SOC 2 observation period start |
+
+---
+
+*v1.0 (2026-06-10): §29 PAM / Privileged Access Management Postgres Schema — OQ-INS-01 Resolution · CC6.1/CC6.2/CC6.3/CC6.6 Auditor Evidence. Closes OQ-INS-01 from `docs/INCIDENT_RESPONSE.md §R-20` (P0 blocker — FORM-INSIDER-001 alert and the C2 forensic query were blocked until `admin_jit_escalations` table existed; all automated insider detection required manual calendar-record cross-referencing). §29.1 purpose and scope: two-store duality — KV (enforcement, ephemeral, TTL-based) vs. Postgres (forensic audit, durable 7yr, SQL-queryable); write sequencing (KV first, Postgres second, failure-tolerant); reconciliation job closes any gap. §29.2 KV ↔ Postgres duality table: dimensions are primary use, write path, expiry, query model, privacy invariant, and SOC 2 role. §29.3 migration 0058: two tables — `admin_jit_escalations` (pam_session_id UNIQUE, actor_user_id FK, access_level CHECK enum, target_tenant_id nullable, escalation_start/expiry/revoked_at timing columns, authorised_by_ic_user_id / authorised_by_cop_user_id approval columns, business_justification plain-text under security_reviewer-only, justification_hash for DEC-030 cross-reference, is_break_glass flag, status CHECK enum, dec030 event ID columns; four indexes: idx_jit_actor, idx_jit_tenant, idx_jit_break_glass, idx_jit_active partial) and `pam_break_glass_reviews` (pam_session_id UNIQUE FK, review_due_at, reviewed_at, outcome CHECK enum, reviewed_by_security/compliance FK, github_issue_url, pg_audit_lines_reviewed, notes, dec030 event ID columns; idx_bg_review_due partial). §29.4 RLS: `admin_jit_escalations` — five policies (form_system PERMISSIVE ALL, security_reviewer PERMISSIVE SELECT, form_compliance PERMISSIVE SELECT, form_api PERMISSIVE INSERT-only, RESTRICTIVE block for tenant_admin/owner/manager roles — HR invariant at DDL level); `pam_break_glass_reviews` — four policies (form_compliance PERMISSIVE ALL, security_reviewer PERMISSIVE SELECT, form_system PERMISSIVE INSERT-only, RESTRICTIVE deny-all for other roles). §29.5 audit trigger pattern: `fn_inject_pam_session_id()` SECURITY DEFINER trigger reads `app.pam_session_id` GUC (current_setting with null-safe true flag); appends pam_session_id to metadata JSONB on all six sensitive tables (tenant_sso_configs, tenant_members, enterprise_seat_assignments, user_profiles, cv_sessions, audit_log_events); no-op when GUC not set — zero overhead for normal form_api requests. §29.6 DEC-030: one new event `pam.break_glass_review_completed` (HIGH, 7yr) closes the break-glass DEC-030 chain (break_glass_activated → break_glass_expired → break_glass_review_completed); Zod schema provided. §29.7 C2 query: full SQL provided; interpretation guide (zero rows = FORM-INSIDER-001 condition; row with ACTIVE/EXPIRED state + approver = legitimate access; break-glass row = check pam_break_glass_reviews; revoked row before operation timestamp = potentially unauthorised). §29.8 FORM-INSIDER-001 automation: 15-minute pg_cron / Worker detection query matches audit_log_events carrying metadata.pam_session_id against admin_jit_escalations coverage window; zero matches = `security.insider_threat_candidate` DEC-030 HIGH + PagerDuty P0. §29.9 SOC 2 evidence mapping: CC6.1 (PAM-E-001 — zero null-scoped rows + ≤4h TTL), CC6.2 (PAM-E-002 — non-null approver for all non-read_only rows), CC6.3 (PAM-E-003 — expired rows + DEC-030 pam.session_expired chain), CC6.6 (PAM-E-004 — pam_break_glass_reviews all reviewed within 72h + pam.break_glass_review_completed events); artefacts stored in compliance/evidence/pam/; cross-reference to SOC2_READINESS §24.8 as CC6-E-PAM-005 through CC6-E-PAM-008. §29.10 implementation checklist: 6× P0 M6 (migration, pam-elevation-service INSERT, break-glass-notifier stub INSERT, pam-expiry-sweeper UPDATE, audit triggers, DEC-030 event registration), 5× P1 M7 (pg_cron reconciliation job 20, AL-PAM-BG-01 pg_cron job 21, FORM-INSIDER-001 automation, evidence collection, CHECK constraint migration 0058b), 2× P2 M8–M10 (tenant transparency report, OQ-PAM-01 decision). §29.11 two open questions: OQ-PAM-01 (dual-auth for break-glass audit record queries — P2, recommendation: alert-on-access approach), OQ-PAM-02 (plaintext justification in SOC 2 auditor evidence — P1, recommendation: redacted sample approach). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §24` (KV schema, DEC-030 events, alert rules AL-PAM-01/02/03 — §29 does not duplicate), `docs/INCIDENT_RESPONSE.md §R-20` (OQ-INS-01 → 🟢 Resolved by §29; C2 query updated to reference `admin_jit_escalations`; checklist item 1 closed), `docs/OBSERVABILITY.md §29` (PAM observability — AL-PAM-BG-01 to be added), `docs/OBSERVABILITY.md §12.6` (pg_cron registry: job 20 pam_postgres_sync, job 21 pam_bg_review_alert), `docs/AUDIT_LOG_SCHEMA.md` (`pam.break_glass_review_completed` — new event to register), `docs/SOC2_READINESS.md §24.8` (CC6-E-PAM-005 through CC6-E-PAM-008 evidence artefacts), `docs/CRYPTOGRAPHY_POLICY.md §3` (BUSINESS_JUSTIFICATION is plain-text stored under security_reviewer only — no key needed; confirm with compliance-officer before M6 migration), `docs/ENTERPRISE_ADMIN_API.md` (OQ-PAM-01 transparency report endpoint — P2 M10). Owner: enterprise-architect + security-engineer + compliance-officer.*
