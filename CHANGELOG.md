@@ -6,6 +6,15 @@
 
 ---
 
+## [3.36.0] — 2026-06-10
+
+### Added
+- [`content/post-406-breathing-iap-strength.md`](content/post-406-breathing-iap-strength.md) — дихання і IAP у силовому тренінгу (Valsalva, bracing vs draw-in, lift-specific cues)
+- [`content/post-408-warmup-optimization-strength.md`](content/post-408-warmup-optimization-strength.md) — оптимізація розминки (PAP, static vs dynamic, warm-up sets)
+- [`content/post-410-tendon-adaptation-resistance-training.md`](content/post-410-tendon-adaptation-resistance-training.md) — адаптація сухожиль до силових навантажень (collagen turnover, HSR, eccentric, isometric)
+
+---
+
 ## [3.35.0] — 2026-06-10
 
 ### Added
