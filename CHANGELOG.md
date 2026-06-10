@@ -6,6 +6,19 @@
 
 ---
 
+## [3.34.0] — 2026-06-10
+
+### Added
+- `content/post-405-bodyweight-progression-variables.md` — Прогрес без зовнішнього навантаження: сім змінних, які замінюють залізо (13 хв читання). Schoenfeld (2010) три механізми гіпертрофії; Mitchell et al. (2012) 30% 1RM до відмови = 80% 1RM; Pedrosa et al. (2022) подовжений ROM і гіпертрофія; Oranchuk et al. (2019) ізометрика у розтягнутій позиції; Calatayud et al. (2015) ЕМГ push-up vs bench; Fleckenstein et al. (2023) Nordic і травматизм. Сім змінних: leverage, унілатеральна прогресія, ROM, темп, ізометрика, обсяг, щільність; ієрархія Tier 1–3; практична прогресія для push/pull/squat/hinge. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — додано картку post-405 (347 cards total)
+- `README.md` — post-405 позначено ✓; додано roadmap post-411–415
+- `STATUS.md` — TL;DR: 405 posts, v3.34.0; blog.html row: 347 cards; content engine table: +post-405
+- `VERSION` → 3.34.0
+
+---
+
 ## [3.33.0] — 2026-06-10
 
 ### Added
