@@ -789,7 +789,7 @@ Each iteration:
 - [x] post-426: Тривалість тренувального блоку — Haff & Triplett мезоцикл 3–6 тижнів, Issurin блокова, Painter MEV/MRV як реальний тригер деловання; clinical-safety NOT REQUIRED · v3.40.0
 - [x] post-427: Силове тренування і VO2max — Hagerman (1996) пауерліфтери і VO2max, концентрична LV гіпертрофія, Murlasits (2018) concurrent мета-аналіз; clinical-safety NOT REQUIRED · v3.40.0
 - [x] post-428: Силові стандарти — Stone et al. алометрія, Wilks/IPF GL нормалізація, таблиця BW-кратних стандартів; clinical-safety NOT REQUIRED · v3.40.0
-- [ ] post-429: Прогресія у ізоляційних вправах — специфіка накопичення сили у односуглобних рухах, відмінність від базових, коли plateau нормальний; clinical-safety NOT REQUIRED
+- [x] post-429: Прогресія у ізоляційних вправах — специфіка накопичення сили у односуглобних рухах, відмінність від базових, коли plateau нормальний; Moritani & deVries (1979) нейральна адаптація; математика відносного приросту; Lasevicius et al. (2019) темп гіпертрофії двоголового; Wolf et al. (2023) lengthened position; clinical-safety NOT REQUIRED · v3.40.1
 - [ ] post-430: Навантаження на суглоби — як силовий тренінг впливає на суглобовий хрящ, зв'язки та менісків (без клінічних рекомендацій); clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
