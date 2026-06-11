@@ -6,6 +6,17 @@
 
 ---
 
+## [3.54.1] — 2026-06-11
+
+### Added
+- `docs/COST_MODEL.md §33` — Enterprise AI Token Budget & Billing Architecture: resolves OQ-COACH-02 (DATA_MODEL.md §21, P1 — before first enterprise pilot invoicing). Flat per-seat billing adopted; token budgets defined per tier (Starter/Growth 50k tokens/seat/mo, Enterprise 75k); `tenant_monthly_coaching_cost` view retained for FORM-internal cost governance only; `tenant_config.coaching_seat_allowance_tokens` NOT activated at launch; overage policy (§33.7) is internal-only. DEC-030 events `enterprise.ai_cost_outlier_flagged` and `enterprise.ai_cost_monitor_alert` registered.
+
+### Changed
+- `docs/DATA_MODEL.md §21` — OQ-COACH-02 updated: 🟡 P1 Open → 🟢 Resolved (DEC-041, 2026-06-11); cross-reference to COST_MODEL.md §33.
+- `VERSION` — 3.54.0 → 3.54.1
+
+---
+
 ## [3.54.0] — 2026-06-11
 
 ### Added

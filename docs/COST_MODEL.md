@@ -178,6 +178,18 @@
     - 32.5 Record Keeping
     - 32.6 SOC 2 Relevance
     - 32.7 Checklist Closure
+33. [Enterprise AI Token Budget & Billing Architecture](#33-enterprise-ai-token-budget--billing-architecture)
+    - 33.1 Purpose & Scope
+    - 33.2 The Two Models: Flat Per-Seat vs. Consumption Billing
+    - 33.3 Token Budget Per Seat Per Tier
+    - 33.4 Flat Per-Seat Model — Margin Math
+    - 33.5 Consumption Billing (Not Recommended at Launch)
+    - 33.6 Recommended Decision
+    - 33.7 Overage Policy (Internal)
+    - 33.8 Revenue Recognition (ASC 606 / IFRS 15)
+    - 33.9 DEC-030 HMAC-Chained Audit Events
+    - 33.10 Implementation Checklist
+    - 33.11 Open Questions Resolved
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -6601,6 +6613,261 @@ This section closes `docs/COST_MODEL.md §31.9` item 3 (P0, M4).
 2. Test the `emit-audit-event` Worker endpoint with a dummy `enterprise.pricing_exception_approved` event in staging; confirm HMAC chain integrity
 3. Create the `pricing-exceptions/` folder structure in the deal tracking system (pre-CRM: shared folder, drive, or Linear project)
 4. Add DEC-038 entry to `docs/DECISION_LOG.md` (done in this commit)
+
+---
+
+---
+
+## 33. Enterprise AI Token Budget & Billing Architecture
+
+> **Resolves OQ-COACH-02** (DATA_MODEL.md §21.15) — Decision required before first enterprise contracts are signed. Status: 🟢 Resolved — DEC-041 (2026-06-11).
+
+---
+
+### 33.1 Purpose & Scope
+
+This section defines how FORM accounts for Anthropic API (Victor coaching) and ElevenLabs voice synthesis costs in enterprise contracts, and documents the internal token budget governance model.
+
+**In scope:**
+- Billing model selection: flat per-seat vs. consumption billing
+- Internal token budgets per tier (cost governance, not contractual limits)
+- Gross margin sensitivity analysis at multi-seat scale
+- Overage policy (internal operational procedure only)
+- Revenue recognition treatment under ASC 606 / IFRS 15
+- DEC-030 HMAC-chained audit events for cost monitoring
+
+**Out of scope:**
+- Consumer Pro billing (covered in §4 and §31.2)
+- Infrastructure COGS (covered in §3 and §15)
+- `tenant_monthly_coaching_cost` materialized view schema (documented in DATA_MODEL.md §21.8)
+
+---
+
+### 33.2 The Two Models: Flat Per-Seat vs. Consumption Billing
+
+| Dimension | Flat Per-Seat | Consumption Billing |
+|---|---|---|
+| **Predictability (enterprise)** | ✅ Fixed monthly invoice — CFO-friendly | ❌ Variable — hard to budget |
+| **Predictability (FORM)** | ✅ Predictable COGS | ❌ COGS variance tied to coaching intensity |
+| **Fairness** | ❌ Light users subsidise heavy users | ✅ Pay-for-what-you-use |
+| **Implementation complexity** | ✅ Simple — invoice = seats × rate | ❌ Metering infrastructure, invoice reconciliation, dispute handling |
+| **Sales motion** | ✅ Clean quote; no usage rider required | ❌ Requires usage cap clause, overage rate, reconciliation cadence |
+| **ASC 606 / IFRS 15** | ✅ Ratable over contract term — clean | ⚠️ Variable consideration — requires constraint estimation |
+| **Enterprise preference** | ✅ Strongly preferred (procurement benchmark) | ❌ Avoided unless budget is tied to outcomes |
+
+**Conclusion**: Flat per-seat billing is the correct model for FORM's enterprise tier at launch.
+
+---
+
+### 33.3 Token Budget Per Seat Per Tier
+
+Token budgets below are **internal cost-governance targets**. They are NOT contractual limits, NOT exposed to tenant admins, and NOT surfaced in any customer-facing document.
+
+Baseline consumption derived from: median active user = ~3 coaching sessions/week, ~8 turns/session, ~400 tokens/turn average (input+output blended), 4.3 weeks/month.
+
+| Tier | Seat range | Tokens/seat/mo (budget) | Headroom vs. baseline (32,256) | Voice chars/seat/mo | AI cost/seat (budget) | Voice cost/seat (budget) | Total AI+Voice/seat |
+|---|---|---|---|---|---|---|---|
+| **Starter** | 50–200 | 50,000 | 1.55× | 13,000 | $0.20 | $0.039 | **$0.24** |
+| **Growth** | 201–1,000 | 50,000 | 1.55× | 13,000 | $0.20 | $0.039 | **$0.24** |
+| **Enterprise** | 1,001+ | 75,000 | 2.33× | 20,000 | $0.30 | $0.060 | **$0.36** |
+
+**Token cost calculation**: blended Anthropic rate ≈ $4.00/1M tokens (weighted 3:1 input/output at $3/$15). Voice at $0.30/1K chars.
+
+> **Privacy invariant**: `tenant_monthly_coaching_cost` is aggregated at tenant level. FORM never exposes per-user token consumption to HR or tenant admins. Enforced at Postgres RLS layer.
+
+---
+
+### 33.4 Flat Per-Seat Model — Margin Math
+
+At the per-seat rates above, AI+Voice COGS as a percentage of revenue by tier and usage intensity:
+
+| Usage intensity | AI+Voice cost/seat | Starter $12/seat | Growth $9/seat | Enterprise $7/seat |
+|---|---|---|---|---|
+| **Baseline (1× median)** | $0.24–0.36 | 2.0–3.0% | 2.7–4.0% | 3.4–5.1% |
+| **Heavy user (3× median)** | $0.72–1.08 | 6.0–9.0% | 8.0–12.0% | 10.3–15.4% |
+| **Extreme user (5× median)** | $1.20–1.80 | 10.0–15.0% | 13.3–20.0% | 17.1–25.7% |
+
+**Key insight**: Even at 5× median usage, AI+Voice remains a minority of COGS. The dominant cost drivers are CSM labour (§26) and infrastructure (§15). The margin risk is manageable without consumption billing.
+
+**Fully-loaded gross margin** at baseline usage (including infra + CSM from §15 and §26):
+- Starter $12: ~83% GM
+- Growth $9: ~85% GM  
+- Enterprise $7: ~88% GM
+
+These figures are robust even at 3× usage intensity.
+
+---
+
+### 33.5 Consumption Billing (Not Recommended at Launch)
+
+Consumption billing may be revisited if **all three** conditions are met:
+1. A single tenant accounts for >15% of FORM's total Anthropic spend in any calendar month
+2. The enterprise tier average seat count exceeds 2,000 (making per-tenant COGS material)
+3. FORM has metering infrastructure mature enough to produce auditable per-tenant consumption reports (P2, M9+)
+
+Until all three conditions are met, flat per-seat billing remains the standard.
+
+If consumption billing is ever introduced, it must include:
+- A contractual "included tokens" baseline (not less than the budgets in §33.3)
+- A clearly disclosed overage rate
+- Monthly usage reports accessible to tenant admins (aggregate only — no per-user breakdown)
+- DEC-030 audit events for every overage invoice issued
+
+---
+
+### 33.6 Recommended Decision
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| **Billing model** | Flat per-seat | Predictable for enterprise CFOs; simple to invoice; ASC 606 clean; margin healthy at launch scale |
+| **Token budgets** | Internal governance only | Not contractual; not disclosed to tenants; enforced via alerting, not hard cutoffs |
+| **`coaching_seat_allowance_tokens`** | NULL at launch | Column exists for future optionality; not activated |
+| **`tenant_monthly_coaching_cost` view** | Retained, FORM-internal only | Used for gross margin monitoring and churn-risk signalling; never exposed to tenant admins |
+| **Overage policy** | Internal operational procedure (§33.7) | Not a customer-facing SLA; not referenced in MSA or enterprise contracts |
+
+**Decision reference**: DEC-041 (2026-06-11). Owner: `enterprise-architect` + `finance` + `compliance-officer`.
+
+---
+
+### 33.7 Overage Policy (Internal)
+
+> ⚠️ **This policy is INTERNAL ONLY.** It must never be referenced in customer-facing documents, MSA templates, sales decks, or pricing-enterprise.html.
+
+When a tenant's monthly AI+Voice cost exceeds the budget in §33.3:
+
+| Overage band | Monthly AI+Voice spend vs. budget | Action |
+|---|---|---|
+| **Yellow** | 100–150% of budget | Auto-alert to `enterprise-architect` + assigned CSM. Review coaching patterns. No customer contact. |
+| **Orange** | 150–200% of budget | Escalate to finance lead. CSM account review. Assess whether tenant is an outlier or indicates model drift. |
+| **Red** | >200% of budget | Founder review. Assess: (a) anomalous tenant behaviour, (b) model regression, (c) need to revisit flat-fee assumption for this account. |
+
+No hard token cutoffs are applied at any band. Victor coaching continuity is never interrupted due to cost overrun — this is a financial monitoring policy, not a service limitation.
+
+---
+
+### 33.8 Revenue Recognition (ASC 606 / IFRS 15)
+
+Flat per-seat enterprise contracts are treated as a single performance obligation: access to the FORM platform (including Victor AI coaching) over the contract term.
+
+| ASC 606 step | FORM treatment |
+|---|---|
+| **Step 1** — Identify contract | Signed MSA + Order Form = enforceable contract |
+| **Step 2** — Identify performance obligations | Single PO: platform access (coaching + analytics + admin) |
+| **Step 3** — Determine transaction price | Fixed: seats × rate × months. No variable consideration. |
+| **Step 4** — Allocate transaction price | Not applicable (single PO) |
+| **Step 5** — Recognise revenue | Ratably over the contract term (daily or monthly proration) |
+
+**Annual pre-pay treatment**: Cash received upfront → Deferred Revenue liability → recognised ratably over 12 months.
+
+**No variable consideration risk**: Because token consumption is not a contractual term, there is no variable consideration adjustment required. This is a material advantage of flat per-seat billing from an accounting perspective.
+
+---
+
+### 33.9 DEC-030 HMAC-Chained Audit Events
+
+Two new audit event types are registered under DEC-030. Both are STANDARD severity (3-year retention).
+
+**Event 1: `enterprise.ai_cost_monitor_alert`**
+
+Emitted when a tenant crosses the Yellow overage threshold (§33.7).
+
+```sql
+INSERT INTO audit_log (
+  event_type,
+  severity,
+  tenant_id,       -- UUID only; no user_id in payload (privacy floor)
+  payload,
+  sequence_number,
+  prev_hash,
+  hash
+) VALUES (
+  'enterprise.ai_cost_monitor_alert',
+  'STANDARD',
+  $tenant_id,
+  jsonb_build_object(
+    'budget_period',        $yyyy_mm,          -- e.g. '2026-06'
+    'budget_tokens',        $budget_tokens,    -- from §33.3 for this tier
+    'actual_tokens',        $actual_tokens,    -- from tenant_monthly_coaching_cost view
+    'overage_pct',          $overage_pct,      -- (actual - budget) / budget × 100
+    'overage_band',         $band,             -- 'yellow' | 'orange' | 'red'
+    'alert_sent_to',        $recipients        -- e.g. ['enterprise-architect', 'csm-assigned']
+  ),
+  nextval('audit_log_sequence'),
+  $prev_hash,
+  encode(hmac(
+    concat($sequence_number, $prev_hash, $event_type, $tenant_id::text, $payload::text),
+    current_setting('app.hmac_secret'),
+    'sha256'
+  ), 'hex')
+);
+```
+
+**Event 2: `enterprise.ai_cost_outlier_flagged`**
+
+Emitted when a tenant is flagged as a statistical outlier (>2σ above mean per-seat spend across all tenants in same tier).
+
+```sql
+INSERT INTO audit_log (
+  event_type,
+  severity,
+  tenant_id,
+  payload,
+  sequence_number,
+  prev_hash,
+  hash
+) VALUES (
+  'enterprise.ai_cost_outlier_flagged',
+  'STANDARD',
+  $tenant_id,
+  jsonb_build_object(
+    'budget_period',        $yyyy_mm,
+    'tier',                 $tier,
+    'tenant_spend_usd',     $tenant_spend_usd,
+    'tier_mean_spend_usd',  $tier_mean_usd,
+    'tier_stddev_usd',      $tier_stddev_usd,
+    'sigma_above_mean',     $sigma            -- must be ≥ 2.0 to trigger
+  ),
+  nextval('audit_log_sequence'),
+  $prev_hash,
+  encode(hmac(
+    concat($sequence_number, $prev_hash, $event_type, $tenant_id::text, $payload::text),
+    current_setting('app.hmac_secret'),
+    'sha256'
+  ), 'hex')
+);
+```
+
+> **Privacy invariant (both events)**: payload contains `tenant_id` (UUID) only. No `user_id`, no per-user token breakdown, no coaching content. Enforced by schema constraint — `user_id` column is NULL for both event types.
+
+---
+
+### 33.10 Implementation Checklist
+
+| # | Task | Owner | Priority | Milestone |
+|---|---|---|---|---|
+| 1 | Confirm `tenant_config.coaching_seat_allowance_tokens` is NULL for all tenants at launch migration | `enterprise-architect` | **P0** | M5 |
+| 2 | Register `enterprise.ai_cost_monitor_alert` and `enterprise.ai_cost_outlier_flagged` event types in `AUDIT_LOG_SCHEMA.md` with Zod schemas | `enterprise-architect` | **P0** | M5 |
+| 3 | Implement nightly pg_cron job: compare `tenant_monthly_coaching_cost` against §33.3 budgets; emit Yellow alert event if threshold exceeded | `data-engineer` | **P0** | M5 |
+| 4 | Implement monthly outlier detection: per-tier mean + stddev computation; emit `enterprise.ai_cost_outlier_flagged` if σ ≥ 2.0 | `data-engineer` | **P0** | M5 |
+| 5 | Add `enterprise.ai_cost_monitor_alert` and `enterprise.ai_cost_outlier_flagged` to DEC-030 HMAC chain validation tests | `qa-lead` | **P0** | M5 |
+| 6 | Confirm `tenant_monthly_coaching_cost` view is NOT accessible via any tenant-admin API endpoint or dashboard panel | `security-engineer` | **P0** | M5 |
+| 7 | Add DEC-041 entry to `docs/DECISION_LOG.md` (flat per-seat billing decision record) | `enterprise-architect` | **P1** | M6 |
+| 8 | Add §33.7 overage bands to internal runbook (not customer-facing) | `enterprise-architect` | **P1** | M6 |
+| 9 | Verify ASC 606 single-PO treatment with external auditor at Series A readiness review | `finance` + `compliance-officer` | **P1** | M6 |
+| 10 | Update `docs/MSA_TEMPLATE.md` to confirm no token consumption clause is present | `legal` + `compliance-officer` | **P2** | M9 |
+| 11 | Revisit consumption billing conditions (§33.5) at first enterprise cohort QBR | `enterprise-architect` + `finance` | **P2** | M12 |
+
+---
+
+### 33.11 Open Questions Resolved
+
+| OQ | Resolution |
+|---|---|
+| **OQ-COACH-02** (DATA_MODEL.md §21.15) | 🟢 **Resolved — DEC-041 (2026-06-11)**. Flat per-seat billing adopted. `tenant_monthly_coaching_cost` retained for FORM-internal use only. `tenant_config.coaching_seat_allowance_tokens` NULL at launch. Token budgets in §33.3 are internal governance targets, not contractual terms. Consumption billing deferred per conditions in §33.5. |
+
+---
+
+*v1.2 (2026-06-11): §33 Enterprise AI Token Budget & Billing Architecture — OQ-COACH-02 Resolution (DEC-041). Flat per-seat billing adopted; internal token budgets defined per tier (Starter/Growth 50k/seat/mo, Enterprise 75k/seat/mo); `tenant_monthly_coaching_cost` view retained FORM-internal only; `tenant_config.coaching_seat_allowance_tokens` NULL at launch; overage policy §33.7 internal only; ASC 606 single-PO ratable recognition confirmed; two new DEC-030 events (`enterprise.ai_cost_monitor_alert`, `enterprise.ai_cost_outlier_flagged`) with tenant_id-only privacy invariant; 11-item implementation checklist (6× P0/M5, 3× P1/M6, 2× P2). Cross-references: DATA_MODEL.md §21.8 (`tenant_monthly_coaching_cost` view), DATA_MODEL.md §21.15 (OQ-COACH-02), docs/COST_MODEL.md §4 (unit economics), §8 (enterprise economics), §15 (enterprise infrastructure COGS), §26 (CSM cost model), §31 (pricing architecture), docs/ENTERPRISE.md (enterprise feature set), docs/AUDIT_LOG_SCHEMA.md (DEC-030 event registry), docs/DECISION_LOG.md (DEC-041). Owner: enterprise-architect + finance + compliance-officer.*
 
 ---
 
