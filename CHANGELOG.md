@@ -6,6 +6,18 @@
 
 ---
 
+## [3.48.0] — 2026-06-11
+
+### Added
+- [`content/post-456-neuromuscular-fatigue-training-frequency.md`](content/post-456-neuromuscular-fatigue-training-frequency.md) — Нейром'язова стомлюваність і частота тренінгу: центральна (Gandevia 2001 twitch interpolation) vs периферійна (Allen et al. 2008 Pi/Ca²⁺); EIMD і нейральне гальмування через III/IV аференти (Damas et al. 2016); Friden & Lieber (2001) contractile dysfunction; Schoenfeld et al. (2016) мета-аналіз частоти; set-diagnostic протокол без VBT; clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — додано картки posts 452–456 (були відсутні попри наявність файлів у content/).
+- `README.md` — post-456 відмічено `[x]` done; roadmap post-459 (warm-up як нейром'язова підготовка) додано.
+- `VERSION` — 3.47.1 → 3.48.0.
+
+---
+
 ## [3.47.1] — 2026-06-11
 
 ### Changed

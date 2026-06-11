@@ -818,10 +818,12 @@ Each iteration:
 - [x] post-454: Dual-goal програмування: сила і гіпертрофія одночасно — Schoenfeld et al. (2017) concurrent periodization; перекриття rep ranges; операційний алгоритм блоку (heavy compound first); Helms об'єм MEV/MAV/MRV; практичні лімітатори; clinical-safety NOT REQUIRED · v3.47.0
 - [x] post-455: Сон як активний адаптаційний процес — Dattilo et al. (2011) GH/IGF-1 в slow-wave sleep; Walker & Stickgold (2004) motor memory consolidation (REM); Van Dongen et al. (2003) −20% силового output при хронічній нестачі; аудит сну атлета; clinical-safety NOT REQUIRED · v3.47.0
 
-   ── ROADMAP (наступні editorial теми · post-456+) ───────────────
-- [ ] post-456: Нейром'язова стомлюваність і тренувальна частота — Damas et al. (2016) EIMD і нейральне відновлення; як розрізнити центральну і периферійну стомлюваність; практичний протокол оцінки готовності до наступної сесії; clinical-safety NOT REQUIRED
+- [x] post-456: Нейром'язова стомлюваність і частота тренінгу — Gandevia (2001) центральна стомлюваність і twitch interpolation; Allen et al. (2008) периферійна стомлюваність (Pi/Ca²⁺); Damas et al. (2016) EIMD і нейральне гальмування; Schoenfeld et al. (2016) мета-аналіз частоти; set-diagnostic протокол без VBT; clinical-safety NOT REQUIRED · v3.48.0
+
+   ── ROADMAP (наступні editorial теми · post-457+) ───────────────
 - [ ] post-457: Прогресія навантаження для просунутого атлета — чому лінійна прогресія перестає працювати після 2-3 років; undulating periodization vs block periodization; практичний перехід з новачкової на середньо-просунуту модель; clinical-safety NOT REQUIRED
 - [ ] post-458: Вертикальне і горизонтальне навантаження на плечовий пояс — анатомія ротаторної манжети в контексті тренінгу; Push:Pull баланс (Kolber et al. 2009); чому «3 жими : 1 тяга» — не формула; клінічна різниця між тренувальним дискомфортом і субакроміальним конфліктом; ⚠️ clinical-safety REQUIRED — тема болю і суглоба, route to CS before publish
+- [ ] post-459: Warm-up як нейром'язова підготовка, а не «розігрів» — post-activation potentiation (PAP), температурна кінетика міозину, специфічна vs загальна розминка; Robbins (2005) PAP мета-аналіз; протокол розминки для силової сесії; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
