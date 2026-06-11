@@ -6,6 +6,19 @@
 
 ---
 
+## [3.71.0] — 2026-06-11
+
+### Added
+- `content/post-508-self-programming-meta-guide.md` — «Самопрограмування з нуля — мета-гайд для людини без тренера» (13 хв читання; Bompa & Haff 2009, Wilson et al. 2012 JSCR, Schoenfeld et al. 2016 JSCR, Mazzetti et al. 2000 MSSE, Issurin 2010 Sports Med; clinical-safety NOT REQUIRED)
+- `blog.html` — картка для post-508 (категорія: training-science)
+- `README.md` — роадмап post-509–513 (editorial теми)
+
+### Changed
+- `STATUS.md` — додано записи post-506/507/508 у таблицю content engine; blog.html: 433 cards / 508 posts; Version → 3.71.0
+- `VERSION` → 3.71.0
+
+---
+
 ## [3.70.3] — 2026-06-11
 
 ### Changed
