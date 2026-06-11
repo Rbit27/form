@@ -6,6 +6,19 @@
 
 ---
 
+## [3.66.0] — 2026-06-11
+
+### Added
+- `content/post-502-velocity-based-training.md` — Velocity-Based Training: авторегуляція через швидкість штанги; González-Badillo & Sánchez-Medina (2010) IJSMS — середня концентрична швидкість як предиктор %1ПМ; Zourdos et al. (2016) JSCR: швидкісні зони per exercise; Sánchez-Medina & González-Badillo (2011) MSSE: velocity loss threshold і вартість відновлення після підходу; Pareja-Blanco et al. (2017) EJAP: 20% vs 40% velocity loss — сила і гіпертрофія; Weakley et al. (2021) Sports Med: VBT vs RPE у тренованих; MVT як стоп-сигнал без датчика; профіль швидкості для оцінки поточного 1ПМ; хто отримує найбільшу користь; типові помилки. clinical-safety NOT REQUIRED.
+- `content/post-503-rest-intervals-science.md` — Пауза між підходами — що насправді каже наука; Schoenfeld et al. (2016) JSCR: 1 хв vs 3 хв — 3-хвилинна пауза переважає для гіпертрофії і сили у тренованих; Ralston et al. (2017) Sports Med: ≥2 хв асоціюється з більшим приростом при вирівняному об'ємі; Willardson (2006) JSCR: мінімум 2–3 хв для складних рухів, 4–5 хв біля максимуму; проблема невирівняного об'єму; коли коротша пауза виправдана; типові помилки самостійного тренінгу (надто коротко vs неструктуровано надто довго); практичні орієнтири per інтенсивність. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — 2 нові картки (post-502, post-503) → 428 карток (503 пости authored); лічильник статей 388 → 428, хв читання 4 427 → 4 453
+- `STATUS.md` — 501 → 503 постів; blog.html 426 → 428 карток; v3.65.3 → v3.66.0; content table: post-502/503 додано
+- `VERSION` — 3.65.3 → 3.66.0
+
+---
+
 ## [3.65.3] — 2026-06-11
 
 ### Changed
