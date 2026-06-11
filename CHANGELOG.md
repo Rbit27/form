@@ -6,6 +6,18 @@
 
 ---
 
+## [3.49.2] — 2026-06-11
+
+### Added
+- `content/post-461-training-partner-social-facilitation.md` — Партнер у тренажерному залі: Zajonc (1965) drive theory і social facilitation; Bond & Titus (1983) мета-аналіз 241 дослідження (d=+0.44 прості задачі, d=−0.07 складні); Köhler-ефект (Feltz et al. 2011) +24–40% об'єму у слабшого партнера; evaluation apprehension (Cottrell 1968); три умови коли партнер гальмує (фаза освоєння, розходження цілей, зовнішня залежність); ефект присутності на RPE і точність авторегуляції; clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — додано картку post-461; 401 картка (461 пост authored)
+- `STATUS.md` — post-461 додано в content engine table; TL;DR оновлено до 461 постів; версія 3.49.2
+- `VERSION` — 3.49.1 → 3.49.2
+
+---
+
 ## [3.49.1] — 2026-06-11
 
 ### Added
