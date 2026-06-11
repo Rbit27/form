@@ -6,6 +6,14 @@
 
 ---
 
+## [3.45.1] — 2026-06-11
+
+### Changed
+- `README.md` — post-448 roadmap entry corrected: marked `[x]` with actual signal-noise content description (file `post-448-signal-noise-training-progress.md` was committed in v3.44.5 but README checkbox was not updated); "Тренування у подорожі" topic moved to `post-451` placeholder.
+- `VERSION` — 3.45.0 → 3.45.1.
+
+---
+
 ## [3.45.0] — 2026-06-10
 
 ### Added
