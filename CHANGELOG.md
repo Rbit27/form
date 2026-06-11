@@ -6,6 +6,15 @@
 
 ---
 
+## [3.67.1] — 2026-06-11
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v1.3 → v1.4 (header also corrected from v1.2); registered 5 unregistered DEC-030 events from `docs/COST_MODEL.md`: `enterprise.ai_cost_monitor_alert` (STANDARD, 3yr) and `enterprise.ai_cost_outlier_flagged` (STANDARD, 3yr) from §33.9; `enterprise.renewal_risk_flagged` (STANDARD, 3yr), `enterprise.churn_confirmed` (HIGH, 7yr), and `enterprise.retention_discount_granted` (HIGH, 7yr) from §34.8. Two new sections added with full trigger conditions, payload tables, HMAC chain requirements, and emitter assignments. Privacy invariants documented: §33.9 events tenant_id-only, §34.8 events tenant-aggregate-only (no user_id, no health data). Retention table +3 rows. Closes COST_MODEL.md §33.10 item 2 (P0/M5) and §34.9 item 1 (P0/M10 — `[x]` status updated). compliance-officer + enterprise-architect.
+- `docs/COST_MODEL.md` — §34.9 checklist item 1 marked `[x]` (registered in AUDIT_LOG_SCHEMA.md v1.4).
+- `VERSION` — 3.67.0 → 3.67.1
+
+---
+
 ## [3.67.0] — 2026-06-11
 
 ### Added
