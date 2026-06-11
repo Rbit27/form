@@ -873,7 +873,13 @@ Each iteration:
 - [ ] post-468: Пери-тренувальне харчування без містики ⚠️ clinical-safety review required (food-related) — вже у черзі
 - [x] post-491: Силова асиметрія і функціональний дисбаланс — Bishop et al. (2018) IJSM функціональна vs дисфункціональна асиметрія; Maloney (2019) Sports Med LSI і ризик травм; Howard & Enoka (1991) bilateral deficit; поріг 15%/LSI<85%; програмування. clinical-safety NOT REQUIRED · v3.60.0
 - [x] post-492: Velocity-Based Training без пристрою — Gonzalez-Badillo & Sanchez-Medina (2010) MPV і %1RM; Sanchez-Medina & Gonzalez-Badillo (2011) velocity loss threshold; Loturco et al. (2017) максимальний намір; load-velocity профіль без трекера. clinical-safety NOT REQUIRED · v3.60.0
-- [ ] post-493: Tempo training vs load — що є первинним драйвером гіпертрофії; Burd et al. (2012), Wilk et al. (2020); де темп допомагає, де лише ускладнює прогресію. clinical-safety NOT REQUIRED
+- [x] post-493: Темп повторення проти навантаження — Burd et al. (2012) J Physiol TUT і MPS при різних навантаженнях; Wilk et al. (2020) JSCR повільний темп при субмаксимальних навантаженнях; Schoenfeld & Grgic (2020) мета-аналіз TUT; Mitchell et al. (2012) навантаження vs відмова; механіка редукції навантаження при повільному темпі. clinical-safety NOT REQUIRED · v3.61.0
+
+    ── ROADMAP (наступні теми · post-494+) ───────────────────────────
+- [ ] post-494: Прогресивне навантаження — механізми адаптації, способи прогресії за межі лінійної (подвійна прогресія, DUP, хвилеподібна); коли плато є нормою. clinical-safety NOT REQUIRED
+- [ ] post-495: Тренування натще vs після їжі — насправді що змінюється у фізіології і продуктивності; GLM і glікоген; де перевага, де міф. ⚠️ clinical-safety review required (food-related)
+- [ ] post-496: Cooldown: чи є він необхідним — доказова база заминки; фізіологія EPOC і лактатного кліренсу; мінімально ефективний протокол. clinical-safety NOT REQUIRED
+- [ ] post-497: Ізометрія як недооцінений інструмент — isometric training у гіпертрофії та силі; паузи у розтягнутій позиції; практика після серйозних травм. clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 

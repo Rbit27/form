@@ -464,6 +464,7 @@ FORM is at v3.54.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-490-breathing-between-sets-recovery.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.59.0 |
 | post-491-strength-asymmetry-functional-imbalance.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.60.0 |
 | post-492-velocity-based-training-without-device.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.60.0 |
+| post-493-tempo-training-vs-load.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.61.0 |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
