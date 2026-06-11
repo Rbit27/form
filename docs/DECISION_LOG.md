@@ -15,6 +15,24 @@
 
 ## 2026-06-11
 
+### DEC-043 · OQ-PAM-02: business_justification excluded from SOC 2 auditor bulk export; redacted-sample approach adopted
+
+- **Decision:** `business_justification` (plain-text) in `admin_jit_escalations` is NOT included in any SOC 2 auditor bulk evidence export. Auditors receive `justification_hash` (SHA-256) in DEC-030 events and may request plaintext hash-verification for specific examples during fieldwork. FORM provides a redacted sample set — sanitised to remove any PII or customer-identifying details — stored at `compliance/evidence/pam/justification-sample.md`. This resolves OQ-PAM-02 from `docs/DATA_MODEL.md §29.11` (P1 — before SOC 2 observation period start).
+- **Owner:** compliance-officer
+- **Why:** Bulk export of `business_justification` to an auditor creates a secondary access path to plain-text justification content that may carry customer-identifying context (e.g. tenant names, support ticket IDs). The hash-in-chain approach already satisfies CC6.2 (authorised JIT escalation) and CC6.3 (confidential data handling): the auditor can confirm the justification existed and was recorded (hash in DEC-030 HMAC chain) and can verify specific examples on request. A redacted sample demonstrates the control operates as intended without a bulk disclosure. Consistent with FORM's existing `abuse_flags.evidence_summary` redaction policy for auditor staging replica access.
+- **Reverse cost:** Low before first SOC 2 observation period. If a subsequent auditor requires full plaintext bulk export during fieldwork, FORM can provide it under NDA via a time-limited `security_reviewer` grant on a staging replica — no schema or data destruction decision is required.
+
+---
+
+### DEC-042 · OQ-PAM-01: break-glass audit records require no dual-auth query gate; alert-on-access adopted
+
+- **Decision:** `admin_jit_escalations` rows with `is_break_glass = true` do NOT require a separate dual-role authentication step to query. The `security_reviewer` SELECT RLS policy covers all rows including break-glass. In place of a query-time co-approval gate, FORM registers a `security.break_glass_audit_record_accessed` DEC-030 event (HIGH, 7yr) emitted whenever a query specifically targets `admin_jit_escalations WHERE is_break_glass = true` — every read is itself logged in the immutable HMAC chain. This resolves OQ-PAM-01 from `docs/DATA_MODEL.md §29.11` (P2 — decide before first break-glass activation in production).
+- **Owner:** compliance-officer + security-engineer
+- **Why:** A query-time approval gate for break-glass audit record access would directly undermine incident response — break-glass exists to enable rapid remediation, and requiring co-approval to read the audit trail that documents the remediation creates a catch-22 when time-critical (T+15min IR SLA, INCIDENT_RESPONSE.md R-20). Alert-on-access achieves the same transparency goal: the access event is logged in the tamper-evident HMAC chain, making any unauthorized or suspicious read of break-glass records detectable in retrospect. This is operationally equivalent to the GDPR Art. 30 records-of-processing standard: access is controlled, but audited rather than blocked.
+- **Reverse cost:** Low. Switching to a dual-auth gate later is a PAM architecture addition (wrapping a Postgres query in an elevation-approval workflow) — permissible if SOC 2 auditors specifically require it, but no existing auditor framework mandates it. The `security.break_glass_audit_record_accessed` DEC-030 event registration (platform-engineer, P1) is the only implementation item created by this decision.
+
+---
+
 ### DEC-041 · Enterprise AI coaching billing: flat per-seat model adopted; token budgets are internal governance targets only (OQ-COACH-02 resolution)
 
 - **Decision:** Flat per-seat billing is adopted for enterprise AI coaching at launch. Token allowances (`tenant_config.coaching_seat_allowance_tokens`) are set to NULL in production — no per-seat token cap is exposed in contractual terms or the admin dashboard. The `tenant_monthly_coaching_cost` view is retained as a FORM-internal cost-monitoring tool only (never surfaced to tenants). Token budgets defined in `docs/COST_MODEL.md §33.3` (Starter/Growth: 50,000 tokens/seat/month; Enterprise: 75,000 tokens/seat/month) are internal governance thresholds for margin management, not contractual commitments. Consumption billing is explicitly deferred; re-evaluation conditions are documented in `docs/COST_MODEL.md §33.5`.

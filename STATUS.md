@@ -1,7 +1,7 @@
 # FORM · Project Status v1.4.0
 
 **Date:** 11 червня 2026
-**Version:** 3.65.0
+**Version:** 3.65.2
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -64,7 +64,7 @@ FORM is at v3.65.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | LAUNCH_CHECKLIST.md | P0/P1/P2 launch gate | founder |
 | I18N.md | Localization plan UA+EN, DE/PL/ES | marketing-lead |
 | APP_STORE.md | App Store listing draft (cloud) | marketing-lead |
-| DECISION_LOG.md | 38 documented decisions | process-keeper |
+| DECISION_LOG.md | 43 documented decisions (DEC-001 through DEC-043) | process-keeper |
 | ENGINEERING_RUNBOOK.md | On-call, deploy, monitoring | platform-engineer |
 | INVESTOR_UPDATE_TEMPLATE.md | Monthly update format | founder |
 | SUPPORT.md | Customer support playbook | founder |
@@ -691,6 +691,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v3.65.0 · 11 червня 2026**
-**Last update:** 11 червня 2026 · v3.65.0
+**v3.65.2 · 11 червня 2026**
+**Last update:** 11 червня 2026 · v3.65.2
 **Next planned update:** після hire of Founding Engineer

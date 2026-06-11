@@ -144,7 +144,7 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 
 ### PAM (Privileged Access Management) events (DEC-030 HMAC-chained · SSO §24.6)
 
-> Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §24.6`. Six events covering JIT privilege escalation lifecycle and break-glass protocol. Privacy floor: `justification_hash` stores SHA-256 of the justification text — the original text is retained in `PAM_KV` (7yr TTL) but never enters the audit chain; `pam.break_glass_activated` uses `cf_access_jti_hash` (SHA-256 of the Cloudflare Access JTI — not the raw JTI). `target_tenant_id` is nullable (null means FORM infrastructure, not a customer tenant). CRITICAL event `pam.break_glass_activated` triggers immediate PagerDuty P0 (AL-PAM-01) and compliance-officer email. Break-glass sessions require a mandatory post-hoc two-person review within 72h, linked via `pam_session_id`. Cross-ref: SOC 2 CC6.1/CC6.2/CC6.3/CC6.7; closes SSO_SCIM_IMPLEMENTATION.md §24.10 checklist item 8 (P1 M4).
+> Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §24.6` and `docs/DATA_MODEL.md §29.6`. Seven events covering JIT privilege escalation lifecycle, break-glass protocol, and mandatory post-hoc break-glass review. Privacy floor: `justification_hash` stores SHA-256 of the justification text — the original text is retained in `PAM_KV` (7yr TTL) but never enters the audit chain; `pam.break_glass_activated` uses `cf_access_jti_hash` (SHA-256 of the Cloudflare Access JTI — not the raw JTI). `target_tenant_id` is nullable (null means FORM infrastructure, not a customer tenant). CRITICAL event `pam.break_glass_activated` triggers immediate PagerDuty P0 (AL-PAM-01) and compliance-officer email. Break-glass sessions require a mandatory post-hoc two-person review within 72h, linked via `pam_session_id`; the review closure is recorded by `pam.break_glass_review_completed` (HIGH). Cross-ref: SOC 2 CC6.1/CC6.2/CC6.3/CC6.6/CC6.7; closes SSO_SCIM_IMPLEMENTATION.md §24.10 checklist item 8 (P1 M4) and DATA_MODEL.md §29.10 checklist item 6 (P0 M6).
 
 | Event type | Severity | Retention | Two-person rule | Payload fields |
 |---|---|---|---|---|
@@ -154,8 +154,29 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 | `pam.session_expired` | STANDARD | 7 yr | No | `admin_user_id`, `pam_session_id`, `access_level`, `expired_at` (ISO 8601) — emitted by `pam-expiry-sweeper`; distinct from `pam.elevation_denied` (session completed its full TTL) |
 | `pam.break_glass_activated` | CRITICAL | 7 yr | Post-hoc (72h review, §24.4.3) | `admin_user_id`, `pam_session_id`, `cf_access_jti_hash` (SHA-256), `activated_at` (ISO 8601); triggers PagerDuty P0 + compliance email immediately on emission |
 | `pam.break_glass_expired` | HIGH | 7 yr | No | `admin_user_id`, `pam_session_id`, `expired_at` (ISO 8601), `review_issue_url` (GitHub issue auto-created at activation) |
+| `pam.break_glass_review_completed` | HIGH | 7 yr | Post-hoc (two-person sign-off, 72h SLA) | `pam_session_id`, `outcome` (`no_anomaly` / `anomaly_detected` / `process_gap`), `reviewed_by_security` (UUID), `reviewed_by_compliance` (UUID), `review_completed_at` (ISO 8601), `github_issue_url` (optional URL), `pg_audit_lines_reviewed` (optional integer) |
 
 **HMAC chain requirement:** `pam.elevation_approved` must follow `pam.elevation_requested` with the same `pam_request_id` in the chain. If `pam.break_glass_activated` is emitted without a preceding `pam.elevation_requested` for the same session (break-glass is a separate Cloudflare Access path), this is expected — do not treat the missing predecessor as a chain violation. A post-hoc `pam.elevation_approved` is not emitted for break-glass; the `pam.break_glass_activated` CRITICAL event is the authorisation record.
+
+The break-glass DEC-030 three-event chain is: `pam.break_glass_activated` → `pam.break_glass_expired` → `pam.break_glass_review_completed`. An auditor can confirm the full break-glass lifecycle by querying these three event types with the same `pam_session_id`. The chain is complete only when `pam.break_glass_review_completed` is emitted; AL-PAM-BG-01 (OBSERVABILITY.md §29.4) fires a PagerDuty P1 if `pam.break_glass_review_completed` is not emitted within 72h of `pam.break_glass_activated`.
+
+**`pam.break_glass_review_completed` Zod schema** (canonical source: DATA_MODEL.md §29.6):
+
+```typescript
+import { z } from 'zod';
+
+const PamBreakGlassReviewCompletedPayload = z.object({
+  pam_session_id:           z.string().uuid(),
+  outcome:                  z.enum(['no_anomaly', 'anomaly_detected', 'process_gap']),
+  reviewed_by_security:     z.string().uuid(),
+  reviewed_by_compliance:   z.string().uuid(),
+  review_completed_at:      z.string().datetime(),
+  github_issue_url:         z.string().url().optional(),
+  pg_audit_lines_reviewed:  z.number().int().nonneg().optional(),
+});
+```
+
+Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-reviews/:pam_session_id/complete`) when both `reviewed_by_security` and `reviewed_by_compliance` have signed off in the `pam_break_glass_reviews` Postgres table. `emit-audit-event` Worker validates the Zod schema before chain-appending; HTTP 422 on schema violation.
 
 ---
 
@@ -198,15 +219,18 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 
 ### Security & tenant isolation events (DEC-030 HMAC-chained · SOC2 §64.7)
 
-> Defined in `docs/SOC2_READINESS.md §64.7`. Three events covering RLS tenant isolation monitoring and CI test evidence. Privacy floor: `request_ip_hash` in `security.rls_bypass_attempt` is SHA-256 of the client IP with a daily rotating salt (per DPIA §4 constraint) — never a raw IP. `security.definer_function_cross_tenant` must never be aggregated or batched — emit synchronously per invocation (HIGH severity treated equivalent to a confirmed RLS bypass; triggers immediate P0 incident via R-09). Cross-ref: SOC 2 CC6.1/CC6.3/CC6.6/PI1.5-C3; closes SOC2_READINESS.md §64.9 checklist items 2 (P0) and 3 (P1).
+> Defined in `docs/SOC2_READINESS.md §64.7` and `docs/DECISION_LOG.md DEC-042`. Four events covering RLS tenant isolation monitoring, CI test evidence, and PAM audit record access transparency. Privacy floor: `request_ip_hash` in `security.rls_bypass_attempt` is SHA-256 of the client IP with a daily rotating salt (per DPIA §4 constraint) — never a raw IP. `security.definer_function_cross_tenant` must never be aggregated or batched — emit synchronously per invocation (HIGH severity treated equivalent to a confirmed RLS bypass; triggers immediate P0 incident via R-09). `security.break_glass_audit_record_accessed` implements the alert-on-access governance for break-glass audit records per DEC-042 — no query-time approval gate; every read of break-glass rows is itself chained in DEC-030. Cross-ref: SOC 2 CC6.1/CC6.3/CC6.6/PI1.5-C3; closes SOC2_READINESS.md §64.9 checklist items 2 (P0) and 3 (P1).
 
 | Event type | Severity | Retention | Emitter | Payload fields |
 |---|---|---|---|---|
 | `security.rls_bypass_attempt` | MEDIUM | 7 yr | Cloudflare Worker `rls-guard` middleware | `tenant_id_in_jwt` (UUID), `tenant_id_in_filter` (UUID), `table_name`, `query_path` (e.g. `/rest/v1/workout_sessions`), `request_ip_hash` (SHA-256 of IP + daily salt — **not raw IP**) |
 | `security.definer_function_cross_tenant` | HIGH | 7 yr | Cloudflare Worker or Supabase Edge Function `definer-audit` wrapper | `function_name`, `caller_tenant_id` (UUID), `returned_tenant_ids` (UUID array — distinct tenant_ids that do not match caller), `row_count` (total cross-tenant rows) — triggers PagerDuty P0 immediately |
 | `system.rls_test_suite_run` | STANDARD | 3 yr | CI workflow step in `rls-isolation-tests.yml` | `run_id` (GitHub Actions run_id), `ci_build_id` (run_id + run_attempt), `git_sha` (40-char), `tc_rls_001_result` / `tc_rls_002_result` / `tc_rls_003_result` / `tc_rls_004_result` / `tc_rls_005_result` (each: `PASS` / `FAIL` / `SKIP`), `overall_verdict` (`PASS` / `FAIL`), `evidence_path` (R2 object key for PRE-36-E-007 artefact) |
+| `security.break_glass_audit_record_accessed` | HIGH | 7 yr | `pam-db-proxy` Cloudflare Worker — emits on every `SELECT` query that filters `admin_jit_escalations WHERE is_break_glass = true` | `queried_by_user_id` (UUID — admin_user_id of the accessor, resolved from `form_admin` JWT), `queried_by_role` (`security_reviewer` / `form_compliance`), `query_timestamp` (ISO 8601), `row_count_returned` (integer — number of break-glass rows in result set), `pam_session_ids_accessed` (UUID array — `pam_session_id` values in the result, for cross-reference with `pam.break_glass_review_completed` chain) |
 
-**HMAC chain requirement:** `security.rls_bypass_attempt` is expected to be low-volume under normal conditions (rare client bugs or adversarial probes) — no Queues batching needed. A spike > 10 events / 10 min for a single `tenant_id_in_filter` value should be escalated to R-09 Security Incident. `system.rls_test_suite_run` fires on every push to `main` — this is a high-frequency routine event; STANDARD severity is intentional.
+**Privacy constraint for `security.break_glass_audit_record_accessed`:** `pam_session_ids_accessed` array must contain only UUIDs — no `business_justification` text, no `target_tenant_id` (to avoid revealing which tenants were subject to break-glass access to the accessor's entire audit history). `row_count_returned = 0` is still emitted (confirms the query fired, even if no break-glass rows existed), which is the behaviour needed for SOC 2 CC6.6 evidence (access attempt, not just access success).
+
+**HMAC chain requirement:** `security.rls_bypass_attempt` is expected to be low-volume under normal conditions (rare client bugs or adversarial probes) — no Queues batching needed. A spike > 10 events / 10 min for a single `tenant_id_in_filter` value should be escalated to R-09 Security Incident. `system.rls_test_suite_run` fires on every push to `main` — this is a high-frequency routine event; STANDARD severity is intentional. `security.break_glass_audit_record_accessed` is expected at very low frequency (< 1/month outside of SOC 2 fieldwork); any unexpected spike (> 3 within 24h) should trigger a PagerDuty P1 to `security-engineer`.
 
 ---
 
@@ -472,6 +496,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v1.3 · 2026-06-11 · owner: compliance-officer + platform-engineer**
+*v1.3 (2026-06-11): +1 `pam.break_glass_review_completed` event (HIGH, 7yr, two-person sign-off) — closes the break-glass DEC-030 HMAC chain (`pam.break_glass_activated` → `pam.break_glass_expired` → `pam.break_glass_review_completed`). Emitter: compliance-officer via `POST /internal/pam/break-glass-reviews/:pam_session_id/complete` when both reviewers have signed off in `pam_break_glass_reviews`. Payload: `pam_session_id`, `outcome` (3-value enum: no_anomaly / anomaly_detected / process_gap), `reviewed_by_security` UUID, `reviewed_by_compliance` UUID, `review_completed_at`, optional `github_issue_url`, optional `pg_audit_lines_reviewed`. Zod schema provided in-line (canonical source: DATA_MODEL.md §29.6). PAM section header updated: "Six" → "Seven" events; CC6.6 added to SOC 2 cross-ref. HMAC chain note extended: three-event break-glass lifecycle documented with AL-PAM-BG-01 enforcement reference. `emit-audit-event` Worker validates Zod schema before chain-append (HTTP 422 on violation). Closes DATA_MODEL.md §29.10 checklist item 6 (P0 M6 — register `pam.break_glass_review_completed` in AUDIT_LOG_SCHEMA.md and deploy to event registry). Cross-ref: DATA_MODEL.md §29.6 (canonical schema), SOC2_READINESS.md §24.8 (CC6.6 evidence PAM-E-004 — `pam_break_glass_reviews` all reviewed within 72h + this event chain), OBSERVABILITY.md §29.4 (AL-PAM-BG-01 enforces the 72h review SLA by querying `pam_break_glass_reviews.review_due_at`). Owner: compliance-officer + platform-engineer.*
 
 **v1.2 · 2026-06-10 · owner: compliance-officer + security-engineer**
 *v1.2 (2026-06-10): +2 `vendor.*` sub-processor management events (vendor.sub_processor_added HIGH/7yr, vendor.sub_processor_removed STANDARD/3yr) per SOC2_READINESS §75.2.4; +10 `legal.*` government request lifecycle events (legal.disclosure_executed and legal.disclosure_declined CRITICAL/7yr; 8× procedural HIGH/7yr; legal.transparency_tally_updated STANDARD/3yr) per SOC2_READINESS §75.5.3. LEGAL-CHAIN-01 chain guard documented (HTTP 422 on ordering violation). Privacy invariant: no plain-text authority names or user identifiers in any `legal.*` payload — `recipient_authority_hash` SHA-256 only. Retention table updated with 4 new rows. Closes SOC2_READINESS.md §75.8 checklist items 5 and 8 (both P1 Pre-GA). Cross-ref: docs/SUBPROCESSORS.md §8.2 (notification procedure), SOC2_READINESS §75.2.4 and §75.5.3, P6.1/P6.5/CC9.2. Owner: compliance-officer + platform-engineer.*

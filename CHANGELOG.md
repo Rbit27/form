@@ -6,6 +6,15 @@
 
 ---
 
+## [3.65.2] — 2026-06-11
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v1.2 → v1.3; registered `pam.break_glass_review_completed` (HIGH, 7yr) as 7th PAM DEC-030 event, closing the break-glass HMAC chain (`pam.break_glass_activated` → `pam.break_glass_expired` → `pam.break_glass_review_completed`); Zod schema inlined; HMAC chain note updated with three-event lifecycle; PAM section header updated "six" → "seven" events; CC6.6 added to SOC 2 cross-ref. Closes `docs/DATA_MODEL.md §29.10` checklist item 6 (P0 M6). compliance-officer + platform-engineer.
+- `docs/DECISION_LOG.md` — DEC-042 (OQ-PAM-01 resolved: alert-on-access approach for break-glass audit record queries; no dual-auth query gate; `security.break_glass_audit_record_accessed` DEC-030 HIGH/7yr to be registered); DEC-043 (OQ-PAM-02 resolved: `business_justification` excluded from SOC 2 bulk export; redacted-sample approach at `compliance/evidence/pam/justification-sample.md`). Both resolve open questions from DATA_MODEL.md §29.11.
+- `VERSION` — 3.65.1 → 3.65.2
+
+---
+
 ## [3.65.1] — 2026-06-11
 
 ### Changed
