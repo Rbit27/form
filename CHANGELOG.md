@@ -6,6 +6,20 @@
 
 ---
 
+## [3.47.0] — 2026-06-11
+
+### Added
+- [`content/post-452-exercise-selection-individual-anatomy.md`](content/post-452-exercise-selection-individual-anatomy.md) — Вибір вправ під анатомію: антеверсія стегна, Schoenfeld (2010) squat depth, stance/foot/grip під власну механіку; clinical-safety NOT REQUIRED.
+- [`content/post-453-self-coaching-technical-diagnosis.md`](content/post-453-self-coaching-technical-diagnosis.md) — Самостійна діагностика техніки: відеоаналіз (сагітальна/фронтальна), bar path, knee tracking, нейтральний хребет; технічна vs м'язова відмова; Calatayud (2016); clinical-safety NOT REQUIRED.
+- [`content/post-454-dual-goal-programming-strength-hypertrophy.md`](content/post-454-dual-goal-programming-strength-hypertrophy.md) — Dual-goal програмування: Schoenfeld et al. (2017) concurrent periodization; перекриття rep ranges; алгоритм блоку; Helms MEV/MAV/MRV; clinical-safety NOT REQUIRED.
+- [`content/post-455-sleep-active-adaptation-not-rest.md`](content/post-455-sleep-active-adaptation-not-rest.md) — Сон як адаптація: Dattilo et al. (2011) GH/IGF-1; Walker & Stickgold (2004) motor memory; Van Dongen et al. (2003) −20% силового output; аудит сну; clinical-safety NOT REQUIRED.
+
+### Changed
+- `README.md` — posts 452–455 відмічено `[x]` done; roadmap post-456–458 додано (post-458 має clinical-safety gate — тема плечового поясу).
+- `VERSION` — 3.46.2 → 3.47.0.
+
+---
+
 ## [3.46.2] — 2026-06-11
 
 ### Changed

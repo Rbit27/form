@@ -813,11 +813,15 @@ Each iteration:
 - [x] post-450: Силовий тренінг і імунна система — Nieman (1994) J-curve hypothesis; Peters & Bateman (1983) Comrades 33% URTI; Gleeson (2007) відкрите вікно 3–72 год; Walsh et al. (2011) Exercise Immunology Review консенсус — тренінг імунопротективний; практичний поріг для силового атлета; правило «вище/нижче шиї» і матриця рішень; clinical-safety NOT REQUIRED · v3.45.2
 - [x] post-451: Тренування у подорожі — Issurin (2008) residual effects: max сила ~30 днів; Bickel et al. (2011) 1/9 об'єму зберігає адаптації 32 тижні; Graves et al. (1988) 12 тижнів = −10–15% сили; Gabbett (2016) ACWR стрибок >15%/тиждень підвищує ризик травми; чому «надолужувати» — програмна помилка; 30-хвилинний протокол без обладнання; протокол повернення першого тижня; clinical-safety NOT REQUIRED · v3.46.0
 
-   ── ROADMAP (наступні editorial теми · post-452+) ───────────────
-- [ ] post-452: Вибір вправ під анатомію, а не під «правильну техніку» — антеверсія стегна; Schoenfeld (2010) squat depth і м'язова активація; як підібрати вправу під свою механіку; clinical-safety NOT REQUIRED
-- [ ] post-453: Тренінг без тренера: самостійна діагностика технічних помилок — відеоаналіз, маркери форми, bar path; різниця між технічною відмовою і м'язовою; clinical-safety NOT REQUIRED
-- [ ] post-454: Dual-goal програмування: сила і гіпертрофія одночасно — Schoenfeld et al. (2017); операційний алгоритм блоку; clinical-safety NOT REQUIRED
-- [ ] post-455: Сон як активний адаптаційний процес — Dattilo et al. (2011) GH і IGF-1; Walker & Stickgold (2004) motor memory consolidation; Van Dongen et al. (2003) хронічне обмеження і силовий output; клінічний аудит сну атлета; clinical-safety NOT REQUIRED
+- [x] post-452: Вибір вправ під анатомію, а не під «правильну техніку» — антеверсія стегна; Schoenfeld (2010) squat depth і м'язова активація; stance width, foot angle, grip width під власну механіку; «правильна техніка» = оптимальна для твоєї анатомії; clinical-safety NOT REQUIRED · v3.47.0
+- [x] post-453: Тренінг без тренера: самостійна діагностика технічних помилок — відеоаналіз (сагітальна/фронтальна площина); маркери форми (bar path, knee tracking, neutral spine); технічна vs м'язова відмова; критерій «зупинись» і протокол впровадження; clinical-safety NOT REQUIRED · v3.47.0
+- [x] post-454: Dual-goal програмування: сила і гіпертрофія одночасно — Schoenfeld et al. (2017) concurrent periodization; перекриття rep ranges; операційний алгоритм блоку (heavy compound first); Helms об'єм MEV/MAV/MRV; практичні лімітатори; clinical-safety NOT REQUIRED · v3.47.0
+- [x] post-455: Сон як активний адаптаційний процес — Dattilo et al. (2011) GH/IGF-1 в slow-wave sleep; Walker & Stickgold (2004) motor memory consolidation (REM); Van Dongen et al. (2003) −20% силового output при хронічній нестачі; аудит сну атлета; clinical-safety NOT REQUIRED · v3.47.0
+
+   ── ROADMAP (наступні editorial теми · post-456+) ───────────────
+- [ ] post-456: Нейром'язова стомлюваність і тренувальна частота — Damas et al. (2016) EIMD і нейральне відновлення; як розрізнити центральну і периферійну стомлюваність; практичний протокол оцінки готовності до наступної сесії; clinical-safety NOT REQUIRED
+- [ ] post-457: Прогресія навантаження для просунутого атлета — чому лінійна прогресія перестає працювати після 2-3 років; undulating periodization vs block periodization; практичний перехід з новачкової на середньо-просунуту модель; clinical-safety NOT REQUIRED
+- [ ] post-458: Вертикальне і горизонтальне навантаження на плечовий пояс — анатомія ротаторної манжети в контексті тренінгу; Push:Pull баланс (Kolber et al. 2009); чому «3 жими : 1 тяга» — не формула; клінічна різниця між тренувальним дискомфортом і субакроміальним конфліктом; ⚠️ clinical-safety REQUIRED — тема болю і суглоба, route to CS before publish
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
