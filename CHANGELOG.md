@@ -6,6 +6,19 @@
 
 ---
 
+## [3.71.1] — 2026-06-11
+
+### Added
+- `docs/DATA_MODEL.md §30` — Subscription Events Erasure Hardening & Quota Grace Thresholds: resolves three P0 open questions blocking erasure Worker and quota enforcement ship. OQ-BILL-05: split-column approach for `subscription_events` GDPR Art. 17 pseudonymization (migration 0059 — `user_id` nullable + `erased_user_reference TEXT` + `chk_sub_events_user_or_erased` CHECK; erasure Worker step SUB-1; `[ERASED-{sha256(user_id + SALT)}]` keyed HMAC pseudonym). OQ-RL-02: `OVERAGE_GRACE_REQUESTS = 500`; secondary 95% warn threshold; migration 0059b adds `primary_warn_sent_at` / `secondary_warn_sent_at` dedup cols to `api_quota_usage`; new `security.quota_95pct_warning` DEC-030 event (STANDARD, 3yr). OQ-BILL-01: 14-day fixed consumer trial; enterprise pilots via comped active subscription (`billing_channel = 'none'`, `price_usd_cents = 0`). SOC 2 evidence ERA-E-001/002/003 (P5.2, P8.0, CC8.1). DEC-044 + DEC-045.
+
+### Changed
+- `docs/DECISION_LOG.md` — DEC-044 (OQ-BILL-05 split-column) + DEC-045 (OQ-RL-02 OVERAGE_GRACE + OQ-BILL-01 trial policy) added as newest entries
+- `docs/DATA_MODEL.md §24` — OQ-BILL-05 and OQ-BILL-01 marked 🟢 Resolved
+- `docs/DATA_MODEL.md §28` — OQ-RL-02 marked 🟢 Resolved
+- `VERSION` → 3.71.1
+
+---
+
 ## [3.71.0] — 2026-06-11
 
 ### Added

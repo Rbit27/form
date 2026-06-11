@@ -9174,11 +9174,11 @@ All events carry the standard DEC-030 envelope fields: `tenant_id`, `user_id`, `
 
 | ID | Question | Owner | Priority |
 |---|---|---|---|
-| OQ-BILL-01 | **Trial length configurability.** Should trial duration be configurable per enterprise tenant (e.g. 30-day pilot negotiated in §16 enterprise contract) or fixed at 14 days for consumer? If per-tenant: `trial_duration_days` must be added to `enterprise_contracts` (§16) and the billing Worker must read it when computing `trial_ends_at`. If fixed: simpler; pilots handled by comped subscription rather than extended trial. **P0 — affects `trial_ends_at` computation in billing Worker; founder decision before enterprise pilot.** | `founder` + `enterprise-architect` | **P0 — pre-M4** |
+| ~~OQ-BILL-01~~ **🟢 Resolved — DATA_MODEL §30 (2026-06-11)** | ~~**Trial length configurability.**~~ **Resolved:** Consumer Pro trial is 14 days fixed — no per-tenant configurability. Enterprise pilots are handled via comped active subscription (`billing_channel = 'none'`, `price_usd_cents = 0`, `status = 'active'`); pilot window governed by `enterprise_contracts.pilot_start_at / pilot_end_at` (§16 — no schema change). `trial_duration_days` column on `enterprise_contracts` explicitly rejected. See `docs/DATA_MODEL.md §30.4`, `docs/DECISION_LOG.md DEC-045`. | `founder` + `enterprise-architect` | **🟢 Resolved** |
 | OQ-BILL-02 | **Currency localization.** Should UAH pricing be stored as a separate `price_uah_kopecks` column or computed at display time from USD via a fixed exchange rate? Separate storage is more accurate (avoids forex volatility in displayed prices) but requires pricing sync on rate changes. Display-time conversion is simpler but can show jarring price changes. Recommendation: store a `display_prices JSONB` column on `plan_tier_definitions` (new table) with per-currency display amounts, independent of `price_usd_cents` which remains the internal accounting unit. | `product-strategist` + `enterprise-architect` | **P1 — before UA market launch** |
 | OQ-BILL-03 | **Refund policy encoding.** Full refund within 24 hours? Pro-rated? Store-platform refunds (Apple/Google) differ from Stripe refunds. The `billing.refunded` event `amount_usd_cents` field needs a policy decision: (a) always = full period price; (b) pro-rated = `price_usd_cents × (days_remaining / period_days)`; (c) platform-determined (use whatever Apple/Google/Stripe reports). Option (c) is strongly preferred: trust the platform's amount and record it verbatim. Needs legal sign-off for consumer contracts in Ukraine. | `legal` + `compliance-officer` | **P1 — before public launch** |
 | ~~OQ-BILL-04~~ **🟢 Resolved — DATA_MODEL §27 (2026-06-10)** | ~~**Invite-based seat provisioning.**~~ **Resolved:** separate `tenant_invitations` table preferred over `pending_email` column on `enterprise_seat_assignments`. `enterprise_seat_assignments` extended with nullable `user_id` + `invitation_id FK` + `chk_seat_assignment_not_orphan` CHECK. Full schema, state machine, SCIM auto-link path, GDPR Art. 17 erasure handling, and six DEC-030 events documented in `DATA_MODEL.md §27`. | `enterprise-architect` + `platform-engineer` | **🟢 Resolved** |
-| OQ-BILL-05 | **Art. 17 pseudonymization: FK constraint approach.** The `user_id UUID NOT NULL REFERENCES users(id)` FK on `subscription_events` cannot hold a pseudonymized string. Two options: (a) sentinel UUID — insert a permanent `[erased-user]` row in `users` table; set `user_id` to this sentinel on erasure; (b) split column — add `erased_user_reference TEXT` column; null the FK on erasure; populate the text column with the pseudonym. Option (a) is schema-simpler but creates a real row in `users` that must itself be excluded from all queries. Option (b) is cleaner but requires schema migration and query changes everywhere `subscription_events.user_id IS NOT NULL` is assumed. | `enterprise-architect` + `platform-engineer` + `compliance-officer` | **P0 — before any erasure path ships** |
+| ~~OQ-BILL-05~~ **🟢 Resolved — DATA_MODEL §30 (2026-06-11)** | ~~**Art. 17 pseudonymization: FK constraint approach.**~~ **Resolved:** Option (b) split-column adopted. `subscription_events.user_id` made nullable; `erased_user_reference TEXT NULL` column added with regex CHECK; `chk_sub_events_user_or_erased` mutual-exclusivity CHECK constraint enforced. Pseudonym format: `[ERASED-{sha256(user_id + ERASURE_PSEUDONYM_SALT)}]` — per-user keyed HMAC, satisfies GDPR Art. 4(5). Erasure Worker gains step SUB-1. See `docs/DATA_MODEL.md §30.2`, `docs/DECISION_LOG.md DEC-044`. | `enterprise-architect` + `platform-engineer` + `compliance-officer` | **🟢 Resolved** |
 
 ---
 
@@ -11770,7 +11770,7 @@ SELECT COUNT(*) AS archived_count FROM archived;
 | ID | Question | Owner | Priority | Resolution path |
 |---|---|---|---|---|
 | **OQ-RL-01** | **`api_quota_usage.tokens_consumed` as billing source of truth.** Should `tokens_consumed` be the authoritative field for enterprise overage charges (Claude API token billing), or should a separate `billing_metering` table be created for Stripe Metered integration? Using `api_quota_usage` is simpler through M7 and avoids a new table. Risk: `api_quota_usage` is scoped per api_key + endpoint_category; a billing summary across all keys for a tenant requires aggregation, which is feasible but less direct than a purpose-built metering table. Recommendation: use `api_quota_usage` as the source of truth through M7; create a dedicated `billing_metering` table if MRR exceeds $50k or if a Stripe Metered billing integration is contractually required. | enterprise-architect + finance | **P2 — before Stripe Metered integration** | Evaluate at M7 planning; document decision in `docs/DECISION_LOG.md`. |
-| **OQ-RL-02** | **OVERAGE_GRACE threshold: at what `overage_count` value does the hard block trigger?** The application constant `OVERAGE_GRACE` determines how many requests past `quota_limit` are admitted before `hard_blocked_at` is set. Too low → legitimate traffic cut off at month boundary; too high → material overage exposure before block. Recommendation: set `OVERAGE_GRACE = 500` requests (approximately 1% of a 50,000 req/month Enterprise Starter quota). CSM notification at 80% `quota_limit` consumption (already in §28.4 enforcement flow). Alert at 95% to give CSMs a second window before hard block. Both thresholds should be configurable as Cloudflare Workers environment variables, not hard-coded, to allow per-tier tuning without a code deploy. | enterprise-architect + customer-success | **P0 — must be set before quota enforcement ships** | Decision by enterprise-architect before M4 migration runs in production; document in `docs/DECISION_LOG.md`. |
+| ~~**OQ-RL-02**~~ **🟢 Resolved — DATA_MODEL §30 (2026-06-11)** | ~~**OVERAGE_GRACE threshold: at what `overage_count` value does the hard block trigger?**~~ **Resolved:** `OVERAGE_GRACE_REQUESTS = 500` (1.0% of Starter 50k/month quota). Secondary warn at `QUOTA_SECONDARY_WARN_PCT = 0.95`. Both stored as Cloudflare Workers env vars. Migration 0059b adds `primary_warn_sent_at` + `secondary_warn_sent_at` dedup columns to `api_quota_usage`. New DEC-030 event `security.quota_95pct_warning` (STANDARD, 3yr). See `docs/DATA_MODEL.md §30.3`, `docs/DECISION_LOG.md DEC-045`. | enterprise-architect + customer-success | **🟢 Resolved** |
 
 ---
 
@@ -12265,3 +12265,354 @@ All four artefacts are stored in `compliance/evidence/pam/` and cross-referenced
 ---
 
 *v1.0 (2026-06-10): §29 PAM / Privileged Access Management Postgres Schema — OQ-INS-01 Resolution · CC6.1/CC6.2/CC6.3/CC6.6 Auditor Evidence. Closes OQ-INS-01 from `docs/INCIDENT_RESPONSE.md §R-20` (P0 blocker — FORM-INSIDER-001 alert and the C2 forensic query were blocked until `admin_jit_escalations` table existed; all automated insider detection required manual calendar-record cross-referencing). §29.1 purpose and scope: two-store duality — KV (enforcement, ephemeral, TTL-based) vs. Postgres (forensic audit, durable 7yr, SQL-queryable); write sequencing (KV first, Postgres second, failure-tolerant); reconciliation job closes any gap. §29.2 KV ↔ Postgres duality table: dimensions are primary use, write path, expiry, query model, privacy invariant, and SOC 2 role. §29.3 migration 0058: two tables — `admin_jit_escalations` (pam_session_id UNIQUE, actor_user_id FK, access_level CHECK enum, target_tenant_id nullable, escalation_start/expiry/revoked_at timing columns, authorised_by_ic_user_id / authorised_by_cop_user_id approval columns, business_justification plain-text under security_reviewer-only, justification_hash for DEC-030 cross-reference, is_break_glass flag, status CHECK enum, dec030 event ID columns; four indexes: idx_jit_actor, idx_jit_tenant, idx_jit_break_glass, idx_jit_active partial) and `pam_break_glass_reviews` (pam_session_id UNIQUE FK, review_due_at, reviewed_at, outcome CHECK enum, reviewed_by_security/compliance FK, github_issue_url, pg_audit_lines_reviewed, notes, dec030 event ID columns; idx_bg_review_due partial). §29.4 RLS: `admin_jit_escalations` — five policies (form_system PERMISSIVE ALL, security_reviewer PERMISSIVE SELECT, form_compliance PERMISSIVE SELECT, form_api PERMISSIVE INSERT-only, RESTRICTIVE block for tenant_admin/owner/manager roles — HR invariant at DDL level); `pam_break_glass_reviews` — four policies (form_compliance PERMISSIVE ALL, security_reviewer PERMISSIVE SELECT, form_system PERMISSIVE INSERT-only, RESTRICTIVE deny-all for other roles). §29.5 audit trigger pattern: `fn_inject_pam_session_id()` SECURITY DEFINER trigger reads `app.pam_session_id` GUC (current_setting with null-safe true flag); appends pam_session_id to metadata JSONB on all six sensitive tables (tenant_sso_configs, tenant_members, enterprise_seat_assignments, user_profiles, cv_sessions, audit_log_events); no-op when GUC not set — zero overhead for normal form_api requests. §29.6 DEC-030: one new event `pam.break_glass_review_completed` (HIGH, 7yr) closes the break-glass DEC-030 chain (break_glass_activated → break_glass_expired → break_glass_review_completed); Zod schema provided. §29.7 C2 query: full SQL provided; interpretation guide (zero rows = FORM-INSIDER-001 condition; row with ACTIVE/EXPIRED state + approver = legitimate access; break-glass row = check pam_break_glass_reviews; revoked row before operation timestamp = potentially unauthorised). §29.8 FORM-INSIDER-001 automation: 15-minute pg_cron / Worker detection query matches audit_log_events carrying metadata.pam_session_id against admin_jit_escalations coverage window; zero matches = `security.insider_threat_candidate` DEC-030 HIGH + PagerDuty P0. §29.9 SOC 2 evidence mapping: CC6.1 (PAM-E-001 — zero null-scoped rows + ≤4h TTL), CC6.2 (PAM-E-002 — non-null approver for all non-read_only rows), CC6.3 (PAM-E-003 — expired rows + DEC-030 pam.session_expired chain), CC6.6 (PAM-E-004 — pam_break_glass_reviews all reviewed within 72h + pam.break_glass_review_completed events); artefacts stored in compliance/evidence/pam/; cross-reference to SOC2_READINESS §24.8 as CC6-E-PAM-005 through CC6-E-PAM-008. §29.10 implementation checklist: 6× P0 M6 (migration, pam-elevation-service INSERT, break-glass-notifier stub INSERT, pam-expiry-sweeper UPDATE, audit triggers, DEC-030 event registration), 5× P1 M7 (pg_cron reconciliation job 20, AL-PAM-BG-01 pg_cron job 21, FORM-INSIDER-001 automation, evidence collection, CHECK constraint migration 0058b), 2× P2 M8–M10 (tenant transparency report, OQ-PAM-01 decision). §29.11 two open questions: OQ-PAM-01 (dual-auth for break-glass audit record queries — P2, recommendation: alert-on-access approach), OQ-PAM-02 (plaintext justification in SOC 2 auditor evidence — P1, recommendation: redacted sample approach). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §24` (KV schema, DEC-030 events, alert rules AL-PAM-01/02/03 — §29 does not duplicate), `docs/INCIDENT_RESPONSE.md §R-20` (OQ-INS-01 → 🟢 Resolved by §29; C2 query updated to reference `admin_jit_escalations`; checklist item 1 closed), `docs/OBSERVABILITY.md §29` (PAM observability — AL-PAM-BG-01 to be added), `docs/OBSERVABILITY.md §12.6` (pg_cron registry: job 20 pam_postgres_sync, job 21 pam_bg_review_alert), `docs/AUDIT_LOG_SCHEMA.md` (`pam.break_glass_review_completed` — new event to register), `docs/SOC2_READINESS.md §24.8` (CC6-E-PAM-005 through CC6-E-PAM-008 evidence artefacts), `docs/CRYPTOGRAPHY_POLICY.md §3` (BUSINESS_JUSTIFICATION is plain-text stored under security_reviewer only — no key needed; confirm with compliance-officer before M6 migration), `docs/ENTERPRISE_ADMIN_API.md` (OQ-PAM-01 transparency report endpoint — P2 M10). Owner: enterprise-architect + security-engineer + compliance-officer.*
+
+---
+
+## 30. Subscription Events Erasure Hardening & Quota Grace Thresholds — OQ-BILL-05, OQ-RL-02 & OQ-BILL-01 Resolution
+
+> **Closes three P0 open questions** from `DATA_MODEL.md §24` and `§28`:
+> - **OQ-BILL-05** (P0 — before any erasure path ships): Art. 17 FK constraint approach for `subscription_events.user_id` — split-column chosen over sentinel UUID.
+> - **OQ-RL-02** (P0 — before quota enforcement ships): `OVERAGE_GRACE` = 500 requests; secondary 95% soft-warn threshold added.
+> - **OQ-BILL-01** (P0 — before enterprise pilot): trial length policy — 14 days fixed for consumer Pro; enterprise pilots via comped active subscription, not extended trial.
+>
+> DEC-044 and DEC-045 logged in `docs/DECISION_LOG.md`. Migrations: `0059_erasure_hardening.sql` and `0059b_quota_warn_dedup.sql`.
+> References: §24 (`subscription_events`, `user_subscriptions`, billing erasure path); §28 (`api_quota_usage`, `OVERAGE_GRACE` constant); §16 (enterprise contract lifecycle); `docs/AUDIT_LOG_SCHEMA.md` (DEC-030); `docs/GDPR_DPIA.md §4`.
+
+### 30.1 Purpose & Scope
+
+Three P0 blockers prevented the erasure Worker and quota enforcement from shipping to production:
+
+1. **OQ-BILL-05**: `subscription_events.user_id UUID NOT NULL REFERENCES users(id)` is a hard FK. On GDPR Art. 17 erasure, FORM must pseudonymize financial records — retain 7 years under Ukrainian Tax Code Art. 44 and EU VAT Directive Art. 245 (cannot delete), but cannot leave the original `user_id` UUID in the row. The FK type prevents setting `user_id` to a pseudonym string.
+
+2. **OQ-RL-02**: `quota-check.ts` contains the check `overage_count < OVERAGE_GRACE`, where `OVERAGE_GRACE` was an unresolved application constant. Without a defined value, the enforcement logic cannot ship: too low cuts off legitimate traffic at the month boundary; too high permits unacceptable quota overrun before the hard block fires.
+
+3. **OQ-BILL-01**: The `trial_ends_at` computation in the billing Worker must know the trial duration. The question was whether enterprise tenants should receive an extended trial via a `trial_duration_days` column on `enterprise_contracts`, or whether enterprise pilots should be handled as a separate model.
+
+**Out of scope for §30:** The full erasure Worker implementation (§12 erasure protocol is authoritative); KV sliding-window configuration (§28.5 is authoritative); enterprise contract commercial terms (§16 is authoritative).
+
+---
+
+### 30.2 OQ-BILL-05 Resolution: Split Column Approach
+
+#### 30.2.1 The Two Options Considered
+
+| Dimension | Option (a): Sentinel UUID | Option (b): Split Column ✓ |
+|---|---|---|
+| **Approach** | Insert permanent `[erased-user]` row into `users`; set `subscription_events.user_id` to this sentinel UUID on erasure | Add `erased_user_reference TEXT NULL` column; set `user_id = NULL`; write keyed HMAC pseudonym to `erased_user_reference` |
+| **Schema change** | None on `subscription_events` | Migration: `ALTER TABLE subscription_events` — `user_id` nullable + new column + CHECK constraint |
+| **`users` table impact** | Creates a durable sentinel row that must be excluded from every query on `users` (COUNT, list, DSAR export, activation metrics) | Zero impact on `users` table |
+| **RLS implications** | `form_api` SELECT on `users` sees the sentinel unless explicitly excluded; JOINs return the sentinel row | `user_id IS NULL` naturally excludes erased rows; existing queries remain correct without modification |
+| **GDPR Art. 4(5) pseudonymization** | Sentinel UUID is a shared opaque identifier — not a pseudonym per Recital 26; two erased users share the same sentinel, preventing per-user re-identification linkage in HMAC chain | `[ERASED-{sha256(user_id + ERASURE_PSEUDONYM_SALT)}]` is a per-user keyed HMAC — satisfies Art. 4(5) definition; cannot reverse without the secret salt |
+| **SOC 2 CC8.1 auditability** | Sentinel row is a permanent schema artefact with no natural lifecycle; every caller of `users` requires documented exclusion | Erasure evidence is fully contained within `subscription_events`; simpler for auditors to verify |
+
+#### 30.2.2 Decision: Option (b) — Split Column Adopted (DEC-044)
+
+**Option (b)** is adopted. The sentinel UUID approach was rejected for three reasons:
+
+1. **Contaminates the authoritative identity table.** `users` is the source of truth for access control, DSAR exports, activation metrics, and admin tooling. A permanent sentinel row must be excluded from every query on `users` — an invisible maintenance burden that grows with every new query and will catch future engineers off-guard.
+
+2. **Not a true GDPR pseudonym.** A sentinel UUID is a shared opaque identifier; it does not satisfy GDPR Recital 26's requirement that pseudonymization use "additional information kept separately and subject to technical and organisational measures." The split-column pseudonym `[ERASED-{sha256(user_id + SALT)}]` is a per-user HMAC keyed to a secret stored in Cloudflare Secrets Store — a proper pseudonym under Art. 4(5).
+
+3. **SOC 2 CC8.1 auditability.** Auditors reviewing the `users` table would encounter the sentinel and require an explanation of its origin. The split-column approach keeps all erasure evidence within `subscription_events`, which has a well-documented 7-year financial retention basis.
+
+#### 30.2.3 Migration 0059 — `subscription_events` Erasure Hardening
+
+```sql
+-- Migration: 0059_erasure_hardening.sql
+-- Owner: platform-engineer + compliance-officer
+-- Closes: OQ-BILL-05 (DATA_MODEL §24.14)
+-- Run during maintenance window (03:00–04:00 UTC) — ADD CONSTRAINT requires table scan
+-- Idempotent: ALTER ADD COLUMN is a no-op if column already exists
+
+BEGIN;
+
+-- Step 1: Make user_id nullable to support erasure pseudonymization
+-- FK constraint is retained — only erased rows carry user_id = NULL
+ALTER TABLE subscription_events
+  ALTER COLUMN user_id DROP NOT NULL;
+
+-- Step 2: Add erased_user_reference column for keyed HMAC pseudonym
+ALTER TABLE subscription_events
+  ADD COLUMN IF NOT EXISTS erased_user_reference TEXT NULL
+    CHECK (
+      erased_user_reference IS NULL
+      OR erased_user_reference ~ '^\[ERASED-[0-9a-f]{64}\]$'
+    );
+
+-- Step 3: Mutual exclusivity constraint
+--   A row must have exactly one of user_id or erased_user_reference — never both, never neither
+ALTER TABLE subscription_events
+  ADD CONSTRAINT chk_sub_events_user_or_erased CHECK (
+    (user_id IS NOT NULL AND erased_user_reference IS NULL)
+    OR
+    (user_id IS NULL AND erased_user_reference IS NOT NULL)
+  );
+
+-- Step 4: Index for erasure sweep (find all rows for a user_id during Art. 17 processing)
+CREATE INDEX IF NOT EXISTS idx_sub_events_erasure_sweep
+  ON subscription_events (user_id)
+  WHERE user_id IS NOT NULL;
+
+-- Step 5: Index for pseudonym audit lookup
+CREATE INDEX IF NOT EXISTS idx_sub_events_erased_ref
+  ON subscription_events (erased_user_reference)
+  WHERE erased_user_reference IS NOT NULL;
+
+COMMIT;
+```
+
+**Zero-downtime notes:**
+- `ALTER COLUMN ... DROP NOT NULL` acquires `ACCESS EXCLUSIVE` briefly. Safe on Supabase with `lock_timeout = '5s'` (default).
+- `ADD COLUMN IF NOT EXISTS` with no DEFAULT and no NOT NULL does not rewrite the table on Postgres 11+.
+- `ADD CONSTRAINT ... CHECK` requires a table scan — schedule during the 03:00–04:00 UTC maintenance window (`docs/ENGINEERING_RUNBOOK.md §5.1`).
+
+#### 30.2.4 Erasure Worker Step SUB-1
+
+The erasure Worker (§12 Art. 17 protocol) gains step **SUB-1**, inserted after wearable data erasure and before `user_subscriptions` soft-expiry:
+
+```typescript
+// Step SUB-1: Pseudonymize subscription_events rows
+// Requires: form_system Postgres role (set by erasure Worker via SET ROLE)
+// ERASURE_PSEUDONYM_SALT: Cloudflare Secret (write-once — see OQ-ERA-02)
+
+async function pseudonymizeSubscriptionEvents(
+  userId: string,
+  salt: string
+): Promise<{ rowsUpdated: number }> {
+  const pseudonym = `[ERASED-${await sha256Hex(userId + salt)}]`;
+
+  const { count } = await supabase
+    .from('subscription_events')
+    .update({ user_id: null, erased_user_reference: pseudonym })
+    .eq('user_id', userId)
+    .select('count', { count: 'exact', head: true });
+
+  // billing.user_erased DEC-030 (HIGH, 7yr) — already registered in AUDIT_LOG_SCHEMA.md §6
+  // user_id is omitted from the event payload after erasure (see §30.5.2 Zod patch)
+  await emitAuditEvent({
+    event_type: 'billing.user_erased',
+    severity: 'HIGH',
+    tenant_id: null,               // consumer erasure — no tenant context
+    payload: {
+      erased_user_reference: pseudonym,
+      rows_pseudonymized:    count ?? 0,
+      retention_basis:       'UACode_Art44_EUVATDir_Art245',
+      erasure_step:          'SUB-1',
+    },
+  });
+
+  return { rowsUpdated: count ?? 0 };
+}
+```
+
+**Privacy invariant:** `user_id` is omitted from `billing.user_erased` DEC-030 events emitted by step SUB-1. The `erased_user_reference` HMAC is the sole identity marker in the event chain after erasure.
+
+#### 30.2.5 Query Pattern Analysis
+
+The `chk_sub_events_user_or_erased` CHECK guarantees a row always has exactly one identity column — the mutual-exclusivity invariant prevents ambiguity. No existing queries require mandatory changes for correctness:
+
+| Query pattern | After migration | Notes |
+|---|---|---|
+| `WHERE user_id = $id` | Correct — erased rows have `user_id = NULL`, excluded automatically | No change needed |
+| `JOIN users ON subscription_events.user_id = users.id` | Inner join excludes `user_id = NULL` rows naturally | No change needed |
+| `COUNT(DISTINCT user_id)` | Excludes erased users — **intentional** | No change needed |
+| `WHERE user_id IS NOT NULL` | Now meaningful filter (previously tautology) | Recommend making explicit |
+| DSAR export scoped by `user_id` | Erased users cannot request DSAR (account closed before erasure runs) | No change needed |
+| Auditor query for `billing.user_erased` events | Must use `erased_user_reference` column, not `user_id` | Auditor tooling update required |
+
+---
+
+### 30.3 OQ-RL-02 Resolution: OVERAGE_GRACE = 500 Requests (DEC-045)
+
+#### 30.3.1 Threshold Rationale
+
+`OVERAGE_GRACE` is the count of requests admitted past `quota_limit` before `hard_blocked_at` is set in `api_quota_usage`. The enforcement flow in §28.4 increments `overage_count` on each over-limit request and hard-blocks when `overage_count >= OVERAGE_GRACE`.
+
+**Selected value: `OVERAGE_GRACE = 500`**
+
+| Tier | `quota_limit` (monthly) | 500 requests = | Hard-block window |
+|---|---|---|---|
+| Enterprise Starter | 50,000 req/month | 1.0% of quota | ≈ 16 req/day overage window |
+| Enterprise Growth | 200,000 req/month | 0.25% of quota | Tighter — appropriate for sophisticated customers |
+| Enterprise Custom | Configurable | Varies | Per contract |
+
+500 requests is calibrated to:
+- Absorb a legitimately busy final day of the month (month-boundary burst is the primary false-positive scenario)
+- Not represent a material contract violation — at Starter $9/seat/month, 500 excess requests are economically immaterial
+- Align with common SaaS patterns (Stripe uses a grace window before hard-blocking; Twilio uses ~10%)
+
+#### 30.3.2 Environment Variable Configuration
+
+All three quota thresholds are stored as Cloudflare Workers environment variables, not hard-coded. This enables emergency adjustment without a code deploy:
+
+| Variable | Value | Description |
+|---|---|---|
+| `OVERAGE_GRACE_REQUESTS` | `500` | Requests past `quota_limit` before hard block |
+| `QUOTA_WARN_PCT` | `0.80` | First CSM notification threshold (AL-RL-01, P2) |
+| `QUOTA_SECONDARY_WARN_PCT` | `0.95` | Second CSM notification — **new**, see §30.3.3 |
+
+#### 30.3.3 Secondary 95% Warning Threshold
+
+With OVERAGE_GRACE = 500, a Starter tenant at 95% consumption has ≈ 2,500 requests before hard block — insufficient time for a CSM to reach the customer, negotiate an uplift, and have FORM update `api_quota_usage.quota_limit` before the block fires. A second warning at 95% provides a final escalation window.
+
+**Schema addition — `api_quota_usage` dedup columns (migration 0059b):**
+
+```sql
+-- Migration: 0059b_quota_warn_dedup.sql
+ALTER TABLE api_quota_usage
+  ADD COLUMN IF NOT EXISTS primary_warn_sent_at    TIMESTAMPTZ NULL,
+  ADD COLUMN IF NOT EXISTS secondary_warn_sent_at  TIMESTAMPTZ NULL;
+```
+
+**Updated `quota-check.ts` enforcement logic:**
+
+```typescript
+const OVERAGE_GRACE         = parseInt(env.OVERAGE_GRACE_REQUESTS    ?? '500');
+const WARN_PCT              = parseFloat(env.QUOTA_WARN_PCT           ?? '0.80');
+const SECONDARY_WARN_PCT    = parseFloat(env.QUOTA_SECONDARY_WARN_PCT ?? '0.95');
+
+// After UPSERT — read updated row
+if (row.hard_blocked_at) {
+  return http429(secondsUntilNextMonth());
+}
+if (row.overage_count >= OVERAGE_GRACE) {
+  await setHardBlock(row);           // emits security.quota_hard_block DEC-030 (§28.6)
+  return http429(secondsUntilNextMonth());
+}
+if (row.request_count >= row.quota_limit * SECONDARY_WARN_PCT
+    && !row.secondary_warn_sent_at) {
+  await emitQuota95Warning(row);     // emits security.quota_95pct_warning DEC-030 (§30.5.1)
+  await markSecondaryWarnSent(row);
+}
+if (row.request_count >= row.quota_limit * WARN_PCT
+    && !row.primary_warn_sent_at) {
+  await emitQuota80Warning(row);     // emits security.quota_80pct_warning DEC-030 (§28.6)
+  await markPrimaryWarnSent(row);
+}
+```
+
+---
+
+### 30.4 OQ-BILL-01 Resolution: Trial Length Policy (DEC-045)
+
+**Consumer Pro trial: 14 days fixed.** No configurability. The billing Worker computes:
+
+```typescript
+const trial_ends_at = addDays(new Date(), 14);  // date-fns addDays
+```
+
+**Enterprise pilots: comped active subscription, not extended trial.**
+
+Adding `trial_duration_days` to `enterprise_contracts` was rejected. Enterprise pilots are modelled as a comped subscription:
+- `user_subscriptions.status = 'active'`
+- `user_subscriptions.billing_channel = 'none'`
+- `user_subscriptions.price_usd_cents = 0`
+- `enterprise_contracts.pilot_start_at` / `pilot_end_at` govern the pilot window (§16 — already present, no schema change)
+
+**Rationale:**
+1. **Clean semantics.** "Trial" is a consumer self-service concept. "Pilot" is a negotiated enterprise evaluation with a defined CSM cadence, success criteria, and conversion gate. Different commercial models should not share a state machine.
+2. **No state machine leakage.** The billing Worker does not auto-expire pilots — the CSM triggers conversion manually. This avoids accidental production disruption if `pilot_end_at` passes without a contract signed.
+3. **Zero schema change.** `enterprise_contracts.pilot_end_at` already exists; the billing Worker branches on `billing_channel = 'none'` to suppress automatic renewal attempts.
+
+---
+
+### 30.5 DEC-030 HMAC-Chained Audit Events
+
+#### 30.5.1 `security.quota_95pct_warning` (New — STANDARD, 3-year retention)
+
+Register in `docs/AUDIT_LOG_SCHEMA.md §6` alongside `security.quota_80pct_warning`:
+
+```sql
+INSERT INTO audit_log (
+  event_type, severity, tenant_id, payload,
+  sequence_number, prev_hash, hash
+) VALUES (
+  'security.quota_95pct_warning',
+  'STANDARD',
+  $tenant_id,
+  jsonb_build_object(
+    'api_key_id',         $api_key_id,          -- UUID; never key_preview
+    'period_month',       $period_month,         -- YYYY-MM-01
+    'endpoint_category',  $endpoint_category,
+    'request_count',      $request_count,
+    'quota_limit',        $quota_limit,
+    'pct_consumed',       ROUND($request_count::numeric / $quota_limit * 100, 1)
+  ),
+  nextval('audit_log_sequence'), $prev_hash,
+  encode(hmac(
+    concat($sequence_number, $prev_hash, $event_type, $tenant_id::text, $payload::text),
+    current_setting('app.hmac_secret'), 'sha256'
+  ), 'hex')
+);
+```
+
+**Privacy invariant:** No `user_id`. Tenant-aggregate event only.
+
+#### 30.5.2 `billing.user_erased` Zod Schema Patch
+
+The existing `billing.user_erased` event (§24.12) carries `user_id`. Post-migration, step SUB-1 emits the event with `user_id` absent and `erased_user_reference` present. The registered Zod schema must be patched for forward compatibility while preserving backward compatibility with pre-migration events:
+
+```typescript
+// AUDIT_LOG_SCHEMA.md §6 — billing.user_erased Zod schema patch
+const BillingUserErasedPayload = z.object({
+  user_id:                z.string().uuid().optional(),     // deprecated post-§30; kept for backward compat
+  erased_user_reference:  z.string().regex(/^\[ERASED-[0-9a-f]{64}\]$/),
+  rows_pseudonymized:     z.number().int().nonneg(),
+  retention_basis:        z.literal('UACode_Art44_EUVATDir_Art245'),
+  erasure_step:           z.string(),
+});
+```
+
+---
+
+### 30.6 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | §30 mechanism | Evidence artefact | Status |
+|---|---|---|---|---|
+| **P5.2 — Pseudonymization** | `erased_user_reference` is a per-user keyed SHA-256 HMAC — satisfies GDPR Art. 4(5) pseudonymization; `chk_sub_events_user_or_erased` enforces mutual exclusivity at DB layer | `billing.user_erased` DEC-030 HIGH/7yr carries `erased_user_reference`; migration 0059 adds CHECK constraint | **ERA-E-001** — `subscription_events` row export showing `erased_user_reference IS NOT NULL` rows after first erasure run | 🟡 Authored — closes on first Art. 17 erasure in production |
+| **P8.0 — Financial retention basis** | `subscription_events` rows are not deleted on erasure; `billing.user_erased` DEC-030 event carries `retention_basis = 'UACode_Art44_EUVATDir_Art245'` as documentary evidence | `billing.user_erased` event log with `retention_basis` field | **ERA-E-002** — `billing.user_erased` DEC-030 event export with `retention_basis` populated | 🟡 Authored — closes on first Art. 17 erasure in production |
+| **CC8.1 — Change management** | `chk_sub_events_user_or_erased` CHECK prevents simultaneous population of both identity columns; billing Worker is sole erasure mutation path; DEC-030 chain provides tamper-evident record | Migration deploy record + DEC-030 event chain for first production erasure | **ERA-E-003** — migration 0059 deploy log + first-erasure DEC-030 chain export | 🟡 Authored — closes on migration deploy + first production erasure |
+| **CC6.1 — Logical access** | `OVERAGE_GRACE_REQUESTS = 500` enforces quota ceiling with bounded overage; `QUOTA_SECONDARY_WARN_PCT = 0.95` adds advance CSM escalation window; both as Workers env vars (configurable without deploy) | `security.quota_95pct_warning` + `security.quota_hard_block` DEC-030 events | **RL-E-001 (supplement)** — §35.9 RL-E-001 extended; §30.3 adds the 95% event to the enforcement chain evidence | 🟡 Authored |
+
+---
+
+### 30.7 Implementation Checklist
+
+#### P0 — Must complete before erasure Worker ships (M4)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0059_erasure_hardening.sql` (§30.2.3) on staging. Verify: (a) `user_id` is nullable; (b) `erased_user_reference TEXT NULL` column exists; (c) `chk_sub_events_user_or_erased` CHECK present; (d) INSERT with both non-NULL fails with CHECK violation; (e) INSERT with both NULL fails; (f) UPDATE setting `user_id = NULL, erased_user_reference = '[ERASED-{64 hex chars}]'` succeeds. Promote to production in 03:00–04:00 UTC maintenance window. | platform-engineer | **P0** | M4 | [ ] |
+| 2 | Run migration `0059b_quota_warn_dedup.sql` (§30.3.3) on staging and production. Verify `api_quota_usage` gains `primary_warn_sent_at` and `secondary_warn_sent_at` columns; existing rows have both NULL. | platform-engineer | **P0** | M4 | [ ] |
+| 3 | Update erasure Worker: insert step SUB-1 (`pseudonymizeSubscriptionEvents`) per §30.2.4. Staging test: create a test user with ≥ 3 `subscription_events` rows; trigger erasure; confirm (a) all rows for `user_id` now have `user_id = NULL` + `erased_user_reference = '[ERASED-{hash}]'`; (b) `billing.user_erased` DEC-030 event emitted with `erased_user_reference` in payload, no `user_id`; (c) `rows_pseudonymized` count matches actual row count. | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 4 | Patch `billing.user_erased` Zod schema in `docs/AUDIT_LOG_SCHEMA.md §6` per §30.5.2: add required `erased_user_reference`, make `user_id` optional. Deploy updated event registry to `emit-audit-event` Worker. Confirm existing `billing.user_erased` events (pre-migration) still validate against the patched schema. | platform-engineer | **P0** | M4 | [ ] |
+| 5 | Register `security.quota_95pct_warning` in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schema from §30.5.1. Deploy to `emit-audit-event` Worker. | platform-engineer | **P0** | M4 | [ ] |
+| 6 | Update `quota-check.ts` per §30.3.2: read `OVERAGE_GRACE_REQUESTS` env var (replace any hard-coded constant); add `QUOTA_SECONDARY_WARN_PCT = 0.95` check with `secondary_warn_sent_at` dedup. Set `OVERAGE_GRACE_REQUESTS = 500`, `QUOTA_SECONDARY_WARN_PCT = 0.95` in Cloudflare Workers production env for `quota-check` Worker. | platform-engineer + devops-lead | **P0** | M4 | [ ] |
+| 7 | Configure AL-RL-01b alert in PagerDuty `form-customer-success`: trigger on `security.quota_95pct_warning` DEC-030 event; P1 severity; dedup key `rl-quota-95pct-{tenant_id}-{period_month}-{endpoint_category}`; auto-escalates to P0 if no CSM acknowledgement within 2 hours. Add row to §6.2 Alert Rules Table `rate_limit_health` subsection in `docs/OBSERVABILITY.md`. | devops-lead | **P0** | M4 | [ ] |
+
+#### P1 — Before first enterprise pilot goes live (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Confirm all three env vars (`OVERAGE_GRACE_REQUESTS`, `QUOTA_WARN_PCT`, `QUOTA_SECONDARY_WARN_PCT`) are set in production Workers env for `quota-check`. Verify via `wrangler secret list quota-check`. | devops-lead | **P1** | M5 | [ ] |
+| 9 | Document `ERASURE_PSEUDONYM_SALT` as a write-once key in `docs/CRYPTOGRAPHY_POLICY.md §3` key inventory. Rationale: OQ-ERA-02 (§30.8) — rotating this key makes pre-rotation pseudonyms irreconcilable. Write-once policy must be recorded before first Art. 17 erasure in production. | compliance-officer + security-engineer | **P1** | M5 | [ ] |
+| 10 | Collect ERA-E-001, ERA-E-002, ERA-E-003 evidence artefacts (§30.6) after first production erasure; store in `compliance/evidence/erasure/`; cross-reference `docs/SOC2_READINESS.md` P5.2 and P8.0 evidence tables. | compliance-officer | **P1** | M6 | [ ] |
+
+#### P2 — Post-GA
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | Evaluate per-tier `OVERAGE_GRACE_REQUESTS` tuning after first 10 enterprise tenants reach 80%+ consumption. If Growth-tier tenants consistently hard-block within the grace window, increase to 1,000 for Growth; keep 500 for Starter. Document outcome in `docs/DECISION_LOG.md`. | enterprise-architect + customer-success | **P2** | M8 | [ ] |
+
+---
+
+### 30.8 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-ERA-01** | **DSAR requests from users who have already exercised Art. 17 erasure.** `subscription_events` rows for erased users carry `erased_user_reference IS NOT NULL`. A DSAR export scoped by `user_id` returns zero rows (correct — the account is closed). However, if a user requests DSAR before erasure, the export is a point-in-time snapshot and remains valid. Recommendation: DSAR Worker routes 404 after account closure; no schema change required. Document as a Worker routing rule in `docs/ENTERPRISE_ADMIN_API.md §14`. | P2 | compliance-officer + platform-engineer | Document in ENTERPRISE_ADMIN_API.md §14 before Art. 17 erasure goes live |
+| **OQ-ERA-02** | **`ERASURE_PSEUDONYM_SALT` key rotation policy.** The SHA-256 pseudonym is keyed to `ERASURE_PSEUDONYM_SALT`. Rotating this key makes all pre-rotation `erased_user_reference` values irreconcilable — even FORM cannot link old pseudonyms to new ones. This is desirable from a GDPR minimisation standpoint but complicates any audit linkage between `billing.user_erased` events and `erased_user_reference` column values. Recommendation: treat `ERASURE_PSEUDONYM_SALT` as write-once; document in `docs/CRYPTOGRAPHY_POLICY.md §3` key inventory before first production erasure. | P1 | compliance-officer + security-engineer | Document in CRYPTOGRAPHY_POLICY.md §3 before first Art. 17 erasure (P1 §30.7 item 9) |
+
+---
+
+*v1.0 (2026-06-11): §30 Subscription Events Erasure Hardening & Quota Grace Thresholds — resolves OQ-BILL-05 (P0, split-column for `subscription_events` GDPR Art. 17 pseudonymization), OQ-RL-02 (P0, OVERAGE_GRACE = 500 requests), and OQ-BILL-01 (P0, 14-day fixed consumer trial; enterprise pilots via comped active subscription). §30.2 OQ-BILL-05: option (b) split-column adopted (option (a) sentinel UUID rejected — contaminates `users` table; not a true GDPR Art. 4(5) pseudonym; pollutes SOC 2 CC8.1 audit trail); migration 0059 makes `user_id` nullable, adds `erased_user_reference TEXT NULL` with regex CHECK, adds `chk_sub_events_user_or_erased` mutual-exclusivity CHECK, adds two indexes; erasure Worker gains step SUB-1 with `[ERASED-{sha256(user_id + ERASURE_PSEUDONYM_SALT)}]` keyed HMAC pseudonym; query pattern analysis confirms zero mandatory query changes for correctness. §30.3 OQ-RL-02: OVERAGE_GRACE = 500 requests (1.0% of Starter 50k/month quota; 0.25% of Growth 200k/month); secondary 95% warn threshold added (QUOTA_SECONDARY_WARN_PCT = 0.95); migration 0059b adds `primary_warn_sent_at` + `secondary_warn_sent_at` dedup columns to `api_quota_usage`; three env vars replace hard-coded constants. §30.4 OQ-BILL-01: 14-day fixed consumer trial; enterprise pilots use `billing_channel = 'none'`, `price_usd_cents = 0`, `status = 'active'`; `pilot_end_at` in §16 `enterprise_contracts` governs pilot window — no schema change. §30.5 two DEC-030 items: `security.quota_95pct_warning` (new, STANDARD 3yr, tenant-level, no user_id); `billing.user_erased` Zod patch (add required `erased_user_reference`, make `user_id` optional for backward compat). §30.6 SOC 2: ERA-E-001 (P5.2 pseudonymization), ERA-E-002 (P8.0 financial retention with `retention_basis`), ERA-E-003 (CC8.1 migration + erasure chain). §30.7 eleven-item checklist: 7× P0 M4 (migrations 0059/0059b, erasure Worker SUB-1, AUDIT_LOG_SCHEMA patches ×2, quota-check.ts update, AL-RL-01b PagerDuty), 3× P1 M5–M6 (env var confirm, ERASURE_PSEUDONYM_SALT key inventory, evidence collection), 1× P2 M8 (per-tier grace tuning). §30.8 two open questions: OQ-ERA-01 (DSAR routing for erased users — P2, Worker routing decision, no schema change); OQ-ERA-02 (ERASURE_PSEUDONYM_SALT write-once policy — P1, document in CRYPTOGRAPHY_POLICY.md §3). Cross-references: `docs/DATA_MODEL.md §12` (Art. 17 erasure protocol — step SUB-1 insertion point); `docs/DATA_MODEL.md §24` (OQ-BILL-05 ~~P0~~ → 🟢 Resolved; OQ-BILL-01 ~~P0~~ → 🟢 Resolved; `billing.user_erased` Zod schema patched); `docs/DATA_MODEL.md §28` (OQ-RL-02 ~~P0~~ → 🟢 Resolved; `OVERAGE_GRACE` constant defined; `api_quota_usage` schema extended); `docs/AUDIT_LOG_SCHEMA.md §6` (`billing.user_erased` Zod patch + `security.quota_95pct_warning` new registration); `docs/OBSERVABILITY.md §35.4` + §6.2 (AL-RL-01b 95% warn alert added to `rate_limit_health` subsection); `docs/CRYPTOGRAPHY_POLICY.md §3` (ERASURE_PSEUDONYM_SALT — write-once key, P1 before first erasure); `docs/DECISION_LOG.md` (DEC-044: OQ-BILL-05 split-column; DEC-045: OQ-RL-02 + OQ-BILL-01). Owner: enterprise-architect + platform-engineer + compliance-officer.*

@@ -15,6 +15,28 @@
 
 ## 2026-06-11
 
+### DEC-045 · OQ-RL-02 + OQ-BILL-01: OVERAGE_GRACE = 500; enterprise pilots via comped subscription
+
+- **Decision:** Two related P0 open questions resolved together:
+  - **OQ-RL-02 (P0 — before quota enforcement ships):** `OVERAGE_GRACE_REQUESTS = 500` requests. Secondary warn threshold: `QUOTA_SECONDARY_WARN_PCT = 0.95`. Both stored as Cloudflare Workers environment variables, not hard-coded. Migration `0059b` adds `primary_warn_sent_at` and `secondary_warn_sent_at` dedup columns to `api_quota_usage`. New DEC-030 event `security.quota_95pct_warning` (STANDARD, 3-year retention) registered in `docs/AUDIT_LOG_SCHEMA.md §6`.
+  - **OQ-BILL-01 (P0 — before enterprise pilot):** Consumer Pro trial is fixed at **14 days** — no per-tenant `trial_duration_days` on `enterprise_contracts`. Enterprise pilots use a comped active subscription: `billing_channel = 'none'`, `price_usd_cents = 0`, `status = 'active'`; pilot window governed by `enterprise_contracts.pilot_start_at / pilot_end_at` (§16). No schema change required.
+- **Owner:** enterprise-architect + customer-success (OQ-RL-02); founder + enterprise-architect (OQ-BILL-01)
+- **Why:**
+  - *OQ-RL-02:* 500 requests is 1.0% of the Starter 50k/month quota — enough headroom to absorb a legitimate month-boundary burst without representing a material contract violation. The secondary 95% warn gives CSMs a final escalation window before the hard block fires; without it, a CSM receiving only the 80% alert has insufficient time to negotiate a quota uplift before the tenant is blocked.
+  - *OQ-BILL-01:* "Trial" and "pilot" are distinct commercial concepts. A fixed 14-day consumer trial is simpler to reason about and aligns with App Store norms. Modelling enterprise pilots as comped subscriptions avoids extending the billing state machine with per-tenant trial overrides and prevents accidental production disruption if `pilot_end_at` passes without a contract signed.
+- **Reverse cost:** Low (OQ-RL-02). Increasing OVERAGE_GRACE is a single env var change; decreasing it is the same. Per-tier tuning is possible post-GA (§30.7 item 11). Low (OQ-BILL-01). Introducing a `trial_duration_days` column after launch requires a schema migration and billing Worker update; no active enterprise pilots are affected before M5.
+
+---
+
+### DEC-044 · OQ-BILL-05: split-column approach adopted for `subscription_events` GDPR Art. 17 pseudonymization
+
+- **Decision:** Option (b) — split column — is adopted for the `subscription_events.user_id` GDPR Art. 17 erasure FK problem. Migration `0059` makes `user_id` nullable and adds `erased_user_reference TEXT NULL` with a regex CHECK constraint. A mutual-exclusivity CHECK (`chk_sub_events_user_or_erased`) ensures every row has exactly one of the two columns. Pseudonym format: `[ERASED-{sha256(user_id + ERASURE_PSEUDONYM_SALT)}]` — a per-user keyed HMAC satisfying GDPR Art. 4(5). `ERASURE_PSEUDONYM_SALT` is a write-once Cloudflare Secret (see OQ-ERA-02 in `docs/DATA_MODEL.md §30.8`). Erasure Worker gains step SUB-1. See `docs/DATA_MODEL.md §30.2`.
+- **Owner:** enterprise-architect + platform-engineer + compliance-officer
+- **Why:** Option (a) — sentinel UUID — was rejected because: (a) it contaminates the `users` table with a permanent artefact that must be excluded from every query (COUNT, list, DSAR export, activation metrics); (b) a sentinel UUID is not a true GDPR pseudonym under Art. 4(5) — it is a shared opaque identifier, not an individually keyed HMAC; (c) auditors reviewing the `users` table would encounter the sentinel and require an explanation. The split-column approach confines all erasure evidence to `subscription_events`, which has a clear documented 7-year financial retention basis under Ukrainian Tax Code Art. 44 and EU VAT Directive Art. 245. The query pattern analysis (§30.2.5) confirms zero mandatory query changes for correctness — the mutual-exclusivity constraint is backward-compatible with all existing FK-using queries.
+- **Reverse cost:** Medium. Reverting to sentinel UUID requires: (a) migration to make `user_id` non-nullable again; (b) removal of `erased_user_reference` column; (c) insertion of a sentinel row into `users`; (d) re-erasure of any rows already pseudonymized under the split-column approach; (e) update of `billing.user_erased` Zod schema. Cost increases with each Art. 17 erasure processed under the split-column approach.
+
+---
+
 ### DEC-043 · OQ-PAM-02: business_justification excluded from SOC 2 auditor bulk export; redacted-sample approach adopted
 
 - **Decision:** `business_justification` (plain-text) in `admin_jit_escalations` is NOT included in any SOC 2 auditor bulk evidence export. Auditors receive `justification_hash` (SHA-256) in DEC-030 events and may request plaintext hash-verification for specific examples during fieldwork. FORM provides a redacted sample set — sanitised to remove any PII or customer-identifying details — stored at `compliance/evidence/pam/justification-sample.md`. This resolves OQ-PAM-02 from `docs/DATA_MODEL.md §29.11` (P1 — before SOC 2 observation period start).
