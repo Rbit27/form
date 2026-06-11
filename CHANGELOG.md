@@ -6,6 +6,19 @@
 
 ---
 
+## [3.56.0] — 2026-06-11
+
+### Added
+- `content/post-482-autoregulation-without-rpe.md` — Авторегуляція без RPE: Hackett et al. (2012) JSCR RIR-переоцінювання у нетренованих; Gonzalez-Badillo & Sanchez-Medina (2010) IJSM швидкість першого повторення як маркер готовності; Halperin et al. (2015) PLOS ONE технічна відмова як стоп-критерій; Borresen & Lambert (2009) Sports Med між-сесійні маркери; протокол «першого підходу-зонду»; калібрування RPE через тести на резерв. clinical-safety: NOT REQUIRED.
+- `blog.html` — 1 нова картка (post-482) → 410 карток (482 пости authored)
+- `README.md` — roadmap: post-482 → [x]; нові теми post-484–485
+
+### Changed
+- `STATUS.md` — v3.54.0 → v3.56.0; post count 480 → 482; blog.html 409 → 410 карток
+- `VERSION` — 3.55.0 → 3.56.0
+
+---
+
 ## [3.55.0] — 2026-06-11
 
 ### Added
