@@ -6,6 +6,14 @@
 
 ---
 
+## [3.59.1] — 2026-06-11
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — R-24 SCIM Mass Deprovisioning Emergency: twenty-fourth runbook. Covers accidental mass IdP-side SCIM deprovision events (Okta/Azure AD/Google Workspace). Trigger matrix (4 signal sources); P0 admin lockout sub-protocol with magic link recovery; 4 scope assessment SQL queries (R-24-C1 through C4); SCIM sync pause mechanism (`scim:sync:paused:{tenant_id}` KV key); 4 root cause hypotheses (H1–H4); 3 communication templates (MD-01/02/03, aggregate-only privacy floor); 5 DEC-030 HMAC-chained events (`scim.mass_deprovision_detected` CRITICAL through `scim.mass_reprovision_complete`); AL-SCIM-MASS-01 alert rule definition; SOC 2 mapping A1.1/A1.2/CC7.2/CC7.3/CC9.2; 11-item implementation checklist; 3 open questions. Document header bumped v1.8 → v2.0.
+- `VERSION` — 3.59.0 → 3.59.1
+
+---
+
 ## [3.59.0] — 2026-06-11
 
 ### Added

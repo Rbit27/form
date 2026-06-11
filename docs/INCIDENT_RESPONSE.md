@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v1.8
+# FORM · Incident Response Runbook v2.0
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -8709,5 +8709,559 @@ The following entries are to be added to the Appendix A quick-reference table wh
 ---
 
 *v1.9 additions (2026-06-10): R-23 Victor AI Coach Safety Incident — twenty-third runbook; closes the incident response gap for FORM's Victor AI coaching persona producing unsafe, clinically harmful, or sports-science-erroneous output. R-23 covers: ten-row trigger matrix (VT-01 through VT-10) spanning clinical-safety VETO conditions (medical diagnosis, medication recommendation, caloric-deficit, body-shaming — VT-03 through VT-06 P0 unconditional), dangerous training advice (VT-01/02 P1), sports-science errors (VT-07/08 P2), and tone/localisation violations (VT-09/10 P3); four-row severity classification table with clinical-safety VETO boundary and severity upgrade rule (>10 sessions triggers P1 → P0 if clinical-safety keyword found); first-15-minute immediate action timeline (T+0 through T+15min) with P0 global disable at T+3min before any intermediate step; four scope assessment SQL queries C1–C4 (affected session count with clinical-safety keyword scan, prompt-injection user pattern detection, model version regression rate comparison, per-category flag rate analysis); three-tier containment (Tier 1 soft guardrail injection for P2/P3, Tier 2 category partial disable for P1 category-specific, Tier 3 global feature flag disable for P0 and escalated P1 — P0 always Tier 3 with no intermediate); three communication templates (V-01 user in-app notification, V-02 internal Slack #safety-incidents with board-notification threshold at 5+ enterprise users, V-03 enterprise tenant notification within 60 min P0/P1); four root cause hypotheses investigated in parallel (prompt injection, model regression, system prompt gap, clinical-safety guardrail gap); three-step feature flag ramp re-enable (5% → 20% → 100%) with clinical-safety VETO gate for P0 and sports-scientist + founder gate for P1; post-incident controls per hypothesis including adversarial blocklist update, model version pin, prompt regression test suite addition, CLINICAL_SAFETY.md update; five DEC-030 HMAC-chained events (ai.safety_incident_opened CRITICAL/HIGH 7yr; ai.safety_incident_contained HIGH 7yr; ai.victor_disabled HIGH 7yr; ai.victor_reenabled HIGH 7yr; ai.safety_incident_resolved STANDARD 3yr); six evidence artefacts IR-V-E-001 through IR-V-E-006 with PII rule (UUID only in evidence package); SOC 2 mapping CC7.2/CC7.3/CC7.4/CC9.2/A1.2; two open questions (OQ-V-01 real-time safety classifier — P1 M8, document in DECISION_LOG.md; OQ-V-02 GDPR Art. 33 notification for AI output errors to EU users — P1 M9, outside counsel engagement); Appendix A cross-reference table with nine Victor-specific scenario entries; ten-item implementation checklist (3× P0 M4-M5: feature flag, DEC-030 registration, clinical-safety re-enable procedure; 5× P1 M5-M9: regression test suite, communication templates, PagerDuty alert, OBSERVABILITY.md §31 metrics, classifier decision, legal consultation; 1× P2 quarterly: sports-scientist prompt review; 1× P1 M8: OQ-V-01 decision). Owner: security-engineer + clinical-safety.*
+
+---
+
+### R-24: SCIM Mass Deprovisioning Emergency
+
+> **Scope:** Covers the failure mode where a SCIM 2.0 provisioning sync from an enterprise tenant's IdP (Okta, Azure AD / Entra ID, Google Workspace, or any SAML/OIDC provider with SCIM enabled) triggers accidental mass deprovisioning of legitimate active users — causing widespread access loss for the tenant's workforce without any intentional HR action. This is distinct from R-19 (IdP Outage, which covers FORM failing to reach the IdP) and R-04 (SSO/SAML Compromise, which covers a security incident on the authentication path). R-24 is a *data integrity and availability* incident: the IdP connectivity is healthy, FORM's SCIM endpoint processed the request correctly, but the deprovision payload was wrong — typically due to IdP misconfiguration, an AD group deletion, an Okta group rule error, or a SCIM filter expression that matched more users than intended.
+>
+> **Privacy floor invariant:** Individual user access status (who was deprovisioned) is aggregate-only in all external communications. Tenant admins are told the count; HR is never given a list of named individuals unless they are the data controller requesting it in writing under their DPA obligations. Even in a recovery context, FORM does not enumerate individual employees by name to HR contacts.
+
+#### R-24.1 Trigger Matrix
+
+| Source | Signal | Threshold | Severity |
+|---|---|---|---|
+| **AL-SCIM-MASS-01** (new — §R-24.11) | `scim.user_deprovisioned` DEC-030 event burst: ≥ 10% of tenant's active seat count within any rolling 10-minute window | Fires on first threshold breach | See severity table below |
+| **Tenant admin direct report** | Tenant admin contacts CSM or `enterprise@form.coach` reporting "many users locked out" | N/A — any report | P1 pending scope assessment |
+| **CSM weekly health check** | Admin dashboard shows seat activation rate dropped > 20% vs. prior week with no corresponding HR action in CRM | > 20% drop unexplained | P2 investigation |
+| **SCIM endpoint error log** | `scim.batch_deprovision_completed` DEC-030 event where `deprovisioned_count > 0.1 * tenant_seat_count` | Single event | P1 pending scope |
+
+**Severity classification:**
+
+| Condition | Severity | Rationale |
+|---|---|---|
+| ≥ 50% of tenant's active seats deprovisioned in < 30 minutes | **P0** | Critical availability breach; SLA breach guaranteed; board notification threshold may apply (§13) |
+| ≥ 10% but < 50% deprovisioned, OR ≥ 100 users regardless of percentage | **P1** | Material availability impact; SLA at risk; CSM immediate escalation required |
+| < 10% AND < 50 users, AND IdP confirms the deprovisioning was intentional (e.g., terminations) | **P2** | Notification and verification only; no emergency recovery needed |
+| Any deprovisioning affecting a tenant_owner or all tenant_admin roles (admin lockout) | **P0** (override) | Tenant cannot self-service; FORM CSM must take direct action; magic link fallback mandatory per §R-24.4 |
+
+**Do NOT downgrade** from P0 to P1 based on a verbal assertion from a tenant's IT admin that the deprovisioning was "probably intentional" — confirm in writing before downgrade. Accidental deprovisions are often initially attributed to coincidence by IT teams under pressure.
+
+---
+
+#### R-24.2 Immediate Actions (T+0 to T+20 min)
+
+```
+T+0   Open incident channel: #inc-YYYYMMDD-scim-mass-<tenant-slug>
+      Page: CSM (Customer Lead) + platform-engineer
+      Note exact detection time — this is the SLA clock start for §12 enterprise breach protocol
+      Do NOT contact the tenant yet: gather scope first to avoid premature alarm
+
+T+2   Run R-24-C1 (scope assessment SQL below) to confirm deprovisioned count and %
+      If result confirms P0 or P1 threshold: proceed immediately to containment
+      If result < P1 threshold: continue monitoring; move to P2 investigation track
+
+T+5   Suspend SCIM sync for the affected tenant (see §R-24.3 — suspend mechanism)
+      This stops further deprovisioning events from propagating
+      Note: existing valid sessions are NOT revoked by this step — affected users with
+      active session tokens can still use FORM until session expiry
+
+T+8   Run R-24-C2 (active session count for deprovisioned users)
+      If active sessions exist: inform tenant admin that users will experience disruption
+      only at next login, not immediately — this reduces perceived urgency if P1
+
+T+10  Notify tenant admin via Template MD-01 (§R-24.7)
+      Channel: direct email to tenant admin contact + Slack Connect if provisioned
+      The notification names the incident ID, the confirmed scope (aggregate count only),
+      and the containment step already taken (SCIM sync suspended)
+      DO NOT include individual user names or roles in notification
+
+T+20  Begin root cause analysis in parallel with tenant IdP admin (§R-24.5)
+      Objective: determine if deprovisioning was accidental (IdP misconfiguration)
+      or reflects an intentional but mis-scoped IdP change (e.g., group rename)
+```
+
+---
+
+#### R-24.3 Containment
+
+**Step 1: Suspend SCIM sync for the affected tenant**
+
+SCIM provisioning is controlled per-tenant via the `tenant_sso_configs.scim_enabled` flag and the Cloudflare KV key `scim:sync:paused:{tenant_id}` (TTL-free — must be explicitly removed).
+
+```typescript
+// Emergency SCIM suspension — execute via Cloudflare Workers REST API
+// or via the internal admin console at /internal/v1/admin/scim/pause
+
+const PAUSE_PAYLOAD = {
+  tenant_id: "<affected_tenant_id>",
+  reason: "R-24 mass deprovision incident — INC-YYYYMMDD-<slug>",
+  paused_by: "<ic_admin_user_id>",
+  pause_duration_hours: 24,  // auto-lifted after 24h if not manually resumed
+};
+
+// This writes KV key: scim:sync:paused:<tenant_id>
+// The SCIM endpoint returns HTTP 503 for all incoming PUSH requests when key exists
+// GET /scim/v2/Users requests still served (read-only) — IdP dry-run is unaffected
+await env.SCIM_KV.put(
+  `scim:sync:paused:${PAUSE_PAYLOAD.tenant_id}`,
+  JSON.stringify(PAUSE_PAYLOAD),
+  { expirationTtl: PAUSE_PAYLOAD.pause_duration_hours * 3600 }
+);
+```
+
+Emit DEC-030 `scim.sync_suspended` event immediately after KV write (§R-24.9).
+
+**Step 2: Verify existing sessions are intact**
+
+Deprovisioning in FORM sets `tenant_members.deprovisioned_at` to the current timestamp. It does NOT immediately revoke active `enterprise_sessions` — session revocation is a separate, explicit action (per `docs/SSO_SCIM_IMPLEMENTATION.md §22` KV revocation cache). This means users who were deprovisioned may still have valid sessions until expiry or next login attempt.
+
+**Decision point — session revocation:**
+- **If incident is confirmed accidental:** Do NOT revoke active sessions. Affected users can continue working; recovery restores their `tenant_members` row without requiring re-login.
+- **If root cause is unknown and security-related (e.g., possible credential compromise at IdP):** Page security-engineer; consider session revocation per `docs/SSO_SCIM_IMPLEMENTATION.md §22.5` (bulk revocation). This is a higher-disruption action — confirm with IC before proceeding.
+
+**Step 3: Freeze downstream seat-count billing adjustments**
+
+If the tenant is on a metered-by-active-seat billing model (Starter tier contracts), mass deprovision could incorrectly trigger a billing credit calculation at the next billing cycle. Flag to customer-success immediately: do not process any seat-count adjustment for the affected tenant until the incident is resolved. Record the pre-incident active seat count from the scope assessment SQL output.
+
+---
+
+#### R-24.4 Admin Lockout Sub-Protocol
+
+If the mass deprovisioning affects all users with `tenant_admin` or `tenant_owner` roles — leaving the tenant with no admin-capable accounts — the standard self-service admin console is inaccessible. Activate the magic link fallback procedure immediately.
+
+**Magic link fallback for tenant recovery (per `docs/SSO_SCIM_IMPLEMENTATION.md §10`):**
+
+```
+1. Identify the tenant owner's email from FORM's CRM record
+   (do NOT ask the tenant admin — they may be one of the locked-out users)
+   Source: customer-success CRM record, original contract counterparty email
+
+2. CSM sends a FORM-generated magic link directly to that email via the admin API:
+   POST /internal/v1/admin/magic-link
+   { "email": "<tenant_owner_email>", "tenant_id": "<tenant_id>",
+     "reason": "R-24 admin lockout recovery", "incident_id": "INC-..." }
+
+3. Magic link is valid for 15 minutes; grants tenant_owner session
+   bypassing SSO (which may itself be broken if IdP config is corrupt)
+
+4. Tenant owner uses session to re-grant admin roles to other team members
+   from the admin console
+
+5. Emit DEC-030 scim.admin_lockout_recovery (see §R-24.9) for audit trail
+
+6. Log: IC + CSM user IDs, time of magic link generation, tenant owner email hash
+   No plain-text email addresses in incident channel or DEC-030 events
+```
+
+**If the tenant owner email is also unknown** (e.g., the original contract signer has left the company): escalate to compliance-officer + founder. Recovery requires identity verification of the new responsible party — this is a legal/contracts matter, not purely a technical one. Do not issue a magic link to an unverified party.
+
+---
+
+#### R-24.5 Root Cause Analysis
+
+Investigate all four hypotheses in parallel with the tenant IdP admin. The goal is to determine whether the deprovisioning was IdP-side (most common) or FORM-side (rare, but must be ruled out).
+
+| # | Hypothesis | Diagnostic signals | Resolution path |
+|---|---|---|---|
+| **H1** | IdP group deletion or rename caused users to drop out of the SCIM-mapped group | Check IdP audit log for group change events in the 30 minutes preceding first `scim.user_deprovisioned` DEC-030 event | IdP admin re-creates group or renames to match SCIM mapping; FORM re-enables sync; IdP re-pushes group membership |
+| **H2** | SCIM filter expression on the IdP side became too broad (e.g., department filter changed, OU relocated) | Check IdP SCIM provisioning app audit log; compare pre- and post-incident `attribute_mapping` config | IdP admin corrects the filter; FORM re-enables sync; full re-push from IdP to restore membership |
+| **H3** | FORM SCIM endpoint processed a valid batch `DELETE /Users` request incorrectly (FORM-side bug) | Compare `scim_sync_log` Cloudflare Worker logs against IdP-sent SCIM payload; look for deprovisioned_user_ids that do NOT appear in the IdP's DELETE request list | FORM engineering deploys fix; revert affected `tenant_members` rows from DEC-030 event history; post-incident: add batch-deprovision regression test to CI |
+| **H4** | IdP SCIM provisioning app underwent an automatic schema update that changed the user matching logic | Check IdP app version history; look for scheduled IdP platform update in tenant's IT change log | IdP support case + FORM CSM documents new schema; update SCIM attribute mapping config; test with IdP dry-run before re-enabling |
+
+**Evidence to gather from IdP admin (request within T+30 min):**
+- IdP SCIM provisioning audit log export: past 2 hours, all events
+- Any group, OU, or directory change events in the past 6 hours
+- Screenshot of current SCIM provisioning app configuration (filter, attribute mapping, scope)
+- Confirmation of IdP platform version and whether an automatic update occurred
+
+---
+
+#### R-24.6 Scope Assessment SQL
+
+All queries require `form_admin` BYPASSRLS. Execute via `pam-db-proxy` using a `read_only` PAM elevation with `reason: "R-24 mass deprovision scope assessment — INC-..."`.
+
+```sql
+-- R-24-C1: Count deprovisioned users and % of tenant in rolling window
+-- Replace $tenant_id and $window_minutes with incident values
+
+SELECT
+  COUNT(*)                                          AS deprovisioned_count,
+  (SELECT COUNT(*) FROM tenant_members
+   WHERE tenant_id = $tenant_id
+   AND deprovisioned_at IS NULL)                    AS still_active_count,
+  ROUND(
+    COUNT(*) * 100.0 /
+    NULLIF((SELECT COUNT(*) FROM tenant_members
+            WHERE tenant_id = $tenant_id), 0), 1)  AS pct_of_all_seats,
+  MIN(deprovisioned_at)                             AS first_deprovision,
+  MAX(deprovisioned_at)                             AS last_deprovision,
+  ROUND(EXTRACT(EPOCH FROM
+    (MAX(deprovisioned_at) - MIN(deprovisioned_at))
+  ) / 60, 1)                                       AS deprovision_window_minutes
+FROM tenant_members
+WHERE tenant_id = $tenant_id
+  AND deprovisioned_at >= NOW() - INTERVAL '1 hour';
+```
+
+```sql
+-- R-24-C2: Active sessions for deprovisioned users (determines immediate user impact)
+
+SELECT
+  COUNT(DISTINCT es.user_id)          AS users_with_active_session,
+  COUNT(es.id)                        AS total_active_sessions,
+  MIN(es.expires_at)                  AS earliest_session_expiry,
+  MAX(es.expires_at)                  AS latest_session_expiry
+FROM enterprise_sessions es
+INNER JOIN tenant_members tm
+  ON tm.user_id = es.user_id
+  AND tm.tenant_id = es.tenant_id
+WHERE tm.tenant_id = $tenant_id
+  AND tm.deprovisioned_at >= NOW() - INTERVAL '1 hour'
+  AND tm.deprovisioned_at IS NOT NULL
+  AND es.expires_at > NOW()
+  AND es.revoked_at IS NULL;
+```
+
+```sql
+-- R-24-C3: Role distribution of deprovisioned users (identifies admin lockout risk)
+
+SELECT
+  ur.role,
+  COUNT(*)  AS deprovisioned_count
+FROM tenant_members tm
+INNER JOIN user_roles ur ON ur.user_id = tm.user_id AND ur.tenant_id = tm.tenant_id
+WHERE tm.tenant_id = $tenant_id
+  AND tm.deprovisioned_at >= NOW() - INTERVAL '1 hour'
+GROUP BY ur.role
+ORDER BY CASE ur.role
+  WHEN 'tenant_owner'   THEN 1
+  WHEN 'tenant_admin'   THEN 2
+  WHEN 'tenant_manager' THEN 3
+  ELSE 4
+END;
+```
+
+```sql
+-- R-24-C4: DEC-030 audit chain for the deprovisioning burst
+-- Verify events are well-formed SCIM-sourced deprovisions, not a security incident
+
+SELECT
+  ale.id             AS audit_event_id,
+  ale.occurred_at,
+  ale.event_type,
+  ale.actor_id,
+  ale.metadata->>'scim_request_id'   AS scim_request_id,
+  ale.metadata->>'scim_source'       AS scim_source,
+  ale.metadata->>'deprovision_reason' AS deprovision_reason,
+  ale.hmac_chain_position
+FROM audit_log_events ale
+WHERE ale.tenant_id = $tenant_id
+  AND ale.event_type = 'scim.user_deprovisioned'
+  AND ale.occurred_at >= NOW() - INTERVAL '1 hour'
+ORDER BY ale.occurred_at ASC;
+```
+
+**Interpreting R-24-C4:**
+- `actor_id` should be the SCIM service account UUID — not a human user_id. If a human actor_id appears, escalate to R-01 (potential unauthorized bulk action).
+- `scim_request_id` should be consistent across the burst (same batch request) or sequential (multiple IdP-initiated requests). If random and non-sequential, investigate FORM-side processing bug (H3).
+- `deprovision_reason` should be `scim_push` — if it is `admin_manual` or `pam_escalation`, stop immediately and page security-engineer.
+
+---
+
+#### R-24.7 Communication Templates
+
+##### Template MD-01: Initial Notification to Tenant Admin (T+10 min)
+
+```
+Subject: [FORM — Service Notice] Access disruption for [Tenant Name] users — INC-YYYYMMDD-<slug>
+
+[Tenant Admin Name],
+
+We have detected an unexpected change in user provisioning for your FORM account
+and are writing to inform you immediately.
+
+Incident Reference: INC-YYYYMMDD-<slug>
+Severity: [P0 / P1]
+Detected: [HH:MM UTC, YYYY-MM-DD]
+Accounts affected: approximately [N] users (aggregate count)
+Current status: Investigating. FORM has suspended your SCIM sync to prevent
+further changes while we diagnose the root cause.
+
+What this means for your users:
+• Users who had active FORM sessions when this occurred can continue using FORM
+  until their session expires (typically [X] hours from last login).
+• Users who log out or whose session expires will be unable to log in until
+  provisioning is restored.
+• [If admin lockout: Your admin console is affected. We have initiated a
+  recovery procedure and will contact [owner email domain] directly.]
+
+What we are doing:
+Your dedicated CSM [name] is managing this incident. Our engineering team is
+investigating the root cause. We will provide an update within 30 minutes.
+
+What we need from you:
+• Please share your IdP provisioning audit log for the past 2 hours
+  (Okta: Admin → System Log; Azure AD: Users → Audit logs; Google: Admin SDK audit)
+• Confirm whether any group, OU, or directory changes were made in the past 6 hours
+
+Please reply to this email or contact [CSM name] directly at [CSM Slack/email].
+We are treating this as our highest priority.
+
+— [Your CSM Name], FORM Customer Success
+```
+
+##### Template MD-02: Status Update (every 30 min until resolved)
+
+```
+Subject: [FORM — Update] INC-YYYYMMDD-<slug> — [status]
+
+[Tenant Admin Name],
+
+Update as of [HH:MM UTC]:
+
+Current status: [Investigating root cause / Root cause identified, recovery in progress /
+                 SCIM sync restored, re-provisioning complete]
+
+Users restored: [N of N] (updated count if partial recovery is underway)
+
+Root cause (preliminary / confirmed): [one sentence — no speculation if still unknown]
+
+Next update: in 30 minutes, or immediately on resolution.
+
+— [Your CSM Name]
+```
+
+##### Template MD-03: Resolution Notice
+
+```
+Subject: [FORM — Resolved] INC-YYYYMMDD-<slug> — User access restored
+
+[Tenant Admin Name],
+
+We are writing to confirm that the provisioning incident for [Tenant Name] has
+been resolved.
+
+Incident: INC-YYYYMMDD-<slug>
+Resolved at: [HH:MM UTC, YYYY-MM-DD]
+Duration: [N] minutes from detection to full restoration
+
+Summary:
+[2-3 sentences describing root cause and the fix, e.g.:
+"An Okta group rule was inadvertently modified on [date], causing the group
+membership for 'FORM Users' to exclude all active employees. FORM's SCIM endpoint
+processed the resulting deprovision requests as instructed. After your IT team
+corrected the group rule and re-pushed membership, FORM re-enabled SCIM sync and
+confirmed all [N] users are now active."]
+
+Actions taken by FORM:
+• Suspended SCIM sync at [time] to prevent further deprovisioning
+• [If admin lockout was involved: Issued emergency admin access recovery at [time]]
+• Re-enabled SCIM sync at [time] after root cause confirmed resolved on IdP side
+• Confirmed [N] user accounts active at [time]
+
+SLA impact:
+[If P0 threshold triggered: "This incident triggered our P0 SLA threshold. Your
+Customer Success Manager will calculate the applicable credit per §4 of your MSA
+and apply it to your next invoice."]
+[If P1, no breach: "This incident did not breach your contracted SLA thresholds."]
+
+Post-incident review:
+We will share a formal post-incident summary within 5 business days. If you have
+any questions, please contact [CSM name] directly.
+
+— [Your CSM Name]
+```
+
+---
+
+#### R-24.8 Recovery Procedure
+
+**Standard recovery (IdP-side root cause confirmed, H1 or H2):**
+
+1. Wait for confirmation from tenant IT admin that IdP configuration is corrected and re-push is initiated.
+2. Confirm SCIM sync is still suspended (`scim:sync:paused:{tenant_id}` KV key present).
+3. Once IT admin confirms re-push is complete in IdP audit log, remove the KV suspension key:
+
+```typescript
+// Resume SCIM sync — execute via internal admin console or direct KV API
+await env.SCIM_KV.delete(`scim:sync:paused:${tenant_id}`);
+// Emit DEC-030 scim.sync_resumed (§R-24.9)
+```
+
+4. Monitor `scim.user_provisioned` DEC-030 events to confirm re-provisioning is progressing.
+5. Run R-24-C1 with `deprovisioned_at IS NOT NULL AND provisioned_at >= NOW() - INTERVAL '1 hour'` to track recovery count.
+6. Confirm with tenant admin that their users can log in successfully.
+
+**FORM-side root cause (H3 — FORM SCIM processing bug):**
+
+1. Page platform-engineer; initiate a fix deployment via the standard change management process.
+2. Do NOT re-enable SCIM sync until the fix is deployed and verified in staging.
+3. Restore affected `tenant_members` rows by replaying provisioning events from DEC-030 history:
+
+```sql
+-- R-24-R1: Identify users who should be re-provisioned
+-- (were active immediately before the incident window)
+
+WITH pre_incident_active AS (
+  SELECT DISTINCT
+    ale.metadata->>'user_id'::uuid   AS user_id,
+    ale.occurred_at                  AS last_provisioned_at
+  FROM audit_log_events ale
+  WHERE ale.tenant_id = $tenant_id
+    AND ale.event_type = 'scim.user_provisioned'
+    AND ale.occurred_at < $incident_start_time
+    AND ale.occurred_at >= $incident_start_time - INTERVAL '90 days'
+),
+currently_deprovisioned AS (
+  SELECT tm.user_id
+  FROM tenant_members tm
+  WHERE tm.tenant_id = $tenant_id
+    AND tm.deprovisioned_at >= $incident_start_time
+)
+SELECT
+  pia.user_id,
+  pia.last_provisioned_at
+FROM pre_incident_active pia
+INNER JOIN currently_deprovisioned cd ON cd.user_id = pia.user_id
+ORDER BY pia.last_provisioned_at DESC;
+```
+
+4. For each row returned by R-24-R1: manually re-provision via the admin provisioning API (`POST /internal/v1/admin/provision-user`) with `source: "R-24-recovery"` in the audit metadata.
+5. Each manual re-provision emits a standard `scim.user_provisioned` DEC-030 event with `source: "incident_recovery"` for audit trail completeness.
+
+---
+
+#### R-24.9 DEC-030 HMAC-Chained Audit Events
+
+All R-24 events are appended to the master DEC-030 chain. Privacy invariant: no individual user names, emails, or health data in any event payload — only UUIDs, counts, and operational metadata.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `scim.mass_deprovision_detected` | **CRITICAL** | 7 yr | AL-SCIM-MASS-01 threshold breach | `tenant_id`, `deprovisioned_count`, `pct_of_seats`, `window_minutes`, `incident_id`, `detection_source` (`alert` / `csm_report` / `monitoring`) |
+| `scim.sync_suspended` | **HIGH** | 7 yr | IC or platform-engineer executes SCIM pause | `tenant_id`, `suspended_by_admin_id`, `reason`, `auto_resume_at`, `incident_id` |
+| `scim.admin_lockout_recovery` | **HIGH** | 7 yr | Magic link issued to tenant owner during admin lockout | `tenant_id`, `issued_by_admin_id`, `tenant_owner_email_hash` (SHA-256, not raw), `incident_id`, `magic_link_expires_at` |
+| `scim.sync_resumed` | **HIGH** | 7 yr | SCIM suspension KV key removed after root cause resolved | `tenant_id`, `resumed_by_admin_id`, `root_cause_hypothesis` (H1/H2/H3/H4), `incident_id`, `users_restored_count` |
+| `scim.mass_reprovision_complete` | **STANDARD** | 3 yr | Recovery confirmed: all deprovisioned users re-provisioned | `tenant_id`, `restored_count`, `unrestorable_count` (0 expected), `incident_id`, `recovery_method` (`idp_repush` / `form_manual` / `both`) |
+
+**HMAC chain requirement:** `scim.mass_deprovision_detected` must precede `scim.sync_suspended` in the chain; `scim.sync_suspended` must precede `scim.sync_resumed`. If the chain is broken between these events, treat as R-05 (HMAC Chain Break) and alert security-engineer.
+
+---
+
+#### R-24.10 Evidence Preservation
+
+Preserve within T+15 min of incident declaration. All evidence stored in `compliance/evidence/incident-scim-deprovision/<incident_id>/`.
+
+```
+compliance/evidence/incident-scim-deprovision/INC-YYYYMMDD-<slug>/
+├── scope/
+│   ├── r24-c1-scope-query-result.json      # R-24-C1 output (user counts only, no names)
+│   ├── r24-c2-active-sessions.json         # R-24-C2 output
+│   ├── r24-c3-role-distribution.json       # R-24-C3 output
+│   └── r24-c4-dec030-chain.jsonl           # R-24-C4 output (HMAC chain segment)
+├── idp-evidence/
+│   ├── idp-audit-log-export.csv            # Provided by tenant IT admin
+│   ├── scim-provisioning-config-before.png # Screenshot of IdP SCIM config at time of incident
+│   └── scim-provisioning-config-after.png  # Screenshot after fix
+├── comms/
+│   ├── md-01-initial-notification.eml      # Template MD-01 sent copy
+│   ├── md-02-updates.eml                   # All MD-02 updates
+│   └── md-03-resolution.eml               # Template MD-03 sent copy
+├── dec030/
+│   └── scim-mass-deprovision-chain.jsonl   # All five DEC-030 events for this incident
+└── MANIFEST.sha256                         # SHA-256 hash of every file (tamper evidence)
+```
+
+Generate manifest:
+```bash
+find . -type f -not -name MANIFEST.sha256 | sort | xargs sha256sum > MANIFEST.sha256
+git add . && git commit -m "evidence: R-24 incident $INC_ID preserved"
+```
+
+**7-year retention** applies to all evidence files (aligned with `scim.mass_deprovision_detected` CRITICAL 7yr DEC-030 retention). Evidence directory is read-only once the incident PIR is closed — no further modifications permitted.
+
+---
+
+#### R-24.11 AL-SCIM-MASS-01 Alert Rule Definition
+
+This alert rule does not exist until implemented per the R-24 implementation checklist. It must be registered in `docs/OBSERVABILITY.md §26` (SSO/SCIM Identity Observability) under the SCIM provisioning health subsection.
+
+| Field | Value |
+|---|---|
+| Alert ID | `AL-SCIM-MASS-01` |
+| Severity | **P0** (≥ 50% of seats) / **P1** (≥ 10% of seats or ≥ 100 users) |
+| Condition | `scim.user_deprovisioned` DEC-030 event count for a single `tenant_id` exceeds `MAX(0.10 * tenant_seat_count, 10)` within any rolling 10-minute window |
+| Measurement | pg_cron job `scim_mass_deprovision_check` (every 5 min) queries `audit_log_events WHERE event_type = 'scim.user_deprovisioned' AND occurred_at >= NOW() - INTERVAL '10 minutes'` grouped by `tenant_id`; joins to `tenants.seat_count` for percentage calculation |
+| Response | Immediate PagerDuty P0/P1 → platform-engineer + CSM (Customer Lead); emit `scim.mass_deprovision_detected` DEC-030 CRITICAL before PagerDuty call |
+| Dedup key | `scim-mass-deprovision-{tenant_id}-{date_hour}` — one alert per tenant per hour; re-alerts if a second burst occurs after 60 min |
+| Auto-resolve | No — manual resolution only after IC confirms all users are restored |
+| PagerDuty service | `form-customer-success` (primary CSM page) + `form-platform` (secondary) |
+| Runbook link | This document §R-24 |
+
+---
+
+#### R-24.12 SOC 2 Evidence Mapping
+
+| Criterion | Control | R-24 mechanism | Evidence artefact | Status |
+|---|---|---|---|---|
+| **A1.1 — Capacity management** | SCIM mass deprovision is an availability threat to enterprise tenants; AL-SCIM-MASS-01 detects it automatically before tenant reports it | AL-SCIM-MASS-01 alert + `scim.mass_deprovision_detected` DEC-030 event with detection timestamp | **SCIM-E-001:** DEC-030 event export showing detection preceded tenant complaint (demonstrates proactive monitoring) | 🟡 Authored — closes on first production event or staging drill |
+| **A1.2 — Environmental threats** | Accidental mass deprovisioning is an operational availability threat from third-party IdP state changes; FORM detects, contains, and recovers without requiring tenant action | `scim.sync_suspended` + `scim.sync_resumed` DEC-030 chain proves FORM-side isolation controls; recovery SQL proves data integrity | **SCIM-E-002:** Full DEC-030 chain for any R-24 incident during observation period, including `scim.mass_reprovision_complete`; or staging tabletop drill chain | 🟡 Authored |
+| **CC7.2 — System monitoring** | Continuous automated monitoring of SCIM provisioning event rate enables detection of abnormal deprovisioning before users are affected | AL-SCIM-MASS-01 pg_cron job 5-min cadence; `scim.mass_deprovision_detected` event as automated detection artefact | **SCIM-E-003:** PagerDuty incident log showing AL-SCIM-MASS-01 fires within 5 min of threshold breach (staging test); incident `opened_at` vs DEC-030 `occurred_at` delta < 5 min | 🟡 Authored |
+| **CC7.3 — Anomaly response** | Defined escalation and recovery procedures (this runbook) with timing SLAs; magic link admin lockout recovery as a documented compensating control | R-24 runbook; Template MD-01 T+10 min SLA; admin lockout recovery procedure; SCIM suspension/resume controls | **SCIM-E-004:** Communications log (MD-01/MD-02/MD-03) with timestamps from any R-24 incident showing SLA adherence; or tabletop drill evidence | 🟡 Authored |
+| **CC9.2 — Vendor management** | IdP is a third-party service whose configuration changes can affect FORM availability; FORM's containment mechanism (SCIM suspension) does not depend on IdP cooperation | Architectural: `scim:sync:paused` KV key takes effect immediately regardless of IdP state; FORM can restore provisioning state from DEC-030 event history if IdP is unresponsive | **SCIM-E-005:** `wrangler.toml` or KV binding configuration demonstrating the pause mechanism exists independently of IdP API availability | 🟡 Authored |
+
+**Auditor evidence artefacts:**
+
+| Artefact ID | Description | Collection method | Retention |
+|---|---|---|---|
+| **SCIM-E-001** | DEC-030 `scim.mass_deprovision_detected` event for R-24 incident or staging drill | `audit_log_events WHERE event_type = 'scim.mass_deprovision_detected'` + timestamp comparison vs tenant complaint log | 7 yr |
+| **SCIM-E-002** | Full DEC-030 HMAC chain for R-24 incident: `scim.mass_deprovision_detected` → `scim.sync_suspended` → `scim.sync_resumed` → `scim.mass_reprovision_complete` | `audit_log_events WHERE event_type LIKE 'scim.%' AND metadata->>'incident_id' = '<id>'` | 7 yr |
+| **SCIM-E-003** | AL-SCIM-MASS-01 PagerDuty incident showing fire-to-detection delta < 5 min | PagerDuty export: `opened_at`, `alert_key`, first DEC-030 `occurred_at` from matching chain | 7 yr |
+| **SCIM-E-004** | Communication log (Templates MD-01/02/03) with timestamps demonstrating ≤ 10 min initial notification SLA | Email thread + Slack export from incident channel; timestamps in UTC | 7 yr |
+| **SCIM-E-005** | SCIM pause mechanism technical evidence | `wrangler.toml` KV binding for `SCIM_KV` + `quota-check.ts` excerpt showing KV read before processing SCIM PUSH requests; confirms pause works regardless of IdP state | 3 yr |
+
+Store all artefacts in `compliance/evidence/scim-mass-deprovision/` and cross-reference in `docs/SOC2_READINESS.md` §A1.2, §CC7.2, §CC7.3, §CC9.2 evidence tables when the first production event or tabletop drill is completed.
+
+---
+
+#### R-24.13 Post-Incident Controls
+
+Per the §14 Continuous Improvement Program, the following controls are mandatory post-incident actions:
+
+| Control | Trigger condition | Owner | SLA | Notes |
+|---|---|---|---|---|
+| Add SCIM filter expression review to tenant onboarding checklist | Any R-24 incident | customer-success | 7 days post-PIR close | Onboarding engineer to verify IdP SCIM filter scope with IT admin before first sync |
+| Implement IdP SCIM configuration snapshot on first sync and on every config change | H1 or H2 root cause confirmed | platform-engineer | 30 days post-PIR | Snapshot stored in R2; enables diff against incident-time config to speed future diagnosis |
+| Add SCIM batch DELETE threshold server-side (FORM-side rate limit) | H3 root cause confirmed (FORM SCIM processing bug) | platform-engineer | M5 | FORM SCIM endpoint rejects any single SCIM PATCH/DELETE batch that would deprovision > 20% of tenant's seats; returns HTTP 422 with `error: "mass_deprovision_threshold_exceeded"` and requires IC-signed override |
+| Add tabletop Scenario K (SCIM mass deprovision) to §9.4 tabletop catalog | After first R-24 real incident, or at next quarterly IR drill | security-engineer | Quarterly drill schedule | Scenario: Okta group rule change deprovisioning 60% of a 500-seat enterprise tenant at 14:00 UTC on a Friday; IdP admin unreachable; test: detection → suspension → admin lockout recovery → full restoration timeline |
+
+---
+
+#### R-24.14 Open Questions
+
+| OQ | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-R24-01** | **Should FORM implement a SCIM batch DELETE threshold at the endpoint level?** A server-side guard that rejects any incoming SCIM PUSH that would deprovision > 20% of a tenant's seats in a single request — returning HTTP 422 and requiring a CSM-countersigned override token — would prevent H3-type incidents and create a friction point for accidental IdP mass-deprovision pushes. Risk: breaks legitimate mass-termination scenarios (e.g., layoffs). Mitigation: the override path allows legitimate use with an audit trail. Recommendation: implement with a per-tenant configurable threshold (default 20%, adjustable by tenant owner with CSM approval). Requires update to `docs/SSO_SCIM_IMPLEMENTATION.md §15`. | **P1** | enterprise-architect + platform-engineer | Decide before first enterprise GA customer (M13); document in `docs/DECISION_LOG.md` |
+| **OQ-R24-02** | **Should FORM provide an "undo deprovision" self-service button in the admin dashboard for tenant owners?** A time-windowed (e.g., 30-min) emergency re-provision action that restores users deprovisioned in the last N minutes, without requiring FORM CSM involvement. Risk: an attacker who compromises a tenant_owner account could use this to re-provision previously intentionally deprovisioned users. Mitigation: require MFA re-authentication for the "undo" action; log with DEC-030 CRITICAL. Recommendation: implement in M7+ as a Growth/Enterprise feature gated by `feature.scim_undo_deprovision`. | **P2** | enterprise-architect + security-engineer | Evaluate at first 3 enterprise customers; document outcome in `docs/DECISION_LOG.md` |
+| **OQ-R24-03** | **What is FORM's GDPR Art. 33 obligation when a mass deprovisioning event is later determined to have been caused by a FORM-side bug (H3)?** If FORM's SCIM endpoint processed a DELETE request that exceeded its authorized scope (i.e., deleted users the IdP did not intend to deprovision), this is arguably an unauthorised alteration of personal data — potentially triggering Art. 33 notification duty. The key question: is loss of access (no data exfiltration, no disclosure) a "breach of security leading to... alteration" under Art. 4(12)? | **P1** | compliance-officer + outside counsel | Legal consultation (same engagement as OQ-V-02 if timing aligns); document in `docs/DECISION_LOG.md` before enterprise GA |
+
+---
+
+#### R-24.15 Implementation Checklist
+
+| # | Action | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Implement AL-SCIM-MASS-01 as a pg_cron job `scim_mass_deprovision_check` (every 5 min): query `audit_log_events WHERE event_type = 'scim.user_deprovisioned' AND occurred_at >= NOW() - INTERVAL '10 minutes'` grouped by `tenant_id`; join to `tenants.seat_count` for percentage; emit `scim.mass_deprovision_detected` DEC-030 CRITICAL + PagerDuty P0/P1 on threshold breach. Add to `docs/OBSERVABILITY.md §12.6` pg_cron registry and §26 SCIM health alert table. | platform-engineer + devops-lead | **P0** | M5 | [ ] |
+| 2 | Implement SCIM sync pause mechanism: `scim:sync:paused:{tenant_id}` Cloudflare KV key checked at SCIM endpoint entry; HTTP 503 on PUSH requests when key present; GET requests still served; KV write via internal admin console endpoint `POST /internal/v1/admin/scim/pause` with `reason` + `paused_by` fields; emit DEC-030 `scim.sync_suspended` on write. | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Register all five DEC-030 events from §R-24.9 in `docs/AUDIT_LOG_SCHEMA.md` event registry with Zod schemas; validate HMAC chain ordering constraint (`scim.mass_deprovision_detected` → `scim.sync_suspended` → `scim.sync_resumed`) in staging. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 4 | Implement `scim:sync:paused` KV read at SCIM PUSH endpoint entry (in `scim-provisioning-worker.ts`); confirm HTTP 503 is returned for POST/PATCH/DELETE SCIM requests when key present; GET requests return 200 normally; add unit test asserting pause is enforced before any DB writes. | platform-engineer | **P0** | M5 | [ ] |
+| 5 | Add magic link admin lockout recovery endpoint `POST /internal/v1/admin/magic-link` (or extend existing magic link flow): requires `reason` + `incident_id` fields; emits `scim.admin_lockout_recovery` DEC-030 HIGH; logs `issued_by_admin_id` and `tenant_owner_email_hash` (not raw email); valid for 15 minutes. | platform-engineer + security-engineer | **P1** | M5 | [ ] |
+| 6 | Add `scim_mass_deprovision_check` to `docs/OBSERVABILITY.md §12.6` pg_cron registry (resolve job number with devops-lead — next available slot after jobs 22/23). Add AL-SCIM-MASS-01 rows to §26 (SSO/SCIM Identity Observability) alert table. | devops-lead | **P1** | M5 | [ ] |
+| 7 | Draft and review Templates MD-01, MD-02, MD-03 (§R-24.7) copy; review by brand-voice for tone; review by compliance-officer for GDPR-compliant aggregate-only framing (no individual names); final approval by founder. Store approved templates in `compliance/evidence/ir-templates/r24-md-01.txt` etc. | customer-success + brand-voice + compliance-officer | **P1** | M5 | [ ] |
+| 8 | Add tabletop Scenario K to §9 drill catalog (per §R-24.13 post-incident controls): Okta group rule change deprovisioning 60% of 500-seat enterprise tenant; IdP admin unreachable; test detection → suspension → admin lockout recovery → full restoration timeline. Schedule as part of Q1 annual drill. | security-engineer + customer-success | **P2** | Q1 drill | [ ] |
+| 9 | Collect SCIM-E-001 through SCIM-E-005 evidence artefacts (§R-24.12) using the §9 tabletop Scenario K drill (if no production R-24 incident has occurred by M6); store in `compliance/evidence/scim-mass-deprovision/`; cross-reference in `docs/SOC2_READINESS.md` A1.1, A1.2, CC7.2, CC7.3, CC9.2 evidence tables. | compliance-officer | **P1** | M6 | [ ] |
+| 10 | Resolve OQ-R24-01: decide server-side batch DELETE threshold; document in `docs/DECISION_LOG.md`; if approved, add implementation spec to `docs/SSO_SCIM_IMPLEMENTATION.md §15` (SCIM 2.0 Groups Provisioning) as a §15.N sub-section. | enterprise-architect + platform-engineer | **P1** | M13 (before enterprise GA) | [ ] |
+| 11 | Resolve OQ-R24-03 (GDPR Art. 33 obligation for H3 root cause): engage outside counsel (same engagement as OQ-V-02); document outcome in `docs/DECISION_LOG.md`. | compliance-officer + outside counsel | **P1** | M9 | [ ] |
+
+---
+
+*v2.0 additions (2026-06-11): R-24 SCIM Mass Deprovisioning Emergency — twenty-fourth runbook; closes the incident response gap for accidental or erroneous mass SCIM deprovisioning events from enterprise IdP integrations (Okta, Azure AD, Google Workspace, any SAML 2.0/OIDC provider with SCIM enabled). R-24 is classified as a data integrity and availability incident (distinct from R-04 SSO/SAML Compromise, R-19 IdP Outage, and R-01 Data Breach). Trigger matrix: four signal sources (AL-SCIM-MASS-01 automated threshold alert, tenant admin direct report, CSM health check, SCIM endpoint error log); severity table with P0 override for admin lockout and P0 at ≥ 50% seats in < 30 min. Immediate actions: T+0 to T+20 timeline (channel open, scope SQL, SCIM suspension, active session check, tenant notification). SCIM suspension mechanism: `scim:sync:paused:{tenant_id}` Cloudflare KV key (HTTP 503 on PUSH, GET unaffected); TypeScript implementation provided. Admin lockout sub-protocol: magic link recovery for locked-out tenant_owner with `tenant_owner_email_hash` in DEC-030 (no raw email). Root cause hypotheses H1–H4 (IdP group deletion, SCIM filter, FORM-side processing bug, IdP platform update) with per-hypothesis diagnostic signals and resolution paths. Four scope assessment SQL queries: R-24-C1 (deprovisioned count + % of seats + time window), R-24-C2 (active sessions for deprovisioned users), R-24-C3 (role distribution including admin lockout risk), R-24-C4 (DEC-030 chain with actor_id and scim_source validation). Three communication templates: MD-01 (T+10 min initial notification, aggregate count only, no individual names), MD-02 (30-min status update), MD-03 (resolution notice with SLA impact section). Recovery procedure: standard IdP-side recovery (KV resume after IdP fix) and FORM-side recovery (R-24-R1 restoration SQL for H3 root cause). Five DEC-030 HMAC-chained events: `scim.mass_deprovision_detected` (CRITICAL 7yr), `scim.sync_suspended` (HIGH 7yr), `scim.admin_lockout_recovery` (HIGH 7yr), `scim.sync_resumed` (HIGH 7yr), `scim.mass_reprovision_complete` (STANDARD 3yr); chain ordering requirement documented. Evidence structure: `compliance/evidence/incident-scim-deprovision/<incident_id>/` with five subdirectories (scope, idp-evidence, comms, dec030, MANIFEST.sha256). AL-SCIM-MASS-01 alert rule definition: pg_cron `scim_mass_deprovision_check` every 5 min, `MAX(0.10 * seat_count, 10)` threshold, dedup key per tenant per hour, PagerDuty `form-customer-success` + `form-platform` dual page. SOC 2 evidence mapping: A1.1 (availability threat monitoring — SCIM-E-001), A1.2 (environmental threat detection — SCIM-E-002 DEC-030 chain), CC7.2 (proactive monitoring — SCIM-E-003 AL-SCIM-MASS-01 PagerDuty log), CC7.3 (anomaly response — SCIM-E-004 communication SLA), CC9.2 (IdP as third-party risk — SCIM-E-005 pause mechanism independence). Post-incident controls: four controls including server-side batch DELETE threshold (OQ-R24-01 P1), admin dashboard "undo deprovision" (OQ-R24-02 P2), tabletop Scenario K (P2 Q1 drill), SCIM config snapshot on first sync (P1 30 days). Three open questions: OQ-R24-01 (server-side batch DELETE threshold — P1, enterprise-architect, M13), OQ-R24-02 (admin dashboard undo deprovision — P2, evaluate at 3 customers), OQ-R24-03 (GDPR Art. 33 for FORM-side H3 root cause — P1, outside counsel, M9). Eleven-item implementation checklist: 4× P0 M5 (AL-SCIM-MASS-01 pg_cron, SCIM pause KV mechanism, DEC-030 event registration, SCIM PUSH endpoint enforcement), 5× P1 M5-M13 (admin lockout magic link, OBSERVABILITY §12.6/§26 registry, templates, evidence collection, OQ-R24-01 decision, OQ-R24-03 legal consultation), 1× P2 Q1 (tabletop Scenario K). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §10` (magic link fallback), `docs/SSO_SCIM_IMPLEMENTATION.md §15` (SCIM 2.0 Groups Provisioning — batch DELETE threshold OQ-R24-01), `docs/SSO_SCIM_IMPLEMENTATION.md §22` (KV session revocation — session revocation decision point), `docs/DATA_MODEL.md §15` (SCIM provisioning webhook event queue), `docs/OBSERVABILITY.md §12.6` (pg_cron registry — scim_mass_deprovision_check job), `docs/OBSERVABILITY.md §26` (SSO/SCIM Identity Observability — AL-SCIM-MASS-01 alert row), `docs/AUDIT_LOG_SCHEMA.md` (five DEC-030 events to register), `docs/SOC2_READINESS.md §A1.2/CC7.2/CC7.3/CC9.2` (evidence artefacts SCIM-E-001 through SCIM-E-005), `docs/ENTERPRISE_SLA.md §4` (SLA credit calculation for P0 breach — referenced in Template MD-03). Owner: enterprise-architect + security-engineer + customer-success + compliance-officer.*
+
+---
+
+**v2.0 · 2026-06-11 · Owner: security-engineer + compliance-officer**
+**Review: after every P0/P1 incident, minimum annual.**
+**Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
 ---
