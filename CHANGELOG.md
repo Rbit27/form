@@ -6,6 +6,19 @@
 
 ---
 
+## [3.53.0] — 2026-06-11
+
+### Added
+- `content/post-476-tempo-time-under-tension.md` — Темп і час під навантаженням: TUT гіпотеза, Burd et al. (2012), Roig et al. (2009) BJSM eccentric meta, Wilk et al. (2020) JHK tempo RCT, Schoenfeld (2015) JSCR; практика: ексцентрика &gt; концентрика, темп як вторинний модулятор. clinical-safety NOT REQUIRED. sports-scientist PASS.
+- `content/post-477-mev-mav-mrv-volume-thresholds.md` — MEV/MAV/MRV: Schoenfeld et al. (2017) JSCR dose-response meta, Krieger (2010) JSCR set-volume meta; мезоциклова структура від MEV до MRV; n=1 калібрування порогів; обмеження моделі. clinical-safety NOT REQUIRED. sports-scientist PASS.
+- `blog.html` — 2 нові картки (post-476, post-477) → 408 карток (479 постів authored)
+
+### Changed
+- `STATUS.md` — v3.51.0 → v3.53.0; post count 473 → 479; таблиця файлів +2 записи
+- `VERSION` — 3.52.1 → 3.53.0
+
+---
+
 ## [3.52.1] — 2026-06-11
 
 ### Changed
