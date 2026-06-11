@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v2.4
+# FORM · Observability & Monitoring Taxonomy v2.7
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -1120,6 +1120,10 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `security-counter-daily-cleanup` | `0 4 * * *` | 26 h | CC7.2 — `security_counters` table hygiene; stale = rate-limit memory growth | PagerDuty P1 → devops-lead |
 | `pam_postgres_sync` | `*/30 * * * *` | 35 h | CC6.2/CC6.6 — verifies every `pam.elevation_approved` DEC-030 event has a matching `admin_jit_escalations` row; gap → `security.pam_postgres_sync_gap` HIGH + PagerDuty P2 to security-engineer | PagerDuty P2 → security-engineer (DATA_MODEL §29.10 item 7, job 20) |
 | `pam_bg_review_alert` | `0 8 * * *` | 26 h | CC6.6 — enforces 72-hour break-glass post-hoc review SLA; `pam_break_glass_reviews.review_due_at < now() AND reviewed_at IS NULL` → PagerDuty P1 AL-PAM-BG-01 | PagerDuty P1 → compliance-officer (DATA_MODEL §29.10 item 8, job 21) |
+| `rate_limit_violations_cleanup` | `0 3 * * *` | 26 h | CC6.6 / CC4.1 — `rate_limit_violations` 90-day rolling retention; stale = table growth unbounded; RLS prevents cross-tenant leak but size degrades query performance | PagerDuty P1 `form-devops` → devops-lead; dedup `rl-cron-stale-rate_limit_violations_cleanup` (§35, job 16) |
+| `api_quota_usage_archive` | `30 0 1 * *` | 48 h | CC6.1 / CC4.1 — `api_quota_usage` 36-month billing evidence retention; emits `data.quota_records_archived` DEC-030 STANDARD 1yr before DELETE; stale = billing retention policy breached | PagerDuty P1 `form-devops` → devops-lead; 48 h window (monthly cadence); dedup `rl-cron-stale-api_quota_usage_archive` (§35, job 17) |
+| `siem_bridge_cr02_impossible_travel` | `*/5 * * * *` | 6 min | CC7.2 — SIEM bridge CR-02 impossible travel; emits `siem.correlation_rule_matched` HIGH via pg_net on match; closes OQ-SIEM-01 | PagerDuty P2 `form-devops` → platform-engineer; freshness breach = CR-02 detection blind spot; check pg_cron + pg_net health (§34.5, job 22) |
+| `siem_bridge_cr03_priv_escalation` | `*/5 * * * *` | 6 min | CC7.2/CC6.6 — SIEM bridge CR-03 privilege escalation after denial; 7-year retention on match; emits `siem.correlation_rule_matched` HIGH via pg_net | PagerDuty P2 `form-devops` → platform-engineer; freshness breach = CR-03 detection blind spot (§34.5, job 23) |
 
 *Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. All daily jobs use 26 h to absorb clock drift and cron scheduling jitter.
 
@@ -1128,7 +1132,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | Event name | Severity | Retention | Trigger | Key payload fields |
 |---|---|---|---|---|
 | `system.cron_job_stale` | HIGH | 7 yr | Any monitored job exceeds its freshness window | `job_name`, `schedule`, `last_successful_run`, `hours_since_last_run`, `freshness_window_hours` |
-| `system.cron_health_check_passed` | LOW | 3 yr | All 9 monitored jobs are within freshness windows | `jobs_checked`, `all_healthy: true` |
+| `system.cron_health_check_passed` | LOW | 3 yr | All monitored jobs within freshness windows | `jobs_checked`, `all_healthy: true` |
 | `system.cron_health_check_failed` | HIGH | 7 yr | Edge Function itself errors (DB unreachable, query failure, unhandled exception) | `error_message`, `jobs_checked` |
 
 **Privacy invariant:** No `user_id`, `tenant_id`, or health data in any cron health event. All fields are operational metadata. These events are safe to stream to SIEM without redaction.
@@ -8687,3 +8691,301 @@ Emit `siem.bridge_decommissioned` DEC-030 STANDARD event. Remove Analytics Engin
 ---
 
 *v2.6 (2026-06-10): §34 SIEM Correlation Rules — Supabase Bridge Implementation (M4–M8) & ClickHouse Migration Plan. Closes OQ-SIEM-01 (P0 from §27.12 — blocked M4 SIEM alert implementation since §27 was authored). Decision: hybrid bridge. CR-01 (brute force) and CR-04 (bulk data access) via Cloudflare Analytics Engine (real-time < 10 s — pure aggregation, no JOIN). CR-02 (impossible travel) and CR-03 (privilege escalation) via Supabase pg_cron every 5 minutes (≤ 5 min lag — LAG() window + self-JOIN not available in Analytics Engine aggregation SQL). §34.1 purpose: gap between §27.3 ClickHouse spec (M9) and M4 alert requirement; bridge closes the gap with documented, bounded detection lag. §34.2 four-row platform decision table with detection-lag column. §34.3 Analytics Engine bridge: `SIEM_BRIDGE_EVENTS` seven-column schema (blob1 event_type, blob2 actor_ip_subnet /24, blob3 actor_user_sha256, blob4 tenant_id, blob5 session_id, double1 row_count, double2 country_code_numeric); CR-01 query (GROUP BY subnet HAVING ≥ 10 auth failures / 600s, dedup key subnet_hash+10min_bucket); CR-04 two-pattern UNION (Pattern A: ≥ 5 data.read_* per session / 3600s; Pattern B: bulk_export > 10,000 rows). §34.4 Supabase pg_cron bridge: migration `0059_siem_bridge.sql` — `siem_country_continent` static reference table (249-country seed, EU/NA/SA/AS/AF/OC/AN continents, no RLS); `fn_siem_continent()` STABLE SQL function; `fn_siem_bridge_cr02()` SECURITY DEFINER (pg_cron job 22, `*/5 * * * *`) — self-JOIN on login events 2h window, continent-pair check, NOT EXISTS dedup on trigger_event_id, `pg_net.http_post` to `emit-audit-event` Worker, NULL GUC guard with RAISE EXCEPTION, 10-match safety cap, SHA-256 actor pseudonym; `fn_siem_bridge_cr03()` SECURITY DEFINER (pg_cron job 23, `*/5 * * * *`) — JOIN `pam.elevation_denied` → `pam.session_started` within 30 min, cross_tenant/break_glass access_level filter, NOT EXISTS dedup, 7-year DEC-030 retention for CC6.6. §34.5 §12.6 pg_cron registry additions jobs 22–23 (both `*/5 * * * *`, 6-min freshness window, P2 PagerDuty on stale). §34.6 SIEM-SLO-BRIDGE-01 (P95 ≤ 5 min, deprecated M9); AL-SIEM-BRIDGE-01/02 (staleness alerts, both P2 `form-devops`). §34.7 three-step M9 migration: shadow mode (parallel run, suppress bridge alerts), ClickHouse primary (suppress bridge, 2 weeks), decommission (cron.unschedule, STANDARD DEC-030 event, §6.2/§27.6/§12.6 cleanup). §34.8 SOC 2 evidence: CC7.2 (four rules active M4, lag bounded) SIEM-BRIDGE-E-001 (DDL + grants); CC7.3 (alert routing documented) SIEM-BRIDGE-E-002 (DEC-030 match sample 7yr); CC9.2 (security_reviewer SELECT, no BYPASSRLS) SIEM-BRIDGE-E-001. §34.9 implementation checklist: 6× P0 M4 (migration 0059 deploy, GUC configuration, security_reviewer grants + negative-privilege test, pg_cron registration, siem-correlation-checker Worker deploy + staging test, AL-SIEM-BRIDGE PagerDuty config), 3× P1 M5 (AUDIT_LOG_SCHEMA registration, SLO update, evidence collection), 2× P2 M9 (ClickHouse migration + post-decommission cleanup). §34.10 four open questions: OQ-SIEM-02 (DPA consent for tenant SIEM export — P1 M5, from §27.12), OQ-SIEM-03 (HMAC verification library — P2 M13, from §27.12), OQ-SIEM-BRIDGE-01 (Postgres seq_scan load at scale — P2, monitor M5), OQ-SIEM-BRIDGE-02 (NULL GUC guard verification — P1, verify in staging before M4). TOC addition: §34 after §33. Cross-references: `docs/OBSERVABILITY.md §27.3` (ClickHouse CR SQL — §34 is the pre-M9 bridge; ClickHouse specs are preserved and are the M9 target); `docs/OBSERVABILITY.md §27.12` (OQ-SIEM-01 — resolution patch applied in this version update); `docs/OBSERVABILITY.md §21` (ClickHouse Analytics — M9 target platform); `docs/OBSERVABILITY.md §12.6` (pg_cron registry — jobs 22 and 23 to be appended); `docs/OBSERVABILITY.md §6.2` (alert rules table — AL-SIEM-BRIDGE-01/02 to be appended to `siem_health` subsection); `docs/AUDIT_LOG_SCHEMA.md` (`siem.correlation_rule_matched` — HIGH 3yr default, 7yr for CR-03; to be registered); `docs/SOC2_READINESS.md §46` (alert-relay Worker — pg_net bridge emissions go through the existing Logpush→alert-relay pipeline); `docs/INCIDENT_RESPONSE.md R-01` (cross-referenced from CR-04 bulk access match — large data access triggers R-01 parallel assessment); `docs/DATA_MODEL.md §2.4` (`audit_log_events` — source table for pg_cron bridge queries); `docs/SSO_SCIM_IMPLEMENTATION.md §24` (PAM KV — `pam.elevation_denied` events sourced from PAM service). Owner: platform-engineer + devops-lead + compliance-officer.*
+
+---
+
+## §35 Rate Limiting, Quota Enforcement & Abuse Prevention Observability
+
+**Owner:** devops-lead + security-engineer + platform-engineer
+**SOC 2 scope:** CC6.1, CC6.6, CC7.2
+**Last updated:** 2026-06-11
+**Closes:** `docs/DATA_MODEL.md §28.9` checklist item 8 (P1 M5 — "Add pg_cron jobs 16 and 17 to `docs/OBSERVABILITY.md §12.6` registry with expected row counts, alert thresholds, and runbook links")
+**Also closes:** §34.5 registry gap — jobs 22 and 23 were defined in §34.5 but not yet appended to the §12.6 table; those rows are added in §35.6 of this section.
+**Companion schema:** `docs/DATA_MODEL.md §28` (Rate Limiting, Quota Enforcement & Abuse Prevention Schema — canonical table DDL, RLS, enforcement flow, and DEC-030 events)
+
+---
+
+### 35.1 Purpose and Scope
+
+This section is the observability companion to DATA_MODEL §28. It defines the monitoring layer for FORM's three-layer rate-limiting and abuse-prevention architecture:
+
+- **Layer 1 — Cloudflare WAF (L3/L4/L7):** volumetric DDoS and TLS fingerprint blocks. WAF analytics signals only; no Postgres state. Runbook: INCIDENT_RESPONSE R-06. Not covered here.
+- **Layer 2 — Cloudflare KV sliding window:** per-API-key, per-endpoint, per-window burst limits. KV violation events emitted to `RLIMIT_TELEMETRY` Analytics Engine dataset by `quota-check.ts` Worker.
+- **Layer 3 — Postgres DB quota tracking:** monthly cumulative counters for enterprise contract enforcement and billing evidence. Tables: `api_quota_usage`, `rate_limit_violations`, `abuse_flags` (DATA_MODEL §28.2).
+
+**Scope:**
+- `RLIMIT_TELEMETRY` Cloudflare Analytics Engine dataset (Layer 2 burst signals)
+- `quota-check.ts` Worker middleware performance metrics (Layer 3 DB path)
+- Four SLOs (RL-SLO-01 through RL-SLO-04)
+- Five alert rules (AL-RL-01 through AL-RL-05)
+- `rate_limit_health` subsection in §6.2 Alert Rules table (five rows)
+- pg_cron registry entries for jobs 16, 17, 22, and 23 in §12.6 (four rows added)
+- "Rate Limit & Abuse Health" Metabase + Better Stack dashboard
+- SOC 2 evidence artefacts RL-E-001 through RL-E-003 (canonical source: DATA_MODEL §28.8); new artefact RL-E-004 defined here
+
+**Out of scope for §35:** Cloudflare WAF signals and DDoS runbook (→ INCIDENT_RESPONSE R-06); API key authentication performance signals (→ §31); SCIM IP allowlist enforcement signals (→ §26); quota billing integration with Stripe Metered (→ §24, OQ-RL-01 resolution pending).
+
+**Privacy invariant:** The `rate_limit_violations` table stores `ip_country` (2-character ISO 3166-1 alpha-2 country code) only — never raw client IP, never /24 subnet. The `abuse_flags.evidence_summary` JSONB field contains statistical metadata only (request counts, time deltas, entropy scores) — no request content, no PII, no health data. The `RLIMIT_TELEMETRY` dataset contains `api_key_id` (UUID pseudonym) but never `key_preview` or raw API key material. The `abuse_flags` table is restricted to `security_reviewer` and `form_system` Postgres roles by RESTRICTIVE RLS policy; tenant admins and `form_compliance` have zero SELECT access (DATA_MODEL §28.3).
+
+---
+
+### 35.2 RED Metrics
+
+Rate limiting and abuse prevention spans two compute layers with different observability data sources.
+
+#### 35.2.1 `RLIMIT_TELEMETRY` Analytics Engine Dataset (Layer 2 — KV burst limits)
+
+The `quota-check.ts` Worker emits one data point to `RLIMIT_TELEMETRY` per KV sliding-window violation or quota threshold crossing. Consumer Pro users generate KV signals with `tenant_id = "none"`.
+
+| Field | Type | Description | Privacy rule |
+|---|---|---|---|
+| `api_key_id` | UUID string | Pseudonymous API key identifier | UUID only — no `key_preview`, no raw key |
+| `tenant_id` | UUID string \| `"none"` | Enterprise tenant UUID or `"none"` for consumer | Per-tenant quota aggregation and per-tenant SLA reporting |
+| `endpoint_category` | string | `coaching` \| `analytics_read` \| `data_export` \| `admin_read` \| `admin_write` | — |
+| `violation_type` | string | `rate_limit_exceeded` (KV layer) \| `quota_80pct` (soft warn, DB layer) \| `quota_hard_block` (DB layer) | — |
+| `violation_layer` | string | `kv_sliding_window` \| `db_quota` | — |
+| `request_count` | integer | Current window count at time of event | — |
+| `quota_limit` | integer \| `null` | Contract quota ceiling from `api_quota_usage.quota_limit`; null for Consumer Pro | CC6.1 evidence field — quota ceiling in Analytics Engine signal |
+| `timestamp` | TIMESTAMPTZ | Event time | — |
+
+**What is NOT in `RLIMIT_TELEMETRY`:** Raw client IP, IP subnet, `key_preview`, request content, user PII, health data. IP country is stored in `rate_limit_violations` (Postgres, 2-char ISO only) — it is never written to Analytics Engine.
+
+#### 35.2.2 Layer 2 RED Metrics
+
+| Dimension | Metric | Query pattern | Normal range | Alert threshold |
+|---|---|---|---|---|
+| **Rate** | KV rate limit violations / min by `endpoint_category` | `COUNT(*) WHERE violation_layer = 'kv_sliding_window'` GROUP BY endpoint_category, 1-min bucket | < 10/min per category | > 50/min for a single `api_key_id` in 5 min → AL-RL-04 |
+| **Rate** | Quota hard blocks / day by `tenant_id` | `COUNT(*) WHERE violation_type = 'quota_hard_block'` GROUP BY tenant_id | 0 for contracted enterprise tenants | Any enterprise hard block → AL-RL-02 |
+| **Rate** | 80% quota threshold crossings / month by `tenant_id` | `COUNT(*) WHERE violation_type = 'quota_80pct'` GROUP BY tenant_id | ≤ 1/month per tenant (first-hit only) | First hit per tenant per billing month → AL-RL-01 |
+| **Errors** | Quota check middleware failure rate | `QUOTA_CHECK_ERRORS` / `QUOTA_CHECK_TOTAL` from Worker error counter | < 0.01% | > 0.1% → RL-SLO-01 breach; immediate investigation |
+| **Duration** | Quota check P95 latency — KV path | `P95(latency_ms) WHERE violation_layer = 'kv_sliding_window'` | 1–3 ms | > 5 ms → RL-SLO-01 breach |
+| **Duration** | Quota check P95 latency — DB path | `P95(latency_ms) WHERE violation_layer = 'db_quota'` | 5–10 ms | > 15 ms → RL-SLO-01 breach; investigate Supabase connection pooling |
+
+#### 35.2.3 Layer 3 Postgres Metrics
+
+These metrics are computed from `api_quota_usage`, `rate_limit_violations`, and `abuse_flags` via SQL queries. They power the dashboard (§35.7) and feed evidence collection (§35.9).
+
+| Metric | Source table | SQL pattern | Compliance relevance |
+|---|---|---|---|
+| Monthly request consumption % per tenant per endpoint_category | `api_quota_usage` | `request_count / NULLIF(quota_limit, 0) * 100` WHERE `period_month = DATE_TRUNC('month', NOW())` | CC6.1 — contract boundary enforcement evidence |
+| Rate limit violation event count (90-day rolling) | `rate_limit_violations` | `COUNT(*) WHERE created_at >= NOW() - INTERVAL '90 days'` | CC6.6 — unauthorized access attempt volume |
+| Open abuse flags by severity | `abuse_flags` | `COUNT(*) GROUP BY severity WHERE resolved_at IS NULL` | CC7.2 — anomaly backlog status |
+| Auto-actioned abuse flags (30 d) | `abuse_flags` | `COUNT(*) WHERE auto_actioned = TRUE AND created_at >= NOW() - INTERVAL '30 days'` | CC7.2 — automated response evidence |
+| Abuse flag median time-to-resolve (days) | `abuse_flags` | `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM resolved_at - created_at)/86400) WHERE resolved_at IS NOT NULL AND created_at >= NOW() - INTERVAL '90 days'` | CC7.2 — response SLA |
+
+**RL-SLO-02 false-hard-block verification query** (runs daily, 01:00 UTC):
+
+```sql
+-- Zero rows = RL-SLO-02 met.
+-- Any row = contract/quota misconfiguration or enforcement bug; fire AL-RL-02.
+SELECT
+  api_key_id,
+  tenant_id,
+  endpoint_category,
+  period_month,
+  request_count,
+  quota_limit,
+  hard_blocked_at
+FROM api_quota_usage
+WHERE hard_blocked_at IS NOT NULL
+  AND request_count <= quota_limit
+  AND period_month = DATE_TRUNC('month', NOW());
+```
+
+---
+
+### 35.3 SLOs
+
+| SLO ID | Name | Target | Measurement | Window | Evidence artefact |
+|---|---|---|---|---|---|
+| **RL-SLO-01** | Quota check middleware latency | KV path P95 < 5 ms; DB path P95 < 15 ms | `RLIMIT_TELEMETRY` P95 latency aggregation by `violation_layer` | 7-day rolling | `RLIMIT_TELEMETRY` export |
+| **RL-SLO-02** | Zero false hard-blocks for contracted enterprise tenants | 0% — no enterprise tenant hard-blocked while within contracted `quota_limit` | RL-SLO-02 verification SQL (§35.2.3) run daily 01:00 UTC | Monthly | `api_quota_usage` export (RL-E-001) |
+| **RL-SLO-03** | CSM notified within 5 min of 80% quota threshold breach | 100% of 80% threshold crossings produce a DEC-030 `security.quota_80pct_warning` event within 5 min of the triggering request | DEC-030 event lag: `occurred_at - triggering_request_timestamp` | Per event | DEC-030 event export |
+| **RL-SLO-04** | `rate_limit_violations_cleanup` schedule adherence | Executes within ± 90 min of 03:00 UTC daily | `cron.job_run_details` freshness check for `rate_limit_violations_cleanup` (§12.6 job 16) | Daily | `cron.job_run_details` export |
+
+---
+
+### 35.4 Alert Rules
+
+| Alert ID | Severity | Trigger condition | Routing | Dedup key | SIEM routing |
+|---|---|---|---|---|---|
+| **AL-RL-01** | **P2** | Enterprise tenant's `api_quota_usage.request_count` reaches 80% of `quota_limit` on any `endpoint_category` (first occurrence per `{tenant_id, period_month, endpoint_category}` combination only; duplicate suppressed within the same billing period and category) | PagerDuty `form-customer-success` → customer-success; Slack `#customer-success` | `rl-quota-80pct-{tenant_id}-{period_month}-{endpoint_category}` | `siem.quota_threshold_warning` LOW |
+| **AL-RL-02** | **P1** | Enterprise tenant `hard_blocked_at` set in `api_quota_usage` — any hard block for a tenant with a non-null `quota_limit` is unexpected and warrants investigation for contract misconfiguration or potential credential compromise | PagerDuty `form-customer-success` (customer-success) + `form-security` (security-engineer) simultaneously | `rl-quota-hard-block-{tenant_id}-{period_month}` | `siem.quota_hard_block` MEDIUM |
+| **AL-RL-03** | **P0** | `abuse_flags.severity = 'critical'` row created (with or without `auto_actioned = TRUE`); no auto-resolve — security-engineer must manually resolve after investigation | PagerDuty `form-security` → security-engineer + on-call simultaneously | `rl-abuse-critical-{flag_id}` | `siem.abuse_flag_critical` HIGH |
+| **AL-RL-04** | **P1** | KV rate limit violations > 50 per `api_key_id` in any 5-minute window (potential credential stuffing or compromised API key); triggers parallel R-03 (Compromised Credentials) assessment | PagerDuty `form-security` → security-engineer; cross-reference §31 AL-APIKEY-01 (IP-block spike for the same key — distinct trigger, may co-fire) | `rl-kv-spike-{api_key_id}-{5min_bucket}` | `siem.rate_limit_spike` MEDIUM |
+| **AL-RL-05** | **P1** | pg_cron job stale: `rate_limit_violations_cleanup` (job 16) exceeds 26 h freshness window OR `api_quota_usage_archive` (job 17) exceeds 48 h freshness window | PagerDuty `form-devops` → devops-lead | `rl-cron-stale-{job_name}` | — |
+
+**AL-RL-01 implementation note:** The 80% threshold notification is built into `quota-check.ts` middleware (DATA_MODEL §28.4 enforcement flow — the Worker emits a `security.quota_80pct_warning` DEC-030 STANDARD 3yr event on first breach). AL-RL-01 is the PagerDuty routing rule that converts this DEC-030 event into a customer-success page. Dedup by `{tenant_id}-{period_month}-{endpoint_category}` ensures one page per threshold per period per category — not per-request spam.
+
+**AL-RL-02 interpretation:** A hard block for an enterprise tenant within contracted quota indicates either (a) a contract tier misconfiguration (`quota_limit` wrong in `api_quota_usage`), (b) an enforcement logic bug in `quota-check.ts`, or (c) a security event — the tenant's API keys were compromised and a third party consumed their quota. Customer-success investigates (a) and (b) first; if no config or code explanation within 30 minutes, security-engineer activates R-03. The RL-SLO-02 verification SQL (§35.2.3) running daily provides the audit trail regardless of human response time.
+
+**AL-RL-03 interpretation:** `critical` severity abuse flags represent the highest-confidence detection patterns (e.g., OWASP attack signature confirmed, automated mass-credential-testing confirmed). `auto_actioned = TRUE` means the Worker has already applied a temporary block; the security-engineer's task is to review, confirm the detection, and escalate to a permanent per-tenant ban or an INCIDENT_RESPONSE R-03/R-06 activation if needed. `auto_actioned = FALSE` on a critical flag means automatic action was suppressed (by tenant-specific exception or Worker config) — human action is mandatory within 60 minutes.
+
+---
+
+### 35.5 §6.2 Alert Rules Additions
+
+The following five rows constitute the `rate_limit_health` subsection and are inserted **after** the `api_key_health` subsection (§31) and **before** the `siem_health` subsection (§34) in the §6.2 Alert Rules table:
+
+| Alert ID | Severity | Trigger | Routing | Dedup key | References |
+|---|---|---|---|---|---|
+| **AL-RL-01** | P2 | Enterprise tenant first hits 80% of monthly `quota_limit` for an `endpoint_category`; sourced from `security.quota_80pct_warning` DEC-030 event | PagerDuty `form-customer-success` → customer-success | `rl-quota-80pct-{tenant_id}-{period_month}-{endpoint_category}` | DATA_MODEL §28.4; §35.4 |
+| **AL-RL-02** | P1 | Enterprise tenant `hard_blocked_at` set in `api_quota_usage` (contracted tenant hard-blocked = unexpected) | PagerDuty `form-customer-success` + `form-security` | `rl-quota-hard-block-{tenant_id}-{period_month}` | DATA_MODEL §28.4; §35.4; RL-SLO-02 |
+| **AL-RL-03** | **P0** | `abuse_flags.severity = 'critical'` created; no auto-resolve; security-engineer must confirm and act | PagerDuty `form-security` → security-engineer + on-call | `rl-abuse-critical-{flag_id}` | DATA_MODEL §28.6; §35.4; INCIDENT_RESPONSE R-06 |
+| **AL-RL-04** | P1 | KV violations > 50 per `api_key_id` / 5-min window; `siem-rl-checker` Worker Cron Trigger (`*/5 * * * *`) on `RLIMIT_TELEMETRY` | PagerDuty `form-security` → security-engineer | `rl-kv-spike-{api_key_id}-{5min_bucket}` | §35.4; INCIDENT_RESPONSE R-03 |
+| **AL-RL-05** | P1 | pg_cron `rate_limit_violations_cleanup` (job 16) stale > 26 h OR `api_quota_usage_archive` (job 17) stale > 48 h | PagerDuty `form-devops` → devops-lead | `rl-cron-stale-{job_name}` | §35.6; §12.6 |
+
+---
+
+### 35.6 §12.6 pg_cron Registry Additions — Jobs 16, 17, 22, and 23
+
+**Primary closure:** DATA_MODEL §28.9 checklist item 8 (P1 M5) — adds jobs 16 and 17 to the §12.6 registry table.
+**Secondary closure:** §34.5 defined jobs 22 and 23 for the SIEM bridge but those rows were not appended to the actual §12.6 table. This section adds them.
+
+The following four rows are now appended to the §12.6 registry table (already inserted into the table above by this patch — this subsection provides the implementation notes and rationale for devops-lead):
+
+| Job name | Schedule (UTC) | Freshness window | Compliance relevance | Alert if stale |
+|---|---|---|---|---|
+| `rate_limit_violations_cleanup` | `0 3 * * *` | 26 h | CC6.6 / CC4.1 — `rate_limit_violations` 90-day rolling retention; stale = unbounded table growth; RLS prevents cross-tenant data leak but query performance degrades as row count grows; 90-day window covers the full SOC 2 observation period look-back | PagerDuty P1 `form-devops` → devops-lead; dedup `rl-cron-stale-rate_limit_violations_cleanup` (AL-RL-05 trigger, §35.4) — job 16 |
+| `api_quota_usage_archive` | `30 0 1 * *` | 48 h | CC6.1 / CC4.1 — `api_quota_usage` 36-month billing evidence retention; emits `data.quota_records_archived` DEC-030 STANDARD 1yr before DELETE; stale = billing evidence retention policy breached; 48 h freshness window (broader tolerance appropriate for monthly cadence — 4-day late execution window before impact) | PagerDuty P1 `form-devops` → devops-lead; dedup `rl-cron-stale-api_quota_usage_archive` (AL-RL-05 trigger, §35.4) — job 17 |
+| `siem_bridge_cr02_impossible_travel` | `*/5 * * * *` | 6 min | CC7.2 — SIEM bridge CR-02 impossible travel correlation rule; emits `siem.correlation_rule_matched` DEC-030 HIGH via pg_net on match; stale = CR-02 detection blind spot; closes OQ-SIEM-01 | PagerDuty P2 `form-devops` → platform-engineer (AL-SIEM-BRIDGE-01, §34.6); freshness breach = CR-02 detection blind; check pg_cron + pg_net health — job 22 |
+| `siem_bridge_cr03_priv_escalation` | `*/5 * * * *` | 6 min | CC7.2/CC6.6 — SIEM bridge CR-03 privilege escalation after denial; 7-year DEC-030 retention on match event; stale = CR-03 detection blind spot | PagerDuty P2 `form-devops` → platform-engineer (AL-SIEM-BRIDGE-02, §34.6) — job 23 |
+
+**pg_cron deploy SQL for jobs 16 and 17** (migration `0055b_rate_limit_cron.sql`):
+
+```sql
+-- Job 16: rate_limit_violations_cleanup
+-- Retention: 90 days rolling (CC6.6 SOC 2 observation window)
+SELECT cron.schedule(
+  'rate_limit_violations_cleanup',
+  '0 3 * * *',
+  $$DELETE FROM rate_limit_violations WHERE created_at < NOW() - INTERVAL '90 days'$$
+);
+
+-- Job 17: api_quota_usage_archive
+-- Retention: 36 months (CC4.1 billing evidence; DEC-030 event emitted before delete)
+-- Note: the application-layer Worker reads the RETURNING clause and emits
+-- data.quota_records_archived (STANDARD, 1yr) before committing the DELETE.
+-- This job triggers the process; the Worker handles the DEC-030 emission.
+SELECT cron.schedule(
+  'api_quota_usage_archive',
+  '30 0 1 * *',
+  $$
+    WITH to_archive AS (
+      DELETE FROM api_quota_usage
+      WHERE period_month < DATE_TRUNC('month', NOW()) - INTERVAL '36 months'
+      RETURNING id, api_key_id, tenant_id, period_month, endpoint_category,
+                request_count, tokens_consumed
+    )
+    SELECT COUNT(*) AS archived_count FROM to_archive;
+  $$
+);
+```
+
+**Jobs 22 and 23** are deployed as part of `0059_siem_bridge.sql` (§34.4). Their deploy SQL uses `cron.schedule('siem_bridge_cr02_impossible_travel', ...)` and `cron.schedule('siem_bridge_cr03_priv_escalation', ...)` respectively. The rows above in §35.6 are appended to §12.6 to close the registry gap — no additional deploy action is needed beyond what §34 already specifies.
+
+**Registry status after this §35 patch:**
+
+| Jobs in §12.6 registry | Count | Status |
+|---|---|---|
+| Jobs 1–9 (original, v1.9) | 9 | ✅ In registry + deployed (🟡 Authored pending M5 deploy per A1-GAP-004) |
+| Job 20 (`pam_postgres_sync`) | 1 | ✅ Added by DATA_MODEL §29 cross-reference (job 20) |
+| Job 21 (`pam_bg_review_alert`) | 1 | ✅ Added by DATA_MODEL §29 cross-reference (job 21) |
+| Jobs 16, 17, 22, 23 (this patch) | 4 | ✅ Added to registry table in §12.6 by this patch |
+| Jobs 10–15 (various sections) | 6 | ⬜ Defined in §§ 6.2/31/32/DATA_MODEL §27 but not yet appended to §12.6 table — see §35.10 item 12 |
+
+---
+
+### 35.7 Dashboard: "Rate Limit & Abuse Health"
+
+**Location:** Metabase + Better Stack composite dashboard.
+**Audience:** devops-lead, security-engineer, compliance-officer, customer-success.
+**Tenant admins** see a restricted view via the Admin Dashboard "Quota" panel (`docs/DATA_MODEL.md §28.4`) — they see their own consumption metrics and do not access this FORM-internal dashboard or other tenants' data.
+
+| Panel | Type | Data source | Query / metric | Alert linkage |
+|---|---|---|---|---|
+| Monthly quota consumption by tenant | Grouped bar chart (current month) | `api_quota_usage` | `ROUND(SUM(request_count)::numeric / NULLIF(quota_limit,0) * 100, 1)` % per `(tenant_id, endpoint_category)`; amber > 80%, red > 100%; `null` quota_limit (Consumer Pro) shown as "Unlimited" | AL-RL-01 / AL-RL-02 threshold reference lines |
+| KV rate limit violations — 7-day trend | Time-series (1-h buckets) | `RLIMIT_TELEMETRY` | `COUNT(*) WHERE violation_layer = 'kv_sliding_window'` per endpoint_category per 1-h bucket | AL-RL-04 threshold line (50/key/5 min shown as rolling 5-min average) |
+| Quota hard blocks (last 30 d) | Table | `api_quota_usage WHERE hard_blocked_at IS NOT NULL AND hard_blocked_at >= NOW() - INTERVAL '30 days'` | `tenant_id` (UUID), `endpoint_category`, `period_month`, `overage_count`, `hard_blocked_at`; red badge on any row | AL-RL-02 cross-reference |
+| Abuse flags — open by severity | Stacked bar (30 d, daily buckets) | `abuse_flags WHERE resolved_at IS NULL` | `COUNT(*) GROUP BY severity, DATE(created_at)` | Ember highlight for `critical` severity bars — AL-RL-03 |
+| Abuse flag auto-action rate (30 d) | Stat (%) | `abuse_flags WHERE created_at >= NOW() - INTERVAL '30 days'` | `ROUND(100.0 * COUNT(*) FILTER (WHERE auto_actioned) / NULLIF(COUNT(*),0), 1)` | Amber if < 80% (manual review backlog building) |
+| Median time-to-resolve abuse flags (30 d) | Stat (hours) | `abuse_flags WHERE resolved_at IS NOT NULL AND created_at >= NOW() - INTERVAL '30 days'` | `ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM resolved_at-created_at)/3600), 1)` | Red if > 72 h |
+| pg_cron health — jobs 16 and 17 | Status tiles (green/amber/red) | `cron.job_run_details` | `MAX(start_time) WHERE jobname IN ('rate_limit_violations_cleanup','api_quota_usage_archive')` vs. freshness window (26 h / 48 h) | AL-RL-05 fires on breach |
+| DEC-030 rate-limit event log (last 50) | Event log | `audit_log_events WHERE event_type IN ('security.quota_hard_block','security.abuse_flag_raised','security.abuse_action_taken')` | `event_type`, `tenant_id`, `occurred_at`, `severity` — descending; `critical` rows highlighted in ember | HMAC chain integrity visible via existing §5 audit integrity dashboard |
+
+**Privacy note for the consumption panel:** `tenant_id` is displayed as UUID. The mapping from UUID to company name is available to customer-success via a separate, restricted Metabase datasource (`tenants.name`). The default dashboard view uses UUID identifiers to prevent accidental cross-role disclosure of customer names to viewers without customer-success context.
+
+---
+
+### 35.8 Privacy Constraints
+
+| Constraint | Enforcement location | Rationale |
+|---|---|---|
+| No raw client IP in `RLIMIT_TELEMETRY` | `quota-check.ts`: IP address received on inbound request is never written to Analytics Engine; only `ip_country` (2-char ISO, in `rate_limit_violations` Postgres table) is retained | IP addresses are personal data under GDPR Art. 4(1) for EU residents; even /24 subnet (used in SIEM bridge §34) is excluded from quota telemetry — the threat model for rate limiting does not require IP attribution, only key attribution |
+| `key_preview` excluded from all observability signals | `quota-check.ts`: only `api_key_id` (UUID) propagated to `RLIMIT_TELEMETRY`; `key_preview` is reserved for tenant Admin Dashboard display only (§31.8) | `key_preview` is a customer-facing credential identifier; cross-tenant exposure via FORM-internal dashboards would constitute credential context leakage |
+| `abuse_flags.evidence_summary` is statistical metadata only | `abuse-detection.ts` Workers: the `evidence_summary` JSONB field contains request counts, time deltas, and entropy scores — never request content, HTTP headers, or partial payloads | GDPR Art. 6(1)(f) legitimate interest for security processing requires data minimisation; request content may contain Art. 9 health-adjacent coaching data |
+| `abuse_flags` table restricted to `security_reviewer` + `form_system` | Postgres RESTRICTIVE RLS policy: `form_api`, `tenant_admin`, `tenant_manager`, `tenant_owner`, `form_compliance` all have zero SELECT on `abuse_flags` (DATA_MODEL §28.3) | Abuse detection patterns are an operational security secret; disclosure allows adversaries to calibrate evasion; enterprise tenant admins have no entitlement to FORM's internal security process artefacts |
+| Tenant admins see only their own quota consumption | `GET /api/admin/v1/quota` route scoped to `requesting_tenant_id` only by RLS + Worker RBAC; no cross-tenant fields in response | Standard multi-tenant isolation guarantee (DATA_MODEL §4.1) |
+
+---
+
+### 35.9 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | §35 mechanism | Evidence artefact | Status |
+|---|---|---|---|---|
+| **CC6.1 — Logical access controls** | `api_quota_usage.quota_limit` enforces the authorized request ceiling per enterprise contract. `hard_blocked_at` demonstrates system-level enforcement (not just monitoring). RL-SLO-02 (zero false hard-blocks) provides quantitative evidence that the control is working correctly. | RL-SLO-02 verification SQL (§35.2.3) run daily; `api_quota_usage` monthly export | **RL-E-001** (canonical source: DATA_MODEL §28.8) | 🟡 Authored — closes on 30-day production data collection in M5 |
+| **CC6.6 — Unauthorized access attempts logged** | `rate_limit_violations` records every Layer-2 and Layer-3 breach event with timestamp, violation type, layer, and 2-char IP country. 90-day rolling retention covers the SOC 2 observation period. The DEC-030 chain provides a tamper-evident supplement for the highest-severity events. | `rate_limit_violations` export | **RL-E-002** (canonical source: DATA_MODEL §28.8) | 🟡 Authored — closes on first 90-day data window |
+| **CC7.2 — Monitoring for anomalous activity** | `abuse_flags` provides multi-pattern anomaly detection with automated response. `security.abuse_flag_raised` and `security.abuse_action_taken` DEC-030 HMAC-chained events provide detection-to-resolution evidence. AL-RL-03 (P0, critical auto-action) demonstrates zero-tolerance response to highest-severity anomalies. | `abuse_flags` export + DEC-030 event chain; AL-RL-03 PagerDuty incident history | **RL-E-003** (canonical source: DATA_MODEL §28.8); **RL-E-004** (new — PagerDuty incident history for AL-RL-03) | 🟡 Authored — RL-E-004 closes on first production `critical` abuse_flag event or synthetic staging test |
+
+**New evidence artefact: RL-E-004**
+
+| Artefact ID | Description | Location | Retention |
+|---|---|---|---|
+| **RL-E-004** | PagerDuty incident export for `form-security` service, alert key prefix `rl-abuse-critical-*`, for the SOC 2 observation period — demonstrates P0 critical abuse flags were acknowledged within 60 minutes of firing; export columns: `opened_at`, `acknowledged_at`, `resolved_at`, `alert_key`, `responder` | `compliance/evidence/rate-limiting/rl-e-004-abuse-critical-pagerduty-YYYY.csv` | 7 years (aligned with `security.abuse_flag_raised` DEC-030 HIGH 7yr retention) |
+
+**SOC 2 auditor access note:** The `abuse_flags` table is restricted to `security_reviewer` by RLS. For auditor fieldwork, compliance-officer grants a time-limited `security_reviewer` grant to a staging replica containing synthetic test data, plus a production redacted export (UUID identifiers only, no `evidence_summary` content). This grant generates a `pam.elevation_approved` DEC-030 event per the PAM protocol (DATA_MODEL §29).
+
+---
+
+### 35.10 Implementation Checklist
+
+#### P0 — Must complete before quota enforcement ships (M4)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Configure AL-RL-01 in PagerDuty `form-customer-success` service: trigger on `security.quota_80pct_warning` DEC-030 event (STANDARD 3yr — must be registered in `docs/AUDIT_LOG_SCHEMA.md` alongside the three existing DATA_MODEL §28.6 events); dedup key `rl-quota-80pct-{tenant_id}-{period_month}-{endpoint_category}`; suppress re-alerts for same combination within billing period. Staging test: insert `api_quota_usage` row with `request_count = FLOOR(0.80 * quota_limit)` + trigger `quota-check.ts` next request; confirm DEC-030 event + PagerDuty page. | devops-lead | **P0** | M4 | [ ] |
+| 2 | Configure AL-RL-02 in PagerDuty `form-customer-success` + `form-security` (dual-page): trigger on `security.quota_hard_block` DEC-030 event (HIGH 3yr) for enterprise tenants (non-null `tenant_id`); dedup `rl-quota-hard-block-{tenant_id}-{period_month}`; both services paged simultaneously. | devops-lead | **P0** | M4 | [ ] |
+| 3 | Configure AL-RL-03 in PagerDuty `form-security`: trigger on `security.abuse_flag_raised` DEC-030 event with `severity = 'critical'`; dedup `rl-abuse-critical-{flag_id}`; P0 pages security-engineer + on-call; no auto-resolve. Staging test: INSERT synthetic `abuse_flags` row (severity=critical, auto_actioned=true) and emit corresponding DEC-030 event via `emit-audit-event` Worker; confirm page fires within 60 s. | devops-lead | **P0** | M4 | [ ] |
+| 4 | Configure AL-RL-04 via `siem-rl-checker` Cloudflare Worker (Cron Trigger `*/5 * * * *`): query `RLIMIT_TELEMETRY` for any `api_key_id` with > 50 `violation_layer = 'kv_sliding_window'` events in the trailing 5-min window; on match emit `siem.rate_limit_spike` DEC-030 MEDIUM (register in `docs/AUDIT_LOG_SCHEMA.md`) and fire PagerDuty `form-security`. | platform-engineer + devops-lead | **P0** | M4 | [ ] |
+| 5 | Add `rate_limit_health` subsection rows (AL-RL-01 through AL-RL-05) to the §6.2 Alert Rules table as specified in §35.5. Confirm insertion point: after `api_key_health` subsection, before `siem_health` subsection. | devops-lead | **P0** | M4 | [ ] |
+
+#### P1 — Before first enterprise tenant goes live with API keys (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | **[Closes DATA_MODEL §28.9 item 8 — job 16]** Run `0055b_rate_limit_cron.sql` job 16 deploy SQL (§35.6) against production Supabase. Verify: `SELECT * FROM cron.job WHERE jobname = 'rate_limit_violations_cleanup'` returns one row; first run (03:00 UTC) completes with zero deleted rows on fresh schema; add to §12.6 table (done in §35.6 of this patch). | platform-engineer + devops-lead | **P1** | M5 | [ ] |
+| 7 | **[Closes DATA_MODEL §28.9 item 8 — job 17]** Run `0055b_rate_limit_cron.sql` job 17 deploy SQL (§35.6) against production Supabase. Verify: job appears in `cron.job`; first monthly run (00:30 UTC, 1st of month) completes with zero archived rows on fresh schema; `data.quota_records_archived` DEC-030 event registered in `docs/AUDIT_LOG_SCHEMA.md`. | platform-engineer + devops-lead | **P1** | M5 | [ ] |
+| 8 | Register RL-SLO-01 through RL-SLO-04 in §2 SLO table. Wire RL-SLO-02 verification SQL (§35.2.3) as a pg_cron daily check (01:00 UTC) that fires AL-RL-02 PagerDuty pipeline on any false-hard-block row found (also triggers RL-SLO-02 breach metric in Better Stack). | devops-lead + compliance-officer | **P1** | M5 | [ ] |
+| 9 | Wire `RLIMIT_TELEMETRY` Analytics Engine dataset write in `quota-check.ts`: eight-column schema per §35.2.1; confirm no IP value, no `key_preview` in any emitted data point; staging test: trigger KV violation, verify data point visible in Analytics Engine within 60 seconds. | platform-engineer | **P1** | M5 | [ ] |
+| 10 | Build "Rate Limit & Abuse Health" dashboard (§35.7, eight panels) in Metabase + Better Stack; restrict `abuse_flags` panels to security-engineer + compliance-officer; expose "Monthly quota consumption" panel to customer-success. | devops-lead | **P1** | M5 | [ ] |
+| 11 | Collect RL-E-001 through RL-E-004 evidence artefacts (§35.9) 30 days after M5 go-live; for RL-E-004, use a synthetic staging `abuse_flags` critical row if no production critical event occurs in the 30-day window; store all artefacts in `compliance/evidence/rate-limiting/`; cross-reference in `docs/SOC2_READINESS.md` CC6.1, CC6.6, and CC7.2 evidence tables. | compliance-officer | **P1** | M6 | [ ] |
+
+#### P2 — Post-GA clean-up
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 12 | **[Registry gap closure]** Append the six missing §12.6 rows for jobs 10–15. For each job, confirm with the owning section author: job name, exact schedule, freshness window, compliance relevance, and PagerDuty routing. Jobs to add: `victor_safety_baseline_refresh` (§32, job 14 per §32 text), `c1-erasure-sla-monitor` (§6.2 v2.0, job 11 per v2.0 text), `api_key_chain_monitor` (§31.6, job 13), `invite_expiry_sweep` (DATA_MODEL §27, job 14), `invite_email_expiry_cleanup` (DATA_MODEL §27, job 15). Note: `victor_safety_baseline_refresh` and `invite_expiry_sweep` both claim job 14 — coordinate with devops-lead to disambiguate numbering before appending. | devops-lead + compliance-officer | **P2** | M6 | [ ] |
+| 13 | Resolve OQ-RL-OBS-01 (§35.11): decide whether a 7-day quota utilisation trend + projected month-end view should be added to the tenant Admin Dashboard Quota panel; evaluate after first two enterprise pilot customers onboard. | customer-success + product-manager | **P2** | M7 | [ ] |
+
+---
+
+### 35.11 Open Questions
+
+| OQ | Question | Owner | Priority | Resolution path |
+|---|---|---|---|---|
+| **OQ-RL-OBS-01** | **Advanced quota utilisation metrics in the tenant Admin Dashboard.** The current Admin Dashboard Quota panel (DATA_MODEL §28.4) shows current-month `request_count` vs. `quota_limit`. A richer view could add: 7-day rolling daily consumption trend, projected month-end consumption (linear extrapolation), `hard_blocked_at` history per endpoint_category, top-5 endpoints by consumption. Risk: over-engineering for M5 pilot; adds Supabase query complexity. Recommendation: ship basic panel at M5; add trend + projection if ≥ 2 enterprise pilot customers explicitly request it in QBR feedback. | customer-success + product-manager | **P2** | Evaluate after first enterprise pilot QBR (M6–M7); document outcome in `docs/DECISION_LOG.md` |
+| **OQ-RL-OBS-02** | **Tenant-facing anonymised abuse summary.** Should FORM surface a high-level summary to enterprise tenant admins — e.g., "3 automated security events were detected and mitigated in your tenant in the last 30 days" — without disclosing detection patterns, severity, or `evidence_summary`? Risk: any signal about detection presence or absence could allow an adversary tenant employee to calibrate evasion timing. Recommendation: no tenant-facing abuse summary at M5; revisit only if enterprise procurement questionnaires begin requiring FORM to disclose incident counts to customers. | security-engineer + compliance-officer | **P2** | Evaluate before enterprise GA M13; document outcome in `docs/DECISION_LOG.md` |
+
+---
+
+*v2.7 (2026-06-11): §35 Rate Limiting, Quota Enforcement & Abuse Prevention Observability — observability companion to `docs/DATA_MODEL.md §28` (v1.0, 2026-06-10). Closes DATA_MODEL §28.9 checklist item 8 (P1 M5). Also closes §34.5 registry gap: jobs 22 and 23 (`siem_bridge_cr02_impossible_travel` and `siem_bridge_cr03_priv_escalation`) were defined in §34.5 but not appended to the §12.6 table; this patch adds those rows. §35.1 scope: three-layer architecture monitoring — WAF excluded (R-06); KV burst via `RLIMIT_TELEMETRY` Analytics Engine; DB quota via Postgres queries on `api_quota_usage`, `rate_limit_violations`, `abuse_flags`. Privacy floor: no raw IP in Analytics Engine (ip_country 2-char in Postgres only), no `key_preview`, `abuse_flags.evidence_summary` statistical metadata only, `abuse_flags` RLS blocks all roles except `security_reviewer` + `form_system`. §35.2 RED metrics: `RLIMIT_TELEMETRY` eight-column schema (api_key_id UUID, tenant_id, endpoint_category, violation_type, violation_layer, request_count, quota_limit, timestamp; no IP, no key_preview); Layer 2 RED table (KV violations/min, hard_blocks/day, 80% warnings/month, middleware error rate, P95 latency by layer); Layer 3 Postgres metrics (consumption %, violation count, open abuse flags by severity, auto-action rate, median time-to-resolve); RL-SLO-02 false-hard-block verification SQL. §35.3 four SLOs: RL-SLO-01 (latency KV < 5 ms P95 / DB < 15 ms P95 — 99.9%), RL-SLO-02 (false hard-block rate 0% for contracted enterprise — daily SQL verification), RL-SLO-03 (CSM 80%-threshold notification within 5 min — 100%), RL-SLO-04 (rate_limit_violations_cleanup ± 90 min schedule adherence). §35.4 five alert rules: AL-RL-01 (P2, 80%-threshold first-hit → customer-success, dedup per period/category), AL-RL-02 (P1, enterprise hard block → customer-success + security-engineer dual-page), AL-RL-03 (P0, critical abuse_flag → security-engineer, no auto-resolve), AL-RL-04 (P1, KV spike > 50/key/5 min → R-03 trigger, `siem-rl-checker` Worker), AL-RL-05 (P1, pg_cron stale jobs 16/17). §35.5 `rate_limit_health` §6.2 subsection: five rows AL-RL-01 through AL-RL-05 inserted after `api_key_health` and before `siem_health`. §35.6 §12.6 additions: four rows — job 16 (`rate_limit_violations_cleanup` daily 03:00 UTC, 26h window, CC6.6/CC4.1), job 17 (`api_quota_usage_archive` monthly 00:30 UTC 1st, 48h window — broader tolerance for monthly cadence, emits `data.quota_records_archived` DEC-030 STANDARD 1yr before DELETE), job 22 (`siem_bridge_cr02_impossible_travel` */5 UTC, 6min window — CR-02 blind on stale), job 23 (`siem_bridge_cr03_priv_escalation` */5 UTC, 6min window — CR-03 blind on stale). Registry status table provided: 15 jobs total (9 original + 2 PAM + 4 this patch); 6 jobs still missing (jobs 10–15, tracked in §35.10 item 12). Deploy SQL provided for jobs 16/17 (`0055b_rate_limit_cron.sql`). §35.7 eight-panel "Rate Limit & Abuse Health" Metabase + Better Stack dashboard: monthly quota by tenant (grouped bar, 80%/100% threshold lines, UUID display for cross-role privacy), KV violations 7-day trend, hard blocks table (30 d), abuse flags stacked bar (30 d), auto-action rate stat, median time-to-resolve stat, pg_cron health tiles (jobs 16/17), DEC-030 event log (last 50). §35.8 five privacy constraints: no raw IP in RLIMIT_TELEMETRY, key_preview excluded, evidence_summary statistical only, abuse_flags RLS (security_reviewer + form_system only), tenant quota scope (own tenant only). §35.9 SOC 2 evidence: CC6.1 (RL-E-001 + RL-SLO-02 verification query), CC6.6 (RL-E-002 rate_limit_violations 90-day export), CC7.2 (RL-E-003 + new RL-E-004 AL-RL-03 PagerDuty incident history 7yr). RL-E-004 artefact defined: PagerDuty `form-security` AL-RL-03 incidents (opened/acknowledged/resolved timestamps) stored at `compliance/evidence/rate-limiting/rl-e-004-abuse-critical-pagerduty-YYYY.csv`. §35.10 thirteen-item checklist: 5× P0 M4 (AL-RL-01 through AL-RL-04 PagerDuty + `siem-rl-checker` Worker, §6.2 table addition), 6× P1 M5-M6 (pg_cron jobs 16-17 deploy, RL-SLO registration + RL-SLO-02 daily check, RLIMIT_TELEMETRY wiring, dashboard build, evidence collection), 2× P2 M6-M7 (§12.6 jobs 10-15 registry gap closure, OQ-RL-OBS-01 pilot feedback evaluation). §35.11 two open questions: OQ-RL-OBS-01 (advanced tenant quota trend panel — P2, ≥ 2 pilot requests trigger), OQ-RL-OBS-02 (tenant-facing anonymised abuse summary — P2, no at M5; re-evaluate pre-GA M13). Cross-references: `docs/DATA_MODEL.md §28` (canonical rate-limit schema — three tables, RLS, enforcement flow, three DEC-030 events); `docs/DATA_MODEL.md §28.9` checklist item 8 (P1 — closed by §35.6 jobs 16/17); `docs/DATA_MODEL.md §26` (API key schema — FK source for `api_quota_usage.api_key_id`); `docs/INCIDENT_RESPONSE.md R-06` (DDoS / WAF Bypass — Layer 1 signal owner); `docs/INCIDENT_RESPONSE.md R-03` (Compromised Credentials — AL-RL-04 trigger path); `docs/SSO_SCIM_IMPLEMENTATION.md §26` (API key auth security — companion layer above rate limiting); `docs/OBSERVABILITY.md §31` (API key auth observability — AL-APIKEY-01/04 for KV spike; distinct from AL-RL-04 but may co-fire); `docs/OBSERVABILITY.md §34.5` (§12.6 jobs 22-23 — described but not previously appended to registry table; closed by this patch). Owner: devops-lead + security-engineer + platform-engineer + compliance-officer.*

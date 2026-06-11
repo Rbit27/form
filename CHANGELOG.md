@@ -6,6 +6,16 @@
 
 ---
 
+## [3.50.2] — 2026-06-11
+
+### Added
+- `docs/OBSERVABILITY.md §35` — Rate Limiting, Quota Enforcement & Abuse Prevention Observability: companion section to DATA_MODEL §28 (v1.0 2026-06-10). Closes DATA_MODEL §28.9 checklist item 8 (P1 M5 — pg_cron jobs 16/17 added to §12.6 registry). Also closes §34.5 registry gap (jobs 22-23 SIEM bridge rows now in §12.6 table). Includes: RLIMIT_TELEMETRY Analytics Engine dataset schema; four SLOs (RL-SLO-01–04); five alert rules (AL-RL-01–05); `rate_limit_health` §6.2 subsection; 8-panel "Rate Limit & Abuse Health" dashboard spec; evidence artefact RL-E-004; 13-item implementation checklist; OQ-RL-OBS-01/02. OBSERVABILITY.md v2.6 → v2.7.
+
+### Changed
+- `VERSION` — 3.50.1 → 3.50.2
+
+---
+
 ## [3.50.1] — 2026-06-11
 
 ### Added
