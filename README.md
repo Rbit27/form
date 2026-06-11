@@ -891,7 +891,7 @@ Each iteration:
 - [x] post-498: Тренування після 30 — тестостерон, відновлення, сухожилля, прогрес. clinical-safety NOT REQUIRED · v3.63.0
 - [x] post-499: Хронічна перевтома vs детренованість — FOR/NFOR/OTS ієрархія; Meeusen 2013; Mujika & Padilla 2000 detraining timelines; дерево рішень. clinical-safety NOT REQUIRED · v3.64.0
 - [x] post-500: Сполучна тканина не встигає за м'язами — адаптація тижні/місяці/роки; Magnusson 2010; Kjaer 2006; Gabbett 2016; 5% тижневий поріг. clinical-safety APPROVED · v3.64.0
-- [ ] post-501: Вибір між програмою і принципами — коли слідувати шаблону, а коли розуміти механіку. clinical-safety NOT REQUIRED
+- [x] post-501: Вибір між програмою і принципами — коли слідувати шаблону, а коли розуміти механіку. clinical-safety NOT REQUIRED · authored v3.65.0
 - [ ] post-502: Функціональна сила — що це реально означає, де хайп і де доказова база. clinical-safety NOT REQUIRED
 - [ ] post-503: Прогресія новачка: типові помилки першого року, які затримують розвиток на роки. clinical-safety NOT REQUIRED
 
