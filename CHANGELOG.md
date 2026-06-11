@@ -6,6 +6,22 @@
 
 ---
 
+## [3.62.0] — 2026-06-11
+
+### Added
+- `content/post-494-progressive-overload-mechanisms.md` — Прогресивне навантаження: Selye (1950) GAS і три фази адаптації; Kraemer & Ratamess (2004) MSSE SAID principle і специфіка адаптації; Ralston et al. (2017) JSCR volume-load і сила; Rhea et al. (2002) MSSE лінійна vs DUP (щотижнева зміна інтенсивності); Miranda et al. (2011) JSCR підтвердження переваги DUP; Zourdos et al. (2016) JSCR RPE-авторегуляція; механізм чому лінійна прогресія вичерпується (нейральна ефективність, нелінійне відновлення); подвійна прогресія, DUP, хвилеподібне навантаження; коли плато є нормою (2-тижневе vs 6-тижневе); дерево рішень за тривалістю стагнації. clinical-safety NOT REQUIRED.
+- `content/post-495-fasted-vs-fed-training.md` — Тренування натще vs після їжі: Van Proeyen et al. (2011) J Physiol жировий метаболізм і intramyocellular lipid при тренуванні натще; Aird et al. (2018) SJMSS систематичний огляд: субстрат змінюється, функціональний результат — ні при контрольованому харчуванні; Gonzalez et al. (2013) Br J Nutr глікоген і субстратне використання при різній інтенсивності; Howarth et al. (2010) J Appl Physiol окиснення BCAA при низькому глікогені; Schoenfeld & Aragon (2013) JISSN анаболічне вікно: загальне добове харчування важить більше за тайминг; порівняльна таблиця параметрів; фреймворк для силового тренування; явне відсилання до дієтолога. ⚠️ clinical-safety REVIEWED AND APPROVED.
+- `content/post-496-cooldown-evidence-base.md` — Cooldown: Herbert & de Noronha (2007) Cochrane: розтяжка не зменшує DOMS (clinical significance нижча за поріг); Cheung et al. (2003) Sports Medicine: огляд DOMS методів без стабільного ефекту; LaForgia et al. (2006) J Sports Sci: EPOC відбувається незалежно від заминки; Mika et al. (2007) JOSPT: активне відновлення пришвидшує лактатний кліренс але не впливає на DOMS; Weerapong et al. (2005) Sports Medicine: масаж > розтяжка > спокій для суб'єктивного відновлення; серцево-судинний аргумент: де ортостатична гіпотензія реально важлива (кардіо, не силові); мінімально ефективний протокол за типом тренування. clinical-safety NOT REQUIRED.
+- `content/post-497-isometric-training-underrated.md` — Ізометрія як недооцінений інструмент: Tillin & Bishop (2009) Sports Medicine: rate coding 80–100 Гц і explosive force development при коротких максимальних ізометріях; Folland et al. (2005) MSSE: кутова специфічність ±15–20°, порівняння ізометричного і динамічного тренування; Oranchuk et al. (2019) IJSPP: систематичний огляд — гіпертрофія при >70% MVC, регіональний характер; Rio et al. (2015) BJSM: ізометрія і пателярна тендинопатія (застереження про лікарську консультацію включено); Lum & Barbosa (2019) overcoming isometrics і RFD; yielding vs overcoming практична різниця; паузи в розтягнутій позиції як гіпертрофійний стимул; дозування по цілях (таблиця MVC×sec×підходи); практичне програмування 4-тижневого блоку. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — 4 нові картки (post-494, post-495, post-496, post-497) → 422 картки (497 постів authored; note: actual HTML card count corrected from claimed 421 to verified 422 via grep)
+- `README.md` — roadmap: posts 494–497 → [x] з реальними описами; нова секція post-498+ (3 теми: деload, HRV, ексцентрика); blog.html entry оновлено
+- `STATUS.md` — TL;DR: v3.54.0 → v3.62.0; 492 → 497 постів; blog.html 420 → 422 картки; posts 494–497 у файловому реєстрі; footer v3.60.0 → v3.62.0
+- `VERSION` — 3.61.1 → 3.62.0
+
+---
+
 ## [3.61.1] — 2026-06-11
 
 ### Changed

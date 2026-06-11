@@ -874,12 +874,15 @@ Each iteration:
 - [x] post-491: Силова асиметрія і функціональний дисбаланс — Bishop et al. (2018) IJSM функціональна vs дисфункціональна асиметрія; Maloney (2019) Sports Med LSI і ризик травм; Howard & Enoka (1991) bilateral deficit; поріг 15%/LSI<85%; програмування. clinical-safety NOT REQUIRED · v3.60.0
 - [x] post-492: Velocity-Based Training без пристрою — Gonzalez-Badillo & Sanchez-Medina (2010) MPV і %1RM; Sanchez-Medina & Gonzalez-Badillo (2011) velocity loss threshold; Loturco et al. (2017) максимальний намір; load-velocity профіль без трекера. clinical-safety NOT REQUIRED · v3.60.0
 - [x] post-493: Темп повторення проти навантаження — Burd et al. (2012) J Physiol TUT і MPS при різних навантаженнях; Wilk et al. (2020) JSCR повільний темп при субмаксимальних навантаженнях; Schoenfeld & Grgic (2020) мета-аналіз TUT; Mitchell et al. (2012) навантаження vs відмова; механіка редукції навантаження при повільному темпі. clinical-safety NOT REQUIRED · v3.61.0
+- [x] post-494: Прогресивне навантаження — Selye (1950) GAS і суперкомпенсація; Kraemer & Ratamess (2004) MSSE SAID principle; Ralston et al. (2017) JSCR volume-load; Rhea et al. (2002) MSSE DUP vs лінійна; Miranda et al. (2011) підтвердження DUP; Zourdos et al. (2016) RPE авторегуляція; подвійна прогресія, DUP, хвилеподібне; коли плато є нормою. clinical-safety NOT REQUIRED · v3.62.0
+- [x] post-495: Тренування натще vs після їжі — Van Proeyen et al. (2011) J Physiol жировий метаболізм натще; Aird et al. (2018) систематичний огляд субстрат vs результат; Gonzalez et al. (2013) глікоген і інтенсивність; Howarth et al. (2010) BCAA окиснення; Schoenfeld & Aragon (2013) анаболічне вікно; тайминг як другорядний фактор. ⚠️ clinical-safety REVIEWED AND APPROVED · v3.62.0
+- [x] post-496: Cooldown — Herbert & de Noronha (2007) Cochrane: розтяжка не зменшує DOMS; Cheung et al. (2003) огляд DOMS методів; LaForgia et al. (2006) EPOC масштаб; Mika et al. (2007) активне vs пасивне відновлення; Weerapong et al. (2005) масаж і відновлення; ортостатична гіпотензія контекст; мінімально ефективний протокол. clinical-safety NOT REQUIRED · v3.62.0
+- [x] post-497: Ізометрія як недооцінений інструмент — Tillin & Bishop (2009) rate coding і RFD; Folland et al. (2005) MSSE кутова специфічність ±15–20°; Oranchuk et al. (2019) IJSPP систематичний огляд; Rio et al. (2015) BJSM тендинопатія; Lum & Barbosa (2019) overcoming isometrics; yielding vs overcoming; паузи в розтягнутій позиції; жорсткість сухожилля. clinical-safety NOT REQUIRED · v3.62.0
 
-    ── ROADMAP (наступні теми · post-494+) ───────────────────────────
-- [ ] post-494: Прогресивне навантаження — механізми адаптації, способи прогресії за межі лінійної (подвійна прогресія, DUP, хвилеподібна); коли плато є нормою. clinical-safety NOT REQUIRED
-- [ ] post-495: Тренування натще vs після їжі — насправді що змінюється у фізіології і продуктивності; GLM і glікоген; де перевага, де міф. ⚠️ clinical-safety review required (food-related)
-- [ ] post-496: Cooldown: чи є він необхідним — доказова база заминки; фізіологія EPOC і лактатного кліренсу; мінімально ефективний протокол. clinical-safety NOT REQUIRED
-- [ ] post-497: Ізометрія як недооцінений інструмент — isometric training у гіпертрофії та силі; паузи у розтягнутій позиції; практика після серйозних травм. clinical-safety NOT REQUIRED
+    ── ROADMAP (наступні теми · post-498+) ───────────────────────────
+- [ ] post-498: Деload — коли, як часто, яка глибина зниження; активний vs пасивний деload; індикатори необхідності деload без суб'єктивщини. clinical-safety NOT REQUIRED
+- [ ] post-499: Варіабельність серцевого ритму (HRV) як тренувальний інструмент — що вимірює, межі застосування, що робити з даними реально. clinical-safety NOT REQUIRED
+- [ ] post-500: Ексцентричне тренування — механізми ексцентричної гіпертрофії; DOMS як сигнал; практичне програмування. clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
