@@ -6,6 +6,18 @@
 
 ---
 
+## [3.68.0] — 2026-06-11
+
+### Added
+- `content/post-505-second-year-training-intermediate-plateau.md` — «Другий рік у залі: чому прогрес сповільнюється і як він виглядає далі»; 13-хв читання; Häkkinen et al. (1985) нейром'язовий резерв і стеля, Seynnes et al. (2007) JAP структурна гіпертрофія у тренованих, Kraemer & Ratamess (2004) MSSE SAID і варіативність, Peterson et al. (2011) JSCR мета-аналіз ефекту розміру, Rhea et al. (2003) + Buford et al. (2007) JSCR нелінійна і хвилеподібна періодизація, Schoenfeld et al. (2017) JSCR dose-response об'єм, Kreher & Schwartz (2012) Sports Health ознаки недовідновлення, Haff & Triplett (2016) NSCA проміжний рівень як режим системи; editorial-brutalist; clinical-safety NOT REQUIRED. sports-scientist review pending.
+- `blog.html` — картка post-505 додана (505 постів загалом).
+
+### Changed
+- `VERSION` — 3.67.1 → 3.68.0
+- `STATUS.md` — content engine table: post-505 рядок додано.
+
+---
+
 ## [3.67.1] — 2026-06-11
 
 ### Changed
