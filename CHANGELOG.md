@@ -6,6 +6,17 @@
 
 ---
 
+## [3.75.0] — 2026-06-11
+
+### Added
+- `content/post-512-isolation-exercises-when-needed.md` — «Ізоляційні вправи — коли вони справді потрібні, а коли це театр»: чотири контексти де ізоляція дає унікальну цінність (відстаючий м'яз при компаундному домінуванні, ROM-специфічність через активну/пасивну недостатність, реабілітація і профілактика, пізні стадії гіпертрофії); три сценарії де це театр (новачок, заміна компаунду, перевищення MRV); механічна напруга у подовженому положенні (stretch-mediated hypertrophy); принцип «останніх 10%». Refs: Gentil 2013, Vigotsky 2015, Brandão 2020, Pedrosa 2022, Schoenfeld & Grgic 2018, Bohm 2015, Herzog 2014. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `blog.html` — додано картки post-511 і post-512
+- `README.md` — roadmap оновлено: post-510/511/512 позначено ✓, додано теми post-513–517
+- `STATUS.md` — додано рядки post-511 і post-512 у content engine table
+- `VERSION` — 3.74.0 → 3.75.0
+
+---
+
 ## [3.74.0] — 2026-06-11
 
 ### Added
