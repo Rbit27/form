@@ -6,6 +6,18 @@
 
 ---
 
+## [3.49.0] — 2026-06-11
+
+### Added
+- `content/post-457-advanced-load-progression.md` — Прогресія навантаження для просунутого атлета: чому LP перестає працювати після 2–3 років; DUP vs блокова periodizація (Rhea 2002, Kraemer & Ratamess 2004, Issurin 2010, Prestes 2009); алгоритм переходу LP → DUP; RIR-anchor (Zourdos 2016); матриця вибору моделі; clinical-safety NOT REQUIRED
+- `content/post-459-warmup-neuromuscular.md` — Warm-up як нейром'язова підготовка: Q10-ефект і кінетика міозину (Fry 2004); PAP механізм MLC kinase (Tillin & Bishop 2009); Robbins (2005) мета-аналіз d=0.6–0.8; Chatzopoulos et al. (2007); специфічна vs загальна розминка; 4-фазний протокол 50% → 70% → 85% → PAP → робочий підхід; clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — post-457 і post-459 позначені ✓; roadmap header оновлено до post-460+
+- `VERSION` — 3.48.1 → 3.49.0
+
+---
+
 ## [3.48.1] — 2026-06-11
 
 ### Changed

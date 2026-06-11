@@ -820,10 +820,11 @@ Each iteration:
 
 - [x] post-456: Нейром'язова стомлюваність і частота тренінгу — Gandevia (2001) центральна стомлюваність і twitch interpolation; Allen et al. (2008) периферійна стомлюваність (Pi/Ca²⁺); Damas et al. (2016) EIMD і нейральне гальмування; Schoenfeld et al. (2016) мета-аналіз частоти; set-diagnostic протокол без VBT; clinical-safety NOT REQUIRED · v3.48.0
 
-   ── ROADMAP (наступні editorial теми · post-457+) ───────────────
-- [ ] post-457: Прогресія навантаження для просунутого атлета — чому лінійна прогресія перестає працювати після 2-3 років; undulating periodization vs block periodization; практичний перехід з новачкової на середньо-просунуту модель; clinical-safety NOT REQUIRED
+- [x] post-457: Прогресія навантаження для просунутого атлета — чому лінійна прогресія перестає працювати після 2–3 років; DUP vs блокова periodizація (Rhea 2002, Kraemer & Ratamess 2004, Issurin 2010); алгоритм переходу з LP на DUP; Zourdos et al. (2016) RIR-anchor; clinical-safety NOT REQUIRED · v3.49.0
 - [ ] post-458: Вертикальне і горизонтальне навантаження на плечовий пояс — анатомія ротаторної манжети в контексті тренінгу; Push:Pull баланс (Kolber et al. 2009); чому «3 жими : 1 тяга» — не формула; клінічна різниця між тренувальним дискомфортом і субакроміальним конфліктом; ⚠️ clinical-safety REQUIRED — тема болю і суглоба, route to CS before publish
-- [ ] post-459: Warm-up як нейром'язова підготовка, а не «розігрів» — post-activation potentiation (PAP), температурна кінетика міозину, специфічна vs загальна розминка; Robbins (2005) PAP мета-аналіз; протокол розминки для силової сесії; clinical-safety NOT REQUIRED
+- [x] post-459: Warm-up як нейром'язова підготовка, а не «розігрів» — Q10-ефект і кінетика міозину (Fry 2004); PAP механізм MLC kinase (Tillin & Bishop 2009); Robbins (2005) мета-аналіз d=0.6–0.8; Chatzopoulos et al. (2007); специфічна vs загальна розминка; 4-фазний протокол; clinical-safety NOT REQUIRED · v3.49.0
+
+   ── ROADMAP (наступні editorial теми · post-460+) ───────────────
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
