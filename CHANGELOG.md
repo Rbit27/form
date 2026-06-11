@@ -6,6 +6,14 @@
 
 ---
 
+## [3.65.1] — 2026-06-11
+
+### Changed
+- `docs/COST_MODEL.md` — v1.2 → v1.3; §34 Enterprise Renewal Risk Register, Churn Decision Economics & Intervention Model. Three-band CHS-to-risk-band translation (Green/Amber/Red) with trigger conditions from OBSERVABILITY §33 alert rules; financial impact of churn by tier (Starter MRR replacement 3–5 mo, Enterprise 15–28 mo); Year 2 churn NPV loss model ($15.9k–$178.8k including CAC destruction and Y3 ACV foregone); EV model for CSM intervention decisions (15h/$585 unit cost; positive EV across all risk bands for Growth+; borderline only for Starter-minimum non-responsive admin); retention discount NPV model with hard price floor from §31.5 and approval authority chain from §32.2; contract vintage gross churn benchmarks (Y1 < 30%, Y2 < 15%, Y3+ < 8%); NRR sensitivity table showing Y1 churn > 25% breaks 115% NRR target; three new DEC-030 HMAC-chained audit events (`enterprise.renewal_risk_flagged` STANDARD/3yr, `enterprise.churn_confirmed` HIGH/7yr, `enterprise.retention_discount_granted` HIGH/7yr) with tenant-only privacy invariants; 9-item implementation checklist (5× P0/M10, 4× P1/M12, 2× P2); 3 open questions (OQ-CHURN-01 CHS cutoff calibration, OQ-CHURN-02 multi-year price-lock as retention play, OQ-CHURN-03 mid-contract termination risk DEC-030 event). TOC updated. enterprise-architect + customer-success + compliance-officer.
+- `VERSION` — 3.65.0 → 3.65.1
+
+---
+
 ## [3.65.0] — 2026-06-11
 
 ### Added

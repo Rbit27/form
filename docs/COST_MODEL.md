@@ -190,6 +190,17 @@
     - 33.9 DEC-030 HMAC-Chained Audit Events
     - 33.10 Implementation Checklist
     - 33.11 Open Questions Resolved
+34. [Enterprise Renewal Risk Register, Churn Decision Economics & Intervention Model](#34-enterprise-renewal-risk-register-churn-decision-economics--intervention-model)
+    - 34.1 Purpose & Scope
+    - 34.2 Churn Risk Classification Framework
+    - 34.3 Financial Impact of Churn by Tier
+    - 34.4 Intervention Economics: Expected Value of CSM Time
+    - 34.5 Retention Discount Authorization Model
+    - 34.6 Contract Vintage Churn Analysis
+    - 34.7 Post-Churn Recovery Timeline
+    - 34.8 DEC-030 HMAC-Chained Audit Events
+    - 34.9 Implementation Checklist
+    - 34.10 Open Questions
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -6864,6 +6875,408 @@ INSERT INTO audit_log (
 | OQ | Resolution |
 |---|---|
 | **OQ-COACH-02** (DATA_MODEL.md §21.15) | 🟢 **Resolved — DEC-041 (2026-06-11)**. Flat per-seat billing adopted. `tenant_monthly_coaching_cost` retained for FORM-internal use only. `tenant_config.coaching_seat_allowance_tokens` NULL at launch. Token budgets in §33.3 are internal governance targets, not contractual terms. Consumption billing deferred per conditions in §33.5. |
+
+---
+
+## 34. Enterprise Renewal Risk Register, Churn Decision Economics & Intervention Model
+
+### 34.1 Purpose & Scope
+
+> Owner: customer-success + founder + finance. Audience: CS team, AE team, board. Review: monthly (risk register), quarterly (churn economics review). Cross-references: §23 (Enterprise NRR Engine — expansion mechanics and NRR formula), §26 (CS Team Scaling — CSM capacity and cost-per-account), §31 (Pricing Architecture — discount floor constraints), §32 (Pricing Exception Approval — retention discount approval procedure), `docs/OBSERVABILITY.md §33` (tenant engagement health metrics and CHS model), `docs/ENTERPRISE.md` (CS tier definitions and QBR cadence).
+
+Section §23 models NRR as an *output* — the formula that combines expansion, contraction, and churn into a single ARR percentage. Section §26 models the *capacity* side — how many accounts one CSM can carry, and the headcount ramp required as the customer base grows. Neither section answers the financially critical operational questions:
+
+1. **How do we rank accounts by churn probability** before they churn, not after?
+2. **What is the financial cost of losing a specific account**, tier by tier, including CAC replacement cost?
+3. **When is a retention discount NPV-positive** vs. when is it cheaper to let the account churn and reacquire at standard pricing?
+4. **What is the expected value of CSM intervention** on an at-risk account, given intervention cost, success probability, and ACV at risk?
+5. **What does churn by contract vintage** look like, and what target benchmark should FORM hold itself to in Year 1, 2, and 3 of a contract?
+
+This section fills that gap. All figures are [ESTIMATE] until first 10 enterprise renewals are tracked. The churn risk classification in §34.2 uses the Customer Health Score (CHS) model from `docs/OBSERVABILITY.md §33.3` — this section provides the *financial translation* of CHS bands into revenue-at-risk numbers.
+
+**Privacy floor reminder:** All analysis in this section operates at tenant level. No individual user health data, workout records, or personally identifiable coaching content is used in churn risk scoring. The engagement signals feeding the risk classifier come exclusively from `tenant_engagement_snapshots` (OBSERVABILITY §33.7), which enforces k-anonymity (n ≥ 10) and column-level RLS preventing PII access.
+
+---
+
+### 34.2 Churn Risk Classification Framework
+
+FORM uses a three-band risk classification tied to the Customer Health Score (CHS) from OBSERVABILITY §33.3. CHS is a weighted composite of seat utilization (40%), coaching engagement (30%), onboarding/retention (20%), and feature adoption (10%), scored 0–100.
+
+| Risk band | CHS score | Label | Renewal likelihood | CSM action required |
+|---|---|---|---|---|
+| 🟢 **Green** | 70–100 | Healthy | > 90% | Routine QBR; explore expansion |
+| 🟡 **Amber** | 40–69 | At-risk | 55–75% | Proactive outreach; root-cause analysis; consider concession |
+| 🔴 **Red** | 0–39 | Critical | < 40% | Executive escalation; retention play decision within 30 days |
+
+**Risk band thresholds are reviewed quarterly.** Before first 5 renewal events, all thresholds are provisional. After 5 renewals, calibrate CHS cutoffs against actual churn outcomes (see OQ-CHURN-01).
+
+#### 34.2.1 Trigger conditions for risk downgrade
+
+An account is automatically downgraded from Green → Amber, or Amber → Red, when any of the following conditions are detected by OBSERVABILITY §33 alert rules:
+
+| Trigger | Source alert | Downgrade |
+|---|---|---|
+| Seat utilization < 40% for 14 consecutive days | AL-ENGAGE-01 | Green → Amber |
+| Seat utilization < 25% for 7 consecutive days | AL-ENGAGE-02 | Amber → Red (or direct Green → Red if sudden drop) |
+| Zero coaching sessions with ≥ 5 active seats for 7 days | AL-ENGAGE-03 | → Red (immediate) |
+| CHS score newly enters critical band (< 40) | AL-ENGAGE-05 | → Red |
+| CHS "freefall" (< 30 for 3 consecutive weeks) | AL-ENGAGE-06 | Red — CS VP escalation required |
+| Admin dashboard login: zero in last 30 days | (§33 derived) | Green → Amber |
+| Renewal is < 90 days away AND account is Amber | CSM dashboard query | Amber → Red (time-sensitivity override) |
+
+#### 34.2.2 Upgrade conditions
+
+An account is upgraded from Red → Amber or Amber → Green when:
+- CHS score exceeds the upper band threshold for 3 consecutive weekly snapshots.
+- Seat utilization recovers above 50% for 2 consecutive weeks.
+- Coaching sessions resume at ≥ 2 sessions per active seat per month.
+
+Upgrades require CSM confirmation — the system flags the upgrade, but the CSM documents the recovery root cause before the CHS band is changed in the risk register.
+
+---
+
+### 34.3 Financial Impact of Churn by Tier
+
+The cost of losing an enterprise account has three components: (1) immediate MRR loss, (2) sunk cost of the account acquisition (CAC, from §8.5), and (3) replacement cost — time to find and close a replacement deal.
+
+#### 34.3.1 Immediate MRR and ACV loss by representative deal
+
+| Tier | Representative deal | Monthly MRR lost | Annual ACV lost | MRR replacement time [ESTIMATE] |
+|---|---|---|---|---|
+| Starter · minimum | 50 seats × $12 | $600 | $7,200 | 3–5 months |
+| Starter · typical | 100 seats × $12 | $1,200 | $14,400 | 3–4 months |
+| Growth · typical | 300 seats × $9 | $2,700 | $32,400 | 4–7 months |
+| Growth · large | 800 seats × $9 | $7,200 | $86,400 | 9–14 months |
+| Enterprise · typical | 2,000 seats × $7 | $14,000 | $168,000 | 12–24 months |
+
+**MRR replacement time definition:** Months from churn date until net new MRR from alternative accounts equals the lost MRR. Assumes 3:1 ACV pipeline coverage and 25% win rate (§19 GTM model). Enterprise-tier replacement time is the longest because single large deals are required; the pipeline rarely has multiple $168k-ACV opportunities in parallel.
+
+#### 34.3.2 Total economic loss of a Year 2 churn (CAC destruction + foregone Y3 ARR)
+
+When an account churns, the original CAC becomes a sunk loss. For Year 2 churns, the expansion ARR projected in §23 is permanently removed from the NRR numerator.
+
+| Tier | Representative deal | Original CAC (§8.5) | Y3 ACV foregone | Total NPV loss on Y2 churn |
+|---|---|---|---|---|
+| Starter · typical | 100 seats | $1,500 | $14,400 | **~$15,900** |
+| Growth · typical | 300 seats | $4,200 | $32,400 | **~$36,600** |
+| Enterprise · typical | 2,000 seats | $10,750 | $168,000 | **~$178,750** |
+
+**Key insight:** On a Year 2 churn the economic loss is dominated by the Year 3 ACV foregone, not the CAC. An Enterprise-typical churn at Year 2 destroys ~$179k in NPV — equivalent to finding and closing 16–17 additional Growth-tier accounts from scratch. This asymmetry is why retention investment has dramatically higher ROI than new acquisition at the 2-year mark.
+
+---
+
+### 34.4 Intervention Economics: Expected Value of CSM Time
+
+Not all interventions succeed, and not all at-risk accounts are worth saving at any cost. This section models the expected value (EV) of a CSM intervention to determine whether the intervention cost is justified before committing CSM capacity.
+
+**EV formula:**
+
+```
+EV(intervention) = [P(save | intervention) − P(save | no action)] × ACV_annual
+                 − Intervention_cost
+
+Grant intervention if EV(intervention) > 0
+```
+
+#### 34.4.1 Intervention success rate estimates by risk band
+
+| Risk band | P(save | no action) | P(save | CSM intervention) | Intervention lift |
+|---|---|---|---|---|
+| Amber | 65% | 82% | +17 pp |
+| Red — early (CHS 25–39) | 35% | 60% | +25 pp |
+| Red — freefall (CHS < 25) | 15% | 35% | +20 pp |
+| Red — admin non-responsive (zero logins 30d) | 5% | 18% | +13 pp |
+
+All figures are **[ESTIMATE]**. Replace with actuals after first 10 at-risk interventions using the tracking procedure in §34.9 checklist item 5.
+
+#### 34.4.2 CSM intervention cost model
+
+One intervention unit (deep engagement, root-cause diagnosis, recovery plan, 6-week follow-up) requires:
+
+| Activity | Hours | CSM cost at $75k/yr ($39/hr) |
+|---|---|---|
+| Account diagnostic review (CHS + engagement signals) | 2h | $78 |
+| Executive sponsor outreach and call | 3h | $117 |
+| Root-cause analysis documentation | 1h | $39 |
+| Recovery plan delivery (call + written) | 3h | $117 |
+| Weekly check-ins × 6 weeks | 6h | $234 |
+| **Total intervention unit** | **15h** | **$585** |
+
+Plus any retention discount concession cost (see §34.5).
+
+#### 34.4.3 EV decision table (no concession)
+
+| Risk band | Tier | ACV | EV (intervention, no discount) | Verdict |
+|---|---|---|---|---|
+| Amber | Starter · minimum | $7,200 | 0.17 × $7,200 − $585 = **+$639** | ✅ Intervene |
+| Amber | Growth · typical | $32,400 | 0.17 × $32,400 − $585 = **+$4,923** | ✅ Intervene |
+| Red — early | Starter · minimum | $7,200 | 0.25 × $7,200 − $585 = **+$1,215** | ✅ Intervene |
+| Red — early | Growth · typical | $32,400 | 0.25 × $32,400 − $585 = **+$7,515** | ✅ Intervene |
+| Red — freefall | Starter · minimum | $7,200 | 0.20 × $7,200 − $585 = **+$855** | ✅ Intervene |
+| Red — freefall | Growth · typical | $32,400 | 0.20 × $32,400 − $585 = **+$5,895** | ✅ Intervene |
+| Red — non-responsive | Starter · minimum | $7,200 | 0.13 × $7,200 − $585 = **+$351** | ⚠️ One unit only; second unit is NPV-negative |
+| Red — non-responsive | Growth · typical | $32,400 | 0.13 × $32,400 − $585 = **+$3,627** | ✅ Intervene |
+
+**Key finding:** At these probability estimates, every at-risk account warrants at least one CSM intervention unit. The only borderline case is a Starter-minimum account with an unresponsive admin ($351 EV) — intervene once but do not allocate a second unit unless the admin responds.
+
+---
+
+### 34.5 Retention Discount Authorization Model
+
+A retention discount is a price reduction offered at renewal to retain an account that would otherwise churn. It is a subset of §32 (Pricing Exception Approval) — the same approval chain applies, and the same price floor constraint (§31.5) is a hard limit.
+
+**NPV-positive condition for granting a retention discount:**
+
+```
+NPV(grant discount) = P_save_with_discount × (ACV × (1 − disc_pct) × remaining_years)
+NPV(no discount)    = P_save_no_discount   × (ACV × remaining_years)
+
+Grant discount if: NPV(grant) − NPV(no discount) > 0
+Simplified:        [P_save_disc − P_save_base] × ACV × years  >  ACV × disc_pct × P_save_disc × years
+```
+
+#### 34.5.1 Retention discount NPV table (Year 1 renewal, 1-year renewal term)
+
+Assumes Red-early risk band: P_save baseline 35%, P_save with discount 65% [ESTIMATE]. Discount increments are illustrative.
+
+| Tier | ACV | Discount | Revenue conceded (Year 1) | EV of discount | Verdict |
+|---|---|---|---|---|---|
+| Starter · typical | $14,400 | 10% | $1,440 | 0.30 × $14,400 − $1,440 = **+$2,880** | ✅ Approve |
+| Starter · typical | $14,400 | 25% | $3,600 | 0.30 × $14,400 − $3,600 = **+$720** | ✅ Approve (barely) |
+| Starter · typical | $14,400 | 40% | $5,760 | 0.30 × $14,400 − $5,760 = **−$1,440** | ❌ Decline |
+| Growth · typical | $32,400 | 10% | $3,240 | 0.30 × $32,400 − $3,240 = **+$6,480** | ✅ Approve |
+| Growth · typical | $32,400 | 25% | $8,100 | 0.30 × $32,400 − $8,100 = **+$1,620** | ✅ Approve |
+| Growth · typical | $32,400 | 40% | $12,960 | 0.30 × $32,400 − $12,960 = **−$3,240** | ❌ Decline |
+
+**Hard constraint:** No retention discount may take the effective rate below the price floor from §31.5 (Starter: $6.00/seat/mo, Growth: $4.50/seat/mo, Enterprise: $4.00/seat/mo). This applies even when the NPV calculation suggests a deeper discount would be positive.
+
+**Approval authority (identical to §32.2):**
+- Up to –15%: CS lead approval (no §32 exception procedure required; standard multi-year rate)
+- –16% to –32.5%: Founder approval required (§32 procedure applies)
+- –32.5% to price floor: Founder + investor lead
+- Below price floor: **Not permitted at any approval level**
+
+**Non-pricing concessions (no approval required):** When a retention discount is NPV-negative or borderline, offer non-pricing concessions instead: extended onboarding support (4 extra weeks), priority scheduling for a feature request review, QBR cadence upgrade (Starter → Growth frequency with no pricing change), or access to beta features. These generate real customer value without triggering the §32 exception chain.
+
+---
+
+### 34.6 Contract Vintage Churn Analysis
+
+Churn probability is not uniform across contract years. Industry benchmarks for B2B SaaS wellness products indicate a J-curve pattern: highest churn risk in Year 1 (low activation, program not yet embedded in culture), declining in Year 2 (survivors proved value), stabilizing in Year 3+ (program embedded in benefits infrastructure).
+
+#### 34.6.1 Target annual gross churn benchmarks by vintage
+
+| Contract year | Description | Target gross churn | Rationale |
+|---|---|---|---|
+| **Year 1** | Pilot converts, first year | < 30% [ESTIMATE] | High risk: activation phase; champion may change; program not embedded |
+| **Year 2** | Proven survivors | < 15% [ESTIMATE] | Lower risk: customers who renewed once proved value; champion locked in |
+| **Year 3+** | Embedded accounts | < 8% [ESTIMATE] | Lowest: program in employee benefits handbook; switching cost high |
+| **Blended (steady state)** | ~50% Y1, 30% Y2, 20% Y3+ | < 18% gross churn | Aligns with §23 NRR model — >115% NRR requires gross churn < ~18% at modest expansion |
+
+Replace with FORM actuals at first 5 renewals. If Year 1 gross churn exceeds 30%, escalate to product-strategist — this signals an activation or product-market fit problem, not a CS capacity problem.
+
+#### 34.6.2 NRR sensitivity to Year 1 churn rate
+
+High Year 1 churn destroys the expansion cohort permanently. The following table shows NRR impact on a Growth cohort of 10 accounts × $32,400 ACV:
+
+| Y1 gross churn | Accounts retained | Y2 expansion ARR (15% expansion on survivors, §23.5) | Blended NRR |
+|---|---|---|---|
+| 15% | 8.5 accounts | $41,310 | **118%** |
+| 25% | 7.5 accounts | $36,450 | **111%** |
+| 35% | 6.5 accounts | $31,590 | **104%** |
+| 45% | 5.5 accounts | $26,730 | **97%** (net contraction) |
+
+**Implication:** FORM's 115% NRR target requires Y1 gross churn ≤ 25% for the Growth cohort. This makes Year 1 CSM investment — onboarding quality, Day 30 engagement review, early risk detection — the highest-leverage CS activity in the entire model, higher than expansion plays or QBR frequency.
+
+---
+
+### 34.7 Post-Churn Recovery Timeline
+
+When an enterprise account churns, the net MRR deficit must be absorbed by new business pipeline. Recovery time is the number of months until net new ARR from replacement deals equals the churned ARR.
+
+Assumptions: sales cycle 5–7 months (enterprise), 25% win rate (§19), pipeline maintains 3:1 ACV coverage.
+
+| Churned account | ACV lost | Monthly MRR lost | Replacement deals needed | Minimum recovery time |
+|---|---|---|---|---|
+| Starter · minimum (50 seats) | $7,200 | $600 | 0.5 new Starter | **3–4 months** (pipeline already open) |
+| Growth · typical (300 seats) | $32,400 | $2,700 | ~1 new Growth | **5–8 months** |
+| Growth · large (1,000 seats) | $108,000 | $9,000 | 3–4 new Growth | **10–18 months** |
+| Enterprise · typical (2,000 seats) | $168,000 | $14,000 | 5 Growth or 1 Enterprise | **15–28 months** |
+
+**Key takeaway:** A single Enterprise-tier churn requires 15–28 months to replace through new business alone. At FORM's pre-PMF sales velocity (1–3 new enterprise deals per quarter), this could materially set back the ARR growth trajectory for 2+ years — reinforcing why every dollar spent on retention has dramatically higher ROI than equivalent spend on new acquisition for the Enterprise tier.
+
+**Mid-contract termination:** MSA termination-for-cause clauses can trigger mid-contract exits. These are more severe than non-renewals: (a) ARR is removed immediately rather than at the scheduled renewal date; (b) deferred revenue not yet earned must be reversed under ASC 606 (§18.1). CSM trigger threshold for mid-contract termination risk: CHS score < 20 sustained for 4 consecutive weeks with > 6 months remaining on the contract. This triggers CS VP + founder escalation regardless of renewal date proximity.
+
+---
+
+### 34.8 DEC-030 HMAC-Chained Audit Events
+
+Three new audit event types are registered under DEC-030. These events create an immutable record of risk classification changes and retention decisions, supporting SOC 2 CC5.2 (business risk assessment) and CC7.2 (monitoring of controls) and providing the evidence trail for pricing exception compliance (§32.6).
+
+**Event 1: `enterprise.renewal_risk_flagged`** — STANDARD severity, 3-year retention.
+
+Emitted when a tenant's CHS band changes to Amber or Red, or when the time-sensitivity override fires (renewal < 90 days away on an Amber account).
+
+```sql
+INSERT INTO audit_log (
+  event_type,
+  severity,
+  tenant_id,
+  payload,
+  sequence_number,
+  prev_hash,
+  hash
+) VALUES (
+  'enterprise.renewal_risk_flagged',
+  'STANDARD',
+  $tenant_id,
+  jsonb_build_object(
+    'risk_band',           $risk_band,           -- 'amber' | 'red'
+    'chs_score',           $chs_score,           -- current CHS composite (0–100)
+    'prior_risk_band',     $prior_band,          -- 'green' | 'amber'
+    'trigger_rule',        $trigger_rule,        -- 'AL-ENGAGE-02' | 'AL-ENGAGE-05' | 'renewal_proximity' | ...
+    'days_to_renewal',     $days_to_renewal,     -- integer; NULL if > 180 days or no active contract
+    'alerted_to',          $recipients           -- e.g. ['csm-assigned', 'cs-lead']
+    -- INVARIANT: no user_id, no individual engagement data, no health metrics.
+    -- CHS is a tenant-aggregate composite; k-anonymity enforced in tenant_engagement_snapshots.
+  ),
+  nextval('audit_log_sequence'),
+  $prev_hash,
+  encode(hmac(
+    concat($sequence_number, $prev_hash, $event_type, $tenant_id::text, $payload::text),
+    current_setting('app.hmac_secret'),
+    'sha256'
+  ), 'hex')
+);
+```
+
+---
+
+**Event 2: `enterprise.churn_confirmed`** — HIGH severity, 7-year retention (contract lifecycle evidence).
+
+Emitted when a tenant formally notifies non-renewal, or when a contract is terminated early.
+
+```sql
+INSERT INTO audit_log (
+  event_type,
+  severity,
+  tenant_id,
+  payload,
+  sequence_number,
+  prev_hash,
+  hash
+) VALUES (
+  'enterprise.churn_confirmed',
+  'HIGH',
+  $tenant_id,
+  jsonb_build_object(
+    'churn_type',              $churn_type,           -- 'non_renewal' | 'mid_contract_termination'
+    'churn_effective_date',    $effective_date,       -- ISO 8601
+    'contract_id',             $contract_id,          -- FK to tenant_contracts.id
+    'acv_usd',                 $acv_usd,              -- integer USD (no cent precision)
+    'final_risk_band',         $final_risk_band,      -- 'green' | 'amber' | 'red'
+    'intervention_count',      $intervention_count,   -- number of CSM intervention units logged
+    'churn_reason_category',   $reason_cat            -- 'low_utilization' | 'budget_cut'
+                                                      --   | 'champion_left' | 'product_gap'
+                                                      --   | 'competitor' | 'unknown'
+    -- reason_category is CSM-classified at renewal close.
+    -- Verbatim exit interview notes → CRM only; not stored in DEC-030 chain.
+  ),
+  nextval('audit_log_sequence'),
+  $prev_hash,
+  encode(hmac(
+    concat($sequence_number, $prev_hash, $event_type, $tenant_id::text, $payload::text),
+    current_setting('app.hmac_secret'),
+    'sha256'
+  ), 'hex')
+);
+```
+
+---
+
+**Event 3: `enterprise.retention_discount_granted`** — HIGH severity, 7-year retention.
+
+Emitted when a retention discount is approved and included in the renewal quote. Links to the §32 pricing exception chain via `pricing_exception_event_id` for discounts > 15%.
+
+```sql
+INSERT INTO audit_log (
+  event_type,
+  severity,
+  tenant_id,
+  payload,
+  sequence_number,
+  prev_hash,
+  hash
+) VALUES (
+  'enterprise.retention_discount_granted',
+  'HIGH',
+  $tenant_id,
+  jsonb_build_object(
+    'prior_acv_usd',              $prior_acv,             -- contract value before discount
+    'new_acv_usd',                $new_acv,               -- contract value after discount
+    'discount_pct',               $discount_pct,          -- e.g. 15.0
+    'effective_rate_per_seat',    $effective_rate,        -- must be ≥ price floor for tier (§31.5)
+    'floor_respected',            true,                   -- INVARIANT: always true; floor enforced upstream
+    'risk_band_at_grant',         $risk_band,             -- 'amber' | 'red'
+    'approver_role',              $approver_role,         -- 'cs_lead' | 'founder' | 'founder_investor'
+    'pricing_exception_event_id', $pricing_exc_event_id  -- FK to enterprise.pricing_exception_approved
+                                                         --   (§31.8); required if discount_pct > 15
+  ),
+  nextval('audit_log_sequence'),
+  $prev_hash,
+  encode(hmac(
+    concat($sequence_number, $prev_hash, $event_type, $tenant_id::text, $payload::text),
+    current_setting('app.hmac_secret'),
+    'sha256'
+  ), 'hex')
+);
+```
+
+> **Invariant:** `floor_respected` is always `true` in this event. If a retention discount would violate the price floor, the discount is not granted and this event is never emitted. The attempted violation is recorded as `enterprise.price_floor_override_requested` (CRITICAL, §31.8), which fires even for denied attempts.
+
+---
+
+### 34.9 Implementation Checklist
+
+#### P0 — Must complete before first enterprise renewal date (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `enterprise.renewal_risk_flagged`, `enterprise.churn_confirmed`, and `enterprise.retention_discount_granted` in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schemas matching the payload shapes in §34.8. Deploy updated event registry to `emit-audit-event` Worker. | enterprise-architect | **P0** | M10 | [ ] |
+| 2 | Implement CSM renewal risk dashboard: query `tenant_engagement_snapshots` (OBSERVABILITY §33.7) and surface all tenants by CHS band, days to renewal, and assigned CSM. Filter: `renewal_date BETWEEN now() AND now() + INTERVAL '180 days'`. Privacy constraint: aggregate metrics only; no individual user data. | data-engineer + customer-success | **P0** | M10 | [ ] |
+| 3 | Wire OBSERVABILITY §33 alert routing to emit `enterprise.renewal_risk_flagged` whenever AL-ENGAGE-02, AL-ENGAGE-05, or AL-ENGAGE-06 fires, and on `renewal_proximity` trigger (renewal < 90 days + Amber band). Call `emit-audit-event` with DEC-030 payload from §34.8. | devops-lead + customer-success | **P0** | M10 | [ ] |
+| 4 | Add churn reason classification to the internal CRM / account record: six categories from §34.8 (`low_utilization`, `budget_cut`, `champion_left`, `product_gap`, `competitor`, `unknown`). CSM must classify before `enterprise.churn_confirmed` event is emitted. | customer-success | **P0** | M10 | [ ] |
+| 5 | Create intervention tracking log (Notion or Linear template) for each at-risk account. Fields: `tenant_id`, `risk_band`, `intervention_date`, `intervention_type`, `outcome` (saved / churned / pending), `csm_hours_spent`, `concession_granted` (Y/N), `concession_type`. Use to calibrate §34.4.1 probability estimates after 10 outcomes. | customer-success | **P0** | M10 | [ ] |
+
+#### P1 — Before first Series A board reporting package (M12)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Add churn vintage tracking to ARR bridge (§18.3): separate "Churned ARR — Year 1 cohort" from "Churned ARR — Year 2+ cohort" in the monthly MRR bridge template. Report churn by vintage at every board meeting. | finance + data-engineer | **P1** | M12 | [ ] |
+| 7 | Calibrate §34.4.1 intervention probability estimates using first 10 at-risk outcomes. Update EV table in §34.4.3 with actuals. If deviation from estimates exceeds 15 pp, escalate to product-strategist for CS playbook review. | customer-success + data-engineer | **P1** | M12 | [ ] |
+| 8 | Add `churn_reason_category` distribution to quarterly CS review report. If `product_gap` appears in > 30% of churns, escalate to product-manager for roadmap impact assessment. If `low_utilization` appears in > 40%, escalate to product-manager for onboarding flow review. | customer-success + compliance-officer | **P1** | M12 | [ ] |
+| 9 | Add `enterprise.retention_discount_granted` cross-reference requirement to `docs/DECISION_LOG.md`: any retention discount > 15% must include a DECISION_LOG entry (DEC-XXX) linking to the `pricing_exception_event_id` from the DEC-030 chain. | compliance-officer | **P1** | M12 | [ ] |
+
+#### P2 — Post-Series A
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | Build automated intervention EV calculator for CSMs: input `tenant_id` + proposed discount → output EV from §34.5.1 using live CHS score and days-to-renewal. Ensures consistent application of the EV model across CSMs. | data-engineer + customer-success | **P2** | M16 | [ ] |
+| 11 | Resolve OQ-CHURN-01 (§34.10): calibrate CHS band cutoffs against actual renewal outcomes from first 10 renewals. If Green band has > 15% churn, lower the threshold; if Red band has > 60% save rate without intervention, raise it. | data-engineer + customer-success | **P2** | M14 | [ ] |
+
+---
+
+### 34.10 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-CHURN-01** | **Are the CHS band cutoffs (70 = Amber, 40 = Red) optimal for renewal prediction?** Current thresholds are borrowed from OBSERVABILITY §33.3 (designed for operational monitoring, not renewal prediction). A cutoff that maximizes recall (catching at-risk accounts early) may differ from one maximizing precision (minimizing false alarms that consume CSM time). Recommendation: run a simple logistic regression on `{chs_score_at_90d_pre_renewal, renewed: bool}` after first 10 renewals to find the empirically optimal cutoff for FORM's specific customer base. | P2 | data-engineer + customer-success | After first 10 renewal outcomes (est. M14) |
+| **OQ-CHURN-02** | **Should the primary retention play be a multi-year price-lock rather than a percentage discount?** Offering a 2-year or 3-year renewal at *current pricing* (no discount, but price-locked against future increases per §31.7) gives FORM forward ARR visibility and gives the customer protection against price inflation — both without triggering the §32 exception chain. Risk: locking in a struggling account at current pricing if engagement does not recover. Recommendation: test multi-year price-lock as a retention play on the first 3 Amber accounts; compare renewal quality (2yr vs. 1yr + discount) over a 6-month window. | P1 | customer-success + founder | After first 3 at-risk renewals (est. M10–M12) |
+| **OQ-CHURN-03** | **Should mid-contract termination risk have a separate DEC-030 event?** Current framework emits `enterprise.renewal_risk_flagged` even for mid-contract risk signals. However, mid-contract termination (§34.7) carries a different financial signature — immediate ARR loss + deferred revenue reversal under ASC 606 — that warrants distinct tracking. Recommendation: add `enterprise.mid_contract_termination_risk_flagged` (HIGH, 7yr) as a separate event type when CHS < 20 sustained 4+ weeks with > 6 months remaining. Register before first Enterprise-tier account reaches Month 6. | P2 | enterprise-architect + customer-success | Before first Enterprise-tier account Month 6 (est. M11) |
+
+---
+
+*v1.3 (2026-06-11): §34 Enterprise Renewal Risk Register, Churn Decision Economics & Intervention Model. Three-band CHS-to-risk-band translation (Green/Amber/Red) with financial impact per tier; EV model for CSM intervention decisions (15h/$585 unit cost; positive EV for all bands except borderline Starter-minimum non-responsive); retention discount NPV model with hard price floor constraint from §31.5; contract vintage churn benchmarks (Y1 < 30%, Y2 < 15%, Y3+ < 8%) with NRR sensitivity table; post-churn recovery timeline (Starter 3–4 mo, Enterprise 15–28 mo); three new DEC-030 events (`enterprise.renewal_risk_flagged` STANDARD/3yr, `enterprise.churn_confirmed` HIGH/7yr, `enterprise.retention_discount_granted` HIGH/7yr) with privacy invariants (tenant-aggregate only, no user_id, no health data); 9-item implementation checklist (5× P0/M10, 4× P1/M12, 2× P2); 3 open questions (OQ-CHURN-01/02/03). Cross-references: §8.5 (enterprise CAC), §18.1 (ASC 606 deferred revenue reversal on mid-contract termination), §23 (NRR engine — NRR sensitivity table in §34.6.2), §26 (CS team scaling — CSM capacity and hourly cost), §31.5 (price floors — retention discount hard constraint), §31.8 (DEC-030 `enterprise.price_floor_override_requested` — fires on denied floor violations), §32 (pricing exception approval — retention discount > 15% approval chain), `docs/OBSERVABILITY.md §33` (tenant engagement health — CHS model, k-anonymity, AL-ENGAGE-* alert rules, `tenant_engagement_snapshots`), `docs/ENTERPRISE.md` (CS tier definitions, QBR cadence), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 event registry — three new event types to register), `docs/DECISION_LOG.md` (retention discount > 15% requires DEC-XXX entry per §34.9 item 9). Owner: customer-success + founder + finance + compliance-officer.*
 
 ---
 
