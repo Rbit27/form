@@ -6,6 +6,19 @@
 
 ---
 
+## [3.67.0] — 2026-06-11
+
+### Added
+- `content/post-504-first-year-training-realistic-guide.md` — «Перший рік у залі: що реально відбувається і чому твої очікування хибні»; 13-хв читання; Sale (1988) ESSR нейром'язова ефективність, Schoenfeld (2010) JSCR механізми гіпертрофії, Lauersen et al. (2014) BJSM профілактика травм, Kjaer (2004) Physiol Rev адаптація сухожиль, Haff & Triplett (2016) тренувальний вік; editorial-brutalist; clinical-safety NOT REQUIRED. sports-scientist review pending.
+- `blog.html` — картка post-504 (429 карток, 504 пости загалом).
+- `README.md` — posts 501–504 позначені ✓ виконано; roadmap post-505–508 додано.
+
+### Changed
+- `STATUS.md` — 503 → 504 пости; blog.html 428 → 429 карток; content engine table рядок post-504; Version 3.66.0 → 3.67.0.
+- `VERSION` — 3.66.0 → 3.67.0
+
+---
+
 ## [3.66.0] — 2026-06-11
 
 ### Added
