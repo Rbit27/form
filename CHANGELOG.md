@@ -6,6 +6,19 @@
 
 ---
 
+## [3.52.0] — 2026-06-11
+
+### Added
+- `content/post-475-individual-training-response.md` — Ти не є середнє значення: чому групові дослідження не дають персональної відповіді; Bouchard et al. (1999) JAP HERITAGE Family Study (−0.2..+1.5 L/min VO₂max variance), Churchward-Venne et al. (2015) AJP (20–40% CoV MPS), Yang et al. (2003) AJHG ACTN3 R577X, Montgomery et al. (1998) Nature ACE I/D, Krieger (2010) JSCR set-volume meta; n=1 методологія, ізоляція змінних, вимірювана відповідь; наука як навігатор. clinical-safety NOT REQUIRED. 12 хв читання.
+- `blog.html` — нова картка (post-475); лічильник 387 → 388 статей; 4 415 → 4 427 хв читання; 319 → 320 постів.
+
+### Changed
+- `STATUS.md` — 472 → 473 пости; blog.html рядок 405 → 406 карток; версія → v3.52.0; post-475 додано до таблиці контенту
+- `README.md` — post-475 позначено [x]; roadmap post-476–480 додано
+- `VERSION` — 3.51.0 → 3.52.0
+
+---
+
 ## [3.51.0] — 2026-06-11
 
 ### Added
