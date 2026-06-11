@@ -6,6 +6,18 @@
 
 ---
 
+## [3.45.2] — 2026-06-11
+
+### Added
+- [`content/post-449-psychology-of-stopping-set.md`](content/post-449-psychology-of-stopping-set.md) — Психологія зупинки підходу: Marcora, Staiano & Manning (2009) психобіологічна модель perceived effort — велосипедний-до-виснаження → 5-секундний спринт 731 Вт vs 242 Вт середня потужність; Gandevia (2001) Physiological Reviews спінальний/суперспінальний компонент центральної втоми, twitch interpolation методологія; Allen, Lamb, Westerblad (2008) периферійна втома ATP/H⁺/Pi; Noakes (2011) central governor; Zourdos et al. (2016) JSCR — атлети систематично переоцінюють RIR на початку і недооцінюють у кінці підходу; Schoenfeld (2010) proximity to failure і гіпертрофічний стимул; Hatzigeorgiadis, Zourbanos et al. (2011) Perspectives on Psychological Science — self-talk мета-аналіз 32 дослідження, 600+ учасників; інструктивний vs мотиваційний self-talk; три механізми (атенційне фокусування, моторний праймінг, регуляція arousal); матриця погано/добре каліброваного атлета; RIR-калібрування через test sets і velocity tracking. clinical-safety NOT REQUIRED.
+- [`content/post-450-strength-training-immune-system.md`](content/post-450-strength-training-immune-system.md) — Силовий тренінг і імунна система: Nieman (1994) Med Sci Sports Exerc J-curve hypothesis URTI; Peters & Bateman (1983) Comrades 90 km — 33% фінішерів URTI vs 15% нестартерів; Gleeson (2007) J Appl Physiol відкрите вікно 3–72 год — NK-клітини, секреторний IgA, кортизол/адреналін лімфоцит-перерозподіл; Walsh NP et al. (2011) Exercise Immunology Review консенсус — регулярний тренінг імунопротективний, не імуносупресивний; «імунологічне навантаження» як сукупний стрес; Weidner (1994) правило «вище/нижче шиї»; матриця рішень тренуватись/ні при симптомах; практичний поріг для силового атлета (>5 сесій/тиждень + хронічний недосип + дефіцит = ризик); Schoenfeld (2010) ефективні об'єми збігаються з імунопротективною зоною. clinical-safety NOT REQUIRED.
+
+### Changed
+- `README.md` — posts 449, 450 marked [x].
+- `VERSION` — 3.45.1 → 3.45.2.
+
+---
+
 ## [3.45.1] — 2026-06-11
 
 ### Changed
