@@ -6,6 +6,17 @@
 
 ---
 
+## [3.50.1] — 2026-06-11
+
+### Added
+- [`content/post-469-machines-vs-free-weights.md`](content/post-469-machines-vs-free-weights.md) — Тренажери vs вільні ваги: Schwanbeck (2020) JSCR зіставна гіпертрофія; resistance curve і stretch-mediated hypertrophy (Maeo 2021); нейральна адаптація і координаційний компонент вільних ваг; ізоляція і cognitively depleted sessions для тренажерів; практична матриця по фазах програмування; clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — roadmap: post-469 відмічено `[x]`; додано roadmap теми post-470–474
+- `blog.html` — додано картку post-469
+
+---
+
 ## [3.50.0] — 2026-06-11
 
 ### Added

@@ -835,6 +835,14 @@ Each iteration:
 - [ ] post-466: Що робити, коли не хочеться тренуватися — розрізнення втоми ЦНС, перетренованості, сезонного спаду і справжнього сигналу тіла; алгоритм без мотиваційного буллшиту ⚠️ clinical-safety review required before authoring (mental-health adjacent)
 - [x] post-467: Силові стандарти — що вважається «добрим» результатом для нетренованого, початківця, проміжного; чому стандарти залежать від морфології і для чого вони взагалі потрібні; clinical-safety NOT REQUIRED · v3.50.0
 - [ ] post-468: Пери-тренувальне харчування без містики — тайминг білка (Morton 2018), pre/post window vs загальний добовий профіль; що реально важливо і що є маркетингом ⚠️ clinical-safety review required before authoring (food-related)
+- [x] post-469: Тренажери vs вільні ваги — чесний trade-off без фітнес-снобства; Schwanbeck (2020) JSCR зіставна гіпертрофія; resistance curve і stretch-mediated hypertrophy (Maeo 2021); де вільні ваги кращі (нейральна адаптація, прогресія, системний стрес); де тренажери кращі (ізоляція, соло-тренування, cognitively depleted sessions); клінічна безпека NOT REQUIRED · v3.50.1
+
+    ── ROADMAP (наступні теми · post-470+) ───────────────────────────
+- [ ] post-470: Ефект Готорна у тренуванні — чому будь-який новий метод «точно працює» перші 4–6 тижнів; observer effect, self-monitoring bias, regression to the mean; як відокремити реальну адаптацію від новизни; clinical-safety NOT REQUIRED
+- [ ] post-471: Відсоток vs RPE vs VBT — порівняльна таблиця точності і де кожен метод дає систематичну похибку; клінічна безпека NOT REQUIRED
+- [ ] post-472: Тренування при хронічному болю в нижній частині спини (неспецифічний LBP) — що дозволено, що заборонено, що доведено ⚠️ clinical-safety review required (injury-adjacent)
+- [ ] post-473: Ексцентричне перевантаження для сухожиль — докази, протоколи, критерії готовності до важкого тренінгу ⚠️ clinical-safety review required (injury-adjacent)
+- [ ] post-474: Тренування вдома без обладнання — прогресія, яка справді веде до гіпертрофії; де межа bodyweight і коли потрібне додаткове навантаження; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
