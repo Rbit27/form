@@ -6,6 +6,18 @@
 
 ---
 
+## [3.69.0] — 2026-06-11
+
+### Added
+- `content/post-506-adaptation-lag.md` — «Адаптаційне відставання — чому результати тренування приходять із запізненням і як це використовувати»; 13-хв читання; Stone et al. різні часові вікна суперкомпенсації (нервова/м'язова/сполучна), Schoenfeld (2010) JSCR mTORC1-каскад і синтез міофібрилярних білків 24–72 год, Kraemer & Ratamess (2004) MSSE нейральна адаптація передує структурній 4–8 тижнів, Issurin (2010) Sports Med блокова модель, Bompa & Haff (2009) periodization, мінімальні вікна оцінки сила 4–6 тиж/гіпертрофія 8–12 тиж; editorial-brutalist; clinical-safety NOT REQUIRED. sports-scientist review pending.
+- `blog.html` — картка post-506 додана (506 постів загалом).
+
+### Changed
+- `README.md` — post-505 marked [x] (authored v3.68.0); post-506 marked [x]; tree та roadmap оновлені.
+- `VERSION` — 3.68.1 → 3.69.0
+
+---
+
 ## [3.68.1] — 2026-06-11
 
 ### Changed
