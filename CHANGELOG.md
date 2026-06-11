@@ -6,6 +6,14 @@
 
 ---
 
+## [3.46.2] — 2026-06-11
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v1.8.3 patch: §26.11 checklist items 7 і 12 закрито 🟢. Item 7: `API_KEY_HASH_SECRET` підтверджено у `CRYPTOGRAPHY_POLICY.md` §5 (180-day rotation, re-hash при ротації) і `SOC2_READINESS.md` §56.3 — marked Done. Item 12: `DATA_MODEL.md §26` "API Key Authentication Schema" підтверджено — cross-reference з SSO_SCIM §26 як canonical reference — marked Done. enterprise-architect + security-engineer.
+- `VERSION` — 3.46.1 → 3.46.2.
+
+---
+
 ## [3.46.1] — 2026-06-11
 
 ### Added
