@@ -15,6 +15,15 @@
 
 ## 2026-06-11
 
+### DEC-041 · Enterprise AI coaching billing: flat per-seat model adopted; token budgets are internal governance targets only (OQ-COACH-02 resolution)
+
+- **Decision:** Flat per-seat billing is adopted for enterprise AI coaching at launch. Token allowances (`tenant_config.coaching_seat_allowance_tokens`) are set to NULL in production — no per-seat token cap is exposed in contractual terms or the admin dashboard. The `tenant_monthly_coaching_cost` view is retained as a FORM-internal cost-monitoring tool only (never surfaced to tenants). Token budgets defined in `docs/COST_MODEL.md §33.3` (Starter/Growth: 50,000 tokens/seat/month; Enterprise: 75,000 tokens/seat/month) are internal governance thresholds for margin management, not contractual commitments. Consumption billing is explicitly deferred; re-evaluation conditions are documented in `docs/COST_MODEL.md §33.5`.
+- **Owner:** enterprise-architect + finance + compliance-officer
+- **Why:** OQ-COACH-02 (`DATA_MODEL.md §21.15`) asked whether per-seat token consumption should be tracked, capped, and/or billed contractually. Contractual per-seat token limits were rejected because: (a) they create a two-sided measurement problem (FORM must prove consumption to customers who cannot independently verify token counts); (b) they shift the enterprise sales conversation to technical minutiae about token burn rates rather than coaching outcomes; (c) the fully-loaded coaching COGS at expected consumption rates produces 92.5% gross margin at Starter tier and 93.3% at Enterprise — no material margin risk justifies the sales and legal complexity; (d) the internal monitoring view (`tenant_monthly_coaching_cost`) provides sufficient early-warning signal for FORM to act on consumption outliers without binding customers to token terms. Flat per-seat billing is also consistent with ASC 606 single-PO ratable revenue recognition (no variable-consideration constraint). DEC-030 events `enterprise.ai_cost_monitor_alert` and `enterprise.ai_cost_outlier_flagged` (with tenant-id-only privacy invariant) provide the operational governance layer.
+- **Reverse cost:** Medium. Introducing consumption billing after launch requires: MSA amendment with active tenants, 90-day notice under §31.7.2 pricing change governance, and `tenant_config.coaching_seat_allowance_tokens` schema migration from NULL to integer. Increases with number of signed enterprise contracts. Decision can be revisited at first enterprise cohort QBR (§33.10 item 11, P2, M12).
+
+---
+
 ### DEC-040 · Feature flag lifecycle: plan downgrade auto-disables Growth+ flags (OQ-FLAG-01); 90-day deprecation sunset policy (OQ-FLAG-02)
 
 - **Decision:** Two decisions for the feature flag lifecycle in `docs/DATA_MODEL.md §19`:

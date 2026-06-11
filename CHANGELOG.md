@@ -6,6 +6,19 @@
 
 ---
 
+## [3.55.0] — 2026-06-11
+
+### Added
+- `content/post-479-strength-endurance-continuum.md` — Міф про «зони повторень»: що насправді каже наука. Mitchell et al. 2012, Schoenfeld et al. 2017, Mangine et al. 2015. clinical-safety: NOT REQUIRED.
+- `content/post-480-post-activation-potentiation.md` — Постактиваційна потенціація: механізм, умови та чому більшість застосувань не працює. Sale 2002, Seitz & Haff 2016, Tillin & Bishop 2009. clinical-safety: NOT REQUIRED.
+- `content/post-481-training-density-rest-intervals.md` — Тривалість відпочинку між підходами: що реально важливо. Schoenfeld et al. 2016, Ahtiainen et al. 2005. clinical-safety: NOT REQUIRED.
+- `docs/DECISION_LOG.md DEC-041` — Enterprise AI coaching billing: flat per-seat model adopted; OQ-COACH-02 resolution. Closes COST_MODEL §33.10 checklist item 7 (P1/M6).
+
+### Changed
+- `VERSION` — 3.54.1 → 3.55.0
+
+---
+
 ## [3.54.1] — 2026-06-11
 
 ### Added
