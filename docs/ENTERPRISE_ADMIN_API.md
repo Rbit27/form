@@ -1038,6 +1038,62 @@ Attempting any of these operations programmatically (e.g., by directly construct
 
 This is non-negotiable at any contract value.
 
+### 14.1 DSAR routing for erased accounts (OQ-ERA-01 resolution)
+
+**Worker routing rule — DSAR export after Art. 17 erasure.**
+
+When a tenant admin submits `POST /v1/admin/users/{user_id}/gdpr/export` for a `user_id` whose Art. 17 erasure has completed (hard delete executed), the DSAR Worker returns **404 Not Found** with the following response body:
+
+```json
+{
+  "error": "user_not_found",
+  "code": "DSAR_404",
+  "message": "No active account found for the provided user identifier. If you believe this is an error, contact FORM support with your DSAR reference number.",
+  "support_reference": "https://form.coach/support"
+}
+```
+
+**Routing logic (dsar-worker.ts):**
+
+```typescript
+// Step 1: look up user_id in users table
+const user = await db.query(
+  `SELECT id, erased_at FROM users WHERE id = $1`,
+  [userId]
+);
+
+if (!user.rows.length) {
+  // user_id hard-deleted (Art. 17 day-30 or earlier)
+  return c.json({ error: "user_not_found", code: "DSAR_404", ... }, 404);
+}
+
+if (user.rows[0].erased_at !== null) {
+  // soft-delete window still active — account scheduled for deletion
+  // still returns 404 to prevent timing-based enumeration
+  return c.json({ error: "user_not_found", code: "DSAR_404", ... }, 404);
+}
+
+// user is active — proceed with DSAR export
+```
+
+**Design rationale:**
+
+| Consideration | Decision | Rationale |
+|---|---|---|
+| Response code | 404, not 410 Gone | 410 would confirm erasure occurred, enabling enumeration of which accounts have been erased. 404 is privacy-neutral. |
+| Response body | Generic "user not found" | Does not confirm whether erasure was requested, completed, or whether the `user_id` ever existed. |
+| Emits DEC-030? | No | A 404 on a non-existent resource does not constitute a processed DSAR request. No `data.export_initiated` event is emitted; no DSAR SLA clock starts. |
+| Tenant admin informed? | No automatic notification | The 404 response is self-explanatory. If the tenant admin believes erasure was accidental, they contact support via the provided URL. |
+| Pre-erasure DSAR | Unaffected | A DSAR export initiated before Art. 17 erasure is a valid point-in-time snapshot. The export job (`job_id`) remains accessible via `GET /v1/admin/gdpr/exports/{job_id}` even after the user's account is later erased. The job record is retained for the GDPR Art. 15 SLA period (30 days from initiation) regardless of subsequent erasure. |
+
+**Soft-delete window behaviour (days 1–30 post-erasure initiation):**
+
+During the 30-day soft-delete window, `users.erased_at IS NOT NULL` but the hard delete has not yet executed. The DSAR Worker returns 404 in this state as well, to prevent a scenario where a DSAR export captures data that is already scheduled for deletion and would produce a misleading "data held" picture. The Art. 9 nullification (CV keypoints, health profiles) has already executed immediately; the soft-delete window covers standard personal data. A DSAR export of partially-nullified data would be incomplete and potentially confusing.
+
+**SOC 2 evidence:** This routing rule is the Worker-layer implementation of P8.0 (disposal and privacy-preserving post-erasure operations). Auditor evidence: `dsar-worker.ts` code review showing the 404 branch on null/erased `user_id`; no `data.export_initiated` DEC-030 event in the audit log for the post-erasure DSAR attempt. Cross-reference: `docs/DATA_MODEL.md §30.8` (OQ-ERA-01 resolution note); `docs/DATA_MODEL.md §12` (Art. 17 erasure phases and timing).
+
+*OQ-ERA-01 status: 🟢 Resolved — Worker routing rule documented above. Owner: platform-engineer + compliance-officer.*
+
 ---
 
 ## 15. SOC 2 Mapping

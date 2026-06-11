@@ -6,6 +6,18 @@
 
 ---
 
+## [3.74.0] — 2026-06-11
+
+### Added
+- `content/post-511-reverse-mesocycle-planning.md` — «Зворотне планування — чому серйозні аматори починають програму з неправильного кінця»: зворотнє (backward) планування мезоциклу від цільової дати; фізіологічне обґрунтування послідовності Фаза 1→4; три кроки — визначення цільового стану, відкладання тейперу/делового назад, заповнення накопичувального блоку; практична таблиця 8-тижневого присідального мезоциклу; адаптація при зміні дати. Refs: Bosquet 2007 (тейпер), Issurin 2008 (block periodization), Mujika 2003 (tapering strategies). sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `docs/ENTERPRISE_ADMIN_API.md §14.1` — «DSAR Routing for Erased Accounts» — Worker routing rule для OQ-ERA-01: HTTP 404 + `DSAR_404` error code для будь-якого `user_id` з `erased_at IS NOT NULL` або hard-deleted; TypeScript routing logic (dsar-worker.ts); design rationale table (404 vs 410 для запобігання enumeration; no DEC-030 emitted; no SLA clock); поведінка під час 30-денного soft-delete window; pre-erasure DSAR job залишається доступним за job ID; SOC 2 P8.0 mapping. Closes **OQ-ERA-01** (DATA_MODEL §30.8) → 🟢 Resolved.
+
+### Changed
+- `docs/DATA_MODEL.md §30.8` — OQ-ERA-01 оновлено: P2 Open → 🟢 Resolved з cross-reference на ENTERPRISE_ADMIN_API §14.1 (2026-06-11).
+- `VERSION` → 3.74.0
+
+---
+
 ## [3.73.1] — 2026-06-11
 
 ### Changed
