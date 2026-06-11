@@ -6,6 +6,14 @@
 
 ---
 
+## [3.65.3] — 2026-06-11
+
+### Changed
+- `docs/DATA_MODEL.md` — §29.10 checklist item 13 marked [x] (OQ-PAM-01 → DEC-042); §29.11 OQ table updated — OQ-PAM-01 and OQ-PAM-02 marked 🟢 RESOLVED with DEC-042/DEC-043 cross-references. Strikethrough applied to resolved question text per append-only convention.
+- `VERSION` — 3.65.2 → 3.65.3
+
+---
+
 ## [3.65.2] — 2026-06-11
 
 ### Changed

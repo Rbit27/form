@@ -1,7 +1,7 @@
 # FORM · Project Status v1.4.0
 
 **Date:** 11 червня 2026
-**Version:** 3.65.2
+**Version:** 3.65.3
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -691,6 +691,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v3.65.2 · 11 червня 2026**
-**Last update:** 11 червня 2026 · v3.65.2
+**v3.65.3 · 11 червня 2026**
+**Last update:** 11 червня 2026 · v3.65.3
 **Next planned update:** після hire of Founding Engineer
