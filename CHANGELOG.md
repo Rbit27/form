@@ -6,6 +6,14 @@
 
 ---
 
+## [3.49.3] — 2026-06-11
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.5.3 → v3.5.4 patch: 7 stale gap-markers closed. CC1: `Code of conduct / acceptable use policy` 🟡 Gap → 🟢 Done (`docs/ACCEPTABLE_USE_POLICY.md` POL-001, CC1-E-004). CC2: `Internal security training` 🔴 Gap → 🟡 Partial (`docs/SECURITY_AWARENESS_TRAINING_POLICY.md` POL-012 + `docs/ONBOARDING_SECURITY.md` CC1-E-002; pending compliance-officer approval). CC2: `Vendor security review process` 🟡 Gap → 🟢 Done (`docs/VENDOR_REGISTRY.md` v1.0, 15 vendors T1–T4). CC3: `Vendor/third-party risk assessment` 🟡 Partial → 🟢 Done (same). CC7: `Vulnerability scanning` 🟡 Gap → 🟢 Done (`docs/VULNERABILITY_MANAGEMENT.md` POL-010, Dependabot + CI gate). CC7: `Patching SLA defined` 🟡 Gap → 🟢 Done (Critical 24h, High 7d, Medium 30d; health-data uplift rule). CC9: `Sub-processor list published` 🔴 Gap → 🟢 Done (`docs/SUBPROCESSORS.md` v1.0 + `/subprocessors.html`; VRM-GAP-001 🔴 HIGH — 5 DPAs pending still blocks CC9.2). CC9: `Annual vendor security review` 🔴 Gap → 🟢 Done (T1 annual / T2 semi-annual cadence, first review Q3 2026). compliance-officer + security-engineer.
+- `VERSION` — 3.49.2 → 3.49.3
+
+---
+
 ## [3.49.2] — 2026-06-11
 
 ### Added

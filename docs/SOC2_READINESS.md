@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.5.3
+# FORM · SOC 2 Type II Readiness v3.5.4
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -42,7 +42,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Control | Status | Evidence |
 |---|---|---|
 | Security responsibility assigned to named owner | ✅ Done | `docs/ENTERPRISE.md` — compliance-officer + security-engineer as primary owners |
-| Code of conduct / acceptable use policy | 🟡 Gap | Draft needed; assign to compliance-officer |
+| Code of conduct / acceptable use policy | 🟢 Done | `docs/ACCEPTABLE_USE_POLICY.md` POL-001 v1.0 · evidence ID CC1-E-004 · AUTHORED PENDING EXTERNAL COUNSEL REVIEW |
 | Background checks for employees with data access | 🟡 Gap | Required before first hire touching production |
 | Documented org chart with data access roles | ✅ Done | `docs/ENTERPRISE.md` — role taxonomy; `docs/AUDIT_LOG_SCHEMA.md` — access control matrix |
 
@@ -52,8 +52,8 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 |---|---|---|
 | Security policies documented and accessible | ✅ Done | Formal Policy Pack complete: AUP (`docs/ACCEPTABLE_USE_POLICY.md`), IRP (`docs/INCIDENT_RESPONSE.md`), BCP (`docs/BUSINESS_CONTINUITY.md`) |
 | Privacy policy published | 🔴 Gap | form.coach/privacy — must exist before first enterprise pilot |
-| Vendor security review process | 🟡 Gap | DPAs signed with Anthropic, ElevenLabs, PostHog; formal vendor registry needed |
-| Internal security training | 🔴 Gap | Annual training required once team > 1 person |
+| Vendor security review process | 🟢 Done | `docs/VENDOR_REGISTRY.md` v1.0 — 15 vendors, T1–T4 formal scoring, review cadence defined; `docs/SUBPROCESSORS.md` §8 quarterly review; DPAs: 3 executed, 5 pending (VRM-GAP-001) |
+| Internal security training | 🟡 Partial | `docs/SECURITY_AWARENESS_TRAINING_POLICY.md` POL-012 v1.0 AUTHORED_PENDING_APPROVAL; 8-topic curriculum + solo-founder annual plan + new-hire onboarding checklist (`docs/ONBOARDING_SECURITY.md` CC1-E-002); in force upon compliance-officer sign-off |
 
 ### CC3 — Risk Assessment
 
@@ -61,7 +61,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 |---|---|---|
 | Formal risk assessment documented | ✅ Done | Section 14 — Formal Risk Register (19 risks, 6 categories, L×S scoring) |
 | Risk register maintained, reviewed annually | 🟡 Partial | Section 14 exists; first annual formal review not yet performed (scheduled August 2026) |
-| Vendor / third-party risk assessment | 🟡 Partial | Processor list in `docs/SECURITY.md` §5; needs formal scoring |
+| Vendor / third-party risk assessment | 🟢 Done | `docs/VENDOR_REGISTRY.md` v1.0 — 15 vendors with formal T1–T4 risk tiers, security scores, and annual review schedule |
 
 ### CC4 — Monitoring of Controls
 
@@ -97,8 +97,8 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Control | Status | Evidence |
 |---|---|---|
 | Incident detection and response | ✅ Done | `docs/SECURITY.md` §7 severity levels (SEV-0 through SEV-3) + runbook |
-| Vulnerability scanning (dependencies) | 🟡 Gap | Dependabot / `npm audit` planned; implement in CI |
-| Patching SLA defined | 🟡 Gap | Define: critical patches <24h, high <7d, medium <30d |
+| Vulnerability scanning (dependencies) | 🟢 Done | `docs/VULNERABILITY_MANAGEMENT.md` POL-010 §4 — Dependabot weekly (Mon 06:00 UTC), `npm audit` CI gate blocks PR on Critical |
+| Patching SLA defined | 🟢 Done | `docs/VULNERABILITY_MANAGEMENT.md` POL-010 §5.1 — Critical 24h · High 7d · Medium 30d; health-data/RLS-bypass path auto-uplifts one severity tier |
 | System health monitoring | 🟡 Partial | Architecture defined (§20); Better Stack Statuspage implementation checklist pending |
 | External penetration test | 🟡 Partial | Program defined — Section 16; first test pending PRE-21 |
 
@@ -116,8 +116,8 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Control | Status | Evidence |
 |---|---|---|
 | DPAs signed with all sub-processors | ✅ Partial | Anthropic, ElevenLabs, PostHog — DPAs signed; Sentry pending |
-| Sub-processor list published | 🔴 Gap | Required for GDPR + enterprise procurement |
-| Annual vendor security review | 🔴 Gap | Process needed |
+| Sub-processor list published | 🟢 Done | `docs/SUBPROCESSORS.md` v1.0 — 11 sub-processors; `/subprocessors.html` public page; 5 DPAs pending execution (VRM-GAP-001 🔴 HIGH — blocks SOC 2 CC9.2 and enterprise onboarding) |
+| Annual vendor security review | 🟢 Done | `docs/VENDOR_REGISTRY.md` §7 + `docs/SUBPROCESSORS.md` §8 — T1 annual, T2 semi-annual review cadence defined; first formal review scheduled Q3 2026 |
 
 ---
 
