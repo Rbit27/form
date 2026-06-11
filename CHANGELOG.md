@@ -6,6 +6,20 @@
 
 ---
 
+## [3.50.0] — 2026-06-11
+
+### Added
+- [`content/post-462-isometric-training-strength.md`](content/post-462-isometric-training-strength.md) — Ізометричне тренування для силового атлета: кутова специфічність (Lum & Barbosa 2019), overcoming vs yielding, тендинопатія (Docking & Cook 2016), протокол інтеграції в силовий блок; clinical-safety NOT REQUIRED
+- [`content/post-463-how-to-read-research.md`](content/post-463-how-to-read-research.md) — Як читати наукову статтю за 10 хвилин: 5-фільтрова схема (study design, sample, effect size vs p-value, COI, external validity), I² heterogeneity, publication bias, trained vs untrained population gap; clinical-safety NOT REQUIRED
+- [`content/post-464-squat-kinematics.md`](content/post-464-squat-kinematics.md) — Кінематика присідання: деконструкція правила «коліна за носки» (Fry 2003), анатомічна варіабельність кульшового суглоба (Nötzli et al.), Escamilla 2001, Myer 2014 functional vs pathological valgus, ATG-прогресія; clinical-safety NOT REQUIRED
+- [`content/post-465-training-in-heat.md`](content/post-465-training-in-heat.md) — Тренування в спеку: терморегуляція, Cheung & McLellan 1998 performance decline, González-Alonso 2012 cardiovascular drift, Périard 2015 heat acclimation (+10–12% plasma volume), HSP70/90, протокол коригування навантаження; clinical-safety NOT REQUIRED
+- [`content/post-467-strength-standards.md`](content/post-467-strength-standards.md) — Силові стандарти: allometric scaling (Jaric 2002), таблиці класифікації squat/bench/deadlift/OHP за рівнями, морфологічна варіабельність, діагностичне використання стандартів; clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — roadmap: posts 462–465, 467 відмічені як `[x]`
+
+---
+
 ## [3.49.3] — 2026-06-11
 
 ### Changed
