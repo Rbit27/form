@@ -6,6 +6,19 @@
 
 ---
 
+## [3.57.0] — 2026-06-11
+
+### Added
+- `content/post-483-training-frequency.md` — Частота тренувань: Schoenfeld et al. (2016) JSCR мета-аналіз 1× vs 2×; Ralston et al. (2017) JSCR частота та сила; Colquhoun et al. (2018) JSCR 3× = 6× при рівному об'ємі; junk volume; рекомендації за рівнем стажу (новачок / проміжний / досвідчений). clinical-safety NOT REQUIRED.
+- `content/post-484-overreaching-overtraining.md` — FOR/NFOR/OTS: Meeusen et al. (2013) ECSS/ACSM консенсус (тристадійна модель); Halson & Jeukendrup (2004) Sports Med (діагноз виключення); Morgan et al. (1987) POMS і критика; Kreher & Schwartz (2012) Sports Health (протокол повернення); практичний моніторинг без лабораторії. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — 2 нові картки (post-483, post-484) → 411 карток (484 пости authored)
+- `README.md` — roadmap: posts 483–484 → [x]
+- `VERSION` — 3.56.1 → 3.57.0
+
+---
+
 ## [3.56.1] — 2026-06-11
 
 ### Changed
