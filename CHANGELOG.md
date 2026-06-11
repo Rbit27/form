@@ -6,6 +6,15 @@
 
 ---
 
+## [3.73.1] — 2026-06-11
+
+### Changed
+- `docs/OBSERVABILITY.md` v3.0 — §2.1 SLO master table: 8 new rows — APIKEY-SLO-01 (false-rejection ≤ 0.1%), APIKEY-SLO-02 (auth P95 < 50 ms), APIKEY-SLO-03 (rotation gap ≤ 26 h / CC6.4 zero-tolerance), APIKEY-SLO-04 (zero keys ≥ 365 d without rotation); RL-SLO-01 (quota middleware KV < 5 ms / DB < 15 ms), RL-SLO-02 (zero false hard-blocks), RL-SLO-03 (80% threshold notification ≤ 5 min), RL-SLO-04 (cron schedule adherence). §12.6 pg_cron registry: 6 new rows — job 10 `invite_expiry_sweep`, job 11 `c1-erasure-sla-monitor`, job 12 `invite_email_expiry_cleanup`, job 13 `api_key_chain_monitor`, job 14 `victor_safety_baseline_refresh`, job 15 `victor_safety_chain_monitor`. Resolves job-14 numbering conflict (DATA_MODEL §27 vs §32); invite jobs renumbered to 10/12. §32.6 body typo fixed (chain_monitor was "job 14" — corrected to "job 15"). Closes §31.10 item 8 (P1), §35.10 items 8 + 12 (P1/P2).
+- `docs/DATA_MODEL.md §27` — checklist items 8 and 9 reference updated to resolved job numbers (10 and 12).
+- `VERSION` → 3.73.1
+
+---
+
 ## [3.73.0] — 2026-06-11
 
 ### Added
