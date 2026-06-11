@@ -6,6 +6,18 @@
 
 ---
 
+## [3.49.1] — 2026-06-11
+
+### Added
+- `content/post-460-program-accommodation-diagnosis.md` — Програма вичерпала себе: 5 ознак нейром'язової акомодації (RPE-крива, тоннаж, автоматизація техніки, швидке відновлення, 3RM тест) vs 3 зовнішніх фактори плато (сон Van Dongen 2003, білок Morton 2018, concurrent training Wilson 2012); Spiering et al. (2008) акомодація; Kraemer & Ratamess (2004); Issurin (2010) residual effects; алгоритм тестового тижня; clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — додано картки post-457, post-459, post-460; blog.html тепер відображає 400 карток (459 постів authored)
+- `README.md` — post-460 позначено ✓ у roadmap; додано post-461–464 як наступні теми
+- `VERSION` — 3.49.0 → 3.49.1
+
+---
+
 ## [3.49.0] — 2026-06-11
 
 ### Added
