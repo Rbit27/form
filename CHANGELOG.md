@@ -6,6 +6,14 @@
 
 ---
 
+## [3.63.1] — 2026-06-11
+
+### Changed
+- `docs/OBSERVABILITY.md` — v2.7 → v2.8; §26.7a AL-SCIM-MASS-01 (SCIM mass deprovisioning alert spec: trigger `scim.user_deprovisioned` burst ≥ MAX(10%×seats, 10) / 10-min window, P0 ≥ 50% or admin lockout, P1 ≥ 10% or ≥ 100 users, dual-page PagerDuty `form-customer-success` + `form-platform`, pg_cron SQL, alert response flow, privacy floor); §12.6 `scim_mass_deprovision_check` job 24 (`*/5 * * * *`, 6-min freshness window, A1.1/CC7.2); §26.1 cross-reference to R-24 + A1.1/A1.2 SOC 2 mapping; §26.8 `mass_deprovision` §6.2 condensed row; §26.11 CC7.2 fifteen→sixteen rules, A1.1/A1.2 rows, SSO-OBS-E-005; §26.12 three new checklist items (P0 M5 + P1). Closes `docs/INCIDENT_RESPONSE.md` R-24.15 checklist items 1 and 6.
+- `VERSION` — 3.63.0 → 3.63.1
+
+---
+
 ## [3.63.0] — 2026-06-11
 
 ### Added
