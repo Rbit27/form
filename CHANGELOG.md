@@ -6,6 +6,19 @@
 
 ---
 
+## [3.58.0] — 2026-06-11
+
+### Added
+- `content/post-485-ai-vs-live-trainer.md` — AI-тренер проти живого тренера: Andersen & Aagaard (2000) технічна деградація під навантаженням; Feltz et al. (2011) соціальна динаміка зворотного зв'язку; Magistro et al. (2021) міжрейтерна надійність; Cressey (2012) гібридна модель; чесний trade-off без корпоративної лояльності. clinical-safety NOT REQUIRED.
+- `content/post-486-neural-adaptations.md` — Нейральні адаптації силового тренінгу: Moritani & deVries (1979) нейральна vs гіпертрофічна фаза; Henneman et al. (1965) size principle; Sale (1988) ЕМГ vs електростимуляція; Duchateau et al. (2006) rate coding і RFD; міжм'язова та внутрішньом'язова координація; стеля нейрального резерву (6–12 тижнів). clinical-safety NOT REQUIRED.
+- `content/post-487-intra-abdominal-pressure.md` — Дихання і внутрішньочеревний тиск: Harman et al. (1988) MSSE Valsalva і IAP; McGill (2006) спінальна жорсткість і TvA; Hagins et al. (2004) Spine піковий ВЧТ під час концентричної фази; Lander et al. (1990) пояс -10–15% компресії; Hodges & Richardson (1997) anticipatory TvA activation; дихальні стратегії для різних типів підйомів. clinical-safety NOT REQUIRED.
+
+### Changed
+- `README.md` — roadmap: posts 479–481 → [x] з реальними описами; post-485 → [x]; post-486, 487 → [x]; нові roadmap items 488–489; Last update синхронізовано з v3.58.0
+- `VERSION` — 3.57.0 → 3.58.0
+
+---
+
 ## [3.57.0] — 2026-06-11
 
 ### Added

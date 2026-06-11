@@ -851,13 +851,23 @@ Each iteration:
 - [x] post-478: Вихід з новачкового ефекту — Moritani & deVries (1979) нейральна фаза, Kraemer & Ratamess (2004), Schoenfeld (2016) частота, Conley (2000) хвилеподібна прогресія; ознаки переходу, тижнева диференціація, 4-тижневий цикл. clinical-safety NOT REQUIRED · v3.54.0
 
     ── ROADMAP (наступні теми · post-479+) ───────────────────────────
-- [ ] post-479: Субмаксимальне тренування — наукова база «не кожна сесія має бути важкою»; Israetel MEV/MAV; хронічне перевищення MRV як причина плато; практика субмаксимальних блоків
-- [ ] post-480: Паузи між підходами: сила проти гіпертрофії — Schoenfeld et al. (2016) JSCR 1 vs 3 хв rest; різні оптимуми для різних цілей; практичний протокол
-- [ ] post-481: Ексцентричне vs концентричне — що реально дає більше для гіпертрофії; огляд механізмів; чому «повільне опускання» — не завжди правило
+- [x] post-479: Міф про «зони повторень» — Schoenfeld & Grgic (2017) JSCR контінуум сила-гіпертрофія-витривалість; Robinson (1995), Mitchell (2012) рівнозначна гіпертрофія 30% vs 80% 1RM; практичний висновок. clinical-safety NOT REQUIRED · v3.55.0
+- [x] post-480: Постактиваційна потенціація — Tillin & Bishop (2009) Sports Medicine PAP механізм; Hamada et al. (2000) фосфорилювання міозинових ланцюгів; вузьке вікно 3–12 хвилин; умови ефективності та чому більшість застосувань не працює. clinical-safety NOT REQUIRED · v3.55.0
+- [x] post-481: Тривалість відпочинку між підходами — Schoenfeld et al. (2016) JSCR 1 vs 3 хв rest; оптимуми для сили, гіпертрофії, витривалості; коли скорочення відпочинку шкодить. clinical-safety NOT REQUIRED · v3.55.0
 - [x] post-482: Авторегуляція без RPE — Hackett et al. (2012) JSCR RIR-переоцінювання у нетренованих; Gonzalez-Badillo & Sanchez-Medina (2010) VBT швидкість як маркер готовності; Halperin et al. (2015) технічна відмова; Borresen & Lambert (2009) між-сесійні маркери; протокол калібрування RPE. clinical-safety NOT REQUIRED · v3.56.0
 - [x] post-483: Частота тренувань — Schoenfeld et al. (2016) 2× > 1× для гіпертрофії; Colquhoun et al. (2018) 3× = 6× при рівному об'ємі; junk volume; рекомендації за стажем. clinical-safety NOT REQUIRED · v3.57.0
 - [x] post-484: FOR/NFOR/OTS — Meeusen et al. (2013) ECSS тристадійна модель; Halson &amp; Jeukendrup (2004) діагностика виключення; Kreher &amp; Schwartz (2012) протоколи відновлення. clinical-safety NOT REQUIRED · v3.57.0
-- [ ] post-485: AI-тренер проти живого тренера — чесний trade-off без маркетингового булшиту; що AI робить краще, де живий тренер незамінний
+- [x] post-485: AI-тренер проти живого тренера — Andersen & Aagaard (2000) технічні помилки під навантаженням; Feltz et al. (2011) соціальна динаміка зворотного зв'язку; Magistro et al. (2021) міжрейтерна надійність; гібридна модель; editorial-brutalist trade-off. clinical-safety NOT REQUIRED · v3.58.0
+
+    ── ROADMAP (наступні теми · post-486+) ───────────────────────────
+- [x] post-486: Нейральні адаптації силового тренінгу — Moritani & deVries (1979) EJAP нейральна vs гіпертрофічна фаза; Henneman et al. (1965) JNP size principle; Sale (1988) MSSE motor unit recruitment; Duchateau et al. (2006) JAP rate coding; практика для новачків і перехід до гіпертрофічного блоку. clinical-safety NOT REQUIRED · v3.58.0
+- [x] post-487: Дихання і внутрішньочеревний тиск при важких підйомах — Harman et al. (1988) MSSE IAP і Вальсальва; McGill (2006) спінальна жорсткість; Hagins et al. (2004) Spine піковий ВЧТ; Lander et al. (1990) MSSE пояс -10-15% компресії; Hodges & Richardson (1997) Spine TvA anticipatory; протокол для різних підйомів. clinical-safety NOT REQUIRED · v3.58.0
+
+    ── ROADMAP (наступні теми · post-488+) ───────────────────────────
+- [ ] post-466: Що робити, коли не хочеться тренуватися ⚠️ clinical-safety review required (mental-health adjacent) — вже у черзі
+- [ ] post-468: Пери-тренувальне харчування без містики ⚠️ clinical-safety review required (food-related) — вже у черзі
+- [ ] post-488: Силова асиметрія і bilateral deficit — механізм, вимірювання, коли виправляти
+- [ ] post-489: Tempo training vs load — що є первинним драйвером і де кожен підхід переможе
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -902,4 +912,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 10 червня 2026 · v3.29.0
+**Last update:** 11 червня 2026 · v3.58.0 (posts 485–487 · README roadmap sync)
