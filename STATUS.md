@@ -1,7 +1,7 @@
 # FORM · Project Status v1.4.0
 
 **Date:** 11 червня 2026
-**Version:** 3.71.0
+**Version:** 3.73.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -31,7 +31,7 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 434 cards (509 posts authored), category filter, newsletter CTA | v3.72.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 437 cards (510 posts authored), category filter, newsletter CTA | v3.73.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 | [`security.html`](security.html) | Security Trust Center — SOC 2 status, sub-processors, responsible disclosure | v2.40.0 ✓ |
@@ -481,6 +481,7 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-507-cortisol-training.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.70.0 |
 | post-508-self-programming-meta-guide.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.71.0 |
 | post-509-strength-cardiovascular-health.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.72.0 |
+| post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | twitter-launch-thread.md | Social | draft |
 | linkedin-posts.md | Social | 12 posts ready |
 | press-pitch-templates.md | Outreach | 5 templates |
