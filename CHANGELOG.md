@@ -6,6 +6,21 @@
 
 ---
 
+## [3.51.0] — 2026-06-11
+
+### Added
+- `content/post-470-hawthorne-effect-training.md` — Ефект Готорна у тренуванні: observer effect, self-monitoring bias, регресія до середнього; Roethlisberger & Dickson (1939), Levitt & List (2011) AEJ:AE, McCarney et al. (2007) Trials, Wernbom et al. (2007) Sports Med; 5 критеріїв для чистого n=1 порівняння. clinical-safety NOT REQUIRED. 8 хв читання.
+- `content/post-471-percent-rpe-vbt.md` — Відсоток від 1ПМ vs RPE vs VBT: порівняльна таблиця точності і систематичні похибки кожного методу; Zourdos et al. (2016) JSCR, Helms et al. (2016) IJSPP, Jidovtseff et al. (2011) JHK, Pareja-Blanco et al. (2017) EJAP; матриця комбінування. clinical-safety NOT REQUIRED. 14 хв читання.
+- `content/post-474-home-training-no-equipment.md` — Тренування вдома без обладнання: прогресія до гіпертрофії, межа bodyweight; Lasevicius et al. (2019) EJSS, Schoenfeld et al. (2017) JSCR, Kikuchi & Nakazato (2017), Calatayud et al. (2015); прогресійні таблиці для push/squat/hinge/pull; чесна відповідь про тягу. clinical-safety NOT REQUIRED. 15 хв читання.
+- `blog.html` — 3 нові картки (posts 470, 471, 474); лічильник 402 → 405 карток.
+
+### Changed
+- `STATUS.md` — 469 → 472 пости; версія → v3.51.0; blog.html рядок оновлено
+- `README.md` — posts 470, 471, 474 позначені [x]
+- `VERSION` — 3.50.2 → 3.51.0
+
+---
+
 ## [3.50.2] — 2026-06-11
 
 ### Added
