@@ -6,6 +6,14 @@
 
 ---
 
+## [3.56.1] — 2026-06-11
+
+### Changed
+- `docs/COMPETITIVE.md` — §§13–21 enterprise / corporate wellness section added (v0.1 → v0.2); closes `docs/COST_MODEL.md §31.9` checklist item 6 (P1/M6). Covers: B2B field map; deep teardowns of Wellhub, Headspace for Work, Calm for Business, Virgin Pulse/Personify Health, Whoop for Teams, Future Enterprise; enterprise defensibility map (7 layers); sales objection map (9 objections with scripted answers). All pricing [ESTIMATE] from public reports. Owner: marketing-lead + enterprise-architect + compliance-officer.
+- `VERSION` — 3.56.0 → 3.56.1
+
+---
+
 ## [3.56.0] — 2026-06-11
 
 ### Added
