@@ -6,6 +6,15 @@
 
 ---
 
+## [3.75.1] — 2026-06-11
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` v1.6 — зареєстровано 5 DEC-030 HMAC-chained events для R-24 SCIM Mass Deprovisioning runbook: `scim.mass_deprovision_detected` (CRITICAL, 7yr), `scim.sync_suspended` (HIGH, 7yr), `scim.admin_lockout_recovery` (HIGH, 7yr), `scim.sync_resumed` (HIGH, 7yr), `scim.mass_reprovision_complete` (STANDARD, 3yr). R24-CHAIN-01 ordering guard задокументовано (`emit-audit-event` Worker HTTP 422 на порушення). Privacy invariant: тільки `tenant_id` + aggregate counts, жодного `user_id` чи health data. Retention table: +2 рядки. Заголовок документа виправлено з v1.4 → v1.6 (v1.5 content було застосовано раніше без оновлення заголовка). Closes INCIDENT_RESPONSE.md R-24.15 checklist item 3 (P0 M5 — register five DEC-030 events before first enterprise pilot). Cross-ref: INCIDENT_RESPONSE.md §R-24.9; OBSERVABILITY.md §26.7a (AL-SCIM-MASS-01); SOC2_READINESS.md A1.1/A1.2/CC7.2/CC7.3/CC9.2 (SCIM-E-001–005). compliance-officer + enterprise-architect owners.
+- `docs/INCIDENT_RESPONSE.md` R-24.15 item 3 — позначено як [x] Done з посиланням на AUDIT_LOG_SCHEMA.md v1.6 (2026-06-11).
+- `VERSION` — 3.75.0 → 3.75.1
+
+---
+
 ## [3.75.0] — 2026-06-11
 
 ### Added
