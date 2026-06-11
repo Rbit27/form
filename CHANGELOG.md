@@ -6,6 +6,19 @@
 
 ---
 
+## [3.54.0] — 2026-06-11
+
+### Added
+- `content/post-478-novice-to-intermediate-transition.md` — Вихід з новачкового ефекту: Moritani & deVries (1979) нейральна vs структурна фаза, Kraemer & Ratamess (2004) хронологія адаптацій, Schoenfeld et al. (2016) JSCR частота тренувань, Conley et al. (2000) хвилеподібна прогресія; ознаки переходу, тижнева диференціація сесій, 4-тижневий цикл. clinical-safety NOT REQUIRED. sports-scientist PASS.
+- `blog.html` — 1 нова картка (post-478) → 409 карток (480 постів authored)
+
+### Changed
+- `README.md` — roadmap: post-476/477 → [x]; post-478 → [x]; нові теми post-479–483
+- `STATUS.md` — v3.53.0 → v3.54.0; post count 479 → 480; blog.html 408 → 409 карток
+- `VERSION` — 3.53.0 → 3.54.0
+
+---
+
 ## [3.53.0] — 2026-06-11
 
 ### Added
