@@ -6,6 +6,17 @@
 
 ---
 
+## [3.46.1] — 2026-06-11
+
+### Added
+- [`docs/DECISION_LOG.md` DEC-039](docs/DECISION_LOG.md) — SCIM group role conflict resolution (OQ-SSO-19.1) і ліміт груп на тенант (OQ-SSO-19.3): higher-privilege-wins підтверджено founder + enterprise-architect; `MAX()` агрегація у `group_member_effective_role` view залишається; `tenant_owner` виключено з group assignment; ліміт 500 груп/тенант встановлено як default (configurable via `tenants.feature_limits`). Closes P0 M4 blocker з §19.10 checklist. clinical-safety NOT REQUIRED.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — v1.8.2 patch: §9 G-005 статус оновлено 🔴 → 🟡 (design complete, посилання на §21); §19.9 OQ-SSO-19.1 та OQ-SSO-19.3 закрито 🟢 Resolved з посиланням на DEC-039; §19.10 P0 checklist item "Get founder sign-off" позначено [x] Done.
+- `VERSION` — 3.46.0 → 3.46.1.
+
+---
+
 ## [3.46.0] — 2026-06-11
 
 ### Added

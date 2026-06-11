@@ -13,6 +13,19 @@
 
 ---
 
+## 2026-06-11
+
+### DEC-039 · SCIM group role conflict: higher-privilege-wins confirmed (OQ-SSO-19.1); group cap 500/tenant (OQ-SSO-19.3)
+
+- **Decision:** Two enterprise-architect decisions to close P0/P1 open questions in `docs/SSO_SCIM_IMPLEMENTATION.md §19` (SCIM Groups Sync & Group-Based Role Mapping):
+  - **OQ-SSO-19.1 (P0 — founder sign-off):** When a user belongs to multiple SCIM groups with conflicting role mappings, **higher privilege wins.** The `group_member_effective_role` view uses `MAX()` aggregation with ordinal scoring (`tenant_owner` > `tenant_admin` > `coach` > `member` > `viewer`). `tenant_owner` is explicitly excluded from group assignment — no group mapping may elevate to `tenant_owner`; that role is assigned exclusively at tenant creation or by direct admin action. Rationale (§19.3.2): enterprise IT assigns users to groups by job function, not minimum access level. A user in both "All Staff" (member) and "FORM Coaches" (admin) holds a specialist function and should receive the admin role. Lowest-privilege-wins would require IT to manually exclude specialists from broad groups — a fragile configuration that breaks with standard Active Directory nesting patterns. The decision is already encoded in the `group_member_effective_role` view (§19.4.4); this entry is the required governance record.
+  - **OQ-SSO-19.3 (P1 — enterprise-architect decision):** Default maximum groups per tenant is **500.** Configurable per enterprise agreement via `tenants.feature_limits JSONB`. Rationale: 500 covers a 10,000-seat org with granular team groups; exceeding 500 indicates a misconfigured IdP push filter (pushing all org groups rather than FORM-specific groups). B-tree index on `(tenant_id, scim_group_id)` in `tenant_groups` is performant well beyond 500 rows. The cap is already enforced in `resolveJitGroups()` (§19.6.2) and in SCIM Group POST validation.
+- **Owner:** founder + enterprise-architect
+- **Why:** OQ-SSO-19.1 was a **P0 M4 blocker** in the §19.10 implementation checklist — the feature cannot ship without the founder's decision logged. OQ-SSO-19.3 was a P1 item with a clear recommendation already written in §19.3.4 and §19.5.2. Both items were deferred from v1.1 (2026-05-30) authoring pass; this closes both as a patch.
+- **Reverse cost:** Medium (OQ-SSO-19.1). Switching to lowest-privilege-wins requires: (a) one-line view change `MAX()` → `MIN()` in `group_member_effective_role`, (b) §19.3.2 rationale rewrite, (c) notifying enterprise customers whose role configuration relies on higher-privilege resolution. Low (OQ-SSO-19.3): any cap change only requires updating `tenants.feature_limits` default and `resolveJitGroups()` constant; tenants already at 500 groups need data migration.
+
+---
+
 ## 2026-06-10
 
 ### DEC-038 · Pricing exception approval procedure formalised in COST_MODEL.md §32; closes §31.9 P0 item 3
