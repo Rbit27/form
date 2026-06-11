@@ -6,6 +6,20 @@
 
 ---
 
+## [3.60.0] — 2026-06-11
+
+### Added
+- `content/post-491-strength-asymmetry-functional-imbalance.md` — Силова асиметрія і функціональний дисбаланс: Bishop et al. (2018) IJSM функціональна vs дисфункціональна асиметрія (systematic review); Maloney (2019) Sports Medicine мета-аналіз LSI і ризик травм (22 дослідження); Howard & Enoka (1991) JAP bilateral deficit і інтерлімбальна нейральна інгібіція; Jakobi & Cafarelli (1998) JAP нейральні механізми BD; Koh et al. (1993) JAP step vs ramp contractions; Impellizzeri et al. (2007) MSSE LSI методологічні обмеження; поріг 15%/LSI<85% для нетравмованих атлетів; алгоритм «виправляти / не виправляти»; 3 стратегії корекції (пріоритет слабшої сторони, додатковий об'єм, унілатеральний акцент); критика LSI 90% як реабілітаційного, а не тренувального стандарту. clinical-safety NOT REQUIRED.
+- `content/post-492-velocity-based-training-without-device.md` — VBT без пристрою: Gonzalez-Badillo & Sanchez-Medina (2010) IJSM MPV і %1RM лінійний зв'язок (r²>0.98); мінімальний velocity threshold (MVT ≈0.17 м/с жим, ≈0.30 м/с присід); Sanchez-Medina & Gonzalez-Badillo (2011) MSSE velocity loss threshold для різних тренувальних цілей (10–15% нейральний, 20–30% гіпертрофійний, >40% метаболічний); Loturco et al. (2017) JSCR намір максимального прискорення і рекрутинг RM; Banyard et al. (2017) IJSPP суб'єктивна оцінка velocity loss; Weakley et al. (2021) SCJ VBT практичний огляд; load-velocity профіль через хронометрування без трекера; референсна таблиця MVT/MPV для жиму/присядання/тяги; фреймворк 4-принципів. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — 2 нові картки (post-491, post-492) → 420 карток (492 пости authored)
+- `README.md` — roadmap: posts 488–490 → [x] з реальними описами; нова секція post-491+; post-491, 492 → [x]; post-493 (Tempo training vs load) — наступний
+- `STATUS.md` — content engine: 490 → 492 постів; blog.html 418 → 420 карток; post-491, 492 у файловому реєстрі; версія 3.59.0 → 3.60.0
+- `VERSION` — 3.59.1 → 3.60.0
+
+---
+
 ## [3.59.1] — 2026-06-11
 
 ### Changed

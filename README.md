@@ -864,10 +864,16 @@ Each iteration:
 - [x] post-487: Дихання і внутрішньочеревний тиск при важких підйомах — Harman et al. (1988) MSSE IAP і Вальсальва; McGill (2006) спінальна жорсткість; Hagins et al. (2004) Spine піковий ВЧТ; Lander et al. (1990) MSSE пояс -10-15% компресії; Hodges & Richardson (1997) Spine TvA anticipatory; протокол для різних підйомів. clinical-safety NOT REQUIRED · v3.58.0
 
     ── ROADMAP (наступні теми · post-488+) ───────────────────────────
+- [x] post-488: Вектор сили у виборі вправ — горизонтальний/вертикальний патерн навантаження; Contreras et al. (2015), Andersen et al. (2014), Schoenfeld et al. (2020); алгоритм перевірки програми за векторами. clinical-safety NOT REQUIRED · v3.59.0
+- [x] post-489: Баланс тяги та пресу — лопаткові стабілізатори і програмування плечового поясу; Ludewig & Cook (2000), Cools et al. (2007), Lehman et al. (2004); правило «2:1» і практичне програмування. clinical-safety NOT REQUIRED · v3.59.0
+- [x] post-490: Дихання між підходами — CO₂, HRV і фізіологія відновлення; Harris et al. (1976), Berntson et al. (1997), Jerath et al. (2006); протокол між підходами. clinical-safety NOT REQUIRED · v3.59.0
+
+    ── ROADMAP (наступні теми · post-491+) ───────────────────────────
 - [ ] post-466: Що робити, коли не хочеться тренуватися ⚠️ clinical-safety review required (mental-health adjacent) — вже у черзі
 - [ ] post-468: Пери-тренувальне харчування без містики ⚠️ clinical-safety review required (food-related) — вже у черзі
-- [ ] post-488: Силова асиметрія і bilateral deficit — механізм, вимірювання, коли виправляти
-- [ ] post-489: Tempo training vs load — що є первинним драйвером і де кожен підхід переможе
+- [x] post-491: Силова асиметрія і функціональний дисбаланс — Bishop et al. (2018) IJSM функціональна vs дисфункціональна асиметрія; Maloney (2019) Sports Med LSI і ризик травм; Howard & Enoka (1991) bilateral deficit; поріг 15%/LSI<85%; програмування. clinical-safety NOT REQUIRED · v3.60.0
+- [x] post-492: Velocity-Based Training без пристрою — Gonzalez-Badillo & Sanchez-Medina (2010) MPV і %1RM; Sanchez-Medina & Gonzalez-Badillo (2011) velocity loss threshold; Loturco et al. (2017) максимальний намір; load-velocity профіль без трекера. clinical-safety NOT REQUIRED · v3.60.0
+- [ ] post-493: Tempo training vs load — що є первинним драйвером гіпертрофії; Burd et al. (2012), Wilk et al. (2020); де темп допомагає, де лише ускладнює прогресію. clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
