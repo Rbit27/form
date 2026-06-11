@@ -15,6 +15,21 @@
 
 ## 2026-06-11
 
+### DEC-040 · Feature flag lifecycle: plan downgrade auto-disables Growth+ flags (OQ-FLAG-01); 90-day deprecation sunset policy (OQ-FLAG-02)
+
+- **Decision:** Two decisions for the feature flag lifecycle in `docs/DATA_MODEL.md §19`:
+  - **OQ-FLAG-01 (High — before M5):** When a tenant downgrades from Growth to Starter (or from Enterprise to Growth/Starter), **Option (a) is adopted:** all flags whose `feature_flag_registry.minimum_tier IN ('growth', 'enterprise')` are automatically disabled in `tenant_feature_flags` via a plan-downgrade hook wired into the contract lifecycle (`DATA_MODEL.md §16 tenant.lifecycle_status`). Each disabled flag emits a `feature_flag.disabled` DEC-030 HMAC-chained event with `reason = 'plan_downgrade'` and `set_by = 'system'`. Rows are set to `enabled = FALSE` (not deleted) so the disable is explicitly re-enabled on re-upgrade — no silent reactivation. The downgrade hook fires synchronously inside the same transaction as the `tenants.plan` column update and uses `FOR UPDATE SKIP LOCKED` to avoid TOCTOU races with concurrent feature-flag reads.
+  - **OQ-FLAG-02 (Medium — before first deprecation):** The flag deprecation sunset process is formalised as: (a) minimum **90 days** between setting `deprecated_at` on a `feature_flag_registry` row and the effective disablement date; (b) customer-success communicates via a non-dismissible admin dashboard banner when a tenant has an enabled flag whose `deprecated_at IS NOT NULL` (banner text: *"Feature [flag_label] will be retired on [deprecated_at + 90d]. Contact your CSM to plan the transition."*); (c) a pg_cron job runs nightly at 03:15 UTC and soft-deletes `tenant_feature_flags` rows where the corresponding registry `deprecated_at + INTERVAL '90 days' <= now()`, emitting `feature_flag.disabled` DEC-030 events with `reason = 'deprecated'` for each row. Hard-delete is explicitly rejected — rows remain as tombstones to preserve the historical audit trail.
+- **Owner:** enterprise-architect + compliance-officer
+- **Why:**
+  - *OQ-FLAG-01:* Without the downgrade hook, a Starter tenant retains `enabled = TRUE` in `tenant_feature_flags` for Growth-only flags after a plan downgrade. `assertFeatureEnabled()` blocks at the Worker tier gate, so there is no functional access regression — but the inconsistent stored rows mislead `form_admin` operators, pollute the audit trail, and would silently re-activate Growth features on any future re-upgrade without a deliberate admin action. This violates SOC 2 CC8.1 (change management requires explicit, logged authorisation for feature enablement). Option (a) produces clean data and a correct audit chain at negligible implementation cost.
+  - *OQ-FLAG-02:* Enterprise customers depend on flagged features for production integrations (e.g. `audit.siem_export_enabled`, `admin.cohort_analytics_enabled`). Surprise removal without notice causes customer outages and erodes trust. A 90-day documented sunset policy satisfies SOC 2 CC9.2 (vendor and partner obligations) and creates a defensible change management record. Soft-delete preserves evidence of what features each tenant held and for how long — necessary for SOC 2 audits and GDPR Art. 30 records of processing.
+- **Reverse cost:**
+  - *OQ-FLAG-01:* Medium. Switching to Option (b) — rely solely on the Worker tier gate — requires: removing the downgrade hook, updating the SOC 2 CC8.1 narrative (losing the "explicit re-enable" guarantee), and notifying any tenant already downgraded under this rule if their flag rows were set to `enabled = FALSE`. Permissible before the first downgrade event is processed; increases in cost with each downgrade processed under this rule.
+  - *OQ-FLAG-02:* Low before any 90-day sunset notice is dispatched. Once a sunset banner is shown to a tenant, the date is a commitment — cannot be shortened without a retroactive notification and amended CSM communication.
+
+---
+
 ### DEC-039 · SCIM group role conflict: higher-privilege-wins confirmed (OQ-SSO-19.1); group cap 500/tenant (OQ-SSO-19.3)
 
 - **Decision:** Two enterprise-architect decisions to close P0/P1 open questions in `docs/SSO_SCIM_IMPLEMENTATION.md §19` (SCIM Groups Sync & Group-Based Role Mapping):

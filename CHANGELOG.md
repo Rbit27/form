@@ -6,6 +6,15 @@
 
 ---
 
+## [3.48.1] — 2026-06-11
+
+### Changed
+- `docs/DECISION_LOG.md` — DEC-040 added: feature flag lifecycle decisions (OQ-FLAG-01 + OQ-FLAG-02). OQ-FLAG-01: plan-downgrade hook auto-disables Growth+/Enterprise-only flags (`reason = 'plan_downgrade'`); `FOR UPDATE SKIP LOCKED` guard; rows set `enabled = FALSE` not deleted — no silent re-activation on re-upgrade (SOC 2 CC8.1). OQ-FLAG-02: 90-day deprecation sunset; non-dismissible admin dashboard banner; pg_cron nightly soft-delete at `deprecated_at + 90 days`; `reason = 'deprecated'` DEC-030 per row; hard-delete rejected to preserve SOC 2 / GDPR Art. 30 audit trail.
+- `docs/DATA_MODEL.md` — §19.10 OQ-FLAG-01 and OQ-FLAG-02 updated 🟡 Open → 🟢 Resolved (DEC-040); §19.12 checklist items 11–12 marked Decision done with DEC-040 reference; engineering implementation remains on M5/M6 milestone.
+- `VERSION` — 3.48.0 → 3.48.1.
+
+---
+
 ## [3.48.0] — 2026-06-11
 
 ### Added
