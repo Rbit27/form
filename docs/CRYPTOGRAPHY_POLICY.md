@@ -96,6 +96,7 @@ This policy establishes mandatory cryptographic standards for all FORM systems t
 | TLS certificates | Cloudflare auto-renew | 30-day expiry warning fires via Better Stack S-012 probe | Cloudflare-managed; Better Stack alert at T-30 days | security-engineer | Better Stack alert history; Cloudflare certificate dashboard |
 | Mobile cert pin (SHA-256 of Cloudflare leaf cert) | With each TLS certificate rotation | 90-day advance notice in release notes required before rotation | Manual; coordinated with mobile release cycle | security-engineer | Release notes; App Store and Play Store submission records |
 | API key hash secret (`API_KEY_HASH_SECRET`) | 180 days | Scheduled; immediate on suspected compromise | Manual: Cloudflare Workers Secrets re-deployment; rotation requires re-hashing all active `tenant_api_keys` rows during maintenance window | security-engineer | Cloudflare Workers Secrets deployment audit log; `tenant_api_keys` row count before/after re-hash migration |
+| `ERASURE_PSEUDONYM_SALT` (GDPR Art. 17 erasure keyed HMAC pseudonym for `subscription_events`) | **Never — write-once** (OQ-ERA-02 · DATA_MODEL §30.8) | Write-once policy: rotating this secret makes all pre-rotation `erased_user_reference` values permanently irreconcilable with the new key — FORM cannot audit-link `billing.user_erased` DEC-030 chain entries to their pseudonymized `subscription_events` rows. Any rotation consideration must be escalated as a compliance decision (compliance-officer + security-engineer + legal) before any action is taken | **Prohibited** — no automated or scheduled rotation pipeline; no manual rotation permitted without explicit compliance-officer + security-engineer joint sign-off after full impact assessment | compliance-officer + security-engineer | 1Password Operations vault write-one-entry timestamp; Cloudflare Workers Secrets deployment log (confirms single write event — no subsequent rotation records); DATA_MODEL §30.8 rationale |
 
 ---
 
@@ -112,6 +113,7 @@ This policy establishes mandatory cryptographic standards for all FORM systems t
 | JWT signing secret (Supabase Auth) | Supabase-managed; accessible only via Supabase dashboard | security-engineer; rotation requires authenticated Supabase dashboard session | No | Supabase platform |
 | SAML IDP certificates (per tenant) | Encrypted DB column (Supabase Vault) | Service role only; read at SAML assertion validation time | No | Supabase Vault |
 | API key hash secret (`API_KEY_HASH_SECRET`) | Cloudflare Workers Secret | security-engineer; `form_system` Worker reads at key creation and validation time only; never returned to API response | No | 1Password Operations vault |
+| `ERASURE_PSEUDONYM_SALT` (GDPR Art. 17 erasure pseudonym for `subscription_events.erased_user_reference`) | Cloudflare Workers Secret — `erasure-worker` only | compliance-officer reads via Cloudflare dashboard; `erasure-worker` reads at Art. 17 erasure execution time only; never returned in any API response, log, or error trace | No — single-person custody acceptable given write-once policy (rotation risk exceeds dual-custody benefit) | 1Password Operations vault (write-once backup copy — **must not be rotated or overwritten**; label entry with `WRITE-ONCE — OQ-ERA-02` warning) |
 
 **Mandatory prohibitions:**
 
@@ -224,7 +226,8 @@ MD5 and SHA-1 are permanently prohibited per §3. They are not subject to this d
 | Version | Date | Author | Change Summary |
 |---|---|---|---|
 | v1.0 | May 2026 | security-engineer | Initial version; closes CC5-GAP-002 (SOC 2 Readiness CC5-P0-002) |
+| v1.1 | 2026-06-11 | security-engineer + compliance-officer | OQ-ERA-02 resolved: `ERASURE_PSEUDONYM_SALT` documented as write-once key in §5 (rotation schedule — never rotate; any rotation is a compliance event requiring joint sign-off) and §6 (custody — `erasure-worker` Cloudflare Workers Secret; 1Password Operations vault backup; single-person custody acceptable given write-once policy). Cross-ref: DATA_MODEL §30.8 (OQ-ERA-02 rationale — rotating makes pre-rotation pseudonyms irreconcilable); DATA_MODEL §30.2.4 (erasure Worker step SUB-1; keyed HMAC pseudonym `[ERASED-{sha256(user_id + ERASURE_PSEUDONYM_SALT)}]`); DATA_MODEL §30.7 item 9 (P1 M5 checklist item — ✅ closed by this entry). |
 
 ---
 
-v1.0 · May 2026 · Owner: security-engineer + compliance-officer. Reviewed annually per §15 compliance calendar and on any material architecture change.
+v1.1 · 2026-06-11 · Owner: security-engineer + compliance-officer. Reviewed annually per §15 compliance calendar and on any material architecture change.

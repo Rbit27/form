@@ -6,6 +6,20 @@
 
 ---
 
+## [3.72.0] — 2026-06-11
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md` v1.5 — нова секція «Billing & GDPR erasure events»: `billing.user_erased` (HIGH, 7yr, HMAC-chained) з Zod v2 схемою (`erased_user_reference` required, `user_id` optional для backward-compat); `security.quota_95pct_warning` (STANDARD, 3yr) додано до Security & tenant isolation table; retention table +2 рядки. Закриває DATA_MODEL §30.7 items 4 і 5 (P0 M4).
+- `docs/OBSERVABILITY.md` v2.9 — AL-RL-01b (P1, auto-escalation to P0 після 2h без ack) додано до §35.4 та §35.5 `rate_limit_health` subsection; sourced from `security.quota_95pct_warning`. Закриває DATA_MODEL §30.7 item 7 (P0 M4).
+- `docs/CRYPTOGRAPHY_POLICY.md` v1.1 — `ERASURE_PSEUDONYM_SALT` задокументовано як write-once ключ у §5 (rotation: Never) та §6 (custody: `erasure-worker` Cloudflare Workers Secret + 1Password backup). OQ-ERA-02 → 🟢 Resolved. Закриває DATA_MODEL §30.7 item 9 (P1 M5).
+
+### Changed
+- `docs/DATA_MODEL.md §30.7` — items 4, 5, 7 позначені `[x]` (документаційні завдання виконані; engineering deploy items 1-3, 6 pending platform-engineer)
+- `docs/DATA_MODEL.md §30.8` — OQ-ERA-02 позначено 🟢 Resolved
+- `VERSION` → 3.72.0
+
+---
+
 ## [3.71.1] — 2026-06-11
 
 ### Added
