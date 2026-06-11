@@ -5124,6 +5124,24 @@ Admin dashboard showing individual employee data? → R-22 (privacy floor breach
   ED screening / body composition / mental health in employer report? → R-22 P0; clinical-safety VETO activates
   k-anonymity cohort < 5 in employer-visible report? → R-22 P1; suppress offending cohort
   Tenant demanding individual data or punishing non-participants? → R-22.9 no-go escalation; founder authority only
+Victor AI coach producing unsafe content?    → R-23 (clinical-safety VETO applies; do NOT share raw harmful text in channel)
+  Dangerous training advice (extreme loads, injury training)?  → R-23 P1; R-23.3 immediate actions; R-23.5 Tier 2 containment
+  Medical diagnosis / medication recommendation?  → R-23 P0 CRITICAL; clinical-safety VETO; T+3min global disable
+  Body-shaming / eating-disorder-adjacent content?  → R-23 P0 CRITICAL; clinical-safety VETO; T+3min global disable
+  Dangerously caloric-deficit advice?  → R-23 P0 CRITICAL; clinical-safety VETO; T+3min global disable
+  Sports-science consensus violated (no rest days, ignore pain)?  → R-23 P2; R-23.5 Tier 1 guardrail injection
+  Hallucinated exercises / contradictory periodisation?  → R-23 P2; R-23.5 Tier 1 guardrail injection
+  Wrong language in coaching response?  → R-23 P3; R-23.5 Tier 1 guardrail injection
+  Prompt injection suspected?  → R-23.7 Hypothesis 1; also activate R-01 if PII exfiltration possible
+  Enterprise tenant users affected?  → R-23.6 Template V-03; also R-22 if privacy floor breach suspected
+SCIM mass deprovisioning event?       → R-24 (data integrity + availability; NOT R-04 or R-19)
+  ≥ 50% of tenant seats deprovisioned in < 30 min?  → R-24 P0; suspend SCIM sync (§R-24.3); page CSM + platform-engineer
+  ≥ 10% or ≥ 100 users unexpectedly deprovisioned?  → R-24 P1; run R-24-C1 scope SQL; tenant admin notification MD-01 at T+10
+  All tenant_admin roles deprovisioned (admin lockout)?  → R-24 P0 override; magic link recovery §R-24.4
+  AL-SCIM-MASS-01 fires?             → R-24; run C1 scope SQL BEFORE contacting tenant; confirm P0 vs P1 threshold
+  IdP admin confirms deprovision was intentional?  → Do NOT downgrade on verbal; confirm in writing before P0 → P1 downgrade
+  FORM-side SCIM bug suspected (H3)?  → R-24 + consult OQ-R24-03; legal consultation on Art. 33 obligation
+  All external comms: aggregate count only — NO individual user names to HR contacts
 
 GDPR Art. 33 clock: 72h from first awareness, not from confirmation.
   Sub-processor breach: clock starts when FORM receives notification, not when
@@ -9260,7 +9278,7 @@ Per the §14 Continuous Improvement Program, the following controls are mandator
 
 ---
 
-**v2.0 · 2026-06-11 · Owner: security-engineer + compliance-officer**
+**v2.1 · 2026-06-11 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 

@@ -6,6 +6,14 @@
 
 ---
 
+## [3.61.1] — 2026-06-11
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — Appendix A Quick Reference Card: R-23 and R-24 entries integrated. R-23 (Victor AI Coach Safety Incident): 10 routing entries covering P0 CRITICAL clinical-safety VETO conditions (medical diagnosis, body-shaming, caloric-deficit advice), P1 dangerous training advice, P2 sports-science errors, P3 localisation violations, prompt injection branch, enterprise tenant path. R-24 (SCIM Mass Deprovisioning Emergency): 8 routing entries covering P0 ≥ 50% seat threshold, P1 ≥ 10%/100-user threshold, P0 override for admin lockout, AL-SCIM-MASS-01 alert routing, verbal-downgrade prohibition, H3 FORM-side bug with OQ-R24-03 legal consultation flag, aggregate-only external comms invariant. Closes §R-23.14 cross-reference ("to be added to Appendix A when R-23 is integrated into the main document index"). Document header v1.9 → v2.0 already reflects R-23 and v2.0 reflects R-24 additions; Appendix A was the only remaining gap. Document v2.1.
+- `VERSION` — 3.61.0 → 3.61.1
+
+---
+
 ## [3.61.0] — 2026-06-11
 
 ### Added
