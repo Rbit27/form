@@ -6,6 +6,20 @@
 
 ---
 
+## [3.59.0] — 2026-06-11
+
+### Added
+- `content/post-488-force-vector-exercise-selection.md` — Вектор сили у виборі вправ: Contreras et al. (2015) J Appl Biomech EMG присідання vs hip thrust; Andersen et al. (2014) JSCR кут навантаження і грудні; Schoenfeld et al. (2020) lengthened partials; горизонтальний vs вертикальний патерн нижньої і верхньої частини тіла; алгоритм перевірки програми за векторами. clinical-safety NOT REQUIRED.
+- `content/post-489-push-pull-balance-scapular-stability.md` — Баланс тяги та пресу: Ludewig & Cook (2000) Physical Therapy кінематика лопатки; Cools et al. (2007) JOSPT слабкість нижньої трапеції і плечовий біль; Lehman et al. (2004) JSCR EMG лопаткових стабілізаторів; face pull / Y-T-W / pull-apart; правило 2:1; практичне програмування для балансу плечового поясу. clinical-safety NOT REQUIRED.
+- `content/post-490-breathing-between-sets-recovery.md` — Дихання між підходами: Harris et al. (1976) Eur J Clin Invest PCr ресинтез і кисень; Berntson et al. (1997) Psychophysiology дихальна синусова аритмія; Jerath et al. (2006) Medical Hypotheses діафрагмальне дихання і ANS; Lundberg et al. (1995) Acta Physiol Scand назальний NO; протокол між підходами для силових і гіпертрофійних сетів. clinical-safety NOT REQUIRED.
+
+### Changed
+- `blog.html` — 6 нових карток (post-485 → post-490) → 418 карток (490 постів authored)
+- `STATUS.md` — content engine: 484 → 490 постів; posts 485–487 в v3.58.0, posts 488–490 в v3.59.0; blog.html рядок оновлено
+- `VERSION` — 3.58.0 → 3.59.0
+
+---
+
 ## [3.58.0] — 2026-06-11
 
 ### Added
