@@ -6,6 +6,14 @@
 
 ---
 
+## [3.52.1] — 2026-06-11
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.5.4 → v3.5.5 patch: §34 C1 gap status sync. C1-GAP-004 (media/device disposal) **closed** 🔴→🟢: `compliance/c1/device-disposal-policy.md` POL-013 v1.0 IN_FORCE (2026-06-07) reflected in §4 summary table, PRE-06 checklist, §34.4, §34.5 PRE-34-E-008, §34.6 checklist, §34.7 delta, and standalone priority table. C1-GAP-001 (NDA template) progressed 🔴→🟡 Authored: `compliance/c1/nda-template.md` C1-NDA-001 v1.0 (2026-06-10) reflected in §34.2, §34.4, §34.5 PRE-34-E-003, §34.6 checklist, §34.7 delta. SOC 2 readiness score: ~92% → ~92.2%. 14 targeted edits. compliance-officer + enterprise-builder.
+- `VERSION` — 3.52.0 → 3.52.1
+
+---
+
 ## [3.52.0] — 2026-06-11
 
 ### Added
