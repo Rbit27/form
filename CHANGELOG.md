@@ -6,6 +6,15 @@
 
 ---
 
+## [3.68.1] — 2026-06-11
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.6.1 control table reconciliation: 6 early-table rows updated from stale 🔴 Gap to current authored/done state, consistent with the document's own gap register (§75, §927) and later sections. No evidence artefact or compliance posture change. Rows updated: CC1 §1 "Privacy policy published" 🔴→🟡 Authored (P-GAP-001; DEC-037); CC6 §6 "Offboarding process" 🔴→🟡 Authored (`compliance/cc6/offboarding-procedure.md` CC6-E-001; PRE-05); P1 §35 "Privacy policy at collection point" 🔴→🟡 Authored (P-GAP-001); P1 §35 "Privacy policy covers all data categories" 🔴→🟡 Authored (`docs/PRIVACY_POLICY.md` v0.1); P1 §35 "Cookie banner / consent management" 🔴→🟡 Authored (`form-consent-gate` §74 2026-06-09; PRE-16); P6 §35 "Sub-processor disclosure" 🔴→🟢 Done (`/subprocessors.html` live; P-GAP-002 🟢 per §75.6). compliance-officer + enterprise-architect.
+- `admin-dashboard.html` — corrected `lang="uk"` → `lang="en"` (all content is English).
+- `VERSION` — 3.68.0 → 3.68.1
+
+---
+
 ## [3.68.0] — 2026-06-11
 
 ### Added
