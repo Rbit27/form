@@ -6,6 +6,16 @@
 
 ---
 
+## [4.16.0] — 2026-06-12
+
+### Added
+- `content/post-581-counterfactual-thinking-training-progress.md` — Контрфактуальне мислення і тренувальний прогрес; Roese (1997) Psychol Bull upward vs downward counterfactuals і функції afective/preparatory; Kray et al. (2003) action-oriented vs ruminative counterfactuals — точка переходу до дисфункції; Byrne (2005) counterfactual closure — тенденція аналізувати останню подію, а не найважливішу причину; Ntoumanis et al. (2008) perceived competence як модератор мотиваційного ефекту; практичний 3-кроковий алгоритм переробки «якби» у конкретний план; clinical-safety NOT REQUIRED
+- `content/post-582-emotion-regulation-training-behavior.md` — Емоційна регуляція і тренувальна поведінка; Gross (1998) process model ER: cognitive reappraisal (antecedent-focused) vs expressive suppression (response-focused); Gross & John (2003) асиметрія стратегій у досвіді, вираженні і фізіології; Baumeister et al. (1998) ego depletion — когнітивна вартість suppression; Totterdell & Leach (2001) спортивний контекст: reappraisal і distraction > rumination; механізм впливу suppression і rumination на інтероцептивну точність і RIR-оцінку; pre-set ER check (3 питання); clinical-safety NOT REQUIRED
+- `content/post-583-good-bad-workout-psychology.md` — Психологія «доброго» і «поганого» тренування; Ekkekakis et al. (2011) Psychol Bull мета-аналіз афективних відповідей на навантаження — нелінійність і відсутність кореляції зі стимулом; Hardy & Rejeski (1989) feeling states vs RPE — різні виміри; Dunlop et al. (2021) peak-end rule у ретроспективній оцінці тренувань; три систематичних спотворення суб'єктивної оцінки (легкість = якість; дискомфорт = невдача; відповідність очікуванням = якість); практичний 3-питання post-set check; clinical-safety NOT REQUIRED
+- `blog.html` +3 cards = 350 total
+
+---
+
 ## [4.15.0] — 2026-06-12
 
 ### Added

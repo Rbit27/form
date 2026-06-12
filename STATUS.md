@@ -1,4 +1,4 @@
-# FORM · Project Status v4.14.0
+# FORM · Project Status v4.16.0
 
 **Date:** 12 червня 2026
 **Version:** 4.8.0
@@ -31,7 +31,7 @@ FORM is at v4.8.1 with 65+ tagged releases, 17 functional HTML pages (marketing 
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 347 cards (580 posts authored), category filter, newsletter CTA | v4.14.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 350 cards (583 posts authored), category filter, newsletter CTA | v4.16.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 | [`security.html`](security.html) | Security Trust Center — SOC 2 status, sub-processors, responsible disclosure | v2.40.0 ✓ |
@@ -544,6 +544,9 @@ FORM is at v4.8.1 with 65+ tagged releases, 17 functional HTML pages (marketing 
 | post-578-rumination-training-concentration.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v4.13.0 |
 | post-579-social-comparison-gym.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v4.13.0 |
 | post-580-dissociative-vs-associative-attention.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v4.14.0 |
+| post-581-counterfactual-thinking-training-progress.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v4.16.0 |
+| post-582-emotion-regulation-training-behavior.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v4.16.0 |
+| post-583-good-bad-workout-psychology.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v4.16.0 |
 | post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | post-511-reverse-mesocycle-planning.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.74.0 |
 | post-512-isolation-exercises-when-needed.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.75.0 |
@@ -764,6 +767,9 @@ M10-M12 (Q2 2027)
 ---
 
 **Updated weekly.** Major changes → new version bump.
+
+**v4.16.0 · 12 червня 2026**
+**Last update:** 12 червня 2026 · v4.16.0 (posts 581–583 authored · sport psychology block: counterfactual thinking/Roese 1997, emotion regulation/Gross 1998/Baumeister 1998, good-bad workout psychology/Ekkekakis 2011/Hardy&Rejeski 1989 · all clinical-safety NOT REQUIRED · blog.html +3 cards = 350 total · README roadmap post-584–586 додано)
 
 **v4.14.0 · 12 червня 2026**
 **Last update:** 12 червня 2026 · v4.14.0 (post-580 authored · дисоціативна vs асоціативна увага · Morgan 1987 / Stevinson&Biddle 1998 / Brick et al. 2016 / Wulf 2013 / Terry et al. 2020 · clinical-safety NOT REQUIRED · blog.html +1 card = 347 total · README roadmap оновлено)
