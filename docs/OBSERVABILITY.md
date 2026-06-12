@@ -59,6 +59,7 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §34 | SIEM Correlation Rules — Supabase Bridge Implementation (M4–M8) & ClickHouse Migration Plan |
 | §35 | Rate Limiting, Quota Enforcement & Abuse Prevention Observability |
 | §36 | Mid-Contract Termination Risk Monitoring |
+| §37 | Data Retention, Erasure & GDPR Compliance Pipeline Observability |
 
 ---
 
@@ -9437,6 +9438,285 @@ COMMENT ON COLUMN tenants.mid_contract_risk_alerted_at IS 'Dedup guard for enter
 | **OQ-ETF-05** | **Should AL-ETF-01 trigger a Metabase CHS dashboard deep-link in the PagerDuty alert body?** This would reduce CSM time-to-investigate from ~5 min (navigate to Metabase manually) to ~30 sec. Requires parameterised Metabase dashboard URL with `tenant_id`. Risk: Metabase URL contains `tenant_id` in plaintext — acceptable in PagerDuty (internal tool) but must never appear in customer-facing communications. | P2 | devops-lead + customer-success | Implement at M11 if Metabase dashboard is live |
 
 ---
+
+---
+
+## §37 Data Retention, Erasure & GDPR Compliance Pipeline Observability
+
+> Owner: compliance-officer + platform-engineer + devops-lead. Review: after any schema change to `data_subject_requests`, `audit_log_events`, or retention schedule; and quarterly. SOC 2 evidence: CC6.5, PI1.2, P4, P6.
+
+### 37.1 Scope
+
+This section defines observability for FORM's data lifecycle pipelines: scheduled retention enforcement, GDPR data subject request (DSAR) fulfillment, user account deletion (consumer), and enterprise off-boarding hard-delete (DEC-036). These pipelines are distinct from day-to-day application operations — they run asynchronously and can fail silently without impacting user-facing features, making dedicated monitoring critical for regulatory compliance.
+
+**Pipelines in scope:**
+
+| Pipeline | Trigger | Regulatory basis | Data deleted / archived |
+|---|---|---|---|
+| Consumer account deletion | User-initiated ("Delete my account") | GDPR Art. 17 | PII, workout history, biometric trends, auth records — within 30 days |
+| DSAR erasure (data subject request) | `data_subject_requests` row with `request_type = 'erasure'` | GDPR Art. 17 | Same as account deletion; 30-day deadline from request receipt |
+| DSAR data export | `data_subject_requests` row with `request_type = 'access'` | GDPR Art. 15 | Export package delivered to user; request closed within 30 days |
+| Enterprise off-boarding Art. 9 hard-delete | `tenants.status = 'offboarding'` (set by CSM) | GDPR Art. 9, DEC-036 | All Art. 9 health data for tenant users; immediate, no grace period |
+| Audit log 7-year retention purge | Monthly pg_cron job | DEC-030, SOC 2 CC6.5 | `audit_log_events` rows older than 7 years (2,557 days) permanently deleted |
+| Workout data purge (post-deletion users) | Daily pg_cron job | GDPR Art. 5(1)(e), FORM retention schedule | `workout_sets`, `workout_sessions`, `body_metrics` for `deleted_at NOT NULL` users past 30-day hold |
+| Revoked API key archive | Triggered at key revocation | Data minimisation | `api_keys` post-revocation PII (scoped secrets) zeroed within 24h; metadata retained 90 days for audit correlation (§31) |
+
+**Out of scope:**
+
+- Supabase internal backup retention (vendor-managed; monitored via S-008 synthetic probe in §16)
+- Cloudflare R2 lifecycle policies (bucket-level TTL, not pipeline-level)
+- Employee data (HR system, not FORM product data)
+
+**DEC-036 note:** Enterprise off-boarding Art. 9 hard-delete has zero grace period. Any recovery window clauses in enterprise contracts were explicitly refused at MSA review (DEC-036). This is the strictest pipeline in scope and drives the tightest alerting thresholds below.
+
+### 37.2 Data retention schedule (summary)
+
+| Data class | Retention period | Post-deletion hold | Purge mechanism | HMAC-chained? |
+|---|---|---|---|---|
+| `audit_log_events` | 7 years from event | None (immutable, never deleted before 7yr) | pg_cron job 27 (monthly) | Yes — DEC-030; chain integrity verified before DELETE |
+| `workout_sets`, `workout_sessions` | Active user lifetime + 30d post-deletion | 30 days | pg_cron job 26 (daily) | No |
+| `body_metrics` | Active user lifetime + 30d post-deletion | 30 days | pg_cron job 26 (daily) | No |
+| `users` PII fields | Until erasure completion | 30 days from deletion request | DSAR Worker | No |
+| `enterprise_users` Art. 9 data | Until off-boarding hard-delete | 0 days (DEC-036) | Off-boarding Worker | No |
+| `api_keys` secret material | Until revocation | 0 days | Key revocation Worker | No |
+| `api_keys` metadata | Until revocation + 90 days | 90 days | pg_cron (existing job 16 scope-adjacent) | No |
+| `rate_limit_violations` | 90 days | None | pg_cron job 16 | No |
+| `api_quota_usage` | 12 months | None (archive then delete per job 17) | pg_cron job 17 | No |
+| `data_subject_requests` | 7 years from closure (regulatory record) | N/A | Archived, not deleted | No |
+
+### 37.3 RED metrics — erasure and retention pipelines
+
+**GDPR Erasure Pipeline:**
+
+| Signal | Type | Description |
+|---|---|---|
+| `erasure_requests_open_count` | Gauge | `COUNT(*) FROM data_subject_requests WHERE request_type = 'erasure' AND status != 'completed'` |
+| `erasure_requests_approaching_deadline` | Gauge | Above WHERE `NOW() - requested_at > INTERVAL '23 days'` (7-day buffer before 30-day deadline) |
+| `erasure_requests_overdue` | Gauge | Above WHERE `NOW() - requested_at > INTERVAL '30 days'` — GDPR violation if > 0 |
+| `erasure_completion_time_days_p95` | Histogram | Time from `requested_at` to `completed_at` for completed erasure requests (7-day rolling window) |
+| `enterprise_offboarding_pending_art9_delete` | Gauge | `COUNT(*) FROM tenants WHERE status = 'offboarding' AND art9_hard_delete_completed_at IS NULL` |
+| `enterprise_offboarding_overdue_art9_delete` | Gauge | Above WHERE `NOW() - offboarding_initiated_at > INTERVAL '24 hours'` — DEC-036 breach if > 0 |
+
+**Retention Purge Pipeline:**
+
+| Signal | Type | Description |
+|---|---|---|
+| `audit_log_rows_pending_purge` | Gauge | `COUNT(*) FROM audit_log_events WHERE event_timestamp < NOW() - INTERVAL '2557 days'` |
+| `workout_data_pending_purge_users` | Gauge | `COUNT(DISTINCT user_id) FROM workout_sessions WHERE user_id IN (SELECT id FROM users WHERE deleted_at < NOW() - INTERVAL '30 days')` |
+| `purge_job_last_run_audit_log` | Gauge | Seconds since last successful run of pg_cron job 27 (sourced from `pg_cron.job_run_details`) |
+| `purge_job_last_run_workout_data` | Gauge | Seconds since last successful run of pg_cron job 26 |
+
+**Data classification note:** No user identifiers appear in dashboards or alert payloads for erasure pipeline metrics — counts only. `data_subject_requests` rows are accessible only to `form_system` and `compliance_reviewer` Postgres roles (RLS enforced). `erasure_requests_approaching_deadline` and `erasure_requests_overdue` are aggregate counts, not lists of user IDs.
+
+### 37.4 SLOs
+
+| SLO ID | Metric | Target | Window | Rationale |
+|---|---|---|---|---|
+| **GDPR-SLO-01** | DSAR erasure completion within 25 days from request receipt | 100% | Rolling 90 days | 5-day buffer before GDPR Art. 17 30-day hard deadline; 100% because any miss is a regulatory breach, not a performance degradation |
+| **GDPR-SLO-02** | DSAR data export (access request) delivered within 25 days | 100% | Rolling 90 days | GDPR Art. 15 symmetry with erasure |
+| **GDPR-SLO-03** | Enterprise Art. 9 hard-delete completed within 4 hours of off-boarding initiation | 100% | Per-event | DEC-036: no grace period; 4h operational target provides on-call response window before breach |
+| **GDPR-SLO-04** | pg_cron job 26 (workout data purge) schedule adherence ± 26h | 99% | Monthly | Daily job; 26h window consistent with §12.6 standard freshness window |
+| **GDPR-SLO-05** | pg_cron job 27 (audit log purge) schedule adherence ± 48h | 99% | Monthly | Monthly job; 48h window is appropriate for low-cadence jobs |
+
+**GDPR-SLO-01 and GDPR-SLO-02 are hard compliance targets, not engineering SLOs.** Missing them is not an error-budget event — it is a potential regulatory violation requiring DPA notification within 72 hours under GDPR Art. 33 if the erasure failure constitutes a personal data breach. Escalation path: compliance-officer → legal counsel → DPA notification decision.
+
+### 37.5 Alert rules
+
+| Alert ID | Trigger | Severity | Routing | Dedup | Auto-resolve |
+|---|---|---|---|---|---|
+| **AL-GDPR-01** | `erasure_requests_approaching_deadline > 0` (any erasure request age > 23 days without completion) | **P0** | PagerDuty `form-compliance` → compliance-officer + platform-engineer; Slack `#gdpr-ops` CRITICAL | `gdpr-erasure-deadline-{request_id}` | Yes, on request completion |
+| **AL-GDPR-02** | `erasure_requests_overdue > 0` (any erasure request age > 30 days without completion) | **P0** | PagerDuty `form-compliance` **immediate page** compliance-officer; Slack `#gdpr-ops` BREACH | `gdpr-erasure-overdue-{request_id}` | No — requires manual compliance-officer close after remediation documented |
+| **AL-GDPR-03** | `enterprise_offboarding_overdue_art9_delete > 0` (Art. 9 hard-delete not completed within 4h) | **P0** | PagerDuty `form-platform` + `form-compliance` dual page; Slack `#enterprise-ops` + `#gdpr-ops` | `art9-delete-overdue-{tenant_id}` | No — manual close after deletion confirmed + DEC-030 evidence artefact captured |
+| **AL-GDPR-04** | `purge_job_last_run_workout_data > 93600` (job 26 stale > 26h) | **P1** | PagerDuty `form-devops` → devops-lead | `purge-job-26-stale` | Yes, on next successful run |
+| **AL-GDPR-05** | `purge_job_last_run_audit_log > 172800` (job 27 stale > 48h) | **P1** | PagerDuty `form-devops` → devops-lead + compliance-officer | `purge-job-27-stale` | Yes, on next successful run |
+| **AL-GDPR-06** | `erasure_requests_open_count > 20` (backlog signal — not per-request urgency, but pipeline health) | **P2** | Slack `#gdpr-ops` WARN; no page | `gdpr-erasure-backlog-high` (24h TTL) | Yes, on count drop below 15 |
+
+**On AL-GDPR-02 manual close requirement:** When an erasure request passes the 30-day deadline, the incident must remain open until: (a) the erasure is confirmed complete, (b) compliance-officer documents the cause and remediation, and (c) a decision is made on DPA notification. Auto-resolve would create a compliance gap where the breach was acknowledged and then silently closed without evidence.
+
+**On AL-GDPR-03 manual close requirement:** Identical logic. Art. 9 breach potential is too severe for auto-resolve. The DEC-030 `user.art9_data_hard_deleted` event chain must be verified before close.
+
+### 37.6 Monitoring queries
+
+**Query: erasure deadline check (source for AL-GDPR-01/02)**
+
+```sql
+-- Run every 6 hours via pg_cron job 26a or inline in GDPR monitoring Worker
+SELECT
+  id AS request_id,
+  user_id,          -- never appears in alert payload — for compliance-officer investigation only
+  requested_at,
+  EXTRACT(EPOCH FROM (NOW() - requested_at)) / 86400 AS age_days,
+  CASE
+    WHEN NOW() - requested_at > INTERVAL '30 days' THEN 'OVERDUE'
+    WHEN NOW() - requested_at > INTERVAL '23 days' THEN 'APPROACHING_DEADLINE'
+    ELSE 'OK'
+  END AS deadline_status
+FROM data_subject_requests
+WHERE request_type = 'erasure'
+  AND status != 'completed'
+ORDER BY requested_at ASC;
+```
+
+**Query: Art. 9 off-boarding overdue check (source for AL-GDPR-03)**
+
+```sql
+SELECT
+  tenant_id,
+  offboarding_initiated_at,
+  EXTRACT(EPOCH FROM (NOW() - offboarding_initiated_at)) / 3600 AS hours_since_offboarding
+FROM tenants
+WHERE status = 'offboarding'
+  AND art9_hard_delete_completed_at IS NULL
+  AND NOW() - offboarding_initiated_at > INTERVAL '4 hours';
+```
+
+**Query: audit log purge eligibility (informational — job 27 pre-run check)**
+
+```sql
+SELECT
+  COUNT(*) AS rows_eligible_for_purge,
+  MIN(event_timestamp) AS oldest_eligible_event,
+  MAX(event_timestamp) AS newest_eligible_event
+FROM audit_log_events
+WHERE event_timestamp < NOW() - INTERVAL '2557 days';
+-- Result must be 0 for first several years; non-zero starting 2033
+```
+
+**Privacy invariants for query results:**
+- `user_id` from DSAR queries is accessible only to `form_system` and `compliance_reviewer` roles; never included in alert payloads, Slack messages, or Metabase panels
+- `tenant_id` from Art. 9 overdue query routes to PagerDuty only; never in Slack channel messages (internal but broad audience)
+- All aggregate counts (AL-GDPR-06 backlog) are count-only; no user-level data
+
+### 37.7 pg_cron jobs (new — jobs 26 and 27)
+
+Two new jobs are defined by this section. These extend the §12.6 pg_cron registry.
+
+**Job 26 — `workout_data_purge` (daily, 02:00 UTC)**
+
+```
+Schedule: 0 2 * * *
+```
+
+```sql
+-- Permanent delete of workout data for users deleted > 30 days ago
+-- Pre-condition: user.deleted_at NOT NULL AND deleted_at < NOW() - INTERVAL '30 days'
+-- Emits data.workout_data_purged DEC-030 STANDARD per user (aggregate count, not per-row)
+DELETE FROM workout_sets
+WHERE session_id IN (
+  SELECT id FROM workout_sessions
+  WHERE user_id IN (
+    SELECT id FROM users
+    WHERE deleted_at IS NOT NULL
+      AND deleted_at < NOW() - INTERVAL '30 days'
+  )
+);
+DELETE FROM workout_sessions
+WHERE user_id IN (
+  SELECT id FROM users
+  WHERE deleted_at IS NOT NULL
+    AND deleted_at < NOW() - INTERVAL '30 days'
+);
+DELETE FROM body_metrics
+WHERE user_id IN (
+  SELECT id FROM users
+  WHERE deleted_at IS NOT NULL
+    AND deleted_at < NOW() - INTERVAL '30 days'
+);
+-- DEC-030 event emitted via pg_net after successful DELETE (count of affected users, not rows)
+```
+
+Freshness window: 26h. PagerDuty P1 AL-GDPR-04 on stale.
+
+**Job 27 — `audit_log_retention_purge` (monthly, 03:00 UTC, 1st of month)**
+
+```
+Schedule: 0 3 1 * *
+```
+
+```sql
+-- Enforce 7-year (2,557-day) retention on audit_log_events
+-- CRITICAL: verify HMAC chain integrity on the oldest N rows BEFORE deleting
+-- Chain verification: the oldest rows should form an unbroken chain; purge only if chain is intact
+
+-- Step 1: Verify chain integrity for rows about to be purged (sample 1000 oldest)
+-- (chain verification logic in audit-chain-verify Worker — call via pg_net before proceeding)
+
+-- Step 2: Delete only after chain verification passes
+DELETE FROM audit_log_events
+WHERE event_timestamp < NOW() - INTERVAL '2557 days';
+
+-- Step 3: Emit DEC-030 data.audit_log_purge_completed STANDARD
+-- Payload: rows_deleted (count), oldest_retained_event_timestamp, verification_result
+```
+
+**DEC-030 ordering for job 27:** The audit log purge itself requires a DEC-030 event. This creates a self-referential constraint: the purge event must be emitted and chained before the oldest rows are deleted, so the chain end-state is preserved in the new tail entry. Implementation: emit `data.audit_log_purge_completed` via `emit-audit-event` Worker, confirm HTTP 200, then DELETE.
+
+Freshness window: 48h. PagerDuty P1 AL-GDPR-05 on stale.
+
+**§12.6 registry additions:**
+
+| Job | Schedule | Freshness window | Purpose | On stale |
+|---|---|---|---|---|
+| 26 `workout_data_purge` | `0 2 * * *` | 26 h | GDPR Art. 5(1)(e) — workout data deletion for post-30d deleted users; emits `data.workout_data_purged` DEC-030 | P1 AL-GDPR-04 `form-devops` |
+| 27 `audit_log_retention_purge` | `0 3 1 * *` | 48 h | DEC-030 / CC6.5 — 7-year audit log retention enforcement; HMAC chain verified before DELETE; emits `data.audit_log_purge_completed` DEC-030 | P1 AL-GDPR-05 `form-devops` + `form-compliance` |
+
+### 37.8 Dashboard — "Data Governance & Erasure Health"
+
+Location: Metabase, Collection `/collections/compliance` (accessible to `FORM-Compliance`, `FORM-DevOps`, `FORM-Security`; not `FORM-Support`).
+
+| Panel | Type | Query | Refresh |
+|---|---|---|---|
+| Open DSAR requests by status | Stacked bar (erasure / access / count) | `data_subject_requests` grouped by `request_type`, `status` | 1h |
+| Erasure deadline distribution | Histogram (age in days for open erasure requests) | `data_subject_requests WHERE status != 'completed' AND request_type = 'erasure'` | 1h |
+| GDPR-SLO-01 compliance rate (rolling 90d) | Stat (%, green/red threshold) | `completed_within_25d / total_erasure_requests` | Daily |
+| Enterprise off-boarding status | Table (tenant name, offboarding_initiated_at, art9_delete_status) | `tenants WHERE status IN ('offboarding', 'offboarded')` last 90d | 1h |
+| Art. 9 hard-delete latency (P95) | Stat (hours) | `PERCENTILE_CONT(0.95)` over `art9_hard_delete_completed_at - offboarding_initiated_at` | Daily |
+| pg_cron jobs 26/27 health | Tile (last run, next run, status) | `pg_cron.job_run_details` WHERE jobid IN (26, 27) | 30 min |
+| Audit log row count near-7yr (informational) | Stat | `COUNT(*) FROM audit_log_events WHERE event_timestamp < NOW() - INTERVAL '2500 days'` | Daily |
+
+**Privacy invariant:** No user IDs, email addresses, or request details appear in any panel. Counts only. Individual request review requires direct Postgres query by `compliance_reviewer` role with incident documentation.
+
+### 37.9 SOC 2 evidence mapping
+
+| Evidence artefact | TSC criterion | Description | Retention |
+|---|---|---|---|
+| GDPR-E-001 | CC6.5 (logical and physical access controls — data retention/deletion) | Monthly export of `data_subject_requests` completion timestamps at `compliance/evidence/gdpr/dsar-completions-YYYY-MM.csv` | 7 yr |
+| GDPR-E-002 | PI1.2 (privacy commitments — data minimisation) | pg_cron job 26 run logs (date, rows_deleted count, success/failure) from `pg_cron.job_run_details` exported quarterly | 7 yr |
+| GDPR-E-003 | PI1.2 / CC6.5 | pg_cron job 27 run logs + HMAC chain verification result per run | 7 yr |
+| GDPR-E-004 | P4 (privacy access — right to erasure) | GDPR-SLO-01 compliance rate (rolling 90d) — must be 100% at audit window | 7 yr |
+| GDPR-E-005 | P6 (privacy choices — right to deletion) | Art. 9 hard-delete latency distribution (P95, P99) per enterprise off-boarding event; `art9_hard_delete_completed_at - offboarding_initiated_at` | 7 yr |
+| GDPR-E-006 | CC6.5 | DEC-030 `user.art9_data_hard_deleted` event chain — append-only HMAC evidence of each enterprise off-boarding deletion | 7 yr (DEC-030 standard) |
+
+**Note on P-series criteria:** SOC 2 Type II Privacy Criteria (P1–P8) are optional and not included in FORM's initial audit scope. However, GDPR-E-001 through GDPR-E-005 are collected proactively because (a) enterprise customers ask for them during security questionnaires, and (b) they support GDPR accountability principle (Art. 5(2)) independently of SOC 2.
+
+### 37.10 Implementation checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create `data_subject_requests` table DDL with `request_type`, `status`, `requested_at`, `completed_at`, `user_id` (FK), `art9_scope` boolean; RLS: `form_system` + `compliance_reviewer` only | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Add `tenants.art9_hard_delete_completed_at TIMESTAMPTZ NULL` and `tenants.offboarding_initiated_at TIMESTAMPTZ NULL` columns via migration | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Implement consumer account deletion Worker: cascade DELETE with 30-day hold, emit `user.account_deletion_initiated` DEC-030 STANDARD | platform-engineer | **P0** | M5 | [ ] |
+| 4 | Implement DSAR erasure Worker: query `data_subject_requests WHERE request_type = 'erasure' AND status = 'pending'`; execute deletion cascade; emit `user.data_erasure_completed` DEC-030 STANDARD; update status to 'completed' | platform-engineer | **P0** | M6 | [ ] |
+| 5 | Implement enterprise Art. 9 off-boarding Worker: triggered on `tenants.status = 'offboarding'`; hard-delete all Art. 9 data for tenant users; emit `user.art9_data_hard_deleted` DEC-030 HIGH per tenant; update `art9_hard_delete_completed_at`; target < 4h from trigger | platform-engineer | **P0** | M6 | [ ] |
+| 6 | Deploy pg_cron job 26 `workout_data_purge` (§37.7 DDL); register in §12.6 freshness table; configure AL-GDPR-04 PagerDuty | devops-lead | **P0** | M6 | [ ] |
+| 7 | Deploy pg_cron job 27 `audit_log_retention_purge` (§37.7 DDL); implement HMAC chain pre-verification via `audit-chain-verify` Worker call; register in §12.6 freshness table; configure AL-GDPR-05 PagerDuty | devops-lead + platform-engineer | **P0** | M7 | [ ] |
+| 8 | Configure AL-GDPR-01 through AL-GDPR-06 in PagerDuty and Better Stack; test AL-GDPR-01 with synthetic request inserted 23+ days ago in staging | devops-lead | **P1** | M6 | [ ] |
+| 9 | Build "Data Governance & Erasure Health" Metabase dashboard (§37.8 spec); restrict to `FORM-Compliance` collection | data-engineer | **P1** | M7 | [ ] |
+| 10 | Configure GDPR-E-001 monthly CSV export to `compliance/evidence/gdpr/` via Cloudflare Cron Worker | devops-lead | **P1** | M7 | [ ] |
+| 11 | Register `data.workout_data_purged`, `data.audit_log_purge_completed`, `user.art9_data_hard_deleted`, `user.data_erasure_completed`, `user.account_deletion_initiated` in `emit-audit-event` Worker event registry (AUDIT_LOG_SCHEMA.md update required) | platform-engineer | **P1** | M6 | [ ] |
+| 12 | GDPR-SLO-01/02/03 registration in SLO tracking framework (§19); deploy `slo_budget_tracking` rows; configure error budget policy (note: GDPR SLOs have no error budget — breach = P0 incident, not budget burn) | devops-lead | **P2** | M8 | [ ] |
+
+### 37.11 Open questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-GDPR-OBS-01** | **Should DSAR erasure completions emit a DEC-030 event, or is the `data_subject_requests.completed_at` timestamp the authoritative record?** DEC-030 provides HMAC-chained tamper evidence but adds complexity for a record that already exists in `data_subject_requests`. Recommendation: emit DEC-030 `user.data_erasure_completed` as the chain-of-custody record; `data_subject_requests` row is the operational state; both are needed for complete SOC 2 evidence. | P1 | compliance-officer + platform-engineer | Resolve before M6 DSAR Worker implementation |
+| **OQ-GDPR-OBS-02** | **Does GDPR-SLO-03 (Art. 9 hard-delete < 4h) apply to enterprise tenants with > 10,000 users, where cascade deletion may take longer than 4h?** At 10,000 users with ~500 workout sessions per user, the cascade DELETE may take 20–60 minutes at Supabase free-tier IOPS. On dedicated Supabase plans the IOPS ceiling is higher but still bounded. Mitigation: batch DELETE via pg_cron (job 26-adjacent) with progress tracking in `tenants.art9_delete_progress_pct`. SLO target may need to be 24h for large tenants. | P1 | platform-engineer + compliance-officer | Resolve before first enterprise GA customer (M13); test with synthetic 10,000-user tenant in staging |
+| **OQ-GDPR-OBS-03** | **Should the Art. 9 off-boarding Worker hard-delete the `audit_log_events` rows for enterprise tenant users?** DEC-030 requires 7-year retention for audit events; GDPR Art. 9 requires deletion of health data. The audit log may contain health-adjacent events (workout completion with RPE, body weight check-in). Tension: delete audit log rows (GDPR compliant) vs retain (DEC-030 compliant). Resolution path: pseudonymise `user_id` in audit log rows at off-boarding (replace UUID with deterministic hash that cannot be reversed without the original UUID, which is also deleted). Requires legal counsel confirmation. | P0 | compliance-officer + legal + security-engineer | Resolve before enterprise GA (M13); current recommendation is pseudonymisation |
+
+---
+
+*v3.3 (2026-06-12): §37 Data Retention, Erasure & GDPR Compliance Pipeline Observability — closes observability gap for FORM's data lifecycle pipelines. Seven pipelines in scope (§37.1): consumer account deletion, DSAR erasure, DSAR data export, enterprise Art. 9 hard-delete (DEC-036), audit log 7-year retention purge, workout data purge, revoked API key archive. Data retention schedule (§37.2): eight data classes with retention periods, post-deletion holds, and purge mechanisms. RED metrics (§37.3): six gauge metrics covering erasure request age, Art. 9 overdue state, purge job freshness; privacy invariant: counts only in dashboards, no user IDs in alert payloads. Five SLOs (§37.4): GDPR-SLO-01/02 (100% DSAR completion within 25d — hard compliance targets, not error-budget SLOs), GDPR-SLO-03 (Art. 9 hard-delete within 4h — DEC-036), GDPR-SLO-04/05 (purge job schedule adherence). Six alert rules AL-GDPR-01 through AL-GDPR-06 (§37.5): AL-GDPR-01 P0 (erasure approaching deadline, 23d trigger), AL-GDPR-02 P0 no-auto-resolve (erasure overdue — potential GDPR violation), AL-GDPR-03 P0 no-auto-resolve (Art. 9 hard-delete overdue — DEC-036), AL-GDPR-04 P1 (purge job 26 stale), AL-GDPR-05 P1 (purge job 27 stale), AL-GDPR-06 P2 (backlog signal). Postgres monitoring queries (§37.6): deadline check, Art. 9 overdue check, audit log purge eligibility. Two new pg_cron jobs (§37.7): job 26 `workout_data_purge` (daily 02:00 UTC, 26h window) + job 27 `audit_log_retention_purge` (monthly 01st 03:00 UTC, 48h window) with HMAC pre-verification and DEC-030 post-emission; §12.6 registry rows added. Seven-panel "Data Governance & Erasure Health" Metabase dashboard (§37.8): FORM-Compliance collection only, count-only panels, no user IDs. Six SOC 2 evidence artefacts GDPR-E-001 through GDPR-E-006 (§37.9): CC6.5, PI1.2, P4, P6 (Privacy Criteria collected proactively for enterprise procurement even outside initial audit scope). Twelve-item implementation checklist P0–P2 across M5–M8 (§37.10). Three open questions OQ-GDPR-OBS-01/02/03 (§37.11): DEC-030 vs operational record for erasure completions; Art. 9 SLO at scale (> 10,000-user tenants); audit log pseudonymisation at off-boarding (P0 tension between DEC-030 7-year retention and GDPR Art. 9 deletion — legal counsel required). TOC entry added. Cross-ref: DATA_MODEL.md §6 (user schema — `deleted_at`); AUDIT_LOG_SCHEMA.md v1.7 (event registry — five new events); INCIDENT_RESPONSE.md R-15 (GDPR breach notification runbook); docs/GDPR_DPIA.md (Art. 9 classification); docs/BUSINESS_CONTINUITY.md §5 (backup architecture); DEC-030 (append-only audit log — informs job 27 HMAC pre-verification requirement); DEC-036 (Art. 9 hard-delete, zero grace period). Owner: compliance-officer + platform-engineer + devops-lead.*
 
 *v3.2 (2026-06-12): §29.12 OQ-PAM-OBS-01 Resolution + §29.13 OQ-PAM-OBS-02 Resolution — closes both open questions from §29.11 (v1.6, 2026-06-03). OQ-PAM-OBS-01 (P1, before M4 deploy): same UUID as DEC-030 events confirmed for `admin_user_id` in Analytics Engine `PAM_TELEMETRY`; separate-pseudonym approach rejected (requires translation table, degrades forensic correlation, adds investigation latency against PAM-SLO-01 60 s zero-tolerance); access-control approach adopted instead (§29.12.2): Metabase Collection `/collections/pam-security` restricted to `FORM-DevOps`, `FORM-Security`, `FORM-Compliance` groups; `cf-ae-pam-read` Cloudflare API token scoped to `PAM_TELEMETRY` binding; investigation procedure (UUID queries require active PagerDuty incident) documented as procedural control; SOC 2 CC6.1 row in §29.9 updated; four-item P0/P1 M4 implementation checklist at §29.12.4. OQ-PAM-OBS-02 (P2, before enterprise GA M13): aggregate count panel accepted; quarterly PDF rejected (does not remove pre-close procurement blocker, scales linearly with CSM hours); `GET /api/admin/tenants/:tenantId/pam-activity` Worker endpoint specified (§29.13.2): dual-query backend — `privilegedOperationsCount` (COUNT pam_session_id-tagged audit events) + `breakGlassActivations` (COUNT pam.break_glass_activated, not token_issued or admin_login); period default = current month; max 90-day window; rate limit 60 req/min; response schema strictly typed (§29.13.2); five privacy floor invariants enforced by schema (§29.13.4: no admin_user_id, no pam_session_id, no operation type, no session duration, no access_level); static `noteOnBreakGlass` text when activations > 0; Admin Dashboard "Privileged Access Activity" card placement spec (§29.13.5: Security & Compliance tab, below Audit Log Export, period selector, green/amber break-glass indicator); DEC-030 not required for API query (read-only, consistent with §13.4 SLA API); DEC-030 `admin.pam_activity_report_downloaded` deferred to CSV export (P2 M8, §29.13.8 item 3); SOC 2 CC6.1 + C1.2 mapping (§29.13.7); five-item implementation checklist P0/P1/P2 M5–M8 (§29.13.8). TOC updated to add §29.12 and §29.13 entries. §29.11 OQ rows updated to 🟢 Resolved. Owner: security-engineer + compliance-officer + enterprise-architect + customer-success.*
 

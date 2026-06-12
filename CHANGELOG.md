@@ -6,6 +6,14 @@
 
 ---
 
+## [3.88.2] — 2026-06-12
+
+### Changed
+- `docs/OBSERVABILITY.md` v3.2 → v3.3 — §37 Data Retention, Erasure & GDPR Compliance Pipeline Observability: seven pipelines in scope (consumer account deletion, DSAR erasure/access, enterprise Art. 9 hard-delete per DEC-036, audit log 7yr retention purge, workout data purge, revoked API key archive). Data retention schedule (§37.2): eight data classes with retention periods, post-deletion holds, purge mechanisms. RED metrics (§37.3): six gauges covering DSAR deadline status, Art. 9 overdue state, purge job freshness — counts only in dashboards, no user IDs in alert payloads. Five SLOs (§37.4): GDPR-SLO-01/02 (100% DSAR completion within 25 days — hard compliance targets), GDPR-SLO-03 (Art. 9 hard-delete < 4h — DEC-036), GDPR-SLO-04/05 (purge job schedule adherence). Six alert rules AL-GDPR-01 through AL-GDPR-06 (§37.5): P0 no-auto-resolve for overdue erasure (GDPR violation risk) and overdue Art. 9 delete (DEC-036). Postgres monitoring queries (§37.6). Two new pg_cron jobs (§37.7): job 26 `workout_data_purge` (daily 02:00 UTC) + job 27 `audit_log_retention_purge` (monthly 01st 03:00 UTC) with HMAC chain pre-verification and DEC-030 post-emission; §12.6 registry rows added. Seven-panel "Data Governance & Erasure Health" Metabase dashboard (§37.8): FORM-Compliance collection only. Six SOC 2 evidence artefacts GDPR-E-001 through GDPR-E-006 (CC6.5, PI1.2, P4, P6). Twelve-item checklist P0–P2 across M5–M8 (§37.10). Three open questions OQ-GDPR-OBS-01/02/03 including P0 tension between DEC-030 7yr retention and GDPR Art. 9 deletion (pseudonymisation resolution path, legal counsel required). TOC updated. Cross-ref: DATA_MODEL.md §6, AUDIT_LOG_SCHEMA.md v1.7, INCIDENT_RESPONSE.md R-15, GDPR_DPIA.md, BUSINESS_CONTINUITY.md §5, DEC-030, DEC-036. Owner: compliance-officer + platform-engineer + devops-lead.
+- `VERSION` — 3.88.1 → 3.88.2
+
+---
+
 ## [3.88.1] — 2026-06-12
 
 ### Changed
