@@ -6,6 +6,18 @@
 
 ---
 
+## [4.6.0] — 2026-06-12
+
+### Added
+- `compliance/dpa/README.md` — DPA Receipt Registry v1.0; canonical `compliance/dpa/` directory created (closes structural gap C1-GAP-003 🔴 → 🟡 Authored); 11-row status table for all GDPR Art. 28 sub-processors (SP-01–SP-11) with DPA status, SCC requirement, collection method, and remediation deadlines; collection procedure (5 steps: click-through, email request, SCC Module 2 verification, evidence filing, deadline tracking); DEC-030 event schema for `vendor.dpa_executed` / `vendor.dpa_renewed` / `vendor.dpa_lapsed` / `vendor.dpa_removed` (HIGH severity, 7yr HMAC-chained); SOC 2 evidence mapping (C1.1, CC9.2, P6.2–P6.3); DPA request email template; placeholder file tree for all 11 vendor receipts; PRE-34-E-004 structural artefact advanced from 🔴 To collect → 🟡 Authored; VRM-GAP-001 P0 collection procedure defined · owners: compliance-officer + security-engineer + enterprise-architect
+- `compliance/dpa/dpa-collection-checklist.md` — reusable per-vendor DPA collection checklist template; 20+ pre/during/post-collection verification steps; SHA-256 hash chain-of-custody requirement; evidence artifact row template for `compliance/policy-approval-log.csv`; DEC-030 emission confirmation; copy and rename pattern `dpa-collection-checklist-{vendor}-YYYY-MM-DD.md` · P0 gate artefact for all SP DPA collections
+- `compliance/dpa/apple-dpla-compensating-control.md` — SP-05 Apple APNs GDPR Art. 28 compensating control documentation v1.0; gap description (Apple does not offer standalone Art. 28 DPA for APNs); four compensating controls: (1) data minimisation — no Art. 9 health data in APNs payloads, enforced by `notifications-worker` Zod schema with DEC-030 `notifications.health_data_in_push_blocked` CRITICAL alert; (2) DPLA acceptance record placeholder; (3) EU-US DPF adequacy transfer basis (Apple self-certified); (4) outside counsel assessment pending (OQ-VRM-01, pre-Series A); SOC 2 C1.1 auditor narrative · closes OQ-VRM-01 partially
+
+### Changed
+- `VERSION` — 4.5.0 → 4.6.0
+
+---
+
 ## [4.5.0] — 2026-06-12
 
 ### Added
