@@ -6,6 +6,18 @@
 
 ---
 
+## [4.3.0] — 2026-06-12
+
+### Added
+- `compliance/p1/privacy-policy-changelog.md` (P1-CLP-001 v1.0) — formal Privacy Policy version changelog; remediates PRV-05 (`docs/SOC2_READINESS.md §35.3.1`): defines `YYYY-MM-vN` version scheme, `CONSENT_SCHEMA_VERSION` deployment process, material vs non-material change classification (8 material / 5 non-material criteria), per-step deployment runbook with DEC-030 event triggers, version history from `2026-05-v1` (initial draft), consent re-request log, SOC 2 evidence classification (PRE-35-E-002 supporting); closes the "changelog doc not yet created" gap blocking PRV-05 from 🟡 Partial → 🟡 Authored; pending staging DEC-030 event sample for full PRE-35-E-002 closure · owners: compliance-officer + security-engineer + enterprise-architect
+
+### Changed
+- `docs/SOC2_READINESS.md §35.3.1 PRV-05` — status updated from "changelog doc not yet created" → "🟡 Authored — P1-CLP-001 created 2026-06-12"; `consent_version` format example corrected (`2026-01-v1` → `2026-05-v1` matching `PRIVACY_POLICY.md` draft date); PRE-35-E-002 status updated (staging pending)
+- `docs/SOC2_READINESS.md §P6 summary table` — P-GAP-006 government request handling policy status corrected from stale "🟡 Gap" → "🟡 Authored": `compliance/p1/gov-request-policy.md` was authored 2026-06-10 (reflected in §75 since v4.x); summary table was lagging
+- `VERSION` — 4.2.0 → 4.3.0
+
+---
+
 ## [4.2.0] — 2026-06-12
 
 ### Added

@@ -228,7 +228,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 |---|---|---|
 | Breach notification procedure | ✅ Done | `docs/SECURITY.md` §6 — 72h supervisory authority, user notification |
 | Sub-processor disclosure | 🟢 Done | `/subprocessors.html` live at `form.coach/legal/sub-processors`; 11 sub-processors; P-GAP-002 🟢 Closed (§75.6) |
-| Government request handling policy | 🟡 Gap | Define; FORM declines government backdoor requests (docs/ENTERPRISE.md) |
+| Government request handling policy | 🟡 Authored | `compliance/p1/gov-request-policy.md` P1-CIP-002 v1 (2026-06-10) — four-principle framework: legal-review-first, narrowest response, user notification, annual transparency report; P-GAP-006 🟡 Authored (§75 P-CIP-002 cross-reference); pending outside counsel review + founder signature |
 
 ### P7 — Quality
 
@@ -5639,7 +5639,7 @@ The AICPA P-series (P1 through P8) maps almost one-for-one onto the GDPR obligat
 | **PRV-02** | Art. 13 notice delivered at point of collection — onboarding screen presents privacy notice before any health data field is surfaced; user must scroll to bottom before consent button activates | Onboarding flow gated on scroll completion; notice text references form.coach/privacy; data categories described in plain language | 🟡 Partial — implemented in code; not yet in production | PRE-35-E-003 (onboarding screenshot) |
 | **PRV-03** | Cookie consent banner on form.coach marketing site; analytics cookies blocked until opt-in; `privacy.cookies_changed` DEC-030 event logged | ✅ `form-consent-gate` Worker + `consent_records` migration 0037 + mobile Art. 9 consent gate authored §74 (2026-06-09). **Remaining:** production deployment, smoke test. | 🟡 Authored — P-GAP-003 | PRE-74-E-001 (deployment log) |
 | **PRV-04** | Privacy policy explicitly covers all Art. 9 data categories: health_profile, meal_log, wearable_data, cv_workout_analysis, ED-screening result (PA-01–PA-12 per GDPR_DPIA.md §3) | Per-category table in policy: purpose, legal basis, retention period, deletion mechanism | 🟡 Partial — P-GAP-001 policy page authored (DEC-037; PRE-01 → 🟡); retention schedule (P-GAP-004) pending counsel sign-off | PRE-35-E-001 |
-| **PRV-05** | Privacy policy version management — `consent_version` field in `privacy.consent_granted` DEC-030 event ties each consent record to the policy version in force at time of consent | Semantic version string (e.g., `2026-01-v1`) stamped on every `privacy.consent_granted` event; policy changelog in `compliance/p1/privacy-policy-changelog.md` | 🟡 Partial — field defined in DEC-030 schema; changelog doc not yet created | PRE-35-E-002 (DEC-030 event sample) |
+| **PRV-05** | Privacy policy version management — `consent_version` field in `privacy.consent_granted` DEC-030 event ties each consent record to the policy version in force at time of consent | Semantic version string (e.g., `2026-05-v1`) stamped on every `privacy.consent_granted` event; policy changelog at `compliance/p1/privacy-policy-changelog.md` (P1-CLP-001 v1.0, 2026-06-12) — defines `YYYY-MM-vN` format, material/non-material classification, deployment process, version history from `2026-05-v1`, and consent re-request log | 🟡 Authored — P1-CLP-001 created 2026-06-12; pending staging DEC-030 event sample | PRE-35-E-002 (DEC-030 event sample — staging pending) |
 
 #### 35.3.2 Art. 13/14 Notice Delivery Architecture
 
