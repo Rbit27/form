@@ -966,10 +966,10 @@ Each iteration:
 - [x] post-552: Плато, яке не є плато — три типи (накопичена втома / недостатній стимул / справжня стагнація); Meeusen 2013 FOR/NFOR/OTS; Fry 2004; Israetel et al. 2019 MEV/MAV/MRV; Schoenfeld & Grgic 2020; Issurin 2010 блокова periodизація; 3-питання діагностика; таблиця рішень; clinical-safety NOT REQUIRED · authored v4.1.0
 - [x] post-553: Мінімалістична програма — 3–4 вправи на тренування без втрати результату; MEV/MAV/MRV (Israetel et al. 2019); Krieger (2010) JSCR спадна гранична корисність; Schoenfeld & Grgic (2020); SAID (Kraemer & Ratamess 2004); Fonseca et al. (2014) регіональна гіпертрофія; Bickel et al. (2011); Marcora et al. (2009) ментальна втома; протокол переходу і таблиця «що прибрати»; clinical-safety NOT REQUIRED · authored v4.2.0
 - [x] post-554: Як зробити перший відеозапис свого тренування — протокол самооцінки техніки; кути зйомки, що шукати, що ігнорувати; Wulf & Prinz (2001) зовнішній фокус, Kompf & Arandjelovic (2016) стікінг-поінти · authored v4.4.0
-- [ ] post-555: Перехід з 3-денного на 4-денний тиждень — коли і як збільшувати частоту тренувань; Schoenfeld et al. (2016) frequency meta-analysis; practical split structures; adherence-перевірка до переходу
-- [ ] post-556: Як тренуватися при легкому нездужанні — правило «над шиєю», імунна відповідь на вправи (Nieman 2011 BJSM), коли продовжити і коли зупинитися; clinical-safety REQUIRED
-- [ ] post-557: Чому техніка деградує під втомою — моторний контроль і стомлюваність (Enoka & Duchateau 2008 J Physiol); практичний протокол самоперевірки після відмови
-- [ ] post-558: Адаптація без рекордів — чому «не ставлю нові max» не означає «не прогресую»; нейральні адаптації, сухожилкова жорсткість, якість руху як показники поза вагою; Sale (1988), Reeves et al. (2003)
+- [x] post-555: Перехід з 3-денного на 4-денний тиждень — Schoenfeld et al. (2016) JSCR meta-analysis; три 4-денні структури (Upper/Lower, PPL+1, Full body×4); 3-питання adherence check; протокол переходу без стрибка обʼєму; clinical-safety NOT REQUIRED · authored v4.5.0
+- [x] post-556: Тренування при легкому нездужанні — Nieman (2011) BJSM J-curve; Gleeson (2007) open window; матриця рішень; абсолютні критерії зупинки; clinical-safety-pending — REVIEW REQUIRED before publish · authored v4.5.0
+- [x] post-557: Чому техніка деградує під втомою — Enoka & Duchateau (2008) J Physiol; три локуси деградації; технічна vs м'язова відмова операційні критерії; маркери зупинки; clinical-safety NOT REQUIRED · authored v4.5.0
+- [x] post-558: Адаптація без рекордів — Sale (1988); Reeves et al. (2003) +65% сухожилкова жорсткість; 5 типів прихованих адаптацій; хронологічна таблиця; clinical-safety NOT REQUIRED · authored v4.5.0
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -1014,4 +1014,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v4.4.0 (post-554 · відеозапис тренування / самооцінка техніки · clinical-safety NOT REQUIRED · blog.html +554 card · roadmap post-554 [x])
+**Last update:** 12 червня 2026 · v4.5.0 (posts 555–558 authored · blog.html +4 cards = 464 total · post-556 clinical-safety REVIEW PENDING · roadmap post-555/556/557/558 [x])

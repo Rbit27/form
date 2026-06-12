@@ -6,6 +6,22 @@
 
 ---
 
+## [4.5.0] — 2026-06-12
+
+### Added
+- `content/post-555-frequency-3-to-4-days.md` — «Перехід з 3-денного на 4-денний тиждень: коли і як збільшувати тренувальну частоту»; Schoenfeld et al. (2016) JSCR meta-analysis обʼєм як первинний драйвер (не частота сама по собі); Ralston et al. (2017) Sports Med; McLester et al. (2000) JSCR розподіл обʼєму per session; Colquhoun et al. (2018) JSCR; 3-питання adherence check; сигнали «надто рано» vs «час переходити»; три структури 4-денного тижня (Upper/Lower, PPL+1, Full body×4); протокол переходу без стрибка обʼєму; clinical-safety NOT REQUIRED · ~10 хв читання
+- `content/post-556-training-during-illness.md` — «Тренування при легкому нездужанні: правило «вище-нижче шиї» та його реальні межі»; Nieman (2011) BJSM J-curve імунна відповідь на навантаження; Gleeson (2007) J Appl Physiol open window hypothesis; Walsh et al. (2011) consensus; Peters & Bateman (1983) Comrades marathon; матриця рішень (симптом→дія); абсолютні критерії зупинки (температура ≥38°C, біль у грудях, задишка → зупинити + лікар); модифіковані параметри при легких симптомах (-40-50% інтенсивності, ≤40хв); протокол повернення; **status: clinical-safety-pending — CLINICAL-SAFETY REVIEW REQUIRED before publish** · ~10 хв читання
+- `content/post-557-technique-degradation-fatigue.md` — «Чому техніка деградує під втомою: моторний контроль і механізм вимкнення»; Enoka & Duchateau (2008) J Physiol центральна vs периферична втома; Kompf & Arandjelovic (2016) реорганізація моторної програми; три первинні локуси деградації (dorsiflexion при присіданні, округлення попереку при тязі, протракція плеча при жимі); технічна vs м'язова відмова — операційні критерії; 3-питання self-check протокол; маркери зупинки для присідань / тяги / жиму; clinical-safety NOT REQUIRED · ~11 хв читання
+- `content/post-558-adaptation-without-records.md` — «Адаптація без рекордів: чому "не ставлю нові максимуми" не означає "не прогресую"»; Sale (1988) Exercise Sport Sci Rev нейральні адаптації без гіпертрофії; Häkkinen et al. (1998) Acta Physiol Scand RFD і якість скорочення; Reeves et al. (2003) J Appl Physiol +65% сухожилкової жорсткості за 14 тижнів; Folland & Williams (2007) Sports Med; 5 типів прихованих адаптацій (нейральна ефективність, сухожилкова жорсткість, RFD, автоматизація руху, еластичний потенціал); хронологічна таблиця адаптацій; як відстежувати без лабораторного обладнання; clinical-safety NOT REQUIRED · ~11 хв читання
+
+### Changed
+- `blog.html` — додано картки post-555, post-556 (clinical-safety REVIEW PENDING), post-557, post-558; всього 464 картки
+- `README.md` — roadmap: post-555/556/557/558 позначено [x] authored v4.5.0; Last update оновлено
+- `STATUS.md` — v4.5.0; post-556 clinical-safety PENDING
+- `VERSION` — 4.4.0 → 4.5.0
+
+---
+
 ## [4.4.0] — 2026-06-12
 
 ### Added
