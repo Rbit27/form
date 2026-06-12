@@ -6,6 +6,14 @@
 
 ---
 
+## [3.94.1] — 2026-06-12
+
+### Changed
+- `docs/SOC2_READINESS.md` §25.7 + §27.2.5 — back-propagated ETF evidence artefacts ETF-E-001, ETF-E-002, ETF-E-003 from `docs/OBSERVABILITY.md §36.4` (added v3.83.0); §25.7 CC7.2 evidence table +ETF-E-002 (AL-ETF-01 alert dispatch log, PagerDuty `form-customer-success` + Slack `#enterprise-health`, CC7.2); new §27.2.5 subsection with ETF-E-001 (`enterprise.mid_contract_termination_risk_flagged` DEC-030 chain, pg_cron job 25 Mondays 09:00 UTC, CC5.2) and ETF-E-003 (`enterprise.early_termination_fee_waived` DEC-030 chain, five-tier approval authority matrix COST_MODEL.md §35.5.5, HMAC ordering guard AUDIT_LOG_SCHEMA.md §6 v1.7, CC5.2); doc version note v3.6.2 appended; no gap register change
+- `VERSION` — 3.94.0 → 3.94.1
+
+---
+
 ## [3.94.0] — 2026-06-12
 
 ### Added
