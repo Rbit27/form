@@ -6,6 +6,15 @@
 
 ---
 
+## [4.18.0] — 2026-06-12
+
+### Added
+- `content/post-585-motivational-climate-autonomy-training.md` — Мотиваційний клімат і автономія у тренуванні; Deci & Ryan (1985, 2000) SDT — мотиваційний континуум від зовнішньої до внутрішньої регуляції і три базові психологічні потреби (автономія/компетентність/зв'язок); Ntoumanis (2001) Br J Educ Psychol — autonomy-supportive vs controlling клімат у фізичній активності; Mageau & Vallerand (2003) J Sports Sci — сім поведінок тренера, що підтримують автономію; Pelletier et al. (1995) SMS і Relative Autonomy Index; Teixeira et al. (2012) IJBNPA систематичний огляд 66 досліджень — autonomy support як найсильніший предиктор adherence; інтроєктована vs ідентифікована регуляція — крихкість при стресі і what-the-hell effect; Martela & Ryan (2015) виснаження від shame-based regulation; self-coached клімат: 5 принципів автономно-підтримуючого самоструктурування; clinical-safety NOT REQUIRED
+- `blog.html` +1 card = 352 total
+- `README.md` roadmap: post-585 (SDT мотиваційний клімат) marked done; пост-589–592 нові теми додані
+
+---
+
 ## [4.17.1] — 2026-06-12
 
 ### Changed
