@@ -6,6 +6,19 @@
 
 ---
 
+## [3.94.0] — 2026-06-12
+
+### Added
+- `content/post-540-subjective-signal-not-instruction.md` — «Суб'єктивний сигнал як дані — чому «слухати тіло» і «терпіти біль» однаково неточні»: Moseley & Butler (2015) *Journal of Pain* — біль як захисний сигнал, а не датчик пошкодження; Naugle et al. (2012) *Journal of Pain* — exercise-induced hypoalgesia (EIH); Borg (1982) RPE-шкала; Foster et al. (2001) *JSCR* session RPE; Zourdos et al. (2016) *JSCR* r=0.78 RIR-калібрування; Helms et al. (2016) *IJSPP* калібрувальний gap; Schoenfeld (2010) DOMS vs гіпертрофічний стимул; три категорії сигналів: м'язова втома / дискомфорт виклику / захисний больовий сигнал; практичний алгоритм «де/характер/техніка/RIR»; повний перелік red flags і критерії ескалації до лікаря. sports_scientist_review: APPROVED; clinical_safety: CONDITIONAL PASS (2026-06-12) — required changes applied: pain category 3 hard-stop, explicit medical referral criteria, scope carve-out for existing injuries/conditions.
+- blog cards for post-538, post-539, post-540 added to `blog.html` (451 cards, 540 posts authored)
+
+### Changed
+- `README.md` — post-540 позначений [x] у roadmap; нові теми post-541+ додані; Last update → v3.94.0
+- `STATUS.md` — Version 3.94.0; blog.html рядок → 451 cards (540 posts); content engine table +4 рядки (537–540)
+- `VERSION` — 3.93.0 → 3.94.0
+
+---
+
 ## [3.93.0] — 2026-06-12
 
 ### Added

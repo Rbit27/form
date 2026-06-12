@@ -949,7 +949,12 @@ Each iteration:
 - [x] post-537: Тренування без видимих результатів — 12 тижнів пройшли, нічого не змінилось; діагностика «справжнього» плато vs нормального темпу адаптації; Schoenfeld (2010) adaptation timeline; три рівні перевірки (об'єм, інтенсивність, відновлення); clinical-safety NOT REQUIRED · authored v3.92.0
 - [x] post-538: Як побудувати перший тренувальний журнал — мінімальна структура без надмірного відстеження; що фіксувати обов'язково (вага, повторення, RIR), що опціонально (RPE тренування, самопочуття), як аналізувати дані без PhD; clinical-safety NOT REQUIRED · authored v3.93.0
 - [x] post-539: Тренування після важкої хвороби — різниця між «над шиєю» і системним запаленням; timeline повернення (5–14 днів залежно від важкості); чому «de-load до нуля» не є правилом; сигнали готовності; clinical-safety CONDITIONAL PASS · authored v3.93.0
-- [ ] post-540: Чому «слухати тіло» і «ігнорувати біль» — обидва погані поради; суб'єктивний сигнал як дані, не інструкція; навчання інтерпретувати RPE, дискомфорт і реальний біль; clinical-safety REVIEW REQUIRED
+- [x] post-540: Суб'єктивний сигнал як дані — три категорії сигналів (м'язова втома / дискомфорт виклику / захисний больовий сигнал); Moseley & Butler (2015) біль як захист, не датчик пошкодження; Naugle et al. (2012) exercise-induced hypoalgesia; RIR-калібрування як переклад суб'єктивного; алгоритм «де/характер/техніка/RIR»; red flags і критерії ескалації; clinical-safety CONDITIONAL PASS · authored v3.94.0
+
+    ── ROADMAP (наступні editorial теми · post-541+) ─────────────────────────
+- [ ] post-541: Тренування при хронічному стресі — відмінність між «не хочу» і «не можу»; HPA-axis і cortisol-suppression VO2/сили; практичний протокол зниження об'єму при life-load; clinical-safety REVIEW REQUIRED
+- [ ] post-542: Як оцінити свою техніку без тренера — самодіагностика з телефону; Wulf & Prinz (2001) зовнішній фокус; video review чеклист; сигнали поганої техніки у RIR-записах; clinical-safety NOT REQUIRED
+- [ ] post-543: Новачок до середнього рівня — конкретні критерії переходу; де ламаються новачки після 6 місяців; перша нелінійна програма; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -994,4 +999,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v3.93.0 (post-538 · training journal first build + post-539 · training after illness · roadmap post-540 next)
+**Last update:** 12 червня 2026 · v3.94.0 (post-540 · суб'єктивний сигнал як дані · clinical-safety CONDITIONAL PASS · blog cards 538–540 added · roadmap post-541+ new)
