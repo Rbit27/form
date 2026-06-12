@@ -979,6 +979,11 @@ Each iteration:
 - [x] post-565: Моторна уява і сила — Jeannerod (2001) NeuroImage нейральна симуляція; Ranganathan et al. (2004) Neuropsychologia +35% сили від ментального тренування без руху; Driskell et al. (1994) JAP мета-аналіз 35 досліджень d=0.48; PETTLEP Holmes & Collins (2001) функціональна еквівалентність; практика 3 хв від першої особи у реальному темпі; clinical-safety NOT REQUIRED · authored v4.8.0
 - [x] post-566: Автономна мотивація і adherence — Ryan & Deci (2000) Am Psychol SDT спектр мотивації; Teixeira et al. (2012) IJBNPA систематичний огляд 66 досліджень; Deci et al. (1999) Psychol Bull мета-аналіз підриву внутрішньої мотивації; три базові потреби (автономія/компетентність/зв'язок); чому сила волі не відповідь; clinical-safety NOT REQUIRED · authored v4.8.0
 - [x] post-567: Ефект очікування в тренінгу — Beedie & Foad (2009) Sports Med плацебо-ефект у спортивній продуктивності; Beedie et al. (2006) MSSE кофеїновий плацебо; Ross et al. (2015) MSSE відновлювальне плацебо; Noakes (2004) центральний губернатор; nocebo-ефект скептицизму; фільтр «розумний план → повна впевненість»; clinical-safety NOT REQUIRED · authored v4.8.0
+- [x] post-568: Самоефективність у силовому тренінгу — Bandura (1977) Psychol Rev чотири джерела SE; Moritz et al. (2000) RQES мета-аналіз 45 досліджень r=0.38; досвід майстерності / вікарний досвід / вербальне переконання / arousal reinterpretation; Jones & Swain (1995) Sport Psychologist; Hays et al. (2009) J Sports Sci; Feltz & Riessinger (1990); алгоритм після провалу; clinical-safety NOT REQUIRED · authored v4.8.1
+- [ ] post-569: Постановка цілей у силовому тренінгу — Locke & Latham (1990) goal-setting theory; process vs outcome goals; proximity effects; чому «хочу бути сильніший» гірше за «+5 кг на присіданні за 8 тижнів»; clinical-safety NOT REQUIRED
+- [ ] post-570: Конкурентна тривога і збудження — Yerkes-Dodson inverted-U; IZOF Hanin (1997); catastrophe model Hardy (1990); тривога стан vs тривога риса; як конкурентне середовище залу впливає на продуктивність; clinical-safety NOT REQUIRED
+- [ ] post-571: Реалізаційні наміри і adherence — Gollwitzer (1999) Am Psychol «if-then» planning; Milne et al. (2002) Br J Health Psychol ефект на gym attendance; practical шаблон для тренувального тижня; clinical-safety NOT REQUIRED
+- [ ] post-572: Атрибуційний стиль і тренувальна резилієнтність — Weiner (1985) attribution theory; internal/external, stable/unstable, controllable/uncontrollable; як атрибуція провалу впливає на SE і наполегливість; Biddle et al. (1996) IJSP спортивний контекст; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -1023,4 +1028,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v4.8.0 (posts 564–567 authored · blog.html +4 cards = 334 total · clinical-safety NOT REQUIRED · roadmap post-564–567 [x])
+**Last update:** 12 червня 2026 · v4.8.1 (post-568 authored · blog.html +1 card = 335 total · clinical-safety NOT REQUIRED · roadmap post-569–572 додано)

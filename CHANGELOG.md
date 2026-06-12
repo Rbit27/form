@@ -6,6 +6,19 @@
 
 ---
 
+## [4.8.1] — 2026-06-12
+
+### Added
+- `content/post-568-self-efficacy-strength-training.md` — «Самоефективність у силовому тренінгу: чотири джерела впевненості у власних здатностях»; Bandura (1977) Psychol Rev самоефективність як task-specific переконання у здатності; Moritz et al. (2000) RQES мета-аналіз 45 досліджень r=0.38 SE→продуктивність; чотири джерела SE: досвід майстерності / вікарний досвід / вербальне переконання / фізіологічні стани; Jones & Swain (1995) Sport Psychologist arousal reinterpretation у залежності від SE; Hays et al. (2009) J Sports Sci елітні атлети і управління SE; Feltz & Riessinger (1990) recalled mastery; протокол самокерованого атлета: записи попередніх успіхів / консервативний вхід у нові ваги / переосмислення збудження; SE після провалу — алгоритм повернення; clinical-safety NOT REQUIRED
+- `blog.html` — +1 картка для post-568 (335 total)
+- `README.md` — roadmap posts 568–572 додано; post-568 [x]; Last update → v4.8.1
+- `STATUS.md` — оновлено до v4.8.1; 568 постів; blog.html 335 cards
+
+### Changed
+- `VERSION` — 4.8.0 → 4.8.1
+
+---
+
 ## [4.8.0] — 2026-06-12
 
 ### Added
