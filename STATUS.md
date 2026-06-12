@@ -508,6 +508,8 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-542-self-technique-assessment.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist REVIEWED · blog card: Читати → · v3.97.0 |
 | post-543-beginner-to-intermediate-criteria.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist REVIEWED · blog card: Читати → · v3.97.0 |
 | post-544-self-sufficient-athlete.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist REVIEWED · blog card: Читати → · v3.97.0 |
+| post-545-weekly-checkin-protocol.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist REVIEWED · v3.98.0 |
+| post-546-first-year-without-coach.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist REVIEWED · v3.98.0 |
 | post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | post-511-reverse-mesocycle-planning.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.74.0 |
 | post-512-isolation-exercises-when-needed.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.75.0 |
@@ -730,5 +732,5 @@ M10-M12 (Q2 2027)
 **Updated weekly.** Major changes → new version bump.
 
 **v3.94.2 · 12 червня 2026**
-**Last update:** 12 червня 2026 · v3.97.0 (post-544 · «самодостатній атлет» · clinical-safety NOT REQUIRED · blog cards 542–544 added)
+**Last update:** 12 червня 2026 · v3.98.0 (post-545 · «тижневий чекін» + post-546 · «перший рік без тренера» · clinical-safety NOT REQUIRED · series self-coaching 542–546)
 **Next planned update:** після hire of Founding Engineer

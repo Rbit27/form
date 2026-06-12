@@ -6,6 +6,18 @@
 
 ---
 
+## [3.98.0] — 2026-06-12
+
+### Added
+- `content/post-545-weekly-checkin-protocol.md` — «Тижневий чекін — 15 хвилин щонеділі, які замінюють тренера»; Ericsson et al. (1993, *Psychol Rev*) deliberate practice і когнітивний ресурс; Zourdos et al. (2016) RPE-динаміка як трендовий сигнал; Halson (2014, *Sports Med* Suppl) суб'єктивне відновлення vs лабораторні маркери; Issurin (2010) мезоцикл як одиниця аналізу; чотири питання чекіну; шаблон запису; мезоцикловий огляд кожні 4 тижні; editorial-brutalist · 10 хв · clinical-safety NOT REQUIRED
+- `content/post-546-first-year-without-coach.md` — «Перший рік без тренера — що справді вчишся і де більшість помиляється»; Fitts & Posner (1967) три стадії моторного навчання — когнітивна/асоціативна/автономна; Zourdos et al. (2016) RIR-калібрування і досвід; Cheung, Hume & Maxwell (2003, *Sports Med*) DOMS як шум vs реальні сигнали відновлення; Kraemer & Ratamess (2004) мінімальний ефективний протокол; Wulf & Prinz (2001) зовнішній фокус уваги; алгоритм «правильне важко vs неефективне важко» (три кроки); таблиця причин стагнації; editorial-brutalist · 12 хв · clinical-safety NOT REQUIRED
+
+### Changed
+- `README.md` — post-545, post-546 позначено ✓; записи оновлено з авторськими посиланнями
+- `VERSION` — 3.97.1 → 3.98.0
+
+---
+
 ## [3.97.1] — 2026-06-12
 
 ### Changed
