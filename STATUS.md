@@ -1,7 +1,7 @@
 # FORM · Project Status v1.4.0
 
 **Date:** 12 червня 2026
-**Version:** 3.94.0
+**Version:** 3.94.2
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -31,7 +31,7 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 451 cards (540 posts authored), category filter, newsletter CTA | v3.94.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 452 cards (540 posts authored), category filter, newsletter CTA | v3.94.2 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 | [`security.html`](security.html) | Security Trust Center — SOC 2 status, sub-processors, responsible disclosure | v2.40.0 ✓ |
@@ -121,7 +121,7 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-11-deload-weeks.md | Blog | draft · clinical-safety PASS · sports-scientist pending · blog card: Читати → |
 | post-12-technique-over-intensity.md | Blog | draft · clinical-safety PASS · sports-scientist pending · blog card: Читати → |
 | post-13-rir-rpe-autoregulation.md | Blog | draft · clinical-safety PASS · sports-scientist pending · blog card: Читати → |
-| post-14-sleep-deprived-training.md | Blog | draft · clinical-safety PENDING · sports-scientist DONE · blog card: Незабаром (pending CS review) |
+| post-14-sleep-deprived-training.md | Blog | draft · clinical-safety PASS (cloud-agent · 2026-06-12) · sports-scientist pending · blog card: Читати → · v3.94.2 |
 | post-15-training-frequency.md | Blog | draft · clinical-safety PASS · sports-scientist DONE · blog card: Читати → |
 | post-16-ai-coach-vs-pt.md | Blog | draft · clinical-safety PASS · sports-scientist N/A · blog card: Читати → |
 | post-17-overtraining-vs-laziness.md | Blog | draft · clinical-safety PASS · sports-scientist pending · blog card: Читати → |
@@ -725,6 +725,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v3.91.0 · 12 червня 2026**
-**Last update:** 12 червня 2026 · v3.91.0
+**v3.94.2 · 12 червня 2026**
+**Last update:** 12 червня 2026 · v3.94.2
 **Next planned update:** після hire of Founding Engineer
