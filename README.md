@@ -940,7 +940,13 @@ Each iteration:
 - [x] post-505: Другий рік у залі — нейром'язовий резерв, сповільнення прогресу, нелінійна періодизація. clinical-safety NOT REQUIRED · authored v3.68.0
 - [x] post-506: Адаптаційне відставання — чому результати тренування приходять із запізненням і як це використовувати. clinical-safety NOT REQUIRED · authored v3.69.0
 - [x] post-507: Тренування і кортизол — коли хронічний стрес зупиняє адаптацію (і коли ні). clinical-safety NOT REQUIRED · authored v3.70.0
-- [ ] post-508: Самопрограмування з нуля — мета-гайд для людини без тренера. clinical-safety NOT REQUIRED
+- [x] post-508: Самопрограмування з нуля — мета-гайд для людини без тренера. clinical-safety NOT REQUIRED · authored v3.71.0
+
+    ── ROADMAP (наступні теми · post-534+) ─────────────────────────
+- [x] post-534: Момент переходу до самопрограмування — коли відмовитися від чужої програми; три передумови (RPE-калібрування, знання власних порогів об'єму, технічна автономія); п'ять сигналів готовності (не тренувальний вік); мінімальна архітектура першого блоку (8 тижнів, одна змінна прогресії); типові помилки ранньої автономії; Kraemer & Ratamess (2004), Zourdos et al. (2016) r=0.78 RIR, Rhea et al. (2002) DUP +28.8%; clinical-safety NOT REQUIRED · authored v3.90.0
+- [ ] post-535: Несвіже тренування — що відбувається, коли повертаєшся до добре знайомого підйому після 3–4 місяців паузи; residual neural encoding vs structural detraining vs RPE-recalibration; практичний алгоритм першого тижня повернення; Seaborne et al. (2018) epigenetic muscle memory; Bickel et al. (2011); clinical-safety NOT REQUIRED
+- [ ] post-536: Коли закінчується блок — практичні тригери завершення мезоциклу; чому «8 тижнів» є орієнтиром, а не законом; RPE-drift, тижневий тоннаж і 3RM тест як реальні сигнали; Haff & Triplett (2016) block duration; Israetel et al. (2017) MRV-trigger; clinical-safety NOT REQUIRED
+- [ ] post-537: Тренування без видимих результатів — 12 тижнів пройшли, нічого не змінилось; діагностика «справжнього» плато vs нормального темпу адаптації; Schoenfeld (2010) adaptation timeline; три рівні перевірки (об'єм, інтенсивність, відновлення); clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -985,4 +991,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v3.85.0 (posts-528–529 · isolation progression · unilateral vs bilateral)
+**Last update:** 12 червня 2026 · v3.90.0 (post-534 · transition to self-programming · roadmap post-535–537 added)

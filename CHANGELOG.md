@@ -6,6 +6,19 @@
 
 ---
 
+## [3.90.0] — 2026-06-12
+
+### Added
+- `content/post-534-transition-to-self-programming.md` — «Момент переходу — коли відмовитися від чужої програми і почати програмувати для себе»: Kraemer & Ratamess (2004) MSSE: на intermediate рівні стандартизовані протоколи стають субоптимальними; Zourdos et al. (2016) JSCR r=0.78 RIR-калібрування як функціональна передумова переходу (не тренувальний вік); Hackett et al. (2012) систематична переоцінка зусилля у менш тренованій популяції; Fitts & Posner (1967) автономна стадія техніки; Israetel et al. (2017) MEV/MAV/MRV; Fonseca et al. (2014) JSCR варіативність вправ не дає переваги над послідовністю; Rhea et al. (2002) MSSE DUP +28.8% vs лінійна +14.4% у trained; Haff & Triplett (2016) мезоцикл; Schoenfeld, Ogborn & Krieger (2016) частота; п'ять функціональних сигналів готовності; мінімальна архітектура першого блоку (8 тижнів, одна прогресійна змінна); п'ять типових помилок ранньої автономії; критерії повернення до шаблону. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `blog.html` — картка post-533 додана (пропущена у v3.89.0); картка post-534 додана; загальна кількість 445 карток
+- `README.md` — post-508 відмічено як виконаний; roadmap post-534 ✓; додано post-535, post-536, post-537 у roadmap
+- `STATUS.md` — рядок post-533 оновлено (blog card: Читати →); рядок post-534 додано; blog.html 445 cards / 534 posts authored
+
+### Changed
+- `VERSION` — 3.89.0 → 3.90.0
+
+---
+
 ## [3.89.0] — 2026-06-12
 
 ### Added
