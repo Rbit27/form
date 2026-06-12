@@ -6,6 +6,18 @@
 
 ---
 
+## [4.0.1] — 2026-06-12
+
+### Added
+- `content/post-548-self-programming-intermediate.md` — «Самопрограмування для середнього рівня — як написати власний план»; 7-крокова інженерна методологія: мета блоку → тривалість → частота → рухові патерни → обсяг (MEV/MAV таблиця) → інтенсивність/RPE → прогресія; citations: Schoenfeld 2017 JSCR, Kraemer & Ratamess 2004, Schoenfeld 2016 JSCR, Israetel et al. 2019, Zourdos 2016 JSCR, Kilpatrick 2014; clinical-safety NOT REQUIRED; sports-scientist pending · ~15 хв читання
+- `content/post-549-audit-your-programming.md` — «Як перевірити, чи твій план працює — аудит власного програмування»; 4-класова система аудиту (прогресія / техніка / відновлення / структурна відповідність); 4-питання протокол після блоку + таблиця рішень по сценаріях; citations: Fry 2004 Sports Medicine, Schoenfeld & Grgic 2020, Meeusen 2013 MSSE, McGill 2007; clinical-safety NOT REQUIRED; sports-scientist pending · ~12 хв читання
+
+### Changed
+- `STATUS.md` — додано рядки post-548 і post-549; оновлено Last update до v4.0.1
+- `VERSION` — 4.0.0 → 4.0.1
+
+---
+
 ## [4.0.0] — 2026-06-12
 
 ### Added
