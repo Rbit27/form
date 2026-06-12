@@ -6,6 +6,20 @@
 
 ---
 
+## [3.76.0] — 2026-06-12
+
+### Added
+- `content/post-513-why-6-week-plans-fail.md` — «Чому план на 6 тижнів рідко доживає до кінця — і як це виправити»: три механізми провалу плану (кумулятивна втома у неправильний момент, падіння самоефективності за McAuley & Blissmer 2000, відсутність вбудованої гнучкості); дослідження Lally et al. (2010) — формування звички 66 днів, не 21; авторегуляція і commitment window як структурні рішення; Plisk & Stone (2003) fitness-fatigue model. Refs: Trost 2002, Lally 2010, McAuley & Blissmer 2000, Dishman, Plisk & Stone 2003. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `content/post-514-eccentric-phase.md` — «Ексцентрична фаза — чому більшість людей її ігнорують і що вони втрачають»: ексцентрична сила на 20–60% вища за концентричну (cross-bridge mechanics); роль тайтину у силовому підсиленні (Herzog); гіпертрофія у подовженому положенні (Franchi 2017, Pedrosa 2022); DOMS-парадокс; Nordic curl RCT (Petersen 2011 AJSM) — профілактика травм підколінних сухожиль; практичні темпові рекомендації (2–4с ексцентрика). Refs: Franchi 2017, Douglas 2017, Farthing & Chilibeck 2003, Schoenfeld 2010, Pedrosa 2022, Petersen 2011. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `content/post-516-supersets.md` — «Суперсети — коли вони прискорюють прогрес, а коли саботують відновлення»: таксономія трьох типів суперсетів; механізм агоніст-антагоніст фасилітації (Carregaro 2011); коли суперсети — реальний виграш у часі і об'ємі (Paz 2017, Kelleher 2010); чотири сценарії де вони шкодять (>85% 1RM, недостатній відпочинок, pre-exhaustion неоднозначність, перевикористання); практичні межі (90–120с, ≤2–4 пари за сесію). Refs: Weakley 2017, Robbins 2009, Paz 2017, Carregaro 2011, Kelleher 2010. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `content/post-515-training-under-chronic-stress.md` — «Тренування при хронічному стресі — як коригувати об'єм коли нервова система перевантажена»: алостатичне навантаження (McEwen 1998 NEJM); загальний адаптаційний синдром (Selye 1950); вплив хронічного кортизолу на синтез м'язового протеїну (Hackney 2006); нейроендокринна відповідь при перетренованості (Fry & Kraemer 1997); HRV як індикатор готовності до тренування (Buchheit 2014); практичні алгоритми корекції об'єму при підвищеному алостатичному навантаженні. clinical-safety: REVIEWED — PASS (physiological scope only; no mental health content). sports_scientist_review: APPROVED.
+- `content/post-517-beginner-vs-intermediate.md` — «Початківець vs проміжний — як зрозуміти що ти перейшов межу і що з цим робити»: хибність класифікації за роками тренування; правильна класифікація за швидкістю адаптації (лінійний прогрес щотренування → щотижня → мезоцикл); три практичні маркери переходу; помилка пропуску проміжного програмування; Colquhoun et al. (2018) про об'єм за рівнем тренованості; Fry & Kraemer (1997) нейроендокринна відповідь. Refs: Baechle & Earle 2008, Colquhoun 2018, Fry & Kraemer 1997, Haff & Triplett 2015, Mangine 2015, Schoenfeld 2010. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `blog.html` — додано картки post-513, post-514, post-515, post-516, post-517
+- `README.md` — roadmap оновлено: post-513/514/515/516/517 позначено ✓ (v3.76.0)
+- `VERSION` — 3.75.1 → 3.76.0
+
+---
+
 ## [3.75.1] — 2026-06-11
 
 ### Changed
