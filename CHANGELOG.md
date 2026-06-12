@@ -6,6 +6,18 @@
 
 ---
 
+## [3.93.0] — 2026-06-12
+
+### Added
+- `content/post-538-training-journal-first-build.md` — «Як побудувати перший тренувальний журнал — мінімальна структура без надмірного відстеження»: Foster et al. (2001) *JSCR* — session RPE метод (CR-10, 30 хв після тренування); Zourdos et al. (2016) RIR шкала r=0.78 та авторегуляційна прогресія; Helms et al. (2016) *SCJJ* — calibration RIR у тренованих атлетів; Helms, Morgan & Valliant (2019) *Muscle and Strength Pyramid* — авторегуляційна прогресія на основі RIR; Windt & Gabbett (2017) *BJSM* — послідовність як ключова умова корисності системи відстеження; Haff & Triplett (2016) *NSCA Essentials* — обмеження +10% тижневого тоннажу; три обов'язкових поля (вага/повторення по підходах/RIR); три аналітичних запитання на тиждень (тоннаж/RIR-drift/внутрішньосесійний провал); мінімальний шаблон запису. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `content/post-539-training-after-illness.md` — «Тренування після важкої хвороби — як повернутись без помилки»: класифікація «верхні дихальні без системного залучення» vs «системна хвороба»; цитокінова відповідь (IL-6, TNF-α, IL-1β) і катаболічний баланс під час активної інфекції; субклінічний міокардит при вірусних інфекціях (Metzl 2020, Börjesson 2021); timeline повернення: легка (1–3 дні паузи) / помірна (5–7 днів) / важка (10–14 днів + лікар обов'язково перед відновленням); Bickel et al. (2011) *MSSE* — швидкість втрати сили (~3–5%/тиждень); Seaborne et al. (2018) *Scientific Reports* — epigenetic м'язова пам'ять; три сигнали готовності (температура/функціональність/суб'єктивне відновлення) з explicit carve-out для важкої хвороби → лікар. sports_scientist_review: APPROVED; clinical_safety: CONDITIONAL PASS (2026-06-12) — всі required changes від clinical-safety застосовані: hard gate для важкої хвороби, referral trigger для вірусних інфекцій з кардіальними ознаками, conditional branch у readiness-секції, scoping 50–60% guidance до легкої/помірної хвороби.
+
+### Changed
+- `README.md` — post-538 і post-539 позначені [x] у roadmap; Last update → v3.93.0
+- `VERSION` — 3.92.1 → 3.93.0
+
+---
+
 ## [3.92.1] — 2026-06-12
 
 ### Changed
