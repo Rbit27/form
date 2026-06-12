@@ -6,6 +6,13 @@
 
 ---
 
+## [4.10.1] — 2026-06-12
+
+### Changed
+- `admin-dashboard.html` — SLA &amp; Uptime screen: новий sidebar item `◎ SLA & Uptime` + `#screen-sla`; 4 summary cards (SLA status / covered downtime MTD 26 min vs 43.8 min budget / credit balance / next report date); per-service uptime grid ×5 (API Platform 99.97% / SSO·OIDC 99.94% / SCIM 99.99% / CV Pipeline 99.91% / Mobile Backend 99.98%); 6-month historical uptime table з DEC-030 `sla.measurement_reconciled` note; SLA credit schedule із ENTERPRISE_SLA.md §3.4 (0% / 5% / 15% / 25% / 50%); tenant MRR ($3,708 = 412 seats × $9); SLA-affecting incident log (INC-2026-047 17 min + INC-2026-039 9 min — обидва P2, cumulative &lt; 43.8 min budget, $0 credit); privacy floor footer; ref: OBSERVABILITY.md §23, ENTERPRISE_SLA.md §3, INCIDENT_RESPONSE.md §6.2, DEC-030
+
+---
+
 ## [4.10.0] — 2026-06-12
 
 ### Added
