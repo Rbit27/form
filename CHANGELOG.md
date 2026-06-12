@@ -6,6 +6,18 @@
 
 ---
 
+## [4.2.0] — 2026-06-12
+
+### Added
+- `content/post-553-minimalistychna-prohrama.md` — «Мінімалістична програма — 3–4 вправи на тренування і чому цього достатньо»; MEV/MAV/MRV (Israetel et al. 2019); Krieger (2010) JSCR спадна гранична корисність підходів; Schoenfeld & Grgic (2020) об'єм за сесію vs гіпертрофія; SAID principle (Kraemer & Ratamess 2004); Fonseca et al. (2014) EJ Appl Physiol регіональна гіпертрофія; Bickel et al. (2011) MSSE об'єм підтримки; Marcora et al. (2009) ментальна втома і RPE; протокол переходу від складної до мінімалістичної (7-тижневий); таблиця «що прибрати без втрати прогресу»; Сесія А/Б шаблон; clinical-safety NOT REQUIRED; sports-scientist pending · ~13 хв читання
+
+### Changed
+- `blog.html` — додано 3 картки: post-551 (тренування в поїздці), post-552 (плато не є плато), post-553 (мінімалістична програма); всього 459 карток
+- `README.md` — roadmap: post-553 позначено [x] authored; додано нові теми post-556–558 у roadmap; Last update оновлено
+- `VERSION` — 4.1.0 → 4.2.0
+
+---
+
 ## [4.1.0] — 2026-06-12
 
 ### Added
