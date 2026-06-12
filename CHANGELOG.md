@@ -6,6 +6,19 @@
 
 ---
 
+## [4.10.0] — 2026-06-12
+
+### Added
+- `content/post-573-growth-mindset-strength-training.md` — «Growth mindset і силові тренування: що implicit theories означають для прогресу»; Dweck (2006) entity vs incremental theories of ability; Biddle et al. (2003) Eur J Sport Sci систематичний огляд 25 досліджень у фізичній активності; Ames (1992) J Educ Psychol mastery vs ego goal orientation; Elliot & Dweck (1988) поведінка після невдачі (entity = зниження прагнення; incremental = підвищення ентузіазму); Wang & Biddle (2001) perceived competence незалежно від реального рівня фітнесу; Sisk et al. (2018) Psychol Sci d≈0.10 critique поверхневих growth mindset інтервенцій; 3 конкретні ситуації — провал підходу / соціальне порівняння / технічна деградація; 3-питання діагностичний протокол; clinical-safety NOT REQUIRED
+- `blog.html` — +1 картка для post-573 (340 total)
+- `README.md` — post-573 позначено [x]; roadmap post-574–575 додано
+
+### Changed
+- `README.md` — Last update → v4.10.0; roadmap post-574–575 заплановано
+- `STATUS.md` — оновлено до v4.10.0; 573 постів; blog.html 340 cards
+
+---
+
 ## [4.9.0] — 2026-06-12
 
 ### Added

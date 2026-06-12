@@ -984,6 +984,10 @@ Each iteration:
 - [x] post-570: Конкурентна тривога і збудження — Yerkes-Dodson inverted-U; IZOF Hanin (1997); catastrophe model Hardy (1990); тривога стан vs тривога риса; як конкурентне середовище залу впливає на продуктивність; clinical-safety NOT REQUIRED · authored v4.9.0
 - [x] post-571: Реалізаційні наміри і adherence — Gollwitzer (1999) Am Psychol «if-then» planning; Milne et al. (2002) Br J Health Psychol ефект на gym attendance; practical шаблон для тренувального тижня; clinical-safety NOT REQUIRED · authored v4.9.0
 - [x] post-572: Атрибуційний стиль і тренувальна резилієнтність — Weiner (1985) attribution theory; internal/external, stable/unstable, controllable/uncontrollable; як атрибуція провалу впливає на SE і наполегливість; Biddle et al. (2001) J Sport Sci спортивний контекст; clinical-safety NOT REQUIRED · authored v4.9.0
+- [x] post-573: Growth mindset і силові тренування — Dweck (2006) entity vs incremental theories; Biddle et al. (2003) Eur J Sport Sci мета-огляд 25 досліджень; Ames (1992) mastery vs ego goal orientation; Elliot & Dweck (1988) поведінка після невдачі; Wang & Biddle (2001) perceived competence; Sisk et al. (2018) Psychol Sci d≈0.10 critique; практичний 3-питання діагностичний протокол; clinical-safety NOT REQUIRED · authored v4.10.0
+    ── ROADMAP (наступні теми · post-574+) ───────────────────────────
+- [ ] post-574: Ментальна жорсткість vs гріт — Clough et al. (2002) MTQ; Duckworth et al. (2007) Psychol Sci grit scale; Crust (2008) Mental Toughness in Sport; що дослідження реально показують vs gym culture; чому «просто не здавайся» — не механізм; clinical-safety NOT REQUIRED
+- [ ] post-575: Страх невдачі і тренувальні рішення — Conroy et al. (2001) MFS; Elliot & Church (1997) JPSP approach-avoidance framework; як fear of failure формує вибір ваги, уникання вправ і зупинку підходу; operationalizable exit criteria; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 

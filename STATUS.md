@@ -1,4 +1,4 @@
-# FORM · Project Status v4.9.0
+# FORM · Project Status v4.10.0
 
 **Date:** 12 червня 2026
 **Version:** 4.8.0
@@ -31,7 +31,7 @@ FORM is at v4.8.1 with 65+ tagged releases, 17 functional HTML pages (marketing 
 | [`workout-live.html`](workout-live.html) | Detailed workout mockup з CV | v0.4.8 ✓ |
 | [`investors.html`](investors.html) | Investor one-pager (noindex — direct link) | v0.14.0 ✓ |
 | [`jobs.html`](jobs.html) | Careers page — FE + Design Lead open roles | v0.15.0 ✓ |
-| [`blog.html`](blog.html) | Articles index — 339 cards (572 posts authored), category filter, newsletter CTA | v4.9.0 ✓ |
+| [`blog.html`](blog.html) | Articles index — 340 cards (573 posts authored), category filter, newsletter CTA | v4.10.0 ✓ |
 | [`enterprise.html`](enterprise.html) | Enterprise landing — SSO/SCIM/SOC2, tiers, pilot CTA | v0.44.0 ✓ |
 | [`pricing-enterprise.html`](pricing-enterprise.html) | Enterprise pricing calculator — seats/contract/discounts | v0.45.0 ✓ |
 | [`security.html`](security.html) | Security Trust Center — SOC 2 status, sub-processors, responsible disclosure | v2.40.0 ✓ |
@@ -536,6 +536,7 @@ FORM is at v4.8.1 with 65+ tagged releases, 17 functional HTML pages (marketing 
 | post-570-competitive-anxiety-arousal.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → · v4.9.0 |
 | post-571-implementation-intentions-adherence.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → · v4.9.0 |
 | post-572-attributional-style-resilience.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → · v4.9.0 |
+| post-573-growth-mindset-strength-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → · v4.10.0 |
 | post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | post-511-reverse-mesocycle-planning.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.74.0 |
 | post-512-isolation-exercises-when-needed.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.75.0 |
@@ -757,6 +758,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v4.9.0 · 12 червня 2026**
-**Last update:** 12 червня 2026 · v4.9.0 (posts 569–572 authored · психологічний блок резилієнтності: goal-setting (Locke & Latham) / competitive anxiety & IZOF (Hanin, Hardy) / implementation intentions (Gollwitzer, Milne) / attributional style (Weiner, Biddle) · clinical-safety NOT REQUIRED × 4 · blog.html +4 cards = 339 total)
+**v4.10.0 · 12 червня 2026**
+**Last update:** 12 червня 2026 · v4.10.0 (post-573 authored · growth mindset & implicit theories of ability: Dweck / Biddle et al. / Ames / Elliot & Dweck / Sisk et al. critique · clinical-safety NOT REQUIRED · blog.html +1 card = 340 total · roadmap post-574–575 додано)
 **Next planned update:** після hire of Founding Engineer
