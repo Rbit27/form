@@ -6,6 +6,22 @@
 
 ---
 
+## [4.9.0] — 2026-06-12
+
+### Added
+- `content/post-569-goal-setting-strength-training.md` — «Постановка цілей у силовому тренінгу: чому «хочу бути сильніший» провалюється — і що замість»; Locke & Latham (1990) Goal-Setting Theory; мета-аналіз 400+ досліджень; d≈0.58 конкретних vs «роби найкраще»; чотири механізми (напрямок уваги / зусилля / наполегливість / стратегія); outcome vs process vs performance goals; proximity effect — Bandura & Schunk (1981) JPSP проксимальні > дистанційні цілі для SE і продуктивності; зворотний зв'язок як умова дії цілі; практичний 5-кроковий алгоритм на мезоцикл; clinical-safety NOT REQUIRED
+- `content/post-570-competitive-anxiety-arousal.md` — «Конкурентна тривога і збудження: чому «нервуватись» не одне і те саме що «провалитись»»; Yerkes-Dodson (1908) перевернута U і модерація складністю завдання; Hanin (1997) IZOF — індивідуальна зона оптимального функціонування; cognitive vs somatic anxiety; Hardy (1990) catastrophe model — асиметрична нелінійність при високій когнітивній тривозі; Spielberger тривога-стан vs тривога-риса; Zajonc (1965) соціальна фасилітація; практичні протоколи при перезбудженні і недозбудженні; кейс 1ПМ-тестування; clinical-safety NOT REQUIRED
+- `content/post-571-implementation-intentions-adherence.md` — «Реалізаційні наміри і adherence: як «якщо–то» планування знижує кількість пропущених тренувань»; Gollwitzer (1999) Am Psychol «if-then» implementation intentions vs goal intentions; Milne et al. (2002) Br J Health Psychol 91% vs 29% gym attendance; Gollwitzer & Sheeran (2006) мета-аналіз 94 досліджень d=0.65; Brandstätter et al. (2001) JPSP — захист поведінки в умовах когнітивного навантаження; coping planning (Sniehotta et al. 2006); DEC-013 «не пропускай два поспіль» як вбудований coping plan; шаблон тижня (сигнал + перший крок + coping plans + повернення після пропуску); clinical-safety NOT REQUIRED
+- `content/post-572-attributional-style-resilience.md` — «Атрибуційний стиль і тренувальна резилієнтність: чому пояснення провалу важливіше за сам провал»; Weiner (1985) JPSP attribution theory: три виміри (локус / стабільність / контрольованість); specific emotional consequences: вина (корекція) vs сором (уникання); Biddle et al. (2001) J Sport Sci internal-unstable-controllable = вища persistence; Abramson, Seligman & Teasdale (1978) learned helplessness; self-serving bias і його функціональна ціна; зв'язок атрибуційного стилю і SE (пост-568); алгоритм «трьох питань» після провалу; clinical-safety NOT REQUIRED
+- `blog.html` — +4 картки для posts 569–572 (339 total)
+
+### Changed
+- `README.md` — posts 569–572 позначено [x]; Last update → v4.9.0
+- `STATUS.md` — оновлено до v4.9.0; 572 постів; blog.html 339 cards
+- `VERSION` — 4.8.2 → 4.9.0
+
+---
+
 ## [4.8.2] — 2026-06-12
 
 ### Added
