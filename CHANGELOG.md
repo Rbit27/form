@@ -6,6 +6,15 @@
 
 ---
 
+## [3.95.2] — 2026-06-12
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v1.7 → v1.8; +3 `enterprise.*` implementation lifecycle events registered: `enterprise.implementation_kickoff_completed` (STANDARD, 7yr — CSM-emitted at kickoff; payload: tenant_id, deal_sequence, contracted_tier/seats, idp_type, white_label_enabled, eu_data_residency, kickoff_date, target_go_live_date, csm_actor_id), `enterprise.sso_scim_setup_verified` (STANDARD, 7yr — engineer-emitted after SSO/SCIM smoke test per SSO_SCIM_IMPLEMENTATION.md §7.4; payload: idp_type, sso_modes_verified, scim_features_enabled, eu_data_residency_confirmed, engineer_actor_id, verification_date), `enterprise.implementation_cost_model_calibrated` (STANDARD, 7yr — founder-emitted at OQ-08 closure; aggregate model-level event, no tenant_id; payload: deals_analysed ≥ 3, avg_impl_cost per tier, variance_vs_model_pct, model_version_updated, decision_log_ref, calibration_date); new section "Enterprise implementation lifecycle events" added before `## Export & delivery`; +1 retention table row (all three events, 7yr, SOC 2 CC5.2 + CC7.2); chain ordering: non-blocking WARNING if sso_scim_setup_verified precedes kickoff_completed for same tenant_id; no PagerDuty routing (STANDARD severity). Closes COST_MODEL.md §36.11 checklist item 1 (P0, M8 — documentation registration complete; emit-audit-event Worker deployment is an engineering implementation task).
+- `docs/COST_MODEL.md` — §36.11 checklist item 1 status updated: `[ ]` → ✅ documentation registered in AUDIT_LOG_SCHEMA.md v1.8; Worker deployment item noted separately
+- `VERSION` — 3.95.1 → 3.95.2
+
+---
+
 ## [3.95.1] — 2026-06-12
 
 ### Changed

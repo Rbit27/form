@@ -8305,7 +8305,7 @@ All three events must be registered in `docs/AUDIT_LOG_SCHEMA.md §6` before the
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Register `enterprise.implementation_kickoff_completed`, `enterprise.sso_scim_setup_verified`, and `enterprise.implementation_cost_model_calibrated` in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schemas from §36.10. Deploy to `emit-audit-event` Worker. | platform-engineer | **P0** | M8 | [ ] |
+| 1 | Register `enterprise.implementation_kickoff_completed`, `enterprise.sso_scim_setup_verified`, and `enterprise.implementation_cost_model_calibrated` in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schemas from §36.10. Deploy to `emit-audit-event` Worker. | platform-engineer | **P0** | M8 | ✅ Documentation registered in AUDIT_LOG_SCHEMA.md v1.8 (2026-06-12). `emit-audit-event` Worker deployment remains an engineering implementation task. |
 | 2 | Create `enterprise_impl_time_log` table (§36.9.1 DDL) with RLS policies. Register migration `0060_enterprise_impl_time_log.sql`. | platform-engineer | **P0** | M8 | [ ] |
 | 3 | Build and test the cost extraction query (§36.9.2) in Supabase Studio. Verify it produces per-role, per-activity totals. | data-engineer | **P0** | M9 | [ ] |
 | 4 | Begin time-logging all implementation activities from Deal 1, using `activity_code` values from §36.9.1. Ensure every session of engineering or CSM work is logged within 24h. | founder (solo phase) | **P0** | Deal 1 | [ ] |
