@@ -6,6 +6,21 @@
 
 ---
 
+## [4.7.0] — 2026-06-12
+
+### Added
+- `content/post-559-pre-workout-nap.md` — «Дрімота перед тренуванням: нейронаука і практичний протокол»; аденозиновий кліренс; Dutheil et al. (2021) IJERPH мета-аналіз ES 0.29 пильності; Waterhouse et al. (2007) J Sports Sci покращення спринту p=0.031; Romdhani et al. (2021) Sports Med огляд; power nap 10–20 хв vs full cycle 90 хв; інерція сну; протокол завершення за 30–60 хв до тренування; caffeine nap (Horne & Reyner 1996); clinical-safety NOT REQUIRED
+- `content/post-560-monday-heaviness-within-week-readiness.md` — «Чому перше тренування тижня завжди важче: нейромʼязова готовність і добові ритми»; Atkinson & Reilly (1996) Sports Med циркадний пік; Twist & Highton (2013) Int J Sports Physiol Perform; Claudino et al. (2017) JSCR CMJ; internal potentiation; 4 практичні приписи; clinical-safety NOT REQUIRED
+- `content/post-561-cold-water-hypertrophy.md` — «Холодний душ після тренування і гіпертрофія: що каже наука і коли це шкодить»; Roberts et al. (2015) J Physiol CWI пригнічує mTORC1; Yamane et al. (2006) J Physiol; Petersen et al. (2012) BJSM між змаганнями; 4-годинне анаболічне вікно; три сценарії; clinical-safety NOT REQUIRED
+- `content/post-562-self-talk-strength-performance.md` — «Самовербалізація і силова продуктивність: «я можу» як вимірюваний інструмент»; Hatzigeorgiadis et al. (2011) Perspect Psychol Sci мета-аналіз d=0.48; Theodorakis et al. (2000) Sport Psychol; Tod et al. (2011) J Sport Exerc Psychol; інструкційна vs мотиваційна СВ; механізми; протокол; clinical-safety NOT REQUIRED
+- `blog.html` — +4 картки для постів 559–562
+- `STATUS.md` — оновлено до v4.7.0; 562 пости; roadmap post-563+
+
+### Changed
+- `VERSION` — 4.6.0 → 4.7.0
+
+---
+
 ## [4.6.0] — 2026-06-12
 
 ### Added
