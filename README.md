@@ -985,9 +985,11 @@ Each iteration:
 - [x] post-571: Реалізаційні наміри і adherence — Gollwitzer (1999) Am Psychol «if-then» planning; Milne et al. (2002) Br J Health Psychol ефект на gym attendance; practical шаблон для тренувального тижня; clinical-safety NOT REQUIRED · authored v4.9.0
 - [x] post-572: Атрибуційний стиль і тренувальна резилієнтність — Weiner (1985) attribution theory; internal/external, stable/unstable, controllable/uncontrollable; як атрибуція провалу впливає на SE і наполегливість; Biddle et al. (2001) J Sport Sci спортивний контекст; clinical-safety NOT REQUIRED · authored v4.9.0
 - [x] post-573: Growth mindset і силові тренування — Dweck (2006) entity vs incremental theories; Biddle et al. (2003) Eur J Sport Sci мета-огляд 25 досліджень; Ames (1992) mastery vs ego goal orientation; Elliot & Dweck (1988) поведінка після невдачі; Wang & Biddle (2001) perceived competence; Sisk et al. (2018) Psychol Sci d≈0.10 critique; практичний 3-питання діагностичний протокол; clinical-safety NOT REQUIRED · authored v4.10.0
-    ── ROADMAP (наступні теми · post-574+) ───────────────────────────
-- [ ] post-574: Ментальна жорсткість vs гріт — Clough et al. (2002) MTQ; Duckworth et al. (2007) Psychol Sci grit scale; Crust (2008) Mental Toughness in Sport; що дослідження реально показують vs gym culture; чому «просто не здавайся» — не механізм; clinical-safety NOT REQUIRED
-- [ ] post-575: Страх невдачі і тренувальні рішення — Conroy et al. (2001) MFS; Elliot & Church (1997) JPSP approach-avoidance framework; як fear of failure формує вибір ваги, уникання вправ і зупинку підходу; operationalizable exit criteria; clinical-safety NOT REQUIRED
+    ── ROADMAP (наступні теми · post-576+) ───────────────────────────
+- [x] post-574: Ментальна жорсткість vs гріт — Clough et al. (2002) MTQ; Duckworth et al. (2007) Psychol Sci grit scale; Crust (2008) Mental Toughness in Sport; Gucciardi et al. (2015) discriminant validity; чому «просто не здавайся» — не механізм; clinical-safety NOT REQUIRED · authored v4.11.0
+- [x] post-575: Страх невдачі і тренувальні рішення — Conroy et al. (2001) MFS 5 вимірів; Elliot & Church (1997) JPSP approach-avoidance 2×2 framework; performance-avoidance як медіатор під-навантаження і передчасної зупинки підходу; operationalizable exit criteria; clinical-safety NOT REQUIRED · authored v4.11.0
+- [ ] post-576: Регуляція зусилля і самоконтроль — Baumeister et al. ego depletion (1998 JPSP); Hagger et al. (2010) meta-analysis; Inzlicht & Schmeichel (2012) critique; що це означає для тренувань наприкінці робочого дня; clinical-safety NOT REQUIRED
+- [ ] post-577: Перфекціонізм і тренувальна поведінка — Frost et al. (1990) MPS; Stoeber & Otto (2006) Sport Exerc Psychol Rev адаптивний vs дезадаптивний; як perfectionism формує вибір програми та ставлення до пропущених тренувань; clinical-safety NOT REQUIRED
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -1032,4 +1034,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v4.9.0 (posts 569–572 authored · blog.html +4 cards = 339 total · psychological resilience block: goal-setting / competitive anxiety / implementation intentions / attributional style · clinical-safety NOT REQUIRED × 4)
+**Last update:** 12 червня 2026 · v4.11.0 (posts 574–575 authored · blog.html +2 cards = 342 total · mental toughness/grit block + fear of failure block · clinical-safety NOT REQUIRED × 2)

@@ -6,6 +6,15 @@
 
 ---
 
+## [4.11.0] — 2026-06-12
+
+### Added
+- `content/post-574-mental-toughness-grit-strength-training.md` — Ментальна жорсткість vs гріт: Clough et al. (2002) MTQ48 4Cs, Duckworth et al. (2007) grit scale, Crust (2008) sport MT review, Gucciardi et al. (2015) discriminant validity critique; clinical-safety NOT REQUIRED
+- `content/post-575-fear-of-failure-training-decisions.md` — Страх невдачі і тренувальні рішення: Conroy et al. (2001) MFS 5 вимірів, Elliot & Church (1997) JPSP approach-avoidance 2×2, performance-avoidance як медіатор; operationalizable exit criteria; clinical-safety NOT REQUIRED
+- `blog.html` — +2 картки (342 total); заголовок оновлено до актуального підрахунку
+
+---
+
 ## [4.10.1] — 2026-06-12
 
 ### Changed
