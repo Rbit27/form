@@ -955,7 +955,7 @@ Each iteration:
 - [x] post-541: «Не хочу чи не можу» — практична діагностика готовності до тренування; Marcora (2010) психобіологічна модель; Flatt & Esco (2016) HRV як маркер готовності; Pageaux & Lepers (2018) перший підхід як тест; матриця рішень повна/знижена/відновлення; clinical-safety REVIEWED PASS · authored v3.95.0
 - [x] post-542: Як оцінити свою техніку без тренера — самодіагностика з телефону; Wulf & Prinz (2001) CAH + Wulf et al. (2010, HMS) ЕМГ; Kompf & Arandjelovic (2016) sticking region; відео-чеклист по 4 вправах; RIR як вторинний сигнал; clinical-safety NOT REQUIRED · authored v3.96.0
 - [x] post-543: Новачок до середнього рівня — конкретні критерії переходу; Kraemer & Ratamess (2004); Sale (1988) нейральна адаптація; Rhea et al. (2002) DUP; 4 операційних критерії; DUP 3-денний шаблон; clinical-safety NOT REQUIRED · authored v3.96.0
-- [ ] post-544: Самодостатній атлет — коли і як перейти від шаблону до власного програмування; ознаки готовності; що потрібно вміти до першої власної програми; clinical-safety NOT REQUIRED
+- [x] post-544: Самодостатній атлет — коли і як перейти від шаблону до власного програмування; Kraemer & Ratamess (2004) передумови; Zourdos et al. (2016) RPE-зрілість; Israetel et al. (2019) MEV/MRV траєкторія; Haff & Triplett (2016) принципи; архітектура першого 8-тижневого блоку; таблиця прогресивних схем; ознаки готовності/неготовності; clinical-safety NOT REQUIRED · authored v3.97.0
 - [ ] post-545: Тижневий чекін як мінімальний протокол самоаналізу — 15 хвилин щонеділі; що варто аналізувати у тренувальному журналі; різниця між «фіксувати» і «аналізувати»; clinical-safety NOT REQUIRED
 - [ ] post-546: Перший рік без тренера — що справді вчишся і де більшість помиляється; чому новачки перескакують через прогресію; як відрізнити правильне «важко» від неефективного «важко»; clinical-safety NOT REQUIRED
 
@@ -1002,4 +1002,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v3.96.0 (post-542 · самодіагностика техніки · post-543 · новачок→проміжний · clinical-safety NOT REQUIRED · blog cards 542–543 added)
+**Last update:** 12 червня 2026 · v3.97.0 (post-544 · самодостатній атлет · clinical-safety NOT REQUIRED · blog cards 542–544 added)

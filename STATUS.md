@@ -505,6 +505,9 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-539-training-after-illness.md | Blog | draft · clinical-safety CONDITIONAL PASS · sports-scientist APPROVED · blog card: Читати → · v3.93.0 |
 | post-540-subjective-signal-not-instruction.md | Blog | draft · clinical-safety CONDITIONAL PASS · sports-scientist APPROVED · blog card: Читати → · v3.94.0 |
 | post-541-training-readiness-diagnostic.md | Blog | draft · clinical-safety REVIEWED PASS · sports-scientist PENDING · blog card: Читати → · v3.95.0 |
+| post-542-self-technique-assessment.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist REVIEWED · blog card: Читати → · v3.97.0 |
+| post-543-beginner-to-intermediate-criteria.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist REVIEWED · blog card: Читати → · v3.97.0 |
+| post-544-self-sufficient-athlete.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist REVIEWED · blog card: Читати → · v3.97.0 |
 | post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | post-511-reverse-mesocycle-planning.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.74.0 |
 | post-512-isolation-exercises-when-needed.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.75.0 |
@@ -727,5 +730,5 @@ M10-M12 (Q2 2027)
 **Updated weekly.** Major changes → new version bump.
 
 **v3.94.2 · 12 червня 2026**
-**Last update:** 12 червня 2026 · v3.95.0 (post-541 · «не хочу чи не можу» · clinical-safety REVIEWED PASS · blog card 541 added · roadmap post-544–546 new)
+**Last update:** 12 червня 2026 · v3.97.0 (post-544 · «самодостатній атлет» · clinical-safety NOT REQUIRED · blog cards 542–544 added)
 **Next planned update:** після hire of Founding Engineer

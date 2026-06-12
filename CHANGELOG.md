@@ -6,6 +6,18 @@
 
 ---
 
+## [3.97.0] — 2026-06-12
+
+### Added
+- `content/post-544-self-sufficient-athlete.md` — «Самодостатній атлет — коли і як перейти від шаблону до власного програмування»; Kraemer & Ratamess (2004, *Med Sci Sports Exerc*) тренувальний статус і передумови; Zourdos et al. (2016) RPE-калібрування як маркер зрілості; Israetel, Hoffman & Case (2019) MEV/MRV об'ємна траєкторія; Haff & Triplett (2016) принципи прогресивного перевантаження; Issurin (2010) блокова структура і надлишкова складність; архітектура першого 8-тижневого блоку; таблиця прогресивних схем; ознаки готовності/неготовності; editorial-brutalist · 13 хв · clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — додано blog cards для post-542, post-543, post-544 (cards 542–543 були відсутні незважаючи на README v3.96.0)
+- `VERSION` — 3.96.2 → 3.97.0
+- `README.md` — post-544 позначено ✓; Last update оновлено
+
+---
+
 ## [3.96.2] — 2026-06-12
 
 ### Fixed
