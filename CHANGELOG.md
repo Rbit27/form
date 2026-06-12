@@ -6,6 +6,18 @@
 
 ---
 
+## [3.79.0] — 2026-06-12
+
+### Added
+- `content/post-519-missed-workouts-detraining.md` — «Пропущені тренування — одна сесія, тиждень, місяць: що реально втрачається і як повернутись»: диференційована фізіологія детренованості за часовим вікном (одна сесія / тиждень / місяць); Mujika & Padilla (2000) Sports Med двочастинний огляд — детренованість сили vs кардіо за компонентами; Bickel et al. (2011) Med Sci Sports Exerc: навіть 1/9 від об'єму зберігає більшість адаптацій 32 тижні; Gundersen (2016) J Exp Biol: міоядерна «м'язова пам'ять» — механізм, а не метафора; Ogasawara et al. (2013) PLOS ONE: циклічний протокол з 3-тижневими перервами = безперервне тренування за гіпертрофією; Coyle et al. (1984) J Appl Physiol: VO₂max починає падати наприкінці першого тижня детренованості; Kjaer (2004) Physiol Rev: сухожильна адаптація повільніша за м'язову — протокол ступінчастого повернення; Lally et al. (2010): пропуск двох поспіль — ризик руйнування звичкового патерну (грунтування DEC-013). sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `content/post-520-two-a-day-training.md` — «Тренування двічі на день — коли це має сенс для аматора і коли це самознищення»: оригінальна концепція two-a-days у блоковій системі Verkhoshansky (2009); Häkkinen & Kallinen (1994) Electromyogr Clin Neurophysiol: supercompensation у добре тренованих при плановому деловому блоці; Hansen et al. (2005) J Appl Physiol: low-glycogen signaling покращує мітохондріальну адаптацію, але не силу — чітке розмежування; Haff et al. (2003) IJSNEM: знижений глікоген = нижча якість силової сесії; Hickson (1980) + Wilson et al. (2012) мета-аналіз 21 дослідження: interference effect і умови його мінімізації (≥6 год між модальностями); Fry & Kraemer (1997) Sports Med: нефункціональне перетренування; чотири сценарії «самознищення»; практичний чеклист готовності; альтернатива — більше тренувальних днів замість двох сесій за день. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `blog.html` — додано картки post-519 і post-520
+- `README.md` — roadmap оновлено: post-519/520 позначено ✓; додано post-521–524 у roadmap (v3.79.0)
+- `STATUS.md` — додано рядки post-519 і post-520 у content engine table
+- `VERSION` — 3.78.0 → 3.79.0
+
+---
+
 ## [3.78.0] — 2026-06-12
 
 ### Added
