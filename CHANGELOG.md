@@ -6,6 +6,15 @@
 
 ---
 
+## [4.17.0] — 2026-06-12
+
+### Added
+- `content/post-584-athletic-identity-training-consistency.md` — Атлетична ідентичність і тренувальна послідовність; Brewer, Van Raalte & Lerner (1993) AIMS — три компоненти (когнітивний/афективний/поведінковий), AIMS як надійніший предиктор послідовності ніж мотивація; Tajfel & Turner (1979) Social Identity Theory — самокатегоризація і дефолтна поведінка без щоразу нового прийняття рішення; Anderson & Cychosz (1994) рольова vs атлетична ідентичність — контекст-залежність і вразливість рольової; Oyserman et al. (2002) Possible Selves Psychol Bull — деталізований образ майбутнього «я», пара бажаний/небажаний self, поведінкова конкретизація; Grove, Lavallee & Gordon (1997) over-identification і психологічний відгук на травму; механізм переходу від «я тренуюсь» до «я є той хто тренується»; Bruner & Spink (2010) самокеровані атлети з вищим AIMS і вища послідовність без зовнішньої відповідальності; clinical-safety NOT REQUIRED
+- `blog.html` +1 card = 351 total
+- `README.md` roadmap: post-584 marked done; post-585–588 додані (SDT мотиваційний клімат, choking under pressure, flow у силовому, self-talk протокол)
+
+---
+
 ## [4.16.0] — 2026-06-12
 
 ### Added
