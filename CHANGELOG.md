@@ -6,6 +6,14 @@
 
 ---
 
+## [3.88.1] — 2026-06-12
+
+### Changed
+- `docs/OBSERVABILITY.md` v3.1 → v3.2 — §29.12 OQ-PAM-OBS-01 Resolution: confirms `admin_user_id` in PAM observability signals uses the same pseudonymous UUID as DEC-030 events (separate-pseudonym approach rejected — forensic correlation value outweighs privacy layer; correct fix is access-control, not pseudonymisation). §29.12.2 access-control implementation spec: Metabase Collection `/collections/pam-security` restricted to `FORM-DevOps`, `FORM-Security`, `FORM-Compliance` groups; `cf-ae-pam-read` Cloudflare API token scoped to `PAM_TELEMETRY` binding only; investigation procedure (PAM_TELEMETRY UUID queries require active PagerDuty incident) as procedural control; DEC-030 not required (read-only, Metabase audit log sufficient). §29.13 OQ-PAM-OBS-02 Resolution: aggregate count panel accepted; quarterly PDF rejected. `GET /api/admin/tenants/:tenantId/pam-activity` endpoint spec: dual-query backend (`privilegedOperationsCount` + `breakGlassActivations`), 90-day max window, 60 req/min, five privacy floor invariants by schema (no admin_user_id, no pam_session_id, no operation type). Admin Dashboard "Privileged Access Activity" card in Security & Compliance tab (§29.13.5). SOC 2 CC6.1 + C1.2 mapping (§29.13.7). Nine implementation checklist items across §29.12 + §29.13 (4× P0 M4, 2× P1 M5, 3× P2 M6–M8). OQ-PAM-OBS-01 and OQ-PAM-OBS-02 in §29.11 updated to 🟢 Resolved. TOC updated. Owner: security-engineer + compliance-officer + enterprise-architect + customer-success.
+- `VERSION` — 3.88.0 → 3.88.1
+
+---
+
 ## [3.88.0] — 2026-06-12
 
 ### Added

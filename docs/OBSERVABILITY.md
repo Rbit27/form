@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v3.1
+# FORM · Observability & Monitoring Taxonomy v3.2
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -50,6 +50,8 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §27 | SIEM Integration & Security Event Streaming |
 | §28 | Mobile Application Performance Observability |
 | §29 | PAM / Privileged Access Management Observability |
+| §29.12 | OQ-PAM-OBS-01 Resolution — Observability-Layer Identity Resolution |
+| §29.13 | OQ-PAM-OBS-02 Resolution — Tenant-Facing PAM Activity Panel |
 | §30 | Key Management & Cryptography Observability |
 | §31 | API Key Authentication & Usage Observability |
 | §32 | Victor AI Safety Monitoring & Clinical-Safety Observability |
@@ -7093,8 +7095,190 @@ Beyond the operational alert rules in §29.4, four health monitors verify the in
 
 | OQ | Question | Owner | Priority | Target |
 |---|---|---|---|---|
-| OQ-PAM-OBS-01 | **Should `admin_user_id` in observability signals use the same pseudonymous UUID as in DEC-030 events, or a separate observability-layer pseudonym?** Using the same UUID enables direct correlation between AL-PAM-02 (denial spike in Better Stack) and the DEC-030 `pam.elevation_denied` audit record — this is the primary forensic value. Using a separate pseudonym adds a privacy layer in case the observability tier (Analytics Engine, Metabase) is broader-access than the DEC-030 audit log. Current intent: same UUID, with access controls on Metabase PAM dashboard restricted to devops-lead + security-engineer + compliance-officer. Confirm access scope before M4 deploy. | security-engineer + compliance-officer | **P1** | Before M4 deploy |
-| OQ-PAM-OBS-02 | **Should PAM session activity on tenant data be surfaced in the enterprise Admin Dashboard for tenant admins?** Large enterprise buyers (FSI, pharma, public companies) often require evidence that privileged access to their data is controlled and audited — some procurement teams make this a contract requirement. Proposal: expose only the aggregate count of "admin operations performed on your tenant's data" sourced from `SELECT COUNT(*) FROM audit_log WHERE metadata->>'pam_session_id' IS NOT NULL AND tenant_id = $tenant_id AND event_ts BETWEEN $period_start AND $period_end` — no session details, no admin_user_id, no operation type. This count gives the tenant evidence that PAM controls are active without exposing FORM's internal access patterns. Alternative: a "Privileged Access Report" downloadable PDF generated quarterly by compliance-officer and shared on request (lower engineering cost, higher-touch). | customer-success + security-engineer | **P2** | Before enterprise GA (M13) |
+| OQ-PAM-OBS-01 | 🟢 **Resolved (2026-06-12).** Same UUID as DEC-030 events confirmed. Access-control approach adopted: Metabase PAM dashboard + Analytics Engine `PAM_TELEMETRY` restricted to devops-lead + security-engineer + compliance-officer only. Forensic correlation value outweighs a separate pseudonym layer; separate-pseudonym approach rejected (requires translation table, adds investigation latency). See §29.12 for full decision record and access-control implementation spec. | security-engineer + compliance-officer | ~~P1~~ 🟢 | 2026-06-12 |
+| OQ-PAM-OBS-02 | 🟢 **Resolved (2026-06-12) — design complete.** Aggregate count panel accepted; quarterly PDF alternative rejected (does not remove pre-close procurement blocker; scales poorly). API endpoint `GET /api/admin/tenants/:tenantId/pam-activity` returning `privilegedOperationsCount` + `breakGlassActivations` integers only — no admin_user_id, no operation type. Admin Dashboard "Privileged Access Activity" card in Security & Compliance tab. Implementation: P0 M5 (API), P1 M5 (dashboard panel). See §29.13 for full design spec and implementation checklist. | customer-success + security-engineer | ~~P2~~ 🟢 | 2026-06-12 |
+
+---
+
+### 29.12 OQ-PAM-OBS-01 Resolution — Observability-Layer Identity Resolution
+
+**Decision (2026-06-12): `admin_user_id` in PAM observability signals uses the same pseudonymous UUID as DEC-030 audit events. Decided by: security-engineer + compliance-officer + enterprise-architect.**
+
+#### 29.12.1 Decision rationale
+
+The forensic correlation between AL-PAM-02 (elevation-denial spike in Better Stack) and the DEC-030 `pam.elevation_denied` audit record is the **primary security value of PAM observability**. An anomaly alert with no tractable path to the underlying audit chain is investigation theatre. Implementing a separate observability-layer pseudonym would require:
+
+1. A UUID translation table mapping observability pseudonyms to DEC-030 UUIDs — a new secret whose compromise undermines the stated privacy benefit.
+2. Changes to `pam-elevation-service` to resolve and maintain two parallel identity representations across every emitted Analytics Engine event.
+3. A manual de-anonymisation step during every active PagerDuty security incident — adding latency to an investigation that is already subject to PAM-SLO-01 (break-glass PagerDuty alert ≤ 60 s, zero-tolerance).
+
+The privacy concern motivating a separate pseudonym is **access-control solvable, not pseudonymisation-solvable**: if the observability tier has broader access than the DEC-030 audit log, that is an access-control gap, not a pseudonymisation problem. The correct fix is to restrict access to the observability tier, not to degrade the forensic signal. §29.12.2 specifies the access control that replaces the pseudonymisation approach.
+
+#### 29.12.2 Access control implementation (required before M4 deploy)
+
+| Role | Metabase PAM Dashboard (`/collections/pam-security`) | Analytics Engine `PAM_TELEMETRY` raw dataset | Better Stack PAM alert history |
+|---|---|---|---|
+| devops-lead | ✅ Read + manage alerts | ✅ Via `cf-ae-pam-read` API token (scoped to `PAM_TELEMETRY` binding only) | ✅ Full |
+| security-engineer | ✅ Read | ✅ Via `cf-ae-pam-read` API token | ✅ Full |
+| compliance-officer | ✅ Read | ❌ No raw dataset access (pre-aggregated Better Stack only) | ✅ Full |
+| All other internal roles | ❌ No access | ❌ No access | ❌ No access |
+| Tenant admins | ❌ No access (see §29.13) | ❌ No access | ❌ No access |
+
+**Metabase implementation:** The PAM dashboard is published in a restricted Metabase Collection (`/collections/pam-security`). View access is granted only to Metabase groups `FORM-DevOps`, `FORM-Security`, and `FORM-Compliance`. Group membership requires devops-lead approval. `admin_user_id` is displayed as a UUID only in all panels — no display-name resolution, no email address. Metabase audit log is enabled; PAM dashboard access events are logged to `metabase_audit` (retained 90 days per §9.1).
+
+**Analytics Engine scoping:** `PAM_TELEMETRY` is accessed via dedicated Cloudflare API token `cf-ae-pam-read` with permission scope `com.cloudflare.api.account.analytics.read` restricted to the `PAM_TELEMETRY` dataset binding only. This token is held by devops-lead and security-engineer only. compliance-officer uses only Better Stack dashboards, which consume pre-aggregated time-series metrics — no UUID-level data is present in those panels.
+
+**Investigation procedure:** Any query against `PAM_TELEMETRY` that filters on a specific `admin_user_id` UUID must be performed under an active PagerDuty incident and the investigator's query and findings must be added to the incident timeline. This is a documented procedural control. It is enforced by security-engineer + devops-lead on-call duty, not by a technical gate.
+
+#### 29.12.3 SOC 2 update
+
+**CC6.1 row in §29.9** is updated: the access-control implementation specified in §29.12.2 is the documented control demonstrating that the observability tier holding `admin_user_id` UUIDs is restricted to three enumerated internal roles. This supplements the existing "no standing `form_admin` credentials" control narrative.
+
+**DEC-030 event:** `admin.pam_dashboard_access` — **not required**. The Metabase audit log (`metabase_audit`) provides sufficient access evidence at the observability-layer tier. A DEC-030 event for a read-only observability query would add low-value entries to the HMAC chain, inconsistent with the principle that DEC-030 covers data mutations and security-relevant state changes (DEC-030 §1.2, `docs/AUDIT_LOG_SCHEMA.md`).
+
+#### 29.12.4 Implementation checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create Metabase Collection `/collections/pam-security`; set View permissions to groups `FORM-DevOps`, `FORM-Security`, `FORM-Compliance`; move PAM dashboard (§29.7) into this collection | devops-lead | **P0** | M4 | [ ] |
+| 2 | Provision Cloudflare API token `cf-ae-pam-read` scoped to `PAM_TELEMETRY` binding only; store in 1Password `FORM-Engineering` vault; share with devops-lead + security-engineer | devops-lead | **P0** | M4 | [ ] |
+| 3 | Validate Metabase `admin_user_id` column displays UUID only in all PAM dashboard panels — no name-resolution query against any user directory; add Metabase audit log verification step to SOC 2 observation-period evidence runbook | devops-lead + compliance-officer | **P0** | M4 | [ ] |
+| 4 | Document investigation procedure (§29.12.2, final paragraph) in internal security runbook; add to `docs/INCIDENT_RESPONSE.md` R-20 (Insider Threat) §C3 evidence query notes as "PAM_TELEMETRY query requires active PagerDuty incident reference" | security-engineer | **P1** | M4 | [ ] |
+
+---
+
+### 29.13 OQ-PAM-OBS-02 Resolution — Tenant-Facing PAM Activity Panel
+
+**Decision (2026-06-12): Aggregate count panel approach accepted. Quarterly PDF alternative rejected. Design complete; implementation gated on M5 admin dashboard build. Decided by: customer-success + security-engineer + enterprise-architect.**
+
+#### 29.13.1 Decision rationale
+
+Large enterprise buyers (FSI, pharma, publicly traded companies) routinely ask "can you demonstrate when your engineers accessed our data?" as a security procurement requirement. Surfacing a self-service answer in the enterprise Admin Dashboard eliminates a pre-close procurement blocker. The two options evaluated:
+
+| Criterion | Aggregate count panel (accepted) | Quarterly PDF report (rejected) |
+|---|---|---|
+| **Self-service** | Tenant admin queries any period in real time | Requires CSM request; 5-business-day turnaround |
+| **Removes procurement blocker** | Yes — admin provides evidence to their own security team immediately | No — PDF arrives post-close; does not unblock pre-close sign-off |
+| **Engineering cost** | One API endpoint + one dashboard panel | Recurring CSM workflow + scheduled Cloudflare queued job; grows with customer count |
+| **Privacy surface** | Zero — `COUNT(*)` scalar integer only | Equivalent backend query; same privacy properties |
+| **SOC 2 value** | CC6.1 tenant-accessible evidence, on demand | Not auditor-accessible; requires CSM mediation |
+
+The aggregate count approach is privacy-safe by construction: `COUNT(*)` with a `tenant_id` filter returns a scalar integer. There is no path from this value to FORM engineering identity, query content, or internal access patterns. The HR-never-sees-individual-user-data privacy floor (DEC-030, `docs/ENTERPRISE.md §10`) is orthogonal: this panel covers FORM-to-tenant administrative access, not employee-to-product activity.
+
+#### 29.13.2 API specification
+
+**`GET /api/admin/tenants/:tenantId/pam-activity`**
+
+Authentication: `tenant_owner` or `tenant_admin` JWT role. RLS policy: `tenant_id = auth.jwt()->>'tenant_id'::UUID` (same pattern as `GET /api/admin/tenants/:tenantId/sla` in §13.4).
+
+Query parameters:
+
+| Parameter | Type | Default | Constraint |
+|---|---|---|---|
+| `period_start` | ISO 8601 date string | First day of current calendar month | Must be ≤ `period_end` |
+| `period_end` | ISO 8601 date string | Current date (inclusive) | Must be ≥ `period_start` |
+
+Period window exceeding 90 days returns HTTP 400:
+```json
+{ "error": "period_too_long", "max_days": 90 }
+```
+
+Response schema:
+
+```typescript
+interface TenantPamActivityReport {
+  tenantId: string;
+  tenantSlug: string;
+  period: {
+    from: string;   // ISO 8601 date
+    to:   string;   // ISO 8601 date (inclusive)
+  };
+  privilegedOperationsCount: number;   // COUNT(*) of pam_session_id-tagged audit events
+  breakGlassActivations: number;       // COUNT(*) of pam.break_glass_activated events
+  noteOnBreakGlass: string | null;     // non-null only when breakGlassActivations > 0
+  generatedAt: string;                 // ISO 8601 timestamp
+}
+```
+
+`noteOnBreakGlass` static value (when `breakGlassActivations > 0`): `"Break-glass access requires two-person authorisation and a mandatory post-hoc review. Contact your FORM CSM to receive a summary of any break-glass event during this period."` This text is static and templated; it never references internal identities or session details.
+
+#### 29.13.3 Backend implementation
+
+Worker: `admin-api` Cloudflare Worker (same worker as §13.4 SLA endpoint). Role: `form_api` Postgres role, RLS-enforced. Two sequential queries per request:
+
+```sql
+-- Query 1: Privileged operations count
+SELECT COUNT(*)::INT AS privileged_operations_count
+FROM audit_log
+WHERE tenant_id  = $1::UUID        -- bound from JWT claim, not URL parameter
+  AND (metadata->>'pam_session_id') IS NOT NULL
+  AND event_ts >= $2::TIMESTAMPTZ
+  AND event_ts <  $3::TIMESTAMPTZ + INTERVAL '1 day';
+
+-- Query 2: Break-glass activations
+-- Restricted to pam.break_glass_activated only (not token_issued or admin_login)
+-- so tenant learns activation occurred without exposing FORM's internal issuance detail
+SELECT COUNT(*)::INT AS break_glass_activations
+FROM audit_log
+WHERE event_type = 'pam.break_glass_activated'
+  AND tenant_id  = $1::UUID
+  AND event_ts >= $2::TIMESTAMPTZ
+  AND event_ts <  $3::TIMESTAMPTZ + INTERVAL '1 day';
+```
+
+**RLS note:** `audit_log` exposes rows via `form_api` role only where `tenant_id = current_setting('app.tenant_id')::UUID`. The Worker sets `app.tenant_id` from the validated JWT before executing the query. The `$1::UUID` bind variable is redundant with RLS but is included as a defence-in-depth constraint; if the RLS policy were to be missing or misconfigured, the explicit `tenant_id = $1` filter prevents a cross-tenant leak. See `docs/DATA_MODEL.md §3.8`.
+
+**Rate limit:** 60 requests/minute per tenant (consistent with §31 API key defaults for read-only admin endpoints). Overage returns HTTP 429.
+
+#### 29.13.4 Privacy floor invariants
+
+The following fields are **never present** in the API response, by schema enforcement:
+
+1. `admin_user_id` — not in response schema; not derivable from `COUNT(*)`
+2. `pam_session_id` — not in response schema
+3. Operation type, query content, affected table — not in response schema
+4. Session duration, `access_level` (`read_only` / `read_write` / `destructive`) — not in response schema
+5. Any FORM internal identifier, service name, or infrastructure detail — not in response schema
+
+The integers `privilegedOperationsCount` and `breakGlassActivations` are the complete data exposed. A tenant receiving `{ "privilegedOperationsCount": 47, "breakGlassActivations": 0 }` learns that FORM's engineering team performed 47 privileged database operations on their data in the period, with no unauthorized emergency access — the minimum information a security audit requires, and no more.
+
+#### 29.13.5 Admin Dashboard placement
+
+**Location:** `admin-dashboard.html` → Security & Compliance tab → new "Privileged Access Activity" card, positioned below the existing "Audit Log Export" card.
+
+| Card element | Content |
+|---|---|
+| **Heading** | Privileged Access Activity |
+| **Subheading** | FORM engineering access to your data is time-limited, two-person approved, and fully audited. |
+| **Primary stat** | `privilegedOperationsCount` — large numeral; current calendar month default |
+| **Secondary stat** | Break-glass activations this period. If `breakGlassActivations === 0`: green dot + "None". If `> 0`: amber dot + count + tooltip: *"Break-glass access is authorised for production incidents only and requires a mandatory post-hoc review. Contact your CSM for details."* |
+| **Period selector** | Dropdown: current month, previous 3 calendar months, custom range (up to 90 days) |
+| **Footer link** | "Learn about FORM's privileged access controls →" linking to the PAM section of the public security page (`/security.html`) |
+
+**Copy rationale:** "Two-person approved" (not "two-factor") — the distinguishing property for enterprise buyers is the human approval gate, not MFA. "Fully audited" is accurate: every PAM session emits DEC-030 HMAC-chained events.
+
+#### 29.13.6 DEC-030 event
+
+`admin.pam_activity_report_downloaded` — **not required for the API endpoint** (read-only query; consistent with §13.4 SLA API which also has no DEC-030 event). If Implementation checklist item 3 (CSV export) ships, emit `admin.pam_activity_report_downloaded` (STANDARD, 1yr) per CSV generation, carrying `tenant_id`, `period_start`, `period_end`, `actor_id` (tenant admin `user_id`). CSV export generates a persistent artefact leaving FORM's systems; the API query does not.
+
+**`docs/AUDIT_LOG_SCHEMA.md` registration:** pending checklist item 5 below (P2, M8).
+
+#### 29.13.7 SOC 2 mapping
+
+| Criterion | Control | Evidence artefact |
+|---|---|---|
+| **CC6.1 — Logical access controls** | Enterprise tenants can independently verify FORM-side privileged access to their data on demand, without CSM mediation. This strengthens the evidential story for the "no standing `form_admin` credentials" control narrative. | Tenant-generated panel screenshot or API response JSON during observation period; no separate FORM-managed artefact required — tenant self-serves |
+| **C1.2 — Personal information access** | This panel covers FORM-to-tenant administrative access only. Employee-to-product activity remains invisible to employer per the privacy floor. No employee identifier is present in the response. | Response schema (§29.13.2) enforced in `admin-api` Worker type definitions |
+
+#### 29.13.8 Implementation checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Implement `GET /api/admin/tenants/:tenantId/pam-activity` in `admin-api` Worker: JWT-scoped RLS (`app.tenant_id` set from JWT before query), dual-query backend (§29.13.3 SQL), period validation (max 90 days → HTTP 400), 60 req/min rate limit, static `noteOnBreakGlass` text | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Add "Privileged Access Activity" card to `admin-dashboard.html` Security & Compliance tab: primary + secondary stats, period selector, break-glass indicator (zero = green, non-zero = amber + tooltip), footer security-page link | design-craft + platform-engineer | **P1** | M5 | [ ] |
+| 3 | CSV export: `GET /api/admin/tenants/:tenantId/pam-activity?format=csv` — single-row summary CSV (`period_start,period_end,privileged_operations_count,break_glass_activations`); emit `admin.pam_activity_report_downloaded` DEC-030 STANDARD 1yr on each generation | platform-engineer + compliance-officer | **P2** | M8 | [ ] |
+| 4 | Add panel to `docs/SSO_CLIENT_CONFIG.md` §6 (Admin Dashboard overview) describing the Privileged Access Activity card and how to reference it in security questionnaire responses | enterprise-architect | **P2** | M6 | [ ] |
+| 5 | Register `admin.pam_activity_report_downloaded` event type in `docs/AUDIT_LOG_SCHEMA.md` action taxonomy: STANDARD, 1yr, `tenant_id` + `period_start` + `period_end` + `actor_id` payload; no health data | compliance-officer | **P2** | M8 | [ ] |
 
 ---
 
@@ -9253,6 +9437,8 @@ COMMENT ON COLUMN tenants.mid_contract_risk_alerted_at IS 'Dedup guard for enter
 | **OQ-ETF-05** | **Should AL-ETF-01 trigger a Metabase CHS dashboard deep-link in the PagerDuty alert body?** This would reduce CSM time-to-investigate from ~5 min (navigate to Metabase manually) to ~30 sec. Requires parameterised Metabase dashboard URL with `tenant_id`. Risk: Metabase URL contains `tenant_id` in plaintext — acceptable in PagerDuty (internal tool) but must never appear in customer-facing communications. | P2 | devops-lead + customer-success | Implement at M11 if Metabase dashboard is live |
 
 ---
+
+*v3.2 (2026-06-12): §29.12 OQ-PAM-OBS-01 Resolution + §29.13 OQ-PAM-OBS-02 Resolution — closes both open questions from §29.11 (v1.6, 2026-06-03). OQ-PAM-OBS-01 (P1, before M4 deploy): same UUID as DEC-030 events confirmed for `admin_user_id` in Analytics Engine `PAM_TELEMETRY`; separate-pseudonym approach rejected (requires translation table, degrades forensic correlation, adds investigation latency against PAM-SLO-01 60 s zero-tolerance); access-control approach adopted instead (§29.12.2): Metabase Collection `/collections/pam-security` restricted to `FORM-DevOps`, `FORM-Security`, `FORM-Compliance` groups; `cf-ae-pam-read` Cloudflare API token scoped to `PAM_TELEMETRY` binding; investigation procedure (UUID queries require active PagerDuty incident) documented as procedural control; SOC 2 CC6.1 row in §29.9 updated; four-item P0/P1 M4 implementation checklist at §29.12.4. OQ-PAM-OBS-02 (P2, before enterprise GA M13): aggregate count panel accepted; quarterly PDF rejected (does not remove pre-close procurement blocker, scales linearly with CSM hours); `GET /api/admin/tenants/:tenantId/pam-activity` Worker endpoint specified (§29.13.2): dual-query backend — `privilegedOperationsCount` (COUNT pam_session_id-tagged audit events) + `breakGlassActivations` (COUNT pam.break_glass_activated, not token_issued or admin_login); period default = current month; max 90-day window; rate limit 60 req/min; response schema strictly typed (§29.13.2); five privacy floor invariants enforced by schema (§29.13.4: no admin_user_id, no pam_session_id, no operation type, no session duration, no access_level); static `noteOnBreakGlass` text when activations > 0; Admin Dashboard "Privileged Access Activity" card placement spec (§29.13.5: Security & Compliance tab, below Audit Log Export, period selector, green/amber break-glass indicator); DEC-030 not required for API query (read-only, consistent with §13.4 SLA API); DEC-030 `admin.pam_activity_report_downloaded` deferred to CSV export (P2 M8, §29.13.8 item 3); SOC 2 CC6.1 + C1.2 mapping (§29.13.7); five-item implementation checklist P0/P1/P2 M5–M8 (§29.13.8). TOC updated to add §29.12 and §29.13 entries. §29.11 OQ rows updated to 🟢 Resolved. Owner: security-engineer + compliance-officer + enterprise-architect + customer-success.*
 
 *v0.1 (2026-06-12): §36 Mid-Contract Termination Risk Monitoring — operationalises COST_MODEL.md §35 at the observability layer. AL-ETF-01 alert rule (§36.3): P1 PagerDuty `form-customer-success` + Slack `#enterprise-health` HIGH on `enterprise.mid_contract_termination_risk_flagged` DEC-030 emission; 30-day dedup per tenant. pg_cron job 25 `mid_contract_termination_risk_check` (§36.2, 09:00 UTC Mondays, 8-day freshness window): SQL detection query for `chs_score < 20` in ≥ 4 consecutive weekly snapshots AND `days_remaining > 180`; requires `tenants.mid_contract_risk_alerted_at TIMESTAMPTZ NULL` migration; pg_net → emit-audit-event Worker emission; DEC-030 ordering enforced (chain entry precedes UPDATE). SOC 2 evidence artefacts ETF-E-001 (CC5.2), ETF-E-002 (CC7.2), ETF-E-003 (CC5.2) at §36.4. Five-item P0/M10 implementation checklist at §36.5. Two open questions OQ-ETF-04/OQ-ETF-05 at §36.6. Note: section numbered §36 (not §35) because `## §35` is reserved for Rate Limiting & Quota Enforcement Observability (v2.7). Cross-ref: COST_MODEL.md §35 (ETF model definition); AUDIT_LOG_SCHEMA.md v1.7 (event registration); MSA_TEMPLATE.md §11.4 (ETF clause); §12.6 (job 25 registered); §33 (CHS model — `tenant_engagement_snapshots` source table). Owner: devops-lead + enterprise-architect + customer-success.*
 
