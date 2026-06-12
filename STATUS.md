@@ -1,7 +1,7 @@
 # FORM · Project Status v1.4.0
 
 **Date:** 12 червня 2026
-**Version:** 3.80.0
+**Version:** 3.82.0
 **Phase:** Pre-launch · Closed Beta planning Q3 2026
 **Repo:** https://github.com/Rbit27/form
 
@@ -485,6 +485,10 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-519-missed-workouts-detraining.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.79.0 |
 | post-520-two-a-day-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.79.0 |
 | post-521-hypertrophy-without-strength-gain.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.80.0 |
+| post-522-isometric-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.81.0 |
+| post-523-blood-flow-restriction.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.81.0 |
+| post-524-training-frequency.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.81.0 |
+| post-525-resistance-bands-specificity.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.82.0 |
 | post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | post-511-reverse-mesocycle-planning.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.74.0 |
 | post-512-isolation-exercises-when-needed.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.75.0 |
