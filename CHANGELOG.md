@@ -6,6 +6,19 @@
 
 ---
 
+## [3.99.0] — 2026-06-12
+
+### Added
+- `content/post-547-second-year-training-logic-shift.md` — «Другий рік тренувань — де закінчується логіка початківця»; Kraemer & Ratamess (2004, *Med Sci Sports Exerc*) principle of variation і тренувальний статус; Moritani & deVries (1979) нейральна vs структурна адаптація; Seynnes et al. (2007, *MSSE*) ранні структурні зміни; Israetel, Hoffman & Case (2019) MEV/MAV/MRV зони та зміщення з ростом досвіду; Schoenfeld et al. (2019, *SJMSS*) хронічний обсяг як предиктор гіпертрофії; Issurin (2010, *Sports Med*) блокова структура для intermediate; Schoenfeld, Ogborn & Krieger (2016) частота тренувань і гіпертрофія; Zourdos et al. (2016) RPE-калібрування і досвід; таблиця початківець vs середній рівень; 4 типові застряги другого року; алгоритм 5–6-тижневого мезоциклу; editorial-brutalist · 13 хв · clinical-safety NOT REQUIRED
+
+### Changed
+- `blog.html` — додано blog card для post-547 (серія self-coaching 542–547)
+- `README.md` — post-547 позначено ✓; roadmap post-548–551 додано (плато-діагностика, мінімалізм, вибір програми, тренування в поїздці)
+- `STATUS.md` — рядок post-547 в content engine table; last update оновлено до v3.99.0
+- `VERSION` — 3.98.0 → 3.99.0
+
+---
+
 ## [3.98.0] — 2026-06-12
 
 ### Added
