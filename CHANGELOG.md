@@ -6,6 +6,17 @@
 
 ---
 
+## [3.77.0] — 2026-06-12
+
+### Added
+- `content/post-518-exercise-count-per-session.md` — «Скільки вправ за тренування — де закон убутньої віддачі перестає працювати на вас»: деградація нейром'язової і гормональної відповіді при надмірному об'ємі за сесію (Ahtiainen 2003); систематичне погіршення продуктивності пізніших вправ незалежно від порядку (Robbins 2009); перевага розподілу об'єму між сесіями (McLester 2000); тижневий об'єм як первинний предиктор (Krieger 2010 мета-аналіз); гормональна відповідь на тривалість сесії (Kraemer & Ratamess 2005, Hackney 2006); практична межа 3–5 вправ за сесію; функціональна перевірка «зайвих» вправ. Refs: Ahtiainen 2003, Robbins 2009, McLester 2000, Krieger 2010, Kraemer & Ratamess 2005, Hackney 2006, Schoenfeld 2010, Sale 1988, Haff & Triplett 2015. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `blog.html` — додано картку post-518
+- `README.md` — roadmap оновлено: post-517 позначено ✓, додано теми post-518–522; post-518 позначено ✓
+- `STATUS.md` — додано рядок post-518 у content engine table
+- `VERSION` — 3.76.0 → 3.77.0
+
+---
+
 ## [3.76.0] — 2026-06-12
 
 ### Added
