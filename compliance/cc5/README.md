@@ -12,7 +12,7 @@
 |---|---|---|
 | CC5.1 | Control activities selected and developed to mitigate risks to the achievement of objectives | 🟡 Partial — risk-to-control matrix complete (§27.1.1); gaps: TruffleHog CI (CC5-P1-003), IaC drift detection (CC5-P1-005) |
 | CC5.2 | General control activities over technology to support the achievement of objectives | 🟡 Partial — IaC enforcement table, configuration baseline, logical access table, and automated monitoring documented; gaps: CSP header (CC6-GAP-007), Dependabot CI gate (CC6-GAP-005), TruffleHog CI (CC5-P1-003), IaC drift (CC5-P1-005) |
-| CC5.3 | Control activities deployed through policies and procedures | 🟡 Partial — 10 of 12 policies authored or in force; 1 policy pending counsel (AUP); 1 policy partial (Security Awareness Training standalone doc); policy approval log exists |
+| CC5.3 | Control activities deployed through policies and procedures | 🟡 Partial — 12 of 13 policies authored or in force; 1 policy pending counsel (AUP — POL-001); policy approval log exists with 13 entries |
 
 ---
 
@@ -22,7 +22,7 @@
 |---|---|---|---|
 | `docs/CRYPTOGRAPHY_POLICY.md` | Cryptography Policy v1.0 (POL-002) — cipher suites, key lengths, rotation SLA, key custody, SHA-1/MD5 prohibition | CC5.2, CC5.3, C1.1, C1.2 | 🟢 In Force · 2026-05-21 |
 | `docs/ACCEPTABLE_USE_POLICY.md` | Acceptable Use Policy v1.0 (POL-001) — permitted uses, prohibited uses, consequences, review cadence | CC1.1, CC5.3, CC6.3 | 🟡 Authored · pending external counsel review and founder signature |
-| `compliance/policy-approval-log.csv` | Policy approval register (POL-001 through POL-011) — policy name, version, status, approval date, approver, next review | CC5.3 | 🟢 Exists · 11 policies registered |
+| `compliance/policy-approval-log.csv` | Policy approval register (POL-001 through POL-013) — policy name, version, status, approval date, approver, next review | CC5.3 | 🟢 Exists · 13 policies registered |
 | `docs/SOC2_READINESS.md §27.1.1` | Risk-to-control mapping matrix — 10 risk categories mapped to named controls with owners, review cadences, and evidence artefacts | CC5.1 | 🟢 Complete |
 | `docs/SOC2_READINESS.md §27.1.2` | Control ownership register — 12 controls with owners, authority, review cadence, and evidence artefact IDs | CC5.1 | 🟢 Complete |
 | `docs/SOC2_READINESS.md §27.2.1` | IaC enforcement table — 9 deployment systems with change method, config location, drift detection status | CC5.2 | 🟡 Partial — drift detection gap (CC5-P1-005) |
@@ -41,7 +41,7 @@
 | **CC5-GAP-001** | Acceptable Use Policy | P0 — blocks CC5.3 and CC1.1 from 🟡 → 🟢 | 🟡 Authored · pending counsel | `docs/ACCEPTABLE_USE_POLICY.md` (POL-001) exists; pending external counsel review + founder signature |
 | **CC5-GAP-002** | Cryptography Policy | P0 — blocks CC5.3 and CC5.2 | 🟢 Closed | `docs/CRYPTOGRAPHY_POLICY.md` (POL-002) in force · 2026-05-21 |
 | **CC5-GAP-003** | TruffleHog CI secret scan | P1 | 🔴 Open | GitHub Actions workflow not yet implemented (CC5-P1-003) |
-| **CC5-GAP-004** | `compliance/policy-approval-log.csv` creation | P1 | 🟢 Closed | `compliance/policy-approval-log.csv` exists with 11 policies (POL-001 through POL-011) |
+| **CC5-GAP-004** | `compliance/policy-approval-log.csv` creation | P1 | 🟢 Closed | `compliance/policy-approval-log.csv` exists with 13 policies (POL-001 through POL-013) |
 | **CC5-GAP-005** | Terraform IaC drift detection in CI | P1 | 🔴 Open | CC5-P1-005 — remote state backend + GitHub Actions step not yet implemented |
 
 ---
@@ -73,3 +73,6 @@
 *v1.0 · 2026-06-07 · Owner: compliance-officer + security-engineer*
 *Gaps closed this version: CC5-GAP-002 (Cryptography Policy in force), CC5-GAP-004 (policy-approval-log.csv created)*
 *Gaps downgraded this version: CC5-GAP-001 (AUP 🔴 → 🟡 authored, pending counsel)*
+
+*v1.1 · 2026-06-12 · enterprise-builder sync*
+*Updated: policy count 11 → 13 (POL-012 Security Awareness Training, POL-013 Media Disposal Policy added); CC5.3 coverage updated to 12/13 policies; CC5-GAP-004 count corrected.*

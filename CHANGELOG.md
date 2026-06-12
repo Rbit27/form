@@ -6,6 +6,16 @@
 
 ---
 
+## [4.0.3] — 2026-06-12
+
+### Changed
+- `docs/SOC2_READINESS.md §29.4` — CC1-GAP-001 implementation checklist corrected: removed outdated `docs/AUP.md` reference and incorrect `CC1-E-001` artifact ID; now correctly references `docs/ACCEPTABLE_USE_POLICY.md` v1.0 (CC1-E-004) with the 5-step signing workflow from `compliance/cc1/README.md §AUP Acknowledgment Path`; added explicit note that `docs/AUP.md` + `CC1-E-001` identifiers are superseded — closes SOC 2 audit artifact ID conflict
+- `docs/SOC2_READINESS.md §29.4` — CC1-GAP-004 implementation checklist marked CLOSED: `compliance/policy-approval-log.csv` already exists at repository root (not `compliance/cc1/`) with 13 policies; artifact correctly classified as CC5.3 evidence (CC5-E-001), not CC1-E-004
+- `compliance/cc5/README.md` — policy count synced 11 → 13 (adds POL-012 Security Awareness Training Policy, POL-013 Media and Device Disposal Policy); CC5.3 coverage updated to 12/13 policies; CC5-GAP-004 entry count corrected; v1.1 version note added
+- `VERSION` — 4.0.2 → 4.0.3
+
+---
+
 ## [4.0.2] — 2026-06-12
 
 ### Added
