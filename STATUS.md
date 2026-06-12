@@ -761,6 +761,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v4.12.0 · 12 червня 2026**
-**Last update:** 12 червня 2026 · v4.12.0 (post-576 authored · ego depletion / effort regulation: Baumeister 1998, Hagger 2010/2016 replication failure, Inzlicht & Schmeichel 2012, Marcora 2009 JAP, Carter 2015 publication bias, Job 2010 implicit theory · clinical-safety NOT REQUIRED · blog.html +1 card = 343 total · roadmap post-578–579 додано)
+**v4.13.0 · 12 червня 2026**
+**Last update:** 12 червня 2026 · v4.13.0 (posts 577–579 authored · sport psychology block: perfectionism/Frost MPS/Stoeber&Otto, rumination/Nolen-Hoeksema/Borkovec, social comparison/Festinger/Suls&Wheeler · all clinical-safety NOT REQUIRED · blog.html +3 cards = 346 total · roadmap post-580–581 додано)
 **Next planned update:** після hire of Founding Engineer

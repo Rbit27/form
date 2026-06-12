@@ -6,6 +6,17 @@
 
 ---
 
+## [4.13.0] — 2026-06-12
+
+### Added
+- `content/post-577-perfectionism-training-behavior.md` — Перфекціонізм і тренувальна поведінка; Frost et al. (1990) MPS 6 субшкал; Stoeber & Otto (2006) Pers Soc Psychol Rev адаптивний (perfectionistic striving) vs дезадаптивний (perfectionism concerns); Flett & Hewitt (2005) механізми спортивної тривоги; Hall et al. (1998) socially prescribed perfectionism; Gotwals et al. (2012) Sport MPS-2; чотири поведінкових механізми: вибір програми, реакція на miss, pre-set anxiety, вибір ваги; clinical-safety NOT REQUIRED
+- `content/post-578-rumination-training-concentration.md` — Румінація і тренувальна концентрація; Nolen-Hoeksema (1991) RSQ; Borkovec et al. (2002) worry vs rumination (future-oriented verbal vs past-oriented abstract); Smallwood & Schooler (2006) task-unrelated thought; Mooneyham & Schooler (2013) costs of mind-wandering; Hatzigeorgiadis et al. (2011) self-talk meta-analysis d≈0.48; Wulf (2013) external vs internal focus; Wegner (1994) ironic processes; Zeigarnik (1927) і журнал як когнітивне закриття; clinical-safety NOT REQUIRED
+- `content/post-579-social-comparison-gym.md` — Соціальне порівняння у залі; Festinger (1954) Psychol Rev similarity hypothesis і unidirectional upward drive; Suls & Wheeler (2000) upward/downward/lateral comparison functions; Buunk & Gibbons (2007) gym як структурно аномальне середовище; White et al. (2009) perceived attainability як медіатор ego threat vs motivation; Martin Ginis et al. (2008) дзеркала і зовнішня увага; вага на грифі як неконтрольована змінна; журнал як internal baseline; clinical-safety NOT REQUIRED
+- `blog.html` — +3 картки (post-577, post-578, post-579); blog card count: 346 total
+- `README.md` — roadmap post-577–579 позначено done; додано roadmap post-580–581
+
+---
+
 ## [4.12.1] — 2026-06-12
 
 ### Changed
