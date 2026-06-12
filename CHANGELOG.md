@@ -6,6 +6,14 @@
 
 ---
 
+## [3.80.1] — 2026-06-12
+
+### Changed
+- `docs/OBSERVABILITY.md` v3.1 — OQ-APIKEY-OBS-02 stale-status patch: marked 🟢 Resolved citing DEC-035 (2026-06-01); soft enforcement of `expires_at` confirmed; §31.10 checklist item 13 closed; §2.1 + §31.3 APIKEY-SLO-04 rows updated from "pending OQ-APIKEY-OBS-02" → "confirmed per DEC-035"; file header corrected from v2.9 → v3.1 (v3.0 header update was missing from v3.73.1 commit). Mirror of OQ-SSO-26.2 resolution already in `docs/SSO_SCIM_IMPLEMENTATION.md §26.10` v1.8.1.
+- `VERSION` — 3.80.0 → 3.80.1
+
+---
+
 ## [3.80.0] — 2026-06-12
 
 ### Added
