@@ -489,6 +489,8 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-523-blood-flow-restriction.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.81.0 |
 | post-524-training-frequency.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.81.0 |
 | post-525-resistance-bands-specificity.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.82.0 |
+| post-526-training-load-management-ati-ctl.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.83.0 |
+| post-527-undertrained-signals-mev-deficit.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.84.0 |
 | post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | post-511-reverse-mesocycle-planning.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.74.0 |
 | post-512-isolation-exercises-when-needed.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.75.0 |

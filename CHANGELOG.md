@@ -6,6 +6,19 @@
 
 ---
 
+## [3.84.0] — 2026-06-12
+
+### Added
+- `content/post-527-undertrained-signals-mev-deficit.md` — «П'ять ознак того, що ви тренуєтесь недостатньо інтенсивно — MEV-дефіцит і як його виявити»: Israetel/RP MEV-пороги (6–10 підходів/тиждень на групу); Foster et al. (2001) session RPE як діагностика стимулу; Helms et al. (2016) IJSPP RPE-дрейф; Zourdos et al. (2016) JSCR: RIR 3 vs RIR 1 — 28–35% різниця адаптаційного стимулу; Schoenfeld (2010) proximity-to-failure; Morton et al. (2016) Type IIx рекрутування; Banister & Hamilton (1985) нейральна vs структурна адаптація; McHugh (2003) repeated bout effect; п'ять операційних ознак MEV-дефіциту; три кроки реконфігурації. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `blog.html` — додано картки post-526 і post-527
+- `README.md` — roadmap: post-526 ✓ (v3.83.0), post-527 ✓ (v3.84.0); додано пункти post-530–533
+- `STATUS.md` — додано рядки post-526 і post-527 у content engine table; Version 3.84.0
+
+### Changed
+- `VERSION` — 3.83.0 → 3.84.0
+
+---
+
 ## [3.83.0] — 2026-06-12
 
 ### Added
