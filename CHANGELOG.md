@@ -6,6 +6,18 @@
 
 ---
 
+## [3.96.0] — 2026-06-12
+
+### Added
+- `content/post-542-self-technique-assessment.md` — «Як оцінити свою техніку без тренера — самодіагностика з телефону»; Wulf & Prinz (2001) і Wulf, McNevin & Shea (2001) CAH; Wulf et al. (2010, *Human Movement Science*) ЕМГ-верифікація; Kompf & Arandjelovic (2016) sticking region механіка; Zourdos et al. (2016) RIR-RPE; таблиця відео-чеклистів по 4 вправах; camera setup protocol; editorial-brutalist · 12 хв · clinical-safety NOT REQUIRED
+- `content/post-543-beginner-to-intermediate-criteria.md` — «Новачок до середнього рівня — конкретні критерії переходу»; Kraemer & Ratamess (2004, *Med Sci Sports Exerc*) класифікація тренувального статусу; Sale (1988) і Moritani & deVries (1979) нейральна адаптація; Rhea et al. (2002) DUP vs лінійна прогресія; Zourdos et al. (2016) RIR; DUP 3-денний шаблон; 4 операційних критерії переходу; editorial-brutalist · 11 хв · clinical-safety NOT REQUIRED
+
+### Changed
+- `VERSION` — 3.95.2 → 3.96.0
+- `README.md` — post-542 і post-543 позначені ✓; Last update оновлено
+
+---
+
 ## [3.95.2] — 2026-06-12
 
 ### Changed
