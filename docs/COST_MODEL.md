@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.0
+# FORM · Cost Model & Unit Economics v2.1
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -201,6 +201,18 @@
     - 34.8 DEC-030 HMAC-Chained Audit Events
     - 34.9 Implementation Checklist
     - 34.10 Open Questions
+35. [Enterprise Contract Amendment, Mid-Contract Termination & Early Termination Fee Model](#35-enterprise-contract-amendment-mid-contract-termination--early-termination-fee-model)
+    - 35.1 Purpose & Scope
+    - 35.2 Contract Amendment Taxonomy
+    - 35.3 Seat Reduction Policy (Mid-Contract)
+    - 35.4 Mid-Contract Termination Economics
+    - 35.5 Early Termination Fee Structure & Calculation
+    - 35.6 ETF Waiver Decision Framework
+    - 35.7 Multi-Year Price-Lock as Retention Tool (OQ-CHURN-02 Resolution)
+    - 35.8 ASC 606 / IFRS 15 Treatment for Terminations & Amendments
+    - 35.9 DEC-030 HMAC-Chained Audit Events (Closes OQ-CHURN-03)
+    - 35.10 Implementation Checklist
+    - 35.11 Open Questions
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -7271,8 +7283,8 @@ INSERT INTO audit_log (
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
 | **OQ-CHURN-01** | **Are the CHS band cutoffs (70 = Amber, 40 = Red) optimal for renewal prediction?** Current thresholds are borrowed from OBSERVABILITY §33.3 (designed for operational monitoring, not renewal prediction). A cutoff that maximizes recall (catching at-risk accounts early) may differ from one maximizing precision (minimizing false alarms that consume CSM time). Recommendation: run a simple logistic regression on `{chs_score_at_90d_pre_renewal, renewed: bool}` after first 10 renewals to find the empirically optimal cutoff for FORM's specific customer base. | P2 | data-engineer + customer-success | After first 10 renewal outcomes (est. M14) |
-| **OQ-CHURN-02** | **Should the primary retention play be a multi-year price-lock rather than a percentage discount?** Offering a 2-year or 3-year renewal at *current pricing* (no discount, but price-locked against future increases per §31.7) gives FORM forward ARR visibility and gives the customer protection against price inflation — both without triggering the §32 exception chain. Risk: locking in a struggling account at current pricing if engagement does not recover. Recommendation: test multi-year price-lock as a retention play on the first 3 Amber accounts; compare renewal quality (2yr vs. 1yr + discount) over a 6-month window. | P1 | customer-success + founder | After first 3 at-risk renewals (est. M10–M12) |
-| **OQ-CHURN-03** | **Should mid-contract termination risk have a separate DEC-030 event?** Current framework emits `enterprise.renewal_risk_flagged` even for mid-contract risk signals. However, mid-contract termination (§34.7) carries a different financial signature — immediate ARR loss + deferred revenue reversal under ASC 606 — that warrants distinct tracking. Recommendation: add `enterprise.mid_contract_termination_risk_flagged` (HIGH, 7yr) as a separate event type when CHS < 20 sustained 4+ weeks with > 6 months remaining. Register before first Enterprise-tier account reaches Month 6. | P2 | enterprise-architect + customer-success | Before first Enterprise-tier account Month 6 (est. M11) |
+| **OQ-CHURN-02** | ~~**Should the primary retention play be a multi-year price-lock rather than a percentage discount?**~~ **🟢 Resolved — §35.7 (2026-06-12).** NPV comparison framework adopted: price-lock advantage of $8,668 over 2yr horizon vs. 10% discount for a 300-seat Growth Amber account with CFO/procurement buyer. Five-profile decision matrix in §35.7.3 guides which tool to apply by customer profile. Empirical calibration after first 3 Amber renewals (M10–M12) per §35.10 item 10. | P1 → **Resolved** | customer-success + founder | §35.7 |
+| **OQ-CHURN-03** | ~~**Should mid-contract termination risk have a separate DEC-030 event?**~~ **🟢 Resolved — §35.9 (2026-06-12).** `enterprise.mid_contract_termination_risk_flagged` (HIGH, 7yr) defined in §35.9.1: triggers when CHS < 20 sustained ≥ 4 weeks AND remaining contract term > 180 days; automated pg_cron emission; suppresses duplicates within 30 days per tenant. Register in `docs/AUDIT_LOG_SCHEMA.md §6` per §35.10 item 1 (P0/M10). | P2 → **Resolved** | enterprise-architect + customer-success | §35.9 |
 
 ---
 
@@ -7291,4 +7303,488 @@ INSERT INTO audit_log (
 *v1.0 (2026-06-10): §31 Pricing Architecture, Competitive Benchmarking & Discount Governance — closes the gap between FORM's price list and the documented rationale behind it. §31.1 scopes the section: consumer Pro derivation, enterprise tier derivation, corporate wellness benchmarking, COGS-anchored price floors, discount authority matrix, pricing change governance, DEC-030 events, checklist, open questions. §31.2 consumer Pro price derivation ($19/month): WTP anchor table against human PT ($200–$600), AI coaching (Future/Caliber $149–$199), smart fitness (Whoop/Oura $6–$30), personalised apps (Fitbod $15/Ladder $20), general apps (free–$10); key insight — FORM competes on AI coach axis, not fitness tracker axis; 85–90% cheaper than human-supervised AI coaching; COGS-coverage analysis at $19 confirms 96.9% gross margin (SBP) and 96.2% (standard 30%); price sensitivity range bear $12 through stretch $39 with GM table; consumer price floor $12/month with reasoning. §31.3 enterprise price derivation: three-input methodology (COGS floor + target GM, competitive WTP ceiling, value anchor vs. consumer); Starter $12 derivation (removes App Store fee; fully-loaded GM 83.3% with email CSM allocation $1.67/seat); Growth $9 derivation (25% volume discount; fully-loaded GM 85.1% with named CSM $1.00/seat at 300-seat average — higher fully-loaded GM than Starter due to labour scale); Enterprise $6–8 derivation ($7 midpoint for modelling; floor $6 from §31.5; ceiling $8 from competitive benchmarking; fully-loaded GM 88.0% at $7 midpoint with dedicated CSM $0.40–0.50/seat at 1,000+ seats); ACV floor table: Starter 50 seats = $7,200/year, Growth 201 seats = $21,708, Enterprise 1,001 seats = $84,084; OQ-11 resolution: 50-seat Starter floor defensible at 73.5% Year 1 GM including implementation cost amortisation; recommend keep 50-seat floor. §31.4 corporate wellness competitive benchmarking: eight platforms benchmarked with [ESTIMATE] price ranges — Wellhub/Gympass ($8–$45 gym network), Headspace for Work ($10–$14 meditation), Calm for Business ($10–$15), Virgin Pulse/Personify Health ($40–$75 incentive platform), Noom for Work ($30–$50 weight management; FORM cannot compete here by ethics), Peloton Corporate ($20–$40 hardware-dependent), Whoop for Teams ($18–$30 wearable-only), Future enterprise ($99–$149 human coach); ASCII positioning matrix; positioning conclusion: FORM occupies unique $6–12 AI coaching quadrant with no direct competitor at this price/feature intersection; sales framing: FORM replaces gym stipend ($600–$1,800/year) not Wellhub (gym network) or Headspace (mental wellness); four-point anchor script for sales conversations. §31.5 COGS-anchored price floor analysis: COGS floor table (Starter $3.00/seat, Growth $2.00, Enterprise $1.50) including $0.15 compliance overhead amortisation; rationale that COGS floor is theoretical; contractual price floors set at 50% of list (Starter $6.00, Growth $4.50, Enterprise $4.00) to preserve > 55% GM at floor; Enterprise $6/seat edge case noted — floor allows only 33% headroom at lowest list price. §31.6 discount authority matrix: pre-approved schedule (2yr –15%, 3yr –25%, upfront –10%; max –32.5% multiplicative — enforced in calculator); non-standard discount levels (up to –40% = founder-only, up to –50%/floor = founder + investor pre-Series A; below floor NOT PERMITTED at any approval level); contractual floor summary table with floor as % of list and maximum discount per tier; non-pricing concessions list (extended pilot, priority scheduling, executive call — no pricing approval required). §31.7 pricing change governance: consumer changes (30-day notice, annual grandfathering, price decrease immediate, founder approval + DECISION_LOG); enterprise list price changes (active contract audit, 90-day notice at renewal, investor consult, MSA update, DEC-030 event); annual price indexation clause CPI+1% capped 5% (references §23.6 NRR expansion lever); rate lock commitment for contracted term; four signals indicating underprice vs. four signals indicating overprice or competitive pressure. §31.8 four DEC-030 pricing audit events: `enterprise.pricing_exception_approved` (HIGH, 7yr — before quote sent; links to `enterprise.contract_signed` via `pricing_exception_event_id`), `enterprise.consumer_price_updated` (HIGH, 7yr — includes grandfathering policy text), `enterprise.list_price_updated` (HIGH, 7yr — captures count of active contracts at prior list), `enterprise.price_floor_override_requested` (CRITICAL, 7yr — records even denied attempts). §31.9 eight-item checklist: 3× P0/M4 (DEC-030 event registration + Zod schemas, calculator floor enforcement, exception approval procedure), 2× P1/M5–M6 (MSA price escalation clause, quarterly competitive intelligence update process), 1× P1/M6 (COMPETITIVE.md enterprise section), 2× P2/M9–M12 (WTP validation study with pilot participants, annual pricing review). §31.10 three open questions: OQ-PRICE-01 (non-profit/edu discount tier — defer until three commercial deals close; track conversion channel signal), OQ-PRICE-02 (consumer $19 price review trigger — D90 ≥ 40% + NPS ≥ 60 + ARR ≥ $200k before increasing to $24/month; P2 checkpoint M12), OQ-PRICE-03 (CV-optional enterprise deals — single-price model for now; create "Professional" SKU at $8/seat if CV restriction objection recurs in > 3 deals; P2 M12 review). Cross-references: §3 (infrastructure COGS used in §31.2 and §31.3 margin calculations), §4 (unit economics table — §31.2.2 cross-checks GM figures), §8 (Enterprise Economics — §31.3 extends the enterprise pricing rationale), §11 OQ-11 (Starter 50-seat floor — resolved in §31.3.3), §15 (Enterprise Infrastructure COGS — compliance overhead allocation in §31.5), §20 (Customer ROI Model — gym stipend substitution in §31.4.2 sales framing), §21 (Pilot Economics & Discount Governance — §31.6 formalises the authority matrix referenced there), §23.6 (Annual price indexation — MSA clause in §31.7.2 enables this NRR lever), §26 (CSM Cost Model — labour allocations in §31.3.2 and §31.5), docs/ENTERPRISE.md (pricing table and sales process), docs/MSA_TEMPLATE.md (price escalation clause — §31.7.2 requires update), docs/COMPETITIVE.md (consumer competitors — enterprise benchmarks to be added per §31.9 item 6), docs/DECISION_LOG.md (pricing change decisions), docs/AUDIT_LOG_SCHEMA.md (four new DEC-030 event types). Owner: founder + product-strategist + compliance-officer.*
 
 ---
+
+## 35. Enterprise Contract Amendment, Mid-Contract Termination & Early Termination Fee Model
+
+### 35.1 Purpose & Scope
+
+This section closes two open questions from §34:
+
+- **OQ-CHURN-02 (P1):** Should the primary retention play be a multi-year price-lock rather than a percentage discount? — resolved in §35.7 with NPV comparison framework.
+- **OQ-CHURN-03 (P2):** Should mid-contract termination risk have a separate DEC-030 event? — resolved in §35.9 with `enterprise.mid_contract_termination_risk_flagged` event definition.
+
+**What §16.4, §18.5, and §31.7 already cover:**
+- §16.4: Multi-year discount economics (FORM's perspective — GP sacrifice vs. churn elimination)
+- §18.5: Deferred revenue waterfall for ASC 606 purposes on multi-year prepayments
+- §31.7: Rate lock commitment (customers cannot be repriced during contracted term)
+
+**What this section adds:**
+- Contract amendment taxonomy and approval workflow
+- Seat reduction policy (can a customer reduce contracted seats mid-term?)
+- Mid-contract termination economics: immediate ARR loss, deferred revenue reversal, CAC destruction
+- Early Termination Fee (ETF) structure, calculation methodology, and waiver framework
+- Multi-year price-lock as a retention tool vs. cash discount (NPV comparison — OQ-CHURN-02)
+- `enterprise.mid_contract_termination_risk_flagged` DEC-030 event (OQ-CHURN-03)
+- `enterprise.contract_amended` and `enterprise.early_termination_fee_waived` DEC-030 events
+
+**Audience:** CSMs handling at-risk accounts, founder in contract negotiations, compliance-officer for MSA review, finance for deferred revenue management.
+
+---
+
+### 35.2 Contract Amendment Taxonomy
+
+Enterprise MSAs may be amended mid-term for four reasons. Each carries a different financial signature and approval requirement.
+
+| Amendment Type | Description | Financial Signature | Approval Required | DEC-030 Event |
+|---|---|---|---|---|
+| **Seat expansion** | Customer adds seats above contracted quantity | Positive ARR delta; new MRR starts at amendment date | CSM approval (standard; > 20% ACV increase → founder review) | `enterprise.account_expanded` (§23.7) |
+| **Tier upgrade** | Customer moves Starter → Growth or Growth → Enterprise mid-term | Positive ARR delta; pro-rated billing from amendment date | CSM + compliance-officer (DPA addendum if new features access health data) | `enterprise.account_expanded` with `expansion_type = 'tier_upgrade'` |
+| **Seat reduction** | Customer reduces contracted seat count | Negative ARR delta; potential deferred revenue credit | Founder approval required; subject to §35.3 | `enterprise.contract_amended` with `amendment_type = 'seat_reduction'` |
+| **Early termination** | Customer exits before contract end date | Immediate ARR loss + deferred revenue reversal; ETF may apply | Founder + investor (if ETF waived > $10k); see §35.6 | `enterprise.early_termination_fee_waived` or no event if ETF collected |
+
+**General rule:** FORM does not permit seat reductions below the tier minimum (50 seats for Starter, 201 for Growth, 1,001 for Enterprise) mid-contract. A customer wanting to go below tier minimum must either terminate (ETF applies) or negotiate a downgrade at the next annual renewal window.
+
+---
+
+### 35.3 Seat Reduction Policy (Mid-Contract)
+
+**Default position: seat count is fixed for the contracted term.** The customer committed to a seat count at signing; FORM committed to deliver service at that level. Seat reductions mid-term reduce FORM's ARR below the contracted amount and destroy the unit economics modeled in §16.
+
+| Reduction Size | Policy |
+|---|---|
+| ≤ 10% of contracted seats | Not permitted without founder approval. If approved as goodwill concession, effective at next annual renewal date — no mid-term billing credit. |
+| 10–30% of contracted seats | Founder approval required. If approved (e.g., documented company downsizing), effective at next annual renewal date. Must not fall below tier minimum. |
+| > 30% of contracted seats OR below tier minimum | Treated as partial early termination. ETF applies to the terminated portion per §35.5. Customer may alternatively terminate the full contract with full ETF. |
+| Force majeure (documented company closure or acquisition resulting in workforce < contracted seats) | ETF may be waived per §35.6. Requires compliance-officer review and DECISION_LOG entry. |
+
+**Why the strict default:** Each seat represents $84–$144/year in contracted ARR. A 30% reduction on a 300-seat Growth account equals $8,100/year ARR loss. Implementation cost ($7,200 for Growth, per §8.2) is front-loaded — allowing seat reductions in Year 1 guarantees negative unit economics. Additionally, customers who are struggling most (low CHS) are most likely to request reductions; allowing easy reductions removes the renewal-pressure signal that drives CS intervention.
+
+---
+
+### 35.4 Mid-Contract Termination Economics
+
+When a customer terminates a multi-year contract early, FORM faces three distinct financial hits that must all be quantified before deciding whether to enforce the ETF.
+
+#### 35.4.1 Three Components of Early Termination Loss
+
+| Component | Definition | Example: Growth 300-seat, 3yr contract (–25% = $24,300/yr), exits at M18 |
+|---|---|---|
+| **Remaining contracted ARR** | ACV for each contract year not fulfilled | 1.5yr × $24,300 = $36,450 |
+| **Deferred revenue reversal** | Paid-but-unearned revenue that must be returned if customer prepaid annually | 6 months prepaid × $2,025/mo = $12,150 to be returned |
+| **CAC destruction** | Unamortized CAC expensed immediately at exit | $7,200 × (18/36 remaining) = $3,600 written off |
+
+**Total economic loss (Growth 300-seat, M18 exit from 3yr deal): ~$52,200**
+
+Against this, the ETF (§35.5) is designed to recover a meaningful fraction of the foregone ARR without being so punitive as to trigger legal disputes or brand damage.
+
+#### 35.4.2 Loss by Tier and Exit Point
+
+*Note: ACV figures use contracted rates including multi-year discounts (§16.4): 2yr = –15%, 3yr = –25%.*
+
+| Tier | Seats | Contracted ACV/yr | Contract | Exit at M6 — ARR foregone | Exit at M18 — ARR foregone | CAC written off (M6) |
+|---|---|---|---|---|---|---|
+| **Starter** | 50 | $6,120 (2yr) | 2yr | $9,180 | $3,060 | $1,013 |
+| **Starter** | 50 | $5,400 (3yr) | 3yr | $18,900 | $12,600 | $1,013 |
+| **Growth** | 300 | $27,540 (2yr) | 2yr | $41,310 | $13,770 | $5,400 |
+| **Growth** | 300 | $24,300 (3yr) | 3yr | $68,850 | $45,900 | $5,400 |
+| **Enterprise** | 1,000 | $71,400 (2yr) | 2yr | $107,100 | $35,700 | $16,875 |
+| **Enterprise** | 1,000 | $63,000 (3yr) | 3yr | $189,000 | $126,000 | $16,875 |
+
+---
+
+### 35.5 Early Termination Fee Structure & Calculation
+
+#### 35.5.1 ETF Design Principles
+
+1. **Recovery target:** 40–60% of remaining contracted ARR. This is the B2B SaaS standard range and is defensible in contract negotiations.
+2. **Not punitive:** ETF compensates FORM for unrecovered CAC and foregone contract ARR. MSA language must use *"liquidated damages representing a genuine pre-estimate of loss"* — courts in DE and US jurisdictions are more likely to uphold compensation-framed ETFs than penalty-framed ones. Outside counsel review required (§35.10 item 2).
+3. **Declining balance:** ETF decreases as the customer completes more of the contracted term.
+4. **Floor:** Minimum ETF = 1 month contracted ACV for any early exit, regardless of timing.
+
+#### 35.5.2 ETF Formula
+
+```
+ETF = MAX(
+  1 × monthly_contracted_ACV,                            -- minimum floor
+  remaining_months × monthly_contracted_ACV × etf_rate
+)
+```
+
+`etf_rate` is a function of the month of exit (§35.5.3). ETF is calculated on **contracted ACV** (after multi-year discount), not list ACV. See OQ-ETF-02 for the legal rationale.
+
+#### 35.5.3 ETF Rate Schedule by Exit Month
+
+| Month of Exit (from contract start) | ETF Rate (% of remaining contracted value) | Notes |
+|---|---|---|
+| M1–M3 | **60%** | Exit in first quarter — full pre-launch investment unrecovered |
+| M4–M6 | **55%** | Pilot period; implementation cost not yet amortized |
+| M7–M12 | **50%** | Standard first-year ETF; most common scenario |
+| M13–M18 | **40%** | Mid-contract of 2yr deal or Year 2 of 3yr |
+| M19–M24 | **30%** | Late-stage 2yr deal; lower recovery acceptable |
+| M25–M30 | **25%** | Year 3 of 3yr deal |
+| M31–M35 | **15%** | Near end of 3yr deal |
+| M36 (last month) | **0%** (floor only) | Near-expiry; no meaningful remaining value |
+
+#### 35.5.4 ETF Calculation Examples
+
+**Example A: Growth 300-seat, 2yr deal (–15% = $27,540/yr contracted, $2,295/mo). Exits at M9.**
+- Remaining months: 24 − 9 = 15
+- ETF rate at M9: 50%
+- ETF = $2,295 × 15 × 50% = **$17,213**
+- Floor: $2,295 → not binding
+- **ETF payable: $17,213**
+
+**Example B: Enterprise 1,000-seat, 3yr deal (–25% = $63,000/yr contracted, $5,250/mo). Exits at M18.**
+- Remaining months: 36 − 18 = 18
+- ETF rate at M18: 40%
+- ETF = $5,250 × 18 × 40% = **$37,800**
+- **ETF payable: $37,800**
+
+**Example C: Starter 50-seat, 2yr deal (–15% = $6,120/yr contracted, $510/mo). Exits at M23.**
+- Remaining months: 24 − 23 = 1
+- ETF rate at M23: 30%
+- ETF = $510 × 1 × 30% = $153 → below floor
+- Floor: $510
+- **ETF payable: $510 (floor)**
+
+#### 35.5.5 ETF Approval Authority Matrix
+
+| ETF Amount | Approval Authority | Process |
+|---|---|---|
+| ETF ≤ $5,000 | CSM lead | Note in CRM; emit `enterprise.early_termination_fee_waived` if waived |
+| $5,001 – $25,000 | Founder | 48h decision window; DECISION_LOG entry |
+| $25,001 – $100,000 | Founder + compliance-officer | DECISION_LOG entry; investor notification |
+| > $100,000 | Founder + investor lead | Board notification if ETF waiver > $100k |
+
+**Waiving the ETF does not require the §32 pricing exception procedure** — ETF is a liquidated damages clause, not a pricing discount. It has its own approval chain above.
+
+---
+
+### 35.6 ETF Waiver Decision Framework
+
+Waiving the ETF eliminates cash recovery but may preserve the relationship, reference value, and future re-engagement opportunity.
+
+#### 35.6.1 Factors Favouring ETF Enforcement
+
+| Factor | Rationale |
+|---|---|
+| Customer is a competitor's acquisition target | Relationship is ending regardless |
+| Customer showed bad faith (false pilot metrics, disputed charges) | Enforce to set precedent for contract integrity |
+| ETF > $25k and FORM is cash-constrained | Cash recovery outweighs reputational risk |
+| Documented competitor undercutting on price | Reference value is likely already lost |
+| No expansion potential (company downsizing permanently) | No future upsell to preserve |
+
+#### 35.6.2 Factors Favouring ETF Waiver
+
+| Factor | Rationale |
+|---|---|
+| Potential reference account in FORM's sweet spot (engineering/product org) | Reference + case study value may exceed ETF cash value |
+| Documented product gap caused under-utilisation | FORM's issue; waiving is appropriate and prevents negative G2/Glassdoor reviews |
+| Champion leaving and successor not yet won | Invest in relationship; waiver earns goodwill with new champion |
+| ETF < $5,000 and legal enforcement cost is non-trivial | Management overhead of collecting small ETF exceeds its value |
+| Force majeure (acquisition, bankruptcy, restructuring) | Ethical and legal risk of enforcement in genuine force-majeure |
+
+#### 35.6.3 ETF Waiver Expected Value Model
+
+Consistent with the intervention EV model in §34.4, frame the enforcement/waiver decision as an EV calculation.
+
+**Variables:**
+- `ETF_cash`: ETF amount if collected
+- `P_collect`: probability of successful collection (0.7 undisputed; 0.3 if customer likely to dispute)
+- `legal_cost`: estimated cost to collect if disputed ($3,000–$10,000 for B2B SaaS disputes)
+- `P_re_engage_waive`: probability of future re-engagement if ETF waived (0.10–0.40 depending on churn reason)
+- `future_ACV`: expected future ACV if re-engaged (tier-appropriate)
+- `reference_value`: qualitative; treat as $5,000 for a named reference in an ICP industry
+
+**EV of enforcement:**
+```
+EV_enforce = P_collect × ETF_cash − (1 − P_collect) × legal_cost
+```
+
+**EV of waiver:**
+```
+EV_waive = P_re_engage_waive × future_ACV / (1 + 0.15)^2 + reference_value
+```
+
+**Decision rule:** Waive if `EV_waive > EV_enforce`.
+
+**Example A — Growth 300-seat, ETF $17,213, documented product gap:**
+- EV enforce: 0.5 × $17,213 − 0.5 × $5,000 = $8,607 − $2,500 = **$6,107**
+- EV waive: 0.25 × $32,400 / 1.32 + $5,000 = $6,136 + $5,000 = **$11,136**
+- **Decision: waive**
+
+**Example B — Enterprise 1,000-seat, ETF $37,800, competitor acquisition:**
+- EV enforce: 0.8 × $37,800 − 0.2 × $5,000 = $30,240 − $1,000 = **$29,240**
+- EV waive: 0.05 × $84,000 / 1.32 + $0 = **$3,182** (acquired → re-engagement probability near zero)
+- **Decision: enforce**
+
+The EV model must be documented and filed in the account record. For ETF waivers > $5,000, `ev_analysis_completed: true` is required in the DEC-030 event payload or the `emit-audit-event` Worker returns HTTP 422.
+
+---
+
+### 35.7 Multi-Year Price-Lock as Retention Tool (OQ-CHURN-02 Resolution)
+
+**Resolution status: PARTIALLY RESOLVED — framework adopted 2026-06-12. Empirical calibration after first 3 Amber-band renewals per §35.10 item 10 (est. M10–M12).**
+
+#### 35.7.1 The Retention Discount vs. Price-Lock Trade-off
+
+§34 identifies two primary retention tools for Amber-band customers at renewal:
+
+- **Retention discount:** reduce per-seat rate 5–15% for a 1-year renewal. Triggers §32 exception procedure if > 15%. Costs FORM ARR immediately and creates a discounted base for future renewals.
+- **Multi-year price-lock:** offer renewal at *current contracted rate* for 2 years with a contractual guarantee that the CPI+1% escalation clause (§23.6) will not apply during the locked term.
+
+The price-lock does not reduce ARR. It foregoes a future price increase that was conditional on the customer renewing anyway. The lock creates certainty for both parties.
+
+#### 35.7.2 NPV Comparison: Discount vs. Price-Lock for Growth 300-Seat Amber Customer
+
+*Assumptions: current contracted rate $9.00/seat/month → ACV $32,400/yr; CPI escalation foregone under price-lock ≈ 3.5%/yr = $1,134/yr; discount rate 15%.*
+
+**Option A: 10% retention discount, 1-year renewal**
+
+| Year | Revenue | Probability-adjusted | NPV factor | NPV contribution |
+|---|---|---|---|---|
+| Y1 (discounted at –10%) | $29,160 | 1.00 | 1.00 | $29,160 |
+| Y2 (at-risk; no new commitment) | $32,400 | 0.80 × 0.70 = 0.56 | 0.87 | $15,713 |
+| **2yr NPV** | | | | **$44,873** |
+
+ARR sacrifice: $3,240/yr. §32 exception procedure required if discount > 15%.
+
+**Option B: 2yr price-lock at current $9.00/seat/month**
+
+| Year | Revenue | Probability-adjusted | NPV factor | NPV contribution |
+|---|---|---|---|---|
+| Y1 (locked) | $32,400 | 1.00 | 1.00 | $32,400 |
+| Y2 (locked) | $32,400 | 0.75 | 0.87 | $21,141 |
+| **2yr NPV** | | | | **$53,541** |
+
+ARR sacrifice: $0 upfront + $1,134/yr CPI escalation foregone (conditional on Y2 retention anyway).
+
+**Price-lock NPV advantage: $53,541 − $44,873 = $8,668 over 2 years for a 300-seat Growth account** where both tools achieve similar retention probabilities with a CFO/procurement-led buyer.
+
+#### 35.7.3 Decision Matrix: Which Tool to Use by Customer Profile
+
+| Customer Profile | Preferred Tool | Rationale |
+|---|---|---|
+| **CFO/procurement-led buyer** (budget certainty is the primary concern) | Price-lock | Guaranteed 2yr budget line. No discount needed — certainty itself is the value. Does not trigger §32 exception procedure. |
+| **Champion is leaving** (relationship risk is the primary threat) | 1yr discount only | Price-lock requires trust over 2yrs. Win the new champion first; do not commit to a 2yr lock without an established relationship. |
+| **Documented product gap** | Discount + roadmap commitment | Price-lock on a product that doesn't serve the need is not credible. Discount + named roadmap item is the right trade. |
+| **Low utilisation, Amber CHS** | Price-lock + free activation sprint | Low usage means customer doesn't see value. Adding a 4-week CSM-led activation support engagement alongside the price-lock addresses the root cause. |
+| **Active competitor pressure** (customer has a competing quote) | Retention discount | Competitor is anchoring on rate. Price-lock is irrelevant when the customer is negotiating absolute price. Match the competitive rate for 1yr; re-assess at Y2 renewal. |
+| **Expansion expected** (headcount growing, CHS trending toward Green) | 2yr price-lock | Locks in expansion at current economics. Customer benefits from rate certainty; FORM benefits from guaranteed seat growth within the locked term. |
+
+#### 35.7.4 Constraints on Price-Lock Offers
+
+1. **§32 exception procedure still applies** if the locked rate is already below list price due to a prior non-standard discount. Locking a below-list rate for 2 years extends the exception period — founder sign-off required.
+2. **Rate lock applies to per-seat rate only.** Seat additions within the locked term are billed at the locked rate (positive for the customer; acceptable for FORM given expansion adds positive margin contribution).
+3. **CPI indexation resumes** at Year 3 renewal from the locked base rate. The lock does not permanently suppress the escalation clause.
+4. **DEC-030 required:** Every accepted price-lock renewal must emit `enterprise.contract_amended` with `amendment_type = 'price_lock_renewal'` and `rate_locked_usd_per_seat` to preserve the audit trail.
+
+---
+
+### 35.8 ASC 606 / IFRS 15 Treatment for Terminations & Amendments
+
+#### 35.8.1 Early Termination
+
+| Scenario | ASC 606 / IFRS 15 Treatment |
+|---|---|
+| Customer prepaid annually and terminates at M6 | Remaining 6 months of prepayment is a contract liability (deferred revenue). At termination, deferred revenue is reversed and either refunded per MSA terms or retained as ETF consideration. |
+| Customer pays monthly (no prepayment) | No deferred revenue to reverse. Revenue recognition ceases at termination date. ETF, if collected, is recognized as a settlement payment on receipt. |
+| ETF is waived | No settlement recognized. Revenue recognition ceases at termination date. Loss = unamortized CAC (§35.4.1 component 3). |
+| ETF is disputed | Constrain the variable consideration estimate: recognize ETF only to the extent it is highly probable of collection. Recognize $0 until dispute is resolved. |
+
+#### 35.8.2 Mid-Contract Seat Reduction (If Approved per §35.3)
+
+A seat reduction is a contract modification under ASC 606. For FORM's seat-based SaaS model:
+
+- **Prospective modification** (remaining performance obligations repriced at reduced seat count from amendment date): most common treatment. Recognize modified price over remaining term.
+- **FORM's policy:** MSA should specify that mid-contract seat reductions are effective only at the next annual renewal date. This avoids mid-period contract modification accounting complexity and is consistent with §35.3.
+
+#### 35.8.3 Price-Lock Renewal as Modification
+
+A price-lock renewal is a contract modification that replaces the expiring contract with a new contract at the same rate. Treatment: recognize as a new contract for the 2yr lock period at the contracted rate. The foregone CPI escalation is not an accounting entry — it is a counterfactual that does not enter the ledger.
+
+---
+
+### 35.9 DEC-030 HMAC-Chained Audit Events (Closes OQ-CHURN-03)
+
+Three new DEC-030 events complete the contract amendment and termination audit chain. `enterprise.mid_contract_termination_risk_flagged` is the specific event requested in OQ-CHURN-03.
+
+#### 35.9.1 Event: `enterprise.mid_contract_termination_risk_flagged`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.mid_contract_termination_risk_flagged` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **Actor** | `system:pg_cron` (automated) or `csm_user_id` (manual flag) |
+| **Trigger** | CHS score < 20 sustained ≥ 4 consecutive weeks AND remaining contract term > 180 days |
+| **Privacy invariant** | `tenant_id` only; no `user_id`; no health data |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  tenant_id:               z.string().uuid(),
+  chs_score_current:       z.number().int().min(0).max(100),
+  chs_weeks_below_20:      z.number().int().min(4),
+  contract_end_date:       z.string().datetime(),
+  days_remaining:          z.number().int().min(181),
+  contract_type:           z.enum(['1yr', '2yr', '3yr']),
+  contracted_acv_usd:      z.number().int().positive(),
+  estimated_etf_usd:       z.number().int().nonnegative(),
+  risk_signal_source:      z.enum(['pg_cron_monitor', 'csm_manual_flag']),
+})
+```
+
+**Deduplication:** Suppresses duplicate events if an unresolved `enterprise.mid_contract_termination_risk_flagged` was emitted within the last 30 days for the same `tenant_id`.
+
+**HMAC chain INSERT:**
+```sql
+INSERT INTO audit_log (
+  event_ts, event_type, actor_id, tenant_id, payload,
+  sequence_number, prev_hash, hmac_signature
+)
+VALUES (
+  now(),
+  'enterprise.mid_contract_termination_risk_flagged',
+  $actor_id,           -- 'system:pg_cron' or CSM UUID
+  $tenant_id,
+  jsonb_build_object(
+    'chs_score_current',   $chs_score,
+    'chs_weeks_below_20',  $weeks_below_20,
+    'contract_end_date',   $end_date,
+    'days_remaining',      $days_remaining,
+    'contract_type',       $contract_type,
+    'contracted_acv_usd',  $contracted_acv,
+    'estimated_etf_usd',   $estimated_etf,
+    'risk_signal_source',  $source
+  ),
+  nextval('audit_log_sequence'),
+  $prev_hash,
+  encode(hmac(
+    concat($seq::text, $prev_hash,
+           'enterprise.mid_contract_termination_risk_flagged',
+           $tenant_id::text, $payload::text),
+    current_setting('app.hmac_secret'), 'sha256'
+  ), 'hex')
+);
+```
+
+---
+
+#### 35.9.2 Event: `enterprise.contract_amended`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.contract_amended` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **Actor** | CSM or founder executing the amendment |
+| **Trigger** | Any signed contract amendment (seat change, tier change, price-lock renewal, term extension) |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  tenant_id:                z.string().uuid(),
+  amendment_type:           z.enum([
+    'seat_reduction', 'seat_expansion', 'tier_upgrade', 'tier_downgrade',
+    'price_lock_renewal', 'term_extension', 'force_majeure_modification'
+  ]),
+  seats_before:             z.number().int().positive(),
+  seats_after:              z.number().int().positive(),
+  acv_before_usd:           z.number().int().positive(),
+  acv_after_usd:            z.number().int().positive(),
+  rate_locked_usd_per_seat: z.number().optional(),       // price_lock_renewal only
+  new_contract_end_date:    z.string().datetime().optional(),
+  approval_actor_id:        z.string().uuid(),
+  amendment_docusign_id:    z.string().optional(),
+})
+```
+
+---
+
+#### 35.9.3 Event: `enterprise.early_termination_fee_waived`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.early_termination_fee_waived` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **Actor** | Founder (or founder + investor lead for large waivers) |
+| **Trigger** | ETF waiver decision per §35.5.5 approval matrix |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  tenant_id:               z.string().uuid(),
+  etf_amount_waived_usd:   z.number().int().positive(),
+  exit_month:              z.number().int().min(1),
+  remaining_months:        z.number().int().min(1),
+  waiver_reason:           z.enum([
+    'product_gap', 'force_majeure', 'champion_departed', 'reference_value',
+    'competitor_acquisition', 'legal_dispute_resolution', 'goodwill_concession',
+    'small_etf_enforcement_uneconomic'
+  ]),
+  approval_actor_id:       z.string().uuid(),
+  ev_analysis_completed:   z.boolean(),
+  decision_log_ref:        z.string().optional(),
+})
+```
+
+> **Enforcement invariant:** `ev_analysis_completed` must be `true` for `etf_amount_waived_usd > 5000`. If `ev_analysis_completed: false` and the amount exceeds this threshold, the `emit-audit-event` Worker returns HTTP 422 with `ETF_WAIVER_REQUIRES_EV_ANALYSIS`. CSM must complete the §35.6.3 EV model before proceeding.
+
+---
+
+#### 35.9.4 DEC-030 Event Summary for §35
+
+| Event | Severity | Retention | Trigger | Privacy constraint |
+|---|---|---|---|---|
+| `enterprise.mid_contract_termination_risk_flagged` | HIGH | 7 yr | CHS < 20 for ≥ 4 weeks AND days remaining > 180 | `tenant_id` only; no `user_id` |
+| `enterprise.contract_amended` | HIGH | 7 yr | Any signed contract amendment | `tenant_id`; pseudonymous actor IDs |
+| `enterprise.early_termination_fee_waived` | HIGH | 7 yr | ETF waiver per §35.5.5 approval matrix | `tenant_id`; waiver reason enum required |
+
+All three events must be registered in `docs/AUDIT_LOG_SCHEMA.md §6` before the first enterprise contract amendment or termination is processed.
+
+---
+
+### 35.10 Implementation Checklist
+
+#### P0 — Must complete before first enterprise multi-year contract close (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `enterprise.mid_contract_termination_risk_flagged`, `enterprise.contract_amended`, and `enterprise.early_termination_fee_waived` in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schemas from §35.9. Deploy to `emit-audit-event` Worker. | enterprise-architect | **P0** | M10 | [ ] |
+| 2 | Add ETF clause to `docs/MSA_TEMPLATE.md`: liquidated damages framing (§35.5.1), declining balance rate schedule (§35.5.3), minimum floor, seat reduction policy (§35.3). Have outside counsel review for enforceability in DE/US jurisdictions. | compliance-officer + outside counsel | **P0** | M10 | [ ] |
+| 3 | Add `enterprise.mid_contract_termination_risk_flagged` to `docs/OBSERVABILITY.md §12.6` pg_cron registry. Implement the weekly CHS < 20 check with 30-day deduplication. PagerDuty P1 alert (CSM + CS lead) on emission. | devops-lead + data-engineer | **P0** | M10 | [ ] |
+| 4 | Implement `ev_analysis_completed` enforcement in `emit-audit-event` Worker: return HTTP 422 with `ETF_WAIVER_REQUIRES_EV_ANALYSIS` if `etf_amount_waived_usd > 5000` and `ev_analysis_completed: false`. | platform-engineer | **P0** | M10 | [ ] |
+
+#### P1 — Before first enterprise contract renewal (M12)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Add §35.6.3 EV model to the internal CS playbook as the standard ETF waiver decision process. Run a 1-hour CSM training session before the first at-risk renewal. | customer-success | **P1** | M12 | [ ] |
+| 6 | Add price-lock renewal option to standard renewal offer templates. CSMs should default to price-lock for CFO/procurement-led Amber accounts per §35.7.3. | customer-success | **P1** | M12 | [ ] |
+| 7 | Add §35.8 ASC 606 treatment to the internal finance runbook: deferred revenue reversal procedure on early termination; price-lock renewal accounting. | finance | **P1** | M12 | [ ] |
+| 8 | Add `enterprise.contract_amended` cross-reference requirement to `docs/DECISION_LOG.md`: any seat reduction > 10% must include a DECISION_LOG entry (DEC-XXX) linking to the `enterprise.contract_amended` event ID. | compliance-officer | **P1** | M12 | [ ] |
+
+#### P2 — Post first 3 renewals (M14–M16)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | Calibrate ETF rate schedule (§35.5.3) against actual negotiation outcomes. If customers routinely negotiate below the 50% midpoint, recalibrate the schedule to reduce friction while preserving CAC recovery. | customer-success + founder | **P2** | M16 | [ ] |
+| 10 | Calibrate price-lock vs. discount NPV model (§35.7.2) using first 3 Amber renewal outcomes. Update retention probabilities (currently [ESTIMATE]) with actuals. If price-lock retention rate < 65%, rebalance toward discount. | customer-success + data-engineer | **P2** | M16 | [ ] |
+| 11 | Evaluate whether the mid-contract CHS < 20 trigger should spawn an automated CSM intervention protocol (parallel to §34 renewal risk intervention at 90 days). Document outcome in `docs/DECISION_LOG.md`. | customer-success + product-manager | **P2** | M16 | [ ] |
+
+---
+
+### 35.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-ETF-01** | **Is the ETF rate schedule (§35.5.3) enforceable as written in DE and US jurisdictions?** DE law (§§339–340 BGB) distinguishes valid contractual penalties from void forfeitures: compensation must be a genuine pre-estimate of loss. The "liquidated damages" framing and declining balance schedule are designed to support this. US enforceability varies by state (CA disfavours penalty clauses; NY/DE are more permissive). Outside counsel review at MSA review (§35.10 item 2) resolves this. | **P0** | compliance-officer + outside counsel | M10 — MSA legal review |
+| **OQ-ETF-02** | **Should the ETF calculation use contracted ACV or list ACV?** §35.5.2 uses contracted ACV (post multi-year discount). This is the correct economic basis — FORM's actual revenue commitment is the contracted rate. However, some ETF clauses reference list ACV (higher ETF amounts; stronger recovery). Using list ACV risks being characterised as a penalty clause in DE. Current position: contracted ACV basis. Confirm with counsel at MSA review. | **P1** | compliance-officer | M10 |
+| **OQ-ETF-03** | **Should FORM offer a seat suspension option for accounts in temporary headcount contraction (e.g., a tech company in a hiring freeze)?** A 3–6 month seat suspension would pause billing on unused seats while preserving the relationship. Risk: sets a precedent for billing disputes; complex to implement in Stripe. Alternative: allow 10% seat reduction at next annual date at no ETF (already in §35.3 policy). Recommendation: defer until a customer explicitly requests suspension. Document the first request outcome in `docs/DECISION_LOG.md`. | **P2** | customer-success + founder | On first customer request; no later than M18 |
+
+---
+
+*v2.1 (2026-06-12): §35 Enterprise Contract Amendment, Mid-Contract Termination & Early Termination Fee Model. Closes OQ-CHURN-02 (P1, §34.10) with NPV comparison of 2yr price-lock vs. 10% retention discount for Amber-band Growth accounts: price-lock NPV advantage of $8,668 over 2yr horizon for CFO/procurement-led buyers (price-lock 2yr NPV $53,541 vs. discount $44,873); six-profile decision matrix (§35.7.3) guiding tool selection by customer archetype. Closes OQ-CHURN-03 (P2, §34.10) with three new DEC-030 events: `enterprise.mid_contract_termination_risk_flagged` (HIGH, 7yr — CHS < 20 sustained ≥ 4 weeks AND days remaining > 180; pg_cron automated emission; 30-day deduplication per tenant; HTTP 422 guard in emit-audit-event Worker if Worker enforcement not yet in place), `enterprise.contract_amended` (HIGH, 7yr — all signed contract amendments including price-lock renewals), `enterprise.early_termination_fee_waived` (HIGH, 7yr — `ev_analysis_completed: true` required for waivers > $5k or Worker returns 422). Contract amendment taxonomy: four types with DEC-030 event mapping. Seat reduction policy: contractually fixed for term; ≤ 10% deferred to annual renewal; > 30% or below tier minimum triggers ETF. Mid-contract termination loss: three components (remaining ARR, deferred revenue reversal, CAC destruction); loss table by tier and exit month. ETF structure: declining-balance rate schedule (60% at M1–M3 to 0%+floor at M36); calculated on contracted ACV; minimum floor of 1 month contracted ACV; five-tier approval authority matrix ($5k CSM lead / $25k founder / $100k founder+compliance-officer / >$100k founder+investor). EV waiver model (§35.6.3): two worked examples (Growth product-gap waiver: EV $11,136 waive > $6,107 enforce; Enterprise competitor-acquisition: EV $29,240 enforce > $3,182 waive). ASC 606 treatment for terminations, seat reductions, and price-lock renewals. 11-item implementation checklist (4× P0/M10, 4× P1/M12, 3× P2/M16). Three open questions (OQ-ETF-01 counsel review P0/M10; OQ-ETF-02 ACV basis P1/M10; OQ-ETF-03 seat suspension P2/M18). TOC updated. §34.10 OQ-CHURN-02 and OQ-CHURN-03 marked 🟢 Resolved. Cross-references: §16.4 (multi-year discount economics — ETF calculated on discounted contracted ACV), §18.1 (ASC 606 deferred revenue — reversal on early termination), §18.5 (multi-year deferred revenue waterfall), §23.6 (CPI indexation clause — price-lock defers application for 2yr term), §31.7 (rate lock commitment during contracted term), §32 (pricing exception approval — price-lock below list requires §32 approval chain), §34 (renewal risk register — this section extends the churn framework to mid-contract), `docs/MSA_TEMPLATE.md` (ETF clause + seat reduction policy — P0 M10 update required), `docs/AUDIT_LOG_SCHEMA.md` (three new DEC-030 event types to register — P0 before first amendment), `docs/OBSERVABILITY.md §12.6` (pg_cron job for mid-contract risk detection — P0 M10). Owner: enterprise-architect + customer-success + compliance-officer + founder.*
 

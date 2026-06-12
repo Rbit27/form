@@ -6,6 +6,14 @@
 
 ---
 
+## [3.82.1] — 2026-06-12
+
+### Changed
+- `docs/COST_MODEL.md` v2.0 → v2.1 — §35 Enterprise Contract Amendment, Mid-Contract Termination & Early Termination Fee Model. Closes **OQ-CHURN-02** (P1) with NPV comparison framework: price-lock NPV advantage of $8,668 over 2yr horizon vs. 10% retention discount for Amber-band Growth accounts; six-profile decision matrix by customer archetype. Closes **OQ-CHURN-03** (P2) with three DEC-030 events: `enterprise.mid_contract_termination_risk_flagged` (HIGH, 7yr — CHS < 20 sustained ≥ 4 weeks AND > 180 days remaining; pg_cron automated; 30-day dedup per tenant), `enterprise.contract_amended` (HIGH, 7yr), `enterprise.early_termination_fee_waived` (HIGH, 7yr — `ev_analysis_completed: true` required for waivers > $5k). ETF: declining-balance rate schedule (60% at M1–M3 → 0%+floor at M36); calculated on contracted ACV; five-tier approval authority matrix. ETF waiver EV model with two worked examples. ASC 606 treatment for terminations and price-lock renewals. 11-item checklist (4× P0/M10, 4× P1/M12, 3× P2/M16). TOC updated. §34.10 OQ-CHURN-02 and OQ-CHURN-03 marked 🟢 Resolved. Owner: enterprise-architect + customer-success + compliance-officer.
+- `VERSION` — 3.82.0 → 3.82.1
+
+---
+
 ## [3.82.0] — 2026-06-12
 
 ### Added
