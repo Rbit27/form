@@ -6,6 +6,14 @@
 
 ---
 
+## [4.12.0] — 2026-06-12
+
+### Added
+- `content/post-576-effort-regulation-self-control-training.md` — Регуляція зусилля і самоконтроль: Baumeister et al. (1998) ego depletion, Hagger et al. (2010) meta-analysis d≈0.62, Hagger et al. (2016) multi-lab replication d=0.04, Inzlicht & Schmeichel (2012) motivational model critique, Marcora et al. (2009) JAP mental fatigue + RPE, Carter et al. (2015) publication bias, Job et al. (2010) implicit theory moderator; pre-commitment protocol; clinical-safety NOT REQUIRED
+- `blog.html` — +1 картка (343 total); заголовок оновлено до актуального підрахунку
+
+---
+
 ## [4.11.0] — 2026-06-12
 
 ### Added

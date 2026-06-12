@@ -539,6 +539,7 @@ FORM is at v4.8.1 with 65+ tagged releases, 17 functional HTML pages (marketing 
 | post-573-growth-mindset-strength-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist pending · blog card: Читати → · v4.10.0 |
 | post-574-mental-toughness-grit-strength-training.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v4.11.0 |
 | post-575-fear-of-failure-training-decisions.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v4.11.0 |
+| post-576-effort-regulation-self-control-training.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v4.12.0 |
 | post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | post-511-reverse-mesocycle-planning.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.74.0 |
 | post-512-isolation-exercises-when-needed.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.75.0 |
@@ -760,6 +761,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v4.11.0 · 12 червня 2026**
-**Last update:** 12 червня 2026 · v4.11.0 (posts 574–575 authored · mental toughness/grit: Clough/Duckworth/Crust/Gucciardi · fear of failure: Conroy/Elliot & Church approach-avoidance · clinical-safety NOT REQUIRED × 2 · blog.html +2 cards = 342 total · roadmap post-576–577 додано)
+**v4.12.0 · 12 червня 2026**
+**Last update:** 12 червня 2026 · v4.12.0 (post-576 authored · ego depletion / effort regulation: Baumeister 1998, Hagger 2010/2016 replication failure, Inzlicht & Schmeichel 2012, Marcora 2009 JAP, Carter 2015 publication bias, Job 2010 implicit theory · clinical-safety NOT REQUIRED · blog.html +1 card = 343 total · roadmap post-578–579 додано)
 **Next planned update:** після hire of Founding Engineer
