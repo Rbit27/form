@@ -496,6 +496,7 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-530-forced-reps.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.86.0 |
 | post-531-warmup-first-working-set.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.87.0 |
 | post-532-drop-sets-solo-mechanics.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.88.0 |
+| post-533-chronic-lbp-training.md | Blog | draft · clinical-safety CONDITIONAL_PASS · sports-scientist APPROVED · v3.89.0 |
 | post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | post-511-reverse-mesocycle-planning.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.74.0 |
 | post-512-isolation-exercises-when-needed.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.75.0 |
@@ -717,6 +718,6 @@ M10-M12 (Q2 2027)
 
 **Updated weekly.** Major changes → new version bump.
 
-**v3.86.0 · 12 червня 2026**
-**Last update:** 12 червня 2026 · v3.86.0
+**v3.89.0 · 12 червня 2026**
+**Last update:** 12 червня 2026 · v3.89.0
 **Next planned update:** після hire of Founding Engineer
