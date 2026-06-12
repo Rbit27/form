@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.20.0] — 2026-06-12
+
+### Added
+- `content/post-591-wearables-accuracy.md` — Training with tech block, post 1/10. Consumer wearable accuracy: PPG limitations for HRV vs. ECG gold standard, sleep staging PSG gap (58% stage accuracy), VO2max submax estimation with ±3–5 ml/kg/min range, TRIMP-based training load blind spots. Practical framework: trust trend not point, device as one data source not authority.
+- `README.md` — content roadmap added: published block table, block 591–600 topic list (Training with tech), proposed block 601–650 (Programming edge cases). Replaces placeholder.
+
+### Changed
+- `STATUS.md` — new content block row 591 added; next priorities updated to include post-591 review.
+
+---
+
 ## [4.19.0] — 2026-06-12
 
 ### Added
