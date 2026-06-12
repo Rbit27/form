@@ -6,6 +6,23 @@
 
 ---
 
+## [3.81.0] — 2026-06-12
+
+### Added
+- `content/post-522-isometric-training.md` — «Ізометричний тренінг — механізми, кутова специфічність і практичні протоколи»: yielding vs overcoming isometrics; Lum & Barbosa (2019) JSCR: overcoming > yielding для максимальної сили і потужності; Oranchuk et al. (2019) Scand J Med Sci Sports: кутова специфічність ±15°, перенос сили обмежений діапазоном; Kubo et al. (2001) J Appl Physiol: yielding-утримання збільшують жорсткість і CSA сухожилля ефективніше за динаміку; Tillin & Bishop (2009) Sports Med: «explosively-intentioned» overcoming ізометрика покращує RFD за перші 100 мс; Cook & Purdam (2009) Br J Sports Med: ізометрія як аналгетик при тендинопатії; три практичні протоколи (overcoming для sticking points, yielding для гіпертрофії/тендин, PAP-праймінг). sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `content/post-523-blood-flow-restriction.md` — «Тренінг з обмеженням кровотоку (BFR) — фізіологія, протоколи і межі застосування»: Sato (1966) kaatsu-походження; Loenneke et al. (2012) Sports Med: мета-аналіз — метаболічний стрес + cell swelling (mTOR) + рекрутування волокон типу II при 20–30% 1ПМ; Patterson & Brandner (2018) J Sports Sci: ЕМГ при BFR ≈ 70–80% без BFR; Takarada et al. (2000) Am J Physiol: GH-відгук у 4–5× вище базового; Pearson & Hussain (2015) Int J Sports Med: систематичний огляд 34 досліджень — гіпертрофія BFR ≈ традиційній при рівному об'ємі; ACSM LOP рекомендації (40–80%); Hughes et al. (2017) Br J Sports Med: ефективність BFR при реабілітації ПХЗ; практичний протокол 30+15×3; клінічні протипоказання. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `content/post-524-training-frequency.md` — «Оптимальна частота тренувань — скільки разів на тиждень тренувати кожну групу м'язів»: Schoenfeld, Ogborn & Krieger (2016) Sports Med мета-аналіз 10 досліджень: 2×/тиждень > 1× при рівному об'ємі (d=0.36); McLester, Bishop & Guilliams (2000) JSCR: 3× > 1× при великому сесійному об'ємі; Ralston et al. (2017) JSCR: тижневий об'єм є первинним чинником гіпертрофії — частота є механізмом розподілу; MacDougall et al. (1995) Can J Appl Physiol: MPS пік 24 год, норма 48–72 год; проблема junk volume (падіння ефективності після 5–8 підходів за сесію); порівняння full body / upper-lower / PPL структур. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `docs/DECISION_LOG.md` — **DEC-046** · OQ-33 clinical-safety ruling: readiness_bucket CONDITIONAL PASS; mood_bucket VETO (2026-06-12). Closes OQ-33 (P0 blocker для M4 deploy). Детальне ruling у `docs/OBSERVABILITY.md §25.9`. Owner: clinical-safety + compliance-officer + platform-engineer.
+- `blog.html` — додано картки post-522, post-523, post-524
+
+### Changed
+- `docs/OBSERVABILITY.md` — §25.9 OQ-33: оновлено таблицю open questions (RESOLVED 2026-06-12) + додано повний ruling-блок «OQ-33 Clinical-Safety Ruling — 2026-06-12» з детальними умовами CONDITIONAL PASS (readiness_bucket) і VETO (mood_bucket), альтернативами для mood_score, binding implementation constraints і expiry date. OQ-33 закрито як P0-CLOSED.
+- `docs/PRIVACY_IMPACT.md` — §2.2 OC-08 оновлено: raw readiness_score (1–5) → prohibited; readiness_bucket (low|medium|high) → conditionally permitted per DEC-041; mood_score + mood_bucket → permanently prohibited (clinical-safety VETO).
+- `README.md` — roadmap: post-522/523/524 позначено ✓ з новими темами; post-525–529 як наступний roadmap; post count 374 → 516; last update → v3.81.0.
+- `VERSION` — 3.80.1 → 3.81.0
+
+---
+
 ## [3.80.1] — 2026-06-12
 
 ### Changed

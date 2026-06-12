@@ -5705,7 +5705,56 @@ The following constraints are enforced by design. They are hard requirements, no
 |---|---|---|---|---|
 | OQ-31 | D7 Activation Rate baseline — 40% is an [ESTIMATE] derived from comparable fitness app benchmarks (Strava, Fitbod cohort data, published mobile fitness retention studies). FORM's CV-gated activation definition is more demanding than most comparators; the true baseline may be lower. | growth-lead | First 500 installs; recalibrate ACT-SLO-01 target and AL-ACT-01 threshold based on observed distribution | P1 |
 | OQ-32 | PostHog vs Amplitude — PostHog was selected for open-source option, EU data residency, and combined feature flag + analytics surface in a single contract. If enterprise customers require data portability guarantees for product analytics data (e.g., exporting their own users' funnel data to their own BI tool), Amplitude has a stronger export and data governance story. This is not a current blocker but may become one at enterprise GA. | data-engineer | Before enterprise GA; revisit if a prospective enterprise customer explicitly requires analytics data portability as a contract term | P2 |
-| OQ-33 | Readiness score and mood score in PostHog — the numerical `readiness_score` (1–5) and `mood_score` (1–5) captured in the daily check-in flow are excluded from PostHog pending clinical-safety review. If ruled as non-health data (i.e., subjective self-report that does not constitute a clinical measure), they could be included as bucketed properties (`readiness_bucket`: low\|medium\|high) to improve check-in drop-off analysis. Clinical-safety has not yet issued a ruling. Until ruled, treat as prohibited per §25.7 constraint 1. | clinical-safety | Before M4 deploy; this must be resolved before the check-in event schema is finalised | P0 |
+| OQ-33 | Readiness score and mood score in PostHog — **RESOLVED 2026-06-12. See Clinical-Safety Ruling below.** `readiness_bucket` (low\|medium\|high): CONDITIONAL PASS. `mood_bucket` (low\|medium\|high): VETO — do not send to PostHog. See §25.9 OQ-33 Ruling block for full conditions and alternative. Constraint OC-08 in `docs/PRIVACY_IMPACT.md §2.2` must be updated to reflect this ruling. | clinical-safety | **RESOLVED 2026-06-12** | P0 — CLOSED |
+
+### OQ-33 Clinical-Safety Ruling — 2026-06-12
+
+**Subject:** readiness_score + mood_score in PostHog (bucketed properties)
+**Ruling authority:** clinical-safety agent · FORM
+**Status:** SPLIT — CONDITIONAL PASS (readiness_bucket) / VETO (mood_bucket)
+
+#### readiness_bucket (low|medium|high)
+**Ruling:** CONDITIONAL PASS
+
+**Reasoning:** Subjective physical readiness self-report (1–5, collapsed to three buckets) sits at the boundary of GDPR Art. 9 special category health data. The EDPB's guidance on Art. 9 applies where data "relates to" health, not only where it constitutes a clinical measurement. A self-reported readiness score collected inside a fitness application, tied via PostHog's pseudonymous `distinct_id` to a user profile that already carries `persona_segment`, `subscription_status`, `ed_path`, and workout history, creates a longitudinal dataset from which physical health state can be inferred at the individual level — PostHog's person-level data model means bucketed properties are not aggregated by default; they persist on the person record. The three-bucket collapse (low|medium|high) meaningfully reduces the precision of inference relative to the raw 1–5 score and is consistent with sports-science practice of triaging readiness into actionable tiers rather than continuous scales; this bucketing, combined with the constraints below, brings inference risk to an acceptable level for funnel-drop analysis purposes. Lawful basis for this processing is Art. 6(1)(f) legitimate interest, not Art. 9(2)(a) consent, only if the data is genuinely non-clinical after bucketing — the conditions below are what maintain that classification; removing any condition may push the data back into Art. 9 territory and require a DPIA amendment.
+
+**Conditions (if CONDITIONAL PASS):**
+- `readiness_bucket` (low|medium|high) is the only permitted form. The raw `readiness_score` integer (1–5) must never be sent to PostHog under any circumstances.
+- `readiness_bucket` must be sent only as a property on the existing `checkin.submitted` event. It must not be attached to any other event, any user property / super property, or any PostHog person record field.
+- `readiness_bucket` must not be used as a segmentation dimension in any A/B experiment, feature flag targeting rule, or cohort definition without a fresh clinical-safety review. Its only permitted use is as a property dimension in check-in funnel drop-off analysis (F2 step analysis in §25.2).
+- `readiness_bucket` must be excluded from any PostHog export, data warehouse sync, or ClickHouse pipeline that joins it with any other health-adjacent field (wearable data, CV session data, ED path, or meal log presence).
+- The `stripPersonalProperties()` gate in the mobile SDK layer must explicitly allowlist `readiness_bucket` by name. Any property not on the explicit allowlist remains prohibited. The allowlist addition requires a PR reviewed by compliance-officer.
+- If FORM adds wearable-derived readiness signals (HRV, resting HR, sleep score) to the check-in flow in future, this ruling is immediately suspended and must be re-issued. A machine-assisted readiness score derived from biometric data is Art. 9 health data regardless of bucketing.
+- This condition set must be reviewed if PostHog's data model changes such that person-level properties become linkable to the raw score or to individual health records.
+
+---
+
+#### mood_bucket (low|medium|high)
+**Ruling:** VETO
+
+**Reasoning:** Mood self-report is mental health data. It does not become non-mental-health data by virtue of being self-reported on a 1–5 scale inside a fitness application, nor by being collapsed into three buckets. GDPR Art. 9 special category status attaches to data that "relates to" mental health — the EDPB and multiple EU supervisory authorities (including the Irish DPC and the French CNIL) have consistently held that subjective mood data collected in a digital health or wellness context relates to mental health within the meaning of Art. 9, irrespective of clinical instrument status. Processing mood data in PostHog under Art. 6(1)(f) legitimate interest is not available because the data is Art. 9 special category; it would require Art. 9(2)(a) explicit consent as a separate legal basis, and FORM has not collected that consent for analytics processing specifically (existing consent at onboarding covers in-app coaching use, not transmission to a third-party analytics sub-processor). Beyond the legal basis problem, PostHog's individual-level person model means that even `mood_bucket` = "low" persists on a pseudonymous person record across sessions, creating a longitudinal mental health state profile; combined with FORM's `ed_path` super property, a "low" mood bucket in a user on the `soft` ED path constitutes particularly sensitive inference. The inference risk from persistent mood tracking in an analytics tool — even bucketed — is not acceptable for a population that includes users with eating disorders, depression, anxiety, and body dysmorphia. A harmed user cannot be undone.
+
+**Alternative:** To analyze check-in funnel drop-off without transmitting mood data to PostHog, use one of the following approaches:
+1. **Backend-only cohort analysis.** Compute mood-correlated drop-off rates in Supabase directly, against the pseudonymised user dataset, without exporting mood values to any third-party processor. Expose only the aggregate result (e.g., "drop-off rate for low-mood check-ins vs high-mood check-ins") to dashboards — never the individual-level mood value.
+2. **Proxy behavioral signal.** If the goal is to identify check-ins that precede session abandonment, use behavioral proxies that carry no mental health inference: `checkin_duration_bucket` (fast|normal|slow, based on time-to-submit), or `checkin_to_session_gap_min` (bucketed). These measure engagement friction without capturing subjective state.
+3. **Aggregated server-side metric only.** Compute a server-side metric `pct_low_mood_checkins_7d` at the cohort level (not individual level) and expose it as a scalar in a product dashboard via Supabase materialized view — never routed through PostHog.
+
+**The `mood_score` and `mood_bucket` fields remain on the OC-08 prohibited list in `docs/PRIVACY_IMPACT.md §2.2`. The EF-07 enterprise privacy floor constraint (mental health and mood data never aggregated to employer) is unaffected by this ruling and remains in force unconditionally.**
+
+---
+
+#### Implementation constraints (apply to the readiness_bucket CONDITIONAL PASS)
+- The `checkin.submitted` event schema in §25.3 must be updated to add `readiness_bucket: "low"|"medium"|"high"` as a permitted optional property. The event table row must note: "mood_score and mood_bucket remain prohibited — OQ-33 VETO."
+- Constraint OC-08 in `docs/PRIVACY_IMPACT.md §2.2` must be updated to read: "`readiness_score` (1–5) raw value: prohibited. `readiness_bucket` (low|medium|high): conditionally permitted per OQ-33 ruling 2026-06-12 — see §25.9 conditions. `mood_score` (1–5) and `mood_bucket` (low|medium|high): prohibited — clinical-safety VETO per OQ-33 ruling 2026-06-12."
+- The mobile SDK `stripPersonalProperties()` function must be updated before M4 deploy: explicitly allowlist `readiness_bucket`; explicitly blocklist `mood_score`, `mood_bucket`, and `readiness_score`.
+- A CI lint rule must enforce that no PostHog `.capture()` call contains a property named `mood_score`, `mood_bucket`, or `readiness_score`. The lint rule must fail the build, not warn.
+- The DPA with PostHog (EU Cloud, Frankfurt) must be reviewed to confirm that `readiness_bucket` as a bucketed physical-readiness self-report is within the scope of the existing sub-processor agreement. If PostHog's DPA scope does not cover health-adjacent data, a DPA amendment is required before any `readiness_bucket` value is transmitted. This is a compliance-officer action, not a platform-engineer action.
+- PostHog's Session Recording feature must remain disabled on the check-in screen. This is already required by §25.7 constraint 7; it is re-stated here because the check-in screen is the surface where `readiness_bucket` originates.
+- This ruling does not grant permission to add `readiness_bucket` or any check-in score to enterprise aggregate views, the `tenant_wellness_summary` materialized view, or any employer-facing dashboard. EF-07 applies independently of this ruling.
+
+**Ruling expires:** This ruling must be re-reviewed if: (1) FORM integrates biometric readiness signals into the check-in score; (2) PostHog changes its person-level data model; (3) the EDPB or a relevant supervisory authority issues guidance that reclassifies subjective fitness readiness data as Art. 9 special category health data; or (4) 12 months elapse from the signing date (re-review by 2027-06-12).
+
+**Signed:** clinical-safety · FORM · 2026-06-12
 
 ---
 

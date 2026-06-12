@@ -71,7 +71,7 @@ The following constraints are **non-negotiable hard requirements**, not guidelin
 | **OC-05** | No free-text content (Victor conversation turns, custom notes, user input) in PostHog | Same `stripPersonalProperties()` gate; length-bucket proxies permitted |
 | **OC-06** | No CV keypoints or pose data in PostHog — no frame-level coordinates, numerical form scores, or per-rep quality assessments | Boolean `cv_enabled` permitted; numerical scores prohibited |
 | **OC-07** | PostHog `distinct_id` is `sha256(user_id)` — never the plaintext Supabase UUID | Computed in mobile app before SDK call; PostHog itself never receives plaintext UUID |
-| **OC-08** | `readiness_score` (1–5) and `mood_score` (1–5) treated as prohibited PostHog properties pending OQ-33 ruling | Clinical-safety OQ-33 ruling required before either field is reclassified as permitted |
+| **OC-08** | `readiness_score` (1–5) raw value: **prohibited** (PostHog). `readiness_bucket` (low\|medium\|high): **conditionally permitted** per OQ-33 clinical-safety ruling 2026-06-12 — see `docs/OBSERVABILITY.md §25.9 OQ-33 Ruling` for the full condition set; conditions are binding and non-negotiable. `mood_score` (1–5) and `mood_bucket` (low\|medium\|high): **prohibited — clinical-safety VETO** per OQ-33 ruling 2026-06-12; this is a permanent prohibition absent a new ruling. | SDK `stripPersonalProperties()` explicit allowlist for `readiness_bucket`; explicit blocklist for `mood_score`, `mood_bucket`, `readiness_score`; CI lint rule fails build on any PostHog `.capture()` call containing a prohibited property name |
 
 ### 2.3 Data Model Isolation Constraints (from `docs/DATA_MODEL.md`)
 

@@ -16,7 +16,7 @@ This is a **pre-product** project repository. There is no app code yet (mobile d
 
 - **16 HTML product surfaces** — marketing site + product mockups + investor one-pager + careers page + articles index + enterprise landing + pricing calculator
 - **65+ markdown documents** — strategic, operational, content
-- **374 evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
+- **516 evidence-based blog posts** — sports-science content engine, clinical-safety reviewed
 - **3 hiring JDs** — Founding Engineer, Design Lead, Sport Science Advisor
 - **3 sample training programs** — sports-science discipline reference
 - **24 specialized AI agents** — operating model embodied у `.claude/agents/`
@@ -271,12 +271,14 @@ G:\\Клод\\form\\
 │   │
 │   │   ── ROADMAP (наступні editorial теми · post-521+) ───────────────
 │   ├── [x] post-521: Гіпертрофія без зростання сили — як це можливо і що це означає для програмування ✓ (v3.80.0)
-│   ├── [ ] post-522: Резинові стрічки як інструмент, а не замінник штанги — де межа специфічності
-│   ├── [ ] post-523: Тренування в жарку погоду — термальна регуляція, дегідратація і корекція об'єму
-│   ├── [ ] post-524: Форсовані повторення — коли асистована відмова дає більше, а коли зменшує адаптацію
-│   ├── [ ] post-525: Розминка і перший підхід — нейром'язова підготовка vs «просто підняти легше»
-│   ├── [ ] post-526: Прогресія ізоляційних вправ — чому «більше ваги» не єдиний варіант
-│   └── [ ] post-527: Сила на одну ногу vs дві — коли унілатеральна робота стає основою, а не допоміжною
+│   ├── [x] post-522: Ізометричний тренінг — механізми, кутова специфічність і практичні протоколи ✓ (v3.81.0)
+│   ├── [x] post-523: Тренінг з обмеженням кровотоку (BFR) — фізіологія, протоколи і межі застосування ✓ (v3.81.0)
+│   ├── [x] post-524: Оптимальна частота тренувань — скільки разів на тиждень тренувати кожну групу м'язів ✓ (v3.81.0)
+│   ├── [ ] post-525: Резинові стрічки як інструмент, а не замінник штанги — де межа специфічності
+│   ├── [ ] post-526: Форсовані повторення — коли асистована відмова дає більше, а коли зменшує адаптацію
+│   ├── [ ] post-527: Розминка і перший підхід — нейром'язова підготовка vs «просто підняти легше»
+│   ├── [ ] post-528: Прогресія ізоляційних вправ — чому «більше ваги» не єдиний варіант
+│   └── [ ] post-529: Сила на одну ногу vs дві — коли унілатеральна робота стає основою, а не допоміжною
 │   │
 │   ├── twitter-launch-thread.md
 │   ├── linkedin-posts.md
@@ -979,4 +981,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v3.80.0 (post-521 · content engine)
+**Last update:** 12 червня 2026 · v3.81.0 (posts-522–524 · OQ-33 ruling DEC-041)

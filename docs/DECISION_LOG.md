@@ -64,6 +64,15 @@
 
 ---
 
+### DEC-046 · OQ-33 clinical-safety ruling: readiness_bucket CONDITIONAL PASS; mood_bucket VETO
+
+- **Decision:** SPLIT ruling on OQ-33 (2026-06-12). `readiness_bucket` (low|medium|high) is **CONDITIONALLY PERMITTED** in PostHog as a property on the `checkin.submitted` event only, subject to all conditions in `docs/OBSERVABILITY.md §25.9 OQ-33 Ruling`. `mood_score` and `mood_bucket` in any form are **PERMANENTLY PROHIBITED** from PostHog — clinical-safety VETO. `mood_captured` (boolean) may replace `mood_score` as a completion signal without revealing the score value. The raw `readiness_score` (1–5 integer) remains prohibited from PostHog regardless of this ruling. The ruling expires at SOC 2 observation period start (mandatory re-review) and must be re-issued immediately if FORM integrates biometric readiness signals into the check-in score computation. `docs/PRIVACY_IMPACT.md §2.2` OC-08 constraint updated to reflect the split ruling. A Lightweight PIA (PIA-YYYY-NNN) must be filed by compliance-officer before any `readiness_bucket` value is transmitted to PostHog (per `docs/PRIVACY_IMPACT.md §6.2` OQ-PIA-03 requirement). DPA with PostHog must be reviewed by compliance-officer to confirm `readiness_bucket` is within agreed sub-processor scope — blocking pre-condition on the CONDITIONAL PASS.
+- **Owner:** clinical-safety (ruling) + compliance-officer (PIA filing + PostHog DPA review) + platform-engineer (SDK allowlist/blocklist + CI lint rule)
+- **Why:** `readiness_score` (physical readiness self-report) at the boundary of GDPR Art. 9 health data; the three-bucket collapse reduces individual-level inference precision to an acceptable level when combined with the binding conditions (event-property-only, no person-record fields, no A/B segmentation, no export joins with other health-adjacent fields). `mood_score` is mental health data — EDPB and multiple EU supervisory authorities (Irish DPC, CNIL) have consistently held that subjective mood data in a digital wellness context constitutes Art. 9 special category data. PostHog's individual-level person model means bucketed mood properties persist on pseudonymous person records, creating longitudinal mental health state profiles. Combined with FORM's `ed_path` super property, a "low" mood bucket for a user on the `soft` ED path constitutes particularly high-risk inference in a population that includes users with eating disorders, depression, and body dysmorphia. The harm risk is not reducible by bucketing alone. Full ruling text: `docs/OBSERVABILITY.md §25.9`.
+- **Reverse cost:** Medium for the CONDITIONAL PASS (removing `readiness_bucket` from PostHog requires SDK update + PIA amendment + stakeholder communication, but no schema migration). High for the VETO (overturning a clinical-safety VETO requires a new ruling with fresh DPIA-level evidence and explicit founder sign-off — not a product team decision alone).
+
+---
+
 ### DEC-040 · Feature flag lifecycle: plan downgrade auto-disables Growth+ flags (OQ-FLAG-01); 90-day deprecation sunset policy (OQ-FLAG-02)
 
 - **Decision:** Two decisions for the feature flag lifecycle in `docs/DATA_MODEL.md §19`:
