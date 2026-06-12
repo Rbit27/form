@@ -6,6 +6,14 @@
 
 ---
 
+## [3.90.1] — 2026-06-12
+
+### Changed
+- `docs/OBSERVABILITY.md` §12.6 v0.2 → v0.3 — pg_cron health monitoring job registry: added jobs 26 (`workout_data_purge`, `0 2 * * *`, 26h freshness, GDPR Art. 5(1)(e) — permanent DELETE of `workout_sets`/`workout_sessions`/`body_metrics` for post-30d deleted users; `data.workout_data_purged` DEC-030 STANDARD; PagerDuty P1 AL-GDPR-04 on stale; dedup `purge-job-26-stale`) and 27 (`audit_log_retention_purge`, `0 3 1 * *`, 48h freshness, DEC-030/CC6.5/P4.1 — 7-year 2,557-day retention ceiling on `audit_log_events`; HMAC chain verified via `audit-chain-verify` Worker before DELETE; `data.audit_log_purge_completed` DEC-030 STANDARD; PagerDuty P1 AL-GDPR-05 on stale; dedup `purge-job-27-stale`). Gap: these jobs were specified in §37.7 when v3.3 shipped (v3.88.2) and the changelog entry stated "§12.6 registry rows added" but the rows were not physically inserted into the canonical §12.6 table. This patch closes that documentation inconsistency. Cross-ref: §37.7 (DDL + DEC-030 ordering invariant for job 27's self-referential chain constraint), §37.10 items 6/7 (deployment checklist — [ ] unchanged as infrastructure not yet deployed), AL-GDPR-04/05, SOC 2 evidence GDPR-E-002/GDPR-E-003. Owner: devops-lead + compliance-officer.
+- `VERSION` — 3.90.0 → 3.90.1
+
+---
+
 ## [3.90.0] — 2026-06-12
 
 ### Added
