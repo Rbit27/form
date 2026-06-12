@@ -121,6 +121,10 @@
         <span class="font-mono">⚿</span>
         <span>SSO · SCIM</span>
       </div>
+      <div class="sidebar-item" data-screen="apikeys">
+        <span class="font-mono">⌗</span>
+        <span>API Keys</span>
+      </div>
       <div class="sidebar-item" data-screen="rbac">
         <span class="font-mono">≡</span>
         <span>Roles · RBAC</span>
@@ -846,6 +850,76 @@
         </div>
       </div>
 
+      <!-- Directory Sync IP Restriction (§26.3.4 SSO_SCIM_IMPLEMENTATION) -->
+      <div class="stat-card mb-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="label">Directory Sync IP Restriction</div>
+            <div class="text-paper font-medium mt-1">Restrict SCIM provisioning to specific IP ranges</div>
+          </div>
+          <span style="background:rgba(163,157,142,0.15);color:#A39D8E;border:1px solid rgba(163,157,142,0.3);font-size:9px;letter-spacing:0.12em;font-family:'JetBrains Mono',monospace;text-transform:uppercase;padding:3px 8px;border-radius:9999px;">Enterprise only</span>
+        </div>
+
+        <div class="text-mute text-sm mb-6 leading-relaxed" style="max-width:640px;">
+          Use this only if your IdP has stable, predictable source IPs. Most IdPs (Okta, Azure AD) use shared infrastructure with dynamic IPs — enabling this without verified CIDR ranges will silently break provisioning. The general IP allowlist never applies to SCIM routes; this is a separate control.
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 mb-6">
+          <div>
+            <div class="label mb-3">SCIM IP enforcement</div>
+            <div class="flex items-center gap-3">
+              <label class="toggle">
+                <input type="checkbox" id="scimIpToggle" onchange="toggleScimIp(this.checked)" />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="text-paper text-sm" id="scimIpStatus">Off — all source IPs accepted</span>
+            </div>
+            <div class="text-mute text-xs mt-2">Default: off. Enabling emits a HIGH-severity DEC-030 audit event.</div>
+          </div>
+          <div id="scimIpActions" style="opacity:0.4;pointer-events:none;">
+            <div class="label mb-3">Quick import</div>
+            <div class="flex gap-2 flex-wrap">
+              <button class="btn-ghost" style="padding:6px 14px;font-size:10px;">Import Okta ranges</button>
+              <button class="btn-ghost" style="padding:6px 14px;font-size:10px;">Import Azure AD ranges</button>
+              <button class="btn-ghost" style="padding:6px 14px;font-size:10px;">+ Add CIDR</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="scimCidrSection" style="display:none;">
+          <div class="bg-deep border border-line rounded-xl p-4 mb-4">
+            <table>
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>CIDR range</th>
+                  <th>Added</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-paper">Okta US region</td>
+                  <td class="text-dim data">198.18.0.0/16</td>
+                  <td class="text-mute data">2026-05-01</td>
+                  <td><button class="copy-btn" style="color:#FF5733;border-color:rgba(255,87,51,0.3);">remove</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="flex items-start gap-3 p-4 rounded-xl mb-4" style="background:rgba(255,87,51,0.06);border:1px solid rgba(255,87,51,0.2);">
+            <span style="color:#FF5733;font-size:16px;">⚠</span>
+            <div class="text-sm leading-relaxed" style="color:#FF5733;">Enabling this will immediately block SCIM provisioning from any IP outside this list. Verify CIDR ranges in staging before enabling in production.</div>
+          </div>
+
+          <div class="flex justify-end gap-3">
+            <button class="btn-ghost" onclick="document.getElementById('scimIpToggle').checked=false;toggleScimIp(false);">Cancel</button>
+            <button class="btn-primary">Save IP restriction</button>
+          </div>
+        </div>
+      </div>
+
       <!-- MFA policy -->
       <div class="stat-card">
         <div class="label mb-4">MFA Policy</div>
@@ -868,6 +942,196 @@
               <option>FORM application level</option>
               <option>Both</option>
             </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ API KEYS ═══════════════════════════════════ -->
+    <div id="screen-apikeys" class="screen">
+      <div class="flex items-end justify-between mb-10">
+        <div>
+          <div class="label mb-2">Security · Credentials</div>
+          <h1 class="font-serif text-paper text-5xl font-light leading-tight">
+            API Keys<br>
+            <em class="text-mute text-3xl">Long-lived integration credentials</em>
+          </h1>
+        </div>
+        <button class="btn-primary" onclick="showCreateKeyModal()">+ Create API key</button>
+      </div>
+
+      <div class="flex items-start gap-3 p-4 rounded-xl mb-8" style="background:rgba(221,255,45,0.04);border:1px solid rgba(221,255,45,0.15);">
+        <span class="text-acid font-mono text-lg">⌗</span>
+        <div>
+          <div class="text-paper text-sm font-medium">Scoped credentials for headless integrations</div>
+          <div class="text-mute text-xs mt-1">Each key is shown <strong class="text-paper">once</strong> at creation — store it in your secrets manager immediately. Every lifecycle action (create, rotate, revoke, IP toggle) emits a HIGH-severity HMAC-chained audit event retained for 7 years per DEC-030. IP enforcement requires Enterprise plan.</div>
+        </div>
+      </div>
+
+      <!-- Active keys -->
+      <div class="stat-card mb-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <div class="label">Active keys</div>
+            <div class="text-mute text-xs mt-1 font-mono">Rotation recommended: 365d general · 90d admin:write scope</div>
+          </div>
+          <div class="data text-paper text-2xl font-light">3</div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table style="min-width:860px;">
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Preview</th>
+                <th>Scopes</th>
+                <th>Created</th>
+                <th>Last used</th>
+                <th>Age</th>
+                <th>IP enforcement</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="text-paper font-medium">HRIS sync</div>
+                  <div class="text-mute text-xs font-mono">Workday integration</div>
+                </td>
+                <td class="data text-dim">fk_live_···4f9a</td>
+                <td><span class="badge badge-onboarding">reporting:read</span></td>
+                <td class="data text-mute">2026-01-10</td>
+                <td class="data text-mute">2026-06-03</td>
+                <td><span class="text-mute text-xs font-mono">153d</span></td>
+                <td><span class="text-mute text-xs font-mono">Off</span></td>
+                <td>
+                  <div class="flex gap-2">
+                    <button class="copy-btn">rotate</button>
+                    <button class="copy-btn" style="color:#FF5733;border-color:rgba(255,87,51,0.3);">revoke</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="text-paper font-medium">Reporting bot</div>
+                  <div class="text-mute text-xs font-mono">BI pipeline export</div>
+                </td>
+                <td class="data text-dim">fk_live_···b12c</td>
+                <td><span class="badge badge-onboarding">reporting:read</span></td>
+                <td class="data text-mute">2025-05-15</td>
+                <td class="data text-mute">2026-05-28</td>
+                <td>
+                  <span class="badge" style="background:rgba(251,191,36,0.15);color:#FBBF24;border:1px solid rgba(251,191,36,0.4);font-size:9px;letter-spacing:0.06em;white-space:nowrap;">386d — consider rotating</span>
+                </td>
+                <td><span class="text-acid text-xs font-mono">On · 3 CIDRs</span></td>
+                <td>
+                  <div class="flex gap-2">
+                    <button class="copy-btn">rotate</button>
+                    <button class="copy-btn" style="color:#FF5733;border-color:rgba(255,87,51,0.3);">revoke</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="text-paper font-medium">Pipeline CI</div>
+                  <div class="text-mute text-xs font-mono">GitHub Actions export</div>
+                </td>
+                <td class="data text-dim">fk_live_···e72d</td>
+                <td><span class="badge badge-onboarding">reporting:read</span></td>
+                <td class="data text-mute">2024-11-01</td>
+                <td class="data text-mute">2026-06-01</td>
+                <td>
+                  <span class="badge badge-lapsed" style="font-size:9px;letter-spacing:0.06em;white-space:nowrap;">588d — rotate now</span>
+                </td>
+                <td><span class="text-mute text-xs font-mono">Off</span></td>
+                <td>
+                  <div class="flex gap-2">
+                    <button class="copy-btn">rotate</button>
+                    <button class="copy-btn" style="color:#FF5733;border-color:rgba(255,87,51,0.3);">revoke</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Revoked (30d) -->
+      <div class="stat-card mb-6">
+        <div class="flex items-center justify-between mb-6">
+          <div class="label">Revoked · last 30 days</div>
+          <button class="text-mute text-xs font-mono hover:text-paper transition-colors" onclick="navigateTo('auditlog')">view in audit log →</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Preview</th>
+              <th>Revoked</th>
+              <th>Reason</th>
+              <th>By</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="text-mute">Analytics export (legacy)</td>
+              <td class="data text-mute">fk_live_···3a91</td>
+              <td class="data text-mute">2026-05-22</td>
+              <td><span class="hmac-tag">admin_request</span></td>
+              <td class="data text-mute">sarah.chen@acme.com</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- DEC-030 note -->
+      <div class="flex items-start gap-3 p-4 rounded-xl" style="background:rgba(163,157,142,0.06);border:1px solid #1F1D16;">
+        <span class="hmac-tag" style="margin-top:1px;white-space:nowrap;">DEC-030</span>
+        <div class="text-mute text-sm leading-relaxed">
+          Every key lifecycle action emits a HIGH-severity HMAC-chained event retained for 7 years. Raw key values never appear in the audit chain — only the 8-character preview is recorded. IP enforcement enabled/disabled events require compliance-officer review for <span class="hmac-tag">admin:write</span> scope keys.
+          <a href="#" onclick="navigateTo('auditlog'); return false;" class="text-dim hover:text-paper transition-colors underline-offset-2" style="text-decoration:underline;">View audit log →</a>
+        </div>
+      </div>
+
+      <!-- Create key modal -->
+      <div id="createKeyModal" style="display:none;position:fixed;inset:0;background:rgba(11,10,7,0.88);z-index:500;align-items:center;justify-content:center;">
+        <div class="stat-card" style="width:500px;max-width:92vw;">
+          <div class="flex items-center justify-between mb-6">
+            <div class="label">New API key</div>
+            <button class="text-mute hover:text-paper font-mono text-lg leading-none" onclick="hideCreateKeyModal()">✕</button>
+          </div>
+          <div class="flex flex-col gap-4">
+            <div>
+              <div class="label mb-2">Label</div>
+              <input type="text" class="input-field" placeholder="e.g. HRIS sync — Workday" style="width:100%;" />
+            </div>
+            <div>
+              <div class="label mb-2">Scope</div>
+              <select class="input-field">
+                <option>reporting:read — aggregate analytics export only</option>
+                <option>admin:read — read-only admin operations</option>
+                <option>admin:write — full admin operations (90-day rotation required)</option>
+              </select>
+            </div>
+            <div>
+              <div class="label mb-3">IP enforcement <span class="text-mute">(Enterprise plan)</span></div>
+              <div class="flex items-center gap-3">
+                <label class="toggle">
+                  <input type="checkbox" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="text-mute text-sm">Restrict to specific CIDR ranges</span>
+              </div>
+            </div>
+          </div>
+          <div class="section-divider"></div>
+          <div class="flex items-start gap-3 p-3 rounded-lg mb-4" style="background:rgba(221,255,45,0.06);border:1px solid rgba(221,255,45,0.15);">
+            <span class="text-acid">⚠</span>
+            <div class="text-mute text-xs leading-relaxed">The full key is shown <strong class="text-paper">once</strong> after creation and cannot be retrieved again. Copy it to your secrets manager before closing this dialog.</div>
+          </div>
+          <div class="flex justify-end gap-3">
+            <button class="btn-ghost" onclick="hideCreateKeyModal()">Cancel</button>
+            <button class="btn-primary">Generate key</button>
           </div>
         </div>
       </div>
@@ -1499,6 +1763,25 @@
       if (s) s.classList.add('active');
     });
   });
+
+  function toggleScimIp(enabled) {
+    document.getElementById('scimIpStatus').textContent = enabled
+      ? 'On — SCIM requests checked against allowlist'
+      : 'Off — all source IPs accepted';
+    const actions = document.getElementById('scimIpActions');
+    const cidrs   = document.getElementById('scimCidrSection');
+    actions.style.opacity        = enabled ? '1'     : '0.4';
+    actions.style.pointerEvents  = enabled ? 'auto'  : 'none';
+    cidrs.style.display          = enabled ? 'block' : 'none';
+  }
+
+  function showCreateKeyModal() {
+    const m = document.getElementById('createKeyModal');
+    m.style.display = 'flex';
+  }
+  function hideCreateKeyModal() {
+    document.getElementById('createKeyModal').style.display = 'none';
+  }
 
   function navigateTo(target) {
     nav.forEach(n => n.classList.remove('active'));

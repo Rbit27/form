@@ -6,6 +6,14 @@
 
 ---
 
+## [3.97.1] — 2026-06-12
+
+### Changed
+- `admin-dashboard.html` — +API Keys screen (§26.5.3 `SSO_SCIM_IMPLEMENTATION.md`): active-key table with label, 8-char preview, scope badge, created/last-used dates, age-warning pill (amber ≥ 365d, red ≥ 730d), IP enforcement status, rotate/revoke actions; revoked-keys table (30d window); DEC-030 HMAC-chain footnote; "Create API key" modal with label/scope/IP-enforcement fields and one-time-display warning; +Directory Sync IP Restriction collapsible card in SSO · SCIM screen (§26.3.4): SCIM-specific IP enforcement toggle (default off, separate from general IP allowlist), CIDR table with Import Okta / Import Azure / Add CIDR quick-import, enforcement-impact warning banner; +sidebar nav item "API Keys" between SSO · SCIM and Roles · RBAC; interactive JS: `toggleScimIp()`, `showCreateKeyModal()`, `hideCreateKeyModal()`. Closes `SSO_SCIM_IMPLEMENTATION.md §26.11` checklist item 6 (P0 mockup coverage — implementation in Sprint 2–4). Owner: enterprise-architect + platform-engineer.
+- `VERSION` — 3.97.0 → 3.97.1
+
+---
+
 ## [3.97.0] — 2026-06-12
 
 ### Added
