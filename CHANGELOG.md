@@ -6,6 +6,19 @@
 
 ---
 
+## [3.87.0] — 2026-06-12
+
+### Added
+- `content/post-531-warmup-first-working-set.md` — «Розминка і перший підхід — нейром'язова підготовка vs «просто підняти легше»»: Bishop (2003) *Sports Medicine* термічні ефекти Q10 і в'язкість м'яза; Blazevich & Babault (2019) *Frontiers in Physiology* PAP vs PAPE — механізм фосфорилювання міозинових легких ланцюгів; Safran et al. (1988) *AJSM* холодний старт і ризик травми — знижений failure threshold; Behm & Chaouachi (2011) *EJAP* статичне розтягування гостро знижує RFD та силу через аутогенне гальмування GTО; рамп-протокол та принцип Хеннемана (прогресивний рекрутинг вищопорогових МО); диференціація за типом вправи (компаунд vs ізоляція vs друга вправа); практичний протокол для 90% 1ПМ (приклад 120 кг присідання). sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `blog.html` — картка post-531 додана
+- `README.md` — post-531 ✓ (v3.87.0)
+- `STATUS.md` — рядок post-531 у content engine table
+
+### Changed
+- `VERSION` — 3.86.1 → 3.87.0
+
+---
+
 ## [3.86.1] — 2026-06-12
 
 ### Fixed

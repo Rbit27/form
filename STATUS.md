@@ -494,6 +494,7 @@ FORM is at v3.66.0 with 60+ tagged releases, 17 functional HTML pages (marketing
 | post-528-isolation-exercise-progression.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.85.0 |
 | post-529-unilateral-vs-bilateral-training.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.85.0 |
 | post-530-forced-reps.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.86.0 |
+| post-531-warmup-first-working-set.md | Blog | draft · clinical-safety NOT REQUIRED · sports-scientist APPROVED · blog card: Читати → · v3.87.0 |
 | post-510-seasonal-programming-summer-winter.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.73.0 |
 | post-511-reverse-mesocycle-planning.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.74.0 |
 | post-512-isolation-exercises-when-needed.md | Blog | draft · clinical-safety NOT REQUIRED · blog card: Читати → · v3.75.0 |
