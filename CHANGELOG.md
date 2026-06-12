@@ -6,6 +6,16 @@
 
 ---
 
+## [3.94.2] — 2026-06-12
+
+### Changed
+- `content/post-14-sleep-deprived-training.md` — clinical-safety PASS (cloud-agent · 2026-06-12); scope: training physiology under sleep deprivation, no nutrition/body-image/postpartum content; `review_pending` updated; CTA + footer disclaimer added
+- `content/post-15-training-frequency.md` — footer disclaimer corrected from `clinical-safety PENDING` to `PASS (cloud-agent · 2026-05-16)` to match frontmatter (written 2026-05-16, contradictory footer was a copy-paste artefact)
+- `blog.html` — post-14 card unlocked: `status-soon` → `status-read` with link to `content/post-14-sleep-deprived-training.md`
+- `VERSION` — 3.94.1 → 3.94.2
+
+---
+
 ## [3.94.1] — 2026-06-12
 
 ### Changed
