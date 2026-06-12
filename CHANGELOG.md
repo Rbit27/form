@@ -6,6 +6,19 @@
 
 ---
 
+## [3.95.0] — 2026-06-12
+
+### Added
+- `content/post-541-training-readiness-diagnostic.md` — «Не хочу чи не можу — практична діагностика готовності до тренування»; Marcora et al. (2010) психобіологічна модель зусилля; Flatt & Esco (2016) HRV як маркер готовності; Pageaux & Lepers (2018) перший підхід як фізіологічний тест; Hooper & Mackinnon (1995) суб'єктивна картка; Kreher & Schwartz (2012) overtraining differential; матриця рішень; editorial-brutalist · 13 хв · clinical-safety REVIEWED PASS
+
+### Changed
+- `blog.html` — post-541 card added (cat-method, status-read); 453 cards total
+- `README.md` — post-541 marked ✓ in roadmap; roadmap extended with post-544–546 (самодостатній атлет, тижневий чекін, перший рік без тренера)
+- `STATUS.md` — version 3.94.2 → 3.95.0; post-541 registered; content engine table updated
+- `VERSION` — 3.94.2 → 3.95.0
+
+---
+
 ## [3.94.2] — 2026-06-12
 
 ### Changed
