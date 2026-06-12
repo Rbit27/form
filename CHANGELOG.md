@@ -6,6 +6,17 @@
 
 ---
 
+## [3.80.0] — 2026-06-12
+
+### Added
+- `content/post-521-hypertrophy-without-strength-gain.md` — «Гіпертрофія без зростання сили — як це можливо і що це означає для програмування»: парадокс розриву між розміром і силою; Ikai & Fukunaga (1968, 1970) J Appl Physiol: кореляція CSA і сили r=0.5–0.7, специфічна сила тренованих вища; Moritani & deVries (1979) Eur J Appl Physiol: нейральна (2–4 тиж.) vs структурна (5–8 тиж.) фаза адаптації; Folland & Williams (2007) MSSE: нейральна ефективність пояснює 50% приросту у новачків; Schoenfeld et al. (2017) JSCR: рівна гіпертрофія 6–12 і 25–35 пов при вирівняному об'ємі, але різна максимальна сила; Soriano et al. (2020): ≥80% 1RM перевершує для силового виходу; DUP Rhea et al. (2002): +28% vs +14% RM за 12 тижнів; специфічне напруження (Young 1984; Bamman et al. 2000); пентаційний кут (Kawakami et al. 1993); саркоплазматична vs міофібрилярна гіпертрофія; Sale (1988) MSSE rate coding; Van Cutsem et al. (1998) high-frequency doublets; три практичних висновки і матриця рішень. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `blog.html` — додано картку post-521
+- `README.md` — roadmap: post-521 позначено ✓; додано post-525–527 у roadmap
+- `STATUS.md` — додано рядок post-521 у content engine table
+- `VERSION` — 3.79.0 → 3.80.0
+
+---
+
 ## [3.79.0] — 2026-06-12
 
 ### Added
