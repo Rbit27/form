@@ -975,6 +975,10 @@ Each iteration:
 - [x] post-561: Холодний душ після тренування і гіпертрофія — Roberts et al. (2015) J Physiol CWI пригнічує mTORC1; Yamane et al. (2006) J Physiol; Petersen et al. (2012) BJSM; 4-годинне вікно; три сценарії; clinical-safety NOT REQUIRED · authored v4.7.0
 - [x] post-562: Самовербалізація і силова продуктивність — Hatzigeorgiadis et al. (2011) Perspect Psychol Sci мета-аналіз d=0.48; Tod et al. (2011) J Sport Exerc Psychol; Theodorakis et al. (2000) Sport Psychol; інструкційна vs мотиваційна СВ; clinical-safety NOT REQUIRED · authored v4.7.0
 - [x] post-563: Технічне плато — Fitts & Posner (1967) три стадії моторного навчання; Shea & Morgan (1979) contextual interference effect; Schmidt (1975) schema theory; Wulf & Prinz (2001) зовнішній vs внутрішній фокус; Enoka & Duchateau (2008) деградація техніки під втомою; три виходи (contextual interference / зовнішній фокус / перевантаження+isolated drill); clinical-safety NOT REQUIRED · authored v4.7.1
+- [x] post-564: Музика під час тренування — Terry et al. (2020) Psychol Bull мета-аналіз 139 досліджень d=0.46; Karageorghis & Priest (2012) чотири механізми (дисоціація/синхронізація/збудження/настрій); поріг ≥80% VO₂max і зникнення дисоціаційного ефекту; Waterhouse et al. (2010) Scand J Med Sci Sports BPM і субмаксимальна продуктивність; BMRI-2 і персональна релевантність; practical протокол по типу підходу; clinical-safety NOT REQUIRED · authored v4.8.0
+- [x] post-565: Моторна уява і сила — Jeannerod (2001) NeuroImage нейральна симуляція; Ranganathan et al. (2004) Neuropsychologia +35% сили від ментального тренування без руху; Driskell et al. (1994) JAP мета-аналіз 35 досліджень d=0.48; PETTLEP Holmes & Collins (2001) функціональна еквівалентність; практика 3 хв від першої особи у реальному темпі; clinical-safety NOT REQUIRED · authored v4.8.0
+- [x] post-566: Автономна мотивація і adherence — Ryan & Deci (2000) Am Psychol SDT спектр мотивації; Teixeira et al. (2012) IJBNPA систематичний огляд 66 досліджень; Deci et al. (1999) Psychol Bull мета-аналіз підриву внутрішньої мотивації; три базові потреби (автономія/компетентність/зв'язок); чому сила волі не відповідь; clinical-safety NOT REQUIRED · authored v4.8.0
+- [x] post-567: Ефект очікування в тренінгу — Beedie & Foad (2009) Sports Med плацебо-ефект у спортивній продуктивності; Beedie et al. (2006) MSSE кофеїновий плацебо; Ross et al. (2015) MSSE відновлювальне плацебо; Noakes (2004) центральний губернатор; nocebo-ефект скептицизму; фільтр «розумний план → повна впевненість»; clinical-safety NOT REQUIRED · authored v4.8.0
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -1019,4 +1023,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v4.7.1 (post-563 authored · blog.html +1 card = 330 total · clinical-safety NOT REQUIRED · roadmap post-559–563 [x])
+**Last update:** 12 червня 2026 · v4.8.0 (posts 564–567 authored · blog.html +4 cards = 334 total · clinical-safety NOT REQUIRED · roadmap post-564–567 [x])

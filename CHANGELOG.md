@@ -6,6 +6,22 @@
 
 ---
 
+## [4.8.0] — 2026-06-12
+
+### Added
+- `content/post-564-music-training-performance.md` — «Музика під час тренування: що наука каже насправді»; Terry et al. (2020) Psychol Bull мета-аналіз 139 досліджень d=0.46; Karageorghis & Priest (2012) чотири механізми (дисоціація / синхронізація / регуляція збудження / настрій); порогова межа ≥80% VO₂max і зникнення дисоціаційного ефекту; Waterhouse et al. (2010) Scand J Med Sci Sports BPM і субмаксимальна продуктивність; BMRI-2 і персональна релевантність музики; практичний протокол по типу підходу; clinical-safety NOT REQUIRED
+- `content/post-565-motor-imagery-strength.md` — «Моторна уява: тренування без руху, яке дає вимірюваний результат»; Jeannerod (2001) NeuroImage нейральна симуляція дії і перекриваючі мережі SMA/моторна кора/мозочок; Ranganathan et al. (2004) Neuropsychologia — +35% сили від ментального тренування vs +53% фізичного; Driskell et al. (1994) JAP мета-аналіз 35 досліджень d=0.48; PETTLEP модель Holmes & Collins (2001); Sale (1988) нейральна адаптація; практика 3 хв перед важким підходом; clinical-safety NOT REQUIRED
+- `content/post-566-autonomous-motivation-adherence.md` — «Автономна мотивація і довгострокова прихильність: чому «сила волі» не відповідь»; Ryan & Deci (2000) Am Psychol Self-Determination Theory спектр мотивації; Teixeira et al. (2012) IJBNPA систематичний огляд 66 досліджень — автономна мотивація передбачає adherence; Deci et al. (1999) Psychol Bull мета-аналіз 128 досліджень підриву внутрішньої мотивації зовнішньою нагородою; три базові потреби (автономія / компетентність / зв'язок); practical наслідки програмування; clinical-safety NOT REQUIRED
+- `content/post-567-expectation-placebo-training.md` — «Ефект очікування в тренінгу: чому впевненість у плані дає вимірюваний результат»; Beedie & Foad (2009) Sports Med огляд плацебо-ефекту у спортивній продуктивності; Beedie et al. (2006) MSSE кофеїновий плацебо у велосипедистів; Ross et al. (2015) MSSE відновлювальне плацебо і командний спорт; Noakes (2004) JAP центральний губернатор; механізми (ендогенні опіоїди / зниження тривоги / стратегія зусилля); nocebo-ефект; фільтр «розумний план → повна впевненість»; clinical-safety NOT REQUIRED
+- `blog.html` — +4 картки для постів 564–567 (334 total)
+- `README.md` — roadmap posts 564–567 [x]; Last update → v4.8.0
+- `STATUS.md` — оновлено до v4.8.0; 567 постів; blog.html 334 cards
+
+### Changed
+- `VERSION` — 4.7.1 → 4.8.0
+
+---
+
 ## [4.7.1] — 2026-06-12
 
 ### Added
