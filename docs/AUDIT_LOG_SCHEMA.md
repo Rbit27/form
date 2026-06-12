@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v1.8
+# FORM · Audit Log Schema v1.9
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -521,6 +521,10 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 | `support.unauthorized_nuke_attempt` | 7 years | Internal safety control violation record |
 | `integration.api_call` (sampled) | 30 days | Volume management |
 | `data.read_aggregate` | 90 days | Investigation but not unlimited |
+| `user.account_deletion_initiated` / `user.data_erasure_completed` | 7 years | GDPR Art. 17 erasure chain-of-custody record; SOC 2 P4/P5.2/P6; `user.data_erasure_completed.slo_met` is GDPR-SLO-01 evidence; 7yr matches FORM's general compliance-record floor — individual user data is absent from payloads so retention does not conflict with the erasure itself |
+| `user.art9_data_hard_deleted` | 7 years | GDPR Art. 9 enterprise off-boarding deletion record; GDPR-E-005/E-006 evidence artefacts; SOC 2 CC6.5/P6; `latency_seconds` field is GDPR-SLO-03 evidence; 7yr is the DEC-030 HIGH event standard and matches FORM's compliance record floor |
+| `data.workout_data_purged` | 1 year | GDPR Art. 5(1)(e) storage-limitation enforcement; GDPR-E-002 evidence artefact (SOC 2 PI1.2); 1yr sufficient — operational purge log, not a contract or financial record; daily cadence means 365 events/yr; older runs add no compliance value |
+| `data.audit_log_purge_completed` | 7 years | DEC-030 / CC6.5 audit log retention enforcement record; GDPR-E-003 evidence artefact; self-referential: this event is itself part of the audit log chain it governs; 7yr matches the retention period it enforces (the event that records the purge must outlive what it purged by at least one audit cycle)
 
 After retention period, rows **hard-deleted via partition drop** (not soft-delete). Hash of deleted-partition's last row preserved у `audit_log_retention_summary` for chain continuity proof.
 
@@ -579,6 +583,76 @@ Engineer needs production debug access:
 
 ---
 
+### GDPR data lifecycle events (DEC-030 HMAC-chained · OBSERVABILITY §37)
+
+> Defined in `docs/OBSERVABILITY.md §37`. Five events covering the complete GDPR data-deletion and retention enforcement pipeline — consumer account deletion, DSAR erasure completion, enterprise Art. 9 off-boarding, workout-data purge (job 26), and audit-log retention purge (job 27). **Privacy floor (all five events):** no plaintext `user_id` in any payload. Consumer-facing events reference `deletion_request_id` or `erasure_request_id` (UUID FKs to Postgres records protected by `form_system`-only RLS). Aggregate count fields only. The `user.art9_data_hard_deleted` payload contains `tenant_id` and counts — no individual employee UUIDs. **GDPR-SLO-03 / DEC-036:** `user.art9_data_hard_deleted` must be emitted within 4 hours of `tenants.offboarding_initiated_at`; `latency_seconds > 14400` indicates a GDPR Art. 9 breach requiring immediate P0 response per AL-GDPR-03. **DEC-030 ordering invariant for job 27:** `data.audit_log_purge_completed` must be emitted and HTTP 200 confirmed *before* `DELETE FROM audit_log_events` executes — the chain entry preserves the end-state before the oldest rows are removed. Cross-ref: SOC 2 PI1.2 (data minimisation), P4 (right to erasure), P5.2 (pseudonymisation evidence), P6 (privacy choices), CC6.5 (retention/deletion); `docs/OBSERVABILITY.md §37.4` (GDPR-SLO-01/02/03/04/05); `docs/OBSERVABILITY.md §37.5` (AL-GDPR-01 through AL-GDPR-06); `docs/OBSERVABILITY.md §37.7` (pg_cron jobs 26 and 27 DDL + ordering invariant); GDPR Art. 5(1)(e) (storage limitation), Art. 17 (right to erasure), Art. 9 (special categories). Closes OBSERVABILITY.md §37.10 checklist item 11 (P1, M6 — AUDIT_LOG_SCHEMA.md update required).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `user.account_deletion_initiated` | STANDARD | 7 yr | Consumer account deletion Worker: user initiates deletion in-app → `users.deleted_at = NOW()` (soft-delete); 30-day hold period begins | `deletion_request_id` (UUID — internal deletion record; maps to `user_id` via `form_system`-only RLS — **no `user_id` in payload**), `initiated_at` (ISO 8601), `hard_delete_scheduled_at` (ISO 8601 — `initiated_at + 30 days`), `account_type` (`"consumer"` \| `"enterprise_member"` — enterprise members deprovision via SCIM; only `"consumer"` uses this Worker path) |
+| `user.data_erasure_completed` | STANDARD | 7 yr | DSAR erasure Worker: deletion cascade confirmed complete; `data_subject_requests.status` updated to `'completed'` | `erasure_request_id` (UUID — FK to `data_subject_requests.id`; **no `user_id` in payload** — cross-ref via RLS-gated table), `request_age_days` (float — days from `requested_at` to completion; ≤ 25.0 = GDPR-SLO-01 met; ≤ 30.0 = Art. 17 met), `tables_purged` (string array — data categories erased, e.g. `["workout_sessions","coaching_turns","cv_session_keypoints"]`), `completed_at` (ISO 8601), `slo_met` (boolean — `request_age_days ≤ 25.0`) |
+| `user.art9_data_hard_deleted` | **HIGH** | 7 yr | Enterprise Art. 9 off-boarding Worker: `tenants.status = 'offboarding'` triggers hard-delete of all Art. 9 health data for tenant users; target < 4h (GDPR-SLO-03 / DEC-036); emitted immediately after deletion cascade completes | `tenant_id` (UUID), `offboarding_initiated_at` (ISO 8601), `hard_delete_completed_at` (ISO 8601), `latency_seconds` (integer — elapsed time; **`latency_seconds > 14400` = GDPR-SLO-03 breach, triggers AL-GDPR-03 P0**), `users_hard_deleted_count` (integer — number of tenant users whose Art. 9 data was removed), `art9_tables_purged` (string array — e.g. `["workout_sessions","workout_sets","body_metrics","cv_session_keypoints","coaching_turns"]`) |
+| `data.workout_data_purged` | STANDARD | 1 yr | pg_cron job 26 `workout_data_purge` (daily 02:00 UTC): permanent DELETE of `workout_sets`, `workout_sessions`, `body_metrics` for users with `deleted_at < NOW() - INTERVAL '30 days'`; emitted after successful DELETE | `purge_date` (ISO 8601 date), `users_purged_count` (integer — distinct deleted users whose data was removed), `workout_sessions_deleted` (integer), `workout_sets_deleted` (integer), `body_metrics_deleted` (integer), `pg_cron_run_id` (bigint — `cron.job_run_details.runid` for §12.6 freshness cross-reference) |
+| `data.audit_log_purge_completed` | STANDARD | 7 yr | pg_cron job 27 `audit_log_retention_purge` (monthly, 1st, 03:00 UTC): 7-year (2,557-day) retention enforcement; **emitted and HTTP 200 confirmed BEFORE `DELETE FROM audit_log_events` executes** (DEC-030 ordering invariant — chain entry must precede row removal) | `purge_month` (YYYY-MM), `rows_eligible` (integer — COUNT before DELETE; 0 until ~2033), `rows_deleted` (integer), `oldest_retained_event_timestamp` (ISO 8601 — oldest event remaining after purge), `chain_verification_result` (`"pass"` \| `"skip_no_eligible_rows"` — Worker returns HTTP 422 and aborts purge if verification fails), `pg_cron_run_id` (bigint) |
+
+```typescript
+// Zod schemas — canonical source for emit-audit-event Worker validation
+
+const UserAccountDeletionInitiatedPayload = z.object({
+  deletion_request_id: z.string().uuid(),
+  initiated_at:        z.string().datetime(),
+  hard_delete_scheduled_at: z.string().datetime(),
+  account_type:        z.enum(['consumer', 'enterprise_member']),
+});
+
+const UserDataErasureCompletedPayload = z.object({
+  erasure_request_id:  z.string().uuid(),
+  request_age_days:    z.number().nonnegative(),
+  tables_purged:       z.array(z.string()).min(1),
+  completed_at:        z.string().datetime(),
+  slo_met:             z.boolean(),
+});
+
+const UserArt9DataHardDeletedPayload = z.object({
+  tenant_id:                  z.string().uuid(),
+  offboarding_initiated_at:   z.string().datetime(),
+  hard_delete_completed_at:   z.string().datetime(),
+  latency_seconds:            z.number().int().nonnegative(),
+  users_hard_deleted_count:   z.number().int().nonnegative(),
+  art9_tables_purged:         z.array(z.string()).min(1),
+});
+
+const DataWorkoutDataPurgedPayload = z.object({
+  purge_date:               z.string().date(),
+  users_purged_count:       z.number().int().nonnegative(),
+  workout_sessions_deleted: z.number().int().nonnegative(),
+  workout_sets_deleted:     z.number().int().nonnegative(),
+  body_metrics_deleted:     z.number().int().nonnegative(),
+  pg_cron_run_id:           z.number().int().positive(),
+});
+
+const DataAuditLogPurgeCompletedPayload = z.object({
+  purge_month:                    z.string().regex(/^\d{4}-\d{2}$/),
+  rows_eligible:                  z.number().int().nonnegative(),
+  rows_deleted:                   z.number().int().nonnegative(),
+  oldest_retained_event_timestamp: z.string().datetime(),
+  chain_verification_result:       z.enum(['pass', 'skip_no_eligible_rows']),
+  pg_cron_run_id:                  z.number().int().positive(),
+});
+```
+
+**HMAC chain requirements:**
+
+- `user.account_deletion_initiated` — emitted synchronously within the account deletion Worker transaction (fail-closed: failure aborts the soft-delete). If the user was an enterprise member recently deprovisioned via SCIM, `session.bulk_revocation_complete` will appear earlier in the chain for the associated `tenant_id`; no strict predecessor requirement for this event itself. Followed within 30 days by `billing.user_erased` (from §§Billing & GDPR erasure events) for the same account.
+- `user.data_erasure_completed` — constitutes the GDPR Art. 17 chain-of-custody record. Chain auditors verify completeness by locating `data.individual_deletion` (existing taxonomy) followed by this event referencing the same `erasure_request_id`. No chain guard enforced (ordering may vary if erasure Worker processes in batches); compliance-officer must verify both events present for any DSAR inspection.
+- `user.art9_data_hard_deleted` — emitted synchronously inside the Art. 9 off-boarding Worker transaction; `latency_seconds` field is the GDPR-SLO-03 evidence value. If `latency_seconds > 14400`, AL-GDPR-03 fires (P0, dual-page `form-platform` + `form-compliance`, no auto-resolve) — **do not emit the event and suppress the alert**; emit the event even on SLO breach so auditors can see the latency value.
+- `data.workout_data_purge_completed` — low-volume (one emission per daily job run); no predecessor required. Emitter must confirm DELETE row count matches `users_purged_count` before emitting.
+- `data.audit_log_purge_completed` — **DEC-030 ordering invariant**: this event must enter the chain (HTTP 200 from `emit-audit-event` Worker) before `DELETE FROM audit_log_events` executes. The self-referential constraint is: the purge event itself is a new audit log row; it becomes the new chain tail before the oldest rows are removed. A chain break on this event (e.g. `emit-audit-event` Worker unreachable) must abort the DELETE and trigger AL-GDPR-05 (P1).
+
+**Emitter assignments:** `user.account_deletion_initiated` — `form_system` (consumer account deletion Worker, automated); `user.data_erasure_completed` — `form_system` (DSAR erasure Worker, automated); `user.art9_data_hard_deleted` — `form_system` (enterprise Art. 9 off-boarding Worker, automated); `data.workout_data_purged` — `form_system` (pg_cron job 26 via pg_net, automated daily); `data.audit_log_purge_completed` — `form_system` (pg_cron job 27 via pg_net, automated monthly, BEFORE DELETE). None of these events may be emitted manually via the admin console.
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:
@@ -618,6 +692,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v1.9 · 2026-06-12 · owner: compliance-officer + enterprise-architect**
+*v1.9 (2026-06-12): +5 GDPR data lifecycle events — closes OBSERVABILITY.md §37.10 checklist item 11 (P1, M6 — AUDIT_LOG_SCHEMA.md update required). (1) `user.account_deletion_initiated` (STANDARD, 7yr): consumer account deletion Worker fires synchronously after soft-delete (`users.deleted_at = NOW()`); payload: `deletion_request_id` (UUID, no `user_id`), `initiated_at`, `hard_delete_scheduled_at` (+30d), `account_type` (consumer|enterprise_member); fail-closed. (2) `user.data_erasure_completed` (STANDARD, 7yr): DSAR erasure Worker fires after cascade DELETE and `data_subject_requests.status = 'completed'`; payload: `erasure_request_id` (UUID, no `user_id`), `request_age_days` (float — GDPR-SLO-01 ≤25.0 evidence), `tables_purged` (array), `completed_at`, `slo_met` (bool). (3) `user.art9_data_hard_deleted` (HIGH, 7yr): enterprise Art. 9 off-boarding Worker; must complete ≤4h (GDPR-SLO-03 / DEC-036, P0 AL-GDPR-03 if breach); payload: `tenant_id`, `offboarding_initiated_at`, `hard_delete_completed_at`, `latency_seconds` (SLO evidence), `users_hard_deleted_count`, `art9_tables_purged` (array); no `user_id`. (4) `data.workout_data_purged` (STANDARD, 1yr): pg_cron job 26 (daily 02:00 UTC) fires after DELETE of workout_sets/sessions/body_metrics for post-30d deleted users; payload: `purge_date`, `users_purged_count`, `workout_sessions_deleted`, `workout_sets_deleted`, `body_metrics_deleted`, `pg_cron_run_id`; aggregate counts, no `user_id`; GDPR-E-002 (SOC 2 PI1.2). (5) `data.audit_log_purge_completed` (STANDARD, 7yr): pg_cron job 27 (monthly 1st 03:00 UTC); **DEC-030 ordering invariant — emitted and HTTP 200 confirmed BEFORE DELETE executes** (chain entry becomes new tail before oldest rows removed — failure aborts DELETE); payload: `purge_month`, `rows_eligible`, `rows_deleted`, `oldest_retained_event_timestamp`, `chain_verification_result` (pass|skip_no_eligible_rows), `pg_cron_run_id`; GDPR-E-003 (SOC 2 PI1.2/CC6.5). Five Zod schemas provided (canonical source for emit-audit-event Worker). Retention table: +4 rows (`user.account_deletion_initiated`/`user.data_erasure_completed` 7yr; `user.art9_data_hard_deleted` 7yr; `data.workout_data_purged` 1yr; `data.audit_log_purge_completed` 7yr). Privacy floor all five: no plaintext `user_id` in any payload; consumer-facing events use UUID FKs to RLS-gated Postgres tables; `user.art9_data_hard_deleted` is `tenant_id` + aggregate counts only. Emitter all five: `form_system` (automated Workers and pg_cron — no manual admin console path). Cross-ref: OBSERVABILITY.md §37 (canonical event definitions, SLOs, alert rules, pg_cron DDL); GDPR Art. 5(1)(e) storage limitation / Art. 17 erasure / Art. 9 special categories; SOC 2 PI1.2/P4/P5.2/P6/CC6.5; DEC-036 (Art. 9 hard-delete zero grace period). Owner: compliance-officer + platform-engineer + devops-lead.*
 
 **v1.8 · 2026-06-12 · owner: compliance-officer + enterprise-architect**
 *v1.8 (2026-06-12): +3 `enterprise.*` implementation lifecycle events — closes COST_MODEL.md §36.11 checklist item 1 (P0, M8 — register all three DEC-030 events before first enterprise deal closes). (1) `enterprise.implementation_kickoff_completed` (STANDARD, 7yr): CSM-emitted at kickoff completion; payload: `tenant_id`, `deal_sequence` (nth deal for OQ-08 cost calibration), `contracted_tier`, `contracted_seats`, `idp_type`, `white_label_enabled`, `eu_data_residency`, `kickoff_date`, `target_go_live_date`, `csm_actor_id` (FORM team UUID — not tenant employee); emitter: customer-success (founder in solo phase). (2) `enterprise.sso_scim_setup_verified` (STANDARD, 7yr): engineer-emitted after SSO/SCIM smoke test per SSO_SCIM_IMPLEMENTATION.md §7.4; payload: `tenant_id`, `idp_type`, `sso_modes_verified` (object: `idp_initiated`, `sp_initiated`), `scim_features_enabled` (object: `user_crud`, `group_sync`, `role_mapping`, `jit_provisioning`), `eu_data_residency_confirmed`, `engineer_actor_id` (FORM team UUID), `verification_date`; emitter: platform-engineer or form_system (automated smoke harness if available). (3) `enterprise.implementation_cost_model_calibrated` (STANDARD, 7yr): founder-emitted at OQ-08 closure after 3 deals time-tracked in `enterprise_impl_time_log`; payload: `deals_analysed` (int ≥ 3), `avg_impl_cost_*` (optional per tier), `variance_vs_model_pct` (signed float), `model_version_updated`, `decision_log_ref`, `calibration_date`; no `tenant_id` (aggregate model event, not per-tenant). Privacy invariant all three events: `tenant_id` + operational FORM-team metadata only — no individual employee user_id, no health values, no coaching content; `csm_actor_id` / `engineer_actor_id` are FORM-internal identities safe for chain payload. Chain ordering: no strict predecessor-successor enforcement between events; WARN (non-blocking) logged by emit-audit-event Worker if `sso_scim_setup_verified` has no prior `implementation_kickoff_completed` for same `tenant_id`; no chain guard for `implementation_cost_model_calibrated` (no tenant_id). No PagerDuty routing (STANDARD severity); events appear in weekly chain audit and CSM implementation dashboard only. Retention table: +1 row (all three events, 7yr, SOC 2 CC5.2 + CC7.2). Cross-ref: COST_MODEL.md §36.10 (canonical Zod schemas + trigger conditions), §36.11 checklist (this patch closes item 1), §36.9 (`enterprise_impl_time_log` table — source for calibration query); SSO_SCIM_IMPLEMENTATION.md §7.4 (test procedure — operational counterpart of sso_scim_setup_verified); ENTERPRISE_ONBOARDING.md (sequential trigger points); DECISION_LOG.md (OQ-08 closure record — decision_log_ref target). Owner: compliance-officer + enterprise-architect.*

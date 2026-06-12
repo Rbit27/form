@@ -9707,7 +9707,7 @@ Location: Metabase, Collection `/collections/compliance` (accessible to `FORM-Co
 | 8 | Configure AL-GDPR-01 through AL-GDPR-06 in PagerDuty and Better Stack; test AL-GDPR-01 with synthetic request inserted 23+ days ago in staging | devops-lead | **P1** | M6 | [ ] |
 | 9 | Build "Data Governance & Erasure Health" Metabase dashboard (§37.8 spec); restrict to `FORM-Compliance` collection | data-engineer | **P1** | M7 | [ ] |
 | 10 | Configure GDPR-E-001 monthly CSV export to `compliance/evidence/gdpr/` via Cloudflare Cron Worker | devops-lead | **P1** | M7 | [ ] |
-| 11 | Register `data.workout_data_purged`, `data.audit_log_purge_completed`, `user.art9_data_hard_deleted`, `user.data_erasure_completed`, `user.account_deletion_initiated` in `emit-audit-event` Worker event registry (AUDIT_LOG_SCHEMA.md update required) | platform-engineer | **P1** | M6 | [ ] |
+| 11 | Register `data.workout_data_purged`, `data.audit_log_purge_completed`, `user.art9_data_hard_deleted`, `user.data_erasure_completed`, `user.account_deletion_initiated` in `emit-audit-event` Worker event registry (AUDIT_LOG_SCHEMA.md update required) | platform-engineer | **P1** | M6 | ✅ Registered in AUDIT_LOG_SCHEMA.md v1.9 (2026-06-12). `emit-audit-event` Worker Zod validation + chain deployment remain engineering implementation tasks. |
 | 12 | GDPR-SLO-01/02/03 registration in SLO tracking framework (§19); deploy `slo_budget_tracking` rows; configure error budget policy (note: GDPR SLOs have no error budget — breach = P0 incident, not budget burn) | devops-lead | **P2** | M8 | [ ] |
 
 ### 37.11 Open questions

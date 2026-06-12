@@ -6,6 +6,17 @@
 
 ---
 
+## [4.8.2] — 2026-06-12
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md` v1.9 — +5 GDPR data lifecycle DEC-030 events: `user.account_deletion_initiated` (STANDARD, 7yr), `user.data_erasure_completed` (STANDARD, 7yr), `user.art9_data_hard_deleted` (HIGH, 7yr), `data.workout_data_purged` (STANDARD, 1yr), `data.audit_log_purge_completed` (STANDARD, 7yr). New section "GDPR data lifecycle events" with full event table, Zod schemas, HMAC chain requirements, and emitter assignments. Retention table +4 rows. Closes `docs/OBSERVABILITY.md §37.10` item 11 (P1 M6). Privacy floor enforced: no `user_id` in any payload; consumer-facing events use UUID FKs to RLS-gated tables; `user.art9_data_hard_deleted` is tenant-aggregate only. DEC-030 ordering invariant documented for `data.audit_log_purge_completed` (emitted before DELETE — chain entry precedes row removal).
+
+### Changed
+- `docs/OBSERVABILITY.md` — §37.10 item 11 status: `[ ]` → `✅ Registered in AUDIT_LOG_SCHEMA.md v1.9 (2026-06-12)`
+- `VERSION` — 4.8.1 → 4.8.2
+
+---
+
 ## [4.8.1] — 2026-06-12
 
 ### Added
