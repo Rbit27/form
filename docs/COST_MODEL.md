@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.1
+# FORM · Cost Model & Unit Economics v2.2
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -213,6 +213,19 @@
     - 35.9 DEC-030 HMAC-Chained Audit Events (Closes OQ-CHURN-03)
     - 35.10 Implementation Checklist
     - 35.11 Open Questions
+36. [Enterprise Implementation Cost Deep-Dive: Engineering, CS & Legal Time Model](#36-enterprise-implementation-cost-deep-dive-engineering-cs--legal-time-model)
+    - 36.1 Purpose & Scope
+    - 36.2 Implementation Activity Taxonomy
+    - 36.3 Engineering Hour Model by Tier
+    - 36.4 CS Hour Model by Tier
+    - 36.5 Legal & Compliance Hour Model
+    - 36.6 Bottom-Up Cost Table & §8.2 Variance Analysis
+    - 36.7 Implementation Cost as % ACV — Year 1 GM Impact
+    - 36.8 Multi-Deal Scale Economics
+    - 36.9 Time-Tracking Instrument for OQ-08 Resolution
+    - 36.10 DEC-030 HMAC-Chained Audit Events
+    - 36.11 Implementation Checklist
+    - 36.12 Open Questions
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -7786,5 +7799,543 @@ All three events must be registered in `docs/AUDIT_LOG_SCHEMA.md §6` before the
 
 ---
 
+*v2.2 (2026-06-12): §36 Enterprise Implementation Cost Deep-Dive. See §36.1–§36.12 below.*
+
 *v2.1 (2026-06-12): §35 Enterprise Contract Amendment, Mid-Contract Termination & Early Termination Fee Model. Closes OQ-CHURN-02 (P1, §34.10) with NPV comparison of 2yr price-lock vs. 10% retention discount for Amber-band Growth accounts: price-lock NPV advantage of $8,668 over 2yr horizon for CFO/procurement-led buyers (price-lock 2yr NPV $53,541 vs. discount $44,873); six-profile decision matrix (§35.7.3) guiding tool selection by customer archetype. Closes OQ-CHURN-03 (P2, §34.10) with three new DEC-030 events: `enterprise.mid_contract_termination_risk_flagged` (HIGH, 7yr — CHS < 20 sustained ≥ 4 weeks AND days remaining > 180; pg_cron automated emission; 30-day deduplication per tenant; HTTP 422 guard in emit-audit-event Worker if Worker enforcement not yet in place), `enterprise.contract_amended` (HIGH, 7yr — all signed contract amendments including price-lock renewals), `enterprise.early_termination_fee_waived` (HIGH, 7yr — `ev_analysis_completed: true` required for waivers > $5k or Worker returns 422). Contract amendment taxonomy: four types with DEC-030 event mapping. Seat reduction policy: contractually fixed for term; ≤ 10% deferred to annual renewal; > 30% or below tier minimum triggers ETF. Mid-contract termination loss: three components (remaining ARR, deferred revenue reversal, CAC destruction); loss table by tier and exit month. ETF structure: declining-balance rate schedule (60% at M1–M3 to 0%+floor at M36); calculated on contracted ACV; minimum floor of 1 month contracted ACV; five-tier approval authority matrix ($5k CSM lead / $25k founder / $100k founder+compliance-officer / >$100k founder+investor). EV waiver model (§35.6.3): two worked examples (Growth product-gap waiver: EV $11,136 waive > $6,107 enforce; Enterprise competitor-acquisition: EV $29,240 enforce > $3,182 waive). ASC 606 treatment for terminations, seat reductions, and price-lock renewals. 11-item implementation checklist (4× P0/M10, 4× P1/M12, 3× P2/M16). Three open questions (OQ-ETF-01 counsel review P0/M10; OQ-ETF-02 ACV basis P1/M10; OQ-ETF-03 seat suspension P2/M18). TOC updated. §34.10 OQ-CHURN-02 and OQ-CHURN-03 marked 🟢 Resolved. Cross-references: §16.4 (multi-year discount economics — ETF calculated on discounted contracted ACV), §18.1 (ASC 606 deferred revenue — reversal on early termination), §18.5 (multi-year deferred revenue waterfall), §23.6 (CPI indexation clause — price-lock defers application for 2yr term), §31.7 (rate lock commitment during contracted term), §32 (pricing exception approval — price-lock below list requires §32 approval chain), §34 (renewal risk register — this section extends the churn framework to mid-contract), `docs/MSA_TEMPLATE.md` (ETF clause + seat reduction policy — P0 M10 update required), `docs/AUDIT_LOG_SCHEMA.md` (three new DEC-030 event types to register — P0 before first amendment), `docs/OBSERVABILITY.md §12.6` (pg_cron job for mid-contract risk detection — P0 M10). Owner: enterprise-architect + customer-success + compliance-officer + founder.*
+
+---
+
+## 36. Enterprise Implementation Cost Deep-Dive: Engineering, CS & Legal Time Model
+
+### 36.1 Purpose & Scope
+
+**Gap this section fills:** §8.2 states one-time implementation costs of $1,150 (Starter), $1,500 (Growth), and $2,000 (Enterprise) as top-level estimates marked `[ESTIMATE]`. Open question OQ-08 (`§11`) asks for the true cost in engineering and CS hours per deal. This section provides a bottom-up derivation using hourly rates established in §26 (CSM cost model) and §27 (engineering cost model). The resulting figures revise §8.2 upward and create a trackable instrument for OQ-08 resolution after the first three enterprise deals close.
+
+**What this section does NOT cover:**
+- Ongoing CSM cost post-implementation (§26 owns that model)
+- Infrastructure provisioning cost (§15 owns that; it is near-zero per §15.7)
+- Sales and pre-sales cost (§8.5, §19.3–§19.5)
+- Legal counsel fees for first-time contract template creation (§25.3 one-time spend; amortized here as per-deal cost after template exists)
+
+**Privacy invariant:** All time-tracking is at `tenant_id` scope. No `user_id` is ever referenced in implementation tracking. Implementation work touches configuration, not individual health data.
+
+**Hourly rates used throughout this section:**
+
+| Role | Annual cost basis | Effective hourly rate | Source |
+|---|---|---|---|
+| Founding engineer | $115,000/yr total comp (§27.2.1) | **$62.50/hr** | ÷ 1,840 billable hours/yr |
+| CSM (dedicated, Growth+) | $70,000/yr base + 16% taxes = $81,200 total | **$44.13/hr** | ÷ 1,840 hrs; §26.3 uses $37.50/hr (base-only rate); this section uses fully-loaded rate for margin accuracy |
+| Compliance-officer / founder | Phase 0: $0 cash cost (founder time) | **$0 cash / $62.50 opportunity** | Opportunity cost modelled separately in §36.7 |
+| External legal counsel | $250–$350/hr range (§25.3) | **$300/hr midpoint** | Per outside counsel engagement |
+
+> **Note on CSM rate:** §26.8 uses $37.50/hr (base salary ÷ hours) for QBR economics. This section uses $44.13/hr (fully-loaded, including employer taxes and overhead) to produce the COGS-accurate implementation cost that should flow into §16.1 gross margin calculations. The two rates serve different purposes; always use the fully-loaded rate for margin analysis.
+
+---
+
+### 36.2 Implementation Activity Taxonomy
+
+Implementation for each new enterprise customer consists of four work-streams executed over the Day 0–90 timeline from `docs/ENTERPRISE.md`:
+
+| Work-stream | Primary owner | Secondary | Timing |
+|---|---|---|---|
+| **A. Identity integration** (SSO, SCIM, JIT provisioning) | Engineer | CSM (coordination) | Day 7–14 |
+| **B. Tenant provisioning & configuration** (feature flags, RLS check, bulk import) | Engineer | CSM | Day 0–7 |
+| **C. Branding & white-label** (custom domain, logo, colours; Growth+ only) | Engineer | CSM | Day 14–21 |
+| **D. Training & admin onboarding** (admin dashboard, RBAC, CSM-led sessions) | CSM | Engineer (support) | Day 21–28 |
+| **E. Pilot management** (weekly check-ins, adoption tracking, user comms kit) | CSM | — | Day 28–90 |
+| **F. Compliance & legal** (MSA, DPA, ISQ, security questionnaire, DPIA if EU) | Founder / compliance-officer | Outside counsel | Day −30 to Day 0 |
+
+Each work-stream has Starter / Growth / Enterprise variant hours. White-label (work-stream C) applies to Growth and Enterprise only. EU data residency verification adds ~1h to work-stream A for EU-HQ customers.
+
+---
+
+### 36.3 Engineering Hour Model by Tier
+
+#### 36.3.1 Work-stream A: Identity Integration
+
+| Activity | Starter | Growth | Enterprise | Notes |
+|---|---|---|---|---|
+| IdP metadata exchange + FORM app registration | 0.5 h | 0.5 h | 0.5 h | One-time per IdP; reuse playbook from `docs/SSO_SCIM_IMPLEMENTATION.md §4` |
+| Test IdP-initiated SSO flow | 0.5 h | 0.5 h | 0.5 h | Standard regardless of tier |
+| Test SP-initiated SSO flow | 0.5 h | 0.5 h | 0.5 h | Standard |
+| JIT user provisioning verification (first login creates user) | 1.0 h | 1.0 h | 1.0 h | Verify `tenant_id` propagation and RLS row creation |
+| SCIM basic user CRUD testing (create, update, deactivate) | 1.0 h | 1.0 h | 1.0 h | Standard across tiers |
+| SCIM group sync testing (Growth+) | — | 2.0 h | 3.0 h | Growth: up to 10 groups; Enterprise: complex nested groups per §19 |
+| SCIM group-to-role mapping verification (Growth+) | — | 1.0 h | 2.0 h | Verify `group_member_effective_role` view (higher-privilege-wins, DEC-039) |
+| SSO/SCIM troubleshooting buffer | 1.0 h | 2.0 h | 3.0 h | Non-standard IdP config, customer IT delay, attribute mapping edge cases |
+| EU data residency verification (EU-HQ tenants only) | 1.0 h | 1.0 h | 1.0 h | Confirm Cloudflare EU-Central routing; verify no US egress |
+| **Work-stream A subtotal (non-EU)** | **4.5 h** | **8.5 h** | **11.5 h** | |
+| **Work-stream A subtotal (EU customer)** | **5.5 h** | **9.5 h** | **12.5 h** | +1h data residency verification |
+
+#### 36.3.2 Work-stream B: Tenant Provisioning & Configuration
+
+| Activity | All tiers | Notes |
+|---|---|---|
+| Create tenant record + set feature flags for contracted tier | 0.5 h | `tenants` row + `tenant_feature_flags` population per DEC-040 |
+| Bulk user import test (CSV, 50–1,000 users) | 1.0 h | Validate deduplication, error handling, RLS isolation |
+| Cross-tenant isolation sanity check | 0.5 h | Run TC-RLS-001 through TC-RLS-003 from §25.5.1 against new tenant in staging before prod promotion |
+| Admin dashboard role verification | 0.5 h | Confirm `tenant_owner`, `tenant_admin`, `tenant_manager` RBAC operates correctly |
+| **Work-stream B subtotal** | **2.5 h** | Same for all tiers; scale of tenant doesn't affect config time |
+
+#### 36.3.3 Work-stream C: Branding & White-Label (Growth+ only)
+
+| Activity | Growth | Enterprise | Notes |
+|---|---|---|---|
+| Custom domain CNAME configuration + SSL verification | 0.5 h | 0.5 h | Cloudflare-managed; near-zero engineering time per §15.5 |
+| Branding asset upload (logo SVG, favicon, primary colour token) | 0.5 h | 0.5 h | `tenant_config` row update |
+| Accessibility contrast ratio check (WCAG AA floor) | 0.5 h | 0.5 h | Run automated check; flag if customer colour fails contrast |
+| End-to-end branded URL smoke test | 0.5 h | 0.5 h | Verify CNAME resolves, logo renders, CSS override correct |
+| **Work-stream C subtotal** | **2.0 h** | **2.0 h** | Not applicable to Starter |
+
+#### 36.3.4 Work-stream A/B/C Engineering Subtotals
+
+| Tier | Non-EU | EU customer |
+|---|---|---|
+| **Starter** | 4.5 + 2.5 = **7.0 h** | 5.5 + 2.5 = **8.0 h** |
+| **Growth** | 8.5 + 2.5 + 2.0 = **13.0 h** | 9.5 + 2.5 + 2.0 = **14.0 h** |
+| **Enterprise** | 11.5 + 2.5 + 2.0 = **16.0 h** | 12.5 + 2.5 + 2.0 = **17.0 h** |
+
+#### 36.3.5 Engineering cost per tier
+
+| Tier | Hours (non-EU) | Hours (EU) | Cost non-EU | Cost EU |
+|---|---|---|---|---|
+| Starter | 7.0 h | 8.0 h | **$437.50** | **$500.00** |
+| Growth | 13.0 h | 14.0 h | **$812.50** | **$875.00** |
+| Enterprise | 16.0 h | 17.0 h | **$1,000.00** | **$1,062.50** |
+
+All figures at $62.50/hr (§27.2 founding engineer fully-loaded rate).
+
+---
+
+### 36.4 CS Hour Model by Tier
+
+#### 36.4.1 Work-stream D: Training & Admin Onboarding
+
+| Activity | Starter | Growth | Enterprise |
+|---|---|---|---|
+| Review MSA / order form to understand deal terms | 1.0 h | 1.0 h | 1.0 h |
+| Slack Connect setup + internal account record | 0.5 h | 0.5 h | 0.5 h |
+| Kickoff call preparation (agenda, deck) | 1.0 h | 1.5 h | 2.0 h |
+| Lead kickoff call(s) | 1.0 h (1 call) | 1.5 h (1 call + async) | 3.0 h (2 calls) |
+| Kickoff note-taking + follow-up | 0.5 h | 0.5 h | 0.5 h |
+| IT coordination for SSO/SCIM (customer-side liaison) | 1.5 h | 2.5 h | 4.0 h |
+| Branding input review + feedback loop (Growth+) | — | 1.0 h | 1.5 h |
+| User communication kit (internal announcement email + FAQ) | 2.0 h | 3.0 h | 4.0 h |
+| Admin dashboard training — session prep + delivery | 1.5 h (1 session) | 3.0 h (2 sessions) | 6.0 h (3 sessions + custom deck) |
+| **Work-stream D subtotal** | **9.0 h** | **14.5 h** | **22.5 h** |
+
+#### 36.4.2 Work-stream E: Pilot Management (Day 28–90)
+
+| Activity | Starter | Growth | Enterprise |
+|---|---|---|---|
+| Weekly check-in calls | 3.0 h (2 × 30 min + prep) | 5.0 h (4 × 30 min + prep) | 8.0 h (4 × 60 min + prep) |
+| Async adoption tracking + proactive outreach | 1.0 h | 2.0 h | 3.0 h |
+| 30/60/90 day adoption report (prepare + present) | 2.0 h | 3.0 h | 5.0 h |
+| **Work-stream E subtotal** | **6.0 h** | **10.0 h** | **16.0 h** |
+
+#### 36.4.3 CS Hour and Cost Subtotals
+
+| Tier | D + E total hours | Cost at $44.13/hr |
+|---|---|---|
+| Starter | 9.0 + 6.0 = **15.0 h** | **$661.95** |
+| Growth | 14.5 + 10.0 = **24.5 h** | **$1,081.19** |
+| Enterprise | 22.5 + 16.0 = **38.5 h** | **$1,699.01** |
+
+> **Starter note:** Starter tier is email-only support (no named CSM). In the solo-founder phase, the founder performs CS duties. The $0 cash cost overstates the economics; the table above represents the true cost once a CS hire is in place, and the founder's time in the solo phase should be considered the same opportunity cost as the $44.13/hr rate for economic accuracy.
+
+---
+
+### 36.5 Legal & Compliance Hour Model
+
+#### 36.5.1 Work-stream F: Pre-launch Legal & Compliance
+
+**MSA execution cost** depends on whether a template already exists and how much the customer red-lines:
+
+| Scenario | Internal time (founder/compliance-officer) | Counsel time | Counsel cost |
+|---|---|---|---|
+| **Template deal** (standard terms, minimal red-lining, post-Deal 1) | 2 h | 1 h | $300 |
+| **First deal ever** (establishing template from scratch) | 4 h | 3 h | $900 |
+| **Complex deal** (material MSA changes, EU data residency addendum, heavy redlines) | 8 h | 6 h | $1,800 |
+
+**Default for modelling:** Template deal ($300 counsel, 2h internal). First-deal overhead is a one-time cost; see §36.8 for amortization.
+
+**DPA execution:**
+
+| Scenario | Internal time | Counsel time | Counsel cost |
+|---|---|---|---|
+| Standard DPA (FORM template, no modifications) | 1.0 h | 0 h | $0 |
+| EU customer requiring DPIA supplement or SCC Annex review | 2.5 h | 1.0 h | $300 |
+
+**Security / IT questionnaire response (ISQ):**
+
+Most enterprise procurement processes include a vendor security questionnaire. FORM maintains a master response document (`docs/SECURITY_QUESTIONNAIRE.md`) that can be exported to PDF, but customer-specific customisation and follow-up are unavoidable:
+
+| Tier | Hours to customise and submit | Notes |
+|---|---|---|
+| Starter | 3.0 h | Often a short checklist (20–40 questions); master doc covers ~85% |
+| Growth | 5.0 h | Mid-depth ISQ (50–100 questions); requires admin dashboard and logging evidence |
+| Enterprise | 9.0 h | Full enterprise ISQ (100–250 questions); network diagrams, RLS attestation, SOC 2 status, pen-test summary, GDPR DPIA, subprocessor list — each with follow-up round |
+
+**Security review call (Growth and Enterprise):**
+
+| Tier | Hours | Notes |
+|---|---|---|
+| Starter | 0 h | Typically not required |
+| Growth | 1.0 h | 1-hour CISO or IT security call |
+| Enterprise | 2.0 h | Formal security review call + 1h follow-up questions async |
+
+#### 36.5.2 Work-stream F cost subtotals (template deal, non-EU)
+
+| Tier | Internal hours (founder/CO) | Counsel cost | Total internal opp. cost | Total cash (counsel) |
+|---|---|---|---|---|
+| Starter | 2 + 1 + 3 + 0 = **6.0 h** | **$300** | $375 (at $62.50/h) | **$300** |
+| Growth | 2 + 1 + 5 + 1 = **9.0 h** | **$300** | $563 (at $62.50/h) | **$300** |
+| Enterprise | 2 + 1 + 9 + 2 = **14.0 h** | **$300** | $875 (at $62.50/h) | **$300** |
+
+For EU customers: add 1.5h internal + $300 counsel for DPIA supplement review.
+
+---
+
+### 36.6 Bottom-Up Cost Table & §8.2 Variance Analysis
+
+#### 36.6.1 Fully-loaded implementation cost (template deal, non-EU)
+
+| Cost component | Starter | Growth | Enterprise |
+|---|---|---|---|
+| Engineering (§36.3) | $437.50 | $812.50 | $1,000.00 |
+| CS (§36.4, fully-loaded $44.13/hr) | $661.95 | $1,081.19 | $1,699.01 |
+| Internal compliance / founder time (cash = $0; opp. cost $62.50/hr) | $0 cash | $0 cash | $0 cash |
+| External counsel (§36.5.2) | $300.00 | $300.00 | $300.00 |
+| **Total cash implementation cost** | **$1,399.45** | **$2,193.69** | **$2,999.01** |
+| + Internal opp. cost (compliance/founder 6h / 9h / 14h) | $375.00 | $562.50 | $875.00 |
+| **Total fully-loaded (incl. opp. cost)** | **$1,774.45** | **$2,756.19** | **$3,874.01** |
+
+EU customer premium (add to above):
+
+| | Starter | Growth | Enterprise |
+|---|---|---|---|
+| EU data residency verification (engineering) | +$62.50 | +$62.50 | +$62.50 |
+| EU DPIA supplement (counsel) | +$300 | +$300 | +$300 |
+| EU DPIA supplement (internal time) | +$94 opp. | +$94 opp. | +$94 opp. |
+| **EU premium total (cash)** | **+$362.50** | **+$362.50** | **+$362.50** |
+
+#### 36.6.2 Comparison with §8.2 estimates
+
+| Tier | §8.2 estimate (midpoint) | §36 bottom-up (cash, non-EU) | Variance | Primary driver |
+|---|---|---|---|---|
+| Starter | $1,150 | **$1,399** | **+$249 (+21.7%)** | ISQ response time (3h) and fully-loaded CS rate ($44.13 vs. implicit lower) |
+| Growth | $1,500 | **$2,194** | **+$694 (+46.3%)** | ISQ time (5h), SCIM group testing (3h), white-label config (2h), and CS pilot check-ins |
+| Enterprise | $2,000 | **$2,999** | **+$999 (+50.0%)** | ISQ time (9h), complex SCIM role mapping (5h), security review calls (2h), and extended pilot management (38.5h CS) |
+
+**Key finding:** §8.2 underestimates implementation cost by 22–50% across tiers. The largest systematic gap is the Security / IT Questionnaire response time, which §8.2 folds into the "Custom SLA / compliance review" line at $300–$500, understating the true cost by $188–$563 depending on tier.
+
+**Implication for gross margin:** The §16.1 break-even table uses §8.2 estimates. The corrected implementation cost reduces Year 1 gross margin on the first deal by 1.7–5.0pp depending on tier and seat count. See §36.7 for the updated GM impact table.
+
+#### 36.6.3 §8.2 update mandate
+
+The implementation cost figures in §8.2 should be updated after the first 3 enterprise deals are time-tracked per §36.9. Until then, the §36 bottom-up figures are the planning model. The discrepancy is not large enough to threaten viability at any tier (§16.2 minimum viable seat floor of 50 seats remains valid), but it is material enough to affect investor-facing gross margin projections.
+
+---
+
+### 36.7 Implementation Cost as % ACV — Year 1 GM Impact
+
+#### 36.7.1 Implementation cost as % of 1-year ACV by deal size
+
+| Tier | Seats | Annual ACV | §8.2 impl. | §36 impl. (cash) | §8.2 impl/ACV | §36 impl/ACV |
+|---|---|---|---|---|---|---|
+| Starter | 50 | $7,200 | $1,150 | $1,399 | 16.0% | 19.4% |
+| Starter | 100 | $14,400 | $1,150 | $1,399 | 8.0% | 9.7% |
+| Starter | 200 | $28,800 | $1,150 | $1,399 | 4.0% | 4.9% |
+| Growth | 200 | $21,600 | $1,500 | $2,194 | 6.9% | 10.2% |
+| Growth | 500 | $54,000 | $1,500 | $2,194 | 2.8% | 4.1% |
+| Growth | 1,000 | $108,000 | $1,500 | $2,194 | 1.4% | 2.0% |
+| Enterprise | 1,000 | $72,000 | $2,000 | $2,999 | 2.8% | 4.2% |
+| Enterprise | 2,000 | $144,000 | $2,000 | $2,999 | 1.4% | 2.1% |
+| Enterprise | 5,000 | $360,000 | $2,000 | $2,999 | 0.6% | 0.8% |
+
+**Pattern:** Implementation cost % ACV falls steeply with seat count. Starter economics at 50 seats are the most exposed (19.4% of ACV); Enterprise at 5,000 seats is negligible (0.8%). This reinforces the 50-seat Starter minimum deal size from §16.2.
+
+#### 36.7.2 Year 1 gross margin impact (updated vs. §16.1)
+
+§16.1 computes Year 1 GM using §8.2 implementation cost. Substituting §36 bottom-up cost:
+
+| Tier | Seats | §16.1 Year 1 GM (§8.2 impl.) | §36 Year 1 GM (§36 impl.) | Delta |
+|---|---|---|---|---|
+| Starter | 50 | 43.4% | **39.9%** | −3.5 pp |
+| Starter | 100 | 65.0% | **63.3%** | −1.7 pp |
+| Starter | 200 | 72.6% | **71.8%** | −0.8 pp |
+| Growth | 200 | 74.9% | **71.6%** | −3.3 pp |
+| Growth | 500 | 82.5% | **81.3%** | −1.2 pp |
+| Enterprise | 1,000 | 85.2% | **83.8%** | −1.4 pp |
+
+**50-seat Starter floor validity:** §31.3.3 confirmed the 50-seat Starter floor at a Year 1 GM of 73.5% using §8.2's implementation cost. With §36's updated implementation cost ($1,399 vs. $1,150), the 50-seat Year 1 GM falls to 39.9% (using the full §16.1 framework including ongoing CSM cost). This is below the 70% threshold in §31.3.3. However, that threshold referenced infrastructure COGS only; the full-cost GM including CSM was always lower. The 50-seat minimum remains defensible for the following reasons:
+1. Year 2+ GM at 50 seats (no implementation cost) rises to ~80.3% — payback is fast
+2. 50-seat Starter is explicitly a loss-leader to land the account; expansion to 100+ seats within 12 months is the economic thesis (§8.7)
+3. The $1,399 implementation cost is fully recovered in 2.3 months of gross profit at 50 seats ($1,399 ÷ $605/month net margin)
+
+The correct threshold for declining a deal is not Year 1 GM but deal lifetime value: a 50-seat Starter with 120% NRR over 3 years produces ~$25,920 gross profit vs. ~$1,399 implementation cost — a 17.5× implementation cost recovery.
+
+---
+
+### 36.8 Multi-Deal Scale Economics
+
+#### 36.8.1 Fixed vs. variable implementation costs
+
+Not all implementation cost scales with each new deal. Some activities are template-driven and decrease in time as FORM's playbook matures:
+
+| Activity | Deal 1 (first ever) | Deal 2–5 | Deal 6+ (playbook mature) |
+|---|---|---|---|
+| MSA negotiation (engineer) | 0 (legal only) | 0 | 0 |
+| MSA negotiation (internal) | 4 h (template creation) | 2 h (standard) | 1.5 h (review only) |
+| MSA counsel cost | $900 (3h) | $300 (1h) | $300 (1h) |
+| ISQ response | 5–9 h (build master response) | 3–7 h (customise master) | 2–5 h (minor updates) |
+| SSO setup | 4.5–11.5 h (learn per-IdP quirks) | 4.0–10.0 h | 3.5–9.5 h (IdP-specific playbooks exist) |
+| Admin training | Full per §36.4 | Full (but deck reused) | Full (deck reused; prep −0.5h) |
+| Pilot management | Full per §36.4 | Full | Full |
+
+**Conclusion:** Implementation fixed costs (MSA template creation, ISQ master document construction) are front-loaded in Deals 1–3. By Deal 6, implementation cost decreases by approximately 15–20% from the §36 baseline.
+
+#### 36.8.2 Founding engineer hire timing effect
+
+In the solo-founder phase, the founder performs all engineering work. At the §27.2 opportunity cost rate of $62.50/hr, engineering cost is the same as post-hire. However, the founding engineer hire (§27.3, Month 13 Base scenario) frees the founder from implementation work, which is critical as the enterprise pipeline scales. With 3 enterprise deals in Year 1, implementation engineering load is:
+- Starter: 7h × 3 = 21h
+- Mix (1 Starter, 1 Growth, 1 Enterprise): 7 + 13 + 16 = 36h
+
+36 engineering hours = ~4.5% of a founding engineer's annual capacity (36h ÷ 800h expected first 6 months of tenure). Implementation is not the founding engineer's primary workload; it is a marginal addition to platform development. The engineering time model above is a ceiling, not a mandate.
+
+#### 36.8.3 Non-standard IdP premium
+
+The §36.3 model assumes Okta, Azure AD, Google Workspace, or OneLogin — the four IdPs for which FORM maintains configuration playbooks (`docs/SSO_CLIENT_CONFIG.md`). Non-standard IdPs (AD FS, PingFederate, JumpCloud, custom SAML providers) carry an additional engineering time premium:
+
+| IdP category | Additional hours | Cost premium |
+|---|---|---|
+| Supported IdP (Okta / Azure AD / GWS / OneLogin) | 0 h | $0 |
+| Partially-supported IdP (JumpCloud, OneLogin custom) | +2–3 h | +$125–188 |
+| Non-standard SAML 2.0 (AD FS, PingFederate) | +4–6 h | +$250–375 |
+| Non-standard OIDC (custom provider) | +3–5 h | +$188–313 |
+| Legacy IdP requiring custom SAML assertion mapping | +8–12 h | +$500–750 |
+
+Non-standard IdP work should be flagged in the sales discovery process. Legacy IdPs at a >$500 premium may warrant a one-time "technical integration fee" at Growth/Enterprise tier, to be negotiated by the founder before contract signature. Document any such fee in `docs/DECISION_LOG.md` as a custom commercials decision.
+
+---
+
+### 36.9 Time-Tracking Instrument for OQ-08 Resolution
+
+OQ-08 (`§11`) asks for the true implementation cost per enterprise deal, to be resolved by time-tracking the first 3 enterprise deals. This subsection specifies the tracking instrument.
+
+#### 36.9.1 Schema: `enterprise_impl_time_log`
+
+```sql
+CREATE TABLE enterprise_impl_time_log (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  deal_sequence   INTEGER NOT NULL,          -- 1 = first ever, 2 = second, etc.
+  role            TEXT NOT NULL CHECK (role IN (
+                    'founder', 'engineer', 'csm', 'compliance_officer', 'counsel'
+                  )),
+  activity_code   TEXT NOT NULL CHECK (activity_code IN (
+                    'sso_scim_setup',
+                    'tenant_provisioning',
+                    'white_label_config',
+                    'admin_training',
+                    'pilot_management',
+                    'adoption_report',
+                    'msa_negotiation',
+                    'dpa_execution',
+                    'isq_response',
+                    'security_review_call',
+                    'eu_data_residency_check',
+                    'other'
+                  )),
+  hours_spent     NUMERIC(5,2) NOT NULL CHECK (hours_spent > 0 AND hours_spent <= 40),
+  hourly_rate_usd NUMERIC(8,2) NOT NULL,     -- actual fully-loaded rate at time of deal
+  notes           TEXT,
+  logged_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  logged_by       UUID NOT NULL              -- actor UUID (founder or CSM user_id in admin system)
+);
+
+-- Indexes
+CREATE INDEX ON enterprise_impl_time_log (tenant_id);
+CREATE INDEX ON enterprise_impl_time_log (deal_sequence, activity_code);
+
+-- RLS: only compliance_reviewer and form_admin may read; only form_system may write
+ALTER TABLE enterprise_impl_time_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY impl_log_read ON enterprise_impl_time_log
+  FOR SELECT USING (auth.role() IN ('compliance_reviewer', 'form_admin'));
+CREATE POLICY impl_log_write ON enterprise_impl_time_log
+  FOR INSERT WITH CHECK (auth.role() = 'form_system');
+```
+
+#### 36.9.2 Cost extraction query
+
+After the first 3 deals are logged, run this query to produce the OQ-08 actuals:
+
+```sql
+SELECT
+  deal_sequence,
+  role,
+  activity_code,
+  SUM(hours_spent)                                    AS total_hours,
+  SUM(hours_spent * hourly_rate_usd)                  AS total_cost_usd,
+  ROUND(AVG(hours_spent * hourly_rate_usd), 2)        AS avg_cost_usd
+FROM enterprise_impl_time_log
+GROUP BY deal_sequence, role, activity_code
+ORDER BY deal_sequence, role, activity_code;
+```
+
+Compare `SUM(total_cost_usd)` by `deal_sequence` to the §36.6.1 bottom-up estimates. If actuals are within ±20%, §8.2 can be updated using §36.6 figures. If actuals deviate by > 20%, recalibrate §36 assumptions.
+
+#### 36.9.3 OQ-08 closure protocol
+
+OQ-08 is formally closed when:
+1. `enterprise_impl_time_log` contains at least 3 rows for each `deal_sequence` value 1, 2, 3
+2. The variance between actuals and §36.6.1 estimates is computed and documented
+3. §8.2 is updated with the actual midpoint from the first 3 deals
+4. A DEC-030 event `enterprise.implementation_cost_model_calibrated` is emitted (§36.10.3)
+5. A `docs/DECISION_LOG.md` entry records the calibration outcome
+
+---
+
+### 36.10 DEC-030 HMAC-Chained Audit Events
+
+Three new DEC-030 events for implementation milestones. All events use `tenant_id` scope; no `user_id` is included (privacy invariant: implementation tracking is at account level, not individual level).
+
+#### 36.10.1 Event: `enterprise.implementation_kickoff_completed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.implementation_kickoff_completed` |
+| **Severity** | STANDARD |
+| **Retention** | 7 years |
+| **Actor** | CSM (or founder in solo phase) |
+| **Trigger** | Kickoff call(s) complete; implementation project plan confirmed with customer |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  tenant_id:               z.string().uuid(),
+  deal_sequence:           z.number().int().positive(),
+  contracted_tier:         z.enum(['starter', 'growth', 'enterprise']),
+  contracted_seats:        z.number().int().positive(),
+  idp_type:                z.enum([
+    'okta', 'azure_ad', 'google_workspace', 'onelogin',
+    'adfs', 'pingfederate', 'jumpcloud', 'other_saml', 'other_oidc'
+  ]),
+  white_label_enabled:     z.boolean(),
+  eu_data_residency:       z.boolean(),
+  kickoff_date:            z.string().date(),                       // YYYY-MM-DD
+  target_go_live_date:     z.string().date(),
+  csm_actor_id:            z.string().uuid(),
+})
+```
+
+#### 36.10.2 Event: `enterprise.sso_scim_setup_verified`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.sso_scim_setup_verified` |
+| **Severity** | STANDARD |
+| **Retention** | 7 years |
+| **Actor** | Engineer (or founder) |
+| **Trigger** | SSO IdP-initiated and SP-initiated flows verified; SCIM provisioning smoke-tested |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  tenant_id:               z.string().uuid(),
+  idp_type:                z.enum([
+    'okta', 'azure_ad', 'google_workspace', 'onelogin',
+    'adfs', 'pingfederate', 'jumpcloud', 'other_saml', 'other_oidc'
+  ]),
+  sso_modes_verified:      z.object({
+    idp_initiated:         z.boolean(),
+    sp_initiated:          z.boolean(),
+  }),
+  scim_features_enabled:   z.object({
+    user_crud:             z.boolean(),
+    group_sync:            z.boolean(),
+    role_mapping:          z.boolean(),
+    jit_provisioning:      z.boolean(),
+  }),
+  eu_data_residency_confirmed: z.boolean(),
+  engineer_actor_id:       z.string().uuid(),
+  verification_date:       z.string().date(),
+})
+```
+
+#### 36.10.3 Event: `enterprise.implementation_cost_model_calibrated`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.implementation_cost_model_calibrated` |
+| **Severity** | STANDARD |
+| **Retention** | 7 years |
+| **Actor** | Founder (data-engineer or compliance-officer post-Series A) |
+| **Trigger** | First 3 deals time-tracked; §8.2 updated; OQ-08 closed |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  deals_analysed:          z.number().int().min(3),
+  avg_impl_cost_starter:   z.number().optional(),    // actual average if starter deals exist
+  avg_impl_cost_growth:    z.number().optional(),
+  avg_impl_cost_enterprise: z.number().optional(),
+  variance_vs_model_pct:   z.number(),               // signed %; positive = actuals exceed model
+  model_version_updated:   z.string(),               // e.g. "COST_MODEL.md §8.2 v2.3"
+  decision_log_ref:        z.string(),               // e.g. "DEC-XXX"
+  calibration_date:        z.string().date(),
+})
+```
+
+#### 36.10.4 DEC-030 Event Summary for §36
+
+| Event | Severity | Retention | Trigger | Privacy constraint |
+|---|---|---|---|---|
+| `enterprise.implementation_kickoff_completed` | STANDARD | 7 yr | Kickoff complete | `tenant_id` only; no user IDs |
+| `enterprise.sso_scim_setup_verified` | STANDARD | 7 yr | SSO/SCIM smoke test passes | `tenant_id` + `idp_type`; no individual user data |
+| `enterprise.implementation_cost_model_calibrated` | STANDARD | 7 yr | OQ-08 closure | Aggregate cost data only; no tenant names in payload |
+
+All three events must be registered in `docs/AUDIT_LOG_SCHEMA.md §6` before the first enterprise deal closes.
+
+---
+
+### 36.11 Implementation Checklist
+
+#### P0 — Before first enterprise deal closes (M8–M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `enterprise.implementation_kickoff_completed`, `enterprise.sso_scim_setup_verified`, and `enterprise.implementation_cost_model_calibrated` in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schemas from §36.10. Deploy to `emit-audit-event` Worker. | platform-engineer | **P0** | M8 | [ ] |
+| 2 | Create `enterprise_impl_time_log` table (§36.9.1 DDL) with RLS policies. Register migration `0060_enterprise_impl_time_log.sql`. | platform-engineer | **P0** | M8 | [ ] |
+| 3 | Build and test the cost extraction query (§36.9.2) in Supabase Studio. Verify it produces per-role, per-activity totals. | data-engineer | **P0** | M9 | [ ] |
+| 4 | Begin time-logging all implementation activities from Deal 1, using `activity_code` values from §36.9.1. Ensure every session of engineering or CSM work is logged within 24h. | founder (solo phase) | **P0** | Deal 1 | [ ] |
+
+#### P1 — Before third enterprise deal closes (M12–M14)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | After Deal 3 closes, run extraction query. Compute variance vs. §36.6.1 model. If variance > 20%, update §8.2 implementation cost estimates and document in `docs/DECISION_LOG.md` (DEC-XXX). | data-engineer + founder | **P1** | M14 | [ ] |
+| 6 | Emit `enterprise.implementation_cost_model_calibrated` DEC-030 event after §8.2 update, whether or not the model was recalibrated. | compliance-officer | **P1** | M14 | [ ] |
+| 7 | Build per-IdP time tracking to identify which IdP types consistently exceed the §36.3 time model by > 2h (non-standard IdP premium, §36.8.3). Document findings in `docs/SSO_CLIENT_CONFIG.md`. | engineer | **P1** | M15 | [ ] |
+
+#### P2 — Before enterprise GA (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Evaluate whether a one-time "technical integration fee" for legacy/non-standard IdPs should be added to the standard pricing schedule. Discuss with founder; document decision in `docs/DECISION_LOG.md`. | customer-success + founder | **P2** | M13 | [ ] |
+| 9 | Update §16.1 break-even table with §36.6.2 corrected implementation figures (replacing §8.2 midpoints). | data-engineer | **P2** | M14 | [ ] |
+
+---
+
+### 36.12 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-IMPL-01** | **What is the true, time-tracked implementation cost per deal across first 3 enterprise deals?** This is the direct instrument for closing OQ-08 (§11). The §36 model estimates $1,399 / $2,194 / $2,999 for Starter / Growth / Enterprise (non-EU, template deal). Actuals may be higher if ISQ response takes longer than estimated (enterprise ISQ often runs 250+ questions with follow-up rounds). | **P1** | data-engineer + founder | After Deal 3 closes; per §36.9.3 OQ-08 closure protocol |
+| **OQ-IMPL-02** | **Does non-standard IdP implementation time match the §36.8.3 premium table?** AD FS and PingFederate carry the largest time premium (+8–12h, +$500–$750). Until FORM has completed at least one AD FS and one PingFederate implementation, the premium is an estimate. If the first AD FS deal takes > 16h engineering, the non-standard IdP premium for the pricing schedule (§36.8.3) should be formalised as a line-item fee in the order form. | **P2** | engineer + customer-success | On first non-standard IdP deal; no later than M18 |
+| **OQ-IMPL-03** | **Does CSM implementation time decrease significantly with playbook maturity?** §36.8.1 estimates a 15–20% decrease by Deal 6. If the CSM time model does not decrease (e.g., because enterprise customers have structurally longer training sessions regardless of playbook), the §36.4 figures represent steady-state cost, not just Deal 1–3 cost. Calibrate by logging CSM time per activity across first 6 deals. | **P2** | customer-success + data-engineer | After Deal 6; no later than M20 |
+
+---
+
+*v2.2 (2026-06-12): §36 Enterprise Implementation Cost Deep-Dive: Engineering, CS & Legal Time Model — bottom-up derivation of per-deal implementation cost using hourly rates from §26 (CSM model) and §27 (engineering model). §36.1 scopes to one-time implementation cost only (ongoing CS in §26; infrastructure COGS in §15). §36.2 six-work-stream activity taxonomy (identity integration, tenant provisioning, white-label, training, pilot management, compliance/legal). §36.3 engineering hour model by tier: SSO/SCIM setup (4.5h Starter / 8.5h Growth / 11.5h Enterprise non-EU) + tenant provisioning (2.5h all) + white-label (2.0h Growth+); per-tier engineering cost $437.50 / $812.50 / $1,000.00 at $62.50/hr (§27.2 founding engineer rate). §36.4 CS hour model by tier: training + admin onboarding (9.0h / 14.5h / 22.5h) + pilot management (6.0h / 10.0h / 16.0h) = 15.0h / 24.5h / 38.5h; per-tier CS cost $661.95 / $1,081.19 / $1,699.01 at $44.13/hr (fully-loaded CSM rate — more accurate than §26.8's base-only $37.50/hr for margin analysis). §36.5 legal/compliance model: MSA (template deal: 2h internal + $300 counsel), DPA (1h internal), ISQ response (3h / 5h / 9h by tier), security review call (0h / 1h / 2h) — total internal 6h / 9h / 14h + $300 counsel all tiers. §36.6 bottom-up cost summary: Starter $1,399 / Growth $2,194 / Enterprise $2,999 (cash, non-EU, template deal); variance vs. §8.2 midpoints: +22% / +46% / +50% — ISQ response time and fully-loaded CS rate are primary drivers of gap; EU premium +$362.50 all tiers. §36.7 implementation cost as % ACV: 19.4% at 50-seat Starter falling to 0.8% at 5,000-seat Enterprise; Year 1 GM impact vs. §16.1: Starter 50-seat −3.5pp (39.9%), Growth 200-seat −3.3pp (71.6%), Enterprise 1,000-seat −1.4pp (83.8%); 50-seat Starter minimum deal floor remains defensible (implementation cost recovered in 2.3 months of gross profit; 3-year LTV recovery 17.5×). §36.8 multi-deal scale economics: MSA template + ISQ master construction are fixed front-loaded costs in Deals 1–3 (→ 15–20% cost reduction by Deal 6); founding engineer implementation load ~36h for 3-deal Year 1 pipeline = 4.5% of 6-month capacity (not a bottleneck); non-standard IdP premium table (+$0 to +$750 by IdP type; legacy IdP may warrant a line-item fee in order form). §36.9 time-tracking instrument: `enterprise_impl_time_log` Postgres table with 12 `activity_code` values, RLS (compliance_reviewer + form_admin read; form_system write), deal_sequence column; cost extraction query; OQ-08 closure protocol (3 deals logged → §8.2 update → DEC-030 emission → DECISION_LOG entry). §36.10 three new DEC-030 events: `enterprise.implementation_kickoff_completed` (STANDARD, 7yr), `enterprise.sso_scim_setup_verified` (STANDARD, 7yr — idp_type + sso_modes_verified + scim_features_enabled + eu_data_residency_confirmed), `enterprise.implementation_cost_model_calibrated` (STANDARD, 7yr — OQ-08 closure trigger; aggregate cost data only). §36.11 nine-item implementation checklist: 4× P0/M8–M9 (DEC-030 registration, table DDL, extraction query, time-logging start at Deal 1), 3× P1/M14–M15 (Deal 3 variance analysis + §8.2 update + DEC-030 emission + non-IdP per-IdP tracking), 2× P2/M13–M14 (IdP fee decision + §16.1 table update). §36.12 three open questions (OQ-IMPL-01/02/03). TOC updated. §11 OQ-08 tracking instrument now in place — full closure per §36.9.3 after Deal 3. Cross-references: §8.2 (implementation cost summary — to be updated post OQ-08 closure); §11 OQ-08 (original open question); §15.5–15.7 (enterprise infrastructure COGS — near-zero; implementation is the true cost); §16.1 (break-even table — Year 1 GM updated in §36.7.2); §26 (CSM cost model — ongoing cost, not one-time); §26.3 / §26.8 (CSM rate basis); §27.2 (engineering rate basis); §31.3 (enterprise price derivation — fully-loaded GM cross-check); `docs/ENTERPRISE_ONBOARDING.md` (operational playbook — §36 provides the financial model behind the same timeline); `docs/SSO_SCIM_IMPLEMENTATION.md §4` (IdP configuration playbook — time basis for §36.3.1); `docs/SSO_CLIENT_CONFIG.md` (per-IdP guides — non-standard IdP premium §36.8.3 cross-ref); `docs/AUDIT_LOG_SCHEMA.md` (three new DEC-030 events to register — P0 before Deal 1). Owner: enterprise-architect + customer-success + data-engineer + compliance-officer.*
 

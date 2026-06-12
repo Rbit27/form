@@ -6,6 +6,14 @@
 
 ---
 
+## [3.95.1] — 2026-06-12
+
+### Changed
+- `docs/COST_MODEL.md` — §36 Enterprise Implementation Cost Deep-Dive: Engineering, CS & Legal Time Model (v2.1 → v2.2); bottom-up derivation of per-deal implementation cost using hourly rates from §26 (CSM) and §27 (engineering); six-work-stream activity taxonomy; engineering hours by tier (7h / 13h / 16h non-EU); CS hours by tier (15h / 24.5h / 38.5h); legal/compliance model (ISQ 3h / 5h / 9h + $300 counsel all tiers); bottom-up total $1,399 / $2,194 / $2,999 (non-EU, template deal) — +22% / +46% / +50% variance vs. §8.2 top-level estimates; Year 1 GM impact table; 50-seat Starter floor validity confirmed (2.3-month payback, 17.5× 3yr LTV recovery); multi-deal scale economics (15–20% cost reduction by Deal 6; non-standard IdP premium table); `enterprise_impl_time_log` Postgres table schema with 12 activity codes + RLS + OQ-08 closure protocol; three new DEC-030 events (`enterprise.implementation_kickoff_completed` / `enterprise.sso_scim_setup_verified` / `enterprise.implementation_cost_model_calibrated`); 9-item implementation checklist; 3 open questions (OQ-IMPL-01/02/03); TOC updated; §11 OQ-08 tracking instrument in place
+- `VERSION` — 3.95.0 → 3.95.1
+
+---
+
 ## [3.95.0] — 2026-06-12
 
 ### Added
