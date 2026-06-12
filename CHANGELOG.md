@@ -6,6 +6,19 @@
 
 ---
 
+## [4.0.2] — 2026-06-12
+
+### Added
+- `content/post-550-how-to-choose-a-program.md` — «Як вибрати програму, якщо програм занадто багато»; 5-питань фільтр для оцінки будь-якої готової програми; SAID principle (Kraemer & Ratamess 2004 MSSE), MEV/MAV/MRV volume landmarks (Israetel et al. 2019, Krieger 2010 JSCR), механізми гіпертрофії (Schoenfeld 2010 JSCR), functional overreaching vs OTS (Meeusen 2013 EJSS); таблиця рішень; ознаки якісного протоколу vs маркетинг-флаф; clinical-safety NOT REQUIRED; sports-scientist pending · ~13 хв читання
+
+### Changed
+- `blog.html` — додані blog cards для post-548, post-549, post-550; лічильник 456 карток
+- `README.md` — roadmap: posts 548–550 позначені [x] authored; додані теми post-552–555; Last update оновлено
+- `STATUS.md` — оновлено content engine table: post-550 authored v4.0.2
+- `VERSION` — 4.0.1 → 4.0.2
+
+---
+
 ## [4.0.1] — 2026-06-12
 
 ### Added
