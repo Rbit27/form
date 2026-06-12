@@ -6,6 +6,16 @@
 
 ---
 
+## [3.86.1] — 2026-06-12
+
+### Fixed
+- `content/post-530-forced-reps.md` — removed two unverified inline citations from §7 (Alternatives): «Jonson et al. (2013) Journal of Human Kinetics» (suspicious author name, absent from references) and «Schöenfeld & Grgic (2017)» (no confirmed 2017 dropset meta-analysis; absent from references). Claims retained; unsupported attributions stripped per citation discipline.
+
+### Changed
+- `VERSION` — 3.86.0 → 3.86.1
+
+---
+
 ## [3.86.0] — 2026-06-12
 
 ### Added
