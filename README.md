@@ -970,6 +970,11 @@ Each iteration:
 - [x] post-556: Тренування при легкому нездужанні — Nieman (2011) BJSM J-curve; Gleeson (2007) open window; матриця рішень; абсолютні критерії зупинки; clinical-safety-pending — REVIEW REQUIRED before publish · authored v4.5.0
 - [x] post-557: Чому техніка деградує під втомою — Enoka & Duchateau (2008) J Physiol; три локуси деградації; технічна vs м'язова відмова операційні критерії; маркери зупинки; clinical-safety NOT REQUIRED · authored v4.5.0
 - [x] post-558: Адаптація без рекордів — Sale (1988); Reeves et al. (2003) +65% сухожилкова жорсткість; 5 типів прихованих адаптацій; хронологічна таблиця; clinical-safety NOT REQUIRED · authored v4.5.0
+- [x] post-559: Дрімота перед тренуванням — Dutheil et al. (2021) IJERPH мета-аналіз ES 0.29; Waterhouse et al. (2007) J Sports Sci; Romdhani et al. (2021) Sports Med; аденозиновий кліренс; power nap 10–20 хв; caffeine nap; клінічна безпека NOT REQUIRED · authored v4.7.0
+- [x] post-560: Чому перше тренування тижня важче — Atkinson & Reilly (1996) Sports Med; Twist & Highton (2013) Int J Sports Physiol Perform; Claudino et al. (2017) JSCR CMJ; internal potentiation; clinical-safety NOT REQUIRED · authored v4.7.0
+- [x] post-561: Холодний душ після тренування і гіпертрофія — Roberts et al. (2015) J Physiol CWI пригнічує mTORC1; Yamane et al. (2006) J Physiol; Petersen et al. (2012) BJSM; 4-годинне вікно; три сценарії; clinical-safety NOT REQUIRED · authored v4.7.0
+- [x] post-562: Самовербалізація і силова продуктивність — Hatzigeorgiadis et al. (2011) Perspect Psychol Sci мета-аналіз d=0.48; Tod et al. (2011) J Sport Exerc Psychol; Theodorakis et al. (2000) Sport Psychol; інструкційна vs мотиваційна СВ; clinical-safety NOT REQUIRED · authored v4.7.0
+- [x] post-563: Технічне плато — Fitts & Posner (1967) три стадії моторного навчання; Shea & Morgan (1979) contextual interference effect; Schmidt (1975) schema theory; Wulf & Prinz (2001) зовнішній vs внутрішній фокус; Enoka & Duchateau (2008) деградація техніки під втомою; три виходи (contextual interference / зовнішній фокус / перевантаження+isolated drill); clinical-safety NOT REQUIRED · authored v4.7.1
 
 Full roadmap у [STATUS.md](STATUS.md) і [docs/OKRS_2026.md](docs/OKRS_2026.md).
 
@@ -1014,4 +1019,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v4.5.0 (posts 555–558 authored · blog.html +4 cards = 464 total · post-556 clinical-safety REVIEW PENDING · roadmap post-555/556/557/558 [x])
+**Last update:** 12 червня 2026 · v4.7.1 (post-563 authored · blog.html +1 card = 330 total · clinical-safety NOT REQUIRED · roadmap post-559–563 [x])

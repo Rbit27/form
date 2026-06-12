@@ -6,6 +6,19 @@
 
 ---
 
+## [4.7.1] — 2026-06-12
+
+### Added
+- `content/post-563-technique-plateau.md` — «Технічне плато: чому форма перестає вдосконалюватись — і три виходи з нього»; Fitts & Posner (1967) три стадії моторного навчання (когнітивна/асоціативна/автономна); Shea & Morgan (1979) J Exp Psychol contextual interference — повільніше навчання, стійкіше утримання; Schmidt (1975) Psychol Rev schema theory і variability of practice; Wulf & Prinz (2001) Psychon Bull Rev зовнішній vs внутрішній фокус уваги; Enoka & Duchateau (2008) J Physiol деградація найменш автоматизованих компонентів під втомою; три методи виходу (contextual interference / переформулювання у зовнішній фокус / перевантаження + isolated drill); 4–6-тижневий протокол; анатомічні обмеження vs нейральний патерн; clinical-safety NOT REQUIRED
+- `blog.html` — +1 картка для post-563
+- `README.md` — roadmap posts 559–563 [x]; Last update → v4.7.1
+- `STATUS.md` — оновлено до v4.7.1; 563 пости; blog.html 330 cards; Last update v4.7.1
+
+### Changed
+- `VERSION` — 4.7.0 → 4.7.1
+
+---
+
 ## [4.7.0] — 2026-06-12
 
 ### Added
