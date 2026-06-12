@@ -965,7 +965,7 @@ Each iteration:
 - [x] post-551: Тренування в поїздці — деtraining-крива (Mujika & Padilla 2000); поріг ≥80% 1RM для підтримки (Hortobágyi et al. 1993); Bickel et al. (2011) об'єм підтримки; Häkkinen et al. (1985) нейральні фактори; алгоритм готель/мінімум/нормальний зал; clinical-safety NOT REQUIRED · authored v4.1.0
 - [x] post-552: Плато, яке не є плато — три типи (накопичена втома / недостатній стимул / справжня стагнація); Meeusen 2013 FOR/NFOR/OTS; Fry 2004; Israetel et al. 2019 MEV/MAV/MRV; Schoenfeld & Grgic 2020; Issurin 2010 блокова periodизація; 3-питання діагностика; таблиця рішень; clinical-safety NOT REQUIRED · authored v4.1.0
 - [x] post-553: Мінімалістична програма — 3–4 вправи на тренування без втрати результату; MEV/MAV/MRV (Israetel et al. 2019); Krieger (2010) JSCR спадна гранична корисність; Schoenfeld & Grgic (2020); SAID (Kraemer & Ratamess 2004); Fonseca et al. (2014) регіональна гіпертрофія; Bickel et al. (2011); Marcora et al. (2009) ментальна втома; протокол переходу і таблиця «що прибрати»; clinical-safety NOT REQUIRED · authored v4.2.0
-- [ ] post-554: Як зробити перший відеозапис свого тренування — протокол самооцінки техніки; кути зйомки, що шукати, що ігнорувати; Wulf & Prinz (2001) зовнішній фокус, Kompf & Arandjelovic (2016) стікінг-поінти
+- [x] post-554: Як зробити перший відеозапис свого тренування — протокол самооцінки техніки; кути зйомки, що шукати, що ігнорувати; Wulf & Prinz (2001) зовнішній фокус, Kompf & Arandjelovic (2016) стікінг-поінти · authored v4.4.0
 - [ ] post-555: Перехід з 3-денного на 4-денний тиждень — коли і як збільшувати частоту тренувань; Schoenfeld et al. (2016) frequency meta-analysis; practical split structures; adherence-перевірка до переходу
 - [ ] post-556: Як тренуватися при легкому нездужанні — правило «над шиєю», імунна відповідь на вправи (Nieman 2011 BJSM), коли продовжити і коли зупинитися; clinical-safety REQUIRED
 - [ ] post-557: Чому техніка деградує під втомою — моторний контроль і стомлюваність (Enoka & Duchateau 2008 J Physiol); практичний протокол самоперевірки після відмови
@@ -1014,4 +1014,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v4.2.0 (post-553 · мінімалістична програма · clinical-safety NOT REQUIRED · blog.html +551/552/553 cards · roadmap post-554–558)
+**Last update:** 12 червня 2026 · v4.4.0 (post-554 · відеозапис тренування / самооцінка техніки · clinical-safety NOT REQUIRED · blog.html +554 card · roadmap post-554 [x])
