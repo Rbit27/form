@@ -6,6 +6,13 @@
 
 ---
 
+## [4.12.1] — 2026-06-12
+
+### Changed
+- `admin-dashboard.html` — новий screen `◎ Compliance` (screen-compliance) у sidebar (після SIEM Export); 6 секцій: (1) summary row з 4 stat-cards — SOC 2 Type II status (⧖ In progress, 40% evidence readiness), GDPR DPA (✓ Signed + EU-Central residency), pen test Mar 2026 (0 critical, 2 medium, all resolved), HMAC audit chain (✓ Intact); (2) SOC 2 5 Trust Service Criteria bar grid — CC Security 82% / Availability 91% / Processing Integrity 75% / Confidentiality 88% / Privacy 79% — з Drata observation period note; (3) three-col row — GDPR posture (DPA / SCC / DPIA / DSR Art.17 / Art.33 72h breach notice), Encryption & key management (AES-256-GCM per-tenant / TLS 1.3 / 90-day key rotation / HMAC-SHA256 chain), Pen test record (Mar 2026 findings + Mar 2027 schedule); (4) sub-processor registry table — Cloudflare / Neon / Anthropic / PostHog EU / Stripe / Resend з location, DPA status, active-since; (5) break-glass & support access 90-day counters — 0 escalations / 0 break-glass / 0 data-touched / 0 auto-notifications; (6) compliance document access cards — DPA PDF download, pen test summary request, SOC 2 report ETA; privacy floor footer. Refs: SOC2_READINESS.md §2, §4.3 · CRYPTOGRAPHY_POLICY.md · KEY_ROTATION.md · PENETRATION_TESTING.md · SUBPROCESSORS.md · GDPR_DPIA.md · AUDIT_LOG_SCHEMA.md §3.2 · DEC-030 · DEC-042 · DEC-046; enterprise-architect + compliance-officer + security-engineer
+
+---
+
 ## [4.12.0] — 2026-06-12
 
 ### Added

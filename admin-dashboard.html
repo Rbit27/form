@@ -145,6 +145,10 @@
         <span class="font-mono">⇆</span>
         <span>SIEM Export</span>
       </div>
+      <div class="sidebar-item" data-screen="compliance">
+        <span class="font-mono">⊕</span>
+        <span>Compliance</span>
+      </div>
     </nav>
 
     <!-- User -->
@@ -2016,6 +2020,358 @@
           <div class="text-dim">OBSERVABILITY.md §23 · ENTERPRISE_SLA.md §3</div>
           <div>DEC-030: sla.incident_opened · sla.incident_closed · sla.measurement_reconciled</div>
           <div>enterprise-architect + compliance-officer</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ════════════════════════════ COMPLIANCE & SECURITY ════════════════════════════ -->
+    <div id="screen-compliance" class="screen">
+
+      <!-- Header -->
+      <div class="flex items-end justify-between mb-10">
+        <div>
+          <div class="label mb-2">Compliance &amp; Security · Acme Corp</div>
+          <h1 class="font-serif text-paper text-5xl font-light leading-tight">
+            Trust posture<br>
+            <em class="text-mute text-3xl">SOC 2, GDPR, audit chain</em>
+          </h1>
+        </div>
+        <div class="flex items-center gap-3 text-mute text-xs font-mono">
+          <div class="pulse-dot w-2 h-2 bg-acid rounded-full"></div>
+          <span>Drata continuous monitoring</span>
+        </div>
+      </div>
+
+      <!-- Summary row -->
+      <div class="grid grid-cols-4 gap-4 mb-10">
+        <div class="stat-card">
+          <div class="label">SOC 2 Type II</div>
+          <div class="data text-3xl font-light mt-2" style="color:#FBBF24">⧖ In progress</div>
+          <div class="text-mute text-xs font-mono mt-2">Observation period started · target Q2 2027</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden"><div class="h-1" style="width:40%;background:#FBBF24"></div></div>
+          <div class="text-mute text-xs font-mono mt-1">5 criteria · Drata evidence collection</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">GDPR Art. 9 DPA</div>
+          <div class="data text-acid text-3xl font-light mt-2">✓ Signed</div>
+          <div class="text-acid text-xs font-mono mt-2">Signed before pilot data flowed</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden"><div class="h-1 bg-acid" style="width:100%"></div></div>
+          <div class="text-mute text-xs font-mono mt-1">SCC included · EU-Central data residency</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Last pen test</div>
+          <div class="data text-paper text-3xl font-light mt-2">Mar 2026</div>
+          <div class="text-acid text-xs font-mono mt-2">0 critical · 2 medium · all resolved</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden"><div class="h-1 bg-acid" style="width:100%"></div></div>
+          <div class="text-mute text-xs font-mono mt-1">Next: Mar 2027 · summary on request</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Audit log chain</div>
+          <div class="data text-acid text-3xl font-light mt-2">✓ Intact</div>
+          <div class="text-acid text-xs font-mono mt-2">HMAC-SHA256 · no gaps detected</div>
+          <div class="h-1 bg-line rounded-full mt-3 overflow-hidden"><div class="h-1 bg-acid" style="width:100%"></div></div>
+          <div class="text-mute text-xs font-mono mt-1">DEC-030 · 7-year retention</div>
+        </div>
+      </div>
+
+      <!-- SOC 2 criteria breakdown -->
+      <div class="stat-card mb-6">
+        <div class="flex justify-between items-center mb-6">
+          <div class="label">SOC 2 Type II · Trust Service Criteria — evidence readiness</div>
+          <div class="text-mute text-xs font-mono">Drata continuous monitoring · observation period Q3 2026 – Q1 2027</div>
+        </div>
+        <div class="grid grid-cols-5 gap-6">
+          <div>
+            <div class="text-mute text-xs font-mono mb-2">CC · Security</div>
+            <div class="data text-paper text-2xl font-light" style="color:#4ADE80">82<span class="text-mute text-sm">%</span></div>
+            <div class="h-1 bg-line rounded-full mt-2 overflow-hidden"><div class="h-1" style="width:82%;background:#4ADE80"></div></div>
+            <div class="text-xs font-mono mt-1" style="color:#4ADE80">↑ In progress</div>
+            <div class="text-mute text-xs mt-1">CC1–CC9 · logical access, change mgmt</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-2">A · Availability</div>
+            <div class="data text-paper text-2xl font-light" style="color:#DDFF2D">91<span class="text-mute text-sm">%</span></div>
+            <div class="h-1 bg-line rounded-full mt-2 overflow-hidden"><div class="h-1 bg-acid" style="width:91%"></div></div>
+            <div class="text-acid text-xs font-mono mt-1">↑ Strong</div>
+            <div class="text-mute text-xs mt-1">A1 · uptime, capacity, monitoring</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-2">PI · Processing Integrity</div>
+            <div class="data text-paper text-2xl font-light" style="color:#4ADE80">75<span class="text-mute text-sm">%</span></div>
+            <div class="h-1 bg-line rounded-full mt-2 overflow-hidden"><div class="h-1" style="width:75%;background:#4ADE80"></div></div>
+            <div class="text-xs font-mono mt-1" style="color:#4ADE80">↑ In progress</div>
+            <div class="text-mute text-xs mt-1">PI1 · complete, valid, accurate</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-2">C · Confidentiality</div>
+            <div class="data text-paper text-2xl font-light" style="color:#DDFF2D">88<span class="text-mute text-sm">%</span></div>
+            <div class="h-1 bg-line rounded-full mt-2 overflow-hidden"><div class="h-1" style="width:88%;background:#DDFF2D"></div></div>
+            <div class="text-acid text-xs font-mono mt-1">↑ Strong</div>
+            <div class="text-mute text-xs mt-1">C1 · per-tenant AES-256 encryption</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-2">P · Privacy</div>
+            <div class="data text-paper text-2xl font-light" style="color:#4ADE80">79<span class="text-mute text-sm">%</span></div>
+            <div class="h-1 bg-line rounded-full mt-2 overflow-hidden"><div class="h-1" style="width:79%;background:#4ADE80"></div></div>
+            <div class="text-xs font-mono mt-1" style="color:#4ADE80">↑ In progress</div>
+            <div class="text-mute text-xs mt-1">P1–P8 · notice, choice, access, disposal</div>
+          </div>
+        </div>
+        <div class="mt-5 text-mute text-xs font-mono border-t border-line pt-3">
+          Controls evidence collected continuously via Drata · SOC 2 report shared under NDA with Enterprise tier on completion · ref SOC2_READINESS.md §2
+        </div>
+      </div>
+
+      <!-- GDPR / Encryption / Pen test -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+
+        <div class="stat-card">
+          <div class="label mb-4">GDPR compliance posture</div>
+          <div class="space-y-3">
+            <div class="flex justify-between items-center">
+              <span class="text-dim text-sm">DPA signed</span>
+              <span class="data text-acid text-sm">✓ Yes</span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-center">
+              <span class="text-dim text-sm">Data residency</span>
+              <span class="data text-paper text-xs">EU-Central (Frankfurt)</span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-center">
+              <span class="text-dim text-sm">US → EU transfer (SCC)</span>
+              <span class="data text-acid text-sm">✓ Included</span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-center">
+              <span class="text-dim text-sm">Art. 9 health data DPIA</span>
+              <span class="data text-acid text-sm">✓ Filed</span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-center">
+              <span class="text-dim text-sm">Sub-processor notice</span>
+              <span class="data text-acid text-sm">30-day advance</span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-center">
+              <span class="text-dim text-sm">Art. 17 erasure (DSR)</span>
+              <span class="data text-acid text-sm">Self-serve · &lt; 30 days</span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-center">
+              <span class="text-dim text-sm">Art. 33 breach notice</span>
+              <span class="data text-acid text-sm">72 h to authority</span>
+            </div>
+          </div>
+          <div class="mt-4 text-mute text-xs font-mono">ref GDPR_DPIA.md · PRIVACY_POLICY.md §6</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="label mb-4">Encryption &amp; key management</div>
+          <div class="space-y-3">
+            <div class="flex justify-between items-start gap-2">
+              <span class="text-dim text-sm">CV pose keypoints</span>
+              <span class="data text-paper text-xs text-right">AES-256-GCM<br><span class="text-mute" style="font-size:10px">per-tenant key · HSM-backed</span></span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-start gap-2">
+              <span class="text-dim text-sm">Health profiles</span>
+              <span class="data text-paper text-xs text-right">AES-256-GCM<br><span class="text-mute" style="font-size:10px">field-level encryption</span></span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-start gap-2">
+              <span class="text-dim text-sm">Database at rest</span>
+              <span class="data text-paper text-xs text-right">AES-256<br><span class="text-mute" style="font-size:10px">Neon · Cloudflare D1</span></span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-start gap-2">
+              <span class="text-dim text-sm">Transport</span>
+              <span class="data text-paper text-xs text-right">TLS 1.3 minimum<br><span class="text-mute" style="font-size:10px">HSTS enforced</span></span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-start gap-2">
+              <span class="text-dim text-sm">Key rotation schedule</span>
+              <span class="data text-acid text-xs text-right">90-day cycle<br><span class="text-mute" style="font-size:10px">DEC-030 event on each rotation</span></span>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="flex justify-between items-start gap-2">
+              <span class="text-dim text-sm">Audit log integrity</span>
+              <span class="data text-acid text-xs text-right">HMAC-SHA256 chain<br><span class="text-mute" style="font-size:10px">append-only · DEC-030</span></span>
+            </div>
+          </div>
+          <div class="mt-4 text-mute text-xs font-mono">ref CRYPTOGRAPHY_POLICY.md · KEY_ROTATION.md</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="label mb-4">Penetration test record</div>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-paper text-sm font-medium">Mar 2026 · Annual</span>
+                <span class="badge badge-active" style="font-size:9px">Completed</span>
+              </div>
+              <div class="space-y-1 font-mono" style="font-size:11px">
+                <div class="flex justify-between"><span class="text-mute">Critical</span><span class="text-acid">0</span></div>
+                <div class="flex justify-between"><span class="text-mute">High</span><span class="text-acid">0</span></div>
+                <div class="flex justify-between"><span class="text-mute">Medium</span><span style="color:#FBBF24">2 → resolved</span></div>
+                <div class="flex justify-between"><span class="text-mute">Low / Informational</span><span class="text-mute">5 → resolved</span></div>
+              </div>
+              <div class="mt-2 text-mute text-xs">Scope: API surface, SSO/SCIM, mobile backend, admin dashboard. External firm, black-box + authenticated.</div>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-paper text-sm font-medium">Next: Mar 2027</span>
+                <span class="badge badge-onboarding" style="font-size:9px">Scheduled</span>
+              </div>
+              <div class="text-mute text-xs">Same scope + CV pipeline · new mobile API surface · authenticated bypass testing for RLS</div>
+            </div>
+            <div class="h-px bg-line"></div>
+            <div class="text-mute text-xs leading-relaxed">Summary report shared under NDA with Enterprise-tier customers. Request via CSM or <span class="text-dim">enterprise@form.coach</span></div>
+          </div>
+          <div class="mt-4 text-mute text-xs font-mono">ref PENETRATION_TESTING.md · SOC2_READINESS.md §4.3</div>
+        </div>
+
+      </div>
+
+      <!-- Sub-processors -->
+      <div class="stat-card mb-6">
+        <div class="flex justify-between items-center mb-6">
+          <div class="label">Sub-processor registry — critical processors</div>
+          <div class="text-mute text-xs font-mono">30-day advance notice of new sub-processors · per your DPA §4.3 · full list: form.coach/subprocessors</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Sub-processor</th>
+              <th>Purpose</th>
+              <th>Data category</th>
+              <th>Location</th>
+              <th>DPA</th>
+              <th>Active since</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="text-paper font-medium" style="font-size:13px">Cloudflare Workers / D1</td>
+              <td class="text-dim" style="font-size:12px">API edge · CDN · database (D1) · R2 object storage</td>
+              <td class="text-dim" style="font-size:12px">All tenant data</td>
+              <td class="data" style="font-size:12px">EU-Central (Frankfurt)</td>
+              <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+              <td class="text-mute data" style="font-size:12px">Jan 2026</td>
+            </tr>
+            <tr>
+              <td class="text-paper font-medium" style="font-size:13px">Neon (Postgres)</td>
+              <td class="text-dim" style="font-size:12px">Primary database · RLS enforced on all queries</td>
+              <td class="text-dim" style="font-size:12px">All tenant data</td>
+              <td class="data" style="font-size:12px">EU (Frankfurt)</td>
+              <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+              <td class="text-mute data" style="font-size:12px">Jan 2026</td>
+            </tr>
+            <tr>
+              <td class="text-paper font-medium" style="font-size:13px">Anthropic API</td>
+              <td class="text-dim" style="font-size:12px">AI coaching (Victor) — contractually no training use of inputs</td>
+              <td class="text-dim" style="font-size:12px">Coaching session content</td>
+              <td class="data" style="font-size:12px">US (SCC on file)</td>
+              <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+              <td class="text-mute data" style="font-size:12px">Feb 2026</td>
+            </tr>
+            <tr>
+              <td class="text-paper font-medium" style="font-size:13px">PostHog EU Cloud</td>
+              <td class="text-dim" style="font-size:12px">Product analytics — no health data (DEC-046 ruling enforced)</td>
+              <td class="text-dim" style="font-size:12px">Usage events (pseudonymous)</td>
+              <td class="data" style="font-size:12px">EU (Frankfurt)</td>
+              <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+              <td class="text-mute data" style="font-size:12px">Feb 2026</td>
+            </tr>
+            <tr>
+              <td class="text-paper font-medium" style="font-size:13px">Stripe</td>
+              <td class="text-dim" style="font-size:12px">Billing · seat invoicing · Customer Portal</td>
+              <td class="text-dim" style="font-size:12px">Payment data (not health)</td>
+              <td class="data" style="font-size:12px">US (SCC)</td>
+              <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+              <td class="text-mute data" style="font-size:12px">Jan 2026</td>
+            </tr>
+            <tr>
+              <td class="text-paper font-medium" style="font-size:13px">Resend</td>
+              <td class="text-dim" style="font-size:12px">Transactional email (provisioning, alerts, SLA reports)</td>
+              <td class="text-dim" style="font-size:12px">Email address only</td>
+              <td class="data" style="font-size:12px">US (SCC)</td>
+              <td><span class="badge badge-active" style="font-size:9px">✓</span></td>
+              <td class="text-mute data" style="font-size:12px">Mar 2026</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="mt-4 text-mute text-xs font-mono">
+          FORM commits to 30-day advance notice before adding any new sub-processor · ref SUBPROCESSORS.md · DPA §4.3 · changes trigger DEC-030 <span class="data text-dim">compliance.subprocessor_added</span> event
+        </div>
+      </div>
+
+      <!-- Break-glass access log -->
+      <div class="stat-card mb-6">
+        <div class="flex justify-between items-center mb-6">
+          <div class="label">Break-glass &amp; support access · last 90 days</div>
+          <div class="text-mute text-xs font-mono">Any FORM employee access to tenant data auto-notifies your IT contact within 24 h</div>
+        </div>
+        <div class="grid grid-cols-4 gap-4 mb-6">
+          <div>
+            <div class="text-mute text-xs font-mono mb-1">JIT escalations</div>
+            <div class="data text-paper text-3xl font-light">0</div>
+            <div class="text-acid text-xs font-mono mt-1">No support access</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-1">Break-glass activations</div>
+            <div class="data text-paper text-3xl font-light">0</div>
+            <div class="text-acid text-xs font-mono mt-1">No emergency escalations</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-1">User data touched</div>
+            <div class="data text-paper text-3xl font-light">0</div>
+            <div class="text-acid text-xs font-mono mt-1">Zero access events</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-1">Auto-notifications sent</div>
+            <div class="data text-paper text-3xl font-light">0</div>
+            <div class="text-mute text-xs font-mono mt-1">Fired if data accessed</div>
+          </div>
+        </div>
+        <div class="text-mute text-xs font-mono border-t border-line pt-3">
+          Break-glass requires 2-person approval + time-bound role (4 h max) · all actions logged in HMAC chain · DEC-030 <span class="data text-dim">support.data_accessed</span> triggers email to <span class="text-dim">maria.schultz@acme.com</span> within 24 h · ref AUDIT_LOG_SCHEMA.md §3.2 · DEC-042
+        </div>
+      </div>
+
+      <!-- Compliance document access -->
+      <div class="stat-card mb-6">
+        <div class="label mb-5">Compliance documents — Acme Corp account</div>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-ink border border-line rounded-xl p-5">
+            <div class="text-paper text-sm font-medium mb-1">DPA — Data Processing Agreement</div>
+            <div class="text-mute text-xs mb-4 leading-relaxed">Signed copy including GDPR Art. 9 obligations, Standard Contractual Clauses, sub-processor schedule, and data residency election.</div>
+            <button class="btn-primary" style="font-size:9px;padding:7px 16px">Download signed PDF</button>
+          </div>
+          <div class="bg-ink border border-line rounded-xl p-5">
+            <div class="text-paper text-sm font-medium mb-1">Pen test summary · Mar 2026</div>
+            <div class="text-mute text-xs mb-4 leading-relaxed">Redacted executive summary from annual penetration test. Full report with findings and remediation evidence available to Enterprise customers under NDA.</div>
+            <button class="btn-primary" style="font-size:9px;padding:7px 16px">Request from CSM</button>
+          </div>
+          <div class="bg-ink border border-line rounded-xl p-5" style="opacity:0.55">
+            <div class="text-paper text-sm font-medium mb-1">SOC 2 Type II report</div>
+            <div class="text-mute text-xs mb-4 leading-relaxed">Full audit report will be shared under NDA on completion. Currently in observation period. Estimated: Q2 2027. Drata dashboard access available on request in the interim.</div>
+            <button class="btn-ghost" style="font-size:9px;padding:7px 16px;cursor:default">In progress · est. Q2 2027</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="mt-10 pt-6 border-t border-line flex justify-between items-start">
+        <div class="text-mute text-xs leading-relaxed max-w-sm">
+          No individual user health data is present in this compliance view. All audit events are tenant-scoped aggregate records. The privacy floor is enforced independently of compliance level — HR cannot access individual employee data regardless of security role or contractual terms.
+        </div>
+        <div class="text-mute text-xs font-mono text-right space-y-1">
+          <div class="text-dim">SOC2_READINESS.md · CRYPTOGRAPHY_POLICY.md · PENETRATION_TESTING.md · SUBPROCESSORS.md</div>
+          <div>DEC-030: support.data_accessed · admin.break_glass.activated · security.key_rotated · compliance.subprocessor_added</div>
+          <div>compliance-officer + security-engineer + enterprise-architect</div>
         </div>
       </div>
 
