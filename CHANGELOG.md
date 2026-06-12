@@ -6,6 +6,18 @@
 
 ---
 
+## [4.1.0] — 2026-06-12
+
+### Added
+- `content/post-551-trenuvannya-v-poyizdtsi.md` — «Тренування в поїздці — що реально підтримує форму за 2 тижні і що ні»; detraining curve (Mujika & Padilla 2000); мінімальний ефективний стимул — поріг ≥80% 1RM при зниженій частоті (Hortobágyi et al. 1993); об'єм підтримки ~1/3 від звичного (Bickel et al. 2011); нейральні фактори раннього детренування (Häkkinen et al. 1985); практичний алгоритм ≤7/8–14/>14 днів; що НЕ працює (кардіо, низькоінтенсивні кола); clinical-safety NOT REQUIRED; sports-scientist pending · ~10 хв читання
+- `content/post-552-plateau-ne-ye-plateau.md` — «Плато, яке не є плато — три причини «я не прогресую» і окремі виходи з кожної»; Тип 1 накопичена втома (Meeusen et al. 2013 FOR/NFOR/OTS; Fry 2004; Issurin 2010 залишковий ефект); Тип 2 недостатній стимул (Israetel et al. 2019 MEV/MAV/MRV; Schoenfeld & Grgic 2020 dose-response); Тип 3 справжня стагнація (Kraemer & Ratamess 2004 специфічність; Issurin 2010 блокова periodизація); 3-питання діагностичний протокол; таблиця рішень по типах; clinical-safety NOT REQUIRED; sports-scientist pending · ~9 хв читання
+
+### Changed
+- `README.md` — roadmap: posts 551–552 позначені [x] authored; Last update оновлено
+- `VERSION` — 4.0.3 → 4.1.0
+
+---
+
 ## [4.0.3] — 2026-06-12
 
 ### Changed

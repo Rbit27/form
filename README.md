@@ -962,8 +962,8 @@ Each iteration:
 - [x] post-548: Самопрограмування для середнього рівня — 7-крокова методологія написання власного блоку; Schoenfeld 2017, Kraemer & Ratamess 2004, Israetel et al. 2019, Zourdos 2016; таблиця MEV/MAV по групах; алгоритм першого блоку; clinical-safety NOT REQUIRED · authored v4.0.1
 - [x] post-549: Як перевірити, чи твій план працює — аудит власного програмування; 4-класова система (прогресія/техніка/відновлення/структура); Fry 2004, Schoenfeld & Grgic 2020, Meeusen 2013, McGill 2007; 4-питання протокол; таблиця рішень; clinical-safety NOT REQUIRED · authored v4.0.1
 - [x] post-550: Як вибрати програму, якщо програм занадто багато — 5-питань фільтр; SAID (Kraemer & Ratamess 2004), MEV/MAV/MRV (Israetel et al. 2019, Krieger 2010), Schoenfeld 2010, Meeusen 2013; таблиця рішень; ознаки якісного протоколу vs маркетинг-флаф; clinical-safety NOT REQUIRED · authored v4.0.2
-- [ ] post-551: Тренування в поїздці — що реально підтримує форму за 2 тижні і що ні; деtraining-крива і мінімальний ефективний стимул для збереження
-- [ ] post-552: Плато, яке не є плато — розрізнити накопичену втому, недостатній обсяг і реальну стагнацію адаптації; три різних причини «я не прогресую» і окремі виходи з кожної
+- [x] post-551: Тренування в поїздці — деtraining-крива (Mujika & Padilla 2000); поріг ≥80% 1RM для підтримки (Hortobágyi et al. 1993); Bickel et al. (2011) об'єм підтримки; Häkkinen et al. (1985) нейральні фактори; алгоритм готель/мінімум/нормальний зал; clinical-safety NOT REQUIRED · authored v4.1.0
+- [x] post-552: Плато, яке не є плато — три типи (накопичена втома / недостатній стимул / справжня стагнація); Meeusen 2013 FOR/NFOR/OTS; Fry 2004; Israetel et al. 2019 MEV/MAV/MRV; Schoenfeld & Grgic 2020; Issurin 2010 блокова periodизація; 3-питання діагностика; таблиця рішень; clinical-safety NOT REQUIRED · authored v4.1.0
 - [ ] post-553: Мінімалістична програма — 3–4 вправи на тренування без втрати результату; принцип специфічності і мінімальний ефективний стимул; для зайнятих людей з реальними часовими обмеженнями
 - [ ] post-554: Як зробити перший відеозапис свого тренування — протокол самооцінки техніки; кути зйомки, що шукати, що ігнорувати; Wulf & Prinz (2001) зовнішній фокус, Kompf & Arandjelovic (2016) стікінг-поінти
 - [ ] post-555: Перехід з 3-денного на 4-денний тиждень — коли і як збільшувати частоту тренувань; Schoenfeld et al. (2016) frequency meta-analysis; practical split structures; adherence-перевірка до переходу
@@ -1011,4 +1011,4 @@ If you read **three**: + [docs/FINANCIALS.md](docs/FINANCIALS.md)
 **Lead:** Claude (Opus 4.7, 1M context) · координує
 **Cloud iterator:** Claude (Sonnet 4.6) · 2-hour cycle
 **Owner:** Rbit27 (George)
-**Last update:** 12 червня 2026 · v4.0.2 (post-550 · як вибрати програму · clinical-safety NOT REQUIRED · blog cards 548–550 added · roadmap 552–555)
+**Last update:** 12 червня 2026 · v4.1.0 (post-551 · тренування в поїздці + post-552 · плато що не є плато · clinical-safety NOT REQUIRED · roadmap post-553–555 залишається)
