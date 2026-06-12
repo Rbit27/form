@@ -6,6 +6,13 @@
 
 ---
 
+## [4.15.0] — 2026-06-12
+
+### Added
+- `compliance/evidence/pam/justification-sample.md` — SOC 2 CC6.2/CC6.3/CC6.6 auditor evidence: redacted sample set of `admin_jit_escalations.business_justification` entries per DEC-043. 10 sample entries across all 4 access tiers: `read_only` (5 samples), `read_write` (3), `destructive` (2), `break_glass` (2). Each entry shows: `access_level`, `target_tenant_id` (redacted), `escalation_start` (date-only), `status`, `is_break_glass`, sanitised justification text, SHA-256 `justification_hash`. Redaction methodology table (12 fields — 4 redacted, 8 exported). Hash verification protocol (3-way match: document → live row → DEC-030 HMAC chain). Control effectiveness summary: 10/10 entries have logged justification; 8/10 auto-expired at TTL; 0 sessions survive beyond TTL; 2/2 break-glass sessions have two-reviewer sign-off in `pam_break_glass_reviews`. Refs: `docs/DATA_MODEL.md §29` · `docs/AUDIT_LOG_SCHEMA.md §PAM` · `docs/SSO_SCIM_IMPLEMENTATION.md §24` · `docs/SOC2_READINESS.md §24.8` · DEC-043 · DEC-042 · DEC-030; compliance-officer + security-engineer
+
+---
+
 ## [4.13.0] — 2026-06-12
 
 ### Added
