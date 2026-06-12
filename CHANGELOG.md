@@ -6,6 +6,18 @@
 
 ---
 
+## [3.85.0] — 2026-06-12
+
+### Added
+- `content/post-528-isolation-exercise-progression.md` — «Прогресія ізоляційних вправ — чому «більше ваги» не єдиний варіант»: 7 векторів прогресії (навантаження, об'єм, щільність, ROM, темп/TUT, близькість до відмови, техніка); Schoenfeld (2010) трифакторна модель гіпертрофії; Wernbom et al. (2007) *Sports Medicine* мета-аналіз об'єм-навантаження; Burd et al. (2012) *J Physiology* ексцентрика та синтез протеїну; Zourdos et al. (2016) JSCR RIR-точність; Helms et al. (2016) RIR 1–3 для гіпертрофії; Pedrosa et al. (2022) long-muscle-length training; Calatayud et al. (2016) mind-muscle connection ЕМГ +10–20%; структура мезоциклу load→volume→density блоки; діагностика «плато ізоляції як базовий дефіцит». sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `content/post-529-unilateral-vs-bilateral-training.md` — «Сила на одну ногу vs дві — коли унілатеральна робота стає основою, а не допоміжною»: Van Dieën et al. (2003) MSSE білатеральний дефіцит 88–92% sum; Enoka (1997) *J Biomechanics* нейронна адаптація і cross-education; Escamilla (2001) MSSE біомеханіка присідання; McCurdy et al. (2005) JSCR спліт-присідання vs двостороннє (8 тижнів, порівнянна сила, кращий функціональний перенос); Speirs et al. (2016) JSCR унілатеральне vs білатеральне у регбістів — еквівалентна сила, вищий трансфер у спринт/agility; 3 профілі для унілатеральної основи (асиметрія >15%, техніка руйнується під навантаженням, командні види спорту); практичний тест (10RM спліт × 2 vs 10RM присідання); ієрархія впровадження спліт→лунж→болгарське. citations fact-checked, Seynnes (2004) замінено на Van Dieën (2003). sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+- `README.md` — roadmap: post-528 ✓ (v3.85.0), post-529 ✓ (v3.85.0); Last update оновлено
+
+### Changed
+- `VERSION` — 3.84.1 → 3.85.0
+
+---
+
 ## [3.84.1] — 2026-06-12
 
 ### Changed
