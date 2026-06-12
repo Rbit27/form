@@ -6,6 +6,13 @@
 
 ---
 
+## [4.17.1] — 2026-06-12
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v2.2 — R-25 GDPR Art. 9 Enterprise Tenant Off-boarding: Hard-Delete Overdue (AL-GDPR-03); twenty-fifth runbook; closes incident response gap from OBSERVABILITY.md §37 AL-GDPR-03 (P0, no-auto-resolve); five DEC-030 events (`gdpr.art9_delete_overdue_detected`, `gdpr.art9_delete_resumed`, `gdpr.art9_delete_completed`, `gdpr.art9_delete_manual_trigger`, `gdpr.audit_log_pending_art9_decision`); GDPR Art. 33 72h supervisory-authority decision tree; four scope-assessment queries (R-25-C1 through R-25-C4); chunked batch DELETE for large-tenant IOPS; six evidence artefacts (ART9-E-001–E-006); three communication templates (ART9-01–ART9-03); SOC 2 TSC CC7.2/CC7.3/CC7.4/CC6.5/P5.2/P4.0; OQ-GDPR-OBS-03 interim protocol for audit log pseudonymisation (additive ERASURE_PSEUDONYM_SALT, pending outside counsel); eight-item implementation checklist (3×P0/M6, 1×P0/M13, 4×P1); Owner: compliance-officer + platform-engineer + security-engineer
+
+---
+
 ## [4.17.0] — 2026-06-12
 
 ### Added

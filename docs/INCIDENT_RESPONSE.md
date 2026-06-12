@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v2.0
+# FORM · Incident Response Runbook v2.2
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -9278,7 +9278,297 @@ Per the §14 Continuous Improvement Program, the following controls are mandator
 
 ---
 
-**v2.1 · 2026-06-11 · Owner: security-engineer + compliance-officer**
+### R-25: GDPR Art. 9 Enterprise Tenant Off-boarding — Hard-Delete Overdue (AL-GDPR-03)
+
+**Owner:** compliance-officer + platform-engineer
+**Last updated:** 2026-06-12
+**Related docs:** `docs/DATA_MODEL.md §25` (Tenant Off-boarding & Data Egress Schema), `docs/OBSERVABILITY.md §37` (GDPR Compliance Pipeline Observability), `docs/SOC2_READINESS.md §67` (Tenant Deletion Certificate), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 events)
+**Cross-ref:** R-01 (Data Breach — activate in parallel if Art. 9 data was accessed by unauthorized party during delay), R-14 (DSAR Art. 17 consumer erasure — R-25 covers enterprise tenant off-boarding only)
+
+---
+
+#### R-25.1 Trigger Matrix
+
+| Source | Signal | Severity at Trigger | Auto-paging |
+|---|---|---|---|
+| **AL-GDPR-03** (OBSERVABILITY §37.5) | pg_cron check finds `tenants.status = 'offboarding'` AND `art9_hard_delete_completed_at IS NULL` AND `offboarding_initiated_at < NOW() - INTERVAL '4 hours'` | **P0** — no-auto-resolve | PagerDuty `form-compliance` → compliance-officer |
+| Tenant admin complaint | Customer reports employee data still accessible via export API after off-boarding confirmation | P0 | Page compliance-officer immediately |
+| GDPR supervisory authority inquiry | DPA requests confirmation of Art. 9 data deletion following tenant off-boarding | P1 | compliance-officer + founder |
+| Scheduled monthly evidence collection | `compliance/evidence/gdpr/` audit reveals overdue deletion in `data_subject_requests` table | P1 | Linear ticket; page only if > 72h overdue |
+
+**Critical distinction from R-14 (DSAR Art. 17):** R-14 covers individual consumer-tier erasure requests. R-25 covers the enterprise *tenant* off-boarding pipeline — bulk deletion of Art. 9 data for all users of a deprovisioned tenant. Art. 9 health data (workout records, CV keypoints, body composition, coaching session content) must be hard-deleted within 4 hours of `tenants.offboarding_initiated_at` per GDPR-SLO-03 (DEC-036 zero-grace-period commitment).
+
+---
+
+#### R-25.2 Severity Classification
+
+| Condition | Severity | GDPR Art. 33 Trigger |
+|---|---|---|
+| Art. 9 data not deleted > 4h after `offboarding_initiated_at`; data at rest in Supabase only, not accessible via API | **P0** | Monitor — Art. 33 unlikely if no access path exists; assess per §R-25.7 |
+| Art. 9 data not deleted AND tenant admin can still retrieve individual user data via export API | **P0** | **Yes — 72h clock starts at detection** |
+| Art. 9 data not deleted AND unauthorized third party accessed data during delay | **P0** | **Yes — immediate Art. 33; R-01 activates in parallel** |
+| Hard-delete Worker crashed and is not retrying; data at rest only | **P0** | Unlikely if delay < 72h and no access path; reassess at T+72h |
+| Deletion partially complete (> 50% rows removed) AND Worker currently retrying | **P1** | No — monitor for P0 upgrade if Worker stalls |
+| Large tenant (> 10,000 users); delay > 4h but < 24h; Worker still running | **P1** → P0 at 24h | No — pending OQ-GDPR-OBS-02 large-tenant SLO; upgrade at 24h |
+
+---
+
+#### R-25.3 Immediate Actions (T+0 to T+20 min)
+
+```
+T+0:  Open incident channel: #inc-YYYYMMDD-gdpr-art9-delete
+T+0:  Page: compliance-officer + platform-engineer simultaneously
+T+0:  Note exact time of AL-GDPR-03 first fire — GDPR regulatory clock may have already started
+T+2:  Run R-25-C1: identify affected tenant(s) and hours overdue
+T+5:  Check art9_hard_delete Worker status:
+        SELECT * FROM pg_cron.job_run_details
+        WHERE jobname = 'enterprise_art9_hard_delete'
+        ORDER BY start_time DESC LIMIT 10;
+T+5:  Run R-25-C2: verify whether Art. 9 data is currently accessible via API
+T+10: If data IS accessible to tenant admins → upgrade to P0 + open R-01 in parallel
+T+10: If Worker is slow (large tenant) → apply R-25.2 large-tenant severity rule
+T+15: Emit DEC-030 gdpr.art9_delete_overdue_detected (CRITICAL) BEFORE any remediation
+      action — this is the evidentiary anchor for the regulatory response
+T+20: Decision: manual retry per §R-25.6 Step 1 or escalate to founder for Art. 33 assessment
+```
+
+---
+
+#### R-25.4 Scope Assessment Queries
+
+```sql
+-- R-25-C1: Which tenants are overdue for Art. 9 hard-delete?
+SELECT
+  tenant_id,
+  status,
+  offboarding_initiated_at,
+  art9_hard_delete_completed_at,
+  EXTRACT(EPOCH FROM (NOW() - offboarding_initiated_at)) / 3600 AS hours_overdue,
+  seat_count
+FROM tenants
+WHERE status = 'offboarding'
+  AND art9_hard_delete_completed_at IS NULL
+  AND offboarding_initiated_at < NOW() - INTERVAL '4 hours'
+ORDER BY offboarding_initiated_at ASC;
+
+-- R-25-C2: How much Art. 9 data remains for the affected tenant?
+-- Run per affected tenant_id
+SELECT 'workout_sessions' AS table_name, COUNT(*) AS rows_remaining
+  FROM workout_sessions WHERE tenant_id = '<tenant_id>'
+UNION ALL
+SELECT 'cv_sessions', COUNT(*)
+  FROM cv_sessions WHERE tenant_id = '<tenant_id>'
+UNION ALL
+SELECT 'coaching_turns', COUNT(*)
+  FROM coaching_turns
+  WHERE user_id IN (SELECT id FROM users WHERE tenant_id = '<tenant_id>')
+UNION ALL
+SELECT 'body_metrics', COUNT(*)
+  FROM body_metrics
+  WHERE user_id IN (SELECT id FROM users WHERE tenant_id = '<tenant_id>')
+ORDER BY table_name;
+
+-- R-25-C3: Are tenant admin sessions still active post-offboarding?
+SELECT
+  s.id, s.user_id, s.tenant_id, s.created_at, s.expires_at,
+  u.role
+FROM enterprise_sessions s
+JOIN users u ON u.id = s.user_id
+WHERE s.tenant_id = '<tenant_id>'
+  AND s.expires_at > NOW()
+  AND s.revoked_at IS NULL;
+
+-- R-25-C4: DEC-030 off-boarding audit chain for this tenant
+SELECT event_type, occurred_at, actor_id,
+       metadata->>'hours_overdue' AS hours_overdue
+FROM audit_log_events
+WHERE tenant_id = '<tenant_id>'
+  AND event_type LIKE 'tenant.%' OR event_type LIKE 'gdpr.%'
+ORDER BY occurred_at ASC;
+```
+
+---
+
+#### R-25.5 Root Cause Hypotheses
+
+| Hypothesis | Diagnostic Signal | Resolution |
+|---|---|---|
+| **H1 — Worker crash / uncaught exception** | `pg_cron.job_run_details` shows `status = 'failed'` or non-zero `return_value`; Sentry error from `enterprise-art9-hard-delete` Worker | Investigate Sentry; fix exception; trigger manual retry per §R-25.6 Step 1 |
+| **H2 — Supabase IOPS exhaustion for large tenant** | Worker completed without error but rows remain; `pg_stat_activity` shows cascade DELETE sleeping; no Sentry error | Use chunked batch mode §R-25.6 Step 2; notify compliance-officer of SLO extension; see OQ-GDPR-OBS-02 |
+| **H3 — Migration not yet deployed** | pg_cron shows `ERROR: column "offboarding_initiated_at" does not exist`; OBSERVABILITY §37.10 items 1/2 not yet executed | P0 deployment gap — notify founder; run the migration immediately before retrying |
+| **H4 — Tenant `status` or `offboarding_initiated_at` not set** | `tenants.status != 'offboarding'` or `offboarding_initiated_at IS NULL` despite contractual off-boarding | Set manually with compliance-officer approval; emit `tenant.offboarding_initiated` DEC-030 before setting |
+| **H5 — Audit log pseudonymisation conflict** | Worker refused to delete `audit_log_events` rows; OQ-GDPR-OBS-03 unresolved | Follow interim protocol §R-25.8 — do NOT delete audit log rows; continue deletion of application tables |
+
+---
+
+#### R-25.6 Recovery Procedure
+
+**Step 1 — Standard Worker retry (H1)**
+```sql
+-- Manually trigger the pg_cron job (requires devops-lead access)
+SELECT cron.run_job('<job_id_for_enterprise_art9_hard_delete>');
+```
+
+**Step 2 — Chunked batch DELETE (H2 — large tenant)**
+```
+⚠ Requires PAM break-glass escalation (DATA_MODEL.md §29) + IC + compliance-officer sign-off
+⚠ Emit DEC-030 gdpr.art9_delete_manual_trigger BEFORE executing any SQL
+```
+```sql
+-- Chunk deletion per table; 1,000-row batches; 100ms yield between batches
+DO $$
+DECLARE batch_size INT := 1000; rows_deleted INT;
+BEGIN
+  LOOP
+    DELETE FROM workout_sessions
+    WHERE id IN (SELECT id FROM workout_sessions
+                 WHERE tenant_id = '<tenant_id>' LIMIT batch_size);
+    GET DIAGNOSTICS rows_deleted = ROW_COUNT;
+    EXIT WHEN rows_deleted = 0;
+    PERFORM pg_sleep(0.1);
+  END LOOP;
+END $$;
+-- Repeat for: cv_sessions, coaching_turns, body_metrics, and all other Art. 9 tables
+-- per docs/DATA_MODEL.md §25 off-boarding table list
+```
+
+**Step 3 — Mark deletion complete**
+```sql
+UPDATE tenants
+SET art9_hard_delete_completed_at = NOW(),
+    status = 'offboarded'
+WHERE tenant_id = '<tenant_id>';
+-- Worker then emits DEC-030 gdpr.art9_delete_completed (HIGH, 7yr) automatically
+```
+
+---
+
+#### R-25.7 GDPR Art. 33 Assessment Decision Tree
+
+Art. 33 requires supervisory authority notification within 72 hours of **becoming aware** of a **breach of security** leading to unauthorised access to or loss of personal data. Evaluate at T+15 min:
+
+| Question | Yes → | No → |
+|---|---|---|
+| Was Art. 9 data accessible to the tenant admin via API after `offboarding_initiated_at`? | **Art. 33 likely — 72h clock starts at detection; page founder** | Continue |
+| Did any third party access Art. 9 data during the delay? | **Art. 33 required — R-01 activates; 72h clock from breach discovery** | Continue |
+| Is the delay > 72h with data still present in the database? | **Art. 33 likely — GDPR Art. 5(1)(f) integrity obligation may be breached; founder + outside counsel decision required** | Continue |
+| Delay < 4h AND no access path existed at any point? | Art. 33 unlikely — operational failure contained before threshold; document reasoning in PIR | Close |
+
+If the Art. 33 decision is unclear, escalate to outside counsel immediately. Contact and decision authority: `compliance/p1/gov-request-policy.md §2`.
+
+---
+
+#### R-25.8 Interim Protocol: Audit Log Rows (OQ-GDPR-OBS-03)
+
+> **⚠ Legal status: UNRESOLVED.** OQ-GDPR-OBS-03 (P0 · OBSERVABILITY.md §37.11) identifies a fundamental tension between DEC-030's 7-year retention requirement for audit events and GDPR Art. 9's deletion obligation, given that some audit events (e.g., `workout.session_completed`, `ai.coaching_turn_submitted`) contain health-adjacent `user_id` references. Deleting these rows would break the HMAC chain. Outside counsel confirmation is required before either deletion or pseudonymisation is implemented.
+
+**Until OQ-GDPR-OBS-03 is resolved, apply the following during R-25:**
+
+1. **Do NOT delete `audit_log_events` rows** for the off-boarded tenant. The HMAC chain must remain intact and verifiable for SOC 2 CC7.2 evidence.
+2. **Verify tenant isolation holds:** the RLS policy for `form_api` and `tenant_admin` roles already prevents any query from reading another tenant's rows. No additional access revocation is needed for cross-tenant isolation.
+3. **Emit `gdpr.audit_log_pending_art9_decision`** (STANDARD, 7yr) at T+15 min, before the PIR is finalised. This creates the chain-of-custody record that the legal question was identified and is pending resolution.
+4. **Document in PIR:** reference OQ-GDPR-OBS-03 and state that `audit_log_events` rows for the tenant are retained with original `user_id` values intact, pending outside counsel guidance (target: M13 pre-GA).
+
+**Recommended resolution path (pending counsel confirmation):** pseudonymise `user_id` in `audit_log_events` using `ERASURE_PSEUDONYM_SALT` (write-once key per CRYPTOGRAPHY_POLICY.md §5) — add `user_id_pseudonym TEXT NULL` column; set at off-boarding; RLS restricts original `user_id` column to `form_admin` + `compliance_reviewer` roles only. The HMAC chain remains valid as pseudonymisation is additive (does not modify the at-write hash).
+
+---
+
+#### R-25.9 Communication Templates
+
+**Template ART9-01 — Initial notification (P0; send at T+10 min via Slack Connect and email):**
+> FORM is contacting you regarding the completion of your data deletion request. We have identified that the automated deletion of health and fitness data for your tenant is taking longer than our standard 4-hour target. No data has left FORM-controlled systems, and employee data is not accessible to any other tenant or external party. Our compliance team is actively resolving this. We will send a status update within 60 minutes. Questions: enterprise@form.coach.
+
+**Template ART9-02 — Status update (send every 60 min until resolved):**
+> Status update [HH:MM UTC]: The deletion process is progressing. [N]% of records have been removed across [M] affected tables. Estimated completion: [T+X]. We will notify you upon completion with a deletion confirmation reference.
+
+**Template ART9-03 — Deletion confirmation (send after Step 3 — completion):**
+> Deletion complete [TIMESTAMP UTC]. Your tenant's GDPR Art. 9 health and fitness data has been removed from all FORM systems. DEC-030 audit event reference: `gdpr.art9_delete_completed` event ID [UUID]. A written deletion certificate per your contract is available on request within 5 business days. Reference: `docs/SOC2_READINESS.md §67`.
+
+---
+
+#### R-25.10 DEC-030 HMAC-Chained Audit Events
+
+Chain ordering constraint: `gdpr.art9_delete_overdue_detected` → `gdpr.art9_delete_resumed` (if applicable) → `gdpr.art9_delete_completed`. `gdpr.art9_delete_manual_trigger` must precede any manual deletion SQL.
+
+| Event type | Severity | Retention | Trigger | Privacy constraints |
+|---|---|---|---|---|
+| `gdpr.art9_delete_overdue_detected` | CRITICAL | 7 yr | AL-GDPR-03 fires; emit at T+15 before any remediation | `tenant_id` only; `hours_overdue` rounded to nearest hour; no `user_id`, no health data |
+| `gdpr.art9_delete_resumed` | HIGH | 7 yr | Manual or automatic retry of hard-delete Worker begins | `tenant_id`, `triggered_by_actor_id`, `root_cause_hypothesis` (H1–H5 enum) |
+| `gdpr.art9_delete_completed` | HIGH | 7 yr | `tenants.art9_hard_delete_completed_at` set; 0 rows across all Art. 9 tables confirmed | `tenant_id`, `total_hours_to_complete`, `rows_deleted_count` (aggregate only) |
+| `gdpr.art9_delete_manual_trigger` | CRITICAL | 7 yr | IC + compliance-officer approve break-glass manual DELETE | `tenant_id`, `ic_actor_id`, `compliance_officer_actor_id`, `pam_session_id` |
+| `gdpr.audit_log_pending_art9_decision` | STANDARD | 7 yr | OQ-GDPR-OBS-03 interim protocol (§R-25.8) — records that audit log rows are retained pending legal counsel decision | `tenant_id`, `oq_reference: "OQ-GDPR-OBS-03"`, `expected_resolution_milestone: "M13"` |
+
+---
+
+#### R-25.11 Evidence Preservation
+
+Store all artefacts at `compliance/evidence/incident-gdpr-art9-delete/<incident_id>/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **ART9-E-001** | DEC-030 `gdpr.art9_delete_overdue_detected` HMAC chain export for affected tenant | P5.2, CC7.2 | 7 yr |
+| **ART9-E-002** | `pg_cron.job_run_details` export: all runs of `enterprise_art9_hard_delete` during incident window | CC7.2 | 7 yr |
+| **ART9-E-003** | R-25-C2 query output before and after remediation: aggregate row counts per table (no individual `user_id` values) | P5.2, CC7.3 | 7 yr |
+| **ART9-E-004** | Communication log: Templates ART9-01/02/03 with UTC timestamps; confirms tenant notification | P6.4, CC7.4 | 7 yr |
+| **ART9-E-005** | Art. 33 assessment decision record: IC + compliance-officer written decision on whether Art. 33 applied; outside counsel sign-off if triggered | P4 | 7 yr |
+| **ART9-E-006** | DEC-030 `gdpr.art9_delete_completed` event — final tamper-evident deletion certificate; referenced in written certificate issued to tenant per `docs/SOC2_READINESS.md §67` | P5.2, CC6.5 | 7 yr |
+
+---
+
+#### R-25.12 SOC 2 and GDPR Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC7.2** — Monitoring | ART9-E-002 + AL-GDPR-03 PagerDuty alert history | AL-GDPR-03 automated monitoring detects overdue deletion within 1 hour of GDPR-SLO-03 breach |
+| **CC7.3** — Anomaly response | ART9-E-003 (rows before/after) + DEC-030 chain | Incident response completes Art. 9 deletion as the recovery action |
+| **CC7.4** — Security incident response | ART9-E-005 (Art. 33 assessment) | Compliance-officer assesses regulatory obligation and escalates if required |
+| **CC6.5** — Logical access termination | ART9-E-006 (`gdpr.art9_delete_completed`) | Hard-delete is the terminal access revocation for off-boarded tenants |
+| **P5.2** — Disposal of personal information | ART9-E-001 + ART9-E-003 + ART9-E-006 | Art. 9 data is hard-deleted from all application tables; deletion is HMAC-evidenced |
+| **P4.0** — Privacy notification | ART9-E-004 | FORM notifies the tenant controller of deletion completion per GDPR controller-processor obligations |
+| **GDPR Art. 5(1)(f)** — Integrity and confidentiality | DEC-030 chain + §R-25.8 interim protocol | HMAC chain integrity preserved; Art. 9 application data deleted; audit log pending legal resolution (OQ-GDPR-OBS-03) |
+
+---
+
+#### R-25.13 Post-Incident Controls
+
+| Control | Trigger condition | Owner | SLA |
+|---|---|---|---|
+| Add tabletop Scenario M (Art. 9 hard-delete failure for 10,000-user tenant) to §9.4 catalog | Any production R-25 incident | security-engineer + devops-lead | 30 days post-PIR |
+| Implement chunked batch deletion as the default Worker behavior (not only in recovery) | H2 root cause confirmed | platform-engineer | M6 |
+| Implement `art9_delete_progress_pct` column on `tenants` table to track partial progress | H2 root cause confirmed | platform-engineer | M6 — closes OQ-GDPR-OBS-02 large-tenant tracking requirement |
+| Add per-tenant Art. 9 SLO extension log (`tenant_art9_slo_extensions` with compliance-officer approval gate) | First large-tenant (> 10,000 seats) off-boarding | compliance-officer + enterprise-architect | M13 |
+
+---
+
+#### R-25.14 Open Questions
+
+| OQ | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-GDPR-OBS-03** | **Should the Art. 9 off-boarding Worker hard-delete `audit_log_events` rows for the tenant's users?** DEC-030 requires 7-year retention; GDPR Art. 9 requires deletion of health-adjacent event data. Interim protocol (§R-25.8): retain rows; RLS prevents access; emit `gdpr.audit_log_pending_art9_decision`. Recommended path: add `user_id_pseudonym TEXT NULL` column; pseudonymise with `ERASURE_PSEUDONYM_SALT` at off-boarding; RLS restricts raw `user_id` to `form_admin` + `compliance_reviewer`; HMAC chain integrity preserved (pseudonymisation is additive). **Outside counsel confirmation required.** | **P0** | compliance-officer + legal + security-engineer | Resolve before first enterprise tenant off-boarding (M13 pre-GA); route to same counsel engagement as OQ-R24-03 |
+| **OQ-R25-01** | **At what delay threshold does a hard-delete overrun automatically trigger GDPR Art. 33 notification?** Current position: Art. 33 applies only if data was accessible during the delay, not merely retained in a locked DB. Counsel may confirm that a 4h–24h delay with no unauthorized access does not constitute a "breach" under GDPR Art. 4(12). Without a clear threshold, the IC must apply the §R-25.7 decision tree manually on each incident. | **P1** | compliance-officer + outside counsel | Same counsel engagement as OQ-GDPR-OBS-03; document outcome in `docs/DECISION_LOG.md` before enterprise GA |
+
+---
+
+#### R-25.15 Implementation Checklist
+
+| # | Action | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all five DEC-030 events from §R-25.10 in `docs/AUDIT_LOG_SCHEMA.md` event registry with Zod schemas; deploy to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 2 | Implement enterprise Art. 9 off-boarding Worker (OBSERVABILITY §37.10 item 5): cascade DELETE per table list in DATA_MODEL.md §25; update `art9_hard_delete_completed_at`; emit `gdpr.art9_delete_completed`. | platform-engineer | **P0** | M6 | [ ] |
+| 3 | Configure AL-GDPR-03 in PagerDuty `form-compliance` service: P0, no-auto-resolve, dedup key `art9-overdue-{tenant_id}`; test with synthetic overdue row in staging. | devops-lead | **P0** | M6 | [ ] |
+| 4 | Resolve OQ-GDPR-OBS-03: engage outside counsel (same engagement as OQ-R24-03); if pseudonymisation approach confirmed, add `user_id_pseudonym TEXT NULL` migration; update `docs/DATA_MODEL.md §12` and `docs/AUDIT_LOG_SCHEMA.md`. | compliance-officer + legal + security-engineer | **P0** | M13 (pre-GA) | [ ] |
+| 5 | Draft and store templates ART9-01/ART9-02/ART9-03 at `compliance/evidence/ir-templates/r25-art9-0N.txt`; review by brand-voice + compliance-officer before first enterprise off-boarding. | customer-success + brand-voice + compliance-officer | **P1** | M10 | [ ] |
+| 6 | Add Scenario M (Art. 9 delete overrun) to §9.4 tabletop drill catalog; schedule in Q1 2027 annual IR drill. | security-engineer | **P1** | Q1 2027 | [ ] |
+| 7 | Collect ART9-E-001 through ART9-E-006 artefacts after first production R-25 incident or Scenario M tabletop; store in `compliance/evidence/incident-gdpr-art9-delete/<drill_id>/`; cross-reference in `docs/SOC2_READINESS.md §70` and `§67`. | compliance-officer | **P1** | M13 or first off-boarding | [ ] |
+| 8 | Resolve OQ-R25-01 (Art. 33 automatic threshold): document in `docs/DECISION_LOG.md` and update §R-25.7 with confirmed threshold. | compliance-officer + outside counsel | **P1** | M13 | [ ] |
+
+---
+
+*v2.2 additions (2026-06-12): R-25 GDPR Art. 9 Enterprise Tenant Off-boarding — Hard-Delete Overdue (AL-GDPR-03) — twenty-fifth runbook. Closes the incident response gap created when `docs/OBSERVABILITY.md §37` (v3.3, 2026-06-12) defined AL-GDPR-03 (P0, no-auto-resolve) for Art. 9 hard-delete overdue events with no corresponding incident runbook. R-25 covers the enterprise tenant off-boarding pipeline failure scenario: the Art. 9 hard-delete Worker fails to complete within GDPR-SLO-03 (4h from `tenants.offboarding_initiated_at`, DEC-036 zero-grace-period commitment). Distinct from R-14 (consumer DSAR Art. 17 individual erasure) and R-01 (data breach — activated in parallel only if data was accessed during the delay). Trigger matrix: AL-GDPR-03 primary automated trigger; tenant admin complaint and scheduled audit as manual triggers. Severity table: P0 for > 4h delay; P1 for partially-complete deletion; large-tenant extension threshold per OQ-GDPR-OBS-02. Immediate actions T+0 to T+20 with DEC-030 emission at T+15 as evidentiary anchor before any remediation action. Five root cause hypotheses H1–H5 (Worker crash, IOPS exhaustion, missing migration, tenant status not set, audit log pseudonymisation conflict). Recovery: Step 1 standard Worker retry; Step 2 chunked batch DELETE with 100ms pg_sleep yield for H2; Step 3 completion UPDATE + DEC-030 emission. Critical sub-protocol §R-25.8 (OQ-GDPR-OBS-03 interim): audit_log_events rows are NOT deleted during R-25 pending outside counsel confirmation on pseudonymisation vs deletion under HMAC-chain constraint; `gdpr.audit_log_pending_art9_decision` (STANDARD, 7yr) marks the pending decision in the chain. Recommended resolution: additive pseudonymisation (user_id_pseudonym column + ERASURE_PSEUDONYM_SALT + RLS restriction on original user_id) preserves chain integrity and satisfies GDPR Art. 4(5). GDPR Art. 33 decision tree §R-25.7: three-question gate (data accessible? third-party access? delay > 72h?) with explicit trigger conditions and outside counsel path. Three communication templates ART9-01/02/03. Five DEC-030 HMAC-chained events (CRITICAL: gdpr.art9_delete_overdue_detected + gdpr.art9_delete_manual_trigger; HIGH: gdpr.art9_delete_resumed + gdpr.art9_delete_completed; STANDARD: gdpr.audit_log_pending_art9_decision). Six evidence artefacts ART9-E-001 through ART9-E-006 mapped to SOC 2 CC7.2/CC7.3/CC7.4/CC6.5/P5.2/P4.0/GDPR Art. 5(1)(f). Four post-incident controls including Scenario M tabletop and chunked batch default. Two open questions: OQ-GDPR-OBS-03 (P0, shared with OBSERVABILITY §37.11 — outside counsel required before M13) and OQ-R25-01 (P1, Art. 33 automatic trigger threshold). Eight-item implementation checklist: 3× P0/M6 (DEC-030 registration, off-boarding Worker, AL-GDPR-03 PagerDuty); 1× P0/M13 (OQ-GDPR-OBS-03 counsel + migration); 4× P1 (templates, Scenario M, evidence collection, OQ-R25-01). Cross-references: `docs/OBSERVABILITY.md §37` (AL-GDPR-03 trigger; GDPR-SLO-03; OQ-GDPR-OBS-03 shared); `docs/DATA_MODEL.md §25` (off-boarding table list); `docs/DATA_MODEL.md §12` (Art. 17 erasure — pseudonymisation pattern for OQ-GDPR-OBS-03 resolution); `docs/SOC2_READINESS.md §67` (deletion certificate); `docs/SOC2_READINESS.md §70` (DSAR lifecycle — sister evidence section); `docs/AUDIT_LOG_SCHEMA.md` (five new DEC-030 events to register); R-01 (parallel activation condition); R-14 (consumer sister runbook). Owner: compliance-officer + platform-engineer + security-engineer.*
+
+---
+
+**v2.2 · 2026-06-12 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
