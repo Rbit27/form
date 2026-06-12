@@ -6,6 +6,19 @@
 
 ---
 
+## [3.83.0] — 2026-06-12
+
+### Added
+- `docs/OBSERVABILITY.md §36` — Mid-Contract Termination Risk Monitoring: pg_cron job 25 `mid_contract_termination_risk_check` (Mondays 09:00 UTC, 8-day freshness window); CHS < 20 sustained ≥ 4 weeks AND > 180 days remaining; 30-day per-tenant dedup via `tenants.mid_contract_risk_alerted_at`; alert rule AL-ETF-01 (P1, PagerDuty `form-customer-success` + Slack `#enterprise-health`); SOC 2 evidence ETF-E-001/ETF-E-002/ETF-E-003 (CC5.2/CC7.2); 5-item P0/M10 checklist; 2 open questions OQ-ETF-04/OQ-ETF-05. Owner: devops-lead + enterprise-architect.
+- `docs/AUDIT_LOG_SCHEMA.md §6` v1.7 — 3 new `enterprise.*` DEC-030 events: `enterprise.mid_contract_termination_risk_flagged` (HIGH, 7yr — pg_cron job 25; `chs_score` + `weeks_below_threshold` + `days_remaining` payload; no `user_id`), `enterprise.contract_amended` (HIGH, 7yr — CSM manual; `amendment_type` enum; `decision_log_ref` required for seat_reduction > 10%), `enterprise.early_termination_fee_waived` (HIGH, 7yr — founder manual; `ev_analysis_completed: true` required for waivers > $5k or HTTP 422; 8-value `waiver_reason` enum; HMAC guard: risk-flagged required within 12 months). Closes COST_MODEL §35.10 item 1 (P0/M10). Owner: compliance-officer + enterprise-architect.
+- `docs/MSA_TEMPLATE.md §11.4` — Early Termination Fee clause: §§8.1–8.8 (liquidated damages framing, declining balance rate schedule M1–M36, seat reduction policy ≤ 10% deferred to annual date, five-tier waiver approval authority, §11.5 counsel review checkpoint at M10, DEC-030 audit record cross-ref). Footer bumped v0.1 → v0.2. Owner: compliance-officer + enterprise-architect.
+- `content/post-526-training-load-management-ati-ctl.md` — «ATL:CTL — Чому ваш «готовий» може означати «на межі»»: ACWR модель (Gabbett 2016 BJSM, Windt & Gabbett 2017), fitness-fatigue model (Banister 1975); деконструкція вікна 0.8–1.3; три практичних принципи для спортсмена без повного контролю над тренувальним середовищем; три розповсюджені помилки. sports_scientist_review: APPROVED; clinical_safety: NOT REQUIRED.
+
+### Changed
+- `VERSION` — 3.82.1 → 3.83.0
+
+---
+
 ## [3.82.1] — 2026-06-12
 
 ### Changed

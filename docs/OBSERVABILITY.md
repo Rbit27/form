@@ -54,6 +54,9 @@ Scope covers all production systems: Cloudflare Workers (edge API), Cloudflare P
 | §31 | API Key Authentication & Usage Observability |
 | §32 | Victor AI Safety Monitoring & Clinical-Safety Observability |
 | §33 | Enterprise Tenant Engagement Health & QBR Metrics Observability |
+| §34 | SIEM Correlation Rules — Supabase Bridge Implementation (M4–M8) & ClickHouse Migration Plan |
+| §35 | Rate Limiting, Quota Enforcement & Abuse Prevention Observability |
+| §36 | Mid-Contract Termination Risk Monitoring |
 
 ---
 
@@ -1139,6 +1142,7 @@ The canonical registry of all production pg_cron jobs subject to automated fresh
 | `api_key_chain_monitor` | `0 3 * * *` | 26 h | CC6.4 / CC7.2 — runs APIKEY-CHAIN-01 (zero events in 90 d with live unmatched `tenant_api_keys` rows — bypass detection) and APIKEY-CHAIN-02 (rotation overlap expired without `api_key.revoked` in 26 h — APIKEY-SLO-03 breach); emits `admin.monitoring_check_failed` DEC-030 on non-zero result; stale = rotation-gap detection blind spot | PagerDuty P1 `form-security` → security-engineer; dedup `apikey-chain-stale`; §31.6 — **job 13** |
 | `victor_safety_baseline_refresh` | `0 1 * * *` | 26 h | CC7.2 / A1.2 — nightly 30-day rolling baseline computation per `trigger_category` from `VICTOR_SAFETY_TELEMETRY`; writes to `system.victor_safety_baselines` KV namespace (`vsafety:baseline:{trigger_category}:{date}`); required for FORM-VICTOR-002/003/004 threshold evaluation; stale = FORM-VICTOR-002/003/004 thresholds use stale baseline → false-positive risk | PagerDuty P1 `form-devops` → devops-lead; dedup `victor-baseline-stale`; §32.4 — **job 14** |
 | `victor_safety_chain_monitor` | `30 0 * * *` | 26 h | CC7.4 / A1.2 — runs VSAFETY-CHAIN-01 (P0 incident open with no `ai.safety_incident_contained` > 60 min) and VSAFETY-CHAIN-02 (Victor disabled > 48 h with no re-enable); emits `admin.monitoring_check_failed` DEC-030 on non-zero result; stale = clinical-safety chain integrity blind spot | PagerDuty P1 `form-devops` → devops-lead + clinical-safety; dedup `victor-chain-stale`; §32.6 — **job 15** |
+| `mid_contract_termination_risk_check` | `0 9 * * 1` | 8 days | CC5.2 / CC7.2 — weekly check for tenants with `chs_score < 20` in ≥ 4 consecutive weekly `tenant_engagement_snapshots` rows AND `days_remaining > 180`; emits `enterprise.mid_contract_termination_risk_flagged` DEC-030 HIGH 7yr; 30-day per-tenant dedup via `tenants.mid_contract_risk_alerted_at`; stale = mid-contract churn risk blind spot for high-value at-risk accounts | PagerDuty P1 `form-customer-success` → CSM lead + CS lead; Slack `#enterprise-health` HIGH; **job 25**; cross-ref: §36 AL-ETF-01; COST_MODEL.md §35.9.1 (canonical event definition); AUDIT_LOG_SCHEMA.md (event registered v1.7) |
 
 *Freshness window note:* `row-count-monitor` runs every 15 minutes — 1 h window gives four-missed-run tolerance before alert. `audit-event-flush` runs every 30 minutes — 2 h window gives four-missed-run tolerance; tolerated because event loss requires simultaneous flush failure **and** Supabase unrecoverable failure within the same window. All daily jobs use 26 h to absorb clock drift and cron scheduling jitter.
 
@@ -9139,5 +9143,115 @@ SELECT cron.schedule(
 *v2.9 (2026-06-11): §35.4 and §35.5 AL-RL-01b — 95% quota soft-warn alert. New `AL-RL-01b` (P1, auto-escalates to P0 after 2h unacknowledged) added between AL-RL-01 and AL-RL-02 in both the §35.4 detailed alert table and the §35.5 `rate_limit_health` §6.2 subsection condensed table. Sourced from `security.quota_95pct_warning` DEC-030 STANDARD 3yr event (DATA_MODEL §30.3 OQ-RL-02 resolution); deduped via `api_quota_usage.secondary_warn_sent_at` — at most one page per tenant per billing period per category. §35.5 header: "five rows" → "six rows". Closes DATA_MODEL §30.7 checklist item 7 (P0 M4 — add AL-RL-01b to OBSERVABILITY.md §6.2 rate_limit_health subsection). Cross-ref: DATA_MODEL §30.3 (OVERAGE_GRACE = 500, QUOTA_SECONDARY_WARN_PCT = 0.95, migration 0059b adds secondary_warn_sent_at); AUDIT_LOG_SCHEMA.md v1.5 (security.quota_95pct_warning registered). Owner: devops-lead + platform-engineer + compliance-officer.*
 
 *v2.8 (2026-06-11): §26.7a SCIM Mass Deprovisioning Observability + §12.6 job 24 — patch to close `docs/INCIDENT_RESPONSE.md R-24.15` checklist items 1 and 6. §12.6: `scim_mass_deprovision_check` (job 24, `*/5 * * * *`, 6-min freshness window, A1.1/CC7.2) added as seventeenth monitored pg_cron job; dual-page PagerDuty `form-customer-success` + `form-platform` on stale. §26.1: fourth cross-reference (R-24 → §26.7a); privacy constraint updated; SOC 2 mapping extended to A1.1 + A1.2. §26.7a: new alert spec for AL-SCIM-MASS-01 — trigger (`scim.user_deprovisioned` burst ≥ `MAX(0.10 × seat_count, 10)` / 10-min rolling window per tenant_id), P0 threshold (≥ 50% or admin lockout), P1 threshold (≥ 10% or ≥ 100 users), dual-page PagerDuty, dedup keys (1h P0 / 15min P1), pg_cron SQL with `NULLIF(seat_count, 0)` guard, response flow (IC → scope SQL → suspend → H1–H4 → restore), privacy floor (tenant_id + aggregate count only). §26.8: `mass_deprovision` condensed-format subsection row added. §26.11: CC7.2 updated (fifteen → sixteen alert rules); CC7.3 extended (adds R-24); A1.1 and A1.2 criterion rows added; SSO-OBS-E-005 evidence artefact (AL-SCIM-MASS-01 PagerDuty export with zero-count guidance). §26.12: three new implementation items (pg_cron deploy + DEC-030 register + staging test P0/M5; SCIM pause endpoint P0/M5; SSO-OBS-E-005 filing P1/observation period). Cross-references: `docs/INCIDENT_RESPONSE.md R-24` (trigger, scope SQL, suspend mechanism, root cause H1–H4, communication templates, DEC-030 events); `docs/AUDIT_LOG_SCHEMA.md` (five R-24 DEC-030 events: `scim.mass_deprovision_detected`, `scim.sync_suspended`, `scim.admin_lockout_recovery`, `scim.sync_resumed`, `scim.mass_reprovision_complete`); `docs/SOC2_READINESS.md §33` (A1 availability deep-dive); `docs/SSO_SCIM_IMPLEMENTATION.md §15` (OQ-R24-01 batch DELETE threshold). Owner: devops-lead + security-engineer + compliance-officer.*
+
+---
+
+## §36 Mid-Contract Termination Risk Monitoring
+
+This section specifies the monitoring infrastructure for detecting enterprise accounts at risk of mid-contract termination — distinct from the renewal risk framework (§33, which monitors the 90-day pre-renewal window) and the churn lifecycle events (COST_MODEL §34). This section operationalises COST_MODEL §35 at the observability layer.
+
+### 36.1 Scope and threshold definition
+
+| Signal | Threshold | Rationale |
+|---|---|---|
+| CHS score | `chs_score < 20` | Sub-floor of the §33 "critical" band (< 40). CHS < 20 for a sustained period signals a disengaged account, not merely an at-risk one. |
+| Sustained duration | ≥ 4 consecutive weekly snapshots | Filters transient dips (holiday, onboarding lag). Four consecutive weeks (~28 days) confirms structural disengagement. |
+| Contract tenure remaining | `days_remaining > 180` | Termination risk is only financially material (ETF recovery justified) if ≥ 6 months remain. Accounts within 180 days of expiry are handled by §33 renewal risk, not mid-contract ETF risk. |
+| Deduplication window | 30 days per tenant | Prevents re-alert noise for the same sustained-risk event. CSM should resolve or document the account before the next alert window. |
+
+### 36.2 pg_cron job 25 — `mid_contract_termination_risk_check`
+
+**Schedule:** `0 9 * * 1` (09:00 UTC every Monday — after §33 `tenant_chs_compute` job at 02:30 UTC, ensuring the most recent CHS snapshot is available)
+
+**Freshness window:** 8 days (Monday ± 1 day tolerance; 8-day window absorbs one missed Monday run before alert)
+
+**Detection query:**
+
+```sql
+WITH consecutive_low_chs AS (
+  SELECT
+    tes.tenant_id,
+    COUNT(*) AS weeks_below_threshold,
+    MIN(tes.chs_score) AS min_chs_score,
+    MAX(tes.chs_score) AS max_chs_score,
+    MAX(tes.snapshot_date) AS latest_snapshot_date
+  FROM tenant_engagement_snapshots tes
+  WHERE tes.snapshot_date >= NOW() - INTERVAL '28 days'
+    AND tes.chs_score < 20
+    AND tes.below_k_threshold = false  -- k-anonymity: suppress tenants < 10 seats
+  GROUP BY tes.tenant_id
+  HAVING COUNT(*) >= 4
+),
+at_risk_contracts AS (
+  SELECT
+    clc.tenant_id,
+    clc.weeks_below_threshold,
+    clc.min_chs_score AS chs_score,
+    t.contract_end_date,
+    (t.contract_end_date - NOW()::date) AS days_remaining,
+    t.contract_acv_usd,
+    t.mid_contract_risk_alerted_at
+  FROM consecutive_low_chs clc
+  JOIN tenants t ON t.id = clc.tenant_id
+  WHERE (t.contract_end_date - NOW()::date) > 180
+    AND (
+      t.mid_contract_risk_alerted_at IS NULL
+      OR NOW() - t.mid_contract_risk_alerted_at > INTERVAL '30 days'
+    )
+)
+SELECT * FROM at_risk_contracts;
+```
+
+**Emission logic:** For each row returned, emit `enterprise.mid_contract_termination_risk_flagged` DEC-030 HIGH via `pg_net` → `emit-audit-event` Worker, then UPDATE `tenants SET mid_contract_risk_alerted_at = NOW()` for the tenant. The DEC-030 emission must precede the UPDATE (DEC-030 ordering: chain entry precedes state mutation).
+
+**Schema dependency:** Requires `tenants.mid_contract_risk_alerted_at TIMESTAMPTZ NULL` column. Add via migration `migrations/YYYYMMDD_tenants_mid_contract_risk.sql`:
+
+```sql
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS mid_contract_risk_alerted_at TIMESTAMPTZ NULL;
+COMMENT ON COLUMN tenants.mid_contract_risk_alerted_at IS 'Dedup guard for enterprise.mid_contract_termination_risk_flagged DEC-030 event (§36.5 P0). Set to NOW() on emission; next emission only if NOW() - this > 30 days.';
+```
+
+### 36.3 Alert rule AL-ETF-01
+
+| Alert | AL-ETF-01 · Mid-contract termination risk detected |
+|---|---|
+| **Trigger** | `enterprise.mid_contract_termination_risk_flagged` DEC-030 event emitted |
+| **Severity** | P1 |
+| **Routing** | PagerDuty `form-customer-success` → CSM lead + CS lead; Slack `#enterprise-health` HIGH |
+| **Dedup key** | `etf-risk-{tenant_id}` (30-day TTL matching the pg_cron dedup window) |
+| **Re-alert** | Once per 30 days per tenant (enforced by `mid_contract_risk_alerted_at` dedup in job 25) |
+| **On-call action** | CSM lead reviews CHS trend in Metabase §33 dashboard; initiates CSM intervention call within 48 h; classifies account in CRM as "Mid-Contract At-Risk"; escalates to founder if `days_remaining > 365` AND `contract_acv_usd > 50000` |
+| **Escalation** | Founder notification if `days_remaining > 365` AND `contract_acv_usd > 50000` (high-value long-duration at-risk) |
+| **Resolution** | Alert closes when CHS ≥ 20 for 2 consecutive weekly snapshots OR contract reaches `days_remaining ≤ 180` (transitions to §33 renewal risk framework) |
+| **Cross-ref** | COST_MODEL.md §35.9.1 (event definition); §35.6.3 (EV waiver model — CSM references this if account escalates to termination discussion); AUDIT_LOG_SCHEMA.md v1.7 (`enterprise.mid_contract_termination_risk_flagged` registered); §12.6 job 25 |
+
+### 36.4 SOC 2 evidence mapping
+
+| Evidence artefact | TSC criterion | Description | Retention |
+|---|---|---|---|
+| ETF-E-001 | CC5.2 (risk assessment) | `enterprise.mid_contract_termination_risk_flagged` DEC-030 chain — demonstrates FORM proactively identifies and responds to contract risk signals | 7 yr |
+| ETF-E-002 | CC7.2 (monitoring of controls) | AL-ETF-01 alert dispatch log — PagerDuty incident records for each AL-ETF-01 trigger; `#enterprise-health` Slack log | 3 yr |
+| ETF-E-003 | CC5.2 (risk assessment) | `enterprise.early_termination_fee_waived` DEC-030 chain — waiver audit trail; `ev_analysis_completed` boolean enforced by emit-audit-event Worker | 7 yr |
+
+### 36.5 Implementation checklist
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Add `tenants.mid_contract_risk_alerted_at TIMESTAMPTZ NULL` column via migration (§36.2 DDL) | platform-engineer | **P0** | M10 | [ ] |
+| 2 | Implement pg_cron job 25 `mid_contract_termination_risk_check` with detection query (§36.2) + pg_net DEC-030 emission + UPDATE guard | platform-engineer | **P0** | M10 | [ ] |
+| 3 | Configure PagerDuty AL-ETF-01 routing to `form-customer-success` service (CSM lead + CS lead) + Slack `#enterprise-health` hook | devops-lead | **P0** | M10 | [ ] |
+| 4 | Add `mid_contract_termination_risk_check` to `pg-cron-health-monitor` freshness registry (8-day window, PagerDuty P1) | devops-lead | **P0** | M10 | [ ] |
+| 5 | Register `enterprise.mid_contract_termination_risk_flagged`, `enterprise.contract_amended`, `enterprise.early_termination_fee_waived` in `emit-audit-event` Worker event registry; add `ev_analysis_completed` enforcement (HTTP 422 for waivers > $5k with `ev_analysis_completed: false`); add HMAC ordering guard (risk-flagged required within 12 months before ETF waiver, except `small_etf_enforcement_uneconomic`) | platform-engineer | **P0** | M10 | [ ] |
+
+### 36.6 Open questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-ETF-04** | **Should the 4-consecutive-week detection window use calendar weeks (Monday-anchored via pg_cron) or a rolling 28-day window?** Current implementation uses calendar-week snapshots from `tenant_engagement_snapshots` (one row per tenant per week, inserted by `tenant_chs_compute` job 17). A rolling 28-day window is marginally more sensitive but adds query complexity. Recommendation: calendar-week approach is correct for the current snapshot frequency — revisit if snapshot cadence increases to daily. | P2 | devops-lead | After first 3 AL-ETF-01 alerts; confirm no false positives from holiday-week CHS dips |
+| **OQ-ETF-05** | **Should AL-ETF-01 trigger a Metabase CHS dashboard deep-link in the PagerDuty alert body?** This would reduce CSM time-to-investigate from ~5 min (navigate to Metabase manually) to ~30 sec. Requires parameterised Metabase dashboard URL with `tenant_id`. Risk: Metabase URL contains `tenant_id` in plaintext — acceptable in PagerDuty (internal tool) but must never appear in customer-facing communications. | P2 | devops-lead + customer-success | Implement at M11 if Metabase dashboard is live |
+
+---
+
+*v0.1 (2026-06-12): §36 Mid-Contract Termination Risk Monitoring — operationalises COST_MODEL.md §35 at the observability layer. AL-ETF-01 alert rule (§36.3): P1 PagerDuty `form-customer-success` + Slack `#enterprise-health` HIGH on `enterprise.mid_contract_termination_risk_flagged` DEC-030 emission; 30-day dedup per tenant. pg_cron job 25 `mid_contract_termination_risk_check` (§36.2, 09:00 UTC Mondays, 8-day freshness window): SQL detection query for `chs_score < 20` in ≥ 4 consecutive weekly snapshots AND `days_remaining > 180`; requires `tenants.mid_contract_risk_alerted_at TIMESTAMPTZ NULL` migration; pg_net → emit-audit-event Worker emission; DEC-030 ordering enforced (chain entry precedes UPDATE). SOC 2 evidence artefacts ETF-E-001 (CC5.2), ETF-E-002 (CC7.2), ETF-E-003 (CC5.2) at §36.4. Five-item P0/M10 implementation checklist at §36.5. Two open questions OQ-ETF-04/OQ-ETF-05 at §36.6. Note: section numbered §36 (not §35) because `## §35` is reserved for Rate Limiting & Quota Enforcement Observability (v2.7). Cross-ref: COST_MODEL.md §35 (ETF model definition); AUDIT_LOG_SCHEMA.md v1.7 (event registration); MSA_TEMPLATE.md §11.4 (ETF clause); §12.6 (job 25 registered); §33 (CHS model — `tenant_engagement_snapshots` source table). Owner: devops-lead + enterprise-architect + customer-success.*
 
 *v2.7 (2026-06-11): §35 Rate Limiting, Quota Enforcement & Abuse Prevention Observability — observability companion to `docs/DATA_MODEL.md §28` (v1.0, 2026-06-10). Closes DATA_MODEL §28.9 checklist item 8 (P1 M5). Also closes §34.5 registry gap: jobs 22 and 23 (`siem_bridge_cr02_impossible_travel` and `siem_bridge_cr03_priv_escalation`) were defined in §34.5 but not appended to the §12.6 table; this patch adds those rows. §35.1 scope: three-layer architecture monitoring — WAF excluded (R-06); KV burst via `RLIMIT_TELEMETRY` Analytics Engine; DB quota via Postgres queries on `api_quota_usage`, `rate_limit_violations`, `abuse_flags`. Privacy floor: no raw IP in Analytics Engine (ip_country 2-char in Postgres only), no `key_preview`, `abuse_flags.evidence_summary` statistical metadata only, `abuse_flags` RLS blocks all roles except `security_reviewer` + `form_system`. §35.2 RED metrics: `RLIMIT_TELEMETRY` eight-column schema (api_key_id UUID, tenant_id, endpoint_category, violation_type, violation_layer, request_count, quota_limit, timestamp; no IP, no key_preview); Layer 2 RED table (KV violations/min, hard_blocks/day, 80% warnings/month, middleware error rate, P95 latency by layer); Layer 3 Postgres metrics (consumption %, violation count, open abuse flags by severity, auto-action rate, median time-to-resolve); RL-SLO-02 false-hard-block verification SQL. §35.3 four SLOs: RL-SLO-01 (latency KV < 5 ms P95 / DB < 15 ms P95 — 99.9%), RL-SLO-02 (false hard-block rate 0% for contracted enterprise — daily SQL verification), RL-SLO-03 (CSM 80%-threshold notification within 5 min — 100%), RL-SLO-04 (rate_limit_violations_cleanup ± 90 min schedule adherence). §35.4 five alert rules: AL-RL-01 (P2, 80%-threshold first-hit → customer-success, dedup per period/category), AL-RL-02 (P1, enterprise hard block → customer-success + security-engineer dual-page), AL-RL-03 (P0, critical abuse_flag → security-engineer, no auto-resolve), AL-RL-04 (P1, KV spike > 50/key/5 min → R-03 trigger, `siem-rl-checker` Worker), AL-RL-05 (P1, pg_cron stale jobs 16/17). §35.5 `rate_limit_health` §6.2 subsection: five rows AL-RL-01 through AL-RL-05 inserted after `api_key_health` and before `siem_health`. §35.6 §12.6 additions: four rows — job 16 (`rate_limit_violations_cleanup` daily 03:00 UTC, 26h window, CC6.6/CC4.1), job 17 (`api_quota_usage_archive` monthly 00:30 UTC 1st, 48h window — broader tolerance for monthly cadence, emits `data.quota_records_archived` DEC-030 STANDARD 1yr before DELETE), job 22 (`siem_bridge_cr02_impossible_travel` */5 UTC, 6min window — CR-02 blind on stale), job 23 (`siem_bridge_cr03_priv_escalation` */5 UTC, 6min window — CR-03 blind on stale). Registry status table provided: 15 jobs total (9 original + 2 PAM + 4 this patch); 6 jobs still missing (jobs 10–15, tracked in §35.10 item 12). Deploy SQL provided for jobs 16/17 (`0055b_rate_limit_cron.sql`). §35.7 eight-panel "Rate Limit & Abuse Health" Metabase + Better Stack dashboard: monthly quota by tenant (grouped bar, 80%/100% threshold lines, UUID display for cross-role privacy), KV violations 7-day trend, hard blocks table (30 d), abuse flags stacked bar (30 d), auto-action rate stat, median time-to-resolve stat, pg_cron health tiles (jobs 16/17), DEC-030 event log (last 50). §35.8 five privacy constraints: no raw IP in RLIMIT_TELEMETRY, key_preview excluded, evidence_summary statistical only, abuse_flags RLS (security_reviewer + form_system only), tenant quota scope (own tenant only). §35.9 SOC 2 evidence: CC6.1 (RL-E-001 + RL-SLO-02 verification query), CC6.6 (RL-E-002 rate_limit_violations 90-day export), CC7.2 (RL-E-003 + new RL-E-004 AL-RL-03 PagerDuty incident history 7yr). RL-E-004 artefact defined: PagerDuty `form-security` AL-RL-03 incidents (opened/acknowledged/resolved timestamps) stored at `compliance/evidence/rate-limiting/rl-e-004-abuse-critical-pagerduty-YYYY.csv`. §35.10 thirteen-item checklist: 5× P0 M4 (AL-RL-01 through AL-RL-04 PagerDuty + `siem-rl-checker` Worker, §6.2 table addition), 6× P1 M5-M6 (pg_cron jobs 16-17 deploy, RL-SLO registration + RL-SLO-02 daily check, RLIMIT_TELEMETRY wiring, dashboard build, evidence collection), 2× P2 M6-M7 (§12.6 jobs 10-15 registry gap closure, OQ-RL-OBS-01 pilot feedback evaluation). §35.11 two open questions: OQ-RL-OBS-01 (advanced tenant quota trend panel — P2, ≥ 2 pilot requests trigger), OQ-RL-OBS-02 (tenant-facing anonymised abuse summary — P2, no at M5; re-evaluate pre-GA M13). Cross-references: `docs/DATA_MODEL.md §28` (canonical rate-limit schema — three tables, RLS, enforcement flow, three DEC-030 events); `docs/DATA_MODEL.md §28.9` checklist item 8 (P1 — closed by §35.6 jobs 16/17); `docs/DATA_MODEL.md §26` (API key schema — FK source for `api_quota_usage.api_key_id`); `docs/INCIDENT_RESPONSE.md R-06` (DDoS / WAF Bypass — Layer 1 signal owner); `docs/INCIDENT_RESPONSE.md R-03` (Compromised Credentials — AL-RL-04 trigger path); `docs/SSO_SCIM_IMPLEMENTATION.md §26` (API key auth security — companion layer above rate limiting); `docs/OBSERVABILITY.md §31` (API key auth observability — AL-APIKEY-01/04 for KV spike; distinct from AL-RL-04 but may co-fire); `docs/OBSERVABILITY.md §34.5` (§12.6 jobs 22-23 — described but not previously appended to registry table; closed by this patch). Owner: devops-lead + security-engineer + platform-engineer + compliance-officer.*

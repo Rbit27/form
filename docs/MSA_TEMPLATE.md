@@ -246,9 +246,38 @@ FORM may terminate immediately upon Customer's breach of §8 (Privacy Floor) or 
 
 ### 11.3 Termination for Convenience
 
-Customer may terminate an Order Form with 90 days written notice. Fees for the remaining contract period are not waived on termination for convenience; prepaid annual fees for the remaining period are forfeited. Customer must negotiate early-termination provisions in the Order Form at signing if it requires a different arrangement.
+Customer may terminate an Order Form with 90 days written notice. Fees for the remaining contract period are not waived on termination for convenience; prepaid annual fees for the remaining period are forfeited. The Early Termination Fee framework in §11.4 governs the calculation of amounts owed on early termination.
 
-### 11.4 Effect of Termination
+### 11.4 Early Termination Fee
+
+**8.1 Liquidated Damages.** If Customer terminates for convenience before the end of the contracted subscription term, Customer agrees to pay FORM an Early Termination Fee ("ETF") representing a genuine pre-estimate of FORM's losses from the early termination, including unamortised customer acquisition cost and lost recurring revenue. The ETF is not a penalty.
+
+**8.2 ETF Calculation.** The ETF is calculated on Customer's Contracted Annual Contract Value ("ACV") — the actual contracted rate post any multi-year discount — not the list price.
+
+**8.3 Declining Balance Rate Schedule.**
+
+| Exit at month | ETF rate (% of remaining contracted ACV) |
+|---|---|
+| M1–M3 | 60% |
+| M4–M6 | 50% |
+| M7–M12 | 40% |
+| M13–M18 | 30% |
+| M19–M24 | 20% |
+| M25–M30 | 10% |
+| M31–M36 | 0% + minimum floor |
+| M37+ (multi-year renewal term) | Resets to M1 schedule for the new term |
+
+**8.4 Minimum Floor.** The ETF shall not be less than one (1) month of the contracted ACV, regardless of the rate schedule above.
+
+**8.5 Seat Reduction Policy.** Contracted seat counts are fixed for the term. Seat reductions of ten percent (10%) or fewer of contracted seats may be deferred to the next annual renewal date at no ETF. Seat reductions greater than ten percent (10%), or reductions that would bring the account below the tier minimum seat count, trigger an ETF calculated on the ACV reduction amount using the rate schedule in §8.3 applied to the remaining term.
+
+**8.6 Waiver Authority.** FORM may waive the ETF in whole or in part at its sole discretion, subject to an expected-value analysis confirming the waiver exceeds enforcement net present value. Any waiver of an ETF exceeding USD 5,000 requires approval by FORM's founder. Any waiver exceeding USD 100,000 requires approval by FORM's founder and a lead investor. ETF waivers are logged as immutable audit events per FORM's DEC-030 policy.
+
+**8.7 Counsel Review Checkpoint.** *[⚠ OUTSIDE COUNSEL REVIEW REQUIRED BEFORE FIRST MULTI-YEAR CONTRACT — M10. Confirm enforceability of liquidated damages framing in DE (§§339–340 BGB) and US (NY/DE preferred; CA requires special consideration). Confirm ACV basis vs list ACV (current position: contracted ACV). See docs/COST_MODEL.md OQ-ETF-01 and OQ-ETF-02.]*
+
+**8.8 Audit Record.** Any ETF waiver and any contract amendment (including price-lock renewals and seat reductions) is logged as an immutable HMAC-chained DEC-030 audit event (`enterprise.early_termination_fee_waived`, `enterprise.contract_amended`) and retained for 7 years per FORM's audit log policy (`docs/AUDIT_LOG_SCHEMA.md`).
+
+### 11.5 Effect of Termination
 
 Upon termination or expiry:
 - FORM will continue to provide the Services during any applicable notice period.
@@ -603,4 +632,8 @@ Executed separately. Governs: CCPA service-provider obligations; prohibition on 
 
 ---
 
-*v0.1 · 2026-06-09 · owners: compliance-officer, enterprise-architect, founder · next review: before first enterprise contract execution · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`*
+*v0.2 · 2026-06-12 · owners: compliance-officer, enterprise-architect, founder · next review: before first enterprise multi-year contract execution (M10 — outside counsel review required per §11.4 §8.7) · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`, `docs/COST_MODEL.md §35`*
+
+*v0.2 (2026-06-12): +§11.4 Early Termination Fee clause — closes COST_MODEL.md §35.10 checklist item 2 (P0, M10 — add ETF clause to MSA before first enterprise multi-year contract close). Added: (1) §11.4.8.1 liquidated damages framing (ETF is a genuine pre-estimate of FORM losses, not a penalty); (2) §11.4.8.2 ETF calculated on contracted ACV post multi-year discount, not list price; (3) §11.4.8.3 declining balance rate schedule (M1–M3: 60%, M4–M6: 50%, M7–M12: 40%, M13–M18: 30%, M19–M24: 20%, M25–M30: 10%, M31–M36: 0% + floor, M37+: resets); (4) §11.4.8.4 minimum floor of one month contracted ACV; (5) §11.4.8.5 seat reduction policy — reductions ≤ 10% deferred to annual date at no ETF; reductions > 10% or below tier minimum trigger ETF on ACV reduction amount; (6) §11.4.8.6 waiver authority — founder approval for waivers > USD 5,000; founder + lead investor for waivers > USD 100,000; (7) §11.4.8.7 outside counsel review checkpoint — M10 required before first multi-year contract (DE §§339–340 BGB enforceability + US NY/DE/CA considerations; OQ-ETF-01/OQ-ETF-02 from COST_MODEL.md); (8) §11.4.8.8 audit record — ETF waivers and contract amendments logged as DEC-030 HMAC-chained events per AUDIT_LOG_SCHEMA.md. §11.3 updated to reference §11.4. Former §11.4 (Effect of Termination) renumbered to §11.5. Cross-ref: COST_MODEL.md §35.3 (rate schedule), §35.5.5 (approval authority matrix), §35.9 (DEC-030 event definitions), §35.10 (P0 M10 checklist); AUDIT_LOG_SCHEMA.md §enterprise-contract-amendment-etf (enterprise.mid_contract_termination_risk_flagged, enterprise.contract_amended, enterprise.early_termination_fee_waived). Owner: compliance-officer, enterprise-architect, founder.*
+
+*v0.1 · 2026-06-09 · owners: compliance-officer, enterprise-architect, founder · initial template draft · next review: before first enterprise contract execution · references: `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/ENTERPRISE_SLA.md`, `docs/SUBPROCESSORS.md §5`, `docs/SOC2_READINESS.md §13`*
