@@ -6,6 +6,17 @@
 
 ---
 
+## [4.0.0] — 2026-06-12
+
+### Added
+- `docs/PENETRATION_TESTING.md` — standalone annual penetration test program v1.0; closes the "formal policy document not yet standalone" gap flagged in `docs/SOC2_READINESS.md §16`; covers scope (7 in-scope surfaces / 9 out-of-scope, with change process), methodology (OWASP WSTG v4.2 + ASVS L2 + MASVS L1/L2 + PTES + CWE Top 25), test cadence (5 trigger types), testing firm selection RFP process with CREST-accreditation + health-data experience criteria and evaluation shortlist, pre-engagement preparation checklist, CVSS v3.1 severity table with health-data one-tier uplift and tenant-isolation absolute Critical override, 7-step remediation workflow with Linear ticket conventions and emergency patch procedure, 8-artifact SOC 2 evidence package definition, enterprise customer disclosure policy (executive summary ≥$50k ACV / attestation letter <$50k ACV / buyer timeline coordination), 10-event DEC-030 HMAC-chained audit log registry, roles and responsibilities, prohibited activities contract clause, three disclosure templates (scope letter / attestation letter / executive summary cover memo), CC7.1 + CC7.2 + CC4.1 + CC9.2 + CC3.2 + P5.2 SOC 2 control mapping table · owners: security-engineer + compliance-officer + enterprise-architect
+
+### Changed
+- `docs/SOC2_READINESS.md §16` — updated to cross-reference `docs/PENETRATION_TESTING.md` as authoritative source; §16 now retains gap-status table and SOC 2 criteria mapping only; "Programme defined; formal policy document not yet standalone" gap resolved
+- `VERSION` — 3.99.0 → 4.0.0
+
+---
+
 ## [3.99.0] — 2026-06-12
 
 ### Added

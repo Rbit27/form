@@ -972,12 +972,19 @@ The following controls are formally impossible with one person. They are documen
 
 ## 16. Penetration Test Program
 
-> Owner: `security-engineer` + `compliance-officer`. SOC 2 criteria closed: CC7.1 (threat identification), CC7.2 (vulnerability management), CC9.2 (vendor risk).
-> Reference: DEC-030 (HMAC-chained audit log), `docs/AUDIT_LOG_SCHEMA.md`, `docs/ENTERPRISE.md`, `docs/INCIDENT_RESPONSE.md`.
+> **⚠ This section is now a summary cross-reference only.**
+> The authoritative standalone program document is **`docs/PENETRATION_TESTING.md`** (v1.0, 2026-06-12).
+> Operational detail — scope, methodology, firm selection, remediation workflow, evidence package, DEC-030 events, and customer disclosure templates — lives there.
+> This section retains the gap-status table (§16.11) and SOC 2 criteria mapping for auditor navigation.
+>
+> Owner: `security-engineer` + `compliance-officer`. SOC 2 criteria: CC7.1, CC7.2, CC9.2.
+> References: `docs/PENETRATION_TESTING.md`, `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), `docs/INCIDENT_RESPONSE.md`, `docs/VULNERABILITY_MANAGEMENT.md`.
 
 ### 16.1 Purpose
 
 The penetration test program formally identifies security vulnerabilities in FORM's production systems before an attacker does. It produces auditor-grade evidence for CC7 (System Operations) and demonstrates due care to enterprise customers. Results feed directly into the risk register (Section 14) and the incident response program (`docs/INCIDENT_RESPONSE.md`).
+
+**Full program detail:** `docs/PENETRATION_TESTING.md §1`.
 
 This section defines the program structure. The first execution maps to PRE-21 in the readiness checklist (Section 15.2). Once executed, the report and remediation evidence are stored as durable SOC 2 artifacts.
 
