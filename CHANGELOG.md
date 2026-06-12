@@ -6,6 +6,14 @@
 
 ---
 
+## [3.96.2] — 2026-06-12
+
+### Fixed
+- `content/post-543-beginner-to-intermediate-criteria.md` — повторний citation fix (background agent re-introduced errors): Kraemer журнал → *Med Sci Sports Exerc* 36(4):674–688; Schoenfeld для neural shift → Moritani & deVries (1979) + Sale (1988); Zourdos misattribution для LP-stall → прибрано атрибуцію, лишено як practitioner definition; Peterson et al. (2011) phantom → Peterson, Rhea & Alvar (2004) *JSCR* 18(2):377–382; footnotes оновлено
+- `VERSION` — 3.96.1 → 3.96.2
+
+---
+
 ## [3.96.1] — 2026-06-12
 
 ### Fixed
