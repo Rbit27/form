@@ -6,6 +6,14 @@
 
 ---
 
+## [3.92.1] — 2026-06-12
+
+### Changed
+- `docs/OBSERVABILITY.md` §25.3 v3.2 → v3.4 — OQ-33 clinical-safety ruling implementation (DEC-046, 2026-06-12). `checkin.submitted` event row updated: `readiness_bucket` (`"low"`|`"medium"`|`"high"`) added to Key Properties as **conditionally permitted** per OQ-33 split ruling; Notes column updated to reflect event-property-only scope, PostHog DPA review pre-condition, prohibition on raw `readiness_score` integer, and permanent clinical-safety VETO on `mood_score`/`mood_bucket`. Prohibited Properties table split into two rows: `mood_score`/`mood_bucket` → permanently prohibited (GDPR Art. 9 mental health data; PostHog person-model longitudinal inference risk; clinical-safety VETO); `readiness_score` raw integer → prohibited with explicit note that `readiness_bucket` is conditionally permitted on `checkin.submitted` only per §25.9. Document title bumped v3.2 → v3.4. Companion updates already committed: `docs/PRIVACY_IMPACT.md §2.2` OC-08 (2026-06-12); `docs/DECISION_LOG.md` DEC-046 (governance record).
+- `VERSION` — 3.92.0 → 3.92.1
+
+---
+
 ## [3.92.0] — 2026-06-12
 
 ### Added
