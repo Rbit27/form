@@ -6,6 +6,15 @@
 
 ---
 
+## [3.84.1] — 2026-06-12
+
+### Changed
+- `docs/ENTERPRISE_ADMIN_API.md` v0.1 → v0.2 — §1.9–§1.10 API Key Usage Telemetry: closes **OQ-APIKEY-OBS-01** (P1 · customer-success + enterprise-architect). §1.9 `GET /v1/admin/api-keys/{id}`: single-key retrieval with `telemetry_30d` block — `request_count`, `rejection_count`, `last_rejection_reason`, `last_rejection_at`, rolling 30-day window bounds; sourced from `APIKEY_TELEMETRY` Analytics Engine via two-query pattern (COUNTIF aggregate + ORDER BY DESC LIMIT 1 for last rejection); `tenant_id` scope guard in Workers middleware prevents cross-tenant reads; `client_ip_hash` and `key_preview` absent by design; no DEC-030 event (read-only). §1.10 `GET /v1/admin/api-keys/{id}/usage`: day/week granularity breakdown; `window_days` 1–90; `totals` (request_count, rejection_count, success_rate_pct) + `rejection_breakdown` (five-reason enum: scope_insufficient, ip_blocked, key_revoked, hmac_mismatch, key_not_found) + `series` array; SOC 2 evidence note — `rejection_breakdown.hmac_mismatch = 0` satisfies CC6.2 observation-period evidence requests from FSI-tier procurement; rate limit 10 req/min per tenant. CC6.2 SOC 2 mapping row updated. Both endpoints: `write:api_keys` scope + `tenant_owner` role required.
+- `docs/OBSERVABILITY.md` v2.1 → v2.2 — §31.11 OQ-APIKEY-OBS-01 marked 🟢 Resolved with reference to ENTERPRISE_ADMIN_API.md v0.2 resolution.
+- `VERSION` — 3.84.0 → 3.84.1
+
+---
+
 ## [3.84.0] — 2026-06-12
 
 ### Added

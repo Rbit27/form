@@ -156,6 +156,141 @@ PATCH /v1/admin/api-keys/{id}
 
 Emits `api_key.ip_enforcement_enabled` or `api_key.ip_enforcement_disabled` (STANDARD, 7-year retention).
 
+### 1.9 Get single API key [DESIGNED]
+
+Returns key metadata plus 30-day usage telemetry sourced from the `APIKEY_TELEMETRY` Analytics Engine dataset. Resolves **OQ-APIKEY-OBS-01** (P1 — customer-success + enterprise-architect).
+
+```http
+GET /v1/admin/api-keys/{id}
+Authorization: Bearer <owner-key>
+```
+
+Required scope: `write:api_keys`. Required role: `tenant_owner`.
+
+Response `200 OK`:
+```json
+{
+  "id": "key_01J9ABCXYZ",
+  "label": "Okta SCIM Integration",
+  "key": "***",
+  "preview": "...a1b2",
+  "scopes": ["read:reporting", "read:users"],
+  "ip_allowlist": ["203.0.113.0/24"],
+  "ip_enforcement_enabled": true,
+  "created_at": "2026-07-01T14:00:00Z",
+  "expires_at": null,
+  "revoked_at": null,
+  "last_used_at": "2026-08-15T09:42:11Z",
+  "telemetry_30d": {
+    "request_count": 14823,
+    "rejection_count": 3,
+    "last_rejection_reason": "scope_insufficient",
+    "last_rejection_at": "2026-08-14T17:03:55Z",
+    "window_start": "2026-07-17T00:00:00Z",
+    "window_end": "2026-08-16T00:00:00Z"
+  }
+}
+```
+
+**`telemetry_30d` field semantics:**
+
+| Field | Source | Notes |
+|---|---|---|
+| `request_count` | `APIKEY_TELEMETRY` COUNT WHERE `key_id` = `{id}` AND `ts` ≥ now − 30 d | Total authenticated requests (successes + rejections) |
+| `rejection_count` | `APIKEY_TELEMETRY` COUNT WHERE `key_id` = `{id}` AND `rejection_reason IS NOT NULL` AND `ts` ≥ now − 30 d | Only authentication failures; does not count `204 No Content` or `403` from k-anonymity guard (different middleware) |
+| `last_rejection_reason` | Most recent non-null `rejection_reason` in `APIKEY_TELEMETRY` for this `key_id` | Enum: `scope_insufficient` \| `ip_blocked` \| `key_revoked` \| `hmac_mismatch` \| `key_not_found`; null if no rejections in window |
+| `last_rejection_at` | Timestamp of most recent rejection row | null if no rejections in window |
+| `window_start` / `window_end` | Rolling 30-day window bounds returned with every response | Helps integrations confirm freshness |
+
+**Privacy and scope-enforcement constraints:**
+
+1. **Zero cross-tenant:** the Workers middleware adds `WHERE tenant_id = app.current_tenant_id` to the `APIKEY_TELEMETRY` Analytics Engine query before the `key_id` filter. A response with `key_id` belonging to a different tenant returns `404 Not Found` — not `403` — to avoid tenant enumeration.
+2. **No raw IP:** `client_ip_hash` is excluded from `APIKEY_TELEMETRY` by the `api-key-auth.ts` writer. It does not appear in this response.
+3. **No `key_preview` in Analytics Engine:** the raw key and `key_preview` are discarded in-Worker after HMAC verification; they are never written to `APIKEY_TELEMETRY`.
+4. **Read-only:** this endpoint emits no DEC-030 event. Usage telemetry reads do not constitute a credential access event.
+
+**Implementation note (Cloudflare Analytics Engine query):**
+
+```typescript
+// api-key-auth-detail.ts — GET /v1/admin/api-keys/:id
+const AE_QUERY = `
+  SELECT
+    COUNT(*) AS request_count,
+    COUNTIF(rejection_reason IS NOT NULL) AS rejection_count
+  FROM APIKEY_TELEMETRY
+  WHERE key_id = '${keyId}'
+    AND tenant_id = '${tenantId}'          -- scope guard
+    AND timestamp >= NOW() - INTERVAL '30' DAY
+`;
+
+// For last_rejection_reason / last_rejection_at — a second query on the same dataset
+// ordering by timestamp DESC LIMIT 1 WHERE rejection_reason IS NOT NULL.
+// Two-query pattern is required because Analytics Engine does not support
+// ORDER BY + LIMIT in the same aggregation query as COUNTIF.
+```
+
+If `APIKEY_TELEMETRY` returns no rows for the key (new key, or key never used), `telemetry_30d.request_count` returns `0` and `last_rejection_reason` returns `null`.
+
+---
+
+### 1.10 API key usage telemetry — daily breakdown [DESIGNED]
+
+Returns a day-by-day breakdown of request volume and rejection counts for procurement and integration health audits. FSI-tier customers commonly require this for evidence that their integrations are functioning during vendor risk reviews.
+
+```http
+GET /v1/admin/api-keys/{id}/usage
+Authorization: Bearer <owner-key>
+```
+
+Required scope: `write:api_keys`. Required role: `tenant_owner`.
+
+Optional query parameters:
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `window_days` | integer | `30` | Lookback window in days. Max `90`. |
+| `bucket` | `day` \| `week` | `day` | Aggregation granularity. |
+
+Response `200 OK`:
+```json
+{
+  "key_id": "key_01J9ABCXYZ",
+  "tenant_id": "ten_01J9ABC",
+  "window_days": 30,
+  "bucket": "day",
+  "totals": {
+    "request_count": 14823,
+    "rejection_count": 3,
+    "success_rate_pct": 99.98
+  },
+  "rejection_breakdown": {
+    "scope_insufficient": 2,
+    "ip_blocked": 0,
+    "key_revoked": 0,
+    "hmac_mismatch": 1,
+    "key_not_found": 0
+  },
+  "series": [
+    {
+      "date": "2026-08-16",
+      "request_count": 512,
+      "rejection_count": 0
+    },
+    {
+      "date": "2026-08-15",
+      "request_count": 498,
+      "rejection_count": 1
+    }
+  ]
+}
+```
+
+**Rate limit:** 10 req / min per tenant (same pool as `GET /v1/admin/api-keys` list). Cloudflare Analytics Engine queries are billed per query; excessive polling is logged as `admin.rate_limit_exceeded` if it exceeds the threshold.
+
+**SOC 2 evidence use:** `rejection_breakdown` provides auditor-facing evidence that integration failures are transient (expected `scope_insufficient` during permission testing) rather than systematic (`hmac_mismatch` clusters indicate credential mishandling). This satisfies CC6.2 evidence requests for key health during the SOC 2 observation period.
+
+**Privacy constraints:** identical to §1.9 — same `tenant_id` scope guard, no raw IP, no `key_preview`, no DEC-030 event emitted on read.
+
 ---
 
 ## 2. RBAC: Roles and Permissions
@@ -1101,7 +1236,7 @@ During the 30-day soft-delete window, `users.erased_at IS NOT NULL` but the hard
 | SOC 2 criterion | Admin API control | Evidence artefact |
 |---|---|---|
 | **CC6.1 — Logical access restricted** | RBAC roles enforced at API layer; no individual health data route for admin roles; `/v1/admin/reporting/users` does not exist | DEC-030 `admin.consent_override_attempted` event; quarterly access review (CC6-QAR) |
-| **CC6.2 — New access authorised** | API key creation requires `tenant_owner` role; DEC-030 `api_key.created` with creator identity | Audit log export for access-review cycle |
+| **CC6.2 — New access authorised** | API key creation requires `tenant_owner` role; DEC-030 `api_key.created` with creator identity; `GET /v1/admin/api-keys/{id}/usage` rejection breakdown provides evidence of integration health during observation period | Audit log export for access-review cycle; `rejection_breakdown.hmac_mismatch` = 0 confirms no credential mishandling |
 | **CC6.3 — Access removed** | Deprovision endpoint (`DELETE /v1/admin/users/{id}`); SCIM DELETE → erasure queue; DEC-030 `admin.user_deprovisioned` | Access review offboarding log (§65 in SOC2_READINESS) |
 | **CC6.4 — Credential lifecycle** | API key rotation with 26-hour overlap; revocation on offboarding; DEC-030 `api_key.*` lifecycle events | `api_key.revoked` events with `reason: tenant_offboarding` filed as CC6-E-004 |
 | **CC7.2 — Anomaly detection** | `api_key.ip_blocked` events bulk-ingested to SIEM; chain-break alert (R-05) | Alert rule AL-APIKEY-01 / AL-APIKEY-02 |
@@ -1131,5 +1266,7 @@ This document is the authoritative pre-production API specification for Founding
 6. **Privacy floor test suite** runs against every admin API endpoint on every CI deploy. Any endpoint returning user-identifiable data fails the CI gate. See `docs/DATA_MODEL.md §17.10`.
 
 ---
+
+*v0.2 (2026-06-12): §1.9–1.10 API Key Usage Telemetry — OQ-APIKEY-OBS-01 resolution (P1 · customer-success + enterprise-architect). §1.9 `GET /v1/admin/api-keys/{id}`: single-key retrieval with `telemetry_30d` block (`request_count`, `rejection_count`, `last_rejection_reason`, `last_rejection_at`, window bounds) sourced from `APIKEY_TELEMETRY` Analytics Engine; `tenant_id` scope guard in Workers middleware prevents cross-tenant reads; `client_ip_hash` and `key_preview` absent from response by design; two-query Analytics Engine pattern documented (COUNTIF aggregation + ORDER BY DESC LIMIT 1 for last rejection). §1.10 `GET /v1/admin/api-keys/{id}/usage`: day/week granularity breakdown; `window_days` up to 90; `totals` + `rejection_breakdown` (five-reason enum) + time-series `series` array; SOC 2 evidence use documented (CC6.2 observation-period evidence — `rejection_breakdown.hmac_mismatch = 0` confirms no credential mishandling); rate limit 10 req/min per tenant. CC6.2 SOC 2 mapping updated to reference §1.10 `rejection_breakdown`. Both endpoints: `write:api_keys` scope + `tenant_owner` role required; no DEC-030 event emitted (read-only); privacy constraints identical to §1.8 IP allowlisting. OQ-APIKEY-OBS-01 marked 🟢 Resolved in `docs/OBSERVABILITY.md §31.11`.*
 
 *v0.1 (2026-06-10): Initial specification — Enterprise Admin REST API reference. Covers: API key management (create/rotate/revoke/IP enforcement, DEC-030 lifecycle); RBAC (tenant_owner/admin/manager/member, role escalation events); tenant configuration (settings, white-label); SSO management (SAML 2.0, OIDC, certificate rotation); user provisioning (list/get/update-role/suspend/deprovision); SCIM v2 endpoint index (cross-references SSO_SCIM_IMPLEMENTATION.md); aggregate reporting endpoints (/wellness, /engagement, /features, /cohorts, /export — all privacy-floor enforced, k-anonymity N≥5, DPA gate); audit log pull API and HMAC chain verification; webhook management (create/list/delete, signature verification, retry policy); GDPR endpoints (export, erasure with Art. 9 immediate nullification, erasure status); rate limit table (12 endpoint groups); DEC-030 event reference (22 event types); error code table (11 codes); privacy floor enforcement table (8 prohibited operations, clinical-safety vetoes); SOC 2 mapping (CC6.1–CC6.4, CC7.2, CC7.4, A1.1, C1.1, P1.1, P5.1, P4.3); implementation notes for Founding Engineer (5 key items: Workers JWT middleware, k-anonymity guard, DEC-030 sync/async emission, SCIM token hashing, SSO secret encryption). All endpoints marked [DESIGNED] — pre-production spec. Cross-references: DATA_MODEL.md §17 (aggregate reporting schema), AUDIT_LOG_SCHEMA.md (DEC-030 event schema), SSO_SCIM_IMPLEMENTATION.md (protocol detail), ENTERPRISE_SLA.md (SLA tiers), ENTERPRISE_ONBOARDING.md (privacy floor, no-go use cases). Owner: enterprise-architect + platform-engineer.*
