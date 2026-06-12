@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v3.4
+# FORM · Observability & Monitoring Taxonomy v3.5
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -9729,3 +9729,399 @@ Location: Metabase, Collection `/collections/compliance` (accessible to `FORM-Co
 *v3.4 (2026-06-12): §25.3 PostHog Event Taxonomy — OQ-33 clinical-safety ruling implementation. Closes the documentation obligation created by DEC-046 (2026-06-12) which issued a split ruling on readiness and mood score transmission to PostHog. Two changes: (1) `checkin.submitted` event row in §25.3 event table updated — `readiness_bucket` (`"low"`|`"medium"`|`"high"`) added to Key Properties column as CONDITIONALLY PERMITTED per OQ-33 ruling; Notes column updated to reflect: `readiness_bucket` conditional-pass scope (event-property-only; no A/B segmentation; PostHog DPA review required as pre-condition); raw `readiness_score` (1–5) remains prohibited; `mood_score`/`mood_bucket` permanently prohibited under clinical-safety VETO. (2) Prohibited Properties table in §25.3 updated — single stale row "Mood score (1–5), readiness score (1–5) | Health-adjacent | Excluded pending OQ-33 ruling" split into two rows: row 1 covers `mood_score`/`mood_bucket` as **permanently prohibited** mental health data (GDPR Art. 9 special category; PostHog person-model longitudinal inference risk; clinical-safety VETO per OQ-33); row 2 covers `readiness_score` raw integer as prohibited with explicit note that `readiness_bucket` bucket form is **conditionally permitted** on `checkin.submitted` only per §25.9 conditions. Document title updated v3.2 → v3.4 (v3.3 was §37 GDPR pipeline observability, 2026-06-12). Companion updates already made: `docs/PRIVACY_IMPACT.md §2.2` OC-08 constraint updated to reflect split ruling (2026-06-12); `docs/DECISION_LOG.md` DEC-046 is the governance record; `docs/OBSERVABILITY.md §25.9 OQ-33 Ruling` block contains the authoritative binding conditions. Mobile SDK `stripPersonalProperties()` update (explicit allowlist for `readiness_bucket`; explicit blocklist for `mood_score`, `mood_bucket`, `readiness_score`) and PostHog DPA review remain open P0 implementation items before M4 deploy. Owner: compliance-officer (ruling implementation) + clinical-safety (OQ-33 ruling authority, DEC-046) + platform-engineer (SDK update). Cross-ref: §25.9 (OQ-33 Ruling — binding conditions); `docs/PRIVACY_IMPACT.md §2.2` OC-08 (constraint update); `docs/DECISION_LOG.md` DEC-046 (governance record); `docs/OBSERVABILITY.md §25.7` constraint 1 (PostHog health-data prohibition baseline).*
 
 *v2.7 (2026-06-11): §35 Rate Limiting, Quota Enforcement & Abuse Prevention Observability — observability companion to `docs/DATA_MODEL.md §28` (v1.0, 2026-06-10). Closes DATA_MODEL §28.9 checklist item 8 (P1 M5). Also closes §34.5 registry gap: jobs 22 and 23 (`siem_bridge_cr02_impossible_travel` and `siem_bridge_cr03_priv_escalation`) were defined in §34.5 but not appended to the §12.6 table; this patch adds those rows. §35.1 scope: three-layer architecture monitoring — WAF excluded (R-06); KV burst via `RLIMIT_TELEMETRY` Analytics Engine; DB quota via Postgres queries on `api_quota_usage`, `rate_limit_violations`, `abuse_flags`. Privacy floor: no raw IP in Analytics Engine (ip_country 2-char in Postgres only), no `key_preview`, `abuse_flags.evidence_summary` statistical metadata only, `abuse_flags` RLS blocks all roles except `security_reviewer` + `form_system`. §35.2 RED metrics: `RLIMIT_TELEMETRY` eight-column schema (api_key_id UUID, tenant_id, endpoint_category, violation_type, violation_layer, request_count, quota_limit, timestamp; no IP, no key_preview); Layer 2 RED table (KV violations/min, hard_blocks/day, 80% warnings/month, middleware error rate, P95 latency by layer); Layer 3 Postgres metrics (consumption %, violation count, open abuse flags by severity, auto-action rate, median time-to-resolve); RL-SLO-02 false-hard-block verification SQL. §35.3 four SLOs: RL-SLO-01 (latency KV < 5 ms P95 / DB < 15 ms P95 — 99.9%), RL-SLO-02 (false hard-block rate 0% for contracted enterprise — daily SQL verification), RL-SLO-03 (CSM 80%-threshold notification within 5 min — 100%), RL-SLO-04 (rate_limit_violations_cleanup ± 90 min schedule adherence). §35.4 five alert rules: AL-RL-01 (P2, 80%-threshold first-hit → customer-success, dedup per period/category), AL-RL-02 (P1, enterprise hard block → customer-success + security-engineer dual-page), AL-RL-03 (P0, critical abuse_flag → security-engineer, no auto-resolve), AL-RL-04 (P1, KV spike > 50/key/5 min → R-03 trigger, `siem-rl-checker` Worker), AL-RL-05 (P1, pg_cron stale jobs 16/17). §35.5 `rate_limit_health` §6.2 subsection: five rows AL-RL-01 through AL-RL-05 inserted after `api_key_health` and before `siem_health`. §35.6 §12.6 additions: four rows — job 16 (`rate_limit_violations_cleanup` daily 03:00 UTC, 26h window, CC6.6/CC4.1), job 17 (`api_quota_usage_archive` monthly 00:30 UTC 1st, 48h window — broader tolerance for monthly cadence, emits `data.quota_records_archived` DEC-030 STANDARD 1yr before DELETE), job 22 (`siem_bridge_cr02_impossible_travel` */5 UTC, 6min window — CR-02 blind on stale), job 23 (`siem_bridge_cr03_priv_escalation` */5 UTC, 6min window — CR-03 blind on stale). Registry status table provided: 15 jobs total (9 original + 2 PAM + 4 this patch); 6 jobs still missing (jobs 10–15, tracked in §35.10 item 12). Deploy SQL provided for jobs 16/17 (`0055b_rate_limit_cron.sql`). §35.7 eight-panel "Rate Limit & Abuse Health" Metabase + Better Stack dashboard: monthly quota by tenant (grouped bar, 80%/100% threshold lines, UUID display for cross-role privacy), KV violations 7-day trend, hard blocks table (30 d), abuse flags stacked bar (30 d), auto-action rate stat, median time-to-resolve stat, pg_cron health tiles (jobs 16/17), DEC-030 event log (last 50). §35.8 five privacy constraints: no raw IP in RLIMIT_TELEMETRY, key_preview excluded, evidence_summary statistical only, abuse_flags RLS (security_reviewer + form_system only), tenant quota scope (own tenant only). §35.9 SOC 2 evidence: CC6.1 (RL-E-001 + RL-SLO-02 verification query), CC6.6 (RL-E-002 rate_limit_violations 90-day export), CC7.2 (RL-E-003 + new RL-E-004 AL-RL-03 PagerDuty incident history 7yr). RL-E-004 artefact defined: PagerDuty `form-security` AL-RL-03 incidents (opened/acknowledged/resolved timestamps) stored at `compliance/evidence/rate-limiting/rl-e-004-abuse-critical-pagerduty-YYYY.csv`. §35.10 thirteen-item checklist: 5× P0 M4 (AL-RL-01 through AL-RL-04 PagerDuty + `siem-rl-checker` Worker, §6.2 table addition), 6× P1 M5-M6 (pg_cron jobs 16-17 deploy, RL-SLO registration + RL-SLO-02 daily check, RLIMIT_TELEMETRY wiring, dashboard build, evidence collection), 2× P2 M6-M7 (§12.6 jobs 10-15 registry gap closure, OQ-RL-OBS-01 pilot feedback evaluation). §35.11 two open questions: OQ-RL-OBS-01 (advanced tenant quota trend panel — P2, ≥ 2 pilot requests trigger), OQ-RL-OBS-02 (tenant-facing anonymised abuse summary — P2, no at M5; re-evaluate pre-GA M13). Cross-references: `docs/DATA_MODEL.md §28` (canonical rate-limit schema — three tables, RLS, enforcement flow, three DEC-030 events); `docs/DATA_MODEL.md §28.9` checklist item 8 (P1 — closed by §35.6 jobs 16/17); `docs/DATA_MODEL.md §26` (API key schema — FK source for `api_quota_usage.api_key_id`); `docs/INCIDENT_RESPONSE.md R-06` (DDoS / WAF Bypass — Layer 1 signal owner); `docs/INCIDENT_RESPONSE.md R-03` (Compromised Credentials — AL-RL-04 trigger path); `docs/SSO_SCIM_IMPLEMENTATION.md §26` (API key auth security — companion layer above rate limiting); `docs/OBSERVABILITY.md §31` (API key auth observability — AL-APIKEY-01/04 for KV spike; distinct from AL-RL-04 but may co-fire); `docs/OBSERVABILITY.md §34.5` (§12.6 jobs 22-23 — described but not previously appended to registry table; closed by this patch). Owner: devops-lead + security-engineer + platform-engineer + compliance-officer.*
+
+---
+
+## §38 CI/CD & Deployment Pipeline Observability
+
+> Owner: devops-lead + platform-engineer. Review: on any change to CI/CD architecture, deployment topology, or migration strategy; at minimum quarterly. SOC 2 evidence: **CC8.1** (authorises, tests, and documents changes before implementation), **CC7.2** (monitoring and anomaly detection for deployment-related regressions).
+
+### 38.1 Scope
+
+This section defines observability for FORM's deployment pipeline — the mechanism by which all code, schema, and configuration changes enter production. The pipeline is itself a critical control for SOC 2 CC8.1: every production change must pass automated gates before deployment, and every deployment must be traceable via the DEC-030 HMAC audit chain.
+
+**Surfaces in scope:**
+
+| Surface | Technology | Monitoring source | CC8.1 relevance |
+|---|---|---|---|
+| CI pipeline | GitHub Actions | GitHub API + Cloudflare R2 log archive | Test/lint/build gates evidence |
+| Worker deployment | Wrangler (`wrangler deploy`) | GitHub Actions post-deploy step | Authorization + test evidence |
+| Database migrations | Supabase migration runner (`supabase db push`) | pg_cron health + DEC-030 events | Schema change documentation |
+| Mobile app builds | EAS / Expo (`eas build`, `eas submit`) | EAS webhook → Cloudflare Worker | Production-build authorization |
+| SLO error-budget gate | §19.4 pre-deploy check | `slo_budget_tracking` materialized view | Deployment freeze enforcement |
+
+**Out of scope (covered by other sections):**
+
+- Cloudflare IaC drift detection — §50 in `docs/SOC2_READINESS.md` (`infra-drift.yml`)
+- Dependency vulnerability gates — §54 in `docs/SOC2_READINESS.md` (Snyk + npm audit)
+- Synthetic post-deploy smoke probes (S-001 through S-005) — §16
+- SLO error budget policy — §19
+
+**Privacy floor:** No `user_id`, tenant health data, coaching content, or biometric values appear in any CI/CD event payload. Payloads are restricted to infrastructure identifiers: commit SHA, branch name, workflow run ID, migration file name, environment name. This is structurally enforced — CI/CD systems have no access to the Postgres health-data tables.
+
+---
+
+### 38.2 DORA Metrics
+
+FORM tracks the four DORA (DevOps Research and Assessment) metrics as leading indicators of deployment pipeline health. These are computed monthly from GitHub Actions run logs and the DEC-030 audit chain, and reviewed at each quarterly compliance review (§15.1 compliance calendar).
+
+| Metric | Definition | Target (Year 1) | Measurement source |
+|---|---|---|---|
+| **Deployment Frequency** | Deployments to production per week (Worker + mobile combined) | ≥ 1 / week (elite: ≥ 1 / day) | DEC-030 `system.deployment_completed` + EAS webhook log |
+| **Lead Time for Changes** | Median time from first commit on a branch to production deploy | < 24 h for standard changes | GitHub commit timestamp → `system.deployment_completed` timestamp delta |
+| **Change Failure Rate** | % of deployments that result in rollback (`ci.deployment_rolled_back`) or P0 incident (R-02) within 60 minutes of deploy | < 5% (elite: < 1%) | `ci.deployment_rolled_back` count ÷ `system.deployment_completed` count (rolling 30 d) |
+| **MTTR** | Median time from deploy-failure detection to service restored (via rollback or hotfix deploy) | < 30 min | PagerDuty incident `opened_at` → `resolved_at` for incidents with `deploy_regression` tag |
+
+**DORA computation query (Metabase — monthly, devops-lead collection):**
+
+```sql
+-- Deployment frequency (last 30 days)
+SELECT
+  DATE_TRUNC('week', event_timestamp) AS week,
+  COUNT(*) AS deploys_to_production
+FROM audit_log_events
+WHERE event_type = 'system.deployment_completed'
+  AND (payload->>'environment') = 'production'
+  AND event_timestamp >= NOW() - INTERVAL '30 days'
+GROUP BY 1
+ORDER BY 1;
+
+-- Change failure rate (last 30 days)
+WITH deploys AS (
+  SELECT COUNT(*) AS total
+  FROM audit_log_events
+  WHERE event_type = 'system.deployment_completed'
+    AND (payload->>'environment') = 'production'
+    AND event_timestamp >= NOW() - INTERVAL '30 days'
+),
+rollbacks AS (
+  SELECT COUNT(*) AS total
+  FROM audit_log_events
+  WHERE event_type = 'ci.deployment_rolled_back'
+    AND event_timestamp >= NOW() - INTERVAL '30 days'
+)
+SELECT
+  ROUND(rollbacks.total::numeric / NULLIF(deploys.total, 0) * 100, 2) AS change_failure_rate_pct
+FROM deploys, rollbacks;
+```
+
+---
+
+### 38.3 RED Metrics
+
+| Signal | Type | Collection method | Freshness |
+|---|---|---|---|
+| CI pipeline failures on `main` | Rate (failures/day) | GitHub Actions API → `CI_TELEMETRY` Analytics Engine | Real-time (webhook) |
+| CI pipeline duration (P50, P95) | Duration | GitHub Actions `job.completed` webhook | Per run |
+| Production deployments (success/fail) | Rate | `system.deployment_completed` + `ci.deploy_failed` DEC-030 events | Real-time |
+| Migration success / failure | Rate | `ci.migration_applied` + `ci.migration_failed` DEC-030 events | Per deploy |
+| Deployment rollbacks | Count (30-day) | `ci.deployment_rolled_back` DEC-030 events | Real-time |
+| SLO gate activations (deploy freeze events) | Count | `slo_budget_tracking.policy_state` transition | On policy change |
+| EAS build failure rate | Rate | EAS webhook → Cloudflare Worker log | Per build |
+
+**Analytics Engine schema — `CI_TELEMETRY` (Cloudflare Analytics Engine binding):**
+
+```typescript
+// Written by github-actions-relay Worker on every job.completed webhook
+interface CiTelemetryRow {
+  workflow_name:   string;      // e.g. "ci.yml", "infra-drift.yml"
+  job_name:        string;      // e.g. "test", "deploy-worker", "migration"
+  conclusion:      'success' | 'failure' | 'cancelled' | 'skipped';
+  duration_ms:     number;
+  branch:          string;      // "main" or PR branch name (no SHA — PII risk on feature branches)
+  environment:     'production' | 'staging' | 'preview';
+  run_id:          string;      // GitHub Actions run_id (numeric, cast to string)
+  trigger:         'push' | 'pull_request' | 'schedule' | 'workflow_dispatch';
+  timestamp:       string;      // ISO 8601 UTC
+}
+```
+
+**Privacy note:** `branch` field must NOT include commit messages, author names, or GitHub usernames. `run_id` is a numeric identifier with no personal data. No `user_id` or `actor` field in `CI_TELEMETRY` — actor is captured in DEC-030 HMAC events, not in the high-frequency telemetry store.
+
+---
+
+### 38.4 SLOs
+
+| ID | SLO | Target | Window | Breach impact |
+|---|---|---|---|---|
+| **CI-SLO-01** | CI test suite pass rate on `main` branch | ≥ 98% | Rolling 30 days | P1 — unstable main signals broken change management gate |
+| **CI-SLO-02** | Production deployment smoke-test pass rate (§16 S-001/S-002) | ≥ 99.5% | Rolling 30 days | P0 — smoke failure = likely regression deployed to production |
+| **CI-SLO-03** | Production migration failure rate | 0% | Rolling 30 days | P0 — any migration failure is immediate P0 incident; SLO hard floor |
+| **CI-SLO-04** | Deployment rollback time (MTTR for deploy regression) | P95 < 30 min | Rolling 90 days | P1 — exceeding 30 min MTTR violates enterprise RTO commitment (docs/ENTERPRISE_SLA.md §4.3) |
+
+**CI-SLO-03 note:** A production migration failure is always P0. There is no error budget for CI-SLO-03 — a single failure triggers the R-02 runbook (`docs/INCIDENT_RESPONSE.md R-02`). CI-SLO-03 is therefore excluded from the §19 error budget management framework; it is tracked as a compliance hard-floor metric.
+
+**SLI calculation:**
+
+```sql
+-- CI-SLO-01: test suite pass rate on main (last 30 days)
+-- Source: CI_TELEMETRY Analytics Engine (queried via Worker)
+SELECT
+  SUM(CASE WHEN conclusion = 'success' THEN 1 ELSE 0 END)::float /
+  COUNT(*) * 100 AS pass_rate_pct
+FROM ci_telemetry   -- materialized daily into Supabase from Analytics Engine
+WHERE job_name = 'test'
+  AND branch = 'main'
+  AND trigger = 'push'
+  AND timestamp >= NOW() - INTERVAL '30 days';
+
+-- CI-SLO-04: P95 rollback time (last 90 days)
+SELECT
+  PERCENTILE_CONT(0.95) WITHIN GROUP (
+    ORDER BY
+      EXTRACT(EPOCH FROM (
+        rollback.event_timestamp - deploy.event_timestamp
+      )) / 60  -- minutes
+  ) AS rollback_p95_minutes
+FROM audit_log_events rollback
+JOIN audit_log_events deploy
+  ON deploy.event_type = 'system.deployment_completed'
+  AND (deploy.payload->>'environment') = 'production'
+  AND deploy.event_timestamp >= rollback.event_timestamp - INTERVAL '60 minutes'
+WHERE rollback.event_type = 'ci.deployment_rolled_back'
+  AND rollback.event_timestamp >= NOW() - INTERVAL '90 days';
+```
+
+---
+
+### 38.5 Alert Rules
+
+| ID | Condition | Severity | Routing | Runbook |
+|---|---|---|---|---|
+| **AL-CI-01** | CI test job on `main` fails (conclusion = 'failure' for job_name = 'test', branch = 'main', trigger = 'push') | P1 | PagerDuty `form-engineering` + Slack `#eng-alerts` | Fix or revert the offending commit within 2 hours; do not merge additional PRs while main is red |
+| **AL-CI-02** | `ci.migration_failed` DEC-030 event emitted (any environment = 'production') | P0 | PagerDuty `form-devops` + `form-engineering` (dual page); no auto-resolve; Slack `#incidents` CRITICAL | `docs/INCIDENT_RESPONSE.md R-02`; migration rollback procedure; founder notified immediately |
+| **AL-CI-03** | `ci.deployment_rolled_back` DEC-030 event within 60 minutes of a `system.deployment_completed` | P1 | PagerDuty `form-engineering` + Slack `#incidents` | Post-rollback RCA required within 24 hours; DEC-030 chain validates ordering |
+| **AL-CI-04** | Change failure rate (DORA) > 5% in rolling 7-day window | P1 | Slack `#eng-quality` → devops-lead for review | Review last 7 days of `ci.deployment_rolled_back` events; escalate to P0 if trend persists > 14 days |
+| **AL-CI-05** | CI pipeline duration P95 > 15 minutes (7-day rolling average, job_name = 'test', branch = 'main') | P2 | Slack `#eng-perf` | Identify slowest CI job steps; no immediate SLA breach; optimize before next quarterly infra review |
+| **AL-CI-06** | SLO error budget gate activates (§19.4 policy_state transitions from Green → Yellow or Orange) | P1 | Slack `#devops-slo` + devops-lead direct message | Freeze non-critical deployments; follow §19.4 deploy-freeze policy |
+
+**AL-CI-02 deduplication:** `ci.migration_failed` events are CRITICAL severity with no deduplication — every emitted event pages until resolved. This is intentional: multiple alert fires during a migration incident are preferable to missing a second failure.
+
+---
+
+### 38.6 DEC-030 Events
+
+> All events in this section are HMAC-chained per DEC-030. Privacy invariant: no `user_id`, tenant health data, coaching content, or biometric values in any payload field. Payloads are infrastructure-only: commit SHAs, run IDs, environment names, migration file names.
+
+#### 38.6.1 `system.deployment_completed` (formalised schema)
+
+This event is listed in `docs/AUDIT_LOG_SCHEMA.md §System` but without a full Zod schema. The canonical schema is defined here for SOC 2 CC8.1 evidence purposes.
+
+| Field | Value |
+|---|---|
+| **Event type** | `system.deployment_completed` |
+| **Severity** | STANDARD |
+| **Retention** | 5 years |
+| **Actor** | `devops-lead` (automated via GitHub Actions post-deploy step) |
+| **Trigger** | Wrangler deploy succeeds + post-deploy smoke probe S-001 passes (§16) |
+
+```typescript
+z.object({
+  environment:         z.enum(['production', 'staging', 'preview']),
+  surface:             z.enum(['worker', 'pages', 'eas_mobile', 'edge_function']),
+  commit_sha:          z.string().length(40),   // full SHA, not abbreviated
+  branch:              z.string().max(100),
+  github_run_id:       z.string(),              // numeric run ID as string
+  wrangler_version:    z.string().optional(),   // for Worker deploys
+  eas_build_id:        z.string().optional(),   // for mobile deploys
+  duration_ms:         z.number().int().positive(),
+  smoke_probe_passed:  z.boolean(),             // true = S-001/S-002 green
+  deployed_at:         z.string().datetime(),
+})
+```
+
+#### 38.6.2 `ci.migration_applied`
+
+| Field | Value |
+|---|---|
+| **Event type** | `ci.migration_applied` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **Actor** | `devops-lead` (automated via Supabase migration runner in GitHub Actions) |
+| **Trigger** | `supabase db push` completes with exit code 0 in the `migration` CI job |
+
+```typescript
+z.object({
+  environment:          z.enum(['production', 'staging']),
+  migration_file:       z.string().regex(/^\d{14}_[\w]+\.sql$/),  // e.g. "20260612143000_add_col.sql"
+  migration_sha256:     z.string().length(64),  // SHA-256 of migration file content
+  commit_sha:           z.string().length(40),
+  github_run_id:        z.string(),
+  tables_affected:      z.array(z.string()).max(20),  // table names touched by migration
+  rls_policy_changed:   z.boolean(),  // true if migration contains CREATE/ALTER/DROP POLICY
+  applied_at:           z.string().datetime(),
+  supabase_project_ref: z.string(),   // public project ref only; no secrets
+})
+```
+
+**HMAC chain requirement:** `ci.migration_applied` must follow (in the chain) the most recent `system.deployment_completed` for the same `commit_sha`. A migration event without a preceding deploy event is a chain anomaly detectable by the weekly audit batch.
+
+**SOC 2 note on `rls_policy_changed`:** Any migration with `rls_policy_changed: true` is automatically flagged in the §38.7 dashboard for manual review by `security-engineer`. This is the observability companion to the CI gate that runs the cross-tenant RLS adversarial test suite (DATA_MODEL §7) on every RLS-touching migration.
+
+#### 38.6.3 `ci.migration_failed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `ci.migration_failed` |
+| **Severity** | CRITICAL |
+| **Retention** | 7 years |
+| **Actor** | `devops-lead` (automated — emitted by `migration-failure-handler` step in GitHub Actions) |
+| **Trigger** | `supabase db push` exits non-zero in any production-targeting workflow run |
+
+```typescript
+z.object({
+  environment:          z.enum(['production', 'staging']),
+  migration_file:       z.string().regex(/^\d{14}_[\w]+\.sql$/),
+  migration_sha256:     z.string().length(64),
+  commit_sha:           z.string().length(40),
+  github_run_id:        z.string(),
+  error_code:           z.string().max(50),     // Postgres error code (e.g. "42P01")
+  error_message_hash:   z.string().length(64),  // SHA-256 of error message — no raw SQL in chain
+  partial_apply:        z.boolean(),            // true = migration was partially applied before failure
+  rollback_attempted:   z.boolean(),
+  failed_at:            z.string().datetime(),
+})
+```
+
+**Critical constraint on `error_message_hash`:** Raw SQL error messages may contain table names, column values, or constraint text that could reveal data classification details. Only the SHA-256 hash is stored in the HMAC chain. The raw error message is written to GitHub Actions log only, which is access-controlled separately.
+
+#### 38.6.4 `ci.deployment_rolled_back`
+
+| Field | Value |
+|---|---|
+| **Event type** | `ci.deployment_rolled_back` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **Actor** | `devops-lead` (manual rollback via `wrangler rollback`) |
+| **Trigger** | On-call engineer executes rollback per R-02 runbook |
+
+```typescript
+z.object({
+  environment:              z.enum(['production', 'staging']),
+  surface:                  z.enum(['worker', 'pages', 'eas_mobile', 'edge_function']),
+  rolled_back_to_commit_sha:z.string().length(40),
+  failing_commit_sha:       z.string().length(40),
+  trigger:                  z.enum(['smoke_test_failure', 'slo_breach', 'manual_oncall', 'post_incident']),
+  rollback_initiated_by:    z.string().uuid(),  // form_admin user_id of on-call engineer; never a customer user_id
+  minutes_since_deploy:     z.number().int().nonneg(),   // time between failing deploy and rollback decision
+  incident_ticket_url:      z.string().url().optional(), // Linear ticket URL if P0/P1
+  rolled_back_at:           z.string().datetime(),
+})
+```
+
+**HMAC chain ordering requirement:** `ci.deployment_rolled_back` must reference a `failing_commit_sha` that appears in a prior `system.deployment_completed` event in the chain. Chain audit batch flags orphaned rollback events (rollback with no matching deploy).
+
+#### 38.6.5 `ci.pipeline_failed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `ci.pipeline_failed` |
+| **Severity** | STANDARD |
+| **Retention** | 3 years |
+| **Actor** | `devops-lead` (automated — `pipeline-failure-relay` step in GitHub Actions) |
+| **Trigger** | Any required CI job on `main` branch (job_name IN: 'test', 'lint', 'build', 'migration') exits non-zero |
+
+```typescript
+z.object({
+  branch:         z.string().max(100),
+  is_main:        z.boolean(),   // true when branch = 'main'; drives AL-CI-01 alert routing
+  job_name:       z.enum(['test', 'lint', 'build', 'migration', 'deploy-worker', 'eas-build']),
+  conclusion:     z.enum(['failure', 'cancelled']),
+  commit_sha:     z.string().length(40),
+  github_run_id:  z.string(),
+  duration_ms:    z.number().int().nonneg(),
+  failed_at:      z.string().datetime(),
+})
+```
+
+**Volume note:** `ci.pipeline_failed` is STANDARD severity with 3-year retention. During active development, PR-branch CI failures are expected and high-volume. The `is_main` boolean allows the weekly chain audit to separately assess main-branch failures (compliance-relevant) from PR-branch failures (developer noise). Only `is_main = true` failures trigger AL-CI-01.
+
+---
+
+### 38.7 Dashboard — "CI/CD & Deployment Health"
+
+**Location:** Metabase, Collection `/collections/engineering` (accessible to `FORM-DevOps`, `FORM-Engineering`; not `FORM-Support` or `FORM-Compliance`).
+
+**Privacy constraint:** No per-commit author names, no GitHub usernames, no PR titles. Panels display commit SHAs (first 8 chars), workflow names, and run IDs only.
+
+| Panel | Type | Data source | Refresh |
+|---|---|---|---|
+| DORA metrics summary (30-day) | Four KPI tiles (deploy freq, lead time, CFR, MTTR) | Metabase query over `audit_log_events` + `ci_telemetry` | Daily |
+| CI pass/fail rate on `main` (30-day trend) | Line chart (% passing, CI-SLO-01 threshold line) | `ci_telemetry` | 1h |
+| Production deployments (30-day) | Bar chart by surface (worker / pages / mobile) | `system.deployment_completed` DEC-030 events | 6h |
+| Migrations applied / failed (30-day) | Stacked bar (success vs. failure) | `ci.migration_applied` + `ci.migration_failed` DEC-030 events | 6h |
+| RLS-policy migrations (audit list) | Table: migration_file, applied_at, commit_sha | `ci.migration_applied WHERE rls_policy_changed = true` (last 12 months) | Daily |
+| Open rollbacks (30-day) | Table: failed_commit_sha, trigger, minutes_since_deploy | `ci.deployment_rolled_back` | 1h |
+| CI pipeline duration P95 (7-day) | Stat + trend (CI-SLO threshold line at 15 min) | `ci_telemetry` | 1h |
+| SLO gate activations (90-day) | Event log (policy_state transitions) | `slo_budget_tracking` | 30 min |
+
+---
+
+### 38.8 SOC 2 Evidence Artifacts
+
+| Artifact ID | SOC 2 criterion | Description | Collection cadence | Path |
+|---|---|---|---|---|
+| **CI-E-001** | CC8.1 | GitHub Actions CI run history for `main` branch — test pass/fail for trailing 90-day observation period | Continuous (GitHub API) | `compliance/evidence/cc8/ci-e-001-ci-run-log-YYYY-QN.csv` |
+| **CI-E-002** | CC8.1 | `ci.migration_applied` DEC-030 chain excerpt — every migration deployed during observation period with `migration_sha256` and `rls_policy_changed` flag | Per SOC 2 fieldwork request | `compliance/evidence/cc8/ci-e-002-migrations-YYYY-QN.csv` |
+| **CI-E-003** | CC8.1 | DORA metrics quarterly report (deploy frequency, lead time, change failure rate, MTTR) computed from DEC-030 chain + GitHub API | Quarterly (§15.1 calendar — end of each quarter) | `compliance/evidence/cc8/ci-e-003-dora-YYYY-QN.pdf` |
+| **CI-E-004** | CC8.1 | `ci.deployment_rolled_back` DEC-030 chain excerpt — rollback events with ordering validation (each references a prior `system.deployment_completed`) | Per SOC 2 fieldwork request | `compliance/evidence/cc8/ci-e-004-rollbacks-YYYY-QN.csv` |
+| **CI-E-005** | CC7.2 | AL-CI-01 PagerDuty incident history — main-branch CI failures paged to on-call, with acknowledge and resolve timestamps | Quarterly | `compliance/evidence/cc8/ci-e-005-alerts-YYYY-QN.csv` |
+
+**Auditor narrative for CC8.1:** FORM's change management controls gate every production deployment through an automated CI pipeline (GitHub Actions). Every deployment is authorised by requiring a passing CI run before merge (branch protection: `enforce_admins: true`, required status checks — `docs/SOC2_READINESS.md §21.3`). Every deployment to production emits a `system.deployment_completed` DEC-030 HMAC-chained event (CI-E-001), and every database schema change emits a `ci.migration_applied` event with the migration file SHA-256 (CI-E-002). Rollbacks are recorded in the HMAC chain (CI-E-004) and DORA change failure rate confirms the control's effectiveness (CI-E-003). The SLO error budget gate (§19.4) enforces a documented, graduated response that freezes non-critical deployments when reliability is under pressure — this is a programmatic compensating control for the solo-founder separation-of-duties gap documented in `docs/SOC2_READINESS.md §21.7`.
+
+---
+
+### 38.9 pg_cron Registry Additions
+
+No new pg_cron jobs are required by §38. The DORA metric computation runs as a Metabase scheduled query (daily at 07:00 UTC) rather than a pg_cron job because it reads from the Analytics Engine `CI_TELEMETRY` binding via Cloudflare Workers API — not from Postgres directly.
+
+One §12.6 addition is required: a `ci_telemetry` materialization job to persist daily CI_TELEMETRY aggregates from Cloudflare Analytics Engine into a `ci_telemetry_daily` Postgres table for Metabase querying.
+
+| Job | Schedule | Freshness window | Purpose | On stale |
+|---|---|---|---|---|
+| 28 `ci_telemetry_daily_sync` | `0 4 * * *` | 26 h | Daily sync of CI_TELEMETRY aggregates from Cloudflare AE → `ci_telemetry_daily` Postgres table for DORA metric queries | P2 AL-CI-07 `form-devops` Slack only |
+
+---
+
+### 38.10 Implementation Checklist
+
+#### P0 — Before first enterprise GA (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `ci.migration_applied`, `ci.migration_failed`, `ci.deployment_rolled_back`, `ci.pipeline_failed` in `docs/AUDIT_LOG_SCHEMA.md §System` with Zod schemas from §38.6. Deploy event types to `emit-audit-event` Worker event registry. | platform-engineer | **P0** | M7 | [ ] |
+| 2 | Add `migration-failure-handler` step to GitHub Actions migration job: on failure, call `emit-audit-event` with `ci.migration_failed` payload; include `error_code` (Postgres code from stderr) and `error_message_hash` (SHA-256 of stderr output). | devops-lead | **P0** | M7 | [ ] |
+| 3 | Add `deployment-completed-emit` step to Wrangler deploy job: on success + S-001 smoke probe pass, call `emit-audit-event` with formalised `system.deployment_completed` payload from §38.6.1 (including `smoke_probe_passed: true`). | devops-lead | **P0** | M7 | [ ] |
+| 4 | Implement `github-actions-relay` Cloudflare Worker: receives GitHub Actions `job.completed` webhook (HMAC-validated via `X-Hub-Signature-256`), writes to `CI_TELEMETRY` Analytics Engine binding, emits `ci.pipeline_failed` DEC-030 for `is_main = true` failures. | platform-engineer | **P0** | M7 | [ ] |
+| 5 | Configure AL-CI-01 through AL-CI-05 alert rules in PagerDuty + Better Stack. Verify AL-CI-02 (migration failure) pages without auto-resolve. | devops-lead | **P0** | M7 | [ ] |
+| 6 | Add `ci_telemetry_daily` Postgres table DDL (migration `0061_ci_telemetry_daily.sql`); RLS: `form_system` insert, `form_admin` + `analytics_reader` SELECT; register pg_cron job 28 in §12.6. | platform-engineer | **P0** | M8 | [ ] |
+
+#### P1 — Before SOC 2 observation period start (M4 target; M8 actual if observation delayed)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Build "CI/CD & Deployment Health" Metabase dashboard (§38.7 spec); add to `/collections/engineering` collection; verify no PII in any panel. | data-engineer | **P1** | M8 | [ ] |
+| 8 | Run DORA metrics baseline computation for last 30 days of development; file as CI-E-003 Q0 baseline in `compliance/evidence/cc8/`. | data-engineer + devops-lead | **P1** | M8 | [ ] |
+| 9 | Register `ci.migration_applied` and `ci.migration_failed` events in AUDIT_LOG_SCHEMA.md §System retention table (5 yr and 7 yr respectively); update CC8 criterion row. | compliance-officer | **P1** | M8 | [ ] |
+| 10 | Configure CI-E-001 quarterly CSV export via Cloudflare Cron Worker (GitHub API → CSV → R2 `form-compliance-vault/cc8/`); schedule first export for end of M8. | devops-lead | **P1** | M8 | [ ] |
+
+#### P2 — Before first annual SOC 2 recertification (M24+)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | Evaluate whether DORA metrics should be surfaced in the enterprise admin dashboard as a "platform reliability" trust signal. Publish only aggregate fleet-wide metrics — no per-tenant deployment data. | customer-success + enterprise-architect | **P2** | M13 | [ ] |
+| 12 | Add `ci.migration_applied WHERE rls_policy_changed = true` DEC-030 query to quarterly access review procedure (§23) as a supplementary check: confirm all RLS-touching migrations were reviewed by `security-engineer` before merge. | security-engineer + compliance-officer | **P2** | M9 | [ ] |
+
+---
+
+### 38.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-CI-OBS-01** | **Should `ci.pipeline_failed` events be emitted for PR branches, or only `main`?** High-frequency PR failures create noise in the DEC-030 chain (potentially thousands of events/month pre-launch). The `is_main` boolean in the payload allows filtering. Recommendation: emit for all branches but retain PR-branch events at 90 days only (not 3 years). Requires AUDIT_LOG_SCHEMA.md retention table update and Worker-side `retention_days` override logic. | **P1** | devops-lead + compliance-officer | Resolve before M7 deploy; default to `main`-only emission if overhead is a concern |
+| **OQ-CI-OBS-02** | **Should EAS mobile build failures emit `ci.pipeline_failed` events, or a separate `ci.eas_build_failed` event type?** EAS builds are async (minutes to hours); polling-based failure detection differs from GitHub Actions synchronous job webhooks. A separate event type allows different retention and alert routing. | **P2** | platform-engineer | Resolve before mobile GA (M13); default to a unified `ci.pipeline_failed` with `job_name = 'eas-build'` until EAS volume warrants a dedicated event type |
+| **OQ-CI-OBS-03** | **Does change failure rate (DORA CFR) include failed EAS App Store submissions, or only production Worker deployments?** App Store submission failures are visible in EAS webhook data but do not cause production downtime. Including them inflates CFR; excluding them understates risk. | **P2** | devops-lead + ml-engineer | Resolve at first EAS production submission; document definition in CI-E-003 methodology note |
+
+---
+
+*v3.5 (2026-06-12): §38 CI/CD & Deployment Pipeline Observability — closes the CC8.1 observability gap. Until §38, the OBSERVABILITY.md documented post-deployment synthetic probes (§16) and the SLO error budget deploy gate (§19) but had no unified section for CI/CD pipeline health metrics, DORA tracking, or the DEC-030 HMAC event chain for deployments and migrations. §38.1 scopes to five surfaces (GitHub Actions, Wrangler, Supabase migrations, EAS, SLO gate) and explicitly excludes IaC drift (SOC2_READINESS §50) and SCA scanning (SOC2_READINESS §54). §38.2 defines the four DORA metrics (deployment frequency, lead time for changes, change failure rate, MTTR) with Postgres computation queries against the DEC-030 `audit_log_events` table and `CI_TELEMETRY` Analytics Engine. §38.3 RED metrics: `CI_TELEMETRY` Analytics Engine schema (eight-column; no PII — no commit author, no GitHub username, no PR title); pipeline failure rate, duration P95, migration success/failure rate, rollback count, SLO gate activations. §38.4 four SLOs: CI-SLO-01 (test pass rate ≥ 98% on main, 30d), CI-SLO-02 (smoke test pass rate ≥ 99.5%, 30d), CI-SLO-03 (migration failure rate = 0% — hard floor, excluded from error budget framework), CI-SLO-04 (rollback MTTR P95 < 30 min, 90d — cross-ref ENTERPRISE_SLA.md RTO). §38.5 six alert rules AL-CI-01 through AL-CI-06: AL-CI-01 (P1, main CI failure), AL-CI-02 (P0, production migration failure — no dedup, no auto-resolve, dual-page), AL-CI-03 (P1, deployment rolled back within 60 min of deploy), AL-CI-04 (P1, DORA CFR > 5% in rolling 7d), AL-CI-05 (P2, CI duration P95 > 15 min), AL-CI-06 (P1, SLO gate activation). §38.6 five DEC-030 events: `system.deployment_completed` formalised with full Zod schema (STANDARD, 5yr — includes `smoke_probe_passed` boolean binding deploy to §16 probes); `ci.migration_applied` (HIGH, 7yr — includes `rls_policy_changed` boolean triggering manual security-engineer review; `migration_sha256` for tamper-evidence; `tables_affected` array); `ci.migration_failed` (CRITICAL, 7yr — `error_message_hash` SHA-256 instead of raw error message to prevent SQL data leakage in chain; `partial_apply` boolean for partial-migration incident triage); `ci.deployment_rolled_back` (HIGH, 7yr — `minutes_since_deploy` for MTTR calculation; references `failing_commit_sha` enabling chain-ordering validation against prior `system.deployment_completed`); `ci.pipeline_failed` (STANDARD, 3yr — `is_main` boolean separates compliance-relevant main failures from PR-branch developer noise; OQ-CI-OBS-01 governs PR-branch emission decision). §38.7 eight-panel "CI/CD & Deployment Health" Metabase dashboard: FORM-DevOps + FORM-Engineering collection; no PII (commit SHAs truncated to 8 chars, no author names). §38.8 five SOC 2 evidence artefacts CI-E-001 through CI-E-005: CI-E-001 (CC8.1 — GitHub Actions CI run history, quarterly CSV), CI-E-002 (CC8.1 — migration chain excerpt per fieldwork request), CI-E-003 (CC8.1 — DORA quarterly report), CI-E-004 (CC8.1 — rollback chain excerpt), CI-E-005 (CC7.2 — AL-CI-01 PagerDuty history). Auditor narrative for CC8.1 supplied (solo-founder compensating control for separation-of-duties; SLO gate as programmatic policy enforcement). §38.9 pg_cron job 28 `ci_telemetry_daily_sync` (daily 04:00 UTC, 26h freshness, P2 AL-CI-07); no new health-data pg_cron jobs. §38.10 twelve-item implementation checklist: 6× P0/M7–M8 (event registration + emit-audit-event deploy, migration-failure-handler step, deployment-completed-emit step, github-actions-relay Worker, alert configuration, ci_telemetry_daily DDL + pg_cron), 4× P1/M8 (Metabase dashboard, DORA baseline, AUDIT_LOG_SCHEMA retention table update, CI-E-001 export), 2× P2/M9–M13 (DORA in admin dashboard evaluation, RLS-migration quarterly access review supplement). §38.11 three open questions OQ-CI-OBS-01/02/03 (PR-branch emission scope, EAS build event type, CFR definition for App Store submissions). Cross-references: `docs/ENTERPRISE.md §What we promise customers` (99.9% uptime + P0 < 1h response — CI-SLO-04 MTTR is the deployment companion to these commitments); `docs/AUDIT_LOG_SCHEMA.md §System` (`system.deployment_completed` — formal Zod schema provided here; `ci.*` events to be registered); `docs/INCIDENT_RESPONSE.md R-02` (production outage rollback runbook — AL-CI-02 triggers R-02); `docs/SOC2_READINESS.md §21` (CC8.1 Change Management Controls — §38 provides the observability layer for the controls documented there); `docs/ENTERPRISE_SLA.md §4.3` (RTO < 4h — CI-SLO-04 MTTR < 30 min is the deployment sub-component of this commitment); §16 (synthetic probes S-001/S-002 referenced in `system.deployment_completed` smoke_probe_passed field); §19 (SLO error budget gate — AL-CI-06 is the observability trigger for gate activations); DEC-030 (HMAC chain — all five events are HMAC-chained; `ci.migration_failed` CRITICAL severity triggers chain-break audit within 24h per §R-05). Owner: devops-lead + platform-engineer + compliance-officer.*
