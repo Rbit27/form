@@ -6,6 +6,15 @@
 
 ---
 
+## [3.96.1] — 2026-06-12
+
+### Fixed
+- `content/post-542-self-technique-assessment.md` — citation corrections post sports-scientist review: Wulf & Prinz (2001) журнал виправлено на *Psychonomic Bulletin & Review* 8(4):648–660; додано Wulf, McNevin & Shea (2001, *QJEP*) як емпіричний тест CAH; Wulf et al. (2010) журнал виправлено на *Human Movement Science* 29(3):440–448; замінено неверифікований Whiteside (2016) на загальний statement з r-значеннями для 2D validity; van den Tillaar (2013) для multi-lift замінено на Kompf & Arandjelovic (2016, *Sports Medicine* 46:751–762); Helms (2016) IJSPP замінено на Zourdos et al. (2016) JSCR 30(1):267–275
+- `content/post-543-beginner-to-intermediate-criteria.md` — citation corrections: Kraemer & Ratamess журнал виправлено в body text та footnotes (*Med Sci Sports Exerc* 36(4):674–688); Schoenfeld (2010) для neural shift claim замінено на Sale (1988) + Moritani & deVries (1979); Peterson et al. (2011) — неверифікована стаття прибрана, замінена на Rhea et al. (2002) JSCR 16(2):250–255
+- `VERSION` — 3.96.0 → 3.96.1
+
+---
+
 ## [3.96.0] — 2026-06-12
 
 ### Added
