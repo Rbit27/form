@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [4.64.0] — 2026-06-13
+
+### Added
+- `content/post-664-shoulder-complex-overhead-mechanics.md` — Block 651–700 post 664. Плечовий комплекс: механіка overhead руху і програмування для здоров'я плеча. Три суглоби плечового комплексу (GH, AC, scapulothoracic). Механіка лопатки: upward rotation, posterior tilt, зовнішня ротація як умова для subacromial space при підйомі руки. Scapulohumeral rhythm 2:1. Три причини порушеної лопаткової механіки: надмірна протракція, слабкість serratus anterior, обмеження торакального відділу. Push-pull ratio і відмінність горизонтальних vs вертикальних тяг. Зовнішньоротаційна робота як структурна частина програми. Overhead pressing: коли замінювати на neutral-grip або landmine. Торакальна рухливість як попередня умова. clinical_safety: PASS. sports_scientist_review: required before publish.
+
+### Changed
+- `blog.html` — додано картку post-664.
+- `STATUS.md` — Block 651–700: 12 постів написано (664 додано); total posts 662.
+- `VERSION` — 4.63.0 → 4.64.0.
+
 ## [4.63.0] — 2026-06-13
 
 ### Added
