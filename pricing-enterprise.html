@@ -626,7 +626,7 @@
       <!-- Enterprise custom pricing note -->
       <div id="enterpriseNote" class="hidden mb-6 bg-ember bg-opacity-5 border border-ember border-opacity-20 rounded-xl p-4">
         <div class="label mb-2" style="color:#FF5733;font-size:9px;">Custom pricing applies</div>
-        <p class="text-dim text-xs leading-relaxed">For 1,001+ seats, rate is negotiated based on contract length, features, and multi-year commitment. Estimate shown uses $7/seat — actual rate ranges $6–$8.</p>
+        <p class="text-dim text-xs leading-relaxed">For 1,000+ seats, rate is negotiated based on contract length, features, and multi-year commitment. Estimate shown uses $7/seat — actual rate ranges $6–$8.</p>
       </div>
 
       <!-- Savings callout -->
@@ -686,9 +686,9 @@
         <thead>
           <tr>
             <th style="width:38%;">Feature</th>
-            <th>Starter<br/><span style="font-size:9px;color:#A39D8E;letter-spacing:0.05em;">$12 · 50–200</span></th>
-            <th class="col-highlight">Growth<br/><span style="font-size:9px;color:#DDFF2D;opacity:0.7;letter-spacing:0.05em;">$9 · 201–1,000</span></th>
-            <th>Enterprise<br/><span style="font-size:9px;color:#FF5733;opacity:0.7;letter-spacing:0.05em;">$6–8 · 1,001+</span></th>
+            <th>Starter<br/><span style="font-size:9px;color:#A39D8E;letter-spacing:0.05em;">$12 · 50–199</span></th>
+            <th class="col-highlight">Growth<br/><span style="font-size:9px;color:#DDFF2D;opacity:0.7;letter-spacing:0.05em;">$9 · 200–999</span></th>
+            <th>Enterprise<br/><span style="font-size:9px;color:#FF5733;opacity:0.7;letter-spacing:0.05em;">$6–8 · 1,000+</span></th>
           </tr>
         </thead>
         <tbody>
@@ -999,13 +999,15 @@
   };
 
   // Minimum seat counts enforced by each requirement
-  var REQ_MINS = { sso: 50, csm: 201, soc2: 1001 };
+  var REQ_MINS = { sso: 50, csm: 200, soc2: 1000 };
 
   // ── Tier rules ─────────────────────────────────────────────────
+  // Boundaries: Starter 50–199, Growth 200–999, Enterprise 1,000+
+  // Aligns with docs/ENTERPRISE.md pricing table (Growth 200–1,000; Enterprise 1,000+).
   var TIERS = {
-    starter:    { name: 'Starter',    min: 50,   max: 200,  baseRate: 12 },
-    growth:     { name: 'Growth',     min: 201,  max: 1000, baseRate: 9  },
-    enterprise: { name: 'Enterprise', min: 1001, max: 10000,baseRate: 7  }, // midpoint of $6–$8
+    starter:    { name: 'Starter',    min: 50,  max: 199,  baseRate: 12 },
+    growth:     { name: 'Growth',     min: 200, max: 999,  baseRate: 9  },
+    enterprise: { name: 'Enterprise', min: 1000, max: 10000, baseRate: 7 }, // midpoint of $6–$8
   };
 
   var CONTRACT_DISCOUNTS = { 1: 0, 2: 0.15, 3: 0.25 };
@@ -1060,8 +1062,8 @@
 
   // ── Helpers ────────────────────────────────────────────────────
   function getTier(seats) {
-    if (seats <= 200)  return 'starter';
-    if (seats <= 1000) return 'growth';
+    if (seats <= 199)  return 'starter';
+    if (seats <= 999)  return 'growth';
     return 'enterprise';
   }
 
@@ -1109,8 +1111,8 @@
       sliderVal.textContent = fmt(minSeats) + ' seats';
     }
     var constraints = [];
-    if (state.reqCSM)  constraints.push('CSM requires Growth+ · min 201 seats');
-    if (state.reqSOC2) constraints.push('SOC 2 requires Enterprise · min 1,001 seats');
+    if (state.reqCSM)  constraints.push('CSM requires Growth+ · min 200 seats');
+    if (state.reqSOC2) constraints.push('SOC 2 requires Enterprise · min 1,000 seats');
     if (constraints.length > 0) {
       reqNotice.textContent = '↑ ' + constraints.join(' · ');
       reqNotice.classList.add('visible');

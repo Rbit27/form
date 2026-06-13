@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [4.66.1] — 2026-06-13
+
+### Fixed
+- `enterprise.html` — Tier seat ranges corrected to match calculator logic: Starter 50–199, Growth 200–999, Enterprise 1,000+. Previously "200–1,000" for Growth caused a $7,200/year discrepancy for 200-seat prospects (marketing showed Growth pricing, calculator charged Starter).
+- `pricing-enterprise.html` — Calculator tier boundaries aligned with `docs/ENTERPRISE.md` (Growth 200–1,000; Enterprise 1,000+). `TIERS.starter.max` 200→199, `TIERS.growth.min` 201→200, `TIERS.growth.max` 1000→999, `TIERS.enterprise.min` 1001→1000. `REQ_MINS.csm` 201→200, `REQ_MINS.soc2` 1001→1000. Feature comparison table headers and Enterprise custom-pricing note updated to reflect 1,000+ boundary.
+- `VERSION` — 4.66.0 → 4.66.1.
+
+---
+
 ## [4.66.0] — 2026-06-13
 
 ### Added
