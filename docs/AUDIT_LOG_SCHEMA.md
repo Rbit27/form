@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.3
+# FORM · Audit Log Schema v2.4
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -101,6 +101,16 @@ hmac_self = HMAC-SHA256(secret_key, hmac_prev || canonical_payload)
 - `privacy.floor_breach_tenant_notified` — enterprise tenant admin notified per Template PF-01 or employer controller notified per PF-02; **P0 SLA: ≤ 30 min after detection for PF-01**; payload: `{tenant_id, notification_template: 'PF-01'|'PF-02', notified_at: ISO8601, notified_by_user_id: UUID, employee_count_disclosed_to_tenant: integer, incident_slug: string}`; HIGH severity, 7yr retention; HMAC-chained
 - `privacy.floor_breach_resolved` — breach fully resolved; root cause remediated; reporting re-enabled with 2-person approval including clinical-safety sign-off; payload: `{tenant_id, fix_commit_sha: string, fix_deployed_at: ISO8601, feature_flags_re_enabled: string[], clinical_safety_approved: boolean, two_person_approvers: UUID[], incident_slug: string}`; STANDARD severity, 7yr retention; HMAC-chained; must follow `privacy.floor_breach_contained` in chain
 - `privacy.no_go_escalation_activated` — no-go escalation protocol activated: wellness-as-punishment or equivalent pattern detected (R-22.9); unconditional response regardless of root cause dispute; payload: `{tenant_id, no_go_reason: 'wellness_as_punishment'|'individual_data_demand'|'manager_report_demand'|'insurance_risk_scoring', dashboard_suspended_at: ISO8601, founder_notified_at: ISO8601, legal_counsel_engaged: boolean, incident_slug: string}`; **CRITICAL severity, 7yr retention; HMAC-chained; PagerDuty P0; clinical-safety VETO activated; triggers automatic global reporting suspension for affected tenant**
+
+---
+
+### Privacy Incident Lifecycle events (DEC-030 HMAC-chained · SOC2_READINESS §77 · P8.2/P8.3)
+
+> Defined in `docs/SOC2_READINESS.md §77`. Three events forming the immutable register of privacy incidents (PI-P0–PI-P3 severity taxonomy). **PRIV-INC-CHAIN-01 ordering invariant:** `privacy.incident_reviewed` and `privacy.incident_closed` must NOT be emitted for an `incident_id` with no preceding `privacy.incident_opened` — violation returns HTTP 422 (blocking). PI-P0/P1 incidents (`art9_suspected = true` or `severity_class IN ('PI-P0','PI-P1')`) trigger PagerDuty `form-privacy` CRITICAL page to compliance-officer + security-engineer + founder simultaneously. **Privacy floor (all three events):** no health values, no coaching turn content, no employee names; `incident_id` UUID is the sole cross-reference between chain events. `scope_assessment_notes` and `recurrence_prevention` are capped at 500 chars and must contain no user PII or tenant contact details. Cross-ref: `docs/SOC2_READINESS.md §77` (full classification taxonomy, runbook mapping, evidence artefacts PRIV-PI-E-001–004); `docs/INCIDENT_RESPONSE.md §15` (GDPR Art. 33/34 breach notification procedure — triggered by PI-P0/P1); `docs/INCIDENT_RESPONSE.md R-11` (biometric incident); `docs/INCIDENT_RESPONSE.md R-22` (enterprise privacy floor — PI-P0 escalation path); SOC 2 P8.2 (privacy incident identification and investigation), P8.3 (individual data accounting on request), CC7.4 (external party notification). Closes SOC2_READINESS.md §77.10 checklist item 1 (P0, M8).
+
+- `privacy.incident_opened` — first detection of any privacy incident; **must be emitted BEFORE any investigation or containment action**; **CRITICAL severity for PI-P0/P1** (PagerDuty `form-privacy` immediate triple-page); **STANDARD severity for PI-P2/P3**; 7yr retention (PI-P0/P1), 3yr retention (PI-P2/P3); PRIV-INC-CHAIN-01 anchor
+- `privacy.incident_reviewed` — scope assessment complete; Art. 33 determination made by compliance-officer; **HIGH severity; 7yr retention**; required for PI-P0/P1/P2; **optional for PI-P3** (process deviations often resolve in a single step — per OQ-PRIV-INC-02 resolution 2026-06-13); PRIV-INC-CHAIN-01 enforces predecessor `privacy.incident_opened` for same `incident_id`
+- `privacy.incident_closed` — all remediation complete; PIR filed for PI-P0/P1 (`post_incident_review_filed: true` required); `art33_notification_id` present when GDPR Art. 33 notification was submitted to supervisory authority; **HIGH severity; 7yr retention**; PRIV-INC-CHAIN-01 enforces predecessor `privacy.incident_opened` for same `incident_id`
 
 ---
 
@@ -545,6 +555,9 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 | `privacy.pia_filed` / `privacy.pia_completed` / `privacy.pia_veto_issued` / `privacy.constraint_relaxation_rejected` | 7 years | SOC 2 P1.1/P3.2/P8.1 PIA governance evidence; GDPR Art. 5(2) accountability record; `privacy.pia_veto_issued` CRITICAL is the clinical-safety decision record — 7yr ensures multiple SOC 2 observation periods are covered; `privacy.constraint_relaxation_rejected` provides a durable record that FORM declined to relax a privacy constraint on request of an enterprise customer or government, satisfying CC1.4 / P6.5 |
 | `privacy.annual_review_scope_drafted` | 3 years | Routine annual privacy review scope record; P8.1 operating-effectiveness evidence; superseded each year by a new scope draft — 3yr covers the current and prior year for any inspection window |
 | `privacy.annual_review_completed` | 7 years | Annual privacy review completion record; SOC 2 P8.1 monitoring and enforcement evidence; 7yr required — auditors conducting a Type II engagement may request evidence covering multiple annual review cycles |
+| `privacy.incident_opened` (PI-P0 / PI-P1) | 7 years | SOC 2 P8.2 privacy incident register — PI-P0/P1 incidents involve confirmed or suspected Art. 9 special category data and may trigger GDPR Art. 33 supervisory authority notification; 7yr retention matches the supervisory authority look-back window and ensures the full incident history is available across multiple SOC 2 Type II observation periods; `art9_suspected` and `art33_clock_started` fields provide the auditor narrative for notification decisions |
+| `privacy.incident_opened` (PI-P2 / PI-P3) | 3 years | SOC 2 P8.2 operational incident register for control-failure and process-deviation incidents; 3yr sufficient for operating-effectiveness evidence within a single SOC 2 certification cycle; PI-P2/P3 incidents do not trigger Art. 33 notifications and are not financial-adjacent records |
+| `privacy.incident_reviewed` / `privacy.incident_closed` | 7 years | SOC 2 P8.2/P8.3 investigation and resolution records; 7yr required across the board — `art33_notification_id` in `privacy.incident_closed` references a supervisory authority case number, which is a financial-adjacent regulatory record; `post_incident_review_filed` attests to the PIR document existence; auditors inspecting multi-year Type II reports need the full remediation chain for every PI-P0/P1 incident in scope |
 | `sla.incident_opened` / `sla.incident_closed` | 7 years | SOC 2 A1.1 SLA incident evidence — primary artefact for auditing covered downtime against the 99.9% commitment; `incident_id` links open→close in SLA-CHAIN-01; 7yr matches financial audit floor (credits issued against these incidents are themselves 7yr records) |
 | `sla.measurement_reconciled` | 7 years | SOC 2 A1.1 measurement methodology evidence — dual-source reconciliation record (Better Stack vs. Cloudflare Analytics); `betterstack_report_sha256` cross-reference makes this the chain anchor for the monthly uptime figure; 7yr required — auditors need multi-year availability data for Type II opinion |
 | `sla.credit_calculated` / `sla.credit_approved` / `sla.credit_adjusted` | 7 years | SOC 2 A1.1 SLA credit issuance chain — three-event sequence covering automated calculation, compliance-officer approval, and any dispute-driven adjustment; financial records (credit applied to invoices) must meet 7yr accounting retention floor per FORM financial policy |
@@ -765,6 +778,124 @@ const AnnualReviewCompletedSchema = z.object({
 - `privacy.annual_review_completed` — no strict predecessor requirement beyond a matching `privacy.annual_review_scope_drafted` for the same `review_year` (WARNING if absent, non-blocking).
 
 **Emitter assignments:** All six events emitted manually by compliance-officer via admin console, except `privacy.pia_veto_issued` which is emitted by the clinical-safety agent. No automated system path for any PIA event — these are governance decisions requiring human judgement. `form_system` has INSERT privilege for break-glass scenarios only (e.g., retroactive baseline PIA-2026-000).
+
+---
+
+### Privacy Incident Lifecycle events — full Zod schemas (DEC-030 HMAC-chained · SOC2_READINESS §77.4 · P8.2/P8.3)
+
+> Canonical Zod schemas for `emit-audit-event` Worker validation. All three events must be deployed together — PRIV-INC-CHAIN-01 requires `privacy.incident_opened` to be the chain anchor; partial deployment of only `incident_reviewed` or `incident_closed` without `incident_opened` enforcement creates an undetectable chain gap. Severity and retention split by incident class: `severity_class IN ('PI-P0','PI-P1')` → CRITICAL/HIGH severity, 7yr; `severity_class IN ('PI-P2','PI-P3')` → STANDARD/HIGH severity, 3yr/7yr (see table below). Privacy floor: `scope_assessment_notes` and `recurrence_prevention` are free-text fields capped at 500 chars — worker MUST reject payloads where these fields contain strings matching `/@|\buser_id\b|\bhealth\b/i` patterns (privacy floor lint). `art33_notification_id` is a DPA notification reference string (e.g. supervisory authority case number) — never the content of the notification. Closes SOC2_READINESS §77.10 P0 checklist item 1 and resolves OQ-PRIV-INC-02 (PI-P3 `incident_reviewed` optional).
+
+| Event type | Severity (PI-P0/P1) | Severity (PI-P2/P3) | Retention | Trigger | PRIV-INC-CHAIN-01 |
+|---|---|---|---|---|---|
+| `privacy.incident_opened` | **CRITICAL** | STANDARD | 7yr (P0/P1) · 3yr (P2/P3) | First detection; before any investigation action | **Anchor** — must precede reviewed + closed for same `incident_id` |
+| `privacy.incident_reviewed` | HIGH | HIGH | 7yr | Scope assessment complete; Art. 33 determination made | Required predecessor: `privacy.incident_opened` for same `incident_id` (HTTP 422 if absent); **optional for PI-P3** |
+| `privacy.incident_closed` | HIGH | HIGH | 7yr | All remediation complete; PIR filed (PI-P0/P1) | Required predecessor: `privacy.incident_opened` for same `incident_id` (HTTP 422 if absent) |
+
+```typescript
+// Zod schemas — canonical source for emit-audit-event Worker validation
+// Defined in docs/SOC2_READINESS.md §77.4
+import { z } from 'zod';
+
+const PrivacyIncidentOpenedSchema = z.object({
+  incident_id:          z.string().uuid(),
+  severity_class:       z.enum(['PI-P0', 'PI-P1', 'PI-P2', 'PI-P3']),
+  incident_type:        z.enum([
+    'art9_confirmed',
+    'art9_suspected',
+    'contact_data',
+    'privacy_floor_breach',
+    'dsar_delay',
+    'consent_failure',
+    'control_gap',
+    'sub_processor',
+    'process_deviation',
+    'government_request',
+  ]),
+  detection_source:     z.enum([
+    'pagerduty_alert',
+    'dsar_review',
+    'annual_review',
+    'pentest_finding',
+    'internal_report',
+    'external_report',
+    'sub_processor_notice',
+    'regulatory_inquiry',
+  ]),
+  tenant_id:            z.string().uuid().optional(),   // null for consumer incidents
+  art9_suspected:       z.boolean(),
+  art33_clock_started:  z.boolean(),
+  linear_ticket_url:    z.string().url().optional(),
+  opened_by:            z.string().uuid(),
+});
+
+const PrivacyIncidentReviewedSchema = z.object({
+  incident_id:                z.string().uuid(),
+  final_severity_class:       z.enum(['PI-P0', 'PI-P1', 'PI-P2', 'PI-P3']),
+  severity_changed:           z.boolean(),
+  art33_required:             z.boolean(),
+  art34_required:             z.boolean(),
+  runbook_invoked:            z.array(z.enum([
+    'R-11', 'R-12', 'R-13', 'R-14', 'R-22', 'section_15', 'R-07', 'none',
+  ])),
+  external_counsel_engaged:   z.boolean(),
+  scope_assessment_notes:     z.string().max(500),      // no health values, no user PII
+  reviewed_by:                z.string().uuid(),
+});
+
+const PrivacyIncidentClosedSchema = z.object({
+  incident_id:                z.string().uuid(),
+  resolution_type:            z.enum([
+    'remediated_no_notification',
+    'art33_notification_filed',
+    'art34_notifications_sent',
+    'false_positive',
+    'process_improvement',
+  ]),
+  root_cause_category:        z.enum([
+    'configuration_error',
+    'code_defect',
+    'human_error',
+    'sub_processor_failure',
+    'policy_gap',
+    'unknown',
+  ]),
+  recurrence_prevention:      z.string().max(500),      // no health values, no user PII
+  post_incident_review_filed: z.boolean(),
+  closed_by:                  z.string().uuid(),
+  art33_notification_id:      z.string().optional(),    // supervisory authority case ref
+});
+```
+
+**PRIV-INC-CHAIN-01 ordering invariant enforcement:**
+
+The `emit-audit-event` Worker enforces the following:
+- `privacy.incident_reviewed` emitted with no prior `privacy.incident_opened` for same `incident_id` → HTTP 422 (`PRIV_INC_CHAIN_01_VIOLATION`); blocking.
+- `privacy.incident_closed` emitted with no prior `privacy.incident_opened` for same `incident_id` → HTTP 422 (`PRIV_INC_CHAIN_01_VIOLATION`); blocking.
+- `privacy.incident_reviewed` for PI-P3 incidents is **not enforced** — the Worker does NOT require a prior `incident_reviewed` before accepting `incident_closed` for `severity_class = 'PI-P3'`. PI-P3 process deviations may resolve in a single engineering fix without a formal scope assessment. Both `incident_reviewed` and `incident_closed` must still have a preceding `incident_opened`. This resolves OQ-PRIV-INC-02 from `docs/SOC2_READINESS.md §77.11` (P1, M8).
+
+**PagerDuty routing:**
+
+| Severity class | PagerDuty service | Recipients | Dedup |
+|---|---|---|---|
+| PI-P0 or `art9_suspected = true` | `form-privacy` CRITICAL | compliance-officer + security-engineer + founder (simultaneous) | No dedup — every PI-P0 `incident_opened` pages immediately |
+| PI-P1 | `form-privacy` HIGH | compliance-officer + security-engineer | 15-min dedup window |
+| PI-P2 | Slack `#privacy-incidents` | compliance-officer | No PagerDuty |
+| PI-P3 | Linear ticket only | compliance-officer | No PagerDuty |
+
+**Evidence artefacts (from SOC2_READINESS §77.7):**
+
+| ID | Query | Filing path | SOC 2 | Retention |
+|---|---|---|---|---|
+| PRIV-PI-E-001 | `SELECT … FROM audit_log_events WHERE action = 'privacy.incident_opened' AND created_at BETWEEN $obs_start AND $obs_end` | `compliance/evidence/privacy/incident-register/priv-pi-e-001-YYYY-QN.jsonl` | P8.2, P8.3 | 7yr |
+| PRIV-PI-E-002 | Monthly aggregate count by severity class (no individual incident details) | `compliance/evidence/privacy/incident-register/priv-pi-e-002-YYYY-QN.json` | P8.2 | 7yr |
+| PRIV-PI-E-003 | PI-P0/P1 close confirmation — `incident_opened` JOIN `incident_closed` with `post_incident_review_filed = true` | `compliance/evidence/privacy/incident-register/priv-pi-e-003-YYYY-QN.json` | P8.2, P8.3 | 7yr |
+| PRIV-PI-E-004 | `privacy.annual_review_completed` event for calendar year (from §60 evidence package) | `compliance/evidence/privacy/YYYY/p-e-008.json` | P8.1, P8.2 | 7yr |
+
+**Emitter assignments:**
+
+- `privacy.incident_opened` — compliance-officer (manual, within 30 min of P0/P1 awareness; 4h for P2/P3). Security-engineer may also emit for detection-triggered P0/P1 when compliance-officer is unavailable. No automated emission path — human judgement required to classify severity.
+- `privacy.incident_reviewed` — compliance-officer only. `form_system` INSERT privilege reserved for break-glass retroactive filing with compliance-officer co-approval.
+- `privacy.incident_closed` — compliance-officer only. `post_incident_review_filed: true` is self-attestation by the emitter — the PIR document itself must be filed separately at `compliance/evidence/privacy/incident-register/pir-{incident_id}.md`.
 
 ---
 
@@ -1321,6 +1452,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.4 · 2026-06-13 · owner: compliance-officer + security-engineer**
+*v2.4 (2026-06-13): +3 `privacy.incident_*` Privacy Incident Lifecycle events — closes SOC2_READINESS.md §77.10 P0 checklist item 1 (register all three events in AUDIT_LOG_SCHEMA.md before first enterprise pilot, M8) and resolves OQ-PRIV-INC-02 (§77.11, P1) by documenting the PI-P3 optional `incident_reviewed` rule in the PRIV-INC-CHAIN-01 enforcement spec. (1) `privacy.incident_opened` (CRITICAL/STANDARD, 7yr/3yr by severity class): compliance-officer or security-engineer emits on first detection of any privacy incident before any investigation action; CRITICAL for PI-P0/P1 → PagerDuty `form-privacy` triple-page (compliance-officer + security-engineer + founder, no dedup); STANDARD for PI-P2/P3 (Slack `#privacy-incidents`); payload: `incident_id` UUID, `severity_class` (PI-P0–PI-P3 enum), `incident_type` (10-value enum: art9_confirmed/art9_suspected/contact_data/privacy_floor_breach/dsar_delay/consent_failure/control_gap/sub_processor/process_deviation/government_request), `detection_source` (8-value enum: pagerduty_alert/dsar_review/annual_review/pentest_finding/internal_report/external_report/sub_processor_notice/regulatory_inquiry), `tenant_id` (UUID optional — null for consumer incidents), `art9_suspected` (boolean), `art33_clock_started` (boolean — true starts 72h GDPR Art. 33 window), `linear_ticket_url` (optional), `opened_by` UUID. (2) `privacy.incident_reviewed` (HIGH, 7yr): compliance-officer emits after scope assessment and Art. 33 determination; required for PI-P0/P1/P2; **optional for PI-P3** (OQ-PRIV-INC-02 resolution: process deviations often resolve in a single engineering fix; Worker does NOT block `incident_closed` for PI-P3 if no prior `incident_reviewed` exists); payload: `incident_id`, `final_severity_class`, `severity_changed` (bool — true if escalated or downgraded from opening class), `art33_required`, `art34_required`, `runbook_invoked` (array of R-11/R-12/R-13/R-14/R-22/section_15/R-07/none), `external_counsel_engaged`, `scope_assessment_notes` (max 500 chars, no PII/health values), `reviewed_by` UUID. (3) `privacy.incident_closed` (HIGH, 7yr): compliance-officer emits after full remediation; `post_incident_review_filed: true` self-attests PIR document existence (PIR filed separately at `compliance/evidence/privacy/incident-register/pir-{incident_id}.md`); `art33_notification_id` carries supervisory authority case reference if Art. 33 notification was filed (never notification content); payload: `incident_id`, `resolution_type` (5-value enum: remediated_no_notification/art33_notification_filed/art34_notifications_sent/false_positive/process_improvement), `root_cause_category` (6-value enum), `recurrence_prevention` (max 500 chars), `post_incident_review_filed`, `closed_by` UUID, `art33_notification_id` (optional string). PRIV-INC-CHAIN-01: `incident_reviewed` and `incident_closed` require preceding `incident_opened` for same `incident_id` → HTTP 422 `PRIV_INC_CHAIN_01_VIOLATION` on violation (blocking); PI-P3 exception for `incident_reviewed` only. Evidence artefacts: PRIV-PI-E-001 (quarterly incident register — `incident_opened` export, jsonl, 7yr), PRIV-PI-E-002 (monthly aggregate count by class, no individual details, 7yr), PRIV-PI-E-003 (PI-P0/P1 close confirmation — `incident_opened` JOIN `incident_closed` with `post_incident_review_filed = true`, 7yr), PRIV-PI-E-004 (`privacy.annual_review_completed` annual event from §60). Retention table: +3 rows (`privacy.incident_opened` PI-P0/P1 7yr; `privacy.incident_opened` PI-P2/P3 3yr; `privacy.incident_reviewed`/`privacy.incident_closed` 7yr). Privacy floor: no health values, no coaching turn content, no employee names, no tenant contact details in any payload; `incident_id` UUID is the sole cross-reference. SOC 2 criteria: P8.2 (privacy incident identification, investigation, communication), P8.3 (individual data accounting — DSAR-triggered incidents), CC7.4 (external party notification — `incident_closed.art33_notification_id`). Cross-ref: `docs/SOC2_READINESS.md §77` (full taxonomy, runbook mapping, evidence paths); `docs/INCIDENT_RESPONSE.md §15` (Art. 33/34 procedure); R-11 (biometric), R-22 (enterprise privacy floor), R-13 (government request), R-14 (DSAR delay); `docs/PRIVACY_IMPACT.md §7` (PIA events — companion P-series event family); DEC-030 (HMAC chain requirement). Owner: compliance-officer + security-engineer.*
 
 **v2.3 · 2026-06-13 · owner: compliance-officer + security-engineer**
 *v2.3 (2026-06-13): +25 events across four new namespaces plus five Admin key rotation lifecycle events. (1) `incident.*` Incident Lifecycle (10 events, INCIDENT_RESPONSE §16, CC7.3/CC7.4/CC7.5/CC4.1): `incident.opened` (HIGH, 7yr — `incident_severity`, `incident_runbook`, `trigger_alert_id`, `siem_correlation_score`; IRCHAIN-01 anchor), `incident.ic_assigned` (MEDIUM, 7yr — `minutes_since_open` as IR-SLO-01 evidence), `incident.severity_changed` (HIGH, 7yr — `direction` upgrade/downgrade; `approver_user_id` required for downgrade), `incident.escalated` (HIGH, 7yr — `escalation_target` 5-value enum), `incident.update_posted` (STANDARD, 3yr — `privacy_floor_verified: literal(true)` required; false rejected HTTP 422), `incident.containment_verified` (HIGH, 7yr — `data_exfiltration_confirmed` + `hmac_chain_integrity` bools), `incident.eradicated` (HIGH, 7yr — `root_cause_category` 7-value enum), `incident.recovered` (HIGH, 7yr — `duration_minutes`), `incident.pir_opened` (MEDIUM, 7yr — `pir_due_at` ISO 8601), `incident.pir_closed` (HIGH, 7yr — `critical_action_items_count` + `pir_document_sha256`). IRCHAIN-01 sub-chain rule: `incident.opened` must precede all `incident.*` for same `incident_id`; break = P0 R-05. Dead-man's switches: pg_cron at T+48h for missing PIR + daily for overdue PIR. Closes INCIDENT_RESPONSE.md §16.8 checklist items 1–2 (P0, M4). (2) `wearable.*` Wearable Integration (6 events, OBSERVABILITY §41, A1.1/P3.2): `wearable.sync_completed` (STANDARD, 2yr), `wearable.sync_failed` (HIGH, 3yr — `error_class` enum + `error_message_hash` SHA-256), `wearable.oauth_token_expired` (HIGH, 3yr — `OAuthSource` enum: whoop/oura/garmin only), `wearable.permission_revoked` (HIGH, **5yr** — GDPR Art. 7(3) withdrawal record; `consent_event_id` FK to consent chain; no `user_id`), `wearable.fleet_freshness_assessed` (STANDARD, 2yr — k-anonymity gate: `sources_breakdown` suppressed if any source N < 5), `wearable.stale_data_coaching_context` (HIGH, 3yr — `coaching_context_downgraded: literal(true)`; false = HTTP 422 WS-CHAIN-01; clinical-safety VETO on gate weakening). Privacy floor all six: no `user_id`; `tenant_id` nullable. Closes OBSERVABILITY.md §41.11 checklist item 1 (P0, M5). (3) `system.load_test_*` Performance & Load Testing (5 events, OBSERVABILITY §40, A1.1/CC5.2/CC8.1): `system.load_test_initiated` (STANDARD, 3yr — `environment: literal('staging')` constraint), `system.load_test_completed` (STANDARD, 3yr — `slo_results` object per PERF-SLO-01…05), `system.load_test_failed` (HIGH, 7yr — `failing_slos` array + `gate_action: literal('merge_blocked')`), `system.load_test_gate_bypassed` (CRITICAL, 7yr — AL-PERF-04 no-auto-resolve; `bypass_reason_hash` SHA-256), `system.perf_regression_detected` (HIGH, 7yr — quarterly PERF-SLO-06 breach). PERF-CHAIN-01: completed/failed requires prior initiated for same `commit_sha`. Closes OBSERVABILITY.md §40.10 checklist item 1 (P0, M5). (4) `enterprise.pipeline_*` Enterprise Pipeline & ARR (4 events, COST_MODEL §37, CC4.2): `enterprise.pipeline_reviewed` (STANDARD, 3yr — weekly PCR + weighted pipeline), `enterprise.arr_bridge_closed` (STANDARD, **7yr** — 5-component ARR bridge; Ukrainian Tax Code Art. 44 + SOC 2 financial floor), `enterprise.deal_aged_out` (STANDARD, 3yr — pg_cron job 31 daily; `deal_id` internal UUID only, never shared), `enterprise.pipeline_conversion_model_recalibrated` (STANDARD, 7yr — `decision_log_ref` non-null required; null rejected HTTP 422 PIPE-CHAIN-01). Privacy floor all four: no prospect names or contact emails. Closes COST_MODEL.md §37.10 checklist item 1 (P0, M7). (5) Admin key rotation lifecycle (5 events, SOC2_READINESS §57, CC6.7/CC6.8): `admin.key_rotation_initiated` (CRITICAL, 7yr — PAM session anchor; must precede all rotation events for same `key_name` within 24h), `admin.key_rotation_announced` (HIGH, 7yr — Slack `#engineering` advance notice), `admin.emergency_key_rotation` (CRITICAL, 7yr — `gdpr_art33_clock_started_iso` field; triggers GDPR 72h notification clock), `admin.key_rotation_reminder` (LOW, 3yr — `workers/key-rotation-monitor` cron at 14/7/3 days before expiry), `admin.key_rotation_overdue` (HIGH, 7yr — fires when `days_until_expiry ≤ 0`; triggers AL-KEY-02 P0 no-auto-resolve). Privacy invariant: JWT value never stored — `iat` Unix timestamp only. Closes SOC2_READINESS.md §57.11 checklist items 1–2 (P0, M5). Retention table updated: +9 rows (incident HIGH/MEDIUM/STANDARD entries; wearable 2yr/3yr/5yr entries; load test STANDARD/HIGH/CRITICAL entries; pipeline STANDARD 3yr/7yr entries; admin key rotation CRITICAL/HIGH/LOW entries). Owner: compliance-officer + security-engineer.*

@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [4.55.2] — 2026-06-13
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.3 → v2.4. Registered three new DEC-030 HMAC-chained event types for the Privacy Incident Lifecycle (SOC2_READINESS §77): `privacy.incident_opened` (CRITICAL/STANDARD, 7yr/3yr by severity class), `privacy.incident_reviewed` (HIGH, 7yr), `privacy.incident_closed` (HIGH, 7yr). Includes: full Zod v2 schemas (canonical source for `emit-audit-event` Worker validation); PRIV-INC-CHAIN-01 ordering invariant enforcement spec (HTTP 422 on violation, PI-P3 `incident_reviewed` optional per OQ-PRIV-INC-02 resolution); PagerDuty routing table (PI-P0 triple-page `form-privacy` CRITICAL; PI-P1 dual-page HIGH; PI-P2 Slack only); evidence artefact queries PRIV-PI-E-001–E-004 with filing paths; emitter assignment rules for compliance-officer and security-engineer. Retention table: +3 rows (`privacy.incident_opened` PI-P0/P1 7yr; `privacy.incident_opened` PI-P2/P3 3yr; `privacy.incident_reviewed`/`privacy.incident_closed` 7yr). Taxonomy section: new `### Privacy Incident Lifecycle events` block after Privacy floor enforcement events. Closes SOC2_READINESS §77.10 P0 checklist item 1.
+- `docs/SOC2_READINESS.md` — v3.7.0 → v3.7.1. §77.10 checklist item 1 marked [x] Done (AUDIT_LOG_SCHEMA.md v2.4). §77.10 checklist item 2 updated to include PI-P3 exception in PRIV-INC-CHAIN-01 spec. OQ-PRIV-INC-02 (§77.11) resolved 🟢: PI-P3 `privacy.incident_reviewed` optional; enforcement rule documented in AUDIT_LOG_SCHEMA.md.
+- `VERSION` — 4.55.1 → 4.55.2.
+
+---
+
 ## [4.55.1] — 2026-06-13
 
 ### Added
