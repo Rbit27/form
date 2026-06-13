@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.0
+# FORM · Audit Log Schema v2.2
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -540,6 +540,13 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 | `privacy.pia_filed` / `privacy.pia_completed` / `privacy.pia_veto_issued` / `privacy.constraint_relaxation_rejected` | 7 years | SOC 2 P1.1/P3.2/P8.1 PIA governance evidence; GDPR Art. 5(2) accountability record; `privacy.pia_veto_issued` CRITICAL is the clinical-safety decision record — 7yr ensures multiple SOC 2 observation periods are covered; `privacy.constraint_relaxation_rejected` provides a durable record that FORM declined to relax a privacy constraint on request of an enterprise customer or government, satisfying CC1.4 / P6.5 |
 | `privacy.annual_review_scope_drafted` | 3 years | Routine annual privacy review scope record; P8.1 operating-effectiveness evidence; superseded each year by a new scope draft — 3yr covers the current and prior year for any inspection window |
 | `privacy.annual_review_completed` | 7 years | Annual privacy review completion record; SOC 2 P8.1 monitoring and enforcement evidence; 7yr required — auditors conducting a Type II engagement may request evidence covering multiple annual review cycles |
+| `sla.incident_opened` / `sla.incident_closed` | 7 years | SOC 2 A1.1 SLA incident evidence — primary artefact for auditing covered downtime against the 99.9% commitment; `incident_id` links open→close in SLA-CHAIN-01; 7yr matches financial audit floor (credits issued against these incidents are themselves 7yr records) |
+| `sla.measurement_reconciled` | 7 years | SOC 2 A1.1 measurement methodology evidence — dual-source reconciliation record (Better Stack vs. Cloudflare Analytics); `betterstack_report_sha256` cross-reference makes this the chain anchor for the monthly uptime figure; 7yr required — auditors need multi-year availability data for Type II opinion |
+| `sla.credit_calculated` / `sla.credit_approved` / `sla.credit_adjusted` | 7 years | SOC 2 A1.1 SLA credit issuance chain — three-event sequence covering automated calculation, compliance-officer approval, and any dispute-driven adjustment; financial records (credit applied to invoices) must meet 7yr accounting retention floor per FORM financial policy |
+| `sla.dispute_opened` | 3 years | Tenant dispute initiation record; operational lifecycle log; 3yr sufficient — primary dispute resolution evidence is captured in the higher-severity `sla.dispute_resolved` (7yr) record that must follow per SLA-CHAIN-03 |
+| `sla.dispute_resolved` | 7 years | SOC 2 A1.1 dispute resolution record — `outcome` (upheld/rejected) + `final_credit_usd` + `resolved_by` constitutes the compliance-officer decision record; 7yr matches financial audit floor and ensures availability across multiple SOC 2 Type II observation periods |
+| `sla.maintenance_window_registered` | 3 years | Planned maintenance exclusion registration record; operational planning log; the `notification_hours` field provides evidence the §23.4 advance-notice requirement was met; 3yr sufficient — maintenance window records are operational, not financial |
+| `sla.exclusion_reclassified` | 7 years | SOC 2 A1.1 probe false-positive reclassification evidence — `security-engineer` approval + second-approver requirement for windows > 30 min creates a tamper-evident record that downtime exclusions are subject to independent review; 7yr ensures auditors can inspect reclassification decisions across the full SOC 2 history |
 
 After retention period, rows **hard-deleted via partition drop** (not soft-delete). Hash of deleted-partition's last row preserved у `audit_log_retention_summary` for chain continuity proof.
 
@@ -955,6 +962,140 @@ const BackupStalenessDetectedSchema = z.object({
 
 ---
 
+### Enterprise SLA events (DEC-030 HMAC-chained · OBSERVABILITY §23 · A1.1 / CC7.2)
+
+> Defined in `docs/OBSERVABILITY.md §23`. Ten events covering the full SLA incident, measurement, credit, and dispute lifecycle for enterprise tenants. Closes OBSERVABILITY.md §23.11 checklist item 8 (P0, M4 — "Register all 10 `sla.*` DEC-030 event types in `AUDIT_LOG_SCHEMA.md` event registry").
+>
+> **Privacy floor (all ten events):** `actor_id` is a FORM internal identity (`devops-lead` UUID, `form_system`, or `compliance-officer` UUID). Tenant is identified via `tenant_id` only — no `user_id`, no employee PII, no health values. `sla.dispute_opened` captures `dispute_reason` (free text); this field must not include employee identifiers — the platform-layer `form_system` emitter truncates and hashes any value containing `@` characters before writing to chain. **Financial data:** `credit_amount_usd` and `final_credit_usd` fields are FORM–tenant contractual records; they appear in the chain under tenant scope and are protected by the same RLS tenant-isolation policy as `sla_monthly_reports` (§23.8 — tenant_admin sees only their own tenant's records).
+>
+> **SLA-CHAIN ordering invariants** (enforced at write time by `emit-audit-event` Worker — HTTP 422 on violation):
+> - **SLA-CHAIN-01:** `sla.incident_closed` MUST follow a `sla.incident_opened` with the same `incident_id` in the chain. An orphaned close event (no matching open) is rejected.
+> - **SLA-CHAIN-02:** `sla.credit_approved` MUST follow a `sla.credit_calculated` for the same `(tenant_id, report_month)`. Credit approval without a calculation record is rejected.
+> - **SLA-CHAIN-03:** `sla.dispute_resolved` MUST follow a `sla.dispute_opened` for the same `(tenant_id, report_month)`. A resolved dispute without a corresponding open is rejected.
+>
+> A chain break on any `sla.*` event is a P0 incident per `docs/INCIDENT_RESPONSE.md §R-05`.
+>
+> Cross-ref: `docs/OBSERVABILITY.md §23.9` (canonical event table); `docs/ENTERPRISE_SLA.md` (committed SLA terms — these events are the contractual audit trail); `docs/SOC2_READINESS.md §2 A1.1` (gap closure — SLA credit calculation and process, OBSERVABILITY §23 is the primary evidence section).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `sla.incident_opened` | HIGH | 7 yr | Probes detect covered downtime (month-close Worker) or devops-lead manually declares P0 outage | `tenant_id`, `incident_id` (UUID), `probe_ids` (string[]), `outage_type` (`full`\|`partial`), `downtime_weight` (1.0 or 0.5), `started_at` |
+| `sla.incident_closed` | HIGH | 7 yr | Probes recover; `sla_incidents.ended_at` written | `tenant_id`, `incident_id`, `ended_at`, `duration_minutes`, `exclusion_applied` (bool), `exclusion_reason` (string\|null) |
+| `sla.measurement_reconciled` | STANDARD | 7 yr | Month-end reconciliation Worker compares Better Stack vs. Cloudflare Analytics; conservative source chosen per §23.3 | `tenant_id`, `report_month` (ISO date), `betterstack_pct`, `cf_analytics_pct`, `delta_pct`, `chosen_source` (`betterstack`\|`cf_analytics`) |
+| `sla.credit_calculated` | HIGH | 7 yr | `workers/sla/month-close.ts` determines credit tier for the reporting month | `tenant_id`, `report_month`, `availability_pct`, `covered_downtime_minutes`, `credit_tier_pct` (0\|5\|15\|25\|50), `credit_amount_usd`, `mrr_snapshot_usd` |
+| `sla.credit_approved` | HIGH | 7 yr | `compliance-officer` approves credit after verifying reconciliation; applies credit to next invoice | `tenant_id`, `report_month`, `approved_by` (UUID — compliance-officer), `final_credit_usd`, `original_calculated_usd` |
+| `sla.credit_adjusted` | HIGH | 7 yr | `compliance-officer` modifies credit from calculated amount (upward or downward, e.g. dispute upheld) | `tenant_id`, `report_month`, `original_usd`, `adjusted_usd`, `adjustment_delta_usd`, `reason` (string — plain-text rationale), `adjusted_by` (UUID) |
+| `sla.dispute_opened` | STANDARD | 3 yr | Tenant submits dispute via admin dashboard "Dispute this report" flow; routes to `enterprise@form.coach` | `tenant_id`, `report_month`, `dispute_reason` (hashed if contains `@`), `submitted_via` (`admin_dashboard`\|`email`) |
+| `sla.dispute_resolved` | HIGH | 7 yr | `compliance-officer` closes dispute — outcome `upheld` (credit increased) or `rejected` (original credit stands) | `tenant_id`, `report_month`, `outcome` (`upheld`\|`rejected`), `final_credit_usd`, `resolved_by` (UUID), `resolution_notes_hash` (SHA-256 — no raw text in chain) |
+| `sla.maintenance_window_registered` | STANDARD | 3 yr | `devops-lead` inserts row into `maintenance_windows` table before window begins; required for §23.4 scheduled-maintenance exclusion | `tenant_id` (UUID\|null — null for platform-wide), `window_id` (UUID), `scheduled_start`, `scheduled_end`, `notification_hours`, `approved_by` (UUID) |
+| `sla.exclusion_reclassified` | HIGH | 7 yr | `security-engineer` reclassifies a false-positive probe failure per §23.4; requires second approver for probe windows > 30 min | `tenant_id`, `incident_id`, `original_classification` (`covered`\|`partial`), `new_classification` (`excluded`), `exclusion_reason` (enum), `approved_by` (UUID — security-engineer), `reclassified_at` |
+
+```typescript
+import { z } from 'zod';
+
+// sla.* Zod schemas — source of truth for emit-audit-event Worker validation
+// Canonical definitions: docs/OBSERVABILITY.md §23.9
+// All schemas share the standard DEC-030 envelope: { tenant_id, trace_id, actor_id, hmac_prev, hmac_self, created_at }
+
+const SlaIncidentOpenedSchema = z.object({
+  incident_id:     z.string().uuid(),
+  probe_ids:       z.array(z.string()),
+  outage_type:     z.enum(['full', 'partial']),
+  downtime_weight: z.number().refine(w => w === 1.0 || w === 0.5),
+  started_at:      z.string().datetime(),
+});
+
+const SlaIncidentClosedSchema = z.object({
+  incident_id:        z.string().uuid(),
+  ended_at:           z.string().datetime(),
+  duration_minutes:   z.number().nonnegative(),
+  exclusion_applied:  z.boolean(),
+  exclusion_reason:   z.string().nullable(),
+});
+
+const SlaMeasurementReconciledSchema = z.object({
+  report_month:    z.string().regex(/^\d{4}-\d{2}-01$/),  // e.g. "2026-05-01"
+  betterstack_pct: z.number().min(0).max(100),
+  cf_analytics_pct:z.number().min(0).max(100),
+  delta_pct:       z.number().nonnegative(),
+  chosen_source:   z.enum(['betterstack', 'cf_analytics']),
+});
+
+const SlaCreditCalculatedSchema = z.object({
+  report_month:             z.string().regex(/^\d{4}-\d{2}-01$/),
+  availability_pct:         z.number().min(0).max(100),
+  covered_downtime_minutes: z.number().nonnegative(),
+  credit_tier_pct:          z.union([z.literal(0), z.literal(5), z.literal(15), z.literal(25), z.literal(50)]),
+  credit_amount_usd:        z.number().nonnegative(),
+  mrr_snapshot_usd:         z.number().positive(),
+});
+
+const SlaCreditApprovedSchema = z.object({
+  report_month:           z.string().regex(/^\d{4}-\d{2}-01$/),
+  approved_by:            z.string().uuid(),
+  final_credit_usd:       z.number().nonnegative(),
+  original_calculated_usd:z.number().nonnegative(),
+});
+
+const SlaCreditAdjustedSchema = z.object({
+  report_month:       z.string().regex(/^\d{4}-\d{2}-01$/),
+  original_usd:       z.number().nonnegative(),
+  adjusted_usd:       z.number().nonnegative(),
+  adjustment_delta_usd:z.number(),
+  reason:             z.string().min(10).max(500),
+  adjusted_by:        z.string().uuid(),
+});
+
+const SlaDisputeOpenedSchema = z.object({
+  report_month:   z.string().regex(/^\d{4}-\d{2}-01$/),
+  dispute_reason: z.string().max(1000),  // hashed at write layer if contains '@'
+  submitted_via:  z.enum(['admin_dashboard', 'email']),
+});
+
+const SlaDisputeResolvedSchema = z.object({
+  report_month:          z.string().regex(/^\d{4}-\d{2}-01$/),
+  outcome:               z.enum(['upheld', 'rejected']),
+  final_credit_usd:      z.number().nonnegative(),
+  resolved_by:           z.string().uuid(),
+  resolution_notes_hash: z.string().length(64),  // SHA-256 hex — no raw text in chain
+});
+
+const SlaMaintenanceWindowRegisteredSchema = z.object({
+  window_id:         z.string().uuid(),
+  scheduled_start:   z.string().datetime(),
+  scheduled_end:     z.string().datetime(),
+  notification_hours:z.number().nonnegative(),
+  approved_by:       z.string().uuid(),
+  // tenant_id is null for platform-wide windows (present in DEC-030 envelope as null)
+});
+
+const SlaExclusionReclassifiedSchema = z.object({
+  incident_id:           z.string().uuid(),
+  original_classification:z.enum(['covered', 'partial']),
+  new_classification:    z.literal('excluded'),
+  exclusion_reason:      z.enum([
+    'upstream_provider_outage',
+    'scheduled_maintenance',
+    'customer_idp_misconfiguration',
+    'force_majeure',
+    'synthetic_probe_false_positive',
+    'beta_feature',
+  ]),
+  approved_by:        z.string().uuid(),
+  reclassified_at:    z.string().datetime(),
+});
+```
+
+**Emitter assignments:**
+- `sla.incident_opened` / `sla.incident_closed`: `workers/sla/month-close.ts` (`form_system` role) on automated probe detection; `devops-lead` manually via admin console for P0 declarations.
+- `sla.measurement_reconciled` / `sla.credit_calculated`: `workers/sla/month-close.ts` (`form_system` role), triggered by pg_cron at 00:30 UTC on the 1st of each month.
+- `sla.credit_approved` / `sla.credit_adjusted` / `sla.dispute_resolved`: `compliance-officer` manually via admin console after verification — no automated path.
+- `sla.dispute_opened`: `form_system` role on receipt of tenant dispute submission through admin dashboard.
+- `sla.maintenance_window_registered`: `devops-lead` via admin console; `form_system` validates the `notification_hours ≥ 72` constraint (≥ 168 for Enterprise tier) before emitting.
+- `sla.exclusion_reclassified`: `security-engineer` via admin console; a second approver (`compliance-officer`) is required for any reclassification that affects a window > 30 min (validated by the Worker before chain write).
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:
@@ -994,6 +1135,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.2 · 2026-06-13 · owner: compliance-officer + security-engineer**
+*v2.2 (2026-06-13): +10 `sla.*` Enterprise SLA lifecycle events — closes OBSERVABILITY.md §23.11 checklist item 8 (P0, M4 — "Register all 10 `sla.*` DEC-030 event types in `AUDIT_LOG_SCHEMA.md` event registry"). New section: `### Enterprise SLA events (DEC-030 HMAC-chained · OBSERVABILITY §23 · A1.1 / CC7.2)`. Events: `sla.incident_opened` (HIGH, 7yr — `incident_id` + `probe_ids` + `outage_type` + `downtime_weight`); `sla.incident_closed` (HIGH, 7yr — `duration_minutes`, `exclusion_applied` bool + `exclusion_reason` nullable); `sla.measurement_reconciled` (STANDARD, 7yr — `betterstack_pct` vs. `cf_analytics_pct` dual-source reconciliation, `chosen_source` enum — conservative lower value; `report_month` ISO date regex validated); `sla.credit_calculated` (HIGH, 7yr — `credit_tier_pct` union literal 0|5|15|25|50, `credit_amount_usd`, `mrr_snapshot_usd`); `sla.credit_approved` (HIGH, 7yr — `approved_by` UUID, `final_credit_usd`, `original_calculated_usd`; compliance-officer manual emitter — no automated path); `sla.credit_adjusted` (HIGH, 7yr — `adjustment_delta_usd` signed, `reason` 10–500 chars, `adjusted_by` UUID); `sla.dispute_opened` (STANDARD, 3yr — `dispute_reason` hashed at write layer if contains `@`; `submitted_via` enum); `sla.dispute_resolved` (HIGH, 7yr — `outcome` upheld|rejected, `resolution_notes_hash` SHA-256 — no raw text in chain); `sla.maintenance_window_registered` (STANDARD, 3yr — `notification_hours` evidences §23.4 advance-notice requirement; `tenant_id` nullable for platform-wide windows); `sla.exclusion_reclassified` (HIGH, 7yr — `exclusion_reason` 6-value enum, `approved_by` security-engineer, second-approver required for windows > 30 min validated by Worker). Three SLA-CHAIN ordering invariants: SLA-CHAIN-01 (`sla.incident_closed` requires prior `sla.incident_opened` same `incident_id`); SLA-CHAIN-02 (`sla.credit_approved` requires prior `sla.credit_calculated` same `(tenant_id, report_month)`); SLA-CHAIN-03 (`sla.dispute_resolved` requires prior `sla.dispute_opened` same `(tenant_id, report_month)`); all enforced by `emit-audit-event` Worker (HTTP 422 on violation). Privacy floor: no user_id, no employee PII, no health values; `dispute_reason` hashed if contains `@`. Financial data (`credit_amount_usd`, `final_credit_usd`) protected by RLS tenant-isolation. Ten Zod schemas provided (canonical source for Worker validation). Retention table: +8 rows across five groupings (incident 7yr A1.1; measurement_reconciled 7yr A1.1; credit trio 7yr financial; dispute_opened 3yr operational; dispute_resolved 7yr A1.1 financial; maintenance_window_registered 3yr operational; exclusion_reclassified 7yr A1.1). SOC 2 criterion: A1.1 (availability commitments — incidents, measurement, credits are the contractual evidence chain); CC7.2 (SLA anomaly monitoring — incident events are the anomaly detection audit trail). Cross-ref: `docs/OBSERVABILITY.md §23.9` (canonical event definitions); `docs/ENTERPRISE_SLA.md` (99.9% commitment — these events are its audit trail); `docs/SOC2_READINESS.md §2 A1.1` (gap: SLA credit calculation process — closed by OBSERVABILITY §23 + these chain events). Owner: compliance-officer + security-engineer.*
 
 **v2.1 · 2026-06-13 · owner: compliance-officer + enterprise-architect**
 *v2.1 (2026-06-13): +11 events across two new families. CI/CD Pipeline (5 events, OBSERVABILITY §38, CC8.1): `system.deployment_completed` formalised Zod schema (STANDARD, 5yr — `smoke_probe_passed` bool binds deploy to §16 S-001/S-002 probes; `commit_sha` length-40 constraint); `ci.migration_applied` (HIGH, 7yr — `migration_sha256` SHA-256, `rls_policy_changed` bool triggers security-engineer review dashboard flag, `tables_affected[]`, `supabase_project_ref`); `ci.migration_failed` (CRITICAL, 7yr — `error_message_hash` SHA-256 prevents raw SQL leakage in chain; `partial_apply` + `rollback_attempted` bools for incident triage; no dedup, no auto-resolve); `ci.deployment_rolled_back` (HIGH, 7yr — `failing_commit_sha` links to prior `system.deployment_completed` via CI-CHAIN-01; `trigger` enum; `rollback_initiated_by` is `form_admin` UUID — never customer user_id; `minutes_since_deploy` for MTTR calculation); `ci.pipeline_failed` (STANDARD, 3yr — `is_main` bool separates compliance-relevant main failures from PR-branch noise; drives AL-CI-01 routing). Backup & DR (6 events, OBSERVABILITY §39, A1.2/A1.3): `system.backup_completed` (STANDARD, 5yr — `store` enum postgres/r2_primary/r2_dr; `pitr_point_in_time` optional; no user_id/tenant_id — infrastructure only); `system.backup_failed` (CRITICAL, 7yr — AL-BC-05 no-auto-resolve; `error_message_hash` SHA-256); `system.restore_test_initiated` (STANDARD, 7yr — `test_id` UUID is BC-CHAIN-01 anchor; `initiated_by` is PAM session ID not raw user_id; `environment: 'staging'` literal constraint — no production restore events); `system.restore_test_completed` (STANDARD, 7yr — `rto_target_minutes: 240` literal (ENTERPRISE_SLA §4.3); `privacy_floor_verified` bool — must be true for SOC 2 A1.3 evidence; `rpo_gap_minutes` documents actual data loss in test; primary BC-E-002 evidence artefact); `system.restore_test_failed` (CRITICAL, 7yr — `failure_reason: 'privacy_floor_violation'` additionally notifies clinical-safety); `system.backup_staleness_detected` (HIGH, 7yr — emitted by pg_cron job 29 every 4h; `dedup_key` prevents chain spam; `alert_fired` enum links to AL-BC-01/02/03). BC-CHAIN-01 ordering invariant: `restore_test_completed`/`restore_test_failed` requires prior `restore_test_initiated` with same `test_id`; `emit-audit-event` Worker returns HTTP 422 on violation. Retention table: +11 rows (ci.migration_applied 7yr CC8.1; ci.migration_failed 7yr CC8.1 CRITICAL; ci.deployment_rolled_back 7yr CC8.1; ci.pipeline_failed 3yr; system.deployment_completed 5yr CC8.1; system.backup_completed 5yr A1.2; system.backup_failed 7yr A1.2 CRITICAL; system.restore_test_initiated 7yr A1.3; system.restore_test_completed 7yr A1.3; system.restore_test_failed 7yr A1.3 CRITICAL; system.backup_staleness_detected 7yr A1.2). Updated generic `### System` section note: `system.deployment_completed` and `system.backup_completed`/`system.backup_restored` now have full Zod schemas in their respective dedicated sections. Closes OBSERVABILITY.md §38.10 checklist item 1 (P0, M7) and §39.11 checklist item 1 (P0, M13 enterprise GA). Cross-ref: `docs/OBSERVABILITY.md §38.6` (CI/CD canonical schemas); `docs/OBSERVABILITY.md §39.9` (BC canonical schemas); SOC 2 CC8.1 (change management deployment evidence); SOC 2 A1.2 (capacity/environmental monitoring); SOC 2 A1.3 (recovery plan testing). Owner: compliance-officer + devops-lead + platform-engineer.*
