@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.46.0] — 2026-06-13
+
+### Added
+- `content/post-632-minimum-effective-dose.md` — Programming edge cases block, post 32/50. Мінімальна ефективна доза: операційна різниця між мінімумом для прогресу і мінімумом для підтримання. Сила: 2–4 важких підходи на рух 2 рази на тиждень. Гіпертрофія: 5–10 підходів на м'язову групу на тиждень (вищий поріг, ніж для сили). Підтримання: 1–2 важких підходи 1 раз на тиждень при збереженні інтенсивності ≥80% 1RM — об'єм вдвічі менший від «будуючого» протоколу. Шаблони 2-day full-body (прогрес) і 1-day (підтримання). Чотири пастки мінімалізму. Протокол повернення до повного об'єму.
+- `content/newsletter-05.md` — Newsletter issue 05 (draft). Тема: «Your wearable has an opinion. It's not always right.» Синтез training-with-tech блоку (posts 591–600). Чому readiness score не є prescriptive. PPG vs. ECG обмеження. HRV: trend over 14 days is signal, daily point is noise. Три практичні межі корисності носимих пристроїв. Training log як первинний інструмент. Clinical safety: PASS (no food/body/injury/mental health content).
+
+### Changed
+- `VERSION` — 4.45.1 → 4.46.0.
+
+---
+
 ## [4.45.1] — 2026-06-13
 
 ### Changed
