@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [4.45.1] — 2026-06-13
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` v2.2 → v2.3 — two additions:
+  - **R-14.8 update:** Five new DSAR events from `docs/ENTERPRISE_SLA.md §19.5` (v1.1) added to DEC-030 event table: `dsar.data_provided` (HIGH, 7yr — enterprise Art. 15 export provision, 24-hour SLO), `dsar.deletion_soft` (HIGH, 7yr — Art. 17 soft delete), `dsar.deletion_confirmed` (HIGH, 7yr — hard-delete + deletion certificate), `dsar.portability_export_completed` (STANDARD, 7yr — employee self-serve Art. 20), `dsar.offboarding_export_available` (STANDARD, 7yr — contract-end bulk export). Privacy floor: `user_id_hash` (SHA-256) in portability event; no plaintext user identifiers in any event.
+  - **R-26 new:** SCIM Deprovisioning Latency SLA Breach runbook. Closes the incident-response gap created when `docs/ENTERPRISE_SLA.md §3.7` (v1.1, OQ-SLA-03 resolved) defined AL-SCIM-LAT-02 (P1 auto-open; any single SCIM DELETE > 5 min) with no corresponding runbook. Distinct from R-24 (mass deprovisioning). Trigger matrix, severity table, immediate actions T+0 to T+15, scope query R-26-C1, five root cause hypotheses H1–H5, manual revocation procedure, Template LAT-01, three DEC-030 HMAC-chained events (`scim.deprovision_latency_breach` HIGH 7yr, `scim.deprovision_sessions_manual_revoke` HIGH 7yr, `scim.deprovision_latency_resolved` STANDARD 3yr), five evidence artefacts LAT-E-001–LAT-E-005, SOC 2 CC6.3/CC7.2/CC7.3 mapping, five-item implementation checklist.
+- `VERSION` — 4.45.0 → 4.45.1.
+
+---
+
 ## [4.45.0] — 2026-06-13
 
 ### Added

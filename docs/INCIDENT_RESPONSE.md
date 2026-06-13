@@ -4306,6 +4306,13 @@ Contact: enterprise@form.coach
 | `dsar.rejected_art_12_5` | HIGH | Request refused as manifestly excessive | `dsar_id`, `reason`, `legal_basis` |
 | `dsar.dpa_notified` | HIGH | Voluntary DPA self-report sent | `dsar_id`, `dpa_name`, `notification_method` |
 | `dsar.enterprise_tenant_notified` | MEDIUM | Enterprise admin notified of employee DSAR | `dsar_id`, `tenant_id`, `notification_timestamp` |
+| `dsar.data_provided` | HIGH | Enterprise processor-side: export package made available to Customer (Art. 15; ENTERPRISE_SLA §19.1 — SLO: ≤ 24 h) | `request_id`, `requester_tenant_id`, `export_sha256`, `sla_hours` (float — hours from forwarded request to provision), `slo_met` (bool: `sla_hours ≤ 24.0`) |
+| `dsar.deletion_soft` | HIGH | Soft delete executed; employee account access revoked (Art. 17 step 1; ENTERPRISE_SLA §19.2) | `request_id`, `tenant_id`, `soft_deleted_at` (ISO 8601); **privacy floor:** no `user_id` in payload — cross-ref via `form_system`-only RLS |
+| `dsar.deletion_confirmed` | HIGH | Hard-delete cascade complete; deletion certificate issued to tenant (Art. 17 step 2; ENTERPRISE_SLA §19.2 — SLO: certificate within 30 days of soft delete) | `request_id`, `tenant_id`, `rows_deleted_count` (aggregate), `certificate_ref` (UUID — maps to written certificate sent to `tenant_ops_email`) |
+| `dsar.portability_export_completed` | STANDARD | Employee self-serve Art. 20 portability export fulfilled (ENTERPRISE_SLA §19.3) | `user_id_hash` (SHA-256 — **never plaintext user_id**), `export_size_bytes`, `tables_included` (string array), `delivery_method` (`in_app_download` \| `email_link`) |
+| `dsar.offboarding_export_available` | STANDARD | Tenant contract-end bulk export package ready for admin download (ENTERPRISE_SLA §19.4 — window opens within 24 h of contract termination) | `tenant_id`, `export_package_id` (UUID), `expires_at` (ISO 8601 — 30-day window), `seat_count` (integer) |
+
+> **Retention (ENTERPRISE_SLA §19.5):** `dsar.data_provided`, `dsar.deletion_soft`, `dsar.deletion_confirmed` — 7 years. `dsar.portability_export_completed`, `dsar.offboarding_export_available` — 7 years. All five events HMAC-chained per DEC-030. Cross-ref: `docs/ENTERPRISE_SLA.md §19.5` (canonical event definitions); `docs/AUDIT_LOG_SCHEMA.md` (Zod schema registration required — see R-14.10 checklist item 9).
 
 #### R-14.9 SOC 2 Evidence Mapping
 
@@ -9564,11 +9571,193 @@ Store all artefacts at `compliance/evidence/incident-gdpr-art9-delete/<incident_
 
 ---
 
+### R-26: SCIM Deprovisioning Latency SLA Breach (AL-SCIM-LAT-01 / AL-SCIM-LAT-02)
+
+> **Scope:** Covers incidents where individual SCIM DELETE requests (employee deprovisioning) exceed the latency commitments in `docs/ENTERPRISE_SLA.md §3.7` (OQ-SLA-03 resolved, v1.1 2026-06-13). This is a *latency and access-revocation* incident — distinct from R-24 (SCIM Mass Deprovisioning), which covers bulk deprovisioning of ≥ 10 % of a tenant's seats. R-26 triggers when a single SCIM DELETE takes > 5 minutes (AL-SCIM-LAT-02, P1 auto-opened) or when the P99 latency over a 1-hour rolling window exceeds 30 seconds (AL-SCIM-LAT-01, P2). Security significance: an employee whose IdP account has been deactivated but whose FORM sessions remain active represents an access control gap — a potential SOC 2 CC6.3 violation (access revocation on termination) if unresolved.
+>
+> **Not R-24:** R-26 is triggered per-event or by rolling-window P99 statistics. R-24 is triggered by a count threshold (≥ 10 % of seats deprovisioned in 10 minutes). If AL-SCIM-MASS-01 and AL-SCIM-LAT-02 fire simultaneously, treat as R-24 (higher severity) and close R-26 as a duplicate.
+
+#### R-26.1 Trigger Matrix
+
+| Alert | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **AL-SCIM-LAT-02** | Better Stack S-014 (`scim-deprovision-latency`) or real SCIM DELETE event | Any single SCIM DELETE > 5 minutes | **P1 auto-opened** | `form-platform` + `form-customer-success` |
+| **AL-SCIM-LAT-01** | Better Stack S-014 — rolling P99 | P99 latency > 30 s over 1-hour rolling window | **P2** | `form-platform` |
+| **Manual** | CSM reports production tenant employee still active post-SCIM DELETE | N/A | **P1** (presume breach) | `form-platform` + `form-customer-success` |
+
+> **Probe S-014:** Better Stack synthetic probe fires a SCIM DELETE on a canary test user in each deployed region every 15 minutes. Real SCIM DELETEs on production tenants that exceed the threshold also trigger the same alert rules.
+
+#### R-26.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Single SCIM DELETE > 5 min AND sessions not yet revoked | **P1** | IC + security-engineer + CSM immediately |
+| Single SCIM DELETE > 5 min AND sessions confirmed revoked (latency only, no access window) | **P2** | IC + platform-engineer; CSM monitors tenant |
+| P99 > 30 s (systemic, no single event > 5 min) | **P2** | IC + platform-engineer |
+| S-014 canary probe fails only (no production tenant affected) | **P2** | IC + platform-engineer; escalate to P1 if ≥ 3 consecutive failures |
+| Production tenant affected AND employee is being offboarded (active HR action) | **P1 elevated** | Add compliance-officer and tenant's named CSM to incident channel immediately |
+
+#### R-26.3 Immediate Actions (T+0 to T+15 min)
+
+```
+T+0   PagerDuty P1/P2 fires. IC takes ownership of incident channel #ir-scim-latency-YYYYMMDD.
+      Emit DEC-030 scim.deprovision_latency_breach (§R-26.7) as the first HMAC chain entry.
+
+T+2   Determine: canary event or real production SCIM DELETE?
+      Canary → probe S-014 in region X failed. No production tenant affected yet. Continue monitoring.
+      Real   → check Cloudflare Workers logs for SCIM endpoint: which tenant_id, which scim_request_id?
+
+T+3   If real production event:
+        Run R-26-C1 (§R-26.4) to check whether the user's sessions are actually revoked.
+        A latency spike does not necessarily mean sessions are still active — the Worker may have completed.
+
+T+5   If sessions NOT revoked (R-26-C1 confirms active_sessions > 0):
+        Manual session revocation via admin console:
+          POST /internal/v1/admin/session/revoke-tenant-user
+            { "tenant_id": "<id>", "scim_request_id": "<id>",
+              "reason": "R-26 latency breach manual revoke — INC-YYYYMMDD" }
+        Emit DEC-030 scim.deprovision_sessions_manual_revoke immediately after (§R-26.7).
+
+T+7   Notify tenant CSM lead: send Template LAT-01 (§R-26.6) if affected user is a production tenant employee.
+      Do NOT send LAT-01 for canary-probe-only incidents.
+
+T+10  Check S-014 probe history: isolated (1 event) or systemic (≥ 3 events in 30 min)?
+      Isolated  → proceed to §R-26.4 root cause analysis.
+      Systemic  → escalate to P1 regardless of initial classification; page devops-lead.
+
+T+15  Begin root cause analysis (§R-26.4). All immediate containment must be complete by T+15.
+```
+
+#### R-26.4 Root Cause Hypotheses and Scope Query
+
+**Scope query R-26-C1 — Check session revocation status:**
+
+```sql
+-- Requires form_admin BYPASSRLS via pam-db-proxy (read_only PAM elevation)
+-- Reason: "R-26 SCIM latency scope assessment — INC-YYYYMMDD"
+-- Privacy: returns session count and timestamps only; no user_id in result set.
+SELECT
+  t.id                                              AS tenant_id,
+  t.name                                            AS tenant_name,
+  COUNT(s.id)                                       AS total_sessions,
+  COUNT(CASE WHEN s.revoked_at IS NULL THEN 1 END)  AS active_sessions,
+  MAX(u.scim_deprovisioned_at)                      AS deprovisioned_at,
+  NOW() - MAX(u.scim_deprovisioned_at)              AS elapsed
+FROM scim_requests sr
+JOIN users u  ON u.id       = sr.subject_user_id AND u.tenant_id = sr.tenant_id
+JOIN tenants t ON t.id      = sr.tenant_id
+LEFT JOIN sessions s ON s.user_id = u.id AND s.revoked_at IS NULL
+WHERE sr.id        = '<scim_request_id>'   -- from alert payload
+  AND sr.tenant_id = '<tenant_id>'         -- belt-and-suspenders RLS enforcement
+GROUP BY t.id, t.name;
+```
+
+> If `active_sessions > 0` after 5+ minutes: immediate manual revocation required (T+5 action above).
+
+**Root cause hypotheses:**
+
+| # | Hypothesis | Diagnostic signal | Immediate mitigation |
+|---|---|---|---|
+| **H1** | Postgres high load / lock contention on `users` table | `pg_stat_activity` — long-running lock holders on `users`; Supabase dashboard — connection saturation | Wait for lock to clear; if > 10 min, devops-lead kills blocking backend (`pg_terminate_backend`) |
+| **H2** | Supabase Edge Function timeout / cold start | Worker invocation logs — function timed out or cold-started with > 3 s boot | Manual session revocation (T+5); re-invoke after warm-up |
+| **H3** | Session-revocation Worker queue backlog | Cloudflare Queue depth for session-revocation FIFO consumer > 500 messages | Drain queue; manual revocation for affected user; devops-lead scales queue consumer concurrency |
+| **H4** | HMAC audit log write contention | `emit-audit-event` Worker 429s or high P99 in Cloudflare Analytics | Retry with exponential backoff; investigate write throughput limit in `emit-audit-event` |
+| **H5** | Region-specific Cloudflare routing degradation | S-014 probe fails in one region only; Cloudflare status page confirms edge degradation | Canary-only failure — no production access window. Monitor for recovery; P2 unless production traffic affected |
+
+#### R-26.5 Recovery Procedure
+
+**Step 1 — Confirm session revocation.**
+Run R-26-C1. If `active_sessions = 0`: sessions were revoked despite probe latency. No access window existed. Document in PIR.
+
+**Step 2 — If sessions still active.**
+1. Execute manual revocation via `POST /internal/v1/admin/session/revoke-tenant-user`.
+2. Re-run R-26-C1 to confirm `active_sessions = 0`.
+3. Emit `scim.deprovision_sessions_manual_revoke` DEC-030 event (§R-26.7).
+
+**Step 3 — Root cause fix.**
+- H1: Investigate lock contention; review index on `users(tenant_id, scim_deprovisioned_at)`.
+- H2: Investigate Edge Function cold-start behavior; increase min instances or add warmup cron.
+- H3: Scale session-revocation queue consumer; increase `max_concurrency` in wrangler.toml.
+- H4: Review `emit-audit-event` Worker write throughput limit; evaluate D1 batch write migration.
+- H5: No FORM-side fix required; file Cloudflare incident report if persistent.
+
+**Step 4 — Verify S-014 probe recovery.**
+Probe S-014 should return green within 2 probe cycles (≤ 30 minutes) after root cause fix. Confirm with Better Stack dashboard before closing.
+
+**Step 5 — Close incident.**
+Emit `scim.deprovision_latency_resolved` DEC-030 event (§R-26.7). Update PagerDuty status. Schedule PIR if P1.
+
+#### R-26.6 Communication Templates
+
+**Template LAT-01 — Tenant notification (P1 real-production only; do not send for canary-only incidents):**
+> FORM is contacting you regarding a brief delay we detected in processing a SCIM deprovisioning request for a member of your organisation [ref: INC-YYYYMMDD]. We confirmed that [the employee's sessions were revoked / the employee's sessions were manually revoked as a precaution]. No employee data was accessed by any external party during this period. Our engineering team is investigating the root cause. We will send a resolution confirmation within [60 minutes / 4 hours]. Questions: enterprise@form.coach.
+
+> **When to send LAT-01:** Required for any P1 where `active_sessions > 0` was confirmed by R-26-C1 (an access window existed, even briefly). IC discretion for P1 where sessions were already revoked (no access window). Never send for canary-probe-only P2.
+
+#### R-26.7 DEC-030 HMAC-Chained Audit Events
+
+Chain ordering constraint: `scim.deprovision_latency_breach` must be the first event emitted for any `incident_id`. `scim.deprovision_sessions_manual_revoke` (if issued) must follow it. `scim.deprovision_latency_resolved` must be last and reference the same `incident_id`.
+
+**Privacy invariant (all three events):** No `user_id`, no employee name or email in any payload. `scim_request_id` is an opaque UUID tied to the SCIM endpoint request log — it maps to a user only via `form_admin`-only RLS-gated tables. `tenant_id` is null for canary-probe events.
+
+| Event type | Severity | Retention | Trigger | Payload |
+|---|---|---|---|---|
+| `scim.deprovision_latency_breach` | HIGH | 7 yr | AL-SCIM-LAT-02 fires, or manual P1 raised by CSM | `tenant_id` (null for canary), `scim_request_id`, `latency_ms`, `region`, `probe_type` (`real` \| `canary`), `sessions_revoked_at_detection` (bool), `incident_id` (UUID) |
+| `scim.deprovision_sessions_manual_revoke` | HIGH | 7 yr | IC manually revokes sessions after R-26-C1 confirms `active_sessions > 0` | `tenant_id`, `scim_request_id`, `revoked_session_count` (integer), `manual_revoke_actor_id` (FORM internal UUID — not tenant employee), `incident_id` |
+| `scim.deprovision_latency_resolved` | STANDARD | 3 yr | IC confirms S-014 probe green + R-26-C1 `active_sessions = 0`; incident closed | `tenant_id` (null for canary), `incident_id`, `resolution_method` (`auto` \| `manual_revoke` \| `probe_recovery`), `time_to_resolution_min` (float) |
+
+**HMAC chain requirement (R26-CHAIN-01):** `scim.deprovision_latency_breach` must precede all other R-26 events for a given `incident_id`. A chain break among these events triggers R-05 (HMAC Chain Break) and immediate escalation to security-engineer.
+
+#### R-26.8 Evidence Preservation
+
+Store artefacts at `compliance/evidence/incident-scim-latency/<incident_id>/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **LAT-E-001** | DEC-030 `scim.deprovision_latency_breach` HMAC chain export | CC6.3, CC7.2 | 7 yr |
+| **LAT-E-002** | R-26-C1 query output: `active_sessions` before and after manual revocation (session count only — no `user_id`) | CC6.3 | 7 yr |
+| **LAT-E-003** | Cloudflare Workers SCIM endpoint access log for the affected `scim_request_id` (P95 response time) | CC7.2 | 3 yr |
+| **LAT-E-004** | Better Stack S-014 probe history export for incident window (± 30 min) | CC7.2 | 3 yr |
+| **LAT-E-005** | Template LAT-01 send record with UTC timestamp (P1 real-production incidents only) | CC7.4 | 7 yr |
+
+#### R-26.9 SOC 2 and ENTERPRISE_SLA Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC6.3** — Removes access when appropriate | LAT-E-001 + LAT-E-002 | SCIM deprovisioning latency is monitored; manual revocation closes any access window within the P1 SLA window |
+| **CC7.2** — Proactive monitoring | LAT-E-004 (S-014 probe) + LAT-E-003 | Better Stack S-014 detects latency breaches every 15 minutes per region; AL-SCIM-LAT-01/02 rules provide automated SLA breach detection |
+| **CC7.3** — Responds to identified events | LAT-E-001 + LAT-E-002 + PIR | IC response (T+0 to T+15) and manual revocation demonstrate CC7.3 operational response |
+| **ENTERPRISE_SLA §3.7** (OQ-SLA-03) | LAT-E-003 + LAT-E-004 | P99 < 30 s deactivation and < 60 s session revocation measured by S-014; breach events HMAC-evidenced per DEC-030 |
+
+#### R-26.10 Post-Incident Controls
+
+| Control | Trigger condition | Owner | SLA |
+|---|---|---|---|
+| Add Scenario N (SCIM deprovisioning latency breach) to §9.4 tabletop catalog | Any P1 R-26 production incident | security-engineer | 30 days post-PIR |
+| Review session-revocation Worker concurrency limits | H3 confirmed as root cause | devops-lead + platform-engineer | Next sprint |
+| Review Postgres index on `users(tenant_id, scim_deprovisioned_at)` | H1 confirmed as root cause | platform-engineer | Next sprint |
+
+#### R-26.11 Implementation Checklist
+
+| # | Action | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three DEC-030 events from §R-26.7 in `docs/AUDIT_LOG_SCHEMA.md` with Zod schemas; deploy to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 2 | Configure AL-SCIM-LAT-01 (P2) and AL-SCIM-LAT-02 (P1) alert rules in Better Stack for probe S-014; verify PagerDuty routing (`form-platform` P2; `form-platform` + `form-customer-success` P1). | devops-lead | **P0** | M6 | [ ] |
+| 3 | Implement `POST /internal/v1/admin/session/revoke-tenant-user` endpoint (if not already available from R-24 admin lockout tooling); requires `form_admin` PAM elevation; emits DEC-030 `scim.deprovision_sessions_manual_revoke`. | platform-engineer | **P1** | M6 | [ ] |
+| 4 | Add Scenario N to §9.4 tabletop catalog; schedule in Q2 2027 drill set. | security-engineer | **P2** | Q2 2027 | [ ] |
+| 5 | Store Template LAT-01 at `compliance/evidence/ir-templates/r26-lat-01.txt`; review by brand-voice + compliance-officer. | customer-success + brand-voice | **P2** | M10 | [ ] |
+
+---
+
+*v2.3 additions (2026-06-13): Two changes. (1) R-14.8 DEC-030 event table: five new DSAR events from `docs/ENTERPRISE_SLA.md §19.5` (v1.1 2026-06-13) added — `dsar.data_provided` (HIGH, 7yr — enterprise processor-side Art. 15 export provision, 24-hour SLO tracking), `dsar.deletion_soft` (HIGH, 7yr — Art. 17 step 1 soft delete), `dsar.deletion_confirmed` (HIGH, 7yr — hard-delete cascade complete, deletion certificate issued), `dsar.portability_export_completed` (STANDARD, 7yr — employee self-serve Art. 20 export), `dsar.offboarding_export_available` (STANDARD, 7yr — contract-end bulk export window open for tenant admin). Privacy invariant: `user_id_hash` (SHA-256) used in portability event; `tenant_id` only in enterprise events; no plaintext user identifiers. AUDIT_LOG_SCHEMA.md registration required (see updated R-14 checklist item 9). (2) R-26 SCIM Deprovisioning Latency SLA Breach — twenty-sixth runbook. Closes the incident-response gap created when `docs/ENTERPRISE_SLA.md §3.7` (v1.1, OQ-SLA-03 resolved) defined AL-SCIM-LAT-02 (P1 auto-open; any single SCIM DELETE > 5 min) with no corresponding runbook. Distinct from R-24 (mass deprovisioning — count threshold); R-26 is per-event latency. Security significance: SOC 2 CC6.3 (access revocation on termination) at risk if employee sessions remain active post-IdP deactivation. Trigger matrix: AL-SCIM-LAT-02 (P1 auto), AL-SCIM-LAT-01 (P2, P99 > 30 s over 1 h rolling), manual CSM report. Better Stack probe S-014 (`scim-deprovision-latency`) every 15 min per region. Severity table: P1 if sessions not revoked; P2 if sessions confirmed revoked or canary-only. Immediate actions T+0 to T+15 with DEC-030 emission at T+0 as evidentiary anchor. Scope query R-26-C1 (session revocation status — no `user_id` in result). Five root cause hypotheses H1–H5 (Postgres lock contention, Edge Function timeout, queue backlog, HMAC chain write contention, regional Cloudflare degradation). Manual revocation endpoint `POST /internal/v1/admin/session/revoke-tenant-user`. One communication template LAT-01 (P1 real-production only). Three DEC-030 HMAC-chained events: `scim.deprovision_latency_breach` (HIGH, 7yr, anchor), `scim.deprovision_sessions_manual_revoke` (HIGH, 7yr, if manual revocation required), `scim.deprovision_latency_resolved` (STANDARD, 3yr). Five evidence artefacts LAT-E-001 through LAT-E-005 mapped to SOC 2 CC6.3/CC7.2/CC7.3/ENTERPRISE_SLA §3.7. Three post-incident controls (Scenario N tabletop, queue concurrency review, Postgres index review). Five-item implementation checklist: 2× P0/M6 (DEC-030 registration, AL-SCIM-LAT alert rules), 1× P1/M6 (revoke endpoint), 2× P2 (Scenario N, LAT-01 template). Cross-references: `docs/ENTERPRISE_SLA.md §3.7` (OQ-SLA-03 — trigger and SLA commitment); `docs/AUDIT_LOG_SCHEMA.md` (three new DEC-030 events + five DSAR events to register); `docs/OBSERVABILITY.md` (S-014 probe definition, AL-SCIM-LAT-01/02 alert rules); R-24 (mass deprovisioning — sibling runbook); R-05 (HMAC chain break — chain break sub-protocol). Owner: security-engineer + platform-engineer + compliance-officer.*
+
+---
+
 *v2.2 additions (2026-06-12): R-25 GDPR Art. 9 Enterprise Tenant Off-boarding — Hard-Delete Overdue (AL-GDPR-03) — twenty-fifth runbook. Closes the incident response gap created when `docs/OBSERVABILITY.md §37` (v3.3, 2026-06-12) defined AL-GDPR-03 (P0, no-auto-resolve) for Art. 9 hard-delete overdue events with no corresponding incident runbook. R-25 covers the enterprise tenant off-boarding pipeline failure scenario: the Art. 9 hard-delete Worker fails to complete within GDPR-SLO-03 (4h from `tenants.offboarding_initiated_at`, DEC-036 zero-grace-period commitment). Distinct from R-14 (consumer DSAR Art. 17 individual erasure) and R-01 (data breach — activated in parallel only if data was accessed during the delay). Trigger matrix: AL-GDPR-03 primary automated trigger; tenant admin complaint and scheduled audit as manual triggers. Severity table: P0 for > 4h delay; P1 for partially-complete deletion; large-tenant extension threshold per OQ-GDPR-OBS-02. Immediate actions T+0 to T+20 with DEC-030 emission at T+15 as evidentiary anchor before any remediation action. Five root cause hypotheses H1–H5 (Worker crash, IOPS exhaustion, missing migration, tenant status not set, audit log pseudonymisation conflict). Recovery: Step 1 standard Worker retry; Step 2 chunked batch DELETE with 100ms pg_sleep yield for H2; Step 3 completion UPDATE + DEC-030 emission. Critical sub-protocol §R-25.8 (OQ-GDPR-OBS-03 interim): audit_log_events rows are NOT deleted during R-25 pending outside counsel confirmation on pseudonymisation vs deletion under HMAC-chain constraint; `gdpr.audit_log_pending_art9_decision` (STANDARD, 7yr) marks the pending decision in the chain. Recommended resolution: additive pseudonymisation (user_id_pseudonym column + ERASURE_PSEUDONYM_SALT + RLS restriction on original user_id) preserves chain integrity and satisfies GDPR Art. 4(5). GDPR Art. 33 decision tree §R-25.7: three-question gate (data accessible? third-party access? delay > 72h?) with explicit trigger conditions and outside counsel path. Three communication templates ART9-01/02/03. Five DEC-030 HMAC-chained events (CRITICAL: gdpr.art9_delete_overdue_detected + gdpr.art9_delete_manual_trigger; HIGH: gdpr.art9_delete_resumed + gdpr.art9_delete_completed; STANDARD: gdpr.audit_log_pending_art9_decision). Six evidence artefacts ART9-E-001 through ART9-E-006 mapped to SOC 2 CC7.2/CC7.3/CC7.4/CC6.5/P5.2/P4.0/GDPR Art. 5(1)(f). Four post-incident controls including Scenario M tabletop and chunked batch default. Two open questions: OQ-GDPR-OBS-03 (P0, shared with OBSERVABILITY §37.11 — outside counsel required before M13) and OQ-R25-01 (P1, Art. 33 automatic trigger threshold). Eight-item implementation checklist: 3× P0/M6 (DEC-030 registration, off-boarding Worker, AL-GDPR-03 PagerDuty); 1× P0/M13 (OQ-GDPR-OBS-03 counsel + migration); 4× P1 (templates, Scenario M, evidence collection, OQ-R25-01). Cross-references: `docs/OBSERVABILITY.md §37` (AL-GDPR-03 trigger; GDPR-SLO-03; OQ-GDPR-OBS-03 shared); `docs/DATA_MODEL.md §25` (off-boarding table list); `docs/DATA_MODEL.md §12` (Art. 17 erasure — pseudonymisation pattern for OQ-GDPR-OBS-03 resolution); `docs/SOC2_READINESS.md §67` (deletion certificate); `docs/SOC2_READINESS.md §70` (DSAR lifecycle — sister evidence section); `docs/AUDIT_LOG_SCHEMA.md` (five new DEC-030 events to register); R-01 (parallel activation condition); R-14 (consumer sister runbook). Owner: compliance-officer + platform-engineer + security-engineer.*
 
 ---
 
-**v2.2 · 2026-06-12 · Owner: security-engineer + compliance-officer**
+**v2.3 · 2026-06-13 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
