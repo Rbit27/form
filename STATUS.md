@@ -1,4 +1,4 @@
-# FORM · Project Status v4.40.0
+# FORM · Project Status v4.41.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.40.0** — 2026-06-13
+**v4.41.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 22 | Draft — post-622: return to accumulation after peak (block continues, 22/50) |
+| 601–650 | Programming edge cases | 23 | Draft — post-624: паузні повторення і dead-stop техніка (block continues, 23/50) |
 
-**Total posts: 622**
+**Total posts: 623**
 
 ---
 

@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.41.0] — 2026-06-13
+
+### Added
+- `content/post-624-paused-reps-dead-stop-technique.md` — Programming edge cases block, post 24/50. Паузні повторення і dead-stop техніка: механічна логіка (SSC removal, TUT at sticking point, motor control), per-lift sections (паузний присід, паузний жим, dead-stop deadlift) з load ranges (%1RM + RPE anchors), типові помилки програмування (занадто важко, занадто багато об'єму, indefinite replacement), три практичні шаблони інтеграції з week-by-week прогресією. Sources: Sorensen 2016, Schoenfeld 2017, Helms 2016, Flanagan & Comyns 2008.
+
+### Changed
+- `STATUS.md` — content table updated: post-624 added, total posts 622 → 623; block 601–650 progress 22/50 → 23/50.
+- `VERSION` — 4.40.1 → 4.41.0.
+
+---
+
 ## [4.40.1] — 2026-06-13
 
 ### Added
