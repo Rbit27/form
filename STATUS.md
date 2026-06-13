@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.55.0** — 2026-06-13
+**v4.55.1** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 45 | Draft — posts 641–645 added; 639 (chronic pain) HARD VETO pending clinical-safety review (block continues, 45/50); topics 644–650 filled from 851–900 pool |
+| 601–650 | Programming edge cases | 46 | Draft — posts 641–646 added; 639 (chronic pain) HARD VETO pending clinical-safety review (block continues, 46/50); topics 644–650 filled from 851–900 pool |
 
-**Total posts: 645**
+**Total posts: 646**
 
 ---
 
