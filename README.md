@@ -37,7 +37,7 @@ Honest trade-off analysis of tools, devices, and AI in the training context. No 
 | 599 | VO2max estimate longitudinal tracking — методологія і обмеження |
 | 600 | Synthesis: self-coached athlete technology stack 2026 |
 
-### Block 601–650 — Programming edge cases (in progress · 40/50)
+### Block 601–650 — Programming edge cases (COMPLETE · 49/50 written · post-639 blocked clinical-safety HARD VETO)
 
 Done — posts 601–635:
 
@@ -80,7 +80,7 @@ Done — posts 601–635:
 | 635 | Частота проти об'єму: що обирати, коли часу менше |
 | 636 | RPE у початківців: чому шкала не калібрована перші 6–12 місяців |
 
-Done — posts 637–640:
+Done — posts 637–650:
 
 | Post | Topic |
 |---|---|
@@ -88,11 +88,6 @@ Done — posts 637–640:
 | 638 | Програмування без обладнання — повноцінна структура для дому або готелю |
 | 639 | **BLOCKED** — Тренування при хронічному болю (clinical-safety HARD VETO — required before write) |
 | 640 | Shift-workers і тренування: конкретний алгоритм розкладу для кожного типу зміни |
-
-Remaining topics for posts 641–650:
-
-| Post | Topic |
-|---|---|
 | 641 | Перша програма після 40 — що змінити в дозуванні і відновленні |
 | 642 | Коли програмування стає надто складним: принцип достатності |
 | 643 | Від програми до принципів — коли атлет готовий самостійно планувати |

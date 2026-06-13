@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [4.56.0] — 2026-06-13
+
+### Added
+- `content/post-647-compound-vs-isolation-order.md` — Block 601–650 post 647. Логіка вибору порядку вправ: compound-first як дефолт для сили і координації; три виправдані сценарії для isolation-first (pre-exhaust для пріоритетної групи, нейром'язова activation, реабілітаційний контекст); ключовий фреймворк: лімітуючий фактор у ключовому русі визначає порядок, а не правило. clinical-safety: PASS. sports_scientist_review: required before publish.
+- `content/post-648-return-to-basics-after-specialization.md` — Block 601–650 post 648. Повернення до базових рухів після спеціалізованого блоку: що відбувається із балансом під час спеціалізованого блоку; чому відновлення базових рухів обов'язкове (баланс антагоністів, координаційна схема); практичний протокол тижень-за-тижнем; орієнтир «половина тривалості блоку» для відновлення балансу; типові помилки. clinical-safety: PASS. sports_scientist_review: required before publish.
+- `content/post-649-sleep-deprived-athlete-programming.md` — Block 601–650 post 649. Програмування при хронічно скороченому сні через графік (не клінічний розлад). Scope обмежено чітко: змінна робота, дитина, ранні зміни — не медична проблема сну. Фізіологічні наслідки (синтез протеїну, відновлення, суб'єктивне зусилля, координація). Пʼять принципів адаптації програмування: знизити об'єм АБО інтенсивність (не обидва), вища частота/менше за сесію, RPE-based замість відсоткового, складні рухи першими, деload кожні 3–4 тижні. Часовий горизонт (1–2 міс / 3–6 міс / без горизонту). clinical-safety: PASS (scope не клінічний; редирект до лікаря при розладах сну). sports_scientist_review: required before publish.
+- `content/post-650-self-programming-year-one.md` — Block 601–650 post 650. Self-programming рік перший: дізнаєшся лімітуючий фактор, власну динаміку відновлення, де програма розпадається у реальному житті, як калібрується RPE. Типові помилки: надто часта зміна програми, ігнорування щоденника, копіювання чужих висновків. Що змінюється на початку другого циклу. Перший цикл як інструмент збору даних. clinical-safety: PASS. sports_scientist_review: required before publish.
+
+### Changed
+- `README.md` — Block 601–650 статус: «in progress · 40/50» → «COMPLETE · 49/50 written · post-639 blocked clinical-safety HARD VETO». Пости 641–650 переміщено з «Remaining» до «Done» таблиці.
+- `STATUS.md` — Block 601–650: 46 → 50, статус BLOCK COMPLETE. Total posts: 646 → 650. Next priorities: блок 651–700 planning.
+- `VERSION` — 4.55.2 → 4.56.0.
+
+---
+
 ## [4.55.2] — 2026-06-13
 
 ### Changed

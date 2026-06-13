@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 46 | Draft — posts 641–646 added; 639 (chronic pain) HARD VETO pending clinical-safety review (block continues, 46/50); topics 644–650 filled from 851–900 pool |
+| 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 
-**Total posts: 646**
+**Total posts: 650**
 
 ---
 
@@ -90,10 +90,11 @@
 - newsletter-05.md — **DRAFT COMPLETE** (training-with-tech synthesis, posts 591–600; brand-voice editorial pass pending)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- Block 601–650 continues: posts 646–650 remaining (5 posts); **639 (хронічний біль) — clinical-safety HARD VETO; пропущено; наступний: 646**
+- Block 601–650: **COMPLETE** — всі пости написані (639 blocked HARD VETO); sports-scientist review needed перед publish
+- Block 651–700 planning: biomechanics & injury prevention — перший пост: кінетичний ланцюг (не chronic pain → clinical-safety review required for будь-якого injury-adjacent контенту)
 - Block 651–700 planning: biomechanics & injury prevention (first topic: chronic pain — **clinical-safety review required before writing**)
 - Block 851–900 proposed: Applied programming deep dives (added to README roadmap v4.52.0)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.55.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.56.0**
