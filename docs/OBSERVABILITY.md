@@ -10125,3 +10125,313 @@ One §12.6 addition is required: a `ci_telemetry` materialization job to persist
 ---
 
 *v3.5 (2026-06-12): §38 CI/CD & Deployment Pipeline Observability — closes the CC8.1 observability gap. Until §38, the OBSERVABILITY.md documented post-deployment synthetic probes (§16) and the SLO error budget deploy gate (§19) but had no unified section for CI/CD pipeline health metrics, DORA tracking, or the DEC-030 HMAC event chain for deployments and migrations. §38.1 scopes to five surfaces (GitHub Actions, Wrangler, Supabase migrations, EAS, SLO gate) and explicitly excludes IaC drift (SOC2_READINESS §50) and SCA scanning (SOC2_READINESS §54). §38.2 defines the four DORA metrics (deployment frequency, lead time for changes, change failure rate, MTTR) with Postgres computation queries against the DEC-030 `audit_log_events` table and `CI_TELEMETRY` Analytics Engine. §38.3 RED metrics: `CI_TELEMETRY` Analytics Engine schema (eight-column; no PII — no commit author, no GitHub username, no PR title); pipeline failure rate, duration P95, migration success/failure rate, rollback count, SLO gate activations. §38.4 four SLOs: CI-SLO-01 (test pass rate ≥ 98% on main, 30d), CI-SLO-02 (smoke test pass rate ≥ 99.5%, 30d), CI-SLO-03 (migration failure rate = 0% — hard floor, excluded from error budget framework), CI-SLO-04 (rollback MTTR P95 < 30 min, 90d — cross-ref ENTERPRISE_SLA.md RTO). §38.5 six alert rules AL-CI-01 through AL-CI-06: AL-CI-01 (P1, main CI failure), AL-CI-02 (P0, production migration failure — no dedup, no auto-resolve, dual-page), AL-CI-03 (P1, deployment rolled back within 60 min of deploy), AL-CI-04 (P1, DORA CFR > 5% in rolling 7d), AL-CI-05 (P2, CI duration P95 > 15 min), AL-CI-06 (P1, SLO gate activation). §38.6 five DEC-030 events: `system.deployment_completed` formalised with full Zod schema (STANDARD, 5yr — includes `smoke_probe_passed` boolean binding deploy to §16 probes); `ci.migration_applied` (HIGH, 7yr — includes `rls_policy_changed` boolean triggering manual security-engineer review; `migration_sha256` for tamper-evidence; `tables_affected` array); `ci.migration_failed` (CRITICAL, 7yr — `error_message_hash` SHA-256 instead of raw error message to prevent SQL data leakage in chain; `partial_apply` boolean for partial-migration incident triage); `ci.deployment_rolled_back` (HIGH, 7yr — `minutes_since_deploy` for MTTR calculation; references `failing_commit_sha` enabling chain-ordering validation against prior `system.deployment_completed`); `ci.pipeline_failed` (STANDARD, 3yr — `is_main` boolean separates compliance-relevant main failures from PR-branch developer noise; OQ-CI-OBS-01 governs PR-branch emission decision). §38.7 eight-panel "CI/CD & Deployment Health" Metabase dashboard: FORM-DevOps + FORM-Engineering collection; no PII (commit SHAs truncated to 8 chars, no author names). §38.8 five SOC 2 evidence artefacts CI-E-001 through CI-E-005: CI-E-001 (CC8.1 — GitHub Actions CI run history, quarterly CSV), CI-E-002 (CC8.1 — migration chain excerpt per fieldwork request), CI-E-003 (CC8.1 — DORA quarterly report), CI-E-004 (CC8.1 — rollback chain excerpt), CI-E-005 (CC7.2 — AL-CI-01 PagerDuty history). Auditor narrative for CC8.1 supplied (solo-founder compensating control for separation-of-duties; SLO gate as programmatic policy enforcement). §38.9 pg_cron job 28 `ci_telemetry_daily_sync` (daily 04:00 UTC, 26h freshness, P2 AL-CI-07); no new health-data pg_cron jobs. §38.10 twelve-item implementation checklist: 6× P0/M7–M8 (event registration + emit-audit-event deploy, migration-failure-handler step, deployment-completed-emit step, github-actions-relay Worker, alert configuration, ci_telemetry_daily DDL + pg_cron), 4× P1/M8 (Metabase dashboard, DORA baseline, AUDIT_LOG_SCHEMA retention table update, CI-E-001 export), 2× P2/M9–M13 (DORA in admin dashboard evaluation, RLS-migration quarterly access review supplement). §38.11 three open questions OQ-CI-OBS-01/02/03 (PR-branch emission scope, EAS build event type, CFR definition for App Store submissions). Cross-references: `docs/ENTERPRISE.md §What we promise customers` (99.9% uptime + P0 < 1h response — CI-SLO-04 MTTR is the deployment companion to these commitments); `docs/AUDIT_LOG_SCHEMA.md §System` (`system.deployment_completed` — formal Zod schema provided here; `ci.*` events to be registered); `docs/INCIDENT_RESPONSE.md R-02` (production outage rollback runbook — AL-CI-02 triggers R-02); `docs/SOC2_READINESS.md §21` (CC8.1 Change Management Controls — §38 provides the observability layer for the controls documented there); `docs/ENTERPRISE_SLA.md §4.3` (RTO < 4h — CI-SLO-04 MTTR < 30 min is the deployment sub-component of this commitment); §16 (synthetic probes S-001/S-002 referenced in `system.deployment_completed` smoke_probe_passed field); §19 (SLO error budget gate — AL-CI-06 is the observability trigger for gate activations); DEC-030 (HMAC chain — all five events are HMAC-chained; `ci.migration_failed` CRITICAL severity triggers chain-break audit within 24h per §R-05). Owner: devops-lead + platform-engineer + compliance-officer.*
+
+---
+
+## §39 Backup Integrity, DR Readiness & Business Continuity Observability
+
+> Owner: devops-lead + compliance-officer + platform-engineer. Review: after every DR drill, after any backup infrastructure change, and quarterly. SOC 2 evidence: A1.2, A1.3, CC7.2, CC6.5.
+
+### 39.1 Scope
+
+This section provides the observability layer for `docs/BUSINESS_CONTINUITY.md`. It closes the explicit gap in §37.1, which lists "Supabase internal backup retention" and "Cloudflare R2 lifecycle policies" as out of scope for the data lifecycle pipeline section. §37 covers *data lifecycle* pipelines (GDPR erasure, retention purges); §39 covers *infrastructure backup health* — the controls that guarantee recovery within the RTO/RPO commitments in `docs/ENTERPRISE_SLA.md §4.3` and `docs/BUSINESS_CONTINUITY.md §3.1`.
+
+SOC 2 A1.2 requires automated monitoring of controls that support the availability commitment. SOC 2 A1.3 requires periodic testing of recovery plans with documented results. The DEC-030 HMAC-chained events defined in §39.9 are the tamper-evident evidence artefacts auditors will request for both criteria.
+
+**In scope:**
+
+| Surface | Backup mechanism | §39 role |
+|---|---|---|
+| Supabase Postgres (primary) | Supabase continuous WAL replication + daily logical backup | Freshness monitoring, DEC-030 emission, BC-SLO-01 |
+| R2 `form-backups` | Cloudflare Scheduled Worker — daily encrypted Postgres dump to R2 | Freshness monitoring, companion to S-008 synthetic probe (§16) |
+| Backblaze B2 `form-dr-backups` (EU) | Nightly mirror from `form-backups` → B2 EU region | EU-residency customer RPO coverage, BC-SLO-02b |
+| Quarterly / annual restore tests (staging) | Manual execution per `docs/BUSINESS_CONTINUITY.md §6`; automated DEC-030 emission | RTO evidence collection, BC-SLO-03/BC-SLO-04 |
+
+**Out of scope (already covered or not in scope):**
+
+- PITR restore runbook execution: `docs/BUSINESS_CONTINUITY.md §6.1` and `docs/DATA_MODEL.md §10`
+- R2 and B2 bucket lifecycle policy configuration (infrastructure provisioning layer)
+- Audit log chain integrity verification: `docs/OBSERVABILITY.md §11.8` (HMAC chain audit query) and §15 (audit log export pipeline)
+- GDPR erasure pipelines: §37
+- Workers config backup: Git repository is the source of truth; no backup observability needed
+
+### 39.2 Backup Coverage Map
+
+| Data store | Backup type | Target freshness | RPO contribution | Notes |
+|---|---|---|---|---|
+| Supabase Postgres | Continuous WAL (PITR) | Continuous — RPO ≤ 5 min in practice | Direct | `docs/BUSINESS_CONTINUITY.md §5.1` — effective RPO for most incidents < 5 min |
+| Supabase Postgres | Daily logical backup | ≤ 26h | Cold-start path only | Used for Scenario D ("nuke") `docs/BUSINESS_CONTINUITY.md §6.4`; PITR is primary |
+| R2 `form-backups` | Daily encrypted dump | ≤ 26h | Cold-start path | S-008 synthetic probe (§16) checks object age; §39 adds DEC-030 chain |
+| B2 `form-dr-backups` EU | Nightly mirror from R2 | ≤ 30h | EU DR path | 4h mirror lag window on top of R2 target |
+| Workers KV (session, SSO state) | Not backed up — ephemeral by design | N/A | N/A | Recoverable from Postgres within minutes on cold start |
+| Workers Secrets | 1Password Operations vault — manual | N/A | N/A | Rotation procedure: `docs/KEY_ROTATION.md`; not a backup problem |
+
+### 39.3 RED Metrics
+
+**Rate:**
+
+| Signal | Type | Description |
+|---|---|---|
+| `backup_completion_rate_24h{store}` | Gauge | `COUNT(system.backup_completed WHERE store = X AND created_at > NOW() - INTERVAL '26h') / 1` — 1 expected per store per day; 0 triggers AL-BC-01 |
+| `restore_tests_completed_rolling_90d` | Gauge | Count of `system.restore_test_completed WHERE success = true AND created_at > NOW() - INTERVAL '90 days'` — drives BC-SLO-04 |
+
+**Errors:**
+
+| Signal | Type | Description |
+|---|---|---|
+| `backup_age_hours{store}` | Gauge | `EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600` from `audit_log_events WHERE event_type = 'system.backup_completed' AND payload->>'store' = X`; sourced by pg_cron job 29 every 4h |
+| `backup_failed_count_7d{store}` | Counter | `COUNT(*) FROM audit_log_events WHERE event_type = 'system.backup_failed' AND created_at > NOW() - INTERVAL '7 days'` |
+| `restore_test_age_days` | Gauge | `EXTRACT(EPOCH FROM (NOW() - MAX(completed_at))) / 86400` from `audit_log_events WHERE event_type = 'system.restore_test_completed' AND payload->>'success' = 'true'` |
+
+**Duration:**
+
+| Signal | Type | Description |
+|---|---|---|
+| `backup_duration_minutes_p95{store}` | Histogram | `payload->>'duration_minutes'` from `system.backup_completed`, P95 over rolling 30 days per store |
+| `restore_test_rto_minutes_p95` | Histogram | `(payload->>'rto_achieved_minutes')::int` from `system.restore_test_completed WHERE success = true`, P95 over all time (infrequent event — no windowing) |
+
+**Data classification note:** All backup observability metrics are infrastructure-only. No user identifiers, no tenant data, no health data appear in any signal, dashboard panel, or alert payload. `system.backup_completed` payload carries only: `store`, `backup_type`, `duration_minutes`, `size_bytes_estimate` (optional), `backup_id`, `region`, `triggered_by`. `user_id` and `tenant_id` fields are structurally absent from all five §39.9 DEC-030 event schemas.
+
+### 39.4 SLOs
+
+| SLO ID | Metric | Target | Window | Rationale |
+|---|---|---|---|---|
+| **BC-SLO-01** | Postgres backup freshness ≤ 26h (daily backup + 2h grace window) | 100% — zero tolerance | Per-day | Direct prerequisite for RPO ≤ 1h enterprise commitment (`docs/BUSINESS_CONTINUITY.md §3.1`). Stale backup does not immediately breach RPO (PITR continues from WAL), but it is a backup control failure. Any breach is a P1 incident regardless of whether RPO was actually impacted. |
+| **BC-SLO-02** | R2 `form-backups` object freshness ≤ 26h | 99.5% | Rolling 30 days | R2 is the primary cold-start recovery artefact (Scenario D, `docs/BUSINESS_CONTINUITY.md §5.2`). 0.5% error budget ≈ one missed daily backup per 200 days. |
+| **BC-SLO-02b** | Backblaze B2 `form-dr-backups` EU freshness ≤ 30h | 99% | Rolling 30 days | EU DR backup mirrors R2; 30h target provides a 4h mirror-lag allowance on top of BC-SLO-02. Relevant for EU-residency enterprise tenants only; breach does not affect non-EU customers. |
+| **BC-SLO-03** | Quarterly restore test: RTO achieved ≤ 4h | 100% per test | Per-event | `docs/ENTERPRISE_SLA.md §4.3` enterprise API RTO = 4h. The restore test is the only way to verify this claim is operationally true. A test RTO > 4h means the SLA commitment is not supported by evidence — P1 remediation required before next enterprise renewal. |
+| **BC-SLO-04** | At least one restore test completed per calendar quarter | 100% — zero tolerance | Calendar quarter | SOC 2 A1.3 requires periodic recovery testing. Missing a quarter is a direct evidence gap. Breach triggers AL-BC-04 (P1) with compliance-officer routing. |
+
+**BC-SLO-01 and BC-SLO-04 are hard compliance targets, not engineering error-budget events.** BC-SLO-01 breach triggers RPO risk escalation. BC-SLO-04 breach must be remediated (test executed + evidence filed) before the SOC 2 observation period closes for that quarter.
+
+### 39.5 Alert Rules
+
+| Alert ID | Trigger | Severity | Routing | Dedup key | Auto-resolve |
+|---|---|---|---|---|---|
+| **AL-BC-01** | `backup_age_hours{store="postgres"} > 26` | **P1** | PagerDuty `form-devops` → devops-lead; Slack `#infra-ops` WARN | `backup-stale-postgres` | Yes, on `system.backup_completed{store="postgres"}` received |
+| **AL-BC-02** | `backup_age_hours{store="postgres"} > 48` | **P0** | PagerDuty `form-devops` + `form-platform` dual page; Slack `#infra-ops` CRITICAL | `backup-critical-postgres` | No — manual close requires: (a) backup confirmed completed, (b) PITR continuity verified intact for stale window, (c) compliance-officer acknowledgement documented in incident |
+| **AL-BC-03** | `backup_age_hours{store="r2_primary"} > 26` | **P1** | PagerDuty `form-devops` → devops-lead; Slack `#infra-ops` | `backup-stale-r2` | Yes, on `system.backup_completed{store="r2_primary"}` received |
+| **AL-BC-04** | `restore_test_age_days > 90` | **P1** | PagerDuty `form-compliance` → compliance-officer; Slack `#compliance-ops` | `restore-test-overdue` (7d TTL — re-fires weekly until resolved) | Yes, on `system.restore_test_completed WHERE success = true` |
+| **AL-BC-05** | `system.backup_failed` DEC-030 CRITICAL event received | **P0** | PagerDuty `form-devops` CRITICAL → devops-lead + founding-engineer; Slack `#infra-ops` CRITICAL | `backup-failed-{store}-{date}` | No — manual close after root cause documented in incident post-mortem |
+| **AL-BC-06** | `backup_duration_minutes_p95{store} > 240` (P95 > 4h — indicates DB bloat or network degradation) | **P2** | Slack `#infra-ops` WARN only; no page | `backup-slow-{store}` (24h TTL) | Yes, on P95 normalising below 120 min |
+
+**On AL-BC-02 manual close requirement:** RPO risk escalation requires compliance-officer and devops-lead joint sign-off confirming either (a) the backup was completed without a `system.backup_completed` event being emitted (event emission failure, not backup failure — requires separate investigation), or (b) WAL-based PITR continuity was verified intact for the entire stale window via the Supabase dashboard. Evidence artefact: screenshot of Supabase PITR coverage confirming no gap + `system.backup_completed` DEC-030 event for the recovered backup filed in `compliance/evidence/a1/`.
+
+**On AL-BC-05 manual close requirement:** `system.backup_failed` is CRITICAL severity in the DEC-030 chain. Root cause must be documented before close: backup Worker logs, Supabase status, R2 write error. If the failure was caused by a secret expiry or credential rotation without updating Workers Secrets, this is simultaneously an `admin.encryption_key_rotated` DEC-030 gap and must be escalated to security-engineer.
+
+### 39.6 §6.2 Alert Rules Additions
+
+Add the following rows to the master alert table (§6.2) under a new `backup_dr_health` subsection:
+
+| Alert | Condition | Severity | Routing | Ref |
+|---|---|---|---|---|
+| Postgres backup stale | `backup_age_hours{store="postgres"} > 26` | P1 | PagerDuty `form-devops` | §39.5 AL-BC-01 |
+| Postgres backup critical (RPO risk) | `backup_age_hours{store="postgres"} > 48` | P0 | Dual page `form-devops` + `form-platform`; no auto-resolve | §39.5 AL-BC-02 |
+| R2 backup stale | `backup_age_hours{store="r2_primary"} > 26` | P1 | PagerDuty `form-devops` | §39.5 AL-BC-03 |
+| Restore test overdue (BC-SLO-04 breach) | `restore_test_age_days > 90` | P1 | PagerDuty `form-compliance` → compliance-officer | §39.5 AL-BC-04 |
+| Backup job failed | `system.backup_failed` DEC-030 CRITICAL received | P0 | Dual page `form-devops`; no auto-resolve | §39.5 AL-BC-05 |
+
+### 39.7 §12.6 pg_cron Registry Addition — Job 29
+
+| Job | Schedule | Freshness window | Purpose | On stale |
+|---|---|---|---|---|
+| **29 `backup_age_monitor`** | `0 */4 * * *` (every 4h) | 5h (2× schedule) | Queries `audit_log_events` for most recent `system.backup_completed` event per `payload->>'store'`; if `backup_age_hours > 26` for any store, emits `system.backup_staleness_detected` DEC-030 HIGH (deduplicated per 24h per store via `payload->>'dedup_key'`); also writes `backup_age_hours` values to a `system_metrics` KV namespace for Metabase gauge panels. Migration: `0062_backup_age_monitor_cron.sql`. | PagerDuty P1 `form-devops` → AL-BC-01 (postgres) or AL-BC-03 (r2); escalates to P0 AL-BC-02 if `backup_age_hours > 48` |
+
+**Why a dedicated pg_cron job rather than relying solely on S-008 (§16)?** S-008 checks if a recent object exists in the R2 bucket via a synthetic Worker HTTP request. It does not: (a) verify backup integrity or schema, (b) monitor Postgres PITR coverage continuity, (c) emit DEC-030 HMAC-chained events for the SOC 2 A1.2 evidence record, or (d) escalate through the PagerDuty tiered alert chain. Job 29 is *complementary* to S-008: S-008 provides uptime-style availability monitoring (is the file there?); job 29 provides compliance-grade evidence (was the process completed and recorded in the HMAC chain?).
+
+**Postgres PITR vs. daily backup:** Job 29 monitors for `system.backup_completed` events, which are emitted by the FORM-managed backup Worker (daily encrypted dump to R2). Supabase's own continuous WAL PITR is vendor-managed and not surfaced via DEC-030 events. OQ-BC-OBS-01 documents the resolution path for cross-validating PITR continuity via the Supabase Management API.
+
+### 39.8 Dashboard — "Backup & DR Readiness"
+
+Collection: `FORM-DevOps`. Visibility: `form_admin` + `compliance_reviewer`. No PII in any panel.
+
+| Panel | Type | Source | Privacy note |
+|---|---|---|---|
+| 1. Backup Age — Current (3 gauges) | Gauge × 3 | `backup_age_hours{store}` from job 29 KV writes | Infrastructure metadata only; no user data |
+| 2. Backup Freshness History (30d) | Heatmap (x = store, y = date, colour = age bucket: green ≤ 26h / yellow ≤ 48h / red > 48h) | `audit_log_events WHERE event_type = 'system.backup_completed'` | — |
+| 3. Restore Test History | Table: date, store, `rto_achieved_minutes`, `rto_target_minutes`, outcome (pass/fail), `privacy_floor_verified` | `audit_log_events WHERE event_type IN ('system.restore_test_completed', 'system.restore_test_failed')` | — |
+| 4. Days Since Last Successful Restore Test | Single stat with BC-SLO-04 threshold annotation (90d red line) | `MAX(completed_at) WHERE success = true` | — |
+| 5. Backup Duration Trend P95 (30d) | Line chart per store | `(payload->>'duration_minutes')::numeric` from `system.backup_completed`, P95 rolling 30d | — |
+| 6. Backup Failure History (7d) | Bar chart per store per day | `audit_log_events WHERE event_type = 'system.backup_failed'` | Error message hash only; no raw error |
+| 7. BC-SLO Compliance Table | Table: SLO ID, current value, target, status (🟢/🟡/🔴) | Computed from signals in §39.3 | — |
+
+### 39.9 DEC-030 HMAC-Chained Audit Events
+
+Register all five events in `docs/AUDIT_LOG_SCHEMA.md §System` before enterprise GA (M13). All events: `user_id = NULL`, `tenant_id = NULL` — infrastructure-only events.
+
+---
+
+**`system.backup_completed`** — STANDARD severity, 5-year retention
+
+```typescript
+const BackupCompletedPayload = z.object({
+  store:               z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  backup_type:         z.enum(['logical', 'wal_snapshot', 'pitr_checkpoint']),
+  initiated_at:        z.string().datetime(),
+  completed_at:        z.string().datetime(),
+  duration_minutes:    z.number().nonneg(),
+  size_bytes_estimate: z.number().nonneg().optional(), // omit if store has no accessible size metric
+  backup_id:           z.string(),                     // Supabase backup ID or R2 object key prefix
+  region:              z.enum(['us-east-1', 'eu-central-1', 'eu-west-1']),
+  pitr_point_in_time:  z.string().datetime().optional(), // WAL position as timestamp; Postgres only
+  triggered_by:        z.enum(['scheduled', 'manual', 'pre_maintenance']),
+});
+// Privacy invariant: no user_id, no tenant_id, no coaching or health data.
+```
+
+---
+
+**`system.backup_failed`** — CRITICAL severity, 7-year retention
+
+```typescript
+const BackupFailedPayload = z.object({
+  store:              z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  backup_type:        z.enum(['logical', 'wal_snapshot', 'pitr_checkpoint']),
+  initiated_at:       z.string().datetime(),
+  failed_at:          z.string().datetime(),
+  error_code:         z.string(),
+  error_message_hash: z.string(), // SHA-256 of raw error — prevents credential leakage in chain
+  triggered_by:       z.enum(['scheduled', 'manual', 'pre_maintenance']),
+});
+// CRITICAL: triggers AL-BC-05. No auto-resolve. Requires compliance-officer acknowledgement.
+```
+
+---
+
+**`system.restore_test_initiated`** — STANDARD severity, 7-year retention
+
+```typescript
+const RestoreTestInitiatedPayload = z.object({
+  test_id:          z.string().uuid(),
+  store:            z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  restore_type:     z.enum(['pitr', 'logical_dump', 'point_in_time']),
+  initiated_by:     z.string().uuid(), // PAM session ID — not raw user_id (CC6.1 invariant)
+  environment:      z.literal('staging'), // MUST be staging; production restores use a separate event type if ever needed
+  target_timestamp: z.string().datetime().optional(), // PITR target; logical dump omits
+  backup_id:        z.string(),
+  rationale:        z.enum([
+    'quarterly_dr_drill',
+    'annual_dr_drill',
+    'ad_hoc_verification',
+    'pre_production_migration',
+  ]),
+});
+```
+
+---
+
+**`system.restore_test_completed`** — STANDARD severity, 7-year retention
+
+```typescript
+const RestoreTestCompletedPayload = z.object({
+  test_id:               z.string().uuid(),  // links to restore_test_initiated
+  store:                 z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  initiated_at:          z.string().datetime(),
+  completed_at:          z.string().datetime(),
+  rto_achieved_minutes:  z.number().nonneg(),
+  rto_target_minutes:    z.literal(240),  // 4h = docs/ENTERPRISE_SLA.md §4.3 RTO
+  success:               z.boolean(),
+  row_count_spot_check:  z.number().int().nonneg(), // row count of a spot-checked table post-restore
+  privacy_floor_verified: z.boolean(),
+  // ^ BUSINESS_CONTINUITY.md §4.2: RLS enforcement confirmed before returning from maintenance mode.
+  // If false, the test MUST be classified as failed regardless of rto_achieved_minutes.
+  rpo_gap_minutes:       z.number().nonneg(), // data loss window in restored DB vs. PITR target
+  environment:           z.literal('staging'),
+  verified_by:           z.string().uuid(), // PAM session ID of devops-lead who verified
+});
+```
+
+---
+
+**`system.restore_test_failed`** — CRITICAL severity, 7-year retention
+
+```typescript
+const RestoreTestFailedPayload = z.object({
+  test_id:        z.string().uuid(),
+  store:          z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  initiated_at:   z.string().datetime(),
+  failed_at:      z.string().datetime(),
+  failure_reason: z.enum([
+    'backup_corrupted',
+    'pitr_gap_detected',
+    'rto_exceeded',
+    'privacy_floor_violation', // RLS invariant check failed post-restore
+    'row_count_mismatch',
+    'connection_timeout',
+    'manual_abort',
+  ]),
+  error_hash:     z.string(), // SHA-256 of raw error output
+  environment:    z.literal('staging'),
+});
+// failure_reason 'privacy_floor_violation': additionally notify clinical-safety.
+// failure_reason 'pitr_gap_detected': additionally open INCIDENT_RESPONSE.md R-BC-01 if in production context.
+```
+
+---
+
+**`system.backup_staleness_detected`** — HIGH severity, 7-year retention
+
+```typescript
+const BackupStalenessDetectedPayload = z.object({
+  store:             z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  last_completed_at: z.string().datetime(),
+  age_hours:         z.number().nonneg(),
+  threshold_hours:   z.literal(26),
+  detected_by:       z.literal('pg_cron_job_29'),
+  alert_fired:       z.enum(['AL-BC-01', 'AL-BC-02', 'AL-BC-03']),
+  dedup_key:         z.string(), // `backup-stale-{store}-{date}` — prevents chain spam on repeated detection
+});
+```
+
+**HMAC chain ordering invariant (BC-CHAIN-01):** `system.restore_test_completed` or `system.restore_test_failed` MUST have a corresponding `system.restore_test_initiated` with matching `test_id` earlier in the chain. The `emit-audit-event` Worker MUST return HTTP 422 if either completion event is submitted for a `test_id` with no preceding `system.restore_test_initiated`. Chain break between restore test events triggers §R-05 (HMAC Chain Break Investigation).
+
+### 39.10 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | §39 mechanism | Evidence artefact | Status |
+|---|---|---|---|---|
+| **A1.2 — Capacity and environmental threats** | Backup freshness monitoring via DEC-030 event chain + pg_cron job 29; AL-BC-01/02 automated alerting | `backup_age_hours` gauge updated every 4h; AL-BC-01 fires before RPO risk materialises | **BC-E-001** — pg_cron job 29 run history, quarterly CSV from `pg_cron.job_run_details` (`compliance/evidence/a1/bc-e-001-YYYY-QN.csv`) | 🟡 Authored — closes on job 29 deploy to production |
+| **A1.3 — Recovery plan and procedures tested** | Quarterly staging PITR restore + RTO measurement + privacy floor verification; `system.restore_test_completed` DEC-030 event as tamper-evident evidence | `rto_achieved_minutes ≤ 240` AND `privacy_floor_verified = true` in DEC-030 event | **BC-E-002** — `system.restore_test_completed` DEC-030 event export per quarter (4 events/year minimum; `compliance/evidence/a1/bc-e-002-YYYY-QN.json`) | 🟡 Authored — closes on first quarterly drill |
+| **A1.3 — Recovery time documented and measured** | `rto_achieved_minutes` vs `rto_target_minutes = 240` comparison | Auditors receive: DEC-030 event showing RTO achieved ≤ 4h + delta from `docs/ENTERPRISE_SLA.md §4.3` commitment | **BC-E-003** — `rto_achieved_minutes` vs target comparison chart (Metabase §39.8 Panel 7 export; `compliance/evidence/a1/bc-e-003-YYYY-QN.png`) | 🟡 Authored — closes on first quarterly drill |
+| **CC7.2 — System anomalies detected and responded to** | AL-BC-01 through AL-BC-05 alert rules; PagerDuty P0/P1 routing ensures human acknowledgement within SLA window | PagerDuty incident history with acknowledge + resolve timestamps | **BC-E-004** — AL-BC-01/AL-BC-02 PagerDuty incident history, quarterly CSV (`compliance/evidence/cc7/bc-e-004-YYYY-QN.csv`) | 🟡 Authored — closes on first quarter with active alerting |
+| **CC6.5 — Data at rest controls** | Encrypted Postgres backup (Supabase AES-256 at rest); encrypted R2 backup (Cloudflare AES-256 at rest); `system.backup_completed` DEC-030 chain provides tamper-evident backup ledger | DEC-030 chain cross-referenced against Supabase backup completion records | **BC-E-005** — 10 consecutive `system.backup_completed` DEC-030 events (`hmac_valid = TRUE`; `compliance/evidence/cc6/bc-e-005-YYYY-QN.json`) | 🟡 Authored — closes after 10 successive production backup events |
+
+**Auditor narrative for A1.3:** FORM's quarterly restore test programme provides evidence that the 4-hour RTO commitment in the enterprise SLA is operationally verified, not merely documented. Each test produces a `system.restore_test_completed` HMAC-chained DEC-030 event with `rto_achieved_minutes`, `privacy_floor_verified`, and `rpo_gap_minutes` fields that auditors can independently verify against the chain. The `privacy_floor_verified` field additionally confirms that Row-Level Security enforcement (HR never sees individual user data — `docs/ENTERPRISE.md §Privacy Floor`) persists through a restore operation, which is required by `docs/BUSINESS_CONTINUITY.md §4.2`.
+
+### 39.11 Open Questions
+
+| OQ | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-BC-OBS-01** | **Should pg_cron job 29 query the Supabase Management API to confirm Postgres backup completion, or infer freshness from the most recent `system.backup_completed` DEC-030 event?** Querying the Supabase Management API directly is more authoritative (backup source of truth), but adds an external API dependency inside a pg_cron job and requires storing `SUPABASE_MANAGEMENT_API_KEY` in Cloudflare Workers Secrets. The DEC-030 event approach is self-contained but introduces a monitoring blind spot: if the backup Worker crashes silently, neither the backup NOR the event is emitted, making job 29 unable to distinguish "backup ran but event missed" from "backup failed." **Recommendation:** dual-path — DEC-030 event is primary; a separate Cloudflare Scheduled Worker calls the Supabase Management API every 6h for cross-validation and emits a `system.backup_completed` from Management API data if no DEC-030 event was found within the expected window. | **P1** | devops-lead + platform-engineer | Decide before M8 (SOC 2 observation period start); if Management API path chosen, store `SUPABASE_MANAGEMENT_API_KEY` per `docs/CRYPTOGRAPHY_POLICY.md §5` key inventory |
+| **OQ-BC-OBS-02** | **Should quarterly restore tests cover only Postgres PITR, or also R2 cold backup restore and Backblaze B2 EU DR restore?** Postgres PITR is the critical path for RTO ≤ 4h (warm recovery path). R2/B2 cold backup restore covers only Scenario D ("nuke" — total environment loss; `docs/BUSINESS_CONTINUITY.md §6.4`), which carries a non-contractual 8h RTO. Testing R2/B2 quarterly is operationally heavy (~8h per test). **Recommendation:** quarterly drill = Postgres PITR only; R2/B2 cold backup restore tested annually in the annual DR drill (`docs/BUSINESS_CONTINUITY.md §7`). Document decision in `docs/DECISION_LOG.md` before first quarterly drill. | **P2** | devops-lead + compliance-officer | Decide before first quarterly drill (M5); update `docs/BUSINESS_CONTINUITY.md §7` drill scope accordingly |
+
+### 39.12 Implementation Checklist
+
+#### P0 — Before SOC 2 observation period start (M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all five DEC-030 events from §39.9 (`system.backup_completed`, `system.backup_failed`, `system.restore_test_initiated`, `system.restore_test_completed`, `system.restore_test_failed`) in `docs/AUDIT_LOG_SCHEMA.md §System` with Zod schemas; deploy event types to `emit-audit-event` Worker event registry. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 2 | Register `system.backup_staleness_detected` (§39.9) in `docs/AUDIT_LOG_SCHEMA.md §System`; add dedup logic to `emit-audit-event` Worker (`dedup_key` field, 24h TTL per store). | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Instrument backup Worker: inject `system.backup_completed` call on success and `system.backup_failed` call on failure at the end of the existing Cloudflare Scheduled Worker that performs the daily R2 dump. Staging test: verify both events appear in `audit_log_events` with `hmac_valid = TRUE`. | platform-engineer | **P0** | M6 | [ ] |
+| 4 | Create pg_cron job 29 `backup_age_monitor`: run migration `0062_backup_age_monitor_cron.sql`; register in §12.6 pg_cron table; deploy to staging; verify first `system.backup_staleness_detected` event fires on synthetic stale condition (temporarily set threshold to 1h for test). | platform-engineer | **P0** | M6 | [ ] |
+| 5 | Configure AL-BC-01 through AL-BC-05 in PagerDuty: create `backup_dr_health` alert routing subsection in `form-devops` and `form-compliance` services; verify dedup keys; confirm AL-BC-02 and AL-BC-05 have `auto_resolve: false`. | devops-lead | **P0** | M6 | [ ] |
+
+#### P1 — Before first enterprise pilot (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Execute first quarterly Postgres PITR restore test in staging: follow `docs/BUSINESS_CONTINUITY.md §6.1`; measure RTO; complete privacy floor check (`docs/BUSINESS_CONTINUITY.md §4.2` — verify RLS on restored DB); emit `system.restore_test_initiated` → `system.restore_test_completed` DEC-030 chain (manually until item 1 deploys); file BC-E-002 in `compliance/evidence/a1/`. | devops-lead + compliance-officer | **P1** | M5 | [ ] |
+| 7 | Build "Backup & DR Readiness" Metabase dashboard (§39.8 spec — 7 panels); add to `FORM-DevOps` collection; restrict visibility to `form_admin` + `compliance_reviewer`. Verify Panel 4 (days since restore test) correctly shows 90d threshold annotation. | data-engineer | **P1** | M7 | [ ] |
+| 8 | Decide OQ-BC-OBS-02 (quarterly drill scope — Postgres PITR only vs. R2/B2 inclusion); document in `docs/DECISION_LOG.md`; update `docs/BUSINESS_CONTINUITY.md §7` drill scope if applicable. | devops-lead + compliance-officer | **P1** | M5 | [ ] |
+
+#### P2 — Before first annual SOC 2 recertification (M24+)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | Collect BC-E-001 (pg_cron job 29 first quarter run history) and BC-E-005 (10-event `system.backup_completed` DEC-030 chain excerpt) after first 90 days of production operation; file in `compliance/evidence/a1/` and `compliance/evidence/cc6/` respectively. | compliance-officer | **P2** | M9 | [ ] |
+| 10 | Decide OQ-BC-OBS-01 (Supabase Management API cross-validation); implement dual-path monitoring if chosen; add `SUPABASE_MANAGEMENT_API_KEY` to `docs/CRYPTOGRAPHY_POLICY.md §5` key inventory. | devops-lead + platform-engineer + compliance-officer | **P2** | M12 | [ ] |
+| 11 | Evaluate whether BC-SLO compliance (§39.8 Panel 7) should be surfaced in the enterprise admin dashboard as a trust signal. Publish only binary pass/fail per SLO — no raw backup metadata, no size or timing data that could reveal infrastructure scale to tenants. | customer-success + enterprise-architect | **P2** | M13 | [ ] |
+
+---
+
+*v3.6 (2026-06-13): §39 Backup Integrity, DR Readiness & Business Continuity Observability — closes the observability gap explicitly noted in §37.1 ("Supabase internal backup retention — vendor-managed; monitored via S-008 synthetic probe in §16"). §39 is the compliance-grade companion to `docs/BUSINESS_CONTINUITY.md`: where the BCP defines what to do, §39 defines how FORM knows it's doing it. §39.1 scopes to four surfaces: Supabase Postgres daily logical backup, R2 `form-backups` (primary cold-start), Backblaze B2 `form-dr-backups` (EU DR), and quarterly/annual restore tests. Explicitly out of scope: PITR restore runbooks (BCP §6.1 + DATA_MODEL.md §10), R2/B2 lifecycle policy configuration, audit log chain integrity (§15/§11.8), and GDPR erasure pipelines (§37). §39.2 backup coverage map: six data stores tabulated with backup type, target freshness, and RPO contribution — Workers KV and Workers Secrets explicitly not backed up by design. §39.3 RED metrics: two rate metrics (backup_completion_rate_24h, restore_tests_completed_rolling_90d), three error metrics (backup_age_hours per store, backup_failed_count_7d, restore_test_age_days), two duration metrics (backup_duration_minutes_p95 per store, restore_test_rto_minutes_p95); all infrastructure-only — no user_id, no tenant_id, no health data in any signal. §39.4 five SLOs: BC-SLO-01 (Postgres backup freshness ≤ 26h, 100% zero-tolerance), BC-SLO-02 (R2 freshness ≤ 26h, 99.5%), BC-SLO-02b (B2 EU freshness ≤ 30h, 99%), BC-SLO-03 (restore test RTO ≤ 4h per event, mirrors ENTERPRISE_SLA.md §4.3), BC-SLO-04 (one restore test per calendar quarter, 100% zero-tolerance — direct SOC 2 A1.3 evidence gate). §39.5 six alert rules AL-BC-01 through AL-BC-06: AL-BC-01 (P1, Postgres stale > 26h, auto-resolve), AL-BC-02 (P0, Postgres critical > 48h, no-auto-resolve, dual page), AL-BC-03 (P1, R2 stale > 26h, auto-resolve), AL-BC-04 (P1, restore test overdue > 90d, 7d TTL re-fire, auto-resolve on test completion), AL-BC-05 (P0, backup_failed DEC-030 CRITICAL, no-auto-resolve), AL-BC-06 (P2, backup duration P95 > 4h, Slack only). §39.6 five-row §6.2 master alert table addition for `backup_dr_health` subsection. §39.7 pg_cron job 29 `backup_age_monitor` (every 4h, 5h freshness window, P1 → AL-BC-01/03; escalates to P0 → AL-BC-02 if > 48h); design note distinguishing job 29 (DEC-030 compliance evidence) from S-008 (uptime-style availability monitoring). §39.8 seven-panel "Backup & DR Readiness" Metabase dashboard: `FORM-DevOps` collection, `form_admin` + `compliance_reviewer` visibility, no PII in any panel. §39.9 five DEC-030 HMAC-chained events: `system.backup_completed` (STANDARD, 5yr — `store`, `backup_type`, `duration_minutes`, `backup_id`, `region`, `pitr_point_in_time`), `system.backup_failed` (CRITICAL, 7yr — `error_message_hash` SHA-256 prevents credential leakage), `system.restore_test_initiated` (STANDARD, 7yr — `initiated_by` = PAM session ID, not raw user_id; `environment: literal("staging")`), `system.restore_test_completed` (STANDARD, 7yr — `rto_achieved_minutes`, `rto_target_minutes: literal(240)`, `privacy_floor_verified` boolean; if false, test is classified failed regardless of RTO), `system.restore_test_failed` (CRITICAL, 7yr — `failure_reason` enum includes `privacy_floor_violation` which additionally notifies clinical-safety), `system.backup_staleness_detected` (HIGH, 7yr — `dedup_key` prevents chain spam on repeated stale detection); BC-CHAIN-01 ordering invariant enforced at `emit-audit-event` Worker. §39.10 five SOC 2 evidence artefacts BC-E-001 through BC-E-005: BC-E-001 (A1.2 — job 29 run history), BC-E-002 (A1.3 — restore_test_completed events, quarterly), BC-E-003 (A1.3 — RTO comparison chart), BC-E-004 (CC7.2 — AL-BC-01/02 PagerDuty history), BC-E-005 (CC6.5 — 10-event backup_completed chain excerpt); A1.3 auditor narrative supplied (RTO operationally verified, not merely documented; privacy_floor_verified field extends compliance assurance through restore operations). §39.11 two open questions: OQ-BC-OBS-01 (P1, Supabase Management API vs DEC-030 event for Postgres backup cross-validation — dual-path recommended; resolve M8), OQ-BC-OBS-02 (P2, quarterly drill scope: Postgres PITR only vs. R2/B2 cold backup — Postgres-only recommended, annual for R2/B2; resolve M5). §39.12 eleven-item implementation checklist: 5× P0/M5–M6 (five-event DEC-030 registration, staleness event + dedup, backup Worker instrumentation, pg_cron job 29 DDL + cron registration, AL-BC-01 through AL-BC-05 PagerDuty configuration), 3× P1/M5–M7 (first quarterly restore test + BC-E-002 filing, Metabase dashboard, OQ-BC-OBS-02 decision), 3× P2/M9–M13 (evidence collection BC-E-001/005, OQ-BC-OBS-01 dual-path implementation, admin dashboard BC-SLO surface evaluation). Cross-references: `docs/BUSINESS_CONTINUITY.md §3.1` (RTO/RPO targets — BC-SLO-01/03 anchor); `docs/BUSINESS_CONTINUITY.md §4.2` (Privacy Floor verification — `privacy_floor_verified` boolean in restore_test_completed); `docs/BUSINESS_CONTINUITY.md §5.1–5.2` (Postgres PITR + R2 backup architecture); `docs/BUSINESS_CONTINUITY.md §6.1` (Postgres PITR restore runbook — §39 provides observability, BCP provides runbook); `docs/BUSINESS_CONTINUITY.md §7` (annual DR drill — OQ-BC-OBS-02 governs whether R2/B2 is included in quarterly vs. annual scope); `docs/ENTERPRISE_SLA.md §4.3` (RTO < 4h enterprise commitment — BC-SLO-03 target_minutes = 240); `docs/SOC2_READINESS.md §A1 criteria` (A1.2 capacity monitoring, A1.3 recovery testing — BC-E-001 through BC-E-005 close these evidence gaps); `docs/AUDIT_LOG_SCHEMA.md §System` (five new DEC-030 events to register — P0 before M5); `docs/CRYPTOGRAPHY_POLICY.md §5` (key inventory — OQ-BC-OBS-01 may require SUPABASE_MANAGEMENT_API_KEY entry); §16 S-008 (R2 backup freshness synthetic probe — complementary to, not replaced by, §39); §37.1 (GDPR data lifecycle out-of-scope note — §39 closes that explicit gap); §38 (CI/CD observability — both §38 and §39 emit into `audit_log_events` §System events namespace). Owner: devops-lead + compliance-officer + platform-engineer.*

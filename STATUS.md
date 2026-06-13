@@ -1,4 +1,4 @@
-# FORM · Project Status v4.24.1
+# FORM · Project Status v4.24.2
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.24.1** — 2026-06-13
+**v4.24.2** — 2026-06-13
 
 ---
 
@@ -38,7 +38,7 @@
 | SSO_SCIM_IMPLEMENTATION.md | Complete — 9 283 lines | v4.x |
 | INCIDENT_RESPONSE.md | Complete — 9 575 lines | v4.x |
 | DATA_MODEL.md | Complete — 12 618 lines | v4.x |
-| OBSERVABILITY.md | Complete — 9 731 lines, OQ-33 ruling (DEC-046) | v4.x |
+| OBSERVABILITY.md | Complete — v3.6, §39 Backup Integrity/DR Readiness added, pg_cron job 29 | v4.24.2 |
 | COST_MODEL.md | Complete — 8 341 lines | v4.x |
 | SHARED_RESPONSIBILITY_MODEL.md | Complete — v1.0 | v4.18.0 |
 
