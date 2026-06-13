@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.41.0** — 2026-06-13
+**v4.42.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 23 | Draft — post-624: паузні повторення і dead-stop техніка (block continues, 23/50) |
+| 601–650 | Programming edge cases | 24 | Draft — post-624: паузні повторення і dead-stop техніка (block continues, 24/50) |
 
-**Total posts: 623**
+**Total posts: 624**
 
 ---
 

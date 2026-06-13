@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.42.0] — 2026-06-13
+
+### Added
+- `content/post-623-volume-distribution-microcycle.md` — Programming edge cases block, post 23/50. Розподіл об'єму між тренувальними днями: чому рівномірний розподіл субоптимальний, ієрархія hard/medium/easy сесій, логіка сиквенсингу рухів, практичні фреймворки для 3/4/5-денних сплітів. Sources: Israetel (2019) MEV/MAV/MRV, Schoenfeld 2017, Helms 2018, Phillips & Van Loon 2011 (MPS window), Seiler 2010 (polarization principle).
+
+### Changed
+- `STATUS.md` — content table: post-623 added, total 623 → 624; block 601–650 progress 23/50 → 24/50.
+- `VERSION` — 4.41.0 → 4.42.0.
+
+---
+
 ## [4.41.0] — 2026-06-13
 
 ### Added
