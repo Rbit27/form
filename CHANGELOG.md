@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [4.50.0] — 2026-06-13
+
+### Added
+- `docs/ROPA.md` — GDPR Art. 30 Records of Processing Activities v0.1. Closes `docs/GDPR_DPIA.md §10.2.1` (explicit blocking open item: "formal Art. 30 register required before SOC 2 observation period, Month 2") and `docs/SSO_SCIM_IMPLEMENTATION.md §15.9.4` (SCIM group processing note requiring Art. 30 registration). Dual-role structure: Art. 30(1) register as Data Controller (RA-01–RA-13) + Art. 30(2) register as Data Processor for enterprise customers (RP-01–RP-06). Art. 30(1) controller register covers all 12 processing activities from `docs/GDPR_DPIA.md §2.1` (account/identity, health profile, CV pose estimation, meal logging, Victor AI coaching, voice synthesis, wearable integration, ED screening, enterprise aggregate reporting, audit logging, product analytics, error monitoring) plus RA-13 SCIM group membership from `docs/SSO_SCIM_IMPLEMENTATION.md §15.9.4` — legal basis, data categories, Art. 9 flag, sub-processors, retention, transfer mechanism per activity. Art. 30(2) processor register covers RP-01–RP-06 (employee SSO provisioning, employee health data processing, aggregate reporting, audit log, DSAR fulfilment, tenant offboarding). §2 controller identity with ROPA-GAP-001 (Art. 27 EU representative not designated — P0 before EU marketing). §6 international transfer summary: 10 transfer routes mapped with SCCs Module 2 / EU adequacy / Cloudflare DPA status; ROPA-GAP-002 (UK IDTA not verified), ROPA-GAP-003 (TIA not completed). §7 retention schedule aligned to `compliance/p1/retention-decisions.md` (P1-RET-001): 13 data categories with retention periods, legal basis, deletion method, implementation status; Art. 17 erasure cascade (12-step hard-delete sequence); enterprise tenant offboarding 90-day deletion procedure. §8 TOMs summary with 12 control categories cross-referenced to security docs. §9 DEC-030 audit events: 17 events including 3 new ROPA-specific events (`ropa.review_completed`, `ropa.processing_activity_added`, `ropa.processing_activity_modified`) pending registration in `docs/AUDIT_LOG_SCHEMA.md`. §10 gaps: 6 P0 gaps (EU rep, UK transfer, TIA, TTL migrations, DEC-030 registration, VRM-GAP-001 DPAs) + 6 P1 gaps (first EU deal). §11 implementation checklist: 6 P0 / 6 P1 / 4 P2 items. Consent dependency map (§3.2): five-category consent model with withdrawal cascade. Sub-processor processing scope table (§5): all 11 sub-processors with Art. 9 exposure flag. Privacy invariant throughout: RA-09 enterprise aggregate reporting: k-anonymity floor N < 5; admin roles have zero access to individual health rows. Owner: compliance-officer + enterprise-architect + security-engineer.
+
+### Changed
+- `VERSION` — 4.49.0 → 4.50.0.
+
+---
+
 ## [4.49.0] — 2026-06-13
 
 ### Added
