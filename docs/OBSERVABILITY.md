@@ -10613,6 +10613,318 @@ Metabase collection: `FORM-DevOps`. Visibility: `form_admin`, `compliance_review
 
 ---
 
+## §41 Wearable Integration & Health Platform Sync Pipeline Observability
+
+> Owner: `platform-engineer` + `devops-lead` + `compliance-officer`. Review: on any new source integration, API contract change, or quarterly.
+> References: `docs/DATA_MODEL.md §14` (schema), DEC-030, `docs/AUDIT_LOG_SCHEMA.md`, `docs/CLINICAL_SAFETY.md`, `docs/SOC2_READINESS.md §35.6.3`.
+
+---
+
+### 41.1 Purpose & Scope
+
+FORM's wearable integrations are a primary data collection surface: HRV, resting HR, and sleep data from five sources feed directly into Victor's coaching context and the enterprise admin dashboard's aggregate engagement metrics. A silent ingestion failure — OAuth token expiry, WorkManager suppression, API rate-limit — means Victor coaches without fresh physiological context and enterprise administrators see stale wellness aggregates. Neither failure produces an error visible to the user; both require proactive monitoring.
+
+**This section defines the observability layer for the server-side ingestion pipeline.** It is the operational companion to `docs/DATA_MODEL.md §14` (which defines the schema and per-source data types) and `docs/OBSERVABILITY.md §28` (which covers mobile app performance — client-side, not server-side ingestion).
+
+**In scope:**
+
+| Surface | Pipeline Stage Monitored |
+|---|---|
+| HealthKit (iOS) | Background delivery → `wearable-ingestion-worker` → `wearable_readings` INSERT |
+| Health Connect (Android) | WorkManager job → sync request → Worker → `wearable_readings` INSERT |
+| Whoop | OAuth 2.0 polling Worker → Whoop API → normalise → INSERT |
+| Oura Ring | OAuth 2.0 daily polling Worker → Oura API → normalise → INSERT |
+| Garmin | OAuth 1.0a polling Worker → Garmin Health API → normalise → INSERT |
+
+**Out of scope:**
+- What data users have on their devices (not accessible to FORM)
+- HealthKit / Health Connect OS internals (Apple / Google responsibility)
+- Wearable hardware accuracy (covered in §22 AI coaching quality)
+- Per-user sync frequency or individual reading freshness (would require `user_id` in signals — privacy invariant violation)
+
+**Privacy invariant (enforced at Analytics Engine and pg_cron levels):**
+
+No `user_id`, no reading values (HRV ms, HR bpm, sleep stage data), no health field content in any observability signal. All metrics are aggregate counts over a time window, per source slug. Signals with a tenant dimension carry `tenant_id` only for enterprise fleet metrics (§41.2 rate metrics), not for individual user attribution.
+
+**k-anonymity gate:** Any per-source breakdown that would resolve to fewer than 5 users across the fleet is suppressed and replaced with `suppressed_k_anonymity_floor: true` in the DEC-030 `wearable.fleet_freshness_assessed` payload. Consistent with the k-anonymity rule in `docs/DATA_MODEL.md §17.4.1`.
+
+---
+
+### 41.2 RED Metrics
+
+All metrics published to `WEARABLE_TELEMETRY` Analytics Engine binding. Schema: `timestamp TIMESTAMP, source TEXT, metric TEXT, value FLOAT, error_class TEXT NULLABLE`. No `user_id` column.
+
+#### Rate (R)
+
+| Signal | Definition | Granularity |
+|---|---|---|
+| `sync_success_rate` | Successful `wearable_readings` INSERTs / total sync attempts by `source` | Hourly per source |
+| `sync_attempts_per_hour` | Total `wearable-ingestion-worker` invocations by `source` | Hourly per source |
+| `oauth_grant_count` | New OAuth authorizations (Whoop / Oura / Garmin) by `source` | Daily |
+| `oauth_revocation_count` | OAuth revocations or OS permission withdrawals by `source` and `revocation_type` | Daily |
+| `new_source_connections` | Users connecting a new wearable source (any tier) | Daily |
+| `active_connected_sources` | Fleet count of distinct users with ≥ 1 successful sync in last 48h, by `source` | Daily at 07:05 UTC (pg_cron job 31) — k-anonymity gate applies |
+
+#### Errors (E)
+
+| Signal | Definition | Error class values |
+|---|---|---|
+| `sync_failure_rate` | Failed sync attempts / total attempts by `source` × `error_class` | `oauth_expired`, `api_rate_limit`, `network_timeout`, `schema_validation_error`, `permission_denied`, `api_5xx`, `duplicate_reading` |
+| `oauth_expired_count` | Count of `oauth_expired` errors in rolling 1h by `source` | Whoop / Oura / Garmin only — HealthKit/Health Connect use OS permissions, no OAuth |
+| `api_rate_limit_count` | HTTP 429 responses from upstream API by `source` in rolling 15 min | Whoop (100 req/min cap); Oura (self-service rate limits); Garmin (per enterprise contract) |
+| `stale_coaching_context_count` | `wearable.stale_data_coaching_context` DEC-030 events per day | Fleet-level count only; no user dimension |
+| `permission_denied_count` | OS-level permission denied responses (HealthKit `HKError.Code.errorAuthorizationNotDetermined`; Health Connect `SecurityException`) by `source` per 24h | Signals user removed app permission; triggers `wearable.permission_revoked` event |
+
+#### Duration (D)
+
+| Signal | Definition | Granularity |
+|---|---|---|
+| `ingestion_latency_p95` | p95 end-to-end Worker duration (notification/poll received → `wearable_readings` INSERT committed) by `source` | Hourly, 1-second resolution |
+| `ingestion_latency_p99` | p99 end-to-end by `source` | Hourly |
+| `whoop_api_response_p95` | p95 Whoop API call duration (fetch → response body parsed) | 15-min rolling |
+| `oura_api_response_p95` | p95 Oura API call duration | Per daily polling cycle |
+
+---
+
+### 41.3 SLOs
+
+| SLO ID | Signal | Target | Window | Notes |
+|---|---|---|---|---|
+| **WS-SLO-01** | HealthKit sync success rate | ≥ 99% | 24h rolling | Background delivery is OS-managed; < 1% tolerance for Worker-side failures only |
+| **WS-SLO-02** | Health Connect sync success rate | ≥ 97% | 24h rolling | Android WorkManager 15-minute minimum interval increases retry variance; 97% reflects platform constraint |
+| **WS-SLO-03** | Whoop sync success rate | ≥ 98% | 24h rolling | Excludes `duplicate_reading` (idempotent; not a failure); includes `api_rate_limit` and `oauth_expired` |
+| **WS-SLO-04** | Oura sync success rate | ≥ 99% | 24h rolling | Daily polling cycle — one failure per user = 0% for that user for the day |
+| **WS-SLO-05** | Garmin sync success rate | ≥ 95% | 24h rolling | Enterprise-contract API; lower floor reflects Garmin Health API SLA; OQ-WS-OBS-01 governs final target |
+| **WS-SLO-06** | Fleet freshness | ≥ 95% of active connected users have a reading < 26h old | Daily at 07:05 UTC | Measured by pg_cron job 31; k-anonymity gate: per-source breakdown suppressed if N < 5 for any source |
+
+**SLO error budget note:** WS-SLO-01 through WS-SLO-05 consume error budget proportionally by source. A Whoop API outage counts against WS-SLO-03 only — not against the enterprise 99.9% uptime commitment in `docs/ENTERPRISE_SLA.md §3` (which covers FORM's own endpoints). If the Whoop outage causes Victor to coach without fresh HRV data, the `wearable.stale_data_coaching_context` path in §41.7 activates.
+
+---
+
+### 41.4 Alert Rules
+
+Add these seven rules to the `§6.2` master alert table under a new `wearable_sync_health` subsection.
+
+| Rule ID | Severity | Condition | Window | Routing | Auto-resolve |
+|---|---|---|---|---|---|
+| **AL-WS-01** | **P1** | Whoop `oauth_expired` count > 5% of connected Whoop users in rolling 1h | 1h | PagerDuty `form-platform` + Slack `#wearable-alerts` + `#customer-success` | Yes — on `oauth_expired` rate falling < 1% |
+| **AL-WS-02** | **P1** | Whoop API 429 responses > 10% of total Whoop requests in rolling 15 min | 15 min | PagerDuty `form-platform` | Yes — on 429 rate < 2% for 10 min |
+| **AL-WS-03** | **P2** | Health Connect sync failure rate > 10% in rolling 30-min window | 30 min | Slack `#wearable-alerts` | Yes — on failure rate < 5% for 15 min |
+| **AL-WS-04** | **P1** | Oura API: 100% sync failure rate for > 15 consecutive minutes | 15 min | PagerDuty `form-platform` | Yes — on first Oura sync success after failure window |
+| **AL-WS-05** | **P2** | HealthKit: zero successful ingestions for any tenant with > 5 active HealthKit users for > 4h | 4h | Slack `#wearable-alerts` | Yes — on first successful HealthKit ingestion for affected tenant |
+| **AL-WS-06** | **P1** | Fleet freshness (WS-SLO-06): `fresh_pct` < 95% at daily 07:05 UTC check | Point-in-time | PagerDuty `form-platform` + `form-customer-success`; no auto-resolve | No — manual close after root cause identified and `fresh_pct` ≥ 95% at next check |
+| **AL-WS-07** | **P2** | Garmin OAuth expiry on any enterprise tenant | Per-event | Slack `#wearable-alerts` + email to assigned CSM | Yes — on Garmin OAuth re-grant confirmed |
+
+**AL-WS-01 enterprise escalation note:** Whoop OAuth expiry waves often follow Whoop backend changes to token TTL or scope requirements. If AL-WS-01 fires and > 5 enterprise tenant users are affected, customer-success must notify affected tenants via E-WEARABLE-01 (§41.6.1) within 4h — consistent with `docs/ENTERPRISE_SLA.md §3.4` P1 communication SLA.
+
+---
+
+### 41.5 pg_cron Job 31: `wearable_sync_freshness_check`
+
+```sql
+-- pg_cron job 31: daily fleet freshness check for WS-SLO-06
+-- Schedule: 07:05 UTC daily (5 min after Victor morning push window closes)
+-- Emits: wearable.fleet_freshness_assessed DEC-030 event
+-- Privacy: no user_id in result; k-anonymity gate enforced (N < 5 → suppressed)
+
+SELECT cron.schedule(
+  'wearable_sync_freshness_check',
+  '5 7 * * *',
+  $$
+  DO $$DECLARE
+    v_fresh_count   INTEGER;
+    v_total_count   INTEGER;
+    v_fresh_pct     FLOAT;
+    v_slo_met       BOOLEAN;
+    v_breakdown     JSONB := '{}';
+    v_src           TEXT;
+    v_src_fresh     INTEGER;
+    v_src_total     INTEGER;
+  BEGIN
+    -- Fleet totals: active = any user with a successful sync in last 48h
+    SELECT
+      COUNT(*) FILTER (WHERE latest_reading_age_hours < 26),
+      COUNT(*)
+    INTO v_fresh_count, v_total_count
+    FROM (
+      SELECT
+        user_id,
+        EXTRACT(EPOCH FROM (NOW() - MAX(recorded_at))) / 3600.0 AS latest_reading_age_hours
+      FROM wearable_readings
+      WHERE deleted_at IS NULL
+        AND recorded_at > NOW() - INTERVAL '48 hours'
+      GROUP BY user_id
+    ) sub;
+
+    IF v_total_count = 0 THEN RETURN; END IF;  -- No connected users; skip emission
+
+    v_fresh_pct := (v_fresh_count::FLOAT / v_total_count::FLOAT) * 100.0;
+    v_slo_met   := (v_fresh_pct >= 95.0);
+
+    -- Per-source breakdown with k-anonymity gate (k=5)
+    FOREACH v_src IN ARRAY ARRAY['healthkit','health_connect','whoop','oura','garmin'] LOOP
+      SELECT
+        COUNT(*) FILTER (WHERE latest_age < 26),
+        COUNT(*)
+      INTO v_src_fresh, v_src_total
+      FROM (
+        SELECT
+          user_id,
+          EXTRACT(EPOCH FROM (NOW() - MAX(recorded_at))) / 3600.0 AS latest_age
+        FROM wearable_readings
+        WHERE source = v_src
+          AND deleted_at IS NULL
+          AND recorded_at > NOW() - INTERVAL '48 hours'
+        GROUP BY user_id
+      ) src_sub;
+
+      IF v_src_total >= 5 THEN
+        v_breakdown := v_breakdown || jsonb_build_object(
+          v_src, jsonb_build_object(
+            'fresh_pct',    ROUND((v_src_fresh::FLOAT / v_src_total::FLOAT * 100.0)::NUMERIC, 1),
+            'total_users',  v_src_total
+          )
+        );
+      ELSE
+        v_breakdown := v_breakdown || jsonb_build_object(
+          v_src, jsonb_build_object('suppressed_k_anonymity_floor', true)
+        );
+      END IF;
+    END LOOP;
+
+    -- Emit DEC-030 event (emit_dec030_event also writes to WEARABLE_TELEMETRY via Worker)
+    PERFORM emit_dec030_event(
+      'wearable.fleet_freshness_assessed',
+      jsonb_build_object(
+        'fresh_pct',           ROUND(v_fresh_pct::NUMERIC, 1),
+        'fresh_count',         v_fresh_count,
+        'total_connected',     v_total_count,
+        'slo_met',             v_slo_met,
+        'sources_breakdown',   v_breakdown,
+        'check_timestamp_utc', NOW()
+      )
+    );
+  END$$;
+  $$
+);
+```
+
+**Health check:** pg_cron meta-monitoring (§12) watches for `wearable_sync_freshness_check` `last_run_time > 26h` (one miss → Slack P2 alert); two consecutive misses (48h) → escalate to AL-WS-06 severity.
+
+---
+
+### 41.6 DEC-030 HMAC-Chained Events
+
+Register in `docs/AUDIT_LOG_SCHEMA.md §Wearable` namespace. Privacy invariant: no `user_id`, no health values, no reading content. Events are keyed by `source`, `tenant_id` (nullable for consumer tier), and time-window aggregates only.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `wearable.sync_completed` | STANDARD | 2 yr | `wearable-ingestion-worker` — successful batch INSERT | `source`, `reading_count` (int), `oldest_reading_age_hours` (float), `tenant_id` (nullable) |
+| `wearable.sync_failed` | HIGH | 3 yr | Worker catches non-transient error after retry exhaustion | `source`, `error_class` (enum), `error_message_hash` (SHA-256), `retry_count` (int), `tenant_id` (nullable) |
+| `wearable.oauth_token_expired` | HIGH | 3 yr | Worker receives 401 after attempted token refresh fails | `source` (whoop\|oura\|garmin only — HealthKit/Health Connect use OS permissions), `tenant_id` (nullable), `refresh_attempted` (bool) |
+| `wearable.permission_revoked` | HIGH | 5 yr | OS permission denied or explicit user withdrawal detected | `source`, `revocation_type` (`user_initiated`\|`os_prompt`\|`enterprise_mdm`), `consent_event_id` (links to consent chain for GDPR Art. 7(3) trail — no `user_id` direct) |
+| `wearable.fleet_freshness_assessed` | STANDARD | 2 yr | pg_cron job 31 daily at 07:05 UTC | `fresh_pct` (float), `total_connected` (int), `slo_met` (bool), `sources_breakdown` (object, k-anonymity gated) |
+| `wearable.stale_data_coaching_context` | HIGH | 3 yr | Victor ingestion layer detects HRV data > 48h used as coaching context | `source`, `hrv_data_age_hours` (float), `coaching_context_downgraded` (bool — must be `true`; see §41.7) |
+
+**WS-CHAIN-01 ordering constraint:** `wearable.sync_failed` cannot appear in the chain without a preceding `wearable.sync_completed` for the same `source` × `tenant_id` within a UTC day unless it is the first event for that combination (i.e., a failure on first attempt is valid; a success followed immediately by a failure of the same batch is not). A chain ordering violation triggers R-05 (HMAC Chain Break) and security-engineer notification.
+
+#### 41.6.1 Communication Template: E-WEARABLE-01
+
+**Trigger:** AL-WS-01 (Whoop OAuth expiry wave) affecting ≥ 5 enterprise tenant users.
+**Owner:** customer-success — send within 4h of AL-WS-01 fire.
+
+> FORM has detected an interruption in the Whoop integration for your organisation. Some employees may not see their wearable data reflected in FORM's coaching for the next [X] hours. No personal data has been lost — historical readings remain intact. Affected employees may see a prompt to re-authorise their Whoop connection within the FORM app. This typically resolves within [time estimate]. We will update you once normal sync has resumed. Questions: enterprise@form.coach.
+
+> Do NOT name Whoop's infrastructure unless confirmed by devops-lead — consistent with `docs/INCIDENT_RESPONSE.md R-17` sub-processor communication policy.
+
+---
+
+### 41.7 Coaching Safety Integration — Stale HRV Data Protocol
+
+Victor uses wearable HRV as a primary signal for training load and recovery recommendations. Stale data used as current produces clinically unsafe coaching output.
+
+**Staleness threshold:** HRV data is stale if the user's most recent `wearable_readings` row with `reading_type IN ('hrv_rmssd', 'hrv_status_garmin')` has `recorded_at < NOW() - INTERVAL '48 hours'` at session start.
+
+**Required behaviour when stale HRV detected:**
+
+1. `wearable-ingestion-worker` sets `coaching_context_flag = 'hrv_stale'` on the `coaching_turns` row before returning context to Victor.
+2. Victor prompt layer MUST omit or explicitly qualify HRV-based recommendations — no "your HRV suggests you're well-recovered today" without fresh data.
+3. `wearable.stale_data_coaching_context` DEC-030 event is emitted with `coaching_context_downgraded: true` as the compliance record that the protocol ran.
+4. If `coaching_context_downgraded: false` appears in this event — which must never happen — PagerDuty `form-clinical` is notified immediately.
+
+**Clinical-safety veto:** clinical-safety has permanent veto authority over any change that removes or weakens the 48h staleness gate. Any PR touching the staleness threshold requires clinical-safety as a required reviewer.
+
+---
+
+### 41.8 Metabase Dashboard: Wearable Sync Pipeline Health
+
+Dashboard: `"Wearable Sync Pipeline Health"` · `FORM-Platform` collection · `form_admin` + `compliance_reviewer` access. No PII in any panel; k-anonymity gate active on all per-source user-count panels.
+
+| Panel | Metric | Chart type |
+|---|---|---|
+| 1. Sync success rate (7-day trend) | `sync_success_rate` by `source` per 6h bucket | Stacked line per source |
+| 2. Fleet freshness — WS-SLO-06 | Daily `fresh_pct` with 95% SLO threshold line | Time-series with threshold annotation |
+| 3. OAuth token health | `oauth_expired_count` + `oauth_revocation_count` per source per day | Grouped bar |
+| 4. Error distribution | `sync_failure_rate` by `source` × `error_class` (last 7d) | Heatmap |
+| 5. Stale HRV coaching events | `stale_coaching_context_count` per day | Bar chart; annotation at 0 (any event = yellow) |
+| 6. Ingestion latency p95 / p99 | `ingestion_latency_p95` + `_p99` per source (last 7d) | Dual-line per source with target bands |
+
+---
+
+### 41.9 SOC 2 Evidence Artefacts
+
+Store at `compliance/evidence/wearable/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **WS-E-001** | Quarterly export of `wearable.sync_completed` DEC-030 chain excerpt per source — demonstrates data collection pipeline available as promised | A1.1 — Availability commitments met | 5 yr |
+| **WS-E-002** | Quarterly fleet freshness report: `wearable.fleet_freshness_assessed` events for the quarter with `slo_met` trend — no user data; fleet percentages only | P3.2 — Personal information collected from specified sources per privacy notice | 5 yr |
+| **WS-E-003** | AL-WS-01 through AL-WS-07 rule configuration screenshots from Better Stack / PagerDuty; annual or on rule change | CC7.2 — Proactive anomaly detection for data collection pipeline | 3 yr |
+
+**Auditor narrative for A1.1:** FORM's wearable data collection pipeline is a user-facing availability commitment: users connect a wearable expecting their data to flow into coaching. WS-E-001 provides the DEC-030 chain evidence that `wearable-ingestion-worker` processed syncs across all five sources during the observation period. Combined with §28 (mobile client performance) and §33 (enterprise engagement metrics), the record demonstrates availability across the full data-collection → coaching → reporting chain.
+
+---
+
+### 41.10 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-WS-OBS-01** | **Garmin Health API production SLA.** The Garmin enterprise API requires a separate contract (6–12 week legal review per `docs/DATA_MODEL.md §14`). Until signed and a production SLA confirmed, WS-SLO-05 (≥ 95%) is provisional. **Recommendation:** exclude Garmin from WS-E-001 evidence scope until first successful production quarter. | **P1** | enterprise-architect + compliance-officer | Document in `docs/DECISION_LOG.md` before first Garmin integration goes live (M10) |
+| **OQ-WS-OBS-02** | **`wearable.stale_data_coaching_context` namespace ownership.** This event simultaneously serves §32 (Victor AI Safety — clinical signal) and §41 (wearable pipeline — availability signal). **Recommendation:** emit once in `wearable.*` namespace with `clinical_safety_relevant: true` boolean; §32 monitoring query filters on this field rather than requiring a separate event. | **P2** | platform-engineer + compliance-officer | Document in `docs/DECISION_LOG.md`; resolve M8 before first session uses this event for evidence |
+
+---
+
+### 41.11 Implementation Checklist
+
+#### P0 — Before first wearable source goes to production (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all six DEC-030 events from §41.6 in `docs/AUDIT_LOG_SCHEMA.md §Wearable` with Zod schemas and retention labels; deploy to `emit-audit-event` Worker event registry. Priority order: `wearable.sync_failed` and `wearable.oauth_token_expired` first (error path before happy path). | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 2 | Instrument `wearable-ingestion-worker` to emit `wearable.sync_completed` and `wearable.sync_failed` on batch completion/error; publish `sync_success_rate`, `ingestion_latency_p95`, and `error_class` counters to `WEARABLE_TELEMETRY` Analytics Engine binding. | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Create pg_cron job 31 `wearable_sync_freshness_check` (§41.5 SQL spec); register in §12.6 pg_cron job registry; verify first `wearable.fleet_freshness_assessed` event emits on staging with synthetic data; confirm k-anonymity gate suppresses breakdown for sources with N < 5. | platform-engineer | **P0** | M6 | [ ] |
+| 4 | Configure AL-WS-01 (P1), AL-WS-02 (P1), AL-WS-04 (P1), AL-WS-06 (P1) in PagerDuty with `form-platform` routing; verify PagerDuty receives test event for each rule before enabling in production. | devops-lead | **P0** | M6 | [ ] |
+
+#### P1 — Before first enterprise pilot (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Configure AL-WS-03 (P2), AL-WS-05 (P2), AL-WS-07 (P2) in Better Stack / Slack `#wearable-alerts`; test with synthetic failure injection per source. | devops-lead | **P1** | M7 | [ ] |
+| 6 | Build "Wearable Sync Pipeline Health" Metabase dashboard (§41.8 — 6 panels); add to `FORM-Platform` collection; confirm no PII in any panel; restrict to `form_admin` + `compliance_reviewer`. | data-engineer | **P1** | M8 | [ ] |
+| 7 | Implement §41.7 coaching safety downgrade gate in Victor ingestion layer: detect `recorded_at < NOW() - 48h` for HRV readings; set `coaching_context_flag = 'hrv_stale'`; emit `wearable.stale_data_coaching_context` with `coaching_context_downgraded: true`. Clinical-safety sign-off required as a required PR reviewer before merge. | platform-engineer + clinical-safety | **P1** | M7 | [ ] |
+
+#### P2 — Before SOC 2 observation period start (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Collect WS-E-001 (first quarterly `wearable.sync_completed` chain excerpt) and WS-E-002 (first fleet freshness quarterly report); file in `compliance/evidence/wearable/`; add to `compliance/evidence/MANIFEST.sha256`. | compliance-officer | **P2** | M9 | [ ] |
+| 9 | Resolve OQ-WS-OBS-01: document Garmin Health API SLA in `docs/DECISION_LOG.md`; add Garmin to WS-E-001 evidence scope once first production quarter completes. | enterprise-architect + compliance-officer | **P2** | M10 | [ ] |
+| 10 | Resolve OQ-WS-OBS-02: document `wearable.stale_data_coaching_context` namespace decision in `docs/DECISION_LOG.md`; update `docs/AUDIT_LOG_SCHEMA.md §Wearable` and §32 cross-reference accordingly. | platform-engineer + compliance-officer | **P2** | M8 | [ ] |
+
+---
+
 *v3.6 (2026-06-13): §39 Backup Integrity, DR Readiness & Business Continuity Observability — closes the observability gap explicitly noted in §37.1 ("Supabase internal backup retention — vendor-managed; monitored via S-008 synthetic probe in §16"). §39 is the compliance-grade companion to `docs/BUSINESS_CONTINUITY.md`: where the BCP defines what to do, §39 defines how FORM knows it's doing it. §39.1 scopes to four surfaces: Supabase Postgres daily logical backup, R2 `form-backups` (primary cold-start), Backblaze B2 `form-dr-backups` (EU DR), and quarterly/annual restore tests. Explicitly out of scope: PITR restore runbooks (BCP §6.1 + DATA_MODEL.md §10), R2/B2 lifecycle policy configuration, audit log chain integrity (§15/§11.8), and GDPR erasure pipelines (§37). §39.2 backup coverage map: six data stores tabulated with backup type, target freshness, and RPO contribution — Workers KV and Workers Secrets explicitly not backed up by design. §39.3 RED metrics: two rate metrics (backup_completion_rate_24h, restore_tests_completed_rolling_90d), three error metrics (backup_age_hours per store, backup_failed_count_7d, restore_test_age_days), two duration metrics (backup_duration_minutes_p95 per store, restore_test_rto_minutes_p95); all infrastructure-only — no user_id, no tenant_id, no health data in any signal. §39.4 five SLOs: BC-SLO-01 (Postgres backup freshness ≤ 26h, 100% zero-tolerance), BC-SLO-02 (R2 freshness ≤ 26h, 99.5%), BC-SLO-02b (B2 EU freshness ≤ 30h, 99%), BC-SLO-03 (restore test RTO ≤ 4h per event, mirrors ENTERPRISE_SLA.md §4.3), BC-SLO-04 (one restore test per calendar quarter, 100% zero-tolerance — direct SOC 2 A1.3 evidence gate). §39.5 six alert rules AL-BC-01 through AL-BC-06: AL-BC-01 (P1, Postgres stale > 26h, auto-resolve), AL-BC-02 (P0, Postgres critical > 48h, no-auto-resolve, dual page), AL-BC-03 (P1, R2 stale > 26h, auto-resolve), AL-BC-04 (P1, restore test overdue > 90d, 7d TTL re-fire, auto-resolve on test completion), AL-BC-05 (P0, backup_failed DEC-030 CRITICAL, no-auto-resolve), AL-BC-06 (P2, backup duration P95 > 4h, Slack only). §39.6 five-row §6.2 master alert table addition for `backup_dr_health` subsection. §39.7 pg_cron job 29 `backup_age_monitor` (every 4h, 5h freshness window, P1 → AL-BC-01/03; escalates to P0 → AL-BC-02 if > 48h); design note distinguishing job 29 (DEC-030 compliance evidence) from S-008 (uptime-style availability monitoring). §39.8 seven-panel "Backup & DR Readiness" Metabase dashboard: `FORM-DevOps` collection, `form_admin` + `compliance_reviewer` visibility, no PII in any panel. §39.9 five DEC-030 HMAC-chained events: `system.backup_completed` (STANDARD, 5yr — `store`, `backup_type`, `duration_minutes`, `backup_id`, `region`, `pitr_point_in_time`), `system.backup_failed` (CRITICAL, 7yr — `error_message_hash` SHA-256 prevents credential leakage), `system.restore_test_initiated` (STANDARD, 7yr — `initiated_by` = PAM session ID, not raw user_id; `environment: literal("staging")`), `system.restore_test_completed` (STANDARD, 7yr — `rto_achieved_minutes`, `rto_target_minutes: literal(240)`, `privacy_floor_verified` boolean; if false, test is classified failed regardless of RTO), `system.restore_test_failed` (CRITICAL, 7yr — `failure_reason` enum includes `privacy_floor_violation` which additionally notifies clinical-safety), `system.backup_staleness_detected` (HIGH, 7yr — `dedup_key` prevents chain spam on repeated stale detection); BC-CHAIN-01 ordering invariant enforced at `emit-audit-event` Worker. §39.10 five SOC 2 evidence artefacts BC-E-001 through BC-E-005: BC-E-001 (A1.2 — job 29 run history), BC-E-002 (A1.3 — restore_test_completed events, quarterly), BC-E-003 (A1.3 — RTO comparison chart), BC-E-004 (CC7.2 — AL-BC-01/02 PagerDuty history), BC-E-005 (CC6.5 — 10-event backup_completed chain excerpt); A1.3 auditor narrative supplied (RTO operationally verified, not merely documented; privacy_floor_verified field extends compliance assurance through restore operations). §39.11 two open questions: OQ-BC-OBS-01 (P1, Supabase Management API vs DEC-030 event for Postgres backup cross-validation — dual-path recommended; resolve M8), OQ-BC-OBS-02 (P2, quarterly drill scope: Postgres PITR only vs. R2/B2 cold backup — Postgres-only recommended, annual for R2/B2; resolve M5). §39.12 eleven-item implementation checklist: 5× P0/M5–M6 (five-event DEC-030 registration, staleness event + dedup, backup Worker instrumentation, pg_cron job 29 DDL + cron registration, AL-BC-01 through AL-BC-05 PagerDuty configuration), 3× P1/M5–M7 (first quarterly restore test + BC-E-002 filing, Metabase dashboard, OQ-BC-OBS-02 decision), 3× P2/M9–M13 (evidence collection BC-E-001/005, OQ-BC-OBS-01 dual-path implementation, admin dashboard BC-SLO surface evaluation). Cross-references: `docs/BUSINESS_CONTINUITY.md §3.1` (RTO/RPO targets — BC-SLO-01/03 anchor); `docs/BUSINESS_CONTINUITY.md §4.2` (Privacy Floor verification — `privacy_floor_verified` boolean in restore_test_completed); `docs/BUSINESS_CONTINUITY.md §5.1–5.2` (Postgres PITR + R2 backup architecture); `docs/BUSINESS_CONTINUITY.md §6.1` (Postgres PITR restore runbook — §39 provides observability, BCP provides runbook); `docs/BUSINESS_CONTINUITY.md §7` (annual DR drill — OQ-BC-OBS-02 governs whether R2/B2 is included in quarterly vs. annual scope); `docs/ENTERPRISE_SLA.md §4.3` (RTO < 4h enterprise commitment — BC-SLO-03 target_minutes = 240); `docs/SOC2_READINESS.md §A1 criteria` (A1.2 capacity monitoring, A1.3 recovery testing — BC-E-001 through BC-E-005 close these evidence gaps); `docs/AUDIT_LOG_SCHEMA.md §System` (five new DEC-030 events to register — P0 before M5); `docs/CRYPTOGRAPHY_POLICY.md §5` (key inventory — OQ-BC-OBS-01 may require SUPABASE_MANAGEMENT_API_KEY entry); §16 S-008 (R2 backup freshness synthetic probe — complementary to, not replaced by, §39); §37.1 (GDPR data lifecycle out-of-scope note — §39 closes that explicit gap); §38 (CI/CD observability — both §38 and §39 emit into `audit_log_events` §System events namespace). Owner: devops-lead + compliance-officer + platform-engineer.*
+
+*v3.8 (2026-06-13): §41 Wearable Integration & Health Platform Sync Pipeline Observability — closes the data-collection-availability gap left by `docs/DATA_MODEL.md §14` (which defines the schema and sources) and `docs/OBSERVABILITY.md §28` (which covers mobile app performance but not the backend ingestion pipeline). §41 scopes to five sources (HealthKit, Health Connect, Whoop, Oura, Garmin) and three pipeline stages: (1) source-to-`wearable-ingestion-worker` notification, (2) Worker validate-and-insert, (3) `wearable_readings` committed. Privacy invariant enforced throughout: no `user_id`, no reading values, no health data in any signal — only aggregate counts, source slugs, and error codes. §41.2 RED metrics: six rate signals (sync success rate by source × time window; OAuth grant/revocation counts), five error signals (sync failure rate by source × error_class enum; stale-data coaching event rate), four duration signals (p95 Worker end-to-end latency by source; Whoop API response time p95). §41.3 six WS-SLO-* entries: WS-SLO-01 (HealthKit success ≥ 99% / 24h), WS-SLO-02 (Health Connect ≥ 97% / 24h — Android WorkManager 15-minute floor increases variance), WS-SLO-03 (Whoop ≥ 98% / 24h), WS-SLO-04 (Oura ≥ 99% / 24h), WS-SLO-05 (Garmin ≥ 95% / 24h — enterprise-contract API; lower floor reflects Garmin Health API SLA), WS-SLO-06 (fleet freshness: ≥ 95% of active users with a connected wearable have a reading < 26h old, measured at 07:00 UTC daily). §41.4 seven AL-WS-* alert rules: AL-WS-01 (P1, Whoop OAuth expiry wave > 5% failing on `oauth_expired` in 1h, PagerDuty + form-customer-success Slack), AL-WS-02 (P1, Whoop API 429 rate > 10% in 15 min, PagerDuty form-platform), AL-WS-03 (P2, Health Connect failure > 10% / 30 min, Slack), AL-WS-04 (P1, Oura API total failure 15 min, PagerDuty form-platform), AL-WS-05 (P2, HealthKit background delivery stall: zero ingestions for a tenant with active HealthKit users for > 4h, Slack), AL-WS-06 (P1, fleet freshness SLO-06 breach at daily check, PagerDuty form-platform + form-customer-success, no auto-resolve), AL-WS-07 (P2, Garmin OAuth expiry on any enterprise tenant, Slack + CSM notification). §41.5 pg_cron job 31 `wearable_sync_freshness_check` (daily 07:05 UTC — 5 min after Victor morning push window closes; freshness window 26h; emits WS-SLO-06 `wearable.fleet_freshness_assessed` event; k-anonymity gate: suppresses per-source breakdown if any source N < 5 across fleet). §41.6 six DEC-030 HMAC-chained events: `wearable.sync_completed` (STANDARD, 2yr — `source`, `reading_count` integer, `oldest_reading_age_hours` float; no user_id; tenant_id nullable for consumer tier), `wearable.sync_failed` (HIGH, 3yr — `source`, `error_class` enum, `error_message_hash` SHA-256), `wearable.oauth_token_expired` (HIGH, 3yr — `source` whoop|oura|garmin only; HealthKit/HealthConnect use OS permissions, no OAuth), `wearable.permission_revoked` (HIGH, 5yr — GDPR Art. 7(3) withdrawal record; `revocation_type` enum user_initiated|os_prompt|enterprise_mdm; no user_id — linked to consent chain by `consent_event_id` foreign key), `wearable.fleet_freshness_assessed` (STANDARD, 2yr — `fresh_pct` 0–100 float, `sources_breakdown` object by source, `slo_met` bool; no per-user data; k-anonymity gate enforced by pg_cron job 31), `wearable.stale_data_coaching_context` (HIGH, 3yr — emitted when Victor ingestion layer detects wearable data > 48h old is used as HRV coaching context; no `user_id`; `hrv_data_age_hours` float; `source`; triggers §41.7 coaching safety downgrade). §41.7 coaching safety integration: stale HRV data (> 48h) triggers mandatory confidence downgrade — Victor must not surface HRV-based training adjustments at HIGH confidence without fresh data; `wearable.stale_data_coaching_context` event is the compliance evidence that the downgrade ran; clinical-safety has VETO on any stale-data coaching output that bypasses downgrade. §41.8 six-panel "Wearable Sync Pipeline Health" Metabase dashboard (`FORM-Platform` collection; no PII; k-anonymity enforced in all per-source panels). §41.9 three SOC 2 evidence artefacts: WS-E-001 (A1.1 — quarterly `wearable.sync_completed` chain excerpt per source: data collection available as promised), WS-E-002 (P3.2 — quarterly fleet freshness report: data from specified sources collected per privacy notice), WS-E-003 (CC7.2 — AL-WS-01 through AL-WS-07 PagerDuty/Slack configuration screenshots). §41.10 two open questions: OQ-WS-OBS-01 (P1 — Garmin Health API SLA: confirm production availability target before filing WS-E-001 for Garmin; file OQ as DECISION_LOG entry before M10 enterprise pilot), OQ-WS-OBS-02 (P2 — `wearable.stale_data_coaching_context` namespace ownership: wearable namespace vs. §32 Victor AI Safety chain; recommendation: dual-emit for SOC 2 P-series + CC7.2 cross-coverage; resolve M8). §41.11 ten-item implementation checklist: 4× P0/M5–M6 (six DEC-030 events registration in AUDIT_LOG_SCHEMA.md, wearable-ingestion-worker instrumentation, pg_cron job 31 DDL + cron registration, AL-WS-01/02/04/06 PagerDuty routing), 3× P1/M7–M8 (AL-WS-03/05/07 Slack alerts, Metabase dashboard, WS-SLO-06 coaching-safety downgrade gate in Victor ingestion), 3× P2/M9–M10 (WS-E-001/002 evidence collection, OQ-WS-OBS-01 Garmin SLA decision, OQ-WS-OBS-02 namespace decision). Cross-references: `docs/DATA_MODEL.md §14` (wearable_readings schema; five-source integration table — this section is the observability companion); `docs/DATA_MODEL.md §17` (enterprise admin reporting aggregate-only model — fleet freshness metric is the observability signal that §17.4.3 wearable engagement aggregate is populated); `docs/OBSERVABILITY.md §28` (mobile app performance — covers client-side rendering, not server-side ingestion pipeline; §41 is the backend complement); `docs/OBSERVABILITY.md §32` (Victor AI Safety — stale-HRV coaching context event cross-references §32 clinical-safety monitoring); `docs/OBSERVABILITY.md §33` (enterprise QBR metrics — WS-SLO-06 fleet freshness rate is an input to the engagement health score in §33.4); `docs/SOC2_READINESS.md §35.6.3` (wearable_readings retention: 2-year proposed period); `docs/AUDIT_LOG_SCHEMA.md §Wearable` (six new DEC-030 events to register — P0 before M5); `docs/CLINICAL_SAFETY.md` (stale-HRV coaching output veto authority); DEC-030 (HMAC chain requirement for all six events). Owner: platform-engineer + devops-lead + compliance-officer.*
 
 *v3.7 (2026-06-13): §40 Pre-Launch Load Testing & Performance Capacity Observability — closes the SOC 2 observability gap *"Load testing before launches"* noted in `docs/SOC2_READINESS.md §2` (previously 🟡 Gap → 🟡 Partial with §33.3 k6 scenarios defined; §40 advances toward 🟢 by adding the DEC-030 HMAC-chain layer and production alert rules). §40 is the observability companion to `docs/SOC2_READINESS.md §33.3`: §33.3 defines WHAT the gate tests, §40 defines HOW the results are audited and monitored. §40.1 scopes to the load test gate (not mobile client, not Anthropic API, not DR failover); establishes privacy invariant (synthetic `lt-` tenant IDs only; no real user or health data in any payload). §40.2 trigger matrix: four gate events mapped to required k6 profiles and DEC-030 actions, plus a documented bypass protocol (compliance-officer acknowledgement + CRITICAL event + 48h post-deploy test). §40.3 six SLOs: PERF-SLO-01 (baseline p95 ≤ 300 ms — derived from §33.3 and §33.4.1 production p95 < 300 ms target), PERF-SLO-02 (SSO burst auth p95 ≤ 500 ms), PERF-SLO-03 (coaching session p95 ≤ 2,000 ms), PERF-SLO-04 (error rate ≤ 0.1%), PERF-SLO-05 (SCIM 5xx = 0, zero-tolerance); PERF-SLO-01–05 are hard gates blocking merge; PERF-SLO-06 (quarterly p95 drift ≤ +20%) is a soft gate generating investigation alert. §40.4 five AL-PERF-* production alert rules: AL-PERF-01 (P2, p95 > 300 ms / 10 min, Slack), AL-PERF-02 (P1, p99 > 600 ms / 5 min, PagerDuty), AL-PERF-03 (P1, error rate > 0.5% / 5 min, PagerDuty), AL-PERF-04 (P1, load_test_gate_bypassed CRITICAL event, PagerDuty form-compliance, no auto-resolve), AL-PERF-05 (P2, quarterly PERF-SLO-06 breach, Slack). §40.5 five DEC-030 HMAC-chained events: `system.load_test_initiated` (STANDARD, 3yr — `profile`, `commit_sha`, `triggered_by`, `environment:staging`), `system.load_test_completed` (STANDARD, 3yr — full `slo_results` object for PERF-SLO-01–05), `system.load_test_failed` (HIGH, 7yr — `failing_slos` array, `gate_action:merge_blocked`), `system.load_test_gate_bypassed` (CRITICAL, 7yr — `bypass_reason_hash` SHA-256 per DEC-044 pattern; plaintext in Linear ticket), `system.perf_regression_detected` (HIGH, 7yr — quarterly PERF-SLO-06 breach). PERF-CHAIN-01 ordering invariant: `load_test_initiated` precedes `completed`/`failed`; inversion = P1 per R-05. §40.6 pg_cron job 30 `quarterly_perf_regression_check` (`0 9 1 4,7,10 1` — first Monday Apr/Jul/Oct; 35-day check window). §40.7 six-panel "Performance & Load Test History" Metabase dashboard (`FORM-DevOps`, `form_admin` + `compliance_reviewer` visibility, no PII). §40.8 four SOC 2 evidence artefacts: LT-E-001 (A1.1 — `system.load_test_completed` quarterly CSV; `compliance/evidence/a1/`), LT-E-002 (A1.2 — PERF-SLO-06 quarterly regression report with dual sign-off; `compliance/evidence/a1/`), LT-E-003 (CC5.2/CC7.2 — AL-PERF-04 PagerDuty history + bypass events; `compliance/evidence/cc5/`); auditor narrative for A1.1 supplied (commit_sha in `system.load_test_completed` links to CI-E-001 §38.8 — closes policy→gate→performance→SLA evidence chain). §40.9 three open questions: OQ-PERF-01 (P1, k6 OSS vs. Cloud for quarterly reference run), OQ-PERF-02 (P1, staging data anonymisation procedure for quarterly refresh), OQ-PERF-03 (P2, per-tenant vs. fleet-wide profile scaling post-Series A). §40.10 twelve-item implementation checklist: 4× P0/M5–M6 (DEC-030 event registration, GitHub Actions load-test job, merge gate enforcement, AL-PERF-* PagerDuty/Slack config), 5× P1/M6–M7 (all five k6 scenarios for enterprise gate triggers, pg_cron job 30, Metabase dashboard, OQ-PERF-01 decision, staging anonymisation procedure), 3× P2/M9–M10 (LT-E-001/002 evidence collection, OQ-PERF-03 decision). `docs/SOC2_READINESS.md §2` gap table updated: "Load testing before launches" 🟡 Gap → 🟡 Partial. Owner: devops-lead + platform-engineer + compliance-officer.*
