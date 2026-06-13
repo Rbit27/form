@@ -14,13 +14,24 @@
 
 **editorial_review:**
 ```yaml
-status: draft
+status: approved
 reviewed_by: brand-voice
 date: 2026-06-13
 recommended_subject: "Your wearable has an opinion. It's not always right."
 recommended_preview: "Consumer wearables are useful tools with real limits. Here's where the line is."
-tone_check: pending
-notes: "Editorial-brutalist throughout. Tech framing — no appearance motivation, no body-image language. Clinical safety gate satisfied."
+tone_check: complete
+notes: |
+  PASS. Editorial-brutalist tone maintained throughout.
+  Opening hook (score scenario) is strong — concrete, no fluff.
+  "This is the trap. And it's not the device's fault." — on-brand line.
+  "Your device is a useful tool. It's not the coach." — correct closing register.
+  PPG/ECG accuracy section is technical without being clinical — appropriate.
+  No appearance motivation, no body-image language, no weight-centric framing.
+  No "дисципліна — свобода" (DEC-014 compliant).
+  Victor's voice consistent with issues 01–04.
+  Placeholder [посилання на підписку] must be resolved before send.
+  Subject line 1 recommended: direct, sets up the tension immediately.
+  READY TO SEND pending subscription link substitution.
 ```
 
 ---
