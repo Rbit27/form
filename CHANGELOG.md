@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [4.65.0] — 2026-06-13
+
+### Added
+- `content/post-665-hip-hinge-mechanics.md` — Biomechanics block post 15/50. Hip hinge as a distinct movement pattern from squat: anatom of tazo-femoral joint sharn, why most athletes cannot hinge (hamstring neural restriction, absent motor pattern, hip capsular limits). Wall drill, RDL, KB swing, good morning as teaching progression. Common faults: spine flexion instead of hinge, overdepth, compensatory hyperextension, locked knees. Posterior chain loading through lengthened position as hypertrophic stimulus. Programming placement. sports-scientist review required before publish.
+- `content/post-666-wrist-elbow-pressing-mechanics.md` — Biomechanics block post 16/50. Wrist and elbow mechanics in pressing movements: neutral wrist position and bar placement in palm vs. fingers; grip width effects on elbow flare, ROM, and muscle recruitment; elbow angle range 30–60° rationale; overhead press rack position and stacking principle; wrist wraps — when they help vs. when they mask a technique problem; rowing elbow as driver vs. passive hook. Clinical safety: technique/mechanics only, no pain treatment content. sports-scientist review required before publish.
+- `STATUS.md` — content table updated: 651–700 row updated to 14 posts (665–666 added); total posts 662 → 664; next priorities updated to 667+.
+
+---
+
 ## [4.64.1] — 2026-06-13
 
 ### Fixed
