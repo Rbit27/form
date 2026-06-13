@@ -1,4 +1,4 @@
-# FORM · Project Status v4.22.0
+# FORM · Project Status v4.23.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.22.0** — 2026-06-13
+**v4.23.0** — 2026-06-13
 
 ---
 
@@ -23,9 +23,9 @@
 | 501–559 | Self-programming mastery | 59 | Published |
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
-| 591–592 | Training with tech block | 2 | Draft — review_pending: sports-scientist |
+| 591–593 | Training with tech block | 3 | Draft — review_pending: sports-scientist |
 
-**Total posts: 592**
+**Total posts: 593**
 
 ---
 
@@ -86,7 +86,7 @@
 
 - Review posts 586–592 (sports-scientist pass before publish)
 - newsletter-04.md — drafted v4.22.0, needs editorial review before send
-- posts 593–600 (Training with tech block, 8 remaining)
+- posts 594–600 (Training with tech block, 7 remaining)
 - MOBILE_ROADMAP.md update (platform-engineer)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
@@ -94,4 +94,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.23.0**

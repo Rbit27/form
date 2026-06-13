@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.23.0] — 2026-06-13
+
+### Added
+- `content/post-593-video-technique-analysis.md` — Training with tech block, post 3/10. Відеоаналіз техніки: що смартфон показує, що ні, де лабораторія принципова. Структура: кінематика vs механіка, частота кадрів (30/60/240 fps), позиція камери і вибір площини, різниця між симптомом і діагнозом у відео, протокол зйомки для self-coached атлета, огляд інструментів (Kinovea/Coach's Eye), коли потрібна 3D motion capture або силова платформа, самоаналіз vs тренерський погляд. Практична таблиця «питання → площина → позиція камери». clinical-safety: PASS.
+
+### Changed
+- `blog.html` — додана картка post-593 вгорі блоку Training with tech.
+- `STATUS.md` — оновлено: Training with tech block 2→3 posts, total 592→593, next priorities 594–600.
+- `VERSION` — 4.22.0 → 4.23.0.
+
+---
+
 ## [4.22.0] — 2026-06-13
 
 ### Added
