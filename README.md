@@ -37,9 +37,9 @@ Honest trade-off analysis of tools, devices, and AI in the training context. No 
 | 599 | VO2max estimate longitudinal tracking — методологія і обмеження |
 | 600 | Synthesis: self-coached athlete technology stack 2026 |
 
-### Block 601–650 — Programming edge cases (in progress · 33/50)
+### Block 601–650 — Programming edge cases (in progress · 35/50)
 
-Done — posts 601–633:
+Done — posts 601–635:
 
 | Post | Topic |
 |---|---|
@@ -76,13 +76,13 @@ Done — posts 601–633:
 | 631 | Програмування при хронічному нетренувальному стресі (clinical-safety PASS) |
 | 632 | Мінімальна ефективна доза: різниця між прогресом і підтриманням |
 | 633 | Блок накопичення: як структурувати фазу накопичення від нуля |
+| 634 | Мікролодинг і дрібна прогресія: коли стандартних стрибків не вистачає |
+| 635 | Частота проти об'єму: що обирати, коли часу менше |
 
-Continued topics for posts 634–650:
+Continued topics for posts 636–650:
 
 | Topic |
 |---|
-| Microloading і дрібна прогресія — коли ваги на штанзі не вистачає |
-| Frequency vs. volume tradeoff: що обирати коли часу менше |
 | Rate of perceived exertion у початківців — чому RPE не калібрована перші 6–12 місяців |
 | Тренування з партнером: плюси, мінуси і компенсаційні протоколи |
 | Програмування без обладнання — повноцінна структура для дому або готелю |

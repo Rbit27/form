@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.47.1** — 2026-06-13
+**v4.49.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 33 | Draft — posts 630–633 added (block continues, 33/50) |
+| 601–650 | Programming edge cases | 35 | Draft — posts 634–635 added (block continues, 35/50) |
 
-**Total posts: 633**
+**Total posts: 635**
 
 ---
 
@@ -90,9 +90,9 @@
 - newsletter-05.md — **DRAFT COMPLETE** (training-with-tech synthesis, posts 591–600; brand-voice editorial pass pending)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- Block 601–650 continues: posts 633–650 remaining (18 posts); next topics: агресивне vs. помірне прогресування (пост 633), periodization для атлетів що поєднують кілька видів спорту (634)
+- Block 601–650 continues: posts 635–650 remaining (15 posts); next topics: RPE у початківців — чому шкала не калібрована перші 6–12 місяців (636), тренування з партнером (637), програмування без обладнання (638)
 - Block 651–700 planning: biomechanics & injury prevention (first topic: chronic pain — **clinical-safety review required before writing**)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.47.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.49.0**
