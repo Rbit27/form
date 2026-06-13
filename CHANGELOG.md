@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [4.67.0] — 2026-06-13
+
+### Added
+- `content/post-670-knee-valgus-mechanics.md` — Biomechanics block, post 20/50. Dynamic valgus: three-component anatomical definition (femoral internal rotation + foot pronation + hip adduction), compensatory adaptation vs. technical fault differentiation, glute medius and abductor EMG data (Distefano 2009, Boren 2011), limitations of frontal-plane video analysis, muscle stimulus redistribution under valgus. clinical-safety PASS. sports-scientist review pending.
+- `content/post-671-pelvic-tilt-compound-lifts.md` — Biomechanics block, post 21/50. Anterior vs. posterior pelvic tilt mechanics in compound lifts: lumbopelvic rhythm as a dynamic cycle, APT in squat (when adaptive vs. compensatory), PPT in deadlift (early loss of posterior chain efficiency), practical hip hinge test with dowel rod. clinical-safety PASS. sports-scientist review pending.
+- `content/post-672-hamstring-mechanics.md` — Biomechanics block, post 22/50. Biarticular hamstring mechanics: active and passive insufficiency, length-tension relationship at long muscle lengths, why nordic curl is hardest at start (Herzog/titin eccentric force), RDL vs. lying leg curl as different vectors (proximal vs. distal hypertrophy, Bourne et al. 2017), deadlift vs. RDL distinction. clinical-safety PASS. sports-scientist review pending.
+- `content/post-673-quad-dominance-posterior-chain.md` — Biomechanics block, post 23/50. Quad dominance as relative load distribution pattern, not absolute weakness: trunk lean angle and hip moment arm mechanics, when it is adaptive (powerlifter low-bar squat) vs. limiting, single-leg squat and single-leg RDL as diagnostic tests, vector-based programming solutions over isolation additions. clinical-safety PASS. sports-scientist review pending.
+- `content/post-674-glute-medius-lateral-stability.md` — Biomechanics block, post 24/50. Gluteus medius anatomy and three roles (abduction, medial rotation, frontal-plane pelvic stabilisation), Trendelenburg as extreme manifestation, glute medius activity in bilateral squat and deadlift (EMG data Bolgla & Uhl 2005; Boudreau 2009), isolating vs. functional exercises (Distefano 2009 EMG comparison), practical single-leg stance and lateral band walk assessment. clinical-safety PASS. sports-scientist review pending.
+- `content/post-675-cervical-spine-loading.md` — Biomechanics block, post 25/50. Cervical spine mechanics under load: cranio-cervical chain effect on dura mater tension, why "look up" in deadlift is mechanically questionable (C4–C7 compression, McGill 2010; Hales 2010), neutral cervical vs. packed neck cue differentiation, head position in high-bar vs. low-bar squat, overhead press "head through" mechanics. clinical-safety PASS. sports-scientist review pending.
+- `content/post-676-bilateral-deficit.md` — Biomechanics block, post 26/50. Bilateral deficit: definition and measurement, interhemispheric inhibition mechanism (Howard & Enoka 1991), BLD magnitude by training level (Vandervoort, Secher), when BLD is sport-relevant vs. irrelevant (powerlifting specificity), unilateral training as complementary neural adaptation, 10% inter-limb asymmetry threshold. clinical-safety PASS. sports-scientist review pending.
+- `content/post-677-neural-vs-metabolic-fatigue.md` — Biomechanics block, post 27/50. Two fatigue mechanisms: neural (central drive reduction, Gandevia 2001; Bigland-Ritchie) vs. metabolic (Pi, H+ accumulation, glycogen depletion), different recovery timescales, why heavy singles after high-rep volume perform sub-maximally despite metabolic recovery, intra-set vs. inter-session fatigue as distinct phenomena. clinical-safety PASS. sports-scientist review pending.
+- `STATUS.md` — content table updated: block 651–700 count 17→25; total posts 667→675; next priorities updated.
+
+---
+
 ## [4.66.1] — 2026-06-13
 
 ### Fixed
