@@ -1,4 +1,4 @@
-# FORM · Project Status v4.59.0
+# FORM · Project Status v4.61.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.59.0** — 2026-06-13
+**v4.61.0** — 2026-06-13
 
 ---
 
@@ -25,9 +25,9 @@
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
-| 651–700 | Biomechanics & injury prevention | 5 | In progress — posts 651–655 written; sports-scientist review required before publish |
+| 651–700 | Biomechanics & injury prevention | 8 | In progress — posts 651–658 written; 659–660 pending clinical-safety review before writing; sports-scientist review required before publish |
 
-**Total posts: 655**
+**Total posts: 658**
 
 ---
 
@@ -92,10 +92,10 @@
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
 - Block 601–650: **COMPLETE** — всі пости написані (639 blocked HARD VETO); sports-scientist review needed перед publish
-- Block 651–700: posts 651–655 written (kinetic chain, mobility/stability framework, ankle mobility, squat anatomy, bench press biomechanics). Next: posts 656–660 — deadlift mechanics, core stability, breathing patterns, shoulder complex (659 — clinical-safety review required before writing), rehab-to-performance (660 — clinical-safety review required before writing)
+- Block 651–700: posts 651–658 written. Next: 659 (shoulder complex — clinical-safety review REQUIRED before writing), 660 (rehab-to-performance — clinical-safety review REQUIRED before writing)
 - newsletter-05.md — brand-voice editorial pass pending before send
 - Block 851–900 proposed: Applied programming deep dives (added to README roadmap v4.52.0)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.59.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.61.0**
