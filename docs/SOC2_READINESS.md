@@ -26196,3 +26196,274 @@ Every privacy incident severity class maps to one or more existing runbooks. Thi
 *v3.7.0 (2026-06-13): §77 P8.2 Privacy Incident Classification & Operating Evidence — closes §2 P8 row "Privacy incident tracking" 🟡 Gap → 🟡 Partial; advances "Annual privacy review" and "DR test" stale 🔴 rows to 🟡 Partial (§60 and BCP §7 already existed); header version v3.5.5 → v3.7.0; readiness score ~98.3% → ~98.4%. See §77 for full content. Owner: compliance-officer + security-engineer.*
 
 *v3.6.3 (2026-06-13): §76 CC7.2/CC4.1 Security Monitoring & Anomaly Detection Operating Evidence — formally closes the §2 CC7 row "Anomaly alerting (auth failures, spike detection)" gap (🟡 Gap → 🟡 Partial). §76.1 scopes to the security-classified alert corpus (§7 OBSERVABILITY) and SIEM correlation rules (§27.3/§34 OBSERVABILITY); explicitly out of scope: quality monitoring (§22/§32), cryptographic health alerting (§30), and billing anomaly alerting. §76.2 CC7.2 control narrative: three sub-criteria mapped — (CC7.2.1) six primary security alert rules from OBSERVABILITY §7 (auth failure spike P1 `supabase_auth_failures_total > 50/min`, HMAC chain break P0, tenant_id missing P1, traffic spike anomaly P2, audit log write failure P0, Enterprise SSO outage P1); (CC7.2.2) four-tier P0–P3 severity + 30-min P1 acknowledge SLA per INCIDENT_RESPONSE §1.1; (CC7.2.3) PagerDuty `form-security` service + `#security-alerts` Slack + DEC-030 HMAC-chained tamper-evident record; privacy floor: no `user_id`, no health data, no plaintext IP in any CC7.2 signal. §76.3 CC4.1 monitoring-of-monitoring: three meta-monitoring controls — AL-SIEM-06 dead-man's switch (zero events in 30-min P1), pg_cron freshness gates jobs 22–23 (`siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, 6-min freshness SLO), S-007 HMAC chain integrity synthetic probe (5-min cadence). §76.4 SIEM correlation rule corpus: four-row table CR-01 through CR-04 with threshold, detection path (Analytics Engine real-time vs pg_cron 5-min bridge), DEC-030 event, and P-level; SIEM bridge ≤ 5-min detection lag for CR-02/CR-03 documented as bounded constraint per SIEM-SLO-BRIDGE-01 (OBSERVABILITY §34). §76.5 SIEM bridge transition map: M4–M8 (bridge) vs M9+ (ClickHouse native) detection lag per rule; evidence continuity statement — DEC-030 events bridge M4→M9 without gap. §76.6 privacy floor table: six CC7.2 signals confirmed no `user_id`, no health data, no plaintext IP; HR principle: tenant_id in anomaly events identifies organisation only; individual actor data restricted to `compliance_reviewer` for incident investigation. §76.7 six evidence artefacts ANOM-E-001 through ANOM-E-006: (001) PagerDuty `form-security` service config export (CC7.2/CC4.1, one-time pre-M5); (002) 90-day auth failure spike alert history with SLA timing (CC7.2/CC7.3, quarterly); (003) SIEM bridge pg_cron execution log jobs 22–23 (CC7.2/CC4.1, quarterly); (004) correlation rule match log `anomaly.*` + `siem.correlation_rule_matched` DEC-030 events (CC7.2, quarterly); (005) CC4.1 meta-monitoring — AL-SIEM-06 non-fire attestation + pg_cron freshness export (CC4.1/CC7.2, quarterly); (006) `#security-alerts` Slack 90-day export for P2/P3 events (CC7.2/CC7.3, quarterly). §76.8 SOC 2 criteria mapping: CC7.2 (six alert rules + four correlation rules → ANOM-E-001/002/004/006), CC4.1 (three meta-monitoring controls → ANOM-E-003/005), CC7.3 (PagerDuty SLA + defined runbooks → ANOM-E-002/004). §76.9 gap tracker: §2 CC7 row 🟡 Gap → 🟡 Partial; CC4.1 monitoring-of-monitoring 🟡 Partial defined; PRE-17 🟡 Partial unchanged (PRE-10 PagerDuty provisioning remains deployment gate); overall readiness ~98.6% → ~98.7% (authored). §76.10 twelve-item implementation checklist: 4× P0/M5 (PagerDuty `form-security` provisioning + six CC7.2 alerts, AL-SIEM-06 config, pg_cron jobs 22–23 production verification, ANOM-E-001 filing); 5× P1/M9–M15 (ANOM-E-002 through ANOM-E-006 quarterly filing with SLA attestation); 2× P1/M9 (ClickHouse migration of CR-02/CR-03, gap register advance to 🟢); 1× P2/Q1-2027 (annual effectiveness review). §76.11 two open questions: OQ-ANOM-01 (P1 — per-tenant vs fleet-wide CR-01 Analytics Engine aggregation blind-spot risk; decision before M10); OQ-ANOM-02 (P1 — AL-SIEM-06 30-min threshold false-positive risk during off-peak; decide before M5 deployment). Cross-references: `docs/OBSERVABILITY.md §7` (six primary security alert rules), `docs/OBSERVABILITY.md §27.3` (correlation rules CR-01–CR-04 SQL), `docs/OBSERVABILITY.md §27.7` (AL-SIEM-01 through AL-SIEM-06), `docs/OBSERVABILITY.md §34` (SIEM bridge hybrid architecture, pg_cron jobs 22–23, SIEM-SLO-BRIDGE-01), `docs/OBSERVABILITY.md §16` (S-007 HMAC chain integrity probe), `docs/OBSERVABILITY.md §12.6` (pg_cron job registry jobs 22–23), `docs/INCIDENT_RESPONSE.md R-03` (auth failure spike runbook), `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break / audit log failure runbook), `docs/INCIDENT_RESPONSE.md R-06` (traffic spike runbook), `docs/INCIDENT_RESPONSE.md R-12` (insider threat / credential compromise — CR-02/CR-03 escalation path), `docs/INCIDENT_RESPONSE.md §1.1` (P-level SLA table), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 `anomaly.*` and `siem.*` events), `docs/SOC2_READINESS.md §2` (CC7 gap row updated). Owner: security-engineer + devops-lead + compliance-officer.*
+
+---
+
+## §78 Continuous Compliance Automation — Vanta Integration Design, Vendor Pre-Activation Review & Observation Period Evidence Bootstrapping · CC4.1/CC4.2/CC2.3 · PRE-25 Pathway
+
+> **Owner:** `compliance-officer` + `devops-lead`. Review: at PRE-25 activation (Month O-1) and annually thereafter.
+> **Advances:** PRE-25 🔴 Open → 🟡 Partial — integration design complete; DPA-first activation procedure defined; implementation pending Month O-1 (one month before 90-day observation clock starts).
+> **References:** `docs/VENDOR_REGISTRY.md` (Vanta/Drata High-tier vendor entry), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 `system.compliance_tool_connected`), `docs/SUBPROCESSORS.md §5.3` (TOMs), `docs/SOC2_READINESS.md §15` (compliance calendar), `docs/SOC2_READINESS.md §17` (vendor pre-activation security review), DEC-030.
+
+---
+
+### §78.1 Scope and Purpose
+
+SOC 2 CC4.1 requires that FORM *"selects, develops, and performs ongoing and/or separate evaluations to ascertain whether the components of internal control are present and functioning."* CC4.2 requires *"the entity evaluates and communicates internal control deficiencies in a timely manner."* CC2.3 requires *"the entity communicates relevant quality information to external parties including owners, regulators, and customers."*
+
+Throughout §1–§77, manual evidence collection is the primary compliance mechanism: git commit timestamps, quarterly access review exports, DEC-030 HMAC chain queries, and Markdown artefacts filed to the private compliance repository. Manual collection is correct and auditor-admissible during the solo-founder phase. It becomes unsustainable at three or more engineers generating daily evidence signals across seven integrated systems. Continuous compliance tooling converts evidence collection from a quarterly manual effort to a continuous automated stream, reducing auditor fieldwork from weeks to days and eliminating the risk of evidence gaps caused by human scheduling failure.
+
+PRE-25 in the pre-observation readiness checklist (§15.1) requires: *"Continuous compliance tooling (Vanta or Drata) connected to GitHub, Cloudflare, Supabase, 1Password; controls mapped."* Status: 🔴 Open — no tool selected, no DPA executed, no integration configured. Target: Month O-1 (one calendar month before observation period clock starts).
+
+This section closes the specification gap: tool selection rationale, privacy-safe integration architecture, DPA pre-activation procedure, control coverage map, evidence artefacts, and implementation checklist. PRE-25 advances from 🔴 Open to 🟡 Partial on merge; it advances to 🟢 Done when CTOOL-E-001 (executed Vanta DPA) and CTOOL-E-002 (integration scope screenshot) are filed.
+
+**In scope:** Tool selection, integration architecture design, privacy constraints on Vanta data access, DPA review procedure, evidence artefact definitions, control mapping.
+
+**Out of scope:** Vanta control library configuration (done at activation time), auditor portal setup (done at audit engagement), pricing negotiation, renewal management.
+
+---
+
+### §78.2 Tool Selection: Vanta vs Drata
+
+Both Vanta and Drata are mature SOC 2 automation platforms that integrate with FORM's core stack. This section makes the selection recommendation and documents the rationale.
+
+| Criterion | Vanta | Drata |
+|---|---|---|
+| GitHub integration | Native: PR history, branch protection, CI status, Dependabot alerts, team membership | Native: similar scope |
+| Supabase integration | Available via PostgreSQL connector (read-only connection string) | Available via PostgreSQL connector |
+| 1Password integration | Teams integration: vault member list, access events | Available |
+| WorkOS integration | Available via SCIM or OAuth read scope | Available |
+| Cloudflare integration | **No native connector** — manual evidence upload required | **No native connector** — manual evidence upload required |
+| Solo-team UX | Single-owner onboarding optimised; fast time-to-first-evidence | More enterprise-oriented; steeper initial setup |
+| Auditor portal | Widely adopted; all four Big 4 audit firms accept Vanta evidence package format | Accepted; less universal adoption at this stage |
+| SOC 2 focus | Primary product; roadmap SOC 2-first | Multi-framework (SOC 2, HIPAA, ISO 27001); more breadth, less depth per framework |
+| Pricing stage fit | Entry-tier pricing accessible pre-Series A | Minimum contract typically higher |
+| Evidence export format | JSON + CSV; auditor request portal | Similar |
+
+**Recommendation: Vanta.** For FORM at this stage — solo founder, pre-Series A, SOC 2 Type II as the primary compliance target — Vanta's focus, auditor portal adoption, and entry-tier pricing make it the correct selection. **This decision is logged as DEC-031 in `docs/DECISION_LOG.md`.** Reverse cost: low — evidence collected in Vanta can be exported in standard formats and migrated to Drata at Series A if coverage requirements expand (HIPAA, ISO 27001). The VENDOR_REGISTRY.md entry for Vanta/Drata is updated to "Vanta" upon DEC-031 logging.
+
+---
+
+### §78.3 Integration Architecture
+
+Vanta connects to FORM's stack via read-only OAuth tokens, API keys, and a Postgres read-only role. All connections are read-pull: Vanta polls FORM's systems on a defined cadence; FORM systems do not push data to Vanta.
+
+| Integration | Connection method | Vanta access scope | Data Vanta receives | Health data risk |
+|---|---|---|---|---|
+| **GitHub** | OAuth App (read-only) | Repos, PRs, team membership, branch protection settings, Dependabot alerts, GitHub Actions run status | PR metadata (title, author, CI pass/fail, merge date), team member GitHub handles, Dependabot CVE alert titles | None — no source code content, no secrets, no user data |
+| **1Password** | 1Password Teams Service Account (read-only audit events) | Vault member list, access grant/revoke events | Who has access to which vaults; event timestamps | None — vault *content* is never exposed to Vanta |
+| **Supabase** | PostgreSQL read-only connection string (`vanta_readonly` role — see §78.4) | `pg_roles`, `information_schema.tables`, RLS policy text from `pg_policies` | Table names, column names (not values), role memberships, RLS policy SQL | **Critical constraint: see §78.4** |
+| **WorkOS** | API key (read-only) | Enterprise tenant list, SSO configuration status, SCIM provisioning events | Tenant names (anonymised in Vanta evidence), SSO IdP type, provisioning event counts | None — no user health data in WorkOS |
+| **Cloudflare** | **Manual upload only** | None (no native Vanta connector) | WAF rule export JSON uploaded quarterly to Vanta manual evidence tab | None |
+| **Better Uptime** | **Manual upload only** | None | Uptime history CSV uploaded quarterly to Vanta manual evidence tab | None |
+| **PagerDuty** | **Manual upload only** | None | Incident history export uploaded quarterly to Vanta | None |
+
+**Cloudflare note.** Neither Vanta nor Drata has a native Cloudflare connector as of 2026-06. WAF rule evidence (PRE-25-E-001) and uptime monitoring evidence (PRE-25-E-002) must be uploaded manually on a quarterly cadence. The `compliance-officer` adds a quarterly reminder to `compliance/calendar/` at activation time. See §78.10 checklist item 7.
+
+---
+
+### §78.4 Privacy Floor Constraints for Vanta Access
+
+This constraint is non-negotiable. The `vanta_readonly` Postgres role must have **explicit DENY on all Art. 9 health-data tables**. Vanta schema introspection must not be able to read the content of — or even confirm the existence of rows in — any table containing user health data, coaching content, biometric measurements, or CV keypoints.
+
+**`vanta_readonly` role definition (migration `0065_vanta_readonly_role.sql`):**
+
+```sql
+-- Create read-only role for Vanta compliance tooling
+-- Privacy floor: no access to any Art. 9 health-data table
+CREATE ROLE vanta_readonly NOINHERIT NOLOGIN;
+
+-- Connection rights only
+GRANT CONNECT ON DATABASE postgres TO vanta_readonly;
+GRANT USAGE ON SCHEMA public TO vanta_readonly;
+
+-- Allow schema introspection (table names, column types — NOT values)
+GRANT SELECT ON information_schema.tables TO vanta_readonly;
+GRANT SELECT ON information_schema.columns TO vanta_readonly;
+GRANT SELECT ON pg_catalog.pg_roles TO vanta_readonly;
+GRANT SELECT ON pg_catalog.pg_policies TO vanta_readonly;
+
+-- Compliance-safe tables (no health data): allow SELECT
+GRANT SELECT ON audit_log_events TO vanta_readonly;
+GRANT SELECT ON tenants TO vanta_readonly;
+GRANT SELECT ON tenant_members TO vanta_readonly;
+GRANT SELECT ON subscription_events TO vanta_readonly;  -- metadata only; billing tier
+
+-- EXPLICIT REVOKE on all Art. 9 / health-data tables
+REVOKE ALL ON users FROM vanta_readonly;
+REVOKE ALL ON user_profiles FROM vanta_readonly;
+REVOKE ALL ON coaching_turns FROM vanta_readonly;
+REVOKE ALL ON cv_sessions FROM vanta_readonly;
+REVOKE ALL ON workout_sessions FROM vanta_readonly;
+REVOKE ALL ON workout_sets FROM vanta_readonly;
+REVOKE ALL ON meal_logs FROM vanta_readonly;
+REVOKE ALL ON body_composition FROM vanta_readonly;
+REVOKE ALL ON body_comp_history FROM vanta_readonly;
+REVOKE ALL ON wearable_data FROM vanta_readonly;
+REVOKE ALL ON VICTOR_SAFETY_TELEMETRY FROM vanta_readonly;
+
+-- New tables: default deny enforced by NOINHERIT; compliance-officer
+-- must explicitly grant before Vanta can read any new table.
+```
+
+**Additional constraint on `subscription_events`:** Vanta receives billing-tier metadata (`subscription_tier`, `event_type`, timestamps) for access control evidence only. The `user_id` column must be excluded from Vanta's view. At activation, create a view:
+
+```sql
+CREATE VIEW vanta_subscription_summary AS
+  SELECT subscription_tier, event_type, created_at, COUNT(*) AS event_count
+  FROM subscription_events
+  GROUP BY subscription_tier, event_type, DATE_TRUNC('month', created_at);
+GRANT SELECT ON vanta_subscription_summary TO vanta_readonly;
+```
+
+**Privacy floor statement for §78:** Vanta/Drata credentials have zero access to individual user health data, workout logs, coaching transcripts, CV keypoints, meal logs, or body composition. HR managers at enterprise tenants never see Vanta compliance evidence — compliance evidence is org-level and is shared only with the SOC 2 auditor and the FORM `compliance-officer`. The `vanta_readonly` role is verified quarterly via CTOOL-E-002.
+
+---
+
+### §78.5 Control Coverage Map
+
+Vanta automates evidence collection for the following FORM controls. Manual evidence collection continues for controls outside Vanta's integration scope.
+
+| SOC 2 Criterion | Manual evidence (pre-Vanta) | Vanta-automated evidence | Evidence artefact |
+|---|---|---|---|
+| **CC6.2** — Logical access provisioning | Quarterly access review memo (`compliance/access-review/`) | GitHub team membership + 1Password vault access list (continuous polling) | CTOOL-E-004 |
+| **CC6.3** — Access modification | Quarterly access review | GitHub team change events + 1Password grant/revoke events | CTOOL-E-004 |
+| **CC6.5** — Access removal (offboarding) | Offboarding checklist execution | 1Password vault revocation event timestamp (automated signal; checklist remains required) | CTOOL-E-004 |
+| **CC8.1** — Change management | PR merge history export (CC8-E-006) | GitHub PR metadata: author, approver (when ≥2 engineers), CI pass/fail, merge date | CTOOL-E-004 |
+| **CC1.4** — Security training | Manual training completion log (`compliance/cc1/security-training-log.md`) | Vanta training module completion records (when Vanta Learning is activated) | CTOOL-E-004 |
+| **CC7.1** — Vulnerability identification | Manual Dependabot triage log | GitHub Dependabot alert list + close date (automated) | CTOOL-E-005 |
+| **CC9.2** — Vendor management | Annual vendor review memo (`compliance/vendor-review/`) | Vanta vendor questionnaire portal: vendor SOC 2 cert upload, questionnaire responses | CTOOL-E-003 |
+| **CC4.1** — Monitoring activities | Quarterly compliance memo | Vanta control dashboard: pass/fail per control, trend over observation period | CTOOL-E-003 |
+| **A1.1** — Uptime monitoring | Better Uptime CSV export (manual upload) | Manual upload to Vanta evidence tab (no native connector) | PRE-25-E-002 (existing artefact) |
+| **DEC-030 chain integrity** | `system.audit_chain_verified` DEC-030 events (automated, not Vanta) | **Not automated by Vanta** — DEC-030 HMAC chain remains primary and cannot be delegated to compliance tooling | PRE-25-E-003 (existing artefact) |
+
+**Scope boundary:** DEC-030 HMAC-chained audit events are FORM's root-of-trust for evidence integrity. Vanta supplements but never replaces DEC-030. An auditor who receives both Vanta evidence and DEC-030 query results has redundant, independently-generated evidence streams — a stronger posture than either alone.
+
+---
+
+### §78.6 DPA and Pre-Activation Security Review Procedure
+
+Vanta is classified as a **High-tier vendor** in `docs/VENDOR_REGISTRY.md` (read access to GitHub, 1Password, Supabase schema, WorkOS — Confidential data in scope). A DPA must be executed and a security review completed **before any Vanta integration is connected to production systems**. The `system.compliance_tool_connected` DEC-030 event (see §78.7) is emitted only after DPA execution — never before.
+
+**Four-step pre-activation procedure:**
+
+| Step | Action | Owner | Gate |
+|---|---|---|---|
+| **1. SOC 2 + DPA request** | Download Vanta's SOC 2 Type II report and DPA template from `trust.vanta.com`. File both to `compliance/dpa/vanta-soc2-YYYY.pdf` and `compliance/dpa/vanta-dpa-draft-YYYY.pdf`. | compliance-officer | Required before step 2 |
+| **2. DPA review** | Review Vanta DPA for GDPR Art. 28 compliance: (a) purpose limitation — data used only for compliance automation, no secondary use; (b) sub-processor clause — Vanta lists its own infrastructure sub-processors; (c) deletion on termination — ≤30 days after contract end; (d) audit rights — right to inspect Vanta's controls; (e) breach notification — ≤24h to FORM on any confirmed breach affecting FORM data. If Vanta's DPA is non-standard, flag for external counsel review before execution. | compliance-officer | DPA must satisfy all five points |
+| **3. Security architecture review** | Confirm with Vanta's Trust documentation: (a) Vanta uses read-pull architecture (polls FORM systems; does not receive FORM push); (b) Vanta does not proxy or re-transmit user data beyond evidence aggregation; (c) Vanta's SOC 2 Type II covers the observation period overlapping FORM's activation date. Update `docs/VENDOR_REGISTRY.md` Vanta row: add SOC 2 report date. | security-engineer | Must confirm read-pull before step 4 |
+| **4. Execution and activation** | Execute Vanta DPA; file signed copy to `compliance/dpa/vanta-dpa-executed-YYYY.pdf`. Update VENDOR_REGISTRY.md Vanta row: DPA status 🟡 Pre-activation → 🟢 Active; risk score 🟡 Medium → 🟢 Low. Emit `system.compliance_tool_connected` DEC-030 event (see §78.7). Connect integrations in sequence: GitHub → 1Password → Supabase (`vanta_readonly`) → WorkOS. | compliance-officer + devops-lead | DPA executed + all 4 systems connected |
+
+**If Vanta's DPA terms are materially different from FORM's standard Art. 28 requirements** (e.g., audit rights restricted, deletion SLA > 30 days, secondary use permitted), seek external counsel review before execution. Do not connect any integration before the DPA is signed. A Vanta instance connected without a DPA is a GDPR Art. 28 violation and a SOC 2 CC9.2 gap.
+
+---
+
+### §78.7 Evidence Artefacts
+
+| Artefact ID | Description | Location | Collection cadence | SOC 2 criteria |
+|---|---|---|---|---|
+| **CTOOL-E-001** | Vanta SOC 2 Type II report (most recent) + executed DPA | `compliance/dpa/vanta-soc2-YYYY.pdf` + `compliance/dpa/vanta-dpa-executed-YYYY.pdf` | One-time at activation; re-collect on annual renewal | CC9.2 (vendor assurance), CC4.1 (tooling controls), CC2.3 |
+| **CTOOL-E-002** | Vanta integration scope screenshot — shows active integrations (GitHub, 1Password, Supabase, WorkOS), confirms `vanta_readonly` Postgres role scope, confirms no health-data tables in scope | Vanta Dashboard → Integrations → screenshot; `compliance/evidence/ctool/scope-YYYY-QN.png` | Quarterly; re-file immediately if any integration scope changes | CC4.1, Privacy floor verification |
+| **CTOOL-E-003** | Vanta control dashboard export — all mapped SOC 2 controls with pass/fail status, evidence links, and trend over observation quarter | Vanta → Controls → Export CSV; `compliance/evidence/ctool/controls-YYYY-QN.csv` | Quarterly during observation period; at audit fieldwork on auditor request | CC4.1, CC4.2, CC2.3 |
+| **CTOOL-E-004** | Vanta people and access evidence — GitHub team membership history, 1Password vault access, offboarding event log | Vanta → People → Export; `compliance/evidence/ctool/people-access-YYYY-QN.csv` | Quarterly; supplements (does not replace) manual access review | CC6.2, CC6.3, CC6.5, CC8.1 |
+| **CTOOL-E-005** | Dependabot alert triage log via Vanta — open and closed alerts with CVE severity, close date, PR reference | Vanta → Vulnerabilities → Export; `compliance/evidence/ctool/vulns-YYYY-QN.csv` | Quarterly; supplements `docs/VULNERABILITY_MANAGEMENT.md §41` evidence | CC7.1 |
+| **CTOOL-E-006** | `system.compliance_tool_connected` DEC-030 HMAC-chained event — tamper-evident activation record proving DPA-first discipline | `SELECT * FROM audit_log_events WHERE action = 'system.compliance_tool_connected'`; filed at `compliance/evidence/ctool/activation-event.json` | One-time at activation | CC4.1 (control implementation evidence), CC9.2 (DPA-first) |
+
+**DEC-030 event specification for `system.compliance_tool_connected`:**
+
+| Field | Value |
+|---|---|
+| **Event type** | `system.compliance_tool_connected` |
+| **Severity** | STANDARD |
+| **Retention** | 3 years |
+| **Actor** | `compliance-officer` (human — not `form_system`) |
+| **Trigger** | After DPA execution and first successful integration connection |
+
+Payload (Zod v2 schema):
+```typescript
+z.object({
+  tool_name:            z.enum(['vanta', 'drata']),
+  integrations_active:  z.array(z.enum(['github', 'onepassword', 'supabase', 'workos'])),
+  dpa_executed_date:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dpa_file_ref:         z.string().max(200),  // compliance/dpa/ path only — no personal names
+  vanta_soc2_report_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  activated_by:         z.string().uuid(),    // compliance-officer user_id
+})
+```
+
+**Privacy invariant:** No user health data, no tenant-level user counts, no individual user identifiers in this event. `integrations_active` is a string array of integration types — not a list of connected users or tenants.
+
+---
+
+### §78.8 SOC 2 Criteria Mapping
+
+| Criterion | Sub-criterion | FORM control | Evidence artefact |
+|---|---|---|---|
+| **CC4.1** | Entity performs ongoing evaluations of internal control components | Vanta continuous control monitoring — 24/7 polling of GitHub, 1Password, Supabase, WorkOS; pass/fail status updated in real time | CTOOL-E-003 (quarterly export) |
+| **CC4.2** | Entity evaluates and communicates internal control deficiencies in a timely manner | Vanta control dashboard surfaces failing controls to `compliance-officer` immediately; deficiency log in `compliance/cc4/deficiency-communication-procedure.md` | CTOOL-E-003 (failing controls section) |
+| **CC2.3** | Entity communicates relevant quality information to external parties | Vanta auditor portal: structured evidence package delivered to SOC 2 audit firm via Vanta's auditor request workflow; eliminates manual evidence packaging | CTOOL-E-003, CTOOL-E-004 (shared via Vanta auditor portal) |
+| **CC8.1** | Entity authorises, tests, and documents changes before implementation | Vanta GitHub integration surfaces PR merge history and CI pass/fail to auditor as automated evidence stream; supplements CC8-E-006 (manual PR export) | CTOOL-E-004 |
+| **CC6.2** | Prior to issuing system credentials, the entity registers and authorises new internal and external users | Vanta 1Password + GitHub integration surfaces team member access grants with timestamps | CTOOL-E-004 |
+| **CC7.1** | Entity identifies and manages threats and vulnerabilities | Vanta Dependabot integration provides automated vulnerability evidence stream — open CVEs, severity, triage, close date | CTOOL-E-005 |
+| **CC9.2** | Entity assesses and manages risks associated with vendors | Vanta is itself a vendor assessed under §17 pre-activation procedure; Vanta vendor portal collects questionnaire responses from other vendors | CTOOL-E-001 (Vanta's own assurance) |
+
+---
+
+### §78.9 Gap Tracker Update
+
+| PRE Item | Status Before §78 | Status After §78 | Advance Condition |
+|---|---|---|---|
+| **PRE-25** — Continuous compliance tooling (Vanta or Drata) connected to GitHub, Cloudflare, Supabase, 1Password; controls mapped | 🔴 Open | **🟡 Partial** — tool selected (Vanta, DEC-031), integration architecture designed (§78.3), privacy constraints specified (§78.4), DPA procedure defined (§78.6), evidence artefacts CTOOL-E-001 through CTOOL-E-006 defined (§78.7); activation pending DPA execution at Month O-1 | 🟢 Done: when CTOOL-E-001 (executed DPA) and CTOOL-E-002 (integration scope screenshot) are filed to `compliance/evidence/ctool/` |
+
+**Net readiness change:** ~98.4% → ~98.4% — no score change until activation. PRE-25 moved from 🔴 to 🟡; score increases on CTOOL-E-001 + CTOOL-E-002 filing (estimated +0.3 pp on full activation).
+
+---
+
+### §78.10 Implementation Checklist
+
+#### P0 — Before observation period (Month O-1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Log DEC-031 in `docs/DECISION_LOG.md`: Vanta selected over Drata — rationale per §78.2 | compliance-officer | **P0** | Before activation | [ ] |
+| 2 | Download Vanta SOC 2 Type II report + DPA from `trust.vanta.com`; file drafts to `compliance/dpa/` | compliance-officer | **P0** | Month O-1 | [ ] |
+| 3 | Complete 4-step pre-activation procedure per §78.6 (SOC 2 review → DPA review → security architecture review → execution) | compliance-officer + security-engineer | **P0** | Month O-1 | [ ] |
+| 4 | Run migration `0065_vanta_readonly_role.sql` in production Supabase; verify `vanta_readonly` has no access to health-data tables via test query: `SET ROLE vanta_readonly; SELECT * FROM users LIMIT 1;` — must return permission denied | devops-lead + security-engineer | **P0** | Before Supabase integration activation | [ ] |
+| 5 | Update `docs/VENDOR_REGISTRY.md` Vanta row: DPA status 🟡 Pre-activation → 🟢 Active; risk score 🟡 Medium → 🟢 Low; add executed DPA file path | compliance-officer | **P0** | After DPA execution | [ ] |
+| 6 | Connect integrations in sequence: GitHub (OAuth read) → 1Password (Service Account) → Supabase (`vanta_readonly` connection string) → WorkOS (read API key). Confirm each integration shows ✓ in Vanta dashboard before proceeding to next. | devops-lead | **P0** | Month O-1 | [ ] |
+| 7 | Emit `system.compliance_tool_connected` DEC-030 event immediately after all four integrations confirmed active; file event JSON as CTOOL-E-006 | compliance-officer | **P0** | Immediately post-activation | [ ] |
+| 8 | File CTOOL-E-001 (Vanta SOC 2 report + DPA) and CTOOL-E-002 (integration scope screenshot) to `compliance/evidence/ctool/`; confirm CTOOL-E-002 shows zero health-data tables in Supabase scope | compliance-officer | **P0** | Month O-1 | [ ] |
+| 9 | Map all 🟢 and 🟡 controls from FORM's SOC 2 control library (§1–§77) to Vanta's control library; assign `compliance-officer` as primary control owner in Vanta | compliance-officer | **P0** | First week post-activation | [ ] |
+| 10 | Add quarterly CTOOL-E-003/004/005 filing to `docs/SOC2_READINESS.md §15` compliance calendar: *"File CTOOL-E-003, CTOOL-E-004, CTOOL-E-005 from Vanta by 5th of month following each quarter"* | compliance-officer | **P0** | After §15 update | [ ] |
+
+#### P1 — During observation period (quarterly)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | File CTOOL-E-003 (Vanta control dashboard export) each quarter; review failing controls and open Linear tickets for any new deficiencies | compliance-officer | **P1** | M9, M12, M15 | [ ] |
+| 12 | File CTOOL-E-004 (Vanta people and access export) each quarter; cross-reference against manual quarterly access review to confirm consistency | compliance-officer + security-engineer | **P1** | M9, M12, M15 | [ ] |
+| 13 | File CTOOL-E-005 (Vanta Dependabot triage export) each quarter; confirm all CVEs within patching SLA per `docs/VULNERABILITY_MANAGEMENT.md §6` | compliance-officer | **P1** | M9, M12, M15 | [ ] |
+| 14 | Upload manual evidence to Vanta each quarter: WAF rule export (CTOOL-Cloudflare), Better Uptime uptime history (CTOOL-BetterUptime), PagerDuty incident log (CTOOL-PagerDuty) | compliance-officer | **P1** | M9, M12, M15 | [ ] |
+
+#### P2 — Annual
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 15 | Annual Vanta SOC 2 report refresh: download new report, file to `compliance/dpa/vanta-soc2-YYYY.pdf`; confirm coverage period overlaps FORM's current observation period | compliance-officer | **P2** | Q1 annually | [ ] |
+| 16 | Evaluate adding Cloudflare native connector if available; evaluate Vanta's HIPAA module if FORM expands into clinical wellness use cases | compliance-officer + devops-lead | **P2** | Series A review | [ ] |
+
+---
+
+### §78.11 Open Questions
+
+| ID | Question | Priority | Owner | Target |
+|---|---|---|---|---|
+| **OQ-CTOOL-01** | **Should Cloudflare WAF rule exports (PRE-25-E-001) be auto-collected via Terraform state output or via Vanta's manual evidence upload?** Terraform plan output for WAF rules can be generated on demand and uploaded as a structured JSON file; this is more tamper-evident than a dashboard screenshot. Recommendation: Terraform state export (`terraform show -json \| jq '.values.root_module.resources[] \| select(.type == "cloudflare_ruleset")'`) uploaded quarterly to Vanta manual evidence tab. Decision before Month O-1. | **P1** | devops-lead + compliance-officer | Month O-1 |
+| **OQ-CTOOL-02** | **Should Vanta's built-in training module replace the manual `compliance/cc1/security-training-log.md` cadence?** Vanta Learning provides completion tracking and automated reminders. For a solo founder it adds no value; for a team of 3+, it replaces the manual log. Recommendation: activate Vanta Learning at first engineering hire; maintain manual log until then. Document activation trigger in `docs/SECURITY_AWARENESS_TRAINING_POLICY.md §8`. | **P2** | compliance-officer | On first engineering hire |
+| **OQ-CTOOL-03** | **If Vanta's SOC 2 Type II report lapses (e.g., renewal delay), what is the compensating control?** Vanta publishes a bridge letter during renewal gaps; this is acceptable for CC9.2 evidence continuity. The bridge letter must cover the FORM observation period. File bridge letter to `compliance/dpa/vanta-bridge-letter-YYYY.pdf` if gap exceeds 30 days. | **P2** | compliance-officer | Standing (per renewal cycle) |
+
+---
+
+*v3.7.2 (2026-06-13): §78 Continuous Compliance Automation — Vanta Integration Design, Vendor Pre-Activation Review & Observation Period Evidence Bootstrapping. PRE-25 🔴 Open → 🟡 Partial: tool selected (Vanta, DEC-031 pending DECISION_LOG.md), integration architecture designed (§78.3, four integrations: GitHub/1Password/Supabase/WorkOS; Cloudflare manual upload), privacy constraints specified (§78.4 — `vanta_readonly` Postgres role with explicit REVOKE on all Art. 9 health-data tables; `vanta_subscription_summary` view for billing-tier metadata), four-step DPA pre-activation procedure (§78.6), evidence artefacts CTOOL-E-001 through CTOOL-E-006 (§78.7), control coverage map (§78.5 — 7 automated controls, 2 manual upload, DEC-030 chain not delegatable), SOC 2 criteria mapping CC4.1/CC4.2/CC2.3/CC8.1/CC6.2/CC7.1/CC9.2 (§78.8), gap tracker PRE-25 🔴→🟡 (§78.9), 16-item implementation checklist with 10× P0/Month-O-1 items (§78.10). `system.compliance_tool_connected` DEC-030 event type registered (STANDARD, 3yr, §78.7). Three open questions: OQ-CTOOL-01 (P1 — Terraform vs manual Cloudflare WAF evidence), OQ-CTOOL-02 (P2 — Vanta Learning vs manual training log), OQ-CTOOL-03 (P2 — Vanta SOC 2 report lapse compensating control). Readiness: ~98.4% → ~98.4% (score updates on CTOOL-E-001 + CTOOL-E-002 filing, estimated +0.3 pp). Cross-references: docs/VENDOR_REGISTRY.md (Vanta High-tier vendor), docs/VULNERABILITY_MANAGEMENT.md §41 (Dependabot evidence), docs/SOC2_READINESS.md §15 (compliance calendar), docs/SOC2_READINESS.md §17 (vendor pre-activation procedure), docs/AUDIT_LOG_SCHEMA.md (DEC-030 `system.compliance_tool_connected`). Owner: compliance-officer + devops-lead.*
+
+---

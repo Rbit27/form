@@ -13,6 +13,17 @@
 
 ---
 
+## 2026-06-13
+
+### DEC-047 · Vanta selected as continuous compliance tooling over Drata (PRE-25 pathway)
+
+- **Decision:** Vanta is selected as FORM's continuous compliance automation platform for the SOC 2 Type II observation period. Drata is not adopted at this stage. Full rationale in `docs/SOC2_READINESS.md §78.2`. Re-evaluation trigger: Series A close or initiation of HIPAA / ISO 27001 scope expansion.
+- **Owner:** compliance-officer + security-engineer
+- **Why:** (a) SOC 2-first product roadmap — Vanta's core evidence automation is tightly scoped to SOC 2; Drata adds HIPAA/ISO 27001 surface area that increases DPA scope without value pre-Series A. (b) Solo-team UX — Vanta's control library is simpler to manage before a dedicated compliance engineer is hired. (c) Supabase PostgreSQL connector available natively; Cloudflare and Better Uptime remain manual-upload paths for both tools. (d) Auditor portal adoption — Vanta's auditor portal is more widely adopted among mid-market SOC 2 audit firms likely to be engaged for FORM's first Type II. (e) Entry-tier pricing is lower pre-Series A. Privacy invariant enforced by `vanta_readonly` Postgres role (`migration 0065_vanta_readonly_role.sql`): explicit REVOKE on all Art. 9 / health-data tables; `vanta_subscription_summary` view exposes only aggregate billing-tier counts. DEC-030 event `system.compliance_tool_connected` (STANDARD, 3yr, CTOOL-E-006) emitted by compliance-officer after DPA execution.
+- **Reverse cost:** Medium. Switching to Drata or another tool post-activation requires: (a) Drata DPA execution and `vanta_readonly` role audit; (b) evidence re-upload to Drata for any artefacts already filed in Vanta; (c) auditor portal handoff if observation period has begun. No schema changes required — `system.compliance_tool_connected` payload supports `tool_name: 'drata'` already.
+
+---
+
 ## 2026-06-11
 
 ### DEC-045 · OQ-RL-02 + OQ-BILL-01: OVERAGE_GRACE = 500; enterprise pilots via comped subscription

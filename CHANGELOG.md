@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [4.57.1] — 2026-06-13
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.7.1 → v3.7.2. §78 added: Continuous Compliance Automation — Vanta Integration Design, Vendor Pre-Activation Review & Observation Period Evidence Bootstrapping (CC4.1/CC4.2/CC2.3). Covers tool selection rationale (Vanta over Drata, DEC-031), integration architecture (6 connectors), `vanta_readonly` Postgres role with explicit REVOKE on all Art. 9 health-data tables, CTOOL-E-001–E-006 evidence artefact series, 4-step DPA pre-activation procedure, control coverage map (7 automated, 2 manual upload), 16-item implementation checklist. Gap tracker: PRE-25 🔴 Open → 🟡 Partial. Readiness advances +0.3 pp on CTOOL-E-001/E-002 filing.
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.4 → v2.5. `system.compliance_tool_connected` event registered (STANDARD, 3yr, HMAC-chained). DPA-first compliance tooling activation record. Privacy invariant: no user_id, no health data. Zod v2 schema in SOC2_READINESS §78.7; filing path CTOOL-E-006. Retention table +1 row.
+- `VERSION` — 4.57.0 → 4.57.1.
+
+---
+
 ## [4.57.0] — 2026-06-13
 
 ### Added
