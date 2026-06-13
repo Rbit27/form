@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [4.66.0] — 2026-06-13
+
+### Added
+- `content/post-669-scapular-mechanics-pressing-pulling.md` — Biomechanics block post 17/50. Scapular mechanics in pressing and pulling: scapula as a floating bone with no synovial joint to the thorax; six scapular movement vectors; bench press mechanics — retraction/depression at setup, natural protraction at lockout (why "keep shoulder blades pinched throughout" is a partial cue); overhead press — upward rotation required at lockout, the "shoulders away from ears" cue as context-dependent; horizontal row — full protraction at start required for full ROM, retraction + depression at peak (without elevation); vertical pull — scapular depression as first movement, not elbow drive; serratus anterior as an undertrained stabilizer; scapular push-up and wall slide as 2-minute pre-session activation. Three common errors invisible in a mirror. Clinical safety: pure biomechanics/mechanics, no pain/rehab content. sports-scientist review required before publish.
+- `README.md` — Block 1001–1050 "Training literacy: reading your own data" added to roadmap. Ten proposed topics covering the meta-skill of pattern recognition in self-coaching data.
+
+### Changed
+- `blog.html` — post-669 card added (Biomechanics · 13 хв · draft).
+- `STATUS.md` — block 651–700 row updated 16 → 17 posts, range note updated to 661–669; total posts 666 → 667; next priorities updated (670+; Block 1001–1050 proposed).
+- `VERSION` — 4.65.3 → 4.66.0.
+
+---
+
 ## [4.65.3] — 2026-06-13
 
 ### Added
