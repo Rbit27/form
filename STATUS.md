@@ -1,4 +1,4 @@
-# FORM · Project Status v4.33.0
+# FORM · Project Status v4.36.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.35.0** — 2026-06-13
+**v4.36.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 15 | Draft — posts 613–615 added; post-615: розламаний мезоцикл (block continues, 15/50) |
+| 601–650 | Programming edge cases | 17 | Draft — posts 616–617 added; post-616: авторегуляція/RPE; post-617: деload типи (block continues, 17/50) |
 
-**Total posts: 615**
+**Total posts: 617**
 
 ---
 
@@ -85,13 +85,14 @@
 
 ## Next priorities
 
-- Review posts 586–611 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
-- newsletter-04.md — drafted, needs final editorial review before send
+- Review posts 586–617 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
+- newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
+- newsletter-05.md planning (topic: programming edge cases wrap-up or training-with-tech synthesis)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- Block 651–700 planning: biomechanics & injury prevention — post-614+ (first topic: chronic pain — **clinical-safety review required before writing**)
-- newsletter-05.md planning (topic: programming edge cases wrap-up or biomechanics preview)
+- Block 601–650 continues: posts 618–650 remaining (33 posts); next topics: autoregulation anchor-points, high/low responder identification, peaking for 1RM
+- Block 651–700 planning: biomechanics & injury prevention (first topic: chronic pain — **clinical-safety review required before writing**)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.32.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.36.0**

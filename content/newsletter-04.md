@@ -12,6 +12,17 @@
 **Audience:** Beta waitlist + pre-subscribers  
 **clinical-safety review:** PASS — no food/calorie content, no body-image language, no appearance-based motivation, no weight-centric framing, no injury encouragement, no mental health claims. Training-only framing throughout. Research results presented as population-level findings, not individual prescriptions. Individual response variability framed positively (information, not inadequacy).
 
+**editorial_review:**
+```yaml
+status: ready_to_send
+reviewed_by: brand-voice
+date: 2026-06-13
+recommended_subject: "Everything you read about training is right. None of it is about you."
+recommended_preview: "Research tells you what works on average. Your log tells you what works for you."
+tone_check: pass
+notes: "Clean editorial-brutalist throughout. One flag: 'a specific kind of discipline that is different from the discipline' (para The part that requires patience) is slightly recursive — acceptable in body copy, not a blocker. No motivational clichés, no social comparison, no дисципліна=свобода framing detected."
+```
+
 ---
 
 ## Everything you read about training is right. None of it is about you.
