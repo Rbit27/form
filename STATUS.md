@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.52.0** — 2026-06-13
+**v4.53.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 40 | Draft — posts 637–638, 640 added; 639 (chronic pain) HARD VETO pending clinical-safety review (block continues, 40/50) |
+| 601–650 | Programming edge cases | 42 | Draft — posts 641–642 added; 639 (chronic pain) HARD VETO pending clinical-safety review (block continues, 42/50) |
 
-**Total posts: 640**
+**Total posts: 642**
 
 ---
 
@@ -90,10 +90,10 @@
 - newsletter-05.md — **DRAFT COMPLETE** (training-with-tech synthesis, posts 591–600; brand-voice editorial pass pending)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- Block 601–650 continues: posts 641–650 remaining (10 posts); **639 (хронічний біль) — clinical-safety HARD VETO; пропущено; наступний: 641 (перша програма після 40)**
+- Block 601–650 continues: posts 643–650 remaining (8 posts); **639 (хронічний біль) — clinical-safety HARD VETO; пропущено; наступний: 643 (від програми до принципів)**
 - Block 651–700 planning: biomechanics & injury prevention (first topic: chronic pain — **clinical-safety review required before writing**)
 - Block 851–900 proposed: Applied programming deep dives (added to README roadmap v4.52.0)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.51.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.53.0**
