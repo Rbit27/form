@@ -292,10 +292,10 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 - `integration.api_call` (sampled, not every call)
 
 ### System
-- `system.backup_completed` / `system.backup_restored`
+- `system.backup_completed` / `system.backup_restored` — full Zod schema + retention in **§ Backup & DR Observability events** below
 - `system.maintenance_started` / `system.maintenance_completed`
 - `system.config_changed` (feature flag, environment var)
-- `system.deployment_completed` (release SHA, environment)
+- `system.deployment_completed` (release SHA, environment) — full Zod schema + retention in **§ CI/CD Pipeline events** below
 - `system.access_review_completed` — quarterly access review completed (SOC 2 CC6.2/CC6.3/CC6.5/CC4.2); payload: `{reviewer_id, quarter, artifact_sha256, systems_reviewed_count, accounts_reviewed_count, findings_count, review_latency_days}`; STANDARD severity, 7yr retention; HMAC-chained; cross-ref: SOC2_READINESS §23, §65
 - `system.credential_rotated` — FORM-internal credential rotated (scheduled or triggered); payload: `{credential_name, rotation_trigger: 'scheduled'|'compromise'|'quarterly_review'|'key_ceremony', days_since_last_rotation, rotated_by}`; STANDARD severity, 7yr retention; HMAC-chained; cross-ref: SOC2_READINESS §56/§57, §65.9
 - `system.cron_job_stale` — `pg-cron-health-monitor` detected that a monitored pg_cron job exceeded its freshness window; payload: `{job_name, schedule, last_successful_run, hours_since_last_run, freshness_window_hours}`; HIGH severity, 7yr retention; HMAC-chained; emits PagerDuty P1 for most jobs (P0 for `audit-chain-daily-check`, `row-count-monitor`, `audit-event-flush` — see OBSERVABILITY §12.6 job registry); cross-ref: SOC2_READINESS §71.2.2, OBSERVABILITY §12.6, DEC-030
@@ -526,6 +526,17 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 | `data.workout_data_purged` | 1 year | GDPR Art. 5(1)(e) storage-limitation enforcement; GDPR-E-002 evidence artefact (SOC 2 PI1.2); 1yr sufficient — operational purge log, not a contract or financial record; daily cadence means 365 events/yr; older runs add no compliance value |
 | `data.audit_log_purge_completed` | 7 years | DEC-030 / CC6.5 audit log retention enforcement record; GDPR-E-003 evidence artefact; self-referential: this event is itself part of the audit log chain it governs; 7yr matches the retention period it enforces (the event that records the purge must outlive what it purged by at least one audit cycle)
 
+| `ci.migration_applied` | 7 years | SOC 2 CC8.1 migration chain evidence — `migration_sha256` + `rls_policy_changed` flag; primary evidence artefact CI-E-002 for change management audit fieldwork |
+| `ci.migration_failed` | 7 years | SOC 2 CC8.1 production migration failure record; CRITICAL severity — no dedup, no auto-resolve; cross-ref INCIDENT_RESPONSE.md R-02; `error_message_hash` (no raw SQL); 7yr matches financial audit floor |
+| `ci.deployment_rolled_back` | 7 years | SOC 2 CC8.1 deployment rollback evidence; cross-ref CI-E-004; `failing_commit_sha` links to prior `system.deployment_completed` in chain — orphaned rollback is a chain anomaly |
+| `ci.pipeline_failed` | 3 years | CI pipeline failure record; `is_main = true` failures are SOC 2 CC8.1 operating evidence (AL-CI-01); PR-branch failures are developer noise — 3yr sufficient for trend analysis, not required as long-term compliance evidence |
+| `system.deployment_completed` | 5 years | SOC 2 CC8.1 deployment evidence — CI-E-001; `smoke_probe_passed` boolean binds deploy record to §16 S-001/S-002 probes; 5yr covers multiple SOC 2 observation periods |
+| `system.backup_completed` | 5 years | SOC 2 A1.2 backup freshness evidence; primary signal for BC-SLO-01/02/02b freshness gauges; `backup_id` + `region` + `triggered_by` are infrastructure-only — no user or tenant data |
+| `system.backup_failed` | 7 years | SOC 2 A1.2 backup failure record; CRITICAL severity — no auto-resolve; requires compliance-officer joint sign-off to close; `error_message_hash` SHA-256 prevents credential leakage in chain |
+| `system.restore_test_initiated` | 7 years | SOC 2 A1.3 DR test initiation record; `test_id` UUID links initiation → completion in BC-CHAIN-01; `rationale` enum documents quarterly vs. annual drill cadence |
+| `system.restore_test_completed` | 7 years | SOC 2 A1.3 primary evidence artefact BC-E-002; `rto_achieved_minutes ≤ 240 AND privacy_floor_verified = true` is the dual-condition pass criterion; `rpo_gap_minutes` documents actual data loss window in test |
+| `system.restore_test_failed` | 7 years | SOC 2 A1.3 DR test failure record; CRITICAL for `privacy_floor_violation` failure reason (triggers R-BC-01 and clinical-safety notification); `failure_reason` enum enables structured post-mortem analysis |
+| `system.backup_staleness_detected` | 7 years | SOC 2 A1.2 backup staleness monitoring evidence; emitted by pg_cron job 29 (every 4h); `dedup_key` prevents chain spam; `alert_fired` enum links to AL-BC-01/02/03 PagerDuty routing |
 | `privacy.pia_filed` / `privacy.pia_completed` / `privacy.pia_veto_issued` / `privacy.constraint_relaxation_rejected` | 7 years | SOC 2 P1.1/P3.2/P8.1 PIA governance evidence; GDPR Art. 5(2) accountability record; `privacy.pia_veto_issued` CRITICAL is the clinical-safety decision record — 7yr ensures multiple SOC 2 observation periods are covered; `privacy.constraint_relaxation_rejected` provides a durable record that FORM declined to relax a privacy constraint on request of an enterprise customer or government, satisfying CC1.4 / P6.5 |
 | `privacy.annual_review_scope_drafted` | 3 years | Routine annual privacy review scope record; P8.1 operating-effectiveness evidence; superseded each year by a new scope draft — 3yr covers the current and prior year for any inspection window |
 | `privacy.annual_review_completed` | 7 years | Annual privacy review completion record; SOC 2 P8.1 monitoring and enforcement evidence; 7yr required — auditors conducting a Type II engagement may request evidence covering multiple annual review cycles |
@@ -745,6 +756,205 @@ const AnnualReviewCompletedSchema = z.object({
 
 ---
 
+### CI/CD Pipeline events (DEC-030 HMAC-chained · OBSERVABILITY §38 · CC8.1)
+
+> Defined in `docs/OBSERVABILITY.md §38`. Five events covering the full CI/CD deployment lifecycle — production deploys, database migrations, deployment rollbacks, and pipeline failures. **Privacy floor (all five events):** no `user_id`, no `tenant_id`, no health or coaching data in any payload. All actor fields reference internal FORM engineering identities (`rollback_initiated_by` is a `form_admin` UUID — never a customer user_id). `error_message_hash` in `ci.migration_failed` and `ci.deployment_rolled_back` uses SHA-256 to prevent raw SQL or stderr content from entering the chain. **CC8.1 note:** `ci.migration_applied` with `rls_policy_changed: true` is the primary SOC 2 evidence artefact that every RLS-touching migration was deployed through the CI pipeline (not manually); this is the observability companion to the adversarial RLS CI gate in `docs/DATA_MODEL.md §7`. **Ordering invariant (CI-CHAIN-01):** `ci.migration_applied` must follow the most recent `system.deployment_completed` for the same `commit_sha`; `ci.deployment_rolled_back.failing_commit_sha` must reference a prior `system.deployment_completed` in the chain — orphaned rollback events are flagged by the weekly chain audit batch. Cross-ref: `docs/SOC2_READINESS.md §21` (CC8.1 Change Management Controls — §38 is the observability layer); `docs/INCIDENT_RESPONSE.md R-02` (production outage rollback runbook — AL-CI-02 triggers R-02); `docs/ENTERPRISE_SLA.md §4.3` (RTO — CI-SLO-04 MTTR is the deployment sub-component). Closes OBSERVABILITY.md §38.10 checklist item 1 (P0, M7).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `system.deployment_completed` | STANDARD | 5 yr | GitHub Actions Wrangler deploy succeeds + S-001 smoke probe passes | `environment` (enum), `surface` (enum), `commit_sha` (40 chars), `branch`, `github_run_id`, `duration_ms`, `smoke_probe_passed` (bool), `deployed_at` |
+| `ci.migration_applied` | HIGH | 7 yr | `supabase db push` exits 0 in production-targeting workflow | `environment`, `migration_file` (regex), `migration_sha256` (64 chars), `commit_sha`, `tables_affected[]`, `rls_policy_changed` (bool — flags manual `security-engineer` review), `applied_at` |
+| `ci.migration_failed` | **CRITICAL** | 7 yr | `supabase db push` exits non-zero in production workflow | `environment`, `migration_file`, `migration_sha256`, `commit_sha`, `error_code`, `error_message_hash` (SHA-256 — no raw SQL in chain), `partial_apply` (bool), `rollback_attempted` (bool), `failed_at` |
+| `ci.deployment_rolled_back` | HIGH | 7 yr | On-call engineer executes rollback per R-02 runbook | `environment`, `surface`, `rolled_back_to_commit_sha`, `failing_commit_sha`, `trigger` (enum), `rollback_initiated_by` (UUID — `form_admin`), `minutes_since_deploy`, `incident_ticket_url` (optional), `rolled_back_at` |
+| `ci.pipeline_failed` | STANDARD | 3 yr | Required CI job on main branch exits non-zero | `branch`, `is_main` (bool — drives AL-CI-01), `job_name` (enum), `conclusion` (enum), `commit_sha`, `github_run_id`, `duration_ms`, `failed_at` |
+
+```typescript
+import { z } from 'zod';
+
+// Canonical Zod schemas — source of truth for emit-audit-event Worker validation
+// Full schemas defined in docs/OBSERVABILITY.md §38.6
+
+const DeploymentCompletedSchema = z.object({
+  environment:         z.enum(['production', 'staging', 'preview']),
+  surface:             z.enum(['worker', 'pages', 'eas_mobile', 'edge_function']),
+  commit_sha:          z.string().length(40),
+  branch:              z.string().max(100),
+  github_run_id:       z.string(),
+  wrangler_version:    z.string().optional(),
+  eas_build_id:        z.string().optional(),
+  duration_ms:         z.number().int().positive(),
+  smoke_probe_passed:  z.boolean(),
+  deployed_at:         z.string().datetime(),
+});
+
+const MigrationAppliedSchema = z.object({
+  environment:          z.enum(['production', 'staging']),
+  migration_file:       z.string().regex(/^\d{14}_[\w]+\.sql$/),
+  migration_sha256:     z.string().length(64),
+  commit_sha:           z.string().length(40),
+  github_run_id:        z.string(),
+  tables_affected:      z.array(z.string()).max(20),
+  rls_policy_changed:   z.boolean(),
+  applied_at:           z.string().datetime(),
+  supabase_project_ref: z.string(),
+});
+
+const MigrationFailedSchema = z.object({
+  environment:          z.enum(['production', 'staging']),
+  migration_file:       z.string().regex(/^\d{14}_[\w]+\.sql$/),
+  migration_sha256:     z.string().length(64),
+  commit_sha:           z.string().length(40),
+  github_run_id:        z.string(),
+  error_code:           z.string().max(50),
+  error_message_hash:   z.string().length(64),
+  partial_apply:        z.boolean(),
+  rollback_attempted:   z.boolean(),
+  failed_at:            z.string().datetime(),
+});
+
+const DeploymentRolledBackSchema = z.object({
+  environment:               z.enum(['production', 'staging']),
+  surface:                   z.enum(['worker', 'pages', 'eas_mobile', 'edge_function']),
+  rolled_back_to_commit_sha: z.string().length(40),
+  failing_commit_sha:        z.string().length(40),
+  trigger:                   z.enum(['smoke_test_failure', 'slo_breach', 'manual_oncall', 'post_incident']),
+  rollback_initiated_by:     z.string().uuid(),
+  minutes_since_deploy:      z.number().int().nonneg(),
+  incident_ticket_url:       z.string().url().optional(),
+  rolled_back_at:            z.string().datetime(),
+});
+
+const PipelineFailedSchema = z.object({
+  branch:         z.string().max(100),
+  is_main:        z.boolean(),
+  job_name:       z.enum(['test', 'lint', 'build', 'migration', 'deploy-worker', 'eas-build']),
+  conclusion:     z.enum(['failure', 'cancelled']),
+  commit_sha:     z.string().length(40),
+  github_run_id:  z.string(),
+  duration_ms:    z.number().int().nonneg(),
+  failed_at:      z.string().datetime(),
+});
+```
+
+**HMAC chain ordering (CI-CHAIN-01):**
+- `ci.migration_applied` must follow the most recent `system.deployment_completed` for the same `commit_sha`. Orphaned migration events (no preceding deploy) are flagged by the weekly chain audit batch.
+- `ci.deployment_rolled_back.failing_commit_sha` must reference a prior `system.deployment_completed` in the chain. Orphaned rollback events trigger a chain anomaly alert.
+- `ci.migration_failed` is CRITICAL severity: no deduplication, no auto-resolve. Every emission pages PagerDuty AL-CI-02 until manually closed.
+
+**Emitter assignments:** `devops-lead` role via automated GitHub Actions steps, except `ci.deployment_rolled_back` which is emitted by the on-call engineer via admin console during R-02 runbook execution.
+
+---
+
+### Backup & DR Observability events (DEC-030 HMAC-chained · OBSERVABILITY §39 · A1.2/A1.3)
+
+> Defined in `docs/OBSERVABILITY.md §39`. Six events covering backup health and disaster recovery test lifecycle — daily backup completions, backup failures, and quarterly restore tests. **Privacy floor (all six events):** `user_id = NULL`, `tenant_id = NULL` — infrastructure-only events. No user identifiers, tenant data, or health data appear in any payload. `error_message_hash` in `system.backup_failed` and `system.restore_test_failed` uses SHA-256 to prevent raw error output from entering the chain. **`privacy_floor_verified` invariant:** `system.restore_test_completed` MUST have `privacy_floor_verified: true` to count as a successful SOC 2 A1.3 evidence artefact — a restore with `privacy_floor_verified: false` is treated as a failed test regardless of `success` field value. **BC-CHAIN-01 ordering invariant:** `system.restore_test_completed` or `system.restore_test_failed` MUST have a corresponding `system.restore_test_initiated` with matching `test_id` earlier in the chain; the `emit-audit-event` Worker returns HTTP 422 on violation. Cross-ref: `docs/BUSINESS_CONTINUITY.md §3.1` (RTO/RPO commitments — §39 is the observability layer); `docs/ENTERPRISE_SLA.md §4.3` (RTO = 4h — `rto_target_minutes: 240` is the literal contract commitment in the chain); `docs/OBSERVABILITY.md §39.10` (SOC 2 evidence artefacts BC-E-001 through BC-E-005). Closes OBSERVABILITY.md §39.11 checklist item 1 (P0, M13 enterprise GA).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `system.backup_completed` | STANDARD | 5 yr | FORM-managed backup Worker completes daily encrypted dump | `store` (enum), `backup_type` (enum), `initiated_at`, `completed_at`, `duration_minutes`, `size_bytes_estimate` (optional), `backup_id`, `region` (enum), `triggered_by` (enum) |
+| `system.backup_failed` | **CRITICAL** | 7 yr | Backup Worker exits non-zero or R2/B2 write fails | `store`, `backup_type`, `initiated_at`, `failed_at`, `error_code`, `error_message_hash` (SHA-256), `triggered_by` |
+| `system.restore_test_initiated` | STANDARD | 7 yr | devops-lead begins quarterly DR drill on staging | `test_id` (UUID), `store`, `restore_type` (enum), `initiated_by` (PAM session ID), `environment: 'staging'`, `backup_id`, `rationale` (enum) |
+| `system.restore_test_completed` | STANDARD | 7 yr | devops-lead verifies restored DB passes checks | `test_id`, `store`, `initiated_at`, `completed_at`, `rto_achieved_minutes`, `rto_target_minutes: 240`, `success` (bool), `privacy_floor_verified` (bool — **must be true for SOC 2 A1.3 evidence**), `rpo_gap_minutes`, `verified_by` (PAM session ID) |
+| `system.restore_test_failed` | **CRITICAL** | 7 yr | Restore exceeds RTO, privacy floor check fails, or backup corrupted | `test_id`, `store`, `initiated_at`, `failed_at`, `failure_reason` (enum — includes `privacy_floor_violation`), `error_hash` (SHA-256) |
+| `system.backup_staleness_detected` | HIGH | 7 yr | pg_cron job 29 detects `backup_age_hours > 26` for any store | `store`, `last_completed_at`, `age_hours`, `threshold_hours: 26`, `detected_by: 'pg_cron_job_29'`, `alert_fired` (enum), `dedup_key` |
+
+```typescript
+import { z } from 'zod';
+
+// Canonical Zod schemas — source of truth for emit-audit-event Worker validation
+// Full schemas defined in docs/OBSERVABILITY.md §39.9
+
+const BackupCompletedSchema = z.object({
+  store:               z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  backup_type:         z.enum(['logical', 'wal_snapshot', 'pitr_checkpoint']),
+  initiated_at:        z.string().datetime(),
+  completed_at:        z.string().datetime(),
+  duration_minutes:    z.number().nonneg(),
+  size_bytes_estimate: z.number().nonneg().optional(),
+  backup_id:           z.string(),
+  region:              z.enum(['us-east-1', 'eu-central-1', 'eu-west-1']),
+  pitr_point_in_time:  z.string().datetime().optional(),
+  triggered_by:        z.enum(['scheduled', 'manual', 'pre_maintenance']),
+});
+
+const BackupFailedSchema = z.object({
+  store:              z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  backup_type:        z.enum(['logical', 'wal_snapshot', 'pitr_checkpoint']),
+  initiated_at:       z.string().datetime(),
+  failed_at:          z.string().datetime(),
+  error_code:         z.string(),
+  error_message_hash: z.string(),
+  triggered_by:       z.enum(['scheduled', 'manual', 'pre_maintenance']),
+});
+
+const RestoreTestInitiatedSchema = z.object({
+  test_id:          z.string().uuid(),
+  store:            z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  restore_type:     z.enum(['pitr', 'logical_dump', 'point_in_time']),
+  initiated_by:     z.string().uuid(),
+  environment:      z.literal('staging'),
+  target_timestamp: z.string().datetime().optional(),
+  backup_id:        z.string(),
+  rationale:        z.enum([
+    'quarterly_dr_drill',
+    'annual_dr_drill',
+    'ad_hoc_verification',
+    'pre_production_migration',
+  ]),
+});
+
+const RestoreTestCompletedSchema = z.object({
+  test_id:                z.string().uuid(),
+  store:                  z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  initiated_at:           z.string().datetime(),
+  completed_at:           z.string().datetime(),
+  rto_achieved_minutes:   z.number().nonneg(),
+  rto_target_minutes:     z.literal(240),
+  success:                z.boolean(),
+  row_count_spot_check:   z.number().int().nonneg(),
+  privacy_floor_verified: z.boolean(),
+  rpo_gap_minutes:        z.number().nonneg(),
+  environment:            z.literal('staging'),
+  verified_by:            z.string().uuid(),
+});
+
+const RestoreTestFailedSchema = z.object({
+  test_id:        z.string().uuid(),
+  store:          z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  initiated_at:   z.string().datetime(),
+  failed_at:      z.string().datetime(),
+  failure_reason: z.enum([
+    'backup_corrupted',
+    'pitr_gap_detected',
+    'rto_exceeded',
+    'privacy_floor_violation',
+    'row_count_mismatch',
+    'connection_timeout',
+    'manual_abort',
+  ]),
+  error_hash:     z.string(),
+  environment:    z.literal('staging'),
+});
+
+const BackupStalenessDetectedSchema = z.object({
+  store:             z.enum(['postgres', 'r2_primary', 'r2_dr']),
+  last_completed_at: z.string().datetime(),
+  age_hours:         z.number().nonneg(),
+  threshold_hours:   z.literal(26),
+  detected_by:       z.literal('pg_cron_job_29'),
+  alert_fired:       z.enum(['AL-BC-01', 'AL-BC-02', 'AL-BC-03']),
+  dedup_key:         z.string(),
+});
+```
+
+**HMAC chain ordering (BC-CHAIN-01):** `system.restore_test_completed` or `system.restore_test_failed` MUST follow a `system.restore_test_initiated` with the same `test_id`. The `emit-audit-event` Worker returns HTTP 422 on violation — a completion event without a matching initiation event is rejected at write time, not flagged post-hoc.
+
+**`failure_reason: 'privacy_floor_violation'`** in `system.restore_test_failed`: additionally notifies `clinical-safety` via PagerDuty and triggers the RLS-invariant investigation procedure in `docs/INCIDENT_RESPONSE.md`. A restore test that fails the privacy floor check is classified as a P0 infrastructure incident, not a routine test failure.
+
+**Emitter assignments:** `system.backup_completed` and `system.backup_failed` are emitted by the FORM-managed backup Worker (automated, `form_system` role). `system.restore_test_*` are emitted manually by `devops-lead` via admin console during DR drill execution — no automated path (restore tests require human judgment and verification). `system.backup_staleness_detected` is emitted by pg_cron job 29 (`form_system` role, scheduled every 4h).
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:
@@ -785,7 +995,8 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 
 ---
 
-**v2.0 · 2026-06-13 · owner: compliance-officer + enterprise-architect**
+**v2.1 · 2026-06-13 · owner: compliance-officer + enterprise-architect**
+*v2.1 (2026-06-13): +11 events across two new families. CI/CD Pipeline (5 events, OBSERVABILITY §38, CC8.1): `system.deployment_completed` formalised Zod schema (STANDARD, 5yr — `smoke_probe_passed` bool binds deploy to §16 S-001/S-002 probes; `commit_sha` length-40 constraint); `ci.migration_applied` (HIGH, 7yr — `migration_sha256` SHA-256, `rls_policy_changed` bool triggers security-engineer review dashboard flag, `tables_affected[]`, `supabase_project_ref`); `ci.migration_failed` (CRITICAL, 7yr — `error_message_hash` SHA-256 prevents raw SQL leakage in chain; `partial_apply` + `rollback_attempted` bools for incident triage; no dedup, no auto-resolve); `ci.deployment_rolled_back` (HIGH, 7yr — `failing_commit_sha` links to prior `system.deployment_completed` via CI-CHAIN-01; `trigger` enum; `rollback_initiated_by` is `form_admin` UUID — never customer user_id; `minutes_since_deploy` for MTTR calculation); `ci.pipeline_failed` (STANDARD, 3yr — `is_main` bool separates compliance-relevant main failures from PR-branch noise; drives AL-CI-01 routing). Backup & DR (6 events, OBSERVABILITY §39, A1.2/A1.3): `system.backup_completed` (STANDARD, 5yr — `store` enum postgres/r2_primary/r2_dr; `pitr_point_in_time` optional; no user_id/tenant_id — infrastructure only); `system.backup_failed` (CRITICAL, 7yr — AL-BC-05 no-auto-resolve; `error_message_hash` SHA-256); `system.restore_test_initiated` (STANDARD, 7yr — `test_id` UUID is BC-CHAIN-01 anchor; `initiated_by` is PAM session ID not raw user_id; `environment: 'staging'` literal constraint — no production restore events); `system.restore_test_completed` (STANDARD, 7yr — `rto_target_minutes: 240` literal (ENTERPRISE_SLA §4.3); `privacy_floor_verified` bool — must be true for SOC 2 A1.3 evidence; `rpo_gap_minutes` documents actual data loss in test; primary BC-E-002 evidence artefact); `system.restore_test_failed` (CRITICAL, 7yr — `failure_reason: 'privacy_floor_violation'` additionally notifies clinical-safety); `system.backup_staleness_detected` (HIGH, 7yr — emitted by pg_cron job 29 every 4h; `dedup_key` prevents chain spam; `alert_fired` enum links to AL-BC-01/02/03). BC-CHAIN-01 ordering invariant: `restore_test_completed`/`restore_test_failed` requires prior `restore_test_initiated` with same `test_id`; `emit-audit-event` Worker returns HTTP 422 on violation. Retention table: +11 rows (ci.migration_applied 7yr CC8.1; ci.migration_failed 7yr CC8.1 CRITICAL; ci.deployment_rolled_back 7yr CC8.1; ci.pipeline_failed 3yr; system.deployment_completed 5yr CC8.1; system.backup_completed 5yr A1.2; system.backup_failed 7yr A1.2 CRITICAL; system.restore_test_initiated 7yr A1.3; system.restore_test_completed 7yr A1.3; system.restore_test_failed 7yr A1.3 CRITICAL; system.backup_staleness_detected 7yr A1.2). Updated generic `### System` section note: `system.deployment_completed` and `system.backup_completed`/`system.backup_restored` now have full Zod schemas in their respective dedicated sections. Closes OBSERVABILITY.md §38.10 checklist item 1 (P0, M7) and §39.11 checklist item 1 (P0, M13 enterprise GA). Cross-ref: `docs/OBSERVABILITY.md §38.6` (CI/CD canonical schemas); `docs/OBSERVABILITY.md §39.9` (BC canonical schemas); SOC 2 CC8.1 (change management deployment evidence); SOC 2 A1.2 (capacity/environmental monitoring); SOC 2 A1.3 (recovery plan testing). Owner: compliance-officer + devops-lead + platform-engineer.*
 *v2.0 (2026-06-13): +6 `privacy.pia_*` Privacy Impact Assessment lifecycle events — closes PRIVACY_IMPACT.md §11 P0/M4 checklist item 1 (register all six event types in AUDIT_LOG_SCHEMA.md before first enterprise pilot). (1) `privacy.pia_filed` (STANDARD, 7yr): compliance-officer emits at PIA Step 1; payload: `pia_id` (PIA-YYYY-NNN regex), `trigger_type` (T-1…T-7), `proposed_by` (role enum), `constraints_affected[]`, `linear_ticket_url`, `filed_by` UUID. (2) `privacy.pia_completed` (HIGH, 7yr): compliance-officer emits at PIA Step 5 final decision; payload: `pia_id`, `risk_rating`, `clinical_safety_required`, `clinical_safety_decision` (4-value enum), `decision` (3-value enum), `conditions[]`, `gdpr_dpia_delta_required`, `completed_by` UUID. (3) `privacy.pia_veto_issued` (CRITICAL, 7yr): clinical-safety agent emits on veto; triggers PRIV-VETO-001 PagerDuty dual-page (compliance-officer + founder, no auto-resolve); payload: `veto_id`, `pia_id`, `constraints_protected[]`, `harm_prevented` (max 500 chars, no health values), `vetoed_by: "clinical-safety"`, `acknowledged_by_founder` (bool — founder must update to true within 24h). (4) `privacy.constraint_relaxation_rejected` (HIGH, 7yr): compliance-officer emits on any formal rejection of a constraint relaxation request; `pia_id` optional (rejections without a PIA also emit this event); payload: `constraint_id` (EF/OC/DM regex), `requester_type` (3-value enum), `rejection_reason` (max 500 chars), `rejected_by` UUID. (5) `privacy.annual_review_scope_drafted` (STANDARD, 3yr): annual scope finalization; payload: `review_year`, `scope_items[]`, `drafted_by`. (6) `privacy.annual_review_completed` (HIGH, 7yr): annual review sign-off; payload: `review_year`, `dpia_version_reviewed`, `pias_in_scope[]`, `gaps_opened/gaps_closed` counts, `sign_off_by`. PIA-CHAIN-01 ordering invariant: `pia_filed` must precede `pia_completed` for same `pia_id`; WARNING (non-blocking) logged if `pia_completed` emitted without prior `pia_filed`. Retention table: +3 rows (PIA governance 7yr; annual_review_scope_drafted 3yr; annual_review_completed 7yr). Privacy floor: no user_id, tenant_id, or individual health values in any payload. Zod schemas provided (canonical source for emit-audit-event Worker validation). Cross-ref: PRIVACY_IMPACT.md §7 (canonical event definitions, trigger conditions), §11 P0/M4 item 1 (checklist — closed by this patch), §10 (PIA Register — pia_id FK links chain entries to register rows); SOC 2 P1.1/P3.2/P8.1; GDPR Art. 5(2) accountability; DEC-046 (OQ-33 clinical-safety ruling — PIA-2026-001 filed in PRIVACY_IMPACT.md §10 as T-6 PIA). Owner: compliance-officer + enterprise-architect.*
 
 **v1.9 · 2026-06-12 · owner: compliance-officer + enterprise-architect**
