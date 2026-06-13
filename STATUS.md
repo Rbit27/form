@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.46.0** — 2026-06-13
+**v4.47.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 30 | Draft — post-632 added (block continues, 30/50) |
+| 601–650 | Programming edge cases | 32 | Draft — posts 630–632 added (block continues, 32/50) |
 
-**Total posts: 630**
+**Total posts: 632**
 
 ---
 
@@ -90,9 +90,9 @@
 - newsletter-05.md — **DRAFT COMPLETE** (training-with-tech synthesis, posts 591–600; brand-voice editorial pass pending)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- Block 601–650 continues: posts 630–650 remaining (21 posts); next topics: програмування при хронічному дефіциті сну (post-630), тренування при стресі робота/сім'я (post-631) — **agents in progress**
+- Block 601–650 continues: posts 633–650 remaining (18 posts); next topics: агресивне vs. помірне прогресування (пост 633), periodization для атлетів що поєднують кілька видів спорту (634)
 - Block 651–700 planning: biomechanics & injury prevention (first topic: chronic pain — **clinical-safety review required before writing**)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.46.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.47.0**
