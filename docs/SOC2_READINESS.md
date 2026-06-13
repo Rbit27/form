@@ -26240,7 +26240,7 @@ Both Vanta and Drata are mature SOC 2 automation platforms that integrate with F
 | Pricing stage fit | Entry-tier pricing accessible pre-Series A | Minimum contract typically higher |
 | Evidence export format | JSON + CSV; auditor request portal | Similar |
 
-**Recommendation: Vanta.** For FORM at this stage — solo founder, pre-Series A, SOC 2 Type II as the primary compliance target — Vanta's focus, auditor portal adoption, and entry-tier pricing make it the correct selection. **This decision is logged as DEC-031 in `docs/DECISION_LOG.md`.** Reverse cost: low — evidence collected in Vanta can be exported in standard formats and migrated to Drata at Series A if coverage requirements expand (HIPAA, ISO 27001). The VENDOR_REGISTRY.md entry for Vanta/Drata is updated to "Vanta" upon DEC-031 logging.
+**Recommendation: Vanta.** For FORM at this stage — solo founder, pre-Series A, SOC 2 Type II as the primary compliance target — Vanta's focus, auditor portal adoption, and entry-tier pricing make it the correct selection. **This decision is logged as DEC-047 in `docs/DECISION_LOG.md`.** Reverse cost: low — evidence collected in Vanta can be exported in standard formats and migrated to Drata at Series A if coverage requirements expand (HIPAA, ISO 27001). The VENDOR_REGISTRY.md entry for Vanta/Drata is updated to "Vanta" upon DEC-047 logging.
 
 ---
 
@@ -26413,7 +26413,7 @@ z.object({
 
 | PRE Item | Status Before §78 | Status After §78 | Advance Condition |
 |---|---|---|---|
-| **PRE-25** — Continuous compliance tooling (Vanta or Drata) connected to GitHub, Cloudflare, Supabase, 1Password; controls mapped | 🔴 Open | **🟡 Partial** — tool selected (Vanta, DEC-031), integration architecture designed (§78.3), privacy constraints specified (§78.4), DPA procedure defined (§78.6), evidence artefacts CTOOL-E-001 through CTOOL-E-006 defined (§78.7); activation pending DPA execution at Month O-1 | 🟢 Done: when CTOOL-E-001 (executed DPA) and CTOOL-E-002 (integration scope screenshot) are filed to `compliance/evidence/ctool/` |
+| **PRE-25** — Continuous compliance tooling (Vanta or Drata) connected to GitHub, Cloudflare, Supabase, 1Password; controls mapped | 🔴 Open | **🟡 Partial** — tool selected (Vanta, DEC-047), integration architecture designed (§78.3), privacy constraints specified (§78.4), DPA procedure defined (§78.6), evidence artefacts CTOOL-E-001 through CTOOL-E-006 defined (§78.7); activation pending DPA execution at Month O-1 | 🟢 Done: when CTOOL-E-001 (executed DPA) and CTOOL-E-002 (integration scope screenshot) are filed to `compliance/evidence/ctool/` |
 
 **Net readiness change:** ~98.4% → ~98.4% — no score change until activation. PRE-25 moved from 🔴 to 🟡; score increases on CTOOL-E-001 + CTOOL-E-002 filing (estimated +0.3 pp on full activation).
 
@@ -26425,7 +26425,7 @@ z.object({
 
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
-| 1 | Log DEC-031 in `docs/DECISION_LOG.md`: Vanta selected over Drata — rationale per §78.2 | compliance-officer | **P0** | Before activation | [ ] |
+| 1 | Log DEC-047 in `docs/DECISION_LOG.md`: Vanta selected over Drata — rationale per §78.2 | compliance-officer | **P0** | Before activation | [x] |
 | 2 | Download Vanta SOC 2 Type II report + DPA from `trust.vanta.com`; file drafts to `compliance/dpa/` | compliance-officer | **P0** | Month O-1 | [ ] |
 | 3 | Complete 4-step pre-activation procedure per §78.6 (SOC 2 review → DPA review → security architecture review → execution) | compliance-officer + security-engineer | **P0** | Month O-1 | [ ] |
 | 4 | Run migration `0065_vanta_readonly_role.sql` in production Supabase; verify `vanta_readonly` has no access to health-data tables via test query: `SET ROLE vanta_readonly; SELECT * FROM users LIMIT 1;` — must return permission denied | devops-lead + security-engineer | **P0** | Before Supabase integration activation | [ ] |
@@ -26463,6 +26463,8 @@ z.object({
 | **OQ-CTOOL-03** | **If Vanta's SOC 2 Type II report lapses (e.g., renewal delay), what is the compensating control?** Vanta publishes a bridge letter during renewal gaps; this is acceptable for CC9.2 evidence continuity. The bridge letter must cover the FORM observation period. File bridge letter to `compliance/dpa/vanta-bridge-letter-YYYY.pdf` if gap exceeds 30 days. | **P2** | compliance-officer | Standing (per renewal cycle) |
 
 ---
+
+*v3.7.3 (2026-06-13): §78 cross-reference correction — DEC-031 → DEC-047 in three locations (§78.2 recommendation paragraph, §78.9 gap tracker, §78.10 checklist item 1). DEC-047 (Vanta selected over Drata, 2026-06-13) is the correct DECISION_LOG entry for this tool selection; DEC-031 is "Agent team expanded from 14 → 24 agents" and was incorrectly referenced during initial §78 authoring. Checklist item 1 (§78.10) marked [x] — DEC-047 is logged. No control coverage, evidence artefact, or gap tracker status changes. Owner: compliance-officer.*
 
 *v3.7.2 (2026-06-13): §78 Continuous Compliance Automation — Vanta Integration Design, Vendor Pre-Activation Review & Observation Period Evidence Bootstrapping. PRE-25 🔴 Open → 🟡 Partial: tool selected (Vanta, DEC-031 pending DECISION_LOG.md), integration architecture designed (§78.3, four integrations: GitHub/1Password/Supabase/WorkOS; Cloudflare manual upload), privacy constraints specified (§78.4 — `vanta_readonly` Postgres role with explicit REVOKE on all Art. 9 health-data tables; `vanta_subscription_summary` view for billing-tier metadata), four-step DPA pre-activation procedure (§78.6), evidence artefacts CTOOL-E-001 through CTOOL-E-006 (§78.7), control coverage map (§78.5 — 7 automated controls, 2 manual upload, DEC-030 chain not delegatable), SOC 2 criteria mapping CC4.1/CC4.2/CC2.3/CC8.1/CC6.2/CC7.1/CC9.2 (§78.8), gap tracker PRE-25 🔴→🟡 (§78.9), 16-item implementation checklist with 10× P0/Month-O-1 items (§78.10). `system.compliance_tool_connected` DEC-030 event type registered (STANDARD, 3yr, §78.7). Three open questions: OQ-CTOOL-01 (P1 — Terraform vs manual Cloudflare WAF evidence), OQ-CTOOL-02 (P2 — Vanta Learning vs manual training log), OQ-CTOOL-03 (P2 — Vanta SOC 2 report lapse compensating control). Readiness: ~98.4% → ~98.4% (score updates on CTOOL-E-001 + CTOOL-E-002 filing, estimated +0.3 pp). Cross-references: docs/VENDOR_REGISTRY.md (Vanta High-tier vendor), docs/VULNERABILITY_MANAGEMENT.md §41 (Dependabot evidence), docs/SOC2_READINESS.md §15 (compliance calendar), docs/SOC2_READINESS.md §17 (vendor pre-activation procedure), docs/AUDIT_LOG_SCHEMA.md (DEC-030 `system.compliance_tool_connected`). Owner: compliance-officer + devops-lead.*
 

@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [4.64.1] — 2026-06-13
+
+### Fixed
+- `docs/SOC2_READINESS.md §78` — DEC cross-reference correction: three occurrences of `DEC-031` in §78.2 (recommendation paragraph), §78.9 (gap tracker), and §78.10 checklist item 1 corrected to `DEC-047`. DEC-031 is "Agent team expanded from 14 → 24 agents"; the Vanta tool-selection decision is DEC-047 (2026-06-13). Checklist item 1 status updated `[ ]` → `[x]` — DEC-047 is now logged in DECISION_LOG.md. Version note v3.7.3 appended.
+
+### Changed
+- `VERSION` — 4.64.0 → 4.64.1.
+
 ## [4.64.0] — 2026-06-13
 
 ### Added
