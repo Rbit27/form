@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.27.0] — 2026-06-13
+
+### Added
+- `content/post-602-dup-vs-single-session.md` — Programming edge cases block 601–650, post 2. Single-session vs. щоденне хвильове програмування (DUP) для натурального атлета: що реально означає DUP (vs. WUP і блокова periodization), огляд дослідження (Rhea et al. 2002, Miranda et al. 2011) із чесним коментарем щодо обмежень, фізіологічне обґрунтування для натурала (вікно MPS 24-36h, системна і периферична втома), практична матриця «DUP vs. single-session focus» за 6 параметрами, трьохденний тижневий шаблон DUP із відсотками 1RM, типові помилки застосування. Тон: editorial-brutalist, без оверклеймів.
+
+### Changed
+- `STATUS.md` — блок 601–650 оновлено до 2 постів (draft); next priorities оновлено.
+- `VERSION` — 4.26.1 → 4.27.0.
+
+---
+
 ## [4.26.1] — 2026-06-13
 
 ### Changed
