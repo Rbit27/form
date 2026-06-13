@@ -1,4 +1,4 @@
-# FORM · Project Status v4.25.0
+# FORM · Project Status v4.26.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.25.0** — 2026-06-13
+**v4.26.0** — 2026-06-13
 
 ---
 
@@ -24,8 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
+| 601–650 | Programming edge cases | 1 | Draft — review_pending: sports-scientist |
 
-**Total posts: 600**
+**Total posts: 601**
 
 ---
 
@@ -89,8 +90,8 @@
 - MOBILE_ROADMAP.md update (platform-engineer)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- Plan block 601–650 (Programming edge cases — README roadmap)
+- Continue block 601–650: post-602 (single-session vs. DUP periodization) · post-603 (time-deficit programming) · post-604 (master athletes 40+) · post-605 (block vs. wave vs. linear periodization)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.25.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.26.0**
