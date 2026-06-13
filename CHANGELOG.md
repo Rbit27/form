@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.28.0] — 2026-06-13
+
+### Added
+- `content/post-605-block-wave-linear-periodization.md` — Programming edge cases block, post 5/50. Practical comparison of linear, daily undulating (DUP), and block periodization models. Decision table by training age, session frequency, and planning horizon. Self-coached intermediate case study: why DUP over block for athletes without a competition date. Prestes et al. 2009 and Harries et al. 2015 cited. Clinical safety: PASS — no food/body-image/injury/mental health content.
+- `content/post-606-shift-work-travel-training.md` — Programming edge cases block, post 6/50. Detraining timelines by quality (neural strength, hypertrophy, VO2max, motor skill). Three-mode switching architecture: Mode A (full, 3–4 sessions/week), Mode B (maintenance, 1–2 sessions/week), Mode C (minimal, hotel/no-gym). Specific scenarios: night shift, 3–5 day travel, unpredictable weekly schedule with planless sequencing. Bickel et al. 2011 cited. Clinical safety: PASS — circadian disruption at physiological level only, no mental health framing.
+- `STATUS.md` — post count updated to 606; block 601–650 row updated to 6 posts; next priorities updated.
+
+### Changed
+- `VERSION` — 4.27.3 → 4.28.0.
+
+---
+
 ## [4.27.3] — 2026-06-13
 
 ### Changed
