@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [4.62.1] — 2026-06-13
+
+### Added
+- `docs/OBSERVABILITY.md §37.12` — Enterprise Employer-Side DSAR Observability Extension. Closes the observability gap created by DATA_MODEL §32 (v4.60.0): five new employer-side DSAR events had no §37 monitoring coverage. New content: GDPR-SLO-06 (employer Art. 15 provision ≤ 24h, 100% per-event, ENTERPRISE_SLA §19.5 contractual); five RED metrics for employer DSAR pipeline (aggregate counts only — no user_id, no health data); three alert rules — AL-GDPR-07 (P2, offboarding export gap > 1h), AL-DSAR-04 (P1, DEC-032-EXT chain violation — deletion_confirmed without preceding deletion_soft), AL-DSAR-05 (P1, employer DSAR SLO breach, graduated response: first miss per tenant per quarter P1 PagerDuty, subsequent CSM Slack only); three monitoring queries (employer SLO status every 15 min, offboarding export gap every 10 min, DEC-032-EXT chain violation every 30 min via HMAC Worker); three SOC 2 evidence artefacts DSAR-E-011 through DSAR-E-013 (P5.0/A1.1, CC7.2/CC7.3, CC7.2); eight-item implementation checklist. Closes DATA_MODEL §32.8 OQ-DSAR-03 (P1 — how to handle dsar.data_provided SLO breach): AL-DSAR-05 graduated response is the decision.
+
+### Fixed
+- `docs/DATA_MODEL.md §32.5` (v1.12) — alert ID naming conflict: DATA_MODEL §32 (v1.11) incorrectly assigned the offboarding export gap alert `AL-GDPR-04`, which was already defined in OBSERVABILITY §37.5 as workout data purge job 26 staleness (P1 PagerDuty). Corrected to **AL-GDPR-07** across §32.4 chain note, §32.5 alert table (row renamed + correction note added), and §32.7 checklist item 5.
+
+### Changed
+- `docs/OBSERVABILITY.md` — v3.5 → v3.9 (header sync to match v3.8 footnote + §37.12 v3.9 addition).
+- `docs/DATA_MODEL.md` — v1.11 → v1.12.
+- `VERSION` — 4.62.0 → 4.62.1.
+
 ## [4.62.0] — 2026-06-13
 
 ### Added

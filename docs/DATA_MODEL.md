@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.11
+# FORM · Multi-Tenant Data Model v1.12
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -13204,7 +13204,7 @@ The `dsar.offboarding_export_available` event is the DEC-030 compliance record f
    emits: offboarding.purge_complete              (§25.6)
 ```
 
-The 1-hour window between `offboarding.wind_down_started` and `dsar.offboarding_export_available` is the SLO for sending the tenant admin notification email and generating the export token. Breach of this window fires AL-GDPR-04 (§32.5).
+The 1-hour window between `offboarding.wind_down_started` and `dsar.offboarding_export_available` is the SLO for sending the tenant admin notification email and generating the export token. Breach of this window fires AL-GDPR-07 (§32.5).
 
 **Privacy invariant for the chain:** no employee `user_id` appears in any event in this offboarding sub-chain. Employee-level health data remains readable by the employee during the wind-down window and is erased per R-25 (INCIDENT_RESPONSE.md) once the window closes.
 
@@ -13214,10 +13214,12 @@ The 1-hour window between `offboarding.wind_down_started` and `dsar.offboarding_
 
 | Alert | Severity | Condition | Routing | Auto-resolve |
 |---|---|---|---|---|
-| **AL-GDPR-04** | P2 | `dsar.offboarding_export_available` not emitted within 1 hour of `offboarding.wind_down_started` for the same `tenant_id` | Slack `#compliance-alerts` + CSM on-call | Yes — on `dsar.offboarding_export_available` emission |
+| **AL-GDPR-07** | P2 | `dsar.offboarding_export_available` not emitted within 1 hour of `offboarding.wind_down_started` for the same `tenant_id` | Slack `#compliance-alerts` + CSM on-call | Yes — on `dsar.offboarding_export_available` emission |
 | **AL-DSAR-04** | P1 | `dsar.deletion_confirmed` emitted without preceding `dsar.deletion_soft` for the same `dsar_id` (DEC-032-EXT chain violation) | PagerDuty `form-platform` + `form-compliance`; no auto-resolve | No — IC review required per R-05 protocol |
 
-AL-GDPR-04 extends the §37 GDPR compliance pipeline alert taxonomy in `docs/OBSERVABILITY.md §37`.
+> **Alert ID correction (v1.12):** This section originally labelled the offboarding export gap alert as `AL-GDPR-04`. That ID was already in use by `docs/OBSERVABILITY.md §37.5` (workout data purge job 26 staleness — P1 PagerDuty). The correct ID is **AL-GDPR-07** — the next unused position in the AL-GDPR-* sequence after AL-GDPR-06. `docs/OBSERVABILITY.md §37.12` (v3.9) is the authoritative definition of AL-GDPR-07 and AL-DSAR-04; §37.12 also adds AL-DSAR-05 (employer DSAR SLO breach, closes OQ-DSAR-03).
+
+AL-GDPR-07 and AL-DSAR-04 are defined in `docs/OBSERVABILITY.md §37.12` (Enterprise Employer-Side DSAR Observability Extension).
 
 ---
 
@@ -13246,7 +13248,7 @@ Evidence collection path: `compliance/evidence/dsar/DSAR-E-00{7..10}_<YYYY-QN>.p
 | 2 | Instrument §25 offboarding pipeline (`offboarding-worker.ts`): emit `dsar.offboarding_export_available` within 1h of `offboarding.wind_down_started` state transition; generate `export_token` using `OFFBOARDING_EXPORT_TOKEN_SECRET` Worker secret (rotate per `docs/CRYPTOGRAPHY_POLICY.md §5`; add to key inventory). | platform-engineer | **P0** | M5 | [ ] |
 | 3 | Instrument erasure Worker to emit `dsar.deletion_soft` at Phase 1 completion and `dsar.deletion_confirmed` at Phase 2 verification; enforce DEC-032-EXT ordering invariant at `emit-audit-event` Worker before accepting `deletion_confirmed` (reject if no `deletion_soft` precedes it for the same `dsar_id`). | platform-engineer | **P0** | M4 | [ ] |
 | 4 | Instrument self-serve export endpoint (`GET /api/v1/dsar/export/download`) to emit `dsar.portability_export_completed` on link generation; compute `user_id_hash` as `SHA-256(user_id + PSEUDONYM_SALT)` using the shared `pseudonymise()` utility. | platform-engineer | **P0** | M4 | [ ] |
-| 5 | Configure AL-GDPR-04 (P2, Slack `#compliance-alerts` + CSM routing, auto-resolve) and AL-DSAR-04 (P1, PagerDuty `form-compliance`, no auto-resolve) per §32.5; verify both rules receive synthetic test events in staging before enabling in production. | devops-lead | **P0** | M5 | [ ] |
+| 5 | Configure AL-GDPR-07 (P2, Slack `#compliance-alerts` + CSM routing, auto-resolve) and AL-DSAR-04 (P1, PagerDuty `form-compliance`, no auto-resolve) per §32.5 and `docs/OBSERVABILITY.md §37.12.7`; verify both rules receive synthetic test events in staging before enabling in production. Note: alert ID corrected from AL-GDPR-04 → AL-GDPR-07 per v1.12 patch (naming conflict with §37.5 workout purge alert). | devops-lead | **P0** | M5 | [ ] |
 
 #### P1 — Pre-GA
 
@@ -13266,5 +13268,7 @@ Evidence collection path: `compliance/evidence/dsar/DSAR-E-00{7..10}_<YYYY-QN>.p
 | **OQ-DSAR-04** | **Deletion certificate format and delivery channel.** `dsar.deletion_confirmed.certificate_ref` is an opaque UUID. The deletion certificate itself (PDF or signed JSON attesting erasure) must be delivered to the data subject or employer. Open: (a) format; (b) delivery channel (email vs. admin dashboard download); (c) storage path (`compliance/evidence/` vs. R2-only). | P2 | compliance-officer + legal | Evaluate at first production Art. 17 hard-delete erasure; document in DECISION_LOG.md |
 
 ---
+
+*v1.2 (2026-06-13): §32.5 alert ID correction — `AL-GDPR-04` → `AL-GDPR-07`. DATA_MODEL §32 (v1.1, 2026-06-13) incorrectly assigned the offboarding export gap alert the ID `AL-GDPR-04`, which was already in use by `docs/OBSERVABILITY.md §37.5` for workout data purge job 26 staleness (P1, PagerDuty `form-devops`). The correct ID for the new offboarding export gap alert is **AL-GDPR-07** — the next unused position in the AL-GDPR-* sequence after AL-GDPR-06 (§37.5 erasure backlog signal). Three changes: (1) §32.4 chain interaction note updated: "fires AL-GDPR-04" → "fires AL-GDPR-07"; (2) §32.5 alert table: AL-GDPR-04 row renamed to AL-GDPR-07; explanatory note added about the correction and cross-reference to `docs/OBSERVABILITY.md §37.12`; (3) §32.7 checklist item 5 updated: "Configure AL-GDPR-04" → "Configure AL-GDPR-07" with note about the naming conflict resolution. `docs/OBSERVABILITY.md §37.12` (v3.9, 2026-06-13) is the authoritative definition of AL-GDPR-07, AL-DSAR-04, and the new AL-DSAR-05 (employer DSAR SLO breach alert, which closes DATA_MODEL §32.8 OQ-DSAR-03). Owner: compliance-officer + enterprise-architect.*
 
 *v1.1 (2026-06-13): §32 Enterprise DSAR Extensions — Employer-Side Data Lifecycle & Offboarding Export Schema. Closes the DEC-030 event gap created when `docs/INCIDENT_RESPONSE.md` v2.3 (2026-06-13) registered five enterprise-specific DSAR events in R-14.8 — `dsar.data_provided`, `dsar.deletion_soft`, `dsar.deletion_confirmed`, `dsar.portability_export_completed`, `dsar.offboarding_export_available` — sourced from `docs/ENTERPRISE_SLA.md §19.5` (v1.1, 2026-06-13), without a corresponding DATA_MODEL.md schema section. §32 provides: purpose + scope boundary relative to §31 (consumer DSAR); full DEC-030 event registration table with severity, retention, trigger, and privacy invariant for all five events; Zod v2 schemas (to be added to AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise); two-phase erasure chain ordering constraint DEC-032-EXT (`deletion_soft` must precede `deletion_confirmed`; violation triggers R-05); §25 offboarding chain interaction with 1-hour SLO for `dsar.offboarding_export_available` gap from `offboarding.wind_down_started`; two new alert rules (AL-GDPR-04 P2 offboarding notification gap; AL-DSAR-04 P1 DEC-032-EXT chain violation); four SOC 2 evidence artefacts DSAR-E-007 through DSAR-E-010 (P5.0, P8.0, P5.1, A1.1); eight-item implementation checklist (5× P0 M4–M5, 3× P1 M6–M7); two open questions (OQ-DSAR-03 SLO breach response P1, OQ-DSAR-04 deletion certificate format P2). Cross-references: `docs/INCIDENT_RESPONSE.md R-14.8` (five-event taxonomy source); `docs/ENTERPRISE_SLA.md §19.5` (24-hour employer DSAR SLO source); `docs/DATA_MODEL.md §25` (tenant offboarding pipeline — `offboarding.wind_down_started` HMAC anchor); `docs/DATA_MODEL.md §12` (Art. 17 two-phase erasure — §32 adds the DEC-030 evidence layer for each phase); `docs/DATA_MODEL.md §31` (consumer DSAR schema — §32 is the employer-side extension); `docs/AUDIT_LOG_SCHEMA.md §6` (five events to register — P0 before M4); `docs/SOC2_READINESS.md §P5.0/§P8.0` (evidence tables DSAR-E-007/008 extend); `docs/OBSERVABILITY.md §37` (GDPR compliance pipeline — AL-GDPR-04 extends §37 alert taxonomy). Owner: compliance-officer + enterprise-architect + security-engineer.*

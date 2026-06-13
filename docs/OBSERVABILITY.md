@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v3.5
+# FORM · Observability & Monitoring Taxonomy v3.9
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -9717,6 +9717,181 @@ Location: Metabase, Collection `/collections/compliance` (accessible to `FORM-Co
 | **OQ-GDPR-OBS-01** | **Should DSAR erasure completions emit a DEC-030 event, or is the `data_subject_requests.completed_at` timestamp the authoritative record?** DEC-030 provides HMAC-chained tamper evidence but adds complexity for a record that already exists in `data_subject_requests`. Recommendation: emit DEC-030 `user.data_erasure_completed` as the chain-of-custody record; `data_subject_requests` row is the operational state; both are needed for complete SOC 2 evidence. | P1 | compliance-officer + platform-engineer | Resolve before M6 DSAR Worker implementation |
 | **OQ-GDPR-OBS-02** | **Does GDPR-SLO-03 (Art. 9 hard-delete < 4h) apply to enterprise tenants with > 10,000 users, where cascade deletion may take longer than 4h?** At 10,000 users with ~500 workout sessions per user, the cascade DELETE may take 20–60 minutes at Supabase free-tier IOPS. On dedicated Supabase plans the IOPS ceiling is higher but still bounded. Mitigation: batch DELETE via pg_cron (job 26-adjacent) with progress tracking in `tenants.art9_delete_progress_pct`. SLO target may need to be 24h for large tenants. | P1 | platform-engineer + compliance-officer | Resolve before first enterprise GA customer (M13); test with synthetic 10,000-user tenant in staging |
 | **OQ-GDPR-OBS-03** | **Should the Art. 9 off-boarding Worker hard-delete the `audit_log_events` rows for enterprise tenant users?** DEC-030 requires 7-year retention for audit events; GDPR Art. 9 requires deletion of health data. The audit log may contain health-adjacent events (workout completion with RPE, body weight check-in). Tension: delete audit log rows (GDPR compliant) vs retain (DEC-030 compliant). Resolution path: pseudonymise `user_id` in audit log rows at off-boarding (replace UUID with deterministic hash that cannot be reversed without the original UUID, which is also deleted). Requires legal counsel confirmation. | P0 | compliance-officer + legal + security-engineer | Resolve before enterprise GA (M13); current recommendation is pseudonymisation |
+
+### 37.12 Enterprise Employer-Side DSAR Observability Extension — DATA_MODEL §32 Integration
+
+> Added in v3.9 to integrate observability coverage for the five employer-side DSAR DEC-030 events defined in `docs/DATA_MODEL.md §32`. This sub-section also resolves the **alert ID naming conflict** created when DATA_MODEL §32 was authored with `AL-GDPR-04` — an ID already occupied by the workout purge job staleness alert in §37.5. The corrected IDs are defined below.
+
+#### 37.12.1 Scope
+
+`docs/DATA_MODEL.md §32` (v1.12, 2026-06-13) introduced five employer-side enterprise DSAR events that create new monitoring obligations not covered by §37.1–§37.11 (which scope to consumer DSAR and infrastructure purge pipelines):
+
+| Event | Purpose | SLO |
+|---|---|---|
+| `dsar.data_provided` | Employer-side Art. 15 provision — employer admin receives filtered user export | 24h from employer request (`ENTERPRISE_SLA.md §19.5`) |
+| `dsar.deletion_soft` | Art. 17 Phase 1 soft-delete completed (PII anonymised; health data zeroed) | 30 days from employee Art. 17 request |
+| `dsar.deletion_confirmed` | Art. 17 Phase 2 hard-delete confirmed; deletion certificate issued | ≤ 48h after `deletion_soft` (DEC-032-EXT) |
+| `dsar.portability_export_completed` | Art. 20 employee self-serve portability export link generated | 30 days from employee Art. 20 request |
+| `dsar.offboarding_export_available` | Contract-end bulk export window opened for tenant admin | ≤ 1h after `offboarding.wind_down_started` |
+
+**Key difference from consumer DSAR (§37.1–§37.11):** these events involve the employer as a separate actor. The privacy floor is enforced at the event schema level — no per-employee `user_id` in employer-visible events; `user_id_hash` (SHA-256) only.
+
+**Alert ID correction:** DATA_MODEL §32 originally labelled the offboarding export gap alert as `AL-GDPR-04`. This conflicts with the §37.5 definition of `AL-GDPR-04` (workout data purge job 26 staleness, P1). The correct ID for the new alert is **AL-GDPR-07** — the next unused position in the `AL-GDPR-*` sequence after AL-GDPR-06 (§37.5). DATA_MODEL §32 §32.5 is corrected accordingly (v1.12).
+
+---
+
+#### 37.12.2 New SLO — Employer-Side DSAR Provision
+
+| SLO ID | Metric | Target | Window | Regulatory basis |
+|---|---|---|---|---|
+| **GDPR-SLO-06** | `dsar.data_provided` emitted within 24h of employer DSAR request received (tracked via `dsar_requests.employer_requested_at`) | 100% | Per-event | `ENTERPRISE_SLA.md §19.5`; contractual — any miss is a CSM P1 escalation trigger |
+
+**GDPR-SLO-06 is a contractual commitment to enterprise customers, not an internal engineering target.** A `slo_met = false` value in a `dsar.data_provided` event is the primary breach signal. Unlike GDPR-SLO-01/02 (which trigger Art. 33 DPA notification), GDPR-SLO-06 breach triggers the enterprise SLA credit mechanism (`ENTERPRISE_SLA.md §19.5`) and a CSM escalation — not a DPA notification unless the provision failure constitutes a data breach in its own right (evaluate via R-14).
+
+---
+
+#### 37.12.3 RED Metrics — Employer DSAR Pipeline
+
+| Signal | Type | Query / source | Privacy invariant |
+|---|---|---|---|
+| `employer_dsar_open_count` | Gauge | `COUNT(*) FROM dsar_requests WHERE type = 'employer_access' AND status != 'provided'` | Aggregate count; no `tenant_id` in metric label (aggregated across all tenants) |
+| `employer_dsar_approaching_slo` | Gauge | Above WHERE `NOW() - employer_requested_at > INTERVAL '20 hours'` (4h buffer before 24h hard SLO) | Count only |
+| `employer_dsar_slo_breached` | Gauge | `COUNT(*) FROM dsar_requests WHERE type = 'employer_access' AND status != 'provided' AND NOW() - employer_requested_at > INTERVAL '24 hours'` | Count only; ≥ 1 triggers AL-DSAR-05 |
+| `dsar_deletion_chain_violations` | Gauge | `SELECT COUNT(*) FROM audit_log_events WHERE action = 'dsar.deletion_confirmed' AND NOT EXISTS (SELECT 1 FROM audit_log_events p WHERE p.action = 'dsar.deletion_soft' AND p.payload->>'dsar_id' = audit_log_events.payload->>'dsar_id')` | Count only; audit log query; no health data; DEC-032-EXT guard |
+| `offboarding_export_slo_lag_p95` | Histogram | Time from `offboarding.wind_down_started` to `dsar.offboarding_export_available` for the same `tenant_id` (P95 over rolling 90 days) | `tenant_id` in alert payload only; no employee data |
+
+**Data classification note:** All employer DSAR metrics are aggregate counts or P95 durations. No `user_id`, no employee names, no health values appear in any metric label or alert routing payload. `tenant_id` is present only in PagerDuty incident details visible to the IC — not in Slack channel messages.
+
+---
+
+#### 37.12.4 Alert Rules — Corrected and Extended
+
+| Alert ID | Trigger | Severity | Routing | Dedup | Auto-resolve |
+|---|---|---|---|---|---|
+| **AL-GDPR-07** | `dsar.offboarding_export_available` not emitted within 1 hour of `offboarding.wind_down_started` for the same `tenant_id` | **P2** | Slack `#compliance-alerts` + CSM on-call | `offboarding-export-gap-{tenant_id}` (24h TTL) | Yes — on `dsar.offboarding_export_available` emission |
+| **AL-DSAR-04** | `dsar_deletion_chain_violations > 0` — `dsar.deletion_confirmed` emitted without preceding `dsar.deletion_soft` for the same `dsar_id` (DEC-032-EXT violation) | **P1** | PagerDuty `form-platform` + `form-compliance`; no auto-resolve | `dsar-chain-violation-{dsar_id}` | No — IC review required per R-05 protocol; HMAC chain integrity must be re-verified |
+| **AL-DSAR-05** | `employer_dsar_slo_breached > 0` (employer Art. 15 DSAR not provided within 24h) | **P1** | PagerDuty `form-customer-success` + `form-compliance`; Slack `#enterprise-ops` HIGH | `employer-dsar-breach-{tenant_id}-{period}` (first breach only per tenant per 90-day rolling window; subsequent within window → P2 CSM escalation) | No — IC + CSM review required; SLA credit assessment per `ENTERPRISE_SLA.md §19.5` |
+
+**AL-GDPR-07 note:** This alert replaces the incorrectly-named `AL-GDPR-04` from DATA_MODEL §32.5. The condition and routing are identical — only the ID is corrected. Infrastructure configuration (Slack `#compliance-alerts`) should reference AL-GDPR-07. Any configuration already labelled AL-GDPR-04 for this condition must be renamed to prevent confusion with the workout purge job alert (§37.5 AL-GDPR-04).
+
+**AL-DSAR-04 manual close requirement:** A DEC-032-EXT chain violation means either (a) the `emit-audit-event` Worker guard failed (severe — security-engineer P0 investigation) or (b) an event was emitted out-of-order due to a race condition (platform-engineer P1). The IC must determine root cause, verify the audit chain tail hash, and confirm whether R-05 (HMAC Chain Break) must be co-activated before closing this incident.
+
+**AL-DSAR-05 escalation pattern:** For most enterprise customers, the first missed employer DSAR SLO in a quarter is handled as a P1 PagerDuty incident by the CSM (ENTERPRISE_SLA.md §19.5 SLA credit trigger). Subsequent misses in the same quarter for the same tenant are escalated by the CSM directly without re-paging (reduced PagerDuty noise while maintaining accountability). The `period` dedup key encodes the calendar quarter (e.g., `employer-dsar-breach-{tenant_id}-2026Q3`).
+
+**On OQ-DSAR-03 closure:** DATA_MODEL §32.8 OQ-DSAR-03 asked whether `slo_met = false` in `dsar.data_provided` should auto-open a P1 PagerDuty incident or be handled by CSM manually. **AL-DSAR-05 resolves this.** The graduated response is adopted: P1 auto-alert for the first SLO breach per tenant per quarter (dedup key encodes the quarter); subsequent breaches within the same quarter route to CSM on-call via Slack only (no re-page). This aligns with ENTERPRISE_SLA §19.5 — the SLA credit mechanism handles systematic failure; the first miss triggers the accountability loop.
+
+---
+
+#### 37.12.5 Monitoring Queries
+
+**Query: employer DSAR SLO approaching / breached (source for AL-DSAR-05)**
+
+```sql
+-- Run every 15 minutes via monitoring Worker (not pg_cron — no health data in cron logs)
+-- Requires form_system or compliance_reviewer role
+SELECT
+  tenant_id,                                 -- routed to PagerDuty incident only
+  COUNT(*) AS open_employer_dsars,
+  MAX(NOW() - employer_requested_at)         AS max_age,
+  COUNT(*) FILTER (
+    WHERE NOW() - employer_requested_at > INTERVAL '20 hours'
+  ) AS approaching_slo_count,
+  COUNT(*) FILTER (
+    WHERE NOW() - employer_requested_at > INTERVAL '24 hours'
+  ) AS breached_slo_count
+FROM dsar_requests
+WHERE type = 'employer_access'
+  AND status != 'provided'
+GROUP BY tenant_id
+HAVING COUNT(*) FILTER (
+  WHERE NOW() - employer_requested_at > INTERVAL '24 hours'
+) > 0;
+-- Non-empty result → AL-DSAR-05 P1 per unique tenant_id in result
+-- Privacy floor: query result never written to Slack; tenant_id to PagerDuty only
+```
+
+**Query: offboarding export gap check (source for AL-GDPR-07)**
+
+```sql
+-- Run every 10 minutes via monitoring Worker
+SELECT
+  t.id AS tenant_id,
+  t.offboarding_initiated_at,
+  EXTRACT(EPOCH FROM (NOW() - t.offboarding_initiated_at)) / 3600 AS gap_hours
+FROM tenants t
+WHERE t.status = 'offboarding'
+  AND t.offboarding_initiated_at IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM audit_log_events ale
+    WHERE ale.action = 'dsar.offboarding_export_available'
+      AND ale.payload->>'tenant_id' = t.id::text
+      AND ale.event_timestamp > t.offboarding_initiated_at
+  )
+  AND NOW() - t.offboarding_initiated_at > INTERVAL '1 hour';
+-- Non-empty result → AL-GDPR-07 P2 per tenant_id in result
+```
+
+**Query: DEC-032-EXT chain violation check (source for AL-DSAR-04)**
+
+```sql
+-- Run every 30 minutes via HMAC chain monitoring Worker (same path as R-05)
+-- Requires form_audit role (read-only on audit_log_events)
+SELECT
+  confirmed.payload->>'dsar_id' AS dsar_id,
+  confirmed.event_timestamp AS confirmed_at,
+  soft.event_timestamp AS soft_delete_at
+FROM audit_log_events confirmed
+LEFT JOIN audit_log_events soft
+  ON soft.action = 'dsar.deletion_soft'
+  AND soft.payload->>'dsar_id' = confirmed.payload->>'dsar_id'
+  AND soft.event_timestamp < confirmed.event_timestamp
+WHERE confirmed.action = 'dsar.deletion_confirmed'
+  AND soft.id IS NULL
+  AND confirmed.event_timestamp > NOW() - INTERVAL '7 days';
+-- Non-empty result → AL-DSAR-04 P1; co-activate R-05 protocol
+-- Privacy floor: dsar_id is UUID — not linked to user_id or health data in this query
+```
+
+---
+
+#### 37.12.6 SOC 2 Evidence Extensions
+
+Extends the DSAR-E-007 through DSAR-E-010 artefacts defined in `docs/DATA_MODEL.md §32.6` with the monitoring evidence layer:
+
+| Artefact | SOC 2 criterion | Source | Collection path | Retention |
+|---|---|---|---|---|
+| **DSAR-E-011** | **P5.0 / A1.1** — employer-side DSAR SLO compliance rate | Quarterly: `SELECT slo_met, COUNT(*) FROM audit_log_events WHERE action = 'dsar.data_provided' GROUP BY slo_met` — confirms `slo_met = true` rate ≥ 99% | `compliance/evidence/dsar/DSAR-E-011_<YYYY-QN>.csv` | 7 yr |
+| **DSAR-E-012** | **CC7.2 / CC7.3** — AL-DSAR-04 PagerDuty incident history (chain violation alert) | Annual PagerDuty export: all AL-DSAR-04 incidents opened, acknowledged, resolved with RCA reference | `compliance/evidence/dsar/DSAR-E-012_<YYYY>.pdf` | 7 yr |
+| **DSAR-E-013** | **CC7.2** — AL-GDPR-07 Slack alert history (offboarding export gap) | Quarterly Slack export from `#compliance-alerts` filtered by `offboarding-export-gap-*` dedup keys | `compliance/evidence/dsar/DSAR-E-013_<YYYY-QN>.pdf` | 7 yr |
+
+**Auditor narrative for P5.0:** DSAR-E-011 demonstrates that FORM's employer-side Art. 15 provision pipeline operates within the contractual 24-hour SLO (ENTERPRISE_SLA.md §19.5) and the GDPR Art. 12(3) one-month maximum. The `slo_met` boolean in `dsar.data_provided` is set by the DSAR Worker at event emission time — it is a contemporaneous record, not a retrospective calculation. Combined with DSAR-E-007 (DATA_MODEL §32.6), which provides the quarterly DEC-030 chain excerpt, the two artefacts establish both the completeness and timeliness of employer DSAR fulfillment.
+
+---
+
+#### 37.12.7 Implementation Checklist
+
+#### P0 — Before first enterprise employer DSAR (M4–M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Rename any monitoring configuration already created for DATA_MODEL §32's `AL-GDPR-04` (offboarding export gap) to **AL-GDPR-07**. Update Slack routing labels, PagerDuty service names, and any IaC alert-rule references. Do not rename the existing §37.5 AL-GDPR-04 (workout purge). | devops-lead | **P0** | M5 | [ ] |
+| 2 | Configure **AL-GDPR-07** (offboarding export gap): Cloudflare monitoring Worker query (§37.12.5) every 10 min; Slack `#compliance-alerts` payload with tenant-id; dedup key `offboarding-export-gap-{tenant_id}` 24h TTL; auto-resolve on `dsar.offboarding_export_available` emission. | devops-lead | **P0** | M5 | [ ] |
+| 3 | Configure **AL-DSAR-04** (DEC-032-EXT chain violation): monitoring Worker query (§37.12.5) every 30 min; PagerDuty `form-platform` + `form-compliance` dual route; no auto-resolve; R-05 co-activation note in PagerDuty incident description template. | devops-lead + platform-engineer | **P0** | M4 | [ ] |
+| 4 | Configure **AL-DSAR-05** (employer DSAR SLO breach): monitoring Worker query (§37.12.5) every 15 min; PagerDuty `form-customer-success` + `form-compliance` for first miss per tenant per quarter; Slack `#enterprise-ops` HIGH for subsequent misses (implement via dedup key `employer-dsar-breach-{tenant_id}-{quarter}`); no auto-resolve. | devops-lead + customer-success | **P0** | M5 | [ ] |
+| 5 | Add `GDPR-SLO-06` to the §19 SLO tracking framework (`slo_budget_tracking` table): `slo_id = 'GDPR-SLO-06'`, `target_pct = 100`, `window_type = 'per_event'`, `breach_response = 'pagerduty_p1'`; note — no error budget applies (contractual); violation is direct SLA credit trigger. | platform-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before first enterprise pilot (M6–M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Build employer DSAR monitoring view in Metabase `FORM-Compliance` collection: three panels — (1) `employer_dsar_open_count` gauge by status (provided / approaching / breached), (2) SLO compliance rate per quarter (bar chart), (3) offboarding export gap P95 trend (line, 90-day window). Access: `compliance_reviewer` + `form_admin` only; no per-employee data. | data-engineer | **P1** | M7 | [ ] |
+| 7 | After first employer DSAR is fulfilled: collect DSAR-E-011 quarterly CSV; verify `slo_met = true` on all events; file in `compliance/evidence/dsar/`; cross-reference in `docs/SOC2_READINESS.md §P5.0` evidence table. | compliance-officer | **P1** | M6 | [ ] |
+| 8 | Verify AL-DSAR-04 fires on a synthetic DEC-032-EXT violation in staging (emit `dsar.deletion_confirmed` without preceding `dsar.deletion_soft` for the same `dsar_id`; confirm PagerDuty incident opens within 2 min; confirm `emit-audit-event` Worker HTTP 422 rejection logged). | platform-engineer + devops-lead | **P1** | M6 | [ ] |
+
+---
+
+*v3.9 additions (2026-06-13): §37.12 Enterprise Employer-Side DSAR Observability Extension — resolves the observability gap created when `docs/DATA_MODEL.md §32` (v1.11, 2026-06-13) introduced five employer-side enterprise DSAR DEC-030 events (`dsar.data_provided`, `dsar.deletion_soft`, `dsar.deletion_confirmed`, `dsar.portability_export_completed`, `dsar.offboarding_export_available`) without a corresponding §37 sub-section for monitoring, alerting, and SOC 2 evidence collection. §37.12 also resolves the **alert ID naming conflict** in DATA_MODEL §32.5: the offboarding export gap alert was incorrectly assigned `AL-GDPR-04` (already used by §37.5 for workout purge job 26 staleness — P1 PagerDuty). The correct ID is **AL-GDPR-07** (next unused in sequence after AL-GDPR-06). DATA_MODEL §32.5 is corrected in the companion patch (DATA_MODEL.md v1.12). §37.12.1 scopes to five employer-side events and their SLO obligations. §37.12.2 defines GDPR-SLO-06 (employer Art. 15 provision ≤ 24h, 100% per-event target, ENTERPRISE_SLA.md §19.5 contractual commitment — no error budget; breach triggers SLA credit mechanism). §37.12.3 defines five RED metrics for the employer DSAR pipeline (employer_dsar_open_count, employer_dsar_approaching_slo, employer_dsar_slo_breached, dsar_deletion_chain_violations, offboarding_export_slo_lag_p95); privacy invariant: aggregate counts and P95 durations only — no user_id, employee names, or health values in metric labels. §37.12.4 defines three alert rules: AL-GDPR-07 (P2, offboarding export gap > 1h — corrected from DATA_MODEL §32's AL-GDPR-04), AL-DSAR-04 (P1, DEC-032-EXT chain violation — dsar.deletion_confirmed without preceding dsar.deletion_soft), AL-DSAR-05 (P1, employer DSAR SLO breached per event — closes OQ-DSAR-03 from DATA_MODEL §32.8 with graduated response: P1 PagerDuty first miss per tenant per quarter, CSM-only Slack for subsequent misses same quarter). §37.12.5 provides three monitoring queries: employer DSAR SLO status (every 15 min), offboarding export gap check (every 10 min), DEC-032-EXT chain violation check (every 30 min via HMAC monitoring Worker). §37.12.6 defines three new SOC 2 evidence artefacts DSAR-E-011 through DSAR-E-013 (P5.0/A1.1, CC7.2/CC7.3, CC7.2 respectively) extending DATA_MODEL §32.6's DSAR-E-007 through DSAR-E-010. §37.12.7 provides an eight-item implementation checklist (5× P0 M4–M5, 3× P1 M6–M7) covering alert configuration rename, AL-GDPR-07/AL-DSAR-04/AL-DSAR-05 setup, GDPR-SLO-06 registration, Metabase monitoring panel, evidence collection, and AL-DSAR-04 staging verification. **OQ-DSAR-03 closure:** DATA_MODEL §32.8 OQ-DSAR-03 (P1 — should slo_met = false auto-open P1 PagerDuty incident?) is resolved by AL-DSAR-05's graduated response pattern. Cross-references: `docs/DATA_MODEL.md §32` (five employer-side events — this section is the observability companion); `docs/DATA_MODEL.md §32.5` (alert rule definitions — AL-GDPR-04 → AL-GDPR-07 correction in v1.12 patch); `docs/DATA_MODEL.md §32.6` (DSAR-E-007–010 — §37.12.6 adds E-011–013); `docs/DATA_MODEL.md §32.8 OQ-DSAR-03` (closed by AL-DSAR-05); `docs/ENTERPRISE_SLA.md §19.5` (24h employer DSAR SLO — GDPR-SLO-06 source); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — AL-DSAR-04 co-activation); `docs/INCIDENT_RESPONSE.md R-14` (DSAR incident response — employer DSAR variant); `docs/SOC2_READINESS.md §P5.0` (evidence table — DSAR-E-011 cross-reference); `docs/AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise` (five events to register — P0 before M4; prerequisite for AL-DSAR-04 query). Owner: compliance-officer + devops-lead + customer-success.*
 
 ---
 
