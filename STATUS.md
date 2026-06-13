@@ -1,4 +1,4 @@
-# FORM · Project Status v4.36.0
+# FORM · Project Status v4.37.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.36.0** — 2026-06-13
+**v4.37.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 17 | Draft — posts 616–617 added; post-616: авторегуляція/RPE; post-617: деload типи (block continues, 17/50) |
+| 601–650 | Programming edge cases | 18 | Draft — post-618: розтренованість/міонуклеарна пам'ять (block continues, 18/50) |
 
-**Total posts: 617**
+**Total posts: 618**
 
 ---
 
