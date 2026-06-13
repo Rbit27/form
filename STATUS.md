@@ -1,4 +1,4 @@
-# FORM · Project Status v4.24.2
+# FORM · Project Status v4.25.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.24.2** — 2026-06-13
+**v4.25.0** — 2026-06-13
 
 ---
 
@@ -23,10 +23,9 @@
 | 501–559 | Self-programming mastery | 59 | Published |
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
-| 591–598 | Training with tech block | 8 | Draft — review_pending: sports-scientist |
-| 599–600 | Training with tech block (remaining) | 0 | Planned |
+| 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
 
-**Total posts: 598**
+**Total posts: 600**
 
 ---
 
@@ -85,14 +84,13 @@
 
 ## Next priorities
 
-- Review posts 586–597 (sports-scientist pass before publish)
+- Review posts 586–600 (sports-scientist pass before publish)
 - newsletter-04.md — drafted v4.22.0, needs editorial review before send
-- posts 598–600 (Training with tech block, 3 remaining: tech-dependency signs, VO2max longitudinal, synthesis stack 2026)
 - MOBILE_ROADMAP.md update (platform-engineer)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- `security.break_glass_audit_record_accessed` DEC-030 event registration (platform-engineer — DEC-042)
+- Plan block 601–650 (Programming edge cases — README roadmap)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.24.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.25.0**
