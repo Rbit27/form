@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v1.9
+# FORM · Audit Log Schema v2.0
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
