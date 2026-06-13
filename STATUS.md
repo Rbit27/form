@@ -1,4 +1,4 @@
-# FORM · Project Status v4.28.0
+# FORM · Project Status v4.29.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.28.0** — 2026-06-13
+**v4.29.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 6 | Draft — post-602 sports-scientist PASS; post-603/604/605/606 review_pending |
+| 601–650 | Programming edge cases | 7 | Draft — post-602 sports-scientist PASS; post-603/604/605/606/607 review_pending |
 
-**Total posts: 606**
+**Total posts: 607**
 
 ---
 

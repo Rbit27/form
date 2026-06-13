@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [4.29.0] — 2026-06-13
+
+### Added
+- `content/post-607-concurrent-training-interference-resolved.md` — Programming edge cases block, post 7/50. Deep dive into concurrent training interference: AMPK-mTOR molecular mechanism, four controlling parameters (session order, time gap, cardio mode, volume), three practical scheduling architectures. Evidence from Hickson 1980, Wilson et al. 2012, Murach & Bagley 2016, Coffey & Hawley 2017, Küüsmaa et al. 2016. Clinical safety: PASS — physiology only, no food/body-image/appearance framing.
+- `blog.html` — картки post-605, post-606, post-607 додані на початок grid.
+- `README.md` — Block 751–800 (Athlete lifecycle & context) і Block 801–850 (Evidence-based deep dives) додані до roadmap.
+- `STATUS.md` — блок 601–650 оновлено до 7 постів; total 607; версія → 4.29.0.
+
+### Changed
+- `VERSION` — 4.28.0 → 4.29.0.
+
+---
+
 ## [4.28.0] — 2026-06-13
 
 ### Added
