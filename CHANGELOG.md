@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.31.0] — 2026-06-13
+
+### Added
+- `content/post-610-flexible-microcycle-variable-schedule.md` — Programming edge cases block, post 10/50. Flexible microcycle for irregular schedules: replacing the fixed weekly template with a time-window + session-count model. Three models (2/7, 3/7, 4/7) with session priority rules (heavy compound always first). Minimum effective frequency anchor: Schoenfeld et al. 2016 (2×/week threshold for hypertrophy). Emergency single-session protocol. Bickel et al. 2011 on maintenance under reduced frequency. Diagnostic log-based schedule variance analysis. Sports-scientist reviewed, clinical-safety: not_required.
+- `blog.html` — картки post-608, post-609, post-610 додані на початок grid.
+
+### Changed
+- `STATUS.md` — блок 601–650 оновлено до 10 постів; total 610; версія → 4.31.0.
+- `VERSION` — 4.30.0 → 4.31.0.
+
+---
+
 ## [4.30.0] — 2026-06-13
 
 ### Added
