@@ -1,4 +1,4 @@
-# FORM · Project Status v4.29.0
+# FORM · Project Status v4.30.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.29.0** — 2026-06-13
+**v4.30.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 7 | Draft — post-602 sports-scientist PASS; post-603/604/605/606/607 review_pending |
+| 601–650 | Programming edge cases | 9 | Draft — posts 608–609 added (masters 40+, taper protocols); post-610 remaining |
 
-**Total posts: 607**
+**Total posts: 609**
 
 ---
 
@@ -90,10 +90,9 @@
 - MOBILE_ROADMAP.md update (platform-engineer)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- Continue block 601–650: post-607+ (next topics TBD — see content roadmap in README)
-- post-605 (block vs. wave vs. linear periodization) — review_pending: sports-scientist
-- post-606 (shift work / travel adaptation) — review_pending: sports-scientist
+- post-610 (де закінчується самокоучинг — when to get an external coach) — final post for block 601–650
+- Block 651–700 planning: biomechanics & injury prevention — post-611 chronic pain requires clinical-safety review before writing
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.28.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.30.0**
