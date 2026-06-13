@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.2
+# FORM · Audit Log Schema v2.3
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -308,6 +308,11 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 
 - `admin.encryption_key_rotated` — master encryption key rotated in KMS; payload: `{key_id, key_version_old, key_version_new, rotation_trigger: 'scheduled'|'incident'|'compromise', rotated_by, kms_provider}`; HIGH severity, 7yr retention; cross-ref: SOC2_READINESS §56, OBSERVABILITY §30.10 item 10, DEC-030
 - `admin.signing_key_rotated` — HMAC chain signing key rotated; payload: `{key_id, rotation_trigger, rotated_by}`; HIGH severity, 7yr retention; DEC-030 chain continuity preserved via `key_transition` metadata
+- `admin.key_rotation_initiated` — PAM session opened and both engineers present; **CRITICAL severity, 7yr retention**; MUST be the first chain event in any rotation — `emit-audit-event` Worker rejects subsequent rotation events if no matching `key_rotation_initiated` for the same `key_name` within 24h; payload: `{key_name, rotation_type: 'scheduled'|'emergency'|'infrastructure_repair', pam_session_id, second_engineer_user_id, reason, pre_rotation_hmac_chain_status: 'intact', estimated_window_minutes}`; cross-ref: SOC2_READINESS §57.4.1
+- `admin.key_rotation_announced` — Dev-env rotation notice sent to #engineering Slack; **HIGH severity, 7yr retention**; emitter: `security-engineer` (manual); payload: `{key_name, announcement_channel: 'slack:#engineering', local_env_rotation_deadline_iso}`; cross-ref: SOC2_READINESS §57.4.2
+- `admin.emergency_key_rotation` — Unplanned P0 rotation triggered by compromise signal; **CRITICAL severity, 7yr retention**; triggers GDPR Art. 33 72h clock via `gdpr_art33_clock_started_iso` field; payload: `{key_name, trigger: 'trufflehog_detection'|'log_leak'|'anomalous_query'|'third_party_report'|'pitr_post_rotation', incident_id, pam_session_id, second_person_user_id, gdpr_art33_clock_started_iso, gdpr_art33_deadline_iso, scope_assessment_status: 'in_progress'}`; **privacy invariant: JWT value never stored — `iat` Unix timestamp only**; cross-ref: SOC2_READINESS §57.5.2, INCIDENT_RESPONSE R-16
+- `admin.key_rotation_reminder` — Automated cadence alert (14d, 7d, 3d before scheduled rotation); **LOW severity, 3yr retention**; emitter: `workers/key-rotation-monitor` Cron (daily 09:00 UTC per KEY_ROTATION_KV); payload: `{key_name, days_until_expiry, next_rotation_due_iso, rotation_type: 'scheduled'}`; no PagerDuty — Slack `#security-ops` only; cross-ref: SOC2_READINESS §57.7, OBSERVABILITY §30 AL-KEY-01
+- `admin.key_rotation_overdue` — Scheduled rotation window missed; **HIGH severity, 7yr retention**; fires when `days_until_expiry ≤ 0`; triggers AL-KEY-02 (P0 PagerDuty, no auto-resolve); payload: `{key_name, days_overdue, last_rotation_iso, rotation_period_days}`; cross-ref: SOC2_READINESS §57.7, OBSERVABILITY §30 AL-KEY-02
 
 ### Asset & Device Management
 
@@ -1096,6 +1101,187 @@ const SlaExclusionReclassifiedSchema = z.object({
 
 ---
 
+### Incident Lifecycle events (DEC-030 HMAC-chained · INCIDENT_RESPONSE §16 · CC7.3/CC7.4/CC7.5)
+
+> Defined in `docs/INCIDENT_RESPONSE.md §16.2`. Ten events forming the cross-cutting incident audit trail — distinct from domain-specific runbook events (breach.\*, legal.\*, dsar.\*) which record the *what*; these record the *when* and *who* of every incident management state transition. Required for CC7.4 (incident response activities documented and communicated) and CC7.5 (post-incident review). **Privacy floor:** no end-user PII (`user_id`, health values, coaching content, employee names) in any payload — `actor_user_id` is a FORM internal team UUID (IC, devops-lead, compliance-officer) never a tenant employee ID. `incident.update_posted.audience_scope` must be set by the IC — `privacy_floor_verified: true` is a required boolean that the IC attests before the event is accepted. **IRCHAIN-01 ordering invariant:** `incident.opened` must precede all other `incident.*` events for the same `incident_id`; the `emit-audit-event` Worker returns HTTP 422 on violation. **Sub-chain rule:** All `incident.*` events for a given `incident_id` form a sub-chain; a break in this sub-chain is P0 per R-05. Cross-ref: `docs/INCIDENT_RESPONSE.md §16.3` (TypeScript schemas), `§16.4` (SIEM-triggered automation), `§16.5` (IR-SLO meta-monitoring); SOC 2 CC7.3/CC7.4/CC7.5/CC4.1/CC2.2. Closes INCIDENT_RESPONSE.md §16.8 checklist items 1–2 (P0, M4).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `incident.opened` | HIGH | 7 yr | IC declares incident or SIEM AL-\* rule auto-triggers (siem-incident-automator Worker) | `incident_id` (UUID), `title` (max 100 chars), `incident_severity` (P0–P3), `incident_runbook` (R-NN), `trigger_alert_id` (nullable), `trigger_correlation_rule` (nullable), `siem_correlation_score` (0–1, nullable), `source` (ic_declared\|siem_auto) |
+| `incident.ic_assigned` | MEDIUM | 7 yr | First confirmed IC takes command; within P0 15 min / P1 30 min SLA (IR-SLO-01) | `incident_id`, `ic_user_id`, `ic_role`, `minutes_since_open` (float — IR-SLO-01 evidence) |
+| `incident.severity_changed` | HIGH | 7 yr | Any severity upgrade OR IC-approved downgrade | `incident_id`, `previous_severity`, `new_severity`, `direction` (upgrade\|downgrade), `reason` (free text, max 500 chars), `approver_user_id` (required for downgrade) |
+| `incident.escalated` | HIGH | 7 yr | Founder, board, external counsel, DPA, or enterprise tenant escalated | `incident_id`, `escalation_target` (founder\|board\|legal_counsel\|dpa\|enterprise_tenant), `reason`, `template_used` (nullable) |
+| `incident.update_posted` | STANDARD | 3 yr | Status page update or enterprise tenant notification sent | `incident_id`, `channel` (status_page\|enterprise_tenant_email\|board_email\|internal_slack), `audience_scope` (public\|enterprise_tenants_affected\|all_enterprise\|internal), `privacy_floor_verified` (bool — **must be true**) |
+| `incident.containment_verified` | HIGH | 7 yr | IC confirms active threat vector closed | `incident_id`, `containment_actions` (string[]), `data_exfiltration_confirmed` (bool), `hmac_chain_integrity` (bool) |
+| `incident.eradicated` | HIGH | 7 yr | Root cause removed from production | `incident_id`, `root_cause_category` (config_error\|code_defect\|credential_compromise\|third_party_breach\|insider_threat\|hardware_failure\|unknown) |
+| `incident.recovered` | HIGH | 7 yr | All services restored; SLAs re-met | `incident_id`, `recovery_actions` (string[]), `duration_minutes` (float) |
+| `incident.pir_opened` | MEDIUM | 7 yr | PIR meeting scheduled; Linear PIR project created; within P0 24h / P1 72h of recovery (IR-SLO-02 clock starts) | `incident_id`, `pir_linear_url`, `pir_due_at` (ISO 8601) |
+| `incident.pir_closed` | HIGH | 7 yr | PIR complete; all action items logged; document signed off (IR-SLO-03: P0 ≤7 days, P1 ≤14 days) | `incident_id`, `critical_action_items_count` (int), `pir_document_sha256`, `signed_off_by_user_id` |
+
+```typescript
+import { z } from 'zod';
+
+const IncidentSeverity = z.enum(['P0', 'P1', 'P2', 'P3']);
+
+// Common DEC-030 envelope fields omitted (tenant_id, trace_id, actor_id, hmac_prev, hmac_self, created_at)
+// Privacy invariant: actor_user_id is always a FORM internal team UUID, never a tenant employee UUID.
+
+const IncidentOpenedSchema = z.object({
+  incident_id:             z.string().uuid(),
+  title:                   z.string().max(100),
+  incident_severity:       IncidentSeverity,
+  incident_runbook:        z.string().regex(/^R-\d+$/),
+  trigger_alert_id:        z.string().nullable(),
+  trigger_correlation_rule:z.string().nullable(),
+  siem_correlation_score:  z.number().min(0).max(1).nullable(),
+  source:                  z.enum(['ic_declared', 'siem_auto']),
+});
+
+const IncidentIcAssignedSchema = z.object({
+  incident_id:      z.string().uuid(),
+  ic_user_id:       z.string().uuid(),
+  ic_role:          z.string(),
+  minutes_since_open: z.number().nonnegative(),
+});
+
+const IncidentSeverityChangedSchema = z.object({
+  incident_id:      z.string().uuid(),
+  previous_severity:IncidentSeverity,
+  new_severity:     IncidentSeverity,
+  direction:        z.enum(['upgrade', 'downgrade']),
+  reason:           z.string().max(500),
+  approver_user_id: z.string().uuid().optional(), // required for downgrade — Worker validates
+});
+
+const IncidentUpdatePostedSchema = z.object({
+  incident_id:          z.string().uuid(),
+  channel:              z.enum(['status_page', 'enterprise_tenant_email', 'board_email', 'internal_slack']),
+  audience_scope:       z.enum(['public', 'enterprise_tenants_affected', 'all_enterprise', 'internal']),
+  privacy_floor_verified: z.literal(true),  // IC attestation — false rejected at write time
+});
+
+const IncidentRecoveredSchema = z.object({
+  incident_id:       z.string().uuid(),
+  recovery_actions:  z.array(z.string()),
+  duration_minutes:  z.number().nonnegative(),
+});
+
+const IncidentPirClosedSchema = z.object({
+  incident_id:               z.string().uuid(),
+  critical_action_items_count: z.number().int().nonnegative(),
+  pir_document_sha256:       z.string().length(64),
+  signed_off_by_user_id:     z.string().uuid(),
+});
+```
+
+**HMAC chain ordering (IRCHAIN-01):** `incident.opened` is the sub-chain anchor for its `incident_id`. All subsequent `incident.*` events for that `incident_id` must reference the prior event in the sub-chain via `prev_hash`. Orphaned events (no matching `opened`) are rejected HTTP 422. **Dead-man's switches:** pg_cron checks at T+48h after `incident.recovered` for a missing `incident.pir_opened` (fires Slack + Linear auto-ticket); checks PIR `pir_due_at` daily for overdue PIRs (fires Slack + PagerDuty low-urgency). Both are IR-SLO-02/03 SLA enforcement mechanisms.
+
+**Emitter assignments:** `incident.opened` — siem-incident-automator Worker (`form_system`) for SIEM auto-triggers, or IC (manual admin console) for declared incidents. `incident.ic_assigned` / `incident.severity_changed` / `incident.escalated` / `incident.containment_verified` / `incident.eradicated` / `incident.recovered` / `incident.pir_opened` / `incident.pir_closed` — IC (manual admin console). `incident.update_posted` — IC (manual; `privacy_floor_verified` attestation required before emitting).
+
+---
+
+### Wearable Integration & Sync Pipeline events (DEC-030 HMAC-chained · OBSERVABILITY §41 · A1.1/P3.2)
+
+> Defined in `docs/OBSERVABILITY.md §41.6`. Six events covering the wearable data ingestion pipeline for all five supported sources (HealthKit, Health Connect, Whoop, Oura, Garmin). **Privacy floor (all six events):** no `user_id` in any payload — `tenant_id` is nullable (null for consumer tier). `error_message_hash` uses SHA-256 to prevent raw API error messages (which may contain access tokens) from entering the chain. `wearable.permission_revoked` is the GDPR Art. 7(3) withdrawal record — linked to the consent chain via `consent_event_id` foreign key; no direct `user_id`. `wearable.fleet_freshness_assessed` is emitted by pg_cron job 31 with a k-anonymity gate: `sources_breakdown` object is suppressed for any source where N < 5 across the active fleet. **WS-CHAIN-01:** `wearable.stale_data_coaching_context` MUST have `coaching_context_downgraded: true` — a `false` value is a clinical-safety policy violation rejected at write time (HTTP 422). Cross-ref: `docs/OBSERVABILITY.md §41.3` (WS-SLO-01 through WS-SLO-06); `docs/DATA_MODEL.md §14` (wearable_readings schema — §41 is the observability companion); `docs/CLINICAL_SAFETY.md` (stale-HRV veto authority). Closes OBSERVABILITY.md §41.11 checklist item 1 (P0, M5).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `wearable.sync_completed` | STANDARD | 2 yr | `wearable-ingestion-worker` completes a batch for one source | `source` (healthkit\|health_connect\|whoop\|oura\|garmin), `reading_count` (int), `oldest_reading_age_hours` (float), `tenant_id` (UUID\|null) |
+| `wearable.sync_failed` | HIGH | 3 yr | Worker exits with non-2xx from source API or Supabase insert error | `source`, `error_class` (oauth_expired\|rate_limited\|api_unavailable\|schema_mismatch\|insert_error), `error_message_hash` (SHA-256), `retry_count` (int), `tenant_id` (UUID\|null) |
+| `wearable.oauth_token_expired` | HIGH | 3 yr | OAuth 2.0 token for Whoop, Oura, or Garmin is expired and refresh failed (HealthKit/Health Connect use OS permissions — no OAuth) | `source` (whoop\|oura\|garmin), `refresh_attempted` (bool), `tenant_id` (UUID\|null) |
+| `wearable.permission_revoked` | HIGH | 5 yr | User revokes wearable permission (OS prompt, user-initiated in app, or enterprise MDM policy change); GDPR Art. 7(3) withdrawal record | `source`, `revocation_type` (user_initiated\|os_prompt\|enterprise_mdm), `consent_event_id` (UUID — FK to GDPR consent chain; **no `user_id`**) |
+| `wearable.fleet_freshness_assessed` | STANDARD | 2 yr | pg_cron job 31 (`wearable_sync_freshness_check`) runs daily 07:05 UTC | `fresh_pct` (float 0–100), `total_connected` (int), `slo_met` (bool — WS-SLO-06), `sources_breakdown` (object by source — **suppressed if any source N < 5**), `detected_by: 'pg_cron_job_31'` |
+| `wearable.stale_data_coaching_context` | HIGH | 3 yr | Victor ingestion layer detects HRV reading > 48h old used as coaching context | `source`, `hrv_data_age_hours` (float), `coaching_context_downgraded` (bool — **must be true; false = HTTP 422**) |
+
+```typescript
+import { z } from 'zod';
+
+const WearableSource = z.enum(['healthkit', 'health_connect', 'whoop', 'oura', 'garmin']);
+const OAuthSource    = z.enum(['whoop', 'oura', 'garmin']); // HealthKit/HC use OS permissions
+
+const WearableSyncCompletedSchema = z.object({
+  source:                  WearableSource,
+  reading_count:           z.number().int().nonnegative(),
+  oldest_reading_age_hours:z.number().nonnegative(),
+  tenant_id:               z.string().uuid().nullable(),
+});
+
+const WearableSyncFailedSchema = z.object({
+  source:              WearableSource,
+  error_class:         z.enum(['oauth_expired', 'rate_limited', 'api_unavailable', 'schema_mismatch', 'insert_error']),
+  error_message_hash:  z.string().length(64),   // SHA-256 hex
+  retry_count:         z.number().int().nonnegative(),
+  tenant_id:           z.string().uuid().nullable(),
+});
+
+const WearableOAuthTokenExpiredSchema = z.object({
+  source:             OAuthSource,
+  refresh_attempted:  z.boolean(),
+  tenant_id:          z.string().uuid().nullable(),
+});
+
+const WearablePermissionRevokedSchema = z.object({
+  source:           WearableSource,
+  revocation_type:  z.enum(['user_initiated', 'os_prompt', 'enterprise_mdm']),
+  consent_event_id: z.string().uuid(),   // FK to consent chain — no user_id
+});
+
+const WearableFleetFreshnessAssessedSchema = z.object({
+  fresh_pct:         z.number().min(0).max(100),
+  total_connected:   z.number().int().nonnegative(),
+  slo_met:           z.boolean(),
+  sources_breakdown: z.record(z.number()).optional(), // omitted when any source N < 5
+  detected_by:       z.literal('pg_cron_job_31'),
+});
+
+const WearableStaleDataCoachingContextSchema = z.object({
+  source:                     WearableSource,
+  hrv_data_age_hours:         z.number().positive(),
+  coaching_context_downgraded:z.literal(true),  // false rejected HTTP 422 — WS-CHAIN-01
+});
+```
+
+**HMAC chain requirement:** All six events are DEC-030 HMAC-chained. `wearable.oauth_token_expired` for a `source` should be followed by `wearable.sync_failed` (same source, `error_class: 'oauth_expired'`) within the same batch window — the weekly chain audit flags an `oauth_token_expired` with no subsequent `sync_failed` as a chain gap. `wearable.permission_revoked` has 5-year retention (longest in this namespace) because it serves as the GDPR Art. 7(3) withdrawal evidence record — never suppress or redact.
+
+**Emitter assignments:** `wearable.sync_completed` and `wearable.sync_failed` — `wearable-ingestion-worker` (`form_system`, automated). `wearable.oauth_token_expired` — `wearable-ingestion-worker` on refresh failure. `wearable.permission_revoked` — OS permission layer or enterprise MDM webhook handler (`form_system`). `wearable.fleet_freshness_assessed` — pg_cron job 31 (`form_system`). `wearable.stale_data_coaching_context` — Victor ingestion layer (`form_system`); clinical-safety has VETO on any implementation change that weakens the 48h gate.
+
+---
+
+### Performance & Load Testing events (DEC-030 HMAC-chained · OBSERVABILITY §40 · A1.1/CC5.2/CC8.1)
+
+> Defined in `docs/OBSERVABILITY.md §40.5`. Five events forming the pre-launch load test gate audit trail — every deployment that requires a load test gate is evidence under SOC 2 A1.1 (capacity commitments met before go-live) and CC5.2 (technology controls verified before deployment). **Privacy floor (all five events):** `environment: 'staging'` is a literal constraint — no production load test events may be emitted (Worker enforces). Synthetic `lt-` tenant IDs only; no real user data in any test payload. `system.load_test_gate_bypassed.bypass_reason_hash` uses SHA-256; plaintext reason lives in the associated Linear ticket only. **PERF-CHAIN-01 ordering invariant:** `system.load_test_completed` or `system.load_test_failed` MUST follow a `system.load_test_initiated` with the same `commit_sha`; inversion is a P1 per R-05. Cross-ref: `docs/OBSERVABILITY.md §40.3` (PERF-SLO-01 through PERF-SLO-06); `docs/SOC2_READINESS.md §2` (A1.1 gap: load testing before launches). Closes OBSERVABILITY.md §40.10 checklist item 1 (P0, M5).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `system.load_test_initiated` | STANDARD | 3 yr | GitHub Actions `load-test` job starts or devops-lead triggers manual run | `profile` (baseline\|sso_burst\|coaching\|db_saturation\|scim_burst\|all), `commit_sha` (40-char), `triggered_by` (github_actions\|manual), `environment: 'staging'` |
+| `system.load_test_completed` | STANDARD | 3 yr | k6 run exits; all PERF-SLO-01…05 evaluated | `profile`, `commit_sha`, `pass` (bool), `p95_ms_max`, `error_rate`, `duration_seconds`, `vus_peak`, `slo_results` (object: each PERF-SLO → `{pass: bool, actual: number}`) |
+| `system.load_test_failed` | HIGH | 7 yr | One or more PERF-SLO-01…05 gates fail; merge blocked | `profile`, `commit_sha`, `failing_slos` (string[]), `p95_ms_max`, `error_rate`, `gate_action: 'merge_blocked'` |
+| `system.load_test_gate_bypassed` | **CRITICAL** | 7 yr | IC-approved bypass per §40.2 bypass protocol; triggers AL-PERF-04 (P1 PagerDuty, no auto-resolve) | `commit_sha`, `bypass_reason_hash` (SHA-256), `authorised_by_hash` (SHA-256), `post_deploy_test_linear_id`, `p0_incident_id` (nullable) |
+| `system.perf_regression_detected` | HIGH | 7 yr | pg_cron job 30 quarterly check detects PERF-SLO-06 breach (P95 drift > +20% vs. reference quarter) | `quarter` (YYYY-QN), `endpoint`, `p95_current_ms`, `p95_reference_ms`, `drift_pct`, `slo: 'PERF-SLO-06'` |
+
+**HMAC chain ordering (PERF-CHAIN-01):** `system.load_test_completed` or `system.load_test_failed` must follow `system.load_test_initiated` for the same `commit_sha`. Both a `completed` AND a `failed` event for the same `commit_sha` is a chain anomaly (detected by weekly audit). `system.load_test_gate_bypassed` must be emitted before any deployment event for the same `commit_sha` — the CI pipeline validates this ordering via the `emit-audit-event` Worker response before allowing the deployment step to proceed.
+
+**Emitter assignments:** `system.load_test_initiated` / `system.load_test_completed` / `system.load_test_failed` — GitHub Actions (`form_system` via CI service token). `system.load_test_gate_bypassed` — IC (manual admin console; dual-person authorisation). `system.perf_regression_detected` — pg_cron job 30 (`form_system`, quarterly).
+
+---
+
+### Enterprise Pipeline & ARR Forecasting events (DEC-030 HMAC-chained · COST_MODEL §37 · CC4.2)
+
+> Defined in `docs/COST_MODEL.md §37.7`. Four events forming the enterprise pipeline governance audit trail — weekly review cadence, monthly ARR bridge, deal aging triggers, and model recalibration. **Privacy floor (all four events):** no prospect names, contact emails, or individual `user_id` in any payload. `enterprise.deal_aged_out.deal_id` is a FORM-internal UUID from `enterprise_pipeline_stages` — never shared externally. `enterprise.arr_bridge_closed` is a financial record with 7-year retention per Ukrainian Tax Code Art. 44 and SOC 2 financial evidence floor. `enterprise.pipeline_reviewed` carries aggregate pipeline metrics only — `weighted_pipeline_usd` and `pipeline_coverage_ratio` are fleet-level numbers. **PIPE-CHAIN-01:** `enterprise.pipeline_conversion_model_recalibrated` requires a corresponding `docs/DECISION_LOG.md` entry (validated via `decision_log_ref` non-null check); missing `decision_log_ref` is rejected HTTP 422. Cross-ref: `docs/COST_MODEL.md §37.3` (stage conversion rate table), `§37.5` (ARR build table), `§37.8` (pg_cron job 31 + SQL queries). Closes COST_MODEL.md §37.10 checklist item 1 (P0, M7).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `enterprise.pipeline_reviewed` | STANDARD | 3 yr | Weekly Monday pipeline review completed (cadence per §37.7.1) | `review_date` (YYYY-MM-DD), `active_deals` (int), `weighted_pipeline_usd` (number), `pipeline_coverage_ratio` (float — PCR), `deals_aged_out_count` (int), `closed_won_this_week_usd` (number), `actor_id` (founder UUID — FORM internal, not tenant employee) |
+| `enterprise.arr_bridge_closed` | STANDARD | 7 yr | Monthly ARR bridge reconciled and signed off by founder (per §37.7.2); investor-grade financial record | `period_month` (YYYY-MM regex), `opening_arr_usd`, `new_arr_usd`, `expansion_arr_usd`, `contraction_arr_usd`, `churned_arr_usd`, `indexation_arr_usd`, `closing_arr_usd`, `monthly_nrr` (float), `active_contracts` (int), `actor_id` (UUID) |
+| `enterprise.deal_aged_out` | STANDARD | 3 yr | pg_cron job 31 (`deal_aging_alert`, daily 07:00 UTC) detects deal age exceeding `max_stage_age_days` | `deal_id` (FORM-internal UUID — never shared externally), `stage` (S0_inbound\|S1_qualified\|S2_pilot\|S3_proposal\|S4_legal_review), `entered_at`, `age_days` (int), `max_age_days` (int), `action_required` (call_prospect\|review_qualification\|mid_pilot_intervention\|re_engage_buyer\|contact_legal) |
+| `enterprise.pipeline_conversion_model_recalibrated` | STANDARD | 7 yr | Quarterly retrospective reveals > 10pp deviation in any stage conversion rate after ≥ 10 closed-won deals (OQ-PIPE-01 closure trigger) | `recalibration_date` (YYYY-MM-DD), `deals_analysed` (int ≥ 10), `stage_updates` (array: `{stage_transition, old_rate, new_rate, deviation_pp}`), `decision_log_ref` (DEC-XXX slug — **required; null rejected HTTP 422**), `actor_id` (UUID) |
+
+**HMAC chain requirement:** `enterprise.arr_bridge_closed` events must be sequential by `period_month` with no gaps (monthly cadence enforced by the weekly chain audit — missing a month is flagged as a STANDARD compliance gap). `enterprise.pipeline_conversion_model_recalibrated` has a pre-condition guard: `emit-audit-event` Worker checks that `decision_log_ref` is non-null and a `DECISION_LOG.md` entry matching `DEC-` + numeric suffix exists in the git log before accepting the event.
+
+**Emitter assignments:** `enterprise.pipeline_reviewed` — founder (manual, weekly via admin console). `enterprise.arr_bridge_closed` — founder (manual, monthly; data-engineer post-Series A). `enterprise.deal_aged_out` — pg_cron job 31 (`form_system`, daily). `enterprise.pipeline_conversion_model_recalibrated` — founder / data-engineer (manual; triggered on OQ-PIPE-01 closure after Deal 10).
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:
@@ -1135,6 +1321,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.3 · 2026-06-13 · owner: compliance-officer + security-engineer**
+*v2.3 (2026-06-13): +25 events across four new namespaces plus five Admin key rotation lifecycle events. (1) `incident.*` Incident Lifecycle (10 events, INCIDENT_RESPONSE §16, CC7.3/CC7.4/CC7.5/CC4.1): `incident.opened` (HIGH, 7yr — `incident_severity`, `incident_runbook`, `trigger_alert_id`, `siem_correlation_score`; IRCHAIN-01 anchor), `incident.ic_assigned` (MEDIUM, 7yr — `minutes_since_open` as IR-SLO-01 evidence), `incident.severity_changed` (HIGH, 7yr — `direction` upgrade/downgrade; `approver_user_id` required for downgrade), `incident.escalated` (HIGH, 7yr — `escalation_target` 5-value enum), `incident.update_posted` (STANDARD, 3yr — `privacy_floor_verified: literal(true)` required; false rejected HTTP 422), `incident.containment_verified` (HIGH, 7yr — `data_exfiltration_confirmed` + `hmac_chain_integrity` bools), `incident.eradicated` (HIGH, 7yr — `root_cause_category` 7-value enum), `incident.recovered` (HIGH, 7yr — `duration_minutes`), `incident.pir_opened` (MEDIUM, 7yr — `pir_due_at` ISO 8601), `incident.pir_closed` (HIGH, 7yr — `critical_action_items_count` + `pir_document_sha256`). IRCHAIN-01 sub-chain rule: `incident.opened` must precede all `incident.*` for same `incident_id`; break = P0 R-05. Dead-man's switches: pg_cron at T+48h for missing PIR + daily for overdue PIR. Closes INCIDENT_RESPONSE.md §16.8 checklist items 1–2 (P0, M4). (2) `wearable.*` Wearable Integration (6 events, OBSERVABILITY §41, A1.1/P3.2): `wearable.sync_completed` (STANDARD, 2yr), `wearable.sync_failed` (HIGH, 3yr — `error_class` enum + `error_message_hash` SHA-256), `wearable.oauth_token_expired` (HIGH, 3yr — `OAuthSource` enum: whoop/oura/garmin only), `wearable.permission_revoked` (HIGH, **5yr** — GDPR Art. 7(3) withdrawal record; `consent_event_id` FK to consent chain; no `user_id`), `wearable.fleet_freshness_assessed` (STANDARD, 2yr — k-anonymity gate: `sources_breakdown` suppressed if any source N < 5), `wearable.stale_data_coaching_context` (HIGH, 3yr — `coaching_context_downgraded: literal(true)`; false = HTTP 422 WS-CHAIN-01; clinical-safety VETO on gate weakening). Privacy floor all six: no `user_id`; `tenant_id` nullable. Closes OBSERVABILITY.md §41.11 checklist item 1 (P0, M5). (3) `system.load_test_*` Performance & Load Testing (5 events, OBSERVABILITY §40, A1.1/CC5.2/CC8.1): `system.load_test_initiated` (STANDARD, 3yr — `environment: literal('staging')` constraint), `system.load_test_completed` (STANDARD, 3yr — `slo_results` object per PERF-SLO-01…05), `system.load_test_failed` (HIGH, 7yr — `failing_slos` array + `gate_action: literal('merge_blocked')`), `system.load_test_gate_bypassed` (CRITICAL, 7yr — AL-PERF-04 no-auto-resolve; `bypass_reason_hash` SHA-256), `system.perf_regression_detected` (HIGH, 7yr — quarterly PERF-SLO-06 breach). PERF-CHAIN-01: completed/failed requires prior initiated for same `commit_sha`. Closes OBSERVABILITY.md §40.10 checklist item 1 (P0, M5). (4) `enterprise.pipeline_*` Enterprise Pipeline & ARR (4 events, COST_MODEL §37, CC4.2): `enterprise.pipeline_reviewed` (STANDARD, 3yr — weekly PCR + weighted pipeline), `enterprise.arr_bridge_closed` (STANDARD, **7yr** — 5-component ARR bridge; Ukrainian Tax Code Art. 44 + SOC 2 financial floor), `enterprise.deal_aged_out` (STANDARD, 3yr — pg_cron job 31 daily; `deal_id` internal UUID only, never shared), `enterprise.pipeline_conversion_model_recalibrated` (STANDARD, 7yr — `decision_log_ref` non-null required; null rejected HTTP 422 PIPE-CHAIN-01). Privacy floor all four: no prospect names or contact emails. Closes COST_MODEL.md §37.10 checklist item 1 (P0, M7). (5) Admin key rotation lifecycle (5 events, SOC2_READINESS §57, CC6.7/CC6.8): `admin.key_rotation_initiated` (CRITICAL, 7yr — PAM session anchor; must precede all rotation events for same `key_name` within 24h), `admin.key_rotation_announced` (HIGH, 7yr — Slack `#engineering` advance notice), `admin.emergency_key_rotation` (CRITICAL, 7yr — `gdpr_art33_clock_started_iso` field; triggers GDPR 72h notification clock), `admin.key_rotation_reminder` (LOW, 3yr — `workers/key-rotation-monitor` cron at 14/7/3 days before expiry), `admin.key_rotation_overdue` (HIGH, 7yr — fires when `days_until_expiry ≤ 0`; triggers AL-KEY-02 P0 no-auto-resolve). Privacy invariant: JWT value never stored — `iat` Unix timestamp only. Closes SOC2_READINESS.md §57.11 checklist items 1–2 (P0, M5). Retention table updated: +9 rows (incident HIGH/MEDIUM/STANDARD entries; wearable 2yr/3yr/5yr entries; load test STANDARD/HIGH/CRITICAL entries; pipeline STANDARD 3yr/7yr entries; admin key rotation CRITICAL/HIGH/LOW entries). Owner: compliance-officer + security-engineer.*
 
 **v2.2 · 2026-06-13 · owner: compliance-officer + security-engineer**
 *v2.2 (2026-06-13): +10 `sla.*` Enterprise SLA lifecycle events — closes OBSERVABILITY.md §23.11 checklist item 8 (P0, M4 — "Register all 10 `sla.*` DEC-030 event types in `AUDIT_LOG_SCHEMA.md` event registry"). New section: `### Enterprise SLA events (DEC-030 HMAC-chained · OBSERVABILITY §23 · A1.1 / CC7.2)`. Events: `sla.incident_opened` (HIGH, 7yr — `incident_id` + `probe_ids` + `outage_type` + `downtime_weight`); `sla.incident_closed` (HIGH, 7yr — `duration_minutes`, `exclusion_applied` bool + `exclusion_reason` nullable); `sla.measurement_reconciled` (STANDARD, 7yr — `betterstack_pct` vs. `cf_analytics_pct` dual-source reconciliation, `chosen_source` enum — conservative lower value; `report_month` ISO date regex validated); `sla.credit_calculated` (HIGH, 7yr — `credit_tier_pct` union literal 0|5|15|25|50, `credit_amount_usd`, `mrr_snapshot_usd`); `sla.credit_approved` (HIGH, 7yr — `approved_by` UUID, `final_credit_usd`, `original_calculated_usd`; compliance-officer manual emitter — no automated path); `sla.credit_adjusted` (HIGH, 7yr — `adjustment_delta_usd` signed, `reason` 10–500 chars, `adjusted_by` UUID); `sla.dispute_opened` (STANDARD, 3yr — `dispute_reason` hashed at write layer if contains `@`; `submitted_via` enum); `sla.dispute_resolved` (HIGH, 7yr — `outcome` upheld|rejected, `resolution_notes_hash` SHA-256 — no raw text in chain); `sla.maintenance_window_registered` (STANDARD, 3yr — `notification_hours` evidences §23.4 advance-notice requirement; `tenant_id` nullable for platform-wide windows); `sla.exclusion_reclassified` (HIGH, 7yr — `exclusion_reason` 6-value enum, `approved_by` security-engineer, second-approver required for windows > 30 min validated by Worker). Three SLA-CHAIN ordering invariants: SLA-CHAIN-01 (`sla.incident_closed` requires prior `sla.incident_opened` same `incident_id`); SLA-CHAIN-02 (`sla.credit_approved` requires prior `sla.credit_calculated` same `(tenant_id, report_month)`); SLA-CHAIN-03 (`sla.dispute_resolved` requires prior `sla.dispute_opened` same `(tenant_id, report_month)`); all enforced by `emit-audit-event` Worker (HTTP 422 on violation). Privacy floor: no user_id, no employee PII, no health values; `dispute_reason` hashed if contains `@`. Financial data (`credit_amount_usd`, `final_credit_usd`) protected by RLS tenant-isolation. Ten Zod schemas provided (canonical source for Worker validation). Retention table: +8 rows across five groupings (incident 7yr A1.1; measurement_reconciled 7yr A1.1; credit trio 7yr financial; dispute_opened 3yr operational; dispute_resolved 7yr A1.1 financial; maintenance_window_registered 3yr operational; exclusion_reclassified 7yr A1.1). SOC 2 criterion: A1.1 (availability commitments — incidents, measurement, credits are the contractual evidence chain); CC7.2 (SLA anomaly monitoring — incident events are the anomaly detection audit trail). Cross-ref: `docs/OBSERVABILITY.md §23.9` (canonical event definitions); `docs/ENTERPRISE_SLA.md` (99.9% commitment — these events are its audit trail); `docs/SOC2_READINESS.md §2 A1.1` (gap: SLA credit calculation process — closed by OBSERVABILITY §23 + these chain events). Owner: compliance-officer + security-engineer.*

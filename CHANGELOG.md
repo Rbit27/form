@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [4.52.1] — 2026-06-13
+
+### Added
+- `docs/AUDIT_LOG_SCHEMA.md §Incident` — 10 `incident.*` lifecycle events (INCIDENT_RESPONSE §16, CC7.3/CC7.4/CC7.5): `incident.opened` (IRCHAIN-01 anchor; `siem_correlation_score` + `trigger_alert_id` for SIEM auto-open path), `incident.ic_assigned` (`minutes_since_open` as IR-SLO-01 evidence), `incident.severity_changed` (downgrade requires `approver_user_id` + `reason`), `incident.escalated`, `incident.update_posted` (`privacy_floor_verified: literal(true)` — IC attestation; false rejected HTTP 422), `incident.containment_verified`, `incident.eradicated` (`root_cause_category` 7-value enum), `incident.recovered`, `incident.pir_opened` (`pir_due_at` — IR-SLO-03 clock anchor), `incident.pir_closed` (`pir_document_sha256`). IRCHAIN-01 sub-chain rule + dead-man's pg_cron switches documented. Closes INCIDENT_RESPONSE.md §16.8 checklist items 1–2 (P0, M4). Six Zod schemas provided.
+- `docs/AUDIT_LOG_SCHEMA.md §Wearable` — 6 `wearable.*` sync pipeline events (OBSERVABILITY §41, A1.1/P3.2): `wearable.sync_completed` (STANDARD, 2yr), `wearable.sync_failed` (HIGH, 3yr — `error_class` enum + SHA-256 error hash), `wearable.oauth_token_expired` (HIGH, 3yr — OAuth sources only: whoop/oura/garmin), `wearable.permission_revoked` (HIGH, **5yr** — GDPR Art. 7(3) withdrawal record; `consent_event_id` FK; no `user_id`), `wearable.fleet_freshness_assessed` (STANDARD, 2yr — k-anonymity gate on `sources_breakdown`), `wearable.stale_data_coaching_context` (HIGH, 3yr — WS-CHAIN-01: `coaching_context_downgraded: literal(true)` required; clinical-safety VETO on gate weakening). All 6 Zod schemas provided. Closes OBSERVABILITY.md §41.11 checklist item 1 (P0, M5).
+- `docs/AUDIT_LOG_SCHEMA.md §LoadTest` — 5 `system.load_test_*` performance gate events (OBSERVABILITY §40, A1.1/CC5.2/CC8.1): `system.load_test_initiated` (`environment: literal('staging')` constraint), `system.load_test_completed` (`slo_results` object per PERF-SLO-01…05), `system.load_test_failed` (`gate_action: literal('merge_blocked')`), `system.load_test_gate_bypassed` (CRITICAL — AL-PERF-04 no-auto-resolve; `bypass_reason_hash` SHA-256), `system.perf_regression_detected` (quarterly PERF-SLO-06 drift). PERF-CHAIN-01 invariant documented. Closes OBSERVABILITY.md §40.10 checklist item 1 (P0, M5).
+- `docs/AUDIT_LOG_SCHEMA.md §Pipeline` — 4 `enterprise.pipeline_*` ARR governance events (COST_MODEL §37, CC4.2): `enterprise.pipeline_reviewed` (STANDARD, 3yr — weekly PCR + weighted pipeline), `enterprise.arr_bridge_closed` (STANDARD, **7yr** — 5-component ARR bridge; Ukrainian Tax Code Art. 44 financial evidence floor), `enterprise.deal_aged_out` (STANDARD, 3yr — pg_cron job 31; `deal_id` internal UUID only), `enterprise.pipeline_conversion_model_recalibrated` (STANDARD, 7yr — PIPE-CHAIN-01: `decision_log_ref` required or HTTP 422). Closes COST_MODEL.md §37.10 checklist item 1 (P0, M7).
+- `docs/AUDIT_LOG_SCHEMA.md §AdminKeyRotation` — 5 admin key rotation lifecycle events extending existing `### Admin (key management)` section (SOC2_READINESS §57, CC6.7/CC6.8): `admin.key_rotation_initiated` (CRITICAL, 7yr — PAM session anchor; must precede all rotation events for same `key_name` within 24h), `admin.key_rotation_announced` (HIGH, 7yr — Slack advance notice), `admin.emergency_key_rotation` (CRITICAL, 7yr — `gdpr_art33_clock_started_iso` field; GDPR 72h notification clock), `admin.key_rotation_reminder` (LOW, 3yr — `workers/key-rotation-monitor` at 14/7/3d pre-expiry), `admin.key_rotation_overdue` (HIGH, 7yr — `days_overdue`; triggers AL-KEY-02 P0 no-auto-resolve). Privacy invariant: JWT value never in chain — `iat` timestamp only. Closes SOC2_READINESS.md §57.11 checklist items 1–2 (P0, M5).
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — header v2.2 → v2.3; retention table +9 rows across five new groupings; version note added.
+- `VERSION` — 4.52.0 → 4.52.1.
+
+---
+
 ## [4.52.0] — 2026-06-13
 
 ### Added
