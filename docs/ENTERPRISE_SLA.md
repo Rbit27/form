@@ -1,4 +1,4 @@
-# FORM · Enterprise Service Level Agreement v1.0
+# FORM · Enterprise Service Level Agreement v1.1
 
 > Customer-facing SLA Terms. Attached to the Master Service Agreement (MSA) as **Exhibit B — Service Level Agreement**.
 > Owner: `compliance-officer` + `enterprise-architect`. Review: annually or after any P0 incident that results in a credit dispute.
@@ -134,6 +134,30 @@ Incident: May, 95 minutes full-platform outage
 | 4 | FORM (billing) | Applies credit line item to following month's invoice | Next invoice cycle |
 | 5 | Customer (optional) | Disputes via Admin Dashboard → SLA Reports → "Dispute this report" | Within 30 days |
 | 6 | FORM (`compliance-officer` → founder) | Escalates unresolved disputes; final determination | ≤ 10 business days from dispute receipt |
+
+Credits are **auto-applied** by default across all tiers. Starter and Growth tier customers who prefer a manual-claim workflow (for example, to negotiate credits as contract goodwill) may switch to Manual Credit Mode in Admin Dashboard → Billing → Credit Preferences. In Manual Credit Mode, a `sla.credit_pending_claim` notification is sent to `tenant_billing_email`; the credit expires unclaimed after 90 days. Default remains auto-apply; Growth/Enterprise auto-apply cannot be disabled. *(OQ-SLA-02 resolved — see §18.)*
+
+---
+
+### 3.7 SCIM Deprovisioning and Provisioning Latency
+
+SCIM deprovisioning latency is a security-critical commitment. An employee who retains active FORM sessions after their IdP account is deactivated represents an access control gap. FORM commits to the following latency targets, measured from the moment FORM's SCIM API receives the request.
+
+| Operation | P99 Target | SLA-Breach Threshold | Measurement source |
+|---|---|---|---|
+| SCIM DELETE / PATCH `active: false` → user deactivated | < 30 seconds | > 2 minutes | `user.scim_deprovisioned` DEC-030 timestamp − SCIM request receipt timestamp |
+| SCIM DELETE / PATCH `active: false` → all active sessions revoked | < 60 seconds | > 5 minutes | `user.scim_deprovisioned.session_revocation_completed_at` DEC-030 field |
+| SCIM POST → user account created and accessible | < 60 seconds | > 10 minutes | `user.scim_created` DEC-030 timestamp − SCIM request receipt timestamp |
+
+**SLA-breach consequence:** A deprovisioning event that exceeds the breach threshold for **session revocation** (> 5 minutes) is automatically classified as a **P1 incident** per §6.1 regardless of any broader platform outage. The Customer's `tenant_security_contact` is notified within 30 minutes. This ensures security-critical deprovisioning failures are never silently absorbed as low-severity anomalies.
+
+**Measurement probe:** Better Stack synthetic probe **S-014** (`scim-deprovision-latency`) fires a SCIM DELETE on a canary test user in each deployed region every 15 minutes.
+- **AL-SCIM-LAT-01:** P99 > 30 seconds over a 1-hour rolling window → PagerDuty P2 (`form-platform`).
+- **AL-SCIM-LAT-02:** Any single event > 5 minutes → PagerDuty P1 (`form-platform` + `form-customer-success`); P1 incident auto-opened.
+
+**Exclusions:** The SCIM latency SLA does not apply when delay is caused by Customer-side SCIM credential expiry, Customer IdP rate limiting on outbound SCIM requests, or Customer-side network connectivity issues between the IdP and FORM's SCIM endpoint (all §5 SLA Exclusions).
+
+*(OQ-SLA-03 resolved — see §18.)*
 
 ---
 
@@ -373,11 +397,13 @@ All events carry `tenant_id`, `actor_id`, `actor_type`, timestamp, and HMAC chai
 | **A1.1** — Availability commitments documented | §3.1 (uptime commitment), §3.3 (measurement methodology), §3.4 (credit schedule) |
 | **A1.2** — Availability monitored | §3.3 (Better Stack + Cloudflare dual-source), §3.6 (automated month-close) |
 | **A1.3** — Recovery and continuity | §4 (maintenance policy), §6.2 (P0 resolution target < 4 h) |
-| **CC7.2** — Incidents detected and responded to | §6 (incident response SLAs), §15 (DEC-030 audit trail) |
+| **CC6.4** — Access revocation timely on personnel changes | §3.7 (SCIM deprovisioning P99 < 60 s; > 5 min breach → auto P1 incident) |
+| **CC7.2** — Incidents detected and responded to | §6 (incident response SLAs), §15 (DEC-030 audit trail), §3.7 (AL-SCIM-LAT-01/02) |
 | **CC7.3** — Incidents communicated | §6.2–6.3 (customer notification timelines), §6.2 (GDPR 72h) |
 | **CC9.1** — Vendor/sub-processor management | §8 (data residency), §10.2 (30-day sub-processor notice) |
 | **P4.0** — Privacy notice and communication | §13 (Privacy Floor), `docs/PRIVACY_POLICY.md` |
-| **P8.0** — Privacy requests handled | §12 (audit rights), §13 (employee revocation right) |
+| **P8.0** — Privacy requests handled (DSARs) | §19 (DSAR SLAs: 24 h provision, 30-day erasure cert, self-serve portability) |
+| **P8.1** — Personal info provided on request | §19.1–19.2 (data export and erasure commitments), §19.5 (DEC-030 DSAR events) |
 
 ---
 
@@ -416,16 +442,88 @@ All events carry `tenant_id`, `actor_id`, `actor_type`, timestamp, and HMAC chai
 
 OBSERVABILITY.md OQ-SSO-OBS-01 raises this: single-tenant IdP misconfiguration breaches that tenant's SLO without indicating a platform-wide issue. The alert thresholds in PagerDuty (AL-CERT-* and AL-SSO-GDIR-*) must be scoped per `tenant_id` for SSO-related incidents. Confirm the filter logic is implemented before the first enterprise SLA review. Owner: `compliance-officer` + `devops-lead`. Priority: **P1 — before Month 13 SLA review.** Resolution: PagerDuty alert rules reviewed; cross-reference with `docs/OBSERVABILITY.md §23`.
 
-**OQ-SLA-02: Should credits be auto-applied for all tiers or require opt-in claim for Starter tier?**
+**OQ-SLA-02: Should credits be auto-applied for all tiers or require opt-in claim for Starter tier? — 🟢 RESOLVED v1.1**
 
-Current design (§3.6) auto-applies credits ≥ 5% with no claim required across all tiers. Some enterprise customers prefer explicit credit claims so they can decide whether to apply credits or roll them into goodwill. For Growth/Enterprise tier, auto-apply is the right default (reduces compliance-officer overhead). For Starter tier, an opt-in claim flow might be preferable. Owner: `customer-success` + `compliance-officer`. Priority: **P2 — before first Starter customer credit event.** Resolution: decision documented in `docs/DECISION_LOG.md`.
+Credits auto-apply for all tiers. Starter and Growth tier customers may switch to Manual Credit Mode in Admin Dashboard → Billing → Credit Preferences (growth/enterprise auto-apply is not disableable). Manual-claim mode holds the credit as `sla.credit_pending_claim` for 90 days. This eliminates compliance-officer overhead while giving procurement-conscious Starter customers the option to negotiate credits as contract goodwill. See §3.6.
 
-**OQ-SLA-03: What is the SLA commitment for SCIM provisioning latency?**
+**OQ-SLA-03: What is the SLA commitment for SCIM provisioning latency? — 🟢 RESOLVED v1.1**
 
-ENTERPRISE.md and SSO_SCIM_IMPLEMENTATION.md define SCIM v2 endpoints but do not specify a provisioning latency SLA (e.g., "user deprovisioned within X minutes of SCIM DELETE call"). Enterprise customers with rapid offboarding requirements (e.g., financial services) will ask for a binding commitment. Suggested target: SCIM DELETE → user access revoked within 15 minutes under normal load. Owner: `enterprise-architect` + `security-engineer`. Priority: **P1 — before first regulated-industry enterprise customer.** Resolution: add SCIM latency SLA row to §3.2 Covered Services; define corresponding Better Stack probe (S-014).
+SCIM deprovisioning latency SLA added to §3.7. Commitments: SCIM DELETE → user deactivated P99 < 30 s; sessions revoked P99 < 60 s; breach threshold > 5 minutes triggers auto P1 incident. Better Stack probe S-014 (`scim-deprovision-latency`) defined with alerts AL-SCIM-LAT-01 (P2) and AL-SCIM-LAT-02 (P1). Provisioning (SCIM POST → account created) P99 < 60 s; breach threshold > 10 minutes.
+
+---
+
+## 19. DSAR and Data Portability SLAs
+
+FORM's processor-side obligations for Data Subject Access Requests (DSARs), Right to Erasure (Art. 17), and Data Portability (Art. 20) are time-bound commitments documented here as standalone SLA terms. The Customer remains the data controller responsible for the 30-day window to respond to the data subject.
+
+### 19.1 Subject Access Request — Data Provision (FORM to Customer)
+
+When a Customer forwards an Art. 15 DSAR to FORM via `privacy@form.coach` or the Admin Dashboard DSAR flow:
+
+| Obligation | FORM's Commitment | Customer's Responsibility |
+|---|---|---|
+| Export package available | Within **24 hours** of FORM receiving the forwarded request | Respond to data subject within 30 days (GDPR Art. 15(3)) |
+| Export scope | All FORM-held user data: workout history, CV session keypoints, coaching transcripts, biometric trends, wearable sync metadata, account settings | Combine FORM export with data from other Customer systems |
+| Export format | Signed JSON package; SHA-256 hash included for verification | |
+| Fulfillment record | `dsar.data_provided` DEC-030 event (HIGH, 7yr retention) — `request_id`, `user_id`, `requester_tenant_id`, `export_sha256` | |
+
+Legal maximum: 30 days from FORM receiving the Customer's forwarded request. The 24-hour commitment is a service target; the 30-day window is the binding legal maximum.
+
+### 19.2 Right to Erasure (GDPR Art. 17)
+
+When a Customer initiates deletion of a user's personal data via the Admin API or Admin Dashboard:
+
+| Step | FORM's Commitment | Timeline |
+|---|---|---|
+| Soft delete (access revoked, data masked) | Immediate on `DELETE /v1/users/{user_id}` | Within 30 seconds |
+| Hard-delete cascade (workouts, CV keypoints, coaching transcripts, media in R2) | Per `docs/DATA_MODEL.md §12` retention schedule | Within 30 days of soft delete |
+| Audit log pseudonymisation | `user_id` → keyed HMAC pseudonym per DEC-044 (`DATA_MODEL.md §30.2`); HMAC chain integrity preserved | Within 30 days |
+| Deletion certificate | Written certificate issued to `tenant_ops_email` (`dsar.deletion_confirmed` DEC-030 event, HIGH, 7yr); attests scope, cascade timestamp, and DEC-030 chain reference | Within 30 days of soft delete |
+
+**Exception for audit records:** Audit log entries are pseudonymised, not erased, to preserve HMAC chain integrity (SOC 2 CC6.1 / CC7.2 requirement). This exception is disclosed in the DPA (MSA Exhibit C §4.3) and documented in `docs/DATA_MODEL.md §30.2`. The deletion certificate explicitly notes the pseudonymisation exception.
+
+### 19.3 Data Portability — Employee Self-Serve (GDPR Art. 20)
+
+Employees exercise Art. 20 directly, without involving the Customer or FORM support:
+
+| Metric | Commitment |
+|---|---|
+| Export processing | Typically < 24 hours; legal maximum 30 days |
+| Export format | Machine-readable JSON per `docs/DATA_MODEL.md §25` |
+| Availability | Self-serve 24×7 at Settings → Privacy → Export; no IT ticket or Customer action required |
+| Customer visibility | None — employee's personal data portability request is invisible to the Customer tenant admin |
+
+### 19.4 Offboarding Bulk Data Export (Tenant Termination)
+
+At contract termination, FORM provides a window for the Customer to export tenant-level data:
+
+| Metric | Commitment |
+|---|---|
+| Export window opens | Within 24 hours of contract termination notice |
+| Export window duration | 30 days from termination date |
+| Export scope | Tenant configuration, aggregate analytics history, admin audit log for the contract period |
+| Individual employee personal data | NOT included — employees export personal data independently (§19.3) |
+| Post-window purge | Tenant data purged within 30 days of window close; deletion certificate issued on request |
+
+### 19.5 DEC-030 DSAR Events
+
+All DSAR-lifecycle events are recorded in the HMAC-chained `audit_log` per `docs/AUDIT_LOG_SCHEMA.md`.
+
+| Event | Severity | Retention | When emitted |
+|---|---|---|---|
+| `dsar.request_received` | HIGH | 7 years | FORM receives a Customer-forwarded DSAR |
+| `dsar.data_provided` | HIGH | 7 years | Export package made available to Customer |
+| `dsar.deletion_soft` | HIGH | 7 years | Soft delete executed; access revoked |
+| `dsar.deletion_confirmed` | HIGH | 7 years | Hard-delete cascade complete; certificate issued |
+| `dsar.portability_export_completed` | STANDARD | 7 years | Employee self-serve export fulfilled |
+| `dsar.offboarding_export_available` | STANDARD | 7 years | Offboarding bulk export package ready |
+
+All events carry `tenant_id`, `actor_id`, `actor_type`, timestamp, and HMAC chain fields per `docs/AUDIT_LOG_SCHEMA.md`.
 
 ---
 
 *v1.0 · 2026-06-06 · enterprise-builder cloud worker*
+
+*v1.1 · 2026-06-13 · enterprise-builder cloud worker — §3.6 update (OQ-SLA-02 resolved: auto-apply for all tiers; Starter Manual Credit Mode opt-in added); §3.7 new (OQ-SLA-03 resolved: SCIM deprovisioning latency SLA — P99 < 60 s session revocation; breach threshold > 5 min triggers P1 incident; probe S-014 with AL-SCIM-LAT-01/02); §16 updated (CC6.4, P8.1 added); §19 new (DSAR and Data Portability SLAs: 24-hour DSAR provision commitment, 30-day erasure certificate, self-serve Art. 20 portability, offboarding export window, five DEC-030 DSAR events). References: `docs/DATA_MODEL.md §30.2` (pseudonymisation on erasure), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 schema), `docs/ENTERPRISE.md` (Privacy Floor), `docs/INCIDENT_RESPONSE.md` (P1 incident classification), `docs/OBSERVABILITY.md §23` (SLA measurement spec). SOC 2 CC6.4 + P8.0 + P8.1 evidence.*
 
 *This document fills the gap identified by `docs/OBSERVABILITY.md OQ-SSO-OBS-01` ("Confirm this is consistent with enterprise contract language before the first SLA review") and provides the customer-facing counterpart to the internal SLA engineering spec in `docs/OBSERVABILITY.md §23`. It supplies SOC 2 A1.1 evidence ("Availability commitments documented") and serves as Exhibit B to the FORM Master Service Agreement. References: `docs/ENTERPRISE.md` (tier pricing, Privacy Floor), `docs/INCIDENT_RESPONSE.md` (P0–P3 classification), `docs/OBSERVABILITY.md §23` (measurement spec), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 event schema), `docs/SUBPROCESSORS.md` (sub-processor register), `docs/SOC2_READINESS.md` (SOC 2 criterion mapping). DEC-030 anchored per DEC-030 decision.*

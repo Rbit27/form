@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.43.1] — 2026-06-13
+
+### Changed
+- `docs/ENTERPRISE_SLA.md` v1.0 → v1.1 — three additions:
+  - **§3.6 update (OQ-SLA-02 resolved):** Credits auto-apply for all tiers; Starter/Growth customers can opt into Manual Credit Mode in Admin Dashboard → Billing → Credit Preferences. `sla.credit_pending_claim` DEC-030 event holds credit for 90 days in manual mode.
+  - **§3.7 new (OQ-SLA-03 resolved):** SCIM deprovisioning latency SLA — SCIM DELETE → sessions revoked P99 < 60 s; breach threshold > 5 min triggers auto P1 incident + `tenant_security_contact` notification within 30 min. Provisioning P99 < 60 s. Better Stack probe S-014 (`scim-deprovision-latency`) with alert rules AL-SCIM-LAT-01 (P2) and AL-SCIM-LAT-02 (P1) defined.
+  - **§19 new:** DSAR and Data Portability SLAs — DSAR data provision within 24 h of Customer's forwarded request; Art. 17 erasure: soft delete immediate, hard-delete cascade + deletion certificate within 30 days; Art. 20 employee self-serve export 24 h target; offboarding bulk export window 30 days; five new DEC-030 DSAR events (`dsar.request_received`, `dsar.data_provided`, `dsar.deletion_soft`, `dsar.deletion_confirmed`, `dsar.portability_export_completed`, `dsar.offboarding_export_available`).
+  - **§16 updated:** CC6.4 (SCIM deprovisioning) and P8.1 (DSAR SLAs) added to SOC 2 evidence mapping.
+- `VERSION` — 4.43.0 → 4.43.1.
+
+---
+
 ## [4.43.0] — 2026-06-13
 
 ### Added
