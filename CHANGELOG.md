@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [4.65.1] — 2026-06-13
+
+### Changed
+- `admin-dashboard.html` — Added DSAR status widget to Compliance screen. Closes DATA_MODEL.md §31 checklist item 10 (P1 M5). Widget shows: 4 summary stats (open requests, overdue count, closed-last-30-days, GDPR 30-day deadline clock); open-requests table (request ID, GDPR basis, status, submitted, deadline, days-remaining — colour-coded amber ≥14d / acid ≥21d); closed-last-30-days table with SLO outcome; privacy-floor footer noting excluded fields (`user_id`, `export_url`, `tables_erased`, `deletion_certificate_ref`) and Postgres RLS enforcement (`form_tenant_admin` policy per DATA_MODEL.md §31.4). Alert references: AL-DSAR-01 (P1, day-25 warn), AL-DSAR-02 (P0, overdue), AL-DSAR-04 (P1, DEC-032-EXT chain violation). HR admin cannot identify which employee filed a request — enforced at DB layer, not application code.
+- `VERSION` — 4.65.0 → 4.65.1.
+
+---
+
 ## [4.65.0] — 2026-06-13
 
 ### Added

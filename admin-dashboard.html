@@ -2123,6 +2123,101 @@
         </div>
       </div>
 
+      <!-- DSAR Request Status ─ DATA_MODEL.md §31 checklist item 10 -->
+      <div class="stat-card mb-6">
+        <div class="flex justify-between items-center mb-6">
+          <div class="label">Data Subject Access Requests · Acme Corp</div>
+          <div class="text-mute text-xs font-mono">Tenant-aggregate view only · no individual health data · ref DATA_MODEL.md §31.4</div>
+        </div>
+
+        <!-- Summary stats -->
+        <div class="grid grid-cols-4 gap-4 mb-7">
+          <div>
+            <div class="text-mute text-xs font-mono mb-1">Open requests</div>
+            <div class="data text-paper text-3xl font-light">2</div>
+            <div class="text-mute text-xs font-mono mt-1">Art. 15 (1) · Art. 17 (1)</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-1">Overdue</div>
+            <div class="data text-acid text-3xl font-light">0</div>
+            <div class="text-acid text-xs font-mono mt-1">None past 30-day SLA</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-1">Closed · 30 days</div>
+            <div class="data text-acid text-3xl font-light">1</div>
+            <div class="text-acid text-xs font-mono mt-1">SLO met · avg 11 days</div>
+          </div>
+          <div>
+            <div class="text-mute text-xs font-mono mb-1">GDPR deadline</div>
+            <div class="data text-paper text-3xl font-light">30<span class="text-mute text-base font-light">d</span></div>
+            <div class="text-mute text-xs font-mono mt-1">Art. 12.3 · AL-DSAR-01 fires day 25</div>
+          </div>
+        </div>
+
+        <!-- Open requests table -->
+        <div class="label mb-3">Open requests</div>
+        <table style="margin-bottom:24px">
+          <thead>
+            <tr>
+              <th>Request ID</th>
+              <th>GDPR basis</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Deadline</th>
+              <th style="text-align:right">Days left</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="data text-dim" style="font-size:12px">dsar:dsar_0021</td>
+              <td class="text-dim" style="font-size:12px">Art. 15 — Access</td>
+              <td><span class="badge badge-onboarding" style="font-size:9px">Processing</span></td>
+              <td class="text-mute data" style="font-size:12px">2026-06-01</td>
+              <td class="text-mute data" style="font-size:12px">2026-07-01</td>
+              <td class="data" style="font-size:14px;font-weight:500;color:#FBBF24;text-align:right">18</td>
+            </tr>
+            <tr>
+              <td class="data text-dim" style="font-size:12px">dsar:dsar_0022</td>
+              <td class="text-dim" style="font-size:12px">Art. 17 — Erasure</td>
+              <td><span class="badge" style="font-size:9px;background:rgba(251,191,36,0.15);color:#FBBF24;border:1px solid rgba(251,191,36,0.4)">Erasure initiated</span></td>
+              <td class="text-mute data" style="font-size:12px">2026-06-08</td>
+              <td class="text-mute data" style="font-size:12px">2026-07-08</td>
+              <td class="data text-acid" style="font-size:14px;font-weight:500;text-align:right">25</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Closed this month table -->
+        <div class="label mb-3">Closed · last 30 days</div>
+        <table style="margin-bottom:20px">
+          <thead>
+            <tr>
+              <th>Request ID</th>
+              <th>GDPR basis</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Closed</th>
+              <th style="text-align:right">SLO</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="data text-dim" style="font-size:12px">dsar:dsar_0019</td>
+              <td class="text-dim" style="font-size:12px">Art. 20 — Portability</td>
+              <td><span class="badge badge-active" style="font-size:9px">Fulfilled</span></td>
+              <td class="text-mute data" style="font-size:12px">2026-05-22</td>
+              <td class="text-mute data" style="font-size:12px">2026-06-02</td>
+              <td class="data text-acid" style="font-size:12px;text-align:right">✓ 11 days</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Privacy floor -->
+        <div class="text-mute text-xs font-mono border-t border-line pt-3 leading-relaxed">
+          Privacy floor: this view exposes request ID, GDPR basis, status, and SLA dates only — <span class="data text-dim">user_id</span>, <span class="data text-dim">export_url</span>, <span class="data text-dim">tables_erased</span>, and <span class="data text-dim">deletion_certificate_ref</span> are excluded · HR admin cannot identify which employee filed a request · enforced at Postgres RLS (<span class="data text-dim">form_tenant_admin</span> policy, DATA_MODEL.md §31.4) · day-25 warn → AL-DSAR-01 (P1 PagerDuty); overdue → AL-DSAR-02 (P0); DEC-032-EXT chain violation → AL-DSAR-04 (P1)
+        </div>
+      </div>
+
       <!-- GDPR / Encryption / Pen test -->
       <div class="grid grid-cols-3 gap-4 mb-6">
 
