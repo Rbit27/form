@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [4.65.2] — 2026-06-13
+
+### Changed
+- `content/newsletter-05.md` — brand-voice editorial pass complete. `tone_check` updated from `pending` to `complete`, status updated to `approved`. Editorial-brutalist tone confirmed throughout; PPG/ECG accuracy framing on-brand; closing line ("Your device is a useful tool. It's not the coach.") confirmed in register; Victor's voice consistent with issues 01–04. Placeholder `[посилання на підписку]` flagged — must be resolved before send. READY TO SEND pending subscription link substitution.
+
+---
+
 ## [4.65.1] — 2026-06-13
 
 ### Changed
