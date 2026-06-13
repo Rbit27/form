@@ -1,4 +1,4 @@
-# FORM · Mobile Product Roadmap v0.1
+# FORM · Mobile Product Roadmap v0.2
 
 > **Purpose of this document:** The FORM iOS app is built in a separate repository (private, Swift/Xcode). This document is the canonical reference for mobile product scope, technical constraints, deferred decisions, and integration points so that cloud agents working in this repository do not attempt to write, scaffold, or modify mobile code here. All new mobile feature ideas, roadmap changes, and technical decisions go into this document first — not into code in this repo.
 >
@@ -588,11 +588,12 @@ No PII in event properties. User identifiers in PostHog are pseudonymous (`disti
 
 ### 8.7 Enterprise Tier — Mobile Touchpoints
 
-The enterprise tier is defined in `docs/ENTERPRISE.md` and `docs/SSO_SCIM_IMPLEMENTATION.md`. For v1.0, enterprise features on mobile are minimal:
+The enterprise tier is defined in `docs/ENTERPRISE.md`, `docs/SSO_SCIM_IMPLEMENTATION.md`, and `docs/SHARED_RESPONSIBILITY_MODEL.md`. For v1.0, enterprise features on mobile are minimal:
 
 - Consumer mobile auth: Apple Sign In → Supabase. This is fully independent from the enterprise SSO flow (SAML/OIDC via WorkOS/Auth0), which is for admin dashboard access, not the mobile app.
 - The RLS policies in `docs/DATA_MODEL.md §3.3–3.4` ensure tenant admins cannot read individual workout or health data from the mobile app. Enforced at the database layer, not the mobile layer.
-- If a future enterprise plan includes managed mobile access (SSO on mobile, corporate-issued accounts), this requires a separate design — the current mobile auth architecture does not support SAML-initiated login on iOS without significant additions.
+- Shared responsibility boundary: FORM owns mobile app security (binary integrity, TLS, Supabase auth). The customer owns corporate device management (MDM), network security, and corporate account provisioning. See `docs/SHARED_RESPONSIBILITY_MODEL.md §6`.
+- If a future enterprise plan includes managed mobile access (SSO on mobile, corporate-issued accounts), this requires a separate design — the current mobile auth architecture does not support SAML-initiated login on iOS without significant additions. File as a roadmap item in this document, not as code in this repo.
 
 ---
 
@@ -612,7 +613,9 @@ These questions cannot be resolved by cloud agents. They require implementation 
 | Q-M-008 | What is the interaction model for Victor during an active set? | Victor must not interrupt a set in progress. The interaction model for the user responding to Victor during a set is not designed. Should cues interrupt music? Is there a visual-only mode? | User research during TestFlight beta. Design decision before v1.1. |
 | Q-M-009 | Live Activity / Dynamic Island for workout sessions — v1.0 or v1.1? | WidgetKit Live Activity is a high-demand feature for a workout app but adds scope to v1.0. Currently listed as P1. | Founding Engineer scope decision at M1. If it adds more than 2 weeks of work, defer to v1.1. |
 | Q-M-010 | What is the data schema for the on-device local model, and how does it map to the Supabase schema in DATA_MODEL.md? | The local model must support offline-first operation: create a workout session without network, complete it, sync when reconnected. Field mapping between local and remote schemas needs explicit definition to avoid sync conflicts. | Founding Engineer decision at M1, documented in the mobile repo. Divergence from `docs/DATA_MODEL.md` must be flagged to `platform-engineer` for API alignment. |
-| Q-M-011 | StoreKit 2 directly vs. RevenueCat wrapper? | StoreKit 2 is leaner; RevenueCat adds analytics and multi-platform subscription management. The existing PRODUCT_SPEC says StoreKit 2 directly — but the brief mentioned RevenueCat. This is unresolved. | Founder + Founding Engineer decision before M1. Log as DEC entry when final. |
+| ~~Q-M-011~~ | ~~StoreKit 2 directly vs. RevenueCat wrapper?~~ | **Resolved.** StoreKit 2 directly. No RevenueCat wrapper at v1.0. Recorded in Platform Decisions table and PRODUCT_SPEC.md §1. | Closed — Founding Engineer decision, pre-M0. |
+| Q-M-012 | When is it safe to activate the `readiness_bucket` PostHog event on mobile? | DEC-046 granted CONDITIONAL PASS: `readiness_bucket` event (Low/Moderate/High) is permitted in PostHog **only after** (a) PIA filed with compliance-officer and (b) PostHog DPA reviewed. Neither pre-condition is complete as of June 2026. Mobile instrumentation of readiness data must not ship until both gates are cleared. | compliance-officer PIA + DPA review. No mobile code change needed — gate is a compliance hold, not a technical one. |
+| Q-M-013 | How does mobile fit into the enterprise shared-responsibility model? | `docs/SHARED_RESPONSIBILITY_MODEL.md` (added v4.18.0) defines the boundary between FORM infrastructure and customer responsibilities. Mobile is primarily within FORM's domain, but corporate-issued device management (MDM) and enterprise SSO on mobile fall to the customer. The mobile app has no MDM integration in v1.0. | Founding Engineer + enterprise-architect review at first enterprise pilot. Reference: SHARED_RESPONSIBILITY_MODEL.md §6 (Operations). |
 
 ---
 
@@ -641,6 +644,6 @@ Design decisions that conflict with Dmytro's profile (gamification, excessive no
 
 ---
 
-**v0.1 · May 2026 · Owner: platform-engineer + product-strategist · Safety gate: clinical-safety**
+**v0.2 · June 2026 · Owner: platform-engineer + product-strategist · Safety gate: clinical-safety**
 **Review: before each milestone boundary (M0 through M6) or on significant architecture change.**
 **Mobile code does not go in this repo. New mobile ideas and scope changes go in this document first.**
