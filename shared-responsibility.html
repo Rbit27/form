@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORM · Shared Responsibility Model · Enterprise</title>
+<meta name="description" content="FORM Enterprise Shared Responsibility Model — infrastructure, identity, data, audit, compliance, and incident response ownership boundaries. Who owns what between FORM and your organisation." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: {
+      ink:   '#0B0A07',
+      deep:  '#13110C',
+      line:  '#1F1D16',
+      mute:  '#6F6A60',
+      dim:   '#A39D8E',
+      paper: '#F3EEE0',
+      cream: '#E7DFC8',
+      acid:  '#DDFF2D',
+      ember: '#FF5733',
+      amber: '#F59E0B',
+    },
+    fontFamily: {
+      serif: ['Fraunces', 'serif'],
+      sans:  ['Manrope', 'sans-serif'],
+      mono:  ['JetBrains Mono', 'monospace'],
+    },
+  }}};
+</script>
+<style>
+  html, body { background: #0B0A07; color: #F3EEE0; font-family: 'Manrope', sans-serif; }
+  body { font-feature-settings: "ss01", "cv11"; }
+  ::selection { background: #DDFF2D; color: #0B0A07; }
+
+  .grain::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000; opacity: 0.06;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 220px;
+  }
+
+  .display { font-family: 'Fraunces', serif; font-weight: 300; letter-spacing: -0.04em; line-height: 0.88; }
+  .display em { font-style: italic; font-weight: 300; }
+
+  .label { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px; color: #6F6A60; }
+
+  .btn-acid {
+    background: #DDFF2D; color: #0B0A07;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 600;
+    transition: transform 0.15s, background 0.2s; padding: 16px 32px; border-radius: 9999px; display: inline-block;
+  }
+  .btn-acid:hover { background: #ECFF6B; transform: translateY(-1px); }
+
+  .btn-out {
+    border: 1px solid #2A2820; color: #F3EEE0;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 500;
+    padding: 16px 32px; border-radius: 9999px; display: inline-block; transition: border-color 0.2s;
+  }
+  .btn-out:hover { border-color: #DDFF2D; }
+
+  .divider { border: none; border-top: 1px solid #1F1D16; margin: 0; }
+
+  /* ── Responsibility pills ── */
+  .pill-form {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(221,255,45,0.08); border: 1px solid rgba(221,255,45,0.3);
+    color: #DDFF2D; font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 9999px; white-space: nowrap; flex-shrink: 0;
+  }
+  .pill-shared {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3);
+    color: #F59E0B; font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 9999px; white-space: nowrap; flex-shrink: 0;
+  }
+  .pill-customer {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(243,238,224,0.06); border: 1px solid rgba(243,238,224,0.2);
+    color: #A39D8E; font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 9999px; white-space: nowrap; flex-shrink: 0;
+  }
+
+  /* ── Responsibility tables ── */
+  .resp-table { width: 100%; border-collapse: collapse; }
+  .resp-table thead th {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.16em;
+    text-transform: uppercase; padding: 12px 16px; text-align: left;
+    border-bottom: 1px solid #1F1D16; font-weight: 400;
+  }
+  .resp-table thead th:first-child { width: 34%; color: #6F6A60; }
+  .resp-table thead th.col-form     { color: rgba(221,255,45,0.7); }
+  .resp-table thead th.col-shared   { color: rgba(245,158,11,0.7); }
+  .resp-table thead th.col-customer { color: #A39D8E; }
+  .resp-table tbody td {
+    padding: 14px 16px; border-bottom: 1px solid #1F1D16;
+    vertical-align: top; font-size: 12px; line-height: 1.6; color: #A39D8E;
+  }
+  .resp-table tbody tr:last-child td { border-bottom: none; }
+  .resp-table tbody td:first-child { color: #F3EEE0; font-size: 13px; }
+  .resp-table .form-cell     { background: rgba(221,255,45,0.02); }
+  .resp-table .shared-cell   { background: rgba(245,158,11,0.02); }
+  .resp-table .customer-cell { background: transparent; }
+
+  /* Summary matrix */
+  .matrix-table { width: 100%; border-collapse: collapse; }
+  .matrix-table thead th {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.16em;
+    text-transform: uppercase; padding: 14px 20px; text-align: center;
+    border-bottom: 1px solid #1F1D16; font-weight: 400;
+  }
+  .matrix-table thead th:first-child { text-align: left; color: #6F6A60; width: 52%; }
+  .matrix-table thead th.col-form     { color: rgba(221,255,45,0.7); }
+  .matrix-table thead th.col-shared   { color: rgba(245,158,11,0.7); }
+  .matrix-table thead th.col-customer { color: #A39D8E; }
+  .matrix-table tbody td {
+    padding: 11px 20px; border-bottom: 1px solid #1F1D16;
+    font-size: 13px; color: #A39D8E;
+  }
+  .matrix-table tbody tr:last-child td { border-bottom: none; }
+  .matrix-table tbody td:first-child { color: #F3EEE0; }
+  .matrix-table tbody td:not(:first-child) { text-align: center; }
+  .matrix-table .dot-form     { color: #DDFF2D; font-size: 16px; }
+  .matrix-table .dot-shared   { color: #F59E0B; font-size: 16px; }
+  .matrix-table .dot-customer { color: #A39D8E; font-size: 16px; }
+  .matrix-table .dot-empty    { color: #2A2820; font-size: 16px; }
+  .matrix-group td { padding: 8px 20px 4px; background: #0B0A07; }
+  .matrix-group-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #2A2820;
+  }
+
+  /* Section card */
+  .section-card {
+    background: #13110C; border: 1px solid #1F1D16; border-radius: 20px;
+    overflow: hidden;
+  }
+
+  /* Non-negotiable floor table */
+  .floor-table { width: 100%; border-collapse: collapse; }
+  .floor-table tbody td {
+    padding: 14px 20px; border-bottom: 1px solid rgba(255,87,51,0.15);
+    font-size: 13px; vertical-align: top; line-height: 1.6;
+  }
+  .floor-table tbody tr:last-child td { border-bottom: none; }
+  .floor-table tbody td:first-child { color: #F3EEE0; width: 48%; }
+  .floor-table tbody td:last-child  { color: #A39D8E; }
+  .floor-table thead th {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.16em;
+    text-transform: uppercase; padding: 12px 20px; text-align: left;
+    border-bottom: 1px solid rgba(255,87,51,0.2); font-weight: 400; color: rgba(255,87,51,0.6);
+  }
+
+  /* Glossary */
+  .glossary-item { padding: 14px 0; border-bottom: 1px solid #1F1D16; display: flex; gap: 24px; }
+  .glossary-item:last-child { border-bottom: none; }
+  .glossary-term {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #DDFF2D;
+    flex-shrink: 0; width: 180px; padding-top: 1px;
+  }
+  .glossary-def { font-size: 13px; color: #A39D8E; line-height: 1.65; }
+
+  /* TOC nav */
+  .toc-link {
+    display: block; padding: 8px 0; font-size: 12px; color: #6F6A60;
+    border-bottom: 1px solid #1F1D16; transition: color 0.15s; text-decoration: none;
+    font-family: 'Manrope', sans-serif;
+  }
+  .toc-link:hover { color: #F3EEE0; }
+  .toc-link:last-child { border-bottom: none; }
+
+  /* Sticky ToC */
+  .sticky-toc { position: sticky; top: 96px; }
+
+  /* Section heading */
+  .sec-heading {
+    font-family: 'Fraunces', serif; font-weight: 300; letter-spacing: -0.03em;
+    color: #F3EEE0;
+  }
+</style>
+</head>
+<body class="grain antialiased">
+
+<!-- ─── Header ────────────────────────────────────────────── -->
+<header class="border-b border-line sticky top-0 z-50" style="background:rgba(11,10,7,0.92);backdrop-filter:blur(12px);">
+  <div class="max-w-[1440px] mx-auto px-8 py-5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-acid rounded-full"></div>
+      <div class="font-serif text-xl tracking-tight text-paper">FORM<span class="text-acid">.</span></div>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 font-mono text-[11px] tracking-widest uppercase text-mute">
+      <a href="/#demo" class="hover:text-paper transition-colors">Product</a>
+      <a href="/enterprise.html" class="hover:text-paper transition-colors">Enterprise</a>
+      <a href="/pricing-enterprise.html" class="hover:text-paper transition-colors">Pricing</a>
+      <a href="/admin-dashboard.html" class="hover:text-paper transition-colors">Admin demo</a>
+    </nav>
+    <div class="flex items-center gap-4">
+      <a href="mailto:enterprise@form.coach" class="btn-out hidden md:inline-block">Talk to sales</a>
+      <a href="/enterprise.html" class="btn-acid">Enterprise overview →</a>
+    </div>
+  </div>
+</header>
+
+<!-- ─── Hero ──────────────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 pt-24 pb-20">
+  <div class="max-w-4xl">
+    <div class="flex flex-wrap items-center gap-3 mb-8">
+      <span class="label text-acid">Enterprise · Due diligence</span>
+      <span class="label" style="color:#2A2820;">·</span>
+      <span class="label">v1.0 · 2026-06-12</span>
+    </div>
+    <h1 class="display text-[80px] md:text-[108px] text-paper mb-10">
+      Shared<br/>Responsibility<br/><em>Model.</em>
+    </h1>
+    <p class="text-dim text-xl leading-relaxed max-w-2xl mb-10" style="font-weight:300;">
+      When your organisation deploys FORM for employees, security controls span two domains.
+      This document defines — precisely — <span class="text-paper">who owns what.</span>
+    </p>
+
+    <!-- Legend -->
+    <div class="flex flex-wrap gap-4 mb-10">
+      <div class="flex items-center gap-2">
+        <span class="pill-form">FORM</span>
+        <span class="text-mute text-xs">FORM owns. Failure is FORM's liability.</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="pill-shared">Shared</span>
+        <span class="text-mute text-xs">Both parties have a role. See sub-notes.</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="pill-customer">Customer</span>
+        <span class="text-mute text-xs">Your IT/security team owns. FORM provides tooling.</span>
+      </div>
+    </div>
+
+    <!-- Quick stats -->
+    <div class="flex flex-wrap gap-3">
+      <div class="inline-flex items-center gap-2 bg-deep border border-line rounded-full px-4 py-2">
+        <span class="font-mono text-acid text-sm">10</span>
+        <span class="label">Domains covered</span>
+      </div>
+      <div class="inline-flex items-center gap-2 bg-deep border border-line rounded-full px-4 py-2">
+        <span class="font-mono text-paper text-sm">SOC 2</span>
+        <span class="label">Control attribution per AICPA</span>
+      </div>
+      <div class="inline-flex items-center gap-2 bg-deep border border-line rounded-full px-4 py-2">
+        <span class="font-mono text-paper text-sm">GDPR Art. 28</span>
+        <span class="label">Controller–Processor boundary</span>
+      </div>
+      <div class="inline-flex items-center gap-2 bg-deep border border-line rounded-full px-4 py-2">
+        <span class="font-mono text-paper text-sm">Enterprise</span>
+        <span class="label">Starter, Growth &amp; Enterprise tiers</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
+<!-- ─── Body: ToC + content ───────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-20">
+  <div class="grid lg:grid-cols-[240px_1fr] gap-16 items-start">
+
+    <!-- Sticky ToC -->
+    <div class="sticky-toc hidden lg:block">
+      <div class="label mb-4">Contents</div>
+      <nav>
+        <a href="#summary"        class="toc-link">Summary matrix</a>
+        <a href="#infrastructure" class="toc-link">Infrastructure security</a>
+        <a href="#application"    class="toc-link">Application security</a>
+        <a href="#identity"       class="toc-link">Identity &amp; access</a>
+        <a href="#data"           class="toc-link">Data security &amp; privacy</a>
+        <a href="#audit"          class="toc-link">Audit logging</a>
+        <a href="#operations"     class="toc-link">Operations &amp; IR</a>
+        <a href="#compliance"     class="toc-link">Compliance</a>
+        <a href="#onboarding"     class="toc-link">Onboarding &amp; offboarding</a>
+        <a href="#liability"      class="toc-link">Liability boundaries</a>
+        <a href="#floors"         class="toc-link">Non-negotiable floors</a>
+        <a href="#glossary"       class="toc-link">Glossary</a>
+      </nav>
+
+      <div class="mt-8 pt-8 border-t border-line">
+        <div class="label mb-3">Owners</div>
+        <div class="text-mute text-xs leading-relaxed">enterprise-architect<br/>compliance-officer<br/>security-engineer</div>
+        <div class="label mt-4 mb-2">Review cadence</div>
+        <div class="text-mute text-xs leading-relaxed">Quarterly, or on any material architecture or contract change.</div>
+      </div>
+    </div>
+
+    <!-- ── Main content ──────────────────────────────────────── -->
+    <div class="space-y-20">
+
+      <!-- ─── 2. Summary Matrix ─────────────────────────────── -->
+      <div id="summary">
+        <div class="label mb-4">§2</div>
+        <h2 class="sec-heading text-[36px] mb-2">Summary <em>Matrix</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">Quick-reference across all domains. Detailed tables follow in subsequent sections.</p>
+
+        <div class="section-card">
+          <div class="overflow-x-auto">
+            <table class="matrix-table">
+              <thead>
+                <tr>
+                  <th>Domain</th>
+                  <th class="col-form">FORM</th>
+                  <th class="col-shared">Shared</th>
+                  <th class="col-customer">Customer</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="matrix-group"><td colspan="4"><span class="matrix-group-label">Infrastructure</span></td></tr>
+                <tr><td>Physical infrastructure (Cloudflare, Supabase)</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Network security and DDoS protection</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Platform patching (OS, Postgres, Workers runtime)</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Geographic region selection</td><td><span class="dot-form">●</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+
+                <tr class="matrix-group"><td colspan="4"><span class="matrix-group-label">Application security</span></td></tr>
+                <tr><td>Application security (auth, API, CV pipeline)</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Encryption at rest and in transit</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Backup and disaster recovery</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Uptime and SLA adherence</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Annual penetration test</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+
+                <tr class="matrix-group"><td colspan="4"><span class="matrix-group-label">Identity &amp; access</span></td></tr>
+                <tr><td>IdP configuration (Okta, Azure AD, Google Workspace)</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>MFA policy enforcement</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>SCIM provisioning setup</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Role-to-group mapping</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Session timeout policy</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+
+                <tr class="matrix-group"><td colspan="4"><span class="matrix-group-label">Data &amp; privacy</span></td></tr>
+                <tr><td>GDPR controller obligations (employee data)</td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-customer">●</span></td></tr>
+                <tr><td>Art. 13–14 employee notice (pre-login SCIM data)</td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-customer">●</span></td></tr>
+                <tr><td>Data Subject Access Request fulfillment</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Employee offboarding from FORM</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Acceptable use policy enforcement</td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-customer">●</span></td></tr>
+
+                <tr class="matrix-group"><td colspan="4"><span class="matrix-group-label">Incident response &amp; compliance</span></td></tr>
+                <tr><td>Incident response (P0/P1 — FORM infrastructure)</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Incident response (P2/P3 — customer-controlled)</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Compliance attestation (your industry)</td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-customer">●</span></td></tr>
+                <tr><td>SOC 2 Type II report sharing</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>DPA execution</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+
+                <tr class="matrix-group"><td colspan="4"><span class="matrix-group-label">Audit &amp; configuration</span></td></tr>
+                <tr><td>Audit log retention (FORM infrastructure events)</td><td><span class="dot-form">●</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Audit log review (admin actions, your tenant)</td><td><span class="dot-empty">○</span></td><td><span class="dot-empty">○</span></td><td><span class="dot-customer">●</span></td></tr>
+                <tr><td>White-label branding configuration</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+                <tr><td>Custom domain (CNAME setup)</td><td><span class="dot-empty">○</span></td><td><span class="dot-shared">●</span></td><td><span class="dot-empty">○</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 3. Infrastructure ──────────────────────────────── -->
+      <div id="infrastructure">
+        <div class="label mb-4">§3</div>
+        <h2 class="sec-heading text-[36px] mb-2">Infrastructure <em>Security</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">FORM runs on Cloudflare Workers (edge compute), Supabase (managed Postgres), and Cloudflare R2 (object storage). The underlying infrastructure is operated by these sub-processors, each holding SOC 2 Type II and ISO 27001 certifications.</p>
+
+        <div class="space-y-4">
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§3.1 · Physical infrastructure</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Control</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-shared">Shared</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Data centre physical security</td>
+                    <td class="form-cell">Cloudflare / Supabase data centres — SOC 2 certified. FORM does not operate physical infrastructure.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Hardware lifecycle and disposal</td>
+                    <td class="form-cell">Sub-processor responsibility (Cloudflare, Supabase).</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Geographic region selection</td>
+                    <td class="form-cell">FORM assigns tenants to EU (Frankfurt) or US (Virginia) based on contract.</td>
+                    <td class="shared-cell">Customer specifies region requirement during onboarding.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§3.2 · Network security</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Control</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-shared">Shared</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>DDoS mitigation</td>
+                    <td class="form-cell">Cloudflare enterprise DDoS protection on all FORM endpoints.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>TLS termination</td>
+                    <td class="form-cell">TLS 1.2 minimum, TLS 1.3 preferred. HSTS with <span class="font-mono text-xs" style="color:#DDFF2D;">max-age=31536000; includeSubDomains; preload</span>.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>API rate limiting</td>
+                    <td class="form-cell">Per-tenant and per-user rate limits enforced at Worker layer. 500-request overage grace before hard block (DEC-045).</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Customer network (egress from IdP to FORM)</td>
+                    <td class="form-cell"></td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell">Customer ensures outbound HTTPS is permitted from their IdP to FORM SSO endpoints. Required IP ranges documented in <code class="font-mono text-xs" style="color:#DDFF2D;">docs/SSO_CLIENT_CONFIG.md</code>.</td>
+                  </tr>
+                  <tr>
+                    <td>IP allowlisting for admin dashboard</td>
+                    <td class="form-cell"></td>
+                    <td class="shared-cell">FORM provides the technical control (<span class="font-mono text-xs" style="color:#F59E0B;">session_policy.ip_allowlist</span>). Customer configures the allowlist during onboarding.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§3.3 · Platform patching</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Control</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-shared">Shared</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Cloudflare Workers runtime updates</td>
+                    <td class="form-cell">Cloudflare manages runtime. FORM monitors for deprecations.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Supabase Postgres version upgrades</td>
+                    <td class="form-cell">FORM owns the upgrade schedule and tests migrations in staging before production.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Application dependency updates</td>
+                    <td class="form-cell">Dependabot + weekly security patch sprint. Critical CVEs patched within 72 hours per <code class="font-mono text-xs" style="color:#DDFF2D;">docs/VULNERABILITY_MANAGEMENT.md</code>.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Mobile app updates (iOS / Android)</td>
+                    <td class="form-cell">FORM publishes updates to App Store and Google Play.</td>
+                    <td class="shared-cell">Employees update on their own device management cadence. Customer cannot force app updates on employee-owned devices.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>MDM / EMM management of FORM app</td>
+                    <td class="form-cell"></td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell">If your organisation requires managed app distribution, your MDM team configures deployment. FORM does not integrate with MDM management planes.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 4. Application Security ────────────────────────── -->
+      <div id="application">
+        <div class="label mb-4">§4</div>
+        <h2 class="sec-heading text-[36px] mb-2">Application &amp; Platform <em>Security</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">Authentication, vulnerability management, and the CV computer-vision pipeline.</p>
+
+        <div class="space-y-4">
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§4.1 · Application authentication</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Control</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-shared">Shared</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>SSO integration (SAML 2.0 / OIDC)</td>
+                    <td class="form-cell">FORM maintains the SP-side implementation — assertion validation, PKCE, token issuance.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>IdP configuration</td>
+                    <td class="form-cell"></td>
+                    <td class="shared-cell">FORM provides configuration guides per IdP in <code class="font-mono text-xs" style="color:#F59E0B;">docs/SSO_CLIENT_CONFIG.md</code>. Customer IT configures the IdP application. Natively tested: Okta, Azure AD / Entra ID, Google Workspace, OneLogin.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Certificate rotation</td>
+                    <td class="form-cell">FORM rotates signing certificates 90 days before expiry and publishes updated metadata.</td>
+                    <td class="shared-cell">Customer IT must update the SP certificate in IdP configurations that do not support automatic metadata refresh (e.g. ADFS). FORM notifies 60 days in advance.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Admin API key management</td>
+                    <td class="form-cell">FORM issues API keys; keys are hashed at rest (HMAC-SHA256). Keys age out after 365 days with soft enforcement (CSM notified).</td>
+                    <td class="shared-cell">Customer is responsible for storing API keys securely. Leaked keys must be reported to <span style="color:#F59E0B;">security@form.coach</span> immediately for revocation.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§4.2 · Vulnerability management</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Control</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-shared">Shared</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Secure SDLC</td>
+                    <td class="form-cell">Code review required before merge. SAST (CodeQL) in CI. No secrets in source (gitleaks pre-commit hook).</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Annual penetration test</td>
+                    <td class="form-cell">Independent external pen test annually. Findings remediated per severity SLA (<code class="font-mono text-xs" style="color:#DDFF2D;">docs/PENETRATION_TESTING.md</code>). Summary shared with enterprise customers under NDA.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Third-party integrations (customer-built)</td>
+                    <td class="form-cell"></td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell">Customer is responsible for securing any tools that access FORM via the Admin API. OAuth tokens issued to customer-operated integrations are the customer's responsibility to rotate and revoke.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§4.3 · Computer vision (CV) pipeline</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Control</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-shared">Shared</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>On-device inference</td>
+                    <td class="form-cell">CV models run on-device. Raw camera frames are never uploaded. Only derived pose keypoints are transmitted.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Model integrity</td>
+                    <td class="form-cell">Models are signed. The app validates the signature before loading.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Camera permission</td>
+                    <td class="form-cell">FORM requests camera permission only when CV coaching is initiated, using the OS-native permission prompt.</td>
+                    <td class="shared-cell">Enterprise IT may restrict camera access via MDM policy — this will disable CV coaching for those devices (graceful degradation to rep-counting).</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 5. Identity & Access Management ───────────────── -->
+      <div id="identity">
+        <div class="label mb-4">§5</div>
+        <h2 class="sec-heading text-[36px] mb-2">Identity &amp; Access <em>Management</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">User lifecycle, RBAC, and MFA/session policy ownership.</p>
+
+        <!-- RBAC summary -->
+        <div class="section-card mb-4">
+          <div class="px-6 py-4 border-b border-line">
+            <div class="label">FORM enterprise roles</div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="resp-table">
+              <thead>
+                <tr>
+                  <th>Role</th>
+                  <th class="col-form" style="text-align:left;">Permission scope</th>
+                  <th class="col-customer" style="text-align:left;">Who assigns</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#DDFF2D;">tenant_owner</span></td>
+                  <td class="form-cell">Full org control — billing, SSO config, delete org</td>
+                  <td class="customer-cell"><strong class="text-paper">FORM enterprise-architect only.</strong> Cannot be mapped via SCIM or SSO group — a hard schema constraint preventing IdP compromise from becoming a full org takeover.</td>
+                </tr>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#A39D8E;">tenant_admin</span></td>
+                  <td class="form-cell">All admin capabilities except delete org and billing transfer</td>
+                  <td class="customer-cell">Customer IT via SCIM group mapping or manual assignment.</td>
+                </tr>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#A39D8E;">tenant_manager</span></td>
+                  <td class="form-cell">Read-only aggregate reports; manage assigned user groups</td>
+                  <td class="customer-cell">Customer IT via SCIM group mapping.</td>
+                </tr>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#6F6A60;">member</span></td>
+                  <td class="form-cell">Personal coaching access only</td>
+                  <td class="customer-cell">All provisioned users by default.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="px-6 py-4 border-b border-line">
+            <div class="label">§5.1–5.3 · User lifecycle, RBAC &amp; session policy</div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="resp-table">
+              <thead>
+                <tr>
+                  <th>Control</th>
+                  <th class="col-form">FORM</th>
+                  <th class="col-shared">Shared</th>
+                  <th class="col-customer">Customer</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>User provisioning (SCIM 2.0)</td>
+                  <td class="form-cell">FORM maintains the SCIM v2 endpoint. JIT provisioning creates records on first successful SSO assertion when enabled.</td>
+                  <td class="shared-cell">Customer IT configures the SCIM connector in their IdP. FORM provides per-IdP guides. Customer controls whether JIT is enabled — regulated environments typically require SCIM-first provisioning.</td>
+                  <td class="customer-cell"></td>
+                </tr>
+                <tr>
+                  <td>User deprovisioning</td>
+                  <td class="form-cell">FORM revokes all active sessions synchronously when a SCIM deactivation signal arrives.</td>
+                  <td class="shared-cell">Customer IT is responsible for removing the user from the IdP group or disabling their IdP account to trigger SCIM deactivation. Deprovisioning does <strong class="text-paper">not</strong> happen automatically on HR system termination unless HR is connected to the IdP.</td>
+                  <td class="customer-cell"></td>
+                </tr>
+                <tr>
+                  <td>Role-to-group mapping</td>
+                  <td class="form-cell">Role schema and enforcement in JWT claims + database RLS.</td>
+                  <td class="shared-cell">FORM provides the mapping interface. Customer IT defines which IdP groups map to which FORM roles. On multiple conflicting groups, higher privilege wins (DEC-043 rationale).</td>
+                  <td class="customer-cell"></td>
+                </tr>
+                <tr>
+                  <td>Principle of least privilege</td>
+                  <td class="form-cell"></td>
+                  <td class="shared-cell"></td>
+                  <td class="customer-cell">Customer is responsible for granting only the minimum necessary FORM role to each employee group.</td>
+                </tr>
+                <tr>
+                  <td>Access review (quarterly)</td>
+                  <td class="form-cell"></td>
+                  <td class="shared-cell">FORM provides the audit log viewer and SCIM roster API. Customer's security or IT team is responsible for running periodic access reviews. FORM recommends quarterly.</td>
+                  <td class="customer-cell"></td>
+                </tr>
+                <tr>
+                  <td>MFA enforcement</td>
+                  <td class="form-cell">SSO is the <strong class="text-paper">only</strong> authentication path once configured. MFA enforcement is the IdP's responsibility.</td>
+                  <td class="shared-cell">Customer IdP administrator enforces MFA on the IdP application. FORM strongly recommends MFA and will flag its absence at onboarding. FORM cannot enforce MFA independently of the IdP.</td>
+                  <td class="customer-cell"></td>
+                </tr>
+                <tr>
+                  <td>Session duration</td>
+                  <td class="form-cell">FORM enforces the maximum session duration configured for the tenant (<span class="font-mono text-xs" style="color:#DDFF2D;">session_timeout_hours</span>, default 168h / 7 days). Sessions expire unconditionally at the configured maximum.</td>
+                  <td class="shared-cell">Customer specifies timeout during onboarding. Regulated environments (healthcare, finance) commonly require 8 hours.</td>
+                  <td class="customer-cell"></td>
+                </tr>
+                <tr>
+                  <td>Employee ability to revoke company association</td>
+                  <td class="form-cell">Any employee can disassociate their FORM account at any time from Settings → Privacy → Leave organisation. FORM enforces this unconditionally.</td>
+                  <td class="shared-cell"></td>
+                  <td class="customer-cell"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 6. Data Security & Privacy ────────────────────── -->
+      <div id="data">
+        <div class="label mb-4">§6</div>
+        <h2 class="sec-heading text-[36px] mb-2">Data Security <em>&amp; Privacy</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">Encryption, multi-tenant isolation, and GDPR controller–processor boundary.</p>
+
+        <div class="space-y-4">
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§6.1 · Encryption</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Control</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-shared">Shared</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Encryption in transit</td>
+                    <td class="form-cell">TLS 1.2+ on all endpoints. Certificate managed by Cloudflare. HSTS enforced.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Encryption at rest (Postgres + R2)</td>
+                    <td class="form-cell">AES-256 at rest on Supabase Postgres (Supabase SOC 2 evidence available) and Cloudflare R2.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Health data fields (GDPR Art. 9 special-category)</td>
+                    <td class="form-cell">Column-level AES-256-GCM on <span class="font-mono text-xs" style="color:#DDFF2D;">body_metrics</span>, <span class="font-mono text-xs" style="color:#DDFF2D;">workout_sessions</span>, <span class="font-mono text-xs" style="color:#DDFF2D;">ed_screening</span>. Key rotation per <code class="font-mono text-xs" style="color:#DDFF2D;">docs/KEY_ROTATION.md</code>.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Customer-managed encryption keys (BYOK)</td>
+                    <td class="form-cell" colspan="3" style="color:#6F6A60;">Not currently available. Roadmap: post-Series A. Enterprise customers requiring BYOK must note this as a contractual gap.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§6.2 · Multi-tenant data isolation</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Control</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-shared">Shared</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>RLS policy enforcement</td>
+                    <td class="form-cell">Every application query runs under a Postgres role that has RLS enforced. <span class="font-mono text-xs" style="color:#DDFF2D;">form_admin</span> (BYPASSRLS) is restricted to migration runner and compliance toolchain — never the API request path.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td><span class="font-mono text-xs" style="color:#DDFF2D;">tenant_id</span> sourced from JWT claims</td>
+                    <td class="form-cell"><span class="font-mono text-xs" style="color:#DDFF2D;">tenant_id</span> is extracted from the verified JWT, never from client request parameters. A missing or invalid <span class="font-mono text-xs" style="color:#DDFF2D;">tenant_id</span> returns 0 rows — fail-closed.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Cross-tenant penetration test</td>
+                    <td class="form-cell">Annual penetration test includes explicit cross-tenant isolation testing. A failed RLS bypass is a P0 finding with immediate remediation. Adversarial CI suite also tests this on every deploy.</td>
+                    <td class="shared-cell"></td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Admin API key scope</td>
+                    <td class="form-cell">Admin API enforces tenant scoping at all endpoints.</td>
+                    <td class="shared-cell">Customer is responsible for the security of Admin API keys. A compromised key can read all data within that tenant's scope.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§6.3 · GDPR controller–processor responsibilities</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Obligation</th>
+                    <th class="col-form">FORM (Processor)</th>
+                    <th class="col-customer">Customer (Controller)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>DPA execution</td>
+                    <td class="form-cell">FORM provides a GDPR-compliant Data Processing Addendum. Executed before pilot data flows.</td>
+                    <td class="customer-cell">Customer legal must review and sign the DPA before any employee data enters FORM.</td>
+                  </tr>
+                  <tr>
+                    <td>Lawful basis for processing</td>
+                    <td class="form-cell"></td>
+                    <td class="customer-cell">Customer must establish and document a lawful basis under Art. 6 — typically Art. 6(1)(b) (employment contract performance) or Art. 6(1)(a) (consent), depending on programme design.</td>
+                  </tr>
+                  <tr>
+                    <td>Art. 13–14 employee notice</td>
+                    <td class="form-cell">FORM's consumer privacy notice (form.coach/privacy) covers data processed after first login.</td>
+                    <td class="customer-cell">Customer must issue a separate Art. 14 notice to employees about SCIM-provisioned data (directory attributes synced before first login). FORM's privacy notice does not cover this.</td>
+                  </tr>
+                  <tr>
+                    <td>Standard Contractual Clauses (SCCs)</td>
+                    <td class="form-cell">FORM includes SCCs Module 2 (controller-to-processor) in the DPA for US-region tenants processing EU employee data.</td>
+                    <td class="customer-cell">Customer's legal team must confirm that SCCs are an appropriate transfer mechanism. Some sector-specific rules impose stricter requirements.</td>
+                  </tr>
+                  <tr>
+                    <td>Sub-processor disclosure</td>
+                    <td class="form-cell">FORM maintains a public sub-processor list at <a href="/subprocessors.html" style="color:#DDFF2D;text-decoration:underline;">form.coach/subprocessors</a>. 30-day advance notice for material changes.</td>
+                    <td class="customer-cell">Customer has the right to object to new sub-processors within the 30-day notice window.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 7. Audit Logging ───────────────────────────────── -->
+      <div id="audit">
+        <div class="label mb-4">§7</div>
+        <h2 class="sec-heading text-[36px] mb-2">Audit Logging <em>&amp; Evidence</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">FORM maintains an append-only, HMAC-chained audit log for all privileged actions (DEC-030). Any modification to a historical log record breaks the chain and is detected.</p>
+
+        <!-- Log categories -->
+        <div class="section-card mb-4">
+          <div class="px-6 py-4 border-b border-line">
+            <div class="label">§7.1 · What FORM logs</div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="resp-table">
+              <thead>
+                <tr>
+                  <th>Log category</th>
+                  <th class="col-form" style="text-align:left;">Retention</th>
+                  <th class="col-form" style="text-align:left;">Who can read</th>
+                  <th class="col-shared" style="text-align:left;">Notifies tenant</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#DDFF2D;">auth.*</span> — login, logout, SSO assertions, MFA events</td>
+                  <td class="form-cell">3 years</td>
+                  <td class="form-cell">Tenant <span class="font-mono text-xs">tenant_admin</span> + FORM security-engineer</td>
+                  <td class="shared-cell" style="color:#6F6A60;">No</td>
+                </tr>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#DDFF2D;">admin.*</span> — provisioning, role changes, config changes</td>
+                  <td class="form-cell">7 years</td>
+                  <td class="form-cell">Tenant <span class="font-mono text-xs">tenant_admin</span> + FORM security-engineer</td>
+                  <td class="shared-cell" style="color:#6F6A60;">Visible in audit log viewer</td>
+                </tr>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#DDFF2D;">support.*</span> — FORM employee views tenant data</td>
+                  <td class="form-cell">7 years</td>
+                  <td class="form-cell">FORM security-engineer + compliance-officer</td>
+                  <td class="shared-cell" style="color:#F59E0B;">✓ Tenant admin email within 24h</td>
+                </tr>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#DDFF2D;">data.*</span> — sensitive field access, bulk exports, DSARs</td>
+                  <td class="form-cell">7 years</td>
+                  <td class="form-cell">FORM compliance-officer</td>
+                  <td class="shared-cell" style="color:#6F6A60;">Available on DSAR request</td>
+                </tr>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#DDFF2D;">security.*</span> — rate limit hits, quota warnings, break-glass access</td>
+                  <td class="form-cell">3 years</td>
+                  <td class="form-cell">FORM security-engineer + tenant <span class="font-mono text-xs">tenant_admin</span></td>
+                  <td class="shared-cell" style="color:#F59E0B;">Alert at quota 80% / 95%</td>
+                </tr>
+                <tr>
+                  <td><span class="font-mono text-xs" style="color:#DDFF2D;">billing.*</span> — contract events, seat changes, pilot state</td>
+                  <td class="form-cell">7 years</td>
+                  <td class="form-cell">Tenant <span class="font-mono text-xs">tenant_owner</span> + FORM billing</td>
+                  <td class="shared-cell" style="color:#6F6A60;">No</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="px-6 py-4 border-b border-line">
+            <div class="label">§7.2 · Audit log access responsibilities</div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="resp-table">
+              <thead>
+                <tr>
+                  <th>Control</th>
+                  <th class="col-form">FORM</th>
+                  <th class="col-shared">Shared</th>
+                  <th class="col-customer">Customer</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Generating and storing audit logs</td>
+                  <td class="form-cell">All logs generated automatically. Cannot be disabled by tenant config.</td>
+                  <td class="shared-cell"></td>
+                  <td class="customer-cell"></td>
+                </tr>
+                <tr>
+                  <td>HMAC chain integrity validation</td>
+                  <td class="form-cell">Validated on read and by scheduled nightly job. Integrity failure triggers a P0 incident.</td>
+                  <td class="shared-cell"></td>
+                  <td class="customer-cell"></td>
+                </tr>
+                <tr>
+                  <td>Exporting audit logs</td>
+                  <td class="form-cell">FORM provides <span class="font-mono text-xs" style="color:#DDFF2D;">/v1/audit-logs</span> export endpoint for tenant admins. SIEM integrations (Datadog, Splunk) and S3 sync available on Growth+ tier.</td>
+                  <td class="shared-cell"></td>
+                  <td class="customer-cell"></td>
+                </tr>
+                <tr>
+                  <td>Reviewing logs for anomalies</td>
+                  <td class="form-cell"></td>
+                  <td class="shared-cell"></td>
+                  <td class="customer-cell">Customer's security team is responsible for reviewing their tenant's audit logs. FORM provides the data; FORM does not perform threat hunting on behalf of customers.</td>
+                </tr>
+                <tr>
+                  <td>Retaining logs beyond FORM retention periods</td>
+                  <td class="form-cell"></td>
+                  <td class="shared-cell"></td>
+                  <td class="customer-cell">If customer compliance requirements exceed FORM's 7-year retention, customer must export and store logs in their own SIEM/archive before FORM retention elapses.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 8. Operations & IR ─────────────────────────────── -->
+      <div id="operations">
+        <div class="label mb-4">§8</div>
+        <h2 class="sec-heading text-[36px] mb-2">Operations &amp; <em>Incident Response</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">Uptime, SLA, and incident response ownership by severity classification.</p>
+
+        <!-- IR table by severity -->
+        <div class="space-y-4">
+          <!-- P0 -->
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+              <div class="label">P0 — Critical · data breach or full service outage</div>
+              <span class="font-mono text-xs" style="color:#FF5733;background:rgba(255,87,51,0.1);border:1px solid rgba(255,87,51,0.3);border-radius:9999px;padding:3px 10px;">&lt; 1h FORM response</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Step</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Incident detection</td>
+                    <td class="form-cell">Automated alerting (PagerDuty, 60-second probe intervals).</td>
+                    <td class="customer-cell">May also report via <span style="color:#A39D8E;">security@form.coach</span>.</td>
+                  </tr>
+                  <tr>
+                    <td>Incident declaration and triage</td>
+                    <td class="form-cell">FORM security-engineer / devops-lead declares. Full internal triage by FORM.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Customer notification</td>
+                    <td class="form-cell">Tenant technical contact notified within 1 hour of declaration.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>GDPR Art. 33 breach notification</td>
+                    <td class="form-cell">Provides technical facts in writing within 24h of resolution.</td>
+                    <td class="customer-cell">As data controller, customer decides whether Art. 33 notification to supervisory DPA is required and drafts the notification. FORM's written summary supports this.</td>
+                  </tr>
+                  <tr>
+                    <td>Employee / HR communication</td>
+                    <td class="form-cell"></td>
+                    <td class="customer-cell">Customer HR / People team.</td>
+                  </tr>
+                  <tr>
+                    <td>Post-mortem</td>
+                    <td class="form-cell">FORM publishes post-mortem, shared with customer under NDA within 5 business days of resolution.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- P1 / P2-P3 -->
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">P1–P3 · Degradation and configuration incidents</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Control</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-shared">Shared</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>P1 — Significant degradation or vulnerability</td>
+                    <td class="form-cell">FORM leads response. Tenant technical contact notified within 4 hours. Workaround communicated via CSM.</td>
+                    <td class="shared-cell">FORM provides GDPR assessment. Shared with customer if personal data is at risk.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>P2 / P3 — Customer-controlled configuration issues</td>
+                    <td class="form-cell">Provides diagnostic tooling — audit logs, SCIM sync status API — and support within standard SLA window.</td>
+                    <td class="shared-cell">Joint diagnosis: FORM confirms the infrastructure is healthy; customer IT investigates IdP / SCIM configuration.</td>
+                    <td class="customer-cell">Customer IT leads remediation on the IdP side (e.g. misconfigured SCIM, group mapping change).</td>
+                  </tr>
+                  <tr>
+                    <td>Uptime SLA</td>
+                    <td class="form-cell">99.9% monthly uptime (Growth and Enterprise). 99.5% (Starter). Credits calculated and issued automatically. Full terms in <code class="font-mono text-xs" style="color:#DDFF2D;">docs/ENTERPRISE_SLA.md</code>.</td>
+                    <td class="shared-cell">Customer may dispute credit calculations within 30 days of incident month close.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Disaster recovery</td>
+                    <td class="form-cell">Supabase PITR — 7-day restore window, RPO ≤ 1h. RTO target ≤ 4h for Supabase primary failure. Annual DR drill documented.</td>
+                    <td class="shared-cell">FORM provides data egress API. Customer must initiate bulk export before offboarding deadline and retain data in own storage.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 9. Compliance ──────────────────────────────────── -->
+      <div id="compliance">
+        <div class="label mb-4">§9</div>
+        <h2 class="sec-heading text-[36px] mb-2">Compliance &amp; <em>Regulatory Obligations</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">FORM does not assess, verify, or warrant that using FORM satisfies any industry-specific compliance requirement.</p>
+
+        <div class="space-y-4">
+          <!-- FORM's obligations -->
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§9.1 · FORM's compliance obligations</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Area</th>
+                    <th class="col-form">FORM's obligation</th>
+                    <th class="col-form" style="text-align:left;">Evidence available</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>SOC 2 Type II</td>
+                    <td class="form-cell">Target completion 12 months post-commercial launch. Continuous monitoring via Drata.</td>
+                    <td class="form-cell">SOC 2 report under NDA on completion. Pen-test summary + Drata dashboard access available in interim.</td>
+                  </tr>
+                  <tr>
+                    <td>GDPR (as processor)</td>
+                    <td class="form-cell">DPA executed before data flows. Sub-processor list maintained. DSAR tooling provided. SCC in DPA for EU-US transfers.</td>
+                    <td class="form-cell"><code class="font-mono text-xs" style="color:#DDFF2D;">docs/GDPR_DPIA.md</code>, <code class="font-mono text-xs" style="color:#DDFF2D;">docs/SUBPROCESSORS.md</code>.</td>
+                  </tr>
+                  <tr>
+                    <td>Penetration testing</td>
+                    <td class="form-cell">Annual external pen test. Critical findings remediated within 30 days.</td>
+                    <td class="form-cell">Summary shared under NDA. Full report available under NDA + MSA.</td>
+                  </tr>
+                  <tr>
+                    <td>Cryptographic controls</td>
+                    <td class="form-cell">FIPS-aligned cipher suites. Key rotation policy and annual rotation schedule.</td>
+                    <td class="form-cell"><code class="font-mono text-xs" style="color:#DDFF2D;">docs/CRYPTOGRAPHY_POLICY.md</code>, <code class="font-mono text-xs" style="color:#DDFF2D;">docs/KEY_ROTATION.md</code>.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Customer's obligations -->
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§9.2 · Customer's compliance obligations</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Obligation</th>
+                    <th class="col-customer" colspan="2">Guidance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>HIPAA (if applicable)</td>
+                    <td class="customer-cell" colspan="2">FORM is not a Covered Entity and does not accept HIPAA BAAs. Enterprise customers in US healthcare must evaluate whether employee wellness data constitutes PHI. FORM's privacy floor minimises HIPAA exposure but does not eliminate it. Consult legal counsel.</td>
+                  </tr>
+                  <tr>
+                    <td>ISO 27001 supplier assessment</td>
+                    <td class="customer-cell" colspan="2">Customers conducting ISO 27001 assessments may request FORM's ISMS documentation summary, pen-test executive summary, and SOC 2 bridge letter under NDA.</td>
+                  </tr>
+                  <tr>
+                    <td>FedRAMP / StateRAMP</td>
+                    <td class="customer-cell" colspan="2">FORM does not hold and does not plan to pursue FedRAMP authorisation. Government sector customers requiring FedRAMP-authorised products cannot use FORM at this time.</td>
+                  </tr>
+                  <tr>
+                    <td>Employee consent programmes</td>
+                    <td class="customer-cell" colspan="2">Where the customer's jurisdiction requires employee consent before collecting wellness data, the customer is responsible for obtaining, recording, and honouring that consent. FORM provides a technical consent flow in the app; whether it is legally sufficient depends on jurisdiction and programme design.</td>
+                  </tr>
+                  <tr>
+                    <td>Works council / union consultation (EU)</td>
+                    <td class="customer-cell" colspan="2">In EU jurisdictions where employee health monitoring requires works council approval, the customer is responsible for obtaining that approval before deploying FORM.</td>
+                  </tr>
+                  <tr>
+                    <td>Industry-specific data residency</td>
+                    <td class="customer-cell" colspan="2">FORM offers EU (Frankfurt) and US (Virginia) regions. Country-level residency (e.g. Germany-only) is not currently available. Customers with this requirement must disclose it before signing.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 10. Onboarding & Offboarding ──────────────────── -->
+      <div id="onboarding">
+        <div class="label mb-4">§10</div>
+        <h2 class="sec-heading text-[36px] mb-2">Onboarding <em>&amp; Offboarding</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">Step ownership from contract signature to full rollout — and from termination to data deletion certificate.</p>
+
+        <div class="space-y-4">
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§10.1 · Onboarding responsibilities</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Step</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>DPA and MSA execution</td>
+                    <td class="form-cell">FORM prepares DPA and MSA. DPA must be signed before any pilot data enters FORM.</td>
+                    <td class="customer-cell">Customer legal executes both documents.</td>
+                  </tr>
+                  <tr>
+                    <td>Tenant provisioning</td>
+                    <td class="form-cell">FORM enterprise-architect provisions the tenant in production (slug, region, plan).</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>SSO / SCIM configuration</td>
+                    <td class="form-cell">Provides step-by-step guides per IdP. CSM available for live support on the setup call.</td>
+                    <td class="customer-cell">Customer IT implements the IdP configuration and tests SSO in staging before pilot launch.</td>
+                  </tr>
+                  <tr>
+                    <td>White-label branding</td>
+                    <td class="form-cell">Provides the branding configuration panel (logo, primary colour, custom domain).</td>
+                    <td class="customer-cell">Customer provides brand assets (SVG logo, hex colour) and configures CNAME for custom domain. DNS ownership stays with customer.</td>
+                  </tr>
+                  <tr>
+                    <td>Internal employee communication</td>
+                    <td class="form-cell">Provides communication templates and guidance.</td>
+                    <td class="customer-cell">Customer HR / People team sends internal launch communications. FORM cannot communicate with employees directly without customer approval.</td>
+                  </tr>
+                  <tr>
+                    <td>Success criteria definition</td>
+                    <td class="form-cell">CSM facilitates. Template: <code class="font-mono text-xs" style="color:#DDFF2D;">docs/ENTERPRISE_ONBOARDING.md §success-criteria</code>.</td>
+                    <td class="customer-cell">Customer HR/People lead signs off on success criteria before pilot launch.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§10.2 · Offboarding responsibilities</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Step</th>
+                    <th class="col-form">FORM</th>
+                    <th class="col-customer">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Data export window</td>
+                    <td class="form-cell">Data held for export for 30 days after contract end date.</td>
+                    <td class="customer-cell">Customer must initiate bulk export before the 30-day window closes.</td>
+                  </tr>
+                  <tr>
+                    <td>Data deletion</td>
+                    <td class="form-cell">Hard delete of all tenant data within 30 days of export window close. Written deletion certificate issued on request (satisfies GDPR Art. 17).</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                  <tr>
+                    <td>Art. 9 health data (DEC-036)</td>
+                    <td class="form-cell">Hard-deleted immediately — no grace period. This invariant cannot be overridden by MSA clause.</td>
+                    <td class="customer-cell">Employees requiring personal data export must exercise portability (Settings → Privacy → Export) before the offboarding trigger date.</td>
+                  </tr>
+                  <tr>
+                    <td>SSO / SCIM decommissioning</td>
+                    <td class="form-cell"></td>
+                    <td class="customer-cell">Customer IT decommissions the FORM application from their IdP after offboarding to prevent residual access.</td>
+                  </tr>
+                  <tr>
+                    <td>Audit log retention (post-offboarding)</td>
+                    <td class="form-cell">Audit log entries retained for the regulatory retention period (7 years for financial and admin events), in anonymised form.</td>
+                    <td class="customer-cell"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 11. Liability boundaries ─────────────────────── -->
+      <div id="liability">
+        <div class="label mb-4">§11</div>
+        <h2 class="sec-heading text-[36px] mb-2">Liability <em>Boundaries</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">When something falls in a gap, and controls FORM cannot provide at any contract tier.</p>
+
+        <div class="space-y-4">
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§11.1 · Escalation path for control gaps</div>
+            </div>
+            <div class="p-6 space-y-4">
+              <div class="flex gap-4">
+                <div class="w-8 h-8 rounded-full bg-deep border border-line flex items-center justify-center font-mono text-xs text-mute flex-shrink-0">1</div>
+                <div class="text-dim text-sm leading-relaxed pt-1">Customer security team raises the issue with their <strong class="text-paper">FORM CSM</strong> (Growth/Enterprise) or <span style="color:#A39D8E;">support@form.coach</span> (Starter).</div>
+              </div>
+              <div class="flex gap-4">
+                <div class="w-8 h-8 rounded-full bg-deep border border-line flex items-center justify-center font-mono text-xs text-mute flex-shrink-0">2</div>
+                <div class="text-dim text-sm leading-relaxed pt-1">FORM's <strong class="text-paper">enterprise-architect</strong> and <strong class="text-paper">security-engineer</strong> jointly assess whether the control gap is on FORM's side, the customer's side, or genuinely shared.</div>
+              </div>
+              <div class="flex gap-4">
+                <div class="w-8 h-8 rounded-full bg-deep border border-line flex items-center justify-center font-mono text-xs text-mute flex-shrink-0">3</div>
+                <div class="text-dim text-sm leading-relaxed pt-1">Written gap assessment provided within <strong class="text-paper">5 business days.</strong></div>
+              </div>
+              <div class="flex gap-4">
+                <div class="w-8 h-8 rounded-full bg-acid" style="min-width:2rem;height:2rem;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:#0B0A07;flex-shrink:0;">4</div>
+                <div class="text-dim text-sm leading-relaxed pt-1">If gap is on FORM's side: internal issue filed, added to remediation backlog with a target date. If on customer's side: FORM provides a configuration guide and CSM support. If genuinely shared: both parties agree on a remediation plan.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="px-6 py-4 border-b border-line">
+              <div class="label">§11.2 · Controls FORM cannot provide</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="resp-table">
+                <thead>
+                  <tr>
+                    <th>Out-of-scope control</th>
+                    <th class="col-customer" colspan="2">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>MFA enforcement on the SSO path</td>
+                    <td class="customer-cell" colspan="2">Controlled by the customer's IdP. FORM cannot force-enable MFA on a third-party identity provider.</td>
+                  </tr>
+                  <tr>
+                    <td>Physical device security for employee devices</td>
+                    <td class="customer-cell" colspan="2">FORM is a mobile app. Physical security is outside FORM's perimeter.</td>
+                  </tr>
+                  <tr>
+                    <td>Preventing insider threat from within the customer's IdP admin team</td>
+                    <td class="customer-cell" colspan="2">A compromised IdP admin can provision rogue users. FORM mitigates this by requiring FORM enterprise-architect approval for <span class="font-mono text-xs" style="color:#DDFF2D;">tenant_owner</span> changes, but cannot fully prevent an IdP-level compromise.</td>
+                  </tr>
+                  <tr>
+                    <td>Monitoring employee use of the FORM app</td>
+                    <td class="customer-cell" colspan="2">FORM's privacy floor prohibits employer access to individual user data. This is a product constraint, not a technical gap.</td>
+                  </tr>
+                  <tr>
+                    <td>HIPAA BAA</td>
+                    <td class="customer-cell" colspan="2">Not available at this time.</td>
+                  </tr>
+                  <tr>
+                    <td>Country-level data residency below EU / US region</td>
+                    <td class="customer-cell" colspan="2">Not available at this time. Roadmap: post-Series A.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 12. Non-Negotiable Floors ─────────────────────── -->
+      <div id="floors">
+        <div class="label mb-4 text-ember">§12</div>
+        <h2 class="sec-heading text-[36px] mb-2">Non-Negotiable <em>Floors</em></h2>
+        <p class="text-mute text-sm mb-8 leading-relaxed">These customer requests are declined regardless of contract value or legal pressure. These protections exist for employees — FORM's end users — and cannot be waived by any party.</p>
+
+        <div class="section-card" style="border-color:rgba(255,87,51,0.2);background:rgba(255,87,51,0.02);">
+          <div class="px-6 py-4 border-b" style="border-color:rgba(255,87,51,0.15);">
+            <div class="label" style="color:rgba(255,87,51,0.6);">Declined regardless of contract value or legal pressure</div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="floor-table">
+              <thead>
+                <tr>
+                  <th>Request</th>
+                  <th>Response</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Grant HR access to individual employee health, body composition, or coaching data</td>
+                  <td>Declined. Privacy floor enforced at application + database layer. Not configurable by any admin role or MSA clause.</td>
+                </tr>
+                <tr>
+                  <td>Share workout performance or health data for insurance premium calculation</td>
+                  <td>Declined. Explicitly listed in <code class="font-mono text-xs" style="color:#A39D8E;">docs/ENTERPRISE.md §When we say no</code>.</td>
+                </tr>
+                <tr>
+                  <td>Enable real-time monitoring of individual employee fitness activity</td>
+                  <td>Declined. Admin dashboard shows aggregates only, with a minimum cohort size of 10. No individual time-series is exposed.</td>
+                </tr>
+                <tr>
+                  <td>Provide a backdoor or law enforcement access without valid legal process</td>
+                  <td>Declined. FORM follows a legal-review-first government request policy. Narrowest possible response. User notification where legally permitted. Transparency report published annually.</td>
+                </tr>
+                <tr>
+                  <td>Tie wellness participation to performance reviews, insurance, or employment consequences</td>
+                  <td>Declined. Employee participation data is never surfaced to managers in any form. A contract that requires this is not a contract FORM signs.</td>
+                </tr>
+                <tr>
+                  <td>Custom feature that weakens the HMAC audit chain (DEC-030)</td>
+                  <td>Declined. Audit chain integrity is a SOC 2 Type II control. Weakening it invalidates the control for all tenants and the observation period.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Glossary ───────────────────────────────────────── -->
+      <div id="glossary">
+        <div class="label mb-4">§13</div>
+        <h2 class="sec-heading text-[36px] mb-8">Glossary</h2>
+
+        <div class="section-card">
+          <div class="px-6 py-2">
+            <div class="glossary-item">
+              <div class="glossary-term">Processor</div>
+              <div class="glossary-def">FORM's legal role under GDPR. Processes personal data on behalf of the controller.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">Controller</div>
+              <div class="glossary-def">The enterprise customer. Determines the purpose and means of processing employee data.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">DPA</div>
+              <div class="glossary-def">Data Processing Addendum. Contract between controller and processor per GDPR Art. 28.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">SCIM</div>
+              <div class="glossary-def">System for Cross-domain Identity Management. Protocol for automated user provisioning.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">RLS</div>
+              <div class="glossary-def">Row-Level Security. Postgres feature that enforces tenant data isolation at the database layer.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">JIT</div>
+              <div class="glossary-def">Just-In-Time provisioning. User record created in FORM on first successful SSO login.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">HMAC chain</div>
+              <div class="glossary-def">Hash-based Message Authentication Code chain. Provides tamper-evident audit log integrity (DEC-030).</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">Break-glass</div>
+              <div class="glossary-def">Emergency access procedure for FORM personnel to access a tenant's data with 2-person approval and time-bounded scope.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">CSM</div>
+              <div class="glossary-def">Customer Success Manager. Named FORM contact for Growth and Enterprise plan customers.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">DSAR</div>
+              <div class="glossary-def">Data Subject Access Request. Formal request by an individual to receive or delete their personal data.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">Privacy floor</div>
+              <div class="glossary-def">Non-negotiable data access boundaries protecting employees from employer surveillance. Enforced at application and database layer.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">SOC 2 Type II</div>
+              <div class="glossary-def">Audit of security controls over a 12-month observation period by an independent CPA firm.</div>
+            </div>
+            <div class="glossary-item">
+              <div class="glossary-term">SCCs</div>
+              <div class="glossary-def">Standard Contractual Clauses. EU-approved contractual mechanism for transferring personal data from the EU to third countries. Included in FORM's DPA.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main content -->
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
+<!-- ─── Due diligence package ─────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-16">
+  <div class="label mb-8">Complete due diligence package</div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+    <a href="/security.html" class="bg-deep border border-line rounded-2xl p-6 hover:border-mute transition-colors group block" style="text-decoration:none;">
+      <div class="label mb-3 text-acid">Security</div>
+      <div class="text-paper text-sm font-medium mb-2">Security posture</div>
+      <div class="text-mute text-xs leading-relaxed">Architecture, controls, pen-testing cadence, vulnerability management.</div>
+      <div class="mt-5 font-mono text-[10px] text-mute group-hover:text-paper transition-colors tracking-widest">VIEW →</div>
+    </a>
+
+    <a href="/privacy.html" class="bg-deep border border-line rounded-2xl p-6 hover:border-mute transition-colors group block" style="text-decoration:none;">
+      <div class="label mb-3">Privacy</div>
+      <div class="text-paper text-sm font-medium mb-2">Privacy policy</div>
+      <div class="text-mute text-xs leading-relaxed">What we collect, why, retention periods, and legal basis under GDPR Art. 13/14.</div>
+      <div class="mt-5 font-mono text-[10px] text-mute group-hover:text-paper transition-colors tracking-widest">VIEW →</div>
+    </a>
+
+    <a href="/subprocessors.html" class="bg-deep border border-line rounded-2xl p-6 hover:border-mute transition-colors group block" style="text-decoration:none;">
+      <div class="label mb-3">Subprocessors</div>
+      <div class="text-paper text-sm font-medium mb-2">Sub-processor registry</div>
+      <div class="text-mute text-xs leading-relaxed">Full vendor list, data categories, legal basis, and DPA status — updated on any change.</div>
+      <div class="mt-5 font-mono text-[10px] text-mute group-hover:text-paper transition-colors tracking-widest">VIEW →</div>
+    </a>
+
+    <div class="bg-deep border rounded-2xl p-6" style="border-color:rgba(221,255,45,0.25);background:rgba(221,255,45,0.02);">
+      <div class="label mb-3 text-acid">Shared responsibility</div>
+      <div class="text-paper text-sm font-medium mb-2">This document</div>
+      <div class="text-mute text-xs leading-relaxed">Infrastructure, identity, data, audit, operations, and compliance ownership boundaries.</div>
+      <div class="mt-5 font-mono text-[10px] text-acid tracking-widest">YOU ARE HERE</div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider" style="margin:0 2rem;" />
+
+<!-- ─── CTA ────────────────────────────────────────────────── -->
+<section class="max-w-[1440px] mx-auto px-8 py-20 text-center">
+  <div class="max-w-2xl mx-auto">
+    <div class="label mb-8">Questions on ownership boundaries?</div>
+    <h2 class="display text-[60px] md:text-[72px] text-paper mb-8">
+      We answer<br/><em>before</em> you sign.
+    </h2>
+    <p class="text-dim text-lg mb-12 leading-relaxed" style="font-weight:300;">
+      Your security team can schedule a 60-minute deep-dive on any section of this document. No NDAs required for the initial call. DPA signed before any pilot data flows.
+    </p>
+    <div class="flex flex-wrap gap-4 justify-center">
+      <a href="mailto:enterprise@form.coach?subject=Shared%20Responsibility%20Model%20%E2%80%94%20deep%20dive%20request" class="btn-acid">Schedule a security review →</a>
+      <a href="/enterprise.html" class="btn-out">Enterprise overview</a>
+    </div>
+    <p class="text-mute text-xs mt-8 font-mono">enterprise-architect + compliance-officer + security-engineer · v1.0 · 2026-06-12</p>
+  </div>
+</section>
+
+<!-- ─── Footer ─────────────────────────────────────────────── -->
+<footer class="border-t border-line">
+  <div class="max-w-[1440px] mx-auto px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 bg-acid rounded-full"></div>
+      <span class="font-serif text-lg tracking-tight text-paper">FORM<span class="text-acid">.</span></span>
+      <span class="label ml-2">Enterprise</span>
+    </div>
+    <nav class="flex flex-wrap gap-6 font-mono text-[11px] tracking-widest uppercase text-mute">
+      <a href="/enterprise.html" class="hover:text-paper transition-colors">Enterprise</a>
+      <a href="/pricing-enterprise.html" class="hover:text-paper transition-colors">Pricing</a>
+      <a href="/admin-dashboard.html" class="hover:text-paper transition-colors">Admin demo</a>
+      <a href="/security.html" class="hover:text-paper transition-colors">Security</a>
+      <a href="/privacy.html" class="hover:text-paper transition-colors">Privacy</a>
+      <a href="/subprocessors.html" class="hover:text-paper transition-colors">Subprocessors</a>
+      <a href="mailto:enterprise@form.coach" class="hover:text-paper transition-colors">Contact sales</a>
+    </nav>
+    <div class="text-mute text-xs font-mono">© 2026 FORM · Privacy floor enforced</div>
+  </div>
+</footer>
+
+</body>
+</html>

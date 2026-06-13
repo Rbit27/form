@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.54.0] — 2026-06-13
+
+### Added
+- `shared-responsibility.html` — Enterprise Shared Responsibility Model as a public due diligence page. 13 sections: summary matrix (28 rows across 5 domains), infrastructure security (§3: physical, network, patching), application security (§4: auth, vulnerability management, CV pipeline), identity & access management (§5: user lifecycle, RBAC roles, session policy), data security & privacy (§6: encryption, multi-tenant isolation, GDPR controller–processor boundary), audit logging (§7: DEC-030 HMAC chain, log categories by retention and read access), operations & incident response (§8: P0–P3 severity tables with step-level ownership), compliance & regulatory obligations (§9: FORM's SOC 2/GDPR/pen-test obligations + customer's HIPAA/ISO/FedRAMP/consent obligations), onboarding & offboarding (§10: step-by-step ownership), liability boundaries (§11: escalation path + out-of-scope controls), non-negotiable floors (§12: 6 declined request types), glossary (§13: 13 terms). Colour-coded FORM/Shared/Customer pills. Sticky ToC navigation. Consistent design system: Fraunces + Manrope + JetBrains Mono, ink/paper/acid palette, grain overlay.
+- Referenced: `docs/SHARED_RESPONSIBILITY_MODEL.md`, `docs/ENTERPRISE.md`, `docs/AUDIT_LOG_SCHEMA.md`, DEC-030, DEC-036, DEC-043, DEC-045.
+
+### Changed
+- `enterprise.html` — "Shared responsibility model" due diligence card updated from "AVAILABLE ON REQUEST" placeholder to live link `/shared-responsibility.html` with hover state. Compliance badge in §Compliance & security posture section also linked. Owners: enterprise-architect + compliance-officer + security-engineer.
+- `VERSION` — 4.53.1 → 4.54.0.
+
+---
+
 ## [4.53.1] — 2026-06-13
 
 ### Added
