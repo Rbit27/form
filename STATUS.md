@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.47.0** — 2026-06-13
+**v4.47.1** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 32 | Draft — posts 630–632 added (block continues, 32/50) |
+| 601–650 | Programming edge cases | 33 | Draft — posts 630–633 added (block continues, 33/50) |
 
-**Total posts: 632**
+**Total posts: 633**
 
 ---
 
