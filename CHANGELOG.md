@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [4.65.3] — 2026-06-13
+
+### Added
+- `content/post-667-lumbar-spine-under-load.md` — Biomechanics block post 17/50. Lumbar spine mechanics under load: neutral spine as a range not a fixed angle; butt wink dissected (femoral-acetabular impingement as structural constraint, ankle dorsiflexion as upstream cause); flexion-relaxation phenomenon at end-range; moment arm analysis comparing low-bar squat, high-bar squat, conventional and sumo deadlift; IAP — 360-degree bracing vs hollowing, Valsalva at 85%+; practical pre-lift checklist. Clinical safety: mechanics-only, no pain/rehab content. Sports-scientist review required before publish.
+- `content/post-668-thoracic-spine-strength-training.md` — Biomechanics block post 18/50. Thoracic spine mechanics in strength training: rib cage as mobility limiter, 20–25° total extension range; how T-spine deficits manifest in overhead press (compensatory lumbar extension), bench press (scapular protraction), and rows (premature anterior tilt limits lat ROM); scapular mechanics — posterior tilt requires T-spine extension underneath it; postural vs structural kyphosis (passive extension test as screen); "chest up" cue explained biomechanically; foam roller + wall angel warm-up integration. Clinical safety: mechanics-only, no pain/rehab content. Sports-scientist review required before publish.
+- `compliance/dpa/dpa-collection-checklist-posthog-2026-06-13.md` — PostHog DPA scope review (DEC-046 pre-condition #1 — compliance-officer). Full scope analysis: `readiness_bucket` confirmed within PostHog product analytics scope; Art. 9 health data analysis per DEC-046 clinical-safety ruling (three-bucket collapse not Art. 9 under EDPB guidance 03/2020); EU adequacy confirmed for EU Cloud Frankfurt (no SCC Module 2 required); mood_bucket/mood_score/readiness_score raw permanently prohibited. Click-through execution pending (founder action — PostHog Dashboard → Organization → Privacy & DPA). Three DEC-046 pre-conditions tabulated: review complete (#1), platform-engineer SDK allowlist (#2 pending), CI lint rule (#3 pending).
+
+### Changed
+- `STATUS.md` — block 651–700 row updated 14 → 16 posts; total posts 664 → 666; next priorities updated (newsletter-05 READY TO SEND; PostHog DPA review COMPLETE → click-through pending; Block 651–700 next: 669+).
+- `VERSION` — 4.65.2 → 4.65.3.
+
+---
+
 ## [4.65.2] — 2026-06-13
 
 ### Changed
