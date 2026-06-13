@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.5.5
+# FORM · SOC 2 Type II Readiness v3.7.0
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -139,7 +139,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Load testing before launches | 🟡 Partial | Program defined — `docs/SOC2_READINESS.md §33.3` (k6 scenarios, pass criteria, PRE-33-E-002); DEC-030 gate events and production alert rules — `docs/OBSERVABILITY.md §40`; first gate execution pending M5 |
 | Auto-scaling configured | 🟡 Partial | Cloudflare Workers scale automatically; Supabase connection pooling needed |
 | Disaster recovery RTO/RPO defined | ✅ Done | `docs/SECURITY.md` §10 — RTO 4h, RPO 1h |
-| DR test performed annually | 🔴 Gap | Schedule annual DR drill |
+| DR test performed annually | 🟡 Partial | DR Drill Procedure defined — `docs/BUSINESS_CONTINUITY.md §7` (quarterly Postgres PITR drill + annual full-scope cold-storage drill); BC-SLO-04 (≥ 1 restore test/quarter, `docs/OBSERVABILITY.md §39`); first quarterly drill execution pending M5 |
 
 ---
 
@@ -242,8 +242,8 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 | Control | Status | Evidence |
 |---|---|---|
 | Privacy floor enforced — HR cannot see individual data | ✅ Done | `docs/ENTERPRISE.md` — 7 non-negotiable privacy rules; data.read_individual = forbidden + alert |
-| Privacy incident tracking | 🟡 Gap | Formalize as part of incident response (severity classification) |
-| Annual privacy review | 🔴 Gap | Schedule as part of compliance calendar |
+| Privacy incident tracking | 🟡 Partial | §77 Privacy Incident Classification framework; PI-P0–PI-P3 severity taxonomy; mapped to `docs/INCIDENT_RESPONSE.md §15` (Art. 33/34), R-11 (biometric), R-22 (privacy floor); three new DEC-030 events (`privacy.incident_opened/reviewed/closed`) defined; PRIV-PI-E-001–E-003 evidence paths defined; first observation-quarter incident register collection pending M5 |
+| Annual privacy review | 🟡 Partial | §60 Annual Privacy Programme Review — 8-phase P1.1–P8.1 procedure, evidence artefacts P-E-001–P-E-010 defined; Art. 22 AI automated decision-making controls documented; `privacy.annual_review_completed` DEC-030 event registered (AUDIT_LOG_SCHEMA.md v2.0); first January execution pending (scheduled Q1 2027) |
 
 ---
 
@@ -251,11 +251,11 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Severity | Count | Examples |
 |---|---|---|
-| 🔴 **Critical gap** (blocks SOC 2) | 0 | ~~Cookie banner / consent management (PRE-16)~~ — closed 🟡 Authored in §74 (2026-06-09); no remaining 🔴 critical gaps |
-| 🟡 **Partial / needs formalization** | 34 | PRE-16 cookie consent (`form-consent-gate` Worker + `consent_records` DDL authored, §74), offboarding procedure, quarterly access review (§23 — first execution pending), vendor security review (§17), DR drill (Q1-Jan scheduled), CC7.1–CC7.2 (pentest program defined, execution pending), patching SLA, DSAR SLA, phishing simulation (platform pending), sub-processor list publication (§20 — implementation checklist complete), annual privacy review (§15.1 Q1-Jan scheduled), change management CI gates (§21) |
+| 🔴 **Critical gap** (blocks SOC 2) | 0 | No remaining 🔴 critical gaps blocking observation period start |
+| 🟡 **Partial / needs formalization** | 36 | PRE-16 cookie consent (`form-consent-gate` Worker + `consent_records` DDL authored, §74), offboarding procedure, quarterly access review (§23 — first execution pending), vendor security review (§17), DR drill (§7 BCP + BC-SLO-04 defined, first execution pending M5), CC7.1–CC7.2 (pentest program defined, execution pending), patching SLA, DSAR SLA, phishing simulation (platform pending), sub-processor list publication (§20 — implementation checklist complete), annual privacy review (§60 procedure defined, first execution Q1 2027), privacy incident tracking (§77 classification framework defined), change management CI gates (§21) |
 | ✅ **In place** | 31 | HMAC audit log, encryption, RLS tenant isolation, access controls, CV on-device, breach notification, data classification policy (§13), DPIA (docs/GDPR_DPIA.md), formal risk register (§14), compliance calendar (§15), penetration test program (§16), privacy policy (docs/PRIVACY_POLICY.md), security awareness training programme (§22), BCP/DR architecture (§18), cold storage backup architecture (§19), status page architecture (§20), change management policy (§21) |
 
-**Readiness score: ~98.3% controls fully in place or formally designed** (v3.5; see version history at bottom). No remaining 🔴 critical gaps blocking observation period start.
+**Readiness score: ~98.4% controls fully in place or formally designed** (v3.7.0; see version history at bottom). No remaining 🔴 critical gaps blocking observation period start.
 
 ---
 
@@ -25885,5 +25885,312 @@ HR-facing principle: No monitoring signal exposes individual user activity to HR
 | **OQ-ANOM-02** | **Is the 30-min dead-man's switch (AL-SIEM-06) threshold appropriate for the FORM event volume before enterprise GA?** Pre-enterprise, SIEM event volume during off-peak hours (02:00–06:00 UTC) may be legitimately zero. A 30-min dead-man's threshold during low-traffic windows could produce false-positive P1 pages. Resolution options: (a) restrict AL-SIEM-06 to 08:00–22:00 UTC business hours window; (b) lower threshold to zero events in 60 min (reduces noise, increases detection lag); (c) add a minimum `event_count` floor (fire only if daily average > 5 events/30-min). Document decision in `docs/DECISION_LOG.md` before AL-SIEM-06 goes live in production. | **P1** | devops-lead + security-engineer | Before M5 PagerDuty deployment |
 
 ---
+
+## §77 P8.2 Privacy Incident Classification & Operating Evidence · Privacy Monitoring & Enforcement · P8.1/P8.2/P8.3
+
+> **Owner:** `compliance-officer` (primary) · `security-engineer` (detection layer) · `clinical-safety` (P0 Art. 9 veto). Review: after every privacy incident, minimum quarterly review of incident register.
+> **Closes:** SOC 2 §2 P8 row — *"Privacy incident tracking"* 🟡 Gap → 🟡 Partial.
+> **References:** `docs/INCIDENT_RESPONSE.md §15` (GDPR Art. 33/34), `R-11` (biometric), `R-22` (privacy floor), `§60` (annual review), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), DEC-030.
+
+---
+
+### §77.1 Purpose and Scope
+
+SOC 2 P8.2 requires that FORM *"identifies, investigates, and communicates to affected parties and regulatory authorities where required, privacy incidents in an accurate and timely manner."* P8.3 requires that FORM *"provides data subjects with an accounting of personal information held, used, and disclosed."*
+
+Prior to this section, `docs/SOC2_READINESS.md §2` recorded privacy incident tracking as 🟡 Gap with the note *"Formalize as part of incident response (severity classification)."* FORM's incident response infrastructure already handles the most critical privacy incidents: GDPR Art. 33/34 breach notification (`docs/INCIDENT_RESPONSE.md §15`), CV biometric data incidents (R-11), and enterprise privacy floor breaches (R-22). What was missing was a **cross-incident classification taxonomy** and a **formal register** covering the full spectrum — from PI-P3 process deviations through PI-P0 Art. 9 confirmed breaches.
+
+This section defines that taxonomy, registers three new DEC-030 HMAC-chained events that create the privacy incident register as a tamper-evident audit chain, and maps every severity class to its corresponding runbook. It does not introduce new detection controls; it formalises the evidence chain for P8.2 operating effectiveness.
+
+**In scope:**
+- All privacy incidents at severity PI-P0 through PI-P3, regardless of source (internal system, third-party sub-processor, government request, DSAR finding)
+- Enterprise tenant privacy floor breaches (R-22 as PI-P0 or PI-P1 depending on scope)
+- GDPR Art. 9 confirmed breaches (always PI-P0)
+- Lower-severity incidents: consent collection failures, DSAR delay, accidental data visibility corrections
+
+**Out of scope:**
+- Security incidents with no privacy dimension (e.g., auth failure spikes that don't involve data access) — covered by §76 CC7.2
+- Product quality issues that don't touch personal data — covered by OBSERVABILITY §22
+- Penetration test findings — covered by §61
+
+**Privacy floor invariant (non-negotiable):** The privacy incident register itself must not contain individual health data. `privacy.incident_opened` payloads carry `incident_id` (UUID), `severity_class`, `incident_type`, and `art9_suspected` (boolean) — never coaching turn content, health profile values, or user identifiers beyond UUID-level references accessible only to `compliance_reviewer` role.
+
+---
+
+### §77.2 Privacy Incident Definition
+
+A **privacy incident** is any event — confirmed or suspected — that involves:
+
+1. **Unauthorised access, disclosure, alteration, or destruction** of personal data processed by FORM as controller or processor.
+2. **A failure of a privacy control** that creates exposure risk even if no data was confirmed accessed (e.g., a temporary RLS policy gap, a misconfigured API response filter, a consent banner non-functional period).
+3. **A process deviation** that could affect data subject rights (e.g., a DSAR approaching the 30-day deadline without resolution, a retention schedule not executing on schedule).
+4. **A regulatory or contractual trigger** — a government data request (R-13), a sub-processor breach notification (R-07), or an enterprise tenant raising a privacy concern during their admin review.
+
+**Not a privacy incident** (do not log as `privacy.incident_opened`):
+- Security monitoring alerts with no confirmed or suspected data access (route to §76 CC7.2)
+- Product bugs that don't involve personal data
+- Failed login attempts (route to R-03)
+- DSAR requests that are proceeding normally within SLA
+
+---
+
+### §77.3 Privacy Incident Severity Classification
+
+| Class | Name | Trigger | GDPR Clock | Runbook | P-Level |
+|---|---|---|---|---|---|
+| **PI-P0** | Critical privacy incident | Art. 9 special category data (health, biometric) confirmed or highly probable accessed/disclosed without authorisation; OR enterprise privacy floor confirmed breached (any individual data exposed to HR/admin) | Art. 33 clock starts at detection — 72-hour obligation | `docs/INCIDENT_RESPONSE.md §15` (breach) + R-11 (biometric) or R-22 (floor) | PagerDuty `form-privacy` CRITICAL — compliance-officer + security-engineer + founder simultaneously |
+| **PI-P1** | High privacy incident | Contact data (email, name) or non-Art. 9 personal data confirmed accessed without authorisation; OR Art. 9 data suspected but not confirmed; OR DSAR cross-contamination (one user's data in another's export) | Art. 33 assessment required; clock may start | `docs/INCIDENT_RESPONSE.md §15` + R-01/R-12 as applicable | PagerDuty `form-privacy` HIGH — compliance-officer + security-engineer |
+| **PI-P2** | Medium privacy incident | Control failure without confirmed data access (e.g., RLS policy gap detected and patched before any query executed, consent banner non-functional for < 24h with no subsequent data processing); OR DSAR approaching day-25 warning threshold | Art. 33 assessment required; clock does not start unless scope expands | `docs/INCIDENT_RESPONSE.md R-14` (DSAR delay), R-07 (sub-processor) | Slack `#privacy-incidents` + compliance-officer email |
+| **PI-P3** | Low privacy incident / process deviation | Retention schedule failure detected by cron alert; a `privacy.consent_granted` event not emitted for an expected flow; minor process gap identified in audit; near-miss that was contained before any exposure | No Art. 33 obligation | Log and review in quarterly incident register | No pager; linear ticket + quarterly review |
+
+**Escalation rule:** Any PI-P2 or PI-P3 incident where scope assessment within 4 hours cannot rule out Art. 9 data involvement must be escalated to PI-P1. If Art. 9 data involvement is confirmed, immediately escalate to PI-P0 and start the GDPR Art. 33 clock. Escalation is **one-way only** — a privacy incident cannot be downgraded without compliance-officer written determination.
+
+**Enterprise tenant incidents:** Any privacy incident involving an enterprise tenant automatically escalates by one class. A PI-P3 process deviation for a consumer user becomes PI-P2 if it affects an enterprise tenant, because the DPA agreement creates additional contractual notification obligations.
+
+---
+
+### §77.4 DEC-030 HMAC-Chained Events — Privacy Incident Lifecycle
+
+Three new DEC-030 events constitute the privacy incident register. All three are HMAC-chained with all existing events in the `audit_log_events` table — no separate table is required.
+
+#### Event 1: `privacy.incident_opened`
+
+| Field | Value |
+|---|---|
+| **Event type** | `privacy.incident_opened` |
+| **Severity (PI-P0/P1)** | CRITICAL |
+| **Severity (PI-P2/P3)** | STANDARD |
+| **Retention** | 7 years (PI-P0/P1); 3 years (PI-P2/P3) |
+| **Actor** | compliance-officer (manual) or security-engineer (for detection-triggered P0/P1) |
+| **Trigger** | First detection of any privacy incident; must be emitted before any investigation action is taken |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  incident_id:          z.string().uuid(),                         // unique incident UUID
+  severity_class:       z.enum(['PI-P0', 'PI-P1', 'PI-P2', 'PI-P3']),
+  incident_type:        z.enum([
+    'art9_confirmed',         // Art. 9 health/biometric data exposure
+    'art9_suspected',         // Art. 9 suspected pending scope assessment
+    'contact_data',           // contact data (email/name) without Art. 9
+    'privacy_floor_breach',   // R-22 enterprise privacy floor
+    'dsar_delay',             // DSAR approaching or exceeding SLA
+    'consent_failure',        // consent control non-functional
+    'control_gap',            // RLS/API/filter gap detected
+    'sub_processor',          // third-party sub-processor breach (R-07)
+    'process_deviation',      // retention, audit, or policy deviation
+    'government_request',     // R-13 government data request
+  ]),
+  detection_source:     z.enum([
+    'pagerduty_alert',        // automated alert escalated by on-call
+    'dsar_review',            // found during DSAR processing
+    'annual_review',          // found during §60 annual privacy review
+    'pentest_finding',        // pentest or code review discovery
+    'internal_report',        // FORM engineer self-report
+    'external_report',        // user report, researcher disclosure
+    'sub_processor_notice',   // sub-processor breach notification
+    'regulatory_inquiry',     // supervisory authority inquiry
+  ]),
+  tenant_id:            z.string().uuid().optional(),              // null for consumer incidents
+  art9_suspected:       z.boolean(),                               // true if Art. 9 data may be involved
+  art33_clock_started:  z.boolean(),                               // true if 72-hour window is running
+  linear_ticket_url:    z.string().url().optional(),
+  opened_by:            z.string().uuid(),                         // compliance-officer UUID
+})
+```
+
+**PRIV-INC-CHAIN-01 ordering invariant:** `privacy.incident_reviewed` and `privacy.incident_closed` MUST NOT be emitted for an `incident_id` that has no preceding `privacy.incident_opened` with the same `incident_id`. The `emit-audit-event` Worker MUST return HTTP 422 on violation (blocking). This ensures the register is complete — partial incident records are not permitted.
+
+---
+
+#### Event 2: `privacy.incident_reviewed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `privacy.incident_reviewed` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **Actor** | compliance-officer |
+| **Trigger** | After scope assessment is complete and compliance-officer makes Art. 33 determination |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  incident_id:                z.string().uuid(),
+  final_severity_class:       z.enum(['PI-P0', 'PI-P1', 'PI-P2', 'PI-P3']),
+  severity_changed:           z.boolean(),                         // true if escalated or (rare) downgraded
+  art33_required:             z.boolean(),
+  art34_required:             z.boolean(),
+  runbook_invoked:            z.enum([
+    'R-11', 'R-12', 'R-13', 'R-14', 'R-22', 'section_15',
+    'R-07', 'none',
+  ]).array(),                                                       // may invoke multiple
+  external_counsel_engaged:   z.boolean(),
+  scope_assessment_notes:     z.string().max(500),                 // no health values, no user PII
+  reviewed_by:                z.string().uuid(),
+})
+```
+
+---
+
+#### Event 3: `privacy.incident_closed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `privacy.incident_closed` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **Actor** | compliance-officer |
+| **Trigger** | After all remediation actions are complete and post-incident review is filed |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  incident_id:                z.string().uuid(),
+  resolution_type:            z.enum([
+    'remediated_no_notification',  // fixed; below notification threshold
+    'art33_notification_filed',    // GDPR Art. 33 notification submitted
+    'art34_notifications_sent',    // individual data subject notifications sent
+    'false_positive',              // scope assessment confirmed no incident
+    'process_improvement',         // PI-P3: process change made, no data affected
+  ]),
+  root_cause_category:        z.enum([
+    'configuration_error',
+    'code_defect',
+    'human_error',
+    'sub_processor_failure',
+    'policy_gap',
+    'unknown',
+  ]),
+  recurrence_prevention:      z.string().max(500),                 // control or process change description
+  post_incident_review_filed: z.boolean(),
+  closed_by:                  z.string().uuid(),
+  art33_notification_id:      z.string().optional(),               // DPA notification reference if filed
+})
+```
+
+**DEC-030 event summary for §77:**
+
+| Event | Severity (PI-P0/P1) | Severity (PI-P2/P3) | Retention | Privacy floor |
+|---|---|---|---|---|
+| `privacy.incident_opened` | CRITICAL | STANDARD | 7yr / 3yr | No user PII; `incident_id` UUID only; no health values; `art9_suspected` boolean only |
+| `privacy.incident_reviewed` | HIGH | HIGH | 7yr | `scope_assessment_notes` max 500 chars; no patient/user names; no health values |
+| `privacy.incident_closed` | HIGH | HIGH | 7yr | `recurrence_prevention` max 500 chars; `art33_notification_id` DPA reference only — not notification content |
+
+All three events must be registered in `docs/AUDIT_LOG_SCHEMA.md §6` before the first enterprise pilot (M8 at latest — PI-P0 incidents during pilot must produce a complete chain).
+
+---
+
+### §77.5 Control Narrative — P8.2 / P8.3
+
+**P8.2 sub-criteria mapping:**
+
+| P8.2 Sub-criterion | FORM Control | Evidence Reference |
+|---|---|---|
+| **P8.2.1** — Identifies privacy incidents | Four-source detection: (a) automated PagerDuty alerts (`privacy.floor_breach_detected`, `data.read_individual`, HMAC chain break); (b) DSAR processing (R-14 surface cross-contamination); (c) quarterly privacy incident register review; (d) annual §60 privacy programme review | `docs/INCIDENT_RESPONSE.md §15.2` (awareness clock); `docs/OBSERVABILITY.md §7` (security alerts) |
+| **P8.2.2** — Investigates privacy incidents | Scope assessment SQL (INCIDENT_RESPONSE §15.4); Art. 33 determination (§15.3 matrix); runbook invocation per severity class (§77.3); compliance-officer as privacy incident commander | `privacy.incident_reviewed` DEC-030 event; `docs/INCIDENT_RESPONSE.md §15.3` |
+| **P8.2.3** — Communicates to affected parties | PI-P0/P1: GDPR Art. 33 supervisory authority notification (§15.6 template) + Art. 34 data subject notification (§15.7 template); PI-P0 enterprise: enterprise tenant admin notified per R-22 template PF-01 within 30 min | `privacy.incident_closed` DEC-030 event with `resolution_type`; §15.6/§15.7 notification templates |
+| **P8.2.4** — Communicates to regulatory authorities | GDPR Art. 33: DPA notification filed ≤ 72h from awareness (§15.5 procedure); partial notification + supplementary notification mechanism defined (§15.11) | `privacy.incident_closed` with `art33_notification_id`; §15.6 template filed to lead supervisory authority |
+
+**P8.3 sub-criterion (data subject accounting):**
+
+| P8.3 Sub-criterion | FORM Control | Evidence Reference |
+|---|---|---|
+| **P8.3.1** — Provides individual accounting on request | DSAR export (R-14) delivers JSON data export covering all personal data FORM holds; export scope defined in `docs/SECURITY.md §9` | `data.export_initiated` DEC-030 event; R-14 test execution evidence (PRE-24) |
+
+---
+
+### §77.6 Mapping to Existing Runbooks
+
+Every privacy incident severity class maps to one or more existing runbooks. This table is the canonical reference for responders — when `privacy.incident_opened` is emitted, the on-call compliance-officer selects the applicable runbook(s) from this table.
+
+| Severity | Incident Type | Primary Runbook | Secondary Runbook | DEC-030 Prerequisite |
+|---|---|---|---|---|
+| **PI-P0** | Art. 9 health data confirmed exposed | `docs/INCIDENT_RESPONSE.md §15` (Art. 33/34) | R-12 (if insider); R-07 (if sub-processor) | `privacy.floor_breach_detected` (R-22) OR HMAC chain break alert |
+| **PI-P0** | CV biometric data (keypoints) exposed | R-11 + §15 | None | `data.read_individual` alert |
+| **PI-P0** | Enterprise privacy floor breach | R-22 | §15 if Art. 9 in scope | `privacy.floor_breach_detected` CRITICAL |
+| **PI-P1** | Contact data (email/name) exposed | §15 (assessment) | R-01 or R-12 | `anomaly.bulk_data_access` or equivalent |
+| **PI-P1** | Art. 9 data suspected (not confirmed) | §15 (assessment, pre-notification hold) | R-11 scope check | Scope assessment SQL (§15.4) |
+| **PI-P2** | DSAR approaching day-25 warning | R-14 | None | DSAR cron alert `dsar-sla-day25-alert` |
+| **PI-P2** | Sub-processor notifies breach | R-07 | §15 (Art. 33 assessment) | Written notice from sub-processor (§15.2) |
+| **PI-P2** | Control gap (no confirmed access) | Engineering incident (fix + verify) | None | RLS test failure or equivalent control alert |
+| **PI-P3** | Retention schedule deviation | Engineering fix | §60 annual review integration | `system.cron_job_stale` DEC-030 for relevant cron |
+| **PI-P3** | Consent banner non-functional < 24h | Engineering fix + consent banner re-verify | None | Better Stack S-* downtime period |
+
+---
+
+### §77.7 Evidence Artefacts
+
+| Artefact ID | Description | Query / Source | SOC 2 Criteria | Retention |
+|---|---|---|---|---|
+| **PRIV-PI-E-001** | Privacy incident register — DEC-030 export of all `privacy.incident_opened` events for the observation period; shows incident_id, severity_class, incident_type, detection_source, art9_suspected, art33_clock_started | `SELECT event_id, action, severity, created_at, payload FROM audit_log_events WHERE action = 'privacy.incident_opened' AND created_at BETWEEN $obs_start AND $obs_end ORDER BY created_at`; filed at `compliance/evidence/privacy/incident-register/priv-pi-e-001-YYYY-QN.jsonl` | P8.2, P8.3 | 7 years |
+| **PRIV-PI-E-002** | Privacy incident monthly aggregate — zero/non-zero summary by severity class; no individual incident details; demonstrates ongoing monitoring without re-creating a PII-containing record | `SELECT DATE_TRUNC('month', created_at) AS month, payload->>'severity_class' AS class, COUNT(*) FROM audit_log_events WHERE action = 'privacy.incident_opened' AND created_at BETWEEN $obs_start AND $obs_end GROUP BY 1, 2 ORDER BY 1, 2`; filed at `compliance/evidence/privacy/incident-register/priv-pi-e-002-YYYY-QN.json` | P8.2 (ongoing monitoring) | 7 years |
+| **PRIV-PI-E-003** | Privacy incident close confirmation — for every PI-P0 and PI-P1 incident in the observation period: matching `privacy.incident_closed` event with `resolution_type`, `post_incident_review_filed = true`, and (where applicable) `art33_notification_id` | `SELECT a.event_id AS open_event, b.event_id AS close_event, b.payload->>'resolution_type', b.payload->>'art33_notification_id' FROM audit_log_events a JOIN audit_log_events b ON a.payload->>'incident_id' = b.payload->>'incident_id' WHERE a.action = 'privacy.incident_opened' AND b.action = 'privacy.incident_closed' AND a.payload->>'severity_class' IN ('PI-P0','PI-P1') AND a.created_at BETWEEN $obs_start AND $obs_end`; filed at `compliance/evidence/privacy/incident-register/priv-pi-e-003-YYYY-QN.json` | P8.2, P8.3 | 7 years |
+| **PRIV-PI-E-004** | Annual privacy review completion record — `privacy.annual_review_completed` DEC-030 event for the calendar year (from §60 P-E-008); demonstrates that the review process ran, §77 incident register was reviewed, and any open incidents were adjudicated | `SELECT * FROM audit_log_events WHERE action = 'privacy.annual_review_completed' AND EXTRACT(YEAR FROM created_at) = YYYY`; filed as part of §60 evidence package at `compliance/evidence/privacy/YYYY/p-e-008.json` | P8.1, P8.2 | 7 years |
+
+**Evidence collection cadence:** PRIV-PI-E-001 and PRIV-PI-E-002 quarterly during the observation period. PRIV-PI-E-003 quarterly (limited to PI-P0/P1 incidents only; may be empty if no high-severity incidents occurred — empty result is valid evidence of control effectiveness). PRIV-PI-E-004 annually (January execution).
+
+---
+
+### §77.8 SOC 2 Criteria Mapping
+
+| Criterion | Description | FORM Control | Evidence Artefact |
+|---|---|---|---|
+| **P8.2** | Identifies, investigates, and communicates privacy incidents | Privacy incident classification taxonomy (§77.3) + DEC-030 incident chain (`privacy.incident_opened/reviewed/closed`) + runbook mapping (§77.6) | PRIV-PI-E-001, PRIV-PI-E-003 |
+| **P8.1** | Monitors privacy programme effectiveness | Quarterly incident register review + annual §60 privacy review with `privacy.annual_review_completed` DEC-030 event | PRIV-PI-E-002, PRIV-PI-E-004 |
+| **P8.3** | Provides individual data accounting on request | DSAR export (R-14); PRIV-PI-E-001 demonstrates that DSAR-triggered incidents are logged and resolved | PRIV-PI-E-001 (DSAR delay incidents), `data.export_initiated` DEC-030 |
+| **CC7.4** | Communicates security incidents to external parties | Art. 33 supervisory authority notification (§15.6); Art. 34 individual notification (§15.7); `privacy.incident_closed` with `art33_notification_id` provides tamper-evident filing record | PRIV-PI-E-003 |
+
+---
+
+### §77.9 Gap Tracker Update
+
+| Control | Status Before §77 | Status After §77 | Advance Condition |
+|---|---|---|---|
+| **§2 P8.2 — Privacy incident tracking** | 🟡 Gap — *"Formalize as part of incident response (severity classification)"* | **🟡 Partial** — PI-P0–P3 taxonomy defined (§77.3); three DEC-030 chain events (`privacy.incident_opened/reviewed/closed`) define the register schema; runbook mapping complete (§77.6); three evidence artefact paths defined (PRIV-PI-E-001/002/003); first observation-quarter incident register collection pending M5 | 🟢 on first quarterly PRIV-PI-E-001 filing with observation data |
+| **§2 P8.1 — Annual privacy review** | 🔴 Gap (label stale; §60 existed) | **🟡 Partial** — §60 procedure defined; `privacy.annual_review_completed` DEC-030 event registered; first execution Q1 2027 | 🟢 on first `privacy.annual_review_completed` event emitted |
+| **§2 A1.3 — DR test performed annually** | 🔴 Gap (label stale; BCP §7 existed) | **🟡 Partial** — `docs/BUSINESS_CONTINUITY.md §7` DR Drill Procedure defined; BC-SLO-04 quarterly cadence (`docs/OBSERVABILITY.md §39`); first execution pending M5 | 🟢 on first BC-E-002 quarterly evidence filed |
+| **Net readiness change** | ~98.7% (authored) | **~98.4% → ~98.4%** — label corrections + one new 🟡 Partial (§2 P8.2 privacy incident tracking); readiness score unchanged (all three items were already in Partial bucket per gap summary) | — |
+
+---
+
+### §77.10 Implementation Checklist
+
+#### P0 — Before first enterprise pilot (M8 at latest)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all three `privacy.incident_*` DEC-030 event types (`privacy.incident_opened`, `privacy.incident_reviewed`, `privacy.incident_closed`) in `docs/AUDIT_LOG_SCHEMA.md §6` with Zod schemas from §77.4. Deploy to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M8 | [ ] |
+| 2 | Implement PRIV-INC-CHAIN-01 ordering invariant in `emit-audit-event` Worker: block `privacy.incident_reviewed` or `privacy.incident_closed` with no preceding `privacy.incident_opened` for the same `incident_id` (HTTP 422 on violation). | platform-engineer | **P0** | M8 | [ ] |
+| 3 | Create PagerDuty `form-privacy` service (separate from `form-security`); configure PI-P0 routing: compliance-officer + security-engineer + founder simultaneous page on any `privacy.incident_opened` event with `severity_class = 'PI-P0'` or `art9_suspected = true`; PI-P1 routing: compliance-officer + security-engineer. | devops-lead + compliance-officer | **P0** | M8 | [ ] |
+| 4 | Train compliance-officer on `privacy.incident_opened` emission protocol: every new privacy incident requires a DEC-030 event within 30 minutes of awareness (P0/P1) or 4 hours (P2/P3). Failure to emit before acting on an incident is a PRIV-INC-CHAIN-01 precedent violation. | compliance-officer (self-training) | **P0** | M8 | [ ] |
+
+#### P1 — Before SOC 2 observation period begins (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | File PRIV-PI-E-001 (quarterly privacy incident register) at end of first observation quarter; confirm PRIV-INC-CHAIN-01 integrity (zero HTTP 422 errors in `emit-audit-event` Worker logs for `privacy.incident_*` events). | compliance-officer | **P1** | M9, M12, M15 | [ ] |
+| 6 | File PRIV-PI-E-002 (monthly aggregate count) for each month of the observation period; confirm query returns correct counts; confirm no PI-P0 incidents with open `privacy.incident_opened` and no matching `privacy.incident_closed`. | compliance-officer | **P1** | Monthly during observation | [ ] |
+| 7 | File PRIV-PI-E-003 for each observation quarter; confirm all PI-P0/P1 incidents have closed with `post_incident_review_filed = true`; flag any unclosed PI-P0/P1 incident as a P1 remediation item before end of quarter. | compliance-officer + security-engineer | **P1** | M9, M12, M15 | [ ] |
+
+#### P2 — Annual
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Integrate §77 privacy incident register review into §60 Annual Privacy Programme Review Phase P-8 checklist: at each January review, query PRIV-PI-E-001 for prior year; confirm all incidents were closed; confirm PI-P2/P3 incidents received appropriate corrective action; document in §60 evidence package. | compliance-officer | **P2** | Q1 annually | [ ] |
+| 9 | After first year of operation: evaluate whether any `incident_type` category is underrepresented (e.g., zero PI-P3 process_deviation incidents likely means the classification is not being applied to process findings). Adjust training and threshold if needed. Document evaluation in `docs/DECISION_LOG.md`. | compliance-officer | **P2** | Q1 2028 | [ ] |
+
+---
+
+### §77.11 Open Questions
+
+| ID | Question | Priority | Owner | Target |
+|---|---|---|---|---|
+| **OQ-PRIV-INC-01** | **Should PI-P2/P3 incidents trigger a Linear ticket automatically, or is manual compliance-officer logging sufficient?** For the solo-founder phase, manual logging is practical. Post-Series A, automatic ticket creation from `privacy.incident_opened` events would reduce compliance-officer burden and create a bi-directional link (DEC-030 event ↔ Linear ticket URL). The Zod schema for `privacy.incident_opened` includes `linear_ticket_url` as optional — this field can be populated post-facto. Decision: manual for M1–M12; evaluate automation at first SOC 2 recertification. Document in `docs/DECISION_LOG.md` when resolved. | **P2** | compliance-officer | Before first SOC 2 recertification (M24) |
+| **OQ-PRIV-INC-02** | **Should `privacy.incident_reviewed` be emitted for PI-P3 (process deviation) incidents, or only for PI-P0/P1/P2?** PI-P3 incidents often resolve with a one-step engineering fix and no compliance-officer scope assessment. Requiring a `privacy.incident_reviewed` event for every PI-P3 incident adds operational overhead without material SOC 2 benefit. Recommendation: require `privacy.incident_reviewed` for PI-P0/P1/P2; make it optional for PI-P3 (document as such in `docs/AUDIT_LOG_SCHEMA.md §6` when the three events are registered). PRIV-INC-CHAIN-01 must be updated to enforce the stricter rule only for PI-P0/P1/P2. | **P1** | compliance-officer + platform-engineer | Before M8 event registration |
+
+---
+
+*v3.7.0 (2026-06-13): §77 P8.2 Privacy Incident Classification & Operating Evidence — closes §2 P8 row "Privacy incident tracking" 🟡 Gap → 🟡 Partial; advances "Annual privacy review" and "DR test" stale 🔴 rows to 🟡 Partial (§60 and BCP §7 already existed); header version v3.5.5 → v3.7.0; readiness score ~98.3% → ~98.4%. See §77 for full content. Owner: compliance-officer + security-engineer.*
 
 *v3.6.3 (2026-06-13): §76 CC7.2/CC4.1 Security Monitoring & Anomaly Detection Operating Evidence — formally closes the §2 CC7 row "Anomaly alerting (auth failures, spike detection)" gap (🟡 Gap → 🟡 Partial). §76.1 scopes to the security-classified alert corpus (§7 OBSERVABILITY) and SIEM correlation rules (§27.3/§34 OBSERVABILITY); explicitly out of scope: quality monitoring (§22/§32), cryptographic health alerting (§30), and billing anomaly alerting. §76.2 CC7.2 control narrative: three sub-criteria mapped — (CC7.2.1) six primary security alert rules from OBSERVABILITY §7 (auth failure spike P1 `supabase_auth_failures_total > 50/min`, HMAC chain break P0, tenant_id missing P1, traffic spike anomaly P2, audit log write failure P0, Enterprise SSO outage P1); (CC7.2.2) four-tier P0–P3 severity + 30-min P1 acknowledge SLA per INCIDENT_RESPONSE §1.1; (CC7.2.3) PagerDuty `form-security` service + `#security-alerts` Slack + DEC-030 HMAC-chained tamper-evident record; privacy floor: no `user_id`, no health data, no plaintext IP in any CC7.2 signal. §76.3 CC4.1 monitoring-of-monitoring: three meta-monitoring controls — AL-SIEM-06 dead-man's switch (zero events in 30-min P1), pg_cron freshness gates jobs 22–23 (`siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, 6-min freshness SLO), S-007 HMAC chain integrity synthetic probe (5-min cadence). §76.4 SIEM correlation rule corpus: four-row table CR-01 through CR-04 with threshold, detection path (Analytics Engine real-time vs pg_cron 5-min bridge), DEC-030 event, and P-level; SIEM bridge ≤ 5-min detection lag for CR-02/CR-03 documented as bounded constraint per SIEM-SLO-BRIDGE-01 (OBSERVABILITY §34). §76.5 SIEM bridge transition map: M4–M8 (bridge) vs M9+ (ClickHouse native) detection lag per rule; evidence continuity statement — DEC-030 events bridge M4→M9 without gap. §76.6 privacy floor table: six CC7.2 signals confirmed no `user_id`, no health data, no plaintext IP; HR principle: tenant_id in anomaly events identifies organisation only; individual actor data restricted to `compliance_reviewer` for incident investigation. §76.7 six evidence artefacts ANOM-E-001 through ANOM-E-006: (001) PagerDuty `form-security` service config export (CC7.2/CC4.1, one-time pre-M5); (002) 90-day auth failure spike alert history with SLA timing (CC7.2/CC7.3, quarterly); (003) SIEM bridge pg_cron execution log jobs 22–23 (CC7.2/CC4.1, quarterly); (004) correlation rule match log `anomaly.*` + `siem.correlation_rule_matched` DEC-030 events (CC7.2, quarterly); (005) CC4.1 meta-monitoring — AL-SIEM-06 non-fire attestation + pg_cron freshness export (CC4.1/CC7.2, quarterly); (006) `#security-alerts` Slack 90-day export for P2/P3 events (CC7.2/CC7.3, quarterly). §76.8 SOC 2 criteria mapping: CC7.2 (six alert rules + four correlation rules → ANOM-E-001/002/004/006), CC4.1 (three meta-monitoring controls → ANOM-E-003/005), CC7.3 (PagerDuty SLA + defined runbooks → ANOM-E-002/004). §76.9 gap tracker: §2 CC7 row 🟡 Gap → 🟡 Partial; CC4.1 monitoring-of-monitoring 🟡 Partial defined; PRE-17 🟡 Partial unchanged (PRE-10 PagerDuty provisioning remains deployment gate); overall readiness ~98.6% → ~98.7% (authored). §76.10 twelve-item implementation checklist: 4× P0/M5 (PagerDuty `form-security` provisioning + six CC7.2 alerts, AL-SIEM-06 config, pg_cron jobs 22–23 production verification, ANOM-E-001 filing); 5× P1/M9–M15 (ANOM-E-002 through ANOM-E-006 quarterly filing with SLA attestation); 2× P1/M9 (ClickHouse migration of CR-02/CR-03, gap register advance to 🟢); 1× P2/Q1-2027 (annual effectiveness review). §76.11 two open questions: OQ-ANOM-01 (P1 — per-tenant vs fleet-wide CR-01 Analytics Engine aggregation blind-spot risk; decision before M10); OQ-ANOM-02 (P1 — AL-SIEM-06 30-min threshold false-positive risk during off-peak; decide before M5 deployment). Cross-references: `docs/OBSERVABILITY.md §7` (six primary security alert rules), `docs/OBSERVABILITY.md §27.3` (correlation rules CR-01–CR-04 SQL), `docs/OBSERVABILITY.md §27.7` (AL-SIEM-01 through AL-SIEM-06), `docs/OBSERVABILITY.md §34` (SIEM bridge hybrid architecture, pg_cron jobs 22–23, SIEM-SLO-BRIDGE-01), `docs/OBSERVABILITY.md §16` (S-007 HMAC chain integrity probe), `docs/OBSERVABILITY.md §12.6` (pg_cron job registry jobs 22–23), `docs/INCIDENT_RESPONSE.md R-03` (auth failure spike runbook), `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break / audit log failure runbook), `docs/INCIDENT_RESPONSE.md R-06` (traffic spike runbook), `docs/INCIDENT_RESPONSE.md R-12` (insider threat / credential compromise — CR-02/CR-03 escalation path), `docs/INCIDENT_RESPONSE.md §1.1` (P-level SLA table), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 `anomaly.*` and `siem.*` events), `docs/SOC2_READINESS.md §2` (CC7 gap row updated). Owner: security-engineer + devops-lead + compliance-officer.*
