@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v1.8
+# FORM · SSO/SCIM Implementation v1.9
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -34,6 +34,7 @@
 24. [Privileged Access Management (PAM): Just-in-Time Privilege Escalation & Break-Glass Protocol](#24-privileged-access-management-pam-just-in-time-privilege-escalation--break-glass-protocol-for-form_admin-operations)
 25. [Per-Tenant Authentication Policy Engine — IP Allowlist, MFA Enforcement & Session Policy](#25-per-tenant-authentication-policy-engine--ip-allowlist-mfa-enforcement--session-policy)
 26. [API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy](#26-api-key-authentication-security--scim-ip-scope-api-key-ip-enforcement--rotation-policy)
+27. [SCIM v2.0 Endpoint — Worker Implementation Design (Closes G-001)](#27-scim-v20-endpoint--worker-implementation-design-closes-g-001)
 
 ---
 
@@ -1151,7 +1152,7 @@ The following items are not yet built or require a decision before implementatio
 
 | # | Gap | Severity | Owner | Notes |
 |---|---|---|---|---|
-| G-001 | **SCIM endpoint not yet implemented.** Schema is defined; endpoint code, token authentication, and attribute mapping are not written. | Critical — blocks any SCIM provisioning | enterprise-architect + platform-engineer | Estimate: 6–8 weeks engineering |
+| G-001 | **SCIM endpoint not yet implemented.** ~~Schema is defined; endpoint code, token authentication, and attribute mapping are not written.~~ **🟡 Design complete — see §27.** Full Cloudflare Worker architecture, token authentication pipeline, User/Group CRUD handlers, idempotency contract, RFC 7644 error format, and six DEC-030 lifecycle events fully specified. Implementation pending per §27.14 checklist (P0 M4/M5). | ~~Critical — blocks any SCIM provisioning~~ **🟡 Design complete; implementation pending §27.14 P0 checklist** | enterprise-architect + platform-engineer | ~~Estimate: 6–8 weeks engineering~~ **Design complete in §27 (v1.9); implementation per §27.14 checklist. SOC 2 CC6.3: advance to 🟢 Closed once §27.14 P0 tasks deploy to production and G-013 DPA block is cleared.** |
 | G-002 | **SAML SLO not yet implemented.** SP-initiated and IdP-initiated SLO are designed but not coded. Logout currently only invalidates FORM session, does not propagate to IdP. | High — required for SOC 2 CC6 (logical access revocation) | security-engineer | Estimate: 2–3 weeks |
 | G-003 | **OIDC back-channel logout not implemented.** The endpoint exists in design but not in code. | High | platform-engineer | Estimate: 1 week (simpler than SLO) |
 | G-004 | **Certificate rotation automation.** The rotation runbook in 8.1 is manual. The 60-day expiry alert cron and the dual-cert metadata endpoint do not exist yet. | Medium — operational risk | devops-lead | Estimate: 1–2 weeks |
@@ -9271,6 +9272,539 @@ All events in this section are appended to the FORM DEC-030 HMAC audit log chain
 |---|---|---|---|---|
 | 13 | Resolve OQ-SSO-26.1 (mandatory IP enforcement for `admin:write` scope keys): evaluate after first customer issues an `admin:write` key. | security-engineer + enterprise-architect | **P2** | Before first `admin:write` key issued |
 | 14 | Add `admin:write` key age warning (amber at >90 days) to the dashboard API Keys panel, distinct from the 365-day general threshold. | platform-engineer | **P2** | M6 |
+
+---
+
+---
+
+## 27. SCIM v2.0 Endpoint — Worker Implementation Design (Closes G-001)
+
+### 27.1 Purpose and Gap Closure
+
+**Gap closed:** G-001 (§9) — *"SCIM endpoint not yet implemented. Schema is defined; endpoint code, token authentication, and attribute mapping are not written."*
+
+This section provides the complete Cloudflare Worker implementation design for the SCIM v2.0 endpoint: bearer-token authentication, request routing, User and Group CRUD handlers, idempotency contract, RFC 7644 error format, and the six DEC-030 lifecycle events that the R-24 runbook and OBSERVABILITY.md §26.7a already reference by name. No component in this section introduces new architectural dependencies — it connects schemas (§3–§4), role mapping (§5), session revocation (§22), and IP enforcement (§25–§26) into a runnable endpoint.
+
+**DPA gate (G-013):** SCIM provisioning must not be enabled for any enterprise customer until the DPA template update in §14 is signed. This implementation may be built and tested in staging ahead of G-013 closure, but the `SCIM_ENABLED` feature flag must remain off in production until the DPA block is cleared.
+
+**Privacy floor:** No employee name, email, or health data appears in any DEC-030 SCIM event payload. Events carry `tenant_id` + aggregate counts + FORM-internal UUIDs only. User identity is linked via `external_user_id` (IdP-side stable ID) stored in Supabase, not surfaced in the audit chain.
+
+---
+
+### 27.2 Worker Architecture and File Layout
+
+The SCIM endpoint runs as a dedicated Cloudflare Worker separate from the main `api-gateway` Worker to allow independent rate-limit quotas, IP enforcement routing, and deployment cadence.
+
+```
+apps/scim-worker/
+├── src/
+│   ├── index.ts               # Entry point — router dispatch
+│   ├── auth.ts                # Token authentication pipeline (§27.3)
+│   ├── router.ts              # URL pattern → handler dispatch (§27.4)
+│   ├── handlers/
+│   │   ├── users.ts           # User CRUD (§27.5)
+│   │   ├── groups.ts          # Group sync (§27.6)
+│   │   └── discovery.ts       # ServiceProviderConfig, Schemas, ResourceTypes (§27.7)
+│   ├── errors.ts              # RFC 7644 error helpers (§27.8)
+│   ├── idempotency.ts         # Upsert + dedup logic (§27.9)
+│   ├── events.ts              # DEC-030 emission (§27.10)
+│   └── types.ts               # Shared TypeScript interfaces
+└── wrangler.toml
+```
+
+**Cloudflare bindings required:**
+
+| Binding | Type | Purpose |
+|---|---|---|
+| `SCIM_KV` | KV Namespace | Token → tenant metadata cache; separate from `SSO_KV` for quota isolation |
+| `SUPABASE_URL` | Secret | Postgres REST endpoint |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret | Service role for SCIM writes (RLS bypassed; set `app.current_tenant_id` manually) |
+| `SCIM_TOKEN_HASH_SECRET` | Secret | HMAC-SHA256 key for hashing bearer tokens before KV lookup and Supabase lookup |
+| `AUDIT_QUEUE` | Queue | Cloudflare Queue for DEC-030 event emission (shared with other Workers) |
+| `IP_HASH_SALT` | Secret | Shared with §25/§26 — daily-rotating salt for `client_ip_hash` in blocked events |
+
+`SCIM_TOKEN_HASH_SECRET` must be registered in `docs/CRYPTOGRAPHY_POLICY.md §5` Key Rotation Schedule (180-day rotation; re-hash all active `tenant_scim_tokens.token_hash` rows on rotation). Add to `docs/SOC2_READINESS.md` key inventory.
+
+---
+
+### 27.3 Token Authentication Pipeline
+
+Every SCIM request is authenticated via HMAC-SHA256 of the bearer token against `tenant_scim_tokens`. KV caches the token metadata to avoid a Supabase round-trip on every request.
+
+**Token KV key format:** `scim_token:{token_hash_hex}` → JSON:
+
+```typescript
+interface ScimTokenCache {
+  tenant_id: string;               // UUID
+  label: string;                   // human-readable label from admin dashboard
+  is_active: boolean;
+  scim_ip_enforcement_enabled: boolean;
+  scim_ip_allowlist_config: {
+    cidrs: string[];
+    mode: 'allowlist' | 'denylist';
+  } | null;
+}
+```
+
+**KV TTL:** 5 minutes. This ensures that token rotation (24-hour overlap window per §3.1) propagates to the Worker within one provisioning cycle. A revoked token is invalidated within 5 minutes — acceptable for SCIM directory sync traffic where requests are batched, not real-time.
+
+**Authentication sequence (`auth.ts`):**
+
+```typescript
+export async function authenticateScimRequest(
+  request: Request,
+  env: Env,
+): Promise<{ tenantMeta: ScimTokenCache } | ScimError> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return scimError(401, 'invalidValue', 'Missing or malformed Authorization header.');
+  }
+  const rawToken = authHeader.slice(7);
+
+  // Hash the raw token — never store or log plaintext
+  const tokenHash = await hmacSha256Hex(rawToken, env.SCIM_TOKEN_HASH_SECRET);
+
+  // 1. KV cache hit (fast path)
+  const cached = await env.SCIM_KV.get<ScimTokenCache>(
+    `scim_token:${tokenHash}`, { type: 'json' }
+  );
+  if (cached) {
+    if (!cached.is_active) return scimError(401, 'invalidValue', 'Token revoked.');
+    return { tenantMeta: cached };
+  }
+
+  // 2. KV miss — fall back to Supabase (cold path: first request after token creation or cache expiry)
+  const row = await supabaseQuery<ScimTokenCache>(
+    env,
+    `SELECT
+       tst.tenant_id,
+       tst.label,
+       tst.is_active,
+       tsc.scim_ip_enforcement_enabled,
+       tsc.scim_ip_allowlist_config
+     FROM tenant_scim_tokens tst
+     JOIN tenant_sso_configs tsc ON tsc.tenant_id = tst.tenant_id
+     WHERE tst.token_hash = $1
+       AND (tst.expires_at IS NULL OR tst.expires_at > NOW())`,
+    [tokenHash],
+  );
+  if (!row || !row.is_active) return scimError(401, 'invalidValue', 'Invalid or revoked token.');
+
+  // Populate KV for future requests
+  await env.SCIM_KV.put(
+    `scim_token:${tokenHash}`,
+    JSON.stringify(row),
+    { expirationTtl: 300 },  // 5 minutes
+  );
+  return { tenantMeta: row };
+}
+```
+
+**IP enforcement:** After token auth succeeds, the request is passed to `enforceScimIpAllowlist()` from `apps/api-gateway/src/sso/ip-allowlist.ts` (shared utility, §25.5). If the IP check fails, a `scim.ip_blocked` DEC-030 event is emitted (HIGH, §26.6) and HTTP 403 is returned — consistent with §26.3 SCIM IP scope design.
+
+---
+
+### 27.4 Request Routing
+
+The router dispatches on HTTP method and URL path. All SCIM routes are under `/scim/v2/`.
+
+```typescript
+// router.ts
+export async function routeScimRequest(
+  request: Request,
+  tenantMeta: ScimTokenCache,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  const { method, pathname } = new URL(request.url);
+
+  // Schema discovery (unauthenticated in some IdP implementations — FORM requires auth)
+  if (method === 'GET' && pathname === '/scim/v2/ServiceProviderConfig')
+    return handleServiceProviderConfig();
+  if (method === 'GET' && pathname === '/scim/v2/Schemas')
+    return handleSchemas();
+  if (method === 'GET' && pathname === '/scim/v2/ResourceTypes')
+    return handleResourceTypes();
+
+  // Users
+  const userListMatch = pathname === '/scim/v2/Users';
+  const userItemMatch = pathname.match(/^\/scim\/v2\/Users\/([^/]+)$/);
+  if (userListMatch && method === 'GET')  return handleListUsers(request, tenantMeta, env);
+  if (userListMatch && method === 'POST') return handleCreateUser(request, tenantMeta, env, ctx);
+  if (userItemMatch && method === 'GET')  return handleGetUser(userItemMatch[1], tenantMeta, env);
+  if (userItemMatch && method === 'PUT')  return handleReplaceUser(request, userItemMatch[1], tenantMeta, env, ctx);
+  if (userItemMatch && method === 'PATCH') return handlePatchUser(request, userItemMatch[1], tenantMeta, env, ctx);
+  if (userItemMatch && method === 'DELETE') return handleDeleteUser(userItemMatch[1], tenantMeta, env, ctx);
+
+  // Groups
+  const groupListMatch = pathname === '/scim/v2/Groups';
+  const groupItemMatch = pathname.match(/^\/scim\/v2\/Groups\/([^/]+)$/);
+  if (groupListMatch && method === 'GET')  return handleListGroups(request, tenantMeta, env);
+  if (groupListMatch && method === 'POST') return handleCreateGroup(request, tenantMeta, env, ctx);
+  if (groupItemMatch && method === 'GET')  return handleGetGroup(groupItemMatch[1], tenantMeta, env);
+  if (groupItemMatch && method === 'PATCH') return handlePatchGroup(request, groupItemMatch[1], tenantMeta, env, ctx);
+  if (groupItemMatch && method === 'DELETE') return handleDeleteGroup(groupItemMatch[1], tenantMeta, env, ctx);
+
+  return scimError(404, 'noTarget', `Path not found: ${pathname}`);
+}
+```
+
+All handlers share the `tenantMeta` object (which carries `tenant_id`) and set `app.current_tenant_id` via the `X-Supabase-Tenant-ID` header in every Supabase request (the Supabase middleware reads this and calls `SET LOCAL app.current_tenant_id = $1` before executing).
+
+---
+
+### 27.5 User Handlers
+
+#### 27.5.1 POST /scim/v2/Users — Create or Reactivate
+
+**Idempotency gate:** Before creating a user, look up by `externalId` (§27.9). Three outcomes:
+
+| Lookup result | Action | HTTP response | DEC-030 event |
+|---|---|---|---|
+| Not found | INSERT new user | `201 Created` | `scim.user_provisioned` |
+| Found, `is_active = true` | Return existing user (no write) | `200 OK` | None (idempotent replay) |
+| Found, `is_active = false` | UPDATE `is_active = true`, restore seat | `200 OK` | `scim.user_reactivated` |
+
+**Sensitive attribute guard:** Before any write, the request body is scanned for GDPR Art. 9 special category attributes (§14.5). If detected, the request is rejected `HTTP 400` with `scimType: "invalidValue"` and a `scim.rejected_sensitive_attribute` DEC-030 event is emitted (HIGH, 7yr). No user record is written. Prohibited attribute names: `healthStatus`, `disability`, `religion`, `ethnicity`, `unionMembership`, `politicalOpinion`, and any `urn:ietf:params:scim:schemas:extension:*` attribute whose key contains these strings (case-insensitive).
+
+**Seat limit check:** Before INSERT, verify `(SELECT COUNT(*) FROM tenant_users WHERE tenant_id = $1 AND is_active = true) < (SELECT contracted_seats FROM tenants WHERE id = $1)`. If at cap, return `HTTP 409 Conflict` with `scimType: "uniqueness"` and detail: `"Seat limit reached. Contact your FORM account manager to expand contracted seats."` No DEC-030 event for this condition (operational, not security-relevant; CSM dashboard tracks seat utilization separately).
+
+**Success response (201):**
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "id": "<form-uuid>",
+  "externalId": "<idp-stable-id>",
+  "userName": "dmytro.kovalenko@acme.com",
+  "name": { "givenName": "Dmytro", "familyName": "Kovalenko" },
+  "emails": [{ "value": "dmytro.kovalenko@acme.com", "primary": true }],
+  "active": true,
+  "meta": {
+    "resourceType": "User",
+    "created": "2026-06-13T10:00:00Z",
+    "lastModified": "2026-06-13T10:00:00Z",
+    "location": "https://form.coach/scim/v2/Users/<form-uuid>",
+    "version": "W/\"<etag>\""
+  }
+}
+```
+
+The `id` field is always the FORM-generated UUID. The `externalId` is stored in `tenant_users.external_user_id` and is the IdP-side stable identifier used for deduplication.
+
+#### 27.5.2 GET /scim/v2/Users/:id
+
+Fetches the user by FORM UUID. Returns `HTTP 404` with `scimType: "noTarget"` if `id` is not found within the tenant (RLS enforces tenant isolation — a valid UUID from another tenant is treated as not found, same response as a nonexistent UUID, to prevent cross-tenant enumeration).
+
+No DEC-030 event for reads (reads are not security-relevant at the individual level; aggregate access patterns are covered by SOC 2 audit log monitoring in `docs/OBSERVABILITY.md §4`).
+
+#### 27.5.3 GET /scim/v2/Users?filter=...
+
+Supports `filter` parameter with `eq` operator on `userName`, `emails.value`, `externalId`, and `active`. Additional operators (`co`, `sw`, `pr`) return `HTTP 400 scimType:invalidFilter`.
+
+Pagination via `startIndex` (1-based) and `count` (default 100, max 200). Response format:
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  "totalResults": 142,
+  "startIndex": 1,
+  "itemsPerPage": 100,
+  "Resources": [ ...User objects... ]
+}
+```
+
+IdPs use this endpoint during the initial sync to check for existing users before issuing creates. The filter implementation must be constant-time on tenant scope (RLS handles isolation; no timing leakage possible between tenants).
+
+#### 27.5.4 PUT /scim/v2/Users/:id — Full Replace
+
+Full replacement of all mutable attributes. Immutable fields (`id`, `tenant_id`, `created_at`) are ignored even if present in the payload. Sensitive attribute guard runs on the full request body before any write.
+
+If `active` transitions from `true → false` in a PUT, the same session revocation path as PATCH deactivation is triggered (§27.5.5).
+
+DEC-030 event: `scim.user_updated` (STANDARD, 7yr) — tracks that a full replace occurred; does not diff fields.
+
+#### 27.5.5 PATCH /scim/v2/Users/:id — Partial Update
+
+Supports RFC 7644 PatchOp: `add`, `replace`, `remove` operations on individual attributes. The Worker parses the `Operations` array and applies each operation sequentially to a staging object before committing to Supabase as a single UPDATE.
+
+**Deactivation path (active: false):**
+
+When `active` is set to `false` via PATCH (or the SCIM DELETE handler, which is aliased to this path internally):
+
+1. `UPDATE tenant_users SET is_active = false, deactivated_at = NOW(), deactivated_via = 'scim' WHERE id = $1 AND tenant_id = $2`
+2. Seat count decremented: `UPDATE tenants SET active_seat_count = active_seat_count - 1 WHERE id = $1`
+3. Session revocation: call `nukeTenantUserSessions(tenant_id, user_id, env)` from §22 KV revocation layer — writes `revoke:user:{tenant_id}:{user_id}` KV key (TTL 24h); all active JWTs for this user are invalidated within the next request cycle (< 3 ms per §22 architecture). If KV write fails, fall back to Supabase `session_blocklist` INSERT (§22 fallback path) and emit `session.revocation_kv_sync_error` per AL-REVOKE-01.
+4. Emit `scim.user_deprovisioned` DEC-030 (HIGH, 7yr).
+5. Return `HTTP 200` with updated user representation (`active: false`).
+
+**Standardized event name note:** §3.5 uses the interim name `scim.user_deactivated`. The canonical name, used by R-24 mass deprovisioning detection and formally defined in §27.10, is `scim.user_deprovisioned`. AUDIT_LOG_SCHEMA.md must register the canonical name; `scim.user_deactivated` is deprecated and must not be used in new code.
+
+#### 27.5.6 DELETE /scim/v2/Users/:id
+
+SCIM DELETE is treated identically to PATCH `{ "op": "replace", "path": "active", "value": false }`. Data is not deleted from Supabase — soft-delete only. Hard deletion requires a separate DSAR Art. 17 erasure request (§31/§32 DATA_MODEL). This is intentional and must be disclosed in the DPA per §14.
+
+Response: `HTTP 204 No Content`. DEC-030 event: `scim.user_deprovisioned` (same as PATCH deactivation — the emitter distinguishes via `deprovision_method: 'scim_delete' | 'scim_patch_inactive'` in the payload).
+
+---
+
+### 27.6 Group Handlers
+
+SCIM Groups are used exclusively for role mapping (§5, §19). FORM does not maintain a native group membership store outside the SCIM sync — `scim_group_role_mappings` maps IdP group IDs to FORM roles, and users are assigned roles based on group membership received in SCIM requests.
+
+#### 27.6.1 POST /scim/v2/Groups — Create Mapping
+
+Creates a new entry in `scim_group_role_mappings`. The FORM role defaults to `member` — the admin must configure the actual role mapping in the dashboard after creation (§16.8). Response: `HTTP 201` with group representation.
+
+Idempotency: if a group with the same `externalId` / `displayName` already exists for this tenant, return `HTTP 200` with the existing record.
+
+DEC-030 event: none for group creation (low-risk config change; covered by admin dashboard audit log).
+
+#### 27.6.2 PATCH /scim/v2/Groups/:id — Member Add/Remove
+
+This is the primary role-assignment trigger. The IdP sends PATCH operations with `members` array additions and removals.
+
+**Processing sequence:**
+
+1. Parse `Operations` array — extract member UUIDs to add/remove (IdP sends FORM UUIDs from prior `POST /Users` responses, or `externalId` as `value` depending on IdP — see §27.6.3).
+2. For each added member: look up `scim_group_role_mappings` to resolve FORM role; UPDATE `tenant_users.form_role` where the new role is higher privilege than current (higher-privilege-wins, per DEC-039 — §19.9 OQ-SSO-19.1 resolution).
+3. For each removed member: re-evaluate role from remaining group memberships (MAX aggregation per §19.3 `group_member_effective_role` view); UPDATE `tenant_users.form_role` to the highest remaining role.
+4. Emit `scim.group_synced` DEC-030 (STANDARD, 5yr) once per PATCH operation — aggregate counts only, no individual `user_id` in payload.
+5. Return `HTTP 200` with updated group representation.
+
+**Reactivation side-effect:** If a member-add operation targets a `user_id` with `is_active = false`, the user is reactivated automatically (same path as §27.5.1 reactivation) and `scim.user_reactivated` is emitted alongside `scim.group_synced`.
+
+#### 27.6.3 IdP Value Field Semantics
+
+Different IdPs send different values in `members[].value`:
+
+| IdP | `members[].value` contains | Resolution in FORM |
+|---|---|---|
+| Okta | FORM SCIM `id` (UUID from prior `/Users` response) | Direct lookup by `tenant_users.id` |
+| Azure AD | FORM SCIM `id` (UUID from prior `/Users` response) | Direct lookup by `tenant_users.id` |
+| Google Workspace (via SCIM bridge) | `externalId` (Google directory user key) | Lookup by `tenant_users.external_user_id` |
+| OneLogin | FORM SCIM `id` | Direct lookup by `tenant_users.id` |
+
+The PATCH Groups handler must tolerate both `id` and `externalId` as the value — attempt `id` lookup first; if no match, attempt `external_user_id` lookup. If neither matches, skip the member (log a STANDARD-severity warning to structured logs; do not fail the request — partial membership lists from IdPs are normal during large directory syncs).
+
+#### 27.6.4 DELETE /scim/v2/Groups/:id
+
+Removes the `scim_group_role_mappings` entry. All users who received their highest role from this group have their role downgraded to the highest remaining group-assigned role (or `member` default if no other group mapping exists). Role changes trigger a re-evaluation of each affected user's active sessions — no session invalidation, but the next JWT refresh will reflect the new role (< 1 hour for standard session TTL).
+
+Response: `HTTP 204 No Content`.
+
+---
+
+### 27.7 Schema Discovery Endpoints
+
+SCIM clients call these endpoints during initial configuration to learn FORM's capabilities. All three are read-only and require SCIM bearer auth (FORM enforces auth on discovery to prevent capability enumeration by unauthenticated scanners).
+
+#### 27.7.1 GET /scim/v2/ServiceProviderConfig
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
+  "documentationUri": "https://form.coach/docs/enterprise/scim",
+  "patch": { "supported": true },
+  "bulk": { "supported": false, "maxOperations": 0, "maxPayloadSize": 0 },
+  "filter": { "supported": true, "maxResults": 200 },
+  "changePassword": { "supported": false },
+  "sort": { "supported": false },
+  "etag": { "supported": true },
+  "authenticationSchemes": [{
+    "type": "oauthbearertoken",
+    "name": "OAuth Bearer Token",
+    "description": "SCIM bearer token issued per tenant via FORM Admin Dashboard → Directory Sync."
+  }]
+}
+```
+
+**`bulk: false`**: FORM does not implement SCIM bulk operations. IdP bulk syncs are handled via individual CRUD calls. Bulk is a v2-optional feature; the production IdPs (Okta, Azure AD, Google Workspace) operate correctly without it.
+
+**`changePassword: false`**: Passwords are not managed via SCIM — users authenticate via SSO. Password management is entirely the IdP's responsibility.
+
+#### 27.7.2 GET /scim/v2/Schemas
+
+Returns the `urn:ietf:params:scim:schemas:core:2.0:User` and `urn:ietf:params:scim:schemas:core:2.0:Group` schema definitions plus the Enterprise User extension schema `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User`. Only attributes that FORM actually reads (§3.3 attribute mapping table) are declared — attributes FORM ignores are not listed, to prevent IdPs from erroneously assuming FORM stores them.
+
+#### 27.7.3 GET /scim/v2/ResourceTypes
+
+Returns `User` and `Group` resource type definitions with their supported schema extensions.
+
+---
+
+### 27.8 Error Response Format (RFC 7644)
+
+All SCIM errors use the RFC 7644 error schema. HTTP status codes are the primary classification signal; `scimType` is provided for machine-readable sub-classification.
+
+```typescript
+// errors.ts
+export function scimError(
+  status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503,
+  scimType:
+    | 'invalidFilter'   // 400 — unsupported filter operator
+    | 'tooMany'         // 400 — filter would return too many results
+    | 'uniqueness'      // 409 — unique constraint violation (email, seat cap)
+    | 'mutability'      // 400 — attempt to modify immutable attribute (id, tenant_id)
+    | 'invalidSyntax'   // 400 — malformed JSON or missing required field
+    | 'invalidPath'     // 400 — PatchOp path references non-existent attribute
+    | 'noTarget'        // 404 — resource not found, or path not found
+    | 'invalidValue',   // 400/401 — invalid attribute value, including auth failure
+  detail: string,
+): Response {
+  return new Response(JSON.stringify({
+    schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+    status: String(status),
+    scimType,
+    detail,
+  }), {
+    status,
+    headers: { 'Content-Type': 'application/scim+json' },
+  });
+}
+```
+
+**Never expose tenant internals in error details.** `detail` strings are pre-approved literals — no database error messages, no stack traces, no internal IDs. The only exception is `uniqueness` conflict on email (acceptable to echo the email for UX — the IdP already knows the email it sent).
+
+**Rate limit errors (429):** Return `Retry-After: <seconds>` header alongside the SCIM error body. The Worker derives `<seconds>` from the KV TTL remaining on the rate limit counter key.
+
+---
+
+### 27.9 Idempotency Contract
+
+SCIM clients retry on transient errors (network timeout, 5xx). FORM must tolerate retried requests without creating duplicate users or emitting duplicate DEC-030 events.
+
+**User creation idempotency (POST /Users):**
+
+The primary idempotency key is `(tenant_id, external_user_id)` — the unique index `UNIQUE (tenant_id, external_user_id)` on `tenant_users` enforces this at the database level. If the SCIM Worker receives a POST with an `externalId` that already exists in the tenant, the existing user is returned (200) rather than attempting an INSERT that would fail with a uniqueness violation.
+
+A secondary dedup path uses `(tenant_id, email)` — if `externalId` is absent (some legacy IdP integrations omit it), the Worker falls back to email lookup. If email lookup finds an existing user, the response is the same: 200 with the existing user, with `externalId` populated from the found record.
+
+**Group PATCH idempotency:**
+
+Group PATCH operations are inherently idempotent — adding an already-present member is a no-op at the role level (higher-privilege-wins; same role does not change). Removing an absent member is silently skipped (§27.6.2).
+
+**Event deduplication:**
+
+`scim.user_provisioned` and `scim.user_reactivated` carry a `scim_request_id` (UUID generated by the Worker per inbound request). The `emit-audit-event` Worker's `scim_request_id` uniqueness check (same pattern as R-24's `scim_request_id` dedup) prevents the same physical request from emitting duplicate chain events if the Worker retries internally.
+
+---
+
+### 27.10 DEC-030 HMAC-Chained Audit Events
+
+Six SCIM lifecycle events are formally defined here. These are the canonical definitions; AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle must register these before the SCIM endpoint goes to production.
+
+**Event naming note:** §3.5 uses the interim name `scim.user_deactivated`. The canonical name is `scim.user_deprovisioned` — consistent with the R-24 runbook reference and the INCIDENT_RESPONSE.md mass deprovisioning detection clause. Any existing staging instrumentation using `scim.user_deactivated` must be renamed.
+
+**Privacy invariant (all six events):** No employee name, email address, or health/coaching data in any payload. `external_user_id` is the IdP-side opaque stable identifier — acceptable in the audit chain as it carries no health data. `user_id` (FORM internal UUID) is acceptable in per-user events as it is internal-only and carries no PII by itself. `tenant_id` is always present.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `scim.user_provisioned` | HIGH | 7 yr | Successful `POST /scim/v2/Users` resulting in a new `tenant_users` INSERT | `tenant_id`, `user_id` (FORM UUID), `external_user_id` (IdP stable ID — opaque), `scim_request_id` (UUID, dedup key), `provisioning_source: 'scim'`, `assigned_role` (default `member`) |
+| `scim.user_reactivated` | HIGH | 7 yr | `POST /scim/v2/Users` where user existed with `is_active = false`; or `PATCH /Users` group member-add targeting inactive user | `tenant_id`, `user_id`, `external_user_id`, `scim_request_id`, `prior_deactivated_at` (ISO 8601 — duration-since-deactivation supports SOC 2 CC6.3 evidence) |
+| `scim.user_deprovisioned` | HIGH | 7 yr | `PATCH /scim/v2/Users/:id` with `active: false`, or `DELETE /scim/v2/Users/:id` | `tenant_id`, `user_id`, `external_user_id`, `scim_request_id`, `deprovision_method` (`scim_patch_inactive` \| `scim_delete`), `sessions_revoked_count` (integer — sessions invalidated by §22 KV revocation; 0 if user had no active sessions) |
+| `scim.user_updated` | STANDARD | 7 yr | `PUT` or `PATCH /scim/v2/Users/:id` updating non-activation attributes (name, department, role change via group) | `tenant_id`, `user_id`, `scim_request_id`, `update_method` (`put` \| `patch`), `fields_changed` (string[] — attribute names only; no values — e.g. `["department", "name.givenName"]`) |
+| `scim.group_synced` | STANDARD | 5 yr | `PATCH /scim/v2/Groups/:id` processed successfully | `tenant_id`, `group_id` (FORM `scim_group_role_mappings.id` UUID), `idp_group_id` (IdP-side group identifier, opaque string), `members_added` (integer count), `members_removed` (integer count), `role_changes` (integer — users whose FORM role changed as a result), `scim_request_id` |
+| `scim.rejected_sensitive_attribute` | HIGH | 7 yr | Request body contains GDPR Art. 9 special category attribute; request rejected before any write | `tenant_id`, `scim_request_id`, `rejected_attribute_name` (the offending field name), `request_path` (`/scim/v2/Users` \| `/scim/v2/Groups`), `http_method` |
+
+**HMAC chain requirement (SCIM-CHAIN-01):** For a given `user_id`, `scim.user_deprovisioned` must not precede `scim.user_provisioned` in the chain (a deprovisioned user with no prior provisioning event indicates a chain gap or bug). The `emit-audit-event` Worker logs a HIGH-severity WARNING (non-blocking) if this ordering invariant is violated — it does not reject the event, as the SCIM endpoint must still process the deprovisioning even if the audit log is incomplete. A chain invariant violation triggers R-05 investigation protocol.
+
+**Retention rationale:** `scim.user_deprovisioned` is 7yr because it is the primary SOC 2 CC6.3 evidence ("logical access removed in a timely manner"). `scim.group_synced` is 5yr (role management rather than identity lifecycle — lower regulatory importance; Supabase storage cost optimisation at scale). All other events are 7yr as direct user identity lifecycle records.
+
+---
+
+### 27.11 Alerting Rules
+
+| Alert ID | Condition | Severity | Routing | Auto-resolve |
+|---|---|---|---|---|
+| **AL-SCIM-01** | `scim.rejected_sensitive_attribute` events > 3 for a single `tenant_id` in 1 hour | **P1** | PagerDuty `form-platform` + `form-compliance`; Slack `#security-alerts` | No — IC review required (may indicate IdP misconfiguration or data classification policy gap at customer) |
+| **AL-SCIM-02** | `POST /scim/v2/Users` 5xx error rate > 5% over a 10-minute rolling window for any tenant | **P2** | PagerDuty `form-platform` | Yes — on error rate returning to < 1% |
+| **AL-SCIM-03** | `scim.user_provisioned` count for a tenant drops to 0 for > 24 hours when the tenant has an active SCIM configuration and the previous 7-day average was > 5/day (signals SCIM sync stall) | **P2** | Slack `#enterprise-ops` + CSM on-call | Yes — on next `scim.user_provisioned` emission for the tenant |
+| **AL-SCIM-04** | SCIM-CHAIN-01 ordering invariant violated (`scim.user_deprovisioned` with no prior `scim.user_provisioned` for the same `user_id`) | **P1** | PagerDuty `form-platform` + `form-compliance`; R-05 co-activation | No |
+
+**AL-SCIM-01 severity rationale:** A `scim.rejected_sensitive_attribute` event means a customer's IdP attempted to push GDPR Art. 9 health/biometric data into FORM. One occurrence is likely a misconfigured custom SCIM attribute. Three occurrences in an hour indicate a systematic mapping issue. Compliance-officer must notify the customer CSM within 4 hours and verify the IdP schema is corrected before the block is lifted.
+
+---
+
+### 27.12 SOC 2 Evidence Mapping
+
+| Criterion | Event / artefact | Control statement |
+|---|---|---|
+| **CC6.1** — Logical access to infrastructure | `scim.user_provisioned` + `scim.user_deprovisioned` DEC-030 chain | Every access grant and revocation is HMAC-evidenced and auditor-extractable |
+| **CC6.3** — Removes access on a timely basis | `scim.user_deprovisioned.sessions_revoked_count` > 0; timestamp delta from SCIM DELETE receipt to `session.bulk_revocation_complete` ≤ 60 s per `ENTERPRISE_SLA.md §3.7` | Sessions invalidated within SLA window on every deprovisioning event |
+| **CC6.4** — Restricts access to authorised users via provisioning controls | `scim.rejected_sensitive_attribute` event count = 0 during observation period | FORM's SCIM layer enforces Art. 9 attribute rejection; zero tolerance for health data ingestion via SCIM |
+| **CC6.6** — Role changes are authorised | `scim.group_synced.role_changes` correlated with `scim_group_role_mappings` admin dashboard change log | Role assignments flow from IdP group → FORM group mapping (admin-configured); no direct role write exists outside the group sync path |
+| **CC7.2** — Proactive monitoring | AL-SCIM-01 through AL-SCIM-04 PagerDuty/Slack configuration screenshots | Four alerting rules cover sensitive attribute rejection, provisioning error spikes, sync stall detection, and chain integrity |
+| **PI1.1** — Processing is complete | `scim.user_provisioned` count equals IdP `POST /Users` success count (reconcilable via IdP provisioning log) | Every IdP provisioning request that FORM accepted is reflected in the DEC-030 chain |
+
+**SOC 2 evidence artefacts:**
+
+| Artefact | Description | Criteria | Retention |
+|---|---|---|---|
+| **SCIM-PROV-E-001** | Quarterly export of `scim.user_provisioned` DEC-030 chain for observation period; HMAC chain head verification | CC6.1, PI1.1 | 7 yr |
+| **SCIM-PROV-E-002** | Quarterly export of `scim.user_deprovisioned` events; for each event, verify `sessions_revoked_count ≥ 0` and delta to `session.bulk_revocation_complete` ≤ 60 s | CC6.3 | 7 yr |
+| **SCIM-PROV-E-003** | Assertion that `scim.rejected_sensitive_attribute` count = 0 in observation period; if > 0, incident report for each occurrence | CC6.4 | 7 yr |
+| **SCIM-PROV-E-004** | AL-SCIM-01 through AL-SCIM-04 PagerDuty alert configuration screenshots; verify all four rules active before observation period | CC7.2 | 3 yr |
+
+Filing path: `compliance/evidence/scim-provisioning/SCIM-PROV-E-00{1..4}_<YYYY-QN>.pdf`
+
+---
+
+### 27.13 Gap Status Update
+
+| Gap | Prior status | New status | Notes |
+|---|---|---|---|
+| **G-001** | 🔴 Not designed | 🟡 Design complete, implementation pending | Full Worker architecture, authentication pipeline, CRUD handlers, idempotency, error format, and DEC-030 events specified in this section. Implementation blocked on: (1) `apps/scim-worker/` scaffold creation per §27.14; (2) G-013 DPA closure (cannot enable in production for any customer until DPA updated). |
+
+---
+
+### 27.14 Implementation Checklist
+
+#### P0 — Must complete before SCIM goes live for any enterprise customer (M4/M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all six DEC-030 events from §27.10 in `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` with Zod v2 schemas and retention labels. Deprecate `scim.user_deactivated` (§3.5 interim name) — update all references to `scim.user_deprovisioned`. | compliance-officer + platform-engineer | **P0** | M4 | [ ] |
+| 2 | Scaffold `apps/scim-worker/` directory structure per §27.2. Configure `wrangler.toml` with `SCIM_KV` namespace binding (new; separate from `SSO_KV`), `SCIM_TOKEN_HASH_SECRET` Workers Secret, and `AUDIT_QUEUE` binding. | platform-engineer | **P0** | M4 | [ ] |
+| 3 | Add `SCIM_TOKEN_HASH_SECRET` to `docs/CRYPTOGRAPHY_POLICY.md §5` Key Rotation Schedule (180-day cycle; re-hash `tenant_scim_tokens.token_hash` on rotation). Add to `docs/SOC2_READINESS.md` key inventory. | security-engineer | **P0** | M4 | [ ] |
+| 4 | Implement `auth.ts` token authentication pipeline (§27.3): HMAC-SHA256 hash, KV lookup with 5-minute TTL, Supabase fallback, IP enforcement call to shared `enforceScimIpAllowlist()`. | platform-engineer | **P0** | M4 | [ ] |
+| 5 | Implement `router.ts` dispatch (§27.4) and `errors.ts` RFC 7644 error helpers (§27.8). | platform-engineer | **P0** | M4 | [ ] |
+| 6 | Implement `handlers/users.ts`: POST (create/reactivate with idempotency gate — §27.5.1), GET by id (§27.5.2), GET list with filter (§27.5.3), PUT (§27.5.4), PATCH (§27.5.5 including deactivation → §22 KV revocation), DELETE (§27.5.6). Include sensitive attribute guard (§27.5.1) across all write handlers. | platform-engineer | **P0** | M5 | [ ] |
+| 7 | Implement `handlers/groups.ts`: POST (§27.6.1), PATCH with role re-evaluation and `MAX()` aggregation per §19.3 view (§27.6.2), DELETE (§27.6.4). Handle both `id` and `externalId` member value formats per §27.6.3. | platform-engineer | **P0** | M5 | [ ] |
+| 8 | Implement `handlers/discovery.ts`: ServiceProviderConfig (§27.7.1), Schemas (§27.7.2), ResourceTypes (§27.7.3). | platform-engineer | **P0** | M4 | [ ] |
+| 9 | Configure AL-SCIM-01 through AL-SCIM-04 in PagerDuty / Slack per §27.11. Test AL-SCIM-01 by submitting a synthetic SCIM payload with a prohibited attribute name to staging; verify `scim.rejected_sensitive_attribute` event fires and PagerDuty alert triggers. | devops-lead | **P0** | M5 | [ ] |
+| 10 | G-013 DPA gate: before enabling `SCIM_ENABLED` feature flag for any production tenant, confirm compliance-officer has signed updated DPA template per §14. Blocking gate — do not merge feature flag activation without written compliance-officer sign-off. | compliance-officer | **P0** | M5 | [ ] |
+
+#### P1 — Before first enterprise pilot with SCIM active
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | End-to-end SCIM smoke test per §7.4: configure test tenant with Okta SCIM; provision three users; verify `scim.user_provisioned` events in chain; deactivate one user via Okta; verify session revocation within 60 s; check `scim.user_deprovisioned.sessions_revoked_count` = 1. Emit `enterprise.sso_scim_setup_verified` (AUDIT_LOG_SCHEMA §Enterprise Implementation) after test passes. | platform-engineer | **P1** | M5 | [ ] |
+| 12 | Repeat smoke test with Azure AD SCIM connector; verify group sync (`scim.group_synced`) fires with correct `role_changes` count after adding test user to mapped group. | platform-engineer | **P1** | M5 | [ ] |
+| 13 | Load test `POST /scim/v2/Users` at 100 req/min burst (§3.6 burst limit) for 5 minutes using k6; verify no 5xx responses and that AL-SCIM-02 does not fire falsely; confirm `sessions_revoked_count` accuracy under concurrent deprovisioning. | devops-lead | **P1** | M5 | [ ] |
+| 14 | After 30 days of production SCIM activity: collect SCIM-PROV-E-001 and SCIM-PROV-E-002 artefacts; file in `compliance/evidence/scim-provisioning/`; add cross-references to `docs/SOC2_READINESS.md §CC6.1` and `§CC6.3` evidence tables. | compliance-officer | **P1** | M6 | [ ] |
+
+#### P2 — Post-GA and SOC 2 observation prep
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 15 | Update `docs/SOC2_READINESS.md §9 G-001` from 🔴 → 🟢 Closed once §27.14 P0 tasks deploy to production. | compliance-officer | **P2** | M5 | [ ] |
+| 16 | Evaluate `bulk: true` SCIM support for large-directory customers (> 10,000 seats) where sequential CRUD creates excessive latency. Decision: defer to post-Series A or if first enterprise customer requires > 10,000-seat directory sync. Document in `docs/DECISION_LOG.md`. | enterprise-architect | **P2** | M12 | [ ] |
+| 17 | Collect SCIM-PROV-E-003 (zero `scim.rejected_sensitive_attribute`) and SCIM-PROV-E-004 (alert rule screenshots) artefacts for SOC 2 observation period start. | compliance-officer | **P2** | M9 | [ ] |
+
+---
+
+### 27.15 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-SSO-27.1** | **SCIM provisioning for non-SSO tenants.** §3.1 implies SCIM requires SSO to be configured (the SCIM token is associated with `tenant_sso_configs`). Should FORM support SCIM-only provisioning for enterprise tenants who use FORM's native email+password auth but want automated directory sync? This would require decoupling `tenant_scim_tokens` from `tenant_sso_configs`. | P2 | enterprise-architect | Evaluate at first customer asking for SCIM without SSO (estimated rare — most enterprise IdPs bundle SSO and SCIM). If demand exists, document decision in `docs/DECISION_LOG.md`. |
+| **OQ-SSO-27.2** | **SCIM `PUT /Users` full-replace and audit diffing.** Currently `scim.user_updated` records `fields_changed` (attribute names only, no values). Should FORM store old/new values for role changes specifically, to give the SOC 2 auditor a full role-change trail? Risk: if role values are stored in the audit event, a cross-tenant read of the chain would expose role information. Recommendation: store role changes in a separate `tenant_users_role_history` table (not in the DEC-030 chain), accessible only to `compliance_reviewer` role under RLS. | P1 | security-engineer + compliance-officer | Resolve before SOC 2 observation period start (M9); document in `docs/DECISION_LOG.md`. |
+| **OQ-SSO-27.3** | **SCIM async vs. synchronous session revocation on deprovisioning.** §27.5.5 specifies synchronous KV write for session revocation (< 3 ms). Under the §22 KV revocation architecture this is correct. However, if the Worker's KV write fails (network partition), the SCIM response is still 200 but revocation is deferred to the Supabase fallback. The SLA commitment (`ENTERPRISE_SLA.md §3.7` P99 < 60 s session revocation) could be breached in this failure mode. Options: (a) return 503 on KV write failure and let the IdP retry (breaks idempotency guarantee); (b) accept the Supabase fallback path as within SLA (< 30 s for the Supabase blocklist SELECT path); (c) emit AL-REVOKE-01 and page devops-lead when the fallback path activates, but still return 200 to the IdP. Recommendation: option (c). | P1 | platform-engineer + devops-lead | Resolve before G-013 DPA cleared (must specify in DPA whether session revocation is synchronous or best-effort). |
+
+---
+
+*v1.9 (2026-06-13): §27 SCIM v2.0 Endpoint — Worker Implementation Design. Closes G-001 (§9): 🔴 Not designed → 🟡 Design complete, implementation pending. §27.1 purpose and DPA gate (G-013 block remains). §27.2 Worker file layout (`apps/scim-worker/src/`): six source files (index, auth, router, handlers/{users,groups,discovery}, errors, idempotency, events, types); six Cloudflare bindings (SCIM_KV separate from SSO_KV, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SCIM_TOKEN_HASH_SECRET, AUDIT_QUEUE, IP_HASH_SALT). §27.3 token auth pipeline: HMAC-SHA256 hash → `SCIM_KV` 5-minute TTL cache → Supabase `tenant_scim_tokens` fallback; `ScimTokenCache` type; IP enforcement call to shared §25 `enforceScimIpAllowlist()`; `SCIM_TOKEN_HASH_SECRET` added to CRYPTOGRAPHY_POLICY.md rotation schedule. §27.4 router dispatch: fourteen route patterns for Users + Groups + schema discovery. §27.5 User handlers: POST (idempotency via `(tenant_id, external_user_id)` UNIQUE index; three outcomes: 201 create / 200 reactivate / 200 idempotent-replay; sensitive attribute guard; seat limit check; canonical event name `scim.user_deprovisioned` replacing deprecated `scim.user_deactivated`); GET by id (cross-tenant enumeration prevention via RLS); GET list (filter `eq` on four fields, max 200 results); PUT (full replace); PATCH (deactivation path: `is_active = false` → §22 KV `revoke:user:{tenant_id}:{user_id}` → 60 s revocation SLA); DELETE (aliased to PATCH deactivation). §27.6 Group handlers: POST (create mapping, default `member` role, idempotent on displayName match); PATCH (role re-evaluation via §19.3 `group_member_effective_role` view, higher-privilege-wins per DEC-039; both FORM-UUID and `externalId` member value formats handled; `scim.group_synced` event); DELETE (role downgrade cascade). §27.7 schema discovery: ServiceProviderConfig (bulk false, changePassword false, sort false); Schemas (only attributes FORM reads); ResourceTypes. §27.8 RFC 7644 error format (`scimError()` helper; seven scimType values; no tenant internals in detail strings). §27.9 idempotency contract: `(tenant_id, external_user_id)` UNIQUE index as primary key; email fallback for legacy IdPs without externalId; group PATCH operations inherently idempotent; `scim_request_id` dedup at `emit-audit-event` Worker. §27.10 six DEC-030 events: `scim.user_provisioned` (HIGH, 7yr), `scim.user_reactivated` (HIGH, 7yr), `scim.user_deprovisioned` (HIGH, 7yr — canonical name replacing `scim.user_deactivated`), `scim.user_updated` (STANDARD, 7yr), `scim.group_synced` (STANDARD, 5yr), `scim.rejected_sensitive_attribute` (HIGH, 7yr); SCIM-CHAIN-01 ordering invariant (deprovisioned must not precede provisioned for same user_id; WARNING not reject); privacy invariant: no name/email/health data in any payload. §27.11 four alerting rules AL-SCIM-01 through AL-SCIM-04 (P1: sensitive attr rejection burst; P2: 5xx error spike; P2: sync stall detection; P1: chain invariant violation). §27.12 SOC 2 evidence mapping CC6.1/CC6.3/CC6.4/CC6.6/CC7.2/PI1.1; four artefacts SCIM-PROV-E-001 through SCIM-PROV-E-004. §27.13 gap status update: G-001 🔴 → 🟡. §27.14 seventeen-item implementation checklist: 10× P0/M4–M5 (DEC-030 registration + deprecation of scim.user_deactivated, SCIM_KV + SCIM_TOKEN_HASH_SECRET setup, auth.ts + router.ts + errors.ts, users.ts, groups.ts, discovery.ts, AL-SCIM alert config, G-013 DPA gate), 4× P1/M5–M6 (Okta smoke test, Azure AD smoke test, load test at 100 req/min, SCIM-PROV-E-001/002 collection), 3× P2/M5–M12 (SOC2 gap close, SCIM bulk evaluation, SCIM-PROV-E-003/004 collection). §27.15 three open questions: OQ-SSO-27.1 (SCIM without SSO P2), OQ-SSO-27.2 (role change audit diffing P1 — `tenant_users_role_history` recommendation), OQ-SSO-27.3 (async vs synchronous revocation on KV failure P1 — option (c) recommendation). TOC updated to add §27. Header updated from v1.8 to v1.9. Cross-references: `docs/ENTERPRISE.md` (SCIM 2.0 enterprise feature commitment); `docs/AUDIT_LOG_SCHEMA.md §SCIM-Lifecycle` (six new DEC-030 events to register — P0 before M4); `docs/SOC2_READINESS.md §CC6.1/CC6.3` (evidence tables SCIM-PROV-E-001/002 to add post-observation); `docs/INCIDENT_RESPONSE.md R-24` (canonical source of `scim.user_deprovisioned` name); `docs/ENTERPRISE_SLA.md §3.7` (60 s session revocation SLA — OQ-SSO-27.3 async/sync decision); `docs/DATA_MODEL.md §4.2` (`tenant_sso_configs` schema — `tenant_scim_tokens` child table); §3.3 (attribute mapping — unchanged); §4 (RLS — unchanged; `app.current_tenant_id` GUC still required); §5 (role mapping — unchanged; group sync references §19.3 view); §14 (G-013 DPA gate — block must be cleared before production); §19 (group sync role evaluation — §19.3 view canonical source); §22 (session revocation KV — canonical revocation path); §25 (IP enforcement — `enforceScimIpAllowlist()` shared utility); `docs/CRYPTOGRAPHY_POLICY.md §5` (`SCIM_TOKEN_HASH_SECRET` rotation schedule — P0 checklist item 3). Owner: enterprise-architect + platform-engineer + security-engineer + compliance-officer.*
 
 ---
 

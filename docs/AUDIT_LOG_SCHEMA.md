@@ -260,6 +260,89 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 
 ---
 
+### SCIM Provisioning Lifecycle events (DEC-030 HMAC-chained · SSO §27 · SOC 2 CC6.1/CC6.3/CC6.4)
+
+> Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §27.10` (v1.9, 2026-06-13). Six events covering the complete SCIM provisioning lifecycle: user creation, reactivation, deprovisioning, attribute updates, group sync, and sensitive-attribute rejection. These are the canonical operational events emitted by the SCIM endpoint Worker (`apps/scim-worker/`). **Canonical name note:** `scim.user_deactivated` (used as an interim name in `docs/SSO_SCIM_IMPLEMENTATION.md §3.5`) is deprecated; the canonical name is `scim.user_deprovisioned` — consistent with INCIDENT_RESPONSE.md R-24 mass deprovisioning detection clause. All existing staging instrumentation using `scim.user_deactivated` must be renamed. **Privacy invariant (all six events):** no employee name, email address, or health/coaching data in any payload. `external_user_id` is the IdP-side opaque stable identifier. `user_id` is FORM-internal UUID. No health data linkage in any SCIM chain event. **HMAC chain requirement (SCIM-CHAIN-01):** for a given `user_id`, `scim.user_deprovisioned` must not precede `scim.user_provisioned` in the chain; violation → HIGH WARNING (non-blocking) + AL-SCIM-04 P1. Cross-ref: SOC 2 CC6.1 (logical access grant/revoke — SCIM-PROV-E-001), CC6.3 (timely access removal — SCIM-PROV-E-002; delta to session revocation ≤ 60 s per `ENTERPRISE_SLA.md §3.7`), CC6.4 (restricted access via Art. 9 attribute rejection — SCIM-PROV-E-003), CC7.2 (AL-SCIM-01/04 — SCIM-PROV-E-004); closes SSO_SCIM_IMPLEMENTATION.md §27.14 checklist item 1 (P0 M4). Requires G-013 DPA gate cleared before production use.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `scim.user_provisioned` | HIGH | 7 yr | Successful `POST /scim/v2/Users` resulting in new `tenant_users` INSERT | `tenant_id`, `user_id` (FORM UUID), `external_user_id` (IdP opaque stable ID), `scim_request_id` (UUID, dedup key), `provisioning_source: 'scim'`, `assigned_role` (default `member`) |
+| `scim.user_reactivated` | HIGH | 7 yr | `POST /scim/v2/Users` where user existed with `is_active = false`; or `PATCH /Groups` member-add targeting inactive user | `tenant_id`, `user_id`, `external_user_id`, `scim_request_id`, `prior_deactivated_at` (ISO 8601) |
+| `scim.user_deprovisioned` | HIGH | 7 yr | `PATCH /scim/v2/Users/:id` with `active: false`, or `DELETE /scim/v2/Users/:id` | `tenant_id`, `user_id`, `external_user_id`, `scim_request_id`, `deprovision_method` (`scim_patch_inactive` \| `scim_delete`), `sessions_revoked_count` (integer) |
+| `scim.user_updated` | STANDARD | 7 yr | `PUT` or `PATCH /scim/v2/Users/:id` updating non-activation attributes | `tenant_id`, `user_id`, `scim_request_id`, `update_method` (`put` \| `patch`), `fields_changed` (string[] — attribute names only; **no values**) |
+| `scim.group_synced` | STANDARD | 5 yr | `PATCH /scim/v2/Groups/:id` processed successfully | `tenant_id`, `group_id` (FORM `scim_group_role_mappings.id` UUID), `idp_group_id` (IdP-side opaque group ID), `members_added` (integer), `members_removed` (integer), `role_changes` (integer), `scim_request_id` |
+| `scim.rejected_sensitive_attribute` | HIGH | 7 yr | SCIM request body contains GDPR Art. 9 special category attribute; request rejected before any write | `tenant_id`, `scim_request_id`, `rejected_attribute_name`, `request_path`, `http_method` |
+
+**Emitter assignment:** `scim.user_provisioned`, `scim.user_reactivated`, `scim.user_deprovisioned`, `scim.user_updated`, `scim.group_synced`, `scim.rejected_sensitive_attribute` — `form_system` (SCIM endpoint Worker `apps/scim-worker/` via `AUDIT_QUEUE` Cloudflare Queue binding). No human emitter for any lifecycle event; all are automated.
+
+**Zod schemas** (to register in `apps/audit-worker/src/schemas/scim-lifecycle.ts`):
+
+```typescript
+import { z } from 'zod';
+
+export const ScimUserProvisionedSchema = z.object({
+  tenant_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  external_user_id: z.string().max(256),
+  scim_request_id: z.string().uuid(),
+  provisioning_source: z.literal('scim'),
+  assigned_role: z.enum(['tenant_admin', 'tenant_manager', 'member']),
+});
+
+export const ScimUserReactivatedSchema = z.object({
+  tenant_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  external_user_id: z.string().max(256),
+  scim_request_id: z.string().uuid(),
+  prior_deactivated_at: z.string().datetime(),
+});
+
+export const ScimUserDeprovisionedSchema = z.object({
+  tenant_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  external_user_id: z.string().max(256),
+  scim_request_id: z.string().uuid(),
+  deprovision_method: z.enum(['scim_patch_inactive', 'scim_delete']),
+  sessions_revoked_count: z.number().int().min(0),
+});
+
+export const ScimUserUpdatedSchema = z.object({
+  tenant_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  scim_request_id: z.string().uuid(),
+  update_method: z.enum(['put', 'patch']),
+  fields_changed: z.array(z.string()).min(1),
+});
+
+export const ScimGroupSyncedSchema = z.object({
+  tenant_id: z.string().uuid(),
+  group_id: z.string().uuid(),
+  idp_group_id: z.string().max(256),
+  members_added: z.number().int().min(0),
+  members_removed: z.number().int().min(0),
+  role_changes: z.number().int().min(0),
+  scim_request_id: z.string().uuid(),
+});
+
+export const ScimRejectedSensitiveAttributeSchema = z.object({
+  tenant_id: z.string().uuid(),
+  scim_request_id: z.string().uuid(),
+  rejected_attribute_name: z.string().max(256),
+  request_path: z.string().max(256),
+  http_method: z.enum(['POST', 'PUT', 'PATCH']),
+});
+```
+
+**Retention table additions:**
+
+| Event family | Retention | SOC 2 / regulatory basis |
+|---|---|---|
+| `scim.user_provisioned` / `scim.user_reactivated` / `scim.user_deprovisioned` / `scim.rejected_sensitive_attribute` | 7 years | SOC 2 CC6.1 (logical access evidence), CC6.3 (timely revocation), CC6.4 (attribute rejection enforcement); GDPR Art. 28 processor obligation evidence |
+| `scim.user_updated` | 7 years | SOC 2 CC6.1; role change trail linked to OQ-SSO-27.2 |
+| `scim.group_synced` | 5 years | SOC 2 CC6.6 (authorised role assignments via group mapping); lower retention than lifecycle events — no direct erasure or access obligation |
+
+---
+
 ### SCIM Mass Deprovisioning events (DEC-030 HMAC-chained · INCIDENT_RESPONSE R-24)
 
 > Defined in `docs/INCIDENT_RESPONSE.md §R-24.9`. Five events covering the detection, containment, admin lockout recovery, and resolution of accidental or erroneous mass SCIM deprovisioning events from enterprise IdPs (Okta, Azure AD, Google Workspace). Classified as a data integrity and availability incident distinct from R-04 (SSO/SAML Compromise) and R-19 (IdP Outage). **Privacy invariant (all five events):** `tenant_id` and aggregate counts only — no `user_id`, no individual employee names, no coaching or health data. `tenant_owner_email_hash` is SHA-256 of the tenant owner email — raw email never enters the audit chain. **CRITICAL event** (`scim.mass_deprovision_detected`) triggers immediate PagerDuty P0/P1 dual-page to `form-customer-success` + `form-platform` before any other response action (DEC-030 ordering: chain entry precedes state mutation). Cross-ref: SOC 2 A1.1 (capacity monitoring — SCIM-E-001), A1.2 (environmental threat detection — SCIM-E-002 DEC-030 chain), CC7.2 (proactive monitoring — SCIM-E-003 AL-SCIM-MASS-01 PagerDuty log), CC7.3 (anomaly response — SCIM-E-004 communication SLA), CC9.2 (IdP as third-party risk — SCIM-E-005 pause mechanism independence); `docs/OBSERVABILITY.md §26.7a` (AL-SCIM-MASS-01 alert rule); `docs/OBSERVABILITY.md §12.6` (pg_cron job 24 `scim_mass_deprovision_check`). Closes INCIDENT_RESPONSE.md R-24.15 checklist item 3 (P0 M5).
