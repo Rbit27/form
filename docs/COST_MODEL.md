@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.2
+# FORM · Cost Model & Unit Economics v2.3
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -226,6 +226,18 @@
     - 36.10 DEC-030 HMAC-Chained Audit Events
     - 36.11 Implementation Checklist
     - 36.12 Open Questions
+37. [Enterprise Pipeline Health & ARR Forecasting Model](#37-enterprise-pipeline-health--arr-forecasting-model)
+    - 37.1 Purpose & Scope
+    - 37.2 Pipeline Stage Definitions
+    - 37.3 Stage Conversion Rate Assumptions
+    - 37.4 Pipeline Health Metrics (coverage ratio, velocity, aging)
+    - 37.5 ARR Build Table (Y1–Y3)
+    - 37.6 NRR Decomposition & ARR Bridge
+    - 37.7 Forecasting Cadence & Governance
+    - 37.8 Postgres Pipeline Tracking Schema
+    - 37.9 DEC-030 HMAC-Chained Audit Events
+    - 37.10 Implementation Checklist
+    - 37.11 Open Questions (OQ-PIPE-01 to OQ-PIPE-03)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -8334,6 +8346,592 @@ All three events must be registered in `docs/AUDIT_LOG_SCHEMA.md §6` before the
 | **OQ-IMPL-01** | **What is the true, time-tracked implementation cost per deal across first 3 enterprise deals?** This is the direct instrument for closing OQ-08 (§11). The §36 model estimates $1,399 / $2,194 / $2,999 for Starter / Growth / Enterprise (non-EU, template deal). Actuals may be higher if ISQ response takes longer than estimated (enterprise ISQ often runs 250+ questions with follow-up rounds). | **P1** | data-engineer + founder | After Deal 3 closes; per §36.9.3 OQ-08 closure protocol |
 | **OQ-IMPL-02** | **Does non-standard IdP implementation time match the §36.8.3 premium table?** AD FS and PingFederate carry the largest time premium (+8–12h, +$500–$750). Until FORM has completed at least one AD FS and one PingFederate implementation, the premium is an estimate. If the first AD FS deal takes > 16h engineering, the non-standard IdP premium for the pricing schedule (§36.8.3) should be formalised as a line-item fee in the order form. | **P2** | engineer + customer-success | On first non-standard IdP deal; no later than M18 |
 | **OQ-IMPL-03** | **Does CSM implementation time decrease significantly with playbook maturity?** §36.8.1 estimates a 15–20% decrease by Deal 6. If the CSM time model does not decrease (e.g., because enterprise customers have structurally longer training sessions regardless of playbook), the §36.4 figures represent steady-state cost, not just Deal 1–3 cost. Calibrate by logging CSM time per activity across first 6 deals. | **P2** | customer-success + data-engineer | After Deal 6; no later than M20 |
+
+---
+
+## 37. Enterprise Pipeline Health & ARR Forecasting Model
+
+### 37.1 Purpose & Scope
+
+This section provides a quantitative framework for tracking enterprise pipeline health, projecting ARR from pipeline state, and governing the weekly forecast cadence. It is the forward-looking companion to §19 (Go-to-Market Financial Model), §23 (NRR Engine), and §34 (Churn Intervention Model).
+
+**What this section adds that §19 does not:**
+- Formal pipeline *stage* definitions with entry/exit criteria (not just conversion rate inputs)
+- Pipeline coverage ratio thresholds (how many $ of pipeline FORM needs in each stage per $ of ARR target)
+- Pipeline aging policy (how long a deal may sit in a stage before triggering a CSM or founder action)
+- A weekly ARR bridge reconciling pipeline movements to recognised revenue
+- Governance record for forecast overrides (DEC-030 HMAC chain — investor-grade audit trail)
+
+**Scope:** Enterprise pipeline only. Consumer subscription revenue is forecast via the cohort model in §14 and the cash flow model in §22. This section does not cover consumer MRR.
+
+**Not in scope:** CRM tooling selection (pre-Series A FORM runs on a spreadsheet; CRM selection is OQ-PIPE-02 below). Quota assignment to AEs (not relevant until first AE hire; see §19.4).
+
+**Owners:** founder (pre-Series A), customer-success + data-engineer (post-Series A).
+
+**Cadence:** Weekly pipeline review (Monday); monthly ARR bridge close (last business day of month); quarterly forecast vs. actuals retrospective.
+
+---
+
+### 37.2 Pipeline Stage Definitions
+
+FORM uses a six-stage enterprise pipeline. Each stage has a single entry criterion, a single exit criterion, and a maximum age (calendar days) before escalation.
+
+| # | Stage | Entry criterion | Exit criterion | Max age (days) | Owner |
+|---|---|---|---|---|---|
+| **S0 · Inbound** | Qualified lead received (email, referral, inbound form) | Qualification call booked | 14 | founder |
+| **S1 · Qualified** | Qualification call complete; ≥ 50-seat count confirmed; budget signal received | Pilot agreement signed | 30 | founder |
+| **S2 · Pilot** | Pilot agreement signed; DPA executed; at least 10 employees invited | Pilot success criteria assessed | 90 | founder + CSM |
+| **S3 · Proposal** | Pilot success criteria met (≥ 40% D7 activation, ≥ 50 NPS opt-in); MSA and order form sent | Contract signed | 60 | founder |
+| **S4 · Legal review** | Customer's legal team has the MSA for review | Contract signed | 45 | founder |
+| **S5 · Closed-Won** | Contract signed; ACV recognised; first invoice issued | — (deal lifecycle continues in §34) | — | CSM |
+
+**Stage overlap:** S3 (Proposal) and S4 (Legal review) may run in parallel if the customer's procurement and legal teams work simultaneously. In this case, the deal is logged at S4 (higher milestone) once legal review opens.
+
+**Pilot success criteria** are agreed upfront in writing (per enterprise.html CTA language). The default criteria are:
+- D7 activation ≥ 40% of invited employees (DEC-034)
+- Opt-in NPS (among activated) ≥ 50
+- Zero P0/P1 incidents during pilot window
+
+If any criterion is not met, FORM does not issue an invoice. The deal re-enters S2 (Extended Pilot, per §21) or closes.
+
+---
+
+### 37.3 Stage Conversion Rate Assumptions
+
+Conversion rates below are FORM's pre-revenue benchmark assumptions, grounded in comparable B2B SaaS wellness and productivity platforms (OpenView Partners SaaS Benchmarks 2024; Gartner corporate wellness vendor close rate analysis 2023). They will be calibrated against actual outcomes after the first 10 deals close (OQ-PIPE-01).
+
+| Transition | Benchmark | FORM assumption (conservative) | FORM assumption (base) | FORM assumption (optimistic) |
+|---|---|---|---|---|
+| S0 → S1 (qual rate) | 20–35% | 20% | 28% | 35% |
+| S1 → S2 (pilot start rate) | 45–65% | 45% | 55% | 65% |
+| S2 → S3 (pilot success rate) | 55–75% | 60% | 68% | 75% |
+| S3/S4 → S5 (close rate from proposal) | 65–85% | 65% | 75% | 85% |
+| **End-to-end (S0 → S5)** | **10–20%** | **~7.5%** | **~12%** | **~18%** |
+
+**Why FORM uses conservative-to-base rates at launch:**
+- First deals are founder-led with no established playbook or reference customers → higher early drop-off
+- Pilot success criterion (D7 ≥ 40%) is tighter than most wellness vendors use → lower S2→S3 rate initially
+- Legal review (S4) is expected to take longer than average for GDPR Art. 9 DPA negotiation in EU deals
+
+**Rate recalibration trigger:** After 10 closed-won deals, run the query in §37.8.3 to compute actual stage conversion rates. If the S2→S3 rate consistently exceeds 72%, the base assumption can be raised; if the S0→S1 rate is below 18%, qualification criteria may need tightening.
+
+---
+
+### 37.4 Pipeline Health Metrics
+
+Three pipeline health metrics are tracked weekly. Each has a WARNING and CRITICAL threshold that trigger specific actions.
+
+#### 37.4.1 Pipeline Coverage Ratio (PCR)
+
+**Definition:** Total weighted pipeline ACV ÷ Remaining quarterly ARR target.
+
+Weighted pipeline ACV uses stage weights:
+
+| Stage | Weight |
+|---|---|
+| S0 · Inbound | 5% |
+| S1 · Qualified | 15% |
+| S2 · Pilot | 40% |
+| S3 · Proposal | 65% |
+| S4 · Legal review | 80% |
+| S5 · Closed-Won | 100% (recognised) |
+
+**Thresholds:**
+
+| Status | PCR | Action |
+|---|---|---|
+| Healthy | ≥ 3.0× | No action — hold current outbound cadence |
+| Warning | 2.0× – 2.9× | Increase outbound; founder reviews every deal in S0 and S1; evaluate extending pilot to recover S2 candidates |
+| Critical | < 2.0× | Founder escalation; consider quarterly target revision; evaluate partner-sourced or re-engagement outbound |
+
+**Rationale for 3.0× floor:** Enterprise sales carry binary outcomes (each deal is large; a single late-stage loss can miss 25–50% of a quarterly target). A 3.0× PCR provides a buffer for the expected 35–40% of S3/S4 deals that slip into the next quarter due to legal or procurement delays — consistent with OpenView median SaaS PCR guidance of 3×–4× for founder-led teams.
+
+#### 37.4.2 Sales Velocity
+
+**Formula** (from §19.1):
+```
+Sales Velocity = (# Qualified Deals × Average ACV × Win Rate) ÷ Sales Cycle Length (months)
+```
+
+**FORM monthly velocity at base case (Year 1):**
+- 3 qualified deals/month (solo founder outbound + inbound)
+- Average ACV: $32,400 (blended across tier mix from §19.7)
+- Win rate (S0→S5): 12%
+- Sales cycle: 6 months
+- Monthly velocity = (3 × $32,400 × 0.12) ÷ 6 = **$1,944 / month ARR**
+
+**FORM monthly velocity at Year 2 (first AE hired):**
+- 8 qualified deals/month
+- Average ACV: $42,000 (growing mix toward Growth/Enterprise)
+- Win rate: 15% (playbook maturing)
+- Sales cycle: 5.5 months
+- Monthly velocity = (8 × $42,000 × 0.15) ÷ 5.5 = **$9,164 / month ARR**
+
+**Velocity tracking query:** see §37.8.3.
+
+#### 37.4.3 Pipeline Aging
+
+Any deal that exceeds its stage maximum age (§37.2) triggers the following action:
+
+| Stage exceeded | Age > | Action |
+|---|---|---|
+| S0 | 14 days | Founder calls the prospect; no-response → mark S0-Stale; remove from weighted pipeline |
+| S1 | 30 days | Founder reviews qualification; either books pilot agreement call within 7 days or downgrades to S0-Stale |
+| S2 | 90 days | Founder + CSM reviews pilot metrics; if D7 activation < 20% at day 60, trigger mid-pilot intervention; if < 20% at day 90, close or move to Extended Pilot |
+| S3 | 60 days | Founder re-engages economic buyer; consider discount or extended payment terms |
+| S4 | 45 days | Founder contacts customer's legal team directly; if no movement after contact, flag as DEAL_AT_RISK |
+
+**Aging DEC-030 events** are emitted at each threshold crossing (§37.9.3).
+
+---
+
+### 37.5 ARR Build Table (Y1–Y3)
+
+The table below is the **base case** from §19.7, re-stated here with the pipeline-to-ARR mechanics made explicit. Figures are cumulative ARR at end of each quarter (not incremental).
+
+Assumptions: 12-month weighted conversion rates from §37.3 (base); churn rates from §34 (Y1 < 30%, Y2 < 15%, Y3+ < 8%); NRR from §23 (110% Year 1, 120% Year 2+).
+
+| Quarter | New Logos | Avg ACV | New ARR | Churned ARR | Expansion ARR | Cumulative ARR |
+|---|---|---|---|---|---|---|
+| Q1 Y1 | 0 | — | $0 | $0 | $0 | $0 |
+| Q2 Y1 | 1 | $28,800 | $28,800 | $0 | $0 | $28,800 |
+| Q3 Y1 | 2 | $32,400 | $64,800 | $0 | $0 | $93,600 |
+| Q4 Y1 | 2 | $32,400 | $64,800 | −$8,640 (1 × Y1 churn) | $2,880 | $152,640 |
+| Q1 Y2 | 3 | $36,000 | $108,000 | −$9,180 | $6,096 | $257,556 |
+| Q2 Y2 | 4 | $39,600 | $158,400 | −$9,180 | $10,302 | $417,078 |
+| Q3 Y2 | 4 | $39,600 | $158,400 | −$12,753 | $16,683 | $579,408 |
+| Q4 Y2 | 5 | $42,000 | $210,000 | −$12,753 | $23,176 | $799,831 |
+| Q1 Y3 | 5 | $45,000 | $225,000 | −$11,997 | $31,993 | $1,044,827 |
+| Q2 Y3 | 6 | $45,000 | $270,000 | −$11,997 | $41,793 | $1,344,623 |
+| Q3 Y3 | 6 | $48,000 | $288,000 | −$15,596 | $53,785 | $1,670,812 |
+| Q4 Y3 | 7 | $48,000 | $336,000 | −$15,596 | $66,832 | $2,058,048 |
+
+**Notes:**
+- Q1 Y1: Sales cycle is 6 months; first pilot signed in M1 cannot close before M7 → zero closed-won in Q1.
+- Churn: applied at 25% annual rate Y1 (conservative end of Y1 < 30% band); 13% Y2; 8% Y3.
+- Expansion: seat upsell + tier upgrades driving 10% expansion ARR on retained base Year 1, 15% Year 2+. Detailed mechanics in §23.
+- Q4 Y3 cumulative ARR of ~$2.1M represents the Series A fundraising milestone (see §22.6 and §24.3).
+
+**Downside scenario** (40% miss on new logos each quarter, S5: S3: no improvement in churn):
+- Q4 Y2 cumulative ARR: ~$490k (vs. $800k base)
+- Q4 Y3 cumulative ARR: ~$1.3M (vs. $2.1M base)
+- Series A timing shifts to Q2 Y4 at earliest.
+
+---
+
+### 37.6 NRR Decomposition & ARR Bridge
+
+The monthly ARR bridge reconciles Opening ARR → Closing ARR across five components. This bridges §23 (NRR engine) with the pipeline model above.
+
+#### 37.6.1 ARR Bridge Components
+
+| Component | Definition | Source |
+|---|---|---|
+| **New ARR** | ACV of contracts closed in the month | §37.5 new logo additions |
+| **Expansion ARR** | Seat additions and tier upgrades on existing contracts | §23.2 (tier migration economics) |
+| **Contraction ARR** | Seat reductions on existing contracts | §35.3 (seat reduction policy) |
+| **Churned ARR** | ACV of contracts not renewed | §34.3 (financial impact of churn) |
+| **Price indexation ARR** | Annual CPI-linked price adjustment on renewal cohort | §23.6 (indexation clause) |
+
+**Monthly ARR bridge formula:**
+```
+Closing ARR = Opening ARR
+            + New ARR
+            + Expansion ARR
+            − Contraction ARR
+            − Churned ARR
+            + Price Indexation ARR
+```
+
+#### 37.6.2 Bridge Reconciliation Cadence
+
+The ARR bridge is reconciled on the last business day of each month by the founder (pre-Series A) or data-engineer (post-Series A):
+
+1. Pull all `enterprise_contracts` rows where `activated_at` falls within the month → New ARR
+2. Pull all `enterprise_contracts` rows where `seats_current` changed within the month → Expansion / Contraction ARR
+3. Pull all `enterprise_contracts` rows where `lifecycle_status` changed to `churned` within the month → Churned ARR
+4. Pull price indexation ARR from the renewal pipeline (contracts with `renewal_date` in the month that include CPI clause)
+5. Sum → compute NRR for the month (Closing ARR − New ARR) ÷ Opening ARR × 12 (annualised)
+
+**Minimum NRR thresholds** (from §23 and §14.6):
+- Year 1: 100% (churn and expansion expected to roughly offset)
+- Year 2: 110% (expansion begins outpacing churn as base matures)
+- Year 3+: 120% (Series A readiness criterion per §24.3)
+
+If monthly NRR drops below the annual target for two consecutive months, a DEC-030 `enterprise.nrr_slo_breach` event is emitted and the founder reviews the renewal risk register (§34) within 5 business days.
+
+---
+
+### 37.7 Forecasting Cadence & Governance
+
+#### 37.7.1 Weekly Pipeline Review (Monday)
+
+**Participants:** founder (pre-Series A); founder + VP Sales + CSM (post-Series A).
+
+**Agenda (30 minutes):**
+1. PCR calculation for the current quarter (§37.4.1)
+2. New deals added to pipeline this week (stage, ACV, source)
+3. Deals that changed stage this week
+4. Deals that crossed an aging threshold this week (§37.4.3)
+5. Action items from last week's review: closed?
+
+**Output:** Updated pipeline spreadsheet (pre-CRM) or CRM dashboard. One `enterprise.pipeline_reviewed` DEC-030 event per review (§37.9.1).
+
+#### 37.7.2 Monthly ARR Close (last business day)
+
+ARR bridge reconciliation per §37.6.2. Output: signed-off ARR figure used in investor updates and board reporting. `enterprise.arr_bridge_closed` DEC-030 event emitted (§37.9.2).
+
+#### 37.7.3 Quarterly Forecast vs. Actuals Retrospective
+
+Held within 10 business days of quarter-end. Compares:
+- Forecast at quarter-start (pipeline × weighted conversion rates)
+- Actual Closed-Won ACV
+- Variance analysis by stage (where did deals stall or accelerate?)
+- Conversion rate actuals vs. §37.3 assumptions
+
+If actual conversion rate deviates > 10 percentage points from base assumption in any stage, the §37.3 table is updated and a `enterprise.pipeline_conversion_model_recalibrated` DEC-030 event is emitted (§37.9.4). Recalibration requires a `docs/DECISION_LOG.md` entry.
+
+#### 37.7.4 Forecast Override Policy
+
+If the founder overrides the weighted-pipeline forecast (e.g., includes a deal as "highly likely" despite being in S1), the override must:
+1. Be documented in the pipeline spreadsheet with a written rationale
+2. Emit a `enterprise.forecast_override_applied` DEC-030 event with the unadjusted and adjusted ARR amounts
+3. Be reviewed in the next quarterly retrospective
+
+Forecast overrides that consistently under-forecast (i.e., override says "likely" but deal churns at S1) are a SOC 2 CC9.2 governance signal — FORM should not present optimistic pipeline figures to investors without a matching audit trail.
+
+---
+
+### 37.8 Postgres Pipeline Tracking Schema
+
+Pre-CRM, FORM tracks enterprise pipeline in `enterprise_pipeline_stages`. The schema is designed to be CRM-replaceable at Series A — CRM becomes the source of truth and `enterprise_pipeline_stages` is retired.
+
+#### 37.8.1 Table DDL
+
+```sql
+-- Tracks each pipeline stage entry/exit event per deal.
+-- One row per stage transition, not per deal (immutable audit pattern).
+CREATE TABLE enterprise_pipeline_stages (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID REFERENCES tenants(id) ON DELETE SET NULL,
+                   -- NULL for pre-contract deals (no tenant provisioned yet)
+  deal_id          UUID NOT NULL,
+                   -- Stable identifier for the deal across stage transitions.
+                   -- Generated by founder at S0 entry; persists through Closed-Won.
+  stage            TEXT NOT NULL CHECK (stage IN (
+                     'S0_inbound',
+                     'S1_qualified',
+                     'S2_pilot',
+                     'S3_proposal',
+                     'S4_legal_review',
+                     'S5_closed_won',
+                     'stale',         -- deal aged out and removed from pipeline
+                     'closed_lost'    -- deal explicitly lost (with reason)
+                   )),
+  acv_estimate_usd NUMERIC(12,2) CHECK (acv_estimate_usd > 0),
+                   -- Best estimate of ACV at stage entry; updated on seat/tier changes.
+  seat_estimate    INTEGER CHECK (seat_estimate >= 50),
+  tier_estimate    TEXT CHECK (tier_estimate IN ('starter','growth','enterprise')),
+  entered_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  exited_at        TIMESTAMPTZ,       -- NULL = currently in this stage
+  exit_reason      TEXT,              -- for 'stale' or 'closed_lost': required
+  source           TEXT CHECK (source IN (
+                     'inbound_email', 'inbound_form', 'inbound_referral',
+                     'outbound_founder', 'outbound_partner', 'conference', 'other'
+                   )),
+  champion_name    TEXT,              -- internal champion at prospect; never PII-scoped to FORM users
+  notes            TEXT,
+  created_by       UUID NOT NULL      -- founder or CSM UUID (FORM team, not tenant)
+);
+
+-- RLS: form_admin read; form_system write only
+ALTER TABLE enterprise_pipeline_stages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY pipeline_read  ON enterprise_pipeline_stages FOR SELECT USING (auth.role() IN ('form_admin', 'compliance_reviewer'));
+CREATE POLICY pipeline_write ON enterprise_pipeline_stages FOR INSERT WITH CHECK (auth.role() = 'form_system');
+
+-- Indexes
+CREATE INDEX ON enterprise_pipeline_stages (deal_id);
+CREATE INDEX ON enterprise_pipeline_stages (stage) WHERE exited_at IS NULL;
+CREATE INDEX ON enterprise_pipeline_stages (entered_at);
+```
+
+#### 37.8.2 Pipeline Coverage Ratio Query
+
+```sql
+-- Run weekly (Monday pipeline review). Returns current quarter PCR.
+WITH stage_weights AS (
+  SELECT stage, weight FROM (VALUES
+    ('S0_inbound',     0.05),
+    ('S1_qualified',   0.15),
+    ('S2_pilot',       0.40),
+    ('S3_proposal',    0.65),
+    ('S4_legal_review',0.80),
+    ('S5_closed_won',  1.00)
+  ) AS t(stage, weight)
+),
+current_pipeline AS (
+  SELECT
+    p.deal_id,
+    p.stage,
+    p.acv_estimate_usd,
+    w.weight,
+    p.acv_estimate_usd * w.weight AS weighted_acv
+  FROM enterprise_pipeline_stages p
+  JOIN stage_weights w ON w.stage = p.stage
+  WHERE p.exited_at IS NULL
+    AND p.stage NOT IN ('stale', 'closed_lost')
+)
+SELECT
+  SUM(weighted_acv)                         AS total_weighted_pipeline_usd,
+  COUNT(DISTINCT deal_id)                   AS active_deals,
+  SUM(CASE WHEN stage = 'S5_closed_won' THEN acv_estimate_usd ELSE 0 END) AS closed_won_usd,
+  ROUND(SUM(weighted_acv) /
+    NULLIF(
+      -- Replace 90000 with the quarterly ARR target from the financial model
+      90000, 0
+    ), 2
+  )                                         AS pipeline_coverage_ratio
+FROM current_pipeline;
+```
+
+#### 37.8.3 Stage Conversion Rate Actuals Query
+
+```sql
+-- Run quarterly (retrospective). Returns actual conversion rates per transition.
+WITH transitions AS (
+  SELECT
+    deal_id,
+    stage,
+    LAG(stage) OVER (PARTITION BY deal_id ORDER BY entered_at) AS prev_stage,
+    entered_at
+  FROM enterprise_pipeline_stages
+),
+conversions AS (
+  SELECT
+    prev_stage || ' → ' || stage AS transition,
+    COUNT(*) AS count
+  FROM transitions
+  WHERE prev_stage IS NOT NULL
+    AND stage NOT IN ('stale', 'closed_lost')
+  GROUP BY 1
+),
+losses AS (
+  SELECT
+    prev_stage || ' → stale/lost' AS transition,
+    COUNT(*) AS count
+  FROM transitions
+  WHERE prev_stage IS NOT NULL
+    AND stage IN ('stale', 'closed_lost')
+  GROUP BY 1
+)
+SELECT * FROM conversions
+UNION ALL
+SELECT * FROM losses
+ORDER BY 1;
+```
+
+#### 37.8.4 Pipeline Aging Alert Query
+
+```sql
+-- Run daily (automated pg_cron job 31 — see §37.10 item 2).
+-- Returns deals in each stage that have exceeded their maximum age.
+SELECT
+  deal_id,
+  stage,
+  entered_at,
+  NOW() - entered_at                  AS age,
+  CASE stage
+    WHEN 'S0_inbound'      THEN INTERVAL '14 days'
+    WHEN 'S1_qualified'    THEN INTERVAL '30 days'
+    WHEN 'S2_pilot'        THEN INTERVAL '90 days'
+    WHEN 'S3_proposal'     THEN INTERVAL '60 days'
+    WHEN 'S4_legal_review' THEN INTERVAL '45 days'
+    ELSE NULL
+  END                                 AS max_age,
+  (NOW() - entered_at) >
+  CASE stage
+    WHEN 'S0_inbound'      THEN INTERVAL '14 days'
+    WHEN 'S1_qualified'    THEN INTERVAL '30 days'
+    WHEN 'S2_pilot'        THEN INTERVAL '90 days'
+    WHEN 'S3_proposal'     THEN INTERVAL '60 days'
+    WHEN 'S4_legal_review' THEN INTERVAL '45 days'
+    ELSE FALSE
+  END                                 AS is_aged_out,
+  acv_estimate_usd,
+  champion_name,
+  notes
+FROM enterprise_pipeline_stages
+WHERE exited_at IS NULL
+  AND stage NOT IN ('S5_closed_won', 'stale', 'closed_lost')
+ORDER BY age DESC;
+```
+
+---
+
+### 37.9 DEC-030 HMAC-Chained Audit Events
+
+Four new DEC-030 events for pipeline governance. All use `deal_id` (not `tenant_id`) for pre-contract stage events. No `user_id` — pipeline tracking is at deal level, never at individual employee level.
+
+#### 37.9.1 Event: `enterprise.pipeline_reviewed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.pipeline_reviewed` |
+| **Severity** | STANDARD |
+| **Retention** | 3 years |
+| **Actor** | founder |
+| **Trigger** | Weekly Monday pipeline review completed |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  review_date:              z.string().date(),          // YYYY-MM-DD (Monday)
+  active_deals:             z.number().int().min(0),
+  weighted_pipeline_usd:    z.number().min(0),
+  pipeline_coverage_ratio:  z.number().min(0),          // vs. quarterly target
+  deals_aged_out_count:     z.number().int().min(0),    // count of aged-out deals actioned
+  closed_won_this_week_usd: z.number().min(0),
+  actor_id:                 z.string().uuid(),           // founder FORM-team UUID
+})
+```
+
+**Privacy invariant:** No `tenant_id`, no prospect company name, no individual user data. `deal_id` references are aggregate counts only in this event — full deal_id list is in `enterprise_pipeline_stages`, not in the audit chain.
+
+#### 37.9.2 Event: `enterprise.arr_bridge_closed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.arr_bridge_closed` |
+| **Severity** | STANDARD |
+| **Retention** | 7 years |
+| **Actor** | founder or data-engineer |
+| **Trigger** | Monthly ARR bridge reconciled and signed off |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  period_month:           z.string().regex(/^\d{4}-\d{2}$/),  // YYYY-MM
+  opening_arr_usd:        z.number().min(0),
+  new_arr_usd:            z.number().min(0),
+  expansion_arr_usd:      z.number().min(0),
+  contraction_arr_usd:    z.number().min(0),
+  churned_arr_usd:        z.number().min(0),
+  indexation_arr_usd:     z.number().min(0),
+  closing_arr_usd:        z.number().min(0),
+  monthly_nrr:            z.number().min(0),    // (closing - new) / opening, annualised
+  active_contracts:       z.number().int().min(0),
+  actor_id:               z.string().uuid(),
+})
+```
+
+**7-year retention rationale:** ARR bridge reconciliation is a financial record equivalent to a monthly revenue statement. Ukrainian Tax Code Art. 44 requires 7-year retention of financial records. US (SOX-adjacent) best practice: 7 years. This event is the investor-grade evidence that FORM's ARR figures were computed consistently and auditably each month.
+
+#### 37.9.3 Event: `enterprise.deal_aged_out`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.deal_aged_out` |
+| **Severity** | STANDARD |
+| **Retention** | 3 years |
+| **Actor** | `form_system` (pg_cron job 31) |
+| **Trigger** | Pipeline aging query (§37.8.4) detects a deal exceeding max stage age |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  deal_id:             z.string().uuid(),
+  stage:               z.enum([
+    'S0_inbound','S1_qualified','S2_pilot','S3_proposal','S4_legal_review'
+  ]),
+  entered_at:          z.string().datetime(),
+  age_days:            z.number().int().positive(),
+  max_age_days:        z.number().int().positive(),
+  acv_estimate_usd:    z.number().min(0),
+  action_required:     z.enum(['call_prospect','review_qualification','mid_pilot_intervention','re_engage_buyer','contact_legal']),
+})
+```
+
+**Note:** `deal_id` is a FORM-internal UUID generated at S0 entry — it is never shared with the prospect or tenant and does not map to a Postgres `tenants.id`. Privacy invariant preserved.
+
+#### 37.9.4 Event: `enterprise.pipeline_conversion_model_recalibrated`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.pipeline_conversion_model_recalibrated` |
+| **Severity** | STANDARD |
+| **Retention** | 7 years |
+| **Actor** | founder or data-engineer |
+| **Trigger** | Quarterly retrospective reveals > 10pp deviation in any stage conversion rate |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  recalibration_date:    z.string().date(),
+  deals_analysed:        z.number().int().min(1),
+  stage_updates: z.array(z.object({
+    stage_transition:    z.string(),       // e.g. "S1 → S2"
+    old_rate:            z.number(),       // prior assumption (decimal, e.g. 0.55)
+    new_rate:            z.number(),       // updated assumption
+    deviation_pp:        z.number(),       // actual vs. old assumption (percentage points)
+  })),
+  decision_log_ref:      z.string(),       // e.g. "DEC-XXX"
+  actor_id:              z.string().uuid(),
+})
+```
+
+#### 37.9.5 DEC-030 Event Summary for §37
+
+| Event | Severity | Retention | Trigger | Privacy constraint |
+|---|---|---|---|---|
+| `enterprise.pipeline_reviewed` | STANDARD | 3 yr | Weekly Monday pipeline review | Aggregate deal counts; no tenant IDs, no prospect names |
+| `enterprise.arr_bridge_closed` | STANDARD | 7 yr | Monthly ARR bridge sign-off | Aggregate ARR components only; no per-customer breakdown |
+| `enterprise.deal_aged_out` | STANDARD | 3 yr | pg_cron job 31 daily aging check | `deal_id` (FORM-internal UUID) only; no prospect PII |
+| `enterprise.pipeline_conversion_model_recalibrated` | STANDARD | 7 yr | Quarterly retrospective; > 10pp deviation | Aggregate conversion rates; no per-deal data in payload |
+
+**Registration requirement:** All four events must be registered in `docs/AUDIT_LOG_SCHEMA.md §6` before the first S0 deal is entered into `enterprise_pipeline_stages`. See §37.10 item 1.
+
+---
+
+### 37.10 Implementation Checklist
+
+#### P0 — Before first S0 deal entered (pre-M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all four §37.9 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §6`. Deploy event types to `emit-audit-event` Worker. | platform-engineer | **P0** | M7 | [ ] |
+| 2 | Create `enterprise_pipeline_stages` table (§37.8.1 DDL) with RLS. Register migration `0061_enterprise_pipeline_stages.sql`. | platform-engineer | **P0** | M7 | [ ] |
+| 3 | Set up weekly pipeline review cadence — Monday 09:00 UTC recurring calendar event. First review: M8. | founder | **P0** | M8 | [ ] |
+| 4 | Configure pg_cron job 31: daily 07:00 UTC, runs §37.8.4 aging query; for each aged-out deal, emits `enterprise.deal_aged_out` DEC-030 event and sends Slack alert to #enterprise-pipeline channel. | platform-engineer | **P0** | M8 | [ ] |
+
+#### P1 — Before first enterprise deal closes (M9–M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Set up monthly ARR bridge reconciliation process using §37.6.2 steps. First bridge close: end of month of first Closed-Won deal. Emit `enterprise.arr_bridge_closed` DEC-030 event. | founder + data-engineer | **P1** | M10 | [ ] |
+| 6 | Build the §37.8.2 PCR query into a Retool or Supabase Studio dashboard accessible by founder. Target: PCR visible within 2 minutes of opening the dashboard. | data-engineer | **P1** | M9 | [ ] |
+| 7 | Document quarterly ARR target for each quarter of Y1 in a `enterprise_arr_targets` config table (1 row per quarter; `target_arr_usd`; read-only for `form_admin`). Required input for the PCR query denominator. | founder | **P1** | M8 | [ ] |
+
+#### P2 — Before Series A fundraising preparation (M18–M20)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | After 10 closed-won deals, run §37.8.3 conversion rate actuals query. Compare to §37.3 base assumptions. If deviation > 10pp in any stage, update §37.3 and emit `enterprise.pipeline_conversion_model_recalibrated`. Document in `docs/DECISION_LOG.md`. | data-engineer + founder | **P2** | M18 | [ ] |
+| 9 | Evaluate CRM tool selection (OQ-PIPE-02 below) and migration path from `enterprise_pipeline_stages`. If CRM adopted, `enterprise_pipeline_stages` becomes a read-only historical archive; new pipeline data flows from CRM via webhook. | founder + data-engineer | **P2** | M20 | [ ] |
+| 10 | Update §37.5 ARR Build Table with actuals from the first 8 quarters. Publish revised Y3–Y5 forecast for Series A data room. | data-engineer + founder | **P2** | M22 | [ ] |
+
+---
+
+### 37.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-PIPE-01** | **What are FORM's actual stage conversion rates after 10 closed-won deals?** §37.3 uses conservative-to-base benchmarks derived from comparable SaaS platforms. FORM's CV-demo advantage in the pilot and the DPA-before-data privacy floor may improve S2→S3 rates; the GDPR Art. 9 DPA negotiation requirement may extend S4 beyond 45 days for EU deals. Neither effect can be measured before 10 deals. Resolution: run §37.8.3 query after Deal 10; update §37.3 and emit `enterprise.pipeline_conversion_model_recalibrated` per §37.7.3 governance. | **P1** | data-engineer + founder | After Deal 10 (est. M18) |
+| **OQ-PIPE-02** | **Which CRM tool should FORM adopt, and when?** Pre-Series A, `enterprise_pipeline_stages` plus a spreadsheet is sufficient for 3–10 deals. At 10+ active pipeline deals, a CRM (HubSpot, Salesforce, Attio) reduces founder cognitive load and provides investor-grade reporting. Cost consideration: HubSpot Starter is ~$600/year; Salesforce Starter is ~$900/year; Attio is usage-based. Resolution: evaluate at M12 (when pipeline likely has 5+ active deals); adopt before M18. Compatibility requirement: CRM must support bi-directional webhook to keep `enterprise.pipeline_reviewed` DEC-030 events current. | **P2** | founder | M12 evaluation; M18 adoption |
+| **OQ-PIPE-03** | **Should FORM track partner-sourced deals separately in the pipeline?** Currently all deals are founder-sourced (outbound or inbound). If FORM develops a partner channel (HR consultancies, benefits brokers, EAP platforms), partner-sourced deals may have different conversion rates and ACV profiles. A `source_partner_id` column in `enterprise_pipeline_stages` would enable attribution. Resolution: defer until first partner deal; add column at that point (backward-compatible schema change). | **P2** | founder | On first partner deal; no later than M24 |
+
+---
+
+*v2.3 (2026-06-13): §37 Enterprise Pipeline Health & ARR Forecasting Model — six-stage pipeline definition (S0 Inbound → S5 Closed-Won) with entry/exit criteria and maximum stage age; stage conversion rate table (conservative / base / optimistic with benchmark sources: OpenView Partners 2024, Gartner wellness 2023); three pipeline health metrics: PCR (3.0× healthy threshold; weighted by stage from 5% S0 → 100% S5), sales velocity formula (Y1 base: $1,944/month; Y2: $9,164/month), and pipeline aging triggers with required actions by stage; ARR build table Y1–Y3 base case and downside (40% logo miss) with quarterly granularity; monthly ARR bridge reconciliation (five components: new + expansion − contraction − churn + indexation) with NRR floor thresholds (100% Y1 / 110% Y2 / 120% Y3+); forecasting governance cadence (weekly pipeline review / monthly bridge close / quarterly retrospective) with forecast override policy; `enterprise_pipeline_stages` Postgres table DDL with RLS (form_admin + compliance_reviewer read; form_system write), four SQL queries (PCR, conversion actuals, aging alert, monthly bridge); four DEC-030 HMAC-chained events: `enterprise.pipeline_reviewed` (STANDARD, 3yr — aggregate deal counts; no tenant/prospect IDs), `enterprise.arr_bridge_closed` (STANDARD, 7yr — aggregate ARR components; investor-grade financial record; 7yr per Ukrainian Tax Code Art. 44), `enterprise.deal_aged_out` (STANDARD, 3yr — deal_id internal UUID only; pg_cron job 31 daily), `enterprise.pipeline_conversion_model_recalibrated` (STANDARD, 7yr — fires when >10pp deviation in any stage; requires DECISION_LOG entry); 10-item implementation checklist (4× P0/M7–M8, 3× P1/M9–M10, 3× P2/M18–M22); 3 open questions (OQ-PIPE-01 actual conversion rates after Deal 10; OQ-PIPE-02 CRM adoption decision; OQ-PIPE-03 partner channel attribution). Cross-references: §19 (GTM financial model — sales velocity inputs); §23 (NRR engine — expansion ARR source data for bridge); §34 (churn register — churned ARR source for bridge); §35 (contract amendments — contraction ARR); §36 (implementation cost — used in §37.5 Y1 ARR table comments); §22 (cash flow model — ARR bridge feeds cash projection); §24.3 (Series A readiness — $2.1M ARR Q4 Y3 target from §37.5); `docs/ENTERPRISE.md` (commercial model and team); `docs/AUDIT_LOG_SCHEMA.md` (four new DEC-030 events to register — P0 before first pipeline entry); `docs/DECISION_LOG.md` (OQ-PIPE-01 closure; forecast override policy §37.7.4). Privacy floor: no individual employee user_id in any §37 DEC-030 event; no prospect PII in audit chain; `deal_id` is FORM-internal UUID never shared externally. Owner: enterprise-architect + customer-success + data-engineer + compliance-officer.*
 
 ---
 
