@@ -10434,4 +10434,185 @@ const BackupStalenessDetectedPayload = z.object({
 
 ---
 
+## §40 Pre-Launch Load Testing & Performance Capacity Observability
+
+> **Owner:** devops-lead + platform-engineer. **Review:** before each gated deployment; quarterly for PERF-SLO-06 regression check.
+> **SOC 2:** A1.1 (capacity management), A1.2 (environmental protections). Advances *"Load testing before launches"* from 🟡 Partial to 🟢 Done (observability layer complete) once first gate execution is in the HMAC chain.
+> **Cross-references:** `docs/SOC2_READINESS.md §33.3` (k6 scenario definitions and pass/fail thresholds — this section is the observability companion); `docs/SOC2_READINESS.md §33.4.1` (production API latency SLAs: p95 < 300 ms Growth/Enterprise); `docs/ENTERPRISE_SLA.md §3` (99.9% uptime commitment the load tests validate); §38 (CI/CD pipeline — load test as a downstream gate job); §39 (backup/DR observability — separate evidence chain).
+
+---
+
+### 40.1 Scope and Purpose
+
+This section is the observability companion to `docs/SOC2_READINESS.md §33.3`, which defines the pre-launch load test scenarios, k6 VU profiles, and pass/fail thresholds. §40 adds:
+
+- **DEC-030 HMAC-chained audit events** for every load test execution and gate bypass — giving the SOC 2 auditor a verifiable deployment-by-deployment performance validation record
+- **Production performance alert rules** (AL-PERF-\*) that detect latency regressions in production between test runs
+- **Quarterly baseline regression SLO** (PERF-SLO-06) with pg_cron enforcement
+- **SOC 2 evidence artefact IDs** (LT-E-001 through LT-E-003) with filing paths
+
+**What §40 does NOT redefine:** The k6 scenario parameters (VU counts, stage durations, threshold values) are authoritative in `docs/SOC2_READINESS.md §33.3`. Any change to those thresholds must update §33.3 first; §40 references them by pointer, not by copy.
+
+**Explicitly out of scope:** mobile client performance (separate EAS tooling), Anthropic API latency (external dependency; see §32 and `docs/INCIDENT_RESPONSE.md R-04`), DR failover throughput (§39).
+
+**Privacy invariant:** All k6 test virtual users operate against synthetic tenant data in staging only. No real user identifiers, health data, coaching content, or biometric values appear in any load test script, analytics record, or DEC-030 payload. The `tenant_id` in load test DEC-030 events always carries the prefix `lt-synthetic-` — never a live enterprise tenant ID.
+
+---
+
+### 40.2 Load Test Gate: Deployment Trigger Matrix
+
+Cross-reference: `docs/SOC2_READINESS.md §33.3` lists the four gate events. The table below adds the DEC-030 gate action for CI enforcement and the bypass protocol.
+
+| Trigger | k6 profiles required | Gate action on FAIL | DEC-030 event emitted |
+|---|---|---|---|
+| First enterprise customer onboarding (> 200 seats) | All five §33.3 scenarios | Merge blocked; Linear `[COMPLIANCE]` ticket required | `system.load_test_failed` HIGH |
+| GA launch (App Store / Play Store) | All five §33.3 scenarios | Release blocked | `system.load_test_failed` HIGH |
+| New background Worker or cron job handling user data | Baseline scenario | Merge blocked | `system.load_test_failed` HIGH |
+| Supabase migration on table with > 1M rows | DB connection saturation scenario | Merge blocked | `system.load_test_failed` HIGH |
+
+**Gate bypass protocol:** A P0 emergency hotfix may bypass the gate with: (a) compliance-officer Slack acknowledgement in `#form-compliance-private`; (b) `system.load_test_gate_bypassed` CRITICAL DEC-030 event emitted before the deploy; (c) post-deploy load test scheduled within 48 h as a Linear `[COMPLIANCE]` ticket referenced in the event payload. Bypasses are filed in LT-E-003.
+
+---
+
+### 40.3 SLOs
+
+PERF-SLO-01 through PERF-SLO-05 are **hard gates** enforced by the GitHub Actions `load-test` job. PERF-SLO-06 is a **soft gate** — quarterly drift triggers an investigation alert but does not block an in-flight deployment.
+
+Threshold values are derived from `docs/SOC2_READINESS.md §33.3` pass criteria and `docs/SOC2_READINESS.md §33.4.1` production SLA targets.
+
+| SLO ID | Metric | Threshold | Window | Gate type |
+|---|---|---|---|---|
+| **PERF-SLO-01** | Baseline scenario p95 latency (all API endpoints) | ≤ 300 ms | Per test run | Hard gate → merge blocked on breach |
+| **PERF-SLO-02** | SSO login burst auth p95 latency | ≤ 500 ms | Per test run | Hard gate |
+| **PERF-SLO-03** | Coaching session load p95 latency | ≤ 2,000 ms | Per test run | Hard gate |
+| **PERF-SLO-04** | Baseline + DB scenarios error rate | ≤ 0.1% | Per test run | Hard gate |
+| **PERF-SLO-05** | SCIM provisioning burst 5xx rate | 0 (zero-tolerance) | Per test run | Hard gate |
+| **PERF-SLO-06** | Quarterly p95 drift vs. prior quarter reference run (any endpoint) | ≤ +20% | Quarterly cron | Soft gate → P2 alert + investigation ticket |
+
+---
+
+### 40.4 Alert Rules (Production)
+
+These rules monitor **production** performance (Cloudflare Analytics Engine + Better Stack), not the load test gate itself.
+
+| Rule ID | Condition | Severity | Routing | Auto-resolve | Notes |
+|---|---|---|---|---|---|
+| **AL-PERF-01** | API p95 latency > 300 ms over 10-min rolling window (any Worker) | P2 | `form-devops` Slack | Yes — 15 min | Leading-indicator before SLA breach; investigate before enterprise office hours |
+| **AL-PERF-02** | API p99 latency > 600 ms over 5-min rolling window | P1 | PagerDuty `form-devops` | Yes — 15 min | Crosses headroom above §33.4.1 p95 < 300 ms production SLA; enterprise SLA risk |
+| **AL-PERF-03** | API error rate > 0.5% over 5 min (all Workers combined) | P1 | PagerDuty `form-devops` | Yes — 15 min | §4 auth-specific AL-AUTH-02 governs SSO errors; AL-PERF-03 covers general API errors |
+| **AL-PERF-04** | `system.load_test_gate_bypassed` DEC-030 CRITICAL event detected | P1 | PagerDuty `form-compliance` | **No** | compliance-officer must confirm bypass was authorised; no auto-resolve; filed in LT-E-003 |
+| **AL-PERF-05** | Quarterly PERF-SLO-06 regression: p95 > +20% vs. reference baseline | P2 | `form-devops` Slack | Yes — on investigation ticket close | pg_cron job 30 fires quarterly; dedup key per (endpoint, quarter) |
+
+**§6.2 master alert table addition:** Add `performance` subsection with AL-PERF-01 through AL-PERF-05 using the standard condensed format.
+
+---
+
+### 40.5 DEC-030 HMAC-Chained Audit Events
+
+All events are HMAC-chained per DEC-030. Privacy invariant: no `user_id`, real tenant identifier, health data, coaching content, biometric values, or k6 script source in any payload field.
+
+| Event type | Severity | Retention | Key payload fields | SOC 2 |
+|---|---|---|---|---|
+| `system.load_test_initiated` | STANDARD | 3 years | `profile` (enum: baseline / sso_burst / coaching / db_saturation / scim_burst / all), `commit_sha` (8-char), `triggered_by` (github_actions / manual), `environment: literal("staging")` | A1.1 |
+| `system.load_test_completed` | STANDARD | 3 years | `profile`, `commit_sha`, `pass` (bool), `p95_ms_max` (worst-case across endpoints), `error_rate`, `duration_seconds`, `vus_peak`, `slo_results` (object: PERF-SLO-01…05 each with `pass` bool and `actual` value) | A1.1, A1.2 |
+| `system.load_test_failed` | HIGH | 7 years | `profile`, `commit_sha`, `failing_slos` (array of PERF-SLO-ID strings), `p95_ms_max`, `error_rate`, `gate_action: literal("merge_blocked")` | A1.2, CC7.2 |
+| `system.load_test_gate_bypassed` | CRITICAL | 7 years | `commit_sha`, `bypass_reason_hash` (SHA-256 of plaintext reason — raw stored in Linear ticket), `authorised_by_hash` (SHA-256 of compliance-officer Slack handle), `post_deploy_test_linear_id`, `p0_incident_id` (if applicable) | A1.2, CC5.2, CC8.1 |
+| `system.perf_regression_detected` | HIGH | 7 years | `quarter` (YYYY-QN), `endpoint`, `p95_current_ms`, `p95_reference_ms`, `drift_pct`, `slo: literal("PERF-SLO-06")` | A1.2 |
+
+**HMAC chain ordering invariant (PERF-CHAIN-01):** Within a single test run, `system.load_test_initiated` must precede `system.load_test_completed` or `system.load_test_failed` in the chain. A gap or inversion is a P1 incident per §R-05.
+
+**Bypass event pattern:** `system.load_test_gate_bypassed` uses SHA-256 hashing for both the bypass reason and the authoriser identity — consistent with the `admin_jit_escalations.justification_hash` pattern established in DEC-044 (OQ-PAM-02). The plaintext reason is stored exclusively in the Linear ticket referenced by `post_deploy_test_linear_id`; the auditor may request it per DEC-044 fieldwork protocol.
+
+---
+
+### 40.6 §12.6 pg_cron Registry Addition — Job 30
+
+```sql
+-- Job 30: quarterly_perf_regression_check
+-- Runs first business day of Q2, Q3, Q4 (Q1 handled by annual reference run — item 8 in §40.9)
+-- Queries LOAD_TEST_TELEMETRY Analytics Engine; emits system.perf_regression_detected if drift > 20%
+SELECT cron.schedule(
+  'quarterly_perf_regression_check',
+  '0 9 1 4,7,10 1',   -- 09:00 UTC first Monday of Apr, Jul, Oct
+  $$SELECT perf_regression_check_quarterly()$$
+);
+```
+
+| Job | Schedule | Freshness window | SOC 2 | Alert on failure |
+|---|---|---|---|---|
+| `quarterly_perf_regression_check` (job 30) | `0 9 1 4,7,10 1` | 35-day check window | A1.2, CC7.2 | P2 via AL-PERF-05 if > 20% drift |
+
+---
+
+### 40.7 Dashboard — "Performance & Load Test History"
+
+Metabase collection: `FORM-DevOps`. Visibility: `form_admin`, `compliance_reviewer`, `devops_lead`. No PII in any panel.
+
+| Panel | Metric | Visualisation | SLO reference |
+|---|---|---|---|
+| 1 | API p95 latency (production) — rolling 30 days per Worker | Time-series; 300 ms reference line | PERF-SLO-01 / §33.4.1 |
+| 2 | API p99 latency (production) — rolling 30 days | Time-series; 600 ms reference line | AL-PERF-02 threshold |
+| 3 | Error rate (production) — rolling 7 days by endpoint group | Stacked bar; 0.5% threshold line | AL-PERF-03 |
+| 4 | Load test results — last 30 runs | Table: commit SHA, profile, pass/fail, p95_ms_max, date; fail rows amber | PERF-SLO-01–05 |
+| 5 | Gate bypass log — all time | Table: commit SHA, reason hash, authorised_by hash, Linear ticket | LT-E-003 |
+| 6 | Quarterly p95 drift (PERF-SLO-06) — current vs. prior quarter per endpoint | Bar chart; +20% threshold line highlighted amber | PERF-SLO-06 |
+
+---
+
+### 40.8 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | §40 mechanism | Evidence artefact | Status |
+|---|---|---|---|---|
+| **A1.1 — Capacity management** | Pre-deploy performance validation confirms API infrastructure meets the §33.4.1 p95 < 300 ms production SLA at enterprise-fleet concurrent load before any gated deployment | `system.load_test_completed` events with `pass: true` in the HMAC chain, one per gated deployment | **LT-E-001** — `system.load_test_completed` DEC-030 extract, all test runs during observation period (quarterly CSV; `compliance/evidence/a1/lt-e-001-YYYY-QN.csv`) | 🟡 Authored — closes after first gate execution |
+| **A1.2 — Environmental protections** | Quarterly baseline regression SLO (PERF-SLO-06) confirms that cumulative code changes do not degrade sustained performance headroom; pg_cron job 30 provides continuous cadenced evidence | `system.perf_regression_detected` events; quarterly regression report | **LT-E-002** — quarterly PERF-SLO-06 comparison report (`compliance/evidence/a1/lt-e-002-YYYY-QN.md` — p95 current vs. prior quarter per endpoint; devops-lead + compliance-officer sign-off) | 🟡 Authored — closes after first quarterly run (M9) |
+| **CC5.2 — Monitoring for deviations from policy** | `system.load_test_gate_bypassed` CRITICAL event provides an auditor-visible, HMAC-chained record of any policy exception with SHA-256-hashed management authorisation | CRITICAL severity, 7-year retention; bypass reason recoverable via Linear ticket per DEC-044 protocol | **LT-E-003** — PagerDuty AL-PERF-04 history + DEC-030 `load_test_gate_bypassed` extract (`compliance/evidence/cc5/lt-e-003-YYYY-QN.json`) | 🟡 Authored — expected to be empty record; zero bypasses is the target state |
+| **CC8.1 — Change management** | Load test gate is a GitHub Actions check (§38 CI/CD framework) — a merge to main that requires a load test cannot proceed without `system.load_test_completed{pass:true}` in the DEC-030 chain | Gate enforced at CI level; bypass is explicitly authorised and HMAC-chained | Covered by **CI-E-001** (§38.8); §40 adds LT-E-001 as the performance-specific evidence record | 🟡 Authored — complementary to §38 CC8.1 narrative |
+
+**Auditor narrative for A1.1:** The pre-launch load test gate converts the `docs/SOC2_READINESS.md §33.3` program from a written policy into a per-deployment HMAC-chained audit record. LT-E-001 gives the auditor a direct correlation between each merge to main and a verified performance baseline — `commit_sha` in `system.load_test_completed` links to the GitHub Actions run in CI-E-001 (§38.8). Together they close the evidence chain: policy (§33.3) → gate enforcement (§38 CI) → performance verification (§40 DEC-030 chain) → SLA commitment (ENTERPRISE_SLA.md §3).
+
+---
+
+### 40.9 Open Questions
+
+| OQ | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-PERF-01** | **k6 OSS in GitHub Actions vs. k6 Cloud for quarterly PERF-SLO-06 reference run.** k6 OSS in CI is subject to the GitHub Actions runner's network bandwidth and geographic limits (US East by default), which may inflate measured latency for FORM's EU-primary Cloudflare Workers deployment. k6 Cloud's distributed EU nodes would give a more accurate reference for European enterprise tenants. **Recommendation:** k6 OSS in CI for merge-gate enforcement (§40.2 trigger matrix); k6 Cloud for the quarterly PERF-SLO-06 reference benchmark run only. Cost estimate needed before committing. | **P1** | devops-lead | Decide before first quarterly reference run (M6); cost estimate from k6 Cloud pricing page; document in `docs/DECISION_LOG.md` |
+| **OQ-PERF-02** | **Staging data freshness for load tests.** If the staging Supabase project drifts from production schema (e.g., missing new RLS policies added after last refresh), load test results may not reflect production latency. **Recommendation:** document a staging schema refresh procedure — production snapshot with health data anonymised — and run it before each quarterly PERF-SLO-06 reference run. Clinical-safety must sign off that no real health data enters the anonymised staging snapshot. | **P1** | platform-engineer + compliance-officer | Document anonymisation procedure at `compliance/cc8/staging-data-anonymisation-procedure.md` before first quarterly reference run (M6) |
+| **OQ-PERF-03** | **Fleet-wide vs. per-tenant load profile scaling.** §33.3 profiles simulate a single 1,000-seat enterprise tenant (SCIM burst 500 VUs, SSO burst 500 VUs). As FORM adds more tenants, fleet-wide peak load multiplies. Should profiles scale with the largest active tenant or with total fleet active users? **Recommendation:** per-tenant (largest active seat count) through enterprise GA; revisit fleet-wide post-Series A when fleet exceeds 5,000 seats. | **P2** | devops-lead + platform-engineer | Document in `docs/DECISION_LOG.md` before first enterprise pilot (M10) |
+
+---
+
+### 40.10 Implementation Checklist
+
+#### P0 — Before load test gate is enforced in CI (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all five DEC-030 events from §40.5 in `docs/AUDIT_LOG_SCHEMA.md §System` with Zod schemas; deploy event types to `emit-audit-event` Worker event registry. Priority: `system.load_test_gate_bypassed` CRITICAL must be registered first. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 2 | Add `load-test` GitHub Actions job (downstream of CI job in §38): run k6 `baseline` scenario per §33.3 against staging; emit `system.load_test_initiated` → `system.load_test_completed` (or `_failed`) DEC-030 events; publish p95/p99/error-rate to `LOAD_TEST_TELEMETRY` Analytics Engine dataset. | devops-lead + platform-engineer | **P0** | M5 | [ ] |
+| 3 | Enable merge gate: set `fail_on_slo_breach: true` in the `load-test` job; verify a synthetic SLO breach on a feature branch blocks the merge. | devops-lead | **P0** | M6 | [ ] |
+| 4 | Configure AL-PERF-01 through AL-PERF-05 in PagerDuty (AL-PERF-02, AL-PERF-03, AL-PERF-04) and Slack (AL-PERF-01, AL-PERF-05); add `performance` subsection to §6.2 master alert table in this document. | devops-lead | **P0** | M6 | [ ] |
+
+#### P1 — Before first enterprise pilot (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Extend `load-test` GitHub Actions job to run all five §33.3 k6 scenarios (not just baseline) for the four enterprise-specific gate triggers listed in §40.2. | platform-engineer | **P1** | M7 | [ ] |
+| 6 | Create pg_cron job 30 `quarterly_perf_regression_check` (§40.6 SQL spec); register in §12.6 pg_cron registry; deploy to staging and verify first `system.perf_regression_detected` event fires on synthetic > 20% threshold breach. | platform-engineer | **P1** | M6 | [ ] |
+| 7 | Build "Performance & Load Test History" Metabase dashboard (§40.7 — 6 panels); add to `FORM-DevOps` collection; restrict visibility to `form_admin` + `compliance_reviewer`. | data-engineer | **P1** | M7 | [ ] |
+| 8 | Decide OQ-PERF-01 (k6 OSS vs. k6 Cloud); document in `docs/DECISION_LOG.md`; provision k6 Cloud account if chosen. | devops-lead | **P1** | M6 | [ ] |
+| 9 | Document staging data anonymisation procedure (OQ-PERF-02) at `compliance/cc8/staging-data-anonymisation-procedure.md`; clinical-safety sign-off required before first staging refresh. | platform-engineer + compliance-officer | **P1** | M6 | [ ] |
+
+#### P2 — Before SOC 2 observation period start (M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | Collect LT-E-001 (first quarter of `system.load_test_completed` DEC-030 chain) and file in `compliance/evidence/a1/lt-e-001-YYYY-QN.csv`. | compliance-officer | **P2** | M9 | [ ] |
+| 11 | Produce first LT-E-002 quarterly PERF-SLO-06 regression report; sign-off devops-lead + compliance-officer; file in `compliance/evidence/a1/lt-e-002-YYYY-QN.md`. | devops-lead + compliance-officer | **P2** | M9 | [ ] |
+| 12 | Decide OQ-PERF-03 (fleet-wide vs. per-tenant load profile scaling); document in `docs/DECISION_LOG.md`. | devops-lead + platform-engineer | **P2** | M10 | [ ] |
+
+---
+
 *v3.6 (2026-06-13): §39 Backup Integrity, DR Readiness & Business Continuity Observability — closes the observability gap explicitly noted in §37.1 ("Supabase internal backup retention — vendor-managed; monitored via S-008 synthetic probe in §16"). §39 is the compliance-grade companion to `docs/BUSINESS_CONTINUITY.md`: where the BCP defines what to do, §39 defines how FORM knows it's doing it. §39.1 scopes to four surfaces: Supabase Postgres daily logical backup, R2 `form-backups` (primary cold-start), Backblaze B2 `form-dr-backups` (EU DR), and quarterly/annual restore tests. Explicitly out of scope: PITR restore runbooks (BCP §6.1 + DATA_MODEL.md §10), R2/B2 lifecycle policy configuration, audit log chain integrity (§15/§11.8), and GDPR erasure pipelines (§37). §39.2 backup coverage map: six data stores tabulated with backup type, target freshness, and RPO contribution — Workers KV and Workers Secrets explicitly not backed up by design. §39.3 RED metrics: two rate metrics (backup_completion_rate_24h, restore_tests_completed_rolling_90d), three error metrics (backup_age_hours per store, backup_failed_count_7d, restore_test_age_days), two duration metrics (backup_duration_minutes_p95 per store, restore_test_rto_minutes_p95); all infrastructure-only — no user_id, no tenant_id, no health data in any signal. §39.4 five SLOs: BC-SLO-01 (Postgres backup freshness ≤ 26h, 100% zero-tolerance), BC-SLO-02 (R2 freshness ≤ 26h, 99.5%), BC-SLO-02b (B2 EU freshness ≤ 30h, 99%), BC-SLO-03 (restore test RTO ≤ 4h per event, mirrors ENTERPRISE_SLA.md §4.3), BC-SLO-04 (one restore test per calendar quarter, 100% zero-tolerance — direct SOC 2 A1.3 evidence gate). §39.5 six alert rules AL-BC-01 through AL-BC-06: AL-BC-01 (P1, Postgres stale > 26h, auto-resolve), AL-BC-02 (P0, Postgres critical > 48h, no-auto-resolve, dual page), AL-BC-03 (P1, R2 stale > 26h, auto-resolve), AL-BC-04 (P1, restore test overdue > 90d, 7d TTL re-fire, auto-resolve on test completion), AL-BC-05 (P0, backup_failed DEC-030 CRITICAL, no-auto-resolve), AL-BC-06 (P2, backup duration P95 > 4h, Slack only). §39.6 five-row §6.2 master alert table addition for `backup_dr_health` subsection. §39.7 pg_cron job 29 `backup_age_monitor` (every 4h, 5h freshness window, P1 → AL-BC-01/03; escalates to P0 → AL-BC-02 if > 48h); design note distinguishing job 29 (DEC-030 compliance evidence) from S-008 (uptime-style availability monitoring). §39.8 seven-panel "Backup & DR Readiness" Metabase dashboard: `FORM-DevOps` collection, `form_admin` + `compliance_reviewer` visibility, no PII in any panel. §39.9 five DEC-030 HMAC-chained events: `system.backup_completed` (STANDARD, 5yr — `store`, `backup_type`, `duration_minutes`, `backup_id`, `region`, `pitr_point_in_time`), `system.backup_failed` (CRITICAL, 7yr — `error_message_hash` SHA-256 prevents credential leakage), `system.restore_test_initiated` (STANDARD, 7yr — `initiated_by` = PAM session ID, not raw user_id; `environment: literal("staging")`), `system.restore_test_completed` (STANDARD, 7yr — `rto_achieved_minutes`, `rto_target_minutes: literal(240)`, `privacy_floor_verified` boolean; if false, test is classified failed regardless of RTO), `system.restore_test_failed` (CRITICAL, 7yr — `failure_reason` enum includes `privacy_floor_violation` which additionally notifies clinical-safety), `system.backup_staleness_detected` (HIGH, 7yr — `dedup_key` prevents chain spam on repeated stale detection); BC-CHAIN-01 ordering invariant enforced at `emit-audit-event` Worker. §39.10 five SOC 2 evidence artefacts BC-E-001 through BC-E-005: BC-E-001 (A1.2 — job 29 run history), BC-E-002 (A1.3 — restore_test_completed events, quarterly), BC-E-003 (A1.3 — RTO comparison chart), BC-E-004 (CC7.2 — AL-BC-01/02 PagerDuty history), BC-E-005 (CC6.5 — 10-event backup_completed chain excerpt); A1.3 auditor narrative supplied (RTO operationally verified, not merely documented; privacy_floor_verified field extends compliance assurance through restore operations). §39.11 two open questions: OQ-BC-OBS-01 (P1, Supabase Management API vs DEC-030 event for Postgres backup cross-validation — dual-path recommended; resolve M8), OQ-BC-OBS-02 (P2, quarterly drill scope: Postgres PITR only vs. R2/B2 cold backup — Postgres-only recommended, annual for R2/B2; resolve M5). §39.12 eleven-item implementation checklist: 5× P0/M5–M6 (five-event DEC-030 registration, staleness event + dedup, backup Worker instrumentation, pg_cron job 29 DDL + cron registration, AL-BC-01 through AL-BC-05 PagerDuty configuration), 3× P1/M5–M7 (first quarterly restore test + BC-E-002 filing, Metabase dashboard, OQ-BC-OBS-02 decision), 3× P2/M9–M13 (evidence collection BC-E-001/005, OQ-BC-OBS-01 dual-path implementation, admin dashboard BC-SLO surface evaluation). Cross-references: `docs/BUSINESS_CONTINUITY.md §3.1` (RTO/RPO targets — BC-SLO-01/03 anchor); `docs/BUSINESS_CONTINUITY.md §4.2` (Privacy Floor verification — `privacy_floor_verified` boolean in restore_test_completed); `docs/BUSINESS_CONTINUITY.md §5.1–5.2` (Postgres PITR + R2 backup architecture); `docs/BUSINESS_CONTINUITY.md §6.1` (Postgres PITR restore runbook — §39 provides observability, BCP provides runbook); `docs/BUSINESS_CONTINUITY.md §7` (annual DR drill — OQ-BC-OBS-02 governs whether R2/B2 is included in quarterly vs. annual scope); `docs/ENTERPRISE_SLA.md §4.3` (RTO < 4h enterprise commitment — BC-SLO-03 target_minutes = 240); `docs/SOC2_READINESS.md §A1 criteria` (A1.2 capacity monitoring, A1.3 recovery testing — BC-E-001 through BC-E-005 close these evidence gaps); `docs/AUDIT_LOG_SCHEMA.md §System` (five new DEC-030 events to register — P0 before M5); `docs/CRYPTOGRAPHY_POLICY.md §5` (key inventory — OQ-BC-OBS-01 may require SUPABASE_MANAGEMENT_API_KEY entry); §16 S-008 (R2 backup freshness synthetic probe — complementary to, not replaced by, §39); §37.1 (GDPR data lifecycle out-of-scope note — §39 closes that explicit gap); §38 (CI/CD observability — both §38 and §39 emit into `audit_log_events` §System events namespace). Owner: devops-lead + compliance-officer + platform-engineer.*
+
+*v3.7 (2026-06-13): §40 Pre-Launch Load Testing & Performance Capacity Observability — closes the SOC 2 observability gap *"Load testing before launches"* noted in `docs/SOC2_READINESS.md §2` (previously 🟡 Gap → 🟡 Partial with §33.3 k6 scenarios defined; §40 advances toward 🟢 by adding the DEC-030 HMAC-chain layer and production alert rules). §40 is the observability companion to `docs/SOC2_READINESS.md §33.3`: §33.3 defines WHAT the gate tests, §40 defines HOW the results are audited and monitored. §40.1 scopes to the load test gate (not mobile client, not Anthropic API, not DR failover); establishes privacy invariant (synthetic `lt-` tenant IDs only; no real user or health data in any payload). §40.2 trigger matrix: four gate events mapped to required k6 profiles and DEC-030 actions, plus a documented bypass protocol (compliance-officer acknowledgement + CRITICAL event + 48h post-deploy test). §40.3 six SLOs: PERF-SLO-01 (baseline p95 ≤ 300 ms — derived from §33.3 and §33.4.1 production p95 < 300 ms target), PERF-SLO-02 (SSO burst auth p95 ≤ 500 ms), PERF-SLO-03 (coaching session p95 ≤ 2,000 ms), PERF-SLO-04 (error rate ≤ 0.1%), PERF-SLO-05 (SCIM 5xx = 0, zero-tolerance); PERF-SLO-01–05 are hard gates blocking merge; PERF-SLO-06 (quarterly p95 drift ≤ +20%) is a soft gate generating investigation alert. §40.4 five AL-PERF-* production alert rules: AL-PERF-01 (P2, p95 > 300 ms / 10 min, Slack), AL-PERF-02 (P1, p99 > 600 ms / 5 min, PagerDuty), AL-PERF-03 (P1, error rate > 0.5% / 5 min, PagerDuty), AL-PERF-04 (P1, load_test_gate_bypassed CRITICAL event, PagerDuty form-compliance, no auto-resolve), AL-PERF-05 (P2, quarterly PERF-SLO-06 breach, Slack). §40.5 five DEC-030 HMAC-chained events: `system.load_test_initiated` (STANDARD, 3yr — `profile`, `commit_sha`, `triggered_by`, `environment:staging`), `system.load_test_completed` (STANDARD, 3yr — full `slo_results` object for PERF-SLO-01–05), `system.load_test_failed` (HIGH, 7yr — `failing_slos` array, `gate_action:merge_blocked`), `system.load_test_gate_bypassed` (CRITICAL, 7yr — `bypass_reason_hash` SHA-256 per DEC-044 pattern; plaintext in Linear ticket), `system.perf_regression_detected` (HIGH, 7yr — quarterly PERF-SLO-06 breach). PERF-CHAIN-01 ordering invariant: `load_test_initiated` precedes `completed`/`failed`; inversion = P1 per R-05. §40.6 pg_cron job 30 `quarterly_perf_regression_check` (`0 9 1 4,7,10 1` — first Monday Apr/Jul/Oct; 35-day check window). §40.7 six-panel "Performance & Load Test History" Metabase dashboard (`FORM-DevOps`, `form_admin` + `compliance_reviewer` visibility, no PII). §40.8 four SOC 2 evidence artefacts: LT-E-001 (A1.1 — `system.load_test_completed` quarterly CSV; `compliance/evidence/a1/`), LT-E-002 (A1.2 — PERF-SLO-06 quarterly regression report with dual sign-off; `compliance/evidence/a1/`), LT-E-003 (CC5.2/CC7.2 — AL-PERF-04 PagerDuty history + bypass events; `compliance/evidence/cc5/`); auditor narrative for A1.1 supplied (commit_sha in `system.load_test_completed` links to CI-E-001 §38.8 — closes policy→gate→performance→SLA evidence chain). §40.9 three open questions: OQ-PERF-01 (P1, k6 OSS vs. Cloud for quarterly reference run), OQ-PERF-02 (P1, staging data anonymisation procedure for quarterly refresh), OQ-PERF-03 (P2, per-tenant vs. fleet-wide profile scaling post-Series A). §40.10 twelve-item implementation checklist: 4× P0/M5–M6 (DEC-030 event registration, GitHub Actions load-test job, merge gate enforcement, AL-PERF-* PagerDuty/Slack config), 5× P1/M6–M7 (all five k6 scenarios for enterprise gate triggers, pg_cron job 30, Metabase dashboard, OQ-PERF-01 decision, staging anonymisation procedure), 3× P2/M9–M10 (LT-E-001/002 evidence collection, OQ-PERF-03 decision). `docs/SOC2_READINESS.md §2` gap table updated: "Load testing before launches" 🟡 Gap → 🟡 Partial. Owner: devops-lead + platform-engineer + compliance-officer.*

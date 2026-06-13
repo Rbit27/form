@@ -136,7 +136,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 
 | Control | Status | Evidence |
 |---|---|---|
-| Load testing before launches | 🟡 Gap | Define pre-launch load test requirement |
+| Load testing before launches | 🟡 Partial | Program defined — `docs/SOC2_READINESS.md §33.3` (k6 scenarios, pass criteria, PRE-33-E-002); DEC-030 gate events and production alert rules — `docs/OBSERVABILITY.md §40`; first gate execution pending M5 |
 | Auto-scaling configured | 🟡 Partial | Cloudflare Workers scale automatically; Supabase connection pooling needed |
 | Disaster recovery RTO/RPO defined | ✅ Done | `docs/SECURITY.md` §10 — RTO 4h, RPO 1h |
 | DR test performed annually | 🔴 Gap | Schedule annual DR drill |
