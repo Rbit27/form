@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 10 | Draft — posts 608–610 added; post-610: flexible microcycle variable schedule |
+| 601–650 | Programming edge cases | 11 | Draft — posts 608–611 added; post-611: де закінчується самокоучинг (block 601–650 initial 10-topic plan complete) |
 
-**Total posts: 610**
+**Total posts: 611**
 
 ---
 
@@ -85,14 +85,13 @@
 
 ## Next priorities
 
-- Review posts 586–600 (sports-scientist pass before publish)
-- newsletter-04.md — drafted v4.22.0, needs editorial review before send
-- MOBILE_ROADMAP.md update (platform-engineer)
+- Review posts 586–611 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
+- newsletter-04.md — drafted, needs final editorial review before send
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- post-610 (де закінчується самокоучинг — when to get an external coach) — final post for block 601–650
-- Block 651–700 planning: biomechanics & injury prevention — post-611 chronic pain requires clinical-safety review before writing
+- Block 651–700 planning: biomechanics & injury prevention — post-612+ (first topic: chronic pain — **clinical-safety review required before writing**)
+- newsletter-05.md planning (topic: programming edge cases wrap-up or biomechanics preview)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.30.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.32.0**
