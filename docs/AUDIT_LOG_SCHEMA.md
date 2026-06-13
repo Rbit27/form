@@ -526,6 +526,10 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 | `data.workout_data_purged` | 1 year | GDPR Art. 5(1)(e) storage-limitation enforcement; GDPR-E-002 evidence artefact (SOC 2 PI1.2); 1yr sufficient — operational purge log, not a contract or financial record; daily cadence means 365 events/yr; older runs add no compliance value |
 | `data.audit_log_purge_completed` | 7 years | DEC-030 / CC6.5 audit log retention enforcement record; GDPR-E-003 evidence artefact; self-referential: this event is itself part of the audit log chain it governs; 7yr matches the retention period it enforces (the event that records the purge must outlive what it purged by at least one audit cycle)
 
+| `privacy.pia_filed` / `privacy.pia_completed` / `privacy.pia_veto_issued` / `privacy.constraint_relaxation_rejected` | 7 years | SOC 2 P1.1/P3.2/P8.1 PIA governance evidence; GDPR Art. 5(2) accountability record; `privacy.pia_veto_issued` CRITICAL is the clinical-safety decision record — 7yr ensures multiple SOC 2 observation periods are covered; `privacy.constraint_relaxation_rejected` provides a durable record that FORM declined to relax a privacy constraint on request of an enterprise customer or government, satisfying CC1.4 / P6.5 |
+| `privacy.annual_review_scope_drafted` | 3 years | Routine annual privacy review scope record; P8.1 operating-effectiveness evidence; superseded each year by a new scope draft — 3yr covers the current and prior year for any inspection window |
+| `privacy.annual_review_completed` | 7 years | Annual privacy review completion record; SOC 2 P8.1 monitoring and enforcement evidence; 7yr required — auditors conducting a Type II engagement may request evidence covering multiple annual review cycles |
+
 After retention period, rows **hard-deleted via partition drop** (not soft-delete). Hash of deleted-partition's last row preserved у `audit_log_retention_summary` for chain continuity proof.
 
 ---
@@ -653,6 +657,94 @@ const DataAuditLogPurgeCompletedPayload = z.object({
 
 ---
 
+### Privacy Impact Assessment events (DEC-030 HMAC-chained · PRIVACY_IMPACT.md §7 · P1.1/P3.2/P8.1)
+
+> Defined in `docs/PRIVACY_IMPACT.md §7`. Six events covering the full PIA governance lifecycle — from filing through completion, clinical-safety veto, constraint relaxation rejection, and annual review. Required for PRIVACY_IMPACT.md §11 P0/M4 item 1 (register all six events in AUDIT_LOG_SCHEMA.md before first enterprise pilot). **Privacy floor (all six events):** no `user_id`, `tenant_id`, or individual health values in any payload. `filed_by` and `completed_by` fields are internal FORM compliance-officer or clinical-safety UUIDs — not customer/employee IDs. `constraints_affected[]` and `constraints_protected[]` carry constraint IDs (e.g. `"OC-08"`, `"EF-05"`), not data values. **PIA-CHAIN-01 ordering invariant:** `privacy.pia_filed` must precede `privacy.pia_completed` for the same `pia_id`; `emit-audit-event` Worker logs a WARNING (non-blocking) if `privacy.pia_completed` is emitted with no prior `privacy.pia_filed` for the same `pia_id`. For veto events: `privacy.pia_veto_issued` may be emitted independently of `privacy.pia_completed` (veto terminates the PIA — no completion event is required after a veto). **PRIV-VETO-001 alert:** `privacy.pia_veto_issued` at CRITICAL severity triggers immediate PagerDuty dual-page to `compliance-officer` and `founder` — no dedup, no auto-resolve. Cross-ref: SOC 2 P1.1 (privacy notice management), P3.2 (explicit consent / change management record), P8.1 (monitoring and enforcement — annual review evidence); GDPR Art. 5(2) (accountability); `docs/PRIVACY_IMPACT.md §4` (five-step PIA process — these events are emitted at Steps 1 and 5); `docs/PRIVACY_IMPACT.md §5` (clinical-safety veto procedure — `privacy.pia_veto_issued` is the HMAC-chained record of the veto decision); `docs/PRIVACY_IMPACT.md §10` (PIA Register — `pia_id` FK links chain entry to register row). Closes PRIVACY_IMPACT.md §11 P0/M4 checklist item 1.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `privacy.pia_filed` | STANDARD | 7 yr | Compliance-officer acknowledges PIA ticket at Step 1 of §4 process; Linear ticket created; emitter: compliance-officer (manual via admin console) | `pia_id` (string — `PIA-YYYY-NNN` format), `trigger_type` (`T-1`…`T-7` per §3), `proposed_by` (role enum — proposer of the change), `constraints_affected` (string array — constraint IDs, e.g. `["OC-08"]`), `linear_ticket_url` (string), `filed_by` (UUID — compliance-officer user_id) |
+| `privacy.pia_completed` | HIGH | 7 yr | Compliance-officer records final decision at Step 5 of §4 process; emitter: compliance-officer (manual) | `pia_id` (string), `risk_rating` (`low`\|`medium`\|`high`\|`critical` per §4 risk-rated SLA table), `clinical_safety_required` (boolean), `clinical_safety_decision` (`approved`\|`approved_with_conditions`\|`vetoed`\|`not_required`), `decision` (`approved`\|`approved_with_conditions`\|`rejected`), `conditions` (string array — condition text list; empty if unconditional approval), `gdpr_dpia_delta_required` (boolean — whether GDPR_DPIA.md requires amendment), `completed_by` (UUID — compliance-officer user_id) |
+| `privacy.pia_veto_issued` | **CRITICAL** | 7 yr | Clinical-safety issues veto at §5 step; **triggers PRIV-VETO-001 PagerDuty dual-page (compliance-officer + founder) immediately; no auto-resolve**; emitter: clinical-safety agent | `veto_id` (UUID — unique veto record), `pia_id` (string — the PIA being vetoed), `constraints_protected` (string array — constraint IDs the veto protects), `harm_prevented` (string, max 500 chars — free-text harm description; no health values, no user data), `vetoed_by` (literal `"clinical-safety"`), `acknowledged_by_founder` (boolean — set to `false` at emission; founder must update to `true` within 24h via admin console) |
+| `privacy.constraint_relaxation_rejected` | HIGH | 7 yr | Any constraint relaxation proposal formally rejected by compliance-officer, regardless of whether a full PIA was filed; emitter: compliance-officer (manual) | `pia_id` (string — optional; null if rejection was made without a full PIA filing), `constraint_id` (string — e.g. `"EF-05"`, `"OC-08"`), `requester_type` (`internal`\|`enterprise_customer`\|`government`), `rejection_reason` (string, max 500 chars), `rejected_by` (UUID — compliance-officer user_id) |
+| `privacy.annual_review_scope_drafted` | STANDARD | 3 yr | Compliance-officer finalises annual review scope checklist (Q1 §9 table) and drafts review agenda; emitter: compliance-officer (manual) | `review_year` (integer — calendar year, e.g. `2027`), `scope_items` (string array — §9 PR-1 through PR-9 item IDs included in scope), `drafted_by` (UUID — compliance-officer user_id) |
+| `privacy.annual_review_completed` | HIGH | 7 yr | Compliance-officer signs off annual privacy review at P8.1; emitter: compliance-officer (manual) | `review_year` (integer), `dpia_version_reviewed` (string — e.g. `"v1.2"`), `pias_in_scope` (string array — PIA IDs reviewed this cycle), `gaps_opened` (non-negative integer — new gaps discovered), `gaps_closed` (non-negative integer — gaps remediated this cycle), `sign_off_by` (UUID — compliance-officer user_id) |
+
+```typescript
+// Zod schemas — canonical source for emit-audit-event Worker validation
+import { z } from 'zod';
+
+const PIA_ID_REGEX = /^PIA-\d{4}-\d{3}$/;
+
+const PiaFiledSchema = z.object({
+  pia_id:               z.string().regex(PIA_ID_REGEX),
+  trigger_type:         z.enum(['T-1','T-2','T-3','T-4','T-5','T-6','T-7']),
+  proposed_by:          z.enum([
+                          'product-manager','enterprise-architect','compliance-officer',
+                          'security-engineer','platform-engineer','founder','clinical-safety',
+                        ]),
+  constraints_affected: z.array(z.string()).min(1),
+  linear_ticket_url:    z.string().url(),
+  filed_by:             z.string().uuid(),
+});
+
+const PiaCompletedSchema = z.object({
+  pia_id:                   z.string().regex(PIA_ID_REGEX),
+  risk_rating:              z.enum(['low','medium','high','critical']),
+  clinical_safety_required: z.boolean(),
+  clinical_safety_decision: z.enum(['approved','approved_with_conditions','vetoed','not_required']),
+  decision:                 z.enum(['approved','approved_with_conditions','rejected']),
+  conditions:               z.array(z.string()),
+  gdpr_dpia_delta_required: z.boolean(),
+  completed_by:             z.string().uuid(),
+});
+
+const PiaVetoIssuedSchema = z.object({
+  veto_id:                  z.string().uuid(),
+  pia_id:                   z.string().regex(PIA_ID_REGEX),
+  constraints_protected:    z.array(z.string()).min(1),
+  harm_prevented:           z.string().max(500),
+  vetoed_by:                z.literal('clinical-safety'),
+  acknowledged_by_founder:  z.boolean(),
+});
+
+const ConstraintRelaxationRejectedSchema = z.object({
+  pia_id:           z.string().regex(PIA_ID_REGEX).optional(),
+  constraint_id:    z.string().regex(/^(EF|OC|DM)-\d{2}$/),
+  requester_type:   z.enum(['internal','enterprise_customer','government']),
+  rejection_reason: z.string().max(500),
+  rejected_by:      z.string().uuid(),
+});
+
+const AnnualReviewScopeDraftedSchema = z.object({
+  review_year:  z.number().int().min(2026),
+  scope_items:  z.array(z.string()).min(1),
+  drafted_by:   z.string().uuid(),
+});
+
+const AnnualReviewCompletedSchema = z.object({
+  review_year:           z.number().int().min(2026),
+  dpia_version_reviewed: z.string(),
+  pias_in_scope:         z.array(z.string()),
+  gaps_opened:           z.number().int().nonneg(),
+  gaps_closed:           z.number().int().nonneg(),
+  sign_off_by:           z.string().uuid(),
+});
+```
+
+**HMAC chain requirements (PIA-CHAIN-01):**
+
+- `privacy.pia_filed` — emitted synchronously when compliance-officer opens PIA ticket (Step 1). Fail-closed on `emit-audit-event` error — PIA process must not proceed until chain entry is confirmed (HTTP 200).
+- `privacy.pia_completed` — emitted synchronously at Step 5 final decision. `emit-audit-event` Worker logs WARNING if no prior `privacy.pia_filed` with same `pia_id` in chain (PIA-CHAIN-01); WARNING is non-blocking to allow retroactive filing during compliance programme bootstrap.
+- `privacy.pia_veto_issued` — emitted by clinical-safety agent immediately upon veto decision. May precede or replace `privacy.pia_completed`; no strict predecessor requirement. CRITICAL severity → PagerDuty PRIV-VETO-001 auto-fires.
+- `privacy.constraint_relaxation_rejected` — emitted independently of PIA lifecycle (rejections without a formal PIA also require a chain entry). No predecessor requirement.
+- `privacy.annual_review_scope_drafted` — no predecessor requirement; emitted once per calendar year at Q1 scope finalization.
+- `privacy.annual_review_completed` — no strict predecessor requirement beyond a matching `privacy.annual_review_scope_drafted` for the same `review_year` (WARNING if absent, non-blocking).
+
+**Emitter assignments:** All six events emitted manually by compliance-officer via admin console, except `privacy.pia_veto_issued` which is emitted by the clinical-safety agent. No automated system path for any PIA event — these are governance decisions requiring human judgement. `form_system` has INSERT privilege for break-glass scenarios only (e.g., retroactive baseline PIA-2026-000).
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:
@@ -692,6 +784,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.0 · 2026-06-13 · owner: compliance-officer + enterprise-architect**
+*v2.0 (2026-06-13): +6 `privacy.pia_*` Privacy Impact Assessment lifecycle events — closes PRIVACY_IMPACT.md §11 P0/M4 checklist item 1 (register all six event types in AUDIT_LOG_SCHEMA.md before first enterprise pilot). (1) `privacy.pia_filed` (STANDARD, 7yr): compliance-officer emits at PIA Step 1; payload: `pia_id` (PIA-YYYY-NNN regex), `trigger_type` (T-1…T-7), `proposed_by` (role enum), `constraints_affected[]`, `linear_ticket_url`, `filed_by` UUID. (2) `privacy.pia_completed` (HIGH, 7yr): compliance-officer emits at PIA Step 5 final decision; payload: `pia_id`, `risk_rating`, `clinical_safety_required`, `clinical_safety_decision` (4-value enum), `decision` (3-value enum), `conditions[]`, `gdpr_dpia_delta_required`, `completed_by` UUID. (3) `privacy.pia_veto_issued` (CRITICAL, 7yr): clinical-safety agent emits on veto; triggers PRIV-VETO-001 PagerDuty dual-page (compliance-officer + founder, no auto-resolve); payload: `veto_id`, `pia_id`, `constraints_protected[]`, `harm_prevented` (max 500 chars, no health values), `vetoed_by: "clinical-safety"`, `acknowledged_by_founder` (bool — founder must update to true within 24h). (4) `privacy.constraint_relaxation_rejected` (HIGH, 7yr): compliance-officer emits on any formal rejection of a constraint relaxation request; `pia_id` optional (rejections without a PIA also emit this event); payload: `constraint_id` (EF/OC/DM regex), `requester_type` (3-value enum), `rejection_reason` (max 500 chars), `rejected_by` UUID. (5) `privacy.annual_review_scope_drafted` (STANDARD, 3yr): annual scope finalization; payload: `review_year`, `scope_items[]`, `drafted_by`. (6) `privacy.annual_review_completed` (HIGH, 7yr): annual review sign-off; payload: `review_year`, `dpia_version_reviewed`, `pias_in_scope[]`, `gaps_opened/gaps_closed` counts, `sign_off_by`. PIA-CHAIN-01 ordering invariant: `pia_filed` must precede `pia_completed` for same `pia_id`; WARNING (non-blocking) logged if `pia_completed` emitted without prior `pia_filed`. Retention table: +3 rows (PIA governance 7yr; annual_review_scope_drafted 3yr; annual_review_completed 7yr). Privacy floor: no user_id, tenant_id, or individual health values in any payload. Zod schemas provided (canonical source for emit-audit-event Worker validation). Cross-ref: PRIVACY_IMPACT.md §7 (canonical event definitions, trigger conditions), §11 P0/M4 item 1 (checklist — closed by this patch), §10 (PIA Register — pia_id FK links chain entries to register rows); SOC 2 P1.1/P3.2/P8.1; GDPR Art. 5(2) accountability; DEC-046 (OQ-33 clinical-safety ruling — PIA-2026-001 filed in PRIVACY_IMPACT.md §10 as T-6 PIA). Owner: compliance-officer + enterprise-architect.*
 
 **v1.9 · 2026-06-12 · owner: compliance-officer + enterprise-architect**
 *v1.9 (2026-06-12): +5 GDPR data lifecycle events — closes OBSERVABILITY.md §37.10 checklist item 11 (P1, M6 — AUDIT_LOG_SCHEMA.md update required). (1) `user.account_deletion_initiated` (STANDARD, 7yr): consumer account deletion Worker fires synchronously after soft-delete (`users.deleted_at = NOW()`); payload: `deletion_request_id` (UUID, no `user_id`), `initiated_at`, `hard_delete_scheduled_at` (+30d), `account_type` (consumer|enterprise_member); fail-closed. (2) `user.data_erasure_completed` (STANDARD, 7yr): DSAR erasure Worker fires after cascade DELETE and `data_subject_requests.status = 'completed'`; payload: `erasure_request_id` (UUID, no `user_id`), `request_age_days` (float — GDPR-SLO-01 ≤25.0 evidence), `tables_purged` (array), `completed_at`, `slo_met` (bool). (3) `user.art9_data_hard_deleted` (HIGH, 7yr): enterprise Art. 9 off-boarding Worker; must complete ≤4h (GDPR-SLO-03 / DEC-036, P0 AL-GDPR-03 if breach); payload: `tenant_id`, `offboarding_initiated_at`, `hard_delete_completed_at`, `latency_seconds` (SLO evidence), `users_hard_deleted_count`, `art9_tables_purged` (array); no `user_id`. (4) `data.workout_data_purged` (STANDARD, 1yr): pg_cron job 26 (daily 02:00 UTC) fires after DELETE of workout_sets/sessions/body_metrics for post-30d deleted users; payload: `purge_date`, `users_purged_count`, `workout_sessions_deleted`, `workout_sets_deleted`, `body_metrics_deleted`, `pg_cron_run_id`; aggregate counts, no `user_id`; GDPR-E-002 (SOC 2 PI1.2). (5) `data.audit_log_purge_completed` (STANDARD, 7yr): pg_cron job 27 (monthly 1st 03:00 UTC); **DEC-030 ordering invariant — emitted and HTTP 200 confirmed BEFORE DELETE executes** (chain entry becomes new tail before oldest rows removed — failure aborts DELETE); payload: `purge_month`, `rows_eligible`, `rows_deleted`, `oldest_retained_event_timestamp`, `chain_verification_result` (pass|skip_no_eligible_rows), `pg_cron_run_id`; GDPR-E-003 (SOC 2 PI1.2/CC6.5). Five Zod schemas provided (canonical source for emit-audit-event Worker). Retention table: +4 rows (`user.account_deletion_initiated`/`user.data_erasure_completed` 7yr; `user.art9_data_hard_deleted` 7yr; `data.workout_data_purged` 1yr; `data.audit_log_purge_completed` 7yr). Privacy floor all five: no plaintext `user_id` in any payload; consumer-facing events use UUID FKs to RLS-gated Postgres tables; `user.art9_data_hard_deleted` is `tenant_id` + aggregate counts only. Emitter all five: `form_system` (automated Workers and pg_cron — no manual admin console path). Cross-ref: OBSERVABILITY.md §37 (canonical event definitions, SLOs, alert rules, pg_cron DDL); GDPR Art. 5(1)(e) storage limitation / Art. 17 erasure / Art. 9 special categories; SOC 2 PI1.2/P4/P5.2/P6/CC6.5; DEC-036 (Art. 9 hard-delete zero grace period). Owner: compliance-officer + platform-engineer + devops-lead.*
