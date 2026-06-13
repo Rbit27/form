@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.35.0] — 2026-06-13
+
+### Added
+- `content/post-615-broken-mesocycle-mid-block-disruption.md` — Programming edge cases block, post 15/50. "Розламаний мезоцикл — що робити, коли блок перервано на середині." Covers two disruption scenarios (stress-without-recovery vs. rest-without-training), block-phase-dependent decision algorithm (early break → restart; mid-block → reintegration week; late-block → deload + new cycle), sunk cost bias in periodization, and a practical reintegration protocol. References: Schmidt & Lee motor learning (procedural memory retention), Ogasawara et al. 2013 (structural adaptation preservation). Clinical safety: not_required — pure periodization/programming content, no food/body/injury/mental health framing. ~1900 words, Ukrainian, editorial-brutalist tone.
+
+### Changed
+- `blog.html` — картка post-615 додана на початок grid.
+- `STATUS.md` — block 601–650 updated: 14 → 15 posts; total 614 → 615; version v4.33.0 → v4.35.0.
+- `VERSION` — 4.34.0 → 4.35.0.
+
+---
+
 ## [4.34.0] — 2026-06-13
 
 ### Added

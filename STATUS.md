@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.33.0** — 2026-06-13
+**v4.35.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 14 | Draft — posts 613–614 added; post-613: куди після першої цілі; post-614: натуральний атлет і enhanced дослідження (block continues, 14/50) |
+| 601–650 | Programming edge cases | 15 | Draft — posts 613–615 added; post-615: розламаний мезоцикл (block continues, 15/50) |
 
-**Total posts: 614**
+**Total posts: 615**
 
 ---
 
