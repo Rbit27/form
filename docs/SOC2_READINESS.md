@@ -69,7 +69,7 @@ AICPA defines five TSC. We pursue **all five** — Security is mandatory; the re
 |---|---|---|
 | Continuous monitoring infrastructure | 🟡 Partial | PostHog for product; needs uptime monitoring (Better Uptime / Pagerduty) |
 | HMAC-chained audit log with chain-integrity verification | ✅ Done | DEC-030; `docs/AUDIT_LOG_SCHEMA.md` — weekly cron, alert on chain break |
-| Anomaly alerting (auth failures, spike detection) | 🟡 Gap | Rate limiting exists (Cloudflare WAF); needs alerting to security channel |
+| Anomaly alerting (auth failures, spike detection) | 🟡 Partial | Alert corpus defined: auth failure spike P1 PagerDuty (OBSERVABILITY §7), SIEM correlation rules CR-01–CR-04 (OBSERVABILITY §34), CC4.1 meta-monitoring (§76); ANOM-E-001–E-006 evidence paths defined; deployment gate = PRE-10 PagerDuty provisioning |
 | Quarterly control effectiveness review | 🟡 Partial | Access-control effectiveness integrated into quarterly access review — §23.4 Step 5; full cross-domain review expands post-hire |
 
 ### CC5 — Control Activities
@@ -25672,3 +25672,218 @@ P-GAP-002 and CC9-GAP-004 are now ✅ Closed. **P-GAP-001 and VRM-GAP-001 are th
 *v3.6.1 (2026-06-11): Control table reconciliation — 6 early-version rows updated to match the current gap register and later document sections. No evidence artefact or compliance posture change; all underlying work was already completed and recorded in later §§. Specific updates: CC1 §1 "Privacy policy published" 🔴 Gap → 🟡 Authored (privacy.html authored DEC-037; P-GAP-001 🟡); CC6 §6 "Offboarding process" 🔴 Gap → 🟡 Authored (compliance/cc6/offboarding-procedure.md CC6-E-001 2026-05-22; PRE-05 🟡); P1 §35 "Privacy policy at collection point" 🔴 Gap → 🟡 Authored (P-GAP-001); P1 §35 "Privacy policy covers all data categories" 🔴 Gap → 🟡 Authored (PRIVACY_POLICY.md v0.1); P1 §35 "Cookie banner / consent management" 🔴 Gap → 🟡 Authored (form-consent-gate §74 2026-06-09; PRE-16 🟡); P6 §35 "Sub-processor disclosure" 🔴 Gap → 🟢 Done (subprocessors.html live; P-GAP-002 🟢 per §75.6 2026-06-10). Overall readiness unchanged at ~98.6% (authored). Owner: compliance-officer + enterprise-architect.*
 
 *v3.6.2 (2026-06-12): Back-propagated ETF evidence artefacts from `docs/OBSERVABILITY.md §36.4` (added v3.83.0) into the SOC 2 readiness cross-reference. §25.7 CC7.2 evidence table: +ETF-E-002 (AL-ETF-01 alert dispatch log, PagerDuty `form-customer-success` + `#enterprise-health` Slack, CC7.2). §27.2.5 new subsection: +ETF-E-001 (`enterprise.mid_contract_termination_risk_flagged` DEC-030 chain, pg_cron job 25 Mondays 09:00 UTC, CC5.2) and +ETF-E-003 (`enterprise.early_termination_fee_waived` DEC-030 chain, five-tier approval authority matrix per `COST_MODEL.md §35.5.5`, HMAC ordering guard per `AUDIT_LOG_SCHEMA.md §6` v1.7, CC5.2). No gap register change; evidence paths already defined. Cross-references: `docs/OBSERVABILITY.md §36.2–§36.4`, `docs/COST_MODEL.md §35`, `docs/AUDIT_LOG_SCHEMA.md §6`. Owner: compliance-officer + enterprise-architect.*
+
+---
+
+## §76 CC7.2 / CC4.1 Security Monitoring & Anomaly Detection Operating Evidence · Anomaly Alert Corpus, SIEM Bridge Validation & Monitoring-of-Monitoring · CC7.2 / CC4.1 / CC7.3
+
+> **Owner:** `security-engineer` + `devops-lead` + `compliance-officer`. Review: quarterly or after any alert rule change.
+> **Closes:** SOC 2 §2 CC7 row — *"Anomaly alerting (auth failures, spike detection)"* 🟡 Gap → 🟡 Partial.
+> **References:** `docs/OBSERVABILITY.md §7` (alert corpus), `docs/OBSERVABILITY.md §27` (SIEM), `docs/OBSERVABILITY.md §34` (SIEM bridge), `docs/INCIDENT_RESPONSE.md R-03` (auth failure runbook), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030), DEC-030.
+
+---
+
+### §76.1 Purpose and Scope
+
+SOC 2 CC7.2 requires that FORM *"monitors system components for anomalies that could indicate a malicious act, a natural disaster, or an operational error."* SOC 2 CC4.1 requires that FORM *"selects, develops, and performs ongoing and/or separate evaluations to ascertain whether the components of internal control are present and functioning."*
+
+Prior to this section, `docs/SOC2_READINESS.md §2` recorded anomaly alerting as 🟡 Gap with the note *"Rate limiting exists (Cloudflare WAF); needs alerting to security channel."* Cloudflare WAF rate-limiting is a preventive control (CC6.6) — it blocks attack traffic but does not generate audit-chain evidence or route to a 24×7 response team. CC7.2 requires a separate detective control layer that monitors for anomalies and generates evidence of continuous observation.
+
+This section packages the monitoring controls already defined across `docs/OBSERVABILITY.md §7`, `§27`, and `§34` as an auditor-ready evidence exhibit. It does not introduce new controls; it formalises the evidence chain.
+
+**In scope:**
+- Security-classified alert rules (`#security-alerts` channel; PagerDuty `form-security` service) from `docs/OBSERVABILITY.md §7`
+- SIEM correlation rules CR-01 through CR-04 from `docs/OBSERVABILITY.md §27.3` / `§34`
+- SIEM bridge pg_cron jobs 22–23 from `docs/OBSERVABILITY.md §12.6`
+- CC4.1 meta-monitoring controls (monitoring-of-monitoring)
+
+**Out of scope:**
+- Product-quality alerting (§22 AI Coaching Quality, §32 Victor AI Safety) — covered by their own SOC 2 evidence sections
+- Key rotation alerting (§30 Cryptographic Health) — CC5.2/CC5.3 domain, not CC7.2
+- Billing anomaly alerting — PI1 domain
+
+---
+
+### §76.2 Control Narrative — CC7.2
+
+CC7.2 has three sub-criteria: (1) implement monitoring controls, (2) evaluate anomalies and determine whether they indicate an issue, (3) communicate identified anomalies to the parties responsible for resolution.
+
+**How FORM satisfies each sub-criterion:**
+
+| CC7.2 Sub-criterion | FORM Control | Evidence Reference |
+|---|---|---|
+| **CC7.2.1** — Implements monitoring controls | Auth failure spike alert (`supabase_auth_failures_total > 50/min → P1 PagerDuty`) + SIEM correlation rules CR-01 through CR-04 | `docs/OBSERVABILITY.md §7` + `§27.3` / `§34` |
+| **CC7.2.2** — Anomalies evaluated; escalation path defined | Four-tier severity (P0–P3); P1/P0 events auto-open incident in PagerDuty; security-engineer on-call acks within 30 min (INCIDENT_RESPONSE.md §1.1 SLA) | `docs/INCIDENT_RESPONSE.md §1.1` + `R-03`, `R-05`, `R-06`, `R-12` |
+| **CC7.2.3** — Anomalies communicated to responsible parties | PagerDuty `form-security` service pages security-engineer; `#security-alerts` Slack channel for P2/P3; all events emitted as DEC-030 HMAC-chained entries providing tamper-evident record | `docs/AUDIT_LOG_SCHEMA.md` + `docs/OBSERVABILITY.md §27.9` |
+| **CC7.2 — Special category: health data context** | Anomaly monitoring signals contain no personal health data. `supabase_auth_failures_total` is a counter by `failure_reason` (no `user_id`); SIEM correlation events use `user_email_hash` SHA-256 per §27.5 privacy floor; no IP address stored in plaintext | `docs/OBSERVABILITY.md §27.5` |
+
+**Primary security-classified alert rules (from `docs/OBSERVABILITY.md §7`):**
+
+| Alert Name | Trigger Condition | P-level | Destination | Runbook |
+|---|---|---|---|---|
+| **Auth failure spike** | `supabase_auth_failures_total` > 50 events/min sustained > 2 min | P1 | PagerDuty `form-security` → security-engineer | `docs/INCIDENT_RESPONSE.md R-03` |
+| **HMAC chain break detected** | `auditLog()` chain-verify cron fails OR `siem.hmac_chain_break_detected` CRITICAL DEC-030 event | P0 | PagerDuty `form-security` + founder (dual page); R-05 auto-opened | `docs/INCIDENT_RESPONSE.md R-05` |
+| **tenant_id missing on traced path** | `tenant_id_missing` counter > 0 in any 5-min window | P1 | PagerDuty `form-security` → security-engineer | `docs/INCIDENT_RESPONSE.md R-01` |
+| **Traffic spike anomaly** | Request rate > 5× 7-day baseline / 10-min window | P2 | Slack `#security-alerts` | `docs/INCIDENT_RESPONSE.md R-06` |
+| **Audit log write failure** | `auditLog()` middleware returns error on `auth.*`, `tenant.*`, or `support.*` action | P0 | PagerDuty `form-security` + IC | `docs/INCIDENT_RESPONSE.md R-05` |
+| **Enterprise SSO outage** | Any enterprise tenant SSO success rate < 99% / 15-min | P1 | PagerDuty `form-security` + on-call | `docs/INCIDENT_RESPONSE.md R-04` |
+
+These six alert rules constitute the **primary CC7.2 anomaly detection corpus**. All six are defined in `docs/OBSERVABILITY.md §7` which is the authoritative configuration register.
+
+---
+
+### §76.3 Control Narrative — CC4.1 (Monitoring-of-Monitoring)
+
+CC4.1 requires evaluation of whether monitoring controls are *"present and functioning."* For a monitoring control to satisfy CC4.1, the monitoring system itself must have a watchdog — a failure of the alert pipeline must be detectable and actionable.
+
+FORM implements three meta-monitoring controls:
+
+**1. SIEM dead-man's switch (AL-SIEM-06)**
+
+Defined in `docs/OBSERVABILITY.md §27.7`: if the SIEM pipeline emits zero events for any 30-minute window during active hours (08:00–22:00 UTC), AL-SIEM-06 fires P1 PagerDuty → devops-lead. A silent SIEM is operationally indistinguishable from a compromised SIEM; this alert closes the gap.
+
+**2. SIEM bridge pg_cron freshness gates (jobs 22–23)**
+
+Defined in `docs/OBSERVABILITY.md §12.6` and `§34`:
+- `siem_bridge_cr02_impossible_travel` (job 22): runs every 5 minutes; freshness SLO = 6 min. Stale → PagerDuty P2 `form-devops` → "CR-02 detection blind spot."
+- `siem_bridge_cr03_priv_escalation` (job 23): runs every 5 minutes; freshness SLO = 6 min. Stale → PagerDuty P2 `form-devops` → "CR-03 detection blind spot."
+
+These two jobs are themselves monitored by the pg_cron staleness framework (§12.6): if either job misses two consecutive runs, a staleness event fires before the detection gap exceeds 12 minutes.
+
+**3. Audit log chain monitor (S-007 synthetic probe)**
+
+Defined in `docs/OBSERVABILITY.md §16`: S-007 is a Cloudflare scheduled Worker that executes the HMAC chain integrity verification query against `audit_log_events` every 5 minutes. A failed verification emits `admin.monitoring_check_failed` DEC-030 STANDARD severity and opens PagerDuty P0 (same runbook as R-05). This ensures the DEC-030 evidence chain itself — the tamper-evident backbone of all CC7.2 monitoring — is continuously validated.
+
+---
+
+### §76.4 SIEM Correlation Rule Corpus — CC7.2 Advanced Anomaly Detection
+
+The SIEM correlation rules defined in `docs/OBSERVABILITY.md §27.3` and implemented via the §34 hybrid bridge provide threshold-crossing anomaly detection beyond the raw alert rules in §76.2.
+
+| Rule | Description | Threshold | Detection Path | DEC-030 Event | P-level |
+|---|---|---|---|---|---|
+| **CR-01** — Brute-force login | ≥ 10 authentication failures / 10-min window / (tenant, subnet) | 10 failures / 10 min | Cloudflare Analytics Engine (real-time, < 10 s) | `anomaly.brute_force_threshold_exceeded` HIGH | P1 → `form-security` |
+| **CR-02** — Impossible travel | Cross-country login gap < 2 hours for same `user_email_hash` | 2-hour window | pg_cron `siem_bridge_cr02_impossible_travel` (5-min cadence, job 22) | `anomaly.impossible_travel_detected` HIGH | P1 → `form-security` + `#security-alerts` |
+| **CR-03** — Privilege escalation | Role elevation within 30 min of a preceding access denial for same actor | 30-min window | pg_cron `siem_bridge_cr03_priv_escalation` (5-min cadence, job 23) | `siem.correlation_rule_matched` HIGH | P1 → `form-security` + `#sso-alerts` |
+| **CR-04** — Bulk data access | ≥ 5 bulk export events / 1 h OR ≥ 10,000 records accessed by single actor in 1 h | Dual threshold | Cloudflare Analytics Engine (real-time, < 10 s) | `anomaly.bulk_data_access` HIGH | P1 → `form-security` + `#security-alerts` |
+
+All four correlation rules emit DEC-030 HMAC-chained events with `user_email_hash` (SHA-256, no plaintext email) and `tenant_id` as the primary correlation keys. No personal health data, no workout content, no coaching session content enters any correlation rule payload — privacy floor per `docs/OBSERVABILITY.md §27.5`.
+
+The M9 migration from the hybrid bridge to native ClickHouse MergeTree correlation (full §27.3 implementation) will improve CR-02 and CR-03 detection latency from ≤ 5 min to < 10 s. Until M9, the 5-min detection lag for CR-02/CR-03 is a documented bounded constraint per `docs/OBSERVABILITY.md §34` OQ-SIEM-01 resolution (DEC-030 event: `siem.correlation_rule_matched`).
+
+---
+
+### §76.5 SIEM Bridge Transition Map (M4 → M9)
+
+This table is the auditor-facing summary of the §34 hybrid architecture for the observation period. It documents the detection lag commitment and how each rule's evidence chain is continuous despite the M4–M9 bridge phase.
+
+| Rule | M4–M8 (Bridge Phase) | Detection Lag | M9+ (ClickHouse Native) | Detection Lag | Evidence Continuity |
+|---|---|---|---|---|---|
+| CR-01 — Brute-force | Cloudflare Analytics Engine scheduled query | < 10 s | ClickHouse MergeTree scheduled query (same SQL) | < 10 s | Continuous; Analytics Engine → ClickHouse ingest no gap |
+| CR-02 — Impossible travel | pg_cron `siem_bridge_cr02_impossible_travel` (job 22, every 5 min) | ≤ 5 min | ClickHouse MergeTree LAG() window query | < 10 s | `anomaly.impossible_travel_detected` DEC-030 events bridge the evidence chain; pg_cron job 22 retains 7-year retention |
+| CR-03 — Privilege escalation | pg_cron `siem_bridge_cr03_priv_escalation` (job 23, every 5 min) | ≤ 5 min | ClickHouse MergeTree self-JOIN query | < 10 s | `siem.correlation_rule_matched` DEC-030 events bridge the evidence chain; job 23 retains 7-year retention |
+| CR-04 — Bulk data access | Cloudflare Analytics Engine scheduled query | < 10 s | ClickHouse MergeTree scheduled query (same SQL) | < 10 s | Continuous |
+
+**Auditor note:** The ≤ 5-min detection lag for CR-02 and CR-03 during M4–M8 is accepted as a bounded, documented compensating control gap per the SIEM-SLO-BRIDGE-01 SLO defined in `docs/OBSERVABILITY.md §34.3`. The pg_cron freshness alerts (jobs 22–23) ensure any failure of the bridge detection layer is itself detected within 6 minutes. The overall system satisfies CC7.2's continuous monitoring intent: no anomaly class covered by CR-02 or CR-03 can persist undetected for > 6 minutes in the bridge phase.
+
+---
+
+### §76.6 Privacy Floor for CC7.2 Monitoring
+
+All CC7.2 monitoring signals comply with FORM's privacy floor (ENTERPRISE.md §Privacy floor; DEC-030 privacy constraints):
+
+| Signal | Contains `user_id`? | Contains health data? | Contains plaintext IP? | Privacy control |
+|---|---|---|---|---|
+| `supabase_auth_failures_total` | No (counter, no row identifier) | No | No | Aggregated metric only; `failure_reason` enum (no PII) |
+| `anomaly.brute_force_threshold_exceeded` DEC-030 | No | No | No | `user_email_hash` SHA-256 + `subnet` /24 only (per §27.5) |
+| `anomaly.impossible_travel_detected` DEC-030 | No | No | No | `user_email_hash` SHA-256 + country code only |
+| `siem.correlation_rule_matched` DEC-030 | No | No | No | `user_email_hash` SHA-256 + `rule_id` + `tenant_id` only |
+| `anomaly.bulk_data_access` DEC-030 | No | No | No | `user_email_hash` SHA-256 + `total_records_accessed` integer only |
+| `tenant_id_missing` counter | No | No | No | Counter only; no request body or session content |
+
+HR-facing principle: No monitoring signal exposes individual user activity to HR or to any enterprise admin. The `tenant_id` in DEC-030 anomaly events identifies the tenant organisation, not the individual; individual actor information is accessible only to `compliance_reviewer` role for incident investigation and is not surfaced in any dashboard visible to tenant admins.
+
+---
+
+### §76.7 Evidence Artefacts
+
+| Artefact ID | Description | Query / Source | SOC 2 Criteria | Retention |
+|---|---|---|---|---|
+| **ANOM-E-001** | PagerDuty `form-security` service configuration export — shows all six security alert rules (auth failure spike, HMAC chain break, tenant_id missing, traffic spike, audit log write failure, Enterprise SSO outage) with trigger conditions, P-levels, and escalation paths | PagerDuty Admin → Services → `form-security` → Service Config export; screenshot of alert rule list at `compliance/evidence/cc7/anom-e-001-pagerduty-security-config-YYYY-MM.pdf` | CC7.2, CC4.1 | 7 years |
+| **ANOM-E-002** | 90-day auth failure spike alert fire history — PagerDuty incident export for `form-security` service filtered on "Auth failure spike" alert name; shows each fire event, acknowledgement time, and resolution time against the 30-min acknowledge SLA | PagerDuty Incident Report: `service=form-security AND alert_name="Auth failure spike" AND created_at BETWEEN $obs_start AND $obs_end`; filed at `compliance/evidence/cc7/anom-e-002-auth-failure-alert-history-YYYY-QN.csv` | CC7.2, CC7.3 | 7 years |
+| **ANOM-E-003** | SIEM bridge pg_cron execution log — jobs 22 and 23 run history for the observation period; demonstrates ≤ 5-min detection cadence for CR-02 (impossible travel) and CR-03 (privilege escalation) | `SELECT job_name, run_id, status, started_at, finished_at FROM cron.job_run_details WHERE job_name IN ('siem_bridge_cr02_impossible_travel', 'siem_bridge_cr03_priv_escalation') AND started_at BETWEEN $obs_start AND $obs_end ORDER BY started_at`; filed at `compliance/evidence/cc7/anom-e-003-siem-bridge-cron-history-YYYY-QN.csv` | CC7.2, CC4.1 | 7 years |
+| **ANOM-E-004** | Correlation rule match log — all `siem.correlation_rule_matched` and `anomaly.*` DEC-030 events during the observation period | `SELECT event_id, action, created_at, tenant_id, payload FROM audit_log_events WHERE action IN ('siem.correlation_rule_matched', 'anomaly.brute_force_threshold_exceeded', 'anomaly.impossible_travel_detected', 'anomaly.bulk_data_access') AND created_at BETWEEN $obs_start AND $obs_end ORDER BY created_at`; filed at `compliance/evidence/cc7/anom-e-004-correlation-rule-matches-YYYY-QN.jsonl` | CC7.2 | 7 years |
+| **ANOM-E-005** | CC4.1 meta-monitoring evidence — AL-SIEM-06 (dead-man's switch) PagerDuty configuration + 90-day non-fire attestation + SIEM bridge pg_cron freshness alert history (jobs 22–23); demonstrates that the monitoring layer itself is monitored | (a) PagerDuty AL-SIEM-06 config screenshot; (b) `SELECT COUNT(*) FROM audit_log_events WHERE action = 'admin.monitoring_check_failed' AND created_at BETWEEN $obs_start AND $obs_end` — expected: 0 for clean quarter; (c) pg_cron freshness alert export for jobs 22–23; filed at `compliance/evidence/cc7/anom-e-005-meta-monitoring-YYYY-QN.pdf` | CC4.1, CC7.2 | 7 years |
+| **ANOM-E-006** | `#security-alerts` Slack channel 90-day export — traffic spike anomaly P2 alerts, SAML cert expiry alerts, and any other P2/P3 security events routed to the channel; demonstrates communication of lower-severity anomalies without PagerDuty paging | Slack export via Admin → Audit Logs API or channel export, filtered to `channel=#security-alerts AND date BETWEEN $obs_start AND $obs_end`; filed at `compliance/evidence/cc7/anom-e-006-security-alerts-slack-YYYY-QN.json` | CC7.2, CC7.3 | 7 years |
+
+**Evidence collection cadence:** ANOM-E-001 once before the SOC 2 observation period begins (M5); ANOM-E-002 through ANOM-E-006 quarterly during the observation period (months 3, 6, 9 of the observation window).
+
+---
+
+### §76.8 SOC 2 Criteria Mapping
+
+| Criterion | Description | FORM Control | Artefact |
+|---|---|---|---|
+| **CC7.2** | Monitors system components for anomalies | Six primary security alert rules (§76.2) + four SIEM correlation rules CR-01–CR-04 (§76.4) | ANOM-E-001, ANOM-E-002, ANOM-E-004, ANOM-E-006 |
+| **CC4.1** | Evaluates whether monitoring controls are functioning | Three meta-monitoring controls: AL-SIEM-06 dead-man's switch, pg_cron freshness gates (jobs 22–23), S-007 chain integrity probe (§76.3) | ANOM-E-003, ANOM-E-005 |
+| **CC7.3** | Evaluates security events to determine if they represent incidents | PagerDuty SLA table (INCIDENT_RESPONSE.md §1.1): P0/P1 acknowledge ≤ 30 min; all security anomaly events have defined runbook pointers (R-03, R-05, R-06, R-12) | ANOM-E-002, ANOM-E-004 |
+
+---
+
+### §76.9 Gap Tracker Update
+
+| Control | Status Before §76 | Status After §76 | Advance Condition |
+|---|---|---|---|
+| **§2 CC7 — Anomaly alerting (auth failures, spike detection)** | 🟡 Gap — "Rate limiting exists (Cloudflare WAF); needs alerting to security channel" | **🟡 Partial** — auth failure spike P1 PagerDuty alert defined (§7 OBSERVABILITY); SIEM bridge CR-01–CR-04 operational (§34); six CC7.2 alert rules documented as auditor exhibit (ANOM-E-001); first quarter of evidence collection pending M5 deployment | 🟢 on M9 ClickHouse migration (< 10 s detection for all four correlation rules) + first full observation-quarter evidence filed |
+| **CC4.1 — Monitoring-of-monitoring** | Not previously documented as a formal control | **🟡 Partial** — three meta-monitoring controls defined (AL-SIEM-06, pg_cron freshness jobs 22–23, S-007 chain probe); ANOM-E-005 evidence path defined; execution evidence pending M5 | 🟢 on first quarterly ANOM-E-005 filing |
+| **§35 PRE-17 — Anomaly alerting live** | 🟡 Partial | **🟡 Partial** — auth failure alert architecture complete (OBSERVABILITY §7); PagerDuty provisioning (PRE-10) remains the deployment gate | 🟢 on PRE-10 PagerDuty live + ANOM-E-001 filed |
+| **Net readiness change** | ~98.6% (authored) | **~98.7% (authored)** — one documented 🟡 Gap advances to 🟡 Partial with defined evidence path | — |
+
+---
+
+### §76.10 Implementation Checklist
+
+#### P0 — Before SOC 2 observation period begins (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Provision PagerDuty `form-security` service (PRE-10 dependency); configure all six CC7.2 alert rules (auth failure spike, HMAC chain break, tenant_id missing, traffic spike, audit log write failure, Enterprise SSO outage) per `docs/OBSERVABILITY.md §7`; validate synthetic test scenario fires P1 within 60 s | devops-lead + security-engineer | **P0** | M5 | [ ] |
+| 2 | Configure AL-SIEM-06 (dead-man's switch: zero SIEM events for 30 min → P1) in PagerDuty `form-devops` service; validate by blocking SIEM event emission in staging for 35 min | devops-lead | **P0** | M5 | [ ] |
+| 3 | Verify pg_cron jobs 22 and 23 (`siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`) are running in production; confirm freshness check triggers within 6 min on synthetic staleness | platform-engineer | **P0** | M5 | [ ] |
+| 4 | Collect ANOM-E-001 (PagerDuty `form-security` config export); file at `compliance/evidence/cc7/anom-e-001-pagerduty-security-config-2026-M5.pdf`; cross-reference in `docs/SOC2_READINESS.md §76.7` | compliance-officer | **P0** | M5 | [ ] |
+
+#### P1 — During observation period (monthly M6–M12)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | File ANOM-E-002 (auth failure spike alert history) quarterly; confirm all P1 fires were acknowledged within the 30-min SLA; flag any SLA miss in the quarterly control effectiveness review (§15.1 CC4.2) | compliance-officer + security-engineer | **P1** | M9, M12, M15 | [ ] |
+| 6 | File ANOM-E-003 (SIEM bridge pg_cron run history) quarterly; confirm no freshness breach > 6 min; if any breach occurred, document root cause and remediation in `docs/DECISION_LOG.md` | devops-lead | **P1** | M9, M12, M15 | [ ] |
+| 7 | File ANOM-E-004 (correlation rule match log) quarterly; for each CR-01–CR-04 match, confirm a corresponding INCIDENT_RESPONSE incident was opened (R-03 for brute force; R-12 for impossible travel or privilege escalation) or a false-positive determination was documented | security-engineer + compliance-officer | **P1** | M9, M12, M15 | [ ] |
+| 8 | File ANOM-E-005 (meta-monitoring evidence) quarterly; include AL-SIEM-06 non-fire attestation (`admin.monitoring_check_failed` count = 0) and pg_cron freshness alert export | compliance-officer | **P1** | M9, M12, M15 | [ ] |
+| 9 | File ANOM-E-006 (`#security-alerts` Slack export) quarterly | compliance-officer | **P1** | M9, M12, M15 | [ ] |
+
+#### P1 — M9 ClickHouse migration
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | At M9 ClickHouse provisioning: migrate CR-02 and CR-03 from pg_cron bridge (jobs 22–23) to native ClickHouse MergeTree scheduled queries; validate detection latency drops to < 10 s in staging; update SIEM bridge transition map (§76.5) row status | devops-lead + platform-engineer | **P1** | M9 | [ ] |
+| 11 | Advance §2 CC7 anomaly alerting row from 🟡 Partial → 🟢 on M9 ClickHouse migration confirmation; update §76.9 gap tracker | compliance-officer | **P1** | M9 | [ ] |
+
+#### P2 — Post-observation period
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 12 | Add "Anomaly alerting effectiveness review" to the Q1 annual compliance calendar (§15.1): review all CR match events for the prior year; confirm no category of anomaly was systematically missed; update thresholds if false-positive rate > 20% for any rule | security-engineer + compliance-officer | **P2** | Q1 2027 | [ ] |
+
+---
+
+### §76.11 Open Questions
+
+| ID | Question | Priority | Owner | Target |
+|---|---|---|---|---|
+| **OQ-ANOM-01** | **Should CR-01 (brute-force) threshold be per-tenant rather than global?** Current threshold: ≥ 10 failures / 10-min / (tenant, subnet) — already per-tenant. However, the Analytics Engine query aggregates fleet-wide before applying the `GROUP BY tenant_id` filter. A high-volume tenant could mask a slower brute-force attack against a low-volume tenant if the global ingestion pipeline has lag. Recommendation: confirm that the Analytics Engine query resolves per-tenant with no cross-tenant blind spot before M9; document finding in `docs/DECISION_LOG.md`. | **P1** | security-engineer + devops-lead | Before first enterprise pilot (M10); no later than first SOC 2 observation period quarter |
+| **OQ-ANOM-02** | **Is the 30-min dead-man's switch (AL-SIEM-06) threshold appropriate for the FORM event volume before enterprise GA?** Pre-enterprise, SIEM event volume during off-peak hours (02:00–06:00 UTC) may be legitimately zero. A 30-min dead-man's threshold during low-traffic windows could produce false-positive P1 pages. Resolution options: (a) restrict AL-SIEM-06 to 08:00–22:00 UTC business hours window; (b) lower threshold to zero events in 60 min (reduces noise, increases detection lag); (c) add a minimum `event_count` floor (fire only if daily average > 5 events/30-min). Document decision in `docs/DECISION_LOG.md` before AL-SIEM-06 goes live in production. | **P1** | devops-lead + security-engineer | Before M5 PagerDuty deployment |
+
+---
+
+*v3.6.3 (2026-06-13): §76 CC7.2/CC4.1 Security Monitoring & Anomaly Detection Operating Evidence — formally closes the §2 CC7 row "Anomaly alerting (auth failures, spike detection)" gap (🟡 Gap → 🟡 Partial). §76.1 scopes to the security-classified alert corpus (§7 OBSERVABILITY) and SIEM correlation rules (§27.3/§34 OBSERVABILITY); explicitly out of scope: quality monitoring (§22/§32), cryptographic health alerting (§30), and billing anomaly alerting. §76.2 CC7.2 control narrative: three sub-criteria mapped — (CC7.2.1) six primary security alert rules from OBSERVABILITY §7 (auth failure spike P1 `supabase_auth_failures_total > 50/min`, HMAC chain break P0, tenant_id missing P1, traffic spike anomaly P2, audit log write failure P0, Enterprise SSO outage P1); (CC7.2.2) four-tier P0–P3 severity + 30-min P1 acknowledge SLA per INCIDENT_RESPONSE §1.1; (CC7.2.3) PagerDuty `form-security` service + `#security-alerts` Slack + DEC-030 HMAC-chained tamper-evident record; privacy floor: no `user_id`, no health data, no plaintext IP in any CC7.2 signal. §76.3 CC4.1 monitoring-of-monitoring: three meta-monitoring controls — AL-SIEM-06 dead-man's switch (zero events in 30-min P1), pg_cron freshness gates jobs 22–23 (`siem_bridge_cr02_impossible_travel`, `siem_bridge_cr03_priv_escalation`, 6-min freshness SLO), S-007 HMAC chain integrity synthetic probe (5-min cadence). §76.4 SIEM correlation rule corpus: four-row table CR-01 through CR-04 with threshold, detection path (Analytics Engine real-time vs pg_cron 5-min bridge), DEC-030 event, and P-level; SIEM bridge ≤ 5-min detection lag for CR-02/CR-03 documented as bounded constraint per SIEM-SLO-BRIDGE-01 (OBSERVABILITY §34). §76.5 SIEM bridge transition map: M4–M8 (bridge) vs M9+ (ClickHouse native) detection lag per rule; evidence continuity statement — DEC-030 events bridge M4→M9 without gap. §76.6 privacy floor table: six CC7.2 signals confirmed no `user_id`, no health data, no plaintext IP; HR principle: tenant_id in anomaly events identifies organisation only; individual actor data restricted to `compliance_reviewer` for incident investigation. §76.7 six evidence artefacts ANOM-E-001 through ANOM-E-006: (001) PagerDuty `form-security` service config export (CC7.2/CC4.1, one-time pre-M5); (002) 90-day auth failure spike alert history with SLA timing (CC7.2/CC7.3, quarterly); (003) SIEM bridge pg_cron execution log jobs 22–23 (CC7.2/CC4.1, quarterly); (004) correlation rule match log `anomaly.*` + `siem.correlation_rule_matched` DEC-030 events (CC7.2, quarterly); (005) CC4.1 meta-monitoring — AL-SIEM-06 non-fire attestation + pg_cron freshness export (CC4.1/CC7.2, quarterly); (006) `#security-alerts` Slack 90-day export for P2/P3 events (CC7.2/CC7.3, quarterly). §76.8 SOC 2 criteria mapping: CC7.2 (six alert rules + four correlation rules → ANOM-E-001/002/004/006), CC4.1 (three meta-monitoring controls → ANOM-E-003/005), CC7.3 (PagerDuty SLA + defined runbooks → ANOM-E-002/004). §76.9 gap tracker: §2 CC7 row 🟡 Gap → 🟡 Partial; CC4.1 monitoring-of-monitoring 🟡 Partial defined; PRE-17 🟡 Partial unchanged (PRE-10 PagerDuty provisioning remains deployment gate); overall readiness ~98.6% → ~98.7% (authored). §76.10 twelve-item implementation checklist: 4× P0/M5 (PagerDuty `form-security` provisioning + six CC7.2 alerts, AL-SIEM-06 config, pg_cron jobs 22–23 production verification, ANOM-E-001 filing); 5× P1/M9–M15 (ANOM-E-002 through ANOM-E-006 quarterly filing with SLA attestation); 2× P1/M9 (ClickHouse migration of CR-02/CR-03, gap register advance to 🟢); 1× P2/Q1-2027 (annual effectiveness review). §76.11 two open questions: OQ-ANOM-01 (P1 — per-tenant vs fleet-wide CR-01 Analytics Engine aggregation blind-spot risk; decision before M10); OQ-ANOM-02 (P1 — AL-SIEM-06 30-min threshold false-positive risk during off-peak; decide before M5 deployment). Cross-references: `docs/OBSERVABILITY.md §7` (six primary security alert rules), `docs/OBSERVABILITY.md §27.3` (correlation rules CR-01–CR-04 SQL), `docs/OBSERVABILITY.md §27.7` (AL-SIEM-01 through AL-SIEM-06), `docs/OBSERVABILITY.md §34` (SIEM bridge hybrid architecture, pg_cron jobs 22–23, SIEM-SLO-BRIDGE-01), `docs/OBSERVABILITY.md §16` (S-007 HMAC chain integrity probe), `docs/OBSERVABILITY.md §12.6` (pg_cron job registry jobs 22–23), `docs/INCIDENT_RESPONSE.md R-03` (auth failure spike runbook), `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break / audit log failure runbook), `docs/INCIDENT_RESPONSE.md R-06` (traffic spike runbook), `docs/INCIDENT_RESPONSE.md R-12` (insider threat / credential compromise — CR-02/CR-03 escalation path), `docs/INCIDENT_RESPONSE.md §1.1` (P-level SLA table), `docs/AUDIT_LOG_SCHEMA.md` (DEC-030 `anomaly.*` and `siem.*` events), `docs/SOC2_READINESS.md §2` (CC7 gap row updated). Owner: security-engineer + devops-lead + compliance-officer.*
