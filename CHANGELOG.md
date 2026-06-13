@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [4.43.0] — 2026-06-13
+
+### Added
+- `content/post-625-strength-team-sport-programming.md` — Programming edge cases block, post 25/50. Сила + командний спорт без саботажу: interference effect (AMPK/mTORC1 механізм), чотири фази сезонного планування (offseason/preseason/in-season/postseason) з параметрами обсягу/інтенсивності для кожної, мінімальна ефективна доза in-season (≥80% 1RM, 1–2 сесії/тиждень), правило 48 годин секвенсингу після матчу, практичний шаблон мікроциклу, типові помилки. Sources: Wilson et al. 2012, Rhea et al. 2002, Hammami et al. 2017, Rønnestad et al. 2011, Hawley 2009, Fyfe et al. 2014.
+
+### Changed
+- `blog.html` — added card for post-625 at top of grid.
+- `STATUS.md` — content table: post-625 added, total 624 → 625; block 601–650 progress 24/50 → 25/50; next priorities updated.
+- `README.md` — roadmap: post-625 added to block 601–650 done list; new topics appended for posts 626–650.
+- `VERSION` — 4.42.0 → 4.43.0.
+
+---
+
 ## [4.42.0] — 2026-06-13
 
 ### Added
