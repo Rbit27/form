@@ -1,4 +1,4 @@
-# FORM · Project Status v4.39.0
+# FORM · Project Status v4.40.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.39.0** — 2026-06-13
+**v4.40.0** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 21 | Draft — post-621: peaking for 1RM (block continues, 21/50) |
+| 601–650 | Programming edge cases | 22 | Draft — post-622: return to accumulation after peak (block continues, 22/50) |
 
-**Total posts: 621**
+**Total posts: 622**
 
 ---
 
@@ -90,7 +90,7 @@
 - newsletter-05.md planning (topic: programming edge cases wrap-up or training-with-tech synthesis)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- Block 601–650 continues: posts 618–650 remaining (33 posts); next topics: autoregulation anchor-points, high/low responder identification, peaking for 1RM
+- Block 601–650 continues: posts 623–650 remaining (28 posts); next topics: volume distribution across weekly structure, paused-reps and dead-stop technique programming, programming for two competing goals (strength + sport)
 - Block 651–700 planning: biomechanics & injury prevention (first topic: chronic pain — **clinical-safety review required before writing**)
 
 ---
