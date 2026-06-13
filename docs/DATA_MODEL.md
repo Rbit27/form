@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.9
+# FORM · Multi-Tenant Data Model v1.10
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -35,6 +35,10 @@
 25. [Enterprise Tenant Offboarding & Data Egress Schema](#25-enterprise-tenant-offboarding--data-egress-schema)
 26. [API Key Authentication Schema](#26-api-key-authentication-schema)
 27. [Enterprise Invite & Pending-Seat Provisioning Schema](#27-enterprise-invite--pending-seat-provisioning-schema)
+28. [Rate Limiting, Quota Enforcement & Abuse Prevention Schema](#28-rate-limiting-quota-enforcement--abuse-prevention-schema)
+29. [PAM / Privileged Access Management Postgres Schema](#29-pam--privileged-access-management-postgres-schema--oq-ins-01-resolution--cc61cc62cc63cc66-auditor-evidence)
+30. [Subscription Events Erasure Hardening & Quota Grace Thresholds](#30-subscription-events-erasure-hardening--quota-grace-thresholds--oq-bill-05-oq-rl-02--oq-bill-01-resolution)
+31. [DSAR Request Registry Schema — Art. 15/17/20 Lifecycle Tracking](#31-dsar-request-registry-schema--art-1517-request-lifecycle-tracking)
 
 ---
 
@@ -12616,3 +12620,459 @@ const BillingUserErasedPayload = z.object({
 ---
 
 *v1.0 (2026-06-11): §30 Subscription Events Erasure Hardening & Quota Grace Thresholds — resolves OQ-BILL-05 (P0, split-column for `subscription_events` GDPR Art. 17 pseudonymization), OQ-RL-02 (P0, OVERAGE_GRACE = 500 requests), and OQ-BILL-01 (P0, 14-day fixed consumer trial; enterprise pilots via comped active subscription). §30.2 OQ-BILL-05: option (b) split-column adopted (option (a) sentinel UUID rejected — contaminates `users` table; not a true GDPR Art. 4(5) pseudonym; pollutes SOC 2 CC8.1 audit trail); migration 0059 makes `user_id` nullable, adds `erased_user_reference TEXT NULL` with regex CHECK, adds `chk_sub_events_user_or_erased` mutual-exclusivity CHECK, adds two indexes; erasure Worker gains step SUB-1 with `[ERASED-{sha256(user_id + ERASURE_PSEUDONYM_SALT)}]` keyed HMAC pseudonym; query pattern analysis confirms zero mandatory query changes for correctness. §30.3 OQ-RL-02: OVERAGE_GRACE = 500 requests (1.0% of Starter 50k/month quota; 0.25% of Growth 200k/month); secondary 95% warn threshold added (QUOTA_SECONDARY_WARN_PCT = 0.95); migration 0059b adds `primary_warn_sent_at` + `secondary_warn_sent_at` dedup columns to `api_quota_usage`; three env vars replace hard-coded constants. §30.4 OQ-BILL-01: 14-day fixed consumer trial; enterprise pilots use `billing_channel = 'none'`, `price_usd_cents = 0`, `status = 'active'`; `pilot_end_at` in §16 `enterprise_contracts` governs pilot window — no schema change. §30.5 two DEC-030 items: `security.quota_95pct_warning` (new, STANDARD 3yr, tenant-level, no user_id); `billing.user_erased` Zod patch (add required `erased_user_reference`, make `user_id` optional for backward compat). §30.6 SOC 2: ERA-E-001 (P5.2 pseudonymization), ERA-E-002 (P8.0 financial retention with `retention_basis`), ERA-E-003 (CC8.1 migration + erasure chain). §30.7 eleven-item checklist: 7× P0 M4 (migrations 0059/0059b, erasure Worker SUB-1, AUDIT_LOG_SCHEMA patches ×2, quota-check.ts update, AL-RL-01b PagerDuty), 3× P1 M5–M6 (env var confirm, ERASURE_PSEUDONYM_SALT key inventory, evidence collection), 1× P2 M8 (per-tier grace tuning). §30.8 two open questions: OQ-ERA-01 (DSAR routing for erased users — P2, Worker routing decision, no schema change); OQ-ERA-02 (ERASURE_PSEUDONYM_SALT write-once policy — P1, document in CRYPTOGRAPHY_POLICY.md §3). Cross-references: `docs/DATA_MODEL.md §12` (Art. 17 erasure protocol — step SUB-1 insertion point); `docs/DATA_MODEL.md §24` (OQ-BILL-05 ~~P0~~ → 🟢 Resolved; OQ-BILL-01 ~~P0~~ → 🟢 Resolved; `billing.user_erased` Zod schema patched); `docs/DATA_MODEL.md §28` (OQ-RL-02 ~~P0~~ → 🟢 Resolved; `OVERAGE_GRACE` constant defined; `api_quota_usage` schema extended); `docs/AUDIT_LOG_SCHEMA.md §6` (`billing.user_erased` Zod patch + `security.quota_95pct_warning` new registration); `docs/OBSERVABILITY.md §35.4` + §6.2 (AL-RL-01b 95% warn alert added to `rate_limit_health` subsection); `docs/CRYPTOGRAPHY_POLICY.md §3` (ERASURE_PSEUDONYM_SALT — write-once key, P1 before first erasure); `docs/DECISION_LOG.md` (DEC-044: OQ-BILL-05 split-column; DEC-045: OQ-RL-02 + OQ-BILL-01). Owner: enterprise-architect + platform-engineer + compliance-officer.*
+
+---
+
+## 31. DSAR Request Registry Schema — Art. 15/17 Request Lifecycle Tracking
+
+> **Owners**: compliance-officer · security-engineer · enterprise-architect  
+> **Regulatory basis**: GDPR Art. 15 (access), Art. 17 (erasure), Art. 20 (portability), Art. 12 (timely response — 30-day deadline, 90-day max with extension)  
+> **Audit reference**: DEC-030 · `docs/AUDIT_LOG_SCHEMA.md §6` · `docs/INCIDENT_RESPONSE.md R-14`  
+> **SOC 2 mapping**: P4.0 (data subject inquiries), P5.0 (personal information requests), P5.1 (consent / choice), P8.0 (disposal), CC2.2 (communication), CC6.5 (logical access)  
+> **Status**: ✅ Active — this section supplies the DDL backing INCIDENT_RESPONSE.md R-14 SQL queries
+
+### 31.1 Background and Gap Rationale
+
+`docs/INCIDENT_RESPONSE.md` R-14 (DSAR / Data Subject Rights Incident) defines operational SQL queries, 14 DEC-030 audit events, and an SLA runbook that all reference the `dsar_requests` table. `docs/SOC2_READINESS.md` P4.0 cites this table as a mandatory evidence source for SOC 2 Type II auditors. Prior to this section, no DDL, RLS policies, or schema documentation existed in `DATA_MODEL.md`.
+
+This section is the canonical source for the `dsar_requests` table definition. All references in R-14 and SOC2_READINESS.md are satisfied by the DDL below.
+
+**Privacy floor invariant**: tenant admins (HR, People Ops) **must never** see the content of a data subject's export, the reason for a refusal, or any field beyond the existence and status of a request. RLS is the enforcement mechanism; see §31.4.
+
+---
+
+### 31.2 `dsar_requests` Table DDL
+
+```sql
+-- Migration: 0060_dsar_requests.sql
+-- Purpose: DSAR request registry — Art. 15/17/20 lifecycle tracking
+-- Tenant isolation: row-level via tenant_id (NULL for consumer-tier requests)
+-- Retention: 7 years from request closure (Art. 5(2) accountability; SOC 2 P4.0)
+
+CREATE TYPE dsar_request_type AS ENUM (
+    'access',           -- Art. 15: right of access
+    'erasure',          -- Art. 17: right to erasure ("right to be forgotten")
+    'portability',      -- Art. 20: data portability (machine-readable export)
+    'rectification',    -- Art. 16: correction of inaccurate data
+    'restriction',      -- Art. 18: restriction of processing
+    'objection'         -- Art. 21: right to object
+);
+
+CREATE TYPE dsar_status AS ENUM (
+    'received',                 -- request logged; identity verification pending
+    'identity_verified',        -- verification complete; processing can begin
+    'export_initiated',         -- Art. 15/20: export job queued
+    'export_generated',         -- export bundle ready; delivery pending
+    'export_delivered',         -- export link sent to subject
+    'erasure_initiated',        -- Art. 17: erasure job queued
+    'erasure_completed',        -- all in-scope tables processed
+    'fulfilled',                -- terminal: all obligations met
+    'rejected_art_12_5',        -- terminal: manifestly unfounded / excessive
+    'rejected_with_reason',     -- terminal: other lawful refusal basis
+    'extension_applied',        -- SLA clock extended (max +60 days per Art. 12(3))
+    'overdue'                   -- deadline breached; DPA notification may be required
+);
+
+CREATE TABLE dsar_requests (
+    id                          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- Subject identification
+    user_id                     UUID        REFERENCES users(id) ON DELETE SET NULL,
+    -- NULL after Art. 17 erasure of the user row; erased_user_reference carries the pseudonym
+    erased_user_reference       TEXT        NULL
+        CHECK (erased_user_reference IS NULL OR erased_user_reference ~ '^\[ERASED-[0-9a-f]{64}\]$'),
+
+    -- Exactly one of user_id / erased_user_reference must be non-null
+    CONSTRAINT chk_dsar_user_identity CHECK (
+        (user_id IS NOT NULL AND erased_user_reference IS NULL) OR
+        (user_id IS NULL AND erased_user_reference IS NOT NULL)
+    ),
+
+    -- Enterprise context (NULL for consumer-tier requests)
+    tenant_id                   UUID        REFERENCES enterprise_tenants(id) ON DELETE SET NULL,
+
+    -- Request classification
+    request_type                dsar_request_type   NOT NULL,
+    jurisdiction                TEXT        NOT NULL DEFAULT 'GDPR'
+        CHECK (jurisdiction IN ('GDPR', 'CCPA', 'LGPD', 'PIPEDA', 'OTHER')),
+
+    -- SLA timeline
+    submitted_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deadline_at                 TIMESTAMPTZ GENERATED ALWAYS AS (submitted_at + interval '30 days') STORED,
+    extension_days              SMALLINT    NULL CHECK (extension_days BETWEEN 1 AND 60),
+    extended_deadline_at        TIMESTAMPTZ GENERATED ALWAYS AS (
+                                    submitted_at + interval '30 days' +
+                                    (COALESCE(extension_days, 0) || ' days')::interval
+                                ) STORED,
+    extension_reason            TEXT        NULL,   -- required when extension_days IS NOT NULL
+
+    -- Status machine
+    status                      dsar_status NOT NULL DEFAULT 'received',
+    status_updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    -- Export lifecycle (Art. 15 / Art. 20)
+    export_job_id               UUID        NULL,   -- references async job queue
+    export_url_generated_at     TIMESTAMPTZ NULL,
+    export_delivered_at         TIMESTAMPTZ NULL,
+    export_download_confirmed_at TIMESTAMPTZ NULL,
+    export_link_revoked_at      TIMESTAMPTZ NULL,
+    export_link_revoked_reason  TEXT        NULL,
+
+    -- Erasure lifecycle (Art. 17)
+    erasure_job_id              UUID        NULL,
+    erasure_initiated_at        TIMESTAMPTZ NULL,
+    erasure_completed_at        TIMESTAMPTZ NULL,
+    tables_erased               TEXT[]      NULL,   -- e.g. '{users,workout_sessions,...}'
+    rows_deleted_total          INTEGER     NULL,
+
+    -- Refusal
+    refusal_basis               TEXT        NULL,   -- legal citation when rejected
+    refusal_notified_at         TIMESTAMPTZ NULL,
+
+    -- DPA notification (Art. 33 / Art. 77)
+    dpa_notified_at             TIMESTAMPTZ NULL,
+    dpa_name                    TEXT        NULL,
+    dpa_notification_method     TEXT        NULL CHECK (dpa_notification_method IN ('portal', 'email', 'post', NULL)),
+
+    -- Identity verification
+    verification_method         TEXT        NULL CHECK (verification_method IN ('email_otp', 'id_document', 'account_confirmation', NULL)),
+    verified_at                 TIMESTAMPTZ NULL,
+
+    -- Audit / retention
+    operator_id                 UUID        NULL REFERENCES users(id) ON DELETE SET NULL, -- form_admin who last touched
+    closed_at                   TIMESTAMPTZ NULL,   -- set at 'fulfilled' / 'rejected_*'
+    retain_until                TIMESTAMPTZ GENERATED ALWAYS AS (
+                                    COALESCE(closed_at, now()) + interval '7 years'
+                                ) STORED,
+
+    -- HMAC chain (DEC-030)
+    audit_hmac                  TEXT        NOT NULL DEFAULT '',
+    prev_hmac                   TEXT        NULL,
+
+    created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ── Indexes ──────────────────────────────────────────────────────────────────
+
+-- SLA monitoring: quickly find open requests approaching deadline
+CREATE INDEX idx_dsar_open_deadline
+    ON dsar_requests (extended_deadline_at ASC)
+    WHERE status NOT IN ('fulfilled', 'rejected_art_12_5', 'rejected_with_reason');
+
+-- Tenant admin view (existence + status only — no content columns)
+CREATE INDEX idx_dsar_tenant
+    ON dsar_requests (tenant_id, status, submitted_at DESC)
+    WHERE tenant_id IS NOT NULL;
+
+-- User self-service: subject checks own request status
+CREATE INDEX idx_dsar_user
+    ON dsar_requests (user_id, submitted_at DESC)
+    WHERE user_id IS NOT NULL;
+
+-- Export delivery follow-up: find generated-but-undelivered exports
+CREATE INDEX idx_dsar_export_pending
+    ON dsar_requests (export_url_generated_at)
+    WHERE status = 'export_generated' AND export_delivered_at IS NULL;
+
+-- Retention enforcement: find records past retain_until
+CREATE INDEX idx_dsar_retention
+    ON dsar_requests (retain_until)
+    WHERE closed_at IS NOT NULL;
+
+-- ── Triggers ─────────────────────────────────────────────────────────────────
+
+-- Auto-update updated_at and status_updated_at on any row change
+CREATE OR REPLACE FUNCTION dsar_requests_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.updated_at     := now();
+    IF NEW.status <> OLD.status THEN
+        NEW.status_updated_at := now();
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_dsar_updated_at
+    BEFORE UPDATE ON dsar_requests
+    FOR EACH ROW EXECUTE FUNCTION dsar_requests_updated_at();
+
+-- Auto-set closed_at when status transitions to a terminal state
+CREATE OR REPLACE FUNCTION dsar_requests_set_closed_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.status IN ('fulfilled', 'rejected_art_12_5', 'rejected_with_reason')
+       AND OLD.status NOT IN ('fulfilled', 'rejected_art_12_5', 'rejected_with_reason') THEN
+        NEW.closed_at := now();
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_dsar_closed_at
+    BEFORE UPDATE ON dsar_requests
+    FOR EACH ROW EXECUTE FUNCTION dsar_requests_set_closed_at();
+```
+
+---
+
+### 31.3 Status-Transition State Machine
+
+```
+received
+  └─► identity_verified
+        ├─► export_initiated  ──► export_generated ──► export_delivered ──► fulfilled
+        ├─► erasure_initiated ──► erasure_completed ──────────────────────► fulfilled
+        ├─► rejected_art_12_5   (terminal)
+        └─► rejected_with_reason (terminal)
+
+Any non-terminal state:
+  └─► extension_applied  (SLA extended; prior state preserved in status_updated_at)
+  └─► overdue            (deadline_at / extended_deadline_at breached)
+```
+
+Transition guards enforced at the application layer (DSAR Worker):
+
+| Transition | Guard |
+|---|---|
+| `received` → `identity_verified` | `verification_method` + `verified_at` must be set |
+| `*` → `extension_applied` | `extension_days` (1–60) + `extension_reason` must be set |
+| `export_generated` → `export_delivered` | `export_delivered_at` must be set |
+| `*` → `fulfilled` | `closed_at` auto-set by trigger; must be in terminal-eligible prior state |
+| `*` → `rejected_*` | `refusal_basis` + `refusal_notified_at` must be set |
+| Any state | DEC-030 event emitted on every transition (see §31.5) |
+
+---
+
+### 31.4 Row-Level Security Policies
+
+```sql
+ALTER TABLE dsar_requests ENABLE ROW LEVEL SECURITY;
+
+-- ── form_system: full access (DSAR Worker, erasure Worker, scheduled jobs) ──
+
+CREATE POLICY dsar_system_all ON dsar_requests
+    FOR ALL
+    TO form_system
+    USING (true)
+    WITH CHECK (true);
+
+-- ── form_user: subject reads own open request status ──────────────────────
+
+CREATE POLICY dsar_user_read_own ON dsar_requests
+    FOR SELECT
+    TO form_user
+    USING (user_id = current_setting('app.current_user_id')::uuid);
+
+-- Subjects cannot insert or update their own DSAR records directly;
+-- all mutations go through the DSAR Worker (runs as form_system).
+
+-- ── form_tenant_admin: existence + status only — NO content columns ────────
+--
+-- Privacy floor (DEC-030 §4.3): HR / People Ops must never see:
+--   • export content, export URLs, or delivery timestamps
+--   • erasure table lists or row counts
+--   • refusal basis or DPA notification details
+--   • verification method or operator identity
+--
+-- Only columns exposed: id, request_type, submitted_at, status,
+--   extended_deadline_at, jurisdiction — sufficient for compliance dashboard.
+
+CREATE POLICY dsar_tenant_admin_read_status ON dsar_requests
+    FOR SELECT
+    TO form_tenant_admin
+    USING (
+        tenant_id = current_setting('app.current_tenant_id')::uuid
+    );
+
+-- Column-level restriction enforced at the API layer (DSAR admin endpoint
+-- returns only the allowlisted columns listed above for form_tenant_admin role).
+-- Postgres column privileges are an additional defence-in-depth layer:
+
+REVOKE SELECT ON dsar_requests FROM form_tenant_admin;
+GRANT  SELECT (
+    id, tenant_id, request_type, submitted_at, status, status_updated_at,
+    extended_deadline_at, jurisdiction, closed_at
+) ON dsar_requests TO form_tenant_admin;
+
+-- ── form_admin: PAM break-glass (DEC-042 — alert-on-access) ──────────────
+
+CREATE POLICY dsar_admin_break_glass ON dsar_requests
+    FOR ALL
+    TO form_admin
+    USING (
+        current_setting('app.break_glass_active', true)::boolean IS TRUE
+        AND current_setting('app.break_glass_expires_at', true)::timestamptz > now()
+    )
+    WITH CHECK (false);  -- form_admin never writes; mutations via form_system only
+```
+
+> **DEC-042 note**: Break-glass `SELECT` on `dsar_requests` triggers a `pam.break_glass_query` DEC-030 event (CRITICAL, 7yr) with `table_name = 'dsar_requests'`. Access is alert-only, not dual-auth gated. See `docs/DATA_MODEL.md §29`.
+
+---
+
+### 31.5 DEC-030 Audit Event Registration
+
+All 14 events below are registered in `docs/AUDIT_LOG_SCHEMA.md §6`. They correspond directly to the events defined in `docs/INCIDENT_RESPONSE.md R-14 §14.7` and satisfy the HMAC-chained append-only audit log requirement (DEC-030).
+
+| Event name | Severity | Retention | Required payload fields |
+|---|---|---|---|
+| `dsar.request_received` | MEDIUM | 7 yr | `dsar_id`, `request_type`, `user_id`, `jurisdiction` |
+| `dsar.identity_verified` | LOW | 7 yr | `dsar_id`, `verification_method` |
+| `dsar.export_initiated` | MEDIUM | 7 yr | `dsar_id`, `export_job_id` |
+| `dsar.export_delivered` | MEDIUM | 7 yr | `dsar_id`, `delivery_method`, `link_expiry` |
+| `dsar.export_link_revoked` | CRITICAL | 7 yr | `dsar_id`, `reason`, `was_downloaded` |
+| `dsar.export_redelivered` | HIGH | 7 yr | `dsar_id`, `correction_reason` |
+| `dsar.erasure_initiated` | HIGH | 7 yr | `dsar_id`, `user_id`, `tables_in_scope` |
+| `dsar.erasure_completed` | HIGH | 7 yr | `dsar_id`, `tables_erased`, `rows_deleted_total` |
+| `dsar.erasure_manual_supplement` | CRITICAL | 7 yr | `dsar_id`, `table_name`, `row_count`, `operator_id`, `ic_authorization_ref` |
+| `dsar.deadline_missed` | HIGH | 7 yr | `dsar_id`, `deadline`, `current_status` |
+| `dsar.extension_applied` | MEDIUM | 7 yr | `dsar_id`, `reason`, `new_deadline` |
+| `dsar.rejected_art_12_5` | HIGH | 7 yr | `dsar_id`, `reason`, `legal_basis` |
+| `dsar.dpa_notified` | HIGH | 7 yr | `dsar_id`, `dpa_name`, `notification_method` |
+| `dsar.enterprise_tenant_notified` | MEDIUM | 7 yr | `dsar_id`, `tenant_id`, `notification_timestamp` |
+
+**Zod schema skeleton** (to be added to `docs/AUDIT_LOG_SCHEMA.md §6`):
+
+```typescript
+// dsar.request_received
+z.object({
+  event:        z.literal('dsar.request_received'),
+  dsar_id:      z.string().uuid(),
+  request_type: z.enum(['access','erasure','portability','rectification','restriction','objection']),
+  user_id:      z.string().uuid().nullable(),  // null when received post-erasure (edge case)
+  jurisdiction: z.enum(['GDPR','CCPA','LGPD','PIPEDA','OTHER']),
+  tenant_id:    z.string().uuid().nullable(),
+});
+
+// dsar.erasure_completed
+z.object({
+  event:              z.literal('dsar.erasure_completed'),
+  dsar_id:            z.string().uuid(),
+  tables_erased:      z.array(z.string()),
+  rows_deleted_total: z.number().int().nonnegative(),
+});
+
+// dsar.erasure_manual_supplement  (CRITICAL — requires IC sign-off)
+z.object({
+  event:                  z.literal('dsar.erasure_manual_supplement'),
+  dsar_id:                z.string().uuid(),
+  table_name:             z.string(),
+  row_count:              z.number().int().positive(),
+  operator_id:            z.string().uuid(),
+  ic_authorization_ref:   z.string().min(1),  // legal / IC ticket reference
+});
+```
+
+---
+
+### 31.6 Alerting Rules
+
+#### AL-DSAR-01 — SLA 5-Day Warning (P1)
+
+```yaml
+# Cloudflare Workers scheduled cron: 0 8 * * *  (08:00 UTC daily)
+alert: AL-DSAR-01
+description: DSAR request approaching 30-day Art. 12 deadline (≤ 5 days remaining)
+condition: |
+  SELECT count(*) FROM dsar_requests
+  WHERE status NOT IN ('fulfilled', 'rejected_art_12_5', 'rejected_with_reason')
+    AND extended_deadline_at <= now() + interval '5 days'
+    AND extended_deadline_at > now()
+threshold: count >= 1
+severity: P1
+channel: PagerDuty → CSM on-call + compliance-officer
+runbook: docs/INCIDENT_RESPONSE.md R-14
+dec030_event: dsar.deadline_missed (emitted when extended_deadline_at < now())
+```
+
+#### AL-DSAR-02 — Overdue DSAR (P0)
+
+```yaml
+alert: AL-DSAR-02
+description: DSAR request past Art. 12 deadline; DPA notification risk
+condition: |
+  SELECT count(*) FROM dsar_requests
+  WHERE status NOT IN ('fulfilled', 'rejected_art_12_5', 'rejected_with_reason')
+    AND extended_deadline_at < now()
+threshold: count >= 1
+severity: P0
+channel: PagerDuty → compliance-officer + legal + CTO
+runbook: docs/INCIDENT_RESPONSE.md R-14 §14.5 (DPA notification protocol)
+dec030_event: dsar.deadline_missed (CRITICAL escalation path)
+```
+
+#### AL-DSAR-03 — Undelivered Export (P2)
+
+```yaml
+alert: AL-DSAR-03
+description: Export generated but not delivered within 48 hours
+condition: |
+  SELECT count(*) FROM dsar_requests
+  WHERE status = 'export_generated'
+    AND export_delivered_at IS NULL
+    AND export_url_generated_at < now() - interval '48 hours'
+threshold: count >= 1
+severity: P2
+channel: Slack #dsar-ops
+runbook: docs/INCIDENT_RESPONSE.md R-14 §14.3
+```
+
+---
+
+### 31.7 SOC 2 Evidence Mapping
+
+| Control | Criterion | Evidence artefact | Source |
+|---|---|---|---|
+| DSAR-E-001 | P4.0 — data subject inquiries tracked | `dsar_requests` row count by status per quarter; screenshot from admin-dashboard.html Compliance screen | `dsar_requests` table + AL-DSAR-01 PagerDuty history |
+| DSAR-E-002 | P5.0 — personal information requests processed within deadline | Query: `SELECT * FROM dsar_requests WHERE closed_at IS NOT NULL AND closed_at <= extended_deadline_at` | `dsar_requests` closed_at vs extended_deadline_at |
+| DSAR-E-003 | P5.1 — consent withdrawal / objection processed | `dsar_requests WHERE request_type IN ('restriction','objection')` + linked `dsar.erasure_completed` DEC-030 events | AUDIT_LOG_SCHEMA §6 |
+| DSAR-E-004 | P8.0 — disposal upon request | `dsar.erasure_completed` event log with `tables_erased` + `rows_deleted_total`; cross-ref `docs/DATA_MODEL.md §12` (Art. 17 erasure protocol) | AUDIT_LOG_SCHEMA §6 |
+| DSAR-E-005 | CC2.2 — communication of obligations | Customer DPA references `docs/DATA_MODEL.md §31`; enterprise.html privacy floor disclosure | enterprise.html §Privacy |
+| DSAR-E-006 | CC6.5 — logical access to request data | RLS policy `dsar_tenant_admin_read_status` restricts columns; `dsar_admin_break_glass` requires PAM session | §31.4 RLS policies |
+
+Evidence collection path: `compliance/evidence/dsar/DSAR-E-00{1..6}_<YYYY-QN>.pdf`
+
+---
+
+### 31.8 Implementation Checklist
+
+#### P0 — Before First Production DSAR
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run migration `0060_dsar_requests.sql` against production Supabase; verify RLS policies active (`SELECT * FROM pg_policies WHERE tablename = 'dsar_requests'`). | platform-engineer | **P0** | M4 | [ ] |
+| 2 | Deploy DSAR submission endpoint `POST /api/v1/dsar/submit` (DSAR Worker); validate status 202 + `dsar_id` in response; emit `dsar.request_received` DEC-030 event. | platform-engineer | **P0** | M4 | [ ] |
+| 3 | Update export Worker to write `export_job_id`, `export_url_generated_at` on completion and transition status to `export_generated`; emit `dsar.export_initiated` + `dsar.export_delivered` events. | platform-engineer | **P0** | M4 | [ ] |
+| 4 | Update erasure Worker to write `erasure_job_id`, `erasure_initiated_at`, `erasure_completed_at`, `tables_erased`, `rows_deleted_total` and transition status to `erasure_completed` / `fulfilled`; emit `dsar.erasure_initiated` + `dsar.erasure_completed` events. | platform-engineer | **P0** | M4 | [ ] |
+| 5 | Register 14 `dsar.*` Zod schemas in `docs/AUDIT_LOG_SCHEMA.md §6`; run HMAC-chain integration test. | security-engineer | **P0** | M4 | [ ] |
+| 6 | Configure AL-DSAR-01 (5-day warn) and AL-DSAR-02 (overdue) in PagerDuty; assign CSM on-call + compliance-officer routing rules. | devops-lead | **P0** | M4 | [ ] |
+| 7 | Add `dsar_requests` column grants to Postgres role definitions (`form_tenant_admin` allowlist per §31.4); verify column-level REVOKE/GRANT applied. | enterprise-architect | **P0** | M4 | [ ] |
+
+#### P1 — Pre-GA
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Implement tenant admin DSAR status endpoint `GET /api/v1/enterprise/dsar` returning only allowlisted columns (§31.4 privacy floor). Verify HR persona cannot access `export_url`, `refusal_basis`, or `tables_erased`. | enterprise-architect + compliance-officer | **P1** | M5 | [ ] |
+| 9 | Collect DSAR-E-001 through DSAR-E-006 evidence artefacts after first production DSAR lifecycle; store in `compliance/evidence/dsar/`; cross-reference `docs/SOC2_READINESS.md` P4.0 and P8.0 evidence tables. | compliance-officer | **P1** | M5 | [ ] |
+| 10 | Add DSAR status widget to admin-dashboard.html Compliance screen (open requests, days remaining, overdue count). | platform-engineer | **P1** | M5 | [ ] |
+
+#### P2 — Post-GA
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | Evaluate CCPA / LGPD jurisdiction handling: confirm `jurisdiction` column routing and whether `deadline_at` formula differs per jurisdiction (CCPA = 45 days). Document outcome in `docs/DECISION_LOG.md`. | compliance-officer + legal | **P2** | M8 | [ ] |
+
+---
+
+### 31.9 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-DSAR-01** | **CCPA 45-day deadline vs GDPR 30-day.** `deadline_at` is currently hardcoded to `submitted_at + 30 days`. CCPA requests need a 45-day SLA clock. Options: (a) make `deadline_days` a nullable column, default 30; (b) compute in application layer based on `jurisdiction`; (c) separate `deadline_at` from `extended_deadline_at` entirely. | P2 | compliance-officer + platform-engineer | Evaluate after first CCPA request in production; document in DECISION_LOG.md |
+| **OQ-DSAR-02** | **Retention after user account erasure.** When a user exercises Art. 17 erasure, `users.id` is hard-deleted (§12). The `dsar_requests.user_id` FK is `ON DELETE SET NULL`, and `erased_user_reference` carries the HMAC pseudonym. Confirm that the `retain_until` GENERATED column (7yr from `closed_at`) continues to function correctly when `closed_at` is NULL for an in-flight DSAR at erasure time (the `COALESCE(closed_at, now())` expression causes `retain_until` to recalculate on each read — verify this is acceptable or snapshot the value at close time). | P1 | platform-engineer + compliance-officer | Evaluate in migration 0060 testing; consider switching `retain_until` to a regular column set by trigger if GENERATED behaviour is ambiguous. |
+
+---
+
+*v1.0 (2026-06-13): §31 DSAR Request Registry Schema — supplies DDL for `dsar_requests` table referenced by INCIDENT_RESPONSE.md R-14 SQL queries and SOC2_READINESS.md P4.0 evidence. Includes: `dsar_request_type` + `dsar_status` enums; full column set (SLA timeline, export lifecycle, erasure lifecycle, refusal, DPA notification, HMAC chain); 5 indexes (open-deadline, tenant, user, export-pending, retention); 2 triggers (updated_at, closed_at auto-set); RLS policies for form_system (full), form_user (self-read), form_tenant_admin (existence + status columns only — privacy floor), form_admin (break-glass, DEC-042); 14 DEC-030 event registrations with Zod schema skeletons; 3 alerting rules (AL-DSAR-01 5-day P1, AL-DSAR-02 overdue P0, AL-DSAR-03 undelivered export P2); 6 SOC 2 evidence artefacts (DSAR-E-001 through DSAR-E-006) mapped to P4.0/P5.0/P5.1/P8.0/CC2.2/CC6.5; 11-item implementation checklist (7× P0 M4, 3× P1 M5, 1× P2 M8); 2 open questions (OQ-DSAR-01 CCPA 45-day deadline, OQ-DSAR-02 retain_until GENERATED column behaviour post-erasure). Closes the cross-reference gap between DATA_MODEL.md and INCIDENT_RESPONSE.md R-14 / SOC2_READINESS.md P4.0. Owner: compliance-officer · security-engineer · enterprise-architect.*
