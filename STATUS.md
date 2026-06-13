@@ -1,4 +1,4 @@
-# FORM · Project Status v4.67.0
+# FORM · Project Status v4.68.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -25,9 +25,9 @@
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
-| 651–700 | Biomechanics & injury prevention | 25 | In progress — posts 651–658, 661–669, 670–677 written; 659–660 pending clinical-safety review before writing; 678–700 next; sports-scientist review required before publish |
+| 651–700 | Biomechanics & injury prevention | 26 | In progress — posts 651–658, 661–669, 670–678 written; 659–660 pending clinical-safety review before writing; 679–700 next; sports-scientist review required before publish |
 
-**Total posts: 675**
+**Total posts: 676**
 
 ---
 
@@ -91,10 +91,10 @@
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
 - PostHog DPA review (compliance-officer) — **REVIEW COMPLETE** (scope analysis + Art.9 ruling documented · `compliance/dpa/dpa-collection-checklist-posthog-2026-06-13.md`); click-through execution pending (founder action — PostHog Dashboard → Organization → Privacy & DPA); PIA-2026-001 filed v4.x
 - Block 601–650: **COMPLETE** — всі пости написані (639 blocked HARD VETO); sports-scientist review needed перед publish
-- Block 651–700: posts 651–658, 661–669, 670–677 written (25/50); 659–660 pending clinical-safety review REQUIRED before writing; next: 678+
+- Block 651–700: posts 651–658, 661–669, 670–678 written (26/50); 659–660 pending clinical-safety review REQUIRED before writing; next: 679+
 - Block 851–900 proposed: Applied programming deep dives (added to README roadmap v4.52.0)
 - Block 1001–1050 proposed: Training literacy: reading your own data (added to README roadmap v4.66.0)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.66.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.68.0**

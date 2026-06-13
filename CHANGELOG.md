@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [4.68.0] — 2026-06-13
+
+### Added
+- `content/post-678-compression-vs-shear-spine-mechanics.md` — Biomechanics block, post 26/50. Compression vs. shear force mechanics at the spine: axial compression (vertebral tolerance >14 000 N per McGill lab data) vs. shear (lower threshold, ligament/disc risk). Trunk angle as primary determinant of shear-to-compression ratio. IAP (intra-abdominal pressure) as hydraulic stabilizer reducing lumbar compression by ~1 000–1 400 N. Spinal adaptation to loading (bone density, disc hydration cycle). Three evidence-based risk factors: shear under fatigue, dynamic flexion under load, chronic overload without recovery. clinical-safety PASS. sports-scientist review pending.
+- `blog.html` — added card for post-678.
+- `STATUS.md` — block 651–700 updated to 26/50; total posts 676; next priorities updated.
+
 ## [4.67.0] — 2026-06-13
 
 ### Added
