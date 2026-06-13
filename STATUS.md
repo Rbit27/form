@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.27.0** — 2026-06-13
+**v4.27.1** — 2026-06-13
 
 ---
 
@@ -24,9 +24,9 @@
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
-| 601–650 | Programming edge cases | 2 | Draft — review_pending: sports-scientist |
+| 601–650 | Programming edge cases | 3 | Draft — post-602 sports-scientist PASS; post-603 review_pending |
 
-**Total posts: 602**
+**Total posts: 603**
 
 ---
 
@@ -90,7 +90,7 @@
 - MOBILE_ROADMAP.md update (platform-engineer)
 - PIA filing for readiness_bucket PostHog (compliance-officer — DEC-046 pre-condition)
 - PostHog DPA review (compliance-officer — DEC-046 pre-condition)
-- Continue block 601–650: post-603 (time-deficit programming) · post-604 (master athletes 40+) · post-605 (block vs. wave vs. linear periodization)
+- Continue block 601–650: post-604 (master athletes 40+) · post-605 (block vs. wave vs. linear periodization) · post-606 (shift work / travel adaptation)
 
 ---
 
