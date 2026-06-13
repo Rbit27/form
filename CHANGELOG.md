@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.60.0] — 2026-06-13
+
+### Added
+- `docs/DATA_MODEL.md §32` — Enterprise DSAR Extensions: employer-side data lifecycle & offboarding export schema. Closes DEC-030 event gap created when `INCIDENT_RESPONSE.md` v2.3 registered five enterprise DSAR events (`dsar.data_provided`, `dsar.deletion_soft`, `dsar.deletion_confirmed`, `dsar.portability_export_completed`, `dsar.offboarding_export_available`) from `ENTERPRISE_SLA.md §19.5` without a corresponding DATA_MODEL.md schema section. New section covers: event registration table + Zod v2 schemas for all five events; DEC-032-EXT two-phase erasure chain ordering constraint; §25 offboarding chain interaction (1-hour SLO for export-available notification); two alert rules (AL-GDPR-04, AL-DSAR-04); four SOC 2 evidence artefacts DSAR-E-007–010 (P5.0, P8.0, P5.1, A1.1); eight-item implementation checklist; two open questions (OQ-DSAR-03, OQ-DSAR-04).
+
+### Changed
+- `docs/DATA_MODEL.md` — v1.10 → v1.11. TOC updated with §32 entry.
+- `VERSION` — 4.59.0 → 4.60.0.
+
+---
+
 ## [4.59.0] — 2026-06-13
 
 ### Added

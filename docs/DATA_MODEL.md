@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.10
+# FORM · Multi-Tenant Data Model v1.11
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -39,6 +39,7 @@
 29. [PAM / Privileged Access Management Postgres Schema](#29-pam--privileged-access-management-postgres-schema--oq-ins-01-resolution--cc61cc62cc63cc66-auditor-evidence)
 30. [Subscription Events Erasure Hardening & Quota Grace Thresholds](#30-subscription-events-erasure-hardening--quota-grace-thresholds--oq-bill-05-oq-rl-02--oq-bill-01-resolution)
 31. [DSAR Request Registry Schema — Art. 15/17/20 Lifecycle Tracking](#31-dsar-request-registry-schema--art-1517-request-lifecycle-tracking)
+32. [Enterprise DSAR Extensions — Employer-Side Data Lifecycle & Offboarding Export Schema](#32-enterprise-dsar-extensions--employer-side-data-lifecycle--offboarding-export-schema)
 
 ---
 
@@ -13076,3 +13077,194 @@ Evidence collection path: `compliance/evidence/dsar/DSAR-E-00{1..6}_<YYYY-QN>.pd
 ---
 
 *v1.0 (2026-06-13): §31 DSAR Request Registry Schema — supplies DDL for `dsar_requests` table referenced by INCIDENT_RESPONSE.md R-14 SQL queries and SOC2_READINESS.md P4.0 evidence. Includes: `dsar_request_type` + `dsar_status` enums; full column set (SLA timeline, export lifecycle, erasure lifecycle, refusal, DPA notification, HMAC chain); 5 indexes (open-deadline, tenant, user, export-pending, retention); 2 triggers (updated_at, closed_at auto-set); RLS policies for form_system (full), form_user (self-read), form_tenant_admin (existence + status columns only — privacy floor), form_admin (break-glass, DEC-042); 14 DEC-030 event registrations with Zod schema skeletons; 3 alerting rules (AL-DSAR-01 5-day P1, AL-DSAR-02 overdue P0, AL-DSAR-03 undelivered export P2); 6 SOC 2 evidence artefacts (DSAR-E-001 through DSAR-E-006) mapped to P4.0/P5.0/P5.1/P8.0/CC2.2/CC6.5; 11-item implementation checklist (7× P0 M4, 3× P1 M5, 1× P2 M8); 2 open questions (OQ-DSAR-01 CCPA 45-day deadline, OQ-DSAR-02 retain_until GENERATED column behaviour post-erasure). Closes the cross-reference gap between DATA_MODEL.md and INCIDENT_RESPONSE.md R-14 / SOC2_READINESS.md P4.0. Owner: compliance-officer · security-engineer · enterprise-architect.*
+
+---
+
+## 32. Enterprise DSAR Extensions — Employer-Side Data Lifecycle & Offboarding Export Schema
+
+### 32.1 Purpose and Scope
+
+This section extends §31 (consumer DSAR lifecycle) with the five enterprise-specific DEC-030 events defined in `docs/ENTERPRISE_SLA.md §19.5` (v1.1, 2026-06-13) and registered in `docs/INCIDENT_RESPONSE.md R-14.8` (v2.3, 2026-06-13). Those events appear in the HMAC audit chain but lacked a DATA_MODEL schema section — this section closes that gap.
+
+These events are distinct from the §31 consumer DSAR events because:
+
+1. They track the **employer-side** data obligation — FORM's duties to the enterprise tenant as data processor under the DPA (GDPR Art. 28), not only to the data subject.
+2. They close the audit trail for **offboarding export availability** — the 90-day wind-down window (§25) must leave a HMAC-chain evidence record of when the export window opened and was notified.
+3. They separate **soft delete** from **hard delete** phases of Art. 17 erasure, enabling auditors to verify the two-phase deletion protocol independently (a single `dsar.erasure_completed` in §31 does not give auditors visibility into the two-step sequence required for Art. 9 health data).
+
+**Privacy floor (enforced at the event layer):**
+- `user_id_hash` (SHA-256 via `PSEUDONYM_SALT` Worker secret) is used in events that identify a specific data subject — never raw `user_id` or email.
+- `tenant_id` is present only in employer-side events (`dsar.data_provided`, `dsar.offboarding_export_available`).
+- No plaintext employee identifiers appear in any audit chain event in this section.
+
+**Scope boundary:**
+- Consumer Art. 15/17/20 DSAR lifecycle → **§31**.
+- Enterprise processor-side obligations and tenant offboarding export lifecycle → **this section (§32)**.
+- HMAC chain ordering constraint between soft and hard delete events → §32.3.
+
+---
+
+### 32.2 DEC-030 Event Registration
+
+Five events registered in `docs/AUDIT_LOG_SCHEMA.md §6` (DSAR namespace — enterprise extension). All are HMAC-SHA256 chained per DEC-030.
+
+| Event type | Severity | Retention | Trigger | Privacy invariant |
+|---|---|---|---|---|
+| `dsar.data_provided` | HIGH | 7 yr | Enterprise processor fulfils Art. 15 access request on behalf of tenant within 24-hour SLO (`ENTERPRISE_SLA.md §19.5`) | `tenant_id`; no `user_id`; `record_count` integer only — no data values |
+| `dsar.deletion_soft` | HIGH | 7 yr | Art. 17 Phase 1 soft delete executed: `deleted_at` set on all in-scope user rows (§12 erasure protocol Phase 1) | `user_id_hash` (SHA-256); `tables_soft_deleted` array; `dsar_id`; no plaintext identity |
+| `dsar.deletion_confirmed` | HIGH | 7 yr | Art. 17 Phase 2 hard-delete cascade verified complete; deletion certificate reference generated and issued | `dsar_id`; `certificate_ref` (opaque UUID); `tables_erased` array; no `user_id` after this point |
+| `dsar.portability_export_completed` | STANDARD | 7 yr | Employee self-serve Art. 20 export delivered (`Settings → Privacy → Export`) — re-download link generated | `user_id_hash`; `export_format` enum; `record_count` integer; `link_expiry_at` |
+| `dsar.offboarding_export_available` | STANDARD | 7 yr | Tenant offboarding 90-day wind-down window opened (§25 pipeline state transition) — tenant admin notified | `tenant_id`; `window_opens_at`; `window_closes_at`; `export_token` (opaque, never decodable from audit log) |
+
+**HMAC chain ordering constraint (DEC-032-EXT):**
+- For the same `dsar_id`: `dsar.deletion_soft` MUST precede `dsar.deletion_confirmed` in the HMAC chain. A `deletion_confirmed` event arriving before a `deletion_soft` event for the same `dsar_id` constitutes a chain violation and triggers R-05 (HMAC Chain Break) immediately — the IC does not wait for confirmation.
+- `dsar.offboarding_export_available` chains within the tenant offboarding audit sub-sequence (§25.6), not the per-user DSAR chain. It has no ordering constraint relative to §31 events.
+
+---
+
+### 32.3 Zod Schemas
+
+To be registered in `docs/AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise`:
+
+```typescript
+// dsar.data_provided — enterprise processor-side Art. 15 export (24-hour SLO)
+const DsarDataProvided = z.object({
+  event:                 z.literal('dsar.data_provided'),
+  dsar_id:               z.string().uuid(),
+  tenant_id:             z.string().uuid(),
+  record_count:          z.number().int().nonnegative(),
+  export_format:         z.enum(['json', 'csv', 'pdf']),
+  slo_met:               z.boolean(),               // true if fulfilled within 24h of employer request
+  employer_request_ref:  z.string().min(1),          // employer ticket ref / email thread ID
+  // No user_id. No data values. No employee identifiers.
+});
+
+// dsar.deletion_soft — Art. 17 Phase 1 soft delete
+const DsarDeletionSoft = z.object({
+  event:                    z.literal('dsar.deletion_soft'),
+  dsar_id:                  z.string().uuid(),
+  user_id_hash:             z.string().length(64),   // SHA-256 hex of user_id via PSEUDONYM_SALT
+  tables_soft_deleted:      z.array(z.string()).min(1),
+  rows_soft_deleted_total:  z.number().int().nonnegative(),
+  deletion_phase:           z.literal('soft'),
+  executed_by:              z.enum(['system', 'manual_ic']), // manual_ic = IC-authorised override
+});
+
+// dsar.deletion_confirmed — Art. 17 Phase 2 hard-delete complete
+const DsarDeletionConfirmed = z.object({
+  event:               z.literal('dsar.deletion_confirmed'),
+  dsar_id:             z.string().uuid(),
+  certificate_ref:     z.string().uuid(),            // opaque UUID — issued deletion certificate
+  tables_erased:       z.array(z.string()).min(1),
+  rows_deleted_total:  z.number().int().nonnegative(),
+  deletion_phase:      z.literal('hard'),
+  // No user_id after hard delete — the users row has been erased per §12
+});
+
+// dsar.portability_export_completed — Art. 20 self-serve employee export
+const DsarPortabilityExportCompleted = z.object({
+  event:           z.literal('dsar.portability_export_completed'),
+  dsar_id:         z.string().uuid().nullable(),     // null for self-serve outside a formal DSAR
+  user_id_hash:    z.string().length(64),            // SHA-256 hex of user_id
+  export_format:   z.literal('json'),                // machine-readable per Art. 20(1) requirement
+  record_count:    z.number().int().nonnegative(),
+  link_expiry_at:  z.string().datetime(),            // ISO-8601; short-lived download link (48h)
+  requested_by:    z.literal('user'),                // always user — employer cannot initiate Art. 20
+});
+
+// dsar.offboarding_export_available — tenant contract-end bulk export window opened
+const DsarOffboardingExportAvailable = z.object({
+  event:            z.literal('dsar.offboarding_export_available'),
+  tenant_id:        z.string().uuid(),
+  window_opens_at:  z.string().datetime(),
+  window_closes_at: z.string().datetime(),
+  export_token:     z.string().length(64),           // opaque HMAC token; not decodable from log
+  triggered_by:     z.enum(['contract_end', 'admin_initiated', 'auto_offboarding']),
+  // No employee identifiers — tenant-level metadata only
+});
+```
+
+---
+
+### 32.4 Chain Interaction with §25 (Tenant Offboarding)
+
+The `dsar.offboarding_export_available` event is the DEC-030 compliance record for the 90-day wind-down window opening. Its timestamp anchors the ENTERPRISE_SLA.md §5 wind-down SLO for auditors.
+
+**Chain sequence:**
+
+```
+§25 state machine: tenants.offboarding_status → 'wind_down_active'
+   emits: offboarding.wind_down_started           (§25.6, HMAC anchor)
+   within 1h SLO:
+   emits: dsar.offboarding_export_available       (§32, this section)
+   [90-day window — tenant admin reads aggregate reports, downloads permitted]
+§25 state machine: tenants.offboarding_status → 'purge_scheduled'
+   emits: offboarding.purge_scheduled             (§25.6)
+§25 state machine: tenants.offboarding_status → 'purge_complete'
+   emits: offboarding.purge_complete              (§25.6)
+```
+
+The 1-hour window between `offboarding.wind_down_started` and `dsar.offboarding_export_available` is the SLO for sending the tenant admin notification email and generating the export token. Breach of this window fires AL-GDPR-04 (§32.5).
+
+**Privacy invariant for the chain:** no employee `user_id` appears in any event in this offboarding sub-chain. Employee-level health data remains readable by the employee during the wind-down window and is erased per R-25 (INCIDENT_RESPONSE.md) once the window closes.
+
+---
+
+### 32.5 Alerting Rules
+
+| Alert | Severity | Condition | Routing | Auto-resolve |
+|---|---|---|---|---|
+| **AL-GDPR-04** | P2 | `dsar.offboarding_export_available` not emitted within 1 hour of `offboarding.wind_down_started` for the same `tenant_id` | Slack `#compliance-alerts` + CSM on-call | Yes — on `dsar.offboarding_export_available` emission |
+| **AL-DSAR-04** | P1 | `dsar.deletion_confirmed` emitted without preceding `dsar.deletion_soft` for the same `dsar_id` (DEC-032-EXT chain violation) | PagerDuty `form-platform` + `form-compliance`; no auto-resolve | No — IC review required per R-05 protocol |
+
+AL-GDPR-04 extends the §37 GDPR compliance pipeline alert taxonomy in `docs/OBSERVABILITY.md §37`.
+
+---
+
+### 32.6 SOC 2 Evidence Mapping
+
+Extends the §31.7 evidence registry (DSAR-E-001 through DSAR-E-006):
+
+| Artefact | SOC 2 criterion | Source | Retention |
+|---|---|---|---|
+| **DSAR-E-007** | P5.0 — employer-side data subject requests processed within agreed timeframe | Quarterly export of `dsar.data_provided` DEC-030 chain; `slo_met = true` rate ≥ 99% | 7 yr |
+| **DSAR-E-008** | P8.0 — personal information disposal confirmed in two auditable phases | `dsar.deletion_soft → dsar.deletion_confirmed` chain pair per fulfilled Art. 17 erasure; `certificate_ref` cross-reference to deletion certificate | 7 yr |
+| **DSAR-E-009** | P5.1 — consent withdrawal and portability rights exercised on request | Quarterly `dsar.portability_export_completed` event log; `requested_by = 'user'` confirms employee-initiated (no employer coercion) | 7 yr |
+| **DSAR-E-010** | A1.1 — tenant data made available during committed wind-down window | `dsar.offboarding_export_available` events; gap to `offboarding.wind_down_started` ≤ 1h per §32.4 SLO | 7 yr |
+
+Evidence collection path: `compliance/evidence/dsar/DSAR-E-00{7..10}_<YYYY-QN>.pdf`
+
+---
+
+### 32.7 Implementation Checklist
+
+#### P0 — Before first enterprise customer off-boarding or enterprise DSAR
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register five `dsar.*` enterprise events in `docs/AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise` with Zod schemas from §32.3; run HMAC chain integration test in staging for `deletion_soft → deletion_confirmed` ordering constraint (DEC-032-EXT); confirm chain break emits R-05 PagerDuty alert. | security-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 2 | Instrument §25 offboarding pipeline (`offboarding-worker.ts`): emit `dsar.offboarding_export_available` within 1h of `offboarding.wind_down_started` state transition; generate `export_token` using `OFFBOARDING_EXPORT_TOKEN_SECRET` Worker secret (rotate per `docs/CRYPTOGRAPHY_POLICY.md §5`; add to key inventory). | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Instrument erasure Worker to emit `dsar.deletion_soft` at Phase 1 completion and `dsar.deletion_confirmed` at Phase 2 verification; enforce DEC-032-EXT ordering invariant at `emit-audit-event` Worker before accepting `deletion_confirmed` (reject if no `deletion_soft` precedes it for the same `dsar_id`). | platform-engineer | **P0** | M4 | [ ] |
+| 4 | Instrument self-serve export endpoint (`GET /api/v1/dsar/export/download`) to emit `dsar.portability_export_completed` on link generation; compute `user_id_hash` as `SHA-256(user_id + PSEUDONYM_SALT)` using the shared `pseudonymise()` utility. | platform-engineer | **P0** | M4 | [ ] |
+| 5 | Configure AL-GDPR-04 (P2, Slack `#compliance-alerts` + CSM routing, auto-resolve) and AL-DSAR-04 (P1, PagerDuty `form-compliance`, no auto-resolve) per §32.5; verify both rules receive synthetic test events in staging before enabling in production. | devops-lead | **P0** | M5 | [ ] |
+
+#### P1 — Pre-GA
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | After first enterprise DSAR fulfillment: collect DSAR-E-007 and DSAR-E-008 artefacts; file in `compliance/evidence/dsar/`; add cross-references to `docs/SOC2_READINESS.md §P5.0` and `§P8.0` evidence tables. | compliance-officer | **P1** | M6 | [ ] |
+| 7 | After first employee self-serve portability export: collect DSAR-E-009 (quarterly batch); file in `compliance/evidence/dsar/`. | compliance-officer | **P1** | M6 | [ ] |
+| 8 | After first tenant offboarding wind-down opens: collect DSAR-E-010; verify `dsar.offboarding_export_available` timestamp minus `offboarding.wind_down_started` timestamp ≤ 1h; file in `compliance/evidence/dsar/`. | compliance-officer | **P1** | M7 | [ ] |
+
+---
+
+### 32.8 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-DSAR-03** | **`dsar.data_provided` SLO breach response.** ENTERPRISE_SLA.md §19.5 sets a 24-hour SLO for employer-side Art. 15 data provision. Should `slo_met = false` in `dsar.data_provided` auto-open a P1 PagerDuty incident, or is it a P2 handled by the CSM manually? Recommendation: P1 auto-alert for the first missed SLO per tenant per quarter; P2 thereafter (CSM manages pattern with the customer). | P1 | customer-success + compliance-officer | Resolve before first enterprise DSAR; document in DECISION_LOG.md |
+| **OQ-DSAR-04** | **Deletion certificate format and delivery channel.** `dsar.deletion_confirmed.certificate_ref` is an opaque UUID. The deletion certificate itself (PDF or signed JSON attesting erasure) must be delivered to the data subject or employer. Open: (a) format; (b) delivery channel (email vs. admin dashboard download); (c) storage path (`compliance/evidence/` vs. R2-only). | P2 | compliance-officer + legal | Evaluate at first production Art. 17 hard-delete erasure; document in DECISION_LOG.md |
+
+---
+
+*v1.1 (2026-06-13): §32 Enterprise DSAR Extensions — Employer-Side Data Lifecycle & Offboarding Export Schema. Closes the DEC-030 event gap created when `docs/INCIDENT_RESPONSE.md` v2.3 (2026-06-13) registered five enterprise-specific DSAR events in R-14.8 — `dsar.data_provided`, `dsar.deletion_soft`, `dsar.deletion_confirmed`, `dsar.portability_export_completed`, `dsar.offboarding_export_available` — sourced from `docs/ENTERPRISE_SLA.md §19.5` (v1.1, 2026-06-13), without a corresponding DATA_MODEL.md schema section. §32 provides: purpose + scope boundary relative to §31 (consumer DSAR); full DEC-030 event registration table with severity, retention, trigger, and privacy invariant for all five events; Zod v2 schemas (to be added to AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise); two-phase erasure chain ordering constraint DEC-032-EXT (`deletion_soft` must precede `deletion_confirmed`; violation triggers R-05); §25 offboarding chain interaction with 1-hour SLO for `dsar.offboarding_export_available` gap from `offboarding.wind_down_started`; two new alert rules (AL-GDPR-04 P2 offboarding notification gap; AL-DSAR-04 P1 DEC-032-EXT chain violation); four SOC 2 evidence artefacts DSAR-E-007 through DSAR-E-010 (P5.0, P8.0, P5.1, A1.1); eight-item implementation checklist (5× P0 M4–M5, 3× P1 M6–M7); two open questions (OQ-DSAR-03 SLO breach response P1, OQ-DSAR-04 deletion certificate format P2). Cross-references: `docs/INCIDENT_RESPONSE.md R-14.8` (five-event taxonomy source); `docs/ENTERPRISE_SLA.md §19.5` (24-hour employer DSAR SLO source); `docs/DATA_MODEL.md §25` (tenant offboarding pipeline — `offboarding.wind_down_started` HMAC anchor); `docs/DATA_MODEL.md §12` (Art. 17 two-phase erasure — §32 adds the DEC-030 evidence layer for each phase); `docs/DATA_MODEL.md §31` (consumer DSAR schema — §32 is the employer-side extension); `docs/AUDIT_LOG_SCHEMA.md §6` (five events to register — P0 before M4); `docs/SOC2_READINESS.md §P5.0/§P8.0` (evidence tables DSAR-E-007/008 extend); `docs/OBSERVABILITY.md §37` (GDPR compliance pipeline — AL-GDPR-04 extends §37 alert taxonomy). Owner: compliance-officer + enterprise-architect + security-engineer.*
