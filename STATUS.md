@@ -1,4 +1,4 @@
-# FORM · Project Status v4.24.0
+# FORM · Project Status v4.24.1
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.24.0** — 2026-06-13
+**v4.24.1** — 2026-06-13
 
 ---
 
@@ -23,10 +23,10 @@
 | 501–559 | Self-programming mastery | 59 | Published |
 | 560–585 | Sport psychology block | 26 | Published |
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
-| 591–597 | Training with tech block | 7 | Draft — review_pending: sports-scientist |
-| 598–600 | Training with tech block (remaining) | 0 | Planned |
+| 591–598 | Training with tech block | 8 | Draft — review_pending: sports-scientist |
+| 599–600 | Training with tech block (remaining) | 0 | Planned |
 
-**Total posts: 597**
+**Total posts: 598**
 
 ---
 
