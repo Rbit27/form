@@ -27,9 +27,9 @@
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
-| 751–800 | Athlete lifecycle & context | 5 | In progress — posts 751–755 written (desk-worker, shift-worker, masters 40+, return after break, travel training); sports-scientist review required before publish |
+| 751–800 | Athlete lifecycle & context | 6 | In progress — posts 751–756 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase); sports-scientist review required before publish |
 
-**Total posts: 755**
+**Total posts: 756**
 
 ---
 
@@ -89,7 +89,7 @@
 ## Next priorities
 
 - **Block 701–750: COMPLETE** — всі 50 постів написані; sports-scientist review required before publish
-- **Block 751–800: IN PROGRESS** — posts 751–755 written (desk-worker, shift-worker, masters 40+, return after break, travel training); next: posts 756–760 (novice phase, female athlete considerations, time-constrained training, high-volume vs. life stress, intermediate plateau)
+- **Block 751–800: IN PROGRESS** — posts 751–756 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase); next: posts 757–760 (female athlete considerations, time-constrained training, high-volume vs. life stress, intermediate plateau)
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
