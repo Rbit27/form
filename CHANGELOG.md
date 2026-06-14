@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.88.0] — 2026-06-14
+
+### Added
+- `content/post-768-hotel-training-minimal-effective-session.md` — Block 751–800 post 18/50. Hotel training — minimum effective session without equipment: detraining timeline (Mujika & Padilla 2000 — neuromuscular 10–14 days, structural 3–4 weeks), why most hotel workouts don't count (intensity drop without external load), four bodyweight progression mechanisms (eccentric tempo, leverage/anatomy position, pause in lengthened position, reduced rest), pulling movement limitation (honest coverage), four movement patterns to cover (horizontal push, vertical push, squat, hip hinge), 45-min room-only session protocol with sets/reps/tempo table, hotel gym adaptation (dumbbells to 30 kg, cable machine priority), frequency management (1 session ≤5 days / 2–3 sessions 5–14 days), what not to do (high-rep burpees ≠ strength stimulus). clinical-safety PASS · sports-scientist review required before publish.
+- `blog.html` — post-768 card added (Travel training category, draft).
+
+### Changed
+- `VERSION` — 4.87.0 → 4.88.0.
+
+---
+
 ## [4.87.0] — 2026-06-14
 
 ### Added
