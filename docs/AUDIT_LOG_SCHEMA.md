@@ -768,6 +768,11 @@ Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted wit
 | `sla.dispute_resolved` | 7 years | SOC 2 A1.1 dispute resolution record — `outcome` (upheld/rejected) + `final_credit_usd` + `resolved_by` constitutes the compliance-officer decision record; 7yr matches financial audit floor and ensures availability across multiple SOC 2 Type II observation periods |
 | `sla.maintenance_window_registered` | 3 years | Planned maintenance exclusion registration record; operational planning log; the `notification_hours` field provides evidence the §23.4 advance-notice requirement was met; 3yr sufficient — maintenance window records are operational, not financial |
 | `sla.exclusion_reclassified` | 7 years | SOC 2 A1.1 probe false-positive reclassification evidence — `security-engineer` approval + second-approver requirement for windows > 30 min creates a tamper-evident record that downtime exclusions are subject to independent review; 7yr ensures auditors can inspect reclassification decisions across the full SOC 2 history |
+| `tenant.white_label_provisioned` / `tenant.white_label_cert_renewed` | 7 years | SOC 2 A1.1 — WL-E-001 evidence artefact (annual `tenant.white_label_cert_renewed` chain export demonstrates no cert expired during observation period); `tenant.white_label_provisioned` is the WL-CHAIN-01 lifecycle anchor — must precede all `tenant.white_label_cert_*` events for the same `tenant_id`; 7yr matches enterprise contract and SOC 2 multi-cycle evidence floor |
+| `tenant.white_label_cert_expiry_warning` / `tenant.white_label_revoked` | 7 years | SOC 2 CC7.2 — WL-E-002 evidence artefact (AL-WL-03/04/05 PagerDuty config + 90-day warning history); `tenant.white_label_revoked` satisfies CC6.3 timely access-removal record for the white-label surface (Cloudflare Custom Hostname deleted at revocation); `revoked_by_pam_session` links to the PAM chain (OBSERVABILITY §29); 7yr matches enterprise contract audit and access-removal evidence floor |
+| `tenant.white_label_cert_expiry_breach` / `system.white_label_cert_check_stale` | 7 years | SOC 2 A1.1 CRITICAL — `tenant.white_label_cert_expiry_breach` constitutes WL-SLO-01 + WL-SLO-02 breach; directly triggers §23 SLA credit engine (`sla_incident_id` FK); financial record requiring 7yr accounting floor; `system.white_label_cert_check_stale` is the WL-CHAIN-01 monitoring gap record (HIGH — detective control failure); 7yr matches `system.cron_job_stale` precedent for operational monitoring failures requiring multi-cycle SOC 2 coverage |
+| `dsar.certificate_issued` | 7 years | SOC 2 P8.0 — DSAR-E-011 evidence artefact (tamper-evident deletion certificate issuance record; quarterly `payload_hash` cross-check against R2 object SHA-256 confirms certificate integrity post-issuance); GDPR Art. 17 accountability proof that erasure was communicated with a verifiable certificate; `r2_object_key` + `payload_hash` create a dual-layer integrity trail (HMAC chain + R2 object); 7yr matches CERT-CHAIN-01 evidence floor and SOC 2 multi-cycle observation window |
+| `dsar.certificate_delivered` | 7 years | SOC 2 P8.0 — delivery confirmation closes the CERT-CHAIN-01 four-event chain (`dsar.deletion_soft → deletion_confirmed → certificate_issued → certificate_delivered`); CC7.2 — `delivered_to_hash` + `delivery_channel` document that the disposal notification reached the intended party; STANDARD severity; 7yr required because the delivery record completes Art. 17 accountability — shorter retention would leave `dsar.certificate_issued` without a verifiable follow-through across multi-year SOC 2 Type II observation windows |
 
 After retention period, rows **hard-deleted via partition drop** (not soft-delete). Hash of deleted-partition's last row preserved у `audit_log_retention_summary` for chain continuity proof.
 
@@ -1616,6 +1621,134 @@ const WearableStaleDataCoachingContextSchema = z.object({
 
 ---
 
+### White-label custom domain & SSL certificate events (DEC-030 HMAC-chained · OBSERVABILITY §42 · A1.1/CC7.2)
+
+> Defined in `docs/OBSERVABILITY.md §42.10`. Six DEC-030 HMAC-chained events covering the white-label custom domain and SSL certificate lifecycle for enterprise tenants (available ≥ $50k ARR per `docs/ENTERPRISE.md §Branding`). One additional high-volume operational event (`system.white_label_cert_checked`, STANDARD, 1yr — emitted per polled domain by pg_cron job 32 nightly) is excluded from this DEC-030 evidence set and from the weekly chain integrity audit. **Privacy floor (all six events):** Custom domain hostnames are commercially sensitive enterprise-customer identifiers — not GDPR Art. 4(1) personal data, but excluded from all cross-tenant exports, aggregated dashboards visible to other tenants, and SIEM streams beyond the affected tenant's own endpoint. `custom_domain_hash` = SHA-256(`custom_domain`) — plaintext custom domain does not appear in any DEC-030 payload pending OQ-WL-OBS-01 resolution (OBSERVABILITY §42.14, P1, before first white-label tenant goes live). `form_api` role has no access to `tenant_white_label_domains` (REVOKE ALL enforced in migration 0072). Cross-ref: `docs/OBSERVABILITY.md §42.4` (WL-SLO-01 through WL-SLO-04); `docs/ENTERPRISE.md §Branding`; `docs/OBSERVABILITY.md §23` (SLA credit engine — WL-SLO-01 breach triggers credit calculation via `sla_incident_id` FK); `docs/SSO_SCIM_IMPLEMENTATION.md §20` (SAML cert lifecycle — analogous expiry alert escalation ladder, different cert class). **Closes OBSERVABILITY.md §42.14 checklist item 1 (P0, M10 — register all six DEC-030 events in AUDIT_LOG_SCHEMA.md before first white-label tenant goes live).**
+
+**WL-CHAIN-01 ordering invariant:** `tenant.white_label_provisioned` must precede all `tenant.white_label_cert_*` events for the same `tenant_id` in the HMAC chain. A `tenant.white_label_cert_expiry_breach` emitted without a preceding `tenant.white_label_cert_expiry_warning` within the same 30-calendar-day window constitutes a WL-CHAIN-01 violation — the `emit-audit-event` Worker returns HTTP 422 (`WL_CHAIN_01_VIOLATION`) and co-emits `system.white_label_cert_check_stale` to record the monitoring gap. `tenant.white_label_revoked` without a preceding `tenant.white_label_provisioned` for the same `tenant_id` emits a chain WARNING (non-blocking — accommodates rare provisioning-failure-then-cleanup paths). R-05 is triggered on any blocking WL-CHAIN-01 violation.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `tenant.white_label_provisioned` | STANDARD | 7 yr | Cloudflare Custom Hostname API call succeeds; `tenant_white_label_domains` row created with `status = 'active'`; emitter: platform-engineer (PAM-gated `POST /internal/enterprise/white-label/provision`) | `tenant_id` (UUID), `custom_domain_hash` (SHA-256 — OQ-WL-OBS-01 pending), `cloudflare_hostname_id` (string max 128), `provisioned_by_pam_session` (UUID), `provisioned_at` (ISO 8601) |
+| `tenant.white_label_cert_expiry_warning` | HIGH | 7 yr | pg_cron job 32 (`white_label_cert_check`, 02:00 UTC daily) detects `ssl_cert_expiry_at` < NOW() + 30 days; triggers AL-WL-03 (P2 Slack, 7-day cooldown per tenant) and AL-WL-04 (P1 PagerDuty dual-page at < 7 days) | `tenant_id` (UUID), `custom_domain_hash` (SHA-256), `days_to_expiry` (int ≥ 0, ≤ 29), `ssl_cert_expiry_at` (ISO 8601), `detected_by: 'pg_cron_job_32'` |
+| `tenant.white_label_cert_renewed` | STANDARD | 7 yr | pg_cron job 32 nightly poll detects Cloudflare API returns `ssl_cert_expiry_at` > prior recorded value — cert auto-renewed by Cloudflare SSL for SaaS | `tenant_id` (UUID), `custom_domain_hash` (SHA-256), `old_expiry_at` (ISO 8601), `new_expiry_at` (ISO 8601), `renewed_by: 'cloudflare_auto_renewal'` |
+| `tenant.white_label_cert_expiry_breach` | **CRITICAL** | 7 yr | pg_cron job 32 detects `ssl_cert_expiry_at` ≤ NOW() for any `status = 'active'` domain; constitutes WL-SLO-01 + WL-SLO-02 breach; triggers AL-WL-05 (P0 CRITICAL dual-page devops-lead + founder, no auto-resolve); opens §23 SLA incident | `tenant_id` (UUID), `custom_domain_hash` (SHA-256), `expired_at` (ISO 8601 — `ssl_cert_expiry_at` value at detection time), `sla_incident_id` (UUID — §23 SLA incident; optional until §23 SLA credit engine wired at M11), `detected_by: 'pg_cron_job_32'` |
+| `tenant.white_label_revoked` | HIGH | 7 yr | Tenant ARR drops below $50k threshold (automated), customer requests removal, or non-payment; `tenant_white_label_domains.status` set to `'revoked'`; Cloudflare Custom Hostname deleted; emitter: `form_system` (automated ARR check) or platform-engineer (PAM-gated manual) | `tenant_id` (UUID), `custom_domain_hash` (SHA-256), `reason` (enum: `downgrade` \| `customer_request` \| `non_payment`), `revoked_by_pam_session` (UUID — no raw user_id), `effective_at` (ISO 8601) |
+| `system.white_label_cert_check_stale` | HIGH | 7 yr | pg_cron job 32 detects one or more active domains with `last_checked_at` > 26 hours — nightly check stale or failed; also co-emitted by `emit-audit-event` Worker on WL-CHAIN-01 violation (breach without warning) | `stale_tenant_count` (int ≥ 1 — count of active domains with `last_checked_at` > 26h; no individual `tenant_id` in payload), `detected_by: 'pg_cron_job_32'`, `checked_at` (ISO 8601) |
+
+**HMAC chain ordering (WL-CHAIN-01):** `tenant.white_label_cert_expiry_breach` without a prior `tenant.white_label_cert_expiry_warning` for the same `tenant_id` within 30 days → HTTP 422 + `system.white_label_cert_check_stale` co-emission. The weekly chain audit additionally flags any `tenant.white_label_cert_expiry_breach` without a preceding warning as a HIGH anomaly requiring compliance-officer review within 48 hours.
+
+**Emitter assignments:** `tenant.white_label_provisioned` — platform-engineer (PAM-gated, manual). `tenant.white_label_cert_expiry_warning`, `tenant.white_label_cert_renewed`, `tenant.white_label_cert_expiry_breach`, `system.white_label_cert_check_stale` — pg_cron job 32 (`form_system`, automated nightly). `tenant.white_label_revoked` — `form_system` (automated ARR-threshold check) or platform-engineer (PAM-gated for manual revocations).
+
+**Zod v2 schemas (canonical source for `emit-audit-event` Worker validation):**
+
+```typescript
+const TenantWhiteLabelProvisionedSchema = z.object({
+  tenant_id:                  z.string().uuid(),
+  custom_domain_hash:         z.string().regex(/^[a-f0-9]{64}$/),  // SHA-256(custom_domain) — OQ-WL-OBS-01
+  cloudflare_hostname_id:     z.string().max(128),
+  provisioned_by_pam_session: z.string().uuid(),
+  provisioned_at:             z.string().datetime(),
+});
+
+const TenantWhiteLabelCertExpiryWarningSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  custom_domain_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  days_to_expiry:     z.number().int().min(0).max(29),
+  ssl_cert_expiry_at: z.string().datetime(),
+  detected_by:        z.literal('pg_cron_job_32'),
+});
+
+const TenantWhiteLabelCertRenewedSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  custom_domain_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  old_expiry_at:      z.string().datetime(),
+  new_expiry_at:      z.string().datetime(),
+  renewed_by:         z.literal('cloudflare_auto_renewal'),
+});
+
+const TenantWhiteLabelCertExpiryBreachSchema = z.object({
+  tenant_id:          z.string().uuid(),
+  custom_domain_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  expired_at:         z.string().datetime(),
+  sla_incident_id:    z.string().uuid().optional(),
+  detected_by:        z.literal('pg_cron_job_32'),
+});
+
+const TenantWhiteLabelRevokedSchema = z.object({
+  tenant_id:              z.string().uuid(),
+  custom_domain_hash:     z.string().regex(/^[a-f0-9]{64}$/),
+  reason:                 z.enum(['downgrade', 'customer_request', 'non_payment']),
+  revoked_by_pam_session: z.string().uuid(),
+  effective_at:           z.string().datetime(),
+});
+
+const SystemWhiteLabelCertCheckStaleSchema = z.object({
+  stale_tenant_count: z.number().int().min(1),
+  detected_by:        z.literal('pg_cron_job_32'),
+  checked_at:         z.string().datetime(),
+});
+```
+
+**SOC 2 evidence artefacts:**
+
+| Artefact | SOC 2 criterion | Source | Retention |
+|---|---|---|---|
+| **WL-E-001** | A1.1 — no active-tenant cert expired during observation period | Annual export of `tenant.white_label_cert_renewed` chain events for all white-label tenants; `compliance/evidence/a1/WL-E-001_<YYYY>.csv` | 7 yr |
+| **WL-E-002** | CC7.2 — proactive detective control for cert expiry | AL-WL-03/04/05 PagerDuty config screenshots + 90-day incident history; `compliance/evidence/cc7/WL-E-002_<YYYY>.pdf` | 3 yr |
+| **WL-E-003** | CC7.2 — nightly monitoring demonstrated | pg_cron job 32 run history (180-day `system.white_label_cert_checked` event export); `compliance/evidence/cc7/WL-E-003_<YYYY>.pdf` | 3 yr |
+
+---
+
+### Enterprise DSAR deletion certificate events (DEC-030 HMAC-chained · DATA_MODEL §35 · P8.0/CC7.2)
+
+> Defined in `docs/DATA_MODEL.md §35.6`. Two DEC-030 HMAC-chained events covering the GDPR Art. 17 deletion certificate issuance and delivery lifecycle for enterprise tenants. Deletion certificates prove to the data subject (employee) and employer HR contact that a two-phase hard-delete has been completed — the certificate is HMAC-SHA256-signed with `ERASURE_CERT_SECRET` (256-bit, annual rotation per `docs/CRYPTOGRAPHY_POLICY.md §5`) and stored durably at R2 `form-dsar-certs/<tenant_id>/<certificate_id>.json`. **Privacy floor (both events):** No plaintext user email, name, or health data in any payload. `user_id_hash` = SHA-256(user_id + PSEUDONYM_SALT); `delivered_to_hash` = SHA-256(email + PSEUDONYM_SALT). Certificate payload (signed JSON) is never stored in Postgres — only `payload_hash` (SHA-256 of the signed certificate) is recorded in the DEC-030 chain and in `dsar_deletion_certificates`. The Admin Dashboard "DSAR & Erasure" panel (`docs/DATA_MODEL.md §35.8`) is accessible to `tenant_admin` and `tenant_owner` only — `tenant_manager` (HR role) is explicitly blocked. Cross-ref: `docs/DATA_MODEL.md §35` (canonical event definitions, Zod schemas, CERT-CHAIN-01 invariant); `docs/DATA_MODEL.md §31` (consumer DSAR `dsar_requests` table — `dsar_id` soft-ref); `docs/DATA_MODEL.md §12` (Art. 17 two-phase erasure — §35 adds the certificate step after Phase 2 verification); `docs/INCIDENT_RESPONSE.md R-05` (CERT-CHAIN-01 chain break → R-05 activation); `docs/OBSERVABILITY.md §37.12` (AL-DSAR-05 — authoritative SLO breach alert, `enterprise_sla_counters.dsar_slo_misses_this_quarter`). **Closes DATA_MODEL.md §35.10 checklist item 5 (P0, M5 — register `dsar.certificate_issued` and `dsar.certificate_delivered` in AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise with Zod schemas).**
+
+**CERT-CHAIN-01 ordering invariant:** The full DSAR erasure chain sequence is `dsar.deletion_soft` → `dsar.deletion_confirmed` → `dsar.certificate_issued` → `dsar.certificate_delivered`. `dsar.certificate_issued` without a preceding `dsar.deletion_confirmed` for the same `dsar_id` is rejected HTTP 422 (`CERT_CHAIN_01_VIOLATION`). `dsar.certificate_delivered` without a preceding `dsar.certificate_issued` for the same `certificate_id` is rejected HTTP 422. Any CERT-CHAIN-01 violation triggers R-05 (HMAC chain break response). The weekly chain audit additionally validates that every `dsar.certificate_issued` has a subsequent `dsar.certificate_delivered` within 48 hours + 1-hour tolerance; absence at the 49-hour mark triggers a P1 compliance alert.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `dsar.certificate_issued` | HIGH | 7 yr | `form-erasure-worker` completes Phase 2 deletion verification, calls `generateDeletionCertificate()` in `src/workers/erasure/certificate.ts`, R2 write succeeds, `dsar_deletion_certificates` metadata row inserted; emitter: `form_system` (automated, synchronous post-Phase-2) | `certificate_id` (UUID — PK of `dsar_deletion_certificates`), `dsar_id` (UUID — soft-ref to `dsar_requests`), `tenant_id` (UUID), `user_id_hash` (SHA-256), `deletion_type` (enum: `consumer_account` \| `enterprise_member_art17` \| `enterprise_employer_art15`), `tables_erased` (string[] min 1), `rows_deleted_total` (int ≥ 0), `erased_at` (ISO 8601), `payload_hash` (SHA-256 of signed certificate JSON), `r2_object_key` (regex: `^form-dsar-certs/[0-9a-f-]{36}/[0-9a-f-]{36}\.json$`) |
+| `dsar.certificate_delivered` | STANDARD | 7 yr | Resend `dsar-deletion-cert` email successfully delivered (0h delay for employee, 48h delay for employer HR contact per GDPR Art. 34 notification ordering); emitter: `form-erasure-worker` (`form_system`) on successful Resend delivery confirmation | `certificate_id` (UUID — FK to `dsar_deletion_certificates`), `tenant_id` (UUID), `delivery_channel` (enum: `dashboard` \| `email_data_subject` \| `email_employer_hr`), `delivered_to_hash` (SHA-256(email + PSEUDONYM_SALT) — nullable for dashboard-only delivery), `resend_message_id` (string max 128 — nullable for dashboard delivery) |
+
+**HMAC chain ordering (CERT-CHAIN-01):** Both events are validated by the `emit-audit-event` Worker against predecessor events via HTTP 422 on violation. The full four-event chain (`deletion_soft → deletion_confirmed → certificate_issued → certificate_delivered`) creates a tamper-evident, end-to-end Art. 17 accountability trail — from erasure initiation through certificate delivery — that satisfies SOC 2 P8.0 auditor requirements.
+
+**Emitter assignments:** `dsar.certificate_issued` — `form-erasure-worker` (`form_system`; automated; synchronous post-Phase-2 deletion; fail-closed — erasure Worker aborts if certificate issuance fails). `dsar.certificate_delivered` — `form-erasure-worker` (`form_system`; triggered on Resend delivery webhook confirmation).
+
+**Zod v2 schemas (canonical source: `docs/DATA_MODEL.md §35.7`; the schemas below are authoritative copies for the `emit-audit-event` Worker — update DATA_MODEL.md §35.7 first on any change):**
+
+```typescript
+const DsarCertificateIssuedSchema = z.object({
+  certificate_id:     z.string().uuid(),
+  dsar_id:            z.string().uuid(),
+  tenant_id:          z.string().uuid(),
+  user_id_hash:       z.string().regex(/^[a-f0-9]{64}$/),
+  deletion_type:      z.enum(['consumer_account', 'enterprise_member_art17', 'enterprise_employer_art15']),
+  tables_erased:      z.array(z.string()).min(1),
+  rows_deleted_total: z.number().int().min(0),
+  erased_at:          z.string().datetime(),
+  payload_hash:       z.string().regex(/^[a-f0-9]{64}$/),
+  r2_object_key:      z.string().regex(/^form-dsar-certs\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.json$/),
+});
+
+const DsarCertificateDeliveredSchema = z.object({
+  certificate_id:    z.string().uuid(),
+  tenant_id:         z.string().uuid(),
+  delivery_channel:  z.enum(['dashboard', 'email_data_subject', 'email_employer_hr']),
+  delivered_to_hash: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+  resend_message_id: z.string().max(128).nullable(),
+});
+```
+
+**SOC 2 evidence artefacts:**
+
+| Artefact | SOC 2 criterion | Source | Retention |
+|---|---|---|---|
+| **DSAR-E-011** | P8.0 — disposal confirmed to data subject with tamper-evident certificate | Quarterly export of `dsar.certificate_issued` chain events; `payload_hash` cross-checked against R2 object SHA-256; `compliance/evidence/dsar/DSAR-E-011_<YYYY-QN>.csv` | 7 yr |
+| **DSAR-E-012** | CC7.2 — automated SLO monitoring detects SLA breach without human trigger | AL-DSAR-05 PagerDuty incident history + pg_cron job 33 quarterly reset run log; `compliance/evidence/dsar/DSAR-E-012_<YYYY-QN>.pdf` | 3 yr |
+
+---
+
 ## Export & delivery
 
 Enterprise tenants can:
@@ -1655,6 +1788,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.8 · 2026-06-14 · owner: compliance-officer + security-engineer + enterprise-architect**
+*v2.8 (2026-06-14): +8 events across two new namespaces — `tenant.white_label_*` + `system.white_label_cert_check_stale` (OBSERVABILITY §42 · P0, M10) and `dsar.certificate_*` (DATA_MODEL §35 · P0, M5). (1) White-label custom domain & SSL certificate events (6 events, OBSERVABILITY §42.10, A1.1/CC7.2): `tenant.white_label_provisioned` (STANDARD, 7yr — WL-CHAIN-01 anchor; `custom_domain_hash` SHA-256 pending OQ-WL-OBS-01; `cloudflare_hostname_id`, `provisioned_by_pam_session`); `tenant.white_label_cert_expiry_warning` (HIGH, 7yr — pg_cron job 32; `days_to_expiry` int ≤ 29; `ssl_cert_expiry_at`; triggers AL-WL-03/04); `tenant.white_label_cert_renewed` (STANDARD, 7yr — Cloudflare auto-renewal confirmed; `old_expiry_at` → `new_expiry_at`); `tenant.white_label_cert_expiry_breach` (CRITICAL, 7yr — WL-SLO-01/02 breach; triggers §23 SLA incident; `sla_incident_id` optional until M11 credit engine wired; AL-WL-05 dual-page no-auto-resolve); `tenant.white_label_revoked` (HIGH, 7yr — `reason` 3-value enum; `revoked_by_pam_session`; CC6.3 access-removal evidence); `system.white_label_cert_check_stale` (HIGH, 7yr — pg_cron job 32 > 26h stale OR WL-CHAIN-01 breach-without-warning co-emission; `stale_tenant_count` aggregate, no `tenant_id`). WL-CHAIN-01: `tenant.white_label_provisioned` must precede all `tenant.white_label_cert_*` for same `tenant_id`; breach without warning in 30-day window → HTTP 422 `WL_CHAIN_01_VIOLATION` + `system.white_label_cert_check_stale` co-emission; R-05 on blocking violation. Six Zod v2 schemas provided. Three SOC 2 evidence artefacts: WL-E-001 (A1.1 — annual cert_renewed export), WL-E-002 (CC7.2 — AL-WL alert config + 90-day history), WL-E-003 (CC7.2 — pg_cron job 32 180-day run history). Retention table: +3 rows. Privacy floor all six events: `custom_domain_hash` SHA-256 only; `form_api` REVOKED from `tenant_white_label_domains`; no cross-tenant exports. Closes OBSERVABILITY.md §42.14 checklist item 1 (P0, M10). (2) Enterprise DSAR deletion certificate events (2 events, DATA_MODEL §35.6, P8.0/CC7.2): `dsar.certificate_issued` (HIGH, 7yr — `certificate_id`, `dsar_id`, `tenant_id`, `user_id_hash` SHA-256, `deletion_type` 3-value enum, `tables_erased`[], `rows_deleted_total`, `erased_at`, `payload_hash` SHA-256, `r2_object_key` regex-validated path `form-dsar-certs/<tenant_id>/<cert_id>.json`); `dsar.certificate_delivered` (STANDARD, 7yr — `certificate_id`, `tenant_id`, `delivery_channel` 3-value enum, `delivered_to_hash` SHA-256 nullable, `resend_message_id` nullable). CERT-CHAIN-01 ordering invariant: `dsar.deletion_soft` → `dsar.deletion_confirmed` → `dsar.certificate_issued` → `dsar.certificate_delivered`; all predecessor checks enforced HTTP 422; chain break triggers R-05; weekly audit validates `certificate_issued` followed by `certificate_delivered` within 48h + 1h tolerance. Two Zod v2 schemas provided (canonical: DATA_MODEL.md §35.7). Two SOC 2 evidence artefacts: DSAR-E-011 (P8.0 — quarterly `dsar.certificate_issued` export with R2 payload_hash cross-check; 7yr), DSAR-E-012 (CC7.2 — AL-DSAR-05 PagerDuty history + pg_cron job 33 quarterly reset; 3yr). Retention table: +2 rows (both 7yr — `dsar.certificate_delivered` STANDARD 7yr justified: delivery record completes CERT-CHAIN-01 and must cover multi-year SOC 2 observation windows). Privacy floor both events: no plaintext user email or name; `user_id_hash`/`delivered_to_hash` SHA-256 + PSEUDONYM_SALT; certificate payload (signed JSON) never in Postgres; `tenant_manager` (HR) blocked from Admin Dashboard "DSAR & Erasure" panel. Closes DATA_MODEL.md §35.10 checklist item 5 (P0, M5). Cross-ref: OBSERVABILITY.md §42.10 (white-label canonical events), §42.14 (WL-E-001–003 evidence paths), §23 (SLA credit engine `sla_incident_id`); DATA_MODEL.md §35.6 (DSAR cert canonical definitions), §35.7 (canonical Zod schemas), §35.8 (Admin Dashboard panel), §35.9 (OQ-DSAR-04 — HMAC-SHA256 signing); INCIDENT_RESPONSE.md R-05 (WL-CHAIN-01 + CERT-CHAIN-01 violations); ENTERPRISE.md §Branding (≥ $50k ARR gate). Owner: compliance-officer + security-engineer + enterprise-architect.*
 
 **v2.7 · 2026-06-14 · owner: compliance-officer + security-engineer + enterprise-architect**
 *v2.7 (2026-06-14): +4 `enterprise.partner_*` partner channel events — closes COST_MODEL.md §38.10 checklist item 1 (P0, M10 — register all four DEC-030 events before first partner agreement is signed). New section `### Enterprise partner channel events (DEC-030 HMAC-chained · COST_MODEL §38.8)` inserted after `### Enterprise renewal & churn lifecycle events`. (1) `enterprise.partner_agreement_signed` (STANDARD, 7yr): compliance-officer or founder emits at agreement execution; Zod v2 schema — `partner_id` (UUID FK `enterprise_partners.id`), `partner_category` (4-value enum), `revenue_share_pct` (float 0–45), `agreement_doc_ref` (internal ID — no company name), `dpa_signed` (boolean — `z.literal(true)` required for reseller/integration; HTTP 422 on false); `created_by_pam_session` UUID. (2) `enterprise.partner_revenue_share_paid` (HIGH, 7yr): compliance-officer manual only — no automated path; hard invariant `privacy_floor_check_passed: z.literal(true)` — HTTP 422 `PART_PAY_FLOOR_CHECK` if false or absent; `partner_id`, `period_start`/`period_end` (ISO 8601 dates), `attributed_arr_usd`, `share_amount_usd`, `payment_method` (2-value enum), `paid_by_pam_session`. (3) `enterprise.partner_deal_attributed` (STANDARD, 7yr): founder or form_system at S5 close with `attributed_to_partner_id` set; `partner_id`, `deal_id` (internal UUID — never shared externally), `tier` (3-value enum), `acv_usd`, `attribution_type` (4-value enum), `sales_cycle_days` (positive integer — §38.5.1 CAC velocity). (4) `enterprise.partner_offboarded` (HIGH, 7yr): compliance-officer manual only; `partner_id`, `termination_reason` (5-value enum), `outstanding_share_usd`, `dispute_open`, `privacy_incident_ref` (string or null — required non-null when `termination_reason = 'privacy_floor_breach'`; HTTP 422 if null for that reason), `offboarded_by_pam_session`. PART-CHAIN-01 ordering invariant: `enterprise.partner_offboarded` with `termination_reason = 'privacy_floor_breach'` or `'no_go_criteria_violation'` must be preceded in chain by `privacy.floor_breach_detected` for affected `tenant_id` within 12 months prior; HTTP 422 `PART_CHAIN_01_VIOLATION` on violation → R-05. Three SOC 2 evidence artefacts defined: PART-E-001 (CC9.2 — annual `partner_agreement_signed` export), PART-E-002 (CC9.2/CC4.1 — annual `partner_revenue_share_paid` export with `privacy_floor_check_passed: true`), PART-E-003 (CC9.2/CC7.4 — `partner_offboarded` observation-period export). All four Zod v2 schemas provided (canonical source for `emit-audit-event` Worker validation; `form_api` REVOKED on `enterprise_partners` table). Retention table: +2 rows (`enterprise.partner_agreement_signed` + `enterprise.partner_deal_attributed` STANDARD 7yr; `enterprise.partner_revenue_share_paid` + `enterprise.partner_offboarded` HIGH 7yr). Cross-ref: `docs/COST_MODEL.md §38.8` (canonical event definitions and Zod schemas), §38.9 (SOC 2 evidence artefacts PART-E-001–003), §38.10 item 1 (P0 checklist — closed by this patch); `docs/INCIDENT_RESPONSE.md R-22` (privacy floor breach — PART-CHAIN-01 predecessor event); `docs/ENTERPRISE.md` (partner no-go criteria). Privacy floor (all four events): no `user_id`, no health values, no coaching content, no partner contact names; `deal_id` is FORM-internal UUID never surfaced to any partner. Owner: compliance-officer + enterprise-architect.*

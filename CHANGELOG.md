@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [4.97.1] — 2026-06-14
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.7 → v2.8: +8 DEC-030 HMAC-chained events across two new sections. (1) White-label custom domain & SSL certificate events (`tenant.white_label_provisioned`, `tenant.white_label_cert_expiry_warning`, `tenant.white_label_cert_renewed`, `tenant.white_label_cert_expiry_breach` CRITICAL, `tenant.white_label_revoked`, `system.white_label_cert_check_stale`) — closes OBSERVABILITY.md §42.14 checklist item 1 (P0, M10); WL-CHAIN-01 invariant + six Zod v2 schemas + WL-E-001/002/003 evidence artefacts; +3 retention table rows. (2) Enterprise DSAR deletion certificate events (`dsar.certificate_issued` HIGH, `dsar.certificate_delivered` STANDARD) — closes DATA_MODEL.md §35.10 checklist item 5 (P0, M5); CERT-CHAIN-01 chain extension (`deletion_soft → deletion_confirmed → certificate_issued → certificate_delivered`); two Zod v2 schemas + DSAR-E-011/012 evidence artefacts; +2 retention table rows.
+- `VERSION` — 4.97.0 → 4.97.1.
+
+---
+
 ## [4.97.0] — 2026-06-14
 
 ### Added
