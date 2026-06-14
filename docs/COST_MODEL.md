@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.3
+# FORM · Cost Model & Unit Economics v2.4
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -238,6 +238,18 @@
     - 37.9 DEC-030 HMAC-Chained Audit Events
     - 37.10 Implementation Checklist
     - 37.11 Open Questions (OQ-PIPE-01 to OQ-PIPE-03)
+38. [Enterprise Partner Channel & Reseller Economics](#38-enterprise-partner-channel--reseller-economics)
+    - 38.1 Purpose & Scope
+    - 38.2 Partner Category Taxonomy
+    - 38.3 Partner Acquisition & Enablement Cost Model
+    - 38.4 Revenue Share Model by Partner Type
+    - 38.5 Partner Economics vs. Direct Sales Comparison
+    - 38.6 Partner Program Governance & Privacy Floor
+    - 38.7 `enterprise_partners` Postgres Schema
+    - 38.8 DEC-030 HMAC-Chained Events
+    - 38.9 SOC 2 Evidence Mapping
+    - 38.10 Implementation Checklist
+    - 38.11 Open Questions (OQ-PART-01 to OQ-PART-03)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -8936,4 +8948,485 @@ z.object({
 ---
 
 *v2.2 (2026-06-12): §36 Enterprise Implementation Cost Deep-Dive: Engineering, CS & Legal Time Model — bottom-up derivation of per-deal implementation cost using hourly rates from §26 (CSM model) and §27 (engineering model). §36.1 scopes to one-time implementation cost only (ongoing CS in §26; infrastructure COGS in §15). §36.2 six-work-stream activity taxonomy (identity integration, tenant provisioning, white-label, training, pilot management, compliance/legal). §36.3 engineering hour model by tier: SSO/SCIM setup (4.5h Starter / 8.5h Growth / 11.5h Enterprise non-EU) + tenant provisioning (2.5h all) + white-label (2.0h Growth+); per-tier engineering cost $437.50 / $812.50 / $1,000.00 at $62.50/hr (§27.2 founding engineer rate). §36.4 CS hour model by tier: training + admin onboarding (9.0h / 14.5h / 22.5h) + pilot management (6.0h / 10.0h / 16.0h) = 15.0h / 24.5h / 38.5h; per-tier CS cost $661.95 / $1,081.19 / $1,699.01 at $44.13/hr (fully-loaded CSM rate — more accurate than §26.8's base-only $37.50/hr for margin analysis). §36.5 legal/compliance model: MSA (template deal: 2h internal + $300 counsel), DPA (1h internal), ISQ response (3h / 5h / 9h by tier), security review call (0h / 1h / 2h) — total internal 6h / 9h / 14h + $300 counsel all tiers. §36.6 bottom-up cost summary: Starter $1,399 / Growth $2,194 / Enterprise $2,999 (cash, non-EU, template deal); variance vs. §8.2 midpoints: +22% / +46% / +50% — ISQ response time and fully-loaded CS rate are primary drivers of gap; EU premium +$362.50 all tiers. §36.7 implementation cost as % ACV: 19.4% at 50-seat Starter falling to 0.8% at 5,000-seat Enterprise; Year 1 GM impact vs. §16.1: Starter 50-seat −3.5pp (39.9%), Growth 200-seat −3.3pp (71.6%), Enterprise 1,000-seat −1.4pp (83.8%); 50-seat Starter minimum deal floor remains defensible (implementation cost recovered in 2.3 months of gross profit; 3-year LTV recovery 17.5×). §36.8 multi-deal scale economics: MSA template + ISQ master construction are fixed front-loaded costs in Deals 1–3 (→ 15–20% cost reduction by Deal 6); founding engineer implementation load ~36h for 3-deal Year 1 pipeline = 4.5% of 6-month capacity (not a bottleneck); non-standard IdP premium table (+$0 to +$750 by IdP type; legacy IdP may warrant a line-item fee in order form). §36.9 time-tracking instrument: `enterprise_impl_time_log` Postgres table with 12 `activity_code` values, RLS (compliance_reviewer + form_admin read; form_system write), deal_sequence column; cost extraction query; OQ-08 closure protocol (3 deals logged → §8.2 update → DEC-030 emission → DECISION_LOG entry). §36.10 three new DEC-030 events: `enterprise.implementation_kickoff_completed` (STANDARD, 7yr), `enterprise.sso_scim_setup_verified` (STANDARD, 7yr — idp_type + sso_modes_verified + scim_features_enabled + eu_data_residency_confirmed), `enterprise.implementation_cost_model_calibrated` (STANDARD, 7yr — OQ-08 closure trigger; aggregate cost data only). §36.11 nine-item implementation checklist: 4× P0/M8–M9 (DEC-030 registration, table DDL, extraction query, time-logging start at Deal 1), 3× P1/M14–M15 (Deal 3 variance analysis + §8.2 update + DEC-030 emission + non-IdP per-IdP tracking), 2× P2/M13–M14 (IdP fee decision + §16.1 table update). §36.12 three open questions (OQ-IMPL-01/02/03). TOC updated. §11 OQ-08 tracking instrument now in place — full closure per §36.9.3 after Deal 3. Cross-references: §8.2 (implementation cost summary — to be updated post OQ-08 closure); §11 OQ-08 (original open question); §15.5–15.7 (enterprise infrastructure COGS — near-zero; implementation is the true cost); §16.1 (break-even table — Year 1 GM updated in §36.7.2); §26 (CSM cost model — ongoing cost, not one-time); §26.3 / §26.8 (CSM rate basis); §27.2 (engineering rate basis); §31.3 (enterprise price derivation — fully-loaded GM cross-check); `docs/ENTERPRISE_ONBOARDING.md` (operational playbook — §36 provides the financial model behind the same timeline); `docs/SSO_SCIM_IMPLEMENTATION.md §4` (IdP configuration playbook — time basis for §36.3.1); `docs/SSO_CLIENT_CONFIG.md` (per-IdP guides — non-standard IdP premium §36.8.3 cross-ref); `docs/AUDIT_LOG_SCHEMA.md` (three new DEC-030 events to register — P0 before Deal 1). Owner: enterprise-architect + customer-success + data-engineer + compliance-officer.*
+
+
+---
+
+## 38. Enterprise Partner Channel & Reseller Economics
+
+### 38.1 Purpose & Scope
+
+> Cross-references: `docs/ENTERPRISE.md` (sales process; no-go criteria), §19 (GTM financial model — direct sales basis), §26 (CSM cost model), §36 (implementation cost — partner deals reuse the same kickoff playbook), §37.11 OQ-PIPE-03 (partner-sourced deal attribution — deferred here until first partner deal). Owner: customer-success + enterprise-architect + compliance-officer. Review: at first partner deal closed; annually thereafter.
+
+Section §37 defines FORM's six-stage enterprise pipeline for **direct sales** (founder or AE-led). It explicitly defers partner-channel attribution to "OQ-PIPE-03 — when first partner deal occurs." This section builds the economic framework before that moment, so FORM is not designing a revenue-share model under time pressure during a live deal negotiation.
+
+**What this section adds that §37 and §19 do not:**
+
+1. **Partner category taxonomy** — four distinct partner types with different margin profiles, integration depths, and governance requirements.
+2. **Partner-enabled CAC model** — how partner-sourced CAC compares to founder-direct CAC by deal tier, and what pipeline acceleration discount to apply when a warm partner introduction shortens sales cycle.
+3. **Revenue share economics** — referral fee, reseller margin, and white-label revenue share, with gross margin impact per tier.
+4. **Partner program governance** — tier structure, privacy floor enforcement in partner agreements, and no-go partner criteria (consistent with `docs/ENTERPRISE.md §When we say no`).
+5. **DEC-030 audit trail** — four HMAC-chained events covering partner agreement execution, deal attribution, revenue share payment, and partner offboarding.
+6. **`enterprise_partners` Postgres schema** — the lightweight table that tracks active partner agreements and attribution state before a CRM is adopted.
+7. **SOC 2 evidence** — partner agreement records satisfy CC9.2 (vendor and partner management).
+
+**Not in scope:** CRM integration with partner portals (post-Series A); affiliate link tracking for consumer tier (§28 marketing model); investor referral programmes (no revenue share — investor relations only).
+
+**Privacy floor note:** Partner contacts are B2B counterparties, not end users. No individual employee health data is disclosed to any partner. The privacy floor defined in `docs/ENTERPRISE.md §Privacy floor for enterprise` applies to all joint enterprise customers introduced by partners — the partner has no access to aggregate tenant dashboards on the customer's behalf.
+
+**No-go partners (inherits ENTERPRISE.md §When we say no):**
+- Insurance companies requesting risk-scoring data on employees → declined at partner agreement stage.
+- Any partner whose contractual use case requires manager-level reports on direct reports.
+- EAP platforms that require FORM to make individual health data available to employer HR as part of the integration.
+- Government-adjacent resellers requiring backdoor data access or state-mandated access clauses.
+
+---
+
+### 38.2 Partner Category Taxonomy
+
+FORM recognises four partner categories. Each has a distinct commercial model, integration depth, and margin profile.
+
+| Category | Description | Example partners | Integration depth | Revenue model |
+|---|---|---|---|---|
+| **Referral Partner** | Warm introduction to a qualified enterprise buyer; no co-sell or proposal involvement | HR consultants, fitness/wellness influencers with corporate audience, employee benefits advisors | Light — referral link or named intro email; FORM closes the deal independently | One-time referral fee: 10–15% of first-year ACV, paid at contract signing |
+| **Reseller / Co-sell Partner** | Partner is part of the sales process — handles discovery or pilot logistics; may appear on the customer's purchase order | Benefits brokers, EAP platforms reselling or bundling FORM, HR tech distributors | Medium — partner is named in the order form; FORM white-labels onboarding materials for partner's brand | Ongoing revenue share: 20–25% of ACV for the contracted term (max 3 years); partner invoices FORM monthly |
+| **Integration Partner** | Wearable platform or productivity tool whose native integration with FORM creates a data-layer or workflow advantage that neither party can replicate alone | Whoop, Garmin Health (enterprise API), benefits admin platforms with SSO federation | High — API-level integration agreement; FORM engineering required; DPA cross-reference; joint implementation playbook | Attribution-based revenue share: 15% of ACV for deals where the integration is cited as a selection driver (tracked via `attributed_to_partner_id` in deal record); capped at 3 years |
+| **White-Label Reseller** | Partner sells FORM under their own brand to their own enterprise clients; FORM operates as the underlying platform | Large EAP networks, corporate wellness aggregators (non-risk-scoring) | Very high — white-label tier required ($50k ARR threshold per `docs/ENTERPRISE.md §Branding`); full SSO/SCIM config; custom domain; joint DPA | Gross revenue share: 30–40% of contracted ACV; minimum deal ACV $50k; separate white-label MSA addendum required |
+
+**Tier eligibility notes:**
+- Referral partners can introduce any FORM tier (Starter, Growth, Enterprise) but their fee scales only with first-year ACV — they have no incentive to upsell beyond the first year.
+- White-label resellers are restricted to the Enterprise tier (1,000+ seats) and require the $50k ARR white-label threshold to be met by the end of the first contract year; below this threshold, the "Powered by FORM" footer remains active.
+- No partner category may override the Privacy Floor or the no-go criteria. These restrictions are written into the Partner Agreement template as non-negotiable clauses (§38.6.2).
+
+---
+
+### 38.3 Partner Acquisition & Enablement Cost Model
+
+Partners are not "free" CAC. Each partner relationship has an acquisition cost (recruiting and vetting the partner) and an ongoing enablement cost (training, collateral, joint QBRs, co-marketing). These costs must be included in the fully-loaded CAC calculation for partner-sourced deals.
+
+#### 38.3.1 Partner recruitment cost
+
+| Activity | Estimated time (founder/CSM hours) | Estimated cost at §26.3/$44.13/hr or §27.2/$62.50/hr | Notes |
+|---|---|---|---|
+| Partner identification & outreach (per candidate) | 2h founder | $125.00 [ESTIMATE] | Outreach to 3–5 candidates per 1 signed partner |
+| Partner qualification call & due diligence | 3h founder | $187.50 [ESTIMATE] | Includes company review, reference check, no-go criteria assessment |
+| Partner Agreement negotiation & legal review | 4h founder + 2h outside counsel ($400/hr) | $250.00 + $800.00 = **$1,050.00** [ESTIMATE] | MSA addendum or standalone Partner Agreement; outside counsel for first partner agreement template; reuse thereafter |
+| Privacy floor briefing & compliance check | 1h compliance-officer + 1h founder | $44.13 + $62.50 = **$106.63** [ESTIMATE] | Required for all partners; compliance-officer confirms no-go criteria and DPA scope |
+| **Total per signed partner** | — | **~$1,469** (first template) / **~$669** (reuse) | First partner agreement absorbs the template legal cost; subsequent use the template |
+
+**Template reuse economics:** After the first Partner Agreement template is drafted (Deal P-001), subsequent partner agreements use the same template with variable fields populated (partner name, revenue share rate, deal tier scope, term). Legal review time drops to < 1h for substantially similar partners. The $800 counsel cost appears only once in the deal sequence, not per partner.
+
+#### 38.3.2 Partner enablement cost (annual, per active partner)
+
+| Activity | Time per partner per year | Cost at blended CSM rate ($44.13/hr) | Notes |
+|---|---|---|---|
+| Partner onboarding & portal setup | 8h (one-time; amortized at 5yr partner life = 1.6h/yr) | $70.61/yr | Sales collateral, demo access, FORM product walkthrough |
+| Quarterly partner business review (QBR) | 2h × 4 quarters | $352.00/yr | Revenue reconciliation, pipeline review, privacy floor compliance check |
+| Joint sales calls (co-sell partners only) | 3h per qualified deal × estimated 2 deals/yr | $264.78/yr | Referral partners: $0 (no joint selling). White-label: higher (see §38.3.3) |
+| Deal attribution reconciliation | 1h/quarter | $176.60/yr | Matching `enterprise_partners.partner_id` to `enterprise_pipeline_stages.attributed_to_partner_id` |
+| Compliance review (partner agreement refresh) | 2h/yr | $88.26/yr | Annual check: privacy floor compliance, DPA status, no-go criteria re-assessment |
+| **Total annual enablement per active partner** | ~18h/yr | **~$952/yr** [ESTIMATE] | Referral partners ≈ $600/yr (no joint sales calls); White-label ≈ $1,400/yr (more QBR depth) |
+
+#### 38.3.3 White-label partner enablement premium
+
+White-label partners require a higher enablement investment due to:
+- Joint implementation project management (§36 implementation cost applies in full, borne by FORM)
+- Quarterly white-label branding asset review (§42 OBSERVABILITY — domain cert lifecycle)
+- Dedicated slack channel and escalation path (P0 response SLA < 30 min)
+- Annual DPA review with partner's DPO
+
+Additional enablement cost per white-label partner per year: **+$2,000–$3,500** [ESTIMATE].
+
+---
+
+### 38.4 Revenue Share Model by Partner Type
+
+Revenue share economics for a representative deal by tier. All figures reference the §16.1 break-even table and §8 enterprise economics.
+
+#### 38.4.1 Referral partner — one-time fee model
+
+Fee = 10–15% of first-year ACV, paid at contract signing (not at renewal).
+
+| FORM tier | Seats | ACV (base case; §31.3) | Referral fee (12.5% mid-point) | FORM net ACV Y1 | FORM GM at 75% (§16.1) | GM after referral fee |
+|---|---|---|---|---|---|---|
+| Starter | 50 | $7,200 | $900 | $6,300 | $5,400 | $4,500 |
+| Starter | 150 | $21,600 | $2,700 | $18,900 | $16,200 | $13,500 |
+| Growth | 300 | $32,400 | $4,050 | $28,350 | $24,300 | $20,250 |
+| Enterprise | 1,000 | $96,000 | $12,000 | $84,000 | $72,000 | $60,000 |
+
+**Key observation:** Even at the 15% referral ceiling, FORM's Y1 gross margin on a partner-sourced deal exceeds a direct-sourced deal net of CAC — because direct-sourced deals carry $1,399–$2,999 in one-time implementation cost plus $3,000–$8,000 in founder sales time (at §27.2 opportunity cost rate of $62.50/hr × 48–128h for a full S0→S5 cycle). The referral fee is a flat % of ACV with no variable cost; the partner bears the lead-generation overhead.
+
+**Renewal economics:** Referral fee is **one-time** (first-year ACV only). In Y2+ the deal is fully direct (100% ACV net to FORM). This creates a natural incentive for referral partners to keep introductions warm and introduce new deals rather than extracting value from existing renewals — the commercial model is aligned with FORM's NRR goals.
+
+#### 38.4.2 Reseller / co-sell partner — ongoing revenue share model
+
+Revenue share = 20–25% of ACV for contracted term (max 3 years). FORM invoices the end customer directly; partner invoices FORM monthly for their share.
+
+| FORM tier | Seats | ACV | Partner share (22.5% mid) | FORM net ACV/yr | FORM GM contribution (75% → adjusted) | Y2 NRR impact if partner churns customer |
+|---|---|---|---|---|---|---|
+| Growth | 300 | $32,400 | $7,290/yr | $25,110/yr | $18,833/yr (~73% adj. GM) | −$25,110 ARR (partner re-signs or FORM absorbs direct) |
+| Enterprise | 1,000 | $96,000 | $21,600/yr | $74,400/yr | $55,800/yr (~73% adj. GM) | −$74,400 ARR |
+
+**Margin note:** At 22.5% ongoing revenue share, FORM's effective gross margin on reseller deals falls from ~75% to ~58% (22.5pp share + same infrastructure COGS). This is material. The trade-off is pipeline velocity: a reseller-sourced deal has a shorter S0→S5 cycle because the reseller's existing trust relationship with the customer eliminates 2–3 months of qualification and pilot gate uncertainty. If a direct-sourced deal costs FORM $3,000–$8,000 in founder time, a reseller-sourced deal closing 60 days faster recovers approximately $5,000–$10,000 in opportunity cost — which partially offsets the ongoing margin reduction.
+
+**Term cap:** 3-year revenue share maximum. On contract renewal after year 3, FORM renegotiates the revenue share downward (target: 10–15% for continuation) or transitions the customer to a direct relationship if the reseller is not actively managing the account.
+
+#### 38.4.3 White-label reseller — gross revenue share model
+
+Revenue share = 30–40% of contracted ACV. White-label minimum deal: $50k ARR.
+
+| FORM tier | Seats | ACV | Partner share (35% mid) | FORM net ACV/yr | Infrastructure COGS (§15.7) | FORM adj. GM contribution |
+|---|---|---|---|---|---|---|
+| Enterprise | 1,500 | $144,000 | $50,400/yr | $93,600/yr | $2,160/yr | **$91,440/yr (~63% adj. GM)** |
+| Enterprise | 5,000 | $360,000 | $126,000/yr | $234,000/yr | $7,200/yr | **$226,800/yr (~65% adj. GM)** |
+
+**White-label margin floor:** Even at 40% revenue share, white-label Enterprise deals produce ≥ 60% adjusted gross margin because the infrastructure COGS (§15.7) is near-zero (< 1.5% of ACV at these seat counts). The higher partner share is offset by: (a) lower direct sales cost (the partner owns the relationship); (b) lower CSM overhead (partner's account team handles tier-1 support); (c) lower implementation cost (partner's IT team leads SSO/SCIM setup with FORM support only). Effective implementation cost for FORM on a white-label deal: approximately $500–$800 (50% reduction vs. §36.6.1 Enterprise non-EU figure of $2,999).
+
+---
+
+### 38.5 Partner Economics vs. Direct Sales Comparison
+
+#### 38.5.1 CAC comparison — Growth 300-seat deal
+
+| Metric | Direct sales (founder-led) | Referral partner | Reseller / co-sell partner |
+|---|---|---|---|
+| **Total CAC** | $4,399–$11,000 [ESTIMATE] | $2,700 + $669 partner cost = **$3,369** | $7,290 Y1 share + $952 enablement = **$8,242** |
+| **Sales cycle (S0→S5)** | 5–7 months (§37.2) | 3–4 months (warm intro compresses S0→S1 and S1→S2) | 3–5 months (reseller handles qualification) |
+| **Y1 gross margin contribution** | $24,300 (at 75%) | $20,250 (after referral fee; §38.4.1) | $18,833 (at 73% adj. GM; §38.4.2) |
+| **CAC payback period** | 2.2–5.4 months | **2.0 months** | **5.3 months** |
+| **Y3 cumulative GM** (NRR 110%) | $80,190 | $73,913 (referral fee one-time) | **$62,175** (ongoing revenue share erodes Y2/Y3) |
+| **LTV:CAC** (3yr) | 7.3–18.2× | **21.9×** | **7.5×** |
+
+**Interpretation:**
+- Referral partners offer the best LTV:CAC ratio (21.9×) because their one-time fee is a small fraction of multi-year deal value.
+- Reseller/co-sell partners have a lower cumulative GM due to ongoing revenue share, but their pipeline acceleration value is real — a 2-month shorter sales cycle frees the founder for the next deal.
+- The breakeven for preferring a reseller partner over a direct deal (on a 3-year basis) occurs when the founder's time saving > the cumulative revenue share cost. At $62.50/hr and 60 hours saved, the time value is $3,750 — which is less than the $21,873 total revenue share paid over 3 years. **Reseller partners are therefore economically optimal only when they add deal access FORM cannot generate independently** (e.g., a benefits broker whose enterprise client base has no direct relationship with FORM).
+
+#### 38.5.2 Partner-sourced pipeline as % of total ARR targets
+
+From §37.5 ARR build table (base case):
+
+| Year | ARR target (base) | Partner-sourced share target | Rationale |
+|---|---|---|---|
+| Y1 | $216,000 | 0% (0 deals) | No partner agreements signed; direct only |
+| Y2 | $936,000 | 10–15% ($94k–$140k) | 1–2 referral or reseller partners signed in H2 Y1; pipeline contribution begins in Y2 |
+| Y3 | $2,376,000 | 20–25% ($475k–$594k) | Partner channel maturing; white-label pilot possible |
+
+These are planning targets, not commitments. **Partner-channel ARR must not exceed 40% of total ARR by Year 3** — over-dependence on a single channel creates negotiation leverage risk at partner contract renewal (a reseller carrying 20%+ of FORM's ARR can demand higher revenue share at renewal).
+
+---
+
+### 38.6 Partner Program Governance & Privacy Floor
+
+#### 38.6.1 Partner tier structure
+
+| Tier | Qualification criteria | Benefits | Review cadence |
+|---|---|---|---|
+| **Bronze** | 1 closed-won deal attributed to partner | Named in partner directory (internal); access to FORM sales collateral portal | Semi-annual |
+| **Silver** | ≥ 3 closed-won deals OR ≥ $100k ARR attributed | Priority CSM escalation path; joint co-marketing (case study with partner logo — no customer logos/data) | Quarterly |
+| **Gold** | ≥ $500k ARR attributed OR white-label agreement in force | Dedicated partner success manager; product roadmap input sessions; NDA-gated roadmap preview | Monthly partner QBR |
+
+**Tier freeze policy:** A partner that fails to introduce a qualified deal within 12 months of signing is placed on "inactive" status. Revenue share accruals pause; partner may re-activate by introducing a qualified deal. This prevents FORM from paying enablement costs on non-performing partners.
+
+#### 38.6.2 Privacy floor in partner agreements
+
+The Partner Agreement template includes the following non-negotiable clauses (drafted at signing; cannot be waived at any revenue share level):
+
+1. Partner may not request, receive, or process individual employee health data on behalf of any FORM enterprise customer. Aggregate-only metrics (activation rate, engagement score) are permissible only where the partner is acting as the customer's authorised representative under a documented DPA addendum.
+2. Partner may not represent to any customer that FORM will provide employer-level access to individual user data as part of the commercial relationship.
+3. Partner agrees to FORM's no-go criteria (§38.1) and will not propose FORM to prospects whose use case violates those criteria.
+4. Partner DPA: all partners that receive any personal data incidental to deal management (contact names, email addresses of customer employees used in pilot coordination) are required to execute FORM's standard Partner DPA before receiving that data.
+
+**Enforcement mechanism:** Violation of any clause above is grounds for immediate partner agreement termination with no revenue share payment for the current quarter. The `enterprise.partner_offboarded` DEC-030 event (§38.8.4) records the termination and reason. If the violation involved individual health data exposure, it triggers INCIDENT_RESPONSE.md R-22 (Privacy Floor Breach protocol) in addition.
+
+#### 38.6.3 Revenue share payment governance
+
+Revenue share is paid quarterly, 30 days after quarter close. Payment requires:
+1. Partner invoice submitted to `legal@form.coach`
+2. FORM internal reconciliation: `enterprise_partners.attributed_arr_usd` vs. partner's invoice amount
+3. Compliance-officer review: confirm no privacy floor violations reported in the quarter
+4. `enterprise.partner_revenue_share_paid` DEC-030 event emitted before payment is released (§38.8.2)
+5. Payment processed via Stripe Payout or wire transfer
+
+**Revenue share disputes:** If partner disputes the attributed ARR figure, the `enterprise_partners.deal_attribution_log` JSONB field provides the authoritative record. The DEC-030 `enterprise.partner_deal_attributed` events for the disputed quarter are the tamper-evident audit trail. Disputes must be raised within 30 days of the quarterly statement; after 30 days, the FORM reconciliation is final.
+
+---
+
+### 38.7 `enterprise_partners` Postgres Schema
+
+This table tracks active partner agreements, attribution state, and revenue share balances before a CRM is adopted (OQ-PIPE-02 in §37.11).
+
+```sql
+-- Migration: 0073_enterprise_partners.sql
+-- Owners: compliance_reviewer (SELECT), form_admin (SELECT), form_system (INSERT/UPDATE)
+-- form_api: REVOKED (partner data never exposed via public API)
+
+CREATE TYPE partner_category_enum AS ENUM (
+  'referral',
+  'reseller',
+  'integration',
+  'white_label'
+);
+
+CREATE TYPE partner_status_enum AS ENUM (
+  'active',
+  'inactive',       -- No deal introduced in last 12 months
+  'suspended',      -- Privacy floor violation under investigation
+  'terminated'      -- Agreement terminated; no future revenue share
+);
+
+CREATE TABLE enterprise_partners (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_name              TEXT NOT NULL,
+  partner_category          partner_category_enum NOT NULL,
+  status                    partner_status_enum NOT NULL DEFAULT 'active',
+
+  -- Agreement terms
+  revenue_share_pct         NUMERIC(5,2) NOT NULL CHECK (revenue_share_pct BETWEEN 0 AND 45),
+  agreement_signed_at       TIMESTAMPTZ NOT NULL,
+  agreement_expires_at      TIMESTAMPTZ,           -- NULL = open-ended (referral only)
+  agreement_doc_ref         TEXT NOT NULL,         -- e.g. 'compliance/partners/p-001-acme-partner-agreement.pdf'
+  dpa_signed_at             TIMESTAMPTZ,           -- NULL for referral partners with zero PII transfer
+  dpa_doc_ref               TEXT,
+
+  -- Attribution tracking
+  attributed_arr_usd        NUMERIC(12,2) NOT NULL DEFAULT 0,   -- Rolling total ARR attributed to this partner
+  attributed_deal_count     INTEGER NOT NULL DEFAULT 0,
+  deal_attribution_log      JSONB NOT NULL DEFAULT '[]',        -- [{deal_id, signed_at, acv_usd, tier}]
+
+  -- Revenue share accounting
+  total_share_paid_usd      NUMERIC(12,2) NOT NULL DEFAULT 0,
+  last_payment_at           TIMESTAMPTZ,
+  next_payment_due_at       TIMESTAMPTZ,
+
+  -- Privacy floor compliance
+  privacy_floor_violation_at  TIMESTAMPTZ,         -- SET if termination reason = 'privacy_floor_breach'
+  termination_reason          TEXT,                -- Populated on status = 'terminated'
+
+  -- Audit
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by                UUID NOT NULL           -- PAM session ID (compliance-officer or founder only)
+);
+
+-- Prevent revenue share payment after termination
+ALTER TABLE enterprise_partners
+  ADD CONSTRAINT chk_ep_no_payment_after_termination
+  CHECK (
+    status != 'terminated'
+    OR last_payment_at < agreement_expires_at
+    OR agreement_expires_at IS NULL
+  );
+
+-- Partial index: active partners with upcoming payment
+CREATE INDEX idx_ep_active_payment_due
+  ON enterprise_partners (next_payment_due_at)
+  WHERE status = 'active';
+
+-- RLS
+ALTER TABLE enterprise_partners ENABLE ROW LEVEL SECURITY;
+
+-- compliance_reviewer: read all (SOC 2 CC9.2 evidence)
+CREATE POLICY ep_compliance_read ON enterprise_partners
+  FOR SELECT TO compliance_reviewer USING (true);
+
+-- form_admin: read all (founder + CS director access)
+CREATE POLICY ep_admin_read ON enterprise_partners
+  FOR SELECT TO form_admin USING (true);
+
+-- form_system: full write access (background jobs, DEC-030 event emission)
+CREATE POLICY ep_system_write ON enterprise_partners
+  FOR ALL TO form_system USING (true);
+
+-- form_api: NO ACCESS
+REVOKE ALL ON enterprise_partners FROM form_api;
+```
+
+**`deal_attribution_log` JSONB schema (per element):**
+```json
+{
+  "deal_id": "uuid",
+  "partner_pipeline_stage_id": "uuid",
+  "signed_at": "ISO8601",
+  "acv_usd": 32400,
+  "tier": "growth",
+  "referral_fee_paid_at": "ISO8601 | null",
+  "revenue_share_active": true
+}
+```
+
+---
+
+### 38.8 DEC-030 HMAC-Chained Events
+
+All four events are HMAC-chained per `docs/AUDIT_LOG_SCHEMA.md §HMAC chaining`. Privacy invariant: no individual employee user data in any payload. Partner contact names are not included — `partner_id` (FORM-internal UUID) is the only identifier. `deal_id` references `enterprise_pipeline_stages.id` (§37.8.1) — also a FORM-internal UUID never shared externally.
+
+#### 38.8.1 `enterprise.partner_agreement_signed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.partner_agreement_signed` |
+| **Severity** | STANDARD |
+| **Retention** | 7 years (contractual record; Ukrainian Tax Code Art. 44) |
+| **Actor** | compliance-officer or founder |
+| **Trigger** | Partner agreement executed; `enterprise_partners` row created |
+
+**Payload (Zod v2 schema):**
+```typescript
+z.object({
+  partner_id:           z.string().uuid(),
+  partner_category:     z.enum(['referral','reseller','integration','white_label']),
+  revenue_share_pct:    z.number().min(0).max(45),
+  agreement_doc_ref:    z.string(),
+  dpa_signed:           z.boolean(),
+  created_by_pam_session: z.string().uuid(),
+})
+```
+
+#### 38.8.2 `enterprise.partner_revenue_share_paid`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.partner_revenue_share_paid` |
+| **Severity** | HIGH |
+| **Retention** | 7 years (financial record; SOC 2 CC9.2; Ukrainian Tax Code Art. 44) |
+| **Actor** | compliance-officer |
+| **Trigger** | Quarterly revenue share payment released; required before payment processing |
+
+**Payload:**
+```typescript
+z.object({
+  partner_id:           z.string().uuid(),
+  period_start:         z.string().date(),   // Quarter start ISO 8601 date
+  period_end:           z.string().date(),   // Quarter end ISO 8601 date
+  attributed_arr_usd:   z.number().min(0),   // Total ARR attributed this quarter
+  share_amount_usd:     z.number().min(0),   // revenue_share_pct × attributed_arr_usd / 4
+  payment_method:       z.enum(['stripe_payout','wire_transfer']),
+  paid_by_pam_session:  z.string().uuid(),
+  privacy_floor_check_passed: z.literal(true),  // Must be true; rejects if false
+})
+```
+
+**Hard invariant:** `privacy_floor_check_passed` must be `true`. The `emit-audit-event` Worker returns HTTP 422 if this field is `false` or absent — the payment is blocked until a compliance-officer explicitly confirms no privacy floor violations occurred in the payment period.
+
+#### 38.8.3 `enterprise.partner_deal_attributed`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.partner_deal_attributed` |
+| **Severity** | STANDARD |
+| **Retention** | 7 years |
+| **Actor** | founder or form_system (pipeline automation) |
+| **Trigger** | A deal in `enterprise_pipeline_stages` closes (S5) with `attributed_to_partner_id` set |
+
+**Payload:**
+```typescript
+z.object({
+  partner_id:           z.string().uuid(),
+  deal_id:              z.string().uuid(),   // enterprise_pipeline_stages.id — internal only
+  tier:                 z.enum(['starter','growth','enterprise']),
+  acv_usd:              z.number().min(0),
+  attribution_type:     z.enum(['referral','reseller','integration','white_label']),
+  sales_cycle_days:     z.number().int().positive(),  // For pipeline velocity comparison (§38.5.1)
+})
+```
+
+#### 38.8.4 `enterprise.partner_offboarded`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.partner_offboarded` |
+| **Severity** | HIGH |
+| **Retention** | 7 years |
+| **Actor** | compliance-officer |
+| **Trigger** | Partner status set to `terminated`; DPA revoked; outstanding revenue share settled or disputed |
+
+**Payload:**
+```typescript
+z.object({
+  partner_id:           z.string().uuid(),
+  termination_reason:   z.enum([
+    'privacy_floor_breach',
+    'no_go_criteria_violation',
+    'performance_inactive',
+    'mutual_agreement',
+    'agreement_expiry',
+  ]),
+  outstanding_share_usd: z.number().min(0),   // $0 if fully settled; > $0 if disputed
+  dispute_open:         z.boolean(),
+  privacy_incident_ref: z.string().nullable(), // INCIDENT_RESPONSE incident slug if applicable
+  offboarded_by_pam_session: z.string().uuid(),
+})
+```
+
+**Chain invariant PART-CHAIN-01:** A `partner_offboarded` event with `termination_reason = 'privacy_floor_breach'` must be preceded in the HMAC chain by a `privacy.floor_breach_detected` event (see `docs/AUDIT_LOG_SCHEMA.md §Privacy floor enforcement events`). A chain where the offboarding precedes the breach detection is a PART-CHAIN-01 violation and triggers R-05 (chain integrity failure) in `docs/INCIDENT_RESPONSE.md`.
+
+#### 38.8.5 DEC-030 Event Summary for §38
+
+| Event | Severity | Retention | Trigger | Privacy constraint |
+|---|---|---|---|---|
+| `enterprise.partner_agreement_signed` | STANDARD | 7 yr | Partner agreement executed | `partner_id` UUID only; no partner contact names |
+| `enterprise.partner_revenue_share_paid` | HIGH | 7 yr | Quarterly payment released | Aggregate ARR/share amounts; `partner_id` only |
+| `enterprise.partner_deal_attributed` | STANDARD | 7 yr | S5 close with partner attribution | `deal_id` internal UUID; ACV aggregate; no tenant name |
+| `enterprise.partner_offboarded` | HIGH | 7 yr | Partner terminated | Reason enum; incident slug if privacy breach |
+
+**Registration requirement:** All four events must be registered in `docs/AUDIT_LOG_SCHEMA.md §6` before the first partner agreement is executed (P0 checklist item 1 below).
+
+---
+
+### 38.9 SOC 2 Evidence Mapping
+
+Store at `compliance/evidence/partners/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **PART-E-001** | Annual export of `enterprise.partner_agreement_signed` chain events for all active partners — demonstrates signed agreements and DPA status for every active partner | CC9.2 — Vendor and partner agreements in place | 7 yr |
+| **PART-E-002** | Annual export of `enterprise.partner_revenue_share_paid` chain events — demonstrates financial governance over revenue share payments, including `privacy_floor_check_passed: true` confirmation | CC9.2 — Vendor financial controls; CC4.1 — Control activities over financial obligations | 7 yr |
+| **PART-E-003** | Termination event export (`enterprise.partner_offboarded`) for the observation period — demonstrates that terminated partners had agreements formally closed and any privacy floor breaches were escalated per INCIDENT_RESPONSE.md | CC9.2 — Vendor offboarding; CC7.4 — Incident response activated on vendor breach | 7 yr |
+
+**Auditor narrative for CC9.2:** FORM manages its partner channel through formally executed Partner Agreements that include non-waivable privacy floor clauses and DPA obligations. PART-E-001 provides the chain-level evidence that every active partner during the observation period had a signed agreement. PART-E-002 demonstrates that revenue share payments were gated on an explicit compliance-officer privacy floor attestation (`privacy_floor_check_passed: true`) before release. No individual employee health data is shared with any partner at any tier — this invariant is enforced at the API layer (`REVOKE ALL ON enterprise_partners FROM form_api`), at the DEC-030 payload schema (no `user_id` or health data fields), and at the contract layer (Partner Agreement §38.6.2 clauses).
+
+---
+
+### 38.10 Implementation Checklist
+
+#### P0 — Before first partner agreement is signed
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all four §38.8 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §6`; deploy event types to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 2 | Create `enterprise_partners` table (§38.7 DDL + RLS); register migration `0073_enterprise_partners.sql`. | platform-engineer | **P0** | M10 | [ ] |
+| 3 | Draft Partner Agreement template (referral + reseller variants) with §38.6.2 privacy floor clauses. Obtain outside counsel review (same counsel as MSA template). | compliance-officer + outside counsel | **P0** | M10 | [ ] |
+| 4 | Draft Partner DPA addendum (for reseller and integration partners who receive incidental PII). Cross-reference with `docs/MSA_TEMPLATE.md` DPA template. | compliance-officer | **P0** | M10 | [ ] |
+| 5 | Add `attributed_to_partner_id UUID REFERENCES enterprise_partners(id)` column to `enterprise_pipeline_stages` (§37.8.1). Register migration `0073b_pipeline_partner_attribution.sql`. | platform-engineer | **P0** | M10 | [ ] |
+
+#### P1 — Before first partner-sourced deal closes
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Implement revenue share calculation query: `SELECT ep.id, ep.revenue_share_pct, SUM(eps.acv_usd) AS attributed_arr FROM enterprise_partners ep JOIN enterprise_pipeline_stages eps ON eps.attributed_to_partner_id = ep.id WHERE eps.stage = 'S5' GROUP BY ep.id, ep.revenue_share_pct;` Verify output matches Deal P-001 invoice. | data-engineer | **P1** | M11 | [ ] |
+| 7 | Build "Partner Attribution" panel in Retool or Supabase Studio: active partners, attributed ARR per partner, revenue share YTD, next payment due date. Accessible by `form_admin` and `compliance_reviewer` only. | data-engineer | **P1** | M11 | [ ] |
+| 8 | File PART-E-001 for the quarter in which the first partner agreement is signed (even if no deals yet closed). | compliance-officer | **P1** | M11 | [ ] |
+
+#### P2 — Before SOC 2 observation period starts (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | Evaluate OQ-PART-01 (partner program manager hire timing); document decision in `docs/DECISION_LOG.md`. | founder + customer-success | **P2** | M13 | [ ] |
+| 10 | After first 3 partner-sourced deals close, run §38.5.1 CAC comparison analysis. If referral partner LTV:CAC > 18× consistently, increase referral fee budget allocation; if reseller GM contribution < 55%, renegotiate revenue share or cap reseller tier. Document findings in `docs/DECISION_LOG.md`. | data-engineer + customer-success | **P2** | M15 | [ ] |
+| 11 | Collect PART-E-001, PART-E-002, and PART-E-003 (if applicable) at end of first observation quarter with active partners; file in `compliance/evidence/partners/`. | compliance-officer | **P2** | M13 | [ ] |
+
+---
+
+### 38.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-PART-01** | **At what partner ARR threshold should FORM hire a dedicated Partner Success Manager (PSM)?** Section §26.3 models CSM capacity at 12–15 Growth accounts per CSM. A PSM would require a comparable model: at what ARR-under-management does partner oversight exceed the founder's capacity? Preliminary estimate: 5+ active reseller partners or $500k+ ARR attributed (whichever comes first). At that scale, CSM partner overhead exceeds ~8h/week — a meaningful distraction from direct enterprise accounts. Recommended: hire PSM at $500k partner-attributed ARR, ahead of demand at $350k (2-quarter lead time). | **P1** | founder + customer-success | Evaluate at first reseller partner signed; formal hire decision at $250k partner-attributed ARR |
+| **OQ-PART-02** | **Should FORM offer a partner co-marketing budget?** Co-marketing (joint webinar, co-authored blog post, conference appearance) can accelerate the partner's pipeline contribution without increasing the revenue share rate. Cost estimate: $2,000–$5,000 per co-marketing activation (design, event sponsorship, content production). The ROI is real but difficult to attribute directly. Recommendation: offer a Bronze-tier co-marketing credit of $1,000/year (redeemable against FORM-approved content production) — low cost, creates partner stickiness, avoids uncontrolled brand spend. White-label partners: co-marketing with their end customers is prohibited unless FORM is not identifiable in the output (brand-system veto on unapproved co-marketing). | **P2** | marketing-lead + compliance-officer | Decide before first Silver-tier partner (3 deals closed by a single partner) |
+| **OQ-PART-03** | **How should FORM handle a partner whose enterprise customer migrates to a direct FORM contract?** Scenarios: (a) reseller partner's customer contacts FORM directly for renewal and requests a direct contract (lower price, no partner margin); (b) partner ceases trading and customer has no reseller. Policy proposal: the customer may migrate to a direct contract at the next annual renewal date. FORM pays the partner their contracted revenue share through the original term end even after migration. On direct renewal, no revenue share applies. Ensures the partner has no incentive to block migrations; ensures FORM recovers full margin at renewal. Requires a "Direct Migration" clause in the Partner Agreement template (§38.6.2). | **P2** | compliance-officer + customer-success | Draft Direct Migration clause before first reseller agreement signed (P0 item 3 above) |
+
+---
+
+*v2.4 (2026-06-14): §38 Enterprise Partner Channel & Reseller Economics — fills the revenue model gap opened by OQ-PIPE-03 (`§37.11`) by providing a pre-deal framework before FORM is under negotiation time pressure. §38.1 scopes to four partner categories (referral / reseller / integration / white-label) with out-of-scope list (consumer affiliate, investor referrals); privacy floor and no-go criteria inherited from `docs/ENTERPRISE.md`. §38.2 partner category taxonomy: four types with integration depth, example partners, and revenue model summary; white-label restricted to Enterprise tier (1,000+ seats; $50k ARR threshold). §38.3 partner acquisition and enablement cost model: recruitment cost $669 (template reuse) / $1,469 (first agreement, including $800 outside counsel); annual enablement $600–$1,400/yr by type; white-label premium +$2,000–$3,500/yr. §38.4 revenue share economics: referral 10–15% first-year ACV (one-time); reseller 20–25% ACV ongoing (3-year max term); white-label 30–40% gross revenue share (min $50k ACV; ~63–65% adj. GM). §38.5 partner vs. direct CAC comparison: referral partner LTV:CAC 21.9× (best class); reseller 7.5× (comparable to direct); breakeven condition — reseller economically preferred only when deal access is otherwise unavailable; partner-sourced ARR ceiling 40% of total ARR to prevent concentration risk. §38.6 governance: three-tier partner programme (Bronze/Silver/Gold by deals or ARR attributed); 12-month inactivity freeze; five non-waivable privacy floor clauses in Partner Agreement template; quarterly revenue share payment gated on `privacy_floor_check_passed: true`; dispute resolution via `deal_attribution_log` JSONB and DEC-030 chain. §38.7 `enterprise_partners` Postgres table DDL: UUID PK, `partner_category_enum`, `partner_status_enum`, revenue share pct CHECK (0–45), agreement + DPA doc refs, `attributed_arr_usd`, `deal_attribution_log` JSONB, `total_share_paid_usd`, `privacy_floor_violation_at` nullable; RLS: compliance_reviewer + form_admin SELECT; form_system ALL; form_api REVOKED; `attributed_to_partner_id` FK column added to `enterprise_pipeline_stages` (migration 0073b). §38.8 four DEC-030 HMAC-chained events: `enterprise.partner_agreement_signed` (STANDARD, 7yr — partner_id + category + revenue_share_pct + dpa_signed; no contact names), `enterprise.partner_revenue_share_paid` (HIGH, 7yr — hard invariant: `privacy_floor_check_passed: true` required; 422 if absent), `enterprise.partner_deal_attributed` (STANDARD, 7yr — deal_id internal UUID, ACV, sales_cycle_days for velocity analysis), `enterprise.partner_offboarded` (HIGH, 7yr — reason enum + incident slug if privacy breach; PART-CHAIN-01 ordering invariant: offboard with `privacy_floor_breach` must follow `privacy.floor_breach_detected` in chain). §38.9 three SOC 2 evidence artefacts: PART-E-001 (CC9.2 — annual partner agreement chain export), PART-E-002 (CC9.2/CC4.1 — revenue share payment chain with privacy_floor_check_passed attestation), PART-E-003 (CC9.2/CC7.4 — partner offboarding and incident escalation events). §38.10 eleven-item implementation checklist: 5× P0/M10 (DEC-030 registration, table DDL, Partner Agreement + DPA templates with outside counsel, pipeline attribution column), 3× P1/M11 (revenue share calculation query, attribution dashboard, PART-E-001 first filing), 3× P2/M13–M15 (PSM hire decision, CAC retrospective after 3 partner deals, SOC 2 evidence collection). §38.11 three open questions: OQ-PART-01 (P1 — PSM hire threshold: 5 active resellers or $500k partner ARR; formal decision at $250k), OQ-PART-02 (P2 — co-marketing budget: $1k Bronze credit recommended; white-label co-marketing gated by brand-system veto), OQ-PART-03 (P2 — Direct Migration clause when customer transitions from reseller to direct contract; draft before first reseller agreement). TOC entry §38 added. Cross-references: `docs/ENTERPRISE.md` (sales process, no-go criteria, privacy floor); §19.4 (GTM — AE hire pattern; partner channel is the pre-AE distribution alternative); §26.3 (CSM capacity model — enablement hours share the same rate basis); §36.6.1 (implementation cost — 50% reduction for white-label deals); §37.5 (ARR build table — partner-sourced ARR targets at Y2/Y3); §37.11 OQ-PIPE-03 (partner channel attribution — this section resolves the framework; OQ-PIPE-03 governs the first actual deal); `docs/INCIDENT_RESPONSE.md R-22` (privacy floor breach — PART-CHAIN-01 prerequisite); `docs/AUDIT_LOG_SCHEMA.md` (four new DEC-030 events to register — P0 before first partner agreement); `docs/OBSERVABILITY.md §42` (white-label cert lifecycle — partner white-label enablement cost includes cert monitoring overhead). Privacy floor: no individual employee user_id or health data in any §38 DEC-030 event; no partner contact names in chain; `deal_id` is FORM-internal UUID never shared externally; `form_api` REVOKED on `enterprise_partners` table. Owner: customer-success + enterprise-architect + compliance-officer.*
 

@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [4.86.1] — 2026-06-14
+
+### Changed
+- `docs/COST_MODEL.md` — §38 Enterprise Partner Channel & Reseller Economics (v2.3 → v2.4). Resolves OQ-PIPE-03 framework gap: four partner categories (referral 10–15% one-time / reseller 20–25% ongoing / integration 15% attribution / white-label 30–40% gross); partner-vs-direct CAC comparison (referral LTV:CAC 21.9× best class; reseller breakeven condition); `enterprise_partners` Postgres table + `attributed_to_partner_id` FK on pipeline (migrations 0073, 0073b); four DEC-030 HMAC-chained events (`enterprise.partner_agreement_signed`, `enterprise.partner_revenue_share_paid` with `privacy_floor_check_passed: true` hard invariant, `enterprise.partner_deal_attributed`, `enterprise.partner_offboarded` + PART-CHAIN-01 ordering invariant); three SOC 2 evidence artefacts PART-E-001/002/003 (CC9.2/CC4.1/CC7.4); eleven-item implementation checklist; three open questions (OQ-PART-01 PSM hire threshold / OQ-PART-02 co-marketing budget / OQ-PART-03 Direct Migration clause). Privacy floor: no individual health data in any event; form_api REVOKED; partner contact names excluded from chain.
+- `VERSION` — 4.86.0 → 4.86.1.
+
+---
+
 ## [4.86.0] — 2026-06-14
 
 ### Added
