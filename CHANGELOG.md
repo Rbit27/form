@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.7.1] — 2026-06-14
+
+### Added
+- `docs/OBSERVABILITY.md §44` — SIEM Alert Calibration Governance. Closes two P1 open questions from `docs/SOC2_READINESS.md §76.11` that were blocking M5 PagerDuty deployment. **OQ-ANOM-02 → DEC-056:** AL-SIEM-06 dead-man's switch (zero siem_events / 30 min / business hours) confirmed at 30-min threshold; graduated activation policy added — 30-day shadow mode (P3 Slack) then full P1 PagerDuty activation on day 31 or when `auth_event_avg_per_30min > 5`; `system.siem_alert_activated` DEC-030 event (STANDARD, 3yr) records transition; CALIB-E-001 SOC 2 evidence artefact (CC4.1/CC7.2). **OQ-ANOM-01 → DEC-057:** CR-01 Analytics Engine `GROUP BY (tenant_id, actor_ip_subnet)` confirmed per-tenant isolated — no cross-tenant aggregation blind spot; mandatory staging verification test (`src/tests/siem/cr01-per-tenant-isolation.test.ts`): dual-tenant synthetic test with 1,000-failure high-volume tenant and 12-failure low-volume tenant on distinct subnets; `system.siem_calibration_verified` DEC-030 event (STANDARD, 3yr); CALIB-E-002 SOC 2 evidence artefact (CC7.2/CC4.1). Eleven-item implementation checklist: 7× P0/M5, 2× P1/30-days-post-M5, 2× P2/Annual+M9.
+- `docs/DECISION_LOG.md DEC-056` — OQ-ANOM-02 closure: AL-SIEM-06 30-min threshold confirmed; graduated activation policy.
+- `docs/DECISION_LOG.md DEC-057` — OQ-ANOM-01 closure: CR-01 per-tenant isolation confirmed; mandatory staging verification test required before M5.
+
+### Changed
+- `VERSION` — 5.7.0 → 5.7.1.
+
+---
+
 ## [5.7.0] — 2026-06-14
 
 ### Added

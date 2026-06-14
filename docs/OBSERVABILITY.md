@@ -11522,6 +11522,289 @@ Store at `compliance/evidence/white-label/` with `MANIFEST.sha256`.
 
 ---
 
+## §44 SIEM Alert Calibration Governance — AL-SIEM-06 Dead-Man's Switch Threshold & CR-01 Per-Tenant Aggregation Analysis (DEC-056, DEC-057)
+
+> **Closes:** OQ-ANOM-01 (🟡 P1, `docs/SOC2_READINESS.md §76.11` — Analytics Engine per-tenant aggregation blind-spot analysis) via **DEC-057** and OQ-ANOM-02 (🟡 P1, `docs/SOC2_READINESS.md §76.11` — AL-SIEM-06 30-min dead-man's switch threshold calibration) via **DEC-056**. Both OQs were blocking the M5 PagerDuty `form-security` service deployment.
+>
+> **Primary owners:** security-engineer + devops-lead + compliance-officer.
+
+---
+
+### 44.1 Purpose and Scope
+
+This section resolves the two P1 open questions from `docs/SOC2_READINESS.md §76.11` (CC7.2/CC4.1 Security Monitoring & Anomaly Detection) that were blocking the M5 production deployment of AL-SIEM-06 in PagerDuty:
+
+| OQ | Question | Priority | Resolution |
+|---|---|---|---|
+| **OQ-ANOM-02** | Is the 30-min AL-SIEM-06 dead-man's switch threshold appropriate before enterprise GA? | P1 (M5 blocker) | §44.2 — DEC-056 |
+| **OQ-ANOM-01** | Does the CR-01 Analytics Engine query have a cross-tenant aggregation blind spot? | P1 (M10 blocker) | §44.3 — DEC-057 |
+
+**Scope:**
+- `AL-SIEM-06`: the dead-man's switch alert rule defined in `docs/OBSERVABILITY.md §27.7` (zero `siem_events` rows ingested in any 30-min window during business hours — P1 PagerDuty)
+- `CR-01`: the brute-force correlation rule defined in `docs/OBSERVABILITY.md §27.3` (≥ 10 auth failures / 10-min / (tenant, subnet) — Analytics Engine real-time, < 10 s detection lag)
+
+**Out of scope:** CR-02 (impossible travel), CR-03 (privilege escalation), CR-04 (bulk data access) — these run via Supabase pg_cron bridge (§34) with ≤ 5-min detection lag; their aggregation is row-based, not Analytics Engine.
+
+**Privacy floor:** No `user_id`, no health data, no plaintext IP in any §44 content. All calibration analysis uses aggregate event counts by `(tenant_id, actor_ip_subnet)` only — individual actors are not identifiable from the threshold analysis.
+
+---
+
+### 44.2 OQ-ANOM-02 Resolution — AL-SIEM-06 Dead-Man's Switch Threshold (DEC-056)
+
+#### 44.2.1 Pre-Enterprise Event Volume Baseline
+
+To evaluate whether the 30-min threshold produces false-positive P1 pages before enterprise GA, the event volume during business hours must be assessed:
+
+| Phase | Expected daily auth events (08:00–22:00 UTC) | Events per 30-min window (uniform distribution) | 30-min zero-event probability |
+|---|---|---|---|
+| **Staging-only (0 active users)** | 0–10 (CI pipeline logins, devops-lead testing) | 0–0.4 | **HIGH** — false-positive risk during off-peak testing days |
+| **Pre-beta (1–100 active users)** | 50–500 | 1.8–18 | **LOW** — zero-event window implies pipeline stall, not zero traffic |
+| **Consumer beta (100–1,000 users)** | 500–5,000 | 18–180 | **NEGLIGIBLE** — 30-min gap impossible under normal operation |
+| **Post-enterprise pilot (1,000+ users)** | 5,000–50,000 | 180–1,800 | **NEGLIGIBLE** |
+
+**Baseline conclusion:** The false-positive risk is concentrated in the **staging-only phase** (0 active users), where even business-hours gaps are plausible on days without active CI runs. Once any users are active in production, the risk disappears. The existing 08:00–22:00 UTC business-hours gate (already in §27.7) already eliminates the 02:00–06:00 UTC off-peak concern raised in OQ-ANOM-02.
+
+#### 44.2.2 Option Analysis
+
+| Option | Description | Pros | Cons |
+|---|---|---|---|
+| **(a) Confirm 08:00–22:00 UTC gate; 30-min threshold unchanged** | Formally adopt the existing §27.7 spec as written | Off-peak concern (02:00–06:00 UTC) already resolved by business-hours gate; 30-min is a tight detection window that closes quickly on any pipeline stall | False-positive risk during staging-only phase before any user traffic within business hours |
+| **(b) Lower threshold to 60 min** | Fire AL-SIEM-06 only if zero events in 60 min during business hours | Halves false-positive risk during staging-only phase | Increases undetected-stall window from 30 min to 60 min; a 60-min silent SIEM pipeline could allow a meaningful HMAC chain gap before AL-SIEM-06 fires |
+| **(c) Add minimum event_count floor** | Fire AL-SIEM-06 only if prior 24h `auth_event_count > N` (e.g., N = 50) | Eliminates staging-only false positives without changing the 30-min detection window | Requires real-time rolling 24h event count query in PagerDuty condition logic — not natively supported in Better Stack alert rules without a pg_cron aggregation helper table |
+| **(a + graduated activation) — ADOPTED** | Confirm 08:00–22:00 UTC + 30-min threshold; add a **30-day shadow activation** window on first production deployment | Eliminates false-positive risk during deployment ramp-up without permanently weakening the control; shadow period produces calibration data confirming threshold before P1 escalation is active | 30-day shadow window means P1 paging is deferred; mitigated by daily P3 Slack alerts proving the control was operational throughout |
+
+#### 44.2.3 Decision: Option (a) + Graduated Activation (DEC-056)
+
+**Decision:** The existing `docs/OBSERVABILITY.md §27.7` AL-SIEM-06 specification — zero `siem_events` rows in any **30-minute** window during **08:00–22:00 UTC** — is formally confirmed as the production specification. No change to the threshold or the business-hours gate.
+
+**Graduated activation policy (one-time, per AL-SIEM-06 production deployment):**
+
+| Phase | AL-SIEM-06 behaviour | Trigger condition |
+|---|---|---|
+| **Shadow mode** (first 30 calendar days after production deployment) | P3 Slack `#devops-alerts` only; no PagerDuty page | AL-SIEM-06 condition met (zero events in 30 min during business hours) |
+| **Full activation** (from day 31 onward OR when 30-day rolling `auth_event_avg_per_30min > 5`, whichever comes first) | P1 PagerDuty `form-devops` HIGH + `#devops-alerts` | Same condition; threshold unchanged |
+
+**The 30-day cap is absolute:** even if `auth_event_avg_per_30min ≤ 5` at day 30 (indicating a system not yet in active production use), AL-SIEM-06 still escalates to full P1 activation. A staging-only system with a live SIEM pipeline still warrants P1 dead-man's switch alerting — a silent staging SIEM during SOC 2 evidence collection is a genuine gap.
+
+**Transition event:** On exit from shadow mode, devops-lead emits `system.siem_alert_activated` (STANDARD, 3yr) with `rule_id: 'AL-SIEM-06'`, `activation_mode: 'full'`, `shadow_period_start`, `shadow_period_end`, and `auth_event_avg_per_30min` (30-day rolling average at the moment of transition). This DEC-030 event provides SOC 2 CC4.1 evidence that AL-SIEM-06 was calibrated under governance before full P1 activation.
+
+#### 44.2.4 Updated AL-SIEM-06 Specification (§27.7 Patch)
+
+Replace the §27.7 AL-SIEM-06 row with the following dual-phase specification:
+
+| Rule | Condition | Severity | Routing | Acknowledge SLA | Triage |
+|---|---|---|---|---|---|
+| **AL-SIEM-06** (shadow mode, first 30 days) | Zero `siem_events` rows ingested in any 30-min window during business hours (08:00–22:00 UTC) | **P3** | `#devops-alerts` Slack only | Next business day | Confirm via `SELECT COUNT(*) FROM siem_events WHERE ingested_at > NOW() - INTERVAL '30 MINUTE'`; log result in `#devops-alerts` shadow-mode thread; clear without PagerDuty page; alert is diagnostic — accumulate data on actual zero-event frequency |
+| **AL-SIEM-06** (full mode, from day 31 or `auth_event_avg_per_30min > 5`) | Zero `siem_events` rows ingested in any 30-min window during business hours (08:00–22:00 UTC) | **P1** | PagerDuty HIGH `form-devops` + `#devops-alerts` | < 30 min | Check Cloudflare Logpush status, Worker error rates in Sentry, ClickHouse Cloud health dashboard; if all healthy, confirm against live Worker request logs before clearing — a genuine zero-event period during business hours is operationally anomalous at this traffic level |
+| **AL-SIEM-06-SHADOW-END** | `auth_event_avg_per_30min > 5` (30-day rolling) OR 30 calendar days elapsed since production deployment | STANDARD (informational) | `#devops-alerts` Slack informational | N/A | Emit `system.siem_alert_activated` DEC-030 event; update AL-SIEM-06 PagerDuty routing P3 → P1 HIGH; file CALIB-E-001 evidence artefact (§44.5) |
+
+#### 44.2.5 Rationale
+
+1. **No threshold change.** Thirty minutes is the shortest interval that minimises detection lag without triggering on transient network hiccups. A 60-min silent pipeline (Option (b)) would allow up to 60 min of HMAC chain events to be silently lost before detection — unacceptable for a CC4.1 monitoring-of-monitoring control.
+
+2. **Graduated activation addresses the sole identified risk.** The only plausible false-positive scenario is the staging-only phase (pre-beta, 0 active users). The 30-day shadow mode eliminates this without permanently weakening the control.
+
+3. **SOC 2 CC4.1 continuity.** P3 Slack alerts during the shadow period demonstrate the control was operational throughout the ramp-up. The `system.siem_alert_activated` DEC-030 event provides a tamper-evident record of the transition date and the calibration data that triggered it. Auditors can verify CC4.1 across both phases without a gap in evidence.
+
+4. **Consistent with AL-SIEM-05 precedent.** AL-SIEM-05 (HMAC chain break, P0) has no shadow mode — the chain must be tamper-evident from event 1. AL-SIEM-06 (pipeline health meta-monitoring) is a higher-layer control where a calibration window before P1 routing is operationally defensible.
+
+---
+
+### 44.3 OQ-ANOM-01 Resolution — CR-01 Per-Tenant Analytics Engine Aggregation Analysis (DEC-057)
+
+#### 44.3.1 Analytics Engine Architecture and GROUP BY Semantics
+
+Cloudflare Analytics Engine is a time-series write-once datastore where events are written per-occurrence and read via SQL-style aggregation queries. The CR-01 query defined in `docs/OBSERVABILITY.md §27.3` and the bridge variant in §34.3 operates as:
+
+```sql
+-- CR-01: Brute-force detection (Analytics Engine real-time; < 10 s detection lag)
+SELECT
+  blob4  AS tenant_id,
+  blob2  AS actor_ip_subnet,          -- /24 subnet, never full IP
+  SUM(_sample_interval) AS failure_count
+FROM SIEM_BRIDGE_EVENTS
+WHERE blob1 = 'auth.failed'
+  AND timestamp > NOW() - INTERVAL '10' MINUTE
+GROUP BY blob4, blob2
+HAVING SUM(_sample_interval) >= 10
+```
+
+**Key architectural property:** Analytics Engine GROUP BY evaluation produces per-bucket aggregates. Each `(tenant_id, actor_ip_subnet)` pair forms an independent bucket. The HAVING clause `SUM(_sample_interval) >= 10` is evaluated **within each bucket independently** — not against any fleet-wide total.
+
+#### 44.3.2 Cross-Tenant Blind Spot Analysis
+
+**Concern from OQ-ANOM-01:** "The Analytics Engine query aggregates fleet-wide before applying the `GROUP BY tenant_id` filter. A high-volume tenant could mask a slower brute-force attack against a low-volume tenant if the global ingestion pipeline has lag."
+
+**Analysis across three dimensions:**
+
+| Dimension | Actual behaviour | Risk assessment |
+|---|---|---|
+| **GROUP BY evaluation order** | GROUP BY produces per-bucket aggregates simultaneously; HAVING filters each bucket independently. Tenant A's events never contribute to Tenant B's `(tenant_id, actor_ip_subnet)` bucket regardless of relative volumes. | **None.** No cross-tenant bucket pollution is possible given the `blob4` (tenant_id) GROUP BY key. |
+| **Ingestion pipeline lag symmetry** | Events from high-volume and low-volume tenants enter the same Analytics Engine dataset. At high total ingestion rates, propagation delay before events become queryable may occur. This delay is symmetric — all tenants experience the same maximum lag. | **Bounded.** SIEM-SLO-BRIDGE-01 caps lag at ≤ 5 min for pg_cron bridge rules and < 10 s for Analytics Engine real-time queries. High-volume tenants do not receive query-layer priority over low-volume tenants. |
+| **HAVING threshold masking** | Could Tenant A's failures inadvertently satisfy the HAVING threshold for Tenant B's subnet? | **Impossible.** GROUP BY `(blob4, blob2)` means `(tenant_a_id, subnet_a)` and `(tenant_b_id, subnet_b)` are distinct buckets. No arithmetic connection exists between them. |
+
+**The concern in OQ-ANOM-01 would apply** to a query that omits `tenant_id` from the GROUP BY key (e.g., `GROUP BY blob2` without `blob4`). The current query includes `blob4` as a mandatory GROUP BY dimension, making per-tenant isolation structural, not coincidental.
+
+**The only plausible residual risk** is symmetric ingestion pipeline lag at extremely high total ingestion volumes (> 1M events/min) — out of scope for FORM's current scale and bounded by SIEM-SLO-BRIDGE-01.
+
+#### 44.3.3 Decision: No Architecture Change Required (DEC-057)
+
+**Decision:** The CR-01 Analytics Engine query is confirmed to provide per-tenant isolation with no cross-tenant aggregation blind spot. The existing `GROUP BY blob4, blob2` (tenant_id, actor_ip_subnet) specification in §27.3 and §34.3 is correct as written. No schema change, query modification, or additional per-tenant fairness mechanism is required.
+
+**One addition:** a mandatory **staging verification test** (§44.3.4) must pass before the M5 SIEM alert deployment. The test provides SOC 2 CC7.2 evidence that per-tenant isolation was empirically validated — not just architecturally inferred — before production activation.
+
+**Re-evaluation trigger:** If FORM's Analytics Engine query is redesigned (e.g., during the §34.7 M9 ClickHouse migration), re-run the §44.3.4 verification against the new implementation before re-activating CR-01 alerts. Emit a new `system.siem_calibration_verified` event on pass.
+
+#### 44.3.4 Verification Protocol — CR-01 Per-Tenant Isolation Test
+
+**Test environment:** Staging with synthetic `lt-` tenant IDs per §40 privacy invariant. No real user data.
+
+**Test setup:**
+
+```typescript
+// src/tests/siem/cr01-per-tenant-isolation.test.ts
+// Required CI gate before siem-alert-activation deployment workflow
+
+const HIGH_VOLUME_TENANT = 'lt-00000000-0000-0000-0000-000000000001'; // synthetic
+const LOW_VOLUME_TENANT  = 'lt-00000000-0000-0000-0000-000000000002'; // synthetic
+
+// Tenant A: high-volume traffic — 1,000 auth failures / 10 min on 203.0.113.0/24
+await emitSyntheticAuthFailures({
+  tenant_id: HIGH_VOLUME_TENANT,
+  subnet:    '203.0.113.0',
+  count:     1000,
+  window_min: 10,
+});
+
+// Tenant B: brute-force attack — 12 auth failures / 10 min on 198.51.100.0/24
+// Expected: CR-01 fires (12 ≥ threshold of 10) independently of Tenant A's volume
+await emitSyntheticAuthFailures({
+  tenant_id: LOW_VOLUME_TENANT,
+  subnet:    '198.51.100.0',
+  count:     12,
+  window_min: 10,
+});
+```
+
+**Required assertions:**
+
+| # | Assertion | Expected | Failure action |
+|---|---|---|---|
+| 1 | `anomaly.brute_force_threshold_exceeded` fires for `(LOW_VOLUME_TENANT, 198.51.100.0)` | Event emitted with `tenant_id = LOW_VOLUME_TENANT`, `failure_count = 12` | **BLOCK** M5 SIEM deployment; escalate to platform-engineer for Analytics Engine query review |
+| 2 | `failure_count` in the Tenant B alert equals exactly 12 (no cross-tenant event bleed) | `failure_count: 12` in payload | **BLOCK** if `failure_count > 12`; investigate Analytics Engine bucket isolation |
+| 3 | No `anomaly.brute_force_threshold_exceeded` event appears with incorrect `tenant_id` attribution | All alerts carry exactly one of the two synthetic `lt-` IDs; no mixed attribution | **BLOCK** if any alert references a `tenant_id` not matching its emitting test thread |
+
+**On pass:** emit `system.siem_calibration_verified` DEC-030 event (§44.4) with `test_result: 'pass'`; file CALIB-E-002 (§44.5).
+
+**On fail:** BLOCK M5 deployment; re-run with a simplified single-tenant baseline to isolate whether the failure is in the test harness or the Analytics Engine query; escalate to devops-lead + security-engineer before rescheduling deployment.
+
+---
+
+### 44.4 DEC-030 Events
+
+Two new HMAC-chained events for §44 governance:
+
+| Event type | Severity | Retention | Trigger | Privacy invariant |
+|---|---|---|---|---|
+| `system.siem_alert_activated` | STANDARD | 3 yr | AL-SIEM-06 exits shadow mode and transitions to P1 PagerDuty routing | `rule_id`, `activation_mode` enum, `shadow_period_start`, `shadow_period_end`, `auth_event_avg_per_30min` scalar — no per-user count |
+| `system.siem_calibration_verified` | STANDARD | 3 yr | CR-01 per-tenant isolation test passes in staging (§44.3.4) | `correlation_rule` enum, `test_id` CI run ID, `test_result` enum, synthetic `lt-` tenant IDs only — no real customer data |
+
+**Zod schemas:**
+
+```typescript
+// system.siem_alert_activated — AL-SIEM-06 shadow-to-full activation record
+const SiemAlertActivated = z.object({
+  event:                    z.literal('system.siem_alert_activated'),
+  rule_id:                  z.string(),               // 'AL-SIEM-06'
+  activation_mode:          z.enum(['shadow', 'full']),
+  shadow_period_start:      z.string().datetime(),
+  shadow_period_end:        z.string().datetime().nullable(), // null if exited by event_count floor before 30 days
+  auth_event_avg_per_30min: z.number().min(0),        // 30-day rolling average scalar; no per-user data
+});
+
+// system.siem_calibration_verified — CR-01 per-tenant isolation test result
+const SiemCalibrationVerified = z.object({
+  event:                  z.literal('system.siem_calibration_verified'),
+  correlation_rule:       z.enum(['CR-01', 'CR-02', 'CR-03', 'CR-04']),
+  test_id:                z.string().min(1),           // CI pipeline run ID
+  test_result:            z.enum(['pass', 'fail']),
+  high_volume_tenant_id:  z.string().startsWith('lt-'), // synthetic only; never a real tenant UUID
+  low_volume_tenant_id:   z.string().startsWith('lt-'), // synthetic only
+  low_volume_alert_fired: z.boolean(),
+  failure_count_matched:  z.boolean(),
+});
+```
+
+**Emitter assignments:** `system.siem_alert_activated` — devops-lead (manual; emitted via `form-admin` console on AL-SIEM-06 PagerDuty routing update). `system.siem_calibration_verified` — `siem-alert-activation` CI workflow (`form_system`; automated on test pass; blocked from emitting `test_result: 'pass'` unless all three §44.3.4 assertions return true).
+
+**Privacy invariant:** No real `user_id`, no real `tenant_id`, no health data in either event. `auth_event_avg_per_30min` is a fleet-wide scalar aggregate — cannot be reverse-engineered to individual user activity. Synthetic `lt-` tenant IDs in `siem_calibration_verified` are not linked to any real enterprise customer and must be explicitly validated by the `z.string().startsWith('lt-')` constraint.
+
+---
+
+### 44.5 SOC 2 Evidence Artefacts
+
+Store at `compliance/evidence/cc7/siem-calibration/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **CALIB-E-001** | `system.siem_alert_activated` DEC-030 chain event for AL-SIEM-06 — demonstrates the shadow activation period was executed per DEC-056, with documented 30-day calibration before P1 PagerDuty routing was activated. Also includes the P3 Slack `#devops-alerts` shadow-mode message log (exported from Slack) showing AL-SIEM-06 was emitting P3 alerts throughout the shadow period. | CC4.1 — Performance evaluations of controls (calibration documented before P1 activation); CC7.2 — Monitoring control activated under governance | 3 yr |
+| **CALIB-E-002** | `system.siem_calibration_verified` DEC-030 chain event + CI test run log showing all three §44.3.4 assertions passed — demonstrates CR-01 was verified to provide per-tenant alert isolation before production activation | CC7.2 — Anomaly detection controls verified as operating correctly; CC4.1 — Control verification evidence | 3 yr |
+
+**Auditor narrative for CC4.1:** FORM's AL-SIEM-06 dead-man's switch was deployed under a documented graduated activation protocol (DEC-056). During the 30-day shadow period, the control operated at P3 Slack routing — demonstrating the alert condition logic was functional — while P1 PagerDuty activation was deferred until the event volume floor (`auth_event_avg_per_30min > 5`) was reached or 30 days elapsed. CALIB-E-001 provides tamper-evident chain evidence of the activation transition date and the event rate that triggered it. The SOC 2 observation period evidence for AL-SIEM-06 combines ANOM-E-005 (§76 non-fire attestation) with CALIB-E-001 (activation governance) to confirm the control was operational throughout the observation window.
+
+**Auditor narrative for CC7.2:** CR-01 brute-force detection was validated for per-tenant isolation before M5 production activation via the synthetic dual-tenant staging test (§44.3.4). CALIB-E-002 proves the Analytics Engine GROUP BY `(tenant_id, actor_ip_subnet)` aggregation correctly isolated a low-volume brute-force attack (12 failures) against a background of high-volume legitimate traffic (1,000 failures) from a different tenant on a different subnet. This closes the cross-tenant blind-spot concern documented in OQ-ANOM-01 with direct empirical evidence rather than architectural inference alone.
+
+---
+
+### 44.6 Implementation Checklist
+
+#### P0 — Before M5 PagerDuty `form-security` service activation
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register `system.siem_alert_activated` and `system.siem_calibration_verified` in `docs/AUDIT_LOG_SCHEMA.md §6.System` with Zod schemas from §44.4; deploy event types to `emit-audit-event` Worker event registry. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 2 | Implement CR-01 per-tenant isolation test (`src/tests/siem/cr01-per-tenant-isolation.test.ts`) per §44.3.4 spec; wire to `siem-alert-activation` CI deployment workflow as a required gate (blocks deployment if any assertion fails). | security-engineer + platform-engineer | **P0** | M5 | [ ] |
+| 3 | Run §44.3.4 test in staging; confirm all three assertions pass; emit `system.siem_calibration_verified` STANDARD DEC-030 event with `test_result: 'pass'` and CI run ID; file CALIB-E-002 at `compliance/evidence/cc7/siem-calibration/CALIB-E-002_M5.md`. | security-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 4 | Deploy AL-SIEM-06 in **shadow mode** (P3 Slack `#devops-alerts` only): configure Better Stack alert rule with P3 severity and Slack-only routing; record `shadow_mode_activated_at` timestamp in `#devops-alerts`; emit `system.siem_alert_activated` with `activation_mode: 'shadow'` and `shadow_period_start`. | devops-lead | **P0** | M5 | [ ] |
+| 5 | Update `docs/OBSERVABILITY.md §27.7` AL-SIEM-06 alert rule table row with the dual-phase specification from §44.2.4; add AL-SIEM-06-SHADOW-END informational rule; update `docs/OBSERVABILITY.md §6.2` master alert table accordingly. | devops-lead + compliance-officer | **P0** | M5 | [ ] |
+| 6 | Update `docs/SOC2_READINESS.md §76.11`: mark OQ-ANOM-01 and OQ-ANOM-02 as 🟢 Resolved (DEC-057 and DEC-056 respectively, 2026-06-14). Update §76.9 gap tracker: CC4.1 monitoring-of-monitoring → 🟡 Partial (→ 🟢 on CALIB-E-001 filing). | compliance-officer | **P0** | M5 | [ ] |
+| 7 | Add CALIB-E-001 and CALIB-E-002 to `docs/SOC2_READINESS.md §76.7` evidence artefact table under CC4.1 and CC7.2 criteria rows respectively. | compliance-officer | **P0** | M5 | [ ] |
+
+#### P1 — Shadow-mode exit (30 days after AL-SIEM-06 production deployment)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | At shadow-mode exit trigger (day 30 OR `auth_event_avg_per_30min > 5`, whichever comes first): update AL-SIEM-06 Better Stack routing P3 → P1 HIGH; verify PagerDuty `form-devops` service receives the alert; emit `system.siem_alert_activated` with `activation_mode: 'full'`; file CALIB-E-001 at `compliance/evidence/cc7/siem-calibration/CALIB-E-001_<YYYY-MM-DD>.md`. | devops-lead + compliance-officer | **P1** | 30 days post-M5 | [ ] |
+| 9 | After full activation, mark `docs/SOC2_READINESS.md §76.10` implementation checklist item 2 (Configure AL-SIEM-06 in PagerDuty) status `[x]` Done; add cross-reference to CALIB-E-001; advance §76.9 CC4.1 monitoring-of-monitoring → 🟢. | compliance-officer | **P1** | 30 days post-M5 | [ ] |
+
+#### P2 — Annual governance and M9 ClickHouse migration
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | Annual review: if three or more AL-SIEM-06 P1 pages fired during the observation year and all were confirmed false positives (not real pipeline stalls), evaluate Option (b) (60-min threshold increase) per §44.2.2 and document decision in `docs/DECISION_LOG.md`. | devops-lead + security-engineer | **P2** | Annual (M12, M24, …) | [ ] |
+| 11 | After §34.7 M9 ClickHouse migration: re-run §44.3.4 CR-01 per-tenant isolation verification against the ClickHouse MergeTree CR-01 implementation (Analytics Engine bridge decommissioned); emit a new `system.siem_calibration_verified` event on pass; file updated CALIB-E-002 evidence confirming isolation on the new architecture. | security-engineer + platform-engineer | **P2** | M9 | [ ] |
+
+---
+
+### 44.7 OQ-ANOM-01 and OQ-ANOM-02 Status
+
+| OQ | Status | Decision | Document |
+|---|---|---|---|
+| **OQ-ANOM-02** | 🟢 **Resolved — DEC-056 (2026-06-14)** | Option (a) confirmed; 30-min threshold during 08:00–22:00 UTC; graduated activation (30-day shadow mode) eliminates staging-only false-positive risk | `docs/DECISION_LOG.md DEC-056`; §44.2 |
+| **OQ-ANOM-01** | 🟢 **Resolved — DEC-057 (2026-06-14)** | No architecture change; CR-01 Analytics Engine GROUP BY `(tenant_id, actor_ip_subnet)` confirmed per-tenant isolated; mandatory staging verification test (§44.3.4) required before M5 | `docs/DECISION_LOG.md DEC-057`; §44.3 |
+
+**Cross-updates required by this section:**
+- `docs/SOC2_READINESS.md §76.11` — OQ-ANOM-01 and OQ-ANOM-02 → 🟢 Resolved (§44.6 items 6, 7)
+- `docs/OBSERVABILITY.md §27.7` — AL-SIEM-06 dual-phase specification patch (§44.6 item 5)
+- `docs/OBSERVABILITY.md §6.2` — master alert table: AL-SIEM-06-SHADOW-END informational row (§44.6 item 5)
+- `docs/AUDIT_LOG_SCHEMA.md §6.System` — two new DEC-030 event types (§44.6 item 1)
+
+---
+
+*v4.1 (2026-06-14): §44 SIEM Alert Calibration Governance — AL-SIEM-06 Dead-Man's Switch Threshold & CR-01 Per-Tenant Aggregation Analysis. Closes OQ-ANOM-02 (P1, M5 blocker, `docs/SOC2_READINESS.md §76.11`) via **DEC-056** and OQ-ANOM-01 (P1, M10 blocker, §76.11) via **DEC-057**. OQ-ANOM-02 (§44.2): four-phase event volume baseline analysis (staging-only 0–0.4 events/30-min → pre-beta 1.8–18 → consumer beta 18–180 → post-enterprise 180–1,800); false-positive risk confirmed limited to staging-only phase only; existing 08:00–22:00 UTC gate already eliminates off-peak concern. Four-option analysis (a/b/c/a+graduated): Option (a+graduated) adopted — 30-min threshold and business-hours gate confirmed unchanged from §27.7; graduated activation policy added: shadow mode (P3 Slack) for 30 calendar days after production deployment, then full P1 PagerDuty on day 31 or `auth_event_avg_per_30min > 5`; 30-day cap is absolute; `system.siem_alert_activated` DEC-030 event (STANDARD, 3yr) records transition. AL-SIEM-06 dual-phase specification (§44.2.4): shadow-mode row (P3 Slack, next-business-day SLA, diagnostic accumulation instructions), full-mode row (P1 PagerDuty HIGH `form-devops`, < 30 min SLA, standard SIEM triage procedure), AL-SIEM-06-SHADOW-END informational row (triggers on event_count floor or day 30; emits chain event; updates PagerDuty routing). Rationale four points: no threshold change (30-min detection lag vs 60-min undetected-stall window tradeoff); graduated activation addresses sole identified risk; CC4.1 continuity via P3 shadow alerts + chain event; AL-SIEM-05 P0 no-shadow-mode precedent confirms the layered approach. OQ-ANOM-01 (§44.3): Analytics Engine GROUP BY `(blob4 tenant_id, blob2 actor_ip_subnet)` architecture confirmed; cross-tenant blind spot debunked across three dimensions: GROUP BY evaluation order (per-bucket before HAVING, not fleet-wide), ingestion pipeline lag symmetry (symmetric across tenants — no per-tenant query priority), HAVING threshold masking (impossible given distinct (tenant_id, subnet) bucket keys). Decision: no architecture change required; mandatory staging verification test required before M5 activation; dual-tenant synthetic test: HIGH_VOLUME_TENANT (1,000 failures, 203.0.113.0/24) + LOW_VOLUME_TENANT (12 failures, 198.51.100.0/24); three assertions: Tenant B fires, failure_count = 12 exactly, no cross-tenant attribution error. On pass: emit `system.siem_calibration_verified` (STANDARD, 3yr). Re-evaluation trigger: M9 ClickHouse migration. §44.4 two DEC-030 events with Zod schemas: `system.siem_alert_activated` (rule_id, activation_mode enum, shadow timestamps, event_avg scalar — no per-user data) and `system.siem_calibration_verified` (correlation_rule enum, test_id, test_result, boolean assertions; `z.string().startsWith('lt-')` constraint on both tenant IDs — no real customer UUIDs possible). §44.5 two SOC 2 evidence artefacts: CALIB-E-001 (CC4.1/CC7.2 — `siem_alert_activated` chain event + shadow-period P3 Slack log; demonstrates calibration governance before P1 activation; complements ANOM-E-005 §76 non-fire attestation) and CALIB-E-002 (CC7.2/CC4.1 — `siem_calibration_verified` chain event + CI test log; empirical per-tenant isolation proof; closes OQ-ANOM-01 with direct test evidence rather than architectural inference). §44.6 eleven-item implementation checklist: 7× P0/M5 (DEC-030 event registration, CR-01 isolation test implementation + staging run + CALIB-E-002 filing, AL-SIEM-06 shadow deployment, §27.7 + §6.2 alert table patch, SOC2_READINESS §76.11 OQ updates, §76.7 evidence table additions); 2× P1/30-days-post-M5 (full P1 routing activation + CALIB-E-001 filing, §76.10 checklist cross-update + §76.9 gap tracker advance); 2× P2/Annual + M9 (annual false-positive review against Option (b) re-evaluation threshold, post-ClickHouse CR-01 re-verification). §44.7 OQ status: both 🟢 Resolved. Cross-updates: SOC2_READINESS §76.11 (OQ-ANOM-01/02 → 🟢), OBSERVABILITY §27.7 (dual-phase AL-SIEM-06 spec), OBSERVABILITY §6.2 (AL-SIEM-06-SHADOW-END row), AUDIT_LOG_SCHEMA §6.System (two new events). Cross-references: `docs/OBSERVABILITY.md §27.3` (CR-01 Analytics Engine SQL — §44.3.1 references query structure); `docs/OBSERVABILITY.md §27.7` (AL-SIEM-06 source definition — §44.2.4 patch applied per §44.6 item 5); `docs/OBSERVABILITY.md §34.3` (SIEM bridge Analytics Engine CR-01 variant — per-tenant grouping confirmed in §44.3.2); `docs/OBSERVABILITY.md §6.2` (master alert table — AL-SIEM-06-SHADOW-END informational row); `docs/SOC2_READINESS.md §76.11` (OQ-ANOM-01/02 source — both 🟢 Resolved); `docs/SOC2_READINESS.md §76.7` (CALIB-E-001/002 added to CC4.1 and CC7.2 evidence rows); `docs/SOC2_READINESS.md §76.9` (CC4.1 monitoring-of-monitoring gap tracker: 🟡 Partial → 🟢 on CALIB-E-001 filing); `docs/AUDIT_LOG_SCHEMA.md §6.System` (two new DEC-030 event types — P0 before M5); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — no §44 DEC-030 events trigger R-05 directly; calibration tests run in staging only and use synthetic tenant IDs); `docs/DECISION_LOG.md DEC-056` (OQ-ANOM-02 closure); `docs/DECISION_LOG.md DEC-057` (OQ-ANOM-01 closure). Privacy floor: no user_id, no health data, no plaintext IP in any §44 event; `auth_event_avg_per_30min` is a fleet-wide scalar aggregate incapable of identifying individual users; `lt-` prefixed synthetic tenant IDs in `siem_calibration_verified` are validated by Zod `startsWith('lt-')` and are not linked to any real enterprise customer. Owner: security-engineer + devops-lead + compliance-officer.*
+
+---
+
 *v3.8 (2026-06-13): §41 Wearable Integration & Health Platform Sync Pipeline Observability — closes the data-collection-availability gap left by `docs/DATA_MODEL.md §14` (which defines the schema and sources) and `docs/OBSERVABILITY.md §28` (which covers mobile app performance but not the backend ingestion pipeline). §41 scopes to five sources (HealthKit, Health Connect, Whoop, Oura, Garmin) and three pipeline stages: (1) source-to-`wearable-ingestion-worker` notification, (2) Worker validate-and-insert, (3) `wearable_readings` committed. Privacy invariant enforced throughout: no `user_id`, no reading values, no health data in any signal — only aggregate counts, source slugs, and error codes. §41.2 RED metrics: six rate signals (sync success rate by source × time window; OAuth grant/revocation counts), five error signals (sync failure rate by source × error_class enum; stale-data coaching event rate), four duration signals (p95 Worker end-to-end latency by source; Whoop API response time p95). §41.3 six WS-SLO-* entries: WS-SLO-01 (HealthKit success ≥ 99% / 24h), WS-SLO-02 (Health Connect ≥ 97% / 24h — Android WorkManager 15-minute floor increases variance), WS-SLO-03 (Whoop ≥ 98% / 24h), WS-SLO-04 (Oura ≥ 99% / 24h), WS-SLO-05 (Garmin ≥ 95% / 24h — enterprise-contract API; lower floor reflects Garmin Health API SLA), WS-SLO-06 (fleet freshness: ≥ 95% of active users with a connected wearable have a reading < 26h old, measured at 07:00 UTC daily). §41.4 seven AL-WS-* alert rules: AL-WS-01 (P1, Whoop OAuth expiry wave > 5% failing on `oauth_expired` in 1h, PagerDuty + form-customer-success Slack), AL-WS-02 (P1, Whoop API 429 rate > 10% in 15 min, PagerDuty form-platform), AL-WS-03 (P2, Health Connect failure > 10% / 30 min, Slack), AL-WS-04 (P1, Oura API total failure 15 min, PagerDuty form-platform), AL-WS-05 (P2, HealthKit background delivery stall: zero ingestions for a tenant with active HealthKit users for > 4h, Slack), AL-WS-06 (P1, fleet freshness SLO-06 breach at daily check, PagerDuty form-platform + form-customer-success, no auto-resolve), AL-WS-07 (P2, Garmin OAuth expiry on any enterprise tenant, Slack + CSM notification). §41.5 pg_cron job 31 `wearable_sync_freshness_check` (daily 07:05 UTC — 5 min after Victor morning push window closes; freshness window 26h; emits WS-SLO-06 `wearable.fleet_freshness_assessed` event; k-anonymity gate: suppresses per-source breakdown if any source N < 5 across fleet). §41.6 six DEC-030 HMAC-chained events: `wearable.sync_completed` (STANDARD, 2yr — `source`, `reading_count` integer, `oldest_reading_age_hours` float; no user_id; tenant_id nullable for consumer tier), `wearable.sync_failed` (HIGH, 3yr — `source`, `error_class` enum, `error_message_hash` SHA-256), `wearable.oauth_token_expired` (HIGH, 3yr — `source` whoop|oura|garmin only; HealthKit/HealthConnect use OS permissions, no OAuth), `wearable.permission_revoked` (HIGH, 5yr — GDPR Art. 7(3) withdrawal record; `revocation_type` enum user_initiated|os_prompt|enterprise_mdm; no user_id — linked to consent chain by `consent_event_id` foreign key), `wearable.fleet_freshness_assessed` (STANDARD, 2yr — `fresh_pct` 0–100 float, `sources_breakdown` object by source, `slo_met` bool; no per-user data; k-anonymity gate enforced by pg_cron job 31), `wearable.stale_data_coaching_context` (HIGH, 3yr — emitted when Victor ingestion layer detects wearable data > 48h old is used as HRV coaching context; no `user_id`; `hrv_data_age_hours` float; `source`; triggers §41.7 coaching safety downgrade). §41.7 coaching safety integration: stale HRV data (> 48h) triggers mandatory confidence downgrade — Victor must not surface HRV-based training adjustments at HIGH confidence without fresh data; `wearable.stale_data_coaching_context` event is the compliance evidence that the downgrade ran; clinical-safety has VETO on any stale-data coaching output that bypasses downgrade. §41.8 six-panel "Wearable Sync Pipeline Health" Metabase dashboard (`FORM-Platform` collection; no PII; k-anonymity enforced in all per-source panels). §41.9 three SOC 2 evidence artefacts: WS-E-001 (A1.1 — quarterly `wearable.sync_completed` chain excerpt per source: data collection available as promised), WS-E-002 (P3.2 — quarterly fleet freshness report: data from specified sources collected per privacy notice), WS-E-003 (CC7.2 — AL-WS-01 through AL-WS-07 PagerDuty/Slack configuration screenshots). §41.10 two open questions: OQ-WS-OBS-01 (P1 — Garmin Health API SLA: confirm production availability target before filing WS-E-001 for Garmin; file OQ as DECISION_LOG entry before M10 enterprise pilot), OQ-WS-OBS-02 (P2 — `wearable.stale_data_coaching_context` namespace ownership: wearable namespace vs. §32 Victor AI Safety chain; recommendation: dual-emit for SOC 2 P-series + CC7.2 cross-coverage; resolve M8). §41.11 ten-item implementation checklist: 4× P0/M5–M6 (six DEC-030 events registration in AUDIT_LOG_SCHEMA.md, wearable-ingestion-worker instrumentation, pg_cron job 31 DDL + cron registration, AL-WS-01/02/04/06 PagerDuty routing), 3× P1/M7–M8 (AL-WS-03/05/07 Slack alerts, Metabase dashboard, WS-SLO-06 coaching-safety downgrade gate in Victor ingestion), 3× P2/M9–M10 (WS-E-001/002 evidence collection, OQ-WS-OBS-01 Garmin SLA decision, OQ-WS-OBS-02 namespace decision). Cross-references: `docs/DATA_MODEL.md §14` (wearable_readings schema; five-source integration table — this section is the observability companion); `docs/DATA_MODEL.md §17` (enterprise admin reporting aggregate-only model — fleet freshness metric is the observability signal that §17.4.3 wearable engagement aggregate is populated); `docs/OBSERVABILITY.md §28` (mobile app performance — covers client-side rendering, not server-side ingestion pipeline; §41 is the backend complement); `docs/OBSERVABILITY.md §32` (Victor AI Safety — stale-HRV coaching context event cross-references §32 clinical-safety monitoring); `docs/OBSERVABILITY.md §33` (enterprise QBR metrics — WS-SLO-06 fleet freshness rate is an input to the engagement health score in §33.4); `docs/SOC2_READINESS.md §35.6.3` (wearable_readings retention: 2-year proposed period); `docs/AUDIT_LOG_SCHEMA.md §Wearable` (six new DEC-030 events to register — P0 before M5); `docs/CLINICAL_SAFETY.md` (stale-HRV coaching output veto authority); DEC-030 (HMAC chain requirement for all six events). Owner: platform-engineer + devops-lead + compliance-officer.*
 
 *v3.7 (2026-06-13): §40 Pre-Launch Load Testing & Performance Capacity Observability — closes the SOC 2 observability gap *"Load testing before launches"* noted in `docs/SOC2_READINESS.md §2` (previously 🟡 Gap → 🟡 Partial with §33.3 k6 scenarios defined; §40 advances toward 🟢 by adding the DEC-030 HMAC-chain layer and production alert rules). §40 is the observability companion to `docs/SOC2_READINESS.md §33.3`: §33.3 defines WHAT the gate tests, §40 defines HOW the results are audited and monitored. §40.1 scopes to the load test gate (not mobile client, not Anthropic API, not DR failover); establishes privacy invariant (synthetic `lt-` tenant IDs only; no real user or health data in any payload). §40.2 trigger matrix: four gate events mapped to required k6 profiles and DEC-030 actions, plus a documented bypass protocol (compliance-officer acknowledgement + CRITICAL event + 48h post-deploy test). §40.3 six SLOs: PERF-SLO-01 (baseline p95 ≤ 300 ms — derived from §33.3 and §33.4.1 production p95 < 300 ms target), PERF-SLO-02 (SSO burst auth p95 ≤ 500 ms), PERF-SLO-03 (coaching session p95 ≤ 2,000 ms), PERF-SLO-04 (error rate ≤ 0.1%), PERF-SLO-05 (SCIM 5xx = 0, zero-tolerance); PERF-SLO-01–05 are hard gates blocking merge; PERF-SLO-06 (quarterly p95 drift ≤ +20%) is a soft gate generating investigation alert. §40.4 five AL-PERF-* production alert rules: AL-PERF-01 (P2, p95 > 300 ms / 10 min, Slack), AL-PERF-02 (P1, p99 > 600 ms / 5 min, PagerDuty), AL-PERF-03 (P1, error rate > 0.5% / 5 min, PagerDuty), AL-PERF-04 (P1, load_test_gate_bypassed CRITICAL event, PagerDuty form-compliance, no auto-resolve), AL-PERF-05 (P2, quarterly PERF-SLO-06 breach, Slack). §40.5 five DEC-030 HMAC-chained events: `system.load_test_initiated` (STANDARD, 3yr — `profile`, `commit_sha`, `triggered_by`, `environment:staging`), `system.load_test_completed` (STANDARD, 3yr — full `slo_results` object for PERF-SLO-01–05), `system.load_test_failed` (HIGH, 7yr — `failing_slos` array, `gate_action:merge_blocked`), `system.load_test_gate_bypassed` (CRITICAL, 7yr — `bypass_reason_hash` SHA-256 per DEC-044 pattern; plaintext in Linear ticket), `system.perf_regression_detected` (HIGH, 7yr — quarterly PERF-SLO-06 breach). PERF-CHAIN-01 ordering invariant: `load_test_initiated` precedes `completed`/`failed`; inversion = P1 per R-05. §40.6 pg_cron job 30 `quarterly_perf_regression_check` (`0 9 1 4,7,10 1` — first Monday Apr/Jul/Oct; 35-day check window). §40.7 six-panel "Performance & Load Test History" Metabase dashboard (`FORM-DevOps`, `form_admin` + `compliance_reviewer` visibility, no PII). §40.8 four SOC 2 evidence artefacts: LT-E-001 (A1.1 — `system.load_test_completed` quarterly CSV; `compliance/evidence/a1/`), LT-E-002 (A1.2 — PERF-SLO-06 quarterly regression report with dual sign-off; `compliance/evidence/a1/`), LT-E-003 (CC5.2/CC7.2 — AL-PERF-04 PagerDuty history + bypass events; `compliance/evidence/cc5/`); auditor narrative for A1.1 supplied (commit_sha in `system.load_test_completed` links to CI-E-001 §38.8 — closes policy→gate→performance→SLA evidence chain). §40.9 three open questions: OQ-PERF-01 (P1, k6 OSS vs. Cloud for quarterly reference run), OQ-PERF-02 (P1, staging data anonymisation procedure for quarterly refresh), OQ-PERF-03 (P2, per-tenant vs. fleet-wide profile scaling post-Series A). §40.10 twelve-item implementation checklist: 4× P0/M5–M6 (DEC-030 event registration, GitHub Actions load-test job, merge gate enforcement, AL-PERF-* PagerDuty/Slack config), 5× P1/M6–M7 (all five k6 scenarios for enterprise gate triggers, pg_cron job 30, Metabase dashboard, OQ-PERF-01 decision, staging anonymisation procedure), 3× P2/M9–M10 (LT-E-001/002 evidence collection, OQ-PERF-03 decision). `docs/SOC2_READINESS.md §2` gap table updated: "Load testing before launches" 🟡 Gap → 🟡 Partial. Owner: devops-lead + platform-engineer + compliance-officer.*
