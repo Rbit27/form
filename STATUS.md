@@ -1,4 +1,4 @@
-# FORM · Project Status v5.2.0
+# FORM · Project Status v5.3.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.2.0** — 2026-06-14
+**v5.3.0** — 2026-06-14
 
 ---
 
@@ -28,9 +28,9 @@
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
 | 751–800 | Athlete lifecycle & context | 50 | **BLOCK COMPLETE** — all 50 posts written v5.1.0: posts 791 (athletes with movement limitations · clinical-safety CONDITIONAL PASS), 793 (sustained high stress training · clinical-safety CONDITIONAL PASS), 794 (medically-restricted diet · clinical-safety CONDITIONAL PASS) now written with embedded guard rails. Blog cards added for posts 785–800. sports-scientist review required for all 50 before publish |
-| 801–850 | Evidence-based deep dives | 7 | **7/50 written** — posts 801–807: creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms 2020s, myofibrillar vs. sarcoplasmic hypertrophy. sports-scientist review required before publish |
+| 801–850 | Evidence-based deep dives | 9 | **9/50 written** — posts 801–809: creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms 2020s, myofibrillar vs. sarcoplasmic hypertrophy, steroids and natural training research interpretation, genetic ceiling. sports-scientist review required before publish |
 
-**Total posts: 802**
+**Total posts: 804**
 
 **Editorial series 11–16** — post-16 written (overtraining vs underrecovery · clinical-safety PASS); blog.html cards added for posts 11–16; post-17 (AI-coach vs PT) proposed in README.
 
@@ -44,7 +44,7 @@
 | SSO_SCIM_IMPLEMENTATION.md | Complete — 9 283 lines | v4.x |
 | INCIDENT_RESPONSE.md | Complete — 9 575 lines | v4.x |
 | DATA_MODEL.md | Complete — 12 618 lines | v4.x |
-| OBSERVABILITY.md | Complete — v3.6, §39 Backup Integrity/DR Readiness added, pg_cron job 29 | v4.24.2 |
+| OBSERVABILITY.md | Complete — v4.0, §43 Webhook Delivery Observability added (WH-SLO-01–04, AL-WH-01–05, DDL 0074/0074b, pg_cron job 34) · OQ-WL-OBS-01 resolved DEC-054 | v5.1.1 |
 | COST_MODEL.md | Complete — 8 341 lines | v4.x |
 | SHARED_RESPONSIBILITY_MODEL.md | Complete — v1.0 | v4.18.0 |
 
@@ -54,6 +54,7 @@
 
 | ID | Summary | Status |
 |---|---|---|
+| DEC-054 | OQ-WL-OBS-01: `custom_domain_hash` SHA-256 for white_label DEC-030 payloads | Closed |
 | DEC-051 | OQ-SSO-28.2: tenant_users_role_history retention 7yr | Closed |
 | DEC-050 | OQ-TURH-01+02: form_role_enum & role_change_source_enum ENUM types | Closed |
 | DEC-049 | OQ-SSO-27.2: role change audit trail — separate table approach | Closed |
@@ -97,7 +98,7 @@
 ## Next priorities
 
 - **Block 751–800: COMPLETE** — all 50/50 posts written; posts 791, 793, 794 clinical-safety CONDITIONAL PASS (guard rails embedded); sports-scientist review required for all 50 before publish
-- **Block 801–850 ACTIVE** — Evidence-based deep dives: 7/50 written (posts 801–807: creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic); next: steroids/natural training interpretation, genetic ceiling, fat as fuel, sleep and performance
+- **Block 801–850 ACTIVE** — Evidence-based deep dives: 9/50 written (posts 801–809: creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic, steroids/research interpretation, genetic ceiling); next: fat as fuel, sleep and performance, deload science, training age, volume landmarks
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
@@ -109,4 +110,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v5.2.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v5.3.0**
