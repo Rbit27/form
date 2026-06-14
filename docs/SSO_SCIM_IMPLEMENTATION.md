@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v2.1
+# FORM · SSO/SCIM Implementation v2.2
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -37,6 +37,7 @@
 27. [SCIM v2.0 Endpoint — Worker Implementation Design (Closes G-001)](#27-scim-v20-endpoint--worker-implementation-design-closes-g-001)
 28. [SCIM Role Change Audit Trail & Session Revocation Fallback Design](#28-scim-role-change-audit-trail--session-revocation-fallback-design)
 29. [OQ-SSO-28.2 Resolution — `tenant_users_role_history` Retention Period (DEC-051)](#29-oq-sso-282-resolution--tenant_users_role_history-retention-period-dec-051)
+30. [OQ-MOBILE-03 Resolution — Mobile SSO Browser Mode & Deep-Link Security (DEC-059)](#30-oq-mobile-03-resolution--mobile-sso-browser-mode--deep-link-security-dec-059)
 
 ---
 
@@ -10456,6 +10457,413 @@ The alert language in AL-TURH-01 below distinguishes these two cases by checking
 | 8 | Annual review: confirm `scim.user_updated` DEC-030 retention remains 7yr; if any change proposed, trigger TURH-CHAIN-01 retention alignment review (§29.2.1) before implementation. Document in `docs/DECISION_LOG.md`. | compliance-officer | **P2** | Annual (M12, M24, …) | [ ] |
 
 ---
+
+---
+
+## §30 OQ-MOBILE-03 Resolution — Mobile SSO Browser Mode & Deep-Link Security (DEC-059)
+
+**Owner:** security-engineer + platform-engineer + enterprise-architect
+**SOC 2 scope:** CC6.1, CC6.2, CC8.1
+**Last updated:** 2026-06-14
+**Closes:** OQ-MOBILE-03 from `docs/OBSERVABILITY.md §28.13` (P1 — before first enterprise SSO customer, M10)
+**Decision:** DEC-059 — System browser mandated for all mobile SSO redirects; embedded WebView prohibited.
+
+---
+
+### 30.1 Purpose and Scope
+
+OQ-MOBILE-03 (`docs/OBSERVABILITY.md §28.13`) identified a security architecture gap in FORM's mobile SSO flow: React Native's `Linking` API handles the `form://` deep link that returns from the IdP after SAML assertion POST or OIDC authorization code redirect, but the open question was whether the *outbound* authentication redirect — sending the user to the IdP login page — should use the system browser or an embedded WebView.
+
+The question was flagged because certain enterprise IdPs (specifically Azure AD B2C custom policy flows and some Okta org-level configurations) exhibit redirect behaviour that some integrations handle with an embedded WebView. OQ-MOBILE-03 asked: should FORM follow that approach, or enforce system-browser-only with IdP-specific workarounds?
+
+This section documents the security analysis (§30.4), the DEC-059 decision (§30.3), the React Native implementation (§30.5), per-IdP compatibility details (§30.6), Universal Links / App Links callback hardening (§30.7), Azure AD B2C OIDC workaround (§30.8), two DEC-030 audit events (§30.9), one alert rule (§30.10), SOC 2 evidence (§30.11), and the implementation checklist (§30.13).
+
+**Out of scope:** IdP-initiated flows (§1.2, §3) do not involve a mobile outbound redirect; they are excluded. Consumer iOS login via Apple Sign In is excluded (SSO scope is enterprise only — per document header). Session revocation KV (§22) and CAEP (§23) are unaffected.
+
+**Privacy floor:** No user_id, employee name, email, or health data appears in any DEC-030 event defined in this section. The `browser_mode` field records `"system_browser"` or `"webview_blocked"` — a configuration state, not personal data.
+
+---
+
+### 30.2 Mobile SSO Redirect Context
+
+The §1.2 OIDC SP-Initiated flow and SAML SP-Initiated flow diagrams describe the browser / admin dashboard client. For the React Native mobile client the flow diverges at step 2 (outbound redirect to IdP):
+
+```
+React Native App                  FORM Worker               Customer IdP
+      |                               |                           |
+      |  1. User taps "Sign in        |                           |
+      |     with [Company SSO]"       |                           |
+      |------------------------------>|                           |
+      |                               |                           |
+      |  2. Worker returns            |                           |
+      |     IdP auth URL              |                           |
+      |<------------------------------|                           |
+      |                               |                           |
+      |  3. App opens IdP URL         |                           |
+      |     in ??? (DECISION POINT)   |                           |
+      |        (a) expo-web-browser   |                           |
+      |            openAuthSessionAsync                           |
+      |        (b) <WebView>          |                           |
+      |                               |                           |
+      |  4. User authenticates at IdP |                           |
+      |<-----------------------------------------------------------
+      |                               |                           |
+      |  5. IdP redirects to          |                           |
+      |     form://auth/callback?...  |                           |
+      |     OR https://form.coach/... |                           |
+      |     (Universal Link)          |                           |
+      |                               |                           |
+      |  6. App receives callback     |                           |
+      |     (Linking.addEventListener)|                           |
+      |------------------------------>|                           |
+      |                               |                           |
+      |  7. FORM Worker validates     |                           |
+      |     code/assertion, issues    |                           |
+      |     session JWT               |                           |
+      |<------------------------------|                           |
+```
+
+Step 3 is the decision point. DEC-059 resolves it to option (a) unconditionally.
+
+---
+
+### 30.3 DEC-059 Decision — System Browser Mandated
+
+**Decision:** FORM's React Native mobile application MUST use `WebBrowser.openAuthSessionAsync()` from `expo-web-browser` for ALL enterprise SSO outbound redirects. Embedding a `<WebView>` component for any SSO authentication step is **prohibited** — this is a hard security requirement, not a preference.
+
+- **iOS:** `openAuthSessionAsync` uses `ASWebAuthenticationSession` (separate sandboxed process; host app cannot observe URL, cookies, or keystrokes).
+- **Android:** `openAuthSessionAsync` uses Chrome Custom Tabs (separate process with Android Credential Manager integration; Safe Browsing enabled by default).
+- **Custom scheme callback (`form://`):** Permitted for OIDC SP-initiated as a fallback; however, Universal Links (iOS) / App Links (Android) via `https://form.coach/auth/mobile/callback/{tenant_id}` are **preferred** to eliminate custom-scheme hijacking risk on unpatched devices (§30.7).
+- **Azure AD B2C:** Use OIDC PKCE mode — not SAML — for any tenant using Azure AD B2C custom policies (§30.8). System browser is fully compatible with OIDC PKCE mode.
+- **Okta, Entra, Google:** All three are compatible with `openAuthSessionAsync` using their standard OIDC authorization endpoints (§30.6).
+
+**Provisional hard gate:** If a future IdP is discovered that genuinely cannot complete authentication via a system browser under any configuration, platform-engineer + security-engineer + enterprise-architect must jointly evaluate the case. The evaluation requires: (1) documented evidence the IdP vendor cannot support system browser; (2) security-engineer threat model for the WebView approach; (3) founder + compliance-officer sign-off; (4) a new DEC entry in `docs/DECISION_LOG.md`. The prohibition stands until that sign-off is obtained.
+
+---
+
+### 30.4 Security Analysis — System Browser vs. Embedded WebView
+
+| Security Property | System Browser (`ASWebAuthenticationSession` / Chrome Custom Tabs) | Embedded `<WebView>` |
+|---|---|---|
+| **Process isolation** | Runs in a separate OS process. Host app cannot access URL, cookies, DOM, or keystrokes during authentication. | Runs in the same process as the React Native app. Any malicious SDK, native module, or future app update could instrument `shouldOverrideUrlLoading()` / `onReceivedSslError()` to intercept credentials. |
+| **TLS certificate validation** | Enforced by the OS (SecureTransport / BoringSSL). Cannot be disabled by the host app. | Host app can override `onReceivedSslError()` on Android to silently accept invalid certificates — disabling HTTPS protection entirely. iOS WKWebView is harder to subvert but still allows `decidePolicyForNavigationAction` interception. |
+| **Phishing detection** | Safari (iOS) and Chrome (Android) include Google Safe Browsing / fraud detection for URLs loaded in system browser tabs. | No equivalent phishing detection. A lookalike IdP URL (e.g., `https://login.microsoftonfine.com`) shows no warning. |
+| **Credential Manager / Autofill** | Chrome Custom Tabs integrates with Android Credential Manager (passkeys, saved passwords). Safari integrates with iCloud Keychain. | WebView autofill is opt-in and inconsistent; passkeys are not supported in WebView contexts as of Android 14 / iOS 17. |
+| **Cookie / session isolation** | `ASWebAuthenticationSession` uses an isolated cookie store separate from the app and from WKWebView — prevents the host app from reading SSO session cookies post-auth. | Shares a WebView cookie store. The app can read IdP session cookies post-authentication via `CookieManager.getInstance().getCookie()` (Android) or `HTTPCookieStorage` bridging (iOS). |
+| **RFC 9700 compliance** | RFC 9700 §4.1 (OAuth 2.0 Security Best Current Practice): "The authorization server MUST NOT allow the embedding of its authorization endpoint in embedded user agents." Using a system browser satisfies this requirement by design. | Violates RFC 9700 §4.1. Enterprise customers whose security teams audit the mobile app for OAuth BCP compliance will flag this as a Critical finding. |
+| **SOC 2 auditor narrative** | CC6.1: credentials are handled in a sandboxed OS process with no host-app access — demonstrates industry-standard secure auth design. | A WebView approach would require explaining why FORM chose a non-standard, lower-security path — auditors routinely flag this under CC6.1 as a control weakness. |
+
+**Conclusion:** Embedded WebView creates four independently sufficient grounds for rejection: (1) process isolation failure, (2) RFC 9700 non-compliance, (3) credential manager incompatibility, (4) TLS bypass risk. No IdP compatibility benefit is sufficient to accept these risks when system browser alternatives exist for all FORM-supported IdPs.
+
+---
+
+### 30.5 React Native Implementation
+
+**File:** `apps/mobile/src/auth/sso-browser.ts`
+
+```typescript
+// apps/mobile/src/auth/sso-browser.ts
+// Canonical mobile SSO browser launcher — DEC-059.
+// NEVER use <WebView> for SSO. openAuthSessionAsync is the only permitted path.
+
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
+
+export type SsoBrowserResult =
+  | { type: 'success'; callbackUrl: string }
+  | { type: 'cancel' }
+  | { type: 'error'; message: string };
+
+/**
+ * Opens the IdP authorization URL in a system browser:
+ *   - iOS:     ASWebAuthenticationSession (sandboxed process)
+ *   - Android: Chrome Custom Tabs (separate process)
+ * Never opens a WebView. See docs/SSO_SCIM_IMPLEMENTATION.md §30.3 (DEC-059).
+ */
+export async function openSsoBrowser(
+  idpAuthUrl: string,
+  tenantId: string,
+): Promise<SsoBrowserResult> {
+  // Prefer Universal Link callback (https) over custom scheme (form://)
+  // to eliminate custom-scheme hijacking on unpatched Android devices.
+  // See §30.7 for Universal Links / App Links configuration.
+  const callbackScheme = Platform.OS === 'ios'
+    ? `https://form.coach/auth/mobile/callback/${tenantId}`
+    : `https://form.coach/auth/mobile/callback/${tenantId}`;
+
+  let result: WebBrowser.WebBrowserAuthSessionResult;
+  try {
+    result = await WebBrowser.openAuthSessionAsync(idpAuthUrl, callbackScheme, {
+      // preferEphemeralSession: true on iOS prevents sharing cookies with Safari.
+      // Set to false so the user's existing IdP session (e.g., already logged into Okta)
+      // carries over — avoids forcing re-authentication on every app open.
+      preferEphemeralSession: false,
+      // showInRecents: false on Android prevents the auth tab appearing in the
+      // task switcher, reducing the surface for task-hijacking attacks.
+      showInRecents: false,
+      // createTask: false ensures the Chrome Custom Tab does not create a separate
+      // Android back-stack task, preventing deep-link interception via task affinity.
+      createTask: false,
+    });
+  } catch (err) {
+    return { type: 'error', message: (err as Error).message };
+  }
+
+  if (result.type === 'success' && result.url) {
+    return { type: 'success', callbackUrl: result.url };
+  }
+  if (result.type === 'cancel' || result.type === 'dismiss') {
+    return { type: 'cancel' };
+  }
+  return { type: 'error', message: `Unexpected browser result: ${result.type}` };
+}
+```
+
+**Lint guard** — add to `.eslintrc.js` to prevent accidental WebView usage in the auth directory:
+
+```js
+// .eslintrc.js — added as part of DEC-059
+{
+  files: ['apps/mobile/src/auth/**/*.{ts,tsx}'],
+  rules: {
+    // Prohibit <WebView> in the auth directory unconditionally.
+    // WebView is never permitted for SSO. See docs/SSO_SCIM_IMPLEMENTATION.md §30.3.
+    'no-restricted-imports': ['error', {
+      paths: [{ name: 'react-native-webview', message: 'WebView is prohibited in the auth module (DEC-059).' }],
+    }],
+  },
+}
+```
+
+**Unit test assertion** (runs in CI on every PR touching `apps/mobile/`):
+
+```typescript
+// apps/mobile/src/__tests__/auth/no-webview-in-sso.test.ts
+import { execSync } from 'child_process';
+
+describe('DEC-059: No WebView in SSO auth module', () => {
+  it('contains zero WebView imports in apps/mobile/src/auth/', () => {
+    const result = execSync(
+      'grep -r "react-native-webview\\|<WebView" apps/mobile/src/auth/ || true',
+    ).toString();
+    expect(result.trim()).toBe('');
+  });
+});
+```
+
+---
+
+### 30.6 IdP Compatibility Matrix
+
+| IdP | Protocol | System Browser Compatible? | Notes |
+|---|---|---|---|
+| **Okta** | OIDC (preferred) | ✅ Full | Standard PKCE OIDC flow. Callback to `https://form.coach/auth/mobile/callback/{tenant_id}` (Universal Link) or `form://auth/callback` (custom scheme). No configuration change required. |
+| **Okta** | SAML | ✅ Full | ACS URL `https://form.coach/auth/saml/{tenant_id}/acs` is a server-side callback — the mobile client simply opens the Okta SSO URL in system browser; the SAML POST happens server-to-server after user authenticates. IdP-initiated SAML returns to the same ACS, then FORM issues a deep-link redirect to the mobile app. |
+| **Microsoft Entra ID (Azure AD)** | OIDC (preferred) | ✅ Full | Standard PKCE OIDC. `redirect_uri` must be registered in the Entra app registration as `https://form.coach/auth/mobile/callback/{tenant_id}`. Entra's system-browser redirect works reliably on both iOS and Android. |
+| **Microsoft Entra ID** | SAML | ✅ Full | Same as Okta SAML — server-side ACS callback. No mobile-browser interaction required after initial redirect to IdP login page. |
+| **Azure AD B2C** | SAML (custom policy) | ⚠️ Avoid | Some B2C custom policies POST the SAML assertion to a form inside a redirect chain that some implementations handle with a WebView. **Mitigation: configure B2C tenants to use OIDC PKCE mode instead of SAML** (§30.8). All B2C custom policies that expose an OIDC endpoint work correctly with system browser. |
+| **Azure AD B2C** | OIDC (custom policy) | ✅ Full | OIDC PKCE mode works with `openAuthSessionAsync`. Use `https://login.microsoftonline.com/{b2c_tenant}.onmicrosoft.com/{policy_name}/oauth2/v2.0/authorize` as the auth URL. The redirect completes in the system browser with no WebView required. |
+| **Google Workspace (OIDC)** | OIDC | ✅ Full | Google explicitly recommends Chrome Custom Tabs for OAuth on Android (their documentation states: "We strongly recommend against using WebViews"). `hd` domain restriction applies as per §2.3. |
+| **PingFederate / PingOne** | OIDC or SAML | ✅ Full | Both protocols tested by Ping's own React Native SDK, which uses Chrome Custom Tabs / ASWebAuthenticationSession. No WebView required. |
+| **OneLogin** | OIDC or SAML | ✅ Full | Standard OAuth 2.0 / SAML behaviour; system browser compatible. Redirect URI must be registered. |
+| **Generic SAML IdP** | SAML | ✅ Full | The ACS callback is server-side. Opening the IdP SSO URL in a system browser and waiting for the deep-link callback is the universal pattern for SAML on mobile. |
+
+**Decision for "⚠️ Avoid" case:** Any tenant currently using Azure AD B2C with a SAML custom policy MUST be migrated to OIDC PKCE mode before the mobile SSO feature is enabled for that tenant. The CSM onboarding playbook (§7) includes a pre-enablement check: if `sso_protocol = 'saml'` AND `idp_type = 'azure_ad_b2c'`, block mobile SSO enablement and flag to CSM for migration.
+
+---
+
+### 30.7 Universal Links (iOS) and App Links (Android) for SSO Callback
+
+Using `form://auth/callback` as the SSO redirect URI introduces a **custom scheme hijacking risk**: on devices running Android ≤ 11 (API level ≤ 30), any app can register the `form://` scheme and intercept the authorization code or SAML artifact before FORM's app receives it.
+
+**Mitigation: Universal Links (iOS) and App Links (Android)**
+
+Universal Links / App Links bind a specific `https://` domain to a specific app, verified by the OS at install time. The IdP redirect goes to `https://form.coach/auth/mobile/callback/{tenant_id}` — the OS intercepts this HTTPS URL and routes it directly to the FORM mobile app without opening a browser. No other app can claim the `form.coach` domain.
+
+**iOS — `apple-app-site-association` (AASA):**
+
+```json
+// https://form.coach/.well-known/apple-app-site-association
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.coach.form.app",
+        "paths": ["/auth/mobile/callback/*"]
+      }
+    ]
+  }
+}
+```
+
+Served at `https://form.coach/.well-known/apple-app-site-association` with `Content-Type: application/json`, no redirect, no authentication. The Cloudflare Worker at `form.coach` must serve this file at that path (static asset or KV-backed).
+
+**Android — `assetlinks.json`:**
+
+```json
+// https://form.coach/.well-known/assetlinks.json
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "coach.form.app",
+    "sha256_cert_fingerprints": ["<SHA256_OF_RELEASE_SIGNING_CERT>"]
+  }
+}]
+```
+
+Served at `https://form.coach/.well-known/assetlinks.json` with `Content-Type: application/json`.
+
+**Registering the Universal Link redirect URI:** The FORM Worker at `POST /auth/mobile/callback/{tenant_id}` (or `GET`, for OIDC code) must accept the `redirect_uri` value `https://form.coach/auth/mobile/callback/{tenant_id}` and treat it identically to the custom scheme equivalent. This value must also be registered in every supported IdP's application configuration (see §30.6 column "Notes" for per-IdP instructions).
+
+**Fallback:** If a device is running Android ≤ 11 with no Play Services, or the AASA/assetlinks fetch fails at install time, the OS falls back to opening `https://form.coach/auth/mobile/callback/{tenant_id}` in the browser. The Worker at that URL must detect this condition (absence of `X-Requested-Mobile: true` header from the React Native client) and render a deeplink redirect page: `<meta http-equiv="refresh" content="0;url=form://auth/callback?{params}">` — this falls back to the custom scheme for that specific device only, with the hijacking risk scoped to pre-Android-12 devices (< 10% of FORM's target enterprise fleet, per §28.6 device tier distribution).
+
+---
+
+### 30.8 Azure AD B2C — OIDC PKCE Mode Workaround
+
+Tenants using Azure AD B2C for employee SSO sometimes configure SAML as the primary protocol because their B2C custom policy was originally built for web apps. For mobile SSO, FORM requires OIDC PKCE mode. This is a standard B2C capability — no new policy is needed; only a new application registration.
+
+**Configuration steps for tenant IT admin (provided by CSM at onboarding):**
+
+1. In the Azure portal, navigate to **Azure AD B2C → App registrations → New registration**.
+2. Set the redirect URI to `https://form.coach/auth/mobile/callback/{tenant_id}` (type: Web, not SPA or Public client — the FORM Worker handles PKCE exchange server-side).
+3. Under **Authentication → Implicit grant and hybrid flows**, ensure both boxes are **unchecked** (PKCE via authorization code flow only; no implicit).
+4. Note the **Application (client) ID** and the **B2C tenant domain** (`{your-tenant}.b2clogin.com`).
+5. Provide FORM CSM with: Client ID, B2C tenant domain, User flow / policy name (e.g., `B2C_1_signupsignin`).
+
+**FORM CSM configures `tenant_sso_configs`:**
+
+```sql
+UPDATE tenant_sso_configs SET
+  sso_protocol         = 'oidc',
+  idp_type             = 'azure_ad_b2c',
+  oidc_discovery_url   = 'https://{b2c_tenant}.b2clogin.com/{b2c_tenant}.onmicrosoft.com/{policy_name}/v2.0/.well-known/openid-configuration',
+  oidc_client_id       = '{b2c_application_client_id}',
+  oidc_client_secret   = '{encrypted_client_secret}',  -- optional; PKCE can be confidential
+  mobile_sso_enabled   = true
+WHERE tenant_id = :tenant_id;
+```
+
+The existing OIDC callback worker (§1.2) handles Azure AD B2C OIDC tokens identically to Entra OIDC — the `iss` claim format differs (`{b2c_tenant}.b2clogin.com`) but JWKS validation and `sub`/`email` extraction follow the same path.
+
+---
+
+### 30.9 DEC-030 HMAC-Chained Audit Events
+
+Two new events, both registered in `docs/AUDIT_LOG_SCHEMA.md §6.SSO-Mobile`:
+
+| Event Type | Severity | Retention | Payload Fields | Notes |
+|---|---|---|---|---|
+| `sso.mobile_browser_mode_set` | STANDARD | 7 yr | `tenant_id`, `mobile_sso_enabled` (bool), `callback_scheme` (`"universal_link"` or `"custom_scheme"`), `idp_type`, `sso_protocol`, `changed_by_user_id` | Emitted when `mobile_sso_enabled` is toggled or callback scheme is changed in `tenant_sso_configs`. Establishes an auditable record that FORM's system-browser policy was active for the tenant at the time of each enterprise pilot. `user_id` of changing admin; no employee data. |
+| `sso.mobile_webview_blocked` | HIGH | 7 yr | `tenant_id`, `attempted_url_hash` (SHA-256 of the IdP auth URL, first 32 chars), `source_module` (`"sso-browser.ts"`), `blocked_at` | Emitted if any code path in `apps/mobile/src/auth/` attempts a WebView open for a URL matching an SSO endpoint pattern. Should never fire in production — its presence in the chain is itself an incident indicator (triggers AL-SSO-WEB-01 below). |
+
+```typescript
+// Emit sso.mobile_browser_mode_set when CSM enables mobile SSO for a tenant
+const event = {
+  event_type: 'sso.mobile_browser_mode_set',
+  severity: 'STANDARD',
+  payload: {
+    tenant_id:         tenantId,
+    mobile_sso_enabled: true,
+    callback_scheme:   universalLinksConfigured ? 'universal_link' : 'custom_scheme',
+    idp_type:          ssoConfig.idp_type,           // 'okta' | 'azure_ad' | 'azure_ad_b2c' | 'google' | 'generic_saml'
+    sso_protocol:      ssoConfig.sso_protocol,       // 'oidc' | 'saml'
+    changed_by_user_id: actorUserId,                 // UUID; no PII
+  },
+};
+await emitDec030Event(event, supabaseAdminClient);
+```
+
+**MOBILE-CHAIN-01 ordering invariant:** A `sso.mobile_webview_blocked` event MUST be preceded in the HMAC chain by a `sso.mobile_browser_mode_set` event with `mobile_sso_enabled: true` for the same `tenant_id`. A chain where the blocked event precedes enablement is a MOBILE-CHAIN-01 violation and triggers R-05 investigation.
+
+---
+
+### 30.10 Alert Rule AL-SSO-WEB-01
+
+| Field | Value |
+|---|---|
+| **Alert ID** | AL-SSO-WEB-01 |
+| **Condition** | Any `sso.mobile_webview_blocked` DEC-030 event emitted in production |
+| **Severity** | **P1** |
+| **Routing** | PagerDuty `form-security` service → security-engineer (on-call) + platform-engineer |
+| **Dedup key** | `sso-webview-blocked-{tenant_id}-{date}` (24h dedup window) |
+| **Auto-resolve** | No |
+| **Response SLA** | Acknowledge within 15 minutes; root cause within 4 hours |
+
+**Triage:** If AL-SSO-WEB-01 fires:
+1. Identify the `source_module` from the `sso.mobile_webview_blocked` event payload.
+2. Find the PR or commit that introduced the WebView call (git log `apps/mobile/src/auth/`).
+3. If an SDK update pulled in a dependency that opened WebView: treat as a supply-chain incident (R-08); engage security-engineer.
+4. If intentional code change: roll back the mobile release via EAS Update OTA channel; open a severity-1 Linear ticket; notify founder.
+5. The ESLint guard (§30.5) should have caught this in CI — investigate why it did not fire.
+
+**Note:** AL-SSO-WEB-01 should never fire under normal operation. Its sole purpose is to detect the unexpected — a CI bypass, a dependency injection, or a future code change that violates DEC-059. The alert's value is its zero-tolerance nature: one event is one incident.
+
+Register AL-SSO-WEB-01 in `docs/OBSERVABILITY.md §26.8` `sso_browser_security` subsection after implementation.
+
+---
+
+### 30.11 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control | Evidence Artefact |
+|---|---|---|
+| **CC6.1** — Logical access controls | Mobile SSO authentication is handled in a sandboxed system browser process (ASWebAuthenticationSession / Chrome Custom Tabs) that the host app cannot observe. The `sso.mobile_browser_mode_set` DEC-030 events establish an auditable record of when this control was activated for each tenant. | **SSO-WEB-E-001:** Export of all `sso.mobile_browser_mode_set` events for the observation period, demonstrating that every enterprise tenant with mobile SSO enabled used the system-browser mode (`callback_scheme` present). File at `compliance/evidence/sso/SSO-WEB-E-001_<YYYY>.csv`. 7-year retention. |
+| **CC6.2** — Prior to issuing credentials, FORM registers and authorises the relying party | Universal Links / App Links (§30.7) ensure only the signed FORM app binary can receive the SSO callback URL — the OS verifies the association file at install time, preventing credential interception by other apps. | **SSO-WEB-E-002:** AASA file (`apple-app-site-association`) + Android `assetlinks.json` version-controlled snapshots; CI test result showing no WebView in `apps/mobile/src/auth/` for the current build (`no-webview-in-sso.test.ts` green). File at `compliance/evidence/sso/SSO-WEB-E-002_<YYYY>.md`. 3-year retention. |
+| **CC8.1** — Security testing in SDLC | The `no-webview-in-sso.test.ts` test and the ESLint `no-restricted-imports` rule together form a CI gate that blocks any PR from introducing a WebView into the auth flow. AL-SSO-WEB-01 provides post-deployment detective coverage. | **SSO-WEB-E-002** (CI test log) as above; plus the **AL-SSO-WEB-01 zero-fire attestation** for the observation period (PagerDuty `form-security` service incident history showing zero AL-SSO-WEB-01 fires). 3-year retention. |
+
+**Auditor narrative for CC6.1:** FORM's mobile SSO authentication flow uses `ASWebAuthenticationSession` (iOS) and Chrome Custom Tabs (Android) exclusively, pursuant to DEC-059 (2026-06-14). These APIs run authentication in a separate OS-managed process with no access from the host application. The `sso.mobile_browser_mode_set` DEC-030 chain events (SSO-WEB-E-001) demonstrate that this control was active for every enterprise tenant with mobile SSO enabled during the observation period. The no-WebView CI gate (SSO-WEB-E-002) and AL-SSO-WEB-01 zero-fire attestation provide ongoing detective assurance that no code change bypassed this control.
+
+---
+
+### 30.12 OQ-MOBILE-03 Status
+
+| Status | 🟢 **Resolved — DEC-059 (2026-06-14)** |
+|---|---|
+| **Decision** | System browser (`expo-web-browser openAuthSessionAsync`) mandated; WebView prohibited |
+| **Rationale** | RFC 9700 §4.1 compliance + process isolation + TLS bypass prevention + credential manager integration + SOC 2 CC6.1 posture |
+| **Azure AD B2C workaround** | OIDC PKCE mode (§30.8) — system browser compatible, no custom policy change needed |
+| **Callback hardening** | Universal Links (iOS) + App Links (Android) preferred over `form://` custom scheme (§30.7) |
+| **OBSERVABILITY cross-update** | `docs/OBSERVABILITY.md §28.13` OQ-MOBILE-03 row: 🟡 P1 Open → **🟢 Resolved (DEC-059, 2026-06-14)** |
+
+---
+
+### 30.13 Implementation Checklist
+
+#### P0 — Before mobile SSO feature flag enabled for any enterprise tenant (M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Implement `openSsoBrowser()` in `apps/mobile/src/auth/sso-browser.ts` per §30.5 TypeScript spec. Replace any existing `Linking.openURL()` or `<WebView>` SSO call. | platform-engineer | **P0** | M8 | [ ] |
+| 2 | Add ESLint `no-restricted-imports` rule for `react-native-webview` in `apps/mobile/src/auth/**` per §30.5. Confirm rule fires on a test import, then remove the test import. | platform-engineer | **P0** | M8 | [ ] |
+| 3 | Add `no-webview-in-sso.test.ts` CI test per §30.5. Confirm it passes on main. Add to the `mobile-security` test suite tag in CI configuration. | platform-engineer | **P0** | M8 | [ ] |
+| 4 | Register `sso.mobile_browser_mode_set` (STANDARD, 7yr) and `sso.mobile_webview_blocked` (HIGH, 7yr) in `docs/AUDIT_LOG_SCHEMA.md §6.SSO-Mobile`; deploy updated event registry to `emit-audit-event` Worker. Write integration test: toggle `mobile_sso_enabled` in staging → confirm `sso.mobile_browser_mode_set` event appears in `audit_log_events`. | platform-engineer + compliance-officer | **P0** | M8 | [ ] |
+| 5 | Configure AL-SSO-WEB-01 in PagerDuty `form-security` service: trigger on `sso.mobile_webview_blocked` event; dedup key `sso-webview-blocked-{tenant_id}-{date}` (24h window); no auto-resolve; link to §30.10 triage steps in alert description. | devops-lead | **P0** | M8 | [ ] |
+| 6 | Register AL-SSO-WEB-01 in `docs/OBSERVABILITY.md §26.8` as a new `sso_browser_security` alert subsection row. | compliance-officer | **P0** | M8 | [ ] |
+
+#### P1 — Before first enterprise tenant enables mobile SSO (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Deploy `apple-app-site-association` to `https://form.coach/.well-known/apple-app-site-association` via Cloudflare Worker static asset (§30.7). Verify: open `https://form.coach/auth/mobile/callback/test` on a development device → confirm iOS opens FORM app, not Safari. | platform-engineer | **P1** | M10 | [ ] |
+| 8 | Deploy `assetlinks.json` to `https://form.coach/.well-known/assetlinks.json` with the production release signing certificate SHA-256 fingerprint (§30.7). Verify: `adb shell pm get-app-links coach.form.app` shows `verified` status. | platform-engineer | **P1** | M10 | [ ] |
+| 9 | Register `https://form.coach/auth/mobile/callback/{tenant_id}` as an allowed redirect URI in all four supported IdP types: Okta, Entra, Google Workspace, and generic SAML ACS. Update the CSM onboarding checklist (§7.1) to include this redirect URI alongside the existing ACS URL. | platform-engineer + customer-success | **P1** | M10 | [ ] |
+| 10 | Update the Azure AD B2C pre-enablement check in the mobile SSO feature-flag Worker: if `idp_type = 'azure_ad_b2c'` AND `sso_protocol = 'saml'`, return a 409 with message `"Mobile SSO requires OIDC PKCE mode for Azure AD B2C tenants. Contact your CSM."` (§30.6). | platform-engineer | **P1** | M10 | [ ] |
+| 11 | Collect SSO-WEB-E-001 after first enterprise tenant activates mobile SSO: export `sso.mobile_browser_mode_set` events from `audit_log_events`; confirm `callback_scheme` field is `"universal_link"` for all tenants with Universal Links deployed; file at `compliance/evidence/sso/SSO-WEB-E-001_2026.csv`. | compliance-officer | **P1** | M10 + 30 days | [ ] |
+| 12 | Collect SSO-WEB-E-002: snapshot `apple-app-site-association` and `assetlinks.json` from production; export the `no-webview-in-sso.test.ts` CI run result for the current mobile release; export AL-SSO-WEB-01 zero-fire attestation from PagerDuty `form-security`; file at `compliance/evidence/sso/SSO-WEB-E-002_2026.md`. | compliance-officer | **P1** | M10 + 30 days | [ ] |
+
+#### P2 — Ongoing governance
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 13 | Update `docs/SSO_CLIENT_CONFIG.md` (if it exists) or `docs/ENTERPRISE_ONBOARDING.md` with per-IdP redirect URI registration steps for mobile (`https://form.coach/auth/mobile/callback/{tenant_id}`), including Azure AD B2C OIDC PKCE configuration steps from §30.8. | customer-success + platform-engineer | **P2** | M11 | [ ] |
+| 14 | Annual review: confirm `ASWebAuthenticationSession` and Chrome Custom Tabs remain the recommended system-browser APIs on the current iOS / Android OS versions. If either API is deprecated or a better alternative emerges (e.g., passkey-native flow), evaluate migration path and open a new DEC entry. | security-engineer + platform-engineer | **P2** | Annual (M12, M24, …) | [ ] |
+
+---
+
+*v2.2 additions (2026-06-14): §30 OQ-MOBILE-03 Resolution — Mobile SSO Browser Mode & Deep-Link Security (DEC-059). Closes OQ-MOBILE-03 from `docs/OBSERVABILITY.md §28.13` (P1 — before first enterprise SSO customer, M10). Decision: **system browser mandated** (`expo-web-browser openAuthSessionAsync` → ASWebAuthenticationSession on iOS / Chrome Custom Tabs on Android); embedded WebView **prohibited** in all SSO authentication paths. §30.1 scopes to enterprise mobile SSO only; consumer Apple Sign In excluded; §22 session revocation and §23 CAEP unaffected. §30.2 mobile SSO redirect context: ASCII flow diagram showing step 3 as the WebView vs. system-browser decision point. §30.3 DEC-059 decision: `WebBrowser.openAuthSessionAsync()` is the only permitted path; provisional WebView exception gate requires platform-engineer + security-engineer + enterprise-architect + founder + compliance-officer joint sign-off and new DEC entry before any exception is granted. §30.4 security analysis: seven-row comparison table (process isolation, TLS certificate validation, phishing detection, Credential Manager / autofill, cookie / session isolation, RFC 9700 §4.1 compliance, SOC 2 auditor narrative) — all seven properties favor system browser; embedded WebView fails on RFC 9700 §4.1 and creates process-isolation, TLS-bypass, and phishing-detection gaps. §30.5 TypeScript implementation: `apps/mobile/src/auth/sso-browser.ts` — `openSsoBrowser()` using `WebBrowser.openAuthSessionAsync` with `preferEphemeralSession: false` (preserve IdP session), `showInRecents: false` (Android), `createTask: false` (Android task hijacking prevention); ESLint `no-restricted-imports` rule blocking `react-native-webview` in `apps/mobile/src/auth/**`; `no-webview-in-sso.test.ts` grep-based CI assertion. §30.6 IdP compatibility matrix: nine rows (Okta OIDC + SAML, Entra OIDC + SAML, Azure AD B2C SAML ⚠️ avoid / OIDC ✅, Google Workspace OIDC, PingFederate, OneLogin, generic SAML) — all compatible with system browser except Azure AD B2C SAML (mitigation: OIDC PKCE mode, §30.8). Pre-enablement guard: block `mobile_sso_enabled` if `idp_type = 'azure_ad_b2c'` AND `sso_protocol = 'saml'` (409 response). §30.7 Universal Links / App Links callback hardening: AASA JSON (`/auth/mobile/callback/*` path, FORM teamId); Android assetlinks.json (release-cert SHA-256 fingerprint, `coach.form.app`; served at `form.coach/.well-known/`); fallback deeplink redirect page for pre-Android-12 devices (`<meta http-equiv="refresh">` to `form://`). §30.8 Azure AD B2C OIDC PKCE workaround: five-step IT admin configuration (new app registration, redirect URI, disable implicit grant, note client ID + B2C domain, share with FORM CSM); `tenant_sso_configs` UPDATE snippet (`idp_type = 'azure_ad_b2c'`, `oidc_discovery_url` B2C-specific format). §30.9 two new DEC-030 HMAC-chained events: `sso.mobile_browser_mode_set` (STANDARD, 7yr — tenant_id, mobile_sso_enabled bool, callback_scheme enum, idp_type, sso_protocol, changed_by_user_id; no employee PII); `sso.mobile_webview_blocked` (HIGH, 7yr — tenant_id, attempted_url_hash SHA-256[:32], source_module, blocked_at; emitted only if code violation detected); MOBILE-CHAIN-01 ordering invariant (blocked event must follow mode_set for same tenant_id; inversion → R-05). §30.10 AL-SSO-WEB-01 (P1 — PagerDuty `form-security`, triggered by any `sso.mobile_webview_blocked` event in production; dedup per tenant 24h; zero-fire is the expected state; triage tree: identify source_module → find PR → rollback OTA → investigate CI bypass). §30.11 three SOC 2 evidence artefacts: SSO-WEB-E-001 (CC6.1 — `sso.mobile_browser_mode_set` DEC-030 export, all tenants with mobile SSO, 7yr); SSO-WEB-E-002 (CC6.2 + CC8.1 — AASA + assetlinks.json snapshots + no-webview CI test log + AL-SSO-WEB-01 zero-fire attestation, 3yr). Auditor narrative for CC6.1 confirms process isolation, DEC-059 as the operative decision, and SSO-WEB-E-001 as the chain-level evidence. §30.12 OQ-MOBILE-03 status: 🟡 P1 Open → 🟢 Resolved (DEC-059, 2026-06-14); OBSERVABILITY §28.13 cross-update required (see checklist). §30.13 fourteen-item implementation checklist: 6× P0/M8 (sso-browser.ts implementation, ESLint rule, CI test, DEC-030 event registration + integration test, AL-SSO-WEB-01 PagerDuty config, OBSERVABILITY §26.8 row addition), 6× P1/M10–M10+30 (AASA deploy + iOS verification, assetlinks.json deploy + Android adb verification, redirect URI registration in all IdPs + CSM onboarding update, B2C pre-enablement 409 guard, SSO-WEB-E-001 first collection, SSO-WEB-E-002 first collection), 2× P2/M11-Annual (SSO_CLIENT_CONFIG / ENTERPRISE_ONBOARDING update, annual API review). Cross-references: `docs/OBSERVABILITY.md §28.13` (OQ-MOBILE-03 source — update to 🟢 Resolved); `docs/OBSERVABILITY.md §26.8` (AL-SSO-WEB-01 registration in sso_browser_security subsection — P0 checklist item 6); `docs/ENTERPRISE.md §Enterprise SSO` (enterprise SSO feature scope — mobile SSO is enterprise tier only); `docs/AUDIT_LOG_SCHEMA.md §6.SSO-Mobile` (two new events to register — P0 checklist item 4); `docs/INCIDENT_RESPONSE.md R-05` (MOBILE-CHAIN-01 violation → R-05); `docs/INCIDENT_RESPONSE.md R-08` (supply-chain concern if AL-SSO-WEB-01 fires due to SDK injection); `docs/SSO_SCIM_IMPLEMENTATION.md §1.2` (SP-initiated OIDC + SAML flows — §30 adds the mobile-client perspective to the same protocol flows); `docs/ENTERPRISE_ONBOARDING.md` (CSM onboarding checklist — mobile redirect URI and B2C OIDC guidance to be added); `docs/DECISION_LOG.md DEC-059`. Privacy floor: `sso.mobile_browser_mode_set` payload contains tenant_id + config state only — no employee user_id, name, email, or health data; `sso.mobile_webview_blocked` contains attempted_url_hash (SHA-256 of IdP URL, first 32 chars only) — the full URL is never stored; no personal data in either event. Owner: security-engineer + platform-engineer + enterprise-architect.*
 
 *v2.1 additions (2026-06-14): §29 OQ-SSO-28.2 Resolution — `tenant_users_role_history` Retention Period (DEC-051). Closes the sole remaining P1 open question from §28.9 (v2.0, 2026-06-14). Decision: **7-year retention** adopted for `tenant_users_role_history`, effective from `changed_at`. Three grounds documented: (1) audit-chain continuity — `scim.user_updated` DEC-030 events are retained 7yr; purging the table at 3yr creates a verifiable SOC 2 CC6.3 evidence gap where the chain references a role change but the table row has been deleted (DATA_MODEL §33.8 rejection rationale confirmed); (2) legal obligation — Ukrainian Tax Code Art. 44 (7yr business records) and EU audit-record doctrine (access-control records should be retained at least as long as the data they protect access to); (3) SOC 2 CC6.3/CC6.6 evidence continuity across multi-cycle observation windows. GDPR Art. 4(1) analysis: the `user_id` + `changed_at` + role history combination qualifies as personal data because it enables reconstruction of an employee's access history; legal basis for 7yr retention is GDPR Art. 17(3)(b) (legal obligation overrides erasure right); `user_id` is pseudonymised on user erasure per §28.4 / DATA_MODEL §33.7; full hard-delete occurs at 7yr `changed_at` boundary via pg_cron job 32. DPA Annex B update required: enterprise DPA template (§14.3.2) must add a "role change logs: 7yr" row to the retention schedule before DPA execution with any EU enterprise customer. Consumer privacy policy: no change — `tenant_users_role_history` is enterprise-only. New pg_cron job 32 `turh_retention_purge` (04:00 UTC daily): hard-deletes pseudonymised rows past 7yr; safety gate (`user_id IS NULL AND user_id_pseudonym IS NOT NULL`) prevents accidental deletion of active-user records; companion AL-TURH-01 (P2, Slack `#compliance-alerts`) fires when any row with `user_id IS NOT NULL` exceeds the 7yr window (indicates erasure pipeline miss). New SOC 2 evidence artefact TURH-RET-E-001: annual `#turh-retention-purge` cron run log + AL-TURH-01 zero-fire attestation filed to `compliance/evidence/scim-role/`; covers CC6.3 retention-policy-as-evidence and CC4.1 ongoing monitoring. `docs/DATA_MODEL.md §33.8` retention table updated: 7-year row from "Proposed" → 🟢 Resolved. `docs/DATA_MODEL.md §33.10` checklist item 4 updated to 🟢 Done. Header updated v1.9 → v2.1 (v2.0 was §28). Cross-references: `docs/DATA_MODEL.md §33` (canonical DDL and erasure path — §33.7 pseudonymisation path; §33.8 retention table now resolved; §33.10 checklist item 4 closed); `docs/DATA_MODEL.md §34` (DEC-050 `form_role_enum` — column types for `old_role`/`new_role` in `tenant_users_role_history`); `docs/AUDIT_LOG_SCHEMA.md §6.SCIM-Lifecycle` (`scim.user_updated` 7yr retention anchor); `docs/ENTERPRISE.md §Privacy floor for enterprise` (HR never sees individual user data — §29.4 clarifies role history is admin-only, not HR-accessible); `docs/CRYPTOGRAPHY_POLICY.md §5` (ERASURE_PSEUDONYM_SALT — key used in pg_cron job 32 safety gate); `docs/OBSERVABILITY.md §26` (AL-SCIM-05 taxonomy — AL-TURH-01 is a new parallel alert using its own prefix); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — pg_cron stale-active-user detection escalates to compliance-officer, not P0 IR, because it does not breach the chain itself); `docs/SOC2_READINESS.md §CC6.3` (SCIM-ROLE-E-001 evidence table — TURH-RET-E-001 extends this evidence set); `docs/DECISION_LOG.md DEC-051`. Owner: compliance-officer + enterprise-architect + security-engineer.*
 

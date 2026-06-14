@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [5.8.4] — 2026-06-14
+
+### Changed
+
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §30 added (v2.1 → v2.2): OQ-MOBILE-03 Resolution — Mobile SSO Browser Mode & Deep-Link Security (DEC-059). System browser (`expo-web-browser openAuthSessionAsync`) mandated for all enterprise mobile SSO redirects; embedded WebView prohibited. Covers: security analysis (RFC 9700 §4.1 compliance, process isolation, TLS-bypass prevention, credential-manager integration), `openSsoBrowser()` TypeScript implementation with `ASWebAuthenticationSession` / Chrome Custom Tabs, ESLint prohibition guard + CI grep test, nine-row IdP compatibility matrix, Universal Links / App Links callback hardening for `https://form.coach/auth/mobile/callback/{tenant_id}`, Azure AD B2C OIDC PKCE workaround for SAML-incompatible B2C tenants, two new DEC-030 HMAC-chained events (`sso.mobile_browser_mode_set` STANDARD 7yr; `sso.mobile_webview_blocked` HIGH 7yr), AL-SSO-WEB-01 P1 alert (PagerDuty `form-security`, zero-fire expected), three SOC 2 evidence artefacts (SSO-WEB-E-001 CC6.1; SSO-WEB-E-002 CC6.2/CC8.1), fourteen-item implementation checklist (6× P0/M8, 6× P1/M10, 2× P2/Annual).
+- `docs/OBSERVABILITY.md` — §28.13 OQ-MOBILE-03 updated: 🟡 P1 Open → 🟢 Resolved (DEC-059, 2026-06-14); resolution summary cross-references `docs/SSO_SCIM_IMPLEMENTATION.md §30`.
+- `docs/DECISION_LOG.md` — DEC-059 added (2026-06-14): Mobile SSO browser mode — system browser mandated, WebView prohibited. Three grounds: RFC 9700 §4.1 compliance, process isolation (host app cannot observe ASWebAuthenticationSession), TLS bypass prevention. Low reverse cost.
+- `VERSION` — 5.8.3 → 5.8.4.
+
+---
+
 ## [5.8.3] — 2026-06-14
 
 ### Added
