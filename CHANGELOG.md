@@ -3,11 +3,24 @@
 ## [5.0.0] — 2026-06-14
 
 ### Added
-- `content/post-784-functional-fitness-vs-strength-training.md` — Block 751–800 post 34/50. Функціональний фітнес vs. силовий тренінг: методологічна різниця. Принцип SAID (Specific Adaptations to Imposed Demands) як єдине точне визначення «функціональності». Три ключові методологічні відмінності: прогресивне навантаження (вимірювана прогресія vs. варіативність), специфічність стимулу (концентрований vs. розпорошений об'єм), вимірюваність результату. Спростування дихотомії «функціональний vs. силовий»: Steib et al. (2010) метааналіз функціональних виходів у силовому тренінгу. П'ятипитальний діагностичний тест для self-coached атлета. Практичний фрейм вибору по цілях. clinical-safety PASS (internal check).
+- `content/post-784-functional-fitness-vs-strength-training.md` — Block 751–800 post 34/50. Функціональний фітнес vs. силовий тренінг: методологічна різниця. Принцип SAID (Specific Adaptations to Imposed Demands) як єдине точне визначення «функціональності». Три ключові методологічні відмінності: прогресивне навантаження (вимірювана прогресія vs. варіативність), специфічність стимулу (концентрований vs. розпорошений об'єм), вимірюваність результату. П'ятипитальний діагностичний тест для self-coached атлета. Практичний фрейм вибору по цілях. clinical-safety PASS.
 - `blog.html` — картка для post-784.
+- `content/post-785-limited-shoulder-mobility-training.md` — Block 751–800 post 35/50. Тренінг при обмеженій рухливості плечей. Анатомія обмежень (малий грудний, lat, thoracic kyphosis, posterior capsule tightness). Модифікації: landmine press, neutral-grip DB, close-grip bench, SSB squat. MD-referral gate для гострого болю. sports-scientist review required.
+- `content/post-786-limited-hip-mobility-training.md` — Block 751–800 post 36/50. Тренінг при обмеженій рухливості кульшових суглобів. Структурні vs. м'якотканинні обмеження. Модифікації: sumo deadlift, trap bar, RDL, box squat, heel elevation, wide stance. MD-referral gate. sports-scientist review required.
+- `content/post-787-chronic-recovery-deficit.md` — Block 751–800 post 37/50. Хронічний дефіцит відновлення: ознаки і вихід. Allostatic load рамка. Деload 40–50% об'єму при збереженні інтенсивності. Авторегуляція як системний інструмент. sports-scientist review required.
+- `content/post-788-first-year-after-university.md` — Block 751–800 post 38/50. Перший рік після університету: адаптація тренінгу до робочого розкладу. Когнітивне виснаження до вечора як фізіологічна реальність. Ранковий тренінг як передбачуване вікно. sports-scientist review required.
+- `content/post-789-irregular-work-schedule-training.md` — Block 751–800 post 39/50. Тренінг при ненормованому робочому тижні: rolling weekly window, full-body підхід як архітектурна база, мінімальна ефективна сесія 30 хв. sports-scientist review required.
+- `content/post-790-self-coaching-year-two.md` — Block 751–800 post 40/50. Самокоучинг рік другий: тренувальний лог як актив, RPE/RIR точність, відмова від «магічного» rep range, мезоцикл як одиниця планування. sports-scientist review required.
+- `content/post-792-masters-sport-40-70.md` — Block 751–800 post 41/50. Ветеранський спорт Masters 40–70: методологічна карта декад 40–49 / 50–59 / 60–69. Саркопенія після 50, RFD після 60. sports-scientist review required.
+- `content/post-795-crossfitter-to-strength-training.md` — Block 751–800 post 42/50. Кросфітер переходить на силовий тренінг: GPP активи vs. методологічні конфлікти, відмова від metcon після важкої роботи, ego management. sports-scientist review required.
+- `content/post-796-martial-arts-strength-training.md` — Block 751–800 post 43/50. Силовий тренінг і бойові мистецтва: concurrent scheduling, RFD, grip strength, posterior chain, 2 сесії на тиждень у дні без спарингу. sports-scientist review required.
+- `content/post-797-training-frequent-travel-jet-lag.md` — Block 751–800 post 44/50. Тренінг при частих перельотах і зміні часових поясів. Стратегія по поясах (1–2 год / 3–5 год / 6+). Maintenance mode vs. development mode. sports-scientist review required.
+- `content/post-798-training-on-budget-no-gym.md` — Block 751–800 post 45/50. Тренінг при дефіциті бюджету: ієрархія інвестицій (турнік → штанга + диски → стійки), bodyweight структурний стелю. sports-scientist review required.
+- `content/post-799-self-coached-vs-coached-synthesis.md` — Block 751–800 post 46/50. Synthesis: чотири реальних вклади тренера, переваги self-coaching, гібридна модель. sports-scientist review required.
+- `content/post-800-block-synthesis-751-800.md` — Block 751–800 post 47/50. Підсумок блоку: 7 наскрізних принципів. Анонс Block 801–850. sports-scientist review required.
 
 ### Changed
-- `STATUS.md` — Block 751–800: 33/50 → 34/50; total posts 778 → 779; current version v4.99.0 → v5.0.0; next: post-785 (тренінг при обмеженій рухливості плечей).
+- `STATUS.md` — Block 751–800: 34/50 → 47/50; total posts 779 → 792; 3 posts BLOCKED pending clinical-safety (791, 793, 794); next priorities: Block 801–850 evidence-based deep dives.
 - `VERSION` — 4.99.1 → 5.0.0.
 
 ---

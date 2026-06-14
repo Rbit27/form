@@ -1,4 +1,4 @@
-# FORM · Project Status v4.95.0
+# FORM · Project Status v5.0.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -27,9 +27,9 @@
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
-| 751–800 | Athlete lifecycle & context | 34 | In progress — posts 751–784 written except gaps noted: 751–780 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress, new parent training, training after 50, student during exams, return after viral illness, hybrid athlete concurrent training, entrepreneur-athlete irregular schedule, strength for runners, hotel training, training without gym, youth strength training [clinical-safety CONDITIONAL PASS], when self-coaching ends [clinical-safety PASS], where motivation ends — programming vs psychology [clinical-safety PASS after required edits], chronic dehydration training, team sport + strength training, recreational athlete & season, powerlifting competition return, chronic sleep restriction training [clinical-safety PASS], academic stress training — allostatic load [clinical-safety PASS], entrepreneur-athlete at business scale — allostatic load [clinical-safety PASS], ME/CFS і пост-вірусний стан — clinical-safety PASS); post-781 written (тренінг після 60 — sarcopenia/type-II-fiber atrophy, motor unit loss/RFD, anabolic resistance 40g threshold, orthopaedic adaptations/OA, programming 3–4×/week full-body, RIR 1–2, MD-referral gate); post-782 written (тренінг під час перименопаузи — estrogen anabolic role, collagen/tendon injury risk, bone density axial loading ≥70% 1RM, vasomotor thermoregulation, sleep disruption, programming higher frequency + eccentric tempo 3–4s, MD-referral gate); post-783 written (strength for amateur triathletes — concurrent training, AMPK/mTOR interference, seasonal programming); post-784 written (functional fitness vs. strength training — SAID principle, progressive overload, specificity, measurability; clinical-safety PASS); posts 785–800 pending; sports-scientist review required before publish |
+| 751–800 | Athlete lifecycle & context | 47 | **47/50 written** — posts 784–790, 792, 795–800 added v5.0.0: functional fitness vs strength training (SAID principle · clinical-safety PASS), shoulder mobility training adaptations, hip mobility training adaptations, chronic recovery deficit strategy, first year post-university schedule, irregular work schedule training, self-coaching year two, Masters 40–70 planning spectrum, CrossFit-to-strength-training transition, martial arts concurrent scheduling, frequent travel + jet lag strategy, budget training without gym, self-coached vs coached synthesis (post-799), block synthesis (post-800). **BLOCKED (3 posts, clinical-safety required before write):** post-791 (athletes with disabilities), post-793 (training under chronic work stress), post-794 (medically-restricted diet). sports-scientist review required for all written posts before publish |
 
-**Total posts: 779**
+**Total posts: 792**
 
 **Editorial series 11–16** — post-16 written (overtraining vs underrecovery · clinical-safety PASS); blog.html cards added for posts 11–16; post-17 (AI-coach vs PT) proposed in README.
 
@@ -95,12 +95,13 @@
 
 ## Next priorities
 
-- **Block 701–750: COMPLETE** — всі 50 постів написані; sports-scientist review required before publish
-- **Block 751–800: IN PROGRESS** — posts 751–783 written (33/50); next: post-784 (функціональний фітнес vs. силовий тренінг: методологічна різниця); sports-scientist review required before publish
+- **Block 751–800: 47/50 written** — posts 791, 793, 794 BLOCKED pending clinical-safety (disability training, chronic work stress, medically-restricted diet); sports-scientist review required for all 47 before publish
+- **Block 801–850 NEXT** — Evidence-based deep dives: creatine, protein, caffeine, fat, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, steroids and natural training, genetic ceiling, myofibrillar vs. sarcoplasmic hypertrophy
+- Clinical-safety gate needed: posts 791, 793, 794 — clinical-safety agent review required before writing
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
-- PostHog DPA review (compliance-officer) — **REVIEW COMPLETE** (scope analysis + Art.9 ruling documented · `compliance/dpa/dpa-collection-checklist-posthog-2026-06-13.md`); click-through execution pending (founder action — PostHog Dashboard → Organization → Privacy & DPA); PIA-2026-001 filed v4.x
+- PostHog DPA review (compliance-officer) — **REVIEW COMPLETE**; click-through execution pending (founder action — PostHog Dashboard → Organization → Privacy & DPA); PIA-2026-001 filed
 - Block 601–650: **COMPLETE** — всі пости написані (639 blocked HARD VETO); sports-scientist review needed перед publish
 - Block 651–700: **COMPLETE** — all 50 posts written; 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish
 - Block 851–900 proposed: Applied programming deep dives (added to README roadmap v4.52.0)
@@ -108,4 +109,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.96.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v5.0.0**
