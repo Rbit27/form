@@ -25,9 +25,9 @@
 | 586–590 | Research literacy block | 5 | Draft — review_pending: sports-scientist |
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
-| 651–700 | Biomechanics & injury prevention | 33 | In progress — posts 651–658, 659–660 (clinical-safety CONDITIONAL PASS), 661–669, 670–683 written; 684–700 next; sports-scientist review required before publish |
+| 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 
-**Total posts: 683**
+**Total posts: 700**
 
 ---
 
