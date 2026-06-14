@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [4.77.1] — 2026-06-14
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md §17` — New section: `siem-incident-automator` Resilience Design — Incident ID Pre-generation & Free-Text Privacy Controls. Closes OQ-IR-02 (P1) and OQ-IR-03 (P2) from §16.9. OQ-IR-02: Option A adopted — `incident_id` (`INC-YYYYMMDD-[6hex]`) generated before any external API call; `incident.opened` emitted at T+0; `incident.linear_ticket_linked` (new LOW event, 7yr) closes linkage asynchronously via 5× exponential-backoff retry or IC amendment endpoint `POST /internal/v1/incident/link-ticket`; AL-IR-LINEAR-01 (P2 Slack) on persistent failure. OQ-IR-03: Option A + SHA-256 hash masking (consistent with DEC-044 `bypass_reason_hash` pattern, §40): `reason_plaintext` replaced by `reason_hash` in DEC-030 `incident.severity_changed`; `INCIDENT_REASON_HASH_SALT` added to CRYPTOGRAPHY_POLICY.md §5 (annual rotation); runtime blocklist (5 patterns) emits advisory `incident.pii_risk_detected` (new MEDIUM event, 7yr — no blocking); auditor fieldwork protocol at §17.3.6. Three SOC 2 evidence artefacts: IR-AUTO-E-001/002 (CC7.4), IR-AUTO-E-003 (P3.2). 11-item checklist (5× P0/M4, 3× P1/M5, 3× P2/M9). §16.9 OQ-IR-02 and OQ-IR-03 marked 🟢 Resolved. Document header v2.3 → v2.4. Owner: security-engineer + platform-engineer + compliance-officer.
+- `VERSION` — 4.77.0 → 4.77.1.
+
 ## [4.77.0] — 2026-06-14
 
 ### Added

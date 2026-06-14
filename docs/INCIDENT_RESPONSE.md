@@ -6040,11 +6040,11 @@ When two incidents are simultaneously active (e.g., a P0 breach discovered while
 
 **OQ-IR-02: Linear API as a control dependency**
 
-The `siem-incident-automator` Worker depends on the Linear API for ticket creation. If Linear is unavailable when a SIEM auto-open triggers, the worker falls back to PagerDuty-only notification (§16.4.2). However, if the engineer on call is paged via PagerDuty without a Linear ticket, they have no authoritative incident ID to attach to DEC-030 events until the ticket is manually created and the `linear_ticket_url` field is patched via the amendment procedure. This creates a short window where lifecycle events have `linear_ticket_url: 'PENDING'`, which auditors may flag. Options: (a) Generate the `incident_id` in the Worker before Linear API call so DEC-030 can emit immediately with the correct ID, and create Linear ticket asynchronously with the same ID as the title prefix. (b) Pre-generate a pool of incident IDs and consume the next available one on failure. Owner: platform-engineer. Priority: P1. Resolution target: M4 implementation sprint.
+~~The `siem-incident-automator` Worker depends on the Linear API for ticket creation. If Linear is unavailable when a SIEM auto-open triggers, the worker falls back to PagerDuty-only notification (§16.4.2). However, if the engineer on call is paged via PagerDuty without a Linear ticket, they have no authoritative incident ID to attach to DEC-030 events until the ticket is manually created and the `linear_ticket_url` field is patched via the amendment procedure. This creates a short window where lifecycle events have `linear_ticket_url: 'PENDING'`, which auditors may flag. Options: (a) Generate the `incident_id` in the Worker before Linear API call so DEC-030 can emit immediately with the correct ID, and create Linear ticket asynchronously with the same ID as the title prefix. (b) Pre-generate a pool of incident IDs and consume the next available one on failure. Owner: platform-engineer. Priority: P1. Resolution target: M4 implementation sprint.~~ **🟢 Resolved (2026-06-14, v2.4) — see §17.2.** Option A adopted: `siem-incident-automator` generates `incident_id` as its first operation before any external API call; `incident.opened` is emitted at T+0 with `linear_ticket_url: "PENDING"`; Linear ticket is created asynchronously (5× exponential-backoff retry); `incident.linear_ticket_linked` (new LOW event, 7yr) closes the linkage loop. AL-IR-LINEAR-01 (P2 Slack) fires on persistent Linear failure; IC uses amendment endpoint `POST /internal/v1/incident/link-ticket`.
 
 **OQ-IR-03: Privacy floor for `incident.severity_changed.reason` free-text field**
 
-The `reason` field in `incident.severity_changed` is IC-authored free text. Under time pressure, an IC may inadvertently include a user's name, email, or health data category when describing why severity was upgraded. The DEC-030 record is retained for 7 years and cannot be deleted. Mitigation options: (a) Add a real-time regex filter in the emitter that rejects the event if the reason field matches patterns for email addresses, Ukrainian national ID numbers, or known health category terms — and prompts the IC to rephrase. (b) Document the prohibition clearly in the IC training checklist and accept residual risk. (c) Require reason field to reference only incident_id, runbook IDs, and DEC-030 event types, and enforce this constraint in the emitter schema validator using an allowlist. Owner: security-engineer + compliance-officer. Priority: P2. Resolution target: M4 emitter implementation review.
+~~The `reason` field in `incident.severity_changed` is IC-authored free text. Under time pressure, an IC may inadvertently include a user's name, email, or health data category when describing why severity was upgraded. The DEC-030 record is retained for 7 years and cannot be deleted. Mitigation options: (a) Add a real-time regex filter in the emitter that rejects the event if the reason field matches patterns for email addresses, Ukrainian national ID numbers, or known health category terms — and prompts the IC to rephrase. (b) Document the prohibition clearly in the IC training checklist and accept residual risk. (c) Require reason field to reference only incident_id, runbook IDs, and DEC-030 event types, and enforce this constraint in the emitter schema validator using an allowlist. Owner: security-engineer + compliance-officer. Priority: P2. Resolution target: M4 emitter implementation review.~~ **🟢 Resolved (2026-06-14, v2.4) — see §17.3.** Option A + SHA-256 hash masking adopted (consistent with DEC-044 `bypass_reason_hash` pattern, §40): `reason_plaintext` is never stored in the DEC-030 chain; `reason_hash = SHA-256(incident_id + '|' + reason_plaintext + '|' + INCIDENT_REASON_HASH_SALT)` is the chain record; plaintext lives exclusively in the Linear ticket. Runtime blocklist (email, national IDs, Art. 9 terms) emits advisory `incident.pii_risk_detected` (MEDIUM, 7yr) to Slack `#security-ops` without blocking incident workflow. `INCIDENT_REASON_HASH_SALT` catalogued in CRYPTOGRAPHY_POLICY.md §5 (annual rotation).
 
 ---
 
@@ -9753,11 +9753,274 @@ Store artefacts at `compliance/evidence/incident-scim-latency/<incident_id>/` wi
 
 ---
 
+## 17. `siem-incident-automator` Resilience Design — Incident ID Pre-generation & Free-Text Privacy Controls
+
+> Closes: OQ-IR-02 (P1, platform-engineer, M4) and OQ-IR-03 (P2, security-engineer + compliance-officer, M4 emitter review).
+> Owner: security-engineer + platform-engineer + compliance-officer. References: §16, DEC-030, `docs/AUDIT_LOG_SCHEMA.md`, `docs/CRYPTOGRAPHY_POLICY.md`.
+
+### 17.1 Purpose and Decisions
+
+This section formalises two design decisions for the `siem-incident-automator` Cloudflare Worker (§16.4) left as open questions in §16.9.
+
+| Open Question | Decision | Section |
+|---|---|---|
+| **OQ-IR-02** — Linear API unavailability creates a gap window where DEC-030 events have no stable `incident_id` | **Option A adopted**: pre-generate `incident_id` before Linear API call; emit `incident.opened` immediately; link ticket asynchronously via new `incident.linear_ticket_linked` event | §17.2 |
+| **OQ-IR-03** — IC may inadvertently write PII into `incident.severity_changed.reason`, which is retained 7 years in immutable chain | **Option A + SHA-256 hash masking**: no plaintext stored in DEC-030; runtime blocklist provides soft-warning advisory without blocking; plaintext lives exclusively in the Linear ticket | §17.3 |
+
+---
+
+### 17.2 OQ-IR-02: Pre-Generated Incident ID Architecture
+
+#### 17.2.1 Problem
+
+The §16.4 design creates the Linear ticket first, then uses the returned URL to populate `incident.opened`'s `linear_ticket_url` field. When Linear is unavailable, the Worker falls back to PagerDuty-only notification. The on-call IC is paged but has no `incident_id` anchor until someone manually creates a Linear ticket — creating a window where DEC-030 lifecycle events have no stable ID to reference, which auditors may flag as a CC7.4 evidence gap.
+
+#### 17.2.2 Decision: Option A — ID-first emission
+
+**Adopted approach:** The `siem-incident-automator` Worker generates `incident_id` as its very first operation, before any outbound API call. DEC-030 `incident.opened` is emitted immediately with this ID. Linear and PagerDuty calls proceed asynchronously after the emit.
+
+**`incident_id` format:**
+
+```
+INC-YYYYMMDD-[6hex]
+```
+
+Where:
+- `YYYYMMDD` — UTC date at event receipt
+- `[6hex]` — 3-byte cryptographically random suffix (`crypto.getRandomValues(3)`, hex-encoded)
+
+Collision probability at 1,000 events/day: < 0.00001%. If a duplicate primary key is returned by `audit_log_events`, the Worker retries suffix generation once. A second collision is CRITICAL (R-05).
+
+#### 17.2.3 Revised Worker Execution Order
+
+```
+siem-incident-automator Worker (per SIEM webhook receipt)
+
+Step 1  Validate PagerDuty webhook HMAC-SHA256 signature
+Step 2  Generate: incident_id = "INC-" + UTC_YYYYMMDD + "-" + hex(crypto.getRandomValues(3))
+Step 3  EMIT  incident.opened  (HIGH, 7yr)
+               { incident_id, alert_id, severity, triggered_by: "siem_auto",
+                 linear_ticket_url: "PENDING" }
+               ← PRIMARY CHAIN ANCHOR. Must succeed before Steps 4–6.
+               On write failure → return HTTP 500; PagerDuty retries delivery.
+Step 4  CREATE Linear issue asynchronously
+               title = "[{incident_id}] {alert_summary}"
+               → Success:  EMIT incident.linear_ticket_linked (LOW, 7yr)
+                           { incident_id, linear_ticket_url, linked_by: "auto" }
+               → Failure:  retry ×5 with exponential backoff (2 s / 4 s / 8 s / 16 s / 32 s ≈ 62 s total)
+                           After 5 failures: fire AL-IR-LINEAR-01 (P2, Slack #security-ops);
+                           set linear_ticket_url = "PENDING-LINEAR-UNAVAILABLE"
+Step 5  PAGE   PagerDuty Events API v2
+               dedup_key = incident_id; custom_details include incident_id
+Step 6  NOTIFY Slack #security-ops: incident_id, severity, runbook link
+```
+
+**Chain invariant:** `incident.opened` at Step 3 is the primary anchor. All subsequent `incident.*` events for this `incident_id` reference it via `prev_event_hash`. Auditor verification starts at `incident.opened`; `incident.linear_ticket_linked` is the secondary reference to the human-readable ticket.
+
+#### 17.2.4 `incident.linear_ticket_linked` — New DEC-030 Event
+
+| Field | Value |
+|---|---|
+| `action` | `incident.linear_ticket_linked` |
+| `severity` | LOW |
+| `retention` | 7 yr |
+| `trigger` | Linear ticket successfully created — either immediately (Step 4 auto) or via IC amendment endpoint (§17.2.5) |
+| `payload` | `{ incident_id, linear_ticket_url, linked_by: "auto" \| "manual_ic" }` |
+| Privacy invariant | No user PII. `incident_id` + `linear_ticket_url` only. `linked_by` distinguishes automated vs. manual IC linkage for CC7.4 completeness review. |
+| HMAC chain position | Immediately follows `incident.opened` (if auto) or at the time of IC amendment (if manual). A `incident.linear_ticket_linked` event without a preceding `incident.opened` for the same `incident_id` is a chain ordering violation (R-05). |
+
+Every `incident.opened` event must be paired with exactly one `incident.linear_ticket_linked` event. Auditors verify this pairing during SOC 2 fieldwork.
+
+#### 17.2.5 Manual Ticket Amendment Protocol
+
+When `AL-IR-LINEAR-01` fires (5 retries exhausted):
+
+1. IC creates the Linear ticket manually; title **must** begin with `[{incident_id}]` (exact format enforced by the amendment endpoint validator).
+2. IC calls `POST /internal/v1/incident/link-ticket` with `{ incident_id, linear_ticket_url }` — requires PAM-elevated `form_admin` role (§24).
+3. The amendment endpoint emits `incident.linear_ticket_linked` with `{ incident_id, linear_ticket_url, linked_by: "manual_ic" }`.
+4. IC closes AL-IR-LINEAR-01 in Slack/PagerDuty with the Linear ticket URL in the resolution note.
+
+This protocol guarantees every `incident.opened` chain anchor eventually receives a corresponding `incident.linear_ticket_linked` — the linkage is complete regardless of Linear API availability at the moment of incident detection.
+
+#### 17.2.6 SOC 2 Evidence Impact
+
+| Criterion | Before §17 | After §17 |
+|---|---|---|
+| **CC7.4** — Incident response activities documented in chain | `incident.opened` may emit with `linear_ticket_url: 'PENDING'` and never resolve; auditors may flag | Every incident: `incident.opened` at T+0 + `incident.linear_ticket_linked` within 62 s (auto) or IC amendment SLA |
+| **CC7.3** — Detection and monitoring | SIEM auto-open had a gap window under Linear unavailability | DEC-030 chain anchor at T+0 regardless of Linear or PagerDuty state |
+| **CC7.2** — Anomaly monitoring | No alert on Linear API failure | AL-IR-LINEAR-01 (P2 Slack) detects persistent Linear unavailability within 62 s |
+
+---
+
+### 17.3 OQ-IR-03: Privacy Floor for Free-Text Fields in Incident Lifecycle Events
+
+#### 17.3.1 Problem
+
+The `incident.severity_changed` event (§16.2) includes a `reason` field authored by the IC under time pressure. This field is retained for 7 years in the immutable HMAC chain. Under incident conditions, an IC may inadvertently write a user's name, email address, Ukrainian IPN (10-digit national identifier), or a health data category term. Mitigation options were (a) runtime blocklist, (b) documentation-only, (c) allowlist schema.
+
+#### 17.3.2 Decision: Option A with SHA-256 Hash Masking
+
+**Adopted approach:** `reason_plaintext` is never written to the DEC-030 chain record. Instead, the `emit-audit-event` Worker stores:
+
+```
+reason_hash = SHA-256(incident_id + "|" + reason_plaintext + "|" + INCIDENT_REASON_HASH_SALT)
+```
+
+This is identical to the `bypass_reason_hash` pattern established by DEC-044 in §40 (`system.load_test_gate_bypassed`), creating a consistent auditor verification workflow across FORM's incident and control records. `reason_plaintext` is stored exclusively in the Linear ticket referenced by `incident.linear_ticket_linked`.
+
+**Why not Option B (documentation-only):** IC training checklists do not provide a reliable privacy guarantee for a 7-year immutable record that cannot be corrected after the fact.
+
+**Why not Option C (allowlist):** A strict allowlist (only incident IDs, runbook IDs, DEC-030 event types) would prevent ICs from writing useful free-form context under time pressure — "Postgres index lock contention in SCIM Worker" would be rejected — increasing cognitive load during active P0s. Hash masking achieves the privacy guarantee without imposing allowlist friction on the IC.
+
+#### 17.3.3 Hash Computation
+
+```typescript
+// In emit-audit-event Worker, for incident.severity_changed
+const reasonBytes = new TextEncoder().encode(
+  incident_id + '|' + reason_plaintext + '|' + env.INCIDENT_REASON_HASH_SALT
+);
+const hashBuffer = await crypto.subtle.digest('SHA-256', reasonBytes);
+const reason_hash = Array.from(new Uint8Array(hashBuffer))
+  .map(b => b.toString(16).padStart(2, '0'))
+  .join('');
+
+// Stored in DEC-030 record:  reason_hash  (hex string, 64 chars)
+// NOT stored in DEC-030:     reason_plaintext
+```
+
+`INCIDENT_REASON_HASH_SALT` is a Cloudflare Workers Secret on the `emit-audit-event` Worker, catalogued in `docs/CRYPTOGRAPHY_POLICY.md §5`:
+
+| Key | Purpose | Custody | Rotation | Write-once? |
+|---|---|---|---|---|
+| `INCIDENT_REASON_HASH_SALT` | SHA-256 salt for `reason_plaintext` in `incident.severity_changed` | Cloudflare Workers Secret: `emit-audit-event` | Annual — compliance-officer + security-engineer joint approval; rotation is forward-only (does not invalidate past hash records; auditor uses the salt in effect at event emission time, retrievable from key version history in 1Password Operations vault) | No |
+
+#### 17.3.4 Runtime Blocklist — Soft-Warning Layer
+
+Before SHA-256 hashing, the emitter runs a lightweight blocklist scan on `reason_plaintext`. If any pattern matches, it:
+1. Emits `incident.pii_risk_detected` (§17.3.5) immediately after `incident.severity_changed` in the chain.
+2. Posts to `#security-ops` Slack: `⚠️ PII pattern detected in incident.severity_changed reason for {incident_id} — category: {matched_pattern_category}. Review the Linear ticket and redact if needed. (May be false positive.)`
+
+The blocklist is a **soft warning only** — it does not block the `incident.severity_changed` emission or pause incident management workflow.
+
+| Pattern | Category | Rationale |
+|---|---|---|
+| `/\S+@\S+\.\S+/` | `email` | Email addresses |
+| `/\b\d{10}\b/` | `national_id` | Ukrainian IPN (10-digit tax identifier) |
+| `/\b\d{9}\b/` | `national_id` | Potential SSN / NIN format |
+| `/\b(user_id\|tenant_id\|coaching_turn_id)\s*[:=]\s*[0-9a-f-]{8,}/i` | `uuid_dump` | Accidental structured field dump with UUIDs |
+| `/\b(hrv\|injury\|clinical\|diagnosis\|health data\|weight\|bmi)\b/i` | `art9_term` | GDPR Art. 9 special category terms (note: may false-positive on runbook names like R-15 "Health Data Field") |
+
+**False positive handling:** The Slack warning is annotated `(may be false positive — review Linear ticket)`. Auditors treat `incident.pii_risk_detected` events as advisory; a confirmed PII write is assessed separately under R-22 (Privacy Floor Breach). The false-positive rate is tracked via IR-AUTO-E-003 (§17.6) with a tuning review at M9 if the rate exceeds 30%.
+
+#### 17.3.5 `incident.pii_risk_detected` — New Advisory DEC-030 Event
+
+| Field | Value |
+|---|---|
+| `action` | `incident.pii_risk_detected` |
+| `severity` | MEDIUM |
+| `retention` | 7 yr |
+| `trigger` | Blocklist match on `reason_plaintext` during `incident.severity_changed` emission |
+| `payload` | `{ incident_id, matched_pattern_category: z.enum(["email","national_id","uuid_dump","art9_term"]), false_positive_likely: z.boolean() }` |
+| Privacy invariant | The matched plaintext fragment is **not** stored — only the pattern category. `false_positive_likely: true` is set automatically when the matched term is a known runbook ID substring (e.g., "health" in "R-15 Health Data Field"). |
+| HMAC chain position | Must immediately follow the `incident.severity_changed` event with the same `incident_id`. Chain ordering constraint **IR-PII-CHAIN-01**: a `incident.pii_risk_detected` without a directly preceding `incident.severity_changed` for the same `incident_id` is a chain ordering violation (R-05). |
+
+#### 17.3.6 Auditor Fieldwork Protocol for `reason_plaintext` Retrieval
+
+Auditors needing to read the IC's reason for a severity change:
+
+1. Locate the `incident.severity_changed` chain record for the target `incident_id`. Note `reason_hash` (64-char hex).
+2. Cross-reference `incident.linear_ticket_linked` for the same `incident_id` to obtain `linear_ticket_url`.
+3. Access the Linear ticket via read-only guest credentials (granted by compliance-officer for the observation-period fieldwork window).
+4. `reason_plaintext` is in the Linear ticket description or the incident log comment thread.
+5. Independent hash verification: `SHA-256(incident_id + '|' + reason_plaintext + '|' + INCIDENT_REASON_HASH_SALT)` must match the stored `reason_hash`. The salt version in effect at emission time is retrievable from the 1Password Operations vault version history.
+
+This protocol is filed at `compliance/fieldwork/incident-reason-verification.md` (P1, §17.7 checklist item 6).
+
+---
+
+### 17.4 AUDIT_LOG_SCHEMA.md Registration
+
+Two new events require registration in `docs/AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle`:
+
+| Event type | Severity | Retention | Zod schema |
+|---|---|---|---|
+| `incident.linear_ticket_linked` | LOW | 7 yr | `z.object({ incident_id: z.string().regex(/^INC-\d{8}-[0-9a-f]{6}$/), linear_ticket_url: z.string().url(), linked_by: z.enum(["auto", "manual_ic"]) })` |
+| `incident.pii_risk_detected` | MEDIUM | 7 yr | `z.object({ incident_id: z.string().regex(/^INC-\d{8}-[0-9a-f]{6}$/), matched_pattern_category: z.enum(["email","national_id","uuid_dump","art9_term"]), false_positive_likely: z.boolean() })` |
+
+HMAC chain entries for both events reference the `prev_event_hash` of the immediately preceding event in the `incident.*` namespace for the same `incident_id`.
+
+---
+
+### 17.5 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC7.4** — Incident response activities documented | IR-AUTO-E-001 (`incident.opened` T+0 latency sample) + IR-AUTO-E-002 (linkage latency distribution) | Every SIEM-triggered incident has a DEC-030 chain anchor within 3 seconds of webhook receipt, regardless of Linear API availability |
+| **CC7.3** — Responds to detected events | IR-AUTO-E-001 | `incident_id` is stable from T+0; IC has an authoritative ID to reference in all subsequent communications |
+| **CC7.2** — Anomaly monitoring | AL-IR-LINEAR-01 PagerDuty/Slack history | Linear API unavailability is detected and alerted within 62 seconds |
+| **CC2.2** — External communications | `incident.update_posted` + `reason_hash` | `incident.severity_changed` chain record contains no plaintext PII; all stakeholder communications reference `incident_id` only |
+| **P3.2** — Privacy practices followed | IR-AUTO-E-003 (`incident.pii_risk_detected` history) | Automated monitoring of accidental PII in IC-authored free text; 7-year chain contains no plaintext `reason` content |
+
+Evidence artefacts:
+
+| ID | Type | Collection query / source | Path | Retention |
+|---|---|---|---|---|
+| **IR-AUTO-E-001** | CC7.4 | `SELECT incident_id, (emitted_at - webhook_received_at) AS t0_latency_ms FROM audit_log_events WHERE action = 'incident.opened' AND emitted_at BETWEEN :obs_start AND :obs_end` | `compliance/evidence/cc7/ir-auto-e-001-YYYY-QN.csv` | 7 yr |
+| **IR-AUTO-E-002** | CC7.4 | Cross-join `incident.opened` and `incident.linear_ticket_linked` on `incident_id`; compute `linked_at - opened_at`; report P95 linkage latency and count of `linked_by = "manual_ic"` amendments | `compliance/evidence/cc7/ir-auto-e-002-YYYY-QN.csv` | 7 yr |
+| **IR-AUTO-E-003** | P3.2 | `SELECT matched_pattern_category, false_positive_likely, COUNT(*) FROM audit_log_events WHERE action = 'incident.pii_risk_detected' AND emitted_at BETWEEN :obs_start AND :obs_end GROUP BY 1, 2` | `compliance/evidence/privacy/ir-auto-e-003-YYYY-QN.csv` | 7 yr |
+
+---
+
+### 17.6 Implementation Checklist
+
+#### P0 — Before M4 siem-incident-automator deployment
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Refactor `siem-incident-automator` Worker per §17.2.3: generate `incident_id` before all external API calls; emit `incident.opened` with `linear_ticket_url: "PENDING"`; add Linear 5× exponential-backoff retry (2 s / 4 s / 8 s / 16 s / 32 s); fire AL-IR-LINEAR-01 Slack alert on final failure. | platform-engineer | **P0** | M4 | [ ] |
+| 2 | Register `incident.linear_ticket_linked` in `docs/AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle` with Zod schema from §17.4; deploy to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M4 | [ ] |
+| 3 | Implement `POST /internal/v1/incident/link-ticket` amendment endpoint: PAM-elevated `form_admin` role required (§24); validates `incident_id` regex; emits `incident.linear_ticket_linked` with `linked_by: "manual_ic"`. | platform-engineer | **P0** | M4 | [ ] |
+| 4 | Replace `reason` plaintext field with `reason_hash` (SHA-256, §17.3.3) in `incident.severity_changed` emitter; provision `INCIDENT_REASON_HASH_SALT` as Cloudflare Workers Secret on `emit-audit-event`; add to `docs/CRYPTOGRAPHY_POLICY.md §5` key inventory. | security-engineer + platform-engineer | **P0** | M4 | [ ] |
+| 5 | Implement runtime blocklist regex scan (§17.3.4) in emitter; register `incident.pii_risk_detected` in `AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle` (§17.4); configure Slack `#security-ops` notification with false-positive guidance. | security-engineer | **P0** | M4 | [ ] |
+
+#### P1 — Before M5 SOC 2 pre-observation readiness
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Document auditor fieldwork protocol (§17.3.6) at `compliance/fieldwork/incident-reason-verification.md`; include in auditor onboarding package alongside existing break-glass and DSAR fieldwork procedures. | compliance-officer | **P1** | M5 | [ ] |
+| 7 | Collect IR-AUTO-E-001 for first month of production `incident.opened` events; confirm P95 T+0 latency < 3 seconds; confirm zero incidents with `linear_ticket_url: "PENDING-LINEAR-UNAVAILABLE"` unresolved for > 1 hour. | compliance-officer | **P1** | M5 | [ ] |
+| 8 | Add Tabletop Scenario O: "Linear API unavailable during active P0 — IC manually links ticket via amendment endpoint" to §9.4 tabletop catalog; schedule in Q3 2026 drill set. | security-engineer | **P1** | M5 | [ ] |
+
+#### P2 — Post-observation period (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | Collect IR-AUTO-E-002 (linkage latency distribution); confirm P95 < 62 s for auto-linked incidents; report count of `manual_ic` amendments. | compliance-officer | **P2** | M9 | [ ] |
+| 10 | Collect IR-AUTO-E-003 (`incident.pii_risk_detected` by category); review false-positive rate; tune blocklist if `art9_term` category > 30% false-positive rate (consider removing terms that match common runbook names). | security-engineer | **P2** | M9 | [ ] |
+| 11 | Update `docs/SOC2_READINESS.md §CC7.4` evidence table to reference IR-AUTO-E-001 and IR-AUTO-E-002 as the primary CC7.4 automation evidence corpus. | compliance-officer | **P2** | M9 | [ ] |
+
+---
+
+### 17.7 Open Questions Resolved
+
+| ID | Resolution | Date | Section |
+|---|---|---|---|
+| **OQ-IR-02** | 🟢 **Resolved** — Option A adopted. `incident_id` generated before all external API calls; `incident.opened` emitted at T+0; `incident.linear_ticket_linked` closes linkage asynchronously (auto 62 s / manual IC amendment). AL-IR-LINEAR-01 provides observability. | 2026-06-14 | §17.2 |
+| **OQ-IR-03** | 🟢 **Resolved** — Option A + SHA-256 hash masking. `reason_plaintext` replaced by `reason_hash` in DEC-030; plaintext in Linear ticket only; runtime blocklist emits advisory `incident.pii_risk_detected` (no block). Consistent with DEC-044 §40 pattern. | 2026-06-14 | §17.3 |
+
+OQ-IR-01 (concurrent incident sub-chain ordering, P2) remains open — resolution target M6.
+
+---
+
+*v2.4 additions (2026-06-14): §17 `siem-incident-automator` Resilience Design — Incident ID Pre-generation & Free-Text Privacy Controls. Closes OQ-IR-02 (P1, platform-engineer, M4) and OQ-IR-03 (P2, security-engineer + compliance-officer, M4 emitter review) from §16.9. OQ-IR-02 decision: Option A — `incident_id` = `INC-YYYYMMDD-[6hex]` (crypto.getRandomValues) generated as Worker's first operation; `incident.opened` (HIGH, 7yr) emitted with `linear_ticket_url: "PENDING"` before any external API call; Linear ticket created asynchronously with title prefix `[{incident_id}]`; 5× exponential-backoff retry (2/4/8/16/32 s); AL-IR-LINEAR-01 (P2 Slack) on persistent failure; IC amendment via `POST /internal/v1/incident/link-ticket` (PAM-elevated); `incident.linear_ticket_linked` (new LOW event, 7yr) closes linkage loop in both auto and manual paths. OQ-IR-03 decision: Option A + SHA-256 hash masking — `reason_hash = SHA-256(incident_id + '|' + reason_plaintext + '|' + INCIDENT_REASON_HASH_SALT)` stored in DEC-030 chain; no plaintext `reason` in 7-year record; consistent with DEC-044 `bypass_reason_hash` pattern (§40); `INCIDENT_REASON_HASH_SALT` added to CRYPTOGRAPHY_POLICY.md §5 (annual rotation, not write-once); runtime blocklist (5 patterns: email, national_id, uuid_dump, art9_term) emits advisory `incident.pii_risk_detected` (new MEDIUM event, 7yr — pattern category only, no fragment) to Slack `#security-ops` without blocking IC workflow; auditor fieldwork protocol (§17.3.6) mirrors §40 `bypass_reason_hash` verification procedure. Two new DEC-030 events: `incident.linear_ticket_linked` (LOW, 7yr) + `incident.pii_risk_detected` (MEDIUM, 7yr) — both require AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle registration. Three SOC 2 evidence artefacts: IR-AUTO-E-001 (CC7.4 — T+0 latency), IR-AUTO-E-002 (CC7.4 — linkage latency P95), IR-AUTO-E-003 (P3.2 — pii_risk_detected by category). Eleven-item implementation checklist: 5× P0/M4 (Worker refactor, event registration ×2, amendment endpoint, reason_hash + salt, blocklist), 3× P1/M5 (fieldwork procedure doc, IR-AUTO-E-001 collection, Tabletop Scenario O), 3× P2/M9 (linkage P95 evidence, false-positive tuning, SOC2_READINESS CC7.4 update). Chain ordering constraints: IR-PII-CHAIN-01 (`incident.pii_risk_detected` must follow same-incident `incident.severity_changed`); `incident.linear_ticket_linked` must follow `incident.opened` for same `incident_id`. Cross-references: §16 (§16.9 OQ-IR-02/03 source); §40 (DEC-044 `bypass_reason_hash` pattern — §17.3 adopts identically); `docs/AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle` (two new events to register — P0/M4); `docs/CRYPTOGRAPHY_POLICY.md §5` (INCIDENT_REASON_HASH_SALT key inventory entry — P0/M4); `docs/SOC2_READINESS.md §CC7.4` (evidence table update — P2/M9); R-05 (chain ordering violations — IR-PII-CHAIN-01 escalation path). Owner: security-engineer + platform-engineer + compliance-officer.*
+
+---
+
 *v2.2 additions (2026-06-12): R-25 GDPR Art. 9 Enterprise Tenant Off-boarding — Hard-Delete Overdue (AL-GDPR-03) — twenty-fifth runbook. Closes the incident response gap created when `docs/OBSERVABILITY.md §37` (v3.3, 2026-06-12) defined AL-GDPR-03 (P0, no-auto-resolve) for Art. 9 hard-delete overdue events with no corresponding incident runbook. R-25 covers the enterprise tenant off-boarding pipeline failure scenario: the Art. 9 hard-delete Worker fails to complete within GDPR-SLO-03 (4h from `tenants.offboarding_initiated_at`, DEC-036 zero-grace-period commitment). Distinct from R-14 (consumer DSAR Art. 17 individual erasure) and R-01 (data breach — activated in parallel only if data was accessed during the delay). Trigger matrix: AL-GDPR-03 primary automated trigger; tenant admin complaint and scheduled audit as manual triggers. Severity table: P0 for > 4h delay; P1 for partially-complete deletion; large-tenant extension threshold per OQ-GDPR-OBS-02. Immediate actions T+0 to T+20 with DEC-030 emission at T+15 as evidentiary anchor before any remediation action. Five root cause hypotheses H1–H5 (Worker crash, IOPS exhaustion, missing migration, tenant status not set, audit log pseudonymisation conflict). Recovery: Step 1 standard Worker retry; Step 2 chunked batch DELETE with 100ms pg_sleep yield for H2; Step 3 completion UPDATE + DEC-030 emission. Critical sub-protocol §R-25.8 (OQ-GDPR-OBS-03 interim): audit_log_events rows are NOT deleted during R-25 pending outside counsel confirmation on pseudonymisation vs deletion under HMAC-chain constraint; `gdpr.audit_log_pending_art9_decision` (STANDARD, 7yr) marks the pending decision in the chain. Recommended resolution: additive pseudonymisation (user_id_pseudonym column + ERASURE_PSEUDONYM_SALT + RLS restriction on original user_id) preserves chain integrity and satisfies GDPR Art. 4(5). GDPR Art. 33 decision tree §R-25.7: three-question gate (data accessible? third-party access? delay > 72h?) with explicit trigger conditions and outside counsel path. Three communication templates ART9-01/02/03. Five DEC-030 HMAC-chained events (CRITICAL: gdpr.art9_delete_overdue_detected + gdpr.art9_delete_manual_trigger; HIGH: gdpr.art9_delete_resumed + gdpr.art9_delete_completed; STANDARD: gdpr.audit_log_pending_art9_decision). Six evidence artefacts ART9-E-001 through ART9-E-006 mapped to SOC 2 CC7.2/CC7.3/CC7.4/CC6.5/P5.2/P4.0/GDPR Art. 5(1)(f). Four post-incident controls including Scenario M tabletop and chunked batch default. Two open questions: OQ-GDPR-OBS-03 (P0, shared with OBSERVABILITY §37.11 — outside counsel required before M13) and OQ-R25-01 (P1, Art. 33 automatic trigger threshold). Eight-item implementation checklist: 3× P0/M6 (DEC-030 registration, off-boarding Worker, AL-GDPR-03 PagerDuty); 1× P0/M13 (OQ-GDPR-OBS-03 counsel + migration); 4× P1 (templates, Scenario M, evidence collection, OQ-R25-01). Cross-references: `docs/OBSERVABILITY.md §37` (AL-GDPR-03 trigger; GDPR-SLO-03; OQ-GDPR-OBS-03 shared); `docs/DATA_MODEL.md §25` (off-boarding table list); `docs/DATA_MODEL.md §12` (Art. 17 erasure — pseudonymisation pattern for OQ-GDPR-OBS-03 resolution); `docs/SOC2_READINESS.md §67` (deletion certificate); `docs/SOC2_READINESS.md §70` (DSAR lifecycle — sister evidence section); `docs/AUDIT_LOG_SCHEMA.md` (five new DEC-030 events to register); R-01 (parallel activation condition); R-14 (consumer sister runbook). Owner: compliance-officer + platform-engineer + security-engineer.*
 
 ---
 
-**v2.3 · 2026-06-13 · Owner: security-engineer + compliance-officer**
+**v2.4 · 2026-06-14 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 
