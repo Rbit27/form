@@ -114,7 +114,7 @@ Done — posts 637–650:
 | Shoulder complex: impingement, overhead mobility, програмування для здоров'я |
 | Rehab-to-performance: зворотна інтеграція після реабілітації (clinical-safety review) |
 
-### Block 701–750 — Strength sports specifics (in progress — 20/50 written · sports-scientist review required before publish)
+### Block 701–750 — Strength sports specifics (in progress — 22/50 written · sports-scientist review required before publish)
 
 Специфіка різних силових і суміжних дисциплін — для атлета, що розуміє принципи і хоче знати як вони реалізуються у різних контекстах.
 
@@ -140,8 +140,8 @@ Done — posts 637–650:
 | 718 | Ігрові командні спорти і залова підготовка: concurrent scheduling для аматорів | Draft |
 | 719 | Скалолазіння і силовий тренінг: finger strength, pulling strength, antagonist balance | Draft |
 | 720 | Перший старт у паверліфтингу: підготовка, відбір спроб, день виступу | Draft |
-| 721 | Raw vs. equipped паверліфтинг: різна техніка, різне програмування | Planned |
-| 722 | Одноповторний максимум: тестування, планування, periodization навколо 1RM | Planned |
+| 721 | Raw vs. equipped паверліфтинг: різна техніка, різне програмування | Draft |
+| 722 | Одноповторний максимум: тестування, планування, periodization навколо 1RM | Draft |
 | 723 | Squat depth і індивідуальна анатомія: що говорить наука про ATG vs. parallel | Planned |
 | 724 | Bench press arch: техніка, фізіологія, legitimate variation | Planned |
 | 725 | Deadlift conventional vs. sumo: механіка, вибір, комбінування | Planned |

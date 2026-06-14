@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [4.76.2] — 2026-06-14
+
+### Added
+- `content/post-722-one-rep-max-testing-periodization.md` — Block 701–750 Strength sports specifics, post 22/50. Одноповторний максимум: тестування, планування, periodization навколо 1RM. e1RM формули і їх обмеження (Epley, Brzycki, Lombardi; похибка ±5–10% поза діапазоном 3–10 повторень); коли виправдано тестувати 1RM пряму і коли ні (накопичена втома, технічна нестабільність, < 6–12 місяців тренінгу); протокол прямого 1RM-тесту (підготовка за кілька днів, схема розминки з відсотками, кількість спроб, відпочинок між спробами); training max vs. competition max і чому TM = 85–90% від реального 1RM; три моделі periodization (лінійна, DUP/WUP, autoregulated RPE/RIR); частота тестувань по рівнях атлетів; 5 типових помилок при роботі з 1RM; реалістичні очікування приросту за цикл по рівнях. clinical-safety: PASS. sports_scientist_review: required before publish.
+- `blog.html` — картка post-722 додана (Strength sports specifics, 13 хв, 2026-06-14, draft)
+- `STATUS.md` — content engine рядок оновлено: 701–721 → 701–722 (22 пост), total posts: 722; next priorities: 723–730
+- `README.md` — Block 701–750 прогрес оновлено: 21/50 → 22/50; post-721 і post-722 статус Planned → Draft
+
 ## [4.76.1] — 2026-06-14
 
 ### Changed
