@@ -114,7 +114,7 @@ Done — posts 637–650:
 | Shoulder complex: impingement, overhead mobility, програмування для здоров'я |
 | Rehab-to-performance: зворотна інтеграція після реабілітації (clinical-safety review) |
 
-### Block 701–750 — Strength sports specifics (in progress — 10/50 written · sports-scientist review required before publish)
+### Block 701–750 — Strength sports specifics (in progress — 20/50 written · sports-scientist review required before publish)
 
 Специфіка різних силових і суміжних дисциплін — для атлета, що розуміє принципи і хоче знати як вони реалізуються у різних контекстах.
 
@@ -130,16 +130,16 @@ Done — posts 637–650:
 | 708 | Тренування з обважниками на тілі: навантажений рух і системний стрес | Draft |
 | 709 | Гирьовий спорт і силовий атлет: що kettlebell training дає поза модою | Draft |
 | 710 | Стронгмен як методологія: що farmer's walk і log press дають атлету поза змаганнями | Draft |
-| 711 | Бодібілдинг vs. силовий тренінг: методологічні відмінності і що взяти від кожного | Planned |
-| 712 | Гімнастична відносна сила: чому гімнасти сильні без штанги | Planned |
-| 713 | Велоспорт і силовий тренінг: concurrent scheduling, quad dominance | Planned |
-| 714 | Плавання і dryland strength: overhead overuse і специфіка | Planned |
-| 715 | Бойові мистецтва і силовий тренінг: grip, explosive power, isometric strength | Planned |
-| 716 | Борьба і силовий тренінг: isometric, grip, wrestling-specific programming | Planned |
-| 717 | Тенніс і силовий тренінг: ротаційна потужність, асиметрія, serve mechanics | Planned |
-| 718 | Ігрові командні спорти і залова підготовка: concurrent scheduling для аматорів | Planned |
-| 719 | Скалолазіння і силовий тренінг: finger strength, pulling strength, antagonist balance | Planned |
-| 720 | Перший старт у паверліфтингу: підготовка, відбір спроб, день виступу | Planned |
+| 711 | Бодібілдинг vs. силовий тренінг: методологічні відмінності і що взяти від кожного | Draft |
+| 712 | Гімнастична відносна сила: чому гімнасти сильні без штанги | Draft |
+| 713 | Велоспорт і силовий тренінг: concurrent scheduling, quad dominance | Draft |
+| 714 | Плавання і dryland strength: overhead overuse і специфіка | Draft |
+| 715 | Бойові мистецтва і силовий тренінг: grip, explosive power, isometric strength | Draft |
+| 716 | Борьба і силовий тренінг: isometric, grip, wrestling-specific programming | Draft |
+| 717 | Тенніс і силовий тренінг: ротаційна потужність, асиметрія, serve mechanics | Draft |
+| 718 | Ігрові командні спорти і залова підготовка: concurrent scheduling для аматорів | Draft |
+| 719 | Скалолазіння і силовий тренінг: finger strength, pulling strength, antagonist balance | Draft |
+| 720 | Перший старт у паверліфтингу: підготовка, відбір спроб, день виступу | Draft |
 | 721 | Raw vs. equipped паверліфтинг: різна техніка, різне програмування | Planned |
 | 722 | Одноповторний максимум: тестування, планування, periodization навколо 1RM | Planned |
 | 723 | Squat depth і індивідуальна анатомія: що говорить наука про ATG vs. parallel | Planned |
