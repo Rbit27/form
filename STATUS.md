@@ -1,4 +1,4 @@
-# FORM · Project Status v4.90.0
+# FORM · Project Status v4.91.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.90.0** — 2026-06-14
+**v4.91.0** — 2026-06-14
 
 ---
 
@@ -27,9 +27,9 @@
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
-| 751–800 | Athlete lifecycle & context | 21 | In progress — posts 751–771 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress, new parent training, training after 50, student during exams, return after viral illness, hybrid athlete concurrent training, entrepreneur-athlete irregular schedule, strength for runners, hotel training, training without gym, youth strength training [clinical-safety CONDITIONAL PASS], when self-coaching ends [clinical-safety PASS]); sports-scientist review required before publish |
+| 751–800 | Athlete lifecycle & context | 22 | In progress — posts 751–772 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress, new parent training, training after 50, student during exams, return after viral illness, hybrid athlete concurrent training, entrepreneur-athlete irregular schedule, strength for runners, hotel training, training without gym, youth strength training [clinical-safety CONDITIONAL PASS], when self-coaching ends [clinical-safety PASS], where motivation ends — programming vs psychology [clinical-safety PASS after required edits]); sports-scientist review required before publish |
 
-**Total posts: 765**
+**Total posts: 766**
 
 ---
 
@@ -94,7 +94,7 @@
 ## Next priorities
 
 - **Block 701–750: COMPLETE** — всі 50 постів написані; sports-scientist review required before publish
-- **Block 751–800: IN PROGRESS** — posts 751–770 written (20/50); next: posts 771–772 per README plan (де закінчується самокоучинг; де закінчується мотивація — 772 clinical-safety review required); sports-scientist review required before publish
+- **Block 751–800: IN PROGRESS** — posts 751–772 written (22/50); next: posts 773–775 (хронічне зневоднення [clinical-safety review required before write], командний спорт + силовий тренінг, рекреаційний атлет і «сезон»); sports-scientist review required before publish
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
@@ -106,4 +106,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.89.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.91.0**

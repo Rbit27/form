@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [4.91.0] — 2026-06-14
+
+### Added
+- `content/post-772-where-motivation-ends.md` — Block 751–800, post 22/50. Topic: де закінчується мотивація — коли проблема в програмуванні, а не в голові. Core argument: systematic motivation loss is often misattributed to psychological weakness when the actual cause is programming failure (monotony, chronic under-recovery, no visible progress, program-context mismatch, uncomfortable exercise selection). Practical 4-step diagnostic algorithm to distinguish programming-driven vs. psychological cause. Explicit clinical-safety boundary: persistent motivation loss + anhedonia, depressed mood, disrupted sleep, hopelessness → professional referral, not programming adjustment. Three FIX-level edits applied per clinical-safety CONDITIONAL PASS review: (1) Step 1 expanded to close false negative on partial anhedonia; (2) Step 3 "look elsewhere" replaced with explicit redirect to clinician; (3) "це не голова — це нейробіологія" replaced with behavioral framing to avoid blurring the psychology/neurobiology boundary. sports-scientist review required before publish. clinical-safety: PASS (after required edits, v4.91.0).
+
+### Changed
+- `STATUS.md` — Block 751–800 count 21 → 22 posts; total posts 765 → 766; next priorities updated (next: posts 773–775).
+
+---
+
 ## [4.90.1] — 2026-06-14
 
 ### Changed
