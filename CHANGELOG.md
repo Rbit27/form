@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.92.0] — 2026-06-14
+
+### Added
+- `content/post-773-chronic-dehydration-training.md` — Block 751–800, post 23/50. Topic: тренінг при хронічному зневодненні — клімат, робота, звичка не пити. Core argument: chronic hypohydration is a persistent, often unrecognized performance limiter distinct from acute dehydration; practical breakdown by context (office worker + evening training, heat/summer, shift workers, morning training) with actionable protocols for each; covers impact on strength, aerobic capacity, thermoregulation, cognition under load, and recovery; electrolyte section for when plain water is insufficient; common mistakes; practical one-week correction plan. Angle: athlete lifecycle — lived context rather than physiology lecture (physiology covered in post-104). No clinical-safety concerns (no food/body/pain/mental content). sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — cards for posts 772 and 773 added.
+- `STATUS.md` — Block 751–800 count 22 → 23 posts; total posts 766 → 767; v4.91.0 → v4.92.0.
+- `VERSION` — 4.91.0 → 4.92.0.
+
+---
+
 ## [4.91.0] — 2026-06-14
 
 ### Added
