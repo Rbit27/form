@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [4.76.0] — 2026-06-14
+
+### Added
+- `content/post-721-raw-vs-equipped-powerlifting.md` — Block 701–750 Strength sports specifics, post 21/50. Raw vs. equipped паверліфтинг: різна техніка, різне програмування. Squat suit як акумулятор пружної енергії (carryover 5–40%), bench shirt механіка (атлет тягне штангу вниз проти опору shirt, а не опускає), deadlift suit (3–8% carryover). Технічні відмінності ліфт за ліфтом: forced ширша стійка і low-bar у equipped squat; активний тяг і groove-специфічна техніка в bench shirt; мінімальні відмінності в DL. Програмувальні відмінності: gear sessions обов'язкові pre-competition, off-season — переважно raw; дві незалежні RPE-шкали; допоміжні вправи під shirt вимоги (більше горизонтальних тяг). Що raw бере з equipped методології і навпаки. Коли equipped виправданий і коли ні. clinical-safety: PASS. sports_scientist_review: required before publish.
+- `blog.html` — картка post-721 додана (Strength sports specifics, 13 хв, 2026-06-14, draft)
+- `STATUS.md` — content engine рядок оновлено: 701–721 (21 пост), total posts: 721; next priorities: 722–730
+
 ## [4.75.0] — 2026-06-14
 
 ### Added
