@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.10.0] — 2026-06-14
+
+### Added
+
+- `content/post-834-glutamine-evidence-review.md` — Block 801–850 evidence-based deep dives, post 34/50. Glutamine: the most-marketed supplement with null evidence in healthy athletes. Covers endogenous synthesis capacity (glutamine synthetase in skeletal muscle), clinical context (sepsis, burns, surgery, IBD) vs. sports marketing. Key studies: Antonio & Street 1999 (0.9 g/kg/day, no body composition effect), Candow 2001 (6-week RCT, no strength or mass effect), Legault 2015 (no DOMS reduction), Gleeson 2008 systematic review (immune function: weak, mixed data). Gut permeability: Van Wijck 2011 (transient effect in endurance athletes; clinical significance unclear). Nitrogen shuttle and endo/exogenous balance explained. Archetype pattern: clinical data decontextualised into supplement marketing (parallels HMB post-832). clinical-safety: PASS.
+
+### Changed
+
+- `blog.html` — blog cards added for posts 832, 833, 834 (Evidence-based block).
+- `STATUS.md` — block 801–850 updated: 33 → 34 posts written; total posts 829 → 830; next priorities updated to posts 835–840.
+- `VERSION` — 5.9.0 → 5.10.0.
+
+---
+
 ## [5.9.0] — 2026-06-14
 
 ### Added
