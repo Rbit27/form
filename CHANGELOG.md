@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [4.70.0] — 2026-06-14
+
+### Added
+- `content/post-659-training-discomfort-vs-pain-neurobiology.md` — Biomechanics block, post 27/50. Neurobiology of training sensations: nociception vs. proprioception, DOMS (peripheral sensitization via inflammatory mediators, Z-disc microtrauma), metabolic burn (Group III/IV metaboreceptors), central pain modulation (DNIC, endogenous opioids, expectation effects). Educational framing only — no symptom triage, no "train through it" guidance. clinical-safety CONDITIONAL PASS (disclaimer required, no decision tree, no injury identification by sensation). sports-scientist review pending.
+- `content/post-660-return-after-break-load-progression.md` — Biomechanics block, post 28/50. Return-to-training principles after lifestyle breaks (travel, schedule — not illness/injury). Detraining timeline asymmetry: cardiorespiratory (VO₂max drops 10–14 days) vs. neuromuscular (patterns persist weeks) vs. connective tissue (slowest). Nuclear and neural muscle memory mechanisms. Conservative load return orientations (70–80% post 2–6wk break). Explicit scope: healthy athletes, lifestyle break only. clinical-safety CONDITIONAL PASS (illness/injury explicitly scoped out, medical clearance disclaimer). sports-scientist review pending.
+- `content/post-679-tendon-adaptation-collagen.md` — Biomechanics block, post 29/50. Tendon adaptation: collagen type I structure, mechanosensitivity of tenocytes (3–8% strain window), collagen synthesis timeline (peak 24–72h, full remodeling 6–12+ weeks per Kjaer/Magnusson isotope research). Stiffness adaptation vs. hypertrophy. Load-rate mismatch: muscle adapts faster than connective tissue — core periodization implication. Eccentric loading and collagen synthesis. clinical-safety PASS. sports-scientist review pending.
+- `content/post-680-stretch-shortening-cycle.md` — Biomechanics block, post 30/50. SSC (Stretch-Shortening Cycle) mechanics: three mechanisms (elastic energy storage, stretch reflex via Ia afferents, titin-mediated potentiation). Short SSC (<250ms) vs. long SSC (>250ms) and stiffness optimum. Touch-and-go vs. paused lifting as SSC manipulation tool. Controlled vs. uncontrolled rebound and knee joint loading implications. clinical-safety PASS. sports-scientist review pending.
+- `content/post-681-rate-of-force-development.md` — Biomechanics block, post 31/50. RFD (Rate of Force Development, ΔF/Δt in N/s): early RFD 0–50ms (doublet discharges, motor unit synchronization, descending neural drive) vs. late RFD (maximal strength, CSA, tendon stiffness). Relevance for strength sports: dead stop lifts, sticking point dynamics. Training methods: maximal intent at all intensities, dynamic effort (55–80% 1RM), plyometrics, near-maximal loads. Tendon stiffness as RFD transmission amplifier. clinical-safety PASS. sports-scientist review pending.
+
 ## [4.69.0] — 2026-06-13
 
 ### Added
