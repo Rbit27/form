@@ -114,18 +114,62 @@ Done — posts 637–650:
 | Shoulder complex: impingement, overhead mobility, програмування для здоров'я |
 | Rehab-to-performance: зворотна інтеграція після реабілітації (clinical-safety review) |
 
-### Block 701–750 — Strength sports specifics (proposed)
+### Block 701–750 — Strength sports specifics (in progress — 10/50 written · sports-scientist review required before publish)
 
-| Topic |
-|---|
-| Паверліфтинг для початківців: розуміння трьох ліфтів, перша програма |
-| Weightlifting для атлетів поза вагліфтингом: clean, snatch як тренувальний інструмент |
-| Кросфіт і методологія: що реально розвиває, де слабкі місця |
-| Ранкові vs. вечірні тренування: циркадний ритм і peak performance |
-| Жіноча анатомія і силовий тренінг: реальні відмінності, не міти |
-| Тренування підлітків: специфіка дозування і вибору вправ |
-| Сила для бігунів: чому і як, без страху «заважить» |
-| Тренування з обважниками на тілі — вестибулярне навантаження, специфіка |
+Специфіка різних силових і суміжних дисциплін — для атлета, що розуміє принципи і хоче знати як вони реалізуються у різних контекстах.
+
+| Post | Topic | Status |
+|---|---|---|
+| 701 | Паверліфтинг для початківців: три ліфти, одна логіка | Draft |
+| 702 | Weightlifting для атлетів поза вагліфтингом: snatch і clean як тренувальний інструмент | Draft |
+| 703 | Кросфіт і методологія: що він реально розвиває, де слабкі місця | Draft |
+| 704 | Ранкові vs. вечірні тренування: циркадний ритм і peak performance | Draft |
+| 705 | Жіноча фізіологія і силовий тренінг: реальні відмінності, не міти | Draft · clinical-safety REQUIRES REVIEW |
+| 706 | Силовий тренінг для підлітків: фізіологія, безпека, реальні орієнтири | Draft · clinical-safety REQUIRES REVIEW |
+| 707 | Сила для бігунів: чому і як, без страху «заважу» | Draft |
+| 708 | Тренування з обважниками на тілі: навантажений рух і системний стрес | Draft |
+| 709 | Гирьовий спорт і силовий атлет: що kettlebell training дає поза модою | Draft |
+| 710 | Стронгмен як методологія: що farmer's walk і log press дають атлету поза змаганнями | Draft |
+| 711 | Бодібілдинг vs. силовий тренінг: методологічні відмінності і що взяти від кожного | Planned |
+| 712 | Гімнастична відносна сила: чому гімнасти сильні без штанги | Planned |
+| 713 | Велоспорт і силовий тренінг: concurrent scheduling, quad dominance | Planned |
+| 714 | Плавання і dryland strength: overhead overuse і специфіка | Planned |
+| 715 | Бойові мистецтва і силовий тренінг: grip, explosive power, isometric strength | Planned |
+| 716 | Борьба і силовий тренінг: isometric, grip, wrestling-specific programming | Planned |
+| 717 | Тенніс і силовий тренінг: ротаційна потужність, асиметрія, serve mechanics | Planned |
+| 718 | Ігрові командні спорти і залова підготовка: concurrent scheduling для аматорів | Planned |
+| 719 | Скалолазіння і силовий тренінг: finger strength, pulling strength, antagonist balance | Planned |
+| 720 | Перший старт у паверліфтингу: підготовка, відбір спроб, день виступу | Planned |
+| 721 | Raw vs. equipped паверліфтинг: різна техніка, різне програмування | Planned |
+| 722 | Одноповторний максимум: тестування, планування, periodization навколо 1RM | Planned |
+| 723 | Squat depth і індивідуальна анатомія: що говорить наука про ATG vs. parallel | Planned |
+| 724 | Bench press arch: техніка, фізіологія, legitimate variation | Planned |
+| 725 | Deadlift conventional vs. sumo: механіка, вибір, комбінування | Planned |
+| 726 | Overhead press: push press vs. strict press — коли що і чому | Planned |
+| 727 | Front squat для паверліфтера: допоміжна вправа чи окремий акцент | Planned |
+| 728 | Romanian deadlift як самостійна вправа: програмування і дозування | Planned |
+| 729 | Hip thrust: доказова база, обмеження, місце у програмі | Planned |
+| 730 | Горизонтальна тяга: row variations і що кожен варіант дає | Planned |
+| 731 | Pull-up programming: від нуля до weighted, дозування по стадіях | Planned |
+| 732 | Дипс: грудні vs. трицепсові — техніка і програмування | Planned |
+| 733 | Прес ногами: місце у програмі і коли він виправданий | Planned |
+| 734 | Фермерська ходьба як основна вправа: програмування і прогресія | Planned |
+| 735 | Шраги і верхня трапеція: роль у силовому програмуванні | Planned |
+| 736 | Hyperextension і back extension: задній ланцюг без штанги | Planned |
+| 737 | Pallof press і anti-rotation: core в контексті сили | Planned |
+| 738 | Landmine вправи: нішевий інструмент чи реальна альтернатива | Planned |
+| 739 | Belt squat: коли і чому замість back squat | Planned |
+| 740 | Суперсети і paired sets у силовому тренінгу: ефективність і обмеження | Planned |
+| 741 | Кластерні підходи: механізм, застосування, коли вони мають сенс | Planned |
+| 742 | Паузні повторення в жимі: техніка і програмування | Planned |
+| 743 | Touch-and-go vs. dead stop deadlift: різниця і вибір | Planned |
+| 744 | Tempo training у силовому тренінгу: де виправданий, де ні | Planned |
+| 745 | Forced reps і assisted training: докази і ризики | Planned |
+| 746 | Сезонне програмування: off-season vs. in-season для змагальних атлетів | Planned |
+| 747 | Реалізація максимуму: від програми до виконання в день змагань | Planned |
+| 748 | Вагліфтинговий тренінг для паверліфтера: чому включити і як | Planned |
+| 749 | Силові дисципліни і загальна атлетична база: що брати з кожного | Planned |
+| 750 | Синтез блоку 701–750: strength sports specifics — ключові принципи | Planned |
 
 ### Block 751–800 — Athlete lifecycle & context (proposed)
 

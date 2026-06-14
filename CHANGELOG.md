@@ -1,5 +1,26 @@
 # Changelog · FORM
 
+## [4.73.0] — 2026-06-14
+
+### Added
+- `content/post-701-powerlifting-basics.md` — Block 701–750 Strength sports specifics, post 1/50. Паверліфтинг для початківців: три ліфти (SBD), федерації і правила, чому паверліфтинг корисний і для тих хто не планує змагатись (структура, прогресія, вимірюваність), техніка кожного ліфту, перша програма 3x/тиждень лінійна прогресія, типова periodization arc, помилки початківця, коли виходити на перший старт. sports_scientist_review: required before publish.
+- `content/post-702-weightlifting-for-athletes.md` — Block 701–750, post 2/50. Weightlifting movements (clean, snatch) для неважкоатлетів: механіка triple extension, доказова база трансферу на атлетизм (RFD, vert jump, sprint), спрощені варіанти (power clean, hang clean, DB snatch), де weightlifting НЕ потрібне (гіпертрофія, базова сила), технічна крива навчання, включення у мікроцикл. sports_scientist_review: required before publish.
+- `content/post-703-crossfit-methodology.md` — Block 701–750, post 3/50. CrossFit як GPP-система: що реально розвиває (метаболічна кондиція, варіативність рухів, work capacity), де не оптимальний (максимальна сила, гіпертрофія, специфічна витривалість), рівень травматизму за даними (Claudino 2018, Hak 2013), rhabdomyolysis ризик, для кого підходить, поєднання з силовим тренінгом. sports_scientist_review: required before publish.
+- `content/post-704-circadian-training-timing.md` — Block 701–750, post 4/50. Циркадний ритм і час тренування: core body temperature і нейром'язова функція, peak performance о 15–18 год за популяційними даними, тестостерон/кортизол — чому ранковий пік не = «кращий час», ефект хронотипу (Facer-Childs 2018/2019), адаптація до конкретного часу за 6–10 тижнів (Sedliak 2008, Chtourou 2012), вечірнє тренування і сон (Stutz 2019), висновок: consistency > теоретичний оптимум. sports_scientist_review: required before publish.
+- `content/post-705-female-physiology-strength.md` — Block 701–750, post 5/50. Жіноча фізіологія і силовий тренінг: ендокринний профіль відмінності, ACL лаксість і гормональний цикл (фолікулярна фаза ризик), menstrual cycle і тренувальна продуктивність по фазах, сила per kg lean mass — відмінності мінімальні, практична авторегуляція за фазою, RED-S коректно флагований як клінічна тема з рефералом до лікаря. clinical-safety: REQUIRES REVIEW перед публікацією. sports_scientist_review: required before publish.
+- `content/post-706-youth-strength-training.md` — Block 701–750, post 6/50. Силовий тренінг для підлітків: позиція NSCA/ACSM/AAP (безпечний при правильному дозуванні), реальний ризик зон росту vs. myth (більшість травм — від контактних видів, не силового тренінгу), нейром'язовий механізм у підлітків (нейральний, не гіпертрофічний до гормонального піку), bone mineral density ефект, практичне програмування (2-3x/тиждень, 50–70% → 85%+ при стабільній техніці), різниця pre/post-puberty. clinical-safety: REQUIRES REVIEW перед публікацією. sports_scientist_review: required before publish.
+- `content/post-707-strength-for-runners.md` — Block 701–750, post 7/50. Сила для бігунів: сухожилкова жорсткість і running economy (Bohm 2015), нейром'язова ефективність, мета-аналізи Berryman 2018 і Blagrove 2018, тижнева програма 2x/тиждень (важка робота 80–90% 1RM), interference effect — реальний лише при великому об'ємі (Wilson 2012), різниця для half-marathon vs. ultra. sports_scientist_review: required before publish.
+- `content/post-708-weighted-vest-training.md` — Block 701–750, post 8/50. Тренування з обважниками: GRF механіка, де weighted vest має сенс (bodyweight вправи з прогресивним навантаженням, навантажена ходьба, bone loading), де не має сенсу (замість штанги, технічне навчання, plyometrics при надмірній вазі), постуральна адаптація, практичне дозування за контекстом. sports_scientist_review: required before publish.
+- `content/post-709-kettlebell-sport-for-strength-athletes.md` — Block 701–750, post 9/50. Гирьовий спорт і silovий атлет: різниця між girevoy sport (10-хв set) і kettlebell fitness, механіка swing/clean/снатч, реальні адаптації (grip endurance, posterior chain, lactate threshold), де kettlebell не замінює штангу (максимальна сила, гіпертрофія), трансфер, включення у програму 1–2x/тиждень. sports_scientist_review: required before publish.
+- `content/post-710-strongman-methodology.md` — Block 701–750, post 10/50. Стронгмен як методологія: farmer's walk (grip endurance, тулубна жорсткість), log press/axle press (нейтральний grip, менше навантаження на anterior capsule), atlas stones (технічна вимога, posterior chain), tire flip і sled, практичні альтернативи без спеціалізованого обладнання, блоки дозування farmer's walk і sled GPP. sports_scientist_review: required before publish.
+
+### Changed
+- `README.md` — Block 701–750 розширено з (proposed, 8 тем) до (in progress, повний 50-topic list з post/status колонками). Перші 10 постів позначені як Draft.
+- `STATUS.md` — Content table updated: posts 701–710 додано, total posts 700 → 710; next priorities updated; Block 651–700 позначено як COMPLETE.
+- `VERSION` — 4.72.1 → 4.73.0.
+
+---
+
 ## [4.72.1] — 2026-06-14
 
 ### Added

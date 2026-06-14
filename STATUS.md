@@ -1,4 +1,4 @@
-# FORM · Project Status v4.72.0
+# FORM · Project Status v4.73.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.72.0** — 2026-06-14
+**v4.73.0** — 2026-06-14
 
 ---
 
@@ -26,8 +26,9 @@
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
+| 701–710 | Strength sports specifics (block 701–750 in progress) | 10 | Draft — posts 705–706 clinical-safety REQUIRES REVIEW before publish; all 10 sports-scientist review required |
 
-**Total posts: 700**
+**Total posts: 710**
 
 ---
 
@@ -86,15 +87,16 @@
 
 ## Next priorities
 
+- **Block 701–750 in progress** — posts 701–710 written; next: 711–720 (bodybuilding methodology, gymnastics strength, cycling, swimming, combat sports); sports-scientist review required before publish; posts 705–706 clinical-safety REQUIRES REVIEW
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
 - PostHog DPA review (compliance-officer) — **REVIEW COMPLETE** (scope analysis + Art.9 ruling documented · `compliance/dpa/dpa-collection-checklist-posthog-2026-06-13.md`); click-through execution pending (founder action — PostHog Dashboard → Organization → Privacy & DPA); PIA-2026-001 filed v4.x
 - Block 601–650: **COMPLETE** — всі пости написані (639 blocked HARD VETO); sports-scientist review needed перед publish
-- Block 651–700: posts 651–683 written (33/50); 659–660 clinical-safety CONDITIONAL PASS complete; next: 684–700; sports-scientist review required before publish
+- Block 651–700: **COMPLETE** — all 50 posts written; 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish
 - Block 851–900 proposed: Applied programming deep dives (added to README roadmap v4.52.0)
 - Block 1001–1050 proposed: Training literacy: reading your own data (added to README roadmap v4.66.0)
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.72.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.73.0**
