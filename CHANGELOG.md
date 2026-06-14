@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [4.71.0] — 2026-06-14
+
+### Added
+- `content/post-682-hip-anatomy-variability-squat.md` — Biomechanics block, post 32/50. Hip joint anatomy variability and its effect on squat mechanics: acetabular version (anteversion/retroversion), femoral neck angle (coxa valga/vara), femoral version (anteversion/retroversion). Distinguishes soft-tissue restriction (responds to mobility work) from bony impingement (requires technique adaptation). Butt wink as anatomical vs. mobility phenomenon. Functional assessment without imaging (passive hip rotation test, natural stance test). Practical implications for squat stance, deadlift variant, and unilateral exercises. Brief FAI scope note: normal anatomical variation ≠ clinical FAI. clinical-safety PASS (anatomy education only; explicit disclaimer that symptomatic hip pain requires medical evaluation; no injury triage). sports-scientist review pending.
+- `README.md` — Block 1051–1100 «М'язова специфіка та функціональна анатомія» added to content roadmap: 10 topics covering individual muscle group anatomy, moment arms, multi-joint behavior, programming implications. Glutes, hamstrings, quads, lats, pec major, deltoids, rotator cuff, traps, deep spinal stabilizers, calves.
+
 ## [4.70.0] — 2026-06-14
 
 ### Added
