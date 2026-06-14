@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [4.85.0] — 2026-06-14
+
+### Added
+- `content/post-762-training-after-50.md` — Block 751–800 (Athlete lifecycle & context), post 12/50. Тренінг після 50: саркопенія після 50 як якісно відмінний процес від 40+ (прискорення через денервацію волокон типу II, анаболічний резист — Burd et al.); сполучна тканина — зниження синтезу колагену і чому розминка стає структурною вимогою (Couppe et al., Kjaer et al.); відновлення — MPS і запальний cascade; гормональний контекст — вільний тестостерон через SHBG, GH пульси, постменопауза; що НЕ змінюється (progressive overload, specificity, neural efficiency); програмування 50+ vs 40+: частота 2x/тиждень, мезоцикл 3+1, вибір вправ (RDL > touch-and-go), маркери успіху. Clinical-safety: PASS.
+- `content/post-763-student-during-exams.md` — Block 751–800 (Athlete lifecycle & context), post 13/50. Студент у сесію: центральна втома (Marcora et al. — RPE drift при незмінній периферії); кортизол і анаболічна супресія; сон і ефективність (Fullagar et al. 2015); алгоритм — три режими (помірне навантаження / MED у пік / MED до кінця при 3+ тижні); ієрархія що зберігати/відрізати (базові рухи + інтенсивність > ізоляція + об'єм); реінтеграція 3 тижні (Belenky et al. 2003). Clinical-safety: PASS.
+
+### Changed
+- `README.md` — Block 751–800: posts 751–763 in done table; planned starts at 764.
+- `STATUS.md` — Block 751–800 count 13 posts (763); total posts 763; next priorities updated to 764–770.
+- `VERSION` — 4.84.3 → 4.85.0.
+
+---
+
 ## [4.84.3] — 2026-06-14
 
 ### Added
