@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.9.0] — 2026-06-14
+
+### Added
+
+- `content/post-832-hmb-evidence-review.md` — Block 801–850 evidence-based deep dives, post 32/50. HMB: comprehensive evidence review contrasting manufacturer-funded vs. independent RCTs. Covers UPS/MAFbx/MuRF-1 molecular mechanism, caspace-3 apoptosis pathway, PI3K/Akt mTOR activation, and membrane-stabilisation hypothesis. Key studies: Nissen et al. 1996 (patent-holder conflict-of-interest analysis), Gallagher 2000, Thomson 2009 (trained athletes, null result), Slater & Jenkins 2000 (methodological critique), Wilson 2014 meta-analysis (sponsor-bias analysis), Jakubowski 2020 independent RCT (null result in trained). HMB-Ca vs HMB-FA comparison. Contexts where anti-catabolic mechanism may be relevant (immobilisation, aggressive deficit, clinical populations). Concluding framing: sponsor-bias pattern applicable beyond HMB. clinical-safety: PASS.
+- `content/post-833-caffeine-tolerance-cycling.md` — Block 801–850 evidence-based deep dives, post 33/50. Caffeine tolerance and strategic cycling for trained athletes. Mechanism: adenosine A₁/A₂A receptor upregulation under chronic exposure. Key studies: Bell & McLellan 2002 (habitual consumers vs. infrequent; shorter, blunted ergogenic effect), Gonçalves 2017 systematic review (trained status as moderator), Pickering & Kiely 2019 (challenges mandatory wash-out dogma), Grgic 2020 meta-analysis BJSM 225 studies (dose-response curve 2–6 mg/kg optimal; > 6 mg/kg diminishing returns). Four strategies: full wash-out (10–14 days), selective use (target training days only), chronotiming (90-min post-waking delay; 45–60 min pre-training window), sleep-debt caveat. CYP1A2 genotype variability (slow vs. fast metabolisers). L-theanine combination (Dodd 2015 meta-analysis). clinical-safety: PASS.
+
+### Changed
+
+- `STATUS.md` — block 801–850 updated: 31 → 33 posts written; total posts 827 → 829; next priorities updated to posts 834–840.
+- `VERSION` — 5.8.4 → 5.9.0.
+
+---
+
 ## [5.8.4] — 2026-06-14
 
 ### Changed
