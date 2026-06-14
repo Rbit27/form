@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.86.0] — 2026-06-14
+
+### Added
+- `content/post-764-return-after-viral-illness.md` — Block 751–800 (Athlete lifecycle & context), post 14/50. Повернення після вірусної хвороби: «neck check» як перша фільтрація; ранковий ЧСС як основний маркер готовності; ризик міокардиту — симптоми і explicit redirect до лікаря; постковідний синдром / PEM — другий explicit redirect; три фази протоколу (фаза 0–3, критерії переходу); маркери-стоп-сигнали; J-крива ризику інфекцій (Shephard & Shek 1998); деадаптація при хворобі vs звичайний детренінг (Mujika & Padilla 2000). Clinical-safety: PASS.
+
+### Changed
+- `blog.html` — картка post-764 додана першою у grid.
+- `STATUS.md` — Block 751–800: 14 постів написано (764); next 765–770.
+- `VERSION` — 4.85.0 → 4.86.0.
+
+---
+
 ## [4.85.0] — 2026-06-14
 
 ### Added
