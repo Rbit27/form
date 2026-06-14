@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.74.0] — 2026-06-14
+
+### Added
+- `content/post-711-bodybuilding-vs-strength-training.md` — Block 701–750 Strength sports specifics, post 11/50. Бодібілдинг vs. силовий тренінг: що кожна система оптимізує (гіпертрофія vs. нейром'язова адаптація), порівняння об'єму / інтенсивності / пауз між підходами, логіка вибору вправ (ізоляція vs. специфічність), periodization архітектура (block vs. лінійний), proximity to failure і RPE, що силовий атлет може взяти з бодібілдингу і навпаки, powerbuilding як обґрунтована синтетична модель. clinical-safety: PASS. sports_scientist_review: required before publish.
+
+### Changed
+- `STATUS.md` — Content table updated: 701–710 → 701–711, total posts 710 → 711.
+- `VERSION` — 4.73.0 → 4.74.0.
+
+---
+
 ## [4.73.0] — 2026-06-14
 
 ### Added
