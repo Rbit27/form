@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [4.80.2] — 2026-06-14
+
+### Changed
+- `docs/DATA_MODEL.md` — v1.12 → v1.13: §34 FORM Role ENUM Types (`form_role_enum` & `role_change_source_enum`). Closes OQ-TURH-01 and OQ-TURH-02 from §33.11 (DEC-050). Creates `form_role_enum` (5 values: `tenant_owner`, `tenant_admin`, `tenant_manager`, `member`, `support_readonly`) matching SSO_SCIM_IMPLEMENTATION §5.1; `role_change_source_enum` (4 values: `scim_sync`, `admin_ui`, `jit_provisioning`, `form_system`). Migration `0069_role_enum_types.sql` migrates `tenant_users.form_role`, `scim_group_role_mappings.form_role`, and `tenant_users_role_history.old_role`/`new_role`/`changed_by` from TEXT+CHECK to typed ENUMs. Closes the silent §5.1 vs. DDL inconsistency (`support_readonly` was documented but missing from DB constraint). Companion assignability CHECK on `scim_group_role_mappings` preserves §5.1 group-mapping restrictions. TypeScript types: `FormRole`, `RoleChangeSource`, `SCIM_ASSIGNABLE_ROLES`. SOC 2 evidence ENUM-E-001/002/003. §33.11 OQ-TURH-01 and OQ-TURH-02 marked 🟢 Resolved.
+- `VERSION` — 4.80.1 → 4.80.2.
+
 ## [4.80.1] — 2026-06-14
 
 ### Added

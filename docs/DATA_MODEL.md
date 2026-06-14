@@ -1,4 +1,4 @@
-# FORM · Multi-Tenant Data Model v1.12
+# FORM · Multi-Tenant Data Model v1.13
 
 > Owner: `enterprise-architect` + `compliance-officer`. Review: on any schema migration or quarterly.
 > Scope: enterprise-tier multi-tenancy. Consumer tier (single-tenant Postgres) is a subset of this model.
@@ -40,6 +40,8 @@
 30. [Subscription Events Erasure Hardening & Quota Grace Thresholds](#30-subscription-events-erasure-hardening--quota-grace-thresholds--oq-bill-05-oq-rl-02--oq-bill-01-resolution)
 31. [DSAR Request Registry Schema — Art. 15/17/20 Lifecycle Tracking](#31-dsar-request-registry-schema--art-1517-request-lifecycle-tracking)
 32. [Enterprise DSAR Extensions — Employer-Side Data Lifecycle & Offboarding Export Schema](#32-enterprise-dsar-extensions--employer-side-data-lifecycle--offboarding-export-schema)
+33. [`tenant_users_role_history` — SCIM Role Change Audit Trail Schema](#33-tenant_users_role_history--scim-role-change-audit-trail-schema)
+34. [FORM Role ENUM Types: `form_role_enum` & `role_change_source_enum`](#34-form-role-enum-types-form_role_enum--role_change_source_enum)
 
 ---
 
@@ -13452,8 +13454,8 @@ Resolution: `docs/SSO_SCIM_IMPLEMENTATION.md §28.9 OQ-SSO-28.2` — compliance-
 
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
-| **OQ-TURH-01** | **`changed_by` enum formalisation.** The `changed_by` column uses a plain TEXT type with a DEFAULT of `'scim_sync'`. Should this be a Postgres ENUM (`CREATE TYPE role_change_source_enum AS ENUM (...)`)? Recommendation: yes — prevents free-text pollution from future callers; add ENUM before M5 migration runs. | P1 | platform-engineer | Resolve before M5 migration; add ENUM DDL to `0068_` if adopted. |
-| **OQ-TURH-02** | **`old_role`/`new_role` column type.** Currently TEXT with no ENUM constraint. The `tenant_users.role` column itself uses a FORM-defined role ENUM (§5 of SSO_SCIM_IMPLEMENTATION.md). The `tenant_users_role_history` columns should reference the same type to prevent orphaned values. Recommendation: alter `old_role`/`new_role` to the same `form_role_enum` type after §5 role ENUM is formalised in its own migration. | P1 | platform-engineer + enterprise-architect | Resolve when §5 role ENUM migration is scheduled; update `0068_` accordingly. |
+| ~~**OQ-TURH-01**~~ **🟢 Resolved — DATA_MODEL §34 (DEC-050, 2026-06-14)** | ~~**`changed_by` enum formalisation.**~~ **Resolved:** `role_change_source_enum` created with four values (`scim_sync`, `admin_ui`, `jit_provisioning`, `form_system`); `changed_by` column in `tenant_users_role_history` migrated from `TEXT DEFAULT 'scim_sync'` to `role_change_source_enum` in migration `0069_role_enum_types.sql`. See `docs/DATA_MODEL.md §34`. | ~~P1~~ **🟢 Closed** | platform-engineer | **Done — §34 / DEC-050** |
+| ~~**OQ-TURH-02**~~ **🟢 Resolved — DATA_MODEL §34 (DEC-050, 2026-06-14)** | ~~**`old_role`/`new_role` column type.**~~ **Resolved:** `form_role_enum` created with five values (`tenant_owner`, `tenant_admin`, `tenant_manager`, `member`, `support_readonly`) matching `docs/SSO_SCIM_IMPLEMENTATION.md §5.1`; `old_role`/`new_role` in `tenant_users_role_history` migrated from `TEXT` to `form_role_enum`; `tenant_users.form_role` and `scim_group_role_mappings.form_role` also migrated in `0069_role_enum_types.sql`. See `docs/DATA_MODEL.md §34`. | ~~P1~~ **🟢 Closed** | platform-engineer + enterprise-architect | **Done — §34 / DEC-050** |
 
 ---
 
@@ -13464,3 +13466,263 @@ Resolution: `docs/SSO_SCIM_IMPLEMENTATION.md §28.9 OQ-SSO-28.2` — compliance-
 *v1.2 (2026-06-13): §32.5 alert ID correction — `AL-GDPR-04` → `AL-GDPR-07`. DATA_MODEL §32 (v1.1, 2026-06-13) incorrectly assigned the offboarding export gap alert the ID `AL-GDPR-04`, which was already in use by `docs/OBSERVABILITY.md §37.5` for workout data purge job 26 staleness (P1, PagerDuty `form-devops`). The correct ID for the new offboarding export gap alert is **AL-GDPR-07** — the next unused position in the AL-GDPR-* sequence after AL-GDPR-06 (§37.5 erasure backlog signal). Three changes: (1) §32.4 chain interaction note updated: "fires AL-GDPR-04" → "fires AL-GDPR-07"; (2) §32.5 alert table: AL-GDPR-04 row renamed to AL-GDPR-07; explanatory note added about the correction and cross-reference to `docs/OBSERVABILITY.md §37.12`; (3) §32.7 checklist item 5 updated: "Configure AL-GDPR-04" → "Configure AL-GDPR-07" with note about the naming conflict resolution. `docs/OBSERVABILITY.md §37.12` (v3.9, 2026-06-13) is the authoritative definition of AL-GDPR-07, AL-DSAR-04, and the new AL-DSAR-05 (employer DSAR SLO breach alert, which closes DATA_MODEL §32.8 OQ-DSAR-03). Owner: compliance-officer + enterprise-architect.*
 
 *v1.1 (2026-06-13): §32 Enterprise DSAR Extensions — Employer-Side Data Lifecycle & Offboarding Export Schema. Closes the DEC-030 event gap created when `docs/INCIDENT_RESPONSE.md` v2.3 (2026-06-13) registered five enterprise-specific DSAR events in R-14.8 — `dsar.data_provided`, `dsar.deletion_soft`, `dsar.deletion_confirmed`, `dsar.portability_export_completed`, `dsar.offboarding_export_available` — sourced from `docs/ENTERPRISE_SLA.md §19.5` (v1.1, 2026-06-13), without a corresponding DATA_MODEL.md schema section. §32 provides: purpose + scope boundary relative to §31 (consumer DSAR); full DEC-030 event registration table with severity, retention, trigger, and privacy invariant for all five events; Zod v2 schemas (to be added to AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise); two-phase erasure chain ordering constraint DEC-032-EXT (`deletion_soft` must precede `deletion_confirmed`; violation triggers R-05); §25 offboarding chain interaction with 1-hour SLO for `dsar.offboarding_export_available` gap from `offboarding.wind_down_started`; two new alert rules (AL-GDPR-04 P2 offboarding notification gap; AL-DSAR-04 P1 DEC-032-EXT chain violation); four SOC 2 evidence artefacts DSAR-E-007 through DSAR-E-010 (P5.0, P8.0, P5.1, A1.1); eight-item implementation checklist (5× P0 M4–M5, 3× P1 M6–M7); two open questions (OQ-DSAR-03 SLO breach response P1, OQ-DSAR-04 deletion certificate format P2). Cross-references: `docs/INCIDENT_RESPONSE.md R-14.8` (five-event taxonomy source); `docs/ENTERPRISE_SLA.md §19.5` (24-hour employer DSAR SLO source); `docs/DATA_MODEL.md §25` (tenant offboarding pipeline — `offboarding.wind_down_started` HMAC anchor); `docs/DATA_MODEL.md §12` (Art. 17 two-phase erasure — §32 adds the DEC-030 evidence layer for each phase); `docs/DATA_MODEL.md §31` (consumer DSAR schema — §32 is the employer-side extension); `docs/AUDIT_LOG_SCHEMA.md §6` (five events to register — P0 before M4); `docs/SOC2_READINESS.md §P5.0/§P8.0` (evidence tables DSAR-E-007/008 extend); `docs/OBSERVABILITY.md §37` (GDPR compliance pipeline — AL-GDPR-04 extends §37 alert taxonomy). Owner: compliance-officer + enterprise-architect + security-engineer.*
+
+---
+
+## 34. FORM Role ENUM Types: `form_role_enum` & `role_change_source_enum`
+
+### 34.1 Purpose & Scope
+
+This section formalises two Postgres ENUM types that replace ad-hoc `TEXT CHECK` constraints scattered across the enterprise schema, and resolves the two P1 open questions from §33.11:
+
+- **OQ-TURH-01 → DEC-050:** `changed_by` column in `tenant_users_role_history` migrated from `TEXT DEFAULT 'scim_sync'` to `role_change_source_enum`.
+- **OQ-TURH-02 → DEC-050:** `old_role`/`new_role` columns in `tenant_users_role_history` migrated from `TEXT` to `form_role_enum`.
+
+Migration `0069_role_enum_types.sql` also migrates the two older tables that used TEXT CHECK constraints for role storage — `tenant_users.form_role` and `scim_group_role_mappings.form_role` — so that the type system enforces role validity uniformly across all role-bearing columns.
+
+**Scope:** Role columns in `tenant_users`, `scim_group_role_mappings`, and `tenant_users_role_history`. Out of scope: the `group_member_effective_role` computed view (uses shorthand aliases for ranking; no schema change required), JWT role claims (runtime strings; validated against ENUM at token issuance).
+
+---
+
+### 34.2 Decision Rationale (DEC-050)
+
+**Decision date:** 2026-06-14. **Decision authority:** enterprise-architect + platform-engineer.
+
+| Option | Description | Verdict |
+|---|---|---|
+| A — Keep TEXT CHECK | Maintain per-column `CHECK (form_role IN (...))` constraints on each table | ❌ Rejected — three separate CHECK definitions drift independently; adding a new role requires touching every table; Postgres does not enforce consistency across tables |
+| B — Single `form_role_enum` ENUM type | Create a named Postgres ENUM; all role columns reference the same type | ✅ **Selected** — one-place definition; Postgres enforces at storage layer; invalid inserts rejected without application-layer validation; `ALTER TYPE ... ADD VALUE` is forward-compatible |
+| C — `role` DOMAIN on TEXT | `CREATE DOMAIN form_role AS TEXT CHECK (...)` | ❌ Rejected — DOMAIN constraints are equivalent to CHECK but do not give Postgres the type information for enum-specific operators; `ALTER DOMAIN` drops and recreates the constraint, which locks the table |
+
+**Addendum:** The original `tenant_users.form_role` CHECK had 4 values. `support_readonly` was documented in `docs/SSO_SCIM_IMPLEMENTATION.md §5.1` as a valid role but was missing from the column constraint — a silent inconsistency. The `form_role_enum` definition includes all five §5.1 values, closing the gap. The `scim_group_role_mappings` table retains a companion CHECK that restricts group-mappable values to `('tenant_admin', 'tenant_manager', 'member')`, since `tenant_owner` and `support_readonly` are policy-prohibited from SCIM group assignment (§5.1).
+
+---
+
+### 34.3 `form_role_enum` Definition
+
+The five values match `docs/SSO_SCIM_IMPLEMENTATION.md §5.1` exactly.
+
+| Value | SCIM/SSO Assignable | Description |
+|---|---|---|
+| `tenant_owner` | No — manual FORM enterprise-architect only | Full org control: billing, SSO config, delete org |
+| `tenant_admin` | Yes | Manage users, analytics, SSO, branding |
+| `tenant_manager` | Yes | Aggregate team analytics (no individual PII), read-only |
+| `member` | Yes (default) | Regular FORM user within org |
+| `support_readonly` | No — FORM-internal only | Customer success access, read-only; previously absent from DB constraint |
+
+---
+
+### 34.4 `role_change_source_enum` Definition
+
+Four values match the `changed_by` column documentation in `docs/DATA_MODEL.md §33.3`.
+
+| Value | Description |
+|---|---|
+| `scim_sync` | SCIM Worker automated sync (`PUT /Users` or Group PATCH re-evaluation) |
+| `admin_ui` | Admin dashboard manual role assignment or override (§5.3 role override flow) |
+| `jit_provisioning` | Just-in-time provisioning role assignment at first login (§11 JIT flow) |
+| `form_system` | Programmatic internal assignment (platform migrations, onboarding automation) |
+
+---
+
+### 34.5 Migration DDL — `0069_role_enum_types.sql`
+
+```sql
+-- Migration: 0069_role_enum_types.sql
+-- Author: platform-engineer
+-- Resolves: OQ-TURH-01 + OQ-TURH-02 (DEC-050, 2026-06-14)
+-- Cross-ref: docs/DATA_MODEL.md §34; docs/SSO_SCIM_IMPLEMENTATION.md §5.1
+
+-- ─── Step 1: Create types ─────────────────────────────────────────────────────
+
+CREATE TYPE form_role_enum AS ENUM (
+  'tenant_owner',
+  'tenant_admin',
+  'tenant_manager',
+  'member',
+  'support_readonly'
+);
+
+CREATE TYPE role_change_source_enum AS ENUM (
+  'scim_sync',
+  'admin_ui',
+  'jit_provisioning',
+  'form_system'
+);
+
+-- ─── Step 2: Migrate tenant_users.form_role ───────────────────────────────────
+-- Existing CHECK: ('tenant_owner', 'tenant_admin', 'tenant_manager', 'member')
+-- All four values are valid members of form_role_enum; USING cast is safe.
+-- 'support_readonly' is new; zero existing rows use it; no backfill needed.
+
+ALTER TABLE tenant_users
+  DROP CONSTRAINT IF EXISTS tenant_users_form_role_check,
+  ALTER COLUMN form_role TYPE form_role_enum
+    USING form_role::form_role_enum;
+
+-- ─── Step 3: Migrate scim_group_role_mappings.form_role ───────────────────────
+-- Retain a companion CHECK restricting group-assignable values per §5.1 policy.
+-- 'tenant_owner' and 'support_readonly' remain invalid for group mappings.
+
+ALTER TABLE scim_group_role_mappings
+  DROP CONSTRAINT IF EXISTS scim_group_role_mappings_form_role_check,
+  ALTER COLUMN form_role TYPE form_role_enum
+    USING form_role::form_role_enum;
+
+ALTER TABLE scim_group_role_mappings
+  ADD CONSTRAINT scim_group_role_mappings_form_role_assignable
+    CHECK (form_role IN ('tenant_admin', 'tenant_manager', 'member'));
+
+-- ─── Step 4: Migrate tenant_users_role_history ───────────────────────────────
+-- Run after migration 0068 in environments where 0068 has already been applied.
+-- In environments where 0068 has NOT yet run, apply 0069 first so 0068's
+-- DDL uses the ENUM types directly (no USING cast needed on a new table).
+
+ALTER TABLE tenant_users_role_history
+  ALTER COLUMN old_role     TYPE form_role_enum          USING old_role::form_role_enum,
+  ALTER COLUMN new_role     TYPE form_role_enum          USING new_role::form_role_enum,
+  ALTER COLUMN changed_by   TYPE role_change_source_enum USING changed_by::role_change_source_enum;
+
+-- Update DEFAULT to use the typed literal (required after type change)
+ALTER TABLE tenant_users_role_history
+  ALTER COLUMN changed_by SET DEFAULT 'scim_sync'::role_change_source_enum;
+
+-- ─── Step 5: Verification queries (run post-deploy, separate transaction) ─────
+
+-- 5a. Confirm enum values:
+-- SELECT enumlabel FROM pg_enum
+-- WHERE enumtypid = 'form_role_enum'::regtype ORDER BY enumsortorder;
+-- Expected: tenant_owner, tenant_admin, tenant_manager, member, support_readonly
+
+-- SELECT enumlabel FROM pg_enum
+-- WHERE enumtypid = 'role_change_source_enum'::regtype ORDER BY enumsortorder;
+-- Expected: scim_sync, admin_ui, jit_provisioning, form_system
+
+-- 5b. Confirm column types:
+-- SELECT table_name, column_name, udt_name
+-- FROM information_schema.columns
+-- WHERE table_name IN ('tenant_users','scim_group_role_mappings','tenant_users_role_history')
+--   AND column_name IN ('form_role','old_role','new_role','changed_by');
+-- All role columns must show udt_name = 'form_role_enum' or 'role_change_source_enum'.
+
+-- 5c. Confirm assignability guard on scim_group_role_mappings:
+-- INSERT INTO scim_group_role_mappings (tenant_id, idp_group_id, form_role)
+-- VALUES (gen_random_uuid(), 'test', 'tenant_owner');
+-- Expected: ERROR:  new row violates check constraint
+--           "scim_group_role_mappings_form_role_assignable"
+```
+
+---
+
+### 34.6 Per-Table Change Summary
+
+| Table | Column | Before | After | Notes |
+|---|---|---|---|---|
+| `tenant_users` | `form_role` | `TEXT CHECK (4 values)` | `form_role_enum` | `support_readonly` added; zero rows required backfill |
+| `scim_group_role_mappings` | `form_role` | `TEXT CHECK (4 values)` | `form_role_enum` + `_assignable CHECK (3 values)` | ENUM allows all 5; CHECK restricts group-assignable subset |
+| `tenant_users_role_history` | `old_role` | `TEXT NOT NULL` | `form_role_enum NOT NULL` | Closes OQ-TURH-02 |
+| `tenant_users_role_history` | `new_role` | `TEXT NOT NULL` | `form_role_enum NOT NULL` | Closes OQ-TURH-02 |
+| `tenant_users_role_history` | `changed_by` | `TEXT NOT NULL DEFAULT 'scim_sync'` | `role_change_source_enum NOT NULL DEFAULT 'scim_sync'` | Closes OQ-TURH-01 |
+
+---
+
+### 34.7 TypeScript Type Alignment
+
+Replace loose `string` role parameters in the Workers codebase with these discriminated union types after the migration. Values are the exact Postgres ENUM literals.
+
+```typescript
+// src/types/roles.ts
+
+export type FormRole =
+  | 'tenant_owner'
+  | 'tenant_admin'
+  | 'tenant_manager'
+  | 'member'
+  | 'support_readonly';
+
+export type RoleChangeSource =
+  | 'scim_sync'
+  | 'admin_ui'
+  | 'jit_provisioning'
+  | 'form_system';
+
+// Group-assignable subset — enforced by DB CHECK; mirrored for application-layer guard
+export const SCIM_ASSIGNABLE_ROLES = [
+  'tenant_admin',
+  'tenant_manager',
+  'member',
+] as const satisfies FormRole[];
+
+export type ScimAssignableRole = (typeof SCIM_ASSIGNABLE_ROLES)[number];
+
+// Roles policy-prohibited from SCIM group assignment (§5.1)
+export const SCIM_EXCLUDED_ROLES = [
+  'tenant_owner',
+  'support_readonly',
+] as const satisfies FormRole[];
+```
+
+**`recordRoleChange()` signature update (§28.3 helper):**
+
+```typescript
+import type { FormRole, RoleChangeSource } from '../types/roles';
+
+export async function recordRoleChange(
+  env: Env,
+  params: {
+    tenantId: string;
+    userId: string | null;
+    scimRequestId: string;
+    changedBy: RoleChangeSource; // was: string
+    oldRole: FormRole;            // was: string
+    newRole: FormRole;            // was: string
+  }
+): Promise<void> {
+  // TypeScript enforces valid enum values at compile time.
+  // The DB ENUM provides the second enforcement layer at INSERT.
+  await env.SUPABASE.from('tenant_users_role_history').insert(params);
+}
+```
+
+---
+
+### 34.8 SOC 2 Evidence Mapping
+
+| SOC 2 Criterion | Control mechanism | Evidence artefact |
+|---|---|---|
+| **CC6.1** — Logical access restrictions | `form_role_enum` prevents invalid role values at DB layer; `_assignable CHECK` prevents `tenant_owner` / `support_readonly` assignment via SCIM | **ENUM-E-001** — `pg_enum` query output confirming `form_role_enum` values post-migration (§34.5 step 5a) |
+| **CC6.2** — Authorised access | `scim_group_role_mappings_form_role_assignable` CHECK enforces §5.1 policy that `tenant_owner` is never assignable via group mapping | **ENUM-E-002** — Migration `0069` applied; step 5c test query result showing CHECK rejection |
+| **CC8.1** — Change management | Migration `0069` in versioned migration log; pre/post-migration verification queries documented in §34.5; `compliance/migrations/log.md` entry with reviewer sign-off | **ENUM-E-003** — Migration log entry with timestamp and reviewer name |
+
+---
+
+### 34.9 Implementation Checklist
+
+#### P0 — Before M5 (must precede or co-apply with migration 0068 in new environments)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0069_role_enum_types.sql` to staging; run verification queries §34.5 steps 5a–5c; add to `compliance/migrations/log.md`. | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Apply migration `0069` to production after staging sign-off; confirm column types via step 5b; add production log entry. | platform-engineer | **P0** | M5 | [ ] |
+| 3 | Add `src/types/roles.ts` (`FormRole`, `RoleChangeSource`, `SCIM_ASSIGNABLE_ROLES`); update `recordRoleChange()` to typed parameters; fix any TypeScript compile errors from loose `string` role params. | platform-engineer | **P0** | M5 | [ ] |
+
+#### P1 — Before first enterprise SCIM pilot (M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Update `src/workers/scim/users.ts` and `groups.ts` to import `ScimAssignableRole` and apply `SCIM_EXCLUDED_ROLES` guard before `INSERT` into `scim_group_role_mappings`; add unit test for `tenant_owner` application-layer rejection. | platform-engineer | **P1** | M6 | [ ] |
+| 5 | Collect ENUM-E-001, ENUM-E-002, ENUM-E-003 and file at `compliance/evidence/soc2/CC6/ENUM-E-001.sql`, `ENUM-E-002.sql`, `ENUM-E-003.md`. | compliance-officer + platform-engineer | **P1** | M9 | [ ] |
+
+---
+
+### 34.10 Open Questions
+
+OQ-TURH-01 and OQ-TURH-02 are closed. One forward-looking governance item is tracked:
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-ENUM-01** | **`form_role_enum` evolution — how to add a new role value?** `ALTER TYPE form_role_enum ADD VALUE 'new_value'` is forward-compatible and requires no table lock. However, once added, a value cannot be removed without recreating the type and all dependent columns. Any future role addition must be approved via a DECISION_LOG entry before the migration runs; removal requires a multi-step migration (backfill + type recreation) at a scheduled maintenance window. | P2 | enterprise-architect + platform-engineer | Document decision in `docs/DECISION_LOG.md` before any `ALTER TYPE ... ADD VALUE` in production. |
+
+---
+
+*v1.0 (2026-06-14): §34 FORM Role ENUM Types — resolves OQ-TURH-01 and OQ-TURH-02 from §33.11 (2026-06-14) via DEC-050. Creates two Postgres ENUM types: `form_role_enum` with five values (`tenant_owner`, `tenant_admin`, `tenant_manager`, `member`, `support_readonly`) matching `docs/SSO_SCIM_IMPLEMENTATION.md §5.1` exactly (closes the silent inconsistency between the §5.1 role taxonomy and the 4-value TEXT CHECK in `tenant_users.form_role` and `scim_group_role_mappings.form_role`); `role_change_source_enum` with four values (`scim_sync`, `admin_ui`, `jit_provisioning`, `form_system`) matching §33.3 `changed_by` documentation. Migration `0069_role_enum_types.sql`: five-step migration covering CREATE TYPE ×2 (step 1), `tenant_users.form_role` TEXT → `form_role_enum` with CHECK drop (step 2), `scim_group_role_mappings.form_role` type migration + replacement assignability CHECK (step 3), `tenant_users_role_history.old_role`/`new_role`/`changed_by` type migration (step 4), and five verification queries (step 5). Per-table change summary (§34.6): five column changes across three tables. TypeScript alignment (§34.7): `FormRole`, `RoleChangeSource`, `SCIM_ASSIGNABLE_ROLES`, `ScimAssignableRole` discriminated union types; `SCIM_EXCLUDED_ROLES` constant; `recordRoleChange()` signature update from `string` to typed parameters. SOC 2 evidence: three artefacts ENUM-E-001 (CC6.1), ENUM-E-002 (CC6.2), ENUM-E-003 (CC8.1). Five-item implementation checklist: 3× P0/M5 (staging + production migration, TypeScript types), 2× P1/M6–M9 (SCIM worker guard, evidence). One new open question OQ-ENUM-01 (P2 — future role addition governance). §33.11 OQ-TURH-01 and OQ-TURH-02 updated to 🟢 Resolved. TOC updated to add §33 and §34 entries. Header updated v1.12 → v1.13. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §5.1` (authoritative role taxonomy — `form_role_enum` matches exactly); `docs/SSO_SCIM_IMPLEMENTATION.md §28.3` (DEC-049 context — `recordRoleChange()` updated in §34.7); `docs/DATA_MODEL.md §33.11` (OQ-TURH-01 + OQ-TURH-02 source — both marked 🟢 Resolved); `docs/DATA_MODEL.md §2` (`tenant_users` DDL — `form_role` column altered); `docs/DATA_MODEL.md §4.2` (`scim_group_role_mappings` DDL — `form_role` column altered); `docs/DECISION_LOG.md DEC-050` (to be created at migration apply time). Owner: enterprise-architect + platform-engineer + compliance-officer.*
