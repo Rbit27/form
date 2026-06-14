@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [5.7.0] — 2026-06-14
+
+### Added
+- `content/post-21-plateau-diagnosis.md` — Editorial series, post 21. "Плато — це не стеля. Це діагноз." Three sources of training plateau (absent progressive overload, accumulated fatigue, technical limiter), diagnostic algorithm (8-week audit → recovery markers → video tech review), practical interventions per source, time horizon for intervention assessment. 13-min read. clinical-safety: PASS (no food/body image/mental health content). sports-scientist review required before publish.
+- `blog.html` — Cards added for posts 18 (rest intervals), 19 (warm-up protocols), 20 (DOMS), 21 (plateau diagnosis).
+
+### Changed
+- `README.md` — Editorial series table updated: 11–21 complete; proposed next posts 22–25 added (seasonal programming, return from break, female physiology · clinical-safety required, minimal equipment).
+- `STATUS.md` — Editorial series row updated; total posts 815 → 816.
+- `VERSION` — 5.6.0 → 5.7.0.
+
+---
+
 ## [5.6.0] — 2026-06-14
 
 ### Added

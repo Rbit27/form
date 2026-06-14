@@ -6,17 +6,22 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–17 complete · proposed next (18–20)
+### Editorial series: 11–21 complete · proposed next (22–25)
 
-Теми з оригінального скоупу 11–15, які отримали інші номери. Пишуться як editorial long-reads — той самий формат 13-min.
+Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
 | Post | Topic | Status |
 |---|---|---|
 | 16 | Перетренованість або недовідновлення: як self-coached атлет читає сигнали тіла | draft |
 | 17 | AI-coach проти персонального тренера: чесний trade-off | draft |
-| 18 | Як пробити плато: прогрес зупинився — що робити далі | proposed |
-| 19 | Сезонне програмування для recreational athlete: зима, літо, відпустки | proposed |
-| 20 | Жіноча фізіологія і силові тренування — що реально відрізняється | proposed (clinical-safety review required) |
+| 18 | Скільки відпочивати між підходами — і чому таймер на 60 секунд неправильний | draft |
+| 19 | Warm-up протоколи — чому більшість не відповідає реальним потребам атлета | draft |
+| 20 | Крепатура — це не індикатор тренування | draft |
+| 21 | Плато — це не стеля. Це діагноз. | draft · v5.7.0 |
+| 22 | Сезонне програмування для recreational athlete: зима, літо, відпустки | proposed |
+| 23 | Як повернутись до тренування після перерви: скільки втрачається і за який час | proposed |
+| 24 | Жіноча фізіологія і силові тренування — що реально відрізняється | proposed (clinical-safety review required) |
+| 25 | Тренування в умовах мінімального обладнання: що зберігає результат, а що — ні | proposed |
 
 ---
 

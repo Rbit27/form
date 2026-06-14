@@ -1,4 +1,4 @@
-# FORM · Project Status v5.6.0
+# FORM · Project Status v5.7.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.6.0** — 2026-06-14
+**v5.7.0** — 2026-06-14
 
 ---
 
@@ -30,9 +30,9 @@
 | 751–800 | Athlete lifecycle & context | 50 | **BLOCK COMPLETE** — all 50 posts written v5.1.0: posts 791 (athletes with movement limitations · clinical-safety CONDITIONAL PASS), 793 (sustained high stress training · clinical-safety CONDITIONAL PASS), 794 (medically-restricted diet · clinical-safety CONDITIONAL PASS) now written with embedded guard rails. Blog cards added for posts 785–800. sports-scientist review required for all 50 before publish |
 | 801–850 | Evidence-based deep dives | 20 | **20/50 written** — posts 801–810: creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic, steroids/research interpretation, genetic ceiling, fat as endocrine organ. Posts 811–820: sleep & performance, deload science, training age, volume landmarks (MEV/MAV/MRV), inter-set rest, rate of force development, concurrent training interference, heat/cold exposure, altitude training, evidence-based stretching. All sports-scientist review required before publish. |
 
-**Total posts: 815**
+**Total posts: 816**
 
-**Editorial series 11–17** — post-17 written (AI-coach vs PT · clinical-safety PASS); blog.html cards added for posts 11–17; posts 18–20 proposed in README.
+**Editorial series 11–21** — post-21 written (plateau diagnosis · clinical-safety PASS); blog.html cards added for posts 11–21; posts 22–25 proposed in README.
 
 ---
 
