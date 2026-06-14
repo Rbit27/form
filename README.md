@@ -6,6 +6,17 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
+### Editorial series: proposed next (16–17)
+
+Теми з оригінального скоупу 11–15, які отримали інші номери. Пишуться як editorial long-reads — той самий формат 13-min.
+
+| Post | Topic | Status |
+|---|---|---|
+| 16 | Перетренованість або недовідновлення: як self-coached атлет читає сигнали тіла | draft |
+| 17 | AI-coach проти персонального тренера: чесний trade-off 2026 | proposed |
+
+---
+
 ### Published blocks
 
 | Range | Theme | Posts | Status |

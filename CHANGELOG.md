@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [4.99.0] — 2026-06-14
+
+### Added
+- `content/post-16-overtraining-vs-underrecovery.md` — Editorial series post 16/17. Спектр перевантаження: functional overreaching → non-functional overreaching → overtraining syndrome (Meeusen et al. 2013 consensus). HRV як трекінговий маркер (7-денне ковзне середнє). Диференційний чекліст (об'єктивний + суб'єктивний + часовий блок). Протоколи відновлення на кожному рівні. Психологічні прояви OTS подано як нейроендокринна дисфункція HPA-осі — не психологічний фрейм. MD-referral gate для OTS. clinical-safety PASS (cloud-agent).
+- `blog.html` — картки для posts 11–16 (posts 11–15 раніше не мали карток).
+- `README.md` — розділ «Editorial series: proposed next (16–17)» з темами post-16 (draft) і post-17 AI-coach vs PT (proposed).
+
+### Changed
+- `STATUS.md` — total posts 777 → 778; editorial series 11–16 зафіксовано; post-17 proposed.
+- `VERSION` — 4.98.0 → 4.99.0.
+
+---
+
 ## [4.98.0] — 2026-06-14
 
 ### Added
