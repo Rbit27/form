@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [4.83.4] — 2026-06-14
+
+### Added
+- `docs/OBSERVABILITY.md §42` — White-Label Custom Domain & SSL Certificate Observability (v3.9). Covers three surfaces: custom domain DNS (CNAME → Cloudflare), SSL certificate lifecycle (Cloudflare Custom Hostnames / SSL for SaaS), and branding asset CDN delivery. Four SLOs (WL-SLO-01 through WL-SLO-04), six alert rules (AL-WL-01 through AL-WL-06), pg_cron job 32 `white_label_cert_check` (02:00 UTC daily, polls Cloudflare Custom Hostnames API), `tenant_white_label_domains` Postgres DDL with RLS, six DEC-030 HMAC-chained events (tenant.white_label_provisioned / cert_expiry_warning / cert_renewed / cert_expiry_breach / revoked + system.white_label_cert_check_stale), WL-CHAIN-01 ordering invariant, three SOC 2 evidence artefacts (WL-E-001 A1.1 / WL-E-002 CC7.2 / WL-E-003 CC7.2), Admin Dashboard "Domain & Branding" panel (tenant-scoped, powered-by-FORM toggle locked below $50k ARR), internal Metabase "White-Label Fleet Health" dashboard. Closes the observability gap for the white-label feature documented in `docs/ENTERPRISE.md §Branding`.
+
+### Changed
+- `VERSION` — 4.83.3 → 4.83.4.
+
 ## [4.83.3] — 2026-06-14
 
 ### Added

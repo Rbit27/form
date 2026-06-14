@@ -11235,6 +11235,292 @@ Store at `compliance/evidence/wearable/` with `MANIFEST.sha256`.
 
 *v3.6 (2026-06-13): §39 Backup Integrity, DR Readiness & Business Continuity Observability — closes the observability gap explicitly noted in §37.1 ("Supabase internal backup retention — vendor-managed; monitored via S-008 synthetic probe in §16"). §39 is the compliance-grade companion to `docs/BUSINESS_CONTINUITY.md`: where the BCP defines what to do, §39 defines how FORM knows it's doing it. §39.1 scopes to four surfaces: Supabase Postgres daily logical backup, R2 `form-backups` (primary cold-start), Backblaze B2 `form-dr-backups` (EU DR), and quarterly/annual restore tests. Explicitly out of scope: PITR restore runbooks (BCP §6.1 + DATA_MODEL.md §10), R2/B2 lifecycle policy configuration, audit log chain integrity (§15/§11.8), and GDPR erasure pipelines (§37). §39.2 backup coverage map: six data stores tabulated with backup type, target freshness, and RPO contribution — Workers KV and Workers Secrets explicitly not backed up by design. §39.3 RED metrics: two rate metrics (backup_completion_rate_24h, restore_tests_completed_rolling_90d), three error metrics (backup_age_hours per store, backup_failed_count_7d, restore_test_age_days), two duration metrics (backup_duration_minutes_p95 per store, restore_test_rto_minutes_p95); all infrastructure-only — no user_id, no tenant_id, no health data in any signal. §39.4 five SLOs: BC-SLO-01 (Postgres backup freshness ≤ 26h, 100% zero-tolerance), BC-SLO-02 (R2 freshness ≤ 26h, 99.5%), BC-SLO-02b (B2 EU freshness ≤ 30h, 99%), BC-SLO-03 (restore test RTO ≤ 4h per event, mirrors ENTERPRISE_SLA.md §4.3), BC-SLO-04 (one restore test per calendar quarter, 100% zero-tolerance — direct SOC 2 A1.3 evidence gate). §39.5 six alert rules AL-BC-01 through AL-BC-06: AL-BC-01 (P1, Postgres stale > 26h, auto-resolve), AL-BC-02 (P0, Postgres critical > 48h, no-auto-resolve, dual page), AL-BC-03 (P1, R2 stale > 26h, auto-resolve), AL-BC-04 (P1, restore test overdue > 90d, 7d TTL re-fire, auto-resolve on test completion), AL-BC-05 (P0, backup_failed DEC-030 CRITICAL, no-auto-resolve), AL-BC-06 (P2, backup duration P95 > 4h, Slack only). §39.6 five-row §6.2 master alert table addition for `backup_dr_health` subsection. §39.7 pg_cron job 29 `backup_age_monitor` (every 4h, 5h freshness window, P1 → AL-BC-01/03; escalates to P0 → AL-BC-02 if > 48h); design note distinguishing job 29 (DEC-030 compliance evidence) from S-008 (uptime-style availability monitoring). §39.8 seven-panel "Backup & DR Readiness" Metabase dashboard: `FORM-DevOps` collection, `form_admin` + `compliance_reviewer` visibility, no PII in any panel. §39.9 five DEC-030 HMAC-chained events: `system.backup_completed` (STANDARD, 5yr — `store`, `backup_type`, `duration_minutes`, `backup_id`, `region`, `pitr_point_in_time`), `system.backup_failed` (CRITICAL, 7yr — `error_message_hash` SHA-256 prevents credential leakage), `system.restore_test_initiated` (STANDARD, 7yr — `initiated_by` = PAM session ID, not raw user_id; `environment: literal("staging")`), `system.restore_test_completed` (STANDARD, 7yr — `rto_achieved_minutes`, `rto_target_minutes: literal(240)`, `privacy_floor_verified` boolean; if false, test is classified failed regardless of RTO), `system.restore_test_failed` (CRITICAL, 7yr — `failure_reason` enum includes `privacy_floor_violation` which additionally notifies clinical-safety), `system.backup_staleness_detected` (HIGH, 7yr — `dedup_key` prevents chain spam on repeated stale detection); BC-CHAIN-01 ordering invariant enforced at `emit-audit-event` Worker. §39.10 five SOC 2 evidence artefacts BC-E-001 through BC-E-005: BC-E-001 (A1.2 — job 29 run history), BC-E-002 (A1.3 — restore_test_completed events, quarterly), BC-E-003 (A1.3 — RTO comparison chart), BC-E-004 (CC7.2 — AL-BC-01/02 PagerDuty history), BC-E-005 (CC6.5 — 10-event backup_completed chain excerpt); A1.3 auditor narrative supplied (RTO operationally verified, not merely documented; privacy_floor_verified field extends compliance assurance through restore operations). §39.11 two open questions: OQ-BC-OBS-01 (P1, Supabase Management API vs DEC-030 event for Postgres backup cross-validation — dual-path recommended; resolve M8), OQ-BC-OBS-02 (P2, quarterly drill scope: Postgres PITR only vs. R2/B2 cold backup — Postgres-only recommended, annual for R2/B2; resolve M5). §39.12 eleven-item implementation checklist: 5× P0/M5–M6 (five-event DEC-030 registration, staleness event + dedup, backup Worker instrumentation, pg_cron job 29 DDL + cron registration, AL-BC-01 through AL-BC-05 PagerDuty configuration), 3× P1/M5–M7 (first quarterly restore test + BC-E-002 filing, Metabase dashboard, OQ-BC-OBS-02 decision), 3× P2/M9–M13 (evidence collection BC-E-001/005, OQ-BC-OBS-01 dual-path implementation, admin dashboard BC-SLO surface evaluation). Cross-references: `docs/BUSINESS_CONTINUITY.md §3.1` (RTO/RPO targets — BC-SLO-01/03 anchor); `docs/BUSINESS_CONTINUITY.md §4.2` (Privacy Floor verification — `privacy_floor_verified` boolean in restore_test_completed); `docs/BUSINESS_CONTINUITY.md §5.1–5.2` (Postgres PITR + R2 backup architecture); `docs/BUSINESS_CONTINUITY.md §6.1` (Postgres PITR restore runbook — §39 provides observability, BCP provides runbook); `docs/BUSINESS_CONTINUITY.md §7` (annual DR drill — OQ-BC-OBS-02 governs whether R2/B2 is included in quarterly vs. annual scope); `docs/ENTERPRISE_SLA.md §4.3` (RTO < 4h enterprise commitment — BC-SLO-03 target_minutes = 240); `docs/SOC2_READINESS.md §A1 criteria` (A1.2 capacity monitoring, A1.3 recovery testing — BC-E-001 through BC-E-005 close these evidence gaps); `docs/AUDIT_LOG_SCHEMA.md §System` (five new DEC-030 events to register — P0 before M5); `docs/CRYPTOGRAPHY_POLICY.md §5` (key inventory — OQ-BC-OBS-01 may require SUPABASE_MANAGEMENT_API_KEY entry); §16 S-008 (R2 backup freshness synthetic probe — complementary to, not replaced by, §39); §37.1 (GDPR data lifecycle out-of-scope note — §39 closes that explicit gap); §38 (CI/CD observability — both §38 and §39 emit into `audit_log_events` §System events namespace). Owner: devops-lead + compliance-officer + platform-engineer.*
 
+---
+
+## §42 White-Label Custom Domain & SSL Certificate Observability
+
+### 42.1 Purpose and Scope
+
+White-label is available to tenants at the Growth tier threshold (≥ $50k ARR, per `docs/ENTERPRISE.md §Branding`). This section covers the observability of three surfaces:
+
+1. **Custom domain DNS** — tenant's CNAME (e.g. `fitness.acme.com`) resolving to Cloudflare (form.coach infrastructure)
+2. **SSL certificate lifecycle** — Cloudflare-provisioned cert on the custom hostname via Cloudflare SSL for SaaS; expiry, renewal, and validation events
+3. **Branding asset CDN delivery** — tenant logo and color-palette override served from R2; cache availability
+
+Out of scope: SAML certificate lifecycle (§26 + `docs/SSO_SCIM_IMPLEMENTATION.md §20`), API key management (§31), wearable sync (§41).
+
+**Privacy floor:** Custom domain hostnames are tenant-level commercial metadata — not personal data under GDPR Art. 4(1). However, custom domain names identify a specific enterprise customer and are commercially sensitive. No custom domain appears in any cross-tenant export, in SIEM streams beyond the affected tenant's own SIEM endpoint, or in aggregated dashboards visible to other tenants. All Admin Dashboard panels (§42.8) are tenant-scoped.
+
+**SOC 2 criteria in scope:** A1.1 (availability — custom domain is part of the contracted service SLA for white-label tenants), A1.2 (environmental threats — expired cert causes a browser TLS error for every tenant employee), CC7.2 (anomaly monitoring — cert expiry and CNAME resolution failure alert rules), CC9.2 (vendor monitoring — Cloudflare Custom Hostnames is a sub-processor for cert provisioning).
+
+---
+
+### 42.2 Architecture Note
+
+Cloudflare Custom Hostnames (SSL for SaaS) is the provisioning mechanism:
+
+```
+tenant CNAME (fitness.acme.com) → Cloudflare edge (form.coach zone)
+Cloudflare provisions TLS cert for custom hostname via ACME/DCV
+Cert lifecycle managed by Cloudflare; FORM polls Cloudflare API nightly to detect renewal failures
+```
+
+Cert auto-renewal is Cloudflare-managed. FORM's responsibility: detect renewal failures before the cert expires, notify the CSM and tenant admin, and open a P0 incident if a cert expires. The `tenant_white_label_domains` table (§42.6) is the source of truth for active custom hostnames; pg_cron job 32 polls the Cloudflare Custom Hostnames API nightly against that table.
+
+---
+
+### 42.3 RED Metrics
+
+**Dataset:** `WL_TELEMETRY` (Cloudflare Analytics Engine binding)
+
+| Signal | Type | Metric name | Notes |
+|---|---|---|---|
+| **Rate** | | | |
+| HTTPS requests via custom domain | Rate | `custom_domain_requests_total` | Emitted by Cloudflare origin-edge Worker; `hostname_slug` (not raw domain) |
+| Cert renewal events | Rate | DEC-030 `tenant.white_label_cert_renewed` count/month | From pg_cron job 32 nightly Cloudflare API poll |
+| **Errors** | | | |
+| CNAME resolution failure | Error | `cname_resolution_failed` counter | S-WL-{n} Better Stack synthetic probe |
+| SSL handshake error | Error | `ssl_handshake_error` counter | Cloudflare edge report; non-zero triggers AL-WL-03 |
+| Cert days-to-expiry gauge | Error | `cert_days_to_expiry` (per tenant) | pg_cron job 32; alert thresholds at 30d and 7d |
+| **Duration** | | | |
+| HTTPS handshake P95 | Duration | `tls_handshake_ms_p95` | Cloudflare Analytics Engine; target < 300 ms |
+| R2 branding asset P95 | Duration | `branding_asset_latency_ms_p95` | R2 object fetch latency; target < 500 ms |
+
+---
+
+### 42.4 SLOs
+
+| ID | SLO | Target | Window | Source | Alert |
+|---|---|---|---|---|---|
+| **WL-SLO-01** | Custom domain HTTPS availability (white-label tenants) | ≥ 99.9% | Calendar month per tenant | S-WL-{n} Better Stack synthetic + Cloudflare Analytics Engine | AL-WL-01 |
+| **WL-SLO-02** | Zero active white-label tenants with expired SSL cert | 100% zero-tolerance | Continuous | pg_cron job 32 nightly Cloudflare API poll | AL-WL-05 |
+| **WL-SLO-03** | Cert expiry warning issued ≥ 30 days before expiry | 100% zero-tolerance | Per-cert lifecycle | pg_cron job 32 | AL-WL-03 |
+| **WL-SLO-04** | Branding asset CDN P95 latency | < 500 ms | 7-day rolling | `WL_TELEMETRY` | AL-WL-06 |
+
+**SLO ownership:** WL-SLO-01 feeds the §23 Enterprise SLA credit engine — a custom domain outage counts toward the tenant's 99.9% monthly uptime SLA. WL-SLO-02 is zero-tolerance: an expired cert causes a browser TLS error for every tenant employee, constituting a full-service outage and automatic SLA credit.
+
+**Add to §2.1 SLO master table** after the `SSO-SLO-05` entry.
+
+---
+
+### 42.5 Alert Rules
+
+| ID | Condition | Severity | Routing | Dedup key | Runbook |
+|---|---|---|---|---|---|
+| **AL-WL-01** | S-WL-{n} synthetic probe fails ≥ 2 consecutive checks | **P1** | PagerDuty `form-platform` + CSM Slack `#enterprise-{tenant_slug}` | `wl-cname-down-{tenant_id}` (auto-resolve on recovery) | Check Cloudflare Custom Hostname status via API; if status ≠ `active`, investigate DCV failure; escalate to P0 if WL-SLO-01 breach threatens monthly SLA credit threshold and open §23 SLA incident |
+| **AL-WL-02** | Cloudflare Custom Hostname status ≠ `active` for any white-label tenant | **P1** | PagerDuty `form-platform` | `wl-provision-status-{tenant_id}` (auto-resolve on `active`) | Fires during provisioning delays or Cloudflare API degradation; CSM notifies tenant IT if status persists > 2 h; check `ssl_cert_status` for `pending_validation` |
+| **AL-WL-03** | Cert `days_to_expiry` < 30 for any active white-label tenant | **P2** | Slack `#infra-alerts` | `wl-cert-warn-30d-{tenant_id}` (7-day cooldown) | Cloudflare auto-renewal should have fired; check Cloudflare Custom Hostname status for `pending_validation`; verify CNAME is still correctly pointed |
+| **AL-WL-04** | Cert `days_to_expiry` < 7 for any active white-label tenant | **P1** | PagerDuty `form-platform` + CSM + devops-lead | `wl-cert-warn-7d-{tenant_id}` (24-hour re-alert) | Treat as pre-incident; if Cloudflare auto-renewal has not completed, trigger manual renewal via Cloudflare API (`PATCH /zones/{zone_id}/custom_hostnames/{hostname_id}`); open INCIDENT_RESPONSE.md pre-incident track |
+| **AL-WL-05** | Cert `days_to_expiry` ≤ 0 (expired cert, any active white-label tenant) | **P0** | PagerDuty CRITICAL dual-page: devops-lead + founder | `wl-cert-expired-{tenant_id}` (no auto-resolve) | WL-SLO-01 + WL-SLO-02 breach; open §23 SLA incident automatically; CSM notifies tenant within 15 min; emit `tenant.white_label_cert_expiry_breach` DEC-030 CRITICAL; escalate to Cloudflare support if API-triggered renewal fails |
+| **AL-WL-06** | R2 branding asset P95 latency > 1,000 ms over 30-min window | **P2** | Slack `#infra-alerts` | `wl-asset-latency-{region}` (1-hour cooldown) | Check R2 regional status; likely upstream Cloudflare R2 degradation; branding failure does not trigger SLA credit (cosmetic, not functional) |
+
+**Add rows to §6.2 master alert table** under a new subsection `white_label_domain_health` after `api_key_health`.
+
+---
+
+### 42.6 Postgres Schema
+
+```sql
+-- Migration 0072_tenant_white_label_domains.sql
+CREATE TABLE tenant_white_label_domains (
+  id                     UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id              UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  custom_domain          TEXT        NOT NULL UNIQUE,          -- e.g. fitness.acme.com
+  cname_target           TEXT        NOT NULL DEFAULT 'custom.form.coach',
+  cloudflare_hostname_id TEXT        NOT NULL UNIQUE,          -- Cloudflare Custom Hostnames resource ID
+  status                 TEXT        NOT NULL DEFAULT 'pending'
+                         CHECK (status IN ('pending','active','error','revoked')),
+  ssl_cert_expiry_at     TIMESTAMPTZ,                          -- populated by nightly pg_cron job 32
+  ssl_cert_status        TEXT        CHECK (ssl_cert_status IN
+                           ('active','pending_validation','expired','error')),
+  last_checked_at        TIMESTAMPTZ,                          -- last successful Cloudflare API poll
+  provisioned_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  revoked_at             TIMESTAMPTZ,                          -- set on white-label downgrade
+  created_by             UUID        NOT NULL,                 -- PAM session ID, not raw user_id
+  CONSTRAINT chk_wld_revoke_nullability
+    CHECK ((revoked_at IS NULL) = (status != 'revoked'))
+);
+
+CREATE INDEX idx_wld_cert_expiry ON tenant_white_label_domains (ssl_cert_expiry_at)
+  WHERE status = 'active';
+
+CREATE INDEX idx_wld_tenant ON tenant_white_label_domains (tenant_id)
+  WHERE status = 'active';
+```
+
+**RLS policies:**
+
+```sql
+-- tenant_admin reads their own domain record (Admin Dashboard §42.8)
+CREATE POLICY wld_tenant_admin_read ON tenant_white_label_domains
+  FOR SELECT TO form_tenant_admin
+  USING (tenant_id = (SELECT tenant_id FROM current_tenant_context()));
+
+-- form_system (Workers service role) writes all
+CREATE POLICY wld_system_write ON tenant_white_label_domains
+  FOR ALL TO form_system USING (true) WITH CHECK (true);
+
+-- compliance_reviewer reads all for SOC 2 evidence (WL-E-001)
+CREATE POLICY wld_compliance_read ON tenant_white_label_domains
+  FOR SELECT TO compliance_reviewer USING (true);
+
+-- form_api: no access — domain name not surfaced in any public API response
+REVOKE ALL ON tenant_white_label_domains FROM form_api;
+```
+
+---
+
+### 42.7 pg_cron Job 32 — `white_label_cert_check`
+
+Schedule: **02:00 UTC daily** (after Cloudflare auto-renewal window, which closes by ~01:30 UTC). Freshness window: 26 h (matching §12.6 audit-chain-daily-check convention).
+
+**Execution flow:**
+
+```
+1. SELECT all rows from tenant_white_label_domains WHERE status = 'active'
+2. For each row: call Cloudflare Custom Hostnames API via Worker proxy
+   GET /zones/{zone_id}/custom_hostnames/{cloudflare_hostname_id}
+   Worker holds CF_API_TOKEN as Worker Secret (not in Postgres)
+3. UPDATE tenant_white_label_domains SET
+     ssl_cert_expiry_at = :new_expiry,
+     ssl_cert_status    = :cf_ssl_status,
+     status             = :cf_hostname_status,
+     last_checked_at    = NOW()
+   WHERE cloudflare_hostname_id = :cf_hostname_id
+4. Emit system.white_label_cert_checked (STANDARD, 1yr) per polled domain
+5. Identify at-risk domains:
+   SELECT * FROM tenant_white_label_domains
+   WHERE status = 'active'
+     AND ssl_cert_expiry_at < NOW() + INTERVAL '30 days'
+   For each: emit tenant.white_label_cert_expiry_warning (HIGH, 7yr)
+   For rows where ssl_cert_expiry_at <= NOW():
+     emit tenant.white_label_cert_expiry_breach (CRITICAL, 7yr)
+     trigger AL-WL-05 via PagerDuty Events API
+```
+
+**Stale detection:** If any row has `last_checked_at IS NULL OR last_checked_at < NOW() - INTERVAL '26 hours'`, emit `system.cron_job_stale` for job 32 (§12.6 pattern). This indicates the pg_net → Worker proxy call is failing — a FORM-side operational gap.
+
+**Register in §12.6 pg_cron job registry as job 32.**
+
+---
+
+### 42.8 Admin Dashboard Panel — "Domain & Branding"
+
+Visible only when `tenants.white_label_enabled = true`. Tab appears in the admin sidebar under Settings.
+
+| Panel element | Data source | Privacy constraint |
+|---|---|---|
+| Custom domain status badge (active / pending / error) | `tenant_white_label_domains.status` | Domain name visible to tenant_admin of that tenant only; never in cross-tenant views |
+| SSL cert expiry countdown (days) | `tenant_white_label_domains.ssl_cert_expiry_at` | Days only; no cert fingerprint or chain exposed |
+| CNAME configuration guide | Static UI (tenant-specific CNAME target `custom.form.coach`) | CNAME target is not a secret |
+| Branding asset upload status | `tenant_branding_assets.last_updated_at` | No CDN URL in panel |
+| Powered-by-FORM footer toggle | `tenants.powered_by_form_visible` | Locked `true` for tenants below $50k ARR threshold; non-configurable at Starter tier |
+
+---
+
+### 42.9 Internal Dashboard — "White-Label Fleet Health"
+
+Metabase collection: `FORM-DevOps`. Visibility: `form_admin` + `devops-lead` + `compliance_reviewer`.
+
+| Panel | Source | Refresh |
+|---|---|---|
+| Active white-label tenant count | `COUNT(*) WHERE status = 'active'` | 1 h |
+| Cert expiry timeline — next 60 days | `tenant_white_label_domains` ordered by `ssl_cert_expiry_at ASC` | 1 h |
+| Provisioning status breakdown (active / pending / error) | `GROUP BY status` | 15 min |
+| Cert check freshness (last job 32 run) | §12.6 `last_run_at` for job 32 | 15 min |
+| Recent AL-WL-01 / AL-WL-04 / AL-WL-05 incidents | PagerDuty API (last 90 days) | 5 min |
+
+**Note:** `tenant_white_label_domains` is excluded from the Metabase raw-table schema sync (same `analytics_readonly` schema filter that excludes health tables), preventing accidental domain name exposure in ad-hoc analyst queries.
+
+---
+
+### 42.10 DEC-030 HMAC-Chained Events
+
+Register all events in `docs/AUDIT_LOG_SCHEMA.md §WhiteLabel`.
+
+| Event | Severity | Retention | Trigger | Payload privacy constraint |
+|---|---|---|---|---|
+| `tenant.white_label_provisioned` | STANDARD | 7 yr | Domain record created; Cloudflare Custom Hostname API call succeeds | `custom_domain` in payload (commercially sensitive; excluded from cross-tenant auditor bulk exports) |
+| `tenant.white_label_cert_expiry_warning` | HIGH | 7 yr | pg_cron job 32 detects `days_to_expiry` < 30 | `days_to_expiry` integer; `custom_domain_hash` SHA-256 for chain linkage; no cert material |
+| `tenant.white_label_cert_renewed` | STANDARD | 7 yr | Cloudflare API returns `ssl_cert_expiry_at` > prior value | `old_expiry_at`, `new_expiry_at`; no cert material |
+| `tenant.white_label_cert_expiry_breach` | CRITICAL | 7 yr | `ssl_cert_expiry_at` ≤ NOW() for any `status = 'active'` domain | Constitutes SLA breach; triggers §23 SLA incident; `custom_domain_hash` SHA-256 |
+| `tenant.white_label_revoked` | HIGH | 7 yr | Tenant downgrades below $50k ARR or requests removal | `revoked_by` PAM session ID; `reason` enum (`downgrade` \| `customer_request` \| `non_payment`) |
+| `system.white_label_cert_check_stale` | HIGH | 7 yr | Job 32 `last_checked_at` > 26 h for any active domain | Operational gap; no tenant data in payload |
+
+**WL-CHAIN-01 ordering invariant:** For each active white-label tenant, the sequence `tenant.white_label_provisioned` → `tenant.white_label_cert_renewed`^N must remain unbroken. A `tenant.white_label_cert_expiry_breach` without a preceding `tenant.white_label_cert_expiry_warning` in the same 30-day window constitutes a WL-CHAIN-01 violation (warning was suppressed or cert check stale) and additionally emits `system.white_label_cert_check_stale`.
+
+---
+
+### 42.11 SOC 2 Evidence Artefacts
+
+Store at `compliance/evidence/white-label/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **WL-E-001** | Annual export of `tenant.white_label_cert_renewed` DEC-030 chain events for all active white-label tenants during the observation period — demonstrates no cert expired during observation | A1.1 — Availability commitments met | 7 yr |
+| **WL-E-002** | AL-WL-03 / AL-WL-04 / AL-WL-05 PagerDuty rule configuration screenshots + 90-day incident history export | CC7.2 — Anomaly detection for certificate lifecycle | 3 yr |
+| **WL-E-003** | pg_cron job 32 run history for the observation period (180-day `system.white_label_cert_checked` event export) — demonstrates proactive nightly monitoring | CC7.2 — Detective control for cert expiry | 3 yr |
+
+**Auditor narrative for A1.1:** For white-label tenants, service availability extends to the custom domain. WL-E-001 provides chain evidence that every active white-label cert was renewed before expiry during the observation period. Combined with §23 SLA reports and §16 synthetic probe history, the record demonstrates end-to-end custom domain availability across the full observation window.
+
+---
+
+### 42.12 Privacy Constraints Summary
+
+| Constraint | Enforcement location |
+|---|---|
+| Custom domain name excluded from cross-tenant dashboards and exports | `tenant_white_label_domains` RLS; Metabase schema filter excludes table from ad-hoc queries |
+| SIEM stream scopes `tenant.white_label_*` events to the affected tenant's SIEM endpoint only | §27.2 SIEM routing: `tenant.white_label_*` delivered to `tenant_id`-matched webhook; no cross-tenant stream |
+| `compliance_reviewer` may read all custom domain records | Required for WL-E-001 SOC 2 evidence (auditor must confirm all active tenants had valid certs); disclosed in DPA Annex B |
+| `form_api` role has no access to `tenant_white_label_domains` | `REVOKE ALL ... FROM form_api`; custom domain not surfaced in any public API response |
+
+---
+
+### 42.13 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-WL-OBS-01** | **Should `custom_domain` appear as plaintext or SHA-256 hash in the `tenant.white_label_provisioned` DEC-030 payload?** Proposal: SHA-256 hash in the HMAC chain body; plaintext retained in `tenant_white_label_domains` (RLS-gated). Rationale: auditor bulk chain export should not expose customer domain names — consistent with `business_justification` redaction in DEC-043. Counter-argument: domain name is browser-visible and semi-public; hashing reduces debuggability without meaningful security benefit. | **P1** | compliance-officer + security-engineer | Resolve before first white-label tenant goes live; document in `docs/DECISION_LOG.md` |
+| **OQ-WL-OBS-02** | **What is the Cloudflare Custom Hostnames API rate limit for nightly polling at scale?** Cloudflare API allows 1,200 req/5 min. At ≤ 100 active white-label tenants, nightly polling (1 API call/tenant/night) is well within limits. At 1,000+ tenants, parallel polling risks rate-limiting. Resolution: add `wl_poll_rate_limited` counter to `WL_TELEMETRY`; alert at > 5% rate-limited calls (P2 Slack); implement exponential backoff with jitter in the polling Worker. | **P2** | platform-engineer | Evaluate at 100 active white-label tenants; no action required before then |
+
+---
+
+### 42.14 Implementation Checklist
+
+#### P0 — Before first white-label tenant activates
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all six DEC-030 events from §42.10 in `docs/AUDIT_LOG_SCHEMA.md §WhiteLabel`; deploy to `emit-audit-event` Worker event registry. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 2 | Create `tenant_white_label_domains` table (§42.6 DDL + RLS); register migration `0072_tenant_white_label_domains.sql`. | platform-engineer | **P0** | M10 | [ ] |
+| 3 | Implement pg_cron job 32 `white_label_cert_check` (§42.7 spec) + polling Worker proxy holding `CF_API_TOKEN` as Worker Secret; register in §12.6 pg_cron job registry. | devops-lead + platform-engineer | **P0** | M10 | [ ] |
+| 4 | Configure AL-WL-04 (P1) and AL-WL-05 (P0) in PagerDuty `form-platform`; verify with synthetic test event before first white-label provisioning. | devops-lead | **P0** | M10 | [ ] |
+| 5 | Configure Better Stack synthetic probe S-WL-{n} per active white-label domain (60-second interval, 2-consecutive-failure trigger); route to AL-WL-01. Script must be created for each new white-label activation. | devops-lead | **P0** | M10 | [ ] |
+
+#### P1 — Before SOC 2 observation period starts (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Configure AL-WL-01 (P1), AL-WL-02 (P1), AL-WL-03 (P2) in PagerDuty / Slack `#infra-alerts`. | devops-lead | **P1** | M11 | [ ] |
+| 7 | Add §42.8 "Domain & Branding" Admin Dashboard panel; gate behind `tenants.white_label_enabled` feature flag. | platform-engineer | **P1** | M11 | [ ] |
+| 8 | Register WL-SLO-01 through WL-SLO-04 in §2.1 master SLO table; wire WL-SLO-01 into §23 SLA credit engine as a covered service. | devops-lead + compliance-officer | **P1** | M11 | [ ] |
+| 9 | Update §6.2 master alert table with `white_label_domain_health` subsection (six rows from §42.5). | devops-lead | **P1** | M11 | [ ] |
+
+#### P2 — Before first SOC 2 evidence collection (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | Build §42.9 "White-Label Fleet Health" Metabase dashboard; configure schema filter to exclude `tenant_white_label_domains` from raw explorer. | data-engineer | **P2** | M12 | [ ] |
+| 11 | Collect WL-E-001, WL-E-002, WL-E-003 artefacts after first full observation quarter with at least one active white-label tenant; file in `compliance/evidence/white-label/`. | compliance-officer | **P2** | M13 | [ ] |
+| 12 | Resolve OQ-WL-OBS-01 (domain name hashing policy); document decision in `docs/DECISION_LOG.md`. | compliance-officer + security-engineer | **P2** | Before first white-label tenant live | [ ] |
+| 13 | Evaluate OQ-WL-OBS-02 (polling rate limit) at 100 active white-label tenants; implement backoff Worker if needed. | platform-engineer | **P2** | At 100 tenants | [ ] |
+
+---
+
+*v3.9 (2026-06-14): §42 White-Label Custom Domain & SSL Certificate Observability — closes the observability gap for the white-label enterprise feature documented in `docs/ENTERPRISE.md §Branding` (available ≥ $50k ARR). §42.1 scopes to three surfaces: custom domain DNS (CNAME → Cloudflare), SSL certificate lifecycle (Cloudflare Custom Hostnames / SSL for SaaS), and branding asset CDN delivery (tenant logo + color palette from R2); SAML cert lifecycle (§26 + SSO_SCIM §20), API key management (§31), and wearable sync (§41) are explicitly out of scope. §42.2 architecture note: Cloudflare Custom Hostnames is the provisioning mechanism; FORM polls Cloudflare API nightly via `white_label_cert_check` pg_cron job (job 32); cert auto-renewal is Cloudflare-managed, FORM's responsibility is failure detection before cert expiry. §42.3 RED metrics: `WL_TELEMETRY` Analytics Engine dataset — `custom_domain_requests_total`, `cname_resolution_failed`, `ssl_handshake_error`, `cert_days_to_expiry` gauge, `tls_handshake_ms_p95`, `branding_asset_latency_ms_p95`. §42.4 four SLOs: WL-SLO-01 (custom domain HTTPS availability ≥ 99.9% calendar-month per tenant — feeds §23 SLA credit engine), WL-SLO-02 (zero expired certs on active tenants — 100% zero-tolerance), WL-SLO-03 (cert expiry warning ≥ 30 days before expiry — 100% zero-tolerance), WL-SLO-04 (branding asset CDN P95 < 500 ms / 7-day rolling). §42.5 six alert rules AL-WL-01 through AL-WL-06: AL-WL-01 (P1, S-WL-{n} probe fails 2 consecutive checks — CNAME down; auto-resolve; escalate to P0 at SLA credit risk), AL-WL-02 (P1, Cloudflare hostname status ≠ active; auto-resolve on active), AL-WL-03 (P2, cert days_to_expiry < 30; Slack; 7-day cooldown per tenant), AL-WL-04 (P1, days_to_expiry < 7; PagerDuty dual-page; 24-hour re-alert), AL-WL-05 (P0, cert expired; CRITICAL dual-page founder + devops-lead; no auto-resolve; CSM notification ≤ 15 min; triggers §23 SLA incident), AL-WL-06 (P2, R2 branding asset P95 > 1,000 ms; Slack; 1-hour cooldown). §42.6 `tenant_white_label_domains` Postgres DDL: UUID PK, tenant_id FK, custom_domain UNIQUE, cloudflare_hostname_id UNIQUE, status enum (pending/active/error/revoked), ssl_cert_expiry_at, ssl_cert_status enum (active/pending_validation/expired/error), last_checked_at, provisioned_at, revoked_at, created_by (PAM session ID); revoke-nullability constraint; partial index on ssl_cert_expiry_at WHERE active; RLS: tenant_admin SELECT own; form_system ALL; compliance_reviewer SELECT all; form_api REVOKED. §42.7 pg_cron job 32 `white_label_cert_check` (02:00 UTC daily — after Cloudflare renewal window; Worker proxy holds CF_API_TOKEN; polls Cloudflare Custom Hostnames API per active domain; updates ssl_cert_expiry_at + ssl_cert_status + last_checked_at; emits system.white_label_cert_checked STANDARD 1yr per domain; emits tenant.white_label_cert_expiry_warning HIGH 7yr for days < 30; emits tenant.white_label_cert_expiry_breach CRITICAL 7yr for expired; stale detection at 26h freshness). §42.8 Admin Dashboard "Domain & Branding" panel: visible only when tenants.white_label_enabled; shows status badge, cert expiry countdown in days, CNAME guide, branding asset upload status, powered-by-FORM toggle (locked true below $50k ARR). §42.9 internal Metabase "White-Label Fleet Health" dashboard (FORM-DevOps collection; form_admin + devops-lead + compliance_reviewer; 5 panels: active tenant count, cert expiry timeline 60d, provisioning status breakdown, job 32 freshness, recent AL-WL-01/04/05 incidents; table excluded from raw schema explorer). §42.10 six DEC-030 HMAC-chained events: tenant.white_label_provisioned (STANDARD, 7yr), tenant.white_label_cert_expiry_warning (HIGH, 7yr — SHA-256 domain hash, no cert material), tenant.white_label_cert_renewed (STANDARD, 7yr — old/new expiry dates), tenant.white_label_cert_expiry_breach (CRITICAL, 7yr — triggers §23 SLA incident), tenant.white_label_revoked (HIGH, 7yr — PAM session ID + reason enum), system.white_label_cert_check_stale (HIGH, 7yr — no tenant data); WL-CHAIN-01 ordering invariant (breach without preceding warning = chain violation). §42.11 three SOC 2 evidence artefacts: WL-E-001 (A1.1 — annual cert_renewed chain export), WL-E-002 (CC7.2 — AL-WL-03/04/05 PagerDuty config + 90d history), WL-E-003 (CC7.2 — job 32 run history 180d). §42.12 four privacy constraints: domain excluded from cross-tenant dashboards (RLS + Metabase schema filter); SIEM stream tenant-scoped; compliance_reviewer access disclosed in DPA; form_api REVOKED. §42.13 two open questions: OQ-WL-OBS-01 (P1 — custom_domain plaintext vs. SHA-256 in DEC-030 payload; resolve before first white-label live); OQ-WL-OBS-02 (P2 — Cloudflare API rate limit at 1,000+ tenants; evaluate at 100 active). §42.14 thirteen-item implementation checklist: 5× P0/M10 (DEC-030 registration, DDL migration 0072, pg_cron job 32 + polling Worker, AL-WL-04/05 PagerDuty, Better Stack S-WL-{n} probes), 4× P1/M11 (AL-WL-01/02/03 alerts, Admin Dashboard panel, SLO registration in §2.1 + §23, §6.2 master alert table update), 4× P2/M12–M13 (Metabase dashboard, WL-E-001/002/003 evidence, OQ-WL-OBS-01 decision, OQ-WL-OBS-02 backoff evaluation). Cross-references: `docs/ENTERPRISE.md §Branding` (white-label spec: ≥ $50k ARR, CNAME → form.coach, tenant logo, color override with accessibility floor, powered-by-FORM non-removable below threshold); `docs/SSO_SCIM_IMPLEMENTATION.md §20` (SAML cert lifecycle — similar alert escalation ladder, different cert class); §23 Enterprise SLA Reporting (WL-SLO-01 feeds §23 credit engine for white-label tenants); §26 SSO/SCIM Identity Observability (AL-CERT-01 through AL-CERT-05 pattern reference for §42.5); §12.6 (pg_cron job registry — job 32); §2.1 (SLO master table — WL-SLO-01 through WL-SLO-04); §6.2 (master alert table — white_label_domain_health subsection); §27.2 (SIEM routing — tenant.white_label_* events); `docs/AUDIT_LOG_SCHEMA.md §WhiteLabel` (six new DEC-030 events — P0 before first white-label tenant); `docs/SOC2_READINESS.md` A1.1/A1.2/CC7.2/CC9.2 (evidence artefacts WL-E-001 through WL-E-003). Owner: devops-lead + platform-engineer + compliance-officer.*
+
+---
+
 *v3.8 (2026-06-13): §41 Wearable Integration & Health Platform Sync Pipeline Observability — closes the data-collection-availability gap left by `docs/DATA_MODEL.md §14` (which defines the schema and sources) and `docs/OBSERVABILITY.md §28` (which covers mobile app performance but not the backend ingestion pipeline). §41 scopes to five sources (HealthKit, Health Connect, Whoop, Oura, Garmin) and three pipeline stages: (1) source-to-`wearable-ingestion-worker` notification, (2) Worker validate-and-insert, (3) `wearable_readings` committed. Privacy invariant enforced throughout: no `user_id`, no reading values, no health data in any signal — only aggregate counts, source slugs, and error codes. §41.2 RED metrics: six rate signals (sync success rate by source × time window; OAuth grant/revocation counts), five error signals (sync failure rate by source × error_class enum; stale-data coaching event rate), four duration signals (p95 Worker end-to-end latency by source; Whoop API response time p95). §41.3 six WS-SLO-* entries: WS-SLO-01 (HealthKit success ≥ 99% / 24h), WS-SLO-02 (Health Connect ≥ 97% / 24h — Android WorkManager 15-minute floor increases variance), WS-SLO-03 (Whoop ≥ 98% / 24h), WS-SLO-04 (Oura ≥ 99% / 24h), WS-SLO-05 (Garmin ≥ 95% / 24h — enterprise-contract API; lower floor reflects Garmin Health API SLA), WS-SLO-06 (fleet freshness: ≥ 95% of active users with a connected wearable have a reading < 26h old, measured at 07:00 UTC daily). §41.4 seven AL-WS-* alert rules: AL-WS-01 (P1, Whoop OAuth expiry wave > 5% failing on `oauth_expired` in 1h, PagerDuty + form-customer-success Slack), AL-WS-02 (P1, Whoop API 429 rate > 10% in 15 min, PagerDuty form-platform), AL-WS-03 (P2, Health Connect failure > 10% / 30 min, Slack), AL-WS-04 (P1, Oura API total failure 15 min, PagerDuty form-platform), AL-WS-05 (P2, HealthKit background delivery stall: zero ingestions for a tenant with active HealthKit users for > 4h, Slack), AL-WS-06 (P1, fleet freshness SLO-06 breach at daily check, PagerDuty form-platform + form-customer-success, no auto-resolve), AL-WS-07 (P2, Garmin OAuth expiry on any enterprise tenant, Slack + CSM notification). §41.5 pg_cron job 31 `wearable_sync_freshness_check` (daily 07:05 UTC — 5 min after Victor morning push window closes; freshness window 26h; emits WS-SLO-06 `wearable.fleet_freshness_assessed` event; k-anonymity gate: suppresses per-source breakdown if any source N < 5 across fleet). §41.6 six DEC-030 HMAC-chained events: `wearable.sync_completed` (STANDARD, 2yr — `source`, `reading_count` integer, `oldest_reading_age_hours` float; no user_id; tenant_id nullable for consumer tier), `wearable.sync_failed` (HIGH, 3yr — `source`, `error_class` enum, `error_message_hash` SHA-256), `wearable.oauth_token_expired` (HIGH, 3yr — `source` whoop|oura|garmin only; HealthKit/HealthConnect use OS permissions, no OAuth), `wearable.permission_revoked` (HIGH, 5yr — GDPR Art. 7(3) withdrawal record; `revocation_type` enum user_initiated|os_prompt|enterprise_mdm; no user_id — linked to consent chain by `consent_event_id` foreign key), `wearable.fleet_freshness_assessed` (STANDARD, 2yr — `fresh_pct` 0–100 float, `sources_breakdown` object by source, `slo_met` bool; no per-user data; k-anonymity gate enforced by pg_cron job 31), `wearable.stale_data_coaching_context` (HIGH, 3yr — emitted when Victor ingestion layer detects wearable data > 48h old is used as HRV coaching context; no `user_id`; `hrv_data_age_hours` float; `source`; triggers §41.7 coaching safety downgrade). §41.7 coaching safety integration: stale HRV data (> 48h) triggers mandatory confidence downgrade — Victor must not surface HRV-based training adjustments at HIGH confidence without fresh data; `wearable.stale_data_coaching_context` event is the compliance evidence that the downgrade ran; clinical-safety has VETO on any stale-data coaching output that bypasses downgrade. §41.8 six-panel "Wearable Sync Pipeline Health" Metabase dashboard (`FORM-Platform` collection; no PII; k-anonymity enforced in all per-source panels). §41.9 three SOC 2 evidence artefacts: WS-E-001 (A1.1 — quarterly `wearable.sync_completed` chain excerpt per source: data collection available as promised), WS-E-002 (P3.2 — quarterly fleet freshness report: data from specified sources collected per privacy notice), WS-E-003 (CC7.2 — AL-WS-01 through AL-WS-07 PagerDuty/Slack configuration screenshots). §41.10 two open questions: OQ-WS-OBS-01 (P1 — Garmin Health API SLA: confirm production availability target before filing WS-E-001 for Garmin; file OQ as DECISION_LOG entry before M10 enterprise pilot), OQ-WS-OBS-02 (P2 — `wearable.stale_data_coaching_context` namespace ownership: wearable namespace vs. §32 Victor AI Safety chain; recommendation: dual-emit for SOC 2 P-series + CC7.2 cross-coverage; resolve M8). §41.11 ten-item implementation checklist: 4× P0/M5–M6 (six DEC-030 events registration in AUDIT_LOG_SCHEMA.md, wearable-ingestion-worker instrumentation, pg_cron job 31 DDL + cron registration, AL-WS-01/02/04/06 PagerDuty routing), 3× P1/M7–M8 (AL-WS-03/05/07 Slack alerts, Metabase dashboard, WS-SLO-06 coaching-safety downgrade gate in Victor ingestion), 3× P2/M9–M10 (WS-E-001/002 evidence collection, OQ-WS-OBS-01 Garmin SLA decision, OQ-WS-OBS-02 namespace decision). Cross-references: `docs/DATA_MODEL.md §14` (wearable_readings schema; five-source integration table — this section is the observability companion); `docs/DATA_MODEL.md §17` (enterprise admin reporting aggregate-only model — fleet freshness metric is the observability signal that §17.4.3 wearable engagement aggregate is populated); `docs/OBSERVABILITY.md §28` (mobile app performance — covers client-side rendering, not server-side ingestion pipeline; §41 is the backend complement); `docs/OBSERVABILITY.md §32` (Victor AI Safety — stale-HRV coaching context event cross-references §32 clinical-safety monitoring); `docs/OBSERVABILITY.md §33` (enterprise QBR metrics — WS-SLO-06 fleet freshness rate is an input to the engagement health score in §33.4); `docs/SOC2_READINESS.md §35.6.3` (wearable_readings retention: 2-year proposed period); `docs/AUDIT_LOG_SCHEMA.md §Wearable` (six new DEC-030 events to register — P0 before M5); `docs/CLINICAL_SAFETY.md` (stale-HRV coaching output veto authority); DEC-030 (HMAC chain requirement for all six events). Owner: platform-engineer + devops-lead + compliance-officer.*
 
 *v3.7 (2026-06-13): §40 Pre-Launch Load Testing & Performance Capacity Observability — closes the SOC 2 observability gap *"Load testing before launches"* noted in `docs/SOC2_READINESS.md §2` (previously 🟡 Gap → 🟡 Partial with §33.3 k6 scenarios defined; §40 advances toward 🟢 by adding the DEC-030 HMAC-chain layer and production alert rules). §40 is the observability companion to `docs/SOC2_READINESS.md §33.3`: §33.3 defines WHAT the gate tests, §40 defines HOW the results are audited and monitored. §40.1 scopes to the load test gate (not mobile client, not Anthropic API, not DR failover); establishes privacy invariant (synthetic `lt-` tenant IDs only; no real user or health data in any payload). §40.2 trigger matrix: four gate events mapped to required k6 profiles and DEC-030 actions, plus a documented bypass protocol (compliance-officer acknowledgement + CRITICAL event + 48h post-deploy test). §40.3 six SLOs: PERF-SLO-01 (baseline p95 ≤ 300 ms — derived from §33.3 and §33.4.1 production p95 < 300 ms target), PERF-SLO-02 (SSO burst auth p95 ≤ 500 ms), PERF-SLO-03 (coaching session p95 ≤ 2,000 ms), PERF-SLO-04 (error rate ≤ 0.1%), PERF-SLO-05 (SCIM 5xx = 0, zero-tolerance); PERF-SLO-01–05 are hard gates blocking merge; PERF-SLO-06 (quarterly p95 drift ≤ +20%) is a soft gate generating investigation alert. §40.4 five AL-PERF-* production alert rules: AL-PERF-01 (P2, p95 > 300 ms / 10 min, Slack), AL-PERF-02 (P1, p99 > 600 ms / 5 min, PagerDuty), AL-PERF-03 (P1, error rate > 0.5% / 5 min, PagerDuty), AL-PERF-04 (P1, load_test_gate_bypassed CRITICAL event, PagerDuty form-compliance, no auto-resolve), AL-PERF-05 (P2, quarterly PERF-SLO-06 breach, Slack). §40.5 five DEC-030 HMAC-chained events: `system.load_test_initiated` (STANDARD, 3yr — `profile`, `commit_sha`, `triggered_by`, `environment:staging`), `system.load_test_completed` (STANDARD, 3yr — full `slo_results` object for PERF-SLO-01–05), `system.load_test_failed` (HIGH, 7yr — `failing_slos` array, `gate_action:merge_blocked`), `system.load_test_gate_bypassed` (CRITICAL, 7yr — `bypass_reason_hash` SHA-256 per DEC-044 pattern; plaintext in Linear ticket), `system.perf_regression_detected` (HIGH, 7yr — quarterly PERF-SLO-06 breach). PERF-CHAIN-01 ordering invariant: `load_test_initiated` precedes `completed`/`failed`; inversion = P1 per R-05. §40.6 pg_cron job 30 `quarterly_perf_regression_check` (`0 9 1 4,7,10 1` — first Monday Apr/Jul/Oct; 35-day check window). §40.7 six-panel "Performance & Load Test History" Metabase dashboard (`FORM-DevOps`, `form_admin` + `compliance_reviewer` visibility, no PII). §40.8 four SOC 2 evidence artefacts: LT-E-001 (A1.1 — `system.load_test_completed` quarterly CSV; `compliance/evidence/a1/`), LT-E-002 (A1.2 — PERF-SLO-06 quarterly regression report with dual sign-off; `compliance/evidence/a1/`), LT-E-003 (CC5.2/CC7.2 — AL-PERF-04 PagerDuty history + bypass events; `compliance/evidence/cc5/`); auditor narrative for A1.1 supplied (commit_sha in `system.load_test_completed` links to CI-E-001 §38.8 — closes policy→gate→performance→SLA evidence chain). §40.9 three open questions: OQ-PERF-01 (P1, k6 OSS vs. Cloud for quarterly reference run), OQ-PERF-02 (P1, staging data anonymisation procedure for quarterly refresh), OQ-PERF-03 (P2, per-tenant vs. fleet-wide profile scaling post-Series A). §40.10 twelve-item implementation checklist: 4× P0/M5–M6 (DEC-030 event registration, GitHub Actions load-test job, merge gate enforcement, AL-PERF-* PagerDuty/Slack config), 5× P1/M6–M7 (all five k6 scenarios for enterprise gate triggers, pg_cron job 30, Metabase dashboard, OQ-PERF-01 decision, staging anonymisation procedure), 3× P2/M9–M10 (LT-E-001/002 evidence collection, OQ-PERF-03 decision). `docs/SOC2_READINESS.md §2` gap table updated: "Load testing before launches" 🟡 Gap → 🟡 Partial. Owner: devops-lead + platform-engineer + compliance-officer.*
