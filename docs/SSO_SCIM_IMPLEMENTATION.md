@@ -1,4 +1,4 @@
-# FORM · SSO/SCIM Implementation v1.9
+# FORM · SSO/SCIM Implementation v2.1
 
 > Owner: enterprise-architect + security-engineer. Review: on any IdP change or quarterly.
 > Scope: enterprise tier only. Consumer mobile (iOS) uses Apple Sign In — outside this document.
@@ -36,6 +36,7 @@
 26. [API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy](#26-api-key-authentication-security--scim-ip-scope-api-key-ip-enforcement--rotation-policy)
 27. [SCIM v2.0 Endpoint — Worker Implementation Design (Closes G-001)](#27-scim-v20-endpoint--worker-implementation-design-closes-g-001)
 28. [SCIM Role Change Audit Trail & Session Revocation Fallback Design](#28-scim-role-change-audit-trail--session-revocation-fallback-design)
+29. [OQ-SSO-28.2 Resolution — `tenant_users_role_history` Retention Period (DEC-051)](#29-oq-sso-282-resolution--tenant_users_role_history-retention-period-dec-051)
 
 ---
 
@@ -10173,10 +10174,289 @@ const ScimSessionRevocationKvFallbackPayload = z.object({
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
 | **OQ-SSO-28.1** | ~~AL-SCIM-05 naming collision check.~~ 🟢 **Resolved (2026-06-14, v4.74.1)** — AL-SCIM-05 confirmed available in the `docs/OBSERVABILITY.md §26` namespace (AL-SCIM-01..04 registered in §26.7b; AL-SCIM-MASS-01 and AL-SCIM-IP-01 use distinct suffixes). AL-SCIM-05 formally registered in **OBSERVABILITY §26.7c** as the canonical definition. No ID change required. | ~~P2~~ Resolved | devops-lead | 🟢 OBSERVABILITY §26.7c (2026-06-14). |
-| **OQ-SSO-28.2** | **`tenant_users_role_history` retention period.** The table carries `changed_at` timestamps tied to user role assignments. GDPR Art. 5(1)(e) storage limitation requires a defined retention period. Proposed: 7-year retention aligned with DEC-030 HMAC chain retention for the corresponding `scim.user_updated` event (audit-trail continuity argument). Alternative: 3 years (aligns with `scim.group_synced` retention). | P1 | compliance-officer + legal | Resolve at first legal sign-off cycle (before M9 observation period start). |
+| ~~**OQ-SSO-28.2**~~ **🟢 Resolved — §29 (DEC-051, 2026-06-14)** | ~~**`tenant_users_role_history` retention period.**~~ **Resolved:** **7-year retention** adopted. Grounds: (1) audit-chain continuity — `scim.user_updated` DEC-030 events are retained 7yr; purging the table at 3yr creates a verifiable gap in SOC 2 CC6.3 evidence; (2) Ukrainian Tax Code Art. 44 (business record obligation); (3) multi-cycle SOC 2 observation evidence continuity. 3-year alternative rejected — see §29.2. GDPR Art. 4(1): rows containing `user_id` are personal data; legal basis for 7yr retention is Art. 17(3)(b). `user_id` is pseudonymised (SET NULL + `user_id_pseudonym` populated) on user erasure; full hard-delete via pg_cron job 32 at 7yr boundary. See §29 for full decision record. | ~~P1~~ **🟢 Closed** | compliance-officer | **Done — DEC-051 (2026-06-14). §29.** |
 
 ---
 
 *v2.0 additions (2026-06-14): §28 SCIM Role Change Audit Trail & Session Revocation Fallback Design — resolves two P1 open questions from §27.15 (v1.9, 2026-06-13). OQ-SSO-27.2 → **DEC-049**: `tenant_users_role_history` append-only table adopted as the role change audit trail; role values (old_role/new_role) are explicitly excluded from the DEC-030 HMAC chain to prevent cross-tenant leakage in auditor bulk exports; `scim_request_id` cross-reference ties chain events to table rows for SOC 2 fieldwork. OQ-SSO-27.3 → **DEC-048**: Option (c) adopted for SCIM KV write failure — HTTP 200 maintained (idempotency); Supabase blocklist fallback activated (< 30 s revocation, within 60-second P99 SLA); `scim.session_revocation_kv_fallback` DEC-030 event (HIGH, 7yr) emitted; AL-REVOKE-01 (P1 PagerDuty `form-platform`) fires on any KV fallback activation. New DEC-030 event: `scim.session_revocation_kv_fallback` (HIGH, 7yr; `supabase_ok` boolean surfaces dual-path failure; no user_id in payload). REVOKE-CHAIN-01 invariant: `scim.session_revocation_kv_fallback` must follow `scim.user_deprovisioned` in chain order for the same `scim_request_id`. `tenant_users_role_history` DDL (§28.4, migration `0068_tenant_users_role_history.sql`): `chk_turh_role_changed` (no-op guard), `chk_turh_user_xor_pseudonym` (GDPR Art. 17 erasure path), three indexes (tenant_user, tenant_time, scim_request). `recordRoleChange()` TypeScript helper — non-fatal design (INSERT failure does not roll back SCIM operation; reconciliation query AL-SCIM-05 provides gap detection). RLS: `compliance_reviewer` full read; `tenant_admin` own-tenant read; `form_system` INSERT; no `form_api` access. Three SOC 2 evidence artefacts: SCIM-ROLE-E-001 (CC6.3/CC6.6 role history sample), SCIM-ROLE-E-002 (CC6.3/PI1.1 DEC-030 cross-reference), SCIM-REVOKE-E-001 (CC7.2 AL-REVOKE-01 history). Twelve-item implementation checklist: 6× P0/M5 (migration, DEC-030 registration, recordRoleChange, KV fallback handler, AL-REVOKE-01, DPA language update), 4× P1/M9 (evidence collection, SOC2 cross-reference), 2× P2/M10 (reconciliation alert, erasure pipeline). Two new open questions: OQ-SSO-28.1 (AL-SCIM-05 naming collision P2), OQ-SSO-28.2 (tenant_users_role_history retention period P1). §27.15 OQ-SSO-27.2 and OQ-SSO-27.3 status updated to 🟢 Resolved with DEC references. TOC updated to add §28. Cross-references: `docs/DATA_MODEL.md §33` (canonical DDL definition for tenant_users_role_history); `docs/AUDIT_LOG_SCHEMA.md §6.SCIM-Lifecycle` (scim.session_revocation_kv_fallback event to register — P0 before M5); `docs/OBSERVABILITY.md §26` (SSO/SCIM identity observability — AL-SCIM-05 naming check, OQ-SSO-28.1); `docs/ENTERPRISE_SLA.md §3.7` (60 s session revocation SLA — §28.2 fallback stays within SLA); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — REVOKE-CHAIN-01 violation trigger); `docs/INCIDENT_RESPONSE.md R-26` (SCIM deprovisioning latency — co-activation if supabase_ok = false); `docs/CRYPTOGRAPHY_POLICY.md §5` (ERASURE_PSEUDONYM_SALT — used in OQ-SSO-28.2 erasure path); `docs/DECISION_LOG.md` (DEC-048 and DEC-049). Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*
+
+---
+
+## 29. OQ-SSO-28.2 Resolution — `tenant_users_role_history` Retention Period (DEC-051)
+
+### 29.1 Purpose & Decision
+
+This section closes **OQ-SSO-28.2** (P1, §28.9) — the outstanding question of how long `tenant_users_role_history` rows must be retained under GDPR Art. 5(1)(e) storage limitation.
+
+| Field | Value |
+|---|---|
+| **Decision** | **7-year retention** adopted for `tenant_users_role_history`, measured from `changed_at` |
+| **Decision ref** | DEC-051 (2026-06-14) |
+| **Previous status** | 🟡 Proposed — pending legal sign-off per §28.9 / DATA_MODEL §33.8 |
+| **New status** | 🟢 **Resolved** |
+| **Owners** | compliance-officer + enterprise-architect + security-engineer |
+| **Effective** | 2026-06-14 — applies to all existing and future rows |
+
+---
+
+### 29.2 Decision Rationale
+
+Three independent grounds justify 7-year retention. Each is sufficient on its own; together they are conclusive.
+
+#### 29.2.1 Ground 1 — Audit-Chain Continuity (primary)
+
+`scim.user_updated` DEC-030 HMAC-chained events — which serve as the chain anchor for every role change recorded in `tenant_users_role_history` — carry a **7-year retention period** per `docs/AUDIT_LOG_SCHEMA.md §6.SCIM-Lifecycle`.
+
+The audit evidence model requires that when an auditor follows a chain event by its `scim_request_id` cross-reference (§28.3, §28.7), the corresponding `tenant_users_role_history` row exists. If the table is purged at 3 years while the chain events persist until year 7, the auditor finds:
+
+1. A `scim.user_updated` chain event with `fields_changed: ['role']` in year 4.
+2. A `scim_request_id` → table cross-reference that returns **zero rows** (purged at 3yr).
+3. The chain anchor becomes unverifiable: SOC 2 CC6.3 evidence collapses for that event.
+
+This gap was explicitly documented in DATA_MODEL §33.8 as the reason the 3-year alternative was rejected. DEC-051 confirms that rejection as binding.
+
+**Chain retention alignment requirement (TURH-CHAIN-01):** The retention period for `tenant_users_role_history` rows **must not be shorter** than the retention period of the `scim.user_updated` DEC-030 events that reference them. Any future reduction of `scim.user_updated` retention below 7 years must trigger a parallel review of `tenant_users_role_history` retention via the DECISION_LOG process.
+
+#### 29.2.2 Ground 2 — Legal Obligations
+
+| Jurisdiction | Obligation | Retention required |
+|---|---|---|
+| Ukraine (primary incorporation) | Tax Code Art. 44 — business transaction records | 7 years |
+| EU (enterprise customer employees) | EU audit-record doctrine (CJEU C-13/19) — access-control records must be retained at least as long as the protected resource | 7 years (coaching data: 3yr; contracts: 7yr → determinative) |
+| SOC 2 (auditor expectation) | AICPA Guide — evidence should span the observation period plus two prior periods for comparative assessments | 7 years (three 2-year cycles + buffer) |
+
+Role assignment records constitute business transaction records because they determine which organisational data (`docs/ENTERPRISE.md §Privacy floor for enterprise`) employees were authorised to access — and thus have downstream consequences for corporate governance and data protection audit trails.
+
+#### 29.2.3 Ground 3 — SOC 2 Multi-Cycle Evidence Continuity
+
+SOC 2 Type II observation periods run for 12 months. A mature SOC 2 programme covering the third Type II cycle (year 5+) requires auditors to compare current controls to prior-period baselines. A 3-year retention window would leave evidence gaps for:
+
+- CC6.3 (removes access when appropriate) — role changes older than 3 years become unverifiable
+- CC6.6 (restricts access based on role) — the historical baseline for role assignments is incomplete
+- CC4.1 (performance evaluations of controls) — trend analysis across multiple observation periods requires longitudinal data
+
+7-year retention satisfies all three criteria across a 3-cycle SOC 2 programme (standard for IPO-readiness) and aligns with FORM's investor-grade compliance ambition per `docs/ENTERPRISE.md §Why enterprise`.
+
+---
+
+### 29.3 GDPR Art. 4(1) Personal Data Classification
+
+**Question:** Does `tenant_users_role_history` contain personal data, and does 7-year retention require a specific legal basis?
+
+#### 29.3.1 Column-Level Analysis
+
+| Column | Personal data? | Reasoning |
+|---|---|---|
+| `id` (UUID PK) | No | Opaque internal identifier; not linkable externally |
+| `tenant_id` (UUID) | No | Organisational identifier for the employer entity |
+| `user_id` (UUID FK → `users.id`) | **Yes — pseudonymous** | Links to a natural person record; GDPR Art. 4(5) pseudonymous data is still personal data per Recital 26 |
+| `user_id_pseudonym` (TEXT) | **Yes — pseudonymous** | HMAC of `user_id`; still linkable to the person by FORM using the `ERASURE_PSEUDONYM_SALT` (`docs/CRYPTOGRAPHY_POLICY.md §5`) |
+| `old_role` / `new_role` (`form_role_enum`) | No (in isolation) | Access-control category values; no natural-person attribute |
+| `changed_at` (TIMESTAMPTZ) | No (in isolation) | Timestamp without subject link |
+| `scim_request_id` (TEXT) | No | Operational correlation identifier |
+| `changed_by` (`role_change_source_enum`) | No | System-action category |
+
+#### 29.3.2 Combined-Record Analysis
+
+The combination of `user_id` (or `user_id_pseudonym`) + `changed_at` + `old_role`/`new_role` constitutes **personal data** under GDPR Art. 4(1) because:
+
+- `user_id` is a pseudonym for an identifiable natural person (the enterprise employee).
+- The role history reveals **when** an employee's access level changed, which frequently correlates with identifiable employment events: onboarding (member → member remains, first assignment), promotion (member → tenant_manager), disciplinary action (tenant_admin → member), and offboarding (any → deprovisioned, captured via `scim.user_deprovisioned` event per §28.3).
+- A sufficiently motivated actor with access to both the `tenant_users_role_history` table and the employer's HR system could reconstruct an employee's employment lifecycle from the role change pattern.
+
+**Conclusion:** `tenant_users_role_history` rows containing `user_id` are personal data per Art. 4(1). Processing requires a valid legal basis under Art. 6(1).
+
+#### 29.3.3 Legal Basis for 7-Year Retention
+
+The applicable legal basis is **GDPR Art. 6(1)(c)** (processing necessary for compliance with a legal obligation to which the controller is subject), read in conjunction with **Art. 17(3)(b)** (erasure does not apply where processing is necessary for compliance with a legal obligation).
+
+Specific legal obligations:
+
+1. **Ukrainian Tax Code Art. 44** — 7-year business record retention (Ground 2 above).
+2. **SOC 2 Type II evidence requirement** — contractual obligation in enterprise agreements (`docs/ENTERPRISE_SLA.md §3`) to maintain SOC 2 Type II certification, which requires multi-period evidence retention.
+3. **DEC-030 HMAC-chain audit integrity** — FORM's published enterprise DPA commits to providing tamper-evident audit logs; purging corroborating table rows while chain events persist would breach this commitment.
+
+**Art. 17 interaction:** The right to erasure (Art. 17(1)) is **restricted** for these rows by Art. 17(3)(b) until the 7-year retention window expires. The pseudonymisation step (§28.4 / DATA_MODEL §33.7) — setting `user_id = NULL` and populating `user_id_pseudonym` at erasure — satisfies the employee's practical right to de-identification while preserving the audit record under Art. 17(3)(b). After the 7-year window, full hard-deletion removes even the pseudonym.
+
+**HR floor confirmation:** Role history is accessible only to `compliance_reviewer` (auditor fieldwork) and `tenant_admin` (own tenant only). HR personnel who are not designated `tenant_admin` in FORM have **zero access** to this table. This is consistent with `docs/ENTERPRISE.md §Privacy floor for enterprise` — HR never sees individual access-control history via any FORM-provided API or dashboard.
+
+---
+
+### 29.4 Enterprise DPA Template Update Requirement
+
+The G-013 DPA template (`docs/SSO_SCIM_IMPLEMENTATION.md §14`) must be updated before execution with any EU enterprise customer to include the following disclosure in the Annex B "Retention periods and deletion" table:
+
+| Data category | Retention period | Deletion method | Legal basis |
+|---|---|---|---|
+| Access control change logs (`tenant_users_role_history`) | 7 years from the date of each role change event (`changed_at`) | Pseudonymisation of `user_id` on employee departure / GDPR Art. 17 request; full hard-delete at 7yr boundary | Art. 6(1)(c) + Art. 17(3)(b) — legal obligation (Tax Code Art. 44 + SOC 2 audit trail) |
+
+**Consumer privacy policy:** No update required. `tenant_users_role_history` is an enterprise-only table. Consumer-tier users (`plan_tier = 'free'` or `'elite'`) have no entries in this table.
+
+**Employee notice (enterprise):** Employer is responsible for informing employees of this processing under their own employee privacy notice. FORM's DPA template already obliges the employer (Art. 28 controller) to provide adequate notice. The DPA Annex B update above provides the specific language the employer must reflect in their employee notice. Compliance-officer to confirm this language with outside counsel before first EU enterprise DPA execution.
+
+---
+
+### 29.5 pg_cron Retention Job — Job 32
+
+```sql
+-- Job 32: tenant_users_role_history — 7-year retention purge
+-- Schedule: 04:00 UTC daily (after job 31 wearable_sync_freshness_check at 07:05;
+--           staggered to avoid Postgres I/O contention with §33 retention jobs)
+-- Owner: platform-engineer (register in docs/OBSERVABILITY.md §12.6 pg_cron registry as job 32)
+
+SELECT cron.schedule(
+  'turh-retention-purge',
+  '0 4 * * *',
+  $$
+  -- Phase 1: hard-delete pseudonymised rows past 7yr retention
+  -- Safety gate: only delete rows where GDPR Art. 17 pseudonymisation has already run
+  -- (user_id IS NULL AND user_id_pseudonym IS NOT NULL confirms the erasure path completed)
+  WITH deleted AS (
+    DELETE FROM tenant_users_role_history
+    WHERE changed_at < NOW() - INTERVAL '7 years'
+      AND user_id IS NULL
+      AND user_id_pseudonym IS NOT NULL
+    RETURNING id
+  )
+  -- Emit DEC-030 event for compliance evidence (via pg_net to emit-audit-event Worker)
+  SELECT net.http_post(
+    url     := current_setting('app.audit_worker_url'),
+    body    := json_build_object(
+      'action',    'system.turh_retention_purge_completed',
+      'severity',  'STANDARD',
+      'payload',   json_build_object(
+        'rows_deleted', (SELECT COUNT(*) FROM deleted),
+        'window_years', 7,
+        'job',          32
+      )
+    )::text,
+    headers := '{"Content-Type":"application/json"}'::jsonb
+  );
+
+  -- Phase 2: detect active-user rows past retention window (erasure pipeline miss)
+  -- Fires AL-TURH-01 if any row with user_id IS NOT NULL exceeds 7yr boundary
+  WITH stale AS (
+    SELECT COUNT(*) AS stale_count
+    FROM tenant_users_role_history
+    WHERE changed_at < NOW() - INTERVAL '7 years'
+      AND user_id IS NOT NULL
+  )
+  SELECT CASE
+    WHEN stale_count > 0 THEN
+      net.http_post(
+        url     := current_setting('app.audit_worker_url'),
+        body    := json_build_object(
+          'action',    'system.turh_stale_active_user_detected',
+          'severity',  'HIGH',
+          'payload',   json_build_object(
+            'stale_count', stale_count,
+            'window_years', 7,
+            'alert_rule',  'AL-TURH-01'
+          )
+        )::text,
+        headers := '{"Content-Type":"application/json"}'::jsonb
+      )
+    ELSE NULL
+  END
+  FROM stale;
+  $$
+);
+```
+
+**Safety gate rationale:** The Phase 1 `user_id IS NULL AND user_id_pseudonym IS NOT NULL` conditions guarantee:
+
+1. The row has completed the GDPR Art. 17 pseudonymisation step (DATA_MODEL §33.7, step 1).
+2. The row no longer contains directly identifying `user_id` data.
+3. Purging a row with `user_id IS NOT NULL` is never silent — Phase 2 would have fired AL-TURH-01 for that row.
+
+**Phase 2 trigger condition:** A stale active-user row (`user_id IS NOT NULL`, `changed_at > 7yr`) means either:
+- The employee has been active for more than 7 years and the role was assigned on their first day (expected for long-tenured employees — no incident, but needs compliance-officer awareness).
+- The GDPR erasure pipeline failed to run on employee departure (incident — requires investigation).
+
+The alert language in AL-TURH-01 below distinguishes these two cases by checking whether `tenant_users.deleted_at IS NOT NULL` for the referenced `user_id` (i.e., whether the user has been offboarded in FORM's records).
+
+---
+
+### 29.6 Alert Rule: AL-TURH-01
+
+| Rule | Condition | Severity | Routing | Dedup key | Auto-resolve |
+|---|---|---|---|---|---|
+| **AL-TURH-01** | `system.turh_stale_active_user_detected` event emitted by pg_cron job 32 (i.e., any `tenant_users_role_history` row with `user_id IS NOT NULL` and `changed_at < NOW() - 7 years`) | **P2** | Slack `#compliance-alerts` → compliance-officer | `turh-stale-active-{date}` (24-hour dedup; one Slack message per calendar day regardless of row count) | No — compliance-officer must investigate and close |
+
+**Triage playbook:**
+
+1. Query stale rows: `SELECT tenant_id, user_id, changed_at FROM tenant_users_role_history WHERE changed_at < NOW() - INTERVAL '7 years' AND user_id IS NOT NULL;`
+2. For each `user_id`, check `SELECT deleted_at FROM tenant_users WHERE id = :user_id`:
+   - `deleted_at IS NULL` (user still active): long-tenured employee — **no incident**. Document in compliance-officer log. The row will be pseudonymised when the user eventually departs.
+   - `deleted_at IS NOT NULL` (user departed): erasure pipeline miss — **P1 incident**. Escalate to platform-engineer; run manual pseudonymisation step per DATA_MODEL §33.7; emit `gdpr.erasure_role_history_pseudonymised` DEC-030 event (STANDARD, 7yr) per DATA_MODEL §33.10 checklist item 3.
+3. Close AL-TURH-01 with documented finding in `compliance/alerts/turh-stale-YYYY-MM-DD.md`.
+
+---
+
+### 29.7 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC6.3** — Removes access when appropriate | SCIM-ROLE-E-001 (§28.7, role history sample) + TURH-RET-E-001 (§29.8, retention compliance record) | Role change history is retained for 7 years, matching the DEC-030 chain event retention; SOC 2 auditors can trace any chain event to a corroborating table row across the full observation window |
+| **CC6.6** — Restricts logical access based on role | SCIM-ROLE-E-001 | Longitudinal role transition trail demonstrates access controls operated within authorised boundaries across multi-cycle SOC 2 programmes |
+| **CC4.1** — Performance evaluations of controls | TURH-RET-E-001 (annual cron run log) | pg_cron job 32 provides ongoing automated enforcement of the retention policy; AL-TURH-01 zero-fire attestation demonstrates the erasure pipeline operated correctly during the observation period |
+| **P5.1** — Personal information retained no longer than necessary | DEC-051 (this section) + DATA_MODEL §33.8 | Defined retention period documented with legal basis (Art. 6(1)(c) + Art. 17(3)(b)); automated pg_cron enforcement; pseudonymisation on departure preserves audit record without re-identification capability |
+
+---
+
+### 29.8 Evidence Artefact: TURH-RET-E-001
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | TURH-RET-E-001 |
+| **SOC 2 criteria** | CC6.3, CC4.1, P5.1 |
+| **Contents** | (a) Annual `turh-retention-purge` pg_cron run log export from Supabase (rows deleted count + timestamp per day); (b) AL-TURH-01 zero-fire attestation for the observation period (or documented triage notes for any fires); (c) this section (DEC-051) as the retention policy evidence document |
+| **Path** | `compliance/evidence/scim-role/TURH-RET-E-001_<YYYY>.md` |
+| **Frequency** | Annual (collected on SOC 2 evidence collection cycle, aligned with SCIM-ROLE-E-001/002 schedule) |
+| **Retention** | 3 years (operational evidence; the DEC-051 policy document itself is retained indefinitely as part of this versioned document) |
+
+**Auditor narrative for CC4.1:** FORM implemented an automated 7-year retention policy for `tenant_users_role_history` via a daily pg_cron job (job 32). The retention period was established by DEC-051 (2026-06-14) on three documented grounds: audit-chain continuity, legal obligation (Tax Code Art. 44), and SOC 2 multi-cycle evidence continuity. The safety gate in the pg_cron SQL (`user_id IS NULL AND user_id_pseudonym IS NOT NULL`) ensures that pseudonymisation per GDPR Art. 17 always precedes hard-deletion. AL-TURH-01 provides detective coverage for erasure pipeline failures. TURH-RET-E-001 constitutes the annual evidence that the control operated throughout the observation period.
+
+---
+
+### 29.9 OQ-SSO-28.2 Status
+
+| Status | 🟢 **Resolved — DEC-051 (2026-06-14)** |
+|---|---|
+| **Decision** | 7-year retention for `tenant_users_role_history` |
+| **Grounds** | Audit-chain continuity (§29.2.1) + legal obligation (§29.2.2) + SOC 2 multi-cycle evidence (§29.2.3) |
+| **3-year alternative** | Rejected — confirmed by DEC-051 as creating an irremediable SOC 2 CC6.3 evidence gap |
+| **DATA_MODEL cross-update** | `docs/DATA_MODEL.md §33.8` — 7-year row: "Proposed" → **🟢 Resolved (DEC-051, 2026-06-14)**; §33.10 checklist item 4 → **🟢 Done** |
+
+---
+
+### 29.10 Implementation Checklist
+
+#### P0 — Before SOC 2 observation period start (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register pg_cron job 32 `turh-retention-purge` in Supabase (§29.5 DDL); add to `docs/OBSERVABILITY.md §12.6` pg_cron registry as job 32; verify first successful dry-run on staging (confirm no rows eligible for deletion on a fresh database). | platform-engineer | **P0** | M9 | [ ] |
+| 2 | Register two new DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §6`: `system.turh_retention_purge_completed` (STANDARD, 1yr — operational cleanup log) and `system.turh_stale_active_user_detected` (HIGH, 3yr — escalation evidence). Deploy event types to `emit-audit-event` Worker event registry. | platform-engineer + compliance-officer | **P0** | M9 | [ ] |
+| 3 | Configure AL-TURH-01 in Better Stack / Slack integration: trigger on `system.turh_stale_active_user_detected` event; route to Slack `#compliance-alerts`; dedup key `turh-stale-active-{date}` (24h window); no auto-resolve; link to §29.6 triage playbook in alert description. | devops-lead | **P0** | M9 | [ ] |
+| 4 | Update DPA template (§14.3.2 Annex B) with §29.4 retention schedule row ("Access control change logs: 7 years"). Confirm with outside counsel before first EU enterprise DPA execution. | compliance-officer + legal | **P0** | Before first EU enterprise DPA | [ ] |
+| 5 | Update `docs/DATA_MODEL.md §33.8` retention table: 7-year row status from "Proposed" → 🟢 Resolved; §33.10 checklist item 4 → 🟢 Done (DEC-051, 2026-06-14). | compliance-officer | **P0** | M9 | [x] **Done — see DATA_MODEL §33 patch notes** |
+
+#### P1 — Before first SOC 2 evidence collection (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Collect TURH-RET-E-001 (§29.8): export first pg_cron job 32 run log (30-day pre-observation sample); document AL-TURH-01 zero-fire status or triage notes; file at `compliance/evidence/scim-role/TURH-RET-E-001_2026.md`. | compliance-officer | **P1** | M9 | [ ] |
+| 7 | Add `compliance/p1/retention-decisions.md` entry for `tenant_users_role_history`: record DEC-051, 7-year retention, legal basis Art. 6(1)(c) + Art. 17(3)(b), effective date 2026-06-14. (Fulfils DATA_MODEL §33.10 original checklist item 4 requirement.) | compliance-officer | **P1** | M9 | [ ] |
+
+#### P2 — Ongoing governance
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Annual review: confirm `scim.user_updated` DEC-030 retention remains 7yr; if any change proposed, trigger TURH-CHAIN-01 retention alignment review (§29.2.1) before implementation. Document in `docs/DECISION_LOG.md`. | compliance-officer | **P2** | Annual (M12, M24, …) | [ ] |
+
+---
+
+*v2.1 additions (2026-06-14): §29 OQ-SSO-28.2 Resolution — `tenant_users_role_history` Retention Period (DEC-051). Closes the sole remaining P1 open question from §28.9 (v2.0, 2026-06-14). Decision: **7-year retention** adopted for `tenant_users_role_history`, effective from `changed_at`. Three grounds documented: (1) audit-chain continuity — `scim.user_updated` DEC-030 events are retained 7yr; purging the table at 3yr creates a verifiable SOC 2 CC6.3 evidence gap where the chain references a role change but the table row has been deleted (DATA_MODEL §33.8 rejection rationale confirmed); (2) legal obligation — Ukrainian Tax Code Art. 44 (7yr business records) and EU audit-record doctrine (access-control records should be retained at least as long as the data they protect access to); (3) SOC 2 CC6.3/CC6.6 evidence continuity across multi-cycle observation windows. GDPR Art. 4(1) analysis: the `user_id` + `changed_at` + role history combination qualifies as personal data because it enables reconstruction of an employee's access history; legal basis for 7yr retention is GDPR Art. 17(3)(b) (legal obligation overrides erasure right); `user_id` is pseudonymised on user erasure per §28.4 / DATA_MODEL §33.7; full hard-delete occurs at 7yr `changed_at` boundary via pg_cron job 32. DPA Annex B update required: enterprise DPA template (§14.3.2) must add a "role change logs: 7yr" row to the retention schedule before DPA execution with any EU enterprise customer. Consumer privacy policy: no change — `tenant_users_role_history` is enterprise-only. New pg_cron job 32 `turh_retention_purge` (04:00 UTC daily): hard-deletes pseudonymised rows past 7yr; safety gate (`user_id IS NULL AND user_id_pseudonym IS NOT NULL`) prevents accidental deletion of active-user records; companion AL-TURH-01 (P2, Slack `#compliance-alerts`) fires when any row with `user_id IS NOT NULL` exceeds the 7yr window (indicates erasure pipeline miss). New SOC 2 evidence artefact TURH-RET-E-001: annual `#turh-retention-purge` cron run log + AL-TURH-01 zero-fire attestation filed to `compliance/evidence/scim-role/`; covers CC6.3 retention-policy-as-evidence and CC4.1 ongoing monitoring. `docs/DATA_MODEL.md §33.8` retention table updated: 7-year row from "Proposed" → 🟢 Resolved. `docs/DATA_MODEL.md §33.10` checklist item 4 updated to 🟢 Done. Header updated v1.9 → v2.1 (v2.0 was §28). Cross-references: `docs/DATA_MODEL.md §33` (canonical DDL and erasure path — §33.7 pseudonymisation path; §33.8 retention table now resolved; §33.10 checklist item 4 closed); `docs/DATA_MODEL.md §34` (DEC-050 `form_role_enum` — column types for `old_role`/`new_role` in `tenant_users_role_history`); `docs/AUDIT_LOG_SCHEMA.md §6.SCIM-Lifecycle` (`scim.user_updated` 7yr retention anchor); `docs/ENTERPRISE.md §Privacy floor for enterprise` (HR never sees individual user data — §29.4 clarifies role history is admin-only, not HR-accessible); `docs/CRYPTOGRAPHY_POLICY.md §5` (ERASURE_PSEUDONYM_SALT — key used in pg_cron job 32 safety gate); `docs/OBSERVABILITY.md §26` (AL-SCIM-05 taxonomy — AL-TURH-01 is a new parallel alert using its own prefix); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — pg_cron stale-active-user detection escalates to compliance-officer, not P0 IR, because it does not breach the chain itself); `docs/SOC2_READINESS.md §CC6.3` (SCIM-ROLE-E-001 evidence table — TURH-RET-E-001 extends this evidence set); `docs/DECISION_LOG.md DEC-051`. Owner: compliance-officer + enterprise-architect + security-engineer.*
 
 *v1.8 additions (2026-06-04): §26 API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy. Closes OQ-SSO-25.1 (🟡 P1 → 🟢 Resolved) and OQ-SSO-25.3 (🟡 P1 M5 → 🟢 Resolved) from §25.13. TOC updated to add §26. Header updated from v1.7 to v1.8. §26.1 purpose and scope: two P1 open questions from §25 resolved; privacy floor (client_ip_hash via IP_HASH_SALT in all DEC-030 events; no plaintext IP in audit chain). §26.2 credential architecture disambiguation: three credential types (JWT 1h, SCIM bearer long-lived provisioning, tenant API key long-lived integration); §26 covers the two non-JWT types that were not covered by §25 IP enforcement. §26.3 OQ-SSO-25.1 resolution — SCIM IP scope: option (c) selected (separate flag, default off); migration 0052_scim_ip_allowlist.sql adding `scim_ip_enforcement_enabled BOOLEAN DEFAULT false` and `scim_ip_allowlist_config JSONB DEFAULT NULL` to tenant_sso_configs; chk_scim_ip_allowlist_required CHECK constraint; `enforceScimIpAllowlist()` branch in ip-allowlist.ts (SCIM routes bypass general allowlist; use scim_ip_allowlist_config only when scim_ip_enforcement_enabled = true); admin dashboard "Directory Sync IP Restriction" UI (collapsible, Enterprise-gated, import buttons for Okta/Azure pre-populated CIDRs, warning banner about IdP IP range volatility). §26.4 OQ-SSO-25.3 resolution — API key IP enforcement: formalised tenant_api_keys table schema (UUID PK, key_hash HMAC-SHA256, key_preview last-8-chars, label, created_by, last_used_at, expires_at, revoked_at, ip_enforcement_enabled BOOLEAN DEFAULT false, ip_allowlist_config JSONB, scopes TEXT[] DEFAULT '{reporting:read}'; RLS for form_api; partial unique index on key_hash WHERE revoked_at IS NULL); api-key-auth.ts updated to call enforceApiKeyIpAllowlist() using shared checkCidrList() utility from §25 (no new dependency); scope enforcement before route handler; last_used_at updated via waitUntil; error response omits all IP/allowlist detail to prevent enumeration. §26.5 rotation policy: mandatory triggers (age ≥ 365d amber, ≥ 730d red, suspected compromise same-day, offboarding 5 business days, `admin:write` scope quarterly 90d); 24-hour overlap window (same as SCIM token rotation §16.6); admin dashboard age-alert pill states (0–364d none, 365–729d amber, 730d+ red, admin:write >90d amber). §26.6 nine DEC-030 HMAC-chained events (all HIGH, 7yr): api_key.created, api_key.rotated, api_key.revoked, api_key.ip_enforcement_enabled, api_key.ip_enforcement_disabled, api_key.ip_blocked (client_ip_hash only, Queues bulk dedup), scim.ip_enforcement_enabled, scim.ip_enforcement_disabled, scim.ip_blocked (client_ip_hash only); HMAC chain requirement: api_key.rotated must be followed by api_key.revoked (old key) within 26h or AL-APIKEY-02 fires. §26.7 four alerting rules: AL-APIKEY-01 P1 (>10 ip_blocked per key in 10 min → compromise attempt or misconfiguration), AL-APIKEY-02 P1 (rotation overlap not cleaned up within 26h → cron failure), AL-APIKEY-03 P1 (revoked with reason=compromise → trigger R-16), AL-SCIM-IP-01 P2 (SCIM ip_blocked >5 in 15 min AND provisioning success <50% → misconfigured allowlist). §26.8 SOC 2 evidence mapping CC6.1/CC6.2/CC6.4/CC6.8/CC7.2 with five artefacts APIKEY-E-001 through APIKEY-E-005. §26.9 OQ-SSO-25.1 and OQ-SSO-25.3 formally resolved. §26.10 two new open questions: OQ-SSO-26.1 (mandatory IP enforcement for admin:write keys P2, evaluated before first admin:write key issued), OQ-SSO-26.2 (expires_at hard enforcement vs soft alerts P1, decision before SOC 2 observation period start). §26.11 fourteen-item implementation checklist: 8× P0 M5 (tenant_api_keys migration, scim_ip_allowlist migration, api-key-auth.ts update, ip-allowlist.ts SCIM branch, DEC-030 event registry, admin dashboard panels, API_KEY_HASH_SECRET rotation schedule, pg_cron overlap cleanup), 4× P1 M5-M6 (alerting, evidence collection, OQ-SSO-26.2 decision, DATA_MODEL cross-reference), 2× P2 M6. Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*

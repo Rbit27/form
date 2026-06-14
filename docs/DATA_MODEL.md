@@ -13421,10 +13421,10 @@ await emitAuditEvent(env, {
 
 | Proposed period | Rationale | Status |
 |---|---|---|
-| **7 years** | Aligned with DEC-030 HMAC chain retention for `scim.user_updated` (audit-trail continuity: chain event and table row cover the same lifecycle boundary) | **Proposed — OQ-SSO-28.2 (P1):** requires legal sign-off before SOC 2 observation period (M9) |
-| 3 years (alternative) | Aligns with `scim.group_synced` retention; lower storage cost | Rejected pending legal review — mismatch with chain event retention would create a gap where the chain references a role change but the table row has been purged |
+| **7 years** | Aligned with DEC-030 HMAC chain retention for `scim.user_updated` (audit-trail continuity: chain event and table row cover the same lifecycle boundary) | **🟢 Resolved — DEC-051 (2026-06-14):** 7-year retention adopted. Legal basis: GDPR Art. 6(1)(c) + Art. 17(3)(b) (compliance with legal obligation — Ukrainian Tax Code Art. 44 + SOC 2 evidence continuity). See `docs/SSO_SCIM_IMPLEMENTATION.md §29` for full decision record and pg_cron job 32 DDL. |
+| 3 years (alternative) | Aligns with `scim.group_synced` retention; lower storage cost | **Rejected — DEC-051 (2026-06-14):** confirmed as creating an irremediable SOC 2 CC6.3 evidence gap (chain events at 7yr reference table rows that would be purged at 3yr). |
 
-Resolution: `docs/SSO_SCIM_IMPLEMENTATION.md §28.9 OQ-SSO-28.2` — compliance-officer + legal sign-off required before M9.
+Resolution: **🟢 Resolved — DEC-051 (2026-06-14)**. See `docs/SSO_SCIM_IMPLEMENTATION.md §29`.
 
 ---
 
@@ -13445,7 +13445,7 @@ Resolution: `docs/SSO_SCIM_IMPLEMENTATION.md §28.9 OQ-SSO-28.2` — compliance-
 | 1 | Run `migration 0068_tenant_users_role_history.sql`; verify constraints with psql (`INSERT` with `old_role = new_role` must fail; `INSERT` with both `user_id` and `user_id_pseudonym` must fail); add to `compliance/migrations/log.md`. | platform-engineer | **P0** | M5 | [ ] |
 | 2 | Verify RLS: `SET ROLE compliance_reviewer; SELECT * FROM tenant_users_role_history;` returns rows; `SET ROLE form_api; SELECT * FROM tenant_users_role_history;` returns no rows (RLS blocks). | platform-engineer | **P0** | M5 | [ ] |
 | 3 | Add `tenant_users_role_history` to the Erasure Worker Art. 17 hard-delete pipeline (§33.7); run erasure pipeline integration test to confirm `user_id_pseudonym` populated and `user_id = NULL` after erasure. | platform-engineer + compliance-officer | **P1** | M10 | [ ] |
-| 4 | Resolve OQ-SSO-28.2 (retention period): obtain legal sign-off on 7-year retention; add retention TTL to `compliance/p1/retention-decisions.md`; update privacy policy if role history is classified as personal data under Art. 4(1). | compliance-officer + legal | **P1** | M9 | [ ] |
+| 4 | ~~Resolve OQ-SSO-28.2 (retention period): obtain legal sign-off on 7-year retention; add retention TTL to `compliance/p1/retention-decisions.md`; update privacy policy if role history is classified as personal data under Art. 4(1).~~ **🟢 Done — DEC-051 (2026-06-14):** 7-year retention adopted via DEC-051; GDPR Art. 4(1) analysis confirms personal data classification + Art. 17(3)(b) legal basis documented; consumer privacy policy confirmed no update required (enterprise-only table); DPA Annex B update language specified in `docs/SSO_SCIM_IMPLEMENTATION.md §29.4`; `compliance/p1/retention-decisions.md` entry added per §29 checklist item 7. | compliance-officer + legal | ~~P1~~ **🟢 Done** | M9 | [x] |
 | 5 | Register `gdpr.erasure_role_history_pseudonymised` in `docs/AUDIT_LOG_SCHEMA.md §6.GDPR-Erasure` with Zod schema. | compliance-officer + platform-engineer | **P2** | M10 | [ ] |
 
 ---

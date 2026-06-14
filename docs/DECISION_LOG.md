@@ -15,6 +15,15 @@
 
 ## 2026-06-14
 
+### DEC-051 · OQ-SSO-28.2: `tenant_users_role_history` retention period — 7 years adopted
+
+- **Decision:** `tenant_users_role_history` rows are retained for **7 years** from `changed_at`, enforced by pg_cron job 32 (`turh-retention-purge`, 04:00 UTC daily). Safety gate: Phase 1 hard-deletes only rows where `user_id IS NULL AND user_id_pseudonym IS NOT NULL` (GDPR Art. 17 pseudonymisation already complete); Phase 2 emits `system.turh_stale_active_user_detected` HIGH DEC-030 event + AL-TURH-01 (P2 Slack `#compliance-alerts`) if any row with `user_id IS NOT NULL` exceeds the 7yr boundary. Full design and legal basis in `docs/SSO_SCIM_IMPLEMENTATION.md §29`.
+- **Owner:** compliance-officer + enterprise-architect + security-engineer
+- **Why:** Three grounds — each conclusive: (1) **Audit-chain continuity (TURH-CHAIN-01):** `scim.user_updated` DEC-030 events (the HMAC chain anchors for role changes) are retained 7yr; purging `tenant_users_role_history` at 3yr creates an irremediable SOC 2 CC6.3 evidence gap where auditors see chain events but find no corroborating table rows. (2) **Legal obligation:** Ukrainian Tax Code Art. 44 (7yr business records) + EU audit-record doctrine (access-control records retained at least as long as data they protect). (3) **SOC 2 multi-cycle evidence:** 3-cycle Type II programme (IPO-readiness standard) requires longitudinal CC6.3/CC6.6 data across 5+ years. Legal basis for personal data retention: GDPR Art. 6(1)(c) + Art. 17(3)(b) — `user_id` column is pseudonymous personal data; retention is justified by legal obligation; pseudonymisation on employee departure preserves the audit record without re-identification; full hard-delete at 7yr boundary. Consumer privacy policy: no change (enterprise-only table). Enterprise DPA Annex B: disclosure row required before first EU enterprise DPA execution (§14.3.2 template — see §29.4).
+- **Reverse cost:** Medium. Reducing retention below 7yr would require: (a) amending the DPA template and notifying all signed enterprise customers; (b) confirming with AICPA/auditor that shorter retention satisfies SOC 2 multi-cycle evidence requirements; (c) updating pg_cron job 32 DDL. The 7yr choice is conservative and aligns with the DEC-030 chain event retention — no downside to the current decision absent regulatory change.
+
+---
+
 ### DEC-049 · OQ-SSO-27.2: SCIM role change audit trail — `tenant_users_role_history` table approach adopted
 
 - **Decision:** Role change values (old/new role) produced by SCIM `PUT /Users` full-replace and group PATCH operations are stored in a separate `tenant_users_role_history` append-only table, **not** in the DEC-030 HMAC chain. The `scim.user_updated` event continues to record `fields_changed: ['role']` (attribute name only) as the tamper-evident chain anchor; `tenant_users_role_history.scim_request_id` cross-references that anchor to the actual role values. Full design in `docs/SSO_SCIM_IMPLEMENTATION.md §28` (migration `0068_tenant_users_role_history.sql`).
