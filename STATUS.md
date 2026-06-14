@@ -1,4 +1,4 @@
-# FORM · Project Status v4.80.0
+# FORM · Project Status v4.80.1
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.80.0** — 2026-06-14
+**v4.80.1** — 2026-06-14
 
 ---
 
@@ -26,7 +26,7 @@
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
-| 701–741 | Strength sports specifics (block 701–750 in progress) | 41 | Draft — posts 705–706 clinical-safety complete (CONDITIONAL PASS/PASS); posts 737–741 new this iteration (safety bar squat, landmine press, Nordic hamstring curl, paused bench press, competition peaking); all sports-scientist review required before publish |
+| 701–742 | Strength sports specifics (block 701–750 in progress) | 42 | Draft — posts 705–706 clinical-safety complete (CONDITIONAL PASS/PASS); posts 737–742 new this iteration (safety bar squat, landmine press, Nordic hamstring curl, paused bench press, competition peaking, belt squat); all sports-scientist review required before publish |
 
 **Total posts: 741**
 
