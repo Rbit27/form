@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.8.1
+# FORM · SOC 2 Type II Readiness v3.8.2
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -26459,7 +26459,7 @@ z.object({
 
 | ID | Question | Priority | Owner | Target |
 |---|---|---|---|---|
-| **OQ-CTOOL-01** | **Should Cloudflare WAF rule exports (PRE-25-E-001) be auto-collected via Terraform state output or via Vanta's manual evidence upload?** Terraform plan output for WAF rules can be generated on demand and uploaded as a structured JSON file; this is more tamper-evident than a dashboard screenshot. Recommendation: Terraform state export (`terraform show -json \| jq '.values.root_module.resources[] \| select(.type == "cloudflare_ruleset")'`) uploaded quarterly to Vanta manual evidence tab. Decision before Month O-1. | **P1** | devops-lead + compliance-officer | Month O-1 |
+| ~~**OQ-CTOOL-01**~~ **🟢 Resolved — DEC-055 (2026-06-14)** | ~~**Should Cloudflare WAF rule exports (PRE-25-E-001) be auto-collected via Terraform state output or via Vanta's manual evidence upload?**~~ **Resolved:** Terraform state export (Option A) adopted — `terraform show -json \| jq '[.values.root_module.resources[] \| select(.type == "cloudflare_ruleset")]'` → `compliance/evidence/cc6/waf-rules-YYYY-QN.json` → SHA-256 → R2 + Vanta upload. Evidence artefact CTOOL-WAF-E-001 (CC6.8 + CC6.6, quarterly, 3yr). Dashboard screenshot retained as documented fallback only. Full design in §82. | ~~P1~~ **🟢 Closed** | devops-lead + compliance-officer | **Done — DEC-055** |
 | **OQ-CTOOL-02** | **Should Vanta's built-in training module replace the manual `compliance/cc1/security-training-log.md` cadence?** Vanta Learning provides completion tracking and automated reminders. For a solo founder it adds no value; for a team of 3+, it replaces the manual log. Recommendation: activate Vanta Learning at first engineering hire; maintain manual log until then. Document activation trigger in `docs/SECURITY_AWARENESS_TRAINING_POLICY.md §8`. | **P2** | compliance-officer | On first engineering hire |
 | **OQ-CTOOL-03** | **If Vanta's SOC 2 Type II report lapses (e.g., renewal delay), what is the compensating control?** Vanta publishes a bridge letter during renewal gaps; this is acceptable for CC9.2 evidence continuity. The bridge letter must cover the FORM observation period. File bridge letter to `compliance/dpa/vanta-bridge-letter-YYYY.pdf` if gap exceeds 30 days. | **P2** | compliance-officer | Standing (per renewal cycle) |
 
@@ -27454,6 +27454,163 @@ Store at `compliance/evidence/cc4/` with `MANIFEST.sha256`.
 | **OQ-EVD-02** | 🟢 **Resolved** — R-27 (Evidence Collection Automation Failure — Three-Consecutive-Month Recovery) added to `docs/INCIDENT_RESPONSE.md v2.5 (2026-06-14)`. Trigger: 3rd consecutive AL-EVD-01 → P1 PagerDuty `form-compliance` escalation. Five root cause hypotheses (H1 cron disabled; H2 Worker crash; H3 R2 permission; H4 partial crash; H5 ETag conflict). Two-step recovery: automated backfill via manual Cloudflare trigger, then manual collection per §79. Three DEC-030 events: `system.evidence_automation_failure_declared` (HIGH, 7yr), `system.evidence_manual_collection_completed` (STANDARD, 7yr, one per period), `system.evidence_automation_restored` (STANDARD, 3yr). Two communication templates (EVD-01 internal compensating control memo; EVD-02 P0 auditor notification). Evidence artefacts EVD-E-001–005 + EVD-COMP-E-001 mapped to CC4.1/CC4.2/CC7.2/CC7.3/A1.1. | 🟢 **Resolved** · 2026-06-14 | compliance-officer | See `docs/INCIDENT_RESPONSE.md R-27` |
 
 ---
+
+## 82. OQ-CTOOL-01 Resolution — Cloudflare WAF Evidence Collection Method (DEC-055)
+
+> Owner: devops-lead + compliance-officer. Review: before Month O-1; annually thereafter.
+> Closes: **OQ-CTOOL-01** (🟡 P1 → 🟢, DEC-055, 2026-06-14).
+
+---
+
+### 82.1 Purpose and Scope
+
+This section closes **OQ-CTOOL-01** (P1, §78.11) — the question of whether Cloudflare WAF rule exports (PRE-25-E-001 / CTOOL-Cloudflare) should be collected via Terraform state output or via a manual Cloudflare Dashboard screenshot.
+
+§78.10 item 14 requires quarterly manual evidence uploads to Vanta including a WAF rule export. OQ-CTOOL-01 was the only unresolved question about *how* to produce that export — the requirement itself was never in question.
+
+**Two options evaluated:**
+
+| Option | Method | Artefact type |
+|---|---|---|
+| **A (adopted)** | `terraform show -json \| jq` pipeline filtering `cloudflare_ruleset` resources | Structured JSON — machine-parseable, SHA-256 hashable, diff-able |
+| **B (fallback only)** | Cloudflare Dashboard → WAF → screenshot or export | Binary PNG or unstructured HTML export |
+
+**Scope:** WAF evidence collection procedure only. WAF rule content (which rules to deploy, rate limits, managed ruleset configuration) is governed by `docs/SECURITY.md`. Terraform infrastructure management is governed by `docs/DEPLOYMENT.md`. This section governs the SOC 2 evidence artefact creation procedure.
+
+---
+
+### 82.2 Decision Rationale
+
+**Option A (Terraform state export) adopted** on four grounds.
+
+**1. Tamper-evidence.** `terraform show -json` reflects the Terraform state file — the authoritative record of what was deployed. A SOC 2 auditor reviewing CC6.8 (configuration integrity) can cross-reference the quarterly JSON against the GitHub PR that applied the change (CC8.1 change management). Dashboard screenshots reflect what the UI renders at capture time and cannot be independently corroborated against a deployment record; they could diverge from deployed state if a manual console change bypassed Terraform.
+
+**2. Structured JSON is checksum-stable.** `sha256sum` of a JSON file produces a checksum over the file's byte content — semantically stable between quarters unless WAF rules actually changed. A PNG screenshot's SHA-256 changes whenever the Cloudflare UI updates its rendering, the browser zoom level changes, or the screenshot tool uses different compression — producing spurious "changes" that obscure genuine rule modifications.
+
+**3. §79.7 MASTER-INDEX checksum protocol compatibility.** §79.7 requires computing `sha256sum` of each artefact *before* upload and recording the hash in MASTER-INDEX. This discipline proves the artefact was not modified after collection and before filing. For JSON, the hash is computed on content the devops-lead authored; for a screenshot, the hash is computed on a rendering artefact produced by the browser — a weaker chain-of-custody model.
+
+**4. Operational simplicity.** FORM already uses Terraform for Cloudflare WAF deployment. The extraction is a single two-command pipeline (§82.3). By contrast, a Cloudflare Dashboard screenshot requires console login, WAF section navigation, visual verification of the active zone, and a screenshot tool — more steps with a higher risk of capturing the wrong zone or a stale-cached page.
+
+**Option B rejected** as primary method. It remains the documented fallback for Terraform unavailability (e.g., Terraform state lock corruption, provider authentication failure during the quarterly collection window). When the fallback is used, devops-lead must document the reason in the quarterly compliance memo and add a note to the MASTER-INDEX row for that period.
+
+---
+
+### 82.3 Extraction Command
+
+```bash
+# Run from the repository root where Terraform state is initialised.
+# Requires: terraform CLI authenticated to Cloudflare provider.
+
+# Step 1: Refresh state from Cloudflare API (pulls current deployed config)
+terraform refresh
+
+# Step 2: Export all cloudflare_ruleset resources as structured JSON
+terraform show -json \
+  | jq '[.values.root_module.resources[]
+         | select(.type == "cloudflare_ruleset")
+         | {
+             name:    .name,
+             address: .address,
+             zone_id: .values.zone_id,
+             phase:   .values.phase,
+             rules: [.values.rules[]
+                     | {
+                         action:            .action,
+                         expression:        .expression,
+                         enabled:           .enabled,
+                         description:       .description,
+                         action_parameters: .action_parameters
+                       }]
+           }]' \
+  > "compliance/evidence/cc6/waf-rules-$(date +%Y)-Q$(( ($(date +%-m) - 1) / 3 + 1 )).json"
+
+# Step 3: Compute SHA-256 and append to MASTER-INDEX
+ARTEFACT="compliance/evidence/cc6/waf-rules-$(date +%Y)-Q$(( ($(date +%-m) - 1) / 3 + 1 )).json"
+echo "$(sha256sum "${ARTEFACT}") | $(date -u +%Y-%m-%dT%H:%MZ) | devops-lead | CC6.8" \
+  >> "compliance/evidence/MASTER-INDEX.csv"
+```
+
+> **Platform note:** The quarter expression `$(( ($(date +%-m) - 1) / 3 + 1 ))` works on both GNU coreutils (Linux) and macOS. GNU `date +%q` is equivalent but not available on macOS.
+
+> **Zone ID privacy:** `zone_id` is a Cloudflare-internal UUID that is visible to all account members in the Cloudflare Dashboard. It is not sensitive PII. No user health data, employee PII, or tenant personal data appears in WAF rule expressions — FORM's WAF rules operate exclusively on HTTP request metadata (IP reputation, path patterns, method, User-Agent headers).
+
+> **Option B fallback:** If `terraform refresh` or `terraform show` fails, take a full-page screenshot of the Cloudflare Dashboard → Security → WAF → Custom Rules page for each active zone. Document the failure reason in the quarterly compliance memo. The PNG file is the CTOOL-WAF-E-001 artefact for that quarter; note "Option B fallback" in the MASTER-INDEX row comment column.
+
+---
+
+### 82.4 Quarterly Upload Procedure
+
+Run as part of the §79.5 compliance calendar at Month O+3, O+6, O+9, and O+12 (coordinated with §78.10 item 14 "Manual evidence upload" task).
+
+| Step | Action | Owner |
+|---|---|---|
+| 1 | Run §82.3 extraction command. Verify the output JSON is a non-empty array containing at least one `cloudflare_ruleset` object with a non-empty `rules` array. If the array is empty, `terraform refresh` may have failed silently — re-authenticate and retry before falling back to Option B. | devops-lead |
+| 2 | Compute SHA-256 checksum; append line to `compliance/evidence/MASTER-INDEX.csv` with path, date, and "CC6.8" criteria column. | devops-lead |
+| 3 | Upload JSON file to `compliance/evidence/cc6/` in Cloudflare R2 `form-soc2-evidence` bucket (§80.3 primary store). | devops-lead |
+| 4 | Upload same file to Vanta manual evidence tab under the "Cloudflare WAF Configuration" control label (CTOOL-Cloudflare); add a comment referencing the MASTER-INDEX SHA-256 so the Vanta upload is linked to the checksummed R2 primary artefact. | compliance-officer |
+| 5 | If Option B fallback was used: document the Terraform failure in the quarterly compliance memo; note "Option B fallback — [reason]" in the MASTER-INDEX row comment column for this quarter. | devops-lead + compliance-officer |
+
+---
+
+### 82.5 SOC 2 Evidence Artefact
+
+Store at `compliance/evidence/cc6/` in Cloudflare R2 `form-soc2-evidence` bucket (primary) and mirror to Vanta manual evidence tab (auditor-facing).
+
+| Artefact | Description | SOC 2 Criteria | Cadence | Retention |
+|---|---|---|---|---|
+| **CTOOL-WAF-E-001** | Quarterly Terraform state export of `cloudflare_ruleset` resources — structured JSON listing all WAF rules (action, expression, enabled state, description, action parameters) per phase. SHA-256 checksum recorded in MASTER-INDEX before upload. Uploaded to Vanta as CTOOL-Cloudflare. | CC6.8 — Protection of information assets in transit / configuration integrity; CC6.6 — Logical access restricted via network controls (WAF as network boundary) | Quarterly (O+3, O+6, O+9, O+12) | 3 yr |
+
+**Auditor narrative for CC6.8:** FORM manages Cloudflare WAF rules exclusively via Terraform under version-controlled change management (CC8.1 — GitHub PR with reviewer approval required before merge). CTOOL-WAF-E-001 demonstrates that the WAF rules in production at the time of evidence collection exactly match the Terraform state. The SHA-256 in MASTER-INDEX verifies the artefact was not modified after collection. Together with the Vanta GitHub integration artefact for CC8.1, CTOOL-WAF-E-001 provides end-to-end coverage: changes reviewed before merge (CC8.1) → deployed via Terraform (change management) → deployed state evidenced quarterly with integrity checksum (CC6.8). Drift between the quarterly snapshot and what a current `terraform plan` shows would be immediately visible in successive quarterly comparisons — a stronger drift detection model than four independent screenshots.
+
+---
+
+### 82.6 Gap Tracker
+
+| Gap | Before §82 | After §82 |
+|---|---|---|
+| OQ-CTOOL-01 — WAF evidence collection method | 🟡 P1 Open (§78.11, due Month O-1) | 🟢 **Resolved — DEC-055 (2026-06-14)** |
+| PRE-25 — WAF evidence artefact gap | 🟡 Partial (§78 required it; extraction method unspecified) | 🟢 **Resolved** — CTOOL-WAF-E-001 defined; Terraform extraction adopted |
+
+**Readiness impact:** +0.1 pp on first CTOOL-WAF-E-001 quarterly filing (PRE-25 WAF evidence closes from 🟡 Partial to 🟢 for CC6.8 + CC6.6).
+
+---
+
+### 82.7 Implementation Checklist
+
+#### P0 — Before Month O-1 (observation period start)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run §82.3 extraction command against staging or production Terraform state; verify JSON output is valid (non-empty array; at least one `cloudflare_ruleset`; `rules` array non-empty). Record the dry-run result in `compliance/evidence/pre-obs/waf-dry-run-2026.md`; file to R2 `pre-obs/` (not uploaded to Vanta per §80.5 separation protocol). | devops-lead | **P0** | Month O-1 | [ ] |
+| 2 | Create `compliance/evidence/cc6/` subfolder in Cloudflare R2 `form-soc2-evidence` bucket (§80.3 folder structure); confirm `r2:form-api` has NO ACCESS to the bucket (§80.3 bucket policy invariant). | devops-lead | **P0** | Month O-1 | [ ] |
+| 3 | Add CTOOL-WAF-E-001 row to §79.4 master evidence collection table: cadence = quarterly, criteria = CC6.8 + CC6.6, owner = devops-lead + compliance-officer, R2 path = `cc6/waf-rules-YYYY-QN.json`. | compliance-officer | **P0** | Month O-1 | [ ] |
+| 4 | Add quarterly WAF extraction entries to §79.5 compliance calendar: Month O+3, O+6, O+9, O+12; action = "Run §82.3; upload to R2 + Vanta (CTOOL-Cloudflare)"; owner = devops-lead + compliance-officer. | compliance-officer | **P0** | Month O-1 | [ ] |
+| 5 | Update §78.10 item 14 to replace the implicit "WAF rule export" placeholder with an explicit cross-reference to §82.3 command. | compliance-officer | **P0** | Month O-1 | [ ] |
+
+#### P1 — First quarterly filing (Month O+3)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | File first CTOOL-WAF-E-001 (Quarter O+3): run §82.3, compute SHA-256, upload to R2 `cc6/` and Vanta manual evidence tab with MASTER-INDEX SHA-256 comment; update MASTER-INDEX.csv. | devops-lead + compliance-officer | **P1** | Month O+3 | [ ] |
+| 7 | Cross-reference CTOOL-WAF-E-001 against Vanta GitHub integration CC8.1 evidence: confirm all Terraform WAF changes merged in the quarter (Month O+1 through O+3) have corresponding PRs with at least one reviewer approval recorded in the GitHub audit log. Document result in quarterly compliance memo. | compliance-officer | **P1** | Month O+3 | [ ] |
+
+---
+
+### 82.8 OQ-CTOOL-01 Status
+
+| Attribute | Value |
+|---|---|
+| **Status** | 🟢 **Resolved — DEC-055 (2026-06-14)** |
+| **Decision** | Option A — Terraform state export (`terraform show -json \| jq`) |
+| **Fallback** | Option B — Cloudflare Dashboard screenshot; requires compliance memo documentation |
+| **Evidence artefact** | CTOOL-WAF-E-001 — quarterly JSON, SHA-256, R2 primary + Vanta mirror |
+| **SOC 2 criteria** | CC6.8 (configuration integrity) + CC6.6 (network access controls) |
+| **First filing** | Month O+3 |
+| **§78.11 cross-update** | OQ-CTOOL-01 updated to 🟢 Resolved (DEC-055, 2026-06-14) |
+
+---
+
+*v3.8.2 (2026-06-14): §82 OQ-CTOOL-01 Resolution — Cloudflare WAF Evidence Collection Method (DEC-055). Closes the sole remaining P1 open question from §78.11 (v3.7.2, 2026-06-13). Question: should Cloudflare WAF rule exports (PRE-25-E-001) be auto-collected via Terraform state output or via Vanta's manual evidence upload? Decision: **Option A (Terraform state export) adopted**. Four grounds: (1) tamper-evidence — Terraform state is the authoritative deployment record, verifiable against GitHub history under CC8.1 change management; dashboard screenshots have no equivalent provenance linkage; (2) structured JSON — machine-parseable, SHA-256 hashable per §79.7 checksum discipline; screenshot checksums capture file identity but not rule-content integrity; (3) §79.7 consistency — MASTER-INDEX checksum protocol requires hashing before upload; JSON file authored locally before upload satisfies this cleanly; (4) operational simplicity — FORM already uses Terraform for Cloudflare WAF deployment; extraction is a single CLI pipeline requiring no additional tooling. Option B (dashboard screenshot) retained as documented fallback for Terraform unavailability only; requires compliance memo note. §82.1 scopes to WAF evidence collection method (WAF rule content → SECURITY.md; infrastructure management → DEPLOYMENT.md). §82.2 full four-ground rationale with option B rejection. §82.3 extraction command: `terraform refresh` then `terraform show -json | jq '[.values.root_module.resources[] | select(.type == "cloudflare_ruleset") | {name, address, zone_id, phase, rules: [.values.rules[] | {action, expression, enabled, description, action_parameters}]}]'` → `compliance/evidence/cc6/waf-rules-YYYY-QN.json`; `sha256sum` appended to MASTER-INDEX.csv; GNU `%q` note + macOS alternative provided; zone_id privacy note (Cloudflare UUID, no user health data in WAF expressions). §82.4 five-step quarterly upload procedure aligned with §79.5 compliance calendar (Month O+3/O+6/O+9/O+12): devops-lead extracts + hashes + uploads to R2; compliance-officer uploads to Vanta manual tab with MASTER-INDEX SHA-256 comment; Option B fallback procedure documented. §82.5 CTOOL-WAF-E-001 evidence artefact: CC6.8 (transmission/configuration integrity) + CC6.6 (network access controls); quarterly cadence; 3yr retention; auditor CC6.8 narrative: end-to-end chain from CC8.1 PR review → Terraform deploy → quarterly state export + MASTER-INDEX checksum proves rule-content integrity throughout observation year. §82.6 gap tracker: OQ-CTOOL-01 🟡 P1 → 🟢 Resolved (DEC-055); PRE-25 WAF evidence gap 🟡 Partial → 🟢 Resolved; +0.1 pp readiness on first CTOOL-WAF-E-001 filing. §82.7 seven-item implementation checklist: 5× P0/Month-O-1 (staging dry-run + note to `pre-obs/`; R2 `cc6/` folder creation with `form-api` NO ACCESS invariant verified; §79.4 master evidence table CTOOL-WAF-E-001 row; §79.5 calendar entries at O+3/O+6/O+9/O+12; §78.10 item 14 updated to reference §82.3 command explicitly), 2× P1/Month-O+3 (first CTOOL-WAF-E-001 filing + CC8.1 cross-reference confirming all Terraform WAF changes in quarter have merged PRs with reviewer approval). §82.8 OQ-CTOOL-01 status table: 🟢 Resolved DEC-055; decision Option A; fallback Option B; artefact CTOOL-WAF-E-001; SOC 2 CC6.8 + CC6.6; first filing Month O+3. §78.11 OQ-CTOOL-01 row updated to 🟢 Resolved (DEC-055, 2026-06-14). Cross-references: §78.10 item 14 (quarterly Vanta upload task — §82.3 replaces implicit WAF placeholder); §78.11 (OQ-CTOOL-01 source — updated 🟢); §79.4 (master evidence table — CTOOL-WAF-E-001 row to add); §79.5 (compliance calendar — O+3/O+6/O+9/O+12 WAF entries); §79.7 (SHA-256 checksum discipline — JSON output compatible with `sha256sum`); §80.3 (R2 `cc6/` folder; `form-api` NO ACCESS invariant); `docs/DEPLOYMENT.md` (Terraform WAF deployment — §82 treats state as authoritative); `docs/SECURITY.md` (WAF rule content — out of scope); `docs/DECISION_LOG.md DEC-055`. Privacy floor: no individual employee health data in CTOOL-WAF-E-001; `zone_id` is Cloudflare-internal UUID; WAF rule expressions operate on HTTP metadata only; no tenant PII in any rule expression. Owner: devops-lead + compliance-officer.*
 
 *v3.8.1 (2026-06-14): §81 Monthly Evidence Collection Automation — Cloudflare Cron Worker & MASTER-INDEX Reconciler. Closes OQ-EC-03 (🟡 Unblocked → 🟡 Authored): §79.10 OQ-EC-03 stated the target bucket and paths were unknown; §80.3 (DEC-052) resolved that blocker; §81 delivers the full Worker spec. §81.1 scopes to three monthly automation tasks (HMAC chain integrity check CC7-E-001, monthly SLA report A1-E-001, MASTER-INDEX reconciliation); quarterly evidence tasks, Vanta mirror uploads, and R2 setup remain out of scope. §81.2 architecture decision: Cloudflare Cron Worker selected over pg_cron because evidence collection spans Supabase REST, Analytics Engine, and R2 — all inaccessible from pg_cron; pg_cron job 33 retained as dead-man's switch. §81.3 full `wrangler.toml` additions (R2 binding `EVIDENCE_VAULT`, AE binding `SLA_EVENTS`, cron `0 1 1 * *`); five-step Worker execution (chain check → SLA report → chain result file → MASTER-INDEX reconcile → DEC-030 emit + mirror-log append); four Worker Secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AUDIT_EMIT_URL, AUDIT_EMIT_SECRET); `form_api` REVOKED note; chain-abort path (no `system.evidence_collection_automated` emitted on violation). §81.4 HMAC integrity SQL (§79.7 canonical query via Supabase REST `/rpc/run_chain_check`; zero rows = intact; rows present = emit `audit.chain_integrity_violation` + abort). §81.5 `MonthlySLAReport` TypeScript interface (period_start/end, slo_results keyed by slo_id with target/achieved/slo_met/error_budget, p0/p1 incident counts, credits_issued_usd, chain_integrity_ok, generated_at); data sources: `sla_monthly_snapshots` §23 + Analytics Engine `sla_events` + `audit_log` `sla.credit_approved` events. §81.6 DEC-030 event `system.evidence_collection_automated` (STANDARD, 7yr — elevated from STANDARD 3yr because event constitutes SOC 2 A1-E-001 chain evidence; payload: period YYYY-MM, artifacts_written R2 paths, chain_integrity_ok literal true, slo_all_met bool, master_index_hash SHA-256, run_duration_ms int; EVD-CHAIN-01 ordering invariant: must follow `system.evidence_vault_configured` from §80.6); companion event `system.evidence_cron_stale` (HIGH, 3yr, emitted by pg_cron job 33). §81.7 atomic MASTER-INDEX reconciliation via R2 conditional put with `If-Match` ETag; conflict on 2 retries emits `system.evidence_cron_conflict` (MEDIUM, 1yr) and aborts. §81.8 four alert rules AL-EVD-01 through AL-EVD-04 (P2/P0/P1/P2 respectively): AL-EVD-01 dead-man's switch (Slack, monthly dedup, pg_cron job 33 trigger), AL-EVD-02 chain violation (PagerDuty `form-security` HIGH urgency, no auto-resolve, R-05 activation), AL-EVD-03 R2 write failure (PagerDuty `form-platform`), AL-EVD-04 MASTER-INDEX ETag conflict (Slack); pg_cron job 33 SQL included. §81.9 two SOC 2 evidence artefacts: AUTO-E-001 (CC4.2/CC7.1 — annual 12-event DEC-030 chain export with master_index_hash, 7yr) and AUTO-E-002 (CC4.1/CC7.2 — AL-EVD config + 90d incident history, 3yr); auditor narratives for CC4.2 and CC7.1 included. §81.10 gap tracker: OQ-EC-03 🟡 Unblocked → 🟡 Authored (🟢 on Month O+1 first run); CC4.2 🟡 Partial → 🟢 on AUTO-E-001 first annual filing; ~+0.1 pp readiness on filing. §81.11 eleven-item implementation checklist: 6× P0/Month-O-1 (Worker deploy + dry-run validation, three DEC-030 event registrations, pg_cron job 33, four AL-EVD alert rules), 3× P1/Month-O+1 (first run confirmation, MASTER-INDEX verification, AUTO-E-002 filing), 2× P2/annual (AUTO-E-001 collection, OQ-EVD-01 MASTER-INDEX mode decision). §81.12 two open questions: OQ-EVD-01 (P2 — full-rewrite vs. delta-log; recommended: full-rewrite with ETag guard at Year 1; revisit if conflict events > 3), OQ-EVD-02 (P2 — 3-consecutive-miss escalation to P1 + R-27 runbook in INCIDENT_RESPONSE.md). §80.10 OQ-EC-03 row updated to 🟡 Authored — §81. Cross-references: §79 (evidence collection plan — three monthly tasks being automated); §79.5 (compliance calendar — monthly recurring actions now covered by this Worker); §79.7 (chain integrity SQL — canonical query re-used verbatim in §81.4); §80.3 (R2 folder structure and bucket name `form-soc2-evidence` — target paths for `artifacts_written`); §80.4 (Vanta mirror protocol — Worker appends to `mirror-log/YYYY-MM.jsonl` as the trigger for manual Vanta sync); §80.6 (EVD-CHAIN-01 — `system.evidence_vault_configured` as ordering prerequisite); §15 (compliance calendar — monthly cron replaces three manual calendar entries for chain check + SLA report + MASTER-INDEX update); `docs/AUDIT_LOG_SCHEMA.md §6` (register three new DEC-030 events: `system.evidence_collection_automated` / `system.evidence_cron_stale` / `system.evidence_cron_conflict`); `docs/OBSERVABILITY.md §12.6` (pg_cron job registry — add job 33 `evidence_cron_freshness_check`); `docs/INCIDENT_RESPONSE.md R-05` (chain violation response on AL-EVD-02 trigger); `docs/INCIDENT_RESPONSE.md R-27` (evidence automation failure recovery — proposed in OQ-EVD-02); `docs/AUDIT_LOG_SCHEMA.md` (`audit.chain_integrity_violation` — existing HIGH event re-used in §81.4 abort path). Privacy floor: no individual employee health data in any §81 DEC-030 event; `artifacts_written` R2 path strings only; `master_index_hash` is a SHA-256 of path + status columns, never of evidence content; `form_api` REVOKED from all compliance evidence paths. Owner: devops-lead + compliance-officer.*
 

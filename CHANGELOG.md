@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.5.1] — 2026-06-14
+
+### Changed
+- `docs/SOC2_READINESS.md` — §82 OQ-CTOOL-01 Resolution: Cloudflare WAF Evidence Collection Method (DEC-055). Closes the last P1 open question from §78.11. Terraform state export adopted over dashboard screenshot for quarterly WAF evidence (CTOOL-WAF-E-001): tamper-evident, SHA-256 checksum–stable, §79.7 MASTER-INDEX compatible, operationally simpler. Four-ground rationale, §82.3 extraction command, five-step quarterly upload procedure, CTOOL-WAF-E-001 artefact spec (CC6.8 + CC6.6, quarterly, 3yr), gap tracker, seven-item P0/P1 checklist. §78.11 OQ-CTOOL-01 row updated 🟡 → 🟢. Document header v3.8.1 → v3.8.2.
+- `docs/DECISION_LOG.md` — DEC-055: OQ-CTOOL-01 formal closure.
+- `VERSION` — 5.5.0 → 5.5.1.
+
+---
+
 ## [5.5.0] — 2026-06-14
 
 ### Added
