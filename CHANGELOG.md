@@ -1,5 +1,10 @@
 # Changelog · FORM
 
+## [4.76.1] — 2026-06-14
+
+### Changed
+- `docs/SOC2_READINESS.md §79` — Master Evidence Collection & Auditor Submission Protocol. Closes CC4-GAP-002 (🔴 Open → 🟡 Authored): the §32 CC4-GAP-002 task called for `compliance/cc4/evidence-collection-plan.md` (CC4-E-002) documenting what evidence is collected per CC4.1 control, cadence, storage path, and responsible owner. §79 delivers this as the in-document master plan (with §79.9 item 1 requiring it to be additionally filed as the standalone CC4-E-002 artifact). Content: evidence folder structure for `compliance/evidence/` with 16 TSC-domain subfolders (§79.2); three evidence classes — Auto / Manual-periodic / Manual-event (§79.3); 31-row consolidated evidence collection table mapping all primary artefacts across all 5 TSC domains to criteria, cadence, owner, and R2 file path (§79.4); observation period calendar with pre-obs gate actions, monthly recurring actions, quarterly filing cycle, and Month O+12 fieldwork preparation (§79.5); auditor fieldwork response SLA table — artefact-on-hand 2-business-day / query extraction 5-business-day / walkthrough 3-business-day / gap 24h-escalate — plus walkthrough recording procedure and five categories of information that must never be shared with auditors directly (§79.6); evidence integrity verification via SHA-256 checksums per TSC folder plus HMAC chain integrity SQL query to run before every DEC-030 evidence submission (§79.7); gap tracker CC4-GAP-002 🔴 → 🟡 (+0.4 pp readiness on full execution) (§79.8); nine-item implementation checklist — 4× P0/Month-O-1, 3× P1/Month-O+1–O+9, 2× P2/M18+ (§79.9); three open questions — OQ-EC-01 R2 vs Vanta primary store, OQ-EC-02 pre-observation evidence separation, OQ-EC-03 monthly SLA + chain check automation (§79.10). SOC2_READINESS.md v3.7.3 → v3.7.4. Owner: compliance-officer (enterprise-builder).
+
 ## [4.76.0] — 2026-06-14
 
 ### Added

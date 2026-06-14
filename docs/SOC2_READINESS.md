@@ -26465,6 +26465,302 @@ z.object({
 
 ---
 
+## 79. Master Evidence Collection & Auditor Submission Protocol
+
+> Owner: compliance-officer. Review: quarterly during observation period; immediately after auditor fieldwork kickoff.
+> Closes: **CC4-GAP-002** (🔴 Open → 🟡 Authored). Files as **CC4-E-002** (`compliance/cc4/evidence-collection-plan.md`).
+
+---
+
+### 79.1 Purpose and Scope
+
+This section is the master operational guide for collecting, organising, and filing SOC 2 Type II audit evidence. It complements:
+- §1–§77: control descriptions that specify **what** evidence to collect per criterion
+- §78: Vanta integration that **automates** a subset of collection
+- §15: compliance calendar that specifies **when** recurring actions occur
+
+This section answers the remaining question: **how** evidence is operationally collected, stored, verified, and submitted during the observation period and fieldwork phase. It is the authoritative reference compliance-officer consults before every quarterly evidence filing cycle and before auditor fieldwork begins.
+
+**SOC 2 audience note:** Auditors require more than control descriptions — they require evidence that controls *operated* consistently throughout the observation window. An evidence gap in month 4 of a 6-month period is as material as a gap in month 1. This guide ensures no month is missed.
+
+---
+
+### 79.2 Evidence Folder Structure
+
+All evidence artefacts are stored under `compliance/evidence/` in Cloudflare R2 (primary) and mirrored into the Vanta auditor portal (auditor-facing). The folder structure maps directly to SOC 2 TSC domains:
+
+```
+compliance/
+├── evidence/
+│   ├── cc1/          # Control Environment (CC1.1–CC1.5)
+│   ├── cc2/          # Communication & Information (CC2.1–CC2.3)
+│   ├── cc3/          # Risk Assessment (CC3.1–CC3.4)
+│   ├── cc4/          # Monitoring Activities (CC4.1–CC4.2)
+│   │   ├── evidence-collection-plan.md   ← CC4-E-002 (this §79 filed as artifact)
+│   │   ├── control-deficiency-log.csv    ← CC4-E-001
+│   │   └── deficiency-communication-procedure.md  ← CC4-E-003
+│   ├── cc5/          # Control Activities (CC5.1–CC5.3)
+│   ├── cc6/          # Logical & Physical Access Controls (CC6.1–CC6.8)
+│   ├── cc7/          # System Operations (CC7.1–CC7.5)
+│   ├── cc8/          # Change Management (CC8.1)
+│   ├── cc9/          # Risk Mitigation (CC9.1–CC9.2)
+│   ├── a1/           # Availability (A1.1–A1.3)
+│   ├── pi1/          # Processing Integrity (PI1.1–PI1.5)
+│   ├── c1/           # Confidentiality (C1.1–C1.2)
+│   ├── p/            # Privacy (P1–P8)
+│   ├── ctool/        # Vanta continuous compliance (CTOOL-E-001–E-006)
+│   ├── dr-drill/     # Disaster recovery drill outputs
+│   ├── load-tests/   # SLO / performance gate evidence
+│   ├── sla-reports/  # Monthly SLA evidence (Better Stack → R2)
+│   ├── dast/         # DAST / SAST security scan evidence
+│   └── MASTER-INDEX-YYYY.csv   ← master evidence registry (§79.7)
+└── cc4/
+    ├── evidence-collection-plan.md       ← CC4-E-002
+    ├── control-deficiency-log.csv        ← CC4-E-001
+    └── deficiency-communication-procedure.md  ← CC4-E-003
+```
+
+**File naming convention:** `{EVIDENCE-ID}_{YYYY-MM-DD}_{descriptor}.{ext}`
+
+Examples:
+- `CC6-E-003_2026-Q3_quarterly-access-review.csv`
+- `CTOOL-E-003_2026-Q3_vanta-controls-export.csv`
+- `PT-E-001_2026-06-15_pentest-scope-and-rules-of-engagement.pdf`
+- `A1-E-002_2026-09_monthly-sla-report.json`
+
+All filenames use ISO dates or ISO quarter notation (`YYYY-QN`). No spaces. No PII in filenames.
+
+---
+
+### 79.3 Evidence Classification
+
+| Class | Definition | Collection trigger | Responsible |
+|---|---|---|---|
+| **Auto** | Collected by Vanta poll, DEC-030 chain emission, pg_cron job, or CI gate — no human action required | Time-based (Vanta 24h poll) or event-based (DEC-030 emit, CI pass) | Platform / tooling |
+| **Manual-periodic** | Collected by a human on a defined calendar cadence per §15 | Compliance calendar entry fires | compliance-officer or devops-lead |
+| **Manual-event** | Collected when a specific trigger event occurs | Incident, pen test completion, personnel change, deploy | Owner varies by event type |
+
+Auto evidence requires periodic *human verification* that collection is running — it is not fire-and-forget. A Vanta integration that silently fails to poll is worse than no automation, because the auditor sees gaps with no explanation.
+
+---
+
+### 79.4 Consolidated Evidence Collection Table
+
+The table below provides a cross-TSC view of the primary evidence artefacts. Each §1–§77 control section contains the domain-specific evidence details; this table is the auditor-facing summary and the compliance-officer's operational checklist.
+
+| Evidence ID | TSC Domain | Criterion | Description | Class | Cadence | Owner | File path |
+|---|---|---|---|---|---|---|---|
+| CC1-E-001 | CC1 | CC1.1 | Org structure + security ownership doc (ENTERPRISE.md + this doc header) | Manual-event | On any org change | compliance-officer | `cc1/` |
+| CC1-E-002 | CC1 | CC1.3 | New-hire security onboarding checklist completion (ONBOARDING_SECURITY.md) | Manual-event | Per hire | compliance-officer | `cc1/` |
+| CC1-E-003 | CC1 | CC1.4 | Disciplinary action / termination procedure (ACCEPTABLE_USE_POLICY.md) | Manual-event | Per termination | compliance-officer | `cc1/` |
+| CC1-E-004 | CC1 | CC1.2 | Acceptable Use Policy (AUP.md) — signed by all personnel | Manual-periodic | Annual re-sign | compliance-officer | `cc1/` |
+| CC2-E-001 | CC2 | CC2.1 | Security policy pack (AUP, IRP, BCP, Crypto Policy) — version + date | Manual-periodic | Annual review | compliance-officer | `cc2/` |
+| CC2-E-002 | CC2 | CC2.3 | Vanta auditor portal share confirmation + CTOOL-E-003 quarterly export | Auto | Quarterly | compliance-officer | `ctool/` |
+| CC4-E-001 | CC4 | CC4.2 | Control deficiency log CSV (`compliance/cc4/control-deficiency-log.csv`) | Manual-periodic | Monthly update | compliance-officer | `cc4/` |
+| CC4-E-002 | CC4 | CC4.1 | This evidence collection plan (`compliance/cc4/evidence-collection-plan.md`) | Manual-event | Created pre-obs; annual refresh | compliance-officer | `cc4/` |
+| CC4-E-003 | CC4 | CC4.2 | Deficiency communication procedure + founder self-review memo | Manual-periodic | Monthly memo; quarterly advisory | founder | `cc4/` |
+| CC5-E-001 | CC5 | CC5.2 | Feature flag registry dump (shows tier-gated controls) | Auto | Quarterly | platform-engineer | `cc5/` |
+| CC6-E-001 | CC6 | CC6.1 | Quarterly access review report (§23 — all human + service accounts) | Manual-periodic | Quarterly | security-engineer | `cc6/` |
+| CC6-E-002 | CC6 | CC6.3 | Break-glass JIT escalation log (`admin_jit_escalations` export) | Auto | Monthly excerpt | compliance-officer | `cc6/` |
+| CC6-E-003 | CC6 | CC6.5 | SCIM deprovision DEC-030 event excerpt (`scim.user_deprovisioned`) | Auto | Quarterly | compliance-officer | `cc6/` |
+| CC7-E-001 | CC7 | CC7.2 | HMAC chain integrity verification output (`verify_chain_integrity()`) | Manual-periodic | Monthly | devops-lead | `cc7/` |
+| CC7-E-002 | CC7 | CC7.3 | PagerDuty incident log (all P0/P1 events in observation period) | Auto | Quarterly export | devops-lead | `cc7/` |
+| CC7-E-003 | CC7 | CC7.5 | PIR (post-incident review) documents for any P0/P1 during observation | Manual-event | Per incident | security-engineer | `cc7/` |
+| CC8-E-001 | CC8 | CC8.1 | GitHub PR merge log (CI pass required before merge — sampled) | Auto | Quarterly (Vanta / CTOOL-E-004) | devops-lead | `cc8/` |
+| CC9-E-001 | CC9 | CC9.2 | Vendor security review register (VENDOR_REGISTRY.md snapshot) | Manual-periodic | Annual; on new vendor add | compliance-officer | `cc9/` |
+| A1-E-001 | A | A1.1 | Monthly SLA report JSON (`sla-reports/YYYY-MM.json`) | Auto | Monthly | devops-lead | `sla-reports/` |
+| A1-E-002 | A | A1.2 | DR drill report (§18.4; §33 — PRE-33-E-001 through E-010) | Manual-event | Annual | devops-lead | `dr-drill/` |
+| A1-E-003 | A | A1.3 | Capacity review log (`compliance/evidence/capacity-reviews/`) | Manual-periodic | Monthly | devops-lead | `a1/` |
+| PI1-E-001 | PI | PI1.1 | DEC-030 HMAC chain export for AI coaching sessions (completeness) | Auto | Quarterly | compliance-officer | `pi1/` |
+| PI1-E-002 | PI | PI1.4 | SCIM authorisation audit (`scim.user_provisioned` event series) | Auto | Quarterly | compliance-officer | `pi1/` |
+| C1-E-001 | C | C1.1 | CV keypoint encryption verification (per-tenant key, no FORM access) | Manual-event | On first enterprise tenant; annually | security-engineer | `c1/` |
+| C1-E-002 | C | C1.2 | NDA register (all personnel and contractors with production access) | Manual-periodic | Annual | compliance-officer | `c1/` |
+| P-E-001 | P | P1 | Consent audit log — `consent.granted` DEC-030 event series | Auto | Quarterly excerpt | compliance-officer | `p/` |
+| P-E-002 | P | P5 | DSAR fulfilment log (open + closed requests, 30-day SLO compliance) | Manual-periodic | Monthly | compliance-officer | `p/` |
+| P-E-003 | P | P8 | Privacy incident register (`privacy.incident_opened` chain excerpt) | Manual-event | Per incident + quarterly nil return | compliance-officer | `p/` |
+| CTOOL-E-001 | All | CC4.1 | Vanta SOC 2 Type II report + executed DPA (§78.7) | Manual-event | Annual renewal | compliance-officer | `ctool/` |
+| CTOOL-E-002 | All | CC4.1 | Vanta integration scope screenshot (§78.7) | Manual-periodic | Quarterly | compliance-officer | `ctool/` |
+| CTOOL-E-003 | All | CC4.2 | Vanta control dashboard export — pass/fail per criterion (§78.7) | Manual-periodic | Quarterly | compliance-officer | `ctool/` |
+| CTOOL-E-004 | CC6/CC8 | CC6.2 / CC8.1 | Vanta people + access export (§78.7) | Manual-periodic | Quarterly | compliance-officer | `ctool/` |
+| CTOOL-E-005 | CC7 | CC7.1 | Vanta Dependabot vulnerability triage export (§78.7) | Manual-periodic | Quarterly | compliance-officer | `ctool/` |
+| PT-E-001 | CC7 | CC7.1 | Pen test scope & rules of engagement (§16.9) | Manual-event | Annual | security-engineer | `cc7/` |
+| PT-E-002 | CC7 | CC7.1 | Pen test executive summary (redacted) | Manual-event | Annual post-test | security-engineer | `cc7/` |
+
+This table is exhaustive for the primary evidence set. Individual control sections (§1–§78) define supplemental or domain-specific evidence artefacts not listed here.
+
+---
+
+### 79.5 Observation Period Collection Calendar
+
+#### Month O-1 (one month before observation period begins)
+
+| Action | Owner | Gate |
+|---|---|---|
+| Activate Vanta per §78.10 (10 checklist items) — file CTOOL-E-001 and CTOOL-E-002 | compliance-officer + devops-lead | Required before observation starts |
+| Create `compliance/evidence/` folder structure on R2 per §79.2 | devops-lead | Required before first evidence file |
+| File CC4-E-002 (`compliance/cc4/evidence-collection-plan.md`) as this §79 content | compliance-officer | Closes CC4-GAP-002 |
+| File CC4-E-001 initial state: seed deficiency log with all 🔴/🟡 gaps still open at O-1 | compliance-officer | Required before CC4.2 can claim 🟢 |
+| Verify all §15.2 PRE items are 🟢 or have accepted compensating controls | compliance-officer | SOC 2 readiness gate |
+| Run `verify_chain_integrity()` and confirm zero violations; file output as `cc7/O-1-chain-baseline.txt` | devops-lead | Chain integrity baseline established |
+| Create MASTER-INDEX-YYYY.csv; add all evidence IDs from §79.4 table with `status = NOT_YET_COLLECTED` | compliance-officer | Index maintained throughout observation period |
+
+#### Monthly (every month of the observation period)
+
+| Action | Owner | Artefact filed |
+|---|---|---|
+| Pull Better Stack monthly SLA report → R2 `sla-reports/YYYY-MM.json` | devops-lead | A1-E-001 |
+| Run HMAC chain integrity check; file output to `cc7/YYYY-MM-chain-check.txt` | devops-lead | CC7-E-001 |
+| Review Vanta control dashboard for newly failing controls; update CC4-E-001 deficiency log | compliance-officer | CC4-E-001 |
+| File monthly capacity review log (`a1/YYYY-MM-capacity.md`) | devops-lead | A1-E-003 |
+| File founder self-review evidence memo (CC4-GAP-003 compensating control) | founder | CC4-E-003 |
+| Verify CTOOL-E-002 integration scope unchanged; re-screenshot if any integration scope changed | compliance-officer | CTOOL-E-002 |
+
+#### Quarterly (months 3, 6, 9, 12 of the observation + reporting period)
+
+| Action | Owner | Artefact filed |
+|---|---|---|
+| Export CTOOL-E-003 Vanta control dashboard CSV; review all failing controls; open Linear tickets | compliance-officer | CTOOL-E-003 |
+| Export CTOOL-E-004 Vanta people + access export; cross-reference against CC6-E-001 access review | compliance-officer + security-engineer | CTOOL-E-004 |
+| Export CTOOL-E-005 Dependabot triage log; confirm all CVEs within VULNERABILITY_MANAGEMENT.md §6 SLA | compliance-officer | CTOOL-E-005 |
+| Run quarterly access review (§23); file report to `cc6/YYYY-QN-access-review.csv` | security-engineer | CC6-E-001 |
+| Export `scim.user_deprovisioned` DEC-030 events for quarter; file to `cc6/YYYY-QN-scim-deprovision.json` | compliance-officer | CC6-E-003 |
+| Export `admin_jit_escalations` for quarter; file to `cc6/YYYY-QN-break-glass-log.csv` | compliance-officer | CC6-E-002 |
+| Upload manual evidence to Vanta (§78.10 items 11–14): CTOOL-E-003/004/005 + WAF rule export + PagerDuty log | compliance-officer | — |
+| SHA-256 checksum all new evidence files in each TSC folder; append to `{domain}/checksums.sha256` | compliance-officer | Integrity verification |
+| Update MASTER-INDEX-YYYY.csv: mark all filed artefacts `COLLECTED`; flag any missed as `OVERDUE` | compliance-officer | MASTER-INDEX |
+
+#### Month O+12 — Fieldwork Preparation
+
+| Action | Owner | Gate |
+|---|---|---|
+| Review MASTER-INDEX-YYYY.csv: every evidence ID should be `COLLECTED` for at least one quarter | compliance-officer | Any `NOT_YET_COLLECTED` or `OVERDUE` row requires explanation |
+| Package evidence folders for auditor review: confirm Vanta auditor portal access is live | compliance-officer | Invite audit firm lead by email in Vanta — verify read access before fieldwork week 1 |
+| Prepare fieldwork response team: compliance-officer (primary), security-engineer (system access), devops-lead (infra queries), founder (commercial/legal questions) | compliance-officer | Each person briefed on §79.6 response SLAs |
+| Pre-run all SQL queries in §79.4 domain-specific sections; verify outputs match what was filed quarterly | devops-lead | No surprises during fieldwork |
+
+---
+
+### 79.6 Auditor Fieldwork Response Protocol
+
+During the 8–12 week fieldwork phase, the auditor issues Information Request Lists (IRLs) and Evidence Request Lists (ERLs). All requests route through the Vanta auditor portal unless the firm uses a different preferred tool agreed before fieldwork.
+
+**Response SLAs:**
+
+| Request type | Acknowledge | Deliver |
+|---|---|---|
+| Artefact already filed in `compliance/evidence/` | — | 2 business days — provide Vanta portal link |
+| Query extraction required (new SQL query against production/staging read replica) | 24 hours | 5 business days |
+| Walkthrough requested (auditor observes control operating live) | 24 hours to schedule | Within 3 business days |
+| Complex evidence gap (control not yet executed in the observation period) | Immediately escalate to founder | Remediation plan within 24 hours; execution timeline negotiated |
+
+**Walkthrough procedure:**
+1. security-engineer prepares screen-share environment — staging replica preferred; production read-only only if staging is insufficient
+2. No health data, no production PII visible during walkthrough — security-engineer controls the screen
+3. All walkthroughs recorded (screen capture) and filed to `compliance/evidence/{domain}/walkthrough-YYYY-MM-DD.mp4`
+4. After each walkthrough, compliance-officer files a brief memo to Vanta: what was demonstrated, outcome, auditor initials
+
+**Evidence gap response (control not in steady state):**
+If the auditor identifies an evidence gap (e.g., access review not completed in one quarter), the response is:
+1. Acknowledge immediately — do not minimise or dispute
+2. Provide evidence of the gap being corrected: Linear ticket, completion date, CC4-E-001 deficiency log entry
+3. Provide evidence that the gap was isolated (one missed quarter, not a systemic failure)
+4. Offer compensating evidence: DEC-030 chain excerpt showing the control had no anomalies despite the process gap
+
+**Items that MUST NOT be shared with auditors directly (provide via Vanta portal only, not raw file paths or bulk exports):**
+- Raw `audit_log_events` table exports — share chain excerpts only, with HMAC verifications
+- `business_justification` field from `admin_jit_escalations` — per DEC-044, provide redacted sample only
+- Any row containing `user_id` linked to health data — always pseudonymise before evidence submission
+- Production connection strings, API keys, Supabase service role key
+
+---
+
+### 79.7 Evidence Integrity Verification
+
+**SHA-256 checksums for manual evidence:**
+```bash
+# After filing any new evidence file:
+sha256sum compliance/evidence/cc6/CC6-E-001_2026-Q3_access-review.csv \
+  >> compliance/evidence/cc6/checksums.sha256
+
+# Verification before auditor submission:
+sha256sum -c compliance/evidence/cc6/checksums.sha256
+# Expected: all files OK — any FAILED line indicates tampering
+```
+
+**HMAC chain integrity verification before DEC-030 evidence submission:**
+```sql
+-- Run before every auditor evidence submission that includes audit_log_events excerpts.
+-- Zero rows = chain intact. Any row = tampering or corruption.
+SELECT
+  id,
+  action,
+  created_at,
+  prev_hash,
+  computed_prev_hash
+FROM verify_chain_integrity()
+WHERE created_at >= '{observation_period_start_date}'
+ORDER BY created_at;
+```
+
+File the output as `cc7/YYYY-QN-chain-integrity-check.txt` before uploading any DEC-030 chain excerpt to the auditor portal. If the query returns any rows, treat as a P0 incident per INCIDENT_RESPONSE.md §R-05 before proceeding with fieldwork.
+
+**MASTER-INDEX integrity:**
+The MASTER-INDEX-YYYY.csv is itself a SHA-256-hashed file. Any modification to filed evidence after the checksum is recorded must be logged as a CC4-E-001 deficiency entry explaining the modification.
+
+---
+
+### 79.8 Gap Tracker Update
+
+| Gap ID | Status Before §79 | Status After §79 | Advance Condition |
+|---|---|---|---|
+| **CC4-GAP-002** — Observation-period evidence collection plan not yet created | 🔴 Open | **🟡 Authored** — §79 authored as the master plan; CC4-E-002 ready to file at `compliance/cc4/evidence-collection-plan.md` on §79.9 item 1 completion | 🟢 Done: when CC4-E-002 filed + MASTER-INDEX-YYYY.csv created + monthly calendar entry added to §15 |
+
+**Net readiness change:** +0.1 pp on authoring. Score moves to +0.4 pp on CC4-E-002 filing and §15 calendar entry (§79.9 items 1–3).
+
+---
+
+### 79.9 Implementation Checklist
+
+#### P0 — Before observation period (Month O-1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | File this §79 content as `compliance/cc4/evidence-collection-plan.md` (CC4-E-002). This is the auditor exhibit for CC4-GAP-002 — it must exist as a standalone file, not only as a section in this doc. | compliance-officer | **P0** | Month O-1 | [ ] |
+| 2 | Create `compliance/evidence/` folder structure on Cloudflare R2 per §79.2. Configure `compliance-officer` read/write access; `vanta_readonly` read access for Vanta's manual evidence upload path. | devops-lead | **P0** | Month O-1 | [ ] |
+| 3 | Add monthly evidence collection reminder to §15 compliance calendar: "1st of every month — file monthly SLA report (A1-E-001) + run HMAC chain integrity check (CC7-E-001)." | compliance-officer | **P0** | Month O-1 | [ ] |
+| 4 | Create initial MASTER-INDEX-YYYY.csv: seed with all evidence IDs from §79.4 table with `status = NOT_YET_COLLECTED`. Store at `compliance/evidence/MASTER-INDEX-2026.csv`. | compliance-officer | **P0** | Month O-1 | [ ] |
+
+#### P1 — First month of observation period (Month O+1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | Establish SHA-256 checksum files for each TSC evidence folder (`{domain}/checksums.sha256`). Hash all files collected in Month O-1 as the integrity baseline. | compliance-officer | **P1** | Month O+1 | [ ] |
+| 6 | Confirm Vanta auditor portal is configured and audit firm contact has been added. Test by uploading a sample non-sensitive evidence file and confirming the audit firm can view it. | compliance-officer | **P1** | Month O+9 | [ ] |
+| 7 | Update MASTER-INDEX-YYYY.csv with first month's filed artefacts (A1-E-001, CC7-E-001, CC4-E-001 update, CC4-E-003 monthly memo). Mark each `status = COLLECTED`. | compliance-officer | **P1** | Month O+1 | [ ] |
+
+#### P2 — Ongoing / annual
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | After first annual pen test (§16), file PT-E-001 through PT-E-007 per §16.9 and update MASTER-INDEX with `status = COLLECTED`. | security-engineer | **P2** | Post-pentest | [ ] |
+| 9 | Before Series A due diligence, run a dry-run fieldwork exercise: have an internal reviewer attempt to verify each evidence ID in MASTER-INDEX; surface any gaps before the real process starts. | compliance-officer + security-engineer | **P2** | M18 | [ ] |
+
+---
+
+### 79.10 Open Questions
+
+| ID | Question | Priority | Owner | Target |
+|---|---|---|---|---|
+| **OQ-EC-01** | **R2 vs. Vanta evidence vault as primary store.** Vanta uploads are more auditor-friendly; R2 is more tamper-evident (object versioning + WORM policy available). Recommendation: R2 as primary with WORM policy; Vanta as the auditor-facing mirror (compliance-officer manually uploads from R2 to Vanta). Decision required before Month O-1 to configure access controls. | **P1** | compliance-officer + devops-lead | Month O-1 |
+| **OQ-EC-02** | **Pre-observation evidence retention.** Evidence filed before the observation period (e.g., pen test reports from pre-launch, design documentation) supports the "design and implementation" evaluation but is not part of the operating effectiveness evidence set. How should it be separated to avoid auditor confusion? Recommendation: separate `compliance/evidence/pre-obs/` folder with clear README note: "design-phase evidence only — not part of SOC 2 Type II observation window." | **P2** | compliance-officer | Month O-1 |
+| **OQ-EC-03** | **Evidence collection automation: should the monthly SLA report and HMAC chain check be scripted end-to-end?** Currently both require a devops-lead manual step. A Cloudflare Cron Worker could automate: (a) pull Better Stack API → upload to R2 `sla-reports/YYYY-MM.json`; (b) run `verify_chain_integrity()` via Supabase REST → upload result to R2 `cc7/YYYY-MM-chain-check.txt`. Reduces human error and creates a reliable audit trail. Recommendation: implement before Month O+1. Aligns with §78 Vanta integration intent of reducing manual evidence burden. | **P1** | devops-lead | Month O+1 |
+
+---
+
+*v3.7.4 (2026-06-14): §79 Master Evidence Collection & Auditor Submission Protocol. Closes CC4-GAP-002 (🔴 Open → 🟡 Authored): creates master evidence collection plan referenced in §32 CC4-GAP-002 task as CC4-E-002 (`compliance/cc4/evidence-collection-plan.md`). Content: §79.2 evidence folder structure for `compliance/evidence/` with 16 TSC-domain subfolders; §79.3 three evidence classes (Auto / Manual-periodic / Manual-event); §79.4 consolidated 31-row evidence collection table mapping all primary artefacts to TSC criteria, collection cadence, owner, and R2 file path; §79.5 observation period calendar (Month O-1 pre-obs gate, monthly recurring actions, quarterly filing cycle, Month O+12 fieldwork prep); §79.6 auditor fieldwork response SLA table (artefact-on-hand 2-day / query extraction 5-day / walkthrough 3-day / gap 24h-escalate), walkthrough procedure, five categories of information never shared directly with auditors; §79.7 evidence integrity verification (SHA-256 checksum protocol, HMAC chain verify query, MASTER-INDEX hash discipline); §79.8 gap tracker (CC4-GAP-002 🔴 → 🟡; +0.4 pp readiness on full execution); §79.9 nine-item checklist (4× P0/Month-O-1, 3× P1/Month-O+1–O+9, 2× P2/M18+); §79.10 three open questions (OQ-EC-01 R2 vs Vanta primary; OQ-EC-02 pre-obs evidence separation; OQ-EC-03 monthly SLA + chain check automation). Cross-references: §1–§77 (domain control sections); §78 (Vanta integration); §15 (compliance calendar — add monthly collection entry); §32 CC4-GAP-002 (closure action item now authored); §16.9 (pen test evidence package PT-E-001–E-007); §23 (quarterly access review CC6-E-001); INCIDENT_RESPONSE.md §R-05 (chain integrity failure response); AUDIT_LOG_SCHEMA.md (DEC-030 chain events). Owner: compliance-officer.*
+
+---
+
 *v3.7.3 (2026-06-13): §78 cross-reference correction — DEC-031 → DEC-047 in three locations (§78.2 recommendation paragraph, §78.9 gap tracker, §78.10 checklist item 1). DEC-047 (Vanta selected over Drata, 2026-06-13) is the correct DECISION_LOG entry for this tool selection; DEC-031 is "Agent team expanded from 14 → 24 agents" and was incorrectly referenced during initial §78 authoring. Checklist item 1 (§78.10) marked [x] — DEC-047 is logged. No control coverage, evidence artefact, or gap tracker status changes. Owner: compliance-officer.*
 
 *v3.7.2 (2026-06-13): §78 Continuous Compliance Automation — Vanta Integration Design, Vendor Pre-Activation Review & Observation Period Evidence Bootstrapping. PRE-25 🔴 Open → 🟡 Partial: tool selected (Vanta, DEC-031 pending DECISION_LOG.md), integration architecture designed (§78.3, four integrations: GitHub/1Password/Supabase/WorkOS; Cloudflare manual upload), privacy constraints specified (§78.4 — `vanta_readonly` Postgres role with explicit REVOKE on all Art. 9 health-data tables; `vanta_subscription_summary` view for billing-tier metadata), four-step DPA pre-activation procedure (§78.6), evidence artefacts CTOOL-E-001 through CTOOL-E-006 (§78.7), control coverage map (§78.5 — 7 automated controls, 2 manual upload, DEC-030 chain not delegatable), SOC 2 criteria mapping CC4.1/CC4.2/CC2.3/CC8.1/CC6.2/CC7.1/CC9.2 (§78.8), gap tracker PRE-25 🔴→🟡 (§78.9), 16-item implementation checklist with 10× P0/Month-O-1 items (§78.10). `system.compliance_tool_connected` DEC-030 event type registered (STANDARD, 3yr, §78.7). Three open questions: OQ-CTOOL-01 (P1 — Terraform vs manual Cloudflare WAF evidence), OQ-CTOOL-02 (P2 — Vanta Learning vs manual training log), OQ-CTOOL-03 (P2 — Vanta SOC 2 report lapse compensating control). Readiness: ~98.4% → ~98.4% (score updates on CTOOL-E-001 + CTOOL-E-002 filing, estimated +0.3 pp). Cross-references: docs/VENDOR_REGISTRY.md (Vanta High-tier vendor), docs/VULNERABILITY_MANAGEMENT.md §41 (Dependabot evidence), docs/SOC2_READINESS.md §15 (compliance calendar), docs/SOC2_READINESS.md §17 (vendor pre-activation procedure), docs/AUDIT_LOG_SCHEMA.md (DEC-030 `system.compliance_tool_connected`). Owner: compliance-officer + devops-lead.*
