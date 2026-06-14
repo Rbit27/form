@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [4.92.2] — 2026-06-14
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v1.4 → v1.5. 3 new DEC-030 evidence-automation events in the `### System` section: `system.evidence_collection_automated` (STANDARD, 7yr, EVD-CHAIN-01 ordering invariant, AUTO-E-001); `system.evidence_cron_stale` (HIGH, 3yr, dead-man's switch signal → AL-EVD-01); `system.evidence_cron_conflict` (MEDIUM, 1yr, R2 ETag conflict abort → AL-EVD-04). Privacy floor: `actor_type='system'`, `tenant_id` sentinel, `form_api` REVOKED. Retention table +3 rows. Closes §81.11 P0 task #1.
+- `docs/OBSERVABILITY.md` — §12.6 pg_cron health monitoring job registry: job 33 `evidence_cron_freshness_check` added (03:05 UTC, 2nd of month, 32-day freshness window). Annotated as dead-man's switch for the Cloudflare Cron Worker (§81); fires AL-EVD-01 Slack alert via `net.http_post` on miss; does not emit DEC-030 event itself. Closes §81.11 P0 task #2.
+- `VERSION` — 4.92.1 → 4.92.2.
+
+---
+
 ## [4.92.1] — 2026-06-14
 
 ### Changed
