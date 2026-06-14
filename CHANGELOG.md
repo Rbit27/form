@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [4.90.1] — 2026-06-14
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.6 → v2.7. +4 `enterprise.partner_*` partner channel DEC-030 events (STANDARD/HIGH, 7yr): `enterprise.partner_agreement_signed`, `enterprise.partner_revenue_share_paid`, `enterprise.partner_deal_attributed`, `enterprise.partner_offboarded`. Closes COST_MODEL.md §38.10 P0 checklist item 1. PART-CHAIN-01 ordering invariant enforced (`partner_offboarded` with privacy breach requires preceding `privacy.floor_breach_detected`). `privacy_floor_check_passed: z.literal(true)` hard invariant on revenue share payments. Three SOC 2 evidence artefacts PART-E-001–003 (CC9.2 / CC4.1 / CC7.4). Retention table +2 rows.
+- `VERSION` — 4.90.0 → 4.90.1.
+
+---
+
 ## [4.90.0] — 2026-06-14
 
 ### Added

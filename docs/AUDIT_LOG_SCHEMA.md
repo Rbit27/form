@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.6
+# FORM · Audit Log Schema v2.7
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -521,6 +521,94 @@ export const ScimSessionRevocationKvFallbackSchema = z.object({
 
 ---
 
+### Enterprise partner channel events (DEC-030 HMAC-chained · COST_MODEL §38.8)
+
+> Defined in `docs/COST_MODEL.md §38.8`. Four events creating an immutable governance record of partner agreement execution, revenue share payments, deal attribution, and partner offboarding. Required for COST_MODEL §38.10 checklist item 1 (**P0, M10 — before first partner agreement is signed**). **Privacy invariant (all four events):** no individual employee `user_id`, no health values, no coaching content; no partner contact names or company names in chain payload; `deal_id` is a FORM-internal UUID never shared externally; `partner_id` (UUID FK to `enterprise_partners.id`) is the sole cross-reference identifier across all four events. Revenue share percentages and ACV values are aggregate financial metadata only. Cross-ref: SOC 2 CC9.2 (vendor and partner agreements in place — PART-E-001/002/003 evidence artefacts); CC4.1 (control activities over financial obligations — `privacy_floor_check_passed: true` payment gate in `enterprise.partner_revenue_share_paid`); CC7.4 (incident response activated on partner privacy breach — PART-CHAIN-01 prerequisite); `docs/ENTERPRISE.md` (partner no-go criteria and privacy floor); `docs/INCIDENT_RESPONSE.md R-22` (privacy floor breach — PART-CHAIN-01 predecessor requirement); `docs/COST_MODEL.md §38.6` (partner governance — Bronze/Silver/Gold tiers; quarterly revenue share gate); `docs/COST_MODEL.md §38.9` (SOC 2 evidence artefacts PART-E-001 through PART-E-003). Closes COST_MODEL.md §38.10 checklist item 1 (P0, M10).
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `enterprise.partner_agreement_signed` | STANDARD | 7 yr | Partner agreement executed; `enterprise_partners` row created with `status = 'active'`; compliance-officer or founder emits | `partner_id` (UUID), `partner_category` (`referral`\|`reseller`\|`integration`\|`white_label`), `revenue_share_pct` (float 0–45), `agreement_doc_ref` (internal doc ID — **no partner company name in payload**), `dpa_signed` (boolean — **must be `true` for reseller and integration; Worker returns HTTP 422 if false for those categories**), `created_by_pam_session` (UUID — PAM session of FORM `form_admin`) |
+| `enterprise.partner_revenue_share_paid` | HIGH | 7 yr | Quarterly revenue share payment released; compliance-officer emits before payment processing — **never after** | `partner_id`, `period_start` (ISO 8601 date — quarter start), `period_end` (ISO 8601 date — quarter end), `attributed_arr_usd` (float ≥ 0 — total ARR attributed in period), `share_amount_usd` (float ≥ 0 — `attributed_arr_usd × revenue_share_pct / 4`), `payment_method` (`stripe_payout`\|`wire_transfer`), `paid_by_pam_session` (UUID), `privacy_floor_check_passed` (boolean — **`z.literal(true)`; Worker returns HTTP 422 if `false` or absent — payment blocked**) |
+| `enterprise.partner_deal_attributed` | STANDARD | 7 yr | Enterprise deal closes at stage S5 with `attributed_to_partner_id` FK set in `enterprise_pipeline_stages`; founder or form_system emits at deal close | `partner_id`, `deal_id` (UUID FK to `enterprise_pipeline_stages.id` — **internal only, never shared externally**), `tier` (`starter`\|`growth`\|`enterprise`), `acv_usd` (float ≥ 0), `attribution_type` (`referral`\|`reseller`\|`integration`\|`white_label`), `sales_cycle_days` (positive integer — days from `lead_date` to S5 close; drives §38.5.1 CAC velocity comparison) |
+| `enterprise.partner_offboarded` | HIGH | 7 yr | Partner agreement terminated; `enterprise_partners.status` set to `terminated`; compliance-officer emits (manual — no automated path) | `partner_id`, `termination_reason` (`privacy_floor_breach`\|`no_go_criteria_violation`\|`performance_inactive`\|`mutual_agreement`\|`agreement_expiry`), `outstanding_share_usd` (float ≥ 0 — $0 if fully settled, > $0 if disputed), `dispute_open` (boolean), `privacy_incident_ref` (string or null — **required and non-null when `termination_reason = 'privacy_floor_breach'`; Worker returns HTTP 422 if null for that reason**), `offboarded_by_pam_session` (UUID) |
+
+**Zod schemas (canonical source for `emit-audit-event` Worker validation):**
+
+```typescript
+// enterprise.partner_agreement_signed
+const PartnerAgreementSignedPayload = z.object({
+  partner_id:             z.string().uuid(),
+  partner_category:       z.enum(['referral', 'reseller', 'integration', 'white_label']),
+  revenue_share_pct:      z.number().min(0).max(45),
+  agreement_doc_ref:      z.string(),
+  dpa_signed:             z.boolean(),
+  created_by_pam_session: z.string().uuid(),
+});
+
+// enterprise.partner_revenue_share_paid
+const PartnerRevenueSharePaidPayload = z.object({
+  partner_id:                  z.string().uuid(),
+  period_start:                z.string().date(),
+  period_end:                  z.string().date(),
+  attributed_arr_usd:          z.number().min(0),
+  share_amount_usd:            z.number().min(0),
+  payment_method:              z.enum(['stripe_payout', 'wire_transfer']),
+  paid_by_pam_session:         z.string().uuid(),
+  privacy_floor_check_passed:  z.literal(true), // must be true; 422 if false or absent
+});
+
+// enterprise.partner_deal_attributed
+const PartnerDealAttributedPayload = z.object({
+  partner_id:       z.string().uuid(),
+  deal_id:          z.string().uuid(),
+  tier:             z.enum(['starter', 'growth', 'enterprise']),
+  acv_usd:          z.number().min(0),
+  attribution_type: z.enum(['referral', 'reseller', 'integration', 'white_label']),
+  sales_cycle_days: z.number().int().positive(),
+});
+
+// enterprise.partner_offboarded
+const PartnerOffboardedPayload = z.object({
+  partner_id:               z.string().uuid(),
+  termination_reason:       z.enum([
+    'privacy_floor_breach',
+    'no_go_criteria_violation',
+    'performance_inactive',
+    'mutual_agreement',
+    'agreement_expiry',
+  ]),
+  outstanding_share_usd:    z.number().min(0),
+  dispute_open:             z.boolean(),
+  privacy_incident_ref:     z.string().nullable(),
+  offboarded_by_pam_session: z.string().uuid(),
+});
+```
+
+**HMAC chain requirement (PART-CHAIN-01):** All four events must include `prev_hash`. No strict ordering is enforced across the four event types within a single partner's lifecycle — a deal may be attributed before or after a revenue share payment for the same partner.
+
+**Exception — PART-CHAIN-01 ordering invariant:** `enterprise.partner_offboarded` with `termination_reason = 'privacy_floor_breach'` or `'no_go_criteria_violation'` **must** be preceded in the HMAC chain by a `privacy.floor_breach_detected` event for the affected `tenant_id` within the 12 months prior to offboarding. The `emit-audit-event` Worker verifies this predecessor exists before chain-appending; HTTP 422 `PART_CHAIN_01_VIOLATION` on absence → triggers R-05 (HMAC chain integrity failure, `docs/INCIDENT_RESPONSE.md`).
+
+**Additional per-event hard constraints enforced by the Worker:**
+- `enterprise.partner_agreement_signed`: `dpa_signed` must be `true` when `partner_category ∈ {'reseller', 'integration'}` — enforced per §38.6.1; referral-only partners with no data access may have `dpa_signed = false`.
+- `enterprise.partner_revenue_share_paid`: `privacy_floor_check_passed` must be `z.literal(true)` — HTTP 422 `PART_PAY_FLOOR_CHECK` if `false` or absent; payment is blocked upstream until attestation is confirmed.
+- `enterprise.partner_offboarded`: `privacy_incident_ref` must be non-null when `termination_reason = 'privacy_floor_breach'` — HTTP 422 if null; the incident slug links to the R-22 incident record.
+
+Under no circumstance may `enterprise.partner_revenue_share_paid` be emitted with `privacy_floor_check_passed = false` or absent. A blocked payment attempt is recorded by a separate operational log (not in the DEC-030 chain).
+
+**Emitter assignment:** `enterprise.partner_agreement_signed` — `compliance-officer` or `founder` (manual via admin console, PAM session required — emitted before any data or commissions flow to or from the partner); `enterprise.partner_revenue_share_paid` — `compliance-officer` (manual, quarterly, after `privacy_floor_check_passed` attestation; no automated path — human sign-off is the compliance control); `enterprise.partner_deal_attributed` — `customer-success` or `founder` (manual at S5 deal close) or `form_system` (automated trigger when `enterprise_pipeline_stages.stage = 'S5'` and `attributed_to_partner_id IS NOT NULL`); `enterprise.partner_offboarded` — `compliance-officer` (manual only — no automated path; offboarding always requires human review and PAM session).
+
+**SOC 2 evidence artefacts (store at `compliance/evidence/partners/` with `MANIFEST.sha256`):**
+
+| Artefact | Description | SOC 2 criteria | Retention |
+|---|---|---|---|
+| **PART-E-001** | Annual export of `enterprise.partner_agreement_signed` chain events for all active partners — demonstrates executed agreements and DPA status | CC9.2 — Vendor and partner agreements in place | 7 yr |
+| **PART-E-002** | Annual export of `enterprise.partner_revenue_share_paid` chain events — demonstrates financial governance; every row has `privacy_floor_check_passed: true` | CC9.2 — Vendor financial controls; CC4.1 — Control activities over financial obligations | 7 yr |
+| **PART-E-003** | `enterprise.partner_offboarded` export for observation period — demonstrates formal closure and privacy breach escalation per PART-CHAIN-01 | CC9.2 — Vendor offboarding; CC7.4 — Incident response activated on privacy floor breach | 7 yr |
+
+**Auditor narrative (CC9.2):** FORM manages its partner channel through formally executed Partner Agreements gated on DPA execution for reseller and integration partners (`dpa_signed = true` enforced at chain-append time). Revenue share payments are blocked unless `privacy_floor_check_passed: true` is explicitly attested by the compliance-officer — invariant enforced at the `emit-audit-event` Worker layer (HTTP 422 `PART_PAY_FLOOR_CHECK` on violation). PART-E-001 through PART-E-003 provide chain-level evidence for auditors querying the SOC 2 observation window. No individual employee health data or user identifiers are shared with any partner at any tier — enforced at the API layer (`REVOKE ALL ON enterprise_partners FROM form_api`), at the DEC-030 payload schema (`user_id` is absent from all four event types), and at the contract layer (Partner Agreement §38.6.2 non-waivable privacy floor clauses).
+
+---
+
 ### Victor AI safety events (DEC-030 HMAC-chained · OBSERVABILITY §32 · INCIDENT_RESPONSE R-23)
 
 > Defined in `docs/INCIDENT_RESPONSE.md §R-23` and `docs/OBSERVABILITY.md §32`. Five events covering the full Victor AI clinical-safety incident lifecycle — from P0 trigger through containment, global disable, staged re-enable, and resolution. **Privacy floor:** no per-user coaching content, no user health values, no `user_id` in any payload — `incident_id` (UUID), `session_id` (UUID), and aggregate counts only. `clinical_safety_rules_violated` is a boolean; the specific rule text is in the incident record, not the audit chain. VSAFETY-CHAIN-01/02/03 DEC-030 chain monitors (defined in OBSERVABILITY.md §32.7) enforce ordering: `ai.safety_incident_opened` must precede `ai.victor_disabled`; `ai.victor_reenabled` requires a preceding `ai.safety_incident_resolved` for the same `incident_id` — chain guard in `emit-audit-event` Worker returns HTTP 422 on violation. **CRITICAL events (`ai.safety_incident_opened` for VT-03/04/05/06) trigger PagerDuty `FORM Clinical Safety` P0 and clinical-safety VETO unconditionally.** Cross-ref: SOC 2 CC7.2/CC7.4; GDPR Art. 9 (health data integrity record); `docs/OBSERVABILITY.md §32.5` (FORM-VICTOR-001 through FORM-VICTOR-004 alert rules); `docs/OBSERVABILITY.md §2.1` (VICTOR-SLO-01 through VICTOR-SLO-04); closes OBSERVABILITY.md §32.10 checklist item 7 (P0 M4) and INCIDENT_RESPONSE.md R-23 checklist item 2 (P0 M4).
@@ -624,6 +712,8 @@ export const ScimSessionRevocationKvFallbackSchema = z.object({
 | `enterprise.churn_confirmed` / `enterprise.retention_discount_granted` | 7 years | Contract lifecycle evidence (churn type, ACV, contract_id FK); pricing exception linkage via `pricing_exception_event_id`; SOC 2 CC1.4/CC5.2; 7yr matches financial audit retention requirement per COST_MODEL.md §34.8 |
 | `enterprise.mid_contract_termination_risk_flagged` / `enterprise.contract_amended` / `enterprise.early_termination_fee_waived` | 7 years | Contract amendment and ETF lifecycle evidence; SOC 2 CC5.2 (business risk assessment), CC7.2 (monitoring of controls); 7yr matches financial audit retention requirement per COST_MODEL.md §35.9; HMAC ordering guard enforced (risk-flagged prerequisite for ETF waiver within 12-month window) |
 | `enterprise.implementation_kickoff_completed` / `enterprise.sso_scim_setup_verified` / `enterprise.implementation_cost_model_calibrated` | 7 years | Implementation lifecycle evidence; SOC 2 CC5.2 (deal-level implementation governance), CC7.2 (SSO/SCIM smoke-test verification monitoring); COST_MODEL.md §36.10 — 7yr matches deal lifecycle evidence floor; `enterprise.implementation_cost_model_calibrated` cross-links to DECISION_LOG OQ-08 closure record |
+| `enterprise.partner_agreement_signed` / `enterprise.partner_deal_attributed` | 7 years | Partner agreement execution and deal attribution records; SOC 2 CC9.2 (PART-E-001 evidence artefact — executed agreements and DPA status; PART-E-003 — offboarding audit trail); 7yr matches Ukrainian Tax Code Art. 44 financial record floor and SOC 2 multi-cycle evidence requirement; COST_MODEL.md §38.8 |
+| `enterprise.partner_revenue_share_paid` / `enterprise.partner_offboarded` | 7 years | HIGH-severity financial payment record and partner termination record; SOC 2 CC9.2/CC4.1 (PART-E-002 revenue share payment evidence — `privacy_floor_check_passed: true` invariant); CC7.4 (PART-E-003 — PART-CHAIN-01 privacy breach escalation evidence); `partner_revenue_share_paid` is a financial transaction record; COST_MODEL.md §38.8 |
 | `billing.user_erased` | 7 years | GDPR Art. 17 erasure record for `subscription_events`; SOC 2 P5.2 (ERA-E-001 pseudonymization evidence), P8.0 (ERA-E-002 financial retention with `retention_basis`), CC8.1 (ERA-E-003 migration + erasure chain); 7yr matches Ukrainian Tax Code Art. 44 and EU VAT Directive Art. 245 financial retention floor |
 | `security.quota_95pct_warning` | 3 years | Tenant API quota soft-warn telemetry (95% consumption); SOC 2 A1.1 (capacity monitoring); operational deduplication evidence (secondary_warn_sent_at); 3yr sufficient — not a financial or contract record |
 | `ai.safety_incident_opened` / `ai.safety_incident_contained` / `ai.victor_disabled` / `ai.victor_reenabled` | 7 years | Victor AI P0/P1 clinical-safety incident evidence; SOC 2 CC7.2 (threat monitoring) / CC7.4 (incident response); GDPR Art. 9 health data integrity record; VSAFETY-CHAIN-01/02/03 chain monitor evidence |
@@ -1552,6 +1642,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.7 · 2026-06-14 · owner: compliance-officer + security-engineer + enterprise-architect**
+*v2.7 (2026-06-14): +4 `enterprise.partner_*` partner channel events — closes COST_MODEL.md §38.10 checklist item 1 (P0, M10 — register all four DEC-030 events before first partner agreement is signed). New section `### Enterprise partner channel events (DEC-030 HMAC-chained · COST_MODEL §38.8)` inserted after `### Enterprise renewal & churn lifecycle events`. (1) `enterprise.partner_agreement_signed` (STANDARD, 7yr): compliance-officer or founder emits at agreement execution; Zod v2 schema — `partner_id` (UUID FK `enterprise_partners.id`), `partner_category` (4-value enum), `revenue_share_pct` (float 0–45), `agreement_doc_ref` (internal ID — no company name), `dpa_signed` (boolean — `z.literal(true)` required for reseller/integration; HTTP 422 on false); `created_by_pam_session` UUID. (2) `enterprise.partner_revenue_share_paid` (HIGH, 7yr): compliance-officer manual only — no automated path; hard invariant `privacy_floor_check_passed: z.literal(true)` — HTTP 422 `PART_PAY_FLOOR_CHECK` if false or absent; `partner_id`, `period_start`/`period_end` (ISO 8601 dates), `attributed_arr_usd`, `share_amount_usd`, `payment_method` (2-value enum), `paid_by_pam_session`. (3) `enterprise.partner_deal_attributed` (STANDARD, 7yr): founder or form_system at S5 close with `attributed_to_partner_id` set; `partner_id`, `deal_id` (internal UUID — never shared externally), `tier` (3-value enum), `acv_usd`, `attribution_type` (4-value enum), `sales_cycle_days` (positive integer — §38.5.1 CAC velocity). (4) `enterprise.partner_offboarded` (HIGH, 7yr): compliance-officer manual only; `partner_id`, `termination_reason` (5-value enum), `outstanding_share_usd`, `dispute_open`, `privacy_incident_ref` (string or null — required non-null when `termination_reason = 'privacy_floor_breach'`; HTTP 422 if null for that reason), `offboarded_by_pam_session`. PART-CHAIN-01 ordering invariant: `enterprise.partner_offboarded` with `termination_reason = 'privacy_floor_breach'` or `'no_go_criteria_violation'` must be preceded in chain by `privacy.floor_breach_detected` for affected `tenant_id` within 12 months prior; HTTP 422 `PART_CHAIN_01_VIOLATION` on violation → R-05. Three SOC 2 evidence artefacts defined: PART-E-001 (CC9.2 — annual `partner_agreement_signed` export), PART-E-002 (CC9.2/CC4.1 — annual `partner_revenue_share_paid` export with `privacy_floor_check_passed: true`), PART-E-003 (CC9.2/CC7.4 — `partner_offboarded` observation-period export). All four Zod v2 schemas provided (canonical source for `emit-audit-event` Worker validation; `form_api` REVOKED on `enterprise_partners` table). Retention table: +2 rows (`enterprise.partner_agreement_signed` + `enterprise.partner_deal_attributed` STANDARD 7yr; `enterprise.partner_revenue_share_paid` + `enterprise.partner_offboarded` HIGH 7yr). Cross-ref: `docs/COST_MODEL.md §38.8` (canonical event definitions and Zod schemas), §38.9 (SOC 2 evidence artefacts PART-E-001–003), §38.10 item 1 (P0 checklist — closed by this patch); `docs/INCIDENT_RESPONSE.md R-22` (privacy floor breach — PART-CHAIN-01 predecessor event); `docs/ENTERPRISE.md` (partner no-go criteria). Privacy floor (all four events): no `user_id`, no health values, no coaching content, no partner contact names; `deal_id` is FORM-internal UUID never surfaced to any partner. Owner: compliance-officer + enterprise-architect.*
 
 **v2.6 · 2026-06-14 · owner: compliance-officer + security-engineer + enterprise-architect**
 *v2.6 (2026-06-14): +1 `scim.session_revocation_kv_fallback` event (HIGH, 7yr) — closes `docs/SSO_SCIM_IMPLEMENTATION.md §28.8` checklist item 2 (P0, M5 — register `scim.session_revocation_kv_fallback` in AUDIT_LOG_SCHEMA.md before G-013 DPA cleared). Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §28.5` (v2.0, 2026-06-14); resolves DEC-048 (Option c: HTTP 200 + Supabase fallback + AL-REVOKE-01 emit on SCIM KV write failure). Event: emitted by `apps/scim-worker` when `env.SCIM_KV.put()` throws during PATCH deprovisioning; Supabase blocklist fallback path engaged to maintain < 30 s revocation within the 60-second P99 SLA (`ENTERPRISE_SLA.md §3.7`). Payload (Zod v2 — `ScimSessionRevocationKvFallbackSchema`): `tenant_id` (UUID), `scim_request_id` (string max 128), `fallback_path: literal('supabase_blocklist')`, `supabase_ok` (boolean — `false` if both paths fail; triggers P0 co-activation R-02 + R-26), `kv_error_class` (string max 64 — e.g. `'KVError'`, `'NetworkError'`). Privacy invariant: no `user_id`, no email, no role values — `tenant_id` + `scim_request_id` only. REVOKE-CHAIN-01 ordering invariant added: `scim.session_revocation_kv_fallback` must follow `scim.user_deprovisioned` for same `scim_request_id`; `emit-audit-event` Worker returns HTTP 422 `REVOKE_CHAIN_01_VIOLATION` on violation → R-05 (HMAC Chain Break). AL-REVOKE-01 (P1, PagerDuty `form-platform`, dedup key `scim-kv-fallback-{tenant_id}` / 1-hour window, no auto-resolve) fires on `count(scim.session_revocation_kv_fallback) > 0` in any 5-minute window via `scim_kv_fallback_count` Analytics Engine metric. Retention table: +1 row (`scim.session_revocation_kv_fallback` 7yr, SOC 2 CC6.3 + CC7.2). Header corrected v2.4 → v2.6 (v2.5 entry existed in changelog but header was not incremented; this patch fixes the header gap). Cross-ref: `docs/SSO_SCIM_IMPLEMENTATION.md §28.5` (canonical event definition), §28.6 (AL-REVOKE-01 config), §28.7 (SCIM-REVOKE-E-001 evidence artefact), §28.8 checklist item 2 (🟢 closed); `docs/ENTERPRISE_SLA.md §3.7` (60 s P99 revocation SLA — `supabase_ok = true` confirms SLA met); `docs/INCIDENT_RESPONSE.md R-05` (REVOKE-CHAIN-01 violation → immediate escalation); `docs/INCIDENT_RESPONSE.md R-26` (SCIM deprovisioning latency — co-activated when `supabase_ok = false`); `docs/DECISION_LOG.md DEC-048`; `docs/OBSERVABILITY.md §26` (AL-REVOKE-01 alert rule update required — P0 M5). Owner: compliance-officer + security-engineer + platform-engineer.*
