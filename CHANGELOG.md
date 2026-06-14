@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.1.0] — 2026-06-14
+
+### Added
+- `content/post-791-athletes-with-disabilities-training.md` — Block 751–800 post 48/50. Силовий тренінг з обмеженнями руху: принципи адаптації програмування. clinical-safety CONDITIONAL PASS (opening disclaimer, movement-specialist gate, explicit exclusions, no self-assessment language). Класифікація за руховими функціями. Унілатеральний підхід і крос-едукаційний ефект. Обмеження хребта: нейтральна зона, trap bar.
+- `content/post-793-training-chronic-work-stress.md` — Block 751–800 post 49/50. Тренінг і стійкий підвищений стрес: адаптація програми при системно обмеженому ресурсі. clinical-safety CONDITIONAL PASS (opening gate for burnout/clinical exclusion, behavioral framing not clinical cortisol, hard stop criteria, no cortisol-testing or supplement language; delivery restricted: no push 21:00–08:00). Алостатичне навантаження. Знижуй об'єм, не інтенсивність. Deload кожні 2–3 тижні.
+- `content/post-794-medically-restricted-diet-training.md` — Block 751–800 post 50/50. Тренінг при медично обмеженому харчуванні: програмування на стороні тренінгу. clinical-safety CONDITIONAL PASS (mandatory RD/physician gate, no quantitative energy thresholds, ED protection clause, flare exclusion, no recovery nutrition, in-app confirmation screen required). Тренінг адаптується до дієтолога. Об'єм, частота, deload при обмеженому субстраті.
+- **Block 751–800 COMPLETE** — 50/50 posts written. All posts require sports-scientist review before publish. Posts 791, 793, 794 also require clinical-safety guard rail compliance check in-app.
+- `content/post-801-creatine-mechanism-dosing-evidence.md` — Block 801–850 post 1/50. Креатин: механізм, дози і доказова база без маркетингу. PCr ресинтез і ATP регенерація. 30+ років РКД. 3–5 г/день без завантаження. Monohydrate vs. форми. Responders/non-responders. Розвінчення міту про нирки. Вегетаріанці. Водне насичення. Кофеїн конфлікт (поточний консенсус: немає).
+- `blog.html` — картки для постів 791, 793, 794 (із позначкою clinical-safety CONDITIONAL PASS) і post-801.
+
+---
+
 ## [5.0.1] — 2026-06-14
 
 ### Added

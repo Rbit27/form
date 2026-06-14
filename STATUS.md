@@ -1,4 +1,4 @@
-# FORM · Project Status v5.0.0
+# FORM · Project Status v5.1.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.0.0** — 2026-06-14
+**v5.1.0** — 2026-06-14
 
 ---
 
@@ -27,9 +27,10 @@
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
-| 751–800 | Athlete lifecycle & context | 47 | **47/50 written** — posts 784–790, 792, 795–800 added v5.0.0: functional fitness vs strength training (SAID principle · clinical-safety PASS), shoulder mobility training adaptations, hip mobility training adaptations, chronic recovery deficit strategy, first year post-university schedule, irregular work schedule training, self-coaching year two, Masters 40–70 planning spectrum, CrossFit-to-strength-training transition, martial arts concurrent scheduling, frequent travel + jet lag strategy, budget training without gym, self-coached vs coached synthesis (post-799), block synthesis (post-800). **BLOCKED (3 posts, clinical-safety required before write):** post-791 (athletes with disabilities), post-793 (training under chronic work stress), post-794 (medically-restricted diet). sports-scientist review required for all written posts before publish |
+| 751–800 | Athlete lifecycle & context | 50 | **BLOCK COMPLETE** — all 50 posts written v5.1.0: posts 791 (athletes with movement limitations · clinical-safety CONDITIONAL PASS), 793 (sustained high stress training · clinical-safety CONDITIONAL PASS), 794 (medically-restricted diet · clinical-safety CONDITIONAL PASS) now written with embedded guard rails. Blog cards added for posts 785–800. sports-scientist review required for all 50 before publish |
+| 801–850 | Evidence-based deep dives | 1 | **1/50 written** — post-801: creatine mechanism, dosing, evidence review (no clinical-safety flags). sports-scientist review required before publish |
 
-**Total posts: 792**
+**Total posts: 796**
 
 **Editorial series 11–16** — post-16 written (overtraining vs underrecovery · clinical-safety PASS); blog.html cards added for posts 11–16; post-17 (AI-coach vs PT) proposed in README.
 
@@ -95,9 +96,8 @@
 
 ## Next priorities
 
-- **Block 751–800: 47/50 written** — posts 791, 793, 794 BLOCKED pending clinical-safety (disability training, chronic work stress, medically-restricted diet); sports-scientist review required for all 47 before publish
-- **Block 801–850 NEXT** — Evidence-based deep dives: creatine, protein, caffeine, fat, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, steroids and natural training, genetic ceiling, myofibrillar vs. sarcoplasmic hypertrophy
-- Clinical-safety gate needed: posts 791, 793, 794 — clinical-safety agent review required before writing
+- **Block 751–800: COMPLETE** — all 50/50 posts written; posts 791, 793, 794 clinical-safety CONDITIONAL PASS (guard rails embedded); sports-scientist review required for all 50 before publish
+- **Block 801–850 ACTIVE** — Evidence-based deep dives: post-801 creatine written; next: protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic, steroids interpretation, genetic ceiling
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
@@ -109,4 +109,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v5.0.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v5.1.0**
