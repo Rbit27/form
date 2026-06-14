@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [4.84.2] — 2026-06-14
+
+### Changed
+- `enterprise.html` — "Drata continuous monitoring" → "Vanta continuous monitoring" (DEC-047).
+- `pricing-enterprise.html` — "Drata continuous monitoring" → "Vanta continuous monitoring"; "Drata compliance dashboard access" → "Vanta compliance dashboard access" (DEC-047).
+- `VERSION` — 4.84.1 → 4.84.2.
+
 ## [4.84.1] — 2026-06-14
 
 ### Added
