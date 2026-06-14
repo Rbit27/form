@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [4.88.1] — 2026-06-14
+
+### Changed
+- `docs/SOC2_READINESS.md` — §80 Evidence Vault Architecture (v3.7.4 → v3.8.0). Closes OQ-EC-01 (🔴 P1 → 🟢) via DEC-052: R2 bucket `form-soc2-evidence` (EU, Object Lock Governance, versioning locked) is the tamper-evident primary evidence store; Vanta is the auditor-facing mirror with 48-hour upload SLA. Closes OQ-EC-02 (🟡 P2 → 🟢) via §80.5: `pre-obs/` folder + README.md protocol for design-phase evidence separation. New content: §80.1 purpose; §80.2 decision rationale (three alternatives evaluated — Vanta-primary and dual-primary rejected); §80.3 R2 architecture (WORM retention table, `pre-obs/` + `mirror-log/` folder additions, five-row access control matrix with `r2:form-api` NO ACCESS invariant, four bucket policy invariants); §80.4 Vanta mirror protocol (JSONL mirror log schema, mirrored vs. R2-only artefact lists); §80.5 OQ-EC-02 `pre-obs/README.md` authoritative text; §80.6 DEC-030 event `system.evidence_vault_configured` (STANDARD, 7yr, VAULT-CHAIN-01 ordering invariant); §80.7 three SOC 2 evidence artefacts VAULT-E-001/002/003 (CC4.1/CC7.1); §80.8 gap tracker (+0.2 pp, OQ-EC-03 unblocked); §80.9 eleven-item checklist (7× P0/O-1, 2× P1/O+1–O+2, 2× P2/annual); §80.10 open questions status. §79.10 OQ-EC-01 and OQ-EC-02 updated to 🟢 Resolved.
+- `docs/DECISION_LOG.md` — DEC-052 added (OQ-EC-01 closure): R2-primary / Vanta-mirror evidence vault architecture; OQ-EC-02 pre-obs separation.
+- `VERSION` — 4.88.0 → 4.88.1.
+
+---
+
 ## [4.88.0] — 2026-06-14
 
 ### Added

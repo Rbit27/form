@@ -26751,9 +26751,279 @@ The MASTER-INDEX-YYYY.csv is itself a SHA-256-hashed file. Any modification to f
 
 | ID | Question | Priority | Owner | Target |
 |---|---|---|---|---|
-| **OQ-EC-01** | **R2 vs. Vanta evidence vault as primary store.** Vanta uploads are more auditor-friendly; R2 is more tamper-evident (object versioning + WORM policy available). Recommendation: R2 as primary with WORM policy; Vanta as the auditor-facing mirror (compliance-officer manually uploads from R2 to Vanta). Decision required before Month O-1 to configure access controls. | **P1** | compliance-officer + devops-lead | Month O-1 |
-| **OQ-EC-02** | **Pre-observation evidence retention.** Evidence filed before the observation period (e.g., pen test reports from pre-launch, design documentation) supports the "design and implementation" evaluation but is not part of the operating effectiveness evidence set. How should it be separated to avoid auditor confusion? Recommendation: separate `compliance/evidence/pre-obs/` folder with clear README note: "design-phase evidence only — not part of SOC 2 Type II observation window." | **P2** | compliance-officer | Month O-1 |
-| **OQ-EC-03** | **Evidence collection automation: should the monthly SLA report and HMAC chain check be scripted end-to-end?** Currently both require a devops-lead manual step. A Cloudflare Cron Worker could automate: (a) pull Better Stack API → upload to R2 `sla-reports/YYYY-MM.json`; (b) run `verify_chain_integrity()` via Supabase REST → upload result to R2 `cc7/YYYY-MM-chain-check.txt`. Reduces human error and creates a reliable audit trail. Recommendation: implement before Month O+1. Aligns with §78 Vanta integration intent of reducing manual evidence burden. | **P1** | devops-lead | Month O+1 |
+| ~~**OQ-EC-01**~~ **🟢 Resolved — DEC-052 (2026-06-14)** | ~~R2 vs. Vanta evidence vault as primary store.~~ **Resolved:** R2 bucket `form-soc2-evidence` (EU, WORM Governance mode) is the tamper-evident primary store. Vanta is the auditor-facing mirror with 48-hour upload cadence. Full architecture in §80. | ~~P1~~ **🟢 Closed** | compliance-officer + devops-lead | ~~Month O-1~~ **Done** |
+| ~~**OQ-EC-02**~~ **🟢 Resolved — §80.5 (2026-06-14)** | ~~Pre-observation evidence retention.~~ **Resolved:** `compliance/evidence/pre-obs/` folder with README protocol adopted. Artefacts in `pre-obs/` are not uploaded to Vanta; auditors receive them as supplemental design-phase documentation only if requested. Full protocol in §80.5. | ~~P2~~ **🟢 Closed** | compliance-officer | ~~Month O-1~~ **Done** |
+| **OQ-EC-03** | **Evidence collection automation: should the monthly SLA report and HMAC chain check be scripted end-to-end?** Currently both require a devops-lead manual step. A Cloudflare Cron Worker could automate: (a) pull Better Stack API → upload to R2 `sla-reports/YYYY-MM.json`; (b) run `verify_chain_integrity()` via Supabase REST → upload result to R2 `cc7/YYYY-MM-chain-check.txt`. Reduces human error and creates a reliable audit trail. Recommendation: implement before Month O+1. OQ-EC-01 resolution (§80) unblocks this work: target bucket and folder paths are now defined. | **P1** | devops-lead | Month O+1 |
+
+---
+
+## 80. Evidence Vault Architecture — R2-Primary / Vanta-Mirror Decision
+
+> Resolves **OQ-EC-01** (🔴 P1 → 🟢, DEC-052, 2026-06-14) and **OQ-EC-02** (🟡 P2 → 🟢, 2026-06-14). Both were Month O-1 prerequisites — closing them unblocks R2 bucket creation (§79.9 item 2) and access control configuration. Owner: compliance-officer + devops-lead.
+
+---
+
+### 80.1 Purpose and Scope
+
+§79 deferred the question of *where* evidence lives to OQ-EC-01. This section answers it: Cloudflare R2 is the primary tamper-evident store; Vanta is the auditor-facing mirror. §80 also closes OQ-EC-02 by specifying how design-phase (pre-observation) evidence is physically separated from operating-effectiveness evidence.
+
+Scope: applies to all evidence artefacts listed in §79.4 plus all supplemental artefacts added since (SCIM-ROLE-E, ENUM-E, PART-E, TURH-RET-E, DSAR-E, APIKEY-E, CTOOL-E, VAULT-E).
+
+Out of scope: the DEC-030 HMAC chain itself (stored in Supabase `audit_log` table, not R2); Vanta's automated GitHub / 1Password / WorkOS / Supabase connectors (governed by §78).
+
+---
+
+### 80.2 Decision — OQ-EC-01 (DEC-052)
+
+**Decision:** Cloudflare R2 bucket `form-soc2-evidence` is the **primary evidence store**. Vanta is the **auditor-facing mirror**. Evidence is authored on R2 first; Vanta receives a manual upload within 48 hours of collection.
+
+**Alternatives evaluated:**
+
+| Option | Verdict | Rejection reason |
+|---|---|---|
+| Vanta-primary | Rejected | Vanta is a SaaS vendor; a regional outage during fieldwork would block auditor access to our own evidence — unacceptable for a CC7.2 control. R2 provides the offline fallback. |
+| R2-primary + Vanta-mirror | **Selected** | R2 is under FORM's direct control and supports Object Lock (WORM), providing tamper-evidence Vanta cannot guarantee. Vanta provides the auditor-friendly portal. |
+| Dual-primary (both R2 and Vanta as authoritative) | Rejected | Creates two sources of truth; SHA-256 checksum discipline from §79.7 breaks if the same artefact can diverge between stores. One canonical copy is essential for evidence integrity. |
+
+**Rationale for R2 as primary:**
+
+1. **WORM tamper-evidence.** R2 Object Lock in Governance mode prevents object modification or deletion for the retention duration. Vanta has no equivalent object-level write-once guarantee.
+2. **Direct control.** Evidence files never require a third-party SaaS to be available in order for FORM to read, hash, or present them. During fieldwork, a 5-minute R2 presigned URL gets the auditor an artefact even if Vanta is degraded.
+3. **Checksum integrity.** The SHA-256 checksum discipline from §79.7 works cleanly: compliance-officer hashes the file locally, uploads to R2, records the hash in MASTER-INDEX. If Vanta were primary, the authoritative hash would be computed *after* upload — a weaker model.
+4. **DEC-030 chain separation.** The HMAC chain lives in Supabase, not R2. R2 holds the human-readable evidence layer. Keeping them separate prevents a single infrastructure compromise from affecting both.
+
+**Rationale for Vanta as mirror:**
+
+1. Audit firms expect to work in a portal, not a bucket browser. An auditor clicking through Vanta's checklist UI is faster and less error-prone than browsing R2 paths.
+2. Vanta's auditor portal is already provisioned per §78 (DEC-047). Not using it as the fieldwork interface would waste the integration investment.
+3. Vanta's automated connectors (GitHub, 1Password, Supabase, WorkOS) produce evidence that appears *in Vanta* directly. Keeping both automated and manual evidence in Vanta creates a unified auditor view.
+
+---
+
+### 80.3 R2 Primary Store Architecture
+
+**Bucket:** `form-soc2-evidence`
+**Region:** EU (Cloudflare R2 EU region — all evidence files may contain pseudonymous personal data via tenant metadata; EU storage satisfies GDPR Art. 46 transfer requirements)
+**Object Versioning:** Enabled; cannot be disabled by policy (admin console lock). Every PUT creates a new version; prior versions are retained for the retention duration of the governed event class.
+**Object Lock:** Governance mode by default. Escalate to Compliance mode for artefacts filed during the active observation window after they are verified correct (Compliance mode prevents deletion even with administrative override — appropriate for evidence that must survive an audit finding).
+**Retention periods by evidence class:**
+
+| DEC-030 retention class | WORM lock duration | Example artefacts |
+|---|---|---|
+| HIGH (7yr) | 7 years from `changed_at` or collection date | VAULT-E-001, APIKEY-E series, PART-E-002, DEC-030 chain exports |
+| STANDARD (3yr) | 3 years | A1-E-001 (SLA reports), CTOOL-E series, VAULT-E-002 mirror logs |
+| STANDARD (7yr) | 7 years | CC7-E-001 (chain integrity checks), SCIM-ROLE-E series, TURH-RET-E-001 |
+| Pre-obs (no WORM lock) | None — informational only | `pre-obs/` folder; not part of the operating window evidence set |
+
+**Folder structure:** inherits §79.2 (16 TSC-domain subfolders). Two additions:
+
+```
+compliance/evidence/
+  cc1/ cc2/ cc3/ cc4/ cc5/ cc6/ cc7/ cc8/ cc9/
+  a1/ c1/ p5/ p8/
+  scim-role/     (cross-domain SCIM/CC6/CC8/P5 evidence)
+  pre-obs/       (design-phase evidence — NOT observation window)
+  mirror-log/    (Vanta upload receipt log — internal only)
+  MASTER-INDEX-YYYY.csv
+```
+
+**Access control matrix:**
+
+| Principal | R2 permissions | Notes |
+|---|---|---|
+| `r2:compliance-officer` | Read + Write (all folders) | Uses personal API token bound to `compliance@form.coach`; MFA-enforced Cloudflare account |
+| `r2:vanta-sync` | Read-only (all folders except `mirror-log/`) | Service token used only during the manual Vanta upload step. No write access — prevents a compromised sync from overwriting evidence. |
+| `r2:devops-lead` | Read + Write (`mirror-log/` only); Read (all other folders) | Allows devops-lead to implement OQ-EC-03 automation without write access to TSC evidence. |
+| `r2:form-api` | **NO ACCESS** | Same zero-access principle as on Supabase Art. 9 health-data tables. No application service account can read or write evidence files. |
+| Cloudflare root account | Full access (emergency only) | Emergency access requires a DECISION_LOG entry and `system.evidence_vault_emergency_access` DEC-030 event before any object is read or modified. |
+
+**Bucket policy invariants (enforced via R2 bucket policy JSON, filed as VAULT-E-001):**
+
+- Object Lock cannot be disabled on any object whose `changed_at` / collection date is within its retention window.
+- Versioning cannot be disabled.
+- `r2:form-api` token, if it exists, is explicitly denied all `s3:*` operations on this bucket.
+- Bucket ACLs remain private (no public access; no presigned URL expiry > 1 hour for fieldwork delivery).
+
+---
+
+### 80.4 Vanta Mirror Protocol
+
+**Sync trigger:** compliance-officer receives a calendar reminder on the 3rd of each month (added to §15 compliance calendar per §79.9 item 3).
+**Sync cadence:** within 48 hours of each evidence collection event.
+**Sync actor:** compliance-officer logs into Vanta, navigates to the relevant control, and uploads the R2 artefact.
+**Sync receipt:** compliance-officer records each upload in `mirror-log/YYYY-MM.jsonl` on R2:
+
+```jsonl
+{
+  "artefact_id": "A1-E-001",
+  "r2_path": "compliance/evidence/a1/A1-E-001_2026-06.json",
+  "sha256": "abc123...",
+  "vanta_evidence_id": "ev_xxxxxxxx",
+  "uploaded_at": "2026-07-03T14:22:00Z",
+  "uploaded_by": "compliance-officer"
+}
+```
+
+**What is mirrored to Vanta (upload required):**
+
+All primary artefacts from §79.4 (31 items) plus:
+SCIM-ROLE-E-001/002, ENUM-E-001/002/003, PART-E-001/002/003, TURH-RET-E-001, DSAR-E-007/008/009/010, APIKEY-E-001/002/003/004/005, CTOOL-E-001/002/003/004/005, VAULT-E-001/002/003 (this section).
+
+**What stays R2-only (never uploaded to Vanta):**
+
+| Item | Reason |
+|---|---|
+| `MASTER-INDEX-YYYY.csv` | Internal tracking tool; auditors see individual artefacts, not the index. Uploading the index would reveal FORM's internal evidence naming conventions and gap history. |
+| `mirror-log/*.jsonl` | Internal audit of the sync process; not an evidence artefact. |
+| `pre-obs/` folder contents | Design-phase only; not part of observation-window evidence set. Provide as supplemental documentation if auditor specifically requests design context. |
+| Any artefact containing un-sanitised PII | Per §79.6.5, no file containing plaintext PII (employee names, email addresses) is uploaded to Vanta. Sanitise before upload; retain originals in R2 only. |
+| `system.evidence_vault_configured` DEC-030 event (§80.6) | Chain events are provided via structured export, not uploaded as files. |
+
+---
+
+### 80.5 OQ-EC-02 Resolution — Pre-Observation Evidence Separation
+
+**Decision:** `compliance/evidence/pre-obs/` folder is created on R2 with a `README.md` that prevents accidental inclusion in the operating-effectiveness evidence set.
+
+**`compliance/evidence/pre-obs/README.md` content (authoritative):**
+
+```markdown
+# Pre-Observation Evidence
+
+This folder contains design-phase and pre-launch artefacts that support the
+SOC 2 Type II "design and implementation" evaluation.
+
+These files are NOT part of the operating effectiveness evidence set.
+
+Observation period start date: [TO BE FILLED AT VAULT INITIALISATION]
+
+## Usage rules
+
+1. Do NOT upload files from this folder to the Vanta auditor portal unless
+   the auditor explicitly requests supplemental design-phase documentation
+   (e.g., architecture diagrams, threat model review notes).
+
+2. If an auditor requests pre-observation artefacts, email them directly
+   with the subject line: "SOC 2 — Design-Phase Evidence (Supplemental)".
+   Do not upload to the observation-window evidence tab in Vanta.
+
+3. If an artefact from this folder is re-scoped to the observation window
+   (e.g., a pen test conducted before launch is replaced by one conducted
+   during the observation period), move the new artefact to the relevant
+   TSC subfolder and update MASTER-INDEX-YYYY.csv.
+
+## Contents
+
+- Pen test scope and rules of engagement (pre-launch, if applicable)
+- Architecture documentation and threat model reviews
+- SSO/SCIM design documents
+- Security questionnaire templates
+- This SOC2_READINESS.md document itself (design specification)
+```
+
+**No-go:** Do not create a `pre-obs/` Vanta evidence folder. Vanta's auditor portal does not support a "non-operative" evidence category — any file uploaded to Vanta risks being interpreted by the auditor as observation-window evidence. R2 is the only storage location for pre-observation artefacts.
+
+---
+
+### 80.6 DEC-030 Event: `system.evidence_vault_configured`
+
+Register in `docs/AUDIT_LOG_SCHEMA.md §6` before bucket creation:
+
+| Field | Value |
+|---|---|
+| Event type | `system.evidence_vault_configured` |
+| Severity | STANDARD |
+| Retention | 7yr |
+| Trigger | Once, when R2 bucket `form-soc2-evidence` is created and access controls are configured per §80.3. Emit via compliance-officer manually calling the `emit-audit-event` Worker endpoint. |
+| Privacy | No PII. Records infrastructure configuration metadata only. |
+| Chain role | Provides a tamper-evident timestamp proving when the evidence vault was initialised — SOC 2 CC4.1 "design and implementation" evidence for the evidence collection infrastructure itself. |
+
+**Payload schema:**
+
+```typescript
+{
+  r2_bucket: "form-soc2-evidence",
+  r2_region: "EU",
+  object_lock_mode: "GOVERNANCE",
+  versioning_enabled: true,
+  access_roles_configured: ["r2:compliance-officer", "r2:vanta-sync", "r2:devops-lead"],
+  form_api_access: false,           // invariant: must be false
+  vanta_mirror_cadence_hours: 48,
+  pre_obs_folder_created: true,
+  dec_052_effective_date: "2026-06-14",
+  master_index_seeded: boolean      // true once MASTER-INDEX-2026.csv exists
+}
+```
+
+**Ordering invariant (VAULT-CHAIN-01):** `system.evidence_vault_configured` must precede the first `system.evidence_collected` event or any `compliance.*` chain event in the observation window. If the chain is queried and shows a compliance event before `system.evidence_vault_configured`, treat as a P2 gap requiring a compensating control explanation for the auditor.
+
+---
+
+### 80.7 SOC 2 Evidence Artefacts
+
+| Artefact ID | SOC 2 Criterion | Contents | R2 Path | Cadence |
+|---|---|---|---|---|
+| **VAULT-E-001** | CC4.1 | R2 bucket policy JSON export — Object Lock configuration, versioning policy, access control list confirming `r2:form-api` is denied | `compliance/evidence/cc4/VAULT-E-001_r2-bucket-policy.json` | Once at setup; re-collect on any policy change |
+| **VAULT-E-002** | CC4.1, CC7.1 | Mirror sync log — full `mirror-log/YYYY.jsonl` file for the observation year, showing all Vanta uploads with SHA-256 hashes confirming R2 → Vanta integrity | `compliance/evidence/cc4/VAULT-E-002_mirror-log-YYYY.jsonl` | Annual (pull at fieldwork from `mirror-log/`) |
+| **VAULT-E-003** | CC7.1 | `system.evidence_vault_configured` DEC-030 chain event export — JSON row from `audit_log` table confirming vault initialisation timestamp and config | `compliance/evidence/cc7/VAULT-E-003_vault-configured-event.json` | Once at setup |
+
+**Auditor narrative for CC4.1:** FORM implemented a dedicated evidence vault (Cloudflare R2, EU region) before the SOC 2 observation period commenced. The vault uses Object Lock in Governance mode to prevent evidence tampering or deletion during the retention window. A manual mirror to Vanta's auditor portal, with 48-hour upload SLA, ensures audit firm access without making Vanta the authoritative store. VAULT-E-001 through VAULT-E-003 constitute the design-and-implementation evidence for this evidence management control.
+
+---
+
+### 80.8 Gap Tracker
+
+| ID | Status Before §80 | Status After §80 | Advance Condition |
+|---|---|---|---|
+| **OQ-EC-01** — R2 vs Vanta primary store | 🔴 P1 Open (§79.10) | **🟢 Resolved — DEC-052 (2026-06-14).** R2 bucket `form-soc2-evidence` (EU, WORM Governance) is primary; Vanta is auditor-facing mirror; 48h upload cadence. | 🟢 Done: when R2 bucket created + VAULT-E-001 filed |
+| **OQ-EC-02** — Pre-observation evidence separation | 🟡 P2 Open (§79.10) | **🟢 Resolved — §80.5 (2026-06-14).** `pre-obs/` folder + README.md protocol adopted. No DECISION_LOG entry required (operational decision). | 🟢 Done: when `pre-obs/` folder and README.md are created on R2 |
+| **OQ-EC-03** — Evidence collection automation | 🟡 P1 Open (§79.10) | **No change.** OQ-EC-01 resolution unblocks OQ-EC-03 work (target R2 bucket and folder paths are now defined). See §80.9 item 9. | 🟢 Done: when Cloudflare Cron Worker deployed per OQ-EC-03 spec |
+
+**Net readiness impact:** +0.2 pp. OQ-EC-01 was a hard Month O-1 gate — closing it unblocks §79.9 item 2 (R2 folder structure creation) and the access control configuration that devops-lead needs before automating any evidence uploads.
+
+---
+
+### 80.9 Implementation Checklist
+
+#### P0 — Before observation period (Month O-1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create Cloudflare R2 bucket `form-soc2-evidence` in EU region; enable Object Versioning (lock via bucket policy — cannot disable); enable Object Lock in Governance mode with default retention matching §80.3 table. File VAULT-E-001 immediately after creation. | devops-lead | **P0** | Month O-1 | [ ] |
+| 2 | Configure three R2 API tokens per §80.3 access matrix: `r2:compliance-officer` (read+write all), `r2:vanta-sync` (read-only, excludes `mirror-log/`), `r2:devops-lead` (read+write `mirror-log/` only, read-only all others). Confirm no R2 token exists for `form-api`. | devops-lead + compliance-officer | **P0** | Month O-1 | [ ] |
+| 3 | Create `compliance/evidence/pre-obs/` folder on R2; upload `README.md` with §80.5 content (fill in observation period start date). | compliance-officer | **P0** | Month O-1 | [ ] |
+| 4 | Create `compliance/evidence/mirror-log/` folder on R2; initialise `mirror-log/2026.jsonl` as an empty JSONL file. | devops-lead | **P0** | Month O-1 | [ ] |
+| 5 | Register `system.evidence_vault_configured` DEC-030 event in `docs/AUDIT_LOG_SCHEMA.md §6`. Deploy event type to `emit-audit-event` Worker event registry. Emit once on bucket go-live; file VAULT-E-003 with the chain export. | platform-engineer + compliance-officer | **P0** | Month O-1 | [ ] |
+| 6 | Log DEC-052 in `docs/DECISION_LOG.md`. | compliance-officer | **P0** | Month O-1 | [x] **Done — DEC-052 added 2026-06-14** |
+| 7 | Migrate §79.9 item 2 status: mark `[x]` once R2 folder structure per §79.2 is created on the `form-soc2-evidence` bucket (this section provides the bucket name — §79.9 item 2 was previously blocking on OQ-EC-01). | devops-lead | **P0** | Month O-1 | [ ] |
+
+#### P1 — First observation month (Month O+1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Implement monthly Vanta mirror cycle: on the 3rd of each month, upload previous month's new R2 evidence to Vanta portal; record each upload in `mirror-log/YYYY-MM.jsonl`. Collect VAULT-E-002 at year-end. | compliance-officer | **P1** | Month O+1 | [ ] |
+| 9 | Escalate first verified evidence batch from Object Lock Governance mode → Compliance mode (prevents deletion even by bucket owner). Only move artefacts that are verified correct — this transition is irreversible within the retention window. | compliance-officer + devops-lead | **P1** | Month O+2 | [ ] |
+
+#### P2 — Ongoing governance
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | Review OQ-EC-03 (evidence collection automation) at Month O+1: confirm whether monthly manual upload cadence is sustainable; if not, implement Cloudflare Cron Worker per OQ-EC-03 spec using `form-soc2-evidence` bucket paths from §80.3 as the target. | devops-lead | **P2** | Month O+1 review | [ ] |
+| 11 | Annual bucket policy audit: confirm WORM lock retention periods match DEC-030 event retention classes (any retention policy change requires a DECISION_LOG entry and re-filing of VAULT-E-001). | compliance-officer + devops-lead | **P2** | Annual | [ ] |
+
+---
+
+### 80.10 OQ-EC-01 and OQ-EC-02 Status
+
+| OQ ID | Status | Decision | Notes |
+|---|---|---|---|
+| **OQ-EC-01** | 🟢 **Resolved — DEC-052 (2026-06-14)** | R2 primary (WORM Governance default → Compliance mode after Month O+2 verification); Vanta auditor-facing mirror; 48h upload SLA; evidence never Vanta-primary. | Re-evaluation trigger: if Cloudflare R2 adds a GDPR-incompatible EU data residency change, migrate primary store to an equivalent WORM-capable store (AWS S3 eu-central-1 Object Lock is the leading alternative). |
+| **OQ-EC-02** | 🟢 **Resolved — §80.5 (2026-06-14)** | `pre-obs/` folder on R2 with README.md protocol. No DECISION_LOG entry — operational decision. Artefacts in `pre-obs/` not uploaded to Vanta; provided as supplemental design documentation if auditor requests. | Future: if the audit firm requests a "design and implementation" artefact inventory, compile an ad-hoc index from `pre-obs/` rather than mirroring to Vanta. |
+| **OQ-EC-03** | 🟡 **Open — target Month O+1** | Automation spec unchanged (§79.10 OQ-EC-03). OQ-EC-01 closure unblocks: target bucket `form-soc2-evidence` is now defined; Cron Worker upload paths can be implemented per §80.3 folder structure. | Unblocked by DEC-052. |
+
+---
+
+*v3.8.0 (2026-06-14): §80 Evidence Vault Architecture — R2-Primary / Vanta-Mirror Decision. Closes OQ-EC-01 (🔴 P1 → 🟢) via DEC-052 (2026-06-14): R2 bucket `form-soc2-evidence` (EU, Object Lock Governance mode, versioning locked) is the tamper-evident primary evidence store; Vanta is the auditor-facing mirror with 48-hour upload cadence. Closes OQ-EC-02 (🟡 P2 → 🟢) via §80.5: `compliance/evidence/pre-obs/` folder + README.md protocol (design-phase artefacts not uploaded to Vanta; no DECISION_LOG entry required — operational decision). Content: §80.1 purpose and scope; §80.2 decision rationale — three alternatives evaluated, Vanta-primary and dual-primary rejected (SaaS availability risk and dual-source-of-truth breakage respectively), R2-primary selected on four grounds (WORM tamper-evidence, direct control, checksum-before-upload discipline, DEC-030 chain separation); §80.3 R2 primary architecture — EU region, WORM retention table by DEC-030 class (HIGH 7yr / STANDARD 3yr / STANDARD 7yr / pre-obs no lock), `compliance/evidence/` folder structure with `pre-obs/` and `mirror-log/` additions, five-row access control matrix (`r2:compliance-officer` read+write, `r2:vanta-sync` read-only, `r2:devops-lead` limited write, `r2:form-api` NO ACCESS, root account emergency-only), four bucket policy invariants; §80.4 Vanta mirror protocol — JSONL mirror log schema, what-gets-mirrored list (all §79.4 artefacts + SCIM-ROLE/ENUM/PART/TURH-RET/DSAR/APIKEY/CTOOL/VAULT series), what-stays-R2-only (MASTER-INDEX, mirror logs, `pre-obs/`, un-sanitised PII, chain events); §80.5 OQ-EC-02 resolution — `pre-obs/README.md` authoritative text with observation-date placeholder, five-item usage rules, artefact list, no-go on Vanta `pre-obs/` folder; §80.6 DEC-030 event `system.evidence_vault_configured` (STANDARD, 7yr, CC4.1 design evidence, typed TypeScript payload including `form_api_access: false` invariant, VAULT-CHAIN-01 ordering invariant); §80.7 three SOC 2 evidence artefacts VAULT-E-001 (CC4.1 — R2 bucket policy JSON), VAULT-E-002 (CC4.1/CC7.1 — annual mirror log), VAULT-E-003 (CC7.1 — vault configured DEC-030 chain event export); §80.8 gap tracker (OQ-EC-01 🔴→🟢 +0.2pp; OQ-EC-02 🟡→🟢; OQ-EC-03 unblocked); §80.9 eleven-item implementation checklist (7× P0/Month-O-1, 2× P1/O+1–O+2, 2× P2/annual); §80.10 open questions status (OQ-EC-01 🟢 with re-evaluation trigger for EU data residency change; OQ-EC-02 🟢 with ad-hoc index note; OQ-EC-03 🟡 unblocked). §79.10 OQ-EC-01 and OQ-EC-02 rows updated to 🟢 Resolved with cross-references to §80. Cross-references: §78 (Vanta integration — §80 is the architectural counterpart for the R2 side); §79.2 (evidence folder structure — §80.3 adds `pre-obs/` and `mirror-log/`); §79.7 (SHA-256 checksum discipline — §80.3 confirms R2-primary enables checksum-before-upload); §79.9 item 2 (R2 folder creation — unblocked by §80.3 bucket naming); §15 (compliance calendar — Vanta mirror sync reminder; bucket policy annual audit); `docs/AUDIT_LOG_SCHEMA.md §6` (register `system.evidence_vault_configured`); `docs/VENDOR_REGISTRY.md` (Cloudflare R2 — add as evidence vault vendor if not already listed); `docs/INCIDENT_RESPONSE.md R-05` (if chain query reveals VAULT-CHAIN-01 ordering violation); `docs/DECISION_LOG.md DEC-052` (OQ-EC-01 formal closure). Privacy floor: no individual employee health data in any §80 DEC-030 event; VAULT-E artefacts contain only infrastructure configuration metadata; `r2:form-api` has zero access to evidence bucket. Owner: compliance-officer + devops-lead.*
 
 ---
 
