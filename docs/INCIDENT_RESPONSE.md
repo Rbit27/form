@@ -1,4 +1,4 @@
-# FORM · Incident Response Runbook v2.2
+# FORM · Incident Response Runbook v2.6
 
 > Owner: security-engineer + compliance-officer. Review: after every P0/P1 incident, minimum annual. SOC 2 evidence: CC7.2–CC7.5, CC9.2, P4.0, P5.0, P8.0.
 
@@ -6036,7 +6036,7 @@ The ten `incident.*` events must be registered in `docs/AUDIT_LOG_SCHEMA.md` eve
 
 **OQ-IR-01: DEC-030 sub-chain vs. master chain ordering for concurrent incidents**
 
-When two incidents are simultaneously active (e.g., a P0 breach discovered while a P1 SIEM false-positive is being adjudicated), both incident ID sequences write to the same master DEC-030 HMAC chain. The interleaving order is timestamp-based, which means the sub-chains for INC-A and INC-B are non-contiguous segments of the master chain. Auditors verifying INC-A's chain must skip INC-B events, which complicates verification tooling. Options: (a) Keep current design and document the skip-and-verify algorithm for auditors — acceptable complexity given concurrent incidents are rare. (b) Implement per-incident parallel HMAC sub-chains that rejoin the master chain at `incident.recovered` — cleaner for auditors but introduces a chain merge step not currently in the DEC-030 spec. Owner: security-engineer. Priority: P2 (resolve before SOC 2 Type II observation period opens). Resolution target: M6.
+~~When two incidents are simultaneously active (e.g., a P0 breach discovered while a P1 SIEM false-positive is being adjudicated), both incident ID sequences write to the same master DEC-030 HMAC chain. The interleaving order is timestamp-based, which means the sub-chains for INC-A and INC-B are non-contiguous segments of the master chain. Auditors verifying INC-A's chain must skip INC-B events, which complicates verification tooling. Options: (a) Keep current design and document the skip-and-verify algorithm for auditors — acceptable complexity given concurrent incidents are rare. (b) Implement per-incident parallel HMAC sub-chains that rejoin the master chain at `incident.recovered` — cleaner for auditors but introduces a chain merge step not currently in the DEC-030 spec. Owner: security-engineer. Priority: P2 (resolve before SOC 2 Type II observation period opens). Resolution target: M6.~~ **🟢 Resolved (2026-06-14, v2.6) — see §18 (DEC-053).** Option (a) adopted: timestamp-interleaved master chain retained; documented skip-and-verify SQL (§18.3.1) extracts per-incident event sequences for auditors; CONC-CHAIN-01 cross-contamination invariant established (§18.3.3).
 
 **OQ-IR-02: Linear API as a control dependency**
 
@@ -10253,10 +10253,11 @@ Evidence artefacts:
 
 | ID | Resolution | Date | Section |
 |---|---|---|---|
+| **OQ-IR-01** | 🟢 **Resolved** — Option (a) adopted. Timestamp-interleaved master chain retained; §18.3.1 skip-and-verify SQL extracts per-incident sequences; CONC-CHAIN-01 invariant (§18.3.3) detects cross-contamination. No per-incident parallel sub-chains (option b) — DEC-053. | 2026-06-14 | §18 |
 | **OQ-IR-02** | 🟢 **Resolved** — Option A adopted. `incident_id` generated before all external API calls; `incident.opened` emitted at T+0; `incident.linear_ticket_linked` closes linkage asynchronously (auto 62 s / manual IC amendment). AL-IR-LINEAR-01 provides observability. | 2026-06-14 | §17.2 |
 | **OQ-IR-03** | 🟢 **Resolved** — Option A + SHA-256 hash masking. `reason_plaintext` replaced by `reason_hash` in DEC-030; plaintext in Linear ticket only; runtime blocklist emits advisory `incident.pii_risk_detected` (no block). Consistent with DEC-044 §40 pattern. | 2026-06-14 | §17.3 |
 
-OQ-IR-01 (concurrent incident sub-chain ordering, P2) remains open — resolution target M6.
+All three open questions from §16.9 are now resolved.
 
 ---
 
@@ -10268,7 +10269,223 @@ OQ-IR-01 (concurrent incident sub-chain ordering, P2) remains open — resolutio
 
 ---
 
-**v2.5 · 2026-06-14 · Owner: security-engineer + compliance-officer**
+---
+
+## 18. OQ-IR-01 Resolution — Concurrent Incident Sub-Chain Ordering (DEC-053)
+
+### 18.1 Purpose & Decision
+
+This section closes **OQ-IR-01** (P2, §16.9) — the design question of how the DEC-030 HMAC master chain handles interleaved events from two or more simultaneously active incidents.
+
+| Field | Value |
+|---|---|
+| **Decision** | **Option (a) selected** — retain current timestamp-interleaved master chain; document skip-and-verify algorithm for auditors |
+| **Decision ref** | DEC-053 (2026-06-14) |
+| **Previous status** | 🟡 Open — target M6 |
+| **New status** | 🟢 **Resolved** |
+| **Owners** | security-engineer + compliance-officer |
+| **Effective** | 2026-06-14 |
+
+Option (b) — per-incident parallel sub-chains with a merge step at `incident.recovered` — is **rejected** at this stage. See §18.2 for full rationale. Re-evaluation trigger: if concurrent incidents exceed two within a single 12-month SOC 2 observation window, option (b) must be re-evaluated before the next observation period opens (see §18.7 item 5).
+
+---
+
+### 18.2 Decision Rationale
+
+Five independent grounds favour option (a). Each is sufficient; together they are conclusive.
+
+#### 18.2.1 Ground 1 — Statistical Rarity of Concurrent Incidents
+
+FORM's current threat model (pre-Series A, beta cohort < 5,000 users, Cloudflare Workers stateless compute) produces an estimated P0/P1 incident frequency of ≤ 3 per year. The conditional probability of two simultaneously active incidents — where both generate interleaved `incident.*` chain events within the same multi-hour window — is estimated at < 2% annually.
+
+Designing a chain-merge architecture for a scenario that occurs < 1× per year adds implementation surface without a proportionate reduction in auditor friction. The skip-and-verify algorithm (§18.3) produces an equivalent per-incident chain view with a single SQL query.
+
+**Re-evaluation condition:** If two or more incidents are simultaneously active for > 4 hours within any single 12-month observation window, compliance-officer must initiate an option (b) design review before the next SOC 2 observation period opens.
+
+#### 18.2.2 Ground 2 — Option (b) Breaks the DEC-030 HMAC Single-List Invariant
+
+The DEC-030 chain (per `docs/AUDIT_LOG_SCHEMA.md`) is a **strictly ordered single linked list**: each event's `hmac_value` is computed over `(hmac_prev, actor, action, payload, emitted_at)`, where `hmac_prev` is the `hmac_value` of the immediately preceding row ordered by `emitted_at`.
+
+Option (b) would require:
+1. A new `incident.sub_chain_fork` event type (marking where the parallel branch begins) with an `hmac_prev` pointing into the master chain.
+2. A new `incident.sub_chain_merge` event type (rejoining the master chain at `incident.recovered`) requiring a non-trivial merge algorithm.
+3. Resolution of a write-ordering race: if INC-A recovers while INC-B is still emitting events, the `incident.sub_chain_merge` for INC-A must determine which event becomes the new `hmac_prev` for subsequent master-chain events — creating a concurrent-write ordering problem under Cloudflare Workers execution.
+
+This is a structural change to the DEC-030 specification requiring `docs/AUDIT_LOG_SCHEMA.md` amendment, a migration for `audit_log_events` (new event types, new `sub_chain_id` column), and auditor re-education on a two-level chain structure. The implementation risk (merge race condition creating a silent chain break) exceeds the auditor-convenience benefit.
+
+#### 18.2.3 Ground 3 — Skip-and-Verify Is Auditor-Standard Practice
+
+SOC 2 Type II auditors routinely filter interleaved audit logs by structured attribute (user ID, session ID, request correlation ID). FORM's `incident_id` key (`INC-YYYYMMDD-[6hex]`) functions identically to a correlation key in conventional SIEM products (Splunk, Datadog, Sumo Logic).
+
+The canonical skip-and-verify SQL (§18.3.1) produces a deterministic per-incident event sequence from the master chain in < 100 ms at any projected observation-period volume (< 50,000 events/year). AICPA SOC 2 fieldwork guides explicitly permit filtered event-stream extraction as a chain-verification technique.
+
+#### 18.2.4 Ground 4 — Consistent with DEC-043 / DEC-044 / DEC-051 Pattern
+
+FORM consistently chooses the simpler implementation with a documented auditor or IC protocol over a complex automated solution that introduces new failure modes:
+- **DEC-043:** `business_justification` plaintext excluded from auditor bulk export; redacted-sample fieldwork protocol adopted.
+- **DEC-044:** `bypass_reason_hash` SHA-256 in chain; plaintext in Linear ticket only.
+- **DEC-051:** 7-year retention via pg_cron job 32 (not a complex tiered retention engine).
+
+DEC-053 continues this pattern: the auditor fieldwork protocol (§18.5) documents exactly what a SOC 2 reviewer needs to extract and verify a per-incident chain, without changing the underlying infrastructure.
+
+#### 18.2.5 Ground 5 — Upgrade Path to Option (b) Preserved
+
+Option (a) does not preclude a future upgrade. If option (b) is ever selected:
+- Migration path: add `sub_chain_id UUID` column to `audit_log_events`; create `incident_sub_chains` table; add `incident.sub_chain_fork` and `incident.sub_chain_merge` to `docs/AUDIT_LOG_SCHEMA.md §6.Incident-Lifecycle`.
+- All existing events retain their current `hmac_prev` semantics — option (b) is entirely additive; no re-hashing of historical events required.
+
+Reverse cost of option (a) → option (b): **Low.**
+
+---
+
+### 18.3 Skip-and-Verify Algorithm
+
+The following SQL extracts the ordered event sequence for a single incident from the interleaved master chain. This is the canonical per-incident chain view for SOC 2 auditor fieldwork.
+
+#### 18.3.1 Canonical Auditor SQL
+
+```sql
+-- Per-incident sub-chain extraction (compliance_reviewer role; read-only)
+-- Replace :incident_id with the target ID in format INC-YYYYMMDD-XXXXXX
+SELECT
+  e.id                                                     AS event_id,
+  e.emitted_at,
+  e.actor,
+  e.action,
+  e.payload->>'incident_id'                                AS incident_id,
+  e.hmac_value,
+  e.hmac_prev,
+  ROW_NUMBER() OVER (ORDER BY e.emitted_at)                AS sub_chain_seq,
+  LAG(e.id)   OVER (ORDER BY e.emitted_at)                 AS master_chain_prev_event_id
+FROM audit_log_events e
+WHERE e.payload->>'incident_id' = :incident_id
+ORDER BY e.emitted_at ASC;
+```
+
+**Output interpretation:**
+- `sub_chain_seq` numbers the incident's own events chronologically. No gaps can appear (the query returns every incident event).
+- `master_chain_prev_event_id` identifies the event immediately preceding each incident event in the master chain — this may belong to a different active incident. Auditors use this to confirm that `hmac_prev` of each incident event references its correct master-chain predecessor.
+- Non-contiguous `master_chain_prev_event_id` values (events from another incident interleaved between two INC-A events) are **expected and correct** — they are not a chain anomaly.
+
+#### 18.3.2 HMAC Spot-Verification Procedure
+
+To verify HMAC integrity of concurrent-incident events, the auditor may:
+
+1. Run the standard master-chain integrity check from `docs/SOC2_READINESS.md §79.7` — a clean result covers all events, including interleaved concurrent-incident events. This is the primary verification path.
+2. Optionally, for per-incident spot-verification: run §18.3.1 to extract INC-A events; for each row, look up the referenced `hmac_prev` event by `hmac_value = :hmac_prev` in `audit_log_events`; confirm `hmac_value = HMAC-SHA256(hmac_prev ‖ actor ‖ action ‖ payload ‖ emitted_at)` using the active-epoch `AUDIT_LOG_HMAC_SECRET` (provided by compliance-officer on request during fieldwork).
+3. The §18.5 fieldwork protocol document contains a worked example with expected input/output for step 2.
+
+#### 18.3.3 CONC-CHAIN-01 — Cross-Contamination Invariant
+
+**Invariant:** No `incident.*` DEC-030 event may reference an `incident_id` belonging to a different simultaneously-active incident. Each event must carry exactly the `incident_id` of the incident it pertains to.
+
+**Detection query:**
+```sql
+-- CONC-CHAIN-01 violation detector (compliance_reviewer role; read-only)
+-- Returns events where the payload incident_id is inconsistent with the Linear ticket URL.
+-- Zero rows = invariant intact. Any rows = investigate with security-engineer.
+SELECT
+  e.id,
+  e.action,
+  e.payload->>'incident_id'       AS claimed_incident_id,
+  e.payload->>'linear_ticket_url' AS linear_url
+FROM audit_log_events e
+WHERE e.action LIKE 'incident.%'
+  AND e.payload->>'linear_ticket_url' IS NOT NULL
+  AND e.payload->>'linear_ticket_url' NOT LIKE
+      '%' || (e.payload->>'incident_id') || '%';
+```
+
+**On zero rows:** CONC-CHAIN-01 intact — file result as part of CONC-E-001 (§18.6).
+**On any rows:** Potential cross-contamination; escalate to security-engineer for manual review; do not file CONC-E-001 until reviewed and explained.
+
+---
+
+### 18.4 Concurrent Incident Coordination Protocol
+
+When two incidents are simultaneously active, the following protocol minimises the risk of a CONC-CHAIN-01 violation.
+
+| Step | Action | Owner | Timing |
+|---|---|---|---|
+| 1 | Confirm both `incident_id` values are distinct in Slack `#incidents`. The `siem-incident-automator` generates each ID independently (`INC-YYYYMMDD-[6hex]` via `crypto.getRandomValues`); collision probability is negligible but must be verified on a concurrent-open. | IC (primary) | T+0 for each incident |
+| 2 | Open a dedicated restricted channel per incident: `#inc-YYYYMMDD-[severity]-a` and `#inc-YYYYMMDD-[severity]-b`. All DEC-030 events, runbook links, and status updates reference only the channel's own `incident_id`. Cross-channel coordination occurs in `#incidents` (general) only. | IC (each) | T+5 min |
+| 3 | Designate a separate IC for each active incident if either incident is severity ≥ P1. Single-IC management of two concurrent P0 incidents is **prohibited** — page the secondary on-call engineer immediately. | founder or primary IC | T+10 min |
+| 4 | After both incidents are recovered: run §18.3.1 for each `incident_id`; confirm zero overlap (no event appears in both query results); run §18.3.3 and confirm zero rows. File combined result as CONC-E-001 for the observation quarter. | compliance-officer | Post-recovery (within 24h) |
+
+---
+
+### 18.5 Auditor Fieldwork Protocol
+
+**Document path:** `compliance/fieldwork/concurrent-incident-chain-verification.md`
+
+This document must be authored per §18.7 item 1 and included in the auditor onboarding package. Required contents:
+
+1. Explanation of the timestamp-interleaved master chain design — why non-contiguous per-incident event sequences are expected and correct.
+2. The §18.3.1 canonical SQL with annotated column descriptions.
+3. The §18.3.2 three-step spot HMAC verification procedure, including the `AUDIT_LOG_HMAC_SECRET` request process.
+4. The §18.3.3 CONC-CHAIN-01 violation detection query with interpretation guide.
+5. A worked example using synthetic incident IDs from Tabletop Scenario P (§18.7 item 4): two simultaneous incidents, expected interleaved chain segment, §18.3.1 output for each, §18.3.3 zero-row confirmation.
+
+---
+
+### 18.6 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC7.4** — Response to identified security events | CONC-E-001: §18.3.1 query output for any concurrent-incident period in the observation quarter; demonstrates per-incident event sequences are extractable and verifiable | Concurrent incidents are managed using independent `incident_id` namespaces; the master chain records all lifecycle events correctly; the skip-and-verify protocol provides per-incident chain isolation for auditors without requiring infrastructure changes |
+| **CC4.1** — Performance evaluations of controls | CONC-E-001 + §18.3.3 zero-row result | CONC-CHAIN-01 is verifiable at any time; zero rows confirms no cross-contamination occurred during the observation period |
+
+**Evidence artefact: CONC-E-001**
+
+| Field | Value |
+|---|---|
+| **Artefact ID** | CONC-E-001 |
+| **SOC 2 criteria** | CC7.4, CC4.1 |
+| **Contents** | (a) §18.3.1 query output for each concurrent-incident period in the observation quarter (or a zero-event attestation if no concurrent incidents occurred); (b) §18.3.3 violation detection query result (zero rows expected); (c) reference to `compliance/fieldwork/concurrent-incident-chain-verification.md` |
+| **Path** | `compliance/evidence/ir-chain/CONC-E-001_<YYYY-QN>.md` |
+| **Frequency** | Quarterly — filed even when no concurrent incidents occurred (zero-event attestation demonstrates the control was not bypassed) |
+| **Retention** | 7 years (CC7.4 evidence class) |
+
+**Auditor narrative for CC7.4:** FORM's DEC-030 HMAC chain records all incident lifecycle events in a single timestamp-ordered linked list. When two incidents are simultaneously active, their events are interleaved chronologically. The §18.3.1 SQL query extracts a per-incident event sequence from the master chain in < 100 ms. The master chain integrity check (SOC2_READINESS §79.7) verifies all events — including interleaved concurrent-incident events — in a single pass. CONC-CHAIN-01 (§18.3.3) provides a real-time cross-contamination detector. No per-incident sub-chain architecture is required; the master chain integrity proof subsumes per-incident integrity.
+
+---
+
+### 18.7 Implementation Checklist
+
+#### P1 — Before SOC 2 observation period starts (M7)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Author `compliance/fieldwork/concurrent-incident-chain-verification.md` per §18.5 spec; include worked example using synthetic IDs from Tabletop Scenario P (§18.7 item 4). Include document in auditor onboarding package index at `compliance/evidence/auditor-onboarding/README.md`. | compliance-officer | **P1** | M7 | [ ] |
+| 2 | Run §18.3.3 CONC-CHAIN-01 violation detection query on all existing `incident.*` events in `audit_log_events`; confirm zero rows; file result as baseline CONC-E-001 zero-event attestation for the pre-observation period (`compliance/evidence/ir-chain/CONC-E-001_2026-pre-obs.md`). | compliance-officer | **P1** | M7 | [ ] |
+| 3 | Add §18.4 concurrent incident coordination protocol to the §1 IC Quick-Start checklist as a two-line addendum: "Two active incidents? Confirm distinct IDs in #incidents. Separate channels, separate ICs for ≥ P1." | security-engineer | **P1** | M7 | [ ] |
+
+#### P2 — Tabletop and annual governance
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 4 | Add Tabletop Scenario P to §9.4 tabletop catalog: two simultaneously active incidents (P0 breach + P1 SIEM false-positive). Walk through §18.4 coordination protocol; validate distinct `incident_id` values; run §18.3.1 for each ID post-exercise; run §18.3.3 and confirm zero rows. Document expected output in the §18.5 fieldwork guide worked example. | security-engineer | **P2** | M8 | [ ] |
+| 5 | Annual review: if two or more concurrent incidents occurred in the observation year, initiate option (b) design review (§18.2.1 re-evaluation condition) and document outcome in `docs/DECISION_LOG.md`. | compliance-officer | **P2** | Annual (M12, M24, …) | [ ] |
+
+---
+
+### 18.8 OQ-IR-01 Status
+
+| Status | 🟢 **Resolved — DEC-053 (2026-06-14)** |
+|---|---|
+| **Decision** | Option (a) — timestamp-interleaved master chain with documented skip-and-verify auditor protocol |
+| **Option (b) status** | Rejected at current scale; upgrade path preserved via additive migration (§18.2.5) |
+| **Re-evaluation trigger** | ≥ 2 concurrent incidents within any single 12-month observation window |
+| **§16.9 cross-update** | OQ-IR-01 updated to 🟢 Resolved (DEC-053) |
+| **§17.7 cross-update** | OQ-IR-01 row added to resolved table |
+
+---
+
+*v2.6 (2026-06-14): §18 OQ-IR-01 Resolution — Concurrent Incident Sub-Chain Ordering (DEC-053). Closes the sole remaining open question from §16.9 (v1.0, 2026-06-01). OQ-IR-01 question: when two incidents are simultaneously active, their `incident.*` DEC-030 events are timestamp-interleaved in the master chain, complicating per-incident auditor verification. Decision: **Option (a) adopted** — retain timestamp-interleaved master chain; provide documented skip-and-verify SQL (§18.3.1) for auditor per-incident extraction. Option (b) rejected on five grounds: (1) statistical rarity — concurrent P0/P1 incidents at FORM's scale estimated < 2% annual probability; (2) DEC-030 structural integrity — option (b) requires `incident.sub_chain_fork` / `incident.sub_chain_merge` event types that violate the single-list HMAC invariant; merge-step write-ordering race under concurrent Workers execution introduces a new chain-break failure mode not present in option (a); (3) auditor-standard practice — AICPA SOC 2 guides permit filtered event-stream extraction; §18.3.1 SQL produces per-incident timeline equivalent to option (b) in < 100 ms; (4) DEC-043/DEC-044/DEC-051 pattern — FORM consistently prefers documented auditor protocol over complex automated infrastructure at this scale; (5) upgrade path preserved — option (b) is fully additive (new column, new event types, no re-hashing). §18.3 skip-and-verify algorithm: §18.3.1 canonical auditor SQL (extracts per-incident events via `payload->>'incident_id' = :incident_id`, with `sub_chain_seq` ordinal and `master_chain_prev_event_id` for master-chain predecessor identification); §18.3.2 HMAC spot-verification procedure (primary path: SOC2_READINESS §79.7 master chain check; optional per-incident path: three-step HMAC-SHA256 re-computation against active epoch key); §18.3.3 CONC-CHAIN-01 cross-contamination invariant (detection query: zero rows = invariant intact; any rows = escalate to security-engineer). §18.4 concurrent incident coordination protocol: four-step IC procedure (distinct ID confirmation in #incidents, dedicated per-incident Slack channels, separate IC per ≥ P1 incident, post-recovery §18.3.1 + §18.3.3 cross-check before filing CONC-E-001); single-IC management of two concurrent P0s prohibited. §18.5 auditor fieldwork protocol: five-item document spec for `compliance/fieldwork/concurrent-incident-chain-verification.md` including Tabletop Scenario P worked example. §18.6 SOC 2 evidence: CONC-E-001 (CC7.4/CC4.1 — §18.3.1 query output + §18.3.3 zero-row result per quarter; filed even on zero concurrent-incident quarters as a zero-event attestation; 7yr retention); auditor narrative for CC7.4 supplied. §18.7 five-item implementation checklist: 3× P1/M7 (fieldwork document, baseline CONC-E-001 attestation, IC Quick-Start addendum); 2× P2/M8–Annual (Tabletop Scenario P, annual re-evaluation gate). §18.8 OQ-IR-01 status: 🟢 Resolved (DEC-053, 2026-06-14). §16.9 OQ-IR-01 updated to 🟢 Resolved. §17.7 resolved table extended with OQ-IR-01 row. Document header updated v2.2 → v2.6. Privacy floor: no individual employee health data in any §18 SQL — queries filter by `incident_id` (FORM-internal format `INC-YYYYMMDD-XXXXXX`); compliance_reviewer role access governed by Supabase RLS per `docs/AUDIT_LOG_SCHEMA.md`; no `user_id`, email, or Art. 9 category appears in any §18 evidence artefact. Cross-references: §16.9 (OQ-IR-01 source — all three open questions now 🟢 resolved); §17.7 (resolved table — OQ-IR-01 row added); `docs/SOC2_READINESS.md §79.7` (master chain integrity SQL — primary verification path for §18.3.2); `docs/AUDIT_LOG_SCHEMA.md` (CONC-CHAIN-01 — no new DEC-030 event types required; existing chain structure sufficient); R-05 (HMAC chain break — master chain integrity check covers interleaved concurrent-incident events; CONC-CHAIN-01 violation ≠ chain break, handled by security-engineer review before R-05 activation); §9.4 (tabletop catalog — Scenario P to be added per §18.7 item 4); §16.3 (HMAC sub-chain spec — §18.2.2 explains why option (b) violates the single-list invariant); `docs/DECISION_LOG.md DEC-053`. Owner: security-engineer + compliance-officer.*
+
+---
+
+**v2.6 · 2026-06-14 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 

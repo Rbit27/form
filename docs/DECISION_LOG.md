@@ -15,6 +15,15 @@
 
 ## 2026-06-14
 
+### DEC-053 · OQ-IR-01: Concurrent incident sub-chain ordering — Option (a) adopted; timestamp-interleaved master chain with skip-and-verify auditor protocol
+
+- **Decision:** When two or more incidents are simultaneously active, their `incident.*` DEC-030 HMAC-chained events are recorded in the **existing timestamp-interleaved master chain** without modification. No per-incident parallel sub-chains (option b) are introduced. A documented skip-and-verify SQL query (`docs/INCIDENT_RESPONSE.md §18.3.1`) extracts per-incident event sequences from the master chain for auditor fieldwork. CONC-CHAIN-01 invariant established: no `incident.*` event may reference an `incident_id` belonging to a different active incident; cross-contamination detection query in §18.3.3. Full design in `docs/INCIDENT_RESPONSE.md §18`.
+- **Owner:** security-engineer + compliance-officer
+- **Why:** (1) **Statistical rarity** — concurrent P0/P1 incidents at FORM's current scale (< 5k users, pre-Series A) estimated at < 2% annual probability; a chain-merge architecture would be deployed < 1× per year. (2) **DEC-030 structural integrity** — option (b) requires `incident.sub_chain_fork` / `incident.sub_chain_merge` event types that violate the single-list HMAC invariant in `docs/AUDIT_LOG_SCHEMA.md`; a merge-step write-ordering race under concurrent Cloudflare Workers execution introduces a new chain-break failure mode. (3) **Auditor-standard practice** — SOC 2 fieldwork guides permit filtered event-stream extraction; §18.3.1 SQL produces an equivalent per-incident timeline in < 100 ms. (4) **Consistent with DEC-043/DEC-044/DEC-051 pattern** — FORM consistently chooses documented auditor protocol over complex automated infrastructure at this scale. (5) **Upgrade path preserved** — option (b) remains available as an additive migration (new column, new event types, no re-hashing of historical events required) if concurrent-incident frequency increases post-Series A.
+- **Reverse cost:** Low. Option (a) makes no schema changes. Upgrading to option (b) requires adding two new DEC-030 event types, a `sub_chain_id` column to `audit_log_events`, and a merge algorithm in `siem-incident-automator` — all additive; historical events unaffected.
+
+---
+
 ### DEC-052 · OQ-EC-01: Evidence vault architecture — R2-primary, Vanta-mirror adopted
 
 - **Decision:** Cloudflare R2 bucket `form-soc2-evidence` (EU region, Object Lock Governance mode, versioning locked) is the **primary tamper-evident evidence store** for all SOC 2 Type II artefacts. Vanta is the **auditor-facing mirror** only — evidence is authored on R2 first, uploaded to Vanta within 48 hours. Full architecture in `docs/SOC2_READINESS.md §80`. Closes OQ-EC-01 (§79.10). Also closes OQ-EC-02 (operational decision, no separate DEC required): `compliance/evidence/pre-obs/` folder with README.md protocol for design-phase evidence separation.

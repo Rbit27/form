@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.99.1] — 2026-06-14
+
+### Added
+- `docs/INCIDENT_RESPONSE.md §18` — OQ-IR-01 Resolution: Concurrent Incident Sub-Chain Ordering (DEC-053). Option (a) adopted: timestamp-interleaved master chain retained; §18.3.1 skip-and-verify SQL extracts per-incident event sequences for SOC 2 auditors; CONC-CHAIN-01 cross-contamination invariant established (§18.3.3 detection query); §18.4 concurrent-incident IC coordination protocol (distinct ID confirmation, per-incident Slack channels, separate IC for ≥ P1 concurrent incidents, post-recovery §18.3.1/§18.3.3 cross-check); §18.5 auditor fieldwork protocol spec (`compliance/fieldwork/concurrent-incident-chain-verification.md`); CONC-E-001 SOC 2 evidence artefact (CC7.4/CC4.1, quarterly, 7yr). Five-item implementation checklist: 3× P1/M7, 2× P2/M8–annual. Option (b) rejected (per-incident parallel sub-chains with merge step): violates DEC-030 single-list HMAC invariant; introduces concurrent-write merge race; upgrade path to option (b) preserved as additive migration. Closes §16.9 OQ-IR-01 (P2, target M6 — all three §16.9 open questions now 🟢 resolved). Closes §17.7 OQ-IR-01 row.
+- `docs/DECISION_LOG.md DEC-053` — OQ-IR-01 decision record: option (a) timestamp-interleaved; five grounds (rarity, DEC-030 invariant, auditor-standard practice, DEC-043/044/051 pattern, upgrade path preserved); reverse cost Low.
+
+### Changed
+- `docs/INCIDENT_RESPONSE.md` — header v2.2 → v2.6; §16.9 OQ-IR-01 updated to 🟢 Resolved (DEC-053); §17.7 resolved table extended with OQ-IR-01 row.
+- `VERSION` — 4.99.0 → 4.99.1.
+
+---
+
 ## [4.99.0] — 2026-06-14
 
 ### Added
