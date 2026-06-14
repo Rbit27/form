@@ -259,20 +259,29 @@ Planned — posts 764–800:
 | 799 | Synthesis: атлет у реальному світі — чим відрізняється self-coached від coached | — |
 | 800 | Підсумок блоку 751–800: athlete lifecycle — ключові принципи | — |
 
-### Block 801–850 — Evidence-based deep dives (proposed)
+### Block 801–850 — Evidence-based deep dives
 
-| Topic |
-|---|
-| Creatine — повний огляд механізму і доказів без добавочного маркетингу |
-| Протеїн: скільки і коли — наука без «анаболічного вікна» |
-| Кофеїн і тренінг: точний механізм, дозування, толерантність |
-| Жир і тренування — не «паливо для кардіо», а ендокринний орган |
-| Periodization vs. autoregulation: не вибір, а ієрархія |
-| RPE і RIR у реальному тренінгу: калібрація, дрейф, точність |
-| Метаболічний стрес vs. механічна напруга: що насправді будує м'яз |
-| Міофібрилярна vs. саркоплазматична гіпертрофія: міф чи реальність |
-| Стероїди і натуральний тренінг: що це означає для інтерпретації досліджень |
-| Генетичний стеля сили: де він і як зрозуміти, що наближаєтесь |
+**Written (801–830):** creatine, protein, caffeine, fat as endocrine organ, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic, steroids/research interpretation, genetic ceiling; sleep & performance, deload science, training age, volume landmarks (MEV/MAV/MRV), inter-set rest, rate of force development, concurrent training interference, heat/cold exposure, altitude training, evidence-based stretching; protein timing, creatine loading revisited, beta-alanine, citrulline/nitrates, magnesium, omega-3 + training, Vitamin D + athletes, ashwagandha (clinical-safety CONDITIONAL PASS), sleep supplements melatonin/glycine (CONDITIONAL PASS), CBD & recovery (CONDITIONAL PASS).
+
+**Written (831):**
+
+| Post | Topic | Status |
+|---|---|---|
+| 831 | Антиоксиданти і тренування: парадокс адаптації — вітамін C/E пригнічує ROS-сигналізацію | draft · v5.8.1 |
+
+**Proposed (832–840):**
+
+| Post | Topic |
+|---|---|
+| 832 | L-карнітин і жировий метаболізм — що реально показують дані у тренованих атлетів |
+| 833 | HMB (β-гідрокси β-метилбутират) — найконтроверсійніша добавка: мета-аналізи і конфлікт інтересів |
+| 834 | Колаген/желатин і сухожилки — механізм і обмеження доказової бази |
+| 835 | Електроліти і тренування: натрій, калій, хлор — де реальний ефект, де маркетинг |
+| 836 | Таурін і фізична ефективність — повний огляд |
+| 837 | BCAA і EAA — чому питання не закрите і що говорять нові дані |
+| 838 | Дефіцит заліза без анемії у атлетів — прихована проблема продуктивності |
+| 839 | Цинк, тестостерон і тренування — доказова база без маркетингового spin |
+| 840 | Берберин і глюкозний метаболізм для атлетів — нові дані і обмеження |
 
 ### Block 851–900 — Applied programming deep dives (proposed · v4.52.0)
 

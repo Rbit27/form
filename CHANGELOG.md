@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.8.1] — 2026-06-14
+
+### Added
+
+- `content/post-831-antioxidants-training-adaptation-paradox.md` — Антиоксиданти і тренування: парадокс адаптації. ROS як сигнальні молекули (AMPK, PGC-1α, NRF2-каскад); Gomez-Cabrera et al. (2008) Am J Clin Nutr — вітамін C 1000 мг/день пригнічує мітохондріальний біогенез і VO₂max адаптацію; Ristow et al. (2009) PNAS — вітаміни C + E повністю блокують покращення чутливості до інсуліну; Paulsen et al. (2014) J Physiol — пригнічення мітохондріальних маркерів при 11 тижнях силових тренувань; Merry & Ristow (2016) J Physiol — систематичний огляд. Практична рамка: харчові антиоксиданти ≠ мегадози добавок; timing-гіпотеза; виключення для майстер-атлетів і хвороби. clinical-safety: PASS.
+
+### Changed
+
+- `blog.html` — blog card added for post-831 (Evidence-based · 13 хв · 2026-06-14).
+- `README.md` — Block 801–850 expanded: 801–830 written listed; proposed 831–840 topics added (L-carnitine, HMB, collagen/tendons, electrolytes, taurine, BCAA/EAA, non-anemic iron deficiency, zinc/testosterone, berberine).
+- `STATUS.md` — Block 801–850: 30/50 → 31/50 written; total posts 826 → 827; v5.8.0 → v5.8.1.
+- `VERSION` — 5.8.0 → 5.8.1.
+
+---
+
 ## [5.8.0] — 2026-06-14
 
 ### Added
