@@ -10144,7 +10144,7 @@ const ScimSessionRevocationKvFallbackPayload = z.object({
 | # | Task | Owner | Priority | Milestone | Status |
 |---|---|---|---|---|---|
 | 1 | Run `migration 0068_tenant_users_role_history.sql`; verify RLS policies with `SET ROLE compliance_reviewer` and `SET ROLE tenant_admin` in psql; add migration to `compliance/migrations/log.md`. | platform-engineer | **P0** | M5 | [ ] |
-| 2 | Register `scim.session_revocation_kv_fallback` in `docs/AUDIT_LOG_SCHEMA.md §6.SCIM-Lifecycle` with Zod schema from §28.5; deploy schema to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 2 | Register `scim.session_revocation_kv_fallback` in `docs/AUDIT_LOG_SCHEMA.md §6.SCIM-Lifecycle` with Zod schema from §28.5; deploy schema to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M5 | [x] **Done — AUDIT_LOG_SCHEMA.md v2.6 (2026-06-14)** |
 | 3 | Add `recordRoleChange()` utility (§28.4.4) to `apps/scim-worker/src/handlers/users.ts`; call after PUT full-replace and group PATCH role evaluation; verify `chk_turh_role_changed` rejects no-op rows in integration test. | platform-engineer | **P0** | M5 | [ ] |
 | 4 | Add KV fallback try/catch (§28.2.4) to PATCH deprovisioning path in `apps/scim-worker/src/handlers/users.ts`; emit `scim.session_revocation_kv_fallback` via `emitAuditEvent()`. | platform-engineer | **P0** | M5 | [ ] |
 | 5 | Configure **AL-REVOKE-01** in Better Stack: `scim_kv_fallback_count > 0` in 5-min window; PagerDuty `form-platform`; dedup key `scim-kv-fallback-{tenant_id}` (1-hour); no auto-resolve. | devops-lead | **P0** | M5 | [ ] |

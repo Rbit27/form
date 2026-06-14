@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [4.79.1] — 2026-06-14
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.4 → v2.6: +1 `scim.session_revocation_kv_fallback` (HIGH, 7yr) — closes SSO_SCIM_IMPLEMENTATION.md §28.8 checklist item 2 (P0 M5). Registers the DEC-048 dual-path session revocation fallback event in §6.SCIM-Lifecycle; adds `ScimSessionRevocationKvFallbackSchema` Zod schema; REVOKE-CHAIN-01 ordering invariant (must follow `scim.user_deprovisioned` for same `scim_request_id`, HTTP 422 on violation); retention table row (CC6.3 + CC7.2). Header corrected from v2.4 → v2.6 (v2.5 entry existed without header bump). Privacy invariant: no `user_id`, no email, `tenant_id` + `scim_request_id` only; `supabase_ok = false` co-activates R-02 + R-26.
+- `docs/SSO_SCIM_IMPLEMENTATION.md §28.8` — checklist item 2 marked [x] Done.
+- `VERSION` — 4.79.0 → 4.79.1.
+
 ## [4.79.0] — 2026-06-14
 
 ### Added

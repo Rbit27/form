@@ -1,4 +1,4 @@
-# FORM · Audit Log Schema v2.4
+# FORM · Audit Log Schema v2.6
 
 > Що ми логуємо, як довго зберігаємо, хто може дивитись.
 > Owner: `compliance-officer` + `security-engineer`. Reviewed quarterly.
@@ -272,8 +272,13 @@ Emitter: compliance-officer via admin API (`POST /internal/pam/break-glass-revie
 | `scim.user_updated` | STANDARD | 7 yr | `PUT` or `PATCH /scim/v2/Users/:id` updating non-activation attributes | `tenant_id`, `user_id`, `scim_request_id`, `update_method` (`put` \| `patch`), `fields_changed` (string[] — attribute names only; **no values**) |
 | `scim.group_synced` | STANDARD | 5 yr | `PATCH /scim/v2/Groups/:id` processed successfully | `tenant_id`, `group_id` (FORM `scim_group_role_mappings.id` UUID), `idp_group_id` (IdP-side opaque group ID), `members_added` (integer), `members_removed` (integer), `role_changes` (integer), `scim_request_id` |
 | `scim.rejected_sensitive_attribute` | HIGH | 7 yr | SCIM request body contains GDPR Art. 9 special category attribute; request rejected before any write | `tenant_id`, `scim_request_id`, `rejected_attribute_name`, `request_path`, `http_method` |
+| `scim.session_revocation_kv_fallback` | HIGH | 7 yr | `env.SCIM_KV.put()` throws during SCIM PATCH deprovisioning; Supabase blocklist fallback path engaged | `tenant_id`, `scim_request_id`, `fallback_path: 'supabase_blocklist'`, `supabase_ok` (bool — `false` if Supabase fallback also failed), `kv_error_class` (string max 64 — e.g. `'KVError'`, `'NetworkError'`) |
 
-**Emitter assignment:** `scim.user_provisioned`, `scim.user_reactivated`, `scim.user_deprovisioned`, `scim.user_updated`, `scim.group_synced`, `scim.rejected_sensitive_attribute` — `form_system` (SCIM endpoint Worker `apps/scim-worker/` via `AUDIT_QUEUE` Cloudflare Queue binding). No human emitter for any lifecycle event; all are automated.
+**Privacy invariant (`scim.session_revocation_kv_fallback`):** No `user_id`, no email address, no role values. `tenant_id` and `scim_request_id` are the minimum identifiers required for incident correlation. `supabase_ok = false` escalates to P0 (both revocation paths failed) per §28.6 IC response protocol.
+
+**Emitter assignment:** `scim.user_provisioned`, `scim.user_reactivated`, `scim.user_deprovisioned`, `scim.user_updated`, `scim.group_synced`, `scim.rejected_sensitive_attribute`, `scim.session_revocation_kv_fallback` — `form_system` (SCIM endpoint Worker `apps/scim-worker/` via `AUDIT_QUEUE` Cloudflare Queue binding). No human emitter for any lifecycle event; all are automated.
+
+**HMAC chain requirement (REVOKE-CHAIN-01):** `scim.session_revocation_kv_fallback` for a given `scim_request_id` must follow `scim.user_deprovisioned` for the same `scim_request_id` in chain order. A chain break violates CC7.2 evidence integrity and triggers R-05 (HMAC Chain Break). Enforced by `emit-audit-event` Worker: HTTP 422 `REVOKE_CHAIN_01_VIOLATION` if `scim.session_revocation_kv_fallback` is submitted without a preceding `scim.user_deprovisioned` for the same `scim_request_id`.
 
 **Zod schemas** (to register in `apps/audit-worker/src/schemas/scim-lifecycle.ts`):
 
@@ -331,6 +336,14 @@ export const ScimRejectedSensitiveAttributeSchema = z.object({
   request_path: z.string().max(256),
   http_method: z.enum(['POST', 'PUT', 'PATCH']),
 });
+
+export const ScimSessionRevocationKvFallbackSchema = z.object({
+  tenant_id:       z.string().uuid(),
+  scim_request_id: z.string().max(128),
+  fallback_path:   z.literal('supabase_blocklist'),
+  supabase_ok:     z.boolean(),
+  kv_error_class:  z.string().max(64),
+});
 ```
 
 **Retention table additions:**
@@ -340,6 +353,7 @@ export const ScimRejectedSensitiveAttributeSchema = z.object({
 | `scim.user_provisioned` / `scim.user_reactivated` / `scim.user_deprovisioned` / `scim.rejected_sensitive_attribute` | 7 years | SOC 2 CC6.1 (logical access evidence), CC6.3 (timely revocation), CC6.4 (attribute rejection enforcement); GDPR Art. 28 processor obligation evidence |
 | `scim.user_updated` | 7 years | SOC 2 CC6.1; role change trail linked to OQ-SSO-27.2 |
 | `scim.group_synced` | 5 years | SOC 2 CC6.6 (authorised role assignments via group mapping); lower retention than lifecycle events — no direct erasure or access obligation |
+| `scim.session_revocation_kv_fallback` | 7 years | SOC 2 CC6.3 (timely access removal — dual-path session revocation evidence; `supabase_ok = true` confirms 60-second P99 SLA met per `ENTERPRISE_SLA.md §3.7`), CC7.2 (Cloudflare KV degradation detection — triggers AL-REVOKE-01 P1) |
 
 ---
 
@@ -598,6 +612,7 @@ export const ScimRejectedSensitiveAttributeSchema = z.object({
 | `pam.*` | 7 years | SOC 2 CC6.1/CC6.2/CC6.3 JIT privilege access evidence; break-glass record |
 | `sso.google_directory_*` | 7 years | SOC 2 CC6.3/CC9.2 Google Workspace Directory sync evidence |
 | `session.bulk_revocation_*` / `session.tenant_nuke_*` / `session.revocation_kv_sync_error` | 7 years | SOC 2 CC6.3 timely logical access removal evidence |
+| `scim.session_revocation_kv_fallback` | 7 years | SOC 2 CC6.3 (dual-path revocation under KV failure), CC7.2 (KV health monitoring — AL-REVOKE-01 trigger) |
 | `security.rls_bypass_attempt` / `security.definer_function_cross_tenant` | 7 years | Tenant isolation breach evidence; SOC 2 CC6.6/PI1.5 |
 | `asset.*` (device disposal) | 7 years | SOC 2 C1.2 confidential media disposal + CC6.5 access termination evidence |
 | `vuln.*` (vulnerability management) | 7 years | SOC 2 CC7.1 threat identification + CC7.2 remediation tracking evidence; `vuln.sla_exception_granted` also maps to CC7.4 (response to identified events) |
@@ -1537,6 +1552,9 @@ Default format: JSON Lines (NDJSON). Optional CEF for SIEM.
 - Export latency: webhook delivery **P95 < 5s** after event
 
 ---
+
+**v2.6 · 2026-06-14 · owner: compliance-officer + security-engineer + enterprise-architect**
+*v2.6 (2026-06-14): +1 `scim.session_revocation_kv_fallback` event (HIGH, 7yr) — closes `docs/SSO_SCIM_IMPLEMENTATION.md §28.8` checklist item 2 (P0, M5 — register `scim.session_revocation_kv_fallback` in AUDIT_LOG_SCHEMA.md before G-013 DPA cleared). Defined in `docs/SSO_SCIM_IMPLEMENTATION.md §28.5` (v2.0, 2026-06-14); resolves DEC-048 (Option c: HTTP 200 + Supabase fallback + AL-REVOKE-01 emit on SCIM KV write failure). Event: emitted by `apps/scim-worker` when `env.SCIM_KV.put()` throws during PATCH deprovisioning; Supabase blocklist fallback path engaged to maintain < 30 s revocation within the 60-second P99 SLA (`ENTERPRISE_SLA.md §3.7`). Payload (Zod v2 — `ScimSessionRevocationKvFallbackSchema`): `tenant_id` (UUID), `scim_request_id` (string max 128), `fallback_path: literal('supabase_blocklist')`, `supabase_ok` (boolean — `false` if both paths fail; triggers P0 co-activation R-02 + R-26), `kv_error_class` (string max 64 — e.g. `'KVError'`, `'NetworkError'`). Privacy invariant: no `user_id`, no email, no role values — `tenant_id` + `scim_request_id` only. REVOKE-CHAIN-01 ordering invariant added: `scim.session_revocation_kv_fallback` must follow `scim.user_deprovisioned` for same `scim_request_id`; `emit-audit-event` Worker returns HTTP 422 `REVOKE_CHAIN_01_VIOLATION` on violation → R-05 (HMAC Chain Break). AL-REVOKE-01 (P1, PagerDuty `form-platform`, dedup key `scim-kv-fallback-{tenant_id}` / 1-hour window, no auto-resolve) fires on `count(scim.session_revocation_kv_fallback) > 0` in any 5-minute window via `scim_kv_fallback_count` Analytics Engine metric. Retention table: +1 row (`scim.session_revocation_kv_fallback` 7yr, SOC 2 CC6.3 + CC7.2). Header corrected v2.4 → v2.6 (v2.5 entry existed in changelog but header was not incremented; this patch fixes the header gap). Cross-ref: `docs/SSO_SCIM_IMPLEMENTATION.md §28.5` (canonical event definition), §28.6 (AL-REVOKE-01 config), §28.7 (SCIM-REVOKE-E-001 evidence artefact), §28.8 checklist item 2 (🟢 closed); `docs/ENTERPRISE_SLA.md §3.7` (60 s P99 revocation SLA — `supabase_ok = true` confirms SLA met); `docs/INCIDENT_RESPONSE.md R-05` (REVOKE-CHAIN-01 violation → immediate escalation); `docs/INCIDENT_RESPONSE.md R-26` (SCIM deprovisioning latency — co-activated when `supabase_ok = false`); `docs/DECISION_LOG.md DEC-048`; `docs/OBSERVABILITY.md §26` (AL-REVOKE-01 alert rule update required — P0 M5). Owner: compliance-officer + security-engineer + platform-engineer.*
 
 **v2.5 · 2026-06-13 · owner: compliance-officer + security-engineer**
 *v2.5 (2026-06-13): +1 `system.*` event — `system.compliance_tool_connected` (STANDARD severity, 3yr retention, HMAC-chained). Registered per SOC2_READINESS §78.7. DPA-first activation record for continuous compliance tooling (Vanta or Drata). Emitter: `compliance-officer` (human, once per activation — not `form_system`). Payload: `{tool_name: 'vanta'|'drata', integrations_active: string[], dpa_executed_date: 'YYYY-MM-DD', dpa_file_ref: string, vanta_soc2_report_date?: 'YYYY-MM-DD', activated_by: uuid}`. Privacy invariant: no `user_id`, no `tenant_id`, no health data — tool name and integration list only. DPA must be executed before this event is emitted (DPA-first discipline enforced by §78.6 pre-activation procedure). Zod v2 schema canonical in SOC2_READINESS §78.7; filing path `compliance/evidence/ctool/activation-event.json` (CTOOL-E-006). Retention table: +1 row (`system.compliance_tool_connected` 3yr, SOC 2 CC4.1/CC9.2). Cross-ref: SOC2_READINESS §78, docs/VENDOR_REGISTRY.md (Vanta High-tier vendor), DEC-030. Advances PRE-25 🔴 Open → 🟡 Partial.*
