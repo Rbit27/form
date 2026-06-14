@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [5.1.1] — 2026-06-14
+
+### Added
+- `docs/OBSERVABILITY.md §43` — Enterprise Webhook Delivery Observability: observability companion to `docs/ENTERPRISE_ADMIN_API.md §9` (Webhook Management). RED metrics (8 signals in `WH_TELEMETRY` Analytics Engine: delivery attempts, retry rate, queue events, failure rate by error_class, degraded/suspended counts, P95 dispatch latency, P95 queue age). Four SLOs: WH-SLO-01 (P95 < 30 s — feeds §23 SLA credit engine), WH-SLO-02 (zero silent drops), WH-SLO-03 (100% HMAC signature coverage), WH-SLO-04 (degraded notification ≤ 2 h). Five alert rules AL-WH-01 through AL-WH-05 including dispatcher dead-man's switch. Two Postgres tables (`tenant_webhooks` DDL 0074, `webhook_delivery_log` DDL 0074b) with full RLS and `form_api` REVOKED. pg_cron job 34 `webhook_degraded_escalation_check`. Three new DEC-030 events (`integration.webhook_delivery_failed` HIGH 7yr, `integration.webhook_suspended` HIGH 7yr, `integration.webhook_reactivated` HIGH 7yr) + payload extensions to existing `created/deleted/fired` events using `endpoint_url_hash` per DEC-054. WH-CHAIN-01 ordering invariant. WH-NOTIF-01/02 communication templates. Three SOC 2 evidence artefacts (WH-E-001 CC9.2/CC6.8, WH-E-002 CC7.2/CC7.3, WH-E-003 CC6.8/CC6.1). Admin Dashboard "Webhooks & Delivery Health" panel + Metabase "Webhook Fleet Health" internal dashboard. v4.0 internal doc version.
+- `docs/DECISION_LOG.md DEC-054` — OQ-WL-OBS-01: `custom_domain_hash` SHA-256 adopted for all `tenant.white_label_*` DEC-030 payloads; consistent with DEC-043 and §43 `endpoint_url_hash` pattern; migration 0072 DDL extended.
+
+### Changed
+- `docs/OBSERVABILITY.md §42.13` — OQ-WL-OBS-01 updated to 🟢 Resolved — DEC-054 (2026-06-14); `custom_domain_hash` adopted.
+- `docs/OBSERVABILITY.md §42.10` — `tenant.white_label_provisioned` DEC-030 payload spec updated: `custom_domain` → `custom_domain_hash` SHA-256.
+- `docs/OBSERVABILITY.md §42.14 item 12` — marked [x] Done (OQ-WL-OBS-01 closed).
+- `VERSION` — 5.1.0 → 5.1.1.
+
+---
+
 ## [5.1.0] — 2026-06-14
 
 ### Added

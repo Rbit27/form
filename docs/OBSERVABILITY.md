@@ -11441,7 +11441,7 @@ Register all events in `docs/AUDIT_LOG_SCHEMA.md §WhiteLabel`.
 
 | Event | Severity | Retention | Trigger | Payload privacy constraint |
 |---|---|---|---|---|
-| `tenant.white_label_provisioned` | STANDARD | 7 yr | Domain record created; Cloudflare Custom Hostname API call succeeds | `custom_domain` in payload (commercially sensitive; excluded from cross-tenant auditor bulk exports) |
+| `tenant.white_label_provisioned` | STANDARD | 7 yr | Domain record created; Cloudflare Custom Hostname API call succeeds | `custom_domain_hash` SHA-256 in payload (DEC-054, 2026-06-14 — plaintext `custom_domain` retained in `tenant_white_label_domains` RLS-gated table; hash used for chain linkage; consistent with DEC-043 redaction pattern) |
 | `tenant.white_label_cert_expiry_warning` | HIGH | 7 yr | pg_cron job 32 detects `days_to_expiry` < 30 | `days_to_expiry` integer; `custom_domain_hash` SHA-256 for chain linkage; no cert material |
 | `tenant.white_label_cert_renewed` | STANDARD | 7 yr | Cloudflare API returns `ssl_cert_expiry_at` > prior value | `old_expiry_at`, `new_expiry_at`; no cert material |
 | `tenant.white_label_cert_expiry_breach` | CRITICAL | 7 yr | `ssl_cert_expiry_at` ≤ NOW() for any `status = 'active'` domain | Constitutes SLA breach; triggers §23 SLA incident; `custom_domain_hash` SHA-256 |
@@ -11481,7 +11481,7 @@ Store at `compliance/evidence/white-label/` with `MANIFEST.sha256`.
 
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
-| **OQ-WL-OBS-01** | **Should `custom_domain` appear as plaintext or SHA-256 hash in the `tenant.white_label_provisioned` DEC-030 payload?** Proposal: SHA-256 hash in the HMAC chain body; plaintext retained in `tenant_white_label_domains` (RLS-gated). Rationale: auditor bulk chain export should not expose customer domain names — consistent with `business_justification` redaction in DEC-043. Counter-argument: domain name is browser-visible and semi-public; hashing reduces debuggability without meaningful security benefit. | **P1** | compliance-officer + security-engineer | Resolve before first white-label tenant goes live; document in `docs/DECISION_LOG.md` |
+| ~~**OQ-WL-OBS-01**~~ **🟢 Resolved — DEC-054 (2026-06-14)** | ~~**Should `custom_domain` appear as plaintext or SHA-256 hash in the `tenant.white_label_provisioned` DEC-030 payload?**~~ **Resolved:** `custom_domain_hash` = SHA-256(`custom_domain`) adopted for all `tenant.white_label_*` DEC-030 payloads where a domain identifier is needed for chain linkage. Plaintext `custom_domain` retained in `tenant_white_label_domains` (RLS-gated; `compliance_reviewer` + `tenant_admin` SELECT own-tenant). Decision consistent with DEC-043 (`business_justification` redaction) and §43 `endpoint_url_hash` pattern. `docs/AUDIT_LOG_SCHEMA.md §WhiteLabel` `tenant.white_label_provisioned` payload spec updated to use `custom_domain_hash`; migration 0072 DDL to add `custom_domain_hash TEXT GENERATED ALWAYS AS (encode(sha256(custom_domain::bytea), 'hex')) STORED`. | ~~**P1**~~ **🟢 Closed** | compliance-officer + security-engineer | **Done — DEC-054 (2026-06-14)** |
 | **OQ-WL-OBS-02** | **What is the Cloudflare Custom Hostnames API rate limit for nightly polling at scale?** Cloudflare API allows 1,200 req/5 min. At ≤ 100 active white-label tenants, nightly polling (1 API call/tenant/night) is well within limits. At 1,000+ tenants, parallel polling risks rate-limiting. Resolution: add `wl_poll_rate_limited` counter to `WL_TELEMETRY`; alert at > 5% rate-limited calls (P2 Slack); implement exponential backoff with jitter in the polling Worker. | **P2** | platform-engineer | Evaluate at 100 active white-label tenants; no action required before then |
 
 ---
@@ -11513,7 +11513,7 @@ Store at `compliance/evidence/white-label/` with `MANIFEST.sha256`.
 |---|---|---|---|---|---|
 | 10 | Build §42.9 "White-Label Fleet Health" Metabase dashboard; configure schema filter to exclude `tenant_white_label_domains` from raw explorer. | data-engineer | **P2** | M12 | [ ] |
 | 11 | Collect WL-E-001, WL-E-002, WL-E-003 artefacts after first full observation quarter with at least one active white-label tenant; file in `compliance/evidence/white-label/`. | compliance-officer | **P2** | M13 | [ ] |
-| 12 | Resolve OQ-WL-OBS-01 (domain name hashing policy); document decision in `docs/DECISION_LOG.md`. | compliance-officer + security-engineer | **P2** | Before first white-label tenant live | [ ] |
+| 12 | ~~Resolve OQ-WL-OBS-01 (domain name hashing policy); document decision in `docs/DECISION_LOG.md`.~~ **🟢 Done — DEC-054 (2026-06-14):** SHA-256 hash adopted; migration 0072 DDL extended with `custom_domain_hash GENERATED ALWAYS` column; `docs/AUDIT_LOG_SCHEMA.md §WhiteLabel` payload spec to update `tenant.white_label_provisioned` to use `custom_domain_hash`. | compliance-officer + security-engineer | ~~**P2**~~ **🟢 Done** | Before first white-label tenant live | [x] |
 | 13 | Evaluate OQ-WL-OBS-02 (polling rate limit) at 100 active white-label tenants; implement backoff Worker if needed. | platform-engineer | **P2** | At 100 tenants | [ ] |
 
 ---
@@ -11525,3 +11525,397 @@ Store at `compliance/evidence/white-label/` with `MANIFEST.sha256`.
 *v3.8 (2026-06-13): §41 Wearable Integration & Health Platform Sync Pipeline Observability — closes the data-collection-availability gap left by `docs/DATA_MODEL.md §14` (which defines the schema and sources) and `docs/OBSERVABILITY.md §28` (which covers mobile app performance but not the backend ingestion pipeline). §41 scopes to five sources (HealthKit, Health Connect, Whoop, Oura, Garmin) and three pipeline stages: (1) source-to-`wearable-ingestion-worker` notification, (2) Worker validate-and-insert, (3) `wearable_readings` committed. Privacy invariant enforced throughout: no `user_id`, no reading values, no health data in any signal — only aggregate counts, source slugs, and error codes. §41.2 RED metrics: six rate signals (sync success rate by source × time window; OAuth grant/revocation counts), five error signals (sync failure rate by source × error_class enum; stale-data coaching event rate), four duration signals (p95 Worker end-to-end latency by source; Whoop API response time p95). §41.3 six WS-SLO-* entries: WS-SLO-01 (HealthKit success ≥ 99% / 24h), WS-SLO-02 (Health Connect ≥ 97% / 24h — Android WorkManager 15-minute floor increases variance), WS-SLO-03 (Whoop ≥ 98% / 24h), WS-SLO-04 (Oura ≥ 99% / 24h), WS-SLO-05 (Garmin ≥ 95% / 24h — enterprise-contract API; lower floor reflects Garmin Health API SLA), WS-SLO-06 (fleet freshness: ≥ 95% of active users with a connected wearable have a reading < 26h old, measured at 07:00 UTC daily). §41.4 seven AL-WS-* alert rules: AL-WS-01 (P1, Whoop OAuth expiry wave > 5% failing on `oauth_expired` in 1h, PagerDuty + form-customer-success Slack), AL-WS-02 (P1, Whoop API 429 rate > 10% in 15 min, PagerDuty form-platform), AL-WS-03 (P2, Health Connect failure > 10% / 30 min, Slack), AL-WS-04 (P1, Oura API total failure 15 min, PagerDuty form-platform), AL-WS-05 (P2, HealthKit background delivery stall: zero ingestions for a tenant with active HealthKit users for > 4h, Slack), AL-WS-06 (P1, fleet freshness SLO-06 breach at daily check, PagerDuty form-platform + form-customer-success, no auto-resolve), AL-WS-07 (P2, Garmin OAuth expiry on any enterprise tenant, Slack + CSM notification). §41.5 pg_cron job 31 `wearable_sync_freshness_check` (daily 07:05 UTC — 5 min after Victor morning push window closes; freshness window 26h; emits WS-SLO-06 `wearable.fleet_freshness_assessed` event; k-anonymity gate: suppresses per-source breakdown if any source N < 5 across fleet). §41.6 six DEC-030 HMAC-chained events: `wearable.sync_completed` (STANDARD, 2yr — `source`, `reading_count` integer, `oldest_reading_age_hours` float; no user_id; tenant_id nullable for consumer tier), `wearable.sync_failed` (HIGH, 3yr — `source`, `error_class` enum, `error_message_hash` SHA-256), `wearable.oauth_token_expired` (HIGH, 3yr — `source` whoop|oura|garmin only; HealthKit/HealthConnect use OS permissions, no OAuth), `wearable.permission_revoked` (HIGH, 5yr — GDPR Art. 7(3) withdrawal record; `revocation_type` enum user_initiated|os_prompt|enterprise_mdm; no user_id — linked to consent chain by `consent_event_id` foreign key), `wearable.fleet_freshness_assessed` (STANDARD, 2yr — `fresh_pct` 0–100 float, `sources_breakdown` object by source, `slo_met` bool; no per-user data; k-anonymity gate enforced by pg_cron job 31), `wearable.stale_data_coaching_context` (HIGH, 3yr — emitted when Victor ingestion layer detects wearable data > 48h old is used as HRV coaching context; no `user_id`; `hrv_data_age_hours` float; `source`; triggers §41.7 coaching safety downgrade). §41.7 coaching safety integration: stale HRV data (> 48h) triggers mandatory confidence downgrade — Victor must not surface HRV-based training adjustments at HIGH confidence without fresh data; `wearable.stale_data_coaching_context` event is the compliance evidence that the downgrade ran; clinical-safety has VETO on any stale-data coaching output that bypasses downgrade. §41.8 six-panel "Wearable Sync Pipeline Health" Metabase dashboard (`FORM-Platform` collection; no PII; k-anonymity enforced in all per-source panels). §41.9 three SOC 2 evidence artefacts: WS-E-001 (A1.1 — quarterly `wearable.sync_completed` chain excerpt per source: data collection available as promised), WS-E-002 (P3.2 — quarterly fleet freshness report: data from specified sources collected per privacy notice), WS-E-003 (CC7.2 — AL-WS-01 through AL-WS-07 PagerDuty/Slack configuration screenshots). §41.10 two open questions: OQ-WS-OBS-01 (P1 — Garmin Health API SLA: confirm production availability target before filing WS-E-001 for Garmin; file OQ as DECISION_LOG entry before M10 enterprise pilot), OQ-WS-OBS-02 (P2 — `wearable.stale_data_coaching_context` namespace ownership: wearable namespace vs. §32 Victor AI Safety chain; recommendation: dual-emit for SOC 2 P-series + CC7.2 cross-coverage; resolve M8). §41.11 ten-item implementation checklist: 4× P0/M5–M6 (six DEC-030 events registration in AUDIT_LOG_SCHEMA.md, wearable-ingestion-worker instrumentation, pg_cron job 31 DDL + cron registration, AL-WS-01/02/04/06 PagerDuty routing), 3× P1/M7–M8 (AL-WS-03/05/07 Slack alerts, Metabase dashboard, WS-SLO-06 coaching-safety downgrade gate in Victor ingestion), 3× P2/M9–M10 (WS-E-001/002 evidence collection, OQ-WS-OBS-01 Garmin SLA decision, OQ-WS-OBS-02 namespace decision). Cross-references: `docs/DATA_MODEL.md §14` (wearable_readings schema; five-source integration table — this section is the observability companion); `docs/DATA_MODEL.md §17` (enterprise admin reporting aggregate-only model — fleet freshness metric is the observability signal that §17.4.3 wearable engagement aggregate is populated); `docs/OBSERVABILITY.md §28` (mobile app performance — covers client-side rendering, not server-side ingestion pipeline; §41 is the backend complement); `docs/OBSERVABILITY.md §32` (Victor AI Safety — stale-HRV coaching context event cross-references §32 clinical-safety monitoring); `docs/OBSERVABILITY.md §33` (enterprise QBR metrics — WS-SLO-06 fleet freshness rate is an input to the engagement health score in §33.4); `docs/SOC2_READINESS.md §35.6.3` (wearable_readings retention: 2-year proposed period); `docs/AUDIT_LOG_SCHEMA.md §Wearable` (six new DEC-030 events to register — P0 before M5); `docs/CLINICAL_SAFETY.md` (stale-HRV coaching output veto authority); DEC-030 (HMAC chain requirement for all six events). Owner: platform-engineer + devops-lead + compliance-officer.*
 
 *v3.7 (2026-06-13): §40 Pre-Launch Load Testing & Performance Capacity Observability — closes the SOC 2 observability gap *"Load testing before launches"* noted in `docs/SOC2_READINESS.md §2` (previously 🟡 Gap → 🟡 Partial with §33.3 k6 scenarios defined; §40 advances toward 🟢 by adding the DEC-030 HMAC-chain layer and production alert rules). §40 is the observability companion to `docs/SOC2_READINESS.md §33.3`: §33.3 defines WHAT the gate tests, §40 defines HOW the results are audited and monitored. §40.1 scopes to the load test gate (not mobile client, not Anthropic API, not DR failover); establishes privacy invariant (synthetic `lt-` tenant IDs only; no real user or health data in any payload). §40.2 trigger matrix: four gate events mapped to required k6 profiles and DEC-030 actions, plus a documented bypass protocol (compliance-officer acknowledgement + CRITICAL event + 48h post-deploy test). §40.3 six SLOs: PERF-SLO-01 (baseline p95 ≤ 300 ms — derived from §33.3 and §33.4.1 production p95 < 300 ms target), PERF-SLO-02 (SSO burst auth p95 ≤ 500 ms), PERF-SLO-03 (coaching session p95 ≤ 2,000 ms), PERF-SLO-04 (error rate ≤ 0.1%), PERF-SLO-05 (SCIM 5xx = 0, zero-tolerance); PERF-SLO-01–05 are hard gates blocking merge; PERF-SLO-06 (quarterly p95 drift ≤ +20%) is a soft gate generating investigation alert. §40.4 five AL-PERF-* production alert rules: AL-PERF-01 (P2, p95 > 300 ms / 10 min, Slack), AL-PERF-02 (P1, p99 > 600 ms / 5 min, PagerDuty), AL-PERF-03 (P1, error rate > 0.5% / 5 min, PagerDuty), AL-PERF-04 (P1, load_test_gate_bypassed CRITICAL event, PagerDuty form-compliance, no auto-resolve), AL-PERF-05 (P2, quarterly PERF-SLO-06 breach, Slack). §40.5 five DEC-030 HMAC-chained events: `system.load_test_initiated` (STANDARD, 3yr — `profile`, `commit_sha`, `triggered_by`, `environment:staging`), `system.load_test_completed` (STANDARD, 3yr — full `slo_results` object for PERF-SLO-01–05), `system.load_test_failed` (HIGH, 7yr — `failing_slos` array, `gate_action:merge_blocked`), `system.load_test_gate_bypassed` (CRITICAL, 7yr — `bypass_reason_hash` SHA-256 per DEC-044 pattern; plaintext in Linear ticket), `system.perf_regression_detected` (HIGH, 7yr — quarterly PERF-SLO-06 breach). PERF-CHAIN-01 ordering invariant: `load_test_initiated` precedes `completed`/`failed`; inversion = P1 per R-05. §40.6 pg_cron job 30 `quarterly_perf_regression_check` (`0 9 1 4,7,10 1` — first Monday Apr/Jul/Oct; 35-day check window). §40.7 six-panel "Performance & Load Test History" Metabase dashboard (`FORM-DevOps`, `form_admin` + `compliance_reviewer` visibility, no PII). §40.8 four SOC 2 evidence artefacts: LT-E-001 (A1.1 — `system.load_test_completed` quarterly CSV; `compliance/evidence/a1/`), LT-E-002 (A1.2 — PERF-SLO-06 quarterly regression report with dual sign-off; `compliance/evidence/a1/`), LT-E-003 (CC5.2/CC7.2 — AL-PERF-04 PagerDuty history + bypass events; `compliance/evidence/cc5/`); auditor narrative for A1.1 supplied (commit_sha in `system.load_test_completed` links to CI-E-001 §38.8 — closes policy→gate→performance→SLA evidence chain). §40.9 three open questions: OQ-PERF-01 (P1, k6 OSS vs. Cloud for quarterly reference run), OQ-PERF-02 (P1, staging data anonymisation procedure for quarterly refresh), OQ-PERF-03 (P2, per-tenant vs. fleet-wide profile scaling post-Series A). §40.10 twelve-item implementation checklist: 4× P0/M5–M6 (DEC-030 event registration, GitHub Actions load-test job, merge gate enforcement, AL-PERF-* PagerDuty/Slack config), 5× P1/M6–M7 (all five k6 scenarios for enterprise gate triggers, pg_cron job 30, Metabase dashboard, OQ-PERF-01 decision, staging anonymisation procedure), 3× P2/M9–M10 (LT-E-001/002 evidence collection, OQ-PERF-03 decision). `docs/SOC2_READINESS.md §2` gap table updated: "Load testing before launches" 🟡 Gap → 🟡 Partial. Owner: devops-lead + platform-engineer + compliance-officer.*
+
+---
+
+## §43 Enterprise Webhook Delivery Observability
+
+**Owner:** platform-engineer + devops-lead + security-engineer
+**SOC 2 scope:** CC7.2, CC7.3, CC7.4, CC9.2, CC6.8
+
+### 43.1 Purpose and Scope
+
+This section provides the observability companion to `docs/ENTERPRISE_ADMIN_API.md §9` (Webhook Management), which specifies the tenant-facing event webhook system but does not define monitoring, alerting, or SOC 2 evidence collection. `docs/OBSERVABILITY.md §15` (Audit Log Export Pipeline) covers internal SIEM streaming and async S3/R2 batch export; §43 is explicitly **not** §15 — it covers the **tenant-controlled HTTP push endpoint** where tenants receive real-time operational event notifications.
+
+**In scope:**
+- `webhook-dispatcher` Cloudflare Worker — dequeues payloads from `webhook-dispatch` KV queue, HTTP-POSTs to the tenant endpoint with HMAC-SHA256 signature
+- `tenant_webhooks` Postgres table — endpoint registration and lifecycle state
+- `webhook_delivery_log` Postgres table — per-attempt delivery record
+- Retry ladder: 5 s → 30 s → 5 min → 30 min → 2 h → 8 h (5 attempts max); `degraded` state after 5 consecutive failures; `suspended` after 48 h in degraded state
+- Tenant email notification on degraded and suspended transitions
+
+**Out of scope:**
+- Internal SIEM audit log streaming to FORM-operated endpoints (§15, §27)
+- IdP → FORM SCIM provisioning webhooks (§26)
+- Better Stack status-page outbound webhooks (§16)
+- Anthropic or third-party API webhook callbacks
+
+**Privacy invariant:** No GDPR Art. 9 health data appears in webhook event payloads. Webhook subscriptions are limited to audit log lifecycle, SCIM user lifecycle, GDPR/DSAR status, and SLA breach notification events — none of which contain individual workout data, body metrics, or AI coaching session content. `endpoint_url` is tenant-sensitive commercial information; it is excluded from all DEC-030 chain payloads (see §43.12). The `webhook-dispatcher` Worker never persists the outgoing request body.
+
+---
+
+### 43.2 Architecture Note
+
+The `webhook-dispatcher` Worker operates as a Cloudflare Queue Consumer subscribed to the `webhook-dispatch` queue. For every committed DEC-030 event, an `audit-event-dispatcher` Edge Function checks `tenant_webhooks` for matching subscriptions (by `events[]` prefix) and publishes a serialised envelope to the queue. The dispatcher Worker dequeues, computes `HMAC-SHA256(WEBHOOK_SIGNING_SECRET_{webhook_id}, rawBody)`, adds it as `X-Form-Signature-256: sha256=<hex>`, and POSTs to the registered `endpoint_url`.
+
+```
+audit_log_events (Supabase)
+    │
+    └─► audit-event-dispatcher Edge Fn
+              │  matches tenant_webhooks.events[] prefix
+              ▼
+        webhook-dispatch KV queue
+              │
+              ▼
+        webhook-dispatcher Worker
+              │  signs with WEBHOOK_SIGNING_SECRET_{id}
+              │  POST → endpoint_url
+              │  INSERT webhook_delivery_log row
+              ▼
+        Retry queue (exponential backoff)
+              │  5 failures → degraded → pg_cron job 34 → WH-NOTIF-01
+              │  48 h degraded → suspended → WH-NOTIF-02
+```
+
+Per-webhook signing keys (`WEBHOOK_SIGNING_SECRET_{id}`) are Cloudflare Worker Secrets — never stored in Postgres. The `webhook_delivery_log` records only `http_status`, `error_class`, and `latency_ms` — never the outgoing request body.
+
+---
+
+### 43.3 RED Metrics
+
+Dataset: `WH_TELEMETRY` (Cloudflare Analytics Engine; no PII).
+
+| Signal | Metric | Source | Retention |
+|---|---|---|---|
+| **Rate** | `webhook_delivery_attempts_total` — HTTP POST attempt count by `webhook_id` and `tenant_id` | Dispatcher Worker AE emit | 90 d |
+| **Rate** | `webhook_retry_rate` — % deliveries requiring ≥ 2 attempts per `tenant_id` per 1 h window | Derived from `webhook_delivery_log` | 90 d |
+| **Rate** | `webhook_events_enqueued_total` — payloads published to KV queue | `audit-event-dispatcher` AE emit | 90 d |
+| **Errors** | `webhook_delivery_failure_rate` — non-2xx or timeout ratio by `error_class` enum | Dispatcher Worker AE emit | 90 d |
+| **Errors** | `webhook_degraded_count` — tenants with ≥ 1 webhook in `degraded` state | pg_cron job 34 | 1 yr |
+| **Errors** | `webhook_suspended_count` — tenants with ≥ 1 webhook in `suspended` state | pg_cron job 34 | 1 yr |
+| **Duration** | `webhook_dispatch_latency_p95_ms` — queue dequeue → HTTP response by `tenant_id` | Dispatcher Worker AE emit | 90 d |
+| **Duration** | `webhook_queue_age_p95_ms` — DEC-030 commit → queue dequeue | `audit-event-dispatcher` AE emit | 90 d |
+
+**Privacy enforcement:** `WH_TELEMETRY` contains `tenant_id` UUID, `webhook_id` UUID, and aggregate counts only. No `endpoint_url`, no event payload content, no `user_id`.
+
+---
+
+### 43.4 SLOs
+
+Register in §2.1 master SLO table.
+
+| SLO ID | Description | Target | Measurement window | SOC 2 criterion |
+|---|---|---|---|---|
+| **WH-SLO-01** | First-attempt delivery P95 latency < 30 s (queue dequeue → HTTP 2xx) | P95 < 30 s | 7-day rolling per tenant | CC9.2 — Third-party delivery commitment |
+| **WH-SLO-02** | Zero silent drops — every failed event must reach either 5 retries → `degraded` or 2xx success; no events discarded without a `webhook_delivery_log` row | 100 % zero-tolerance | Per event | CC7.3 — Anomaly response |
+| **WH-SLO-03** | HMAC signature coverage — 100 % of deliveries include `X-Form-Signature-256` header | 100 % zero-tolerance | Per delivery | CC6.8 — Transmission integrity |
+| **WH-SLO-04** | Tenant notification latency — degraded-state email (WH-NOTIF-01) dispatched within 2 h of first failure cascade | 100 % | Per degraded event | CC9.2 — Customer notification |
+
+WH-SLO-01 feeds the §23 SLA credit engine for Growth and Enterprise tier tenants. The `integration.webhook_delivery_failed` DEC-030 event (§43.10) is the HMAC-chained SLA anchor.
+
+---
+
+### 43.5 Alert Rules
+
+Add a `webhook_health` subsection to §6.2 master alert table.
+
+| Alert ID | Trigger | Severity | Channel | Dedup key | Auto-resolve |
+|---|---|---|---|---|---|
+| **AL-WH-01** | First-attempt failure rate > 20 % for any `webhook_id` over a 15-min rolling window | P1 | PagerDuty `form-platform` + Slack `#infra-alerts` | `wh-failure-spike-{webhook_id}` (15 min) | Yes — on rate drop < 5 % |
+| **AL-WH-02** | Any `tenant_webhooks.status = 'degraded'` (5 consecutive failures recorded) | P1 | PagerDuty `form-platform` + `form-customer-success` dual-page | `wh-degraded-{webhook_id}` (24 h) | No — IC must close after CSM contact confirmed |
+| **AL-WH-03** | `webhook_dispatch_latency_p95_ms` > 30 000 ms over any 10-min window | P2 | Slack `#infra-alerts` | `wh-latency-{tenant_id}` (1 h) | Yes — on P95 drop < 20 000 ms |
+| **AL-WH-04** | Any `tenant_webhooks.status = 'suspended'` (48 h in `degraded`; auto-deactivated) | P1 | PagerDuty `form-platform` + `form-customer-success` + CSM email | `wh-suspended-{webhook_id}` (no expiry) | No — requires tenant re-activation |
+| **AL-WH-05** | Dead-man's switch: zero `integration.webhook_fired` DEC-030 events in 2 h during business hours (09:00–22:00 UTC) while ≥ 1 `tenant_webhooks.status = 'active'` row exists | P1 | PagerDuty `form-platform` | `wh-dispatcher-stale` (2 h dedup) | Yes — on next successful `webhook_fired` event |
+
+**AL-WH-05 implementation:** pg_cron job 34 (`webhook_stale_dispatcher_check`, `*/30 * * * *`) checks `audit_log_events` for `event_type = 'integration.webhook_fired'` in the last 120 min during 09:00–22:00 UTC; if zero rows and at least one active webhook exists, emits PagerDuty alert. Suppressed outside business hours to prevent false positives during maintenance windows.
+
+---
+
+### 43.6 Postgres Schema
+
+#### 43.6.1 `tenant_webhooks`
+
+```sql
+-- Migration: 0074_tenant_webhooks.sql
+CREATE TABLE tenant_webhooks (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id            UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  label                TEXT NOT NULL,                      -- e.g. "Splunk SIEM"
+  endpoint_url         TEXT NOT NULL,
+  endpoint_url_hash    TEXT NOT NULL GENERATED ALWAYS AS   -- SHA-256 for DEC-030 linkage
+    (encode(sha256(endpoint_url::bytea), 'hex')) STORED,
+  events               TEXT[] NOT NULL,                   -- subscribed prefix list, e.g. '{"scim.*","dsar.*"}'
+  status               TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'degraded', 'suspended', 'deleted')),
+  consecutive_failures INT  NOT NULL DEFAULT 0,
+  last_failure_at      TIMESTAMPTZ,
+  degraded_since       TIMESTAMPTZ,                       -- NULL when active; set on 5th failure
+  last_delivery_at     TIMESTAMPTZ,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by           UUID NOT NULL,                     -- PAM session UUID or tenant_owner user_id
+  deleted_at           TIMESTAMPTZ,
+  CONSTRAINT chk_twh_suspended_requires_degraded CHECK (
+    status <> 'suspended' OR degraded_since IS NOT NULL
+  ),
+  CONSTRAINT chk_twh_endpoint_https CHECK (endpoint_url LIKE 'https://%')
+);
+
+CREATE INDEX idx_tenant_webhooks_tenant_status
+  ON tenant_webhooks (tenant_id, status)
+  WHERE status IN ('active', 'degraded');
+
+ALTER TABLE tenant_webhooks ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON tenant_webhooks FROM PUBLIC;
+
+-- tenant_owner and tenant_admin: own-tenant management (endpoint_url visible — needed for UI)
+CREATE POLICY twh_tenant_select ON tenant_webhooks
+  FOR SELECT TO tenant_owner, tenant_admin
+  USING (tenant_id = app.current_tenant_id());
+
+-- form_system: full write (dispatcher Worker updates consecutive_failures, status, etc.)
+CREATE POLICY twh_system_all ON tenant_webhooks
+  FOR ALL TO form_system USING (true) WITH CHECK (true);
+
+-- compliance_reviewer: SELECT all (SOC 2 evidence collection)
+CREATE POLICY twh_compliance_select ON tenant_webhooks
+  FOR SELECT TO compliance_reviewer USING (true);
+
+-- form_api: REVOKED — endpoint URLs are tenant-sensitive; never exposed via public API
+-- Note: tenant_owner creates/deletes webhooks via ENTERPRISE_ADMIN_API §9 endpoints
+--       (Workers middleware enforces RBAC before touching this table)
+```
+
+#### 43.6.2 `webhook_delivery_log`
+
+```sql
+-- Migration: 0074b_webhook_delivery_log.sql
+CREATE TABLE webhook_delivery_log (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  webhook_id      UUID NOT NULL REFERENCES tenant_webhooks(id) ON DELETE CASCADE,
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  event_type      TEXT NOT NULL,               -- e.g. 'scim.user_provisioned'
+  audit_event_id  UUID,                        -- soft-ref to audit_log_events.id (nullable)
+  attempt_number  INT  NOT NULL CHECK (attempt_number BETWEEN 1 AND 5),
+  http_status     INT,                         -- NULL on timeout / DNS / TLS failure
+  error_class     TEXT CHECK (error_class IN
+    ('timeout', '4xx', '5xx', 'tls_error', 'dns_error', 'internal_error')),
+  latency_ms      INT,                         -- NULL on hard timeout (> 30 000 ms cut-off)
+  queued_at       TIMESTAMPTZ NOT NULL,        -- when payload was published to KV queue
+  dispatched_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  outcome         TEXT NOT NULL CHECK (outcome IN ('success', 'failure', 'pending_retry')),
+  CONSTRAINT chk_wdl_outcome CHECK (
+    (outcome = 'success'  AND http_status BETWEEN 200 AND 299) OR
+    (outcome <> 'success' AND (http_status IS NULL OR http_status NOT BETWEEN 200 AND 299))
+  )
+);
+
+CREATE INDEX idx_wdl_webhook_dispatched ON webhook_delivery_log (webhook_id, dispatched_at DESC);
+CREATE INDEX idx_wdl_tenant_event       ON webhook_delivery_log (tenant_id, event_type, dispatched_at DESC);
+
+ALTER TABLE webhook_delivery_log ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON webhook_delivery_log FROM PUBLIC;
+
+-- tenant_admin: own-tenant delivery log (integration debugging)
+CREATE POLICY wdl_tenant_admin_select ON webhook_delivery_log
+  FOR SELECT TO tenant_admin USING (tenant_id = app.current_tenant_id());
+
+-- form_system: full write
+CREATE POLICY wdl_system_all ON webhook_delivery_log
+  FOR ALL TO form_system USING (true) WITH CHECK (true);
+
+-- compliance_reviewer: SELECT all
+CREATE POLICY wdl_compliance_select ON webhook_delivery_log
+  FOR SELECT TO compliance_reviewer USING (true);
+
+-- form_api: REVOKED
+```
+
+---
+
+### 43.7 pg_cron Job 34 — `webhook_degraded_escalation_check`
+
+**Purpose:** Detect webhooks in `degraded` state > 2 h and dispatch WH-NOTIF-01 email; at the 48 h boundary, set `status = 'suspended'` and emit `integration.webhook_suspended` DEC-030 event. Also supplies `webhook_degraded_count` and `webhook_suspended_count` signals to `WH_TELEMETRY`.
+
+**Schedule:** `*/30 * * * *` (every 30 min). Freshness window: 35 min (for AL-WH-05 dead-man's switch supplemental guard).
+
+```sql
+-- Step 1: Identify webhooks in degraded state > 2 h (notify) or > 48 h (suspend)
+SELECT
+  id,
+  tenant_id,
+  label,
+  endpoint_url_hash,
+  degraded_since,
+  EXTRACT(EPOCH FROM (now() - degraded_since)) / 3600.0 AS degraded_hours
+FROM tenant_webhooks
+WHERE
+  status = 'degraded'
+  AND degraded_since IS NOT NULL;
+
+-- Step 2 (in Worker): for each row
+--   degraded_hours >= 48h  → SET status = 'suspended', emit integration.webhook_suspended (HIGH, 7yr)
+--   degraded_hours >= 2h
+--     AND last notified > 2h ago → dispatch WH-NOTIF-01 via Resend, emit integration.webhook_delivery_slo_breach (STANDARD, 3yr)
+```
+
+Register job 34 in `docs/OBSERVABILITY.md §12.6` pg_cron job registry. Freshness monitoring: if `last_run_at` for job 34 > 35 min, the §12.6 `pg-cron-health-monitor` emits AL-WH-05 supplemental.
+
+---
+
+### 43.8 Admin Dashboard Panel — "Webhooks & Delivery Health"
+
+Visible to `tenant_owner` and `tenant_admin`; hidden from `tenant_manager` (HR role). Gate behind `tenant_webhooks` existence check for the tenant.
+
+| Panel element | Data source | Refresh |
+|---|---|---|
+| Webhook list: label, endpoint hash (last 8 chars of `endpoint_url_hash`), status badge (active/degraded/suspended), last successful delivery timestamp | `tenant_webhooks` | 5 min |
+| 7-day delivery success rate (% 2xx / total attempts) | `webhook_delivery_log` aggregate | 5 min |
+| Last 20 delivery attempts: event_type, attempt #, outcome, http_status, latency_ms | `webhook_delivery_log` | On demand |
+| Retry ceiling indicator (degraded webhooks): attempts remaining vs 5-attempt max | `tenant_webhooks.consecutive_failures` | 1 min |
+| Re-activate button (suspended webhooks only): requires `tenant_owner`; emits `integration.webhook_reactivated` DEC-030 event; resets `consecutive_failures = 0` | Workers middleware endpoint | N/A |
+
+**Privacy note:** `endpoint_url` is shown in full in the UI to `tenant_owner` and `tenant_admin` (needed for verification). The URL is never exposed in DEC-030 chain payloads; only `endpoint_url_hash` appears there.
+
+---
+
+### 43.9 Internal Dashboard — "Webhook Fleet Health"
+
+Metabase `FORM-Platform` collection. Access: `form_admin` + `devops-lead` + `compliance_reviewer`.
+
+| Panel | Source | Refresh |
+|---|---|---|
+| Active tenants with configured webhooks (count) | `tenant_webhooks WHERE status = 'active'` | 1 h |
+| Fleet delivery success rate — % 2xx over 24 h (fleet-wide aggregate) | `WH_TELEMETRY` | 5 min |
+| P95 dispatch latency trend (7 d time-series) | `WH_TELEMETRY` | 5 min |
+| Degraded / suspended webhooks — count + `endpoint_url_hash` last 8 chars | `tenant_webhooks` | 5 min |
+| Error class breakdown (stacked bar: timeout / 4xx / 5xx / tls / dns / internal — 7 d) | `WH_TELEMETRY` | 5 min |
+| AL-WH-01 / AL-WH-02 / AL-WH-04 PagerDuty incidents — last 90 days | PagerDuty API | 5 min |
+
+**Note:** `endpoint_url` is excluded from all dashboard panels. `endpoint_url_hash` last 8 chars is the maximum identification shown in the internal fleet view. Cross-tenant comparison is aggregate counts only.
+
+---
+
+### 43.10 DEC-030 HMAC-Chained Events
+
+Three events are already registered in `docs/ENTERPRISE_ADMIN_API.md §12`: `integration.webhook_created`, `integration.webhook_deleted`, `integration.webhook_fired`. This section registers **three new events**, extends the `integration.webhook_fired` payload, and specifies `endpoint_url_hash` as the payload field for all events (DEC-054).
+
+Register all entries in `docs/AUDIT_LOG_SCHEMA.md §Integration`.
+
+| Event | Severity | Retention | Trigger | Payload privacy constraint |
+|---|---|---|---|---|
+| `integration.webhook_created` *(extended payload)* | STANDARD | 7 yr | Tenant creates a new webhook endpoint | `endpoint_url_hash` SHA-256 (not plaintext URL); `events` prefix array; `created_by` PAM session UUID or `tenant_owner` user_id |
+| `integration.webhook_deleted` *(extended payload)* | STANDARD | 7 yr | Tenant or form_system deletes a webhook | `endpoint_url_hash` only; `deleted_by` role enum |
+| `integration.webhook_fired` *(extended payload)* | STANDARD | 7 yr | Dispatcher Worker records a delivery attempt | Add fields: `attempt_number` int (1–5), `outcome` enum (success/failure/pending_retry), `http_status` nullable int, `error_class` nullable enum, `latency_ms` nullable int; **no outgoing request body** |
+| **`integration.webhook_delivery_failed`** *(NEW)* | HIGH | 7 yr | 5th consecutive failed attempt; endpoint enters `degraded` state | `webhook_id`, `endpoint_url_hash`, `consecutive_failures: 5`, `error_class` of last attempt, `degraded_since` timestamp; triggers AL-WH-02; WH-SLO-04 notification clock starts |
+| **`integration.webhook_suspended`** *(NEW)* | HIGH | 7 yr | 48 h in `degraded` state; auto-deactivation by pg_cron job 34 | `webhook_id`, `endpoint_url_hash`, `degraded_since` timestamp, `total_failed_attempts_in_window` int; triggers AL-WH-04 |
+| **`integration.webhook_reactivated`** *(NEW)* | HIGH | 7 yr | Tenant owner re-activates a suspended webhook via Admin Dashboard | `webhook_id`, `endpoint_url_hash`, `reactivated_by: tenant_owner`, `previous_status: suspended`; resets `consecutive_failures = 0` |
+
+**WH-CHAIN-01 ordering invariant:** For each `webhook_id`, events must follow the ordering: `integration.webhook_created` → `integration.webhook_fired`^N → `integration.webhook_delivery_failed` → `integration.webhook_suspended` → `integration.webhook_reactivated` → `integration.webhook_fired`^N (cycle after reactivation) → `integration.webhook_deleted`. A `webhook_fired` event appearing after `webhook_suspended` without a preceding `integration.webhook_reactivated` for the same `webhook_id` constitutes a WH-CHAIN-01 violation and triggers R-05.
+
+---
+
+### 43.11 Communication Templates
+
+**WH-NOTIF-01** (degraded state; dispatched by pg_cron job 34 after 2 h):
+
+> **Subject:** [FORM] Action required — webhook delivery degraded ({{label}})
+>
+> Your FORM webhook endpoint is experiencing delivery failures.
+>
+> **Endpoint:** `...{{endpoint_url_hash | last 8 chars}}`
+> **Events:** {{events[]}}
+> **Status:** Degraded — 5 consecutive delivery failures
+> **Last error:** {{error_class}} at {{last_failure_at | ISO 8601}}
+>
+> FORM will continue retrying on an exponential backoff schedule. If the endpoint does not respond with HTTP 2xx within **48 hours**, the webhook will be automatically suspended and will require manual re-activation from the Admin Dashboard.
+>
+> To resolve: verify your endpoint is reachable and returning HTTP 2xx for POST requests with the `X-Form-Signature-256` header. To change the endpoint URL, delete and re-create the webhook in **Admin Dashboard → Webhooks**.
+>
+> *This notification contains no individual user health data.*
+
+**WH-NOTIF-02** (suspended state; dispatched at 48 h boundary):
+
+> **Subject:** [FORM] Webhook suspended — re-activation required ({{label}})
+>
+> Your FORM webhook has been suspended after 48 hours in a degraded state with no successful delivery.
+>
+> **To resume deliveries:** Log in to Admin Dashboard → Webhooks → Re-activate.
+>
+> Events published during the suspension window are **not** replayed automatically. They remain available via the Audit Log pull API (`GET /v1/admin/audit-log`) for manual recovery.
+>
+> *This notification contains no individual user health data.*
+
+---
+
+### 43.12 Privacy Constraints Summary
+
+| Constraint | Enforcement location |
+|---|---|
+| `endpoint_url` never in DEC-030 chain | `endpoint_url_hash` SHA-256 used in all chain payloads; plaintext in `tenant_webhooks` (RLS-gated) |
+| Outgoing request body never persisted | `webhook_delivery_log` records `event_type`, HTTP status, error class, latency only — no request body |
+| No Art. 9 health data in webhook payloads | Subscription whitelist enforced in `audit-event-dispatcher`: only audit lifecycle, SCIM, GDPR/DSAR status, and SLA breach event types are eligible for webhook delivery |
+| `tenant_manager` (HR) blocked from webhook management | Workers middleware RBAC gate; `tenant_webhooks` RLS grants `tenant_owner` + `tenant_admin` SELECT only |
+| `form_api` REVOKED on both tables | `tenant_webhooks` and `webhook_delivery_log` are management-plane tables; excluded from all public API responses |
+| `integration.webhook_*` SIEM events routed to `compliance_reviewer` only | §27.2 SIEM routing table — no cross-tenant delivery of webhook management events |
+
+---
+
+### 43.13 SOC 2 Evidence Artefacts
+
+Store at `compliance/evidence/cc9/webhooks/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **WH-E-001** | Quarterly export of `integration.webhook_created`, `integration.webhook_delivery_failed`, `integration.webhook_suspended`, `integration.webhook_reactivated`, `integration.webhook_deleted` DEC-030 chain events — demonstrates controlled third-party delivery lifecycle with no silent drops (WH-SLO-02 evidence) | CC9.2 — Third-party commitment monitoring; CC6.8 — Transmission integrity (HMAC chain proves no events were silently dropped) | 7 yr |
+| **WH-E-002** | AL-WH-02 + AL-WH-04 PagerDuty incident history (90 days) + Resend delivery receipts for WH-NOTIF-01/02 — demonstrates automated detection and timely CSM + tenant notification for degraded and suspended webhooks | CC7.2 — Proactive anomaly detection; CC7.3 — Response to anomalies within defined escalation SLA | 3 yr |
+| **WH-E-003** | Annual `webhook-dispatcher` Worker source code review confirmation — verifies (a) HMAC-SHA256 computed over raw request body for every delivery; (b) `endpoint_url` never appears in any log, analytics signal, or DEC-030 payload; (c) `WEBHOOK_SIGNING_SECRET_{id}` sourced from Worker Secrets only | CC6.8 — Transmission integrity; CC6.1 — Access controls over tenant-sensitive endpoint URLs | 3 yr |
+
+**Auditor narrative for CC9.2:** FORM's enterprise webhook delivery pipeline enables tenant SIEM systems to receive real-time DEC-030 event notifications. WH-E-001 provides quarterly chain-extracted proof that every webhook lifecycle event is HMAC-evidenced and that failed delivery cascades surface as `integration.webhook_delivery_failed` (HIGH, 7-year retention) rather than being silently discarded. The WH-CHAIN-01 ordering invariant ensures that a `webhook_fired` event cannot appear after `webhook_suspended` without a reactivation event — giving auditors tamper-evident evidence that the delivery pipeline operates under controlled state transitions. No health data flows through this pipeline — webhook payloads are restricted to operational metadata categories enumerated in §43.12.
+
+---
+
+### 43.14 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-WH-OBS-01** | **Should FORM provide a "Send test event" button in the Admin Dashboard for integration verification?** A synthetic `test.ping` delivery would allow tenants to confirm their endpoint is reachable before going live. Risk: test deliveries could inflate delivery success rate metrics and appear in WH-E-001 evidence export. Mitigation: `is_test BOOLEAN DEFAULT false` column in `webhook_delivery_log`; exclude test rows from `WH_TELEMETRY` aggregates and SOC 2 evidence queries. Recommendation: implement in M11 alongside §43.8 Admin Dashboard panel; flag all test deliveries with `is_test = true`. | P2 | platform-engineer + enterprise-architect | Implement before M11 if confirmed at first enterprise customer; document in `docs/DECISION_LOG.md` |
+| **OQ-WH-OBS-02** | **What is FORM's maximum sustained webhook events-per-second (EPS) before `webhook-dispatch` KV queue back-pressure causes WH-SLO-01 violations?** At ≤ 20 active enterprise tenants with typical audit event rates (5–50 events/min/tenant), queue pressure is negligible. During a SCIM mass-provisioning event (R-24) or a high-volume DSAR batch, queue age may spike above WH-SLO-01 (30s P95). Resolution: track `webhook_queue_age_p95_ms` in `WH_TELEMETRY`; alert at P95 > 10 000 ms (P2 Slack); evaluate Cloudflare Queues (persistent, higher throughput) migration if sustained P95 > 5 000 ms at 50 active tenants. | P2 | platform-engineer | Evaluate at 50 active webhook tenants; document migration decision in `docs/DECISION_LOG.md` |
+
+---
+
+### 43.15 Implementation Checklist
+
+#### P0 — Before first enterprise tenant activates webhooks (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three new DEC-030 events (`integration.webhook_delivery_failed` HIGH 7yr, `integration.webhook_suspended` HIGH 7yr, `integration.webhook_reactivated` HIGH 7yr) in `docs/AUDIT_LOG_SCHEMA.md §Integration`; extend `integration.webhook_created`, `integration.webhook_deleted`, and `integration.webhook_fired` payload specs to use `endpoint_url_hash`; deploy to `emit-audit-event` Worker event registry. | platform-engineer + compliance-officer | **P0** | M10 | [ ] |
+| 2 | Create `tenant_webhooks` table (§43.6.1 DDL + RLS); register migration `0074_tenant_webhooks.sql`. | platform-engineer | **P0** | M10 | [ ] |
+| 3 | Create `webhook_delivery_log` table (§43.6.2 DDL + RLS); register migration `0074b_webhook_delivery_log.sql`. | platform-engineer | **P0** | M10 | [ ] |
+| 4 | Implement `webhook-dispatcher` Cloudflare Worker: KV queue consumer → HMAC-sign (`WEBHOOK_SIGNING_SECRET_{webhook_id}` Worker Secret) → HTTP POST → `webhook_delivery_log` INSERT → retry ladder → degraded/suspended state transitions per §43.2 spec. | platform-engineer | **P0** | M10 | [ ] |
+| 5 | Configure AL-WH-02 (P1, degraded) and AL-WH-04 (P1, suspended) in PagerDuty `form-platform` + `form-customer-success` dual-page; verify with a synthetic test event before first tenant onboards. | devops-lead | **P0** | M10 | [ ] |
+| 6 | Implement pg_cron job 34 `webhook_degraded_escalation_check` (`*/30 * * * *`) per §43.7 SQL; register in `docs/OBSERVABILITY.md §12.6` pg_cron registry as job 34. | devops-lead + platform-engineer | **P0** | M10 | [ ] |
+| 7 | Implement WH-NOTIF-01 and WH-NOTIF-02 Resend email templates; wire to `degraded` (at 2 h via pg_cron job 34) and `suspended` (at 48 h) state transitions in `webhook-dispatcher` Worker. | platform-engineer | **P0** | M10 | [ ] |
+
+#### P1 — Before SOC 2 observation period starts (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Configure AL-WH-01 (P1, failure rate spike), AL-WH-03 (P2, latency), and AL-WH-05 (P1, dispatcher dead-man's switch via pg_cron job 34) in PagerDuty / Slack `#infra-alerts`. | devops-lead | **P1** | M11 | [ ] |
+| 9 | Add §43.8 "Webhooks & Delivery Health" Admin Dashboard panel; gate behind `tenant_webhooks` existence check for the tenant; re-activate button requires `tenant_owner` role. | platform-engineer | **P1** | M11 | [ ] |
+| 10 | Register WH-SLO-01 through WH-SLO-04 in §2.1 master SLO table; wire WH-SLO-01 into §23 SLA credit engine as a covered service for Growth and Enterprise tier. | devops-lead + compliance-officer | **P1** | M11 | [ ] |
+| 11 | Add `webhook_health` subsection to §6.2 master alert table (five rows: AL-WH-01 through AL-WH-05); register WH-CHAIN-01 ordering invariant in `docs/AUDIT_LOG_SCHEMA.md §Integration`. | devops-lead | **P1** | M11 | [ ] |
+| 12 | Update §27.2 SIEM routing table: `integration.webhook_*` events routed to `compliance_reviewer` only — no cross-tenant SIEM delivery. | security-engineer | **P1** | M11 | [ ] |
+
+#### P2 — Before first SOC 2 evidence collection (M13)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 13 | Build §43.9 "Webhook Fleet Health" Metabase dashboard; configure `endpoint_url` exclusion from all panels (`endpoint_url_hash` last 8 chars only). | data-engineer | **P2** | M12 | [ ] |
+| 14 | Collect WH-E-001, WH-E-002, and WH-E-003 artefacts after first full observation quarter with at least one active enterprise tenant webhook; file in `compliance/evidence/cc9/webhooks/`. | compliance-officer | **P2** | M13 | [ ] |
+| 15 | Resolve OQ-WH-OBS-01 (test endpoint UI): implement `is_test` column in `webhook_delivery_log` if approved; document decision in `docs/DECISION_LOG.md`. | platform-engineer | **P2** | M11 | [ ] |
+| 16 | Evaluate OQ-WH-OBS-02 (KV queue back-pressure) at 50 active webhook tenants; implement `webhook_queue_age_p95_ms` alerting and evaluate Cloudflare Queues migration if P95 > 5 000 ms sustained. | platform-engineer | **P2** | At 50 tenants | [ ] |
+
+---
+
+*v4.0 (2026-06-14): §43 Enterprise Webhook Delivery Observability — observability companion to `docs/ENTERPRISE_ADMIN_API.md §9` (Webhook Management), which specified the tenant-facing event webhook API but left RED metrics, SLO enforcement, alert rules, and SOC 2 evidence collection undefined. §43 explicitly distinguishes itself from §15 (internal audit log export and SIEM streaming) and §27 (SIEM event classification): §43 covers the tenant-controlled HTTP push endpoint where tenants receive real-time operational notifications, not the internal pipeline. Architecture: `webhook-dispatcher` Cloudflare Worker as a KV queue consumer; per-webhook HMAC-SHA256 signing keys stored as Cloudflare Worker Secrets (never in Postgres); retry ladder 5 s → 30 s → 5 min → 30 min → 2 h → 8 h (5 attempts); 5th failure = `degraded` + AL-WH-02 + WH-SLO-04 notification clock; 48 h degraded = `suspended` + AL-WH-04 + WH-NOTIF-02. §43.3 eight RED signals in `WH_TELEMETRY` Analytics Engine (delivery attempts, retry rate, queue events, failure rate by 6-value error_class enum, degraded/suspended counts, P95 dispatch latency, P95 queue age); privacy: tenant_id UUID + webhook_id UUID only, no endpoint_url, no payload body. §43.4 four SLOs: WH-SLO-01 (P95 < 30 s first attempt — §23 SLA credit engine for Growth/Enterprise), WH-SLO-02 (zero silent drops — 100% zero-tolerance), WH-SLO-03 (100% HMAC signature coverage), WH-SLO-04 (degraded notification ≤ 2 h). §43.5 five alert rules: AL-WH-01 (P1, > 20% failure / 15 min, PagerDuty form-platform), AL-WH-02 (P1, degraded state, dual-page form-platform + form-customer-success, no auto-resolve), AL-WH-03 (P2, P95 > 30s, Slack), AL-WH-04 (P1, suspended state, triple notification: dual PagerDuty + CSM email, no auto-resolve), AL-WH-05 (P1, dispatcher dead-man's switch via pg_cron job 34 — zero webhook_fired events in 2 h during business hours 09:00–22:00 UTC). §43.6 two Postgres tables: `tenant_webhooks` (UUID PK, tenant_id FK, label, endpoint_url, `endpoint_url_hash` GENERATED ALWAYS SHA-256, events TEXT[], status CHECK 4 values, consecutive_failures, degraded_since, last_delivery_at, created_by PAM session or tenant_owner; CHECK suspended → degraded_since NOT NULL; CHECK https://; partial index active/degraded; RLS: tenant_owner + tenant_admin SELECT own-tenant; form_system ALL; compliance_reviewer SELECT all; form_api REVOKED); `webhook_delivery_log` (UUID PK, webhook_id FK, tenant_id FK, event_type, audit_event_id soft-ref nullable, attempt_number 1–5, http_status nullable, error_class 6-value CHECK, latency_ms nullable, queued_at, dispatched_at, outcome CHECK 3 values; consistency CHECK; RLS: tenant_admin SELECT own; form_system ALL; compliance_reviewer SELECT all; form_api REVOKED). §43.7 pg_cron job 34 `webhook_degraded_escalation_check` (*/30 * * * *): identifies degraded webhooks > 2 h for WH-NOTIF-01 Resend dispatch + `integration.webhook_delivery_slo_breach` STANDARD 3yr; at 48 h sets status = suspended + emits `integration.webhook_suspended` HIGH 7yr + dispatches WH-NOTIF-02. §43.8 Admin Dashboard "Webhooks & Delivery Health": tenant_owner + tenant_admin only (tenant_manager HR blocked); endpoint_url shown in UI (RLS-gated); 7d success rate, last 20 attempts, retry ceiling stat, re-activate button (tenant_owner only, emits `integration.webhook_reactivated` HIGH 7yr, resets consecutive_failures = 0). §43.9 Metabase "Webhook Fleet Health" dashboard (form_admin + devops-lead + compliance_reviewer; endpoint_url excluded; endpoint_url_hash last 8 chars only). §43.10 six DEC-030 events: `integration.webhook_created` + `integration.webhook_deleted` + `integration.webhook_fired` (extended payload — all three now use endpoint_url_hash per DEC-054); `integration.webhook_delivery_failed` (HIGH, 7yr — NEW; 5th failure; consecutive_failures:5; error_class of last attempt; triggers AL-WH-02; WH-SLO-04 clock); `integration.webhook_suspended` (HIGH, 7yr — NEW; 48 h degraded; triggers AL-WH-04); `integration.webhook_reactivated` (HIGH, 7yr — NEW; tenant_owner action; resets counter). WH-CHAIN-01: webhook_fired after webhook_suspended without webhook_reactivated = R-05 trigger. §43.11 two communication templates: WH-NOTIF-01 (degraded at 2 h by pg_cron job 34; endpoint_url_hash last 8 chars; retry window warning; no health data note), WH-NOTIF-02 (suspended at 48 h; re-activate link; events not replayed; Audit Log pull API reference). §43.12 six privacy constraints: endpoint_url_hash in chain only; no request body in delivery log; no Art. 9 health data in payloads (subscription whitelist); tenant_manager HR blocked; form_api REVOKED on both tables; integration.webhook_* SIEM events compliance_reviewer only. §43.13 three SOC 2 evidence artefacts: WH-E-001 (CC9.2/CC6.8 — quarterly lifecycle chain export; no silent drops), WH-E-002 (CC7.2/CC7.3 — AL-WH-02/04 PagerDuty + Resend receipts), WH-E-003 (CC6.8/CC6.1 — annual Worker source code review confirming HMAC over raw body + no endpoint_url logging). CC9.2 auditor narrative: WH-CHAIN-01 ensures all delivery failures are chain-evidenced; no silent drops demonstrable from chain export. §43.14 two open questions: OQ-WH-OBS-01 (P2 — test endpoint UI; is_test column recommended; decide M11), OQ-WH-OBS-02 (P2 — KV queue back-pressure EPS limit; evaluate at 50 active webhook tenants). §43.15 sixteen-item implementation checklist: 7× P0/M10 (six DEC-030 event registrations + payload extensions, two table migrations, webhook-dispatcher Worker, AL-WH-02/04 PagerDuty, pg_cron job 34, WH-NOTIF-01/02 Resend templates), 5× P1/M11 (AL-WH-01/03/05 alerts, Admin Dashboard panel, SLO registration + §23 credit wire, §6.2 + WH-CHAIN-01 update, §27.2 SIEM routing), 4× P2/M12–M13 (Metabase dashboard, WH-E-001/002/003 evidence, OQ-WH-OBS-01 decision, OQ-WH-OBS-02 evaluation). Also in v4.0: §42.13 OQ-WL-OBS-01 🟢 Resolved — DEC-054 (2026-06-14): `custom_domain_hash` SHA-256 adopted for all `tenant.white_label_*` DEC-030 payloads; consistent with DEC-043 redaction pattern and §43 `endpoint_url_hash` pattern; migration 0072 DDL extended with `GENERATED ALWAYS` column; `docs/AUDIT_LOG_SCHEMA.md §WhiteLabel` payload spec updated. §42.10 `tenant.white_label_provisioned` payload updated to `custom_domain_hash`. §42.14 item 12 marked [x] Done. Cross-references: `docs/ENTERPRISE_ADMIN_API.md §9` (webhook API spec — §9.1 create/§9.2 list/§9.3 delete/§9.4 signature; retry policy and degraded/suspended transitions; §12 DEC-030 event reference — §43 extends payload specs); `docs/ENTERPRISE_ADMIN_API.md §12` (`integration.webhook_created/deleted/fired` — payload extended per DEC-054 pattern); §15 (Audit Log Export Pipeline — async S3/R2 batch + internal SIEM; distinct from §43 tenant-controlled push); §27 (SIEM event streaming — §43 adds routing constraints for integration.webhook_* events to compliance_reviewer only); §23 (Enterprise SLA Reporting — WH-SLO-01 feeds §23 credit engine for Growth/Enterprise tier); §2.1 (master SLO table — WH-SLO-01 through WH-SLO-04); §6.2 (master alert table — webhook_health subsection: AL-WH-01 through AL-WH-05); §12.6 (pg_cron registry — job 34); `docs/INCIDENT_RESPONSE.md R-05` (WH-CHAIN-01 violation); `docs/AUDIT_LOG_SCHEMA.md §Integration` (six DEC-030 events to register/extend — P0 before M10); `docs/SOC2_READINESS.md §CC9.2` (WH-E-001 extends evidence table); `docs/DATA_MODEL.md §26` (tenant_api_keys — peer management-plane table; same RLS pattern); `docs/DECISION_LOG.md DEC-054` (OQ-WL-OBS-01 closure — custom_domain_hash in white-label DEC-030 payloads). Privacy floor: no individual employee user_id or health data in any §43 DEC-030 event; endpoint_url SHA-256 hash only in all chain payloads; no request body in delivery log; form_api REVOKED on both management-plane tables. Owner: platform-engineer + devops-lead + security-engineer + compliance-officer.*
