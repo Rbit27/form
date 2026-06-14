@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [4.93.2] — 2026-06-14
+
+### Changed
+- `docs/DATA_MODEL.md` — v1.13 → v1.14. §35 DSAR Deletion Certificate Schema & SLO Breach Response (DEC-052). Resolves OQ-DSAR-03 (P1) and OQ-DSAR-04 (P2) from §32.8. OQ-DSAR-03: two-tier AL-DSAR-05 escalation — P1 PagerDuty (first SLO miss per tenant per quarter) / P2 Slack (subsequent); `enterprise_sla_counters.dsar_slo_misses_this_quarter` counter (migration `0070b`); pg_cron job 33 quarterly reset. OQ-DSAR-04: HMAC-SHA256-signed JSON cert (`ERASURE_CERT_SECRET`); admin dashboard download (immediate) + Resend email to data subject (0h) / employer HR contact (48h delay per GDPR Art. 34 ordering); R2 `form-dsar-certs/<tenant_id>/<certificate_id>.json` + `dsar_deletion_certificates` Postgres table (metadata + payload_hash only, migration `0070`). Two new DEC-030 events: `dsar.certificate_issued` (HIGH, 7yr) and `dsar.certificate_delivered` (STANDARD, 7yr); CERT-CHAIN-01 ordering invariant extends DEC-032-EXT. Two new SOC 2 artefacts: DSAR-E-011 (P8.0) and DSAR-E-012 (CC7.2). §32.8 OQ-DSAR-03 and OQ-DSAR-04 marked 🟢 Resolved.
+- `VERSION` — 4.93.1 → 4.93.2.
+
+---
+
 ## [4.93.1] — 2026-06-14
 
 ### Added

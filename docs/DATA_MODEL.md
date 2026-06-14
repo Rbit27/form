@@ -13266,8 +13266,8 @@ Evidence collection path: `compliance/evidence/dsar/DSAR-E-00{7..10}_<YYYY-QN>.p
 
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
-| **OQ-DSAR-03** | **`dsar.data_provided` SLO breach response.** ENTERPRISE_SLA.md §19.5 sets a 24-hour SLO for employer-side Art. 15 data provision. Should `slo_met = false` in `dsar.data_provided` auto-open a P1 PagerDuty incident, or is it a P2 handled by the CSM manually? Recommendation: P1 auto-alert for the first missed SLO per tenant per quarter; P2 thereafter (CSM manages pattern with the customer). | P1 | customer-success + compliance-officer | Resolve before first enterprise DSAR; document in DECISION_LOG.md |
-| **OQ-DSAR-04** | **Deletion certificate format and delivery channel.** `dsar.deletion_confirmed.certificate_ref` is an opaque UUID. The deletion certificate itself (PDF or signed JSON attesting erasure) must be delivered to the data subject or employer. Open: (a) format; (b) delivery channel (email vs. admin dashboard download); (c) storage path (`compliance/evidence/` vs. R2-only). | P2 | compliance-officer + legal | Evaluate at first production Art. 17 hard-delete erasure; document in DECISION_LOG.md |
+| ~~**OQ-DSAR-03**~~ **🟢 Resolved — DATA_MODEL §35 (DEC-052, 2026-06-14)** | ~~**`dsar.data_provided` SLO breach response.**~~ **Resolved:** P1 auto-alert (AL-DSAR-05, `docs/OBSERVABILITY.md §37.12`) for first miss per tenant per calendar quarter; P2 Slack alert for subsequent misses in the same quarter. Counter tracked in `enterprise_sla_counters.dsar_slo_misses_this_quarter` (migration `0070b`); reset by pg_cron job 33 quarterly. See `docs/DATA_MODEL.md §35.2` and `docs/DECISION_LOG.md DEC-052`. | ~~P1~~ **🟢 Closed** | compliance-officer | **Done — §35 / DEC-052** |
+| ~~**OQ-DSAR-04**~~ **🟢 Resolved — DATA_MODEL §35 (DEC-052, 2026-06-14)** | ~~**Deletion certificate format and delivery channel.**~~ **Resolved:** (a) format = HMAC-SHA256-signed JSON (`ERASURE_CERT_SECRET`); (b) delivery = admin dashboard download (immediate, primary) + Resend email to data subject (0h delay) and employer HR contact (48h delay); (c) storage = R2 `form-dsar-certs/<tenant_id>/<certificate_id>.json` + `dsar_deletion_certificates` Postgres table (metadata + `payload_hash` only). See `docs/DATA_MODEL.md §35.3`–`§35.4` and `docs/DECISION_LOG.md DEC-052`. | ~~P2~~ **🟢 Closed** | compliance-officer | **Done — §35 / DEC-052** |
 
 ---
 
@@ -13726,3 +13726,348 @@ OQ-TURH-01 and OQ-TURH-02 are closed. One forward-looking governance item is tra
 ---
 
 *v1.0 (2026-06-14): §34 FORM Role ENUM Types — resolves OQ-TURH-01 and OQ-TURH-02 from §33.11 (2026-06-14) via DEC-050. Creates two Postgres ENUM types: `form_role_enum` with five values (`tenant_owner`, `tenant_admin`, `tenant_manager`, `member`, `support_readonly`) matching `docs/SSO_SCIM_IMPLEMENTATION.md §5.1` exactly (closes the silent inconsistency between the §5.1 role taxonomy and the 4-value TEXT CHECK in `tenant_users.form_role` and `scim_group_role_mappings.form_role`); `role_change_source_enum` with four values (`scim_sync`, `admin_ui`, `jit_provisioning`, `form_system`) matching §33.3 `changed_by` documentation. Migration `0069_role_enum_types.sql`: five-step migration covering CREATE TYPE ×2 (step 1), `tenant_users.form_role` TEXT → `form_role_enum` with CHECK drop (step 2), `scim_group_role_mappings.form_role` type migration + replacement assignability CHECK (step 3), `tenant_users_role_history.old_role`/`new_role`/`changed_by` type migration (step 4), and five verification queries (step 5). Per-table change summary (§34.6): five column changes across three tables. TypeScript alignment (§34.7): `FormRole`, `RoleChangeSource`, `SCIM_ASSIGNABLE_ROLES`, `ScimAssignableRole` discriminated union types; `SCIM_EXCLUDED_ROLES` constant; `recordRoleChange()` signature update from `string` to typed parameters. SOC 2 evidence: three artefacts ENUM-E-001 (CC6.1), ENUM-E-002 (CC6.2), ENUM-E-003 (CC8.1). Five-item implementation checklist: 3× P0/M5 (staging + production migration, TypeScript types), 2× P1/M6–M9 (SCIM worker guard, evidence). One new open question OQ-ENUM-01 (P2 — future role addition governance). §33.11 OQ-TURH-01 and OQ-TURH-02 updated to 🟢 Resolved. TOC updated to add §33 and §34 entries. Header updated v1.12 → v1.13. Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §5.1` (authoritative role taxonomy — `form_role_enum` matches exactly); `docs/SSO_SCIM_IMPLEMENTATION.md §28.3` (DEC-049 context — `recordRoleChange()` updated in §34.7); `docs/DATA_MODEL.md §33.11` (OQ-TURH-01 + OQ-TURH-02 source — both marked 🟢 Resolved); `docs/DATA_MODEL.md §2` (`tenant_users` DDL — `form_role` column altered); `docs/DATA_MODEL.md §4.2` (`scim_group_role_mappings` DDL — `form_role` column altered); `docs/DECISION_LOG.md DEC-050` (to be created at migration apply time). Owner: enterprise-architect + platform-engineer + compliance-officer.*
+
+---
+
+## 35. DSAR Deletion Certificate Schema & SLO Breach Response — OQ-DSAR-03 + OQ-DSAR-04 Resolution (DEC-052)
+
+### 35.1 Purpose and Scope
+
+This section resolves the two open questions from §32.8 via **DEC-052 (2026-06-14)**:
+
+- **OQ-DSAR-03 (P1) → 🟢 Resolved:** `dsar.data_provided` SLO breach response — escalation policy for missed 24-hour employer-side Art. 15 SLO. Decision: P1 auto-alert (AL-DSAR-05, already defined in `docs/OBSERVABILITY.md §37.12`) for the **first** SLO miss per tenant per calendar quarter; P2 CSM-managed alert thereafter. This matches the ENTERPRISE_SLA.md §19.5 severity framing and avoids alert fatigue from chronic under-performant integrations.
+
+- **OQ-DSAR-04 (P2) → 🟢 Resolved:** Deletion certificate format, delivery channel, and storage. Decision: **signed JSON** (HMAC-SHA256 via `ERASURE_CERT_SECRET` Worker secret) as primary format; delivery via **admin dashboard download** (primary) + **Resend email to employer HR contact** (secondary, 48-hour delay to allow export window); storage in **R2** (`dsar-certs/<tenant_id>/<certificate_id>.json`) as primary and mirrored to **`dsar_deletion_certificates` Postgres table** (metadata + hash only) for auditability and SOC 2 evidence collection.
+
+**Scope boundary:**
+
+- Certificate generation, signature, and delivery logic → this section (§35).
+- Two-phase erasure protocol (soft delete → hard delete) → §12 and §32.
+- Consumer-facing Art. 17 erasure flow → §31.
+- Employer-side DSAR SLO alerting → `docs/OBSERVABILITY.md §37.12` (AL-DSAR-05 authoritative definition).
+
+**Privacy floor (enforced throughout §35):**
+
+- Deletion certificates contain `user_id_hash` (SHA-256 via `PSEUDONYM_SALT`) — never raw `user_id` or email.
+- Certificate JSON stored in R2 is encrypted at rest (Cloudflare default AES-256); access restricted to `form-erasure-worker` service binding only.
+- `dsar_deletion_certificates` Postgres table does **not** store certificate payload — only metadata (`certificate_id`, `dsar_id`, `tenant_id`, `user_id_hash`, `issued_at`, `payload_hash`, `delivered_to_hash`).
+- The `delivered_to_hash` field is `SHA-256(employer_hr_contact_email + PSEUDONYM_SALT)` — the plaintext email never appears in the database.
+
+---
+
+### 35.2 OQ-DSAR-03 Resolution — DSAR SLO Breach Response (DEC-052 Part A)
+
+**Decision:** Two-tier escalation based on per-tenant quarterly SLO miss count.
+
+| Miss count (calendar quarter) | Severity | Alert | Routing | Auto-resolve |
+|---|---|---|---|---|
+| **First miss** | P1 | AL-DSAR-05 | PagerDuty `form-compliance` + `form-customer-success`; no auto-resolve | No — compliance-officer must acknowledge and open CSM follow-up ticket |
+| **Subsequent misses** | P2 | AL-DSAR-05 (de-escalated) | Slack `#compliance-alerts` + CSM on-call; auto-resolve after 24h if no further breaches | Yes — CSM manages pattern review in next QBR |
+
+**Escalation de-escalation rule:** The quarterly miss counter resets on the first calendar day of each quarter (01 Jan / 01 Apr / 01 Jul / 01 Oct). A new quarter's first miss is always P1 regardless of the previous quarter's history. This prevents normalisation of SLO breaches across quarters.
+
+**Implementation:** pg_cron job 33 (`dsar_slo_miss_counter_reset`, `0 0 1 1,4,7,10 *`) resets `dsar_slo_misses_this_quarter` in `enterprise_sla_counters` (see §35.4). The `dsar-fulfillment-worker` increments this counter when `slo_met = false` on `dsar.data_provided` emission, then reads the counter before routing the alert: counter = 1 → PagerDuty P1; counter > 1 → Slack P2.
+
+**AL-DSAR-05 authoritative definition:** `docs/OBSERVABILITY.md §37.12`. This section documents the DATA_MODEL side: the `enterprise_sla_counters` counter column and the pg_cron reset job.
+
+---
+
+### 35.3 OQ-DSAR-04 Resolution — Deletion Certificate (DEC-052 Part B)
+
+#### 35.3.1 Certificate Format
+
+Deletion certificates are **HMAC-SHA256-signed JSON** generated by `form-erasure-worker` at Phase 2 hard-delete completion. Signed JSON is preferred over PDF because:
+
+- Workers can generate and verify it without a PDF library dependency.
+- It is machine-readable, enabling automated auditor evidence processing (CSV manifest generation).
+- The HMAC signature provides the same tamper-evidence guarantee as a qualified electronic signature for internal audit purposes; a PDF would require an external signing service (added latency, cost, vendor dependency).
+- GDPR Art. 5(2) accountability requires tamper-evidence, not a specific format; signed JSON satisfies this requirement.
+
+**Certificate payload structure:**
+
+```typescript
+interface DeletionCertificate {
+  certificate_id:     string;  // UUID v4 — matches dsar.deletion_confirmed.certificate_ref
+  issued_at:          string;  // ISO-8601 UTC timestamp
+  dsar_id:            string;  // UUID — cross-reference to dsar_requests table (§31)
+  tenant_id:          string;  // UUID — issuing enterprise tenant
+  deletion_type:      'art17_employee_request' | 'art17_employer_request' | 'account_closure';
+  user_id_hash:       string;  // SHA-256(user_id + PSEUDONYM_SALT) — pseudonymised
+  tables_erased:      string[];// List of tables where rows were hard-deleted
+  rows_deleted_total: number;  // Total row count across all tables
+  erased_at:          string;  // ISO-8601 UTC — timestamp of final hard-delete commit
+  signed_by:          'form-erasure-worker';
+  signature:          string;  // HMAC-SHA256(canonical_payload_json, ERASURE_CERT_SECRET)
+}
+```
+
+**Signature computation:** `HMAC-SHA256(JSON.stringify(payload_without_signature_field), ERASURE_CERT_SECRET)` where `ERASURE_CERT_SECRET` is a 256-bit Worker secret rotated annually per `docs/CRYPTOGRAPHY_POLICY.md §5`. The `signature` field is appended after computation — the canonical payload used for signing excludes it. Verifiers reconstruct the canonical payload and call `crypto.subtle.verify()`.
+
+**Certificate ID = `certificate_ref`:** The `certificate_id` in the JSON payload is the same UUID stored in `dsar.deletion_confirmed.certificate_ref` and `dsar_deletion_certificates.certificate_id`. This three-way cross-reference (DEC-030 chain ↔ R2 object ↔ Postgres metadata row) allows auditors to reconstruct the full evidence chain from any anchor.
+
+#### 35.3.2 Delivery Protocol
+
+| Channel | Timing | Recipient | Trigger |
+|---|---|---|---|
+| **Admin dashboard download** | Immediate (Phase 2 complete) | `tenant_admin` and `tenant_owner` roles | `dsar.deletion_confirmed` event emission; download link appears in Admin Dashboard → "DSAR & Erasure" panel |
+| **Email — employee (Art. 17 self-request)** | Within 1 hour of Phase 2 | Data subject email (from `dsar_requests.requestor_email`) | Employee-initiated Art. 17; email via Resend `dsar-deletion-cert` template; link to signed JSON in R2 (presigned, 7-day expiry) |
+| **Email — employer HR contact (Art. 17 employer-side)** | 48 hours after Phase 2 | Employer HR contact (`enterprise_sla_contacts.dsar_contact_email`) | 48-hour delay allows the data subject to receive notification first per GDPR Art. 34 ordering principle; email includes certificate download link (presigned, 30-day expiry) |
+
+The 48-hour delay for employer delivery is a privacy-protective choice: GDPR Art. 17 is a right that belongs to the data subject, not the employer. Notifying the data subject first ensures they are aware of the erasure before their employer receives confirmation.
+
+#### 35.3.3 Storage Architecture
+
+```
+R2 bucket: form-dsar-certs (private; no public access)
+  └── <tenant_id>/
+        └── <certificate_id>.json   ← encrypted at rest (CF default); access: form-erasure-worker only
+
+Postgres: dsar_deletion_certificates (§35.4 DDL)
+  └── metadata + payload_hash only; no certificate payload
+
+compliance/evidence/dsar/
+  └── DSAR-E-008_<YYYY-QN>.pdf     ← annual auditor export (certificate manifest, not payloads)
+```
+
+R2 is primary authoritative storage. Postgres stores metadata to enable SQL queries (e.g., "list all certificates issued for tenant X in Q3 2026"). The `payload_hash` in Postgres is `SHA-256(certificate_json_string)` — auditors can verify R2 object integrity against the hash without needing to re-parse the HMAC signature.
+
+---
+
+### 35.4 `dsar_deletion_certificates` DDL
+
+Migration: `0070_dsar_deletion_certificates.sql`
+
+```sql
+-- Resolves: OQ-DSAR-04 (DEC-052, 2026-06-14)
+-- Companion: docs/DATA_MODEL.md §35; docs/OBSERVABILITY.md §37.12
+
+CREATE TABLE dsar_deletion_certificates (
+  certificate_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  dsar_id           UUID NOT NULL,                              -- FK to dsar_requests (§31)
+  tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  user_id_hash      TEXT NOT NULL,                             -- SHA-256(user_id + PSEUDONYM_SALT)
+  deletion_type     TEXT NOT NULL
+                      CHECK (deletion_type IN (
+                        'art17_employee_request',
+                        'art17_employer_request',
+                        'account_closure'
+                      )),
+  tables_erased     TEXT[] NOT NULL CHECK (array_length(tables_erased, 1) >= 1),
+  rows_deleted_total INTEGER NOT NULL CHECK (rows_deleted_total >= 0),
+  erased_at         TIMESTAMPTZ NOT NULL,
+  issued_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  payload_hash      TEXT NOT NULL,                             -- SHA-256(certificate_json_string)
+  r2_object_key     TEXT NOT NULL UNIQUE,                      -- <tenant_id>/<certificate_id>.json
+  delivered_to_hash TEXT,                                      -- SHA-256(email + PSEUDONYM_SALT); NULL for dashboard-only
+  dashboard_available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  email_sent_at     TIMESTAMPTZ,                               -- NULL until email dispatched
+  email_error       TEXT,                                      -- Resend error, if any
+
+  CONSTRAINT chk_erased_before_issued
+    CHECK (erased_at <= issued_at + interval '5 minutes'),    -- certificate must be issued promptly after erasure
+  CONSTRAINT chk_r2_key_format
+    CHECK (r2_object_key LIKE '%/%')                          -- enforces <tenant_id>/<cert_id> structure
+);
+
+-- Index: tenant + time range queries for quarterly SOC 2 evidence exports
+CREATE INDEX idx_dsar_certs_tenant_issued
+  ON dsar_deletion_certificates (tenant_id, issued_at DESC);
+
+-- Index: dsar_id lookup (auditors may query by DSAR reference)
+CREATE INDEX idx_dsar_certs_dsar_id
+  ON dsar_deletion_certificates (dsar_id);
+
+-- RLS policies
+ALTER TABLE dsar_deletion_certificates ENABLE ROW LEVEL SECURITY;
+
+-- compliance_reviewer: read all (required for SOC 2 evidence DSAR-E-008 collection)
+CREATE POLICY dsar_certs_compliance_read
+  ON dsar_deletion_certificates FOR SELECT
+  TO compliance_reviewer USING (true);
+
+-- tenant_admin: read own-tenant certificates (download link in admin dashboard)
+CREATE POLICY dsar_certs_tenant_admin_read
+  ON dsar_deletion_certificates FOR SELECT
+  TO tenant_admin USING (tenant_id = current_setting('app.tenant_id')::uuid);
+
+-- form_system: INSERT only (erasure worker writes on Phase 2 completion)
+CREATE POLICY dsar_certs_system_insert
+  ON dsar_deletion_certificates FOR INSERT
+  TO form_system WITH CHECK (true);
+
+-- form_system: UPDATE only for email delivery fields (email_sent_at, email_error)
+CREATE POLICY dsar_certs_system_update
+  ON dsar_deletion_certificates FOR UPDATE
+  TO form_system USING (true)
+  WITH CHECK (true);
+
+-- form_api: NO ACCESS — certificate metadata is never exposed via public API
+-- (The public-facing endpoint returns only a presigned R2 URL, not DB metadata)
+REVOKE ALL ON dsar_deletion_certificates FROM form_api;
+```
+
+**Note on `dsar_requests` FK:** `dsar_deletion_certificates.dsar_id` is a soft reference — `dsar_requests` is the §31 consumer DSAR table. A hard FK is not added because `dsar_id` may be NULL for `account_closure` deletion type (account closures are not always preceded by a formal DSAR). The `dsar_id` field should be treated as a cross-reference, not a constraint.
+
+---
+
+### 35.5 `enterprise_sla_counters` — DSAR SLO Miss Counter
+
+OQ-DSAR-03 resolution requires a per-tenant quarterly SLO miss counter to determine P1 vs. P2 routing for AL-DSAR-05. Rather than a dedicated table, the counter is added as a column to the existing `enterprise_sla_counters` table (defined in `docs/ENTERPRISE_SLA.md §19.6`):
+
+```sql
+-- Migration: 0070b_dsar_slo_counter.sql (co-applies with 0070)
+ALTER TABLE enterprise_sla_counters
+  ADD COLUMN IF NOT EXISTS dsar_slo_misses_this_quarter INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS dsar_slo_quarter_resets_at   TIMESTAMPTZ NOT NULL DEFAULT date_trunc('quarter', NOW()) + interval '3 months';
+
+COMMENT ON COLUMN enterprise_sla_counters.dsar_slo_misses_this_quarter
+  IS 'Counts dsar.data_provided events with slo_met=false since last quarter reset. Used by AL-DSAR-05 to determine P1 (first miss) vs P2 (subsequent) routing.';
+```
+
+**pg_cron job 33 — `dsar_slo_miss_counter_reset`:**
+
+```sql
+-- Runs at 00:00 UTC on 1 Jan, 1 Apr, 1 Jul, 1 Oct
+-- Schedule: 0 0 1 1,4,7,10 *
+UPDATE enterprise_sla_counters
+SET
+  dsar_slo_misses_this_quarter = 0,
+  dsar_slo_quarter_resets_at   = date_trunc('quarter', NOW()) + interval '3 months'
+WHERE dsar_slo_misses_this_quarter > 0;
+-- Emits: system.dsar_slo_counter_reset (STANDARD, 1yr) — aggregate row count only; no tenant_id list
+```
+
+---
+
+### 35.6 DEC-030 Event Additions
+
+Two new HMAC-chained events are registered in `docs/AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise`:
+
+| Event type | Severity | Retention | Trigger | Privacy invariant |
+|---|---|---|---|---|
+| `dsar.certificate_issued` | HIGH | 7 yr | Phase 2 hard-delete verified; certificate JSON written to R2; metadata row inserted in `dsar_deletion_certificates` | `certificate_id` UUID; `dsar_id`; `tenant_id`; `user_id_hash` (SHA-256); `payload_hash`; no certificate payload |
+| `dsar.certificate_delivered` | STANDARD | 7 yr | Email sent to data subject or employer HR contact via Resend | `certificate_id`; `tenant_id`; `delivery_channel` enum (`email_employee` \| `email_employer` \| `dashboard`); `delivered_to_hash` (SHA-256 of email); no plaintext email |
+
+**Chain ordering invariant (CERT-CHAIN-01):**
+
+For any `certificate_id`, the sequence must be:
+```
+dsar.deletion_soft (§32) → dsar.deletion_confirmed (§32) → dsar.certificate_issued (§35) → dsar.certificate_delivered (§35)
+```
+
+A `dsar.certificate_issued` event without a preceding `dsar.deletion_confirmed` for the same `dsar_id` constitutes a CERT-CHAIN-01 violation and triggers R-05 (HMAC Chain Break). This extends DEC-032-EXT from §32.3.
+
+**Updated §32 `dsar.deletion_confirmed` event:** The `certificate_ref` field (already present in the §32.3 Zod schema) is confirmed as the UUID that will appear in the subsequent `dsar.certificate_issued` event. No schema change required — the field was already defined as `z.string().uuid()`.
+
+---
+
+### 35.7 Zod Schemas
+
+```typescript
+// dsar.certificate_issued — deletion certificate generated and stored in R2
+const DsarCertificateIssued = z.object({
+  event:            z.literal('dsar.certificate_issued'),
+  certificate_id:   z.string().uuid(),
+  dsar_id:          z.string().uuid().nullable(),    // null for account_closure type
+  tenant_id:        z.string().uuid(),
+  user_id_hash:     z.string().length(64),           // SHA-256 hex
+  deletion_type:    z.enum([
+    'art17_employee_request',
+    'art17_employer_request',
+    'account_closure',
+  ]),
+  payload_hash:     z.string().length(64),           // SHA-256(certificate_json_string)
+  r2_object_key:    z.string().min(1),               // <tenant_id>/<certificate_id>.json
+  // No certificate payload, no plaintext email, no raw user_id
+});
+
+// dsar.certificate_delivered — delivery notification (email or dashboard access confirmed)
+const DsarCertificateDelivered = z.object({
+  event:              z.literal('dsar.certificate_delivered'),
+  certificate_id:     z.string().uuid(),
+  tenant_id:          z.string().uuid(),
+  delivery_channel:   z.enum(['email_employee', 'email_employer', 'dashboard']),
+  delivered_to_hash:  z.string().length(64).nullable(), // NULL for dashboard-only; SHA-256(email) for email channels
+  delivered_at:       z.string().datetime(),
+  resend_message_id:  z.string().nullable(),            // Resend message ID for email channels; NULL for dashboard
+});
+```
+
+---
+
+### 35.8 Admin Dashboard — "DSAR & Erasure" Panel Extension
+
+OQ-DSAR-04 specified "admin dashboard download" as the primary delivery channel. The existing Admin Dashboard requires a new panel:
+
+**Panel: DSAR & Erasure** (visible to `tenant_admin` and `tenant_owner`; gated behind `tenants.enterprise_tier = true`):
+
+| Column | Content |
+|---|---|
+| DSAR ID | Truncated UUID (first 8 chars + "...") |
+| Type | `Art. 15 — Access` / `Art. 17 — Erasure` / `Art. 20 — Portability` |
+| Status | `Fulfilled` / `Pending` / `SLO Breach` |
+| Fulfilled At | ISO-8601 date |
+| Certificate | "Download" button (presigned R2 URL, 7-day expiry) — hidden for non-erasure types |
+| SLO Met | ✓ / ✗ |
+
+**Privacy constraint:** The panel is populated from the `dsar_deletion_certificates` and (future) `dsar_requests` tables via `tenant_admin` RLS. No employee names or emails appear in the panel — only pseudonymised `user_id_hash` (displayed as "Employee [first 8 chars of hash]"). The HR team **cannot** access this panel; it is restricted to `tenant_admin` and `tenant_owner` roles per the privacy floor principle (HR never sees individual user data).
+
+---
+
+### 35.9 SOC 2 Evidence Mapping
+
+Extends DSAR-E-008 from §32.6 with two additional artefacts:
+
+| Artefact | SOC 2 criterion | Source | Retention |
+|---|---|---|---|
+| **DSAR-E-011** | P8.0 — disposal confirmed to data subject with tamper-evident certificate | Quarterly export of `dsar.certificate_issued` chain events; `payload_hash` cross-checked against R2 object SHA-256 | 7 yr |
+| **DSAR-E-012** | CC7.2 — automated SLO monitoring detects breach without human trigger | AL-DSAR-05 PagerDuty incident history (first-miss P1 escalations); `enterprise_sla_counters.dsar_slo_misses_this_quarter` counter audit export from pg_cron job 33 | 3 yr |
+
+**Auditor narrative for P8.0:** DSAR-E-008 (§32) proves the two-phase deletion occurred. DSAR-E-011 (§35) proves the deletion was communicated to the data subject or employer with a tamper-evident certificate. The chain sequence `dsar.deletion_soft → dsar.deletion_confirmed → dsar.certificate_issued → dsar.certificate_delivered` closes the full Art. 17 evidence loop — from erasure initiation through certificate delivery — in a single HMAC-chained audit trail.
+
+Evidence collection path: `compliance/evidence/dsar/DSAR-E-011_<YYYY-QN>.csv`, `compliance/evidence/dsar/DSAR-E-012_<YYYY-QN>.pdf`
+
+---
+
+### 35.10 Implementation Checklist
+
+#### P0 — Before first Art. 17 hard-delete erasure in production
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Apply migration `0070_dsar_deletion_certificates.sql` to staging; verify RLS (form_api access = zero rows; tenant_admin access = own-tenant only; compliance_reviewer = all). Run `EXPLAIN (ANALYZE, BUFFERS)` on `idx_dsar_certs_tenant_issued` with 10k synthetic rows; confirm index scan used. | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Apply migration `0070b_dsar_slo_counter.sql` to staging; verify `enterprise_sla_counters` new columns present; run pg_cron job 33 manually in staging to confirm reset query runs without error. Register job 33 in `docs/OBSERVABILITY.md §12.6` pg_cron job registry. | platform-engineer + devops-lead | **P0** | M5 | [ ] |
+| 3 | Add `ERASURE_CERT_SECRET` (256-bit random, base64-encoded) to `form-erasure-worker` Worker Secrets; add key to `docs/CRYPTOGRAPHY_POLICY.md §5` key inventory (annual rotation cycle, same as `HMAC_AUDIT_LOG_SECRET`); register in `docs/KEY_ROTATION.md`. | platform-engineer + security-engineer | **P0** | M5 | [ ] |
+| 4 | Implement `generateDeletionCertificate()` in `src/workers/erasure/certificate.ts`: construct payload per §35.3.1; sign with `ERASURE_CERT_SECRET` via `crypto.subtle`; write to R2 `form-dsar-certs/<tenant_id>/<certificate_id>.json`; insert metadata row into `dsar_deletion_certificates`; emit `dsar.certificate_issued` DEC-030 event. | platform-engineer | **P0** | M5 | [ ] |
+| 5 | Register `dsar.certificate_issued` and `dsar.certificate_delivered` in `docs/AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise` with Zod schemas from §35.7; run HMAC chain integration test for CERT-CHAIN-01 ordering invariant in staging (verify R-05 fires on chain break). | security-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 6 | Implement Resend `dsar-deletion-cert` email template (plain-text + HTML; certificate download presigned URL; 7-day expiry for employee; 30-day for employer); wire to `form-erasure-worker` post-Phase-2 hook with 0h delay (employee) and 48h delay (employer) per §35.3.2; emit `dsar.certificate_delivered` on successful Resend delivery. | platform-engineer | **P0** | M5 | [ ] |
+| 7 | Add "DSAR & Erasure" panel to Admin Dashboard per §35.8 spec; populate from `dsar_deletion_certificates` via `tenant_admin` RLS; presigned R2 URL generation for "Download" button (7-day TTL); confirm HR role (`tenant_manager`) cannot access panel. | platform-engineer | **P0** | M6 | [ ] |
+
+#### P1 — Before first enterprise DSAR
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Configure AL-DSAR-05 in PagerDuty `form-compliance` per `docs/OBSERVABILITY.md §37.12` spec; wire `dsar-fulfillment-worker` to increment `enterprise_sla_counters.dsar_slo_misses_this_quarter` on `slo_met = false`; verify P1 routing on counter = 1 and P2 Slack routing on counter > 1 in staging with synthetic missed-SLO event. | devops-lead + platform-engineer | **P1** | M6 | [ ] |
+| 9 | Update `docs/SOC2_READINESS.md §32.8` to mark OQ-DSAR-03 and OQ-DSAR-04 as 🟢 Resolved (DEC-052); add DSAR-E-011 and DSAR-E-012 to P8.0 and CC7.2 evidence tables respectively. | compliance-officer | **P1** | M6 | [ ] |
+| 10 | After first production Art. 17 erasure: collect DSAR-E-011 artefact (certificate chain export); verify `payload_hash` against R2 object SHA-256; file at `compliance/evidence/dsar/DSAR-E-011_<YYYY-QN>.csv`. | compliance-officer | **P1** | M7 | [ ] |
+
+#### P2 — Before SOC 2 observation period start (M11)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | Collect DSAR-E-012 artefact (AL-DSAR-05 PagerDuty history + pg_cron job 33 quarterly reset run log); file at `compliance/evidence/dsar/DSAR-E-012_<YYYY-QN>.pdf`. | compliance-officer | **P2** | M11 | [ ] |
+| 12 | Evaluate OQ-CERT-01 (below) — certificate signing upgrade — before first customer with qualified trust requirements (FinServ or government-adjacent); document decision in `docs/DECISION_LOG.md`. | compliance-officer + security-engineer | **P2** | M13 | [ ] |
+
+---
+
+### 35.11 Open Questions
+
+OQ-DSAR-03 and OQ-DSAR-04 are closed. One forward-looking item:
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-CERT-01** | **Should deletion certificates use a qualified electronic signature (QES) for regulated customers?** HMAC-SHA256 with `ERASURE_CERT_SECRET` satisfies GDPR Art. 5(2) accountability for most enterprise customers. However, some FinServ and government-adjacent customers may require a QES (eIDAS-compliant, issued by a QTSP) to satisfy their own internal legal frameworks. Adding QES would require a third-party signing service (e.g., DocuSign API, signRequest, or DocuSeal). Cost: ~$0.05–$0.15 per certificate; implementation complexity: medium. Recommendation: implement HMAC-SHA256 now (this section); evaluate QES upgrade when the first FinServ/gov customer requests it. | P2 | compliance-officer + legal | Evaluate at first FinServ enterprise pilot; document decision in `docs/DECISION_LOG.md` before signing service contract |
+
+---
+
+*v1.0 (2026-06-14): §35 DSAR Deletion Certificate Schema & SLO Breach Response — resolves OQ-DSAR-03 (P1) and OQ-DSAR-04 (P2) from §32.8 (v1.1, 2026-06-13) via DEC-052. OQ-DSAR-03: two-tier escalation policy for `dsar.data_provided` SLO breaches — P1 auto-alert (PagerDuty `form-compliance` + `form-customer-success`) for first miss per tenant per calendar quarter; P2 Slack alert for subsequent misses; quarterly counter reset via pg_cron job 33 (`dsar_slo_miss_counter_reset`, `0 0 1 1,4,7,10 *`) on `enterprise_sla_counters.dsar_slo_misses_this_quarter` column (migration `0070b`); AL-DSAR-05 authoritative definition remains `docs/OBSERVABILITY.md §37.12`. OQ-DSAR-04: deletion certificate format = HMAC-SHA256-signed JSON (ERASURE_CERT_SECRET, 256-bit, annual rotation per CRYPTOGRAPHY_POLICY.md §5); delivery = admin dashboard download (immediate, primary) + Resend `dsar-deletion-cert` email to data subject (0h delay) or employer HR contact (48h delay per GDPR Art. 34 ordering); storage = R2 `form-dsar-certs/<tenant_id>/<certificate_id>.json` (primary) + `dsar_deletion_certificates` Postgres table (metadata + payload_hash only, no payload). `dsar_deletion_certificates` DDL (§35.4): UUID PK (`certificate_id`), `dsar_id` UUID soft-ref, `tenant_id` FK RESTRICT, `user_id_hash` TEXT SHA-256, `deletion_type` CHECK enum (three values), `tables_erased` TEXT[] MIN 1, `rows_deleted_total` INT ≥ 0, `erased_at` TIMESTAMPTZ, `payload_hash` TEXT SHA-256, `r2_object_key` TEXT UNIQUE, `delivered_to_hash` TEXT nullable, `dashboard_available_at`, `email_sent_at`, `email_error`; two CHECK constraints (erased ≤ issued + 5 min; R2 key format); two indexes (tenant + issued DESC; dsar_id); RLS: compliance_reviewer SELECT all, tenant_admin SELECT own-tenant, form_system INSERT + UPDATE; form_api REVOKED. Two new DEC-030 events (§35.6): `dsar.certificate_issued` (HIGH, 7yr — certificate_id, dsar_id, tenant_id, user_id_hash, deletion_type, payload_hash, r2_object_key; no payload); `dsar.certificate_delivered` (STANDARD, 7yr — certificate_id, tenant_id, delivery_channel enum, delivered_to_hash nullable, resend_message_id nullable). CERT-CHAIN-01 ordering invariant: `dsar.deletion_soft → dsar.deletion_confirmed → dsar.certificate_issued → dsar.certificate_delivered`; chain break triggers R-05. Admin Dashboard "DSAR & Erasure" panel (§35.8): tenant_admin + tenant_owner only; HR (`tenant_manager`) blocked; columns: DSAR ID (truncated), type, status, fulfilled_at, certificate download (presigned R2 URL, 7-day TTL), SLO met; `user_id_hash` displayed as "Employee [first 8 chars]" — no names or emails. Two new SOC 2 evidence artefacts: DSAR-E-011 (P8.0 — quarterly `dsar.certificate_issued` chain export with R2 payload_hash cross-check); DSAR-E-012 (CC7.2 — AL-DSAR-05 PagerDuty history + pg_cron job 33 reset run log). Twelve-item implementation checklist: 7× P0/M5–M6 (0070 DDL migration, 0070b counter migration + job 33 registration, ERASURE_CERT_SECRET provisioning, `generateDeletionCertificate()` implementation, DEC-030 event registration + CERT-CHAIN-01 integration test, Resend template + 48h delay hook, Admin Dashboard panel), 3× P1/M6–M7 (AL-DSAR-05 PagerDuty configuration, SOC2_READINESS.md OQ updates, DSAR-E-011 first collection), 2× P2/M11–M13 (DSAR-E-012 evidence, OQ-CERT-01 evaluation). One new open question OQ-CERT-01 (P2 — QES upgrade for FinServ/government customers; evaluate at first pilot). §32.8 OQ-DSAR-03 and OQ-DSAR-04 updated to 🟢 Resolved below. TOC updated to add §35 entry. Header updated v1.13 → v1.14. Cross-references: `docs/DATA_MODEL.md §32` (OQ-DSAR-03/04 source — §32.8 both marked 🟢 Resolved); `docs/DATA_MODEL.md §12` (Art. 17 two-phase erasure — §35 adds the certificate generation step after Phase 2 verification); `docs/DATA_MODEL.md §31` (consumer DSAR schema — `dsar_requests` table soft-referenced via `dsar_id`); `docs/OBSERVABILITY.md §37.12` (AL-DSAR-05 authoritative definition — AL-DSAR-05 is the alert wired to `enterprise_sla_counters.dsar_slo_misses_this_quarter`); `docs/ENTERPRISE_SLA.md §19.5` (24-hour employer-side Art. 15 SLO source); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — CERT-CHAIN-01 violation triggers R-05); `docs/CRYPTOGRAPHY_POLICY.md §5` (ERASURE_CERT_SECRET key inventory + annual rotation); `docs/KEY_ROTATION.md` (ERASURE_CERT_SECRET rotation schedule); `docs/AUDIT_LOG_SCHEMA.md §6.DSAR-enterprise` (two new events to register — P0 before M5); `docs/SOC2_READINESS.md §P8.0` (DSAR-E-011 extends evidence table); `docs/SOC2_READINESS.md §CC7.2` (DSAR-E-012 adds to monitoring evidence). Privacy floor: no certificate payload in Postgres; no raw user_id or email in any DEC-030 event; HR role blocked from Admin Dashboard panel; `delivered_to_hash` is SHA-256(email + PSEUDONYM_SALT) — plaintext never stored. `docs/DECISION_LOG.md DEC-052`. Owner: compliance-officer + platform-engineer + security-engineer.*
