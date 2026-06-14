@@ -1,4 +1,4 @@
-# FORM · Project Status v4.81.0
+# FORM · Project Status v4.82.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.81.0** — 2026-06-14
+**v4.82.0** — 2026-06-14
 
 ---
 
@@ -27,8 +27,9 @@
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
+| 751–800 | Athlete lifecycle & context | 1 | In progress — post-751 (desk-worker strength training) written; sports-scientist review required before publish |
 
-**Total posts: 750**
+**Total posts: 751**
 
 ---
 

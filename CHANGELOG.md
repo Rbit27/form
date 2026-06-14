@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [4.82.0] — 2026-06-14
+
+### Added
+- `content/post-751-desk-worker-strength-training.md` — Block 751–800 (Athlete lifecycle & context), post 1/50. Силовий тренінг для людей із сидячою роботою: постуральний профіль (APT, tight hip flexors, tight pec minor, обмежена thoracic extension), як ці тенденції впливають на механіку присіду/становової/overhead pressing, логіка програмування (пріоритет горизонтальної тяги ≥ жиму, hip hinge і posterior chain як primary, overhead прогресія від доступного ROM, коротка розминка без foam rolling ритуалу). Без «корективної програми» — акценти у звичайному силовому тренінгу. Refernces: Laird et al. 2014, Christensen & Hartvigsen 2008, Cheatham et al. 2015, Lederman 2011.
+- `README.md` — Block 751–800 marked as "in progress"; Block 1151–1200 "Довгострокова адаптація: роки 3–10 тренінгу" added to roadmap (20 topics).
+- `STATUS.md` — Block 751–800 row added (1/50, in progress); total posts updated to 751; version bumped to v4.82.0.
+
 ## [4.81.0] — 2026-06-14
 
 ### Added
