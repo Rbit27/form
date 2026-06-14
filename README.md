@@ -99,7 +99,7 @@ Done — posts 637–650:
 | 649 | Програмування для атлета з хронічно недостатнім сном (не клінічний сон — графік) |
 | 650 | Self-programming рік перший: що змінюється після першого самостійного циклу |
 
-### Block 651–700 — Biomechanics & injury prevention (proposed)
+### Block 651–700 — Biomechanics & injury prevention (in progress — 33/50 written · sports-scientist review required before publish)
 
 | Topic |
 |---|

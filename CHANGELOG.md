@@ -1,5 +1,10 @@
 # Changelog · FORM
 
+## [4.72.0] — 2026-06-14
+
+### Added
+- `content/post-683-foot-mechanics-arch-strength-training.md` — Biomechanics block, post 33/50. Foot mechanics under load: three-arch anatomy (medial/lateral longitudinal, transverse), plantar fascia as passive stabiliser, tripod foot concept (calcaneus + 1st metatarsal head + 5th metatarsal head). Pronation and supination as normal physiological motion, not pathology. Kinetic chain consequence: arch collapse → heel valgus → tibial internal rotation → femoral internal rotation → knee valgus. Footwear mechanics: heeled weightlifting shoes (heel-raise compensates dorsiflexion deficit), flat rigid sole (deadlift, neutral dorsiflexion), soft running shoe (suboptimal for heavy lifts). Foot intrinsics (short foot exercise, toe spread) as trainable active stabilisers. Ankle dorsiflexion restriction: soft-tissue vs. bony differentiation. Sumo vs. conventional loading differences. clinical-safety PASS (biomechanics and anatomy only; no symptom triage, no pain content). sports-scientist review pending.
+
 ## [4.71.1] — 2026-06-14
 
 ### Changed
