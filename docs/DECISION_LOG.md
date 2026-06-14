@@ -24,6 +24,15 @@
 
 ---
 
+### DEC-050 · OQ-TURH-01 + OQ-TURH-02: `form_role_enum` & `role_change_source_enum` Postgres ENUM types adopted
+
+- **Decision:** Two named Postgres ENUM types are created in migration `0069_role_enum_types.sql`: (1) `form_role_enum` with five values (`tenant_owner`, `tenant_admin`, `tenant_manager`, `member`, `support_readonly`) — matching `docs/SSO_SCIM_IMPLEMENTATION.md §5.1`; (2) `role_change_source_enum` with four values (`scim_sync`, `admin_ui`, `jit_provisioning`, `form_system`). Columns migrated: `tenant_users.form_role`, `scim_group_role_mappings.form_role`, `tenant_users_role_history.old_role`, `tenant_users_role_history.new_role` (all → `form_role_enum`); `tenant_users_role_history.changed_by` (→ `role_change_source_enum`). Full DDL and rationale in `docs/DATA_MODEL.md §34`.
+- **Owner:** platform-engineer + enterprise-architect
+- **Why:** (1) **Type safety at storage layer** — Postgres ENUMs reject invalid role values without application-level validation, eliminating a silent data-quality risk. (2) **Gap closure** — the original `tenant_users.form_role` CHECK constraint listed only 4 values; `support_readonly` was documented in SSO_SCIM §5.1 as valid but absent from the CHECK, creating a silent inconsistency. `form_role_enum` includes all five §5.1 values, closing the gap definitively. (3) **Single-place definition** — `ALTER TYPE ... ADD VALUE` is the only migration path for new roles, making the enum the canonical authority. The `scim_group_role_mappings` table retains a companion CHECK restricting group-mappable values to `('tenant_admin', 'tenant_manager', 'member')` — `tenant_owner` and `support_readonly` remain policy-prohibited from SCIM group assignment.
+- **Reverse cost:** Medium. Rolling back requires reversing the `USING` casts in `0069_role_enum_types.sql` and dropping the ENUM types — a Postgres TYPE DROP requires no dependent columns, so the migration must be reversed in exact sequence. Any code referencing enum values as typed constants must also revert to string literals. No cross-tenant or DPA impact.
+
+---
+
 ### DEC-049 · OQ-SSO-27.2: SCIM role change audit trail — `tenant_users_role_history` table approach adopted
 
 - **Decision:** Role change values (old/new role) produced by SCIM `PUT /Users` full-replace and group PATCH operations are stored in a separate `tenant_users_role_history` append-only table, **not** in the DEC-030 HMAC chain. The `scim.user_updated` event continues to record `fields_changed: ['role']` (attribute name only) as the tamper-evident chain anchor; `tenant_users_role_history.scim_request_id` cross-references that anchor to the actual role values. Full design in `docs/SSO_SCIM_IMPLEMENTATION.md §28` (migration `0068_tenant_users_role_history.sql`).

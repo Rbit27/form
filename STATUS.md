@@ -51,6 +51,11 @@
 
 | ID | Summary | Status |
 |---|---|---|
+| DEC-051 | OQ-SSO-28.2: tenant_users_role_history retention 7yr | Closed |
+| DEC-050 | OQ-TURH-01+02: form_role_enum & role_change_source_enum ENUM types | Closed |
+| DEC-049 | OQ-SSO-27.2: role change audit trail — separate table approach | Closed |
+| DEC-048 | OQ-SSO-27.3: SCIM KV failure fallback — option (c) + AL-REVOKE-01 | Closed |
+| DEC-047 | Vanta selected over Drata (PRE-25 pathway) | Closed |
 | DEC-046 | OQ-33: readiness_bucket CONDITIONAL PASS; mood_bucket VETO | Closed |
 | DEC-045 | OQ-RL-02 + OQ-BILL-01 resolved | Closed |
 | DEC-044 | OQ-BILL-05: split-column GDPR pseudonymization | Closed |
@@ -89,7 +94,7 @@
 ## Next priorities
 
 - **Block 701–750: COMPLETE** — всі 50 постів написані; sports-scientist review required before publish
-- **Block 751–800: IN PROGRESS** — posts 751–760 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress); next: posts 761–770 (hardgainer physiology, deload protocols deep dive, RPE calibration, competition prep timeline, peaking for strength sport, strength for endurance athletes, endurance for strength athletes, hypertrophy periodization, powerbuilding integration, masters strength sport)
+- **Block 751–800: IN PROGRESS** — posts 751–761 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress, new parent training); next: posts 762–770 per README plan (тренінг після 50; студент у сесію; повернення після вірусної хвороби; гібридний атлет; атлет-підприємець; сила для бігунів; тренінг в офісному готелі; тренінг без залу; підліткові тренування); sports-scientist review required before publish
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
@@ -101,4 +106,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.84.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.84.2**

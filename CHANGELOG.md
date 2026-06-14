@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.84.3] — 2026-06-14
+
+### Added
+- `docs/DECISION_LOG.md` — DEC-050 entry added (was missing, skipped between DEC-049 and DEC-051). Decision: `form_role_enum` + `role_change_source_enum` Postgres ENUM types adopted; resolves OQ-TURH-01 + OQ-TURH-02 (DATA_MODEL.md §34, migration 0069_role_enum_types.sql).
+
+### Changed
+- `STATUS.md` — Block 751–800 next priorities corrected: posts 751–761 written (not 751–760); next: posts 762–800 per README plan (Тренінг після 50, Студент у сесію, etc.). Open decisions table updated with DEC-047 through DEC-051.
+- `VERSION` — 4.84.2 → 4.84.3.
+
+---
+
 ## [4.84.2] — 2026-06-14
 
 ### Changed
