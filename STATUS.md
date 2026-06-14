@@ -1,4 +1,4 @@
-# FORM · Project Status v5.3.0
+# FORM · Project Status v5.5.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.3.0** — 2026-06-14
+**v5.5.0** — 2026-06-14
 
 ---
 
@@ -32,7 +32,7 @@
 
 **Total posts: 805**
 
-**Editorial series 11–16** — post-16 written (overtraining vs underrecovery · clinical-safety PASS); blog.html cards added for posts 11–16; post-17 (AI-coach vs PT) proposed in README.
+**Editorial series 11–17** — post-17 written (AI-coach vs PT · clinical-safety PASS); blog.html cards added for posts 11–17; posts 18–20 proposed in README.
 
 ---
 

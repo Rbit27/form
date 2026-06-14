@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [5.5.0] — 2026-06-14
+
+### Added
+- `content/post-17-ai-coach-vs-pt.md` — Editorial series post 17/17. AI-тренер проти персонального тренера: чесний trade-off. Матриця вибору: коли PT незамінний (новачок, реабілітація, мотивація як bottleneck, складні рухові патерни); коли AI достатньо (intermediate+, непередбачуваний графік, трендова аналітика, обмежений бюджет). Гібридні варіанти. Позиція FORM — задекларована явно без маркетингового framing. clinical-safety PASS.
+- `blog.html` — картка для post-17.
+
+### Changed
+- `README.md` — editorial series table оновлено: 11–17 complete; пропозиції post-18–20 додані.
+- `STATUS.md` — editorial series рядок оновлено: 11–17 complete; версія v5.5.0.
+- `VERSION` — 5.4.0 → 5.5.0.
+
+---
+
 ## [5.4.0] — 2026-06-14
 
 ### Added
