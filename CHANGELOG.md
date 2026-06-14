@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [4.92.1] — 2026-06-14
+
+### Changed
+- `docs/SOC2_READINESS.md` — v3.8.0 → v3.8.1. §81 Monthly Evidence Collection Automation — Cloudflare Cron Worker & MASTER-INDEX Reconciler. Closes OQ-EC-03 (`🟡 Open` → `🟡 Authored`). Specifies: wrangler.toml trigger (`crons = ["0 1 1 * *"]`); 5-step Worker execution sequence (chain integrity check → SLA report → per-artifact R2 writes → MASTER-INDEX atomic reconciliation via If-Match ETag → DEC-030 event emit); `system.evidence_collection_automated` Zod schema; `system.evidence_cron_stale` and `system.evidence_cron_conflict` event stubs; EVD-CHAIN-01 ordering invariant; pg_cron job 33 `evidence_cron_freshness_check` dead-man's switch (03:05 UTC 2nd of month); 4 alert rules AL-EVD-01–04 (P0 PagerDuty chain break, P1 PagerDuty R2 write failure, P2 Slack dead-man's and ETag conflict); 2 SOC 2 evidence artefacts AUTO-E-001 (CC4.2/CC7.1, 7yr) and AUTO-E-002 (CC4.1/CC7.2, 3yr). P0 implementation tasks: register 3 events in AUDIT_LOG_SCHEMA.md §6; add pg_cron job 33 to OBSERVABILITY.md §12.6.
+- `VERSION` — 4.92.0 → 4.92.1.
+
+---
+
 ## [4.92.0] — 2026-06-14
 
 ### Added

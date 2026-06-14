@@ -1,4 +1,4 @@
-# FORM · SOC 2 Type II Readiness v3.7.0
+# FORM · SOC 2 Type II Readiness v3.8.1
 
 > Внутрішній roadmap до SOC 2 Type II certification.
 > Власник: `compliance-officer` + `security-engineer`. Review: quarterly.
@@ -27019,7 +27019,7 @@ Register in `docs/AUDIT_LOG_SCHEMA.md §6` before bucket creation:
 |---|---|---|---|
 | **OQ-EC-01** | 🟢 **Resolved — DEC-052 (2026-06-14)** | R2 primary (WORM Governance default → Compliance mode after Month O+2 verification); Vanta auditor-facing mirror; 48h upload SLA; evidence never Vanta-primary. | Re-evaluation trigger: if Cloudflare R2 adds a GDPR-incompatible EU data residency change, migrate primary store to an equivalent WORM-capable store (AWS S3 eu-central-1 Object Lock is the leading alternative). |
 | **OQ-EC-02** | 🟢 **Resolved — §80.5 (2026-06-14)** | `pre-obs/` folder on R2 with README.md protocol. No DECISION_LOG entry — operational decision. Artefacts in `pre-obs/` not uploaded to Vanta; provided as supplemental design documentation if auditor requests. | Future: if the audit firm requests a "design and implementation" artefact inventory, compile an ad-hoc index from `pre-obs/` rather than mirroring to Vanta. |
-| **OQ-EC-03** | 🟡 **Open — target Month O+1** | Automation spec unchanged (§79.10 OQ-EC-03). OQ-EC-01 closure unblocks: target bucket `form-soc2-evidence` is now defined; Cron Worker upload paths can be implemented per §80.3 folder structure. | Unblocked by DEC-052. |
+| **OQ-EC-03** | 🟡 **Authored — §81 (2026-06-14)** | Cloudflare Cron Worker `evidence-collection-cron` fully specified in §81. Target bucket and folder paths from §80.3 used as R2 targets. DEC-030 event `system.evidence_collection_automated` specified; pg_cron job 33 dead-man's switch added. Closes 🟡 Authored; becomes 🟢 Done on first successful automated run at Month O+1. | Done: when Worker deployed + first Month O+1 run confirmed + AUTO-E-001 filed |
 
 ---
 
@@ -27034,5 +27034,427 @@ Register in `docs/AUDIT_LOG_SCHEMA.md §6` before bucket creation:
 *v3.7.3 (2026-06-13): §78 cross-reference correction — DEC-031 → DEC-047 in three locations (§78.2 recommendation paragraph, §78.9 gap tracker, §78.10 checklist item 1). DEC-047 (Vanta selected over Drata, 2026-06-13) is the correct DECISION_LOG entry for this tool selection; DEC-031 is "Agent team expanded from 14 → 24 agents" and was incorrectly referenced during initial §78 authoring. Checklist item 1 (§78.10) marked [x] — DEC-047 is logged. No control coverage, evidence artefact, or gap tracker status changes. Owner: compliance-officer.*
 
 *v3.7.2 (2026-06-13): §78 Continuous Compliance Automation — Vanta Integration Design, Vendor Pre-Activation Review & Observation Period Evidence Bootstrapping. PRE-25 🔴 Open → 🟡 Partial: tool selected (Vanta, DEC-031 pending DECISION_LOG.md), integration architecture designed (§78.3, four integrations: GitHub/1Password/Supabase/WorkOS; Cloudflare manual upload), privacy constraints specified (§78.4 — `vanta_readonly` Postgres role with explicit REVOKE on all Art. 9 health-data tables; `vanta_subscription_summary` view for billing-tier metadata), four-step DPA pre-activation procedure (§78.6), evidence artefacts CTOOL-E-001 through CTOOL-E-006 (§78.7), control coverage map (§78.5 — 7 automated controls, 2 manual upload, DEC-030 chain not delegatable), SOC 2 criteria mapping CC4.1/CC4.2/CC2.3/CC8.1/CC6.2/CC7.1/CC9.2 (§78.8), gap tracker PRE-25 🔴→🟡 (§78.9), 16-item implementation checklist with 10× P0/Month-O-1 items (§78.10). `system.compliance_tool_connected` DEC-030 event type registered (STANDARD, 3yr, §78.7). Three open questions: OQ-CTOOL-01 (P1 — Terraform vs manual Cloudflare WAF evidence), OQ-CTOOL-02 (P2 — Vanta Learning vs manual training log), OQ-CTOOL-03 (P2 — Vanta SOC 2 report lapse compensating control). Readiness: ~98.4% → ~98.4% (score updates on CTOOL-E-001 + CTOOL-E-002 filing, estimated +0.3 pp). Cross-references: docs/VENDOR_REGISTRY.md (Vanta High-tier vendor), docs/VULNERABILITY_MANAGEMENT.md §41 (Dependabot evidence), docs/SOC2_READINESS.md §15 (compliance calendar), docs/SOC2_READINESS.md §17 (vendor pre-activation procedure), docs/AUDIT_LOG_SCHEMA.md (DEC-030 `system.compliance_tool_connected`). Owner: compliance-officer + devops-lead.*
+
+---
+
+---
+
+## 81. Monthly Evidence Collection Automation — Cloudflare Cron Worker & MASTER-INDEX Reconciler
+
+### 81.1 Purpose and Scope
+
+This section specifies the `evidence-collection-cron` Cloudflare Worker that automates the three monthly recurring evidence tasks from §79.5 (compliance calendar):
+
+1. **HMAC chain integrity check** (CC7-E-001) — SQL query from §79.7 run against `audit_log`; result filed to `compliance/evidence/cc7/`.
+2. **Monthly SLA report** (A1-E-001) — compiled from `sla_monthly_snapshots` (§23) and Analytics Engine; filed to `compliance/evidence/a1/`.
+3. **MASTER-INDEX update** — `compliance/evidence/MASTER-INDEX-YYYY.csv` marked with `COLLECTED` status for newly filed artefacts.
+
+**Out of scope for this Worker:** quarterly evidence tasks (run by compliance-officer manually); Vanta mirror uploads (remain manual per §80.4, triggered by the monthly mirror-log entry this Worker appends); R2 bucket setup and access control (§80); ad-hoc evidence for incidents (§79.3 Manual-event class).
+
+**Privacy floor:** No individual employee health data in any DEC-030 event emitted by this Worker. `artifacts_written` contains R2 path strings only; `master_index_hash` is a SHA-256 of file paths and status column values — never of evidence content.
+
+---
+
+### 81.2 Architecture: Cloudflare Cron Worker vs. pg_cron
+
+| Dimension | pg_cron | Cloudflare Cron Worker |
+|---|---|---|
+| Supabase SQL | Native | Via Supabase REST API `/rpc/` |
+| R2 writes | Impossible | Native (R2 binding) |
+| Analytics Engine reads | Impossible | Native (AE binding) |
+| DEC-030 emission | Via Edge Function call | Via `emit-audit-event` Worker fetch |
+| Secret management | Supabase Vault | Worker Secrets (env) |
+| Audit trail | DEC-030 via Edge Function | DEC-030 via `emit-audit-event` fetch |
+
+**Decision:** Cloudflare Cron Worker is required because evidence collection spans three systems (Supabase, Analytics Engine, R2) that pg_cron cannot write to directly. pg_cron (job 33) is retained as the dead-man's switch (§81.8) — it checks for the Worker's DEC-030 output event and fires AL-EVD-01 if absent.
+
+---
+
+### 81.3 Worker Specification: `evidence-collection-cron`
+
+**`wrangler.toml` additions:**
+
+```toml
+name = "evidence-collection-cron"
+main = "workers/compliance/evidence-collection-cron.ts"
+compatibility_date = "2026-06-01"
+
+[[r2_buckets]]
+binding = "EVIDENCE_VAULT"
+bucket_name = "form-soc2-evidence"
+
+[[analytics_engine_datasets]]
+binding = "SLA_EVENTS"
+dataset = "sla_events"
+
+[triggers]
+crons = ["0 1 1 * *"]   # 01:00 UTC on the 1st of each month
+```
+
+**Worker execution sequence:**
+
+```typescript
+export default {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    const period = getPeriod(event.scheduledTime);  // "2026-07"
+    const runStart = Date.now();
+
+    // Step 1 — HMAC chain integrity check
+    const chainOk = await runChainIntegrityCheck(env);
+    if (!chainOk) {
+      await emitChainViolation(env, period);
+      // Abort — do NOT emit evidence_collection_automated for this period
+      await markMasterIndexChainBreach(env, period);
+      return;
+    }
+
+    // Step 2 — Monthly SLA report
+    const slaReport = await buildMonthlySLAReport(env, period);
+    const slaPath = `compliance/evidence/a1/A1-E-001-${period}.json`;
+    await writeToR2(env.EVIDENCE_VAULT, slaPath, JSON.stringify(slaReport, null, 2));
+
+    // Step 3 — Chain integrity result file
+    const chainPath = `compliance/evidence/cc7/CC7-E-001-${period}.json`;
+    await writeToR2(env.EVIDENCE_VAULT, chainPath, JSON.stringify({ chain_ok: true, checked_at: new Date().toISOString() }));
+
+    const artifactsWritten = [slaPath, chainPath];
+
+    // Step 4 — MASTER-INDEX reconciliation (atomic)
+    const masterIndexHash = await reconcileMasterIndex(env, period, artifactsWritten);
+
+    // Step 5 — DEC-030 event
+    await emitEvidenceCollectionAutomated(env, {
+      period,
+      artifacts_written: artifactsWritten,
+      chain_integrity_ok: true,
+      slo_all_met: slaReport.slo_results ? Object.values(slaReport.slo_results).every(r => r.slo_met) : false,
+      master_index_hash: masterIndexHash,
+      run_duration_ms: Date.now() - runStart,
+    });
+
+    // Step 6 — Append to mirror-log for Vanta sync
+    await appendMirrorLogEntry(env, period, artifactsWritten);
+  }
+};
+```
+
+**Worker Secrets required:**
+
+| Secret name | Value |
+|---|---|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (read-only query) |
+| `AUDIT_EMIT_URL` | `emit-audit-event` Worker internal URL |
+| `AUDIT_EMIT_SECRET` | Pre-shared secret for `emit-audit-event` auth |
+
+**`form_api` REVOKED:** The `evidence-collection-cron` Worker authenticates to Supabase using `SUPABASE_SERVICE_ROLE_KEY` with `SET ROLE compliance_reviewer` before running the chain integrity query. It does NOT use the `form_api` role. Evidence paths in `artifacts_written` are never returned to any external API consumer.
+
+---
+
+### 81.4 HMAC Chain Integrity Check
+
+The Worker runs the §79.7 canonical integrity SQL via Supabase REST API:
+
+```typescript
+async function runChainIntegrityCheck(env: Env): Promise<boolean> {
+  const query = `
+    SELECT
+      id,
+      action,
+      created_at,
+      hmac_prev,
+      hmac_self,
+      LAG(hmac_self) OVER (PARTITION BY tenant_id ORDER BY created_at ASC) AS prev_actual
+    FROM audit_log
+    WHERE created_at >= NOW() - INTERVAL '35 days'
+    HAVING
+      LAG(hmac_self) OVER (PARTITION BY tenant_id ORDER BY created_at ASC)
+        IS DISTINCT FROM hmac_prev
+    LIMIT 1;
+  `;
+
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/run_chain_check`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query }),
+  });
+
+  const rows = await res.json<unknown[]>();
+  return rows.length === 0;  // zero rows = chain intact
+}
+```
+
+**On violation (rows returned):** Worker immediately emits `audit.chain_integrity_violation` (HIGH — existing event from AUDIT_LOG_SCHEMA.md), then aborts. The DEC-030 event `system.evidence_collection_automated` is NOT emitted. MASTER-INDEX entry for this period is written with `status = CHAIN_BREACH_BLOCKED`. AL-EVD-02 fires to PagerDuty `form-security`; R-05 is activated.
+
+---
+
+### 81.5 Monthly SLA Report Construction
+
+```typescript
+interface MonthlySLAReport {
+  period_start: string;          // ISO 8601 date: first day of month
+  period_end:   string;          // ISO 8601 date: last day of month
+  slo_results: {
+    [slo_id: string]: {          // e.g. "API-SLO-01", "ENT-SLO-01"
+      target_pct:             number;
+      achieved_pct:           number;
+      slo_met:                boolean;
+      error_budget_consumed_pct: number;
+    };
+  };
+  p0_incidents:        number;   // count from sla_monthly_snapshots
+  p1_incidents:        number;
+  credits_issued_usd:  number;   // sum from sla.credit_approved DEC-030 events
+  chain_integrity_ok:  boolean;  // always true when this report is filed
+  generated_at:        string;   // ISO 8601 UTC
+}
+```
+
+**Data sources (no individual health data):**
+
+| Field | Source |
+|---|---|
+| `slo_results` | `sla_monthly_snapshots` table (§23 DDL) — one row per SLO per month |
+| `p0_incidents`, `p1_incidents` | `sla_incidents` table WHERE `period = :period` |
+| `credits_issued_usd` | `audit_log` WHERE action = `sla.credit_approved` AND period |
+| `chain_integrity_ok` | Result of §81.4 query (always `true` when report generated) |
+
+The report is written as pretty-printed JSON to `compliance/evidence/a1/A1-E-001-YYYY-MM.json` with a companion SHA-256 checksum file `A1-E-001-YYYY-MM.json.sha256`.
+
+---
+
+### 81.6 DEC-030 HMAC-Chained Event: `system.evidence_collection_automated`
+
+Register in `docs/AUDIT_LOG_SCHEMA.md §6` (System events subsection) before Worker deployment.
+
+| Field | Value |
+|---|---|
+| **Event type** | `system.evidence_collection_automated` |
+| **Severity** | STANDARD |
+| **Retention** | 7 yr — constitutes SOC 2 A1-E-001 chain evidence; 7yr to match the artefacts it references |
+| **Actor** | `form_system` (Cloudflare Cron Worker) |
+| **Trigger** | Monthly Worker run completes — all steps succeeded |
+| **SOC 2 criteria** | CC4.2, CC7.1 |
+
+**Zod payload schema:**
+
+```typescript
+import { z } from 'zod';
+
+const EvidenceCollectionAutomatedSchema = z.object({
+  period:               z.string().regex(/^\d{4}-\d{2}$/),   // "2026-07"
+  artifacts_written:    z.array(z.string().startsWith('compliance/evidence/')),
+  chain_integrity_ok:   z.literal(true),    // false paths abort before this event
+  slo_all_met:          z.boolean(),
+  master_index_hash:    z.string().length(64),  // SHA-256 of updated MASTER-INDEX-YYYY.csv
+  run_duration_ms:      z.number().int().positive(),
+});
+```
+
+**EVD-CHAIN-01 ordering invariant:** `system.evidence_collection_automated` must be preceded in the chain by `system.evidence_vault_configured` (emitted once in §80.6 at bucket go-live). A `system.evidence_collection_automated` event without a prior `system.evidence_vault_configured` is an EVD-CHAIN-01 violation and the `emit-audit-event` Worker returns HTTP 422. The chain anchor is the `system.evidence_vault_configured` event ID, stored as `parent_event_id` in the MASTER-INDEX header row.
+
+**Companion event: `system.evidence_cron_stale`** (HIGH, 3yr) — emitted by pg_cron job 33 when the monthly Worker has not produced a `system.evidence_collection_automated` event. Payload: `{ period, stale_hours_detected }`. This event is the pg_cron dead-man's counterpart to the Cron Worker's output.
+
+---
+
+### 81.7 MASTER-INDEX Atomic Reconciliation
+
+The MASTER-INDEX is a CSV at `compliance/evidence/MASTER-INDEX-YYYY.csv` with columns:
+
+```
+evidence_id,tsc_criteria,collection_cadence,owner,r2_path,status,collected_at,sha256
+```
+
+The Worker performs a conditional write (atomic read-modify-write):
+
+```typescript
+async function reconcileMasterIndex(
+  env: Env,
+  period: string,
+  artifactsWritten: string[]
+): Promise<string> {  // returns SHA-256 of updated file
+
+  const year = period.slice(0, 4);
+  const key = `compliance/evidence/MASTER-INDEX-${year}.csv`;
+
+  // Read existing file + ETag
+  const existing = await env.EVIDENCE_VAULT.get(key, { type: 'text' });
+  const etag = existing?.etag ?? null;
+
+  // Parse CSV, update matching rows
+  const updated = updateMasterIndexRows(existing?.body ?? '', period, artifactsWritten);
+  const hash = await sha256(updated);
+
+  // Conditional put (If-Match ETag — fails if file changed mid-run)
+  const putResult = await env.EVIDENCE_VAULT.put(key, updated, {
+    httpMetadata: { contentType: 'text/csv' },
+    customMetadata: { sha256: hash, updated_by: 'evidence-collection-cron', period },
+    onlyIf: etag ? { etagMatches: etag } : undefined,
+  });
+
+  if (!putResult) {
+    // ETag mismatch — retry once after 5s
+    await sleep(5000);
+    const retryResult = await conditionalPutMasterIndex(env, key, period, artifactsWritten);
+    if (!retryResult) {
+      await emitCronConflict(env, period);
+      throw new Error('MASTER-INDEX conflict after 2 retries — aborting');
+    }
+    return retryResult;
+  }
+
+  return hash;
+}
+```
+
+**On `If-Match` conflict after 2 retries:** Worker emits `system.evidence_cron_conflict` (MEDIUM, 1yr; payload: `{ period, conflict_count: 2 }`) and throws — execution terminates without emitting `system.evidence_collection_automated`. The DEC-030 absence triggers AL-EVD-01 (dead-man's switch). `status` for this period remains `NOT_YET_COLLECTED` in MASTER-INDEX until manual reconciliation.
+
+---
+
+### 81.8 Failure Handling and Alerting
+
+#### AL-EVD-01 — Monthly run absent (dead-man's switch)
+
+| Attribute | Value |
+|---|---|
+| **Alert ID** | AL-EVD-01 |
+| **Severity** | P2 |
+| **Detection** | pg_cron job 33 `evidence_cron_freshness_check` — runs 03:05 UTC on 2nd of each month |
+| **Trigger** | No `system.evidence_collection_automated` DEC-030 event with `period = YYYY-MM` found in `audit_log` |
+| **Channel** | Slack `#compliance-alerts` |
+| **Dedup** | One alert per missing period |
+| **Triage** | Check Cloudflare Cron Dashboard → `evidence-collection-cron` → previous cron run; check Worker logs; run manually if needed |
+
+**pg_cron job 33 SQL:**
+
+```sql
+-- evidence_cron_freshness_check — runs 03:05 UTC on 2nd of each month
+-- Emits system.evidence_cron_stale (HIGH) if no automation event from yesterday
+SELECT
+  CASE WHEN COUNT(*) = 0 THEN
+    -- Trigger AL-EVD-01: call Edge Function emit_evidence_cron_stale()
+    (SELECT net.http_post(
+      url := current_setting('app.audit_emit_url'),
+      body := jsonb_build_object(
+        'event_type', 'system.evidence_cron_stale',
+        'actor_type', 'system',
+        'period', TO_CHAR(NOW() - INTERVAL '1 month', 'YYYY-MM'),
+        'stale_hours_detected', EXTRACT(EPOCH FROM (NOW() - (NOW() - INTERVAL '1 month AT TIME ZONE ''UTC''
+          + INTERVAL '1 hour'))) / 3600
+      )::text,
+      headers := jsonb_build_object('X-Audit-Secret', current_setting('app.audit_emit_secret'))
+    ))
+  END
+FROM audit_log
+WHERE
+  action = 'system.evidence_collection_automated'
+  AND created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+  AND created_at <  DATE_TRUNC('month', NOW());
+```
+
+Register as job 33 in §12.6 pg_cron job registry in `docs/OBSERVABILITY.md`.
+
+#### AL-EVD-02 — Chain integrity violation detected
+
+| Attribute | Value |
+|---|---|
+| **Alert ID** | AL-EVD-02 |
+| **Severity** | P0 |
+| **Trigger** | `audit.chain_integrity_violation` event emitted by Worker |
+| **Channel** | PagerDuty `form-security` (HIGH urgency) + Slack `#security-alerts` |
+| **Response** | Activate R-05 (HMAC chain break runbook) immediately |
+| **No auto-resolve** | Manual compliance-officer sign-off required |
+
+#### AL-EVD-03 — R2 write failure for required artefact
+
+| Attribute | Value |
+|---|---|
+| **Alert ID** | AL-EVD-03 |
+| **Severity** | P1 |
+| **Trigger** | Worker's `writeToR2` throws on a required artefact path |
+| **Channel** | PagerDuty `form-platform` |
+| **Response** | Check R2 bucket status; re-run Worker manually via Cloudflare Dashboard |
+
+#### AL-EVD-04 — MASTER-INDEX ETag conflict unresolved
+
+| Attribute | Value |
+|---|---|
+| **Alert ID** | AL-EVD-04 |
+| **Severity** | P2 |
+| **Trigger** | `system.evidence_cron_conflict` event emitted |
+| **Channel** | Slack `#compliance-alerts` |
+| **Response** | Manual MASTER-INDEX reconciliation; document in monthly compliance memo |
+
+---
+
+### 81.9 SOC 2 Evidence Artefacts
+
+Store at `compliance/evidence/cc4/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **AUTO-E-001** | Annual export of `system.evidence_collection_automated` DEC-030 events — 12 events per calendar year demonstrating consistent monthly automation; each event contains `master_index_hash` linking the run to the MASTER-INDEX state at that point | CC4.2 — Ongoing monitoring of controls; CC7.1 — Automated detection and response to anomalies | 7 yr |
+| **AUTO-E-002** | AL-EVD-01/AL-EVD-02/AL-EVD-03/AL-EVD-04 PagerDuty and Slack rule configuration export + 90-day alert incident history | CC4.1 — Control environment oversight; CC7.2 — Anomaly detection coverage for the evidence automation layer | 3 yr |
+
+**Auditor narrative for CC4.2:** FORM's monthly evidence collection runs automatically on the 1st of each calendar month at 01:00 UTC via the `evidence-collection-cron` Cloudflare Worker. AUTO-E-001 provides the DEC-030 HMAC chain proof that each monthly run completed, was not manually triggered, ran the chain integrity check, and produced artefacts that passed SHA-256 integrity checks before filing to R2. The `master_index_hash` in each event allows auditors to independently verify the MASTER-INDEX state at any point in the observation year.
+
+**Auditor narrative for CC7.1 (automated anomaly detection):** AL-EVD-02 triggers immediately if the chain integrity SQL returns any rows (chain break). AL-EVD-01 triggers if the monthly automation does not run by 03:05 UTC on the 2nd — this dead-man's switch ensures that a Worker crash does not silently create an evidence gap. Together these controls ensure anomalies in the compliance automation layer are detected and escalated without relying on manual checks.
+
+---
+
+### 81.10 Gap Tracker
+
+| Gap | Before §81 | After §81 |
+|---|---|---|
+| OQ-EC-03 — Evidence collection automation | 🟡 P1 Unblocked (§80.8, 2026-06-14) | 🟡 **Authored — §81 (2026-06-14)** → 🟢 on first successful Month O+1 run |
+| CC4.2 — Ongoing monitoring of controls | 🟡 Partial (§79 manual calendar) | 🟡 Partial → 🟢 on AUTO-E-001 first filing |
+
+**Readiness impact:** ~99.1% → ~99.1% (authored; +0.1 pp on AUTO-E-001 first successful filing at Month O+1 with all 12 monthly events present).
+
+---
+
+### 81.11 Implementation Checklist
+
+#### P0 — Before observation period starts (Month O-1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Deploy `evidence-collection-cron` Worker to production environment; configure R2 binding `EVIDENCE_VAULT` → `form-soc2-evidence` (from §80.3); set all four Worker Secrets. Validate with a synthetic dry-run (period `"test-dry-run"` — must not write to live MASTER-INDEX). | devops-lead | **P0** | Month O-1 | [ ] |
+| 2 | Register `system.evidence_collection_automated` DEC-030 event in `docs/AUDIT_LOG_SCHEMA.md §6`; deploy to `emit-audit-event` Worker event registry; confirm EVD-CHAIN-01 ordering invariant enforced (test: emit without preceding `system.evidence_vault_configured` → expect HTTP 422). | platform-engineer + compliance-officer | **P0** | Month O-1 | [ ] |
+| 3 | Register `system.evidence_cron_stale` DEC-030 event in `docs/AUDIT_LOG_SCHEMA.md §6`; deploy to `emit-audit-event` Worker. | platform-engineer | **P0** | Month O-1 | [ ] |
+| 4 | Register `system.evidence_cron_conflict` DEC-030 event in `docs/AUDIT_LOG_SCHEMA.md §6` (MEDIUM, 1yr). | platform-engineer | **P0** | Month O-1 | [ ] |
+| 5 | Implement pg_cron job 33 `evidence_cron_freshness_check` (03:05 UTC on 2nd of each month) using §81.8 SQL; register in `docs/OBSERVABILITY.md §12.6` pg_cron job registry as job 33. | devops-lead + platform-engineer | **P0** | Month O-1 | [ ] |
+| 6 | Configure AL-EVD-01 in Slack `#compliance-alerts` (P2, monthly dedup); AL-EVD-02 in PagerDuty `form-security` (P0, HIGH urgency); AL-EVD-03 in PagerDuty `form-platform` (P1); AL-EVD-04 in Slack `#compliance-alerts` (P2). | devops-lead | **P0** | Month O-1 | [ ] |
+
+#### P1 — First month of observation (Month O+1)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Confirm first automated run completed: check `system.evidence_collection_automated` DEC-030 event in `audit_log` for period `YYYY-MM` of Month O+1; verify `chain_integrity_ok: true` and `artifacts_written` contains both `A1-E-001-YYYY-MM.json` and `CC7-E-001-YYYY-MM.json`. | compliance-officer | **P1** | Month O+1 | [ ] |
+| 8 | Verify MASTER-INDEX updated: GET `compliance/evidence/MASTER-INDEX-YYYY.csv` from R2; confirm rows for A1-E-001 and CC7-E-001 show `status = COLLECTED` and `sha256` populated. | compliance-officer | **P1** | Month O+1 | [ ] |
+| 9 | File AUTO-E-002: export AL-EVD-01/02/03/04 PagerDuty/Slack configuration screenshots + 30-day incident history (covers first run) to `compliance/evidence/cc4/AUTO-E-002.pdf`. | compliance-officer | **P1** | Month O+1 | [ ] |
+
+#### P2 — Annual
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 10 | At year-end (Month O+12), export all 12 `system.evidence_collection_automated` DEC-030 events as `compliance/evidence/cc4/AUTO-E-001-YYYY.jsonl`; upload to Vanta via mirror protocol (§80.4). | compliance-officer | **P2** | Month O+12 | [ ] |
+| 11 | Review OQ-EVD-01 (full-rewrite vs. delta-log MASTER-INDEX strategy). If `system.evidence_cron_conflict` events > 3 during the year, consider delta-log approach; document decision in `docs/DECISION_LOG.md`. | devops-lead + compliance-officer | **P2** | Month O+12 | [ ] |
+
+---
+
+### 81.12 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-EVD-01** | **Should the Worker maintain a delta-log alongside the full-rewrite MASTER-INDEX approach?** Full-rewrite with `If-Match` ETag guard (§81.7) is simpler and safe for low concurrency. If `system.evidence_cron_conflict` events exceed 3 in any year (indicating another process writes MASTER-INDEX mid-run), switch to a delta-log approach: Worker appends to `MASTER-INDEX-YYYY-deltas.jsonl`; a separate quarterly reconciliation job merges into the canonical CSV. Recommendation: start with full-rewrite; revisit after Year 1 annual review (OQ-EVD-01 checkpoint in §81.11 item 11). | **P2** | devops-lead + compliance-officer | Review at Month O+12 after first year of automated runs; document decision in `docs/DECISION_LOG.md` |
+| **OQ-EVD-02** | **What is the escalation path if the monthly Worker fails 3 consecutive months?** Three consecutive AL-EVD-01 fires without resolution indicate a systemic failure. Proposed protocol: on 3rd consecutive miss, escalate to P1 (PagerDuty `form-compliance`); compliance-officer performs manual evidence collection for all three missed months using §79 Manual-periodic procedures; document a new runbook `R-27` in `docs/INCIDENT_RESPONSE.md` covering evidence automation failure recovery. Owner: security-engineer + compliance-officer. | **P2** | security-engineer + compliance-officer | Define before Month O+1; propose R-27 runbook structure in INCIDENT_RESPONSE.md |
+
+---
+
+*v3.8.1 (2026-06-14): §81 Monthly Evidence Collection Automation — Cloudflare Cron Worker & MASTER-INDEX Reconciler. Closes OQ-EC-03 (🟡 Unblocked → 🟡 Authored): §79.10 OQ-EC-03 stated the target bucket and paths were unknown; §80.3 (DEC-052) resolved that blocker; §81 delivers the full Worker spec. §81.1 scopes to three monthly automation tasks (HMAC chain integrity check CC7-E-001, monthly SLA report A1-E-001, MASTER-INDEX reconciliation); quarterly evidence tasks, Vanta mirror uploads, and R2 setup remain out of scope. §81.2 architecture decision: Cloudflare Cron Worker selected over pg_cron because evidence collection spans Supabase REST, Analytics Engine, and R2 — all inaccessible from pg_cron; pg_cron job 33 retained as dead-man's switch. §81.3 full `wrangler.toml` additions (R2 binding `EVIDENCE_VAULT`, AE binding `SLA_EVENTS`, cron `0 1 1 * *`); five-step Worker execution (chain check → SLA report → chain result file → MASTER-INDEX reconcile → DEC-030 emit + mirror-log append); four Worker Secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AUDIT_EMIT_URL, AUDIT_EMIT_SECRET); `form_api` REVOKED note; chain-abort path (no `system.evidence_collection_automated` emitted on violation). §81.4 HMAC integrity SQL (§79.7 canonical query via Supabase REST `/rpc/run_chain_check`; zero rows = intact; rows present = emit `audit.chain_integrity_violation` + abort). §81.5 `MonthlySLAReport` TypeScript interface (period_start/end, slo_results keyed by slo_id with target/achieved/slo_met/error_budget, p0/p1 incident counts, credits_issued_usd, chain_integrity_ok, generated_at); data sources: `sla_monthly_snapshots` §23 + Analytics Engine `sla_events` + `audit_log` `sla.credit_approved` events. §81.6 DEC-030 event `system.evidence_collection_automated` (STANDARD, 7yr — elevated from STANDARD 3yr because event constitutes SOC 2 A1-E-001 chain evidence; payload: period YYYY-MM, artifacts_written R2 paths, chain_integrity_ok literal true, slo_all_met bool, master_index_hash SHA-256, run_duration_ms int; EVD-CHAIN-01 ordering invariant: must follow `system.evidence_vault_configured` from §80.6); companion event `system.evidence_cron_stale` (HIGH, 3yr, emitted by pg_cron job 33). §81.7 atomic MASTER-INDEX reconciliation via R2 conditional put with `If-Match` ETag; conflict on 2 retries emits `system.evidence_cron_conflict` (MEDIUM, 1yr) and aborts. §81.8 four alert rules AL-EVD-01 through AL-EVD-04 (P2/P0/P1/P2 respectively): AL-EVD-01 dead-man's switch (Slack, monthly dedup, pg_cron job 33 trigger), AL-EVD-02 chain violation (PagerDuty `form-security` HIGH urgency, no auto-resolve, R-05 activation), AL-EVD-03 R2 write failure (PagerDuty `form-platform`), AL-EVD-04 MASTER-INDEX ETag conflict (Slack); pg_cron job 33 SQL included. §81.9 two SOC 2 evidence artefacts: AUTO-E-001 (CC4.2/CC7.1 — annual 12-event DEC-030 chain export with master_index_hash, 7yr) and AUTO-E-002 (CC4.1/CC7.2 — AL-EVD config + 90d incident history, 3yr); auditor narratives for CC4.2 and CC7.1 included. §81.10 gap tracker: OQ-EC-03 🟡 Unblocked → 🟡 Authored (🟢 on Month O+1 first run); CC4.2 🟡 Partial → 🟢 on AUTO-E-001 first annual filing; ~+0.1 pp readiness on filing. §81.11 eleven-item implementation checklist: 6× P0/Month-O-1 (Worker deploy + dry-run validation, three DEC-030 event registrations, pg_cron job 33, four AL-EVD alert rules), 3× P1/Month-O+1 (first run confirmation, MASTER-INDEX verification, AUTO-E-002 filing), 2× P2/annual (AUTO-E-001 collection, OQ-EVD-01 MASTER-INDEX mode decision). §81.12 two open questions: OQ-EVD-01 (P2 — full-rewrite vs. delta-log; recommended: full-rewrite with ETag guard at Year 1; revisit if conflict events > 3), OQ-EVD-02 (P2 — 3-consecutive-miss escalation to P1 + R-27 runbook in INCIDENT_RESPONSE.md). §80.10 OQ-EC-03 row updated to 🟡 Authored — §81. Cross-references: §79 (evidence collection plan — three monthly tasks being automated); §79.5 (compliance calendar — monthly recurring actions now covered by this Worker); §79.7 (chain integrity SQL — canonical query re-used verbatim in §81.4); §80.3 (R2 folder structure and bucket name `form-soc2-evidence` — target paths for `artifacts_written`); §80.4 (Vanta mirror protocol — Worker appends to `mirror-log/YYYY-MM.jsonl` as the trigger for manual Vanta sync); §80.6 (EVD-CHAIN-01 — `system.evidence_vault_configured` as ordering prerequisite); §15 (compliance calendar — monthly cron replaces three manual calendar entries for chain check + SLA report + MASTER-INDEX update); `docs/AUDIT_LOG_SCHEMA.md §6` (register three new DEC-030 events: `system.evidence_collection_automated` / `system.evidence_cron_stale` / `system.evidence_cron_conflict`); `docs/OBSERVABILITY.md §12.6` (pg_cron job registry — add job 33 `evidence_cron_freshness_check`); `docs/INCIDENT_RESPONSE.md R-05` (chain violation response on AL-EVD-02 trigger); `docs/INCIDENT_RESPONSE.md R-27` (evidence automation failure recovery — proposed in OQ-EVD-02); `docs/AUDIT_LOG_SCHEMA.md` (`audit.chain_integrity_violation` — existing HIGH event re-used in §81.4 abort path). Privacy floor: no individual employee health data in any §81 DEC-030 event; `artifacts_written` R2 path strings only; `master_index_hash` is a SHA-256 of path + status columns, never of evidence content; `form_api` REVOKED from all compliance evidence paths. Owner: devops-lead + compliance-officer.*
 
 ---
