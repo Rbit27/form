@@ -10172,7 +10172,7 @@ const ScimSessionRevocationKvFallbackPayload = z.object({
 
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
-| **OQ-SSO-28.1** | **AL-SCIM-05 naming collision check.** The nightly reconciliation alert proposed in §28.8 item 11 is labelled AL-SCIM-05. Confirm this ID is not already in use in `docs/OBSERVABILITY.md §26` (SSO/SCIM identity observability). If AL-SCIM-05 is taken, use the next available ID. | P2 | devops-lead | Check before configuring alert (M10). |
+| **OQ-SSO-28.1** | ~~AL-SCIM-05 naming collision check.~~ 🟢 **Resolved (2026-06-14, v4.74.1)** — AL-SCIM-05 confirmed available in the `docs/OBSERVABILITY.md §26` namespace (AL-SCIM-01..04 registered in §26.7b; AL-SCIM-MASS-01 and AL-SCIM-IP-01 use distinct suffixes). AL-SCIM-05 formally registered in **OBSERVABILITY §26.7c** as the canonical definition. No ID change required. | ~~P2~~ Resolved | devops-lead | 🟢 OBSERVABILITY §26.7c (2026-06-14). |
 | **OQ-SSO-28.2** | **`tenant_users_role_history` retention period.** The table carries `changed_at` timestamps tied to user role assignments. GDPR Art. 5(1)(e) storage limitation requires a defined retention period. Proposed: 7-year retention aligned with DEC-030 HMAC chain retention for the corresponding `scim.user_updated` event (audit-trail continuity argument). Alternative: 3 years (aligns with `scim.group_synced` retention). | P1 | compliance-officer + legal | Resolve at first legal sign-off cycle (before M9 observation period start). |
 
 ---

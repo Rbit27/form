@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [4.74.1] — 2026-06-14
+
+### Changed
+- `docs/OBSERVABILITY.md` — §26.7b SCIM Endpoint Operations alert rules (AL-SCIM-01..04): canonical registration of four SCIM Worker endpoint alerts missing from OBSERVABILITY §26 (defined in SSO §27.11 but never added here). AL-SCIM-01 (P1 — sensitive attribute rejection burst; CC6.1 evidence), AL-SCIM-02 (P2 — 5xx spike; Cloudflare AE signal), AL-SCIM-03 (P2 — sync stall; pg_cron `scim_sync_stall_check` SQL included), AL-SCIM-04 (P1 — SCIM-CHAIN-01 ordering invariant; R-05 co-activation; root-cause taxonomy). §26.7c SCIM Role History Reconciliation (AL-SCIM-05): **resolves OQ-SSO-28.1** — AL-SCIM-05 confirmed available and formally registered; pg_cron `scim_role_history_reconcile` (nightly 04:00 UTC; reconciliation SQL; P2 Slack `#compliance-alerts`; 24-hour dedup; privacy floor: gap_count only). §26.8 updated: `scim_endpoint_operations` (4 rows) + `scim_role_history` (1 row) added to §6.2 consolidated alert table. §26.11 updated: CC7.2 count sixteen → twenty-one; CC7.3 runbook refs extended to R-05; SSO-OBS-E-006 evidence artefact added. §26.12 updated: eight new checklist items (6× P0/M5, 1× P1/obs, 1× P2/M10). v1.3.2 patch.
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — OQ-SSO-28.1 closed: AL-SCIM-05 confirmed available; canonical definition in OBSERVABILITY §26.7c. v2.0.1 patch.
+- `VERSION` — 4.74.0 → 4.74.1.
+
+---
+
 ## [4.74.0] — 2026-06-14
 
 ### Added

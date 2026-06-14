@@ -5960,6 +5960,116 @@ Restore per R-24.8; resume SCIM sync (delete KV key); notify via Template MD-03
 
 ---
 
+### 26.7b Alert Rules: SCIM Endpoint Operations (AL-SCIM-01..04)
+
+> Canonical registration for the four SCIM v2.0 Worker endpoint alert rules defined in `docs/SSO_SCIM_IMPLEMENTATION.md §27.11` (v1.9, 2026-06-13). Those rules were specified alongside the SCIM Worker design but were not yet registered here as the authoritative observability document for the identity layer. SOC 2 evidence artefact SCIM-PROV-E-004 (SSO §27.12) requires PagerDuty screenshots of AL-SCIM-01..04 — this section is the compliance-officer reference for what those four rules are.
+
+| Alert ID | Trigger condition | Severity | Routing | Auto-resolve |
+|---|---|---|---|---|
+| **AL-SCIM-01** | `scim.rejected_sensitive_attribute` DEC-030 events > 3 for a single `tenant_id` in any 1-hour rolling window | **P1** | PagerDuty `form-platform` + `form-compliance`; Slack `#security-alerts` | No — IC review required before re-enabling SCIM attribute ingestion for the tenant |
+| **AL-SCIM-02** | `POST /scim/v2/Users` 5xx error rate > 5% over any 10-minute rolling window for any single tenant | **P2** | PagerDuty `form-platform` | Yes — when error rate returns to < 1% over a 10-min window |
+| **AL-SCIM-03** | `scim.user_provisioned` count for a given `tenant_id` drops to 0 for > 24 consecutive hours when the tenant has `scim_enabled = true` and the trailing 7-day event average was > 5/day (signals SCIM sync stall) | **P2** | Slack `#enterprise-ops` + PagerDuty LOW `form-customer-success` (CSM on-call) | Yes — on next `scim.user_provisioned` DEC-030 emission for that tenant |
+| **AL-SCIM-04** | SCIM-CHAIN-01 ordering invariant violated: `scim.user_deprovisioned` DEC-030 event emitted with no preceding `scim.user_provisioned` for the same `user_id` in the audit chain | **P1** | PagerDuty `form-platform` + `form-compliance`; co-activate `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain anomaly) | No — chain anomaly requires IC investigation |
+
+**AL-SCIM-01 response guidance:** A `scim.rejected_sensitive_attribute` event indicates the customer's IdP attempted to push a GDPR Art. 9 attribute (health or biometric data) into FORM's SCIM endpoint. The sensitive attribute guard in `apps/scim-worker/src/handlers/users.ts` blocks the push and emits the DEC-030 HIGH event. One occurrence is likely an IdP custom attribute mapping misconfiguration. Three or more occurrences in 1 hour indicate a systematic schema error — compliance-officer must contact the tenant CSM within 4 hours to verify the IdP SCIM attribute schema is corrected before SCIM sync resumes.
+
+**AL-SCIM-03 dedup:** `scim-sync-stall-{tenant_id}` with a 6-hour cooldown to prevent alert fatigue on tenants with intentional provisioning pauses. Do not fire if `tenant.lifecycle_status IN ('churned', 'offboarding')`. Signal source: pg_cron job `scim_sync_stall_check` every 30 min (`form_audit` role):
+
+```sql
+-- Schedule: */30 * * * *  (every 30 min)
+-- Freshness window: 35 min (consistent with §12.6 buffer convention)
+SELECT t.id AS tenant_id
+FROM tenants t
+WHERE t.scim_enabled = true
+  AND t.lifecycle_status NOT IN ('churned', 'offboarding')
+  AND (
+    SELECT COUNT(*)
+    FROM audit_log_events ael
+    WHERE ael.tenant_id = t.id
+      AND ael.event_type = 'scim.user_provisioned'
+      AND ael.occurred_at >= NOW() - INTERVAL '24 hours'
+  ) = 0
+  AND (
+    SELECT COUNT(*)
+    FROM audit_log_events ael
+    WHERE ael.tenant_id = t.id
+      AND ael.event_type = 'scim.user_provisioned'
+      AND ael.occurred_at >= NOW() - INTERVAL '7 days'
+  ) > 5;
+-- Each returned row → Slack #enterprise-ops + PagerDuty LOW dedup scim-sync-stall-{tenant_id}
+```
+
+**AL-SCIM-04 root-cause taxonomy:** (a) *Pre-chain users* — provisioned before HMAC chain activation; produces a bounded one-time burst at chain activation, not a recurrence. (b) *IdP replay* — SCIM DELETE replayed after a tenant migration; produces isolated events across random `user_id` values without a correlated pattern. (c) *Genuine chain tamper* — produces a pattern with correlated `tenant_id` and `actor_id`. IC must distinguish these before escalating to SOC 2 incident; case (c) is the only one requiring R-05 escalation and auditor notification.
+
+**Signal sources summary:**
+- AL-SCIM-01, AL-SCIM-04: DEC-030 event stream (`audit_log_events` webhook → `emit-audit-event` Worker → PagerDuty Events API v2; filter on `event_type IN ('scim.rejected_sensitive_attribute', 'scim.user_deprovisioned')`).
+- AL-SCIM-02: Cloudflare Analytics Engine — `scim_requests_total{outcome="error",status_class="5xx"}` per `tenant_id`, 10-min rolling window.
+- AL-SCIM-03: `scim_sync_stall_check` pg_cron (every 30 min) — SQL above.
+
+**SOC 2 mapping (AL-SCIM-01..04):**
+
+| Criterion | Control |
+|---|---|
+| **CC6.1** | Sensitive attribute guard confirmed operational: `scim.rejected_sensitive_attribute` DEC-030 events provide real-time enforcement evidence at the provisioning boundary (SCIM-PROV-E-003 evidence artefact from SSO §27.12) |
+| **CC6.3** | SCIM-CHAIN-01 ordering integrity: AL-SCIM-04 detects deprovision events without a corresponding provision anchor — ensures no user can be deprovisioned who was never formally provisioned in the auditable chain |
+| **CC7.2** | SCIM endpoint anomaly monitoring: sensitive attribute burst (AL-SCIM-01), error spike (AL-SCIM-02), sync stall (AL-SCIM-03), chain invariant violation (AL-SCIM-04) |
+| **PI1.1** | Processing integrity: AL-SCIM-03 (stall) and AL-SCIM-04 (chain ordering) provide direct evidence that SCIM provisioning pipeline processing is complete and accurate |
+
+---
+
+### 26.7c Alert Rules: SCIM Role History Reconciliation (AL-SCIM-05)
+
+> **Resolves OQ-SSO-28.1** from `docs/SSO_SCIM_IMPLEMENTATION.md §28.13`: the ID `AL-SCIM-05` is confirmed available in the AL-SCIM-\* namespace — AL-SCIM-01..04 are defined in §26.7b above; AL-SCIM-MASS-01 and AL-SCIM-IP-01 use distinct suffixes. AL-SCIM-05 is formally registered here as the canonical OBSERVABILITY §26 definition. Cross-reference: `docs/SSO_SCIM_IMPLEMENTATION.md §28.8 checklist item 11` (P2, M10).
+
+**AL-SCIM-05 — SCIM Role History Reconciliation Gap**
+
+| Attribute | Value |
+|---|---|
+| **Signal source** | pg_cron job `scim_role_history_reconcile` (nightly at 04:00 UTC; `form_audit` role) |
+| **Trigger condition** | `COUNT(*) > 0` returned by reconciliation query: `audit_log_events` rows with `event_type = 'scim.user_updated'` AND `'role' = ANY(fields_changed)` AND no matching `tenant_users_role_history.scim_request_id` — indicates `recordRoleChange()` failed silently during a SCIM PUT or group PATCH operation |
+| **Severity** | **P2** |
+| **Routing** | Slack `#compliance-alerts` only (not PagerDuty — non-urgent, SOC 2 audit trail gap detection) |
+| **Dedup key** | `scim-role-history-gap-{YYYY-MM-DD}` (24-hour window — one notification per day maximum) |
+| **Auto-resolve** | No — manual investigation required to identify the silent-failure code path |
+| **Freshness window** | 25 hours (nightly cadence; 1-hour grace for clock drift) |
+| **Privacy invariant** | Alert payload contains only `gap_count INTEGER` and `detected_at TIMESTAMPTZ` — no `user_id`, `tenant_id`, `old_role`, or `new_role` in the Slack notification. IC runs the scoped query inside a controlled psql session only. |
+
+**Reconciliation SQL (pg_cron `scim_role_history_reconcile`, 04:00 UTC):**
+
+```sql
+-- Role: form_audit (SELECT on audit_log_events; SELECT on tenant_users_role_history)
+-- Schedule: 0 4 * * *  (nightly)
+SELECT COUNT(*) AS gap_count
+FROM audit_log_events ael
+WHERE ael.event_type = 'scim.user_updated'
+  AND 'role' = ANY(ael.fields_changed)
+  AND ael.occurred_at >= NOW() - INTERVAL '25 hours'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM tenant_users_role_history turh
+    WHERE turh.scim_request_id = ael.scim_request_id
+  );
+-- gap_count > 0 → POST to Slack #compliance-alerts webhook;
+-- dedup key: scim-role-history-gap-{CURRENT_DATE}; 24-hour TTL
+```
+
+**Response guidance (gap_count > 0):** Per the non-fatal design in `docs/SSO_SCIM_IMPLEMENTATION.md §28.4.5`, the role change itself is preserved in `tenant_users` — the gap is an audit trail gap, not a data loss event. IC response:
+
+1. Run the trigger SQL scoped to each `tenant_id` to identify affected tenants.
+2. Cross-reference matching `scim_request_id` values in `audit_log_events` against `tenant_users_role_history`.
+3. Check Sentry and Supabase connection pool logs at the corresponding `occurred_at` timestamps for transient INSERT errors from `recordRoleChange()`.
+4. If a code path is found that bypasses `recordRoleChange()`, file a **P1 bug** and notify compliance-officer immediately (SOC 2 CC6.3 evidence gap — role change not fully audited in `tenant_users_role_history`).
+5. Document the investigation and resolution in `compliance/evidence/scim-role/gap-YYYY-MM-DD.md`.
+
+**SOC 2 mapping (AL-SCIM-05):**
+
+| Criterion | Control |
+|---|---|
+| **CC6.3** | Role change audit trail completeness: AL-SCIM-05 confirms that every SCIM role change in the DEC-030 chain (excluded from chain exports per DEC-049 to prevent cross-tenant leakage) has a corresponding `tenant_users_role_history` row for SOC 2 fieldwork cross-reference |
+| **CC7.2** | Continuous integrity monitoring of the role-change audit trail via nightly reconciliation — automated detection of silent INSERT failures that would otherwise produce an undetected evidence gap at SOC 2 observation period end |
+
+---
+
 ### 26.8 §6.2 Alert Rules Additions
 
 The rows below are to be inserted into the §6.2 consolidated alert rules table under three new subsection headers. They use the condensed format matching §6.2's existing structure; full runbook detail is in §26.5–§26.7.
@@ -5996,6 +6106,21 @@ The rows below are to be inserted into the §6.2 consolidated alert rules table 
 | Alert condition | Trigger | Severity | Routing | Runbook |
 |---|---|---|---|---|
 | **SCIM mass deprovisioning ≥ 10% of seats** | `scim_mass_deprovision_check` pg_cron (job 24): `scim.user_deprovisioned` burst ≥ `MAX(0.10 × seat_count, 10)` in 10-min window | P0 (≥ 50% or admin lockout) / P1 (≥ 10%) | PagerDuty `form-customer-success` + `form-platform` dual page; dedup `scim-mass-deprovision-{tenant_id}` 1 h / 15 min | §26.7a AL-SCIM-MASS-01; INCIDENT_RESPONSE.md R-24 |
+
+**Subsection: `scim_endpoint_operations` (new subsection in §6.2, insert after `mass_deprovision`):**
+
+| Alert condition | Trigger | Severity | Routing | Runbook |
+|---|---|---|---|---|
+| **SCIM sensitive attribute rejected (burst)** | `scim.rejected_sensitive_attribute` DEC-030 > 3 for same `tenant_id` in 1 h | P1 | PagerDuty `form-platform` + `form-compliance`; `#security-alerts` | §26.7b AL-SCIM-01 |
+| **SCIM endpoint 5xx spike** | `POST /scim/v2/Users` 5xx error rate > 5% / 10-min rolling, any tenant | P2 | PagerDuty `form-platform` | §26.7b AL-SCIM-02 |
+| **SCIM sync stall** | `scim.user_provisioned` = 0 for > 24 h when 7-day avg > 5/day | P2 | Slack `#enterprise-ops` + PagerDuty LOW `form-customer-success` | §26.7b AL-SCIM-03 |
+| **SCIM chain invariant violation** | `scim.user_deprovisioned` with no prior `scim.user_provisioned` for same `user_id` | P1 | PagerDuty `form-platform` + `form-compliance`; R-05 co-activate | §26.7b AL-SCIM-04; INCIDENT_RESPONSE.md R-05 |
+
+**Subsection: `scim_role_history` (new subsection in §6.2, insert after `scim_endpoint_operations`):**
+
+| Alert condition | Trigger | Severity | Routing | Runbook |
+|---|---|---|---|---|
+| **SCIM role history reconciliation gap** | Nightly `scim_role_history_reconcile` pg_cron returns `gap_count > 0`: `scim.user_updated` with `role` in `fields_changed` has no matching `tenant_users_role_history` row | P2 | Slack `#compliance-alerts`; dedup `scim-role-history-gap-{date}` | §26.7c AL-SCIM-05 |
 
 ---
 
@@ -6043,8 +6168,8 @@ The identity layer emits a high volume of DEC-030 HMAC-chained events. Monitorin
 |---|---|---|
 | **CC6.1** | Credentials (X.509 certs, service account keys, SCIM tokens) have a monitored lifecycle with defined rotation and revocation procedures | AL-CERT-01 through AL-CERT-05 provide continuous automated coverage; `sso.cert_expiry_alert` DEC-030 event log for observation period; `cert_alert_tier` snapshot (SSO-OBS-E-002) |
 | **CC6.3** | Logical access is removed on a timely basis when no longer authorized | AL-REVOKE-01 fires on KV sync failures that could delay revocation; SSO-SLO-04 (< 200 ms P99) is the quantitative commitment; `session.bulk_revocation_complete` events with `duration_ms` confirm timeliness (SSO-OBS-E-003) |
-| **CC7.2** | Entity monitors system components for anomalies | All sixteen alert rules (AL-CERT-01..05, AL-REVOKE-01..02, AL-SSO-GDIR-01..05, AL-SCIM-MASS-01, SCIM deprovisioning P1, SSO chain continuity P1) are continuous anomaly monitors with defined thresholds and owners |
-| **CC7.3** | Entity evaluates and responds to identified anomalies | Response SLA column in §26.5–§26.7a; PagerDuty routing to named owners; INCIDENT_RESPONSE.md R-04/R-12/R-24 cross-references form the documented response procedure |
+| **CC7.2** | Entity monitors system components for anomalies | All twenty-one alert rules (AL-CERT-01..05, AL-REVOKE-01..02, AL-SSO-GDIR-01..05, AL-SCIM-MASS-01, AL-SCIM-01..04, AL-SCIM-05, SCIM deprovisioning P1, SSO chain continuity P1) are continuous anomaly monitors with defined thresholds and owners |
+| **CC7.3** | Entity evaluates and responds to identified anomalies | Response SLA column in §26.5–§26.7c; PagerDuty routing to named owners; INCIDENT_RESPONSE.md R-04/R-05/R-12/R-24 cross-references form the documented response procedure |
 | **CC9.2** | Risk from vendors and sub-processors is managed | Google Workspace Directory API is a conditional sub-processor (active only when `google_directory_sync_enabled = true`); AL-SSO-GDIR-04 fires on unexpected sync scope changes; DPA clause in SCIM contract template updated per SSO §21 checklist item 10 |
 | **A1.1** | Entity maintains, monitors, and evaluates current processing capacity and use of system components | AL-SCIM-MASS-01 detects the availability threat where a mass deprovisioning event renders employees unable to access FORM — automated detection before any manual report; dual PagerDuty page provides < 5-min acknowledgement SLA (SSO-OBS-E-005) |
 | **A1.2** | Entity authorizes, designs, develops or acquires, implements, operates, approves, maintains, and monitors environmental protections | `scim_mass_deprovision_check` pg_cron (job 24) runs every 5 minutes with a 6-min freshness window; stale job triggers `system.cron_job_stale` HIGH + §12.6 PagerDuty alert — ensuring the detection mechanism itself is monitored for failure |
@@ -6058,6 +6183,7 @@ The identity layer emits a high volume of DEC-030 HMAC-chained events. Monitorin
 | **SSO-OBS-E-003** | PagerDuty incident log: all incidents fired by AL-CERT-*, AL-REVOKE-*, AL-SSO-GDIR-* rules for the observation period | PagerDuty → Incidents → filter by service "FORM SSO" + date range → export CSV |
 | **SSO-OBS-E-004** | SSO SLO-01 compliance report — login success rate per tenant per month | `SELECT tenant_id, DATE_TRUNC('month', created_at) AS month, SUM(CASE WHEN event_type = 'sso.login_success' THEN 1 ELSE 0 END)::FLOAT / COUNT(*) AS success_rate FROM audit_log WHERE event_type IN ('sso.login_success', 'sso.login_failed') AND created_at BETWEEN $obs_start AND $obs_end GROUP BY 1, 2` |
 | **SSO-OBS-E-005** | PagerDuty incident log for AL-SCIM-MASS-01: any `scim.mass_deprovision_detected` events fired during the observation period (even if zero — zero-count is positive evidence that no mass deprovision event occurred) | PagerDuty → Incidents → filter by service "FORM Customer Success" + alert key prefix `scim-mass-deprovision-*` → export CSV; cross-reference with `SELECT * FROM audit_log WHERE event_type = 'scim.mass_deprovision_detected' AND created_at BETWEEN $obs_start AND $obs_end` |
+| **SSO-OBS-E-006** | PagerDuty incident log for AL-SCIM-01..04 (SCIM endpoint operations): sensitive attribute rejection events, 5xx error spikes, sync stall notifications, and chain invariant violations for the observation period; zero AL-SCIM-04 count is positive chain-ordering integrity evidence | PagerDuty → Incidents → filter by service "FORM Platform" + alert key prefixes `scim-rejected-attr-*`, `scim-5xx-*`, `scim-sync-stall-*`, `scim-chain-*` → export CSV; cross-reference `SELECT * FROM audit_log WHERE event_type = 'scim.rejected_sensitive_attribute' AND created_at BETWEEN $obs_start AND $obs_end` |
 
 ---
 
@@ -6080,6 +6206,13 @@ The identity layer emits a high volume of DEC-030 HMAC-chained events. Monitorin
 | Deploy pg_cron job `scim_mass_deprovision_check` (job 24, §12.6): every 5 min; query `audit_log_events` per §26.7a SQL; emit `scim.mass_deprovision_detected` DEC-030 CRITICAL on threshold breach; dual-page PagerDuty `form-customer-success` + `form-platform`; register in `docs/AUDIT_LOG_SCHEMA.md` event registry alongside the five R-24 DEC-030 events (`scim.mass_deprovision_detected`, `scim.sync_suspended`, `scim.admin_lockout_recovery`, `scim.sync_resumed`, `scim.mass_reprovision_complete`). Test: INSERT synthetic `scim.user_deprovisioned` events in staging for a 200-seat test tenant (insert 21 events in 9 min); confirm pg_cron fires, DEC-030 CRITICAL emitted, dual PagerDuty P1 page received within 60 s. | platform-engineer + devops-lead | **P0** | M5 |
 | Configure SCIM sync pause endpoint (`POST /internal/v1/admin/scim/pause`) so IC can set `scim:sync:paused:{tenant_id}` KV key; confirm SCIM PUSH returns HTTP 503 when key present; add SCIM resume endpoint (`DELETE /internal/v1/admin/scim/pause`). Both emit DEC-030 events (`scim.sync_suspended`, `scim.sync_resumed`) per R-24.9. | platform-engineer | **P0** | M5 |
 | File SSO-OBS-E-005 (AL-SCIM-MASS-01 PagerDuty evidence) in `compliance/evidence/sso/` at observation period open. If zero R-24 incidents occurred, capture the zero-count PagerDuty export and pg_cron `scim_mass_deprovision_check` run log as positive non-occurrence evidence. | compliance-officer | **P1** | Observation period open |
+| Configure AL-SCIM-01 in PagerDuty `form-platform` + `form-compliance` on DEC-030 `scim.rejected_sensitive_attribute` event type; add Slack `#security-alerts` routing; test with a synthetic SCIM POST containing a prohibited `healthData` custom attribute in staging; verify P1 fires within 30 s | devops-lead | **P0** | M5 |
+| Configure AL-SCIM-02 in Cloudflare Analytics Engine as a latency/error alert on `scim_requests_total{outcome="error",status_class="5xx"}` > 5% / 10-min rolling window per `tenant_id`; validate with a synthetic 500-series injection in staging; confirm auto-resolve on < 1% | devops-lead | **P0** | M5 |
+| Deploy pg_cron job `scim_sync_stall_check` (every 30 min; `form_audit` role; §26.7b SQL) for AL-SCIM-03; configure Slack `#enterprise-ops` + PagerDuty LOW `form-customer-success`; dedup key `scim-sync-stall-{tenant_id}` 6-hour cooldown; register in §12.6 pg_cron registry | platform-engineer + devops-lead | **P0** | M5 |
+| Configure AL-SCIM-04 in PagerDuty `form-platform` + `form-compliance` on DEC-030 `scim.user_deprovisioned` events with no preceding `scim.user_provisioned` for same `user_id` (7-day lookback query); co-activate INCIDENT_RESPONSE.md R-05 escalation path; validate with synthetic pre-chain deprovision in staging | platform-engineer | **P0** | M5 |
+| Add §26.8 `scim_endpoint_operations` and `scim_role_history` alert rule rows to §6.2 consolidated alert table | devops-lead | **P0** | M5 |
+| Deploy pg_cron job `scim_role_history_reconcile` (nightly at 04:00 UTC; `form_audit` role; §26.7c SQL) for AL-SCIM-05; configure Slack `#compliance-alerts` webhook with dedup key `scim-role-history-gap-{date}` 24-hour TTL; register in §12.6 pg_cron registry | platform-engineer + compliance-officer | **P2** | M10 |
+| File SSO-OBS-E-006 (AL-SCIM-01..04 PagerDuty evidence) in `compliance/evidence/sso/` at observation period open; capture zero-count for AL-SCIM-04 as positive chain-ordering integrity evidence; cross-reference `scim.rejected_sensitive_attribute` chain export for CC6.1 | compliance-officer | **P1** | Observation period open |
 
 ---
 
@@ -6091,6 +6224,8 @@ The identity layer emits a high volume of DEC-030 HMAC-chained events. Monitorin
 | OQ-SSO-OBS-02 | **DEC-030 event stream vs. Cloudflare Analytics Engine as the signal source for AL-SSO-GDIR-01/02.** Querying Supabase `audit_log` for alert volume works in the observation period but may not scale to fleet-wide alerting once > 50 tenants are active, because each PagerDuty check requires a Supabase query. Cloudflare Analytics Engine data points (one per `sso.google_directory_sync_error` event emission) would enable faster, cheaper aggregation. Decision needed before M4 alert implementation. | platform-engineer + devops-lead | Before AL-SSO-GDIR-01 implementation (M4) | P1 |
 
 ---
+
+*v1.3.2 patch (2026-06-14): §26.7b SCIM Endpoint Operations alert rules (AL-SCIM-01..04) + §26.7c SCIM Role History Reconciliation alert (AL-SCIM-05) — canonical registration of four SCIM Worker endpoint alert rules (SSO §27.11) missing from OBSERVABILITY §26. §26.7b: AL-SCIM-01 (P1 — sensitive attribute rejection burst > 3/h; CC6.1 enforcement evidence for SCIM-PROV-E-003); AL-SCIM-02 (P2 — SCIM endpoint 5xx > 5%/10-min rolling; Cloudflare AE signal); AL-SCIM-03 (P2 — SCIM sync stall, provisioning drops to 0 for 24 h when 7-day avg > 5/day; pg_cron `scim_sync_stall_check` every 30 min, `form_audit` role, lifecycle_status exclusion guard); AL-SCIM-04 (P1 — SCIM-CHAIN-01 ordering invariant violation, deprovision without prior provision; R-05 co-activation; root-cause taxonomy: pre-chain / IdP replay / genuine tamper). §26.7c: **Resolves OQ-SSO-28.1** (SSO §28.13) — AL-SCIM-05 confirmed available, formally registered: pg_cron `scim_role_history_reconcile` (nightly 04:00 UTC; `form_audit`; 25-hour lookback reconciliation between `scim.user_updated[role]` chain events and `tenant_users_role_history.scim_request_id`); P2 Slack `#compliance-alerts`; dedup `scim-role-history-gap-{date}`; privacy floor: aggregate gap_count only in alert, no user_id/role values; response guidance: scoped SQL → Sentry logs → P1 bug if code path found → `compliance/evidence/scim-role/gap-YYYY-MM-DD.md`. §26.8 updated: two new §6.2 subsections (`scim_endpoint_operations` 4 rows, `scim_role_history` 1 row) in condensed format. §26.11 updated: CC7.2 count upgraded from sixteen to twenty-one alert rules (adds AL-SCIM-01..04 + AL-SCIM-05); CC7.3 runbook cross-reference extended to R-05; SSO-OBS-E-006 evidence artefact added (AL-SCIM-01..04 PagerDuty export + AL-SCIM-04 zero-count chain integrity evidence). §26.12 updated: eight new checklist items — AL-SCIM-01 PagerDuty config (P0 M5, devops-lead), AL-SCIM-02 Cloudflare AE alert (P0 M5, devops-lead), `scim_sync_stall_check` pg_cron (P0 M5, platform-engineer + devops-lead), AL-SCIM-04 PagerDuty config (P0 M5, platform-engineer), §26.8 table update (P0 M5, devops-lead), `scim_role_history_reconcile` pg_cron (P2 M10, platform-engineer + compliance-officer), SSO-OBS-E-006 evidence filing (P1 observation period). Cross-references: `docs/SSO_SCIM_IMPLEMENTATION.md §27.11` (AL-SCIM-01..04 source spec); `docs/SSO_SCIM_IMPLEMENTATION.md §28.8 item 11` (AL-SCIM-05 source spec — OQ-SSO-28.1 now resolved); `docs/SSO_SCIM_IMPLEMENTATION.md §28.4.5` (non-fatal recordRoleChange design — context for AL-SCIM-05 gap semantics); `docs/DATA_MODEL.md §33` (tenant_users_role_history DDL and RLS); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain anomaly — AL-SCIM-04 escalation path); `docs/SOC2_READINESS.md §CC6.1/CC6.3` (evidence tables that will reference SCIM-PROV-E-003/004 and SSO-OBS-E-006 post-observation). Owner: devops-lead + security-engineer + compliance-officer.*
 
 *v1.3.1 patch (2026-06-11): §26 SCIM Mass Deprovisioning Observability gap-fill — closes `docs/INCIDENT_RESPONSE.md R-24.15` checklist items 1 and 6 (R-24 v2.0, 2026-06-11). §26.1 updated: fourth cross-reference added (R-24 → §26.7a); privacy constraint extended to include mass deprovisioning aggregate-only invariant; SOC 2 mapping extended to A1.1 (availability threat monitoring) and A1.2 (environmental threat detection — pg_cron freshness). §26.7a new section: AL-SCIM-MASS-01 alert spec — trigger (`scim.user_deprovisioned` burst ≥ `MAX(0.10 × seat_count, 10)` / 10-min rolling window), P0 threshold (≥ 50% or admin lockout), P1 threshold (≥ 10% or ≥ 100 users), dual-page PagerDuty routing (`form-customer-success` + `form-platform`), dedup keys, response SLA (P0 < 5 min), pg_cron implementation SQL (job 24, `form_audit` role, `NULLIF(seat_count, 0)` guard), alert response flow (IC → scope SQL → SCIM suspend → H1–H4 root cause → restore), privacy floor invariant (tenant_id + aggregate count only — no user_id or employee name in any signal). §12.6 updated: `scim_mass_deprovision_check` (job 24, `*/5 * * * *`, 6-min freshness window, A1.1/CC7.2, dual-page PagerDuty P0/P1) added as seventeenth monitored cron job. §26.8 updated: new `mass_deprovision` §6.2 condensed-format subsection (1 row: AL-SCIM-MASS-01, P0/P1, dual-page). §26.11 updated: CC7.2 upgraded from fifteen to sixteen alert rules (adds AL-SCIM-MASS-01); CC7.3 extended to include R-24 cross-reference; A1.1 and A1.2 rows added; SSO-OBS-E-005 evidence artefact added (AL-SCIM-MASS-01 PagerDuty export + zero-count positive-evidence guidance). §26.12 updated: three new checklist items — `scim_mass_deprovision_check` pg_cron deploy + DEC-030 registration + staging test (P0 M5, platform-engineer + devops-lead), SCIM sync pause endpoint (P0 M5, platform-engineer), SSO-OBS-E-005 evidence filing (P1 observation period, compliance-officer). Cross-references: `docs/INCIDENT_RESPONSE.md R-24` (R-24.2 scope SQL, R-24.3 SCIM suspend, R-24.4 admin lockout magic link, R-24.5 H1–H4 root cause, R-24.7 Templates MD-01/02/03, R-24.8 recovery, R-24.9 five DEC-030 events, R-24.12 SCIM-E-001..005 evidence); `docs/AUDIT_LOG_SCHEMA.md` (five R-24 DEC-030 event types to register); `docs/SOC2_READINESS.md §33` (A1 availability deep-dive — AL-SCIM-MASS-01 adds to A1.1/A1.2 evidence); `docs/SSO_SCIM_IMPLEMENTATION.md §15` (SCIM Groups Provisioning — OQ-R24-01 batch DELETE threshold may add enforcement logic here). Owner: devops-lead + security-engineer + compliance-officer.*
 
