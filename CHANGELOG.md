@@ -1,5 +1,19 @@
 # Changelog · FORM
 
+## [4.90.0] — 2026-06-14
+
+### Added
+- `content/post-771-when-self-coaching-ends.md` — Block 751–800 post 21/50. When self-coaching ends — when an external coach is needed: structural limits of self-coaching (technique not visible from own perspective, confirmation bias in own programming, real-time feedback during maximal effort, stagnation without clear cause, post-injury and pre-competition contexts), honest AI-coach trade-off table (what AI does well: consistent programming, availability, no performance anxiety, cost; what AI cannot replace: live technique observation, reading state in real time, motivational presence effect, non-standard situations), six markers that signal external coach is needed now, three questions to ask a coach before first session, framing self-coaching as tool with a ceiling rather than identity. clinical-safety PASS · sports-scientist review required before publish.
+- `README.md` — Block 1201–1250 "Coaching intelligence & external feedback" roadmap added (15 topics: preparing for first PT session, technical consultation vs. ongoing coaching, video self-analysis limits, partner feedback, AI-trainer 2026 assessment, online vs. in-person coaching, evaluating coach competency, short-term coach engagements, peer feedback communities, self-assessment protocols, overanalysis trap, conflicting coach/body signals, athlete-coach autonomy balance, when to change coaches).
+
+### Changed
+- `STATUS.md` — Block 751–800 counter 20 → 21 posts; total posts 764 → 765; v4.89.0 → v4.90.0.
+- `blog.html` — card for post-771 added.
+- `README.md` — post-771 marked Draft · clinical-safety PASS.
+- `VERSION` — 4.89.0 → 4.90.0.
+
+---
+
 ## [4.89.0] — 2026-06-14
 
 ### Added
