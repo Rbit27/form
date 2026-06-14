@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.8.2] — 2026-06-14
+
+### Changed
+
+- `docs/OBSERVABILITY.md` — §45 added (v3.9 → v4.1): OQ-PERF-01 + OQ-PERF-02 Resolution — k6 Platform Selection & Staging Data Governance (DEC-058). Closes two P1 open questions from §40.9: OQ-PERF-01 (k6 OSS vs. k6 Cloud) → hybrid architecture adopted (k6 OSS for CI merge gate; k6 Cloud EU-West Amsterdam for quarterly PERF-SLO-06 reference run); OQ-PERF-02 (staging data freshness) → four-step refresh procedure with ANON-01–ANON-05 invariants and clinical-safety sign-off (PERF-STAGING-E-001). OQ-PERF-03 (fleet-wide VU scaling) closed as 🟢 Deferred with threshold (10k sessions/day or 5,000 fleet seats). Two new DEC-030 STANDARD 3yr events: `system.quarterly_perf_reference_initiated` and `system.quarterly_perf_reference_completed`; PERF-CLOUD-CHAIN-01 ordering invariant. §40.9 OQ table updated; §40.10 items 8 and 9 marked Done.
+- `VERSION` — 5.8.1 → 5.8.2.
+
+---
+
 ## [5.8.1] — 2026-06-14
 
 ### Added

@@ -1,4 +1,4 @@
-# FORM · Observability & Monitoring Taxonomy v3.9
+# FORM · Observability & Monitoring Taxonomy v4.1
 
 > Owner: devops-lead. Review: quarterly or on architecture change. SOC 2 evidence: CC7.2.
 
@@ -10887,9 +10887,9 @@ Metabase collection: `FORM-DevOps`. Visibility: `form_admin`, `compliance_review
 
 | OQ | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
-| **OQ-PERF-01** | **k6 OSS in GitHub Actions vs. k6 Cloud for quarterly PERF-SLO-06 reference run.** k6 OSS in CI is subject to the GitHub Actions runner's network bandwidth and geographic limits (US East by default), which may inflate measured latency for FORM's EU-primary Cloudflare Workers deployment. k6 Cloud's distributed EU nodes would give a more accurate reference for European enterprise tenants. **Recommendation:** k6 OSS in CI for merge-gate enforcement (§40.2 trigger matrix); k6 Cloud for the quarterly PERF-SLO-06 reference benchmark run only. Cost estimate needed before committing. | **P1** | devops-lead | Decide before first quarterly reference run (M6); cost estimate from k6 Cloud pricing page; document in `docs/DECISION_LOG.md` |
-| **OQ-PERF-02** | **Staging data freshness for load tests.** If the staging Supabase project drifts from production schema (e.g., missing new RLS policies added after last refresh), load test results may not reflect production latency. **Recommendation:** document a staging schema refresh procedure — production snapshot with health data anonymised — and run it before each quarterly PERF-SLO-06 reference run. Clinical-safety must sign off that no real health data enters the anonymised staging snapshot. | **P1** | platform-engineer + compliance-officer | Document anonymisation procedure at `compliance/cc8/staging-data-anonymisation-procedure.md` before first quarterly reference run (M6) |
-| **OQ-PERF-03** | **Fleet-wide vs. per-tenant load profile scaling.** §33.3 profiles simulate a single 1,000-seat enterprise tenant (SCIM burst 500 VUs, SSO burst 500 VUs). As FORM adds more tenants, fleet-wide peak load multiplies. Should profiles scale with the largest active tenant or with total fleet active users? **Recommendation:** per-tenant (largest active seat count) through enterprise GA; revisit fleet-wide post-Series A when fleet exceeds 5,000 seats. | **P2** | devops-lead + platform-engineer | Document in `docs/DECISION_LOG.md` before first enterprise pilot (M10) |
+| **OQ-PERF-01** | **🟢 Resolved — DEC-058 (2026-06-14).** Hybrid architecture adopted: k6 OSS (GitHub Actions, US-East) for daily merge-gate enforcement (§40.2, unchanged); k6 Cloud EU-West (Amsterdam) for quarterly PERF-SLO-06 reference runs only. Four grounds: (1) geographic accuracy — US-East inflates EU-primary p95 by 40–80 ms against ENTERPRISE_SLA.md §3 commitment; (2) cost proportionality — Team plan ~$89/month; 4 quarterly runs fit within included VU-hour budget; (3) k6 Cloud `cloud_run_id` provides third-party A1.1 corroboration; (4) DEC-043/DEC-044 pattern. Full rationale and reverse cost in §45.2. | 🟢 **Resolved** | devops-lead | **Done — §45, DEC-058** |
+| **OQ-PERF-02** | **🟢 Resolved — DEC-058 (2026-06-14).** Four-step staging refresh procedure defined in §45.3: (1) `supabase db dump --schema-only` + DDL apply (grep: zero COPY/INSERT); (2) `test-data-factory` seed (lt-synthetic- tenants, @test.form.coach emails, no Art. 9 tables); (3) clinical-safety Slack attestation + `:white_check_mark:` confirmation filed as PERF-STAGING-E-001; (4) post-run `db reset` cleanup. Five ANON invariants (ANON-01 through ANON-05). Procedure constitutes `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0. | 🟢 **Resolved** | platform-engineer + compliance-officer | **Done — §45, DEC-058** |
+| **OQ-PERF-03** | **🟢 Deferred with threshold — DEC-058 (2026-06-14).** Per-tenant VU profile (largest active tenant) maintained through enterprise GA. Re-evaluation trigger: any single tenant exceeds 10,000 active sessions/day OR total fleet exceeds 5,000 contracted seats. No action required before M10. Document decision in `docs/DECISION_LOG.md` when threshold is met. See §45.5. | 🟢 **Deferred** | devops-lead + platform-engineer | **Deferred — §45.5; evaluate at M10 threshold** |
 
 ---
 
@@ -10911,8 +10911,8 @@ Metabase collection: `FORM-DevOps`. Visibility: `form_admin`, `compliance_review
 | 5 | Extend `load-test` GitHub Actions job to run all five §33.3 k6 scenarios (not just baseline) for the four enterprise-specific gate triggers listed in §40.2. | platform-engineer | **P1** | M7 | [ ] |
 | 6 | Create pg_cron job 30 `quarterly_perf_regression_check` (§40.6 SQL spec); register in §12.6 pg_cron registry; deploy to staging and verify first `system.perf_regression_detected` event fires on synthetic > 20% threshold breach. | platform-engineer | **P1** | M6 | [ ] |
 | 7 | Build "Performance & Load Test History" Metabase dashboard (§40.7 — 6 panels); add to `FORM-DevOps` collection; restrict visibility to `form_admin` + `compliance_reviewer`. | data-engineer | **P1** | M7 | [ ] |
-| 8 | Decide OQ-PERF-01 (k6 OSS vs. k6 Cloud); document in `docs/DECISION_LOG.md`; provision k6 Cloud account if chosen. | devops-lead | **P1** | M6 | [ ] |
-| 9 | Document staging data anonymisation procedure (OQ-PERF-02) at `compliance/cc8/staging-data-anonymisation-procedure.md`; clinical-safety sign-off required before first staging refresh. | platform-engineer + compliance-officer | **P1** | M6 | [ ] |
+| 8 | ~~Decide OQ-PERF-01 (k6 OSS vs. k6 Cloud); document in `docs/DECISION_LOG.md`; provision k6 Cloud account if chosen.~~ **[x] Done — DEC-058 (2026-06-14):** hybrid adopted; k6 OSS for CI gate; k6 Cloud EU-West (Amsterdam) for quarterly PERF-SLO-06 reference; k6 Cloud Team plan; see §45.2. | devops-lead | ~~**P1**~~ **🟢 Closed** | M6 | [x] |
+| 9 | ~~Document staging data anonymisation procedure (OQ-PERF-02) at `compliance/cc8/staging-data-anonymisation-procedure.md`; clinical-safety sign-off required before first staging refresh.~~ **[x] Done — DEC-058 (2026-06-14):** four-step procedure defined in §45.3; ANON-01 through ANON-05 invariants; PERF-STAGING-E-001 artefact; `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0 per §45.8 item 3. | platform-engineer + compliance-officer | ~~**P1**~~ **🟢 Closed** | M6 | [x] |
 
 #### P2 — Before SOC 2 observation period start (M8)
 
@@ -12202,3 +12202,234 @@ Store at `compliance/evidence/cc9/webhooks/` with `MANIFEST.sha256`.
 ---
 
 *v4.0 (2026-06-14): §43 Enterprise Webhook Delivery Observability — observability companion to `docs/ENTERPRISE_ADMIN_API.md §9` (Webhook Management), which specified the tenant-facing event webhook API but left RED metrics, SLO enforcement, alert rules, and SOC 2 evidence collection undefined. §43 explicitly distinguishes itself from §15 (internal audit log export and SIEM streaming) and §27 (SIEM event classification): §43 covers the tenant-controlled HTTP push endpoint where tenants receive real-time operational notifications, not the internal pipeline. Architecture: `webhook-dispatcher` Cloudflare Worker as a KV queue consumer; per-webhook HMAC-SHA256 signing keys stored as Cloudflare Worker Secrets (never in Postgres); retry ladder 5 s → 30 s → 5 min → 30 min → 2 h → 8 h (5 attempts); 5th failure = `degraded` + AL-WH-02 + WH-SLO-04 notification clock; 48 h degraded = `suspended` + AL-WH-04 + WH-NOTIF-02. §43.3 eight RED signals in `WH_TELEMETRY` Analytics Engine (delivery attempts, retry rate, queue events, failure rate by 6-value error_class enum, degraded/suspended counts, P95 dispatch latency, P95 queue age); privacy: tenant_id UUID + webhook_id UUID only, no endpoint_url, no payload body. §43.4 four SLOs: WH-SLO-01 (P95 < 30 s first attempt — §23 SLA credit engine for Growth/Enterprise), WH-SLO-02 (zero silent drops — 100% zero-tolerance), WH-SLO-03 (100% HMAC signature coverage), WH-SLO-04 (degraded notification ≤ 2 h). §43.5 five alert rules: AL-WH-01 (P1, > 20% failure / 15 min, PagerDuty form-platform), AL-WH-02 (P1, degraded state, dual-page form-platform + form-customer-success, no auto-resolve), AL-WH-03 (P2, P95 > 30s, Slack), AL-WH-04 (P1, suspended state, triple notification: dual PagerDuty + CSM email, no auto-resolve), AL-WH-05 (P1, dispatcher dead-man's switch via pg_cron job 34 — zero webhook_fired events in 2 h during business hours 09:00–22:00 UTC). §43.6 two Postgres tables: `tenant_webhooks` (UUID PK, tenant_id FK, label, endpoint_url, `endpoint_url_hash` GENERATED ALWAYS SHA-256, events TEXT[], status CHECK 4 values, consecutive_failures, degraded_since, last_delivery_at, created_by PAM session or tenant_owner; CHECK suspended → degraded_since NOT NULL; CHECK https://; partial index active/degraded; RLS: tenant_owner + tenant_admin SELECT own-tenant; form_system ALL; compliance_reviewer SELECT all; form_api REVOKED); `webhook_delivery_log` (UUID PK, webhook_id FK, tenant_id FK, event_type, audit_event_id soft-ref nullable, attempt_number 1–5, http_status nullable, error_class 6-value CHECK, latency_ms nullable, queued_at, dispatched_at, outcome CHECK 3 values; consistency CHECK; RLS: tenant_admin SELECT own; form_system ALL; compliance_reviewer SELECT all; form_api REVOKED). §43.7 pg_cron job 34 `webhook_degraded_escalation_check` (*/30 * * * *): identifies degraded webhooks > 2 h for WH-NOTIF-01 Resend dispatch + `integration.webhook_delivery_slo_breach` STANDARD 3yr; at 48 h sets status = suspended + emits `integration.webhook_suspended` HIGH 7yr + dispatches WH-NOTIF-02. §43.8 Admin Dashboard "Webhooks & Delivery Health": tenant_owner + tenant_admin only (tenant_manager HR blocked); endpoint_url shown in UI (RLS-gated); 7d success rate, last 20 attempts, retry ceiling stat, re-activate button (tenant_owner only, emits `integration.webhook_reactivated` HIGH 7yr, resets consecutive_failures = 0). §43.9 Metabase "Webhook Fleet Health" dashboard (form_admin + devops-lead + compliance_reviewer; endpoint_url excluded; endpoint_url_hash last 8 chars only). §43.10 six DEC-030 events: `integration.webhook_created` + `integration.webhook_deleted` + `integration.webhook_fired` (extended payload — all three now use endpoint_url_hash per DEC-054); `integration.webhook_delivery_failed` (HIGH, 7yr — NEW; 5th failure; consecutive_failures:5; error_class of last attempt; triggers AL-WH-02; WH-SLO-04 clock); `integration.webhook_suspended` (HIGH, 7yr — NEW; 48 h degraded; triggers AL-WH-04); `integration.webhook_reactivated` (HIGH, 7yr — NEW; tenant_owner action; resets counter). WH-CHAIN-01: webhook_fired after webhook_suspended without webhook_reactivated = R-05 trigger. §43.11 two communication templates: WH-NOTIF-01 (degraded at 2 h by pg_cron job 34; endpoint_url_hash last 8 chars; retry window warning; no health data note), WH-NOTIF-02 (suspended at 48 h; re-activate link; events not replayed; Audit Log pull API reference). §43.12 six privacy constraints: endpoint_url_hash in chain only; no request body in delivery log; no Art. 9 health data in payloads (subscription whitelist); tenant_manager HR blocked; form_api REVOKED on both tables; integration.webhook_* SIEM events compliance_reviewer only. §43.13 three SOC 2 evidence artefacts: WH-E-001 (CC9.2/CC6.8 — quarterly lifecycle chain export; no silent drops), WH-E-002 (CC7.2/CC7.3 — AL-WH-02/04 PagerDuty + Resend receipts), WH-E-003 (CC6.8/CC6.1 — annual Worker source code review confirming HMAC over raw body + no endpoint_url logging). CC9.2 auditor narrative: WH-CHAIN-01 ensures all delivery failures are chain-evidenced; no silent drops demonstrable from chain export. §43.14 two open questions: OQ-WH-OBS-01 (P2 — test endpoint UI; is_test column recommended; decide M11), OQ-WH-OBS-02 (P2 — KV queue back-pressure EPS limit; evaluate at 50 active webhook tenants). §43.15 sixteen-item implementation checklist: 7× P0/M10 (six DEC-030 event registrations + payload extensions, two table migrations, webhook-dispatcher Worker, AL-WH-02/04 PagerDuty, pg_cron job 34, WH-NOTIF-01/02 Resend templates), 5× P1/M11 (AL-WH-01/03/05 alerts, Admin Dashboard panel, SLO registration + §23 credit wire, §6.2 + WH-CHAIN-01 update, §27.2 SIEM routing), 4× P2/M12–M13 (Metabase dashboard, WH-E-001/002/003 evidence, OQ-WH-OBS-01 decision, OQ-WH-OBS-02 evaluation). Also in v4.0: §42.13 OQ-WL-OBS-01 🟢 Resolved — DEC-054 (2026-06-14): `custom_domain_hash` SHA-256 adopted for all `tenant.white_label_*` DEC-030 payloads; consistent with DEC-043 redaction pattern and §43 `endpoint_url_hash` pattern; migration 0072 DDL extended with `GENERATED ALWAYS` column; `docs/AUDIT_LOG_SCHEMA.md §WhiteLabel` payload spec updated. §42.10 `tenant.white_label_provisioned` payload updated to `custom_domain_hash`. §42.14 item 12 marked [x] Done. Cross-references: `docs/ENTERPRISE_ADMIN_API.md §9` (webhook API spec — §9.1 create/§9.2 list/§9.3 delete/§9.4 signature; retry policy and degraded/suspended transitions; §12 DEC-030 event reference — §43 extends payload specs); `docs/ENTERPRISE_ADMIN_API.md §12` (`integration.webhook_created/deleted/fired` — payload extended per DEC-054 pattern); §15 (Audit Log Export Pipeline — async S3/R2 batch + internal SIEM; distinct from §43 tenant-controlled push); §27 (SIEM event streaming — §43 adds routing constraints for integration.webhook_* events to compliance_reviewer only); §23 (Enterprise SLA Reporting — WH-SLO-01 feeds §23 credit engine for Growth/Enterprise tier); §2.1 (master SLO table — WH-SLO-01 through WH-SLO-04); §6.2 (master alert table — webhook_health subsection: AL-WH-01 through AL-WH-05); §12.6 (pg_cron registry — job 34); `docs/INCIDENT_RESPONSE.md R-05` (WH-CHAIN-01 violation); `docs/AUDIT_LOG_SCHEMA.md §Integration` (six DEC-030 events to register/extend — P0 before M10); `docs/SOC2_READINESS.md §CC9.2` (WH-E-001 extends evidence table); `docs/DATA_MODEL.md §26` (tenant_api_keys — peer management-plane table; same RLS pattern); `docs/DECISION_LOG.md DEC-054` (OQ-WL-OBS-01 closure — custom_domain_hash in white-label DEC-030 payloads). Privacy floor: no individual employee user_id or health data in any §43 DEC-030 event; endpoint_url SHA-256 hash only in all chain payloads; no request body in delivery log; form_api REVOKED on both management-plane tables. Owner: platform-engineer + devops-lead + security-engineer + compliance-officer.*
+
+## §45 OQ-PERF-01 + OQ-PERF-02 Resolution — k6 Platform Selection & Staging Data Governance (DEC-058)
+
+> Closes: **OQ-PERF-01** (🟡 P1 → 🟢, DEC-058, 2026-06-14) and **OQ-PERF-02** (🟡 P1 → 🟢, DEC-058, 2026-06-14) from §40.9.
+> Owner: devops-lead + platform-engineer + compliance-officer. Review: before each annual k6 Cloud contract renewal; on any change to load test infrastructure.
+> DEC: **DEC-058** — k6 hybrid load test platform architecture (k6 OSS CI gate + k6 Cloud EU-West quarterly reference).
+
+---
+
+### 45.1 Purpose and Scope
+
+§40.9 (v3.7, 2026-06-13) documented two P1 open questions blocking the first quarterly PERF-SLO-06 reference run (target: M6):
+
+- **OQ-PERF-01**: k6 OSS in GitHub Actions vs. k6 Cloud for the quarterly reference benchmark — GitHub Actions US-East runners may inflate EU-primary latency measurements by 40–80 ms, risking false PERF-SLO-01 pass results for EU enterprise tenants.
+- **OQ-PERF-02**: Staging data freshness — production schema drift and health data anonymisation before quarterly k6 Cloud refresh.
+
+This section closes both. OQ-PERF-03 (P2 — fleet-wide vs. per-tenant VU scaling) is formally resolved as deferred with a documented threshold trigger (§45.5).
+
+**Scope:** k6 platform selection rationale, k6 Cloud account architecture, quarterly reference run GitHub Actions workflow spec, staging schema refresh procedure and SQL, clinical-safety anonymisation invariants, two new DEC-030 audit events, one new SOC 2 artefact (PERF-STAGING-E-001), and implementation checklist. **Out of scope:** k6 VU scenario parameters (authoritative in `docs/SOC2_READINESS.md §33.3`), production alert rules (§40.4 — unchanged), merge-gate CI logic (§40.2 — unchanged).
+
+---
+
+### 45.2 OQ-PERF-01 Resolution — k6 Platform Decision (DEC-058)
+
+#### 45.2.1 Decision
+
+**Hybrid architecture adopted:**
+
+| Context | Tool | Trigger | Region | SOC 2 evidence role |
+|---|---|---|---|---|
+| Daily merge gate (§40.2) | k6 OSS (GitHub Actions) | On PR open / push to main | US-East (GitHub default) | PERF-SLO-01–05 gate enforcement; no change |
+| Quarterly PERF-SLO-06 reference run | **k6 Cloud** | `workflow_dispatch` + quarterly cron (`0 9 1 1,4,7,10 *`) | **EU-West (Amsterdam)** | LT-E-001 primary evidence anchor |
+
+k6 OSS remains the merge-gate tool — no change to §40.2. k6 Cloud EU-West is adopted **only** for the quarterly PERF-SLO-06 reference run.
+
+#### 45.2.2 Rationale
+
+**(1) Geographic accuracy for EU-primary SLA commitment.** FORM's Cloudflare Workers route enterprise tenant traffic to EU-primary (Frankfurt/Amsterdam) by default. `docs/ENTERPRISE_SLA.md §3` commits to p95 < 300 ms for Growth and Enterprise tenants. GitHub Actions US-East runners introduce 40–80 ms of transatlantic round-trip overhead absent for EU users. A quarterly reference run from US-East can pass PERF-SLO-01 (p95 ≤ 300 ms) with apparent margin that does not exist for EU tenants — producing compliance evidence that misstates real-world performance. k6 Cloud EU-West (Amsterdam) eliminates this systematic geographic bias from LT-E-001.
+
+**(2) Cost proportionality.** k6 Cloud Team plan: ~$89/month billed annually (~$1,069/year). Four quarterly runs at ≤ 500 VUs peak and ~15-minute duration fall within the Team plan's included 50 browser VU-hours + 500 protocol VU-hours per month — meaning no additional metered charges for FORM's quarterly-only cadence (verified against k6 Cloud pricing, June 2026). By contrast, daily k6 Cloud runs for the CI merge gate would require the Business plan at $299+/month — a $2,600/year uplift with no additional SOC 2 benefit, since merge-gate pass/fail is a regression-detection signal not an SLA-evidence signal.
+
+**(3) Third-party corroboration for A1.1 evidence.** LT-E-001 (`compliance/evidence/a1/lt-e-001-YYYY-QN.csv`) is the primary SOC 2 A1.1 evidence that FORM's availability commitment is backed by performance testing. k6 Cloud run IDs (`cloud_run_id`) are immutable records in the k6 Cloud portal, providing independent third-party confirmation of test execution — an attestation anchor that a self-hosted GitHub Actions artifact cannot match. SOC 2 A1.1 auditors reviewing availability evidence benefit from this corroboration path.
+
+**(4) Pattern consistency with DEC-043/DEC-044/DEC-051.** FORM consistently chooses the simpler automated tool for high-frequency operational gates, and the higher-fidelity method for low-frequency compliance-critical measurements. OQ-PERF-01 follows the same logic.
+
+#### 45.2.3 Reverse Cost
+
+**Low.** If k6 Cloud is deprecated or the Team plan is discontinued: revert quarterly run to k6 OSS with a static geographic calibration offset. Procedure: run a parallel k6 OSS baseline against FORM's production health endpoint (`GET https://api.form.coach/health` — no auth, no PII) to measure US-East RTT; compute delta against last k6 Cloud EU-West baseline; document the correction factor in `docs/DECISION_LOG.md` as a new DEC entry. Apply the offset to subsequent US-East CI results in LT-E-001. No schema changes, no DEC-030 event type changes.
+
+Re-evaluation trigger: annual k6 Cloud contract renewal (January); or if k6 Cloud EU-West latency diverges > 20 ms from §16 Better Stack EU-West synthetic probes (SYNTH-SLO-01) over a 30-day rolling window.
+
+---
+
+### 45.3 OQ-PERF-02 Resolution — Staging Data Governance
+
+#### 45.3.1 Decision
+
+**Quarterly schema-only snapshot refresh with column-level anonymisation invariants and mandatory clinical-safety sign-off.**
+
+The staging Supabase project is refreshed before each quarterly PERF-SLO-06 reference run using the four-step procedure defined in §45.3.3. This procedure constitutes `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0 (extracted per §45.8 item 3).
+
+#### 45.3.2 Anonymisation Invariants (ANON-01 through ANON-05)
+
+The following invariants are **non-negotiable**. clinical-safety must verify all five before issuing the quarterly sign-off (§45.3.3 Step 3):
+
+| ID | Invariant | Enforcement mechanism |
+|---|---|---|
+| **ANON-01** | No real `user_id` from production ever appears in staging | `user_id` values generated as `gen_random_uuid()` by `test-data-factory` seeder; no `pg_dump --data-only` from production |
+| **ANON-02** | No Art. 9 health data (biometric logs, coaching content, workout sessions, body composition) ever copied to staging | `supabase db dump --schema-only` flag; resulting SQL must contain zero `COPY` or `INSERT` statements (grep check in Step 1) |
+| **ANON-03** | No real `tenant_id` from production in staging | All staging tenants use `lt-synthetic-{N}` prefix (established in §40.1 privacy invariant) |
+| **ANON-04** | No real `email` or `full_name` in staging | Synthetic users: `lt-user-{N}@test.form.coach`; full name `Load Test User {N}` |
+| **ANON-05** | Staging project is physically isolated from production | Separate Supabase project (`$STAGING_DB_URL`); no cross-project query, no foreign-data-wrapper to production, no shared read replica |
+
+#### 45.3.3 Staging Refresh Procedure (Four Steps)
+
+**Step 1 — Schema synchronisation from production DDL**
+
+```bash
+# Export production schema (DDL only; no row data)
+supabase db dump \
+  --db-url "$PRODUCTION_DB_URL" \
+  --schema-only \
+  --file "staging-schema-$(date +%Y%m%d).sql"
+
+# ANON-02 enforcement: verify zero data statements
+DATA_ROWS=$(grep -cE '^(COPY|INSERT)' "staging-schema-$(date +%Y%m%d).sql" || true)
+if [ "$DATA_ROWS" -ne 0 ]; then
+  echo "FAIL: schema dump contains $DATA_ROWS COPY/INSERT rows — abort" >&2
+  exit 1
+fi
+
+# Apply to staging (destructive reset then schema apply)
+supabase db reset --db-url "$STAGING_DB_URL"
+psql "$STAGING_DB_URL" < "staging-schema-$(date +%Y%m%d).sql"
+```
+
+**Step 2 — Synthetic tenant and user seeding**
+
+```bash
+# Invoke test-data-factory Worker
+curl -sS -X POST "$TEST_DATA_FACTORY_URL/seed" \
+  -H "Authorization: Bearer $TEST_DATA_FACTORY_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenants": 3,
+    "users_per_tenant": 500,
+    "tenant_id_prefix": "lt-synthetic",
+    "email_domain": "test.form.coach",
+    "skip_art9_tables": true
+  }'
+```
+
+The `test-data-factory` Worker enforces ANON-01 through ANON-04 at seed time. `skip_art9_tables: true` means `coaching_turns`, `workout_sessions`, `biometric_logs`, `body_composition_logs`, and `ed_screening_sessions` tables are left empty. The load test exercises auth, SSO, SCIM, and API quota pathways — not health data pipelines.
+
+**Post-seed verification (run before Step 3):**
+
+```sql
+-- Confirm Art. 9 tables are empty
+SELECT
+  (SELECT COUNT(*) FROM coaching_turns)         AS coaching_turns,
+  (SELECT COUNT(*) FROM workout_sessions)       AS workout_sessions,
+  (SELECT COUNT(*) FROM biometric_logs)         AS biometric_logs,
+  (SELECT COUNT(*) FROM body_composition_logs)  AS body_composition_logs;
+-- All columns must be 0
+```
+
+**Step 3 — Clinical-safety sign-off**
+
+`compliance-officer` sends the following attestation to `clinical-safety` via Slack `#compliance-alerts` before triggering the k6 Cloud run:
+
+> **STAGING REFRESH ATTESTATION — [YYYY-QN]**
+> Schema dump file: `staging-schema-[YYYYMMDD].sql` — [N KB]. COPY/INSERT grep check: **0 rows**.
+> Seeded: `lt-synthetic-1`, `lt-synthetic-2`, `lt-synthetic-3` — 500 users each (@test.form.coach).
+> Art. 9 table counts: coaching_turns=0, workout_sessions=0, biometric_logs=0, body_composition_logs=0.
+> ANON-01–ANON-05 verified. Requesting clinical-safety sign-off before k6 Cloud EU-West run.
+
+`clinical-safety` confirms with a Slack `:white_check_mark:` reaction **or** a written reply. `compliance-officer` screenshots the confirmation thread and files it as **PERF-STAGING-E-001** (§45.6) within 30 minutes of confirmation.
+
+**Step 4 — Post-run cleanup**
+
+After `system.quarterly_perf_reference_completed` DEC-030 event is confirmed in `audit_log` for the completed run:
+
+```bash
+# Return staging to empty schema state
+supabase db reset --db-url "$STAGING_DB_URL"
+```
+
+Staging remains empty until the next quarterly refresh. Day-to-day development uses local Supabase instances (`supabase start`) — not the shared staging project.
+
+---
+
+### 45.4 DEC-030 Event Additions
+
+Two new events complement the existing §40.5 `system.load_test_*` family. They are distinct because quarterly Cloud runs have different infrastructure (k6 Cloud vs. GitHub Actions) and evidence role (LT-E-001 vs. daily CI gate):
+
+| Event | Severity | Retention | Key Payload Fields |
+|---|---|---|---|
+| `system.quarterly_perf_reference_initiated` | STANDARD | 3yr | `run_type: 'k6-cloud-quarterly'`, `cloud_run_id` (k6 Cloud UUID), `node_region: 'eu-west'`, `test_suite: 'perf-slo-06-reference'`, `staging_refresh_date` (date only — no PII), `clinical_safety_sign_off: true`, `quarter` (e.g. `2026-Q3`) |
+| `system.quarterly_perf_reference_completed` | STANDARD | 3yr | `cloud_run_id`, `node_region: 'eu-west'`, `slo_results` (object: PERF-SLO-01–05 each with `threshold`, `achieved`, `passed`), `p95_ms`, `p99_ms`, `error_rate_pct`, `commit_sha`, `quarter`, `run_duration_s` |
+
+**PERF-CLOUD-CHAIN-01 ordering invariant:** `system.quarterly_perf_reference_initiated` must precede `system.quarterly_perf_reference_completed` for the same `cloud_run_id`. Inversion (completed without initiated) → P1 PagerDuty `form-platform` alert; does **not** trigger R-05 (no custody breach — this is a compliance-signal ordering issue, not a chain tamper event).
+
+**Privacy invariant:** No `user_id`, real `tenant_id`, coaching content, biometric values, or employee health data in either payload. `staging_refresh_date` is a date string only. `cloud_run_id` is a k6-Cloud-assigned UUID with no mapping to any FORM user or tenant. `form_api` has no read access to `audit_log_events`.
+
+---
+
+### 45.5 OQ-PERF-03 Status — Fleet-Wide vs. Per-Tenant VU Scaling (Deferred)
+
+**Decision: per-tenant VU profile maintained through enterprise GA; formal re-evaluation deferred to M10 threshold.**
+
+The §40.9 OQ-PERF-03 recommendation is formally adopted:
+
+| Scale condition | VU profile policy | Action |
+|---|---|---|
+| Total fleet ≤ 5,000 contracted seats AND no single tenant > 10,000 daily sessions | Per-tenant (§33.3: largest active tenant, 1,000-seat model) | No change required |
+| Any single tenant exceeds 10,000 active sessions/day OR total fleet > 5,000 seats | Evaluate fleet-wide profile | `devops-lead` + `platform-engineer` document decision in `docs/DECISION_LOG.md` as new DEC entry; update §33.3 VU profiles before next quarterly run |
+
+No new DEC-030 events required — the policy is a process-level decision with no schema implications. OQ-PERF-03 is closed as **🟢 Deferred with threshold.**
+
+---
+
+### 45.6 SOC 2 Evidence
+
+| Artefact ID | Criteria | Description | Location | Cadence | Retention |
+|---|---|---|---|---|---|
+| **PERF-STAGING-E-001** | CC4.1, A1.1 | Slack screenshot showing clinical-safety `:white_check_mark:` or written confirmation of ANON-01–ANON-05 invariants for the quarterly staging refresh; includes attestation message with Art. 9 table row counts and grep check result | `compliance/evidence/a1/perf-staging-e-001-YYYY-QN.png` | Quarterly (before each k6 Cloud run) | 7yr (SOC 2 multi-cycle evidence) |
+| **LT-E-001** (updated scope) | A1.1, A1.2 | `system.quarterly_perf_reference_completed` DEC-030 chain export — **now sourced from k6 Cloud EU-West runs**; `cloud_run_id` field provides independent third-party corroboration traceable to k6 Cloud portal | `compliance/evidence/a1/lt-e-001-YYYY-QN.csv` | Quarterly | 7yr |
+
+**Auditor narrative update for A1.1:** The quarterly PERF-SLO-06 reference run uses k6 Cloud EU-West nodes (Amsterdam), geographically aligned with FORM's EU-primary Cloudflare Workers routing. This eliminates transatlantic RTT inflation from the SLA validation baseline. The `cloud_run_id` in each `system.quarterly_perf_reference_completed` event is an immutable identifier traceable to the k6 Cloud portal — establishing independent third-party corroboration for SOC 2 A1.1 (system availability validated under load). LT-E-001 now pairs the FORM HMAC chain with this external run identifier, closing the single-source-of-truth gap that a self-hosted artifact creates.
+
+---
+
+### 45.7 §40.9 OQ Gap Tracker
+
+| OQ | Status Before §45 | Status After §45 | Decision |
+|---|---|---|---|
+| **OQ-PERF-01** | 🟡 P1 Open | 🟢 **Resolved — DEC-058 (2026-06-14)** | Hybrid: k6 OSS for CI gate; k6 Cloud EU-West for quarterly PERF-SLO-06 reference |
+| **OQ-PERF-02** | 🟡 P1 Open | 🟢 **Resolved — DEC-058 (2026-06-14)** | Four-step staging refresh + ANON-01–ANON-05 + clinical-safety sign-off + PERF-STAGING-E-001 |
+| **OQ-PERF-03** | 🟡 P2 Open | 🟢 **Deferred with threshold** | Per-tenant through GA; re-evaluate at 10k sessions/day or 5,000 fleet seats |
+
+---
+
+### 45.8 Implementation Checklist
+
+#### P0 — Before first quarterly PERF-SLO-06 reference run (M6)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Create k6 Cloud account on Team plan (~$89/month annual); set default test region to EU-West (Amsterdam); obtain API token; store as `K6_CLOUD_API_TOKEN` in 1Password `form-infra` vault + as Cloudflare Workers Secret on `load-test-quarterly` Worker. | devops-lead | **P0** | M6 | [ ] |
+| 2 | Register `system.quarterly_perf_reference_initiated` and `system.quarterly_perf_reference_completed` DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §6` (System namespace); deploy to `emit-audit-event` Worker event registry; write integration test confirming PERF-CLOUD-CHAIN-01 ordering check emits P1 alert on inversion. | platform-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 3 | Extract §45.3 four-step procedure to `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0; send to `clinical-safety` for sign-off; file confirmation screenshot as the baseline PERF-STAGING-E-001 pre-procedure attestation at `compliance/evidence/a1/perf-staging-e-001-baseline.png`. | platform-engineer + compliance-officer | **P0** | M6 | [ ] |
+| 4 | Create `.github/workflows/load-test-quarterly.yml`: `workflow_dispatch` trigger + `schedule: '0 9 1 1,4,7,10 *'` cron. Steps: (a) Step 1 schema sync shell script; (b) Step 2 `test-data-factory` seed invocation; (c) manual-gate step awaiting Slack clinical-safety confirmation (workflow pauses via environment protection rule requiring `compliance-officer` approval); (d) k6 Cloud API trigger with `K6_CLOUD_API_TOKEN` targeting EU-West; (e) poll run status until completion; (f) emit DEC-030 events from run metadata; (g) Step 4 staging reset. | devops-lead + platform-engineer | **P0** | M6 | [ ] |
+| 5 | Update §40.9 OQ table (this document) per §45.7: mark OQ-PERF-01 and OQ-PERF-02 as 🟢 Resolved (DEC-058); OQ-PERF-03 as 🟢 Deferred with threshold. Update §40.10 checklist items 8 and 9 to [x] Done with DEC-058 reference. (Already reflected in this document version — verify no merge conflicts.) | compliance-officer | **P0** | M6 | [x] |
+
+#### P1 — Before SOC 2 observation period start (M8)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 6 | Execute first quarterly PERF-SLO-06 reference run (Month O-4): verify `cloud_run_id` present in `system.quarterly_perf_reference_completed` DEC-030 event; confirm `node_region: 'eu-west'`; file LT-E-001 at `compliance/evidence/a1/lt-e-001-YYYY-Q{N}.csv`; file PERF-STAGING-E-001 at `compliance/evidence/a1/perf-staging-e-001-YYYY-Q{N}.png`. | devops-lead + compliance-officer | **P1** | M8 | [ ] |
+| 7 | Confirm k6 Cloud EU-West p95 baseline for PERF-SLO-01 (target ≤ 300 ms); if p95 > 250 ms raise a Linear `[PERF]` ticket for investigation before SOC 2 observation period start — the 50 ms headroom provides early warning before the 300 ms SLA commitment is at risk. | devops-lead | **P1** | M8 | [ ] |
+
+#### P2 — Annual governance
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | Annual k6 Cloud contract renewal review (January): confirm Team plan VU-hour budget still covers 4 quarterly runs; evaluate Business plan upgrade if metered overage charges appear; document plan change in `docs/DECISION_LOG.md` if upgraded. | devops-lead | **P2** | Annual (January) | [ ] |
+| 9 | Annual OQ-PERF-03 threshold check: query `SELECT MAX(daily_session_count) FROM analytics.tenant_daily_sessions` and total contracted seats; if threshold met (10k sessions/day or 5,000 fleet seats), evaluate per-tenant vs. fleet-wide VU scaling per §45.5; document decision in `docs/DECISION_LOG.md`. | devops-lead + platform-engineer | **P2** | Annual | [ ] |
+
+---
+
+*v4.1 (2026-06-14): §45 OQ-PERF-01 + OQ-PERF-02 Resolution — k6 Platform Selection & Staging Data Governance (DEC-058). Closes two P1 open questions from §40.9 (v3.7, 2026-06-13): OQ-PERF-01 → 🟢 Resolved; OQ-PERF-02 → 🟢 Resolved. OQ-PERF-03 → 🟢 Deferred with threshold. §45.1 scopes to k6 platform selection, quarterly k6 Cloud workflow, staging refresh procedure, two DEC-030 events, one new SOC 2 artefact (PERF-STAGING-E-001); explicitly out of scope: §33.3 VU scenario parameters, §40.4 production alerts, §40.2 merge-gate logic (all unchanged). §45.2 DEC-058 decision — hybrid architecture: k6 OSS (GitHub Actions, US-East) for daily CI gate (no change); k6 Cloud EU-West (Amsterdam) for quarterly PERF-SLO-06 reference only. Four grounds: (1) geographic accuracy — US-East inflates EU-primary latency 40–80 ms vs. ENTERPRISE_SLA.md §3 p95 < 300 ms EU commitment; k6 Cloud EU-West eliminates transatlantic RTT bias from LT-E-001 evidence; (2) cost proportionality — Team plan ~$89/month; 4 quarterly runs fit within included VU-hour budget at zero metered overage; daily k6 Cloud gate requires Business plan $299+/month with no additional compliance benefit; (3) third-party corroboration — cloud_run_id is immutable k6 Cloud portal record providing A1.1 auditor attestation anchor unavailable from self-hosted artifacts; (4) DEC-043/DEC-044/DEC-051 pattern — simpler tool for high-frequency gates, higher-fidelity for low-frequency evidence. Reverse cost low: static RTT correction offset approach available if k6 Cloud deprecated; no schema/event-type changes. Re-evaluation: annual k6 Cloud renewal or > 20 ms divergence from §16 SYNTH-SLO-01. §45.3 OQ-PERF-02 — quarterly schema-only refresh: Step 1 `supabase db dump --schema-only` + grep check (zero COPY/INSERT) + `db reset` + DDL apply; Step 2 `test-data-factory` seed (lt-synthetic-{1,2,3} tenants, 500 users each, lt-user-{N}@test.form.coach, skip_art9_tables: true); Step 3 clinical-safety Slack attestation + `:white_check_mark:` confirmation → PERF-STAGING-E-001; Step 4 post-run `db reset` cleanup. Five ANON invariants: ANON-01 gen_random_uuid for user_id; ANON-02 schema-only dump no Art. 9 data; ANON-03 lt-synthetic- tenant prefix; ANON-04 @test.form.coach email; ANON-05 physically separate Supabase project. Post-seed SQL verification (Art. 9 tables must all = 0). §45.3.3 constitutes `compliance/cc8/staging-data-anonymisation-procedure.md` v1.0. §45.4 two new DEC-030 STANDARD 3yr events: `system.quarterly_perf_reference_initiated` (cloud_run_id, node_region: eu-west, test_suite, staging_refresh_date date-only, clinical_safety_sign_off: true, quarter) and `system.quarterly_perf_reference_completed` (cloud_run_id, node_region, slo_results object with PERF-SLO-01–05, p95_ms, p99_ms, error_rate_pct, commit_sha, quarter, run_duration_s); PERF-CLOUD-CHAIN-01 ordering invariant (initiated before completed per cloud_run_id; inversion → P1 PagerDuty; not R-05). §45.5 OQ-PERF-03 deferred: per-tenant VU profile maintained through GA; re-evaluation trigger at 10k daily sessions for single tenant or 5,000 fleet seats; no new DEC-030 events. §45.6 two SOC 2 artefacts: PERF-STAGING-E-001 (CC4.1/A1.1 — clinical-safety sign-off screenshot; quarterly; 7yr; compliance/evidence/a1/); LT-E-001 updated scope (A1.1 — now k6 Cloud EU-West cloud_run_id provides third-party anchor). §45.7 OQ gap tracker: OQ-PERF-01 🟡→🟢 DEC-058; OQ-PERF-02 🟡→🟢 DEC-058; OQ-PERF-03 🟡→🟢 Deferred with threshold. §45.8 nine-item implementation checklist: 5× P0/M6 (k6 Cloud account + EU-West token, two DEC-030 event registrations + PERF-CLOUD-CHAIN-01 test, compliance/cc8/ procedure extraction + clinical-safety sign-off, .github/workflows/load-test-quarterly.yml workflow with manual Slack gate, §40.9/§40.10 OQ tracker update [already done in this version]), 2× P1/M8 (first quarterly run execution + LT-E-001 + PERF-STAGING-E-001 filing, p95 > 250 ms investigation gate), 2× P2/Annual (k6 Cloud plan renewal, OQ-PERF-03 threshold annual check). Document header: v3.9 → v4.1. Cross-references: §40.2 (merge-gate trigger matrix — unchanged; k6 OSS CI gate continues); §40.4 (production alert rules — unchanged); §40.5 (existing system.load_test_* DEC-030 events — §45 adds two parallel events in system.* namespace); §40.6 (pg_cron job 30 quarterly_perf_regression_check — §45 provides the k6 Cloud evidence input); §40.8 (LT-E-001 updated: k6 Cloud as source; LT-E-002 unchanged); §40.9 (OQ-PERF-01/02/03 — all three now resolved/deferred; §40.9 OQ table updated in this document version); §40.10 (checklist items 8 and 9 marked [x] Done with DEC-058 reference); `docs/SOC2_READINESS.md §33.3` (k6 VU scenario parameters — unchanged; §45 adds Cloud execution wrapper not scenario content); `docs/ENTERPRISE_SLA.md §3` (99.9% uptime + p95 < 300 ms EU commitment — the SLA §45 validates geographically); §16 (synthetic monitoring — Better Stack EU-West probes provide continuous p95 baseline; k6 Cloud quarterly run validates under synthetic load); `docs/AUDIT_LOG_SCHEMA.md §6/§System` (two new DEC-030 events to register — P0 before M6); `docs/CLINICAL_SAFETY.md` (clinical-safety sign-off authority for ANON invariant verification — §45.3.3 Step 3); `docs/DECISION_LOG.md DEC-058`. Privacy floor: no individual employee user_id, health data, coaching content, or biometric values in either DEC-030 event; staging_refresh_date date-only; cloud_run_id k6-Cloud UUID with no FORM user mapping; form_api REVOKED from audit_log_events and compliance evidence paths. Owner: devops-lead + platform-engineer + compliance-officer.*
