@@ -1,4 +1,4 @@
-# FORM · Project Status v4.79.0
+# FORM · Project Status v4.80.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.79.0** — 2026-06-14
+**v4.80.0** — 2026-06-14
 
 ---
 
@@ -26,9 +26,9 @@
 | 591–600 | Training with tech block | 10 | Draft — review_pending: sports-scientist · **BLOCK COMPLETE** |
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
-| 701–736 | Strength sports specifics (block 701–750 in progress) | 36 | Draft — posts 705–706 clinical-safety updated (705 CONDITIONAL PASS, 706 PASS); posts 731–736 new (pull-up, BSS, triceps, box/pause squat, trap-bar, dips); all 36 sports-scientist review required before publish |
+| 701–741 | Strength sports specifics (block 701–750 in progress) | 41 | Draft — posts 705–706 clinical-safety complete (CONDITIONAL PASS/PASS); posts 737–741 new this iteration (safety bar squat, landmine press, Nordic hamstring curl, paused bench press, competition peaking); all sports-scientist review required before publish |
 
-**Total posts: 736**
+**Total posts: 741**
 
 ---
 
@@ -87,7 +87,7 @@
 
 ## Next priorities
 
-- **Block 701–750 in progress** — posts 701–736 written (36/50); posts 705–706 clinical-safety complete (705 CONDITIONAL PASS, 706 PASS); post-736 new this iteration (dips: грудні vs. трицепсові); next: 737–750 (14 posts remaining); sports-scientist review required before publish for all block posts
+- **Block 701–750 in progress** — posts 737–741 written this iteration (41/50 total); 9 posts remaining (742–750); next: complete block (742–750); sports-scientist review required before publish for all block posts
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)

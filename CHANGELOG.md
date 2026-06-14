@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.80.0] — 2026-06-14
+
+### Added
+- `content/post-737-safety-bar-squat.md` — Block 701–750, post 37/50. Safety bar присід: механіка cambered bar (зміщення навантаження вперед вимагає активного thoracic extension), EMG порівняння (Hecker et al. 2019, Yavuz et al. 2015 — вищий vastus lateralis), показання (обмеження мобільності плечей, кіфоз, варіативність), коли barbell переважає (паверліфтинг-специфіка, posterior chain), типові помилки.
+- `content/post-738-landmine-press.md` — Block 701–750, post 38/50. Landmine press: діагональна площина 30–45° від вертикалі (Saeterbakken et al. 2021 — нижчий субакроміальний тиск vs OHP), EMG: anterior deltoid + верхній pec + lower trap + serratus, 4 варіанти (стоячи/half-kneeling/білатеральний/push-press), програмування для спортсменів з імпінджментом плеча і ротаційних видів спорту.
+- `content/post-739-nordic-hamstring-curl.md` — Block 701–750, post 39/50. Нордичне згинання ніг: ексцентрична механіка при подовженому м'язі (van Dyk et al. 2019 meta-analysis, Bourne et al. 2017 biceps femoris hypertrophy), порівняння кривої сила-довжина з leg curl, прогресія від assisted негативів до повного Nordic, програмування для спринтерів і командних ігор.
+- `content/post-740-paused-bench-press.md` — Block 701–750, post 40/50. Паузний жим лежачи: усунення SSC і старт з мертвої точки, 10–15% зниження навантаження vs. TNG, EMG (Schick et al. 2010 — вища активація pectoralis major), порівняльна таблиця кривих сили (TNG/paused/pin press/board press), специфіка паверліфтингу (1–2 с пауза — змагальна вимога), програмування у пікінг-блоці.
+- `content/post-741-competition-peaking-tapering.md` — Block 701–750, post 41/50. Пікування і тейпер перед стартом: 3-тижнева модель (Banister dual-factor, Sheiko/Juggernaut), управління обсягом vs. інтенсивністю (Mujika & Padilla 2000, Bosquet et al. 2007), вибір спроб (90–93% ТМ для відкривача), помилки пікування, тиждень-за-тижневий шаблон і протокол розминки на змаганнях.
+
+### Changed
+- `VERSION` — 4.79.1 → 4.80.0.
+
 ## [4.79.1] — 2026-06-14
 
 ### Changed
