@@ -1,5 +1,34 @@
 # Changelog · FORM
 
+## [5.8.0] — 2026-06-14
+
+### Added
+
+**Block 821–830 — Evidence-based deep dives Batch 3 (supplement science):**
+- `content/post-821-protein-timing-anabolic-window-myth.md` — Protein timing: anabolic window myth vs. reality. Schoenfeld et al. (2013) meta-analysis; daily total vs. peri-workout timing; decision tree for fasted vs. fed training contexts. clinical-safety: PASS.
+- `content/post-822-creatine-loading-vs-maintenance.md` — Creatine loading revisited: loading (20g×5d) vs. maintenance-only (3–5g/day) reach identical saturation at 28 days (Hultman et al., 1996). Non-responder biology. Creatine monohydrate as gold standard. clinical-safety: PASS.
+- `content/post-823-beta-alanine-carnosine-what-data-shows.md` — Beta-alanine: H⁺ buffering via carnosine (not lactic acid). Hobson et al. (2012): Cohen's d ~0.37 for 1–4 min efforts. Minimal benefit for 1–5RM strength. Paresthesia management. clinical-safety: PASS.
+- `content/post-824-citrulline-nitrates-no-pathway-evidence.md` — Citrulline and nitrates: two NO pathways explained. Pérez-Guisado & Jakeman (2010) citrulline malate data. Nitrate/beetroot O2 economy evidence. clinical-safety: CONDITIONAL PASS (PDE5 interaction guard rail).
+- `content/post-825-magnesium-athlete-deficiency-supplementation.md` — Magnesium: ATP-Mg complex, sweat losses, form comparison table (glycinate vs. citrate vs. oxide). Sleep evidence only in deficient individuals. clinical-safety: CONDITIONAL PASS (kidney disease guard rail).
+- `content/post-826-omega3-epa-dha-training-evidence.md` — Omega-3: EPA+DHA (not ALA). Smith et al. (2011) mTOR signaling; Waldman et al. (2020) meta-analysis. Label-reading guidance: EPA+DHA ≠ total omega-3. Oxidation risk. clinical-safety: PASS.
+- `content/post-827-vitamin-d-athletes-deficiency-performance.md` — Vitamin D: fat-soluble hormone precursor. Deficiency prevalence in indoor/high-latitude athletes. Effect only in deficient individuals. 25(OH)D testing guidance. 2000–4000 IU D3. clinical-safety: PASS.
+- `content/post-828-ashwagandha-ksm66-strength-cortisol-evidence.md` — Ashwagandha: KSM-66/Sensoril standardised extracts. Wankhede et al. (2015) strength data. Cortisol claims framed as performance context only — not stress disorder treatment. clinical-safety: CONDITIONAL PASS.
+- `content/post-829-melatonin-glycine-sleep-quality-athletes.md` — Sleep supplements: melatonin (chronobiotic, not hypnotic; 0.5–3mg), glycine (Bannai & Nagashima 2012; 3g pre-bed, core temperature mechanism). Explicitly not for clinical insomnia. clinical-safety: CONDITIONAL PASS.
+- `content/post-830-cbd-recovery-evidence-review-athletes.md` — CBD and recovery: honest null result lead (Isenmann et al., 2021). WADA status. Anti-doping contamination risk. Explicitly not framed as pain or mental health treatment. clinical-safety: CONDITIONAL PASS.
+
+**Editorial series posts 22–25:**
+- `content/post-22-seasonal-programming.md` — Сезонне програмування для recreational athlete: зима, літо, відпустки. Macro-cycle from real calendar; winter accumulation, summer intensification, holiday planning. clinical-safety: PASS.
+- `content/post-23-return-after-break.md` — Повернення після перерви: детренінг timeline (Persson, Lovell, Bruusgaard et al.), muscle memory physiology, on-ramp protocol weeks 1–4. clinical-safety: PASS.
+- `content/post-24-female-physiology-strength.md` — Жіноча фізіологія і силові тренування. Follicular/luteal phase training differences (Sims & Heather 2018), hypertrophy evidence, ACL biomechanics, what is and isn't different. Guard rails: menstrual disorders, amenorrhea, clinical symptoms → physician. clinical-safety: CONDITIONAL PASS.
+- `content/post-25-minimal-equipment-training.md` — Тренування з мінімальним обладнанням: збереження адаптації за патернами (squat/press/pull/hinge), підтримуюча програма A+B, що НЕ зберігає результат. clinical-safety: PASS.
+
+### Changed
+- `README.md` — editorial series updated: 11–21 complete → 11–25 drafted; posts 22–25 table updated to draft status; posts 26–30 added as proposed; OQ-EDITORIAL-01 added (filename collision with May 2026 short posts in range 22–25).
+- `STATUS.md` — Block 801–850: 20/50 → 30/50 written; editorial series 11–25 noted; total posts 816 → 826; next batch 831–840 defined.
+- `VERSION` — 5.7.1 → 5.8.0.
+
+---
+
 ## [5.7.1] — 2026-06-14
 
 ### Added

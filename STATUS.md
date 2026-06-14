@@ -1,4 +1,4 @@
-# FORM · Project Status v5.7.0
+# FORM · Project Status v5.8.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.7.0** — 2026-06-14
+**v5.8.0** — 2026-06-14
 
 ---
 
@@ -28,11 +28,11 @@
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
 | 751–800 | Athlete lifecycle & context | 50 | **BLOCK COMPLETE** — all 50 posts written v5.1.0: posts 791 (athletes with movement limitations · clinical-safety CONDITIONAL PASS), 793 (sustained high stress training · clinical-safety CONDITIONAL PASS), 794 (medically-restricted diet · clinical-safety CONDITIONAL PASS) now written with embedded guard rails. Blog cards added for posts 785–800. sports-scientist review required for all 50 before publish |
-| 801–850 | Evidence-based deep dives | 20 | **20/50 written** — posts 801–810: creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic, steroids/research interpretation, genetic ceiling, fat as endocrine organ. Posts 811–820: sleep & performance, deload science, training age, volume landmarks (MEV/MAV/MRV), inter-set rest, rate of force development, concurrent training interference, heat/cold exposure, altitude training, evidence-based stretching. All sports-scientist review required before publish. |
+| 801–850 | Evidence-based deep dives | 30 | **30/50 written** — posts 801–810: creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic, steroids/research interpretation, genetic ceiling, fat as endocrine organ. Posts 811–820: sleep & performance, deload science, training age, volume landmarks (MEV/MAV/MRV), inter-set rest, rate of force development, concurrent training interference, heat/cold exposure, altitude training, evidence-based stretching. **Posts 821–830 (v5.8.0):** protein timing, creatine loading revisited, beta-alanine, citrulline/nitrates, magnesium, omega-3 + training, Vitamin D + athletes, ashwagandha (clinical-safety CONDITIONAL PASS), sleep supplements — melatonin/glycine (CONDITIONAL PASS), CBD & recovery (CONDITIONAL PASS). All sports-scientist review required before publish. |
 
-**Total posts: 816**
+**Total posts: 826**
 
-**Editorial series 11–21** — post-21 written (plateau diagnosis · clinical-safety PASS); blog.html cards added for posts 11–21; posts 22–25 proposed in README.
+**Editorial series 11–25** — posts 22–25 written v5.8.0: seasonal programming, return after break, female physiology (clinical-safety CONDITIONAL PASS), minimal equipment training. Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.).
 
 ---
 
@@ -98,7 +98,7 @@
 ## Next priorities
 
 - **Block 751–800: COMPLETE** — all 50/50 posts written; posts 791, 793, 794 clinical-safety CONDITIONAL PASS (guard rails embedded); sports-scientist review required for all 50 before publish
-- **Block 801–850 ACTIVE** — Evidence-based deep dives: 20/50 written. Batch 1 (801–810): creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic, steroids/research interpretation, genetic ceiling, fat as endocrine organ. Batch 2 (811–820): sleep & performance, deload science, training age, volume landmarks (MEV/MAV/MRV), inter-set rest, RFD, concurrent training interference, heat/cold exposure, altitude training, evidence-based stretching. **Next batch (821–830):** protein timing, creatine loading revisited, beta-alanine, citrulline/nitrates, magnesium, omega-3 + training, Vitamin D + athletes, ashwagandha evidence, sleep supplements (melatonin/glycine), CBD/CBD & recovery
+- **Block 801–850 ACTIVE** — Evidence-based deep dives: 30/50 written. Batch 1 (801–810): creatine, protein, caffeine, periodization vs. autoregulation, RPE/RIR, hypertrophy mechanisms, myofibrillar vs. sarcoplasmic, steroids/research interpretation, genetic ceiling, fat as endocrine organ. Batch 2 (811–820): sleep & performance, deload science, training age, volume landmarks (MEV/MAV/MRV), inter-set rest, RFD, concurrent training interference, heat/cold exposure, altitude training, evidence-based stretching. **Batch 3 (821–830) COMPLETE v5.8.0:** protein timing, creatine loading revisited, beta-alanine, citrulline/nitrates, magnesium, omega-3+training, Vitamin D+athletes, ashwagandha (CONDITIONAL PASS), sleep supplements (CONDITIONAL PASS), CBD+recovery (CONDITIONAL PASS). **Next batch (831–840):** HMB evidence, caffeine tolerance and cycling, glutamine, zinc+magnesium (ZMA), collagen peptides, sodium bicarbonate buffering, nitrate timing, adaptogen comparison, rhodiola rosea, electrolytes and performance
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)

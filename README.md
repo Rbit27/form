@@ -6,7 +6,7 @@ AI-coach for self-coached athletes. Editorial content engine — training scienc
 
 ## Content roadmap
 
-### Editorial series: 11–21 complete · proposed next (22–25)
+### Editorial series: 11–25 drafted · proposed next (26–30)
 
 Founder-voice editorial long-reads — той самий формат 13-min. Тон: editorial-brutalist. Без motivational буллшиту.
 
@@ -18,10 +18,17 @@ Founder-voice editorial long-reads — той самий формат 13-min. Т
 | 19 | Warm-up протоколи — чому більшість не відповідає реальним потребам атлета | draft |
 | 20 | Крепатура — це не індикатор тренування | draft |
 | 21 | Плато — це не стеля. Це діагноз. | draft · v5.7.0 |
-| 22 | Сезонне програмування для recreational athlete: зима, літо, відпустки | proposed |
-| 23 | Як повернутись до тренування після перерви: скільки втрачається і за який час | proposed |
-| 24 | Жіноча фізіологія і силові тренування — що реально відрізняється | proposed (clinical-safety review required) |
-| 25 | Тренування в умовах мінімального обладнання: що зберігає результат, а що — ні | proposed |
+| 22 | Сезонне програмування для recreational athlete: зима, літо, відпустки | draft · v5.8.0 |
+| 23 | Як повернутись до тренування після перерви: скільки втрачається і за який час | draft · v5.8.0 |
+| 24 | Жіноча фізіологія і силові тренування — що реально відрізняється | draft · v5.8.0 · clinical-safety CONDITIONAL PASS |
+| 25 | Тренування в умовах мінімального обладнання: що зберігає результат, а що — ні | draft · v5.8.0 |
+| 26 | Програмування для підлітків-атлетів: де відрізняється фізіологія, де — ні | proposed |
+| 27 | Силове тренування і сон: двостороння залежність | proposed |
+| 28 | Перетренованість — клінічна рідкість чи прихована епідемія | proposed |
+| 29 | Аматор в залі: соціальний аспект і чому він впливає на тренування | proposed |
+| 30 | Що таке «довгострокові результати» — і чому більшість не думає в цьому горизонті | proposed |
+
+> **Open question OQ-EDITORIAL-01:** Числові файли `post-22-periodization.md` — `post-25-breathing-mechanics.md` (написані 2026-05-17) конфліктують за номером з editorial series posts 22-25. Рішення: ці May-файли потрібно або перенумерувати в діапазон 200+ (де вони логічно входять у «Exercise physiology deep dives»), або зберегти як окремий контент-бібліотечний пост без editorial-серійного номера. Рішення потребує founder review. **OQ-EDITORIAL-01 status: 🟡 Unresolved**
 
 ---
 
