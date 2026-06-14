@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [4.87.0] — 2026-06-14
+
+### Added
+- `content/post-765-hybrid-athlete-concurrent-training.md` — Block 751–800 post 15/50. Hybrid athlete concurrent training: interference effect molecular mechanism (AMPK/mTOR axis), Wilson et al. (2012) meta-analysis, which strength adaptations are most affected (hypertrophy > max strength), minimum effective dose per direction, same-day sequencing order, inter-session recovery windows by vitrivality session type, weekly microcycle templates (A/B/C), modality-specific interference (running > cycling), block vs. simultaneous periodization, interference detection markers. clinical-safety PASS · sports-scientist review required before publish.
+- `content/post-766-entrepreneur-athlete-irregular-schedule.md` — Block 751–800 post 16/50. Entrepreneur-athlete with irregular schedule: why fixed microcycles fail (two failure patterns), floating microcycle structure and session labelling, decision algorithm (window × recovery gap × subjective readiness), allostatic load and non-training stress (Issurin 2010), minimum effective dose for strength maintenance (Bickel 2011) and VO2max (Hickson 1985), session types suited to unpredictable scheduling (full-body vs. mini upper/lower vs. no-equipment), zero-window weeks protocol (10-min morning / active recovery / full pause), travel adaptation, quarterly cycle count as alternative progress metric. clinical-safety PASS · sports-scientist review required before publish.
+- `content/post-767-strength-for-runners.md` — Block 751–800 post 17/50. Strength for runners — interference and synergy: running economy mechanism (stretch-shortening cycle, SSC), Berryman et al. (2018) meta-analysis RE improvement 2–8%, muscle-tendon stiffness pathway (Paavolainen 1999), heavy resistance training vs. plyometrics vs. light bodyweight (effectiveness hierarchy), interference benefit for runners (hypertrophy suppressed = mass not gained), bone density and connective tissue arguments, priority exercises (bilateral/unilateral strength, eccentric calf, Nordic, plyometrics), weekly placement rules (not before quality running), pre-competition taper for strength, hypertrophy expectations. clinical-safety PASS · sports-scientist review required before publish.
+- `STATUS.md` — Block 751–800 counter 751–764 → 751–767; next priorities updated.
+
+### Changed
+- `VERSION` — 4.86.1 → 4.87.0.
+
+---
+
 ## [4.86.1] — 2026-06-14
 
 ### Changed

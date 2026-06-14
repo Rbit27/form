@@ -94,7 +94,7 @@
 ## Next priorities
 
 - **Block 701–750: COMPLETE** — всі 50 постів написані; sports-scientist review required before publish
-- **Block 751–800: IN PROGRESS** — posts 751–764 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress, new parent training, training after 50, student during exams, return after viral illness); next: posts 765–770 per README plan (гібридний атлет; атлет-підприємець; сила для бігунів; тренінг в офісному готелі; тренінг без залу; підліткові тренування); sports-scientist review required before publish
+- **Block 751–800: IN PROGRESS** — posts 751–767 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress, new parent training, training after 50, student during exams, return after viral illness, hybrid athlete concurrent training, entrepreneur-athlete irregular schedule, strength for runners); next: posts 768–770 per README plan (тренінг в офісному готелі; тренінг без залу; підліткові тренування — 770 clinical-safety review required); sports-scientist review required before publish
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
@@ -106,4 +106,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.86.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.87.0**
