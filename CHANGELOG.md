@@ -1,5 +1,31 @@
 # Changelog · FORM
 
+## [4.72.0] — 2026-06-14
+
+### Added
+- `content/post-683-proprioception-strength-training.md` — Biomechanics block, post 33/50. Mechanoreceptors (muscle spindles, Golgi tendon organs, joint receptors), joint position sense, proprioceptive training effect, technique preservation under fatigue.
+- `content/post-684-muscle-synergies-coordination.md` — Biomechanics block, post 34/50. Motor synergies (Bernstein's DOF problem), CNS coordination strategies in compound lifts, inter-muscular vs. intra-muscular coordination, synergy refinement through practice.
+- `content/post-685-elbow-mechanics-pulling.md` — Biomechanics block, post 35/50. Humeroulnar and radioulnar joints, carrying angle variability, pronation/supination in rows and pull-ups, flexor recruitment patterns, grip width downstream effects.
+- `content/post-686-foot-arch-mechanics-lifting.md` — Biomechanics block, post 36/50. Three foot arches, windlass mechanism, pronation/supination under load, force transmission to knee and hip, footwear implications for squat and deadlift.
+- `content/post-687-rotator-cuff-glenohumeral-centering.md` — Biomechanics block, post 37/50. Rotator cuff anatomy, force couple concept, humeral head centering against deltoid's superior pull, compression vs. shear loads, practical warm-up and activation for pressing/overhead.
+- `content/post-688-thoracolumbar-fascia-force-transfer.md` — Biomechanics block, post 38/50. TLF layers and anatomy, passive tension transfer from lats and glutes, role in spinal stiffening, implications for deadlift and bent-over row mechanics.
+- `content/post-689-rib-cage-mechanics-pressing.md` — Biomechanics block, post 39/50. Costovertebral joints, rib expansion in breathing, rib flare and lumbar position, arch vs. flat back in bench press, thoracic mobility for overhead press.
+- `content/post-690-grip-mechanics-force-transfer.md` — Biomechanics block, post 40/50. Carpal anatomy and wrist alignment under axial load, grip type comparisons (hook/double-overhand/mixed), grip width downstream effects, knurling and wrist wrap mechanics.
+- `content/post-691-intra-abdominal-pressure-mechanisms.md` — Biomechanics block, post 41/50. IAP four-element system, hydraulic cylinder mechanism, IAP magnitudes in heavy lifting, Valsalva vs. bracing, belt mechanics (+20–40% IAP), practical protocols by rep range.
+- `content/post-692-fatigue-compensation-patterns.md` — Biomechanics block, post 42/50. Neuromuscular vs. metabolic fatigue effects on technique, proximal-to-distal compensation patterns in squat/deadlift/press, technique degradation as diagnostic signal, set termination criteria.
+- `content/post-693-load-tissue-capacity-model.md` — Biomechanics block, post 43/50. Tissue capacity as dynamic variable, cumulative load model, ACWR with numeric risk zones, spike vs. absolute load risk, recovery as capacity restoration, 5–10%/week ramp rate.
+- `content/post-694-movement-variability-motor-control.md` — Biomechanics block, post 44/50. Bernstein's motor variability, "repetition without repetition," cycle-to-cycle kinematic variability as healthy motor control, uncontrolled manifold hypothesis, micro-variation practice for connective tissue stress distribution.
+- `content/post-695-reactive-strength-plyometrics.md` — Biomechanics block, post 45/50. RSI, slow vs. fast SSC (250 ms threshold), tendon elastic energy storage, why strength athletes benefit from plyometric exposure, dosing table and 12-week entry sequence.
+- `content/post-696-asymmetry-when-to-address.md` — Biomechanics block, post 46/50. Asymmetry prevalence and taxonomy (structural/functional/acquired), LSI thresholds, five functional field tests, decision tree (observe → assess → address or accept), unilateral training as diagnostic tool.
+- `content/post-697-eccentric-mechanics-structural.md` — Biomechanics block, post 47/50. Force-velocity and force-length in eccentric, cross-bridge detachment mechanics, sarcomerogenesis, titin adaptations, collagen remodeling, HSR tempo prescriptions, accentuated eccentrics at 105–120% 1RM.
+- `content/post-698-tissue-stiffness-movement-patterns.md` — Biomechanics block, post 48/50. Young's modulus, passive vs. active stiffness, pre-activation as active stiffness mechanism, joint stiffness continuum, consequences of too-soft/too-stiff states, programming balance for mobility and stability.
+- `content/post-699-cervical-spine-head-mechanics.md` — Biomechanics block, post 49/50. Cervical compressive load, tonic neck reflex, head-spine linkage, neutral head position per lift, gaze direction and motor pattern effects, cueing table, boundary between self-directed and clinical referral.
+- `content/post-700-biomechanics-block-synthesis.md` — Biomechanics block, post 50/50. **BLOCK COMPLETE.** Eight synthesizing principles: joint stack/force chain, anatomy as constraint, structural lag timeline, load-vs-capacity model, movement variability, principle-to-programming decision table, field self-assessment toolkit, clinical referral boundary.
+
+### Changed
+- `STATUS.md` — block 651–700 marked COMPLETE (50/50 posts); total posts updated to 700; version bumped to v4.72.0.
+- `VERSION` — 4.71.1 → 4.72.0.
+
 ## [4.71.1] — 2026-06-14
 
 ### Changed
