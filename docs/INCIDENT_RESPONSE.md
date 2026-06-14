@@ -9753,6 +9753,254 @@ Store artefacts at `compliance/evidence/incident-scim-latency/<incident_id>/` wi
 
 ---
 
+### R-27: Evidence Collection Automation Failure — Three-Consecutive-Month Recovery
+
+> **Scope:** Covers incidents where the `evidence-collection-cron` Cloudflare Worker fails to run for three or more consecutive calendar months, creating an evidence gap that poses a material SOC 2 Type II audit risk. This runbook was explicitly specified in `docs/SOC2_READINESS.md §81.12 OQ-EVD-02` and resolves that open question. A single-month failure is handled operationally by AL-EVD-01 (Slack `#compliance-alerts`) without activating this runbook. This runbook activates on the **third consecutive missing month**, which escalates the severity from an operational annoyance to a compliance risk requiring a documented incident response and manual evidence backfill.
+>
+> **Not R-05 (HMAC Chain Break):** AL-EVD-02 (`audit.chain_integrity_violation`) is a separate incident triggered by a chain integrity check failure, not by missing Worker runs. R-27 covers scheduling and execution failures, not chain integrity failures. If both AL-EVD-01 (missing cron) and AL-EVD-02 (chain break) fire simultaneously, activate R-05 as the primary incident; R-27 becomes a secondary track for evidence backfill.
+>
+> **Not R-03 (Infrastructure Outage):** If the cron failure is attributable to a Cloudflare Workers platform outage, activate R-03 for infrastructure remediation and use R-27 for the evidence backfill aftermath only.
+
+#### R-27.1 Trigger Matrix
+
+| Alert / Trigger | Source | Threshold | Auto-severity | PagerDuty service |
+|---|---|---|---|---|
+| **AL-EVD-01 × 3 consecutive months** | pg_cron job 33 `evidence_cron_freshness_check` (03:05 UTC on 2nd of each month) | No `system.evidence_collection_automated` event for the third consecutive period | **P1 — escalated from P2** on 3rd fire | PagerDuty `form-compliance` (HIGH urgency) |
+| **AL-EVD-03** | `evidence-collection-cron` Worker R2 write failure | Worker's `writeToR2` throws on any required artefact path for 3+ months | **P1** | PagerDuty `form-platform` |
+| **Manual** | Compliance officer notices missing evidence during quarterly audit prep | Two or more periods absent from `MASTER-INDEX-YYYY.csv` | **P1** | `form-compliance` |
+
+> **Escalation note:** The first and second AL-EVD-01 alerts (P2, Slack `#compliance-alerts`) should be handled operationally without activating this runbook — re-run the Worker manually and confirm the missed period is backfilled. This runbook activates only when the compliance-officer confirms three consecutive periods are missing from the MASTER-INDEX or from `audit_log_events WHERE action = 'system.evidence_collection_automated'`. At that point the severity escalates to P1 because three missed months during a 12-month observation period constitutes a SOC 2 evidence gap that may prevent audit sign-off.
+
+#### R-27.2 Severity Classification
+
+| Condition | Severity | Escalation |
+|---|---|---|
+| Three or more consecutive months missing AND observation period has not yet started | **P1** | IC + compliance-officer + devops-lead; no auditor notification required yet |
+| Three or more consecutive months missing AND observation period is active | **P1 elevated** | IC + compliance-officer + founder; assess whether to notify auditor of compensating control (manual backfill) |
+| Evidence gap spans dates of a pending auditor fieldwork window | **P0** | Immediate: compliance-officer + founder + outside counsel; notify auditor proactively |
+| AL-EVD-03 (R2 write failure) is the confirmed root cause AND no periods are permanently missing | **P1 → P2 on R2 recovery** | Downgrade to P2 once R2 is verified accessible and all artefacts re-written |
+
+#### R-27.3 Immediate Actions (T+0 to T+30 min)
+
+```
+T+0   AL-EVD-01 third consecutive fire escalates to P1. PagerDuty `form-compliance` pages IC.
+      IC opens incident channel #ir-evidence-automation-YYYYMMDD.
+      Emit DEC-030 system.evidence_automation_failure_declared (§R-27.7) as first chain entry.
+      Record: which months are confirmed missing? (Run R-27-C1 below.)
+
+T+5   Run R-27-C1 (§R-27.4): count missing periods from audit_log_events.
+      Run R-27-C2: check Cloudflare Cron Dashboard for evidence-collection-cron run history.
+      Cross-check MASTER-INDEX-YYYY.csv: GET compliance/evidence/MASTER-INDEX-YYYY.csv from R2.
+      Reconcile: if R-27-C1 shows N missing but MASTER-INDEX shows only M missing, determine
+      whether some runs completed partially (artefacts filed but DEC-030 event not emitted).
+
+T+10  Determine root cause category (§R-27.4 H1–H5).
+      If R2 bucket unavailable (AL-EVD-03): activate R-03 (Infrastructure Outage) in parallel.
+      If chain integrity failure present (AL-EVD-02): activate R-05 (HMAC Chain Break) in parallel.
+      Do NOT proceed to manual collection until R-03/R-05 are stabilised — manual writes to a
+      degraded R2 or a broken chain will create additional evidence gaps.
+
+T+15  Assess: can the Worker be re-run immediately to backfill the missing months?
+      YES → proceed to §R-27.5 Step 1 (automated backfill attempt).
+      NO  → proceed directly to §R-27.5 Step 2 (manual collection per §79).
+
+T+20  If observation period is active: compliance-officer drafts compensating control memo
+      (Template EVD-01, §R-27.6) documenting the gap, root cause, and backfill plan.
+      This memo will be filed as EVD-COMP-E-001 (§R-27.8) and pre-empts auditor questions.
+
+T+30  All immediate actions complete. Begin recovery procedure (§R-27.5).
+```
+
+#### R-27.4 Root Cause Hypotheses and Scope Queries
+
+**R-27-C1 — Identify missing periods:**
+
+```sql
+-- Requires form_admin BYPASSRLS via pam-db-proxy (read_only PAM elevation)
+-- Reason: "R-27 evidence automation failure scope assessment — INC-YYYYMMDD"
+-- Privacy: no user data; event metadata only
+SELECT
+  TO_CHAR(gs.month, 'YYYY-MM')               AS expected_period,
+  COUNT(ale.id)                               AS events_found,
+  MAX(ale.created_at)                         AS last_run_at
+FROM generate_series(
+  DATE_TRUNC('month', NOW() - INTERVAL '6 months'),
+  DATE_TRUNC('month', NOW() - INTERVAL '1 month'),
+  INTERVAL '1 month'
+) AS gs(month)
+LEFT JOIN audit_log_events ale
+  ON ale.action = 'system.evidence_collection_automated'
+ AND ale.created_at >= gs.month
+ AND ale.created_at <  gs.month + INTERVAL '1 month'
+GROUP BY gs.month
+ORDER BY gs.month;
+```
+
+> Rows where `events_found = 0` are confirmed evidence gaps. Report count and which periods to the incident channel.
+
+**R-27-C2 — Check R2 artefact presence for a specific missing period:**
+
+```
+1. Access Cloudflare R2 → form-soc2-evidence → compliance/evidence/a1/
+2. Check for: A1-E-001-{YYYY-MM}.json  (existence and size > 0)
+3. Access compliance/evidence/cc7/
+4. Check for: CC7-E-001-{YYYY-MM}.json (existence and size > 0)
+5. If artefacts present but DEC-030 event missing: the Worker filed artefacts but crashed
+   before emitting the chain event — treat as a partial failure (H4 below).
+```
+
+**Root cause hypotheses:**
+
+| # | Hypothesis | Diagnostic signal | Immediate mitigation |
+|---|---|---|---|
+| **H1** | Cloudflare Cron trigger disabled or removed from `wrangler.toml` | Cloudflare Dashboard → Workers → `evidence-collection-cron` → Triggers: no active cron trigger listed | Re-add cron trigger `0 1 1 * *`; deploy Worker; trigger manual run |
+| **H2** | Worker runtime error (unhandled exception on every run) | Cloudflare Workers Logs for `evidence-collection-cron`: `Error: ...` in last 3 monthly run windows | Fix the exception; re-deploy Worker; trigger manual runs for each missing period |
+| **H3** | R2 bucket write permission revoked or bucket deleted | AL-EVD-03 history; Cloudflare R2 → `form-soc2-evidence` → 404 or 403 on GET | Restore R2 bucket permissions; verify `EVIDENCE_VAULT` binding in Worker config; re-run |
+| **H4** | Worker crashed after R2 write but before DEC-030 emission | R2 artefacts present for the period; no `system.evidence_collection_automated` in `audit_log_events` | Emit `system.evidence_manual_collection_completed` manually via admin API (compliance-officer); `artefacts_written` populated; `manual_trigger: true` |
+| **H5** | MASTER-INDEX ETag conflict (AL-EVD-04 repeated across multiple months) | Three or more `system.evidence_cron_conflict` events in `audit_log_events` covering the missing periods | Manual MASTER-INDEX reconciliation per §81.7; implement delta-log if triggered OQ-EVD-01 resolution |
+
+#### R-27.5 Recovery Procedure
+
+**Step 1 — Attempt automated backfill.**
+
+If the Worker is deployable (H1 or H2 resolved):
+1. Re-deploy `evidence-collection-cron` with the fix applied.
+2. For each missing period `{YYYY-MM}`, trigger the Worker manually via Cloudflare Dashboard → Workers → `evidence-collection-cron` → Send test event, with body:
+   ```json
+   { "period": "{YYYY-MM}", "dry_run": false, "manual_trigger": true }
+   ```
+3. After each run, confirm via R-27-C1 that `system.evidence_collection_automated` now appears for that period in `audit_log_events` with `chain_integrity_ok: true`.
+4. Verify MASTER-INDEX updated: `MASTER-INDEX-YYYY.csv` must contain rows for the backfilled periods with `status = COLLECTED` and `sha256` populated.
+5. Confirm via R-27-C2 that both `A1-E-001-{YYYY-MM}.json` and `CC7-E-001-{YYYY-MM}.json` exist and are non-empty.
+
+**Step 2 — Manual collection (if Worker cannot be immediately repaired).**
+
+If Step 1 is not possible within the P1 resolution SLA (4 hours), follow `docs/SOC2_READINESS.md §79` manual-periodic procedures for each missing period.
+
+For each missing period `{YYYY-MM}`:
+1. Open `docs/SOC2_READINESS.md §79.5` (periodic evidence collection calendar) and identify which evidence items were due for that period.
+2. Collect `A1-E-001-{YYYY-MM}` manually:
+   - Source: Better Stack SLA report export for the month.
+   - File to: `compliance/evidence/a1/A1-E-001-{YYYY-MM}-MANUAL.json`
+3. Collect `CC7-E-001-{YYYY-MM}` manually:
+   ```sql
+   SELECT action, created_at, severity
+   FROM audit_log_events
+   WHERE created_at >= '{YYYY-MM}-01'::date
+     AND created_at <  '{YYYY+1 or MM+1}-01'::date
+   ORDER BY created_at;
+   ```
+   - File to: `compliance/evidence/cc7/CC7-E-001-{YYYY-MM}-MANUAL.json`
+4. Update `MASTER-INDEX-YYYY.csv`: add rows for each artefact with `status = MANUAL_COLLECTION`, `collected_by = compliance-officer`, `collection_note = R-27 manual backfill — INC-YYYYMMDD`.
+5. Emit `system.evidence_manual_collection_completed` DEC-030 event (§R-27.7) for each period backfilled. One event per period.
+6. Sign the compensating control memo (Template EVD-01, §R-27.6) and file as `EVD-COMP-E-001-{YYYY-MM}.md`.
+
+**Step 3 — Root cause fix and restoration.**
+
+After manual collection closes the evidence gap, fix the underlying root cause:
+- H1: Restore cron trigger in `wrangler.toml` (`0 1 1 * *`); deploy; confirm next scheduled run fires.
+- H2: Fix unhandled exception; add integration test for the failing code path; deploy.
+- H3: Restore R2 bucket permissions; verify `EVIDENCE_VAULT` binding; run synthetic dry-run.
+- H4: Investigate why the crash occurred post-write; add try/catch with DEC-030 fallback emission.
+- H5: Resolve MASTER-INDEX conflict per §81.7 (ETag guard procedure); document OQ-EVD-01 decision in `docs/DECISION_LOG.md` if `system.evidence_cron_conflict` events > 3.
+
+**Step 4 — Confirm restoration.**
+
+After the Worker runs successfully for the first month post-incident:
+1. Confirm `system.evidence_collection_automated` DEC-030 event emitted with `manual_trigger: false`.
+2. Emit `system.evidence_automation_restored` DEC-030 event (§R-27.7).
+3. Update incident status: RESOLVED. Schedule PIR within 7 days.
+
+#### R-27.6 Communication Templates
+
+**Template EVD-01 — Compensating control memo (internal; required for every manual collection):**
+
+> **FORM Compliance Memo — Evidence Automation Failure Compensating Control**
+>
+> Incident: INC-YYYYMMDD
+> Affected periods: {list of YYYY-MM periods}
+> Root cause: {H1–H5 category and description}
+> Gap window: {first missing period} through {last missing period}
+>
+> **Compensating control:** Manual evidence collection was performed for all affected periods per `docs/SOC2_READINESS.md §79`. Evidence artefacts are filed at `compliance/evidence/a1/` and `compliance/evidence/cc7/` with `MANUAL_COLLECTION` status in `MASTER-INDEX-{YYYY}.csv`. DEC-030 `system.evidence_manual_collection_completed` events are HMAC-chained for each period.
+>
+> **Root cause remediation:** {describe fix; date deployed or expected completion}
+>
+> **Auditor disclosure recommendation:** {Disclose / No disclosure required — see §R-27.2 severity table}
+>
+> Signed: {compliance-officer} · {date}
+
+> **When to send EVD-01:** Required whenever Step 2 (manual collection) is performed. One memo per incident covers all missed periods. If the observation period is active, share with the auditor as a proactive disclosure to establish the compensating control trail before fieldwork begins.
+
+**Template EVD-02 — Auditor notification (P0 only; observation period active; fieldwork imminent):**
+
+> We are writing to inform you of an incident (INC-YYYYMMDD) affecting our automated evidence collection layer. The `evidence-collection-cron` Worker did not run for {N} consecutive months ({periods}). We have completed manual evidence collection for all affected periods per our evidence collection protocol (`docs/SOC2_READINESS.md §79`). Evidence artefacts are in the expected R2 paths with `MANUAL_COLLECTION` status in the MASTER-INDEX. Root cause: {brief description}; fix deployed {date}. DEC-030 chain events confirm manual collection completeness. We are prepared to walk through the backfill artefacts at the start of fieldwork. Questions: compliance@form.coach.
+
+#### R-27.7 DEC-030 HMAC-Chained Audit Events
+
+Chain ordering constraint: `system.evidence_automation_failure_declared` must be the first event emitted for a given `incident_id`. For each backfilled period, `system.evidence_manual_collection_completed` must follow the declaration. `system.evidence_automation_restored` must be last and emitted only after the first successful automated (non-manual) cron run post-fix.
+
+**Privacy invariant (all three events):** No user PII, no health data, no `user_id`. `tenant_id` is null — these are system-level compliance events. Only period labels (`YYYY-MM`), artefact R2 paths, and integrity check results appear in payloads.
+
+| Event type | Severity | Retention | Trigger | Payload |
+|---|---|---|---|---|
+| `system.evidence_automation_failure_declared` | HIGH | 7 yr | IC declares P1 incident after 3rd consecutive AL-EVD-01; this runbook activated | `{ incident_id, missing_periods: string[], consecutive_misses: number, first_missing_period: "YYYY-MM", trigger_alert: z.enum(["AL-EVD-01","AL-EVD-03","manual"]) }` |
+| `system.evidence_manual_collection_completed` | STANDARD | 7 yr | Step 2 manual collection complete for one period; one event emitted per period backfilled | `{ incident_id, period: "YYYY-MM", artefacts_written: string[], master_index_updated: boolean, collector: "compliance-officer", manual_trigger: true }` |
+| `system.evidence_automation_restored` | STANDARD | 3 yr | First successful automated cron run post-fix confirms `manual_trigger: false` in `system.evidence_collection_automated` | `{ incident_id, restored_at_period: "YYYY-MM", root_cause_category: z.enum(["cron_disabled","worker_crash","r2_permission","partial_crash","etag_conflict"]), fix_deployed_at: z.string().datetime() }` |
+
+**EVD-CHAIN-01 ordering invariant (R-27 extension):** For any `incident_id` in this runbook, `system.evidence_automation_failure_declared` must precede all `system.evidence_manual_collection_completed` events and `system.evidence_automation_restored`. A chain where `automation_restored` precedes the `failure_declared` for the same `incident_id` is a chain ordering violation that triggers R-05.
+
+#### R-27.8 Evidence Preservation
+
+Store artefacts at `compliance/evidence/incident-evidence-automation/<incident_id>/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **EVD-E-001** | DEC-030 `system.evidence_automation_failure_declared` HMAC chain export | CC4.1, CC4.2 | 7 yr |
+| **EVD-E-002** | R-27-C1 query output: table of expected periods vs. `events_found` (shows which months were missing) | CC4.2 | 7 yr |
+| **EVD-E-003** | Cloudflare Workers log export for `evidence-collection-cron` covering the failure window (crash stack traces / cron trigger absence) | CC4.2, CC7.2 | 3 yr |
+| **EVD-E-004** | Manual collection artefacts for each backfilled period: `A1-E-001-{YYYY-MM}-MANUAL.json` and `CC7-E-001-{YYYY-MM}-MANUAL.json` filed at canonical R2 paths | A1.1, CC7.1 | 7 yr |
+| **EVD-E-005** | DEC-030 `system.evidence_manual_collection_completed` chain exports — one per period | CC4.2 | 7 yr |
+| **EVD-COMP-E-001** | Signed compensating control memo (Template EVD-01) per missed-period batch; filed to `compliance/evidence/cc4/EVD-COMP-E-001-{YYYY-MM}-INC-YYYYMMDD.md`; uploaded to Vanta | CC4.1, CC4.2 | 7 yr |
+
+#### R-27.9 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC4.1** — Control environment: monitoring deficiency detection | EVD-E-001 + EVD-COMP-E-001 | Automation failure detected within 1 month by AL-EVD-01 dead-man's switch; third consecutive failure triggers P1 escalation; compensating control memo demonstrates management response and accountability |
+| **CC4.2** — Ongoing monitoring of controls | EVD-E-002 + EVD-E-004 + EVD-E-005 | Manual collection backfills every evidence gap; `MANUAL_COLLECTION` MASTER-INDEX status transparently distinguishes automated from manual artefacts; three-event DEC-030 chain proves the full recovery lifecycle |
+| **CC7.2** — Anomaly detection | EVD-E-003 (Worker crash / cron trigger logs) | Cloudflare Workers log retention confirms the failure mode was detected and documented; AL-EVD-01 dead-man's switch is the automated detective control |
+| **CC7.3** — Responds to identified events | EVD-E-001 + EVD-COMP-E-001 | `system.evidence_automation_failure_declared` at T+0; recovery steps completed within P1 SLA; root cause fixed before next cron window |
+| **A1.1** — Availability commitments met | EVD-E-004 (`A1-E-001-{YYYY-MM}-MANUAL.json` per missed period) | SLA reports collected manually confirm availability commitments were met during the months the automation was absent; no gap in the A1.1 evidence time series |
+
+**Auditor narrative for CC4.2:** FORM's evidence automation layer experienced a failure affecting {N} consecutive months. The dead-man's switch (AL-EVD-01, pg_cron job 33) detected the first missed run within 24 hours of the expected run time. After three consecutive failures, the compliance-officer activated R-27, declared a formal incident, and completed manual evidence collection for all affected periods following `docs/SOC2_READINESS.md §79`. EVD-COMP-E-001 provides the signed compensating control statement. The `MANUAL_COLLECTION` MASTER-INDEX status transparently distinguishes manually-filed artefacts from automated ones for auditor review. `system.evidence_automation_restored` confirms the Worker was repaired and ran successfully before the end of the observation period.
+
+#### R-27.10 Post-Incident Controls
+
+| Control | Trigger condition | Owner | SLA |
+|---|---|---|---|
+| Add Scenario P (evidence cron failure — manual backfill) to §9.4 tabletop catalog | Any activation of R-27 | security-engineer + compliance-officer | 30 days post-PIR |
+| Review OQ-EVD-01 (delta-log vs. full-rewrite MASTER-INDEX) and document decision in `docs/DECISION_LOG.md` | AL-EVD-04 confirmed as root cause (H5) | devops-lead + compliance-officer | Next sprint |
+| Add CI integration test for `evidence-collection-cron` end-to-end (mock R2 write + DEC-030 emission) | H2 (Worker crash) confirmed as root cause | devops-lead + platform-engineer | 14 days post-PIR |
+| Add quarterly synthetic dry-run: trigger Worker with `{ "period": "test-dry-run", "dry_run": true }` on first Monday of Jan/Apr/Jul/Oct; confirm successful completion | Scheduled quarterly regardless of incidents | devops-lead | Quarterly |
+
+#### R-27.11 Implementation Checklist
+
+| # | Action | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register three DEC-030 events from §R-27.7 in `docs/AUDIT_LOG_SCHEMA.md §6.System-Compliance` with Zod schemas; deploy to `emit-audit-event` Worker event registry. | platform-engineer + compliance-officer | **P0** | Month O-1 | [ ] |
+| 2 | Configure AL-EVD-01 third-consecutive-month P1 escalation: extend pg_cron job 33 SQL to count `system.evidence_cron_stale` events in `audit_log_events` for the rolling 90-day window; on count ≥ 3, auto-escalate to PagerDuty `form-compliance` HIGH urgency via `emit_evidence_automation_failure()` Edge Function. | devops-lead + platform-engineer | **P0** | Month O-1 | [ ] |
+| 3 | Store Template EVD-01 at `compliance/evidence/ir-templates/r27-evd-01.md`; Template EVD-02 at `compliance/evidence/ir-templates/r27-evd-02.md`. Review by compliance-officer. | compliance-officer | **P1** | Month O-1 | [ ] |
+| 4 | Add Scenario P (evidence cron failure) to §9.4 tabletop catalog; schedule in Q4 2026 drill set (pre-observation-period). | security-engineer + compliance-officer | **P1** | Month O-1 | [ ] |
+| 5 | Add quarterly synthetic dry-run calendar entry to `compliance/calendar/` (first Monday of Jan/Apr/Jul/Oct); document procedure at `compliance/evidence/ir-templates/r27-dry-run.md`. | devops-lead | **P2** | Month O+1 | [ ] |
+| 6 | Update `docs/SOC2_READINESS.md §81.12 OQ-EVD-02` status to 🟢 Resolved with reference to this runbook (R-27). | compliance-officer | **P2** | Month O-1 | [ ] |
+
+---
+
+*v2.5 additions (2026-06-14): R-27 Evidence Collection Automation Failure — twenty-seventh runbook. Closes OQ-EVD-02 (P2, security-engineer + compliance-officer, Month O-1) from `docs/SOC2_READINESS.md §81.12`, which specified "propose R-27 runbook structure in INCIDENT_RESPONSE.md covering evidence automation failure recovery." Trigger: three consecutive AL-EVD-01 fires (pg_cron job 33 dead-man's switch; `evidence-collection-cron` Cloudflare Worker absent for 3+ calendar months). Single-month and double-month failures handled operationally by P2 Slack alert; runbook activates only on third consecutive miss. Severity table: P1 for 3+ misses pre-observation; P1 elevated if observation period active; P0 if fieldwork window directly affected. Not R-05 (chain break) or R-03 (infrastructure outage) — those activate in parallel if AL-EVD-02 or R2 bucket is down. Immediate actions T+0 to T+30: DEC-030 anchor `system.evidence_automation_failure_declared` at T+0; R-27-C1 scope query (missing-period count from `audit_log_events` using `generate_series` LEFT JOIN); R-27-C2 R2 artefact presence check; parallel R-03/R-05 coordination gate at T+10; compensating control memo at T+20 if observation active. Five root cause hypotheses: H1 (cron trigger disabled — Cloudflare Dashboard); H2 (Worker runtime exception — Workers Logs); H3 (R2 write permission revoked / bucket deleted — AL-EVD-03); H4 (partial crash: R2 artefacts present but DEC-030 not emitted); H5 (MASTER-INDEX ETag conflict — AL-EVD-04 repeating). Two-step recovery: Step 1 automated backfill via manual Cloudflare trigger `{ "period": "YYYY-MM", "dry_run": false, "manual_trigger": true }` with R-27-C1/C2 verification after each period; Step 2 manual collection per `docs/SOC2_READINESS.md §79` (Better Stack SLA export → `A1-E-001-{YYYY-MM}-MANUAL.json`; `audit_log_events` query → `CC7-E-001-{YYYY-MM}-MANUAL.json`; MASTER-INDEX rows `status = MANUAL_COLLECTION`). Two communication templates: EVD-01 (internal compensating control memo — required for every Step 2 execution; compliance-officer signed) and EVD-02 (auditor notification — P0 fieldwork-imminent only). Three DEC-030 HMAC-chained events: `system.evidence_automation_failure_declared` (HIGH, 7yr — `missing_periods` array, `consecutive_misses` int, `trigger_alert` enum), `system.evidence_manual_collection_completed` (STANDARD, 7yr — one per period backfilled; `artefacts_written` R2 paths, `manual_trigger: true`), `system.evidence_automation_restored` (STANDARD, 3yr — `root_cause_category` enum, `fix_deployed_at` datetime). EVD-CHAIN-01 ordering invariant: failure_declared precedes all manual_collection_completed and automation_restored events for the same `incident_id` — inversion triggers R-05. Six evidence artefacts EVD-E-001 through EVD-E-005 + EVD-COMP-E-001 mapped to CC4.1 / CC4.2 / CC7.2 / CC7.3 / A1.1; CC4.2 auditor narrative supplied (MANUAL_COLLECTION MASTER-INDEX status distinguishes manual from automated artefacts). Four post-incident controls: Scenario P tabletop (30d post-PIR), OQ-EVD-01 delta-log review (H5 trigger), CI integration test for Worker (H2 trigger), quarterly synthetic dry-run (quarterly regardless). Six-item implementation checklist: 2× P0/Month O-1 (three DEC-030 events registered; AL-EVD-01 third-consecutive escalation counter in pg_cron job 33), 2× P1/Month O-1 (EVD-01/02 templates, Scenario P tabletop), 2× P2 (quarterly dry-run calendar, OQ-EVD-02 resolved status update in SOC2_READINESS.md §81.12). Cross-references: `docs/SOC2_READINESS.md §81` (evidence automation Worker design, AL-EVD-01/02/03/04 alert rules); `docs/SOC2_READINESS.md §81.8` (AL-EVD-01 dead-man's switch SQL, AL-EVD-03 R2 write failure, AL-EVD-04 ETag conflict); `docs/SOC2_READINESS.md §81.12 OQ-EVD-02` (source open question — this runbook is the resolution); `docs/SOC2_READINESS.md §79` (master evidence collection protocol — §79.5 periodic calendar used in Step 2 manual collection); `docs/SOC2_READINESS.md §81.7` (MASTER-INDEX ETag guard — H5 root cause and OQ-EVD-01 delta-log trigger); R-03 (Infrastructure Outage — parallel activation when R2 unavailable); R-05 (HMAC Chain Break — parallel activation when AL-EVD-02 fires; EVD-CHAIN-01 ordering violation also triggers); `docs/AUDIT_LOG_SCHEMA.md §6.System-Compliance` (three new DEC-030 events to register — P0 before Month O-1); §9.4 (tabletop catalog — Scenario P); pg_cron job 33 `evidence_cron_freshness_check` (§12.6 OBSERVABILITY.md registry — third-consecutive escalation logic added). Owner: compliance-officer + devops-lead + platform-engineer.*
+
+---
+
 ## 17. `siem-incident-automator` Resilience Design — Incident ID Pre-generation & Free-Text Privacy Controls
 
 > Closes: OQ-IR-02 (P1, platform-engineer, M4) and OQ-IR-03 (P2, security-engineer + compliance-officer, M4 emitter review).
@@ -10020,7 +10268,7 @@ OQ-IR-01 (concurrent incident sub-chain ordering, P2) remains open — resolutio
 
 ---
 
-**v2.4 · 2026-06-14 · Owner: security-engineer + compliance-officer**
+**v2.5 · 2026-06-14 · Owner: security-engineer + compliance-officer**
 **Review: after every P0/P1 incident, minimum annual.**
 **Next scheduled review: June 2027 or after first P0/P1 — whichever comes first.**
 

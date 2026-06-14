@@ -1,5 +1,16 @@
 # Changelog · FORM
 
+## [4.95.1] — 2026-06-14
+
+### Added
+- `docs/INCIDENT_RESPONSE.md` — R-27: Evidence Collection Automation Failure — Three-Consecutive-Month Recovery. Closes OQ-EVD-02 from `docs/SOC2_READINESS.md §81.12`. Trigger: 3rd consecutive AL-EVD-01 (pg_cron job 33 dead-man's switch) → P1 PagerDuty `form-compliance` escalation. Five root cause hypotheses (cron disabled / Worker crash / R2 permission / partial crash / ETag conflict). Two-step recovery: automated backfill via Cloudflare trigger; manual collection per §79. Three DEC-030 HMAC-chained events: `system.evidence_automation_failure_declared` (HIGH, 7yr), `system.evidence_manual_collection_completed` (STANDARD, 7yr), `system.evidence_automation_restored` (STANDARD, 3yr); EVD-CHAIN-01 ordering invariant. Communication templates EVD-01 (compensating control memo) and EVD-02 (P0 auditor notification). Evidence artefacts EVD-E-001–005 + EVD-COMP-E-001 mapped to SOC 2 CC4.1/CC4.2/CC7.2/CC7.3/A1.1. Four post-incident controls; six-item implementation checklist.
+
+### Changed
+- `docs/SOC2_READINESS.md` — §81.12 OQ-EVD-02 marked 🟢 Resolved with R-27 reference and resolution summary.
+- `VERSION` — 4.95.0 → 4.95.1.
+
+---
+
 ## [4.95.0] — 2026-06-14
 
 ### Added
