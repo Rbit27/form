@@ -1,5 +1,11 @@
 # Changelog · FORM
 
+## [4.83.2] — 2026-06-14
+
+### Changed
+- `content/post-755-travel-training.md` — refined final version: expanded opening (cognitive load framing added), 9 sections with decision matrix table for short/medium/extended trips, bodyweight utility ranking table, TRX explicitly dismissed, return plan («no catch-up» rule). 1,318 words.
+- `VERSION` — 4.83.1 → 4.83.2.
+
 ## [4.83.1] — 2026-06-14
 
 ### Added
