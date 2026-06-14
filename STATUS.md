@@ -1,4 +1,4 @@
-# FORM · Project Status v4.83.3
+# FORM · Project Status v4.84.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.83.3** — 2026-06-14
+**v4.84.0** — 2026-06-14
 
 ---
 
@@ -27,9 +27,9 @@
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
-| 751–800 | Athlete lifecycle & context | 7 | In progress — posts 751–757 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition); sports-scientist review required before publish |
+| 751–800 | Athlete lifecycle & context | 10 | In progress — posts 751–760 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress); sports-scientist review required before publish |
 
-**Total posts: 757**
+**Total posts: 760**
 
 ---
 
@@ -89,7 +89,7 @@
 ## Next priorities
 
 - **Block 701–750: COMPLETE** — всі 50 постів написані; sports-scientist review required before publish
-- **Block 751–800: IN PROGRESS** — posts 751–756 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase); next: posts 757–760 (female athlete considerations, time-constrained training, high-volume vs. life stress, intermediate plateau)
+- **Block 751–800: IN PROGRESS** — posts 751–760 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress); next: posts 761–770 (hardgainer physiology, deload protocols deep dive, RPE calibration, competition prep timeline, peaking for strength sport, strength for endurance athletes, endurance for strength athletes, hypertrophy periodization, powerbuilding integration, masters strength sport)
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
@@ -101,4 +101,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.81.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.84.0**
