@@ -394,9 +394,100 @@ export const ScimSessionRevocationKvFallbackSchema = z.object({
 ---
 
 ### Integration
-- `integration.webhook_created` / `integration.webhook_fired`
-- `integration.connector_added` (Slack, MS Teams, etc.)
-- `integration.api_call` (sampled, not every call)
+
+#### Webhook delivery events (DEC-030 HMAC-chained · OBSERVABILITY §43 · CC9.2/CC6.8)
+
+> Defined in `docs/OBSERVABILITY.md §43`. Six DEC-030 HMAC-chained events covering the enterprise webhook delivery lifecycle — the tenant-controlled HTTP push endpoint where enterprise tenants receive real-time operational notifications. This section extends the three previously stubbed events (`integration.webhook_created`, `integration.webhook_deleted`, `integration.webhook_fired`) with full payload specs and registers three new HIGH-severity events. **Scope:** enterprise tenants only (Growth and Enterprise tier), managing webhook subscriptions via `docs/ENTERPRISE_ADMIN_API.md §9`. **Privacy floor (all six events):** `endpoint_url` is tenant-sensitive commercial information — it does not appear in any DEC-030 chain payload; only `endpoint_url_hash` = SHA-256(`endpoint_url`) is stored in chain records, consistent with the DEC-054 `custom_domain_hash` pattern (`docs/OBSERVABILITY.md §42.13`). No GDPR Art. 9 health data in webhook payloads — subscription whitelist enforced in `audit-event-dispatcher`: only audit lifecycle, SCIM user lifecycle, GDPR/DSAR status, and SLA breach event types are eligible for delivery. `tenant_manager` (HR role) has no access to `tenant_webhooks` or `webhook_delivery_log`. `form_api` REVOKED from both management-plane tables. `integration.webhook_*` SIEM events routed to `compliance_reviewer` only — no cross-tenant SIEM delivery. Cross-ref: `docs/OBSERVABILITY.md §43.4` (WH-SLO-01 through WH-SLO-04); `docs/ENTERPRISE_ADMIN_API.md §9` (webhook API spec — create, list, delete, HMAC signature verification); `docs/ENTERPRISE_ADMIN_API.md §12` (DEC-030 event reference — payload extended per this section); `docs/OBSERVABILITY.md §23` (SLA credit engine — WH-SLO-01 breach triggers credit calculation for Growth/Enterprise tier). **Closes OBSERVABILITY §43.15 checklist item 1 (P0, M10 — register all six DEC-030 events in AUDIT_LOG_SCHEMA.md §Integration before first webhook-enabled enterprise tenant goes live).**
+
+**WH-CHAIN-01 ordering invariant:** For each `webhook_id`, events must follow: `integration.webhook_created` → `integration.webhook_fired`^N → `integration.webhook_delivery_failed` → `integration.webhook_suspended` → `integration.webhook_reactivated` → `integration.webhook_fired`^N (cycle restarts after reactivation) → `integration.webhook_deleted`. A `webhook_fired` event appearing after `webhook_suspended` without a preceding `integration.webhook_reactivated` for the same `webhook_id` constitutes a WH-CHAIN-01 violation — the `emit-audit-event` Worker returns HTTP 422 (`WH_CHAIN_01_VIOLATION`) and triggers R-05 (Security Incident Response, `docs/INCIDENT_RESPONSE.md R-05`). `webhook_fired` before `webhook_created` for the same `webhook_id` is a blocking violation (R-05). `webhook_deleted` after `webhook_suspended` without `webhook_reactivated` is a permitted transition (tenant deletes a suspended webhook without re-activating). The weekly HMAC chain audit additionally flags any WH-CHAIN-01 violation discovered in batch as a HIGH anomaly requiring `compliance-officer` + `security-engineer` review within 48 hours.
+
+| Event type | Severity | Retention | Trigger | Key payload fields |
+|---|---|---|---|---|
+| `integration.webhook_created` | STANDARD | 7 yr | Tenant creates a new webhook subscription via `POST /enterprise/webhooks`; `tenant_webhooks` row inserted with `status = 'active'` | `webhook_id` (UUID), `endpoint_url_hash` (SHA-256 of plaintext URL — URL never in chain), `events` (string[] of subscribed event-type prefixes ≥ 1 element), `created_by` (PAM session UUID for `form_system` operations; `tenant_owner` user_id for self-service) |
+| `integration.webhook_deleted` | STANDARD | 7 yr | Tenant or `form_system` deletes a webhook via `DELETE /enterprise/webhooks/{id}`; `tenant_webhooks` row hard-deleted | `webhook_id` (UUID), `endpoint_url_hash` (SHA-256), `deleted_by` (enum: `tenant_owner` \| `tenant_admin` \| `form_system`) |
+| `integration.webhook_fired` | STANDARD | 7 yr | `webhook-dispatcher` Cloudflare Worker records each delivery attempt — all five retry steps each produce one event | `webhook_id` (UUID), `tenant_id` (UUID), `event_type` (string — subscribed event delivered), `attempt_number` (int 1–5), `outcome` (enum: `success` \| `failure` \| `pending_retry`), `http_status` (nullable int — NULL on timeout / TLS / DNS failure), `error_class` (nullable enum: `timeout` \| `4xx` \| `5xx` \| `tls_error` \| `dns_error` \| `internal_error`), `latency_ms` (nullable int — NULL on hard timeout > 30 000 ms cut-off), `endpoint_url_hash` (SHA-256); **no outgoing request body ever persisted** |
+| `integration.webhook_delivery_failed` | **HIGH** | 7 yr | 5th consecutive failed delivery attempt; `tenant_webhooks.status` transitions `active` → `degraded`; triggers AL-WH-02 (PagerDuty `form-platform` + `form-customer-success` dual-page, no auto-resolve); WH-SLO-04 tenant-notification clock starts | `webhook_id` (UUID), `tenant_id` (UUID), `endpoint_url_hash` (SHA-256), `consecutive_failures: 5` (literal int — always 5 at the `degraded` transition), `error_class` (enum — class of the 5th failed attempt), `degraded_since` (ISO 8601 timestamp of this emission) |
+| `integration.webhook_suspended` | **HIGH** | 7 yr | 48 h elapsed in `degraded` state; `tenant_webhooks.status` auto-set to `suspended` by pg_cron job 34 (`webhook_degraded_escalation_check`, `*/30 * * * *`); triggers AL-WH-04 (PagerDuty CRITICAL: `form-platform` + `form-customer-success` dual-page + CSM email WH-NOTIF-02); WH-SLO-04 SLA breach confirmed | `webhook_id` (UUID), `tenant_id` (UUID), `endpoint_url_hash` (SHA-256), `degraded_since` (ISO 8601 — timestamp from the originating `integration.webhook_delivery_failed` event), `total_failed_attempts_in_window` (int ≥ 5 — total delivery attempts recorded since `degraded_since`) |
+| `integration.webhook_reactivated` | **HIGH** | 7 yr | `tenant_owner` re-activates a suspended webhook via Admin Dashboard "Re-activate" button; `tenant_webhooks.status` transitions `suspended` → `active`; `consecutive_failures` reset to 0 | `webhook_id` (UUID), `tenant_id` (UUID), `endpoint_url_hash` (SHA-256), `reactivated_by: 'tenant_owner'` (literal — only `tenant_owner` RBAC role can invoke re-activation), `previous_status: 'suspended'` (literal) |
+
+**HMAC chain requirement:** `integration.webhook_delivery_failed` and `integration.webhook_suspended` are HIGH severity and emitted synchronously — failure aborts the state transition in the `webhook-dispatcher` Worker and pg_cron job 34 respectively. `integration.webhook_reactivated` is emitted synchronously inside the Workers middleware re-activation endpoint — failure blocks the re-activation HTTP response (fail-closed). Any WH-CHAIN-01 violation is treated as a security incident per R-05; no grace period.
+
+**Emitter assignments:** `integration.webhook_created` + `integration.webhook_deleted` — Workers API middleware (`form_system`, on behalf of authenticated `tenant_owner` or `tenant_admin` request). `integration.webhook_fired` — `webhook-dispatcher` Cloudflare Worker (`form_system`, automated, per-attempt). `integration.webhook_delivery_failed` — `webhook-dispatcher` Worker on 5th consecutive failure (`form_system`, automated). `integration.webhook_suspended` — pg_cron job 34 `webhook_degraded_escalation_check` at 48 h boundary (`form_system`, automated). `integration.webhook_reactivated` — Workers API middleware on `tenant_owner` re-activate request.
+
+**Zod v2 schemas (canonical source for `emit-audit-event` Worker validation):**
+
+```typescript
+const IntegrationWebhookCreatedSchema = z.object({
+  webhook_id:        z.string().uuid(),
+  endpoint_url_hash: z.string().regex(/^[a-f0-9]{64}$/),  // SHA-256(endpoint_url) — URL never in chain
+  events:            z.array(z.string().min(1)).min(1),
+  created_by:        z.string(),  // PAM session UUID (form_system ops) or tenant_owner user_id (self-service)
+});
+
+const IntegrationWebhookDeletedSchema = z.object({
+  webhook_id:        z.string().uuid(),
+  endpoint_url_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  deleted_by:        z.enum(['tenant_owner', 'tenant_admin', 'form_system']),
+});
+
+const IntegrationWebhookFiredSchema = z.object({
+  webhook_id:        z.string().uuid(),
+  tenant_id:         z.string().uuid(),
+  event_type:        z.string().min(1),
+  attempt_number:    z.number().int().min(1).max(5),
+  outcome:           z.enum(['success', 'failure', 'pending_retry']),
+  http_status:       z.number().int().nullable(),
+  error_class:       z.enum([
+    'timeout', '4xx', '5xx', 'tls_error', 'dns_error', 'internal_error',
+  ]).nullable(),
+  latency_ms:        z.number().int().nonnegative().nullable(),
+  endpoint_url_hash: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
+const IntegrationWebhookDeliveryFailedSchema = z.object({
+  webhook_id:           z.string().uuid(),
+  tenant_id:            z.string().uuid(),
+  endpoint_url_hash:    z.string().regex(/^[a-f0-9]{64}$/),
+  consecutive_failures: z.literal(5),  // always 5 at degraded transition
+  error_class:          z.enum([
+    'timeout', '4xx', '5xx', 'tls_error', 'dns_error', 'internal_error',
+  ]),
+  degraded_since: z.string().datetime(),
+});
+
+const IntegrationWebhookSuspendedSchema = z.object({
+  webhook_id:                      z.string().uuid(),
+  tenant_id:                       z.string().uuid(),
+  endpoint_url_hash:               z.string().regex(/^[a-f0-9]{64}$/),
+  degraded_since:                  z.string().datetime(),
+  total_failed_attempts_in_window: z.number().int().min(5),
+});
+
+const IntegrationWebhookReactivatedSchema = z.object({
+  webhook_id:        z.string().uuid(),
+  tenant_id:         z.string().uuid(),
+  endpoint_url_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  reactivated_by:    z.literal('tenant_owner'),
+  previous_status:   z.literal('suspended'),
+});
+```
+
+**SOC 2 evidence artefacts** (store at `compliance/evidence/cc9/webhooks/` with `MANIFEST.sha256`):
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **WH-E-001** | Quarterly export of `integration.webhook_created`, `integration.webhook_delivery_failed`, `integration.webhook_suspended`, `integration.webhook_reactivated`, `integration.webhook_deleted` DEC-030 chain events — demonstrates controlled third-party delivery lifecycle with no silent drops (WH-SLO-02 evidence) | CC9.2 — Third-party commitment monitoring; CC6.8 — Transmission integrity (HMAC chain proves no events were silently dropped) | 7 yr |
+| **WH-E-002** | AL-WH-02 + AL-WH-04 PagerDuty incident history (90 days) + Resend delivery receipts for WH-NOTIF-01 / WH-NOTIF-02 — demonstrates automated detection and timely CSM + tenant notification for degraded and suspended webhooks | CC7.2 — Proactive anomaly detection; CC7.3 — Response to anomalies within defined escalation SLA | 3 yr |
+| **WH-E-003** | Annual `webhook-dispatcher` Worker source code review confirmation — verifies (a) HMAC-SHA256 computed over raw request body for every delivery; (b) `endpoint_url` never appears in any log, analytics signal, or DEC-030 payload; (c) `WEBHOOK_SIGNING_SECRET_{webhook_id}` sourced from Cloudflare Worker Secrets only, never from Postgres | CC6.8 — Transmission integrity; CC6.1 — Access controls over tenant-sensitive endpoint URLs | 3 yr |
+
+**Auditor narrative for CC9.2:** FORM's enterprise webhook delivery pipeline enables tenant SIEM systems to receive real-time DEC-030 event notifications. WH-E-001 provides quarterly chain-extracted proof that every webhook lifecycle event is HMAC-evidenced and that failed delivery cascades surface as `integration.webhook_delivery_failed` (HIGH, 7-year retention) rather than being silently discarded. The WH-CHAIN-01 ordering invariant ensures that a `webhook_fired` event cannot appear after `webhook_suspended` without a reactivation event — giving auditors tamper-evident evidence that the delivery pipeline operates under controlled state transitions. No health data flows through this pipeline — webhook payloads are restricted to operational metadata categories enumerated in `docs/OBSERVABILITY.md §43.12`.
+
+---
+
+#### Other integration events (stub — full schemas TBD)
+
+- `integration.connector_added` — Slack, MS Teams, or other team-notification connector activated by `tenant_admin`; STANDARD severity, 7yr retention; payload: `{connector_type, tenant_id, activated_by}`
+- `integration.api_call` — sampled outbound API call record (1-in-10 volume management); STANDARD severity, 30-day retention per §retention table; not HMAC-chained (sampled, not an evidence-class event)
 
 ### System
 - `system.backup_completed` / `system.backup_restored` — full Zod schema + retention in **§ Backup & DR Observability events** below

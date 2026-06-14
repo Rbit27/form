@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.10.1] — 2026-06-14
+
+### Changed
+
+- `docs/AUDIT_LOG_SCHEMA.md §Integration` — expanded the three-line webhook stub into a full DEC-030 specification. Registers six HMAC-chained events covering the enterprise webhook delivery lifecycle: `integration.webhook_created`, `integration.webhook_deleted`, `integration.webhook_fired` (extended payloads — `endpoint_url_hash` SHA-256, all five retry-step fields), `integration.webhook_delivery_failed` (HIGH, 7yr — NEW; 5th consecutive failure; `degraded` transition; AL-WH-02 trigger; WH-SLO-04 notification clock), `integration.webhook_suspended` (HIGH, 7yr — NEW; 48 h `degraded`; pg_cron job 34; AL-WH-04 trigger), `integration.webhook_reactivated` (HIGH, 7yr — NEW; `tenant_owner` self-service; resets `consecutive_failures`). Documents WH-CHAIN-01 ordering invariant (`webhook_fired` after `webhook_suspended` without `webhook_reactivated` → HTTP 422 + R-05). Includes Zod v2 schemas for all six events (canonical source for `emit-audit-event` Worker validation); three SOC 2 evidence artefacts (WH-E-001 CC9.2/CC6.8 quarterly lifecycle export; WH-E-002 CC7.2/CC7.3 PagerDuty + Resend receipts; WH-E-003 CC6.8/CC6.1 annual Worker source code review). Privacy floor documented: `endpoint_url` never in chain; no Art. 9 health data; `tenant_manager` (HR) blocked; `form_api` REVOKED; `integration.webhook_*` SIEM events `compliance_reviewer` only. Closes OBSERVABILITY §43.15 checklist item 1 (P0, M10). Cross-ref: `docs/OBSERVABILITY.md §43`, `docs/ENTERPRISE_ADMIN_API.md §9`, DEC-030.
+- `VERSION` — 5.10.0 → 5.10.1.
+
+---
+
 ## [5.10.0] — 2026-06-14
 
 ### Added
