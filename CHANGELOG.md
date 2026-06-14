@@ -1,5 +1,12 @@
 # Changelog · FORM
 
+## [4.71.1] — 2026-06-14
+
+### Changed
+- `docs/CRYPTOGRAPHY_POLICY.md` v1.2 — `SCIM_TOKEN_HASH_SECRET` registered: §5 Key Rotation Schedule (180-day cycle; rotation requires re-hashing all active `tenant_scim_tokens.token_hash` rows during maintenance window), §6 Key Custody (Cloudflare Workers Secret scoped to `scim-worker` only; 1Password Operations vault backup), §12 Document History updated. Closes SSO_SCIM_IMPLEMENTATION §27.14 checklist item 3 (P0 M4). Cross-ref: SSO_SCIM_IMPLEMENTATION §27.3 (HMAC-SHA256 bearer-token auth pipeline); DATA_MODEL §4.2 (`tenant_scim_tokens.token_hash`).
+- `docs/SOC2_READINESS.md` — §56.3 Key Inventory: `SCIM_TOKEN_HASH_SECRET` row added (HMAC-SHA256; Cloudflare Workers Secret `scim-worker`; 180-day rotation; security-engineer owner). Nine-key inventory now covers all production secrets including both HMAC keying secrets (`API_KEY_HASH_SECRET` and `SCIM_TOKEN_HASH_SECRET`).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §27.14 checklist item 3 marked `[x]` ✅ 2026-06-14.
+
 ## [4.71.0] — 2026-06-14
 
 ### Added
