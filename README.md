@@ -114,7 +114,7 @@ Done — posts 637–650:
 | Shoulder complex: impingement, overhead mobility, програмування для здоров'я |
 | Rehab-to-performance: зворотна інтеграція після реабілітації (clinical-safety review) |
 
-### Block 701–750 — Strength sports specifics (in progress — 22/50 written · sports-scientist review required before publish)
+### Block 701–750 — Strength sports specifics (in progress — 35/50 written · sports-scientist review required before publish)
 
 Специфіка різних силових і суміжних дисциплін — для атлета, що розуміє принципи і хоче знати як вони реалізуються у різних контекстах.
 
@@ -142,33 +142,33 @@ Done — posts 637–650:
 | 720 | Перший старт у паверліфтингу: підготовка, відбір спроб, день виступу | Draft |
 | 721 | Raw vs. equipped паверліфтинг: різна техніка, різне програмування | Draft |
 | 722 | Одноповторний максимум: тестування, планування, periodization навколо 1RM | Draft |
-| 723 | Squat depth і індивідуальна анатомія: що говорить наука про ATG vs. parallel | Planned |
-| 724 | Bench press arch: техніка, фізіологія, legitimate variation | Planned |
-| 725 | Deadlift conventional vs. sumo: механіка, вибір, комбінування | Planned |
-| 726 | Overhead press: push press vs. strict press — коли що і чому | Planned |
-| 727 | Front squat для паверліфтера: допоміжна вправа чи окремий акцент | Planned |
-| 728 | Romanian deadlift як самостійна вправа: програмування і дозування | Planned |
-| 729 | Hip thrust: доказова база, обмеження, місце у програмі | Planned |
-| 730 | Горизонтальна тяга: row variations і що кожен варіант дає | Planned |
-| 731 | Pull-up programming: від нуля до weighted, дозування по стадіях | Planned |
-| 732 | Дипс: грудні vs. трицепсові — техніка і програмування | Planned |
-| 733 | Прес ногами: місце у програмі і коли він виправданий | Planned |
-| 734 | Фермерська ходьба як основна вправа: програмування і прогресія | Planned |
-| 735 | Шраги і верхня трапеція: роль у силовому програмуванні | Planned |
-| 736 | Hyperextension і back extension: задній ланцюг без штанги | Planned |
-| 737 | Pallof press і anti-rotation: core в контексті сили | Planned |
-| 738 | Landmine вправи: нішевий інструмент чи реальна альтернатива | Planned |
-| 739 | Belt squat: коли і чому замість back squat | Planned |
-| 740 | Суперсети і paired sets у силовому тренінгу: ефективність і обмеження | Planned |
-| 741 | Кластерні підходи: механізм, застосування, коли вони мають сенс | Planned |
-| 742 | Паузні повторення в жимі: техніка і програмування | Planned |
-| 743 | Touch-and-go vs. dead stop deadlift: різниця і вибір | Planned |
-| 744 | Tempo training у силовому тренінгу: де виправданий, де ні | Planned |
-| 745 | Forced reps і assisted training: докази і ризики | Planned |
+| 723 | Squat depth і індивідуальна анатомія: що говорить наука про ATG vs. parallel | Draft |
+| 724 | Bench press arch: техніка, фізіологія, legitimate variation | Draft |
+| 725 | Deadlift conventional vs. sumo: механіка, вибір, комбінування | Draft |
+| 726 | Overhead press: push press vs. strict press — коли що і чому | Draft |
+| 727 | Front squat для паверліфтера: допоміжна вправа чи окремий акцент | Draft |
+| 728 | Romanian deadlift як самостійна вправа: програмування і дозування | Draft |
+| 729 | Hip thrust: доказова база, обмеження, місце у програмі | Draft |
+| 730 | Горизонтальна тяга: row variations і що кожен варіант дає | Draft |
+| 731 | Підтягування: від нуля до зваженого варіанту | Draft |
+| 732 | Болгарське спліт-присідання: одностороннє навантаження і його місце у програмі | Draft |
+| 733 | Трицепс у силовому тренінгу: локаут, довга головка і правильна допоміжна робота | Draft |
+| 734 | Бокс-присідання і паузне присідання: специфічна адаптація для силових атлетів | Draft |
+| 735 | Трап-бар станова тяга: механіка, порівняння і вибір варіанту | Draft |
+| 736 | Дипс: грудні vs. трицепсові — техніка і програмування | Planned |
+| 737 | Прес ногами: місце у програмі і коли він виправданий | Planned |
+| 738 | Фермерська ходьба як основна вправа: програмування і прогресія | Planned |
+| 739 | Шраги і верхня трапеція: роль у силовому програмуванні | Planned |
+| 740 | Hyperextension і back extension: задній ланцюг без штанги | Planned |
+| 741 | Pallof press і anti-rotation: core в контексті сили | Planned |
+| 742 | Belt squat: коли і чому замість back squat | Planned |
+| 743 | Landmine вправи: нішевий інструмент чи реальна альтернатива | Planned |
+| 744 | Паузні повторення в жимі: техніка і програмування | Planned |
+| 745 | Touch-and-go vs. dead stop deadlift: різниця і вибір | Planned |
 | 746 | Сезонне програмування: off-season vs. in-season для змагальних атлетів | Planned |
-| 747 | Реалізація максимуму: від програми до виконання в день змагань | Planned |
-| 748 | Вагліфтинговий тренінг для паверліфтера: чому включити і як | Planned |
-| 749 | Силові дисципліни і загальна атлетична база: що брати з кожного | Planned |
+| 747 | Вагліфтинговий тренінг для паверліфтера: чому включити і як | Planned |
+| 748 | Силові дисципліни і загальна атлетична база: що брати з кожного | Planned |
+| 749 | Реалізація максимуму: від програми до виконання в день змагань | Planned |
 | 750 | Синтез блоку 701–750: strength sports specifics — ключові принципи | Planned |
 
 ### Block 751–800 — Athlete lifecycle & context (proposed)
