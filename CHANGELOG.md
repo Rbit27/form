@@ -1,5 +1,20 @@
 # Changelog · FORM
 
+## [5.8.3] — 2026-06-14
+
+### Added
+
+- `content/post-30-long-term-results.md` — Що таке «довгострокові результати» — і чому більшість не думає в цьому горизонті. Editorial-brutalist, 13 хв. Теми: міофібрилярна гіпертрофія vs саркоплазматична, адаптація сухожиль (Arampatzis et al. 2007, 2010), нейром'язова консолідація (Enoka & Duchateau 2017), горизонт планування 12 тижнів vs 3 роки, тренувальний вік як предиктор. clinical-safety: PASS (відсутні теми їжі, тіла, болю, ментального здоров'я).
+
+### Changed
+
+- `blog.html` — blog cards added for posts 26–30 (content existed for 26–29, cards were missing; post-30 new).
+- `README.md` — Editorial series header updated: 11–25 → 11–30; posts 26–29 marked draft; posts 31–35 proposed (mobility vs flexibility, reading research, self-programming vs coach, dropout mechanics, breathing mechanics).
+- `STATUS.md` — Editorial series 11–25 → 11–30; post-30 description added; proposed 31–35 listed; v5.8.1 → v5.8.3.
+- `VERSION` — 5.8.2 → 5.8.3.
+
+---
+
 ## [5.8.2] — 2026-06-14
 
 ### Changed

@@ -1,4 +1,4 @@
-# FORM · Project Status v5.8.1
+# FORM · Project Status v5.8.3
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v5.8.1** — 2026-06-14
+**v5.8.3** — 2026-06-14
 
 ---
 
@@ -32,7 +32,7 @@
 
 **Total posts: 827**
 
-**Editorial series 11–25** — posts 22–25 written v5.8.0: seasonal programming, return after break, female physiology (clinical-safety CONDITIONAL PASS), minimal equipment training. Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.).
+**Editorial series 11–30** — posts 26–29 blog cards added v5.8.3 (content existed since v5.8.2, no blog cards); post-30 written v5.8.3: «Що таке «довгострокові результати»» — training horizon, myofibrillar adaptation, tendon timelines, planning horizon problem; clinical-safety: PASS. Proposed next: posts 31–35 (mobility vs flexibility, reading research, self-programming vs coach, dropout mechanics, breathing mechanics). Open question: OQ-EDITORIAL-01 — filename collision with May 2026 short posts (post-22-periodization.md etc.) — status: 🟡 Unresolved.
 
 ---
 
