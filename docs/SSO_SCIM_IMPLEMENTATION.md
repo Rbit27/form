@@ -35,6 +35,7 @@
 25. [Per-Tenant Authentication Policy Engine — IP Allowlist, MFA Enforcement & Session Policy](#25-per-tenant-authentication-policy-engine--ip-allowlist-mfa-enforcement--session-policy)
 26. [API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy](#26-api-key-authentication-security--scim-ip-scope-api-key-ip-enforcement--rotation-policy)
 27. [SCIM v2.0 Endpoint — Worker Implementation Design (Closes G-001)](#27-scim-v20-endpoint--worker-implementation-design-closes-g-001)
+28. [SCIM Role Change Audit Trail & Session Revocation Fallback Design](#28-scim-role-change-audit-trail--session-revocation-fallback-design)
 
 ---
 
@@ -9799,8 +9800,8 @@ Filing path: `compliance/evidence/scim-provisioning/SCIM-PROV-E-00{1..4}_<YYYY-Q
 | ID | Question | Priority | Owner | Resolution path |
 |---|---|---|---|---|
 | **OQ-SSO-27.1** | **SCIM provisioning for non-SSO tenants.** §3.1 implies SCIM requires SSO to be configured (the SCIM token is associated with `tenant_sso_configs`). Should FORM support SCIM-only provisioning for enterprise tenants who use FORM's native email+password auth but want automated directory sync? This would require decoupling `tenant_scim_tokens` from `tenant_sso_configs`. | P2 | enterprise-architect | Evaluate at first customer asking for SCIM without SSO (estimated rare — most enterprise IdPs bundle SSO and SCIM). If demand exists, document decision in `docs/DECISION_LOG.md`. |
-| **OQ-SSO-27.2** | **SCIM `PUT /Users` full-replace and audit diffing.** Currently `scim.user_updated` records `fields_changed` (attribute names only, no values). Should FORM store old/new values for role changes specifically, to give the SOC 2 auditor a full role-change trail? Risk: if role values are stored in the audit event, a cross-tenant read of the chain would expose role information. Recommendation: store role changes in a separate `tenant_users_role_history` table (not in the DEC-030 chain), accessible only to `compliance_reviewer` role under RLS. | P1 | security-engineer + compliance-officer | Resolve before SOC 2 observation period start (M9); document in `docs/DECISION_LOG.md`. |
-| **OQ-SSO-27.3** | **SCIM async vs. synchronous session revocation on deprovisioning.** §27.5.5 specifies synchronous KV write for session revocation (< 3 ms). Under the §22 KV revocation architecture this is correct. However, if the Worker's KV write fails (network partition), the SCIM response is still 200 but revocation is deferred to the Supabase fallback. The SLA commitment (`ENTERPRISE_SLA.md §3.7` P99 < 60 s session revocation) could be breached in this failure mode. Options: (a) return 503 on KV write failure and let the IdP retry (breaks idempotency guarantee); (b) accept the Supabase fallback path as within SLA (< 30 s for the Supabase blocklist SELECT path); (c) emit AL-REVOKE-01 and page devops-lead when the fallback path activates, but still return 200 to the IdP. Recommendation: option (c). | P1 | platform-engineer + devops-lead | Resolve before G-013 DPA cleared (must specify in DPA whether session revocation is synchronous or best-effort). |
+| **OQ-SSO-27.2** | **SCIM `PUT /Users` full-replace and audit diffing.** Currently `scim.user_updated` records `fields_changed` (attribute names only, no values). Should FORM store old/new values for role changes specifically, to give the SOC 2 auditor a full role-change trail? Risk: if role values are stored in the audit event, a cross-tenant read of the chain would expose role information. Recommendation: store role changes in a separate `tenant_users_role_history` table (not in the DEC-030 chain), accessible only to `compliance_reviewer` role under RLS. | ~~P1~~ **🟢 Resolved** | security-engineer + compliance-officer | **🟢 Resolved — DEC-049 (2026-06-14). `tenant_users_role_history` table adopted. See §28.** |
+| **OQ-SSO-27.3** | **SCIM async vs. synchronous session revocation on deprovisioning.** §27.5.5 specifies synchronous KV write for session revocation (< 3 ms). Under the §22 KV revocation architecture this is correct. However, if the Worker's KV write fails (network partition), the SCIM response is still 200 but revocation is deferred to the Supabase fallback. The SLA commitment (`ENTERPRISE_SLA.md §3.7` P99 < 60 s session revocation) could be breached in this failure mode. Options: (a) return 503 on KV write failure and let the IdP retry (breaks idempotency guarantee); (b) accept the Supabase fallback path as within SLA (< 30 s for the Supabase blocklist SELECT path); (c) emit AL-REVOKE-01 and page devops-lead when the fallback path activates, but still return 200 to the IdP. Recommendation: option (c). | ~~P1~~ **🟢 Resolved** | platform-engineer + devops-lead | **🟢 Resolved — DEC-048 (2026-06-14). Option (c) adopted; AL-REVOKE-01 added. See §28.** |
 
 ---
 
@@ -9813,5 +9814,369 @@ Filing path: `compliance/evidence/scim-provisioning/SCIM-PROV-E-00{1..4}_<YYYY-Q
 *v1.8.3 patch (2026-06-11): §26.11 checklist items 7 and 12 closed. Item 7: `API_KEY_HASH_SECRET` confirmed present in `CRYPTOGRAPHY_POLICY.md` §5 Key Rotation Schedule (180-day cycle, re-hash on rotation) and `SOC2_READINESS.md` §56.3 Key Inventory — marked 🟢 Closed. Item 12: `DATA_MODEL.md §26` "API Key Authentication Schema" confirmed present with canonical DDL scope note and SSO_SCIM §26 cross-reference — marked 🟢 Closed. Owner: security-engineer + enterprise-architect.*
 
 *v1.8.1 patch (2026-06-10): OQ-SSO-26.2 stale-status patch. §26.10 OQ-SSO-26.2 row updated: 🟡 P1 Open → 🟢 Resolved, citing DEC-035 (2026-06-01); soft enforcement (age alerts amber ≥ 365d, red ≥ 730d + CSM escalation) confirmed; provisional hard-enforcement trigger documented (key exceeds 365d without rotation at observation period start). §26.11 checklist item 11 marked [x] Done with DEC-035 reference. Owner: enterprise-architect + compliance-officer.*
+
+---
+
+## 28. SCIM Role Change Audit Trail & Session Revocation Fallback Design
+
+### 28.1 Purpose & Scope
+
+This section formally resolves the two P1 open questions carried since §27.15 (v1.9, 2026-06-13):
+
+| OQ | Resolved by | Decision |
+|---|---|---|
+| **OQ-SSO-27.2** — SCIM role change audit trail: where to store old/new role values | **DEC-049** | `tenant_users_role_history` append-only table; not in DEC-030 chain |
+| **OQ-SSO-27.3** — SCIM KV write failure during deprovisioning session revocation | **DEC-048** | Option (c): HTTP 200 + Supabase fallback + AL-REVOKE-01 emit |
+
+Both decisions are **required before G-013 DPA clearance** (OQ-SSO-27.3) and **before SOC 2 observation period start** (OQ-SSO-27.2). The implementation is a self-contained addition to `apps/scim-worker/` and one new migration (`0068_tenant_users_role_history.sql`).
+
+**Out of scope:** OQ-SSO-27.1 (SCIM without SSO) remains P2 open; no design decision in this section applies to that question.
+
+---
+
+### 28.2 OQ-SSO-27.3 Resolution — KV Write Failure Fallback Protocol (DEC-048)
+
+#### 28.2.1 Decision
+
+**Option (c) adopted.** When `env.SCIM_KV.put()` throws during the SCIM PATCH deprovisioning flow (§27.5.5), the Worker:
+
+1. Immediately falls back to the Supabase blocklist INSERT path (§22 `kv_session_revocations` table).
+2. Returns **HTTP 200** to the IdP — idempotency guarantee (§27.9) is preserved unconditionally.
+3. Emits `scim.session_revocation_kv_fallback` DEC-030 HMAC-chained event (HIGH, 7yr) — provides the SOC 2 auditor with evidence that the fallback activated and that revocation completed via the alternate path.
+4. Triggers **AL-REVOKE-01** (P1, PagerDuty `form-platform`) — alerts devops-lead to investigate KV regional degradation.
+
+The Supabase fallback achieves revocation within < 30 s, well within the `ENTERPRISE_SLA.md §3.7` P99 ≤ 60 s SLA commitment.
+
+#### 28.2.2 Rejection rationale for options (a) and (b)
+
+| Option | Outcome | Rejection reason |
+|---|---|---|
+| **(a)** Return HTTP 503 on KV failure; let IdP retry | IdP retries the DELETE | Breaks the idempotency guarantee (§27.9). The retry fires a second deprovisioning flow that may race with a concurrent reactivation (`scim.user_reactivated` in-flight), creating a SCIM-CHAIN-01 ordering violation. SOC 2 CC6.3 evidence would show two `scim.user_deprovisioned` events for the same `user_id` with no intervening reactivation — auditor flag. |
+| **(b)** Accept Supabase fallback silently; no alerting | Revocation completes; no signal emitted | CC7.2 gap: FORM has no detection of KV infrastructure degradation. A sustained KV outage could affect multiple tenants without any alert firing. Silent fallback is operationally equivalent to "we don't know our revocation path is degraded." |
+
+#### 28.2.3 DPA G-013 language update
+
+The following clause replaces the current §14.3.2 session revocation description:
+
+> "Session revocation on employee deprovisioning uses a best-effort synchronous Cloudflare KV write (< 3 ms under normal conditions). In the event of a Cloudflare KV regional failure, an automatic Supabase fallback path achieves revocation within 30 seconds, remaining within the contracted 60-second P99 SLA commitment. The fallback activation is logged as a tamper-evident DEC-030 audit event (`scim.session_revocation_kv_fallback`, HIGH, 7-year retention) and triggers immediate infrastructure alert (AL-REVOKE-01) to the FORM engineering on-call."
+
+#### 28.2.4 Worker implementation
+
+In `apps/scim-worker/src/handlers/users.ts`, the deprovisioning PATCH path (§27.5.5) gains the following try/catch wrapper around the KV write:
+
+```typescript
+let revocationPath: 'kv' | 'supabase_fallback' = 'kv';
+
+try {
+  await env.SCIM_KV.put(
+    `revoke:user:${tenantId}:${userId}`,
+    '1',
+    { expirationTtl: SESSION_REVOCATION_TTL_SECONDS },
+  );
+} catch (kvError: unknown) {
+  revocationPath = 'supabase_fallback';
+
+  // Fallback: Supabase blocklist table (§22 kv_session_revocations)
+  const { error: sbError } = await supabase
+    .from('kv_session_revocations')
+    .insert({
+      key: `revoke:user:${tenantId}:${userId}`,
+      expires_at: new Date(Date.now() + SESSION_REVOCATION_TTL_MS).toISOString(),
+    });
+
+  if (sbError) {
+    // Both paths failed — this is a P0; surface to Sentry before returning 200
+    console.error('[SCIM][R-REVOKE] Both KV and Supabase revocation paths failed', {
+      tenantId, scimRequestId, kvError, sbError,
+    });
+  }
+
+  // Emit DEC-030 HMAC-chained event — fires AL-REVOKE-01 via audit queue
+  await emitAuditEvent(env, {
+    action: 'scim.session_revocation_kv_fallback',
+    severity: 'HIGH',
+    tenant_id: tenantId,
+    scim_request_id: scimRequestId,
+    fallback_path: 'supabase_blocklist',
+    supabase_ok: !sbError,
+    kv_error_class: kvError instanceof Error ? kvError.constructor.name : 'Unknown',
+  });
+}
+
+// HTTP 200 regardless of revocation path — idempotency guarantee (§27.9)
+return new Response(JSON.stringify(toScimUser(updatedUser)), {
+  status: 200,
+  headers: { 'Content-Type': 'application/scim+json' },
+});
+```
+
+---
+
+### 28.3 OQ-SSO-27.2 Resolution — SCIM Role Change Audit Trail (DEC-049)
+
+#### 28.3.1 Decision
+
+Role change values — `old_role` and `new_role` — produced by SCIM `PUT /Users` full-replace and group PATCH operations are stored in a **dedicated `tenant_users_role_history` table**, not in the DEC-030 HMAC chain.
+
+The `scim.user_updated` event continues to record `fields_changed: ['role']` (attribute name only) as the tamper-evident chain anchor. The `scim_request_id` field in `tenant_users_role_history` cross-references the chain event to the actual role values, giving SOC 2 auditors a two-layer evidence chain:
+
+```
+DEC-030 chain:          scim.user_updated { fields_changed: ['role'], scim_request_id: "X" }
+                                │
+                                └── cross-reference (scim_request_id = "X")
+                                          │
+tenant_users_role_history:        { old_role: 'member', new_role: 'manager', scim_request_id: "X" }
+                                    (RLS: compliance_reviewer + tenant_admin only)
+```
+
+#### 28.3.2 Rejection of in-chain role value storage
+
+The `scim.user_updated` payload must **not** include `old_role`/`new_role` values because:
+
+1. **Cross-tenant leakage risk.** The DEC-030 HMAC chain is replicated as a whole for auditor evidence export. An auditor receiving a bulk chain export for CC6.1/CC6.3 receives events from all tenants covered by the observation period. If role values appear in payloads, an export misconfiguration or accidental over-sharing exposes org-chart-sensitive data (e.g., distinguishing `manager` from `member`) across tenant boundaries.
+
+2. **SOC 2 privacy floor.** `docs/ENTERPRISE.md §Privacy floor` rule 1: "HR can never see individual user data." Role names in the chain expose user-level role assignments; the tenant-scoped RLS table confines visibility to authenticated queries with explicit tenant scope.
+
+3. **Future-proof GDPR Art. 17 erasure.** Role history rows carry a `user_id_pseudonym` column for the erasure path (§28.4 `chk_turh_user_xor_pseudonym`). Chain events cannot be pseudonymised post-emission — the chain's tamper-evident property is broken by in-place mutation.
+
+#### 28.3.3 Evidence chain for auditors
+
+A SOC 2 CC6.3 auditor reviewing role change governance uses the following two-step lookup:
+
+```sql
+-- Step 1: retrieve chain events where a role change was recorded
+SELECT
+  ae.occurred_at,
+  ae.tenant_id,
+  ae.scim_request_id,
+  ae.fields_changed       -- contains 'role'
+FROM audit_log_events ae
+WHERE ae.action = 'scim.user_updated'
+  AND 'role' = ANY(ae.fields_changed)
+  AND ae.tenant_id = :tenant_id
+ORDER BY ae.occurred_at DESC;
+
+-- Step 2: retrieve role change values for a specific event
+SELECT
+  rh.changed_at,
+  rh.old_role,
+  rh.new_role,
+  rh.changed_by,
+  rh.scim_request_id      -- matches ae.scim_request_id from Step 1
+FROM tenant_users_role_history rh
+WHERE rh.tenant_id = :tenant_id
+  AND rh.scim_request_id = :scim_request_id;
+```
+
+Step 1 is available to the auditor via the standard HMAC chain export. Step 2 requires `compliance_reviewer` role access (auditor fieldwork, not bulk export) — appropriate for a query that returns business-sensitive role assignment data.
+
+---
+
+### 28.4 `tenant_users_role_history` Schema
+
+Cross-reference: `docs/DATA_MODEL.md §33` (canonical DDL definition). This section provides the SCIM context and integration pattern.
+
+#### 28.4.1 DDL summary
+
+```sql
+-- Migration: 0068_tenant_users_role_history.sql
+
+CREATE TABLE tenant_users_role_history (
+  id                UUID         NOT NULL DEFAULT gen_random_uuid(),
+  tenant_id         UUID         NOT NULL,
+  user_id           UUID,
+  user_id_pseudonym TEXT,
+  scim_request_id   TEXT         NOT NULL,
+  changed_by        TEXT         NOT NULL DEFAULT 'scim_sync',
+  old_role          TEXT         NOT NULL,
+  new_role          TEXT         NOT NULL,
+  changed_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT pk_tenant_users_role_history       PRIMARY KEY (id),
+  CONSTRAINT fk_turh_tenant  FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+  CONSTRAINT fk_turh_user    FOREIGN KEY (user_id)   REFERENCES users(id)   ON DELETE SET NULL,
+  CONSTRAINT chk_turh_user_xor_pseudonym CHECK (
+    (user_id IS NOT NULL) != (user_id_pseudonym IS NOT NULL)
+  ),
+  CONSTRAINT chk_turh_role_changed CHECK (old_role <> new_role)
+);
+
+CREATE INDEX idx_turh_tenant_user   ON tenant_users_role_history (tenant_id, user_id)    WHERE user_id IS NOT NULL;
+CREATE INDEX idx_turh_tenant_time   ON tenant_users_role_history (tenant_id, changed_at DESC);
+CREATE INDEX idx_turh_scim_request  ON tenant_users_role_history (scim_request_id);
+```
+
+#### 28.4.2 Column notes
+
+| Column | Purpose |
+|---|---|
+| `user_id` | FK to `users.id`; SET NULL on user delete (GDPR Art. 17 step 1) |
+| `user_id_pseudonym` | Keyed HMAC `SHA-256(user_id \|\| ERASURE_PSEUDONYM_SALT)`; populated during Art. 17 erasure Worker; mutually exclusive with `user_id` (`chk_turh_user_xor_pseudonym`) |
+| `scim_request_id` | Ties this row to the `scim.user_updated` DEC-030 chain event for cross-reference |
+| `changed_by` | `'scim_sync'` for SCIM operations; `'admin_ui'` for admin dashboard role edits; `'jit_provisioning'` for §11 JIT flows |
+| `chk_turh_role_changed` | Rejects rows where `old_role = new_role` — prevents no-op audit noise |
+
+#### 28.4.3 RLS policies
+
+```sql
+ALTER TABLE tenant_users_role_history ENABLE ROW LEVEL SECURITY;
+
+-- Compliance reviewer: full read (SOC 2 auditor fieldwork)
+CREATE POLICY turh_compliance_read ON tenant_users_role_history
+  FOR SELECT TO compliance_reviewer USING (true);
+
+-- Tenant admin: read own tenant only
+CREATE POLICY turh_tenant_admin_read ON tenant_users_role_history
+  FOR SELECT TO tenant_admin
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+-- form_system: INSERT only — append-only; no UPDATE, no DELETE
+CREATE POLICY turh_system_insert ON tenant_users_role_history
+  FOR INSERT TO form_system WITH CHECK (true);
+
+-- form_api: no access (enforced by absence of policy)
+```
+
+#### 28.4.4 Worker integration
+
+`recordRoleChange()` is called from the PUT and group PATCH handlers in `apps/scim-worker/src/handlers/users.ts` immediately after the role update commits to `tenant_users`:
+
+```typescript
+async function recordRoleChange(
+  supabase: SupabaseClient,
+  params: {
+    tenantId: string;
+    userId: string;
+    scimRequestId: string;
+    oldRole: string;
+    newRole: string;
+    changedBy?: 'scim_sync' | 'admin_ui' | 'jit_provisioning';
+  },
+): Promise<void> {
+  if (params.oldRole === params.newRole) return;
+
+  const { error } = await supabase
+    .from('tenant_users_role_history')
+    .insert({
+      tenant_id:       params.tenantId,
+      user_id:         params.userId,
+      scim_request_id: params.scimRequestId,
+      changed_by:      params.changedBy ?? 'scim_sync',
+      old_role:        params.oldRole,
+      new_role:        params.newRole,
+    });
+
+  if (error) {
+    // Non-fatal: log to Sentry; SCIM operation already committed.
+    // Do NOT throw — role history failure must not roll back the provisioning action.
+    console.error('[SCIM][ROLE-HISTORY] Failed to record role change', { error, params });
+  }
+}
+```
+
+> **Non-fatal design rationale:** If `tenant_users_role_history` INSERT fails (e.g., transient Supabase edge), the role change itself has already committed to `tenant_users`. Rolling back the entire SCIM operation to preserve audit history would violate the SCIM idempotency contract and create a worse outcome (user stuck in wrong role state, IdP retries). The missing history row is detectable via a nightly reconciliation query (§28.9 checklist item 6); any gap is a P2 investigation item, not a P0 incident.
+
+---
+
+### 28.5 DEC-030 Event: `scim.session_revocation_kv_fallback`
+
+| Field | Value |
+|---|---|
+| **action** | `scim.session_revocation_kv_fallback` |
+| **severity** | HIGH |
+| **retention** | 7 yr |
+| **trigger** | `env.SCIM_KV.put()` throws during SCIM PATCH deprovisioning |
+| **emitter** | `apps/scim-worker` (automated — no human actor) |
+
+**Payload schema (Zod v2):**
+
+```typescript
+const ScimSessionRevocationKvFallbackPayload = z.object({
+  tenant_id:       z.string().uuid(),
+  scim_request_id: z.string().max(128),
+  fallback_path:   z.literal('supabase_blocklist'),
+  supabase_ok:     z.boolean(),                       // false if Supabase fallback also failed
+  kv_error_class:  z.string().max(64),                // e.g. 'KVError', 'NetworkError'
+});
+```
+
+**Privacy invariant:** No `user_id`, no email address, no role values in payload. `tenant_id` and `scim_request_id` are the minimum identifiers required for incident correlation.
+
+**HMAC chain requirement (REVOKE-CHAIN-01):** `scim.session_revocation_kv_fallback` for a given `scim_request_id` must follow a `scim.user_deprovisioned` event for the same `scim_request_id` in the chain order. A chain break violates CC7.2 evidence integrity and triggers R-05.
+
+---
+
+### 28.6 Alert Rule: AL-REVOKE-01
+
+| Rule | Condition | Severity | Routing | Dedup key | Auto-resolve |
+|---|---|---|---|---|---|
+| **AL-REVOKE-01** | Any `scim.session_revocation_kv_fallback` event emitted (count > 0 in 5-min window) | **P1** | PagerDuty `form-platform` → devops-lead | `scim-kv-fallback-{tenant_id}` (1-hour dedup window) | No — IC investigation required |
+
+**Trigger source:** `AUDIT_QUEUE` consumer monitors `action = 'scim.session_revocation_kv_fallback'`; counter incremented in Cloudflare Analytics Engine metric `scim_kv_fallback_count`; Better Stack alert fires on `scim_kv_fallback_count > 0` in any 5-minute window.
+
+**IC response:** Confirm whether `supabase_ok = true` in the event payload (revocation completed via fallback). If `supabase_ok = false`, escalate immediately to P0 (both revocation paths failed); activate R-02 (service outage) and R-26 (SCIM deprovisioning latency) in parallel.
+
+---
+
+### 28.7 SOC 2 Evidence Mapping
+
+| Criterion | Evidence | Control statement |
+|---|---|---|
+| **CC6.3** — Removes access when appropriate | SCIM-ROLE-E-001 (`tenant_users_role_history` audit sample) + SCIM-ROLE-E-002 (DEC-030 cross-reference export) + SCIM-REVOKE-E-001 (AL-REVOKE-01 history) | Role changes are captured in append-only history; session revocation on deprovisioning completes within 60 s via dual-path architecture even under KV failure |
+| **CC6.6** — Restricts logical access based on role | SCIM-ROLE-E-001 | Role transition audit trail demonstrates SCIM sync operated within authorised role boundaries; `compliance_reviewer` RLS gate enforces least-privilege access to role history |
+| **CC7.2** — Monitors for anomalies | SCIM-REVOKE-E-001 (AL-REVOKE-01 history) | AL-REVOKE-01 provides detection coverage for Cloudflare KV degradation affecting the SCIM deprovisioning revocation path |
+| **PI1.1** — Authorised access to sensitive data | SCIM-ROLE-E-001 + SCIM-ROLE-E-002 | `tenant_users_role_history` is accessible only to `compliance_reviewer` (auditor fieldwork) and `tenant_admin` (own-tenant scope); no `form_api` access; cross-reference via `scim_request_id` to chain events allows auditor to verify role changes without bulk export of sensitive role data |
+
+**Evidence artefacts:**
+
+| ID | Type | Query / Source | Path | Retention |
+|---|---|---|---|---|
+| **SCIM-ROLE-E-001** | CC6.3 / CC6.6 | `SELECT id, tenant_id, old_role, new_role, changed_at FROM tenant_users_role_history WHERE tenant_id = :id AND changed_at BETWEEN :obs_start AND :obs_end ORDER BY changed_at` (no `user_id` in export — pseudonymised column omitted) | `compliance/evidence/scim-role/SCIM-ROLE-E-001_<YYYY-QN>.csv` | 7 yr |
+| **SCIM-ROLE-E-002** | CC6.3 / PI1.1 | DEC-030 `scim.user_updated` events where `'role' = ANY(fields_changed)` for observation period — cross-reference sample of 5 `scim_request_id` values to matching `tenant_users_role_history` rows | `compliance/evidence/scim-role/SCIM-ROLE-E-002_<YYYY-QN>.md` | 7 yr |
+| **SCIM-REVOKE-E-001** | CC7.2 | AL-REVOKE-01 alert history for SOC 2 observation period (Better Stack export or zero-fire attestation) | `compliance/evidence/scim-revoke/SCIM-REVOKE-E-001_<YYYY-QN>.csv` | 3 yr |
+
+---
+
+### 28.8 Implementation Checklist
+
+#### P0 — Before G-013 DPA cleared (M5)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Run `migration 0068_tenant_users_role_history.sql`; verify RLS policies with `SET ROLE compliance_reviewer` and `SET ROLE tenant_admin` in psql; add migration to `compliance/migrations/log.md`. | platform-engineer | **P0** | M5 | [ ] |
+| 2 | Register `scim.session_revocation_kv_fallback` in `docs/AUDIT_LOG_SCHEMA.md §6.SCIM-Lifecycle` with Zod schema from §28.5; deploy schema to `emit-audit-event` Worker. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 3 | Add `recordRoleChange()` utility (§28.4.4) to `apps/scim-worker/src/handlers/users.ts`; call after PUT full-replace and group PATCH role evaluation; verify `chk_turh_role_changed` rejects no-op rows in integration test. | platform-engineer | **P0** | M5 | [ ] |
+| 4 | Add KV fallback try/catch (§28.2.4) to PATCH deprovisioning path in `apps/scim-worker/src/handlers/users.ts`; emit `scim.session_revocation_kv_fallback` via `emitAuditEvent()`. | platform-engineer | **P0** | M5 | [ ] |
+| 5 | Configure **AL-REVOKE-01** in Better Stack: `scim_kv_fallback_count > 0` in 5-min window; PagerDuty `form-platform`; dedup key `scim-kv-fallback-{tenant_id}` (1-hour); no auto-resolve. | devops-lead | **P0** | M5 | [ ] |
+| 6 | Update G-013 DPA template §14.3.2 with dual-path revocation language from §28.2.3 before DPA is signed with first enterprise customer. | compliance-officer + legal | **P0** | M5 (before first DPA execution) | [ ] |
+
+#### P1 — Before SOC 2 observation period start (M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | Collect **SCIM-ROLE-E-001**: run role history query for the 30-day pre-observation sample window; confirm `chk_turh_role_changed` constraint produced zero `old_role = new_role` rows (constraint violation audit); file to `compliance/evidence/scim-role/`. | compliance-officer | **P1** | M9 | [ ] |
+| 8 | Collect **SCIM-ROLE-E-002**: export 5 representative `scim.user_updated` chain events where `'role' = ANY(fields_changed)`; manually cross-reference `scim_request_id` to matching `tenant_users_role_history` rows; document match in evidence file. | compliance-officer | **P1** | M9 | [ ] |
+| 9 | Collect **SCIM-REVOKE-E-001**: export AL-REVOKE-01 alert history from Better Stack for observation period; if zero fires, write zero-fire attestation signed by devops-lead. | devops-lead + compliance-officer | **P1** | M9 | [ ] |
+| 10 | Update `docs/SOC2_READINESS.md §CC6.3` evidence table to reference SCIM-ROLE-E-001, SCIM-ROLE-E-002, and SCIM-REVOKE-E-001. | compliance-officer | **P1** | M9 | [ ] |
+
+#### P2 — Post-GA
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 11 | Add nightly reconciliation query: `SELECT COUNT(*) FROM audit_log_events WHERE action = 'scim.user_updated' AND 'role' = ANY(fields_changed) AND NOT EXISTS (SELECT 1 FROM tenant_users_role_history WHERE scim_request_id = audit_log_events.scim_request_id)`; non-zero result → AL-SCIM-05 (P2 Slack `#compliance-alerts`); confirms no role change slipped without a history row. | devops-lead + platform-engineer | **P2** | M10 | [ ] |
+| 12 | Add `tenant_users_role_history` to the Erasure Worker (`apps/erasure-worker/`) GDPR Art. 17 pipeline: on user hard-delete, set `user_id = NULL`, populate `user_id_pseudonym = SHA-256(user_id || ERASURE_PSEUDONYM_SALT)` for all matching rows; emit `gdpr.erasure_role_history_pseudonymised` (STANDARD, 7yr) DEC-030 event. | platform-engineer + compliance-officer | **P2** | M10 | [ ] |
+
+---
+
+### 28.9 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-SSO-28.1** | **AL-SCIM-05 naming collision check.** The nightly reconciliation alert proposed in §28.8 item 11 is labelled AL-SCIM-05. Confirm this ID is not already in use in `docs/OBSERVABILITY.md §26` (SSO/SCIM identity observability). If AL-SCIM-05 is taken, use the next available ID. | P2 | devops-lead | Check before configuring alert (M10). |
+| **OQ-SSO-28.2** | **`tenant_users_role_history` retention period.** The table carries `changed_at` timestamps tied to user role assignments. GDPR Art. 5(1)(e) storage limitation requires a defined retention period. Proposed: 7-year retention aligned with DEC-030 HMAC chain retention for the corresponding `scim.user_updated` event (audit-trail continuity argument). Alternative: 3 years (aligns with `scim.group_synced` retention). | P1 | compliance-officer + legal | Resolve at first legal sign-off cycle (before M9 observation period start). |
+
+---
+
+*v2.0 additions (2026-06-14): §28 SCIM Role Change Audit Trail & Session Revocation Fallback Design — resolves two P1 open questions from §27.15 (v1.9, 2026-06-13). OQ-SSO-27.2 → **DEC-049**: `tenant_users_role_history` append-only table adopted as the role change audit trail; role values (old_role/new_role) are explicitly excluded from the DEC-030 HMAC chain to prevent cross-tenant leakage in auditor bulk exports; `scim_request_id` cross-reference ties chain events to table rows for SOC 2 fieldwork. OQ-SSO-27.3 → **DEC-048**: Option (c) adopted for SCIM KV write failure — HTTP 200 maintained (idempotency); Supabase blocklist fallback activated (< 30 s revocation, within 60-second P99 SLA); `scim.session_revocation_kv_fallback` DEC-030 event (HIGH, 7yr) emitted; AL-REVOKE-01 (P1 PagerDuty `form-platform`) fires on any KV fallback activation. New DEC-030 event: `scim.session_revocation_kv_fallback` (HIGH, 7yr; `supabase_ok` boolean surfaces dual-path failure; no user_id in payload). REVOKE-CHAIN-01 invariant: `scim.session_revocation_kv_fallback` must follow `scim.user_deprovisioned` in chain order for the same `scim_request_id`. `tenant_users_role_history` DDL (§28.4, migration `0068_tenant_users_role_history.sql`): `chk_turh_role_changed` (no-op guard), `chk_turh_user_xor_pseudonym` (GDPR Art. 17 erasure path), three indexes (tenant_user, tenant_time, scim_request). `recordRoleChange()` TypeScript helper — non-fatal design (INSERT failure does not roll back SCIM operation; reconciliation query AL-SCIM-05 provides gap detection). RLS: `compliance_reviewer` full read; `tenant_admin` own-tenant read; `form_system` INSERT; no `form_api` access. Three SOC 2 evidence artefacts: SCIM-ROLE-E-001 (CC6.3/CC6.6 role history sample), SCIM-ROLE-E-002 (CC6.3/PI1.1 DEC-030 cross-reference), SCIM-REVOKE-E-001 (CC7.2 AL-REVOKE-01 history). Twelve-item implementation checklist: 6× P0/M5 (migration, DEC-030 registration, recordRoleChange, KV fallback handler, AL-REVOKE-01, DPA language update), 4× P1/M9 (evidence collection, SOC2 cross-reference), 2× P2/M10 (reconciliation alert, erasure pipeline). Two new open questions: OQ-SSO-28.1 (AL-SCIM-05 naming collision P2), OQ-SSO-28.2 (tenant_users_role_history retention period P1). §27.15 OQ-SSO-27.2 and OQ-SSO-27.3 status updated to 🟢 Resolved with DEC references. TOC updated to add §28. Cross-references: `docs/DATA_MODEL.md §33` (canonical DDL definition for tenant_users_role_history); `docs/AUDIT_LOG_SCHEMA.md §6.SCIM-Lifecycle` (scim.session_revocation_kv_fallback event to register — P0 before M5); `docs/OBSERVABILITY.md §26` (SSO/SCIM identity observability — AL-SCIM-05 naming check, OQ-SSO-28.1); `docs/ENTERPRISE_SLA.md §3.7` (60 s session revocation SLA — §28.2 fallback stays within SLA); `docs/INCIDENT_RESPONSE.md R-05` (HMAC chain break — REVOKE-CHAIN-01 violation trigger); `docs/INCIDENT_RESPONSE.md R-26` (SCIM deprovisioning latency — co-activation if supabase_ok = false); `docs/CRYPTOGRAPHY_POLICY.md §5` (ERASURE_PSEUDONYM_SALT — used in OQ-SSO-28.2 erasure path); `docs/DECISION_LOG.md` (DEC-048 and DEC-049). Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*
 
 *v1.8 additions (2026-06-04): §26 API Key Authentication Security — SCIM IP Scope, API Key IP Enforcement & Rotation Policy. Closes OQ-SSO-25.1 (🟡 P1 → 🟢 Resolved) and OQ-SSO-25.3 (🟡 P1 M5 → 🟢 Resolved) from §25.13. TOC updated to add §26. Header updated from v1.7 to v1.8. §26.1 purpose and scope: two P1 open questions from §25 resolved; privacy floor (client_ip_hash via IP_HASH_SALT in all DEC-030 events; no plaintext IP in audit chain). §26.2 credential architecture disambiguation: three credential types (JWT 1h, SCIM bearer long-lived provisioning, tenant API key long-lived integration); §26 covers the two non-JWT types that were not covered by §25 IP enforcement. §26.3 OQ-SSO-25.1 resolution — SCIM IP scope: option (c) selected (separate flag, default off); migration 0052_scim_ip_allowlist.sql adding `scim_ip_enforcement_enabled BOOLEAN DEFAULT false` and `scim_ip_allowlist_config JSONB DEFAULT NULL` to tenant_sso_configs; chk_scim_ip_allowlist_required CHECK constraint; `enforceScimIpAllowlist()` branch in ip-allowlist.ts (SCIM routes bypass general allowlist; use scim_ip_allowlist_config only when scim_ip_enforcement_enabled = true); admin dashboard "Directory Sync IP Restriction" UI (collapsible, Enterprise-gated, import buttons for Okta/Azure pre-populated CIDRs, warning banner about IdP IP range volatility). §26.4 OQ-SSO-25.3 resolution — API key IP enforcement: formalised tenant_api_keys table schema (UUID PK, key_hash HMAC-SHA256, key_preview last-8-chars, label, created_by, last_used_at, expires_at, revoked_at, ip_enforcement_enabled BOOLEAN DEFAULT false, ip_allowlist_config JSONB, scopes TEXT[] DEFAULT '{reporting:read}'; RLS for form_api; partial unique index on key_hash WHERE revoked_at IS NULL); api-key-auth.ts updated to call enforceApiKeyIpAllowlist() using shared checkCidrList() utility from §25 (no new dependency); scope enforcement before route handler; last_used_at updated via waitUntil; error response omits all IP/allowlist detail to prevent enumeration. §26.5 rotation policy: mandatory triggers (age ≥ 365d amber, ≥ 730d red, suspected compromise same-day, offboarding 5 business days, `admin:write` scope quarterly 90d); 24-hour overlap window (same as SCIM token rotation §16.6); admin dashboard age-alert pill states (0–364d none, 365–729d amber, 730d+ red, admin:write >90d amber). §26.6 nine DEC-030 HMAC-chained events (all HIGH, 7yr): api_key.created, api_key.rotated, api_key.revoked, api_key.ip_enforcement_enabled, api_key.ip_enforcement_disabled, api_key.ip_blocked (client_ip_hash only, Queues bulk dedup), scim.ip_enforcement_enabled, scim.ip_enforcement_disabled, scim.ip_blocked (client_ip_hash only); HMAC chain requirement: api_key.rotated must be followed by api_key.revoked (old key) within 26h or AL-APIKEY-02 fires. §26.7 four alerting rules: AL-APIKEY-01 P1 (>10 ip_blocked per key in 10 min → compromise attempt or misconfiguration), AL-APIKEY-02 P1 (rotation overlap not cleaned up within 26h → cron failure), AL-APIKEY-03 P1 (revoked with reason=compromise → trigger R-16), AL-SCIM-IP-01 P2 (SCIM ip_blocked >5 in 15 min AND provisioning success <50% → misconfigured allowlist). §26.8 SOC 2 evidence mapping CC6.1/CC6.2/CC6.4/CC6.8/CC7.2 with five artefacts APIKEY-E-001 through APIKEY-E-005. §26.9 OQ-SSO-25.1 and OQ-SSO-25.3 formally resolved. §26.10 two new open questions: OQ-SSO-26.1 (mandatory IP enforcement for admin:write keys P2, evaluated before first admin:write key issued), OQ-SSO-26.2 (expires_at hard enforcement vs soft alerts P1, decision before SOC 2 observation period start). §26.11 fourteen-item implementation checklist: 8× P0 M5 (tenant_api_keys migration, scim_ip_allowlist migration, api-key-auth.ts update, ip-allowlist.ts SCIM branch, DEC-030 event registry, admin dashboard panels, API_KEY_HASH_SECRET rotation schedule, pg_cron overlap cleanup), 4× P1 M5-M6 (alerting, evidence collection, OQ-SSO-26.2 decision, DATA_MODEL cross-reference), 2× P2 M6. Owner: enterprise-architect + security-engineer + platform-engineer + compliance-officer.*

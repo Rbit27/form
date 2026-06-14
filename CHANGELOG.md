@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.72.1] — 2026-06-14
+
+### Added
+- `docs/SSO_SCIM_IMPLEMENTATION.md §28` — SCIM Role Change Audit Trail & Session Revocation Fallback Design. Resolves OQ-SSO-27.2 (DEC-049) and OQ-SSO-27.3 (DEC-048), both P1 open questions from v1.9 (2026-06-13). §28 covers: `tenant_users_role_history` append-only table approach for role change audit trail (not DEC-030 chain — cross-tenant leakage prevention); KV write failure fallback protocol (option (c): HTTP 200 + Supabase blocklist fallback + `scim.session_revocation_kv_fallback` DEC-030 event HIGH 7yr + AL-REVOKE-01 P1); `recordRoleChange()` TypeScript helper (non-fatal design); `revocationPath` try/catch in PATCH deprovisioning; DPA G-013 dual-path revocation language; three SOC 2 evidence artefacts (SCIM-ROLE-E-001/E-002/SCIM-REVOKE-E-001); twelve-item checklist (6× P0/M5, 4× P1/M9, 2× P2/M10); two new open questions (OQ-SSO-28.1 AL-SCIM-05 naming check P2; OQ-SSO-28.2 retention period P1).
+- `docs/DATA_MODEL.md §33` — `tenant_users_role_history` canonical DDL definition. Migration `0068_tenant_users_role_history.sql`: nine columns; `chk_turh_role_changed` (no-op guard); `chk_turh_user_xor_pseudonym` (GDPR Art. 17 erasure path); FK `user_id` SET NULL on user delete; three indexes (tenant_user partial, tenant_time, scim_request); six RLS policies (`compliance_reviewer` full read, `tenant_admin` own-tenant read, `form_system` INSERT, `form_api` zero access); four-step GDPR Art. 17 erasure path with `gdpr.erasure_role_history_pseudonymised` DEC-030 event; 7-year retention proposal (OQ-SSO-28.2); SOC 2 CC6.3/CC6.6/PI1.1 mapping; five-item checklist; two open questions (OQ-TURH-01 changed_by ENUM P1; OQ-TURH-02 role column type alignment P1).
+- `docs/DECISION_LOG.md DEC-048` — OQ-SSO-27.3 resolution: SCIM KV failure option (c) adopted; AL-REVOKE-01 added; DPA G-013 dual-path revocation language specified.
+- `docs/DECISION_LOG.md DEC-049` — OQ-SSO-27.2 resolution: `tenant_users_role_history` table adopted for SCIM role change audit trail; role values excluded from DEC-030 chain to prevent cross-tenant leakage in auditor exports.
+
+### Changed
+- `docs/SSO_SCIM_IMPLEMENTATION.md §27.15` — OQ-SSO-27.2 and OQ-SSO-27.3 status updated to 🟢 Resolved (DEC-049 and DEC-048 respectively). TOC updated to add §28.
+- `VERSION` — 4.72.0 → 4.72.1.
+
 ## [4.72.0] — 2026-06-14
 
 ### Added

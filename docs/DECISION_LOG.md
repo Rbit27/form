@@ -13,6 +13,26 @@
 
 ---
 
+## 2026-06-14
+
+### DEC-049 · OQ-SSO-27.2: SCIM role change audit trail — `tenant_users_role_history` table approach adopted
+
+- **Decision:** Role change values (old/new role) produced by SCIM `PUT /Users` full-replace and group PATCH operations are stored in a separate `tenant_users_role_history` append-only table, **not** in the DEC-030 HMAC chain. The `scim.user_updated` event continues to record `fields_changed: ['role']` (attribute name only) as the tamper-evident chain anchor; `tenant_users_role_history.scim_request_id` cross-references that anchor to the actual role values. Full design in `docs/SSO_SCIM_IMPLEMENTATION.md §28` (migration `0068_tenant_users_role_history.sql`).
+- **Owner:** security-engineer + compliance-officer + enterprise-architect
+- **Why:** Storing `old_role`/`new_role` in the DEC-030 payload would make role assignments visible in any auditor bulk chain export. An auditor reviewing chain events for CC6.1/CC6.3 evidence receives the entire export for the observation period; if role names carry business sensitivity (e.g. distinguishing `manager` from `member` in an org chart context), a cross-tenant accidental export would expose confidential organisational data. The separate RLS-gated table (`compliance_reviewer` SELECT; `tenant_admin` SELECT own tenant; `form_system` INSERT; no `form_api` access) confines role history to queries that require active authentication and tenant scope. The `chk_turh_role_changed` constraint prevents no-op inserts; the `chk_turh_user_xor_pseudonym` constraint ensures GDPR Art. 17 erasure path is preserved (user_id SET NULL on user delete, user_id_pseudonym populated at erasure).
+- **Reverse cost:** Low. Removing the table and storing role values in the chain instead would require a HMAC chain schema migration (new field in `scim.user_updated` payload) and a retroactive decision on whether existing chain events are re-emitted. Any auditor evidence already collected from the table would need to be reframed. The separate-table approach is additive — the chain remains unchanged.
+
+---
+
+### DEC-048 · OQ-SSO-27.3: SCIM deprovisioning KV failure — option (c) adopted; AL-REVOKE-01 added
+
+- **Decision:** When the Cloudflare KV write fails during SCIM PATCH deprovisioning (step: `env.SCIM_KV.put(revoke:user:{tenant_id}:{user_id})`), the SCIM Worker responds HTTP 200 to the IdP (maintains idempotency per §27.9) and immediately falls back to the Supabase blocklist path (§22 `kv_session_revocations` INSERT). A `scim.session_revocation_kv_fallback` DEC-030 event (HIGH, 7yr) is emitted, and AL-REVOKE-01 (P1 PagerDuty `form-platform`) fires. Full design in `docs/SSO_SCIM_IMPLEMENTATION.md §28`. The DPA G-013 template clause is updated to: "Session revocation on deprovisioning uses best-effort synchronous Cloudflare KV (< 3 ms under normal conditions). In the event of a regional KV failure, a guaranteed Supabase fallback path achieves revocation within 30 seconds, within the contracted 60-second P99 SLA commitment."
+- **Owner:** platform-engineer + devops-lead + compliance-officer
+- **Why:** Option (a) — return HTTP 503 on KV failure — breaks the SCIM idempotency guarantee: the IdP would retry the DELETE, triggering a second deprovisioning flow that may conflict with a concurrent reactivation. Option (b) — silently accept the fallback — provides no operational visibility into KV degradation, which is itself a CC7.2 gap. Option (c) gives the SOC 2 auditor evidence of detection (AL-REVOKE-01 history) while preserving idempotency and the SLA commitment. The Supabase fallback path achieves < 30 s revocation (confirmed by §22 architecture: `SELECT` on `kv_session_revocations` fires on every Worker request for revocation check), meaning the 60-second P99 is met by the fallback alone.
+- **Reverse cost:** Low. The fallback path already exists (§22 architecture); the only net-new implementation is the try/catch wrapper, the DEC-030 event, and AL-REVOKE-01. Removing this in favour of option (a) or (b) would require removing the event type from AUDIT_LOG_SCHEMA.md (schema migration) and re-negotiating DPA language with affected customers.
+
+---
+
 ## 2026-06-13
 
 ### DEC-047 · Vanta selected as continuous compliance tooling over Drata (PRE-25 pathway)
