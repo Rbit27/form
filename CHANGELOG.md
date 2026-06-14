@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [4.89.0] — 2026-06-14
+
+### Added
+- `content/post-769-training-without-gym.md` — Block 751–800 post 19/50. Training without a gym — what can realistically be built with minimal equipment: progressive overload without external load (exercise complexity, tempo, volume, position mechanics), three equipment tiers (level 0 bodyweight-only / level 1 pull-up bar + bands / level 2 minimal home setup), honest ceiling analysis per tier (strength max-effort limited at all levels, hypertrophy realistic at levels 1–2, motor competence unlimited), progression hierarchy examples for push and pull patterns, three common mistakes (replacing progression with volume / avoiding pull movements / treating no-gym as temporary), when gym is genuinely necessary (maximal strength goal, powerlifting/weightlifting, advanced trainees, rehabilitative context). clinical-safety PASS · sports-scientist review required before publish.
+- `content/post-770-youth-strength-training.md` — Block 751–800 post 20/50. Youth strength training — evidence, limitations, dosing safety: evidence base (AAP 2008/2020, NSCA position statement Faigenbaum et al. 2009, Collins et al. 2019 meta-analysis: 33–50% injury risk reduction), growth plate myth debunking (risk is improper execution and excessive load, not resistance training per se; osteogenic stimulus documented), three physiological differences from adults (neuromuscular system still developing, hormonal environment pre/post puberty, psychological readiness), programming parameters (supervised mandatory, technique-before-load sequence, load/RPE by age group 12–14 vs 15–17, frequency 2–3 sessions/week, Olympic lifting coaching requirement), benefits documented in youth (bone density — peak bone mass window, neuromuscular adaptation, injury prevention, performance), stop signals. clinical-safety CONDITIONAL PASS (conditions satisfied in text: no body composition language, no 1RM recommendation without qualified coaching, pre-existing condition deferral clause included) · sports-scientist review required before publish.
+
+### Changed
+- `STATUS.md` — Block 751–800 counter 751–768 → 751–770 (20/50); next priorities updated to posts 771–772.
+- `VERSION` — 4.88.1 → 4.89.0.
+
+---
+
 ## [4.88.1] — 2026-06-14
 
 ### Changed
