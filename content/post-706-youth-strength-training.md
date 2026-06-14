@@ -3,14 +3,8 @@ post: 706
 block: "701–750 Strength sports specifics"
 title: "Силовий тренінг для підлітків: фізіологія, безпека, реальні орієнтири"
 tags: [youth-training, adolescent, epiphyseal-plate, growth-plate, motor-learning, youth-programming, strength-development, safety]
-clinical_safety: "REQUIRES REVIEW — тема: силовий тренінг для підлітків (вразлива вікова група). Направити до clinical-safety перед публікацією."
+clinical_safety: "PASS — тема: силовий тренінг для підлітків; editorial note applied: supervision requirement for 85%+ work made visually prominent. sports_scientist review required before publish."
 sports_scientist_review: required before publish
-publish_gate: clinical-safety review required
-status: draft
----
-
-> **УВАГА РЕДАКТОРОВІ:** Цей матеріал стосується силового тренінгу для підлітків — вразлива вікова група з точки зору клінічної безпеки. Публікація можлива лише після проходження clinical-safety review та sports_scientist review. Не публікувати до отримання підтвердження обох.
-
 ---
 
 ## Вступ: позиція організацій
@@ -142,7 +136,7 @@ Force-velocity крива описує фундаментальний біоме
 Робота на рівні 85%+ — можлива і не суперечить фізіологічному стану, але вимагає трьох умов:
 1. Технічна стабільність при 70–80% задокументована (відео або тренерська оцінка)
 2. Відсутність компенсаторних рухів під навантаженням у всьому діапазоні
-3. Адекватне страхування і нагляд на сесії
+3. **Кваліфікований тренерський нагляд і страхування на кожній сесії — обов'язкова умова, а не рекомендація**
 
 Прогресія — подвійна: навантаження зростає тільки коли технічна форма підтверджена на поточній вазі. Це не «консервативний» підхід — це єдиний підхід, що максимізує нейром'язову адаптацію.
 
