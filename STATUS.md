@@ -1,4 +1,4 @@
-# FORM · Project Status v4.94.0
+# FORM · Project Status v4.95.0
 
 > Live status board. Updated every iteration. Власник: `process-keeper`.
 
@@ -6,7 +6,7 @@
 
 ## Current version
 
-**v4.94.0** — 2026-06-14
+**v4.95.0** — 2026-06-14
 
 ---
 
@@ -27,9 +27,9 @@
 | 601–650 | Programming edge cases | 50 | **BLOCK COMPLETE** — 49/50 written (post-639 clinical-safety HARD VETO; all others done); sports-scientist review required before publish |
 | 651–700 | Biomechanics & injury prevention | 50 | **BLOCK COMPLETE** — all 50 posts written; posts 659–660 clinical-safety CONDITIONAL PASS; sports-scientist review required before publish |
 | 701–750 | Strength sports specifics | 50 | **BLOCK COMPLETE** — posts 705–706 clinical-safety CONDITIONAL PASS/PASS; posts 743–750 completed this iteration (landmine exercises, paused bench press, TnG vs. dead stop deadlift, seasonal programming, weightlifting for powerlifters, cross-discipline base, competition day execution, block synthesis); all sports-scientist review required before publish |
-| 751–800 | Athlete lifecycle & context | 28 | In progress — posts 751–778 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress, new parent training, training after 50, student during exams, return after viral illness, hybrid athlete concurrent training, entrepreneur-athlete irregular schedule, strength for runners, hotel training, training without gym, youth strength training [clinical-safety CONDITIONAL PASS], when self-coaching ends [clinical-safety PASS], where motivation ends — programming vs psychology [clinical-safety PASS after required edits], chronic dehydration training, team sport + strength training, recreational athlete & season, powerlifting competition return, chronic sleep restriction training [clinical-safety PASS], academic stress training — allostatic load [clinical-safety PASS]); sports-scientist review required before publish |
+| 751–800 | Athlete lifecycle & context | 29 | In progress — posts 751–779 written (desk-worker, shift-worker, masters 40+, return after break, travel training, novice phase, intermediate transition, female athlete considerations, time-constrained training, high-volume vs. life stress, new parent training, training after 50, student during exams, return after viral illness, hybrid athlete concurrent training, entrepreneur-athlete irregular schedule, strength for runners, hotel training, training without gym, youth strength training [clinical-safety CONDITIONAL PASS], when self-coaching ends [clinical-safety PASS], where motivation ends — programming vs psychology [clinical-safety PASS after required edits], chronic dehydration training, team sport + strength training, recreational athlete & season, powerlifting competition return, chronic sleep restriction training [clinical-safety PASS], academic stress training — allostatic load [clinical-safety PASS], entrepreneur-athlete at business scale — allostatic load [clinical-safety PASS]); sports-scientist review required before publish |
 
-**Total posts: 772**
+**Total posts: 773**
 
 ---
 
@@ -94,7 +94,7 @@
 ## Next priorities
 
 - **Block 701–750: COMPLETE** — всі 50 постів написані; sports-scientist review required before publish
-- **Block 751–800: IN PROGRESS** — posts 751–778 written (28/50); next: post-779 (атлет-підприємець у масштабуванні бізнесу — алостатичне навантаження з іншим джерелом); sports-scientist review required before publish
+- **Block 751–800: IN PROGRESS** — posts 751–779 written (29/50); next: post-780 (тренінг при синдромі хронічної втоми і пост-вірусному стані — межа між адаптацією і патологією); sports-scientist review + clinical-safety check required before publish
 - Review posts 586–632 (sports-scientist pass before publish — blocks research literacy, training with tech, programming edge cases)
 - newsletter-04.md — **READY TO SEND** (brand-voice editorial pass complete · v4.36.0)
 - newsletter-05.md — **READY TO SEND** (brand-voice editorial pass complete · v4.65.2 · pending subscription link substitution only)
@@ -106,4 +106,4 @@
 
 ---
 
-**v0.1 · червень 2026 · process-keeper · update every iteration · v4.91.0**
+**v0.1 · червень 2026 · process-keeper · update every iteration · v4.95.0**
