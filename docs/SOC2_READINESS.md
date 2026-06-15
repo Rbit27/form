@@ -25884,8 +25884,8 @@ HR-facing principle: No monitoring signal exposes individual user activity to HR
 
 | ID | Question | Priority | Owner | Target |
 |---|---|---|---|---|
-| **OQ-ANOM-01** | **Should CR-01 (brute-force) threshold be per-tenant rather than global?** Current threshold: ≥ 10 failures / 10-min / (tenant, subnet) — already per-tenant. However, the Analytics Engine query aggregates fleet-wide before applying the `GROUP BY tenant_id` filter. A high-volume tenant could mask a slower brute-force attack against a low-volume tenant if the global ingestion pipeline has lag. Recommendation: confirm that the Analytics Engine query resolves per-tenant with no cross-tenant blind spot before M9; document finding in `docs/DECISION_LOG.md`. | **P1** | security-engineer + devops-lead | Before first enterprise pilot (M10); no later than first SOC 2 observation period quarter |
-| **OQ-ANOM-02** | **Is the 30-min dead-man's switch (AL-SIEM-06) threshold appropriate for the FORM event volume before enterprise GA?** Pre-enterprise, SIEM event volume during off-peak hours (02:00–06:00 UTC) may be legitimately zero. A 30-min dead-man's threshold during low-traffic windows could produce false-positive P1 pages. Resolution options: (a) restrict AL-SIEM-06 to 08:00–22:00 UTC business hours window; (b) lower threshold to zero events in 60 min (reduces noise, increases detection lag); (c) add a minimum `event_count` floor (fire only if daily average > 5 events/30-min). Document decision in `docs/DECISION_LOG.md` before AL-SIEM-06 goes live in production. | **P1** | devops-lead + security-engineer | Before M5 PagerDuty deployment |
+| **OQ-ANOM-01** | **🟢 Resolved — DEC-057 (2026-06-13).** CR-01 `GROUP BY blob4, blob2` (tenant_id, actor_ip_subnet) produces fully independent per-bucket aggregates; a high-volume tenant cannot mask a low-volume tenant's brute-force signal. Mandatory CI staging test `src/tests/siem/cr01-per-tenant-isolation.test.ts` (§44.3.4 OBSERVABILITY) required before M5 SIEM deployment. On pass: `system.siem_calibration_verified` DEC-030 event + CALIB-E-002 filing. Re-evaluation trigger: M9 ClickHouse migration. Full analysis in `docs/OBSERVABILITY.md §44.3`. | **🟢 Closed** | security-engineer + devops-lead | **Closed — §83 + DEC-057** |
+| **OQ-ANOM-02** | **🟢 Resolved — DEC-056 (2026-06-13).** 30-min threshold confirmed correct (option (a) selected). Graduated activation: **shadow mode** (P3 Slack `#devops-alerts` only, no PagerDuty) for first 30 days → **full activation** (P1 PagerDuty `form-devops` HIGH) when `auth_event_avg_per_30min > 5` OR 30 days elapse, whichever comes first. 30-day cap is absolute. `system.siem_alert_activated` DEC-030 event (STANDARD, 3yr) emitted on transition; filed as CALIB-E-001. Full analysis in `docs/OBSERVABILITY.md §44.2`. | **🟢 Closed** | devops-lead + security-engineer | **Closed — §83 + DEC-056** |
 
 ---
 
@@ -27609,6 +27609,135 @@ Store at `compliance/evidence/cc6/` in Cloudflare R2 `form-soc2-evidence` bucket
 | **SOC 2 criteria** | CC6.8 (configuration integrity) + CC6.6 (network access controls) |
 | **First filing** | Month O+3 |
 | **§78.11 cross-update** | OQ-CTOOL-01 updated to 🟢 Resolved (DEC-055, 2026-06-14) |
+
+---
+
+## §83 OQ-ANOM-01 + OQ-ANOM-02 Resolution — SIEM Alert Calibration Governance: CR-01 Per-Tenant Isolation Verification & AL-SIEM-06 Graduated Activation (DEC-056, DEC-057)
+
+> **Closes:** §76.11 OQ-ANOM-01 (🟡 P1 → 🟢 Resolved · DEC-057 · 2026-06-13) and §76.11 OQ-ANOM-02 (🟡 P1 → 🟢 Resolved · DEC-056 · 2026-06-13).
+> **Implementation detail:** `docs/OBSERVABILITY.md §44` — full dual-phase specification, Zod schemas, and CI test requirement.
+> **Owner:** `security-engineer` + `devops-lead` + `compliance-officer`. Review: at M9 ClickHouse migration (CR-01 re-verification trigger) and at first annual anomaly alerting review (Q1 2027).
+
+---
+
+### §83.1 Purpose
+
+`docs/OBSERVABILITY.md §44` (added 2026-06-13) documents the complete SIEM Alert Calibration Governance specification resolving both P1 open questions from §76.11. This section records the **SOC 2 implications** of those decisions: the evidence artefacts produced, the DEC-030 events registered, and how each decision satisfies CC4.1 and CC7.2.
+
+DEC-056 resolved OQ-ANOM-02 (AL-SIEM-06 threshold), DEC-057 resolved OQ-ANOM-01 (CR-01 per-tenant aggregation). Both decisions were recorded in `docs/DECISION_LOG.md` on 2026-06-13. §76.11 is updated to 🟢 Resolved for both questions.
+
+---
+
+### §83.2 OQ-ANOM-02 Resolution — AL-SIEM-06 Threshold (DEC-056)
+
+**Decision:** The existing 30-minute zero-event dead-man's switch (AL-SIEM-06) is confirmed as the production specification. The off-peak false-positive concern (OQ-ANOM-02 option (c)) is already resolved by the existing 08:00–22:00 UTC business-hours gate in §27.7 — no threshold change required.
+
+**Graduated activation policy** (net-new governance):
+
+| Phase | Trigger | Routing | Transition event |
+|---|---|---|---|
+| **Shadow** (days 1–30) | Any 30-min zero-event window, 08:00–22:00 UTC | P3 Slack `#devops-alerts` only — no PagerDuty | — |
+| **Full activation** | `auth_event_avg_per_30min > 5` (30-day rolling) **OR** 30 calendar days elapsed — whichever comes first | P1 PagerDuty `form-devops` HIGH | `system.siem_alert_activated` (STANDARD, 3yr) |
+
+The 30-day cap is absolute: even at zero event volume, P1 activation proceeds at day 30.
+
+**SOC 2 rationale:**
+
+- **CC4.1 (ongoing monitoring):** P3 Slack alerts during the shadow period provide continuous evidence that the control intention was active throughout the calibration window — closing a CC4.1 gap where a control is designed but not yet proven operational. The `system.siem_alert_activated` DEC-030 event provides a tamper-evident chain record of the transition date and calibration data, giving auditors CC4.1 evidence across both phases without a gap.
+- **CC7.2 (anomaly detection):** The 30-min threshold is confirmed by event-volume baseline analysis (§44.2.1): probability of a legitimate zero-event window drops to LOW at pre-beta (≥ 1 active user) and NEGLIGIBLE at consumer-beta scale. The calibrated threshold minimises detection lag without generating noise.
+
+---
+
+### §83.3 OQ-ANOM-01 Resolution — CR-01 Per-Tenant Aggregation (DEC-057)
+
+**Decision:** No architecture change required. The CR-01 brute-force detection query (`GROUP BY blob4, blob2` — tenant_id, actor_ip_subnet) provides complete per-tenant isolation with no cross-tenant aggregation blind spot.
+
+**Architectural confirmation:** Cloudflare Analytics Engine `GROUP BY` evaluation produces independent per-bucket aggregates. The `HAVING SUM(_sample_interval) >= 10` clause is evaluated for each `(tenant_id, actor_ip_subnet)` bucket independently — a high-volume tenant's auth failures cannot suppress or mask a low-volume tenant's alert because the two tenants occupy distinct `(blob4, blob2)` buckets.
+
+**Mandatory verification gate:** A CI staging test `src/tests/siem/cr01-per-tenant-isolation.test.ts` (per §44.3.4) is required before the M5 SIEM alert activation deployment. Test parameters: synthetic high-volume tenant (1,000 failures in 10 minutes) + synthetic low-volume tenant (12 failures in 10 minutes) on distinct subnets. Both must fire independently to pass.
+
+**Re-evaluation trigger:** M9 ClickHouse migration (§34.7) — re-run §44.3.4 verification against the MergeTree CR-01 implementation before reactivating alerts. Emit a new `system.siem_calibration_verified` on pass.
+
+**SOC 2 rationale:**
+
+- **CC7.2 (anomaly detection accuracy):** CALIB-E-002 (CI test pass log + `system.siem_calibration_verified` DEC-030 event) gives auditors an empirical artefact demonstrating that CC7.2 anomaly detection operates correctly per-tenant — stronger than an architecture diagram alone, and consistent with FORM's DEC-043/DEC-044/DEC-051 pattern of documented empirical verification over inference.
+- **CC6.4 (tenant boundary isolation):** Per-tenant isolation of brute-force detection ensures each enterprise tenant's authentication boundary is evaluated independently, preventing one tenant's legitimate traffic from masking another tenant's attack signal.
+
+---
+
+### §83.4 DEC-030 Events Registered
+
+Both events defined in `docs/OBSERVABILITY.md §44.4`; registered in `docs/AUDIT_LOG_SCHEMA.md §System` (v1.5).
+
+| Event | Severity | Retention | Trigger | Privacy invariant |
+|---|---|---|---|---|
+| `system.siem_alert_activated` | STANDARD | 3 yr | devops-lead emits via Admin Console when AL-SIEM-06 transitions from shadow to full P1 activation | No `user_id`, no `tenant_id`, no health data — operational metadata only (`rule_id`, `activation_mode`, shadow period timestamps, `auth_event_avg_per_30min` scalar) |
+| `system.siem_calibration_verified` | STANDARD | 3 yr | CI post-step hook on `cr01-per-tenant-isolation.test.ts` pass (staging only) | No `user_id`, no `tenant_id` — synthetic `lt-` tenant IDs only; `test_result` enum, `correlation_rule` enum, `test_id` CI run ID |
+
+---
+
+### §83.5 Evidence Artefacts
+
+File both to `compliance/evidence/cc7/siem-calibration/`; register in MASTER-INDEX with SHA-256.
+
+| Artefact | Description | SOC 2 Criterion | Retention |
+|---|---|---|---|
+| **CALIB-E-001** | Export of `system.siem_alert_activated` DEC-030 event — documents shadow→full-activation transition date, calibration metric (`activation_trigger`: `volume_threshold` or `30_day_cap`), and `auth_event_avg_per_30min` at moment of transition. Filed at Month M5+30d (or M5+volume threshold, whichever comes first). | CC4.1 — ongoing monitoring of controls; tamper-evident chain record of calibration governance | 3 yr |
+| **CALIB-E-002** | `system.siem_calibration_verified` DEC-030 event export + CI test pass log (`cr01-per-tenant-isolation.test.ts` run output) — demonstrates that CR-01 fires independently for a low-volume tenant even when a high-volume tenant is simultaneously at threshold. Filed at M5 (staging gate) and re-filed at M9 ClickHouse migration (re-verification). | CC7.2 — anomaly detection accuracy; empirical per-tenant isolation evidence | 3 yr |
+
+**Auditor narrative for CC4.1 (CALIB-E-001):** AL-SIEM-06 was not activated at maximum severity immediately — FORM ran a 30-day shadow period to calibrate the threshold against actual event volume before escalating to P1 PagerDuty. CALIB-E-001 provides the DEC-030 chain record of that calibration decision: when it activated, what metric triggered it, and what the event volume was. This demonstrates that FORM's ongoing monitoring controls are calibrated against real conditions rather than deployed blindly — a higher-assurance CC4.1 posture.
+
+**Auditor narrative for CC7.2 (CALIB-E-002):** FORM's CR-01 brute-force correlation rule must detect attacks against *any* individual enterprise tenant regardless of fleet-wide traffic volume. CALIB-E-002 provides empirical staging evidence that a 12-failure attack against a low-volume tenant triggers the CR-01 alert even while a high-volume tenant simultaneously generates 1,000 auth failures. This directly evidences CC7.2 accuracy: the anomaly detection system is shown to operate correctly at its design boundary condition.
+
+---
+
+### §83.6 Gap Tracker
+
+| Gap | Before §83 | After §83 |
+|---|---|---|
+| **§76.11 OQ-ANOM-01** | 🟡 P1 Open — before M10 enterprise pilot | 🟢 **Resolved — DEC-057 (2026-06-13)** |
+| **§76.11 OQ-ANOM-02** | 🟡 P1 Open — before M5 PagerDuty deployment | 🟢 **Resolved — DEC-056 (2026-06-13)** |
+| **CALIB-E-001** (CC4.1 calibration chain event) | Not defined | 🟡 Authored — on M5+activation transition |
+| **CALIB-E-002** (CC7.2 per-tenant isolation evidence) | Not defined | 🟡 Authored — on M5 staging gate pass |
+
+**Net readiness impact:** ~99.1% → ~99.1% (no score change until CALIB-E-001 and CALIB-E-002 are filed at M5; estimated +0.1 pp on both artefacts collected). The two P1 OQ closures remove pre-M5 deployment blockers without altering the overall readiness fraction, since neither was scored as a gap — they were design decisions required before deployment.
+
+---
+
+### §83.7 Implementation Checklist
+
+#### P0 — Before M5 SIEM alert deployment
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Confirm `system.siem_alert_activated` and `system.siem_calibration_verified` are registered in `docs/AUDIT_LOG_SCHEMA.md §System` (v1.5) and deployed to `emit-audit-event` Worker event registry. | platform-engineer + compliance-officer | **P0** | M5 | [ ] |
+| 2 | Deploy AL-SIEM-06 in **shadow mode** on M5 deployment day: Slack `#devops-alerts` P3 only, no PagerDuty routing. Set the 30-day / `auth_event_avg_per_30min > 5` auto-escalation trigger per §44.2.3. | devops-lead | **P0** | M5 | [ ] |
+| 3 | Run `src/tests/siem/cr01-per-tenant-isolation.test.ts` in staging (§44.3.4): synthetic high-volume tenant (1,000 failures) + low-volume tenant (12 failures) on distinct subnets; confirm both CR-01 buckets exceed the `HAVING SUM >= 10` threshold and alert independently. CI pipeline blocks M5 deployment on test fail. | devops-lead + platform-engineer | **P0** | M5 staging | [ ] |
+| 4 | On CI test pass: emit `system.siem_calibration_verified` via CI post-step hook; file CALIB-E-002 to `compliance/evidence/cc7/siem-calibration/CALIB-E-002-<date>.jsonl`; append to MASTER-INDEX with SHA-256. | compliance-officer | **P0** | M5 (after item 3) | [ ] |
+
+#### P1 — After AL-SIEM-06 shadow→full activation
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | When AL-SIEM-06 exits shadow mode: emit `system.siem_alert_activated` DEC-030 event via Admin Console; include `activation_trigger` (`volume_threshold` or `30_day_cap`), `shadow_period_start`, `shadow_period_end`, and `auth_event_avg_per_30min`. | devops-lead | **P1** | M5+30d (or M5+threshold, whichever first) | [ ] |
+| 6 | File CALIB-E-001 to `compliance/evidence/cc7/siem-calibration/CALIB-E-001-<date>.json` (single DEC-030 event export); append to MASTER-INDEX; upload to Vanta manual evidence tab under "Anomaly Alerting Calibration" label. | compliance-officer | **P1** | Within 48h of item 5 | [ ] |
+
+#### P1 — M9 ClickHouse migration re-verification
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 7 | At M9 ClickHouse provisioning: re-run §44.3.4 verification against the new MergeTree CR-01 implementation (`src/tests/siem/cr01-per-tenant-isolation.test.ts` or ClickHouse-adapted equivalent); emit new `system.siem_calibration_verified` event on pass; file updated CALIB-E-002 to `compliance/evidence/cc7/siem-calibration/CALIB-E-002-M9-<date>.jsonl`; update MASTER-INDEX. | devops-lead + platform-engineer | **P1** | M9 | [ ] |
+| 8 | Advance §76.10 item 10 (ClickHouse migration of CR-02/CR-03) to 🟢 — confirmed when M9 re-verification passes and CALIB-E-002-M9 is filed. Update §76.9 gap tracker. | compliance-officer | **P1** | M9+2wk | [ ] |
+
+#### P2 — Annual effectiveness review
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 9 | At Q1 2027 annual compliance review (§15.1): review CALIB-E-001 + CALIB-E-002 chain events for the prior year; confirm AL-SIEM-06 operated at full P1 activation with no threshold-triggered false positive exceeding the SLA acknowledgement window; confirm no M9 re-verification failure. Document findings in annual compliance memo. | security-engineer + compliance-officer | **P2** | Q1 2027 | [ ] |
+
+---
+
+*v3.9.0 (2026-06-15): §83 OQ-ANOM-01 + OQ-ANOM-02 Resolution — SIEM Alert Calibration Governance (DEC-056, DEC-057). Closes both P1 open questions from §76.11: OQ-ANOM-01 (CR-01 per-tenant aggregation blind-spot risk → 🟢 no architecture change required; mandatory CI staging test CALIB-E-002 added) and OQ-ANOM-02 (AL-SIEM-06 30-min threshold false-positive risk → 🟢 threshold confirmed correct; graduated activation policy added: 30-day shadow mode P3 Slack then full P1 PagerDuty at volume threshold or day-30 cap). §83.1 purpose statement cross-referencing OBSERVABILITY §44 (full implementation spec). §83.2 OQ-ANOM-02 resolution: graduated activation table (shadow → full), transition trigger (volume_threshold or 30_day_cap), SOC 2 rationale for CC4.1 (shadow-period CC4.1 coverage without gap) and CC7.2 (baseline event volume analysis confirms 30-min threshold correct). §83.3 OQ-ANOM-01 resolution: CR-01 `GROUP BY` independence confirmation, mandatory CI staging test spec (1,000 + 12 failure synthetic tenants), re-evaluation trigger at M9 ClickHouse migration, SOC 2 rationale for CC7.2 (empirical per-tenant isolation evidence) and CC6.4 (tenant boundary protection). §83.4 two DEC-030 events registered: `system.siem_alert_activated` (STANDARD, 3yr — AL-SIEM-06 shadow→full transition; devops-lead manual emit) and `system.siem_calibration_verified` (STANDARD, 3yr — CR-01 CI test pass; automated CI hook); both registered in `docs/AUDIT_LOG_SCHEMA.md §System` (v1.5). §83.5 two evidence artefacts: CALIB-E-001 (CC4.1 — calibration chain event; filed M5+30d; 3yr) and CALIB-E-002 (CC7.2 — per-tenant isolation CI proof; filed M5 + re-filed M9; 3yr); filing path `compliance/evidence/cc7/siem-calibration/`. §83.6 gap tracker: both OQs 🟢 Closed; readiness ~99.1% → ~99.1% (score update on CALIB-E-001+E-002 filing +0.1 pp). §83.7 nine-item implementation checklist: 4× P0/M5 (DEC-030 event registration, shadow-mode deploy, CR-01 staging test, CALIB-E-002 filing); 2× P1/M5+30d (siem_alert_activated event emit, CALIB-E-001 filing); 2× P1/M9 (ClickHouse re-verification, §76.9 gap tracker advance); 1× P2/Q1-2027 (annual effectiveness review). §76.11 OQ table updated: both rows changed from 🟡 P1 Open to 🟢 Resolved with resolution summary. Cross-references: `docs/OBSERVABILITY.md §44` (full dual-phase spec — §44.2 AL-SIEM-06 graduated activation + §44.3 CR-01 per-tenant analysis + §44.4 DEC-030 events + §44.5 evidence artefacts); `docs/DECISION_LOG.md DEC-056` (AL-SIEM-06 threshold — §44.2 full analysis); `docs/DECISION_LOG.md DEC-057` (CR-01 per-tenant aggregation — §44.3 full analysis); `docs/AUDIT_LOG_SCHEMA.md §System` (v1.5 — two new events); §76 (CC7.2 operating evidence — OQs closed; implementation checklist items 1–4 now unblocked); §76.10 item 10 (ClickHouse migration — re-verification requirement documented). Privacy floor: no user_id, no tenant_id, no health data in either CALIB event; synthetic CI tenants use `lt-` prefixed IDs never shared with real enterprise customers; `auth_event_avg_per_30min` is an aggregate scalar with no per-user attribution. Owner: security-engineer + devops-lead + compliance-officer.*
 
 ---
 

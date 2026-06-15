@@ -1,5 +1,15 @@
 # Changelog · FORM
 
+## [5.36.0] — 2026-06-15
+
+### Added
+- `docs/SOC2_READINESS.md §83` — SIEM calibration governance: resolves OQ-ANOM-01 (CR-01 per-tenant aggregation confirmed, DEC-057) and OQ-ANOM-02 (AL-SIEM-06 graduated shadow→P1 activation adopted, DEC-056). §83 covers two DEC-030 events (`system.siem_alert_activated`, `system.siem_calibration_verified`), two SOC 2 evidence artefacts (CALIB-E-001/CC4.1, CALIB-E-002/CC7.2), and a 9-item implementation checklist. SOC2_READINESS internal version v3.8.3 → v3.9.0. SOC 2 readiness ~99.1% (+0.1pp pending artefact filing).
+- `docs/AUDIT_LOG_SCHEMA.md` v1.4 → v1.5 — Registers `system.siem_alert_activated` (STANDARD, 3yr, devops-lead emitter) and `system.siem_calibration_verified` (STANDARD, 3yr, CI post-step hook emitter) per DEC-030. Privacy invariant: no real tenant_id, no user_id, no health data. Closes SOC2_READINESS §83.4 registration checklist.
+
+### Changed
+- `docs/SOC2_READINESS.md §76.11` — OQ-ANOM-01 and OQ-ANOM-02 status updated from P1 Open → 🟢 Closed; cross-refs to §83 and OBSERVABILITY §44.
+- `VERSION` — bump to 5.36.0.
+
 ## [5.35.0] — 2026-06-15
 
 ### Added
