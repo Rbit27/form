@@ -1,5 +1,21 @@
 # Changelog · FORM
 
+## [5.37.0] — 2026-06-15
+
+### Added
+- `content/post-962-no-squat-rack.md` — Block 951–1000 post 12/50. Equipment constraints: тренування без squat rack. Три аналізи: що вирішує rack і що без нього доступне, повна карта замін (Romanian deadlift + Bulgarian split squat → квадрицепси/задня поверхня стегна, floor press → жим без стійок, front squat з підлоги через hang clean), структура трьох тренувальних днів без rack, безпека жиму лежачи без страхувача (floor press опції). Тимчасовий vs. постійний сценарій. clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-963-machine-only-training.md` — Block 951–1000 post 13/50. Equipment constraints: тренування тільки на тренажерах. Що тренажери дають і чого не дають (стабілізатори, специфіка вільноваговних рухів). Повна карта тренажерів по групах (ноги, груди, спина, плечі, руки). Upper/Lower програма на тренажерах. Чотири стратегії прогресії при великому кроці ваги (темп, діапазон повторів, pause reps, drop set). Регрес при поверненні 5–15% — відновлюється за 2–4 тижні. clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-964-resistance-bands-primary.md` — Block 951–1000 post 14/50. Equipment constraints: гумові стрічки як основний інструмент. Профіль зростаючого опору: перевага для hip thrust і hip abduction, недолік для deadlift-патерну. Де bands кращі за все інше (hip abduction, band pull-apart, activation, assisted pull-ups). Програма на 3 дні тижня (повне тіло). Базовий набір для домашнього тренування. Прогресія без зміни стрічки (темп, ширина кроку, pause reps). clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-965-no-bench-available.md` — Block 951–1000 post 15/50. Equipment constraints: тренування без лавки. Floor press як основна заміна (техніка, вага на 5–15% менша від bench max). Push-up варіації по ефекту (incline/decline/weighted/archer). Dumbbell floor press vs. barbell floor press. Повна push-сесія без лавки (35 хв). Incline і decline без лавки (стілець, elevated push-up). Час до відновлення bench специфіки після повернення: 1–3 сесії. clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+- `content/post-966-equipment-occupied.md` — Block 951–1000 post 16/50. Equipment constraints: переповнений зал. Принцип заміни «функція, не назва» — карта замін для всіх основних патернів (push, pull, квадрицепси, задня поверхня стегна). Три тактики: перестановка порядку, суперсети з незалежними м'язами, заздалегідь визначений «план B». Коли варто зачекати (максимальна силова вправа, специфічний тренажер без аналога). Організація тижня при систематично переповненому залі. clinical-safety NOT REQUIRED. sports-scientist review required before publish.
+
+### Changed
+- `blog.html` — додано картки для posts 962–966 на чолі списку.
+- `STATUS.md` — Block 951–1000 оновлено: 11/50 → 16/50; наступний пріоритет: posts 967–970 (kettlebell-focused, limited weight, no cables, no spotter).
+- `VERSION` — bump to 5.37.0.
+
+---
+
 ## [5.36.0] — 2026-06-15
 
 ### Added
