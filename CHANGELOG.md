@@ -1,5 +1,13 @@
 # Changelog · FORM
 
+## [5.53.0] — 2026-06-15
+
+### Added
+- `docs/WHITE_LABEL_IMPLEMENTATION.md` — Single-source enterprise white-label implementation guide: eligibility gate ($50k ARR, `branding.white_label_enabled` feature flag), architecture (Cloudflare Custom Hostnames + tenant_branding schema + R2 CDN), PAM-gated provisioning workflow, IT admin DNS CNAME setup guide, SSL cert lifecycle with pg_cron job 32 and AL-WL-01–06 escalation ladder (P2/Slack→P1/PagerDuty→P0/dual-page+no-auto-resolve), branding asset constraints (PNG/WebP only, WCAG AA colour validation, powered-by-FORM policy), Admin Dashboard panel spec, revocation (automated ARR-sweep + manual PAM-gated endpoint), six DEC-030 HMAC-chain events + WL-CHAIN-01 ordering invariant (cross-ref: AUDIT_LOG_SCHEMA §WhiteLabel, DEC-054), three SOC 2 evidence artefacts (WL-E-001 A1.1 / WL-E-002 CC7.2 / WL-E-003 CC7.2), four privacy constraints, four open questions (OQ-BRAND-01 / OQ-WL-OBS-02 / OQ-WL-MOB-01 / OQ-WL-EMAIL-01), 20-item implementation checklist (9× P0/M10, 7× P1/M11, 4× P2/M13). Cross-refs: ENTERPRISE.md §Branding, DATA_MODEL §20, OBSERVABILITY §42, ENTERPRISE_SLA §3, INCIDENT_RESPONSE R-05, COST_MODEL §15.5, DECISION_LOG DEC-054. compliance-officer + security-engineer review: NOT_REQUIRED (architecture/operations doc, no clinical content). enterprise-architect owner.
+
+### Changed
+- `VERSION` — bump 5.52.1 → 5.53.0.
+
 ## [5.52.1] — 2026-06-15
 
 ### Added
