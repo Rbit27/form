@@ -10,11 +10,12 @@
 - `content/post-874-mid-block-plateau.md` — Block 851–900 post 24/50. Плато в середині блоку: три причини і три рішення. Distinguishing real stall from fatigue masking fitness; three causes (fatigue accumulation, wrong intensity zone, insufficient volume); three targeted responses; what to check before changing the program. clinical-safety: PASS. review_pending: sports-scientist.
 - `content/post-875-accumulated-fatigue-response.md` — Block 851–900 post 25/50. Накопичена втома всередині блоку: ознаки і оперативна відповідь. How in-block fatigue differs from overtraining; real-time markers to monitor; operational responses without abandoning the block. clinical-safety: PASS. review_pending: sports-scientist.
 - `content/post-876-planned-deload-mindset.md` — Block 851–900 post 26/50. Заплановане зниження без відчуття «я втрачаю прогрес». Supercompensation curve and why deloads feel psychologically wrong; how to structure a deload that preserves movement quality without volume. clinical-safety: PASS. review_pending: sports-scientist.
+- `content/post-877-return-after-illness.md` — Block 851–900 post 27/50. Повернення після хвороби: перший тиждень без регресу. Why jumping to pre-illness loads causes setbacks; volume-first protocol (50–60% volume, maintain intensity); readiness signals for full resumption. clinical-safety: PASS. review_pending: sports-scientist.
 
 ### Changed
 
 - `README.md` — Block 851–900 table updated: actual titles for posts 856–870 replacing planned-topic placeholders; post-871 added; block status updated to in progress · 21/50 · v5.22.0; proposed topics 872–880 added to block table.
-- `blog.html` — posts 871–876 entries prepended to article list (total 175 entries).
+- `blog.html` — posts 871–877 entries prepended to article list (total 176 entries).
 
 ---
 
