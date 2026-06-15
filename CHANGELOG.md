@@ -1,5 +1,18 @@
 # Changelog · FORM
 
+## [5.23.1] — 2026-06-15
+
+### Added
+
+- `docs/COST_MODEL.md §39` — Enterprise Deal Close Governance, Win/Loss Analytics & Competitive Intelligence Model (v2.4 → v2.5). Closes three gaps in the enterprise deal audit trail: (1) missing deal-level close events — `enterprise.deal_closed_won` (STANDARD, 7yr) and `enterprise.deal_closed_lost` (STANDARD, 3yr) with full Zod schemas and HMAC chain invariants (WIN-CHAIN-01 warning, PIPE-CHAIN-02 HTTP 422); (2) missing competitive intelligence schema — structured win/loss reason enums (8 win / 10 loss / 6 competitor_category values; no company names in chain, privacy floor enforced); (3) missing OQ-PIPE-01 (§37.11) calibration trigger — §39.7 four-step resolution protocol with §39.6.1 SQL query and `enterprise.win_loss_analysis_recalibrated` PIPE-CHAIN-02 event. `enterprise_deal_outcomes` Postgres DDL (migration 0074): UUID PK, `deal_id` FK RESTRICT to `enterprise_pipeline_stages`, four CHECK constraints, UNIQUE index on `deal_id`, `sales_cycle_days` GENERATED, `tcv_usd` GENERATED, `form_api` REVOKED; `'closed_lost'` added to `enterprise_pipeline_stage_enum`. Five analytics SQL queries (§39.6): stage conversion rate actuals (OQ-PIPE-01 gate ≥ 10 outcomes, no_go excluded), loss reason frequency, win rate by tier, competitor impact, sales cycle p50/p90. `privacy.no_go_criteria_applied` companion DEC-030 event (auto-emitted when `no_go_criteria_triggered = true` — CC1.4 ethical enforcement evidence; criteria_triggered enum covers insurance_risk_scoring / government_backdoor_request / wellness_as_punishment_use_case / other_no_go). Three SOC 2 evidence artefacts: WIN-E-001 (CC5.2/CC1.4 — annual deal_closed_won export with floor_respected attestation), WIN-E-002 (CC5.2/CC4.1 — win_loss_analysis_recalibrated at Deal 10/20/50), WIN-E-003 (CC1.4/CC9.2 — quarterly no_go_criteria_applied; zero-count filings are affirmative attestations). 10-item checklist (4× P0/M9, 3× P1/M10, 3× P2/M18–M36). OQ-WIN-01 (manual vs. automated deal_closed_won; manual recommended until Deal 5), OQ-WIN-02 (competitor_category unknown% threshold — evaluate at Deal 20). Four DEC-030 events to register in `docs/AUDIT_LOG_SCHEMA.md §Enterprise + §Privacy` before M9.
+
+### Changed
+
+- `docs/COST_MODEL.md` — header v2.4 → v2.5; TOC §39 entry added.
+- `VERSION` — 5.23.0 → 5.23.1.
+
+---
+
 ## [5.23.0] — 2026-06-15
 
 ### Added

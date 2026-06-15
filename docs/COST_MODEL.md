@@ -1,4 +1,4 @@
-# FORM · Cost Model & Unit Economics v2.4
+# FORM · Cost Model & Unit Economics v2.5
 
 > Owner: data-engineer + founder. Review: monthly pre-launch, quarterly post-launch. Audience: founder, investors, future CFO.
 
@@ -250,6 +250,18 @@
     - 38.9 SOC 2 Evidence Mapping
     - 38.10 Implementation Checklist
     - 38.11 Open Questions (OQ-PART-01 to OQ-PART-03)
+39. [Enterprise Deal Close Governance, Win/Loss Analytics & Competitive Intelligence Model](#39-enterprise-deal-close-governance-winloss-analytics--competitive-intelligence-model)
+    - 39.1 Purpose & Scope
+    - 39.2 Terminal Pipeline State Model
+    - 39.3 Win/Loss Reason Taxonomy
+    - 39.4 Deal Close Financial Classification
+    - 39.5 `enterprise_deal_outcomes` Postgres Schema
+    - 39.6 Win/Loss Analytics Queries (OQ-PIPE-01 resolution SQL)
+    - 39.7 OQ-PIPE-01 Resolution Protocol
+    - 39.8 DEC-030 HMAC-Chained Events
+    - 39.9 SOC 2 Evidence Mapping
+    - 39.10 Implementation Checklist
+    - 39.11 Open Questions (OQ-WIN-01 to OQ-WIN-02)
     - 28.2 Marketing Cost Taxonomy
     - 28.3 Pre-Launch Marketing Budget (Months 1–4)
     - 28.4 App Store Optimization (ASO) Investment
@@ -9430,3 +9442,567 @@ Store at `compliance/evidence/partners/` with `MANIFEST.sha256`.
 
 *v2.4 (2026-06-14): §38 Enterprise Partner Channel & Reseller Economics — fills the revenue model gap opened by OQ-PIPE-03 (`§37.11`) by providing a pre-deal framework before FORM is under negotiation time pressure. §38.1 scopes to four partner categories (referral / reseller / integration / white-label) with out-of-scope list (consumer affiliate, investor referrals); privacy floor and no-go criteria inherited from `docs/ENTERPRISE.md`. §38.2 partner category taxonomy: four types with integration depth, example partners, and revenue model summary; white-label restricted to Enterprise tier (1,000+ seats; $50k ARR threshold). §38.3 partner acquisition and enablement cost model: recruitment cost $669 (template reuse) / $1,469 (first agreement, including $800 outside counsel); annual enablement $600–$1,400/yr by type; white-label premium +$2,000–$3,500/yr. §38.4 revenue share economics: referral 10–15% first-year ACV (one-time); reseller 20–25% ACV ongoing (3-year max term); white-label 30–40% gross revenue share (min $50k ACV; ~63–65% adj. GM). §38.5 partner vs. direct CAC comparison: referral partner LTV:CAC 21.9× (best class); reseller 7.5× (comparable to direct); breakeven condition — reseller economically preferred only when deal access is otherwise unavailable; partner-sourced ARR ceiling 40% of total ARR to prevent concentration risk. §38.6 governance: three-tier partner programme (Bronze/Silver/Gold by deals or ARR attributed); 12-month inactivity freeze; five non-waivable privacy floor clauses in Partner Agreement template; quarterly revenue share payment gated on `privacy_floor_check_passed: true`; dispute resolution via `deal_attribution_log` JSONB and DEC-030 chain. §38.7 `enterprise_partners` Postgres table DDL: UUID PK, `partner_category_enum`, `partner_status_enum`, revenue share pct CHECK (0–45), agreement + DPA doc refs, `attributed_arr_usd`, `deal_attribution_log` JSONB, `total_share_paid_usd`, `privacy_floor_violation_at` nullable; RLS: compliance_reviewer + form_admin SELECT; form_system ALL; form_api REVOKED; `attributed_to_partner_id` FK column added to `enterprise_pipeline_stages` (migration 0073b). §38.8 four DEC-030 HMAC-chained events: `enterprise.partner_agreement_signed` (STANDARD, 7yr — partner_id + category + revenue_share_pct + dpa_signed; no contact names), `enterprise.partner_revenue_share_paid` (HIGH, 7yr — hard invariant: `privacy_floor_check_passed: true` required; 422 if absent), `enterprise.partner_deal_attributed` (STANDARD, 7yr — deal_id internal UUID, ACV, sales_cycle_days for velocity analysis), `enterprise.partner_offboarded` (HIGH, 7yr — reason enum + incident slug if privacy breach; PART-CHAIN-01 ordering invariant: offboard with `privacy_floor_breach` must follow `privacy.floor_breach_detected` in chain). §38.9 three SOC 2 evidence artefacts: PART-E-001 (CC9.2 — annual partner agreement chain export), PART-E-002 (CC9.2/CC4.1 — revenue share payment chain with privacy_floor_check_passed attestation), PART-E-003 (CC9.2/CC7.4 — partner offboarding and incident escalation events). §38.10 eleven-item implementation checklist: 5× P0/M10 (DEC-030 registration, table DDL, Partner Agreement + DPA templates with outside counsel, pipeline attribution column), 3× P1/M11 (revenue share calculation query, attribution dashboard, PART-E-001 first filing), 3× P2/M13–M15 (PSM hire decision, CAC retrospective after 3 partner deals, SOC 2 evidence collection). §38.11 three open questions: OQ-PART-01 (P1 — PSM hire threshold: 5 active resellers or $500k partner ARR; formal decision at $250k), OQ-PART-02 (P2 — co-marketing budget: $1k Bronze credit recommended; white-label co-marketing gated by brand-system veto), OQ-PART-03 (P2 — Direct Migration clause when customer transitions from reseller to direct contract; draft before first reseller agreement). TOC entry §38 added. Cross-references: `docs/ENTERPRISE.md` (sales process, no-go criteria, privacy floor); §19.4 (GTM — AE hire pattern; partner channel is the pre-AE distribution alternative); §26.3 (CSM capacity model — enablement hours share the same rate basis); §36.6.1 (implementation cost — 50% reduction for white-label deals); §37.5 (ARR build table — partner-sourced ARR targets at Y2/Y3); §37.11 OQ-PIPE-03 (partner channel attribution — this section resolves the framework; OQ-PIPE-03 governs the first actual deal); `docs/INCIDENT_RESPONSE.md R-22` (privacy floor breach — PART-CHAIN-01 prerequisite); `docs/AUDIT_LOG_SCHEMA.md` (four new DEC-030 events to register — P0 before first partner agreement); `docs/OBSERVABILITY.md §42` (white-label cert lifecycle — partner white-label enablement cost includes cert monitoring overhead). Privacy floor: no individual employee user_id or health data in any §38 DEC-030 event; no partner contact names in chain; `deal_id` is FORM-internal UUID never shared externally; `form_api` REVOKED on `enterprise_partners` table. Owner: customer-success + enterprise-architect + compliance-officer.*
 
+
+---
+
+## 39. Enterprise Deal Close Governance, Win/Loss Analytics & Competitive Intelligence Model
+
+### 39.1 Purpose & Scope
+
+> Cross-references: §37 (pipeline stage definitions — `enterprise_pipeline_stages` table); §38 (partner channel — `attributed_to_partner_id` FK carries into deal outcome); §36 (implementation cost — OQ-08 closure path; `deal_sequence` must be consistent with `enterprise_deal_outcomes`); §23 (NRR engine — `enterprise.deal_closed_won` feeds `new_arr_usd` in the ARR bridge); §34 (renewal risk — win/loss reasons inform CHS model weighting); §37.11 OQ-PIPE-01 (actual conversion rates after 10 deals — §39.6 provides the resolution SQL). Owner: enterprise-architect + customer-success + data-engineer. Review: after Deal 10 (OQ-PIPE-01 calibration); annually thereafter.
+
+Section §37 defines six pipeline stages (S0 Inbound → S5 Closed-Won) and tracks deal health via `enterprise.pipeline_reviewed` and `enterprise.deal_aged_out`. It explicitly leaves the Closed-Won event itself — the moment a deal transitions to a live contract — to the ARR bridge (`enterprise.arr_bridge_closed`, §37.6) without an individual-deal audit trail.
+
+This section closes three gaps:
+
+1. **Missing deal-level close event:** `enterprise.pipeline_reviewed` captures fleet-level weekly snapshots; `enterprise.arr_bridge_closed` captures aggregate monthly ARR. Neither records the moment a specific deal moves to Closed-Won or Closed-Lost. Without a deal-level event, auditors cannot verify that `closed_won_this_week_usd` in `enterprise.pipeline_reviewed` traces to a specific `deal_id`; investors cannot drill into the ARR bridge; the implementation kickoff chain (§36.10) has no trigger anchor.
+
+2. **Missing competitive intelligence schema:** OQ-PIPE-01 (§37.11) requires actual stage conversion rates after 10 deals, but conversion rates are only computable if closed-lost deals carry a structured reason code. Without reason codes, "10 closed-lost deals" is an opaque count. With them, FORM can answer: "We lose 70% of deals at S2→S3 to SOC 2 gap — accelerate Type II certification." or "We win 85% of deals where CV demo runs — product-led qualification works."
+
+3. **Missing OQ-PIPE-01 calibration trigger:** §37.11 OQ-PIPE-01 specifies recalibration after Deal 10 but no document defines the SQL query that computes the recalibrated rates or the DEC-030 event that triggers the DECISION_LOG update. §39.7 fills both.
+
+**Scope:** This section covers (a) terminal pipeline state management (Closed-Won / Closed-Lost); (b) win/loss reason taxonomy; (c) competitor category taxonomy; (d) `enterprise_deal_outcomes` Postgres DDL; (e) analytics SQL; (f) four DEC-030 HMAC-chained events; (g) SOC 2 evidence. It does not cover: ongoing contract management (§34–§35); implementation kickoff (§36); partner revenue share (§38); consumer-tier churn (§3–§7).
+
+**Privacy floor:** No prospect company names, contact email addresses, or individual employee `user_id` values appear in any DEC-030 event or `enterprise_deal_outcomes` row. `deal_id` is a FORM-internal UUID from `enterprise_pipeline_stages` — never shared externally. `competitor_category` is a structured enum, not a free-text company name. Verbatim notes from loss calls must remain in CRM only.
+
+---
+
+### 39.2 Terminal Pipeline State Model
+
+§37.2 defines six stages: S0 (Inbound) → S1 (Qualified) → S2 (Technical Eval) → S3 (Legal/DPA) → S4 (Commercial) → S5 (Closed-Won). A deal that fails to progress reaches one of two terminal states:
+
+| Terminal State | Code | Meaning | ARR Impact |
+|---|---|---|---|
+| **Closed-Won** | `S5` | Contract signed; first payment due; implementation kickoff scheduled | `+new_arr_usd` in ARR bridge |
+| **Closed-Lost** | `closed_lost` | Formally disqualified or lost to a competitor; no contract | Zero; excluded from PCR after close |
+
+**`closed_lost` migration:** Add `'closed_lost'` to the `enterprise_pipeline_stage_enum` type (migration `0074_enterprise_deal_outcomes.sql` Step 1). A `closed_lost` row remains in `enterprise_pipeline_stages` indefinitely for conversion-rate analytics; it is excluded from PCR (Pipeline Coverage Ratio) calculation (§37.4.1) since it carries zero deal probability.
+
+**14-day close rule:** A deal must be explicitly moved to `closed_lost` within 14 days of the founder or AE determining the deal is lost. The `enterprise.deal_aged_out` event (§37.9.3) fires at stage age limits but does not automatically transition a deal to `closed_lost` — a human decision is always required. The 14-day rule prevents pipeline inflation (deals sitting in S2 for 90 days after a verbal "no").
+
+---
+
+### 39.3 Win/Loss Reason Taxonomy
+
+#### 39.3.1 Closed-Won primary reason
+
+Captured in `enterprise_deal_outcomes.win_primary_reason`. Structured enum — exactly one value per won deal:
+
+| Value | Description |
+|---|---|
+| `cv_demo_differentiation` | CV-based workout coaching demo was the differentiator that converted the champion |
+| `privacy_floor_compliance` | HR privacy floor (no individual data visibility) resolved Legal / DPO objection |
+| `soc2_roadmap_credibility` | SOC 2 Type II roadmap + existing compliance docs convinced procurement |
+| `competitive_price_per_seat` | FORM's per-seat price was decisive vs. incumbent's per-employee fee |
+| `product_velocity` | Demo or changelog showed shipping cadence that convinced champion FORM won't stall |
+| `champion_pull` | Strong internal champion navigated procurement; product was secondary signal |
+| `pilot_conversion` | 90-day pilot converted on utilization data without further sales motion |
+| `bundle_package` | White-label or SSO/SCIM bundle package tipped the decision vs. fragmented alternatives |
+
+#### 39.3.2 Closed-Lost primary reason
+
+Captured in `enterprise_deal_outcomes.loss_primary_reason`. Exactly one value per lost deal:
+
+| Value | Description |
+|---|---|
+| `price_too_high` | Budget insufficient for FORM's per-seat rate at required seat count |
+| `feature_gap_ios_only` | Android / cross-platform gap blocked decision at time of eval |
+| `soc2_not_yet_certified` | Procurement requires SOC 2 Type II certificate; FORM not yet certified |
+| `competitor_won` | Competitor selected; see `competitor_category` field for category |
+| `champion_departed` | Internal champion left the organization before deal closed |
+| `no_budget_owner` | Wellness budget not established; no one could sign; timing mismatch |
+| `no_go_criteria_triggered` | FORM's own no-go criteria triggered (see §39.3.3) |
+| `procurement_stall` | Deal in procurement > 60 days with no movement; founder decision to close |
+| `pilot_no_convert` | 90-day pilot ended; utilization data insufficient to justify conversion |
+| `deferred_not_lost` | Customer confirmed interest but deferred > 6 months; moved to S0 dormant |
+
+**No-go criteria note:** `no_go_criteria_triggered` does not count against FORM's funnel conversion rate in §39.7 — it represents a conscious ethical rejection, not a sales failure. Separately tracked via `no_go_criteria_triggered BOOLEAN` column and accompanied by a `privacy.no_go_criteria_applied` DEC-030 event (§39.8.4).
+
+#### 39.3.3 Competitor category
+
+Captured in `enterprise_deal_outcomes.competitor_category`. Populated when `loss_primary_reason = 'competitor_won'` or as secondary context for won deals (`won_vs_competitor_category`):
+
+| Value | Description |
+|---|---|
+| `enterprise_wellness_platform` | Wellhub, Hinge Health, Virgin Pulse, BetterUp-type platform |
+| `point_solution_fitness` | ClassPass, Gympass, Peloton for Business |
+| `employee_assistance_program` | EAP generalist (Optum, Spring Health, Lyra Health) |
+| `in_house_hr_initiative` | Customer chose to build internally / use existing gym reimbursement |
+| `no_decision` | Customer deferred without selecting a competitor |
+| `unknown` | Competitor not disclosed; recorded after two follow-up attempts |
+
+**Privacy note:** `competitor_category` is a structured enum; no competitor company names appear in the DEC-030 chain or `enterprise_deal_outcomes`. Free-text names belong in CRM notes only. See OQ-WIN-02 for the threshold at which a `competitor_subcategory` secondary enum may be warranted.
+
+---
+
+### 39.4 Deal Close Financial Classification
+
+Each closed-won deal carries a full financial profile for ARR bridge integration:
+
+| Field | Description | Source |
+|---|---|---|
+| `tier` | `starter` / `growth` / `enterprise` | `enterprise_pipeline_stages.tier_forecast` at close |
+| `contracted_seats` | Final signed seat count | MSA / order form |
+| `acv_usd` | Annual contract value in USD | `contracted_seats × effective_rate × 12` |
+| `effective_rate_per_seat` | Signed rate post-discount; must be ≥ price floor per §31.5 | Order form |
+| `pricing_exception_event_id` | UUID soft-ref to `enterprise.pricing_exception_approved` if non-standard discount | DEC-030 chain |
+| `contract_years` | 1, 2, or 3 | MSA |
+| `tcv_usd` | Total contract value = `acv_usd × contract_years` | Computed column |
+| `first_payment_due_date` | ISO 8601; triggers ARR bridge `new_arr_usd` inclusion (§37.6) | MSA |
+| `attributed_to_partner_id` | UUID FK to `enterprise_partners` if partner-sourced (§38) | `enterprise_pipeline_stages` |
+
+**ARR bridge linkage:** When `enterprise.deal_closed_won` is emitted, the `new_arr_usd` component of the next `enterprise.arr_bridge_closed` event (§37.9.2) must include this deal's `acv_usd`. The `pricing_exception_event_id` FK enables auditors to verify that any non-standard discount was pre-approved before the quote was sent (§31.8 ordering rule). `floor_respected: true` in the DEC-030 payload provides chain-level evidence that the signed rate was at or above the §31.5 price floor.
+
+---
+
+### 39.5 `enterprise_deal_outcomes` Postgres Schema
+
+```sql
+-- Migration: 0074_enterprise_deal_outcomes.sql
+-- Depends on: 0072_enterprise_pipeline_stages.sql (§37.8.1)
+--             0073b_pipeline_partner_attribution.sql (§38.7)
+
+-- Step 1: extend stage enum
+ALTER TYPE enterprise_pipeline_stage_enum ADD VALUE IF NOT EXISTS 'closed_lost';
+
+-- Step 2: deal outcomes table
+CREATE TABLE enterprise_deal_outcomes (
+  id                          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  deal_id                     UUID         NOT NULL
+                                REFERENCES enterprise_pipeline_stages(id)
+                                ON DELETE RESTRICT,
+  tenant_id                   UUID         REFERENCES tenants(id) ON DELETE SET NULL,
+  outcome                     TEXT         NOT NULL
+                                CHECK (outcome IN ('closed_won', 'closed_lost')),
+  closed_at                   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+
+  -- Closed-Won fields
+  tier                        TEXT         CHECK (tier IN ('starter', 'growth', 'enterprise')),
+  contracted_seats             INTEGER      CHECK (contracted_seats > 0),
+  acv_usd                     INTEGER      CHECK (acv_usd > 0),
+  effective_rate_per_seat     NUMERIC(8,2) CHECK (effective_rate_per_seat >= 0),
+  floor_respected             BOOLEAN,
+  contract_years              SMALLINT     CHECK (contract_years IN (1, 2, 3)),
+  tcv_usd                     INTEGER      GENERATED ALWAYS AS (acv_usd * contract_years) STORED,
+  first_payment_due_date      DATE,
+  pricing_exception_event_id  UUID,
+  win_primary_reason          TEXT         CHECK (win_primary_reason IN (
+    'cv_demo_differentiation', 'privacy_floor_compliance', 'soc2_roadmap_credibility',
+    'competitive_price_per_seat', 'product_velocity', 'champion_pull',
+    'pilot_conversion', 'bundle_package'
+  )),
+  won_vs_competitor_category  TEXT         CHECK (won_vs_competitor_category IN (
+    'enterprise_wellness_platform', 'point_solution_fitness', 'employee_assistance_program',
+    'in_house_hr_initiative', 'no_decision', 'unknown'
+  )),
+
+  -- Closed-Lost fields
+  loss_primary_reason         TEXT         CHECK (loss_primary_reason IN (
+    'price_too_high', 'feature_gap_ios_only', 'soc2_not_yet_certified',
+    'competitor_won', 'champion_departed', 'no_budget_owner',
+    'no_go_criteria_triggered', 'procurement_stall', 'pilot_no_convert', 'deferred_not_lost'
+  )),
+  competitor_category         TEXT         CHECK (competitor_category IN (
+    'enterprise_wellness_platform', 'point_solution_fitness', 'employee_assistance_program',
+    'in_house_hr_initiative', 'no_decision', 'unknown'
+  )),
+  no_go_criteria_triggered    BOOLEAN      NOT NULL DEFAULT false,
+
+  -- Common fields
+  deal_sequence               INTEGER,
+  attributed_to_partner_id    UUID         REFERENCES enterprise_partners(id) ON DELETE SET NULL,
+  sales_cycle_days            INTEGER      GENERATED ALWAYS AS (
+                                EXTRACT(DAY FROM closed_at - (
+                                  SELECT created_at FROM enterprise_pipeline_stages
+                                  WHERE id = deal_id
+                                ))::INTEGER
+                              ) STORED,
+  dec030_event_id             UUID,
+
+  -- Completeness constraints
+  CONSTRAINT won_fields_required CHECK (
+    outcome <> 'closed_won' OR (
+      tier IS NOT NULL AND contracted_seats IS NOT NULL AND acv_usd IS NOT NULL
+      AND effective_rate_per_seat IS NOT NULL AND floor_respected = TRUE
+      AND contract_years IS NOT NULL AND first_payment_due_date IS NOT NULL
+      AND win_primary_reason IS NOT NULL
+    )
+  ),
+  CONSTRAINT lost_fields_required CHECK (
+    outcome <> 'closed_lost' OR loss_primary_reason IS NOT NULL
+  ),
+  CONSTRAINT competitor_category_required_on_competitor_loss CHECK (
+    loss_primary_reason <> 'competitor_won' OR competitor_category IS NOT NULL
+  ),
+  CONSTRAINT no_go_flag_consistent CHECK (
+    (loss_primary_reason = 'no_go_criteria_triggered') = no_go_criteria_triggered
+  )
+);
+
+CREATE UNIQUE INDEX idx_deal_outcomes_deal_id
+  ON enterprise_deal_outcomes(deal_id);
+CREATE INDEX idx_deal_outcomes_outcome_closed
+  ON enterprise_deal_outcomes(outcome, closed_at DESC);
+CREATE INDEX idx_deal_outcomes_tier_reason
+  ON enterprise_deal_outcomes(tier, win_primary_reason, loss_primary_reason);
+```
+
+**RLS policies:**
+```sql
+ALTER TABLE enterprise_deal_outcomes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY edo_compliance_select ON enterprise_deal_outcomes
+  FOR SELECT TO compliance_reviewer USING (true);
+
+CREATE POLICY edo_admin_select ON enterprise_deal_outcomes
+  FOR SELECT TO form_admin USING (true);
+
+CREATE POLICY edo_system_insert ON enterprise_deal_outcomes
+  FOR INSERT TO form_system WITH CHECK (true);
+
+REVOKE ALL ON enterprise_deal_outcomes FROM form_api;
+```
+
+**Why REVOKE on form_api:** `enterprise_deal_outcomes` contains FORM's deal financial data (ACV, effective rates) and competitive intelligence. Tenant admin users access the product via `form_api` — they must never see FORM's commercial deal data. All tenant-facing financial data is in `tenant_contracts` (§23) and `tenant_billing_snapshots`.
+
+---
+
+### 39.6 Win/Loss Analytics Queries
+
+#### 39.6.1 Stage conversion rate actuals (OQ-PIPE-01 resolution query)
+
+Run when `COUNT(*)` on `enterprise_deal_outcomes WHERE outcome IN ('closed_won','closed_lost') AND NOT no_go_criteria_triggered` ≥ 10. The `no_go_criteria_triggered` exclusion prevents FORM's own ethical rejections from distorting the pipeline conversion rate.
+
+```sql
+WITH stage_entry AS (
+  SELECT
+    eps.id                           AS deal_id,
+    CASE WHEN edo.outcome = 'closed_won' THEN 1 ELSE 0 END AS closed_won,
+    eps.stage_s0_entered_at IS NOT NULL AS entered_s0,
+    eps.stage_s1_entered_at IS NOT NULL AS entered_s1,
+    eps.stage_s2_entered_at IS NOT NULL AS entered_s2,
+    eps.stage_s3_entered_at IS NOT NULL AS entered_s3,
+    eps.stage_s4_entered_at IS NOT NULL AS entered_s4,
+    eps.stage_s5_entered_at IS NOT NULL AS entered_s5
+  FROM enterprise_pipeline_stages eps
+  JOIN enterprise_deal_outcomes edo ON edo.deal_id = eps.id
+  WHERE eps.stage IN ('S5', 'closed_lost')
+    AND NOT edo.no_go_criteria_triggered
+),
+totals AS (
+  SELECT
+    COUNT(*) FILTER (WHERE entered_s0)   AS n_s0,
+    COUNT(*) FILTER (WHERE entered_s1)   AS n_s1,
+    COUNT(*) FILTER (WHERE entered_s2)   AS n_s2,
+    COUNT(*) FILTER (WHERE entered_s3)   AS n_s3,
+    COUNT(*) FILTER (WHERE entered_s4)   AS n_s4,
+    COUNT(*) FILTER (WHERE closed_won=1) AS n_won
+  FROM stage_entry
+)
+SELECT
+  n_s0                                                AS deals_entered_pipeline,
+  ROUND(n_s1::NUMERIC/NULLIF(n_s0,0)*100,1)          AS s0_to_s1_pct,
+  ROUND(n_s2::NUMERIC/NULLIF(n_s1,0)*100,1)          AS s1_to_s2_pct,
+  ROUND(n_s3::NUMERIC/NULLIF(n_s2,0)*100,1)          AS s2_to_s3_pct,
+  ROUND(n_s4::NUMERIC/NULLIF(n_s3,0)*100,1)          AS s3_to_s4_pct,
+  ROUND(n_won::NUMERIC/NULLIF(n_s4,0)*100,1)         AS s4_to_s5_pct,
+  ROUND(n_won::NUMERIC/NULLIF(n_s0,0)*100,1)         AS overall_win_rate_pct
+FROM totals;
+```
+
+#### 39.6.2 Loss reason frequency distribution
+
+```sql
+SELECT
+  loss_primary_reason,
+  COUNT(*)                                                   AS deal_count,
+  ROUND(COUNT(*)::NUMERIC/SUM(COUNT(*)) OVER ()*100,1)      AS share_pct,
+  SUM(CASE WHEN attributed_to_partner_id IS NOT NULL
+        THEN 1 ELSE 0 END)                                  AS partner_sourced
+FROM enterprise_deal_outcomes
+WHERE outcome = 'closed_lost' AND NOT no_go_criteria_triggered
+GROUP BY loss_primary_reason
+ORDER BY deal_count DESC;
+```
+
+#### 39.6.3 Win rate by tier
+
+```sql
+SELECT
+  eps.tier_forecast                                           AS tier,
+  COUNT(*) FILTER (WHERE edo.outcome = 'closed_won')         AS won,
+  COUNT(*) FILTER (WHERE edo.outcome = 'closed_lost'
+    AND NOT edo.no_go_criteria_triggered)                    AS lost,
+  ROUND(
+    COUNT(*) FILTER (WHERE edo.outcome = 'closed_won')::NUMERIC
+    / NULLIF(COUNT(*) FILTER (
+        WHERE edo.outcome IN ('closed_won','closed_lost')
+          AND NOT edo.no_go_criteria_triggered
+      ), 0) * 100, 1
+  )                                                          AS win_rate_pct,
+  ROUND(AVG(edo.sales_cycle_days)
+    FILTER (WHERE edo.outcome = 'closed_won'), 0)            AS avg_cycle_days_won
+FROM enterprise_pipeline_stages eps
+JOIN enterprise_deal_outcomes edo ON edo.deal_id = eps.id
+WHERE eps.stage IN ('S5', 'closed_lost')
+GROUP BY eps.tier_forecast
+ORDER BY tier;
+```
+
+#### 39.6.4 Competitor category impact analysis
+
+```sql
+SELECT
+  competitor_category,
+  COUNT(*)                                                   AS times_appeared,
+  COUNT(*) FILTER (WHERE outcome = 'closed_lost')           AS losses_to_category,
+  COUNT(*) FILTER (WHERE outcome = 'closed_won')            AS wins_against_category,
+  ROUND(
+    COUNT(*) FILTER (WHERE outcome = 'closed_won')::NUMERIC
+    / NULLIF(COUNT(*),0) * 100, 1
+  )                                                         AS win_rate_vs_category_pct,
+  ROUND(AVG(acv_usd) FILTER (WHERE outcome = 'closed_won'),0) AS avg_won_acv_usd
+FROM enterprise_deal_outcomes
+WHERE competitor_category IS NOT NULL
+GROUP BY competitor_category
+ORDER BY times_appeared DESC;
+```
+
+#### 39.6.5 Sales cycle days by tier (p50 / p90)
+
+```sql
+SELECT
+  tier,
+  COUNT(*)                                                         AS n,
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY sales_cycle_days)   AS median_days,
+  PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY sales_cycle_days)   AS p90_days,
+  ROUND(AVG(sales_cycle_days), 0)                                  AS avg_days
+FROM enterprise_deal_outcomes
+WHERE outcome = 'closed_won'
+GROUP BY tier
+ORDER BY tier;
+```
+
+---
+
+### 39.7 OQ-PIPE-01 Resolution Protocol
+
+**OQ-PIPE-01** (§37.11): *What are FORM's actual stage conversion rates after 10 closed-won deals?*
+
+**Recalibration gate:** When `COUNT(*) FROM enterprise_deal_outcomes WHERE outcome IN ('closed_won','closed_lost') AND NOT no_go_criteria_triggered` ≥ 10.
+
+**Four-step resolution protocol:**
+
+1. **Run §39.6.1 query.** Compare output to §37.3 benchmark table. If any stage conversion rate deviates by > 10 percentage points from the base case, the deviation is material.
+
+2. **Document in DECISION_LOG.** Create a new entry (DEC-06X) recording: sample size (n ≥ 10), recalibrated conversion rates, delta vs. §37.3 base case, and implications for sales velocity (§19.1) and ARR build table (§37.5).
+
+3. **Update §37.3 table** in this document. Mark the row "Actuals (Deal 10, YYYY-MM-DD)"; retain benchmark rows for comparison.
+
+4. **Emit `enterprise.win_loss_analysis_recalibrated`** (§39.8.3) via Admin Console with `decision_log_ref` slug. This closes OQ-PIPE-01 in the HMAC chain.
+
+**Re-calibration cadence:** Repeat at Deal 20 and Deal 50. At Deal 50, conversion rates should be stable enough to establish FORM-specific benchmarks that replace the OpenView/Gartner proxy figures in §37.3.
+
+---
+
+### 39.8 DEC-030 HMAC-Chained Events
+
+#### 39.8.1 `enterprise.deal_closed_won`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.deal_closed_won` |
+| **Severity** | STANDARD |
+| **Retention** | 7 years |
+| **Actor** | `customer-success` or `founder` (manual via Admin Console at S5 transition) |
+| **Trigger** | `enterprise_pipeline_stages.stage` set to `'S5'`; `enterprise_deal_outcomes` row inserted simultaneously |
+
+**Payload:**
+```typescript
+z.object({
+  deal_id:                    z.string().uuid(),
+  deal_sequence:              z.number().int().positive(),
+  tier:                       z.enum(['starter', 'growth', 'enterprise']),
+  contracted_seats:           z.number().int().positive(),
+  acv_usd:                    z.number().int().positive(),
+  contract_years:             z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  floor_respected:            z.literal(true),
+  win_primary_reason:         z.enum([
+    'cv_demo_differentiation', 'privacy_floor_compliance', 'soc2_roadmap_credibility',
+    'competitive_price_per_seat', 'product_velocity', 'champion_pull',
+    'pilot_conversion', 'bundle_package',
+  ]),
+  won_vs_competitor_category: z.enum([
+    'enterprise_wellness_platform', 'point_solution_fitness', 'employee_assistance_program',
+    'in_house_hr_initiative', 'no_decision', 'unknown',
+  ]).nullable(),
+  attributed_to_partner_id:   z.string().uuid().nullable(),
+  pricing_exception_event_id: z.string().uuid().nullable(),
+  sales_cycle_days:           z.number().int().positive(),
+  first_payment_due_date:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+})
+```
+
+**Privacy invariant:** No prospect company name, contact name, email, or employee `user_id` in payload. `deal_id` is FORM-internal UUID. `acv_usd` and `contracted_seats` are aggregate financial metadata with no link to individual health data.
+
+**WIN-CHAIN-01 (warning-level):** `enterprise.deal_closed_won` should be preceded by `enterprise.implementation_kickoff_completed` (§36.10) for the same `tenant_id` within 72 hours. This is a WARNING (non-blocking) — the Worker logs to Better Stack if no prior kickoff event exists for the `tenant_id` within 72h. Not HTTP 422 because kickoff scheduling may legitimately lag the contract signature.
+
+#### 39.8.2 `enterprise.deal_closed_lost`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.deal_closed_lost` |
+| **Severity** | STANDARD |
+| **Retention** | 3 years |
+| **Actor** | `customer-success` or `founder` (manual) |
+| **Trigger** | Founder/AE decides deal is lost; `enterprise_pipeline_stages.stage` set to `'closed_lost'` |
+
+**Payload:**
+```typescript
+z.object({
+  deal_id:                  z.string().uuid(),
+  loss_primary_reason:      z.enum([
+    'price_too_high', 'feature_gap_ios_only', 'soc2_not_yet_certified',
+    'competitor_won', 'champion_departed', 'no_budget_owner',
+    'no_go_criteria_triggered', 'procurement_stall', 'pilot_no_convert', 'deferred_not_lost',
+  ]),
+  competitor_category:      z.enum([
+    'enterprise_wellness_platform', 'point_solution_fitness', 'employee_assistance_program',
+    'in_house_hr_initiative', 'no_decision', 'unknown',
+  ]).nullable(),
+  no_go_criteria_triggered: z.boolean(),
+  last_stage_reached:       z.enum(['S0', 'S1', 'S2', 'S3', 'S4']),
+  sales_cycle_days:         z.number().int().nonnegative(),
+  attributed_to_partner_id: z.string().uuid().nullable(),
+})
+```
+
+**Privacy invariant:** No prospect contact names, company names, or email addresses. `competitor_category` is a structured enum only. Verbatim loss-call notes remain in CRM.
+
+**no_go companion event:** When `no_go_criteria_triggered = true`, the Worker auto-emits `privacy.no_go_criteria_applied` (§39.8.4) as a companion event appended immediately after `enterprise.deal_closed_lost` in the chain.
+
+**3-year retention rationale:** Closed-lost deals carry no health data and minimal financial sensitivity. 3 years covers two SOC 2 observation windows; competitive intelligence value degrades after 24 months given market evolution.
+
+#### 39.8.3 `enterprise.win_loss_analysis_recalibrated`
+
+| Field | Value |
+|---|---|
+| **Event type** | `enterprise.win_loss_analysis_recalibrated` |
+| **Severity** | STANDARD |
+| **Retention** | 7 years |
+| **Actor** | `founder` or `data-engineer` (manual via Admin Console) |
+| **Trigger** | OQ-PIPE-01 calibration threshold (10 terminal deals); §37.3 updated; DECISION_LOG entry created |
+
+**Payload:**
+```typescript
+z.object({
+  deals_analysed:             z.number().int().min(10),
+  no_go_excluded_count:       z.number().int().nonnegative(),
+  s0_to_s1_actual_pct:        z.number().min(0).max(100),
+  s1_to_s2_actual_pct:        z.number().min(0).max(100),
+  s2_to_s3_actual_pct:        z.number().min(0).max(100),
+  s3_to_s4_actual_pct:        z.number().min(0).max(100),
+  s4_to_s5_actual_pct:        z.number().min(0).max(100),
+  overall_win_rate_pct:       z.number().min(0).max(100),
+  decision_log_ref:           z.string().min(1),
+  cost_model_section_updated: z.literal('§37.3'),
+  calibration_date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+})
+```
+
+**PIPE-CHAIN-02:** `decision_log_ref` must be non-null and non-empty. Worker validates before chain-appending; HTTP 422 `PIPE_CHAIN_02_MISSING_DECISION_REF` if absent. Mirrors PIPE-CHAIN-01 on `enterprise.pipeline_conversion_model_recalibrated` (§37.9.4) — both require a DECISION_LOG record before the chain event fires.
+
+#### 39.8.4 `privacy.no_go_criteria_applied`
+
+| Field | Value |
+|---|---|
+| **Event type** | `privacy.no_go_criteria_applied` |
+| **Severity** | STANDARD |
+| **Retention** | 3 years |
+| **Actor** | `form_system` (auto-companion to `enterprise.deal_closed_lost` when `no_go_criteria_triggered = true`) |
+| **Trigger** | Automated — appended immediately after `enterprise.deal_closed_lost` in the same Worker request |
+
+**Payload:**
+```typescript
+z.object({
+  deal_id:              z.string().uuid(),
+  criteria_triggered:   z.enum([
+    'insurance_risk_scoring',
+    'government_backdoor_request',
+    'wellness_as_punishment_use_case',
+    'other_no_go',
+  ]),
+  review_confirmed_by:  z.string().uuid(),
+})
+```
+
+**Rationale:** FORM's no-go criteria (insurance risk scoring, government backdoors, wellness-as-punishment) are commercial ethics commitments documented in `docs/ENTERPRISE.md`. Recording each triggered rejection in the HMAC chain provides auditors and investors with evidence that these commitments are operationally enforced, not merely stated. CC1.4 (COSO: commitment to integrity and ethical values) is the primary SOC 2 mapping.
+
+#### 39.8.5 DEC-030 Event Summary for §39
+
+| Event | Severity | Retention | Trigger | Privacy constraint |
+|---|---|---|---|---|
+| `enterprise.deal_closed_won` | STANDARD | 7 yr | S5 stage transition | `deal_id` UUID internal; `floor_respected: true`; no prospect PII; no employee health data |
+| `enterprise.deal_closed_lost` | STANDARD | 3 yr | `closed_lost` stage transition | `deal_id` UUID internal; `competitor_category` enum only; no company names |
+| `enterprise.win_loss_analysis_recalibrated` | STANDARD | 7 yr | OQ-PIPE-01 calibration (≥ 10 deals) | Aggregate conversion rates; `decision_log_ref` required (PIPE-CHAIN-02) |
+| `privacy.no_go_criteria_applied` | STANDARD | 3 yr | Auto-companion to `deal_closed_lost` with `no_go=true` | `criteria_triggered` enum; `review_confirmed_by` founder UUID; no prospect name |
+
+**Registration requirement:** All four events must be registered in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (first three) and `§Privacy` (`privacy.no_go_criteria_applied`) before the first S5 deal closes (P0 checklist item 1 below).
+
+---
+
+### 39.9 SOC 2 Evidence Mapping
+
+Store at `compliance/evidence/winloss/` with `MANIFEST.sha256`.
+
+| Artefact | Description | SOC 2 Criteria | Retention |
+|---|---|---|---|
+| **WIN-E-001** | Annual export of `enterprise.deal_closed_won` chain events — demonstrates each closed-won deal was recorded with `floor_respected: true`, linking pricing discipline (§31) to contract execution | CC5.2 (business risk assessed through deal-level close events), CC1.4 (pricing floor integrity at close) | 7 yr |
+| **WIN-E-002** | Export of `enterprise.win_loss_analysis_recalibrated` chain event(s) — demonstrates FORM systematically reviews conversion rates and updates financial models at defined thresholds (Deal 10, 20, 50) | CC5.2 (monitoring of commercial risk), CC4.1 (financial model governance with DECISION_LOG anchor) | 7 yr |
+| **WIN-E-003** | Quarterly export of `privacy.no_go_criteria_applied` chain events — demonstrates operational enforcement of FORM's ethical rejection policy; zero-count quarters filed as a zero-event attestation | CC1.4 (commitment to integrity and ethical values — operationally enforced), CC9.2 (customer selection governance) | 3 yr |
+
+**Auditor narrative for CC5.2:** FORM's enterprise deal pipeline is governed by a structured stage model (§37) with individual-deal close events (`enterprise.deal_closed_won`, §39.8.1) that include a `floor_respected: true` attestation. WIN-E-001 provides chain-level evidence that every closed-won contract during the observation period was executed at or above the price floor (`docs/COST_MODEL.md §31.5`). WIN-E-002 proves that FORM treats deal outcome data as a business risk input — recalibrating its financial model when 10 terminal outcomes accumulate.
+
+**Auditor narrative for CC1.4:** WIN-E-003 demonstrates that FORM's stated no-go criteria (insurance risk scoring, government backdoors, wellness-as-punishment use cases) are operationally enforced, not merely policy text. Each `privacy.no_go_criteria_applied` event records the specific criterion triggered and the founder's confirmation — providing an immutable record of ethical rejection decisions across the SOC 2 observation window. Zero-count filings are not omissions; they are positive attestations that no applicable prospect was presented with a no-go use case during that quarter.
+
+---
+
+### 39.10 Implementation Checklist
+
+#### P0 — Before first S5 deal close (pre-M9)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 1 | Register all four §39.8 DEC-030 events in `docs/AUDIT_LOG_SCHEMA.md §Enterprise` (`deal_closed_won`, `deal_closed_lost`, `win_loss_analysis_recalibrated`) and `§Privacy` (`no_go_criteria_applied`); deploy event types to `emit-audit-event` Worker; write integration test for WIN-CHAIN-01 warning and PIPE-CHAIN-02 HTTP 422 on missing `decision_log_ref`. | platform-engineer + compliance-officer | **P0** | M9 | [ ] |
+| 2 | Apply migration `0074_enterprise_deal_outcomes.sql`: Step 1 `ALTER TYPE enterprise_pipeline_stage_enum ADD VALUE IF NOT EXISTS 'closed_lost'`; Step 2 `CREATE TABLE enterprise_deal_outcomes` with all CHECK constraints; Step 3 create three indexes; Step 4 apply RLS policies + `REVOKE ALL ON enterprise_deal_outcomes FROM form_api`. Run `EXPLAIN (ANALYZE, BUFFERS)` on `idx_deal_outcomes_tier_reason` with 50 synthetic rows; confirm index scan used. | platform-engineer | **P0** | M9 | [ ] |
+| 3 | Implement Admin Console "Close Deal" modal (form_admin + founder roles only): two-option outcome toggle (Closed-Won / Closed-Lost); won-path fields (tier, seats, ACV, rate, contract_years, payment_date, win_reason, optional won_vs_competitor_category, optional pricing_exception_event_id); lost-path fields (loss_reason, last_stage, competitor_category required when reason = `competitor_won`, no_go_criteria enum shown when `no_go_criteria_triggered` checked); on submit → INSERT `enterprise_deal_outcomes` + emit DEC-030 event + update `enterprise_pipeline_stages.stage`. | platform-engineer | **P0** | M9 | [ ] |
+| 4 | Implement `privacy.no_go_criteria_applied` auto-emission: when `enterprise.deal_closed_lost` payload includes `no_go_criteria_triggered: true`, the `emit-audit-event` Worker appends `privacy.no_go_criteria_applied` as a companion event in the same atomic request (array payload; both events share the same `prev_hash` anchor and the companion is appended second in chain order); requires `criteria_triggered` enum selection in the Admin Console modal (visible only when `no_go_criteria_triggered` checkbox is active). | platform-engineer + compliance-officer | **P0** | M9 | [ ] |
+
+#### P1 — Before first enterprise renewal (M10)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 5 | File WIN-E-001 after first closed-won deal: export `enterprise.deal_closed_won` chain events for the quarter; verify `floor_respected: true` in all records; file at `compliance/evidence/winloss/WIN-E-001_<YYYY-QN>.csv`. | compliance-officer | **P1** | M10 | [ ] |
+| 6 | File WIN-E-003 quarterly from M10 (even if zero no-go events — zero count is itself CC1.4 evidence): export `privacy.no_go_criteria_applied` events for the quarter; file at `compliance/evidence/winloss/WIN-E-003_<YYYY-QN>.csv`. If zero events, file a signed attestation noting `n = 0`. | compliance-officer | **P1** | Quarterly from M10 | [ ] |
+| 7 | Add §39.6 queries to data-engineer analytics runbook at `docs/runbooks/RB-ENT-WIN-LOSS-01.md`; schedule quarterly win/loss review in founder calendar (after each `enterprise.arr_bridge_closed` monthly event — win/loss context enriches ARR bridge commentary for investors). | data-engineer | **P1** | M10 | [ ] |
+
+#### P2 — OQ-PIPE-01 calibration (est. M18)
+
+| # | Task | Owner | Priority | Milestone | Status |
+|---|---|---|---|---|---|
+| 8 | When `COUNT(*) FROM enterprise_deal_outcomes WHERE outcome IN ('closed_won','closed_lost') AND NOT no_go_criteria_triggered` ≥ 10: run §39.6.1 query; compare to §37.3 base case; create DECISION_LOG entry DEC-06X; update §37.3; emit `enterprise.win_loss_analysis_recalibrated` via Admin Console with `decision_log_ref`; file WIN-E-002. Closes OQ-PIPE-01. | founder + data-engineer | **P2** | M18 (est. Deal 10) | [ ] |
+| 9 | At Deal 20: repeat OQ-PIPE-01 calibration. Update §37.3 if any rate deviates > 5pp from the Deal-10 calibration (small-sample artifact check). Evaluate OQ-WIN-02 (competitor_category unknown% threshold). | data-engineer | **P2** | M24 (est. Deal 20) | [ ] |
+| 10 | At Deal 50: commission a competitive intelligence synthesis from §39.6.3–39.6.4 queries; feed into next-year roadmap prioritization (product-strategist gate); replace §37.3 proxy benchmarks with FORM-specific actuals. | data-engineer + product-strategist | **P2** | M36 (est. Deal 50) | [ ] |
+
+---
+
+### 39.11 Open Questions
+
+| ID | Question | Priority | Owner | Resolution path |
+|---|---|---|---|---|
+| **OQ-WIN-01** | **Should `enterprise.deal_closed_won` be emitted automatically when `enterprise_pipeline_stages.stage` transitions to 'S5', or only manually via Admin Console?** An automated pg_cron or Postgres trigger could prevent omission but requires the `enterprise_deal_outcomes` row (including `win_primary_reason`) to be pre-populated — otherwise the Zod schema validation fails. Recommendation: manual emission via Admin Console at launch (same pattern as §38.8 partner events); evaluate automation after 5 closed-won deals prove the manual flow is consistently followed. | **P2** | platform-engineer + enterprise-architect | Evaluate after Deal 5; automate if > 1 manual emission was missed or delayed > 48h |
+| **OQ-WIN-02** | **At what deal volume does the `competitor_category` enum need a `competitor_subcategory` secondary enum?** Current approach prioritizes privacy and analytical cleanliness. If > 15% of `competitor_category` values are `unknown` after Deal 20, the bucket inflates and competitive intelligence degrades. Resolution: run §39.6.4 query at Deal 20; if `unknown` share > 15%, add a curated secondary enum field (not free text) to `enterprise_deal_outcomes` and the DEC-030 payload. | **P2** | data-engineer + marketing-lead | Evaluate at Deal 20 using §39.6.4 query; document decision in `docs/DECISION_LOG.md` |
+
+---
+
+*v2.5 (2026-06-15): §39 Enterprise Deal Close Governance, Win/Loss Analytics & Competitive Intelligence Model — closes three gaps between §37 (pipeline S0→S5 stage model without a per-deal close event) and §37.6 (aggregate ARR bridge without individual deal traceability): (1) missing deal-level close event — `enterprise.deal_closed_won` and `enterprise.deal_closed_lost` DEC-030 events with Zod schemas and HMAC chain invariants; (2) missing competitive intelligence schema — structured win/loss reason enums (8 won / 10 lost / 6 competitor_category values) with privacy floor (no company names in chain); (3) missing OQ-PIPE-01 calibration trigger — §39.7 four-step resolution protocol with §39.6.1 SQL and `enterprise.win_loss_analysis_recalibrated` PIPE-CHAIN-02 event. §39.2 terminal state model: `'closed_lost'` added to `enterprise_pipeline_stage_enum` (migration 0074 Step 1); 14-day manual close rule; `enterprise.deal_aged_out` (§37.9.3) does not auto-transition to `closed_lost`. §39.3 win/loss taxonomy: 8 win reason codes; 10 loss reason codes including `no_go_criteria_triggered` (excluded from funnel conversion rate — ethical rejection, not sales failure); 6 competitor_category enum values (no company names). §39.4 deal close financial classification: `floor_respected: true` invariant links to §31.5 price floor; `pricing_exception_event_id` soft-ref to §31.8 chain; `tcv_usd` GENERATED column. §39.5 `enterprise_deal_outcomes` DDL: UUID PK, `deal_id` FK RESTRICT, `outcome` enum (closed_won/closed_lost), tier/seats/ACV/rate/floor_respected/contract_years/tcv_usd GENERATED/payment_date/pricing_exception soft-ref/win_primary_reason/won_vs_competitor_category nullable for won path; loss_primary_reason/competitor_category nullable/no_go_criteria_triggered for lost path; `deal_sequence`, `attributed_to_partner_id` FK SET NULL, `sales_cycle_days` GENERATED, `dec030_event_id` soft-ref; four CHECK constraints (won_fields_required, lost_fields_required, competitor_category_required_on_competitor_loss, no_go_flag_consistent); UNIQUE index on deal_id; two additional indexes; four RLS policies (compliance_reviewer SELECT all, form_admin SELECT all, form_system INSERT, form_api REVOKED). §39.6 five analytics SQL queries: §39.6.1 stage conversion rate actuals with no_go exclusion (OQ-PIPE-01 resolution, gate ≥ 10 terminal outcomes); §39.6.2 loss reason frequency distribution; §39.6.3 win rate by tier with avg sales cycle days; §39.6.4 competitor category impact (win rate vs. each category, avg won ACV); §39.6.5 sales cycle p50/p90 by tier. §39.7 OQ-PIPE-01 four-step protocol: run §39.6.1, create DECISION_LOG DEC-06X, update §37.3, emit `enterprise.win_loss_analysis_recalibrated`; re-calibrate at Deal 10/20/50. §39.8 four DEC-030 events: `enterprise.deal_closed_won` (STANDARD, 7yr — deal_id, tier, contracted_seats, acv_usd, contract_years, floor_respected literal true, win_primary_reason, won_vs_competitor_category nullable, attributed_to_partner_id nullable, pricing_exception_event_id nullable, sales_cycle_days, first_payment_due_date date-only; WIN-CHAIN-01 WARNING if no prior kickoff for tenant_id within 72h); `enterprise.deal_closed_lost` (STANDARD, 3yr — deal_id, loss_primary_reason, competitor_category nullable, no_go_criteria_triggered, last_stage_reached, sales_cycle_days, attributed_to_partner_id nullable; auto-companion `privacy.no_go_criteria_applied` when no_go=true); `enterprise.win_loss_analysis_recalibrated` (STANDARD, 7yr — deals_analysed ≥ 10, no_go_excluded_count, five stage conversion rate fields, overall_win_rate_pct, decision_log_ref PIPE-CHAIN-02 HTTP 422 if absent, cost_model_section_updated literal '§37.3', calibration_date); `privacy.no_go_criteria_applied` (STANDARD, 3yr — companion auto-event; criteria_triggered enum: insurance_risk_scoring / government_backdoor_request / wellness_as_punishment_use_case / other_no_go; review_confirmed_by founder UUID). §39.9 three SOC 2 evidence artefacts: WIN-E-001 (CC5.2/CC1.4 — annual deal_closed_won export with floor_respected attestation; 7yr); WIN-E-002 (CC5.2/CC4.1 — win_loss_analysis_recalibrated chain export at Deal 10/20/50; 7yr); WIN-E-003 (CC1.4/CC9.2 — quarterly no_go_criteria_applied export; zero-count quarters filed as affirmative ethical attestation; 3yr). §39.10 ten-item implementation checklist: 4× P0/M9 (DEC-030 registration + WIN-CHAIN-01/PIPE-CHAIN-02 integration tests, DDL migration 0074, Admin Console "Close Deal" modal with full enum coverage, no_go companion auto-emission with atomic array payload), 3× P1/M10 (WIN-E-001 first filing, WIN-E-003 quarterly cadence start with zero-count protocol, analytics runbook RB-ENT-WIN-LOSS-01), 3× P2/M18–M36 (OQ-PIPE-01 closure at Deal 10, Deal 20 stability check + OQ-WIN-02 evaluation, Deal 50 competitive intelligence synthesis for roadmap). §39.11 two open questions: OQ-WIN-01 (P2 — manual vs. automated deal_closed_won emission; manual recommended until Deal 5 proves flow consistency; automate if > 1 miss or > 48h delay); OQ-WIN-02 (P2 — competitor_category unknown% threshold; evaluate at Deal 20; add subcategory enum if > 15% unknown). TOC entry §39 added. Document header updated v2.4 → v2.5. Cross-references: `docs/ENTERPRISE.md` (no-go criteria — four categories; privacy floor); §37.2 (pipeline stages — `closed_lost` added to enum); §37.3 (conversion rate table — §39.7 provides post-Deal-10 recalibration protocol and SQL); §37.6 (ARR bridge — `new_arr_usd` sourced from `enterprise.deal_closed_won.acv_usd`); §37.8.1 (`enterprise_pipeline_stages` DDL — `deal_id` FK source); §37.9.2 (`enterprise.arr_bridge_closed` — fleet-level complement to deal-level event); §37.9.3 (`enterprise.deal_aged_out` — does not auto-set `closed_lost`; human decision required within 14 days); §37.11 OQ-PIPE-01 (actual conversion rates — §39.6.1 + §39.7 provide the full resolution path); §38.7 (`enterprise_partners` — `attributed_to_partner_id` FK carried into deal outcomes); §38.8.3 (`enterprise.partner_deal_attributed` — emitted alongside `enterprise.deal_closed_won` for partner-sourced deals); §36.9 (`enterprise_impl_time_log.deal_sequence` — same counter); §31.5 (price floors — `floor_respected: true` payload invariant); §31.8 (`enterprise.pricing_exception_approved` — `pricing_exception_event_id` soft-ref if non-standard discount); `docs/AUDIT_LOG_SCHEMA.md §Enterprise + §Privacy` (four new events to register — P0 before M9); `docs/DECISION_LOG.md DEC-06X` (OQ-PIPE-01 closure record — created by founder after Deal 10 calibration). Privacy floor: no prospect company names, contact email, or individual employee user_id in any DEC-030 event or enterprise_deal_outcomes row; competitor_category is a structured enum only; verbatim loss-call notes remain in CRM; deal_id is FORM-internal UUID never shared externally; form_api REVOKED from enterprise_deal_outcomes. Owner: enterprise-architect + customer-success + data-engineer + compliance-officer.*
