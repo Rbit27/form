@@ -1,5 +1,14 @@
 # Changelog · FORM
 
+## [5.30.1] — 2026-06-15
+
+### Changed
+- `docs/AUDIT_LOG_SCHEMA.md` — v2.9 → v2.10: Mobile SSO Browser Mode events section added (`sso.mobile_browser_mode_set` STANDARD 7yr + `sso.mobile_webview_blocked` HIGH 7yr); Zod schemas, MOBILE-CHAIN-01 invariant, SOC 2 evidence artefact SSO-WEB-E-001, and retention table rows. Closes SSO_SCIM §30.13 item 4 (P0/M8).
+- `docs/SSO_SCIM_IMPLEMENTATION.md` — §30.13 checklist items 4 and 6 marked [x] Done: item 4 closed by AUDIT_LOG_SCHEMA v2.10 (2026-06-15); item 6 closed by OBSERVABILITY v4.2 (2026-06-15).
+- `VERSION` — 5.30.0 → 5.30.1.
+
+---
+
 ## [5.30.0] — 2026-06-15
 
 ### Added
