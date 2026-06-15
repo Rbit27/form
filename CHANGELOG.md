@@ -1,5 +1,17 @@
 # Changelog · FORM
 
+## [5.28.0] — 2026-06-15
+
+### Added
+
+- `docs/runbooks/RB-ENT-WIN-LOSS-01.md` v1.0 — Enterprise Win/Loss Analytics: Quarterly Review & OQ-PIPE-01 Calibration. Closes `docs/COST_MODEL.md §39.10` P1 checklist item 7 (M10). Five canonical analytics queries from COST_MODEL §39.6 (stage conversion rates, loss reason distribution, win rate by tier, competitor category impact, sales cycle p50/p90); OQ-PIPE-01 four-step calibration protocol from §39.7 with PIPE-CHAIN-02 invariant; quarterly review cadence anchored to `enterprise.arr_bridge_closed` DEC-030 event; WIN-E-001/002/003 SOC 2 evidence actions with zero-count WIN-E-003 attestation procedure; founder calendar scheduling. Privacy floor: no company names, contact emails, or employee `user_id` in any query result or evidence file; `competitor_category` enum only; `form_api` REVOKED from `enterprise_deal_outcomes`. Owner: data-engineer + enterprise-architect + customer-success + compliance-officer.
+
+### Changed
+
+- `VERSION` — 5.27.0 → 5.28.0.
+
+---
+
 ## [5.27.0] — 2026-06-15
 
 ### Added
